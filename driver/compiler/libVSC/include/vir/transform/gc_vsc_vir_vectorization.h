@@ -34,18 +34,25 @@ typedef struct _VIR_IO_VECTORIZABLE_PACKET
     gctBOOL          bTFB;
 }VIR_IO_VECTORIZABLE_PACKET;
 
+typedef struct _VIR_IO_VECTORIZE_PARAM
+{
+    VIR_Shader*                 pShader;
+    VIR_IO_VECTORIZABLE_PACKET* pIoVectorizablePackets;
+    gctUINT                     numOfPackets;
+    VSC_MM*                     pMM;
+}VIR_IO_VECTORIZE_PARAM;
+
 gctBOOL vscVIR_CheckTwoSymsVectorizability(VIR_Shader* pShader,
                                            VIR_Symbol* pSym1,
                                            VIR_Symbol* pSym2);
 
 /* Io vectorization */
-VSC_ErrCode vscVIR_VectorizeIoPackets(VIR_Shader* pShader,
-                                      VIR_IO_VECTORIZABLE_PACKET* pIoVectorizablePackets,
-                                      gctUINT numOfPackets);
+VSC_ErrCode vscVIR_VectorizeIoPackets(VIR_IO_VECTORIZE_PARAM* pIoVecParam);
 
 /* General local vectorization with instructions merge. To get global-like vectorization
    result, other opts should be done before it, like CSE */
-VSC_ErrCode vscVIR_DoLocalVectorization(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo);
+VSC_ErrCode vscVIR_DoLocalVectorization(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_DoLocalVectorization);
 
 END_EXTERN_C()
 

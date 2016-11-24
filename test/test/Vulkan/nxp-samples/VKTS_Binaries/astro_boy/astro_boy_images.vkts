@@ -1,0 +1,13 @@
+#
+# VulKan ToolS images.
+#
+
+#
+# Image.
+#
+
+name astro_boy_image
+
+mipmap true
+image_data astro_boy.tga
+

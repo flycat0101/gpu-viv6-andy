@@ -35,6 +35,8 @@ BEGIN_EXTERN_C()
 /* the max value for live range's weight */
 #define VIR_RA_LS_MAX_WEIGHT        5.0
 
+#define VIR_RA_LS_MOVA_REG          2
+
 /* we use a gctUINT to represent a register pair.
    we use 10 bit to represent a HW register number, which restricts the
    register count to 1024. If we ever could assign more than that, we need
@@ -54,6 +56,7 @@ typedef enum _VIR_RA_HWREG_TYPE
 {
     VIR_RA_HWREG_GR = 0,
     VIR_RA_HWREG_A0 = 1,
+    VIR_RA_HWREG_B0 = 2,
     /* add other special register support */
     VIR_RA_HWREG_TYPE_COUNT
 } VIR_RA_HWReg_Type;
@@ -111,6 +114,15 @@ typedef enum _VIR_RA_LR_FLAG
     VIR_RA_LRFLAG_VX_EVEN           = 0x100, /* whether LR is in VX special instruciton and needs to be put into even number register */
     VIR_RA_LRFLAG_VX_ODD            = 0x200, /* whether LR is in VX special instruciton and needs to be put into odd number register */
 
+    VIR_RA_LRFLAG_NO_USED_COLOR     = 0x400, /* whether LR should not assign a used color */
+
+    VIR_RA_LRFLAG_A0_INVALID        = 0x1000, /* this A0 LR has been invalid */
+
+    VIR_RA_LRFLAG_ST_DEP            = 0x2000, /* whether this LR has depedence because of store */
+    VIR_RA_LRFLAG_LD_DEP            = 0x4000, /* whether this LR has depedence because of load */
+
+    VIR_RA_LRFLAG_VX                = 0x8000, /* whether LR is in VX instruction */
+
 } VIR_RA_LRFlag;
 
 typedef struct VIR_RA_LS_LIVERANGE VIR_RA_LS_Liverange;
@@ -149,6 +161,9 @@ struct VIR_RA_LS_LIVERANGE
     gctBOOL                 deadIntervalAvail;
 
     gctFLOAT                weight;         /* the weight for LR, used for spill selection */
+
+    gctUINT                 currDef;
+    VIR_Instruction         *pLDSTInst;
 } ;
 
 #define VIR_RA_LR_SetFlag(LR, Val)        do {(LR)->flags |= (Val); } while (0)
@@ -164,6 +179,11 @@ struct VIR_RA_LS_LIVERANGE
 #define isLRDynIndexing(LR)             (((LR)->flags & VIR_RA_LRFLAG_DYN_INDEXING) != 0)
 #define isLRVXEven(LR)                  (((LR)->flags & VIR_RA_LRFLAG_VX_EVEN) != 0)
 #define isLRVXOdd(LR)                   (((LR)->flags & VIR_RA_LRFLAG_VX_ODD) != 0)
+#define isLRNoUsedColor(LR)             (((LR)->flags & VIR_RA_LRFLAG_NO_USED_COLOR) != 0)
+#define isLRA0Invalid(LR)               (((LR)->flags & VIR_RA_LRFLAG_A0_INVALID) != 0)
+#define isLRSTDependence(LR)            (((LR)->flags & VIR_RA_LRFLAG_ST_DEP) != 0)
+#define isLRLDDependence(LR)            (((LR)->flags & VIR_RA_LRFLAG_LD_DEP) != 0)
+#define isLRVX(LR)                      (((LR)->flags & VIR_RA_LRFLAG_VX) != 0)
 
 /* register allocator define */
 typedef struct VIR_REG_ALLOC_LINEAR_SCAN
@@ -171,7 +191,7 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
     VIR_Shader                 *pShader;
     VIR_Dumper                 *pDumper;
     VSC_OPTN_RAOptions         *pOptions;
-    VSC_PRIMARY_MEM_POOL        pmp;
+    VSC_MM                     *pMM;
 
     VSC_HW_CONFIG              *pHwCfg;
 
@@ -189,7 +209,7 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
     /* live ranges who are live at current */
     VSC_BIT_VECTOR              liveLRVec;
 
-    gctINT                      currPos;
+    gctUINT                     currPos;
 
     /* sorted live range list head */
     VIR_RA_LS_Liverange        *sortedLRHead;
@@ -208,9 +228,18 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
     /* reserved HW register for base address, offset, or threadIndex
        baseRegister.x base address for spill
        baseRegister.y computed offset for spill (LDARR/STARR)
-       baseRegister.z threadIndex got from the atomic add
-       baseRegister.w save the MOVA src0 (in case of redefine) */
+       baseRegister.z threadIndex got from the atomic add  */
     VIR_HwRegId                 baseRegister;
+
+    /* reserved HW register for saving MOVA src0 if
+       LDARR spill base  */
+    VIR_HwRegId                 movaRegister[VIR_RA_LS_MOVA_REG];
+
+    /* a hash table to connect spilled offset' MOVA with its MOV instruction
+       (we need a MOV, in case MOVA's src is redefined, we reserve the register
+        to save it ) */
+    VSC_HASH_TABLE              *movaHash;
+
     /* reserved HW register for data, we may need to reserve more than one
        registers to save the data, since in some instruction, maybe more than
        one src is spilled */
@@ -226,7 +255,12 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
 
     VIR_HwRegId                 samplePosRegister;
 
-    gctUINT                     maxReg[VIR_RA_HWREG_TYPE_COUNT];
+    gctUINT                     trueDepPoint;
+
+    /* registers that are occupied because of false dep */
+    VSC_BIT_VECTOR              falseDepRegVec;
+
+    VSC_DIContext               *DIContext;
 
 } VIR_RA_LS;
 
@@ -236,8 +270,7 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
 #define VIR_RA_LS_SetDumper(ra, d)       ((ra)->pDumper = (d))
 #define VIR_RA_LS_GetOptions(ra)         ((ra)->pOptions)
 #define VIR_RA_LS_SetOptions(ra, o)      ((ra)->pOptions = (o))
-#define VIR_RA_LS_GetPmp(ra)             (&((ra)->pmp))
-#define VIR_RA_LS_GetMM(ra)              (&((ra)->pmp.mmWrapper))
+#define VIR_RA_LS_GetMM(ra)              ((ra)->pMM)
 #define VIR_RA_LS_GetHwCfg(ra)           ((ra)->pHwCfg)
 #define VIR_RA_LS_SetHwCfg(ra, hc)       ((ra)->pHwCfg = (hc))
 #define VIR_RA_LS_GetLvInfo(ra)          ((ra)->pLvInfo)
@@ -256,20 +289,15 @@ typedef struct VIR_REG_ALLOC_LINEAR_SCAN
 #define VIR_RA_LS_SetSortedLRHead(ra, h) ((ra)->sortedLRHead = (h))
 #define VIR_RA_LS_GetActiveLRHead(ra)    ((ra)->activeLRHead)
 #define VIR_RA_LS_SetActiveLRHead(ra, h) ((ra)->activeLRHead = (h))
+#define VIR_RA_LS_GetFalseDepRegVec(ra)  (&((ra)->falseDepRegVec))
 
 extern VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
-    VIR_Shader          *pShader,
-    VSC_HW_CONFIG       *pHwCfg,
-    VIR_LIVENESS_INFO   *pLvInfo,
-    VSC_OPTN_RAOptions  *pOptions,
-    VIR_Dumper          *pDumper,
-    VIR_CALL_GRAPH      *pCG);
+    IN VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(VIR_RA_LS_PerformTempRegAlloc);
 
-extern VSC_ErrCode VIR_RA_LS_PerformUniformAlloc(
-    VIR_Shader          *pShader,
-    VSC_HW_CONFIG       *pHwCfg,
-    VSC_OPTN_RAOptions  *pOptions,
-    VIR_Dumper          *pDumper);
+extern VSC_ErrCode VIR_RA_PerformUniformAlloc(
+    VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(VIR_RA_PerformUniformAlloc);
 
 END_EXTERN_C()
 

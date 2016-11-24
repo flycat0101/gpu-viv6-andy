@@ -3679,6 +3679,12 @@ gceSTATUS GalCreateTSurfWithPool(
         alignedStride = gcmALIGN_NP2(alignedStride, 80);
         aligned = aligned < 80 ? 80 : aligned;
     }
+    else if (gcoHAL_IsFeatureAvailable(Hal, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR) &&
+             (Format == gcvSURF_NV12 || Format == gcvSURF_NV21))
+    {
+        alignedStride = gcmALIGN(alignedStride, 64);
+        aligned = gcmALIGN(aligned, 64);
+    }
 
     gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(T2D_SURF), &surf));
     memset(surf, 0, sizeof(T2D_SURF));
@@ -4090,7 +4096,7 @@ gceSTATUS GalDeleteTSurf(
 #if gcvVERSION_MAJOR >= 5
             gcfDelMemoryInfo(Surface->tileStatusNode.address);
 #endif
-            if (Surface->tileStatusConfig != gcv2D_TSC_TPC_COMPRESSED)
+            if (Surface->tileStatusConfig & gcv2D_TSC_TPC_COMPRESSED)
             {
                 gcmONERROR(FreeVideoNode(Hal, Surface->tileStatusNode.node));
             }

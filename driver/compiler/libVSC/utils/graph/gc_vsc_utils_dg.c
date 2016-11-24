@@ -13,12 +13,11 @@
 
 #include "gc_vsc.h"
 
-void vscDGEG_Initialize(VSC_DG_EDGE* pEdge, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode, gctUINT id)
+void vscDGEG_Initialize(VSC_DG_EDGE* pEdge, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode)
 {
     vscULN_Initialize(&pEdge->uniLstNode);
     pEdge->pFromNode = pFromNode;
     pEdge->pToNode = pToNode;
-    pEdge->id = id;
 }
 
 void vscDGEG_Finalize(VSC_DG_EDGE* pEdge)
@@ -26,10 +25,10 @@ void vscDGEG_Finalize(VSC_DG_EDGE* pEdge)
     vscULN_Finalize(&pEdge->uniLstNode);
 }
 
-void vscDGEGEXT_Initialize(VSC_DG_EDGE_EXT* pExtEdge, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode, gctUINT id, void* pUserData)
+void vscDGEGEXT_Initialize(VSC_DG_EDGE_EXT* pExtEdge, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode, void* pUserData)
 {
     vscBSNODE_Initialize(&pExtEdge->baseNode, pUserData);
-    vscDGEG_Initialize(&pExtEdge->dgEdge, pFromNode, pToNode, id);
+    vscDGEG_Initialize(&pExtEdge->dgEdge, pFromNode, pToNode);
 }
 
 void vscDGEGEXT_Finalize(VSC_DG_EDGE_EXT* pExtEdge)
@@ -60,6 +59,29 @@ void vscDGND_Finalize(VSC_DG_NODE* pNode)
     AJLST_FINALIZE(&pNode->predList);
     pNode->id = INVALID_GNODE_ID;
     pNode->bVisited = gcvFALSE;
+}
+
+void vscDGNDAJNIterator_Init(VSC_ADJACENT_NODE_ITERATOR* pIter, VSC_DG_NODE* pNode, gctBOOL bPred)
+{
+    VSC_ADJACENT_LIST_ITERATOR_INIT(pIter, bPred ? &pNode->predList : &pNode->succList);
+}
+
+VSC_DG_NODE* vscDGNDAJNIterator_First(VSC_ADJACENT_NODE_ITERATOR* pIter)
+{
+    VSC_DG_EDGE* pEdge = (VSC_DG_EDGE*)VSC_ADJACENT_LIST_ITERATOR_FIRST(pIter);
+    return pEdge ? pEdge->pToNode : gcvNULL;
+}
+
+VSC_DG_NODE* vscDGNDAJNIterator_Next(VSC_ADJACENT_NODE_ITERATOR* pIter)
+{
+    VSC_DG_EDGE* pEdge = (VSC_DG_EDGE*)VSC_ADJACENT_LIST_ITERATOR_NEXT(pIter);
+    return pEdge ? pEdge->pToNode : gcvNULL;
+}
+
+VSC_DG_NODE* vscDGNDAJNIterator_Last(VSC_ADJACENT_NODE_ITERATOR* pIter)
+{
+    VSC_DG_EDGE* pEdge = (VSC_DG_EDGE*)VSC_ADJACENT_LIST_ITERATOR_LAST(pIter);
+    return pEdge ? pEdge->pToNode : gcvNULL;
 }
 
 void vscDGNDEXT_Initialize(VSC_DG_NODE_EXT* pExtNode, void* pUserData)
@@ -263,9 +285,11 @@ VSC_DG_EDGE* vscDG_AddEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_
     pEdges = (VSC_DG_EDGE*)vscMM_Alloc(pDG->pMM, 2*pDG->edgeAllocSize);
     pSuccEdge = pEdges;
     pPredEdge = (VSC_DG_EDGE*)((gctUINT8*)pEdges + pDG->edgeAllocSize);
-    vscDGEG_Initialize(pSuccEdge, pFromNode, pToNode, pDG->nextEdgeId);
-    vscDGEG_Initialize(pPredEdge, pToNode, pFromNode, pDG->nextEdgeId);
-    pDG->nextEdgeId++;
+    vscDGEG_Initialize(pSuccEdge, pFromNode, pToNode);
+    pSuccEdge->id = pDG->nextEdgeId;
+    vscDGEG_Initialize(pPredEdge, pToNode, pFromNode);
+    pPredEdge->id = pDG->nextEdgeId;
+    pDG->nextEdgeId ++;
 
     /* Now add adjacent list */
     AJLST_ADD_EDGE(&pFromNode->succList, pSuccEdge);
@@ -286,7 +310,7 @@ void vscDG_RemoveEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NO
     gcmASSERT(pFromNode->id != INVALID_GNODE_ID);
     gcmASSERT(pToNode->id != INVALID_GNODE_ID);
 
-    /* Find successor edge and remove */
+    /* Find successor edge and then remove */
     for (pSuccEdge = AJLST_GET_FIRST_EDGE(&pFromNode->succList);
          pSuccEdge != NULL;
          pSuccEdge = DGEG_GET_NEXT_EDGE(pSuccEdge))
@@ -375,6 +399,11 @@ gctUINT vscDG_GetNodeCount(VSC_DIRECTED_GRAPH* pDG)
 gctUINT vscDG_GetHistNodeCount(VSC_DIRECTED_GRAPH* pDG)
 {
     return pDG->nextNodeId;
+}
+
+gctUINT vscDG_GetHistEdgeCount(VSC_DIRECTED_GRAPH* pDG)
+{
+    return pDG->nextEdgeId;
 }
 
 gctUINT vscDG_GetRootCount(VSC_DIRECTED_GRAPH* pDG)
@@ -736,6 +765,7 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
                            PFN_DG_NODE_HANLDER pfnHandlerOwnPost,
                            PFN_DG_NODE_HANLDER pfnHandlerDescendantPre,
                            PFN_DG_NODE_HANLDER pfnHandlerDescendantPost,
+                           PFN_DG_EDGE_HANLDER pfnHandlerDFSEdgeOnRevisit, /* Only for DFS */
                            void* pParam)
 {
     VSC_DG_EDGE*       pEdge = gcvNULL;
@@ -767,8 +797,13 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
                                pfnHandlerOwnPost,
                                pfnHandlerDescendantPre,
                                pfnHandlerDescendantPost,
+                               pfnHandlerDFSEdgeOnRevisit,
                                pParam);
                 SAFE_CALL_DG_NODE_HANDLER_CONTINUE(pfnHandlerDescendantPost, pEdge->pToNode, pParam);
+            }
+            else
+            {
+                SAFE_CALL_DG_EDGE_HANDLER(pfnHandlerDFSEdgeOnRevisit, pEdge, pParam);
             }
         }
 
@@ -811,6 +846,7 @@ static void _DoTraversalCB(VSC_DIRECTED_GRAPH* pDG,
                            pfnHandlerOwnPost,
                            pfnHandlerDescendantPre,
                            pfnHandlerDescendantPost,
+                           gcvNULL,
                            pParam);
             SAFE_CALL_DG_NODE_HANDLER_CONTINUE(pfnHandlerDescendantPost, pTmpNode, pParam);
         }
@@ -874,6 +910,7 @@ void vscDG_TraversalCB(VSC_DIRECTED_GRAPH* pDG,
                        PFN_DG_NODE_HANLDER pfnHandlerOwnPost,
                        PFN_DG_NODE_HANLDER pfnHandlerDescendantPre,
                        PFN_DG_NODE_HANLDER pfnHandlerDescendantPost,
+                       PFN_DG_EDGE_HANLDER pfnHandlerDFSEdgeOnRevisit, /* Only for DFS */
                        void* pParam)
 {
     gctUINT                     i;
@@ -903,6 +940,7 @@ void vscDG_TraversalCB(VSC_DIRECTED_GRAPH* pDG,
                        pfnHandlerOwnPost,
                        pfnHandlerDescendantPre,
                        pfnHandlerDescendantPost,
+                       pfnHandlerDFSEdgeOnRevisit,
                        pParam);
 
         if (searchMode == VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_NARROW)

@@ -157,8 +157,6 @@ extern "C" {
     if (error != VG_NO_ERROR) \
     \
     { \
-        gcmASSERT(error == VG_NO_ERROR); \
-    \
     }
 
 #define vgmENTERSUBAPI(FunctionName) \
@@ -252,8 +250,6 @@ extern "C" {
     if (error != VG_NO_ERROR) \
     \
     { \
-        gcmASSERT(error == VG_NO_ERROR); \
-    \
     }
 
 #define vgmENTERSUBAPI(FunctionName) \
@@ -370,6 +366,7 @@ extern "C" {
 /* Constants in fixed point format. */
 typedef gctFIXED_POINT                  gctFIXED;
 
+#if gcdENABLE_PERFORMANCE_PRIOR
 #define vgvFIXED_INTEGER_BITS           16
 #define vgvFIXED_FRACTION_BITS          16
 
@@ -419,7 +416,7 @@ typedef gctFIXED_POINT                  gctFIXED;
 
 #define vgmFLOAT_TO_FIXED_SPECIAL(X)    vgfFloatToFixed(X)
 #define vgmFIXED_TO_FLOAT_SPECIAL(X)    vgfFixedToFloat(X)
-
+#endif
 /******************************************************************************\
 *********************** Path segment handler definitions. **********************
 \******************************************************************************/

@@ -178,7 +178,7 @@ static __GLchipFmtMapInfo __glChipFmtMapInfo[__GL_FMT_MAX + 1] =
 /*
 ** format map information for patch
 */
-#define __GL_CHIP_PATCH_FMT_MAX         36
+#define __GL_CHIP_PATCH_FMT_MAX         64
 static __GLchipFmtMapInfo __glChipFmtMapInfo_patch[__GL_CHIP_PATCH_FMT_MAX];
 extern __GLformatInfo __glFormatInfoTable[];
 

@@ -19,6 +19,8 @@ static vx_status vxVivScale(vx_node node, vx_image src_image, vx_image dst_image
     vx_status status = VX_SUCCESS;
     vx_uint32 width = 0, height = 0;
     vx_uint32 dst_width, dst_height;
+    vx_int32 uniformNum = 0;
+    vx_int32 index = 0;
 
     vx_float32 m[16] = {0};
     vx_enum type = 0;
@@ -39,6 +41,7 @@ static vx_status vxVivScale(vx_node node, vx_image src_image, vx_image dst_image
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(src_image, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
@@ -47,7 +50,7 @@ static vx_status vxVivScale(vx_node node, vx_image src_image, vx_image dst_image
     vxQueryImage(dst_image, VX_IMAGE_ATTRIBUTE_WIDTH, &dst_width, sizeof(dst_width));
     vxQueryImage(dst_image, VX_IMAGE_ATTRIBUTE_HEIGHT, &dst_height, sizeof(dst_height));
 
-    status |= vxAccessScalarValue(stype, &type);
+    status |= vxReadScalarValue(stype, &type);
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src_image, GC_VX_INDEX_AUTO);
@@ -77,9 +80,10 @@ static vx_status vxVivScale(vx_node node, vx_image src_image, vx_image dst_image
         bin[2] =
         bin[3] = FORMAT_VALUE(borders->mode == VX_BORDER_MODE_CONSTANT?borders->constant_value:0xcd);
 
-        gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
-        kernelContext->uniforms[0].num     = 4 * 4;
-        kernelContext->uniforms[0].index   = 4;
+        gcoOS_MemCopy(&kernelContext->uniforms[index].uniform, bin, sizeof(bin));
+        kernelContext->uniforms[index].num     = 4 * 4;
+        kernelContext->uniforms[index++].index   = 4;
+        uniformNum++;
     }
     m[0] = (vx_float32)width/(vx_float32)dst_width;
     m[1] = (vx_float32)height/(vx_float32)dst_height;
@@ -87,13 +91,41 @@ static vx_status vxVivScale(vx_node node, vx_image src_image, vx_image dst_image
     m[3] = (vx_float32)height/(vx_float32)dst_height;
 
     /* upload matrix */
-    gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, m, sizeof(m));
+    gcoOS_MemCopy(&kernelContext->uniforms[index].uniform, m, sizeof(m));
 
-    kernelContext->uniforms[1].num         = 4 * 4;
-    kernelContext->uniforms[1].index       = 8;
-    kernelContext->uniform_num             = 2;
+    kernelContext->uniforms[index].num         = 4 * 4;
+    kernelContext->uniforms[index++].index       = 8;
+    uniformNum++;
 
-    vxCommitScalarValue(stype, &type);
+    if (node->base.context->evisNoInst.noBilinear)
+    {
+        vx_uint8 constantData0[16] = {0, 0, 8, 8, 64, 64, 72, 72, 0, 8, 0, 8, 0, 8, 0, 8};
+        vx_uint8 constantData1[16] = {0, 0, 16, 0, 0, 0, 0, 0, 16, 0, 16, 0, 0, 0, 0, 0};
+        vx_uint8 constantData2[16] = {32, 32, 40, 40, 96, 96, 104, 104, 0, 8, 0, 8, 0, 8, 0, 8};
+
+        gcoOS_MemCopy(&kernelContext->uniforms[index].uniform, constantData0, sizeof(constantData0));
+        kernelContext->uniforms[index].num = vxmLENGTH_OF(constantData0);
+        kernelContext->uniforms[index++].index = 12;
+        uniformNum++;
+
+        gcoOS_MemCopy(&kernelContext->uniforms[index].uniform, constantData1, sizeof(constantData1));
+        kernelContext->uniforms[index].num = vxmLENGTH_OF(constantData1);
+        kernelContext->uniforms[index++].index = 13;
+        uniformNum++;
+
+        gcoOS_MemCopy(&kernelContext->uniforms[index].uniform, constantData2, sizeof(constantData2));
+        kernelContext->uniforms[index].num = vxmLENGTH_OF(constantData1);
+        kernelContext->uniforms[index++].index = 14;
+        uniformNum++;
+    }
+
+    kernelContext->uniform_num = uniformNum;
+
+    kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+
+    vxWriteScalarValue(stype, &type);
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -112,7 +144,7 @@ vx_status vxScaleImage(vx_node node, vx_image src_image, vx_image dst_image, vx_
     vx_status status = VX_FAILURE;
     vx_enum type = 0;
 
-    vxAccessScalarValue(stype, &type);
+    vxReadScalarValue(stype, &type);
     if (interm && size)
     {
         status = vxVivScale(node, src_image, dst_image, stype, bordermode);
@@ -124,3 +156,4 @@ vx_status vxScaleImage(vx_node node, vx_image src_image, vx_image dst_image, vx_
 
     return status;
 }
+

@@ -258,8 +258,9 @@ _FillInOptions(
 
 
     gcOptions[gcvOPTION_KERNEL_FENCE] = gcvFALSE;
-    gcOptions[gcvOPTION_ASYNC_BLT] = gcvFALSE;
+    gcOptions[gcvOPTION_ASYNC_PIPE] = gcvFALSE;
     gcOptions[gcvOPTION_GPU_TEX_UPLOAD] = gcvTRUE;
+    gcOptions[gcvOPTION_GPU_BUFOBJ_UPLOAD] = gcvTRUE;
 
 
     gcOptions[gcvOPTION_FBO_PREFER_MEM] = gcvFALSE;
@@ -354,7 +355,7 @@ gcoHAL_SetOption(
 
 /*******************************************************************************
 **
-**  gcGetUserDebugOption
+**  gcoHAL_GetUserDebugOption
 **
 **  Get user debug option.
 **
@@ -367,7 +368,7 @@ gcoHAL_SetOption(
 **      Nothing.
 */
 gcsUSER_DEBUG_OPTION *
-gcGetUserDebugOption(
+gcoHAL_GetUserDebugOption(
     void
     )
 {
@@ -431,6 +432,7 @@ gcoHAL_ConstructEx(
         hal->dump      = gcvNULL;
 
         /* Query the kernel version number. */
+        iface.ignoreTLS = gcvFALSE;
         iface.command = gcvHAL_VERSION;
         gcmONERROR(gcoOS_DeviceControl(gcvNULL,
                                        IOCTL_GCHAL_INTERFACE,
@@ -666,6 +668,8 @@ gcoHAL_Call(
 
     /* Verify the arguments. */
     gcmDEBUG_VERIFY_ARGUMENT(Interface != gcvNULL);
+
+    Interface->ignoreTLS = gcvFALSE;
 
     /* Call kernel service. */
     status = gcoOS_DeviceControl(
@@ -922,11 +926,11 @@ gcoHAL_MapUserMemory(
     )
 {
     gceSTATUS status;
-    gctUINT32 baseAddress;
+    gctUINT32 baseAddress = 0;
     gctUINT32 gpuPhysical = Physical;
     gctUINT32 size;
 
-    gcmHEADER_ARG("Logical=0x%08x Physical=0x%08x Size=0x%08x",
+    gcmHEADER_ARG("Logical=0x%08x Physical=0x%08x Size=0x%08zx",
                    Logical, Physical, Size);
 
     gcmVERIFY_ARGUMENT(Logical != gcvNULL || Physical != gcvINVALID_ADDRESS);
@@ -936,7 +940,10 @@ gcoHAL_MapUserMemory(
 
     gcmSAFECASTSIZET(size, Size);
 
-    gcmONERROR(gcoOS_GetBaseAddress(gcvNULL, &baseAddress));
+    if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_MC20) == gcvSTATUS_FALSE)
+    {
+        gcmONERROR(gcoOS_GetBaseAddress(gcvNULL, &baseAddress));
+    }
 
     /* Only valid physical address can be converted to GPU's view */
     if (Physical != gcvINVALID_ADDRESS)
@@ -2049,6 +2056,7 @@ gcoHAL_SetTimeOut(
     gcmHEADER_ARG("Hal=0x%x timeOut=%d", Hal, timeOut);
 
 #if gcdGPU_TIMEOUT
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_SET_TIMEOUT;
     iface.u.SetTimeOut.timeOut = timeOut;
     status = gcoOS_DeviceControl(gcvNULL,
@@ -2083,6 +2091,7 @@ gcoHAL_AddFrameDB(
     }
 
     /* Get frame information. */
+    ioctl.ignoreTLS                = gcvFALSE;
     ioctl.command                  = gcvHAL_GET_FRAME_INFO;
     ioctl.u.GetFrameInfo.frameInfo =
         gcmPTR_TO_UINT64(&gcPLS.hal->frameDB[gcPLS.hal->frameDBIndex]);
@@ -2105,6 +2114,48 @@ OnError:
 #else
     return gcvSTATUS_NOT_SUPPORTED;
 #endif
+}
+
+gceSTATUS
+gcoHAL_InitGPUProfile(
+    void
+    )
+{
+    gcmHEADER();
+    gcoHAL_ConfigPowerManagement(gcvFALSE);
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoHAL_DumpGPUProfile(
+    void
+    )
+{
+    gceSTATUS status;
+    gcsHAL_INTERFACE ioctl;
+
+    gcmHEADER();
+
+    gcmONERROR(gcoHAL_Commit(gcvNULL, gcvTRUE));
+
+    ioctl.ignoreTLS = gcvFALSE;
+    ioctl.command = gcvHAL_DUMP_GPU_PROFILE;
+    gcmONERROR(gcoOS_DeviceControl(gcvNULL,
+                                   IOCTL_GCHAL_INTERFACE,
+                                   &ioctl, gcmSIZEOF(ioctl),
+                                   &ioctl, gcmSIZEOF(ioctl)));
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+ OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
 }
 
 #if gcdFRAME_DB
@@ -2637,6 +2688,7 @@ gcoHAL_CreateShBuffer(
     gcmDEBUG_VERIFY_ARGUMENT(ShBuf != gcvNULL);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_SHBUF;
     iface.u.ShBuf.command = gcvSHBUF_CREATE;
     iface.u.ShBuf.bytes   = Size;
@@ -2688,6 +2740,7 @@ gcoHAL_DestroyShBuffer(
     gcmHEADER_ARG("ShBuf=%u", (gctUINT32)(gctUINTPTR_T) ShBuf);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_SHBUF;
     iface.u.ShBuf.command = gcvSHBUF_DESTROY;
     iface.u.ShBuf.id      = (gctUINT64)(gctUINTPTR_T) ShBuf;
@@ -2733,6 +2786,7 @@ gcoHAL_MapShBuffer(
     gcmDEBUG_VERIFY_ARGUMENT(ShBuf != gcvNULL);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_SHBUF;
     iface.u.ShBuf.command = gcvSHBUF_MAP;
     iface.u.ShBuf.id      = (gctUINT64)(gctUINTPTR_T) ShBuf;
@@ -2784,6 +2838,7 @@ gcoHAL_WriteShBuffer(
                   (gctUINT32)(gctUINTPTR_T) ShBuf, Data, ByteCount);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_SHBUF;
     iface.u.ShBuf.command = gcvSHBUF_WRITE;
     iface.u.ShBuf.id      = (gctUINT64)(gctUINTPTR_T) ShBuf;
@@ -2840,6 +2895,7 @@ gcoHAL_ReadShBuffer(
                   (gctUINT32)(gctUINTPTR_T) ShBuf, Data, ByteCount);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_SHBUF;
     iface.u.ShBuf.command = gcvSHBUF_READ;
     iface.u.ShBuf.id      = (gctUINT64)(gctUINTPTR_T) ShBuf;
@@ -2913,8 +2969,8 @@ gcoHAL_AllocateVideoMemory(
     struct _gcsHAL_ALLOCATE_LINEAR_VIDEO_MEMORY * alvm
         = (struct _gcsHAL_ALLOCATE_LINEAR_VIDEO_MEMORY *) &iface.u;
 
-    gcmHEADER_ARG("Node=%p, Bytes=%llu, Alignement=%d, Type=%d, Flag=%d, Pool=%d",
-                  Node, Bytes, Alignment, Type, Flag, Pool);
+    gcmHEADER_ARG("Node=%p, Bytes=%zu, Alignement=%d, Type=%d, Flag=%d, Pool=%d",
+                  Node, *Bytes, Alignment, Type, Flag, Pool);
 
     iface.command   = gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY;
 
@@ -3385,4 +3441,29 @@ gcoHAL_DetachExternalMemory(
 }
 
 #endif
+
+gceSTATUS
+gcoHAL_ScheduleSignal(
+    IN gctSIGNAL Signal,
+    IN gctSIGNAL AuxSignal,
+    IN gctINT ProcessID,
+    IN gceKERNEL_WHERE FromWhere
+    )
+{
+    gceSTATUS status;
+    gcsHAL_INTERFACE iface;
+
+    iface.command             = gcvHAL_SIGNAL;
+    iface.u.Signal.signal     = gcmPTR_TO_UINT64(Signal);
+    iface.u.Signal.auxSignal  = gcmPTR_TO_UINT64(AuxSignal);
+    iface.u.Signal.process    = ProcessID;
+    iface.u.Signal.fromWhere  = FromWhere;
+
+    gcmONERROR(gcoHAL_ScheduleEvent(gcvNULL, &iface));
+
+    return gcvSTATUS_OK;
+
+OnError:
+    return status;
+}
 

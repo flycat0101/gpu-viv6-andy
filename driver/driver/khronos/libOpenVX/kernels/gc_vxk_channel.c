@@ -37,6 +37,7 @@ vx_status vxChannelCombine(vx_node node, vx_image inputs[4], vx_image output)
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(output, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
@@ -218,6 +219,8 @@ vx_status vxChannelCombine(vx_node node, vx_image inputs[4], vx_image output)
     kernelContext->params.row = width;
     kernelContext->params.col = height;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -254,9 +257,10 @@ vx_status vxChannelExtract(vx_node node, vx_image src, vx_scalar channel, vx_ima
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
-    vxAccessScalarValue(channel, &chan);
+    vxReadScalarValue(channel, &chan);
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
@@ -266,6 +270,7 @@ vx_status vxChannelExtract(vx_node node, vx_image src, vx_scalar channel, vx_ima
         switch (chan)
         {
              case VX_CHANNEL_0:
+             case VX_CHANNEL_R:
                 kernelContext->params.volume = 0;
                 constantData[0] = 0;
                 constantData[1] = 24;
@@ -273,6 +278,7 @@ vx_status vxChannelExtract(vx_node node, vx_image src, vx_scalar channel, vx_ima
                 constantData[3] = 72;
                 break;
             case VX_CHANNEL_1:
+            case VX_CHANNEL_G:
                 kernelContext->params.volume = 1;
                 constantData[0] = 8;
                 constantData[1] = 32;
@@ -280,6 +286,7 @@ vx_status vxChannelExtract(vx_node node, vx_image src, vx_scalar channel, vx_ima
                 constantData[3] = 80;
                 break;
             case VX_CHANNEL_2:
+            case VX_CHANNEL_B:
                 kernelContext->params.volume = 2;
                 constantData[0] = 16;
                 constantData[1] = 40;
@@ -299,15 +306,19 @@ vx_status vxChannelExtract(vx_node node, vx_image src, vx_scalar channel, vx_ima
         switch (chan)
         {
             case VX_CHANNEL_0:
+            case VX_CHANNEL_R:
                 kernelContext->params.volume = 0;
                 break;
             case VX_CHANNEL_1:
+            case VX_CHANNEL_G:
                 kernelContext->params.volume = 1;
                 break;
             case VX_CHANNEL_2:
+            case VX_CHANNEL_B:
                 kernelContext->params.volume = 2;
                 break;
             case VX_CHANNEL_3:
+            case VX_CHANNEL_A:
                 kernelContext->params.volume = 3;
                 break;
             default:
@@ -541,6 +552,8 @@ vx_status vxChannelExtract(vx_node node, vx_image src, vx_scalar channel, vx_ima
     kernelContext->params.row = width;
     kernelContext->params.col = height;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -552,3 +565,4 @@ vx_status vxChannelExtract(vx_node node, vx_image src, vx_scalar channel, vx_ima
 
     return status;
 }
+

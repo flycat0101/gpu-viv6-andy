@@ -48,6 +48,14 @@ BEGIN_EXTERN_C()
 #define VSC_S11E8_SIGN_MASK          0x01
 #define VSC_S11E8_EXPONENT_OFFSET    127
 
+/* S10E5 float format */
+#define VSC_S10E5_MANTISSA_SHIFT     0
+#define VSC_S10E5_MANTISSA_MASK      0x3FF
+#define VSC_S10E5_EXPONENT_SHIFT     10
+#define VSC_S10E5_EXPONENT_MASK      0x1F
+#define VSC_S10E5_SIGN_SHIFT         15
+#define VSC_S10E5_SIGN_MASK          0x01
+
 #define ENCODE_FLOAT(fpType, sign, exponent, mantissa)           \
             (((sign)     << VSC_##fpType##_SIGN_SHIFT)       |   \
              ((exponent) << VSC_##fpType##_EXPONENT_SHIFT)   |   \
@@ -64,7 +72,8 @@ gctBOOL vscCanCvtS23E8FloatToS10E5Float(gctUINT fS23E8);
 
 gctUINT vscCvtS23E8FloatToS11E8Float(gctUINT floatS23E8);
 gctUINT vscCvtS11E8FloatToS23E8Float(gctUINT floatS11E8);
-/*gctUINT vscCvtS23E8FloatToS10E5Float(gctUINT floatS11E8, gctBOOL rtz);*/
+gctUINT32 vscCvtS10E5FloatToS23E8Float(gctUINT32 val32);
+gctUINT32 vscCvtS23E8FloatToS10E5Float(gctUINT32 val32);
 
 END_EXTERN_C()
 

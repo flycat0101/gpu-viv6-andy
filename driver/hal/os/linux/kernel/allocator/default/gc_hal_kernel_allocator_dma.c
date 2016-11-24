@@ -223,9 +223,8 @@ _DmaFree(
     gckOS os = Allocator->os;
     struct mdl_dma_priv *mdlPriv=(struct mdl_dma_priv *)Mdl->priv;
     gcsDMA_PRIV_PTR allocatorPriv = (gcsDMA_PRIV_PTR)Allocator->privateData;
-
 #if defined CONFIG_ARM64 || defined CONFIG_MIPS
-    dma_free_coherent(gcvNULL, Mdl->numPages * PAGE_SIZE, mdlPriv->kvaddr, mdlPriv->dmaHandle);
+    dma_free_coherent(_GetDevice(os), Mdl->numPages * PAGE_SIZE, mdlPriv->kvaddr, mdlPriv->dmaHandle);
 #else
     dma_free_writecombine(gcvNULL, Mdl->numPages * PAGE_SIZE, mdlPriv->kvaddr, mdlPriv->dmaHandle);
 #endif
@@ -455,7 +454,7 @@ _DmaAlloctorInit(
     )
 {
     gceSTATUS status;
-    gckALLOCATOR allocator;
+    gckALLOCATOR allocator = gcvNULL;
     gcsDMA_PRIV_PTR priv = gcvNULL;
 
     gcmkONERROR(gckALLOCATOR_Construct(Os, &DmaAllocatorOperations, &allocator));
@@ -475,14 +474,19 @@ _DmaAlloctorInit(
     allocator->debugfsInit = _DebugfsInit;
     allocator->debugfsCleanup = _DebugfsCleanup;
 
-    /* dma allocator is only used when NO_DMA_COHERENT is not defined. */
-    allocator->capability = gcvALLOC_FLAG_NONE;
+    /*
+     * DMA allocator is only used for NonPaged memory
+     * when NO_DMA_COHERENT is not defined.
+     */
+    allocator->capability = 0;
 
     *Allocator = allocator;
 
     return gcvSTATUS_OK;
 
 OnError:
+    if(allocator != gcvNULL)
+        gckOS_Free(Os, (gctPOINTER)allocator);
     return status;
 }
 

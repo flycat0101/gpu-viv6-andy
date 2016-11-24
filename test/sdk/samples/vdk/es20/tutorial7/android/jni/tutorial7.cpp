@@ -100,7 +100,7 @@ JNIEXPORT jboolean JNICALL Java_com_vivantecorp_graphics_tutorial7_GL2JNILib_ini
     LoadShaders("/sdcard/tutorial/tutorial7/vs_es20t7a.vert", "/sdcard/tutorial/tutorial7/ps_es20t7a.frag", 0);
     LoadShaders("/sdcard/tutorial/tutorial7/vs_es20t7b.vert", "/sdcard/tutorial/tutorial7/ps_es20t7b.frag", 1);
 
-    if (programHandle == 0)
+    if (programHandle[0] == 0 || programHandle[1] == 0)
         return false;
 
     RenderInit();

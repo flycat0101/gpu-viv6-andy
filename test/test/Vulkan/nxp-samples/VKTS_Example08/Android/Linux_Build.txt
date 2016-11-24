@@ -1,0 +1,17 @@
+android update project -p . -t android-23
+
+mkdir -p ./assets/shader/SPIR/V/
+cp -r ../../VKTS_Binaries/shader/SPIR/V/mandelbrot.comp.spv ./assets/shader/SPIR/V/
+
+cd jni
+chmod +w Application.mk
+vi Application.mka
+
+ndk-build
+cd ../
+ant debug
+
+adb install -r bin/NativeActivity-debug.apk
+
+adb shell am start -n tv.nopper.VKTS_Example08/android.app.NativeActivity
+

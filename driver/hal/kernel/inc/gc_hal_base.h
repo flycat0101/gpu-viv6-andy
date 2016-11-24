@@ -111,6 +111,7 @@ gceFENCE_TYPE;
 typedef struct _gcsUSER_MEMORY_DESC *   gcsUSER_MEMORY_DESC_PTR;
 
 
+
 /******************************************************************************\
 ********************* Share obj lock/unlock macros. ****************************
 \******************************************************************************/
@@ -257,7 +258,6 @@ gcsTLS;
 typedef enum _gcePLS_VALUE
 {
   gcePLS_VALUE_EGL_DISPLAY_INFO,
-  gcePLS_VALUE_EGL_SURFACE_INFO,
   gcePLS_VALUE_EGL_CONFIG_FORMAT_INFO,
   gcePLS_VALUE_EGL_DESTRUCTOR_INFO,
 }
@@ -354,6 +354,7 @@ typedef enum _gceAPI
     gcvAPI_OPENGL,
     gcvAPI_OPENVG,
     gcvAPI_OPENCL,
+    gcvAPI_OPENVK,
 }
 gceAPI;
 
@@ -380,6 +381,13 @@ typedef enum _gceSignalHandlerType
     gcvHANDLE_SIGFPE_WHEN_SIGNAL_CODE_IS_0        = 0x1,
 }
 gceSignalHandlerType;
+
+typedef struct _gcsSURF_VIEW
+{
+    gcoSURF surf;
+    gctUINT firstSlice;
+    gctUINT numSlices;
+}gcsSURF_VIEW;
 
 /* gcsHAL_Limits*/
 typedef struct _gcsHAL_LIMITS
@@ -557,7 +565,7 @@ gcoHAL_Get3DEngine(
     IN gcoHAL Hal,
     OUT gco3D * Engine
     );
-#endif /* gcdEANBLE_3D */
+#endif /* gcdENABLE_3D */
 
 
 gceSTATUS
@@ -1057,6 +1065,14 @@ gcoHAL_DetachExternalMemory(
     );
 #endif
 
+gceSTATUS
+gcoHAL_ScheduleSignal(
+    IN gctSIGNAL Signal,
+    IN gctSIGNAL AuxSignal,
+    IN gctINT ProcessID,
+    IN gceKERNEL_WHERE FromWhere
+    );
+
 /******************************************************************************\
 ********************************** gcoOS Object *********************************
 \******************************************************************************/
@@ -1102,7 +1118,6 @@ gceSTATUS
 gcoOS_QueryTLS(
     OUT gcsTLS_PTR * TLS
     );
-
 
 /* Destroy the objects associated with the current thread. */
 void
@@ -1221,6 +1236,12 @@ gcoOS_UnmapUserMemory(
     IN gctSIZE_T Size,
     IN gctPOINTER Info,
     IN gctUINT32 Address
+    );
+
+gceSTATUS
+gcoOS_CPUPhysicalToGPUPhysical(
+    IN gctUINT32 CPUPhysical,
+    OUT gctUINT32_PTR GPUPhysical
     );
 
 /* Device I/O Control call to the kernel HAL layer. */
@@ -1845,25 +1866,11 @@ gcoOS_UnmapSignal(
 /*----------------------------------------------------------------------------*/
 /*----- Android Native Fence -------------------------------------------------*/
 
-/* Create sync point. */
-gceSTATUS
-gcoOS_CreateSyncPoint(
-    IN gcoOS Os,
-    OUT gctSYNC_POINT * SyncPoint
-    );
-
-/* Destroy sync point. */
-gceSTATUS
-gcoOS_DestroySyncPoint(
-    IN gcoOS Os,
-    IN gctSYNC_POINT SyncPoint
-    );
-
 /* Create native fence. */
 gceSTATUS
 gcoOS_CreateNativeFence(
     IN gcoOS Os,
-    IN gctSYNC_POINT SyncPoint,
+    IN gctSIGNAL Signal,
     OUT gctINT * FenceFD
     );
 
@@ -1943,6 +1950,7 @@ gcoOS_QuerySystemInfo(
     IN gcoOS Os,
     OUT gcsSystemInfo *Info
     );
+
 
 /*----------------------------------------------------------------------------*/
 /*----- Profile --------------------------------------------------------------*/
@@ -2435,39 +2443,39 @@ gcoSURF_IsTileStatusSupported(
 /* Verify if surface has tile status enabled. */
 gceSTATUS
 gcoSURF_IsTileStatusEnabled(
-    IN gcoSURF Surface
+    IN gcsSURF_VIEW *SurfView
     );
 
 /* Verify if surface is compressed. */
 gceSTATUS
 gcoSURF_IsCompressed(
-    IN gcoSURF Surface
+    IN gcsSURF_VIEW *SurfView
     );
 
 /* Enable tile status for the specified surface on zero slot. */
 gceSTATUS
 gcoSURF_EnableTileStatus(
-    IN gcoSURF Surface
+    IN gcsSURF_VIEW *Surface
     );
 
 /* Enable tile status for the specified surface on specified slot. */
 gceSTATUS
 gcoSURF_EnableTileStatusEx(
-    IN gcoSURF Surface,
+    IN gcsSURF_VIEW *surfView,
     IN gctUINT RtIndex
     );
 
 /* Disable tile status for the specified surface. */
 gceSTATUS
 gcoSURF_DisableTileStatus(
-    IN gcoSURF Surface,
+    IN gcsSURF_VIEW *SurfView,
     IN gctBOOL Decompress
     );
 
 /* Flush tile status cache for the specified surface. */
 gceSTATUS
 gcoSURF_FlushTileStatus(
-    IN gcoSURF Surface,
+    IN gcsSURF_VIEW *SurfView,
     IN gctBOOL Decompress
     );
 #endif /* gcdENABLE_3D */
@@ -2606,7 +2614,7 @@ gcoSURF_Flush(
 /* Fill surface from it's tile status buffer. */
 gceSTATUS
 gcoSURF_FillFromTile(
-    IN gcoSURF Surface
+    IN gcsSURF_VIEW *SurView
     );
 
 /* Fill surface with a value. */
@@ -4723,6 +4731,22 @@ gckOS_DebugStatus2Name(
 #define gcmONERROR(func)            _gcmONERROR(gcm, func)
 #define gcmkONERROR(func)           _gcmkONERROR(gcmk, func)
 
+#define gcmGET_INDEX_SIZE(type, size) \
+    switch (type) \
+    { \
+    case gcvINDEX_8: \
+        size = 1; \
+        break; \
+    case gcvINDEX_16: \
+        size = 2; \
+        break; \
+    case gcvINDEX_32: \
+        size = 4; \
+        break; \
+    default: \
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT); \
+    } \
+
 /*******************************************************************************
 **
 **  gcmkSAFECASTSIZET
@@ -5013,7 +5037,7 @@ typedef struct _gcsUSER_DEBUG_OPTION
 gcsUSER_DEBUG_OPTION;
 
 gcsUSER_DEBUG_OPTION *
-gcGetUserDebugOption(
+gcoHAL_GetUserDebugOption(
     void
     );
 
@@ -5021,7 +5045,7 @@ gcGetUserDebugOption(
 #define gcmUSER_DEBUG_MSG(level, ...) \
     do \
     { \
-        if (level <= gcGetUserDebugOption()->debugMsg) \
+        if (level <= gcoHAL_GetUserDebugOption()->debugMsg) \
         { \
             gcoOS_Print(__VA_ARGS__); \
         } \
@@ -5850,6 +5874,75 @@ gcGetUserDebugOption(
     } \
 }
 #endif
+
+#define gcmAnyTileStatusEnableForFullMultiSlice(SurfView, anyTsEnableForMultiSlice)\
+{\
+    gctUINT i = 0; \
+    for (; i < (SurfView->surf->requestD); i++)\
+    {\
+        if ((SurfView->surf->tileStatusNode.pool != gcvPOOL_UNKNOWN) && \
+            (SurfView->surf->tileStatusDisabled[i] == gcvFALSE))\
+        {\
+            *anyTsEnableForMultiSlice = gcvTRUE;\
+            break;\
+        }\
+    }\
+}\
+
+#define gcmAnyTileStatusEnableForMultiSlice(SurfView, anyTsEnableForMultiSlice)\
+{\
+    gctUINT i = SurfView->firstSlice; \
+    for (; i < (SurfView->firstSlice + SurfView->numSlices); i++)\
+    {\
+        if ((SurfView->surf->tileStatusNode.pool != gcvPOOL_UNKNOWN) && \
+            (SurfView->surf->tileStatusDisabled[i] == gcvFALSE))\
+        {\
+            *anyTsEnableForMultiSlice = gcvTRUE;\
+            break;\
+        }\
+    }\
+}\
+
+#define gcmCanTileStatusEnabledForMultiSlice(SurfView, canTsEnabled)\
+{\
+    if (SurfView->numSlices > 1)\
+    {\
+        if (SurfView->surf->tileStatusNode.pool != gcvPOOL_UNKNOWN) \
+        {\
+            gctUINT i = 0;\
+            for (; i < SurfView->numSlices; i++)\
+            {\
+                if (SurfView->surf->tileStatusDisabled[i] == gcvTRUE)\
+                {\
+                    *canTsEnabled = gcvFALSE;\
+                    break;\
+                }\
+                if (SurfView->surf->fcValue[i] != SurfView->surf->fcValue[0])\
+                {\
+                    *canTsEnabled = gcvFALSE;\
+                    break;\
+                }\
+                \
+                if (SurfView->surf->fcValueUpper[i] != SurfView->surf->fcValueUpper[0])\
+                {\
+                    *canTsEnabled = gcvFALSE;\
+                    break;\
+                }\
+            }\
+        }\
+        else\
+        {\
+            *canTsEnabled = gcvFALSE;\
+        }\
+    }\
+    else\
+    {\
+        if ((SurfView->surf->tileStatusNode.pool == gcvPOOL_UNKNOWN) || (SurfView->surf->tileStatusDisabled[SurfView->firstSlice] == gcvTRUE))\
+            {\
+                *canTsEnabled = gcvFALSE;\
+            }\
+    }\
+}\
 
 #ifdef __cplusplus
 }

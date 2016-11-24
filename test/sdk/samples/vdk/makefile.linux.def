@@ -39,7 +39,7 @@ include $(AQROOT)/makefile.linux.def
 ################################################################################
 # Supply additional include directories.
 
-INCLUDE += -I$(VIVANTE_SDK_INC) -I$(VIVANTE_SDK_INC)/HAL -I$(AQROOT)/sdk/inc
+INCLUDE += -I$(VIVANTE_SDK_INC) -I$(VIVANTE_SDK_INC)/HAL -I$(VIVANTE_SDK_INC)
 
 ifeq ($(EGL_API_DRI), 1)
 	INCLUDE += -I$(X11_ARM_DIR)/include
@@ -64,7 +64,7 @@ CFLAGS += $(INCLUDE)
 ifeq ($(gcdSTATIC_LINK), 1)
     LIBS += $(VIVANTE_SDK_LIB)/libVIVANTE.a
 else
-    LIBS += -L$(VIVANTE_SDK_LIB) -lGLESv1_CM -lVDK -lEGL
+    LIBS += -L$(VIVANTE_SDK_LIB) -Wl,-rpath-link,$(VIVANTE_SDK_LIB) -lGLESv1_CM -lVDK -lEGL
 endif
 
 LIBS += -lm

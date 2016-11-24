@@ -63,6 +63,7 @@ typedef struct __GLdevicePipelineRec
     GLboolean (*compressedTexSubImage2D)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLint, GLint, GLint, GLint, const GLvoid*, GLsizei);
     GLboolean (*compressedTexSubImage3D)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLint, GLint, GLint, GLint, GLint, const GLvoid*, GLsizei);
     GLboolean (*generateMipmaps)(__GLcontext*, __GLtextureObject*, GLint, GLint*);
+    GLboolean (*getTexImage)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLubyte*);
 
     GLboolean (*copyTexBegin)(__GLcontext*);
     GLvoid (*copyTexValidateState)(__GLcontext *);
@@ -146,7 +147,7 @@ typedef struct __GLdevicePipelineRec
     GLboolean (*renderbufferStorage)(__GLcontext*, __GLrenderbufferObject*);
     GLvoid (*blitFramebuffer)(__GLcontext*, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLint, GLbitfield, GLboolean, GLboolean, GLenum);
     GLboolean (*frameBufferTexture)(__GLcontext*, __GLframebufferObject*, GLint, __GLtextureObject*, GLint, GLint, GLsizei, GLint, GLboolean, __GLfboAttachPoint *);
-    GLvoid (*framebufferRenderbuffer)(__GLcontext*, __GLframebufferObject*, GLint, __GLrenderbufferObject*, __GLfboAttachPoint *);
+    GLvoid (*framebufferRenderbuffer)(__GLcontext*, __GLframebufferObject*, GLint, __GLrenderbufferObject*, __GLfboAttachPoint*);
     GLboolean (*isFramebufferComplete)(__GLcontext*, __GLframebufferObject*);
     GLvoid (*invalidateFramebuffer)(__GLcontext*, __GLframebufferObject*, __GLfboAttachPoint*, GLint, GLint, GLsizei, GLsizei);
     GLvoid (*invalidateDrawable)(__GLcontext*, GLint, GLint, GLsizei, GLsizei);
@@ -188,7 +189,7 @@ typedef struct __GLdevicePipelineRec
     GLenum (*getGraphicsResetStatus)(__GLcontext *);
 
     /* profiler */
-    GLboolean (*profiler)(void *, GLuint, gctHANDLE);
+    GLboolean(*profiler)(__GLcontext *, GLuint, gctHANDLE);
 
     /* Patches. */
     GLvoid  (*patchBlend)(__GLcontext *, gctBOOL);

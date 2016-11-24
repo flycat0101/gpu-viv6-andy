@@ -21,15 +21,12 @@ BEGIN_EXTERN_C()
 #define VIR_FCP_INVALID_REG          0x3FF
 
 VSC_ErrCode vscVIR_PreCleanup(
-    VIR_Shader          *pShader,
-    VIR_DEF_USAGE_INFO  *pDuInfo,
-    VIR_Dumper          *pDumper);
-
+    VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_PreCleanup);
 
 VSC_ErrCode vscVIR_PostCleanup(
-    VIR_Shader          *pShader,
-    VIR_DEF_USAGE_INFO  *pDuInfo,
-    VIR_Dumper          *pDumper);
+    VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_PostCleanup);
 
 END_EXTERN_C()
 

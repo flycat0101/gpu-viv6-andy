@@ -23,6 +23,7 @@ vx_status vxMultiply(vx_node node, vx_image in0, vx_image in1, vx_scalar scale_p
     vx_enum overflow_policy         = -1;
     vx_enum rounding_policy         = -1;
     gcoVX_Kernel_Context * kernelContext = gcvNULL;
+    vx_df_image format = 0;
 
 #if gcdVX_OPTIMIZER
     if (node && node->kernelContext)
@@ -39,11 +40,12 @@ vx_status vxMultiply(vx_node node, vx_image in0, vx_image in1, vx_scalar scale_p
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
-
-    status |= vxAccessScalarValue(scale_param, &scale);
-    status |= vxAccessScalarValue(opolicy_param, &overflow_policy);
-    status |= vxAccessScalarValue(rpolicy_param, &rounding_policy);
+    vxQueryImage(output, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
+    status |= vxReadScalarValue(scale_param, &scale);
+    status |= vxReadScalarValue(opolicy_param, &overflow_policy);
+    status |= vxReadScalarValue(rpolicy_param, &rounding_policy);
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, in0, kernelContext->objects_num);
@@ -59,20 +61,64 @@ vx_status vxMultiply(vx_node node, vx_image in0, vx_image in1, vx_scalar scale_p
 
     kernelContext->params.kernel           = gcvVX_KERNEL_MULTIPLY;
 
-    logs = -gcoMATH_Log2(scale);
-    logr = (vx_float32)ROUNDF(logs);
-
-    /* check if the scale is the integer power of 2 */
-    if(logs - logr < THRESHOLD)
+    if (scale == 0)
     {
-        kernelContext->params.scale            = logr;
+        kernelContext->params.volume           = 1;
+        kernelContext->params.scale            = 0;
         kernelContext->params.xstep            = 8;
+    }
+    else if (scale <= 1)
+    {
+        logs = -gcoMATH_Log2(scale);
+        logr = (vx_float32)ROUNDF(logs);
+
+        /* check if the scale is the integer power of 2 */
+        if(logs - logr < THRESHOLD)
+        {
+            kernelContext->params.scale            = logr;
+            kernelContext->params.xstep            = 8;
+        }
+        else
+        {
+            kernelContext->params.scale            = scale;
+            kernelContext->params.xstep            = 4;
+        }
     }
     else
     {
+        kernelContext->params.volume           = 2;
         kernelContext->params.scale            = scale;
-        kernelContext->params.xstep            = 4;
+        kernelContext->params.xstep            = 8;
+        {
+            vx_float32 bin[4];
+
+            bin[0] =
+            bin[1] =
+            bin[2] =
+            bin[3] = scale;
+
+            gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, bin, sizeof(bin));
+            kernelContext->uniforms[kernelContext->uniform_num].num = 4;
+            kernelContext->uniforms[kernelContext->uniform_num++].index = 3;
+        }
+        if (format == VX_DF_IMAGE_S16 || format == VX_DF_IMAGE_U16)
+        {
+            vx_uint8 constantData[16] = {0, 32, 64, 96, 0, 0, 0, 0, 16, 16, 16, 16, 0, 0, 0, 0};
+            gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, constantData, sizeof(constantData));
+            kernelContext->uniforms[kernelContext->uniform_num].num = sizeof(constantData) / sizeof(vx_uint8);
+            kernelContext->uniforms[kernelContext->uniform_num++].index = 4;
+        }
+        else
+        {
+            vx_uint8 constantData[16] = {0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0};
+            gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, constantData, sizeof(constantData));
+            kernelContext->uniforms[kernelContext->uniform_num].num = sizeof(constantData) / sizeof(vx_uint8);
+            kernelContext->uniforms[kernelContext->uniform_num++].index = 4;
+        }
+
     }
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -85,3 +131,4 @@ vx_status vxMultiply(vx_node node, vx_image in0, vx_image in1, vx_scalar scale_p
 
     return status;
 }
+

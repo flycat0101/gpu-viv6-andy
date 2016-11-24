@@ -20,8 +20,6 @@
 
 BEGIN_EXTERN_C()
 
-#define __USE_IMAGE_LOAD_TO_ACCESS_SAMPLER_BUFFER__ 1
-
 #if gcdRENDER_QUALITY_CHECK
 #define TEMP_OPT_CONSTANT_TEXLD_COORD    0
 #else
@@ -138,11 +136,13 @@ typedef enum _gcSHADER_KIND {
 #define _SHADER_GL_LANGUAGE_TYPE  gcmCC('E', 'S', '\0', '\0')
 #define _SHADER_DX_LANGUAGE_TYPE  gcmCC('D', 'X', '\0', '\0')
 #define _cldLanguageType          gcmCC('C', 'L', '\0', '\0')
+#define _SHADER_VG_TYPE           gcmCC('V', 'G', '\0', '\0')
 
 #define _SHADER_ES11_VERSION      gcmCC('\0', '\0', '\1', '\1')
 #define _SHADER_HALTI_VERSION     gcmCC('\0', '\0', '\0', '\3')
 #define _SHADER_ES31_VERSION      gcmCC('\0', '\0', '\1', '\3')
 #define _SHADER_ES32_VERSION      gcmCC('\0', '\0', '\2', '\3')
+#define _SHADER_ES40_VERSION      gcmCC('\0', '\0', '\0', '\4')
 #define _SHADER_DX_VERSION_30     gcmCC('\3', '\0', '\0', '\0')
 #define _cldCL1Dot1               gcmCC('\0', '\0', '\0', '\1')
 #define _cldCL1Dot2               gcmCC('\0', '\0', '\2', '\1')
@@ -299,6 +299,9 @@ typedef enum _gcSL_OPCODE
     gcSL_GET_SAMPLER_LMM, /* 0x8D Get sampler's lodminmax */
     gcSL_GET_SAMPLER_LBS, /* 0x8E Get sampler's levelbasesize */
     gcSL_TEXLD_U, /* 0x8F For TEXLD_U, use the format of coord to select FLOAT/INT/UNSIGINED. */
+    gcSL_PARAM_CHAIN, /* 0x90 No specific semantic, only used to chain two sources to one dest. */
+    gcSL_INTRINSIC, /* 0x91 Instrinsic dest, IntrinsicId, Param */
+    gcSL_INTRINSIC_ST, /* 0x92 Instrinsic dest, IntrinsicId, Param; Param is stored implicitly */
     gcSL_MAXOPCODE
 }
 gcSL_OPCODE;
@@ -969,8 +972,8 @@ typedef enum _gceLAYOUT_QUALIFIER
                                                                 gcvLAYOUT_QUALIFIER_BLEND_SUPPORT_HSL_COLOR|
                                                                 gcvLAYOUT_QUALIFIER_BLEND_SUPPORT_HSL_LUMINOSITY),
 
-    gcvLAYOUT_QUALIFIER_BLEND_HW_NOT_SUPPORT_EQUATIONS       = gcvLAYOUT_QUALIFIER_BLEND_SUPPORT_ALL_EQUATIONS,
-    gcvLAYOUT_QUALIFIER_BLEND_HW_NOT_SUPPORT_EQUATIONS_HALTI4= (gcvLAYOUT_QUALIFIER_BLEND_SUPPORT_COLORDODGE|
+    gcvLAYOUT_QUALIFIER_BLEND_HW_UNSUPPORT_EQUATIONS_ALL     = gcvLAYOUT_QUALIFIER_BLEND_SUPPORT_ALL_EQUATIONS,
+    gcvLAYOUT_QUALIFIER_BLEND_HW_UNSUPPORT_EQUATIONS_PART0   = (gcvLAYOUT_QUALIFIER_BLEND_SUPPORT_COLORDODGE|
                                                                 gcvLAYOUT_QUALIFIER_BLEND_SUPPORT_COLORBURN|
                                                                 gcvLAYOUT_QUALIFIER_BLEND_SUPPORT_SOFTLIGHT|
                                                                 gcvLAYOUT_QUALIFIER_BLEND_SUPPORT_HSL_HUE|
@@ -1012,7 +1015,8 @@ gcSHADER_SHADERMODE;
 /* Kernel function property flags. */
 typedef enum _gcePROPERTY_FLAGS
 {
-    gcvPROPERTY_REQD_WORK_GRP_SIZE    = 0x01
+    gcvPROPERTY_REQD_WORK_GRP_SIZE    = 0x01,
+    gcvPROPERTY_WORK_GRP_SIZE_HINT    = 0x02
 }
 gceKERNEL_FUNCTION_PROPERTY_FLAGS;
 
@@ -1050,13 +1054,12 @@ typedef enum _gceUNIFORM_FLAGS
     gcvUNIFORM_KIND_WORK_DIM                    = 14,
     gcvUNIFORM_KIND_TRANSFORM_FEEDBACK_BUFFER   = 15,
     gcvUNIFORM_KIND_TRANSFORM_FEEDBACK_STATE    = 16,
-    gcvUNIFORM_KIND_OPT_CONSTANT_TEXLD_COORD    = 17,
-    gcvUNIFORM_KIND_PRINTF_ADDRESS              = 18,
-    gcvUNIFORM_KIND_WORKITEM_PRINTF_BUFFER_SIZE = 19,
-    gcvUNIFORM_KIND_STORAGE_BLOCK_ADDRESS       = 20,
-    gcvUNIFORM_KIND_GENERAL_PATCH               = 21,
-    gcvUNIFORM_KIND_IMAGE_EXTRA_LAYER           = 22,
-    gcvUNIFORM_KIND_IO_BLOCK_ADDRESS            = 23,
+    gcvUNIFORM_KIND_PRINTF_ADDRESS              = 17,
+    gcvUNIFORM_KIND_WORKITEM_PRINTF_BUFFER_SIZE = 18,
+    gcvUNIFORM_KIND_STORAGE_BLOCK_ADDRESS       = 19,
+    gcvUNIFORM_KIND_GENERAL_PATCH               = 20,
+    gcvUNIFORM_KIND_IMAGE_EXTRA_LAYER           = 21,
+    gcvUNIFORM_KIND_IO_BLOCK_ADDRESS            = 22,
 
     /* flags */
     gcvUNIFORM_FLAG_COMPILETIME_INITIALIZED     = 0x000100,
@@ -1135,7 +1138,6 @@ gceUNIFORM_FLAGS;
                                     } while (0)
 
 /* kinds */
-#define isUniformOptConstantTexldCoord(u)    (GetUniformKind(u) == gcvUNIFORM_KIND_OPT_CONSTANT_TEXLD_COORD)
 #define isUniformTransfromFeedbackState(u)   (GetUniformKind(u) == gcvUNIFORM_KIND_TRANSFORM_FEEDBACK_STATE)
 #define isUniformTransfromFeedbackBuffer(u)  (GetUniformKind(u) == gcvUNIFORM_KIND_TRANSFORM_FEEDBACK_BUFFER)
 #define isUniformImageExtraLayer(u)          (GetUniformKind(u) == gcvUNIFORM_KIND_IMAGE_EXTRA_LAYER)
@@ -1287,7 +1289,8 @@ typedef enum _gceBuiltinNameKind
     gcSL_IN_POSITION            = -36, /* gl_in.gl_Position */
     gcSL_IN_POINT_SIZE          = -37, /* gl_in.gl_PointSize */
     gcSL_BOUNDING_BOX           = -38, /* gl_BoundingBox */
-    gcSL_BUILTINNAME_COUNT      = 39
+    gcSL_LAST_FRAG_DATA         = -39, /* gl_LastFragData */
+    gcSL_BUILTINNAME_COUNT      = 40
 } gceBuiltinNameKind;
 
 /* Special code generation indices. */
@@ -1461,8 +1464,16 @@ typedef struct _gcSL_INSTRUCTION
 
     /* Indexed register for source 1 operand. */
     gctUINT16                    source1Indexed;
+
+    gctUINT32                    srcLoc;
 }
 * gcSL_INSTRUCTION;
+
+#define GCSL_SRC_LOC_LINE_OFFSET 16
+#define GCSL_SRC_LOC_COL_MASK 0xffff
+#define GCSL_Build_SRC_LOC(LineNo, StringNo) ((StringNo) | ((LineNo) << GCSL_SRC_LOC_LINE_OFFSET))
+#define GCSL_SRC_LOC_LINENO(loc) (loc >> GCSL_SRC_LOC_LINE_OFFSET)
+#define GCSL_SRC_LOC_COLNO(loc) (loc & GCSL_SRC_LOC_COL_MASK)
 
 #define GetInstOpcode(i)                    ((i)->opcode)
 #define GetInstTemp(i)                      ((i)->temp)
@@ -2434,6 +2445,9 @@ struct _gcUNIFORM
        or for associated sampler of LOD_MIN_MAX and LEVEL_BASE_SIZE */
     gctINT16                        parent;
 
+    gcUNIFORM                       followingAddr;
+    gctUINT32                       followingOffset;
+
     /* image format */
     gctINT16                        imageFormat;
 
@@ -2495,6 +2509,10 @@ struct _gcUNIFORM
 #define SetUniformPrevSibling(u, g)             (GetUniformPrevSibling(u) = (g))
 #define GetUniformParent(u)                     ((u)->parent)
 #define SetUniformParent(u, g)                  ((u)->parent = (g))
+#define GetUniformFollowingAddr(u)              ((u)->followingAddr)
+#define SetUniformFollowingAddr(u, f)           ((u)->followingAddr = (f))
+#define GetUniformFollowingOffset(u)            ((u)->followingOffset)
+#define SetUniformFollowingOffset(u, f)         ((u)->followingOffset = (f))
 #define GetUniformNameLength(u)                 ((u)->nameLength)
 #define GetUniformName(u)                       ((u)->name)
 #define GetUniformImageFormat(u)                ((u)->imageFormat)
@@ -2884,8 +2902,6 @@ struct _gcOUTPUT
 #define SetOutputNextSibling(o, i)          (GetOutputNextSibling(o) = (i))
 #define GetOutputPrevSibling(o)             ((o)->prevSibling)
 #define SetOutputPrevSibling(o, i)          (GetOutputPrevSibling(o) = (i))
-
-#define GetOutputDefaultLocation(S)         (ENABLE_FULL_NEW_LINKER ? -1: ((gctINT) GetShaderOutputCount(S)))
 
 /* Same structure, but inside a binary. */
 typedef struct _gcBINARY_OUTPUT
@@ -3470,6 +3486,7 @@ struct _gcsFUNCTION
     gctUINT                         codeCount;
 
     gctBOOL                         isRecursion;
+    gctUINT16                       die;
 
     gctINT                          nameLength;
     char                            name[1];
@@ -3538,6 +3555,7 @@ typedef struct _gcBINARY_FUNCTION
     gctINT16                        nameLength;
     char                            flags[sizeof(gctUINT32)];
     char                            intrinsicsKind[sizeof(gctUINT32)];
+    gctUINT16                       die;
 
     char                            name[1];
 }
@@ -3659,6 +3677,7 @@ struct _gcsKERNEL_FUNCTION
     gctINT_PTR                      propertyValues;
 
     gctBOOL                         isMain;     /* this kernel is merged with main() */
+    gctUINT16                       die;
 
     gctINT                          nameLength;
     char                            name[1];
@@ -3723,6 +3742,7 @@ typedef struct _gcBINARY_KERNEL_FUNCTION
     gctUINT16                       codeEnd;
 
     gctUINT16                       isMain;
+    gctUINT16                       die;
 
     gctINT16                        nameLength;
     char                            flags[sizeof(gctUINT32)];
@@ -3845,6 +3865,7 @@ typedef enum _gcSHADER_FLAGS
     gcSHADER_FLAG_HAS_INT64                 = 0x4000, /* the shader has 64 bit integer data and operation. */
     gcSHADER_FLAG_HAS_IMAGE_QUERY           = 0x8000, /* the shader has image query */
     gcSHADER_FLAG_HAS_VIV_VX_EXTENSION      = 0x10000, /* the shader has Vivante VX extension */
+    gcSHADER_FLAG_USE_LOCAL_MEM             = 0x20000, /* the shader use local memory */
 } gcSHADER_FLAGS;
 
 #define gcShaderIsOldHeader(Shader)             (((Shader)->flags & gcSHADER_FLAG_OLDHEADER) != 0)
@@ -3864,6 +3885,7 @@ typedef enum _gcSHADER_FLAGS
 #define gcShaderHasInt64(Shader)                (((Shader)->flags & gcSHADER_FLAG_HAS_INT64) != 0)
 #define gcShaderHasImageQuery(Shader)           (((Shader)->flags & gcSHADER_FLAG_HAS_IMAGE_QUERY) != 0)
 #define gcShaderHasVivVxExtension(Shader)       (((Shader)->flags & gcSHADER_FLAG_HAS_VIV_VX_EXTENSION) != 0)
+#define gcShaderUseLocalMem(Shader)             (((Shader)->flags & gcSHADER_FLAG_USE_LOCAL_MEM) != 0)
 
 #define gcShaderGetFlag(Shader)                 (Shader)->flags)
 
@@ -4073,9 +4095,6 @@ struct _gcSHADER
 
     gctINT                      samplerIndex;
 
-    /* Sampler base offset. */
-    gctINT                      samplerBaseOffset;
-
     /* Sampler alloc strategy. */
     gcSHADER_ALLOC_STRATEGY     samplerAllocStrategy;
 
@@ -4207,6 +4226,9 @@ struct _gcSHADER
     /* whether the shader enable early fragment test, only affect fragment shader. */
     gctBOOL                     useEarlyFragTest;
 
+    /* Use gl_LastFragData[]. */
+    gctBOOL                     useLastFragData;
+
     /* whether the shader's input vertex count coming from driver, only affect TCS shader.
        during recompilation, this flag is set to be true. */
     gctBOOL                     useDriverTcsPatchInputVertices;
@@ -4214,6 +4236,8 @@ struct _gcSHADER
     /* whether this shader has any not-states-related error that can be detected by FE
        but specs requires that those errors are treated as link-time errors. */
     gceSTATUS                   hasNotStagesRelatedLinkError;
+
+    void *                      debugInfo;
 
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
     /* used to modefy the index of instruction when need to insert instruction into the shader when recompile */
@@ -4266,7 +4290,6 @@ struct _gcSHADER
 #define GetShaderUniforms(s)                    ((s)->uniforms)
 #define GetShaderUniform(s, i)                  ((s)->uniforms[i])
 #define GetShaderSamplerIndex(s)                ((s)->samplerIndex)
-#define GetShaderSamplerBaseOffset(s)           ((s)->samplerBaseOffset)
 #define GetShaderSamplerAllocStrategy(s)        ((s)->samplerAllocStrategy)
 #define SetShaderSamplerAllocStrategy(s, v)     (GetShaderSamplerAllocStrategy(s) = (v))
 #define GetShaderUniformBlockArraySize(s)       ((s)->uniformBlockArraySize)
@@ -4441,12 +4464,18 @@ typedef enum _gcBuiltinConst
     gcBIConst_MaxTessControlInputComponents,
     gcBIConst_MaxTessControlOutputComponents,
     gcBIConst_MaxTessControlTextureImageUnits,
+    gcBIConst_MaxTessControlImageUniforms,
     gcBIConst_MaxTessControlUniformComponents,
     gcBIConst_MaxTessControlTotalOutputComponents,
+    gcBIConst_MaxTessControlAtomicCounters,
+    gcBIConst_MaxTessControlAtomicCounterBuffers,
     gcBIConst_MaxTessEvaluationInputComponents,
     gcBIConst_MaxTessEvaluationOutputComponents,
     gcBIConst_MaxTessEvaluationTextureImageUnits,
+    gcBIConst_MaxTessEvaluationImageUniforms,
     gcBIConst_MaxTessEvaluationUniformComponents,
+    gcBIConst_MaxTessEvaluationAtomicCounters,
+    gcBIConst_MaxTessEvaluationAtomicCounterBuffers,
     gcBIConst_MaxTessPatchComponents,
     gcBIConst_MaxPatchVertices,
     gcBIConst_MaxTessGenLevel,

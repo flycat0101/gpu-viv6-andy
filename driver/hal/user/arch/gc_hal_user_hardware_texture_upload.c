@@ -12720,7 +12720,7 @@ OnError:
 */
 gceSTATUS
 gcoHARDWARE_UploadTexture(
-    IN gcoSURF TexSurf,
+    IN gcsSURF_VIEW *TexView,
     IN gctUINT32 Offset,
     IN gctUINT XOffset,
     IN gctUINT YOffset,
@@ -12732,18 +12732,22 @@ gcoHARDWARE_UploadTexture(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    gcoSURF TexSurf = TexView->surf;
 
-    gcmHEADER_ARG("TexSurf=%x  Offset=%u "
+    gcmHEADER_ARG("TexView=%x  Offset=%u "
                   "X=%u Y=%u Width=%u Height=%u "
                   "Memory=0x%x SourceStride=%d SourceFormat=%d",
-                  TexSurf, Offset, XOffset, YOffset, Width, Height,
+                  TexView, Offset, XOffset, YOffset, Width, Height,
                   Memory, SourceStride, SourceFormat);
 
-    if (!TexSurf->tileStatusDisabled &&
+    /* No multiSlice support when tile status enabled for now.*/
+    gcmASSERT(TexView->numSlices == 1);
+
+    if (!TexSurf->tileStatusDisabled[TexView->firstSlice] &&
          TexSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN)
     {
         /* Disable tile status buffer in case it's there */
-        gcmONERROR(gcoHARDWARE_DisableTileStatus(gcvNULL, TexSurf, gcvTRUE));
+        gcmONERROR(gcoHARDWARE_DisableTileStatus(gcvNULL, TexView, gcvTRUE));
         gcmONERROR(gcoHARDWARE_FlushPipe(gcvNULL, gcvNULL));
         gcmONERROR(gcoHARDWARE_Commit(gcvNULL));
         gcmONERROR(gcoHARDWARE_Stall(gcvNULL));

@@ -180,6 +180,7 @@ libVSC_SOURCE :=\
 	$(wildcard \
 		$(AQROOT)/compiler/libVSC/old_impl/*.c \
 		$(AQROOT)/compiler/libVSC/old_impl/optimizer/*.c \
+		$(AQROOT)/compiler/libVSC/lib/*.c \
 		)
 
 ifeq ($(VSC_VIR_BUILD),1)
@@ -205,6 +206,8 @@ libVSC_SOURCE += \
 		$(AQROOT)/compiler/libVSC/vir/lower/*.c \
 		$(AQROOT)/compiler/libVSC/vir/passmanager/*.c \
 		$(AQROOT)/compiler/libVSC/vir/transform/*.c \
+		$(AQROOT)/compiler/libVSC/vir/linker/*.c \
+		$(AQROOT)/compiler/libVSC/debug/*.c \
 		)
 endif
 
@@ -291,6 +294,11 @@ $(O_DIR)/%.o: $(AQROOT)/compiler/libVSC/old_impl/optimizer/%.c
 	$(Q)$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc --depend=$(patsubst %.o,%.d,$@) -o $@ $<
 
 $(O_DIR)/%.o: $(AQROOT)/compiler/libVSC/old_impl/%.c
+	@-mkdir -p $(O_DIR)
+	@echo [ CC ] $@
+	$(Q)$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc --depend=$(patsubst %.o,%.d,$@) -o $@ $<
+
+$(O_DIR)/%.o: $(AQROOT)/compiler/libVSC/lib/%.c
 	@-mkdir -p $(O_DIR)
 	@echo [ CC ] $@
 	$(Q)$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc --depend=$(patsubst %.o,%.d,$@) -o $@ $<
@@ -386,12 +394,22 @@ $(O_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/lower/%.c
 	@echo [ CC ] $@
 	$(Q)$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc --depend=$(patsubst %.o,%.d,$@) -o $@ $<
 
+$(O_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/linker/%.c
+	@-mkdir -p $(O_DIR)
+	@echo [ CC ] $@
+	$(Q)$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc --depend=$(patsubst %.o,%.d,$@) -o $@ $<
+
 $(O_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/passmanager/%.c
 	@-mkdir -p $(O_DIR)
 	@echo [ CC ] $@
 	$(Q)$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc --depend=$(patsubst %.o,%.d,$@) -o $@ $<
 
 $(O_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/transform/%.c
+	@-mkdir -p $(O_DIR)
+	@echo [ CC ] $@
+	$(Q)$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc --depend=$(patsubst %.o,%.d,$@) -o $@ $<
+
+$(O_DIR)/%.o: $(AQROOT)/compiler/libVSC/debug/%.c
 	@-mkdir -p $(O_DIR)
 	@echo [ CC ] $@
 	$(Q)$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc --depend=$(patsubst %.o,%.d,$@) -o $@ $<

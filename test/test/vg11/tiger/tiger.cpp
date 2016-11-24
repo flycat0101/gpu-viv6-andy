@@ -26,8 +26,6 @@
 *****************************************************************************/
 
 
-
-
 #include "tiger.h" //We need the defines and prototypes of there
 #include "test_tiger_paths.h"
 #include <stdlib.h>

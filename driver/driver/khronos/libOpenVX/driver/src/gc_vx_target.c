@@ -49,7 +49,7 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
                                                 kernelDescTable[index]->initialize,
                                                 kernelDescTable[index]->deinitialize
 #if gcdVX_OPTIMIZER
-                                                , kernelDescTable[index]->optAttributes
+, kernelDescTable[index]->optAttributes
 #endif
                                                 );
 
@@ -166,12 +166,20 @@ VX_PRIVATE_API vx_action vxoTarget_ProcessNodes(
 
     for (index = startIndex; index < startIndex + nodeCount; index++)
     {
-        vx_status   status;
+        vx_status   status = VX_SUCCESS;
         vx_node     node = nodes[index];
 
         vxoPerf_Begin(&node->perf);
 
-        status = node->kernel->function(node, (vx_reference *)node->paramTable, node->kernel->signature.paramCount);
+        if (!node->kernelAttributes.isGPUKernel)
+        {
+            status = gcfVX_Flush(gcvTRUE);
+        }
+
+        if (status == VX_SUCCESS)
+        {
+            status = node->kernel->function(node, (vx_reference *)node->paramTable, node->kernel->signature.paramCount);
+        }
 
         node->executed = vx_true_e;
         node->status = status;
@@ -200,7 +208,7 @@ VX_PRIVATE_API vx_status vxoTarget_VerifyNode(vx_target target, vx_node node)
 }
 
 VX_PRIVATE_API vx_kernel vxoTarget_AddKernel(
-        vx_target target, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration,
+        vx_target target, const vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration,
         vx_program program, vx_kernel_f funcPtr, vx_uint32 paramCount,
         vx_kernel_input_validate_f input, vx_kernel_output_validate_f output,
         vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize)
@@ -227,7 +235,7 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddKernel(
                                                     VX_NULL, paramCount,
                                                     input, output, initialize, deinitialize
 #if gcdVX_OPTIMIZER
-                                                    , optAttributes
+, optAttributes
 #endif
                                                     );
 
@@ -244,7 +252,7 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddKernel(
     return (vx_kernel)vxoContext_GetErrorObject(target->base.context, VX_ERROR_NO_RESOURCES);
 }
 
-VX_PRIVATE_API vx_status vxTilingKernelFunction(vx_node node, vx_reference paramTable[], vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const vx_reference paramTable[], vx_uint32 num);
 
 VX_PRIVATE_API vx_kernel vxoTarget_AddTilingKernel(
         vx_target target, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration,
@@ -272,7 +280,7 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddTilingKernel(
                                                     VX_NULL, paramCount,
                                                     input, output, VX_NULL, VX_NULL
 #if gcdVX_OPTIMIZER
-                                                    , optAttributes
+, optAttributes
 #endif
                                                     );
 
@@ -331,7 +339,7 @@ VX_PRIVATE_API vx_status vxSetTileToImagePatch(vx_image image, vx_rectangle_t *r
 #define VX_TILE_BLOCK_MULTIPLER                     64
 #define VX_INVALID_INDEX                            ((vx_uint32)-1)
 
-VX_PRIVATE_API vx_status vxTilingKernelFunction(vx_node node, vx_reference paramTable[], vx_uint32 paramCount)
+VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const vx_reference paramTable[], vx_uint32 paramCount)
 {
     vx_uint32           paramIndex;
     vx_status           status;
@@ -407,7 +415,7 @@ VX_PRIVATE_API vx_status vxTilingKernelFunction(vx_node node, vx_reference param
                 break;
 
             case VX_TYPE_SCALAR:
-                status = vxAccessScalarValue((vx_scalar)paramTable[paramIndex], (void *)&scalarTable[paramIndex]);
+                status = vxReadScalarValue((vx_scalar)paramTable[paramIndex], (void *)&scalarTable[paramIndex]);
                 if (status != VX_SUCCESS) return status;
 
                 tileKernelParams[paramIndex] = &scalarTable[paramIndex];
@@ -613,7 +621,7 @@ VX_PRIVATE_API vx_uint32 vxoTarget_GetIndex(vx_target target)
 
 #if defined(OPENVX_USE_TARGET)
 
-VX_PUBLIC_API vx_target vxGetTargetByIndex(vx_context context, vx_uint32 index)
+VX_API_ENTRY vx_target VX_API_CALL VX_API_CALL vxGetTargetByIndex(vx_context context, vx_uint32 index)
 {
     vx_target target;
 
@@ -634,7 +642,7 @@ VX_PUBLIC_API vx_target vxGetTargetByIndex(vx_context context, vx_uint32 index)
     return target;
 }
 
-VX_PUBLIC_API vx_target vxGetTargetByName(vx_context context, const vx_char *name)
+VX_API_ENTRY vx_target VX_API_CALL vxGetTargetByName(vx_context context, const vx_char *name)
 {
     vx_uint32 index;
     vx_target target;
@@ -665,12 +673,12 @@ VX_PUBLIC_API vx_target vxGetTargetByName(vx_context context, const vx_char *nam
     return (vx_target)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
 }
 
-VX_PUBLIC_API vx_status vxReleaseTarget(vx_target *target)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseTarget(vx_target *target)
 {
     return vxoReference_Release((vx_reference_ptr)target, (vx_type_e)VX_TYPE_TARGET, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_status vxQueryTarget(vx_target target, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryTarget(vx_target target, vx_enum attribute, void *ptr, vx_size size)
 {
     vx_uint32           targetIndex;
     vx_uint32           kernelIndex;
@@ -729,7 +737,7 @@ VX_PUBLIC_API vx_status vxQueryTarget(vx_target target, vx_enum attribute, void 
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxAssignNodeAffinity(vx_node node, vx_target target)
+VX_API_ENTRY vx_status VX_API_CALL vxAssignNodeAffinity(vx_node node, vx_target target)
 {
     vx_uint32 kernelIndex;
 
@@ -750,4 +758,5 @@ VX_PUBLIC_API vx_status vxAssignNodeAffinity(vx_node node, vx_target target)
 }
 
 #endif /* defined(OPENVX_USE_TARGET) */
+
 

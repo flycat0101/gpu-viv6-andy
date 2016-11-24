@@ -34,17 +34,12 @@
 #endif
 #endif
 
-#if defined(gcdES11_CORE_WITH_EGL) && !defined(EGLAPI)
+#if !defined(EGLAPI)
 #if defined(_WIN32) && !defined(__SCITECH_SNAP__)
 #    define EGLAPI    __declspec(dllexport)
 #  else
 #    define EGLAPI
 #  endif
-#endif
-
-/* Use renaming trick to add the dispatching to all APIs. */
-#if gcdRENDER_THREADS
-# define _GL_11_APPENDIX _THREAD
 #endif
 
 #include <GLES/gl.h>
@@ -89,7 +84,8 @@ typedef struct _glsCONTEXT * glsCONTEXT_PTR;
 #include "gc_hal.h"
 #include "gc_hal_raster.h"
 #include "gc_hal_engine.h"
-#include "gc_vsc_drvi_interface.h"
+#include "gc_hal_priv.h"
+#include "drvi/gc_vsc_drvi_interface.h"
 #include "gc_hal_driver.h"
 #include "gc_hal_user.h"
 #include "gc_hal_user_os_memory.h"
@@ -120,9 +116,5 @@ typedef struct _glsCONTEXT * glsCONTEXT_PTR;
 #include "gc_glff_multisample.h"
 #include "gc_glff_states.h"
 #include "gc_glff_clip_plane.h"
-
-void glfRenderThread(
-    IN gcsRENDER_THREAD* ThreadInfo
-    );
 
 #endif /* __gc_glff_precomp_h_ */

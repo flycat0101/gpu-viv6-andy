@@ -201,7 +201,6 @@ struct VSC_ALLSHADERS
 {
     VIR_Shader* shaders[VSC_MAX_LINKABLE_SHADER_STAGE_COUNT];
     VSC_GlobalUniformTable global_uniform_table;
-    VSC_HW_CONFIG* hwCfg;
     VIR_Dumper* dumper;
     VSC_MM mem_pool;
 };
@@ -214,7 +213,6 @@ struct VSC_ALLSHADERS
 #define VSC_AllShaders_SetDumper(as, d)                 ((as)->dumper = (d))
 #define VSC_AllShaders_GetMM(as)                        (&(as)->mem_pool)
 #define VSC_AllShaders_SetMM(as, m)                     ((as)->mem_pool = *(m))
-#define VSC_AllShaders_SetHwCFG(as, hc)                    ((as)->hwCfg = (hc))
 
 void
 VSC_AllShaders_Initialize(
@@ -225,7 +223,6 @@ VSC_AllShaders_Initialize(
     IN VIR_Shader* gs_shader,
     IN VIR_Shader* ps_shader,
     IN VIR_Shader* cs_shader,
-    IN VSC_HW_CONFIG* hwCfg,
     IN VIR_Dumper* dumper,
     IN VSC_MM* mem_pool
     );
@@ -243,6 +240,8 @@ VSC_AllShaders_LinkUniforms(
 extern VSC_ErrCode
 VSC_UF_UtilizeAuxUBO(
     IN OUT VSC_AllShaders           *all_shaders,
+    IN VSC_HW_CONFIG                *hwCfg,
+    IN VSC_PROGRAM_RESOURCE_LAYOUT  *pgResourceLayout,
     IN VSC_OPTN_UF_AUBO_Options     *options
     );
 
@@ -257,6 +256,12 @@ VSC_ErrCode
 VSC_CheckUniformUsage(
     IN OUT VIR_Shader       *pShader
     );
+
+VSC_ErrCode
+VSC_UF_CreateAUBO(
+    IN VSC_GPG_PASS_WORKER* pPassWorker
+    );
+DECLARE_QUERY_PASS_PROP(VSC_UF_CreateAUBO);
 
 END_EXTERN_C()
 

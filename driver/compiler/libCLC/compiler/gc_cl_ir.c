@@ -401,6 +401,7 @@ IN clsDECL * LDecl,
 IN clsDECL * RDecl
 )
 {
+  gctBOOL sameType = gcvFALSE;
   gcmASSERT(LDecl);
   gcmASSERT(RDecl);
 
@@ -410,7 +411,8 @@ IN clsDECL * RDecl
               return gcvTRUE;
           }
           else if((!clmDECL_IsPointerType(RDecl) &&
-                   clmDECL_IsGeneralArithmeticType(LDecl)) ||
+                   (clmDECL_IsArithmeticType(LDecl) ||
+                    clmDECL_IsPackedGenType(LDecl))) ||
                   (clmDECL_IsIntegerType(RDecl) &&
                    clmIsElementTypeEvent(LDecl->dataType->elementType))) {/*implicit conversion */
               return gcvTRUE;
@@ -423,11 +425,16 @@ IN clsDECL * RDecl
           return gcvTRUE;
       }
   }
+  else if(clmDECL_IsPackedGenType(LDecl) &&
+     clmIsElementTypePacked(RDecl->dataType->elementType)) {
+      sameType = gcvTRUE;
+  }
 
-  if((LDecl->dataType->elementType == RDecl->dataType->elementType) &&
+  if(sameType ||
+     ((LDecl->dataType->elementType == RDecl->dataType->elementType) &&
      (clmDATA_TYPE_matrixRowCount_GET(LDecl->dataType) == clmDATA_TYPE_matrixRowCount_GET(RDecl->dataType)) &&
      (clmDATA_TYPE_matrixColumnCount_GET(LDecl->dataType) == clmDATA_TYPE_matrixColumnCount_GET(RDecl->dataType)) &&
-     (LDecl->dataType->u.generic == RDecl->dataType->u.generic)) {
+     (LDecl->dataType->u.generic == RDecl->dataType->u.generic))) {
     if(!clmDECL_IsArray(LDecl)) {
        if(clmDECL_IsArray(RDecl)) {
           return (clParseCountIndirectionLevel(LDecl->ptrDscr) == 1);
@@ -452,6 +459,7 @@ IN clsDECL * LDecl,
 IN clsDECL * RDecl
 )
 {
+  gctBOOL sameType = gcvFALSE;
   gcmASSERT(LDecl);
   gcmASSERT(RDecl);
 
@@ -461,7 +469,7 @@ IN clsDECL * RDecl
          return gcvTRUE;
        }
        else if((!clmDECL_IsPointerType(RDecl)
-               && clmDECL_IsGeneralArithmeticType(LDecl)) ||
+               && clmDECL_IsArithmeticType(LDecl)) ||
                (clmDECL_IsIntegerType(RDecl) &&
                 clmIsElementTypeEvent(LDecl->dataType->elementType))) {/*implicit conversion */
          return gcvTRUE;
@@ -472,12 +480,17 @@ IN clsDECL * RDecl
        return gcvTRUE;
     }
   }
+  else if(clmDECL_IsPackedGenType(RDecl) &&
+     clmIsElementTypePacked(LDecl->dataType->elementType)) {
+      sameType = gcvTRUE;
+  }
 
-  if((LDecl->dataType->elementType == RDecl->dataType->elementType) &&
+  if(sameType ||
+     ((LDecl->dataType->elementType == RDecl->dataType->elementType) &&
      (clmDATA_TYPE_vectorSize_NOCHECK_GET(LDecl->dataType) == clmDATA_TYPE_vectorSize_NOCHECK_GET(RDecl->dataType)) &&
      (clmDATA_TYPE_matrixRowCount_GET(LDecl->dataType) == clmDATA_TYPE_matrixRowCount_GET(RDecl->dataType)) &&
      (clmDATA_TYPE_matrixColumnCount_GET(LDecl->dataType) == clmDATA_TYPE_matrixColumnCount_GET(RDecl->dataType)) &&
-     (LDecl->dataType->u.generic == RDecl->dataType->u.generic)) {
+     (LDecl->dataType->u.generic == RDecl->dataType->u.generic))) {
     if(!clmDECL_IsArray(LDecl)) {
        if(clmDECL_IsArray(RDecl)) {
           return clParseCountIndirectionLevel(LDecl->ptrDscr) == 1;
@@ -1006,58 +1019,88 @@ IN clsDECL *Decl
 }
 
 gctSIZE_T
-clGetVectorElementByteSize(
-IN cloCOMPILER Compiler,
-IN cltELEMENT_TYPE ElementType
+clGetElementTypeByteSize(
+cloCOMPILER Compiler,
+cltELEMENT_TYPE ElementType
 )
 {
-    gctSIZE_T size = 0;
+      gctSIZE_T size = 0;
 
-    switch(ElementType) {
-    case clvTYPE_FLOAT:
-    case clvTYPE_BOOL:
-    case clvTYPE_INT:
-    case clvTYPE_UINT:
-       size = 4;
-       break;
+      switch(ElementType) {
+      case clvTYPE_VOID:
+         size = 0;
+         break;
 
-    case clvTYPE_LONG:
-    case clvTYPE_ULONG:
-       size = 8;
-       break;
+      case clvTYPE_FLOAT:
+      case clvTYPE_BOOL:
+      case clvTYPE_INT:
+      case clvTYPE_UINT:
+         size = 4;
+         break;
 
-    case clvTYPE_CHAR:
-    case clvTYPE_UCHAR:
-       size = 1;
-       break;
+      case clvTYPE_LONG:
+      case clvTYPE_ULONG:
+         size = 8;
+         break;
 
-    case clvTYPE_BOOL_PACKED:
-    case clvTYPE_CHAR_PACKED:
-    case clvTYPE_UCHAR_PACKED:
-       size = 1;
-       break;
+      case clvTYPE_CHAR:
+      case clvTYPE_UCHAR:
+         size = 1;
+         break;
 
-    case clvTYPE_SHORT:
-    case clvTYPE_USHORT:
-    case clvTYPE_HALF:
-       size = 2;
-       break;
+      case clvTYPE_BOOL_PACKED:
+      case clvTYPE_CHAR_PACKED:
+      case clvTYPE_UCHAR_PACKED:
+         size = 1;
+         break;
 
-    case clvTYPE_SHORT_PACKED:
-    case clvTYPE_USHORT_PACKED:
-    case clvTYPE_HALF_PACKED:
-       size = 2;
-       break;
+      case clvTYPE_SHORT:
+      case clvTYPE_USHORT:
+      case clvTYPE_HALF:
+         size = 2;
+         break;
 
-    case clvTYPE_DOUBLE:
-       size = 8;
-       break;
+      case clvTYPE_SHORT_PACKED:
+      case clvTYPE_USHORT_PACKED:
+      case clvTYPE_HALF_PACKED:
+         size = 2;
+         break;
 
-    default:
-       gcmASSERT(0);
-    }
+      case clvTYPE_SAMPLER_T:
+         size = 4;
+         break;
 
-    return size;
+      case clvTYPE_IMAGE2D_T:
+      case clvTYPE_IMAGE3D_T:
+      case clvTYPE_IMAGE1D_T:
+      case clvTYPE_IMAGE2D_ARRAY_T:
+      case clvTYPE_IMAGE1D_ARRAY_T:
+      case clvTYPE_IMAGE1D_BUFFER_T:
+        if (cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
+            gcmOPT_oclUseImgIntrinsicQuery()) {
+             size = 32;
+         }
+         else size = 4;
+         break;
+
+      case clvTYPE_DOUBLE:
+         size = 8;
+         break;
+
+      case clvTYPE_EVENT_T:
+         size = 4;
+         break;
+
+      case clvTYPE_GEN_PACKED:
+         size = 4;
+         break;
+
+      default:
+         gcmASSERT(0);
+         return 0;
+      }
+
+      return size;
 }
 
 gctSIZE_T
@@ -1488,6 +1531,7 @@ OUT clsNAME **Name
         name = pointer;
 
         name->mySpace    = MySpace;
+        name->fileNo    = 0;
         name->lineNo    = LineNo;
         name->stringNo    = StringNo;
         name->type    = Type;
@@ -1503,10 +1547,11 @@ OUT clsNAME **Name
                                         &name->decl,
                                         PtrDscr != gcvNULL));
 
-        name->derivedType = gcvNULL;
-        name->symbol    = Symbol;
+        name->derivedType  = gcvNULL;
+        name->symbol       = Symbol;
         name->isBuiltin    = IsBuiltin;
         name->extension    = Extension;
+        name->die          = VSC_DI_INVALIDE_DIE;
 
         switch (Type) {
         case clvVARIABLE_NAME:
@@ -1854,6 +1899,11 @@ IN clsNAME * Name
                       Name->symbol,
                       (Name->isBuiltin)? "true" : "false"));
 
+    if (Name->die != VSC_DI_INVALIDE_DIE)
+    {
+        cloCOMPILER_DumpDIE(Compiler, clvDUMP_IR, Name->die);
+    }
+
     switch (Name->type) {
     case clvVARIABLE_NAME:
         gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -1920,6 +1970,7 @@ OUT clsNAME_SPACE ** NameSpace
 
         nameSpace->parent = Parent;
         nameSpace->scopeName = gcvNULL;
+        nameSpace->die = VSC_DI_INVALIDE_DIE;
         slsDLINK_LIST_Initialize(&nameSpace->names);
         slsDLINK_LIST_Initialize(&nameSpace->subSpaces);
 
@@ -1981,6 +2032,15 @@ IN clsNAME_SPACE * NameSpace
                       "<NAME_SPACE this=\"0x%x\" parent=\"0x%x\">",
                       NameSpace,
                       NameSpace->parent));
+
+    if (NameSpace->die != VSC_DI_INVALIDE_DIE)
+    {
+        cloCOMPILER_DumpDIE(
+            Compiler,
+            clvDUMP_IR,
+            NameSpace->die
+            );
+    }
 
     /* Dump all names */
     FOR_EACH_DLINK_NODE(&NameSpace->names, clsNAME, name) {
@@ -2186,6 +2246,18 @@ static  clsVecCompSelType _BuiltinVectorTypes[] =
 
 static const gctUINT  _BuiltinVectorTypeCount = sizeof(_BuiltinVectorTypes) / sizeof(clsVecCompSelType);
 
+static  clsVecCompSelType _BuiltinPackedVectorTypes[] =
+{
+  {clvTYPE_BOOL_PACKED, {T_BOOL, T_BOOL_PACKED, T_BOOL2_PACKED, T_BOOL3_PACKED, T_BOOL4_PACKED, 0, 0, 0, T_BOOL8_PACKED, 0, 0, 0, 0, 0, 0, 0, T_BOOL16_PACKED}},
+  {clvTYPE_CHAR_PACKED, {T_CHAR, T_CHAR_PACKED, T_CHAR2_PACKED, T_CHAR3_PACKED, T_CHAR4_PACKED, 0, 0, 0, T_CHAR8_PACKED, 0, 0, 0, 0, 0, 0, 0, T_CHAR16_PACKED}},
+  {clvTYPE_UCHAR_PACKED, {T_UCHAR, T_UCHAR_PACKED, T_UCHAR2_PACKED, T_UCHAR3_PACKED, T_UCHAR4_PACKED, 0, 0, 0, T_UCHAR8_PACKED, 0, 0, 0, 0, 0, 0, 0, T_UCHAR16_PACKED}},
+  {clvTYPE_SHORT_PACKED, {T_SHORT, T_SHORT_PACKED, T_SHORT2_PACKED, T_SHORT3_PACKED, T_SHORT4_PACKED, 0, 0, 0, T_SHORT8_PACKED, 0, 0, 0, 0, 0, 0, 0, T_SHORT16_PACKED}},
+  {clvTYPE_USHORT_PACKED, {T_USHORT, T_USHORT_PACKED, T_USHORT2_PACKED, T_USHORT3_PACKED, T_USHORT4_PACKED, 0, 0, 0, T_USHORT8_PACKED, 0, 0, 0, 0, 0, 0, 0, T_USHORT16_PACKED}},
+  {clvTYPE_HALF_PACKED, {T_HALF, T_HALF_PACKED, T_HALF2_PACKED, T_HALF3_PACKED, T_HALF4_PACKED, 0, 0, 0, T_HALF8_PACKED, 0, 0, 0, 0, 0, 0, 0, T_HALF16_PACKED}},
+};
+
+static const gctUINT  _BuiltinPackedVectorTypeCount = sizeof(_BuiltinPackedVectorTypes) / sizeof(clsVecCompSelType);
+
 /** function to compare builtin types for qsort **/
 static gctINT
 _Compare_BuiltinVectorTypes(const void *T1, const void *T2)
@@ -2241,14 +2313,18 @@ cloIR_InitializeVecCompSelTypes()
 #define _clmConvElementTypeToSigned(et) \
    (et == clvTYPE_UINT ? clvTYPE_INT : \
     (et == clvTYPE_USHORT ? clvTYPE_SHORT : \
-      (et == clvTYPE_UCHAR ? clvTYPE_CHAR : \
-        (et == clvTYPE_ULONG ? clvTYPE_LONG : et))))
+       (et == clvTYPE_USHORT_PACKED ? clvTYPE_SHORT_PACKED : \
+          (et == clvTYPE_UCHAR ? clvTYPE_CHAR : \
+             (et == clvTYPE_UCHAR_PACKED ? clvTYPE_CHAR_PACKED : \
+                (et == clvTYPE_ULONG ? clvTYPE_LONG : et))))))
 
 #define _clmConvElementTypeToUnsigned(et) \
    (et == clvTYPE_INT ? clvTYPE_UINT : \
     (et == clvTYPE_SHORT ? clvTYPE_USHORT : \
-      (et == clvTYPE_CHAR ? clvTYPE_UCHAR : \
-        (et == clvTYPE_LONG ? clvTYPE_ULONG : et))))
+      (et == clvTYPE_SHORT_PACKED ? clvTYPE_USHORT_PACKED : \
+        (et == clvTYPE_CHAR ? clvTYPE_UCHAR : \
+          (et == clvTYPE_CHAR_PACKED ? clvTYPE_UCHAR_PACKED : \
+             (et == clvTYPE_LONG ? clvTYPE_ULONG : et))))))
 
 #define _cldDoGentypeArgTypeChecking 1
 
@@ -2262,7 +2338,18 @@ IN gctINT8 NumComponents
 {
    clsVecCompSelType *vectorSel;
 
-   vectorSel = _BuiltinVectorTypes + ElementType;
+   if(clmIsElementTypePacked(ElementType)) {
+       gctINT index;
+       index = ElementType - _BuiltinPackedVectorTypes[0].elementType;
+
+       gcmASSERT(index >= 0 && (gctUINT)index < _BuiltinPackedVectorTypeCount);
+       vectorSel = _BuiltinPackedVectorTypes + index;
+   }
+   else {
+       gcmASSERT((gctUINT)ElementType < _BuiltinVectorTypeCount);
+       vectorSel = _BuiltinVectorTypes + ElementType;
+   }
+
    gcmASSERT(vectorSel->elementType == ElementType);
 
    return vectorSel->compSel[NumComponents];
@@ -2298,6 +2385,38 @@ IN clsDATA_TYPE **VecDataType
                      DataType->addrSpaceQualifier,
                                      VecDataType);
 }
+
+gctBOOL
+clAreElementTypeInRankOrder(
+IN cltELEMENT_TYPE HighRank,
+IN cltELEMENT_TYPE LowRank
+)
+{
+   gctINT index;
+   clsBUILTIN_DATATYPE_INFO *typeInfo;
+   cltELEMENT_TYPE highRank, lowRank;
+
+   if(clmIsElementTypePacked(HighRank)) {
+       index = HighRank - _BuiltinPackedVectorTypes[0].elementType;
+
+       gcmASSERT(index >= 0 && (gctUINT)index < _BuiltinPackedVectorTypeCount);
+       typeInfo = clGetBuiltinDataTypeInfo((_BuiltinPackedVectorTypes + index)->compSel[0]);
+       highRank = typeInfo->dataType.elementType;
+   }
+   else highRank = HighRank;
+
+   if(clmIsElementTypePacked(LowRank)) {
+       index = LowRank - _BuiltinPackedVectorTypes[0].elementType;
+
+       gcmASSERT(index >= 0 && (gctUINT)index < _BuiltinPackedVectorTypeCount);
+       typeInfo = clGetBuiltinDataTypeInfo((_BuiltinPackedVectorTypes + index)->compSel[0]);
+       lowRank = typeInfo->dataType.elementType;
+   }
+   else lowRank = LowRank;
+
+   return (highRank > lowRank);
+}
+
 
 #define cldCHAR_MAX    ((int)0x0000007F)  /* 127 */
 #define cldCHAR_MIN    ((int)0xFFFFFF80)  /* (-127-1) */
@@ -2442,6 +2561,22 @@ IN OUT clsNAME **RefParamName
                    return gcvTRUE;
               }
           }
+      }
+      else {
+         if(clmDECL_IsPointerType(rDecl)) {
+             if(clmIsElementTypePacked(rDecl->dataType->elementType)) {
+                clsBUILTIN_DATATYPE_INFO *typeInfo;
+
+                typeInfo = clGetBuiltinDataTypeInfo(rDecl->dataType->type);
+                if(typeInfo->dualType == paramDecl->dataType->type) return gcvTRUE;
+             }
+             else if(clmIsElementTypePacked(paramDecl->dataType->elementType)) {
+                clsBUILTIN_DATATYPE_INFO *typeInfo;
+
+                typeInfo = clGetBuiltinDataTypeInfo(paramDecl->dataType->type);
+                if(typeInfo->dualType == rDecl->dataType->type) return gcvTRUE;
+             }
+         }
       }
   }
 
@@ -2718,6 +2853,10 @@ IN OUT clsNAME **RefParamName
         sameType = gcvTRUE;
      }
   }
+  else if(clmDECL_IsPackedGenType(paramDecl) &&
+     clmIsElementTypePacked(rDecl->dataType->elementType)) {
+      sameType = gcvTRUE;
+  }
 
   if(sameType ||
      (lDecl->dataType->elementType == rDecl->dataType->elementType &&
@@ -2867,6 +3006,8 @@ OUT clsNAME **NewFuncName
                                &newFuncName);
    if (gcmIS_ERROR(status)) return status;
 
+   newFuncName->die = cloCOMPILER_AddDIEWithName(Compiler, newFuncName);
+
    slsDLINK_LIST_InsertFirst(&builtinSpace->names, &newFuncName->node);
 
    newFuncName->u.funcInfo.isInline = FuncName->u.funcInfo.isInline;
@@ -2886,6 +3027,8 @@ OUT clsNAME **NewFuncName
       status = cloCOMPILER_CreateNameSpace(Compiler,
                                            &newFuncName->u.funcInfo.localSpace);
       if (gcmIS_ERROR(status)) return status;
+      newFuncName->u.funcInfo.localSpace->scopeName = newFuncName;
+      newFuncName->u.funcInfo.localSpace->die = newFuncName->die;
 
       gcmASSERT(FuncName->u.funcInfo.localSpace);
       FOR_EACH_DLINK_NODE(&FuncName->u.funcInfo.localSpace->names, struct _clsNAME, paramName) {
@@ -2936,7 +3079,7 @@ IN clsDECL * RDecl
          return gcvTRUE;
        }
        else if((!clmDECL_IsPointerType(RDecl) &&
-                clmDECL_IsGeneralArithmeticType(LDecl)) ||
+                clmDECL_IsArithmeticType(LDecl)) ||
                 (clmDECL_IsIntegerType(RDecl) &&
                  clmIsElementTypeEvent(LDecl->dataType->elementType))) {/*implicit conversion */
          return gcvTRUE;
@@ -2948,6 +3091,18 @@ IN clsDECL * RDecl
               clmDATA_TYPE_IsVoid(RDecl->dataType) ||
               LDecl->dataType->elementType == RDecl->dataType->elementType) {
               return gcvTRUE;
+           }
+           else if(clmIsElementTypePacked(RDecl->dataType->elementType)) {
+              clsBUILTIN_DATATYPE_INFO *typeInfo;
+
+              typeInfo = clGetBuiltinDataTypeInfo(RDecl->dataType->type);
+              if(typeInfo->dualType == LDecl->dataType->type) return gcvTRUE;
+           }
+           else if(clmIsElementTypePacked(LDecl->dataType->elementType)) {
+              clsBUILTIN_DATATYPE_INFO *typeInfo;
+
+              typeInfo = clGetBuiltinDataTypeInfo(LDecl->dataType->type);
+              if(typeInfo->dualType == RDecl->dataType->type) return gcvTRUE;
            }
        }
        else if(clmDECL_IsInt(RDecl)) {
@@ -3958,7 +4113,11 @@ OUT clsNAME **Name
         else {
            slsDLINK_LIST_InsertLast(&NameSpace->names, &name->node);
         }
-        if (Name != gcvNULL) *Name = name;
+        if (Name != gcvNULL) {
+            name->die = cloCOMPILER_AddDIEWithName(Compiler, name);
+            *Name = name;
+        }
+
         return gcvSTATUS_OK;
     } while (gcvFALSE);
 OnError:
@@ -4034,6 +4193,32 @@ IN cloIR_BASE This
     }
 
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, set));
+    return gcvSTATUS_OK;
+}
+
+/* Empty a cloIR_SET object. */
+gceSTATUS
+cloIR_SET_Empty(
+IN cloCOMPILER Compiler,
+IN cloIR_BASE This
+)
+{
+    cloIR_SET    set = (cloIR_SET)This;
+    slsDLINK_LIST *    members;
+    cloIR_BASE    member;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    clmVERIFY_IR_OBJECT(set, clvIR_SET);
+
+    members = &set->members;
+
+    while (!slsDLINK_LIST_IsEmpty(members)) {
+        slsDLINK_LIST_DetachFirst(members, struct _cloIR_BASE, &member);
+
+        gcmVERIFY_OK(cloIR_OBJECT_Destroy(Compiler, member));
+    }
+
     return gcvSTATUS_OK;
 }
 
@@ -6792,27 +6977,6 @@ OUT cloIR_CONSTANT * ResultConstant
   return gcvSTATUS_OK;
 }
 
-/**
- Mapping of type after casting
-**/
-static gctINT _clCastType_SCALAR[cldArithmeticTypeCount + 1] =
-  {0, T_BOOL, T_CHAR, T_UCHAR, T_SHORT, T_USHORT, T_INT, T_UINT, T_LONG, T_ULONG, T_HALF, T_FLOAT, T_DOUBLE};
-
-static gctINT _clCastType_VECTOR2[cldArithmeticTypeCount + 1] =
-  {0, T_BOOL2, T_CHAR2, T_UCHAR2, T_SHORT2, T_USHORT2, T_INT2, T_UINT2, T_LONG2, T_ULONG2, T_HALF2, T_FLOAT2, T_DOUBLE2};
-
-static gctINT _clCastType_VECTOR3[cldArithmeticTypeCount + 1] =
-  {0, T_BOOL3, T_CHAR3, T_UCHAR3, T_SHORT3, T_USHORT3, T_INT3, T_UINT3, T_LONG3, T_ULONG3, T_HALF3, T_FLOAT3, T_DOUBLE3};
-
-static gctINT _clCastType_VECTOR4[cldArithmeticTypeCount + 1] =
-  {0, T_BOOL4, T_CHAR4, T_UCHAR4, T_SHORT4, T_USHORT4, T_INT4, T_UINT4, T_LONG4, T_ULONG4, T_HALF4, T_FLOAT4, T_DOUBLE4};
-
-static gctINT _clCastType_VECTOR8[cldArithmeticTypeCount + 1] =
-  {0, T_BOOL8, T_CHAR8, T_UCHAR8, T_SHORT8, T_USHORT8, T_INT8, T_UINT8, T_LONG8, T_ULONG8, T_HALF8, T_FLOAT8, T_DOUBLE8};
-
-static gctINT _clCastType_VECTOR16[cldArithmeticTypeCount + 1] =
-  {0, T_BOOL16, T_CHAR16, T_UCHAR16, T_SHORT16, T_USHORT16, T_INT16, T_UINT16, T_LONG16, T_ULONG16, T_HALF16, T_FLOAT16, T_DOUBLE16};
-
 static gceSTATUS
 _cloIR_GetTargetCastDecl(
 IN cloCOMPILER Compiler,
@@ -6835,31 +6999,20 @@ IN OUT clsDECL *ResultDecl
       else resType  = NewDecl->dataType->type;
    }
    else {
+      gctINT8 vectorSize;
       gcmASSERT(orgDataType->matrixSize.columnCount == 0);
 
-      switch(clmDATA_TYPE_vectorSize_NOCHECK_GET(orgDataType)) {
+      vectorSize = clmDATA_TYPE_vectorSize_NOCHECK_GET(orgDataType);
+
+      switch(vectorSize) {
       case 0: /* Scalar */
-        resType = _clCastType_SCALAR[NewDecl->dataType->elementType];
-        break;
-
       case 2:
-        resType = _clCastType_VECTOR2[NewDecl->dataType->elementType];
-        break;
-
       case 3:
-        resType = _clCastType_VECTOR3[NewDecl->dataType->elementType];
-        break;
-
       case 4:
-        resType = _clCastType_VECTOR4[NewDecl->dataType->elementType];
-        break;
-
       case 8:
-        resType = _clCastType_VECTOR8[NewDecl->dataType->elementType];
-        break;
-
       case 16:
-        resType = _clCastType_VECTOR16[NewDecl->dataType->elementType];
+        resType = clGetVectorTerminalToken(NewDecl->dataType->elementType,
+                                           vectorSize);
         break;
 
       default:
@@ -7638,19 +7791,19 @@ _cloIR_CONSTANT_BitwiseLogical(
     vectorSize = clsDECL_GetSize(&resultConstant->exprBase.decl);
     if (clmDATA_TYPE_IsHighPrecision(resultConstant->exprBase.decl.dataType)) {
        switch (ExprType) {
-       case clvBINARY_BITWISE_AND:
+       case clvBINARY_AND_BITWISE:
            for(i=0; i < vectorSize; i++) {
               resultConstant->values[i].longValue = leftValues[i].longValue & rightValues[i].longValue;
            }
            break;
 
-       case clvBINARY_BITWISE_OR:
+       case clvBINARY_OR_BITWISE:
            for(i=0; i < vectorSize; i++) {
               resultConstant->values[i].longValue = leftValues[i].longValue | rightValues[i].longValue;
            }
            break;
 
-       case clvBINARY_BITWISE_XOR:
+       case clvBINARY_XOR_BITWISE:
            for(i=0; i < vectorSize; i++) {
               resultConstant->values[i].longValue = leftValues[i].longValue ^ rightValues[i].longValue;
            }
@@ -7663,19 +7816,19 @@ _cloIR_CONSTANT_BitwiseLogical(
     }
     else {
        switch (ExprType) {
-       case clvBINARY_BITWISE_AND:
+       case clvBINARY_AND_BITWISE:
            for(i=0; i < vectorSize; i++) {
               resultConstant->values[i].intValue = leftValues[i].intValue & rightValues[i].intValue;
            }
            break;
 
-       case clvBINARY_BITWISE_OR:
+       case clvBINARY_OR_BITWISE:
            for(i=0; i < vectorSize; i++) {
               resultConstant->values[i].intValue = leftValues[i].intValue | rightValues[i].intValue;
            }
            break;
 
-       case clvBINARY_BITWISE_XOR:
+       case clvBINARY_XOR_BITWISE:
            for(i=0; i < vectorSize; i++) {
               resultConstant->values[i].intValue = leftValues[i].intValue ^ rightValues[i].intValue;
            }
@@ -7849,7 +8002,6 @@ OUT cloIR_CONSTANT * ResultConstant
     gctUINT8 i;
     cluCONSTANT_VALUE  values[4];
     gctINT resultType;
-    clsVecCompSelType *vectorSel;
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -7868,17 +8020,16 @@ OUT cloIR_CONSTANT * ResultConstant
 
     /* Change to the result constant */
     gcmASSERT((gctUINT)Constant->exprBase.decl.dataType->elementType <  _BuiltinVectorTypeCount);
-    vectorSel = _BuiltinVectorTypes + Constant->exprBase.decl.dataType->elementType;
-    gcmASSERT(vectorSel->elementType == Constant->exprBase.decl.dataType->elementType);
-    resultType = vectorSel->compSel[ComponentSelection->components];
+    resultType = clGetVectorTerminalToken(Constant->exprBase.decl.dataType->elementType,
+                                          ComponentSelection->components);
 
     if(resultType) {
        status = cloCOMPILER_CreateDecl(Compiler,
-                       resultType,
-                           Constant->exprBase.decl.dataType->u.generic,
-                       clvQUALIFIER_CONST,
-                       clvQUALIFIER_NONE,
-                       &Constant->exprBase.decl);
+                                       resultType,
+                                       Constant->exprBase.decl.dataType->u.generic,
+                                       clvQUALIFIER_CONST,
+                                       clvQUALIFIER_NONE,
+                                       &Constant->exprBase.decl);
        if (gcmIS_ERROR(status)) return status;
     }
     else {
@@ -8348,7 +8499,7 @@ IN cleUNARY_EXPR_TYPE UnaryExprType
     case clvUNARY_PRE_DEC:            return "--x";
     case clvUNARY_NEG:            return "-";
     case clvUNARY_NOT:            return "!";
-    case clvUNARY_BITWISE_NOT:        return "~";
+    case clvUNARY_NOT_BITWISE:        return "~";
     case clvUNARY_INDIRECTION:        return "*";
     case clvUNARY_ADDR:            return "&";
     case clvUNARY_CAST:            return "type_cast";
@@ -8472,6 +8623,8 @@ IN gctINT intType
    case T_DOUBLE:
    case T_HALF:
    case T_BOOL:
+   case T_HALF_PACKED:
+   case T_BOOL_PACKED:
       return T_INT;
 
    case T_UINT2:
@@ -8514,8 +8667,40 @@ IN gctINT intType
    case T_BOOL16:
       return T_INT16;
 
+   case T_HALF2_PACKED:
+      return T_SHORT2_PACKED;
+
+   case T_BOOL2_PACKED:
+      return T_CHAR2_PACKED;
+
+   case T_HALF3_PACKED:
+      return T_SHORT3_PACKED;
+
+   case T_BOOL3_PACKED:
+      return T_CHAR3_PACKED;
+
+   case T_HALF4_PACKED:
+      return T_SHORT4_PACKED;
+
+   case T_BOOL4_PACKED:
+      return T_CHAR4_PACKED;
+
+   case T_HALF8_PACKED:
+      return T_SHORT8_PACKED;
+
+   case T_BOOL8_PACKED:
+      return T_CHAR8_PACKED;
+
+   case T_HALF16_PACKED:
+      return T_SHORT16_PACKED;
+
+   case T_BOOL16_PACKED:
+      return T_CHAR16_PACKED;
+
    case T_USHORT:
    case T_SHORT:
+   case T_USHORT_PACKED:
+   case T_SHORT_PACKED:
       return T_SHORT;
 
    case T_USHORT2:
@@ -8538,29 +8723,71 @@ IN gctINT intType
    case T_SHORT16:
       return T_SHORT16;
 
+   case T_USHORT2_PACKED:
+   case T_SHORT2_PACKED:
+      return T_SHORT2_PACKED;
+
+   case T_USHORT3_PACKED:
+   case T_SHORT3_PACKED:
+      return T_SHORT3_PACKED;
+
+   case T_USHORT4_PACKED:
+   case T_SHORT4_PACKED:
+      return T_SHORT4_PACKED;
+
+   case T_USHORT8_PACKED:
+   case T_SHORT8_PACKED:
+      return T_SHORT8_PACKED;
+
+   case T_USHORT16_PACKED:
+   case T_SHORT16_PACKED:
+      return T_SHORT16_PACKED;
+
    case T_UCHAR:
    case T_CHAR:
+   case T_UCHAR_PACKED:
+   case T_CHAR_PACKED:
       return T_CHAR;
 
    case T_UCHAR2:
    case T_CHAR2:
       return T_CHAR2;
 
+   case T_UCHAR2_PACKED:
+   case T_CHAR2_PACKED:
+      return T_CHAR2_PACKED;
+
    case T_UCHAR3:
    case T_CHAR3:
       return T_CHAR3;
+
+   case T_UCHAR3_PACKED:
+   case T_CHAR3_PACKED:
+      return T_CHAR3_PACKED;
 
    case T_UCHAR4:
    case T_CHAR4:
       return T_CHAR4;
 
+   case T_UCHAR4_PACKED:
+   case T_CHAR4_PACKED:
+      return T_CHAR4_PACKED;
+
    case T_UCHAR8:
    case T_CHAR8:
       return T_CHAR8;
 
+   case T_UCHAR8_PACKED:
+   case T_CHAR8_PACKED:
+      return T_CHAR8_PACKED;
+
    case T_UCHAR16:
    case T_CHAR16:
       return T_CHAR16;
+
+   case T_UCHAR16_PACKED:
+   case T_CHAR16_PACKED:
+      return T_CHAR16_PACKED;
 
    case T_ULONG:
    case T_LONG:
@@ -8605,7 +8832,6 @@ OUT clsDECL * Decl
     gceSTATUS status;
     gctINT resultType;
     clsDECL decl;
-    clsVecCompSelType *vectorSel;
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -8632,10 +8858,7 @@ OUT clsDECL * Decl
         gcmASSERT(ComponentSelection);
         gcmASSERT(clmDECL_IsBVecOrIVecOrVec(&Operand->decl));
 
-        gcmASSERT((gctUINT)Operand->decl.dataType->elementType <  _BuiltinVectorTypeCount);
-        vectorSel = _BuiltinVectorTypes + Operand->decl.dataType->elementType;
-        gcmASSERT(vectorSel->elementType == Operand->decl.dataType->elementType);
-        resultType = vectorSel->compSel[ComponentSelection->components];
+        resultType = clGetVectorTerminalToken(Operand->decl.dataType->elementType, ComponentSelection->components);
         if(resultType) {
             status = cloCOMPILER_CreateDecl(Compiler,
                                             resultType,
@@ -8664,7 +8887,7 @@ OUT clsDECL * Decl
 
     case clvUNARY_NEG:
     case clvUNARY_NON_LVAL:
-    case clvUNARY_BITWISE_NOT:
+    case clvUNARY_NOT_BITWISE:
         status = cloCOMPILER_CloneDecl(Compiler,
                                        clvQUALIFIER_CONST,
                                        Operand->decl.dataType->addrSpaceQualifier,
@@ -9034,7 +9257,7 @@ OUT cloIR_CONSTANT * ResultConstant
         evaluate = &_NotConstantValue;
         break;
 
-    case clvUNARY_BITWISE_NOT:
+    case clvUNARY_NOT_BITWISE:
         evaluate = &_BitwiseNotConstantValue;
         break;
 
@@ -9122,9 +9345,9 @@ IN cleBINARY_EXPR_TYPE BinaryExprType
     case clvBINARY_XOR_ASSIGN:    return "^=";
     case clvBINARY_OR_ASSIGN:    return "|=";
 
-    case clvBINARY_BITWISE_AND:     return "&";
-    case clvBINARY_BITWISE_OR:    return "|";
-    case clvBINARY_BITWISE_XOR:    return "^";
+    case clvBINARY_AND_BITWISE:     return "&";
+    case clvBINARY_OR_BITWISE:    return "|";
+    case clvBINARY_XOR_BITWISE:    return "^";
 
     case clvBINARY_LSHIFT:        return "<<";
     case clvBINARY_RSHIFT:        return ">>";
@@ -9217,7 +9440,6 @@ OUT clsDECL *Decl
   clsDECL *exprDecl;
   clsDECL *leftDecl;
   clsDECL *rightDecl;
-  clsVecCompSelType *vectorSel;
   gctINT resultType = 0;
   cltQUALIFIER accessQualifier = clvQUALIFIER_CONST;
 
@@ -9251,20 +9473,18 @@ OUT clsDECL *Decl
       }
       else if(clmDECL_IsVectorType(leftDecl)) {
          if (clmDECL_IsMat(rightDecl)) { /* vector and matrix */
-       vectorSel = _BuiltinVectorTypes + rightDecl->dataType->elementType;
-       gcmASSERT(vectorSel->elementType == rightDecl->dataType->elementType);
-       resultType = vectorSel->compSel[clmDATA_TYPE_matrixColumnCount_GET(rightDecl->dataType)];
-           gcmASSERT(resultType);
+             resultType = clGetVectorTerminalToken(rightDecl->dataType->elementType,
+                                                   clmDATA_TYPE_matrixColumnCount_GET(rightDecl->dataType));
+             gcmASSERT(resultType);
          }
       }
       else if(clmDECL_IsMat(leftDecl)) { /* Left operand must be a matrix */
          if(clmDECL_IsVectorType(rightDecl)) {
-       vectorSel = _BuiltinVectorTypes + leftDecl->dataType->elementType;
-       gcmASSERT(vectorSel->elementType == leftDecl->dataType->elementType);
-       resultType = vectorSel->compSel[clmDATA_TYPE_matrixRowCount_GET(leftDecl->dataType)];
-           gcmASSERT(resultType);
+             resultType = clGetVectorTerminalToken(leftDecl->dataType->elementType,
+                                                   clmDATA_TYPE_matrixRowCount_GET(leftDecl->dataType));
+             gcmASSERT(resultType);
          }
-     else if(clmDECL_IsMat(rightDecl)) { /* both are matrices */
+         else if(clmDECL_IsMat(rightDecl)) { /* both are matrices */
              status = cloCOMPILER_CreateDecl(Compiler,
                                              T_FLOATNXM,
                                              gcvNULL,
@@ -9277,7 +9497,7 @@ OUT clsDECL *Decl
                                          clmDATA_TYPE_matrixColumnCount_GET(rightDecl->dataType));
 
              return gcvSTATUS_OK;
-     }
+         }
       }
     }
   }
@@ -9292,10 +9512,10 @@ OUT clsDECL *Decl
   }
   else {
     status = cloCOMPILER_CloneDecl(Compiler,
-                   accessQualifier,
+                                   accessQualifier,
                                    exprDecl->dataType->addrSpaceQualifier,
-                   exprDecl,
-                   Decl);
+                                   exprDecl,
+                                   Decl);
   }
   if (gcmIS_ERROR(status)) return status;
   return gcvSTATUS_OK;
@@ -9532,9 +9752,9 @@ _GetBinaryExprDecl(
         if (gcmIS_ERROR(status)) return status;
         break;
 
-    case clvBINARY_BITWISE_AND:
-    case clvBINARY_BITWISE_OR:
-    case clvBINARY_BITWISE_XOR:
+    case clvBINARY_AND_BITWISE:
+    case clvBINARY_OR_BITWISE:
+    case clvBINARY_XOR_BITWISE:
         status = _GetBitwiseLogicalExprDecl(Compiler,
                                             LeftOperand,
                                             RightOperand,
@@ -9759,9 +9979,9 @@ OUT cloIR_CONSTANT * ResultConstant
                               RightConstant,
                               ResultConstant);
 
-    case clvBINARY_BITWISE_AND:
-    case clvBINARY_BITWISE_OR:
-    case clvBINARY_BITWISE_XOR:
+    case clvBINARY_AND_BITWISE:
+    case clvBINARY_OR_BITWISE:
+    case clvBINARY_XOR_BITWISE:
         return _cloIR_CONSTANT_BitwiseLogical(Compiler,
                               Type,
                               LeftConstant,
@@ -10527,6 +10747,7 @@ _SetVectorConstantValuesByOneScalarValue(
     switch (ResultConstant->exprBase.decl.dataType->elementType)
     {
     case clvTYPE_BOOL:
+    case clvTYPE_BOOL_PACKED:
         gcmVERIFY_OK(cloIR_CONSTANT_GetBoolValue(Compiler,
                             OperandConstant,
                             0,
@@ -10535,6 +10756,7 @@ _SetVectorConstantValuesByOneScalarValue(
 
     case clvTYPE_INT:
     case clvTYPE_SHORT:
+    case clvTYPE_SHORT_PACKED:
         gcmVERIFY_OK(cloIR_CONSTANT_GetIntValue(Compiler,
                             OperandConstant,
                             0,
@@ -10551,6 +10773,8 @@ _SetVectorConstantValuesByOneScalarValue(
     case clvTYPE_UINT:
     case clvTYPE_USHORT:
     case clvTYPE_UCHAR:
+    case clvTYPE_USHORT_PACKED:
+    case clvTYPE_UCHAR_PACKED:
         gcmVERIFY_OK(cloIR_CONSTANT_GetUintValue(Compiler,
                             OperandConstant,
                             0,
@@ -10567,6 +10791,7 @@ _SetVectorConstantValuesByOneScalarValue(
     case clvTYPE_FLOAT:
     case clvTYPE_DOUBLE:
     case clvTYPE_HALF:
+    case clvTYPE_HALF_PACKED:
         gcmVERIFY_OK(cloIR_CONSTANT_GetFloatValue(Compiler,
                               OperandConstant,
                               0,
@@ -10574,6 +10799,7 @@ _SetVectorConstantValuesByOneScalarValue(
         break;
 
     case clvTYPE_CHAR:
+    case clvTYPE_CHAR_PACKED:
         gcmVERIFY_OK(cloIR_CONSTANT_GetCharValue(Compiler,
                              OperandConstant,
                              0,

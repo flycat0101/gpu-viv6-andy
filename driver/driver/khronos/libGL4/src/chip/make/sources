@@ -1,0 +1,44 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# This is the SOURCES file for OpenGL code
+#
+TARGETNAME=chip
+TARGETTYPE=LIBRARY
+
+MODULEINCDIR=
+
+SOURCES= \
+../gc_chip_basic_types.o \
+../gc_chip_buffer.o \
+../gc_chip_clear.o \
+../gc_chip_codec.o \
+../gc_chip_context.o \
+../gc_chip_depth.o \
+../gc_chip_device.o \
+../gc_chip_draw.o \
+../gc_chip_drawable.o \
+../gc_chip_fbo.o \
+../gc_chip_misc.o \
+../gc_chip_patch.o \
+../gc_chip_pixel.o \
+../gc_chip_profiler.o \
+../gc_chip_hash.o \
+../gc_chip_fragment_shader.o \
+../gc_chip_func.o \
+../gc_chip_vertex_shader.o \
+../gc_chip_shader.o \
+../gc_chip_state.o \
+../gc_chip_texture.o \
+../gc_chip_utils.o

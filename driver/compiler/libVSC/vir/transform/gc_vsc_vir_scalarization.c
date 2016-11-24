@@ -116,15 +116,15 @@ static void _VSC_SCL_ArrayInfo_Dump(
     _VSC_SCL_ArrayInfo_DumpNewSymbols(VSC_SCL_ArrayInfo_GetNewSymbols(array_info), dumper);
 }
 
-void VSC_SCL_Scalarization_Init(
+static void VSC_SCL_Scalarization_Init(
     IN OUT VSC_SCL_Scalarization* scl,
     IN VIR_Shader* shader,
     IN VSC_OPTN_SCLOptions* options,
-    IN VIR_Dumper* dumper
+    IN VIR_Dumper* dumper,
+    IN VSC_MM* pMM
     )
 {
-    vscPMP_Intialize(VSC_SCL_Scalarization_GetPmp(scl), gcvNULL, 1024,
-                     sizeof(void*), gcvTRUE);
+    scl->pMM = pMM;
     vscHTBL_Initialize(VSC_SCL_Scalarization_GetArrayInfos(scl),
         VSC_SCL_Scalarization_GetMM(scl), vscHFUNC_Default, vscHKCMP_Default, 512);
     VSC_SCL_Scalarization_SetShader(scl, shader);
@@ -156,11 +156,10 @@ static VSC_SCL_ArrayInfo* _VSC_SCL_Scalarization_GetArrayInfo(
     }
     return array_info;
 }
-void VSC_SCL_Scalarization_Final(
+static void VSC_SCL_Scalarization_Final(
     IN VSC_SCL_Scalarization* scl
     )
 {
-    vscPMP_Finalize(&scl->pmp);
 }
 
 static VSC_ErrCode _VSC_SCL_CollectInformationFromOper(
@@ -421,19 +420,27 @@ static VSC_ErrCode _VSC_SCL_DoSubstitutionForShader(
     return errcode;
 }
 
+DEF_QUERY_PASS_PROP(VSC_SCL_Scalarization_PerformOnShader)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_SCALARIZE;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+}
+
 VSC_ErrCode VSC_SCL_Scalarization_PerformOnShader(
-    IN OUT VSC_SCL_Scalarization* scl
+    IN VSC_SH_PASS_WORKER* pPassWorker
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    VIR_Shader* shader = VSC_SCL_Scalarization_GetShader(scl);
+    VSC_SCL_Scalarization scl;
+    VIR_Shader* shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VIR_Function* old_curr_func = VIR_Shader_GetCurrentFunction(shader);
-    VSC_OPTN_SCLOptions* options = VSC_SCL_Scalarization_GetOptions(scl);
+    VSC_OPTN_SCLOptions* options = (VSC_OPTN_SCLOptions*)pPassWorker->basePassWorker.pBaseOption;
 
     /* print title */
     if(VSC_OPTN_SCLOptions_GetTrace(options))
     {
-        VIR_Dumper* dumper = VSC_SCL_Scalarization_GetDumper(scl);
+        VIR_Dumper* dumper = pPassWorker->basePassWorker.pDumper;
         VIR_LOG(dumper, VSC_TRACE_BAR_LINE);
         VIR_LOG(dumper, "Scalarization");
         VIR_LOG(dumper, VSC_TRACE_BAR_LINE);
@@ -442,24 +449,29 @@ VSC_ErrCode VSC_SCL_Scalarization_PerformOnShader(
     /* dump input shader */
     if(VSC_UTILS_MASK(VSC_OPTN_SCLOptions_GetTrace(options), VSC_OPTN_SCLOptions_TRACE_INPUT_SHADER))
     {
-        VIR_Dumper* dumper = VSC_SCL_Scalarization_GetDumper(scl);
+        VIR_Dumper* dumper = pPassWorker->basePassWorker.pDumper;
         VIR_LOG(dumper, "Input shader:");
         /* VIR_Shader_Dump(dumper, shader); */
     }
 
+    VSC_SCL_Scalarization_Init(&scl, shader, options, pPassWorker->basePassWorker.pDumper,
+                               pPassWorker->basePassWorker.pMM);
+
     /* collect array information */
-    errCode = _VSC_SCL_CollectInformationforShader(scl);
+    errCode = _VSC_SCL_CollectInformationforShader(&scl);
 
     /* generate new symbols */
-    errCode = _VSC_SCL_GenerateNewSymbolForShader(scl);
+    errCode = _VSC_SCL_GenerateNewSymbolForShader(&scl);
 
     /* do symbol substitution */
-    errCode = _VSC_SCL_DoSubstitutionForShader(scl);
+    errCode = _VSC_SCL_DoSubstitutionForShader(&scl);
+
+    VSC_SCL_Scalarization_Final(&scl);
 
     /* dump output functions */
     if(VSC_UTILS_MASK(VSC_OPTN_SCLOptions_GetTrace(options), VSC_OPTN_SCLOptions_TRACE_INPUT_FUNCTIONS))
     {
-        VIR_Dumper* dumper = VSC_SCL_Scalarization_GetDumper(scl);
+        VIR_Dumper* dumper = pPassWorker->basePassWorker.pDumper;
         VIR_FuncIterator func_iter;
         VIR_FunctionNode* func_node;
 
@@ -477,12 +489,13 @@ VSC_ErrCode VSC_SCL_Scalarization_PerformOnShader(
     /* dump output shader */
     if(VSC_UTILS_MASK(VSC_OPTN_SCLOptions_GetTrace(options),
                       VSC_OPTN_SCLOptions_TRACE_OUTPUT_SHADER) ||
-       gcSHADER_DumpCodeGenVerbose(shader))
+       VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(shader), VIR_Shader_GetId(shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
             VIR_Shader_Dump(gcvNULL, "After scalar replacement.", shader, gcvTRUE);
     }
 
     VIR_Shader_SetCurrentFunction(shader, old_curr_func);
+
     return errCode;
 }
 

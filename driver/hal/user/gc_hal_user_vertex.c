@@ -618,7 +618,7 @@ gcoSTREAM_Upload(
     gctSIZE_T bytes;
     gctUINT bytes32;
 
-    gcmHEADER_ARG("Stream=0x%x Buffer=0x%x Offset=%u Bytes=%lu Dynamic=%d",
+    gcmHEADER_ARG("Stream=0x%x Buffer=0x%x Offset=%lu Bytes=%lu Dynamic=%d",
               Stream, Buffer, Offset, Bytes, Dynamic);
 
     /* Verify the arguments. */
@@ -4150,6 +4150,7 @@ _copyBuffersEx(
     gctSIZE_T copiedBytes;
     gctSIZE_T copySize;
     gctSIZE_T count;
+    gctSIZE_T needCopyCount;
     gctSIZE_T base;
     gctUINT32 copiedBytes32;
 
@@ -4218,7 +4219,8 @@ _copyBuffersEx(
             else
             {
                 count = 0;
-                while (count != streamPtr->count)
+                needCopyCount = (streamPtr->dynamicCacheStride == 0) ? 1 : streamPtr->count;
+                while (count != needCopyCount)
                 {
                     /* Walk all attributes and adjust offset*/
                     for (attrPtr = streamPtr->attributePtr; attrPtr != gcvNULL; attrPtr = attrPtr->next)
@@ -4649,6 +4651,13 @@ gcoSTREAM_CacheAttributesEx(
 
             /* calculate total bytes */
             totalBytesTmp += (streamPtr->dynamicCacheStride * streamPtr->count);
+
+            if ((streamPtr->copyAll == gcvFALSE) && (streamPtr->merged == gcvFALSE))
+            {
+                /* we can do a once copy if the attribute of this streams is generic and not merged,
+                only need set the stride to 0 */
+                streamPtr->dynamicCacheStride = 0;
+            }
         }
     }
 
@@ -6363,7 +6372,7 @@ gcoSTREAM_CPUCacheOperation_Range(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("Stream=0x%x, Offset=%u Length=%u Operation=%d", Stream, Offset, Length, Operation);
+    gcmHEADER_ARG("Stream=0x%x, Offset=%zu Length=%zu Operation=%d", Stream, Offset, Length, Operation);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Stream, gcvOBJ_STREAM);

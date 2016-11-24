@@ -61,8 +61,8 @@ VSC_GlobalUniformItem_Update(
         VSC_GlobalUniformItem_SetLocation(item, location);
         VSC_GlobalUniformItem_SetRange(item, VIR_Shader_GetLogicalCount(shader, uniform_type));
     }
-    VSC_GlobalUniformItem_SetRegCount(item, VIR_Type_GetVirRegCount(shader, uniform_type));
-    VSC_GlobalUniformItem_SetByteSize(item, VIR_Shader_GetTypeByteSize(shader, uniform_type));
+    VSC_GlobalUniformItem_SetRegCount(item, VIR_Type_GetVirRegCount(shader, uniform_type, -1));
+    VSC_GlobalUniformItem_SetByteSize(item, VIR_Type_GetTypeByteSize(shader, uniform_type));
     vscHTBL_DirectSet(VSC_GlobalUniformTable_GetNameMap(global_uniform_table), name, item);
 }
 
@@ -79,8 +79,8 @@ VSC_GlobalUniformItem_UniformTypeMatch(
 gctBOOL
 VSC_GlobalUniformItem_SuitableForPickingIntoAuxUBO(
     IN VSC_GlobalUniformItem* item,
-    IN gctBOOL useDUBO,
-    IN gctBOOL useCUBO
+    IN gctBOOL skipDUBO,
+    IN gctBOOL skipCUBO
     )
 {
     gctUINT i;
@@ -111,11 +111,11 @@ VSC_GlobalUniformItem_SuitableForPickingIntoAuxUBO(
                 {
                     return gcvFALSE;
                 }
-                if(!useCUBO && VIR_Symbol_HasFlag(uniform_sym, VIR_SYMUNIFORMFLAG_COMPILETIME_INITIALIZED))
+                if(skipCUBO && VIR_Symbol_HasFlag(uniform_sym, VIR_SYMUNIFORMFLAG_COMPILETIME_INITIALIZED))
                 {
                     return gcvFALSE;
                 }
-                if(!useDUBO && !VIR_Symbol_HasFlag(uniform_sym, VIR_SYMUNIFORMFLAG_COMPILETIME_INITIALIZED))
+                if(skipDUBO && !VIR_Symbol_HasFlag(uniform_sym, VIR_SYMUNIFORMFLAG_COMPILETIME_INITIALIZED))
                 {
                     return gcvFALSE;
                 }
@@ -511,7 +511,6 @@ VSC_AllShaders_Initialize(
     IN VIR_Shader* gs_shader,
     IN VIR_Shader* ps_shader,
     IN VIR_Shader* cs_shader,
-    IN VSC_HW_CONFIG* hwCfg,
     IN VIR_Dumper* dumper,
     IN VSC_MM* mem_pool
     )
@@ -535,7 +534,6 @@ VSC_AllShaders_Initialize(
     VSC_GlobalUniformTable_Initialize(VSC_AllShaders_GetGlobalUniformTable(all_shaders), all_shaders, mem_pool);
     VSC_AllShaders_SetDumper(all_shaders, dumper);
     VSC_AllShaders_SetMM(all_shaders, mem_pool);
-    VSC_AllShaders_SetHwCFG(all_shaders, hwCfg);
 }
 
 void
@@ -582,6 +580,7 @@ typedef struct VSC_UF_AUBO
 {
     VSC_AllShaders* all_shaders;
     gctUINT dub_reg_count[VSC_MAX_LINKABLE_SHADER_STAGE_COUNT];
+    gctUINT perShaderReserved[VSC_MAX_LINKABLE_SHADER_STAGE_COUNT];
     gctUINT max_reg_count[VSC_MAX_LINKABLE_SHADER_STAGE_COUNT];
     VIR_SymId aubo[VSC_MAX_LINKABLE_SHADER_STAGE_COUNT];
     VIR_SymId dubo_addr[VSC_MAX_LINKABLE_SHADER_STAGE_COUNT];
@@ -591,7 +590,11 @@ typedef struct VSC_UF_AUBO
     gctUINT cubo_item_count[VSC_MAX_LINKABLE_SHADER_STAGE_COUNT];
     gctUINT dubo_byte_size;
     gctUINT cubo_byte_size;
+    VSC_HASH_TABLE* aux_addresses;
+    gctUINT aux_addr_count;
+    VSC_HW_CONFIG* hwCfg;
     VSC_OPTN_UF_AUBO_Options* options;
+    VSC_MM* mm;
 } VSC_UF_AUBO;
 
 #define VSC_UF_AUBO_GetAllShaders(aubo)             ((aubo)->all_shaders)
@@ -600,6 +603,8 @@ typedef struct VSC_UF_AUBO
 #define VSC_UF_AUBO_GetDUBRegCount(aubo, i)         ((aubo)->dub_reg_count[i])
 #define VSC_UF_AUBO_SetDUBRegCount(aubo, i, d)      ((aubo)->dub_reg_count[i] = (d))
 #define VSC_UF_AUBO_IncDUBRegCount(aubo, i, d)      ((aubo)->dub_reg_count[i] = (aubo)->dub_reg_count[i] + (d))
+#define VSC_UF_AUBO_GetPerShRsvedCount(aubo, i)     ((aubo)->perShaderReserved[i])
+#define VSC_UF_AUBO_SetPerShRsvedCount(aubo, i, d)  ((aubo)->perShaderReserved[i] = (d))
 #define VSC_UF_AUBO_GetMaxRegCount(aubo, i)         ((aubo)->max_reg_count[i])
 #define VSC_UF_AUBO_SetMaxRegCount(aubo, i, m)      ((aubo)->max_reg_count[i] = (m))
 #define VSC_UF_AUBO_GetDUBO(aubo, i)                ((aubo)->aubo[i])
@@ -620,17 +625,28 @@ typedef struct VSC_UF_AUBO
 #define VSC_UF_AUBO_SetDUBOByteSize(aubo, d)        ((aubo)->dubo_byte_size = (d))
 #define VSC_UF_AUBO_GetCUBOByteSize(aubo)           ((aubo)->cubo_byte_size)
 #define VSC_UF_AUBO_SetCUBOByteSize(aubo, d)        ((aubo)->cubo_byte_size = (d))
+#define VSC_UF_AUBO_GetAuxAddresses(aubo)           ((aubo)->aux_addresses)
+#define VSC_UF_AUBO_SetAuxAddresses(aubo, a)        ((aubo)->aux_addresses = (a))
+#define VSC_UF_AUBO_GetAuxAddrCount(aubo)           ((aubo)->aux_addr_count)
+#define VSC_UF_AUBO_SetAuxAddrCount(aubo, a)        ((aubo)->aux_addr_count = (a))
+#define VSC_UF_AUBO_IncAuxAddrCount(aubo)           ((aubo)->aux_addr_count++)
+#define VSC_UF_AUBO_GetHwCfg(aubo)                  ((aubo)->hwCfg)
+#define VSC_UF_AUBO_SetHwCfg(aubo, hc)              ((aubo)->hwCfg = (hc))
 #define VSC_UF_AUBO_GetOptions(aubo)                ((aubo)->options)
 #define VSC_UF_AUBO_SetOptions(aubo, o)             ((aubo)->options = (o))
 #define VSC_UF_AUBO_GetDumper(aubo)                 ((aubo)->all_shaders->dumper)
+#define VSC_UF_AUBO_GetMM(aubo)                     ((aubo)->mm)
+#define VSC_UF_AUBO_SetMM(aubo, m)                  ((aubo)->mm = (m))
 
 /* get the maxmium capability of default uniform block */
 static gctUINT
 _VSC_UF_AUBO_GetCapability(
-    IN VIR_ShaderKind kind,
-    IN VSC_HW_CONFIG* HwCfg
+    IN VSC_UF_AUBO* aubo,
+    IN VIR_ShaderKind kind
     )
 {
+    VSC_HW_CONFIG* HwCfg = VSC_UF_AUBO_GetHwCfg(aubo);
+
     switch (kind)
     {
     case VIR_SHADER_VERTEX:
@@ -803,37 +819,33 @@ static void
 _VSC_UF_AUBO_Initialize(
     IN OUT VSC_UF_AUBO* aubo,
     IN VSC_AllShaders* all_shaders,
+    IN VSC_HW_CONFIG* hwCfg,
     IN VSC_OPTN_UF_AUBO_Options* options
     )
 {
     gctUINT i;
 
-    memset(aubo, 0, sizeof(VSC_UF_AUBO));
+    gcoOS_ZeroMemory(aubo, sizeof(VSC_UF_AUBO));
     VSC_UF_AUBO_SetAllShaders(aubo, all_shaders);
+    VSC_UF_AUBO_SetHwCfg(aubo, hwCfg);
 
     for(i = 0; i < VSC_MAX_LINKABLE_SHADER_STAGE_COUNT; i++)
     {
         VIR_Shader* shader = VSC_AllShaders_GetShader(all_shaders, i);
+
         if(shader)
         {
             VSC_UF_AUBO_SetMaxRegCount(aubo, i,
-                _VSC_UF_AUBO_GetCapability(VIR_Shader_GetKind(shader), all_shaders->hwCfg));
+                _VSC_UF_AUBO_GetCapability(aubo, VIR_Shader_GetKind(shader)));
         }
-        else
-        {
-            VSC_UF_AUBO_SetMaxRegCount(aubo, i, 0);
-        }
-        VSC_UF_AUBO_SetDUBRegCount(aubo, i, 0);
+
         VSC_UF_AUBO_SetDUBO(aubo, i, VIR_INVALID_ID);
         VSC_UF_AUBO_SetDUBOAddr(aubo, i, VIR_INVALID_ID);
-        VSC_UF_AUBO_SetDUBOItemCount(aubo, i, 0);
         VSC_UF_AUBO_SetCUBO(aubo, i, VIR_INVALID_ID);
         VSC_UF_AUBO_SetCUBOAddr(aubo, i, VIR_INVALID_ID);
-        VSC_UF_AUBO_SetCUBOItemCount(aubo, i, 0);
     }
-    VSC_UF_AUBO_SetDUBOByteSize(aubo, 0);
-    VSC_UF_AUBO_SetCUBOByteSize(aubo, 0);
     VSC_UF_AUBO_SetOptions(aubo, options);
+    VSC_UF_AUBO_SetMM(aubo, VSC_AllShaders_GetMM(all_shaders));
 
     if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_INITIALIZE))
     {
@@ -918,6 +930,12 @@ _VSC_UF_AUBO_CollectUniformsInfo(
                                     VSC_GlobalUniformItem_SetFlag(item, VIR_SYMUNIFORMFLAG_ALWAYS_IN_DUB);
                                 }
 
+                                if (VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_PUSH_CONSTANT ||
+                                    VIR_Symbol_GetDescriptorSet(sym) != -1)
+                                {
+                                    VSC_GlobalUniformItem_SetFlag(item, VIR_SYMUNIFORMFLAG_ALWAYS_IN_DUB);
+                                }
+
                                 if(VSC_GlobalUniformItem_HasFlag(item, VIR_SYMFLAG_INACTIVE))
                                 {
                                     VSC_GlobalUniformItem_ResetFlag(item, VIR_SYMFLAG_INACTIVE);
@@ -941,9 +959,18 @@ _VSC_UF_AUBO_CollectUniformsInfo(
     return virErrCode;
 }
 
+typedef enum _VSC_INDIRECT_ACCESS_LEVEL
+{
+    VSC_IndirectAccessLevel_NONE,
+    VSC_IndirectAccessLevel_IMM,
+    VSC_IndirectAccessLevel_UNIFORM_DYNAMICALLY,
+    VSC_IndirectAccessLevel_DYNAMICALLY,
+} VSC_IndirectAccessLevel;
+
 static void
 _VSC_UF_AUBO_CollectIndirectlyAccessedUniforms(
-    IN OUT VSC_UF_AUBO* aubo
+    IN OUT VSC_UF_AUBO* aubo,
+    IN VSC_IndirectAccessLevel level
     )
 {
     VSC_AllShaders* all_shaders = VSC_UF_AUBO_GetAllShaders(aubo);
@@ -976,45 +1003,70 @@ _VSC_UF_AUBO_CollectIndirectlyAccessedUniforms(
                 VIR_Function* func = func_node->function;
                 VIR_Instruction* inst = VIR_Function_GetInstList(func)->pHead;
 
-                if(inst == gcvNULL)
+                while(inst)
                 {
-                    continue;
-                }
-
-                /* iterate over instructions */
-                do
-                {
-                    gctUINT i;
-                    /* iterate over source operands */
-                    for(i = 0; i < 3; i++)
+                    VIR_Symbol* uniform_sym = gcvNULL;
+                    if(VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
                     {
-                        VIR_Operand* src = VIR_Inst_GetSource(inst, i);
-                        if(src && VIR_Operand_isSymbol(src))
+                        VIR_Operand* src0 = VIR_Inst_GetSource(inst, 0);
+                        if(VIR_Operand_isSymbol(src0))
                         {
-                            VIR_Symbol* sym = VIR_Operand_GetSymbol(src);
-                            if(VIR_Symbol_isUniform(sym) && VIR_Operand_GetIsConstIndexing(src))        /* you wen ti */
+                            VIR_Symbol* sym = VIR_Operand_GetSymbol(src0);
+                            if(VIR_Symbol_isUniform(sym))
                             {
-                                if(!VIR_Symbol_HasFlag(sym, VIR_SYMUNIFORMFLAG_MOVED_TO_DUBO))
+                                switch(level)
                                 {
-                                    VSC_GlobalUniformItem* item;
-                                    VSC_GlobalUniformTable_FindUniformWithShaderUniform(global_uniform_table, shader, VIR_Symbol_GetIndex(sym), &item);
-                                    gcmASSERT(item);
-                                    if(!VSC_GlobalUniformItem_HasFlag(item, VIR_SYMUNIFORMFLAG_ALWAYS_IN_DUB))
+                                    case VSC_IndirectAccessLevel_UNIFORM_DYNAMICALLY:
                                     {
-                                        VSC_GlobalUniformItem_SetFlag(item, VIR_SYMUNIFORMFLAG_MOVING_TO_DUBO);
-
-                                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_INDIRECT))
+                                        VIR_Operand* src1 = VIR_Inst_GetSource(inst, 1);
+                                        if(!VIR_Operand_HasFlag(src1, VIR_OPNDFLAG_UNIFORM_INDEX) || VIR_TypeId_isFloat(VIR_Operand_GetType(src1)))
                                         {
-                                            VSC_GlobalUniformItem_Dump(item);
+                                            uniform_sym = sym;
                                         }
+                                        break;
                                     }
+                                    default:
+                                        gcmASSERT(0);
                                 }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        gctUINT i;
+                        /* iterate over source operands */
+                        for(i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
+                        {
+                            VIR_Operand* src = VIR_Inst_GetSource(inst, i);
+
+                            gcmASSERT(src);
+                            if(VIR_Operand_isSymbol(src))
+                            {
+                                VIR_Symbol* sym = VIR_Operand_GetSymbol(src);
+                                if(VIR_Symbol_isUniform(sym) && !VIR_Operand_GetIsConstIndexing(src) && VIR_Operand_GetRelAddrMode(src) != VIR_INDEXED_NONE)
+                                {
+                                    uniform_sym = sym;
+                                }
+                            }
+                        }
+                    }
+                    if(uniform_sym && !VIR_Symbol_HasFlag(uniform_sym, VIR_SYMUNIFORMFLAG_MOVED_TO_DUBO))
+                    {
+                        VSC_GlobalUniformItem* item;
+                        VSC_GlobalUniformTable_FindUniformWithShaderUniform(global_uniform_table, shader, VIR_Symbol_GetIndex(uniform_sym), &item);
+                        gcmASSERT(item);
+                        if(!VSC_GlobalUniformItem_HasFlag(item, VIR_SYMUNIFORMFLAG_ALWAYS_IN_DUB))
+                        {
+                            VSC_GlobalUniformItem_SetFlag(item, VIR_SYMUNIFORMFLAG_MOVING_TO_DUBO);
+
+                            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_INDIRECT))
+                            {
+                                VSC_GlobalUniformItem_Dump(item);
                             }
                         }
                     }
                     inst = VIR_Inst_GetNext(inst);
                 }
-                while(inst && inst != VIR_Function_GetInstList(func)->pTail);
             }
         }
     }
@@ -1076,10 +1128,12 @@ _VSC_UF_AUBO_DUBIsAffordable(
             maxRegShaderIdx = i;
         }
 
-        if(VSC_UF_AUBO_GetDUBRegCount(aubo, i) > (VSC_UF_AUBO_GetMaxRegCount(aubo, i) - VSC_OPTN_UF_AUBO_Options_GetConstRegReservation(options)))
+        if(VSC_UF_AUBO_GetDUBRegCount(aubo, i) > (VSC_UF_AUBO_GetMaxRegCount(aubo, i) -
+                              VSC_OPTN_UF_AUBO_Options_GetConstRegReservation(options) - VSC_UF_AUBO_GetPerShRsvedCount(aubo, i)))
         {
             result = gcvFALSE;
-            if(VSC_UF_AUBO_GetDUBRegCount(aubo, i) - (VSC_UF_AUBO_GetMaxRegCount(aubo, i) - VSC_OPTN_UF_AUBO_Options_GetConstRegReservation(options))> max_gap)
+            if(VSC_UF_AUBO_GetDUBRegCount(aubo, i) - (VSC_UF_AUBO_GetMaxRegCount(aubo, i) -
+                              VSC_OPTN_UF_AUBO_Options_GetConstRegReservation(options) - VSC_UF_AUBO_GetPerShRsvedCount(aubo, i))> max_gap)
             {
                 max_gap = VSC_UF_AUBO_GetDUBRegCount(aubo, i) - VSC_UF_AUBO_GetMaxRegCount(aubo, i);
                 fattest = i;
@@ -1093,8 +1147,8 @@ _VSC_UF_AUBO_DUBIsAffordable(
     }
 
     if(result &&
-       aubo->all_shaders->hwCfg->hwFeatureFlags.constRegFileUnified &&
-       totalRegCount > aubo->all_shaders->hwCfg->maxTotalConstRegCount)
+       VSC_UF_AUBO_GetHwCfg(aubo)->hwFeatureFlags.constRegFileUnified &&
+       totalRegCount > VSC_UF_AUBO_GetHwCfg(aubo)->maxTotalConstRegCount)
     {
         result = gcvFALSE;
         if (fattest_shader)
@@ -1201,8 +1255,8 @@ _VSC_UF_AUBO_PickUniforms(
     VSC_GlobalUniformTable* global_uniform_table = VSC_AllShaders_GetGlobalUniformTable(all_shaders);
     VSC_GlobalUniformTable_Iterator iter;
     VSC_GlobalUniformItem* item;
-    gctBOOL usbDUBO = VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_USE_DUBO);
-    gctBOOL usbCUBO = VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_USE_CUBO);
+    gctBOOL skipDUBO = VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_SKIP_DUBO);
+    gctBOOL skipCUBO = VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_SKIP_CUBO);
 
     VSC_GlobalUniformTable_Iterator_Init(&iter, global_uniform_table);
 
@@ -1217,7 +1271,6 @@ _VSC_UF_AUBO_PickUniforms(
     {
         if(VSC_GlobalUniformItem_HasFlag(item, VIR_SYMUNIFORMFLAG_MOVING_TO_DUBO))
         {
-            gcmASSERT(VSC_GlobalUniformItem_SuitableForPickingIntoAuxUBO(item, usbDUBO, usbCUBO));
             _VSC_UF_AUBO_PickItem(aubo, item, &dubo_byte_size, &cubo_byte_size);
         }
     }
@@ -1234,7 +1287,7 @@ _VSC_UF_AUBO_PickUniforms(
         for(item = VSC_GlobalUniformTable_Iterator_First(&iter); item != gcvNULL;
             item = VSC_GlobalUniformTable_Iterator_Next(&iter))
         {
-            if(VSC_GlobalUniformItem_SuitableForPickingIntoAuxUBO(item, usbDUBO, usbCUBO))
+            if(VSC_GlobalUniformItem_SuitableForPickingIntoAuxUBO(item, skipDUBO, skipCUBO))
             {
                 _VSC_UF_AUBO_PickItem(aubo, item, &dubo_byte_size, &cubo_byte_size);
             }
@@ -1252,7 +1305,7 @@ _VSC_UF_AUBO_PickUniforms(
                 for(item = VSC_GlobalUniformTable_Iterator_First(&iter); item != gcvNULL;
                     item = VSC_GlobalUniformTable_Iterator_Next(&iter))
                 {
-                    if(VSC_GlobalUniformItem_IsInShader(item, fattest_shader) && VSC_GlobalUniformItem_SuitableForPickingIntoAuxUBO(item, usbDUBO, usbCUBO))
+                    if(VSC_GlobalUniformItem_IsInShader(item, fattest_shader) && VSC_GlobalUniformItem_SuitableForPickingIntoAuxUBO(item, skipDUBO, skipCUBO))
                     {
                         _VSC_UF_AUBO_PickItem(aubo, item, &dubo_byte_size, &cubo_byte_size);
                         break;
@@ -1310,7 +1363,7 @@ _VSC_UF_AUBO_ConstructDefaultUBO(
             dubo_ub = VIR_Symbol_GetUBO(dubo_sym);
             VSC_UF_AUBO_SetDUBO(aubo, i, VIR_Symbol_GetIndex(dubo_sym));
             dubo_ub->blockSize = VSC_UF_AUBO_GetDUBOByteSize(aubo);
-            dubo_ub->uniforms = (VIR_Uniform **)vscMM_Alloc(&shader->mempool, sizeof(VIR_Uniform*) * count);
+            dubo_ub->uniforms = (VIR_Uniform **)vscMM_Alloc(&shader->pmp.mmWrapper, sizeof(VIR_Uniform*) * count);
             VIR_Symbol_SetFlag(dubo_addr_sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
             VSC_UF_AUBO_SetDUBOAddr(aubo, i, VIR_Symbol_GetIndex(dubo_addr_sym));
         }
@@ -1348,87 +1401,17 @@ _VSC_UF_AUBO_ConstructConstantUBO(
         if(count > 0)
         {
             VIR_Shader* shader = VSC_AllShaders_GetShader(all_shaders, i);
-            /* varables used for creating default ubo */
-            VIR_NameId cubo_nameId;
-            VIR_TypeId cubo_typeId;
-            VIR_SymId cubo_symId;
-            VIR_Symbol* cubo_sym;
+            VIR_Symbol* cubo_sym = gcvNULL;
             VIR_UniformBlock* cubo_ub;
-            /* varables used for creating default ubo address */
-            VIR_NameId cubo_addr_nameId;
-            VIR_SymId cubo_addr_symId;
-            VIR_Symbol* cubo_addr_sym;
-            VIR_Uniform* cubo_addr_uniform;
+            VIR_Symbol* cubo_addr_sym = gcvNULL;
 
-            /* create default ubo */
-            {
-                /* default ubo name */
-                virErrCode = VIR_Shader_AddString(shader,
-                                                    "#ConstantUBO",
-                                                    &cubo_nameId);
-                if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-                /* default ubo type */
-                virErrCode = VIR_Shader_AddStructType(shader,
-                                                        gcvFALSE,
-                                                        cubo_nameId,
-                                                        &cubo_typeId);
-                if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-                /* default ubo symbol */
-                virErrCode = VIR_Shader_AddSymbol(shader,
-                                                    VIR_SYM_UBO,
-                                                    cubo_nameId,
-                                                    VIR_Shader_GetTypeFromId(shader, cubo_typeId),
-                                                    VIR_STORAGE_UNKNOWN,
-                                                    &cubo_symId);
-                if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-                cubo_sym = VIR_Shader_GetSymFromId(shader, cubo_symId);
-                VIR_Symbol_SetPrecision(cubo_sym, VIR_PRECISION_DEFAULT);
-                VIR_Symbol_SetAddrSpace(cubo_sym, VIR_AS_CONSTANT);
-                VIR_Symbol_SetTyQualifier(cubo_sym, VIR_TYQUAL_CONST);
-                VIR_Symbol_SetLayoutQualifier(cubo_sym, VIR_LAYQUAL_PACKED);
-                VIR_Symbol_SetFlag(cubo_sym, VIR_SYMFLAG_COMPILER_GEN);
-
-                cubo_ub = VIR_Symbol_GetUBO(cubo_sym);
-                cubo_ub->blockIndex = (gctINT16)VIR_IdList_Count(VIR_Shader_GetUniformBlocks(shader)) - 1;
-                VIR_Shader_SetConstantUBOIndex(shader, cubo_ub->blockIndex);
-
-                VSC_UF_AUBO_SetCUBO(aubo, i, cubo_symId);
-                cubo_ub->blockSize = VSC_UF_AUBO_GetCUBOByteSize(aubo);
-                cubo_ub->uniforms = (VIR_Uniform **)vscMM_Alloc(&shader->mempool, sizeof(VIR_Uniform*) * count);
-            }
-
-            /* create default ubo address */
-            {
-                virErrCode = VIR_Shader_AddString(shader,
-                                                    "#ConstantUBO",
-                                                    &cubo_addr_nameId);
-                if(virErrCode != VSC_ERR_NONE) return virErrCode;
-
-                /* default ubo symbol */
-                virErrCode = VIR_Shader_AddSymbol(shader,
-                                                    VIR_SYM_UNIFORM,
-                                                    cubo_addr_nameId,
-                                                    VIR_Shader_GetTypeFromId(shader, VIR_TYPE_UINT32),
-                                                    VIR_STORAGE_UNKNOWN,
-                                                    &cubo_addr_symId);
-
-                cubo_addr_sym = VIR_Shader_GetSymFromId(shader, cubo_addr_symId);
-                VIR_Symbol_SetUniformKind(cubo_addr_sym, VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS);
-                VIR_Symbol_SetPrecision(cubo_addr_sym, VIR_PRECISION_HIGH);
-                VIR_Symbol_SetFlag(cubo_addr_sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
-                VIR_Symbol_SetFlag(cubo_addr_sym, VIR_SYMFLAG_COMPILER_GEN);
-
-                cubo_addr_uniform = VIR_Symbol_GetUniform(cubo_addr_sym);
-                cubo_addr_uniform->index = shader->uniformCount - 1;
-                cubo_addr_uniform->blockIndex = cubo_ub->blockIndex;
-
-                VSC_UF_AUBO_SetCUBOAddr(aubo, i, cubo_addr_symId);
-            }
-
-            cubo_ub->baseAddr = cubo_addr_symId;
+            VIR_Shader_GetCUBO(shader, &cubo_sym, &cubo_addr_sym);
+            cubo_ub = VIR_Symbol_GetUBO(cubo_sym);
+            VSC_UF_AUBO_SetCUBO(aubo, i, VIR_Symbol_GetIndex(cubo_sym));
+            cubo_ub->blockSize = VSC_UF_AUBO_GetCUBOByteSize(aubo);
+            cubo_ub->uniforms = (VIR_Uniform **)vscMM_Alloc(&shader->pmp.mmWrapper, sizeof(VIR_Uniform*) * count);
+            VIR_Symbol_SetFlag(cubo_addr_sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
+            VSC_UF_AUBO_SetCUBOAddr(aubo, i, VIR_Symbol_GetIndex(cubo_addr_sym));
         }
     }
 
@@ -1518,18 +1501,16 @@ _VSC_UF_AUBO_FillAuxiliaryUBOs(
 static VIR_TypeId
 _VSC_UF_AUBO_GetUniformDataTypeID(
     IN VIR_Shader* shader,
-    IN VIR_Operand* src
+    IN VIR_Symbol* uniformSym
     )
 {
-    VIR_Symbol* sym;
     VIR_Type* sym_type;
     VIR_TypeId result = VIR_TYPE_UNKNOWN;
     gctBOOL base_find = gcvFALSE;
 
-    sym = VIR_Operand_GetSymbol(src);
-    gcmASSERT(VIR_Symbol_isUniform(sym));
+    gcmASSERT(VIR_Symbol_isUniform(uniformSym));
 
-    sym_type = VIR_Symbol_GetType(sym);
+    sym_type = VIR_Symbol_GetType(uniformSym);
 
     while(!base_find)
     {
@@ -1610,11 +1591,12 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
     gctUINT shader_kind_id = VIR_ShaderKind_Map2KindId(VIR_Shader_GetKind(shader));
     VIR_Instruction *mad_inst, *load_inst;
     VIR_Operand* src0 = VIR_Inst_GetSource(inst, 0);
-    VIR_Operand* indexing_src = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand* indexing_src = gcvNULL;
+    VIR_Swizzle indexing_src_swizzle = VIR_SWIZZLE_X;
     VIR_Symbol* uniform_sym = VIR_Operand_GetSymbol(src);
     VIR_Uniform* uniform = VIR_Symbol_GetUniform(uniform_sym);
     VIR_Type* src_sym_type = VIR_Symbol_GetType(VIR_Operand_GetSymbol(src));
-    VIR_TypeId uniform_data_type_id = _VSC_UF_AUBO_GetUniformDataTypeID(shader, src);
+    VIR_TypeId uniform_data_type_id = _VSC_UF_AUBO_GetUniformDataTypeID(shader, uniform_sym);
     VIR_TypeId base_typeid = VIR_Type_GetBaseTypeId(src_sym_type);
     VIR_Operand *mad_dest, *mad_src0, *mad_src1, *mad_src2, *load_dest, *load_src0, *load_src1;
     VIR_VirRegId mad_regid, load_regid;
@@ -1627,20 +1609,66 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
 
     if (VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
     {
-        VIR_Instruction *prevInst = VIR_Inst_GetPrev(insert_before);
-        if (prevInst &&
-            VIR_Inst_GetOpcode(prevInst) == VIR_OP_MOVA)
-        {
-            VIR_Symbol* movaSym = VIR_Operand_GetSymbol(VIR_Inst_GetDest(prevInst));
+        VIR_Operand* src1 = VIR_Inst_GetSource(inst, 1);
+        VIR_Swizzle src1_swizzle = VIR_Operand_GetSwizzle(src1);
 
-            VIR_Inst_SetOpcode(prevInst, VIR_OP_MOV);
-            VIR_Symbol_SetStorageClass(movaSym, VIR_STORAGE_UNKNOWN);
-            indexing_src = VIR_Inst_GetSource(prevInst, 0);
+        if(VIR_Shader_isRAEnabled(shader))
+        {
+            VIR_Instruction *movaInst = VIR_Inst_GetPrev(inst);
+
+            while(movaInst)
+            {
+                if(VIR_Inst_GetOpcode(movaInst) == VIR_OP_MOVA &&
+                   VIR_Operand_Defines(VIR_Inst_GetDest(movaInst), src1))
+                {
+                    break;
+                }
+                movaInst = VIR_Inst_GetPrev(movaInst);
+            }
+
+            gcmASSERT(movaInst);
+
+            indexing_src = VIR_Inst_GetSource(movaInst, 0);
+        }
+        else
+        {
+            indexing_src = VIR_Inst_GetSource(inst, 1);
+        }
+        indexing_src_swizzle = VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(indexing_src), VIR_Swizzle_GetChannel(src1_swizzle, 0));
+
+        if(VIR_TypeId_isFloat(VIR_Operand_GetType(indexing_src)))
+        {
+            VIR_Instruction *f2i_inst;
+            VIR_Operand *f2i_dest;
+            VIR_VirRegId f2i_regid;
+            VIR_SymId f2i_symid;
+            VIR_Symbol* f2i_sym;
+            virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_AQ_F2I, VIR_TYPE_UINT32, insert_before, gcvTRUE, &f2i_inst);
+
+            f2i_regid = VIR_Shader_NewVirRegId(shader, 1);
+            virErrCode = VIR_Shader_AddSymbol(shader,
+                                              VIR_SYM_VIRREG,
+                                              f2i_regid,
+                                              VIR_Shader_GetTypeFromId(shader, VIR_TYPE_UINT32),
+                                              VIR_STORAGE_UNKNOWN,
+                                              &f2i_symid);
+            if(virErrCode != VSC_ERR_NONE) return virErrCode;
+
+            f2i_sym = VIR_Shader_GetSymFromId(shader, f2i_symid);
+            VIR_Symbol_SetPrecision(f2i_sym, VIR_PRECISION_HIGH);
+            f2i_dest = VIR_Inst_GetDest(f2i_inst);
+            VIR_Operand_SetTempRegister(f2i_dest, func, f2i_symid, VIR_TYPE_UINT32);
+            VIR_Operand_SetEnable(f2i_dest, VIR_ENABLE_X);
+
+            VIR_Operand_Copy(VIR_Inst_GetSource(f2i_inst, 0), indexing_src);
+            VIR_Operand_SetSwizzle(VIR_Inst_GetSource(f2i_inst, 0), indexing_src_swizzle);
+            indexing_src = f2i_dest;
+            indexing_src_swizzle = VIR_SWIZZLE_X;
         }
     }
 
     /* add a MAD instruction to compute the offset */
-    virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_MAD, VIR_TYPE_UINT32, insert_before, &mad_inst);
+    virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_MAD, VIR_TYPE_UINT32, insert_before, gcvTRUE, &mad_inst);
     if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
     /* Get operands from this MAD instruction */
@@ -1652,7 +1680,10 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
     if(VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
     {
             /* set mad_src0 to src1 */
+            gcmASSERT(indexing_src);
             VIR_Operand_Copy(mad_src0, indexing_src);
+            VIR_Operand_Change2Src(mad_src0);
+            VIR_Operand_SetSwizzle(mad_src0, indexing_src_swizzle);
     }
     else if(VIR_Operand_GetRelAddrMode(src))
     {
@@ -1724,19 +1755,12 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
     }
 
     /* add a LOAD instruction to load the uniform data from Default UBO */
-    virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_LOAD, VIR_TYPE_UINT32, insert_before, &load_inst);
+    virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_LOAD, VIR_TYPE_UINT32, insert_before, gcvTRUE, &load_inst);
     if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
-    /* allocate operands for this LOAD instruction */
-    virErrCode = VIR_Function_NewOperand(func, &load_dest);
-    if(virErrCode != VSC_ERR_NONE) return virErrCode;
-    virErrCode = VIR_Function_NewOperand(func, &load_src0);
-    if(virErrCode != VSC_ERR_NONE) return virErrCode;
-    virErrCode = VIR_Function_NewOperand(func, &load_src1);
-    if(virErrCode != VSC_ERR_NONE) return virErrCode;
-    VIR_Inst_SetDest(load_inst, load_dest);
-    VIR_Inst_SetSource(load_inst, 0, load_src0);
-    VIR_Inst_SetSource(load_inst, 1, load_src1);
+    load_dest = VIR_Inst_GetDest(load_inst);
+    load_src0 = VIR_Inst_GetSource(load_inst, 0);
+    load_src1 = VIR_Inst_GetSource(load_inst, 1);
 
     /* allocate a new vir_reg which performs as the dest of LOAD */
     load_regid = VIR_Shader_NewVirRegId(shader, 1);
@@ -1765,7 +1789,7 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
         {
             VIR_TypeId row_typeid = VIR_GetTypeRowType(VIR_Type_GetIndex(base_type));
             VIR_Type* row_type = VIR_Shader_GetTypeFromId(shader, row_typeid);
-            stride = VIR_Shader_GetTypeByteSize(shader, row_type);
+            stride = VIR_Type_GetTypeByteSize(shader, row_type);
         }
         else
         {
@@ -1851,24 +1875,18 @@ _VSC_UF_AUBO_TransformNormalInstruction(
     VIR_Enable new_enable;
     VIR_Symbol* src_sym = VIR_Operand_GetSymbol(src);
     VIR_Type* src_sym_type = VIR_Symbol_GetType(src_sym);
-    VIR_TypeId src_data_type_id = _VSC_UF_AUBO_GetUniformDataTypeID(shader, src);
+    VIR_TypeId src_data_type_id = _VSC_UF_AUBO_GetUniformDataTypeID(shader, src_sym);
     VIR_Type* src_data_type = VIR_Shader_GetTypeFromId(shader, src_data_type_id);
     VIR_Uniform* src_uniform = VIR_Symbol_GetUniform(src_sym);
     VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
     VIR_Dumper* dumper = VSC_UF_AUBO_GetDumper(aubo);
 
-    virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_LOAD, src_data_type_id, insert_before, &new_inst);
+    virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_LOAD, src_data_type_id, insert_before, gcvTRUE, &new_inst);
     if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
-    virErrCode = VIR_Function_NewOperand(func, &new_dest);
-    if(virErrCode != VSC_ERR_NONE) return virErrCode;
-    virErrCode = VIR_Function_NewOperand(func, &new_src0);
-    if(virErrCode != VSC_ERR_NONE) return virErrCode;
-    virErrCode = VIR_Function_NewOperand(func, &new_src1);
-    if(virErrCode != VSC_ERR_NONE) return virErrCode;
-    VIR_Inst_SetDest(new_inst, new_dest);
-    VIR_Inst_SetSource(new_inst, 0, new_src0);
-    VIR_Inst_SetSource(new_inst, 1, new_src1);
+    new_dest = VIR_Inst_GetDest(new_inst);
+    new_src0 = VIR_Inst_GetSource(new_inst, 0);
+    new_src1 = VIR_Inst_GetSource(new_inst, 1);
 
     /* The type of src may be different with the type of uniform data. Use
        the type of uniform data to construct load instruction here */
@@ -1939,11 +1957,11 @@ _VSC_UF_AUBO_TransformNormalInstruction(
                 {
                     VIR_TypeId row_typeid = VIR_GetTypeRowType(VIR_Type_GetIndex(base_type));
                     VIR_Type* row_type = VIR_Shader_GetTypeFromId(shader, row_typeid);
-                    stride = VIR_Shader_GetTypeByteSize(shader, row_type);
+                    stride = VIR_Type_GetTypeByteSize(shader, row_type);
                 }
                 else
                 {
-                    stride = VIR_Shader_GetTypeByteSize(shader, base_type);
+                    stride = VIR_Type_GetTypeByteSize(shader, base_type);
                 }
                 VIR_Operand_SetImmediateUint(new_src1, src_uniform->offset + stride * (const_index + mat_index));
             }
@@ -1972,15 +1990,11 @@ _VSC_UF_AUBO_TransformNormalInstruction(
        (VIR_GetTypeFlag(src_data_type_id) & VIR_TYFLAG_ISFLOAT) && (VIR_GetTypeFlag(src_type_id) & VIR_TYFLAG_ISINTEGER))
     {
         VIR_TypeId converted_typeid = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(src_type_id), VIR_GetTypeComponents(src_data_type_id), 1);
-        virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_AQ_F2I, converted_typeid, insert_before, &conv_inst);
+        virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_AQ_F2I, converted_typeid, insert_before, gcvTRUE, &conv_inst);
         if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
-        virErrCode = VIR_Function_NewOperand(func, &new_dest);
-        if(virErrCode != VSC_ERR_NONE) return virErrCode;
-        virErrCode = VIR_Function_NewOperand(func, &new_src0);
-        if(virErrCode != VSC_ERR_NONE) return virErrCode;
-        VIR_Inst_SetDest(conv_inst, new_dest);
-        VIR_Inst_SetSource(conv_inst, 0, new_src0);
+        new_dest = VIR_Inst_GetDest(conv_inst);
+        new_src0 = VIR_Inst_GetSource(conv_inst, 0);
 
         conv_regid = VIR_Shader_NewVirRegId(shader, 1);
         virErrCode = VIR_Shader_AddSymbol(shader,
@@ -2119,10 +2133,10 @@ _VSC_UF_AUBO_TransformInstructions(
                         if(VIR_Operand_isTexldParm(src))
                         {
                             gctUINT k;
-                            VIR_Operand_TexldModifier* tms = (VIR_Operand_TexldModifier*)src;
+                            VIR_Operand* tms = (VIR_Operand*)src;
                             for(k = 0; k < VIR_TEXLDMODIFIER_COUNT; ++k)
                             {
-                                VIR_Operand* tm = tms->tmodifier[k];
+                                VIR_Operand* tm = VIR_Operand_GetTexldModifier(tms, k);
                                 if(tm != gcvNULL)
                                 {
                                     if(VIR_Operand_isSymbol(tm))
@@ -2158,8 +2172,1893 @@ _VSC_UF_AUBO_TransformInstructions(
     return virErrCode;
 }
 
+typedef struct VSC_UF_AUBO_GetAuxAddress_Key
+{
+    VIR_Symbol* uniformSym;
+    gctUINT constOffset;
+} VSC_UF_AUBO_GetAuxAddress_Key;
+
+static gctUINT
+_VSC_UF_AUBO_GetAuxAddress_HashFunc(const void* pHashKey)
+{
+    VSC_UF_AUBO_GetAuxAddress_Key* key = (VSC_UF_AUBO_GetAuxAddress_Key*)pHashKey;
+
+    return (gctUINT)(gctUINTPTR_T)key->uniformSym & 0xf;
+}
+
+static gctBOOL
+_VSC_UF_AUBO_GetAuxAddress_KeyCmp(const void* pHashKey1, const void* pHashKey2)
+{
+    VSC_UF_AUBO_GetAuxAddress_Key* key1 = (VSC_UF_AUBO_GetAuxAddress_Key*)pHashKey1;
+    VSC_UF_AUBO_GetAuxAddress_Key* key2 = (VSC_UF_AUBO_GetAuxAddress_Key*)pHashKey2;
+
+    return key1->uniformSym == key2->uniformSym &&
+           key1->constOffset == key2->constOffset;
+}
+
+static VIR_SymId
+_VSC_UF_AUBO_GetAuxAddress(
+    IN OUT VSC_UF_AUBO* aubo,
+    IN VIR_Shader* shader,
+    IN VIR_Symbol* uniformSym,
+    IN gctUINT constOffset
+    )
+{
+    VSC_ErrCode virErrCode = VSC_ERR_NONE;
+    VSC_UF_AUBO_GetAuxAddress_Key* key = (VSC_UF_AUBO_GetAuxAddress_Key*)vscMM_Alloc(VSC_UF_AUBO_GetMM(aubo), sizeof(VSC_UF_AUBO_GetAuxAddress_Key));
+    VSC_HASH_TABLE* auxAddressTable = VSC_UF_AUBO_GetAuxAddresses(aubo);
+    VIR_Symbol* auxAddrSym;
+    VIR_SymId auxAddrSymId;
+
+    if(auxAddressTable == gcvNULL)
+    {
+        auxAddressTable = vscHTBL_Create(VSC_UF_AUBO_GetMM(aubo), _VSC_UF_AUBO_GetAuxAddress_HashFunc, _VSC_UF_AUBO_GetAuxAddress_KeyCmp, 16);
+        VSC_UF_AUBO_SetAuxAddresses(aubo, auxAddressTable);
+    }
+
+    key->uniformSym = uniformSym;
+    key->constOffset = constOffset;
+    if(!vscHTBL_DirectTestAndGet(auxAddressTable, (void*)key, (void**)&auxAddrSym))
+    {
+        VIR_Uniform* uniform = VIR_Symbol_GetUniform(uniformSym);
+        VIR_Symbol* defaultUBOSym;
+        VIR_Symbol* defaultUBOAddr;
+
+        VIR_Shader_GetDUBO(shader, &defaultUBOSym, &defaultUBOAddr);
+        if(VIR_Uniform_GetOffset(uniform) + constOffset == 0)
+        {
+            auxAddrSym = defaultUBOAddr;
+        }
+        else
+        {
+            gctCHAR name[64];
+            VIR_NameId auxAddrNameId;
+            VIR_Uniform* auxAddrUniform;
+            VIR_UniformBlock* defaultUBO;
+            VIR_Uniform* defaultUBOAddrUniform;
+
+            gcoOS_PrintStrSafe(name, 64, gcvNULL, "#DefaultUBO_%d", VSC_UF_AUBO_GetAuxAddrCount(aubo));
+            VSC_UF_AUBO_IncAuxAddrCount(aubo);
+
+            virErrCode = VIR_Shader_AddString(shader,
+                                              name,
+                                              &auxAddrNameId);
+            if(virErrCode != VSC_ERR_NONE) return VIR_INVALID_ID;
+
+            defaultUBO = VIR_Symbol_GetUBO(defaultUBOSym);
+            defaultUBOAddrUniform = VIR_Symbol_GetUniform(defaultUBOAddr);
+
+            virErrCode = VIR_Shader_AddSymbol(shader,
+                VIR_SYM_UNIFORM,
+                auxAddrNameId,
+                VIR_Shader_GetTypeFromId(shader, VIR_TYPE_UINT32),
+                VIR_STORAGE_UNKNOWN,
+                &auxAddrSymId);
+
+            auxAddrSym = VIR_Shader_GetSymFromId(shader, auxAddrSymId);
+            VIR_Symbol_SetUniformKind(auxAddrSym, VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS);
+            VIR_Symbol_SetPrecision(auxAddrSym, VIR_PRECISION_HIGH);
+            VIR_Symbol_SetFlag(auxAddrSym, VIR_SYMFLAG_COMPILER_GEN);
+
+            auxAddrUniform = VIR_Symbol_GetUniform(auxAddrSym);
+            auxAddrUniform->blockIndex = defaultUBO->blockIndex;
+            VIR_Uniform_SetOffset(auxAddrUniform, VIR_Uniform_GetOffset(uniform) + constOffset);
+
+            while(VIR_Uniform_GetAuxAddrSymId(defaultUBOAddrUniform) != VIR_INVALID_ID)
+            {
+                VIR_Symbol* auxAddr = VIR_Shader_GetSymFromId(shader, VIR_Uniform_GetAuxAddrSymId(defaultUBOAddrUniform));
+                defaultUBOAddrUniform = VIR_Symbol_GetUniform(auxAddr);
+            }
+
+            VIR_Uniform_SetAuxAddrSymId(defaultUBOAddrUniform, auxAddrSymId);
+        }
+
+        vscHTBL_DirectSet(auxAddressTable, (void*)key, (void*)auxAddrSym);
+    }
+
+    auxAddrSymId = VIR_Symbol_GetIndex(auxAddrSym);
+    return auxAddrSymId;
+}
+
+typedef struct VSC_UF_AUBO_UNIFORMINFONODE
+{
+    VSC_UNI_LIST_NODE node;
+    VIR_Instruction* inst;      /* inst containing the uniform */
+    VIR_Operand* operand;       /* operand containing the uniform */
+    VIR_Symbol* uniformSym;
+    VIR_SymId indexSymId;
+    VIR_Operand* indexOperand;
+    VIR_Swizzle indexSwizzle;
+    gctUINT constOffset;
+    gctUINT stride;
+    struct VSC_UF_AUBO_UNIFORMINFONODE* sameIndexList;
+    struct VSC_UF_AUBO_UNIFORMINFONODE* sameIndexSameSwizzleList;
+    struct VSC_UF_AUBO_UNIFORMINFONODE* sameIndexSameSwizzleSameStrideList;
+    struct VSC_UF_AUBO_UNIFORMINFONODE* identicalList;
+    struct VSC_UF_AUBO_UNIFORMINFONODE* identical;
+    struct VSC_UF_AUBO_UNIFORMINFONODE* sameIndexSameSwizzleSameStride;
+    struct VSC_UF_AUBO_UNIFORMINFONODE* sameIndexSameSwizzle;
+    struct VSC_UF_AUBO_UNIFORMINFONODE* sameIndex;
+    gctUINT sameIndexId;
+    VIR_Instruction* f2iInst;
+    VIR_Instruction* madInst;
+    VIR_Instruction* loadInst;
+} VSC_UF_AUBO_UniformInfoNode;
+
+#define VSC_UF_AUBO_UniformInfoNode_GetInst(ui)                                         ((ui)->inst)
+#define VSC_UF_AUBO_UniformInfoNode_SetInst(ui, i)                                      ((ui)->inst = (i))
+#define VSC_UF_AUBO_UniformInfoNode_GetOperand(ui)                                      ((ui)->operand)
+#define VSC_UF_AUBO_UniformInfoNode_SetOperand(ui, o)                                   ((ui)->operand = (o))
+#define VSC_UF_AUBO_UniformInfoNode_GetUniformSym(ui)                                   ((ui)->uniformSym)
+#define VSC_UF_AUBO_UniformInfoNode_SetUniformSym(ui, us)                               ((ui)->uniformSym = (us))
+#define VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(ui)                                   ((ui)->indexSymId)
+#define VSC_UF_AUBO_UniformInfoNode_SetIndexSymId(ui, i)                                ((ui)->indexSymId = (i))
+#define VSC_UF_AUBO_UniformInfoNode_GetIndexOperand(ui)                                 ((ui)->indexOperand)
+#define VSC_UF_AUBO_UniformInfoNode_SetIndexOperand(ui, i)                              ((ui)->indexOperand = (i))
+#define VSC_UF_AUBO_UniformInfoNode_GetIndexSwizzle(ui)                                 ((ui)->indexSwizzle)
+#define VSC_UF_AUBO_UniformInfoNode_SetIndexSwizzle(ui, is)                             ((ui)->indexSwizzle = (is))
+#define VSC_UF_AUBO_UniformInfoNode_GetConstOffset(ui)                                  ((ui)->constOffset)
+#define VSC_UF_AUBO_UniformInfoNode_SetConstOffset(ui, c)                               ((ui)->constOffset = (c))
+#define VSC_UF_AUBO_UniformInfoNode_GetStride(ui)                                       ((ui)->stride)
+#define VSC_UF_AUBO_UniformInfoNode_SetStride(ui, s)                                    ((ui)->stride = (s))
+#define VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(ui)                                ((ui)->sameIndexList)
+#define VSC_UF_AUBO_UniformInfoNode_SetSameIndexList(ui, s)                             ((ui)->sameIndexList = (s))
+#define VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleList(ui)                     ((ui)->sameIndexSameSwizzleList)
+#define VSC_UF_AUBO_UniformInfoNode_SetSameIndexSameSwizzleList(ui, s)                  ((ui)->sameIndexSameSwizzleList = (s))
+#define VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleSameStrideList(ui)           ((ui)->sameIndexSameSwizzleSameStrideList)
+#define VSC_UF_AUBO_UniformInfoNode_SetSameIndexSameSwizzleSameStrideList(ui, s)        ((ui)->sameIndexSameSwizzleSameStrideList = (s))
+#define VSC_UF_AUBO_UniformInfoNode_GetIdenticalList(ui)                                ((ui)->identicalList)
+#define VSC_UF_AUBO_UniformInfoNode_SetIdenticalList(ui, i)                             ((ui)->identicalList = (i))
+#define VSC_UF_AUBO_UniformInfoNode_GetIdentical(ui)                                    ((ui)->identical)
+#define VSC_UF_AUBO_UniformInfoNode_SetIdentical(ui, i)                                 ((ui)->identical = (i))
+#define VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleSameStride(ui)               ((ui)->sameIndexSameSwizzleSameStride)
+#define VSC_UF_AUBO_UniformInfoNode_SetSameIndexSameSwizzleSameStride(ui, s)            ((ui)->sameIndexSameSwizzleSameStride = (s))
+#define VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzle(ui)                         ((ui)->sameIndexSameSwizzle)
+#define VSC_UF_AUBO_UniformInfoNode_SetSameIndexSameSwizzle(ui, s)                      ((ui)->sameIndexSameSwizzle = (s))
+#define VSC_UF_AUBO_UniformInfoNode_GetSameIndex(ui)                                    ((ui)->sameIndex)
+#define VSC_UF_AUBO_UniformInfoNode_SetSameIndex(ui, s)                                 ((ui)->sameIndex = (s))
+#define VSC_UF_AUBO_UniformInfoNode_GetSameIndexId(ui)                                  ((ui)->sameIndexId)
+#define VSC_UF_AUBO_UniformInfoNode_SetSameIndexId(ui, s)                               ((ui)->sameIndexId = (s))
+#define VSC_UF_AUBO_UniformInfoNode_GetF2IInst(ui)                                      ((ui)->f2iInst)
+#define VSC_UF_AUBO_UniformInfoNode_SetF2IInst(ui, f)                                   ((ui)->f2iInst = (f))
+#define VSC_UF_AUBO_UniformInfoNode_GetMADInst(ui)                                      ((ui)->madInst)
+#define VSC_UF_AUBO_UniformInfoNode_SetMADInst(ui, m)                                   ((ui)->madInst = (m))
+#define VSC_UF_AUBO_UniformInfoNode_GetLOADInst(ui)                                     ((ui)->loadInst)
+#define VSC_UF_AUBO_UniformInfoNode_SetLOADInst(ui, l)                                  ((ui)->loadInst = (l))
+
+static void
+_VSC_UF_AUBO_UniformInfoNode_Init(
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin,
+    IN VIR_Instruction* inst,
+    IN VIR_Operand* opnd,
+    IN VIR_Symbol* uniformSym
+    )
+{
+    gcoOS_ZeroMemory(uin, sizeof(VSC_UF_AUBO_UniformInfoNode));
+    VSC_UF_AUBO_UniformInfoNode_SetInst(uin, inst);
+    VSC_UF_AUBO_UniformInfoNode_SetOperand(uin, opnd);
+    VSC_UF_AUBO_UniformInfoNode_SetUniformSym(uin, uniformSym);
+    VSC_UF_AUBO_UniformInfoNode_SetIndexSymId(uin, VIR_INVALID_ID);
+}
+
+static void
+_VSC_UF_AUBO_UniformInfoNode_AppendSameIndexList(
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin0,
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin1
+    )
+{
+    VSC_UF_AUBO_UniformInfoNode* list = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(uin0);
+
+    VSC_UF_AUBO_UniformInfoNode_SetSameIndex(uin1, uin0);
+    while(list != gcvNULL)
+    {
+        uin0 = list;
+        list = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(uin0);
+    }
+
+    VSC_UF_AUBO_UniformInfoNode_SetSameIndexList(uin0, uin1);
+}
+
+static void
+_VSC_UF_AUBO_UniformInfoNode_RemoveFromSameIndexList(
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin0,
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin1
+    )
+{
+    VSC_UF_AUBO_UniformInfoNode* list = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(uin0);
+
+    if(list == uin1)
+    {
+        VSC_UF_AUBO_UniformInfoNode_SetSameIndexList(uin0, VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(uin1));
+    }
+    else
+    {
+        while(list != gcvNULL)
+        {
+            VSC_UF_AUBO_UniformInfoNode* listNext = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(list);
+
+            if(listNext == uin1)
+            {
+                VSC_UF_AUBO_UniformInfoNode_SetSameIndexList(list, VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(listNext));
+                break;
+            }
+            else
+            {
+                list = listNext;
+            }
+        }
+        gcmASSERT(list);
+    }
+    VSC_UF_AUBO_UniformInfoNode_SetSameIndexList(uin1, gcvNULL);
+}
+
+static void
+_VSC_UF_AUBO_UniformInfoNode_AppendSameIndexSameSwizzleList(
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin0,
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin1
+    )
+{
+    VSC_UF_AUBO_UniformInfoNode* list = VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleList(uin0);
+
+    VSC_UF_AUBO_UniformInfoNode_SetSameIndexSameSwizzle(uin1, uin0);
+    while(list != gcvNULL)
+    {
+        uin0 = list;
+        list = VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleList(uin0);
+    }
+
+    VSC_UF_AUBO_UniformInfoNode_SetSameIndexSameSwizzleList(uin0, uin1);
+}
+
+static void
+_VSC_UF_AUBO_UniformInfoNode_AppendSameIndexSameSwizzleSameStrideList(
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin0,
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin1
+    )
+{
+    VSC_UF_AUBO_UniformInfoNode* list = VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleSameStrideList(uin0);
+
+    VSC_UF_AUBO_UniformInfoNode_SetSameIndexSameSwizzleSameStride(uin1, uin0);
+    while(list != gcvNULL)
+    {
+        uin0 = list;
+        list = VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleSameStrideList(uin0);
+    }
+
+    VSC_UF_AUBO_UniformInfoNode_SetSameIndexSameSwizzleSameStrideList(uin0, uin1);
+}
+
+static void
+_VSC_UF_AUBO_UniformInfoNode_LowerSameIndex2SameIndexSameSwizzle(
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin0,
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin1
+    )
+{
+    _VSC_UF_AUBO_UniformInfoNode_RemoveFromSameIndexList(uin0, uin1);
+    _VSC_UF_AUBO_UniformInfoNode_AppendSameIndexSameSwizzleList(uin0, uin1);
+}
+
+static void
+_VSC_UF_AUBO_UniformInfoNode_LowerSameIndex2SameIndexSameSwizzleSameStride(
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin0,
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin1
+    )
+{
+    _VSC_UF_AUBO_UniformInfoNode_RemoveFromSameIndexList(uin0, uin1);
+    _VSC_UF_AUBO_UniformInfoNode_AppendSameIndexSameSwizzleSameStrideList(uin0, uin1);
+}
+
+static void
+_VSC_UF_AUBO_UniformInfoNode_AppendIdenticalList(
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin0,
+    IN OUT VSC_UF_AUBO_UniformInfoNode* uin1
+    )
+{
+    VSC_UF_AUBO_UniformInfoNode* list = VSC_UF_AUBO_UniformInfoNode_GetIdenticalList(uin0);
+
+    VSC_UF_AUBO_UniformInfoNode_SetIdentical(uin1, uin0);
+    while(list != gcvNULL)
+    {
+        uin0 = list;
+        list = VSC_UF_AUBO_UniformInfoNode_GetIdenticalList(uin0);
+    }
+
+    VSC_UF_AUBO_UniformInfoNode_SetIdenticalList(uin0, uin1);
+}
+
+typedef enum VSC_UF_AUBO_UNIFORMINFONODE_DUMPFLAG
+{
+    VSC_UF_AUBO_UniformInfoNode_DumpFlag_None = 0x0,
+    VSC_UF_AUBO_UniformInfoNode_DumpFlag_Inst = 0x1,
+    VSC_UF_AUBO_UniformInfoNode_DumpFlag_Misc = 0x2,
+    VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndexList = 0x4,
+    VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndexSameSwizzleList = 0x8,
+    VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndexSameSwizzleSameStrideList = 0x10,
+    VSC_UF_AUBO_UniformInfoNode_DumpFlag_IdenticalList = 0x20,
+    VSC_UF_AUBO_UniformInfoNode_DumpFlag_Identical = 0x40,
+    VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndexSameSwizzleSameStride = 0x80,
+    VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndexSameSwizzle = 0x100,
+    VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndex = 0x200,
+
+    VSC_UF_AUBO_UniformInfoNode_DumpFlag_All = 0xff
+} VSC_UF_AUBO_UniformInfoNode_DumpFlag;
+
+static void
+_VSC_UF_AUBO_UniformInfoNode_Dump(
+    IN VSC_UF_AUBO_UniformInfoNode* uin,
+    IN VIR_Dumper* dumper,
+    VSC_UF_AUBO_UniformInfoNode_DumpFlag flags
+    )
+{
+    VSC_UF_AUBO_UniformInfoNode* sameIndexList = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(uin);
+    VSC_UF_AUBO_UniformInfoNode* sameIndexSameSwizzleList = VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleList(uin);
+    VSC_UF_AUBO_UniformInfoNode* sameIndexSameSwizzleSameStrideList = VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleSameStrideList(uin);
+    VSC_UF_AUBO_UniformInfoNode* identicalList = VSC_UF_AUBO_UniformInfoNode_GetIdenticalList(uin);
+    VSC_UF_AUBO_UniformInfoNode* identical = VSC_UF_AUBO_UniformInfoNode_GetIdentical(uin);
+    VSC_UF_AUBO_UniformInfoNode* sameIndexSameSwizzleSameStride = VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleSameStride(uin);
+    VSC_UF_AUBO_UniformInfoNode* sameIndexSameSwizzle = VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzle(uin);
+    VSC_UF_AUBO_UniformInfoNode* sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin);
+
+    if(flags & VSC_UF_AUBO_UniformInfoNode_DumpFlag_Inst)
+    {
+        VIR_Inst_Dump(dumper, VSC_UF_AUBO_UniformInfoNode_GetInst(uin));
+    }
+    if(flags & VSC_UF_AUBO_UniformInfoNode_DumpFlag_Misc)
+    {
+        VIR_LOG(dumper, "indexSymId %x \n", VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(uin));
+        VIR_LOG(dumper, "indexSwizzle %d \n", (gctUINT)VSC_UF_AUBO_UniformInfoNode_GetIndexSwizzle(uin));
+        VIR_LOG(dumper, "constOffset %d \n", VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin));
+        VIR_LOG(dumper, "stride %d \n", VSC_UF_AUBO_UniformInfoNode_GetStride(uin));
+        if(VSC_UF_AUBO_UniformInfoNode_GetSameIndexId(uin))
+        {
+            VIR_LOG(dumper, "sameIndexId %d \n", VSC_UF_AUBO_UniformInfoNode_GetSameIndexId(uin));
+        }
+    }
+    if(sameIndexList && (flags & VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndexList))
+    {
+        VIR_LOG(dumper, "sameIndexList:\n");
+        _VSC_UF_AUBO_UniformInfoNode_Dump(sameIndexList, dumper, (VSC_UF_AUBO_UniformInfoNode_DumpFlag)(VSC_UF_AUBO_UniformInfoNode_DumpFlag_Inst | VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndexList));
+    }
+    if(sameIndexSameSwizzleList && (flags & VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndexSameSwizzleList))
+    {
+        VIR_LOG(dumper, "sameIndexSameSwizzleList:\n");
+        _VSC_UF_AUBO_UniformInfoNode_Dump(sameIndexSameSwizzleList, dumper, (VSC_UF_AUBO_UniformInfoNode_DumpFlag)(VSC_UF_AUBO_UniformInfoNode_DumpFlag_Inst | VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndexSameSwizzleList));
+    }
+    if(sameIndexSameSwizzleSameStrideList && (flags & VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndexSameSwizzleSameStrideList))
+    {
+        VIR_LOG(dumper, "sameIndexSameSwizzleSameStrideList:\n");
+        _VSC_UF_AUBO_UniformInfoNode_Dump(sameIndexSameSwizzleSameStrideList, dumper, (VSC_UF_AUBO_UniformInfoNode_DumpFlag)(VSC_UF_AUBO_UniformInfoNode_DumpFlag_Inst | VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndexSameSwizzleSameStrideList));
+    }
+    if(identicalList && (flags & VSC_UF_AUBO_UniformInfoNode_DumpFlag_IdenticalList))
+    {
+        VIR_LOG(dumper, "identicalList:\n");
+        _VSC_UF_AUBO_UniformInfoNode_Dump(identicalList, dumper, (VSC_UF_AUBO_UniformInfoNode_DumpFlag)(VSC_UF_AUBO_UniformInfoNode_DumpFlag_Inst | VSC_UF_AUBO_UniformInfoNode_DumpFlag_IdenticalList));
+    }
+    if(identical && (flags & VSC_UF_AUBO_UniformInfoNode_DumpFlag_Identical))
+    {
+        VIR_LOG(dumper, "identical:\n");
+        _VSC_UF_AUBO_UniformInfoNode_Dump(identical, dumper, VSC_UF_AUBO_UniformInfoNode_DumpFlag_Inst);
+    }
+    if(sameIndexSameSwizzleSameStride && (flags & VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndexSameSwizzleSameStride))
+    {
+        VIR_LOG(dumper, "sameIndexSameSwizzleSameStride:\n");
+        _VSC_UF_AUBO_UniformInfoNode_Dump(sameIndexSameSwizzleSameStride, dumper, VSC_UF_AUBO_UniformInfoNode_DumpFlag_Inst);
+    }
+    if(sameIndexSameSwizzle && (flags & VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndexSameSwizzle))
+    {
+        VIR_LOG(dumper, "sameIndexSameSwizzle:\n");
+        _VSC_UF_AUBO_UniformInfoNode_Dump(sameIndexSameSwizzle, dumper, VSC_UF_AUBO_UniformInfoNode_DumpFlag_Inst);
+    }
+    if(sameIndex && (flags & VSC_UF_AUBO_UniformInfoNode_DumpFlag_SameIndex))
+    {
+        VIR_LOG(dumper, "sameIndex:\n");
+        _VSC_UF_AUBO_UniformInfoNode_Dump(sameIndex, dumper, VSC_UF_AUBO_UniformInfoNode_DumpFlag_Inst);
+    }
+    if(flags == VSC_UF_AUBO_UniformInfoNode_DumpFlag_All)
+    {
+        VIR_LOG(dumper, "\n");
+    }
+    VIR_LOG_FLUSH(dumper);
+}
+
+typedef struct VSC_UF_AUBO_UNIFORMINFOLIST
+{
+    VSC_UNI_LIST list;
+    VSC_MM* mm;
+} VSC_UF_AUBO_UniformInfoList;
+
+#define VSC_UF_AUBO_UniformInfoList_GetList(uil)                (&(uil)->list)
+#define VSC_UF_AUBO_UniformInfoList_GetLength(uil)              (vscUNILST_GetNodeCount(VSC_UF_AUBO_UniformInfoList_GetList(uil)))
+#define VSC_UF_AUBO_UniformInfoList_GetMM(uil)                  ((uil)->mm)
+#define VSC_UF_AUBO_UniformInfoList_SetMM(uil, m)               ((uil)->mm = (m))
+
+static void
+_VSC_UF_AUBO_UniformInfoList_Initialize(
+    IN OUT VSC_UF_AUBO_UniformInfoList* uil,
+    IN VSC_MM* mm
+    )
+{
+    vscUNILST_Initialize(VSC_UF_AUBO_UniformInfoList_GetList(uil), gcvFALSE);
+    VSC_UF_AUBO_UniformInfoList_SetMM(uil, mm);
+}
+
+static void
+_VSC_UF_AUBO_UniformInfoList_Finalize(
+    IN OUT VSC_UF_AUBO_UniformInfoList* uil
+    )
+{
+    VSC_UL_ITERATOR iter;
+    VSC_UF_AUBO_UniformInfoNode *uin, *lastUIN = gcvNULL;
+
+    vscULIterator_Init(&iter, VSC_UF_AUBO_UniformInfoList_GetList(uil));
+    for(uin = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_First(&iter);
+        uin != gcvNULL;
+        uin = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter))
+    {
+        if(lastUIN == gcvNULL)
+        {
+            lastUIN = uin;
+        }
+        else
+        {
+            vscMM_Free(VSC_UF_AUBO_UniformInfoList_GetMM(uil), lastUIN);
+            lastUIN = uin;
+        }
+    }
+
+    if(lastUIN)
+    {
+        vscMM_Free(VSC_UF_AUBO_UniformInfoList_GetMM(uil), lastUIN);
+    }
+}
+
+static VSC_UF_AUBO_UniformInfoNode*
+_VSC_UF_AUBO_UniformInfoList_NewNode(
+    IN OUT VSC_UF_AUBO_UniformInfoList* uil
+    )
+{
+    VSC_UF_AUBO_UniformInfoNode* uin = (VSC_UF_AUBO_UniformInfoNode*)vscMM_Alloc(VSC_UF_AUBO_UniformInfoList_GetMM(uil), sizeof(VSC_UF_AUBO_UniformInfoNode));
+    vscUNILST_Append(VSC_UF_AUBO_UniformInfoList_GetList(uil), (VSC_UNI_LIST_NODE*)uin);
+
+    return uin;
+}
+
+static void
+_VSC_UF_AUBO_UniformInfoList_Dump(
+    IN VSC_UF_AUBO_UniformInfoList* uil,
+    IN VIR_Dumper* dumper
+    )
+{
+    VSC_UL_ITERATOR iter;
+    VSC_UF_AUBO_UniformInfoNode* uin;
+
+    vscULIterator_Init(&iter, VSC_UF_AUBO_UniformInfoList_GetList(uil));
+    for(uin = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_First(&iter);
+        uin != gcvNULL;
+        uin = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter))
+    {
+        _VSC_UF_AUBO_UniformInfoNode_Dump(uin, dumper, VSC_UF_AUBO_UniformInfoNode_DumpFlag_All);
+    }
+}
+
+static VSC_ErrCode
+_VSC_UF_AUBO_BuildUpInfoList(
+    IN OUT VSC_UF_AUBO* aubo,
+    IN VIR_Shader* shader,
+    IN VIR_Function* func,
+    IN VIR_BB* bb,
+    OUT VSC_UF_AUBO_UniformInfoList* uil
+    )
+{
+    VSC_ErrCode virErrCode = VSC_ERR_NONE;
+    VIR_Instruction* inst = BB_GET_START_INST(bb);
+    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+
+    gcmASSERT(inst);
+
+    while(gcvTRUE)
+    {
+        gctUINT i;
+
+        for(i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
+        {
+            VIR_Operand* src = VIR_Inst_GetSource(inst, i);
+            gcmASSERT(src);
+            if(VIR_Operand_isSymbol(src))
+            {
+                VIR_Symbol* uniformSym = VIR_Operand_GetSymbol(src);
+                if(isSymUniformMovedToAUBO(uniformSym))
+                {
+                    VIR_Type* uniformType = VIR_Symbol_GetType(uniformSym);
+                    VIR_TypeId uniformBaseTypeId = VIR_Type_GetBaseTypeId(uniformType);
+                    VIR_Type* uniformBaseType = VIR_Shader_GetTypeFromId(shader, uniformBaseTypeId);
+                    VSC_UF_AUBO_UniformInfoNode* uin = _VSC_UF_AUBO_UniformInfoList_NewNode(uil);
+                    _VSC_UF_AUBO_UniformInfoNode_Init(uin, inst, src, uniformSym);
+
+                    if(VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
+                    {
+                        VIR_Operand* src0 = VIR_Inst_GetSource(inst, 0);
+                        VIR_Operand* src1 = VIR_Inst_GetSource(inst, 1);
+                        VIR_Swizzle src1Swizzle = VIR_Operand_GetSwizzle(src1);
+                        VIR_Operand* indexingSrc;
+
+                        if(VIR_Shader_isRAEnabled(shader))
+                        {
+                            VIR_Instruction *movaInst = VIR_Inst_GetPrev(inst);
+
+                            while(movaInst)
+                            {
+                                if(VIR_Inst_GetOpcode(movaInst) == VIR_OP_MOVA &&
+                                    VIR_Operand_Defines(VIR_Inst_GetDest(movaInst), src1))
+                                {
+                                    break;
+                                }
+                                movaInst = VIR_Inst_GetPrev(movaInst);
+                            }
+
+                            gcmASSERT(movaInst);
+
+                            indexingSrc = VIR_Inst_GetSource(movaInst, 0);
+                        }
+                        else
+                        {
+                            indexingSrc = VIR_Inst_GetSource(inst, 1);
+                        }
+                        VSC_UF_AUBO_UniformInfoNode_SetIndexSymId(uin, VIR_Operand_GetSymbolId_(indexingSrc));
+                        VSC_UF_AUBO_UniformInfoNode_SetIndexOperand(uin, indexingSrc);
+                        VSC_UF_AUBO_UniformInfoNode_SetIndexSwizzle(uin, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(indexingSrc), VIR_Swizzle_GetChannel(src1Swizzle, 0)));
+
+                        if (VIR_Type_isMatrix(uniformBaseType) && VIR_Type_isArray(uniformType))
+                        {
+                            VSC_UF_AUBO_UniformInfoNode_SetStride(uin, _VSC_UF_AUBO_GetArrayStride(uniformType) / VIR_GetTypeRows(uniformBaseTypeId));
+                            VSC_UF_AUBO_UniformInfoNode_SetConstOffset(uin, VIR_Operand_GetMatrixConstIndex(src0) * VIR_GetTypeSize(VIR_GetTypeRowType(VIR_Type_GetIndex(uniformBaseType))));
+                        }
+                        else
+                        {
+                            VSC_UF_AUBO_UniformInfoNode_SetStride(uin, _VSC_UF_AUBO_GetArrayStride(uniformType));
+                        }
+                    }
+                    else if(VIR_Operand_GetRelAddrMode(src))
+                    {
+                        VSC_UF_AUBO_UniformInfoNode_SetIndexSymId(uin, VIR_Operand_GetRelIndexing(src));
+                        VSC_UF_AUBO_UniformInfoNode_SetIndexSwizzle(uin, VIR_SWIZZLE_X);
+                    }
+                    else
+                    {
+                        VSC_UF_AUBO_UniformInfoNode_SetConstOffset(uin, VIR_Operand_GetMatrixConstIndex(src) * VIR_GetTypeSize(VIR_GetTypeRowType(VIR_Type_GetIndex(uniformBaseType))));
+                    }
+                }
+            }
+            else if(VIR_Operand_isTexldParm(src))
+            {
+                gctUINT k;
+                VIR_Operand* tms = (VIR_Operand*)src;
+                for(k = 0; k < VIR_TEXLDMODIFIER_COUNT; ++k)
+                {
+                    VIR_Operand* tm = VIR_Operand_GetTexldModifier(tms, k);
+                    if(tm != gcvNULL)
+                    {
+                        if(VIR_Operand_isSymbol(tm))
+                        {
+                            VIR_Symbol* uniformSym = VIR_Operand_GetSymbol(tm);
+                            if(VIR_Symbol_HasFlag(uniformSym, VIR_SYMUNIFORMFLAG_MOVED_TO_DUBO))
+                            {
+                                VSC_UF_AUBO_UniformInfoNode* uin = _VSC_UF_AUBO_UniformInfoList_NewNode(uil);
+
+                                _VSC_UF_AUBO_UniformInfoNode_Init(uin, inst, tm, uniformSym);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if(inst == BB_GET_END_INST(bb))
+        {
+            break;
+        }
+        else
+        {
+            inst = VIR_Inst_GetNext(inst);
+        }
+    }
+
+    if(VSC_UF_AUBO_UniformInfoList_GetLength(uil))
+    {
+        /* update bb flags. set this bb having load instructions */
+        BB_FLAGS_SET_LLI(bb);
+    }
+
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_BUILD))
+    {
+        VIR_Dumper* dumper = VIR_Shader_GetDumper(shader);
+        VIR_LOG(dumper, "after building up info list:\n");
+        _VSC_UF_AUBO_UniformInfoList_Dump(uil, VIR_Shader_GetDumper(shader));
+    }
+
+    return virErrCode;
+}
+
+static VSC_ErrCode
+_VSC_UF_AUBO_ReorgUniformInfoList(
+    IN OUT VSC_UF_AUBO* aubo,
+    IN VIR_Shader* shader,
+    IN VIR_Function* func,
+    IN VIR_BB* bb,
+    OUT VSC_UF_AUBO_UniformInfoList* uil
+    )
+{
+    VSC_ErrCode virErrCode = VSC_ERR_NONE;
+    VSC_UL_ITERATOR iter0;
+    VSC_UF_AUBO_UniformInfoNode* uin0;
+    gctBOOL changed = gcvFALSE;
+    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VIR_Dumper* dumper = VIR_Shader_GetDumper(shader);
+
+    gcmASSERT(VSC_OPTN_UF_AUBO_Options_GetOpt(options));
+
+    /* find out identicals */
+    vscULIterator_Init(&iter0, VSC_UF_AUBO_UniformInfoList_GetList(uil));
+    for(uin0 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_First(&iter0);
+        uin0 != gcvNULL;
+        uin0 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter0))
+    {
+        VSC_UL_ITERATOR iter1 = iter0;
+        VSC_UF_AUBO_UniformInfoNode* uin1;
+
+        for(uin1 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter1);
+            uin1 != gcvNULL;
+            uin1 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter1))
+        {
+            if(VSC_UF_AUBO_UniformInfoNode_GetIdentical(uin1) == gcvNULL &&
+               VSC_UF_AUBO_UniformInfoNode_GetUniformSym(uin0) == VSC_UF_AUBO_UniformInfoNode_GetUniformSym(uin1) &&
+               VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(uin0) == VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(uin1) &&
+               VSC_UF_AUBO_UniformInfoNode_GetIndexSwizzle(uin0) == VSC_UF_AUBO_UniformInfoNode_GetIndexSwizzle(uin1) &&
+               VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin0) == VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin1) &&
+               VSC_UF_AUBO_UniformInfoNode_GetStride(uin0) == VSC_UF_AUBO_UniformInfoNode_GetStride(uin1))
+            {
+                _VSC_UF_AUBO_UniformInfoNode_AppendIdenticalList(uin0, uin1);
+                changed = gcvTRUE;
+            }
+        }
+    }
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_REORG))
+    {
+        if(changed)
+        {
+            VIR_LOG(dumper, "after identicals found out:\n");
+            _VSC_UF_AUBO_UniformInfoList_Dump(uil, dumper);
+        }
+        else
+        {
+            VIR_LOG(dumper, "no identicals found out.\n");
+            VIR_LOG_FLUSH(dumper);
+        }
+    }
+
+    /* find out same-indexes */
+    changed = gcvFALSE;
+    vscULIterator_Init(&iter0, VSC_UF_AUBO_UniformInfoList_GetList(uil));
+    for(uin0 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_First(&iter0);
+        uin0 != gcvNULL;
+        uin0 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter0))
+    {
+        if(VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(uin0) != VIR_INVALID_ID && VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin0) == gcvNULL)
+        {
+            VSC_UL_ITERATOR iter1 = iter0;
+            VSC_UF_AUBO_UniformInfoNode* uin1;
+
+            for(uin1 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter1);
+                uin1 != gcvNULL;
+                uin1 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter1))
+            {
+                if(VSC_UF_AUBO_UniformInfoNode_GetIdentical(uin1) == gcvNULL &&
+                   VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(uin1) == VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(uin0))
+                {
+                    _VSC_UF_AUBO_UniformInfoNode_AppendSameIndexList(uin0, uin1);
+                    changed = gcvTRUE;
+                }
+            }
+        }
+    }
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_REORG))
+    {
+        if(changed)
+        {
+            VIR_LOG(dumper, "after same-indexes found out:\n");
+            _VSC_UF_AUBO_UniformInfoList_Dump(uil, dumper);
+        }
+        else
+        {
+            VIR_LOG(dumper, "no same-indexes found out.\n");
+            VIR_LOG_FLUSH(dumper);
+        }
+    }
+
+    if(VSC_OPTN_UF_AUBO_Options_GetOpt(options) == 2)
+    {
+        /* find out same-index-same-swizzles */
+        changed = gcvFALSE;
+        vscULIterator_Init(&iter0, VSC_UF_AUBO_UniformInfoList_GetList(uil));
+        for(uin0 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_First(&iter0);
+            uin0 != gcvNULL;
+            uin0 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter0))
+        {
+            if(VSC_UF_AUBO_UniformInfoNode_GetIndexOperand(uin0))
+            {
+                VIR_SymId indexSymId = VIR_Operand_GetSymbolId_(VSC_UF_AUBO_UniformInfoNode_GetIndexOperand(uin0));
+                VIR_Symbol* indexSym = VIR_Shader_GetSymFromId(shader, indexSymId);
+                VIR_TypeId indexSymTypeId = VIR_Symbol_GetTypeId(indexSym);
+
+                if(VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzle(uin0) == gcvNULL &&
+                   VIR_TypeId_isFloat(indexSymTypeId))
+                {
+                    VSC_UF_AUBO_UniformInfoNode* sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin0);
+                    gctUINT sameIndexId = 0;
+
+                    if(sameIndex)
+                    {
+                        while(sameIndex != uin0)
+                        {
+                            sameIndexId++;
+                            sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(sameIndex);
+                        }
+
+                        gcmASSERT(sameIndexId < 4);
+                        VSC_UF_AUBO_UniformInfoNode_SetSameIndexId(uin0, sameIndexId);
+                    }
+
+                    sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(uin0);
+                    while(sameIndex)
+                    {
+                        VSC_UF_AUBO_UniformInfoNode* sameIndexNext = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(sameIndex);
+                        if(VSC_UF_AUBO_UniformInfoNode_GetIndexSwizzle(sameIndex) == VSC_UF_AUBO_UniformInfoNode_GetIndexSwizzle(uin0))
+                        {
+                            _VSC_UF_AUBO_UniformInfoNode_LowerSameIndex2SameIndexSameSwizzle(uin0, sameIndex);
+                            VSC_UF_AUBO_UniformInfoNode_SetSameIndexId(sameIndex, VSC_UF_AUBO_UniformInfoNode_GetSameIndexId(uin0));
+                            changed = gcvTRUE;
+                        }
+                        sameIndex = sameIndexNext;
+                    }
+                }
+            }
+        }
+        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_REORG))
+        {
+            if(changed)
+            {
+                VIR_LOG(dumper, "after same-index-same-swizzles found out:\n");
+                _VSC_UF_AUBO_UniformInfoList_Dump(uil, dumper);
+            }
+            else
+            {
+                VIR_LOG(dumper, "no same-index-same-swizzles found out.\n");
+                VIR_LOG_FLUSH(dumper);
+            }
+        }
+    }
+    else
+    {
+        /* find out same-index-same-stride-same-swizzles */
+        changed = gcvFALSE;
+        vscULIterator_Init(&iter0, VSC_UF_AUBO_UniformInfoList_GetList(uil));
+        for(uin0 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_First(&iter0);
+            uin0 != gcvNULL;
+            uin0 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter0))
+        {
+            if(VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(uin0))
+            {
+                VSC_UF_AUBO_UniformInfoNode* sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(uin0);
+
+                while(sameIndex)
+                {
+                    VSC_UF_AUBO_UniformInfoNode* sameIndexNext = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(sameIndex);
+                    if(VSC_UF_AUBO_UniformInfoNode_GetStride(sameIndex) == VSC_UF_AUBO_UniformInfoNode_GetStride(uin0) &&
+                       VSC_UF_AUBO_UniformInfoNode_GetIndexSwizzle(sameIndex) == VSC_UF_AUBO_UniformInfoNode_GetIndexSwizzle(uin0))
+                    {
+                        _VSC_UF_AUBO_UniformInfoNode_LowerSameIndex2SameIndexSameSwizzleSameStride(uin0, sameIndex);
+                        changed = gcvTRUE;
+                    }
+                    sameIndex = sameIndexNext;
+                }
+            }
+        }
+        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_REORG))
+        {
+            if(changed)
+            {
+                VIR_LOG(dumper, "after same-index-same-stride-same-swizzles found out:\n");
+                _VSC_UF_AUBO_UniformInfoList_Dump(uil, dumper);
+            }
+            else
+            {
+                VIR_LOG(dumper, "no same-index-same-stride-same-swizzles found out.\n");
+                VIR_LOG_FLUSH(dumper);
+            }
+        }
+
+        /* cut same index list for vectorization vec4 restriction, set sameIndexId at the same time */
+        changed = gcvFALSE;
+        vscULIterator_Init(&iter0, VSC_UF_AUBO_UniformInfoList_GetList(uil));
+        for(uin0 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_First(&iter0);
+            uin0 != gcvNULL;
+            uin0 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter0))
+        {
+            if(VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(uin0) &&
+               VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin0) == gcvNULL)
+            {
+                VSC_UF_AUBO_UniformInfoNode* sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(uin0);
+                gctUINT sameIndexId = 1;
+
+                while(sameIndex)
+                {
+                    VSC_UF_AUBO_UniformInfoNode_SetSameIndexId(sameIndex, sameIndexId);
+                    sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(sameIndex);
+                    ++sameIndexId;
+                    if(sameIndexId == 3)
+                    {
+                        VSC_UF_AUBO_UniformInfoNode_SetSameIndexId(sameIndex, sameIndexId);
+                        break;
+                    }
+                }
+
+                if(sameIndexId == 3 && VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(sameIndex))
+                {
+                    VSC_UF_AUBO_UniformInfoNode* sameIndexNext = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(sameIndex);
+                    VSC_UF_AUBO_UniformInfoNode* sameIndexIter;
+
+                    VSC_UF_AUBO_UniformInfoNode_SetSameIndexList(sameIndex, gcvNULL);
+                    VSC_UF_AUBO_UniformInfoNode_SetSameIndex(sameIndexNext, gcvNULL);
+                    for(sameIndexIter = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(sameIndexNext);
+                        sameIndexIter != gcvNULL;
+                        sameIndexIter = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(sameIndexIter))
+                    {
+                        VSC_UF_AUBO_UniformInfoNode_SetSameIndex(sameIndexIter, sameIndexNext);
+                    }
+                    changed = gcvTRUE;
+                }
+            }
+        }
+        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_REORG))
+        {
+            if(changed)
+            {
+                VIR_LOG(dumper, "after cut same index list:\n");
+                _VSC_UF_AUBO_UniformInfoList_Dump(uil, dumper);
+            }
+            else
+            {
+                VIR_LOG(dumper, "no cut same index list.\n");
+                VIR_LOG_FLUSH(dumper);
+            }
+        }
+    }
+
+    return virErrCode;
+}
+
+static void
+_Extract_LShift_Mul3(
+    IN gctUINT stride,
+    OUT gctUINT* lshift,
+    OUT gctUINT* mul3
+    )
+{
+    gctUINT s = stride;
+    gctUINT ls = 0;
+    gctUINT m3 = 0;
+
+    if(stride % 3 == 0)
+    {
+        m3 = 1;
+        s = stride / 3;
+    }
+
+    while(s != 1)
+    {
+        ls++;
+        s >>= 1;
+    }
+
+    gcmASSERT(stride == (gctUINT)((1 << ls) * (m3 ? 3 : 1)));
+    gcmASSERT(lshift && mul3);
+
+    *lshift = ls;
+    *mul3 = m3;
+}
+
+static VSC_ErrCode
+_VSC_UF_AUBO_InsertInstructions(
+    IN OUT VSC_UF_AUBO* aubo,
+    IN OUT VIR_Shader* shader,
+    IN OUT VIR_Function* func,
+    IN OUT VIR_BB* bb,
+    IN VSC_UF_AUBO_UniformInfoList* uil
+    )
+{
+    VSC_ErrCode virErrCode = VSC_ERR_NONE;
+    VSC_UL_ITERATOR iter;
+    VSC_UF_AUBO_UniformInfoNode* uin;
+    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VIR_Dumper* dumper = VIR_Shader_GetDumper(shader);
+
+    vscULIterator_Init(&iter, VSC_UF_AUBO_UniformInfoList_GetList(uil));
+    for(uin = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_First(&iter);
+        uin != gcvNULL;
+        uin = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter))
+    {
+        VIR_Instruction* inst = VSC_UF_AUBO_UniformInfoNode_GetInst(uin);
+        VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
+        VIR_Operand* operand = VSC_UF_AUBO_UniformInfoNode_GetOperand(uin);
+        VIR_TypeId operandTypeId = VIR_Operand_GetType(operand);
+        VIR_Type* operandType = VIR_Shader_GetTypeFromId(shader, operandTypeId);
+        VIR_Swizzle operandSwizzle = VIR_Operand_GetSwizzle(operand);
+        VIR_Symbol* uniformSym = VSC_UF_AUBO_UniformInfoNode_GetUniformSym(uin);
+        VIR_Type* uniformSymType = VIR_Symbol_GetType(uniformSym);
+        VIR_TypeId uniformSymRegTypeId = _VSC_UF_AUBO_GetUniformDataTypeID(shader, uniformSym);
+        VIR_Type* uniformSymRegType = VIR_Shader_GetTypeFromId(shader, uniformSymRegTypeId);
+        VIR_Uniform* uniform = VIR_Symbol_GetUniform(uniformSym);
+        VIR_Instruction* insertBefore = inst;
+
+        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+        {
+            VIR_LOG(dumper, "inst:\n");
+            VIR_LOG_FLUSH(dumper);
+            VIR_Inst_Dump(dumper, inst);
+        }
+
+        if((VIR_OPCODE_isAtom(VIR_Inst_GetOpcode(inst)) || opcode == VIR_OP_CMP)
+            && VIR_Inst_GetPrev(inst) && VIR_Inst_GetOpcode(VIR_Inst_GetPrev(inst)) == VIR_OP_LOAD)
+        {
+            insertBefore = VIR_Inst_GetPrev(inst);
+        }
+        if(opcode == VIR_OP_ATOMCMPXCHG && VIR_Inst_GetOpcode(VIR_Inst_GetPrev(inst)) == VIR_OP_CMP
+            && VIR_Inst_GetPrev(inst) && VIR_Inst_GetPrev(VIR_Inst_GetPrev(inst))
+            && VIR_Inst_GetOpcode(VIR_Inst_GetPrev(VIR_Inst_GetPrev(inst))) == VIR_OP_LOAD)
+        {
+            insertBefore = VIR_Inst_GetPrev(VIR_Inst_GetPrev(inst));
+        }
+
+        if(VSC_UF_AUBO_UniformInfoNode_GetIdentical(uin))
+        {
+            /* handle uniform usage having identical */
+            VSC_UF_AUBO_UniformInfoNode* identical = VSC_UF_AUBO_UniformInfoNode_GetIdentical(uin);
+            VIR_Instruction* load = VSC_UF_AUBO_UniformInfoNode_GetLOADInst(identical);
+            VIR_Operand* loadDest = VIR_Inst_GetDest(load);
+
+            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+            {
+                VIR_LOG(dumper, "identical to inst:\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Inst_Dump(dumper, VSC_UF_AUBO_UniformInfoNode_GetInst(identical));
+                VIR_LOG(dumper, "use its load:\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Inst_Dump(dumper, load);
+            }
+
+            if(opcode == VIR_OP_LDARR)
+            {
+                VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
+                VIR_Inst_SetSrcNum(inst, 1);
+                VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
+                VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
+                VIR_Operand_SetSwizzle(operand, operandSwizzle);
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                {
+                    VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
+                    VIR_LOG_FLUSH(dumper);
+                    VIR_Inst_Dump(dumper, inst);
+                }
+            }
+            else
+            {
+                VIR_Operand* operand = VSC_UF_AUBO_UniformInfoNode_GetOperand(uin);
+
+                VIR_Operand_Copy(operand, loadDest);
+                VIR_Operand_Change2Src(operand);
+                VIR_Operand_SetSwizzle(operand, operandSwizzle);
+                VIR_Operand_SetRelIndex(operand, 0);
+                VIR_Operand_SetRelAddrMode(operand, 0);
+                VIR_Operand_SetMatrixConstIndex(operand, 0);
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                {
+                    VIR_LOG(dumper, "propagate as:\n");
+                    VIR_LOG_FLUSH(dumper);
+                    VIR_Inst_Dump(dumper, inst);
+                }
+            }
+        }
+        else if((VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzle(uin) ||
+                 VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin)) && VSC_OPTN_UF_AUBO_Options_GetOpt(options) == 2)
+        {
+            /* handle uniform usage having same index */
+            VSC_UF_AUBO_UniformInfoNode* sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin);
+            gctUINT sameIndexId = VSC_UF_AUBO_UniformInfoNode_GetSameIndexId(uin);
+            VIR_Instruction* f2i = VSC_UF_AUBO_UniformInfoNode_GetF2IInst(sameIndex);
+            VIR_Operand* f2iDest;
+            VIR_Operand *loadDest;
+            VIR_SymId loadSymId;
+            gctUINT lshift, mul3;
+
+            gcmASSERT(opcode == VIR_OP_LDARR && f2i);
+            f2iDest = VIR_Inst_GetDest(f2i);
+
+            if(VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzle(uin))
+            {
+                VSC_UF_AUBO_UniformInfoNode* sameIndexSameSwizzle = VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzle(uin);
+                sameIndexId = VSC_UF_AUBO_UniformInfoNode_GetSameIndexId(sameIndexSameSwizzle);
+            }
+
+            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+            {
+                VIR_LOG(dumper, "same index as inst:\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Inst_Dump(dumper, VSC_UF_AUBO_UniformInfoNode_GetInst(sameIndex));
+                VIR_LOG(dumper, "use the f2i:\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Inst_Dump(dumper, f2i);
+            }
+
+            /* insert load */
+            {
+                VIR_Instruction* load;
+                VIR_Operand *loadSrc0, *loadSrc1;
+                VIR_VirRegId loadRegId;
+                VIR_SymId addressSymId;
+
+                VIR_Function_AddInstructionBefore(func, VIR_OP_LOAD, uniformSymRegTypeId, insertBefore, gcvTRUE, &load);
+                loadDest = VIR_Inst_GetDest(load);
+                loadSrc0 = VIR_Inst_GetSource(load, 0);
+                loadSrc1 = VIR_Inst_GetSource(load, 1);
+
+                /* set loadDest */
+                loadRegId = VIR_Shader_NewVirRegId(shader, 1);
+                virErrCode = VIR_Shader_AddSymbol(shader,
+                                                  VIR_SYM_VIRREG,
+                                                  loadRegId,
+                                                  uniformSymRegType,
+                                                  VIR_STORAGE_UNKNOWN,
+                                                  &loadSymId);
+                if(virErrCode != VSC_ERR_NONE) return virErrCode;
+
+                VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
+                VIR_Operand_SetEnable(loadDest, VIR_ENABLE_XYZW);
+
+
+                addressSymId = _VSC_UF_AUBO_GetAuxAddress(aubo, shader, uniformSym, VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin));
+                VIR_Operand_SetSymbol(loadSrc0, func, addressSymId);
+                VIR_Operand_SetSwizzle(loadSrc0, VIR_SWIZZLE_X);
+
+                _Extract_LShift_Mul3(VSC_UF_AUBO_UniformInfoNode_GetStride(uin), &lshift, &mul3);
+                VIR_Operand_Copy(loadSrc1, f2iDest);
+                VIR_Operand_Change2Src(loadSrc1);
+                VIR_Operand_SetSwizzle(loadSrc1, (VIR_Swizzle)sameIndexId);
+                VIR_Operand_SetLShift(loadSrc1, lshift);
+                VIR_Operand_SetModifier(loadSrc1, VIR_MOD_X3);
+
+                if(VIR_Shader_isDual16Mode(shader))
+                {
+                    gctBOOL needRunSingleT = gcvFALSE;
+                    gctBOOL dual16NotSupported = gcvFALSE;
+                    VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+                    if (needRunSingleT)
+                    {
+                        VIR_Inst_SetThreadMode(load, VIR_THREAD_D16_DUAL_32);
+                    }
+                }
+
+                VSC_UF_AUBO_UniformInfoNode_SetLOADInst(uin, load);
+
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                {
+                    VIR_LOG(dumper, "insert load:\n");
+                    VIR_LOG_FLUSH(dumper);
+                    VIR_Inst_Dump(dumper, load);
+                }
+            }
+
+            /* propagate load and change ldarr to mov */
+            {
+                VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
+                VIR_Inst_SetSrcNum(inst, 1);
+                VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
+                VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
+                VIR_Operand_SetSwizzle(operand, operandSwizzle);
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                {
+                    VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
+                    VIR_LOG_FLUSH(dumper);
+                    VIR_Inst_Dump(dumper, inst);
+                }
+            }
+        }
+        else if((VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleSameStride(uin) ||
+                 VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin)) && VSC_OPTN_UF_AUBO_Options_GetOpt(options) == 1)
+        {
+            /* handle uniform usage having same index */
+            VSC_UF_AUBO_UniformInfoNode* sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin);
+            gctUINT sameIndexId = VSC_UF_AUBO_UniformInfoNode_GetSameIndexId(uin);
+            VIR_Instruction* mad = VSC_UF_AUBO_UniformInfoNode_GetMADInst(sameIndex);
+            VIR_Operand* madDest = VIR_Inst_GetDest(mad);
+            VIR_Operand *loadDest;
+            VIR_SymId loadSymId;
+
+            gcmASSERT(opcode == VIR_OP_LDARR);
+
+            if(VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleSameStride(uin))
+            {
+                VSC_UF_AUBO_UniformInfoNode* sameIndexSameSwizzleSameStride = VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleSameStride(uin);
+                sameIndexId = VSC_UF_AUBO_UniformInfoNode_GetSameIndexId(sameIndexSameSwizzleSameStride);
+            }
+
+            gcmASSERT(opcode == VIR_OP_LDARR);
+            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+            {
+                VIR_LOG(dumper, "same index as inst:\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Inst_Dump(dumper, VSC_UF_AUBO_UniformInfoNode_GetInst(sameIndex));
+                VIR_LOG(dumper, "use the mad:\n");
+                VIR_LOG_FLUSH(dumper);
+                VIR_Inst_Dump(dumper, mad);
+            }
+
+            /* insert load */
+            {
+                VIR_Instruction* load;
+                VIR_Operand *loadSrc0, *loadSrc1;
+                VIR_VirRegId loadRegId;
+
+                VIR_Function_AddInstructionBefore(func, VIR_OP_LOAD, uniformSymRegTypeId, insertBefore, gcvTRUE, &load);
+                loadDest = VIR_Inst_GetDest(load);
+                loadSrc0 = VIR_Inst_GetSource(load, 0);
+                loadSrc1 = VIR_Inst_GetSource(load, 1);
+
+                /* set loadDest */
+                loadRegId = VIR_Shader_NewVirRegId(shader, 1);
+                virErrCode = VIR_Shader_AddSymbol(shader,
+                                                    VIR_SYM_VIRREG,
+                                                    loadRegId,
+                                                    uniformSymRegType,
+                                                    VIR_STORAGE_UNKNOWN,
+                                                    &loadSymId);
+                if(virErrCode != VSC_ERR_NONE) return virErrCode;
+
+                VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
+                VIR_Operand_SetEnable(loadDest, VIR_ENABLE_XYZW);
+
+                VIR_Operand_Copy(loadSrc0, madDest);
+                VIR_Operand_Change2Src(loadSrc0);
+                VIR_Operand_SetSwizzle(loadSrc0, (VIR_Swizzle)sameIndexId);
+                VIR_Operand_SetImmediateUint(loadSrc1, VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin) + VIR_Uniform_GetOffset(uniform));
+
+                if(VIR_Shader_isDual16Mode(shader))
+                {
+                    gctBOOL needRunSingleT = gcvFALSE;
+                    gctBOOL dual16NotSupported = gcvFALSE;
+                    VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+                    if (needRunSingleT)
+                    {
+                        VIR_Inst_SetThreadMode(load, VIR_THREAD_D16_DUAL_32);
+                    }
+                }
+
+                VSC_UF_AUBO_UniformInfoNode_SetLOADInst(uin, load);
+
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                {
+                    VIR_LOG(dumper, "insert load:\n");
+                    VIR_LOG_FLUSH(dumper);
+                    VIR_Inst_Dump(dumper, load);
+                }
+            }
+
+            /* propagate load and change ldarr to mov */
+            {
+                VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
+                VIR_Inst_SetSrcNum(inst, 1);
+                VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
+                VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
+                VIR_Operand_SetSwizzle(operand, operandSwizzle);
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                {
+                    VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
+                    VIR_LOG_FLUSH(dumper);
+                    VIR_Inst_Dump(dumper, inst);
+                }
+            }
+        }
+        else
+        {
+            /* handle uniform usage different from others */
+            gctUINT shaderKindId = VIR_ShaderKind_Map2KindId(VIR_Shader_GetKind(shader));
+
+            if(VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(uin) != VIR_INVALID_ID)
+            {
+                /* handle ldarr uniform usage different from others */
+                VIR_SymId indexSymId = VIR_Operand_GetSymbolId_(VSC_UF_AUBO_UniformInfoNode_GetIndexOperand(uin));  /* because indexSymId may be a uniform, which is moved to DUBO already */
+                VIR_Symbol* indexSym = VIR_Shader_GetSymFromId(shader, indexSymId);
+                VIR_TypeId indexSymTypeId = VIR_Symbol_GetTypeId(indexSym);
+
+                VSC_UF_AUBO_UniformInfoNode* sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(uin);
+                gctUINT strides[4];
+                VIR_Swizzle swizzles[4];
+                VIR_VirRegId lastSymId = indexSymId;
+                VIR_Swizzle lastSwizzle;
+                gctUINT i = 0;
+                VIR_Enable lastEnable = VIR_ENABLE_X;
+                gctBOOL needConst = gcvFALSE;
+                VIR_Operand *loadDest;
+
+                strides[0] = VSC_UF_AUBO_UniformInfoNode_GetStride(uin);
+                swizzles[0] = VSC_UF_AUBO_UniformInfoNode_GetIndexSwizzle(uin);
+                lastSwizzle = swizzles[0];
+
+                if(sameIndex)
+                {
+                    for(i = 1; i < 4; i++)
+                    {
+                        gctUINT j;
+
+                        strides[i] = VSC_UF_AUBO_UniformInfoNode_GetStride(sameIndex);
+                        for(j = 0; j < i; j++)
+                        {
+                            if(strides[j] != strides[i])
+                            {
+                                needConst = gcvTRUE;
+                                break;
+                            }
+                        }
+                        swizzles[i] = VSC_UF_AUBO_UniformInfoNode_GetIndexSwizzle(sameIndex);
+                        VIR_Swizzle_SetChannel(lastSwizzle, i, swizzles[i]);
+                        lastEnable = (VIR_Enable)((gctUINT)lastEnable | 1 << i);
+                        sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndexList(sameIndex);
+                        if(sameIndex == gcvNULL)
+                        {
+                            break;
+                        }
+                    }
+                    gcmASSERT(sameIndex == gcvNULL);
+                }
+
+                if(VIR_TypeId_isFloat(indexSymTypeId))
+                {
+                    VIR_Instruction* f2i;
+                    VIR_Operand *f2iDest, *f2iSrc;
+                    VIR_TypeId f2iDestTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_UINT32, i + 1, 1);
+                    VIR_VirRegId f2iRegId;
+                    VIR_SymId f2iSymId;
+                    VIR_Symbol* f2iSym;
+
+                    VIR_Function_AddInstructionBefore(func, VIR_OP_AQ_F2I, f2iDestTypeId, insertBefore, gcvTRUE, &f2i);
+                    f2iDest = VIR_Inst_GetDest(f2i);
+                    f2iSrc = VIR_Inst_GetSource(f2i, 0);
+
+                    f2iRegId = VIR_Shader_NewVirRegId(shader, 1);
+                    virErrCode = VIR_Shader_AddSymbol(shader,
+                                                        VIR_SYM_VIRREG,
+                                                        f2iRegId,
+                                                        VIR_Shader_GetTypeFromId(shader, f2iDestTypeId),
+                                                        VIR_STORAGE_UNKNOWN,
+                                                        &f2iSymId);
+                    if(virErrCode != VSC_ERR_NONE) return virErrCode;
+
+                    f2iSym = VIR_Shader_GetSymFromId(shader, f2iSymId);
+                    VIR_Symbol_SetPrecision(f2iSym, VIR_PRECISION_HIGH);
+                    VIR_Operand_SetTempRegister(f2iDest, func, f2iSymId, f2iDestTypeId);
+                    VIR_Operand_SetEnable(f2iDest, lastEnable);
+
+                    VIR_Operand_SetTempRegister(f2iSrc, func, lastSymId, f2iDestTypeId);
+                    VIR_Operand_SetSwizzle(f2iSrc, lastSwizzle);
+                    VSC_UF_AUBO_UniformInfoNode_SetF2IInst(uin, f2i);
+                    lastSymId = f2iSymId;
+                    lastSwizzle = VIR_Enable_2_Swizzle(lastEnable);
+
+                    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                    {
+                        VIR_LOG(dumper, "insert f2i:\n");
+                        VIR_LOG_FLUSH(dumper);
+                        VIR_Inst_Dump(dumper, f2i);
+                    }
+                }
+
+                if(VSC_OPTN_UF_AUBO_Options_GetOpt(options) == 2)
+                {
+                    /* insert load */
+                    {
+                        VIR_Instruction* load;
+                        VIR_Operand *loadSrc0, *loadSrc1;
+                        VIR_VirRegId loadRegId;
+                        VIR_SymId loadSymId;
+                        VIR_SymId addressSymId;
+                        gctUINT lshift, mul3;
+
+                        VIR_Function_AddInstructionBefore(func, VIR_OP_LOAD, uniformSymRegTypeId, insertBefore, gcvTRUE, &load);
+                        loadDest = VIR_Inst_GetDest(load);
+                        loadSrc0 = VIR_Inst_GetSource(load, 0);
+                        loadSrc1 = VIR_Inst_GetSource(load, 1);
+
+                        /* set loadDest */
+                        loadRegId = VIR_Shader_NewVirRegId(shader, 1);
+                        virErrCode = VIR_Shader_AddSymbol(shader,
+                                                          VIR_SYM_VIRREG,
+                                                          loadRegId,
+                                                          uniformSymRegType,
+                                                          VIR_STORAGE_UNKNOWN,
+                                                          &loadSymId);
+                        if(virErrCode != VSC_ERR_NONE) return virErrCode;
+
+                        VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
+                        VIR_Operand_SetEnable(loadDest, VIR_ENABLE_XYZW);
+
+
+                        addressSymId = _VSC_UF_AUBO_GetAuxAddress(aubo, shader, uniformSym, VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin));
+                        VIR_Operand_SetTempRegister(loadSrc0, func, addressSymId, VIR_TYPE_UINT32);
+                        VIR_Operand_SetSwizzle(loadSrc0, VIR_SWIZZLE_X);
+
+                        _Extract_LShift_Mul3(VSC_UF_AUBO_UniformInfoNode_GetStride(uin), &lshift, &mul3);
+                        VIR_Operand_SetTempRegister(loadSrc1, func, lastSymId, VIR_TYPE_UINT32);
+                        VIR_Operand_SetSwizzle(loadSrc1, lastSwizzle);
+                        VIR_Operand_SetLShift(loadSrc1, lshift);
+                        VIR_Operand_SetModifier(loadSrc1, VIR_MOD_X3);
+
+                        if(VIR_Shader_isDual16Mode(shader))
+                        {
+                            gctBOOL needRunSingleT = gcvFALSE;
+                            gctBOOL dual16NotSupported = gcvFALSE;
+                            VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+                            if (needRunSingleT)
+                            {
+                                VIR_Inst_SetThreadMode(load, VIR_THREAD_D16_DUAL_32);
+                            }
+                        }
+
+                        VSC_UF_AUBO_UniformInfoNode_SetLOADInst(uin, load);
+
+                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                        {
+                            VIR_LOG(dumper, "insert load:\n");
+                            VIR_LOG_FLUSH(dumper);
+                            VIR_Inst_Dump(dumper, load);
+                        }
+                    }
+
+                    /* propagate load and change ldarr to mov */
+                    {
+                        VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
+                        VIR_Inst_SetSrcNum(inst, 1);
+                        VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
+                        VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
+                        VIR_Operand_SetSwizzle(operand, operandSwizzle);
+                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                        {
+                            VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
+                            VIR_LOG_FLUSH(dumper);
+                            VIR_Inst_Dump(dumper, inst);
+                        }
+                    }
+                }
+                else
+                {
+                    /* insert mad */
+                    {
+                        VIR_Instruction* mad;
+                        VIR_Operand* madDest;
+                        VIR_Operand* madSrc0;
+                        VIR_Operand* madSrc1;
+                        VIR_Operand* madSrc2;
+                        VIR_TypeId madDestTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_UINT32, i + 1, 1);
+                        VIR_VirRegId madRegId;
+                        VIR_SymId madSymId;
+                        VIR_Symbol* madSym;
+
+                        VIR_Function_AddInstructionBefore(func, VIR_OP_MAD, madDestTypeId, insertBefore, gcvTRUE, &mad);
+                        madDest = VIR_Inst_GetDest(mad);
+                        madSrc0 = VIR_Inst_GetSource(mad, 0);
+                        madSrc1 = VIR_Inst_GetSource(mad, 1);
+                        madSrc2 = VIR_Inst_GetSource(mad, 2);
+
+                        /* set madDest */
+                        madRegId = VIR_Shader_NewVirRegId(shader, 1);
+                        virErrCode = VIR_Shader_AddSymbol(shader,
+                                                            VIR_SYM_VIRREG,
+                                                            madRegId,
+                                                            VIR_Shader_GetTypeFromId(shader, madDestTypeId),
+                                                            VIR_STORAGE_UNKNOWN,
+                                                            &madSymId);
+                        if(virErrCode != VSC_ERR_NONE) return virErrCode;
+
+                        madSym = VIR_Shader_GetSymFromId(shader, madSymId);
+                        VIR_Symbol_SetPrecision(madSym, VIR_PRECISION_HIGH);
+                        VIR_Operand_SetTempRegister(madDest, func, madSymId, madDestTypeId);
+                        VIR_Operand_SetEnable(madDest, lastEnable);
+
+                        /* set madSrc0 */
+                        VIR_Operand_SetTempRegister(madSrc0, func, lastSymId, madDestTypeId);
+                        VIR_Operand_SetSwizzle(madSrc0, lastSwizzle);
+
+                        /* set madSrc1 */
+                        if(needConst)
+                        {
+                            VIR_ConstVal constVal;
+                            VIR_ConstId constId;
+                            gctUINT j;
+
+                            for(j = 0; j < i; j++)
+                            {
+                                constVal.vecVal.u32Value[j] = strides[j];
+                            }
+
+                            VIR_Shader_AddConstant(shader, madDestTypeId, &constVal, &constId);
+                            VIR_Operand_SetConst(madSrc1, madDestTypeId, constId);
+                        }
+                        else
+                        {
+                            VIR_Operand_SetImmediateUint(madSrc1, strides[0]);
+                        }
+
+                        /* set madSrc2 */
+                        if(isSymUniformMovedToCUBO(uniformSym))
+                        {
+                            VIR_SymId cuboAddrSymId = VSC_UF_AUBO_GetCUBOAddr(aubo, shaderKindId);
+                            VIR_Symbol* cuboAddrSym = VIR_Shader_GetSymFromId(shader, cuboAddrSymId);
+                            VIR_Operand_SetUniform(madSrc2, VIR_Symbol_GetUniform(cuboAddrSym), shader);
+                        }
+                        else
+                        {
+                            VIR_SymId duboAddrSymId;
+                            VIR_Symbol* duboAddrSym;
+
+                            gcmASSERT(isSymUniformMovedToDUBO(uniformSym));
+
+                            duboAddrSymId = VSC_UF_AUBO_GetDUBOAddr(aubo, shaderKindId);
+                            duboAddrSym = VIR_Shader_GetSymFromId(shader, duboAddrSymId);
+
+                            VIR_Operand_SetUniform(madSrc2, VIR_Symbol_GetUniform(duboAddrSym), shader);
+                        }
+                        VIR_Operand_SetSwizzle(madSrc2, VIR_SWIZZLE_X);
+
+                        if(VIR_Shader_isDual16Mode(shader))
+                        {
+                            gctBOOL needRunSingleT = gcvFALSE;
+                            gctBOOL dual16NotSupported = gcvFALSE;
+                            VIR_Inst_Check4Dual16(mad, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+                            if (needRunSingleT)
+                            {
+                                VIR_Inst_SetThreadMode(mad, VIR_THREAD_D16_DUAL_32);
+                            }
+                        }
+
+                        lastSymId = madSymId;
+                        lastSwizzle = VIR_Enable_2_Swizzle(lastEnable);
+                        VSC_UF_AUBO_UniformInfoNode_SetMADInst(uin, mad);
+
+                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                        {
+                            VIR_LOG(dumper, "insert mad:\n");
+                            VIR_LOG_FLUSH(dumper);
+                            VIR_Inst_Dump(dumper, mad);
+                        }
+                    }
+
+                    /* insert load */
+                    {
+                        VIR_Instruction* load;
+                        VIR_Operand *loadSrc0, *loadSrc1;
+                        VIR_VirRegId loadRegId;
+                        VIR_SymId loadSymId;
+
+                        VIR_Function_AddInstructionBefore(func, VIR_OP_LOAD, uniformSymRegTypeId, insertBefore, gcvTRUE, &load);
+                        loadDest = VIR_Inst_GetDest(load);
+                        loadSrc0 = VIR_Inst_GetSource(load, 0);
+                        loadSrc1 = VIR_Inst_GetSource(load, 1);
+
+                        /* set loadDest */
+                        loadRegId = VIR_Shader_NewVirRegId(shader, 1);
+                        virErrCode = VIR_Shader_AddSymbol(shader,
+                                                          VIR_SYM_VIRREG,
+                                                          loadRegId,
+                                                          uniformSymRegType,
+                                                          VIR_STORAGE_UNKNOWN,
+                                                          &loadSymId);
+                        if(virErrCode != VSC_ERR_NONE) return virErrCode;
+
+                        VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
+                        VIR_Operand_SetEnable(loadDest, VIR_ENABLE_XYZW);
+
+                        VIR_Operand_SetTempRegister(loadSrc0, func, lastSymId, VIR_TYPE_UINT32);
+                        VIR_Operand_SetImmediateUint(loadSrc1, VSC_UF_AUBO_UniformInfoNode_GetConstOffset(uin) + VIR_Uniform_GetOffset(uniform));
+
+                        if(VIR_Shader_isDual16Mode(shader))
+                        {
+                            gctBOOL needRunSingleT = gcvFALSE;
+                            gctBOOL dual16NotSupported = gcvFALSE;
+                            VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+                            if (needRunSingleT)
+                            {
+                                VIR_Inst_SetThreadMode(load, VIR_THREAD_D16_DUAL_32);
+                            }
+                        }
+
+                        VSC_UF_AUBO_UniformInfoNode_SetLOADInst(uin, load);
+
+                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                        {
+                            VIR_LOG(dumper, "insert load:\n");
+                            VIR_LOG_FLUSH(dumper);
+                            VIR_Inst_Dump(dumper, load);
+                        }
+                    }
+
+                    /* propagate load and change ldarr to mov */
+                    {
+                        VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
+                        VIR_Inst_SetSrcNum(inst, 1);
+                        VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
+                        VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
+                        VIR_Operand_SetSwizzle(operand, operandSwizzle);
+                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                        {
+                            VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
+                            VIR_LOG_FLUSH(dumper);
+                            VIR_Inst_Dump(dumper, inst);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                /* handle normal uniform usage different from others */
+                VIR_Instruction* load;
+                VIR_Operand *loadDest, *loadSrc0, *loadSrc1;
+                VIR_VirRegId loadRegId;
+                VIR_SymId loadSymId;
+
+                VIR_Function_AddInstructionBefore(func, VIR_OP_LOAD, VIR_Operand_GetType(operand), insertBefore, gcvTRUE, &load);
+                loadDest = VIR_Inst_GetDest(load);
+                loadSrc0 = VIR_Inst_GetSource(load, 0);
+                loadSrc1 = VIR_Inst_GetSource(load, 1);
+
+                /* set loadDest */
+                loadRegId = VIR_Shader_NewVirRegId(shader, 1);
+                virErrCode = VIR_Shader_AddSymbol(shader,
+                                                  VIR_SYM_VIRREG,
+                                                  loadRegId,
+                                                  operandType,
+                                                  VIR_STORAGE_UNKNOWN,
+                                                  &loadSymId);
+                if(virErrCode != VSC_ERR_NONE) return virErrCode;
+
+                VIR_Operand_SetTempRegister(loadDest, func, loadSymId, operandTypeId);
+                VIR_Operand_SetEnable(loadDest, VIR_ENABLE_XYZW);
+
+                /* set loadSrc0 */
+                if(isSymUniformMovedToCUBO(uniformSym))
+                {
+                    VIR_SymId cuboAddrSymId = VSC_UF_AUBO_GetCUBOAddr(aubo, shaderKindId);
+                    VIR_Symbol* cuboAddrSym = VIR_Shader_GetSymFromId(shader, cuboAddrSymId);
+                    VIR_Operand_SetUniform(loadSrc0, VIR_Symbol_GetUniform(cuboAddrSym), shader);
+                }
+                else
+                {
+                    VIR_SymId duboAddrSymId;
+                    VIR_Symbol* duboAddrSym;
+
+                    gcmASSERT(isSymUniformMovedToDUBO(uniformSym));
+
+                    duboAddrSymId = VSC_UF_AUBO_GetDUBOAddr(aubo, shaderKindId);
+                    duboAddrSym = VIR_Shader_GetSymFromId(shader, duboAddrSymId);
+
+                    VIR_Operand_SetUniform(loadSrc0, VIR_Symbol_GetUniform(duboAddrSym), shader);
+                }
+                VIR_Operand_SetSwizzle(loadSrc0, VIR_SWIZZLE_X);
+
+                /* set loadSrc1 */
+                switch(VIR_Type_GetKind(uniformSymType))
+                {
+                    case VIR_TY_INVALID:
+                    case VIR_TY_SCALAR:
+                    case VIR_TY_VECTOR:
+                        VIR_Operand_SetImmediateUint(loadSrc1, VIR_Uniform_GetOffset(uniform));
+                        break;
+                    case VIR_TY_MATRIX:
+                    {
+                        if(VIR_Operand_GetRelAddrMode(operand) == VIR_INDEXED_NONE)
+                        {
+                            VIR_TypeId base_typeid = VIR_Type_GetBaseTypeId(uniformSymType);
+                            gctUINT const_index = VIR_Operand_GetMatrixConstIndex(operand);
+                            VIR_TypeId row_typeid = VIR_GetTypeRowType(base_typeid);
+                            gctUINT stride = VIR_GetTypeSize(row_typeid);
+                            VIR_Operand_SetImmediateUint(loadSrc1, VIR_Uniform_GetOffset(uniform) + stride * const_index);
+                        }
+                        break;
+                    }
+                    case VIR_TY_ARRAY:
+                    {
+                        if(VIR_Operand_GetRelAddrMode(operand) == VIR_INDEXED_NONE)
+                        {
+                            VIR_TypeId base_typeid = VIR_Type_GetBaseTypeId(uniformSymType);
+                            VIR_Type* base_type = VIR_Shader_GetTypeFromId(shader, base_typeid);
+                            gctUINT const_index = VIR_Operand_GetRelIndexing(operand);
+                            gctUINT mat_index = VIR_Operand_GetMatrixConstIndex(operand);
+                            gctUINT stride;
+                            if(VIR_Type_isMatrix(base_type))
+                            {
+                                VIR_TypeId row_typeid = VIR_GetTypeRowType(VIR_Type_GetIndex(base_type));
+                                VIR_Type* row_type = VIR_Shader_GetTypeFromId(shader, row_typeid);
+                                stride = VIR_Type_GetTypeByteSize(shader, row_type);
+                            }
+                            else
+                            {
+                                stride = VIR_Type_GetTypeByteSize(shader, base_type);
+                            }
+                            VIR_Operand_SetImmediateUint(loadSrc1, VIR_Uniform_GetOffset(uniform) + stride * (const_index + mat_index));
+                        }
+                        break;
+                    }
+                    default:
+                    {
+                        gcmASSERT(0);
+                    }
+                }
+
+                if(VIR_Shader_isDual16Mode(shader))
+                {
+                    gctBOOL needRunSingleT = gcvFALSE;
+                    gctBOOL dual16NotSupported = gcvFALSE;
+                    VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+                    if (needRunSingleT)
+                    {
+                        VIR_Inst_SetThreadMode(load, VIR_THREAD_D16_DUAL_32);
+                    }
+                }
+
+                {
+                    VIR_Operand_Copy(operand, loadDest);
+                    VIR_Operand_Change2Src(operand);
+                    VIR_Operand_SetSwizzle(operand, operandSwizzle);
+                }
+
+                VSC_UF_AUBO_UniformInfoNode_SetLOADInst(uin, load);
+
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                {
+                    VIR_LOG(dumper, "insert load:\n");
+                    VIR_LOG_FLUSH(dumper);
+                    VIR_Inst_Dump(dumper, load);
+                    VIR_LOG(dumper, "propagate load to inst:\n");
+                    VIR_LOG_FLUSH(dumper);
+                    VIR_Inst_Dump(dumper, inst);
+                }
+            }
+        }
+    }
+
+    return virErrCode;
+}
+
+static VSC_ErrCode
+_VSC_UF_AUBO_TransformInstructionsForBB(
+    IN OUT VSC_UF_AUBO* aubo,
+    IN OUT VIR_Shader* shader,
+    IN OUT VIR_Function* func,
+    IN OUT VIR_BB* bb
+    )
+{
+    VSC_ErrCode virErrCode = VSC_ERR_NONE;
+    VSC_UF_AUBO_UniformInfoList uil;
+
+    if(BB_GET_LENGTH(bb))
+    {
+        _VSC_UF_AUBO_UniformInfoList_Initialize(&uil, VSC_UF_AUBO_GetMM(aubo));
+
+        virErrCode = _VSC_UF_AUBO_BuildUpInfoList(aubo, shader, func, bb, &uil);
+        if(virErrCode != VSC_ERR_NONE)
+        {
+            return virErrCode;
+        }
+        virErrCode = _VSC_UF_AUBO_ReorgUniformInfoList(aubo, shader, func, bb, &uil);
+        if(virErrCode != VSC_ERR_NONE)
+        {
+            return virErrCode;
+        }
+        virErrCode = _VSC_UF_AUBO_InsertInstructions(aubo, shader, func, bb, &uil);
+        if(virErrCode != VSC_ERR_NONE)
+        {
+            return virErrCode;
+        }
+
+        _VSC_UF_AUBO_UniformInfoList_Finalize(&uil);
+    }
+
+    return virErrCode;
+}
+
+static VSC_ErrCode
+_VSC_UF_AUBO_TransformInstructionsForFunctionLocally(
+    IN OUT VSC_UF_AUBO* aubo,
+    IN OUT VIR_Shader* shader,
+    IN OUT VIR_Function* func
+    )
+{
+    VSC_ErrCode virErrCode = VSC_ERR_NONE;
+    VIR_CONTROL_FLOW_GRAPH* cfg = VIR_Function_GetCFG(func);
+    CFG_ITERATOR cfgIter;
+    VIR_BASIC_BLOCK* bb;
+
+    gcmASSERT(cfg);
+    CFG_ITERATOR_INIT(&cfgIter, cfg);
+    bb = CFG_ITERATOR_FIRST(&cfgIter);
+    gcmASSERT(bb);
+    for(; bb != gcvNULL; bb = CFG_ITERATOR_NEXT(&cfgIter))
+    {
+        virErrCode = _VSC_UF_AUBO_TransformInstructionsForBB(aubo, shader, func, bb);
+        if(virErrCode != VSC_ERR_NONE)
+        {
+            break;
+        }
+    }
+
+    return virErrCode;
+}
+
+static VSC_ErrCode
+_VSC_UF_AUBO_TransformInstructionsForShader(
+    IN OUT VSC_UF_AUBO* aubo,
+    IN OUT VIR_Shader* shader
+    )
+{
+    VSC_ErrCode virErrCode = VSC_ERR_NONE;
+    VIR_FuncIterator func_iter;
+    VIR_FunctionNode* func_node;
+    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_INPUT))
+    {
+        VIR_Shader_Dump(gcvNULL, "CreateAUBO Input", shader, gcvTRUE);
+    }
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(shader));
+    /* iterate over functions */
+    for(func_node = VIR_FuncIterator_First(&func_iter); func_node != gcvNULL;
+        func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function* func = func_node->function;
+
+        virErrCode = _VSC_UF_AUBO_TransformInstructionsForFunctionLocally(aubo, shader, func);
+        if(virErrCode != VSC_ERR_NONE)
+        {
+            break;
+        }
+    }
+
+    if(VSC_UF_AUBO_GetAuxAddresses(aubo))
+    {
+        VSC_HASH_TABLE* auxAddrTable = VSC_UF_AUBO_GetAuxAddresses(aubo);
+        VSC_HASH_ITERATOR iter;
+        VSC_UF_AUBO_GetAuxAddress_Key* key;
+
+        vscHTBLIterator_Init(&iter, auxAddrTable);
+        for(key = (VSC_UF_AUBO_GetAuxAddress_Key*)vscHTBLIterator_First(&iter);
+            key != gcvNULL;
+            key = (VSC_UF_AUBO_GetAuxAddress_Key*)vscHTBLIterator_Next(&iter))
+        {
+            vscMM_Free(VSC_UF_AUBO_GetMM(aubo), key);
+        }
+        vscMM_Free(VSC_UF_AUBO_GetMM(aubo), auxAddrTable);
+        VSC_UF_AUBO_SetAuxAddresses(aubo, gcvNULL);
+    }
+
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_OUTPUT))
+    {
+        VIR_Shader_Dump(gcvNULL, "CreateAUBO Output", shader, gcvTRUE);
+    }
+
+    return virErrCode;
+}
+
+static VSC_ErrCode
+_VSC_UF_AUBO_TransformInstructionsForShaders(
+    IN OUT VSC_UF_AUBO* aubo
+    )
+{
+    VSC_ErrCode virErrCode = VSC_ERR_NONE;
+    VSC_AllShaders* all_shaders = VSC_UF_AUBO_GetAllShaders(aubo);
+    gctUINT i;
+
+    for(i = 0; i < VSC_MAX_LINKABLE_SHADER_STAGE_COUNT; i++)
+    {
+        if(VSC_UF_AUBO_GetDUBOItemCount(aubo, i) || VSC_UF_AUBO_GetCUBOItemCount(aubo, i))
+        {
+            VIR_Shader* shader = VSC_AllShaders_GetShader(all_shaders, i);
+
+            virErrCode = _VSC_UF_AUBO_TransformInstructionsForShader(aubo, shader);
+            if(virErrCode != VSC_ERR_NONE)
+            {
+                break;
+            }
+        }
+    }
+
+    return virErrCode;
+}
+
+
+extern VIR_UniformKind _VIR_CG_ResType2UniformKind(VSC_SHADER_RESOURCE_TYPE    resType);
+extern VIR_Uniform* _VIR_CG_FindResUniform(IN VIR_Shader           *pShader,
+                                           IN VIR_UniformKind      uniformKind,
+                                           IN gctUINT              setOrOffset,
+                                           IN gctUINT              binding,
+                                           IN gctUINT              arraySize);
+
+static void _CheckPerShaderReservation(IN VSC_AllShaders           *all_shaders,
+                                       IN VSC_PROGRAM_RESOURCE_LAYOUT  *pgResourceLayout,
+                                       IN OUT VSC_UF_AUBO* aubo)
+{
+    gctUINT i, k, j, newReservedCount, stage;
+
+    for (k = 0; k < pgResourceLayout->resourceSetCount; k++)
+    {
+        VSC_PROGRAM_RESOURCE_SET* set = &pgResourceLayout->pResourceSets[k];
+
+        for (j = 0; j < set->resourceBindingCount; j ++)
+        {
+            VSC_SHADER_RESOURCE_BINDING resBinding = set->pResouceBindings[j].shResBinding;
+
+            for(i = 0; i < VSC_MAX_LINKABLE_SHADER_STAGE_COUNT; i++)
+            {
+                VIR_Shader* shader = VSC_AllShaders_GetShader(all_shaders, i);
+
+                if (shader)
+                {
+                    stage = i;
+
+                    if (shader->shaderKind == VIR_SHADER_COMPUTE)
+                    {
+                        stage = VSC_SHADER_STAGE_CS;
+                    }
+
+                    if (set->pResouceBindings[j].stageBits & VSC_SHADER_STAGE_2_STAGE_BIT(stage))
+                    {
+                        if (_VIR_CG_FindResUniform(shader,
+                                                   _VIR_CG_ResType2UniformKind(resBinding.type),
+                                                   resBinding.set,
+                                                   resBinding.binding,
+                                                   resBinding.arraySize) == gcvNULL)
+                        {
+                            newReservedCount = VSC_UF_AUBO_GetPerShRsvedCount(aubo, i) + resBinding.arraySize;
+                            VSC_UF_AUBO_SetPerShRsvedCount(aubo, i, newReservedCount);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 VSC_ErrCode VSC_UF_UtilizeAuxUBO(
     IN OUT VSC_AllShaders           *all_shaders,
+    IN VSC_HW_CONFIG                *hwCfg,
+    IN VSC_PROGRAM_RESOURCE_LAYOUT  *pgResourceLayout,
     IN VSC_OPTN_UF_AUBO_Options     *options
     )
 {
@@ -2169,7 +4068,7 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
     VIR_Dumper *dumper = VSC_AllShaders_GetDumper(all_shaders);
 
     /* verify whether hardware configuration supports default UBO */
-    if(!all_shaders->hwCfg->hwFeatureFlags.hasHalti1)
+    if(!hwCfg->hwFeatureFlags.hasHalti1)
     {
         if(VSC_OPTN_UF_AUBO_Options_GetTrace(options))
         {
@@ -2204,6 +4103,17 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
                 }
                 return errCode;
             }
+            if(VIR_Shader_GetClientApiVersion(shader) == gcvAPI_OPENVG ||
+               /* to be modified */
+               (shader->compilerVersion[0] & 0xffff) == _SHADER_VG_TYPE)
+            {
+                if(VSC_OPTN_UF_AUBO_Options_GetTrace(options))
+                {
+                    VIR_LOG(dumper, "Default UBO skips shader(id=%d) because it's an OpenVG shader\n", VIR_Shader_GetId(shader));
+                    VIR_LOG_FLUSH(dumper);
+                }
+                return errCode;
+            }
         }
     }
 
@@ -2213,7 +4123,12 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
         VIR_LOG_FLUSH(dumper);
     }
 
-    _VSC_UF_AUBO_Initialize(&aubo, all_shaders, options);
+    _VSC_UF_AUBO_Initialize(&aubo, all_shaders, hwCfg, options);
+
+    if (pgResourceLayout)
+    {
+        _CheckPerShaderReservation(all_shaders, pgResourceLayout, &aubo);
+    }
 
     {
         gctBOOL has_active = gcvFALSE;
@@ -2233,10 +4148,14 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
     _VSC_UF_AUBO_CalculateDUBRegCount(&aubo);
 
     /* HW may not support dynamic uniform indexing, so put indirectly accessed uniforms into workset if needed */
-    if(all_shaders->hwCfg->hwFeatureFlags.noUniformA0 ||
-       VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_INDIRECT_MUST))
+    if(hwCfg->hwFeatureFlags.hasUniformB0)
     {
-        _VSC_UF_AUBO_CollectIndirectlyAccessedUniforms(&aubo);
+        VSC_OPTN_UF_AUBO_Options_SetIndirectAccessLevel(options, VSC_IndirectAccessLevel_UNIFORM_DYNAMICALLY);
+    }
+
+    if(VSC_OPTN_UF_AUBO_Options_GetIndirectAccessLevel(options))
+    {
+        _VSC_UF_AUBO_CollectIndirectlyAccessedUniforms(&aubo, (VSC_IndirectAccessLevel)VSC_OPTN_UF_AUBO_Options_GetIndirectAccessLevel(options));
     }
 
     /* pick uniforms to put into default UBO */
@@ -2257,7 +4176,14 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
         /* fill default UBO */
         _VSC_UF_AUBO_FillAuxiliaryUBOs(&aubo);
         /* transform corresponding MOV into LOAD */
-        _VSC_UF_AUBO_TransformInstructions(&aubo);
+        if(VSC_OPTN_UF_AUBO_Options_GetOpt(options))
+        {
+            _VSC_UF_AUBO_TransformInstructionsForShaders(&aubo);
+        }
+        else
+        {
+            _VSC_UF_AUBO_TransformInstructions(&aubo);
+        }
     }
 
     _VSC_UF_AUBO_Finalize(&aubo);
@@ -2341,9 +4267,7 @@ VSC_CheckOpndUniformUsage(
     IN     gctBOOL          InLTC
     )
 {
-    gctINT             i, j;
-    gctINT             lastUniformIdx;
-    VIR_Symbol         *sym, *symTemp;
+    VIR_Symbol         *sym;
     VIR_Uniform        *uniform = gcvNULL;
 
     if (!opnd) return;
@@ -2352,78 +4276,8 @@ VSC_CheckOpndUniformUsage(
     {
         sym = VIR_Operand_GetSymbol(opnd);
 
-        if (sym)
-        {
-            for (i = 0; i < (gctINT) VIR_IdList_Count(&pShader->uniforms); i ++)
-            {
-                /* Get uniform. */
-                VIR_Id id  = VIR_IdList_GetId(&pShader->uniforms, i);
-                symTemp = VIR_Shader_GetSymFromId(pShader, id);
-
-                if (symTemp == sym)
-                {
-                    if (VIR_Operand_GetRelAddrLevel(opnd) == VIR_NODE_INDEXED ||
-                        VIR_Operand_GetRelAddrLevel(opnd) == VIR_LEAF_AND_NODE_INDEXED)
-                    {
-                        VSC_GetUniformIndexingRange(pShader,
-                                                    i,
-                                                    &lastUniformIdx);
-                    }
-                    else
-                    {
-                        lastUniformIdx = i;
-                    }
-
-                    for (j = i; j <= lastUniformIdx; j++)
-                    {
-                        id  = VIR_IdList_GetId(&pShader->uniforms, j);
-                        sym = VIR_Shader_GetSymFromId(pShader, id);
-                        uniform = gcvNULL;
-                        if (!sym) continue;
-
-                        if (VIR_Symbol_isUniform(sym))
-                        {
-                            uniform = VIR_Symbol_GetUniform(sym);
-                        }
-                        else if (VIR_Symbol_isSampler(sym))
-                        {
-                            uniform = VIR_Symbol_GetSampler(sym);
-                        }
-
-                        if (uniform == gcvNULL)
-                        {
-                            continue;
-                        }
-
-                        if (InLTC)
-                        {
-                            VIR_Symbol_SetFlag(sym, VIR_SYMUNIFORMFLAG_USED_IN_LTC);
-                        }
-                        else
-                        {
-                            VIR_Symbol_SetFlag(sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
-                        }
-
-                        if (VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS &&
-                            VIR_Inst_GetOpcode(inst) == VIR_OP_LOAD)
-                        {
-                            VIR_Symbol_SetFlag(sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
-                        }
-
-                        /* If this uniform belongs to a UBO, mark this UBO as used. */
-                        if (uniform->blockIndex != -1)
-                        {
-                        }
-                    }
-                }
-            }
-        }
-
-        /* Below is temp conservative uniform usage analyze */
-
-        sym = VIR_Operand_GetSymbol(opnd);
-
         uniform = gcvNULL;
+
         if (VIR_Symbol_isUniform(sym))
         {
             uniform = VIR_Symbol_GetUniform(sym);
@@ -2432,10 +4286,27 @@ VSC_CheckOpndUniformUsage(
         {
             uniform = VIR_Symbol_GetSampler(sym);
         }
+        else if (VIR_Symbol_isImage(sym))
+        {
+            uniform = VIR_Symbol_GetImage(sym);
+        }
+        else if (isSymCombinedSampler(sym))
+        {
+            uniform = sym->u2.sampler;
+        }
 
         if (uniform)
         {
             VIR_Type    *symType = VIR_Symbol_GetType(sym);
+
+            if (InLTC)
+            {
+                VIR_Symbol_SetFlag(sym, VIR_SYMUNIFORMFLAG_USED_IN_LTC);
+            }
+            else
+            {
+                VIR_Symbol_SetFlag(sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
+            }
 
             if (VIR_Type_GetKind(symType) == VIR_TY_ARRAY)
             {
@@ -2454,13 +4325,14 @@ VSC_CheckOpndUniformUsage(
                     gctUINT rows;
                     gctINT  thisArraySize;
 
-                    if (VIR_Symbol_isSampler(sym) || VIR_Symbol_isImage(sym))
+                    if (VIR_Symbol_isSampler(sym) ||
+                        VIR_Symbol_isImage(sym))
                     {
                         rows = 1;
                     }
                     else
                     {
-                        rows = VIR_Type_GetVirRegCount(pShader, baseType);
+                        rows = VIR_Type_GetVirRegCount(pShader, baseType, -1);
                     }
 
                     if (VIR_Operand_GetIsConstIndexing(opnd))
@@ -2484,43 +4356,6 @@ VSC_CheckOpndUniformUsage(
     }
 }
 
-static void
-VSC_CheckInstUniformUsage(
-    IN OUT VIR_Shader       *pShader,
-    IN     VIR_Instruction  *inst,
-    IN     gctBOOL          InLTC
-    )
-{
-    gctINT             i;
-
-    for (i = 0; i < (gctINT) VIR_Inst_GetSrcNum(inst); i++)
-    {
-        VIR_Operand *srcOpnd = VIR_Inst_GetSource(inst, i);
-
-        if (srcOpnd == gcvNULL) continue;
-
-        /* VIR_OPND_TEXLDPARM need to check its tmmodifier */
-        if (VIR_Operand_GetOpKind(srcOpnd) == VIR_OPND_TEXLDPARM)
-        {
-            VIR_Operand_TexldModifier *TexldOperand = (VIR_Operand_TexldModifier*) srcOpnd;
-
-            for(i = 0; i < VIR_TEXLDMODIFIER_COUNT; ++i)
-            {
-                if(TexldOperand->tmodifier[i] != gcvNULL)
-                {
-                    VSC_CheckOpndUniformUsage(
-                        pShader,
-                        inst,
-                        TexldOperand->tmodifier[i],
-                        InLTC);
-                }
-            }
-        }
-
-        VSC_CheckOpndUniformUsage(pShader, inst, srcOpnd, InLTC);
-    }
-}
-
 VSC_ErrCode
 VSC_CheckUniformUsage(
     IN OUT VIR_Shader       *pShader
@@ -2532,13 +4367,9 @@ VSC_CheckUniformUsage(
     VIR_FunctionNode* func_node;
 
     gctSIZE_T      i;
-    for(i = 0; i < VIR_IdList_Count(&pShader->uniformBlocks); ++i)
+    for(i = 0; i < VIR_IdList_Count(VIR_Shader_GetUniforms(pShader)); ++i)
     {
-        VIR_Id      id  = VIR_IdList_GetId(&pShader->uniformBlocks, i);
-        VIR_Symbol *sym = VIR_Shader_GetSymFromId(pShader, id);
-
-        VIR_Symbol_ClrFlag(sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
-        VIR_Symbol_ClrFlag(sym, VIR_SYMUNIFORMFLAG_USED_IN_LTC);
+        /* need to fix here */
     }
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
@@ -2553,12 +4384,63 @@ VSC_CheckUniformUsage(
         for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
              inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
-            VSC_CheckInstUniformUsage(pShader, inst, gcvFALSE);
+            VIR_SrcOperand_Iterator srcOpndIter;
+            VIR_Operand*            srcOpnd;
+
+            VIR_SrcOperand_Iterator_Init(inst, &srcOpndIter);
+            srcOpnd = VIR_SrcOperand_Iterator_First(&srcOpndIter);
+
+            for (; srcOpnd != gcvNULL; srcOpnd = VIR_SrcOperand_Iterator_Next(&srcOpndIter))
+            {
+                VSC_CheckOpndUniformUsage(pShader, inst, srcOpnd, gcvFALSE);
+            }
         }
     }
 
-    /* to-do need to check usage in LTC */
-
+    /* check usage in LTC: to-do LTC is not in VIR yet */
     return retValue;
 }
+
+DEF_QUERY_PASS_PROP(VSC_UF_CreateAUBO)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_MC;
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_AUBO;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+    pPassProp->passFlag.resCreationReq.s.bNeedCfg = gcvTRUE;
+}
+
+VSC_ErrCode
+VSC_UF_CreateAUBO(
+    IN VSC_GPG_PASS_WORKER* pPassWorker
+    )
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VSC_AllShaders             all_shaders;
+    VSC_OPTN_UF_AUBO_Options*  aubo_options = (VSC_OPTN_UF_AUBO_Options*)pPassWorker->basePassWorker.pBaseOption;
+
+    VSC_AllShaders_Initialize(&all_shaders,
+                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_VS],
+                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_HS],
+                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_DS],
+                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_GS],
+                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_PS],
+                              (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_CS],
+                              pPassWorker->basePassWorker.pDumper,
+                              pPassWorker->basePassWorker.pMM
+                              );
+
+    /* Create Default UBO now */
+    errCode = VSC_AllShaders_LinkUniforms(&all_shaders);
+    ON_ERROR(errCode, "Link uniforms");
+
+    errCode = VSC_UF_UtilizeAuxUBO(&all_shaders,
+                                   &pPassWorker->pPgmLinkerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
+                                   pPassWorker->pPgmLinkerParam->pPgResourceLayout,
+                                   aubo_options);
+    ON_ERROR(errCode, "utilize default UBO");
+
+OnError:
+    return errCode;
+}
+
 

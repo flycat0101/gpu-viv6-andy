@@ -179,6 +179,11 @@ __glChipBlendBarrier(
     __GLcontext *gc
     );
 
+extern GLboolean
+gcChipCheckRecompileEnable(
+    __GLcontext *gc,
+    gceSURF_FORMAT format
+    );
 
 #ifdef __cplusplus
 }

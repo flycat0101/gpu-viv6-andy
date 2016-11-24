@@ -146,6 +146,7 @@ typedef struct _cl_kernel
     gctINT                  idivImodMov;
     /* indicate if OCL patch is pathed already */
     gctBOOL                 isPatched;
+    gctBOOL                 hasPrintf;
 }
 clsKernel;
 

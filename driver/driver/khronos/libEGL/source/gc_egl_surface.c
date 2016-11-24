@@ -489,6 +489,9 @@ _DestroySurfaceObjects(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+#if gcdENABLE_3D
+    gcsSURF_VIEW surfView = {gcvNULL, 0, 1};
+#endif
 
     do
     {
@@ -552,9 +555,10 @@ _DestroySurfaceObjects(
         if (Surface->depthBuffer != gcvNULL)
         {
 #if gcdENABLE_3D
+            surfView.surf = Surface->depthBuffer;
             /* Flush pixels and disable the tile status. */
             gcmERR_BREAK(gcoSURF_DisableTileStatus(
-                Surface->depthBuffer, gcvFALSE
+                &surfView, gcvFALSE
                 ));
 #endif
 
@@ -566,9 +570,10 @@ _DestroySurfaceObjects(
         if (Surface->renderTarget != gcvNULL)
         {
 #if gcdENABLE_3D
+            surfView.surf = Surface->renderTarget;
             /* Flush pixels and disable the tile status. */
             gcmERR_BREAK(gcoSURF_DisableTileStatus(
-                Surface->renderTarget, gcvFALSE
+                &surfView, gcvFALSE
                 ));
 #endif
 
@@ -605,6 +610,11 @@ _DestroySurfaceObjects(
         }
 
         gcoOS_ZeroMemory(&Surface->drawable, sizeof(EGLDrawable));
+        if (Surface->openVG)
+        {
+            /* Flush VG event queue */
+            gcmERR_BREAK(gcoHAL_Commit(gcvNULL, gcvFALSE));
+        }
     }
     while (gcvFALSE);
 
@@ -891,6 +901,7 @@ void veglGetFormat(
     )
 {
     gceSURF_FORMAT requestFormat = gcvSURF_UNKNOWN;
+    gceHARDWARE_TYPE currentType  = gcvHARDWARE_INVALID;
 
     gcmTRACE_ZONE(
         gcvLEVEL_VERBOSE, gcdZONE_EGL_SURFACE,
@@ -919,6 +930,9 @@ void veglGetFormat(
             );
     }
 #endif
+
+    /* Get current hardwaret type. */
+    gcmVERIFY_OK(gcoHAL_GetHardwareType(gcvNULL, &currentType));
 
     switch (Config->greenSize)
     {
@@ -972,14 +986,16 @@ void veglGetFormat(
 
     gcmASSERT(RenderTarget);
 
-#if gcdENABLE_3D && !gcdENABLE_VG
-    if (requestFormat != gcvSURF_UNKNOWN)
+#if gcdENABLE_3D
+    if ((currentType == gcvHARDWARE_3D) && (requestFormat != gcvSURF_UNKNOWN))
     {
         gcmVERIFY_OK(gco3D_GetClosestRenderFormat(gcvNULL, requestFormat, RenderTarget));
     }
-#else
-    *RenderTarget = requestFormat;
+    else
 #endif
+    {
+        *RenderTarget = requestFormat;
+    }
 
     if (DepthBuffer != gcvNULL)
     {
@@ -1536,15 +1552,30 @@ _MapLockedBuffer(
         return EGL_FALSE;
     }
 
-#if gcdENABLE_3D
     /* If Preserve bit is set. */
     if (Surface->lockPreserve && (Surface->renderTarget != gcvNULL))
     {
-        gcsSURF_VIEW rtView = {Surface->renderTarget, 0, 1};
-        gcsSURF_VIEW lockView = {Surface->lockBuffer, 0, 1};
+#if gcdENABLE_VG && gcdENABLE_3D
+        if (Surface->openVG)
+#endif
+        {
+#if gcdENABLE_VG
+            status = gcoSURF_Copy(Surface->renderTarget, Surface->lockBuffer);
+#endif
+        }
+#if gcdENABLE_VG && gcdENABLE_3D
+        else
+#endif
+        {
+#if gcdENABLE_3D
+            gcsSURF_VIEW rtView = {Surface->renderTarget, 0, 1};
+            gcsSURF_VIEW lockView = {Surface->lockBuffer, 0, 1};
 
-        /* Resolve color buffer to bitmap. */
-        status = gcoSURF_ResolveRect(&rtView, &lockView, gcvNULL);
+            /* Resolve color buffer to bitmap. */
+            status = gcoSURF_ResolveRect(&rtView, &lockView, gcvNULL);
+#endif
+        }
+
         if (gcmIS_ERROR(status))
         {
             veglSetEGLerror(Thread,  EGL_BAD_ACCESS);
@@ -1552,13 +1583,13 @@ _MapLockedBuffer(
         }
 
         status = gcoHAL_Commit(gcvNULL, gcvTRUE);
+
         if (gcmIS_ERROR(status))
         {
             veglSetEGLerror(Thread,  EGL_BAD_ACCESS);
             return EGL_FALSE;
         }
     }
-#endif
 
     veglSetEGLerror(Thread,  EGL_SUCCESS);
     return EGL_TRUE;
@@ -2011,9 +2042,6 @@ veglCreatePlatformWindowSurface(
     /* Reference surface. Temp fix for lock surface. */
     veglReferenceSurface(thread, dpy, surface);
 
-    /* Stash the VEGLSurface in PLS. This is used in Android HWC. */
-    gcoOS_SetPLSValue(gcePLS_VALUE_EGL_SURFACE_INFO, (gctPOINTER) surface);
-
 #if gcdGC355_MEM_PRINT
     thread->fbMemSize += gcoOS_EndRecordAllocation();
 #endif
@@ -2202,9 +2230,6 @@ veglDestroySurface(
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, surface));
     }
 
-    /* Invalidate the VEGLSurface in PLS. */
-    gcoOS_SetPLSValue(gcePLS_VALUE_EGL_SURFACE_INFO, (gctPOINTER) gcvNULL);
-
     /* Success. */
     veglSetEGLerror(thread,  EGL_SUCCESS);
     gcmFOOTER_ARG("return=%d", EGL_TRUE);
@@ -2322,7 +2347,7 @@ eglCreatePbufferSurface(
                 width = attrib_list[i + 1];
                 if (width < 0)
                 {
-                    veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
+                    veglSetEGLerror(thread, EGL_BAD_PARAMETER);
                     gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
                 }
                 break;
@@ -2331,7 +2356,7 @@ eglCreatePbufferSurface(
                 height = attrib_list[i + 1];
                 if (height < 0)
                 {
-                    veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
+                    veglSetEGLerror(thread, EGL_BAD_PARAMETER);
                     gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
                 }
                 break;
@@ -3140,6 +3165,7 @@ eglQuerySurface(
         break;
 
     case EGL_BITMAP_POINTER_KHR:
+        *value = 0;
         if (surface->locked)
         {
             if (!surface->lockBuffer)
@@ -3951,12 +3977,27 @@ eglUnlockSurfaceKHR(
     {
         if (surface->renderTarget != gcvNULL)
         {
+#if gcdENABLE_VG && gcdENABLE_3D
+            if (surface->openVG)
+#endif
+            {
+#if gcdENABLE_VG
+                status = gcoSURF_Copy(surface->renderTarget,
+                                      surface->lockBuffer);
+#endif
+            }
+#if gcdENABLE_VG && gcdENABLE_3D
+            else
+#endif
+            {
 #if gcdENABLE_3D
-            gcsSURF_VIEW lockView = {surface->lockBuffer, 0, 1};
-            gcsSURF_VIEW rtView = {surface->renderTarget, 0, 1};
+                gcsSURF_VIEW lockView = {surface->lockBuffer, 0, 1};
+                gcsSURF_VIEW rtView = {surface->renderTarget, 0, 1};
 
-            /* Reflect mapped buffer to color buffer. */
-            status = gcoSURF_ResolveRect(&lockView, &rtView, gcvNULL);
+                /* Reflect mapped buffer to color buffer. */
+                status = gcoSURF_ResolveRect(&lockView, &rtView, gcvNULL);
+#endif
+            }
 
             if (gcmIS_ERROR(status))
             {
@@ -3965,7 +4006,6 @@ eglUnlockSurfaceKHR(
             }
 
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
-#endif
         }
         else
         {

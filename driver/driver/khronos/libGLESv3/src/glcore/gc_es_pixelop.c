@@ -201,7 +201,7 @@ GLvoid GL_APIENTRY __gles_DrawBuffers(__GLcontext *gc, GLsizei n, const GLenum *
             ** values in tables 15.3, BACK, or NONE
             */
             if (bufs[i] != GL_NONE && bufs[i] != GL_BACK &&
-                ((bufs[i] < GL_COLOR_ATTACHMENT0) || (bufs[i] > GL_COLOR_ATTACHMENT0 + gc->constants.shaderCaps.maxDrawBuffers - 1)))
+                ((bufs[i] < GL_COLOR_ATTACHMENT0) || (bufs[i] > GL_COLOR_ATTACHMENT0 + gc->constants.shaderCaps.maxDrawBuffers)))
             {
                 __GL_ERROR_EXIT(GL_INVALID_ENUM);
             }
@@ -388,6 +388,7 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
     {
         __GLfboAttachPoint *attachPoint;
         __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
+        GLint attachIndex;
 
         if (!gc->dp.isFramebufferComplete(gc, readFBO))
         {
@@ -399,7 +400,13 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
             __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
         }
 
-        attachPoint = &readFBO->attachPoint[__glMapAttachmentToIndex(readFBO->readBuffer)];
+        attachIndex = __glMapAttachmentToIndex(readFBO->readBuffer);
+        if (-1 == attachIndex)
+        {
+            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+        }
+        attachPoint = &readFBO->attachPoint[attachIndex];
+
         if (0 == attachPoint->objName)
         {
             __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);

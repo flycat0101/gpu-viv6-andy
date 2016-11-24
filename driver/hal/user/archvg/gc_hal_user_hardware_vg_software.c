@@ -33,10 +33,10 @@
 #define gcmLAST_X       ControlCoordinates[2]
 #define gcmLAST_Y       ControlCoordinates[3]
 
-#define gcvTESS_PATH    (1 << 0)
-#define gcvTESS_SUBPATH (1 << 1)
-#define gcvTESS_START   (1 << 2)
-#define gcvTESS_END     (1 << 3)
+#define gcvTESS_PATH    (1U << 0)
+#define gcvTESS_SUBPATH (1U << 1)
+#define gcvTESS_START   (1U << 2)
+#define gcvTESS_END     (1U << 3)
 
 #define gcvCOUNT_COMMANDS       1
 #define gcvDUMP_COMMAND_NAME    1
@@ -268,17 +268,17 @@ static gctBOOL _UpdatePixel(
     case 0x0:
     case 0x1:
         data        = ((gctINT16_PTR) tsBuffer)[offset >> 1];
-        maxNegative = -1 << 8;
+        maxNegative = ~0U << 8;
         break;
 
     case 0x2:
         data        = (gctINT8) tsBuffer[offset];
-        maxNegative = -1 << 6;
+        maxNegative = ~0U << 6;
         break;
 
     case 0x3:
         data        = (gctINT8) tsBuffer[offset];
-        maxNegative = -1 << 2;
+        maxNegative = ~0U << 2;
         if (x & 0x4)
             data >>= 4;
         else
@@ -679,29 +679,29 @@ static void _Fill(
     switch (Hardware->vg.tsQuality)
     {
     case 0x0:
-        maskX = (gctUINT)(~0 << 4);
-        maskY = (gctUINT)(~0 << 4);
+        maskX = (gctUINT)(~0U << 4);
+        maskY = (gctUINT)(~0U << 4);
         incX  =  1 << 4;
         incY  =  1 << 4;
         break;
 
     case 0x1:
-        maskX = (gctUINT)(~0 << 3);
-        maskY = (gctUINT)(~0 << 3);
+        maskX = (gctUINT)(~0U << 3);
+        maskY = (gctUINT)(~0U << 3);
         incX  =  1 << 3;
         incY  =  1 << 3;
         break;
 
     case 0x2:
-        maskX = (gctUINT)(~0 << 3);
-        maskY = (gctUINT)(~0 << 2);
+        maskX = (gctUINT)(~0U << 3);
+        maskY = (gctUINT)(~0U << 2);
         incX  =  1 << 3;
         incY  =  1 << 2;
         break;
 
     case 0x3:
-        maskX = (gctUINT)(~0 << 2);
-        maskY = (gctUINT)(~0 << 2);
+        maskX = (gctUINT)(~0U << 2);
+        maskY = (gctUINT)(~0U << 2);
         incX  =  1 << 2;
         incY  =  1 << 2;
         break;
@@ -1403,7 +1403,7 @@ gcoVGHARDWARE_Tesselate(
                 fecommand = (gctUINT32)   * stream;
                                 /*fedata    = (gctUINT32) ((* stream) >> 32);*/
                 /* Extract the opcode. */
-                feopcode = (gctUINT8) (((((gctUINT32) (fecommand)) >> (0 ? 31:28 )) & ((gctUINT32) ((((1 ? 31:28 ) - (0 ? 31:28 ) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 31:28 ) - (0 ? 31:28 ) + 1)))))) );
+                feopcode = (gctUINT8) (((((gctUINT32) (fecommand)) >> (0 ? 31:28 )) & ((gctUINT32) ((((1 ? 31:28 ) - (0 ? 31:28 ) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:28 ) - (0 ? 31:28 ) + 1)))))) );
 
                 /* END? */
                 if ((feopcode == 0x0) ||
@@ -1417,7 +1417,7 @@ gcoVGHARDWARE_Tesselate(
                 else if (feopcode == 0x3)
                 {
                     /* Extract the state counter. */
-                    gctUINT32 stateCount = (((((gctUINT32) (fecommand)) >> (0 ? 27:16 )) & ((gctUINT32) ((((1 ? 27:16 ) - (0 ? 27:16 ) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 27:16 ) - (0 ? 27:16 ) + 1)))))) );
+                    gctUINT32 stateCount = (((((gctUINT32) (fecommand)) >> (0 ? 27:16 )) & ((gctUINT32) ((((1 ? 27:16 ) - (0 ? 27:16 ) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:16 ) - (0 ? 27:16 ) + 1)))))) );
 
                     /* Determine the skip value. */
                     gctUINT skipValue = gcmALIGN(stateCount + 1, 2) / 2;
@@ -1430,7 +1430,7 @@ gcoVGHARDWARE_Tesselate(
                 else if (feopcode == 0x4)
                 {
                     /* Extract the state counter. */
-                    gctUINT32 dataCount = (((((gctUINT32) (fecommand)) >> (0 ? 15:0 )) & ((gctUINT32) ((((1 ? 15:0 ) - (0 ? 15:0 ) + 1) == 32) ? ~0 : (~(~0 << ((1 ? 15:0 ) - (0 ? 15:0 ) + 1)))))) );
+                    gctUINT32 dataCount = (((((gctUINT32) (fecommand)) >> (0 ? 15:0 )) & ((gctUINT32) ((((1 ? 15:0 ) - (0 ? 15:0 ) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0 ) - (0 ? 15:0 ) + 1)))))) );
 
                     /* Skip the command. */
                     stream += 1;

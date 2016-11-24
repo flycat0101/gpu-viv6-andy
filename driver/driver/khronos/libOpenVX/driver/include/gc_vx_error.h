@@ -24,3 +24,4 @@ EXTERN_C_END
 
 #endif /* __GC_VX_ERROR_H__ */
 
+

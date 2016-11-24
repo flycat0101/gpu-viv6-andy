@@ -1,0 +1,21 @@
+android update project -p . -t android-23
+
+mkdir -p ./assets/shader/SPIR/V/
+cp -r ../../VKTS_Binaries/shader/SPIR/V/vertex_only_ndc.vert.spv ./assets/shader/SPIR/V/
+cp -r ../../VKTS_Binaries/shader/SPIR/V/red.frag.spv ./assets/shader/SPIR/V/
+
+cd jni
+ndk-build
+
+chmod +w Application.mk
+vi Application.mk
+
+ndk-build
+
+ant debug
+
+adb install -r bin/NativeActivity-debug.apk
+
+adb shell am start -n tv.nopper.VKTS_Example02/android.app.NativeActivity
+
+

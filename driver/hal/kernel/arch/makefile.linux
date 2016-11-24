@@ -75,7 +75,7 @@ INCLUDE += -I$(AQROOT)/hal/kernel/inc
 INCLUDE += -I$(AQROOT)/hal/kernel/inc
 INCLUDE += -I$(AQROOT)/hal/kernel
 INCLUDE += -I$(AQROOT)/hal/kernel/arch
-ifeq ($(VIVANTE_ENABLE_VG), 1)
+ifeq ($(VIVANTE_ENABLE_VG),1)
 INCLUDE += -I$(AQROOT)/hal/kernel/archvg
 endif
 

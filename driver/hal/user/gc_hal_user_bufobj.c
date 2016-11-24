@@ -80,7 +80,7 @@ gcoBUFOBJ_GetFence(
     gceSTATUS status = gcvSTATUS_OK;
     gcmHEADER_ARG("BufObj=0x%x Type=%d", BufObj, Type);
 
-    if (BufObj)
+    if ((BufObj) && (BufObj->memory.pool != gcvPOOL_UNKNOWN))
     {
         status = gcsSURF_NODE_GetFence(&BufObj->memory, Type);
     }
@@ -494,6 +494,135 @@ OnError:
     return status;
 }
 
+static gceSTATUS _gpuUpload(
+    gcoBUFOBJ BufObj,
+    gctSIZE_T Offset,
+    gctCONST_POINTER Buffer,
+    gctSIZE_T Bytes
+    )
+{
+    gctUINT32 srcAddress, destAddress, physicAddress;
+    gcsSURF_NODE srcMemory;
+    gctBOOL srcLocked, dstLocked;
+    gctUINT alignment;
+    gctBOOL aSyncPipe;
+    gceENGINE blitEngine;
+    gceSTATUS status = gcvSTATUS_OK;
+
+    srcLocked = gcvFALSE;
+    dstLocked = gcvFALSE;
+    aSyncPipe = gcoHAL_GetOption(gcvNULL, gcvOPTION_ASYNC_PIPE);
+    blitEngine = aSyncPipe ? gcvENGINE_BLT : gcvENGINE_RENDER;
+
+    gcoOS_ZeroMemory(&srcMemory, sizeof(struct _gcsSURF_NODE));
+
+    switch (BufObj->type)
+    {
+    case gcvBUFOBJ_TYPE_ARRAY_BUFFER:
+        /* Query the stream alignment. */
+        gcmONERROR(
+            gcoHARDWARE_QueryStreamCaps(gcvNULL,
+            gcvNULL,
+            gcvNULL,
+            gcvNULL,
+            &alignment,
+            gcvNULL));
+        break;
+
+    case gcvBUFOBJ_TYPE_ELEMENT_ARRAY_BUFFER:
+        /* Get alignment */
+        alignment = BUFFER_INDEX_ALIGNMENT;
+        break;
+
+    case gcvBUFOBJ_TYPE_GENERIC_BUFFER:
+        /* Get alignment */
+        alignment = BUFFER_OBJECT_ALIGNMENT;
+        break;
+
+    default:
+        /* Get alignment */
+        alignment = BUFFER_OBJECT_ALIGNMENT;
+        break;
+    }
+
+    /* Lock the bufobj buffer. */
+    gcmONERROR(gcoHARDWARE_LockEx(&BufObj->memory,
+        blitEngine,
+        &physicAddress,
+        gcvNULL));
+
+    dstLocked = gcvTRUE;
+    destAddress = physicAddress + (gctUINT32)Offset;
+
+    /* Construct src buffer.*/
+    gcmONERROR(gcsSURF_NODE_Construct(
+        &srcMemory,
+        Bytes,
+        alignment,
+        BufObj->surfType,
+        gcvALLOC_FLAG_NONE,
+        gcvPOOL_DEFAULT
+        ));
+
+    /* Lock the bufobj buffer. */
+    gcmONERROR(gcoHARDWARE_LockEx(&srcMemory,
+        blitEngine,
+        &physicAddress,
+        gcvNULL));
+
+    srcLocked = gcvTRUE;
+
+    srcAddress = physicAddress;
+
+    if (Buffer != gcvNULL)
+    {
+        gcmONERROR(gcoHARDWARE_CopyData(&srcMemory,
+            0,
+            Buffer,
+            Bytes));
+
+        /* Dump the buffer. */
+        gcmDUMP_BUFFER(gcvNULL,
+            BufObj->dumpDescriptor,
+            gcsSURF_NODE_GetHWAddress(&srcMemory),
+            srcMemory.logical,
+            0,
+            Bytes);
+    }
+
+    gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, blitEngine, srcAddress, destAddress, (gctUINT32)Bytes));
+
+    gcmONERROR(gcoBUFOBJ_GetFence(BufObj, gcvFENCE_TYPE_WRITE));
+
+    gcoHARDWARE_SetHWSlot(gcvNULL, blitEngine, gcvHWSLOT_BLT_SRC, srcMemory.u.normal.node, 0);
+
+    gcoHARDWARE_SetHWSlot(gcvNULL, blitEngine, gcvHWSLOT_BLT_DST, BufObj->memory.u.normal.node, 0);
+
+OnError:
+    if (srcLocked)
+    {
+        gcoHARDWARE_UnlockEx(&srcMemory,
+            blitEngine,
+            BufObj->surfType);
+    }
+
+    if (dstLocked)
+    {
+        gcoHARDWARE_UnlockEx(&BufObj->memory,
+            blitEngine,
+            BufObj->surfType);
+    }
+
+    if(srcMemory.pool != gcvPOOL_UNKNOWN)
+    {
+        /* Delete srcMemory.*/
+        /* Create an event to free the video memory. */
+        gcmVERIFY_OK(gcsSURF_NODE_Destroy(&srcMemory));
+    }
+
+    return status;
+}
+
 /*******************************************************************************
 **
 **  gcoBUFOBJ_Upload
@@ -557,7 +686,7 @@ gcoBUFOBJ_Upload (
     )
 {
     gceSTATUS status;
-    gctUINT alignment, offset, bytes;
+    gctUINT alignment, bytes;
     gcePOOL memoryPool;
     gctBOOL dynamic;
     gctBOOL allocate;
@@ -566,6 +695,9 @@ gcoBUFOBJ_Upload (
     gctBOOL needBiggerSpace;
     gcsSURF_NODE memory;
     gctBOOL bDisableFenceAndDynamicStream;
+    gctBOOL bGPUupload = gcvFALSE;
+    gctBOOL bCanGPUupload = gcvFALSE;
+    gctBOOL bWaitFence = gcvFALSE;
 
     gcmHEADER_ARG("BufObj=0x%x Buffer=0x%x Offset=%u Bytes=%lu, Dynamic=%d",
                    BufObj, Buffer, Offset, Bytes, Usage);
@@ -578,193 +710,74 @@ gcoBUFOBJ_Upload (
     bDisableFenceAndDynamicStream = (Usage & gcvBUFOBJ_USAGE_DISABLE_FENCE_DYNAMIC_STREAM) ? gcvTRUE : gcvFALSE;
     Usage &= ~gcvBUFOBJ_USAGE_DISABLE_FENCE_DYNAMIC_STREAM;
 
-    if (gcoHAL_GetOption(gcvNULL, gcvOPTION_ASYNC_BLT) &&
-        gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE))
+    bCanGPUupload =  gcoHAL_GetOption(gcvNULL, gcvOPTION_GPU_BUFOBJ_UPLOAD) &&
+                  gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE);
+
+    /* Dynamic for all cases other than static draw */
+    dynamic = (Usage != gcvBUFOBJ_USAGE_STATIC_DRAW);
+
+    /* Set default values */
+    allocate  = gcvFALSE;
+    duplicate = gcvFALSE;
+    allocationSize = 0;
+
+    /* Has it been initialized? */
+    if (BufObj->memory.pool == gcvPOOL_UNKNOWN)
     {
-        gctUINT32 srcAddress, destAddress, physicAddress;
-        gcsSURF_NODE srcMemory;
-        gctBOOL srcLocked, dstLocked;
-
-        srcLocked = gcvFALSE;
-        dstLocked = gcvFALSE;
-        gcoOS_ZeroMemory(&srcMemory, sizeof(struct _gcsSURF_NODE));
-
-        do
-        {
-            allocationSize = Bytes + Offset;
-            /* Is it resized? */
-            needBiggerSpace = (BufObj->bytes < allocationSize);
-            memoryPool = gcvPOOL_DEFAULT;
-
-            switch (BufObj->type)
-            {
-            case gcvBUFOBJ_TYPE_ARRAY_BUFFER:
-                /* Query the stream alignment. */
-                gcmERR_BREAK(
-                    gcoHARDWARE_QueryStreamCaps(gcvNULL,
-                    gcvNULL,
-                    gcvNULL,
-                    gcvNULL,
-                    &alignment,
-                    gcvNULL));
-                break;
-
-            case gcvBUFOBJ_TYPE_ELEMENT_ARRAY_BUFFER:
-                /* Get alignment */
-                alignment = BUFFER_INDEX_ALIGNMENT;
-                break;
-
-            case gcvBUFOBJ_TYPE_GENERIC_BUFFER:
-                /* Get alignment */
-                alignment = BUFFER_OBJECT_ALIGNMENT;
-                break;
-
-            default:
-                /* Get alignment */
-                alignment = BUFFER_OBJECT_ALIGNMENT;
-                break;
-            }
-
-            /* construct dst buffer, if need.*/
-            if (BufObj->memory.pool == gcvPOOL_UNKNOWN || needBiggerSpace)
-            {
-                gcmERR_BREAK(gcsSURF_NODE_Construct(
-                    &memory,
-                    allocationSize,
-                    alignment,
-                    BufObj->surfType,
-                    gcvALLOC_FLAG_NONE,
-                    memoryPool
-                    ));
-
-                /* Free any allocated video memory. */
-                gcmERR_BREAK(gcoBUFOBJ_Free(BufObj));
-
-                /* Reset BufObj */
-                BufObj->bytes = allocationSize;
-                BufObj->memory = memory;
-            }
-
-            /* Lock the bufobj buffer. */
-            gcoHARDWARE_LockEx(&BufObj->memory,
-                gcvENGINE_RENDER,
-                gcvNULL,
-                gcvNULL);
-
-            /* Lock the bufobj buffer. */
-            gcmERR_BREAK(gcoHARDWARE_LockEx(&BufObj->memory,
-                gcvENGINE_BLT,
-                &physicAddress,
-                gcvNULL));
-
-            dstLocked = gcvTRUE;
-            destAddress = physicAddress + (gctUINT32)Offset;
-
-            /* Construct src buffer.*/
-            gcmERR_BREAK(gcsSURF_NODE_Construct(
-                &srcMemory,
-                Bytes,
-                alignment,
-                BufObj->surfType,
-                gcvALLOC_FLAG_NONE,
-                memoryPool
-                ));
-
-            /* Lock the bufobj buffer. */
-            gcmERR_BREAK(gcoHARDWARE_LockEx(&srcMemory,
-                gcvENGINE_BLT,
-                &physicAddress,
-                gcvNULL));
-
-            srcLocked = gcvTRUE;
-
-            srcAddress = physicAddress;
-
-            if (Buffer != gcvNULL)
-            {
-                gcmERR_BREAK(gcoHARDWARE_CopyData(&srcMemory,
-                    0,
-                    Buffer,
-                    Bytes));
-
-                /* Dump the buffer. */
-                gcmDUMP_BUFFER(gcvNULL,
-                    BufObj->dumpDescriptor,
-                    gcsSURF_NODE_GetHWAddress(&srcMemory),
-                    srcMemory.logical,
-                    0,
-                    Bytes);
-            }
-
-            gcmERR_BREAK(gcoHARDWARE_3DBlitCopy(gcvNULL, gcvENGINE_BLT, srcAddress, destAddress, (gctUINT32)Bytes));
-
-            gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_BLT, gcvHWSLOT_BLT_SRC, srcMemory.u.normal.node, 0);
-
-            gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_BLT, gcvHWSLOT_BLT_DST, BufObj->memory.u.normal.node, 0);
-
-        }while(gcvFALSE);
-
-        if (srcLocked)
-        {
-            gcoHARDWARE_UnlockEx(&srcMemory,
-                gcvENGINE_BLT,
-                BufObj->surfType);
-        }
-
-        if (dstLocked)
-        {
-            gcoHARDWARE_UnlockEx(&BufObj->memory,
-                gcvENGINE_BLT,
-                BufObj->surfType);
-        }
-
-
-        if(srcMemory.pool != gcvPOOL_UNKNOWN)
-        {
-            /* Delete srcMemory.*/
-            /* Create an event to free the video memory. */
-            gcmVERIFY_OK(gcsSURF_NODE_Destroy(&srcMemory));
-        }
+        allocate = gcvTRUE;
+        duplicate  = gcvFALSE;
+        allocationSize = Offset + Bytes;
     }
     else
     {
-        /* Run old path.*/
-        status = gcvSTATUS_NOT_SUPPORTED;
-    }
+        /* Is it resized? */
+        needBiggerSpace = (BufObj->bytes < (Bytes + Offset));
 
-    if (gcmIS_ERROR(status))
-    {
-
-        /* Dynamic for all cases other than static draw */
-        dynamic = (Usage != gcvBUFOBJ_USAGE_STATIC_DRAW);
-
-        /* Set default values */
-        allocate  = gcvFALSE;
-        duplicate = gcvFALSE;
-        allocationSize = 0;
-
-        /* Has it been initialized? */
-        if (BufObj->memory.pool == gcvPOOL_UNKNOWN)
+        /* If resized */
+        if (needBiggerSpace)
         {
             allocate = gcvTRUE;
-            duplicate  = gcvFALSE;
             allocationSize = Offset + Bytes;
-        }
-        else
-        {
-            /* Is it resized? */
-            needBiggerSpace = (BufObj->bytes < (Bytes + Offset));
-
-            /* If resized */
-            if (needBiggerSpace)
+            /* Is incoming buffer a whole buffer? */
+            if((Offset == 0) && Buffer != gcvNULL)
             {
-                allocate = gcvTRUE;
-                allocationSize = Offset + Bytes;
-                /* Is incoming buffer a whole buffer? */
-                if((Offset == 0) && Buffer != gcvNULL)
+                /* Yes, then we are going to replace it anyway. So why duplicate? */
+                duplicate = gcvFALSE;
+                /* Clear dynamic range. */
+                BufObj->dynamicStart = ~0U;
+                BufObj->dynamicEnd   = 0;
+            }
+            else
+            {
+                duplicate = gcvTRUE;
+            }
+        }
+        else if (Offset == 0 && Bytes == BufObj->bytes)
+        {
+            allocate = gcvTRUE;
+            allocationSize = Bytes;
+            duplicate = gcvFALSE;
+
+            /* Clear dynamic range. */
+            BufObj->dynamicStart = ~0U;
+            BufObj->dynamicEnd   = 0;
+        }
+        /* if dynamic */
+        else if (dynamic)
+        {
+            /* If the data range overlaps for a dynamic stream,
+            *  create a new buffer.
+            */
+            if ((Offset < BufObj->dynamicEnd)
+                && ((Offset + Bytes) > BufObj->dynamicStart))
+            {
+                allocate  = gcvTRUE;
+                allocationSize = BufObj->bytes;
+                if((BufObj->bytes == Bytes) && (Offset == 0) && (Buffer != gcvNULL))
                 {
-                    /* Yes, then we are going to replace it anyway. So why duplicate? */
+                    /* We are going to override anyway. So why duplicate? */
                     duplicate = gcvFALSE;
+
                     /* Clear dynamic range. */
                     BufObj->dynamicStart = ~0U;
                     BufObj->dynamicEnd   = 0;
@@ -774,166 +787,134 @@ gcoBUFOBJ_Upload (
                     duplicate = gcvTRUE;
                 }
             }
-            else if (Offset == 0 && Bytes == BufObj->bytes)
+        }
+
+        if(!bDisableFenceAndDynamicStream)
+        {
+            if(BufObj->bytes > DYNAMIC_BUFFER_MAX_COUNT &&
+               duplicate                                &&
+               !needBiggerSpace
+                )
             {
-                allocate = gcvTRUE;
-                allocationSize = Bytes;
+                allocate = gcvFALSE;
                 duplicate = gcvFALSE;
-
-                /* Clear dynamic range. */
-                BufObj->dynamicStart = ~0U;
-                BufObj->dynamicEnd   = 0;
-            }
-            /* if dynamic */
-            else if (dynamic)
-            {
-                /* If the data range overlaps for a dynamic stream,
-                *  create a new buffer.
-                */
-                if ((Offset < BufObj->dynamicEnd)
-                    && ((Offset + Bytes) > BufObj->dynamicStart))
-                {
-                    allocate  = gcvTRUE;
-                    allocationSize = BufObj->bytes;
-                    if((BufObj->bytes == Bytes) && (Offset == 0) && (Buffer != gcvNULL))
-                    {
-                        /* We are going to override anyway. So why duplicate? */
-                        duplicate = gcvFALSE;
-
-                        /* Clear dynamic range. */
-                        BufObj->dynamicStart = ~0U;
-                        BufObj->dynamicEnd   = 0;
-                    }
-                    else
-                    {
-                        duplicate = gcvTRUE;
-                    }
-                }
             }
 
-            if(!bDisableFenceAndDynamicStream)
+            if (!allocate && !duplicate)
             {
-                if(BufObj->bytes > DYNAMIC_BUFFER_MAX_COUNT &&
-                    duplicate                                &&
-                    !needBiggerSpace
-                    )
-                {
-                    allocate = gcvFALSE;
-                    duplicate = gcvFALSE;
-                }
-
-                if (!allocate && !duplicate)
-                {
-                    gcoBUFOBJ_WaitFence(BufObj, gcvFENCE_TYPE_ALL);
-                }
+                bWaitFence = gcvTRUE;
             }
         }
+    }
 
-        if(bDisableFenceAndDynamicStream)
+    if (bWaitFence && bCanGPUupload)
+    {
+        bGPUupload = gcvTRUE;
+        bWaitFence = gcvFALSE;
+    }
+
+    if (bWaitFence)
+    {
+        gcoBUFOBJ_WaitFence(BufObj, gcvFENCE_TYPE_ALL);
+    }
+
+    if(bDisableFenceAndDynamicStream)
+    {
+        duplicate = gcvFALSE;
+    }
+
+    /* Set new usage */
+    BufObj->usage = Usage;
+
+    /* If we need to allocate new memory */
+    if (allocate)
+    {
+        switch (BufObj->type)
         {
-            duplicate = gcvFALSE;
-        }
-
-        /* Set new usage */
-        BufObj->usage = Usage;
-
-        /* If we need to allocate new memory */
-        if (allocate)
-        {
-            switch (BufObj->type)
-            {
-            case gcvBUFOBJ_TYPE_ARRAY_BUFFER:
-                /* Query the stream alignment. */
-                gcmONERROR(
-                    gcoHARDWARE_QueryStreamCaps(gcvNULL,
-                    gcvNULL,
-                    gcvNULL,
-                    gcvNULL,
-                    &alignment,
-                    gcvNULL));
-                /* Get memory pool type */
-                memoryPool = dynamic ? gcvPOOL_UNIFIED : gcvPOOL_DEFAULT;
-                break;
-
-            case gcvBUFOBJ_TYPE_ELEMENT_ARRAY_BUFFER:
-                /* Get alignment */
-                alignment = BUFFER_INDEX_ALIGNMENT;
-                /* Get memory pool type */
-                memoryPool = gcvPOOL_DEFAULT;
-                break;
-
-            case gcvBUFOBJ_TYPE_GENERIC_BUFFER:
-                /* Get alignment */
-                alignment = BUFFER_OBJECT_ALIGNMENT;
-                /* Get memory pool type */
-                memoryPool = gcvPOOL_DEFAULT;
-                break;
-
-            default:
-                /* Get alignment */
-                alignment = BUFFER_OBJECT_ALIGNMENT;
-                /* Get memory pool type */
-                memoryPool = gcvPOOL_DEFAULT;
-                break;
-            }
-
-            gcmONERROR(gcsSURF_NODE_Construct(
-                &memory,
-                allocationSize,
-                alignment,
-                BufObj->surfType,
-                gcvALLOC_FLAG_NONE,
-                memoryPool
-                ));
-
-            /* Lock the bufobj buffer. */
-            gcmONERROR(gcoHARDWARE_Lock(&memory,
+        case gcvBUFOBJ_TYPE_ARRAY_BUFFER:
+            /* Query the stream alignment. */
+            gcmONERROR(
+                gcoHARDWARE_QueryStreamCaps(gcvNULL,
                 gcvNULL,
+                gcvNULL,
+                gcvNULL,
+                &alignment,
                 gcvNULL));
+            /* Get memory pool type */
+            memoryPool = dynamic ? gcvPOOL_UNIFIED : gcvPOOL_DEFAULT;
+            break;
 
-            /* If we need to duplicate old data */
-            if (duplicate)
-            {
-                /* Replicate the contents of old buffer in new buffer */
-                gcmONERROR(gcoHARDWARE_CopyData(&memory,
-                    0,
-                    BufObj->memory.logical,
-                    BufObj->bytes));
-            }
+        case gcvBUFOBJ_TYPE_ELEMENT_ARRAY_BUFFER:
+            /* Get alignment */
+            alignment = BUFFER_INDEX_ALIGNMENT;
+            /* Get memory pool type */
+            memoryPool = gcvPOOL_DEFAULT;
+            break;
 
-            /* Free any allocated video memory. */
-            gcmONERROR(gcoBUFOBJ_Free(BufObj));
+        case gcvBUFOBJ_TYPE_GENERIC_BUFFER:
+            /* Get alignment */
+            alignment = BUFFER_OBJECT_ALIGNMENT;
+            /* Get memory pool type */
+            memoryPool = gcvPOOL_DEFAULT;
+            break;
 
-            /* Reset BufObj */
-            BufObj->bytes = allocationSize;
-            BufObj->memory = memory;
+        default:
+            /* Get alignment */
+            alignment = BUFFER_OBJECT_ALIGNMENT;
+            /* Get memory pool type */
+            memoryPool = gcvPOOL_DEFAULT;
+            break;
         }
 
-        if (Buffer != gcvNULL)
+        gcmONERROR(gcsSURF_NODE_Construct(
+            &memory,
+            allocationSize,
+            alignment,
+            BufObj->surfType,
+            gcvALLOC_FLAG_NONE,
+            memoryPool
+            ));
+
+        /* Lock the bufobj buffer. */
+        gcmONERROR(gcoHARDWARE_Lock(&memory,
+            gcvNULL,
+            gcvNULL));
+
+        /* If we need to duplicate old data */
+        if (duplicate)
         {
-            gcmSAFECASTSIZET(offset, Offset);
+            gcmONERROR(gcoBUFOBJ_WaitFence(BufObj, gcvFENCE_TYPE_WRITE));
+            /* Replicate the contents of old buffer in new buffer */
+            gcmONERROR(gcoHARDWARE_CopyData(&memory,
+                0,
+                BufObj->memory.logical,
+                BufObj->bytes));
+        }
+
+        /* Free any allocated video memory. */
+        gcmONERROR(gcoBUFOBJ_Free(BufObj));
+
+        /* Reset BufObj */
+        BufObj->bytes = allocationSize;
+        BufObj->memory = memory;
+    }
+
+    if (Buffer != gcvNULL)
+    {
+        if (bGPUupload)
+        {
+            gcmONERROR(_gpuUpload(BufObj, Offset, Buffer, Bytes));
+        }
+        else
+        {
             /* Upload data into the stream and clean CPU cache */
             gcmONERROR(gcoHARDWARE_CopyData(&BufObj->memory,
-                offset,
+                Offset,
                 Buffer,
                 Bytes));
 
             /* Flush GPU cache */
             gcmONERROR(gcoBUFOBJ_GPUCacheOperation(BufObj));
-
-            /* Update written range for dynamic buffers. */
-            if (dynamic)
-            {
-                if (Offset < BufObj->dynamicStart)
-                {
-                    BufObj->dynamicStart = Offset;
-                }
-
-                if ((Offset + Bytes) > BufObj->dynamicEnd)
-                {
-                    BufObj->dynamicEnd = Offset + Bytes;
-                }
-            }
 
             /* Dump the buffer. */
             gcmDUMP_BUFFER(gcvNULL,
@@ -942,6 +923,20 @@ gcoBUFOBJ_Upload (
                 BufObj->memory.logical,
                 Offset,
                 Bytes);
+        }
+
+        /* Update written range for dynamic buffers. */
+        if (dynamic)
+        {
+            if (Offset < BufObj->dynamicStart)
+            {
+                BufObj->dynamicStart = Offset;
+            }
+
+            if ((Offset + Bytes) > BufObj->dynamicEnd)
+            {
+                BufObj->dynamicEnd = Offset + Bytes;
+            }
         }
     }
 
@@ -1093,7 +1088,7 @@ gcoBUFOBJ_IndexBind (
     gcoHARDWARE_SetHWSlot(gcvNULL, gcvENGINE_RENDER, gcvHWSLOT_INDEX, Index->memory.u.normal.node, 0);
 
     /* Program index */
-    gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL, address, 0, endAddress, Type, (Count * 3)));
+    gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL, address, endAddress, Type, (Count * 3)));
 
     /* Unlock the bufobj buffer. */
     if (indexLocked)
@@ -1417,7 +1412,7 @@ gcoBUFOBJ_CPUCacheOperation_Range(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("BufObj=0x%x, Offset=%u Length=%u Operation=%d", BufObj, Offset, Length, Operation);
+    gcmHEADER_ARG("BufObj=0x%x, Offset=%zu Length=%zu Operation=%d", BufObj, Offset, Length, Operation);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(BufObj, gcvOBJ_BUFOBJ);

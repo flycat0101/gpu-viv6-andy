@@ -293,25 +293,6 @@ fbGetWindowInfo(
     );
 
 void
-fbShowWindow(
-    void * Display,
-    void * Window
-    );
-
-void
-fbHideWindow(
-    void * Display,
-    void * Window
-    );
-
-int
-fbGetEvent(
-    void * Display,
-    void * Window,
-    platEvent * Event
-    );
-
-void
 fbDestroyWindow(
     void * Window
     );
@@ -395,6 +376,17 @@ dfbGetEvent(
     platEvent * Event
     );
 
+int
+dfbGetWindowInfo(
+    void * Window,
+    int * X,
+    int * Y,
+    int * Width,
+    int * Height,
+    int * BitsPerPixel,
+    unsigned int * Offset
+    );
+
 void
 dfbDestroyWindow(
     void * Window
@@ -435,22 +427,47 @@ dfbDestroyPixmap(
 #if defined(WL_EGL_PLATFORM)
 /* Wayland */
 
-/* wayland actually does not define pixmap. */
+/**
+ * wl_egl_pixmap - Vivante specific pixmap implementation on wayland.
+ *
+ * wayland actually does not define pixmap.
+ */
 struct wl_egl_pixmap;
 
-/* Create wayland pixmap. */
-struct wl_egl_pixmap * wl_egl_pixmap_create(int width, int height, int bpp);
+/**
+ * wl_egl_pixmap_create - Create wayland pixmap.
+ * @format uses 'enum wl_shm_format'
+ */
+struct wl_egl_pixmap *wl_egl_pixmap_create(int width, int height, int format);
 
-/* Destroy wayland pixmap. */
+/**
+ * wl_egl_pixmap_destroy - Destroy wayland pixmap.
+ */
 void wl_egl_pixmap_destroy(struct wl_egl_pixmap *pixmap);
 
-/*
- * Get pixmap pixel data.
- * stride is in bytes.
- * Returns 0 on success, negative values on error.
+/**
+ * wl_egl_pixmap_get_stride - Obtain stride in bytes of the pixmap
+ *
+ * Stride is invalid before eglCreatePixmapSurface.
  */
-int wl_egl_pixmap_get_pixels(struct wl_egl_pixmap *pixmap,
-            void **data, int *stride);
+void wl_egl_pixmap_get_stride(struct wl_egl_pixmap *pixmap, int *stride);
+
+/**
+ * wl_egl_pixmap_lock - Lock pixmap memory for client read or write.
+ * @pixels pointer to hold client virtual address.
+ *
+ * Pixel memory is invalid before eglCreatePixmapSurface.
+ * Multiple lock will fail, and pixels sets to NULL.
+ */
+void wl_egl_pixmap_lock(struct wl_egl_pixmap *pixmap, void **pixels);
+
+/**
+ * wl_egl_pixmap_unlock - Unlock pixmap.
+ *
+ * Pixel memory is invalid before eglCreatePixmapSurface.
+ */
+void wl_egl_pixmap_unlock(struct wl_egl_pixmap *pixmap);
+
 #endif
 
 

@@ -34,6 +34,11 @@ cloIR_CONSTANT ConstantOperand,
 cloIR_EXPR *ConstVariableExpr
 );
 
+static gctCONST_STRING
+_GetBinaryOperatorName(
+IN gctINT TokenType
+);
+
 extern int
 cloCOMPILER_Lex(YYSTYPE * pyylval, cloCOMPILER Compiler)
 {
@@ -3024,6 +3029,16 @@ IN cloIR_EXPR Operand
 
     if (Operand == gcvNULL) return gcvNULL;
 
+    if (clmDECL_IsPackedGenType(&Operand->decl)) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                        Operator->lineNo,
+                                        Operator->stringNo,
+                                        clvREPORT_ERROR,
+                                        "_viv_gentype_packed operands not allowed in unary operator '%s'",
+                                        _GetBinaryOperatorName(Operator->u.operator)));
+        return gcvNULL;
+    }
+
     switch (Operator->u.operator) {
     case '-':
         exprType = clvUNARY_NEG; /* fall through */
@@ -3136,7 +3151,7 @@ IN cloIR_EXPR Operand
         break;
 
     case '~':
-        exprType = clvUNARY_BITWISE_NOT;
+        exprType = clvUNARY_NOT_BITWISE;
         status = _CheckBitwiseNotExpr(Compiler, Operand);
         if (gcmIS_ERROR(status)) return gcvNULL;
         break;
@@ -4255,7 +4270,7 @@ cluCONSTANT_VALUE *ValEnd
             cluCONSTANT_VALUE *expectedValEnd;
 
             expectedValEnd = valStart + valueCount;
-            gcmASSERT(expectedValEnd <= valEnd);
+            gcmASSERT(expectedValEnd <= ValEnd);
             status = _MakeTypeCastArgsAsConstant(Compiler,
                                                  (cloIR_TYPECAST_ARGS) member,
                                                  braced ? Dim + 1 : Dim,
@@ -4265,7 +4280,7 @@ cluCONSTANT_VALUE *ValEnd
             if (gcmIS_ERROR(status)) {
                 return gcvSTATUS_INVALID_DATA;
             }
-            valStart += valueCount;
+            valStart = expectedValEnd;
         }
 
         break;
@@ -5024,10 +5039,20 @@ IN clsDECL *Decl
 {
    cloIR_CONSTANT dataSize;
    cluCONSTANT_VALUE constantValue[1];
+   clsDECL declBuf[1];
+   clsDECL *declPtr = Decl;
 
 /* INITIALIZE THE CONSTANT WITH THE SIZE OF THE DECLARATION Decl */
    (void)gcoOS_ZeroMemory((gctPOINTER)constantValue, sizeof(cluCONSTANT_VALUE));
-   constantValue->uintValue = clsDECL_GetByteSize(Compiler, Decl);
+
+   if(declPtr->dataType->type == T_TYPE_NAME) {
+       gceSTATUS status;
+
+       status = _ParseFlattenType(Compiler, declPtr, declBuf);
+       if(gcmIS_ERROR(status)) return 0;
+       declPtr = declBuf;
+   }
+   constantValue->uintValue = clsDECL_GetByteSize(Compiler, declPtr);
    dataSize = _ParseCreateConstant(Compiler,
                                    StartToken->lineNo,
                                    StartToken->stringNo,
@@ -5458,12 +5483,12 @@ IN cloIR_EXPR RightOperand
 
   if(clmDECL_IsScalar(leftDecl)) {
     if(clmDECL_IsVectorType(rightDecl)) {
-       if(leftDecl->dataType->elementType > rightDecl->dataType->elementType) {
+       if(clAreElementTypeInRankOrder(leftDecl->dataType->elementType, rightDecl->dataType->elementType)) {
          gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                          LeftOperand->base.lineNo,
                                          LeftOperand->base.stringNo,
-                         clvREPORT_ERROR,
-                         "conversion from a scalar to a lower ranking vector not allowed"
+                                         clvREPORT_ERROR,
+                                         "conversion from a scalar to a lower ranking vector not allowed"
                                          "or matrix type not allowed"));
          return gcvSTATUS_INVALID_ARGUMENT;
        }
@@ -5478,12 +5503,12 @@ IN cloIR_EXPR RightOperand
   }
   else if(clmDECL_IsScalar(rightDecl)) {
     if(clmDECL_IsVectorType(leftDecl)) {
-      if(rightDecl->dataType->elementType > leftDecl->dataType->elementType) {
+      if(clAreElementTypeInRankOrder(rightDecl->dataType->elementType, leftDecl->dataType->elementType)) {
          gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                                          RightOperand->base.lineNo,
                                          RightOperand->base.stringNo,
-                         clvREPORT_ERROR,
-                         "conversion from a scalar to a lower ranking vector not allowed"
+                                         clvREPORT_ERROR,
+                                         "conversion from a scalar to a lower ranking vector not allowed"
                                          "or matrix type not allowed"));
          return gcvSTATUS_INVALID_ARGUMENT;
       }
@@ -5767,6 +5792,17 @@ IN cloIR_EXPR RightOperand
     gcmASSERT(Operator);
     if (LeftOperand == gcvNULL || RightOperand == gcvNULL) return gcvNULL;
 
+    if (clmDECL_IsPackedGenType(&LeftOperand->decl) ||
+        clmDECL_IsPackedGenType(&RightOperand->decl)) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                        Operator->lineNo,
+                                        Operator->stringNo,
+                                        clvREPORT_ERROR,
+                                        "_viv_gentype_packed operands not allowed in binary operator '%s'",
+                                        _GetBinaryOperatorName(Operator->u.operator)));
+        return gcvNULL;
+    }
+
     switch (Operator->u.operator) {
     case T_LSHIFT_OP:
     case T_RSHIFT_OP:
@@ -5792,11 +5828,11 @@ IN cloIR_EXPR RightOperand
                        RightOperand);
         if (gcmIS_ERROR(status)) return gcvNULL;
         switch (Operator->u.operator) {
-        case '&': exprType = clvBINARY_BITWISE_AND;
+        case '&': exprType = clvBINARY_AND_BITWISE;
                           break;
-        case '|': exprType = clvBINARY_BITWISE_OR;
+        case '|': exprType = clvBINARY_OR_BITWISE;
                           break;
-        case '^': exprType = clvBINARY_BITWISE_XOR;
+        case '^': exprType = clvBINARY_XOR_BITWISE;
                           break;
         }
         break;
@@ -6204,6 +6240,17 @@ clParseSelectionExpr(
 
     if (CondExpr == gcvNULL || TrueOperand == gcvNULL || FalseOperand == gcvNULL) return gcvNULL;
 
+    if (clmDECL_IsPackedGenType(&CondExpr->decl) ||
+        clmDECL_IsPackedGenType(&TrueOperand->decl) ||
+        clmDECL_IsPackedGenType(&FalseOperand->decl)) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                        CondExpr->base.lineNo,
+                                        CondExpr->base.stringNo,
+                                        clvREPORT_ERROR,
+                                        "_viv_gentype_packed operands not allowed in ternery operator '?:'"));
+        return gcvNULL;
+    }
+
     /* Check error */
     status = _CheckSelectionExpr(Compiler,
                      CondExpr,
@@ -6242,18 +6289,34 @@ clParseSelectionExpr(
        clmDECL_IsScalar(&FalseOperand->decl) &&
        clmDECL_IsVectorType(&CondExpr->decl)) {
        decl = TrueOperand->decl;
-           status = cloIR_CreateVectorType(Compiler,
-                                           TrueOperand->decl.dataType,
-                           clmDATA_TYPE_vectorSize_NOCHECK_GET(CondExpr->decl.dataType),
-                                           &decl.dataType);
-           if(gcmIS_ERROR(status)) return gcvNULL;
+       status = cloIR_CreateVectorType(Compiler,
+                                       TrueOperand->decl.dataType,
+                                       clmDATA_TYPE_vectorSize_NOCHECK_GET(CondExpr->decl.dataType),
+                                       &decl.dataType);
+       if(gcmIS_ERROR(status)) return gcvNULL;
     }
     else {
-       status = cloIR_GetArithmeticExprDecl(Compiler,
+       if(clmDECL_IsPointerType(&TrueOperand->decl)) { /* right operand a pointer */
+           status = cloCOMPILER_CloneDecl(Compiler,
+                                          clvQUALIFIER_CONST,
+                                          TrueOperand->decl.dataType->addrSpaceQualifier,
+                                          &TrueOperand->decl,
+                                          &decl);
+       }
+       else if(clmDECL_IsPointerType(&FalseOperand->decl)) { /* left operand a pointer */
+           status = cloCOMPILER_CloneDecl(Compiler,
+                                          clvQUALIFIER_CONST,
+                                          FalseOperand->decl.dataType->addrSpaceQualifier,
+                                          &FalseOperand->decl,
+                                          &decl);
+       }
+       else {
+           status = cloIR_GetArithmeticExprDecl(Compiler,
                                                 gcvFALSE,
                                                 TrueOperand,
                                                 FalseOperand,
                                                 &decl);
+       }
        if (gcmIS_ERROR(status)) return gcvNULL;
     }
 
@@ -7592,6 +7655,15 @@ IN clsLexToken * Identifier
                         Identifier->u.identifier.name));
         return gcvSTATUS_INVALID_ARGUMENT;
     }
+    if(declPtr->dataType->type == T_GENTYPE_PACKED) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                        Identifier->lineNo,
+                        Identifier->stringNo,
+                        clvREPORT_ERROR,
+                        "unrecognizable type '_viv_gentype_packed' specified for variable '%s'",
+                        Identifier->u.identifier.name));
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
     if (clmDATA_TYPE_IsImage(declPtr->dataType)) {
         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                         Identifier->lineNo,
@@ -8308,6 +8380,8 @@ IN cluCONSTANT_VALUE *ToValues
      case clvTYPE_UINT:
      case clvTYPE_UCHAR:
      case clvTYPE_USHORT:
+     case clvTYPE_UCHAR_PACKED:
+     case clvTYPE_USHORT_PACKED:
      case clvTYPE_EVENT_T:
      case clvTYPE_SAMPLER_T:
         for(i=0; i < ValueCount; i++) {
@@ -8323,6 +8397,7 @@ IN cluCONSTANT_VALUE *ToValues
 
      case clvTYPE_INT:
      case clvTYPE_SHORT:
+     case clvTYPE_SHORT_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].floatValue = (gctFLOAT) SourceValues[i].intValue;
         }
@@ -8335,24 +8410,26 @@ IN cluCONSTANT_VALUE *ToValues
         break;
 
      case clvTYPE_BOOL:
+     case clvTYPE_BOOL_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].floatValue = (gctFLOAT) SourceValues[i].boolValue;
         }
         break;
 
      case clvTYPE_CHAR:
+     case clvTYPE_CHAR_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].floatValue = (gctFLOAT) SourceValues[i].intValue;
         }
         break;
 
      case clvTYPE_FLOAT:
+     case clvTYPE_HALF_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].floatValue = SourceValues[i].floatValue;
         }
         break;
-
-     default:
+default:
         gcmASSERT(0);
         return gcvSTATUS_INVALID_ARGUMENT;
      }
@@ -8361,12 +8438,14 @@ IN cluCONSTANT_VALUE *ToValues
    case clvTYPE_INT:
      switch(SourceType) {
      case clvTYPE_FLOAT:
+     case clvTYPE_HALF_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].intValue = (gctINT32) SourceValues[i].floatValue;
         }
         break;
 
      case clvTYPE_BOOL:
+     case clvTYPE_BOOL_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].intValue = (gctINT32) SourceValues[i].boolValue;
         }
@@ -8375,6 +8454,8 @@ IN cluCONSTANT_VALUE *ToValues
      case clvTYPE_UINT:
      case clvTYPE_UCHAR:
      case clvTYPE_USHORT:
+     case clvTYPE_UCHAR_PACKED:
+     case clvTYPE_USHORT_PACKED:
      case clvTYPE_EVENT_T:
      case clvTYPE_SAMPLER_T:
         for(i=0; i < ValueCount; i++) {
@@ -8391,6 +8472,8 @@ IN cluCONSTANT_VALUE *ToValues
      case clvTYPE_INT:
      case clvTYPE_SHORT:
      case clvTYPE_CHAR:
+     case clvTYPE_SHORT_PACKED:
+     case clvTYPE_CHAR_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].intValue = SourceValues[i].intValue;
         }
@@ -8411,12 +8494,14 @@ IN cluCONSTANT_VALUE *ToValues
    case clvTYPE_LONG:
      switch(SourceType) {
      case clvTYPE_FLOAT:
+     case clvTYPE_HALF_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].longValue = (gctINT64) SourceValues[i].floatValue;
         }
         break;
 
      case clvTYPE_BOOL:
+     case clvTYPE_BOOL_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].longValue = (gctINT64) SourceValues[i].boolValue;
         }
@@ -8425,6 +8510,8 @@ IN cluCONSTANT_VALUE *ToValues
      case clvTYPE_UINT:
      case clvTYPE_UCHAR:
      case clvTYPE_USHORT:
+     case clvTYPE_UCHAR_PACKED:
+     case clvTYPE_USHORT_PACKED:
      case clvTYPE_EVENT_T:
      case clvTYPE_SAMPLER_T:
         for(i=0; i < ValueCount; i++) {
@@ -8441,6 +8528,8 @@ IN cluCONSTANT_VALUE *ToValues
      case clvTYPE_INT:
      case clvTYPE_SHORT:
      case clvTYPE_CHAR:
+     case clvTYPE_SHORT_PACKED:
+     case clvTYPE_CHAR_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].longValue = (gctINT64) SourceValues[i].intValue;
         }
@@ -8464,6 +8553,8 @@ IN cluCONSTANT_VALUE *ToValues
      case clvTYPE_INT:
      case clvTYPE_CHAR:
      case clvTYPE_SHORT:
+     case clvTYPE_CHAR_PACKED:
+     case clvTYPE_SHORT_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].intValue = (gctINT16) SourceValues[i].intValue;
         }
@@ -8476,12 +8567,14 @@ IN cluCONSTANT_VALUE *ToValues
         break;
 
      case clvTYPE_FLOAT:
+     case clvTYPE_HALF_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].intValue = (gctINT16) SourceValues[i].floatValue;
         }
         break;
 
      case clvTYPE_BOOL:
+     case clvTYPE_BOOL_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].intValue = (gctINT16) SourceValues[i].boolValue;
         }
@@ -8490,6 +8583,8 @@ IN cluCONSTANT_VALUE *ToValues
      case clvTYPE_UINT:
      case clvTYPE_UCHAR:
      case clvTYPE_USHORT:
+     case clvTYPE_UCHAR_PACKED:
+     case clvTYPE_USHORT_PACKED:
      case clvTYPE_EVENT_T:
      case clvTYPE_SAMPLER_T:
         for(i=0; i < ValueCount; i++) {
@@ -8521,6 +8616,7 @@ IN cluCONSTANT_VALUE *ToValues
         break;
 
      case clvTYPE_BOOL:
+     case clvTYPE_BOOL_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].uintValue = (gctUINT32) SourceValues[i].boolValue;
         }
@@ -8528,6 +8624,7 @@ IN cluCONSTANT_VALUE *ToValues
 
      case clvTYPE_INT:
      case clvTYPE_SHORT:
+     case clvTYPE_SHORT_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].uintValue = (gctUINT32) SourceValues[i].intValue;
         }
@@ -8540,6 +8637,7 @@ IN cluCONSTANT_VALUE *ToValues
         break;
 
      case clvTYPE_CHAR:
+     case clvTYPE_CHAR_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].uintValue = (gctUINT32)SourceValues[i].intValue;
         }
@@ -8548,6 +8646,8 @@ IN cluCONSTANT_VALUE *ToValues
      case clvTYPE_UINT:
      case clvTYPE_USHORT:
      case clvTYPE_UCHAR:
+     case clvTYPE_USHORT_PACKED:
+     case clvTYPE_UCHAR_PACKED:
      case clvTYPE_EVENT_T:
      case clvTYPE_SAMPLER_T:
         for(i=0; i < ValueCount; i++) {
@@ -8570,12 +8670,14 @@ IN cluCONSTANT_VALUE *ToValues
    case clvTYPE_ULONG:
      switch(SourceType) {
      case clvTYPE_FLOAT:
+     case clvTYPE_HALF_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].ulongValue = (gctUINT64) SourceValues[i].floatValue;
         }
         break;
 
      case clvTYPE_BOOL:
+     case clvTYPE_BOOL_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].ulongValue = (gctUINT64) SourceValues[i].boolValue;
         }
@@ -8583,6 +8685,7 @@ IN cluCONSTANT_VALUE *ToValues
 
      case clvTYPE_INT:
      case clvTYPE_SHORT:
+     case clvTYPE_SHORT_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].ulongValue = (gctUINT64) SourceValues[i].intValue;
         }
@@ -8595,6 +8698,7 @@ IN cluCONSTANT_VALUE *ToValues
         break;
 
      case clvTYPE_CHAR:
+     case clvTYPE_CHAR_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].ulongValue = (gctUINT64)SourceValues[i].intValue;
         }
@@ -8603,6 +8707,8 @@ IN cluCONSTANT_VALUE *ToValues
      case clvTYPE_UINT:
      case clvTYPE_USHORT:
      case clvTYPE_UCHAR:
+     case clvTYPE_USHORT_PACKED:
+     case clvTYPE_UCHAR_PACKED:
      case clvTYPE_EVENT_T:
      case clvTYPE_SAMPLER_T:
         for(i=0; i < ValueCount; i++) {
@@ -8626,12 +8732,14 @@ IN cluCONSTANT_VALUE *ToValues
    case clvTYPE_USHORT_PACKED:
      switch(SourceType) {
      case clvTYPE_FLOAT:
+     case clvTYPE_HALF_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].uintValue = (gctUINT16) SourceValues[i].floatValue;
         }
         break;
 
      case clvTYPE_BOOL:
+     case clvTYPE_BOOL_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].uintValue = (gctUINT16) SourceValues[i].boolValue;
         }
@@ -8639,6 +8747,7 @@ IN cluCONSTANT_VALUE *ToValues
 
      case clvTYPE_INT:
      case clvTYPE_SHORT:
+     case clvTYPE_SHORT_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].uintValue = (gctUINT16) SourceValues[i].intValue;
         }
@@ -8651,6 +8760,7 @@ IN cluCONSTANT_VALUE *ToValues
         break;
 
      case clvTYPE_CHAR:
+     case clvTYPE_CHAR_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].uintValue = (gctUINT16)SourceValues[i].intValue;
         }
@@ -8658,7 +8768,9 @@ IN cluCONSTANT_VALUE *ToValues
 
      case clvTYPE_UINT:
      case clvTYPE_USHORT:
+     case clvTYPE_USHORT_PACKED:
      case clvTYPE_UCHAR:
+     case clvTYPE_UCHAR_PACKED:
      case clvTYPE_EVENT_T:
      case clvTYPE_SAMPLER_T:
         for(i=0; i < ValueCount; i++) {
@@ -8682,12 +8794,14 @@ IN cluCONSTANT_VALUE *ToValues
    case clvTYPE_UCHAR_PACKED:
      switch(SourceType) {
      case clvTYPE_FLOAT:
+     case clvTYPE_HALF_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].uintValue = (gctUINT8) SourceValues[i].floatValue;
         }
         break;
 
      case clvTYPE_BOOL:
+     case clvTYPE_BOOL_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].uintValue = (gctUINT8) SourceValues[i].boolValue;
         }
@@ -8695,6 +8809,7 @@ IN cluCONSTANT_VALUE *ToValues
 
      case clvTYPE_INT:
      case clvTYPE_SHORT:
+     case clvTYPE_SHORT_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].uintValue = (gctUINT8) SourceValues[i].intValue;
         }
@@ -8707,6 +8822,7 @@ IN cluCONSTANT_VALUE *ToValues
         break;
 
      case clvTYPE_CHAR:
+     case clvTYPE_CHAR_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].uintValue = (gctUINT8)SourceValues[i].intValue;
         }
@@ -8714,7 +8830,9 @@ IN cluCONSTANT_VALUE *ToValues
 
      case clvTYPE_UINT:
      case clvTYPE_USHORT:
+     case clvTYPE_USHORT_PACKED:
      case clvTYPE_UCHAR:
+     case clvTYPE_UCHAR_PACKED:
      case clvTYPE_EVENT_T:
      case clvTYPE_SAMPLER_T:
         for(i=0; i < ValueCount; i++) {
@@ -8738,12 +8856,14 @@ IN cluCONSTANT_VALUE *ToValues
    case clvTYPE_CHAR_PACKED:
      switch(SourceType) {
      case clvTYPE_FLOAT:
+     case clvTYPE_HALF_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].intValue = (gctCHAR) SourceValues[i].floatValue;
         }
         break;
 
      case clvTYPE_BOOL:
+     case clvTYPE_BOOL_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].intValue = (gctCHAR) SourceValues[i].boolValue;
         }
@@ -8751,6 +8871,7 @@ IN cluCONSTANT_VALUE *ToValues
 
      case clvTYPE_INT:
      case clvTYPE_SHORT:
+     case clvTYPE_SHORT_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].intValue = (gctCHAR) SourceValues[i].intValue;
         }
@@ -8765,6 +8886,8 @@ IN cluCONSTANT_VALUE *ToValues
      case clvTYPE_UINT:
      case clvTYPE_USHORT:
      case clvTYPE_UCHAR:
+     case clvTYPE_USHORT_PACKED:
+     case clvTYPE_UCHAR_PACKED:
      case clvTYPE_EVENT_T:
      case clvTYPE_SAMPLER_T:
         for(i=0; i < ValueCount; i++) {
@@ -8779,6 +8902,7 @@ IN cluCONSTANT_VALUE *ToValues
         break;
 
      case clvTYPE_CHAR:
+     case clvTYPE_CHAR_PACKED:
         for(i=0; i < ValueCount; i++) {
            ToValues[i].intValue = (gctCHAR)SourceValues[i].intValue;
         }
@@ -9284,6 +9408,16 @@ IN clsLexToken *Identifier
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
+    if(declPtr->dataType->type == T_GENTYPE_PACKED) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                        Identifier->lineNo,
+                        Identifier->stringNo,
+                        clvREPORT_ERROR,
+                        "unrecognizable type '_viv_gentype_packed' specified for variable '%s'",
+                        Identifier->u.identifier.name));
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
     if (clmDATA_TYPE_IsImage(declPtr->dataType)) {
         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
                         Identifier->lineNo,
@@ -9605,6 +9739,8 @@ IN clsLexToken *Identifier
 
     status = cloCOMPILER_CreateNameSpace(Compiler, &name->u.funcInfo.localSpace);
     if (gcmIS_ERROR(status)) return gcvNULL;
+    name->u.funcInfo.localSpace->scopeName = name;
+    name->u.funcInfo.localSpace->die = name->die;
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                 clvDUMP_PARSER,
                 "<FUNCTION line=\"%d\" string=\"%d\" name=\"%s\">",
@@ -9684,6 +9820,7 @@ IN clsLexToken *Identifier
 
    name->derivedType = derivedType;
    status = cloCOMPILER_CreateNameSpace(Compiler, &name->u.funcInfo.localSpace);
+   name->u.funcInfo.localSpace->die = name->die;
    if (gcmIS_ERROR(status)) return gcvNULL;
    name->u.funcInfo.localSpace->scopeName = name;
    if(Attr) {
@@ -10035,9 +10172,16 @@ IN cloCOMPILER Compiler
 {
     gceSTATUS    status;
     clsNAME_SPACE *    nameSpace;
+    gctUINT16   die = VSC_DI_INVALIDE_DIE;
+    clsNAME_SPACE *    parentSpace = gcvNULL;
+
+    parentSpace = cloCOMPILER_GetCurrentSpace(Compiler);
+    die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_LEXICALBLOCK, parentSpace->die, gcvNULL, 0, 0, 0);
 
     status = cloCOMPILER_CreateNameSpace(Compiler,
                          &nameSpace);
+
+    nameSpace->die = die;
 
     if (gcmIS_ERROR(status)) return;
 
@@ -10053,11 +10197,15 @@ IN clsLexToken * StartToken,
 IN cloIR_SET Set
 )
 {
+    clsNAME_SPACE *    nameSpace;
+
     gcmASSERT(StartToken);
 
     if (Set == gcvNULL) return gcvNULL;
 
-    cloCOMPILER_PopCurrentNameSpace(Compiler, gcvNULL);
+    cloCOMPILER_PopCurrentNameSpace(Compiler, &nameSpace);
+
+    cloCOMPILER_SetDIESourceLoc(Compiler, nameSpace->die, 0, StartToken->lineNo, StartToken->stringNo);
 
     Set->base.lineNo    = StartToken->lineNo;
     Set->base.stringNo    = StartToken->stringNo;
@@ -11748,12 +11896,25 @@ IN clsLexToken *Token
     }
 
     tok = Token->type;
+    /* convert basic vector type to packed if necessary */
+    if(cloCOMPILER_IsBasicTypePacked(Compiler)) {
+        clsBUILTIN_DATATYPE_INFO *typeInfo;
+
+        typeInfo = clGetBuiltinDataTypeInfo(tok);
+        if(typeInfo &&
+           typeInfo->type != typeInfo->dualType &&
+           clmGEN_CODE_IsVectorDataType(typeInfo->dataType) &&
+           !clmIsElementTypePacked(typeInfo->dataType.elementType)) {
+           tok = typeInfo->dualType;
+        }
+    }
+
     status = cloCOMPILER_CreateDataType(Compiler,
-                                            tok,
-                                            gcvNULL,
-                                            clvQUALIFIER_NONE,
-                                            clvQUALIFIER_NONE,
-                                            &dataType);
+                                        tok,
+                                        gcvNULL,
+                                        clvQUALIFIER_NONE,
+                                        clvQUALIFIER_NONE,
+                                        &dataType);
     if (gcmIS_ERROR(status)) return decl;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -11859,10 +12020,24 @@ IN clsLexToken * Identifier
 {
     gceSTATUS    status;
     clsNAME_SPACE *    nameSpace;
+    gctUINT fileNo = 0;
+    gctUINT lineNo = 0;
+    gctUINT colNo = 0;
+    clsNAME_SPACE *    parentSpace = gcvNULL;
+
+    parentSpace = cloCOMPILER_GetCurrentSpace(Compiler);
+    if (Identifier){
+        fileNo = Identifier->lineNo;
+        lineNo = Identifier->lineNo;
+        colNo = Identifier->stringNo;
+    }
 
     status = cloCOMPILER_CreateNameSpace(Compiler, &nameSpace);
     if (gcmIS_ERROR(status)) return;
     nameSpace->symbol = Identifier ? Identifier->u.identifier.name : "";
+
+    nameSpace->die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_TYPE, parentSpace->die , nameSpace->symbol, fileNo, lineNo, colNo);
+
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler, clvDUMP_PARSER, "<STRUCT_DECL>"));
 }
 
@@ -11954,6 +12129,8 @@ IN gceSTATUS ParsingStatus
                      &prevNameSpace->scopeName);
      if (gcmIS_ERROR(status)) return gcvNULL;
   }
+
+  prevNameSpace->scopeName->die = prevNameSpace->die;
 
   gcmVERIFY_OK(cloCOMPILER_Dump(Compiler, clvDUMP_PARSER, "</STRUCT_DECL>"));
   if(Attr) {

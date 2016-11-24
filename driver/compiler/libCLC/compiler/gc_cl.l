@@ -506,11 +506,13 @@ extern void
 yyerror(char *msg)
 {
 	char *formatString = "%s at '%s'";
+	char *where = yytext;
+	if(yyleng <= 1 && *yytext < 0)where = "end of file";
 	clReport(CurrentLineNo,
 		CurrentStringNo,
 		clvREPORT_ERROR,
 		formatString,
 		msg,
-		yytext);
+		where);
 
 }

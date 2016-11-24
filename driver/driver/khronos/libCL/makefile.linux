@@ -23,20 +23,20 @@ include ./makefile.linux.def
 #############################################################################
 # Macros.
 
-ifeq ($(ANDROID), 1)
+ifeq ($(ANDROID),1)
     STATIC = 1
 else
-    ifeq ($(gcdSTATIC_LINK), 1)
+    ifeq ($(gcdSTATIC_LINK),1)
         STATIC = 1
     else
         DYNAMIC = 1
     endif
 endif
 
-ifeq ($(STATIC), 1)
+ifeq ($(STATIC),1)
     TARGET_NAME = libOpenCL.a
 else
-    ifeq ($(BUILD_OPENCL_ICD), 1)
+    ifeq ($(BUILD_OPENCL_ICD),1)
         TARGET_NAME = libVivanteOpenCL.so
     else
         TARGET_NAME = libOpenCL.so
@@ -61,29 +61,28 @@ OBJECTS			=	$(OBJ_DIR)/gc_cl.o \
 					$(OBJ_DIR)/gc_cl_profiler.o \
 					$(OBJ_DIR)/gc_cl_sampler.o
 
-ifeq ($(ENABLE_CL_GL), 1)
+ifeq ($(ENABLE_CL_GL),1)
     OBJECTS += $(OBJ_DIR)/gc_cl_gl.o
 endif
-
 
 ################################################################################
 # Add extra flags for object files.
 CFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS -DCL_USE_DEPRECATED_OPENCL_1_1_APIS -DBUILD_OPENCL_12=1
-ifeq ($(BUILD_OPENCL_ICD), 1)
+ifeq ($(BUILD_OPENCL_ICD),1)
 CFLAGS += -DBUILD_OPENCL_ICD=1
 endif
 
-ifeq ($(BUILD_OPENCL_FP), 1)
+ifeq ($(BUILD_OPENCL_FP),1)
 CFLAGS += -DBUILD_OPENCL_FP=1
 endif
 
-ifeq ($(ENABLE_CL_GL), 1)
-CFLAGS += -DgcdENABLE_CL_GL=1
+ifeq ($(ENABLE_CL_GL),1)
+  CFLAGS += -DgcdENABLE_CL_GL=1
 else
-CFLAGS += -DgcdENABLE_CL_GL=0
+  CFLAGS += -DgcdENABLE_CL_GL=0
 endif
 
-ifneq ($(USE_ARMCC), 1)
+ifneq ($(USE_ARMCC),1)
 CFLAGS += -fPIC
 ifeq (,$(GL_2_APPENDIX))
 LFLAGS += -Wl,--version-script=libOpenCL12.map
@@ -92,13 +91,13 @@ endif
 
 ################################################################################
 # Add extra library path.
-LIBS += -L $(AQROOT)/build/sdk/drivers
+LIBS += -L $(SDK_DIR)/drivers
 LIBS += -L $(AQROOT)/hal/user/$(OBJ_DIR)
-ifeq ($(ENABLE_CL_GL), 1)
+ifeq ($(ENABLE_CL_GL),1)
 LIBS += -L $(AQROOT)/driver/khronos/libGLESv3/$(OBJ_DIR)
 endif
 LIBS += -L $(AQROOT)/compiler/libVSC/$(OBJ_DIR)
-ifeq ($(ENABLE_CL_GL), 1)
+ifeq ($(ENABLE_CL_GL),1)
 LIBS += -l GAL -lVSC -l GLESv2 -lm
 else
 LIBS += -l GAL -lVSC -lm

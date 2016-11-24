@@ -403,6 +403,7 @@ GLboolean __glCheckTexDirectFmt(__GLcontext *gc,
     case GL_R8_EXT:
     case GL_ALPHA:
     case GL_LUMINANCE_ALPHA:
+    case GL_LUMINANCE8_ALPHA8_EXT:
     case GL_DEPTH_COMPONENT16:
         tex->canonicalFormat = GL_TRUE;
         return GL_TRUE;
@@ -553,7 +554,7 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
 
             break;
         case GL_STENCIL_INDEX8:
-           {
+            {
                 if(!__glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled && gc->apiVersion < __GL_API_VERSION_ES30 )
                 {
                     invalid = GL_TRUE;
@@ -561,6 +562,7 @@ GLboolean __glCheckTexImgInternalFmtArg(__GLcontext *gc,
                 break;
 
             }
+
         default:
             invalid = GL_TRUE;
             break;
@@ -601,6 +603,7 @@ GLboolean __glCheckTexImgFmtArg(__GLcontext *gc,
         case GL_LUMINANCE:
         case GL_LUMINANCE_ALPHA:
         case GL_ALPHA:
+
         case GL_VIV_YV12:
         case GL_VIV_I420:
         case GL_VIV_NV12:
@@ -609,13 +612,13 @@ GLboolean __glCheckTexImgFmtArg(__GLcontext *gc,
         case GL_VIV_UYVY:
         case GL_BGRA_EXT:
             break;
-
         case GL_STENCIL_INDEX:
             if(!__glExtension[__GL_EXTID_OES_texture_stencil8].bEnabled && gc->apiVersion < __GL_API_VERSION_ES30 )
             {
                 invalid = GL_TRUE;
             }
             break;
+
         default:
             invalid = GL_TRUE;
             break;
@@ -1212,6 +1215,8 @@ static GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex
     {
         __GLfboAttachPoint *attachPoint;
         __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
+        GLint attachIndex;
+
         if (!gc->dp.isFramebufferComplete(gc, readFBO))
         {
             __GL_ERROR_RET_VAL(GL_INVALID_FRAMEBUFFER_OPERATION, GL_FALSE);
@@ -1222,7 +1227,13 @@ static GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex
             __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
         }
 
-        attachPoint = &readFBO->attachPoint[__glMapAttachmentToIndex(readFBO->readBuffer)];
+        attachIndex = __glMapAttachmentToIndex(readFBO->readBuffer);
+        if (-1 == attachIndex)
+        {
+            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+        }
+        attachPoint = &readFBO->attachPoint[attachIndex];
+
         if (0 == attachPoint->objName)
         {
             __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
@@ -1457,8 +1468,10 @@ static GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex
     return GL_TRUE;
 }
 
-GLboolean __glCheckCompressedTexImgFmt(__GLcontext *gc, GLint internalFormat)
+GLboolean __glCheckCompressedTexImgFmt(__GLcontext *gc, GLint internalFormat, GLboolean *isASTC)
 {
+    *isASTC = GL_FALSE;
+
     switch (internalFormat)
     {
     case GL_ETC1_RGB8_OES:
@@ -1509,6 +1522,9 @@ GLboolean __glCheckCompressedTexImgFmt(__GLcontext *gc, GLint internalFormat)
     case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_10x10_KHR:
     case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x10_KHR:
     case GL_COMPRESSED_SRGB8_ALPHA8_ASTC_12x12_KHR:
+
+        *isASTC = GL_TRUE;
+
         if (__glExtension[__GL_EXTID_KHR_texture_compression_astc_ldr].bEnabled)
         {
             break;
@@ -1880,6 +1896,7 @@ GLvoid __glSetMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint fac
     mipmap->compressed = formatInfo->compressed;
     mipmap->baseFormat = formatInfo->baseFormat;
     mipmap->requestedFormat = requestedFormat;
+    mipmap->interalFormat = internalFormat;
 
     mipmap->width  = width;
     mipmap->height = height;
@@ -1920,6 +1937,7 @@ GLvoid __glClearMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint f
 
     __GL_MEMZERO(mipmap, sizeof(__GLmipMapLevel));
     mipmap->requestedFormat = GL_RGBA;
+    mipmap->interalFormat = GL_RGBA;
     mipmap->formatInfo = NULL;
 }
 
@@ -2491,7 +2509,7 @@ GLvoid GL_APIENTRY __gles_TexSubImage2D(__GLcontext *gc,
         __GL_EXIT();
     }
 
-    if (!__glCheckTexImgFmt(gc, tex, tex->faceMipmap[face][lod].requestedFormat, format, type))
+    if (!__glCheckTexImgFmt(gc, tex, tex->faceMipmap[face][lod].interalFormat, format, type))
     {
         __GL_EXIT();
     }
@@ -2742,6 +2760,7 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage3D(__GLcontext *gc,
                                                const GLvoid *data)
 {
     GLuint mipHintDirty = 0;
+    GLboolean isASTC = GL_FALSE;
     __GLtextureObject *tex = NULL;
     __GLmipMapLevel *mipmap = NULL;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
@@ -2760,6 +2779,11 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage3D(__GLcontext *gc,
         break;
 
     case GL_TEXTURE_CUBE_MAP_ARRAY_EXT:
+        if (width != height)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
+        }
+
         if (__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
         {
             tex = gc->texture.units[gc->state.texture.activeTexIndex].boundTextures[__GL_TEXTURE_CUBEMAP_ARRAY_INDEX];
@@ -2776,15 +2800,26 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage3D(__GLcontext *gc,
     }
 
     /* Check arguments */
-    if (!__glCheckCompressedTexImgFmt(gc, internalFormat))
+    if (!__glCheckCompressedTexImgFmt(gc, internalFormat, &isASTC))
     {
         __GL_EXIT();
     }
 
-    /* Now internalFormat is valid, only allows 2D_ARRAY target currently. */
-    if (target != GL_TEXTURE_2D_ARRAY && target != GL_TEXTURE_CUBE_MAP_ARRAY_EXT)
+    /* Now internalFormat is valid, only allows 2D_ARRAY target currently in ES3.1. */
+    if(__glExtension[__GL_EXTID_KHR_texture_compression_astc_ldr].bEnabled)
     {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        if (!(target == GL_TEXTURE_2D_ARRAY ||
+             (target == GL_TEXTURE_CUBE_MAP_ARRAY && isASTC)))
+        {
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
+    }
+    else
+    {
+        if (target != GL_TEXTURE_2D_ARRAY)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
     }
 
     if (!__glCheckTexImgArgs(gc, tex, lod, width, height, depth, border))
@@ -2852,6 +2887,7 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage2D(__GLcontext *gc,
     GLuint activeUnit;
     GLuint mipHintDirty = 0;
     GLboolean isPalette = GL_FALSE;
+    GLboolean isASTC = GL_FALSE;
     __GLtextureObject *tex;
     __GLmipMapLevel *mipmap;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
@@ -2894,7 +2930,7 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage2D(__GLcontext *gc,
         break;
 
     default:
-        if (!__glCheckCompressedTexImgFmt(gc, internalFormat))
+        if (!__glCheckCompressedTexImgFmt(gc, internalFormat, &isASTC))
         {
             __GL_EXIT();
         }
@@ -3305,6 +3341,11 @@ GLboolean __glCheckTexStorageArgs(__GLcontext *gc,
         __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
     }
 
+    if (levels > (GLint)__glFloorLog2(maxSize) + 1)
+    {
+        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+    }
+
     if (__GL_IS_TEXTURE_CUBE(tex->targetIndex))
     {
         if (width != height)
@@ -3335,11 +3376,6 @@ GLboolean __glCheckTexStorageArgs(__GLcontext *gc,
     if (maxSize > (GLsizei)gc->constants.maxTextureSize)
     {
         __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
-    }
-
-    if (levels > (GLint)__glFloorLog2(maxSize) + 1)
-    {
-        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
     }
 
     switch (internalformat)
@@ -4099,8 +4135,8 @@ OnError:
     __GL_FOOTER();
 }
 
-GLvoid GL_APIENTRY __gles_TexDirectVIVMap(__GLcontext *gc, GLenum target, GLsizei width, GLsizei height,
-                                          GLenum format, GLvoid ** logical, const GLuint * physical, GLboolean tiled)
+GLvoid __glTexDirectVIVMap(__GLcontext *gc, GLenum target, GLsizei width, GLsizei height,
+                              GLenum format, GLvoid ** logical, const GLuint * physical, GLboolean tiled)
 {
     __GLtextureObject *tex;
     GLint face;
@@ -4150,14 +4186,16 @@ OnError:
     __GL_FOOTER();
 }
 
+GLvoid GL_APIENTRY __gles_TexDirectVIVMap(__GLcontext *gc, GLenum target, GLsizei width, GLsizei height,
+                                          GLenum format, GLvoid ** logical, const GLuint * physical)
+{
+    __glTexDirectVIVMap(gc, target, width, height, format, logical, physical, GL_FALSE);
+}
+
 GLvoid GL_APIENTRY __gles_TexDirectTiledMapVIV(__GLcontext *gc, GLenum target, GLsizei width, GLsizei height,
                                                GLenum format, GLvoid ** logical, const GLuint * physical)
 {
-    __GL_HEADER();
-
-    __gles_TexDirectVIVMap(gc, target, width, height, format, logical, physical, GL_TRUE);
-
-    __GL_FOOTER();
+    __glTexDirectVIVMap(gc, target, width, height, format, logical, physical, GL_TRUE);
 }
 
 #endif
@@ -4455,7 +4493,13 @@ GLvoid GL_APIENTRY __gles_TexBuffer(__GLcontext *gc, GLenum target, GLenum inter
         (offset == tex->bufOffset)
         )
     {
-        return;
+        __GL_EXIT();
+    }
+
+    /* If there is a bufObj bound to texture, unbound it first*/
+    if (tex->bufObj)
+    {
+        __glUnBindTextureBuffer(gc, tex, tex->bufObj);
     }
 
     tex->arrays = 1;
@@ -4536,7 +4580,12 @@ GLvoid GL_APIENTRY __gles_TexBufferRange(__GLcontext *gc, GLenum target, GLenum 
         (offset == tex->bufOffset)
         )
     {
-        return;
+        __GL_EXIT();
+    }
+    /* If there is a bufObj bound to texture, unbound it first*/
+    if (tex->bufObj)
+    {
+        __glUnBindTextureBuffer(gc, tex, tex->bufObj);
     }
 
     tex->arrays = 1;
@@ -4546,13 +4595,11 @@ GLvoid GL_APIENTRY __gles_TexBufferRange(__GLcontext *gc, GLenum target, GLenum 
     /* Init the mipmap info which will be queried by app */
     __glSetMipmapLevelInfo(gc, tex, 0, 0, internalformat, format, type, texelSize, 1, 1);
 
-    tex->bufObj = bufObj;
     tex->bufOffset = (GLint)offset;
     tex->bufSize = (GLint)size;
     tex->bppPerTexel = bppPerTexel;
+    tex->bufObj = bufObj;
 
-    /* Add into list */
-    __glAddImageUser(gc, &bufObj->texList, tex);
 
     __glSetTexAttachedFboDirty(gc, tex, 0, 0);
 
@@ -4631,6 +4678,11 @@ GLboolean __glCheckCopyImageSubDataArg(__GLcontext *gc, GLuint name, GLenum targ
         __GL_ERROR_RET_VAL(GL_INVALID_ENUM, GL_FALSE);
     }
 
+    if (width < 0 || height < 0 || depth < 0)
+    {
+        __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
+    }
+
     if (isTex)
     {
         __GLmipMapLevel *mipmap = NULL;
@@ -4650,6 +4702,12 @@ GLboolean __glCheckCopyImageSubDataArg(__GLcontext *gc, GLuint name, GLenum targ
         }
 
         maxLevelUsed = __glCalcTexMaxLevelUsed(gc, tex, tex->params.sampler.minFilter);
+
+        if (level < 0)
+        {
+            __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
+        }
+
         samplerParam = &tex->params.sampler;
 
         if (!__glIsTextureComplete(gc, tex, samplerParam->minFilter, samplerParam->magFilter,
@@ -4678,7 +4736,7 @@ GLboolean __glCheckCopyImageSubDataArg(__GLcontext *gc, GLuint name, GLenum targ
             __glCompressedTexBlockSize(mipmap->formatInfo->glFormat, &blockWidth, &blockHeight, gcvNULL);
         }
 
-        if ((width > 0) && (height > 0))
+        if ((width > 0) || (height > 0))
         {
             rectWidth  = width;
             rectHeight = height;
@@ -4707,7 +4765,7 @@ GLboolean __glCheckCopyImageSubDataArg(__GLcontext *gc, GLuint name, GLenum targ
     }
     else if (rbo)
     {
-        if ((width > 0) && (height > 0))
+        if ((width > 0) || (height > 0))
         {
             rectWidth  = width;
             rectHeight = height;
@@ -4799,8 +4857,8 @@ GLvoid GL_APIENTRY __gles_CopyImageSubData(__GLcontext *gc,
      GLuint dstTargetIndex = 0;
      GLint srcSamples = 0;
      GLint dstSamples = 0;
-    GLint blockXCount = 0;
-    GLint blockYCount = 0;
+     GLint blockXCount = 0;
+     GLint blockYCount = 0;
 
      __GL_HEADER();
 
@@ -5096,14 +5154,18 @@ GLvoid __glSetFBOAttachedTexDirty(__GLcontext *gc, GLbitfield mask, GLint drawbu
         else
         {
             GLint attachIndex = __glMapAttachmentToIndex(fbo->drawBuffers[drawbuffer]);
-            __GLfboAttachPoint *attachPoint = &fbo->attachPoint[attachIndex];
 
-            if (attachPoint->objType == GL_TEXTURE)
+            if (attachIndex != -1)
             {
-                texObj = (__GLtextureObject *)__glGetObject(gc, gc->texture.shared, attachPoint->objName);
-                if (texObj)
+                __GLfboAttachPoint *attachPoint = &fbo->attachPoint[attachIndex];
+
+                if (attachPoint->objType == GL_TEXTURE)
                 {
-                    __glSetTexImageDirtyBit(gc, texObj, __GL_TEX_IMAGE_CONTENT_CHANGED_BIT);
+                    texObj = (__GLtextureObject *)__glGetObject(gc, gc->texture.shared, attachPoint->objName);
+                    if (texObj)
+                    {
+                        __glSetTexImageDirtyBit(gc, texObj, __GL_TEX_IMAGE_CONTENT_CHANGED_BIT);
+                    }
                 }
             }
         }
@@ -5137,4 +5199,92 @@ GLvoid __glSetFBOAttachedTexDirty(__GLcontext *gc, GLbitfield mask, GLint drawbu
     }
 }
 
+GLvoid GL_APIENTRY __gles_GetTexImage(__GLcontext *gc, GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels)
+{
+    GLint face;
+    GLuint activeUnit = gc->state.texture.activeTexIndex;
+    __GLtextureObject *tex;
+    GLint maxLod = (GLint)(gc->constants.maxNumTextureLevels - 1);
+    __GLbufferObject *packBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_PACK_BUFFER_INDEX].boundBufObj;
+
+    __GL_HEADER();
+
+    switch (target)
+    {
+        case GL_TEXTURE_2D:
+            face = 0;
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_INDEX];
+            break;
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_Y:
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
+            face = target - GL_TEXTURE_CUBE_MAP_POSITIVE_X;
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_INDEX];
+            break;
+        case GL_TEXTURE_2D_ARRAY:
+            face = 0;
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_ARRAY_INDEX];
+            break;
+        case GL_TEXTURE_3D:
+            face = 0;
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_3D_INDEX];
+            break;
+        case GL_TEXTURE_CUBE_MAP_ARRAY_EXT:
+            if (__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
+            {
+                face = 0;
+                tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_ARRAY_INDEX];
+                break;
+            }
+        default:
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
+
+    if (!tex)
+    {
+        __GL_EXIT();
+    }
+
+    /* Check lod, width, height */
+    if (level < 0 || level > maxLod)
+    {
+        __GL_ERROR_RET(GL_INVALID_VALUE);
+    }
+
+    if (!__glCheckTexImgTypeArg(gc, tex, type))
+    {
+        __GL_EXIT();
+    }
+
+    if (!__glCheckTexImgFmtArg(gc, tex, format))
+    {
+        __GL_EXIT();
+    }
+
+    if (!__glCheckTexImgFmt(gc, tex, tex->faceMipmap[face][level].requestedFormat, format, type))
+    {
+        __GL_EXIT();
+    }
+    /* The image is from unpack buffer object? */
+    if (packBufObj)
+    {
+        __GLmipMapLevel *mipmap = &tex->faceMipmap[face][level];
+
+        if (!__glCheckPBO(gc, &gc->clientState.pixel.packModes, packBufObj, mipmap->width, mipmap->height, mipmap->depth, format, type, pixels))
+        {
+            __GL_EXIT();
+        }
+    }
+
+    if (!(*gc->dp.getTexImage)(gc, tex, face, level, (GLubyte*)pixels))
+    {
+        __GL_ERROR((*gc->dp.getError)(gc));
+    }
+
+OnExit:
+    __GL_FOOTER();
+}
 

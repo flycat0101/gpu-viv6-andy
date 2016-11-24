@@ -1096,7 +1096,7 @@ GCHAL::StartThreads(
             if (m_InterruptThreads[i] != gcvNULL)
             {
                 // Boost the thread priority.
-                SetThreadPriority(m_InterruptThreads[i], THREAD_PRIORITY_HIGHEST);
+                CeSetThreadPriority(m_InterruptThreads[i], 152);
             }
         }
     }

@@ -44,7 +44,7 @@ VX_INTERNAL_API void vxEnableAllTraceTargets(vx_bool enable);
 
 VX_INTERNAL_API void vxEnableTraceTarget(vx_trace_target_e target, vx_bool enable);
 
-VX_INTERNAL_API void vxTrace(vx_trace_target_e target,  char *message, ...);
+VX_INTERNAL_API void vxTrace(vx_trace_target_e target, char *message, ...);
 
 VX_INTERNAL_API void vxWarning(char *message, ...);
 
@@ -143,3 +143,4 @@ VX_INTERNAL_API vx_bool vxoThreadpool_IsCompleted(vx_threadpool threadPool, vx_b
 EXTERN_C_END
 
 #endif /* __GC_VX_RUNTIME_H__ */
+

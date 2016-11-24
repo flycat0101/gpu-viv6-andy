@@ -613,6 +613,9 @@ DerivedArgList *Darwin::TranslateArgs(const DerivedArgList &Args,
           XarchArg->getOption().isDriverOption()) {
        getDriver().Diag(clang::diag::err_drv_invalid_Xarch_argument)
           << A->getAsString(Args);
+        if(XarchArg) {
+           delete XarchArg;
+        }
         continue;
       }
 

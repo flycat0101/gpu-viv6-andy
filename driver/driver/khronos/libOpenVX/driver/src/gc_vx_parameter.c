@@ -44,7 +44,7 @@ VX_INTERNAL_CALLBACK_API void vxoParameter_Destructor(vx_reference ref)
     }
 }
 
-VX_PUBLIC_API vx_parameter vxGetKernelParameterByIndex(vx_kernel kernel, vx_uint32 index)
+VX_API_ENTRY vx_parameter VX_API_CALL vxGetKernelParameterByIndex(vx_kernel kernel, vx_uint32 index)
 {
     vx_parameter parameter;
 
@@ -71,12 +71,12 @@ VX_PUBLIC_API vx_parameter vxGetKernelParameterByIndex(vx_kernel kernel, vx_uint
     return parameter;
 }
 
-VX_PUBLIC_API vx_parameter vxGetParameterByIndex(vx_node node, vx_uint32 index)
+VX_API_ENTRY vx_parameter VX_API_CALL vxGetParameterByIndex(vx_node node, vx_uint32 index)
 {
     return vxoNode_GetParameter(node, index);
 }
 
-VX_PUBLIC_API vx_status vxReleaseParameter(vx_parameter *parameter)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseParameter(vx_parameter *parameter)
 {
     if((*parameter)->base.type == VX_TYPE_SCALAR)
     {
@@ -91,12 +91,12 @@ VX_PUBLIC_API vx_status vxReleaseParameter(vx_parameter *parameter)
     return vxoReference_Release((vx_reference_ptr)parameter, VX_TYPE_PARAMETER, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_status vxSetParameterByIndex(vx_node node, vx_uint32 index, vx_reference value)
+VX_API_ENTRY vx_status VX_API_CALL vxSetParameterByIndex(vx_node node, vx_uint32 index, vx_reference value)
 {
     return vxoNode_SetParameter(node, index, value);
 }
 
-VX_PUBLIC_API vx_status vxSetParameterByReference(vx_parameter parameter, vx_reference value)
+VX_API_ENTRY vx_status VX_API_CALL vxSetParameterByReference(vx_parameter parameter, vx_reference value)
 {
     if (!vxoReference_IsValidAndSpecific((vx_reference_s *)parameter, VX_TYPE_PARAMETER))
     {
@@ -108,7 +108,7 @@ VX_PUBLIC_API vx_status vxSetParameterByReference(vx_parameter parameter, vx_ref
     return vxoNode_SetParameter(parameter->node, parameter->index, value);
 }
 
-VX_PUBLIC_API vx_status vxQueryParameter(vx_parameter parameter, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryParameter(vx_parameter parameter, vx_enum attribute, void *ptr, vx_size size)
 {
     vx_reference paramRef;
 
@@ -159,5 +159,6 @@ VX_PUBLIC_API vx_status vxQueryParameter(vx_parameter parameter, vx_enum attribu
 
     return VX_SUCCESS;
 }
+
 
 

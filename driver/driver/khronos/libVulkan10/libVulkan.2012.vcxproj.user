@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='All_Debug|Win32'">
+    <LocalDebuggerCommand>C:\Users\yzhang.CALMER\P4\TEST\SW\Khronos\Conformance\Vulkan\Candy\bin\win32\deqp-vk.exe</LocalDebuggerCommand>
+    <LocalDebuggerEnvironment>VIV_TRACE=0</LocalDebuggerEnvironment>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerWorkingDirectory>C:\Users\yzhang.CALMER\P4\TEST\SW\Khronos\Conformance\Vulkan\Candy\bin\win32</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommandArguments>--deqp-gl-config-name=rgba8888d24s8 --deqp-surface-width=64 --deqp-surface-height=64 --deqp-case=dEQP-VK.binding_model.shader_access.primary_cmd_buf.storage_image.*</LocalDebuggerCommandArguments>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='All_Debug|x64'">
+    <LocalDebuggerCommand>C:\Users\yzhang.CALMER\P4\TEST\SW\Khronos\Conformance\Vulkan\Candy\bin\win64\deqp-vk.exe</LocalDebuggerCommand>
+    <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
+    <LocalDebuggerCommandArguments>--deqp-gl-config-name=rgba8888d24s8 --deqp-surface-width=64 --deqp-surface-height=64 --deqp-case=dEQP-VK.info.device</LocalDebuggerCommandArguments>
+  </PropertyGroup>
+</Project>

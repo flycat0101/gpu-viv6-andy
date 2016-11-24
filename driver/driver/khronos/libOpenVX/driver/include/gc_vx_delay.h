@@ -27,3 +27,4 @@ VX_INTERNAL_API vx_bool vxoParameterValue_UnbindFromDelay(vx_reference value, vx
 EXTERN_C_END
 
 #endif /* __GC_VX_DELAY_H__ */
+

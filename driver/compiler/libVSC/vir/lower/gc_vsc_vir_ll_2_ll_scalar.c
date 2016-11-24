@@ -145,6 +145,19 @@ static VIR_Pattern _modSclPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+static VIR_PatternMatchInst _fixPatInst0[] = {
+    { VIR_OP_FIX, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _fixRepInst0[] = {
+    { VIR_OP_FIX, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { 0 } },
+};
+
+static VIR_Pattern _fixPattern[] = {
+    { VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE | VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O, CODEPATTERN(_fix, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 static VIR_Pattern*
 _GetLowerPatternPhaseScalar(
     IN VIR_PatternContext      *Context,
@@ -171,6 +184,8 @@ _GetLowerPatternPhaseScalar(
         return _divSclPattern;
     case VIR_OP_MOD:
         return _modSclPattern;
+    case VIR_OP_FIX:
+        return _fixPattern;
     default:
         break;
     }
@@ -191,18 +206,19 @@ _CmpInstuction(
 VSC_ErrCode
 VIR_Lower_MiddleLevel_To_LowLevel_Scalar(
     IN  VIR_Shader              *Shader,
-    IN  VSC_HW_CONFIG           *HwCfg,
+    IN  PVSC_CONTEXT            VscContext,
     IN  VIR_PatternLowerContext *Context
     )
 {
     VSC_ErrCode errCode  = VSC_ERR_NONE;
 
-    VIR_PatternContext_Initialize(&Context->header, Shader, VIR_PATN_CONTEXT_FLAG_NONE, _GetLowerPatternPhaseScalar, _CmpInstuction, 512);
+    VIR_PatternContext_Initialize(&Context->header, VscContext, Shader, Context->pMM, VIR_PATN_CONTEXT_FLAG_NONE,
+                                  _GetLowerPatternPhaseScalar, _CmpInstuction, 512);
 
     errCode = VIR_Pattern_Transform((VIR_PatternContext *)Context);
     CHECK_ERROR(errCode, "VIR_Lower_MiddleLevel_To_LowLevel_Scalar failed.");
 
-    VIR_PatternContext_Finalize(&Context->header, 512);
+    VIR_PatternContext_Finalize(&Context->header);
 
     return errCode;
 }

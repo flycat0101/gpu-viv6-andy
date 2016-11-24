@@ -1692,6 +1692,9 @@ clfStartCommand(
     if (Command->event)
     {
         clfSetEventExecutionStatus(Command->event, CL_SUBMITTED);
+
+        clfScheduleEventCallback(Command->event, CL_SUBMITTED);
+
         if (clmCOMMAND_EXEC_HARDWARE(Command->type))
         {
             clfSubmitEventForRunning(Command);
@@ -1699,6 +1702,8 @@ clfStartCommand(
         else
         {
             clfSetEventExecutionStatus(Command->event, CL_RUNNING);
+
+            clfScheduleEventCallback(Command->event, CL_RUNNING);
         }
     }
 
@@ -1722,9 +1727,6 @@ clfFinishCommand(
     gcmHEADER_ARG("Command=0x%x CommandStatus=%d", Command, CommandStatus);
 
     clmASSERT(Command, CL_INVALID_VALUE);
-
-    /* Flush GPU cache before setting event */
-    gcmONERROR(gcoCL_Flush(gcvFALSE));
 
     if (Command->event)
     {
@@ -1801,8 +1803,6 @@ clfProcessCommand(
         /* Add signals to wake up worker when the command is finished. */
         clfWakeUpCommandQueueWorker(commandQueue);
 
-        /* Commit the command buffer. */
-        gcmONERROR(gcoCL_Commit(gcvFALSE));
     }
 
     gcmFOOTER_ARG("%d", CL_SUCCESS);
@@ -1999,8 +1999,6 @@ clfProcessCommitRequestList(
         gctUINT64           minExistingEnqueueNoForFinish;
         clsCommand_PTR      command;
 
-        /* Commit all previously queued commands/events to GPU */
-        gcmONERROR(gcoCL_Commit(gcvFALSE));
 
         /* Get the min existing enqueue no for clFlush */
         if (CommandQueue->numCommands > 0)
@@ -2085,6 +2083,8 @@ clfProcessCommitRequestList(
                     {
                         commitRequest->next->previous = commitRequest->previous;
                     }
+                            /* Commit all previously queued commands/events to GPU */
+                    gcmONERROR(gcoCL_Commit(gcvFALSE));
 
                     /* Wake up the corresponding clFlush thead by signal directly */
                     gcmONERROR(gcoCL_SetSignal(commitRequest->signal));
@@ -2154,6 +2154,7 @@ OnError:
     return status;
 }
 
+#if cldFSL_OPT
 gctINT
 clfAddCommandDependency(
     clsCommandQueue_PTR         CommandQueue,
@@ -2169,6 +2170,7 @@ clfAddCommandDependency(
     /* only process IN ORDER COMMAND_QUEUE */
     if (CommandQueue->properties & CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE)
     {
+        gcmFOOTER_NO();
         return CL_SUCCESS;
     }
 
@@ -2269,6 +2271,11 @@ clfAddCommandDependency(
         case clvCOMMAND_WRITE_BUFFER:
             memObj[0] = Command->u.writeBuffer.buffer;
             break;
+#if BUILD_OPENCL_12
+        case clvCOMMAND_FILL_BUFFER:
+            memObj[0] = Command->u.fillBuffer.buffer;
+            break;
+#endif
         case clvCOMMAND_WRITE_BUFFER_RECT:
             memObj[0] = Command->u.writeBufferRect.buffer;
             break;
@@ -2286,6 +2293,11 @@ clfAddCommandDependency(
         case clvCOMMAND_WRITE_IMAGE:
             memObj[0] = Command->u.writeImage.image;
             break;
+#if BUILD_OPENCL_12
+        case clvCOMMAND_FILL_IMAGE:
+            memObj[0] = Command->u.fillImage.image;
+            break;
+#endif
         case clvCOMMAND_COPY_IMAGE:
             memObj[0] = Command->u.copyImage.srcImage;
             memObj[1] = Command->u.copyImage.dstImage;
@@ -2298,6 +2310,10 @@ clfAddCommandDependency(
             memObj[0] = Command->u.copyBufferToImage.srcBuffer;
             memObj[1] = Command->u.copyBufferToImage.dstImage;
             break;
+#if BUILD_OPENCL_12
+        case clvCOMMAND_MIGRATE_MEM_OBJECTS:
+            break;
+#endif
         case clvCOMMAND_MAP_BUFFER:
             memObj[0] = Command->u.mapBuffer.buffer;
             break;
@@ -2337,6 +2353,7 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
+#endif
 
 gctINT
 clfSubmitCommand(
@@ -2356,11 +2373,15 @@ clfSubmitCommand(
 
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND,
               CL_INVALID_VALUE);
-
+#if cldFSL_OPT
     if (Command->outEvent ||
         Blocking ||
         (((CommandQueue->properties & CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE) == 0) &&
              clmCOMMAND_EXEC_HARDWARE(Command->type)))
+#else
+    if (Command->outEvent ||
+        Blocking)
+#endif
     {
         /* Create event to track status of this command */
         clmONERROR(clfAllocateEvent(CommandQueue->context, &commandEvent),
@@ -2387,10 +2408,10 @@ clfSubmitCommand(
 
         *Command->outEvent = Command->event;
     }
-
+#if cldFSL_OPT
     /* establish the buffer dependency */
     clfAddCommandDependency(CommandQueue, Command);
-
+#endif
     clfAddCommandToCommandQueue(CommandQueue, Command);
 
     if (Blocking)
@@ -2417,10 +2438,12 @@ clfCommandQueueWorker(
 {
     clsCommandQueue_PTR commandQueue = (clsCommandQueue_PTR) Data;
     clsCommand_PTR      command = gcvNULL;
-    gctINT              status;
+    gceSTATUS           status;
     gctBOOL             acquired = gcvFALSE;
 
     /* Use the same hardware for command queue worker. */
+
+    gcmONERROR(gcoCL_SelectDevice(commandQueue->device->gpuId));
     gcmONERROR(gcoCL_SetHardware());
 
     while (gcvTRUE)
@@ -2453,7 +2476,7 @@ clfCommandQueueWorker(
             clfUnlockCommandList(commandQueue);
             acquired = gcvFALSE;
 
-            gcmONERROR(clfProcessCommand(command));
+            if (clmIS_ERROR(clfProcessCommand(command))) goto OnError;
 
             /* Lock the command list in this command queue. */
             clfLockCommandList(commandQueue);
@@ -2583,7 +2606,6 @@ clCreateCommandQueue(
             "OCL-003001: (clCreateCommandQueue) invalid Device.\n");
         clmRETURN_ERROR(CL_INVALID_DEVICE);
     }
-    gcoCL_SetHardware();
     /* Allocate command queue. */
     clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsCommandQueue), &pointer), CL_OUT_OF_HOST_MEMORY);
 
@@ -2745,7 +2767,6 @@ clReleaseCommandQueue(
             "OCL-003004: (clReleaseCommandQueue) invalid CommandQueue.\n");
         clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
     }
-    gcoCL_SetHardware();
 
     gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, CommandQueue->referenceCount, &oldReference));
 
@@ -2976,7 +2997,6 @@ clFlush(
             "OCL-003009: (clFlush) invalid CommandQueue.\n");
         clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
     }
-    gcoCL_SetHardware();
     status = clfFlushCommandQueue(CommandQueue, gcvFALSE);
     if (status != CL_SUCCESS)
     {
@@ -3009,7 +3029,6 @@ clFinish(
             "OCL-003011: (clFinish) invalid CommandQueue.\n");
         clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
     }
-    gcoCL_SetHardware();
     status = clfFlushCommandQueue(CommandQueue, gcvTRUE);
     if (status != CL_SUCCESS)
     {

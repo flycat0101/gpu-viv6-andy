@@ -322,6 +322,7 @@ struct _ppoMACRO_SYMBOL
     ppoTOKEN                argv;
     ppoTOKEN                replacementList;
     gctBOOL                 undefined;
+    gctBOOL                 hasPara;
 };
 
 gceSTATUS
@@ -496,35 +497,36 @@ struct _ppsKEYWORD
 /*R                             */
 struct _ppoPREPROCESSOR
 {
-    /*00 C*/  struct _ppoBASE             base;
-    /*01 C*/  sloCOMPILER                 compiler;
-    /*02*/    gctCONST_STRING*            strings;
-    /*03*/    gctUINT*                    lens;
-    /*04*/    gctUINT                     count;
-    /*05*/    gctBOOL                     otherStatementHasAlreadyAppeared;
-    /*06*/    gctBOOL                     versionStatementHasAlreadyAppeared;
-    /*07 SR*/ ppoMACRO_MANAGER            macroManager;
-    /*08*/    ppoINPUT_STREAM             inputStream;
-    /*09 C*/  ppsKEYWORD                  keyword;
-    /*10*/    gctINT                      currentSourceFileStringNumber;
-    /*11*/    gctINT                      currentSourceFileLineNumber;
-    /*12 C*/  gctSTRING**                 operators;
-    /*13*/    ppoTOKEN                    outputTokenStreamHead;
-    /*14*/    ppoTOKEN                    outputTokenStreamEnd;
-    /*15*/    ppoBYTE_INPUT_STREAM        lastGetcharPhase0IsFromThisBis;
-    /*16*/    gctBOOL                     iAmFollowingAComment;
-    /*17*/    gctBOOL                     doWeInValidArea;
-    /*18*/    gctBOOL                     dirty;
-    /*19*/    gctUINT                     version;
-    /*20*/    gctBOOL                     toLineEnd;
-    /*21*/    gctINT                      skipLine;
-    /*22*/    gctBOOL                     nonpreprocessorStatementHasAlreadyAppeared;
+    struct _ppoBASE             base;
+    sloCOMPILER                 compiler;
+    gctSTRING                   extensionString;
+    gctCONST_STRING*            strings;
+    gctUINT*                    lens;
+    gctUINT                     count;
+    gctBOOL                     otherStatementHasAlreadyAppeared;
+    gctBOOL                     versionStatementHasAlreadyAppeared;
+    ppoMACRO_MANAGER            macroManager;
+    ppoINPUT_STREAM             inputStream;
+    ppsKEYWORD                  keyword;
+    gctINT                      currentSourceFileStringNumber;
+    gctINT                      currentSourceFileLineNumber;
+    gctSTRING**                 operators;
+    ppoTOKEN                    outputTokenStreamHead;
+    ppoTOKEN                    outputTokenStreamEnd;
+    ppoBYTE_INPUT_STREAM        lastGetcharPhase0IsFromThisBis;
+    gctBOOL                     iAmFollowingAComment;
+    gctBOOL                     doWeInValidArea;
+    gctBOOL                     dirty;
+    gctUINT                     version;
+    gctBOOL                     toLineEnd;
+    gctINT                      skipLine;
+    gctBOOL                     nonpreprocessorStatementHasAlreadyAppeared;
 
     /*
     ** to skip undefined identifiers error,
     ** such as: #if 1 || AA  and # if 0 && AA
     */
-    /*22*/  gctBOOL                        skipOPError;
+    gctBOOL                     skipOPError;
 };
 
 gceSTATUS

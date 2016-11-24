@@ -19,7 +19,8 @@
 #include "gc_hal_user_os_memory.h"
 #include "gc_hal_driver.h"
 #include "gc_hal_types.h"
-#include "gc_vsc_drvi_interface.h"
+#include "gc_hal_priv.h"
+#include "drvi/gc_vsc_drvi_interface.h"
 
 typedef char *        gctCHAR_PTR;
 typedef const char *    gctCONST_CHAR_PTR;

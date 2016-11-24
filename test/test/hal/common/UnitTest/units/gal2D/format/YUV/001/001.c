@@ -26,7 +26,6 @@
 *****************************************************************************/
 
 
-
 /*
  *  Feature:    Filter Blit - NV conversion
  *  API:        gco2D_FilterBlit

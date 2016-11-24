@@ -44,8 +44,6 @@ sdk
     |     eglext.h
     |     eglplatform.h
     |     eglvivante.h
-    |     eglrename.h
-    |     eglunname.h
     |
     +---GLES
     |     gl.h

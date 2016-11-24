@@ -147,6 +147,8 @@ vdkGetDisplayInfo(
     int * BitsPerPixel
     )
 {
+
+    fprintf(stderr, "%s not implemented\n", __func__);
     return 0;
 }
 
@@ -190,7 +192,7 @@ vdkGetWindowInfo(
     unsigned int * Offset
     )
 {
-    return 0;
+    return dfbGetWindowInfo(Window, X, Y, Width, Height, BitsPerPixel, Offset);
 }
 
 VDKAPI void VDKLANG

@@ -12,6 +12,7 @@
 
 
 #include <gc_vx_common.h>
+#include "debug/gc_vsc_debug_extern.h"
 
 VX_INTERNAL_API void vxoGraph_Dump(vx_graph graph)
 {
@@ -462,7 +463,7 @@ VX_INTERNAL_API void vxoGraph_PolluteIfInput(vx_graph graph, vx_reference target
     }
 }
 
-VX_PUBLIC_API vx_graph vxCreateGraph(vx_context context)
+VX_API_ENTRY vx_graph VX_API_CALL vxCreateGraph(vx_context context)
 {
     vx_graph graph;
 
@@ -483,14 +484,14 @@ VX_PUBLIC_API vx_graph vxCreateGraph(vx_context context)
     return graph;
 }
 
-VX_PUBLIC_API vx_status vxSetGraphAttribute(vx_graph graph, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxSetGraphAttribute(vx_graph graph, vx_enum attribute, const void *ptr, vx_size size)
 {
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_ERROR_INVALID_REFERENCE;
 
     return VX_ERROR_NOT_SUPPORTED;
 }
 
-VX_PUBLIC_API vx_status vxQueryGraph(vx_graph graph, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryGraph(vx_graph graph, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -530,8 +531,10 @@ VX_PUBLIC_API vx_status vxQueryGraph(vx_graph graph, vx_enum attribute, void *pt
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxReleaseGraph(vx_graph *graph)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseGraph(vx_graph *graph)
 {
+
+
     return vxoReference_Release((vx_reference_ptr)graph, VX_TYPE_GRAPH, VX_REF_EXTERNAL);
 }
 
@@ -661,19 +664,22 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodeParameters(vx_graph graph)
                     {
                         vx_image image = (vx_image)paramRef;
 
-                        if (image->format != metaFormat->u.imageInfo.format && image->format != VX_DF_IMAGE_VIRT)
+                        if (image->format != metaFormat->u.imageInfo.format && !image->base.isVirtual)
                         {
                             vxError("Node %p(\"%s\"): No.%d image parameter's format, %d, is invalid (expected: %d)",
                                     node, node->kernel->name, paramIndex, image->format, metaFormat->u.imageInfo.format);
                             status = VX_ERROR_INVALID_FORMAT;
                             continue;
                         }
+                        else if (image->base.isVirtual)
+                        {
 
-                        image->format   = metaFormat->u.imageInfo.format;
-                        image->width    = metaFormat->u.imageInfo.width;
-                        image->height   = metaFormat->u.imageInfo.height;
+                            image->format   = metaFormat->u.imageInfo.format;
+                            image->width    = metaFormat->u.imageInfo.width;
+                            image->height   = metaFormat->u.imageInfo.height;
 
-                        vxoImage_Initialize(image, image->width, image->height, image->format);
+                            vxoImage_Initialize(image, image->width, image->height, image->format);
+                        }
 
                         vxoImage_Dump(image);
                     }
@@ -1093,15 +1099,18 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodesByTarget(vx_graph graph)
     return VX_SUCCESS;
 }
 
+
 VX_PRIVATE_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
 {
     vx_uint32 nodeIndex;
 
     vxmASSERT(graph);
 
+
     for (nodeIndex = 0; nodeIndex < graph->nodeCount; nodeIndex++)
     {
         vx_node node = graph->nodeTable[nodeIndex];
+
 
         if (node->kernel->initializeFunction != VX_NULL)
         {
@@ -1345,7 +1354,7 @@ VX_PRIVATE_API vx_status vxoGraph_AddNodeBatch(
                 imageSize.x = kernelContext->params.xmax;
                 imageSize.y = kernelContext->params.ymax;
             }
-            else if (   (imageSize.x != kernelContext->params.xmax)
+            else if ((imageSize.x != kernelContext->params.xmax)
                      || (imageSize.y != kernelContext->params.ymax))
             {
                 tiled = vx_false_e;
@@ -1442,13 +1451,15 @@ OnError:
 }
 #endif
 
-VX_PUBLIC_API vx_status vxVerifyGraph(vx_graph graph)
+
+VX_API_ENTRY vx_status VX_API_CALL vxVerifyGraph(vx_graph graph)
 {
     vx_status status;
 
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_ERROR_INVALID_REFERENCE;
 
     vxAcquireMutex(graph->base.lock);
+
 
     status = vxoGraph_VerifyAllNodeParameters(graph);
 
@@ -1679,7 +1690,7 @@ Restart:
 
     if (status == VX_SUCCESS)
     {
-        gcoVX_Commit(gcvTRUE, gcvTRUE, NULL, NULL);
+        gcfVX_Flush(gcvTRUE);
         graph->dirty = vx_false_e;
     }
 
@@ -1712,7 +1723,7 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
 {
     vxmASSERT(graph);
 
-    gcoVX_Commit(gcvTRUE, gcvTRUE, NULL, NULL);
+    gcfVX_Flush(gcvTRUE);
 
     graph->dirty = vx_false_e;
 
@@ -1735,6 +1746,14 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 
     vxmASSERT(graph);
 
+#if VIVANTE_PROFILER
+    /* Only top-level graph needs to profile. */
+    if (!graph->isChildGraph)
+    {
+        vxoProfiler_Begin((vx_reference)graph);
+    }
+#endif
+
     if (!graph->verified)
     {
         status = vxVerifyGraph(graph);
@@ -1751,7 +1770,7 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 #endif
     {
 
-Restart:
+//Restart:
 
     action = VX_ACTION_CONTINUE;
 
@@ -1771,6 +1790,7 @@ Restart:
             }
 
             vxoNode_EnableVirtualAccessible(node);
+
 
             if (graph->dirty)
             {
@@ -1809,23 +1829,30 @@ Restart:
 
     switch (action)
     {
-        case VX_ACTION_RESTART:
-            goto Restart;
+        //case VX_ACTION_RESTART:
+        //    goto Restart;
 
         case VX_ACTION_ABANDON:
             status = VX_ERROR_GRAPH_ABANDONED;
             break;
     }
 
-    vxoGraph_EndProcess(graph);
+        vxoGraph_EndProcess(graph);
     }
+
+#if VIVANTE_PROFILER
+    if (!graph->isChildGraph)
+    {
+        vxoProfiler_End((vx_reference)graph);
+    }
+#endif
 
     if (status != VX_SUCCESS) return status;
 
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxScheduleGraph(vx_graph graph)
+VX_API_ENTRY vx_status VX_API_CALL vxScheduleGraph(vx_graph graph)
 {
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -1843,7 +1870,7 @@ VX_PUBLIC_API vx_status vxScheduleGraph(vx_graph graph)
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxWaitGraph(vx_graph graph)
+VX_API_ENTRY vx_status VX_API_CALL vxWaitGraph(vx_graph graph)
 {
     vx_status       status = VX_SUCCESS;
 
@@ -1879,14 +1906,14 @@ VX_PUBLIC_API vx_status vxWaitGraph(vx_graph graph)
     return status;
 }
 
-VX_PUBLIC_API vx_status vxProcessGraph(vx_graph graph)
+VX_API_ENTRY vx_status VX_API_CALL vxProcessGraph(vx_graph graph)
 {
     if (!vxoReference_IsValidAndNoncontext(&graph->base)) return VX_ERROR_INVALID_REFERENCE;
 
     return vxoGraph_Process(graph);
 }
 
-VX_PUBLIC_API vx_status vxAddParameterToGraph(vx_graph graph, vx_parameter param)
+VX_API_ENTRY vx_status VX_API_CALL vxAddParameterToGraph(vx_graph graph, vx_parameter param)
 {
     if (!vxoReference_IsValidAndNoncontext(&graph->base)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -1919,16 +1946,17 @@ VX_INTERNAL_API vx_status vxoGraph_SetParameter(vx_graph graph, vx_uint32 index,
     if (status != VX_SUCCESS) return status;
 
     graph->verified = vx_true_e;
+    graph->dirty = vx_true_e;
 
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxSetGraphParameterByIndex(vx_graph graph, vx_uint32 index, vx_reference value)
+VX_API_ENTRY vx_status VX_API_CALL vxSetGraphParameterByIndex(vx_graph graph, vx_uint32 index, vx_reference value)
 {
     return vxoGraph_SetParameter(graph, index, value);
 }
 
-VX_PUBLIC_API vx_parameter vxGetGraphParameterByIndex(vx_graph graph, vx_uint32 index)
+VX_API_ENTRY vx_parameter VX_API_CALL vxGetGraphParameterByIndex(vx_graph graph, vx_uint32 index)
 {
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
 
@@ -1940,9 +1968,10 @@ VX_PUBLIC_API vx_parameter vxGetGraphParameterByIndex(vx_graph graph, vx_uint32 
     return vxoNode_GetParameter(graph->paramTable[index].node, graph->paramTable[index].index);
 }
 
-VX_PUBLIC_API vx_bool vxIsGraphVerified(vx_graph graph)
+VX_API_ENTRY vx_bool VX_API_CALL vxIsGraphVerified(vx_graph graph)
 {
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return vx_false_e;
 
     return graph->verified;
 }
+

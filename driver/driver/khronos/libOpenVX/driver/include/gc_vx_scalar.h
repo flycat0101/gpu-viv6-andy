@@ -25,3 +25,4 @@ VX_INTERNAL_API void vxoScalar_Dump(vx_scalar scalar);
 EXTERN_C_END
 
 #endif /* __GC_VX_SCALAR_H__ */
+

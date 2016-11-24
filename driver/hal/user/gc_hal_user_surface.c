@@ -293,10 +293,12 @@ gcoSURF_AllocateTileStatus(
     )
 {
     gceSTATUS status;
-    gctSIZE_T bytes;
+    gctSIZE_T bytes = 0;
     gctUINT alignment;
     gctBOOL tileStatusInVirtual;
     gctUINT32 allocFlags = gcvALLOC_FLAG_NONE;
+    gctUINT i = 0;
+    gctSIZE_T sliceBytes = 0;
 
     gcmHEADER_ARG("Surface=0x%x", Surface);
 
@@ -313,8 +315,15 @@ gcoSURF_AllocateTileStatus(
     Surface->hzTileStatusNode.pool           = gcvPOOL_UNKNOWN;
 
     /* Set tile status disabled at the beginning to be consistent with POOL value */
-    Surface->tileStatusDisabled = gcvTRUE;
-    Surface->dirty = gcvFALSE;
+    for (i = 0; i < Surface->requestD; i++)
+    {
+        Surface->tileStatusDisabled[i] = gcvTRUE;
+    }
+
+    for (i = 0; i < Surface->requestD; i++)
+    {
+        Surface->dirty[i] = gcvFALSE;
+    }
 
     tileStatusInVirtual = gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_MC20);
 
@@ -353,8 +362,14 @@ gcoSURF_AllocateTileStatus(
         return gcvSTATUS_OK;
     }
 
-    /* Can't support multi-slice surface*/
-    if (Surface->requestD > 1)
+    /* Only BLT_ENGINE and HALTI5 can support multi-slice surface.
+    ** For resolve, it will increase the TS buffer size for alignment.
+    ** If layer rendering firstly, then per slice read or sample, the PE rending address for each slice will not match the TX sample address.
+    */
+    if (!(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE) &&
+        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI5)) &&
+        (Surface->requestD > 1)
+        )
     {
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
@@ -373,46 +388,61 @@ gcoSURF_AllocateTileStatus(
     switch (Surface->format)
     {
     case gcvSURF_D16:
-        Surface->clearValue[0] =
-        Surface->fcValueUpper  =
-        Surface->fcValue       = 0xFFFFFFFF;
-        gcmONERROR(gcoHARDWARE_HzClearValueControl(Surface->format,
-                                                   Surface->fcValue,
-                                                   &Surface->fcValueHz,
-                                                   gcvNULL));
+        Surface->clearValue[0] = 0xFFFFFFFF;
+        for (i = 0; i < Surface->requestD; i++)
+        {
+            Surface->fcValueUpper[i]  =
+            Surface->fcValue[i]       = 0xFFFFFFFF;
+            gcmONERROR(gcoHARDWARE_HzClearValueControl(Surface->format,
+                                                       Surface->fcValue[i],
+                                                       &Surface->fcValueHz,
+                                                       gcvNULL));
+        }
         break;
 
     case gcvSURF_D24X8:
     case gcvSURF_D24S8:
-        Surface->clearValue[0] =
-        Surface->fcValueUpper  =
-        Surface->fcValue       = 0xFFFFFF00;
-        gcmONERROR(gcoHARDWARE_HzClearValueControl(Surface->format,
-                                                   Surface->fcValue,
-                                                   &Surface->fcValueHz,
-                                                   gcvNULL));
+        Surface->clearValue[0] = 0xFFFFFF00;
+        for (i = 0; i < Surface->requestD; i++)
+        {
+            Surface->fcValueUpper[i]  =
+            Surface->fcValue[i]       = 0xFFFFFF00;
+            gcmONERROR(gcoHARDWARE_HzClearValueControl(Surface->format,
+                                                       Surface->fcValue[i],
+                                                       &Surface->fcValueHz,
+                                                       gcvNULL));
+        }
         break;
 
     case gcvSURF_S8:
     case gcvSURF_X24S8:
-        Surface->clearValue[0] =
-        Surface->fcValueUpper  =
-        Surface->fcValue       = 0x00000000;
+        Surface->clearValue[0] = 0x00000000;
+        for (i = 0; i < Surface->requestD; i++)
+        {
+            Surface->fcValueUpper[i]  =
+            Surface->fcValue[i]       = 0x00000000;
+        }
         break;
 
     case gcvSURF_R8_1_X8R8G8B8:
     case gcvSURF_G8R8_1_X8R8G8B8:
         Surface->clearValue[0]      =
-        Surface->clearValueUpper[0] =
-        Surface->fcValue            =
-        Surface->fcValueUpper       = 0xFF000000;
+        Surface->clearValueUpper[0] = 0xFF000000;
+        for (i = 0; i < Surface->requestD; i++)
+        {
+            Surface->fcValue[0]            =
+            Surface->fcValueUpper[0]       = 0xFF000000;
+        }
         break;
 
     default:
         Surface->clearValue[0]      =
-        Surface->clearValueUpper[0] =
-        Surface->fcValue            =
-        Surface->fcValueUpper       = 0x00000000;
+        Surface->clearValueUpper[0] = 0x00000000;
+        for (i = 0; i < Surface->requestD; i++)
+        {
+            Surface->fcValue[0]            =
+            Surface->fcValueUpper[0]       = 0x00000000;
+        }
         break;
     }
 
@@ -430,14 +460,16 @@ gcoSURF_AllocateTileStatus(
     status = gcoHARDWARE_QueryTileStatus(gcvNULL,
                                          Surface->alignedW,
                                          Surface->alignedH,
-                                         Surface->size,
+                                         Surface->sliceSize,
                                          Surface->vMsaa,
-                                         &bytes,
+                                         Surface->isMsaa,
+                                         Surface->bitsPerPixel,
+                                         &sliceBytes,
                                          &alignment,
                                          &Surface->tileStatusFiller);
 
     /* Tile status supported? */
-    if ((status == gcvSTATUS_NOT_SUPPORTED) || (0 == bytes))
+    if ((status == gcvSTATUS_NOT_SUPPORTED) || (0 == sliceBytes))
     {
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
@@ -446,6 +478,19 @@ gcoSURF_AllocateTileStatus(
     {
         gcmFOOTER_NO();
         return status;
+    }
+
+    /* Not support 2-layers fake format Ts enable, so no multiply layers.*/
+    gcmASSERT(Surface->formatInfo.layers == 1);
+
+    Surface->tileStatusSliceSize = (gctUINT)sliceBytes;
+    bytes = sliceBytes * Surface->requestD;
+
+    /*gcvFEATURE_MC_FCCACHE_BYTEMASK feature is fix for v621 HW cache overlap bug*/
+    if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COMPRESSION_V4) || gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COMPRESSION_DEC400))
+        && !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MC_FCCACHE_BYTEMASK))
+    {
+        bytes += 128;
     }
 
     if (Surface->hints & gcvSURF_PROTECTED_CONTENT)
@@ -501,7 +546,12 @@ gcoSURF_AllocateTileStatus(
             Surface->TSDirty = gcvFALSE;
         }
 
-        Surface->tileStatusDisabled = gcvFALSE;
+        Surface->cacheMode = DEFAULT_CACHE_MODE;
+
+        for (i = 0; i < Surface->requestD; i++)
+        {
+            Surface->tileStatusDisabled[i] = gcvFALSE;
+        }
 
         /* Only set garbagePadded=0 if by default cleared tile status. */
         if (Surface->paddingFormat)
@@ -535,6 +585,8 @@ gcoSURF_AllocateTileStatus(
                                                  0,
                                                  Surface->hzNode.size,
                                                  gcvFALSE,
+                                                 Surface->isMsaa,
+                                                 0,
                                                  &bytes,
                                                  &alignment,
                                                  gcvNULL);
@@ -1055,6 +1107,28 @@ _FreeSurface(
         Surface->shBuf = gcvNULL;
     }
 
+#if gcdENABLE_3D
+    if (Surface->fcValue != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, Surface->fcValue);
+    }
+
+    if (Surface->fcValueUpper != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, Surface->fcValueUpper);
+    }
+
+    if (Surface->tileStatusDisabled != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, Surface->tileStatusDisabled);
+    }
+
+    if (Surface->dirty != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, Surface->dirty);
+    }
+#endif
+
     /* Success. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -1253,7 +1327,9 @@ _GetBankOffsetBytes(
     *Bytes = offset;
 
     /* Avoid compiler warnings. */
+#ifndef __clang__
     baseOffset = baseOffset;
+#endif
 
     /* Only disable bottom-buffer-offset on android system. */
 #if gcdPARTIAL_FAST_CLEAR && defined(ANDROID)
@@ -1593,6 +1669,14 @@ _ComputeSurfacePlacement(
             * (Surface->alignedH / formatInfo->blockHeight);
         break;
     }
+
+    /* HW need read 64bytes at least for YUV420 tex.*/
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_YUV420_TILER)            &&
+        (Surface->format >= gcvSURF_YUY2) && (Surface->format <= gcvSURF_AYUV) &&
+        ((Surface->stride & (64 -1)) != 0))
+    {
+        Surface->sliceSize += 64;
+    }
 }
 
 static gceSTATUS
@@ -1613,7 +1697,9 @@ _AllocateSurface(
     /* Extra pages needed to offset sub-buffers to different banks. */
     gctUINT32 bankOffsetBytes = 0;
     gctUINT32 layers;
+
 #if gcdENABLE_3D
+    gctUINT i;
     gctUINT32 blockSize;
 #endif
 
@@ -1662,6 +1748,17 @@ _AllocateSurface(
     Surface->allocedW = Width  * Surface->sampleInfo.x;
     Surface->allocedH = Height * Surface->sampleInfo.y;
 
+#if gcdENABLE_3D
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctUINT) * Surface->requestD, (gctPOINTER*)&Surface->fcValue));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctUINT) * Surface->requestD, (gctPOINTER*)&Surface->fcValueUpper));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctBOOL) * Surface->requestD, (gctPOINTER*)&Surface->tileStatusDisabled));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctBOOL) * Surface->requestD, (gctPOINTER*)&Surface->dirty));
+
+    gcoOS_ZeroMemory(Surface->fcValue, gcmSIZEOF(gctUINT) * Surface->requestD);
+    gcoOS_ZeroMemory(Surface->fcValueUpper, gcmSIZEOF(gctUINT) * Surface->requestD);
+    gcoOS_ZeroMemory(Surface->tileStatusDisabled, gcmSIZEOF(gctBOOL) * Surface->requestD);
+    gcoOS_ZeroMemory(Surface->dirty, gcmSIZEOF(gctBOOL) * Surface->requestD);
+#endif
     /* Initialize rotation. */
     Surface->rotation    = gcvSURF_0_DEGREE;
 #if gcdENABLE_3D
@@ -1690,8 +1787,11 @@ _AllocateSurface(
     Surface->alignedH = Surface->allocedH;
 
 #if gcdENABLE_3D
-    /* Tile status disabled currently. */
-    Surface->tileStatusDisabled = gcvTRUE;
+    for (i = 0; i < Surface->requestD; i++)
+    {
+        /* Tile status disabled currently. */
+        Surface->tileStatusDisabled[i] = gcvTRUE;
+    }
 
     /* Init superTiled info. */
     Surface->superTiled = gcvFALSE;
@@ -1866,12 +1966,12 @@ _AllocateSurface(
             if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_TILEFILLER_32TILE_ALIGNED))
             {
                 /* 32 tile alignment. */
-                bytes = gcmALIGN(bytes, 32 * 64);
+                bytes = gcmALIGN(bytes, 32 * (Surface->isMsaa ? 256 : 64));
             }
             else
             {
                 /* 256 tile alignment for fast clear fill feature. */
-                bytes = gcmALIGN(bytes, 256 * 64);
+                bytes = gcmALIGN(bytes, 256 * (Surface->isMsaa ? 256 : 64));
             }
         }
 
@@ -1912,24 +2012,32 @@ _AllocateSurface(
         }
 
 #if gcdENABLE_2D
-        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) == gcvTRUE)
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) == gcvTRUE ||
+            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE)
         {
             if (Format == gcvSURF_NV12 ||
                 Format == gcvSURF_NV21)
             {
-                alignment = alignment < 256 ? 256 : alignment;
+                alignment = gcmALIGN(alignment, 256);
             }
             else if (Format == gcvSURF_P010)
             {
-                alignment = alignment < 512 ? 512 : alignment;
+                alignment = gcmALIGN(alignment, 512);
+            }
+            else if (Format == gcvSURF_NV12_10BIT ||
+                     Format == gcvSURF_NV21_10BIT ||
+                     Format == gcvSURF_NV16_10BIT ||
+                     Format == gcvSURF_NV61_10BIT)
+            {
+                bytes += 320;
             }
         }
-        if (Format == gcvSURF_NV12_10BIT ||
-            Format == gcvSURF_NV21_10BIT ||
-            Format == gcvSURF_NV16_10BIT ||
-            Format == gcvSURF_NV61_10BIT)
+        else if (Format == gcvSURF_NV12_10BIT ||
+                 Format == gcvSURF_NV21_10BIT ||
+                 Format == gcvSURF_NV16_10BIT ||
+                 Format == gcvSURF_NV61_10BIT)
         {
-            alignment = alignment < 256 ? 256 : alignment;
+            bytes += 80;
         }
 
         if ((Surface->type == gcvSURF_BITMAP)
@@ -2037,6 +2145,16 @@ _AllocateSurface(
     Surface->canDropStencilPlane = gcvTRUE;
 #endif
 
+    if (Type & gcvSURF_CACHEABLE)
+    {
+        gcmASSERT(Pool != gcvPOOL_USER);
+        Surface->node.u.normal.cacheable = gcvTRUE;
+    }
+    else if (Pool != gcvPOOL_USER)
+    {
+        Surface->node.u.normal.cacheable = gcvFALSE;
+    }
+
     if (Pool != gcvPOOL_USER)
     {
         if (!(Surface->hints & gcvSURF_NO_VIDMEM))
@@ -2140,16 +2258,6 @@ gcoSURF_Construct(
     surface->tileStatusNode.pool = gcvPOOL_UNKNOWN;
     surface->hzTileStatusNode.pool = gcvPOOL_UNKNOWN;
 #endif /* gcdENABLE_3D */
-
-    if (Type & gcvSURF_CACHEABLE)
-    {
-        gcmASSERT(Pool != gcvPOOL_USER);
-        surface->node.u.normal.cacheable = gcvTRUE;
-    }
-    else if (Pool != gcvPOOL_USER)
-    {
-        surface->node.u.normal.cacheable = gcvFALSE;
-    }
 
 #if gcdENABLE_3D
     if (Type & gcvSURF_TILE_STATUS_DIRTY)
@@ -2734,19 +2842,23 @@ gcoSURF_IsTileStatusSupported(
 */
 gceSTATUS
 gcoSURF_IsTileStatusEnabled(
-    IN gcoSURF Surface
+    IN gcsSURF_VIEW *SurfView
     )
 {
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_FALSE;
 
-    gcmHEADER_ARG("Surface=0x%x", Surface);
+    gcoSURF Surface = SurfView->surf;
+    gctBOOL canTsEnabled = gcvTRUE;
+
+    gcmHEADER_ARG("SurfView=0x%x", SurfView);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
 
+    gcmCanTileStatusEnabledForMultiSlice(SurfView, &canTsEnabled);
+
     /* Check whether the surface has enabled tile status. */
-    if ((Surface->tileStatusNode.pool != gcvPOOL_UNKNOWN) &&
-        (Surface->tileStatusDisabled == gcvFALSE))
+    if ((Surface->tileStatusNode.pool != gcvPOOL_UNKNOWN) && canTsEnabled)
     {
         status = gcvSTATUS_TRUE;
     }
@@ -2778,19 +2890,23 @@ gcoSURF_IsTileStatusEnabled(
 */
 gceSTATUS
 gcoSURF_IsCompressed(
-    IN gcoSURF Surface
+    IN gcsSURF_VIEW *SurfView
     )
 {
     gceSTATUS status;
+    gcoSURF Surface = SurfView->surf;
 
-    gcmHEADER_ARG("Surface=0x%x", Surface);
+    gcmHEADER_ARG("SurfView=0x%x", SurfView);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
 
+    /* No multiSlice support when tile status enabled for now.*/
+    gcmASSERT(SurfView->numSlices == 1);
+
     /* Check whether the surface is compressed. */
     if ((Surface->tileStatusNode.pool != gcvPOOL_UNKNOWN) &&
-        (Surface->tileStatusDisabled == gcvFALSE) &&
+        (Surface->tileStatusDisabled[SurfView->firstSlice] == gcvFALSE) &&
         Surface->compressed)
     {
         status = gcvSTATUS_TRUE;
@@ -2825,14 +2941,15 @@ gcoSURF_IsCompressed(
 */
 gceSTATUS
 gcoSURF_EnableTileStatusEx(
-    IN gcoSURF Surface,
+    IN gcsSURF_VIEW *surfView,
     IN gctUINT RtIndex
     )
 {
     gceSTATUS status;
     gctUINT32 tileStatusAddress = 0;
+    gcoSURF Surface = surfView->surf;
 
-    gcmHEADER_ARG("Surface=0x%x RtIndex=%d", Surface, RtIndex);
+    gcmHEADER_ARG("surfView=0x%x RtIndex=%d", surfView, RtIndex);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
@@ -2844,10 +2961,12 @@ gcoSURF_EnableTileStatusEx(
             gcmGETHARDWAREADDRESS(Surface->tileStatusNode, tileStatusAddress);
         }
 
+        tileStatusAddress += surfView->firstSlice * Surface->tileStatusSliceSize;
+
         /* Enable tile status. */
         gcmERR_BREAK(
             gcoHARDWARE_EnableTileStatus(gcvNULL,
-                                         Surface,
+                                         surfView,
                                          tileStatusAddress,
                                          &Surface->hzTileStatusNode,
                                          RtIndex));
@@ -2880,17 +2999,14 @@ gcoSURF_EnableTileStatusEx(
 */
 gceSTATUS
 gcoSURF_EnableTileStatus(
-    IN gcoSURF Surface
+    IN gcsSURF_VIEW *surfView
     )
 {
     gceSTATUS status;
 
-    gcmHEADER_ARG("Surface=0x%x", Surface);
+    gcmHEADER_ARG("surfView=0x%x", surfView);
 
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
-
-    status = gcoSURF_EnableTileStatusEx(Surface, 0);
+    status = gcoSURF_EnableTileStatusEx(surfView, 0);
 
     /* Return the status. */
     gcmFOOTER();
@@ -2919,13 +3035,14 @@ gcoSURF_EnableTileStatus(
 */
 gceSTATUS
 gcoSURF_DisableTileStatus(
-    IN gcoSURF Surface,
+    IN gcsSURF_VIEW *SurfView,
     IN gctBOOL Decompress
     )
 {
     gceSTATUS status;
+    gcoSURF Surface = SurfView->surf;
 
-    gcmHEADER_ARG("Surface=0x%x", Surface);
+    gcmHEADER_ARG("SurfView=0x%x", SurfView);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
@@ -2935,7 +3052,7 @@ gcoSURF_DisableTileStatus(
         if (Surface->tileStatusNode.pool != gcvPOOL_UNKNOWN)
         {
             /* Disable tile status. */
-            gcmERR_BREAK(gcoHARDWARE_DisableTileStatus(gcvNULL, Surface, Decompress));
+            gcmERR_BREAK(gcoHARDWARE_DisableTileStatus(gcvNULL, SurfView, Decompress));
         }
 
         /* Success. */
@@ -2971,13 +3088,14 @@ gcoSURF_DisableTileStatus(
 */
 gceSTATUS
 gcoSURF_FlushTileStatus(
-    IN gcoSURF Surface,
+    IN gcsSURF_VIEW *SurfView,
     IN gctBOOL Decompress
     )
 {
     gceSTATUS status;
+    gcoSURF Surface = SurfView->surf;
 
-    gcmHEADER_ARG("Surface=0x%x", Surface);
+    gcmHEADER_ARG("SurfView=0x%x", SurfView);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
@@ -2985,7 +3103,7 @@ gcoSURF_FlushTileStatus(
     if (Surface->tileStatusNode.pool != gcvPOOL_UNKNOWN)
     {
         /* Disable tile status. */
-        gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, Surface, Decompress));
+        gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, SurfView, Decompress));
     }
 
     /* Success. */
@@ -4295,7 +4413,8 @@ _ConvertValue(
             {
                 sFloat = gcmFLOATCLAMP_0_TO_1(sFloat);
                 /* Convert floating point (0.0 - 1.0) into color value. */
-                tmpRet = gcoMATH_Float2UInt(gcoMATH_Multiply(gcoMATH_UInt2Float(uMaxValue), sFloat));
+                sFloat = gcoMATH_Multiply(gcoMATH_UInt2Float(uMaxValue), sFloat);
+                tmpRet = gcoMath_Float2UINT_STICKROUNDING(sFloat);
                 return tmpRet > uMaxValue ? uMaxValue : tmpRet;
             }
             else if (ValueType & gcvVALUE_FLAG_SIGNED_DENORM)
@@ -5291,6 +5410,7 @@ _ComputeClear(
         gctBOOL  clearDepth   = (ClearArgs->flags & gcvCLEAR_DEPTH) && ClearArgs->depthMask;
         gctBOOL  clearStencil = (ClearArgs->flags & gcvCLEAR_STENCIL) && ClearArgs->stencilMask;
         gctUINT32 clearValue = 0;
+        gctFLOAT tempValue = 0.0f;
 
         clearValueType = (gceVALUE_TYPE)(gcvVALUE_FLOAT | gcvVALUE_FLAG_UNSIGNED_DENORM);
         tempMask = 0;
@@ -5303,7 +5423,9 @@ _ComputeClear(
             /* Convert depth value to 16-bit. */
             if (clearDepth)
             {
-                clearValue = (_ConvertValue(clearValueType, ClearArgs->depth, 16));
+                tempValue = gcoMATH_Multiply(gcoMATH_UInt2Float((1 << 16) - 1), gcmFLOATCLAMP_0_TO_1(ClearArgs->depth.floatValue));
+                /* This rounding mode need to be consistent with HW in RA & PE */
+                clearValue = gcoMath_Float2UINT_STICKROUNDING(tempValue);
                 clearValue |= (clearValue << 16);
                 tempMask = 0xFFFFFFFF;
                 Surface->clearMask[0] |= 0xF;
@@ -5315,7 +5437,9 @@ _ComputeClear(
             /* Convert depth value to 24-bit. */
             if (clearDepth)
             {
-                clearValue = (_ConvertValue(clearValueType, ClearArgs->depth, 24) << 8 );
+                tempValue = gcoMATH_Multiply(gcoMATH_UInt2Float((1 << 24) - 1), gcmFLOATCLAMP_0_TO_1(ClearArgs->depth.floatValue));
+                /* This rounding mode need to be consistent with HW in RA & PE */
+                clearValue = (gcoMath_Float2UINT_STICKROUNDING(tempValue) << 8);
                 tempMask = 0xFFFFFF00;
                 Surface->clearMask[0] |= 0xE;
             }
@@ -5334,7 +5458,9 @@ _ComputeClear(
             /* Convert depth value to 24-bit. */
             if (clearDepth)
             {
-                clearValue = (_ConvertValue(clearValueType, ClearArgs->depth, 24) << 8 );
+                tempValue = gcoMATH_Multiply(gcoMATH_UInt2Float((1 << 24) - 1), gcmFLOATCLAMP_0_TO_1(ClearArgs->depth.floatValue));
+                /* This rounding mode need to be consistent with HW in RA & PE */
+                clearValue = (gcoMath_Float2UINT_STICKROUNDING(tempValue) << 8);
                 tempMask = 0xFFFFFF00;
                 Surface->clearMask[0] = 0xF;
             }
@@ -5454,7 +5580,7 @@ _ClearRect(
     }
 
     /* Flush the tile status and decompress the buffers. */
-    gcmONERROR(gcoSURF_DisableTileStatus(surf, gcvTRUE));
+    gcmONERROR(gcoSURF_DisableTileStatus(SurfView, gcvTRUE));
 
     /* Compute clear values. */
     gcmONERROR(_ComputeClear(surf, ClearArgs, LayerIndex));
@@ -5598,16 +5724,17 @@ OnError:
 
 static gceSTATUS
 _DoClearTileStatus(
-    IN gcoSURF Surface,
+    IN gcsSURF_VIEW *SurfView,
     IN gctUINT32 TileStatusAddress,
     IN gcsSURF_CLEAR_ARGS_PTR ClearArgs,
     IN gctINT32 LayerIndex
     )
 {
     gceSTATUS status;
+    gcoSURF Surface = SurfView->surf;
 
-    gcmHEADER_ARG("Surface=0x%x TileStatusAddress=0x%08x ClearArgs=0x%x, LayerIndex=%d",
-                  Surface, TileStatusAddress, ClearArgs, LayerIndex);
+    gcmHEADER_ARG("SurfView=0x%x TileStatusAddress=0x%08x ClearArgs=0x%x, LayerIndex=%d",
+                  SurfView, TileStatusAddress, ClearArgs, LayerIndex);
 
     /* Verify the arguments. */
     gcmDEBUG_VERIFY_ARGUMENT(Surface != 0);
@@ -5627,13 +5754,13 @@ _DoClearTileStatus(
             /* Always flush (and invalidate) the tile status cache. */
             gcmONERROR(
                 gcoHARDWARE_FlushTileStatus(gcvNULL,
-                                            Surface,
+                                            SurfView,
                                             gcvFALSE));
 
             /* Send the clear command to the hardware. */
             status =
                 gcoHARDWARE_ClearTileStatus(gcvNULL,
-                                            Surface,
+                                            SurfView,
                                             TileStatusAddress,
                                             0,
                                             gcvSURF_RENDER_TARGET,
@@ -5667,12 +5794,12 @@ _DoClearTileStatus(
                 /* Always flush (and invalidate) the tile status cache. */
                 gcmONERROR(
                     gcoHARDWARE_FlushTileStatus(gcvNULL,
-                                                Surface,
+                                                SurfView,
                                                 gcvFALSE));
 
                 /* Send clear command to hardware. */
                 status = gcoHARDWARE_ClearTileStatus(gcvNULL,
-                                                     Surface,
+                                                     SurfView,
                                                      TileStatusAddress,
                                                      0,
                                                      gcvSURF_DEPTH,
@@ -5743,6 +5870,7 @@ _ClearHzTileStatus(
 {
     gceSTATUS status;
     gctUINT32 address;
+    gcsSURF_VIEW surfView = {Surface, 0, 1};
 
     gcmHEADER_ARG("Surface=0x%x TileStatus=0x%x",
                    Surface, TileStatus);
@@ -5752,7 +5880,7 @@ _ClearHzTileStatus(
     /* Send clear command to hardware. */
     gcmONERROR(
         gcoHARDWARE_ClearTileStatus(gcvNULL,
-                                    Surface,
+                                    &surfView,
                                     address,
                                     TileStatus->size,
                                     gcvSURF_HIERARCHICAL_DEPTH,
@@ -5782,23 +5910,27 @@ OnError:
 /* Attempt to clear using tile status. */
 static gceSTATUS
 _ClearTileStatus(
-    IN gcoSURF Surface,
+    IN gcsSURF_VIEW *SurfView,
     IN gcsSURF_CLEAR_ARGS_PTR ClearArgs,
     IN gctINT32 LayerIndex
     )
 {
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
     gctUINT32 address;
+    gcoSURF Surface = SurfView->surf;
 
-    gcmHEADER_ARG("Surface=0x%x ClearArgs=0x%x LayerIndex=%d", Surface, ClearArgs, LayerIndex);
+    gcmHEADER_ARG("SurfView=0x%x ClearArgs=0x%x LayerIndex=%d", SurfView, ClearArgs, LayerIndex);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
     gcmDEBUG_VERIFY_ARGUMENT(ClearArgs != gcvNULL);
 
+    /* No multiSlice support when tile status enabled for now.*/
+    gcmASSERT(SurfView->numSlices == 1);
+
     if (Surface->tileStatusNode.pool != gcvPOOL_UNKNOWN)
     {
-        gctBOOL saved = Surface->tileStatusDisabled;
+        gctBOOL saved = Surface->tileStatusDisabled[SurfView->firstSlice];
 
         do
         {
@@ -5812,10 +5944,10 @@ _ClearTileStatus(
                           Surface);
             /* Turn on the tile status on in the beginning,
             ** So the later invalidate ts cache will not be skipped. */
-            Surface->tileStatusDisabled = gcvFALSE;
+            Surface->tileStatusDisabled[SurfView->firstSlice] = gcvFALSE;
 
             /* Clear the tile status. */
-            status = _DoClearTileStatus(Surface,
+            status = _DoClearTileStatus(SurfView,
                                         address,
                                         ClearArgs,
                                         LayerIndex);
@@ -5823,7 +5955,7 @@ _ClearTileStatus(
             if (status == gcvSTATUS_SKIP)
             {
                 /* Should restore the tile status when skip the clear. */
-                Surface->tileStatusDisabled = saved;
+                Surface->tileStatusDisabled[SurfView->firstSlice] = saved;
 
                 /* Nothing needed clearing, and no error has occurred. */
                 status = gcvSTATUS_OK;
@@ -5855,14 +5987,14 @@ _ClearTileStatus(
 
             /* Reset the tile status. */
             gcmERR_BREAK(
-                gcoSURF_EnableTileStatus(Surface));
+                gcoSURF_EnableTileStatus(SurfView));
         }
         while (gcvFALSE);
 
         /* Restore if failed. */
         if (gcmIS_ERROR(status))
         {
-            Surface->tileStatusDisabled = saved;
+            Surface->tileStatusDisabled[SurfView->firstSlice] = saved;
         }
     }
 
@@ -5874,21 +6006,26 @@ _ClearTileStatus(
 #if gcdPARTIAL_FAST_CLEAR
 static gceSTATUS
 _ClearTileStatusWindowAligned(
-    IN gcoSURF Surface,
+    IN gcsSURF_VIEW *SurfView,
     IN gcsSURF_CLEAR_ARGS_PTR ClearArgs,
     IN gctINT32 LayerIndex,
     OUT gcsRECT_PTR AlignedRect
     )
 {
     gceSTATUS status;
-    gcmHEADER_ARG("Surface=0x%x ClearArgs=0x%x LayerIndex=%d",
-                  Surface, ClearArgs, LayerIndex);
+    gcoSURF Surface = SurfView->surf;
+
+    gcmHEADER_ARG("SurfView=0x%x ClearArgs=0x%x LayerIndex=%d",
+                  SurfView, ClearArgs, LayerIndex);
 
     /* Verify the arguments. */
     gcmDEBUG_VERIFY_ARGUMENT(ClearArgs != 0);
 
     /* No MRT support when tile status enabled for now. */
     gcmASSERT(LayerIndex == 0);
+
+    /* No multiSlice support when tile status enabled for now.*/
+    gcmASSERT(SurfView->numSlices == 1);
 
     /* Compute clear values. */
     gcmONERROR(_ComputeClear(Surface, ClearArgs, LayerIndex));
@@ -5902,9 +6039,9 @@ _ClearTileStatusWindowAligned(
     }
 
     /* Check clearValue changes. */
-    if ((Surface->tileStatusDisabled == gcvFALSE)
-    &&  (   (Surface->fcValue != Surface->clearValue[0])
-        ||  (Surface->fcValueUpper != Surface->clearValueUpper[0]))
+    if ((Surface->tileStatusDisabled[SurfView->firstSlice] == gcvFALSE)
+    &&  ((Surface->fcValue[SurfView->firstSlice] != Surface->clearValue[0])
+        || (Surface->fcValueUpper[SurfView->firstSlice] != Surface->clearValueUpper[0]))
     )
     {
         /*
@@ -5919,7 +6056,7 @@ _ClearTileStatusWindowAligned(
     }
 
     /* Flush the tile status cache. */
-    gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, Surface, gcvFALSE));
+    gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, SurfView, gcvFALSE));
 
     /* Test for clearing render target. */
     if (ClearArgs->flags & gcvCLEAR_COLOR)
@@ -5927,7 +6064,7 @@ _ClearTileStatusWindowAligned(
         /* Send the clear command to the hardware. */
         status =
             gcoHARDWARE_ClearTileStatusWindowAligned(gcvNULL,
-                                                     Surface,
+                                                     SurfView,
                                                      gcvSURF_RENDER_TARGET,
                                                      Surface->clearValue[0],
                                                      Surface->clearValueUpper[0],
@@ -5956,7 +6093,7 @@ _ClearTileStatusWindowAligned(
         /* Send the clear command to the hardware. */
         status =
             gcoHARDWARE_ClearTileStatusWindowAligned(gcvNULL,
-                                                     Surface,
+                                                     SurfView,
                                                      gcvSURF_DEPTH,
                                                      Surface->clearValue[0],
                                                      Surface->clearValueUpper[0],
@@ -6016,11 +6153,14 @@ _PartialFastClear(
         goto OnError;
     }
 
+    /* No multiSlice support when tile status enabled for now.*/
+    gcmASSERT(SurfView->numSlices == 1);
+
     /* Backup previous tile status is state. */
-    saved = surf->tileStatusDisabled;
+    saved = surf->tileStatusDisabled[SurfView->firstSlice];
 
     /* Do the partial fast clear. */
-    status = _ClearTileStatusWindowAligned(surf,
+    status = _ClearTileStatusWindowAligned(SurfView,
                                            ClearArgs,
                                            LayerIndex,
                                            &alignedRect);
@@ -6035,12 +6175,12 @@ _PartialFastClear(
         gcsSURF_VIEW *dsView = (ClearArgs->flags & gcvCLEAR_COLOR) ? gcvNULL  : SurfView;
 
         /* Tile status is enabled if success, turn it on. */
-        surf->tileStatusDisabled = gcvFALSE;
+        surf->tileStatusDisabled[SurfView->firstSlice] = gcvFALSE;
 
-        surf->dirty = gcvTRUE;
+        surf->dirty[SurfView->firstSlice] = gcvTRUE;
 
         /* Reset the tile status. */
-        gcmONERROR(gcoSURF_EnableTileStatus(surf));
+        gcmONERROR(gcoSURF_EnableTileStatus(SurfView));
 
         if (saved)
         {
@@ -6053,7 +6193,7 @@ _PartialFastClear(
              * hardware will drop tile status cache without write back in that
              * case. So here only 'invalidate' is done in 'flush'.
              */
-            gcmONERROR(gcoSURF_FlushTileStatus(surf, gcvFALSE));
+            gcmONERROR(gcoSURF_FlushTileStatus(SurfView, gcvFALSE));
         }
 
         /* Get not cleared area count. */
@@ -6157,7 +6297,7 @@ _Clear(
             {
                 fullSize = gcvTRUE;
                 /* 1. Full fast clear when it is an entire surface clear. */
-                status = _ClearTileStatus(surf, ClearArgs, LayerIndex);
+                status = _ClearTileStatus(SurfView, ClearArgs, LayerIndex);
             }
 #if gcdPARTIAL_FAST_CLEAR
             else
@@ -6290,6 +6430,9 @@ _3DBlitClearRect(
     gcmHEADER_ARG("SurfView=0x%x ClearArg=0x%x LayerIndex=%d",
                    SurfView, ClearArgs, LayerIndex);
 
+    /* No multiSlice support when tile status enabled for now.*/
+    gcmASSERT(SurfView->numSlices == 1);
+
     origin.x = ClearArgs->clearRect->left;
     origin.y = ClearArgs->clearRect->top;
     rectSize.x = ClearArgs->clearRect->right - ClearArgs->clearRect->left;
@@ -6312,6 +6455,7 @@ _3DBlitClearRect(
     clearInfo.destAddress += LayerIndex * surf->layerSize
                           +  SurfView->firstSlice * surf->sliceSize;
     gcmGETHARDWAREADDRESS(surf->tileStatusNode, clearInfo.destTileStatusAddress);
+    clearInfo.destTileStatusAddress += SurfView->firstSlice * surf->tileStatusSliceSize;
     clearInfo.origin = &origin;
     clearInfo.rect = &rectSize;
     if ((clearInfo.clearBitMask == 0)
@@ -6335,8 +6479,8 @@ _3DBlitClearRect(
     }
     else
     {
-        clearInfo.fcClearValue[0] = surf->fcValue;
-        clearInfo.fcClearValue[1] = surf->fcValueUpper;
+        clearInfo.fcClearValue[0] = surf->fcValue[SurfView->firstSlice];
+        clearInfo.fcClearValue[1] = surf->fcValueUpper[SurfView->firstSlice];
     }
 
     if (clearHZ)
@@ -6355,7 +6499,7 @@ _3DBlitClearRect(
         hzClearInfo.rect = &rectSize;
     }
 
-    fastClear &= !surf->tileStatusDisabled;
+    fastClear &= !surf->tileStatusDisabled[SurfView->firstSlice];
 
     if (clearHZ)
     {
@@ -6371,7 +6515,7 @@ _3DBlitClearRect(
 
     /* Flush the tile status cache. */
     gcmONERROR(gcoHARDWARE_SelectPipe(gcvNULL, gcvPIPE_3D, gcvNULL));
-    gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, surf, gcvFALSE));
+    gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, SurfView, gcvFALSE));
     gcmONERROR(gcoHARDWARE_FlushPipe(gcvNULL, gcvNULL));
 
     if (!fastClear)
@@ -6382,7 +6526,7 @@ _3DBlitClearRect(
         {
             hzClearInfo.destTileStatusAddress = 0;
         }
-        gcmONERROR(gcoSURF_DisableTileStatus(surf, gcvTRUE));
+        gcmONERROR(gcoSURF_DisableTileStatus(SurfView, gcvTRUE));
     }
 
     /* Clear. */
@@ -6402,20 +6546,20 @@ _3DBlitClearRect(
     }
     else
     {
-        gcmONERROR(gcoHARDWARE_3DBlitClear(gcvNULL, gcvENGINE_RENDER, surf, &clearInfo, &origin, &rectSize));
+        gcmONERROR(gcoHARDWARE_3DBlitClear(gcvNULL, gcvENGINE_RENDER, SurfView, &clearInfo, &origin, &rectSize));
     }
 
     if (clearHZ)
     {
         /* Clear HZ. */
-        gcmONERROR(gcoHARDWARE_3DBlitClear(gcvNULL, gcvENGINE_RENDER, surf, &hzClearInfo, &origin, &rectSize));
+        gcmONERROR(gcoHARDWARE_3DBlitClear(gcvNULL, gcvENGINE_RENDER, SurfView, &hzClearInfo, &origin, &rectSize));
     }
 
     if (fastClear)
     {
         /* Record FC value. */
-        surf->fcValue = clearInfo.fcClearValue[0];
-        surf->fcValueUpper = clearInfo.fcClearValue[1];
+        surf->fcValue[SurfView->firstSlice] = clearInfo.fcClearValue[0];
+        surf->fcValueUpper[SurfView->firstSlice] = clearInfo.fcClearValue[1];
 
         if (clearHZ)
         {
@@ -6424,10 +6568,10 @@ _3DBlitClearRect(
         }
 
         /* Turn the tile status on again. */
-        surf->tileStatusDisabled = gcvFALSE;
+        surf->tileStatusDisabled[SurfView->firstSlice] = gcvFALSE;
 
         /* Reset the tile status. */
-        gcmONERROR(gcoSURF_EnableTileStatus(surf));
+        gcmONERROR(gcoSURF_EnableTileStatus(SurfView));
     }
 
 OnError:
@@ -6596,6 +6740,9 @@ gcoSURF_MixSurfacesCPU(
     gctPOINTER dstAddr_l[gcdMAX_SURF_LAYERS];
     gcsPIXEL internalSrc, internalDst;
 
+    gcsSURF_VIEW srcView = {gcvNULL, 0, 1};
+    gcsSURF_VIEW dstView = {TargetSurface, TargetSliceIndex, 1};
+
     dstSurf = TargetSurface;
     dstFmtInfo = &dstSurf->formatInfo;
 
@@ -6660,7 +6807,7 @@ gcoSURF_MixSurfacesCPU(
     gcmONERROR(gcoHARDWARE_Commit(gcvNULL));
     gcmONERROR(gcoHARDWARE_Stall(gcvNULL));
 
-    gcmONERROR(gcoHARDWARE_DisableTileStatus(gcvNULL, dstSurf, gcvTRUE));
+    gcmONERROR(gcoHARDWARE_DisableTileStatus(gcvNULL, &dstView, gcvTRUE));
     gcmONERROR(gcoSURF_Lock(dstSurf, gcvNULL, dstAddr));
     gcmONERROR(gcoSURF_NODE_Cache(&dstSurf->node,
                                   dstAddr[0],
@@ -6675,8 +6822,12 @@ gcoSURF_MixSurfacesCPU(
         /* set color space conversion flag */
         gcmASSERT(srcSurf->colorSpace == dstSurf->colorSpace);
 
+        srcView.surf = srcSurf;
+        srcView.firstSlice = SourceSliceIndices[k];
+        srcView.numSlices = 1;
+
         /* Flush the GPU cache */
-        gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, srcSurf, gcvTRUE));
+        gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, &srcView, gcvTRUE));
         /* Lock the surfaces. */
         gcmONERROR(gcoSURF_Lock(srcSurf, gcvNULL, srcAddr));
         gcmONERROR(gcoSURF_NODE_Cache(&srcSurf->node,
@@ -6977,6 +7128,8 @@ OnError:
             blitArgs.xReverse           = gcvFALSE;
             blitArgs.yReverse           = gcvFALSE;
             blitArgs.scissorTest        = gcvFALSE;
+            blitArgs.srcNumSlice        = 1;
+            blitArgs.dstNumSlice        = 1;
             status = gcoSURF_BlitCPU(&blitArgs);
         }
 #if !gcdDUMP
@@ -7123,16 +7276,15 @@ gceSTATUS gcoSURF_TranslateRotationRect(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
-gcoSURF_3DBlitBltRect(
+static gceSTATUS
+_3DBlitBltRect(
     IN gcsSURF_VIEW *SrcView,
     IN gcsSURF_VIEW *DstView,
     IN gcsSURF_RESOLVE_ARGS *Args
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gcoSURF srcSurf = SrcView->surf;
-    gcoSURF dstSurf = DstView->surf;
+    gctBOOL dstEnableTS = gcvFALSE;
 
     gcmHEADER_ARG("SrcView=0x%x DstView=0x%x Args=0x%x", SrcView, DstView, Args);
 
@@ -7141,11 +7293,13 @@ gcoSURF_3DBlitBltRect(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, srcSurf, gcvFALSE));
+    gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, SrcView, gcvFALSE));
 
-    if (!dstSurf->tileStatusDisabled)
+    gcmAnyTileStatusEnableForMultiSlice(DstView, &dstEnableTS);
+
+    if (dstEnableTS)
     {
-        gcmONERROR(gcoHARDWARE_DisableTileStatus(gcvNULL, dstSurf, gcvTRUE));
+        gcmONERROR(gcoHARDWARE_DisableTileStatus(gcvNULL, DstView, gcvTRUE));
     }
 
     gcmONERROR(gcoHARDWARE_3DBlitBlt(gcvNULL, SrcView, DstView, Args));
@@ -7265,7 +7419,7 @@ gcoSURF_ResolveRect(
         }
         else if (Args->uArgs.v2.srcCompressed ||
                  Args->uArgs.v2.dstCompressed ||
-                 gcmIS_ERROR(gcoSURF_3DBlitBltRect(SrcView, DstView, Args)))
+                 gcmIS_ERROR(_3DBlitBltRect(SrcView, DstView, Args)))
         {
             if(!Args->uArgs.v2.gpuOnly && !(Args->uArgs.v2.srcSwizzle^Args->uArgs.v2.dstSwizzle))
             {
@@ -7288,7 +7442,7 @@ gcoSURF_ResolveRect(
 
         dstSurf->canDropStencilPlane = srcSurf->canDropStencilPlane;
 
-        gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, srcSurf, gcvFALSE));
+        gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, SrcView, gcvFALSE));
 
         if (srcSurf->type == gcvSURF_BITMAP)
         {
@@ -7474,28 +7628,6 @@ OnError:
     }
 
     /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
-gcoSURF_3DBlitCopy(
-    IN gceENGINE Engine,
-    IN gctUINT32 SrcAddress,
-    IN gctUINT32 DstAddress,
-    IN gctUINT32 Bytes
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-
-    gcmHEADER_ARG("SrcAddress=0x%x DstAddress=0x%x Bytes=0x%x", SrcAddress, DstAddress, Bytes);
-
-    gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, Engine, SrcAddress, DstAddress, Bytes));
-
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
     gcmFOOTER();
     return status;
 }
@@ -9452,8 +9584,8 @@ gcoSURF_Set2DSource(
 #if gcdENABLE_3D
     /* Extract tile status arguments. */
     if ((Surface->tileStatusNode.pool == gcvPOOL_UNKNOWN) ||
-        (Surface->tileStatusDisabled) ||
-        (Surface->dirty == gcvFALSE))
+        (Surface->tileStatusDisabled[0]) ||
+        (Surface->dirty[0] == gcvFALSE))
     {
         /* No tile status or tile status disabled. */
         tileStatusConfig = gcv2D_TSC_DISABLE;
@@ -9478,7 +9610,7 @@ gcoSURF_Set2DSource(
         gco2D_SetSourceTileStatus(engine,
                                   tileStatusConfig,
                                   Surface->format,
-                                  Surface->fcValue,
+                                  Surface->fcValue[0],
                                   tileStatusAddress));
 
 #else
@@ -9609,8 +9741,8 @@ gcoSURF_Set2DTarget(
 #if gcdENABLE_3D
     /* Extract tile status arguments. */
     if ((Surface->tileStatusNode.pool == gcvPOOL_UNKNOWN) ||
-        (Surface->tileStatusDisabled) ||
-        (Surface->dirty == gcvFALSE))
+        (Surface->tileStatusDisabled[0]) ||
+        (Surface->dirty[0] == gcvFALSE))
     {
         /* No tile status or tile status disabled. */
         tileStatusConfig = gcv2D_TSC_DISABLE;
@@ -9629,7 +9761,7 @@ gcoSURF_Set2DTarget(
         gco2D_SetTargetTileStatus(engine,
                                   tileStatusConfig,
                                   Surface->format,
-                                  Surface->fcValue,
+                                  Surface->fcValue[0],
                                   tileStatusAddress));
 
 #else
@@ -9788,11 +9920,11 @@ gcoSURF_CopyPixels(
 #if gcdENABLE_3D
         if (!srcSurf->isMsaa)
         {
-            gcmONERROR(gcoSURF_DisableTileStatus(srcSurf, gcvTRUE));
+            gcmONERROR(gcoSURF_DisableTileStatus(SrcView, gcvTRUE));
         }
 
         /* Disable the tile status for the destination. */
-        gcmONERROR(gcoSURF_DisableTileStatus(dstSurf, gcvTRUE));
+        gcmONERROR(gcoSURF_DisableTileStatus(DstView, gcvTRUE));
 #endif /* gcdENABLE_3D */
 
         /* Only unsigned normalized data type and no space conversion needed go hardware copy pixels path.
@@ -9852,6 +9984,8 @@ gcoSURF_CopyPixels(
             arg.srcHeight  = arg.dstHeight = rectSize.y;
             arg.srcDepth   = arg.dstDepth  = 1;
             arg.yReverse   = Args->uArgs.v2.yInverted;
+            arg.srcNumSlice = SrcView->numSlices;
+            arg.dstNumSlice = DstView->numSlices;
             gcmERR_BREAK(gcoSURF_BlitCPU(&arg));
         }
 
@@ -9893,7 +10027,7 @@ gcoSURF_NODE_Cache(
 {
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("Node=0x%x, Operation=%d, Bytes=%u", Node, Operation, Bytes);
+    gcmHEADER_ARG("Node=0x%x, Operation=%d, Bytes=%zu", Node, Operation, Bytes);
 
 #if !gcdPAGED_MEMORY_CACHEABLE
     if (Node->u.normal.cacheable == gcvFALSE)
@@ -9976,7 +10110,7 @@ gcoSURF_NODE_CPUCacheOperation(
     gctPOINTER memory;
     gctBOOL locked = gcvFALSE;
 
-    gcmHEADER_ARG("Node=0x%x, Type=%u, Offset=%u, Length=%u, Operation=%d", Node, Type, Offset, Length, Operation);
+    gcmHEADER_ARG("Node=0x%x, Type=%u, Offset=%zu, Length=%zu, Operation=%d", Node, Type, Offset, Length, Operation);
 
     /* Lock the node. */
     gcmONERROR(gcoHARDWARE_Lock(Node, gcvNULL, &memory));
@@ -10148,22 +10282,25 @@ gcoSURF_Flush(
 */
 gceSTATUS
 gcoSURF_FillFromTile(
-    IN gcoSURF Surface
+    IN gcsSURF_VIEW *SurView
     )
 {
     gceSTATUS status;
-
+    gcoSURF Surface = SurView->surf;
     gcmHEADER_ARG("Surface=0x%x", Surface);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
+
+    /* No multiSlice support when tile status enabled for now.*/
+    gcmASSERT(SurView->numSlices == 1);
 
     if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_TILE_FILLER)
     &&  (Surface->type == gcvSURF_RENDER_TARGET)
     &&  (!Surface->isMsaa)
     &&  (Surface->compressed == gcvFALSE)
     &&  (Surface->tileStatusNode.pool != gcvPOOL_UNKNOWN)
-    &&  (Surface->tileStatusDisabled == gcvFALSE))
+    &&  (Surface->tileStatusDisabled[SurView->firstSlice] == gcvFALSE))
     {
         /*
          * Call underlying tile status disable to do FC fill:
@@ -10173,12 +10310,11 @@ gcoSURF_FillFromTile(
          */
         gcmONERROR(
             gcoHARDWARE_DisableTileStatus(gcvNULL,
-                                          Surface,
+                                          SurView,
                                           gcvTRUE));
     }
-    else
-    if ((Surface->tileStatusNode.pool == gcvPOOL_UNKNOWN)
-    ||  (Surface->tileStatusDisabled == gcvTRUE))
+    else if ((Surface->tileStatusNode.pool == gcvPOOL_UNKNOWN)
+        || (Surface->tileStatusDisabled[SurView->firstSlice] == gcvTRUE))
     {
         /* Flush pipe cache. */
         gcmONERROR(gcoHARDWARE_FlushPipe(gcvNULL, gcvNULL));
@@ -11046,6 +11182,18 @@ gcoSURF_ConstructWrapper(
         surface->node.physical3 = ~0U;
         surface->node.count     = 1;
         surface->refCount       = 1;
+
+#if gcdENABLE_3D
+        gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctUINT) * surface->requestD, (gctPOINTER*)&surface->fcValue));
+        gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctUINT) * surface->requestD, (gctPOINTER*)&surface->fcValueUpper));
+        gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctBOOL) * surface->requestD, (gctPOINTER*)&surface->tileStatusDisabled));
+        gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctBOOL) * surface->requestD, (gctPOINTER*)&surface->dirty));
+
+        gcoOS_ZeroMemory(surface->fcValue, gcmSIZEOF(gctUINT) * surface->requestD);
+        gcoOS_ZeroMemory(surface->fcValueUpper, gcmSIZEOF(gctUINT) * surface->requestD);
+        gcoOS_ZeroMemory(surface->tileStatusDisabled, gcmSIZEOF(gctBOOL) * surface->requestD);
+        gcoOS_ZeroMemory(surface->dirty, gcmSIZEOF(gctBOOL) * surface->requestD);
+#endif
 
         surface->flags = gcvSURF_FLAG_NONE;
 
@@ -11919,6 +12067,8 @@ gcoSURF_BlitCPU(
     gctINT scissorWidth = 0;
     gctBOOL averagePixels = gcvTRUE;
     gcsSURF_FORMAT_INFO *srcFmtInfo, *dstFmtInfo;
+    gcsSURF_VIEW srcView = {args->srcSurface, args->srcZ, args->srcNumSlice};
+    gcsSURF_VIEW dstView = {args->dstSurface, args->dstZ, args->dstNumSlice};
 
     if (!args || !args->srcSurface || !args->dstSurface)
     {
@@ -12043,8 +12193,8 @@ gcoSURF_BlitCPU(
     }
 
     /* Flush the GPU cache */
-    gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, srcSurf, gcvTRUE));
-    gcmONERROR(gcoHARDWARE_DisableTileStatus(gcvNULL, dstSurf, gcvTRUE));
+    gcmONERROR(gcoHARDWARE_FlushTileStatus(gcvNULL, &srcView, gcvTRUE));
+    gcmONERROR(gcoHARDWARE_DisableTileStatus(gcvNULL, &dstView, gcvTRUE));
 
     /* Synchronize with the GPU. */
     /* TODO: if both of the surfaces previously were not write by GPU,
@@ -13069,10 +13219,10 @@ gcoSURF_PushSharedInfo(
     info.timeStamp          = Surface->timeStamp;
 
 #if gcdENABLE_3D
-    info.tileStatusDisabled = Surface->tileStatusDisabled;
-    info.dirty              = Surface->dirty;
-    info.fcValue            = Surface->fcValue;
-    info.fcValueUpper       = Surface->fcValueUpper;
+    info.tileStatusDisabled = Surface->tileStatusDisabled[0];
+    info.dirty              = Surface->dirty[0];
+    info.fcValue            = Surface->fcValue[0];
+    info.fcValueUpper       = Surface->fcValueUpper[0];
     info.compressed         = Surface->compressed;
 #endif
 
@@ -13166,10 +13316,10 @@ gcoSURF_PopSharedInfo(
     Surface->timeStamp          = info.timeStamp;
 
 #if gcdENABLE_3D
-    Surface->tileStatusDisabled = info.tileStatusDisabled;
-    Surface->dirty              = info.dirty;
-    Surface->fcValue            = info.fcValue;
-    Surface->fcValueUpper       = info.fcValueUpper;
+    Surface->tileStatusDisabled[0] = info.tileStatusDisabled;
+    Surface->dirty[0]              = info.dirty;
+    Surface->fcValue[0]            = info.fcValue;
+    Surface->fcValueUpper[0]       = info.fcValueUpper;
     Surface->compressed         = info.compressed;
 #endif
 
@@ -13228,7 +13378,7 @@ gcsSURF_NODE_Construct(
     };
 #endif
 
-    gcmHEADER_ARG("Node=%p, Bytes=%llu, Alignement=%d, Type=%d, Flag=%d, Pool=%d",
+    gcmHEADER_ARG("Node=%p, Bytes=%zu, Alignement=%d, Type=%d, Flag=%d, Pool=%d",
                   Node, Bytes, Alignment, Type, Flag, Pool);
 
 #ifdef LINUX
@@ -13320,6 +13470,24 @@ gcsSURF_NODE_Destroy(
 
     gcmFOOTER();
     return status;
+}
+
+gceSTATUS
+gcsSURF_NODE_Lock(
+    IN gcsSURF_NODE_PTR Node,
+    OUT gctUINT32 * Address,
+    OUT gctPOINTER * Memory
+    )
+{
+    return gcoHARDWARE_LockEx(Node, gcvENGINE_RENDER, Address, Memory);
+}
+
+gceSTATUS
+gcsSURF_NODE_Unlock(
+    IN gcsSURF_NODE_PTR Node
+    )
+{
+    return gcoHARDWARE_UnlockEx(Node, gcvENGINE_RENDER, gcvSURF_TYPE_UNKNOWN);
 }
 
 #if gcdENABLE_3D
@@ -13470,7 +13638,6 @@ gcsSURF_NODE_GetHardwareAddress(
     return gcvSTATUS_OK;
 }
 
-#if gcdDUMP || gcdDUMP_COMMAND
 gctUINT32
 gcsSURF_NODE_GetHWAddress(
     IN gcsSURF_NODE_PTR Node
@@ -13484,7 +13651,6 @@ gcsSURF_NODE_GetHWAddress(
 
     return Node->hardwareAddresses[type];
 }
-#endif
 
 gceSTATUS
 gcoSURF_WrapUserMemory(

@@ -39,6 +39,7 @@
 #include <assert.h>
 #include <gc_hal.h>
 #include <gc_hal_raster.h>
+#include <gc_hal_engine.h>
 
 #define MAX_BUFFER_SIZE         4096
 #define MAX_ARG_COUNT           20

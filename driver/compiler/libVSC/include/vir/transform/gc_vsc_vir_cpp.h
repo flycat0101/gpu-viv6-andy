@@ -31,7 +31,7 @@ typedef struct VIR_CPP_COPYPROPAGATION
     gctINT                  fwOptCount;
     gctINT                  bwOptCount;
 
-    VSC_PRIMARY_MEM_POOL    pmp;
+    VSC_MM                  *pMM;
 
 } VSC_CPP_CopyPropagation;
 
@@ -51,29 +51,17 @@ typedef struct VIR_CPP_COPYPROPAGATION
 #define VSC_CPP_SetFWOptCount(cpp, s)   ((cpp)->fwOptCount = (s))
 #define VSC_CPP_GetBWOptCount(cpp)      ((cpp)->bwOptCount)
 #define VSC_CPP_SetBWOptCount(cpp, s)   ((cpp)->bwOptCount = (s))
-#define VSC_CPP_GetPmp(cpp)             (&((cpp)->pmp))
-#define VSC_CPP_GetMM(cpp)              (&((cpp)->pmp.mmWrapper))
-
-extern void VSC_CPP_Init(
-    IN OUT VSC_CPP_CopyPropagation  *cpp,
-    IN VIR_Shader                   *shader,
-    VIR_DEF_USAGE_INFO              *du_info,
-    IN VSC_OPTN_CPPOptions          *options,
-    IN VIR_Dumper                   *dumper,
-    IN gctBOOL                      globaCPP
-    );
-
-extern void VSC_CPP_Final(
-    IN OUT VSC_CPP_CopyPropagation  *cpp
-    );
-
-extern VSC_ErrCode VSC_CPP_PerformOnFunction(
-    IN OUT VSC_CPP_CopyPropagation  *cpp
-    );
+#define VSC_CPP_GetMM(cpp)              ((cpp)->pMM)
 
 extern VSC_ErrCode VSC_CPP_PerformOnShader(
-    IN OUT VSC_CPP_CopyPropagation  *cpp
+    IN VSC_SH_PASS_WORKER* pPassWorker
     );
+DECLARE_QUERY_PASS_PROP(VSC_CPP_PerformOnShader);
+
+extern VSC_ErrCode VSC_SCPP_PerformOnShader(
+    VSC_SH_PASS_WORKER* pPassWorker
+    );
+DECLARE_QUERY_PASS_PROP(VSC_SCPP_PerformOnShader);
 
 END_EXTERN_C()
 

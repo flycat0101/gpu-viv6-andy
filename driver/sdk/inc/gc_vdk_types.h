@@ -188,7 +188,12 @@ typedef enum _vdkKeys
     VDK_MENU,
     VDK_POWER,
     VDK_SLEEP,
-    VDK_WAKE
+    VDK_WAKE,
+    VDK_MUTE,
+    VDK_VOLUMEDOWN,
+    VDK_VOLUMEUP,
+    VDK_BACK,
+    VDK_FORWARD,
 }
 vdkKeys;
 

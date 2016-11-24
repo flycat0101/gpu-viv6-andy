@@ -337,7 +337,7 @@ slScanIdentifier(
 
     gcmASSERT(Token);
 
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+    shaderType = Compiler->shaderType;
 
     gcoOS_ZeroMemory(Token, gcmSIZEOF(slsLexToken));
     Token->lineNo    = LineNo;

@@ -284,11 +284,7 @@ void glfSetStreamParameters(
         && (Type != GL_HALF_FLOAT_OES);
 
     /* Map shared context. */
-#if gcdRENDER_THREADS
-    shared = (Context->shared != gcvNULL) ? Context->shared : Context;
-#else
     shared = Context;
-#endif
 
     gcmLOCK_SHARE_OBJ(shared->bufferList);
     if (Stream->buffer != gcvNULL)

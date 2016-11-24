@@ -60,6 +60,7 @@ typedef struct _clsBUILTIN_DATATYPE_INFO
     gctBOOL   isUnsigned;
     clsDATA_TYPE *typePtr[cldQUALIFIER_ACCESS_COUNT][cldQUALIFIER_ADDRESS_SPACE_COUNT];
     gctCONST_STRING mangledName;
+    gctUINT    virPrimitiveType;
 }
 clsBUILTIN_DATATYPE_INFO;
 

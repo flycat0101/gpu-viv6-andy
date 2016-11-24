@@ -1,18 +1,5 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
-
 /*
- * Copyright (c) 2012-2013 The Khronos Group Inc.
+ * Copyright (c) 2012-2015 The Khronos Group Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and/or associated documentation files (the
@@ -40,7 +27,6 @@
 /*!
  * \file
  * \brief The OpenVX Utility Library.
- * \author Erik Rainey <erik.rainey@ti.com>
  */
 
 #ifdef __cplusplus
@@ -56,7 +42,7 @@ extern "C" {
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuColorConvert(vx_context context, vx_image input, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuColorConvert(vx_context context, vx_image input, vx_image output);
 
 /*! \brief [Immediate] Invokes an immediate Channel Extract.
  * \param [in] context The reference to the overall context.
@@ -68,7 +54,7 @@ VX_API vx_status vxuColorConvert(vx_context context, vx_image input, vx_image ou
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuChannelExtract(vx_context context, vx_image input, vx_enum channel, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuChannelExtract(vx_context context, vx_image input, vx_enum channel, vx_image output);
 
 /*! \brief [Immediate] Invokes an immediate Channel Combine.
  * \param [in] context The reference to the overall context.
@@ -82,7 +68,7 @@ VX_API vx_status vxuChannelExtract(vx_context context, vx_image input, vx_enum c
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuChannelCombine(vx_context context, vx_image plane0, vx_image plane1, vx_image plane2, vx_image plane3, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuChannelCombine(vx_context context, vx_image plane0, vx_image plane1, vx_image plane2, vx_image plane3, vx_image output);
 
 /*! \brief [Immediate] Invokes an immediate Sobel 3x3.
  * \param [in] context The reference to the overall context.
@@ -94,7 +80,7 @@ VX_API vx_status vxuChannelCombine(vx_context context, vx_image plane0, vx_image
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuSobel3x3(vx_context context, vx_image input, vx_image output_x, vx_image output_y);
+VX_API_ENTRY vx_status VX_API_CALL vxuSobel3x3(vx_context context, vx_image input, vx_image output_x, vx_image output_y);
 
 /*! \brief [Immediate] Invokes an immediate Magnitude.
  * \param [in] context The reference to the overall context.
@@ -106,7 +92,7 @@ VX_API vx_status vxuSobel3x3(vx_context context, vx_image input, vx_image output
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuMagnitude(vx_context context, vx_image grad_x, vx_image grad_y, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuMagnitude(vx_context context, vx_image grad_x, vx_image grad_y, vx_image output);
 
 /*! \brief [Immediate] Invokes an immediate Phase.
  * \param [in] context The reference to the overall context.
@@ -118,19 +104,19 @@ VX_API vx_status vxuMagnitude(vx_context context, vx_image grad_x, vx_image grad
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuPhase(vx_context context, vx_image grad_x, vx_image grad_y, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuPhase(vx_context context, vx_image grad_x, vx_image grad_y, vx_image output);
 
 /*! \brief [Immediate] Scales an input image to an output image.
  * \param [in] context The reference to the overall context.
- * \param [in] src The source image.
- * \param [out] dst The destintation image.
+ * \param [in] src The source image of type <tt>\ref VX_DF_IMAGE_U8</tt>.
+ * \param [out] dst The destintation image of type <tt>\ref VX_DF_IMAGE_U8</tt>.
  * \param [in] type The interpolation type. \see vx_interpolation_type_e.
  * \ingroup group_vision_function_scale_image
  * \return A <tt>\ref vx_status_e</tt> enumeration.
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuScaleImage(vx_context context, vx_image src, vx_image dst, vx_enum type);
+VX_API_ENTRY vx_status VX_API_CALL vxuScaleImage(vx_context context, vx_image src, vx_image dst, vx_enum type);
 
 /*! \brief [Immediate] Processes the image through the LUT.
  * \param [in] context The reference to the overall context.
@@ -142,7 +128,7 @@ VX_API vx_status vxuScaleImage(vx_context context, vx_image src, vx_image dst, v
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuTableLookup(vx_context context, vx_image input, vx_lut lut, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuTableLookup(vx_context context, vx_image input, vx_lut lut, vx_image output);
 
 /*! \brief [Immediate] Generates a distribution from an image.
  * \param [in] context The reference to the overall context.
@@ -153,7 +139,7 @@ VX_API vx_status vxuTableLookup(vx_context context, vx_image input, vx_lut lut, 
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuHistogram(vx_context context, vx_image input, vx_distribution distribution);
+VX_API_ENTRY vx_status VX_API_CALL vxuHistogram(vx_context context, vx_image input, vx_distribution distribution);
 
 /*! \brief [Immediate] Equalizes the Histogram of a grayscale image.
  * \param [in] context The reference to the overall context.
@@ -164,19 +150,19 @@ VX_API vx_status vxuHistogram(vx_context context, vx_image input, vx_distributio
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuEqualizeHist(vx_context context, vx_image input, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuEqualizeHist(vx_context context, vx_image input, vx_image output);
 
 /*! \brief [Immediate] Computes the absolute difference between two images.
  * \param [in] context The reference to the overall context.
- * \param [in] in1 An input image
- * \param [in] in2 An input image
- * \param [out] out The output image.
+ * \param [in] in1 An input image in <tt>\ref VX_DF_IMAGE_U8</tt> or <tt>\ref VX_DF_IMAGE_S16</tt> format.
+ * \param [in] in2 An input image in <tt>\ref VX_DF_IMAGE_U8</tt> or <tt>\ref VX_DF_IMAGE_S16</tt> format.
+ * \param [out] out The output image in <tt>\ref VX_DF_IMAGE_U8</tt> or <tt>\ref VX_DF_IMAGE_S16</tt> format.
  * \ingroup group_vision_function_absdiff
  * \return A <tt>\ref vx_status_e</tt> enumeration.
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuAbsDiff(vx_context context, vx_image in1, vx_image in2, vx_image out);
+VX_API_ENTRY vx_status VX_API_CALL vxuAbsDiff(vx_context context, vx_image in1, vx_image in2, vx_image out);
 
 /*! \brief [Immediate] Computes the mean value and standard deviation.
  * \param [in] context The reference to the overall context.
@@ -188,7 +174,7 @@ VX_API vx_status vxuAbsDiff(vx_context context, vx_image in1, vx_image in2, vx_i
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuMeanStdDev(vx_context context, vx_image input, vx_float32 *mean, vx_float32 *stddev);
+VX_API_ENTRY vx_status VX_API_CALL vxuMeanStdDev(vx_context context, vx_image input, vx_float32 *mean, vx_float32 *stddev);
 
 /*! \brief [Immediate] Threshold's an input image and produces a <tt>\ref VX_DF_IMAGE_U8</tt>  * boolean image.
  * \param [in] context The reference to the overall context.
@@ -201,7 +187,7 @@ VX_API vx_status vxuMeanStdDev(vx_context context, vx_image input, vx_float32 *m
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuThreshold(vx_context context, vx_image input, vx_threshold thresh, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuThreshold(vx_context context, vx_image input, vx_threshold thresh, vx_image output);
 
 /*! \brief [Immediate] Computes the integral image of the input.
  * \param [in] context The reference to the overall context.
@@ -212,7 +198,7 @@ VX_API vx_status vxuThreshold(vx_context context, vx_image input, vx_threshold t
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuIntegralImage(vx_context context, vx_image input, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuIntegralImage(vx_context context, vx_image input, vx_image output);
 
 /*! \brief [Immediate] Erodes an image by a 3x3 window.
  * \param [in] context The reference to the overall context.
@@ -223,7 +209,7 @@ VX_API vx_status vxuIntegralImage(vx_context context, vx_image input, vx_image o
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuErode3x3(vx_context context, vx_image input, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuErode3x3(vx_context context, vx_image input, vx_image output);
 
 /*! \brief [Immediate] Dilates an image by a 3x3 window.
  * \param [in] context The reference to the overall context.
@@ -234,7 +220,7 @@ VX_API vx_status vxuErode3x3(vx_context context, vx_image input, vx_image output
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuDilate3x3(vx_context context, vx_image input, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuDilate3x3(vx_context context, vx_image input, vx_image output);
 
 /*! \brief [Immediate] Computes a median filter on the image by a 3x3 window.
  * \param [in] context The reference to the overall context.
@@ -245,7 +231,7 @@ VX_API vx_status vxuDilate3x3(vx_context context, vx_image input, vx_image outpu
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuMedian3x3(vx_context context, vx_image input, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuMedian3x3(vx_context context, vx_image input, vx_image output);
 
 /*! \brief [Immediate] Computes a box filter on the image by a 3x3 window.
  * \param [in] context The reference to the overall context.
@@ -256,7 +242,7 @@ VX_API vx_status vxuMedian3x3(vx_context context, vx_image input, vx_image outpu
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuBox3x3(vx_context context, vx_image input, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuBox3x3(vx_context context, vx_image input, vx_image output);
 
 /*! \brief [Immediate] Computes a gaussian filter on the image by a 3x3 window.
  * \param [in] context The reference to the overall context.
@@ -267,20 +253,20 @@ VX_API vx_status vxuBox3x3(vx_context context, vx_image input, vx_image output);
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuGaussian3x3(vx_context context, vx_image input, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuGaussian3x3(vx_context context, vx_image input, vx_image output);
 
 /*! \brief [Immediate] Computes a convolution on the input image with the supplied
  * matrix.
  * \param [in] context The reference to the overall context.
  * \param [in] input The input image in <tt>\ref VX_DF_IMAGE_U8</tt> format.
  * \param [in] matrix The convolution matrix.
- * \param [out] output The output image in <tt>\ref VX_DF_IMAGE_S16</tt> format.
+ * \param [out] output The output image in <tt>\ref VX_DF_IMAGE_U8</tt> or <tt>\ref VX_DF_IMAGE_S16</tt> format.
  * \ingroup group_vision_function_custom_convolution
  * \return A <tt>\ref vx_status_e</tt> enumeration.
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuConvolve(vx_context context, vx_image input, vx_convolution matrix, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuConvolve(vx_context context, vx_image input, vx_convolution matrix, vx_image output);
 
 /*! \brief [Immediate] Computes a Gaussian pyramid from an input image.
  * \param [in] context The reference to the overall context.
@@ -291,7 +277,7 @@ VX_API vx_status vxuConvolve(vx_context context, vx_image input, vx_convolution 
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuGaussianPyramid(vx_context context, vx_image input, vx_pyramid gaussian);
+VX_API_ENTRY vx_status VX_API_CALL vxuGaussianPyramid(vx_context context, vx_image input, vx_pyramid gaussian);
 
 /*! \brief [Immediate] Computes an accumulation.
  * \param [in] context The reference to the overall context.
@@ -302,7 +288,7 @@ VX_API vx_status vxuGaussianPyramid(vx_context context, vx_image input, vx_pyram
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuAccumulateImage(vx_context context, vx_image input, vx_image accum);
+VX_API_ENTRY vx_status VX_API_CALL vxuAccumulateImage(vx_context context, vx_image input, vx_image accum);
 
 /*! \brief [Immediate] Computes a weighted accumulation.
  * \param [in] context The reference to the overall context.
@@ -314,19 +300,19 @@ VX_API vx_status vxuAccumulateImage(vx_context context, vx_image input, vx_image
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuAccumulateWeightedImage(vx_context context, vx_image input, vx_scalar scale, vx_image accum);
+VX_API_ENTRY vx_status VX_API_CALL vxuAccumulateWeightedImage(vx_context context, vx_image input, vx_scalar scale, vx_image accum);
 
 /*! \brief [Immediate] Computes a squared accumulation.
  * \param [in] context The reference to the overall context.
  * \param [in] input The input <tt>\ref VX_DF_IMAGE_U8</tt> image.
- * \param [in] scale A <tt>\ref VX_TYPE_UINT32</tt> type, the input value with the range \f$ 0 \le shift \le 15 \f$.
+ * \param [in] shift A <tt>\ref VX_TYPE_UINT32</tt> type, the input value with the range \f$ 0 \le shift \le 15 \f$.
  * \param [in,out] accum The accumulation image in <tt>\ref VX_DF_IMAGE_S16</tt>
  * \ingroup group_vision_function_accumulate_square
  * \return A <tt>\ref vx_status_e</tt> enumeration.
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuAccumulateSquareImage(vx_context context, vx_image input, vx_scalar scale, vx_image accum);
+VX_API_ENTRY vx_status VX_API_CALL vxuAccumulateSquareImage(vx_context context, vx_image input, vx_scalar shift, vx_image accum);
 
 /*! \brief [Immediate] Computes the minimum and maximum values of the image.
  * \param [in] context The reference to the overall context.
@@ -342,7 +328,7 @@ VX_API vx_status vxuAccumulateSquareImage(vx_context context, vx_image input, vx
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuMinMaxLoc(vx_context context, vx_image input,
+VX_API_ENTRY vx_status VX_API_CALL vxuMinMaxLoc(vx_context context, vx_image input,
                         vx_scalar minVal, vx_scalar maxVal,
                         vx_array minLoc, vx_array maxLoc,
                         vx_scalar minCount, vx_scalar maxCount);
@@ -358,7 +344,7 @@ VX_API vx_status vxuMinMaxLoc(vx_context context, vx_image input,
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>..
  */
-VX_API vx_status vxuConvertDepth(vx_context context, vx_image input, vx_image output, vx_enum policy, vx_int32 shift);
+VX_API_ENTRY vx_status VX_API_CALL vxuConvertDepth(vx_context context, vx_image input, vx_image output, vx_enum policy, vx_int32 shift);
 
 /*! \brief [Immediate] Computes Canny Edges on the input image into the output image.
  * \param [in] context The reference to the overall context.
@@ -372,7 +358,7 @@ VX_API vx_status vxuConvertDepth(vx_context context, vx_image input, vx_image ou
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuCannyEdgeDetector(vx_context context, vx_image input, vx_threshold hyst,
+VX_API_ENTRY vx_status VX_API_CALL vxuCannyEdgeDetector(vx_context context, vx_image input, vx_threshold hyst,
                                vx_int32 gradient_size, vx_enum norm_type,
                                vx_image output);
 
@@ -386,7 +372,7 @@ VX_API vx_status vxuCannyEdgeDetector(vx_context context, vx_image input, vx_thr
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuHalfScaleGaussian(vx_context context, vx_image input, vx_image output, vx_int32 kernel_size);
+VX_API_ENTRY vx_status VX_API_CALL vxuHalfScaleGaussian(vx_context context, vx_image input, vx_image output, vx_int32 kernel_size);
 
 /*! \brief [Immediate] Computes the bitwise and between two images.
  * \param [in] context The reference to the overall context.
@@ -398,7 +384,7 @@ VX_API vx_status vxuHalfScaleGaussian(vx_context context, vx_image input, vx_ima
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuAnd(vx_context context, vx_image in1, vx_image in2, vx_image out);
+VX_API_ENTRY vx_status VX_API_CALL vxuAnd(vx_context context, vx_image in1, vx_image in2, vx_image out);
 
 /*! \brief [Immediate] Computes the bitwise inclusive-or between two images.
  * \param [in] context The reference to the overall context.
@@ -410,7 +396,7 @@ VX_API vx_status vxuAnd(vx_context context, vx_image in1, vx_image in2, vx_image
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuOr(vx_context context, vx_image in1, vx_image in2, vx_image out);
+VX_API_ENTRY vx_status VX_API_CALL vxuOr(vx_context context, vx_image in1, vx_image in2, vx_image out);
 
 /*! \brief [Immediate] Computes the bitwise exclusive-or between two images.
  * \param [in] context The reference to the overall context.
@@ -422,7 +408,7 @@ VX_API vx_status vxuOr(vx_context context, vx_image in1, vx_image in2, vx_image 
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuXor(vx_context context, vx_image in1, vx_image in2, vx_image out);
+VX_API_ENTRY vx_status VX_API_CALL vxuXor(vx_context context, vx_image in1, vx_image in2, vx_image out);
 
 /*! \brief [Immediate] Computes the bitwise not of an image.
  * \param [in] context The reference to the overall context.
@@ -433,7 +419,7 @@ VX_API vx_status vxuXor(vx_context context, vx_image in1, vx_image in2, vx_image
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuNot(vx_context context, vx_image input, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuNot(vx_context context, vx_image input, vx_image output);
 
 /*! \brief [Immediate] Performs elementwise multiplications on pixel values in the input images and a scale.
  * \param [in] context The reference to the overall context.
@@ -448,7 +434,7 @@ VX_API vx_status vxuNot(vx_context context, vx_image input, vx_image output);
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuMultiply(vx_context context, vx_image in1, vx_image in2, vx_float32 scale, vx_enum overflow_policy, vx_enum rounding_policy, vx_image out);
+VX_API_ENTRY vx_status VX_API_CALL vxuMultiply(vx_context context, vx_image in1, vx_image in2, vx_float32 scale, vx_enum overflow_policy, vx_enum rounding_policy, vx_image out);
 
 /*! \brief [Immediate] Performs arithmetic addition on pixel values in the input images.
  * \param [in] context The reference to the overall context.
@@ -461,7 +447,7 @@ VX_API vx_status vxuMultiply(vx_context context, vx_image in1, vx_image in2, vx_
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuAdd(vx_context context, vx_image in1, vx_image in2, vx_enum policy, vx_image out);
+VX_API_ENTRY vx_status VX_API_CALL vxuAdd(vx_context context, vx_image in1, vx_image in2, vx_enum policy, vx_image out);
 
 /*! \brief [Immediate] Performs arithmetic subtraction on pixel values in the input images.
  * \param [in] context The reference to the overall context.
@@ -474,7 +460,7 @@ VX_API vx_status vxuAdd(vx_context context, vx_image in1, vx_image in2, vx_enum 
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuSubtract(vx_context context, vx_image in1, vx_image in2, vx_enum policy, vx_image out);
+VX_API_ENTRY vx_status VX_API_CALL vxuSubtract(vx_context context, vx_image in1, vx_image in2, vx_enum policy, vx_image out);
 
 /*! \brief [Immediate] Performs an Affine warp on an image.
  * \param [in] context The reference to the overall context.
@@ -488,7 +474,7 @@ VX_API vx_status vxuSubtract(vx_context context, vx_image in1, vx_image in2, vx_
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuWarpAffine(vx_context context, vx_image input, vx_matrix matrix, vx_enum type, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuWarpAffine(vx_context context, vx_image input, vx_matrix matrix, vx_enum type, vx_image output);
 
 /*! \brief [Immediate] Performs an Perspective warp on an image.
  * \param [in] context The reference to the overall context.
@@ -502,12 +488,12 @@ VX_API vx_status vxuWarpAffine(vx_context context, vx_image input, vx_matrix mat
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuWarpPerspective(vx_context context, vx_image input, vx_matrix matrix, vx_enum type, vx_image output);
+VX_API_ENTRY vx_status VX_API_CALL vxuWarpPerspective(vx_context context, vx_image input, vx_matrix matrix, vx_enum type, vx_image output);
 
 /*! \brief [Immediate] Computes the Harris Corners over an image and produces the array of scored points.
  * \param [in] context The reference to the overall context.
  * \param [in] input The input <tt>\ref VX_DF_IMAGE_U8</tt> image.
- * \param [in] strength_thresh The <tt>\ref VX_TYPE_FLOAT32</tt> minimum threshold which to eliminate Harris Corner scores.
+ * \param [in] strength_thresh The <tt>\ref VX_TYPE_FLOAT32</tt> minimum threshold which to eliminate Harris Corner scores (computed using the normalized Sobel kernel).
  * \param [in] min_distance The <tt>\ref VX_TYPE_FLOAT32</tt> radial Euclidean distance for non-maximum suppression.
  * \param [in] sensitivity The <tt>\ref VX_TYPE_FLOAT32</tt> scalar sensitivity threshold \f$ k \f$ from the Harris-Stephens equation.
  * \param [in] gradient_size The gradient window size to use on the input. The
@@ -515,13 +501,13 @@ VX_API vx_status vxuWarpPerspective(vx_context context, vx_image input, vx_matri
  * \param [in] block_size The block window size used to compute the harris corner score.
  * The implementation must support at least 3, 5, and 7.
  * \param [out] corners The array of <tt>\ref VX_TYPE_KEYPOINT</tt> structs.
- * \param [out] num_corners The total number of detected corners in image (optional).
+ * \param [out] num_corners The total number of detected corners in image (optional). Use a \ref VX_TYPE_SIZE scalar
  * \ingroup group_vision_function_harris
  * \return A <tt>\ref vx_status_e</tt> enumeration.
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuHarrisCorners(vx_context context,
+VX_API_ENTRY vx_status VX_API_CALL vxuHarrisCorners(vx_context context,
                            vx_image input,
                            vx_scalar strength_thresh,
                            vx_scalar min_distance,
@@ -536,32 +522,32 @@ VX_API vx_status vxuHarrisCorners(vx_context context,
  * \param [in] context The reference to the overall context.
  * \param [in] input The input <tt>\ref VX_DF_IMAGE_U8</tt> image.
  * \param [in] strength_thresh Threshold on difference between intensity of the central pixel and pixels on Bresenham's circle of radius 3 (<tt>\ref VX_TYPE_FLOAT32</tt> scalar)
- * \param [in] nonmax_supression If true, non-maximum suppression is applied to
+ * \param [in] nonmax_suppression If true, non-maximum suppression is applied to
  * detected corners before being places in the <tt>\ref vx_array</tt> of <tt>\ref VX_TYPE_KEYPOINT</tt> structs.
  * \param [out] corners Output corner <tt>\ref vx_array</tt> of <tt>\ref VX_TYPE_KEYPOINT</tt>.
- * \param [out] num_corners The total number of detected corners in image (optional).
+ * \param [out] num_corners The total number of detected corners in image (optional). Use a \ref VX_TYPE_SIZE scalar.
  * \ingroup group_vision_function_fast
  * \return A <tt>\ref vx_status_e</tt> enumeration.
  * \retval VX_SUCCESS Success
  * \retval *          An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuFastCorners(vx_context context, vx_image input, vx_scalar strength_thresh, vx_bool nonmax_supression, vx_array corners, vx_scalar num_corners);
+VX_API_ENTRY vx_status VX_API_CALL vxuFastCorners(vx_context context, vx_image input, vx_scalar strength_thresh, vx_bool nonmax_suppression, vx_array corners, vx_scalar num_corners);
 
 /*! \brief [Immediate] Computes an optical flow on two images.
  * \param [in] context The reference to the overall context.
  * \param [in] old_images Input of first (old) image pyramid
  * \param [in] new_images Input of destination (new) image pyramid
- * \param [in] old_points an array of key points in a vx_array of VX_TYPE_KEYPOINT those key points are defined at
+ * \param [in] old_points an array of key points in a vx_array of <tt>\ref VX_TYPE_KEYPOINT</tt> those key points are defined at
  *  the old_images high resolution pyramid
- * \param [in] new_points_estimates an array of estimation on what is the output key points in a vx_array of
- *  VX_TYPE_KEYPOINT those keypoints are defined at the new_images high resolution pyramid
- * \param [out] new_points an output array of key points in a vx_array of VX_TYPE_KEYPOINT those key points are
+ * \param [in] new_points_estimates an array of estimation on what is the output key points in a <tt>\ref vx_array</tt> of
+ * <tt>\ref VX_TYPE_KEYPOINT</tt> those keypoints are defined at the new_images high resolution pyramid
+ * \param [out] new_points an output array of key points in a <tt>\ref vx_array</tt> of <tt>\ref VX_TYPE_KEYPOINT</tt> those key points are
  *  defined at the new_images high resolution pyramid
- * \param [in] termination termination can be VX_TERM_CRITERIA_ITERATIONS or VX_TERM_CRITERIA_EPSILON or
- * VX_TERM_CRITERIA_BOTH
- * \param [in] epsilon is the vx_float32 error for terminating the algorithm
- * \param [in] num_iterations is the number of iterations
- * \param [in] use_initial_estimate Can be set to either vx_false_e or vx_true_e.
+ * \param [in] termination termination can be <tt>\ref VX_TERM_CRITERIA_ITERATIONS</tt> or <tt>\ref VX_TERM_CRITERIA_EPSILON</tt> or
+ * <tt>\ref VX_TERM_CRITERIA_BOTH</tt>
+ * \param [in] epsilon is the <tt>\ref vx_float32</tt> error for terminating the algorithm
+ * \param [in] num_iterations is the number of iterations. Use a <tt>\ref VX_TYPE_UINT32</tt> scalar.
+ * \param [in] use_initial_estimate Can be set to either <tt>\ref vx_false_e</tt> or <tt>\ref vx_true_e</tt>.
  * \param [in] window_dimension The size of the window on which to perform the algorithm. See
  *  <tt>\ref VX_CONTEXT_ATTRIBUTE_OPTICAL_FLOW_WINDOW_MAXIMUM_DIMENSION</tt>
  *
@@ -570,7 +556,7 @@ VX_API vx_status vxuFastCorners(vx_context context, vx_image input, vx_scalar st
  * \retval VX_SUCCESS Success
  * \retval * An error occurred. See <tt>\ref vx_status_e</tt>.
  */
-VX_API vx_status vxuOpticalFlowPyrLK(vx_context context,
+VX_API_ENTRY vx_status VX_API_CALL vxuOpticalFlowPyrLK(vx_context context,
                               vx_pyramid old_images,
                               vx_pyramid new_images,
                               vx_array old_points,
@@ -592,7 +578,7 @@ VX_API vx_status vxuOpticalFlowPyrLK(vx_context context,
  * \return A <tt>\ref vx_status_e</tt> enumeration.
  * \ingroup group_vision_function_remap
  */
-VX_API vx_status vxuRemap(vx_context context,
+VX_API_ENTRY vx_status VX_API_CALL vxuRemap(vx_context context,
                   vx_image input,
                   vx_remap table,
                   vx_enum policy,

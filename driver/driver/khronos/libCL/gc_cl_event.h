@@ -29,8 +29,8 @@ struct _cl_event_callback
     void                    (CL_CALLBACK * pfnNotify)(cl_event, cl_int, void *);
     void                    *userData;
     clsEvent_PTR            event;
+    gctINT                  type;
     clsEventCallback_PTR    next;
-    gctBOOL                 added;
 };
 
 typedef struct _cl_event_profile_info
@@ -92,6 +92,12 @@ clfGetEventExecutionStatus(
 
 gctINT
 clfFinishEvent(
+    cl_event        Event,
+    gctINT          Status
+    );
+
+gctINT
+clfScheduleEventCallback(
     cl_event        Event,
     gctINT          Status
     );

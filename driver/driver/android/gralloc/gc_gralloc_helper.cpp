@@ -45,6 +45,7 @@ check_hardware_types(
     )
 {
     gcsHAL_INTERFACE iface;
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_CHIP_INFO;
 
     defaultHwType = gcvHARDWARE_INVALID;

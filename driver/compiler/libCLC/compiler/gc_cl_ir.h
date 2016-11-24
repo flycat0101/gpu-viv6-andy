@@ -15,6 +15,7 @@
 #define __gc_cl_ir_h_
 
 #include "gc_cl_compiler_int.h"
+#include "debug/gc_vsc_debug.h"
 
 #define cldMAX_VECTOR_COMPONENT  16    /*maximum number of components in a vector */
 #define cldBASIC_VECTOR_SIZE    4      /*Size of a basic vector object: any sized vector
@@ -33,6 +34,8 @@
 #define clmF2L(f)        ((gctINT64)(f))
 #define clmF2UL(f)       ((gctUINT64)(f))
 #define clmF2C(f)        ((gctCHAR)(f))
+/*float to half: to be implemented later. For now, it is just float itself */
+#define clmF2H(f)        (f)
 
 #define clmI2F(i)        ((gctFLOAT)(i))
 #define clmI2U(i)        ((gctUINT32)(i))
@@ -218,46 +221,68 @@ typedef enum _cleELEMENT_TYPE
 #define cldHighestRankedFloat clvTYPE_QUAD
 #define cldFirstPackedType  clvTYPE_BOOL_PACKED
 #define cldLastPackedType   clvTYPE_HALF_PACKED
+#define cldLowestRankedPackedInteger  clvTYPE_BOOL_PACKED
+#define cldHighestRankedPackedInteger clvTYPE_USHORT_PACKED
+
 #define cldArithmeticTypeCount (cldHighestRankedFloat - cldLowestRankedInteger + 1)
 
-#define clmIsElementTypePackedType(EType)    \
-   (((EType) == clvTYPE_BOOL_PACKED)   ||    \
-    ((EType) == clvTYPE_CHAR_PACKED)   ||    \
-    ((EType) == clvTYPE_UCHAR_PACKED)  ||    \
-    ((EType) == clvTYPE_SHORT_PACKED)  ||    \
-    ((EType) == clvTYPE_USHORT_PACKED) ||    \
-    ((EType) == clvTYPE_HALF_PACKED) )
+#define clmIsElementTypePackedGenType(EType)    \
+    ((EType) == clvTYPE_GEN_PACKED)
 
 #define clmIsElementTypeBoolean(EType) \
-   ((EType) == clvTYPE_BOOL)
+   (((EType) == clvTYPE_BOOL) || \
+    (EType) == clvTYPE_BOOL_PACKED)
+
+#define clmIsElementTypePackedChar(EType) \
+   ((EType) == clvTYPE_CHAR_PACKED || \
+    (EType) == clvTYPE_UCHAR_PACKED)
 
 #define clmIsElementTypeChar(EType) \
    ((EType) == clvTYPE_CHAR || \
-    (EType) == clvTYPE_UCHAR)
+    (EType) == clvTYPE_UCHAR || \
+    clmIsElementTypePackedChar(EType))
+
+#define clmIsElementTypePackedInteger(EType) \
+ ((EType) >= cldLowestRankedPackedInteger && (EType) <= cldHighestRankedPackedInteger)
 
 #define clmIsElementTypeInteger(EType) \
- ((EType) >= cldLowestRankedInteger && (EType) <= cldHighestRankedInteger)
+ (((EType) >= cldLowestRankedInteger && (EType) <= cldHighestRankedInteger) || \
+  clmIsElementTypePackedInteger(EType))
+
+#define clmIsElementTypePackedUnsigned(EType) \
+   ((EType) == clvTYPE_UCHAR_PACKED || \
+    (EType) == clvTYPE_USHORT_PACKED)
 
 #define clmIsElementTypeUnsigned(EType) \
    ((EType) == clvTYPE_UINT || \
     (EType) == clvTYPE_USHORT || \
     (EType) == clvTYPE_UCHAR || \
-    (EType) == clvTYPE_ULONG)
+    (EType) == clvTYPE_ULONG || \
+    clmIsElementTypePackedUnsigned(EType))
+
+#define clmIsElementTypePackedSigned(EType) \
+   ((EType) == clvTYPE_CHAR_PACKED || \
+    (EType) == clvTYPE_SHORT_PACKED)
 
 #define clmIsElementTypeSigned(EType) \
    ((EType) == clvTYPE_INT || \
     (EType) == clvTYPE_SHORT || \
     (EType) == clvTYPE_CHAR || \
-    (EType) == clvTYPE_LONG)
+    (EType) == clvTYPE_LONG || \
+    clmIsElementTypePackedSigned(EType))
 
 #define clmIsElementTypeFloating(EType) \
- ((EType) >= cldLowestRankedFloat && (EType) <= cldHighestRankedFloat)
-
-#define clmIsElementTypeArithmetic(EType) \
- ((EType) >= cldLowestRankedInteger && (EType) <= cldHighestRankedFloat)
+ (((EType) >= cldLowestRankedFloat && (EType) <= cldHighestRankedFloat) || \
+  (EType) == clvTYPE_HALF_PACKED)
 
 #define clmIsElementTypePacked(EType) \
- ((EType) >= cldFirstPackedType && (EType) <= cldLastPackedType)
+ (((EType) >= cldFirstPackedType && (EType) <= cldLastPackedType) || \
+  clmIsElementTypePackedGenType(EType))
+
+
+#define clmIsElementTypeArithmetic(EType) \
+ (((EType) >= cldLowestRankedInteger && (EType) <= cldHighestRankedFloat) || \
+  clmIsElementTypePacked(EType))
 
 #define clmIsElementTypeSampler(EType) \
  ((EType) == clvTYPE_SAMPLER_T)
@@ -298,6 +323,10 @@ typedef enum _cleELEMENT_TYPE
 #define clmDECL_IsGenType(Decl) \
   clmDATA_TYPE_IsGenType((Decl)->dataType)
 
+#define clmDECL_IsPackedGenType(Decl) \
+  ((Decl)->ptrDscr == gcvNULL && \
+   clmDATA_TYPE_IsPackedGenType((Decl)->dataType))
+
 #define clmDECL_IsIntegerType(Decl) \
  ((Decl)->array.numDim == 0  && \
   (Decl)->ptrDscr == gcvNULL && \
@@ -318,9 +347,6 @@ typedef enum _cleELEMENT_TYPE
   ((Decl)->array.numDim == 0  && \
   clmIsElementTypeArithmetic((Decl)->dataType->elementType)))
 
-#define clmDECL_IsGeneralArithmeticType(Decl) \
- (clmDECL_IsArithmeticType(Decl) || clmDECL_IsPackedType(Decl))
-
 #define clmDECL_IsPointerType(Decl) \
  (((Decl)->ptrDominant && (Decl)->ptrDscr != gcvNULL) || \
   ((Decl)->array.numDim == 0  && \
@@ -330,7 +356,8 @@ typedef enum _cleELEMENT_TYPE
  ((Decl)->array.numDim == 0  &&  \
   (Decl)->ptrDscr == gcvNULL && \
   clmIsElementTypeArithmetic((Decl)->dataType->elementType) && \
-  clmDATA_TYPE_vectorSize_GET((Decl)->dataType) != 0)
+  (clmDATA_TYPE_vectorSize_GET((Decl)->dataType) != 0 || \
+   clmIsElementTypePackedGenType((Decl)->dataType->elementType)))
 
 #define clmDECL_IsBasicVectorType(Decl) \
  (clmDECL_IsVectorType(Decl) && \
@@ -397,6 +424,7 @@ typedef struct _clsDATA_TYPE
 {
     slsDLINK_NODE    node;
     gctINT        type;
+    VIR_TypeId    virPrimitiveType;
     cltQUALIFIER    addrSpaceQualifier;
     cltQUALIFIER    accessQualifier;
     cltELEMENT_TYPE    elementType;
@@ -496,6 +524,8 @@ IN cloCOMPILER Compiler,
 IN clsDECL * Decl
 );
 
+#define clGetVectorElementByteSize  clGetElementTypeByteSize
+
 gctSIZE_T
 clGetVectorElementByteSize(
 IN cloCOMPILER Compiler,
@@ -560,6 +590,9 @@ IN clsDECL * RDecl
 
 #define clmDATA_TYPE_IsGenType(D) \
   clmIsElementTypeGenType((D)->elementType)
+
+#define clmDATA_TYPE_IsPackedGenType(D) \
+  ((D)->elementType == clvTYPE_GEN_PACKED)
 
 #define clmDATA_TYPE_vectorSize_GET(d) ((d)->matrixSize.columnCount? (gctUINT)0 : (d)->matrixSize.rowCount)
 #define clmDATA_TYPE_vectorSize_NOCHECK_GET(d) ((d)->matrixSize.rowCount)
@@ -668,11 +701,13 @@ IN clsDECL * RDecl
 #define clmDECL_IsScalar(Decl) \
     (clmDECL_IsPointerType(Decl) || \
      (clmDECL_IsArithmeticType(Decl) && \
-      (Decl)->dataType->matrixSize.rowCount == 0))
+      (Decl)->dataType->matrixSize.rowCount == 0 && \
+      !clmDECL_IsPackedGenType(Decl)))
 
 #define clmDECL_IsElementScalar(Decl) \
   ((clmIsElementTypeArithmetic((Decl)->dataType->elementType) && \
-   (Decl)->dataType->matrixSize.rowCount == 0) || \
+   (Decl)->dataType->matrixSize.rowCount == 0 && \
+   !clmDECL_IsPackedGenType(Decl)) || \
    clmIsElementTypeSampler((Decl)->dataType->elementType) || \
    clmIsElementTypeEvent((Decl)->dataType->elementType))
 
@@ -706,8 +741,20 @@ IN clsDECL * RDecl
                 (Decl)->ptrDscr == gcvNULL && \
         (Decl)->array.numDim == 0)
 
+#define clmDECL_IsPackedIVec(Decl) \
+    (clmIsElementTypePackedInteger((Decl)->dataType->elementType) && \
+         clmDATA_TYPE_vectorSize_GET((Decl)->dataType) !=0 && \
+                (Decl)->ptrDscr == gcvNULL && \
+        (Decl)->array.numDim == 0)
+
 #define clmDECL_IsVec(Decl) \
         (clmIsElementTypeFloating((Decl)->dataType->elementType) && \
+          clmDATA_TYPE_vectorSize_GET((Decl)->dataType) !=0  && \
+                (Decl)->ptrDscr == gcvNULL && \
+         (Decl)->array.numDim == 0)
+
+#define clmDECL_IsPackedVec(Decl) \
+        (clmIsElementTypePackedFloating((Decl)->dataType->elementType) && \
           clmDATA_TYPE_vectorSize_GET((Decl)->dataType) !=0  && \
                 (Decl)->ptrDscr == gcvNULL && \
          (Decl)->array.numDim == 0)
@@ -868,6 +915,7 @@ typedef struct _clsNAME
 {
     slsDLINK_NODE    node;
     struct _clsNAME_SPACE *    mySpace;
+    gctUINT         fileNo;
     gctUINT         lineNo;
     gctUINT         stringNo;
     cleNAME_TYPE    type;
@@ -876,6 +924,7 @@ typedef struct _clsNAME
     cltPOOL_STRING  symbol;
     gctBOOL         isBuiltin;
     cleEXTENSION    extension;
+    gctUINT16       die;
     union {
       struct {
         cltATTR_FLAGS  specifiedAttr;
@@ -1028,6 +1077,7 @@ cltPOOL_STRING symbol;
 struct _clsNAME_SPACE *    parent;
 slsDLINK_LIST    names;
 slsDLINK_LIST    subSpaces;
+gctUINT16 die;
 }
 clsNAME_SPACE;
 
@@ -1099,6 +1149,56 @@ IN cloCOMPILER Compiler
 clsNAME_SPACE *
 cloCOMPILER_GetUnnamedSpace(
 IN cloCOMPILER Compiler
+);
+
+gctBOOL
+cloCOMPILER_GenDebugInfo(
+IN cloCOMPILER Compiler
+);
+
+void
+cloCOMPILER_SetCollectDIE(
+IN cloCOMPILER Compiler,
+gctBOOL collect
+);
+
+gctUINT16
+cloCOMPILER_AddDIEWithName(
+IN cloCOMPILER Compiler,
+IN clsNAME * Variable
+);
+
+gctUINT16
+cloCOMPILER_AddDIE(
+IN cloCOMPILER Compiler,
+IN VSC_DIE_TAG Tag,
+IN gctUINT16 Parent,
+IN gctCONST_STRING Name,
+IN gctUINT FileNo,
+IN gctUINT LineNo,
+IN gctUINT ColNo
+);
+
+void
+cloCOMPILER_DumpDIETree(
+IN cloCOMPILER Compiler
+);
+
+void
+cloCOMPILER_SetDIESourceLoc(
+IN cloCOMPILER Compiler,
+IN gctUINT16 Id,
+IN gctUINT FileNo,
+IN gctUINT LineNo,
+IN gctUINT ColNo
+);
+
+void
+cloCOMPILER_SetDIELogicalReg(
+IN cloCOMPILER Compiler,
+IN gctUINT16 Id,
+IN gctUINT32 regIndex,
+IN gctUINT num
 );
 
 gctBOOL
@@ -1291,9 +1391,9 @@ cleSET_TYPE;
 struct _cloIR_SET
 {
     struct _cloIR_BASE  base;
-    cleSET_TYPE        type;
-    slsDLINK_LIST        members;
-    clsNAME *        funcName;    /* Only for the function definition */
+    cleSET_TYPE         type;
+    slsDLINK_LIST       members;
+    clsNAME *           funcName;    /* Only for the function definition */
 };
 
 typedef struct _cloIR_SET *cloIR_SET;
@@ -1309,6 +1409,12 @@ typedef struct _cloIR_EXPR *cloIR_EXPR;
 
 gceSTATUS
 cloIR_SET_Destroy(
+IN cloCOMPILER Compiler,
+IN cloIR_BASE This
+);
+
+gceSTATUS
+cloIR_SET_Empty(
 IN cloCOMPILER Compiler,
 IN cloIR_BASE This
 );
@@ -1568,6 +1674,14 @@ struct _cloIR_VARIABLE
 
 typedef struct _cloIR_VARIABLE *cloIR_VARIABLE;
 
+cloIR_VARIABLE
+cloCOMPILER_GetParamChainVariable(
+IN cloCOMPILER Compiler,
+IN gctINT LineNo,
+IN gctINT StringNo,
+IN gctINT VariableNum
+);
+
 gceSTATUS
 cloIR_VARIABLE_Construct(
     IN cloCOMPILER Compiler,
@@ -1638,6 +1752,15 @@ cloIR_CONSTANT_AddValues(
     IN gctUINT ValueCount,
     IN cluCONSTANT_VALUE * Values
     );
+
+gceSTATUS
+cloIR_CONSTANT_Int_Construct(
+IN cloCOMPILER Compiler,
+IN gctUINT LineNo,
+IN gctUINT StringNo,
+IN gctINT  IntConstant,
+OUT cloIR_CONSTANT *Constant
+);
 
 gceSTATUS
 cloIR_CONSTANT_AddCharValues(
@@ -1745,7 +1868,7 @@ typedef enum _cleUNARY_EXPR_TYPE
     clvUNARY_INDIRECTION,
     clvUNARY_ADDR,
     clvUNARY_CAST,
-    clvUNARY_BITWISE_NOT,
+    clvUNARY_NOT_BITWISE,
     clvUNARY_NOT
 }
 cleUNARY_EXPR_TYPE;
@@ -1906,9 +2029,9 @@ typedef enum _cleBINARY_EXPR_TYPE
     clvBINARY_DIV = 0x08,
     clvBINARY_MOD = 0x10,
 
-    clvBINARY_BITWISE_AND,
-    clvBINARY_BITWISE_OR,
-    clvBINARY_BITWISE_XOR,
+    clvBINARY_AND_BITWISE,
+    clvBINARY_OR_BITWISE,
+    clvBINARY_XOR_BITWISE,
 
     clvBINARY_LSHIFT,
     clvBINARY_RSHIFT,
@@ -2004,6 +2127,12 @@ gctINT
 clGetVectorTerminalToken(
 IN cltELEMENT_TYPE ElementType,
 IN gctINT8 NumComponents
+);
+
+gctBOOL
+clAreElementTypeInRankOrder(
+IN cltELEMENT_TYPE HighRank,
+IN cltELEMENT_TYPE LowRank
 );
 
 void

@@ -25,26 +25,6 @@
 
 BEGIN_EXTERN_C()
 
-/*
- * CPF data flow needs 2-bit for the lattice, thus we
- * are using two bit vectors to represent data flow states
- */
-typedef struct _VSC_CPF_DF_VECTOR
-{
-    VSC_BIT_VECTOR      hi;
-    VSC_BIT_VECTOR      low;
-
-}VSC_CPF_DF_VECTOR;
-
-/* Creation, resize and destroy */
-VSC_CPF_DF_VECTOR* vscCPF_DV_Create(VSC_MM* pMM, gctINT dvSize);
-void vscCPF_DV_Initialize(VSC_CPF_DF_VECTOR* pCPF_DV, VSC_MM* pMM, gctINT dvSize);
-void vscCPF_DV_Resize(VSC_CPF_DF_VECTOR *pCPF_DV, gctINT newDVSize, gctBOOL bKeep);
-void vscCPF_DV_Destroy(VSC_CPF_DF_VECTOR* pCPF_DV);
-void vscCPF_DV_Finalize(VSC_CPF_DF_VECTOR* pCPF_DV);
-
-gctUINT vscCPF_DV_BitCount(VSC_CPF_DF_VECTOR* pCPF_DV);
-
 /* lattice state */
 typedef enum _VSC_CPF_LATTICE
 {
@@ -64,16 +44,18 @@ typedef struct _VSC_CPF_CONST
 /* data flow for each BB */
 typedef struct _VSC_CPF_BLOCK_FLOW
 {
-    VSC_CPF_DF_VECTOR  inFlow;
-    VSC_CPF_DF_VECTOR  outFlow;
+    VSC_STATE_VECTOR  inFlow;
+    VSC_STATE_VECTOR  outFlow;
 } VSC_CPF_BLOCK_FLOW;
 
 typedef struct _VSC_CPF
 {
     VIR_Shader                  *pShader;
+    VSC_HW_CONFIG               *pHwCfg;
     VSC_OPTN_CPFOptions         *pOptions;
     VIR_Dumper                  *pDumper;
-    VSC_PRIMARY_MEM_POOL        pmp;
+    VSC_MM                      *pMM;
+    gctUINT                     flowSize;
 
     VSC_SIMPLE_QUEUE            workList;       /* worklist to save working bb */
     VSC_SIMPLE_RESIZABLE_ARRAY  blkFlowArray;   /* array to save constant data flow,
@@ -85,22 +67,22 @@ typedef struct _VSC_CPF
 
 #define VSC_CPF_GetShader(cpf)                  ((cpf)->pShader)
 #define VSC_CPF_SetShader(cpf, s)               ((cpf)->pShader = (s))
+#define VSC_CPF_GetHwCfg(cpf)                   ((cpf)->pHwCfg)
+#define VSC_CPF_SetHwCfg(cpf, s)                ((cpf)->pHwCfg = (s))
 #define VSC_CPF_GetOptions(cpf)                 ((cpf)->pOptions)
 #define VSC_CPF_SetOptions(cpf, o)              ((cpf)->pOptions = (o))
 #define VSC_CPF_GetDumper(cpf)                  ((cpf)->pDumper)
 #define VSC_CPF_SetDumper(cpf, d)               ((cpf)->pDumper = (d))
-#define VSC_CPF_GetPmp(cpf)                     (&((cpf)->pmp))
-#define VSC_CPF_GetMM(cpf)                      (&((cpf)->pmp.mmWrapper))
+#define VSC_CPF_GetMM(cpf)                      ((cpf)->pMM)
 
 #define VSC_CPF_GetWorkList(cpf)                (&(cpf)->workList)
 #define VSC_CPF_GetBlkFlowArray(cpf)            (&(cpf)->blkFlowArray)
 #define VSC_CPF_GetConstTable(cpf)              (&(cpf)->constTable)
 
 extern VSC_ErrCode VSC_CPF_PerformOnShader(
-    IN VIR_Shader           *shader,
-    IN VSC_OPTN_CPFOptions  *options,
-    IN VIR_Dumper           *dumper
+    IN VSC_SH_PASS_WORKER* pPassWorker
     );
+DECLARE_QUERY_PASS_PROP(VSC_CPF_PerformOnShader);
 
 END_EXTERN_C()
 

@@ -14,13 +14,25 @@
 #ifndef __gc_vsc_vir_ir_h_
 #define __gc_vsc_vir_ir_h_
 
-#include "utils/gc_vsc_utils_table.h"
-
 BEGIN_EXTERN_C()
 
+#define  __SRC  src
+#define  __DEST dest
+
+#define _DEBUG_VIR_IO_COPY   0
+#define __PER_CHANNEL_DATA_MEMORY_SIZE__     4
+
+#define VIR_FUNC_SYMTBL_SZ          2*1024
+#define VIR_FUNC_SYMHSHTBL_SZ       128
+
+#define VIR_FUNC_LBLTBL_SZ          1024
+#define VIR_FUNC_LBLHSHTBL_SZ       64
+
+#define VIR_FUNC_OPNDTBL_SZ         4*1024
 
 /* forward declarations */
 
+typedef struct _VIR_SHADER          VIR_Shader;
 typedef struct _VIR_UNIFORM         VIR_Uniform;
 typedef struct _VIR_FUNCTION        VIR_Function;
 typedef struct _VIR_UNIFORMBLOCK    VIR_UniformBlock;
@@ -33,6 +45,7 @@ typedef struct _VIR_OPERAND         VIR_Operand;
 typedef struct _VIR_PARMPASSING     VIR_ParmPassing;
 typedef struct _VIR_TEXLDPARM       VIR_TexldParm;
 typedef struct _VIR_OPERANDLIST     VIR_OperandList;
+typedef struct _VIR_SYMBOLLIST      VIR_SymbolList;
 typedef struct _VIR_SYMBOL          VIR_Symbol;
 typedef struct _VIR_DUMPER          VIR_Dumper;
 typedef struct _VIR_TYPE            VIR_Type;
@@ -53,12 +66,13 @@ typedef VSC_BLOCK_TABLE  VIR_SymTable;       /* the element size is sizeof(VIR_S
 typedef VSC_BLOCK_TABLE  VIR_TypeTable;
 typedef VSC_BLOCK_TABLE  VIR_LabelTable;
 typedef VSC_BLOCK_TABLE  VIR_ConstTable;
-typedef VSC_BLOCK_TABLE  VIR_TempTable;
 typedef VSC_BLOCK_TABLE  VIR_OperandTable;
+typedef VSC_BLOCK_TABLE  VIR_InstTable;     /* instruction table */
 
 typedef struct _VIR_IDLIST VIR_IdList;
 typedef VIR_IdList      VIR_SymIdList;
 typedef VIR_IdList      VIR_VariableIdList;
+typedef VIR_IdList      VIR_SharedVarIdList;
 typedef VIR_IdList      VIR_TypeIdList;
 typedef VIR_IdList      VIR_UniformIdList;
 typedef VIR_IdList      VIR_UBOIdList;
@@ -88,6 +102,9 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_OPCODE_level(Opcode)   \
     (VIR_OpcodeInfo[(Opcode)].level)
 
+#define VIR_OPCODE_noDest(Opcode)   \
+    (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_NoDest)
+
 #define VIR_OPCODE_hasDest(Opcode)   \
     (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_HasDest)
 
@@ -109,19 +126,38 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_OPCODE_isVXOnly(Opcode)   \
     (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_VXOnly)
 
-#define VIR_OPCODE_Use512BitUnifrom(Opcode)   \
-    (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_Use512Unifrom)
+#define VIR_OPCODE_U512_SrcNo(Opcode)   \
+    ((VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_Use512Unifrom_MASK) >> VIR_OPFLAG_Use512Unifrom_SHIFT)
 
 #define VIR_OPCODE_EVISModifier_SrcNo(Opcode)    \
-    (((VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_EVIS_Modifier_MASK)  >> VIR_OPFLAG_EVIS_Modifier_SHIFT) - 1)
+    ((VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_EVIS_Modifier_MASK)  >> VIR_OPFLAG_EVIS_Modifier_SHIFT)
 
-/* SrcNo start from 1 */
 #define VIR_SrcNo2EVISModifier(SrcNo)    \
     ((SrcNo) << VIR_OPFLAG_EVIS_Modifier_SHIFT)
+
+/* 0 means no U512 */
+#define VIR_SrcNo2U512(SrcNo)    \
+    ((SrcNo) << VIR_OPFLAG_Use512Unifrom_SHIFT)
 
 #define VIR_OPCODE_useCondCode(Opcode)   \
     (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_UseCondCode)
 
+#define VIR_OPCODE_isDestEnableFixed(Opcode)                \
+    ((Opcode) == VIR_OP_NORM                            ||  \
+     (Opcode) == VIR_OP_ARCTRIG                         ||  \
+     (Opcode) == VIR_OP_GET_SAMPLER_LMM                 ||  \
+     (Opcode) == VIR_OP_GET_SAMPLER_LBS                 ||  \
+     (Opcode) == VIR_OP_GET_SAMPLER_LS)
+
+#define VIR_OPCODE_mustFullDestEnable(Opcode)               \
+    ((Opcode) == VIR_OP_SWIZZLE                         ||  \
+     (Opcode) == VIR_OP_SHUFFLE                         ||  \
+     (Opcode) == VIR_OP_SHUFFLE2)
+
+/*
+** Use VIR_Inst_isComponentwise to check if this instruction is component wise.
+** And also need to use VIR_OPCODE_isSourceComponentwise to check if one single source is component wise.
+*/
 #define VIR_OPCODE_isComponentwise(Opcode)   \
     (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_Componentwise)
 
@@ -136,20 +172,20 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_OPCODE_DestOnlyUseEnable(Opcode)   \
     (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_OnlyUseEnable)
 
-#define VIR_OPCODE_ReadMem(Opcode)   \
-    (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_MemoryRead)
+#define VIR_OPCODE_Loads(Opcode)   \
+    (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_Loads)
 
-#define VIR_OPCODE_WriteMem(Opcode)   \
-    (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_MemoryWrite)
+#define VIR_OPCODE_Stores(Opcode)   \
+    (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_Stores)
 
-#define VIR_OPCODE_ReadMemOnly(Opcode)   \
-    (VIR_OPCODE_ReadMem(Opcode) && (!(VIR_OPCODE_WriteMem(Opcode))))
+#define VIR_OPCODE_LoadsOnly(Opcode)   \
+    (VIR_OPCODE_Loads(Opcode) && (!(VIR_OPCODE_Stores(Opcode))))
 
-#define VIR_OPCODE_ReadAndWriteMem(Opcode)   \
-    (VIR_OPCODE_ReadMem(Opcode) &&  VIR_OPCODE_WriteMem(Opcode))
+#define VIR_OPCODE_LoadsAndStores(Opcode)   \
+    (VIR_OPCODE_Loads(Opcode) &&  VIR_OPCODE_Stores(Opcode))
 
-#define VIR_OPCODE_MemOp(Opcode)   \
-    (VIR_OPCODE_ReadMem(Opcode) ||  VIR_OPCODE_WriteMem(Opcode))
+#define VIR_OPCODE_LoadsOrStores(Opcode)   \
+    (VIR_OPCODE_Loads(Opcode) ||  VIR_OPCODE_Stores(Opcode))
 
 #define VIR_OPCODE_IsExpr(Opcode)   \
     (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_Expression)
@@ -201,6 +237,10 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_OPCODE_isTexLd(Opcode)          \
     ((Opcode) == VIR_OP_TEXLD ||            \
      (Opcode) == VIR_OP_TEXLD_U ||          \
+     (Opcode) == VIR_OP_TEXLD_U_F_L ||      \
+     (Opcode) == VIR_OP_TEXLD_U_F_B ||      \
+     (Opcode) == VIR_OP_TEXLD_U_S_L ||      \
+     (Opcode) == VIR_OP_TEXLD_U_U_L ||      \
      (Opcode) == VIR_OP_TEXLDPROJ ||        \
      (Opcode) == VIR_OP_TEXLDPCF ||         \
      (Opcode) == VIR_OP_TEXLDPCFPROJ ||     \
@@ -224,11 +264,38 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
      (Opcode) == VIR_OP_TEXLD_FETCH_MS ||   \
      (Opcode) == VIR_OP_LODQ)
 
+/* Get sampler info. */
+#define VIR_OPCODE_isGetSamplerInfo(Opcode) \
+    ((Opcode) == VIR_OP_GET_SAMPLER_IDX ||  \
+     (Opcode) == VIR_OP_GET_SAMPLER_LMM ||  \
+     (Opcode) == VIR_OP_GET_SAMPLER_LBS ||  \
+     (Opcode) == VIR_OP_GET_SAMPLER_LS)
+
+
+/* IMD_LOAD opcodes. */
 #define VIR_OPCODE_isImgLd(Opcode)          \
     ((Opcode) == VIR_OP_IMG_LOAD        ||  \
      (Opcode) == VIR_OP_IMG_LOAD_3D     ||  \
      (Opcode) == VIR_OP_VX_IMG_LOAD     ||  \
      (Opcode) == VIR_OP_VX_IMG_LOAD_3D)
+
+/* IMD_STORE opcodes. */
+#define VIR_OPCODE_isImgSt(Opcode)          \
+    ((Opcode) == VIR_OP_IMG_STORE       ||  \
+     (Opcode) == VIR_OP_IMG_STORE_3D    ||  \
+     (Opcode) == VIR_OP_VX_IMG_STORE    ||  \
+     (Opcode) == VIR_OP_VX_IMG_STORE_3D)
+
+/* IMD_ADDR opcodes. */
+#define VIR_OPCODE_isImgAddr(Opcode)        \
+    ((Opcode) == VIR_OP_IMG_ADDR        ||  \
+     (Opcode) == VIR_OP_IMG_ADDR_3D)
+
+/* image-related opcodes. */
+#define VIR_OPCODE_isImgRelated(Opcode)     \
+    ((VIR_OPCODE_isImgLd(Opcode))       ||  \
+     (VIR_OPCODE_isImgSt(Opcode))       ||  \
+     (VIR_OPCODE_isImgAddr(Opcode)))
 
 #define VIR_OPCODE_isGlobalMemLd(Opcode)    \
     ((Opcode) == VIR_OP_LOAD)
@@ -241,18 +308,13 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 
 #define VIR_OPCODE_isAttrLd(Opcode)         \
     ((Opcode) == VIR_OP_LOAD_ATTR       ||  \
+     (Opcode) == VIR_OP_LOAD_ATTR_O     ||  \
      (Opcode) == VIR_OP_ATTR_LD)
 
 #define VIR_OPCODE_isMemLd(Opcode)          \
     (VIR_OPCODE_isLocalMemLd(Opcode)    ||  \
      VIR_OPCODE_isSpecialMemLd(Opcode)  ||  \
      VIR_OPCODE_isGlobalMemLd(Opcode))
-
-#define VIR_OPCODE_isImgSt(Opcode)          \
-    ((Opcode) == VIR_OP_IMG_STORE       ||  \
-     (Opcode) == VIR_OP_IMG_STORE_3D    ||  \
-     (Opcode) == VIR_OP_VX_IMG_STORE    ||  \
-     (Opcode) == VIR_OP_VX_IMG_STORE_3D)
 
 #define VIR_OPCODE_isGlobalMemSt(Opcode)    \
     ((Opcode) == VIR_OP_STORE)
@@ -272,23 +334,6 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
      VIR_OPCODE_isSpecialMemSt(Opcode)  ||  \
      VIR_OPCODE_isGlobalMemSt(Opcode))
 
-#define VIR_OPCODE_isUnComponentWised(Opcode) \
-    ((Opcode) == VIR_OP_DP2         ||      \
-     (Opcode) == VIR_OP_DP3         ||      \
-     (Opcode) == VIR_OP_DP4         ||      \
-     (Opcode) == VIR_OP_NORM_DP2    ||      \
-     (Opcode) == VIR_OP_NORM_DP3    ||      \
-     (Opcode) == VIR_OP_NORM_DP4    ||      \
-     (Opcode) == VIR_OP_NORM        ||      \
-     (Opcode) == VIR_OP_CROSS       ||      \
-     (Opcode) == VIR_OP_IMG_ADDR    ||      \
-     (Opcode) == VIR_OP_IMG_ADDR_3D ||      \
-     (Opcode) == VIR_OP_ATOMCMPXCHG ||      \
-     VIR_OPCODE_isMemLd(Opcode)     ||      \
-     VIR_OPCODE_isAttrLd(Opcode)    ||      \
-     VIR_OPCODE_isVXOnly(Opcode)    ||      \
-     VIR_OPCODE_isTexLd(Opcode))
-
 #define VIR_OPCODE_isAtom(Opcode)           \
     ((Opcode) == VIR_OP_ATOMADD     ||      \
     (Opcode) == VIR_OP_ATOMSUB      ||      \
@@ -300,8 +345,16 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
     (Opcode) == VIR_OP_ATOMXOR      ||      \
     (Opcode) == VIR_OP_ATOMXCHG)
 
-#define VIR_OPCODE_isNormalOp(Opcode)   \
-    (!VIR_OPCODE_isTexLd(Opcode) && !VIR_OPCODE_isMemLd(Opcode))
+#define VIR_OPCODE_isLocalAtom(Opcode)     \
+    ((Opcode) == VIR_OP_ATOMADD_L     ||      \
+    (Opcode) == VIR_OP_ATOMSUB_L      ||      \
+    (Opcode) == VIR_OP_ATOMCMPXCHG_L  ||      \
+    (Opcode) == VIR_OP_ATOMMAX_L      ||      \
+    (Opcode) == VIR_OP_ATOMMIN_L      ||      \
+    (Opcode) == VIR_OP_ATOMOR_L       ||      \
+    (Opcode) == VIR_OP_ATOMAND_L      ||      \
+    (Opcode) == VIR_OP_ATOMXOR_L      ||      \
+    (Opcode) == VIR_OP_ATOMXCHG_L)
 
 /* not finished */
 #define VIR_OPCODE_BITWISE(Opcode)     \
@@ -321,12 +374,7 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
      VIR_OPCODE_isBranch(Opcode))
 
 #define VIR_OPCODE_CONDITIONAL_WRITE(Opcode)    \
-    (((Opcode) == VIR_OP_CMOV)          ||      \
-     ((Opcode) == VIR_OP_IMG_LOAD)      ||      \
-     ((Opcode) == VIR_OP_IMG_LOAD_3D)   ||      \
-     ((Opcode) == VIR_OP_VX_IMG_LOAD)   ||      \
-     ((Opcode) == VIR_OP_VX_IMG_LOAD_3D) )
-
+    ((Opcode) == VIR_OP_CMOV)
 
 #define VIR_SymTable_MaxValidId(SymTable)   BT_GET_MAX_VALID_ID(SymTable)
 
@@ -345,15 +393,28 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_Function_GetInstEnd(Func)   ((Func)->instList.pTail)
 #define VIR_Function_GetShader(Func)    ((Func)->hostShader)
 #define VIR_Function_GetFlags(Func)      ((Func)->flags)
+#define VIR_Function_HasFlag(Func, f)           (((Func)->flags & (f)) != 0)
+#define VIR_Function_SetFlags(Func, Flags)      do { (Func)->flags = (Flags); } while (0)
+
+#define VIR_Function_SetFlag(Func, Val)         do {(Func)->flags |= (Val); } while (0)
+#define VIR_Function_ClrFlag(Func, Val)         do {(Func)->flags &= ~(Val); } while (0)
+
 #define VIR_Function_GetSymTable(Func)  ((VIR_SymTable*)&((Func)->symTable))
 #define VIR_Function_GetLabelTable(Func)  ((VIR_LabelTable*)&((Func)->labelTable))
 #define VIR_Function_GetOperandTable(Func)  ((VIR_OperandTable*)&((Func)->operandTable))
+
+#define VIR_Function_GetLocalVar(Func)    (&Func->localVariables)
+#define VIR_Function_GetParameters(Func)  (&Func->paramters)
 
 #define VIR_Function_GetLabelFromId(Func, LabelId)  (VIR_Label*)(VIR_GetEntryFromId(&((Func)->labelTable), (LabelId)))
 #define VIR_Function_GetOperandFromId(Func, OpndId)  (VIR_Operand*)(VIR_GetEntryFromId(&((Func)->operandTable), (OpndId)))
 
 #define VIR_Function_GetFuncBlock(Func) ((Func)->pFuncBlock)
 #define VIR_Function_GetCFG(Func)       (&((Func)->pFuncBlock->cfg))
+
+#define VIR_Function_SetSymId(Func, Val)     do {((Func)->funcSym) = Val; }  while (0)
+#define VIR_Function_SetShader(Func, Val)    do {((Func)->hostShader) = Val; }  while (0)
+#define VIR_Function_SetFuncBlock(Func, Val) do {((Func)->pFuncBlock) = Val; }  while (0)
 
 #define VIR_InstList_GetCount(IList)    (vscBILST_GetNodeCount((VSC_BI_LIST *)IList))
 #define VIR_Inst_GetPrev(inst)          ((VIR_Instruction*)((inst)->biLstNode.pPrevNode))
@@ -364,51 +425,63 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_Inst_GetBasicBlock(Inst)    ((Inst)->_parentUseBB ?                     \
                                             (Inst)->parent.BB : gcvNULL)
 #define VIR_Inst_GetCaleeId(Inst)       ((Inst)->_opcode == VIR_OP_CALL ?           \
-                                            VIR_Operand_GetFunctionId((Inst)->dest) \
+                                            VIR_Operand_GetFunctionId((Inst)->__DEST) \
                                             : VIR_INVALID_ID)
 #define VIR_Inst_GetJmpLabel(Inst)      VIR_Operand_GetLabel(VIR_Inst_GetDest(Inst))
-#define VIR_Inst_GetDest(Inst)          ((Inst)->dest)
+#define VIR_Inst_GetDest(Inst)          ((Inst)->__DEST)
 #define VIR_Inst_GetSource(Inst, SrcNo) (((SrcNo) >= VIR_MAX_SRC_NUM || ((gctUINT)SrcNo >= VIR_Inst_GetSrcNum(Inst))) ? \
-                                              gcvNULL : (Inst)->src[(SrcNo)])
+                                              gcvNULL : (Inst)->__SRC[(SrcNo)])
 #define VIR_Inst_GetShader(Inst)        (VIR_Function_GetShader(VIR_Inst_GetFunction(Inst)))
 
 #define VIR_Inst_GetId(Inst)            ((Inst)->id_)
 #define VIR_Inst_GetOpcode(Inst)        ((VIR_OpCode)(Inst)->_opcode)
 #define VIR_Inst_GetInstType(Inst)      ((Inst)->_instType)
 #define VIR_Inst_GetConditionOp(Inst)   ((VIR_ConditionOp)(Inst)->_condOp)
-#define VIR_Inst_GetFlag(Inst)          ((VIR_InstFlag)(Inst)->_instFlag)
+#define VIR_Inst_GetFlags(Inst)         ((VIR_InstFlag)(Inst)->_instFlags)
 #define VIR_Inst_GetSrcNum(Inst)        ((Inst)->_srcOpndNum)
 #define VIR_Inst_GetThreadMode(Inst)    ((VIR_ThreadMode)(Inst)->_threadMode)
-#define VIR_Inst_GetEnable(Inst)        (VIR_Operand_GetEnable((Inst)->dest))
+#define VIR_Inst_GetEnable(Inst)        (VIR_Operand_GetEnable(VIR_Inst_GetDest(Inst)))
 #define VIR_Inst_isPrecise(Inst)        ((Inst)->_isPrecise)
 #define VIR_Inst_GetPatched(Inst)       ((Inst)->_patched)
 #define VIR_Inst_GetDual16ExpandSeq(Inst) ((Inst)->_dual16ExpandSeq)
+#define VIR_Inst_GetResOpType(Inst)     ((Inst)->_resOpType)
+#define VIR_Inst_IsLoopInvariant(Inst)  ((Inst)->_isLoopInvariant)
+#define VIR_Inst_GetSrcLocLine(Inst)    ((Inst)->sourceLoc.lineNo)
+#define VIR_Inst_GetSrcLocCol(Inst)     ((Inst)->sourceLoc.colNo)
+
 #define VIR_Inst_isWritten2Dest(Inst)   (VIR_Opcode_isWritten2Dest(VIR_Inst_GetOpcode(Inst))
 
 #define VIR_Inst_SetNext(inst, next)        ((inst)->biLstNode.pNextNode = (VIR_Instruction*)(next))
 #define VIR_Inst_SetPrev(inst, prev)        ((inst)->biLstNode.pPrevNode = (VIR_Instruction*)(prev))
-#define VIR_Inst_SetFunction(Inst, pFunc)   do {                                  \
+#define VIR_Inst_SetFunction(Inst, pFunc)   do {                                   \
                                                 (Inst)->_parentUseBB = 0;          \
-                                                (Inst)->parent.function = (pFunc);\
+                                                (Inst)->parent.function = (pFunc); \
                                             } while(0)
 
-#define VIR_Inst_SetBasicBlock(Inst, pBB)   do {                                 \
-                                                (Inst)->_parentUseBB = 1;         \
-                                                (Inst)->parent.BB = (pBB);       \
+#define VIR_Inst_SetBasicBlock(Inst, pBB)   do {                                   \
+                                                (Inst)->_parentUseBB = 1;          \
+                                                (Inst)->parent.BB = (pBB);         \
                                             } while(0)
 #define VIR_Inst_SetId(Inst, Id)            do { (Inst)->id_ = (Id); } while (0)
 #define VIR_Inst_SetOpcode(Inst, Opcode)    do { (Inst)->_opcode = (Opcode); } while (0)
 #define VIR_Inst_SetInstType(Inst, Val)     do { (Inst)->_instType = (Val); } while (0)
 #define VIR_Inst_SetSrcNum(Inst, Val)       do { (Inst)->_srcOpndNum = (Val); } while (0)
-#define VIR_Inst_SetFlag(Inst, Val)         do { (Inst)->_instFlag = (Val); } while (0)
+#define VIR_Inst_SetFlags(Inst, Val)        do {(Inst)->_instFlags = (Val); } while (0)
+#define VIR_Inst_SetFlag(Inst, Val)         do {(Inst)->_instFlags |= (Val); } while (0)
+#define VIR_Inst_ClrFlag(Inst, Val)         do {(Inst)->_instFlags &= ~(Val); } while (0)
 #define VIR_Inst_SetIsPrecise(Inst, Val)    do { (Inst)->_isPrecise = ((Val) == 0) ? 0 : 1; } while (0)
 #define VIR_Inst_SetConditionOp(Inst, COP)  do { (Inst)->_condOp = (gctUINT)(COP); } while (0)
-#define VIR_Inst_SetEnable(Inst, Enable)    do { VIR_Operand_SetEnable((Inst)->dest, (Enable)); } while (0)
+#define VIR_Inst_SetEnable(Inst, Enable)    do { VIR_Operand_SetEnable((Inst)->__DEST, (Enable)); } while (0)
 #define VIR_Inst_SetThreadMode(Inst, TMode) do { (Inst)->_threadMode = (gctUINT)(TMode); } while (0)
-#define VIR_Inst_SetDest(Inst, Dest)        do { (Inst)->dest = (Dest); } while (0)
-#define VIR_Inst_SetSource(Inst, SrcNo, Src)    do { gcmASSERT(SrcNo < VIR_MAX_SRC_NUM); (Inst)->src[(SrcNo)] = (Src); } while (0)
+#define VIR_Inst_SetDest(Inst, Dest)        do { (Inst)->__DEST = (Dest); } while (0)
+#define VIR_Inst_SetSource(Inst, SrcNo, Src) do { gcmASSERT(SrcNo < VIR_MAX_SRC_NUM); (Inst)->__SRC[(SrcNo)] = (Src); } while (0)
+#define VIR_Inst_SetSrcLocLine(Inst, Line)  do { (Inst)->sourceLoc.lineNo = Line ;} while(0)
+
+#define VIR_Inst_SetIsLoopInvariant(Inst, Val)  do { (Inst)->_isLoopInvariant = (Val); } while (0)
 #define VIR_Inst_SetPatched(Inst, Val)      do { (Inst)->_patched = (Val); } while (0)
 #define VIR_Inst_SetDual16ExpandSeq(Inst, Val)  do { (Inst)->_dual16ExpandSeq = (Val); } while (0)
+#define VIR_Inst_SetResOpType(Inst, Val)  do { (Inst)->_resOpType = (Val); } while (0)
+
 /* Inst iterator */
 typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_InstIterator_Init(Iter, InstList) vscBLIterator_Init((Iter), (VSC_BI_LIST *)(InstList))
@@ -418,8 +491,6 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_InstIterator_Last(Iter)           (VIR_Instruction *)vscBLIterator_Last((Iter))
 
 #define VIR_Inst_Count(InstList)              vscBILST_GetNodeCount((VSC_BI_LIST *)InstList)
-
-
 
 #define VIR_OPCODE_GetName(OpCode)          (VIR_OpName[(OpCode)])
 #define VIR_Intrinsic_GetName(Instrinsic)   (VIR_IntrinsicName[(Instrinsic)])
@@ -436,63 +507,83 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Operand_isImm(Opnd)             (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_IMMEDIATE)
 #define VIR_Operand_isConst(Opnd)           (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_CONST)
 #define VIR_Operand_isTexldParm(Opnd)       (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_TEXLDPARM)
+#define VIR_Operand_isParameters(Opnd)      (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_PARAMETERS)
+#define VIR_Operand_isIntrinsic(Opnd)       (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_INTRINSIC)
+#define VIR_Operand_isPhi(Opnd)             (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_PHI)
 
 #define VIR_Operand_GetHeader(Opnd)         ((Opnd)->header)
 #define VIR_Operand_GetIndex(Opnd)          ((Opnd)->header._index)
-#define VIR_Operand_GetFlag(Opnd)           ((Opnd)->_flag)
+#define VIR_Operand_GetFlags(Opnd)          ((Opnd)->u.n._flags)
+#define VIR_Operand_HasFlag(Opnd, f)        ((Opnd)->u.n._flags & (f))
 
 #define VIR_Operand_isLvalue(Opnd)          (!VIR_Operand_isTexldParm(Opnd) && (Opnd)->header._lvalue)
-#define VIR_Operand_isRegAllocated(Opnd)    ((VIR_Operand_GetFlag(Opnd) & VIR_OPNDFLAG_REGALLOCATED) != 0)
-#define VIR_Operand_isTemp256High(Opnd)      ((VIR_Operand_GetFlag(Opnd) & VIR_OPNDFLAG_TEMP256_HIGH) != 0)
-#define VIR_Operand_isTemp256Low(Opnd)      ((VIR_Operand_GetFlag(Opnd) & VIR_OPNDFLAG_TEMP256_LOW) != 0)
-#define VIR_Operand_GetHwRegClass(Opnd)     ((Opnd)->_regClass)
-#define VIR_Operand_GetHwRegId(Opnd)        ((VIR_HwRegId)(Opnd)->_hwRegId)
-#define VIR_Operand_GetHwShift(Opnd)        ((Opnd)->_hwShift)
-#define VIR_Operand_GetHIHwRegId(Opnd)      ((VIR_HwRegId)(Opnd)->_HIhwRegId)
-#define VIR_Operand_GetHIHwShift(Opnd)      ((Opnd)->_HIhwShift)
+#define VIR_Operand_isRegAllocated(Opnd)    VIR_Operand_HasFlag((Opnd), VIR_OPNDFLAG_REGALLOCATED)
+#define VIR_Operand_isTemp256High(Opnd)     VIR_Operand_HasFlag((Opnd), VIR_OPNDFLAG_TEMP256_HIGH)
+#define VIR_Operand_isTemp256Low(Opnd)      VIR_Operand_HasFlag((Opnd), VIR_OPNDFLAG_TEMP256_LOW)
+#define VIR_Operand_is5BitOffset(Opnd)      VIR_Operand_HasFlag((Opnd), VIR_OPNDFLAG_5BITOFFSET)
+#define VIR_Operand_isUniformIndex(Opnd)    VIR_Operand_HasFlag((Opnd), VIR_OPNDFLAG_UNIFORM_INDEX)
+#define VIR_Operand_GetHwRegClass(Opnd)     ((Opnd)->u.n._regClass)
+#define VIR_Operand_GetHwRegId(Opnd)        ((VIR_HwRegId)(Opnd)->u.n._hwRegId)
+#define VIR_Operand_GetHwShift(Opnd)        ((Opnd)->u.n._hwShift)
+#define VIR_Operand_GetHIHwRegId(Opnd)      ((VIR_HwRegId)(Opnd)->u.n._HIhwRegId)
+#define VIR_Operand_GetHIHwShift(Opnd)      ((Opnd)->u.n._HIhwShift)
+
 #define VIR_Operand_GetTexModifierFlag(Opnd)  (((VIR_Operand_Header_TM*)&((Opnd)->header))->_texmodifiers)
+#define VIR_Operand_hasBiasFlag(Opnd)       ((VIR_Operand_GetTexModifierFlag(Opnd) & VIR_TMFLAG_BIAS) != 0)
+#define VIR_Operand_hasLodFlag(Opnd)        ((VIR_Operand_GetTexModifierFlag(Opnd) & VIR_TMFLAG_LOD) != 0)
+#define VIR_Operand_hasGradFlag(Opnd)       ((VIR_Operand_GetTexModifierFlag(Opnd) & VIR_TMFLAG_GRAD) != 0)
+#define VIR_Operand_hasOffsetFlag(Opnd)     ((VIR_Operand_GetTexModifierFlag(Opnd) & VIR_TMFLAG_OFFSET) != 0)
+#define VIR_Operand_hasGatherFlag(Opnd)     ((VIR_Operand_GetTexModifierFlag(Opnd) & VIR_TMFLAG_GATHER) != 0)
+#define VIR_Operand_hasFetchMSFlag(Opnd)    ((VIR_Operand_GetTexModifierFlag(Opnd) & VIR_TMFLAG_FETCHMS) != 0)
 
 #define VIR_Operand_GetRoundMode(Opnd)      ((VIR_RoundMode)(Opnd)->header._roundMode)
 #define VIR_Operand_GetModifier(Opnd)       ((VIR_Modifier)(Opnd)->header._modifier)
-#define VIR_Operand_GetLShift(Opnd)         ((VIR_RoundMode)(Opnd)->header._lshift)
 
-#define VIR_Operand_GetType(Opnd)           ((Opnd)->_opndType)
-#define VIR_Operand_GetEnable(Opnd)         ((VIR_Enable)(Opnd)->_swizzleOrEnable)
-#define VIR_Operand_GetSwizzle(Opnd)        ((VIR_Swizzle)(Opnd)->_swizzleOrEnable)
-#define VIR_Operand_GetFinalAccessType(Opnd) ((Opnd)->_opndType)
+#define VIR_Operand_GetLShift(Opnd)         ((VIR_RoundMode)(Opnd)->u.n._lshift)
 
-#define VIR_Operand_GetSymbol(Opnd)         ((Opnd)->u1.sym)
+#define VIR_Operand_GetType(Opnd)           ((Opnd)->u.n._opndType)
+#define VIR_Operand_GetEnable(Opnd)         ((VIR_Enable)(Opnd)->u.n._swizzleOrEnable)
+#define VIR_Operand_GetSwizzle(Opnd)        ((VIR_Swizzle)(Opnd)->u.n._swizzleOrEnable)
+#define VIR_Operand_GetFinalAccessType(Opnd) ((Opnd)->u.n._opndType)
+
+#define VIR_Operand_GetSymbol(Opnd)         ((Opnd)->u.n.u1.sym)
 #define VIR_Operand_GetSymbolId_(Opnd)      VIR_Symbol_GetIndex(VIR_Operand_GetSymbol(Opnd))
 
-#define VIR_Operand_GetFunction(Opnd)       ((Opnd)->u1.func)
-#define VIR_Operand_GetFunctionId_(Opnd)     (VIR_Function_GetSymId((Opnd)->u1.func))
+#define VIR_Operand_GetFunction(Opnd)       ((Opnd)->u.n.u1.func)
+#define VIR_Operand_GetFunctionId_(Opnd)     (VIR_Function_GetSymId((Opnd)->u.n.u1.func))
 
-#define VIR_Operand_GetLabel(Opnd)          ((Opnd)->u1.label)
-#define VIR_Operand_GetLabelId_(Opnd)       VIR_Symbol_GetIndex((Opnd)->u1.label)
+#define VIR_Operand_GetLabel(Opnd)          ((Opnd)->u.n.u1.label)
+#define VIR_Operand_GetLabelId_(Opnd)       VIR_Symbol_GetIndex((Opnd)->u.n.u1.label)
 
-#define VIR_Operand_GetParameters(Opnd)     ((Opnd)->u1.argList)
-#define VIR_Operand_GetIntrinsicKind(Opnd)  ((Opnd)->u1.intrinsic)
-#define VIR_Operand_GetFieldBase(Opnd)      ((Opnd)->u1.base)
-#define VIR_Operand_GetFieldId(Opnd)        ((Opnd)->u2.fieldId)
-#define VIR_Operand_GetConstId(Opnd)        ((Opnd)->u1.constId)
-#define VIR_Operand_GetArrayBase(Opnd)      ((Opnd)->u1.base)
-#define VIR_Operand_GetImmediateInt(Opnd)   ((Opnd)->u1.iConst)
-#define VIR_Operand_GetImmediateUint(Opnd)  ((Opnd)->u1.uConst)
-#define VIR_Operand_GetImmediateFloat(Opnd) ((Opnd)->u1.fConst)
-#define VIR_Operand_GetEvisModifier(Opnd)   ((Opnd)->u1.evisModifier.u1)
+#define VIR_Operand_GetParameters(Opnd)     ((Opnd)->u.n.u1.argList)
+#define VIR_Operand_GetIntrinsicKind(Opnd)  ((Opnd)->u.n.u1.intrinsic)
+#define VIR_Operand_GetFieldBase(Opnd)      ((Opnd)->u.n.u1.base)
+#define VIR_Operand_GetFieldId(Opnd)        ((Opnd)->u.n.u2.fieldId)
+#define VIR_Operand_GetConstId(Opnd)        ((Opnd)->u.n.u1.constId)
+#define VIR_Operand_GetArrayBase(Opnd)      ((Opnd)->u.n.u1.base)
+#define VIR_Operand_GetImmediateInt(Opnd)   ((Opnd)->u.n.u1.iConst)
+#define VIR_Operand_GetImmediateUint(Opnd)  ((Opnd)->u.n.u1.uConst)
+#define VIR_Operand_GetImmediateFloat(Opnd) ((Opnd)->u.n.u1.fConst)
+#define VIR_Operand_GetEvisModifier(Opnd)   ((Opnd)->u.n.u1.evisModifier.u1)
+#define VIR_Operand_GetPhiOperands(Opnd)        ((Opnd)->u.n.u1.phiOperands)
+#define VIR_Operand_GetPhiOperandsCount(Opnd)   ((Opnd)->u.n.u1.phiOperands->count)
+#define VIR_Operand_GetNthPhiOperand(Opnd, i)   (&(Opnd)->u.n.u1.phiOperands->operands[i])
 
-#define VIR_Operand_GetIsConstIndexing(Opnd)    ((Opnd)->u2.vlInfo._isConstIndexing)
-#define VIR_Operand_GetRelAddrMode(Opnd)        ((VIR_Indexed)(Opnd)->u2.vlInfo._relAddrMode)
-#define VIR_Operand_GetRelAddrLevel(Opnd)       ((VIR_INDEXED_LEVEL)(Opnd)->u2.vlInfo._relAddrLevel)
-#define VIR_Operand_GetMatrixConstIndex(Opnd)   ((Opnd)->u2.vlInfo._matrixConstIndex)
-#define VIR_Operand_GetRelIndexing(Opnd)        ((VIR_SymId)(Opnd)->u2.vlInfo._relIndexing)
-#define VIR_Operand_GetConstIndexingImmed(Opnd) ((Opnd)->u2.vlInfo._relIndexing)
-#define VIR_Operand_isSymLocal(Opnd)            ((Opnd)->u2.vlInfo._isSymLocal != 0)
-#define VIR_Operand_GetArrayIndex(Opnd)         ((Opnd)->u2.arrayIndex)
-#define VIR_Operand_GetFieldId(Opnd)            ((Opnd)->u2.fieldId)
-#define VIR_Operand_GetFinalAccessOffset(Opnd)  ((Opnd)->u2.offset)
+#define VIR_Operand_GetIsConstIndexing(Opnd)    ((Opnd)->u.n.u2.vlInfo._isConstIndexing)
+#define VIR_Operand_GetRelAddrMode(Opnd)        ((VIR_Indexed)(Opnd)->u.n.u2.vlInfo._relAddrMode)
+#define VIR_Operand_GetRelAddrLevel(Opnd)       ((VIR_INDEXED_LEVEL)(Opnd)->u.n.u2.vlInfo._relAddrLevel)
+#define VIR_Operand_GetMatrixConstIndex(Opnd)   ((Opnd)->u.n.u2.vlInfo._matrixConstIndex)
+#define VIR_Operand_GetRelIndexing(Opnd)        ((VIR_SymId)(Opnd)->u.n.u2.vlInfo._relIndexing)
+#define VIR_Operand_GetConstIndexingImmed(Opnd) ((Opnd)->u.n.u2.vlInfo._relIndexing)
+#define VIR_Operand_isSymLocal(Opnd)            ((Opnd)->u.n.u2.vlInfo._isSymLocal != 0)
+#define VIR_Operand_GetArrayIndex(Opnd)         ((Opnd)->u.n.u2.arrayIndex)
+#define VIR_Operand_GetFieldId(Opnd)            ((Opnd)->u.n.u2.fieldId)
+#define VIR_Operand_GetFinalAccessOffset(Opnd)  ((Opnd)->u.n.u2.offset)
+#define VIR_Operand_GetVecIndexSymId(Opnd)      ((Opnd)->u.n.u2.vecIndexSymId)
+#define VIR_Operand_GetMatrixStride(Opnd)       ((Opnd)->u.n.u3.stride.matrixStride)
+#define VIR_Operand_GetLayoutQual(Opnd)         ((Opnd)->u.n.u3.stride.layoutQual)
 
-#define VIR_Operand_GetTexldModifier(Opnd, Mod) (((VIR_Operand_TexldModifier *)(Opnd))->tmodifier[(Mod)])
+#define VIR_Operand_GetTexldModifier(Opnd, Mod) ((Opnd)->u.tmodifier[(Mod)])
 #define VIR_Operand_GetTexldBias(Opnd)          (VIR_Operand_GetTexldModifier(Opnd, VIR_TEXLDMODIFIER_BIAS))
 #define VIR_Operand_GetTexldLod(Opnd)           (VIR_Operand_GetTexldModifier(Opnd, VIR_TEXLDMODIFIER_LOD))
 #define VIR_Operand_GetTexldOffset(Opnd)        (VIR_Operand_GetTexldModifier(Opnd, VIR_TEXLDMODIFIER_OFFSET))
@@ -506,46 +597,61 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Operand_SetOpKind(Opnd, Val)        do { (Opnd)->header._opndKind = (Val); } while (0)
 #define VIR_Operand_SetIndex(Opnd, Val)         do { (Opnd)->header._index = (gctUINT)(Val); } while (0)
 #define VIR_Operand_SetLvalue(Opnd, Lvalue)     do { (Opnd)->header._lvalue = (gctUINT)((Lvalue) != 0); } while (0)
-#define VIR_Operand_SetFlag(Opnd, Val)          do { (Opnd)->_flag |= (gctUINT)(Val); } while (0)
-#define VIR_Operand_ResetFlag(Opnd, Val)        do { (Opnd)->_flag &= ~(gctUINT)(Val); } while (0)
+#define VIR_Operand_SetFlag(Opnd, Val)          do { (Opnd)->u.n._flags |= (gctUINT)(Val); } while (0)
+#define VIR_Operand_SetFlags(Opnd, Val)         do { (Opnd)->u.n._flags = (Val); } while (0)
+#define VIR_Operand_ResetFlag(Opnd, Val)        do { (Opnd)->u.n._flags &= ~(gctUINT)(Val); } while (0)
 #define VIR_Operand_SetRegAllocated(Opnd)       VIR_Operand_SetFlag(Opnd, VIR_OPNDFLAG_REGALLOCATED)
 #define VIR_Operand_ResetRegAllocated(Opnd)     VIR_Operand_ResetFlag(Opnd, VIR_OPNDFLAG_REGALLOCATED)
-#define VIR_Operand_SetHwRegClass(Opnd, Val)    do { (Opnd)->_regClass = (gctUINT)(Val); } while (0)
-#define VIR_Operand_SetHwRegId(Opnd, Val)       do { (Opnd)->_hwRegId = (VIR_HwRegId) (Val); } while (0)
-#define VIR_Operand_SetHwShift(Opnd, Val)       do { (Opnd)->_hwShift = (gctUINT) (Val); } while (0)
-#define VIR_Operand_SetHIHwRegId(Opnd, Val)     do { (Opnd)->_HIhwRegId = (VIR_HwRegId) (Val); } while (0)
-#define VIR_Operand_SetHIHwShift(Opnd, Val)     do { (Opnd)->_HIhwShift = (gctUINT) (Val); } while (0)
+#define VIR_Operand_SetHwRegClass(Opnd, Val)    do { (Opnd)->u.n._regClass = (gctUINT)(Val); } while (0)
+#define VIR_Operand_SetHwRegId(Opnd, Val)       do { (Opnd)->u.n._hwRegId = (VIR_HwRegId) (Val); } while (0)
+#define VIR_Operand_SetHwShift(Opnd, Val)       do { (Opnd)->u.n._hwShift = (gctUINT) (Val); } while (0)
+#define VIR_Operand_SetHIHwRegId(Opnd, Val)     do { (Opnd)->u.n._HIhwRegId = (VIR_HwRegId) (Val); } while (0)
+#define VIR_Operand_SetHIHwShift(Opnd, Val)     do { (Opnd)->u.n._HIhwShift = (gctUINT) (Val); } while (0)
+#define VIR_Operand_SetLShift(Opnd, lshift)     do { (Opnd)->u.n._lshift = (gctUINT)(lshift); } while (0)
 
 #define VIR_Operand_SetRoundMode(Opnd, Round)   do { (Opnd)->header._roundMode = (gctUINT)(Round); } while (0)
-#define VIR_Operand_SetLShift(Opnd, lshift)   do { (Opnd)->header._lshift = (gctUINT)(lshift); } while (0)
 #define VIR_Operand_SetModifier(Opnd, Val)      do { (Opnd)->header._modifier = (gctUINT)(Val); } while (0)
 #define VIR_Operand_SetTexModifierFlag(Opnd, F) do { ((VIR_Operand_Header_TM *)&((Opnd)->header))->_texmodifiers |= (F); } while (0)
-#define VIR_Operand_SetType(Opnd, TypeId)       do { (Opnd)->_opndType = (TypeId); } while (0)
-#define VIR_Operand_SetSym(Opnd, Val)           do { (Opnd)->u1.sym = (Val); } while (0)
-#define VIR_Operand_SetFunc(Opnd, Val)          do { (Opnd)->u1.func = (Val); } while (0)
-#define VIR_Operand_SetIntrinsicKind(Opnd, Val) do { (Opnd)->u1.intrinsic = (Val); } while (0)
-#define VIR_Operand_SetFieldBase(Opnd, Val)     do { (Opnd)->u1.base = (Val); } while (0)
-#define VIR_Operand_SetFieldId(Opnd, Val)       do { (Opnd)->u2.fieldId = (Val); } while (0)
-#define VIR_Operand_SetConstId(Opnd, Val)       do { (Opnd)->u1.constId = (Val); } while (0)
-#define VIR_Operand_SetArrayBase(Opnd, Val)     do { (Opnd)->u1.base = (Val); } while (0)
-#define VIR_Operand_SetEvisModifier(Opnd, Val)  do { (Opnd)->u1.evisModifier.u1 = (Val); } while (0)
+#define VIR_Operand_ClrTexModifierFlag(Opnd, F) do { ((VIR_Operand_Header_TM *)&((Opnd)->header))->_texmodifiers &= ~(F); } while (0)
+#define VIR_Operand_SetType(Opnd, TypeId)       do { (Opnd)->u.n._opndType = (TypeId); } while (0)
+#define VIR_Operand_SetSym(Opnd, Val)           do { (Opnd)->u.n.u1.sym = (Val); } while (0)
+#define VIR_Operand_SetFunc(Opnd, Val)          do { (Opnd)->u.n.u1.func = (Val); } while (0)
+#define VIR_Operand_SetIntrinsicKind(Opnd, Val) do { (Opnd)->u.n.u1.intrinsic = (Val); } while (0)
+#define VIR_Operand_SetFieldBase(Opnd, Val)     do { (Opnd)->u.n.u1.base = (Val); } while (0)
+#define VIR_Operand_SetFieldId(Opnd, Val)       do { (Opnd)->u.n.u2.fieldId = (Val); } while (0)
+#define VIR_Operand_SetConstId(Opnd, Val)       do { (Opnd)->u.n.u1.constId = (Val); } while (0)
+#define VIR_Operand_SetArrayBase(Opnd, Val)     do { (Opnd)->u.n.u1.base = (Val); } while (0)
+#define VIR_Operand_SetEvisModifier(Opnd, Val)  do { (Opnd)->u.n.u1.evisModifier.u1 = (Val); } while (0)
+#define VIR_Operand_SetPhiOperands(Opnd, Val)   do { (Opnd)->u.n.u1.phiOperands = (Val); } while (0)
+#define VIR_Operand_SetParams(Opnd, Val)        do { (Opnd)->u.n.u1.argList = (Val); } while (0)
 
-#define VIR_Operand_SetIsConstIndexing(Opnd, Val)   do { (Opnd)->u2.vlInfo._isConstIndexing = (Val); } while (0)
-#define VIR_Operand_SetRelIndex(Opnd, Val)          do { (Opnd)->u2.vlInfo._relIndexing = (Val); } while (0)
-#define VIR_Operand_SetRelAddrMode(Opnd, Val)       do { (Opnd)->u2.vlInfo._relAddrMode = (Val); } while (0)
-#define VIR_Operand_SetRelAddrLevel(Opnd, Val)      do { (Opnd)->u2.vlInfo._relAddrLevel = (Val); } while (0)
-#define VIR_Operand_SetMatrixConstIndex(Opnd, Val)  do { (Opnd)->u2.vlInfo._matrixConstIndex = (Val); } while (0)
-#define VIR_Operand_SetIsSymLocal(Opnd, Val)        do { (Opnd)->u2.vlInfo._isSymLocal = (Val); } while (0)
-#define VIR_Operand_SetArrayIndex(Opnd, Val)        do { (Opnd)->u2.arrayIndex = (Val); } while (0)
-#define VIR_Operand_SetFieldId(Opnd, Val)           do { (Opnd)->u2.fieldId = (Val); } while (0)
-#define VIR_Operand_SetFinalAccessOffset(Opnd, Val) do { (Opnd)->u2.offset = (Val); } while (0)
-#define VIR_Operand_SetTexldParameter(Opnd, Val)    do { (Opnd)->u2.texldParm = (Val); } while (0)
+#define VIR_Operand_SetImmInt(Opnd, Val)  do { (Opnd)->u.n.u1.iConst = (Val); } while (0)
+#define VIR_Operand_SetImmUint(Opnd, Val) do {  (Opnd)->u.n.u1.uConst = (Val); } while (0)
+#define VIR_Operand_SetImmFloat(Opnd, Val)    do {  (Opnd)->u.n.u1.fConst = (Val); } while (0)
+#define VIR_Operand_SetIsConstIndexing(Opnd, Val)   do { (Opnd)->u.n.u2.vlInfo._isConstIndexing = (Val); } while (0)
+#define VIR_Operand_SetRelIndex(Opnd, Val)          do { (Opnd)->u.n.u2.vlInfo._relIndexing = (Val); } while (0)
+#define VIR_Operand_SetRelAddrMode(Opnd, Val)       do { (Opnd)->u.n.u2.vlInfo._relAddrMode = (Val); } while (0)
+#define VIR_Operand_SetRelAddrLevel(Opnd, Val)      do { (Opnd)->u.n.u2.vlInfo._relAddrLevel = (Val); } while (0)
+#define VIR_Operand_SetMatrixConstIndex(Opnd, Val)  do { (Opnd)->u.n.u2.vlInfo._matrixConstIndex = (Val); } while (0)
+#define VIR_Operand_SetIsSymLocal(Opnd, Val)        do { (Opnd)->u.n.u2.vlInfo._isSymLocal = (Val); } while (0)
+#define VIR_Operand_SetArrayIndex(Opnd, Val)        do { (Opnd)->u.n.u2.arrayIndex = (Val); } while (0)
+#define VIR_Operand_SetFieldId(Opnd, Val)           do { (Opnd)->u.n.u2.fieldId = (Val); } while (0)
+#define VIR_Operand_SetFinalAccessOffset(Opnd, Val) do { (Opnd)->u.n.u2.offset = (Val); } while (0)
+#define VIR_Operand_SetVecIndexSymId(Opnd, Val)     do { (Opnd)->u.n.u2.vecIndexSymId = (Val); } while (0)
+#define VIR_Operand_SetTexldParameter(Opnd, Val)    do { (Opnd)->u.n.u2.texldParm = (Val); } while (0)
+#define VIR_Operand_SetMatrixStride(Opnd, Val)      do { (Opnd)->u.n.u3.stride.matrixStride = (Val); } while (0)
+#define VIR_Operand_SetLayoutQual(Opnd, Val)        do { (Opnd)->u.n.u3.stride.layoutQual = (Val); } while (0)
+#define VIR_Operand_SetTexldModifier(Opnd, Mod, Val) do { (Opnd)->u.tmodifier[(Mod)] = Val; } while (0)
 
 #define VIR_Link_GetReference(Link)                 ((Link)->referenced)
 #define VIR_Link_SetReference(Link, Ref)            do { (Link)->referenced = (gctUINTPTR_T)(Ref); } while (0)
 
 #define VIR_Shader_GetPatchId(Shader)               ((Shader)->patchID)
 #define VIR_Shader_GetClientApiVersion(Shader)      ((Shader)->clientApiVersion)
+#define VIR_Shader_SetClientApiVersion(Shader, V)   ((Shader)->clientApiVersion = (V))
+#define VIR_Shader_GetDumpOptions(Shader)           ((Shader)->dumpOptions)
+#define VIR_Shader_SetDumpOptions(Shader, O)        do { (Shader)->dumpOptions = (O); } while (0)
+#define VIR_Shader_GetDumper(Shader)                ((Shader)->dumper)
 #define VIR_Shader_GetId(Shader)                    ((Shader)->_id)
 #define VIR_Shader_GetKind(Shader)                  ((Shader)->shaderKind)
 #define VIR_Shader_GetDefaultUBOIndex(Shader)       ((Shader)->defaultUniformBlockIndex)
@@ -553,6 +659,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Shader_GetConstantUBOIndex(Shader)      ((Shader)->constUniformBlockIndex)
 #define VIR_Shader_SetConstantUBOIndex(Shader, c)   ((Shader)->constUniformBlockIndex = (c))
 #define VIR_Shader_GetSymFromId(Shader, SymId)      VIR_GetSymFromId(&((Shader)->symTable), (SymId))
+#define VIR_Shader_GetSymAliasTable(Shader)         (&(Shader)->symAliasTable)
 #define VIR_Shader_GetTypeFromId(Shader, TypeId)    ((VIR_Type *)VIR_GetEntryFromId(&((Shader)->typeTable), (TypeId)))
 #define VIR_Shader_GetStringFromId(Shader, StrId)   ((gctSTRING)VIR_GetEntryFromId(&((Shader)->stringTable), (StrId)))
 #define VIR_Shader_GetConstFromId(Shader, ConstId)  ((VIR_Const*)VIR_GetEntryFromId(&((Shader)->constTable), (ConstId)))
@@ -570,6 +677,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Shader_GetPerpatchOutputVregs(Shader)   (&((Shader)->perpatchOutputVregs))
 #define VIR_Shader_GetVirRegs(Shader)               (&((Shader)->virRegs))
 #define VIR_Shader_GetVaribles(Shader)              (&((Shader)->variables))
+#define VIR_Shader_GetSharedVaribles(Shader)        (&((Shader)->sharedVariables))
 #define VIR_Shader_GetUniforms(Shader)              (&((Shader)->uniforms))
 #define VIR_Shader_GetUniformCount(Shader)          ((Shader)->uniformCount)
 #define VIR_Shader_GetUniformSym(Shader, Uniform)   VIR_Shader_GetSymFromId(Shader, (Uniform)->sym)
@@ -621,7 +729,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 
 #define VIR_Shader_SetComputeShaderLayout(s, ws_x, ws_y, ws_z)              \
         do {                                                                \
-             gcmASSERT(VIR_Shader_GetKind(s) == VIR_SHADER_COMPUTE);        \
+             gcmASSERT(VIR_Shader_IsGlCompute(s));                          \
              (s)->shaderLayout.compute.workGroupSize[0] = (ws_x);           \
              (s)->shaderLayout.compute.workGroupSize[1] = (ws_y);           \
              (s)->shaderLayout.compute.workGroupSize[2] = (ws_z);           \
@@ -659,10 +767,13 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
          VIR_Shader_GetKind(S) == VIR_SHADER_TESSELLATION_CONTROL       ||      \
          VIR_Shader_GetKind(S) == VIR_SHADER_TESSELLATION_EVALUATION    ||      \
          VIR_Shader_GetKind(S) == VIR_SHADER_GEOMETRY)
+#define VIR_Shader_IsVS(S)        (VIR_Shader_GetKind(S) == VIR_SHADER_VERTEX)
 #define VIR_Shader_IsFS(S)        (VIR_Shader_GetKind(S) == VIR_SHADER_FRAGMENT)
 
-#define VIR_Shader_IsCL(S)        (VIR_Shader_GetKind(S) == VIR_SHADER_CL)
-#define VIR_Shader_IsCompute(S)   (VIR_Shader_GetKind(S) == VIR_SHADER_COMPUTE)
+#define VIR_Shader_IsGraphics(S)     (VIR_Shader_IsGPipe(S) || VIR_Shader_IsFS(S))
+
+#define VIR_Shader_IsCL(S)           (VIR_Shader_GetKind(S) == VIR_SHADER_COMPUTE && ((S->compilerVersion[0] & 0xFFFF) == _cldLanguageType))
+#define VIR_Shader_IsGlCompute(S)    (VIR_Shader_GetKind(S) == VIR_SHADER_COMPUTE && ((S->compilerVersion[0] & 0xFFFF) != _cldLanguageType))
 
 #define VIR_GetOperandFromId(Func, Id)              ((VIR_Operand *)VIR_GetEntryFromId(&((Func)->operandTable), (Id)))
 #define VIR_GetFuncSymFromId(Func, SymId)           (VIR_GetSymFromId(&(Func)->symTable, (SymId)))
@@ -672,18 +783,21 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Type_isInteger(Ty)              (VIR_GetTypeFlag((Ty)->_base) & VIR_TYFLAG_ISINTEGER)
 #define VIR_Type_isFloat(Ty)                (VIR_GetTypeFlag((Ty)->_base) & VIR_TYFLAG_ISFLOAT)
 
-#define VIR_Type_GetBaseTypeId(Ty)            ((Ty)->_base)
+#define VIR_Type_GetBaseTypeId(Ty)          ((Ty)->_base)
 #define VIR_Type_GetKind(Ty)                ((VIR_TypeKind)(Ty)->_kind)
 #define VIR_Type_GetFlags(Ty)               ((VIR_TyFlag)(Ty)->_flags)
 #define VIR_Type_GetIndex(Ty)               ((Ty)->_tyIndex)
 #define VIR_Type_GetAlignement(Ty)          (0x01 << (Ty)->_alignment)
 #define VIR_Type_GetQualifier(Ty)           ((VIR_TyQualifier)(Ty)->_qualifier)
 #define VIR_Type_GetAddrSpace(Ty)           ((VIR_AddrSpace )(Ty)->_addrSpace)
+#define VIR_Type_GetDuplicationId(Ty)       ((VIR_AddrSpace )(Ty)->_duplicationId)
+#define VIR_Type_GetArrayStride(Ty)         ((VIR_AddrSpace )(Ty)->arrayStride)
+#define VIR_Type_GetMatrixStride(Ty)        ((VIR_AddrSpace )(Ty)->matrixStride)
+#define VIR_Type_GetArrayLength(Ty)         (VIR_Type_isUnSizedArray(Ty) ? 1 : (Ty)->u2.arrayLength)
 
 #define VIR_Type_GetSymId(Ty)               ((Ty)->u1.symId)
 #define VIR_Type_GetNameId(Ty)              ((Ty)->u1.nameId)
 #define VIR_Type_GetSize(Ty)                ((Ty)->u2.size)
-#define VIR_Type_GetArrayLength(Ty)         ((Ty)->u2.arrayLength)
 #define VIR_Type_GetFields(Ty)              ((Ty)->u2.fields)
 #define VIR_Type_GetParameters(Ty)          ((Ty)->u2.params)
 #define VIR_Type_isScalar(Ty)               (VIR_Type_GetKind(Ty) == VIR_TY_SCALAR)
@@ -691,8 +805,27 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Type_isMatrix(Ty)               (VIR_Type_GetKind(Ty) == VIR_TY_MATRIX)
 #define VIR_Type_isStruct(Ty)               (VIR_Type_GetKind(Ty) == VIR_TY_STRUCT)
 #define VIR_Type_isArray(Ty)                (VIR_Type_GetKind(Ty) == VIR_TY_ARRAY)
+#define VIR_Type_isUnSizedArray(Ty)         (VIR_Type_isArray(Ty) && ((VIR_Type_GetFlags(Ty) & VIR_TYFLAG_UNSIZED)))
 #define VIR_Type_isPointer(Ty)              (VIR_Type_GetKind(Ty) == VIR_TY_POINTER)
 #define VIR_Type_isFunction(Ty)             (VIR_Type_GetKind(Ty) == VIR_TY_FUNCTION)
+
+#define VIR_Type_SetFlag(Ty, Val)           do { (Ty)->_flags |= (Val); } while (0)
+#define VIR_Type_SetBaseTypeId(Ty, Val)     do { ((Ty)->_base) = (Val); } while (0)
+#define VIR_Type_SetKind(Ty, Val)           do { ((Ty)->_kind) = (Val); } while (0)
+#define VIR_Type_SetFlags(Ty, Val)          do { ((Ty)->_flags) = (Val); } while (0)
+#define VIR_Type_SetIndex(Ty, Val)          do { ((Ty)->_tyIndex) = (Val); } while (0)
+#define VIR_Type_SetQualifier(Ty, Val)      do { ((Ty)->_qualifier) = (Val); } while (0)
+#define VIR_Type_SetAddrSpace(Ty, Val)      do { ((Ty)->_addrSpace) = (Val); } while (0)
+#define VIR_Type_SetDuplicationId(Ty, Val)  do { ((Ty)->_duplicationId) = (Val); } while (0)
+#define VIR_Type_IncDuplicationId(Ty)       do { ((Ty)->_duplicationId)++; } while (0)
+#define VIR_Type_SetArrayStride(Ty, Val)    do { ((Ty)->arrayStride) = (Val); } while (0)
+#define VIR_Type_SetMatrixStride(Ty, Val)   do { ((Ty)->matrixStride) = (Val); } while (0)
+#define VIR_Type_SetSymId(Ty, Val)          do { ((Ty)->u1.symId) = (Val); } while (0)
+#define VIR_Type_SetNameId(Ty, Val)         do { ((Ty)->u1.nameId) = (Val); } while (0)
+#define VIR_Type_SetSize(Ty, Val)           do { ((Ty)->u2.size) = (Val); } while (0)
+#define VIR_Type_SetFields(Ty, Val)         do { ((Ty)->u2.fields) = (Val); } while (0)
+#define VIR_Type_SetParameters(Ty, Val)     do { ((Ty)->u2.params) = (Val); } while (0)
+#define VIR_Type_SetArrayLength(Ty, Val)    do { ((Ty)->u2.arrayLength) = (Val); } while (0)
 
 #define VIR_Symbol_isVariable(Sym)   ((Sym)->_kind == VIR_SYM_VARIABLE)
 #define VIR_Symbol_isSBO(Sym)        ((Sym)->_kind == VIR_SYM_SBO)
@@ -708,6 +841,9 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_isTypedef(Sym)    ((Sym)->_kind == VIR_SYM_TYPE)
 #define VIR_Symbol_isLabel(Sym)      ((Sym)->_kind == VIR_SYM_LABEL)
 #define VIR_Symbol_isConst(Sym)      ((Sym)->_kind == VIR_SYM_CONST)
+#define VIR_Symbol_isIB(Sym)         (VIR_Symbol_isUBO(Sym) || \
+                                      VIR_Symbol_isSBO(Sym) || \
+                                      VIR_Symbol_isIOB(Sym))
 
 #define VIR_Symbol_isAttribute(Sym)  ((VIR_Symbol_isVariable(Sym) ||      \
                                        VIR_Symbol_isField(Sym))        && \
@@ -742,12 +878,30 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_isGlobalVar(Sym)  ((Sym) && (VIR_Symbol_isVariable(Sym) &&           \
                                         (Sym)->_storageClass == VIR_STORAGE_GLOBAL))
 
-#define VIR_Symbol_isInParam(Sym)    ((Sym) && (VIR_Symbol_isVariable(Sym) &&           \
-                                       ((Sym)->_storageClass == VIR_STORAGE_INPARM||    \
+#define VIR_Symbol_isInParam(Sym)    ((Sym) && (VIR_Symbol_isVariable(Sym)) &&          \
+                                       ((Sym)->_storageClass == VIR_STORAGE_INPARM ||   \
                                         (Sym)->_storageClass == VIR_STORAGE_INOUTPARM))
-#define VIR_Symbol_isOutParam(Sym)   ((Sym) && (VIR_Symbol_isVariable(Sym) &&           \
-                                       ((Sym)->_storageClass == VIR_STORAGE_OUTPARM||   \
-                                        (Sym)->_storageClass == VIR_STORAGE_INOUTPARM)))
+#define VIR_Symbol_isOutParam(Sym)   ((Sym) && (VIR_Symbol_isVariable(Sym)) &&          \
+                                       ((Sym)->_storageClass == VIR_STORAGE_OUTPARM ||  \
+                                        (Sym)->_storageClass == VIR_STORAGE_INOUTPARM))
+
+#define VIR_Symbol_isParamVariable(Sym) ((VIR_Symbol_isVariable(Sym)) &&                  \
+                                         ((Sym)->_storageClass == VIR_STORAGE_INPARM ||   \
+                                          (Sym)->_storageClass == VIR_STORAGE_OUTPARM ||  \
+                                          (Sym)->_storageClass == VIR_STORAGE_INOUTPARM))
+
+#define VIR_Symbol_isParamVirReg(Sym)   ((VIR_Symbol_isVreg(Sym)) &&                      \
+                                         ((Sym)->_storageClass == VIR_STORAGE_INPARM ||   \
+                                          (Sym)->_storageClass == VIR_STORAGE_OUTPARM ||  \
+                                          (Sym)->_storageClass == VIR_STORAGE_INOUTPARM))
+
+#define VIR_Symbol_isSharedVariables(Sym)((VIR_Symbol_isVariable(Sym) ||       \
+                                            VIR_Symbol_isField(Sym))        && \
+                                          ((Sym)->_storageClass == VIR_STORAGE_SHARED_VAR) )
+
+#define VIR_Symbol_Is128Bpp(Sym)     (((VIR_Symbol_GetLayoutQualifier(Sym) & VIR_LAYQUAL_IMAGE_FORMAT_MASK) == VIR_LAYQUAL_IMAGE_FORMAT_RGBA32F) ||\
+                                      ((VIR_Symbol_GetLayoutQualifier(Sym) & VIR_LAYQUAL_IMAGE_FORMAT_MASK) == VIR_LAYQUAL_IMAGE_FORMAT_RGBA32I) ||\
+                                      ((VIR_Symbol_GetLayoutQualifier(Sym) & VIR_LAYQUAL_IMAGE_FORMAT_MASK) == VIR_LAYQUAL_IMAGE_FORMAT_RGBA32UI))
 
 #define VIR_Symbol_GetKind(Sym)         ((Sym)->_kind)
 #define VIR_Symbol_GetStorageClass(Sym) ((VIR_StorageClass)(Sym)->_storageClass)
@@ -755,24 +909,38 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_GetPrecision(Sym)    ((VIR_Precision)(Sym)->_precision)
 #define VIR_Symbol_GetCurrPrecision(Sym) ((VIR_Precision)(Sym)->_currPrecision)
 #define VIR_Symbol_GetTyQualifier(Sym)  ((VIR_TyQualifier)(Sym)->_qualifier)
+#define VIR_Symbol_GetLinkage(Sym)      ((VIR_TyQualifier)(Sym)->_linkage)
+#define VIR_Symbol_GetComponentShift(Sym) ((VIR_TyQualifier)(Sym)->_componentShift)
 #define VIR_Symbol_GetHwRegId(Sym)      ((VIR_HwRegId)(Sym)->_hwRegId)
 #define VIR_Symbol_GetHwShift(Sym)      ((Sym)->_hwShift)
 #define VIR_Symbol_GetHIHwRegId(Sym)    ((VIR_HwRegId)(Sym)->_HIhwRegId)
 #define VIR_Symbol_GetHIHwShift(Sym)    ((Sym)->_HIhwShift)
-#define VIR_Symbol_GetType(Sym)         ((Sym)->type)
-#define VIR_Symbol_GetGeneralFlag(Sym)  ((Sym)->generalFlags)
-#define VIR_Symbol_HasGeneralFlag(Sym, f)      (((Sym)->generalFlags & (f)) != 0)
 #define VIR_Symbol_GetFlag(Sym)         ((Sym)->flags)
 #define VIR_Symbol_HasFlag(Sym, f)      (((Sym)->flags & (f)) != 0)
 #define VIR_Symbol_GetIndex(Sym)        ((Sym)->index)
 #define VIR_Symbol_GetIOBlockIndex(Sym) ((Sym)->ioBlockIndex)
+/* return NULL if it is local variable */
+#define VIR_Symbol_GetHostShader(Sym)   (isSymLocal(Sym) ? gcvNULL : (Sym)->u0.hostShader )
+/* return NULL if it is not local variable */
+#define VIR_Symbol_GetHostFunction(Sym) (isSymLocal(Sym) ? (Sym)->u0.hostFunction : gcvNULL )
+/* always return shader */
+#define VIR_Symbol_GetShader(Sym)       (isSymLocal(Sym) ? VIR_Function_GetShader((Sym)->u0.hostFunction) \
+                                                         : (Sym)->u0.hostShader)
+#define VIR_Symbol_GetType(Sym)         ((Sym)->typeId == VIR_INVALID_ID ? gcvNULL :               \
+                                            VIR_Shader_GetTypeFromId(VIR_Symbol_GetShader(Sym), (Sym)->typeId))
+#define VIR_Symbol_GetTypeId(Sym)       ((Sym)->typeId)
+
+#define VIR_Symbol_GetParamOrHostFunction(Sym) (VIR_Symbol_isParamVirReg(Sym) ? VIR_Symbol_GetParamFunction(Sym) : VIR_Symbol_GetHostFunction(Sym))
 #define VIR_Symbol_GetVariableVregIndex(Sym)        ((Sym)->u2.tempIndex)
 #define VIR_Symbol_GetName(Sym)         ((Sym)->u1.name)
 #define VIR_Symbol_GetConstId(Sym)      (VIR_Symbol_isConst(Sym) ? (Sym)->u1.constId : VIR_INVALID_ID)
 #define VIR_Symbol_GetUniformStructIndex(Sym, Val)  ((Sym)->u2.uniformIndex)
-#define VIR_Symbol_GetVregVariable(Sym) ((Sym)->u2.variable)
+#define VIR_Symbol_GetVregVarSymId(Sym) ((Sym)->u2.varSymId)
+#define VIR_Symbol_GetVregVariable(Sym) ((Sym)->u2.varSymId == VIR_INVALID_ID ? gcvNULL :               \
+                                             (VIR_Id_isFunctionScope((Sym)->u2.varSymId) ? VIR_Function_GetSymFromId(VIR_Symbol_GetParamOrHostFunction(Sym), (Sym)->u2.varSymId) : \
+                                                VIR_Shader_GetSymFromId(VIR_Symbol_GetShader(Sym), (Sym)->u2.varSymId)))
 #define VIR_Symbol_GetFieldInfo(Sym)    ((Sym)->u2.fieldInfo)
-#define VIR_Symbol_GetFieldVreg(Sym)    (VIR_Symbol_GetFieldInfo(Sym)->tempRegOrUniformOffset)
+#define VIR_Symbol_GetFieldVreg(Sym)    (VIR_FieldInfo_GetTempRegOrUniformOffset(VIR_Symbol_GetFieldInfo(Sym)))
 #define VIR_Symbol_GetVregIndex(Sym)    (VIR_Symbol_isVreg(Sym)      ? (Sym)->u1.vregIndex :                  \
                                          (VIR_Symbol_isVariable(Sym) ? VIR_Symbol_GetVariableVregIndex(Sym) : \
                                          (VIR_Symbol_isField(Sym)    ? VIR_Symbol_GetFieldVreg(Sym) :         \
@@ -788,21 +956,33 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_GetUBO(Sym)          (VIR_Symbol_isUBO(Sym) ? (Sym)->u2.ubo : gcvNULL)
 #define VIR_Symbol_GetSBO(Sym)          (VIR_Symbol_isSBO(Sym) ? (Sym)->u2.sbo : gcvNULL)
 #define VIR_Symbol_GetIOB(Sym)          (VIR_Symbol_isIOB(Sym) ? (Sym)->u2.ioBlock : gcvNULL)
-#define VIR_Symbol_GetFuncMangleName(Sym)   ((VIR_Symbol_isFunction(Sym) ?    \
-                                             (Sym)->u3.mangledName) : VIR_INVALID_ID)
-#define VIR_Symbol_GetStructType(Sym)       (VIR_Symbol_isField(Sym) ? (Sym)->u3.structType : gcvNULL)
-#define VIR_Symbol_GetLayout(Sym)           ((Sym)->layout)
+#define VIR_Symbol_GetFuncMangleName(Sym)   (VIR_Symbol_isFunction(Sym) ?    \
+                                             (Sym)->u3.mangledName : VIR_INVALID_ID)
+#define VIR_Symbol_GetStructTypeId(Sym)     (VIR_Symbol_isField(Sym) ? (Sym)->u3.structTypeId : VIR_INVALID_ID)
+#define VIR_Symbol_GetLayout(Sym)           (&(Sym)->layout)
 #define VIR_Symbol_GetLayoutQualifier(Sym)  ((Sym)->layout.layoutQualifier)
 #define VIR_Symbol_GetLocation(Sym)         ((Sym)->layout.location)
+#define VIR_Symbol_GetMasterLocation(Sym)   ((Sym)->layout.masterLocation)
+#define VIR_Symbol_GetLlResSlot(Sym)        ((Sym)->layout.llResSlot)
+#define VIR_Symbol_GetDescriptorSet(Sym)    ((Sym)->layout.descriptorSet)
 #define VIR_Symbol_GetBinding(Sym)          ((Sym)->layout.binding)
 #define VIR_Symbol_GetLayoutOffset(Sym)     ((Sym)->layout.offset)
 #define VIR_Symbol_GetArraySlot(Sym)        ((Sym)->layout.llArraySlot)
 #define VIR_Symbol_GetFirstSlot(Sym)        ((Sym)->layout.llFirstSlot)
 #define VIR_Symbol_GetHwFirstCompIndex(Sym) ((Sym)->layout.hwFirstCompIndex)
 #define VIR_Symbol_GetOffsetInVar(Sym)      ((Sym)->u3.offsetInVar)
-#define VIR_Symbol_GetIndexRange(Sym)       ((Sym)->indexRange)
+#define VIR_Symbol_GetIndexRange(Sym)       ((Sym)->u5.indexRange)
+#define VIR_Symbol_GetSamplerIdxRange(Sym)  ((Sym)->u5.combinedIdx.samplerIdxRange)
+#define VIR_Symbol_GetImgIdxRange(Sym)      ((Sym)->u5.combinedIdx.imgIdxRange)
+#define VIR_Symbol_GetSeparateSampler(Sym)  ((Sym)->u3.separateSampler)
+#define VIR_Symbol_GetSeparateImage(Sym)    ((Sym)->u4.separateImage)
+#define VIR_Symbol_GetFirstElementId(Sym)   ((VIR_Symbol_isVreg(Sym) ? VIR_INVALID_ID : (Sym)->u6.firstElementId))
+#define VIR_Symbol_GetEncloseFuncSymId(Sym) ((Sym)->u4.encloseFuncSymId)
+#define VIR_Symbol_GetParamFuncSymId(Sym)   VIR_Symbol_GetEncloseFuncSymId(Sym)
+#define VIR_Symbol_GetEncloseFunction(Sym)  VIR_Symbol_GetFunction(VIR_Shader_GetSymFromId(VIR_Symbol_GetShader(Sym), (Sym)->u4.encloseFuncSymId))
+#define VIR_Symbol_GetLocalVarFunction(Sym) VIR_Symbol_GetEncloseFunction(Sym)
+#define VIR_Symbol_GetParamFunction(Sym)    VIR_Symbol_GetEncloseFunction(Sym)
 
-#define VIR_Symbol_GetSize(Sym)         (VIR_Symbol_isStruct(Sym) ? (Sym)->u3.size : 0)
 #define VIR_Symbol_GetUniformKind(Sym)  ((VIR_UniformKind)((Sym)->_storageClass))
 
 #define VIR_Symbol_GetOffsetTempIndex(Sym, Offset)  (VIR_Symbol_GetVregIndex(Sym) != VIR_INVALID_ID ?  \
@@ -812,6 +992,10 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
     do {(Sym)->layout.layoutQualifier = (Qual); } while(0)
 #define VIR_Symbol_SetLocation(Sym, Val)                \
     do {(Sym)->layout.location = (Val); } while(0)
+#define VIR_Symbol_SetMasterLocation(Sym, Val)          \
+    do {(Sym)->layout.masterLocation = (Val); } while(0)
+#define VIR_Symbol_SetLlResSlot(Sym, Val)          \
+    do {(Sym)->layout.llResSlot = (Val); } while(0)
 #define VIR_Symbol_SetBinding(Sym, Val)                 \
     do {(Sym)->layout.binding = (Val); } while(0)
 #define VIR_Symbol_SetLayoutOffset(Sym, Val)                  \
@@ -822,6 +1006,8 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
     do {(Sym)->layout.hwFirstCompIndex = (Slot); } while(0)
 #define VIR_Symbol_SetArraySlot(Sym, Slot)              \
     do {(Sym)->layout.llArraySlot = (Slot); } while(0)
+#define VIR_Symbol_SetDescriptorSet(Sym, Val)                \
+    do {(Sym)->layout.descriptorSet = (Val); } while(0)
 
 #define VIR_Symbol_SetKind(Sym, Kind)       do {(Sym)->_kind = Kind; } while (0)
 #define VIR_Symbol_SetStorageClass(Sym, SC) do {(Sym)->_storageClass = SC; } while (0)
@@ -832,20 +1018,26 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_SetHwShift(Sym, Val)     do {(Sym)->_hwShift = (gctUINT)(Val); } while (0)
 #define VIR_Symbol_SetHIHwRegId(Sym, Val)   do {(Sym)->_HIhwRegId = (gctUINT)(Val); } while (0)
 #define VIR_Symbol_SetHIHwShift(Sym, Val)   do {(Sym)->_HIhwShift = (gctUINT)(Val); } while (0)
-#define VIR_Symbol_SetType(Sym, Val)        do {(Sym)->type = (Val); } while (0)
-#define VIR_Symbol_SetGeneralFlag(Sym, Val) do {(Sym)->generalFlags |= (Val); } while (0)
-#define VIR_Symbol_ClrGeneralFlag(Sym, Val) do {(Sym)->generalFlags &= ~(Val); } while (0)
+#define VIR_Symbol_SetTypeId(Sym, Val)      do {(Sym)->typeId = (Val); } while (0)
+#define VIR_Symbol_SetType(Sym, Val)        do {(Sym)->typeId = VIR_Type_GetIndex(Val); } while (0)
+#define VIR_Symbol_SetFlags(Sym, Val)       do {(Sym)->flags = (Val); } while (0)
 #define VIR_Symbol_SetFlag(Sym, Val)        do {(Sym)->flags |= (Val); } while (0)
 #define VIR_Symbol_ClrFlag(Sym, Val)        do {(Sym)->flags &= ~(Val); } while (0)
 #define VIR_Symbol_SetIndex(Sym, Val)       do {(Sym)->index = (Val); } while (0)
-#define VIR_Symbol_SetVirRegVariable(Sym, Var)  do { (Sym)->u2.variable = (Var); } while (0)
+#define VIR_Symbol_SetIOBlockIndex(Sym, Val)    do {(Sym)->ioBlockIndex = (Val); } while (0)
+#define VIR_Symbol_SetVirRegVariable(Sym, Var)  do {(Sym)->u2.variable = (Var); } while (0)
 #define VIR_Symbol_SetTyQualifier(Sym, Val)     do {(Sym)->_qualifier = (gctUINT)(Val); } while (0)
+#define VIR_Symbol_SetLinkage(Sym, Val)         do {(Sym)->_linkage   = (gctUINT)(Val); } while (0)
+#define VIR_Symbol_SetComponentShift(Sym, Val)  do {(Sym)->_componentShift = (gctUINT)(Val); } while (0)
+#define VIR_Symbol_SetHostShader(Sym, Val)      do {(Sym)->u0.hostShader = (Val); } while (0)
+#define VIR_Symbol_SetHostFunction(Sym, Val)    do {(Sym)->u0.hostFunction = (Val); } while (0)
 #define VIR_Symbol_SetVregIndex(Sym, Val)       do {(Sym)->u1.vregIndex = (Val); } while (0)
 #define VIR_Symbol_SetSymbolName(Sym, Val)      do {(Sym)->u1.name = (Val); } while (0)
 #define VIR_Symbol_SetConstId(Sym, Val)         do {(Sym)->u1.constId = (Val); } while (0)
 #define VIR_Symbol_SetVariableVregIndex(Sym, Val) do {(Sym)->u2.tempIndex = (Val); } while (0)
 #define VIR_Symbol_SetUniformStructIndex(Sym, Val) do {(Sym)->u2.uniformIndex = (Val); } while (0)
-#define VIR_Symbol_SetVregVariable(Sym, Val)    do {(Sym)->u2.variable = (Val); } while (0)
+#define VIR_Symbol_SetVregVarSymId(Sym, Val)    do {(Sym)->u2.varSymId = (Val); } while (0)
+#define VIR_Symbol_SetVregVariable(Sym, Val)    do {(Sym)->u2.varSymId = VIR_Symbol_GetIndex(Val); } while (0)
 #define VIR_Symbol_SetFieldInfo(Sym, Val)       do {(Sym)->u2.fieldInfo = (Val); } while (0)
 #define VIR_Symbol_SetFunction(Sym, Val)        do {(Sym)->u2.function = (Val); } while (0)
 #define VIR_Symbol_SetUniform(Sym, Val)         do {(Sym)->u2.uniform = (Val); } while (0)
@@ -853,27 +1045,48 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Symbol_SetUBO(Sym, Val)             do {(Sym)->u2.ubo = (Val); } while (0)
 #define VIR_Symbol_SetSBO(Sym, Val)             do {(Sym)->u2.sbo = (Val); } while (0)
 #define VIR_Symbol_SetFuncMangleName(Sym, Val)  do {(Sym)->u3.mangledName = (Val); } while (0)
-#define VIR_Symbol_SetStructType(Sym, Val)      do {(Sym)->u3.structType = (Val); } while (0)
+#define VIR_Symbol_SetStructTypeId(Sym, Val)    do {(Sym)->u3.structTypeId = (Val); } while (0)
 #define VIR_Symbol_SetLayout(Sym, Val)          do {(Sym)->layout = (Val); } while (0)
 #define VIR_Symbol_SetSize(Sym, Val)            do {(Sym)->u3.size = (Val); } while (0)
 #define VIR_Symbol_SetOffsetInVar(Sym, Val)     do {(Sym)->u3.offsetInVar = (Val); } while (0)
-#define VIR_Symbol_SetIndexRange(Sym, Val)      do {(Sym)->indexRange = (Val); } while (0)
-#define VIR_Symbol_GetFirstElementId(Symbol)    ((Symbol)->firstElementId)
-#define VIR_Symbol_SetFirstElementId(Symbol, Id) ((Symbol)->firstElementId = (Id))
+#define VIR_Symbol_SetIndexRange(Sym, Val)      do {(Sym)->u5.indexRange = (Val); } while (0)
+#define VIR_Symbol_SetSamplerIdxRange(Sym, Val) do {(Sym)->u5.combinedIdx.samplerIdxRange = (Val); } while (0)
+#define VIR_Symbol_SetImgIdxRange(Sym, Val)     do {(Sym)->u5.combinedIdx.imgIdxRange = (Val); } while (0)
+#define VIR_Symbol_SetFirstElementId(Symbol, Id) do {(Symbol)->u6.firstElementId = (Id); } while (0)
+
+#define VIR_Symbol_SetSeparateSamplerId(Symbol, Id) do {(Symbol)->u3.separateSampler = (Id); } while (0)
+#define VIR_Symbol_SetSeparateImageId(Symbol, Id)   do {(Symbol)->u4.separateImage = (Id); } while (0)
+#define VIR_Symbol_SetEncloseFuncSymId(Symbol, Id)  do {(Symbol)->u4.encloseFuncSymId  = (Id); } while (0)
+#define VIR_Symbol_SetParamFuncSymId(Symbol, Id)    VIR_Symbol_SetEncloseFuncSymId(Symbol, Id)
 
 #define VIR_Symbol_SetUniformKind(Sym, Val)     do {(Sym)->_storageClass = (Val); } while (0)
 
-#define VIR_Label_GetId(Label)          ((Label)->index)
-#define VIR_Label_GetSymId(Label)       ((Label)->sym)
-#define VIR_Label_GetDefInst(Label)     ((Label)->defined)
+#define VIR_SymAliasTable_IsCreated(SymAliasTable)          ((SymAliasTable)->pHashTable != gcvNULL)
+#define VIR_SymAliasTable_GetHashTable(SymAliasTable)       ((SymAliasTable)->pHashTable)
+#define VIR_SymAliasTable_SetHashTable(SymAliasTable, T)    ((SymAliasTable)->pHashTable = (T))
+#define VIR_SymAliasTable_GetMM(SymAliasTable)              ((SymAliasTable)->pMM)
+#define VIR_SymAliasTable_SetMM(SymAliasTable, M)           ((SymAliasTable)->pMM = (M))
+
+#define VIR_Label_GetId(Label)              ((Label)->index)
+#define VIR_Label_GetSymId(Label)           ((Label)->sym)
+#define VIR_Label_GetDefInst(Label)         ((Label)->defined)
+#define VIR_Label_SetId(Label, Val)         do { (Label)->index = (Val); } while (0)
+#define VIR_Label_SetSymId(Label, Val)      do { (Label)->sym = (Val); } while (0)
+#define VIR_Label_SetDefInst(Label, Val)    do { (Label)->defined = (Val); } while (0)
+#define VIR_Label_GetReference(Label)       ((Label)->referenced)
+#define VIR_Label_GetReferenceAddr(Label)   (&(Label)->referenced)
 
 #define VIR_OpndInfo_Is_Virtual_Reg(OpndInfo)   ((OpndInfo)->isVreg && ((OpndInfo)->u1.virRegInfo.virReg != VIR_INVALID_ID))
 
 #define VIR_OpndInfo_Is_Output(OpndInfo)        ((OpndInfo)->isOutput)
 
 #define VIR_Uniform_GetSymID(Uniform)                   ((Uniform)->sym)
+#define VIR_Uniform_GetAuxAddrSymId(Uniform)            ((Uniform)->auxAddrSymId)
+#define VIR_Uniform_SetAuxAddrSymId(Uniform, a)         ((Uniform)->auxAddrSymId = (a))
 #define VIR_Uniform_GetID(Uniform)                      ((Uniform)->index)
+#define VIR_Uniform_SetID(Uniform, s)                   ((Uniform)->index = (s))
 #define VIR_Uniform_GetBlockIndex(Uniform)              ((Uniform)->blockIndex)
+#define VIR_Uniform_SetBlockIndex(Uniform, s)           (VIR_Uniform_GetBlockIndex(Uniform) = (s))
 #define VIR_Uniform_GetGLUniformIndex(Uniform)          ((Uniform)->glUniformIndex)
 #define VIR_Uniform_GetVarCategory(Uniform)             ((Uniform)->_varCategory)
 #define VIR_Uniform_SetVarCategory(Uniform, vc)         ((Uniform)->_varCategory = (vc))
@@ -888,7 +1101,9 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Uniform_GetSwizzle(Uniform)                 ((Uniform)->swizzle)
 #define VIR_Uniform_GetAddress(Uniform)                 ((Uniform)->address)
 #define VIR_Uniform_GetOffset(Uniform)                  ((Uniform)->offset)
-#define VIR_Uniform_SetOffset(Uniform, offset)          ((Uniform)->offset = offset)
+#define VIR_Uniform_SetOffset(Uniform, o)               ((Uniform)->offset = (o))
+#define VIR_Uniform_GetRealUseArraySize(Uniform)        ((Uniform)->realUseArraySize)
+#define VIR_Uniform_SetRealUseArraySize(Uniform, r)     ((Uniform)->realUseArraySize = (r))
 #define VIR_Uniform_GetInitializer(Uniform)             ((Uniform)->u.initializer)
 #define VIR_Uniform_SetInitializer(Uniform, i)          ((Uniform)->u.initializer = (i))
 
@@ -1066,24 +1281,27 @@ typedef enum _VIR_PRIMITIVETYPEID
     VIR_TYPE_FLOAT_4X3,
 
     /* sampler type */
-    VIR_TYPE_Min_SAMPLER_TYID,
-    VIR_TYPE_SAMPLER_GENERIC = VIR_TYPE_Min_SAMPLER_TYID, /* generic sampler type */
+    VIR_TYPE_MIN_SAMPLER_TYID,
+    VIR_TYPE_SAMPLER_GENERIC = VIR_TYPE_MIN_SAMPLER_TYID, /* generic sampler type */
     VIR_TYPE_SAMPLER_1D,
     VIR_TYPE_SAMPLER_2D,
     VIR_TYPE_SAMPLER_3D,
     VIR_TYPE_SAMPLER_CUBIC,
     VIR_TYPE_SAMPLER_CUBE_ARRAY,
     VIR_TYPE_SAMPLER,
+    VIR_TYPE_ISAMPLER_1D,
     VIR_TYPE_ISAMPLER_2D,
     VIR_TYPE_ISAMPLER_3D,
     VIR_TYPE_ISAMPLER_CUBIC,
     VIR_TYPE_ISAMPLER_CUBE_ARRAY,
+    VIR_TYPE_USAMPLER_1D,
     VIR_TYPE_USAMPLER_2D,
     VIR_TYPE_USAMPLER_3D,
     VIR_TYPE_USAMPLER_CUBIC,
     VIR_TYPE_USAMPLER_CUBE_ARRAY,
     VIR_TYPE_SAMPLER_EXTERNAL_OES,
 
+    VIR_TYPE_SAMPLER_1D_SHADOW,
     VIR_TYPE_SAMPLER_2D_SHADOW,
     VIR_TYPE_SAMPLER_CUBE_SHADOW,
     VIR_TYPE_SAMPLER_CUBE_ARRAY_SHADOW,
@@ -1104,42 +1322,68 @@ typedef enum _VIR_PRIMITIVETYPEID
     VIR_TYPE_SAMPLER_BUFFER,
     VIR_TYPE_ISAMPLER_BUFFER,
     VIR_TYPE_USAMPLER_BUFFER,
-    VIR_TYPE_Max_SAMPLER_TYID = VIR_TYPE_USAMPLER_BUFFER,
+    VIR_TYPE_MAX_SAMPLER_TYID = VIR_TYPE_USAMPLER_BUFFER,
 
     /* image type */
-    VIR_TYPE_Min_IMAGE_TYID,
-    VIR_TYPE_IMAGE_1D = VIR_TYPE_Min_IMAGE_TYID, /* OCL image1d_t */
-    VIR_TYPE_IMAGE_1D_ARRAY, /* OCL image1d_array_t */
-    VIR_TYPE_IMAGE_1D_BUFFER, /* OCL image1d_buffer_t */
-    VIR_TYPE_IMAGE_2D, /* OCL image2d_t */
-    VIR_TYPE_IMAGE_2D_ARRAY, /* OCL image2d_array_t */
-    VIR_TYPE_IMAGE_3D, /* OCL image3d_t */
-    VIR_TYPE_IMAGE_2D_ARRAY_MSSA, /* OCL image2d_array_mssa_t */
-    VIR_TYPE_IMAGE_2D_MSSA_DEPTH, /* OCL image2d_mssa_depth_t */
-    VIR_TYPE_IMAGE_2D_ARRAY_MSSA_DEPTH, /* OCL image2d_array_mssa_depth_t */
-    VIR_TYPE_IMAGE_2D_DEPTH, /* OCL image2d_depth_t */
-    VIR_TYPE_IMAGE_2D_ARRAY_DEPTH, /* OCL image2d_array_depth_t */
+    VIR_TYPE_MIN_IMAGE_TYID,
+    /* subPass input */
+    VIR_TYPE_SUBPASSINPUT = VIR_TYPE_MIN_IMAGE_TYID,
+    VIR_TYPE_SUBPASSINPUTMS,
+    VIR_TYPE_ISUBPASSINPUT,
+    VIR_TYPE_ISUBPASSINPUTMS,
+    VIR_TYPE_USUBPASSINPUT,
+    VIR_TYPE_USUBPASSINPUTMS,
+
+    VIR_TYPE_IMAGE_1D,
+    VIR_TYPE_IMAGE_1D_DEPTH,
+    VIR_TYPE_IMAGE_1D_ARRAY,
+    VIR_TYPE_IMAGE_1D_ARRAY_DEPTH,
+    VIR_TYPE_IMAGE_1D_BUFFER,
+    VIR_TYPE_IIMAGE_1D,
+    VIR_TYPE_IIMAGE_1D_ARRAY,
+    VIR_TYPE_UIMAGE_1D,
+    VIR_TYPE_UIMAGE_1D_ARRAY,
+    VIR_TYPE_IMAGE_2D,
+    VIR_TYPE_IMAGE_2D_ARRAY,
+    VIR_TYPE_IMAGE_3D,
+    VIR_TYPE_IMAGE_2D_MSSA,
+    VIR_TYPE_IMAGE_2D_ARRAY_MSSA,
+    VIR_TYPE_IMAGE_2D_MSSA_DEPTH,
+    VIR_TYPE_IMAGE_2D_ARRAY_MSSA_DEPTH,
+    VIR_TYPE_IMAGE_2D_DEPTH,
+    VIR_TYPE_IMAGE_2D_ARRAY_DEPTH,
     VIR_TYPE_IIMAGE_2D,
+    VIR_TYPE_IIMAGE_2D_MSSA,
+    VIR_TYPE_IIMAGE_2D_ARRAY_MSSA,
     VIR_TYPE_UIMAGE_2D,
+    VIR_TYPE_UIMAGE_2D_MSSA,
+    VIR_TYPE_UIMAGE_2D_ARRAY_MSSA,
     VIR_TYPE_IIMAGE_3D,
     VIR_TYPE_UIMAGE_3D,
     VIR_TYPE_IIMAGE_2D_ARRAY,
     VIR_TYPE_UIMAGE_2D_ARRAY,
     VIR_TYPE_IMAGE_CUBE,
+    VIR_TYPE_IMAGE_CUBE_DEPTH,
     VIR_TYPE_IMAGE_CUBE_ARRAY,
+    VIR_TYPE_IMAGE_CUBE_DEPTH_ARRAY,
     VIR_TYPE_IIMAGE_CUBE,
+    VIR_TYPE_IIMAGE_CUBE_DEPTH,
     VIR_TYPE_IIMAGE_CUBE_ARRAY,
     VIR_TYPE_UIMAGE_CUBE,
+    VIR_TYPE_UIMAGE_CUBE_DEPTH,
     VIR_TYPE_UIMAGE_CUBE_ARRAY,
     VIR_TYPE_IMAGE_BUFFER,
     VIR_TYPE_IIMAGE_BUFFER,
     VIR_TYPE_UIMAGE_BUFFER,
-    VIR_TYPE_Max_IMAGE_TYID = VIR_TYPE_UIMAGE_BUFFER,
+    VIR_TYPE_MAX_IMAGE_TYID = VIR_TYPE_UIMAGE_BUFFER,
 
     VIR_TYPE_EVENT, /* OCL event_t */
 
-    VIR_TYPE_ATOMIC_UINT, /* atomic counter */
+    /* atomic counter type */
+    VIR_TYPE_MIN_ATOMIC_COUNTER_TYPID,
+    VIR_TYPE_ATOMIC_UINT = VIR_TYPE_MIN_ATOMIC_COUNTER_TYPID,
     VIR_TYPE_ATOMIC_UINT4,
+    VIR_TYPE_MAX_ATOMIC_COUNTER_TYPID = VIR_TYPE_ATOMIC_UINT4,
 
     VIR_TYPE_LAST_PRIMITIVETYPE = VIR_TYPE_ATOMIC_UINT4,
     VIR_TYPE_PRIMITIVETYPE_COUNT, /* must to change _builtinTypes at the
@@ -1148,7 +1392,7 @@ typedef enum _VIR_PRIMITIVETYPEID
 
 typedef VIR_PrimitiveTypeId   VIR_TypeId;        /* index to type table */
 
-#define VIR_ListResize(OldSize) ((gctUINT)((OldSize) * 1.5))
+#define VIR_ListResize(OldSize) ((gctUINT)(((OldSize) < 2 ? 2 : (OldSize)) * 1.5))
 
 struct _VIR_IDLIST
 {
@@ -1177,10 +1421,11 @@ struct _VIR_VALUELIST
 #define VIR_INVALID_ID              INVALID_BT_ENTRY_ID
 #define VIR_Id_GetIndex(Id)         ((gctUINT)(Id) & VALID_BT_ENTRY_ID_MASK)
 #define VIR_Id_GetScope(Id)         (((gctUINT)(Id) & BT_ENTRY_ID_SCOPE_MASK) >> BT_ENTRY_VALID_BITS)
-#define VIR_Id_isFunctionScope(Id)  (((Id) & BT_ENTRY_ID_FUNC_SCOPE))
+#define VIR_Id_isFunctionScope(Id)  ((Id != VIR_INVALID_ID) && (((Id) & BT_ENTRY_ID_FUNC_SCOPE) != 0))
 #define VIR_Id_SetFunctionScope(Id) do { (Id) |= BT_ENTRY_ID_FUNC_SCOPE; } while (0)
 #define VIR_Id_isValid(Id)          (VIR_Id_GetIndex(Id) != VIR_INVALID_ID)
 #define VIR_Id_isInvalid(Id)        (VIR_Id_GetIndex(Id) == VIR_INVALID_ID)
+#define VIR_INVALID_HWREG           0x3FF
 
 #define VIR_GetEntryFromId(BlockTable, Id)  (BT_GET_ENTRY_DATA(BlockTable, (Id)))
 
@@ -1218,10 +1463,31 @@ VIR_IdList_Init(
     IN gctUINT          InitSize,
     IN OUT VIR_IdList **IdList);
 
+void
+VIR_IdList_Finalize(VIR_IdList *IdList);
+
+VSC_ErrCode
+VIR_IdList_Reserve(
+    IN OUT VIR_IdList *     IdList,
+    IN     gctUINT          Count
+    );
+
 VSC_ErrCode
 VIR_IdList_Add(
     IN VIR_IdList *     IdList,
     IN VIR_Id           Id);
+
+VSC_ErrCode
+VIR_IdList_Set(
+    IN VIR_IdList *     IdList,
+    IN gctUINT          Index,
+    IN VIR_Id           Id);
+
+VSC_ErrCode
+VIR_IdList_Copy(
+    IN OUT VIR_IdList *     IdList,
+    IN     VIR_IdList *     SourceIdList
+    );
 
 VSC_ErrCode
 VIR_IdList_DeleteByIndex(
@@ -1233,6 +1499,11 @@ VIR_IdList_DeleteByValue(
     IN VIR_IdList *     IdList,
     IN VIR_Id           Value);
 
+VIR_Id
+VIR_IdList_FindByValue(
+    IN VIR_IdList *     IdList,
+    IN VIR_Id           Value);
+
 #define VIR_IdList_Count(IdList)        ((IdList)->count)
 #if !defined(_DEBUG)
 #define VIR_IdList_GetId(IdList, No)    ((VIR_Id)(IdList)->ids[(No)])
@@ -1240,6 +1511,12 @@ VIR_IdList_DeleteByValue(
 VIR_Id VIR_IdList_GetId(VIR_IdList *, gctUINT);
 #endif
 #define VIR_IdList_SetId(IdList, No, Id) do { gcmASSERT((No) < VIR_IdList_Count(IdList)); (IdList)->ids[(No)] = (Id); } while(0)
+
+VSC_ErrCode
+VIR_IdList_RenumberIndex(
+    IN VIR_Shader *     pShader,
+    IN VIR_IdList *     IdList
+    );
 
 /* How to iterate IdList:
  *  for (int i = 0; i < VIR_IdList_Count(lst); i++)
@@ -1256,6 +1533,9 @@ VIR_ValueList_Init(
     IN gctUINT              InitSize,
     IN gctUINT              ElemSize, /* sizeof(typeof(value)) */
     IN OUT VIR_ValueList ** ValueList);
+
+void
+VIR_ValueList_Finalize(VIR_ValueList *ValueList);
 
 VSC_ErrCode
 VIR_ValueList_Add(
@@ -1327,6 +1607,14 @@ typedef enum _VIR_ConditionOp
     VIR_COP_UCARRY, /* 0x17   0x17 */
     VIR_COP_HELPER, /* 0x18   0x18 */
     VIR_COP_NOTHELPER, /* 0x19 0x19 */
+    /* Floating-point comparison for being unordered. */
+    VIR_COP_EQUAL_UQ,
+    VIR_COP_NOT_EQUAL_UQ,
+    VIR_COP_LESS_UQ,
+    VIR_COP_GREATER_UQ,
+    VIR_COP_LESS_OR_EQUAL_UQ,
+    VIR_COP_GREATER_OR_EQUAL_UQ,
+    VIR_COP_MAX,
 }
 VIR_ConditionOp;
 
@@ -1356,7 +1644,19 @@ VIR_ConditionOp;
                                                      (c) == VIR_COP_OR || \
                                                      (c) == VIR_COP_XOR)
 
+#define VIR_ConditionOp_Unordered(c)                ((c) == VIR_COP_EQUAL_UQ                || \
+                                                     (c) == VIR_COP_NOT_EQUAL_UQ            || \
+                                                     (c) == VIR_COP_LESS_UQ                 || \
+                                                     (c) == VIR_COP_GREATER_UQ              || \
+                                                     (c) == VIR_COP_LESS_OR_EQUAL_UQ        || \
+                                                     (c) == VIR_COP_GREATER_OR_EQUAL_UQ)
+
 #define VIR_CHANNEL_COUNT           4
+#define VIR_CHANNEL_X               0
+#define VIR_CHANNEL_Y               1
+#define VIR_CHANNEL_Z               2
+#define VIR_CHANNEL_W               3
+
 /* Swizzle generator macro. */
 #define virmSWIZZLE(Component1, Component2, Component3, Component4) \
     (\
@@ -1456,15 +1756,18 @@ extern VIR_NameId   VIR_NAME_UNKNOWN,
                     VIR_NAME_DEPTH,
                     VIR_NAME_FOG_COORD,
                     VIR_NAME_VERTEX_ID,
+                    VIR_NAME_VERTEX_INDEX,
                     VIR_NAME_FRONT_COLOR,
                     VIR_NAME_BACK_COLOR,
                     VIR_NAME_FRONT_SECONDARY_COLOR,
                     VIR_NAME_BACK_SECONDARY_COLOR,
                     VIR_NAME_TEX_COORD,
                     VIR_NAME_INSTANCE_ID,
+                    VIR_NAME_INSTANCE_INDEX,
                     VIR_NAME_NUM_GROUPS,
                     VIR_NAME_WORKGROUPSIZE,
                     VIR_NAME_WORK_GROUP_ID,
+                    VIR_NAME_WORK_GROUP_INDEX,
                     VIR_NAME_LOCAL_INVOCATION_ID,
                     VIR_NAME_GLOBAL_INVOCATION_ID,
                     VIR_NAME_LOCALINVOCATIONINDEX,
@@ -1486,9 +1789,11 @@ extern VIR_NameId   VIR_NAME_UNKNOWN,
                     VIR_NAME_SAMPLE_POSITION, /* gl_SamplePosition */
                     VIR_NAME_SAMPLE_MASK_IN, /* gl_SampleMaskIn */
                     VIR_NAME_SAMPLE_MASK, /* gl_SampleMask */
-                    VIR_NAME_IN_POSITION, /* gl_in.gl_Position*/
-                    VIR_NAME_IN_POINT_SIZE, /* gl_in.gl_PointSize*/
-                    VIR_NAME_BOUNDING_BOX, /* gl_BoundingBox*/
+                    VIR_NAME_IN_POSITION, /* gl_in.gl_Position */
+                    VIR_NAME_IN_POINT_SIZE, /* gl_in.gl_PointSize */
+                    VIR_NAME_BOUNDING_BOX, /* gl_BoundingBox */
+                    VIR_NAME_LAST_FRAG_DATA, /* gl_LastFragData */
+                    VIR_NAME_CLIP_DISTANCE, /* gl_PerVertex.gl_ClipDistance */
                     VIR_NAME_BUILTIN_LAST;
 
 typedef enum _VIR_ROUNDMODE
@@ -1579,6 +1884,30 @@ typedef enum _VIR_INTRINSICSKIND
 } VIR_IntrinsicsKind;
 #undef VIR_INTRINSIC_INFO
 
+#define VIR_Intrinsics_isImageAddr(Kind)            ((Kind) == VIR_IK_image_addr)
+#define VIR_Intrinsics_isImageLoad(Kind)            ((Kind) == VIR_IK_image_load)
+#define VIR_Intrinsics_isImageStore(Kind)           ((Kind) == VIR_IK_image_store)
+#define VIR_Intrinsics_isImageQueryDimRelated(Kind) (((Kind) == VIR_IK_image_query_size_lod)    || \
+                                                     ((Kind) == VIR_IK_image_query_size))
+#define VIR_Intrinsics_isImageQueryLod(Kind)        ((Kind) == VIR_IK_image_query_lod)
+#define VIR_Intrinsics_isImageQuery(Kind)           (((Kind) == VIR_IK_image_query_format)      || \
+                                                     ((Kind) == VIR_IK_image_query_order)       || \
+                                                     ((Kind) == VIR_IK_image_query_size_lod)    || \
+                                                     ((Kind) == VIR_IK_image_query_size)        || \
+                                                     ((Kind) == VIR_IK_image_query_lod)         || \
+                                                     ((Kind) == VIR_IK_image_query_levels)      || \
+                                                     ((Kind) == VIR_IK_image_query_samples))
+#define VIR_Intrinsics_isImageRelated(Kind)          (VIR_Intrinsics_isImageLoad(Kind)          || \
+                                                      VIR_Intrinsics_isImageStore(Kind)         || \
+                                                      VIR_Intrinsics_isImageQuery(Kind))
+
+#define VIR_Intrinsics_isImageFetch(Kind)           ((Kind) == VIR_IK_image_fetch)
+
+#define VIR_Intrinsics_isTexLdRelated(Kind)         (((Kind) == VIR_IK_texld)                   || \
+                                                     ((Kind) == VIR_IK_texldpcf)                || \
+                                                     ((Kind) == VIR_IK_texld_proj)              || \
+                                                     ((Kind) == VIR_IK_texld_gather)            || \
+                                                     ((Kind) == VIR_IK_texld_fetch_ms))
 
 #define VIR_OPINFO(OPCODE, OPNDNUM, FLAGS, WRITE2DEST, LEVEL)   VIR_OP_##OPCODE
 typedef enum _VIR_OPCODE
@@ -1603,20 +1932,21 @@ typedef enum _VIR_OP_FLAG
     VIR_OPFLAG_Src2Componentwise    = 0x400,
     VIR_OPFLAG_Src3Componentwise    = 0x800,
     VIR_OPFLAG_OnlyUseEnable        = 0x1000,
-    VIR_OPFLAG_MemoryRead           = 0x2000,
-    VIR_OPFLAG_MemoryWrite          = 0x4000,
+    VIR_OPFLAG_Loads                = 0x2000,
+    VIR_OPFLAG_Stores               = 0x4000,
     VIR_OPFLAG_Expression           = 0x8000,
     VIR_OPFLAG_ExpdPrecFromHighest  = 0x10000, /*expected result precision should be the same as */
     VIR_OPFLAG_ExpdPrecFromSrc0     = 0x20000,
-    VIR_OPFLAG_ExpdPrecFromSrc12    = 0x40000,
-    VIR_OPFLAG_ExpdPrecFromSrc2     = 0x80000,
-    VIR_OPFLAG_ExpdPrecHP           = 0x100000,
-    VIR_OPFLAG_ExpdPrecMP           = 0x200000,
-    VIR_OPFLAG_ExpdPrecFromBits     = 0x3f0000,
-    VIR_OPFLAG_VXOnly               = 0x400000, /* VX only instruction (EVIS) */
-    VIR_OPFLAG_EVIS_Modifier_MASK   = 0x3800000, /* VX inst EVIS_Modifier operand number */
-    VIR_OPFLAG_EVIS_Modifier_SHIFT  = 23, /* VX inst EVIS_Modifier shift count */
-    VIR_OPFLAG_Use512Unifrom        = 0x4000000, /* VX instruction, use 512 bit uniform */
+    VIR_OPFLAG_ExpdPrecFromSrc12    = 0x30000,
+    VIR_OPFLAG_ExpdPrecFromSrc2     = 0x40000,
+    VIR_OPFLAG_ExpdPrecHP           = 0x50000,
+    VIR_OPFLAG_ExpdPrecMP           = 0x60000,
+    VIR_OPFLAG_ExpdPrecFromBits     = 0x70000,
+    VIR_OPFLAG_VXOnly               = 0x80000, /* VX only instruction (EVIS) */
+    VIR_OPFLAG_EVIS_Modifier_MASK   = 0x700000, /* VX inst EVIS_Modifier operand number */
+    VIR_OPFLAG_EVIS_Modifier_SHIFT  = 20, /* VX inst EVIS_Modifier shift count */
+    VIR_OPFLAG_Use512Unifrom_MASK   = 0x3800000, /* VX instruction, 512 bit uniform operand number */
+    VIR_OPFLAG_Use512Unifrom_SHIFT  = 23, /* 512 bit uniform shift count */
 } VIR_OpFlag;
 
 typedef enum _VIR_OP_LEVEL
@@ -1651,12 +1981,55 @@ extern const gctSTRING VIR_DestModifierName[];
 extern const gctSTRING VIR_SrcModifierName[];
 extern const gctSTRING VIR_IntrinsicName[];
 
+typedef enum _VIR_IMAGE_QUERY_KIND
+{
+    VIR_IMAGE_QUERY_KIND_NONE        = 0,
+    VIR_IMAGE_QUERY_KIND_FORMAT      = 1,
+    VIR_IMAGE_QUERY_KIND_ORDER       = 2,
+    VIR_IMAGE_QUERY_KIND_SIZE_LOD    = 3,
+    VIR_IMAGE_QUERY_KIND_SIZE        = 4,
+    VIR_IMAGE_QUERY_KIND_LOD         = 5,
+    VIR_IMAGE_QUERY_KIND_LEVELS      = 6,
+    VIR_IMAGE_QUERY_KIND_SAMPLES     = 7,
+} VIR_IMAGE_QUERY_KIND;
+
+/* defines for intrinsic set */
+typedef enum _VIR_INTRINSIC_SET
+{
+    VIR_INTRINSIC_SET_GLSL      = 1, /* from gcsl.std.450.h */
+    VIR_INTRINSIC_SET_CL        = 2, /* from CL */
+    VIR_INTRINSIC_SET_INTERNAL  = 3, /* internal intrinsic */
+} VIR_INTRINSIC_SET;
+
+/* funcId for internal intrinsics */
+typedef enum _VIR_INTRINSIC_INTERNAL_ID
+{
+    VIR_INTRINSIC_INTERNAL_TRANSPOSE            = 0,
+    VIR_INTRINSIC_INTERNAL_IMAGESTORE           = 1,
+    VIR_INTRINSIC_INTERNAL_IMAGELOAD            = 2,
+    VIR_INTRINSIC_INTERNAL_VECGET               = 3,
+    VIR_INTRINSIC_INTERNAL_VECSET               = 4,
+    VIR_INTRINSIC_INTERNAL_ADDCARRY             = 5,
+    VIR_INTRINSIC_INTERNAL_SUBBORROW            = 6,
+    VIR_INTRINSIC_INTERNAL_UMULEXTENDED         = 7,
+    VIR_INTRINSIC_INTERNAL_SMULEXTENDED         = 8,
+    VIR_INTRINSIC_INTERNAL_QUANTIZE_TO_F16      = 9,
+    VIR_INTRINSIC_INTERNAL_IMAGEFETCH           = 10,
+    VIR_INTRINSIC_INTERNAL_IMAGEADDR            = 11,
+    VIR_INTRINSIC_INTERNAL_IMAGE_QUERY_FORMAT   = 12,
+    VIR_INTRINSIC_INTERNAL_IMAGE_QUERY_ORDER    = 13,
+    VIR_INTRINSIC_INTERNAL_IMAGE_QUERY_SIZE_LOD = 14,
+    VIR_INTRINSIC_INTERNAL_IMAGE_QUERY_SIZE     = 15,
+    VIR_INTRINSIC_INTERNAL_IMAGE_QUERY_LOD      = 16,
+    VIR_INTRINSIC_INTERNAL_IMAGE_QUERY_LEVELS   = 17,
+    VIR_INTRINSIC_INTERNAL_IMAGE_QUERY_SAMPLES  = 18,
+} VIR_INTRINSIC_INTERNAL_ID;
+
 /* Shader types. */
 typedef enum _VIR_SHADERKIND {
     VIR_SHADER_UNKNOWN = 0,
     VIR_SHADER_VERTEX,
     VIR_SHADER_FRAGMENT,
-    VIR_SHADER_CL,
     VIR_SHADER_PRECOMPILED,
     VIR_SHADER_COMPUTE, /* OGL, DX11 */
     VIR_SHADER_TESSELLATION_CONTROL, /* OGL, DOMAIN shader for DX11 */
@@ -1716,7 +2089,17 @@ typedef enum _VIR_STORAGECLASS
     VIR_STORAGE_REGISTER, /* temp register */
     VIR_STORAGE_LOCALSTORAGE, /* local storage */
     VIR_STORAGE_INDEX_REGISTER, /* index register a0 */
+    VIR_STORAGE_SHARED_VAR, /* shared or workgroup variables */
 } VIR_StorageClass;
+
+typedef struct _VIR_CHECK_VAR_USAGE
+{
+    gctBOOL     checkInput;
+    gctBOOL     checkOutput;
+    gctBOOL     checkPrePatchInput;
+    gctBOOL     checkPrePatchOutput;
+    gctBOOL     checkUniform;
+}VIR_CHECK_VAR_USAGE;
 
 /* TODO: create a map later to hide the detail of uniform implemenation */
 typedef enum _VIR_UNIFORMKIND
@@ -1744,12 +2127,18 @@ typedef enum _VIR_UNIFORMKIND
     VIR_UNIFORM_UNIFORM_BLOCK_ADDRESS,
     VIR_UNIFORM_LOD_MIN_MAX,
     VIR_UNIFORM_LEVEL_BASE_SIZE,
+    VIR_UNIFORM_LEVELS_SAMPLES,
     VIR_UNIFORM_STRUCT,
     VIR_UNIFORM_STORAGE_BLOCK_ADDRESS,
     VIR_UNIFORM_SAMPLE_LOCATION,
     VIR_UNIFORM_ENABLE_MULTISAMPLE_BUFFERS,
     VIR_UNIFORM_TEMP_REG_SPILL_MEM_ADDRESS,
     VIR_UNIFORM_CONST_BORDER_VALUE,
+    VIR_UNIFORM_PUSH_CONSTANT,
+    VIR_UNIFORM_SAMPLED_IMAGE,
+    VIR_UNIFORM_EXTRA_LAYER,
+    VIR_UNIFORM_BASE_INSTANCE,
+    /* should not larger than 2^6, since it is using storageClass */
 } VIR_UniformKind;
 
 typedef enum _VIR_ADDRSPACE
@@ -1823,16 +2212,49 @@ typedef struct _VIR_LAYOUT
 {
     VIR_LayoutQual layoutQualifier;     /* layout quliafiers */
     gctINT         location;            /* location of in/out variable, uniform, interface block */
+    gctINT         masterLocation;      /* If the sym is derived from other symbol (master), record the location of master */
+    gctUINT        descriptorSet;       /* descriptor set for resources */
     gctUINT        binding;             /* binding for SBO/UBO/AtomicCounter/sampler/image */
     gctUINT        offset;              /* offset in bound mem resource for atomicCounter */
     gctUINT        llFirstSlot;         /* low level first slot for SEP mapping tables */
     gctUINT        llArraySlot;         /* low level array slot for SEP mapping tables */
+    gctUINT        llResSlot;           /* For some resources, such as image ssbo, it represents low level slot for resource itself */
     gctUINT        hwFirstCompIndex;    /* HW's 'attributeIndex' to index USC, just for I/O */
 } VIR_Layout;
 
+#define VIR_LAYOUT_Initialize(Layout)                                   \
+    do {                                                                \
+        gcoOS_ZeroMemory((Layout), gcmSIZEOF(VIR_Layout));              \
+        (Layout)->location = NOT_ASSIGNED;                              \
+        (Layout)->masterLocation = NOT_ASSIGNED;                        \
+        (Layout)->binding = NOT_ASSIGNED;                               \
+        (Layout)->descriptorSet = NOT_ASSIGNED;                         \
+        (Layout)->llFirstSlot = NOT_ASSIGNED;                           \
+        (Layout)->llArraySlot = NOT_ASSIGNED;                           \
+        (Layout)->llResSlot = NOT_ASSIGNED;                             \
+        (Layout)->hwFirstCompIndex = NOT_ASSIGNED;                      \
+    } while(0)
+
+#define VIR_Layout_GetQualifiers(Layout)    ((Layout)->layoutQualifier)
+#define VIR_Layout_IsPacked(Layout)         ((Layout)->layoutQualifier & VIR_LAYQUAL_PACKED)
+#define VIR_Layout_IsShared(Layout)         ((Layout)->layoutQualifier & VIR_LAYQUAL_SHARED)
+#define VIR_Layout_IsStd140(Layout)         ((Layout)->layoutQualifier & VIR_LAYQUAL_STD140)
+#define VIR_Layout_IsStd430(Layout)         ((Layout)->layoutQualifier & VIR_LAYQUAL_STD430)
+#define VIR_Layout_IsColumnMajor(Layout)    ((Layout)->layoutQualifier & VIR_LAYQUAL_COLUMN_MAJOR)
+#define VIR_Layout_IsRowMajor(Layout)       ((Layout)->layoutQualifier & VIR_LAYQUAL_ROW_MAJOR)
+#define VIR_Layout_HasLocation(Layout)      ((Layout)->layoutQualifier & VIR_LAYQUAL_LOCATION)
 #define VIR_Layout_GetLocation(Layout)      ((Layout)->location)
+#define VIR_Layout_GetMasterLocation(Layout) ((Layout)->masterLocation)
+#define VIR_Layout_GetLlResSlot(Layout)     ((Layout)->llResSlot)
+#define VIR_Layout_GetDescriptorSet(Layout) ((Layout)->descriptorSet)
+#define VIR_Layout_HasBinding(Layout)       ((Layout)->layoutQualifier & VIR_LAYQUAL_BINDING)
 #define VIR_Layout_GetBinding(Layout)       ((Layout)->binding)
+#define VIR_Layout_HasOffset(Layout)        ((Layout)->layoutQualifier & VIR_LAYQUAL_OFFSET)
 #define VIR_Layout_GetOffset(Layout)        ((Layout)->offset)
+#define VIR_Layout_HasBlend(Layout)         ((Layout)->layoutQualifier & VIR_LAYQUAL_BLEND)
+#define VIR_Layout_GetBlend(Layout)         ((Layout)->layoutQualifier & VIR_LAYQUAL_BLEND_MASK)
+#define VIR_Layout_HasImageFormat(Layout)        ((Layout)->layoutQualifier & VIR_LAYQUAL_IMAGE_FORMAT)
+#define VIR_Layout_GetImageFormat(Layout)        ((Layout)->layoutQualifier & VIR_LAYQUAL_IMAGE_FORMAT_MASK)
 #define VIR_Layout_GetLlFirstSlot(Layout)       ((Layout)->llFirstSlot)
 #define VIR_Layout_GetLlArraySlot(Layout)       ((Layout)->llArraySlot)
 #define VIR_Layout_GetHwFirstCompIndex(Layout)  ((Layout)->hwFirstCompIndex)
@@ -1854,20 +2276,40 @@ typedef enum _VIR_TYQUALIFIER
 typedef struct _VIR_FIELDINFO
 {
     gctUINT32   offset;             /* byte offset from the begin of struct */
+    gctINT      arrayStride;        /* array stride of this field */
+    gctINT      matrixStride;       /* matrix stride of this field */
+    gctINT      alignment;          /* alignment of this field */
     gctUINT     isBitfield  : 1;
     gctUINT     bitSize     : 7;    /* number of bits */
     gctUINT     startBit    : 8;    /* start bit from the first byte of this field */
     gctUINT     tempRegOrUniformOffset : 16;   /* the temp register or uniform offset of this field */
 } VIR_FieldInfo;
 
-typedef enum VIR_GENERAL_SYMFLAG
-{
-    /* General flags */
-    VIR_GENERAL_SYMFLAG_NONE                    = 0x00000000, /* no flag */
+#define VIR_FIELDINFO_Initialize(FieldInfo)                             \
+    do {                                                                \
+        gcoOS_ZeroMemory(FieldInfo, gcmSIZEOF(VIR_FieldInfo));          \
+        (FieldInfo)->offset = (gctUINT)-1;                              \
+        (FieldInfo)->arrayStride = -1;                                  \
+        (FieldInfo)->matrixStride = -1;                                 \
+        (FieldInfo)->alignment = -1;                                    \
+    } while(0)
 
-    VIR_GENERAL_SYMFLAG_WITHOUT_REG             = 0x00000001, /* This symbol has no register. */
-
-} VIR_GeneralSymFlag;
+#define VIR_FieldInfo_GetOffset(FieldInfo)                      ((FieldInfo)->offset)
+#define VIR_FieldInfo_SetOffset(FieldInfo, Val)                 do {(FieldInfo)->offset = (Val); } while (0)
+#define VIR_FieldInfo_GetArrayStride(FieldInfo)                 ((FieldInfo)->arrayStride)
+#define VIR_FieldInfo_SetArrayStride(FieldInfo, Val)            do {(FieldInfo)->arrayStride = (Val); } while (0)
+#define VIR_FieldInfo_GetMatrixStride(FieldInfo)                ((FieldInfo)->matrixStride)
+#define VIR_FieldInfo_SetMatrixStride(FieldInfo, Val)           do {(FieldInfo)->matrixStride = (Val); } while (0)
+#define VIR_FieldInfo_GetAlignment(FieldInfo)                   ((FieldInfo)->alignment)
+#define VIR_FieldInfo_SetAlignment(FieldInfo, Val)              do {(FieldInfo)->alignment = (Val); } while (0)
+#define VIR_FieldInfo_GetIsBitField(FieldInfo)                  ((FieldInfo)->isBitfield)
+#define VIR_FieldInfo_SetIsBitField(FieldInfo, Val)             do {(FieldInfo)->isBitfield = (Val); } while (0)
+#define VIR_FieldInfo_GetBitSize(FieldInfo)                     ((FieldInfo)->bitSize)
+#define VIR_FieldInfo_SetBitSize(FieldInfo, Val)                do {(FieldInfo)->bitSize = (Val); } while (0)
+#define VIR_FieldInfo_GetStartBit(FieldInfo)                    ((FieldInfo)->startBit)
+#define VIR_FieldInfo_SetStartBit(FieldInfo, Val)               do {(FieldInfo)->startBit = (Val); } while (0)
+#define VIR_FieldInfo_GetTempRegOrUniformOffset(FieldInfo)      ((FieldInfo)->tempRegOrUniformOffset)
+#define VIR_FieldInfo_SetTempRegOrUniformOffset(FieldInfo, Val) do {(FieldInfo)->tempRegOrUniformOffset = (Val); } while (0)
 
 typedef enum VIR_SYMFLAG
 {
@@ -1877,86 +2319,91 @@ typedef enum VIR_SYMFLAG
     VIR_SYMFLAG_INACTIVE                        = 0x00000002,
     VIR_SYMFLAG_FLAT                            = 0x00000004,
     VIR_SYMFLAG_INVARIANT                       = 0x00000008,
-    VIR_SYMFLAG_IS_ARRAY                        = 0x00000010, /* variable/uniform is array type */
-    VIR_SYMFLAG_IS_POINTER                      = 0x00000020, /* Wheter the uniform is a pointer. */
-    VIR_SYMFLAG_IS_STRUCT                       = 0x00000040, /* variable/uniform is struct type */
+    VIR_SYMFLAG_WITHOUT_REG                     = 0x00000010,
+    VIR_SYMFLAG_COMBINED_SAMPLER                = 0x00000020, /* the sampler is created by combining separaed
+                                                                   * sampler and image/texture */
+    VIR_SYMFLAG_LOCAL                           = 0x00000040, /* the symbol is local to hostFunction */
     VIR_SYMFLAG_IS_FIELD                        = 0x00000080, /* variable/uniform is struct field */
     VIR_SYMFLAG_COMPILER_GEN                    = 0x00000100, /* set the symbol compiler generated */
     VIR_SYMFLAG_BUILTIN                         = 0x00000200, /* set the symbol builtin */
-    VIR_SYMFLAG_DIRECTLY_ADDRESSED              = 0x00000400, /* set the symbol directly addressed */
-    VIR_SYMFLAG_ARRAYED_PER_VERTEX              = 0x00000800, /* set the symbol directly addressed */
-    VIR_SYMFLAG_PRECISE                         = 0x00001000, /* symbol is precise */
-    VIR_SYMFLAG_LOAD_STORE_ATTR                 = 0x00002000, /* only used for inputs/outputs */
-    VIR_SYMFLAG_STATICALLY_USED                 = 0x00004000, /* set the symbol statically used */
-    VIR_SYMFLAG_IS_IOBLOCK_MEMBER               = 0x00008000, /* variable is a member of an IO block */
-    VIR_SYMFLAG_IS_INSTANCE_MEMBER              = 0x00010000, /* variable is a member of an IO block with a instance name*/
-    VIR_SYMFLAG_INDIRECTLY_ADDRESSED            = 0x00020000, /* set the symbol indirectly addressed */
+    VIR_SYMFLAG_ARRAYED_PER_VERTEX              = 0x00000400, /* set the symbol arrayed per vertex */
+    VIR_SYMFLAG_PRECISE                         = 0x00000800, /* symbol is precise */
+    VIR_SYMFLAG_LOAD_STORE_ATTR                 = 0x00001000, /* only used for inputs/outputs */
+    VIR_SYMFLAG_STATICALLY_USED                 = 0x00002000, /* set the symbol statically used */
+    VIR_SYMFLAG_IS_IOBLOCK_MEMBER               = 0x00004000, /* variable is a member of an IO block */
+    VIR_SYMFLAG_IS_INSTANCE_MEMBER              = 0x00008000, /* variable is a member of an IO block with a instance name*/
+    VIR_SYMFLAG_SKIP_NAME_CHECK                 = 0x00010000, /* don't need to check name match, for IO, uniform, ssbo. */
 
     /* ubo flags */
-    VIR_SYMUBOFLAG_IS_DUBO                      = 0x00040000, /* ubo is default ubo */
-    VIR_SYMUBOFLAG_IS_CUBO                      = 0x00080000, /* ubo is constant ubo */
+    VIR_SYMUBOFLAG_IS_DUBO                      = 0x00020000, /* ubo is default ubo */
+    VIR_SYMUBOFLAG_IS_CUBO                      = 0x00040000, /* ubo is constant ubo */
 
     /* uniform flags: may need the seperate flags inside the uniform or
                       combine with the uniformKind  */
-    VIR_SYMUNIFORMFLAG_LOADTIME_CONSTANT        = 0x00040000,
-    VIR_SYMUNIFORMFLAG_COMPILETIME_INITIALIZED  = 0x00080000,
-    VIR_SYMUNIFORMFLAG_USED_IN_SHADER           = 0x00100000,
-    VIR_SYMUNIFORMFLAG_USED_IN_LTC              = 0x00200000, /* it may be not used in
+    VIR_SYMUNIFORMFLAG_LOADTIME_CONSTANT        = 0x00020000,
+    VIR_SYMUNIFORMFLAG_COMPILETIME_INITIALIZED  = 0x00040000,
+    VIR_SYMUNIFORMFLAG_USED_IN_SHADER           = 0x00080000,
+    VIR_SYMUNIFORMFLAG_USED_IN_LTC              = 0x00100000, /* it may be not used in
                                                                    * shader, but is used in LTC */
-    VIR_SYMUNIFORMFLAG_MOVED_TO_DUB             = 0x00400000, /*set the uniform moved from user defined uniform block
+    VIR_SYMUNIFORMFLAG_MOVED_TO_DUB             = 0x00200000, /*set the uniform moved from user defined uniform block
                                                                     to default uniform block */
-    VIR_SYMUNIFORMFLAG_SAMPLER_CALCULATE_TEX_SIZE = 0x00800000,
-    VIR_SYMUNIFORMFLAG_IMPLICITLY_USED          = 0x01000000,
-    VIR_SYMUNIFORMFLAG_FORCE_ACTIVE             = 0x02000000,
-    VIR_SYMUNIFORMFLAG_MOVING_TO_DUBO           = 0x04000000, /* set the symbol to be moved to default UBO */
-    VIR_SYMUNIFORMFLAG_ALWAYS_IN_DUB            = 0x08000000, /* set the symbol always in default uniform block */
-    VIR_SYMUNIFORMFLAG_MOVED_TO_DUBO            = 0x10000000, /* set the uniform moved from default uniform block to DUBO */
-    VIR_SYMUNIFORMFLAG_MOVED_TO_CUBO            = 0x20000000, /* set the uniform moved from constant uniform block to DUBO */
-    VIR_SYMUNIFORMFLAG_ATOMIC_COUNTER           = 0x40000000, /* set the symblo atomic counter */
-    VIR_SYMUNIFORMFLAG_TREAT_SAMPLER_AS_CONST   = 0x80000000,
+    VIR_SYMUNIFORMFLAG_SAMPLER_CALCULATE_TEX_SIZE = 0x00400000,
+    VIR_SYMUNIFORMFLAG_IMPLICITLY_USED          = 0x00800000,
+    VIR_SYMUNIFORMFLAG_FORCE_ACTIVE             = 0x01000000,
+    VIR_SYMUNIFORMFLAG_MOVING_TO_DUBO           = 0x02000000, /* set the symbol to be moved to default UBO */
+    VIR_SYMUNIFORMFLAG_ALWAYS_IN_DUB            = 0x04000000, /* set the symbol always in default uniform block */
+    VIR_SYMUNIFORMFLAG_MOVED_TO_DUBO            = 0x08000000, /* set the uniform moved from default uniform block to DUBO */
+    VIR_SYMUNIFORMFLAG_MOVED_TO_CUBO            = 0x10000000, /* set the uniform moved from constant uniform block to DUBO */
+    VIR_SYMUNIFORMFLAG_ATOMIC_COUNTER           = 0x20000000, /* set the symblo atomic counter */
+    VIR_SYMUNIFORMFLAG_TREAT_SAMPLER_AS_CONST   = 0x40000000,
 
     /* input/output flags */
-    VIR_SYMFLAG_ISCENTROID                      = 0x00040000,
-    VIR_SYMFLAG_ISSAMPLE                        = 0x00080000,
+    VIR_SYMFLAG_ISCENTROID                      = 0x00020000,
+    VIR_SYMFLAG_ISSAMPLE                        = 0x00040000,
 
     /* input attribute flags */
-    VIR_SYMFLAG_ISTEXTURE                       = 0x00100000,
-    VIR_SYMFLAG_PACKEDAWAY                      = 0x00200000, /* the input is packed with other input
+    VIR_SYMFLAG_ISTEXTURE                       = 0x00080000,
+    VIR_SYMFLAG_PACKEDAWAY                      = 0x00100000, /* the input is packed with other input
                                                                    * it is no longer visible spearately */
-    VIR_SYMFLAG_ZWTEXTURE                       = 0x00400000, /* when another texture coord packed
+    VIR_SYMFLAG_ZWTEXTURE                       = 0x00200000, /* when another texture coord packed
                                                                    * with this attribute (2-2 packing) */
-    VIR_SYMFLAG_POSITION                        = 0x00800000, /* the input attribute is position */
-    VIR_SYMFLAG_CONV2REG                        = 0x01000000, /* Converted to physical register */
-    VIR_SYMFLAG_ALWAYSUSED                      = 0x02000000, /* set the attribute always used so the
+    VIR_SYMFLAG_POSITION                        = 0x00400000, /* the input attribute is position */
+    VIR_SYMFLAG_CONV2REG                        = 0x00800000, /* Converted to physical register */
+    VIR_SYMFLAG_ALWAYSUSED                      = 0x01000000, /* set the attribute always used so the
                                                                    * recompilation wouldn't remove this
                                                                    * attribute later */
-    VIR_SYMFLAG_UNUSED                          = 0x04000000, /* set the attribute always used so the
+    VIR_SYMFLAG_UNUSED                          = 0x02000000, /* set the attribute always used so the
                                                                    * recompilation wouldn't remove this
                                                                    * attribute later */
-    VIR_SYMFLAG_POINTSPRITE_TC                  = 0x08000000,
+    VIR_SYMFLAG_POINTSPRITE_TC                  = 0x04000000,
 
-    VIR_SYMFLAG_VECTORIZED_OUT                  = 0x10000000, /* This input/output has been vectorized into
+    VIR_SYMFLAG_VECTORIZED_OUT                  = 0x08000000, /* This input/output has been vectorized into
                                                                      a new one */
+    /* Function flags */
+    VIR_SYMFLAG_ISKERNEL                        = 0x00020000, /* is kernel function */
+    VIR_SYMFLAG_ISMAIN                          = 0x00040000, /* is main function */
+    VIR_SYMFLAG_ISENTRY                         = 0x00080000, /* is entry point function */
+    VIR_SYMFLAG_ISINITFUNC                      = 0x00100000, /* is initialization function */
+    VIR_SYMFLAG_ISFINIFUNC                      = 0x00200000, /* is finialization function */
+
 } VIR_SymFlag;
 
 #define isSymEnabled(sym)                       (((sym)->flags & VIR_SYMFLAG_ENABLED) != 0)
 #define isSymInactive(sym)                      (((sym)->flags & VIR_SYMFLAG_INACTIVE) != 0)
 #define isSymFlat(sym)                          (((sym)->flags & VIR_SYMFLAG_FLAT) != 0)
 #define isSymInvariant(sym)                     (((sym)->flags & VIR_SYMFLAG_INVARIANT) != 0)
-#define isSymArray(sym)                         (((sym)->flags & VIR_SYMFLAG_IS_ARRAY) != 0)
-#define isSymPointer(sym)                       (((sym)->flags & VIR_SYMFLAG_IS_POINTER) != 0)
-#define isSymStruct(sym)                        (((sym)->flags & VIR_SYMFLAG_IS_STRUCT) != 0)
 #define isSymField(sym)                         (((sym)->flags & VIR_SYMFLAG_IS_FIELD) != 0)
+#define isSymLocal(sym)                         (((sym)->flags & VIR_SYMFLAG_LOCAL) != 0)
 #define isSymCompilerGen(sym)                   (((sym)->flags & VIR_SYMFLAG_COMPILER_GEN) != 0)
 #define isSymBuildin(sym)                       (((sym)->flags & VIR_SYMFLAG_BUILTIN) != 0)
-#define isSymDirectlyAddressed(sym)             (((sym)->flags & VIR_SYMFLAG_DIRECTLY_ADDRESSED) != 0)
 #define isSymArrayedPerVertex(sym)              (((sym)->flags & VIR_SYMFLAG_ARRAYED_PER_VERTEX) != 0)
 #define isSymPrecise(sym)                       (((sym)->flags & VIR_SYMFLAG_PRECISE) != 0)
 #define isSymLoadStoreAttr(sym)                 (((sym)->flags & VIR_SYMFLAG_LOAD_STORE_ATTR) != 0)
 #define isSymStaticallyUsed(sym)                (((sym)->flags & VIR_SYMFLAG_STATICALLY_USED) != 0)
 #define isSymIOBlockMember(sym)                 (((sym)->flags & VIR_SYMFLAG_IS_IOBLOCK_MEMBER) != 0)
 #define isSymInstanceMember(sym)                (((sym)->flags & VIR_SYMFLAG_IS_INSTANCE_MEMBER) != 0)
-#define isSymIndirectlyAddressed(sym)           (((sym)->flags & VIR_SYMFLAG_INDIRECTLY_ADDRESSED) != 0)
+#define isSymCombinedSampler(sym)               (((sym)->flags & VIR_SYMFLAG_COMBINED_SAMPLER) != 0)
+#define isSymSkipNameCheck(sym)                 (((sym)->flags & VIR_SYMFLAG_SKIP_NAME_CHECK) != 0)
 
 #define isSymUBODUBO(sym)                       (((sym)->flags & VIR_SYMUBOFLAG_IS_DUBO) != 0)
 #define isSymUBOCUBO(sym)                       (((sym)->flags & VIR_SYMUBOFLAG_IS_CUBO) != 0)
@@ -1970,7 +2417,7 @@ typedef enum VIR_SYMFLAG
 #define isSymUniformImplicitlyUsed(u)           (((u)->flags & VIR_SYMUNIFORMFLAG_IMPLICITLY_USED) != 0)
 #define isSymUniformForcedToActive(u)           (((u)->flags & VIR_SYMUNIFORMFLAG_FORCE_ACTIVE) != 0)
 #define isSymUniformMovingToDUBO(u)             (((u)->flags & VIR_SYMUNIFORMFLAG_MOVING_TO_DUBO) != 0)
-#define isSymUniformAlwaysInDUBO(u)             (((u)->flags & VIR_SYMUNIFORMFLAG_ALWAYS_IN_DUB) != 0)
+#define isSymUniformAlwaysInDUB(u)              (((u)->flags & VIR_SYMUNIFORMFLAG_ALWAYS_IN_DUB) != 0)
 #define isSymUniformMovedToDUBO(u)              (((u)->flags & VIR_SYMUNIFORMFLAG_MOVED_TO_DUBO) != 0)
 #define isSymUniformMovedToCUBO(u)              (((u)->flags & VIR_SYMUNIFORMFLAG_MOVED_TO_CUBO) != 0)
 #define isSymUniformMovedToAUBO(u)              (isSymUniformMovedToDUBO(u) || isSymUniformMovedToCUBO(u))
@@ -1986,6 +2433,13 @@ typedef enum VIR_SYMFLAG
 
 #define isSymVectorizedOut(sym)                 (((sym)->flags & VIR_SYMFLAG_VECTORIZED_OUT) != 0)
 
+/* function flags */
+#define isSymKernelFunction(sym)                (((sym)->flags & VIR_SYMFLAG_ISKERNEL) != 0)
+#define isSymMainFunction(sym)                  (((sym)->flags & VIR_SYMFLAG_ISMAIN) != 0)
+#define isSymEntryPointFunction(sym)            (((sym)->flags & VIR_SYMFLAG_ISENTRY) != 0)
+#define isSymInitFunction(sym)                  (((sym)->flags & VIR_SYMFLAG_ISINITFUNC) != 0)
+#define isSymFiniFunction(sym)                  (((sym)->flags & VIR_SYMFLAG_ISFINIFUNC) != 0)
+
 /*   o UBO symbol
  *      . no instance name: we create an anonymous instance name for it,
  *        the anonymous instance has UniformBlockObject type, which
@@ -1995,33 +2449,48 @@ typedef enum VIR_SYMFLAG
  *      . array of instance: the instance name is the symbol name
  *        which has the type of array of UBO
  */
+
+typedef enum _VIR_LINKAGE
+{
+    VIR_LINKAGE_NONE,
+    VIR_LINKAGE_IMPORT,
+    VIR_LINKAGE_EXPORT
+} VIR_Linkage;
+
 struct _VIR_SYMBOL
 {
-    VIR_SymbolKind      _kind         : 5;
-    gctUINT             _storageClass : 5;   /* storage class for variables
-                                             or uniform Kind for uniform */
+    VIR_SymbolKind      _kind           : 5;
+    gctUINT             _storageClass   : 6;    /* storage class for variables
+                                                 or uniform Kind for uniform */
     gctUINT             _addrSpace      : 2;
     gctUINT             _precision      : 3;
-    gctUINT             _currPrecision  : 3; /* symbol's current updated precision, can be used for future precision update */
+    gctUINT             _currPrecision  : 3;  /* symbol's current updated precision,
+                                               * can be used for future precision update */
     gctUINT             _qualifier      : 2;
-    gctUINT             _reserved1      : 12; /* not used bits */
+    gctUINT             _linkage        : 2;  /* 0: no-linkage, 1: import, 2: export */
+    gctUINT             _componentShift : 2;  /* SPIRV component decoration */
+    gctUINT             _reserved1      : 7;  /* unused bits */
 
-    VIR_HwRegId         _hwRegId      : 10;/* allocated HW register for the temp or attribute */
-    gctUINT             _hwShift      : 2; /* shift for HW register */
-    VIR_HwRegId         _HIhwRegId    : 10; /* in dual16, we need to assign a register pair to high precison attribute */
-    gctUINT             _HIhwShift    : 2;  /* shift for HW register */
-    gctUINT             _reserved2    : 8;  /* not used bits */
+    VIR_HwRegId         _hwRegId      : 10;   /* allocated HW register for the temp or attribute */
+    gctUINT             _hwShift      : 2;    /* shift for HW register */
+    VIR_HwRegId         _HIhwRegId    : 10;   /* in dual16, we need to assign a register pair
+                                               * to high precison attribute */
+    gctUINT             _HIhwShift    : 2;    /* shift for HW register */
+    gctUINT             _reserved2    : 8;    /* not used bits */
 
-    VIR_Type *          type;               /* the type of the symbol */
-
-    VIR_GeneralSymFlag  generalFlags;
+    VIR_TypeId          typeId;               /* the typeId of the symbol */
 
     VIR_SymFlag         flags;
 
     VIR_SymId           index;          /* index of this entry in symtab */
 
-    VIR_SymId           ioBlockIndex;
+    VIR_SymId           ioBlockIndex;   /* TODO */
     VIR_Layout          layout;         /* layout info for in/out/unifrom */
+    union
+    {
+        VIR_Shader *    hostShader;     /* global symbol in hostShader */
+        VIR_Function *  hostFunction;   /* local symbol in hostFunction */
+    } u0;
     union
     {
         VIR_VirRegId    vregIndex;      /* the virtual reg index for VIRREG */
@@ -2033,7 +2502,7 @@ struct _VIR_SYMBOL
     {
         VIR_VirRegId    tempIndex;      /* the start virtual register for VARIABLE */
         VIR_UniformId   uniformIndex;   /* the start uniform index for UNIFORMSTRUCT */
-        VIR_Symbol *    variable;       /* the corresponding variable for VIRREG */
+        VIR_SymId       varSymId;       /* the corresponding variable for VIRREG */
         VIR_FieldInfo * fieldInfo;      /* pointer to the field info for FIELD */
         VIR_Function *  function;       /* point to function for FUNCTION symbol */
         VIR_Uniform *   uniform;        /* point to Uniform for UNIFORM symbol */
@@ -2048,19 +2517,43 @@ struct _VIR_SYMBOL
     {
         VIR_NameId      mangledName;    /* mangled name for function */
         gctUINT32       size;           /* the size for struct */
-        VIR_Type *      structType;     /* the struc type in which the field is defined */
+        VIR_TypeId      structTypeId;   /* the struc typeId in which the field is defined */
         gctUINT         offsetInVar;    /* for VIRREG, it is offset from begining of
                                          * corresponding variable (one variable may map
                                          * to multiple VIRREG) */
+        VIR_SymId       separateSampler;/* symbol of separate sampler */
     } u3;
-    gctINT              indexRange;     /* for VIRREG, UNIFORM, VARIABLE or FIELD,
-                                           the end virReg or uniform it may be indexed */
 
-    /*
-    ** If this symbol is a struct, save the symbol Id of its first element.
-    ** For non-struct variable, it is VIR_INVALID_ID.
-    */
-    VIR_SymId           firstElementId;
+    union
+    {
+        VIR_SymId       separateImage;      /* symbol of separate image/texture */
+        VIR_SymId       encloseFuncSymId;   /* symbol id of the function for parameter virReg
+                                             * the virReg is a global symbol, or for local
+                                             * variable */
+    } u4;
+
+    union
+    {
+        gctINT          indexRange;     /* for VIRREG, UNIFORM, VARIABLE or FIELD,
+                                           the end virReg or uniform it may be indexed */
+         /* separate image/texture
+          * > 0: static array index; < 0: dynamic indexing range */
+        struct
+        {
+            gctINT      samplerIdxRange : 16;
+            gctINT      imgIdxRange     : 16;
+        } combinedIdx;
+    } u5;
+
+    /* Save HL info. */
+    union
+    {
+        /*
+        ** If this symbol is a struct, save the symbol Id of its first element.
+        ** For non-struct variable, it is VIR_INVALID_ID.
+        */
+        VIR_SymId       firstElementId;
+    } u6;
 };
 
 typedef struct _VIR_SymIndexingInfo
@@ -2074,6 +2567,12 @@ typedef struct _VIR_SymIndexingInfo
                                      * 3: temp(13), temp(17), temp(21)
                                      */
 } VIR_SymIndexingInfo;
+
+typedef struct _VIR_SymAliasTable
+{
+    VSC_HASH_TABLE *    pHashTable;
+    VSC_MM *            pMM;
+} VIR_SymAliasTable;
 
 /* Constant */
 typedef union _VIR_SCALARCONSTVAL
@@ -2164,6 +2663,43 @@ typedef enum _VIR_TYFLAG
                                 | VIR_TYFLAG_IS_UNSIGNED_INT
                                 | VIR_TYFLAG_IS_BOOLEAN, /* is integer type */
 
+    VIR_TYFLAG_IS_IMAGE_1D      = 0x100,
+    VIR_TYFLAG_IS_IMAGE_2D      = 0x200,
+    VIR_TYFLAG_IS_IMAGE_3D      = 0x400,
+    VIR_TYFLAG_IS_IMAGE_ARRAY   = 0x800,
+    VIR_TYFLAG_IS_IMAGE_BUFFER  = 0x1000,
+    VIR_TYFLAG_IS_IMAGE_CUBE    = 0x2000,
+    VIR_TYFLAG_IS_SUBPASS       = 0x4000, /* the sampler is subpass */
+    VIR_TYFLAG_IS_IMAGE         = VIR_TYFLAG_IS_IMAGE_1D
+                                | VIR_TYFLAG_IS_IMAGE_2D
+                                | VIR_TYFLAG_IS_IMAGE_3D
+                                | VIR_TYFLAG_IS_IMAGE_ARRAY
+                                | VIR_TYFLAG_IS_IMAGE_BUFFER
+                                | VIR_TYFLAG_IS_IMAGE_CUBE
+                                | VIR_TYFLAG_IS_SUBPASS,
+
+    VIR_TYFLAG_IMAGE_DATA_FLOAT = 0x8000,
+    VIR_TYFLAG_IMAGE_DATA_SIGNED_INT   = 0x10000,
+    VIR_TYFLAG_IMAGE_DATA_UNSIGNED_INT = 0x20000,
+
+    VIR_TYFLAG_UNSIZED          = 0x40000, /* the type is a unsized array.*/
+
+    VIR_TYFLAG_IS_SAMPLER_1D    = 0x80000,
+    VIR_TYFLAG_IS_SAMPLER_2D    = 0x100000,
+    VIR_TYFLAG_IS_SAMPLER_3D    = 0x200000,
+    VIR_TYFLAG_IS_SAMPLER_ARRAY = 0x400000,
+    VIR_TYFLAG_IS_SAMPLER_BUFFER= 0x8000000,
+    VIR_TYFLAG_IS_SAMPLER_CUBE  = 0x1000000,
+    VIR_TYFLAG_IS_SAMPLER_SHADOW = 0x2000000,
+    VIR_TYFLAG_IS_SAMPLER_MS    = 0x4000000,
+    VIR_TYFLAG_IS_SAMPLER       = VIR_TYFLAG_IS_SAMPLER_1D
+                                | VIR_TYFLAG_IS_SAMPLER_2D
+                                | VIR_TYFLAG_IS_SAMPLER_3D
+                                | VIR_TYFLAG_IS_SAMPLER_ARRAY
+                                | VIR_TYFLAG_IS_SAMPLER_BUFFER
+                                | VIR_TYFLAG_IS_SAMPLER_CUBE
+                                | VIR_TYFLAG_IS_SAMPLER_MS
+                                | VIR_TYFLAG_IS_SAMPLER_SHADOW,
     /* flags for function */
 
 } VIR_TyFlag;
@@ -2172,8 +2708,14 @@ typedef struct _VIR_BUILTINTYPEINFO
 {
     const char *    name;               /* e.g. float_2X4 */
     VIR_TypeId      type;               /* e.g. VIR_TYPE_FLOAT_2X4 */
-    gctINT          components;         /* e.g. 4 components each row */
-    gctINT          rows;               /* e.g. 2 rows             */
+    gctUINT         components;         /* e.g. 4 components each row,
+                                         * for packed type it is real component
+                                         * number in vec4 register: CHAR_P3 takes 1
+                                         * component */
+    gctUINT         packedComponents;   /* number of components in packed type,
+                                         * it is 3 for CHAR_P3.
+                                         * same as components for non-packed type */
+    gctUINT         rows;               /* e.g. 2 rows             */
     VIR_TypeId      rowType;            /* e.g. VIR_TYPE_FLOAT_X4  */
     VIR_TypeId      componentType;      /* e.g. VIR_TYPE_FLOAT_X1  */
     size_t          sz;
@@ -2186,16 +2728,20 @@ typedef struct _VIR_BUILTINTYPEINFO
 /* the maximium type we can support  in VIR is 2^16, the symbol is 2^20 */
 struct _VIR_TYPE
 {
-    VIR_TypeId          _base      : 20; /* type id for primitive type, points to type,
-                                           array base type, function return type
+    VIR_TypeId          _base;          /* type id for primitive type, points to type,
+                                         *  array base type, function return type
                                          */
-    VIR_TyFlag          _flags     : 12; /* flags for  the type */
+    VIR_TyFlag          _flags;         /* flags for  the type */
+    VIR_TypeId          _tyIndex;       /* the index for this entry */
 
-    VIR_TypeId          _tyIndex   : 20; /* the index for this entry */
     gctUINT             _kind      : 4;
     gctUINT             _alignment : 3;  /* power of 2 alignment, up to 2^7 (128) */
     gctUINT             _qualifier : 3;  /* type qualifiers of pointer points to */
     gctUINT             _addrSpace : 2;  /* address space of pointer points to */
+    gctUINT             _duplicationId : 8;  /* in case we have to duplicate struct */
+
+    gctINT              arrayStride;     /* array stride of this field */
+    gctINT              matrixStride;    /* matrix stride of this field */
 
     struct
     {
@@ -2213,37 +2759,61 @@ struct _VIR_TYPE
     } u2;
 };
 
-
-extern VIR_BuiltinTypeInfo VIR_builtinTypes[];
+VIR_BuiltinTypeInfo*
+VIR_Shader_GetBuiltInTypes(
+    IN  VIR_TypeId          TypeId
+    );
 
 /* get type info from primitive type id, a faster way than from type node VIR_Type_GetXXX */
-#define VIR_GetTypeName(Ty)             (VIR_builtinTypes[(Ty)].name)
-#define VIR_GetTypeType(Ty)             (VIR_builtinTypes[(Ty)].type)
-#define VIR_GetTypeComponents(Ty)       (VIR_builtinTypes[(Ty)].components)
-#define VIR_GetTypeRows(Ty)             (VIR_builtinTypes[(Ty)].rows)
-#define VIR_GetTypeRowType(Ty)          (VIR_builtinTypes[(Ty)].rowType)
-#define VIR_GetTypeComponentType(Ty)    (VIR_builtinTypes[(Ty)].componentType)
-#define VIR_GetTypeSize(Ty)             (VIR_builtinTypes[(Ty)].sz)
-#define VIR_GetTypeFlag(Ty)             (VIR_builtinTypes[(Ty)].flag)
-#define VIR_GetTypeAlignment(Ty)        (VIR_builtinTypes[(Ty)].alignment)
-#define VIR_GetTypeTypeKind(Ty)         (VIR_builtinTypes[(Ty)].kind)
+#define VIR_GetTypeName(Ty)             (VIR_Shader_GetBuiltInTypes((Ty))->name)
+#define VIR_GetTypeType(Ty)             (VIR_Shader_GetBuiltInTypes((Ty))->type)
+#define VIR_GetTypeComponents(Ty)       (VIR_Shader_GetBuiltInTypes((Ty))->components)
+#define VIR_GetTypePackedComponents(Ty) (VIR_Shader_GetBuiltInTypes((Ty))->packedComponents)
+#define VIR_GetTypeRows(Ty)             (VIR_Shader_GetBuiltInTypes((Ty))->rows)
+#define VIR_GetTypeRowType(Ty)          (VIR_Shader_GetBuiltInTypes((Ty))->rowType)
+#define VIR_GetTypeComponentType(Ty)    (VIR_Shader_GetBuiltInTypes((Ty))->componentType)
+#define VIR_GetTypeSize(Ty)             (VIR_Shader_GetBuiltInTypes((Ty))->sz)
+#define VIR_GetTypeFlag(Ty)             (VIR_Shader_GetBuiltInTypes((Ty))->flag)
+#define VIR_GetTypeAlignment(Ty)        (VIR_Shader_GetBuiltInTypes((Ty))->alignment)
+#define VIR_GetTypeTypeKind(Ty)         (VIR_Shader_GetBuiltInTypes((Ty))->kind)
 
 #define VIR_TypeId_isPrimitive(Id)          ((gctUINT)Id <= VIR_TYPE_LAST_PRIMITIVETYPE)
-#define VIR_TypeId_isSampler(Id)            ((gctUINT)Id >= VIR_TYPE_Min_SAMPLER_TYID &&    \
-                                             (gctUINT)Id <= VIR_TYPE_Max_SAMPLER_TYID)
-#define VIR_TypeId_isImage(Id)              ((gctUINT)Id >= VIR_TYPE_Min_IMAGE_TYID &&    \
-                                             (gctUINT)Id <= VIR_TYPE_Max_IMAGE_TYID)
-#define VIR_TypeId_is2DImage(Id)            ((gctUINT)Id == VIR_TYPE_IMAGE_2D  ||    \
-                                             (gctUINT)Id == VIR_TYPE_IIMAGE_2D ||    \
-                                             (gctUINT)Id == VIR_TYPE_UIMAGE_2D)
-#define VIR_TypeId_isSamplerOrImage(Id)     (VIR_TypeId_isSampler(Id) || VIR_TypeId_isImage(Id))
 
-#define VIR_TypeId_isSamplerBuffer(Id)      ((gctUINT)Id >= VIR_TYPE_SAMPLER_BUFFER &&    \
-                                             (gctUINT)Id <= VIR_TYPE_USAMPLER_BUFFER)
-#define VIR_TypeId_isImageBuffer(Id)        ((gctUINT)Id >= VIR_TYPE_IMAGE_BUFFER &&    \
-                                             (gctUINT)Id <= VIR_TYPE_UIMAGE_BUFFER)
+#define VIR_TypeId_isSampler1D(Id)          (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_SAMPLER_1D) != 0)
+#define VIR_TypeId_isSampler2D(Id)          (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_SAMPLER_2D) != 0)
+#define VIR_TypeId_isSampler3D(Id)          (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_SAMPLER_3D) != 0)
+#define VIR_TypeId_isSamplerArray(Id)       (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_SAMPLER_ARRAY) != 0)
+#define VIR_TypeId_isSamplerBuffer(Id)      (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_SAMPLER_BUFFER) != 0)
+#define VIR_TypeId_isSamplerCube(Id)        (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_SAMPLER_CUBE) != 0)
+#define VIR_TypeId_isSamplerShadow(Id)      (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_SAMPLER_SHADOW) != 0)
+#define VIR_TypeId_isSamplerMS(Id)          (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_SAMPLER_MS) != 0)
+#define VIR_TypeId_isSampler(Id)            ((gctUINT)Id >= VIR_TYPE_MIN_SAMPLER_TYID &&    \
+                                             (gctUINT)Id <= VIR_TYPE_MAX_SAMPLER_TYID)
+
+#define VIR_TypeId_isAtomicCounters(Id)     ((gctUINT)Id >= VIR_TYPE_MIN_ATOMIC_COUNTER_TYPID &&    \
+                                             (gctUINT)Id <= VIR_TYPE_MAX_ATOMIC_COUNTER_TYPID)
+#define VIR_TypeId_isImage1D(Id)            (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_IMAGE_1D) != 0)
+#define VIR_TypeId_isImage2D(Id)            (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_IMAGE_2D) != 0)
+#define VIR_TypeId_isImage3D(Id)            (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_IMAGE_3D) != 0)
+#define VIR_TypeId_isImageArray(Id)         (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_IMAGE_ARRAY) != 0)
+#define VIR_TypeId_isImageBuffer(Id)        (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_IMAGE_BUFFER) != 0)
+#define VIR_TypeId_isImageCube(Id)          (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_IMAGE_CUBE) != 0)
+#define VIR_TypeId_isImage(Id)              (VIR_TypeId_isImage1D(Id)       || \
+                                             VIR_TypeId_isImage2D(Id)       || \
+                                             VIR_TypeId_isImage3D(Id)       || \
+                                             VIR_TypeId_isImageArray(Id)    || \
+                                             VIR_TypeId_isImageBuffer(Id)   || \
+                                             VIR_TypeId_isImageCube(Id))
+
+#define VIR_TypeId_isImageDataFloat(Id)              ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_IMAGE_DATA_FLOAT) != 0)
+#define VIR_TypeId_isImageDataSignedInteger(Id)      ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_IMAGE_DATA_SIGNED_INT) != 0)
+#define VIR_TypeId_isImageDataUnSignedInteger(Id)    ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_IMAGE_DATA_UNSIGNED_INT) != 0)
+
+#define VIR_TypeId_isOpaque(Id)             (VIR_TypeId_isSampler(Id)       || \
+                                             VIR_TypeId_isImage(Id)         || \
+                                             VIR_TypeId_isAtomicCounters(Id))
+#define VIR_TypeId_isSamplerOrImage(Id)     (VIR_TypeId_isSampler(Id) || VIR_TypeId_isImage(Id))
 #define VIR_TypeId_isBuffer(Id)             (VIR_TypeId_isSamplerBuffer(Id) || VIR_TypeId_isImageBuffer(Id))
-#define VIR_TypeId_is3DImage(Id)            (!VIR_TypeId_is2DImage(Id) && !VIR_TypeId_isImageBuffer(Id))
 
 #define VIR_TypeId_isSignedInteger(Id)      ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_SIGNED_INT) != 0)
 #define VIR_TypeId_isUnSignedInteger(Id)    ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_UNSIGNED_INT) != 0)
@@ -2266,6 +2836,7 @@ typedef enum _VIR_OPERANDKIND
     VIR_OPND_UNDEF, /* 1, the operand is undefined */
     VIR_OPND_SYMBOL, /* 2, variable, input, output */
     VIR_OPND_VIRREG, /* 3, virtual register, to speedup access */
+                                /* But actually it is never been used in VIR, so do we need to remove it? */
     VIR_OPND_SAMPLER_INDEXING, /* 4, for sampler parameter passing:
                                    samplerArray[i] => Sampler */
     VIR_OPND_PARAMETERS, /* 5, parameter passing list */
@@ -2280,7 +2851,10 @@ typedef enum _VIR_OPERANDKIND
     VIR_OPND_ADDRESS_OF, /* 14, address of a symbol */
     VIR_OPND_UNUSED, /* 15, the operand node is in free list */
     VIR_OPND_EVIS_MODIFIER, /* 16, evis instruction modifier */
-    VIR_OPND_ACCESS_CHAIN, /* 17, a chain of access, from base obj to final elem/field */
+    VIR_OPND_SIZEOF, /* 17, size of a element variable */
+    VIR_OPND_OFFSETOF, /* 18, field offset */
+    VIR_OPND_PHI, /* 19, phi node */
+    VIR_OPND_VEC_INDEXING, /* 20, dynamic indexing to vector component */
     /* max 31, need to enlarge operand kind field width when exceeding 31 */
 } VIR_OperandKind;
 
@@ -2357,11 +2931,12 @@ typedef union _VIR_EVIS_STATE
     struct {
         gctUINT     src0Format  : 3;
         gctUINT     src1Format  : 3;
+        gctUINT     clampSrc2   : 1;
     } u5;  /* Lerp */
     struct {
         gctUINT     srcFormat   : 3;
         gctUINT     filter      : 4;
-    } u6;  /* Lerp */
+    } u6;  /* Filter */
     struct {
         gctUINT     srcFormat      : 3;
         gctUINT     disablePreAdj  : 1;
@@ -2384,11 +2959,14 @@ typedef union _VIR_EVIS_STATE
     } u10; /* DP 32 instrucitons */
     struct {
         gctUINT     srcFormat   : 3;
-        gctUINT     enableBool  : 2;
+        gctUINT     enableBool  : 1;
     } u11; /* clamp */
     struct {
         gctUINT     srcFormat01 : 3;
         gctUINT     srcFormat2  : 3;
+        gctUINT     clampSrc2   : 1;  /* 0x0: take fraction part of src2.xy
+                                         0x1: clamp src2.xy to the range of [0.0, 1.0]
+                                       */
     } u12; /* BiLinear */
     struct {
         gctUINT     srcFormat0  : 3;
@@ -2400,11 +2978,11 @@ typedef union _VIR_EVIS_STATE
     /* bitextract and bitReplace have no state bits */
 } VIR_EVIS_State;
 
+/* parameter is an arry of operands */
 struct _VIR_PARMPASSING
 {
-    VIR_SymId           arg;        /* argument value in temp register */
-    VIR_SymId           parm;       /* corresponding parameter */
-    VIR_ParmPassing *   next;       /* next parameter */
+    gctUINT         argNum;
+    VIR_Operand     *args[1];   /* variable length array */
 };
 
 
@@ -2414,16 +2992,45 @@ struct _VIR_OPERANDLIST
     VIR_OperandList *       next;   /* next parameter */
 };
 
-typedef gctUINT   VIR_PhiStatus;
+struct _VIR_SYMBOLLIST
+{
+    gctBOOL                 isConst; /* If this symbol is constant, if so, the symId is a constant ID. */
+    VIR_SymId               symId;
+    VIR_SymbolList *        next;   /* next symbol */
+};
 
-typedef struct _VIR_PHIVALUELIST VIR_PhiValueList;
-struct _VIR_PHIVALUELIST
+typedef gctUINT   VIR_PhiOperandFlags;
+
+typedef struct _VIR_PHIOPERAND VIR_PhiOperand;
+struct _VIR_PHIOPERAND
 {
     VIR_Operand *           value;  /* argument value in temp register */
     VIR_Label *             label;  /* label operand, branch target */
-    VIR_PhiStatus           flag;
-    VIR_PhiValueList *      next;   /* next phi value pair */
+    VIR_PhiOperandFlags     flags;
 } ;
+
+#define VIR_PhiOperand_GetValue(PO)         ((PO)->value)
+#define VIR_PhiOperand_SetValue(PO, v)      ((PO)->value = (v))
+#define VIR_PhiOperand_GetLabel(PO)         ((PO)->label)
+#define VIR_PhiOperand_SetLabel(PO, l)      ((PO)->label = (l))
+#define VIR_PhiOperand_GetFlags(PO)         ((PO)->flags)
+#define VIR_PhiOperand_SetFlags(PO, f)      ((PO)->flags = (f))
+
+typedef struct _VIR_PHIOPERANDARRAY VIR_PhiOperandArray;
+struct _VIR_PHIOPERANDARRAY
+{
+    gctUINT                 count;
+    VIR_PhiOperand*         operands;   /* next phi value pair */
+} ;
+
+#define VIR_PhiOperandArray_GetCount(POA)               ((POA)->count)
+#define VIR_PhiOperandArray_SetCount(POA, c)            ((POA)->count = (c))
+#define VIR_PhiOperandArray_GetOperands(POA)            ((POA)->operands)
+#define VIR_PhiOperandArray_SetOperands(POA, o)         ((POA)->operands = (o))
+#define VIR_PhiOperandArray_GetNthOperand(POA, i)       (&(POA)->operands[i])
+#define VIR_PhiOperandArray_SetNthOperand(POA, i, o)    ((POA)->operands[i] = *(o))
+#define VIR_PhiOperandArray_ComputeSize(count)          (sizeof(VIR_PhiOperandArray) + count * sizeof(VIR_PhiOperand))
+#define VIR_PhiOperandArray_GetSize(POA)                VIR_PhiOperandArray_ComputeSize((POA)->count)
 
 typedef enum _VIR_REGCLASS
 {
@@ -2444,6 +3051,7 @@ typedef enum _VIR_HWREG_NAME
     VIR_SR_VERTEXID, /* vertex id register */
     VIR_SR_FACE, /* face register */
     VIR_SR_A0, /* special index register, 4 components */
+    VIR_SR_B0, /* special index register, 1 components */
     VIR_SR_AL, /* loop register */
     VIR_SR_NEXTPC, /* next PC address */
     VIR_REG_MULTISAMPLEDEPTH, /* not accessed by shader program, automatically
@@ -2463,7 +3071,8 @@ typedef enum _VIR_OPNDFLAG
     VIR_OPNDFLAG_REGALLOCATED        = 0x0001,
     VIR_OPNDFLAG_TEMP256_HIGH        = 0x0002, /* Higher part of temp256 register, need allocate even register */
     VIR_OPNDFLAG_TEMP256_LOW         = 0x0004, /* lower part of temp256 register, need to skip it in CG */
-    VIR_OPNDFLAG_MASK                = 0x03FF,
+    VIR_OPNDFLAG_5BITOFFSET          = 0x0008,
+    VIR_OPNDFLAG_UNIFORM_INDEX       = 0x0010, /* A0 indexing uniform (should use B0) */
 } VIR_OPNDFLAG;
 
 struct _VIR_OPERAND_HEADER
@@ -2474,7 +3083,7 @@ struct _VIR_OPERAND_HEADER
     gctUINT                 _roundMode    : 3;
     gctUINT                 _modifier     : 3;   /* dest: saturate modifier
                                                    src:  negate/absolute */
-    gctUINT                 _lshift       : 3;
+    /* no more field can be added after !!! */
 };
 
 typedef enum _VIR_TEXMODIFIER_FLAG
@@ -2491,7 +3100,7 @@ typedef enum _VIR_TEXMODIFIER_FLAG
 /* header for texld modifier operand */
 typedef struct _VIR_OPERAND_HEADER_TM
 {
-    VIR_OperandKind         _opndKind     : 5;
+    VIR_OperandKind         _opndKind     : 5;   /* It can't be VIR_OPND_VIRREG. */
     VIR_OperandId           _index        : 20;  /* entry index of this operand */
     gctUINT                 _texmodifiers : 7;   /* texture modifier */
 } VIR_Operand_Header_TM;
@@ -2508,12 +3117,13 @@ typedef struct _VIR_OPERANDINFO
     VIR_Operand *   opnd;
     union {
         struct {
-            VIR_VirRegId    startVirReg;    /* start virReg of correponding variable */
-            gctUINT         virRegCount;    /* virReg count of correponding variable:
-                                             * so the virReg range is:
-                                             *  [startVirReg, startVirReg + virRegCount - 1]
-                                             */
-            VIR_VirRegId    virReg;         /* the virReg used in the operand */
+            VIR_VirRegId    startVirReg;        /* start virReg of correponding variable */
+            gctUINT         virRegCount;        /* virReg count of correponding variable:
+                                                 * so the virReg range is:
+                                                 *  [startVirReg, startVirReg + virRegCount - 1]
+                                                 */
+            VIR_VirRegId    virReg;             /* the virReg used in the operand */
+            VIR_VirRegId    virRegWithOffset;   /* the virReg with offset. */
         } virRegInfo;
         VIR_ScalarConstVal  immValue;
         VIR_ConstId         vecConstId;
@@ -2554,95 +3164,106 @@ typedef enum _VIR_TEXLDMODIFIER_NAME
     VIR_TEXLDMODIFIER_FETCHMS_SAMPLE = 1, /* shared with modifier for lod as LOD is always at base level */
     VIR_TEXLDMODIFIER_DPDX      = 2,
     VIR_TEXLDMODIFIER_DPDY      = 3,
-    VIR_TEXLDMODIFIER_GATHERCOMP= 2, /* GATHERCOMP, GATHERREFZ shared with modifier for TEXGRAD DPDX and DPDY */
-    VIR_TEXLDMODIFIER_GATHERREFZ= 3,
-    VIR_TEXLDMODIFIER_OFFSET    = 4,
+    VIR_TEXLDMODIFIER_GATHERCOMP= 4,
+    VIR_TEXLDMODIFIER_GATHERREFZ= 5,
+    VIR_TEXLDMODIFIER_OFFSET    = 6,
     VIR_TEXLDMODIFIER_COUNT
 } Vir_TexldModifier_Name;
-
-typedef struct _VIR_OPERAND_TEXLDMODIFIER
-{
-    VIR_Operand_Header      header;
-    VIR_Operand *           tmodifier[VIR_TEXLDMODIFIER_COUNT];
-} VIR_Operand_TexldModifier;
 
 struct _VIR_OPERAND
 {
     VIR_Operand_Header      header;
-    VIR_TypeId              _opndType       : 20;  /* operand type, derived from
-                                                    * tempRegister, variable, etc.
-                                                    * final access type for access chain
-                                                    */
-    gctUINT                 _swizzleOrEnable: 8;
-    gctUINT                 _precision      : 3; /* operand precision */
-    gctUINT                 _reserved1      : 1; /* not used bits */
-
-    /* hardware register info */
-    gctUINT                 _hwShift        : 2;   /* the shift amount of the hwReg
-                                                    *   temp(9).y shift 2 becomes r1.w
-                                                    *      if hwRegIndex == 1
-                                                    *   temp(9).xy shift 1 becomes r1.yz
-                                                    */
-    /* start new word */
-    VIR_HwRegId             _hwRegId      : 10;  /* hardware physical register index */
-    gctUINT                 _HIhwRegId    : 10;  /* in dual16, a pair of register is needed */
-    gctUINT                 _HIhwShift    : 2;   /* in dual16, a pair of register is needed */
-    VIR_OPNDFLAG            _flag         : 14;
-
     union
     {
-        VIR_Symbol *        sym;        /* temp, variable, uniform, sampler,
-                                         * local storage, addressOf
-                                         * base symbol of the access chain... */
-        VIR_ParmPassing *   argList;    /* arg value assigned to parameters */
-        gctFLOAT            fConst;     /* float constant value */
-        gctINT              iConst;     /* int constant value */
-        gctUINT             uConst;     /* unsigned constant value */
-        VIR_EVIS_Modifier   evisModifier;/* evis instruction modifier */
-        VIR_ConstId         constId;    /* vector constant */
-        VIR_Label *         label;      /* label operand, branch target */
-        VIR_Function *      func;       /* callee, call target */
-        VIR_IntrinsicsKind  intrinsic;
-        VIR_Operand *       base;       /* base expression for array indexing
-                                         * or field access */
-        VIR_PhiValueList *  phiValues;
-    } u1;
-    union
-    {
-        /* VL (constIndexed is medium level concept), relative addressing:
-           can be translated from ARRAY operand */
         struct
         {
-            /* relative addressing info: TEMP, UNIFORM, VARIABLE, ATTRIBUTE,
-               OUTPUT, SAMPLER, ADDRESSOF */
-            gctUINT         _isConstIndexing  : 1;  /* is the relIndex const number */
-            gctUINT         _relAddrMode      : 3;  /* relative address mode */
-            gctUINT         _matrixConstIndex : 2;  /* matrix operand can be indexed with
-                                                       const value 0-3 */
-            gctINT          _relIndexing      : 20; /* symbol id used in indexing,
-                                                      or 20bit immediate integer
-                                                      if isConstIndexing */
-            gctUINT         _isSymLocal       : 1;   /* keep the symbol's scope info */
-            gctUINT         _relAddrLevel     : 2;   /* relative address level. */
-        } vlInfo;
-        /* HL, will be lowered to relAddr */
-        VIR_OperandList *   arrayIndex;         /* array index list, support multi-dim array:
-                                                 *  base[arrayIndex->value]
-                                                 *      [arrayindex->next->value]
-                                                 *      ...
-                                                 */
-        VIR_SymId           fieldId;            /* base->field, offset can be obtained from
-                                                 * VIR_GetOffset(opndTye, fieldId)
-                                                 */
-        gctUINT             offset;             /* final access byte offset from baseSym
-                                                 * in the access chian */
-    } u2;
+            VIR_TypeId              _opndType       : 20;  /* operand type, derived from
+                                                            * tempRegister, variable, etc.
+                                                            * final access type for access chain
+                                                            */
+            gctUINT                 _swizzleOrEnable: 8;
+            gctUINT                 _precision      : 3; /* operand precision */
+            gctUINT                 _reserved1      : 1; /* not used bits */
 
-    /* These are ONLY used under SSA form because under SSA form, we don't have extra structures
-       to maitain simple single DU chain. */
-    VIR_Operand *           nextUse;            /* next use of the operand */
-    VIR_Instruction *       defInst;            /* the instruction define this operand */
+            /* start new word */
+            /* hardware register info */
+            gctUINT                 _hwShift      : 2;   /* the shift amount of the hwReg
+                                                          *   temp(9).y shift 2 becomes r1.w
+                                                          *      if hwRegIndex == 1
+                                                          *   temp(9).xy shift 1 becomes r1.yz
+                                                          */
+            VIR_HwRegId             _hwRegId      : 10;  /* hardware physical register index */
+            gctUINT                 _HIhwRegId    : 10;  /* in dual16, a pair of register is needed */
+            gctUINT                 _HIhwShift    : 2;   /* in dual16, a pair of register is needed */
+    gctUINT                 _lshift       : 3;
+            gctUINT                 _reserved2    : 5;   /* not used bits */
 
+            VIR_OPNDFLAG            _flags ;
+
+            union
+            {
+                VIR_Symbol *        sym;        /* temp, variable, uniform, sampler,
+                                                 * local storage, addressOf
+                                                 * base symbol of the access chain... */
+                VIR_ParmPassing *   argList;    /* arg value assigned to parameters */
+                gctFLOAT            fConst;     /* float constant value */
+                gctINT              iConst;     /* int constant value */
+                gctUINT             uConst;     /* unsigned constant value */
+                VIR_EVIS_Modifier   evisModifier;/* evis instruction modifier */
+                VIR_ConstId         constId;    /* vector constant */
+                VIR_Label *         label;      /* label operand, branch target */
+                VIR_Function *      func;       /* callee, call target */
+                VIR_IntrinsicsKind  intrinsic;
+                VIR_Operand *       base;       /* base expression for array indexing
+                                                 * or field access */
+                VIR_PhiOperandArray * phiOperands;  /* the N phiOperands are allocated in one shot */
+            } u1;
+            union
+            {
+                /* VL (constIndexed is medium level concept), relative addressing:
+                   can be translated from ARRAY operand */
+                struct
+                {
+                    /* relative addressing info: TEMP, UNIFORM, VARIABLE, ATTRIBUTE,
+                       OUTPUT, SAMPLER, ADDRESSOF */
+                    gctUINT         _isConstIndexing  : 1;  /* is the relIndex const number */
+                    gctUINT         _relAddrMode      : 3;  /* relative address mode */
+                    gctUINT         _matrixConstIndex : 2;  /* matrix operand can be indexed with
+                                                               const value 0-3 */
+                    gctINT          _relIndexing      : 20; /* symbol id used in indexing,
+                                                              or 20bit immediate integer
+                                                              if isConstIndexing */
+                    gctUINT         _isSymLocal       : 1;   /* keep the symbol's scope info */
+                    gctUINT         _relAddrLevel     : 2;   /* relative address level. */
+                } vlInfo;
+                /* HL, will be lowered to relAddr */
+                VIR_OperandList *   arrayIndex;         /* array index list, support multi-dim array:
+                                                         * VIR_GetOffset(opndTye, fieldId)
+                                                         */
+                VIR_SymId           fieldId;            /* base->field, offset can be obtained from
+                                                         * VIR_GetOffset(opndTye, fieldId)
+                                                         */
+                gctUINT             offset;             /* final access byte offset from baseSym
+                                                         * in the access chian */
+                VIR_SymId           vecIndexSymId;      /* the symbol id used in dynamic indexing to vector */
+            } u2;
+
+            /* Save the HL info. */
+            union
+            {
+                struct
+                {
+                    gctINT          matrixStride;
+                    VIR_LayoutQual  layoutQual;
+                } stride;
+            } u3;
+            /* These are ONLY used under SSA form because under SSA form, we don't have extra structures
+               to maitain simple single DU chain. */
+            VIR_Operand *           _nextUse;            /* next use of the operand */
+        } n;
+        VIR_Operand *               tmodifier[VIR_TEXLDMODIFIER_COUNT];
+    } u;
+    VIR_Instruction *       _defInst;            /* the instruction define this operand */
 };
 
 #define VIR_Operand_isHighLevel(Opnd)  VIR_OperandKind_isHighLevel(VIR_Operand_GetOpKind(Opnd))
@@ -2661,6 +3282,8 @@ typedef enum _VIR_OPERANDNO
 typedef enum _VIR_INSTFLAG
 {
     VIR_INSTFLAG_NONE       = 0x00,
+    VIR_INSTFLAG_PACKEDMODE = 0x01,
+    VIR_INSTFLAG_FULL_DEF   = 0x02,
 }
 VIR_InstFlag;
 
@@ -2673,6 +3296,25 @@ typedef enum _VIR_THREADMODE
     VIR_THREAD_D16_SINGLE_T0  = 0x02, /* dual16, thread 0 execute in 32 bit mode */
     VIR_THREAD_D16_SINGLE_T1  = 0x03      /* dual16, thread 1 execute in 32 bit mode */
 } VIR_ThreadMode;
+
+typedef enum _VIR_RES_OP_TYPE
+{
+    VIR_RES_OP_TYPE_UNKNOWN         = 0,
+    VIR_RES_OP_TYPE_TEXLD           = 1,
+    VIR_RES_OP_TYPE_TEXLD_BIAS      = 2,
+    VIR_RES_OP_TYPE_TEXLD_LOD       = 3,
+    VIR_RES_OP_TYPE_TEXLD_GRAD      = 4,
+    VIR_RES_OP_TYPE_TEXLDP          = 5,
+    VIR_RES_OP_TYPE_TEXLDP_GRAD     = 6,
+    VIR_RES_OP_TYPE_TEXLDP_BIAS     = 7,
+    VIR_RES_OP_TYPE_TEXLDP_LOD      = 8,
+    VIR_RES_OP_TYPE_FETCH           = 9,
+    VIR_RES_OP_TYPE_FETCH_MS        = 10,
+    VIR_RES_OP_TYPE_GATHER          = 11,
+    VIR_RES_OP_TYPE_GATHER_PCF      = 12,
+
+    VIR_RES_OP_TYPE_COUNT           = VIR_RES_OP_TYPE_GATHER_PCF + 1,
+}VIR_RES_OP_TYPE;
 
 /* must be the same order as VSC_BI_LIST_NODE */
 typedef struct _VIR_INSTHEADER
@@ -2699,16 +3341,19 @@ struct _VIR_INSTRUCTION
 
     VIR_TypeId              _instType   : 8; /* HW supported type */
     gctUINT                 _condOp     : 5;
-    gctUINT                 _instFlag   : 3; /* VL concept, etc */
+    VIR_InstFlag            _instFlags  : 3; /* VL concept, etc */
     gctUINT                 _srcOpndNum : 3; /* number of source operands */
     gctUINT                 _threadMode : 2;
     gctUINT                 _parentUseBB: 1; /* parent union uses BB */
-    gctUINT                 _reserved   : 10;
+    VIR_RES_OP_TYPE         _resOpType  : 6; /* For sampler (res) inst only, record high-level inst kind */
+    gctUINT                 _isPatternRep: 1; /* instruction is replacment in a pattern match */
+    gctUINT                 _isLoopInvariant: 1;
+    gctUINT                 _reserved   : 2;
 
     gctUINT                 _dual16ExpandSeq;
 
-    VIR_Operand *           dest;           /* dest operands*/
-    VIR_Operand *           src[VIR_MAX_SRC_NUM];     /* source operands  */
+    VIR_Operand *           __DEST;                  /* dest operands*/
+    VIR_Operand *           __SRC[VIR_MAX_SRC_NUM];  /* source operands  */
 
     void *                  mcInst;
     gctUINT                 mcInstCount;
@@ -2718,7 +3363,8 @@ struct _VIR_INSTRUCTION
 typedef struct _VIR_SRCOPERAND_ITERATOR
 {
     VIR_Instruction *       inst;
-    gctUINT                 speicalNode : 1;    /* the node need special handling */
+    gctUINT                 expandSpecialNode : 1;
+    gctUINT                 specialNode : 1;    /* the node need special handling */
     gctUINT                 useOpndList : 1;    /* the special node use operand list */
     gctUINT                 curSrcNo;
     gctUINT                 inSrcNo;    /* some operands may contain multiple
@@ -2738,16 +3384,18 @@ typedef struct _VIR_OPERAND_ITERATOR
 } VIR_Operand_Iterator;
 
 void VIR_SrcOperand_Iterator_Init(VIR_Instruction *Inst, VIR_SrcOperand_Iterator *Iter);
-void VIR_SrcOperand_Iterator_Init1(VIR_Instruction *Inst, VIR_SrcOperand_Iterator *Iter, gctBOOL SkipUndef);
+void VIR_SrcOperand_Iterator_Init1(VIR_Instruction *Inst, VIR_SrcOperand_Iterator *Iter, gctBOOL ExpandSpecialNode, gctBOOL SkipUndef);
 VIR_Operand * VIR_SrcOperand_Iterator_First(VIR_SrcOperand_Iterator *Iter);
 VIR_Operand * VIR_SrcOperand_Iterator_Next(VIR_SrcOperand_Iterator *Iter);
 
-void          VIR_Operand_Iterator_Init(VIR_Instruction *Inst, VIR_Operand_Iterator *Iter, gctBOOL SkipUndef);
+void          VIR_Operand_Iterator_Init(VIR_Instruction *Inst, VIR_Operand_Iterator *Iter, gctBOOL ExpandSpecialNode, gctBOOL SkipUndef);
 VIR_Operand * VIR_Operand_Iterator_First(VIR_Operand_Iterator *Iter);
 VIR_Operand * VIR_Operand_Iterator_Next(VIR_Operand_Iterator *Iter);
 
 VIR_Function * VIR_Inst_GetCallee(VIR_Instruction *);
 VIR_BB *       VIR_Inst_GetBranchTargetBB(VIR_Instruction *);
+gctBOOL        VIR_Inst_isComponentwise(VIR_Instruction *);
+gctBOOL        VIR_Inst_ConditionalWrite(VIR_Instruction *);
 
 /******************************************************************************\
 |*********************************** SHADERS **********************************|
@@ -2760,6 +3408,7 @@ typedef enum _VIR_IB_FLAG
     VIR_IB_UNSIZED                  = 0x0001,
     VIR_IB_FOR_SHARED_VARIABLE      = 0x0002,
     VIR_IB_WITH_INSTANCE_NAME       = 0x0004,
+    VIR_IB_WITH_CUBO                = 0x0008,
 } VIR_IB_FLAG;
 
 /* Structure that defines a uniform block for a shader. */
@@ -2786,6 +3435,20 @@ struct _VIR_UNIFORMBLOCK
     VIR_Uniform **       uniforms;
 };
 
+#define VIR_UBO_GetFlags(UBlock)                   ((UBlock)->flags)
+#define VIR_UBO_SetFlag(UBlock, Val)               do {(UBlock)->flags |= (Val); } while (0)
+#define VIR_UBO_GetSymId(UBlock)                   ((UBlock)->sym)
+#define VIR_UBO_SetSymId(UBlock, s)                (VIR_UBO_GetSymId(UBlock) = s)
+#define VIR_UBO_GetBlockIndex(UBlock)              ((UBlock)->blockIndex)
+#define VIR_UBO_SetBlockIndex(UBlock, s)           (VIR_UBO_GetBlockIndex(UBlock) = s)
+#define VIR_UBO_GetBaseAddress(UBlock)             ((UBlock)->baseAddr)
+#define VIR_UBO_SetBaseAddress(UBlock, s)          (VIR_UBO_GetBaseAddress(UBlock) = s)
+#define VIR_UBO_GetBlockSize(UBlock)               ((UBlock)->blockSize)
+#define VIR_UBO_SetBlockSize(UBlock, s)            (VIR_UBO_GetBlockSize(UBlock) = s)
+#define VIR_UBO_GetUniformCount(UBlock)            ((UBlock)->uniformCount)
+#define VIR_UBO_SetUniformCount(UBlock, s)         (VIR_UBO_GetUniformCount(UBlock) = s)
+#define VIR_UBO_GetUniforms(UBlock)                ((UBlock)->uniforms)
+#define VIR_UBO_SetUniforms(UBlock, s)             (VIR_UBO_GetUniforms(UBlock) = s)
 
 /* Structure that defines an uniform (constant register) for a shader. */
 struct _VIR_UNIFORM
@@ -2802,9 +3465,9 @@ struct _VIR_UNIFORM
     */
     gctINT16                lastIndexingIndex;
 
-    gctINT16                blockIndex;    /* Uniform block index: Default = -1 */
-    gctUINT16               glUniformIndex;/* Corresponding Index of Program's GLUniform */
-    gctUINT16               imageSamplerIndex;    /* Index to image sampler for OpenCL */
+    gctINT16                blockIndex;         /* Uniform block index: Default = -1 */
+    gctUINT16               glUniformIndex;     /* Corresponding Index of Program's GLUniform */
+    gctUINT16               imageSamplerIndex;  /* Index to image sampler for OpenCL */
 
     gctINT16                matchIndex;    /* If a uniform is used on both VS and PS,
                                             * the index of this uniform on the other
@@ -2813,33 +3476,45 @@ struct _VIR_UNIFORM
     gcSHADER_VAR_CATEGORY   _varCategory : 8;
     /* Physically assigned values. */
     gctUINT8                swizzle;
+
+    /* It is only for when new-CG is not on as result of vir compilation still needs to
+       be converted gcSL */
     gctUINT32               address;
+
     /* The original physical register index that from gcUNIFORM. */
     gctINT                  origPhysical;
     gctINT                  physical;
     gctINT                  samplerPhysical;
 
-    VIR_Uniform            *baseBindingUniform;
+    VIR_SymId               baseBindingUniform;  /* symbol id for the base */
 
     /* offset from uniform block's base address */
     gctINT32                offset;
 
     gctINT32                realUseArraySize;
 
-    /*gceUNIFORM_FLAGS        _flags;*/
+    /* If this uniform is sampler, what inst ops acting on it */
+    gctUINT32               resOpBitsArraySize;
+    gctUINT32*              resOpBitsArray;
 
     union
     {
         VIR_ConstId         initializer;    /* Compile-time constant value, */
         struct
         {
-            VIR_Symbol     *lodMinMax;
-            VIR_Symbol     *levelBaseSize;
+            VIR_SymId       lodMinMax; /* The lodMinMax uniform for this sampler/image. */
+            VIR_SymId       levelBaseSize; /* The levelBaseSize uniform for this sampler/image. */
+            VIR_SymId       levelsSamples; /* The levels samples uniform for this sampler/image. */
+            VIR_SymId       extraImageLayer; /* The extraImageLayer uniform for this image. */
+
+            VIR_SymId       parentSamplerSymId;  /* indicating this attribute uniform belongs to which sampler/image. */
+            gctUINT         arrayIdxInParent; /* If parent is array, which array index in parent */
         } samplerOrImageAttr;
-        VIR_Uniform        *parentSampler;  /* indicating this attribute uniform belongs to which sampler/image. */
+        VIR_SymId          parentSSBO;     /* if the uniform is base addr of SSBO, indicating which SSBO it represents. */
     } u;
 
     VIR_SymId           sym;    /* the symbol for this uniform */
+    VIR_SymId           auxAddrSymId;    /* the following defaultUBO addresses */
 };
 
 /* Structure that defines a stroage block for a shader. */
@@ -2863,8 +3538,22 @@ struct _VIR_STORAGEBLOCK
     gctUINT32           variableCount;
 
     /* array of pointers to variables in block */
-    VIR_Symbol *        variables;
+    VIR_SymId *         variables;
 };
+#define VIR_SBO_GetFlags(SBlock)                   ((SBlock)->flags)
+#define VIR_SBO_SetFlag(SBlock, Val)               do {(SBlock)->flags |= (Val); } while (0)
+#define VIR_SBO_GetSymId(SBlock)                   ((SBlock)->sym)
+#define VIR_SBO_SetSymId(SBlock, s)                (VIR_SBO_GetSymId(SBlock) = s)
+#define VIR_SBO_GetBlockIndex(SBlock)              ((SBlock)->blockIndex)
+#define VIR_SBO_SetBlockIndex(SBlock, s)           (VIR_SBO_GetBlockIndex(SBlock) = s)
+#define VIR_SBO_GetBaseAddress(SBlock)             ((SBlock)->baseAddr)
+#define VIR_SBO_SetBaseAddress(SBlock, s)          (VIR_SBO_GetBaseAddress(SBlock) = s)
+#define VIR_SBO_GetBlockSize(SBlock)               ((SBlock)->blockSize)
+#define VIR_SBO_SetBlockSize(SBlock, s)            (VIR_SBO_GetBlockSize(SBlock) = s)
+#define VIR_SBO_GetVariableCount(SBlock)           ((SBlock)->variableCount)
+#define VIR_SBO_SetVariableCount(SBlock, s)        (VIR_SBO_GetVariableCount(SBlock) = s)
+#define VIR_SBO_GetVariables(SBlock)               ((SBlock)->variables)
+#define VIR_SBO_SetVariables(SBlock, s)            (VIR_SBO_GetVariables(SBlock) = s)
 
 /* Structure that defines a io block for a shader. */
 struct _VIR_IOBLOCK
@@ -2876,7 +3565,7 @@ struct _VIR_IOBLOCK
     VIR_IB_FLAG         flags;
 
     /* IO block index of gcSL shader. */
-    gctINT              blockIndex;
+    gctINT16            blockIndex;
 
     /* The length of block name. */
     gctINT              blockNameLength;
@@ -2891,6 +3580,8 @@ struct _VIR_IOBLOCK
 #define VIR_IB_GetFlags(IB)                             ((IB)->flags)
 #define VIR_IB_SetFlag(IB, Val)                         do {(IB)->flags |= (Val); } while (0)
 
+#define VIR_IOBLOCK_GetFlags(IOBlock)                   ((IOBlock)->flags)
+#define VIR_IOBLOCK_SetFlag(IOBlock, Val)               do {(IOBlock)->flags |= (Val); } while (0)
 #define VIR_IOBLOCK_GetSymId(IOBlock)                   ((IOBlock)->sym)
 #define VIR_IOBLOCK_SetSymId(IOBlock, s)                (VIR_IOBLOCK_GetSymId(IOBlock) = s)
 #define VIR_IOBLOCK_GetBlockIndex(IOBlock)              ((IOBlock)->blockIndex)
@@ -2908,6 +3599,7 @@ typedef enum _VIR_FUNCTIONFLAG
 {
   VIR_FUNCFLAG_NOATTR                   = 0x00,
   VIR_FUNCFLAG_INTRINSICS               = 0x01, /* Function is openCL/OpenGL builtin function */
+  /* Only set this flag in function _CheckAlwaysInlineFunctions. */
   VIR_FUNCFLAG_ALWAYSINLINE             = 0x02, /* Always inline */
   VIR_FUNCFLAG_NOINLINE                 = 0x04, /* Neve inline */
   VIR_FUNCFLAG_INLINEHINT               = 0x08, /* Inline is desirable */
@@ -2929,6 +3621,10 @@ typedef enum _VIR_FUNCTIONFLAG
   VIR_FUNCFLAG_RECOMPILER_STUB          = 0x20000, /* The function to stub a recompile function. */
   VIR_FUNCFLAG_HAS_SAMPLER_INDEXINED    = 0x40000, /* This function has sampler indexing used. */
   VIR_FUNCFLAG_KERNEL_MERGED_MAIN       = 0x80000, /* This kernel function is merged with main function. */
+  VIR_FUNCFLAG_INITIALIZE_FUNC          = 0x100000,
+
+  VIR_FUNCFLAG_LINKED_LIB               = 0x200000, /* This function is coming from linked library */
+  VIR_FUNCFLAG_HAS_GOTO                 = 0x400000, /* This function has goto branch */
 } VIR_FunctionFlag;
 
 typedef struct _VIR_KERNELPROPERTY
@@ -2955,6 +3651,8 @@ typedef struct _VIR_IMAGESAMPLER
 
 typedef struct _VIR_KERNELINFO
 {
+    VIR_NameId          kernelName;     /* keep the name of the kernel
+                                         * after it is merged with main */
     /* Local address space size */
     gctUINT32           localMemorySize;
 
@@ -2969,8 +3667,6 @@ typedef struct _VIR_KERNELINFO
     VIR_ValueList       properties;     /* a list of VIR_KernelProperty */
     VIR_IdList          propertyValues;
 
-    VIR_NameId          kernelName;     /* keep the name of the kernel
-                                         * after it is merged with main */
     gctBOOL             isMain;
 } VIR_KernelInfo;
 
@@ -2987,13 +3683,13 @@ struct _VIR_FUNCTION
     VIR_Shader *        hostShader;
     VIR_SymId           funcSym;
 
-    VIR_SymTable        symTable;
-    VIR_LabelTable      labelTable;
-    VIR_OperandTable    operandTable;   /* operands used in instructions */
-
     VIR_FunctionFlag    flags;
     gctUINT             maxCallDepth;   /* the max call stack depth required
                                            by the function */
+
+    VIR_SymTable        symTable;
+    VIR_LabelTable      labelTable;
+    VIR_OperandTable    operandTable;   /* operands used in instructions */
 
     /* Local variables. */
     VIR_VariableIdList  localVariables;
@@ -3011,6 +3707,9 @@ struct _VIR_FUNCTION
 
     /* Pointer to FunctionBlock which used to build call graph of whole shader */
     VIR_FB*             pFuncBlock;
+
+    gctUINT16           die;
+    void *              debugInfo;
 };
 
 
@@ -3056,14 +3755,14 @@ typedef struct _VIR_TRANSFORMFEEDBACK
     VIR_FeedbackBufferMode          bufferMode;
     /* driver set to 1 if transform feedback is active and not
        paused, 0 if inactive or paused */
-    VIR_Uniform *                   stateUniform;
+    VIR_UniformId                   stateUniformId;
     /* the temp register info for each varying */
     VIR_ValueList *                 varRegInfos;
     union {
         /* array of uniform for separate transform feedback buffers */
-        VIR_Uniform **              separateBufUniforms;
+        VIR_UniformId*              separateBufUniformIds;
         /* transfom feedback buffer for interleaved mode */
-        VIR_Uniform *               interleavedBufUniform;
+        VIR_UniformId               interleavedBufUniformId;
     } feedbackBuffer;
     gctINT                          shaderTempCount;
     /* total size to write to interleaved buffer for one vertex */
@@ -3111,7 +3810,8 @@ typedef struct _VIR_SHADERCODEINFO
     gctINT                  estimatedInst;     /* estimated GPU instruction count */
     gctINT                  runSignleTInstCount;  /* instructions ONLY run at single T in dual16 mode
                                                    * need to count them as two instructions */
-    gctINT                  highPInstCount;      /* high precision instruction count */
+    gctINT                  halfDepInstCount;    /* texld has half dep issue in some HW,
+                                                 if there are too many such instructions, we need to disable dual16*/
 } VIR_ShaderCodeInfo;
 
 
@@ -3142,6 +3842,8 @@ typedef enum _VIR_SHADERFLAGS
     VIR_SHFLAG_HAS_32BITMODULUS                 = 0x0400, /* whether the shader 32 bit modulus */
     VIR_SHFLAG_HAS_INT64                        = 0x0800, /* whether the shader has int64 */
     VIR_SHFLAG_HAS_IMAGE_QUERY                  = 0x1000, /* whether the shader has image query which require img_desc to be vec8 */
+    VIR_SHFLAG_BY_SSA_FORM                      = 0x2000, /* whether the shader is by ssa form */
+    VIR_SHFLAG_BY_SPV_SSA_FORM                  = 0x4000, /* whether the shader is by spirv ssa form */
 
     /* shader specific code characteristic flag */
     VIR_SHFLAG_GS_HAS_STREAM_OUT                = 0x10000, /* whether the shader has stream out, only in GS */
@@ -3160,6 +3862,10 @@ typedef enum _VIR_SHADERFLAGS
                                                                     coming from driver, only affect TCS */
     VIR_SHFLAG_TCS_USE_PACKED_REMAP             = 0x2000000, /* whether the shader's input remap and output
                                                                     remap are packed in one register, only affect TCS */
+
+    VIR_SHFLAG_USE_LOCAL_MEM                    = 0x4000000, /* whether the shader uses local memory */
+    VIR_SHFLAG_USE_LOCAL_MEM_ATOM               = 0x8000000, /* whether the shader uses local memory in atomic,
+                                                                    HW v6.0 does not support it yet */
 
 } VIR_ShaderFlags;
 
@@ -3182,6 +3888,10 @@ typedef enum _VIR_SHADERFLAGS
 #define VIR_Shader_Has32BitModulus(Shader)          (((Shader)->flags & VIR_SHFLAG_HAS_32BITMODULUS) != 0)
 #define VIR_Shader_HasInt64(Shader)                 (((Shader)->flags & VIR_SHFLAG_HAS_INT64) != 0)
 #define VIR_Shader_HasImageQuery(Shader)            (((Shader)->flags & VIR_SHFLAG_HAS_IMAGE_QUERY) != 0)
+#define VIR_Shader_BySSAForm(Shader)                (((Shader)->flags & VIR_SHFLAG_BY_SSA_FORM) != 0)
+#define VIR_Shader_BySpvSSAForm(Shader)             (((Shader)->flags & VIR_SHFLAG_BY_SPV_SSA_FORM) != 0)
+#define VIR_Shader_UseLocalMem(Shader)              (((Shader)->flags & VIR_SHFLAG_USE_LOCAL_MEM) != 0)
+#define VIR_Shader_UseLocalMemAtom(Shader)          (((Shader)->flags & VIR_SHFLAG_USE_LOCAL_MEM_ATOM) != 0)
 
 /* let the client make sure the shaderKind is right.
    Otherwise, it is wrong when the flag is used in !flag case. */
@@ -3289,7 +3999,6 @@ typedef struct _VIR_TCSLAYOUT
     /* Tesselation Control Shader layout */
     gctINT                  tcsPatchInputVertices;
     gctINT                  tcsPatchOutputVertices;
-    VIR_Uniform *           tcsInputVerticesUniform;
     gctBOOL                 hasOutputVertexAccess;
 } VIR_TCSLayout;
 
@@ -3316,8 +4025,6 @@ typedef struct _VIR_GEOLAYOUT
     VIR_GeoPrimitive        geoOutPrimitive;
 } VIR_GEOLayout;
 
-typedef struct _VSC_PASS_MANAGER* PVSC_PASS_MANAGER;
-
 typedef enum _VIR_MEMORY_ACCESS_FLAG
 {
     VIR_MA_FLAG_NONE                 = 0x0000,
@@ -3336,36 +4043,59 @@ typedef enum _VIR_MEMORY_ACCESS_FLAG
     VIR_MA_FLAG_BARRIER              = 0x0020,
 } VIR_MemoryAccessFlag;
 
+typedef struct _VIR_SHADER_RESOURCE_ALLOC_ENTRY
+{
+    VSC_SHADER_RESOURCE_BINDING     resBinding;
+
+    gctBOOL                         bUse;
+
+    gctUINT                         hwRegNo;
+    gctUINT8                        swizzle;
+
+    /* For unsize resources */
+    gctUINT                         fixedSize;
+    gctUINT                         lastElementSize;
+}VIR_SHADER_RESOURCE_ALLOC_ENTRY;
+
+typedef struct _VIR_SHADER_PUSH_CONSTANT_ALLOC_ENTRY
+{
+    VSC_SHADER_PUSH_CONSTANT_RANGE   pushCnstRange;
+
+    gctBOOL                          bUse;
+
+    gctUINT                          hwRegNo;
+    gctUINT8                         swizzle;
+} VIR_SHADER_PUSH_CONSTANT_ALLOC_ENTRY;
+
+typedef struct _VIR_SHADER_RESOURCE_ALLOC_LAYOUT
+{
+    gctUINT32                                   resAllocEntryCount;
+    VIR_SHADER_RESOURCE_ALLOC_ENTRY*            pResAllocEntries;
+
+    gctUINT32                                   pushCnstAllocEntryCount;
+    VIR_SHADER_PUSH_CONSTANT_ALLOC_ENTRY*       pPushCnstAllocEntries;
+}VIR_SHADER_RESOURCE_ALLOC_LAYOUT;
+
 /* The structure that defines the gcSHADER object to the outside world. */
 struct _VIR_SHADER
 {
     /* The base object. */
     gcsOBJECT           object;
-    gcePATCH_ID         patchID;            /* Process name of this shader. */
     gceAPI              clientApiVersion;   /* client API version. */
     gctUINT             _id;                /* unique id used for triage */
     gctUINT             _constVectorId;     /* unique constant uniform vector id */
     gctUINT             _dummyUniformCount;
     gctUINT             _orgTempCount;      /* the org temp register count of gcSL shader */
     gctUINT             _tempRegCount;      /* the temp register count of the shader */
+    gctUINT             _anonymousNameId;
+
+    /* dump options, don't need to save/copy. */
+    VSC_OPTN_DumpOptions *  dumpOptions;
+
+    gctINT32            refCount;           /* Reference count */
 
     /* At which level that this VIR shader is */
     VIR_ShLevel         shLevel;
-
-    /* Index of the uniform block that hold the const uniforms generated by compiler.*/
-    gctINT              constUniformBlockIndex;
-
-    /* The size of the uniform block that hold the const uniforms. */
-    gctINT              constUBOSize;
-
-    /* A memory buffer to store constant uniform. */
-    gctUINT32 *         constUBOData;
-
-    /* Index of the uniform block that hold the const uniforms exceeding the hw cap.*/
-    gctINT              defaultUniformBlockIndex;
-
-    /* Frontend compiler version */
-    gctUINT32           compilerVersion[2];
 
     /* Type of shader. */
     VIR_ShaderKind      shaderKind;
@@ -3373,18 +4103,34 @@ struct _VIR_SHADER
     /* Flags */
     VIR_ShaderFlags     flags;
 
+    /* Frontend compiler version */
+    gctUINT32           compilerVersion[2];
+
+
+    /* Index of the uniform block that hold the const uniforms generated by compiler.*/
+    gctINT              constUniformBlockIndex;
+
+    /* Index of the uniform block that hold the const uniforms exceeding the hw cap.*/
+    gctINT              defaultUniformBlockIndex;
+
     /* Maximum of kernel function arguments, used to calculation the starting uniform index */
     gctUINT32           maxKernelFunctionArgs;
-
-    /* Constant memory address space size for openCL */
-    gctUINT32           constantMemorySize;
-    gctCHAR    *        constantMemoryBuffer;
 
     /* Private memory address space size for openCL */
     gctUINT32           privateMemorySize;
 
     /* Local memory address space size for openCL, inherited from chosen kernel function */
     gctUINT32           localMemorySize;
+
+    /* The size of the uniform block that hold the const uniforms. */
+    gctINT              constUBOSize;
+
+    /* A memory buffer to store constant uniform. */
+    gctUINT32 *         constUBOData;
+
+    /* Constant memory address space size for openCL */
+    gctUINT32           constantMemorySize;
+    gctCHAR    *        constantMemoryBuffer;
 
     /* Attributes. */
     VIR_AttributeIdList attributes;
@@ -3405,10 +4151,7 @@ struct _VIR_SHADER
     VIR_BufferIdList    buffers;        /* a list of buffer objects */
 
     /* Uniforms. */
-    VIR_UniformIdList   uniforms;
-    gctUINT             uniformCount;        /* after gcsl->VIR, it is set to the count of
-                                                gcsl uniforms, which may not be all converted
-                                                to VIR */
+    VIR_UniformIdList   uniforms;            /* uniformId [0, uniformCount) to uniform's symbolId */
     gctUINT32           uniformVectorCount;  /* the vector count of all uniforms */
     gctINT              samplerIndex;
 
@@ -3417,8 +4160,18 @@ struct _VIR_SHADER
     /* Sampler base offset. */
     gctINT              samplerBaseOffset;
 
+    /* Shaderwise layout info */
+    union {
+        VIR_ComputeLayout   compute;
+        VIR_TCSLayout       tcs;
+        VIR_TESLayout       tes;
+        VIR_GEOLayout       geo;
+    } shaderLayout;
+
     /* Global variables. */
     VIR_VariableIdList  variables;
+
+    VIR_SharedVarIdList sharedVariables;
 
     /* HALTI extras: Uniform block. */
     VIR_UBOIdList       uniformBlocks;
@@ -3429,40 +4182,16 @@ struct _VIR_SHADER
     /* ES 3.1 ext: IO block object */
     VIR_IOBIdList       ioBlocks;
 
-    /* Functions. */
-    VIR_FunctionList    functions;
-    VIR_Function *      currentFunction;    /* private member */
-    VIR_Function *      mainFunction;
-    VIR_Function *      initFunction;
-
-    /* Kernel Functions. */
-    VIR_FunctionList    kernelFunctions;
-    VIR_Function *      currentKernelFunction;
-
-    /* Shaderwise layout info */
-    union {
-        VIR_ComputeLayout   compute;
-        VIR_TCSLayout       tcs;
-        VIR_TESLayout       tes;
-        VIR_GEOLayout       geo;
-    } shaderLayout;
-
     gctINT *            loadUsers;
 
     /* load-time optimization uniforms */
     gctINT              ltcUniformCount;      /* load-time constant uniform count */
     gctUINT             ltcUniformBegin;      /* the begin offset of ltc in uniforms */
+
+    gctUINT             ltcInstructionCount;  /* the total instruction count of the LTC expressions */
     gctINT *            ltcCodeUniformIndex;  /* an array to map code index to uniform index,
                                                  element which has 0 value means no uniform for the code*/
-    gctUINT             ltcInstructionCount;  /* the total instruction count of the LTC expressions */
     VIR_Instruction *   ltcExpressions;       /* the expression array for ltc uniforms, which is a list of instructions */
-
-    gctBOOL             vsPositionZDependsOnW;    /* for wClip */
-    gctBOOL             psHasDiscard;
-    VIR_MemoryAccessFlag    memoryAccessFlag;
-    gctBOOL             useEarlyFragTest;
-    gctBOOL             hasDsx;
-    gctBOOL             hasDsy;
 
     /* Optimization option. */
     gctUINT             optimizationOption;
@@ -3474,13 +4203,6 @@ struct _VIR_SHADER
     gctUINT             sourceLength;            /* including terminating '\0' */
     gctSTRING           source;
 
-    /* mapping from library temp index to linked to shader temp index */
-    gctUINT32           mappingTableExntries;
-    gctINT *            mappingTable;
-    gctUINT             linkedToShaderId;
-
-    /* a list of library linked to this shader */
-    VIR_LibraryList *   libraryList;
 
 #if gcdSHADER_SRC_BY_MACHINECODE
     /* It is used to do high level GLSL shader detection, and give a BE a
@@ -3495,6 +4217,17 @@ struct _VIR_SHADER
      */
     gctUINT32           replaceIndex;
 #endif
+
+    VIR_MemoryAccessFlag    memoryAccessFlag;
+    gctBOOL             vsPositionZDependsOnW;    /* for wClip */
+    gctBOOL             psHasDiscard;
+    gctBOOL             useEarlyFragTest;
+    gctBOOL             hasDsx;
+    gctBOOL             hasDsy;
+    gctBOOL             hasThreadGroupSync;
+
+    /* Use gl_LastFragData[]. */
+    gctBOOL             useLastFragData;
 
     /* Need some hardware infomation for lower. Add to here temperarily. */
     gctBOOL             __IsDual16Shader;
@@ -3511,20 +4244,32 @@ struct _VIR_SHADER
     /* Need to adjust sampler physical assignment for function argument. */
     gctBOOL             needToAdjustSamplerPhysical;
 
-    gctUINT             _anonymousNameId;
     gctBOOL             _enableDefaultUBO;
 
     /* VIR Specific data */
-
     VIR_StringTable     stringTable;
     VIR_TypeTable       typeTable;          /* local type table fot the shader,
                                              * it later unified with global type
                                              * table when linking */
-    VIR_SymTable        symTable;
     VIR_ConstTable      constTable;
+    VIR_SymTable        symTable;
+    VIR_SymAliasTable   symAliasTable;
 
+    VIR_InstTable       instTable;          /* shared by all functions, no need to be IOed */
+
+    /* Functions. */
+    VIR_FunctionList    functions;
+    VIR_Function *      currentFunction;    /* private member */
+    VIR_Function *      mainFunction;
+    VIR_Function *      initFunction;
+
+    /* Kernel Functions. */
+    VIR_FunctionList    kernelFunctions;
+    VIR_Function *      currentKernelFunction;
+
+    /* !!! fields below donot need to save to binary !!!*/
     VIR_Context *       context;            /* TODO: change to Program Object */
-    VSC_MM              mempool;            /* memory pool used by the shader */
+    VSC_PRIMARY_MEM_POOL pmp;               /* memory pool used by the shader */
     VIR_Dumper *        dumper;             /* dumper info */
 
     /* register allocation is enabled*/
@@ -3545,6 +4290,8 @@ struct _VIR_SHADER
     /* shader has spill */
     gctBOOL             hasRegisterSpill;
     gctUINT             vidmemSizeOfSpill;
+    gctUINT             llSlotForSpillVidmem;
+    gctBOOL             hasCRegSpill;
 
     /* For pos/point-coord inputs of ps, we need know exact channel valid info to trigger some
        recompiling process.
@@ -3552,8 +4299,17 @@ struct _VIR_SHADER
     gctBOOL             psInputPosCompValid[VIR_CHANNEL_COUNT];
     gctBOOL             psInputPCCompValid[VIR_CHANNEL_COUNT];
 
-    /* Pass manager who manage compiling procedure for this shader */
-    PVSC_PASS_MANAGER   passMnger;
+    /* Pipeline link info */
+    VIR_ShaderKind      inLinkedShaderStage;
+    VIR_ShaderKind      outLinkedShaderStage;
+
+    /* Compiler-config that is acting on this shader */
+    VSC_COMPILER_CONFIG* pCompilerCfg;
+
+    /* It is only used for Vulkan. DONT save into binary!!! */
+    VIR_SHADER_RESOURCE_ALLOC_LAYOUT shaderResAllocLayout;
+
+    void *               debugInfo;
 };
 
 /* VIR interface */
@@ -3577,6 +4333,11 @@ extern gctUINT
 VIR_Inst_GetEvisState(
     IN VIR_Instruction     *pInst,
     IN VIR_Operand         *pOpnd
+    );
+
+VSC_ErrCode
+VIR_Inst_UpdateResOpType(
+    IN VIR_Instruction     *pInst
     );
 
 /* VIR_ConditionOp */
@@ -3625,13 +4386,93 @@ extern VSC_ErrCode
 VIR_Shader_Construct(
     IN gcoHAL         Hal,
     IN VIR_ShaderKind ShaderType,
-    IN VSC_MM *       MemPool,
-    OUT VIR_Shader ** Shader
+    OUT VIR_Shader * Shader
+    );
+
+extern VSC_ErrCode
+VIR_Shader_Construct0(
+    IN gcoHAL         Hal,
+    IN VIR_ShaderKind ShaderType,
+    OUT VIR_Shader *  Shader,
+    gctBOOL           Init
     );
 
 VSC_ErrCode
 VIR_Shader_Destroy(
     IN VIR_Shader * Shader
+    );
+
+gctBOOL
+VIR_Shader_IsNameBuiltIn(
+    IN  VIR_Shader *    Shader,
+    IN  VIR_NameId      NameId
+    );
+
+/*******************************************************************************
+**                              VIR_Shader_Copy
+********************************************************************************
+**
+**    Copy a VIR_Shader object.
+**
+**    INPUT:
+**
+**        VIR_Shader Shader
+**            Pointer to a VIR_Shader object.
+**
+**      VIR_Shader Source
+**          Pointer to a VIR_Shader object that will be copied.
+**
+**    OUTPUT:
+**
+**        Nothing.
+*/
+VSC_ErrCode
+VIR_Shader_Copy(
+    IN OUT VIR_Shader  *Shader,
+    IN  VIR_Shader     *Source);
+
+
+/*******************************************************************************
+**                                VIR_Shader
+********************************************************************************
+**
+**    Load a VIR_Shader object from a binary buffer.
+**
+**    INPUT:
+**
+**        VIR_Shader Shader
+**            Pointer to a VIR_Shader object.
+**
+**        gctPOINTER Buffer
+**            Pointer to a binary buffer containg the shader data to load.
+**
+**        gctUINT32 BufferSize
+**            Number of bytes inside the binary buffer pointed to by 'Buffer'.
+**
+**    OUTPUT:
+**
+**        Nothing.
+*/
+VSC_ErrCode
+VIR_Shader_Load(
+    IN OUT VIR_Shader  Shader,
+    IN gctPOINTER      Buffer,
+    IN gctUINT32       BufferSize
+    );
+
+
+gctUINT
+VIR_Shader_DecodeLangVersionToCompilerVersion(
+    IN VIR_Shader *    Shader,
+    IN gctUINT         LanguageVersion
+    );
+
+void
+VIR_Shader_DecodeCompilerVersionToShVersion(
+    IN VIR_Shader *    Shader,
+    IN gctUINT         CompilerVersion,
+    OUT gctUINT *      MajorVersion,
+    OUT gctUINT *      MinorVersion
     );
 
 gctBOOL
@@ -3646,6 +4487,21 @@ VIR_Shader_IsES30Compiler(
 
 gctBOOL
 VIR_Shader_IsES31Compiler(
+    IN VIR_Shader * Shader
+    );
+
+gctBOOL
+VIR_Shader_IsES32Compiler(
+    IN VIR_Shader * Shader
+    );
+
+gctBOOL
+VIR_Shader_IsES40Compiler(
+    IN VIR_Shader * Shader
+    );
+
+gctBOOL
+VIR_Shader_IsES31AndAboveCompiler(
     IN VIR_Shader * Shader
     );
 
@@ -3698,6 +4554,7 @@ VIR_Shader_AddArrayType(
     IN  VIR_Shader *    Shader,
     IN  VIR_TypeId      BaseType,
     IN  gctUINT32       ArrayLength,
+    IN  gctINT          ArrayStride,
     OUT VIR_TypeId *    TypeId
     );
 
@@ -3723,7 +4580,15 @@ VIR_Shader_AddStructType(
     IN  VIR_Shader *    Shader,
     IN  gctBOOL         IsUnion,
     IN  VIR_NameId      NameId,
+    IN  gctBOOL         ForceDup,
     OUT VIR_TypeId*     TypeId
+    );
+
+VSC_ErrCode
+VIR_Shader_DuplicateType(
+    IN  VIR_Shader *    Shader,
+    IN  VIR_TypeId      OrigTypeId,
+    OUT VIR_TypeId*     DupTypeId
     );
 
 VSC_ErrCode
@@ -3766,12 +4631,6 @@ VIR_Shader_AddNamedUniform(
     );
 
 gctUINT
-VIR_Shader_GetTypeByteSize(
-    IN  VIR_Shader *    Shader,
-    IN  VIR_Type *      Type
-    );
-
-gctUINT
 VIR_Shader_GetLogicalCount(
     IN  VIR_Shader *    Shader,
     IN  VIR_Type *      Type
@@ -3793,6 +4652,150 @@ VIR_Shader_AddBuiltinOutput(
     IN  VIR_NameId      builtinName
     );
 
+void
+VIR_Shader_AddAddrSpace(
+    IN OUT VIR_Type *   Type,
+    IN  VIR_AddrSpace   AS
+    );
+
+VSC_ErrCode
+VIR_Shader_GenNullForScalarAndVector(
+    IN OUT  VIR_Shader     *Shader,
+    IN  VIR_Function       *Function,
+    IN  VIR_Instruction    *Inst,
+    IN  VIR_SymId           SymId,
+    IN  VIR_TypeId          TypeId,
+    IN  gctUINT             MatrixIndex,
+    IN  gctUINT             RegOffset
+    );
+
+VSC_ErrCode
+VIR_Shader_GenNullForMatrix(
+    IN OUT  VIR_Shader     *Shader,
+    IN  VIR_Function       *Function,
+    IN  VIR_Instruction    *Inst,
+    IN  VIR_SymId           SymId,
+    IN  VIR_TypeId          TypeId,
+    IN  gctUINT             RegOffset
+    );
+
+VSC_ErrCode
+VIR_Shader_GenNullForArray(
+    IN OUT  VIR_Shader     *Shader,
+    IN  VIR_Function       *Function,
+    IN  VIR_Instruction    *Inst,
+    IN  VIR_SymId           SymId,
+    IN  VIR_TypeId          TypeId,
+    IN  gctUINT             RegOffset
+    );
+
+VSC_ErrCode
+VIR_Shader_GenNullForStruct(
+    IN OUT  VIR_Shader     *Shader,
+    IN  VIR_Function       *Function,
+    IN  VIR_Instruction    *Inst,
+    IN  VIR_SymId           SymId,
+    IN  VIR_TypeId          TypeId,
+    IN  gctUINT             RegOffset
+    );
+
+VSC_ErrCode
+VIR_Shader_GenNullAssignment(
+    IN OUT  VIR_Shader     *Shader,
+    IN  VIR_Function       *Function,
+    IN  VIR_Instruction    *Inst,
+    IN  VIR_SymId           DestSymId,
+    IN  VIR_TypeId          DestTypeId
+    );
+
+VSC_ErrCode
+VIR_Shader_GenSimpleAssignment(
+    IN OUT  VIR_Shader     *Shader,
+    IN  VIR_Function       *Function,
+    IN  VIR_Instruction    *Inst,
+    IN  VIR_SymId           DestSymId,
+    IN  VIR_TypeId          DestTypeId,
+    IN  VIR_SymbolKind      DestOffsetKind,
+    IN  VIR_SymId           DestOffset,
+    IN  VIR_SymbolKind      SourceSymKind,
+    IN  VIR_SymId           SourceSymId,
+    IN  VIR_SymbolKind      SourceOffsetKind,
+    IN  VIR_SymId           SourceOffset,
+    IN  gctUINT             DestVectorOffset,
+    IN  gctUINT             DestMatrixIndex,
+    IN  gctUINT             SourceMatrixIndex
+    );
+
+VSC_ErrCode
+VIR_Shader_GenMatrixAssignment(
+    IN OUT  VIR_Shader     *Shader,
+    IN  VIR_Function       *Function,
+    IN  VIR_Instruction    *Inst,
+    IN  VIR_Type           *Type,
+    IN  VIR_SymId           DestSymId,
+    IN  VIR_SymId           SourceSymId,
+    IN  VIR_SymbolKind      DestOffsetKind,
+    IN  VIR_SymId           DestOffset,
+    IN  VIR_SymbolKind      SourceOffsetKind,
+    IN  VIR_SymId           SourceOffset
+    );
+
+VSC_ErrCode
+VIR_Shader_GenArrayAssignment(
+    IN OUT  VIR_Shader     *Shader,
+    IN  VIR_Function       *Function,
+    IN  VIR_Instruction    *Inst,
+    IN  VIR_Type           *Type,
+    IN  VIR_SymId           DestSymId,
+    IN  VIR_SymId           SourceSymId,
+    IN  VIR_SymbolKind      DestOffsetKind,
+    IN  VIR_SymId           DestOffset,
+    IN  VIR_SymbolKind      SourceOffsetKind,
+    IN  VIR_SymId           SourceOffset
+    );
+
+VSC_ErrCode
+VIR_Shader_GenStructAssignment(
+    IN OUT  VIR_Shader     *Shader,
+    IN  VIR_Function       *Function,
+    IN  VIR_Instruction    *Inst,
+    IN  VIR_Type           *Type,
+    IN  VIR_SymId           DestSymId,
+    IN  VIR_SymId           SourceSymId,
+    IN  VIR_SymbolKind      DestOffsetKind,
+    IN  VIR_SymId           DestOffset,
+    IN  VIR_SymbolKind      SourceOffsetKind,
+    IN  VIR_SymId           SourceOffset
+    );
+
+VSC_ErrCode
+VIR_Shader_CompositeConstruct(
+    IN OUT  VIR_Shader     *Shader,
+    IN  VIR_Function       *Function,
+    IN  VIR_Instruction    *Inst,
+    IN  VIR_SymId           SymId,
+    IN  VIR_TypeId          TypeId,
+    IN  gctBOOL             ConstructWithNull,
+    IN  VIR_SymId          *CompositeSymId,
+    IN  VIR_SymbolKind     *CompositeSymKind,
+    IN  gctUINT             CompositeSymLength
+    );
+
+VSC_ErrCode
+VIR_Shader_CreateSymAliasTable(
+    IN OUT  VIR_Shader      *Shader
+    );
+
+VSC_ErrCode
+VIR_Shader_DestroySymAliasTable(
+    IN OUT  VIR_Shader      *Shader
+    );
+
+VIR_SymAliasTable*
+VIR_Shader_GetCreatedSymAliasTable(
+    IN OUT  VIR_Shader      *Shader
+    );
+
 /* types */
 void
 VIR_Type_SetAlignment(
@@ -3800,11 +4803,6 @@ VIR_Type_SetAlignment(
     IN  gctUINT         Alignment
     );
 
-void
-VIR_Shader_AddAddrSpace(
-    IN OUT VIR_Type *   Type,
-    IN  VIR_AddrSpace   AS
-    );
 
 VSC_ErrCode
 VIR_Type_AddField(
@@ -3819,14 +4817,21 @@ VIR_Type_AddFieldAndInfo(
     IN  VIR_Type *      StructType,
     IN  gctSTRING       FieldName,
     IN  gctUINT32       Offset,
-    IN  gctBOOL         isBitField,
+    IN  gctINT          ArrayStride,
+    IN  gctINT          Matrixstride,
+    IN  gctBOOL         IsBitField,
     IN  gctUINT         StartBit,
     IN  gctUINT         BitSize,
-    IN  gctUINT         TempRegOffset,
-    OUT VIR_SymId *     FieldSym
+    IN  gctUINT         TempRegOrUniformOffset,
+    OUT VIR_SymId *     FieldSymId
     );
 
-gctUINT VIR_Type_GetVirRegCount(VIR_Shader * Shader, VIR_Type *);
+gctUINT VIR_Type_GetVirRegCount(VIR_Shader * Shader, VIR_Type *, gctINT);
+VIR_Type* VIR_Type_GetRegIndexType(
+    IN VIR_Shader * Shader,
+    IN VIR_Type* Type,
+    IN gctUINT RegIndex
+    );
 gctUINT VIR_Symbol_GetVirIoRegCount(VIR_Shader * Shader, VIR_Symbol*);
 
 /* For dual16 shader, the input symbol could be in 2 registers */
@@ -3836,16 +4841,48 @@ gctINT  VIR_Symbol_GetRegSize(
     IN VIR_Symbol       *Sym);
 
 VIR_SymIndexingInfo VIR_Symbol_GetIndexingInfo(VIR_Shader * Shader, VIR_Symbol *Sym);
-
-VIR_Type *
-VIR_Type_GetFieldTypeByAccessChain(
-    IN  VIR_Shader         *Shader,
-    IN  VIR_Type           *Type,
-    IN  gctUINT             AccessChain,
-    IN  gctBOOL             IsLogicalReg,
-    OUT gctUINT            *FieldOffset
+gctBOOL
+VIR_Symbol_IsInArray(
+    IN  VIR_Symbol              *Symbol
     );
 
+gctBOOL
+VIR_Symbol_NeedReplaceSymWithReg(
+    VIR_Symbol *Sym
+    );
+
+gctBOOL VIR_SymAliasTable_IsEmpty(
+    IN VIR_SymAliasTable        *Table
+    );
+
+void VIR_SymAliasTable_Insert(
+    IN OUT VIR_SymAliasTable    *Table,
+    IN VIR_Symbol               *Sym,
+    IN VIR_Symbol               *Alias
+    );
+
+VIR_Symbol* VIR_SymAliasTable_GetAlias(
+    IN VIR_SymAliasTable        *Table,
+    IN VIR_Symbol               *Sym
+    );
+
+gctUINT
+VIR_Type_GetTypeByteSize(
+    IN  VIR_Shader *    Shader,
+    IN  VIR_Type *      Type
+    );
+
+gctINT
+VIR_Type_GetRegOrOpaqueCount(
+    IN  VIR_Shader         *Shader,
+    IN  VIR_Type           *Type,
+    IN  gctBOOL             CheckSampler,
+    IN  gctBOOL             CheckImage,
+    IN  gctBOOL             CheckAtomicCounter,
+    IN  gctBOOL             IsLogicalReg
+    );
+
+/* Only calculate the non-Opaque type. */
 gctINT
 VIR_Type_GetRegCount(
     IN  VIR_Shader         *Shader,
@@ -3857,6 +4894,25 @@ gctBOOL
 VIR_Type_IsBaseTypeStruct(
     IN  VIR_Shader         *Shader,
     IN  VIR_Type           *Type
+    );
+
+VIR_TypeId
+VIR_Type_SliceType(
+    IN  VIR_Shader         *Shader,
+    IN  VIR_Type           *Type
+    );
+
+VSC_ErrCode
+VIR_Type_CalcByteOffset(
+    IN  VIR_Shader         *Shader,
+    IN  VIR_Type           *BaseType,
+    IN  gctBOOL             IsArray,
+    IN  VIR_LayoutQual      LayoutQual,
+    IN  gctUINT             BaseOffset,
+    IN  gctUINT            *Offset,
+    IN  gctINT             *ArrayStride,
+    IN  gctINT             *MatrixStride,
+    IN  gctINT             *Alignment
     );
 
 gctUINT VIR_Type_GetIndexingRange(VIR_Shader *, VIR_Type *);
@@ -3885,6 +4941,15 @@ VIR_Uniform_Identical(
     );
 
 VSC_ErrCode
+VIR_Sampler_UpdateResOpBits(
+    IN VIR_Shader* Shader,
+    IN VIR_Uniform* Sampler,
+    IN VIR_RES_OP_TYPE resOpType,
+    IN gctUINT index
+    );
+
+/* UBO-related functions. */
+VSC_ErrCode
 VIR_UBO_Member_Identical(
     IN VIR_Shader* Shader1,
     IN VIR_Symbol* Sym1,
@@ -3901,8 +4966,21 @@ VIR_UBO_Identical(
     OUT gctBOOL*   Matched
     );
 
+/* InterfaceBlock-related functions. */
+VSC_ErrCode
+VIR_InterfaceBlock_CalcDataByteSize(
+    IN  VIR_Shader         *Shader,
+    IN  VIR_Symbol         *Symbol
+    );
+
+/* typeId-related functions. */
 VIR_Enable
 VIR_TypeId_Conv2Enable(
+    IN VIR_TypeId       TypeId
+    );
+
+VIR_Swizzle
+VIR_TypeId_Conv2Swizzle(
     IN VIR_TypeId       TypeId
     );
 
@@ -3926,6 +5004,11 @@ VIR_TypeId_ComposeNonOpaqueArrayedType(
     IN gctUINT          CompCount,
     IN gctUINT          RowCount,
     IN gctINT           arrayLength
+    );
+
+gctUINT
+VIR_TypeId_GetSamplerCoordComponentCount(
+    IN VIR_TypeId       SamplerType
     );
 
 /* shader symbols */
@@ -3958,6 +5041,13 @@ VIR_Shader_AddFieldSymbol(
     OUT VIR_SymId*      SymId);
 
 VSC_ErrCode
+VIR_Shader_AddSymbolContents(
+    IN  VIR_Shader *    Shader,
+    IN  VIR_Symbol *    Sym,
+    IN  VIR_Id          PresetId,
+    IN  gctBOOL         UpdateIdList);
+
+VSC_ErrCode
 VIR_Shader_AddSymbol(
     IN  VIR_Shader *    Shader,
     IN  VIR_SymbolKind  SymbolKind,
@@ -3965,6 +5055,18 @@ VIR_Shader_AddSymbol(
     IN  VIR_Type*       Type,
     IN  VIR_StorageClass Storage,
     OUT VIR_SymId*      SymId);
+
+VSC_ErrCode
+VIR_Shader_DuplicateVariableFromSymbol(
+    IN  VIR_Shader *    Shader,
+    IN  VIR_Symbol*     Sym,
+    OUT VIR_SymId*      DupSymId);
+
+VSC_ErrCode
+VIR_Shader_DuplicateVariablelFromSymId(
+    IN  VIR_Shader *    Shader,
+    IN  VIR_SymId       SymId,
+    OUT VIR_SymId*      DupSymId);
 
 VSC_ErrCode
 VIR_Shader_AddSymbolWithName(
@@ -4039,6 +5141,13 @@ VIR_Shader_GetDUBO(
     );
 
 VSC_ErrCode
+VIR_Shader_GetCUBO(
+    IN VIR_Shader *     Shader,
+    OUT VIR_Symbol **   CUBO,
+    OUT VIR_Symbol **   CUBOAddr
+    );
+
+VSC_ErrCode
 VIR_Shader_Dump(
     IN gctFILE          File,
     IN gctCONST_STRING  Text,
@@ -4096,11 +5205,18 @@ VIR_Symbol_isNameMatch(
     );
 
 gctUINT VIR_Symbol_GetComponents(VIR_Symbol *pSym);
-
 /* getters */
 gctSTRING VIR_GetSymbolKindName(VIR_SymbolKind  SymbolKind);
 
 /* functions */
+VSC_ErrCode
+VIR_Shader_AddFunctionContent(
+    IN  VIR_Shader *    Shader,
+    IN  VIR_Symbol *    FuncSym,
+    OUT VIR_Function ** Function,
+    gctBOOL             Init
+    );
+
 VSC_ErrCode
 VIR_Function_AddSymbol(
     IN  VIR_Function *  Function,
@@ -4137,9 +5253,16 @@ VIR_Function_AddLabel(
     );
 
 VSC_ErrCode
+VIR_Function_DuplicateLabel(
+    IN  VIR_Function *  Function,
+    IN  VIR_Label*      Label,
+    OUT VIR_LabelId *   DupLabelId
+    );
+
+VSC_ErrCode
 VIR_Function_FreeLabel(
     IN  VIR_Function *  Function,
-    IN  VIR_LabelId     Label
+    IN  VIR_Label *     Label
     );
 
 
@@ -4158,6 +5281,13 @@ VIR_Function_AddLocalVar(
     IN  gctSTRING       VarName,
     IN  VIR_TypeId      Type,
     OUT VIR_SymId *     SymId
+    );
+
+VSC_ErrCode
+VIR_Function_NewPhiOperandArray(
+    IN  VIR_Function *          Function,
+    IN  gctUINT                 Count,
+    OUT VIR_PhiOperandArray **  PhiOperandArray
     );
 
 VSC_ErrCode
@@ -4190,6 +5320,16 @@ VIR_Function_AddInstructionAfter(
     IN  VIR_OpCode      Opcode,
     IN  VIR_TypeId      ResType,
     IN  VIR_Instruction *AfterMe,
+    IN  gctBOOL         SameBB,
+    OUT VIR_Instruction **Inst
+    );
+
+VSC_ErrCode
+VIR_Function_AddCopiedInstructionAfter(
+    IN  VIR_Function *  Function,
+    IN  VIR_Instruction *CopyFrom,
+    IN  VIR_Instruction *AfterMe,
+    IN  gctBOOL         SameBB,
     OUT VIR_Instruction **Inst
     );
 
@@ -4199,6 +5339,16 @@ VIR_Function_AddInstructionBefore(
     IN  VIR_OpCode      Opcode,
     IN  VIR_TypeId      ResType,
     IN  VIR_Instruction *BeforeMe,
+    IN  gctBOOL         SameBB,
+    OUT VIR_Instruction **Inst
+    );
+
+VSC_ErrCode
+VIR_Function_AddCopiedInstructionBefore(
+    IN  VIR_Function *  Function,
+    IN  VIR_Instruction *CopyFrom,
+    IN  VIR_Instruction *BeforeMe,
+    IN  gctBOOL         SameBB,
     OUT VIR_Instruction **Inst
     );
 
@@ -4209,8 +5359,14 @@ VIR_Function_RemoveInstruction(
     );
 
 VSC_ErrCode
+VIR_Function_DeleteInstruction(
+    IN VIR_Function *     Function,
+    IN VIR_Instruction *  Inst
+    );
+
+VSC_ErrCode
 VIR_Function_MoveInstructionBefore(
-    IN  VIR_Function *  Function,
+    IN  VIR_Function *  MoveFunction,
     IN  VIR_Instruction *BeforeMe,
     IN VIR_Instruction  *Inst
     );
@@ -4241,9 +5397,34 @@ VIR_Function_DupOperand(
     );
 
 VSC_ErrCode
+VIR_Function_AddPhiOperandArrayForInst(
+    IN  VIR_Function *      Function,
+    IN  VIR_Instruction *   Inst,
+    IN  gctUINT             PhiOperandCount
+    );
+
+VSC_ErrCode
+VIR_Function_FreePhiOperandArray(
+    IN  VIR_Function *          Function,
+    IN  VIR_PhiOperandArray *   PhiOperandArray
+    );
+
+VSC_ErrCode
 VIR_Function_FreeOperand(
     IN  VIR_Function *  Function,
     IN  VIR_Operand *   Operand
+    );
+
+VSC_ErrCode
+VIR_Function_NewParameters(
+    IN  VIR_Function    *Function,
+    IN  gctUINT         argsNum,
+    OUT VIR_ParmPassing ** Parms
+    );
+
+VSC_ErrCode
+VIR_Function_BuildLabelLinks(
+    VIR_Function *     pFunction
     );
 
 void VIR_Function_SetVirtualInstStart(VIR_Function *, gctUINT);
@@ -4279,11 +5460,15 @@ VIR_Inst_Store_Have_Dst(
     IN VIR_Instruction * Inst
 );
 
-
 VSC_ErrCode
-VIR_Inst_FreeOperand(
+VIR_Inst_FreeSource(
     IN OUT VIR_Instruction * Inst,
     IN gctINT                SrcNum
+    );
+
+VSC_ErrCode
+VIR_Inst_FreeDest(
+    IN OUT VIR_Instruction * Inst
     );
 
 VSC_ErrCode
@@ -4299,6 +5484,13 @@ VIR_Inst_CopySource(
     IN gctINT                SrcNum,
     IN VIR_Operand *         FromOperand,
     IN gctBOOL               KeepSrcType   /* keep original source type */
+    );
+
+VSC_ErrCode
+VIR_Inst_Copy(
+    IN OUT VIR_Instruction * Dest,
+    IN VIR_Instruction *     Source,
+    IN gctBOOL               SameBB
     );
 
 gctBOOL
@@ -4318,6 +5510,29 @@ VIR_Inst_GetExpressionTypeID(
 VIR_Precision
 VIR_Inst_GetExpectedResultPrecision(
     IN VIR_Instruction  *Inst
+    );
+
+void
+VIR_Inst_InitMcInsts(
+    IN VIR_Instruction  *Inst,
+    IN VIR_Shader       *Shader,
+    IN gctUINT          mcInstCount
+    );
+
+VIR_Instruction*
+VIR_Inst_GetJmpTarget(
+    IN VIR_Instruction  *JmpInst
+    );
+
+void
+VIR_Inst_ChangeJmpTarget(
+    IN VIR_Instruction  *JmpInst,
+    IN VIR_Instruction  *NewTargetInst
+    );
+
+void
+VIR_Inst_CheckAndSetPakedMode(
+    IN OUT VIR_Instruction  * Inst
     );
 
 /* swizzle */
@@ -4359,6 +5574,10 @@ VIR_Swizzle_MergeMappingSwizzles(
     IN VIR_Swizzle map2
     );
 
+VIR_Swizzle VIR_Swizzle_Extract_Single_Channel_Swizzle(
+    IN VIR_Swizzle orgSwizzle,
+    IN gctUINT     channel);
+
 /* it is a channel mapping problem, like mapping x->y, y->z, z->x, w->z.
    with maping yzxz, wxxy would be mapped to zyyz */
 VIR_Swizzle
@@ -4384,6 +5603,12 @@ VIR_Swizzle_MappingNewSwizzle(
 VIR_Swizzle
 VIR_Swizzle_GenSwizzleByComponentCount(
     IN gctUINT ComponentCount
+    );
+
+VIR_Swizzle
+VIR_Swizzle_SwizzleWShiftEnable(
+    IN VIR_Swizzle swizzle,
+    IN VIR_Enable enable
     );
 
 /* enable */
@@ -4435,11 +5660,17 @@ VIR_Operand_SetLabel(
 void
  VIR_Operand_SetImmediateInt(
      IN OUT VIR_Operand *    Operand,
-     IN gctINT              Val
+     IN gctINT               Val
      );
 
 void
  VIR_Operand_SetImmediateUint(
+     IN OUT VIR_Operand *    Operand,
+     IN gctUINT              Val
+     );
+
+void
+ VIR_Operand_SetImmediateBoolean(
      IN OUT VIR_Operand *    Operand,
      IN gctUINT              Val
      );
@@ -4531,9 +5762,33 @@ VIR_Operand_SetTexldGradient(
     );
 
 void
+VIR_Operand_SetTexldGradientDx(
+    IN OUT VIR_Operand *    Operand,
+    IN  VIR_Operand    *    Pdx
+    );
+
+void
+VIR_Operand_SetTexldGradientDy(
+    IN OUT VIR_Operand *    Operand,
+    IN  VIR_Operand    *    Pdy
+    );
+
+void
 VIR_Operand_SetTexldGather(
     IN OUT VIR_Operand *    Operand,
     IN  VIR_Operand    *    Component,
+    IN  VIR_Operand    *    RefZ
+    );
+
+void
+VIR_Operand_SetTexldGatherComp(
+    IN OUT VIR_Operand *    Operand,
+    IN  VIR_Operand    *    Component
+    );
+
+void
+VIR_Operand_SetTexldGatherRefZ(
+    IN OUT VIR_Operand *    Operand,
     IN  VIR_Operand    *    RefZ
     );
 
@@ -4651,6 +5906,10 @@ VIR_Operand_Change2Src(
     IN OUT VIR_Operand*     Operand);
 
 void
+VIR_Operand_Change2Src_WShift(
+    IN OUT VIR_Operand*     Operand);
+
+void
 VIR_Operand_Copy(
     IN OUT VIR_Operand*     Dest,
     IN VIR_Operand*         Source);
@@ -4725,15 +5984,45 @@ VIR_Operand_SetPrecision(
 );
 
 VSC_ErrCode
-VIR_Operand_GenOffsetByAccessChain(
+VIR_Operand_SetIndexingFromOperand(
+    IN  VIR_Shader         *pShader,
+    IN  VIR_Operand        *pOperand,
+    IN  VIR_Operand        *pIndexOperand
+    );
+
+typedef struct _VIR_AC_OFFSET_INFO
+{
+    /* For UBO/SBO/per-vertex only:
+    ** for UBO/SBO, save the base address index;
+    ** for per-vertex, save the invocation index.
+    */
+    VIR_SymbolKind          blockIndexType;
+    VIR_SymId               blockIndex;
+    /* Base offset. */
+    VIR_SymbolKind          baseOffsetType;
+    VIR_SymId               baseOffset;
+    /* Vector index. */
+    VIR_SymbolKind          vectorIndexType;
+    VIR_SymId               vectorIndex;
+    VIR_Symbol*             arraySym;
+    /* array stride and matrix stride, for struct member only. */
+    gctINT                  arrayStride;
+    gctINT                  matrixStride;
+    /* layout qual. */
+    VIR_LayoutQual          layoutQual;
+    gctBOOL                 isRowMajorMatrixColumnIndexing;
+}VIR_AC_OFFSET_INFO;
+
+VSC_ErrCode
+VIR_Operand_EvaluateOffsetByAccessChain(
     IN OUT  VIR_Shader     *Shader,
     IN  VIR_Function       *Function,
-    IN  VIR_Symbol         *Symbol,
-    IN  VIR_SymId           AccessChainIndexSymId,
+    IN  gctUINT             ResultId,
+    IN  VIR_Symbol         *BaseSymbol,
     IN  gctUINT            *AccessChain,
-    IN  gctUINT            *AccessChainType, /* Assume that 1 means it is constant index access. */
+    IN  VIR_SymbolKind     *AccessChainType,
     IN  gctUINT             AccessChainLength,
-    OUT gctUINT            *Offset
+    OUT VIR_AC_OFFSET_INFO *AccessChainOffsetInfo
 );
 
 gctBOOL
@@ -4752,13 +6041,55 @@ VIR_Opnd_GetCompWiseSrcChannelValue(
     OUT gctUINT* pValue
 );
 
+gctBOOL
+VIR_Operand_isValueZero(
+    IN VIR_Shader *        Shader,
+    IN VIR_Operand *       Opnd
+    );
+
+gctBOOL
+VIR_Operand_isValueFit5Bits(
+    IN VIR_Shader *        Shader,
+    IN VIR_Operand *       Opnd
+    );
+
+VSC_ErrCode
+VIR_Operand_ReplaceSymbol(
+    IN  VIR_Shader         *pShader,
+    IN  VIR_Function       *pFunc,
+    IN  VIR_Operand        *pOpnd,
+    IN  VIR_Symbol         *pOrigSym,
+    IN  VIR_Symbol         *pNewSym
+    );
+
+gctBOOL
+VIR_Const_isValueFit5Bits(
+    VIR_Const *      pConstVal
+    );
+/* return encoded value (each channel 5 bits) if the constant values fit into 5 bits,
+ * otherwise return 0 */
+gctUINT
+VIR_Const_EncodeValueIn5Bits(
+    VIR_Const *      pConstVal
+    );
+
+/* return true if the Opnd is fit into 5 bit offset and be changed to
+ * encoded 5bit offsets */
+gctBOOL
+VIR_IMG_LOAD_SetImmOffset(
+    IN VIR_Shader *        Shader,
+    IN VIR_Instruction *   Inst,
+    IN VIR_Operand *       Opnd,
+    IN gctBOOL             Encoded
+    );
+
 void
 VIR_Link_AddLink(
     IN  VIR_Link **         Head,
     IN  VIR_Link *          Link
     );
 
-void
+VIR_Link*
 VIR_Link_RemoveLink(
     IN  VIR_Link **         Head,
     IN  gctUINTPTR_T        Reference
@@ -4878,18 +6209,373 @@ VIR_Inst_Check4Dual16(
     IN  VIR_Dumper              *dumper
     );
 
-gctBOOL
-VIR_Shader_IsDual16able(
-    IN OUT  VIR_Shader              *Shader,
-    IN      VSC_COMPILER_CONFIG     *compCfg,
-    IN      VSC_OPTN_DUAL16Options  *options,
-    IN      VIR_Dumper              *dumper);
-
 VSC_ErrCode
 VIR_Shader_CalcSamplerCount(
     IN      VIR_Shader *         Shader,
     IN OUT  gctINT*              SamplerCount
     );
+
+VIR_IntrinsicsKind
+VIR_IntrisicGetKind(
+    IN  gctUINT setId,
+    IN  gctUINT funcId
+    );
+
+void
+VIR_Inst_ChangeDest(
+    IN OUT VIR_Instruction * Inst,
+    IN     VIR_Operand *     Dest
+    );
+
+void
+VIR_Inst_ChangeSource(
+    IN OUT VIR_Instruction * Inst,
+    IN     gctINT            SrcNo,
+    IN     VIR_Operand *     Src
+    );
+
+void
+VIR_Inst_ChangeSrcNum(
+    IN OUT VIR_Instruction * Inst,
+    IN     gctUINT           SrcNo
+    );
+
+typedef struct _VIR_SHADER_IO_BUFFER
+{
+    VIR_Shader *         shader;
+    gctUINT              curPos;           /* current position in the buffer */
+    gctUINT              allocatedBytes;   /* size of buff allocated */
+    gctCHAR *            buffer;
+} VIR_Shader_IOBuffer;
+
+typedef struct _VIR_CopyContext
+{
+    VSC_MM *      memPool;
+    VIR_Shader *  toShader;
+    VIR_Shader *  fromShader;
+    VIR_Function * curToFunction;
+    VIR_Function * curFromFunction;
+
+} VIR_CopyContext;
+
+typedef VSC_ErrCode (*WRITE_NODE_FP)(VIR_Shader_IOBuffer *, void *);
+typedef VSC_ErrCode (*READ_NODE_FP)(VIR_Shader_IOBuffer *, void *);
+
+typedef VSC_ErrCode (*COPY_NODE_FP)(VIR_CopyContext *, void *);
+typedef VSC_ErrCode (*PATCH_NODE_FP)(VIR_CopyContext *, void *);
+typedef void *      (* GET_KEY_FROM_VAL)(VSC_BLOCK_TABLE *tbl, void *val);
+
+VSC_ErrCode
+VIR_Shader_QueryBinarySize(VIR_Shader* pShader, gctUINT *BinarySz);
+
+/* save the shader binary to a buffer allocated by compiler */
+VSC_ErrCode
+VIR_Shader_Save(VIR_Shader* pShader, VIR_Shader_IOBuffer *Buf);
+
+/* save the shader binary to a buffer allocated by user, the BufSz must be acquired
+ * by VIR_Shader_QueryBinarySize() */
+VSC_ErrCode
+VIR_Shader_Save2Buffer(VIR_Shader* pShader, gctCHAR *Buffer, gctUINT BufSz);
+
+VSC_ErrCode
+VIR_Shader_Read(VIR_Shader* pShader, VIR_Shader_IOBuffer *Buf);
+
+VSC_ErrCode
+VIR_IO_writeShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader);
+
+VSC_ErrCode
+VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader);
+
+VSC_ErrCode
+VIR_IO_Init(VIR_Shader_IOBuffer *buf, VIR_Shader *shader, gctUINT size, gctBOOL QueryOnly);
+
+void
+VIR_IO_Finalize(VIR_Shader_IOBuffer *Buf);
+
+VSC_ErrCode
+VIR_IO_writeInt(VIR_Shader_IOBuffer *buf, gctINT val);
+
+VSC_ErrCode
+VIR_IO_writeUint(VIR_Shader_IOBuffer *buf, gctUINT val);
+
+VSC_ErrCode
+VIR_IO_writeShort(VIR_Shader_IOBuffer *Buf, gctINT16 Val);
+
+VSC_ErrCode
+VIR_IO_writeUshort(VIR_Shader_IOBuffer *Buf, gctUINT16 Val);
+
+VSC_ErrCode
+VIR_IO_writeFloat(VIR_Shader_IOBuffer *buf, gctFLOAT val);
+
+VSC_ErrCode
+VIR_IO_writeChar(VIR_Shader_IOBuffer *buf, gctCHAR val);
+
+VSC_ErrCode
+VIR_IO_writeBlock(VIR_Shader_IOBuffer *buf, gctCHAR *val, gctUINT sz);
+
+VSC_ErrCode
+VIR_IO_writeStringTable(VIR_Shader_IOBuffer *buf, VIR_StringTable* pStringTbl);
+
+VSC_ErrCode
+VIR_IO_writeTypeTable(VIR_Shader_IOBuffer *buf, VIR_TypeTable* pTypeTbl);
+
+VSC_ErrCode
+VIR_IO_writeLabelTable(VIR_Shader_IOBuffer *buf, VIR_LabelTable* pLabelTbl);
+
+VSC_ErrCode
+VIR_IO_writeConstTable(VIR_Shader_IOBuffer *buf, VIR_ConstTable* pConstTbl);
+
+VSC_ErrCode
+VIR_IO_writeOperandTable(VIR_Shader_IOBuffer *buf, VIR_OperandTable* pOperandTbl);
+
+VSC_ErrCode
+VIR_IO_writeSymTable(VIR_Shader_IOBuffer *buf, VIR_SymTable* pTempTbl);
+
+VSC_ErrCode
+VIR_IO_writeIdList(VIR_Shader_IOBuffer *buf, VIR_IdList* pIdList);
+
+VSC_ErrCode
+VIR_IO_writeUniform(VIR_Shader_IOBuffer *buf, VIR_Uniform* pUniform);
+
+VSC_ErrCode
+VIR_IO_writeFunction(VIR_Shader_IOBuffer *buf, VIR_Function* pFunction);
+
+VSC_ErrCode
+VIR_IO_writeUniformBlock(VIR_Shader_IOBuffer *buf, VIR_UniformBlock* pUniformBlock);
+
+VSC_ErrCode
+VIR_IO_writeStorageBlock(VIR_Shader_IOBuffer *buf, VIR_StorageBlock* pStorageBlock);
+
+VSC_ErrCode
+VIR_IO_writeIOBlock(VIR_Shader_IOBuffer *buf, VIR_IOBlock* pIOBlock);
+
+VSC_ErrCode
+VIR_IO_writeLabel(VIR_Shader_IOBuffer *buf, VIR_Label* pLabel);
+
+VSC_ErrCode
+VIR_IO_writeConst(VIR_Shader_IOBuffer *buf, VIR_Const* pConst);
+
+VSC_ErrCode
+VIR_IO_writeInst(VIR_Shader_IOBuffer *buf, VIR_Instruction* pInst);
+
+VSC_ErrCode
+VIR_IO_writeOperand(VIR_Shader_IOBuffer *buf, VIR_Operand* pOperand);
+
+VSC_ErrCode
+VIR_IO_writeParmPassing(VIR_Shader_IOBuffer *buf, VIR_ParmPassing* pParmPassing);
+
+VSC_ErrCode
+VIR_IO_writeTexldParm(VIR_Shader_IOBuffer *buf, VIR_TexldParm* pTexldParm);
+
+VSC_ErrCode
+VIR_IO_writeOperandList(VIR_Shader_IOBuffer *buf, VIR_OperandList* pOperandList);
+
+VSC_ErrCode
+VIR_IO_writeSymbol(VIR_Shader_IOBuffer *buf, VIR_Symbol* pSymbol);
+
+VSC_ErrCode
+VIR_IO_writeType(VIR_Shader_IOBuffer *buf, VIR_Type* pType);
+
+VSC_ErrCode
+VIR_IO_writeTransformFeedback(VIR_Shader_IOBuffer *buf, VIR_TransformFeedback *tfb);
+
+VSC_ErrCode
+VIR_IO_writeValueList(VIR_Shader_IOBuffer *Buf, VIR_ValueList* pValueList, WRITE_NODE_FP fp);
+
+VSC_ErrCode
+VIR_IO_readInt(VIR_Shader_IOBuffer *buf, gctINT * val);
+
+VSC_ErrCode
+VIR_IO_readUint(VIR_Shader_IOBuffer *buf, gctUINT * val);
+
+VSC_ErrCode
+VIR_IO_wreadShort(VIR_Shader_IOBuffer *Buf, gctINT16 * Val);
+
+VSC_ErrCode
+VIR_IO_readUshort(VIR_Shader_IOBuffer *Buf, gctUINT16 * Val);
+
+VSC_ErrCode
+VIR_IO_readFloat(VIR_Shader_IOBuffer *buf, gctFLOAT * val);
+
+VSC_ErrCode
+VIR_IO_readChar(VIR_Shader_IOBuffer *buf, gctCHAR * val);
+
+VSC_ErrCode
+VIR_IO_readBlock(VIR_Shader_IOBuffer *buf, gctCHAR *val, gctUINT sz);
+
+VSC_ErrCode
+VIR_IO_readStringTable(VIR_Shader_IOBuffer *buf, VIR_StringTable* pStringTbl);
+
+VSC_ErrCode
+VIR_IO_readTypeTable(VIR_Shader_IOBuffer *buf, VIR_TypeTable* pTypeTbl);
+
+VSC_ErrCode
+VIR_IO_readLabelTable(VIR_Shader_IOBuffer *buf, VIR_LabelTable* pLabelTbl);
+
+VSC_ErrCode
+VIR_IO_readConstTable(VIR_Shader_IOBuffer *buf, VIR_ConstTable* pConstTbl);
+
+VSC_ErrCode
+VIR_IO_readOperandTable(VIR_Shader_IOBuffer *buf, VIR_OperandTable* pOperandTbl);
+
+VSC_ErrCode
+VIR_IO_readSymTable(VIR_Shader_IOBuffer *buf, VIR_SymTable* pTempTbl);
+
+VSC_ErrCode
+VIR_IO_readIdList(VIR_Shader_IOBuffer *buf, VIR_IdList* pIdList);
+
+VSC_ErrCode
+VIR_IO_readNewIdList(VIR_Shader_IOBuffer *Buf, VIR_IdList** pIdList, gctBOOL Create);
+
+VSC_ErrCode
+VIR_IO_readUniform(VIR_Shader_IOBuffer *buf, VIR_Uniform* pUniform);
+
+VSC_ErrCode
+VIR_IO_readFunction(VIR_Shader_IOBuffer *buf, VIR_Function* pFunction);
+
+VSC_ErrCode
+VIR_IO_readUniformBlock(VIR_Shader_IOBuffer *buf, VIR_UniformBlock* pUniformBlock);
+
+VSC_ErrCode
+VIR_IO_readStorageBlock(VIR_Shader_IOBuffer *buf, VIR_StorageBlock* pStorageBlock);
+
+VSC_ErrCode
+VIR_IO_readIOBlock(VIR_Shader_IOBuffer *buf, VIR_IOBlock* pIOBlock);
+
+VSC_ErrCode
+VIR_IO_readLabel(VIR_Shader_IOBuffer *buf, VIR_Label* pLabel);
+
+VSC_ErrCode
+VIR_IO_readConst(VIR_Shader_IOBuffer *buf, VIR_Const* pConst);
+
+VSC_ErrCode
+VIR_IO_readInst(VIR_Shader_IOBuffer *buf, VIR_Instruction* pInst);
+
+VSC_ErrCode
+VIR_IO_readOperand(VIR_Shader_IOBuffer *buf, VIR_Operand* pOperand);
+
+VSC_ErrCode
+VIR_IO_readParmPassing(VIR_Shader_IOBuffer *buf, VIR_ParmPassing** pParmPassing);
+
+VSC_ErrCode
+VIR_IO_readTexldParm(VIR_Shader_IOBuffer *buf, VIR_TexldParm* pTexldParm);
+
+VSC_ErrCode
+VIR_IO_readOperandList(VIR_Shader_IOBuffer *buf, VIR_OperandList** pOperandList);
+
+VSC_ErrCode
+VIR_IO_readSymbol(VIR_Shader_IOBuffer *buf, VIR_Symbol* pSymbol);
+
+VSC_ErrCode
+VIR_IO_readType(VIR_Shader_IOBuffer *buf, VIR_Type* pType);
+
+VSC_ErrCode
+VIR_IO_readTransformFeedback(VIR_Shader_IOBuffer *buf, VIR_TransformFeedback *tfb);
+
+VSC_ErrCode
+VIR_IO_readValueList(VIR_Shader_IOBuffer *Buf, VIR_ValueList** pValueList, WRITE_NODE_FP fp);
+
+
+/* Copy Shader */
+#define Copy_Field(DestStruct, SourceStruct, Field)  do { (DestStruct)->Field = (SourceStruct)->Field; } while (0)
+
+VSC_ErrCode
+VIR_CopyTypeTable(VIR_CopyContext *Ctx,
+                  VIR_TypeTable* pToTypeTbl,
+                  VIR_TypeTable* pFromTypeTbl);
+
+VSC_ErrCode
+VIR_CopyStringTable(VIR_CopyContext *Ctx,
+                    VIR_StringTable *pToStringTbl,
+                    VIR_StringTable* pFromStringTbl);
+
+VSC_ErrCode
+VIR_CopyBlockTable(VIR_CopyContext *    Ctx,
+                   VSC_BLOCK_TABLE *    pToBlockTbl,
+                   VSC_BLOCK_TABLE *    pFromBlockTbl,
+                   COPY_NODE_FP         fp,
+                   GET_KEY_FROM_VAL     fpGetKey);
+
+VSC_ErrCode
+VIR_Copy_PatchBlockTable(VIR_CopyContext *    Ctx,
+                         VSC_BLOCK_TABLE *    pBlockTbl,
+                         PATCH_NODE_FP        fp);
+
+VSC_ErrCode
+VIR_CopyOperandTable(VIR_CopyContext *Ctx,
+                     VIR_OperandTable* pToOperandTbl,
+                     VIR_OperandTable* pFromOperandTbl);
+VSC_ErrCode
+VIR_CopySymTable(VIR_CopyContext *Ctx,
+                 VIR_SymTable* pToSymTbl,
+                 VIR_SymTable* pFromSymTbl);
+
+VSC_ErrCode
+VIR_CopyFunction(VIR_CopyContext *Ctx,
+                 VIR_Function* pToFunction,
+                 VIR_Function* pFromFunction);
+
+VSC_ErrCode
+VIR_CopyBlock(gctCHAR *Dest, gctCHAR *Source, gctUINT Sz);
+
+VSC_ErrCode
+VIR_CopyIdList(VIR_CopyContext *Ctx,
+               VIR_IdList* pToIdList,
+               VIR_IdList* pFromIdList);
+VSC_ErrCode
+VIR_CopyValueList(VIR_CopyContext *Ctx,
+                  VIR_ValueList* pToValueList,
+                  VIR_ValueList* pFromValueList,
+                  COPY_NODE_FP fp);
+
+VSC_ErrCode
+VIR_CopyInst(
+    VIR_CopyContext *    Ctx,
+    VIR_Instruction *    pToInst,
+    VIR_Instruction *    pFromInst);
+
+VSC_ErrCode
+VIR_CopyUniform(VIR_CopyContext *Ctx, VIR_Uniform* pToUniform, VIR_Uniform* pFromUniform);
+
+
+VSC_ErrCode
+VIR_Copy_StorageBlock(VIR_CopyContext * Ctx, VIR_StorageBlock* pToStorageBlock, VIR_StorageBlock* pFromStorageBlock);
+
+VSC_ErrCode
+VIR_CopyTransformFeedback(VIR_CopyContext *Ctx, VIR_TransformFeedback *toTfb, VIR_TransformFeedback *fromTfb);
+
+VSC_ErrCode
+VIR_CopyUniformBlock(VIR_CopyContext * Ctx, VIR_UniformBlock* pToUniformBlock, VIR_UniformBlock* pFromUniformBlock);
+
+/* fix type */
+VSC_ErrCode
+VIR_Copy_FixType(VIR_CopyContext * Ctx, VIR_Type* pType);
+
+VSC_ErrCode
+VIR_Copy_FixLabel(VIR_CopyContext * Ctx, VIR_Label* pLabel);
+
+VSC_ErrCode
+VIR_Copy_PatchLabel(VIR_CopyContext * Ctx, VIR_Label* pLabel);
+
+VSC_ErrCode
+VIR_Copy_FixIOBlock(VIR_CopyContext * Ctx, VIR_IOBlock* pIOBlock);
+
+VSC_ErrCode
+VIR_Copy_FixSymbol(VIR_CopyContext * Ctx, VIR_Symbol* pSymbol);
+
+VSC_ErrCode
+VIR_Copy_FixOperand(VIR_CopyContext *Ctx, VIR_Operand* pOperand);
+
+#define SHDR_SIG    gcmCC('S', 'H', 'D', 'R')
+#define ENDS_SIG    gcmCC('E', 'N', 'D', 'S')
+#define FUNC_SIG    gcmCC('F', 'U', 'N', 'C')
+#define ENDF_SIG    gcmCC('E', 'N', 'D', 'F')
+#define STRTBL_SIG  gcmCC('S', 'T', 'R', 'T')
+#define TYTBL_SIG   gcmCC('T', 'Y', 'P', 'T')
+#define SYMTBL_SIG  gcmCC('S', 'Y', 'M', 'T')
+#define SYMB_SIG    gcmCC('S', 'Y', 'M', 'B')
+#define INST_SIG    gcmCC('I', 'N', 'S', 'T')
+#define DBUG_SIG    gcmCC('D', 'B', 'U', 'G')
 
 END_EXTERN_C()
 

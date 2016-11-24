@@ -94,6 +94,7 @@ gctBOOL vscHTBL_TestAndGet(VSC_HASH_TABLE* pHT, void* pHashKey, VSC_HASH_NODE** 
 VSC_HASH_NODE* vscHTBL_Get(VSC_HASH_TABLE* pHT, void* pHashKey);
 VSC_HASH_NODE* vscHTBL_Set(VSC_HASH_TABLE* pHT, void* pHashKey, VSC_HASH_NODE* pNode);
 VSC_HASH_NODE* vscHTBL_Remove(VSC_HASH_TABLE* pHT, void* pHashKey);
+gctINT vscHTBL_CountItems(VSC_HASH_TABLE* pHT);
 
 /* Hash node operations exclusively for special case of container that user does not need maintain VSC_HASH_NODE_EXT */
 gctBOOL vscHTBL_DirectTestAndGet(VSC_HASH_TABLE* pHT, void* pHashKey, void** ppVal);
@@ -108,6 +109,7 @@ typedef struct _VSC_HASH_ITERATOR
     VSC_HASH_TABLE*      pHashTable;
     VSC_UL_ITERATOR      htblEntryIterator;
     gctINT               curEntryIdx;
+    gctINT               count;       /* the entries iterated */
 } VSC_HASH_ITERATOR;
 
 void vscHTBLIterator_Init(VSC_HASH_ITERATOR *, VSC_HASH_TABLE *);
@@ -133,18 +135,11 @@ VSC_DIRECT_HNODE_PAIR vscHTBLIterator_DirectLast(VSC_HASH_ITERATOR *);
 /* Common hash functions are defined here */
 gctUINT vscHFUNC_Default(const void *);
 gctUINT vscHFUNC_String(const void *); /* For string */
-gctUINT vscHFUNC_Type(const char *);
-gctUINT vscHFUNC_Symbol(const char *);
-gctUINT vscHFUNC_Const(const char *);
-gctUINT vscHFUNC_Label(const char *);
 
 /* Common hash key compare functions are defined here */
 gctBOOL vscHKCMP_Default(const void* pHashKey1, const void* pHashKey2); /* Default key-comparator if user does not provide */
 gctBOOL vcsHKCMP_String(const void *, const void *);
-gctBOOL vcsHKCMP_Type(const char *, const char *);
-gctBOOL vcsHKCMP_Symbol(const char *, const char *);
-gctBOOL vcsHKCMP_Const(const char *, const char *);
-gctBOOL vcsHKCMP_Label(const char *, const char *);
+
 
 END_EXTERN_C()
 

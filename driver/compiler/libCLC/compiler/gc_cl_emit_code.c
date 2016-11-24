@@ -81,6 +81,10 @@ IN clsGEN_CODE_DATA_TYPE DataType
             }
             break;
 
+        case clvTYPE_GEN_PACKED:
+            size <<= 2;
+            break;
+
         default:
             break;
         }
@@ -152,12 +156,17 @@ IN clsGEN_CODE_DATA_TYPE DataType
     switch(clmGEN_CODE_elementType_GET(DataType)) {
     case clvTYPE_CHAR:
     case clvTYPE_UCHAR:
+    case clvTYPE_CHAR_PACKED:
+    case clvTYPE_UCHAR_PACKED:
        byteCount = 1;
        break;
 
     case clvTYPE_HALF:
     case clvTYPE_SHORT:
     case clvTYPE_USHORT:
+    case clvTYPE_HALF_PACKED:
+    case clvTYPE_SHORT_PACKED:
+    case clvTYPE_USHORT_PACKED:
        byteCount = cldMachineBytesPerWord >> 1;
        break;
 
@@ -208,6 +217,10 @@ IN clsGEN_CODE_DATA_TYPE DataType1,
 IN clsGEN_CODE_DATA_TYPE DataType2
 )
 {
+   if((clmIsElementTypePackedGenType(DataType1.elementType) &&
+       clmIsElementTypePacked(DataType2.elementType)) ||
+      (clmIsElementTypePackedGenType(DataType2.elementType) &&
+       clmIsElementTypePacked(DataType1.elementType))) return gcvTRUE;
    return gcIsElementTypeEqual(DataType1, DataType2)
           && (clmGEN_CODE_matrixRowCount_GET(DataType1) == clmGEN_CODE_matrixRowCount_GET(DataType2))
           && (clmGEN_CODE_matrixColumnCount_GET(DataType1) == clmGEN_CODE_matrixColumnCount_GET(DataType2));
@@ -325,6 +338,11 @@ IN gcSL_OPCODE Opcode
     case gcSL_LONGHI:        return "gcSL_LONGHI";
     case gcSL_MOV_LONG:      return "gcSL_MOV_LONG";
     case gcSL_COPY:          return "gcSL_COPY";
+    case gcSL_PARAM_CHAIN:   return "gcSL_PARAM_CHAIN";
+    case gcSL_INTRINSIC:     return "gcSL_INTRINSIC";
+    case gcSL_INTRINSIC_ST:  return "gcSL_INTRINSIC_ST";
+    case gcSL_FMA_MUL:       return "gcSL_FMA_MUL";
+    case gcSL_FMA_ADD:       return "gcSL_FMA_ADD";
     default:
     gcmASSERT(0);
     return "Invalid";
@@ -1613,7 +1631,23 @@ IN gctREG_INDEX TempRegister
                       gcGetShaderDataTypeName(Type),
                       Length,
                       TempRegister));
-    return gcSHADER_AddOutput(binary, Name, Type, Length, (gctUINT16)TempRegister, gcSHADER_PRECISION_DEFAULT);
+
+    return gcSHADER_AddOutputWithLocation(binary,
+                                          Name,
+                                          Type,
+                                          gcSHADER_PRECISION_DEFAULT,
+                                          Length > 1,
+                                          Length,
+                                          (gctUINT16)TempRegister,
+                                          gcSHADER_SHADER_DEFAULT,
+                                          gcSHADER_GetOutputDefaultLocation(binary),
+                                          -1,
+                                          gcvFALSE,
+                                          gcvFALSE,
+                                          gcvNULL);
+
+
+
 }
 
 static gceSTATUS
@@ -1710,7 +1744,8 @@ _AddOpcode(
     IN gcSL_OPCODE Opcode,
     IN gcSL_FORMAT Format,
     IN gctREG_INDEX TempRegister,
-    IN gctUINT8 Enable
+    IN gctUINT8 Enable,
+    IN gctUINT32 SrcLoc
     )
 {
     gcSHADER binary;
@@ -1726,7 +1761,7 @@ _AddOpcode(
                                   _GetEnableName(Enable, buf),
                                   _GetFormatName(Format)));
 
-    return gcSHADER_AddOpcode(binary, Opcode, (gctUINT16)TempRegister, Enable, Format, gcSHADER_PRECISION_DEFAULT);
+    return gcSHADER_AddOpcode(binary, Opcode, (gctUINT16)TempRegister, Enable, Format, gcSHADER_PRECISION_DEFAULT, SrcLoc);
 }
 
 static gceSTATUS
@@ -1736,7 +1771,8 @@ _AddOpcodeCondition(
     IN gcSL_CONDITION Condition,
     IN gcSL_FORMAT Format,
     IN gctREG_INDEX TempRegister,
-    IN gctUINT8 Enable
+    IN gctUINT8 Enable,
+    IN gctUINT32 SrcLoc
     )
 {
     gcSHADER binary;
@@ -1753,7 +1789,7 @@ _AddOpcodeCondition(
                                   _GetEnableName(Enable, buf),
                                   _GetFormatName(Format)));
 
-    return gcSHADER_AddOpcode2(binary, Opcode, Condition, (gctUINT16)TempRegister, Enable, Format, gcSHADER_PRECISION_DEFAULT);
+    return gcSHADER_AddOpcode2(binary, Opcode, Condition, (gctUINT16)TempRegister, Enable, Format, gcSHADER_PRECISION_DEFAULT, SrcLoc);
 }
 
 static gceSTATUS
@@ -1764,7 +1800,8 @@ _AddOpcodeIndexed(
     IN gctREG_INDEX TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_INDEXED Mode,
-    IN gctREG_INDEX IndexRegister
+    IN gctREG_INDEX IndexRegister,
+    IN gctUINT32 SrcLoc
     )
 {
    gcSHADER binary;
@@ -1782,7 +1819,7 @@ _AddOpcodeIndexed(
                                  IndexRegister,
                                  _GetFormatName(Format)));
 
-    return gcSHADER_AddOpcodeIndexed(binary, Opcode, (gctUINT16)TempRegister, Enable, Mode, (gctUINT16)IndexRegister, Format, gcSHADER_PRECISION_DEFAULT);
+    return gcSHADER_AddOpcodeIndexed(binary, Opcode, (gctUINT16)TempRegister, Enable, Mode, (gctUINT16)IndexRegister, Format, gcSHADER_PRECISION_DEFAULT, SrcLoc);
 }
 
 static gceSTATUS
@@ -1794,7 +1831,8 @@ _AddOpcodeConditionIndexed(
     IN gctREG_INDEX TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_INDEXED Mode,
-    IN gctREG_INDEX IndexRegister
+    IN gctREG_INDEX IndexRegister,
+    IN gctUINT32 SrcLoc
     )
 {
    gcSHADER binary;
@@ -1813,7 +1851,8 @@ _AddOpcodeConditionIndexed(
                                  IndexRegister,
                                  _GetFormatName(Format)));
 
-    return gcSHADER_AddOpcodeConditionIndexed(binary, Opcode, Condition, (gctUINT16)TempRegister, Enable, Mode, (gctUINT16)IndexRegister, Format, gcSHADER_PRECISION_DEFAULT);
+    return gcSHADER_AddOpcodeConditionIndexed(binary, Opcode, Condition, (gctUINT16)TempRegister, Enable, Mode,
+                                              (gctUINT16)IndexRegister, Format, gcSHADER_PRECISION_DEFAULT, SrcLoc);
 }
 
 static gceSTATUS
@@ -2087,7 +2126,8 @@ _AddOpcodeConditionalFormatted(
     IN gcSL_OPCODE Opcode,
     IN gcSL_CONDITION Condition,
     IN gcSL_FORMAT Format,
-    IN gctUINT Label
+    IN gctUINT Label,
+    IN gctUINT32 SrcLoc
     )
 {
     gcSHADER    binary;
@@ -2102,7 +2142,7 @@ _AddOpcodeConditionalFormatted(
                       _GetFormatName(Format),
                       Label));
 
-    return gcSHADER_AddOpcodeConditionalFormatted(binary, Opcode, Condition, Format, Label);
+    return gcSHADER_AddOpcodeConditionalFormatted(binary, Opcode, Condition, Format, Label, SrcLoc);
 }
 
 static gceSTATUS
@@ -2110,7 +2150,8 @@ _AddOpcodeConditional(
     IN cloCOMPILER Compiler,
     IN gcSL_OPCODE Opcode,
     IN gcSL_CONDITION Condition,
-    IN gctUINT Label
+    IN gctUINT Label,
+    IN gctUINT32 SrcLoc
     )
 {
     gcSHADER    binary;
@@ -2124,7 +2165,7 @@ _AddOpcodeConditional(
                       _GetConditionName(Condition),
                       Label));
 
-    return gcSHADER_AddOpcodeConditional(binary, Opcode, Condition, Label);
+    return gcSHADER_AddOpcodeConditional(binary, Opcode, Condition, Label, SrcLoc);
 }
 
 static gceSTATUS
@@ -2380,10 +2421,13 @@ clsGEN_CODE_DATA_TYPE DataType
     case clvTYPE_SAMPLER2D:
     case clvTYPE_SAMPLER3D:
         return gcSL_FLOAT;
-;
+
     case clvTYPE_UNION:
     case clvTYPE_STRUCT:
         return gcSL_INT8;
+
+    case clvTYPE_GEN_PACKED:
+        return gcSL_UINT32;
 
     default:
         gcmASSERT(0);
@@ -2402,17 +2446,21 @@ _EmitOpcodeAndTarget(
 {
     gceSTATUS    status;
     gcSL_FORMAT format;
+    gctUINT32 srcLoc;
 
     gcmASSERT(Target);
 
     format = _ConvDataTypeToFormat(Target->dataType);
+
+    srcLoc = GCSL_Build_SRC_LOC(LineNo, StringNo);
 
     if (Target->indexMode == gcSL_NOT_INDEXED) {
         status = _AddOpcode(Compiler,
                             Opcode,
                             format,
                             Target->tempRegIndex,
-                            Target->enable);
+                            Target->enable,
+                            srcLoc);
     }
     else {
         status = _AddOpcodeIndexed(Compiler,
@@ -2421,10 +2469,11 @@ _EmitOpcodeAndTarget(
                                    Target->tempRegIndex,
                                    Target->enable,
                                    Target->indexMode,
-                                   Target->indexRegIndex);
+                                   Target->indexRegIndex,
+                                   srcLoc);
     }
 
-    if (clmIsElementTypePacked(Target->dataType.elementType))
+    if(clmIsElementTypePacked(Target->dataType.elementType))
     {
         gcSHADER binary;
         gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
@@ -2456,9 +2505,11 @@ _EmitOpcodeConditionAndTarget(
 {
     gceSTATUS    status;
     gcSL_FORMAT format;
+    gctUINT32 srcLoc;
 
     gcmASSERT(Target);
 
+    srcLoc = GCSL_Build_SRC_LOC(LineNo, StringNo);
     format = _ConvDataTypeToFormat(Target->dataType);
 
     if (Target->indexMode == gcSL_NOT_INDEXED) {
@@ -2467,7 +2518,8 @@ _EmitOpcodeConditionAndTarget(
                                      Condition,
                                      format,
                                      Target->tempRegIndex,
-                                     Target->enable);
+                                     Target->enable,
+                                     srcLoc);
     }
     else {
         status = _AddOpcodeConditionIndexed(Compiler,
@@ -2477,7 +2529,16 @@ _EmitOpcodeConditionAndTarget(
                                             Target->tempRegIndex,
                                             Target->enable,
                                             Target->indexMode,
-                                            Target->indexRegIndex);
+                                            Target->indexRegIndex,
+                                            srcLoc);
+    }
+
+    if(clmIsElementTypePacked(Target->dataType.elementType))
+    {
+        gcSHADER binary;
+        gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+        gcSHADER_UpdateTargetPacked(binary,
+                                    clmGEN_CODE_vectorSize_GET(Target->dataType));
     }
 
     if (gcmIS_ERROR(status)) {
@@ -2505,19 +2566,24 @@ _EmitOpcodeConditional(
     )
 {
     gceSTATUS    status;
+    gctUINT32 srcLoc;
+
+    srcLoc = GCSL_Build_SRC_LOC(LineNo, StringNo);
 
     if(DataType) {
        status = _AddOpcodeConditionalFormatted(Compiler,
                                                Opcode,
                                                Condition,
                                                _ConvDataTypeToFormat(*DataType),
-                                               Label);
+                                               Label,
+                                               srcLoc);
     }
     else {
        status = _AddOpcodeConditional(Compiler,
                                       Opcode,
                                       Condition,
-                                      Label);
+                                      Label,
+                                      srcLoc);
     }
 
     if (gcmIS_ERROR(status)) {
@@ -2737,7 +2803,7 @@ _EmitSource(
     gcSHADER_INSTRUCTION_INDEX instrIndex = gcSHADER_OPCODE;
     gcmASSERT(Source);
 
-    if (clmIsElementTypePacked(Source->dataType.elementType))
+    if(clmIsElementTypePacked(Source->dataType.elementType))
     {
         gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
         instrIndex = binary->instrIndex;
@@ -3383,11 +3449,42 @@ IN gctLABEL Label
 }
 
 gctUINT8
+clConvPackedTypeToEnable(
+    IN cloCOMPILER Compiler,
+    IN clsGEN_CODE_DATA_TYPE PackedType
+    )
+{
+    gcmASSERT(clmIsElementTypePacked(PackedType.elementType));
+    switch(clGEN_CODE_DataTypeByteSize(Compiler, PackedType)) {
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+        return gcSL_ENABLE_X;
+
+    case 8:
+        return gcSL_ENABLE_XY;
+
+    case 16:
+    case 32:
+        return gcSL_ENABLE_XYZW;
+
+    default:
+        gcmASSERT(0);
+        return gcSL_ENABLE_XYZW;
+    }
+}
+
+gctUINT8
 gcGetDefaultEnable(
     IN cloCOMPILER Compiler,
     IN clsGEN_CODE_DATA_TYPE DataType
     )
 {
+    if(clmIsElementTypePacked(DataType.elementType)) {
+        return clConvPackedTypeToEnable(Compiler, DataType);
+    }
+
     if((cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
         gcmOPT_oclUseImgIntrinsicQuery()) &&
        clmIsElementTypeImage(DataType.elementType)) return gcSL_ENABLE_XYZW;
@@ -3707,11 +3804,11 @@ _ConvOpcode(
     case clvOPCODE_RSHIFT:           return gcSL_RSHIFT;
     case clvOPCODE_LSHIFT:           return gcSL_LSHIFT;
     case clvOPCODE_NEG:              return gcSL_NEG;
-    case clvOPCODE_BITWISE_NOT:      return gcSL_NOT_BITWISE;
+    case clvOPCODE_NOT_BITWISE:      return gcSL_NOT_BITWISE;
 
-    case clvOPCODE_BITWISE_AND:      return gcSL_AND_BITWISE;
-    case clvOPCODE_BITWISE_OR:       return gcSL_OR_BITWISE;
-    case clvOPCODE_BITWISE_XOR:      return gcSL_XOR_BITWISE;
+    case clvOPCODE_AND_BITWISE:      return gcSL_AND_BITWISE;
+    case clvOPCODE_OR_BITWISE:       return gcSL_OR_BITWISE;
+    case clvOPCODE_XOR_BITWISE:      return gcSL_XOR_BITWISE;
 
     case clvOPCODE_BARRIER:          return gcSL_BARRIER;
     case clvOPCODE_LOAD:             return gcSL_LOAD;
@@ -3834,7 +3931,11 @@ _ConvOpcode(
     case clvOPCODE_LONGHI:           return gcSL_LONGHI;
     case clvOPCODE_MOV_LONG:         return gcSL_MOV_LONG;
     case clvOPCODE_COPY:             return gcSL_COPY;
-
+    case clvOPCODE_PARAM_CHAIN:      return gcSL_PARAM_CHAIN;
+    case clvOPCODE_INTRINSIC:        return gcSL_INTRINSIC;
+    case clvOPCODE_INTRINSIC_ST:     return gcSL_INTRINSIC_ST;
+    case clvOPCODE_FMA_MUL:         return gcSL_FMA_MUL;
+    case clvOPCODE_FMA_ADD:         return gcSL_FMA_ADD;
     default:
         gcmASSERT(0);
         return gcSL_NOP;
@@ -4011,7 +4112,7 @@ _EmitCode0(
     gceSTATUS    status;
     gcSL_OPCODE opcode;
 
-        opcode = _ConvOpcode(Opcode);
+    opcode = _ConvOpcode(Opcode);
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                     clvDUMP_CODE_EMITTER,
@@ -4024,7 +4125,9 @@ _EmitCode0(
                 opcode,
                 0,
                 0,
-                0);
+                0,
+                GCSL_Build_SRC_LOC(LineNo, StringNo));
+
     if (gcmIS_ERROR(status)) return status;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -4224,7 +4327,8 @@ _EmitNullTargetCode(
                 opcode,
                 0,
                 0,
-                0);
+                0,
+                GCSL_Build_SRC_LOC(LineNo, StringNo));
     if (gcmIS_ERROR(status)) return status;
 
     if (Source0 != gcvNULL) {
@@ -7778,19 +7882,23 @@ _EmitCodeImpl2(
             }
         }
         else if(Opcode == clvOPCODE_IMAGE_READ_3D ||
-                Opcode == clvOPCODE_IMAGE_READ)
+                 Opcode == clvOPCODE_IMAGE_READ ||
+                 Opcode == clvOPCODE_IMAGE_WRITE_3D ||
+                 Opcode == clvOPCODE_IMAGE_WRITE ||
+                 Opcode == clvOPCODE_IMAGE_SAMPLER)
         {
             gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
             if(clmIsElementTypeFloating(Target->dataType.elementType))
             {
                 /* according to OCL spec: set default rounding mode for floating point tpye to RTE */
-                gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTN);
+                gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTNE);
             }
             else
             {
                 gcSHADER_AddRoundingMode(binary, gcSL_ROUND_RTZ);
             }
         }
+
         status = _EmitCode(
                         Compiler,
                         LineNo,
@@ -8192,7 +8300,7 @@ clNewFunctionArgument(
                 return status;
             }
             /* only create one argument for packed type even if it occupies more than one vec4 register */
-            if (clmIsElementTypePackedType(DataType.elementType) ||
+            if (clmIsElementTypePacked(DataType.elementType) ||
                 (clmGEN_CODE_IsExtendedVectorType(DataType) && cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)))
             {
                 break;
@@ -8252,7 +8360,7 @@ clNewKernelFunctionArgument(
                 return status;
             }
             /* only create one argument for packed type even if it occupies more than one vec4 register */
-            if (clmIsElementTypePackedType(DataType.elementType) ||
+            if (clmIsElementTypePacked(DataType.elementType) ||
                 (clmGEN_CODE_IsExtendedVectorType(DataType) && cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)))
             {
                 break;
@@ -8413,6 +8521,10 @@ IN clsNAME *FuncName
 
                FOR_EACH_SLINK_NODE(paramName->u.variableInfo.samplers, clsSAMPLER_TYPES, prev, next) {
                  sampler = next->member;
+
+                 if(sampler == gcvNULL)
+                     continue;
+
                  if(sampler->type == clvPARAMETER_NAME) {
                     samplerType = _FindParamNum(FuncName,
                                                 sampler);
@@ -8458,6 +8570,14 @@ IN clsNAME *FuncName
                                                             gcvPROPERTY_REQD_WORK_GRP_SIZE,
                                                             sizeof(FuncName->u.funcInfo.reqdWorkGroupSize)/sizeof(gctINT),
                                                             (gctINT *)FuncName->u.funcInfo.reqdWorkGroupSize
+                                                            );
+   if(gcmIS_ERROR(status)) return status;
+
+   /* Add work group size hint */
+   status = gcKERNEL_FUNCTION_AddKernelFunctionProperties(FuncName->context.u.variable.u.kernelFunction,
+                                                            gcvPROPERTY_WORK_GRP_SIZE_HINT,
+                                                            sizeof(FuncName->u.funcInfo.workGroupSizeHint)/sizeof(gctINT),
+                                                            (gctINT *)FuncName->u.funcInfo.workGroupSizeHint
                                                             );
    if(gcmIS_ERROR(status)) return status;
 

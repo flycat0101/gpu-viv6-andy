@@ -2377,7 +2377,9 @@ gceSTATUS vgfTesselateImage(
             halImageQuality,
             gcvFALSE,
             Context->useSoftwareTS,
-            Context->halBlendMode
+            Context->halBlendMode,
+            Width,
+            Height
             ));
 #else
         gcmERR_BREAK(gcoVG_TesselateImage(

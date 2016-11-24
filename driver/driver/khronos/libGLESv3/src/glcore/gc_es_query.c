@@ -1289,6 +1289,10 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->constants.textureBufferOffsetAlignment;
         break;
 
+    case GL_CONTEXT_FLAGS:
+        *ip++ = gc->contextFlags;
+        break;
+
     default:
         __GL_ERROR_RET(GL_INVALID_ENUM);
     }
@@ -1743,8 +1747,7 @@ const GLubyte* GL_APIENTRY __gles_GetStringi(__GLcontext *gc, GLenum name, GLuin
     }
 
     /* Go through the extension table again to construct the extension string */
-    curExt = __glExtension;
-    while (curExt->index < __GL_EXTID_EXT_LAST)
+    for (curExt = __glExtension; curExt->name; curExt++)
     {
         if (curExt->bEnabled)
         {
@@ -1753,7 +1756,6 @@ const GLubyte* GL_APIENTRY __gles_GetStringi(__GLcontext *gc, GLenum name, GLuin
                 break;
             }
         }
-        curExt++;
     }
 
     return (const GLubyte*)curExt->name;

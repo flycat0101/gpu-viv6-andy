@@ -13,6 +13,7 @@
 
 #include "gc_es_context.h"
 #include "gc_chip_context.h"
+#include "gc_chip_misc.h"
 
 #if defined(ANDROID)
 #if ANDROID_SDK_VERSION >= 16
@@ -29,9 +30,9 @@
 extern __GLformatInfo __glFormatInfoTable[];
 
 #if gcdFRAMEINFO_STATISTIC
-extern GLboolean g_dbgPerDrawKickOff;
-extern GLint g_dbgDumpImagePerDraw;
-extern GLboolean g_dbgSkipDraw;
+extern GLboolean  g_dbgPerDrawKickOff;
+extern GLbitfield g_dbgDumpImagePerDraw;
+extern GLboolean  g_dbgSkipDraw;
 #endif
 
 /************************************************************************/
@@ -259,7 +260,7 @@ gcChipGetFramebufferAttachedSurfaceAndImage(
             }
             else
             {
-                surfView = gcChipGetTextureSurface(chipCtx, tex, attachPoint->level, attachPoint->slice);
+                surfView = gcChipGetTextureSurface(chipCtx, tex, attachPoint->layered, attachPoint->level, attachPoint->slice);
             }
 
             if (image)
@@ -312,6 +313,12 @@ gcChipPickReadBufferForFBO(
         rtView.firstSlice = 0;
         dView.firstSlice  = 0;
         sView.firstSlice  = 0;
+    }
+    else
+    {
+        rtView.numSlices = 1;
+        dView.numSlices = 1;
+        sView.numSlices = 1;
     }
 
     gcmONERROR(gcChipSetReadBuffers(gc, fbo->fbIntMask, &rtView, &dView, &sView, readYInverted, fbo->fbLayered));
@@ -398,12 +405,21 @@ gcChipPickDrawBufferForFBO(
         {
             rtViews[i].firstSlice = 0;
         }
+        else
+        {
+            rtViews[i].numSlices = 1;
+        }
     }
 
     if (fbo->fbLayered)
     {
         dView.firstSlice = 0;
         sView.firstSlice = 0;
+    }
+    else
+    {
+        dView.numSlices = 1;
+        sView.numSlices = 1;
     }
 
     gcmONERROR(gcChipSetDrawBuffers(gc,
@@ -425,52 +441,6 @@ OnError:
     return status;
 }
 
-
-gceSTATUS gcChipFBOSyncAttachment(__GLcontext *gc, __GLfboAttachPoint * attachPoint)
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcmHEADER_ARG("gc=0x%x  attachPoint=0x%x", gc, attachPoint);
-
-    if (attachPoint->objType == GL_TEXTURE)
-    {
-        __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
-        if(texObj)
-        {
-            __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
-            if ((texInfo && texInfo->eglImage.image) ||
-                (texInfo && texInfo->direct.source) )
-            {
-                gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc,
-                    texObj,
-                    attachPoint->face,
-                    attachPoint->level,
-                    attachPoint->layer));
-            }
-            /* Sync Master to direct source. */
-            if(texInfo && texInfo->direct.source &&
-                !texInfo->direct.directSample &&
-                attachPoint->level == 0
-                )
-            {
-                gcmONERROR(gcChipTexDirectSourceSyncFromMipSlice(gc,
-                    texObj));
-            }
-        }
-    }
-    else if (attachPoint->objType == GL_RENDERBUFFER)
-    {
-        __GLrenderbufferObject *rbo = (__GLrenderbufferObject*)attachPoint->object;
-        if (rbo && rbo->eglImage)
-        {
-            gcChipRboSyncFromShadow(gc, rbo);
-
-        }
-    }
-OnError:
-    gcmFOOTER();
-    return status;
-
-}
 
 /*
 ** For FBO rendering, this function is to sync shadow(RT) to master at some sync points.
@@ -593,16 +563,64 @@ gcChipFboSyncFromShadowFreon(
     return status;
 }
 
+
+gceSTATUS gcChipFBOSyncAttachment(__GLcontext *gc, __GLfboAttachPoint * attachPoint)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("gc=0x%x  attachPoint=0x%x", gc, attachPoint);
+
+    if (attachPoint->objType == GL_TEXTURE)
+    {
+        __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
+        if(texObj)
+        {
+            __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
+            if ((texInfo && texInfo->eglImage.image) ||
+                (texInfo && texInfo->direct.source) )
+            {
+                gcmONERROR(gcChipTexMipSliceSyncFromShadow(gc,
+                    texObj,
+                    attachPoint->face,
+                    attachPoint->level,
+                    attachPoint->layer));
+            }
+            /* Sync Master to direct source. */
+            if(texInfo && texInfo->direct.source &&
+                !texInfo->direct.directSample &&
+                attachPoint->level == 0
+                )
+            {
+                gcmONERROR(gcChipTexDirectSourceSyncFromMipSlice(gc,
+                    texObj));
+            }
+        }
+    }
+    else if (attachPoint->objType == GL_RENDERBUFFER)
+    {
+        __GLrenderbufferObject *rbo = (__GLrenderbufferObject*)attachPoint->object;
+        if (rbo && rbo->eglImage)
+        {
+            gcChipRboSyncFromShadow(gc, rbo);
+
+        }
+    }
+OnError:
+    gcmFOOTER();
+    return status;
+
+}
+
+
 GLvoid
 __glChipFramebufferRenderbuffer(
     __GLcontext *gc,
     __GLframebufferObject *fbo,
     GLint attachIndex,
     __GLrenderbufferObject *rbo,
-      __GLfboAttachPoint *preAttach
+    __GLfboAttachPoint *preAttach
     )
 {
-    gcChipFBOSyncAttachment(gc, preAttach);
+   gcChipFBOSyncAttachment(gc, preAttach);
 }
 
 GLboolean
@@ -616,7 +634,7 @@ __glChipFramebufferTexture(
     GLsizei samples,
     GLint zoffset,
     GLboolean layered,
-     __GLfboAttachPoint *preAttach
+    __GLfboAttachPoint *preAttach
     )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
@@ -626,7 +644,7 @@ __glChipFramebufferTexture(
     gcmHEADER_ARG("gc=0x%x fbo=0x%x attachIndex=%d texObj=0x%x level=%d face=%d samples=%d zoffset=%d layered=%d preAttach=0x%x",
         gc, fbo, attachIndex, texObj, level, face, samples, zoffset, layered, preAttach);
 
-    gcmONERROR(gcChipFBOSyncAttachment(gc,preAttach));
+    gcmONERROR(gcChipFBOSyncAttachment(gc, preAttach));
     mipmap = texObj ? &texObj->faceMipmap[face][level] : gcvNULL;
 
     if (mipmap && (mipmap->width * mipmap->height * mipmap->depth))
@@ -669,7 +687,7 @@ __glChipFramebufferTexture(
         if (gcChipTexNeedShadow(gc, texObj, texInfo, formatMapInfo, samples, &attachPoint->samplesUsed))
         {
             __GLimageUser *fboList = texObj->fboList;
-            gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, level, slice);
+            gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->layered, level, slice);
 
             if (texView.surf && chipMipLevel->shadow[slice].shadowDirty && chipMipLevel->shadow[slice].surface)
             {
@@ -1046,7 +1064,7 @@ __glChipIsFramebufferComplete(
         ** And our HW indeed didn't support it. But we already claimed supporting OES_stencilx
         ** extension and need pass conform test, so we should allow the case.
         */
-        if (depthObjSet && stencilObjSet)
+        if (gc->apiVersion == __GL_API_VERSION_ES30 && depthObjSet && stencilObjSet)
         {
             if ((depthObjType != stencilObjType) ||
                 (depthObjName != stencilObjName))
@@ -1218,12 +1236,12 @@ gcChipBlitFramebufferResolve(
 
         for (i = 0; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
         {
-            gcsSURF_VIEW *rtView = &chipCtx->drawRtViews[i];
-            if (rtView->surf)
+            gcsSURF_VIEW rtView = {chipCtx->drawRtViews[i].surf, chipCtx->drawRtViews[i].firstSlice, chipCtx->drawRtViews[i].numSlices};
+            if (rtView.surf)
             {
                 /* Set up the dst surface and rect */
-                gcmONERROR(gcoSURF_GetSize(rtView->surf, (gctUINT*)&dstWidth, (gctUINT*)&dstHeight, NULL));
-                gcmONERROR(gcChipFboSyncFromMasterSurface(gc, rtView, GL_FALSE));
+                gcmONERROR(gcoSURF_GetSize(rtView.surf, (gctUINT*)&dstWidth, (gctUINT*)&dstHeight, NULL));
+                gcmONERROR(gcChipFboSyncFromMasterSurface(gc, &rtView, GL_FALSE));
 
                 if (rlvArgs.uArgs.v2.rectSize.x != __GL_MIN(dstWidth,  (dstX1 - dstX0)) ||
                     rlvArgs.uArgs.v2.rectSize.y != __GL_MIN(dstHeight, (dstY1 - dstY0))
@@ -1232,7 +1250,12 @@ gcChipBlitFramebufferResolve(
                     gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
                 }
 
-                gcmONERROR(gcoSURF_ResolveRect(&pixelPlaneView, rtView, &rlvArgs));
+                /* If the read framebuffer is layered (see section 9.8), pixel values are read from layer zero.
+                ** If the draw framebuffer is layered, pixel values are written to layer zero.
+                ** If both read and draw framebuffers are layered, the blit operation is still performed only on layer zero.
+                */
+                pixelPlaneView.numSlices = rtView.numSlices = 1;
+                gcmONERROR(gcoSURF_ResolveRect(&pixelPlaneView, &rtView, &rlvArgs));
             }
         }
         /* Destroy pixel plane if needed */
@@ -1246,6 +1269,7 @@ gcChipBlitFramebufferResolve(
         gceSURF_FORMAT readFmt, drawFmt;
         gcsSURF_VIEW *readDsView = chipCtx->readDepthView.surf ? &chipCtx->readDepthView : &chipCtx->readStencilView;
         gcsSURF_VIEW *drawDsView = chipCtx->drawDepthView.surf ? &chipCtx->drawDepthView : &chipCtx->drawStencilView;
+        gctUINT drawDsNumSlice = chipCtx->drawDepthView.surf ? chipCtx->drawDepthView.numSlices : chipCtx->drawStencilView.numSlices;
 
         /* If both read/draw are valid, they must be same. */
         GL_ASSERT(!(chipCtx->readDepthView.surf && chipCtx->readStencilView.surf) ||
@@ -1287,10 +1311,19 @@ gcChipBlitFramebufferResolve(
                 gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
             }
 
+            /* If the read framebuffer is layered (see section 9.8), pixel values are read from layer zero.
+            ** If the draw framebuffer is layered, pixel values are written to layer zero.
+            ** If both read and draw framebuffers are layered, the blit operation is still performed only on layer zero.
+            */
+            pixelPlaneView.numSlices = drawDsView->numSlices = 1;
+
             gcmONERROR(gcoSURF_ResolveRect(&pixelPlaneView, drawDsView, &rlvArgs));
 
             /* Destroy pixel plane if needed */
             gcmONERROR(gcChipUtilDestroyPixelPlane(gc, readDsView, &pixelPlaneView));
+
+            /* restore the numSlice for drawDsView*/
+            drawDsView->numSlices = drawDsNumSlice;
         }
 
         /*
@@ -1505,12 +1538,14 @@ gcChipBlitFramebufferSoftware(
     blitArgs.srcWidth           = srcX1 - srcX0;
     blitArgs.srcHeight          = srcY1 - srcY0;
     blitArgs.srcDepth           = 1;
+    blitArgs.srcNumSlice        = 1;
     blitArgs.dstX               = dstX0;
     blitArgs.dstY               = dstY0;
     blitArgs.dstZ               = 0;
     blitArgs.dstWidth           = dstX1 - dstX0;
     blitArgs.dstHeight          = dstY1 - dstY0;
     blitArgs.dstDepth           = 1;
+    blitArgs.dstNumSlice        = 1;
     blitArgs.xReverse           = xReverse;
     blitArgs.yReverse           = yReverse;
     blitArgs.scissorTest        = scissorEnable;
@@ -2008,6 +2043,13 @@ __glChipRenderbufferStorage(
 
     }
 
+    if (drvFormat == __GL_FMT_RGBA4 &&
+        (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)&&
+        gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_DITHER_FIX2) == gcvFALSE)
+    {
+        drvFormat = __GL_FMT_RGBA8;
+    }
+
     if ((rbo->formatInfo->drvFormat == __GL_FMT_SRGB8_ALPHA8) &&
         (chipCtx->patchId == gcvPATCH_GTFES30) &&
         ((rbo->width == 0x1f4 && rbo->height == 0x1f4) ||
@@ -2074,6 +2116,9 @@ __glChipRenderbufferStorage(
         surfType = gcvSURF_RENDER_TARGET;
         break;
     }
+
+    chipCtx->needRTRecompile = chipCtx->needRTRecompile
+                             || gcChipCheckRecompileEnable(gc, formatMapInfo->writeFormat);
 
     /* Create render target. */
     gcmONERROR(gcoSURF_Construct(chipCtx->hal,
@@ -2269,6 +2314,8 @@ __glChipCreateEglImageRenderbuffer(
     khrEGL_IMAGE * eglImage = gcvNULL;
     gctINT32 referenceCount = 0;
     GLenum ret;
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gceSURF_FORMAT format;
     gcmHEADER_ARG("gc=0x%x rbo=0x%x image=0x%x", gc, rbo, image);
 
 
@@ -2312,6 +2359,10 @@ __glChipCreateEglImageRenderbuffer(
     eglImage->u.texture.level  = 0;
     /* Type is not yet set. Default to unknown/invalid. */
     eglImage->u.texture.type = 0xFFFFFFFFu;
+
+    gcoSURF_GetFormat(surface, gcvNULL, &format);
+
+    chipCtx->needRTRecompile = chipCtx->needRTRecompile || gcChipCheckRecompileEnable(gc, format);
 
     ret = EGL_SUCCESS;
     gcmFOOTER_ARG("return=0x%04x", ret);
@@ -2370,6 +2421,8 @@ __glChipEglImageTargetRenderbufferStorageOES(
     case gcvSURF_D16:
     case gcvSURF_D24X8:
     case gcvSURF_D24S8:
+    case gcvSURF_X24S8:
+    case gcvSURF_S8:
         type = gcvSURF_DEPTH;
         break;
 
@@ -2577,6 +2630,13 @@ gcChipRellocShadowResource(
             surfType |= gcvSURF_NO_COMPRESSION;
         }
 
+        chipCtx->needRTRecompile = chipCtx->needRTRecompile
+                                 || gcChipCheckRecompileEnable(gc, targetFormat);
+
+        chipCtx->needTexRecompile = chipCtx->needTexRecompile
+                                  || gcChipCheckRecompileEnable(gc, targetFormat);
+
+
         gcmONERROR(gcoSURF_Construct(chipCtx->hal, targetW, targetH, 1, surfType,
                                      targetFormat, gcvPOOL_DEFAULT, &shadow->surface));
         gcmONERROR(gcoSURF_SetSamples(shadow->surface, targetSamples));
@@ -2652,8 +2712,8 @@ gcChipFBOMarkShadowRendered(
                     /* If the texSurface was uploaded before, sync it to rtSurface before draw/clear RT */
                     if (shadow->masterDirty)
                     {
-                        gcmONERROR(gcoSURF_DisableTileStatus(shadow->surface, gcvTRUE));
-                        texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->level, attachPoint->slice);
+                        gcmONERROR(gcoSURF_DisableTileStatus(&chipCtx->drawRtViews[rtIdx], gcvTRUE));
+                        texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->layered, attachPoint->level, attachPoint->slice);
                         if (texView.surf)
                         {
                             shadowView.surf = shadow->surface;
@@ -2705,8 +2765,8 @@ gcChipFBOMarkShadowRendered(
                 /* If the texSurface was uploaded before, sync it to rtSurface before draw/clear RT */
                 if (shadow->masterDirty)
                 {
-                    gcmONERROR(gcoSURF_DisableTileStatus(shadow->surface, gcvTRUE));
-                    texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->level, attachPoint->slice);
+                    gcmONERROR(gcoSURF_DisableTileStatus(&chipCtx->drawDepthView, gcvTRUE));
+                    texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->layered, attachPoint->level, attachPoint->slice);
                     if (texView.surf)
                     {
                         shadowView.surf = shadow->surface;
@@ -2759,8 +2819,8 @@ gcChipFBOMarkShadowRendered(
                 /* If the texSurface was uploaded before, sync it to rtSurface before draw/clear RT */
                 if (shadow->masterDirty)
                 {
-                    gcmONERROR(gcoSURF_DisableTileStatus(shadow->surface, gcvTRUE));
-                    texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->level, attachPoint->slice);
+                    gcmONERROR(gcoSURF_DisableTileStatus(&chipCtx->drawStencilView, gcvTRUE));
+                    texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->layered, attachPoint->level, attachPoint->slice);
                     if (texView.surf)
                     {
                         shadowView.surf = shadow->surface;
@@ -2823,7 +2883,7 @@ gcChipTexMipSliceSyncFromShadow(
     {
         if (shadow->shadowDirty)
         {
-            gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, level, slice);
+            gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, gcvFALSE, level, slice);
             if (texView.surf)
             {
                 gcsSURF_VIEW shadowView = {shadow->surface, 0 ,1};
@@ -2896,7 +2956,7 @@ gcChipTexDirectSourceSyncFromMipSlice(
     gcmHEADER_ARG("gc=0x%x texObj=0x%x ", gc, texObj);
 
     /* Only Fbo been touched */
-    texView = gcChipGetTextureSurface(chipCtx, texObj, 0, 0);
+    texView = gcChipGetTextureSurface(chipCtx, texObj, gcvFALSE, 0, 0);
     if (texView.surf)
     {
         gcsSURF_VIEW directView = {texInfo->direct.source, 0, 1};
@@ -2955,7 +3015,7 @@ gcChipTexSyncFromShadow(
             {
                 if (shadow->shadowDirty)
                 {
-                    gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, level, slice);
+                    gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, gcvFALSE, level, slice);
                     if (texView.surf)
                     {
                         gcsSURF_VIEW shadowView = {shadow->surface, 0, 1};
@@ -3063,7 +3123,7 @@ gcChipFboSyncFromMasterSurface(
     {
         __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
         __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)(texObj->privateData);
-        gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->level, attachPoint->slice);
+        gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->layered, attachPoint->level, attachPoint->slice);
         __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevels[attachPoint->level];
         __GLchipResourceShadow *shadow = &chipMipLevel->shadow[attachPoint->slice];
 
@@ -3073,7 +3133,7 @@ gcChipFboSyncFromMasterSurface(
             GL_ASSERT((shadow->surface->sampleInfo.x <= texView.surf->sampleInfo.x) &&
                       (shadow->surface->sampleInfo.y <= texView.surf->sampleInfo.y));
 
-            gcmONERROR(gcoSURF_DisableTileStatus(surfView->surf, gcvTRUE));
+            gcmONERROR(gcoSURF_DisableTileStatus(surfView, gcvTRUE));
             gcmONERROR(gcoSURF_ResolveRect(&texView, surfView, gcvNULL));
 
             shadow->masterDirty= GL_FALSE;
@@ -3175,7 +3235,7 @@ gcChipFboSyncFromShadowSurface(
     {
         __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
         __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)(texObj->privateData);
-        gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->level, attachPoint->slice);
+        gcsSURF_VIEW texView = gcChipGetTextureSurface(chipCtx, texObj, attachPoint->layered, attachPoint->level, attachPoint->slice);
         __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevels[attachPoint->level];
         __GLchipResourceShadow *shadow = &chipMipLevel->shadow[attachPoint->slice];
 

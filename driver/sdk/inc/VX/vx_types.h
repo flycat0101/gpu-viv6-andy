@@ -1,18 +1,5 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
-
 /*
- * Copyright (c) 2012-2013 The Khronos Group Inc.
+ * Copyright (c) 2012-2015 The Khronos Group Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and/or associated documentation files (the
@@ -40,14 +27,41 @@
 /*!
  * \file vx_types.h
  * \brief The type definitions required by OpenVX Library.
- * \author Erik Rainey <erik.rainey@ti.com>
  */
 
 #include <stdint.h>
 #include <stddef.h>
 #include <string.h>
-#if defined(WIN32) || defined(UNDER_CE)
-#include <windows.h>
+
+/*!
+ * \internal
+ * \def VX_API_ENTRY
+ * \brief This is a tag used to identify exported, public API functions as
+ * distinct from internal functions, helpers, and other non-public interfaces.
+ * It can optionally be defined in the make system according the the compiler and intent.
+ * \ingroup group_basic_features
+ */
+#ifndef VX_API_ENTRY
+#if defined(_WIN32)
+#define VX_API_ENTRY __declspec(dllexport)
+#else
+#define VX_API_ENTRY __attribute__((visibility("default")))
+#endif
+#endif
+#ifndef VX_API_CALL
+#if defined(_WIN32)
+#define VX_API_CALL __stdcall
+#else
+#define VX_API_CALL
+#endif
+#endif
+#ifndef VX_CALLBACK
+#if defined(_WIN32)
+#define VX_CALLBACK __stdcall
+#else
+#define VX_CALLBACK
+#endif
+
 #endif
 
 /*! \brief An 8 bit ASCII character.
@@ -95,7 +109,7 @@ typedef int32_t  vx_int32;
  */
 typedef int64_t  vx_int64;
 
-#if defined(OPENVX_PLATFORM_SUPPORTS_16_FLOAT)
+#if defined(EXPERIMENTAL_PLATFORM_SUPPORTS_16_FLOAT)
 
 /*! \brief A 16-bit float value.
  * \ingroup group_basic_features
@@ -268,9 +282,13 @@ typedef enum _vx_bool_e {
 } vx_bool;
 
 /*!
- * \brief This structure is used to extract meta data from a validation
- * function. If the data object between nodes is virtual, this allows the
- * framework to automatically create the data object, if needed.
+ * \brief This object is used by output validation functions to specify the meta data
+ * of the expected output data object. If the output object is an image,
+ * the vx_meta_format object can additionally store the valid region delta rectangle.
+ * \note when the actual output object of the user node is virtual, the information
+ * given through the vx_meta_format object allows the OpenVX framework to automatically
+ * create the data object when meta data were not specified by the application at object
+ * creation time.
  * \ingroup group_user_kernels
  */
 typedef struct _vx_meta_format* vx_meta_format;
@@ -294,24 +312,32 @@ enum vx_type_e {
     VX_TYPE_ENUM            = 0x00C,/*!< \brief A <tt>\ref vx_enum</tt>. Equivalent in size to a <tt>\ref vx_int32</tt>. */
     VX_TYPE_SIZE            = 0x00D,/*!< \brief A <tt>\ref vx_size</tt>. */
     VX_TYPE_DF_IMAGE        = 0x00E,/*!< \brief A <tt>\ref vx_df_image</tt>. */
-#if defined(OPENVX_PLATFORM_SUPPORTS_16_FLOAT)
+#if defined(EXPERIMENTAL_PLATFORM_SUPPORTS_16_FLOAT)
     VX_TYPE_FLOAT16         = 0x00F,/*!< \brief A <tt>\ref vx_float16</tt>. */
 #endif
     VX_TYPE_BOOL            = 0x010,/*!< \brief A <tt>\ref vx_bool</tt>. */
 
     /* add new scalar types here */
 
-    VX_TYPE_SCALAR_MAX,     /*!< \brief A floating value for comparison between scalars and structs. */
+    VX_TYPE_SCALAR_MAX,     /*!< \brief A floating value for comparison between OpenVX scalars and OpenVX structs. */
 
     VX_TYPE_RECTANGLE       = 0x020,/*!< \brief A <tt>\ref vx_rectangle_t</tt>. */
     VX_TYPE_KEYPOINT        = 0x021,/*!< \brief A <tt>\ref vx_keypoint_t</tt>. */
     VX_TYPE_COORDINATES2D   = 0x022,/*!< \brief A <tt>\ref vx_coordinates2d_t</tt>. */
     VX_TYPE_COORDINATES3D   = 0x023,/*!< \brief A <tt>\ref vx_coordinates3d_t</tt>. */
-
-    VX_TYPE_STRUCT_MAX,     /*!< \brief A floating value for comparison between structs and objects. */
-
-    VX_TYPE_USER_STRUCT_START = 0x100, /*!< \internal A floating value for user-defined struct base index. */
-
+    VX_TYPE_USER_STRUCT_START = 0x100,
+                                    /*!< \brief A floating value for user-defined struct base index.*/
+    VX_TYPE_STRUCT_MAX      = VX_TYPE_USER_STRUCT_START - 1,
+                                    /*!< \brief A floating value for comparison between OpenVX
+                                          structs and user structs. */
+    VX_TYPE_VENDOR_STRUCT_START = 0x400,
+                                    /*!< \brief A floating value for vendor-defined struct base index.*/
+    VX_TYPE_USER_STRUCT_END = VX_TYPE_VENDOR_STRUCT_START - 1,
+                                    /*!< \brief A floating value for comparison between user structs and
+                                          vendor structs. */
+    VX_TYPE_VENDOR_STRUCT_END = 0x7FF,
+                                    /*!< \brief A floating value for comparison between vendor
+                                          structs and OpenVX objects. */
     VX_TYPE_REFERENCE       = 0x800,/*!< \brief A <tt>\ref vx_reference</tt>. */
     VX_TYPE_CONTEXT         = 0x801,/*!< \brief A <tt>\ref vx_context</tt>. */
     VX_TYPE_GRAPH           = 0x802,/*!< \brief A <tt>\ref vx_graph</tt>. */
@@ -334,7 +360,9 @@ enum vx_type_e {
 
     /* \todo add new object types here */
 
-    VX_TYPE_OBJECT_MAX,     /*!< \brief A value used for bound checking the object types. */
+    VX_TYPE_VENDOR_OBJECT_START  = 0xC00,/*!< \brief A floating value for vendor defined object base index. */
+    VX_TYPE_OBJECT_MAX      = VX_TYPE_VENDOR_OBJECT_START - 1,/*!< \brief A value used for bound checking the OpenVX object types. */
+    VX_TYPE_VENDOR_OBJECT_END   = 0xFFF,/*!< \brief A value used for bound checking of vendor objects */
 };
 
 /*! \brief The enumeration of all status codes.
@@ -390,7 +418,7 @@ typedef vx_enum vx_action;
  * \return An action code from <tt>\ref vx_action_e</tt>.
  * \ingroup group_node_callback
  */
-typedef vx_action (*vx_nodecomplete_f)(vx_node node);
+typedef vx_action (VX_CALLBACK *vx_nodecomplete_f)(vx_node node);
 
 /*! \brief Vendor IDs are 2 nibbles in size and are located in the upper byte of
  * the 4 bytes of an enumeration.
@@ -451,7 +479,7 @@ typedef vx_action (*vx_nodecomplete_f)(vx_node node);
  */
 #define VX_LIBRARY(e)                       (((vx_uint32)e & VX_LIBRARY_MASK) >> 12)
 
-#if defined(_LITTLE_ENDIAN_) || (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__) || defined(_WIN32) || defined(WIN32)
+#if defined(_LITTLE_ENDIAN_) || (__BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__) || defined(_WIN32)
 #define VX_DF_IMAGE(a,b,c,d)                  ((a) | (b << 8) | (c << 16) | (d << 24))
 #define VX_ATTRIBUTE_BASE(vendor, object)   (((vendor) << 20) | (object << 8))
 #define VX_KERNEL_BASE(vendor, lib)         (((vendor) << 20) | (lib << 12))
@@ -525,10 +553,8 @@ enum vx_enum_e {
 enum vx_action_e {
     /*! \brief Continue executing the graph with no changes. */
     VX_ACTION_CONTINUE = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_ACTION) + 0x0,
-    /*! \brief Stop executing the graph at the current point and restart from the beginning. */
-    VX_ACTION_RESTART  = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_ACTION) + 0x1,
     /*! \brief Stop executing the graph. */
-    VX_ACTION_ABANDON  = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_ACTION) + 0x2,
+    VX_ACTION_ABANDON  = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_ACTION) + 0x1,
 };
 
 /*! \brief An indication of how a kernel will treat the given parameter.
@@ -765,7 +791,7 @@ enum vx_parameter_attribute_e {
     VX_PARAMETER_ATTRIBUTE_INDEX = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_PARAMETER) + 0x0,
     /*! \brief Queries a parameter for its direction value on the kernel with which it is associated. Use a <tt>\ref vx_enum</tt> parameter. */
     VX_PARAMETER_ATTRIBUTE_DIRECTION = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_PARAMETER) + 0x1,
-    /*! \brief Queries a parameter for its size in bytes or if it is a <tt>\ref vx_image</tt> or <tt>\ref vx_array</tt> its <tt>\ref vx_type_e</tt> is returned. Use a <tt>\ref vx_enum</tt> parameter. */
+    /*! \brief Queries a parameter for its type, \ref vx_type_e is returned. The size of the parameter is implied for plain data objects. For opaque data objects like images and arrays a query to their attributes has to be called to determine the size. */
     VX_PARAMETER_ATTRIBUTE_TYPE = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_PARAMETER) + 0x2,
     /*! \brief Queries a parameter for its state. A value in <tt>\ref vx_parameter_state_e</tt> is returned. Use a <tt>\ref vx_enum</tt> parameter. */
     VX_PARAMETER_ATTRIBUTE_STATE = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_PARAMETER) + 0x3,
@@ -833,9 +859,9 @@ enum vx_lut_attribute_e {
 enum vx_distribution_attribute_e {
     /*! \brief Indicates the number of dimensions in the distribution. Use a <tt>\ref vx_size</tt> parameter. */
     VX_DISTRIBUTION_ATTRIBUTE_DIMENSIONS = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_DISTRIBUTION) + 0x0,
-    /*! \brief Indicates the start of the values to use (inclusive). Use a <tt>\ref vx_size</tt> parameter. */
+    /*! \brief Indicates the start of the values to use (inclusive). Use a <tt>\ref vx_int32</tt> parameter. */
     VX_DISTRIBUTION_ATTRIBUTE_OFFSET = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_DISTRIBUTION) + 0x1,
-    /*! \brief Indicates end value to use as the range (exclusive). Use a <tt>\ref vx_size</tt> parameter. */
+    /*! \brief Indicates end value to use as the range. Use a <tt>\ref vx_uint32</tt> parameter. */
     VX_DISTRIBUTION_ATTRIBUTE_RANGE = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_DISTRIBUTION) + 0x2,
     /*! \brief Indicates the number of bins. Use a <tt>\ref vx_size</tt> parameter. */
     VX_DISTRIBUTION_ATTRIBUTE_BINS = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_DISTRIBUTION) + 0x3,
@@ -871,6 +897,8 @@ enum vx_threshold_attribute_e {
     VX_THRESHOLD_ATTRIBUTE_TRUE_VALUE = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_THRESHOLD) + 0x4,
     /*! \brief The value of the FALSE threshold. Use a <tt>\ref vx_int32</tt> parameter. */
     VX_THRESHOLD_ATTRIBUTE_FALSE_VALUE = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_THRESHOLD) + 0x5,
+    /*! \brief The data type of the threshold's value. Use a <tt>\ref vx_enum</tt> parameter. Will contain a <tt>\ref vx_type_e</tt>.*/
+    VX_THRESHOLD_ATTRIBUTE_DATA_TYPE = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_THRESHOLD) + 0x6,
 };
 
 /*! \brief The matrix attributes.
@@ -974,19 +1002,19 @@ enum vx_channel_e {
     VX_CHANNEL_3 = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_CHANNEL) + 0x3,
 
     /*! \brief Use to extract the RED channel, no matter the byte or packing order. */
-    VX_CHANNEL_R = VX_CHANNEL_0,
+    VX_CHANNEL_R = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_CHANNEL) + 0x10,
     /*! \brief Use to extract the GREEN channel, no matter the byte or packing order. */
-    VX_CHANNEL_G = VX_CHANNEL_1,
+    VX_CHANNEL_G = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_CHANNEL) + 0x11,
     /*! \brief Use to extract the BLUE channel, no matter the byte or packing order. */
-    VX_CHANNEL_B = VX_CHANNEL_2,
+    VX_CHANNEL_B = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_CHANNEL) + 0x12,
     /*! \brief Use to extract the ALPHA channel, no matter the byte or packing order. */
-    VX_CHANNEL_A = VX_CHANNEL_3,
+    VX_CHANNEL_A = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_CHANNEL) + 0x13,
     /*! \brief Use to extract the LUMA channel, no matter the byte or packing order. */
-    VX_CHANNEL_Y = VX_CHANNEL_0,
+    VX_CHANNEL_Y = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_CHANNEL) + 0x14,
     /*! \brief Use to extract the Cb/U channel, no matter the byte or packing order. */
-    VX_CHANNEL_U = VX_CHANNEL_1,
+    VX_CHANNEL_U = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_CHANNEL) + 0x15,
     /*! \brief Use to extract the Cr/V/Value channel, no matter the byte or packing order. */
-    VX_CHANNEL_V = VX_CHANNEL_2,
+    VX_CHANNEL_V = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_CHANNEL) + 0x16,
 };
 
 /*! \brief An enumeration of memory import types.
@@ -998,6 +1026,9 @@ enum vx_import_type_e {
 
     /*! \brief The default memory type to import from the Host. */
     VX_IMPORT_TYPE_HOST = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_IMPORT_MEM) + 0x1,
+
+    VX_IMPORT_TYPE_DMABUF = VX_ENUM_BASE(VX_ID_VIVANTE, VX_ENUM_IMPORT_MEM) + 0x0,
+
 };
 
 /*! \brief The image reconstruction filters supported by image resampling operations.
@@ -1123,8 +1154,8 @@ enum vx_norm_type_e {
 enum vx_delay_attribute_e {
     /*! \brief The type of reference contained in the delay. Use a <tt>\ref vx_enum</tt> parameter. */
     VX_DELAY_ATTRIBUTE_TYPE = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_DELAY) + 0x0,
-    /*! \brief The number of items in the delay. Use a <tt>\ref vx_uint32</tt> parameter.*/
-    VX_DELAY_ATTRIBUTE_COUNT = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_DELAY) + 0x1,
+    /*! \brief The number of items in the delay. Use a <tt>\ref vx_size</tt> parameter.*/
+    VX_DELAY_ATTRIBUTE_SLOTS = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_DELAY) + 0x1,
 };
 
 /*! \brief The memory accessor hint flags.
@@ -1163,7 +1194,7 @@ enum vx_round_policy_e {
  * \note The symbol exported from the user module must be <tt>vxPublishKernels</tt> in extern C format.
  * \ingroup group_user_kernels
  */
-typedef vx_status (*vx_publish_kernels_f)(vx_context context);
+typedef vx_status (VX_API_CALL *vx_publish_kernels_f)(vx_context context);
 
 /*!
  * \brief The pointer to the Host side kernel.
@@ -1172,7 +1203,7 @@ typedef vx_status (*vx_publish_kernels_f)(vx_context context);
  * \param [in] num The number of parameters.
  * \ingroup group_user_kernels
  */
-typedef vx_status (*vx_kernel_f)(vx_node node, vx_reference *parameters, vx_uint32 num);
+typedef vx_status (VX_CALLBACK *vx_kernel_f)(vx_node node, const vx_reference *parameters, vx_uint32 num);
 
 /*!
  * \brief The pointer to the kernel initializer. If the host code requires a call
@@ -1183,7 +1214,7 @@ typedef vx_status (*vx_kernel_f)(vx_node node, vx_reference *parameters, vx_uint
  * \param [in] num The number of parameters.
  * \ingroup group_user_kernels
  */
-typedef vx_status (*vx_kernel_initialize_f)(vx_node node, vx_reference *parameters, vx_uint32 num);
+typedef vx_status (VX_CALLBACK *vx_kernel_initialize_f)(vx_node node, const vx_reference *parameters, vx_uint32 num);
 
 /*!
  * \brief The pointer to the kernel deinitializer. If the host code requires a call
@@ -1194,11 +1225,11 @@ typedef vx_status (*vx_kernel_initialize_f)(vx_node node, vx_reference *paramete
  * \param [in] num The number of parameters.
  * \ingroup group_user_kernels
  */
-typedef vx_status (*vx_kernel_deinitialize_f)(vx_node node, vx_reference *parameters, vx_uint32 num);
+typedef vx_status (VX_CALLBACK *vx_kernel_deinitialize_f)(vx_node node, const vx_reference *parameters, vx_uint32 num);
 
 /*!
  * \brief The user-defined kernel node input parameter validation function.
- * \note This function is called once for each VX_INPUT or VI_BIDIRECTIONAL
+ * \note This function is called once for each VX_INPUT or VX_BIDIRECTIONAL
  * parameter index.
  * \param [in] node The handle to the node that is being validated.
  * \param [in] index The index of the parameter being validated.
@@ -1210,7 +1241,7 @@ typedef vx_status (*vx_kernel_deinitialize_f)(vx_node node, vx_reference *parame
  * \retval VX_ERROR_INVALID_PARAMETERS The index was out of bounds.
  * \ingroup group_user_kernels
  */
-typedef vx_status (*vx_kernel_input_validate_f)(vx_node node, vx_uint32 index);
+typedef vx_status (VX_CALLBACK *vx_kernel_input_validate_f)(vx_node node, vx_uint32 index);
 
 /*!
  * \brief The user-defined kernel node output parameter validation function. The function only
@@ -1226,21 +1257,10 @@ typedef vx_status (*vx_kernel_input_validate_f)(vx_node node, vx_uint32 index);
  * \retval VX_ERROR_INVALID_PARAMETERS The index is out of bounds.
  * \ingroup group_user_kernels
  */
-typedef vx_status (*vx_kernel_output_validate_f)(vx_node node, vx_uint32 index, vx_meta_format meta);
+typedef vx_status (VX_CALLBACK *vx_kernel_output_validate_f)(vx_node node, vx_uint32 index, vx_meta_format meta);
 
-#if defined(WIN32) || defined(UNDER_CE)
-/*! Use to aid in debugging values in OpenVX.
- * \ingroup group_basic_features
- */
-#define VX_FMT_SIZE "%lu"
-#define VX_FMT_REF  "%lu"
-#if defined(ARCH_32)
-#define VX_FMT_REF  "%lu"
-/*! Use to aid in debugging values in OpenVX.
- * \ingroup group_basic_features
- */
-#define VX_FMT_SIZE "%lu"
-#elif defined(ARCH_64)
+#if defined(_WIN32) || defined(UNDER_CE)
+#if defined(_WIN64)
 /*! Use to aid in debugging values in OpenVX.
  * \ingroup group_basic_features
  */
@@ -1249,6 +1269,15 @@ typedef vx_status (*vx_kernel_output_validate_f)(vx_node node, vx_uint32 index, 
  * \ingroup group_basic_features
  */
 #define VX_FMT_SIZE "%I64u"
+#else
+/*! Use to aid in debugging values in OpenVX.
+ * \ingroup group_basic_features
+ */
+#define VX_FMT_REF  "%lu"
+/*! Use to aid in debugging values in OpenVX.
+ * \ingroup group_basic_features
+ */
+#define VX_FMT_SIZE "%lu"
 #endif
 #else
 /*! Use to aid in debugging values in OpenVX.
@@ -1312,6 +1341,7 @@ typedef struct _vx_perf_t {
     vx_uint64 avg;          /*!< \brief Holds the average of the durations. */
     vx_uint64 min;          /*!< \brief Holds the minimum of the durations. */
     vx_uint64 num;          /*!< \brief Holds the number of measurements. */
+    vx_uint64 max;          /*!< \brief Holds the maximum of the durations. */
 } vx_perf_t;
 
 /*! \brief Initializes a <tt>\ref vx_perf_t</tt> on the stack.
@@ -1419,9 +1449,9 @@ typedef struct _vx_coordinates3d_t {
 /*! \brief The log callback function.
  * \ingroup group_log
  */
-typedef void (*vx_log_callback_f)(vx_context context,
+typedef void (VX_CALLBACK *vx_log_callback_f)(vx_context context,
                                   vx_reference ref,
                                   vx_status status,
-                                  vx_char string[]);
+                                  const vx_char string[]);
 
 #endif

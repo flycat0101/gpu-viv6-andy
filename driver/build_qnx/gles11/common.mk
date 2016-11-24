@@ -38,7 +38,6 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_context.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_cull.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_depth.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_draw.o
-SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_egl.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_enable.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_fixed_func.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_fog.o
@@ -55,7 +54,6 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_pixel.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_point.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_profiler.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_query.o
-SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_render_thread.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_renderbuffer.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_states.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libGLESv11/gc_glff_stream.o
@@ -94,7 +92,7 @@ endif
 
 CCFLAGS += -D__GL_EXPORTS
 
-LIBS += VSC GAL-$(HARDWARENAME) EGL_viv
+LIBS += VSC GAL EGL_viv
 
 ifneq ($(filter v7, $(VARIANT_LIST)), v7)
 	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp

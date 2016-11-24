@@ -59,10 +59,10 @@
 
 typedef enum {
     ImxFbTypeUnknown    = -1,
-    ImxFbTypeDISP3_BG    = 0,
-    ImxFbTypeDISP3_FG    = 1,
+    ImxFbTypeDISP3_BG   = 0,
+    ImxFbTypeDISP3_FG   = 1,
     ImxFbTypeDISP3_BG_D1    = 2,
-    ImxFbTypeEPDC        = 3
+    ImxFbTypeEPDC       = 3
 } ImxFbType;
 
 /* -------------------------------------------------------------------- */

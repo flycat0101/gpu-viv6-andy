@@ -54,9 +54,6 @@ typedef struct _gcsINDEX_DYNAMIC
     gctUINT32                   lastStart;
     gctUINT32                   lastEnd;
 
-    gctUINT32                   minIndex;
-    gctUINT32                   maxIndex;
-
     /* For dynamic allocation */
     gcsSURF_NODE                memory;
     struct _gcsINDEX_DYNAMIC *  next;
@@ -535,7 +532,6 @@ gcoINDEX_Load(
     /* Program index buffer states. */
     gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL,
                                      address,
-                                     0,
                                      endAddress,
                                      IndexType,
                                      Index->bytes));
@@ -609,7 +605,6 @@ gcoINDEX_Bind(
     /* Program index buffer states. */
     status = gcoHARDWARE_BindIndex(gcvNULL,
                                    address,
-                                   0,
                                    endAddress,
                                    Type,
                                    Index->bytes);
@@ -663,7 +658,6 @@ gcoINDEX_BindOffset(
     /* Program index buffer states. */
     status = gcoHARDWARE_BindIndex(gcvNULL,
                                    address + Offset,
-                                   0,
                                    endAddress,
                                    Type,
                                    Index->bytes - Offset);
@@ -694,8 +688,6 @@ _FreeDynamic(
         Dynamic->bytes        = 0;
         Dynamic->memory.pool  = gcvPOOL_UNKNOWN;
         Dynamic->memory.valid = gcvFALSE;
-        Dynamic->maxIndex     = 0;
-        Dynamic->minIndex     = 0;
         Dynamic->free         = 0;
         Dynamic->lastEnd      = 0;
         Dynamic->lastStart    = ~0U;
@@ -939,7 +931,7 @@ gcoINDEX_UploadOffset(
 {
     gceSTATUS status;
 
-    gcmHEADER_ARG("Index=0x%x Offset=%u Buffer=0x%x Bytes=%lu",
+    gcmHEADER_ARG("Index=0x%x Offset=%zu Buffer=0x%x Bytes=%lu",
                   Index, Offset, Buffer, Bytes);
 
     /* Verify the arguments. */
@@ -1664,17 +1656,13 @@ _PatchIndices(
     IN gctPOINTER PatchedIndices,
     IN gctCONST_POINTER Indices,
     IN gceINDEX_TYPE IndexType,
-    IN gctSIZE_T Count,
-    gctUINT32_PTR iMin,
-    gctUINT32_PTR iMax
+    IN gctSIZE_T Count
     )
 {
     gctSIZE_T triangles = Count - 2;
     gctUINT i, j;
     gctPOINTER indices = PatchedIndices;
     gceSTATUS  status;
-    gctUINT32 imin = ~0U, imax = 0;
-    gctBOOL primRestart = gcoHARDWARE_IsPrimitiveRestart(gcvNULL) == gcvTRUE;
 
     /* Dispatch on index type. */
     switch (IndexType)
@@ -1692,26 +1680,7 @@ _PatchIndices(
                 dst[j * 3 + 1] = src[(i % 2) == 0 ? i + 1 : i];
                 dst[j * 3 + 2] = src[i + 2];
 
-                if (!(primRestart && (src[i] == 0xFF)))
-                {
-                    if (src[i] < imin) imin = src[i];
-                    if (src[i] > imax) imax = src[i];
-                }
-
                 j++;
-            }
-
-            /* Compute min/max for the last 2 indices. */
-            if (!(primRestart && (src[triangles] == 0xFF)))
-            {
-                if (src[triangles] < imin) imin = src[triangles];
-                if (src[triangles] > imax) imax = src[triangles];
-            }
-
-            if (!(primRestart && (src[triangles + 1] == 0xFF)))
-            {
-                if (src[triangles + 1] < imin) imin = src[triangles + 1];
-                if (src[triangles + 1] > imax) imax = src[triangles + 1];
             }
         }
         break;
@@ -1729,26 +1698,7 @@ _PatchIndices(
                 dst[j * 3 + 1] = src[(i % 2) == 0 ? i + 1 : i];
                 dst[j * 3 + 2] = src[i + 2];
 
-                if (!(primRestart && (src[i] == 0xFFFF)))
-                {
-                    if (src[i] < imin) imin = src[i];
-                    if (src[i] > imax) imax = src[i];
-                }
-
                 j++;
-            }
-
-            /* Compute min/max for the last 2 indices. */
-            if (!(primRestart && (src[triangles] == 0xFFFF)))
-            {
-                if (src[triangles] < imin) imin = src[triangles];
-                if (src[triangles] > imax) imax = src[triangles];
-            }
-
-            if (!(primRestart && (src[triangles + 1] == 0xFFFF)))
-            {
-                if (src[triangles + 1] < imin) imin = src[triangles + 1];
-                if (src[triangles + 1] > imax) imax = src[triangles + 1];
             }
         }
         break;
@@ -1766,26 +1716,7 @@ _PatchIndices(
                 dst[j * 3 + 1] = src[(i % 2) == 0 ? i + 1 : i];
                 dst[j * 3 + 2] = src[i + 2];
 
-                if (!(primRestart && (src[triangles] == 0xFFFFFFFF)))
-                {
-                    if (src[i] < imin) imin = src[i];
-                    if (src[i] > imax) imax = src[i];
-                }
-
                 j++;
-            }
-
-            /* Compute min/max for the last 2 indices. */
-            if (!(primRestart && (src[triangles] == 0xFFFFFFFF)))
-            {
-                if (src[triangles] < imin) imin = src[triangles];
-                if (src[triangles] > imax) imax = src[triangles];
-            }
-
-            if (!(primRestart && (src[triangles + 1] == 0xFFFFFFFF)))
-            {
-                if (src[triangles + 1] < imin) imin = src[triangles + 1];
-                if (src[triangles + 1] > imax) imax = src[triangles + 1];
             }
         }
         break;
@@ -1794,15 +1725,107 @@ _PatchIndices(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    *iMin = imin;
-    *iMax = imax;
-
     return gcvSTATUS_OK;
 OnError:
     return status;
 }
 
+gceSTATUS
+gcoINDEX_GetMemoryIndexRange(
+    IN gceINDEX_TYPE IndexType,
+    IN gctCONST_POINTER Data,
+    IN gctSIZE_T indexCount,
+    OUT gctUINT32* iMin,
+    OUT gctUINT32* iMax
+    )
+{
+    gceSTATUS status= gcvSTATUS_OK;
+    gctUINT8_PTR src;
+    gctSIZE_T count = 0;
+    gctBOOL primRestart = gcvFALSE;
 
+    gcmHEADER();
+
+    /* Verify the arguments. */
+    gcmDEBUG_VERIFY_ARGUMENT(Data != gcvNULL);
+    gcmDEBUG_VERIFY_ARGUMENT(indexCount > 0);
+
+    /* Setup pointers for copying data. */
+    src  = (gctUINT8_PTR) Data;
+    primRestart = gcoHARDWARE_IsPrimitiveRestart(gcvNULL) == gcvTRUE;
+    *iMin = ~0U;
+    *iMax = 0;
+
+    switch (IndexType)
+    {
+    case gcvINDEX_8:
+        /* Copy all indices as 8-bit data. */
+        for (count = 0; count < indexCount; ++count)
+        {
+            gctUINT8 index = *(gctUINT8_PTR) src++;
+
+            /* Skip the primitive restart index */
+            if (primRestart && (index == 0xFF))
+            {
+                continue;
+            }
+
+            /* Keep track of min/max index. */
+            if (index < *iMin) *iMin = index;
+            if (index > *iMax) *iMax = index;
+        }
+        break;
+
+    case gcvINDEX_16:
+        /* Copy all indices as 16-bit data. */
+        for (count = 0; count < indexCount; ++count)
+        {
+            gctUINT16 index = *(gctUINT16_PTR) src;
+            src += 2;
+
+            /* Skip the primitive restart index */
+            if (primRestart && (index == 0xFFFF))
+            {
+                continue;
+            }
+
+            /* Keep track of min/max index. */
+            if (index < *iMin) *iMin = index;
+            if (index > *iMax) *iMax = index;
+        }
+        break;
+
+    case gcvINDEX_32:
+        /* Copy all indices as 32-bit data. */
+        for (count = 0; count < indexCount; ++count)
+        {
+            gctUINT32 index = *(gctUINT32_PTR) src;
+            src += 4;
+
+            /* Skip the primitive restart index */
+            if (primRestart && (index == 0xFFFFFFFF))
+            {
+                continue;
+            }
+
+            /* Keep track of min/max index. */
+            if (index < *iMin) *iMin = index;
+            if (index > *iMax) *iMax = index;
+        }
+        break;
+    default:
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return the status.*/
+    gcmFOOTER();
+    return status;
+}
 /*******************************************************************************
 **
 **  gcoINDEX_UploadDynamicEx
@@ -1838,9 +1861,9 @@ gcoINDEX_UploadDynamicEx(
     gceSTATUS status;
     gcsHAL_INTERFACE ioctl;
     gcsINDEX_DYNAMIC_PTR dynamic;
-    gctUINT32 iMin = ~0U, iMax = 0, aligned32, spilitIndexMod;
+    gctUINT32 aligned32, spilitIndexMod;
     gctUINT8_PTR src, dest;
-    gctSIZE_T aligned, bytes;
+    gctSIZE_T aligned;
     gctSIZE_T count = 0, convertedBytes = 0;
     gctUINT32 offset = 0;
     gctUINT indexSize = 0;
@@ -1914,8 +1937,8 @@ gcoINDEX_UploadDynamicEx(
 
     /* Compute the mod of spilit index chunck. */
     spilitIndexMod = COMPUTE_LAST_INDEX_ADDR(dynamic->physical+dynamic->lastEnd+Bytes, indexSize) % SPILIT_INDEX_CHUNCK_BYTE;
-    if( gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) != gcvSTATUS_TRUE
-        && spilitIndexMod < SPILIT_INDEX_OFFSET)
+    if (gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) != gcvSTATUS_TRUE
+    &&  spilitIndexMod < SPILIT_INDEX_OFFSET)
     {
         offset = SPILIT_INDEX_OFFSET - spilitIndexMod;
         offset = gcmALIGN(offset, 4);
@@ -1958,8 +1981,9 @@ gcoINDEX_UploadDynamicEx(
 
         /* Compute the mod of spilit index chunck. */
         spilitIndexMod = COMPUTE_LAST_INDEX_ADDR(dynamic->physical+dynamic->lastEnd+Bytes, indexSize) % SPILIT_INDEX_CHUNCK_BYTE;
-        if( gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) != gcvSTATUS_TRUE
-            && spilitIndexMod < SPILIT_INDEX_OFFSET)
+
+        if (gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) != gcvSTATUS_TRUE
+        &&  spilitIndexMod < SPILIT_INDEX_OFFSET)
         {
             offset= SPILIT_INDEX_OFFSET - spilitIndexMod;
             offset = gcmALIGN(offset, 4);
@@ -1990,91 +2014,24 @@ gcoINDEX_UploadDynamicEx(
         _PatchIndices(dynamic->logical + dynamic->lastEnd,
                       Data,
                       IndexType,
-                      count,
-                      &iMin,
-                      &iMax);
+                      count);
     }
     else
     {
-        gctBOOL primRestart = gcoHARDWARE_IsPrimitiveRestart(gcvNULL) == gcvTRUE;
-
-        switch (IndexType)
-        {
-        case gcvINDEX_8:
-            /* Copy all indices as 8-bit data. */
-            for (bytes = Bytes; bytes >= 1; --bytes)
-            {
-                gctUINT8 index = *(gctUINT8_PTR) src++;
-                *dest++ = index;
-
-                /* Skip the primitive restart index */
-                if (primRestart && (index == 0xFF))
-                {
-                    continue;
-                }
-
-                /* Keep track of min/max index. */
-                if (index < iMin) iMin = index;
-                if (index > iMax) iMax = index;
-            }
-            break;
-
-        case gcvINDEX_16:
-            /* Copy all indices as 16-bit data. */
-            for (bytes = Bytes; bytes >= 2; bytes -= 2)
-            {
-                gctUINT16 index = *(gctUINT16_PTR) src;
-                src += 2;
-                *(gctUINT16_PTR) dest = index;
-                dest += 2;
-
-                /* Skip the primitive restart index */
-                if (primRestart && (index == 0xFFFF))
-                {
-                    continue;
-                }
-
-                /* Keep track of min/max index. */
-                if (index < iMin) iMin = index;
-                if (index > iMax) iMax = index;
-            }
-            break;
-
-        case gcvINDEX_32:
-            /* Copy all indices as 32-bit data. */
-            for (bytes = Bytes; bytes >= 4; bytes -= 4)
-            {
-                gctUINT32 index = *(gctUINT32_PTR) src;
-                src += 4;
-                *(gctUINT32_PTR) dest = index;
-                dest += 4;
-
-                /* Skip the primitive restart index */
-                if (primRestart && (index == 0xFFFFFFFF))
-                {
-                    continue;
-                }
-
-                /* Keep track of min/max index. */
-                if (index < iMin) iMin = index;
-                if (index > iMax) iMax = index;
-            }
-            break;
-        }
+        /* Full copy.*/
+        gcoOS_MemCopy(dest, src, Bytes);
     }
 
     /* Flush the cache. */
     gcmONERROR(gcoSURF_NODE_Cache(&dynamic->memory,
-                                dynamic->logical + dynamic->lastEnd,
-                                Bytes,gcvCACHE_CLEAN));
+                                  dynamic->logical + dynamic->lastEnd,
+                                  Bytes,gcvCACHE_CLEAN));
 
     /* Update the pointers. */
     dynamic->lastStart = dynamic->lastEnd + offset;
     gcmSAFECASTSIZET(aligned32, aligned);
     dynamic->lastEnd   = dynamic->lastEnd + aligned32;
     dynamic->free     -= aligned;
-    dynamic->minIndex  = iMin;
-    dynamic->maxIndex  = iMax;
 
     /* Dump the buffer. */
     gcmDUMP_BUFFER(gcvNULL,
@@ -2126,9 +2083,9 @@ gcoINDEX_UploadDynamicEx2(
     gceSTATUS status;
     gcsHAL_INTERFACE ioctl;
     gcsINDEX_DYNAMIC_PTR dynamic;
-    gctUINT32 iMin = ~0U, iMax = 0, aligned32, spilitIndexMod;
+    gctUINT32 aligned32, spilitIndexMod;
     gctUINT8_PTR src, dest;
-    gctSIZE_T aligned, bytes, size;
+    gctSIZE_T aligned, size;
     gctSIZE_T count = 0, convertedBytes = 0;
     gctUINT32 offset = 0;
     gctUINT indexSize = 0;
@@ -2189,8 +2146,9 @@ gcoINDEX_UploadDynamicEx2(
 
     /* Compute number of aligned bytes. We need to align index buffer by 16 bytes.
      * iMX6 instanced draw hangs if otherwise.
+     * For tcs index issue, align to 64 bytes.
     */
-    aligned = gcmALIGN(Bytes + offset, 16);
+    aligned = gcmALIGN(Bytes + offset, 64);
 
     if (dynamic->free < aligned)
     {
@@ -2300,78 +2258,14 @@ gcoINDEX_UploadDynamicEx2(
     if (ConvertToIndexedTriangleList)
     {
         _PatchIndices(dynamic->logical + dynamic->lastEnd,
-            Data,
-            IndexType,
-            count,
-            &iMin,
-            &iMax);
+                      Data,
+                      IndexType,
+                      count);
     }
     else
     {
-        gctBOOL primRestart = gcoHARDWARE_IsPrimitiveRestart(gcvNULL) == gcvTRUE;
-        switch (IndexType)
-        {
-        case gcvINDEX_8:
-            /* Copy all indices as 8-bit data. */
-            for (bytes = Bytes; bytes >= 1; --bytes)
-            {
-                gctUINT8 index = *(gctUINT8_PTR) src++;
-                *dest++ = index;
-
-                /* Skip the primitive restart index */
-                if (primRestart && (index == 0xFF))
-                {
-                    continue;
-                }
-
-                /* Keep track of min/max index. */
-                if (index < iMin) iMin = index;
-                if (index > iMax) iMax = index;
-            }
-            break;
-
-        case gcvINDEX_16:
-            /* Copy all indices as 16-bit data. */
-            for (bytes = Bytes; bytes >= 2; bytes -= 2)
-            {
-                gctUINT16 index = *(gctUINT16_PTR) src;
-                src += 2;
-                *(gctUINT16_PTR) dest = index;
-                dest += 2;
-
-                /* Skip the primitive restart index */
-                if (primRestart && (index == 0xFFFF))
-                {
-                    continue;
-                }
-
-                /* Keep track of min/max index. */
-                if (index < iMin) iMin = index;
-                if (index > iMax) iMax = index;
-            }
-            break;
-
-        case gcvINDEX_32:
-            /* Copy all indices as 32-bit data. */
-            for (bytes = Bytes; bytes >= 4; bytes -= 4)
-            {
-                gctUINT32 index = *(gctUINT32_PTR) src;
-                src += 4;
-                *(gctUINT32_PTR) dest = index;
-                dest += 4;
-
-                /* Skip the primitive restart index */
-                if (primRestart && (index == 0xFFFFFFFF))
-                {
-                    continue;
-                }
-
-                /* Keep track of min/max index. */
-                if (index < iMin) iMin = index;
-                if (index > iMax) iMax = index;
-            }
-            break;
-        }
+        /* Full copy.*/
+        gcoOS_MemCopy(dest, src, Bytes);
     }
 
     /* Flush the cache. */
@@ -2384,8 +2278,6 @@ gcoINDEX_UploadDynamicEx2(
     gcmSAFECASTSIZET(aligned32, aligned);
     dynamic->lastEnd   = dynamic->lastEnd + aligned32;
     dynamic->free     -= aligned;
-    dynamic->minIndex  = iMin;
-    dynamic->maxIndex  = iMax;
 
     /* Dump the buffer. */
     gcmDUMP_BUFFER(gcvNULL,
@@ -2448,82 +2340,11 @@ gcoINDEX_BindDynamic(
     endAddress = Index->dynamicHead->physical + bufSize - 1;
 
     /* Program index buffer states. */
-    if( gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) == gcvSTATUS_TRUE)
-    {
-        gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL,
-                                         (Index->dynamicHead->physical + Index->dynamicHead->lastStart),
-                                         0,
-                                         endAddress,
-                                         Type,
-                                         (Index->dynamicHead->lastEnd - Index->dynamicHead->lastStart)));
-    }
-    else
-    {
-        gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL,
-                                         0,
-                                         (Index->dynamicHead->physical + Index->dynamicHead->lastStart),
-                                         endAddress,
-                                         Type,
-                                         (Index->dynamicHead->lastEnd - Index->dynamicHead->lastStart)));
-    }
-
-    /* Success. */
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-
-/*******************************************************************************
-**
-**  gcoINDEX_GetIndexRangeDynamic
-**
-**  Determine the index range in the current dynamic index buffer.
-**
-**  INPUT:
-**
-**      gcoINDEX Index
-**          Pointer to an gcoINDEX object that needs to be destroyed.
-**
-**  OUTPUT:
-**
-**      gctUINT32 * MinimumIndex
-**          Pointer to a variable receiving the minimum index value in
-**          the index buffer.
-**
-**      gctUINT32 * MaximumIndex
-**          Pointer to a variable receiving the maximum index value in
-**          the index buffer.
-*/
-gceSTATUS
-gcoINDEX_GetDynamicIndexRange(
-    IN gcoINDEX Index,
-    OUT gctUINT32 * MinimumIndex,
-    OUT gctUINT32 * MaximumIndex
-    )
-{
-    gceSTATUS status;
-
-    gcmHEADER_ARG("Index=0x%x ", Index);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Index, gcvOBJ_INDEX);
-    gcmDEBUG_VERIFY_ARGUMENT(MinimumIndex != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(MaximumIndex!= gcvNULL);
-
-    /* This only works for dynamic index buffers. */
-    if (Index->dynamic == gcvNULL)
-    {
-        gcmONERROR(gcvSTATUS_INVALID_REQUEST);
-    }
-
-    /* Dynamic index buffers get checked during upload. */
-    *MinimumIndex = Index->dynamicHead->minIndex;
-    *MaximumIndex = Index->dynamicHead->maxIndex;
+    gcmONERROR(gcoHARDWARE_BindIndex(gcvNULL,
+                                     (Index->dynamicHead->physical + Index->dynamicHead->lastStart),
+                                     endAddress,
+                                     Type,
+                                     (Index->dynamicHead->lastEnd - Index->dynamicHead->lastStart)));
 
     /* Success. */
     gcmFOOTER_NO();
@@ -2710,16 +2531,19 @@ gceSTATUS gcoINDEX_BindDynamic(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS gcoINDEX_GetDynamicIndexRange(
-    IN gcoINDEX Index,
-    OUT gctUINT32 * MinimumIndex,
-    OUT gctUINT32 * MaximumIndex
+gceSTATUS
+gcoINDEX_GetMemoryIndexRange(
+    IN gceINDEX_TYPE IndexType,
+    IN gctCONST_POINTER Data,
+    IN gctSIZE_T indexCount,
+    OUT gctUINT32* iMin,
+    OUT gctUINT32* iMax
     )
 {
-    if (MinimumIndex != gcvNULL)
-        *MinimumIndex = 0;
-    if (MaximumIndex != gcvNULL)
-        *MaximumIndex = 0;
+    if (iMin != gcvNULL)
+        *iMin = 0;
+    if (iMax != gcvNULL)
+        *iMax = 0;
     return gcvSTATUS_OK;
 }
 

@@ -19,17 +19,17 @@
 # Include common definitions.
 
 include $(AQROOT)/makefile.linux.def
+USE_VIV_WAYLAND := 1
 
 ################################################################################
 # Define target module name.
 
 ifeq ($(gcdSTATIC_LINK),1)
-  STATIC           := 1
   TARGET_MODULE    := $(OBJ_DIR)/libEGL.a
 else
-  DYNAMIC          := 1
   TARGET_MODULE    := $(OBJ_DIR)/libEGL.so
   TARGET_SONAME    := libEGL.so
+  TARGET_LINKS     :=
 endif
 
 ################################################################################
@@ -63,10 +63,8 @@ ifeq ($(EGL_API_DRI),1)
 endif
 
 ifeq ($(EGL_API_GBM),1)
-  GBM_INCLUDE := $(shell $(PKG_CONFIG) --cflags gbm 2>/dev/null)
-
-  ifneq ($(GBM_INCLUDE),)
-    INCLUDE += $(GBM_INCLUDE)
+  ifneq ($(GBM_LIBS),)
+    INCLUDE += $(GBM_CFLAGS)
   else
     INCLUDE += -I$(AQROOT)/driver/gbm/main
     INCLUDE += -I$(AQROOT)/driver/gbm/backends/viv
@@ -74,8 +72,13 @@ ifeq ($(EGL_API_GBM),1)
 endif
 
 ifeq ($(EGL_API_WL),1)
+ifeq ($(USE_VIV_WAYLAND),1)
+  INCLUDE += -I$(AQROOT)/driver/wayland \
+             -I$(WAYLAND_DIR)/include
+else
   INCLUDE += -I$(AQROOT)/driver/wl \
              -I$(WAYLAND_DIR)/include
+endif
 endif
 
 ifeq ($(EGL_API_DFB),1)
@@ -108,6 +111,12 @@ ifneq ($(USE_ARMCC),1)
   endif
 endif
 
+ifeq ($(EGL_API_WL),1)
+  ifeq ($(USE_VIV_WAYLAND),1)
+    CFLAGS += -DUSE_VIV_WAYLAND=1
+  endif
+endif
+
 ifeq ($(EGL_API_DFB),1)
   CFLAGS += -DDIRECTFB_MAJOR_VERSION=$(DIRECTFB_MAJOR_VERSION) \
             -DDIRECTFB_MINOR_VERSION=$(DIRECTFB_MINOR_VERSION) \
@@ -116,10 +125,6 @@ endif
 
 ifeq ($(CUSTOM_PIXMAP),1)
   CFLAGS += -DCUSTOM_PIXMAP
-endif
-
-ifeq ($(gcdDUMP_FRAME_TGA),1)
-  CFLAGS += -DgcdDUMP_FRAME_TGA=1
 endif
 
 ################################################################################
@@ -154,8 +159,6 @@ ifeq ($(EGL_API_DRI),1)
 endif
 
 ifeq ($(EGL_API_GBM),1)
-  GBM_LIBS := $(shell $(PKG_CONFIG) --libs gbm 2>/dev/null)
-
   ifneq ($(GBM_LIBS),)
     LDLIBS += $(GBM_LIBS)
   else
@@ -201,10 +204,16 @@ ifeq ($(EGL_API_DRI),1)
 endif
 
 ifeq ($(EGL_API_WL),1)
-  OBJECTS += $(OBJ_DIR)/gc_egl_wayland.o
 
-  OBJECTS += $(OBJ_DIR)/gc_wayland_protocol.o \
-             $(OBJ_DIR)/wayland-viv-protocol.o
+  ifeq ($(USE_VIV_WAYLAND),1)
+    OBJECTS += $(OBJ_DIR)/gc_egl_wayland.o \
+               $(OBJ_DIR)/gc_egl_wayland_server.o \
+               $(OBJ_DIR)/wayland-viv-protocol.o
+  else
+    OBJECTS += $(OBJ_DIR)/gc_egl_wayland_legacy.o \
+               $(OBJ_DIR)/gc_wayland_protocol.o \
+               $(OBJ_DIR)/wayland-viv-protocol.o
+  endif
 endif
 
 ifeq ($(EGL_API_GBM),1)
@@ -236,23 +245,24 @@ install: all
 	@-cp -f $(AQROOT)/sdk/inc/EGL/*.h $(SDK_DIR)/include/EGL
 	@mkdir -p $(SDK_DIR)/include/KHR
 	@-cp -f $(AQROOT)/sdk/inc/KHR/*.h $(SDK_DIR)/include/KHR
+	@for lib in $(TARGET_LINKS); do \
+	    ln -sf $(notdir $(TARGET_MODULE)) $(INSTALL_DIR)/$$lib; \
+	done
 
 ################################################################################
 # Module rules.
 
-ifeq ($(STATIC),1)
+ifeq ($(gcdSTATIC_LINK),1)
 $(TARGET_MODULE): $(OBJECTS)
 	$(AR) -r -c $@ $(OBJECTS)
 ifneq ($(USE_ARMCC),1)
 	$(RANLIB) $@
 endif
-endif
 
-ifeq ($(DYNAMIC),1)
+else
 
 # module dependencies
-$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
-                             $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.a)
+$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so)
 
 $(TARGET_MODULE): $(OBJECTS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
@@ -270,7 +280,11 @@ ifeq ($(EGL_API_DRI),1)
 endif
 
 ifeq ($(EGL_API_WL),1)
-  vpath %.c ../../wl
+  ifeq ($(USE_VIV_WAYLAND),1)
+    vpath %.c ../../wayland
+  else
+    vpath %.c ../../wl
+  endif
 endif
 
 $(OBJ_DIR)/%.o: %.c

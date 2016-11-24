@@ -556,9 +556,10 @@ static gceSTATUS _GetCacheNode(
     )
 {
     gceSTATUS status;
-    gcsCACHE_NODE_PTR node;
+    gcsCACHE_NODE_PTR node = gcvNULL;
     gcoOS os;
     gctUINT32 bytes = 8 * 8 * 4;
+    gctBOOL allocated = gcvFALSE;
 
     gcmHEADER_ARG("BrushCache=0x%x", BrushCache);
 
@@ -611,13 +612,11 @@ static gceSTATUS _GetCacheNode(
 
             if (status != gcvSTATUS_OK)
             {
-                /* Roll back. */
-                gcmVERIFY_OK(gcmOS_SAFE_FREE(os, node));
-
                 /* Error. */
                 break;
             }
 
+            allocated = gcvTRUE;
             node->brushNode                  = gcvNULL;
 
             /* Lock the node. */
@@ -674,6 +673,17 @@ static gceSTATUS _GetCacheNode(
         status = gcvSTATUS_OUT_OF_MEMORY;
     }
     while (gcvFALSE);
+
+    if (status != gcvSTATUS_OK && node != gcvNULL)
+    {
+        if (allocated)
+        {
+            gcmVERIFY_OK(gcsSURF_NODE_Destroy(&node->patternNode));
+        }
+
+        /* Roll back. */
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(os, node));
+    }
 
     /* Return status. */
     gcmFOOTER_ARG("status=%d(%s) *Node=0x%x", status, gcoOS_DebugStatus2Name(status), *Node);

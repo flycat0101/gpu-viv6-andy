@@ -95,36 +95,64 @@
     }while(gcvFALSE);
 
 #define POSITION(reg) \
-    gcmONERROR(gcSHADER_AddOutput(Shader, \
-                                 "#Position", \
-                                 gcSHADER_FLOAT_X4, \
-                                 1, \
-                                 reg, \
-                                 gcSHADER_PRECISION_HIGH))
+    gcmONERROR(gcSHADER_AddOutputWithLocation(Shader, \
+                                              "#Position", \
+                                              gcSHADER_FLOAT_X4, \
+                                              gcSHADER_PRECISION_HIGH, \
+                                              gcvFALSE, \
+                                              1, \
+                                              reg, \
+                                              gcSHADER_SHADER_DEFAULT, \
+                                              gcSHADER_GetOutputDefaultLocation(Shader), \
+                                              -1, \
+                                              gcvFALSE, \
+                                              gcvFALSE, \
+                                              gcvNULL))
 
 #define COLOR(reg,precision) \
-    gcmONERROR(gcSHADER_AddOutput(Shader, \
-                                 "#Color", \
-                                 gcSHADER_FLOAT_X4, \
-                                 1, \
-                                 reg, \
-                                 precision))
+    gcmONERROR(gcSHADER_AddOutputWithLocation(Shader, \
+                                              "#Color", \
+                                              gcSHADER_FLOAT_X4, \
+                                              precision, \
+                                              gcvFALSE, \
+                                              1, \
+                                              reg, \
+                                              gcSHADER_SHADER_DEFAULT, \
+                                              gcSHADER_GetOutputDefaultLocation(Shader), \
+                                              -1, \
+                                              gcvFALSE, \
+                                              gcvFALSE, \
+                                              gcvNULL))
 
 #define ADD_OUTPUT(name,type,precision) \
-    gcmONERROR(gcSHADER_AddOutput(Shader, \
-                                 #name, \
-                                 gcSHADER_##type, \
-                                 1, \
-                                 (gctUINT16) -1, \
-                                 precision))
+    gcmONERROR(gcSHADER_AddOutputWithLocation(Shader, \
+                                              #name, \
+                                              gcSHADER_##type, \
+                                              precision, \
+                                              gcvFALSE, \
+                                              1, \
+                                              (gctUINT16) -1, \
+                                              gcSHADER_SHADER_DEFAULT, \
+                                              gcSHADER_GetOutputDefaultLocation(Shader), \
+                                              -1, \
+                                              gcvFALSE, \
+                                              gcvFALSE, \
+                                              gcvNULL))
 
 #define ADD_OUTPUT_ARRAY(name,type,length,precision) \
-    gcmONERROR(gcSHADER_AddOutput(Shader, \
-                                 #name, \
-                                 gcSHADER_##type, \
-                                 length, \
-                                 (gctUINT16) -1, \
-                                 precision))
+    gcmONERROR(gcSHADER_AddOutputWithLocation(Shader, \
+                                              #name, \
+                                              gcSHADER_##type, \
+                                              precision, \
+                                              length > 1, \
+                                              length, \
+                                              (gctUINT16) -1, \
+                                              gcSHADER_SHADER_DEFAULT, \
+                                              gcSHADER_GetOutputDefaultLocation(Shader), \
+                                              -1, \
+                                              gcvFALSE, \
+                                              gcvFALSE, \
+                                              gcvNULL))
 
 #define LABEL(lbl) \
     gcmONERROR(gcSHADER_AddLabel(Shader, lbl))
@@ -135,7 +163,8 @@
                                     reg, \
                                     gcSL_ENABLE_##enable, \
                                     gcSL_FLOAT, \
-                                    precision))
+                                    precision, \
+                                    0))
 
 #define OPCODE_COND_ENABLE(op,cond,reg,enable,precision) \
     gcmONERROR(gcSHADER_AddOpcode2(Shader, \
@@ -144,13 +173,14 @@
                                      reg, \
                                      gcSL_ENABLE_##enable, \
                                      gcSL_FLOAT, \
-                                     precision))
+                                     precision, \
+                                     0))
 
 #define OPCODE_COND(op,cond,target) \
     gcmONERROR(gcSHADER_AddOpcodeConditional(Shader, \
                                             gcSL_##op, \
                                             gcSL_##cond, \
-                                            target))
+                                            target, 0))
 
 #define UNIFORM(name,swizzle) \
     gcmONERROR(gcSHADER_AddSourceUniform(Shader, \
@@ -259,7 +289,8 @@
                                         gcSL_MOV, \
                                         temp, \
                                         enable, \
-                                        gcSL_FLOAT)); \
+                                        gcSL_FLOAT, \
+                                        0)); \
     } while (gcvFALSE)
 
 #define CALL(func,cond) \
@@ -269,7 +300,7 @@
         gcmONERROR(gcSHADER_AddOpcodeConditional(Shader, \
                                                    gcSL_CALL, \
                                                    gcSL_##cond, \
-                                                   label)); \
+                                                   label, 0)); \
     } while (gcvFALSE)
 
 #define FUNCTION_OUTPUT(func,index) \

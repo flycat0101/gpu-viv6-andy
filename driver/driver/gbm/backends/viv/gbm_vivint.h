@@ -17,9 +17,6 @@
 #include <sys/mman.h>
 #include "gbmint.h"
 
-#include "gc_hal.h"
-#include "gc_hal_user.h"
-
 #include "common_drm.h"
 
 struct gbm_viv_surface;
@@ -34,7 +31,6 @@ struct gbm_viv_device {
 struct gbm_viv_bo {
     struct gbm_bo base;
 
-    gcoSURF surf;
     uint32_t size;
     void *map;
 };

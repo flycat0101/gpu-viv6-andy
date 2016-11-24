@@ -220,7 +220,7 @@ InitializeVGProfiler(
         VGPROFILER_HAL = (gcoHAL) pointer;
     }
 #endif
-    status = gcoPROFILER_Initialize(VGPROFILER_HAL, gcvTRUE);
+    status = gcoPROFILER_Initialize(VGPROFILER_HAL, gcvNULL, gcvTRUE);
 
     switch (status)
     {

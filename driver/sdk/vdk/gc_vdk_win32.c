@@ -39,11 +39,6 @@ typedef int SURF_FORMAT;
 typedef int SURF_TYPE;
 typedef void * OS;
 #define IS_SUCCESS(func) (func == 0)
-#ifdef __cplusplus
-#define galNULL              0
-#else
-#define galNULL              ((void *) 0)
-#endif
 
 
 /*******************************************************************************
@@ -137,48 +132,36 @@ _GAL_GetTicks    GAL_GetTicks;
 
 #include <stdlib.h>
 #include <stdio.h>
+
 #if !gcdSTATIC_LINK
-#if defined(WIN32)
-#include <windows.h>
+#  include <windows.h>
 #ifdef UNDER_CE
-#define Enter_Addr(Module,FunName ) GetProcAddressA(Module,FunName)
-#else
-#define Enter_Addr(Module,FunName ) GetProcAddress(Module,FunName)
-#endif
+#    define Enter_Addr(Module,FunName ) GetProcAddressA(Module,FunName)
+#  else
+#    define Enter_Addr(Module,FunName ) GetProcAddress(Module,FunName)
+#  endif
+
 HMODULE module;
-#elif defined(LINUX) || defined(__QNXNTO__) || defined(__APPLE__)
-#include <dlfcn.h>
-#define Enter_Addr(Module,FunName ) dlsym(Module,FunName)
-void *  module;
-#endif
-#else
-#include "gc_hal_eglplatform.h"
 #endif
 
-GAL_API  * GAL = galNULL;
+GAL_API * GAL = NULL;
 
 int HAL_Constructor() {
     GAL =(GAL_API *) malloc(sizeof(GAL_API));
-    if(GAL == galNULL)
+    if (GAL == NULL)
     {
         printf("Allocate memory failed\n");
         return 1;
     }
 #if !gcdSTATIC_LINK
-#if defined(WIN32)
     module = LoadLibrary(TEXT("libGAL.dll"));
-#elif defined(LINUX)
-    module = dlopen("libGAL.so", RTLD_NOW);
-#elif defined(__APPLE__)
-    module = dlopen("libGAL.dylib", RTLD_NOW);
-#elif defined(__QNXNTO__)
-    module = dlopen("libGAL-"gcdQNX_GAL_NAME_SUFFIX".so", RTLD_NOW);
-#endif
-    if(module == galNULL)
+
+    if (module == NULL)
     {
         printf("Load LibGAL error\n");
         return 1;
     }
+
     GAL->GAL_LoadEGLLibrary=(_GAL_LoadEGLLibrary) Enter_Addr(module,"gcoOS_LoadEGLLibrary");
     GAL->GAL_FreeEGLLibrary=(_GAL_FreeEGLLibrary) Enter_Addr(module,"gcoOS_FreeEGLLibrary");
     GAL->GAL_GetDisplayByIndex=(_GAL_GetDisplayByIndex) Enter_Addr(module,"gcoOS_GetDisplayByIndex");
@@ -222,7 +205,7 @@ int HAL_Constructor() {
 
     GAL->GAL_GetTicks=(_GAL_GetTicks) Enter_Addr(module,"gcoOS_GetTicks");
 
-    if(GAL->GAL_GetTicks == galNULL)
+    if (GAL->GAL_GetTicks == NULL)
     {
         printf("Get Address Error\n");
         return 1;
@@ -276,17 +259,16 @@ int HAL_Constructor() {
 void HAL_Destructor()
 {
 #if !gcdSTATIC_LINK
-    if(module != galNULL)
+    if (module != NULL)
     {
-#if defined(WIN32)
-    FreeLibrary(module);
-#elif defined(LINUX) || defined(__QNXNTO__)
-    dlclose(module);
-#endif
+        FreeLibrary(module);
     }
 #endif
-    if(GAL != galNULL)
+
+    if (GAL != NULL)
+    {
         free(GAL);
+    }
 }
 
 /*******************************************************************************
@@ -304,7 +286,7 @@ struct _vdkPrivate
 /*******************************************************************************
 ** Private functions.
 */
-static vdkPrivate _vdk = galNULL;
+static vdkPrivate _vdk = NULL;
 int HAL_Constructor();
 void HAL_Destructor();
 extern GAL_API * GAL;
@@ -318,28 +300,29 @@ vdkInitialize(
     void
     )
 {
-    vdkPrivate  vdk = galNULL;
+    vdkPrivate  vdk = NULL;
 
-    if(HAL_Constructor())
+    if (HAL_Constructor())
         return vdk;
 
     vdk = (vdkPrivate) malloc(sizeof(struct _vdkPrivate));
+
     if (vdk == NULL)
     {
-        return galNULL;
+        return NULL;
     }
 
 #if gcdSTATIC_LINK
-    vdk->egl = galNULL;
+    vdk->egl = NULL;
 #else
-    if(GAL->GAL_LoadEGLLibrary(&vdk->egl))
-        {
-            free(vdk);
-            return galNULL;
-        }
+    if (GAL->GAL_LoadEGLLibrary(&vdk->egl))
+    {
+        free(vdk);
+        return NULL;
+    }
 #endif
 
-    vdk->display = (EGLNativeDisplayType) galNULL;
+    vdk->display = (EGLNativeDisplayType) NULL;
 
     _vdk = vdk;
     return vdk;
@@ -352,14 +335,14 @@ vdkExit(
     vdkPrivate Private
     )
 {
-    if (Private != galNULL)
+    if (Private != NULL)
     {
         if (_vdk == Private)
         {
-            _vdk = galNULL;
+            _vdk = NULL;
         }
 
-        if (Private->egl != galNULL)
+        if (Private->egl != NULL)
         {
             GAL->GAL_FreeEGLLibrary(Private->egl);
         }
@@ -379,19 +362,19 @@ vdkGetDisplayByIndex(
     int DisplayIndex
     )
 {
-    vdkDisplay  display = (EGLNativeDisplayType) galNULL;
+    vdkDisplay  display = (EGLNativeDisplayType) NULL;
 
-    if ((Private != galNULL) && (Private->display != (EGLNativeDisplayType) galNULL))
+    if ((Private != NULL) && (Private->display != (EGLNativeDisplayType) NULL))
     {
         return Private->display;
     }
 
-    if (IS_SUCCESS(GAL->GAL_GetDisplayByIndex(DisplayIndex, &display, galNULL)))
+    if (IS_SUCCESS(GAL->GAL_GetDisplayByIndex(DisplayIndex, &display, NULL)))
     {
-     if(Private != galNULL)
-     {
-        Private->display = display;
-     }
+        if (Private != NULL)
+        {
+            Private->display = display;
+        }
     }
 
     return display;
@@ -465,7 +448,7 @@ vdkGetWindowInfo(
     SURF_FORMAT  format;
     SURF_TYPE type;
 
-    if (_vdk == galNULL)
+    if (_vdk == NULL)
     {
         return 0;
     }
@@ -485,7 +468,7 @@ vdkDestroyWindow(
     vdkWindow Window
     )
 {
-    if (_vdk != galNULL)
+    if (_vdk != NULL)
     {
         GAL->GAL_DestroyWindow(_vdk->display, Window);
     }
@@ -496,7 +479,7 @@ vdkShowWindow(
     vdkWindow Window
     )
 {
-    if (_vdk == galNULL)
+    if (_vdk == NULL)
     {
         return 0;
     }
@@ -509,7 +492,7 @@ vdkHideWindow(
     vdkWindow Window
     )
 {
-    if (_vdk == galNULL)
+    if (_vdk == NULL)
     {
         return 0;
     }
@@ -523,7 +506,7 @@ vdkSetWindowTitle(
     const char * Title
     )
 {
-    if (_vdk != galNULL)
+    if (_vdk != NULL)
     {
         GAL->GAL_SetWindowTitle(_vdk->display, Window, Title);
     }
@@ -534,7 +517,7 @@ vdkCapturePointer(
     vdkWindow Window
     )
 {
-    if (_vdk != galNULL)
+    if (_vdk != NULL)
     {
         GAL->GAL_CapturePointer(_vdk->display, Window);
     }
@@ -552,12 +535,12 @@ vdkGetEvent(
 {
     halEvent halEvent;
     int result = 0;
-    if (_vdk == galNULL)
+    if (_vdk == NULL)
     {
         return result;
     }
 
-    if(IS_SUCCESS(GAL->GAL_GetEvent(_vdk->display, Window, &halEvent)))
+    if (IS_SUCCESS(GAL->GAL_GetEvent(_vdk->display, Window, &halEvent)))
     {
         result = 1;
         switch(halEvent.type)
@@ -614,9 +597,9 @@ vdkGetAddress(
     }
     address;
 
-    if ((Private != galNULL)
+    if ((Private != NULL)
         &&
-        IS_SUCCESS(GAL->GAL_GetProcAddress(galNULL,
+        IS_SUCCESS(GAL->GAL_GetProcAddress(NULL,
                                            Private->egl,
                                            Function,
                                            &address.ptr))
@@ -625,7 +608,7 @@ vdkGetAddress(
         return address.func;
     }
 
-    return galNULL;
+    return NULL;
  #endif
 }
 
@@ -692,7 +675,7 @@ vdkGetPixmapInfo(
 {
     int bpp, stride;
 
-    if (_vdk == galNULL)
+    if (_vdk == NULL)
     {
         return 0;
     }
@@ -722,7 +705,7 @@ vdkDestroyPixmap(
     vdkPixmap Pixmap
     )
 {
-    if (_vdk != galNULL)
+    if (_vdk != NULL)
     {
         GAL->GAL_DestroyPixmap(_vdk->display, Pixmap);
     }
@@ -759,7 +742,7 @@ vdkCreateClientBuffer(
         return clientBuffer;
     }
 
-    return galNULL;
+    return NULL;
 }
 
 VDKAPI int VDKLANG

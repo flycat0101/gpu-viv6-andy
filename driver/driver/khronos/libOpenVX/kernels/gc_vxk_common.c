@@ -123,14 +123,14 @@ gceSTATUS gcfVX_Kernel_ConvertFormat(
     gcmFOOTER_ARG("%d", status);
     return status;
 }
-#define   GCREG_SH_INSTRUCTION_TYPE_FLOAT32                                  0x0
-#define   GCREG_SH_INSTRUCTION_TYPE_FLOAT16                                  0x1
-#define   GCREG_SH_INSTRUCTION_TYPE_SIGNED32                                 0x2
-#define   GCREG_SH_INSTRUCTION_TYPE_SIGNED16                                 0x3
-#define   GCREG_SH_INSTRUCTION_TYPE_SIGNED8                                  0x4
-#define   GCREG_SH_INSTRUCTION_TYPE_UNSIGNED32                               0x5
-#define   GCREG_SH_INSTRUCTION_TYPE_UNSIGNED16                               0x6
-#define   GCREG_SH_INSTRUCTION_TYPE_UNSIGNED8                                0x7
+#define GCREG_SH_INSTRUCTION_TYPE_FLOAT32 0x0
+#define GCREG_SH_INSTRUCTION_TYPE_FLOAT16 0x1
+#define GCREG_SH_INSTRUCTION_TYPE_SIGNED32 0x2
+#define GCREG_SH_INSTRUCTION_TYPE_SIGNED16 0x3
+#define GCREG_SH_INSTRUCTION_TYPE_SIGNED8 0x4
+#define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED32 0x5
+#define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED16 0x6
+#define GCREG_SH_INSTRUCTION_TYPE_UNSIGNED8 0x7
 
 gctUINT32 gcfVX_ConvertFormat(vx_df_image vx_format)
 {
@@ -141,29 +141,29 @@ gctUINT32 gcfVX_ConvertFormat(vx_df_image vx_format)
     case VX_DF_IMAGE_YUV4:
     case VX_DF_IMAGE_NV21:
     case VX_DF_IMAGE_NV12:
-        format = GCREG_SH_INSTRUCTION_TYPE_UNSIGNED8;
+        format = 0x7;
         break;
     case VX_DF_IMAGE_U16:
     case VX_DF_IMAGE_UYVY:
     case VX_DF_IMAGE_YUYV:
-        format = GCREG_SH_INSTRUCTION_TYPE_UNSIGNED16;
+        format = 0x6;
         break;
     case VX_DF_IMAGE_S16:
-        format = GCREG_SH_INSTRUCTION_TYPE_SIGNED16;
+        format = 0x3;
         break;
     case VX_DF_IMAGE_U32:
     case VX_DF_IMAGE_RGB:
     case VX_DF_IMAGE_RGBX:
-        format = GCREG_SH_INSTRUCTION_TYPE_UNSIGNED32;
+        format = 0x5;
         break;
     case VX_DF_IMAGE_S32:
-        format = GCREG_SH_INSTRUCTION_TYPE_SIGNED32;
+        format = 0x2;
         break;
     case VX_DF_IMAGE_F32:
-        format = GCREG_SH_INSTRUCTION_TYPE_FLOAT32;
+        format = 0x0;
         break;
     default:
-        format = GCREG_SH_INSTRUCTION_TYPE_UNSIGNED8;
+        format = 0x7;
         break;
     }
 
@@ -254,14 +254,18 @@ gcfVX_BindInstructions(
             {
                 gcoVX_Hardware_Context hardwareContext = *C->hwContext[i];
 
+                 gctUINT32 borders = gcvVX_BORDER_MODE_UNDEFINED;
+
+                _SetBorderMode(Context->borders, &borders);
+
                 /*check if hardwareContext exist*/
-                if ((hardwareContext.borders != Context->borders) || (hardwareContext.clamp != Context->clamp) ||
+                if ((hardwareContext.borders != borders) || (hardwareContext.clamp != Context->clamp) ||
                     (hardwareContext.col != Context->col) || (hardwareContext.constant_value != Context->constant_value) ||
                     (hardwareContext.inputFormat != Context->inputFormat) || (hardwareContext.outputFormat != Context->outputFormat) ||
                     (hardwareContext.inputMultipleWidth != Context->inputMultipleWidth) || (hardwareContext.outputMultipleWidth != Context->outputMultipleWidth) ||
                     (hardwareContext.kernel != Context->kernel) || (hardwareContext.maxLevel != Context->maxLevel) ||
                     (hardwareContext.policy != Context->policy) || (hardwareContext.rounding != Context->rounding) ||
-                    (hardwareContext.row != Context->row) || (hardwareContext.scale != Context->scale) ||
+                    (hardwareContext.row != Context->row) || (hardwareContext.scale != Context->scale) || (hardwareContext.factor != Context->factor) ||
                     (hardwareContext.step != Context->step) || (hardwareContext.volume != Context->volume) || (hardwareContext.winSize != Context->winSize) ||
                     (hardwareContext.xstep != Context->xstep) || (hardwareContext.ystep != Context->ystep) ||
                     (hardwareContext.input_count != Context->input_count) || (*hardwareContext.unifor_num != *Num))
@@ -269,10 +273,16 @@ gcfVX_BindInstructions(
                     continue;
                 }
                 else if((gcoOS_MemCmp(hardwareContext.input_type, Context->input_type, Context->input_count * sizeof(Context->input_type[0])) == gcvSTATUS_MISMATCH) ||
-                        (gcoOS_MemCmp(hardwareContext.output_type, Context->output_type, Context->input_count * sizeof(Context->output_type[0])) == gcvSTATUS_MISMATCH) ||
-                        (gcoOS_MemCmp(hardwareContext.uniform, Uniform, (*Num) *sizeof(gcoVX_Kernel_Context_Uniform))))
+                        (gcoOS_MemCmp(hardwareContext.output_type, Context->output_type, Context->input_count * sizeof(Context->output_type[0])) == gcvSTATUS_MISMATCH))
                 {
                     continue;
+                }
+                else if (*Num != 0)
+                {
+                    if (gcoOS_MemCmp(hardwareContext.uniform, Uniform, (*Num) *sizeof(gcoVX_Kernel_Context_Uniform)) == gcvSTATUS_MISMATCH)
+                    {
+                        continue;
+                    }
                 }
 
                 hwContext = C->hwContext[i];
@@ -283,10 +293,25 @@ gcfVX_BindInstructions(
 
         if (hwContext == gcvNULL)
         {
+            if (i == GC_VX_MAX_HARDWARE_CONTEXT)
+                i =0;
+            if (C->hwContext[i] != gcvNULL)
+            {
+                vxFree(C->hwContext[i]);
+            }
             /* Allocal a local hwContext for execution. */
             C->hwContext[i] = (gcoVX_Hardware_Context *) vxAllocate(sizeof(gcoVX_Hardware_Context));
             if (C->hwContext[i] == gcvNULL) return VX_ERROR_NO_MEMORY;
             hwContext = C->hwContext[i];
+
+#if GC_VX_ASM
+            if(Context->instructions.source != gcvNULL)
+            {
+                gcoOS_MemFill(&Context->instructions.binarys, 0, sizeof(Context->instructions.binarys));
+                Context->instructions.count = 0;
+            }
+            else
+#endif
             gcoOS_MemFill(&Context->instructions, 0, sizeof(gcoVX_Instructions));
         }
     }
@@ -306,6 +331,7 @@ gcfVX_BindInstructions(
     hwContext->policy          = Context->policy;
     hwContext->rounding        = Context->rounding;
     hwContext->scale           = Context->scale;
+    hwContext->factor          = Context->factor;
     hwContext->volume          = Context->volume;
 
     hwContext->constant_value  = Context->constant_value;
@@ -332,12 +358,15 @@ gcfVX_BindInstructions(
 
     hwContext->inputFormat     = Context->inputFormat;
     hwContext->outputFormat    = Context->outputFormat;
+    hwContext->inputMultipleWidth  = Context->inputMultipleWidth;
+    hwContext->outputMultipleWidth = Context->outputMultipleWidth;
 
     hwContext->isUseInitialEstimate = Context->isUseInitialEstimate;
     hwContext->maxLevel = Context->maxLevel;
     hwContext->winSize = Context->winSize;
 
     hwContext->evisNoInst = Context->evisNoInst;
+
 
     gcmONERROR(gcoVX_KernelConstruct(hwContext));
 #if gcdVX_OPTIMIZER
@@ -412,8 +441,9 @@ gcfVX_GetImageInfo(
     vxQueryImage(Image, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
 
     /* Initialize information structure.*/
-    Info->isFloat   = gcvFALSE;
     Info->format    = gcfVX_ConvertFormat(format);
+    Info->isFloat   = (Info->format == 0x0 ||
+                       Info->format == 0x1) ? gcvTRUE : gcvFALSE;
 
     gcmONERROR(gcfVX_Kernel_ConvertFormat(format, Info));
 
@@ -433,11 +463,23 @@ gcfVX_GetImageInfo(
         Info->stride[plane] = gcmALIGN(w * b, (b == 3) ? 4 : b);
         Info->bytes = gcmALIGN(Info->stride[plane] * h, 64);
 
-        node = gcvNULL;
-        vxQuerySurfaceNode((vx_reference)Image, plane, (void**)&node);
+        if (Image->importType == VX_IMPORT_TYPE_HOST)
+        {
+            gcoOS_CacheInvalidate(gcvNULL, 0, Image->memory.logicals[plane], Image->memory.wrappedSize[plane]);
+            Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
+        }
+        else if (Image->importType == VX_IMPORT_TYPE_DMABUF)
+        {
+            Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
+        }
+        else
+        {
+            node = gcvNULL;
+            vxQuerySurfaceNode((vx_reference)Image, plane, (void**)&node);
 
-        Info->physicals[plane] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
-        Info->logicals[plane] = (gctUINT32)node->logical;
+            Info->physicals[plane] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
+            Info->logicals[plane] = (gctUINT32)(gctUINTPTR_T)node->logical;
+        }
     }
 
     if (Multiply)
@@ -511,7 +553,7 @@ gceSTATUS gcfVX_GetInfo(
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
             info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
-            info->logicals[0] = (gctUINT32)node->logical;
+            info->logicals[0] = (gctUINT32)(gctUINTPTR_T)node->logical;
 
             gcmONERROR(gcoVX_BindImage(object->index, info));
 
@@ -523,9 +565,9 @@ gceSTATUS gcfVX_GetInfo(
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
             info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
-            info->logicals[0] = (gctUINT32)node->logical;
+            info->logicals[0] = (gctUINT32)(gctUINTPTR_T)node->logical;
 
-#if ! gcdVX_OPTIMIZER
+#if !gcdVX_OPTIMIZER
             gcmONERROR(gcoVX_BindUniform(GC_VX_UNIFORM_PIXEL, object->index, &info->physicals[0], 1));
 #endif
 
@@ -541,7 +583,7 @@ gceSTATUS gcfVX_GetInfo(
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
             info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
-            info->logicals[0] = (gctUINT32)node->logical;
+            info->logicals[0] = (gctUINT32)(gctUINTPTR_T)node->logical;
 
             gcmONERROR(gcoVX_BindImage(object->index, info));
 
@@ -558,7 +600,7 @@ gceSTATUS gcfVX_GetInfo(
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
             info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
-            info->logicals[0] = (gctUINT32)node->logical;
+            info->logicals[0] = (gctUINT32)(gctUINTPTR_T)node->logical;
 
             gcmONERROR(gcoVX_BindImage(object->index, info));
 
@@ -580,7 +622,7 @@ gceSTATUS gcfVX_GetInfo(
                 vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
                 info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
-                info->logicals[0] = (gctUINT32)node->logical;
+                info->logicals[0] = (gctUINT32)(gctUINTPTR_T)node->logical;
 
                 gcmONERROR(gcoVX_BindImage(object->index, info));
             }
@@ -675,14 +717,17 @@ gceSTATUS gcfVX_Commit(
     return status;
 }
 
-vx_status
-gcfVX_Kernel(
+gceSTATUS
+gcfVX_RunKernel(
     IN gcoVX_Kernel_Context *Context
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
 
+    gcoHARDWARE savedHardware = gcvNULL;
     gcmHEADER_ARG("Context=%d", Context);
+
+    gcmONERROR(gcoVX_SaveContext(&savedHardware));
 
     gcmONERROR(gcoVX_Initialize(NULL));
 
@@ -707,7 +752,7 @@ gcfVX_Kernel(
 
 #if gcdDUMP
     /* Need dump output of every node while gcdDUMP is set                              */
-    /* While measuring perf for each kernel inside driver,                              */
+    /* While measuring perf for each kernel inside driver, */
     /* please enable this part so that the measurement approach can keep consistent.    */
     /* This is a temporary way for now.                                                 */
 
@@ -719,9 +764,65 @@ gcfVX_Kernel(
 #endif
 
 OnError:
+    gcmVERIFY_OK(gcoVX_RestoreContext(savedHardware));
     gcmFOOTER_ARG("%d", status);
 
     return status;
+}
+
+
+vx_status
+gcfVX_Kernel(
+    IN gcoVX_Kernel_Context *Context
+    )
+{
+    gceSTATUS status;
+    gctINT32  i;
+
+    gcmHEADER_ARG("Context=%d", Context);
+
+    Context->params.deviceCount = Context->node->base.context->deviceCount;
+    Context->params.devices     = Context->node->base.context->devices;
+
+    if (Context->params.deviceCount > 1)
+    {
+        Context->params.curDeviceID = 0;
+
+        gcmONERROR(gcfVX_RunKernel(Context));
+
+        if (Context->params.usedDeviceCount > 1)
+        {
+            for (i = 1; i < (gctINT32)Context->params.usedDeviceCount; i++)
+            {
+                Context->params.curDeviceID = i;
+
+                gcmONERROR(gcoVX_SetCurrentDevice(Context->params.devices[i], i));
+
+                gcmONERROR(gcfVX_RunKernel(Context));
+
+            }
+
+            for (i = (gctINT32)(Context->params.usedDeviceCount - 1); i >= 0 ; i--)
+            {
+                Context->params.curDeviceID = i;
+                gcmONERROR(gcoVX_SetCurrentDevice(Context->params.devices[i], i));
+                gcmONERROR(gcoVX_MultiDeviceSync(gcvNULL));
+            }
+
+        }
+    }
+    else
+    {
+        gcmONERROR(gcfVX_RunKernel(Context));
+    }
+
+    gcmFOOTER();
+    return VX_SUCCESS;
+
+OnError:
+    gcmFOOTER();
+
+    return VX_FAILURE;
 }
 
 vx_status
@@ -730,13 +831,17 @@ gcfVX_Flush(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    gcoHARDWARE savedHardware;
 
     gcmHEADER_ARG("Stall=%d", Stall);
 
+    gcmONERROR(gcoVX_SaveContext(&savedHardware));
     /* stall */
     gcmONERROR(gcoVX_Commit(gcvTRUE, Stall, NULL, NULL));
 
 OnError:
+    gcmVERIFY_OK(gcoVX_RestoreContext(savedHardware));
     gcmFOOTER_ARG("%d", status);
     return status;
 }
+

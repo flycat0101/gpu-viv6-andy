@@ -168,8 +168,8 @@ gctBOOL vscSV_Test(VSC_STATE_VECTOR* pSV, gctINT ordinal, gctUINT state)
 
     for (bvIdx = 0; bvIdx < pSV->bvCount; bvIdx ++)
     {
-        bTestRes &= (vscBV_TestBit(&pSV->pBVs[bvIdx], ordinal) ==
-                     (VSC_UTILS_TST_BIT(state, bvIdx) != 0));
+        bTestRes &= ((vscBV_TestBit(&pSV->pBVs[bvIdx], ordinal) ==
+                      (VSC_UTILS_TST_BIT(state, bvIdx) != 0)) ? gcvTRUE : gcvFALSE);
     }
 
     return bTestRes;
@@ -265,8 +265,8 @@ gctBOOL vscSV_TestInRange(VSC_STATE_VECTOR* pSV, gctINT startOrdinal, gctINT szR
 
     for (bvIdx = 0; bvIdx < pSV->bvCount; bvIdx ++)
     {
-        bTestRes &= (vscBV_TestInRange(&pSV->pBVs[bvIdx], startOrdinal, szRange) ==
-                     (VSC_UTILS_TST_BIT(state, bvIdx) != 0));
+        bTestRes &= ((vscBV_TestInRange(&pSV->pBVs[bvIdx], startOrdinal, szRange) ==
+                      (VSC_UTILS_TST_BIT(state, bvIdx) != 0)) ? gcvTRUE : gcvFALSE);
     }
 
     return bTestRes;
@@ -288,6 +288,24 @@ gctBOOL vscSV_TestAndSetInRange(VSC_STATE_VECTOR* pSV, gctINT startOrdinal, gctI
     }
 
     return bTestRes;
+}
+
+gctINT vscSV_FindStateForward(VSC_STATE_VECTOR* pSV, gctINT startOrdinal, gctUINT state)
+{
+    gctINT  stateIdx;
+
+    gcmASSERT(SV_IS_VALID(pSV));
+    gcmASSERT(SV_IS_LEGAL_STATE(pSV, state));
+
+    for (stateIdx = startOrdinal; stateIdx < pSV->svSize; stateIdx ++)
+    {
+        if (vscSV_Get(pSV, stateIdx) == state)
+        {
+            return stateIdx;
+        }
+    }
+
+    return INVALID_STATE_LOC;
 }
 
 gctBOOL vscSV_Any(VSC_STATE_VECTOR* pSV, gctUINT state)

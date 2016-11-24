@@ -49,8 +49,8 @@ int test_gl_sharing(cl_device_id device, cl_context context, cl_command_queue qu
         /* Create GL Buffers and etc. */
         /* Not necessary since the device has no support. */
         printf("!!extension cl_khr_gl_sharing is SUPPORTED!!\n");
-        printf("!!TEST cl_khr_gl_sharing FAILED!!\n");
-        fail++;
+        printf("!!TEST cl_khr_gl_sharing PASSED!!\n");
+        passed++;
     }
     else
     {

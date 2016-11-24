@@ -16,6 +16,9 @@
 #include "gc_cl_preprocessor.h"
 #include "gc_cl_parser.h"
 #include "gc_cl_emit_code.h"
+#include "debug/gc_vsc_debug.h"
+
+#define VSC_DI_DEBUG     0
 
 #define _cldFILENAME_MAX 1024
 
@@ -72,6 +75,7 @@ struct _cloCOMPILER
         clsNAME_SPACE *  globalSpace;
         clsNAME_SPACE *  currentSpace;
         clsNAME          *unnamedVariables[cldNumBuiltinVariables];
+        cloIR_VARIABLE   paramChainVariables[cldMaxParamChains];
         cloIR_SET        rootSet;
         gctUINT          localTempRegCount;
         gctUINT          tempRegCount;
@@ -97,6 +101,8 @@ struct _cloCOMPILER
         gctBOOL          hasImageQuery;
         gctUINT          imageArrayMaxLevel;
         gctBOOL          basicTypePacked;
+        VSC_DIContext *  debugInfo;
+        gctBOOL          mainFile;
     } context;
     cloPREPROCESSOR      preprocessor;
     cloCODE_EMITTER      codeEmitter;
@@ -225,7 +231,7 @@ cloCOMPILER_Construct(
         compiler->context.hasLocalMemoryKernelArg = gcvFALSE;
         compiler->context.hasInt64 = gcvFALSE;
         compiler->context.hasImageQuery = gcvFALSE;
-        compiler->context.basicTypePacked = gcvFALSE;
+        compiler->context.basicTypePacked = gcmOPT_oclPackedBasicType();
         compiler->context.imageArrayMaxLevel = cldVxImageArrayMaxLevelDefault;
         compiler->context.constantMemorySize = 0;
         compiler->context.privateMemorySize = 0;
@@ -237,6 +243,15 @@ cloCOMPILER_Construct(
         compiler->context.allowExternSymbols = gcvFALSE;
 
         gcoHAL_GetPatchID(gcvNULL, &patchId);
+
+#if gcdCOMPILER_DEBUGOUTPUT
+        if (gcmIS_ERROR(vscDIConstructContext(gcvNULL,gcvNULL, &compiler->context.debugInfo)))
+        {
+            vscDIDestroyContext(compiler->context.debugInfo);
+            compiler->context.debugInfo = gcvNULL;
+        }
+#endif
+
         if (patchId == gcvPATCH_OCLCTS)
         {
             compiler->context.fpConfig = 0;
@@ -274,6 +289,10 @@ cloCOMPILER_Construct(
             break;
         }
 
+        compiler->context.unnamedSpace->die = compiler->context.debugInfo ?
+                                              compiler->context.debugInfo->cu :
+                                              VSC_DI_INVALIDE_DIE;
+
         /* Create built-in name space */
         status = clsNAME_SPACE_Construct(compiler,
                          gcvNULL,
@@ -282,6 +301,10 @@ cloCOMPILER_Construct(
             gcmASSERT(compiler->context.builtinSpace == gcvNULL);
             break;
         }
+
+        compiler->context.builtinSpace->die = compiler->context.debugInfo ?
+                                              compiler->context.debugInfo->cu :
+                                              VSC_DI_INVALIDE_DIE;
 
         compiler->context.currentSpace = compiler->context.builtinSpace;
 
@@ -293,6 +316,10 @@ cloCOMPILER_Construct(
             gcmASSERT(compiler->context.globalSpace == gcvNULL);
             break;
         }
+
+        compiler->context.globalSpace->die = compiler->context.debugInfo ?
+                                             compiler->context.debugInfo->cu :
+                                             VSC_DI_INVALIDE_DIE;
 
         /* Create IR root */
         status = cloIR_SET_Construct(compiler,
@@ -311,6 +338,7 @@ cloCOMPILER_Construct(
         status = cloPREPROCESSOR_Construct(compiler, &compiler->preprocessor);
         if (gcmIS_ERROR(status)) break;
 #endif
+
         /* Create the code emitter */
         status = cloCODE_EMITTER_Construct(compiler, &compiler->codeEmitter);
         if (gcmIS_ERROR(status)) break;
@@ -398,6 +426,10 @@ cloCOMPILER_Destroy(
     /* Destroy built-in name space */
     if (Compiler->context.builtinSpace != gcvNULL) {
         gcmVERIFY_OK(clsNAME_SPACE_Destroy(Compiler, Compiler->context.builtinSpace));
+    }
+
+    if (Compiler->context.debugInfo != gcvNULL) {
+        vscDIDestroyContext(Compiler->context.debugInfo);
     }
 
     /* Destroy data types */
@@ -618,6 +650,9 @@ cloCOMPILER_VOutputLog(
     gcmVERIFY_OK(gcoOS_PrintStrVSafe(buffer, gcmSIZEOF(buffer), &offset, Message, Arguments));
 
     buffer[MAX_SINGLE_LOG_LENGTH] = '\0';
+#if gcdCOMPILER_DEBUGOUTPUT
+    gcmPRINT("%s", buffer);
+#endif
     return cloCOMPILER_AddLog(Compiler, buffer);
 }
 
@@ -1006,6 +1041,8 @@ cloCOMPILER_Compile(
     do {
         gcmONERROR(cloCOMPILER_Lock(Compiler));
 
+        cloCOMPILER_SetCollectDIE(Compiler, gcvTRUE);
+
         /* Load the built-ins */
         status = cloCOMPILER_LoadBuiltins(Compiler);
         if(gcmIS_ERROR(status)) {
@@ -1072,9 +1109,10 @@ cloCOMPILER_Compile(
             break;
         }
 
+        cloCOMPILER_SetCollectDIE(Compiler, gcvFALSE);
+
         /* Construct the binary */
-        gcmONERROR(gcSHADER_Construct(gcvNULL,
-                                      Compiler->shaderType,
+        gcmONERROR(gcSHADER_Construct(Compiler->shaderType,
                                       &Compiler->binary));
 
         cloCOMPILER_GetVersion(Compiler,
@@ -1153,6 +1191,10 @@ cloCOMPILER_Compile(
                 Compiler->binary = shader;
             }
         }
+        cloCOMPILER_DumpDIETree(Compiler);
+
+        gcSHADER_SetDebugInfo(Compiler->binary, Compiler->context.debugInfo);
+        Compiler->context.debugInfo = gcvNULL;
 
         /* Return */
         *Binary    = Compiler->binary;
@@ -1757,6 +1799,20 @@ IN ...
 }
 
 gceSTATUS
+cloCOMPILER_DumpDIE(
+    IN cloCOMPILER Compiler,
+    IN cleDUMP_OPTION DumpOption,
+    IN gctUINT16 id
+    )
+{
+#if VSC_DI_DEBUG
+    vscDIDumpDIE(Compiler->context.debugInfo, id, 0);
+#endif
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
 cloCOMPILER_Dump(
 IN cloCOMPILER Compiler,
 IN cleDUMP_OPTION DumpOption,
@@ -2241,6 +2297,7 @@ OUT clsDATA_TYPE ** DataType
             if(typeInfo != gcvNULL) {
                 dataType->elementType = typeInfo->dataType.elementType;
                 dataType->matrixSize = typeInfo->dataType.matrixSize;
+                dataType->virPrimitiveType = typeInfo->virPrimitiveType;
                 gcmONERROR(cloCOMPILER_DetachFromMemoryPool(Compiler,
                                                             dataType));
                 typeInfo->typePtr[AccessQualifier][AddrSpaceQualifier] = dataType;
@@ -2257,10 +2314,12 @@ OUT clsDATA_TYPE ** DataType
 
                 case T_ENUM:
                       dataType->elementType = clvTYPE_INT;
+                      dataType->virPrimitiveType = VIR_TYPE_INT32;
                       break;
 
                 case T_FLOATNXM:
                       dataType->elementType = clvTYPE_FLOAT;
+                      dataType->virPrimitiveType = VIR_TYPE_FLOAT32;
                       break;
 
                 case T_TYPE_NAME:
@@ -2603,6 +2662,7 @@ OUT clsDATA_TYPE ** DataType
             if(typeInfo != gcvNULL) {
                 dataType->elementType = typeInfo->dataType.elementType;
                 dataType->matrixSize = typeInfo->dataType.matrixSize;
+                dataType->virPrimitiveType = typeInfo->virPrimitiveType;
                 gcmONERROR(cloCOMPILER_DetachFromMemoryPool(Compiler,
                                                             dataType));
                 typeInfo->typePtr[AccessQualifier][AddrSpaceQualifier] = dataType;
@@ -2611,6 +2671,7 @@ OUT clsDATA_TYPE ** DataType
                 dataType->elementType = Source->elementType;
                 dataType->u.generic  = Source->u.generic;
                 dataType->matrixSize = Source->matrixSize;
+                dataType->virPrimitiveType = Source->virPrimitiveType;
                 slsDLINK_LIST_InsertLast(&Compiler->context.dataTypes, &dataType->node);
             }
         }
@@ -2815,6 +2876,10 @@ IN gctSTRING Text
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
     length = gcoOS_StrLen(Text, gcvNULL);
+    if(length > 3 && Text[length - 2] == 'h' && Text[length - 3] =='.')
+        Compiler->context.mainFile = gcvFALSE;
+    else
+        Compiler->context.mainFile = gcvTRUE;
     if(Compiler->context.fileNameBufferSize < length) {
        if(Compiler->context.currentFileName &&
           Compiler->context.currentFileName != Compiler->fileNameBuffer) {
@@ -3577,7 +3642,6 @@ cloCOMPILER Compiler
 {
    return Compiler->context.allowExternSymbols ||
           cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX);
-;
 }
 
 gceSTATUS
@@ -3600,6 +3664,62 @@ IN gctINT VariableNum
 {
    gcmASSERT(VariableNum < cldNumBuiltinVariables);
    return Compiler->context.unnamedVariables[VariableNum];
+}
+
+cloIR_VARIABLE
+cloCOMPILER_GetParamChainVariable(
+IN cloCOMPILER Compiler,
+IN gctINT LineNo,
+IN gctINT StringNo,
+IN gctINT VariableNum
+)
+{
+   gcmASSERT(VariableNum < cldMaxParamChains);
+   if(Compiler->context.paramChainVariables[VariableNum] == gcvNULL) {
+       gceSTATUS status;
+       clsNAME *unnamedVariable;
+       clsNAME_SPACE *nameSpace;
+       cltPOOL_STRING symbolInPool;
+       gctUINT offset = 0;
+       gctCHAR nameBuf[256];
+       clsDECL decl[1];
+
+       status = cloCOMPILER_CreateDecl(Compiler,
+                                       T_INT,
+                                       gcvNULL,
+                                       clvQUALIFIER_NONE,
+                                       clvQUALIFIER_NONE,
+                                       decl);
+       if (gcmIS_ERROR(status)) return gcvNULL;
+
+       status = cloCOMPILER_PushUnnamedSpace(Compiler, &nameSpace);
+       if (gcmIS_ERROR(status)) return gcvNULL;
+
+       gcoOS_PrintStrSafe(nameBuf, 256, &offset, "#__%VARIABLE_%d", VariableNum);
+       cloCOMPILER_AllocatePoolString(Compiler,
+                                      nameBuf,
+                                      &symbolInPool);
+
+       gcmONERROR(cloCOMPILER_CreateName(Compiler,
+                                         LineNo,
+                                         StringNo,
+                                         clvVARIABLE_NAME,
+                                         decl,
+                                         symbolInPool,
+                                         gcvNULL,
+                                         clvEXTENSION_NONE,
+                                         &unnamedVariable));
+
+       gcmONERROR(cloIR_VARIABLE_Construct(Compiler,
+                                           LineNo,
+                                           StringNo,
+                                           unnamedVariable,
+                                           &Compiler->context.paramChainVariables[VariableNum]));
+   OnError:
+       cloCOMPILER_PopCurrentNameSpace(Compiler, &nameSpace);
+   }
+
+   return Compiler->context.paramChainVariables[VariableNum];
 }
 
 clsNAME_SPACE *
@@ -3633,6 +3753,326 @@ IN cloCOMPILER Compiler
 )
 {
    return Compiler->context.unnamedSpace;
+}
+
+gctBOOL
+cloCOMPILER_GenDebugInfo(
+IN cloCOMPILER Compiler
+)
+{
+    return (Compiler->context.debugInfo != gcvNULL);
+}
+
+gctUINT16
+cloCOMPILER_AddDIE(
+IN cloCOMPILER Compiler,
+IN VSC_DIE_TAG Tag,
+IN gctUINT16 Parent,
+IN gctCONST_STRING Name,
+IN gctUINT FileNo,
+IN gctUINT LineNo,
+IN gctUINT ColNo
+)
+{
+    gctUINT16 die;
+
+    if (Compiler->context.debugInfo && !Compiler->context.debugInfo->collect)
+        return VSC_DI_INVALIDE_DIE;
+
+    /* we need generate type for header file */
+    if (!Compiler->context.mainFile && (Tag == !VSC_DI_TAG_TYPE))
+        return VSC_DI_INVALIDE_DIE;
+
+    if (!Compiler->context.mainFile && (Parent == VSC_DI_INVALIDE_DIE))
+        return VSC_DI_INVALIDE_DIE;
+
+    FileNo = Compiler->context.mainFile ? 0 : 1;
+    die = vscDIAddDIE(Compiler->context.debugInfo, Tag, Parent, Name, FileNo, LineNo, ColNo);
+
+#if VSC_DI_DEBUG
+    vscDIDumpDIE(Compiler->context.debugInfo,die, 0);
+#endif
+
+    return die;
+}
+
+void
+cloCOMPILER_DumpDIETree(
+IN cloCOMPILER Compiler
+)
+{
+#if VSC_DI_DEBUG
+    if (Compiler->context.debugInfo)
+        vscDIDumpDIETree(Compiler->context.debugInfo, Compiler->context.debugInfo->cu);
+#endif
+}
+
+void
+cloCOMPILER_SetDIESourceLoc(
+IN cloCOMPILER Compiler,
+IN gctUINT16 Id,
+IN gctUINT FileNo,
+IN gctUINT LineNo,
+IN gctUINT ColNo
+)
+{
+    VSC_DIE * die;
+
+    if (Compiler->context.debugInfo == gcvNULL) return;
+
+    die = vscDIGetDIE(Compiler->context.debugInfo, Id);
+
+    if (die != gcvNULL)
+    {
+        if (!Compiler->context.mainFile)
+            FileNo = 1;
+
+        die->fileNo = (gctUINT8)FileNo;
+        die->lineNo = (gctUINT16)LineNo;
+        die->colNo = (gctUINT8)ColNo;
+    }
+
+    return;
+}
+
+void
+cloCOMPILER_SetDIELogicalReg(
+IN cloCOMPILER Compiler,
+IN gctUINT16 Id,
+IN gctUINT32 regIndex,
+IN gctUINT num
+)
+{
+    VSC_DIE * die;
+
+    if (Compiler->context.debugInfo == gcvNULL)  return;
+
+    die = vscDIGetDIE(Compiler->context.debugInfo, Id);
+
+    if (die &&
+        ((die->tag == VSC_DI_TAG_VARIABE) ||
+        (die->tag == VSC_DI_TAG_PARAMETER))
+        )
+    {
+        die->u.variable.loc.reg = gcvTRUE;
+        die->u.variable.loc.u.reg.start = (gctUINT16)regIndex;
+        die->u.variable.loc.u.reg.end = (gctUINT16)(regIndex + num -1);
+    }
+}
+
+gctUINT16
+cloCOMPILER_GetDIEType(
+IN cloCOMPILER Compiler,
+IN clsDATA_TYPE *DataType
+)
+{
+    return vscDIGetDIEType(Compiler->context.debugInfo);
+}
+
+gctUINT16
+_GetStructUnionType(
+IN cloCOMPILER Compiler,
+IN clsNAME * Variable
+)
+{
+    struct _clsDECL * decl = &Variable->decl;
+    clsNAME_SPACE * nameSpace;
+
+    nameSpace = (clsNAME_SPACE *)(decl->dataType->u.generic);
+    return nameSpace->die;
+}
+
+gctUINT16
+cloCOMPILER_AddDIEWithName(
+IN cloCOMPILER Compiler,
+IN clsNAME * Variable
+)
+{
+    gctUINT16 parent;
+    gctUINT16  die = VSC_DI_INVALIDE_DIE;
+    struct _clsDECL * decl;
+    VSC_DIE_TAG tag = VSC_DI_TAG_INVALID;
+    gctBOOL gen = gcvTRUE;
+    struct _VSC_DI_TYPE type = {0};
+    gctINT i;
+
+    if ((Compiler->context.debugInfo == gcvNULL) ||
+         !Compiler->context.debugInfo->collect)
+    {
+        return die;
+    }
+
+    if (Variable != gcvNULL)
+    {
+        if (Compiler->context.loadingBuiltins &&
+            (Variable->type == clvFUNC_NAME ||
+             Variable->type == clvPARAMETER_NAME)
+            )
+        {
+            gen = gcvFALSE;
+        }
+
+        if (!Compiler->context.mainFile &&
+            (Variable->type == clvFUNC_NAME ||
+             Variable->type == clvPARAMETER_NAME)
+           )
+        {
+            gen = gcvFALSE;
+        }
+
+        if (!Compiler->context.mainFile &&
+            Variable->mySpace->die == VSC_DI_INVALIDE_DIE)
+        {
+            gen = gcvFALSE;
+        }
+    }
+    else
+    {
+        gen = gcvFALSE;
+    }
+
+    if (gen)
+    {
+        parent = Variable->mySpace->die;
+        type.primitiveType = gcvTRUE;
+        type.type = VIR_TYPE_UNKNOWN;
+
+        if (parent != VSC_DI_INVALIDE_DIE)
+        {
+            switch (Variable->type)
+            {
+            case clvVARIABLE_NAME:
+            case clvPARAMETER_NAME:
+                decl = &(Variable->decl);
+
+                /* struct and enum will not fall into here, so, we don't need set tag = TYPE for these two */
+                if (decl->dataType->accessQualifier == clvQUALIFIER_CONST)
+                {
+                    tag = VSC_DI_TAG_CONSTANT;
+                }
+                else if(cloCOMPILER_GetParserState(Compiler) == clvPARSER_IN_TYPEDEF)
+                {
+                    tag = VSC_DI_TAG_TYPE;
+                }
+                else if (Variable->type == clvPARAMETER_NAME)
+                {
+                    tag = VSC_DI_TAG_PARAMETER;
+                }
+                else
+                {
+                    tag = VSC_DI_TAG_VARIABE;
+                }
+
+                if (decl->dataType->type == T_STRUCT ||
+                    decl->dataType->type == T_UNION)
+                {
+                    type.primitiveType = gcvFALSE;
+                    type.type = (gctINT)_GetStructUnionType(Compiler,Variable);
+                }
+                else
+                {
+                    /* As for primitive type, I don't add DIE for every one, so,
+                    for array, that don't have die, we record full type info.
+                    Struct/Union or some other compound type, they must have die type!!!!*/
+                    type.primitiveType = gcvTRUE;
+                    type.type = Variable->decl.dataType->virPrimitiveType;
+                    type.array.numDim = Variable->decl.array.numDim;
+
+                    for (i = 0 ; i < type.array.numDim; i++)
+                    {
+                        type.array.length[i] = Variable->decl.array.length[i];
+                    }
+                }
+                break;
+
+            case clvFUNC_NAME:
+            case clvKERNEL_FUNC_NAME:
+                tag = VSC_DI_TAG_SUBPROGRAM;
+                type.primitiveType = gcvTRUE;
+                type.type = Variable->decl.dataType->virPrimitiveType;
+                break;
+
+            case clvENUM_NAME:
+                tag = VSC_DI_TAG_INVALID;
+                break;
+
+            case clvENUM_TAG_NAME:
+            case clvSTRUCT_NAME:
+            case clvUNION_NAME:
+                tag = VSC_DI_TAG_INVALID;
+                break;
+
+            case clvFIELD_NAME:
+                tag = VSC_DI_TAG_TYPE;
+                break;
+
+            case clvTYPE_NAME:
+            default:
+                gcmASSERT(0);
+            }
+        }
+        else
+        {
+            gcmASSERT(0);
+        }
+
+        if (tag != VSC_DI_TAG_INVALID &&
+            tag != VSC_DI_TAG_CONSTANT)
+        {
+            VSC_DIE * ptr;
+
+            die = vscDIAddDIE(Compiler->context.debugInfo,
+                              tag,
+                              parent,
+                              Variable->symbol,
+                              (Compiler->context.mainFile ? 0 : 1),
+                              /*Variable->fileNo,*/
+                              Variable->lineNo,
+                              Variable->stringNo
+                              );
+
+            ptr = vscDIGetDIE(Compiler->context.debugInfo, die);
+
+            if (tag == VSC_DI_TAG_TYPE)
+            {
+                ptr->u.type = type;
+            }
+            else if (tag == VSC_DI_TAG_SUBPROGRAM)
+            {
+                ptr->u.func.retType = type;
+            }
+            else if (tag == VSC_DI_TAG_VARIABE ||
+                     tag == VSC_DI_TAG_PARAMETER)
+            {
+                ptr->u.variable.type = type;
+            }
+            else if (tag == VSC_DI_TAG_CONSTANT)
+            {
+            }
+            else
+            {
+                gcmASSERT(0);
+            }
+        }
+    }
+
+#if VSC_DI_DEBUG
+        vscDIDumpDIE(Compiler->context.debugInfo,die, 0);
+#endif
+
+    return die;
+}
+
+void
+cloCOMPILER_SetCollectDIE(
+IN cloCOMPILER Compiler,
+gctBOOL collect
+)
+{
+    if (Compiler->context.debugInfo)
+    {
+        Compiler->context.debugInfo->collect = collect;
+    }
 }
 
 gctBOOL

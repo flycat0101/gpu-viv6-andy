@@ -13,11 +13,6 @@
 
 #include "gc_egl_precomp.h"
 
-#if gcdGC355_PROFILER
-extern gctUINT64 AppstartTimeusec;
-extern gctFILE ApiTimeFile;
-#endif
-
 #if defined(ANDROID)
 #if ANDROID_SDK_VERSION >= 16
 #      include <ui/ANativeObjectBase.h>
@@ -1107,24 +1102,24 @@ _eglSwapBuffersRegion(
     }
 
 #if VIVANTE_PROFILER
-    if (_eglProfileCallback(thread, 0, 0))
+    if (_ProfilerCallback(thread, 0, 0))
     {
         if (thread->api == EGL_OPENGL_ES_API)
         {
             if (MAJOR_API_VER(thread->context->client) == 1)
             {
                 /* GL_PROFILER_FRAME_END */
-                _eglProfileCallback(thread, 10, 0);
+                _ProfilerCallback(thread, 10, 0);
             }
             else if (MAJOR_API_VER(thread->context->client) == 2 || MAJOR_API_VER(thread->context->client) == 3)
             {
                 /* GL3_PROFILER_FRAME_END */
-                _eglProfileCallback(thread, 10, 0);
+                _ProfilerCallback(thread, 10, 0);
             }
         }
         else if (thread->api == EGL_OPENVG_API)
         {
-            _eglProfileCallback(thread, 10, 0);
+            _ProfilerCallback(thread, 10, 0);
         }
     }
 #endif
@@ -1288,6 +1283,9 @@ _SwapBuffersRegionNew(
     VEGLThreadData thread;
     VEGLDisplay dpy;
     VEGLSurface draw;
+#if gcdENABLE_3D
+    gcsSURF_VIEW drawView = {gcvNULL, 0, 1};
+#endif
     VEGLPlatform platform;
 
     do
@@ -1403,8 +1401,9 @@ _SwapBuffersRegionNew(
 
             else if (draw->renderMode == VEGL_DIRECT_RENDERING_FCFILL)
             {
+                drawView.surf = draw->renderTarget;
                 /* Basic No-resolve path. */
-                if (gcmIS_ERROR(gcoSURF_FillFromTile(draw->renderTarget)))
+                if (gcmIS_ERROR(gcoSURF_FillFromTile(&drawView)))
                 {
                     veglSetEGLerror(thread, EGL_BAD_SURFACE);
                     result = EGL_FALSE;
@@ -1463,7 +1462,8 @@ _SwapBuffersRegionNew(
                      * Do not turn off hardware tile status, this buffer can still
                      * be access when buffer preserve.
                      */
-                    gcmVERIFY_OK(gcoSURF_FlushTileStatus(draw->renderTarget, gcvFALSE));
+                    drawView.surf = draw->renderTarget;
+                    gcmVERIFY_OK(gcoSURF_FlushTileStatus(&drawView, gcvFALSE));
                 }
 
                 /* Flush the pipe. */
@@ -2451,9 +2451,9 @@ _eglSwapBuffersRegion(
     while (gcvFALSE);
 
 #if VIVANTE_PROFILER
-    if (_eglProfileCallback(thread, 0, 0))
+    if (_ProfilerCallback(thread, 0, 0))
     {
-        EGLBoolean sync = _eglProfileCallback(thread, 13, 0);
+        EGLBoolean sync = _ProfilerCallback(thread, 13, 0);
         if(sync == EGL_TRUE)
         {
             /* Suspend the thread. */
@@ -2465,17 +2465,17 @@ _eglSwapBuffersRegion(
             if (MAJOR_API_VER(thread->context->client) == 1)
             {
                 /* GL_PROFILER_FRAME_END */
-                _eglProfileCallback(thread, 10, 0);
+                _ProfilerCallback(thread, 10, 0);
             }
             else if (MAJOR_API_VER(thread->context->client) == 2 || MAJOR_API_VER(thread->context->client) == 3)
             {
                 /* GL3_PROFILER_FRAME_END */
-                _eglProfileCallback(thread, 10, 0);
+                _ProfilerCallback(thread, 10, 0);
             }
         }
         else if (thread->api == EGL_OPENVG_API)
         {
-            _eglProfileCallback(thread, 10, 0);
+            _ProfilerCallback(thread, 10, 0);
         }
         if(sync == EGL_TRUE)
         {
@@ -2491,7 +2491,7 @@ _eglSwapBuffersRegion(
 #endif
 
 static void
-eglfDoSwapBuffer(
+eglfDoSwapBuffers(
     EGLDisplay Dpy,
     EGLSurface Draw
     )
@@ -2513,13 +2513,6 @@ eglSwapBuffers(
     EGLBoolean result = EGL_FALSE;
     /* Get dispatch table. */
     veglDISPATCH * dispatch;
-
-#if gcdGC355_PROFILER
-    static int Frame = 0;
-    static gctUINT64 startTimeusec;
-    gctUINT64 endTimeusec = 0;
-    gctUINT64 deltaValue = 0;
-#endif
 
 
     gcmHEADER_ARG("Dpy=0x%x Draw=0x%x", Dpy, Draw);
@@ -2549,34 +2542,44 @@ eglSwapBuffers(
     dispatch = _GetDispatch(veglGetThreadData(), gcvNULL);
 
     /* Check if there is a swapbuffer function. */
-    if ((dispatch != gcvNULL) && (dispatch->swapBuffer != gcvNULL))
+    if ((dispatch != gcvNULL) && (dispatch->swapBuffers != gcvNULL))
     {
         /* Call the swapbuffer function. */
-        result = (*dispatch->swapBuffer)(Dpy, Draw, eglfDoSwapBuffer);
+        result = (*dispatch->swapBuffers)(Dpy, Draw, eglfDoSwapBuffers);
     }
     else
     {
         result = _eglSwapBuffersRegion(Dpy, Draw, 0, gcvNULL);
     }
 
+
 #if gcdGC355_PROFILER
-    gcoOS_GetTime(&endTimeusec);
     {
+        static int frameCount = 0;
+        static gctUINT64 startTimeusec;
+
+        gctUINT64 endTimeusec = 0;
+        gctUINT64 deltaValue = 0;
         gctSIZE_T length;
         gctCHAR savedValue[256] = {'\0'};
         gctUINT offset = 0;
 
-        Frame++;
-        if (Frame == 1)
+        VEGLThreadData thread = veglGetThreadData();
+        VEGLContext context = thread->context;
+
+        gcoOS_GetTime(&endTimeusec);
+
+        frameCount++;
+        if (frameCount == 1)
         {
-            startTimeusec = AppstartTimeusec;
+            startTimeusec = context->appStartTime;
         }
 
         deltaValue = endTimeusec - startTimeusec;
         startTimeusec = endTimeusec;
-        gcoOS_PrintStrSafe(savedValue, gcmSIZEOF(savedValue), &offset, "The elapsed time for Frame #%d = %llu(microsec) \n", Frame, deltaValue);
+        gcoOS_PrintStrSafe(savedValue, gcmSIZEOF(savedValue), &offset, "The elapsed time for Frame #%d = %llu(microsec) \n", frameCount, deltaValue);
         length = gcoOS_StrLen((gctSTRING)savedValue, gcvNULL);
-        gcoOS_Write(gcvNULL, ApiTimeFile, length, savedValue);
+        gcoOS_Write(gcvNULL, context->apiTimeFile, length, savedValue);
     }
 #endif
 

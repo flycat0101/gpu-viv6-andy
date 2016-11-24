@@ -1,0 +1,20 @@
+##########################################################
+# The following setting are for iMX6 Solo, Dual Lite, Dual & Quad
+
+!IFNDEF VIVANTE_ENABLE_3D
+VIVANTE_ENABLE_3D=1
+!ENDIF
+
+!IFNDEF VIVANTE_ENABLE_2D
+VIVANTE_ENABLE_2D=1
+!ENDIF
+
+!IFNDEF VIVANTE_ENABLE_VG
+!IF "$(BSP_IMX6DQ)"=="1"
+VIVANTE_ENABLE_VG=1
+!ELSE
+VIVANTE_ENABLE_VG=0
+!ENDIF
+!ENDIF
+
+CDEFINES=$(CDEFINES) -DgcdSMP=1

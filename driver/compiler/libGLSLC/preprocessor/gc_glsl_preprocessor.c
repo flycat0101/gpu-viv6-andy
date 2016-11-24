@@ -238,6 +238,45 @@ ppoPREPROCESSOR_Construct_InitOperator(
     sloCOMPILER     Compiler,
     ppoPREPROCESSOR *PP);
 
+static gceSTATUS _ConstructExtensionString(
+    sloCOMPILER     Compiler,
+    ppoPREPROCESSOR *PP
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctPOINTER pointer = gcvNULL;
+    gctCONST_STRING extraExtension = "GL_KHR_blend_equation_advanced GL_OES_sample_variables GL_OES_shader_image_atomic "
+                                     "GL_OES_shader_multisample_interpolation GL_OES_texture_storage_multisample_2d_array "
+                                     "GL_EXT_geometry_shader GL_EXT_gpu_shader5 GL_EXT_primitive_bounding_box GL_EXT_shader_io_blocks "
+                                     "GL_EXT_tessellation_shader GL_EXT_texture_buffer GL_EXT_texture_cube_map_array ";
+    gctSIZE_T extraExtensionLength = gcoOS_StrLen(extraExtension, gcvNULL);
+    gctSIZE_T extensionStringLength = gcoOS_StrLen(GetGLExtensionString(), gcvNULL);
+    gctSIZE_T length = 0;
+    gctBOOL catExtraExtension = gcvFALSE;
+
+    if (gcoOS_StrStr(GetGLExtensionString(), "GL_ANDROID_extension_pack_es31a", gcvNULL))
+    {
+        length = extraExtensionLength + extensionStringLength + 1;
+        catExtraExtension = gcvTRUE;
+    }
+    else
+    {
+        length = extensionStringLength + 1;
+    }
+
+    gcmONERROR(sloCOMPILER_Allocate(Compiler, length, &pointer));
+    (*PP)->extensionString = pointer;
+
+    gcoOS_StrCopySafe((*PP)->extensionString, extensionStringLength + 1, GetGLExtensionString());
+    if (catExtraExtension)
+    {
+        gcoOS_StrCatSafe((*PP)->extensionString, length, extraExtension);
+    }
+
+OnError:
+    return status;
+}
+
 /*******************************************************************************
 **
 **  ppoPREPROCESSOR_Construct
@@ -283,6 +322,9 @@ ppoPREPROCESSOR_Construct(
     (*PP)->skipOPError = gcvFALSE;
 
     (*PP)->compiler = Compiler;
+
+    /* Construct extension string. */
+    _ConstructExtensionString(Compiler, PP);
 
     /* Keywords. */
 
@@ -885,6 +927,12 @@ ppoPREPROCESSOR_Destroy(
 
     gcmONERROR(ppoPREPROCESSOR_Reset(PP));
 
+    if (PP->extensionString)
+    {
+        gcmONERROR(sloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->extensionString));
+        PP->extensionString = gcvNULL;
+    }
+
     /*release operators of every level*/
     i = 0;
     while (PP->operators[i] != gcvNULL)
@@ -1151,7 +1199,7 @@ ppoPREPROCESSOR_Parse(
         else
         {
             /* Load the built-ins */
-            gcmONERROR(sloCOMPILER_LoadBuiltIns(PP->compiler, gcvFALSE));
+            gcmONERROR(sloCOMPILER_LoadBuiltIns(PP->compiler));
         }
     }
 
@@ -1275,25 +1323,22 @@ ppoPREPROCESSOR_Reset(
     if (PP->strings)
     {
         gcmONERROR(sloCOMPILER_Free(PP->compiler, (gctPOINTER)PP->strings));
+        PP->strings = gcvNULL;
     }
-
-    PP->strings = gcvNULL;
 
     /*lens*/
     if (PP->lens)
     {
         gcmONERROR(sloCOMPILER_Free(PP->compiler, PP->lens));
+        PP->lens = gcvNULL;
     }
-
-    PP->lens = gcvNULL;
 
     /*macro manager*/
     if (PP->macroManager)
     {
         gcmONERROR(ppoMACRO_MANAGER_Destroy(PP, PP->macroManager));
+        PP->macroManager = gcvNULL;
     }
-
-    PP->macroManager = gcvNULL;
 
     /*inputstream*/
     while (PP->inputStream)
@@ -1309,9 +1354,9 @@ ppoPREPROCESSOR_Reset(
     if(PP->outputTokenStreamHead)
     {
         gcmONERROR(ppoTOKEN_STREAM_Destroy(PP, PP->outputTokenStreamHead));
+        PP->outputTokenStreamHead = gcvNULL;
     }
 
-    PP->outputTokenStreamHead = gcvNULL;
     PP->outputTokenStreamEnd = gcvNULL;
 
     /*reset debug mode*/
@@ -1374,7 +1419,7 @@ gctCONST_STRING vivImgRdWrNeedSWBordercolor(void)
     static gctCONST_STRING needSWBordercolor = gcvNULL;
     if (initialized == 0)
     {
-        needSWBordercolor = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMAGE_OUT_BOUNDARY_FIX) ? "0" : "1"; /* !!! DEBUG !!! */
+        needSWBordercolor = GetHWHasImageOutBoundaryFix() ? "0" : "1"; /* !!! DEBUG !!! */
         initialized = 1;
     }
     return needSWBordercolor;
@@ -1425,6 +1470,8 @@ static slsPREDEFINED_MACRO _PredefinedMacros[] =
    {"GL_EXT_texture_buffer", "1", gcvNULL, gcvTRUE},
    /* primitive bounding box extension. */
    {"GL_EXT_primitive_bounding_box", "1", gcvNULL, gcvTRUE},
+   /* ANDROID_extension_pack_es31a extension*/
+   {"GL_ANDROID_extension_pack_es31a", "1", gcvNULL, gcvTRUE},
 };
 
 #define _sldMaxPredefinedMacroNameLen 64   /*Hard coded maximum predefined macro name length */
@@ -1486,7 +1533,7 @@ ppoPREPROCESSOR_SetSourceStrings(
            gctCONST_STRING valueStr;
 
            if (_PredefinedMacros[i].checkFeature &&
-               gcoOS_StrStr(GetGLExtensionString(), _PredefinedMacros[i].str, gcvNULL) == gcvSTATUS_FALSE)
+               gcoOS_StrStr(PP->extensionString, _PredefinedMacros[i].str, gcvNULL) == gcvSTATUS_FALSE)
            {
                continue;
            }

@@ -27,12 +27,13 @@ VX_INTERNAL_API vx_node vxSobelMxNNode(vx_graph graph, vx_image input, vx_scalar
 }
 
 VX_INTERNAL_API vx_node vxHarrisScoreNode(
-        vx_graph graph, vx_image gx, vx_image gy, vx_scalar sensitivity, vx_scalar blockSize, vx_image score)
+        vx_graph graph, vx_image gx, vx_image gy, vx_scalar sensitivity, vx_scalar winSize, vx_scalar blockSize, vx_image score)
 {
     vx_reference parameters[] = {
         (vx_reference)gx,
         (vx_reference)gy,
         (vx_reference)sensitivity,
+        (vx_reference)winSize,
         (vx_reference)blockSize,
         (vx_reference)score
     };
@@ -324,3 +325,91 @@ VX_INTERNAL_API vx_node vxEqualizeHistLutNode(vx_graph graph, vx_image srcImage,
 
     return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_EQUALIZE_HISTOGRAM_LUT, parameters, vxmLENGTH_OF(parameters));
 }
+
+VX_INTERNAL_API vx_node vxSgmCostNode(vx_graph graph, vx_image right_img, vx_image left_img, vx_scalar range, vx_image cost)
+{
+    vx_reference parameters[] = {
+        (vx_reference)right_img,
+        (vx_reference)left_img,
+        (vx_reference)range,
+        (vx_reference)cost
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_SGM_COST, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxSgmCostPath90Node(vx_graph graph, vx_image cost, vx_scalar range, vx_image path)
+{
+    vx_reference parameters[] = {
+        (vx_reference)cost,
+        (vx_reference)range,
+        (vx_reference)path
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_SGM_PATH90, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxSgmCostPath45Node(vx_graph graph, vx_image cost, vx_scalar range, vx_image path)
+{
+    vx_reference parameters[] = {
+        (vx_reference)cost,
+        (vx_reference)range,
+        (vx_reference)path
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_SGM_PATH45, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxSgmCostPath135Node(vx_graph graph, vx_image cost, vx_scalar range, vx_image path)
+{
+    vx_reference parameters[] = {
+        (vx_reference)cost,
+        (vx_reference)range,
+        (vx_reference)path
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_SGM_PATH135, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxSgmCostPath0Node(vx_graph graph, vx_image cost, vx_scalar range, vx_image path)
+{
+    vx_reference parameters[] = {
+        (vx_reference)cost,
+        (vx_reference)range,
+        (vx_reference)path
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_SGM_PATH0, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxSgmGetDispNode(vx_graph graph, vx_image path, vx_scalar range, vx_image depth)
+{
+    vx_reference parameters[] = {
+        (vx_reference)path,
+        (vx_reference)range,
+        (vx_reference)depth
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_SGM_DISP, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxLaplacian3x3Node(vx_graph graph, vx_image src, vx_image dst)
+{
+    vx_reference parameters[] = {
+        (vx_reference)src,
+        (vx_reference)dst,
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_LAPLACIAN3x3, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxCensus3x3Node(vx_graph graph, vx_image src, vx_image dst)
+{
+    vx_reference parameters[] = {
+        (vx_reference)src,
+        (vx_reference)dst,
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_CENSUS3x3, parameters, vxmLENGTH_OF(parameters));
+}
+

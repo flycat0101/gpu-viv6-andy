@@ -26,39 +26,29 @@
 ##############################################################################
 
 
-LOCAL_PATH:= $(call my-dir)
+LOCAL_PATH:= $(call my-dir)/../..
 include $(CLEAR_VARS)
-VIV_TARGET_ABI ?= $(TARGET_ARCH)
-ifneq ($(findstring 64,$(VIV_TARGET_ABI)),)
-    VIV_MULTILIB=64
-else
-    VIV_MULTILIB=32
-endif
-
-
-COVERFLOW_TOP := ../..
-
-LOCAL_MODULE:= libcover_flow
-LOCAL_MODULE_TAGS := optional
-
 LOCAL_CFLAGS := \
 			-DANDROID \
 			-DANDROID_SDK_VERSION=$(PLATFORM_SDK_VERSION) \
 			-DLOG_TAG=\"cover_flow\"
 
 LOCAL_SRC_FILES:= \
-	cover_flow_android.c \
-	pkm.c \
-	tga.c
+	android/jni/cover_flow_android.c \
+	android/jni/pkm.c \
+	android/jni/tga.c
 
 LOCAL_C_INCLUDES += \
 	$(JNI_H_INCLUDE)
 
-LOCAL_LDFLAGS += -lGLESv1_CM -ldl -llog
+LOCAL_SHARED_LIBRARIES := \
+    libEGL \
+    libGLESv1_CM \
+    liblog
 
+LOCAL_MODULE:= libcover_flow
+LOCAL_MODULE_TAGS := optional
 LOCAL_PRELINK_MODULE:= false
-LOCAL_ARM_MODE := $(VIV_TARGET_ABI)
-LOCAL_MODULE_PATH := $(LOCAL_PATH)/../libs/$(VIV_TARGET_ABI)
-LOCAL_MULTILIB := $(VIV_MULTILIB)
+LOCAL_MULTILIB := both
 include $(BUILD_SHARED_LIBRARY)
 

@@ -19,9 +19,9 @@
 
 
 #if gcdFRAMEINFO_STATISTIC
-extern GLboolean g_dbgPerDrawKickOff;
-extern GLint g_dbgDumpImagePerDraw;
-extern GLboolean g_dbgSkipDraw;
+extern GLboolean  g_dbgPerDrawKickOff;
+extern GLbitfield g_dbgDumpImagePerDraw;
+extern GLboolean  g_dbgSkipDraw;
 #endif
 
 /***************************************************************************/
@@ -53,7 +53,9 @@ gcChipGetClearRect(
     gcmONERROR(gcoSURF_GetSize(surf, (gctUINT*)&width, (gctUINT*)&height, gcvNULL));
 
     /* make compiler happy */
+#ifndef __clang__
     chipCtx = chipCtx;
+#endif
 
     if (gc->state.enables.scissorTest)
     {
@@ -150,13 +152,13 @@ gcChipClearRenderTarget(
                 clearArg.clearRect = &clearRect;
             }
 
-            tsEnabled = gcoSURF_IsTileStatusEnabled(chipCtx->drawRtViews[i].surf);
+            tsEnabled = gcoSURF_IsTileStatusEnabled(&chipCtx->drawRtViews[i]);
 
             gcmONERROR(gcoSURF_Clear(&chipCtx->drawRtViews[i], &clearArg));
 
             /* TS from disable to enable */
             if (!tsEnabled &&
-                gcoSURF_IsTileStatusEnabled(chipCtx->drawRtViews[i].surf))
+                gcoSURF_IsTileStatusEnabled(&chipCtx->drawRtViews[i]))
             {
                 chipCtx->chipDirty.uBuffer.sBuffer.rtSurfDirty = gcvTRUE;
             }

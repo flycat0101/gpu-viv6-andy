@@ -18,6 +18,8 @@ GL_2_APPENDIX  ?= _es2
 GL_3_APPENDIX  ?= _es3
 OS_DIR=linux
 
+USE_VIV_WAYLAND := 1
+
 # Include common makefile.
 include $(AQROOT)/makefile.linux.def
 
@@ -42,7 +44,8 @@ INSTALL_DIR = $(SDK_DIR)/drivers
 # Set source directories.
 vpath %.c $(AQROOT)/hal/user
 vpath %.c $(AQROOT)/hal/os/$(OS_DIR)/user
-vpath %.c $(AQROOT)/hal/os/$(OS_DIR)/user/$(dir $(PLATFORM_CALLBACK))
+vpath %.c $(AQROOT)/hal/os/$(OS_DIR)/user/platform/default
+vpath %.c $(AQROOT)/hal/os/$(OS_DIR)/user/platform/$(soc_vendor)
 ifeq ($(VIVANTE_ENABLE_3D),1)
 vpath %.c $(AQROOT)/sdk/vdk
 vpath %.c $(AQROOT)/driver/khronos/libEGL/source
@@ -67,7 +70,11 @@ ifeq ($(EGL_API_DRI),1)
 vpath %.c $(AQROOT)/driver/X/DRI/src
 endif
 ifeq ($(EGL_API_WL),1)
+ifeq ($(USE_VIV_WAYLAND),1)
+vpath %.c $(AQROOT)/driver/wayland
+else
 vpath %.c $(AQROOT)/driver/wl
+endif
 endif
 
 # Set include directories.
@@ -108,9 +115,15 @@ INC_DIR += \
 endif
 
 ifeq ($(EGL_API_WL), 1)
+ifeq ($(USE_VIV_WAYLAND),1)
+INC_DIR += \
+    $(AQROOT)/driver/wayland \
+    $(WAYLAND_DIR)/include
+else
 INC_DIR += \
     $(AQROOT)/driver/wl \
     $(WAYLAND_DIR)/include
+endif
 
 LIBS += \
     -L$(WAYLAND_DIR)/lib \
@@ -151,12 +164,10 @@ ifeq ($(EGL_API_X),1)
 endif
 
 ifeq ($(EGL_API_GBM),1)
-  GBM_INCLUDE := $(shell $(PKG_CONFIG) --cflags gbm 2>/dev/null)
+  ifneq ($(GBM_LIBS),)
+    CFLAGS += $(GBM_CFLAGS)
 
-  ifneq ($(GBM_INCLUDE),)
-    CFLAGS += $(GBM_INCLUDE)
-
-    LIBS += $(shell $(PKG_CONFIG) --libs gbm 2>/dev/null)
+    LIBS += $(GBM_LIBS)
   else
     INC_DIR += \
         $(AQROOT)/driver/gbm/main \
@@ -188,6 +199,9 @@ endif
 
 ifeq ($(EGL_API_WL), 1)
   CFLAGS += -Wno-deprecated-declarations
+ifeq ($(USE_VIV_WAYLAND),1)
+  CFLAGS += -DUSE_VIV_WAYLAND=1
+endif
 endif
 
 ifeq ($(EGL_API_DFB),1)
@@ -201,8 +215,12 @@ libGAL_SOURCE := $(wildcard \
 					$(AQROOT)/hal/user/*.c \
 					$(AQROOT)/hal/user/arch/*.c \
 					$(AQROOT)/hal/os/$(OS_DIR)/user/*.c \
-					$(AQROOT)/hal/os/$(OS_DIR)/user/$(PLATFORM_CALLBACK).c \
 					)
+
+libGAL_SOURCE += \
+    $(firstword $(wildcard \
+        $(AQROOT)/hal/os/$(OS_DIR)/user/platform/$(soc_vendor)/gc_hal_user_platform_$(soc_board).c \
+        $(AQROOT)/hal/os/$(OS_DIR)/user/platform/default/gc_hal_user_platform_default.c))
 
 ifeq ($(VIVANTE_ENABLE_2D),1)
   libGAL_SOURCE += $(wildcard \
@@ -232,33 +250,40 @@ endif
 
 ifeq ($(VIVANTE_ENABLE_3D),1)
 # libVDK
-libVDK_SOURCE := $(AQROOT)/sdk/vdk/gc_vdk_egl.c \
-				 $(AQROOT)/sdk/vdk/gc_vdk_gl.c
+libVDK_SOURCE := \
+    gc_vdk_egl.c \
+    gc_vdk_gl.c
 
 libVDK_API :=
 
 ifneq ($(filter 1,$(EGL_API_X) $(EGL_API_DRI)),)
-  libVDK_API := $(AQROOT)/sdk/vdk/gc_vdk_x11.c
+  libVDK_API := \
+    gc_vdk_x11.c
 endif
 
 ifeq ($(EGL_API_NULLWS),1)
-  libVDK_API := $(AQROOT)/sdk/vdk/gc_vdk_nullws.c
+  libVDK_API := \
+    gc_vdk_nullws.c
 endif
 
 ifeq ($(EGL_API_FB),1)
-  libVDK_API := $(AQROOT)/sdk/vdk/gc_vdk_fbdev.c
+  libVDK_API := \
+    gc_vdk_fbdev.c
 endif
 
 ifeq ($(EGL_API_DFB),1)
-  libVDK_API := $(AQROOT)/sdk/vdk/gc_vdk_dfb.c
+  libVDK_API := \
+    gc_vdk_dfb.c
 endif
 
 ifeq ($(EGL_API_GBM),1)
-  libVDK_API := $(AQROOT)/sdk/vdk/gc_vdk_gbm.c
+  libVDK_API := \
+    gc_vdk_gbm.c
 endif
 
 ifeq ($(EGL_API_WL),1)
-  libVDK_API := $(AQROOT)/sdk/vdk/gc_vdk_wayland.c
+  libVDK_API := \
+    gc_vdk_wayland.c
 endif
 
 libVDK_SOURCE += $(libVDK_API)
@@ -274,36 +299,82 @@ libEGL_SOURCE = $(wildcard \
 					$(AQROOT)/driver/khronos/libEGL/source/*.c \
 					$(AQROOT)/driver/khronos/libEGL/os/*_$(OS_DIR).c \
 					)
-libEGL_SOURCE += $(AQROOT)/driver/khronos/libEGL/api/gc_egl_nullws.c \
-                 $(AQROOT)/driver/khronos/libEGL/api/gc_egl_fbdev.c
+libEGL_SOURCE += \
+    gc_egl_nullws.c \
+    gc_egl_fbdev.c
 
 ifeq ($(EGL_API_X),1)
-libEGL_SOURCE += $(AQROOT)/driver/khronos/libEGL/api/gc_egl_x11.c
+libEGL_SOURCE += \
+    gc_egl_x11.c
 endif
 
 ifeq ($(EGL_API_DRI),1)
-libEGL_SOURCE += $(AQROOT)/driver/khronos/libEGL/api/gc_egl_dri.c
+libEGL_SOURCE += \
+    gc_egl_dri.c
 endif
 
 ifeq ($(EGL_API_GBM),1)
-libEGL_SOURCE += $(AQROOT)/driver/khronos/libEGL/api/gc_egl_gbm.c
+libEGL_SOURCE += \
+    gc_egl_gbm.c
 endif
 
 ifeq ($(EGL_API_WL),1)
-libEGL_SOURCE += $(AQROOT)/driver/khronos/libEGL/api/gc_egl_wayland.c \
-                 $(AQROOT)/driver/wl/gc_wayland_protocol.c \
-                 $(AQROOT)/driver/wl/wayland-viv-protocol.c
+ifeq ($(USE_VIV_WAYLAND),1)
+libEGL_SOURCE += \
+    gc_egl_wayland.c \
+    gc_egl_wayland_server.c \
+    wayland-viv-protocol.c
+else
+libEGL_SOURCE += \
+    gc_egl_wayland_legacy.c \
+    gc_wayland_protocol.c \
+    wayland-viv-protocol.c
+endif
 endif
 
 ifeq ($(EGL_API_DFB),1)
-libEGL_SOURCE += $(AQROOT)/driver/khronos/libEGL/api/gc_egl_dfb.c
+libEGL_SOURCE += \
+    gc_egl_dfb.c
 endif
 
 OBJECTS += \
 	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libEGL_SOURCE))))
 
 #libGLES_CM
-libGLES_CM_SOURCE = $(wildcard $(AQROOT)/driver/khronos/libGLESv11/*.c)
+libGLES_CM_SOURCE = \
+    gc_glff_alpha.c \
+    gc_glff_basic_types.c \
+    gc_glff_buffer.c \
+    gc_glff.c \
+    gc_glff_clear.c \
+    gc_glff_clip_plane.c \
+    gc_glff_context.c \
+    gc_glff_cull.c \
+    gc_glff_depth.c \
+    gc_glff_draw.c \
+    gc_glff_enable.c \
+    gc_glff_fixed_func.c \
+    gc_glff_fog.c \
+    gc_glff_fragment_shader.c \
+    gc_glff_frag_proc.c \
+    gc_glff_framebuffer.c \
+    gc_glff_hash.c \
+    gc_glff_lighting.c \
+    gc_glff_line.c \
+    gc_glff_matrix.c \
+    gc_glff_multisample.c \
+    gc_glff_named_object.c \
+    gc_glff_pixel.c \
+    gc_glff_point.c \
+    gc_glff_profiler.c \
+    gc_glff_query.c \
+    gc_glff_renderbuffer.c \
+    gc_glff_states.c \
+    gc_glff_stream.c \
+    gc_glff_texture.c \
+    gc_glff_vertex_shader.c \
+    gc_glff_viewport.c
+
 OBJECTS += \
 	$(addprefix $(OBJ_DIR)/,$(notdir $(patsubst %.c,%.o,$(libGLES_CM_SOURCE))))
 
@@ -319,13 +390,14 @@ libVSC_SOURCE :=\
 	$(wildcard \
 		$(AQROOT)/compiler/libVSC/old_impl/*.c \
 		$(AQROOT)/compiler/libVSC/old_impl/optimizer/*.c \
+		$(AQROOT)/compiler/libVSC/lib/*.c \
 		)
 
 ifeq ($(VSC_VIR_BUILD),1)
 libVSC_SOURCE += \
 	$(wildcard \
 		$(AQROOT)/compiler/libVSC/asm/*.c \
-		$(AQROOT)/compiler/libVSC/chip/*.c \
+		$(AQROOT)/compiler/libVSC/chip/gpu/*.c \
 		$(AQROOT)/compiler/libVSC/drvi/*.c \
 		$(AQROOT)/compiler/libVSC/utils/*.c \
 		$(AQROOT)/compiler/libVSC/utils/array/*.c \
@@ -344,6 +416,8 @@ libVSC_SOURCE += \
 		$(AQROOT)/compiler/libVSC/vir/lower/*.c \
 		$(AQROOT)/compiler/libVSC/vir/passmanager/*.c \
 		$(AQROOT)/compiler/libVSC/vir/transform/*.c \
+		$(AQROOT)/compiler/libVSC/vir/linker/*.c \
+		$(AQROOT)/compiler/libVSC/debug/*.c \
 		)
 endif
 
@@ -407,12 +481,16 @@ $(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/old_impl/%.c
 	@mkdir -p $(OBJ_DIR)
 	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
 
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/lib/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
 ifeq ($(VSC_VIR_BUILD),1)
 $(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/asm/%.c
 	@mkdir -p $(OBJ_DIR)
 	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
 
-$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/chip/%.c
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/chip/gpu/%.c
 	@mkdir -p $(OBJ_DIR)
 	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
 
@@ -480,11 +558,19 @@ $(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/lower/%.c
 	@mkdir -p $(OBJ_DIR)
 	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
 
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/linker/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
 $(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/passmanager/%.c
 	@mkdir -p $(OBJ_DIR)
 	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
 
 $(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/vir/transform/%.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
+
+$(OBJ_DIR)/%.o: $(AQROOT)/compiler/libVSC/debug/%.c
 	@mkdir -p $(OBJ_DIR)
 	$(CC) -c $(CFLAGS) -I$(AQARCH)/cmodel/inc -o $@ $<
 endif

@@ -338,22 +338,6 @@ veglGetWaylandPlatform(
     void * NativeDisplay
     );
 
-#if defined(WL_EGL_PLATFORM)
-struct wl_display;
-
-EGLBoolean
-veglBindWaylandDisplayWL(
-    VEGLDisplay Display,
-    struct wl_display * Dpy
-    );
-
-EGLBoolean
-veglUnbindWaylandDisplayWL(
-    VEGLDisplay Display,
-    struct wl_display * Dpy
-    );
-#endif
-
 /*
  * EGL_KHR_platform_x11
  * selects either X11 or DRI implementation.
@@ -395,6 +379,40 @@ VEGLPlatform
 veglGetQnxPlatform(
     void * NativeDisplay
     );
+
+#if defined(WL_EGL_PLATFORM)
+struct wl_display;
+
+EGLBoolean
+veglBindWaylandDisplay(
+    VEGLDisplay Display,
+    struct wl_display * Dpy
+    );
+
+EGLBoolean
+veglUnbindWaylandDisplay(
+    VEGLDisplay Display,
+    struct wl_display * Dpy
+    );
+
+EGLBoolean
+veglQueryWaylandBuffer(
+    VEGLDisplay Display,
+    struct wl_resource *Buffer,
+    EGLint * Width,
+    EGLint * Height,
+    gcoSURF * Surface
+    );
+
+#ifdef USE_VIV_WAYLAND
+struct wl_buffer *
+veglCreateWaylandBufferFromImage(
+    VEGLThreadData Thread,
+    VEGLDisplay Dpy,
+    VEGLImage Image
+    );
+#  endif
+#endif
 
 #ifdef __cplusplus
 }

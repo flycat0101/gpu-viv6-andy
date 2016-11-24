@@ -48,7 +48,7 @@ typedef struct _gcoCL_DEVICE_INFO
     gctUINT             maxParameterSize;
     gctUINT             memBaseAddrAlign;
     gctUINT             minDataTypeAlignSize;
-    gctUINT             maxPrintfBufferSize;
+    gctSIZE_T           maxPrintfBufferSize;
 
     gctBOOL             imageSupport;
     gctUINT             maxReadImageArgs;
@@ -661,12 +661,19 @@ gcoCL_InvokeKernel(
     IN size_t       GlobalWorkOffset[3],
     IN size_t       GlobalWorkSize[3],
     IN size_t       LocalWorkSize[3],
-    IN gctUINT      ValueOrder
+    IN gctUINT      ValueOrder,
+    IN gctBOOL      BarrierUsed
     );
 
 gceSTATUS
 gcoCL_InvokeThreadWalker(
     IN gcsTHREAD_WALKER_INFO_PTR Info
+    );
+
+gceSTATUS
+gcoCL_MultiGPUSync(
+    IN gctUINT32 GPUCount,
+    IN gctUINT_PTR ChipIDs
     );
 
 #ifdef __cplusplus

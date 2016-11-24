@@ -23,6 +23,7 @@ typedef struct _VIR_CONTROL_FLOW_GRAPH  VIR_CONTROL_FLOW_GRAPH;
 typedef struct _VIR_CALL_GRAPH          VIR_CALL_GRAPH;
 typedef struct _VIR_BASIC_BLOCK         VIR_BASIC_BLOCK;
 typedef struct _VIR_FUNC_BLOCK          VIR_FUNC_BLOCK;
+typedef struct _VIR_LOOP_TREE_NODE      VIR_LOOP_TREE_NODE;
 
 #include "gc_vsc_vir_dfa.h"
 
@@ -48,17 +49,75 @@ typedef struct _VIR_DOM_TREE
 }VIR_DOM_TREE;
 
 typedef VSC_TNODE_LIST_ITERATOR DOM_TREE_ITERATOR;
-#define DOM_TREE_ITERATOR_ITERATOR_INIT(iter, pDomTree)    VSC_TNODE_LIST_ITERATOR_INIT((iter), &pDomTree->tree)
-#define DOM_TREE_ITERATOR_ITERATOR_FIRST(iter)             (VIR_DOM_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_FIRST((iter))
-#define DOM_TREE_ITERATOR_ITERATOR_NEXT(iter)              (VIR_DOM_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_NEXT((iter))
-#define DOM_TREE_ITERATOR_ITERATOR_PREV(iter)              (VIR_DOM_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_PREV((iter))
-#define DOM_TREE_ITERATOR_ITERATOR_LAST(iter)              (VIR_DOM_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_LAST((iter))
+#define DOM_TREE_ITERATOR_ITERATOR_INIT(iter, pDomTree)       VSC_TNODE_LIST_ITERATOR_INIT((iter), &pDomTree->tree)
+#define DOM_TREE_ITERATOR_ITERATOR_FIRST(iter)                (VIR_DOM_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_FIRST((iter))
+#define DOM_TREE_ITERATOR_ITERATOR_NEXT(iter)                 (VIR_DOM_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_NEXT((iter))
+#define DOM_TREE_ITERATOR_ITERATOR_PREV(iter)                 (VIR_DOM_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_PREV((iter))
+#define DOM_TREE_ITERATOR_ITERATOR_LAST(iter)                 (VIR_DOM_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_LAST((iter))
 
 typedef VSC_CHILD_LIST_ITERATOR DOM_TREE_NODE_CHILD_ITERATOR;
 #define DOM_TREE_NODE_CHILD_ITERATOR_INIT(iter, pDomTreeNode) VSC_CHILD_LIST_ITERATOR_INIT((iter), &(pDomTreeNode)->treeNode)
 #define DOM_TREE_NODE_CHILD_ITERATOR_FIRST(iter)              (VIR_DOM_TREE_NODE*)VSC_CHILD_LIST_ITERATOR_FIRST((iter))
 #define DOM_TREE_NODE_CHILD_ITERATOR_NEXT(iter)               (VIR_DOM_TREE_NODE*)VSC_CHILD_LIST_ITERATOR_NEXT((iter))
 #define DOM_TREE_NODE_CHILD_ITERATOR_LAST(iter)               (VIR_DOM_TREE_NODE*)VSC_CHILD_LIST_ITERATOR_LAST((iter))
+
+#define LOOP_HIERARCHY_SUPPORT_IN_CFG  0
+
+#if LOOP_HIERARCHY_SUPPORT_IN_CFG
+/*
+ *   Loop hierarchy definition
+ */
+typedef struct _VIR_LOOP_HIERARCHY_INFO
+{
+    /* Loop head and tail */
+    VIR_BASIC_BLOCK*           pLoopHead;
+    VIR_BASIC_BLOCK*           pLoopTail;
+
+    /* Break and continue blocks inside this loop */
+    VSC_SIMPLE_RESIZABLE_ARRAY breakSet;
+    VSC_SIMPLE_RESIZABLE_ARRAY continueSet;
+
+    /* Which loop tree node holds this loop hierarchy info */
+    VIR_LOOP_TREE_NODE*        pLoopTreeNode;
+}VIR_LOOP_HIERARCHY_INFO;
+
+struct _VIR_LOOP_TREE_NODE
+{
+    /* Tree node. It must be put at FIRST place!!!! */
+    VSC_TREE_NODE              treeNode;
+
+    /* Hierarchy info stored in loop tree node */
+    VIR_LOOP_HIERARCHY_INFO    loopHierarchyInfo;
+};
+
+typedef struct _VIR_LOOP_TREE
+{
+    /* Tree-node for loop tree which is made of VIR_LOOP_TREE_NODE. It must be put at FIRST place!!!! */
+    VSC_TREE                   tree;
+}VIR_LOOP_TREE;
+
+typedef struct _VIR_LOOP_HIERARCHY
+{
+    /* All loop-trees maintained in loop-hierarchy of cfg */
+    VSC_SIMPLE_RESIZABLE_ARRAY loopTreeArray;
+
+    /* Owner control flow graph of loop hierarchy */
+    VIR_CONTROL_FLOW_GRAPH*    pOwnerCFG;
+}VIR_LOOP_HIERARCHY;
+
+typedef VSC_TNODE_LIST_ITERATOR LOOP_TREE_ITERATOR;
+#define LOOP_TREE_ITERATOR_ITERATOR_INIT(iter, pLoopTree)      VSC_TNODE_LIST_ITERATOR_INIT((iter), &pLoopTree->tree)
+#define LOOP_TREE_ITERATOR_ITERATOR_FIRST(iter)                (VIR_LOOP_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_FIRST((iter))
+#define LOOP_TREE_ITERATOR_ITERATOR_NEXT(iter)                 (VIR_LOOP_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_NEXT((iter))
+#define LOOP_TREE_ITERATOR_ITERATOR_PREV(iter)                 (VIR_LOOP_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_PREV((iter))
+#define LOOP_TREE_ITERATOR_ITERATOR_LAST(iter)                 (VIR_LOOP_TREE_NODE*)VSC_TNODE_LIST_ITERATOR_LAST((iter))
+
+typedef VSC_CHILD_LIST_ITERATOR LOOP_TREE_NODE_CHILD_ITERATOR;
+#define LOOP_TREE_NODE_CHILD_ITERATOR_INIT(iter, pLoopTreeNode) VSC_CHILD_LIST_ITERATOR_INIT((iter), &(pLoopTreeNode)->treeNode)
+#define LOOP_TREE_NODE_CHILD_ITERATOR_FIRST(iter)              (VIR_LOOP_TREE_NODE*)VSC_CHILD_LIST_ITERATOR_FIRST((iter))
+#define LOOP_TREE_NODE_CHILD_ITERATOR_NEXT(iter)               (VIR_LOOP_TREE_NODE*)VSC_CHILD_LIST_ITERATOR_NEXT((iter))
+#define LOOP_TREE_NODE_CHILD_ITERATOR_LAST(iter)               (VIR_LOOP_TREE_NODE*)VSC_CHILD_LIST_ITERATOR_LAST((iter))
+#endif
 
 /*
  *   Control flow graph definition
@@ -71,10 +130,6 @@ typedef enum _VIR_FLOW_TYPE
     VIR_FLOW_TYPE_EXIT,
     VIR_FLOW_TYPE_JMP,
     VIR_FLOW_TYPE_JMPC,
-    VIR_FLOW_TYPE_LOOPHEAD,
-    VIR_FLOW_TYPE_LOOPTAIL,
-    VIR_FLOW_TYPE_BREAK,
-    VIR_FLOW_TYPE_CONTINUE,
     VIR_FLOW_TYPE_CALL,
     VIR_FLOW_TYPE_RET,
 } VIR_FLOW_TYPE;
@@ -86,10 +141,21 @@ typedef enum _VIR_CFG_EDGE_TYPE
     VIR_CFG_EDGE_TYPE_FALSE
 }VIR_CFG_EDGE_TYPE;
 
+typedef enum _VIR_CFG_DFS_EDGE_TYPE
+{
+    VIR_CFG_DFS_EDGE_TYPE_NORMAL     = 0,
+    VIR_CFG_DFS_EDGE_TYPE_FORWARD,
+    VIR_CFG_DFS_EDGE_TYPE_BACKWARD,
+    VIR_CFG_DFS_EDGE_TYPE_CROSS,
+}VIR_CFG_DFS_EDGE_TYPE;
+
 typedef struct _VIR_CFG_EDGE
 {
     VSC_DG_EDGE               dgEdge;
     VIR_CFG_EDGE_TYPE         type;
+
+    /* Only valid for building DFS spanning tree */
+    VIR_CFG_DFS_EDGE_TYPE     dfsType;
 }VIR_CFG_EDGE;
 
 typedef struct _VIR_BB_REACH_RELATION
@@ -103,7 +169,10 @@ typedef struct _VIR_BB_REACH_RELATION
     VSC_BIT_VECTOR            bwdReachOutBBSet;
 }VIR_BB_REACH_RELATION;
 
+#define CFG_EDGE_GET_FROM_BB(pCfgEdge)  ((VIR_BASIC_BLOCK*)((pCfgEdge)->dgEdge.pFromNode))
 #define CFG_EDGE_GET_TO_BB(pCfgEdge)    ((VIR_BASIC_BLOCK*)((pCfgEdge)->dgEdge.pToNode))
+#define CFG_EDGE_GET_TYPE(pCfgEdge)     ((pCfgEdge)->type)
+#define CFG_EDGE_SET_TYPE(pCfgEdge, t)  ((pCfgEdge)->type = (t))
 
 #define VIR_BB_FLAG_HavingLLI          0x1
 
@@ -137,6 +206,10 @@ struct _VIR_BASIC_BLOCK
     VIR_TS_BLOCK_FLOW*        pTsWorkDataFlow;
     VIR_MS_BLOCK_FLOW*        pMsWorkDataFlow;
 
+    /* For building DFS spanning tree */
+    gctUINT                   dfsPreVisitOrderIdx;
+    gctUINT                   dfsPostVisitOrderIdx;
+
     /* DOM and postDOM set indicating who (post-) dominate the BB */
     VSC_BIT_VECTOR            domSet;
     VSC_BIT_VECTOR            postDomSet;
@@ -159,11 +232,15 @@ struct _VIR_BASIC_BLOCK
 };
 
 #define BB_GET_ID(pBB)          ((pBB)->dgNode.id)
+#define BB_GET_CFG(pBB)         ((pBB)->pOwnerCFG)
 #define BB_GET_FUNC(pBB)        ((pBB)->pOwnerCFG->pOwnerFuncBlk->pVIRFunc)
 #define BB_GET_START_INST(pBB)  ((pBB)->pStartInst)
 #define BB_GET_END_INST(pBB)    ((pBB)->pEndInst)
 #define BB_GET_LENGTH(pBB)      ((pBB)->instCount)
 #define BB_GET_FLOWTYPE(pBB)    ((pBB)->flowType)
+#define BB_SET_FLOWTYPE(pBB, t) ((pBB)->flowType = (t))
+#define BB_GET_IN_DEGREE(pBB)   DGND_GET_IN_DEGREE(&(pBB)->dgNode)
+#define BB_GET_OUT_DEGREE(pBB)  DGND_GET_OUT_DEGREE(&(pBB)->dgNode)
 
 #define BB_INC_LENGTH(pBB)      ((pBB)->instCount ++)
 #define BB_DEC_LENGTH(pBB)      ((pBB)->instCount --)
@@ -189,6 +266,18 @@ struct _VIR_BASIC_BLOCK
         (BB_GET_IPDOM((pBBDominatee)) == (pBBDominator))
 #define BB_IS_SPDOM(pBBDominator, pBBDominatee) \
         (BB_IS_PDOM((pBBDominator), (pBBDominatee)) && ((pBBDominator) != (pBBDominatee)))
+
+typedef VSC_ADJACENT_NODE_ITERATOR PRED_BASIC_BLOCK_ITERATOR;
+#define PRED_BASIC_BLOCK_ITERATOR_ITERATOR_INIT(iter, pBasicBlk) vscDGNDAJNIterator_Init((iter), &(pBasicBlk)->dgNode, gcvTRUE)
+#define PRED_BASIC_BLOCK_ITERATOR_ITERATOR_FIRST(iter)           (VIR_BASIC_BLOCK*)vscDGNDAJNIterator_First((iter))
+#define PRED_BASIC_BLOCK_ITERATOR_ITERATOR_NEXT(iter)            (VIR_BASIC_BLOCK*)vscDGNDAJNIterator_Next((iter))
+#define PRED_BASIC_BLOCK_ITERATOR_ITERATOR_LAST(iter)            (VIR_BASIC_BLOCK*)vscDGNDAJNIterator_Last((iter))
+
+typedef VSC_ADJACENT_NODE_ITERATOR SUCC_BASIC_BLOCK_ITERATOR;
+#define SUCC_BASIC_BLOCK_ITERATOR_ITERATOR_INIT(iter, pBasicBlk) vscDGNDAJNIterator_Init((iter), &(pBasicBlk)->dgNode, gcvFALSE)
+#define SUCC_BASIC_BLOCK_ITERATOR_ITERATOR_FIRST(iter)           (VIR_BASIC_BLOCK*)vscDGNDAJNIterator_First((iter))
+#define SUCC_BASIC_BLOCK_ITERATOR_ITERATOR_NEXT(iter)            (VIR_BASIC_BLOCK*)vscDGNDAJNIterator_Next((iter))
+#define SUCC_BASIC_BLOCK_ITERATOR_ITERATOR_LAST(iter)            (VIR_BASIC_BLOCK*)vscDGNDAJNIterator_Last((iter))
 
 /* Basic block worklist and its item for some algorithm, not only for CFA, but for DFA */
 typedef VSC_SIMPLE_QUEUE  VIR_BB_WORKLIST;
@@ -230,15 +319,15 @@ typedef VSC_GNODE_LIST_ITERATOR CFG_ITERATOR;
 #define CFG_ITERATOR_PREV(iter)          (VIR_BASIC_BLOCK*)VSC_GNODE_LIST_ITERATOR_PREV((iter))
 #define CFG_ITERATOR_LAST(iter)          (VIR_BASIC_BLOCK*)VSC_GNODE_LIST_ITERATOR_LAST((iter))
 
-#define CFG_GET_ENTRY_BB(pCFG)     (*(VIR_BASIC_BLOCK**)vscSRARR_GetElement      \
-                                    (&(pCFG)->dgGraph.rootNodeArray, 0))
+#define CFG_GET_ENTRY_BB(pCFG)           (*(VIR_BASIC_BLOCK**)vscSRARR_GetElement      \
+                                          (&(pCFG)->dgGraph.rootNodeArray, 0))
 
-#define CFG_GET_EXIT_BB(pCFG)      (*(VIR_BASIC_BLOCK**)vscSRARR_GetElement      \
-                                    (&(pCFG)->dgGraph.tailNodeArray, 0))
+#define CFG_GET_EXIT_BB(pCFG)            (*(VIR_BASIC_BLOCK**)vscSRARR_GetElement      \
+                                          (&(pCFG)->dgGraph.tailNodeArray, 0))
 
-#define CFG_GET_BB_BY_ID(pCFG, id) (VIR_BASIC_BLOCK*)vscDG_GetNodeById(&(pCFG)->dgGraph, (id))
-#define CFG_GET_DOM_TREE(pCFG)     (&(pCFG)->domTree)
-#define CFG_GET_PDOM_TREE(pCFG)    (&(pCFG)->postDomTree)
+#define CFG_GET_BB_BY_ID(pCFG, id)       (VIR_BASIC_BLOCK*)vscDG_GetNodeById(&(pCFG)->dgGraph, (id))
+#define CFG_GET_DOM_TREE(pCFG)           (&(pCFG)->domTree)
+#define CFG_GET_PDOM_TREE(pCFG)          (&(pCFG)->postDomTree)
 
 /*
  *   Call graph definition
@@ -322,12 +411,74 @@ typedef VSC_GNODE_LIST_ITERATOR CG_ITERATOR;
 /* CG related functions */
 VSC_ErrCode vscVIR_BuildCallGraph(VIR_Shader* pShader, VIR_CALL_GRAPH* pCg);
 VSC_ErrCode vscVIR_DestroyCallGraph(VIR_CALL_GRAPH* pCg);
+gctBOOL vscVIR_IsCallGraphBuilt(VIR_CALL_GRAPH* pCg);
+VSC_ErrCode vscVIR_RemoveFuncBlockFromCallGraph(VIR_CALL_GRAPH* pCg,
+                                                VIR_FUNC_BLOCK* pFuncBlk,
+                                                gctBOOL bRemoveFuncInShader);
 
 /* CFG related functions */
 VSC_ErrCode vscVIR_BuildCFGPerFunc(VIR_Function* pFunc);
 VSC_ErrCode vscVIR_DestroyCFGPerFunc(VIR_Function* pFunc);
 VSC_ErrCode vscVIR_BuildCFG(VIR_Shader* pShader);
 VSC_ErrCode vscVIR_DestroyCFG(VIR_Shader* pShader);
+gctBOOL vscVIR_IsCFGBuilt(VIR_Shader* pShader);
+VIR_BASIC_BLOCK* vscVIR_AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG,
+                                           VIR_Instruction* pStartInst,
+                                           VIR_Instruction* pEndInst,
+                                           VIR_FLOW_TYPE flowType);
+VSC_ErrCode vscVIR_RemoveBasicBlockFromCFG(VIR_CONTROL_FLOW_GRAPH* pCFG,
+                                           VIR_BASIC_BLOCK* pBasicBlk,
+                                           gctBOOL bDeleteInst);
+VSC_ErrCode vscVIR_AddEdgeToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG,
+                                VIR_BASIC_BLOCK* pFromBasicBlk,
+                                VIR_BASIC_BLOCK* pToBasicBlk,
+                                VIR_CFG_EDGE_TYPE edgeType);
+VSC_ErrCode vscVIR_RemoveEdgeFromCFG(VIR_CONTROL_FLOW_GRAPH* pCFG,
+                                     VIR_BASIC_BLOCK* pFromBasicBlk,
+                                     VIR_BASIC_BLOCK* pToBasicBlk);
+VIR_CFG_EDGE* vscVIR_GetCfgEdge(VIR_CONTROL_FLOW_GRAPH* pCFG,
+                                VIR_BASIC_BLOCK* pFromBasicBlk,
+                                VIR_BASIC_BLOCK* pToBasicBlk);
+
+/* Followings CFG related functions are TO-BE-REFINE!!! */
+VIR_BASIC_BLOCK* VIR_BB_GetLeadingBB(VIR_BASIC_BLOCK* bb);
+VIR_BASIC_BLOCK* VIR_BB_GetFollowingBB(VIR_BASIC_BLOCK* bb);
+VIR_BASIC_BLOCK* VIR_BB_GetJumpToBB(VIR_BASIC_BLOCK* bb);
+VSC_ErrCode
+VIR_BB_ChangeSuccBBs(
+    VIR_BASIC_BLOCK* bb,
+    VIR_BASIC_BLOCK* newJmpTo,
+    VIR_BASIC_BLOCK* newFallThru
+    );
+void
+VIR_BB_RemoveBranch(
+    VIR_BASIC_BLOCK* bb
+    );
+VSC_ErrCode
+VIR_BB_Append(
+    VIR_BASIC_BLOCK* target,
+    VIR_BASIC_BLOCK* source,
+    gctBOOL beforeTargetBranch,
+    gctBOOL sourceBranchExcluded
+    );
+VSC_ErrCode
+VIR_BB_CopyBBBefore(
+    VIR_BASIC_BLOCK* source,
+    VIR_BASIC_BLOCK* before,
+    VIR_BASIC_BLOCK** copy
+    );
+VSC_ErrCode
+VIR_BB_CopyBBAfter(
+    VIR_BASIC_BLOCK* source,
+    VIR_BASIC_BLOCK* after,
+    VIR_BASIC_BLOCK** copy
+    );
+VSC_ErrCode
+VIR_BB_InsertBBAfter(
+    VIR_BB* after,
+    VIR_OpCode opcode,
+    VIR_BB** newBB
+    );
 
 /* (post-) DOM related functions */
 VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG);
@@ -352,6 +503,14 @@ VSC_ErrCode vscVIR_DestroyDomFrontier(VIR_Shader* pShader);
 /* BB reach-relation functions */
 VSC_ErrCode vscVIR_BuildBbReachRelation(VIR_Shader* pShader);
 VSC_ErrCode vscVIR_DestroyBbReachRelation(VIR_Shader* pShader);
+
+#if LOOP_HIERARCHY_SUPPORT_IN_CFG
+/* Loop hierarchy related functions */
+VSC_ErrCode vscVIR_BuildLoopHierarchyPerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_LOOP_HIERARCHY* pLoopHierarchy);
+VSC_ErrCode vscVIR_DestroyLoopHierarchyPerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_LOOP_HIERARCHY* pLoopHierarchy);
+VSC_ErrCode vscVIR_BuildLoopHierarchy(VIR_Shader* pShader, VIR_LOOP_HIERARCHY* pLoopHierarchy);
+VSC_ErrCode vscVIR_DestroyLoopHierarchy(VIR_Shader* pShader, VIR_LOOP_HIERARCHY* pLoopHierarchy);
+#endif
 
 END_EXTERN_C()
 

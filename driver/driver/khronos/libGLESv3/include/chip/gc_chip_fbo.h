@@ -104,7 +104,7 @@ __glChipFramebufferRenderbuffer(
     __GLframebufferObject *framebufferObj,
     GLint attachIndex,
     __GLrenderbufferObject *renderbufferObj,
-     __GLfboAttachPoint *preAttach
+    __GLfboAttachPoint *preAttach
     );
 
 GLboolean

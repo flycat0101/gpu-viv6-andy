@@ -26,7 +26,7 @@ const char * _OPENVG_VERSION = "\n\0$VERSION$"
                                gcmTXT2STR(gcvVERSION_BUILD)
                                "$\n";
 
-static gltCONTEXT_FUNCTION veglGetCurVGCtxFunc = gcvNULL;
+static void * (* veglGetCurVGCtxFunc)(EGLenum) = gcvNULL;
 
 /*******************************************************************************
 **
@@ -289,8 +289,7 @@ gceSTATUS vgfFlushPipe(
     {
 #if gcdGC355_PROFILER
         /* Flush PE cache. */
-        gcmERR_BREAK(gcoHAL_Flush(Context->hal
-            , Context->vg,
+        gcmERR_BREAK(gcoHAL_Flush(Context->hal, Context->vg,
             Context->TreeDepth, Context->saveLayerTreeDepth, Context->varTreeDepth
             ));
 #else
@@ -357,10 +356,6 @@ static void *
 veglCreateContext(
     gcoOS Os,
     gcoHAL Hal,
-#if gcdGC355_PROFILER
-    gctUINT64 appStartTime,
-    gctFILE apiTimeFile,
-#endif
     gctINT ClientVersion,
     VEGLimports *Imports,
     void * SharedContext
@@ -403,8 +398,8 @@ veglCreateContext(
         context->os  = Os;
 #if gcdGC355_PROFILER
         context->enableGetAPITimes = gcvFALSE;
-        context->appStartTime = appStartTime;
-        context->apiTimeFile = apiTimeFile;
+        context->appStartTime = Imports->appStartTime;
+        context->apiTimeFile = Imports->apiTimeFile;
         context->pathName = gcvNULL;
         context->TreeDepth = 0;
         context->saveLayerTreeDepth = 0;
@@ -671,22 +666,13 @@ veglCreateContext(
 static void *
 veglCreateContextEx(
     void * Thread,
-#if gcdGC355_PROFILER
-    gctUINT64 appStartTime,
-    gctFILE apiFileTime,
-#endif
     gctINT ClientVersion,
     VEGLimports *Imports,
     void * SharedContext
     )
 {
-#if gcdGC355_PROFILER
-    return veglCreateContext(gcvNULL, gcvNULL,appStartTime,apiFileTime,
-                ClientVersion, Imports, SharedContext);
-#else
     return veglCreateContext(gcvNULL, gcvNULL,
                 ClientVersion, Imports, SharedContext);
-#endif
 }
 
 /*******************************************************************************
@@ -1163,110 +1149,6 @@ veglUnsetContext(
 
 /*******************************************************************************
 **
-** veglSetBuffer
-**
-** Set render target (multi-buffer support).
-**
-** INPUT:
-**
-**    Draw
-**       Pointer to the surface to be used for drawing.
-**
-** OUTPUT:
-**
-**    Nothing.
-*/
-
-static gceSTATUS
-veglSetBuffer(
-    gcoSURF Draw
-    )
-{
-    gceSTATUS status = gcvSTATUS_GENERIC_IO;
-    vgsTHREADDATA_PTR Thread;
-    vgsCONTEXT_PTR Context;
-
-    Thread = vgfGetThreadData(gcvFALSE);
-    Context = Thread->context;
-    do
-    {
-        gctPOINTER mems[3];
-
-        /* Draw surface cannot be NULL. */
-        gcmASSERT(Draw != gcvNULL);
-
-        gcmTRACE_ZONE(
-            gcvLEVEL_INFO, gcvZONE_PARAMETERS,
-            "%s(0x%08X);\n",
-            __FUNCTION__,
-            Draw
-            );
-
-        /* Same as the current? */
-        if (Draw == Context->targetImage.surface)
-        {
-            status = gcvSTATUS_OK;
-            break;
-        }
-
-        /* Unlock the current buffer. */
-        if (Context->targetImage.buffer != gcvNULL)
-        {
-            gcmERR_BREAK(gcoSURF_Unlock(
-                Context->targetImage.surface,
-                Context->targetImage.buffer
-                ));
-
-            Context->targetImage.buffer = gcvNULL;
-        }
-
-        /* Lock the new buffer. */
-        gcmERR_BREAK(gcoSURF_Lock(
-            Draw,
-            gcvNULL,
-            mems
-            ));
-        Context->targetImage.buffer = (gctUINT8_PTR)mems[0];
-
-        if (Context->targetImage.surface != gcvNULL)
-        {
-
-#if gcdENABLE_3D
-            gcsTLS_PTR tls;
-            gcmERR_BREAK(gcoOS_GetTLS(&tls));
-
-            /* Unset VG target. */
-            if (tls->engineVG != gcvNULL)
-            {
-#if gcdGC355_PROFILER
-                gcmERR_BREAK(
-                    gcoVG_UnsetTarget(tls->engineVG,
-                    0,0,0,
-                    Context->targetImage.surface));
-#else
-                gcmERR_BREAK(
-                    gcoVG_UnsetTarget(tls->engineVG,
-                    Context->targetImage.surface));
-#endif
-            }
-#endif
-
-            gcmERR_BREAK(gcoSURF_Destroy(Context->targetImage.surface));
-        }
-        /* Set the surface object. */
-        Context->targetImage.surface = Draw;
-
-        gcmVERIFY_OK(gcoSURF_ReferenceSurface(Draw));
-
-    }
-    while(gcvFALSE);
-    /* Return status. */
-    return status;
-}
-
-
-/*******************************************************************************
-**
 ** vgGetError
 **
 ** vgGetError returns the oldest error code provided by an API call on the
@@ -1489,7 +1371,7 @@ veglFlushContext(
 #if gcdGC355_PROFILER
     vgsCONTEXT_PTR context = (vgsCONTEXT_PTR)Context;
 
-    gcoHAL_Flush(context->hal, context->vg, gcvNULL, context->TreeDepth, context->saveLayerTreeDepth, context->varTreeDepth);
+    gcoHAL_Flush(context->hal, context->vg, context->TreeDepth, context->saveLayerTreeDepth, context->varTreeDepth);
     /* Make sure the hardware is idle. */
     gcoHAL_Commit(context->hal, gcvFALSE);
     /* Mark the states as not finished. */
@@ -1524,7 +1406,7 @@ veglFlush(
         return;
     }
 
-    gcoHAL_Flush(Context->hal, Context->vg, gcvNULL, Context->TreeDepth, Context->saveLayerTreeDepth, Context->varTreeDepth);
+    gcoHAL_Flush(Context->hal, Context->vg, Context->TreeDepth, Context->saveLayerTreeDepth, Context->varTreeDepth);
     /* Make sure the hardware is idle. */
     gcoHAL_Commit(Context->hal, gcvFALSE);
     /* Mark the states as not finished. */
@@ -1558,7 +1440,7 @@ veglFinish(
         return;
     }
 
-    gcoHAL_Flush(Context->hal, Context->vg, gcvNULL, Context->TreeDepth, Context->saveLayerTreeDepth, Context->varTreeDepth);
+    gcoHAL_Flush(Context->hal, Context->vg, Context->TreeDepth, Context->saveLayerTreeDepth, Context->varTreeDepth);
     /* Make sure the hardware is idle. */
     gcoHAL_Commit(Context->hal, gcvTRUE);
     /* Reset the states. */
@@ -1632,13 +1514,16 @@ veglGetClientBuffer(
     return surface;
 }
 
-static EGLBoolean veglQueryHWVG(void)
+static EGLBoolean
+veglQueryHWVG(
+    void
+    )
 {
     return EGL_TRUE;
 }
 
 /* VG Resolve */
-static void veglAppendVGResolve(
+static void veglResolveVG(
     void * Context,
     gcoSURF Target
     )
@@ -1656,6 +1541,7 @@ static void veglAppendVGResolve(
         /* Set target. */
         gcmERR_BREAK(gcoVG_SetTarget(
             context->vg,
+            (gcsPROFILERFUNCNODE *)context->funcDList,
             context->TreeDepth,
             context->saveLayerTreeDepth,
             context->varTreeDepth,
@@ -1871,6 +1757,7 @@ veglCreateImageParentImage(
     khrEGL_IMAGE    *khImage = gcvNULL;
     int             childCount;
     int             i;
+    gctINT32        pre_referenceCount = 0;
     gctINT32        referenceCount = 0;
     vgsCONTEXT_PTR context = (vgsCONTEXT_PTR) Context;
 
@@ -1894,8 +1781,27 @@ veglCreateImageParentImage(
         return EGL_BAD_ACCESS;
     }
 
+    /* Test if surface is a sibling of any eglImage or bound to an off-screen buffer.*/
+    gcoSURF_QueryReferenceCount(vgimage_obj->surface, &pre_referenceCount);
+#if gcdGC355_PROFILER
+    gcoVG_UnsetTarget(context->vg,
+        gcvNULL,0,0,0,
+        vgimage_obj->surface);
+#else
+    gcoVG_UnsetTarget(context->vg,
+        vgimage_obj->surface);
+#endif
     gcoSURF_QueryReferenceCount(vgimage_obj->surface, &referenceCount);
-    /* Test if surface is a sibling of any eglImage. */
+    /* image->surface is current rendertarget. */
+    if (referenceCount != pre_referenceCount)
+    {
+#if gcdGC355_PROFILER
+        gcoVG_SetTarget(context->vg, NULL, 0, 0, 0, vgimage_obj->surface, gcvORIENTATION_TOP_BOTTOM);
+#else
+        gcoVG_SetTarget(context->vg, vgimage_obj->surface, gcvORIENTATION_TOP_BOTTOM);
+#endif
+    }
+
     if (referenceCount > 1)
     {
         gcmFOOTER_ARG("return=0x%x", EGL_BAD_ACCESS);
@@ -2060,44 +1966,6 @@ VG_API_CALL void VG_API_ENTRY vgFinish(
     vgmLEAVEAPI(vgFinish);
 }
 
-/* Dispatch table. */
-#ifdef _WIN32
-VG_API_CALL
-#endif
-veglDISPATCH
-OpenVG_DISPATCH_TABLE =
-{
-    /* createContext            */  veglCreateContextEx,
-    /* destroyContext           */  veglDestroyContext,
-    /* makeCurrent              */  veglSetContext,
-    /* loseCurrent              */  veglUnsetContext,
-    /* setDrawable              */  veglSetContext,
-    /* flushContext             */  veglFlushContext,
-
-    /* flush                    */  veglFlush,
-    /* finish                   */  veglFinish,
-
-    /* setBuffer                */  veglSetBuffer,
-    /* getClientBuffer          */  veglGetClientBuffer,
-
-    /* createImageTexture       */  gcvNULL,
-    /* createImageRenderbuffer  */  gcvNULL,
-    /* createImageParentImage   */  veglCreateImageParentImage,
-    /* bindTexImage             */  gcvNULL,
-
-    /* profiler                 */  gcvNULL,
-    /* getProcAddr;             */  gcvNULL,
-
-    /* queryHWVG                */  veglQueryHWVG,
-
-    /* renderThread             */  gcvNULL,
-
-    /* swapbuffers              */  gcvNULL,
-    /* VG Resolve */                veglAppendVGResolve,
-
-    /* syncImage                */  gcvNULL,
-};
-
 /* Make sure the maskImage is ready to use. */
 gceSTATUS vgfGetMaskImage(
     vgsCONTEXT_PTR Context)
@@ -2204,3 +2072,30 @@ gceSTATUS vgfGetMaskImage(
     vgmLEAVESUBAPI(vgfGetMaskImage);
     return status;
 }
+
+/* Dispatch table. */
+#ifdef _WIN32
+VG_API_CALL
+#endif
+veglDISPATCH
+OpenVG_DISPATCH_TABLE =
+{
+    /* createContext            */  veglCreateContextEx,
+    /* destroyContext           */  veglDestroyContext,
+    /* makeCurrent              */  veglSetContext,
+    /* loseCurrent              */  veglUnsetContext,
+    /* setDrawable              */  veglSetContext,
+    /* flushContext             */  veglFlushContext,
+    /* flush                    */  veglFlush,
+    /* finish                   */  veglFinish,
+    /* getClientBuffer          */  veglGetClientBuffer,
+    /* createImageTexture       */  gcvNULL,
+    /* createImageRenderbuffer  */  gcvNULL,
+    /* createImageParentImage   */  veglCreateImageParentImage,
+    /* bindTexImage             */  gcvNULL,
+    /* profiler                 */  gcvNULL,
+    /* getProcAddr              */  gcvNULL,
+    /* swapBuffers              */  gcvNULL,
+    /* queryHWVG                */  veglQueryHWVG,
+    /* resolveVG                */  veglResolveVG,
+};

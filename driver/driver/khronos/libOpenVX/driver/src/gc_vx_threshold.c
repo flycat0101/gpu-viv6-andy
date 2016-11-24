@@ -31,12 +31,12 @@ VX_PRIVATE_API vx_bool vxoThreshold_IsValidDataType(vx_enum dataType)
     return (vx_bool)(dataType == VX_TYPE_UINT8);
 }
 
-VX_PUBLIC_API vx_status vxReleaseThreshold(vx_threshold *threshold)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseThreshold(vx_threshold *threshold)
 {
     return vxoReference_Release((vx_reference_ptr)threshold, VX_TYPE_THRESHOLD, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_threshold vxCreateThreshold(vx_context context, vx_enum thresh_type, vx_enum data_type)
+VX_API_ENTRY vx_threshold VX_API_CALL vxCreateThreshold(vx_context context, vx_enum thresh_type, vx_enum data_type)
 {
     vx_threshold threshold;
 
@@ -56,7 +56,7 @@ VX_PUBLIC_API vx_threshold vxCreateThreshold(vx_context context, vx_enum thresh_
     return threshold;
 }
 
-VX_PUBLIC_API vx_status vxSetThresholdAttribute(vx_threshold threshold, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxSetThresholdAttribute(vx_threshold threshold, vx_enum attribute, const void *ptr, vx_size size)
 {
     vx_enum type;
 
@@ -128,7 +128,7 @@ VX_PUBLIC_API vx_status vxSetThresholdAttribute(vx_threshold threshold, vx_enum 
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxQueryThreshold(vx_threshold threshold, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryThreshold(vx_threshold threshold, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoReference_IsValidAndSpecific(&threshold->base, VX_TYPE_THRESHOLD)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -193,3 +193,4 @@ VX_PUBLIC_API vx_status vxQueryThreshold(vx_threshold threshold, vx_enum attribu
 
     return VX_SUCCESS;
 }
+

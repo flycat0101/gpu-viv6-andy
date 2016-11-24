@@ -40,8 +40,6 @@ static const char *sBitmapFile[] = {
     "resource/zero2_B10G10R10A2.bmp",
     "resource/zero2_NV12_10BIT.vimg",
     "resource/zero2_NV21_10BIT.vimg",
-    "resource/zero2_NV16_10BIT.vimg",
-    "resource/zero2_NV61_10BIT.vimg",
 };
 
 static gctCONST_STRING s_CaseDescription = \

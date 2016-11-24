@@ -29,8 +29,7 @@
 #  include "gc_gralloc_priv.h"
 #endif
 
-#if defined(WL_EGL_PLATFORM)
-#  include <gc_hal_eglplatform.h>
+#if defined(WL_EGL_PLATFORM) && !defined(USE_VIV_WAYLAND)
 #  include <wayland-server.h>
 #  include <gc_wayland_protocol.h>
 #endif
@@ -247,6 +246,9 @@ _DestroyImage(
         Image->image.u.ANativeBuffer.nativeBuffer = gcvNULL;
     }
 #endif
+
+    /* Commit accumulated commands. */
+    gcoHAL_Commit(gcvNULL, gcvFALSE);
 
     /* Finalize. */
     _FinalizeImage(Thread, Display, Image);
@@ -1137,7 +1139,9 @@ _CreateImageWL(
     VEGLImage image = gcvNULL;
 
 #if defined(WL_EGL_PLATFORM)
-    gcsWL_VIV_BUFFER *buffer = wl_resource_get_user_data(Buffer);
+    gctUINT width  = 0;
+    gctUINT height = 0;
+    gcoSURF surface = gcvNULL;
 
     /* Context must be null. */
     if (Ctx != gcvNULL)
@@ -1146,15 +1150,31 @@ _CreateImageWL(
         return EGL_NO_IMAGE_KHR;
     }
 
+    if (veglQueryWaylandBuffer(Dpy,
+                               Buffer,
+                               (EGLint *) &width,
+                               (EGLint *) &height,
+                               &surface) != EGL_TRUE)
+    {
+        veglSetEGLerror(Thread,  EGL_BAD_PARAMETER);
+        return EGL_NO_IMAGE_KHR;
+    }
+
     /* Initialize an image struct. */
     image = _InitializeImage(Thread, Dpy, Ctx);
+
+    if (image == gcvNULL)
+    {
+        veglSetEGLerror(Thread, EGL_BAD_ALLOC);;
+        return EGL_NO_IMAGE;
+    }
 
     image->image.magic   = KHR_EGL_IMAGE_MAGIC_NUM;
     image->image.type    = KHR_IMAGE_WAYLAND_BUFFER;
 
-    image->image.surface = buffer->surface;
-    image->image.u.wlbuffer.width =  buffer->width;
-    image->image.u.wlbuffer.height = buffer->height;
+    image->image.surface           = surface;
+    image->image.u.wlbuffer.width  = width;
+    image->image.u.wlbuffer.height = height;
 #endif
 
     return image;
@@ -1509,6 +1529,7 @@ _CreateImageDMABuf(
     {
         /* Error, very unlikely. */
         gcmVERIFY_OK(gcoSURF_Destroy(surface));
+        gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
 
         veglSetEGLerror(Thread, EGL_BAD_ALLOC);;
         return EGL_NO_IMAGE;
@@ -1961,14 +1982,14 @@ eglDestroyImageKHR(
     return result;
 }
 
-#if (defined EGL_WAYLAND_BUFFER_WL && defined EGL_API_WL)
+#if defined EGL_WAYLAND_BUFFER_WL && defined EGL_API_WL
 struct wl_buffer *eglCreateWaylandBufferFromImageWL(EGLDisplay Dpy, EGLImageKHR Image)
 {
     VEGLThreadData  thread;
     VEGLDisplay     dpy;
     VEGLImage       image;
     gceSTATUS status;
-    struct wl_buffer* wl_buffer = gcvNULL;
+    struct wl_buffer * wl_buf = gcvNULL;
 
     gcmHEADER_ARG("Dpy=0x%x Image=0x%x", Dpy, Image);
 
@@ -2019,6 +2040,16 @@ struct wl_buffer *eglCreateWaylandBufferFromImageWL(EGLDisplay Dpy, EGLImageKHR 
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+#if defined(USE_VIV_WAYLAND)
+    /* Call underlying function. */
+    wl_buf = veglCreateWaylandBufferFromImage(thread, dpy, image);
+
+    if (!wl_buf)
+    {
+        veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+#  else
     VEGL_LOCK_DISPLAY_RESOURCE(dpy);
     {
         gcsWL_EGL_DISPLAY* display = ((gcsWL_EGL_DISPLAY*)dpy->localInfo);
@@ -2058,7 +2089,7 @@ struct wl_buffer *eglCreateWaylandBufferFromImageWL(EGLDisplay Dpy, EGLImageKHR 
 
 
         gcoWL_CreateGhostBuffer(display, egl_buffer);
-        wl_buffer = egl_buffer->wl_buffer;
+        wl_buf = egl_buffer->wl_buffer;
         /*egl_buffer is no longer required. wl_buffer will be destoryed by application, look weston nested.c*/
         gcoOS_FreeMemory(gcvNULL, egl_buffer);
         egl_buffer = gcvNULL;
@@ -2066,13 +2097,15 @@ struct wl_buffer *eglCreateWaylandBufferFromImageWL(EGLDisplay Dpy, EGLImageKHR 
     }
 
     VEGL_UNLOCK_DISPLAY_RESOURCE(dpy);
+#  endif
+
     /* Success. */
     veglSetEGLerror(thread,  EGL_SUCCESS);
+    return wl_buf;
 
-    return wl_buffer;
 OnError:
-    return gcvNULL;
-
+    gcmFOOTER_ARG("return=%p", wl_buf);
+    return wl_buf;
 }
 #endif
 

@@ -19,3 +19,4 @@ EXTERN_C_BEGIN
 EXTERN_C_END
 
 #endif /* __GC_VX_THRESHOLD_H__ */
+

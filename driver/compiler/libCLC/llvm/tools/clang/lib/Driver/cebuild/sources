@@ -1,0 +1,52 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+!IF "$(VIVANTE_ENABLE_3D)" != "1"
+SKIPBUILD=1
+!ENDIF
+
+!IF "$(USE_OPENCL)" == "0"
+SKIPBUILD=1
+!ENDIF
+
+DOSYSGEN=1
+SYNCHRONIZE_DRAIN=1
+TARGETNAME=libCLC_clangDriver
+TARGETTYPE=LIBRARY
+
+SOURCES= \
+    ../ToolChain.cpp \
+    ../ArgList.cpp \
+    ../Option.cpp \
+    ../OptTable.cpp \
+    ../Tool.cpp \
+    ../Arg.cpp \
+    ../Action.cpp \
+    ../CC1Options.cpp \
+    ../CC1AsOptions.cpp \
+    ../ToolChains.cpp \
+    ../Tools.cpp \
+    ../HostInfo.cpp \
+    ../Types.cpp \
+
+INCLUDES= \
+  $(INCLUDES); \
+  $(AQROOT)\hal\inc; \
+  $(AQROOT)\hal\user; \
+  $(AQROOT)\hal\os\ce\user; \
+  $(AQROOT)\compiler\libVSC\include; \
+  $(AQROOT)\compiler\libCLC\inc; \
+  $(AQROOT)\compiler\libCLC\llvm\include; \
+  $(AQROOT)\compiler\libCLC\llvm\tools\clang\include; \
+
+EXCEPTION_CPP=NO_SEH_NO_C_THROW

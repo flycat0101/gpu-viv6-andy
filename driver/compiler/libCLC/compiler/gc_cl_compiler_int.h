@@ -51,6 +51,9 @@ typedef gctUINT32 cltLANGUAGE_VERSION;
 #define clmHasRightLanguageVersion(Compiler, Version) \
       (cloCOMPILER_GetLanguageVersion(Compiler) >= (Version))
 
+/* Maximum number of parameter chain variables in an intrinsic ASM call */
+#define cldMaxParamChains   5
+
 gceSTATUS
 cloCOMPILER_Lock(
     IN cloCOMPILER Compiler

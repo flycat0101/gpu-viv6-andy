@@ -1,0 +1,128 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Linux build file for libSPIRV
+#
+
+################################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+
+ifeq ($(USE_ARMCC),1)
+  $(error ARMCC not ready)
+endif
+
+ifeq ($(gcdSTATIC_LINK),1)
+  TARGET_MODULE     := $(OBJ_DIR)/libSPIRV.a
+else
+  TARGET_MODULE     := $(OBJ_DIR)/libSPIRV.so
+  TARGET_SONAME     := libSPIRV.so
+  TARGET_LINKS      :=
+endif
+
+
+################################################################################
+# Installation directory.
+
+INSTALL_DIR         := $(SDK_DIR)/drivers
+
+ifndef FIXED_ARCH_TYPE
+
+OBJECTS := \
+    $(OBJ_DIR)/gc_spirv_mempool.o \
+    $(OBJ_DIR)/gc_spirv_to_vir.o \
+    $(OBJ_DIR)/gc_spriv_disassmble.o
+
+vpath %.c spvconverter
+
+CFLAGS += \
+    -I$(AQROOT)/sdk/inc \
+    -I$(AQROOT)/hal/inc \
+    -I$(AQROOT)/hal/os/linux/user \
+    -I$(AQROOT)/compiler/libVSC/include \
+    -I$(CURDIR)/spvconverter
+
+CFLAGS += \
+    -I$(AQROOT)/hal/user \
+    -I$(AQROOT)/hal/user/arch
+
+CFLAGS += \
+    -I$(AQARCH)/cmodel/inc
+
+CFLAGS += \
+    -fPIC \
+    -std=c99
+
+LDFLAGS := \
+    $(LFLAGS) \
+    -Wall \
+    -shared \
+    -Wl,-z,defs \
+    -Wl,-soname,$(TARGET_SONAME) \
+    -Wl,--version-script=$(CURDIR)/spvconverter/spvconverter.map
+
+LDLIBS := \
+    -L$(SDK_DIR)/drivers \
+    -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL \
+    -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR) -lVSC
+
+.PHONY: all clean install
+
+all: $(TARGET_MODULE)
+
+clean:
+	-rm -rf $(TARGET_MODULE) $(OBJ_DIR)
+
+install: all
+	@mkdir -p $(INSTALL_DIR)
+	@cp $(TARGET_MODULE) $(INSTALL_DIR)
+	@for lib in $(TARGET_LINKS); do \
+	    ln -sf $(notdir $(TARGET_MODULE)) $(INSTALL_DIR)/$$lib; \
+	done
+
+ifeq ($(gcdSTATIC_LINK),1)
+$(TARGET_MODULE): $(OBJECTS)
+	$(AR) -rc $@ $(OBJECTS)
+
+else
+$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so) \
+                  $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so)
+
+$(TARGET_MODULE): $(OBJECTS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
+endif
+
+$(OBJ_DIR)/%.o: %.c
+	@-mkdir -p $(dir $@)
+	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+-include $(OBJECTS:.o=.d)
+
+else # FIXED_ARCH_TYPE
+
+OBJECTS :=
+
+clean: rmfile
+
+install: cpfile
+
+.PHONY: cpfile rmfile
+cpfile:
+	@-cp -f $(FIXED_ARCH_TYPE)/$(TARGET_SONAME) $(INSTALL_DIR)
+
+rmfile:
+	@-rm -f $(INSTALL_DIR)/$(TARGET_SONAME)
+
+endif # End FIXED_ARCH_TYPE

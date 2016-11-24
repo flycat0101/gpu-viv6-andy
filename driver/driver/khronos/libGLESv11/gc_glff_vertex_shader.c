@@ -145,7 +145,8 @@ static gctUINT _AllocateLabel(
 
 static gceSTATUS _Set_uColor(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4];
@@ -164,7 +165,8 @@ static gceSTATUS _Set_uColor(
 
 static gceSTATUS _Set_uNormal(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4];
@@ -183,7 +185,8 @@ static gceSTATUS _Set_uNormal(
 
 static gceSTATUS _Set_uModelView(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4 * 4];
@@ -202,7 +205,8 @@ static gceSTATUS _Set_uModelView(
 
 static gceSTATUS _Set_uModelViewInverse3x3Transposed(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[3 * 3];
@@ -221,7 +225,8 @@ static gceSTATUS _Set_uModelViewInverse3x3Transposed(
 
 static gceSTATUS _Set_uModelViewProjection(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4 * 4];
@@ -250,7 +255,8 @@ static gceSTATUS _Set_uModelViewProjection(
 
 static gceSTATUS _Set_uProjection(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4 * 4];
@@ -269,7 +275,8 @@ static gceSTATUS _Set_uProjection(
 
 static gceSTATUS _Set_uEcm(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4];
@@ -288,7 +295,8 @@ static gceSTATUS _Set_uEcm(
 
 static gceSTATUS _Set_uAcm(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4];
@@ -307,7 +315,8 @@ static gceSTATUS _Set_uAcm(
 
 static gceSTATUS _Set_uDcm(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4];
@@ -326,7 +335,8 @@ static gceSTATUS _Set_uDcm(
 
 static gceSTATUS _Set_uAcs(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4];
@@ -345,7 +355,8 @@ static gceSTATUS _Set_uAcs(
 
 static gceSTATUS _Set_uSrm(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray;
@@ -367,7 +378,8 @@ static gceSTATUS _Set_uSrm(
 
 static gceSTATUS _Set_uScm(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4];
@@ -386,7 +398,8 @@ static gceSTATUS _Set_uScm(
 
 static gceSTATUS _Set_uPpli(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4 * glvMAX_LIGHTS];
@@ -405,7 +418,8 @@ static gceSTATUS _Set_uPpli(
 
 static gceSTATUS _Set_uKi(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[3 * glvMAX_LIGHTS];
@@ -427,7 +441,8 @@ static gceSTATUS _Set_uKi(
 
 static gceSTATUS _Set_uSrli(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[glvMAX_LIGHTS];
@@ -449,7 +464,8 @@ static gceSTATUS _Set_uSrli(
 
 static gceSTATUS _Set_uAcli(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4 * glvMAX_LIGHTS];
@@ -468,7 +484,8 @@ static gceSTATUS _Set_uAcli(
 
 static gceSTATUS _Set_uDcli(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4 * glvMAX_LIGHTS];
@@ -487,7 +504,8 @@ static gceSTATUS _Set_uDcli(
 
 static gceSTATUS _Set_uScli(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4 * glvMAX_LIGHTS];
@@ -506,7 +524,8 @@ static gceSTATUS _Set_uScli(
 
 static gceSTATUS _Set_uTexMatrix(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLint i, x, y;
@@ -557,7 +576,8 @@ static gceSTATUS _Set_uTexMatrix(
 
 static gceSTATUS _Set_uClipPlane(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4 * glvMAX_CLIP_PLANES];
@@ -576,7 +596,8 @@ static gceSTATUS _Set_uClipPlane(
 
 static gceSTATUS _Set_uPointAttenuation(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4];
@@ -595,7 +616,8 @@ static gceSTATUS _Set_uPointAttenuation(
 
 static gceSTATUS _Set_uPointSize(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     gceSTATUS status;
@@ -614,7 +636,8 @@ static gceSTATUS _Set_uPointSize(
 
 static gceSTATUS _Set_uViewport(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     gceSTATUS status;
@@ -658,15 +681,17 @@ static gceSTATUS _Set_uViewport(
 
 static gceSTATUS _Set_uMatrixPalette(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     gctUINT i, x, y;
     glsMATRIX_PTR paletteMatrix;
     GLfloat valueArray[4 * 4 * glvMAX_PALETTE_MATRICES];
     GLfloat* value = valueArray;
+    GLfloat* orignalValue = value;
     GLfloat matrix[4 * 4];
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
 
@@ -691,12 +716,30 @@ static gceSTATUS _Set_uMatrixPalette(
         }
     }
 
-    status = gcUNIFORM_SetFracValue(
-          Uniform,
-          4 * glvMAX_PALETTE_MATRICES,
-          Context->currProgram->hints,
-          valueArray
-          );
+    if ((pointer != gcvNULL) &&
+        isUniformMovedToDUBO(Uniform))
+    {
+        /* find dst */
+        pointer += Uniform->offset;
+
+        gcoOS_MemCopy(pointer, orignalValue, 4 * 4 * sizeof(GLfloat) * glvMAX_PALETTE_MATRICES);
+
+#if gcdSYNC
+        if (Context->currProgram->vs.halBufObj)
+        {
+            gcoBUFOBJ_GetFence(Context->currProgram->vs.halBufObj, gcvFENCE_TYPE_WRITE);
+        }
+#endif
+    }
+    else
+    {
+        status = gcUNIFORM_SetFracValue(
+            Uniform,
+            4 * glvMAX_PALETTE_MATRICES,
+            Context->currProgram->hints,
+            valueArray
+            );
+    }
 
     gcmFOOTER();
 
@@ -705,16 +748,18 @@ static gceSTATUS _Set_uMatrixPalette(
 
 static gceSTATUS _Set_uMatrixPaletteInverse(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     gctUINT i, x, y;
     glsDEPENDENTMATRIX_PTR matrixArray;
     GLfloat valueArray[3 * 3 * glvMAX_PALETTE_MATRICES];
     GLfloat* value = valueArray;
+    GLfloat* orignalValue = value;
     GLfloat matrix[4 * 4];
     GLfloat* row;
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Context=0x%x Uniform=0x%x", Context, Uniform);
 
@@ -739,12 +784,30 @@ static gceSTATUS _Set_uMatrixPaletteInverse(
         }
     }
 
-    status = gcUNIFORM_SetFracValue(
-          Uniform,
-          3 * glvMAX_PALETTE_MATRICES,
-          Context->currProgram->hints,
-          valueArray
-          );
+    if ((pointer != gcvNULL) &&
+        isUniformMovedToDUBO(Uniform))
+    {
+        /* find dst */
+        pointer += Uniform->offset;
+
+        gcoOS_MemCopy(pointer, orignalValue, 3 * 3 * sizeof(GLfloat) * glvMAX_PALETTE_MATRICES);
+
+#if gcdSYNC
+        if (Context->currProgram->vs.halBufObj)
+        {
+            gcoBUFOBJ_GetFence(Context->currProgram->vs.halBufObj, gcvFENCE_TYPE_WRITE);
+        }
+#endif
+    }
+    else
+    {
+        status = gcUNIFORM_SetFracValue(
+            Uniform,
+            3 * glvMAX_PALETTE_MATRICES,
+            Context->currProgram->hints,
+            valueArray
+            );
+    }
 
     gcmFOOTER();
 
@@ -753,7 +816,8 @@ static gceSTATUS _Set_uMatrixPaletteInverse(
 
 static gceSTATUS _Set_uAcmAcli(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4 * glvMAX_LIGHTS];
@@ -800,7 +864,8 @@ static gceSTATUS _Set_uAcmAcli(
 
 static gceSTATUS _Set_uVPpli(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLint       i;
@@ -840,7 +905,8 @@ static gceSTATUS _Set_uVPpli(
 
 static gceSTATUS _Set_uDcmDcli(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4 * glvMAX_LIGHTS];
@@ -887,7 +953,8 @@ static gceSTATUS _Set_uDcmDcli(
 
 static gceSTATUS _Set_uCrli(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[glvMAX_LIGHTS];
@@ -906,7 +973,8 @@ static gceSTATUS _Set_uCrli(
 
 static gceSTATUS _Set_uCosCrli(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[glvMAX_LIGHTS];
@@ -939,7 +1007,8 @@ static gceSTATUS _Set_uCosCrli(
 
 static gceSTATUS _Set_uNormedSdli(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
 
@@ -1881,8 +1950,9 @@ static gceSTATUS _Assign_vColor(
         "vColor1"
     };
     gcSHADER_SHADERMODE shadingMode = gcSHADER_SHADER_DEFAULT;
-
     gceSTATUS status;
+    gctINT location = gcSHADER_GetOutputDefaultLocation(ShaderControl->i->shader);
+
     gcmHEADER_ARG("Context=0x%x ShaderControl=0x%x OutputIndex=%d", Context, ShaderControl, OutputIndex);
 
     if (Context->lightingStates.shadeModel == GL_FLAT &&
@@ -1891,7 +1961,7 @@ static gceSTATUS _Assign_vColor(
         shadingMode = gcSHADER_SHADER_FLAT;
     }
 
-    status = gcSHADER_AddOutputEx(
+    status = gcSHADER_AddOutputWithLocation(
         ShaderControl->i->shader,
         vName[OutputIndex],
         gcSHADER_FLOAT_X4,
@@ -1899,10 +1969,11 @@ static gceSTATUS _Assign_vColor(
         gcvFALSE,
         1,
         ShaderControl->vColor[OutputIndex],
+        shadingMode,
+        location,
         -1,
         gcvFALSE,
         gcvFALSE,
-        shadingMode,
         gcvNULL
         );
     gcmFOOTER();
@@ -4812,7 +4883,8 @@ static gceSTATUS _CallGenericLightingFunction(
             ShaderControl->i->shader,
             gcSL_CALL,
             gcSL_ALWAYS,
-            label
+            label,
+            0
             ));
     }
     while (gcvFALSE);
@@ -5854,7 +5926,6 @@ gceSTATUS glfGenerateVSFixedFunction(
         {
             /* Shader may have been deleted. Construct again. */
             gcmONERROR(gcSHADER_Construct(
-                Context->hal,
                 gcSHADER_TYPE_VERTEX,
                 &vsControl.i->shader
                 ));

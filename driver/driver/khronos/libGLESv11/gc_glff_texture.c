@@ -1423,7 +1423,7 @@ static void _UpdateStageEnable(
         if(!( gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_HALTI2) && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BUG_FIXES18)))
         {
             Sampler->binding->maxLOD = mipmapRequired
-                ? Sampler->binding->maxLevel
+                ? Sampler->binding->maxLevelUsed
                 : 0;
         }
 
@@ -1432,7 +1432,7 @@ static void _UpdateStageEnable(
                                         Sampler->binding->object,
                                         gcvNULL,
                                         0,
-                                        (mipmapRequired ? Sampler->binding->maxLevel: 0)));
+                                        (mipmapRequired ? Sampler->binding->maxLevelUsed : 0)));
     }
 
     /* Get the sampler index. */
@@ -1964,6 +1964,7 @@ static void _InitTextureWrapper(
     ** Init states.
     */
     Texture->maxLevel  = 1000;
+    Texture->maxLevelUsed = 0;
     Texture->maxLOD    = 1000;
     Texture->minFilter = glvNEAREST_MIPMAP_LINEAR;
     Texture->magFilter = glvLINEAR;
@@ -2011,6 +2012,7 @@ static gceSTATUS _ResetTextureWrapper(
     {
         /* Reset the number of levels. */
         Texture->maxLevel = 1000;
+        Texture->maxLevelUsed = 0;
         Texture->maxLOD   = 1000;
 
         Texture->dirty = gcvFALSE;
@@ -2623,11 +2625,7 @@ glsTEXTUREWRAPPER_PTR glfFindTexture(
     gcmHEADER_ARG("Context=0x%x Texture=0x%08x", Context, Texture);
 
     /* Map shared context. */
-#if gcdRENDER_THREADS
-    shared = (Context->shared != gcvNULL) ? Context->shared : Context;
-#else
     shared = Context;
-#endif
 
     texture = _glffFindTexture(shared->texture.textureList, Texture);
     if (texture != gcvNULL)
@@ -3039,7 +3037,7 @@ gceSTATUS glfLoadTexture(
             halTexture.lodMax  = (gctFLOAT)texture->maxLOD;
             halTexture.lodBias = Context->texture.activeSampler->lodBias;
 
-            halTexture.maxLevel = texture->maxLevel;
+            halTexture.maxLevel = texture->maxLevelUsed;
             halTexture.baseLevel = 0;
 
             /* Get the sampler number. */
@@ -3048,7 +3046,8 @@ gceSTATUS glfLoadTexture(
                 &samplerNumber
                 ));
 
-            samplerBase = GetShaderSamplerBaseOffset(Context->currProgram->fs.shader);
+            samplerBase = gcHINTS_GetSamplerBaseOffset(Context->currProgram->hints,
+                                                       Context->currProgram->fs.shader);
             samplerNumber += samplerBase;
 
             if (Context->hasTxDescriptor)
@@ -3310,9 +3309,7 @@ static GLboolean _SetTextureParameter(
 
                 if (maxLevel > 0)
                 {
-                    GLint tValue;
-                    tValue = glfGetMaxLOD(texture->width, texture->height);
-                    texture->maxLevel = gcmMIN(tValue, maxLevel);
+                    texture->maxLevel = maxLevel;
                     result = GL_TRUE;
                 }
                 else
@@ -4201,7 +4198,11 @@ gceSTATUS glfUpdateTextureStates(
             gceSURF_FORMAT textureFormat;
             gctBOOL directSample;
             gcoSURF source;
-            gctBOOL dirty;
+            /* Texture parameters changed, or texture rebind. */
+            gctBOOL textureDirty;
+            /* Texels changed, but no parameters change or rebind. */
+            gctBOOL contentDirty = gcvFALSE;
+            gctBOOL genMipmap = gcvFALSE;
 
             if (texture->image.source  != gcvNULL)
             {
@@ -4211,9 +4212,14 @@ gceSTATUS glfUpdateTextureStates(
                 source        = texture->image.source;
 
                 /* Get dirty state. */
-                dirty         = texture->image.dirty;
+                textureDirty  = texture->image.dirty;
 
                 texture->image.dirty = gcvFALSE;
+
+                /* Get mipmap generation requirement. */
+                genMipmap = texture->image.genMipmap;
+
+                texture->image.genMipmap = gcvFALSE;
             }
             else
             {
@@ -4223,7 +4229,7 @@ gceSTATUS glfUpdateTextureStates(
                 source        = texture->direct.source;
 
                 /* Get dirty state. */
-                dirty         = texture->direct.dirty;
+                textureDirty  = texture->direct.dirty;
 
                 texture->direct.dirty = gcvFALSE;
             }
@@ -4231,7 +4237,9 @@ gceSTATUS glfUpdateTextureStates(
             if (texture->object == gcvNULL)
             {
                 /* Dynamically allocate texture object. */
-                status = gcoTEXTURE_ConstructEx(Context->hal, _HALtexType[texture->targetType], &texture->object);
+                status = gcoTEXTURE_ConstructEx(Context->hal,
+                                                _HALtexType[texture->targetType],
+                                                &texture->object);
 
                 /* Verify creation. */
                 if (gcmIS_ERROR(status))
@@ -4251,17 +4259,42 @@ gceSTATUS glfUpdateTextureStates(
                     if (image->update(image))
                     {
                         /* Force dirty if source updated. */
-                        dirty = gcvTRUE;
+                        contentDirty = gcvTRUE;
                     }
                 }
                 else
                 {
                     /* Assume dirty for other EGL image types. */
-                    dirty = gcvTRUE;
+                    contentDirty = gcvTRUE;
                 }
             }
 
-            if (!directSample)
+            if (directSample)
+            {
+                if (textureDirty)
+                {
+                    /* Directly add surface to mipmap. */
+                    status = gcoTEXTURE_AddMipMapFromClient(
+                        texture->object,
+                        0,
+                        source
+                        );
+
+                    gcmVERIFY_OK(gcoSURF_SetSharedLock(source,
+                        Context->texture.textureList->sharedLock));
+
+                    if (gcmIS_ERROR(status))
+                    {
+                        gcmFATAL("%s: add mipmap fail", __FUNCTION__);
+                        glmERROR(GL_INVALID_VALUE);
+                        break;
+                    }
+
+                    /* Set dirty flag (for later flush). */
+                    texture->dirty = gcvTRUE;
+                }
+            }
+            else
             {
                 /* Try allocate mipmap if not allocated. */
                 status = gcoTEXTURE_GetMipMap(
@@ -4314,32 +4347,10 @@ gceSTATUS glfUpdateTextureStates(
                         Context->texture.textureList->sharedLock));
 
                     /* Force dirty flag. */
-                    dirty = gcvTRUE;
+                    textureDirty = contentDirty = gcvTRUE;
                 }
-            }
 
-            if (dirty)
-            {
-                if (directSample)
-                {
-                    /* Directly add surface to mipmap. */
-                    status = gcoTEXTURE_AddMipMapFromClient(
-                        texture->object,
-                        0,
-                        source
-                        );
-
-                    gcmVERIFY_OK(gcoSURF_SetSharedLock(source,
-                        Context->texture.textureList->sharedLock));
-
-                    if (gcmIS_ERROR(status))
-                    {
-                        gcmFATAL("%s: add mipmap fail", __FUNCTION__);
-                        glmERROR(GL_INVALID_VALUE);
-                        break;
-                    }
-                }
-                else
+                if (textureDirty || contentDirty)
                 {
                     gceSURF_FORMAT srcFormat;
 
@@ -4506,11 +4517,20 @@ gceSTATUS glfUpdateTextureStates(
                             ));
                     }
 
+                    /* Set dirty flag (for later flush). */
+                    texture->dirty = gcvTRUE;
                 }
-
-                /* Set dirty flag (for later flush). */
-                texture->dirty = gcvTRUE;
             }
+
+            if (genMipmap)
+            {
+                /* Do mipmap generation. */
+                glfGenerateMipMaps(
+                    Context, texture, textureFormat, 0,
+                    texture->width, texture->height, 0
+                    );
+            }
+
         }
 
         /* Update stage enable sgtate. */
@@ -5650,11 +5670,7 @@ GL_API void GL_APIENTRY glGenTextures(
         }
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (context->shared != gcvNULL) ? context->shared : context;
-#else
         shared = context;
-#endif
 
         /* Generate textures. */
         for (i = 0; i < Count; i++)
@@ -5747,11 +5763,7 @@ GL_API void GL_APIENTRY glDeleteTextures(
         }
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (context->shared != gcvNULL) ? context->shared : context;
-#else
         shared = context;
-#endif
 
         gcmLOCK_SHARE_OBJ(shared->texture.textureList);
         /* Iterate through the texture names. */
@@ -6085,11 +6097,7 @@ GL_API void GL_APIENTRY glBindTexture(
         glmPROFILE(context, GLES1_BINDTEXTURE, 0);
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (context->shared != gcvNULL) ? context->shared : context;
-#else
         shared = context;
-#endif
 
         /* Determine the target. */
         if (Target == GL_TEXTURE_2D)
@@ -7490,7 +7498,7 @@ GL_API void GL_APIENTRY glTexImage2D(
 
             /* Determine the number of mipmaps. */
             tValue = glfGetMaxLOD(texture->width, texture->height);
-            texture->maxLevel = gcmMIN(tValue, texture->maxLevel);
+            texture->maxLevelUsed = gcmMIN(tValue, texture->maxLevel);
 
             /* Update texture format. */
             _SetTextureWrapperFormat(context, texture, Format);
@@ -7875,6 +7883,8 @@ gceSTATUS glfBlitCPU(
     blitArgs.xReverse           = gcvFALSE;
     blitArgs.yReverse           = gcvTRUE;
     blitArgs.scissorTest        = gcvFALSE;
+    blitArgs.srcNumSlice        = 1;
+    blitArgs.dstNumSlice        = 1;
 
     status = gcoSURF_BlitCPU(&blitArgs);
 
@@ -8303,7 +8313,7 @@ GL_API void GL_APIENTRY glCopyTexImage2D(
 
             /* Determine the number of mipmaps. */
             tValue = glfGetMaxLOD(texture->width, texture->height);
-            texture->maxLevel = gcmMIN(tValue, texture->maxLevel);
+            texture->maxLevelUsed = gcmMIN(tValue, texture->maxLevel);
 
             /* Update texture format. */
             _SetTextureWrapperFormat(context, texture, InternalFormat);
@@ -9566,7 +9576,7 @@ glfBindTexImage(
 
             /* Determine the number of mipmaps. */
             tValue = glfGetMaxLOD(texture->width, texture->height);
-            texture->maxLevel = gcmMIN(tValue, texture->maxLevel);
+            texture->maxLevelUsed = gcmMIN(tValue, texture->maxLevel);
 
             /* Update texture format. */
             _SetTextureWrapperFormat(context, texture, format);
@@ -10990,6 +11000,7 @@ GL_API void GL_APIENTRY glEGLImageTargetTexture2DOES(
         gceSURF_TYPE srcType = gcvSURF_TYPE_UNKNOWN;
         gctBOOL resetTexture = gcvTRUE;
         gctBOOL dirty = gcvFALSE;
+        gcsSURF_VIEW texView = {gcvNULL, 0, 1};
 
         gcmDUMP_API("${ES11 glEGLImageTargetTexture2DOES 0x%08X 0x%08X}", Target, Image);
 
@@ -11101,8 +11112,10 @@ GL_API void GL_APIENTRY glEGLImageTargetTexture2DOES(
         }
 
         /* Make the compiler happy, disable warnings. */
+#ifndef __clang__
         sourceYuv = sourceYuv;
         planarYuv = planarYuv;
+#endif
 
         /* Save closest texture format. */
         texture->image.textureFormat = dstFormat;
@@ -11171,14 +11184,15 @@ GL_API void GL_APIENTRY glEGLImageTargetTexture2DOES(
             if (texture->image.directSample)
             {
                 /* Check tile status. */
+                texView.surf = attributes.surface;
                 if (!context->hasTxTileStatus &&
-                    gcoSURF_IsTileStatusEnabled(attributes.surface))
+                    gcoSURF_IsTileStatusEnabled(&texView))
                 {
                     texture->image.directSample = gcvFALSE;
                 }
                 /* Check compression. */
                 else if (!context->hasTxDecompressor &&
-                    gcoSURF_IsCompressed(attributes.surface))
+                    gcoSURF_IsCompressed(&texView))
                 {
                     texture->image.directSample = gcvFALSE;
                 }
@@ -11363,8 +11377,11 @@ GL_API void GL_APIENTRY glEGLImageTargetTexture2DOES(
             texture->image.dirty = gcvTRUE;
         }
 
-        /* TODO: No mipmap for EGLImage target texture for now. */
-        texture->maxLevel = 0;
+        /* Set default mipmap max level. */
+        texture->maxLevelUsed = 0;
+
+        /* Don't generate mipmap for EGLImage texture. */
+        texture->image.genMipmap = gcvFALSE;
 
         /* Level 0 is special. */
         if (attributes.level == 0)
@@ -11381,12 +11398,21 @@ GL_API void GL_APIENTRY glEGLImageTargetTexture2DOES(
 
             /* Determine the number of mipmaps. */
             tValue=glfGetMaxLOD(texture->width, texture->height);
-            texture->maxLevel = gcmMIN(tValue, texture->maxLevel);
+            texture->maxLevelUsed = gcmMIN(tValue, texture->maxLevel);
 
             /* Update texture format. */
             _QueryImageBaseFormat(image, &baseFormat);
             _SetTextureWrapperFormat(context, texture, baseFormat);
 
+            /* Auto generate mipmaps only for pot textures. */
+            if ((texture->genMipmap) &&
+                (texture->image.dirty) &&
+                ((attributes.width  & (attributes.width  - 1)) == 0) &&
+                ((attributes.height & (attributes.height - 1)) == 0))
+            {
+                /* Defer generate mipmaps. */
+                texture->image.genMipmap = gcvTRUE;
+            }
         }
     }
     glmLEAVE();

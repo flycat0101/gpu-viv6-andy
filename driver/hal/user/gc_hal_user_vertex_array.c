@@ -476,7 +476,7 @@ _CopySpilitIndex(
     gctBOOL indexLocked;
 
     gcmHEADER_ARG("Index=0x%x IndexMemory=0x%x Offset=%u IndexType=%d "
-                  "PrimitiveType=%u Buffer=0x%x SpilitCount=%u",
+                  "PrimitiveType=%u Buffer=0x%x SpilitCount=%zu",
                   Index, IndexMemory, Offset, IndexType,
                   gcmOPT_VALUE(PrimitiveType), gcmOPT_VALUE(Buffer), gcmOPT_VALUE(SpilitCount));
 
@@ -658,6 +658,997 @@ OnError:
     return status;
 }
 
+/* After move fakeLineLoop and convert triangle list to upper level,
+** streamInfo can be removed and this fuc is the same as gcoVERTEXARRAY_IndexBind
+** then, it can be merge with gcoVERTEXARRAY_IndexBind.*/
+gceSTATUS
+gcoVERTEXARRAY_IndexBind_Ex(
+    IN gcoVERTEXARRAY Vertex,
+    IN OUT gcsVERTEXARRAY_STREAM_INFO_PTR StreamInfo,
+    IN gcsVERTEXARRAY_INDEX_INFO_PTR IndexInfo
+    )
+{
+    gceSTATUS status                     = gcvSTATUS_OK;
+    gctBOOL fakeLineLoop                 = gcvFALSE;
+    gctBOOL convertToIndexedTriangleList = gcvFALSE;
+    gctPOINTER indexBuffer               = gcvNULL;
+    gceINDEX_TYPE indexType              = IndexInfo->indexType;
+    gctUINT bytesPerIndex                = 0;
+    gctUINT count32;
+    gctUINT first                        = (gctUINT32)StreamInfo->first;
+
+    gcmHEADER();
+
+    gcmSAFECASTSIZET(count32, IndexInfo->count);
+
+    switch (IndexInfo->indexType)
+    {
+    case gcvINDEX_8:
+        bytesPerIndex = 1;
+        break;
+    case gcvINDEX_16:
+        bytesPerIndex = 2;
+        break;
+    case gcvINDEX_32:
+        bytesPerIndex = 4;
+        break;
+    default:
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Check for hardware line loop support. */
+    fakeLineLoop = (StreamInfo->primMode == gcvPRIMITIVE_LINE_LOOP)
+                 ? !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_LINE_LOOP)
+                 : gcvFALSE;
+
+    convertToIndexedTriangleList = (StreamInfo->primMode == gcvPRIMITIVE_TRIANGLE_STRIP)
+                                && ((IndexInfo->u.es11.indexBuffer == gcvNULL) && (IndexInfo->indexMemory != gcvNULL))
+                                && (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BUG_FIXED_INDEXED_TRIANGLE_STRIP) != gcvSTATUS_TRUE);
+
+
+    /* Check if we need to fake the line loop */
+    if (fakeLineLoop)
+    {
+        gctUINT bytes = 0;
+
+        /* Check if there is an index object or buffer. */
+        if ((IndexInfo->u.es11.indexBuffer != gcvNULL) || (IndexInfo->indexMemory != gcvNULL))
+        {
+            bytes = count32 * bytesPerIndex;
+        }
+        else
+        {
+            /* Check if the count fits in 8-bit. */
+            if (first + count32 + 1 < 256)
+            {
+                /* 8-bit indices. */
+                indexType     = gcvINDEX_8;
+                bytes         = count32;
+                bytesPerIndex = 1;
+            }
+
+            /* Check if the count fits in 16-bit. */
+            else if (first + count32 + 1 < 65536)
+            {
+                /* 16-bit indices. */
+                indexType     = gcvINDEX_16;
+                bytes         = count32 * 2;
+                bytesPerIndex = 2;
+            }
+
+            else
+            {
+                /* 32-bit indices. */
+                indexType     = gcvINDEX_32;
+                bytes         = count32 * 4;
+                bytesPerIndex = 4;
+            }
+        }
+
+        /* Allocate a temporary buffer. */
+        gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                  bytes + bytesPerIndex,
+                                  &indexBuffer));
+
+        /* Test if there is a gcoINDEX stream. */
+        if (IndexInfo->u.es11.indexBuffer != gcvNULL)
+        {
+            gctPOINTER logical;
+
+            /* Lock the index stream. */
+            gcmONERROR(gcoINDEX_Lock(IndexInfo->u.es11.indexBuffer, gcvNULL, &logical));
+
+            /* Copy the indices to the temporary memory. */
+            gcoOS_MemCopy(indexBuffer,
+                          (gctUINT8_PTR) logical
+                          + gcmPTR2INT32(IndexInfo->indexMemory),
+                          bytes);
+
+            /* Append the first index to the temporary memory. */
+            gcoOS_MemCopy((gctUINT8_PTR) indexBuffer + bytes,
+                          (gctUINT8_PTR) logical
+                          + gcmPTR2INT32(IndexInfo->indexMemory),
+                          bytesPerIndex);
+        }
+        else if (IndexInfo->indexMemory != gcvNULL)
+        {
+            /* Copy the indices to the temporary memory. */
+            gcoOS_MemCopy(indexBuffer, IndexInfo->indexMemory, bytes);
+
+            /* Append the first index to the temporary memory. */
+            gcoOS_MemCopy((gctUINT8_PTR) indexBuffer + bytes,
+                          IndexInfo->indexMemory,
+                          bytesPerIndex);
+        }
+        else
+        {
+            gctUINT i;
+
+            /* Test for 8-bit indices. */
+            if (bytesPerIndex == 1)
+            {
+                /* Cast pointer to index buffer. */
+                gctUINT8_PTR ptr = (gctUINT8_PTR) indexBuffer;
+
+                /* Fill index buffer with First through First + Count - 1. */
+                for (i = 0; i < StreamInfo->count; ++i)
+                {
+                    *ptr++ = (gctUINT8) (first + i);
+                }
+
+                /* Append First to index buffer. */
+                *ptr = (gctUINT8) first;
+            }
+            else if (bytesPerIndex == 2)
+            {
+                /* Cast pointer to index buffer. */
+                gctUINT16_PTR ptr = (gctUINT16_PTR) indexBuffer;
+
+                /* Fill index buffer with First through First + Count - 1. */
+                for (i = 0; i < StreamInfo->count; ++i)
+                {
+                    *ptr++ = (gctUINT16) (first + i);
+                }
+
+                /* Append First to index buffer. */
+                *ptr = (gctUINT16) first;
+            }
+            else
+            {
+                /* Cast pointer to index buffer. */
+                gctUINT32_PTR ptr = (gctUINT32_PTR) indexBuffer;
+
+                /* Fill index buffer with First through First + Count - 1. */
+                for (i = 0; i < StreamInfo->count; ++i)
+                {
+                    *ptr++ = first + i;
+                }
+
+                /* Append First to index buffer. */
+                *ptr = first;
+            }
+        }
+
+        /* Upload the data to the dynamic index buffer. */
+        gcmONERROR(gcoINDEX_UploadDynamicEx(Vertex->dynamicIndex,
+                                            indexType,
+                                            indexBuffer,
+                                            bytes + bytesPerIndex,
+                                            gcvFALSE));
+
+        /* Bind the index buffer to the hardware. */
+        gcmONERROR(gcoINDEX_BindDynamic(Vertex->dynamicIndex, indexType));
+
+        /* Free the temporary index buffer. */
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, indexBuffer));
+    }
+    else
+    {
+        /* Test if there is a gcoINDEX stream. */
+        if (IndexInfo->u.es11.indexBuffer != gcvNULL)
+        {
+            /* Bind the index buffer to the hardware. */
+            gcmONERROR(gcoINDEX_BindOffset(IndexInfo->u.es11.indexBuffer,
+                                           IndexInfo->indexType,
+                                           gcmPTR2INT32(IndexInfo->indexMemory)));
+        }
+        /* Test if there are client indices. */
+        else if (IndexInfo->indexMemory != gcvNULL)
+        {
+            gctUINT bytes = 0;
+
+            /* Determine number of bytes in the index buffer. */
+            bytes = count32 * bytesPerIndex;
+
+            /* Upload the data to the dynamic index buffer. */
+            gcmONERROR(gcoINDEX_UploadDynamicEx(Vertex->dynamicIndex,
+                                                IndexInfo->indexType,
+                                                IndexInfo->indexMemory,
+                                                bytes,
+                                                convertToIndexedTriangleList));
+
+            /* Bind the index buffer to the hardware. */
+            gcmONERROR(gcoINDEX_BindDynamic(Vertex->dynamicIndex, IndexInfo->indexType));
+        }
+    }
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    if (indexBuffer != gcvNULL)
+    {
+        /* Free the temporary index buffer. */
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, indexBuffer));
+    }
+
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoVERTEXARRAY_StreamBind_Ex(
+    IN gcoVERTEXARRAY Vertex,
+#if gcdUSE_WCLIP_PATCH
+    IN OUT gctFLOAT * WLimitRms,
+    IN OUT gctBOOL * WLimitRmsDirty,
+#endif
+    gcsVERTEXARRAY_STREAM_INFO_PTR StreamInfo,
+    gcsVERTEXARRAY_INDEX_INFO_PTR IndexInfo
+    )
+{
+    gceSTATUS status                     = gcvSTATUS_OK;
+    gcsVERTEXARRAY_PTR vertexPtr = StreamInfo->u.es11.attributes;
+    gctUINT first                = (gctUINT)StreamInfo->first;
+    gctUINT i, n;
+    gctUINT count, count32;
+
+    /* Zero the arrays. */
+    gcsVERTEXARRAY_ATTRIBUTE attributeArray[gcdATTRIBUTE_COUNT];
+    gcsVERTEXARRAY_ATTRIBUTE_PTR attributePtr = attributeArray;
+    gctUINT attributeCount = 0;
+
+    /* Zero the arrays. */
+    gcsVERTEXARRAY_ATTRIBUTE copyArray[gcdATTRIBUTE_COUNT];
+    gcsVERTEXARRAY_ATTRIBUTE_PTR copyPtr = copyArray;
+    gctUINT copyCount = 0, copyBytes     = 0;
+    gctUINT32 copyPhysical = ~0U;
+
+    /* Zero the arrays. */
+    gcsVERTEXARRAY_STREAM streamArray[gcdATTRIBUTE_COUNT];
+    gcsVERTEXARRAY_STREAM_PTR streamPtr  = gcvNULL;
+    gctUINT stream, streamCount = 0;
+
+#if OPT_VERTEX_ARRAY
+    gcsVERTEXARRAY_BUFFER bufferArray[gcdATTRIBUTE_COUNT];
+    gcsVERTEXARRAY_BUFFER_PTR bufferPtr  = bufferArray;
+    gctUINT bufferCount = 0;
+#endif
+
+    gctBOOL fakeLineLoop                 = gcvFALSE;
+    gctBOOL convertToIndexedTriangleList = gcvFALSE;
+    gcePATCH_ID patchId                  = gcvPATCH_INVALID;
+    gctUINT enableBits                   = StreamInfo->attribMask;
+
+    gcmHEADER_ARG("Vertex=0x%x StreamInfo=0x%x IndexInfo=0x%x",
+                  Vertex, StreamInfo, IndexInfo);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Vertex, gcvOBJ_VERTEX);
+    gcmVERIFY_ARGUMENT(StreamInfo->attribMask != 0);
+    gcmVERIFY_ARGUMENT(StreamInfo->u.es11.attributes != gcvNULL);
+    gcmVERIFY_ARGUMENT(StreamInfo->count > 0);
+
+    gcmSAFECASTSIZET(count32, StreamInfo->count);
+
+    /* Check for hardware line loop support. */
+    fakeLineLoop = (StreamInfo->primMode == gcvPRIMITIVE_LINE_LOOP)
+                 ? !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_LINE_LOOP)
+                 : gcvFALSE;
+
+    convertToIndexedTriangleList = (StreamInfo->primMode == gcvPRIMITIVE_TRIANGLE_STRIP)
+        && ((IndexInfo->u.es11.indexBuffer == gcvNULL) && (IndexInfo->indexMemory != gcvNULL))
+        && (gcoHAL_IsFeatureAvailable(
+                    gcvNULL,
+                    gcvFEATURE_BUG_FIXED_INDEXED_TRIANGLE_STRIP) != gcvSTATUS_TRUE);
+
+    if((StreamInfo->primMode == gcvPRIMITIVE_LINE_LOOP) && (!fakeLineLoop))
+    {
+        /*for line loop the last line is automatic added in hw implementation*/
+        StreamInfo->primCount = StreamInfo->primCount - 1;
+    }
+
+    gcoHARDWARE_GetPatchID(gcvNULL, &patchId);
+    if (patchId == gcvPATCH_GPUBENCH)
+    {
+        gcPLS.hal->isGpuBenchSmoothTriangle = (StreamInfo->primCount == 133);
+    }
+
+    /***************************************************************************
+    ***** Phase 1: Information Gathering **************************************/
+
+    /* Walk through all attributes. */
+    for (i = 0;
+         enableBits != 0;
+         ++i, enableBits >>= 1, ++vertexPtr
+    )
+    {
+        gctBOOL needCopy;
+
+        /* Skip disabled vertex attributes. */
+        if ((enableBits & 1) == 0)
+        {
+            continue;
+        }
+
+        /* Initialize the attribute information. */
+        attributePtr->vertexPtr = vertexPtr;
+        attributePtr->next      = gcvNULL;
+
+        if (vertexPtr->enable)
+        {
+            attributePtr->format = vertexPtr->format;
+
+            /* Compute the size of the attribute. */
+            switch (vertexPtr->format)
+            {
+            case gcvVERTEX_BYTE:
+            case gcvVERTEX_UNSIGNED_BYTE:
+            case gcvVERTEX_INT8:
+                attributePtr->bytes = vertexPtr->size;
+                break;
+
+            case gcvVERTEX_UNSIGNED_INT_10_10_10_2:
+            case gcvVERTEX_INT_10_10_10_2:
+            case gcvVERTEX_UNSIGNED_INT_2_10_10_10_REV:
+            case gcvVERTEX_INT_2_10_10_10_REV:
+                /* 10_10_10_2 format is always in 4 bytes container. */
+                attributePtr->bytes = 4;
+                break;
+
+            case gcvVERTEX_SHORT:
+            case gcvVERTEX_UNSIGNED_SHORT:
+            case gcvVERTEX_HALF:
+            case gcvVERTEX_INT16:
+                attributePtr->bytes = vertexPtr->size * 2;
+                break;
+            case gcvVERTEX_INT32:
+                attributePtr->bytes = vertexPtr->size * 4;
+                break;
+
+            default:
+                attributePtr->bytes = vertexPtr->size * 4;
+                break;
+            }
+        }
+
+        /* Test if this vertex attribute is a gcoSTREAM. */
+        if (vertexPtr->enable && (vertexPtr->stream != gcvNULL))
+        {
+            gcsVERTEXARRAY_ATTRIBUTE_PTR node, prev;
+            gctSIZE_T Size = 0;
+            /* Save offset for this attribute. */
+            attributePtr->offset = gcmPTR2INT32(vertexPtr->pointer);
+
+            /* Find the stream for this vertex attribute in the stream array. */
+            for (stream = 0, streamPtr = streamArray;
+                 stream < streamCount;
+                 ++stream, ++streamPtr
+            )
+            {
+                if (streamPtr->stream == vertexPtr->stream)
+                {
+                    /* Found it. */
+                    break;
+                }
+            }
+
+            /* Test if the stream is not yet known. */
+            if (stream == streamCount)
+            {
+                gctPOINTER pointer = gcvNULL;
+
+                /* Make sure we don't overflow the array. */
+                if (stream == gcmCOUNTOF(streamArray))
+                {
+                    gcmONERROR(gcvSTATUS_TOO_COMPLEX);
+                }
+
+                /* Increase the number of streams. */
+                streamCount += 1;
+
+                /* Initialize the stream information. */
+                streamPtr->stream    = vertexPtr->stream;
+                streamPtr->subStream = gcvNULL;
+
+                /* Lock the stream. */
+                gcmONERROR(gcoSTREAM_Lock(vertexPtr->stream,
+                                          &pointer,
+                                          &streamPtr->physical));
+                gcmONERROR(gcoSTREAM_Size(vertexPtr->stream, &Size));
+                if(Size < attributePtr->offset)
+                {
+                    gcmONERROR(gcvSTATUS_INVALID_DATA);
+                }
+                streamPtr->logical = (gctUINT8_PTR)pointer;
+                /* Initialize attribute to gcvNULL. */
+                streamPtr->attribute = gcvNULL;
+            }
+
+            /* Sort this attribute by offset. */
+            for (node = streamPtr->attribute, prev = gcvNULL;
+                 node != gcvNULL;
+                 node = node->next)
+            {
+                /* Check if we have found an attribute with a larger offset. */
+                if (node->offset > attributePtr->offset)
+                {
+                    break;
+                }
+
+                /* Save attribute and move to next one. */
+                prev = node;
+            }
+
+            /* Link attribute to this stream. */
+            attributePtr->next = node;
+            if (prev == gcvNULL)
+            {
+                streamPtr->attribute = attributePtr;
+            }
+            else
+            {
+                prev->next = attributePtr;
+            }
+
+            /* Set stream attribute. */
+            gcmONERROR(gcoSTREAM_SetAttribute(streamPtr->stream,
+                                              gcmPTR2INT32(vertexPtr->pointer),
+                                              attributePtr->bytes,
+                                              vertexPtr->stride,
+                                              vertexPtr->divisor,
+                                              &streamPtr->subStream));
+
+            /* Set logical pointer to attribute. */
+            attributePtr->logical = streamPtr->logical
+                                  + gcmPTR2INT32(vertexPtr->pointer);
+
+#if gcdUSE_WCLIP_PATCH
+            if ((attributePtr->vertexPtr->isPosition == gcvTRUE)
+                    && (attributePtr->format == gcvVERTEX_FLOAT)
+                    && (attributePtr->bytes/4 == 3)
+                    && (WLimitRms != gcvNULL))
+            {
+                computeWLimit(
+                        (gctFLOAT_PTR)((gctUINT8_PTR)attributePtr->logical + first * attributePtr->vertexPtr->stride),
+                        attributePtr->bytes / 4,
+                        attributePtr->vertexPtr->stride,
+                        count32,
+                        WLimitRms,
+                        WLimitRmsDirty);
+            }
+#endif
+
+            /* Don't need to copy this attribute yet. */
+            needCopy = gcvFALSE;
+        }
+
+        /* Test if this vertex attribute is a client pointer. */
+        else if (vertexPtr->enable && (vertexPtr->pointer != gcvNULL))
+        {
+            /* Set logical pointer to attribute. */
+            attributePtr->logical = vertexPtr->pointer;
+            /* Copy this attribute. */
+            needCopy = gcvTRUE;
+
+#if gcdUSE_WCLIP_PATCH
+            if ((attributePtr->vertexPtr->isPosition == gcvTRUE)
+                 && (attributePtr->format == gcvVERTEX_FLOAT)
+                 && (attributePtr->bytes/4 == 3)
+                 && (WLimitRms != gcvNULL))
+            {
+                computeWLimit((gctFLOAT_PTR)((gctUINT8_PTR)attributePtr->logical + first * attributePtr->vertexPtr->stride),
+                              attributePtr->bytes / 4,
+                              attributePtr->vertexPtr->stride,
+                              count32,
+                              WLimitRms,
+                              WLimitRmsDirty);
+            }
+#endif
+        }
+
+        /* The vertex attribute is not set. */
+        else
+        {
+            /* Need to copy generic value. */
+            attributePtr->format  = gcvVERTEX_FLOAT;
+            attributePtr->bytes   = vertexPtr->genericSize * 4;
+
+            /* Set logical pointer to attribute. */
+            attributePtr->logical = vertexPtr->genericValue;
+
+            /* Copy this attribute. */
+            needCopy = gcvTRUE;
+        }
+
+        if (needCopy)
+        {
+            /* Fill in attribute information that needs to be copied. */
+            copyPtr->vertexPtr = vertexPtr;
+            copyPtr->logical   = attributePtr->logical;
+            copyPtr->offset    = copyBytes;
+
+            /* No generic data. */
+            copyPtr->format = attributePtr->format;
+            copyPtr->bytes  = attributePtr->bytes;
+
+            /* Increase number of bytes per vertex. */
+            copyBytes += copyPtr->bytes;
+
+            /* Move to next array. */
+            copyCount += 1;
+            copyPtr   += 1;
+        }
+
+        /* Next attribute. */
+        attributeCount += 1;
+        attributePtr   += 1;
+    }
+
+    /* Test if there are too many attributes. */
+    if (attributeCount > Vertex->maxAttribute)
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    /* Check for aliasing older hardware has issues with. */
+    if ((streamCount == 1)
+    &&  (attributeCount == 2)
+    &&  (attributeArray[0].logical == attributeArray[1].logical)
+    &&  (attributeArray[0].bytes < 8)
+    &&  (attributeArray[0].vertexPtr->stream != gcvNULL)
+    &&  (count32 > 31)
+    )
+    {
+        /* Unalias the stream buffer. */
+        gcmONERROR(gcoSTREAM_UnAlias(attributeArray[0].vertexPtr->stream,
+                                     streamArray->attribute,
+                                     &streamArray[0].subStream,
+                                     &streamArray[0].logical,
+                                     &streamArray[0].physical));
+    }
+
+    /* Compute total number of streams. */
+    n = (copyCount > 0) ? 1 : 0;
+    for (i = 0, streamPtr = streamArray; i < streamCount; ++i, ++streamPtr)
+    {
+        gctUINT subStreams;
+
+        /* Query number of substreams from this stream. */
+        gcmONERROR(gcoSTREAM_QuerySubStreams(streamPtr->stream,
+                                             streamPtr->subStream,
+                                             &subStreams));
+
+        /* Increase the number of streams. */
+        n += subStreams;
+    }
+
+
+    /***************************************************************************
+    ***** Phase 3: Stream Management ******************************************/
+    /* Test if need to copy vertex data. */
+    if ((copyCount > 0) || (n > Vertex->maxStreams))
+    {
+        gctUINT minIndex, maxIndex;
+
+        /* Test if there is a gcoINDEX object. */
+        if (IndexInfo->u.es11.indexBuffer != gcvNULL)
+        {
+            /* Get the index range. */
+            gcmONERROR(gcoINDEX_GetIndexRange(IndexInfo->u.es11.indexBuffer,
+                                              IndexInfo->indexType,
+                                              gcmPTR2INT32(IndexInfo->indexMemory),
+                                              count32,
+                                              &minIndex, &maxIndex));
+
+            /* Compute vertex range. */
+            first = minIndex;
+            count = maxIndex - minIndex + 1;
+        }
+
+        /* Test if there is an index array. */
+        else if (IndexInfo->indexMemory != gcvNULL)
+        {
+            /* Get the index range. */
+            gcmONERROR(gcoINDEX_GetMemoryIndexRange(IndexInfo->indexType,
+                                                    IndexInfo->indexMemory,
+                                                    count32,
+                                                    &minIndex, &maxIndex));
+
+            /* Compute vertex range. */
+            first = minIndex;
+            count = maxIndex - minIndex + 1;
+        }
+
+        /* No indices present. */
+        else
+        {
+            /* Copy vertex range. */
+            count = count32;
+        }
+    }
+    else
+    {
+        /* No need to verify or copy anything. */
+        count = count32;
+    }
+
+    /* Check if we have too many streams. */
+    if ((n > Vertex->maxStreams) && (copyCount == 0))
+    {
+        gcoSTREAM streamObject;
+        gctPOINTER logical;
+        gctUINT32 physical;
+        gcsSTREAM_SUBSTREAM_PTR subStream;
+
+        /* Merge the streams. */
+        status = gcoSTREAM_MergeStreams(streamArray[0].stream,
+                                        first, count,
+                                        streamCount, streamArray,
+                                        &streamObject, &logical, &physical,
+                                        &attributePtr, &subStream);
+
+        if (gcmIS_SUCCESS(status))
+        {
+            /* Copy stream information to stream array. */
+            streamArray[0].stream    = streamObject;
+            streamArray[0].logical   = (gctUINT8_PTR)logical;
+            streamArray[0].physical  = physical;
+            streamArray[0].attribute = attributePtr;
+            streamArray[0].subStream = subStream;
+            streamCount              = 1;
+            n                        = 1;
+        }
+    }
+
+    /* Check if we still have too many streams. */
+    if (n > Vertex->maxStreams)
+    {
+        /* Reset number of streams. */
+        n = (copyCount > 0) ? 1 : 0;
+
+        /* Walk all streams. */
+        for (i = 0, streamPtr = streamArray;
+             i < streamCount;
+             ++i, ++streamPtr
+        )
+        {
+            gctUINT subStreams;
+
+            /* Query number of streams. */
+            gcmONERROR(gcoSTREAM_QuerySubStreams(streamPtr->stream,
+                                                 streamPtr->subStream,
+                                                 &subStreams));
+
+            /* Check if we can rebuild this stream and if it makes sense. */
+            if ((subStreams > 1) && (n + 1 < Vertex->maxStreams))
+            {
+                /* Rebuild the stream. */
+                status = gcoSTREAM_Rebuild(streamPtr->stream,
+                                           first, count,
+                                           &subStreams);
+                if (gcmIS_ERROR(status))
+                {
+                    /* Error rebuilding. */
+                    gcmTRACE_ZONE(gcvLEVEL_WARNING, gcvZONE_VERTEX,
+                                  "gcoSTREAM_Rebuild returned status=%d",
+                                  status);
+                }
+            }
+
+            if ((n + subStreams > Vertex->maxStreams)
+            ||  (Vertex->maxStreams == 1)
+            )
+            {
+                /* This stream would overflow the maximum stream count, so we
+                ** have to copy it. */
+
+                /* Walk all the stream attributes and append them to the list to
+                ** copy. */
+                for (attributePtr = streamPtr->attribute;
+                     attributePtr != gcvNULL;
+                     attributePtr = attributePtr->next
+                     )
+                {
+                    /* Copy this attribute. */
+                    copyPtr->vertexPtr     = attributePtr->vertexPtr;
+                    copyPtr->logical       = attributePtr->logical;
+                    copyPtr->format        = attributePtr->format;
+                    copyPtr->offset        = copyBytes;
+                    copyPtr->bytes         = attributePtr->bytes;
+
+                    /* Increase number of bytes per vertex. */
+                    copyBytes += copyPtr->bytes;
+
+                    /* Move to next array. */
+                    copyCount += 1;
+                    copyPtr   += 1;
+                }
+
+                /* This stream doesn't need to be programmed. */
+                streamPtr->logical = gcvNULL;
+            }
+            else
+            {
+                /* Advance the number of streams. */
+                n += subStreams;
+            }
+        }
+    }
+
+    /***************************************************************************
+    ***** Phase 4: Vertex Copy ************************************************/
+
+    if (copyCount > 0)
+    {
+#if OPT_VERTEX_ARRAY
+        /* Total size in bytes of all attributes need to be copied */
+        gctUINT totalBufSize = 0;
+        gctUINT hwStream = Vertex->maxStreams - n + 1;
+        gctUINT j, k;
+
+        /* Zero memory */
+        gcoOS_ZeroMemory(bufferArray, copyCount * sizeof(bufferArray[0]));
+
+        /* Setup buffers. */
+        for (i = 0, copyPtr = copyArray; i < copyCount; i++, copyPtr++)
+        {
+            gctUINT8_PTR start = (gctUINT8_PTR)copyPtr->logical;
+            gctUINT8_PTR end   = (gctUINT8_PTR)copyPtr->logical + copyPtr->bytes;
+
+            for (j = 0, bufferPtr = bufferArray;
+                 j < bufferCount;
+                 j++, bufferPtr++)
+            {
+                /* If in a same range and have the same divisor*/
+                if((bufferPtr->stride == copyPtr->vertexPtr->stride) && (bufferPtr->divisor == copyPtr->vertexPtr->divisor))
+                {
+                    /* Test if the attribute falls within the buffer range.*/
+                    if ((start >= bufferPtr->start) &&
+                        (end   <= bufferPtr->end)
+                       )
+                    {
+                        break;
+                    }
+
+                    /* Test if the attribute starts within the sliding window. */
+                    if ((start <  bufferPtr->start) &&
+                        (start >= bufferPtr->minStart)
+                       )
+                    {
+                        bufferPtr->start  = start;
+                        bufferPtr->maxEnd = start + bufferPtr->stride;
+                        break;
+                    }
+
+                    /* Test if attribute ends within the sliding window. */
+                    if ((end >  bufferPtr->end) &&
+                        (end <= bufferPtr->maxEnd)
+                       )
+                    {
+                        bufferPtr->end      = end;
+                        bufferPtr->minStart = end - bufferPtr->stride;
+                        break;
+                    }
+                }
+            }
+
+            /* Create a new vertex buffer. */
+            if (j == bufferCount)
+            {
+                bufferCount++;
+
+                bufferPtr->numAttribs = 1;
+                bufferPtr->map[0]     = i;
+
+                bufferPtr->stride     = copyPtr->vertexPtr->enable
+                                      ? copyPtr->vertexPtr->stride
+                                      : copyPtr->bytes;
+                 /*Force the buffer is combined if stride < bytes  */
+                if(bufferPtr->stride > 0 && bufferPtr->stride < copyPtr->bytes)
+                {
+                    bufferPtr->combined = gcvTRUE;
+                    bufferPtr->stride = copyPtr->bytes;
+                }
+                bufferPtr->divisor    = copyPtr->vertexPtr->divisor;
+                bufferPtr->start      = (gctUINT8_PTR)copyPtr->logical;
+                bufferPtr->end        = bufferPtr->start + copyPtr->bytes;
+                bufferPtr->minStart   = bufferPtr->end   - bufferPtr->stride;
+                bufferPtr->maxEnd     = bufferPtr->start + bufferPtr->stride;
+            }
+            else
+            {
+                /* Sort the attribute in a buffer. */
+                for (k = bufferPtr->numAttribs; k != 0; k--)
+                {
+                    if (copyPtr->logical >= copyArray[bufferPtr->map[k - 1]].logical)
+                    {
+                        bufferPtr->map[k] = i;
+                        break;
+                    }
+
+                    bufferPtr->map[k] = bufferPtr->map[k - 1];
+                }
+
+                if (k == 0)
+                {
+                    bufferPtr->map[0] = i;
+                }
+
+                bufferPtr->numAttribs += 1;
+            }
+        }
+
+        /* Adjust attributes. */
+        for (i = 0, bufferPtr = bufferArray;
+             i < bufferCount;
+             i++, bufferPtr++, --hwStream)
+        {
+            /* Break if only one hw stream available, while more than one buffer left. */
+            if ((hwStream == 1) && (i != (bufferCount -1)))
+            {
+                break;
+            }
+
+            /* Set offset for a buffer. */
+            bufferPtr->offset = totalBufSize;
+
+            /* Adjust attributes offset in a buffer. */
+            for (j = 0; j < bufferPtr->numAttribs; j++)
+            {
+                copyPtr = copyArray + bufferPtr->map[j];
+                copyPtr->offset = (gctUINT)((gctUINT8_PTR)copyPtr->logical
+                                - (gctUINT8_PTR)bufferPtr->start);
+            }
+
+            /* Instance Divisor required count is different than usual cases */
+            bufferPtr->count = bufferPtr->divisor
+                             ? (gctUINT) gcoMATH_Ceiling((gctFLOAT) StreamInfo->instanceCount / (gctFLOAT)bufferPtr->divisor)
+                             : count;
+            totalBufSize += (bufferPtr->count * bufferPtr->stride);
+        }
+
+        /* Check if all buffers have been handled? */
+        /* If no, combine all left attributes into the last buffer. */
+        if (i < bufferCount)
+        {
+            gcsVERTEXARRAY_BUFFER_PTR last;
+            gctUINT attribCount = 0;
+            gctUINT offset = 0;
+            gctUINT adjustedBufferCount = i + 1;
+
+            /* Mark last buffer as combined. */
+            last           = bufferArray + i;
+            last->offset   = totalBufSize;
+            last->combined = gcvTRUE;
+
+            /* Merge all left into the last buffer. */
+            for (bufferPtr = last;
+                 i < bufferCount;
+                 ++i, ++bufferPtr)
+            {
+                for (j = 0; j < bufferPtr->numAttribs; j++, attribCount++)
+                {
+                    /* Adjust attribute offset. */
+                    copyPtr = copyArray + bufferPtr->map[j];
+                    copyPtr->offset = offset;
+
+                    /* Merge attribute into last buffer.*/
+                    if (last != bufferPtr)
+                    {
+                        last->map[attribCount] = bufferPtr->map[j];
+                        last->numAttribs++;
+                    }
+
+                    if (last->divisor != copyPtr->vertexPtr->divisor)
+                    {
+                        /* TODO: one stream can not hold different divisors! */
+                        gcmASSERT(0);
+                    }
+
+                    /* Increase offset. */
+                    offset += copyPtr->bytes;
+                }
+            }
+
+            /* Adjust buffer stride. */
+            last->stride = offset;
+
+            /* Re-adjust total buffer count. */
+            bufferCount = adjustedBufferCount;
+
+
+            /* Instance Divisor required count is different than usual cases */
+            last->count = last->divisor
+                        ? (gctUINT) gcoMATH_Ceiling((gctFLOAT) StreamInfo->instanceCount / (gctFLOAT)last->divisor)
+                        : count;
+            totalBufSize += (last->count * last->stride);
+        }
+
+        /* Copy the vertex data. */
+        status = gcoSTREAM_CacheAttributes(Vertex->dynamicStream,
+                                           first, count,
+                                           totalBufSize,
+                                           bufferCount, bufferArray,
+                                           copyCount, copyArray,
+                                           &copyPhysical);
+        if (gcmIS_ERROR(status))
+        {
+            gcmONERROR(gcoSTREAM_UploadUnCacheableAttributes(Vertex->uncacheableStream,
+                                                             first, count,
+                                                             totalBufSize,
+                                                             bufferCount, bufferArray,
+                                                             copyCount, copyArray,
+                                                             &copyPhysical,
+                                                             &Vertex->uncacheableStream));
+        }
+
+#else
+
+        /* Copy the vertex data. */
+        gcmONERROR(gcoSTREAM_CacheAttributes(Vertex->dynamicStream,
+                                             first, count,
+                                             copyBytes,
+                                             copyCount, copyArray,
+                                             &copyPhysical));
+#endif
+    }
+
+    /***************************************************************************
+    ***** Phase 5: Program the Hardware ***************************************/
+
+    /* Here it is easy - let the next layer worry about the actual registers. */
+#if OPT_VERTEX_ARRAY
+    gcmONERROR(gcoHARDWARE_SetVertexArray(gcvNULL,
+                                          StreamInfo->instanced,
+                                          first, copyPhysical,
+                                          bufferCount, bufferArray,
+                                          copyCount, copyArray,
+                                          streamCount, streamArray));
+
+#else
+    gcmONERROR(gcoHARDWARE_SetVertexArray(gcvNULL,
+                                          first,
+                                          copyPhysical, copyBytes,
+                                          copyCount, copyArray,
+                                          streamCount, streamArray));
+#endif
+
+    if (fakeLineLoop)
+    {
+        /* Switch to Line Strip. */
+        StreamInfo->primMode = gcvPRIMITIVE_LINE_STRIP;
+    }
+    else if (convertToIndexedTriangleList)
+    {
+        /* Switch to Triangle List. */
+        StreamInfo->primMode = gcvPRIMITIVE_TRIANGLE_LIST;
+    }
+
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
 gceSTATUS
 gcoVERTEXARRAY_Bind(
     IN gcoVERTEXARRAY Vertex,
@@ -669,9 +1660,6 @@ gcoVERTEXARRAY_Bind(
     IN gcoINDEX IndexObject,
     IN gctPOINTER IndexMemory,
     IN OUT gcePRIMITIVE * PrimitiveType,
-    IN OUT gctBOOL * SpilitDraw,
-    IN OUT gctSIZE_T * SpilitCount,
-    IN OUT gcePRIMITIVE * SpilitPrimitiveType,
 #if gcdUSE_WCLIP_PATCH
     IN OUT gctUINT * PrimitiveCount,
     IN OUT gctFLOAT * WLimitRms,
@@ -681,29 +1669,61 @@ gcoVERTEXARRAY_Bind(
 #endif
     )
 {
-    return gcoVERTEXARRAY_Bind_Ex(
-        Vertex,
-        EnableBits,
-        VertexArray,
-        First,
-        Count,
-        gcvFALSE,
-        0,
-        IndexType,
-        IndexObject,
-        IndexMemory,
-        PrimitiveType,
-        SpilitDraw,
-        SpilitCount,
-        SpilitPrimitiveType,
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsVERTEXARRAY_STREAM_INFO streamInfo, origStreamInfo;
+    gcsVERTEXARRAY_INDEX_INFO  indexInfo;
+
+    gcmHEADER();
+
+    /* Collect hal leve info.*/
+    streamInfo.attribMask = EnableBits;
+    streamInfo.u.es11.attributes = VertexArray;
+    streamInfo.first = First;
+    streamInfo.count = *Count;
+    streamInfo.primMode = *PrimitiveType;
+    streamInfo.primCount = *PrimitiveCount;
+    streamInfo.instanced = gcvFALSE;
+    streamInfo.instanceCount = 1;
+
+    gcoOS_MemCopy(&origStreamInfo, &streamInfo, sizeof(gcsVERTEXARRAY_STREAM_INFO));
+
+    indexInfo.count = *Count;
+    indexInfo.indexType = IndexType;
+    indexInfo.u.es11.indexBuffer = IndexObject;
+    indexInfo.indexMemory = IndexMemory;
+
 #if gcdUSE_WCLIP_PATCH
-        PrimitiveCount,
-        WLimitRms,
-        WLimitRmsDirty
+    /* Collect hal level info.*/
+    gcmONERROR(gcoVERTEXARRAY_StreamBind_Ex(Vertex,
+                                            WLimitRms,
+                                            WLimitRmsDirty,
+                                            &streamInfo,
+                                            &indexInfo));
 #else
-        PrimitiveCount
+    /* Collect hal level info.*/
+    gcmONERROR(gcoVERTEXARRAY_StreamBind_Ex(Vertex,
+                                            &streamInfo,
+                                            &indexInfo));
 #endif
-        );
+
+    gcmONERROR(gcoVERTEXARRAY_IndexBind_Ex(Vertex,
+                                           &origStreamInfo,
+                                           &indexInfo));
+
+    /* es11 path has some split draw path in hal level,
+    ** and will change StreamInfo data, need update.*/
+    *PrimitiveType = streamInfo.primMode;
+    *PrimitiveCount = (gctUINT)streamInfo.primCount;
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
 }
 
 
@@ -1229,9 +2249,6 @@ gcoVERTEXARRAY_Bind_Ex(
                                             bytes + bytesPerIndex,
                                             gcvFALSE));
 
-        /* Free the temporary index buffer. */
-        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, indexBuffer));
-
         /* Bind the index buffer to the hardware. */
         gcmONERROR(gcoINDEX_BindDynamic(Vertex->dynamicIndex, IndexType));
 
@@ -1241,8 +2258,10 @@ gcoVERTEXARRAY_Bind_Ex(
             gctUINT minIndex, maxIndex;
 
             /* Get the index range. */
-            gcmONERROR(gcoINDEX_GetDynamicIndexRange(Vertex->dynamicIndex,
-                                                     &minIndex, &maxIndex));
+            gcmONERROR(gcoINDEX_GetMemoryIndexRange(IndexType,
+                                                    indexBuffer,
+                                                    count32,
+                                                    &minIndex, &maxIndex));
 
             /* Compute vertex range. */
             first = minIndex;
@@ -1254,6 +2273,9 @@ gcoVERTEXARRAY_Bind_Ex(
             first = First;
             count = count32;
         }
+
+        /* Free the temporary index buffer. */
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, indexBuffer));
     }
     else
     {
@@ -1389,8 +2411,10 @@ gcoVERTEXARRAY_Bind_Ex(
             else if (IndexMemory != gcvNULL)
             {
                 /* Get the index range. */
-                gcmONERROR(gcoINDEX_GetDynamicIndexRange(Vertex->dynamicIndex,
-                                                         &minIndex, &maxIndex));
+                gcmONERROR(gcoINDEX_GetMemoryIndexRange(IndexType,
+                                                        IndexMemory,
+                                                        count32,
+                                                        &minIndex, &maxIndex));
 
                 /* Compute vertex range. */
                 first = minIndex;
@@ -2063,31 +3087,449 @@ gceSTATUS gcoVERTEXARRAY_MergeStreams(IN gcsVERTEXARRAY_BUFOBJ_PTR Streams,
 
     return status;
 }
-
+/**************************************************************************************
+**
+** gcoVERTEXARRAY_IndexBind
+**
+** Bind index data to HW
+**
+** Now sperate bind stream / index to hw. Becareful, BindStream need index data to decide
+** update, so, BindIndex should before BindStream
+** 1) many app/game only update index perframe vertex data not change,
+** 2) many internal special patch will only deal with index.
+***************************************************************************************/
 gceSTATUS
-gcoVERTEXARRAY_IndexUpdate(
-    IN gctSIZE_T * Count,
-    IN gceINDEX_TYPE IndexType,
-    IN gcoBUFOBJ IndexObject,
-    IN gctPOINTER IndexMemory
+gcoVERTEXARRAY_IndexBind(
+    IN gcoVERTEXARRAY Vertex,
+    IN gcsVERTEXARRAY_INDEX_INFO_PTR IndexInfo
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    gctUINT count32 = 0;
+    gctUINT bytes = 0;
+    gceINDEX_TYPE IndexType = IndexInfo->indexType;
 
-    gcmHEADER_ARG("Count=%lu IndexType=%d IndexObject=0x%x IndexMemory=0x%x",
-                   Count, IndexType, IndexObject, IndexMemory);
+    gcmHEADER();
 
-    if (IndexObject != gcvNULL)
+    gcmSAFECASTSIZET(count32, IndexInfo->count);
+
+    /* Test if there is a gcoINDEX stream. */
+    if (IndexInfo->u.es30.indexBuffer != gcvNULL)
     {
         /* Bind the index buffer to the hardware. */
-        gcmONERROR(gcoBUFOBJ_IndexBind(IndexObject,
-                    IndexType,
-                    gcmPTR2INT32(IndexMemory),
-                    *Count));
+        gcmONERROR(gcoBUFOBJ_IndexBind(IndexInfo->u.es30.indexBuffer,
+                                       IndexInfo->indexType,
+                                       gcmPTR2INT32(IndexInfo->indexMemory),
+                                       count32));
+    }
+    /* Test if there are client indices. */
+    else if (IndexInfo->indexMemory != gcvNULL)
+    {
+        gcmCOMPUTE_INDEX_BYTES(count32);
+        /* Upload the data to the dynamic index buffer. */
+        gcmONERROR(gcoINDEX_UploadDynamicEx(Vertex->dynamicIndex,
+                                            IndexInfo->indexType,
+                                            IndexInfo->indexMemory,
+                                            bytes,
+                                            gcvFALSE));
 
+        /* Bind the index buffer to the hardware. */
+        gcmONERROR(gcoINDEX_BindDynamic(Vertex->dynamicIndex, IndexInfo->indexType));
     }
 
     /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+/**************************************************************************************
+**
+** gcoVERTEXARRAY_StreamBind
+**
+** Bind stream data to HW
+**
+** Now sperate bind stream / index to hw.
+** 1) many app/game only update index perframe vertex data not change,
+** 2) many internal special patch will only deal with index.
+***************************************************************************************/
+gceSTATUS
+gcoVERTEXARRAY_StreamBind(
+    IN gcoVERTEXARRAY Vertex,
+#if gcdUSE_WCLIP_PATCH
+    IN OUT gctFLOAT * WLimitRms,
+    IN OUT gctBOOL * WLimitRmsDirty,
+#endif
+    IN gcsVERTEXARRAY_STREAM_INFO_CONST_PTR StreamInfo,
+    IN gcsVERTEXARRAY_INDEX_INFO_CONST_PTR IndexInfo
+    )
+{
+    gceSTATUS   status;
+    gctUINT     i;
+    gctUINT     streamCount, count32;
+    gctUINT     attributeCount;
+    gctUINT     firstCopied;
+    gctUINT     minIndex;
+    gctUINT     maxIndex;
+    gctUINT32   bytes;
+    gctUINT     copyCount;
+    gctUINT     attribMask;
+    gctBOOL     merged;
+
+    /* Pointer to In coming attribute array */
+    gcsATTRIBUTE_PTR vertexPtr = StreamInfo->u.es30.attributes;
+
+    /* Stream pointers */
+    gcsVERTEXARRAY_BUFOBJ_PTR streams       = gcvNULL;
+    gcsVERTEXARRAY_BUFOBJ_PTR streamPtr     = gcvNULL;
+    gcsVERTEXARRAY_BUFOBJ streamPool[gcdVERTEXARRAY_POOL_CAPACITY];
+
+    /* Attribute pointers */
+    gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE_PTR attrPtr = gcvNULL;
+    gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE_PTR prev = gcvNULL;
+    gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE_PTR node = gcvNULL;
+    gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE attrPool[gcdVERTEXARRAY_POOL_CAPACITY];
+
+    gcmHEADER();
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Vertex, gcvOBJ_VERTEX);
+    gcmVERIFY_ARGUMENT(StreamInfo->u.es30.attributes != gcvNULL);
+    gcmVERIFY_ARGUMENT(StreamInfo->count > 0);
+
+    gcmSAFECASTSIZET(count32, StreamInfo->count);
+
+    /* No streams so far. */
+    streamCount = 0;
+    attributeCount = 0;
+    copyCount = 0;
+
+    firstCopied = (gctUINT)StreamInfo->first;
+
+    /***************************************************************************
+    ***** Phase 1: Information Gathering & Stream Management ******************/
+
+    /* Walk through all attributes. */
+    for (i = 0, attribMask = StreamInfo->attribMask;
+         attribMask != 0;
+         ++i, attribMask >>= 1, ++vertexPtr
+    )
+    {
+        /* Skip disabled vertex attributes. */
+        if ((attribMask & 1) == 0)
+        {
+            continue;
+        }
+
+        /* compute bytes */
+        gcmCOMPUTE_BYTES();
+
+        /* Find the gcsVERTEXARRAY_BUFOBJ object */
+        streamPtr = _findStream(Vertex, streams, vertexPtr, bytes);
+
+        /* Is it a new Stream? Then initialize */
+        if (streamPtr == gcvNULL)
+        {
+            /* Get next stream from the pool. Avoid gcoOS_Allocate */
+            if (streamCount < gcdVERTEXARRAY_POOL_CAPACITY )
+            {
+                streamPtr = &streamPool[streamCount];
+            }
+            else
+            {
+                /* Bail out on error */
+                gcmONERROR(gcvSTATUS_TOO_COMPLEX);
+            }
+
+            /* initialize stream */
+            gcoOS_MemFill(streamPtr, 0, sizeof(gcsVERTEXARRAY_BUFOBJ));
+
+            /* check if it is a generic value */
+            if (vertexPtr->enable)
+            {
+                gcmSAFECASTSIZET(streamPtr->stride, vertexPtr->stride);
+                streamPtr->divisor = vertexPtr->divisor;
+            }
+            else
+            {
+                streamPtr->stride = bytes;
+                streamPtr->divisor = 0;
+            }
+
+            /* Set count */
+            if (streamPtr->divisor == 0)
+            {
+                streamPtr->count = StreamInfo->count;
+            }
+            else
+            {
+                streamPtr->count = (gctSIZE_T)gcoMATH_Ceiling((gctFLOAT)StreamInfo->instanceCount / (gctFLOAT)streamPtr->divisor);
+            }
+
+            /* Is this a stream? */
+            if (vertexPtr->stream != gcvNULL)
+            {
+                gcsSURF_NODE_PTR node;
+
+                /* get logical and physical addresses of the stream */
+                streamPtr->stream = vertexPtr->stream;
+                gcoBUFOBJ_FastLock(streamPtr->stream, &streamPtr->physical, (gctPOINTER *) &streamPtr->logical);
+
+                gcoBUFOBJ_GetNode(streamPtr->stream, &node);
+                streamPtr->nodePtr = node;
+            }
+            else
+            {
+                copyCount++;
+            }
+
+            /* Add this to streams */
+            if (streams == gcvNULL)
+            {
+                streams = streamPtr;
+            }
+            else
+            {
+                /* Always keep streamPool stream order */
+                streamPool[streamCount - 1].next = streamPtr;
+            }
+
+            /* increase stream count */
+            streamCount++;
+        }
+
+        /* We have our stream */
+        if (streamPtr != gcvNULL)
+        {
+            attrPtr = gcvNULL;
+
+            /* Get next attribute from the pool. Avoid gcoOS_Allocate */
+            if (attributeCount < gcdVERTEXARRAY_POOL_CAPACITY )
+            {
+                attrPtr = &attrPool[attributeCount];
+            }
+            else
+            {
+                /* Bail out on error */
+                gcmONERROR(gcvSTATUS_TOO_COMPLEX);
+            }
+
+            /* initialize atribute */
+            gcoOS_MemFill(attrPtr, 0, sizeof(gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE));
+
+            if (vertexPtr->enable)
+            {
+                attrPtr->bytes      = bytes;
+                attrPtr->format     = vertexPtr->format;
+                attrPtr->linkage    = vertexPtr->linkage;
+                attrPtr->size       = vertexPtr->size;
+                attrPtr->normalized = vertexPtr->normalized;
+                attrPtr->offset     = gcmPTR2INT32(vertexPtr->pointer);
+                attrPtr->enabled    = gcvTRUE;
+#if gcdUSE_WCLIP_PATCH
+                attrPtr->isPosition = vertexPtr->isPosition;
+#endif
+
+                /* We need to know original attr stride when merging */
+                attrPtr->stride     = streamPtr->stride;
+
+                /* Is this a client array? */
+                if (vertexPtr->stream == gcvNULL)
+                {
+                    attrPtr->pointer = vertexPtr->pointer;
+                }
+                else if ((vertexPtr->stream != gcvNULL) && (streamPtr->stride > Vertex->maxStride))
+                {
+                    copyCount++;
+                    attrPtr->pointer = (gctCONST_POINTER)(streamPtr->logical + attrPtr->offset);
+                    streamPtr->stream = gcvNULL;
+                }
+                else
+                {
+                    attrPtr->pointer = gcvNULL;
+                }
+
+#if gcdUSE_WCLIP_PATCH
+                /* Fix wLimit issue */
+                if ((attrPtr->isPosition == gcvTRUE)
+                    && (attrPtr->format == gcvVERTEX_FLOAT)
+                    && (attrPtr->bytes/4 == 3)
+                    && (WLimitRms != gcvNULL)
+                    && (streamPtr->stream != gcvNULL)
+                    )
+                {
+                    computeWLimit(
+                            (gctFLOAT_PTR)(streamPtr->logical + attrPtr->offset + StreamInfo->first * attrPtr->stride),
+                            attrPtr->bytes / 4,
+                            attrPtr->stride,
+                            (gctUINT)streamPtr->count,
+                            WLimitRms,
+                            WLimitRmsDirty);
+                }
+#endif
+            }
+            else
+            {
+                attrPtr->bytes      = bytes;
+                attrPtr->format     = gcvVERTEX_FLOAT;
+                attrPtr->pointer    = vertexPtr->genericValue;
+                attrPtr->size       = vertexPtr->genericSize;
+                attrPtr->linkage    = vertexPtr->linkage;
+            }
+
+            /* Sort this attribute by offset. */
+            for (node = streamPtr->attributePtr, prev = gcvNULL;
+                 node != gcvNULL;
+                 node = node->next)
+            {
+                /* Check if we have found an attribute with a larger offset. */
+                if (node->offset > attrPtr->offset)
+                {
+                    break;
+                }
+
+                /* Save attribute and move to next one. */
+                prev = node;
+            }
+
+            /* Link attribute to this stream. */
+            attrPtr->next = node;
+            if (prev == gcvNULL)
+            {
+                streamPtr->attributePtr = attrPtr;
+            }
+            else
+            {
+                prev->next = attrPtr;
+            }
+
+            /* Update maxAttribOffset if tail */
+            if (!node)
+            {
+                streamPtr->maxAttribOffset = attrPtr->offset;
+            }
+
+            /* increase attribute count */
+            streamPtr->attributeCount++;
+            attributeCount++;
+        }
+    }
+
+    /* Check for attribute count */
+    if (attributeCount > Vertex->maxAttribute)
+    {
+        gcmONERROR(gcvSTATUS_TOO_COMPLEX);
+    }
+
+    /* Check for aliasing older hardware has issues with. */
+    if ((streamCount == 1)
+    &&  (attributeCount == 2)
+    &&  (streams->stream != gcvNULL)
+    &&  (streams->attributePtr != gcvNULL)
+    &&  (streams->attributePtr->next != gcvNULL)
+    &&  (streams->attributePtr->offset ==  streams->attributePtr->next->offset)
+    &&  (streams->attributePtr->bytes < 8)
+    &&  (StreamInfo->count > 31)
+    )
+    {
+        /* TBD: Handle this problem as 4.6.9 does */
+        gcmASSERT(0);
+    }
+
+    merged = gcvFALSE;
+    if (streamCount > Vertex->maxStreams)
+    {
+        /* Try to merge client streams first */
+        if ((streamCount > Vertex->maxStreams) && (copyCount > 1))
+        {
+            gcmONERROR(gcoVERTEXARRAY_MergeClientStreams(streams, Vertex->maxStreams, &streamCount, &copyCount));
+        }
+
+        /* Then try to merge video memory streams */
+        if (streamCount > Vertex->maxStreams)
+        {
+            gcmONERROR(gcoVERTEXARRAY_MergeStreams(streams, Vertex->maxStreams, &streamCount, &copyCount));
+        }
+
+        /* Bail out if we still exceed max streams. */
+        if (streamCount > Vertex->maxStreams)
+        {
+            gcmONERROR(gcvSTATUS_TOO_COMPLEX);
+        }
+
+        merged = gcvTRUE;
+    }
+
+    /***************************************************************************
+    ***** Phase 2: Bind Hardware *******************************************/
+    if ((copyCount > 0) || (merged))
+    {
+        /* Test if there is a gcoINDEX object. */
+        minIndex = 0;
+        maxIndex = 0;
+
+        if (IndexInfo->u.es30.indexBuffer != gcvNULL)
+        {
+            /* Get the index range. */
+            gcmONERROR(gcoBUFOBJ_IndexGetRange(IndexInfo->u.es30.indexBuffer,
+                                               IndexInfo->indexType,
+                                               gcmPTR2INT32(IndexInfo->indexMemory),
+                                               count32,
+                                               &minIndex,
+                                               &maxIndex));
+        }
+        /* Test if there is an index array. */
+        else if (IndexInfo->indexMemory != gcvNULL)
+        {
+            /* Get the index range. */
+            gcmONERROR(gcoINDEX_GetMemoryIndexRange(IndexInfo->indexType,
+                                                    IndexInfo->indexMemory,
+                                                    count32,
+                                                    &minIndex,
+                                                    &maxIndex));
+        }
+
+        /* Any kind of index at all? */
+        if ((IndexInfo->u.es30.indexBuffer != gcvNULL) || (IndexInfo->indexMemory != gcvNULL))
+        {
+            /* Adjust new counts for all streams that will be copied */
+            for (streamPtr = streams; streamPtr != gcvNULL; streamPtr = streamPtr->next)
+            {
+                if ((streamPtr->divisor == 0) && (streamPtr->stream == gcvNULL))
+                {
+                    streamPtr->count = (gctSIZE_T) (maxIndex - minIndex + 1);
+                }
+            }
+
+            /* Get adjusted first */
+            firstCopied = minIndex;
+        }
+
+        /* Copy the vertex data. */
+        gcmONERROR(gcoSTREAM_CacheAttributesEx(Vertex->dynamicStream,
+                                               streamCount,
+                                               streams,
+                                               firstCopied,
+                                               &Vertex->uncacheableStream
+                                               ));
+    }
+
+    /* Bind Hardware */
+    gcmONERROR(gcoHARDWARE_SetVertexArrayEx(gcvNULL,
+                                            StreamInfo->instanced,
+                                            (IndexInfo->u.es30.indexBuffer != gcvNULL) || (IndexInfo->indexMemory != gcvNULL),
+                                            streamCount,
+                                            streams,
+                                            (gctUINT)StreamInfo->first,
+                                            firstCopied,
+                                            StreamInfo->vertexInstIndex
+                                            ));
+
+     /* Success. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 
@@ -2591,8 +4033,10 @@ gcoVERTEXARRAY_Bind_Ex2(
         else if (IndexMemory != gcvNULL)
         {
             /* Get the index range. */
-            gcmONERROR(gcoINDEX_GetDynamicIndexRange(Vertex->dynamicIndex,
-                                                     &minIndex, &maxIndex));
+            gcmONERROR(gcoINDEX_GetMemoryIndexRange(IndexType,
+                                                    IndexMemory,
+                                                    count32,
+                                                    &minIndex, &maxIndex));
         }
 
         /* Any kind of index at all? */

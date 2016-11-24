@@ -51,13 +51,10 @@ gcmShaderName(
 }
 
 /* Get the compiler options */
-sltOPTIMIZATION_OPTIONS sloCOMPILER_GetOptions(sloCOMPILER Compiler)
+sltOPTIMIZATION_OPTIONS _GetOptions(sleSHADER_TYPE shaderType)
 {
     sltOPTIMIZATION_OPTIONS     opt = slvOPTIMIZATION_ALL;
     gcOPTIMIZER_OPTION *        optimizer_opt = gcGetOptimizerOption();
-    sleSHADER_TYPE              shaderType = slvSHADER_TYPE_VERTEX;
-
-    sloCOMPILER_GetShaderType(Compiler, &shaderType);
 
     if ((optimizer_opt->optFlags & gcvOPTIMIZATION_POWER_OPTIMIZATION) != 0 &&
          optimizer_opt->splitVec == gcvTRUE)
@@ -71,11 +68,6 @@ sltOPTIMIZATION_OPTIONS sloCOMPILER_GetOptions(sloCOMPILER Compiler)
     }
 
     return opt;
-}
-
-gctBOOL sloCOMPILER_ExpandNorm(sloCOMPILER Compiler)
-{
-    return (sloCOMPILER_GetOptions(Compiler) & slvOPTIMIZATION_EXPAND_NORM) != 0;
 }
 
 gctINT
@@ -92,6 +84,282 @@ _convertShaderType(
     return ShaderType;
 }
 
+#define DUMP_BUFFER_SIZE    512
+
+static void
+_DumpShaderSource(
+    IN gcSHADER Shader,
+    IN gctCONST_STRING Source
+    )
+{
+    if (gcSHADER_DumpSource(Shader))
+    {
+        gctCHAR *buffer;
+        gctUINT offset = 0;
+        gctSIZE_T n;
+        gcoOS_Print("===== [ Incoming %s shader source (id:%d) %s] =====",
+                    gcmShaderName(_convertShaderType(Shader->type)), Shader->_id,
+                    (Source != Shader->source) ? "(replaced)" : "");
+
+        gcoOS_Allocate(gcvNULL, DUMP_BUFFER_SIZE, (gctPOINTER *)&buffer) ;
+
+        for (n = 0; n < Shader->sourceLength ; ++n)
+        {
+            if ((Shader->source[n] == '\n')
+            ||  (offset == DUMP_BUFFER_SIZE - 2)
+            )
+            {
+                if (Shader->source[n] != '\n')
+                {
+                    /* take care the last char */
+                    buffer[offset++] = Shader->source[n];
+                }
+                buffer[offset] = '\0';
+                gcoOS_Print("%s", buffer);
+                offset = 0;
+            }
+            else
+            {
+                /* don't print \r, which may be from a DOS format file */
+                if (Shader->source[n] != '\r')
+                    buffer[offset++] = Shader->source[n];
+            }
+        }
+        if (offset != 0)
+        {
+            buffer[offset] = '\0';
+            gcoOS_Print("%s", buffer);
+        }
+
+        gcoOS_Free(gcvNULL, buffer);
+    }
+}
+
+#if gcdUSE_PRECOMPILED_SHADERS
+static gceSTATUS
+_UsePreCompiledShader(
+    IN gcSHADER Shader,
+    OUT gcSHADER * Binary,
+    OUT gctSTRING * Log
+)
+{
+    gceSTATUS status;
+
+    if (gcSHADER_DoPatch(Shader) && Shader->sourceLength >= 604)
+    {
+        const char *p, *q;
+        lookup * lookup;
+        gctBOOL useSource1;
+
+        /* Look up any hand compiled shader. */
+        for (lookup = compiledShaders; lookup->function != gcvNULL; ++lookup)
+        {
+            if (Shader->sourceLength < lookup->sourceSize)
+            {
+                continue;
+            }
+
+            p = Shader->source;
+            q = lookup->source1;
+            useSource1 = gcvTRUE;
+
+            while (*p)
+            {
+                if (*p == *q)
+                {
+                    p++;
+                    q++;
+                }
+                else if (*p == ' ' || *p == '\r' || *p == '\n' || *p == '\t')
+                {
+                    p++;
+                }
+                else if (*q == ' ' || *q == '\r' || *q == '\n' || *q == '\t')
+                {
+                    q++;
+                }
+                else if (*q == '\0' && useSource1 && lookup->source2)
+                {
+                    q = lookup->source2;
+                    useSource1 = gcvFALSE;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (*p == '\0' && *q == '\0')
+            {
+                gctUINT32 compilerVersion[2];
+
+                /* Construct a new gcSHADER object. */
+                gcmONERROR(gcSHADER_Construct(_convertShaderType(Shader->type),
+                                              Binary));
+
+                compilerVersion[0] = _SHADER_GL_LANGUAGE_TYPE | (_convertShaderType(Shader->type) << 16);
+                compilerVersion[1] = _SHADER_ES11_VERSION;
+
+                /* Set GLSL version. */
+                gcmONERROR(gcSHADER_SetCompilerVersion(*Binary, compilerVersion));
+
+                gcmONERROR(gcSHADER_SetClientApiVersion(*Binary, Shader->clientApiVersion));
+
+                gcmONERROR(gcSHADER_SetShaderID(*Binary, Shader->_stringId));
+
+                /* Create the shader dynamically. */
+                gcmONERROR((*lookup->function)(*Binary));
+
+                return gcvSTATUS_TRUE;
+            }
+        }
+    }
+
+    return gcvSTATUS_FALSE;
+
+OnError:
+    return status;
+}
+#endif /* gcdUSE_PRECOMPILED_SHADERS */
+
+void _ReplaceShaderSource(gcSHADER Shader)
+{
+    /* check if the current shader source is replaced by
+       VC_OPTION=-SHADER option
+    */
+    if (gcmOPT_ShaderSourceList() != gcvNULL &&
+        Shader->type != gcSHADER_TYPE_PRECOMPILED)
+    {
+        ShaderSourceList * srcList  = gcmOPT_ShaderSourceList();
+        /* find if the shader id is in the list */
+        while (srcList != gcvNULL)
+        {
+            if ((gctUINT)srcList->shaderId == Shader->_id)
+            {
+                Shader->source       = srcList->src;
+                Shader->sourceLength = srcList->sourceSize;
+                break;
+            }
+            srcList = srcList->next;
+        }
+    }
+}
+
+static gceSTATUS _loadPreCompiledShader(
+    IN gcSHADER Shader,
+    OUT gcSHADER * Binary
+)
+{
+    gceSTATUS status;
+
+    /* Construct a new gcSHADER object. */
+    gcmONERROR(gcSHADER_Construct(Shader->type,
+                                  Binary));
+
+    /* A precompiled shader */
+    gcmONERROR(gcSHADER_SetCompilerVersion(*Binary, sloCOMPILER_GetVersion(gcvNULL, (sleSHADER_TYPE)Shader->type)));
+
+    gcmONERROR(gcSHADER_SetClientApiVersion(*Binary, Shader->clientApiVersion));
+
+    gcmONERROR(gcSHADER_Load(*Binary,
+                             (gctPOINTER) Shader->source,
+                             Shader->sourceLength));
+
+OnError:
+        return status;
+}
+
+static gctUINT _convertShaderTypeToGcCompilerIndex(
+    sleSHADER_TYPE ShaderType
+    )
+{
+    gctUINT compilerIndex = 0;
+
+    switch (ShaderType)
+    {
+    case slvSHADER_TYPE_VERTEX:
+    case slvSHADER_TYPE_PRECOMPILED:
+    case slvSHADER_TYPE_VERTEX_DEFAULT_UBO:
+        compilerIndex = 0;
+        break;
+
+    case slvSHADER_TYPE_FRAGMENT:
+    case slvSHADER_TYPE_FRAGMENT_DEFAULT_UBO:
+        compilerIndex = 1;
+        break;
+
+    case slvSHADER_TYPE_COMPUTE:
+        compilerIndex = 2;
+        break;
+
+    case slvSHADER_TYPE_TCS:
+        compilerIndex = 3;
+        break;
+
+    case slvSHADER_TYPE_TES:
+        compilerIndex = 4;
+        break;
+
+    case slvSHADER_TYPE_GS:
+        compilerIndex = 5;
+        break;
+
+    case slvSHADER_TYPE_LIBRARY:
+        compilerIndex = 6;
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        compilerIndex = 0;
+        break;
+    }
+
+    return compilerIndex;
+}
+
+struct gcsATOM CompilerLockRef = gcmATOM_INITIALIZER;
+gctPOINTER CompilerLock = gcvNULL;
+
+static gceSTATUS
+_LockCompiler(void)
+{
+    gceSTATUS status;
+
+    gcmHEADER();
+
+    if (CompilerLock == gcvNULL)
+    {
+        status = gcvSTATUS_INVALID_OBJECT;
+        gcmFOOTER();
+        return status;
+    }
+
+    status = gcoOS_AcquireMutex(gcvNULL, CompilerLock, gcvINFINITE);
+
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS
+_UnLockCompiler(void)
+{
+    gceSTATUS status;
+
+    gcmHEADER();
+
+    if (CompilerLock == gcvNULL)
+    {
+        status = gcvSTATUS_INVALID_OBJECT;
+        gcmFOOTER();
+        return status;
+    }
+
+    status = gcoOS_ReleaseMutex(gcvNULL, CompilerLock);
+
+    gcmFOOTER();
+    return status;
+}
+
 /*******************************************************************************
 **                              gcCompileShader
 ********************************************************************************
@@ -99,9 +367,6 @@ _convertShaderType(
 **  Compile a shader.
 **
 **  INPUT:
-**
-**      gcoOS Hal
-**          Pointer to an gcoHAL object.
 **
 **      gctINT ShaderType
 **          Shader type to compile.  Can be one of the following values:
@@ -136,7 +401,6 @@ _convertShaderType(
 */
 gceSTATUS
 gcCompileShader(
-    IN gcoHAL Hal,
     IN gctINT ShaderType,
     IN gctUINT SourceSize,
     IN gctCONST_STRING Source,
@@ -146,205 +410,114 @@ gcCompileShader(
 {
     gceSTATUS status;
     sloCOMPILER compiler = gcvNULL;
-    gctSIZE_T theSourceSize = SourceSize;
-    gctCONST_STRING theSource = Source;
-    gctINT shaderId = (gctINT)gcSHADER_NextId();
-    gctUINT stringId = 0;
-    gceAPI apiVersion = gcvAPI_OPENGL_ES20;
-    /* fake a shader to have desired shaderId */
     struct _gcSHADER shader_;
+    gco3D engine;
+    gctBOOL locked = gcvFALSE;
 
-    gcmHEADER_ARG("Hal=0x%x ShaderType=%d SourceSize=%lu Source=0x%x",
-                  Hal, ShaderType, SourceSize, Source);
+    gcmHEADER_ARG("ShaderType=%d SourceSize=%lu Source=0x%x",
+                  ShaderType, SourceSize, Source);
 
     shader_.object.type = gcvOBJ_SHADER;
-    shader_._id = shaderId;
+    shader_._id = gcSHADER_NextId();
+    shader_.type = ShaderType;
+    shader_.source = (gctSTRING)Source;
+    shader_.sourceLength = SourceSize;
 
     if (ShaderType != gcSHADER_TYPE_PRECOMPILED)
     {
-        stringId = gcEvaluateCRC32ForShaderString(Source, (gctUINT32)SourceSize);
+        shader_._stringId = gcEvaluateCRC32ForShaderString(Source, (gctUINT32)SourceSize);
     }
+    else
     {
-        /* Get the current client API type. */
-        gco3D engine;
-        status = gco3D_Get3DEngine(&engine);
-        if (status == gcvSTATUS_OK)
-        {
-            gcmONERROR(gco3D_GetAPI(engine, &apiVersion));
-        }
+        shader_._stringId = 0;
     }
+
+    status = gco3D_Get3DEngine(&engine);
+    if (status == gcvSTATUS_OK)
+    {
+        gcmONERROR(gco3D_GetAPI(engine, &shader_.clientApiVersion));
+    }
+    else
+    {
+        shader_.clientApiVersion = gcvAPI_OPENGL_ES20;
+    }
+
     if (*Binary)
     {
         gcmONERROR(gcSHADER_Destroy(*Binary));
+        *Binary = gcvNULL;
     }
 
-    /* check if the current shader source is replaced by
-       VC_OPTION=-SHADER option
-    */
-    if (gcmOPT_ShaderSourceList() != gcvNULL &&
-        ShaderType != gcSHADER_TYPE_PRECOMPILED)
-    {
-        ShaderSourceList * srcList  = gcmOPT_ShaderSourceList();
-        /* find if the shader id is in the list */
-        while (srcList != gcvNULL)
-        {
-            if (srcList->shaderId == shaderId)
-            {
-                theSource     = srcList->src;
-                theSourceSize = srcList->sourceSize;
-                break;
-            }
-            srcList = srcList->next;
-        }
-    }
-    if (gcSHADER_DumpSource(&shader_))
-    {
-        gctCHAR buffer[512];
-        gctUINT offset = 0;
-        gctSIZE_T n;
-        gcoOS_Print("===== [ Incoming %s shader source (id:%d) %s] =====",
-                    gcmShaderName(_convertShaderType(ShaderType)), shaderId,
-                    (theSource != Source) ? "(replaced)" : "");
-        for (n = 0; n < theSourceSize; ++n)
-        {
-            if ((theSource[n] == '\n')
-            ||  (offset == gcmSIZEOF(buffer) - 2)
-            )
-            {
-                if (theSource[n] != '\n')
-                {
-                    /* take care the last char */
-                    buffer[offset++] = theSource[n];
-                }
-                buffer[offset] = '\0';
-                gcoOS_Print("%s", buffer);
-                offset = 0;
-            }
-            else
-            {
-                /* don't print \r, which may be from a DOS format file */
-                if (theSource[n] != '\r')
-                    buffer[offset++] = theSource[n];
-            }
-        }
-        if (offset != 0)
-        {
-            buffer[offset] = '\0';
-            gcoOS_Print("%s", buffer);
-        }
-    }
+    _ReplaceShaderSource(&shader_);
+
+    _DumpShaderSource(&shader_, Source);
 
     if(ShaderType == gcSHADER_TYPE_PRECOMPILED)
     {
-        /* Construct a new gcSHADER object. */
-        gcmONERROR(gcSHADER_Construct(Hal,
-                                      ShaderType,
-                                      Binary));
-
-        /* A precompiled shader */
-        gcmONERROR(gcSHADER_SetCompilerVersion(*Binary,
-                                               sloCOMPILER_GetVersion(gcvNULL, ShaderType)));
-
-        gcmONERROR(gcSHADER_SetClientApiVersion(*Binary, apiVersion));
-
-        gcmASSERT(theSource == Source);
-        gcmONERROR(gcSHADER_Load(*Binary,
-                                 (gctPOINTER) Source,
-                                 SourceSize));
+        gcmONERROR(_loadPreCompiledShader(&shader_, Binary));
     }
     else
     {
 #if gcdUSE_PRECOMPILED_SHADERS
-        if (gcSHADER_DoPatch(&shader_) && theSourceSize >= 604)
+        gcmONERROR(_UsePreCompiledShader(&shader_, Binary, Log));
+
+        if (status == gcvSTATUS_TRUE)
         {
-            const char *p, *q;
-            lookup * lookup;
-            gctBOOL useSource1;
-
-            /* Look up any hand compiled shader. */
-            for (lookup = compiledShaders; lookup->function != gcvNULL; ++lookup)
-            {
-                if (theSourceSize < lookup->sourceSize)
-                {
-                    continue;
-                }
-
-                p = theSource;
-                q = lookup->source1;
-                useSource1 = gcvTRUE;
-
-                while (*p)
-                {
-                    if (*p == *q)
-                    {
-                        p++;
-                        q++;
-                    }
-                    else if (*p == ' ' || *p == '\r' || *p == '\n' || *p == '\t')
-                    {
-                        p++;
-                    }
-                    else if (*q == ' ' || *q == '\r' || *q == '\n' || *q == '\t')
-                    {
-                        q++;
-                    }
-                    else if (*q == '\0' && useSource1 && lookup->source2)
-                    {
-                        q = lookup->source2;
-                        useSource1 = gcvFALSE;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
-                if (*p == '\0' && *q == '\0')
-                {
-                    gctUINT32 compilerVersion[2];
-
-                    /* Construct a new gcSHADER object. */
-                    gcmONERROR(gcSHADER_Construct(Hal,
-                                                  _convertShaderType(ShaderType),
-                                                  Binary));
-
-                    compilerVersion[0] = gcmCC('E', 'S', '\0', '\0') | (_convertShaderType(ShaderType) << 16);
-                    compilerVersion[1] = gcmCC('\0', '\0', '\1', '\1');
-
-                    /* Set GLSL version. */
-                    gcmONERROR(gcSHADER_SetCompilerVersion(*Binary, compilerVersion));
-
-                    gcmONERROR(gcSHADER_SetClientApiVersion(*Binary, apiVersion));
-
-                    gcmONERROR(gcSHADER_SetShaderID(*Binary, stringId));
-
-                    /* Create the shader dynamically. */
-                    gcmONERROR((*lookup->function)(*Binary));
-
-                    /* Success. */
-                    gcmFOOTER_ARG("*Binary=0x%x *Log=0x%x", *Binary, *Log);
-                    return gcvSTATUS_OK;
-                }
-            }
+            /* Success. */
+            gcmFOOTER_ARG("*Binary=0x%x *Log=0x%x", *Binary, *Log);
+            return gcvSTATUS_OK;
         }
-#endif /* gcdUSE_PRECOMPILED_SHADERS */
+#endif
         {
-            gcmONERROR(sloCOMPILER_Construct(Hal,
-                                             (sleSHADER_TYPE) ShaderType,
-                                             apiVersion,
-                                             &compiler));
+            sltDUMP_OPTIONS dumpOption = slmDUMP_OPTIONS;
+            char* p = gcvNULL;
+            sleSHADER_TYPE shaderType = slvSHADER_TYPE_VERTEX;
+            sltOPTIMIZATION_OPTIONS optOption;
+            gctUINT compilerIndex = _convertShaderTypeToGcCompilerIndex((sleSHADER_TYPE)ShaderType);
+
+            gcmONERROR(_LockCompiler());
+            locked = gcvTRUE;
+
+            compiler = *gcGetCompiler(compilerIndex);
+
+            gcoOS_GetEnv(gcvNULL, "VIV_GLSL_DUMP", &p);
+
+            if (compiler == gcvNULL)
+            {
+                sloCOMPILER_Construct_General((sleSHADER_TYPE)ShaderType,
+                                              gcGetCompiler(compilerIndex));
+                compiler = *gcGetCompiler(compilerIndex);
+            }
+
+            gcmONERROR(sloCOMPILER_Construct((sleSHADER_TYPE)ShaderType,
+                                             shader_.clientApiVersion,
+                                             compiler));
+
+            sloCOMPILER_GetShaderType(compiler, &shaderType);
+
+            optOption = _GetOptions(shaderType);
+
+            if ((p && p[0] == '1') && (shaderType != slvSHADER_TYPE_LIBRARY))
+            {
+                dumpOption = slvDUMP_ALL;
+                optOption &=~slvOPTIMIZATION_DATA_FLOW;
+                dumpOption &=~slvDUMP_CODE_GENERATOR;
+            }
 
             gcmONERROR(sloCOMPILER_Compile(compiler,
-                                           sloCOMPILER_GetOptions(compiler),
-                                           slmDUMP_OPTIONS,
+                                           optOption,
+                                           dumpOption,
                                            1,
-                                           &theSource,
+                                           (gctCONST_STRING *)(&shader_.source),
                                            Binary,
                                            Log));
 
-            gcmONERROR(gcSHADER_SetShaderID(*Binary, stringId));
+            gcmONERROR(gcSHADER_SetShaderID(*Binary, shader_._stringId));
 
             gcmONERROR(sloCOMPILER_Destroy(compiler));
+
+            locked = gcvFALSE;
+            gcmONERROR(_UnLockCompiler());
         }
     }
 
@@ -374,7 +547,7 @@ OnError:
     if (compiler != gcvNULL)
     {
         /* Delete sloCOMPILER object. */
-       gcmVERIFY_OK(sloCOMPILER_Destroy(compiler));
+        gcmVERIFY_OK(sloCOMPILER_Destroy(compiler));
     }
 
     if (*Binary)
@@ -384,21 +557,25 @@ OnError:
         *Binary = gcvNULL;
     }
 
+    if (locked)
+    {
+        gcmVERIFY_OK(_UnLockCompiler());
+    }
+
     /* Return the status. */
     gcmFOOTER();
     return status;
 }
 
-
-static gcsATOM_PTR  CompilerLockRef = gcvNULL;
-gctPOINTER   CompilerLock = gcvNULL;
-
 /*******************************************************************************************
 **  Initialize compiler global variables.
 **
 **  Input:
-**      gcoHAL Hal
-**      Pointer to HAL object
+**      gcePATCH_ID PatchId,
+**      patch ID
+**
+**      gcsHWCaps HWCaps,
+**      HW capabilities filled in by driver and passed to compiler
 **
 **      gcsGLSLCaps *Caps
 **      Min/Max capabilities filled in by driver and passed to compiler
@@ -409,7 +586,8 @@ gctPOINTER   CompilerLock = gcvNULL;
 */
 gceSTATUS
 gcInitializeCompiler(
-    IN gcoHAL Hal,
+    IN gcePATCH_ID PatchId,
+    IN gcsHWCaps *HWCaps,
     IN gcsGLSLCaps *Caps
     )
 {
@@ -418,14 +596,8 @@ gcInitializeCompiler(
 
     gcmHEADER_ARG("Hal=0x%x", Hal);
 
-    if (CompilerLockRef == gcvNULL)
-    {
-        /* Create a new reference counter. */
-        gcmONERROR(gcoOS_AtomConstruct(gcvNULL, &CompilerLockRef));
-    }
-
     /* Increment the reference counter */
-    gcmONERROR(gcoOS_AtomIncrement(gcvNULL, CompilerLockRef, &reference));
+    gcmONERROR(gcoOS_AtomIncrement(gcvNULL, &CompilerLockRef, &reference));
 
     if (reference == 0)
     {
@@ -438,13 +610,24 @@ gcInitializeCompiler(
         }
     }
 
-    if(Caps)
+    *gcGetPatchId() = PatchId;
+
+    if (HWCaps)
+    {
+        *gcGetHWCaps() = *HWCaps;
+    }
+    else
+    {
+        gcQueryShaderCompilerHwCfg(gcvNULL, gcGetHWCaps());
+    }
+
+    if (Caps)
     {
         *gcGetGLSLCaps() = *Caps;
     }
     else
     {
-        gcmVERIFY_OK(gcInitGLSLCaps(Hal, gcGetGLSLCaps()));
+        gcmVERIFY_OK(gcInitGLSLCaps(gcGetGLSLCaps()));
     }
 
 OnError:
@@ -465,31 +648,30 @@ OnError:
 **
 */
 gceSTATUS
-gcFinalizeCompiler(
-    IN gcoHAL Hal
-    )
+gcFinalizeCompiler(void)
 {
     gctINT32 reference = 0;
     gceSTATUS status = gcvSTATUS_OK;
+    gctUINT i;
 
-    gcmHEADER_ARG("Hal=0x%x", Hal);
+    gcmHEADER();
 
-    /* CompilerLockRef could be NULL when Construction failed. */
-    if(CompilerLockRef != gcvNULL)
-    {
-        /* Decrement the reference counter */
-        gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, CompilerLockRef, &reference));
-    }
+    /* Decrement the reference counter */
+    gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, &CompilerLockRef, &reference));
 
     if (reference == 1)
     {
         /* Delete the global lock */
         gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, CompilerLock));
 
-        /* Destroy the reference counter */
-        gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, CompilerLockRef));
-
-        CompilerLockRef = gcvNULL;
+        for (i = 0; i < __GC_COMPILER_NUMBER__; i++)
+        {
+            if (*gcGetCompiler(i) != gcvNULL)
+            {
+                sloCOMPILER_Destroy_General(*gcGetCompiler(i));
+                *gcGetCompiler(i) = gcvNULL;
+            }
+        }
     }
 
     gcmFOOTER_ARG("status=%d", status);

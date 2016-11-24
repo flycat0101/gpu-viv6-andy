@@ -3021,6 +3021,7 @@ gceSTATUS
 gckOS_WaitSignal(
     IN gckOS Os,
     IN gctSIGNAL Signal,
+    IN gctBOOL Interruptable,
     IN gctUINT32 Wait
     )
 {
@@ -5647,6 +5648,18 @@ OnError:
     gcmkFOOTER();
     return status;
 }
+
+gceSTATUS
+gckOS_PhysicalToPhysicalAddress(
+    IN gckOS Os,
+    IN gctPOINTER Physical,
+    IN gctUINT32 Offset,
+    OUT gctPHYS_ADDR_T * PhysicalAddress
+    )
+{
+    return gcvSTATUS_NOT_SUPPORTED;
+}
+
 gceSTATUS
 gckOS_GetPolicyID(
     IN gckOS Os,

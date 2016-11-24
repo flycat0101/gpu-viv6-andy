@@ -20,7 +20,7 @@ VX_INTERNAL_CALLBACK_API void vxoRemap_Destructor(vx_reference ref)
     vxoMemory_Free(remap->base.context, &remap->memory);
 }
 
-VX_PUBLIC_API vx_remap vxCreateRemap(
+VX_API_ENTRY vx_remap VX_API_CALL vxCreateRemap(
         vx_context context, vx_uint32 src_width, vx_uint32 src_height, vx_uint32 dst_width, vx_uint32 dst_height)
 {
     vx_remap remap;
@@ -51,12 +51,12 @@ VX_PUBLIC_API vx_remap vxCreateRemap(
     return remap;
 }
 
-VX_PUBLIC_API vx_status vxReleaseRemap(vx_remap *remap)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseRemap(vx_remap *remap)
 {
     return vxoReference_Release((vx_reference_ptr)remap, VX_TYPE_REMAP, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_status vxQueryRemap(vx_remap remap, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryRemap(vx_remap remap, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoReference_IsValidAndSpecific(&remap->base, VX_TYPE_REMAP)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -94,7 +94,7 @@ VX_PUBLIC_API vx_status vxQueryRemap(vx_remap remap, vx_enum attribute, void *pt
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxSetRemapPoint(
+VX_API_ENTRY vx_status VX_API_CALL vxSetRemapPoint(
         vx_remap remap, vx_uint32 dst_x, vx_uint32 dst_y, vx_float32 src_x, vx_float32 src_y)
 {
     vx_float32_ptr ptr;
@@ -116,7 +116,7 @@ VX_PUBLIC_API vx_status vxSetRemapPoint(
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxGetRemapPoint(
+VX_API_ENTRY vx_status VX_API_CALL vxGetRemapPoint(
         vx_remap remap, vx_uint32 dst_x, vx_uint32 dst_y, vx_float32 *src_x, vx_float32 *src_y)
 {
     vx_float32_ptr ptr;
@@ -135,3 +135,4 @@ VX_PUBLIC_API vx_status vxGetRemapPoint(
 
     return VX_SUCCESS;
 }
+

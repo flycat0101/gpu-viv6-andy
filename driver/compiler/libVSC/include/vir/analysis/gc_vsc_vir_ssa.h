@@ -18,6 +18,7 @@ BEGIN_EXTERN_C()
 
 VSC_ErrCode vscVIR_Transform2SSA(VIR_Shader* pShader);
 VSC_ErrCode vscVIR_TransformFromSSA(VIR_Shader* pShader);
+VSC_ErrCode vscVIR_TransformFromSpvSSA(VIR_Shader* pShader);
 
 END_EXTERN_C()
 

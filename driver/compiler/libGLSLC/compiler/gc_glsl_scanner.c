@@ -2116,6 +2116,13 @@ sloCOMPILER_GetCurrentStringNo(
 }
 
 void
+yyInitScanner(void)
+{
+    yy_init = 1;
+    yy_start = 0;
+}
+
+void
 slScanDeleteBuffer(
 IN sloCOMPILER Compiler
 )

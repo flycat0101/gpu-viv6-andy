@@ -34,7 +34,7 @@ VX_INTERNAL_API void vxoMetaFormat_Release(vx_meta_format_ptr metaFormatPtr)
     vxoReference_Release((vx_reference_ptr)metaFormatPtr, VX_TYPE_META_FORMAT, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_status vxSetMetaFormatAttribute(vx_meta_format meta_format, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxSetMetaFormatAttribute(vx_meta_format meta_format, vx_enum attribute, const void *ptr, vx_size size)
 {
     if (!vxoReference_IsValidAndSpecific(&meta_format->base, VX_TYPE_META_FORMAT)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -127,3 +127,4 @@ VX_PUBLIC_API vx_status vxSetMetaFormatAttribute(vx_meta_format meta_format, vx_
 
     return VX_SUCCESS;
 }
+

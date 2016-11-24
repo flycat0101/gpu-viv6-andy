@@ -59,6 +59,10 @@ VivPrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg) {
     int fgop = 0xF0;
     int bgop = 0xF0;
 
+#ifdef DISABLE_V2D
+    TRACE_EXIT(FALSE);
+#endif
+
     SURF_SIZE_FOR_SW(pPixmap->drawable.width, pPixmap->drawable.height);
 
     if (!CheckFILLValidity(pPixmap, alu, planemask)) {

@@ -13,6 +13,64 @@
 
 #include <gc_vxk_common.h>
 
+vx_status vxCopyImage(vx_node node, vx_image src, vx_image dst)
+{
+    vx_status status = VX_SUCCESS;
+    gcoVX_Kernel_Context * kernelContext = gcvNULL;
+    vx_df_image format;
+
+#if gcdVX_OPTIMIZER
+    if (node && node->kernelContext)
+    {
+        kernelContext = (gcoVX_Kernel_Context *) node->kernelContext;
+    }
+    else
+#endif
+    {
+        if (node->kernelContext == VX_NULL)
+        {
+            /* Allocate a local copy for old flow. */
+            node->kernelContext = (gcoVX_Kernel_Context *) vxAllocate(sizeof(gcoVX_Kernel_Context));
+        }
+        kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
+        kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
+    }
+    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
+    /*index = 0*/
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
+
+    /*index = 1*/
+    gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
+
+    kernelContext->params.kernel = gcvVX_KERNEL_COPY_IMAGE;
+    if (format == VX_DF_IMAGE_S16 || format == VX_DF_IMAGE_U16)
+        kernelContext->params.xstep = 8;
+    else if (format == VX_DF_IMAGE_U8)
+        kernelContext->params.xstep = 16;
+    else if (format == VX_DF_IMAGE_U32 || format == VX_DF_IMAGE_S32)
+        kernelContext->params.xstep = 4;
+    else
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    kernelContext->params.clamp = vx_false_e;
+    kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+
+
+    kernelContext->node = node;
+
+    status = gcfVX_Kernel(kernelContext);
+
+#if gcdVX_OPTIMIZER
+    if (!node || !node->kernelContext)
+    {
+        vxFree(kernelContext);
+    }
+#endif
+
+    return status;
+}
+
 static vx_status vxVivMeanStdDev(vx_node node, vx_image input, vx_scalar mean, vx_scalar stddev)
 {
     vx_status status = VX_SUCCESS;
@@ -36,6 +94,7 @@ static vx_status vxVivMeanStdDev(vx_node node, vx_image input, vx_scalar mean, v
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(input, VX_IMAGE_ATTRIBUTE_WIDTH, &inputWidth, sizeof(vx_uint32));
@@ -62,6 +121,8 @@ static vx_status vxVivMeanStdDev(vx_node node, vx_image input, vx_scalar mean, v
         kernelContext->params.ystep        = 255;
     }
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -85,8 +146,8 @@ vx_status vxMeanStdDev(vx_node node, vx_image input, vx_scalar mean, vx_scalar s
     vx_uint32 width = 0, height = 0;
 
     /* clean init value */
-    status |= vxCommitScalarValue(mean, &fmean);
-    status |= vxCommitScalarValue(stddev, &fstddev);
+    status |= vxWriteScalarValue(mean, &fmean);
+    status |= vxWriteScalarValue(stddev, &fstddev);
 
     status |= vxGetValidRegionImage(input, &rect);
     status |= vxAccessImagePatch(input, &rect, 0, &addrs, &base_ptr, VX_READ_ONLY);
@@ -95,8 +156,8 @@ vx_status vxMeanStdDev(vx_node node, vx_image input, vx_scalar mean, vx_scalar s
     /* To Clean up */
     status |= gcfVX_Flush(gcvTRUE);
 
-    status |= vxAccessScalarValue(mean, &sum);
-    status |= vxAccessScalarValue(stddev, &sqsum);
+    status |= vxReadScalarValue(mean, &sum);
+    status |= vxReadScalarValue(stddev, &sqsum);
 
     width = rect.end_x - rect.start_x;
     height = rect.end_y - rect.start_x;
@@ -121,8 +182,8 @@ vx_status vxMeanStdDev(vx_node node, vx_image input, vx_scalar mean, vx_scalar s
     fstddev = sqsum/npix - fmean * fmean;
     fstddev = (fstddev < 0) ? 0 : (vx_float32)sqrt(fstddev);
 
-    status |= vxCommitScalarValue(mean, &fmean);
-    status |= vxCommitScalarValue(stddev, &fstddev);
+    status |= vxWriteScalarValue(mean, &fmean);
+    status |= vxWriteScalarValue(stddev, &fstddev);
     status |= vxCommitImagePatch(input, &rect, 0, &addrs, base_ptr);
 
     return status;
@@ -155,10 +216,11 @@ vx_status vxMinMaxPackLocation(vx_node node, vx_image inputImage, vx_array input
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
-    vxAccessScalarValue(widthScalar, &width);
-    vxAccessScalarValue(heightScalar, &height);
+    vxReadScalarValue(widthScalar, &width);
+    vxReadScalarValue(heightScalar, &height);
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputImage, GC_VX_INDEX_AUTO);
@@ -185,11 +247,13 @@ vx_status vxMinMaxPackLocation(vx_node node, vx_image inputImage, vx_array input
     kernelContext->params.clamp            = (vx_uint32)itemSize * width;
     kernelContext->params.col              = height;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
     status = gcfVX_Flush(gcvTRUE);
 
-    status |= vxAccessScalarValue(countScalar, &count);
+    status |= vxReadScalarValue(countScalar, &count);
 
     if (outputArray)
     {
@@ -213,7 +277,7 @@ vx_status vxMinMaxPackLocation(vx_node node, vx_image inputImage, vx_array input
     return status;
 }
 
-vx_status vxMinMaxGetLocation(vx_node node, vx_image img, vx_scalar minVal, vx_scalar maxVal, vx_df_image format,  vx_image minImg, vx_image maxImg,
+vx_status vxMinMaxGetLocation(vx_node node, vx_image img, vx_scalar minVal, vx_scalar maxVal, vx_df_image format, vx_image minImg, vx_image maxImg,
                              vx_scalar minCount, vx_scalar maxCount, vx_array minArray, vx_array maxArray)
 {
     vx_status status  = VX_SUCCESS;
@@ -241,6 +305,7 @@ vx_status vxMinMaxGetLocation(vx_node node, vx_image img, vx_scalar minVal, vx_s
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(img, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
@@ -251,8 +316,8 @@ vx_status vxMinMaxGetLocation(vx_node node, vx_image img, vx_scalar minVal, vx_s
         return_loc = vx_true_e;
     }
 
-    vxCommitScalarValue(minCount, &count);
-    vxCommitScalarValue(maxCount, &count);
+    vxWriteScalarValue(minCount, &count);
+    vxWriteScalarValue(maxCount, &count);
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, img, GC_VX_INDEX_AUTO);
@@ -273,8 +338,8 @@ vx_status vxMinMaxGetLocation(vx_node node, vx_image img, vx_scalar minVal, vx_s
         gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_ARRAY, maxArray, GC_VX_INDEX_AUTO);
     }
 
-    vxAccessScalarValue(minVal, &minValue);
-    vxAccessScalarValue(maxVal, &maxValue);
+    vxReadScalarValue(minVal, &minValue);
+    vxReadScalarValue(maxVal, &maxValue);
 
     bin[0] = (format == VX_DF_IMAGE_S16) ? FV2(0xffff & minValue) : FV((vx_uint8)minValue);
     bin[1] = (format == VX_DF_IMAGE_S16) ? FV2(1) : FV(1);
@@ -304,6 +369,8 @@ vx_status vxMinMaxGetLocation(vx_node node, vx_image img, vx_scalar minVal, vx_s
     kernelContext->params.volume           = (vx_uint32)itemSize;
     kernelContext->params.clamp            = (vx_uint32)itemSize * width;
     kernelContext->params.policy           = return_loc;
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -339,6 +406,7 @@ vx_status vxMinMaxLocFilter(vx_node node, vx_image input, vx_scalar filter_min, 
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(input, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
@@ -381,9 +449,9 @@ vx_status vxMinMaxLocFilter(vx_node node, vx_image input, vx_scalar filter_min, 
     {
         gctUINT32 i = 0;
         gcoVX_Index indexs[]                = {
-            /* index,  num,             shift0,         shift1,      mask0,    mask1 */
-            {    3,   4 * 4, {FV4(3*8,(16+3)*8,0,0),        FV4(0,0,0, 0),      FV4(4*8,4*8,0,0),   FV4(0,0,0,0)}  }, /*  */
-            {    4,   4 * 4, {FV4(6*8,(16+6)*8,0,0),        FV4(0,0,0, 0),      FV4(4*8,4*8,0,0),   FV4(0,0,0,0)}  }, /*  */
+            /* index, num, shift0, shift1, mask0, mask1 */
+            {    3, 4 * 4, {FV4(3*8,(16+3)*8,0,0), FV4(0,0,0, 0), FV4(4*8,4*8,0,0), FV4(0,0,0,0)}  }, /*  */
+            {    4, 4 * 4, {FV4(6*8,(16+6)*8,0,0), FV4(0,0,0, 0), FV4(4*8,4*8,0,0), FV4(0,0,0,0)}  }, /*  */
         };
 
         kernelContext->uniform_num             = sizeof(indexs)/sizeof(indexs[0]);
@@ -401,6 +469,8 @@ vx_status vxMinMaxLocFilter(vx_node node, vx_image input, vx_scalar filter_min, 
 
     kernelContext->params.evisNoInst = node->base.context->evisNoInst;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
     status |= gcfVX_Flush(gcvTRUE);
@@ -414,3 +484,4 @@ vx_status vxMinMaxLocFilter(vx_node node, vx_image input, vx_scalar filter_min, 
 
     return status;
 }
+

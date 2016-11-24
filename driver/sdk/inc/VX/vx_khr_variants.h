@@ -1,18 +1,5 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
-
 /*
- * Copyright (c) 2012-2013 The Khronos Group Inc.
+ * Copyright (c) 2012-2015 The Khronos Group Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and/or associated documentation files (the
@@ -40,8 +27,6 @@
 /*!
  * \file
  * \brief The Khronos Extension for Kernel Variants.
- * \author Erik Rainey <erik.rainey@ti.com>
- * \author Erez Natan <erez.natan@samsung.com>
  *
  * \defgroup group_variants Extension: Kernel Variants
  * \brief The Khronos Extension for Kernel Variants.
@@ -109,7 +94,7 @@ extern "C" {
  * \return A <tt>\ref vx_status_e</tt> enumeration.
  * \ingroup group_variants
  */
-VX_API vx_status vxChooseKernelVariant(vx_node node, vx_char variantName[VX_MAX_VARIANT_NAME]);
+VX_API_ENTRY vx_status VX_API_CALL vxChooseKernelVariant(vx_node node, vx_char variantName[VX_MAX_VARIANT_NAME]);
 
 #ifdef __cplusplus
 }

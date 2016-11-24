@@ -18,6 +18,7 @@
 #define slmDUMP_OPTIONS        ((sltDUMP_OPTIONS)slvDUMP_NONE)
 
 #define MAX_SINGLE_LOG_LENGTH       1024*32
+#define __GC_COMPILER_NUMBER__      7
 
 #include "gc_glsl_common.h"
 
@@ -162,9 +163,13 @@ typedef enum _sleSHADER_TYPE
 sleSHADER_TYPE;
 
 gceSTATUS
+sloCOMPILER_LoadGeneralBuiltIns(
+    IN sloCOMPILER Compiler
+    );
+
+gceSTATUS
 sloCOMPILER_LoadBuiltIns(
-    IN sloCOMPILER Compiler,
-    IN gctBOOL LoadPrecisionOnly
+    IN sloCOMPILER Compiler
     );
 
 gctUINT32 *
@@ -223,14 +228,24 @@ sloCOMPILER_SetOutputInvariant(
     );
 
 gceSTATUS
-sloCOMPILER_Construct(
-    IN gcoHAL Hal,
+sloCOMPILER_Construct_General(
     IN sleSHADER_TYPE ShaderType,
-    IN gceAPI ClientApiVersion,
     OUT sloCOMPILER * Compiler
     );
 
+gceSTATUS
+sloCOMPILER_Construct(
+    IN sleSHADER_TYPE ShaderType,
+    IN gceAPI ClientApiVersion,
+    INOUT sloCOMPILER Compiler
+    );
+
 /* Destroy an sloCOMPILER object. */
+gceSTATUS
+sloCOMPILER_Destroy_General(
+    IN sloCOMPILER Compiler
+    );
+
 gceSTATUS
 sloCOMPILER_Destroy(
     IN sloCOMPILER Compiler
@@ -255,12 +270,6 @@ gceSTATUS
 sloCOMPILER_GetBinary(
     IN sloCOMPILER Compiler,
     OUT gcSHADER * Binary
-    );
-
-gceSTATUS
-sloCOMPILER_GetHAL(
-    IN sloCOMPILER Compiler,
-    OUT gcoHAL * Hal
     );
 
 /* Compile the source strings */
@@ -401,6 +410,16 @@ sloCOMPILER_Report(
     );
 
 gceSTATUS
+sloCOMPILER_IncrDumpOffset(
+    IN sloCOMPILER Compiler
+    );
+
+gceSTATUS
+sloCOMPILER_DecrDumpOffset(
+    IN sloCOMPILER Compiler
+    );
+
+gceSTATUS
 sloCOMPILER_CheckErrorLog(
     IN sloCOMPILER Compiler,
     IN gctUINT LineNo,
@@ -466,7 +485,25 @@ typedef enum _sleEXTENSION
                                                                          | slvEXTENSION_SAMPLE_VARIABLES
                                                                          | slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION
                                                                          | slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX
-                                                                         | slvEXTENSION_BLEND_EQUATION_ADVANCED,
+                                                                         | slvEXTENSION_BLEND_EQUATION_ADVANCED
+                                                                         | slvEXTENSION_IMAGE_ATOMIC,
+
+    slvEXTENSION_SHADER_FRAMEBUFFER_FETCH                   = 0x04000000,
+
+    slvEXTENSION_ANDROID_EXTENSION_PACK_ES31A               = slvEXTENSION_BLEND_EQUATION_ADVANCED              |
+                                                              slvEXTENSION_SAMPLE_VARIABLES                     |
+                                                              slvEXTENSION_IMAGE_ATOMIC                         |
+                                                              slvEXTENSION_SHADER_MULTISAMPLE_INTERPOLATION     |
+                                                              slvEXTENSION_TEXTURE_STORAGE_MULTISAMPLE_2D_ARRAY |
+                                                              slvEXTENSION_EXT_GEOMETRY_SHADER                  |
+                                                              slvEXTENSION_EXT_GEOMETRY_POINT_SIZE              |
+                                                              slvEXTENSION_GPU_SHADER5                          |
+                                                              slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX           |
+                                                              slvEXTENSION_IO_BLOCKS                            |
+                                                              slvEXTENSION_TESSELLATION_SHADER                  |
+                                                              slvEXTENSION_TESSELLATION_POINT_SIZE              |
+                                                              slvEXTENSION_EXT_TEXTURE_BUFFER                   |
+                                                              slvEXTENSION_TEXTURE_CUBE_MAP_ARRAY,
 
     slvEXTENSION_ES_30_AND_ABOVE                            = slvEXTENSION_HALTI |
                                                               slvEXTENSION_ES_31 |
@@ -515,12 +552,6 @@ sloCOMPILER_CheckAssignmentForGlFragData(
     IN sloCOMPILER Compiler
     );
 
-gctBOOL
-sloCOMPILER_IsShaderType(
-   IN sloCOMPILER Compiler,
-   IN sleSHADER_TYPE ShaderType
-   );
-
 gceSTATUS
 sloCOMPILER_CompileBuiltinLibrary(
     IN sloCOMPILER Compiler,
@@ -537,33 +568,14 @@ sloCOMPILER_LinkBuiltinLibrary(
     IN     gcSHADER         Library
     );
 
-gceSTATUS
-sloCOMPILER_GetCurrentIterationCount(
-    IN sloCOMPILER Compiler,
-    OUT gctINT * CurrentIterationCount
-    );
-
-gceSTATUS
-sloCOMPILER_SetCurrentIterationCount(
-    IN sloCOMPILER Compiler,
-    IN gctINT CurrentIterationCount
-    );
-
-gceSTATUS
-sloCOMPILER_SetCompilerFlag(
-    IN sloCOMPILER Compiler,
-    IN sleCOMPILER_FLAGS Flag
-    );
-
-gceSTATUS
-sloCOMPILER_GetCompilerFlag(
-    IN sloCOMPILER Compiler,
-    OUT sleCOMPILER_FLAGS * Flag
-    );
-
 gcePATCH_ID
 sloCOMPILER_GetPatchID(
     IN sloCOMPILER Compiler
+    );
+
+sloCOMPILER *
+gcGetCompiler(
+    gctUINT Index
     );
 
 #endif /* __gc_glsl_compiler_h_ */

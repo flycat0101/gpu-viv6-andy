@@ -34,7 +34,7 @@
 // global variables
 cl_context cxContext = 0;
 cl_program cpProgram = 0;
-cl_device_id cdDeviceID = 0;
+cl_device_id cdDeviceID[2];
 cl_kernel kernels[FFT_MAX_LOG2N];
 cl_command_queue commandQueue;
 cl_event gpuExecution[FFT_MAX_LOG2N];
@@ -366,8 +366,8 @@ createCommandQueue(
     )
 {
     cl_int ciErrNum = CL_SUCCESS;
-    ciErrNum = clGetContextInfo(cxContext, CL_CONTEXT_DEVICES, sizeof(cl_device_id), &cdDeviceID, NULL);
-    commandQueue = clCreateCommandQueue(cxContext, cdDeviceID, CL_QUEUE_PROFILING_ENABLE, &ciErrNum);
+    ciErrNum = clGetContextInfo(cxContext, CL_CONTEXT_DEVICES, sizeof(cl_device_id)*2, &cdDeviceID, NULL);
+    commandQueue = clCreateCommandQueue(cxContext, cdDeviceID[0], CL_QUEUE_PROFILING_ENABLE, &ciErrNum);
     checkError(ciErrNum, CL_SUCCESS, "clCreateCommandQueue");
 }
 
@@ -431,7 +431,7 @@ compileProgram(
     if (ciErrNum != CL_SUCCESS)
     {
         char cBuildLog[10240];
-        clGetProgramBuildInfo(cpProgram, cdDeviceID, CL_PROGRAM_BUILD_LOG, sizeof(cBuildLog), cBuildLog, NULL );
+        clGetProgramBuildInfo(cpProgram, cdDeviceID[0], CL_PROGRAM_BUILD_LOG, sizeof(cBuildLog), cBuildLog, NULL );
         printf("\nBuild Log : \n%s\n", cBuildLog);
         checkError(ciErrNum, CL_SUCCESS, "clBuildProgram");
     }

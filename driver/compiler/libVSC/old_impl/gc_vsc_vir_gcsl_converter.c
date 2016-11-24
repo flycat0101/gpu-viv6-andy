@@ -224,7 +224,7 @@ _CalculateInstCount(
     case VIR_OP_STORE_L:
         {
             VIR_OperandInfo src1Info;
-            VIR_Operand_GetOperandInfo(VirInst, VirInst->src[1], &src1Info);
+            VIR_Operand_GetOperandInfo(VirInst, VIR_Inst_GetSource(VirInst, 1), &src1Info);
 
             if(src1Info.isImmVal && src1Info.u1.immValue.iValue == 0)
             {
@@ -244,20 +244,20 @@ _CalculateInstCount(
         {
             gctSIZE_T                  i            = 0;
             gctSIZE_T                  count        = 0;
-            VIR_Operand_TexldModifier *texldOperand = gcvNULL;
+            VIR_Operand *texldOperand = gcvNULL;
 
             gcmASSERT(VIR_Inst_GetSrcNum(VirInst) == 4 &&
-                (VIR_Operand_GetOpKind(VirInst->src[2]) == VIR_OPND_TEXLDPARM ||
-                VIR_Operand_GetOpKind(VirInst->src[2]) == VIR_OPND_UNDEF) &&
-                VirInst->dest != gcvNULL);
+                (VIR_Operand_GetOpKind(VIR_Inst_GetSource(VirInst, 2)) == VIR_OPND_TEXLDPARM ||
+                VIR_Operand_GetOpKind(VIR_Inst_GetSource(VirInst, 2)) == VIR_OPND_UNDEF) &&
+                VIR_Inst_GetDest(VirInst) != gcvNULL);
 
-            texldOperand = ((VIR_Operand_TexldModifier *)VirInst->src[2]);
+            texldOperand = ((VIR_Operand *)VIR_Inst_GetSource(VirInst, 2));
 
-            if (VIR_Operand_GetOpKind(VirInst->src[2]) == VIR_OPND_TEXLDPARM)
+            if (VIR_Operand_GetOpKind(VIR_Inst_GetSource(VirInst, 2)) == VIR_OPND_TEXLDPARM)
             {
                 for(i = 0; i < VIR_TEXLDMODIFIER_COUNT; ++i)
                 {
-                    if(texldOperand->tmodifier[i] != gcvNULL)
+                    if(VIR_Operand_GetTexldModifier(texldOperand, i) != gcvNULL)
                     {
                         ++count;
                         break;
@@ -288,7 +288,7 @@ _CalculateInstCount(
     case VIR_OP_STARR:
         {
             VIR_OperandInfo src0Info;
-            VIR_Operand_GetOperandInfo(VirInst, VirInst->src[0], &src0Info);
+            VIR_Operand_GetOperandInfo(VirInst, VIR_Inst_GetSource(VirInst, 0), &src0Info);
 
             if(VIR_OpndInfo_Is_Virtual_Reg(&src0Info) && !src0Info.isInput)
             {
@@ -303,7 +303,7 @@ _CalculateInstCount(
     case VIR_OP_LDARR:
         {
             VIR_OperandInfo src1Info;
-            VIR_Operand_GetOperandInfo(VirInst, VirInst->src[1], &src1Info);
+            VIR_Operand_GetOperandInfo(VirInst, VIR_Inst_GetSource(VirInst, 1), &src1Info);
 
             if(VIR_OpndInfo_Is_Virtual_Reg(&src1Info) && !src1Info.isInput)
             {
@@ -336,10 +336,12 @@ _CalculateInstCount(
     case VIR_OP_TEXQUERY:   case VIR_OP_ILOAD:
     case VIR_OP_ISTORE:     case VIR_OP_SMOOTH:
     case VIR_OP_ICALL:
-    case VIR_OP_LITP:       case VIR_OP_DST:
+    case VIR_OP_LITP:
+    case VIR_OP_LENGTH:     case VIR_OP_DST:
     case VIR_OP_COPYSIGN:   case VIR_OP_BYTEREV:
     case VIR_OP_STORE_ATTR:
     case VIR_OP_LOAD_ATTR:
+    case VIR_OP_LOAD_ATTR_O:
     case VIR_OP_SELECT_MAP:
     case VIR_OP_EMIT:
     case VIR_OP_RESTART:
@@ -352,6 +354,7 @@ _CalculateInstCount(
     case VIR_OP_BREAK:
     case VIR_OP_ASSERT:     case VIR_OP_TRAP:
     case VIR_OP_EXIT:       case VIR_OP_PHI:
+    case VIR_OP_COMBINE_TEX_SAMPL:
     default:
         gcmASSERT(0);
         break;
@@ -744,7 +747,8 @@ _ConvVirNameIdToBuiltinNameKind(
         kind = gcSL_POSITION_W;
     } else if (VirNameId == VIR_NAME_FOG_COORD) {
         kind = gcSL_FOG_COORD;
-    } else if (VirNameId == VIR_NAME_VERTEX_ID) {
+    } else if (VirNameId == VIR_NAME_VERTEX_ID ||
+               VirNameId == VIR_NAME_VERTEX_INDEX) {
         kind = gcSL_VERTEX_ID;
     } else if (VirNameId == VIR_NAME_INSTANCE_ID) {
         kind = gcSL_INSTANCE_ID;
@@ -806,6 +810,8 @@ _ConvVirNameIdToBuiltinNameKind(
         kind = gcSL_IN_POINT_SIZE;
     } else if (VirNameId == VIR_NAME_BOUNDING_BOX) {
         kind = gcSL_BOUNDING_BOX;
+    } else if (VirNameId == VIR_NAME_LAST_FRAG_DATA) {
+        kind = gcSL_LAST_FRAG_DATA;
     } else {
         *Kind = gcSL_NONBUILTINGNAME;
         return gcvSTATUS_NOT_FOUND;
@@ -1096,9 +1102,9 @@ _GetRegisterSwizzle(
         {
             gctUINT8 enableShift = 0;
 
-            if (VirInst->dest)
+            if (VIR_Inst_GetDest(VirInst))
             {
-                enableShift = (gctUINT8) VIR_Operand_GetHwShift(VirInst->dest);
+                enableShift = (gctUINT8) VIR_Operand_GetHwShift(VIR_Inst_GetDest(VirInst));
 
             }
             while (enableShift-- >0)
@@ -1427,7 +1433,8 @@ _ConvVirOperand2Target(
     IN VIR_OpCode           Opcode,
     IN VIR_Operand          *Operand,
     IN VIR_Instruction      *VirInst,
-    IN gcSL_CONDITION       Condition
+    IN gcSL_CONDITION       Condition,
+    IN gctUINT32            SrcLoc
     )
 {
     gceSTATUS   status = gcvSTATUS_OK;
@@ -1445,8 +1452,8 @@ _ConvVirOperand2Target(
             (gctUINT16)0,
             gcSL_ENABLE_NONE,
             gcSL_INVALID,
-            gcSHADER_PRECISION_DEFAULT
-            );
+            gcSHADER_PRECISION_DEFAULT,
+            SrcLoc);
         return status;
     }
     switch(VIR_Operand_GetOpKind(Operand))
@@ -1463,7 +1470,8 @@ _ConvVirOperand2Target(
             (gctUINT16)0,
             gcSL_ENABLE_NONE,
             gcSL_INVALID,
-            gcSHADER_PRECISION_DEFAULT
+            gcSHADER_PRECISION_DEFAULT,
+            SrcLoc
             );
         return status;
 
@@ -1488,7 +1496,8 @@ _ConvVirOperand2Target(
                 Condition,
                 _ConvVirType2Format(Converter, type),
                 _ConvVirEnable2Enable(VIR_Inst_GetRelEnable(Converter, VirInst, Operand)),
-                defIndex);
+                defIndex,
+                SrcLoc);
 
             break;
         }
@@ -1522,7 +1531,8 @@ _ConvVirOperand2Target(
                 Condition,
                 _ConvVirType2Format(Converter, type),
                 _ConvVirEnable2Enable(VIR_Inst_GetRelEnable(Converter, VirInst, Operand)),
-                defIndex);
+                defIndex,
+                SrcLoc);
             break;
         }
 
@@ -1560,7 +1570,8 @@ _ConvVirOperand2Target(
                 indexed,
                 indexRegister,
                 format,
-                precision);
+                precision,
+                SrcLoc);
 
             if (VIR_Operand_isLvalue(Operand))
             {
@@ -1658,7 +1669,7 @@ _ConvVirOperand2Source(
 
             gcSHADER_AddSourceConstantFormattedWithPrecision(
                 Converter->Shader,
-                &Operand->u1.uConst,
+                &VIR_Operand_GetImmediateUint(Operand),
                 _ConvVirType2Format(Converter, type),
                 gcSHADER_PRECISION_HIGH
                 );
@@ -1788,7 +1799,7 @@ _ConvVirOperand2Source(
 
 static gcSL_OPCODE
 _GetOpcodeByTexldModifier(
-    IN VIR_Operand_TexldModifier *  Operand,
+    IN VIR_Operand *  Operand,
     IN Vir_TexldModifier_Name       Name
     )
 {
@@ -1877,10 +1888,13 @@ _ConvVirInst2Inst(
     gceSTATUS       status    = gcvSTATUS_OK;
     VIR_OpCode      opcode    = VIR_OP_NOP;
     gcSL_CONDITION  condition;
+    gctUINT32       srcLoc;
 
     gcmASSERT(Converter->VirShader != gcvNULL &&
         VirInst != gcvNULL &&
         Converter->Shader != gcvNULL);
+
+    srcLoc = GCSL_Build_SRC_LOC(VIR_Inst_GetSrcLocLine(VirInst),VIR_Inst_GetSrcLocCol(VirInst));
 
     opcode = VIR_Inst_GetOpcode(VirInst);
     condition = _ConvVirCondition2Condition(VIR_Inst_GetConditionOp(VirInst));
@@ -1944,7 +1958,7 @@ _ConvVirInst2Inst(
         {
             gctSIZE_T i = 0;
 
-            _ConvVirOperand2Target(Converter, opcode, VirInst->dest, VirInst, condition);
+            _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
 
             if (_ConvVirOpcode2Opcode(opcode) != gcSL_NOP)
             {
@@ -1963,9 +1977,9 @@ _ConvVirInst2Inst(
                For VIR_OP_IMG_STORE:
                     src0 is the base address, src1 is the offset, src2 is the data.
             */
-            _ConvVirOperand2Target(Converter, opcode, VirInst->src[2], VirInst, condition);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+            _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetSource(VirInst, 2), VirInst, condition, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
             break;
         }
     case VIR_OP_ATOMADD:    case VIR_OP_ATOMSUB:
@@ -1981,23 +1995,23 @@ _ConvVirInst2Inst(
             gctUINT16       tmpReg;
             gcSL_FORMAT     format;
             VIR_Enable      enable;
-            gcSL_TYPE       srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VirInst->dest));
+            gcSL_TYPE       srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VIR_Inst_GetDest(VirInst)));
             gcSL_SWIZZLE    swizzle;
             gcSHADER_PRECISION precision;
 
-            _CloneVirOpnd2TmpOpnd(Converter, VirInst, VirInst->dest, 0, &tmpReg, &enable, &format, &precision);
+            _CloneVirOpnd2TmpOpnd(Converter, VirInst, VIR_Inst_GetDest(VirInst), 0, &tmpReg, &enable, &format, &precision);
 
             /* load t0, src0, src2 */
-            gcSHADER_AddOpcode2(Converter->Shader, gcSL_LOAD, gcSL_ALWAYS, tmpReg, (gcSL_ENABLE)enable, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+            gcSHADER_AddOpcode2(Converter->Shader, gcSL_LOAD, gcSL_ALWAYS, tmpReg, (gcSL_ENABLE)enable, format, precision, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
 
             swizzle     = _ConvVirSwizzle2Swizzle(VIR_Enable_2_Swizzle_WShift(enable));
 
             /* atomop dest, t0, src1 */
-            _ConvVirOperand2Target(Converter, opcode, VirInst->dest, VirInst, condition);
+            _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
             gcSHADER_AddSource(Converter->Shader, srcKind, tmpReg, swizzle, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 1);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
             break;
         }
 
@@ -2006,15 +2020,15 @@ _ConvVirInst2Inst(
         {
             VIR_OperandInfo src1Info;
 
-            VIR_Operand_GetOperandInfo(VirInst, VirInst->src[1], &src1Info);
+            VIR_Operand_GetOperandInfo(VirInst, VIR_Inst_GetSource(VirInst, 1), &src1Info);
             /* VIR_OP_STORE 1, 2, '0', 4 */
                 /* gcSL_STORE1 1, 2, 4 */
 
             if(src1Info.isImmVal && src1Info.u1.immValue.iValue == 0)
             {
-                _ConvVirOperand2Target(Converter, opcode, VirInst->dest, VirInst, condition);
-                _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-                _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 1);
+                _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
             }
             else
             {
@@ -2025,24 +2039,24 @@ _ConvVirInst2Inst(
                 gctUINT16       tmpReg;
                 gcSL_FORMAT     format;
                 VIR_Enable      enable;
-                gcSL_TYPE       srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VirInst->dest));
+                gcSL_TYPE       srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VIR_Inst_GetDest(VirInst)));
                 gcSL_SWIZZLE    swizzle;
                 gcSHADER_PRECISION precision;
 
                 gcmASSERT(VIR_OpndInfo_Is_Virtual_Reg(&src1Info) || src1Info.u1.immValue.iValue != 0);
-                _CloneVirOpnd2TmpOpnd(Converter, VirInst, VirInst->src[1], 0, &tmpReg, &enable, &format, &precision);
+                _CloneVirOpnd2TmpOpnd(Converter, VirInst, VIR_Inst_GetSource(VirInst, 1), 0, &tmpReg, &enable, &format, &precision);
 
                 /* add t0, src0, src2 */
-                gcSHADER_AddOpcode2(Converter->Shader, gcSL_ADD, gcSL_ALWAYS, tmpReg, (gcSL_ENABLE)enable, format, precision);
-                _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-                _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+                gcSHADER_AddOpcode2(Converter->Shader, gcSL_ADD, gcSL_ALWAYS, tmpReg, (gcSL_ENABLE)enable, format, precision, srcLoc);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
 
                 swizzle     = _ConvVirSwizzle2Swizzle(VIR_Enable_2_Swizzle_WShift(enable));
 
                 /* store1 dest, t0, src1 */
-                _ConvVirOperand2Target(Converter, opcode, VirInst->dest, VirInst, condition);
+                _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
                 gcSHADER_AddSource(Converter->Shader, srcKind, tmpReg, swizzle, format, precision);
-                _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 1);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
             }
         }
 
@@ -2060,23 +2074,23 @@ _ConvVirInst2Inst(
 
             gcSL_SWIZZLE    swizzle;
 
-            gcSL_TYPE       srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VirInst->dest));
+            gcSL_TYPE       srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VIR_Inst_GetDest(VirInst)));
             gcSL_OPCODE     opcode0  = (opcode == VIR_OP_MAD) ? gcSL_MUL : gcSL_SUB;
             gcSHADER_PRECISION precision;
 
-            _CloneVirOpnd2TmpOpnd(Converter, VirInst, VirInst->dest, 0, &tmpReg, &enable, &format, &precision);
+            _CloneVirOpnd2TmpOpnd(Converter, VirInst, VIR_Inst_GetDest(VirInst), 0, &tmpReg, &enable, &format, &precision);
 
             /* mul/sub newtmp src0 src1 */
-            gcSHADER_AddOpcode2(Converter->Shader, opcode0, condition, tmpReg, enable, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+            gcSHADER_AddOpcode2(Converter->Shader, opcode0, condition, tmpReg, enable, format, precision, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
 
             swizzle     = _ConvVirSwizzle2Swizzle(VIR_Enable_2_Swizzle_WShift(enable));
 
             /* add dest newtmp src2*/
-            _ConvVirOperand2Target(Converter, VIR_OP_ADD, VirInst->dest, VirInst, condition);
+            _ConvVirOperand2Target(Converter, VIR_OP_ADD, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
             gcSHADER_AddSource(Converter->Shader, srcKind, tmpReg, swizzle, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 1);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
         }
         break;
         /* madsat dest, src0, src1, src2 */
@@ -2089,21 +2103,21 @@ _ConvVirInst2Inst(
             gcSL_SWIZZLE    swizzle;
             gcSHADER_PRECISION precision;
 
-            gcSL_TYPE       srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VirInst->dest));
+            gcSL_TYPE       srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VIR_Inst_GetDest(VirInst)));
 
-            _CloneVirOpnd2TmpOpnd(Converter, VirInst, VirInst->dest, 0, &tmpReg, &enable, &format, &precision);
+            _CloneVirOpnd2TmpOpnd(Converter, VirInst, VIR_Inst_GetDest(VirInst), 0, &tmpReg, &enable, &format, &precision);
 
             /* mulsat newtmp src0 src1 */
-            gcSHADER_AddOpcode2(Converter->Shader, gcSL_MULSAT, condition, tmpReg, enable, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+            gcSHADER_AddOpcode2(Converter->Shader, gcSL_MULSAT, condition, tmpReg, enable, format, precision, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
 
             swizzle     = _ConvVirSwizzle2Swizzle(VIR_Enable_2_Swizzle_WShift(enable));
 
             /* addsat dest newtmp src2*/
-            _ConvVirOperand2Target(Converter, VIR_OP_ADDSAT, VirInst->dest, VirInst, condition);
+            _ConvVirOperand2Target(Converter, VIR_OP_ADDSAT, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
             gcSHADER_AddSource(Converter->Shader, srcKind, tmpReg, swizzle, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 1);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
         }
         break;
 
@@ -2116,26 +2130,26 @@ _ConvVirInst2Inst(
 
             gcSL_SWIZZLE    swizzle;
             gcSHADER_PRECISION precision;
-            gcSL_TYPE       srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VirInst->dest));
+            gcSL_TYPE       srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VIR_Inst_GetDest(VirInst)));
 
-            _CloneVirOpnd2TmpOpnd(Converter, VirInst, VirInst->dest, 0, &tmpReg, &enable, &format, &precision);
+            _CloneVirOpnd2TmpOpnd(Converter, VirInst, VIR_Inst_GetDest(VirInst), 0, &tmpReg, &enable, &format, &precision);
 
             /* sub newtmp src1 src0 */
-            gcSHADER_AddOpcode2(Converter->Shader, gcSL_SUB, condition, tmpReg, enable, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 1);
+            gcSHADER_AddOpcode2(Converter->Shader, gcSL_SUB, condition, tmpReg, enable, format, precision, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 1);
 
             swizzle     = _ConvVirSwizzle2Swizzle(VIR_Enable_2_Swizzle_WShift(enable));
 
             /* mul newtmp newtmp src2 */
-            gcSHADER_AddOpcode2(Converter->Shader, gcSL_MUL, condition, tmpReg, enable, format, precision);
+            gcSHADER_AddOpcode2(Converter->Shader, gcSL_MUL, condition, tmpReg, enable, format, precision, srcLoc);
             gcSHADER_AddSource(Converter->Shader, srcKind, tmpReg, swizzle, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 1);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
 
             /* add dest newtmp src0 */
-            _ConvVirOperand2Target(Converter, VIR_OP_ADD, VirInst->dest, VirInst, condition);
+            _ConvVirOperand2Target(Converter, VIR_OP_ADD, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
             gcSHADER_AddSource(Converter->Shader, srcKind, tmpReg, swizzle, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 1);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 1);
         }
         break;
         /* select.condition dest, src0, src1, src2 */
@@ -2146,23 +2160,23 @@ _ConvVirInst2Inst(
             VIR_Enable      enable;
             gcSHADER_PRECISION precision;
 
-            VIR_Symbol      *sym        = VIR_Operand_GetSymbol(VirInst->dest);
-            _CloneVirOpnd2TmpOpnd(Converter, VirInst, VirInst->src[0], 0, &dest0, &enable, &format, &precision);
+            VIR_Symbol      *sym        = VIR_Operand_GetSymbol(VIR_Inst_GetDest(VirInst));
+            _CloneVirOpnd2TmpOpnd(Converter, VirInst, VIR_Inst_GetSource(VirInst, 0), 0, &dest0, &enable, &format, &precision);
 
             /* SET.cond dest0, src0, src1 */
-            gcSHADER_AddOpcode2(Converter->Shader, gcSL_SET, condition, dest0, gcSL_ENABLE_XYZW, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+            gcSHADER_AddOpcode2(Converter->Shader, gcSL_SET, condition, dest0, gcSL_ENABLE_XYZW, format, precision, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
 
             /* CMP.z dest, dest0, src2 */
-            _ConvVirOperand2Target(Converter, VIR_OP_CMP, VirInst->dest, VirInst, gcSL_ZERO);
+            _ConvVirOperand2Target(Converter, VIR_OP_CMP, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ZERO, srcLoc);
             gcSHADER_AddSource(Converter->Shader, _ConvVirSymbol2Type(sym), dest0, gcSL_SWIZZLE_XYZW, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 1);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
 
             /* CMP.nz dest, dest0, src1 */
-            _ConvVirOperand2Target(Converter, VIR_OP_CMP, VirInst->dest, VirInst, gcSL_NOT_ZERO);
+            _ConvVirOperand2Target(Converter, VIR_OP_CMP, VIR_Inst_GetDest(VirInst), VirInst, gcSL_NOT_ZERO, srcLoc);
             gcSHADER_AddSource(Converter->Shader, _ConvVirSymbol2Type(sym), dest0, gcSL_SWIZZLE_XYZW, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
         }
         break;
         /* select.condition dest, src0, src1, src2 */
@@ -2179,7 +2193,7 @@ _ConvVirInst2Inst(
             gctBOOL         canReverse = gcvFALSE;
 
             gcmASSERT(VIR_Inst_GetSrcNum(VirInst) == 3 &&
-                VirInst->dest != gcvNULL);
+                VIR_Inst_GetDest(VirInst) != gcvNULL);
             gcmASSERT(condition == gcSL_ZERO || condition == gcSL_NOT_ZERO ||
                       condition == gcSL_LESS_ZERO || condition == gcSL_GREATER_OR_EQUAL_ZERO ||
                       condition == gcSL_LESS_OREQUAL_ZERO || condition == gcSL_GREATER_ZERO ||
@@ -2190,39 +2204,39 @@ _ConvVirInst2Inst(
 
             if(needMove)
             {
-                _CloneVirOpnd2TmpOpnd(Converter, VirInst, VirInst->dest, 0, &tmpReg, &enable, &format, &precision);
+                _CloneVirOpnd2TmpOpnd(Converter, VirInst, VIR_Inst_GetDest(VirInst), 0, &tmpReg, &enable, &format, &precision);
                 swizzle  = _ConvVirSwizzle2Swizzle(VIR_Enable_2_Swizzle_WShift(enable));
-                srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VirInst->dest));
+                srcKind  = _ConvVirSymbol2Type(VIR_Operand_GetSymbol(VIR_Inst_GetDest(VirInst)));
             }
 
             canReverse = isConditionReversible(condition, &reversed);
             if(needMove)
             {
                 /* CMP.z dest0, src0, src1 */
-                gcSHADER_AddOpcode2(Converter->Shader, gcSL_CMP, condition, tmpReg, enable, format, precision);
-                _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-                _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+                gcSHADER_AddOpcode2(Converter->Shader, gcSL_CMP, condition, tmpReg, enable, format, precision, srcLoc);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
 
                 /* CMP.nz dest0, src0, src2 */
-                gcSHADER_AddOpcode2(Converter->Shader, gcSL_CMP, canReverse ? reversed : condition, tmpReg, enable, format, precision);
-                _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-                _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 1);
+                gcSHADER_AddOpcode2(Converter->Shader, gcSL_CMP, canReverse ? reversed : condition, tmpReg, enable, format, precision, srcLoc);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
 
                 /* MOV    dest, dest0 */
-                _ConvVirOperand2Target(Converter, VIR_OP_MOV, VirInst->dest, VirInst, gcSL_ALWAYS);
+                _ConvVirOperand2Target(Converter, VIR_OP_MOV, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ALWAYS, srcLoc);
                 gcSHADER_AddSource(Converter->Shader, srcKind, tmpReg, swizzle, format, precision);
             }
             else
             {
                 /* CMP.z dest, src0, src1 */
-                _ConvVirOperand2Target(Converter, VIR_OP_CMP, VirInst->dest, VirInst, condition);
-                _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-                _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+                _ConvVirOperand2Target(Converter, VIR_OP_CMP, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
 
                 /* CMP.nz dest, src0, src2 */
-                _ConvVirOperand2Target(Converter, VIR_OP_CMP, VirInst->dest, VirInst, canReverse ? reversed : condition);
-                _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-                _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 1);
+                _ConvVirOperand2Target(Converter, VIR_OP_CMP, VIR_Inst_GetDest(VirInst), VirInst, canReverse ? reversed : condition, srcLoc);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
             }
         }
         break;
@@ -2238,27 +2252,27 @@ _ConvVirInst2Inst(
             gcSL_SWIZZLE    swizzle;
             gcSHADER_PRECISION precision = gcSHADER_PRECISION_ANY;
 
-            VIR_Symbol      *sym        = VIR_Operand_GetSymbol(VirInst->dest);
+            VIR_Symbol      *sym        = VIR_Operand_GetSymbol(VIR_Inst_GetDest(VirInst));
 
-            _CloneVirOpnd2TmpOpnd(Converter, VirInst, VirInst->dest, 0, &tmpReg, &enable, &format, &precision);
+            _CloneVirOpnd2TmpOpnd(Converter, VirInst, VIR_Inst_GetDest(VirInst), 0, &tmpReg, &enable, &format, &precision);
 
             enable   = VIR_ENABLE_X;
             swizzle  = gcSL_SWIZZLE_X;
 
             /* cmp.cond     dst0, src0, src1       */
-            gcSHADER_AddOpcode2(Converter->Shader, gcSL_CMP, condition, tmpReg, enable, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+            gcSHADER_AddOpcode2(Converter->Shader, gcSL_CMP, condition, tmpReg, enable, format, precision, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
 
             /* cmp.z     dst, dst0, dst  */
-            _ConvVirOperand2Target(Converter, VIR_OP_CMP, VirInst->dest, VirInst, gcSL_ZERO);
+            _ConvVirOperand2Target(Converter, VIR_OP_CMP, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ZERO, srcLoc);
             gcSHADER_AddSource(Converter->Shader, _ConvVirSymbol2Type(sym), tmpReg, swizzle, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->dest, VirInst, 1);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetDest(VirInst), VirInst, 1);
 
             /* cmp.nz    dst, dst0, src2 */
-            _ConvVirOperand2Target(Converter, VIR_OP_CMP, VirInst->dest, VirInst, gcSL_NOT_ZERO);
+            _ConvVirOperand2Target(Converter, VIR_OP_CMP, VIR_Inst_GetDest(VirInst), VirInst, gcSL_NOT_ZERO, srcLoc);
             gcSHADER_AddSource(Converter->Shader, _ConvVirSymbol2Type(sym), tmpReg, swizzle, format, precision);
-            _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 1);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
 
             break;
         }
@@ -2269,22 +2283,22 @@ _ConvVirInst2Inst(
     case VIR_OP_TEXLDPCFPROJ:
     case VIR_OP_TEXLDPROJ:
         {
-            VIR_Operand_TexldModifier *texldOperand = gcvNULL;
+            VIR_Operand *texldOperand = gcvNULL;
             gctSIZE_T                  i            = 0;
 
             gcmASSERT(VIR_Inst_GetSrcNum(VirInst) == 4 &&
-                (VIR_Operand_GetOpKind(VirInst->src[2]) == VIR_OPND_TEXLDPARM ||
-                       VIR_Operand_GetOpKind(VirInst->src[2]) == VIR_OPND_UNDEF) &&
-                VirInst->dest != gcvNULL);
+                (VIR_Operand_GetOpKind(VIR_Inst_GetSource(VirInst, 2)) == VIR_OPND_TEXLDPARM ||
+                       VIR_Operand_GetOpKind(VIR_Inst_GetSource(VirInst, 2)) == VIR_OPND_UNDEF) &&
+                VIR_Inst_GetDest(VirInst) != gcvNULL);
 
-            texldOperand = ((VIR_Operand_TexldModifier *)VirInst->src[2]);
+            texldOperand = ((VIR_Operand *)VIR_Inst_GetSource(VirInst, 2));
 
             /* texbias src0, texldModifier */
-            if (VIR_Operand_GetOpKind(VirInst->src[2]) == VIR_OPND_TEXLDPARM)
+            if (VIR_Operand_GetOpKind(VIR_Inst_GetSource(VirInst, 2)) == VIR_OPND_TEXLDPARM)
             {
                 for (i = 0; i < VIR_TEXLDMODIFIER_COUNT; ++i)
                 {
-                    if (texldOperand->tmodifier[i] != gcvNULL)
+                    if (VIR_Operand_GetTexldModifier(texldOperand, i) != gcvNULL)
                     {
                         gcSHADER_AddOpcode(
                             Converter->Shader,
@@ -2293,22 +2307,23 @@ _ConvVirInst2Inst(
                             (gctUINT16)0,
                             gcSL_ENABLE_NONE,
                             gcSL_FLOAT,
-                            gcSHADER_PRECISION_DEFAULT);
+                            gcSHADER_PRECISION_DEFAULT,
+                            0);
 
                         if ((VIR_Operand_GetTexModifierFlag(texldOperand) & VIR_TMFLAG_GRAD ||
                              VIR_Operand_GetTexModifierFlag(texldOperand) & VIR_TMFLAG_GATHER) &&
                             (Vir_TexldModifier_Name)i == VIR_TEXLDMODIFIER_DPDX &&
-                            texldOperand->tmodifier[i + 1] != gcvNULL)
+                            VIR_Operand_GetTexldModifier(texldOperand, i+1) != gcvNULL)
                         {
                             gcmASSERT((Vir_TexldModifier_Name)(i + 1) == VIR_TEXLDMODIFIER_DPDY);
-                            _ConvVirOperand2Source(Converter, texldOperand->tmodifier[i], VirInst, 0);
-                            _ConvVirOperand2Source(Converter, texldOperand->tmodifier[i + 1], VirInst, 1);
+                            _ConvVirOperand2Source(Converter, VIR_Operand_GetTexldModifier(texldOperand, i), VirInst, 0);
+                            _ConvVirOperand2Source(Converter, VIR_Operand_GetTexldModifier(texldOperand, i), VirInst, 1);
                             i++;
                         }
                         else
                         {
-                            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-                            _ConvVirOperand2Source(Converter, texldOperand->tmodifier[i], VirInst, 1);
+                            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+                            _ConvVirOperand2Source(Converter, VIR_Operand_GetTexldModifier(texldOperand, i), VirInst, 1);
                         }
                         break;
                     }
@@ -2316,9 +2331,9 @@ _ConvVirInst2Inst(
             }
 
             /* texld dest src0, src1 */
-            _ConvVirOperand2Target(Converter, opcode, VirInst->dest, VirInst, gcSL_ALWAYS);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+            _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ALWAYS, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
             break;
         }
     case VIR_OP_LDARR:
@@ -2330,22 +2345,22 @@ _ConvVirInst2Inst(
             */
             gcSL_INSTRUCTION inst       = gcvNULL;
 
-            VIR_Symbol      *sym        = VIR_Operand_GetSymbol(VirInst->src[1]);
+            VIR_Symbol      *sym        = VIR_Operand_GetSymbol(VIR_Inst_GetSource(VirInst, 1));
             VIR_OperandInfo src1Info;
             gcSL_FORMAT     format = _ConvVirType2Format(Converter,
-                VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetType(VirInst->src[1])));
+                VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetType(VIR_Inst_GetSource(VirInst, 1))));
 
-            VIR_Operand_GetOperandInfo(VirInst, VirInst->src[1], &src1Info);
+            VIR_Operand_GetOperandInfo(VirInst, VIR_Inst_GetSource(VirInst, 1), &src1Info);
 
             if(VIR_OpndInfo_Is_Virtual_Reg(&src1Info) && !src1Info.isInput)
             {
-                gctUINT         index       = _GetRegisterIndex(Converter, sym, VirInst->src[1]);
+                gctUINT         index       = _GetRegisterIndex(Converter, sym, VIR_Inst_GetSource(VirInst, 1));
                 gcSL_INDEXED    indexed     =
-                    _ConvVirOpndSwizzle2Indexd(VirInst->src[1]);
+                    _ConvVirOpndSwizzle2Indexd(VIR_Inst_GetSource(VirInst, 1));
 
                 /* mov dest, src0[src1] */
-                _ConvVirOperand2Target(Converter, VIR_OP_MOV, VirInst->dest, VirInst, gcSL_ALWAYS);
-                if (VIR_Operand_GetOpKind(VirInst->src[0]) == VIR_OPND_SAMPLER_INDEXING)
+                _ConvVirOperand2Target(Converter, VIR_OP_MOV, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ALWAYS, srcLoc);
+                if (VIR_Operand_GetOpKind(VIR_Inst_GetSource(VirInst, 0)) == VIR_OPND_SAMPLER_INDEXING)
                 {
                     gcSL_SWIZZLE swizzle = (gcSL_SWIZZLE)gcmComposeSwizzle(indexed - 1,
                                                                            indexed - 1,
@@ -2363,7 +2378,7 @@ _ConvVirInst2Inst(
                 }
                 else
                 {
-                    _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
+                    _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
                     inst = &Converter->Shader->code[SHADER_LASTINST(Converter)];
                     inst->source0 = gcmSL_SOURCE_SET(inst->source0,
                         Indexed, indexed);
@@ -2376,15 +2391,15 @@ _ConvVirInst2Inst(
                 VIR_Enable      enable;
                 gcSHADER_PRECISION precision;
 
-                _CloneVirOpnd2TmpOpnd(Converter, VirInst, VirInst->src[1], 0, &tmpReg, &enable, &format, &precision);
+                _CloneVirOpnd2TmpOpnd(Converter, VirInst, VIR_Inst_GetSource(VirInst, 1), 0, &tmpReg, &enable, &format, &precision);
 
                 /* mov t0, src1 */
-                gcSHADER_AddOpcode2(Converter->Shader, gcSL_MOV, gcSL_ALWAYS, tmpReg, gcSL_ENABLE_X, format, precision);
-                _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 0);
+                gcSHADER_AddOpcode2(Converter->Shader, gcSL_MOV, gcSL_ALWAYS, tmpReg, gcSL_ENABLE_X, format, precision, srcLoc);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 0);
 
                 /* mov dest, src0[t0] */
-                _ConvVirOperand2Target(Converter, VIR_OP_MOV, VirInst->dest, VirInst, gcSL_ALWAYS);
-                if (VIR_Operand_GetOpKind(VirInst->src[0]) == VIR_OPND_SAMPLER_INDEXING)
+                _ConvVirOperand2Target(Converter, VIR_OP_MOV, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ALWAYS, srcLoc);
+                if (VIR_Operand_GetOpKind(VIR_Inst_GetSource(VirInst, 0)) == VIR_OPND_SAMPLER_INDEXING)
                 {
                     inst = &Converter->Shader->code[SHADER_LASTINST(Converter)];
                     inst->source0 = gcmSL_SOURCE_SET(0, Format, format)
@@ -2397,7 +2412,7 @@ _ConvVirInst2Inst(
                 }
                 else
                 {
-                    _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
+                    _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
                     inst = &Converter->Shader->code[SHADER_LASTINST(Converter)];
                     inst->source0 = gcmSL_SOURCE_SET(inst->source0,
                         Indexed, gcSL_INDEXED_X);
@@ -2410,24 +2425,24 @@ _ConvVirInst2Inst(
     case VIR_OP_STARR:
         {
             gcSL_INSTRUCTION inst       = gcvNULL;
-            VIR_Symbol      *sym        = VIR_Operand_GetSymbol(VirInst->src[0]);
+            VIR_Symbol      *sym        = VIR_Operand_GetSymbol(VIR_Inst_GetSource(VirInst, 0));
 
             VIR_OperandInfo src0Info;
 
-            VIR_Operand_GetOperandInfo(VirInst, VirInst->src[0], &src0Info);
+            VIR_Operand_GetOperandInfo(VirInst, VIR_Inst_GetSource(VirInst, 0), &src0Info);
 
             if(VIR_OpndInfo_Is_Virtual_Reg(&src0Info) && !src0Info.isInput)
             {
-                gctUINT         index       = _GetRegisterIndex(Converter, sym, VirInst->src[0]);
+                gctUINT         index       = _GetRegisterIndex(Converter, sym, VIR_Inst_GetSource(VirInst, 0));
                 gcSL_INDEXED    indexed     =
-                    _ConvVirOpndSwizzle2Indexd(VirInst->src[0]);
+                    _ConvVirOpndSwizzle2Indexd(VIR_Inst_GetSource(VirInst, 0));
 
                 /* mov dest[src0], src1 */
-                _ConvVirOperand2Target(Converter, VIR_OP_MOV, VirInst->dest, VirInst, gcSL_ALWAYS);
+                _ConvVirOperand2Target(Converter, VIR_OP_MOV, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ALWAYS, srcLoc);
                 inst = &Converter->Shader->code[SHADER_LASTINST(Converter)];
                 inst->temp = gcmSL_TARGET_SET(inst->temp, Indexed, indexed);
                 inst->tempIndexed = (gctUINT16)index;
-                _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 0);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 0);
             }
             else
             {
@@ -2436,29 +2451,29 @@ _ConvVirInst2Inst(
                 VIR_Enable      enable;
                 gcSHADER_PRECISION precision;
 
-                _CloneVirOpnd2TmpOpnd(Converter, VirInst, VirInst->src[0], 0, &tmpReg, &enable, &format, &precision);
+                _CloneVirOpnd2TmpOpnd(Converter, VirInst, VIR_Inst_GetSource(VirInst, 0), 0, &tmpReg, &enable, &format, &precision);
 
                 /* mov t0, src0 */
-                gcSHADER_AddOpcode2(Converter->Shader, gcSL_MOV, gcSL_ALWAYS, tmpReg, gcSL_ENABLE_X, format, precision);
-                _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
+                gcSHADER_AddOpcode2(Converter->Shader, gcSL_MOV, gcSL_ALWAYS, tmpReg, gcSL_ENABLE_X, format, precision, srcLoc);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
 
                 /* mov dest[t0], src1 */
-                _ConvVirOperand2Target(Converter, VIR_OP_MOV, VirInst->dest, VirInst, gcSL_ALWAYS);
+                _ConvVirOperand2Target(Converter, VIR_OP_MOV, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ALWAYS, srcLoc);
                 inst = &Converter->Shader->code[SHADER_LASTINST(Converter)];
                 inst->temp = gcmSL_TARGET_SET(inst->temp, Indexed, gcSL_INDEXED_X);
                 inst->tempIndexed = tmpReg;
-                _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 0);
+                _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 0);
             }
         }
         break;
     case VIR_OP_CONV:
         {
             VIR_Type   *type = VIR_Shader_GetTypeFromId(Converter->VirShader,
-                VIR_Operand_GetType(VirInst->src[0]));
+                VIR_Operand_GetType(VIR_Inst_GetSource(VirInst, 0)));
             gcSL_FORMAT format = _ConvVirType2Format(Converter, type);
 
-            _ConvVirOperand2Target(Converter, opcode, VirInst->dest, VirInst, condition);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
+            _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
 
             gcSHADER_AddSourceConstantFormattedWithPrecision(
                 Converter->Shader,
@@ -2485,15 +2500,15 @@ _ConvVirInst2Inst(
             {
                 if (VIR_Operand_GetType(src0) == VIR_TYPE_FLOAT32)
                 {
-                    VIR_Operand_SetType(VirInst->dest, VIR_TYPE_FLOAT32);
+                    VIR_Operand_SetType(VIR_Inst_GetDest(VirInst), VIR_TYPE_FLOAT32);
                 }
                 else
                 {
-                    VIR_Operand_SetType(VirInst->dest, VIR_TYPE_INT32);
+                    VIR_Operand_SetType(VIR_Inst_GetDest(VirInst), VIR_TYPE_INT32);
                 }
             }
 
-            _ConvVirOperand2Target(Converter, opcode, VirInst->dest, VirInst, condition);
+            _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
             _ConvVirOperand2Source(Converter, src0, VirInst, 0);
 
         }
@@ -2502,17 +2517,17 @@ _ConvVirInst2Inst(
         /*    sub dest, 0, src0 */
     case VIR_OP_NEG:
         {
-            VIR_Type *ty = VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetType(VirInst->dest));
+            VIR_Type *ty = VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetType(VIR_Inst_GetDest(VirInst)));
             gctUINT   zero = 0;
 
-            _ConvVirOperand2Target(Converter, opcode, VirInst->dest, VirInst, condition);
+            _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
 
             gcSHADER_AddSourceConstantFormattedWithPrecision(
                 Converter->Shader, &zero,
                 _ConvVirType2Format(Converter, ty),
                 gcSHADER_PRECISION_HIGH);
 
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 1);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 1);
         }
         break;
     case VIR_OP_BITEXTRACT:
@@ -2521,12 +2536,12 @@ _ConvVirInst2Inst(
                bitrange t1, src1, src2
                bitextract dest, src0 */
 
-            _ConvVirOperand2Target(Converter, VIR_OP_BITRANGE, VirInst->dest, VirInst, gcSL_ALWAYS);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 1);
+            _ConvVirOperand2Target(Converter, VIR_OP_BITRANGE, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ALWAYS, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
 
-            _ConvVirOperand2Target(Converter, opcode, VirInst->dest, VirInst, condition);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
+            _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
         }
         break;
 
@@ -2536,13 +2551,13 @@ _ConvVirInst2Inst(
                bitrange1 dest, src2, src3
                bitinsert dest, src0, src1 */
 
-            _ConvVirOperand2Target(Converter, VIR_OP_BITRANGE, VirInst->dest, VirInst, condition);
-            _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[3], VirInst, 1);
+            _ConvVirOperand2Target(Converter, VIR_OP_BITRANGE, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 3), VirInst, 1);
 
-            _ConvVirOperand2Target(Converter, opcode, VirInst->dest, VirInst, condition);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+            _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
         }
         break;
 
@@ -2553,13 +2568,13 @@ _ConvVirInst2Inst(
                bitrange1 t2, src2
                bitinsert dest, src0, src1 */
 
-            _ConvVirOperand2Target(Converter, VIR_OP_BITRANGE1, VirInst->dest, VirInst, gcSL_ALWAYS);
-            _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 0);
+            _ConvVirOperand2Target(Converter, VIR_OP_BITRANGE1, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ALWAYS, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 0);
 
             /* bitinsert dest, src0, src1 */
-            _ConvVirOperand2Target(Converter, opcode, VirInst->dest, VirInst, condition);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+            _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
         }
         break;
 
@@ -2571,13 +2586,13 @@ _ConvVirInst2Inst(
                texld dest, src0, src1 */
 
             /* texu  dest, src2 */
-            _ConvVirOperand2Target(Converter, opcode, VirInst->dest, VirInst, condition);
-            _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 0);
+            _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 0);
 
             /* texld dest, src0, src1 */
-            _ConvVirOperand2Target(Converter, VIR_OP_TEXLD, VirInst->dest, VirInst, condition);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+            _ConvVirOperand2Target(Converter, VIR_OP_TEXLD, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
         }
         break;
 
@@ -2589,14 +2604,14 @@ _ConvVirInst2Inst(
                texld dest, src0, src1 */
 
             /* texu_lod  dest, src2_modifier, src2 */
-            _ConvVirOperand2Target(Converter, opcode, VirInst->dest, VirInst, condition);
-            _ConvVirOperand2Source(Converter, VirInst->src[2], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[3], VirInst, 1);
+            _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 3), VirInst, 1);
 
             /* texld dest src0, src1 */
-            _ConvVirOperand2Target(Converter, VIR_OP_TEXLD, VirInst->dest, VirInst, gcSL_ALWAYS);
-            _ConvVirOperand2Source(Converter, VirInst->src[0], VirInst, 0);
-            _ConvVirOperand2Source(Converter, VirInst->src[1], VirInst, 1);
+            _ConvVirOperand2Target(Converter, VIR_OP_TEXLD, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ALWAYS, srcLoc);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
+            _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
 
         }
         break;
@@ -2848,15 +2863,18 @@ OnError:
 gceSTATUS
 gcSHADER_ConvFromVIR(
     IN OUT gcSHADER Shader,
-    IN VIR_Shader * VirShader,
+    IN SHADER_HANDLE hVirShader,
     IN  gceSHADER_FLAGS Flags
     )
 {
     gceSTATUS status    = gcvSTATUS_OK;
+    VIR_Shader* VirShader = (VIR_Shader*)hVirShader;
     Converter converter = { VirShader, Shader, gcvNULL, gcvNULL };
     gctUINT    i, duboMemberIndex;
     gctBOOL seperatedShader = Flags & gcvSHADER_SEPERATED_PROGRAM;
     gcsUNIFORM_BLOCK dubo = gcvNULL, cubo = gcvNULL;
+    gctBOOL useFullNewLinker = gcUseFullNewLinker(gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2)));
+    gcKERNEL_FUNCTION  *kernelFunctions = gcvNULL;
 
     gcmHEADER_ARG("Shader=0x%x VirShader=0x%x", Shader, VirShader);
 
@@ -2895,12 +2913,6 @@ gcSHADER_ConvFromVIR(
     else
     {
         SetShaderSamplerAllocStrategy(Shader, gcSHADER_ALLOC_STRATEGY_FIXED_ADDR_OFFSET);
-    }
-
-    /* Update the sampler base offset. */
-    if (VIR_Shader_isPackUnifiedSampler(VirShader))
-    {
-        Shader->samplerBaseOffset = VIR_Shader_GetSamplerBaseOffset(VirShader);
     }
 
     /* handling ES3.1 data */
@@ -2943,6 +2955,11 @@ gcSHADER_ConvFromVIR(
     if (VirShader->shaderKind == VIR_SHADER_FRAGMENT)
     {
         Shader->isDual16Shader = VirShader->__IsDual16Shader;
+    }
+
+    if (VIR_Shader_UseLocalMem(VirShader))
+    {
+        gcShaderSetFlag(Shader, gcSHADER_FLAG_USE_LOCAL_MEM);
     }
 
     /* Add uniforms. Assume only inserting const values. */
@@ -3059,6 +3076,33 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
         gcmASSERT(VIR_Symbol_isUniform(baseAddress_sym));
         baseAddress_uniform = VIR_Symbol_GetUniform(baseAddress_sym);
         baseAddress_uniform->gcslIndex = baseAddressUniform->index;
+
+        while(VIR_Uniform_GetAuxAddrSymId(baseAddress_uniform) != VIR_INVALID_ID)
+        {
+            VIR_SymId auxAddrSymId = VIR_Uniform_GetAuxAddrSymId(baseAddress_uniform);
+            VIR_Symbol* auxAddrSym = VIR_Shader_GetSymFromId(VirShader, auxAddrSymId);
+            VIR_Uniform* auxAddrUniform = VIR_Symbol_GetUniform(auxAddrSym);
+            gcUNIFORM gcslAuxAddrUniform;
+
+            gcSHADER_AddUniform(Shader,
+                                VIR_Shader_GetSymNameString(VirShader, auxAddrSym),
+                                gcSHADER_UINT_X1,
+                                1,
+                                gcSHADER_PRECISION_HIGH,
+                                &gcslAuxAddrUniform);
+
+            /* Link back to each other */
+            SetUniformFollowingOffset(gcslAuxAddrUniform, VIR_Uniform_GetOffset(auxAddrUniform));
+            SetUniformCategory(gcslAuxAddrUniform, gcSHADER_VAR_CATEGORY_BLOCK_ADDRESS);
+            gcslAuxAddrUniform->blockIndex   = GetUBBlockIndex(dubo);
+            SetUniformFlag(gcslAuxAddrUniform, gcvUNIFORM_FLAG_USED_IN_SHADER);
+            SetUniformFlag(gcslAuxAddrUniform, gcvUNIFORM_FLAG_COMPILER_GEN);
+
+
+            SetUniformFollowingAddr(baseAddressUniform, gcslAuxAddrUniform);
+            baseAddress_uniform = auxAddrUniform;
+            baseAddressUniform = gcslAuxAddrUniform;
+        }
     }
 
     /* set _defaultConstantUniformBlockSize if default cubo is constructed in VIR */
@@ -3125,9 +3169,11 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                     gcUNIFORM lodMinMaxUniform;
                     gcUNIFORM samplerUniform;
                     gctINT16 lastChildIndex;
+                    VIR_Symbol * pSym = VIR_Shader_GetSymFromId(VirShader, virUniform->u.samplerOrImageAttr.parentSamplerSymId);
+                    VIR_Uniform * pUniform = VIR_Symbol_GetSampler(pSym);
 
-                    gcmASSERT(virUniform->u.parentSampler->gcslIndex != -1);
-                    gcSHADER_GetUniform(Shader, virUniform->u.parentSampler->gcslIndex, &samplerUniform);
+                    gcmASSERT(pUniform && pUniform->gcslIndex != -1);
+                    gcSHADER_GetUniform(Shader, pUniform->gcslIndex, &samplerUniform);
                     lastChildIndex = samplerUniform->firstChild;
                     while (lastChildIndex != -1)
                     {
@@ -3169,9 +3215,11 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                     gcUNIFORM levelBaseSizeUniform;
                     gcUNIFORM samplerUniform;
                     gctINT16 lastChildIndex;
+                    VIR_Symbol * pSym = VIR_Shader_GetSymFromId(VirShader, virUniform->u.samplerOrImageAttr.parentSamplerSymId);
+                    VIR_Uniform * pUniform = VIR_Symbol_GetSampler(pSym);
 
-                    gcmASSERT(virUniform->u.parentSampler->gcslIndex != -1);
-                    gcSHADER_GetUniform(Shader, virUniform->u.parentSampler->gcslIndex, &samplerUniform);
+                    gcmASSERT(pUniform && pUniform->gcslIndex != -1);
+                    gcSHADER_GetUniform(Shader, pUniform->gcslIndex, &samplerUniform);
                     lastChildIndex = samplerUniform->firstChild;
                     while (lastChildIndex != -1)
                     {
@@ -3222,7 +3270,6 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                 }
                 else
                 {
-                    gcmASSERT(VIR_Uniform_GetInitializer(virUniform) != VIR_INVALID_ID);
                 }
             }
 
@@ -3330,7 +3377,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                 {
                     gcmATTRIBUTE_SetNotUsed(attribute, gcvTRUE);
 
-                    if (ENABLE_FULL_NEW_LINKER &&
+                    if (useFullNewLinker &&
                         !gcmATTRIBUTE_alwaysUsed(attribute) &&
                         !seperatedShader)
                     {
@@ -3344,7 +3391,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
             }
         }
 
-        if (! ENABLE_FULL_NEW_LINKER)
+        if (!useFullNewLinker)
         {
             /* change outputs tempindex based on register allocation info. */
             {
@@ -3505,7 +3552,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
 
             SetUniformShaderKind(gcslUniform, Shader->type);
 
-            if (symUniform->baseBindingUniform)
+            if (symUniform->baseBindingUniform != VIR_INVALID_ID)
             {
                 gctSIZE_T j = 0;
 
@@ -3513,7 +3560,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
                 {
                     VIR_Symbol *baseSym = VIR_Shader_GetSymFromId(VirShader,
                         VIR_IdList_GetId(pUniforms, j));
-                    if (symUniform->baseBindingUniform == VIR_Symbol_GetUniform(baseSym))
+                    if (symUniform->baseBindingUniform == VIR_Symbol_GetIndex(baseSym))
                     {
                         gcslUniform->baseBindingIdx = (gctINT16)j;
                         break;
@@ -3553,7 +3600,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
         }
     }
 
-    if (! ENABLE_FULL_NEW_LINKER)
+    if (!useFullNewLinker)
     {
         if(VIR_Shader_isRegAllocated(VirShader))
         {
@@ -3642,7 +3689,6 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
         if (Shader->kernelFunctions != gcvNULL)
         {
             gctUINT             i = 0;
-            gcKERNEL_FUNCTION  *kernelFunctions = gcvNULL;
             gctPOINTER          pointer = gcvNULL;
             gctUINT32           length = Shader->currentKernelFunction->nameLength;
 
@@ -3688,6 +3734,7 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
             Shader->kernelFunctionCount = 1;
             Shader->kernelFunctions = kernelFunctions;
             Shader->currentKernelFunction = kernelFunctions[0];
+            kernelFunctions = gcvNULL;
         }
 
         /* Build function */
@@ -3743,6 +3790,10 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
     }
 
 OnError:
+    if (kernelFunctions != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, kernelFunctions);
+    }
     _FinalizeConverter(&converter);
 
     gcmFOOTER_ARG("Shader=0x%x", Shader);

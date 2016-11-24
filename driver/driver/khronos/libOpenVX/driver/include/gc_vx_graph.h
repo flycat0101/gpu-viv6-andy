@@ -40,3 +40,4 @@ VX_INTERNAL_API void vxoGraph_PolluteIfInput(vx_graph graph, vx_reference target
 EXTERN_C_END
 
 #endif /* __GC_VX_GRAPH_H__ */
+

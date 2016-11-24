@@ -1,18 +1,5 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
-
 /*
- * Copyright (c) 2012-2014 The Khronos Group Inc.
+ * Copyright (c) 2012-2015 The Khronos Group Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and/or associated documentation files (the
@@ -40,10 +27,6 @@
 /*!
  * \file
  * \brief The Khronos Extension for User Tiling Functions.
- * \author Erik Rainey <erik.rainey@ti.com>
- * \author Shorin Kyo <shorin.kyo.wz@renasas.com>
- * \author Thierry Lepley <thierry.lepley@st.com>
- * \author Frank Brill <fbrill@nvidia.com>
  *
  * \defgroup group_tiling Extension: User Tiling API
  * \brief The Khronos Extension for User Tiling Functions.
@@ -61,7 +44,7 @@
  * \brief A platform wrapper for the restrict keyword.
  * \ingroup group_tiling
  */
-#if defined(WIN32)
+#if defined(_WIN32)
 #define VX_RESTRICT
 #else
 #if defined(__cplusplus) || defined(ANDROID)
@@ -146,18 +129,17 @@ typedef struct _vx_tile_t {
  * \param [in] ptile The pointer to the \ref vx_tile_t structure.
  * \ingroup group_tiling
  */
-#define vxImageWidth(ptile)    ((ptile))->image.width)
-
+#define vxImageWidth(ptile)   ((ptile))->image.width)
 
 /*!
- * \brief The tile index in the x direction. The left-most tile starts with 0.
+ * \brief The offset between the left edge of the image and the left edge of the tile, in pixels.
  * \param [in] ptile The pointer to the \ref vx_tile_t structure.
  * \ingroup group_tiling
  */
 #define vxTileX(ptile)        ((ptile)->tile_x)
 
 /*!
- * \brief The tile index in the Y direction. The top-most tile starts with 0.
+ * \brief The offset between the top edge of the image and the top edge of the tile, in pixels.
  * \param [in] ptile The pointer to the \ref vx_tile_t structure.
  * \ingroup group_tiling
  */
@@ -169,7 +151,7 @@ typedef struct _vx_tile_t {
  * \param [in] index The plane index.
  * \ingroup group_tiling
  */
-#define vxTileWidth(ptile, index)       ((ptile)->addr[index].dim_x)
+#define vxTileWidth(ptile, index)    ((ptile)->addr[index].dim_x)
 
 /*!
  * \brief The height of the tile in pixels.
@@ -177,14 +159,14 @@ typedef struct _vx_tile_t {
  * \param [in] index The plane index.
  * \ingroup group_tiling
  */
-#define vxTileHeight(ptile, index)    ((ptile)->addr[index].dim_y)
+#define vxTileHeight(ptile, index)   ((ptile)->addr[index].dim_y)
 
 /*!
  * \brief The tile block height.
  * \param [in] ptile The pointer to the \ref vx_tile_t structure.
  * \ingroup group_tiling
  */
-#define vxTileBlockHeight(ptile)      ((ptile)->tile_block.height)
+#define vxTileBlockHeight(ptile)     ((ptile)->tile_block.height)
 
 /*!
  * \brief The tile block width.
@@ -198,21 +180,21 @@ typedef struct _vx_tile_t {
  * \param [in] ptile The pointer to the \ref vx_tile_t structure.
  * \ingroup group_tiling
  */
-#define vxNeighborhoodLeft(ptile)  ((ptile)->neighborhood.left)
+#define vxNeighborhoodLeft(ptile)    ((ptile)->neighborhood.left)
 
 /*!
  * \brief The simple wrapper to access each image's neighborhood +X value.
  * \param [in] ptile The pointer to the \ref vx_tile_t structure.
  * \ingroup group_tiling
  */
-#define vxNeighborhoodRight(ptile)  ((ptile)->neighborhood.right)
+#define vxNeighborhoodRight(ptile)   ((ptile)->neighborhood.right)
 
 /*!
  * \brief The simple wrapper to access each image's neighborhood -Y value.
  * \param [in] ptile The pointer to the \ref vx_tile_t structure.
  * \ingroup group_tiling
  */
-#define vxNeighborhoodTop(ptile)  ((ptile)->neighborhood.top)
+#define vxNeighborhoodTop(ptile)     ((ptile)->neighborhood.top)
 
 /*!
  * \brief The simple wrapper to access each image's neighborhood +Y value.
@@ -229,18 +211,18 @@ typedef struct _vx_tile_t {
  */
 enum vx_kernel_attribute_tiling_e {
     /*! \brief This allows a tiling mode kernel to set its input neighborhood. */
-    VX_KERNEL_ATTRIBUTE_INPUT_NEIGHBORHOOD  = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x7,
+    VX_KERNEL_ATTRIBUTE_INPUT_NEIGHBORHOOD      = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x7,
     /*! \brief This allows a tiling mode kernel to set its output tile block size. */
-    VX_KERNEL_ATTRIBUTE_OUTPUT_TILE_BLOCK_SIZE   = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x8,
+    VX_KERNEL_ATTRIBUTE_OUTPUT_TILE_BLOCK_SIZE  = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x8,
     /*! \brief This allows the author to set the border mode on the tiling kernel. */
-    VX_KERNEL_ATTRIBUTE_BORDER = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x9,
+    VX_KERNEL_ATTRIBUTE_BORDER                  = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x9,
     /*! \brief This determines the per tile memory allocation. */
     VX_KERNEL_ATTRIBUTE_TILE_MEMORY_SIZE        = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0xA,
 #if defined(OPENVX_TILING_1_1)
     /*! \brief This allows a tiling mode kernel to set its input tile block size. */
-    VX_KERNEL_ATTRIBUTE_INPUT_TILE_BLOCK_SIZE    = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0xB,
+    VX_KERNEL_ATTRIBUTE_INPUT_TILE_BLOCK_SIZE   = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0xB,
     /*! \brief This allows a tiling mode kernel to set its output neighborhood. */
-    VX_KERNEL_ATTRIBUTE_OUTPUT_NEIGHBORHOOD = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0xC,
+    VX_KERNEL_ATTRIBUTE_OUTPUT_NEIGHBORHOOD     = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0xC,
 #endif
 };
 
@@ -250,16 +232,16 @@ enum vx_kernel_attribute_tiling_e {
  */
 enum vx_node_attribute_tiling_e {
     /*! \brief This allows a tiling mode node to get its input neighborhood. */
-    VX_NODE_ATTRIBUTE_INPUT_NEIGHBORHOOD  = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0x7,
+    VX_NODE_ATTRIBUTE_INPUT_NEIGHBORHOOD      = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0x7,
     /*! \brief This allows a tiling mode node to get its output tile block size. */
-    VX_NODE_ATTRIBUTE_OUTPUT_TILE_BLOCK_SIZE   = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0x8,
+    VX_NODE_ATTRIBUTE_OUTPUT_TILE_BLOCK_SIZE  = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0x8,
     /*! \brief This is the size of the tile local memory area. */
-    VX_NODE_ATTRIBUTE_TILE_MEMORY_SIZE = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0xA,
+    VX_NODE_ATTRIBUTE_TILE_MEMORY_SIZE        = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0xA,
 #if defined(OPENVX_TILING_1_1)
     /*! \brief This allows a tiling mode node to get its input tile block size. */
-    VX_NODE_ATTRIBUTE_INPUT_TILE_BLOCK_SIZE    = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0xB,
+    VX_NODE_ATTRIBUTE_INPUT_TILE_BLOCK_SIZE   = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0xB,
     /*! \brief This allows a tiling mode node to get its output neighborhood. */
-    VX_NODE_ATTRIBUTE_OUTPUT_NEIGHBORHOOD = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0xC,
+    VX_NODE_ATTRIBUTE_OUTPUT_NEIGHBORHOOD     = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0xC,
 #endif
 };
 
@@ -346,7 +328,7 @@ typedef void (*vx_tiling_kernel_f)(void * VX_RESTRICT parameters[VX_RESTRICT],
  * Note that the fast or flexible formula, but not both, can be NULL.
  * \ingroup group_tiling
  */
-VX_API vx_kernel vxAddTilingKernel(vx_context context,
+VX_API_ENTRY vx_kernel VX_API_CALL vxAddTilingKernel(vx_context context,
                             vx_char name[VX_MAX_KERNEL_NAME],
                             vx_enum enumeration,
                             vx_tiling_kernel_f flexible_func_ptr,
@@ -356,4 +338,3 @@ VX_API vx_kernel vxAddTilingKernel(vx_context context,
                             vx_kernel_output_validate_f output);
 
 #endif
-

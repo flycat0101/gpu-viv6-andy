@@ -56,11 +56,7 @@ STATIC_LIBS += khronosS
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPREF_$(lib) = -Bstatic))
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
 
-LIBS += screen $(STATIC_LIBS) EGL_viv
-
-ifdef HARDWARENAME
-	CCFLAGS += -DgcdQNX_GAL_NAME_SUFFIX=\"$(HARDWARENAME)\"
-endif
+LIBS += screen $(STATIC_LIBS) GAL EGL_viv
 
 ifneq ($(filter v7, $(VARIANT_LIST)), v7)
 	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp

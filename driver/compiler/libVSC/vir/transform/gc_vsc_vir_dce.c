@@ -15,8 +15,6 @@
 
 static const VSC_DCE_Mark emptyMark = { 0 };
 
-#define   VSC_DCE_CONTROL_MAX_TEMP     3500
-
 static gctUINT
 _VSC_DCE_GetInstChannelNum(
     IN VIR_OpCode opcode
@@ -146,7 +144,8 @@ _VSC_DCE_Init(
     IN VIR_Shader           *shader,
     IN VIR_DEF_USAGE_INFO   *du_info,
     IN VSC_OPTN_DCEOptions  *options,
-    IN VIR_Dumper           *dumper
+    IN VIR_Dumper           *dumper,
+    IN VSC_MM               *pMM
     )
 {
     VIR_FuncIterator    func_iter;
@@ -159,8 +158,7 @@ _VSC_DCE_Init(
     VSC_DCE_SetDUInfo(dce, du_info);
     VSC_DCE_SetOptions(dce, options);
     VSC_DCE_SetDumper(dce, dumper);
-    vscPMP_Intialize(VSC_DCE_GetPmp(dce), gcvNULL, 1024,
-                     sizeof(void*), gcvTRUE);
+    dce->pMM = pMM;
     VSC_DCE_SetOptCount(dce, 0);
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(shader));
@@ -229,7 +227,6 @@ _VSC_DCE_Final(
     VSC_DCE_SetDumper(dce, gcvNULL);
     QUEUE_FINALIZE(&VSC_DCE_GetWorkList(dce));
     vscBILST_Finalize(&VSC_DCE_GetJmpList(dce));
-    vscPMP_Finalize(VSC_DCE_GetPmp(dce));
 }
 
 static void
@@ -386,8 +383,8 @@ _VSC_DCE_InitDCEOnFunction(
 
             VIR_Operand_GetOperandInfo(inst, dest, &dest_info);
 
-            if (VIR_OPCODE_MemOp(opcode) &&
-                !VIR_OPCODE_ReadMemOnly(opcode))
+            if (VIR_OPCODE_LoadsOrStores(opcode) &&
+                !VIR_OPCODE_LoadsOnly(opcode))
             {
                 _VSC_DCE_MarkInstAll(dce, inst, &dest_info);
             }
@@ -448,7 +445,7 @@ _VSC_DCE_MarkAndQueueAllDefs(
     vscVIR_InitGeneralUdIterator(&ud_iter, VSC_DCE_GetDUInfo(dce), inst, opnd, gcvFALSE, gcvFALSE);
 
     inst_src_swiz = VIR_Operand_GetSwizzle(opnd);
-    if(!VIR_OPCODE_isComponentwise(opcode))
+    if(!VIR_Inst_isComponentwise(inst))
     {
         gctUINT channelNum = _VSC_DCE_GetInstChannelNum(opcode);
         for(channel = 0; channel < channelNum; ++channel)
@@ -737,7 +734,7 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
             VIR_Inst_GetOpcode(inst) == VIR_OP_NORM_DP4 ||
             VIR_Inst_GetOpcode(inst) == VIR_OP_NORM_MUL ||
             VIR_OPCODE_isVXOnly(VIR_Inst_GetOpcode(inst)) ||
-            (VIR_OPCODE_MemOp(VIR_Inst_GetOpcode(inst)) && VIR_OPCODE_ReadMemOnly(VIR_Inst_GetOpcode(inst))))
+            (VIR_OPCODE_LoadsOrStores(VIR_Inst_GetOpcode(inst)) && VIR_OPCODE_LoadsOnly(VIR_Inst_GetOpcode(inst))))
         {
             if (VSC_DCE_GetMarkByInst(dce, inst).isAlive != 0)
             {
@@ -823,6 +820,7 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
                                                       VIR_OP_LABEL,
                                                       VIR_TYPE_UNKNOWN,
                                                       target_bb->pStartInst,
+                                                      gcvTRUE,
                                                       &label_inst);
 
                     VIR_Function_AddLabel(func, gcvNULL, &label_id);
@@ -852,6 +850,7 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
                                                      VIR_OP_LABEL,
                                                      VIR_TYPE_UNKNOWN,
                                                      lastInst,
+                                                     gcvTRUE,
                                                      &label_inst);
 
                     VIR_Function_AddLabel(func, gcvNULL, &label_id);
@@ -913,7 +912,7 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
             VIR_Operand             *opnd       = gcvNULL;
             VIR_SrcOperand_Iterator  opndIter;
 
-            if (!VIR_OPCODE_isComponentwise(opcode))
+            if (!VIR_Inst_isComponentwise(inst))
             {
                 coverMask = (1 << _VSC_DCE_GetInstChannelNum(opcode)) - 1;
                 coverFlag = coverMask;
@@ -938,7 +937,7 @@ _VSC_DCE_RemoveDeadCodeOnFunction(
 
             VIR_Inst_SetEnable(inst, (VIR_Enable)flag.isAlive);
             /* normalize swizzle by enable */
-            if (VIR_OPCODE_isComponentwise(VIR_Inst_GetOpcode(inst)))
+            if (VIR_Inst_isComponentwise(inst))
             {
                 VIR_Enable enable = VIR_Inst_GetEnable(inst);
                 VIR_Operand * operand;
@@ -984,17 +983,6 @@ _VSC_DCE_PerformOnShader(
         VSC_OPTN_DCEOptions_TRACE_INPUT))
     {
         VIR_Shader_Dump(gcvNULL, "DCE Begin", shader, gcvTRUE);
-    }
-
-    if (!ENABLE_FULL_NEW_LINKER)
-    {
-        /* too large shader, don't do control DCE */
-        if (VIR_Shader_GetVirRegCount(shader) > VSC_DCE_CONTROL_MAX_TEMP)
-        {
-            gctUINT32 opts = VSC_OPTN_DCEOptions_GetOPTS(options);
-            opts = opts & (~VSC_OPTN_DCEOptions_OPTS_CONTROL);
-            VSC_OPTN_DCEOptions_SetOPTS(options, opts);
-        }
     }
 
     if(VSC_UTILS_MASK(VSC_OPTN_DCEOptions_GetOPTS(options),
@@ -1051,7 +1039,8 @@ _VSC_DCE_PerformOnShader(
     }
 
     if(VSC_UTILS_MASK(VSC_OPTN_DCEOptions_GetTrace(options),
-        VSC_OPTN_DCEOptions_TRACE_OUTPUT) || gcSHADER_DumpCodeGenVerbose(shader))
+        VSC_OPTN_DCEOptions_TRACE_OUTPUT) ||
+       VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(shader), VIR_Shader_GetId(shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "DCE End", shader, gcvTRUE);
     }
@@ -1059,23 +1048,34 @@ _VSC_DCE_PerformOnShader(
     return errcode;
 }
 
+DEF_QUERY_PASS_PROP(VSC_DCE_Perform)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL |
+                                 VSC_PASS_LEVEL_MC;
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_DCE;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+}
+
 VSC_ErrCode
 VSC_DCE_Perform(
-    IN VIR_Shader           *shader,
-    IN VIR_DEF_USAGE_INFO   *du_info,
-    IN VSC_OPTN_DCEOptions  *options,
-    IN VIR_Dumper           *dumper,
-    OUT gctBOOL             *rebuildCFG
+    IN VSC_SH_PASS_WORKER* pPassWorker
     )
 {
+    VIR_Shader           *shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_DEF_USAGE_INFO   *du_info = pPassWorker->pDuInfo;
+    VSC_OPTN_DCEOptions  *options = (VSC_OPTN_DCEOptions*)pPassWorker->basePassWorker.pBaseOption;
+    VIR_Dumper           *dumper = pPassWorker->basePassWorker.pDumper;
     VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_DCE dce;
 
-    _VSC_DCE_Init(&dce, shader, du_info, options, dumper);
+    _VSC_DCE_Init(&dce, shader, du_info, options, dumper, pPassWorker->basePassWorker.pMM);
     errCode = _VSC_DCE_PerformOnShader(&dce);
     _VSC_DCE_Final(&dce);
 
-    *rebuildCFG = dce.rebuildCFG;
+    pPassWorker->pResDestroyReq->s.bInvalidateCfg = dce.rebuildCFG;
+
     return errCode;
 }
 

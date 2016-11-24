@@ -543,7 +543,7 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
-    if ((width < 0 || height < 0) ||
+    if ((width < 0 || height < 0) || samples < 0 ||
         ((width > (GLsizei)gc->constants.maxRenderBufferSize) || (height > (GLsizei)gc->constants.maxRenderBufferSize)))
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
@@ -810,7 +810,7 @@ GLvoid __glFramebufferTexture(__GLcontext *gc,
 
     /* If there is previously attached obj, remove fbo from it's owner list. */
     __glRemoveFramebufferAsImageUser(gc, framebufferObj, attachPoint);
-     __GL_MEMCOPY(&preAttach, attachPoint, gcmSIZEOF(preAttach));
+    __GL_MEMCOPY(&preAttach, attachPoint, gcmSIZEOF(preAttach));
 
     if (texObj)
     {
@@ -1882,12 +1882,6 @@ GLvoid GL_APIENTRY __gles_BlitFramebuffer(__GLcontext *gc,
 
     __GL_HEADER();
 
-    if (mask == 0)
-    {
-        /* Ignore it */
-        __GL_EXIT();
-    }
-
     /* Arguments check */
     if (mask & ~(GL_COLOR_BUFFER_BIT |GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT))
     {
@@ -1896,7 +1890,7 @@ GLvoid GL_APIENTRY __gles_BlitFramebuffer(__GLcontext *gc,
 
     if (filter != GL_LINEAR && filter != GL_NEAREST)
     {
-         __GL_ERROR_EXIT(GL_INVALID_VALUE);
+         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
     if (GL_LINEAR == filter && (mask & (GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT)))
@@ -1912,6 +1906,12 @@ GLvoid GL_APIENTRY __gles_BlitFramebuffer(__GLcontext *gc,
         !gc->dp.isFramebufferComplete(gc, readFBO))
     {
         __GL_ERROR_EXIT(GL_INVALID_FRAMEBUFFER_OPERATION);
+    }
+
+    if (mask == 0)
+    {
+        /* Ignore it */
+        __GL_EXIT();
     }
 
     if (mask & GL_COLOR_BUFFER_BIT)
@@ -2440,6 +2440,11 @@ GLvoid __glInvalidateFramebuffer(__GLcontext *gc,
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
+    if (numAttachments < 0)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
     if (0 == numAttachments || gcvNULL == attachments)
     {
         /* Ignore it*/
@@ -2500,7 +2505,7 @@ GLvoid __glInvalidateFramebuffer(__GLcontext *gc,
             case GL_STENCIL:
                 break;
             default:
-                __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+                __GL_ERROR_EXIT(GL_INVALID_ENUM);
             }
 
             gc->dp.invalidateDrawable(gc, x, y, width, height);
@@ -2529,7 +2534,19 @@ GLvoid GL_APIENTRY __gles_InvalidateSubFramebuffer(__GLcontext *gc,
                                                    GLsizei width,
                                                    GLsizei height)
 {
+    __GL_HEADER();
+
+    if (width < 0 || height < 0)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
     __glInvalidateFramebuffer(gc, target, numAttachments, attachments, x, y, width, height);
+
+OnError:
+
+    __GL_FOOTER();
+    return;
 }
 
 GLvoid GL_APIENTRY __gles_GetInternalformativ(__GLcontext *gc, GLenum target, GLenum internalformat, GLenum pname, GLsizei bufSize, GLint* params)
@@ -2862,7 +2879,7 @@ GLvoid GL_APIENTRY __gles_FramebufferTexture(__GLcontext *gc, GLenum target, GLe
         texObj = (__GLtextureObject *)__glGetObject(gc, gc->texture.shared, texture);
         if (!texObj)
         {
-            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
         }
         if ((level >= (GLint)gc->constants.maxNumTextureLevels) ||(level < 0))
         {

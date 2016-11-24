@@ -87,6 +87,7 @@ gceSTATUS FreeVideoNode(
         IN gcoHAL Hal,
         IN gctUINT32 Node) {
     gcsHAL_INTERFACE iface;
+    gceSTATUS status;
 
     gcmASSERT(Node != gcvNULL);
 
@@ -94,7 +95,14 @@ gceSTATUS FreeVideoNode(
     iface.u.ReleaseVideoMemory.node = Node;
 
     /* Call kernel API. */
-    return gcoHAL_Call(Hal, &iface);
+    status = gcoHAL_Call(Hal, &iface);
+
+/* When unlock the video memory node, set event to the kernel,
+ * That is why Commit is needed here to make it work.
+ */
+    gcoHAL_Commit(gcvNULL, gcvFALSE);
+
+    return status;
 }
 
 /**
@@ -151,6 +159,7 @@ gceSTATUS UnlockVideoNode(
     gcmASSERT(Node != gcvNULL);
 
     iface.engine = gcvENGINE_RENDER;
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
     iface.u.UnlockVideoMemory.node = Node;
     iface.u.UnlockVideoMemory.type = surftype;
@@ -601,8 +610,18 @@ Bool CleanSurfaceBySW(GALINFOPTR galInfo, PixmapPtr pPixmap, Viv2DPixmapPtr pPix
         TRACE_EXIT(FALSE);
     surf = (GenericSurfacePtr)pPix->mVidMemInfo;
 
+#ifdef HAVE_G2D
+
+/* Make compiler happer */
+
+    mFormat = mFormat;
+    dstRect = dstRect;
+
+    pPix->mCpuBusy = TRUE;
+    memset((char *)surf->mVideoNode.mLogicalAddr,0,surf->mVideoNode.mSizeInBytes);
+
+#else
     pPix->mCpuBusy = FALSE;
-    //memset((char *)surf->mVideoNode.mLogicalAddr,0,surf->mVideoNode.mSizeInBytes);
 
     if (!GetDefaultFormat(pPixmap->drawable.bitsPerPixel, &mFormat)) {
         TRACE_EXIT(FALSE);
@@ -653,6 +672,8 @@ Bool CleanSurfaceBySW(GALINFOPTR galInfo, PixmapPtr pPixmap, Viv2DPixmapPtr pPix
 
     VIV2DGPUBlitComplete(galInfo, TRUE);
 
+#endif
+
     TRACE_EXIT(TRUE);
 
 }
@@ -671,9 +692,11 @@ Bool WrapSurface(PixmapPtr pPixmap, void * logical, unsigned int physical, Viv2D
     memset(mHandle, 0, sizeof (GenericSurface));
     surf = (GenericSurfacePtr) mHandle;
 
-    alignedWidth = gcmALIGN(pPixmap->drawable.width, WIDTH_ALIGNMENT);
-    alignedHeight = gcmALIGN(pPixmap->drawable.height, HEIGHT_ALIGNMENT);
+
     bytesPerPixel = BITSTOBYTES(pPixmap->drawable.bitsPerPixel);
+    alignedWidth = gcmALIGN(pPixmap->devKind/bytesPerPixel, WIDTH_ALIGNMENT);
+    alignedHeight = gcmALIGN(pPixmap->drawable.height, HEIGHT_ALIGNMENT);
+
 
     surf->mVideoNode.mSizeInBytes = alignedWidth * bytesPerPixel * alignedHeight;
     surf->mVideoNode.mPool = gcvPOOL_USER;

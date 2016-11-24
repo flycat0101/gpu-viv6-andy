@@ -164,6 +164,7 @@ typedef enum _VIR_PATN_FLAG
     VIR_PATN_FLAG_EXPAND_COMP_O2O_SRC_ONLY_INLINE   =  VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE |
                                                        VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O |
                                                        VIR_PATN_FLAG_EXPAND_COMP_INLINE_NOT_BY_DST,
+
     /*
     ** After expand current instruction, move the index to the original previous instruction
     ** and scan the expand instructions.
@@ -185,6 +186,11 @@ typedef enum _VIR_PATN_FLAG
     ** Don't expand special node.
     */
     VIR_PATN_FLAG_NOT_EXPAND_SPECIAL_NODE           = 0x1000,
+
+   /*
+    ** Pattern already matched and replaced
+    */
+    VIR_PATN_FLAG_ALREADY_MATCHED_AND_REPLACED      = 0x2000,
 
 } VIR_PatnFlag;
 
@@ -213,12 +219,11 @@ typedef gctBOOL      (*VIR_PATTERN_CMP_OPCODE_PTR)(
 typedef enum _VIR_PATN_CONTEXT_FLAG
 {
     VIR_PATN_CONTEXT_FLAG_NONE                    = 0x00,
-
-    VIR_PATN_CONTEXT_FLAG_RECURSION               = 0x01,
 } VIR_PatnContextFlag;
 
 struct _VIR_PATTERN_CONTEXT
 {
+    PVSC_CONTEXT                vscContext;
     VIR_Shader                  *shader;
     VIR_Symbol                  *tmpRegSymbol[VIR_PATTERN_TEMP_COUNT];
     VIR_PatnContextFlag          flag;
@@ -229,7 +234,7 @@ struct _VIR_PATTERN_CONTEXT
     VIR_PATTERN_GET_PATTERN_PTR  getPattern;
     VIR_PATTERN_CMP_OPCODE_PTR   cmpOpcode;
 
-    VSC_PRIMARY_MEM_POOL         memPool;
+    VSC_MM                      *pMM;
 };
 
 VSC_ErrCode
@@ -240,7 +245,9 @@ VIR_Pattern_Transform(
 VSC_ErrCode
 VIR_PatternContext_Initialize(
     IN OUT VIR_PatternContext      *Context,
+    IN PVSC_CONTEXT                vscContext,
     IN VIR_Shader                  *Shader,
+    IN VSC_MM                      *pMM,
     IN VIR_PatnContextFlag          Flag,
     IN VIR_PATTERN_GET_PATTERN_PTR  GetPatrernPtr,
     IN VIR_PATTERN_CMP_OPCODE_PTR   CmpOpcodePtr,
@@ -249,8 +256,7 @@ VIR_PatternContext_Initialize(
 
 VSC_ErrCode
 VIR_PatternContext_Finalize(
-    IN OUT VIR_PatternContext      *Context,
-    IN gctSIZE_T                    Size
+    IN OUT VIR_PatternContext      *Context
     );
 
 END_EXTERN_C()

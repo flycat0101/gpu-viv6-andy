@@ -410,16 +410,18 @@ gceSTATUS
 gco3D_SetTarget(
     IN gco3D Engine,
     IN gctUINT32 TargetIndex,
-    IN gcoSURF Surface,
-    IN gctUINT32 SliceIndex,
+    IN gcsSURF_VIEW *SurfView,
     IN gctUINT32 LayerIndex
     )
 {
     gceSTATUS status;
     gcoSURF prevRT = gcvNULL;
+    gcoSURF Surface = SurfView ? SurfView->surf : gcvNULL;
+    gctUINT SliceIndex = SurfView ? SurfView->firstSlice : 0;
+    gcsSURF_VIEW preView = {gcvNULL, 0, 1};
 
-    gcmHEADER_ARG("Engine=0x%x TargetIndex=%d Surface=0x%x SliceIndex=%d LayerIndex=%d",
-                   Engine, TargetIndex, Surface, SliceIndex, LayerIndex);
+    gcmHEADER_ARG("Engine=0x%x TargetIndex=%d SurfView=0x%x LayerIndex=%d",
+                   Engine, TargetIndex, SurfView, LayerIndex);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_3D);
@@ -458,8 +460,12 @@ gco3D_SetTarget(
         {
             prevRT = Engine->mRT[TargetIndex];
 
+            preView.surf = prevRT;
+            preView.firstSlice = Engine->mRTSliceOffset[TargetIndex];
+            preView.numSlices = Engine->mRTSliceNum[TargetIndex];
+
             /* Disable tile status for this surface with color slot0 */
-            gcmONERROR(gcoSURF_DisableTileStatus(prevRT, gcvFALSE));
+            gcmONERROR(gcoSURF_DisableTileStatus(&preView, gcvFALSE));
 
             /* Disable tile status setting for MRT */
             if (Engine->mRTtileStatus && (TargetIndex != 0))
@@ -482,9 +488,10 @@ gco3D_SetTarget(
             /* Reset current target. */
             Engine->mRT[TargetIndex] = gcvNULL;
             Engine->mRTSliceOffset[TargetIndex] = 0;
+            Engine->mRTSliceNum[TargetIndex] = 1;
 
             /* Invalidate target. */
-            gcmONERROR(gcoHARDWARE_SetRenderTarget(Engine->hardware, TargetIndex, gcvNULL, 0, 0));
+            gcmONERROR(gcoHARDWARE_SetRenderTarget(Engine->hardware, TargetIndex, gcvNULL, 0, 1, 0));
             if (prevRT)
             {
                 /* Dereference the surface. */
@@ -498,6 +505,7 @@ gco3D_SetTarget(
             /* Set new render target. */
             Engine->mRT[TargetIndex] = Surface;
             Engine->mRTSliceOffset[TargetIndex] = SliceIndex;
+            Engine->mRTSliceNum[TargetIndex] = SurfView->numSlices;
 
             /* Lock the surface. */
             gcmONERROR(gcoSURF_Lock(Surface, gcvNULL, targetMemory));
@@ -505,7 +513,7 @@ gco3D_SetTarget(
             Engine->mRTMemory[TargetIndex] = targetMemory[0];
 
             /* Program render target. */
-            gcmONERROR(gcoHARDWARE_SetRenderTarget(Engine->hardware, TargetIndex, Surface, SliceIndex, LayerIndex));
+            gcmONERROR(gcoHARDWARE_SetRenderTarget(Engine->hardware, TargetIndex, Surface, SliceIndex, SurfView->numSlices, LayerIndex));
 
             /* Reference the surface. */
             gcmONERROR(gcoSURF_ReferenceSurface(Surface));
@@ -518,14 +526,14 @@ gco3D_SetTarget(
 
          if (Engine->mRTtileStatus && Surface)
          {
-            gcmONERROR(gcoSURF_EnableTileStatusEx(Surface, TargetIndex));
+            gcmONERROR(gcoSURF_EnableTileStatusEx(SurfView, TargetIndex));
          }
          else
          {
              if ((TargetIndex == 0) && Surface)
              {
                  /* Enable tile status. */
-                 gcmONERROR(gcoSURF_EnableTileStatus(Surface));
+                 gcmONERROR(gcoSURF_EnableTileStatus(SurfView));
              }
          }
 
@@ -586,7 +594,7 @@ gco3D_UnsetTarget(
     /* Only unset surface if it is the current render target. */
     if (Engine->mRT[TargetIndex] == Surface)
     {
-        gcmONERROR(gco3D_SetTarget(Engine, TargetIndex, gcvNULL, 0, 0));
+        gcmONERROR(gco3D_SetTarget(Engine, TargetIndex, gcvNULL, 0));
     }
 
     /* Success. */
@@ -621,13 +629,14 @@ OnError:
 gceSTATUS
 gco3D_SetDepth(
     IN gco3D Engine,
-    IN gcoSURF Surface,
-    IN gctUINT32 SliceIndex
+    IN gcsSURF_VIEW *SurfView
     )
 {
     gceSTATUS status;
+    gcoSURF Surface = SurfView ? SurfView->surf : gcvNULL;
+    gctUINT SliceIndex = SurfView ? SurfView->firstSlice : 0;
 
-    gcmHEADER_ARG("Engine=0x%x Surface=0x%x SliceIndex=%d", Engine, Surface, SliceIndex);
+    gcmHEADER_ARG("Engine=0x%x SurfView=0x%x ", Engine, SurfView);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_3D);
@@ -653,9 +662,10 @@ gco3D_SetDepth(
         if (Engine->depth != gcvNULL)
         {
             gcoSURF prevDepth = Engine->depth;
+            gcsSURF_VIEW prevView = {prevDepth, Engine->depthSliceOffset, Engine->depthSliceNum};
 
             /* Disable previous tile status. */
-            gcmONERROR(gcoSURF_DisableTileStatus(prevDepth, gcvFALSE));
+            gcmONERROR(gcoSURF_DisableTileStatus(&prevView, gcvFALSE));
 
             /* Unlock the current depth surface. */
             gcmONERROR(gcoSURF_Unlock(prevDepth, Engine->depthMemory));
@@ -676,9 +686,10 @@ gco3D_SetDepth(
             /* Reset current depth buffer. */
             Engine->depth = gcvNULL;
             Engine->depthSliceOffset = 0;
+            Engine->depthSliceNum = 1;
 
             /* Disable depth. */
-            gcmONERROR(gcoHARDWARE_SetDepthBuffer(Engine->hardware, gcvNULL, 0));
+            gcmONERROR(gcoHARDWARE_SetDepthBuffer(Engine->hardware, gcvNULL, 0, 1));
         }
         else
         {
@@ -687,16 +698,17 @@ gco3D_SetDepth(
             /* Set new depth buffer. */
             Engine->depth = Surface;
             Engine->depthSliceOffset = SliceIndex;
+            Engine->depthSliceNum = SurfView->numSlices;
 
             /* Lock depth buffer. */
             gcmONERROR(gcoSURF_Lock(Surface, gcvNULL, depthMemory));
             Engine->depthMemory = depthMemory[0];
 
             /* Set depth buffer. */
-            gcmONERROR(gcoHARDWARE_SetDepthBuffer(Engine->hardware, Surface, SliceIndex));
+            gcmONERROR(gcoHARDWARE_SetDepthBuffer(Engine->hardware, Surface, SliceIndex, SurfView->numSlices));
 
             /* Enable tile status. */
-            gcmONERROR(gcoSURF_EnableTileStatus(Surface));
+            gcmONERROR(gcoSURF_EnableTileStatus(SurfView));
 
             /* Reference the surface. */
             gcmONERROR(gcoSURF_ReferenceSurface(Surface));
@@ -730,7 +742,7 @@ gco3D_UnsetDepth(
     /* Only unset surface if it is the current depth buffer. */
     if (Engine->depth == Surface)
     {
-        gcmONERROR(gco3D_SetDepth(Engine, gcvNULL, 0));
+        gcmONERROR(gco3D_SetDepth(Engine, gcvNULL));
     }
 
     /* Success. */
@@ -3647,7 +3659,7 @@ gco3D_DrawPrimitives(
     gceSTATUS status;
     gctINT startVertex;
 
-    gcmHEADER_ARG("Engine=0x%x Type=%d StartVertex=%d PrimitiveCount=%lu",
+    gcmHEADER_ARG("Engine=0x%x Type=%d StartVertex=%zu PrimitiveCount=%lu",
                   Engine, Type, StartVertex, PrimitiveCount);
 
     /* Verify the arguments. */
@@ -3866,16 +3878,13 @@ gco3D_DrawInstancedPrimitives(
     IN gctSIZE_T StartIndex,
     IN gctSIZE_T PrimitiveCount,
     IN gctSIZE_T VertexCount,
-    IN gctBOOL SpilitDraw,
-    IN gctSIZE_T SpilitCount,
-    IN gcePRIMITIVE SpilitType,
     IN gctSIZE_T InstanceCount
     )
 {
     gceSTATUS status;
     gctUINT startVertex, startIndex;
 
-    gcmHEADER_ARG("Engine=0x%x Type=%d DrawIndex=%d StartVertex=%d InstanceCount=%lu,VertexCount=%lu,PrimitiveCount=%lu",
+    gcmHEADER_ARG("Engine=0x%x Type=%d DrawIndex=%d StartVertex=%lu InstanceCount=%lu,VertexCount=%lu,PrimitiveCount=%lu",
                   Engine, Type, DrawIndex, StartVertex, InstanceCount, VertexCount, PrimitiveCount);
 
     /* Verify the arguments. */
@@ -3899,18 +3908,6 @@ gco3D_DrawInstancedPrimitives(
                                                  PrimitiveCount,
                                                  VertexCount,
                                                  InstanceCount);
-
-    if (SpilitDraw)
-    {
-        status = gcoHARDWARE_DrawInstancedPrimitives(Engine->hardware,
-                                                     DrawIndex,
-                                                     SpilitType,
-                                                     startVertex,
-                                                     startIndex,
-                                                     PrimitiveCount,
-                                                     SpilitCount,
-                                                     InstanceCount);
-    }
 
     /* Return the status. */
     gcmFOOTER();
@@ -4005,8 +4002,8 @@ gco3D_DrawPrimitivesCount(
 {
     gceSTATUS status;
 
-    gcmHEADER_ARG("Engine=0x%x Type=%d StartVertex=%d PrimitiveCount=%lu",
-                  Engine, Type, StartVertex, PrimitiveCount);
+    gcmHEADER_ARG("Engine=0x%x Type=%d StartVertex=%zu PrimitiveCount=%lu",
+                  Engine, Type, *StartVertex, PrimitiveCount);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Engine, gcvOBJ_3D);
@@ -4089,50 +4086,6 @@ gco3D_DrawPrimitivesOffset(
     return status;
 }
 
-static gceSTATUS _GetPrimitiveCount(
-    IN gcePRIMITIVE PrimitiveMode,
-    IN gctSIZE_T VertexCount,
-    OUT gctSIZE_T * PrimitiveCount
-    )
-{
-    gceSTATUS result = gcvSTATUS_OK;
-
-    /* Translate primitive count. */
-    switch (PrimitiveMode)
-    {
-    case gcvPRIMITIVE_POINT_LIST:
-        *PrimitiveCount = VertexCount;
-        break;
-
-    case gcvPRIMITIVE_LINE_LIST:
-        *PrimitiveCount = VertexCount / 2;
-        break;
-
-    case gcvPRIMITIVE_LINE_LOOP:
-        *PrimitiveCount = VertexCount;
-        break;
-
-    case gcvPRIMITIVE_LINE_STRIP:
-        *PrimitiveCount = VertexCount - 1;
-        break;
-
-    case gcvPRIMITIVE_TRIANGLE_LIST:
-        *PrimitiveCount = VertexCount / 3;
-        break;
-
-    case gcvPRIMITIVE_TRIANGLE_STRIP:
-    case gcvPRIMITIVE_TRIANGLE_FAN:
-        *PrimitiveCount = VertexCount - 2;
-        break;
-
-    default:
-        result = gcvSTATUS_INVALID_ARGUMENT;
-    }
-
-    /* Return result. */
-    return result;
-}
-
 /*******************************************************************************
 **
 **  gco3D_DrawIndexedPrimitives
@@ -4181,17 +4134,13 @@ gco3D_DrawIndexedPrimitives(
     IN gcePRIMITIVE Type,
     IN gctSIZE_T BaseVertex,
     IN gctSIZE_T StartIndex,
-    IN gctSIZE_T PrimitiveCount,
-    IN gctBOOL SpilitDraw,
-    IN gctSIZE_T SpilitCount,
-    IN gcePRIMITIVE SpilitType
+    IN gctSIZE_T PrimitiveCount
     )
 {
     gceSTATUS status;
     gctUINT baseVertex, startIndex;
-    gctSIZE_T spilitPrimCount;
 
-    gcmHEADER_ARG("Engine=0x%x Type=%d BaseVertex=%d StartIndex=%d "
+    gcmHEADER_ARG("Engine=0x%x Type=%d BaseVertex=%d StartIndex=%zu "
                   "PrimitiveCount=%lu",
                   Engine, Type, BaseVertex, StartIndex, PrimitiveCount);
 
@@ -4209,17 +4158,6 @@ gco3D_DrawIndexedPrimitives(
                                                startIndex,
                                                PrimitiveCount);
 
-    if (SpilitDraw)
-    {
-        gcmONERROR(_GetPrimitiveCount(SpilitType, SpilitCount, &spilitPrimCount));
-        status = gcoHARDWARE_DrawIndexedPrimitives(Engine->hardware,
-                                                   SpilitType,
-                                                   baseVertex,
-                                                   startIndex,
-                                                   spilitPrimCount);
-    }
-
-OnError:
     /* Return the status. */
     gcmFOOTER();
     return status;

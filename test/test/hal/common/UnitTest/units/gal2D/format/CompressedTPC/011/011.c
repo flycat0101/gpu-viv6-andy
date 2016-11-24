@@ -341,7 +341,7 @@ static gceSTATUS CDECL InitSourceSurface(Test2D *t2d, gctUINT index)
         t2d->runtime->hal,
         index < 4 ? gcvSURF_A8R8G8B8 : sFormat[index % 7],
         gcvLINEAR,
-        (index < 4) ? gcv2D_TSC_DISABLE: gcv2D_TSC_TPC_COMPRESSED,
+        (index < 4) ? gcv2D_TSC_DISABLE: gcv2D_TSC_TPC_COMPRESSED_V10,
         480, 480, &surf));
 
     dstRect.left   = 0;

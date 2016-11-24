@@ -19,41 +19,29 @@
 
 BEGIN_EXTERN_C()
 
-typedef struct _VIR_PATTERN_LOWER_CONTEXT
+typedef struct _VIR_PATTERN_HL_2_ML_CONTEXT
 {
     VIR_PatternContext          header;
-    VSC_HW_CONFIG*              hwCfg;
-} VIR_PatternLowerContext;
-
-
-VSC_ErrCode
-VIR_Lower_HighLevel_To_MiddleLevel_Reg_Alloc(
-    IN  VIR_Shader              *Shader
-    );
-
-VSC_ErrCode
-VIR_Lower_HighLevel_To_MiddleLevel_Sym_Update(
-    IN  VIR_Shader              *Shader
-    );
-
-VSC_ErrCode
-VIR_Lower_HighLevel_To_MiddleLevel_Preprocess(
-    IN  VIR_Shader              *Shader
-    );
+    PVSC_CONTEXT                vscContext;
+    VSC_MM                      *pMM;
+} VIR_PatternHL2MLContext;
 
 VSC_ErrCode
 VIR_Lower_HighLevel_To_MiddleLevel_Expand(
     IN  VIR_Shader              *Shader,
-    IN  VSC_HW_CONFIG           *HwCfg,
-    IN  VIR_PatternLowerContext *Context
+    IN  VIR_PatternHL2MLContext *Context
     );
 
 VSC_ErrCode
 VIR_Lower_HighLevel_To_MiddleLevel(
-    IN  VIR_Shader              *Shader,
-    IN  VSC_HW_CONFIG           *HwCfg
+    IN VSC_SH_PASS_WORKER* pPassWorker
     );
+DECLARE_QUERY_PASS_PROP(VIR_Lower_HighLevel_To_MiddleLevel);
 
+VSC_ErrCode
+VIR_Lower_MiddleLevel_Process_Intrinsics(
+    IN  VIR_Shader   *Shader
+    );
 END_EXTERN_C()
 #endif
 

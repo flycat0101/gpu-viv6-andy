@@ -16,11 +16,18 @@ include $(LOCAL_PATH)/../../../../Android.mk.def
 
 include $(CLEAR_VARS)
 
+platform_option := \
+    platform/$(soc_vendor)/gc_hal_user_platform_$(soc_board).c
+
+ifeq ($(wildcard $(LOCAL_PATH)/$(platform_option)),)
+  platform_option := platform/default/gc_hal_user_platform_default.c
+endif
+
 LOCAL_SRC_FILES := \
     gc_hal_user_debug.c \
     gc_hal_user_os.c \
     gc_hal_user_math.c \
-    $(PLATFORM_CALLBACK).c
+    $(platform_option)
 
 LOCAL_CFLAGS := \
     $(CFLAGS) \

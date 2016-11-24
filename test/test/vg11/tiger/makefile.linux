@@ -83,7 +83,7 @@ ifeq ($(USE_VDK), 1)
 LIBS += -L $(VIVANTE_SDK_LIB) -l VDK
 endif
 LIBS += -L $(OVG11_DIR)/$(OBJ_DIR) -l OpenVG
-LIBS += -L $(VIVANTE_SDK_LIB) -l EGL
+LIBS += -L $(VIVANTE_SDK_LIB) -Wl,-rpath-link,$(VIVANTE_SDK_LIB) -l EGL
 LIBS += -L $(VIVANTE_SDK_LIB) -l GAL
 endif
 

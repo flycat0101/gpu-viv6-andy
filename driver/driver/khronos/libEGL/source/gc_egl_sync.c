@@ -78,7 +78,18 @@ veglCreateSync(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    if (thread->context == EGL_NO_CONTEXT)
+    /* Test type is a supported type of sync object. */
+    if (type != EGL_SYNC_REUSABLE_KHR
+#if gcdANDROID_NATIVE_FENCE_SYNC
+        && type != EGL_SYNC_NATIVE_FENCE_ANDROID
+#endif
+        && type != EGL_SYNC_FENCE)
+    {
+        thread->error = EGL_BAD_ATTRIBUTE;
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    if (EGL_SYNC_REUSABLE_KHR != type && thread->context == EGL_NO_CONTEXT)
     {
         thread->error = EGL_BAD_MATCH;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
@@ -144,7 +155,6 @@ veglCreateSync(
     sync->condition         = EGL_SYNC_PRIOR_COMMANDS_COMPLETE;
     sync->signal            = gcvNULL;
 #if gcdANDROID_NATIVE_FENCE_SYNC
-    sync->pt                = gcvNULL;
     sync->fenceFD           = EGL_NO_NATIVE_FENCE_FD_ANDROID;
 #endif
 
@@ -175,7 +185,7 @@ veglCreateSync(
         }
 
         /* Create native fence sync. */
-        status = gcoOS_CreateSyncPoint(gcvNULL, &sync->pt);
+        status = gcoOS_CreateSignal(gcvNULL, gcvTRUE, &sync->signal);
 
         if (gcmIS_ERROR(status))
         {
@@ -186,12 +196,12 @@ veglCreateSync(
         }
 
         /* Create native fence. */
-        status = gcoOS_CreateNativeFence(gcvNULL, sync->pt, &fenceFD);
+        status = gcoOS_CreateNativeFence(gcvNULL, sync->signal, &fenceFD);
 
         if (gcmIS_ERROR(status))
         {
             /* Roll back. */
-            gcmVERIFY_OK(gcoOS_DestroySyncPoint(gcvNULL, sync->pt));
+            gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, sync->signal));
             gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, sync));
 
             thread->error = EGL_BAD_ALLOC;
@@ -203,10 +213,12 @@ veglCreateSync(
         veglSyncNative(thread, dpy);
 
         /* Submit the sync point. */
-        iface.command               = gcvHAL_SYNC_POINT;
-        iface.u.SyncPoint.command   = gcvSYNC_POINT_SIGNAL;
-        iface.u.SyncPoint.syncPoint = gcmPTR_TO_UINT64(sync->pt);
-        iface.u.SyncPoint.fromWhere = gcvKERNEL_PIXEL;
+        iface.command            = gcvHAL_SIGNAL;
+        iface.u.Signal.signal    = gcmPTR_TO_UINT64(sync->signal);
+        iface.u.Signal.auxSignal = 0;
+        iface.u.Signal.process   = gcmPTR_TO_UINT64(dpy->process);
+        iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
+
         /* Send event. */
         gcoHAL_ScheduleEvent(gcvNULL, &iface);
         gcoHAL_Commit(gcvNULL, gcvFALSE);
@@ -354,19 +366,6 @@ veglDestroySync(
 
         /* Close file descriptor. */
         status = gcoOS_CloseFD(gcvNULL, sync->fenceFD);
-
-        if (gcmIS_ERROR(status))
-        {
-            /* Error. */
-            thread->error = EGL_BAD_ACCESS;
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-        }
-    }
-
-    if (sync->pt)
-    {
-        /* Destroy sync point. */
-        status = gcoOS_DestroySyncPoint(gcvNULL, sync->pt);
 
         if (gcmIS_ERROR(status))
         {

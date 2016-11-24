@@ -1,0 +1,17 @@
+android update project -p . -t android-23
+
+cd jni
+ndk-build
+
+chmod +w Application.mk
+vi Application.mk
+
+ndk-build
+
+ant debug
+
+adb install -r bin/NativeActivity-debug.apk
+
+adb shell am start -n tv.nopper.VKTS_Example02/android.app.NativeActivity
+
+

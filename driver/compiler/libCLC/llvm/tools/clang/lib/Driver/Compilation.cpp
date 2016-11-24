@@ -152,6 +152,7 @@ int Compilation::ExecuteCommand(const Command &C,
           << Error;
         FailingCommand = &C;
         delete OS;
+        delete[] Argv;
         return 1;
       }
     }

@@ -190,7 +190,8 @@ namespace SrcMgr {
       return SourceLocation::getFromRawEncoding(IncludeLoc);
     }
     const ContentCache* getContentCache() const {
-      return reinterpret_cast<const ContentCache*>(Data & ~7UL);
+      return reinterpret_cast<const ContentCache*>(Data & ~7LL);
+
     }
 
     /// getCharacteristic - Return whether this is a system header or not.

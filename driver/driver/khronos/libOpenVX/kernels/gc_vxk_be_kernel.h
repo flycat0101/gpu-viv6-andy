@@ -99,3 +99,4 @@ gceVX_BorderMode;
 #endif
 
 #endif /* __gc_vx_be_kernel_h_ */
+

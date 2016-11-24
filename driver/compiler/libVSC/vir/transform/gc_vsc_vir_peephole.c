@@ -13,15 +13,14 @@
 
 #include "vir/transform/gc_vsc_vir_peephole.h"
 
-#define VSC_PH_MAX_TEMP 3500
-
-void VSC_PH_Peephole_Init(
+static void VSC_PH_Peephole_Init(
     IN OUT VSC_PH_Peephole* ph,
     IN VIR_Shader* shader,
     IN VIR_DEF_USAGE_INFO* du_info,
     IN VSC_HW_CONFIG* hwCfg,
     IN VSC_OPTN_PHOptions* options,
-    IN VIR_Dumper* dumper
+    IN VIR_Dumper* dumper,
+    IN VSC_MM* pMM
     )
 {
     VSC_PH_Peephole_SetShader(ph, shader);
@@ -30,20 +29,18 @@ void VSC_PH_Peephole_Init(
     VSC_PH_Peephole_SetHwCfg(ph, hwCfg);
     VSC_PH_Peephole_SetOptions(ph, options);
     VSC_PH_Peephole_SetDumper(ph, dumper);
-    vscPMP_Intialize(VSC_PH_Peephole_GetPmp(ph), gcvNULL, 1024,
-                     sizeof(void*), gcvTRUE);
+    ph->pMM = pMM;
      VSC_PH_Peephole_SetCfgChanged(ph, gcvFALSE);
      VSC_PH_Peephole_SetExprChanged(ph, gcvFALSE);
 }
 
-void VSC_PH_Peephole_Final(
+static void VSC_PH_Peephole_Final(
     IN OUT VSC_PH_Peephole* ph
     )
 {
     VSC_PH_Peephole_SetShader(ph, gcvNULL);
     VSC_PH_Peephole_SetOptions(ph, gcvNULL);
     VSC_PH_Peephole_SetDumper(ph, gcvNULL);
-    vscPMP_Finalize(VSC_PH_Peephole_GetPmp(ph));
 }
 
 typedef struct VSC_PH_MODIFIERTOGEN
@@ -1564,7 +1561,7 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
     }
 
     mergedOpcode = VSC_PH_ResultInstsGetMthInstOpcode(resultInsts, channel);
-    VIR_Function_AddInstructionAfter(func, mergedOpcode, instDestTypeId, inst, &newInst);
+    VIR_Function_AddInstructionAfter(func, mergedOpcode, instDestTypeId, inst, gcvTRUE, &newInst);
     newInstDest = VIR_Inst_GetDest(newInst);
     VIR_Operand_Copy(newInstDest, instDest);
     /* du update for newInstDest */
@@ -2003,7 +2000,7 @@ static VSC_ErrCode _VSC_PH_PerformOnInst(
             VIR_Inst_Dump(dumper, inst);
         }
 
-        if(VIR_OPCODE_isComponentwise(opcode))
+        if(VIR_Inst_isComponentwise(inst))
         {
             VIR_Operand* dest = VIR_Inst_GetDest(inst);
             VIR_Enable enable = VIR_Operand_GetEnable(dest);
@@ -2144,8 +2141,7 @@ static gctBOOL _VSC_PH_DoesOpcodeSupportLValueModifier(
     }
 
     if (VIR_OPCODE_isMemLd(opcode)  ||
-        opcode == VIR_OP_LOAD_ATTR  ||
-        opcode == VIR_OP_ATTR_LD)
+        VIR_OPCODE_isAttrLd(opcode))
     {
         return gcvFALSE;
     }
@@ -3461,6 +3457,7 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
             VIR_Inst_SetSource(add_sub, 1, mad_src1);
             VIR_Inst_SetSource(add_sub, 2, other_src);
             VIR_Inst_SetSrcNum(add_sub, 3);
+            VIR_Function_FreeOperand(func, mul_dest_usage);
 
             /* add the use of mad_src0 and mad_src1 to the def of mul_src0 and mul_src1 */
             {
@@ -3832,7 +3829,6 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
             VIR_Swizzle rsq_src0_swizzle = VIR_Swizzle_ApplyMappingSwizzle(sqrt_dest_usage_swizzle, mapping_swizzle0);
             VIR_Enable rsq_src0_enable = VIR_Swizzle_2_Enable(rsq_src0_swizzle);
             VIR_Enable sqrt_dest_usage_enable = VIR_Swizzle_2_Enable(sqrt_dest_usage_swizzle);
-            VIR_Operand* rsq_src0;
 
             if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_RSQ))
             {
@@ -3846,11 +3842,11 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
             vscVIR_DeleteUsage(VSC_PH_Peephole_GetDUInfo(ph), VIR_ANY_DEF_INST, rcp,
                                sqrt_dest_usage, gcvFALSE, sqrt_dest_info.u1.virRegInfo.virReg, 1,
                                sqrt_dest_usage_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
-            VIR_Function_DupOperand(func, sqrt_src0, &rsq_src0);
-            VIR_Operand_SetSwizzle(rsq_src0, rsq_src0_swizzle);
+            VIR_Operand_Copy(VIR_Inst_GetSource(rcp, 0), sqrt_src0);
+            VIR_Operand_SetSwizzle(VIR_Inst_GetSource(rcp, 0), rsq_src0_swizzle);
 
             VIR_Inst_SetOpcode(rcp, VIR_OP_RSQ);
-            VIR_Inst_SetSource(rcp, 0, rsq_src0);
+            VIR_Inst_SetSource(rcp, 0, VIR_Inst_GetSource(rcp, 0));
             VIR_Inst_SetSrcNum(rcp, 1);
 
             /* add the use of rsq_src0 to the def of sqrt_src0 */
@@ -3875,7 +3871,7 @@ static VSC_ErrCode _VSC_PH_GenerateRSQ(
 
                     if (def_dest_enable & rsq_src0_enable)
                     {
-                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, rcp, rsq_src0, gcvFALSE,
+                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, rcp, VIR_Inst_GetSource(rcp, 0), gcvFALSE,
                                                 sqrt_src0_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(def_dest_enable & rsq_src0_enable),
                                                 VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
                     }
@@ -4003,7 +3999,7 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
 
     lshift_src1 = VIR_Inst_GetSource(lshift, 1);
     if (VIR_Operand_GetOpKind(lshift_src1) != VIR_OPND_IMMEDIATE ||
-        lshift_src1->u1.uConst >= 8)
+        VIR_Operand_GetImmediateUint(lshift_src1) >= 4)
     {
         return errCode;
     }
@@ -4210,7 +4206,6 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
 
             VIR_Swizzle lshifted_ls_src1_swizzle = VIR_Swizzle_ApplyMappingSwizzle(lshift_dest_usage_swizzle, mapping_swizzle0);
             VIR_Enable lshifted_ls_src1_enable = VIR_Swizzle_2_Enable(lshifted_ls_src1_swizzle);
-            VIR_Operand* lshifted_ls_src1;
 
             if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_LSHIFT_LS))
             {
@@ -4225,11 +4220,9 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
                                lshift_dest_usage, gcvFALSE, lshift_dest_info.u1.virRegInfo.virReg, 1,
                                lshift_dest_usage_enable, VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
 
-            VIR_Function_DupOperand(func, lshift_src0, &lshifted_ls_src1);
-            VIR_Operand_SetSwizzle(lshifted_ls_src1, lshifted_ls_src1_swizzle);
-
-            VIR_Inst_SetSource(ls, 1, lshifted_ls_src1);
-            VIR_Operand_SetLShift(lshifted_ls_src1, lshift_src1->u1.uConst);
+            VIR_Operand_Copy(VIR_Inst_GetSource(ls, 1), lshift_src0);
+            VIR_Operand_SetSwizzle(VIR_Inst_GetSource(ls, 1), lshifted_ls_src1_swizzle);
+            VIR_Operand_SetLShift(VIR_Inst_GetSource(ls, 1), VIR_Operand_GetImmediateUint(lshift_src1));
 
             /* add the use of ls_src1 to the def of lshift_src0 */
             {
@@ -4253,7 +4246,7 @@ static VSC_ErrCode _VSC_PH_GenerateLShiftedLS(
 
                     if (def_dest_enable & lshifted_ls_src1_enable)
                     {
-                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, ls, lshifted_ls_src1, gcvFALSE,
+                        vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph), def_inst, ls, VIR_Inst_GetSource(ls, 1), gcvFALSE,
                                                 lshift_src0_info.u1.virRegInfo.virReg, 1, (VIR_Enable)(def_dest_enable & lshifted_ls_src1_enable),
                                                 VIR_HALF_CHANNEL_MASK_FULL, gcvNULL);
                     }
@@ -4365,8 +4358,6 @@ static VSC_ErrCode _VSC_PH_ReplaceUsages(
     /* change the usage of mova_dst to use first_def_mova_dst */
     VSC_ErrCode     errCode  = VSC_ERR_NONE;
 
-    VIR_Shader      *shader = VSC_PH_Peephole_GetShader(ph);
-    VIR_Function    *func = VIR_Shader_GetCurrentFunction(shader);
     VIR_Dumper      *dumper = VSC_PH_Peephole_GetDumper(ph);
     VSC_OPTN_PHOptions *options = VSC_PH_Peephole_GetOptions(ph);
 
@@ -4387,7 +4378,6 @@ static VSC_ErrCode _VSC_PH_ReplaceUsages(
         VIR_Swizzle     use_swizzle = VIR_Operand_GetSwizzle(use_opnd);
         VIR_Enable      use_enable = VIR_Swizzle_2_Enable(use_swizzle);
         VIR_OperandInfo use_opnd_info;
-        VIR_Operand     *new_src;
         gctUINT         srcIndex = VIR_Inst_GetSourceIndex(use_inst, use_opnd);
         if (srcIndex >= VIR_MAX_SRC_NUM)
         {
@@ -4408,16 +4398,15 @@ static VSC_ErrCode _VSC_PH_ReplaceUsages(
                 gcvNULL);
 
         /* duplicate merged_inst_dst */
-        VIR_Function_DupOperand(func, merged_inst_dst, &new_src);
-        VIR_Operand_SetLvalue(new_src, 0);
-        VIR_Operand_SetSwizzle(new_src,
+        VIR_Operand_Copy(VIR_Inst_GetSource(use_inst, srcIndex), merged_inst_dst);
+        VIR_Operand_SetLvalue(VIR_Inst_GetSource(use_inst, srcIndex), 0);
+        VIR_Operand_SetSwizzle(VIR_Inst_GetSource(use_inst, srcIndex),
             VIR_Swizzle_ApplyMappingSwizzle(use_swizzle, mapping_swizzle));
-        VIR_Inst_SetSource(use_inst, srcIndex, new_src);
 
         vscVIR_AddNewUsageToDef(VSC_PH_Peephole_GetDUInfo(ph),
             merged_inst,
             use_inst,
-            new_src,
+            VIR_Inst_GetSource(use_inst, srcIndex),
             gcvFALSE,
             merged_inst_dst_info.u1.virRegInfo.virReg,
             1,
@@ -4680,6 +4669,7 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
                     merged_inst_dst,
                     new_dst,
                     merged_inst->enable);
+                VIR_Function_FreeOperand(func, new_dst);
 
                 vscVIR_AddNewDef(VSC_PH_Peephole_GetDUInfo(ph),
                     merged_inst->inst,
@@ -4792,169 +4782,6 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
     return errCode;
 }
 
-static gctBOOL _VSC_PH_EvaluateChecking(
-    VIR_Shader      *pShader,
-    VIR_Instruction *inst,
-    gctBOOL         *checkingResult)
-{
-    VIR_Operand     *src0, *src1;
-    VIR_TypeId      src0Type, src1Type;
-    VIR_OperandInfo  src0Info, src1Info;
-
-    src0 = VIR_Inst_GetSource(inst, 0);
-    src1 = VIR_Inst_GetSource(inst, 1);
-
-    src0Type = VIR_Operand_GetType(src0);
-    src1Type = VIR_Operand_GetType(src1);
-
-    VIR_Operand_GetOperandInfo(inst, src0, &src0Info);
-    VIR_Operand_GetOperandInfo(inst, src1, &src1Info);
-
-    gcmASSERT(src0Info.isImmVal && src1Info.isImmVal);
-
-    if (src0Type == VIR_TYPE_FLOAT32 ||
-        src1Type == VIR_TYPE_FLOAT32)
-    {
-        float f0, f1;
-
-        if (src0Type == VIR_TYPE_FLOAT32)
-        {
-            f0 = src0Info.u1.immValue.fValue;
-        }
-        else if (src0Type == VIR_TYPE_INT32)
-        {
-            f0 = (gctFLOAT)(src0Info.u1.immValue.iValue);
-        }
-        else
-        {
-            return gcvFALSE;
-        }
-
-        if (src1Type == VIR_TYPE_FLOAT32)
-        {
-            f1 = src1Info.u1.immValue.fValue;
-        }
-        else if (src1Type == VIR_TYPE_INT32)
-        {
-            f1 = (gctFLOAT) src1Info.u1.immValue.iValue;
-        }
-        else
-        {
-            /* Error. */
-            return gcvFALSE;
-        }
-
-        switch (VIR_Inst_GetConditionOp(inst))
-        {
-        case VIR_COP_ALWAYS:
-            /* Error. */ return gcvFALSE;
-        case VIR_COP_NOT_EQUAL:
-            *checkingResult = (f0 != f1); break;
-        case VIR_COP_LESS_OR_EQUAL:
-            *checkingResult = (f0 <= f1); break;
-        case VIR_COP_LESS:
-            *checkingResult = (f0 < f1); break;
-        case VIR_COP_EQUAL:
-            *checkingResult = (f0 == f1); break;
-        case VIR_COP_GREATER:
-            *checkingResult = (f0 > f1); break;
-        case VIR_COP_GREATER_OR_EQUAL:
-            *checkingResult = (f0 >= f1); break;
-        case VIR_COP_AND:
-        case VIR_COP_OR:
-        case VIR_COP_XOR:
-            /* TODO - Error. */
-            return gcvFALSE;
-        case VIR_COP_NOT_ZERO:
-            *checkingResult = (f0 != 0.0f); break;
-        default:
-            return gcvFALSE;
-        }
-    }
-    else
-    {
-        gctUINT32 value0 = src0Info.u1.immValue.uValue;
-        gctUINT32 value1 = src1Info.u1.immValue.uValue;
-
-        gctINT32 i0 = src0Info.u1.immValue.iValue;
-        gctINT32 i1 = src1Info.u1.immValue.iValue;
-
-        switch (VIR_Inst_GetConditionOp(inst))
-        {
-        case VIR_COP_ALWAYS:
-            /* Error. */ return gcvFALSE;
-        case VIR_COP_NOT_EQUAL:
-            *checkingResult = (value0 != value1); break;
-        case VIR_COP_LESS_OR_EQUAL:
-            if ((src0Type == VIR_TYPE_INT32 ||
-                 src0Type == VIR_TYPE_INT16) &&
-                (src1Type == VIR_TYPE_INT32 ||
-                 src1Type == VIR_TYPE_INT16))
-            {
-                *checkingResult = (i0 <= i1);
-            }
-            else
-            {
-                *checkingResult = (value0 <= value1);
-            }
-            break;
-        case VIR_COP_LESS:
-            if ((src0Type == VIR_TYPE_INT32 ||
-                 src0Type == VIR_TYPE_INT16) &&
-                (src1Type == VIR_TYPE_INT32 ||
-                 src1Type == VIR_TYPE_INT16))
-            {
-                *checkingResult = (i0 < i1);
-            }
-            else
-            {
-                *checkingResult = (value0 < value1);
-            }
-            break;
-        case VIR_COP_EQUAL:
-            *checkingResult = (value0 == value1); break;
-        case VIR_COP_GREATER:
-            if ((src0Type == VIR_TYPE_INT32 ||
-                 src0Type == VIR_TYPE_INT16) &&
-                (src1Type == VIR_TYPE_INT32 ||
-                 src1Type == VIR_TYPE_INT16))
-            {
-                *checkingResult = (i0 > i1);
-            }
-            else
-            {
-                *checkingResult = (value0 > value1);
-            }
-            break;
-        case VIR_COP_GREATER_OR_EQUAL:
-            if ((src0Type == VIR_TYPE_INT32 ||
-                 src0Type == VIR_TYPE_INT16) &&
-                (src1Type == VIR_TYPE_INT32 ||
-                 src1Type == VIR_TYPE_INT16))
-            {
-                *checkingResult = (i0 >= i1);
-            }
-            else
-            {
-                *checkingResult = (value0 >= value1);
-            }
-            break;
-        case VIR_COP_AND:
-            *checkingResult = (value0 & value1); break;
-        case VIR_COP_OR:
-            *checkingResult = (value0 | value1); break;
-        case VIR_COP_XOR:
-            *checkingResult = (value0 ^ value1); break;
-        case VIR_COP_NOT_ZERO:
-            *checkingResult = (value0 != 0); break;
-        default:
-            return gcvFALSE;
-        }
-    }
-
-    return gcvTRUE;
-}
-
 static gctBOOL
 _VSC_PH_SrcFromUniqueLDARR(
     IN OUT VSC_PH_Peephole  *ph,
@@ -4985,14 +4812,14 @@ static VSC_ErrCode _VSC_PH_MoveDefCode(
     IN OUT VSC_PH_Peephole  *ph,
     IN VIR_Instruction      *inst,
     IN VIR_Operand          *inst_src,
-    IN VIR_Instruction      *defInst
+    IN VIR_Instruction      **defInst
     )
 {
     VSC_ErrCode         errCode  = VSC_ERR_NONE;
     VIR_Dumper          *dumper = VSC_PH_Peephole_GetDumper(ph);
     VSC_OPTN_PHOptions  *options = VSC_PH_Peephole_GetOptions(ph);
     gctBOOL             invalidCase = gcvFALSE;
-    VIR_Instruction     *nextDefInst = VIR_Inst_GetNext(defInst);
+    VIR_Instruction     *nextDefInst = VIR_Inst_GetNext(*defInst);
 
     if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MOV_DEF))
     {
@@ -5009,24 +4836,24 @@ static VSC_ErrCode _VSC_PH_MoveDefCode(
     /* if the defInst and inst is not next to each other, move defInst down */
     if (nextDefInst != inst)
     {
-        gcmASSERT(VIR_Inst_GetPrev(inst) != defInst);
+        gcmASSERT(VIR_Inst_GetPrev(inst) != *defInst);
 
         /* defInst and inst is at the same BB */
-        if(VIR_Inst_GetBasicBlock(defInst) == VIR_Inst_GetBasicBlock(inst))
+        if(VIR_Inst_GetBasicBlock(*defInst) == VIR_Inst_GetBasicBlock(inst))
         {
             /* there is no redefine of defInst'src in between */
-            VIR_Instruction *next = VIR_Inst_GetNext(defInst);
+            VIR_Instruction *next = VIR_Inst_GetNext(*defInst);
             VIR_SrcOperand_Iterator opndIter;
             VIR_Operand     *nextOpnd;
 
             while(next != inst)
             {
-                VIR_SrcOperand_Iterator_Init(defInst, &opndIter);
+                VIR_SrcOperand_Iterator_Init(*defInst, &opndIter);
                 nextOpnd = VIR_SrcOperand_Iterator_First(&opndIter);
 
                 for (; nextOpnd != gcvNULL; nextOpnd = VIR_SrcOperand_Iterator_Next(&opndIter))
                 {
-                    if(VIR_Operand_SameLocation(defInst, nextOpnd, next, VIR_Inst_GetDest(next)))
+                    if(VIR_Operand_SameLocation(*defInst, nextOpnd, next, VIR_Inst_GetDest(next)))
                     {
                         if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MOV_DEF))
                         {
@@ -5054,19 +4881,173 @@ static VSC_ErrCode _VSC_PH_MoveDefCode(
             if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MOV_DEF))
             {
                 VIR_LOG(dumper, "Move \n");
-                VIR_Inst_Dump(dumper, defInst);
+                VIR_Inst_Dump(dumper, *defInst);
                 VIR_LOG_FLUSH(dumper);
                 VIR_LOG(dumper, "close to \n");
                 VIR_Inst_Dump(dumper, inst);
                 VIR_LOG_FLUSH(dumper);
             }
 
-            VIR_Function_MoveInstructionBefore(VIR_Inst_GetFunction(defInst), inst, defInst);
+            /* If those two instructions are from the same function, we just move the instruction.
+            ** Otherwise we need to add a new instruction and copy the old one
+            */
+            if (VIR_Inst_GetFunction(*defInst) == VIR_Inst_GetFunction(inst))
+            {
+                VIR_Function_MoveInstructionBefore(VIR_Inst_GetFunction(*defInst), inst, *defInst);
+            }
+            else
+            {
+                VIR_Instruction *newInst = gcvNULL;
+
+                /* Add a new instruction. */
+                errCode = VIR_Function_AddInstructionBefore(VIR_Inst_GetFunction(inst),
+                                                            VIR_Inst_GetOpcode(*defInst),
+                                                            VIR_Inst_GetInstType(*defInst),
+                                                            inst,
+                                                            gcvTRUE,
+                                                            &newInst);
+                ON_ERROR(errCode, "Add instruction");
+
+                /* Copy the instruction. */
+                errCode = VIR_Inst_Copy(newInst, *defInst, gcvFALSE);
+                ON_ERROR(errCode, "Copy instruction");
+
+                /* Now we can remove this instruction. */
+                errCode = VIR_Function_RemoveInstruction(VIR_Inst_GetFunction(*defInst), *defInst);
+                ON_ERROR(errCode, "Remove instruction");
+
+                *defInst = newInst;
+            }
         }
     }
 
+OnError:
     return errCode;
 }
+
+static gctBOOL _VSC_PH_LocalVariable(
+    IN OUT VSC_PH_Peephole  *ph,
+    VIR_Instruction         *pInst,
+    VIR_Operand             *pOpnd,
+    IN OUT VSC_HASH_TABLE   *visitSet)
+{
+    VIR_Shader  *pShader = ph->shader;
+    VIR_DEF_USAGE_INFO* duInfo = VSC_PH_Peephole_GetDUInfo(ph);
+    VIR_Symbol  *sym = VIR_Operand_GetSymbol(pOpnd);
+
+    if (vscHTBL_DirectTestAndGet(visitSet, (void*) pOpnd, gcvNULL))
+    {
+        return gcvFALSE;
+    }
+
+    vscHTBL_DirectSet(visitSet, (void*) pOpnd, gcvNULL);
+
+    if (VIR_Symbol_isUniform(sym) &&
+        strcmp(VIR_Shader_GetSymNameString(pShader, sym), "#local_address") == 0)
+    {
+        return gcvTRUE;
+    }
+    else
+    {
+        VIR_GENERAL_UD_ITERATOR fromOperandUdIter;
+        VIR_DEF* defKey;
+        VIR_OperandInfo operandInfo;
+
+        VIR_Operand_GetOperandInfo(pInst, pOpnd, &operandInfo);
+        vscVIR_InitGeneralUdIterator(&fromOperandUdIter, duInfo, pInst, pOpnd, gcvFALSE, gcvFALSE);
+
+        for(defKey = vscVIR_GeneralUdIterator_First(&fromOperandUdIter); defKey != gcvNULL;
+            defKey = vscVIR_GeneralUdIterator_Next(&fromOperandUdIter))
+        {
+            VIR_Instruction* defInst = defKey->defKey.pDefInst;
+            gctUINT i;
+            if (defInst != VIR_INPUT_DEF_INST)
+            {
+                for (i = 0; i < VIR_Inst_GetSrcNum(defInst);i++)
+                {
+                    if (!VIR_Operand_isImm(VIR_Inst_GetSource(defInst, i)) &&
+                        _VSC_PH_LocalVariable(ph, defInst, VIR_Inst_GetSource(defInst, i), visitSet))
+                    {
+                        return gcvTRUE;
+                    }
+                }
+            }
+        }
+    }
+
+    return gcvFALSE;
+}
+
+static VSC_ErrCode _VSC_PH_LocalInst(
+    IN OUT VSC_PH_Peephole  *ph,
+    IN VIR_Instruction      *lsInst
+    )
+{
+    VSC_ErrCode         errCode  = VSC_ERR_NONE;
+    VIR_Operand         *baseOpnd = VIR_Inst_GetSource(lsInst, 0);
+    VIR_OpCode          opc = VIR_Inst_GetOpcode(lsInst);
+
+    VSC_HASH_TABLE  *visitSet = gcvNULL;
+
+    visitSet = vscHTBL_Create(ph->pMM, vscHFUNC_Default, vscHKCMP_Default, 512);
+
+    if (_VSC_PH_LocalVariable(ph, lsInst, baseOpnd, visitSet))
+    {
+        switch (opc)
+        {
+        case VIR_OP_LOAD:
+            VIR_Inst_SetOpcode(lsInst, VIR_OP_LOAD_L);
+            break;
+        case VIR_OP_STORE:
+            VIR_Inst_SetOpcode(lsInst, VIR_OP_STORE_L);
+            break;
+        case VIR_OP_ATOMADD:
+            VIR_Shader_SetFlag(ph->shader, VIR_SHFLAG_USE_LOCAL_MEM_ATOM);
+            VIR_Inst_SetOpcode(lsInst, VIR_OP_ATOMADD_L);
+            break;
+        case VIR_OP_ATOMSUB:
+            VIR_Shader_SetFlag(ph->shader, VIR_SHFLAG_USE_LOCAL_MEM_ATOM);
+            VIR_Inst_SetOpcode(lsInst, VIR_OP_ATOMSUB_L);
+            break;
+        case VIR_OP_ATOMCMPXCHG:
+            VIR_Shader_SetFlag(ph->shader, VIR_SHFLAG_USE_LOCAL_MEM_ATOM);
+            VIR_Inst_SetOpcode(lsInst, VIR_OP_ATOMCMPXCHG_L);
+            break;
+        case VIR_OP_ATOMMAX:
+            VIR_Shader_SetFlag(ph->shader, VIR_SHFLAG_USE_LOCAL_MEM_ATOM);
+            VIR_Inst_SetOpcode(lsInst, VIR_OP_ATOMMAX_L);
+            break;
+        case VIR_OP_ATOMMIN:
+            VIR_Shader_SetFlag(ph->shader, VIR_SHFLAG_USE_LOCAL_MEM_ATOM);
+            VIR_Inst_SetOpcode(lsInst, VIR_OP_ATOMMIN_L);
+            break;
+        case VIR_OP_ATOMOR:
+            VIR_Shader_SetFlag(ph->shader, VIR_SHFLAG_USE_LOCAL_MEM_ATOM);
+            VIR_Inst_SetOpcode(lsInst, VIR_OP_ATOMOR_L);
+            break;
+        case VIR_OP_ATOMAND:
+            VIR_Shader_SetFlag(ph->shader, VIR_SHFLAG_USE_LOCAL_MEM_ATOM);
+            VIR_Inst_SetOpcode(lsInst, VIR_OP_ATOMAND_L);
+            break;
+        case VIR_OP_ATOMXOR:
+            VIR_Shader_SetFlag(ph->shader, VIR_SHFLAG_USE_LOCAL_MEM_ATOM);
+            VIR_Inst_SetOpcode(lsInst, VIR_OP_ATOMXOR_L);
+            break;
+        case VIR_OP_ATOMXCHG:
+            VIR_Shader_SetFlag(ph->shader, VIR_SHFLAG_USE_LOCAL_MEM_ATOM);
+            VIR_Inst_SetOpcode(lsInst, VIR_OP_ATOMXCHG_L);
+            break;
+        default:
+            gcmASSERT(gcvFALSE);
+            break;
+        }
+    }
+
+    vscHTBL_Destroy(visitSet);
+
+    return errCode;
+}
+
 static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
     IN OUT VSC_PH_Peephole* ph
     )
@@ -5265,81 +5246,70 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
         while(inst && BB_GET_END_INST(bb) && inst != VIR_Inst_GetNext(BB_GET_END_INST(bb)))
         {
             VIR_OpCode opc;
-            VIR_OperandInfo  src0Info, src1Info;
-            gctBOOL     checkingResult;
+            gctBOOL checkingResult;
 
             opc = VIR_Inst_GetOpcode(inst);
-            if (opc == VIR_OP_JMPC || opc == VIR_OP_CMOV)
+            if (opc == VIR_OP_JMPC || opc == VIR_OP_JMP_ANY || opc == VIR_OP_CMOV)
             {
-                VIR_Operand_GetOperandInfo(inst,
-                    VIR_Inst_GetSource(inst, 0),
-                    &src0Info);
-                VIR_Operand_GetOperandInfo(inst,
-                    VIR_Inst_GetSource(inst, 1),
-                    &src1Info);
-
-                if (src0Info.isImmVal && src1Info.isImmVal)
+                if (VIR_Evaluate_JMPC_Condition(VSC_PH_Peephole_GetShader(ph), inst, &checkingResult))
                 {
-                    if (_VSC_PH_EvaluateChecking(VSC_PH_Peephole_GetShader(ph), inst, &checkingResult))
+                    if (VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options),
+                        VSC_OPTN_PHOptions_TRACE_RUC))
                     {
-                        if (VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options),
-                            VSC_OPTN_PHOptions_TRACE_RUC))
-                        {
-                            VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
-                            VIR_LOG(dumper, "\nInstruction\n");
-                            VIR_Inst_Dump(dumper, inst);
-                            VIR_LOG_FLUSH(dumper);
-                        }
+                        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+                        VIR_LOG(dumper, "\nInstruction\n");
+                        VIR_Inst_Dump(dumper, inst);
+                        VIR_LOG_FLUSH(dumper);
+                    }
 
-                        if (opc == VIR_OP_JMPC)
+                    if (opc == VIR_OP_JMPC || opc == VIR_OP_JMP_ANY)
+                    {
+                        if (checkingResult)
                         {
-                            if (checkingResult)
-                            {
-                                 /* change instruction to jmp*/
-                                VIR_Inst_SetOpcode(inst, VIR_OP_JMP);
-                                VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
-                                VIR_Inst_SetSrcNum(inst, 0);
-                            }
-                            else
-                            {
-                                /*change instruction to nop*/
-                                VIR_Inst_SetOpcode(inst, VIR_OP_NOP);
-                                VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
-                                VIR_Inst_SetSrcNum(inst, 0);
-                                VIR_Inst_SetDest(inst, gcvNULL);
-                            }
+                                /* change instruction to jmp*/
+                            VIR_Inst_SetOpcode(inst, VIR_OP_JMP);
+                            VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+                            VIR_Inst_SetSrcNum(inst, 0);
                         }
                         else
                         {
-                            if (checkingResult)
-                            {
-                                 /* change instruction to MOV*/
-                                VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
-                                VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
-                                VIR_Inst_SetSource(inst, 0, VIR_Inst_GetSource(inst, 2));
-                                VIR_Inst_SetSrcNum(inst, 1);
-                            }
-                            else
-                            {
-                                /*change instruction to nop*/
-                                VIR_Inst_SetOpcode(inst, VIR_OP_NOP);
-                                VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
-                                VIR_Inst_SetSrcNum(inst, 0);
-                                VIR_Inst_SetDest(inst, gcvNULL);
-                            }
+                            /*change instruction to nop*/
+                            VIR_Inst_SetOpcode(inst, VIR_OP_NOP);
+                            VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+                            VIR_Inst_SetSrcNum(inst, 0);
+                            VIR_Inst_SetDest(inst, gcvNULL);
                         }
-
-                        if (VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options),
-                            VSC_OPTN_PHOptions_TRACE_RUC))
-                        {
-                            VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
-                            VIR_LOG(dumper, "==>change to\n");
-                            VIR_Inst_Dump(dumper, inst);
-                            VIR_LOG_FLUSH(dumper);
-                        }
-
-                         VSC_PH_Peephole_SetCfgChanged(ph, gcvTRUE);
                     }
+                    else
+                    {
+                        if (checkingResult)
+                        {
+                                /* change instruction to MOV*/
+                            VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
+                            VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+                            VIR_Inst_SetSource(inst, 0, VIR_Inst_GetSource(inst, 2));
+                            VIR_Inst_SetSrcNum(inst, 1);
+                        }
+                        else
+                        {
+                            /*change instruction to nop*/
+                            VIR_Inst_SetOpcode(inst, VIR_OP_NOP);
+                            VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+                            VIR_Inst_SetSrcNum(inst, 0);
+                            VIR_Inst_SetDest(inst, gcvNULL);
+                        }
+                    }
+
+                    if (VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options),
+                        VSC_OPTN_PHOptions_TRACE_RUC))
+                    {
+                        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+                        VIR_LOG(dumper, "==>change to\n");
+                        VIR_Inst_Dump(dumper, inst);
+                        VIR_LOG_FLUSH(dumper);
+                    }
+
+                        VSC_PH_Peephole_SetCfgChanged(ph, gcvTRUE);
                 }
             }
             inst = VIR_Inst_GetNext(inst);
@@ -5376,7 +5346,7 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
         {
             VIR_OpCode opc;
             VIR_Operand *srcOpnd = gcvNULL;
-            VIR_Instruction *defInst = gcvNULL, *defDefInst = gcvNULL;
+            VIR_Instruction *defInst = gcvNULL, *origDefInst = gcvNULL, *defDefInst = gcvNULL;
 
             opc = VIR_Inst_GetOpcode(inst);
             if (VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetOPTS(options), VSC_OPTN_PHOptions_OPTS_MOV_ATOM) &&
@@ -5387,20 +5357,21 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                 if (vscVIR_DoesUsageInstHaveUniqueDefInst(VSC_PH_Peephole_GetDUInfo(ph), inst, srcOpnd, gcvFALSE, &defInst) &&
                     vscVIR_IsUniqueUsageInstOfDefInst(VSC_PH_Peephole_GetDUInfo(ph), defInst, inst, gcvNULL, gcvFALSE, gcvNULL, gcvNULL, gcvNULL))
                 {
-                    _VSC_PH_MoveDefCode(ph, inst, srcOpnd, defInst);
+                    _VSC_PH_MoveDefCode(ph, inst, srcOpnd, &defInst);
                 }
             }
 
             if (VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetOPTS(options), VSC_OPTN_PHOptions_OPTS_MOV_LDARR) &&
                 _VSC_PH_SrcFromUniqueLDARR(ph, inst, &srcOpnd, &defInst))
             {
-                _VSC_PH_MoveDefCode(ph, inst, srcOpnd, defInst);
+                origDefInst = defInst;
+                _VSC_PH_MoveDefCode(ph, inst, srcOpnd, &defInst);
 
-                srcOpnd = VIR_Inst_GetSource(defInst, 1);
-                if (vscVIR_DoesUsageInstHaveUniqueDefInst(VSC_PH_Peephole_GetDUInfo(ph), defInst, srcOpnd, gcvFALSE, &defDefInst) &&
-                    vscVIR_IsUniqueUsageInstOfDefInst(VSC_PH_Peephole_GetDUInfo(ph), defDefInst, defInst, gcvNULL, gcvFALSE, gcvNULL, gcvNULL, gcvNULL))
+                srcOpnd = VIR_Inst_GetSource(origDefInst, 1);
+                if (vscVIR_DoesUsageInstHaveUniqueDefInst(VSC_PH_Peephole_GetDUInfo(ph), origDefInst, srcOpnd, gcvFALSE, &defDefInst) &&
+                    vscVIR_IsUniqueUsageInstOfDefInst(VSC_PH_Peephole_GetDUInfo(ph), defDefInst, origDefInst, gcvNULL, gcvFALSE, gcvNULL, gcvNULL, gcvNULL))
                 {
-                    _VSC_PH_MoveDefCode(ph, defInst, srcOpnd, defDefInst);
+                    _VSC_PH_MoveDefCode(ph, defInst, srcOpnd, &defDefInst);
                 }
             }
 
@@ -5412,6 +5383,38 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
             VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
             VIR_LOG(dumper, "%s\npeephole MOV DEF OPT ended\n%s\n", VSC_TRACE_SHARP_LINE, VSC_TRACE_SHARP_LINE);
             VIR_LOG_FLUSH(dumper);
+        }
+    }
+
+    /* change the load into load_L, if the number of threads can still make the
+       max local group size requirement
+    */
+    if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetOPTS(options), VSC_OPTN_PHOptions_OPTS_LOC_MEM) &&
+       VIR_Shader_IsCL(ph->shader) &&
+       ph->hwCfg->maxLocalMemSizeInByte > 0)
+    {
+        VIR_Shader      *pShader = ph->shader;
+        VIR_Function    *mainFunc = VIR_Shader_GetCurrentKernelFunction(pShader);
+        gctUINT localMemorySize = mainFunc->kernelInfo->localMemorySize;
+        if (localMemorySize > 0)
+        {
+            inst = BB_GET_START_INST(bb);
+            while(inst != VIR_Inst_GetNext(BB_GET_END_INST(bb)))
+            {
+                VIR_OpCode opc;
+
+                opc = VIR_Inst_GetOpcode(inst);
+                if (opc == VIR_OP_LOAD ||
+                    opc == VIR_OP_STORE ||
+                    VIR_OPCODE_isAtom(opc))
+                {
+                    _VSC_PH_LocalInst(ph, inst);
+                }
+
+                inst = VIR_Inst_GetNext(inst);
+            }
+
+            VIR_Shader_SetFlag(pShader, VIR_SHFLAG_USE_LOCAL_MEM);
         }
     }
 
@@ -5427,7 +5430,7 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
     return errCode;
 }
 
-VSC_ErrCode VSC_PH_Peephole_PerformOnFunction(
+static VSC_ErrCode VSC_PH_Peephole_PerformOnFunction(
     IN OUT VSC_PH_Peephole* ph
     )
 {
@@ -5531,21 +5534,31 @@ VSC_ErrCode VSC_PH_Peephole_PerformOnFunction(
     return errCode;
 }
 
+DEF_QUERY_PASS_PROP(VSC_PH_Peephole_PerformOnShader)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_PH;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+}
+
 VSC_ErrCode VSC_PH_Peephole_PerformOnShader(
-    IN OUT VSC_PH_Peephole* ph
+    VSC_SH_PASS_WORKER* pPassWorker
     )
 {
     VSC_ErrCode errcode  = VSC_ERR_NONE;
-    VIR_Shader* shader = VSC_PH_Peephole_GetShader(ph);
+    VIR_Shader* shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
     VIR_FuncIterator func_iter;
     VIR_FunctionNode* func_node;
-    VSC_OPTN_PHOptions* options = VSC_PH_Peephole_GetOptions(ph);
+    VSC_OPTN_PHOptions* options = (VSC_OPTN_PHOptions*)pPassWorker->basePassWorker.pBaseOption;
+    VSC_PH_Peephole ph;
 
     if(!VSC_OPTN_InRange(VIR_Shader_GetId(shader), VSC_OPTN_PHOptions_GetBeforeShader(options), VSC_OPTN_PHOptions_GetAfterShader(options)))
     {
         if(VSC_OPTN_PHOptions_GetTrace(options))
         {
-            VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+            VIR_Dumper* dumper = pPassWorker->basePassWorker.pDumper;
             VIR_LOG(dumper, "Peephole skips shader(%d)\n", VIR_Shader_GetId(shader));
             VIR_LOG_FLUSH(dumper);
         }
@@ -5555,26 +5568,14 @@ VSC_ErrCode VSC_PH_Peephole_PerformOnShader(
     {
         if(VSC_OPTN_PHOptions_GetTrace(options))
         {
-            VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+            VIR_Dumper* dumper = pPassWorker->basePassWorker.pDumper;
             VIR_LOG(dumper, "Peephole starts for shader(%d)\n", VIR_Shader_GetId(shader));
             VIR_LOG_FLUSH(dumper);
         }
     }
 
-    if (!ENABLE_FULL_NEW_LINKER)
-    {
-        /* too large shader, don't do PH */
-        if (VIR_Shader_GetVirRegCount(shader) > VSC_PH_MAX_TEMP)
-        {
-            if(VSC_OPTN_PHOptions_GetTrace(options))
-            {
-                VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
-                VIR_LOG(dumper, "Peephole skips shader(%d)\n", VIR_Shader_GetId(shader));
-                VIR_LOG_FLUSH(dumper);
-            }
-            return errcode;
-        }
-    }
+    VSC_PH_Peephole_Init(&ph, shader, pPassWorker->pDuInfo, &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
+                         options, pPassWorker->basePassWorker.pDumper, pPassWorker->basePassWorker.pMM);
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(shader));
     for(func_node = VIR_FuncIterator_First(&func_iter);
@@ -5583,20 +5584,24 @@ VSC_ErrCode VSC_PH_Peephole_PerformOnShader(
         VIR_Function* func = func_node->function;
 
         VIR_Shader_SetCurrentFunction(shader, func);
-        errcode = VSC_PH_Peephole_PerformOnFunction(ph);
+        errcode = VSC_PH_Peephole_PerformOnFunction(&ph);
         if(errcode)
         {
             break;
         }
     }
 
+    pPassWorker->pResDestroyReq->s.bInvalidateCfg = VSC_PH_Peephole_GetCfgChanged(&ph);
+
+    VSC_PH_Peephole_Final(&ph);
+
     if(VSC_OPTN_PHOptions_GetTrace(options))
     {
-        VIR_Dumper* dumper = VSC_PH_Peephole_GetDumper(ph);
+        VIR_Dumper* dumper = pPassWorker->basePassWorker.pDumper;
         VIR_LOG(dumper, "Peephole ends for shader(%d)\n", VIR_Shader_GetId(shader));
         VIR_LOG_FLUSH(dumper);
     }
-    if (gcSHADER_DumpCodeGenVerbose(shader))
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(shader), VIR_Shader_GetId(shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "After Peephole.", shader, gcvTRUE);
     }

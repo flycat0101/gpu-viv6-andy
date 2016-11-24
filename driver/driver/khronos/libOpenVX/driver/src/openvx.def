@@ -16,12 +16,12 @@ VERSION 1.0
 EXPORTS
 ; Framework API
 ;    vxAccessArrayRange
-;    vxAccessConvolutionCoefficients
+;    vxReadConvolutionCoefficients
 ;    vxAccessDistribution
 ;    vxAccessImagePatch
 ;    vxAccessLUT
-;    vxAccessMatrix
-;    vxAccessScalarValue
+;    vxReadMatrix
+;    vxReadScalarValue
 ;    vxAddArrayItems
 ;    vxAddKernel
 ;    vxAddLogEntry
@@ -32,12 +32,12 @@ EXPORTS
 ;    vxAssignNodeCallback
 ;    vxAssociateDelayWithNode
 ;    vxCommitArrayRange
-;    vxCommitConvolutionCoefficients
+;    vxWriteConvolutionCoefficients
 ;    vxCommitDistribution
 ;    vxCommitImagePatch
 ;    vxCommitLUT
-;    vxCommitMatrix
-;    vxCommitScalarValue
+;    vxWriteMatrix
+;    vxWriteScalarValue
 ;    vxComputeImagePatchSize
 ;    vxCreateArray
 ;    vxCreateContext

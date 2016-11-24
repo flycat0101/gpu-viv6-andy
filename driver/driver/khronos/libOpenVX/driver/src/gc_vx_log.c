@@ -13,7 +13,7 @@
 
 #include <gc_vx_common.h>
 
-VX_PUBLIC_API void vxRegisterLogCallback(vx_context context, vx_log_callback_f callback, vx_bool reentrant)
+VX_API_ENTRY void  VX_API_CALL vxRegisterLogCallback(vx_context context, vx_log_callback_f callback, vx_bool reentrant)
 {
     if (!vxoContext_IsValid(context)) return;
 
@@ -56,7 +56,7 @@ VX_PUBLIC_API void vxRegisterLogCallback(vx_context context, vx_log_callback_f c
     vxReleaseMutex(context->base.lock);
 }
 
-VX_PUBLIC_API void vxAddLogEntry(vx_reference ref, vx_status status, const char *message, ...)
+VX_API_ENTRY void  VX_API_CALL vxAddLogEntry(vx_reference ref, vx_status status, const char *message, ...)
 {
     vx_context context;
     va_list argList;
@@ -107,4 +107,5 @@ VX_PUBLIC_API void vxAddLogEntry(vx_reference ref, vx_status status, const char 
 
     return;
 }
+
 

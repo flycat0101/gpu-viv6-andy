@@ -34,9 +34,10 @@ vx_status _gcfVX_AddSubOpration(vx_node node, gceVX_KERNEL kernel, vx_image in0,
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
-    vxAccessScalarValue(policy_param, &overflow_policy);
+    vxReadScalarValue(policy_param, &overflow_policy);
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, in0, GC_VX_INDEX_AUTO);
@@ -54,7 +55,9 @@ vx_status _gcfVX_AddSubOpration(vx_node node, gceVX_KERNEL kernel, vx_image in0,
 
     kernelContext->params.evisNoInst       = node->base.context->evisNoInst;
 
-    vxCommitScalarValue(policy_param, &overflow_policy);
+    vxWriteScalarValue(policy_param, &overflow_policy);
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -78,3 +81,4 @@ vx_status vxSubtraction(vx_node node, vx_image in0, vx_image in1, vx_scalar poli
 {
     return _gcfVX_AddSubOpration(node, gcvVX_KERNEL_SUBTRACT, in0, in1, policy_param, output);
 }
+

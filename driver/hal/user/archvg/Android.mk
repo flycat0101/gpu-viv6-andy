@@ -21,6 +21,9 @@ LOCAL_SRC_FILES := \
     gc_hal_user_hardware_vg.c \
     gc_hal_user_hardware_vg_software.c
 
+LOCAL_GENERATED_SOURCES := \
+    $(VG_AQREG)
+
 LOCAL_CFLAGS := \
     $(CFLAGS) \
 	-Wno-unused-function \
@@ -32,9 +35,6 @@ LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/os/linux/user \
     $(AQVGARCH)/cmodel/inc \
     $(AQROOT)/compiler/libVSC/include
-
-LOCAL_GENERATED_SOURCES += \
-    $(VG_AQREG)
 
 LOCAL_MODULE         := libhalarchuser_vg
 LOCAL_MODULE_TAGS    := optional

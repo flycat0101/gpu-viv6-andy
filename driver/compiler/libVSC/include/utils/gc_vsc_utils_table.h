@@ -63,6 +63,7 @@ BEGIN_EXTERN_C()
 #define BT_AUTO_HASH(pBT)                      (((pBT)->flag & VSC_BLOCK_TABLE_FLAG_AUTO_HASH) != 0)
 #define BT_HAS_FREELIST(pBT)                   (((pBT)->flag & VSC_BLOCK_TABLE_FLAG_FREE_ENTRY_LIST) != 0)
 #define BT_IS_FUNCTION_SCOPE(pBT)              (((pBT)->flag & VSC_BLOCK_TABLE_FLAG_FUNCTION_SCOPE) != 0)
+#define BT_FREELIST_USE_PTR(pBT)               (((pBT)->flag & VSC_BLOCK_TABLE_FLAG_FREE_ENTRY_USE_PTR) != 0)
 
 typedef enum _VSC_BLOCK_TABLE_FLAG
 {
@@ -70,15 +71,25 @@ typedef enum _VSC_BLOCK_TABLE_FLAG
     VSC_BLOCK_TABLE_FLAG_HASH_ENTRIES        = 0x02,
     VSC_BLOCK_TABLE_FLAG_AUTO_HASH           = 0x04,
     VSC_BLOCK_TABLE_FLAG_FUNCTION_SCOPE      = 0x08,
+    VSC_BLOCK_TABLE_FLAG_FREE_ENTRY_USE_PTR  = 0x10,
 } VSC_BLOCK_TABLE_FLAG;
 
 typedef gctUINT8* VSC_BT_BLOCK_PTR;
-typedef struct _VSC_BT_FREE_ENTRY VSC_BT_FREE_ENTRY;
 
-struct _VSC_BT_FREE_ENTRY
+typedef union _VSC_BT_FREE_ENTRY
 {
-    VSC_BT_FREE_ENTRY* pNextEntry;   /* points to next free entry */
-};
+    gctUINT            nextFreeEntryId;     /* Next free entry id */
+    void *             nextFreeEntryPtr;    /* ptr to next free entry */
+}VSC_BT_FREE_ENTRY;
+
+/* Get free-entry from entry, it might be located anywhere inside of entry based on
+   user's designation in this function. This callback is introduced because some of
+   users might need re-access some of data in free'ed entry, and user hopes use this
+   function to ask BT not to touch any data outside of VSC_BT_FREE_ENTRY area. But
+   it is unelegant (BT-inside free list management is exposed to user) and unsafe (
+   the erea that user hopes to be untouched can be still be modified by BT accidently
+   or dynamically)!!!! We should remove this later!!! */
+typedef VSC_BT_FREE_ENTRY* (*PFN_VSC_GET_FREE_ENTRY)(void* pEntry);
 
 typedef struct _VSC_BLOCK_TABLE
 {
@@ -110,7 +121,10 @@ typedef struct _VSC_BLOCK_TABLE
        entry. Note that it is only used when VSC_BLOCK_TABLE_FLAG_FIXED_ENTRY_SIZE is set. Also
        note that only entry whose entrySize is GE pointer size (normally 4 bytes) can be put
        in free list */
-    VSC_BT_FREE_ENTRY*        pFreeEntryList;
+    VSC_BT_FREE_ENTRY         firstFreeEntry;
+
+    /* User specified get-free-entry callback */
+    PFN_VSC_GET_FREE_ENTRY    pfnGetFreeEntry;
 
     /* What type of MM are this block table built on? */
     VSC_MM*                   pMM;
@@ -123,6 +137,7 @@ VSC_BLOCK_TABLE* vscBT_Create(
     gctUINT                 entrySize,
     gctUINT                 blockSize,
     gctUINT                 initBlockCount,
+    PFN_VSC_GET_FREE_ENTRY  pfnGetFreeEntry,
     PFN_VSC_HASH_FUNC       pfnHashFunc,
     PFN_VSC_KEY_CMP         pfnKeyCmp,
     gctINT                  hashTableSize);
@@ -134,6 +149,7 @@ void vscBT_Initialize(
     gctUINT                 entrySize,
     gctUINT                 blockSize,
     gctUINT                 initBlockCount,
+    PFN_VSC_GET_FREE_ENTRY  pfnGetFreeEntry,
     PFN_VSC_HASH_FUNC       pfnHashFunc,
     PFN_VSC_KEY_CMP         pfnKeyCmp,
     gctINT                  hashTableSize);
@@ -142,19 +158,33 @@ void vscBT_Finalize(VSC_BLOCK_TABLE* pBT);
 void vscBT_Destroy(VSC_BLOCK_TABLE* pBT);
 
 /* Operations */
-/* get a new empty entry (set to 0) in block table and return the id of the entry */
+
+/* Get a new empty entry (initialize whole enty to 0) in block table and return
+   the id of the entry */
 gctUINT vscBT_NewEntry(VSC_BLOCK_TABLE* pBT);
-/* add pData to the block table and return the id of the entry,
-   if pData is empty, same as newEntry */
+/* return a new entry pointer the table */
+void * vscBT_NewEntryPtr(VSC_BLOCK_TABLE* pBT);
+
+/* Add pData to the block table and return the id of the entry, if pData is empty,
+   same as newEntry */
 gctUINT vscBT_AddEntry(VSC_BLOCK_TABLE* pBT, void* pData);
+
 gctUINT vscBT_AddContinuousEntries(VSC_BLOCK_TABLE* pBT, void* pData, gctUINT entryCount);
 void* vscBT_RemoveEntry(VSC_BLOCK_TABLE* pBT, gctUINT entryId);
+void vscBT_RemoveEntryPtr(VSC_BLOCK_TABLE* pBT, void * entryPtr);
 void vscBT_AddToHash(VSC_BLOCK_TABLE* pBT, gctUINT entryId, void* pHashKey);
 gctUINT vscBT_HashSearch(VSC_BLOCK_TABLE* pBT, void* pHashKey);
 gctUINT vscBT_RemoveFromHash(VSC_BLOCK_TABLE* pBT, void* pHashKey);
-/* find the key in hash table, if found return the id of the key, otherwise
- * enter the key to hash table and return the id */
+VSC_ErrCode vscBT_ResizeBlockArray(VSC_BLOCK_TABLE* pBT, gctUINT newBlockCount, gctBOOL bPreAllocBlock);
+
+/* Try to find an entry based on key, if found, just return, otherwise, add a new
+   entry for the key */
 gctUINT vscBT_Find(VSC_BLOCK_TABLE* pBT, void* pHashKey);
+
+/* Clone a BT */
+VSC_ErrCode vscBT_Copy(VSC_BLOCK_TABLE* pDstBT, VSC_BLOCK_TABLE* pSrcBT);
+
+gctUINT vscBT_GetUsedSize(VSC_BLOCK_TABLE* pBT);
 
 END_EXTERN_C()
 

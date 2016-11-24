@@ -49,7 +49,8 @@ LOCAL_SRC_FILES += \
     gc_hal_user_mem.c \
     gc_hal_user_bufobj.c \
     gc_hal_user_statistics.c \
-    gc_hal_user_shader.c
+    gc_hal_user_shader.c \
+    gc_hal_user_resource.c
 
 ifeq ($(USE_OPENCL),1)
 LOCAL_SRC_FILES += \

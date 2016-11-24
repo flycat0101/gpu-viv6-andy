@@ -12,9 +12,16 @@
 
 
 /*********************************************************************************
-   Following definitions are ONLY used for openGL(ES) to communicate with client
-   query/binding request. NOTE that ONLY active parts are collected into each high
-   level table.
+   Following definitions are ONLY used for openGL(ES)/Vulkan to communicate with
+   client query/binding request from program. NOTE that
+   1. For openGL(ES), ONLY active parts are collected into each high level table.
+      In this case, every table entry has a member pointing to HW resource in SEP.
+   2. For Vulkan, all (whatever it's active or not, whatever the original shaders
+      use or not) must be collected into each high level table as Vulkan's pipeline
+      layout needs all resources in it be allocated into HW resources to avoid driver
+      re-flushing when pipeline is switched. In this case, entry of each table wont
+      point to HW resource in SEP as there might be no such HW resource in SEP which
+      only record info that shader uses.
 **********************************************************************************/
 
 #ifndef __gc_vsc_drvi_program_profile_h_
@@ -22,80 +29,90 @@
 
 BEGIN_EXTERN_C()
 
-typedef enum _SHADER_DATA_TYPE
+typedef enum _PEP_CLIENT
 {
-    SHADER_DATA_TYPE_UNKONW    = 0,
+    PEP_CLIENT_UNKNOWN                = 0,
+    PEP_CLIENT_GL                     = 1,
+    PEP_CLIENT_VK                     = 2,
 }
-SHADER_DATA_TYPE;
+PEP_CLIENT;
 
-typedef enum _SHADER_DATA_PRECISION
+typedef enum _GL_DATA_PRECISION
 {
-    SHADER_DATA_PRECISION_DEFAULT  = 0,
-    SHADER_DATA_PRECISION_HIGH     = 1,
-    SHADER_DATA_PRECISION_MEDIUM   = 2,
-    SHADER_DATA_PRECISION_LOW      = 3,
+    GL_DATA_PRECISION_DEFAULT         = 0,
+    GL_DATA_PRECISION_HIGH            = 1,
+    GL_DATA_PRECISION_MEDIUM          = 2,
+    GL_DATA_PRECISION_LOW             = 3,
 }
-SHADER_DATA_PRECISION;
+GL_DATA_PRECISION;
 
-typedef enum _FX_BUFFERING_MODE
+typedef enum GL_MATRIX_MAJOR
 {
-    FX_BUFFERING_MODE_INTERLEAVED  = 0,
-    FX_BUFFERING_MODE_SEPARATED    = 1,
+    GL_MATRIX_MAJOR_ROW               = 0,
+    GL_MATRIX_MAJOR_COLUMN            = 1,
 }
-FX_BUFFERING_MODE;
+GL_MATRIX_MAJOR;
 
-typedef enum MATRIX_MAJOR
+typedef enum _GL_FX_BUFFERING_MODE
 {
-    MATRIX_MAJOR_ROW                    = 0,
-    MATRIX_MAJOR_COLUMN                 = 1,
+    GL_FX_BUFFERING_MODE_INTERLEAVED  = 0,
+    GL_FX_BUFFERING_MODE_SEPARATED    = 1,
 }
-MATRIX_MAJOR;
+GL_FX_BUFFERING_MODE;
 
-typedef enum SL_UNIFORM_USAGE
+typedef enum GL_FX_STREAMING_MODE
+{
+    GL_FX_STREAMING_MODE_FFU          = 0,
+    GL_FX_STREAMING_MODE_SHADER       = 1,
+}
+GL_FX_STREAMING_MODE;
+
+typedef enum GL_FRAGOUT_USAGE
+{
+    GL_FRAGOUT_USAGE_USER_DEFINED     = 0,
+    GL_FRAGOUT_USAGE_FRAGCOLOR        = 1,
+    GL_FRAGOUT_USAGE_FRAGDATA         = 2,
+}
+GL_FRAGOUT_USAGE;
+
+typedef enum GL_UNIFORM_USAGE
 {
     /* All user defined uniforms will get this type */
-    SL_UNIFORM_USAGE_USER_DEFINED       = 0,
+    GL_UNIFORM_USAGE_USER_DEFINED     = 0,
 
     /* Built-in uniforms */
-    SL_UNIFORM_USAGE_DEPTHRANGE_NEAR    = 1,
-    SL_UNIFORM_USAGE_DEPTHRANGE_FAR     = 2,
-    SL_UNIFORM_USAGE_DEPTHRANGE_DIFF    = 3,
-    SL_UNIFORM_USAGE_HEIGHT             = 4,
+    GL_UNIFORM_USAGE_DEPTHRANGE_NEAR  = 1,
+    GL_UNIFORM_USAGE_DEPTHRANGE_FAR   = 2,
+    GL_UNIFORM_USAGE_DEPTHRANGE_DIFF  = 3,
+    GL_UNIFORM_USAGE_HEIGHT           = 4,
 }
-SL_UNIFORM_USAGE;
+GL_UNIFORM_USAGE;
 
-typedef enum SL_FRAGOUT_USAGE
-{
-    SL_FRAGOUT_USAGE_USER_DEFINED       = 0,
-    SL_FRAGOUT_USAGE_FRAGCOLOR          = 1,
-    SL_FRAGOUT_USAGE_FRAGDATA           = 2,
-}
-SL_FRAGOUT_USAGE;
 
-typedef enum SL_FX_STREAMING_MODE
-{
-    SL_FX_STREAMING_MODE_FFU            = 0,
-    SL_FX_STREAMING_MODE_SHADER         = 1,
-}
-SL_FX_STREAMING_MODE;
+/**********************************************************************************************************************
+ **********************************     Common program mapping table definitions     **********************************
+ **********************************************************************************************************************/
 
 /* Attribute table definition
 
-   1. glGetActiveAttrib works on boundary of SL_ATTRIBUTE_TABLE_ENTRY which currently does not support
-      array. It even must work when glLinkProgram failed.
-   2. glGetAttribLocation and other location related functions work on boundary of SHADER_IO_REG_MAPPING,
-      i.e, it must be on vec4 boundary.
+   For GL(ES),
+       1. glGetActiveAttrib works on boundary of PROG_ATTRIBUTE_TABLE_ENTRY which currently does not support
+          array. It even must work when glLinkProgram failed.
+       2. glGetAttribLocation and other location related functions work on boundary of SHADER_IO_REG_MAPPING,
+          i.e, it must be on vec4 boundary.
+   For Vulkan, no API query, just driver will use to do binding
 */
 
-typedef struct SL_ATTRIBUTE_TABLE_ENTRY
+typedef struct PROG_ATTRIBUTE_TABLE_ENTRY
 {
-    SHADER_DATA_TYPE                            type;
+    VSC_SHADER_DATA_TYPE                        type;
     gctCONST_STRING                             name;
 
-    /* Decl'ed array size by GLSL, this time, it must be 1 */
+    /* Decl'ed array size by GLSL, at this time, it must be 1 */
     gctSIZE_T                                   arraySize;
 
-    /* Index based on countOfEntries in SL_ATTRIBUTE_TABLE. It is corresponding to active attribute index */
+    /* Index based on countOfEntries in PROG_ATTRIBUTE_TABLE. It is corresponding to active attribute
+       index */
     gctUINT                                     attribEntryIndex;
 
     /* Points to HW IO mapping that VS SEP maintains. Compiler MUST assure ioRegMappings are squeezed
@@ -113,33 +130,84 @@ typedef struct SL_ATTRIBUTE_TABLE_ENTRY
     gctUINT*                                    pLocation;
 
     /* How many vec4 'type' can group? For component count of type LT vec4, regarding it as vec4 */
-    gctUINT                                     vec4BasedSize;
+    gctUINT                                     vec4BasedCount;
 
-    /* To vec4BasedSize vec4 that expanded from type, which are really used by VS */
+    /* To vec4BasedCount vec4 that expanded from type, which are really used by VS */
     gctUINT                                     activeVec4Mask;
 }
-SL_ATTRIBUTE_TABLE_ENTRY;
+PROG_ATTRIBUTE_TABLE_ENTRY;
 
-typedef struct SL_ATTRIBUTE_TABLE
+typedef struct PROG_ATTRIBUTE_TABLE
 {
     /* Entries for active attributes of VS */
-    SL_ATTRIBUTE_TABLE_ENTRY*                   pAttribEntries;
+    PROG_ATTRIBUTE_TABLE_ENTRY*                 pAttribEntries;
     gctUINT                                     countOfEntries;
 
     /* For query with ACTIVE_ATTRIBUTE_MAX_LENGTH */
     gctUINT                                     maxLengthOfName;
 }
-SL_ATTRIBUTE_TABLE;
+PROG_ATTRIBUTE_TABLE;
+
+/* Fragment-output table definition
+
+   For GL(ES),
+       1. No API works on boundary of PROG_FRAGOUT_TABLE_ENTRY.
+       2. glGetFragDataLocation works on boundary of SHADER_IO_REG_MAPPING, i.e, it must be on vec4 boundary.
+   For Vulkan, no API query, just driver will use to do binding
+*/
+
+typedef struct PROG_FRAGOUT_TABLE_ENTRY
+{
+    VSC_SHADER_DATA_TYPE                        type;
+    gctCONST_STRING                             name;
+
+    /* Specially for built-in ones */
+    GL_FRAGOUT_USAGE                            usage;
+
+    /* Index based on countOfEntries in PROG_FRAGOUT_TABLE. */
+    gctUINT                                     fragOutEntryIndex;
+
+    /* Points to HW IO mapping that PS SEP maintains. Compiler MUST assure ioRegMappings are squeezed
+       together for all active vec4 that activeVec4Mask are masked. So driver just needs go through
+       activeVec4Mask to program partial of type to HW when programing PE/ps output related registers */
+    SHADER_IO_REG_MAPPING*                      pIoRegMapping;
+
+    /* Shader can have 'layout(location = ?)' qualifier, if so, just use it. Otherwise, we should allocate
+       it then. Each ioRegMapping has a corresponding location. */
+    gctUINT*                                    pLocation;
+
+    /* How many vec4 'type' can group? For component count of type LT vec4, regarding it as vec4. Since
+       frag output variable can only be scalar or vector, so it actually is the array size GLSL decl'ed */
+    gctUINT                                     vec4BasedCount;
+
+    /* To vec4BasedCount vec4 that expanded from type, which are really used by PS */
+    gctUINT                                     activeVec4Mask;
+}
+PROG_FRAGOUT_TABLE_ENTRY;
+
+typedef struct PROG_FRAGOUT_TABLE
+{
+    /* Entries for active fragment color of fragment shader */
+    PROG_FRAGOUT_TABLE_ENTRY*                   pFragOutEntries;
+    gctUINT                                     countOfEntries;
+}
+PROG_FRAGOUT_TABLE;
+
+
+/**********************************************************************************************************************
+ **********************************       GL program mapping table definitions       **********************************
+ **********************************************************************************************************************/
 
 /* Uniform (default uniform-block) table definition
 
-   1. glGetActiveUniform works on boundary of SL_UNIFORM_TABLE_ENTRY which does not support struct,
-      and the least supported data layout is array. It even must work when glLinkProgram failed.
+   1. glGetActiveUniform works on boundary of PROG_GL_UNIFORM_TABLE_ENTRY which does not support
+      struct, and the least supported data layout is array. It even must work when glLinkProgram
+      failed.
    2. glGetUniformLocation and other location related functions work on boundary of element of
       scalar/vec/matrix/sampler array, i.e, single scalar/vec/matrix/sampler boundary.
 */
 
-typedef struct SL_UNIFORM_HW_SUB_MAPPING
+typedef struct PROG_GL_UNIFORM_HW_SUB_MAPPING
 {
     /* We have 2 choices here
 
@@ -179,24 +247,27 @@ typedef struct SL_UNIFORM_HW_SUB_MAPPING
         SHADER_SAMPLER_SLOT_MAPPING*            pSamplerMapping;
     } hwMapping;
 }
-SL_UNIFORM_HW_SUB_MAPPING;
+PROG_GL_UNIFORM_HW_SUB_MAPPING;
 
-typedef struct SL_UNIFORM_HW_MAPPING
+typedef struct PROG_GL_UNIFORM_HW_MAPPING
 {
-    /* From spec, when mapping to mem, it looks individual uniform of named uniform block can not be separated
-       into several active sections due to there is no API let user set part of uniform data, so as long as any
-       part of such uniform is used, compiler must deem all data of uniform is used. In such case, pHWSubMappings
-       maps whole of uniform to HW resource, and countOfHWSubMappings must be 1 */
-    SL_UNIFORM_HW_SUB_MAPPING*                  pHWSubMappings;
+    /* For following two cases, pHWSubMappings maps whole of uniform to HW resource, and countOfHWSubMappings
+       must be 1.
+
+       a. For GL, when mapping to mem, it looks individual uniform of named uniform block can not be separated
+          into several active sections due to there is no API let user set part of uniform data, so as long as
+          any part of such uniform is used, compiler must deem all data of uniform is used.
+       b. For Vulkan, to support pipeline layout compability, we also must deem all data of uniform is used. */
+    PROG_GL_UNIFORM_HW_SUB_MAPPING*             pHWSubMappings;
     gctUINT                                     countOfHWSubMappings;
 }
-SL_UNIFORM_HW_MAPPING;
+PROG_GL_UNIFORM_HW_MAPPING;
 
-typedef struct SL_UNIFORM_COMMON_ENTRY
+typedef struct PROG_GL_UNIFORM_COMMON_ENTRY
 {
-    SHADER_DATA_TYPE                            type;
+    VSC_SHADER_DATA_TYPE                        type;
     gctCONST_STRING                             name;
-    SHADER_DATA_PRECISION                       precision;
+    GL_DATA_PRECISION                           precision;
 
     /* Decl'ed array size by GLSL */
     gctSIZE_T                                   arraySize;
@@ -209,28 +280,28 @@ typedef struct SL_UNIFORM_COMMON_ENTRY
     gctUINT                                     uniformEntryIndex;
 
     /* Different shader stage may have different HW mappings. */
-    SL_UNIFORM_HW_MAPPING                       hwMappings[SHADER_TYPE_GL_SUPPORTED_COUNT];
+    PROG_GL_UNIFORM_HW_MAPPING                  hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
 }
-SL_UNIFORM_COMMON_ENTRY;
+PROG_GL_UNIFORM_COMMON_ENTRY;
 
-typedef struct SL_UNIFORM_TABLE_ENTRY
+typedef struct PROG_GL_UNIFORM_TABLE_ENTRY
 {
-    SL_UNIFORM_COMMON_ENTRY                     common;
+    PROG_GL_UNIFORM_COMMON_ENTRY                common;
 
     /* Specially for built-in ones */
-    SL_UNIFORM_USAGE                            usage;
+    GL_UNIFORM_USAGE                            usage;
 
     /* First location index of this uniform, the last location for this uniform is
-       locationBase + (activeArraySize of SL_UNIFORM_COMMON_ENTRY) - 1 */
+       locationBase + (activeArraySize of GL_UNIFORM_COMMON_ENTRY) - 1 */
     gctUINT                                     locationBase;
 }
-SL_UNIFORM_TABLE_ENTRY;
+PROG_GL_UNIFORM_TABLE_ENTRY;
 
-typedef struct SL_UNIFORM_TABLE
+typedef struct PROG_GL_UNIFORM_TABLE
 {
     /* Entries for active uniforms in default uniform block of whole program. They are
        arranged into 3 chunks in order (sampler + builtin + user-defined) */
-    SL_UNIFORM_TABLE_ENTRY*                     pUniformEntries;
+    PROG_GL_UNIFORM_TABLE_ENTRY*                pUniformEntries;
     gctUINT                                     countOfEntries;
     gctUINT                                     firstBuiltinUniformEntryIndex;
     gctUINT                                     firstUserUniformEntryIndex;
@@ -238,122 +309,79 @@ typedef struct SL_UNIFORM_TABLE
     /* For query with ACTIVE_UNIFORM_MAX_LENGTH */
     gctUINT                                     maxLengthOfName;
 }
-SL_UNIFORM_TABLE;
+PROG_GL_UNIFORM_TABLE;
 
 /* Uniform-block (named uniform-block, pure constants, can't be samplers) table definition
 
    1. glGetActiveUniformBlockiv and other uniform block index related functions work on boundary of
-      SL_UNIFORMBLOCK_TABLE_ENTRY (uniform group).
-   2. glGetActiveUniform works on boundary of SL_UNIFORMBLOCK_UNIFORM_ENTRY which does not support
+      PROG_GL_UNIFORMBLOCK_TABLE_ENTRY (uniform group).
+   2. glGetActiveUniform works on boundary of PROG_GL_UNIFORMBLOCK_UNIFORM_ENTRY which does not support
       struct, and the least supported data layout is array. It even must work when glLinkProgram failed.
    3. Uniforms of uniform-block have no location concept.
 */
 
-typedef struct SL_UNIFORMBLOCK_UNIFORM_ENTRY
+typedef struct PROG_GL_UNIFORMBLOCK_UNIFORM_ENTRY
 {
-    SL_UNIFORM_COMMON_ENTRY                     common;
+    PROG_GL_UNIFORM_COMMON_ENTRY                common;
 
     /* Layout info for individual uniform of uniform block */
     gctSIZE_T                                   offset;
     gctSIZE_T                                   arrayStride;
     gctSIZE_T                                   matrixStride;
-    MATRIX_MAJOR                                matrixMajor;
+    GL_MATRIX_MAJOR                             matrixMajor;
 }
-SL_UNIFORMBLOCK_UNIFORM_ENTRY;
+PROG_GL_UNIFORMBLOCK_UNIFORM_ENTRY;
 
-typedef struct SL_UNIFORMBLOCK_TABLE_ENTRY
+typedef struct PROG_GL_UNIFORMBLOCK_TABLE_ENTRY
 {
-    SL_UNIFORMBLOCK_UNIFORM_ENTRY*              pUniformEntries;
+    PROG_GL_UNIFORMBLOCK_UNIFORM_ENTRY*         pUniformEntries;
     gctUINT                                     countOfEntries;
 
     /* Each includes copy of uniformEntryIndex of 'common' of pUniformEntries. Whole list is for
        query with UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES */
     gctUINT*                                    pUniformIndices;
 
-    /* Index based on countOfEntries in SL_UNIFORMBLOCK_TABLE. It is corresponding to active uniform
+    /* Index based on countOfEntries in PROG_GL_UNIFORMBLOCK_TABLE. It is corresponding to active uniform
        block index */
     gctUINT                                     ubEntryIndex;
 
     /* How many byte size does storage store this uniform block in minimum? */
     gctUINT                                     dataSizeInByte;
 
-    /* If true, there must be something in hwMappings in SL_UNIFORM_COMMON_ENTRY */
-    gctBOOL                                     bRefedByShader[SHADER_TYPE_GL_SUPPORTED_COUNT];
+    /* If true, there must be something in hwMappings in PROG_GL_UNIFORM_COMMON_ENTRY */
+    gctBOOL                                     bRefedByShader[VSC_MAX_SHADER_STAGE_COUNT];
 }
-SL_UNIFORMBLOCK_TABLE_ENTRY;
+PROG_GL_UNIFORMBLOCK_TABLE_ENTRY;
 
-typedef struct SL_UNIFORMBLOCK_TABLE
+typedef struct PROG_GL_UNIFORMBLOCK_TABLE
 {
     /* Entries for active uniform blocks of whole program */
-    SL_UNIFORMBLOCK_TABLE_ENTRY*                pUniformBlockEntries;
+    PROG_GL_UNIFORMBLOCK_TABLE_ENTRY*           pUniformBlockEntries;
     gctUINT                                     countOfEntries;
 
     /* For query with ACTIVE_UNIFORM_BLOCK_MAX_NAME_LENGTH */
     gctUINT                                     maxLengthOfName;
 }
-SL_UNIFORMBLOCK_TABLE;
-
-/* Fragment-output table definition
-
-   1. No API works on boundary of SL_FRAGOUT_TABLE_ENTRY.
-   2. glGetFragDataLocation works on boundary of SHADER_IO_REG_MAPPING, i.e, it must be on vec4 boundary.
-*/
-
-typedef struct SL_FRAGOUT_TABLE_ENTRY
-{
-    SHADER_DATA_TYPE                            type;
-    gctCONST_STRING                             name;
-
-    /* Specially for built-in ones */
-    SL_FRAGOUT_USAGE                            usage;
-
-    /* Index based on countOfEntries in SL_FRAGOUT_TABLE. */
-    gctUINT                                     fragOutEntryIndex;
-
-    /* Points to HW IO mapping that PS SEP maintains. Compiler MUST assure ioRegMappings are squeezed
-       together for all active vec4 that activeVec4Mask are masked. So driver just needs go through
-       activeVec4Mask to program partial of type to HW when programing PE/ps output related registers */
-    SHADER_IO_REG_MAPPING*                      pIoRegMapping;
-
-    /* Shader can have 'layout(location = ?)' qualifier, if so, just use it. Otherwise, we should allocate
-       it then. Each ioRegMapping has a corresponding location. */
-    gctUINT*                                    pLocation;
-
-    /* How many vec4 'type' can group? For component count of type LT vec4, regarding it as vec4. Since
-       frag output variable can only be scalar or vector, so it actually is the array size GLSL decl'ed */
-    gctUINT                                     vec4BasedSize;
-
-    /* To vec4BasedSize vec4 that expanded from type, which are really used by PS */
-    gctUINT                                     activeVec4Mask;
-}
-SL_FRAGOUT_TABLE_ENTRY;
-
-typedef struct SL_FRAGOUT_TABLE
-{
-    /* Entries for active fragment color of fragment shader */
-    SL_FRAGOUT_TABLE_ENTRY*                     pFragOutEntries;
-    gctUINT                                     countOfEntries;
-}
-SL_FRAGOUT_TABLE;
+PROG_GL_UNIFORMBLOCK_TABLE;
 
 /* Transform feedback table definition
 
-   glTransformFeedbackVaryings and glGetTransformFeedbackVarying work on boundary of SL_TRANSFORM_FEEDBACK_OUT_TABLE_ENTRY.
+   glTransformFeedbackVaryings and glGetTransformFeedbackVarying work on boundary of PROG_GL_XFB_OUT_TABLE_ENTRY.
 */
 
-typedef struct SL_TRANSFORM_FEEDBACK_OUT_TABLE_ENTRY
+typedef struct PROG_GL_XFB_OUT_TABLE_ENTRY
 {
-    SHADER_DATA_TYPE                            type;
+    VSC_SHADER_DATA_TYPE                        type;
     gctCONST_STRING                             name;
 
     /* Decl'ed array size by GLSL */
     gctSIZE_T                                   arraySize;
 
-    /* Index based on countOfEntries in SL_TRANSFORM_FEEDBACK_OUT_TABLE. */
+    /* Index based on countOfEntries in PROG_GL_XFB_OUT_TABLE. */
     gctUINT                                     fxOutEntryIndex;
 
     /* Data streamming-2-memory mode, by fixed function unit or shader? */
-    SL_FX_STREAMING_MODE                        fxStreamingMode;
+    GL_FX_STREAMING_MODE                        fxStreamingMode;
 
     union
     {
@@ -376,9 +404,9 @@ typedef struct SL_TRANSFORM_FEEDBACK_OUT_TABLE_ENTRY
             SHADER_IO_REG_MAPPING*              pIoRegMapping;
 
             /* How many vec4 'type' can group? For component count of type LT vec4, regarding it as vec4 */
-            gctUINT                             vec4BasedSize;
+            gctUINT                             vec4BasedCount;
 
-            /* To vec4BasedSize vec4 that expanded from type, which are really written by VS */
+            /* To vec4BasedCount vec4 that expanded from type, which are really written by VS */
             gctUINT                             activeVec4Mask;
         } s;
 
@@ -386,37 +414,508 @@ typedef struct SL_TRANSFORM_FEEDBACK_OUT_TABLE_ENTRY
         SHADER_UAV_SLOT_MAPPING*                pSoBufferMapping;
     } u;
 }
-SL_TRANSFORM_FEEDBACK_OUT_TABLE_ENTRY;
+PROG_GL_XFB_OUT_TABLE_ENTRY;
 
-typedef struct SL_TRANSFORM_FEEDBACK_OUT_TABLE
+typedef struct PROG_GL_XFB_OUT_TABLE
 {
     /* Entries for active transform feedback varyings. pFxOutEntries must be in-orderly corresponding to
        param 'varyings' of glTransformFeedbackVaryings, and countOfEntries is also corresponding to param
        'count' of that API */
-    SL_TRANSFORM_FEEDBACK_OUT_TABLE_ENTRY*      pFxOutEntries;
+    PROG_GL_XFB_OUT_TABLE_ENTRY*                pFxOutEntries;
     gctUINT                                     countOfEntries;
 
     /* To control how to serialize to buffer */
-    FX_BUFFERING_MODE                           mode;
+    GL_FX_BUFFERING_MODE                        mode;
 
     /* For query with TRANSFORM_FEEDBACK_VARYING_MAX_LENGTH */
     gctUINT                                     maxLengthOfName;
 }
-SL_TRANSFORM_FEEDBACK_OUT_TABLE;
+PROG_GL_XFB_OUT_TABLE;
+
+
+/**********************************************************************************************************************
+ **********************************        VK program mapping table definitions       *********************************
+ **********************************************************************************************************************/
+
+typedef struct PROG_VK_SUB_RESOURCE_BINDING
+{
+    /* Pointer to original API resource binding */
+    VSC_SHADER_RESOURCE_BINDING*                pResBinding;
+
+    /* Start array index in original pResBinding::arraySize */
+    gctUINT                                     startIdxOfSubArray;
+
+    /* Size of sub array size*/
+    gctUINT                                     subArraySize;
+}
+PROG_VK_SUB_RESOURCE_BINDING;
+
+typedef struct PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING
+{
+    /* Index based on countOfArray in PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING_POOL. */
+    gctUINT                                     pctsHmEntryIndex;
+
+    /* For sub-array-size m of sampler, and sub-array-size n of tex, if
+       bSamplerMajor is true, the hw sampler will be organized as
+              ((t0, t1, t2...tn), (t0, t1, t2...tn), ...),
+       otherwise it will be organized as
+              ((s0, s1, s2...sm), (s0, s1, s2...sm), ...) */
+    gctBOOL                                     bSamplerMajor;
+
+    /* Texture and sampler part for this private combined tex-sampler */
+    PROG_VK_SUB_RESOURCE_BINDING                texSubBinding;
+    PROG_VK_SUB_RESOURCE_BINDING                samplerSubBinding;
+
+    /* HW sampler slot mapping */
+    SHADER_SAMPLER_SLOT_MAPPING*                pSamplerSlotMapping;
+
+    /* The array size is ((sub-array-size m of sampler) * (sub-array-size n of tex)) */
+    SHADER_PRIV_SAMPLER_ENTRY**                 ppExtraSamplerArray;
+}
+PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING;
+
+typedef struct PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING_POOL
+{
+    PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING*      pPrivCombTsHwMappingArray;
+    gctUINT                                     countOfArray;
+}
+PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING_POOL, PROG_VK_PRIV_CTS_HW_MAPPING_POOL;
+
+typedef struct PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING_LIST
+{
+    /* The entry index (which is indexed to array pPrivCombTsHwMappingArray of
+       PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING_POOL) array */
+    gctUINT*                                    pPctsHmEntryIdxArray;
+
+    gctUINT                                     arraySize;
+}PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING_LIST;
+
+/* Combined texture sampler table definition
+
+   Must support following resource types
+   VSC_SHADER_RESOURCE_TYPE_COMBINED_IMAGE_SAMPLER
+*/
+
+typedef struct PROG_VK_COMBINED_TEXTURE_SAMPLER_HW_MAPPING
+{
+    /* For the case
+       1. HW natively supports separated sampler, so sampler part of API combined texture
+          sampler will be directly mapped to HW separated sampler
+       2. HW does not natively support separated sampler, so API combined texture sampler
+          is directly mapped to HW combined sampler */
+    SHADER_SAMPLER_SLOT_MAPPING                 samplerMapping;
+
+    /* For the case that HW does not natively support separated sampler. The array size is
+       combTsBinding::arraySize */
+    SHADER_PRIV_SAMPLER_ENTRY**                 ppExtraSamplerArray;
+
+    /* For the case that HW natively supports separated texture, so texture part of API
+       combined texture sampler will be directly mapped to HW separated texture */
+    SHADER_RESOURCE_SLOT_MAPPING                texMapping;
+
+    /* For the case that API combined texture sampler is combined to with other
+       API sampler/texture (HW does not natively support separated sampler) */
+    PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING_LIST  samplerHwMappingList;
+    PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING_LIST  texHwMappingList;
+}PROG_VK_COMBINED_TEXTURE_SAMPLER_HW_MAPPING;
+
+typedef struct PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY
+{
+    /* API resource binding */
+    VSC_SHADER_RESOURCE_BINDING                 combTsBinding;
+
+    /* Index based on countOfEntries in PROG_VK_COMBINED_TEXTURE_SAMPLER_TABLE. */
+    gctUINT                                     combTsEntryIndex;
+
+    /* Which shader stages access this entry */
+    VSC_SHADER_STAGE_BIT                        stageBits;
+
+    /* Is this entry really used by shader */
+    gctUINT                                     activeStageMask;
+
+    /* For texel buffer, it might need a texture-size attached. As each texel buffer in
+       combTsBinding::arraySize array has texture-size, so this is the first entry
+       of texture-size array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pTextureSize[VSC_MAX_SHADER_STAGE_COUNT];
+
+    /* For texel buffer, it might need a lodMinMax attached. As each texel buffer in
+       combTsBinding::arraySize array has lodMinMax, so this is the first entry
+       of lodMinMax array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pLodMinMax[VSC_MAX_SHADER_STAGE_COUNT];
+
+    /* For texel buffer, it might need a levelsSamples attached. As each texel buffer in
+       combTsBinding::arraySize array has levelsSamples, so this is the first entry
+       of lodMinMax array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pLevelsSamples[VSC_MAX_SHADER_STAGE_COUNT];
+
+    /* Which kinds of inst operation acting on sampler (texture part). The count of
+       this resOpBit is same as combTsBinding::arraySize */
+    VSC_RES_OP_BIT*                             pResOpBits;
+
+    /* Different shader stage may have different HW mappings. */
+    PROG_VK_COMBINED_TEXTURE_SAMPLER_HW_MAPPING hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
+}
+PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY;
+
+typedef struct PROG_VK_COMBINED_TEXTURE_SAMPLER_TABLE
+{
+    PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY*   pCombTsEntries;
+    gctUINT                                     countOfEntries;
+}
+PROG_VK_COMBINED_TEXTURE_SAMPLER_TABLE;
+
+/* Separated-sampler table definition
+
+   Must support following resource types
+   VSC_SHADER_RESOURCE_TYPE_SAMPLER
+*/
+
+typedef union PROG_VK_SEPARATED_SAMPLER_HW_MAPPING
+{
+    /* For HW natively supports separated sampler */
+    SHADER_SAMPLER_SLOT_MAPPING                 samplerMapping;
+
+    /* For HW does not natively supports separated sampler */
+    PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING_LIST  samplerHwMappingList;
+}
+PROG_VK_SEPARATED_SAMPLER_HW_MAPPING;
+
+typedef struct PROG_VK_SEPARATED_SAMPLER_TABLE_ENTRY
+{
+    /* API resource binding */
+    VSC_SHADER_RESOURCE_BINDING                 samplerBinding;
+
+    /* Index based on countOfEntries in PROG_VK_SEPARATED_SAMPLER_TABLE. */
+    gctUINT                                     samplerEntryIndex;
+
+    /* Which shader stages access this entry */
+    VSC_SHADER_STAGE_BIT                        stageBits;
+
+    /* Is this entry really used by shader */
+    gctUINT                                     activeStageMask;
+
+    /* Which kinds of inst operation acting on sampler. The count of this
+       resOpBit is same as samplerBinding::arraySize */
+    VSC_RES_OP_BIT*                             pResOpBits;
+
+    /* Whether to use hw mapping list in hwMappings. TRUE only under HW
+       does not natively supports separated sampler */
+    gctBOOL                                     bUsingHwMppingList;
+
+    /* Different shader stage may have different HW mappings. */
+    PROG_VK_SEPARATED_SAMPLER_HW_MAPPING        hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
+}
+PROG_VK_SEPARATED_SAMPLER_TABLE_ENTRY;
+
+typedef struct PROG_VK_SEPARATED_SAMPLER_TABLE
+{
+    PROG_VK_SEPARATED_SAMPLER_TABLE_ENTRY*      pSamplerEntries;
+    gctUINT                                     countOfEntries;
+}
+PROG_VK_SEPARATED_SAMPLER_TABLE;
+
+/* Separated-texture table definition
+
+   Must support following resource types if HW supports separated texture
+   VSC_SHADER_RESOURCE_TYPE_SAMPLED_IMAGE
+*/
+
+typedef union PROG_VK_SEPARATED_TEXTURE_HW_MAPPING
+{
+    /* For HW natively supports separated texture */
+    SHADER_RESOURCE_SLOT_MAPPING                texMapping;
+
+    /* For HW does not natively supports separated texture */
+    PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING_LIST  texHwMappingList;
+}
+PROG_VK_SEPARATED_TEXTURE_HW_MAPPING;
+
+typedef struct PROG_VK_SEPARATED_TEXTURE_TABLE_ENTRY
+{
+    /* API resource binding */
+    VSC_SHADER_RESOURCE_BINDING                 texBinding;
+
+    /* Index based on countOfEntries in PROG_VK_SEPARATED_TEXTURE_TABLE. */
+    gctUINT                                     textureEntryIndex;
+
+    /* Which shader stages access this entry */
+    VSC_SHADER_STAGE_BIT                        stageBits;
+
+    /* Is this entry really used by shader */
+    gctUINT                                     activeStageMask;
+
+    /* Which kinds of inst operation acting on texture. The count of this
+       resOpBit is same as texBinding::arraySize */
+    VSC_RES_OP_BIT*                             pResOpBits;
+
+    /* Whether to use hw mapping list in hwMappings. TRUE only under HW
+       does not natively supports separated texture */
+    gctBOOL                                     bUsingHwMppingList;
+
+    /* Different shader stage may have different HW mappings. */
+    PROG_VK_SEPARATED_TEXTURE_HW_MAPPING        hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
+}
+PROG_VK_SEPARATED_TEXTURE_TABLE_ENTRY;
+
+typedef struct PROG_VK_SEPARATED_TEXTURE_TABLE
+{
+    PROG_VK_SEPARATED_TEXTURE_TABLE_ENTRY*      pTextureEntries;
+    gctUINT                                     countOfEntries;
+}
+PROG_VK_SEPARATED_TEXTURE_TABLE;
+
+/* Uniform texel buffer table definition
+
+   Must support following resource types
+   VSC_SHADER_RESOURCE_TYPE_UNIFORM_TEXEL_BUFFER
+*/
+
+typedef union PROG_VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING
+{
+    /* For HW natively supports separated texture */
+    SHADER_RESOURCE_SLOT_MAPPING                texMapping;
+
+    /* For HW does not natively supports separated texture */
+    struct
+    {
+        SHADER_SAMPLER_SLOT_MAPPING             samplerMapping;
+
+        /* The array size is utbBinding::arraySize */
+        SHADER_PRIV_SAMPLER_ENTRY**             ppExtraSamplerArray;
+    } s;
+}
+PROG_VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING;
+
+typedef struct PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY
+{
+    /* API resource binding */
+    VSC_SHADER_RESOURCE_BINDING                 utbBinding;
+
+    /* Index based on countOfEntries in PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE. */
+    gctUINT                                     utbEntryIndex;
+
+    /* Which shader stages access this entry */
+    VSC_SHADER_STAGE_BIT                        stageBits;
+
+    /* Is this entry really used by shader */
+    gctUINT                                     activeStageMask;
+
+    /* For texel buffer, it might need a texture-size attached. As each texel buffer in
+       utbBinding::arraySize array has texture-size, so this is the first entry
+       of texture-size array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pTextureSize[VSC_MAX_SHADER_STAGE_COUNT];
+
+    /* Which kinds of inst operation acting on texture. The count of this
+       resOpBit is same as utbBinding::arraySize */
+    VSC_RES_OP_BIT*                             pResOpBits;
+
+    /* Different shader stage may have different HW mappings. */
+    PROG_VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING     hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
+}
+PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY;
+
+typedef struct PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE
+{
+    PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE_ENTRY*    pUtbEntries;
+    gctUINT                                      countOfEntries;
+}
+PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE;
+
+/* Input attachment table definition
+
+   Must support following resource types
+   VSC_SHADER_RESOURCE_TYPE_INPUT_ATTACHMENT
+*/
+
+typedef union PROG_VK_INPUT_ATTACHMENT_HW_MAPPING
+{
+    SHADER_UAV_SLOT_MAPPING                     uavMapping;
+}
+PROG_VK_INPUT_ATTACHMENT_HW_MAPPING;
+
+typedef struct PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY
+{
+    /* API resource binding */
+    VSC_SHADER_RESOURCE_BINDING                 iaBinding;
+
+    /* Index based on countOfEntries in PROG_VK_INPUT_ATTACHMENT_TABLE. */
+    gctUINT                                     iaEntryIndex;
+
+    /* Which shader stages access this entry */
+    VSC_SHADER_STAGE_BIT                        stageBits;
+
+    /* Is this entry really used by shader */
+    gctUINT                                     activeStageMask;
+
+    /* Different shader stage may have different HW mappings. */
+    PROG_VK_INPUT_ATTACHMENT_HW_MAPPING         hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
+}
+PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY;
+
+typedef struct PROG_VK_INPUT_ATTACHMENT_TABLE
+{
+    PROG_VK_INPUT_ATTACHMENT_TABLE_ENTRY*        pIaEntries;
+    gctUINT                                      countOfEntries;
+}
+PROG_VK_INPUT_ATTACHMENT_TABLE;
+
+/* Storage table definition
+
+   Must support following resource types
+   VSC_SHADER_RESOURCE_TYPE_STORAGE_BUFFER
+   VSC_SHADER_RESOURCE_TYPE_STORAGE_IMAGE
+   VSC_SHADER_RESOURCE_TYPE_STORAGE_TEXEL_BUFFER
+   VSC_SHADER_RESOURCE_TYPE_STORAGE_BUFFER_DYNAMIC
+*/
+
+typedef struct PROG_VK_STORAGE_TABLE_ENTRY
+{
+    /* API resource binding */
+    VSC_SHADER_RESOURCE_BINDING                 storageBinding;
+
+    /* Index based on countOfEntries in PROG_VK_STORAGE_TABLE. */
+    gctUINT                                     storageEntryIndex;
+
+    /* Which shader stages access this entry */
+    VSC_SHADER_STAGE_BIT                        stageBits;
+
+    /* Is this entry really used by shader */
+    gctUINT                                     activeStageMask;
+
+    /* For image storage, it might need a image-size attached. As each image in
+       storageBinding::arraySize array has image-size, so this is the first entry
+       of image-size array. */
+    SHADER_PRIV_CONSTANT_ENTRY*                 pImageSize[VSC_MAX_SHADER_STAGE_COUNT];
+
+    /* Extra layer HW mapping. As currently, for images in in storageBinding::arraySize
+       array, if one image has extra image, all other images must have extra image, so
+       this is the first entry of extra-image */
+    SHADER_PRIV_UAV_ENTRY*                      pExtraLayer[VSC_MAX_SHADER_STAGE_COUNT];
+
+    /* Different shader stage may have different HW mappings. */
+    SHADER_UAV_SLOT_MAPPING                     hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
+}
+PROG_VK_STORAGE_TABLE_ENTRY;
+
+typedef struct PROG_VK_STORAGE_TABLE
+{
+    PROG_VK_STORAGE_TABLE_ENTRY*                pStorageEntries;
+    gctUINT                                     countOfEntries;
+}
+PROG_VK_STORAGE_TABLE;
+
+/* Uniform-buffer table definition
+
+   Must support following resource types
+   VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER
+   VSC_SHADER_RESOURCE_TYPE_UNIFORM_BUFFER_DYNAMIC
+*/
+
+typedef struct PROG_VK_UNIFORM_BUFFER_TABLE_ENTRY
+{
+    /* API resource binding */
+    VSC_SHADER_RESOURCE_BINDING                 ubBinding;
+
+    /* Index based on countOfEntries in PROG_VK_UNIFORM_BUFFER_TABLE. */
+    gctUINT                                     ubEntryIndex;
+
+    /* Which shader stages access this entry */
+    VSC_SHADER_STAGE_BIT                        stageBits;
+
+    /* Is this entry really used by shader */
+    gctUINT                                     activeStageMask;
+
+    /* Different shader stage may have different HW mappings. */
+    SHADER_CONSTANT_HW_LOCATION_MAPPING         hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
+}
+PROG_VK_UNIFORM_BUFFER_TABLE_ENTRY;
+
+typedef struct PROG_VK_UNIFORM_BUFFER_TABLE
+{
+    PROG_VK_UNIFORM_BUFFER_TABLE_ENTRY*         pUniformBufferEntries;
+    gctUINT                                     countOfEntries;
+}
+PROG_VK_UNIFORM_BUFFER_TABLE;
+
+/* Resource set */
+typedef struct PROG_VK_RESOURCE_SET
+{
+    /* This set only holds the entries with current set-NO in each resource table */
+
+    PROG_VK_COMBINED_TEXTURE_SAMPLER_TABLE      combinedSampTexTable;
+    PROG_VK_SEPARATED_SAMPLER_TABLE             separatedSamplerTable;
+    PROG_VK_SEPARATED_TEXTURE_TABLE             separatedTexTable;
+    PROG_VK_UNIFORM_TEXEL_BUFFER_TABLE          uniformTexBufTable;
+    PROG_VK_INPUT_ATTACHMENT_TABLE              inputAttachmentTable;
+    PROG_VK_STORAGE_TABLE                       storageTable;
+    PROG_VK_UNIFORM_BUFFER_TABLE                uniformBufferTable;
+}
+PROG_VK_RESOURCE_SET;
+
+/* Push-constant table definition */
+
+typedef struct PROG_VK_PUSH_CONSTANT_TABLE_ENTRY
+{
+    /* API push-constant range */
+    VSC_SHADER_PUSH_CONSTANT_RANGE              pushConstRange;
+
+    /* Which shader stages access this entry */
+    VSC_SHADER_STAGE_BIT                        stageBits;
+
+    /* Is this entry really used by shader */
+    gctUINT                                     activeStageMask;
+
+    /* Different shader stage may have different HW mappings. */
+    SHADER_CONSTANT_HW_LOCATION_MAPPING         hwMappings[VSC_MAX_SHADER_STAGE_COUNT];
+}
+PROG_VK_PUSH_CONSTANT_TABLE_ENTRY;
+
+typedef struct PROG_VK_PUSH_CONSTANT_TABLE
+{
+    PROG_VK_PUSH_CONSTANT_TABLE_ENTRY*          pPushConstantEntries;
+    gctUINT                                     countOfEntries;
+}
+PROG_VK_PUSH_CONSTANT_TABLE;
 
 /* Executable program profile definition. It is generated only when glLinkProgram or glProgramBinary
    calling. Each client program only has one profile like this. */
 typedef struct PROGRAM_EXECUTABLE_PROFILE
 {
-    /* The executable shaders that this program contains. */
-    SHADER_EXECUTABLE_PROFILE                   sep[VSC_MAX_SHADER_STAGE_COUNT];
+    PEP_CLIENT                                  pepClient;
 
-    /* High level mapping tables from high level variables to # */
-    SL_ATTRIBUTE_TABLE                          attribTable;
-    SL_UNIFORM_TABLE                            uniformTable;
-    SL_UNIFORMBLOCK_TABLE                       uniformBlockTable;
-    SL_FRAGOUT_TABLE                            fragOutTable;
-    SL_TRANSFORM_FEEDBACK_OUT_TABLE             fxOutTable;
+    /* The executable shaders that this program contains. */
+    SHADER_EXECUTABLE_PROFILE                   seps[VSC_MAX_SHADER_STAGE_COUNT];
+
+    /* I/O high level mapping tables (high level variable to #, pointing to entry of SEP) */
+    PROG_ATTRIBUTE_TABLE                        attribTable;
+    PROG_FRAGOUT_TABLE                          fragOutTable;
+
+    /* Other high level mapping tables */
+    union
+    {
+        /* GL client only. High level variable to #, pointing to entry of SEP */
+        struct
+        {
+            PROG_GL_UNIFORM_TABLE               uniformTable;
+            PROG_GL_UNIFORMBLOCK_TABLE          uniformBlockTable;
+            PROG_GL_XFB_OUT_TABLE               fxOutTable;
+        } gl;
+
+        /* Vulkan client only. High level binding to hw resource */
+        struct
+        {
+            PROG_VK_RESOURCE_SET*               pResourceSets;
+            gctUINT32                           resourceSetCount;
+
+            PROG_VK_PUSH_CONSTANT_TABLE         pushConstantTable;
+
+            /* It is not part of API resources, but for some HWs which does not support separated
+               texture/sampler, api texture/sampler need to be combined by ourselves, so we need
+               a separated private combined texture sampler table to maintain all pairs of api
+               texture/sampler which have a specific hw mapping */
+            PROG_VK_PRIV_CTS_HW_MAPPING_POOL    privateCombTsHwMappingPool;
+        } vk;
+    } u;
 }
 PROGRAM_EXECUTABLE_PROFILE;
 

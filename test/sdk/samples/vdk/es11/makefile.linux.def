@@ -63,22 +63,17 @@ CFLAGS += $(INCLUDE) -Wno-switch
 ifeq ($(gcdSTATIC_LINK), 1)
   LIBS += $(VIVANTE_SDK_LIB)/libVIVANTE.a
 else
-  ifeq ($(QNX), 1)
-    LIBS += -lVDK -lEGL -lGLESv1_CM -lm -lstdc++
-  else
-    LIBS += -L$(VIVANTE_SDK_LIB) -lVDK -lEGL -lGLESv1_CM
-  endif
+  LIBS += -L$(VIVANTE_SDK_LIB) -Wl,-rpath-link,$(VIVANTE_SDK_LIB) -lVDK -lEGL -lGLESv1_CM
 endif
 
-ifneq ($(QNX), 1)
-  LIBS += -lm -lpthread -ldl -lstdc++ -lrt
-  ifeq ($(EGL_API_DRI), 1)
-    LIBS += -L$(X11_ARM_DIR)/lib -lXdamage -lXfixes -lXext -lXau -lXdmcp -lX11
-  endif
-  ifeq ($(EGL_API_X), 1)
-    LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lX11
-  endif
-  ifeq ($(EGL_API_DFB), 1)
-    LIBS += -L$(DFB_DIR)/lib -ldirectfb -ldirect -lfusion
-  endif
+LIBS += -lm -lpthread -ldl -lstdc++ -lrt
+
+ifeq ($(EGL_API_DRI), 1)
+  LIBS += -Wl,-rpath-link,$(X11_ARM_DIR)/lib
+endif
+ifeq ($(EGL_API_X), 1)
+  LIBS += -Wl,-rpath-link,$(X11_ARM_DIR)/lib
+endif
+ifeq ($(EGL_API_DFB), 1)
+  LIBS += -Wl,-rpath-link,$(DFB_DIR)/lib
 endif

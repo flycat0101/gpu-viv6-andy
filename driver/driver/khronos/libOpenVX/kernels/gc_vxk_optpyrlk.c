@@ -20,7 +20,7 @@
 #define LKZERO16 { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }
 
 vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyramid, vx_pyramid gradXPyramid, vx_pyramid gradYPyramid,
-    const vx_array prevPts,  const vx_array estimatedPts, vx_array nextPts,
+    const vx_array prevPts, const vx_array estimatedPts, vx_array nextPts,
     vx_scalar criteriaScalar, vx_scalar epsilonScalar, vx_scalar numIterationsScalar, vx_bool isUseInitialEstimate, vx_scalar winSizeScalar,
     vx_int32 maxLevel, vx_float32 pyramidScaleValue
     )
@@ -37,6 +37,8 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
     vx_uint32 bin[16] = LKZERO16;
     vx_image *prevImg, *nextImg;
     vx_image *gradXImage, *gradYImage;
+    vx_int32 uniformNum = 0;
+    vx_int32 uniformIndex = 0;
 
     gcoVX_Kernel_Context * kernelContext = gcvNULL;
 
@@ -55,6 +57,7 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     prevImg = (vx_image*)vxAllocateAndZeroMemory(maxLevel * sizeof(vx_image));
@@ -73,9 +76,9 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
         vxQueryImage(prevImg[level-1], VX_IMAGE_ATTRIBUTE_WIDTH, &(width[level-1]), sizeof(width[level-1]));
         vxQueryImage(prevImg[level-1], VX_IMAGE_ATTRIBUTE_HEIGHT, &(height[level-1]), sizeof(height[level-1]));
     }
-    vxAccessScalarValue(epsilonScalar, &epsilon);
-    vxAccessScalarValue(numIterationsScalar, &numIterations);
-    vxAccessScalarValue(winSizeScalar, &winSize);
+    vxReadScalarValue(epsilonScalar, &epsilon);
+    vxReadScalarValue(numIterationsScalar, &numIterations);
+    //vxReadScalarValue(winSizeScalar, &winSize);
 
     status = (gceSTATUS)vxQueryArray(prevPts, VX_ARRAY_ATTRIBUTE_CAPACITY, &capacity, sizeof(capacity));
     status = (gceSTATUS)vxQueryArray(prevPts, VX_ARRAY_ATTRIBUTE_ITEMSIZE, &itemsize, sizeof(itemsize));
@@ -118,7 +121,7 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
     /* prevDerivIx[] - index = 3+maxLevel*2 ~ 3+maxLevel*3-1 */
     for(level=maxLevel; level>0; level--)
     {
-        gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT,  (vx_image)(gradXImage[level-1]), GC_VX_INDEX_AUTO);
+        gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, (vx_image)(gradXImage[level-1]), GC_VX_INDEX_AUTO);
     }
 
     /* prevDerivIy[] - index = 3+maxLevel*3 ~ 3+maxLevel*4-1 */
@@ -157,7 +160,7 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
         fnumIter = -1.0f * numIterations;
         bin[0] = *((vx_uint32*)(&epsilon));    /* epsilonScalar */
         bin[1] = *((vx_uint32*)(&fnumIter)); /* numIterationsScalar */
-        bin[2] = 0x45a3d70a;     /*5242.88f; /* 0x42d1b717;  minEig(104.8576f) */
+        bin[2] = 0x45a3d70a;     /*5242.88f; 0x42d1b717;  minEig(104.8576f) */
         bin[3] = 0x47d6bf95;                                  /* D(109951.1627776f) */
 
         gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, bin, sizeof(bin));
@@ -198,8 +201,8 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
         kernelContext->uniforms[3+maxLevel].num         = 4 * 4;
         kernelContext->uniforms[3+maxLevel].index       = 3 + maxLevel * 5 + 6;
 
-        /* minEigWin, 0.5f, 4.0f, 0 - index = 3 + maxLevel * 5 + 7 */
-        bin[0] = 0;
+        /* itemNum, 0.5f, 4.0f, 0 - index = 3 + maxLevel * 5 + 7 */
+        bin[0] = kernelContext->params.xmax;
         bin[1] = 0x3f000000;     /* 0.5f */
         bin[2] = 0x40800000;    /* 4.0f */
         bin[3] = 0x00000001;    /* 1 */
@@ -328,8 +331,27 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
         kernelContext->uniforms[3+maxLevel+7].num         = 16 * 4;
         kernelContext->uniforms[3+maxLevel+7].index       = 3 + maxLevel * 5 + 22;
 
-        kernelContext->uniform_num = 3 + maxLevel + 8; /* take attention */
+        uniformNum = 3 + maxLevel + 8; /* take attention */
     }
+
+    uniformIndex = 3+maxLevel+7;
+
+    if (node->base.context->evisNoInst.noBilinear)
+    {
+        vx_uint8 constantData0[16] = {16, 32, 48, 64, 80, 0, 0, 0, 16, 16, 16, 16, 16, 0, 0, 0};
+
+        uniformIndex++;
+        gcoOS_MemCopy(&kernelContext->uniforms[uniformIndex].uniform, constantData0, sizeof(constantData0));
+        kernelContext->uniforms[uniformIndex].num = vxmLENGTH_OF(constantData0);
+        kernelContext->uniforms[uniformIndex].index = 3 + maxLevel * 5 + 26;
+        uniformNum++;
+    }
+
+    kernelContext->uniform_num = uniformNum;
+
+    kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -365,3 +387,4 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
 
     return status;
 }
+

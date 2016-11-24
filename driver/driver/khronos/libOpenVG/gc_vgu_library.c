@@ -1206,6 +1206,15 @@ VGU_API_CALL VGUErrorCode VGU_API_ENTRY vguEllipse(
         /* Close the buffer. */
         gcmERR_GOTO(vgsPATHWALKER_DoneWriting(Context, &destination));
 
+#if gcdMOVG
+        /* Update the bounds for MOVG rendering. */
+        dstPath->boundsDirty = gcvFALSE;
+        dstPath->bounds[0] = CenterX - hRadius;
+        dstPath->bounds[1] = CenterX + hRadius;
+        dstPath->bounds[2] = CenterY - vRadius;
+        dstPath->bounds[3] = CenterY + vRadius;
+#endif
+
         /* Success. */
         result = VGU_NO_ERROR;
         break;
@@ -1453,6 +1462,15 @@ VGU_API_CALL VGUErrorCode VGU_API_ENTRY vguArc(
 
         /* Close the buffer. */
         gcmERR_GOTO(vgsPATHWALKER_DoneWriting(Context, &destination));
+
+#if gcdMOVG
+        /* Update the bounds for MOVG rendering. */
+        dstPath->boundsDirty = gcvFALSE;
+        dstPath->bounds[0] = CenterX - hRadius;
+        dstPath->bounds[1] = CenterX + hRadius;
+        dstPath->bounds[2] = CenterY - vRadius;
+        dstPath->bounds[3] = CenterY + vRadius;
+#endif
 
         /* Success. */
         result = VGU_NO_ERROR;

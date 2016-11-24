@@ -141,12 +141,12 @@ VX_INTERNAL_CALLBACK_API void vxoPyramid_Destructor(vx_reference ref)
     vxFree(pyramid->levels);
 }
 
-VX_PUBLIC_API vx_status vxReleasePyramid(vx_pyramid *pyramid)
+VX_API_ENTRY vx_status VX_API_CALL vxReleasePyramid(vx_pyramid *pyramid)
 {
     return vxoReference_Release((vx_reference_ptr)pyramid, VX_TYPE_PYRAMID, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_pyramid vxCreateVirtualPyramid(
+VX_API_ENTRY vx_pyramid VX_API_CALL vxCreateVirtualPyramid(
         vx_graph graph, vx_size levels, vx_float32 scale, vx_uint32 width, vx_uint32 height, vx_df_image format)
 {
     vx_pyramid pyramid;
@@ -162,7 +162,7 @@ VX_PUBLIC_API vx_pyramid vxCreateVirtualPyramid(
     return pyramid;
 }
 
-VX_PUBLIC_API vx_pyramid vxCreatePyramid(
+VX_API_ENTRY vx_pyramid VX_API_CALL vxCreatePyramid(
         vx_context context, vx_size levels, vx_float32 scale, vx_uint32 width, vx_uint32 height, vx_df_image format)
 {
     if (!vxoContext_IsValid(context)) return VX_NULL;
@@ -175,7 +175,7 @@ VX_PUBLIC_API vx_pyramid vxCreatePyramid(
     return vxoPyramid_Create(context, levels, scale, width, height, format, vx_false_e);
 }
 
-VX_PUBLIC_API vx_status vxQueryPyramid(vx_pyramid pyramid, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryPyramid(vx_pyramid pyramid, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoReference_IsValidAndSpecific(&pyramid->base, VX_TYPE_PYRAMID)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -219,7 +219,7 @@ VX_PUBLIC_API vx_status vxQueryPyramid(vx_pyramid pyramid, vx_enum attribute, vo
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_image vxGetPyramidLevel(vx_pyramid pyramid, vx_uint32 index)
+VX_API_ENTRY vx_image VX_API_CALL vxGetPyramidLevel(vx_pyramid pyramid, vx_uint32 index)
 {
     vx_image image;
 
@@ -236,3 +236,4 @@ VX_PUBLIC_API vx_image vxGetPyramidLevel(vx_pyramid pyramid, vx_uint32 index)
 
     return image;
 }
+

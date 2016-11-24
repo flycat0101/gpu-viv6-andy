@@ -179,7 +179,7 @@ typedef union _vscMC_Source
 typedef struct _vscMC_Instr
 {
     vscMC_OPCODE        opcode       : 9;
-    VIR_ConditionOp     compFunc     : 5;
+    VIR_ConditionOp     compFunc     : 6;
     gctUINT             saturate     : 2;
     gctUINT             rndMode      : 2;   /* ??? */
     vscMC_InstType      instType     : 5;   /* instruction result type */

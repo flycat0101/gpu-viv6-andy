@@ -38,6 +38,7 @@ vx_status vxIntegralImage(vx_node node, vx_image src, vx_uint32 step, vx_image d
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
@@ -66,6 +67,8 @@ vx_status vxIntegralImage(vx_node node, vx_image src, vx_uint32 step, vx_image d
     kernelContext->params.xstep = (step == INTEGRAL_IMAGE_P0) ? 4 : width;
     kernelContext->params.ystep = (step == INTEGRAL_IMAGE_P0) ? height : 2;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -77,3 +80,4 @@ vx_status vxIntegralImage(vx_node node, vx_image src, vx_uint32 step, vx_image d
 
     return status;
 }
+

@@ -17,7 +17,7 @@
 #include "gc_hal.h"
 #include "gc_hal_raster.h"
 #include "gc_hal_engine.h"
-#include "gc_vsc_drvi_interface.h"
+#include "drvi/gc_vsc_drvi_interface.h"
 #include "gc_hal_user_math.h"
 #include "gc_hal_user_os_memory.h"
 #include "gc_chip_base.h"
@@ -176,8 +176,9 @@ typedef struct __GLchipDirtyRec
             unsigned int tesReload       : 1;
             unsigned int gsReload        : 1;
             unsigned int activeUniform   : 1;
+            unsigned int lastFragData    : 1;
             unsigned int pgInsChanged    : 1;
-            unsigned int reserved        : 13;
+            unsigned int reserved        : 12;
         } sDefer;
         unsigned int deferDirty;
     } uDefer;
@@ -219,7 +220,6 @@ typedef struct __GLchipInstantDrawRec
 
     /* indexLoops > 0 means it's an index draw */
     gceINDEX_TYPE   indexType;
-    gctSIZE_T       indexBytes;     /* bytes for per index element */
     gctPOINTER      indexMemory;
     gcoBUFOBJ       indexBuffer;
 
@@ -231,11 +231,6 @@ typedef struct __GLchipInstantDrawRec
     GLint           positionIndex;
 
     gctBOOL         primitiveRestart;
-
-    /** Spilt Draw if last index address mod 64 is locate in 0-47 */
-    gctBOOL         spilitDraw;
-    gctSIZE_T       spilitCount;
-    gcePRIMITIVE    spilitPrimMode;
 } __GLchipInstantDraw;
 
 typedef struct __GLchipHalRtSlotInfoRec
@@ -411,6 +406,12 @@ struct __GLchipContextRec
     GLint                       samples[4];
 
     gctBOOL                     robust;
+
+    /* flags quickly check if we need do recompile */
+    gctBOOL                     needTexRecompile;
+    gctBOOL                     needRTRecompile;
+
+    gcoPROFILER                 profiler;
 };
 
 
@@ -818,6 +819,7 @@ extern gcsSURF_VIEW
 gcChipGetTextureSurface(
     __GLchipContext *chipCtx,
     __GLtextureObject *texObj,
+    GLboolean layered,
     GLint level,
     GLint slice
     );
@@ -955,6 +957,28 @@ __glChipGetError(
     __GLcontext *gc
     );
 
+GLboolean
+__glChipProfiler_NEW_Set(
+    IN __GLcontext *gc,
+    IN GLuint Enum,
+    IN gctHANDLE Value
+    );
+
+gceSTATUS
+gcChipProfiler_NEW_Initialize(
+    IN __GLcontext *gc
+    );
+
+gceSTATUS
+gcChipProfiler_NEW_Destroy(
+    IN __GLcontext *gc
+    );
+
+gceSTATUS
+gcChipProfiler_NEW_Write(
+    IN __GLcontext *gc,
+    IN GLuint Enum
+    );
 
 GLvoid
 gcChipInitProfileDevicePipeline(

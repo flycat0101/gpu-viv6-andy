@@ -33,6 +33,7 @@ vx_status vxAccumulate(vx_node node, vx_image input, vx_image accum)
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     /*index = 0*/
@@ -45,6 +46,21 @@ vx_status vxAccumulate(vx_node node, vx_image input, vx_image accum)
     kernelContext->params.xstep = 8;
 
     kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+
+#if GC_VX_ASM
+    {
+        char source[1024] = {
+            "img_load.u8.evis.{0,15} r1 c0 r0.xy\n"
+            "img_load.s16.evis.{0,7} r2 c1 r0.xy\n"
+            "iadd.s16.evis.clamp.{0,7} r2 r2.s16 r1.u8\n"
+            "img_store.s16.evis.{0,7} r2 c1 r0.xy r2\n"
+        };
+        kernelContext->params.instructions.source = source;
+        kernelContext->params.instructions.regs_count = 3;
+    }
+#endif
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -79,9 +95,10 @@ vx_status vxAccumulateWeighted(vx_node node, vx_image input, vx_scalar scalar, v
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
-    vxAccessScalarValue(scalar, &alpha);
+    vxReadScalarValue(scalar, &alpha);
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
@@ -102,9 +119,25 @@ vx_status vxAccumulateWeighted(vx_node node, vx_image input, vx_scalar scalar, v
 
     kernelContext->params.policy = (vx_uint32)(alpha * 1000);
 
-    vxCommitScalarValue(scalar, &alpha);
+    vxWriteScalarValue(scalar, &alpha);
 
     kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+
+#if GC_VX_ASM
+    {
+        char source[1024] = {0}, s[1024] = {
+            "img_load.u8.evis.{0,15} r1 c0 r0.xy\n"
+            "img_load.s8.evis.{0,15} r2 c1 r0.xy\n"
+            "lerp.u8.evis.rtn.{0,15} r2 r2.u8 r1.u8 %ff\n"
+            "img_store.s8.evis.{0,15} r2 c1 r0.xy r2\n"
+        };
+        sprintf(source, s, alpha);
+        kernelContext->params.instructions.source = source;
+        kernelContext->params.instructions.regs_count = 3;
+    }
+#endif
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -139,9 +172,10 @@ vx_status vxAccumulateSquare(vx_node node, vx_image input, vx_scalar scalar, vx_
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
-    vxAccessScalarValue(scalar, &shift);
+    vxReadScalarValue(scalar, &shift);
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
@@ -153,7 +187,23 @@ vx_status vxAccumulateSquare(vx_node node, vx_image input, vx_scalar scalar, vx_
     kernelContext->params.xstep = 8;
     kernelContext->params.policy = shift;
 
-    vxCommitScalarValue(scalar, &shift);
+    vxWriteScalarValue(scalar, &shift);
+
+#if GC_VX_ASM
+    {
+        char source[1024] = {
+            "img_load.evis.u8.{0,15} r1 c0 r0.xy\n"
+            "img_load.evis.s16.{0,7} r2 c1 r0.xy\n"
+            "iacc_sq.evis.s16.clamp.{0,7} r2 r2.u8 r1.u8 %d\n"
+            "img_store.evis.s16.{0,7} r2 c1 r0.xy r2\n"
+        };
+        sprintf(source, source, shift);
+        kernelContext->params.instructions.source = source;
+        kernelContext->params.instructions.regs_count = 3;
+    }
+#endif
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -166,3 +216,4 @@ vx_status vxAccumulateSquare(vx_node node, vx_image input, vx_scalar scalar, vx_
 
     return status;
 }
+

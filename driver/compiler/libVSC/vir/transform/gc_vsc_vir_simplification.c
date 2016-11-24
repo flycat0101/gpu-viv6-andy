@@ -106,7 +106,7 @@ gctBOOL _DestSrc0Identical(
         {
             return gcvFALSE;
         }
-        return memcmp(dest->u1.sym, src0->u1.sym, sizeof(VIR_Symbol)) == 0;
+        return memcmp(VIR_Operand_GetSymbol(dest), VIR_Operand_GetSymbol(src0), sizeof(VIR_Symbol)) == 0;
     }
     return gcvFALSE;
 }
@@ -127,7 +127,7 @@ gctBOOL _ImmZero(
     IN VIR_Operand* opnd
     )
 {
-    return VIR_Operand_GetOpKind(opnd) == VIR_OPND_IMMEDIATE && opnd->u1.iConst == 0;
+    return VIR_Operand_GetOpKind(opnd) == VIR_OPND_IMMEDIATE && VIR_Operand_GetImmediateInt(opnd) == 0;
 }
 
 gctBOOL _ConstOrImm(
@@ -145,13 +145,13 @@ gctBOOL _ConstOrImmZero(
 {
     if(VIR_Operand_GetOpKind(opnd) == VIR_OPND_IMMEDIATE)
     {
-        return opnd->u1.iConst == 0;
+        return VIR_Operand_GetImmediateInt(opnd) == 0;
     }
     else if(VIR_Operand_GetOpKind(opnd) == VIR_OPND_CONST)
     {
         VIR_Shader* shader = VIR_Inst_GetShader(inst);
         VIR_PrimitiveTypeId type = VIR_Operand_GetType(opnd);
-        VIR_Const* cur_const = (VIR_Const *)VIR_Shader_GetSymFromId(shader, opnd->u1.constId);
+        VIR_Const* cur_const = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(opnd));
         return VIR_VecConstVal_AllZero(type, &cur_const->value.vecVal);
     }
     else
@@ -168,19 +168,59 @@ gctBOOL _ConstOrImmOne(
     if(VIR_Operand_GetOpKind(opnd) == VIR_OPND_IMMEDIATE)
     {
         VIR_PrimitiveTypeId type = VIR_Operand_GetType(opnd);
-        return VIR_ScalarConstVal_One(type, (VIR_ScalarConstVal*)&(opnd->u1));
+        return VIR_ScalarConstVal_One(type, (VIR_ScalarConstVal*)&(opnd->u.n.u1));
     }
     else if(VIR_Operand_GetOpKind(opnd) == VIR_OPND_CONST)
     {
         VIR_Shader* shader = VIR_Inst_GetShader(inst);
         VIR_PrimitiveTypeId type = VIR_Operand_GetType(opnd);
-        VIR_Const* cur_const = (VIR_Const *)VIR_Shader_GetSymFromId(shader, opnd->u1.constId);
+        VIR_Const* cur_const = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(opnd));
         return VIR_VecConstVal_AllOne(type, &cur_const->value.vecVal);
     }
     else
     {
         return gcvFALSE;
     }
+}
+
+gctBOOL _ConstOrImm4294967295(
+    IN VIR_Instruction* inst,
+    IN VIR_Operand* opnd
+    )
+{
+    if(VIR_Operand_GetOpKind(opnd) == VIR_OPND_IMMEDIATE)
+    {
+        return VIR_Operand_GetImmediateUint(opnd) == 0xFFFFFFFF;
+    }
+    else if(VIR_Operand_GetOpKind(opnd) == VIR_OPND_CONST)
+    {
+        VIR_Shader* shader = VIR_Inst_GetShader(inst);
+        VIR_Const* cur_const = VIR_Shader_GetConstFromId(shader, VIR_Operand_GetConstId(opnd));
+        gctUINT i;
+        VIR_Swizzle swizzle = VIR_Operand_GetSwizzle(opnd);
+        for(i = 0; i < VIR_CHANNEL_COUNT; i++)
+        {
+            if(cur_const->value.vecVal.u32Value[VIR_Swizzle_GetChannel(swizzle, i)] != 0xFFFFFFFF)
+            return gcvFALSE;
+        }
+        return gcvTRUE;
+    }
+    else
+    {
+        return gcvFALSE;
+    }
+}
+
+gctBOOL _Is16BitOrLess(
+    IN VIR_Instruction* inst,
+    IN VIR_Operand* opnd
+    )
+{
+    if (VIR_GetTypeSize(VIR_Operand_GetType(opnd)) <= 2)
+    {
+        return gcvTRUE;
+    }
+    return gcvFALSE;
 }
 
 gctBOOL _ConstOrImm65535(
@@ -190,17 +230,57 @@ gctBOOL _ConstOrImm65535(
 {
     if(VIR_Operand_GetOpKind(opnd) == VIR_OPND_IMMEDIATE)
     {
-        return opnd->u1.uConst == 65535;
+        return VIR_Operand_GetImmediateUint(opnd) == 65535;
     }
     else if(VIR_Operand_GetOpKind(opnd) == VIR_OPND_CONST)
     {
         VIR_Shader* shader = VIR_Inst_GetShader(inst);
-        VIR_Const* cur_const = VIR_Shader_GetConstFromId(shader, opnd->u1.constId);
+        VIR_Const* cur_const = VIR_Shader_GetConstFromId(shader, VIR_Operand_GetConstId(opnd));
         gctUINT i;
         VIR_Swizzle swizzle = VIR_Operand_GetSwizzle(opnd);
         for(i = 0; i < VIR_CHANNEL_COUNT; i++)
         {
             if(cur_const->value.vecVal.u32Value[VIR_Swizzle_GetChannel(swizzle, i)] != 65535)
+            return gcvFALSE;
+        }
+        return gcvTRUE;
+    }
+    else
+    {
+        return gcvFALSE;
+    }
+}
+
+gctBOOL _Is8BitOrLess(
+    IN VIR_Instruction* inst,
+    IN VIR_Operand* opnd
+    )
+{
+    if (VIR_GetTypeSize(VIR_Operand_GetType(opnd)) <= 1)
+    {
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+gctBOOL _ConstOrImm255(
+    IN VIR_Instruction* inst,
+    IN VIR_Operand* opnd
+    )
+{
+    if(VIR_Operand_GetOpKind(opnd) == VIR_OPND_IMMEDIATE)
+    {
+        return VIR_Operand_GetImmediateUint(opnd) == 255;
+    }
+    else if(VIR_Operand_GetOpKind(opnd) == VIR_OPND_CONST)
+    {
+        VIR_Shader* shader = VIR_Inst_GetShader(inst);
+        VIR_Const* cur_const = VIR_Shader_GetConstFromId(shader, VIR_Operand_GetConstId(opnd));
+        gctUINT i;
+        VIR_Swizzle swizzle = VIR_Operand_GetSwizzle(opnd);
+        for(i = 0; i < VIR_CHANNEL_COUNT; i++)
+        {
+            if(cur_const->value.vecVal.u32Value[VIR_Swizzle_GetChannel(swizzle, i)] != 255)
             return gcvFALSE;
         }
         return gcvTRUE;
@@ -248,7 +328,7 @@ void _MOVDestSumSrc0Src1(
     if(VIR_Operand_GetOpKind(src0) == VIR_OPND_IMMEDIATE && VIR_Operand_GetOpKind(src1) == VIR_OPND_IMMEDIATE)
     {
         VIR_PrimitiveTypeId type = VIR_Operand_GetType(src0);
-        VIR_ScalarConstVal_AddScalarConstVal(type, (VIR_ScalarConstVal*)&(src0->u1), (VIR_ScalarConstVal*)&(src1->u1), (VIR_ScalarConstVal*)&(src0->u1));
+        VIR_ScalarConstVal_AddScalarConstVal(type, (VIR_ScalarConstVal*)&(src0->u.n.u1), (VIR_ScalarConstVal*)&(src1->u.n.u1), (VIR_ScalarConstVal*)&(src0->u.n.u1));
     }
     else if((VIR_Operand_GetOpKind(src0) == VIR_OPND_CONST && VIR_Operand_GetOpKind(src1) == VIR_OPND_IMMEDIATE)
         || (VIR_Operand_GetOpKind(src0) == VIR_OPND_IMMEDIATE && VIR_Operand_GetOpKind(src1) == VIR_OPND_CONST))
@@ -268,9 +348,9 @@ void _MOVDestSumSrc0Src1(
             src0 = src1;
             src1 = VIR_Inst_GetSource(inst, 0);
         }
-        cur_const = (VIR_Const *)VIR_Shader_GetSymFromId(shader, src0->u1.constId);
+        cur_const = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(src0));
 
-        VIR_VecConstVal_AddScalarConstVal(type, &cur_const->value.vecVal, (VIR_ScalarConstVal*)&(src1->u1), &new_const.vecVal);
+        VIR_VecConstVal_AddScalarConstVal(type, &cur_const->value.vecVal, (VIR_ScalarConstVal*)&(src1->u.n.u1), &new_const.vecVal);
         VIR_Shader_AddConstant(shader, type, &new_const, &new_const_id);
         VIR_Operand_SetConstId(src0, new_const_id);
     }
@@ -278,8 +358,8 @@ void _MOVDestSumSrc0Src1(
     {
         VIR_Shader* shader = VIR_Function_GetShader(VIR_Inst_GetFunction(inst));
         VIR_PrimitiveTypeId type = VIR_Operand_GetType(src0);
-        VIR_Const* cur_const0 = (VIR_Const *)VIR_Shader_GetSymFromId(shader, src0->u1.constId);
-        VIR_Const* cur_const1 = (VIR_Const *)VIR_Shader_GetSymFromId(shader, src1->u1.constId);
+        VIR_Const* cur_const0 = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(src0));
+        VIR_Const* cur_const1 = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(src1));
         VIR_ConstVal new_const;
         VIR_ConstId new_const_id;
 
@@ -305,7 +385,7 @@ void _MOVDestProductSrc0Src1(
     if(VIR_Operand_GetOpKind(src0) == VIR_OPND_IMMEDIATE && VIR_Operand_GetOpKind(src1) == VIR_OPND_IMMEDIATE)
     {
         VIR_PrimitiveTypeId type = VIR_Operand_GetType(src0);
-        VIR_ScalarConstVal_MulScalarConstVal(type, (VIR_ScalarConstVal*)&(src0->u1), (VIR_ScalarConstVal*)&(src1->u1), (VIR_ScalarConstVal*)&(src0->u1));
+        VIR_ScalarConstVal_MulScalarConstVal(type, (VIR_ScalarConstVal*)&(src0->u.n.u1), (VIR_ScalarConstVal*)&(src1->u.n.u1), (VIR_ScalarConstVal*)&(src0->u.n.u1));
     }
     else if((VIR_Operand_GetOpKind(src0) == VIR_OPND_CONST && VIR_Operand_GetOpKind(src1) == VIR_OPND_IMMEDIATE)
         || (VIR_Operand_GetOpKind(src0) == VIR_OPND_IMMEDIATE && VIR_Operand_GetOpKind(src1) == VIR_OPND_CONST))
@@ -325,9 +405,9 @@ void _MOVDestProductSrc0Src1(
             src0 = src1;
             src1 = VIR_Inst_GetSource(inst, 0);
         }
-        cur_const = (VIR_Const *)VIR_Shader_GetSymFromId(shader, src0->u1.constId);
+        cur_const = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(src0));
 
-        VIR_VecConstVal_MulScalarConstVal(type, &cur_const->value.vecVal, (VIR_ScalarConstVal*)&(src1->u1), &new_const.vecVal);
+        VIR_VecConstVal_MulScalarConstVal(type, &cur_const->value.vecVal, (VIR_ScalarConstVal*)&(src1->u.n.u1), &new_const.vecVal);
         VIR_Shader_AddConstant(shader, type, &new_const, &new_const_id);
         VIR_Operand_SetConstId(src0, new_const_id);
     }
@@ -335,8 +415,8 @@ void _MOVDestProductSrc0Src1(
     {
         VIR_Shader* shader = VIR_Function_GetShader(VIR_Inst_GetFunction(inst));
         VIR_PrimitiveTypeId type = VIR_Operand_GetType(src0);
-        VIR_Const* cur_const0 = (VIR_Const *)VIR_Shader_GetSymFromId(shader, src0->u1.constId);
-        VIR_Const* cur_const1 = (VIR_Const *)VIR_Shader_GetSymFromId(shader, src1->u1.constId);
+        VIR_Const* cur_const0 = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(src0));
+        VIR_Const* cur_const1 = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(src1));
         VIR_ConstVal new_const;
         VIR_ConstId new_const_id;
 
@@ -378,8 +458,27 @@ _VSC_SIMP_Steps ADD_Steps[] = {
 
 _VSC_SIMP_Steps AND_BITWISE_Steps[] = {
     {_VSC_SIMP_STEPS_COUNT, {2}},
+    {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_ConstOrImm4294967295}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_MOVDestSrc0}},
+    {_VSC_SIMP_STEPS_COUNT, {2}},
+    {_VSC_SIMP_STEPS_SRC0_CHECK, {(gctUINTPTR_T)_ConstOrImm4294967295}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_MOVDestSrc1}},
+    {_VSC_SIMP_STEPS_COUNT, {3}},
+    {_VSC_SIMP_STEPS_SRC0_CHECK, {(gctUINTPTR_T)_Is16BitOrLess}},
     {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_ConstOrImm65535}},
     {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_MOVDestSrc0}},
+    {_VSC_SIMP_STEPS_COUNT, {3}},
+    {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_Is16BitOrLess}},
+    {_VSC_SIMP_STEPS_SRC0_CHECK, {(gctUINTPTR_T)_ConstOrImm65535}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_MOVDestSrc1}},
+    {_VSC_SIMP_STEPS_COUNT, {3}},
+    {_VSC_SIMP_STEPS_SRC0_CHECK, {(gctUINTPTR_T)_Is8BitOrLess}},
+    {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_ConstOrImm255}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_MOVDestSrc0}},
+    {_VSC_SIMP_STEPS_COUNT, {3}},
+    {_VSC_SIMP_STEPS_SRC1_CHECK, {(gctUINTPTR_T)_Is8BitOrLess}},
+    {_VSC_SIMP_STEPS_SRC0_CHECK, {(gctUINTPTR_T)_ConstOrImm255}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_MOVDestSrc1}},
     {_VSC_SIMP_STEPS_END, {0}},
 };
 
@@ -438,29 +537,20 @@ _VSC_SIMP_Steps SELECT_Steps[] = {
     {_VSC_SIMP_STEPS_END, {0}},
 };
 
-
+_VSC_SIMP_Steps SWIZZLE_Steps[] = {
+    {_VSC_SIMP_STEPS_COUNT, {2}},
+    {_VSC_SIMP_STEPS_SRC2_CHECK, {(gctUINTPTR_T)_ImmZero}},
+    {_VSC_SIMP_STEPS_TRANS, {(gctUINTPTR_T)_NOP}},
+    {_VSC_SIMP_STEPS_END, {0}}
+};
 
 _VSC_SIMP_Steps* _VSC_SIMP_GetSteps(
     IN VIR_OpCode opc)
 {
     switch(opc)
     {
-        case VIR_OP_ADD:
-            return ADD_Steps;
-        case VIR_OP_AND_BITWISE:
-            return AND_BITWISE_Steps;
-        case VIR_OP_LSHIFT:
-            return LSHIFT_Steps;
-        case VIR_OP_MAD:
-            return MAD_Steps;
-        case VIR_OP_MOV:
-            return MOV_Steps;
-        case VIR_OP_MUL:
-            return MUL_Steps;
-        case VIR_OP_RSHIFT:
-            return RSHIFT_Steps;
-        case VIR_OP_SELECT:
-            return SELECT_Steps;
+        case VIR_OP_SWIZZLE:
+            return SWIZZLE_Steps;
         default:
             return gcvNULL;
     }
@@ -695,13 +785,22 @@ VSC_ErrCode VSC_SIMP_Simplification_PerformOnFunction(
     return errCode;
 }
 
+DEF_QUERY_PASS_PROP(VSC_SIMP_Simplification_PerformOnShader)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_SIMP;
+
+    pPassProp->passFlag.resCreationReq.s.bNeedCfg = gcvTRUE;
+}
+
 VSC_ErrCode VSC_SIMP_Simplification_PerformOnShader(
-    IN OUT VIR_Shader* shader,
-    IN VSC_OPTN_SIMPOptions* options,
-    IN VIR_Dumper* dumper
+    IN VSC_SH_PASS_WORKER* pPassWorker
     )
 {
     VSC_ErrCode errcode  = VSC_ERR_NONE;
+    VIR_Shader           *shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VSC_OPTN_SIMPOptions  *options = (VSC_OPTN_SIMPOptions*)pPassWorker->basePassWorker.pBaseOption;
+    VIR_Dumper           *dumper = pPassWorker->basePassWorker.pDumper;
     VSC_SIMP_Simplification simp;
     VIR_FuncIterator func_iter;
     VIR_FunctionNode* func_node;
@@ -746,7 +845,7 @@ VSC_ErrCode VSC_SIMP_Simplification_PerformOnShader(
         VIR_LOG(dumper, "Simplification ends for shader(%d)\n", VIR_Shader_GetId(shader));
         VIR_LOG_FLUSH(dumper);
     }
-    if (gcSHADER_DumpCodeGenVerbose(shader))
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(shader), VIR_Shader_GetId(shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "After Simplification.", shader, gcvTRUE);
     }

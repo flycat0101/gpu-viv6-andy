@@ -1,18 +1,5 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
-
 /*
- * Copyright (c) 2012-2013 The Khronos Group Inc.
+ * Copyright (c) 2012-2015 The Khronos Group Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and/or associated documentation files (the
@@ -40,7 +27,6 @@
 /*!
  * \file
  * \brief The Vendor ID list for OpenVX.
- * \author Erik Rainey <erik.rainey@ti.com>
  */
 
 /*! \brief The Vendor ID of the Implementation. As new vendors submit their
@@ -72,6 +58,7 @@ enum vx_vendor_id_e {
     VX_ID_IMAGINATION=0x015, /*!< \brief Imagination Technologies */
     VX_ID_COGNIVUE  = 0x016, /*!< \brief CogniVue Corporation */
     VX_ID_VIDEANTIS = 0x017, /*!< \brief Videantis */
+    VX_ID_SYNOPSYS  = 0x018, /*!< \brief Synopsys */
     /* Add new vendor code above this line */
 
     VX_ID_MAX       = 0xFFF,

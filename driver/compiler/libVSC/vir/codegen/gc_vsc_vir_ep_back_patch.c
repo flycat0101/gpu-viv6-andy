@@ -14,7 +14,8 @@
 #include "gc_vsc.h"
 #include "vir/codegen/gc_vsc_vir_ep_back_patch.h"
 
-extern SHADER_COMPILE_TIME_CONSTANT* _EnlargeCTCRoom(SHADER_CONSTANT_MAPPING* pCnstMapping, gctUINT enlargeCTCCount);
+extern SHADER_COMPILE_TIME_CONSTANT* _EnlargeCTCRoom(SHADER_CONSTANT_MAPPING* pCnstMapping, gctUINT enlargeCTCCount, gctUINT* pStartCtcSlot);
+extern void _SetValidChannelForHwConstantLoc(SHADER_CONSTANT_HW_LOCATION_MAPPING* pCnstHwLoc, gctUINT hwChannel);
 
 #if gcdALPHA_KILL_IN_SHADER
 static VSC_ErrCode _AddAlphaKillPatch(VIR_Shader* pShader, VSC_HW_CONFIG* pHwCfg, SHADER_EXECUTABLE_PROFILE* pOutSEP)
@@ -78,13 +79,13 @@ static VSC_ErrCode _AddAlphaKillPatch(VIR_Shader* pShader, VSC_HW_CONFIG* pHwCfg
         hwCnstRegChannelFor1fDiv256f = CHANNEL_Y;
 
         /* Add 2 imms to CTC */
-        pCTC = _EnlargeCTCRoom(&pOutSEP->constantMapping, 1);
+        pCTC = _EnlargeCTCRoom(&pOutSEP->constantMapping, 1, gcvNULL);
         vscInitializeCTC(pCTC);
         pCTC->hwConstantLocation.hwLoc.hwRegNo = hwCnstRegNoFor1fDiv256f;
         pCTC->hwConstantLocation.hwAccessMode = SHADER_HW_ACCESS_MODE_REGISTER;
-        pCTC->hwConstantLocation.validHWChannelMask |= (1 << hwCnstRegChannelFor1f);
+        _SetValidChannelForHwConstantLoc(&pCTC->hwConstantLocation, hwCnstRegChannelFor1f);
         pCTC->constantValue[hwCnstRegChannelFor1f] = *(gctUINT*)&imm1f;
-        pCTC->hwConstantLocation.validHWChannelMask |= (1 << hwCnstRegChannelFor1fDiv256f);
+        _SetValidChannelForHwConstantLoc(&pCTC->hwConstantLocation, hwCnstRegChannelFor1fDiv256f);
         pCTC->constantValue[hwCnstRegChannelFor1fDiv256f] = *(gctUINT*)&imm1fDiv256f;
     }
 
@@ -195,15 +196,27 @@ static VSC_ErrCode _AddAlphaKillPatch(VIR_Shader* pShader, VSC_HW_CONFIG* pHwCfg
 }
 #endif
 
+DEF_QUERY_PASS_PROP(vscVIR_PerformSEPBackPatch)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_PST;
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_SEP_GEN;
+}
+
 VSC_ErrCode
 vscVIR_PerformSEPBackPatch(
-    IN  VIR_Shader*                pShader,
-    IN  VSC_HW_CONFIG*             pHwCfg,
-    IN  SHADER_EXECUTABLE_PROFILE* pOutSEP,
-    IN  gctBOOL                    bDumpSEP
+    VSC_SH_PASS_WORKER* pPassWorker
     )
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VIR_Shader*                pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VSC_HW_CONFIG*             pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    SHADER_EXECUTABLE_PROFILE* pOutSEP = (SHADER_EXECUTABLE_PROFILE*)pPassWorker->basePassWorker.pPrvData;
+    VSC_OPTN_SEPGenOptions*    sepgen_options = (VSC_OPTN_SEPGenOptions*)pPassWorker->basePassWorker.pBaseOption;
+
+    if (!(pOutSEP && vscIsValidSEP(pOutSEP)))
+    {
+        return errCode;
+    }
 
     /* This code is temp put here because such patch is actually a dynamic (recompile)
        patch, and if we put it to general static patch framework, it will complex other
@@ -215,9 +228,10 @@ vscVIR_PerformSEPBackPatch(
     ON_ERROR(errCode, "Add alphakill patch to SEP");
 #endif
 
-    if (bDumpSEP)
+    if (VSC_OPTN_SEPGenOptions_GetTrace(sepgen_options) ||
+        VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_CG))
     {
-        vscPrintSEP(pOutSEP, pShader);
+        vscPrintSEP(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx, pOutSEP, pShader);
     }
 
 OnError:

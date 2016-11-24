@@ -38,7 +38,8 @@ else
 	echo
 fi
 
-cd $GC_GLSL_PATH; bison -t -v -d gc_glsl.y
+# Use -l to disable generating #line directive
+cd $GC_GLSL_PATH; bison -l -t -v -d gc_glsl.y
 cd $GC_GLSL_PATH; echo "#ifndef __gc_glsl_token_def_h_" > gc_glsl_token_def.h
 cd $GC_GLSL_PATH; echo "#define __gc_glsl_token_def_h_" >> gc_glsl_token_def.h
 cd $GC_GLSL_PATH; cat gc_glsl.tab.h >> gc_glsl_token_def.h; rm -f gc_glsl.tab.h

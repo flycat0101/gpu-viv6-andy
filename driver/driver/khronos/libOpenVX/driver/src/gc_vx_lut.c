@@ -18,7 +18,7 @@ VX_INTERNAL_CALLBACK_API void vxoLUT_Destructor(vx_reference ref)
     vxoArray_Destructor(ref);
 }
 
-VX_PUBLIC_API vx_lut vxCreateLUT(vx_context context, vx_enum data_type, vx_size count)
+VX_API_ENTRY vx_lut VX_API_CALL vxCreateLUT(vx_context context, vx_enum data_type, vx_size count)
 {
     vx_array lut;
 
@@ -43,12 +43,12 @@ VX_PUBLIC_API vx_lut vxCreateLUT(vx_context context, vx_enum data_type, vx_size 
     return (vx_lut)lut;
 }
 
-VX_PUBLIC_API vx_status vxReleaseLUT(vx_lut *lut)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseLUT(vx_lut *lut)
 {
     return vxoReference_Release((vx_reference_ptr)lut, VX_TYPE_LUT, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_status vxQueryLUT(vx_lut lut, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryLUT(vx_lut lut, vx_enum attribute, void *ptr, vx_size size)
 {
     vx_array lutArray = (vx_array)lut;
 
@@ -82,21 +82,22 @@ VX_PUBLIC_API vx_status vxQueryLUT(vx_lut lut, vx_enum attribute, void *ptr, vx_
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxAccessLUT(vx_lut lut, void **ptr, vx_enum usage)
+VX_API_ENTRY vx_status VX_API_CALL vxAccessLUT(vx_lut lut, void **ptr, vx_enum usage)
 {
     vx_array lutArray = (vx_array)lut;
 
     if (!vxoReference_IsValidAndSpecific(&lutArray->base, VX_TYPE_LUT)) return VX_ERROR_INVALID_REFERENCE;
 
-    return vxoArray_AccessRange(lutArray, 0, lutArray->itemCount, ptr, usage);
+    return vxoArray_AccessRange(lutArray, 0, lutArray->itemCount, VX_NULL, ptr, usage);
 }
 
-VX_PUBLIC_API vx_status vxCommitLUT(vx_lut lut, void *ptr)
+VX_API_ENTRY vx_status VX_API_CALL vxCommitLUT(vx_lut lut, const void *ptr)
 {
     vx_array lutArray = (vx_array)lut;
 
     if (!vxoReference_IsValidAndSpecific(&lutArray->base, VX_TYPE_LUT)) return VX_ERROR_INVALID_REFERENCE;
 
-    return vxoArray_CommitRange(lutArray, 0, lutArray->itemCount, ptr);
+    return vxoArray_CommitRange(lutArray, 0, lutArray->itemCount, (vx_ptr)ptr);
 }
+
 

@@ -37,6 +37,7 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(input, VX_IMAGE_ATTRIBUTE_FORMAT, &inputFormat, sizeof(vx_df_image));
@@ -82,9 +83,9 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
                  (outputFormat == VX_DF_IMAGE_IYUV))
         {
             vx_uint8 constantData[16] = {0, 8, 16, 24, 0, 0, 0, 0, 8, 8, 8, 0, 0, 0, 0, 0};
-            vx_float32 constantData1[4] = { 0.2126f,  0.7152f,  0.0722f, 0.5f};
-            vx_float32 constantData2[4] = {-0.1146f, -0.3854f,  0.5f,    128.5f};
-            vx_float32 constantData3[4] = { 0.5f,    -0.4542f, -0.0458f, 128.5f};
+            vx_float32 constantData1[4] = { 0.2126f, 0.7152f, 0.0722f, 0.5f};
+            vx_float32 constantData2[4] = {-0.1146f, -0.3854f, 0.5f, 128.5f};
+            vx_float32 constantData3[4] = { 0.5f, -0.4542f, -0.0458f, 128.5f};
             vx_uint8 constantData4[16] = {24, 32, 40, 48, 0, 0, 0, 0, 8, 8, 8, 0, 0, 0, 0, 0};
             vx_uint8 constantData5[16] = {48, 56, 64, 72, 0, 0, 0, 0, 8, 8, 8, 0, 0, 0, 0, 0};
             vx_uint8 constantData6[16] = {72, 80, 88, 96, 0, 0, 0, 0, 8, 8, 8, 0, 0, 0, 0, 0};
@@ -184,9 +185,9 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
                  (outputFormat == VX_DF_IMAGE_IYUV))
         {
             vx_uint32 constantData0[8] = {0, 8, 16, 24, 0, 0, 0, 0};
-            vx_float32 constantData1[4] = { 0.2126f,  0.7152f,  0.0722f, 0.5f};
-            vx_float32 constantData2[4] = {-0.1146f, -0.3854f,  0.5f,    128.5f};
-            vx_float32 constantData3[4] = { 0.5f,    -0.4542f, -0.0458f, 128.5f};
+            vx_float32 constantData1[4] = { 0.2126f, 0.7152f, 0.0722f, 0.5f};
+            vx_float32 constantData2[4] = {-0.1146f, -0.3854f, 0.5f, 128.5f};
+            vx_float32 constantData3[4] = { 0.5f, -0.4542f, -0.0458f, 128.5f};
 
             /*index = 0*/
             gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
@@ -250,9 +251,9 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
             vx_uint8 constantData4[16] = {0};
             vx_uint8 constantData5[16] = {0};
             vx_uint8 constantData6[16] = {0};
-            vx_float32 constantData1[4] = {1.0f,  0.0f,     1.5748f, -201.0744f};
-            vx_float32 constantData2[4] = {1.0f, -0.1873f, -0.4681f,   84.3912f};
-            vx_float32 constantData3[4] = {1.0f,  1.8556f,  0.0,     -237.0168f};
+            vx_float32 constantData1[4] = {1.0f, 0.0f, 1.5748f, -201.0744f};
+            vx_float32 constantData2[4] = {1.0f, -0.1873f, -0.4681f, 84.3912f};
+            vx_float32 constantData3[4] = {1.0f, 1.8556f, 0.0, -237.0168f};
 
             vx_uint8 constantData7[16] = {0, 8, 16, 32, 40, 48, 64, 72, 8, 8, 8, 8, 8, 8, 8, 8};
             vx_uint8 constantData8[16] = {80, 96, 104, 112, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0};
@@ -477,9 +478,9 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
         else if (outputFormat == VX_DF_IMAGE_RGBX || outputFormat == VX_DF_IMAGE_RGB)
         {
             vx_uint32 constantData0[8] = {0, 8, 16, 24, 0, 0, 0, 0};
-            vx_float32 constantData1[4] = {1.0f,  0.0f,     1.5748f, -201.0744f};
-            vx_float32 constantData2[4] = {1.0f, -0.1873f, -0.4681f,   84.3912f};
-            vx_float32 constantData3[4] = {1.0f,  1.8556f,  0.0,     -237.0168f};
+            vx_float32 constantData1[4] = {1.0f, 0.0f, 1.5748f, -201.0744f};
+            vx_float32 constantData2[4] = {1.0f, -0.1873f, -0.4681f, 84.3912f};
+            vx_float32 constantData3[4] = {1.0f, 1.8556f, 0.0, -237.0168f};
             vx_uint8 constantData4[16] = {0, 32, 64, 0, 0, 0, 0, 0, 8, 8, 8, 0, 0, 0, 0, 0};
             vx_uint8 constantData5[16] = {0, 8, 16, 32, 40, 48, 64, 72, 8, 8, 8, 8, 8, 8, 8, 8};
             vx_uint8 constantData6[16] = {80, 96, 104, 112, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0};
@@ -543,9 +544,9 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
         if (outputFormat == VX_DF_IMAGE_RGBX || outputFormat == VX_DF_IMAGE_RGB)
         {
             vx_uint32 constantData0[8] = {0, 8, 16, 24, 0, 0, 0, 0};
-            vx_float32 constantData1[4] = {1.0f,  0.0f,     1.5748f, -201.0744f};
-            vx_float32 constantData2[4] = {1.0f, -0.1873f, -0.4681f,   84.3912f};
-            vx_float32 constantData3[4] = {1.0f,  1.8556f,  0.0,     -237.0168f};
+            vx_float32 constantData1[4] = {1.0f, 0.0f, 1.5748f, -201.0744f};
+            vx_float32 constantData2[4] = {1.0f, -0.1873f, -0.4681f, 84.3912f};
+            vx_float32 constantData3[4] = {1.0f, 1.8556f, 0.0, -237.0168f};
             vx_uint8 constantData4[16] = {0, 32, 64, 0, 0, 0, 0, 0, 8, 8, 8, 0, 0, 0, 0, 0};
             vx_uint8 constantData5[16] = {0, 8, 16, 32, 40, 48, 64, 72, 8, 8, 8, 8, 8, 8, 8, 8};
             vx_uint8 constantData6[16] = {80, 96, 104, 112, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0};
@@ -716,6 +717,8 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
         }
     }
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -727,3 +730,4 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
 
     return status;
 }
+

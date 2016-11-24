@@ -27,3 +27,4 @@ VX_INTERNAL_CALLBACK_API void vxoPyramid_Destructor(vx_reference ref);
 EXTERN_C_END
 
 #endif /* __GC_VX_PYRAMID_H__*/
+

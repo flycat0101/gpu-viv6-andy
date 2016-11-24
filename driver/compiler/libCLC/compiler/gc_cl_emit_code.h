@@ -159,6 +159,12 @@ gcGetUniformName(
     );
 
 gctUINT8
+clConvPackedTypeToEnable(
+    IN cloCOMPILER Compiler,
+    IN clsGEN_CODE_DATA_TYPE PackedType
+    );
+
+gctUINT8
 gcGetDefaultEnable(
     IN cloCOMPILER compiler,
     IN clsGEN_CODE_DATA_TYPE DataType

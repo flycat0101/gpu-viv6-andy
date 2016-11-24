@@ -22,7 +22,7 @@ typedef struct _VSC_SCL_SCALARIZATION
     VSC_HASH_TABLE array_infos;
     VSC_OPTN_SCLOptions* options;
     VIR_Dumper* dumper;
-    VSC_PRIMARY_MEM_POOL pmp;
+    VSC_MM* pMM;
 } VSC_SCL_Scalarization;
 
 #define VSC_SCL_Scalarization_GetShader(scl)           ((scl)->shader)
@@ -32,25 +32,14 @@ typedef struct _VSC_SCL_SCALARIZATION
 #define VSC_SCL_Scalarization_SetOptions(scl, options)          ((scl)->options = options)
 #define VSC_SCL_Scalarization_GetDumper(scl)           ((scl)->dumper)
 #define VSC_SCL_Scalarization_SetDumper(scl, dumper)           ((scl)->dumper = dumper)
-#define VSC_SCL_Scalarization_GetPmp(scl)              (&((scl)->pmp))
-#define VSC_SCL_Scalarization_GetMM(scl)               (&((scl)->pmp.mmWrapper))
-
-extern void VSC_SCL_Scalarization_Init(
-    IN OUT VSC_SCL_Scalarization* scl,
-    IN VIR_Shader* shader,
-    IN VSC_OPTN_SCLOptions* options,
-    IN VIR_Dumper* dumper
-    );
-
-extern void VSC_SCL_Scalarization_Final(
-    IN OUT VSC_SCL_Scalarization* scl
-    );
+#define VSC_SCL_Scalarization_GetMM(scl)               ((scl)->pMM)
 
 /* because arrays could be defined in shader scope, this
  * optimization should be performed on shader scope */
 extern VSC_ErrCode VSC_SCL_Scalarization_PerformOnShader(
-    IN OUT VSC_SCL_Scalarization* scl
+    IN VSC_SH_PASS_WORKER* pPassWorker
     );
+DECLARE_QUERY_PASS_PROP(VSC_SCL_Scalarization_PerformOnShader);
 
 #endif
 

@@ -172,6 +172,5 @@ typedef EGLNativeWindowType  NativeWindowType;
 typedef khronos_int32_t EGLint;
 
 #include <EGL/eglvivante.h>
-#include <EGL/eglrename.h>
 
 #endif /* __eglplatform_h */

@@ -20,12 +20,12 @@ VX_INTERNAL_CALLBACK_API void vxoMatrix_Destructor(vx_reference ref)
     vxoMemory_Free(matrix->base.context, &matrix->memory);
 }
 
-VX_PUBLIC_API vx_status vxReleaseMatrix(vx_matrix *mat)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseMatrix(vx_matrix *mat)
 {
     return vxoReference_Release((vx_reference_ptr)mat, VX_TYPE_MATRIX, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_matrix vxCreateMatrix(vx_context context, vx_enum data_type, vx_size columns, vx_size rows)
+VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrix(vx_context context, vx_enum data_type, vx_size columns, vx_size rows)
 {
     vx_matrix   matrix;
     vx_size     dataSize;
@@ -103,7 +103,7 @@ VX_PUBLIC_API vx_matrix vxCreateMatrix(vx_context context, vx_enum data_type, vx
     return (vx_matrix)matrix;
 }
 
-VX_PUBLIC_API vx_status vxQueryMatrix(vx_matrix matrix, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryMatrix(vx_matrix matrix, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -141,7 +141,7 @@ VX_PUBLIC_API vx_status vxQueryMatrix(vx_matrix matrix, vx_enum attribute, void 
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxAccessMatrix(vx_matrix matrix, void *array)
+VX_API_ENTRY vx_status VX_API_CALL vxReadMatrix(vx_matrix matrix, void *array)
 {
     if (!vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -165,7 +165,7 @@ VX_PUBLIC_API vx_status vxAccessMatrix(vx_matrix matrix, void *array)
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxCommitMatrix(vx_matrix matrix, void *array)
+VX_API_ENTRY vx_status VX_API_CALL vxWriteMatrix(vx_matrix matrix, const void *array)
 {
     if (!vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -188,3 +188,4 @@ VX_PUBLIC_API vx_status vxCommitMatrix(vx_matrix matrix, void *array)
 
     return VX_SUCCESS;
 }
+

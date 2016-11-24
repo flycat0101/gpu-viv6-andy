@@ -20,6 +20,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/fcntl.h>
+#include <sys/mman.h>
 
 #include <unistd.h>
 #include <dlfcn.h>
@@ -57,6 +62,8 @@ typedef struct __DRIDisplayRec  __DRIDisplay;
 void _VivGetLock(__DRIdrawablePriv * drawable);
 void _UpdateDrawableInfo(__DRIdrawablePriv * drawable);
 void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable);
+
+static __DRIDisplay *pCurrentDRIDisplay = (__DRIDisplay *)gcvNULL;
 
 static pthread_mutex_t drmMutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -594,6 +601,46 @@ static Bool VIVEXTFULLScreenInfo(Display* dpy, int screen, Drawable drawable)
 
 #endif
 
+/* UINX signal handling utility function  */
+static void setSigFunc(int sig, void (*func)())
+{
+    __sighandler_t handler = signal(sig, SIG_IGN);
+
+    if (handler == SIG_ERR) {
+        fprintf(stderr, "libEGL DRI BackEnd error: UNIX signal setting error!\n");
+        return;
+    }
+    else if (handler == SIG_IGN) {
+        return;
+    }
+
+#if DEBUG
+    if (handler != SIG_DFL) {
+        fprintf(stderr, "libEGL DRI BackEnd error: UNIX signal already caught!");
+    }
+#endif
+
+    if (signal(sig, func) == SIG_ERR) {
+        fprintf(stderr, "libEGL DRI BackEnd error: UNIX signal setting error!\n");
+    }
+
+}
+
+static void setSignalHandlingFunc(void (*func)())
+{
+    setSigFunc(SIGTERM, func);
+    setSigFunc(SIGQUIT, func);
+    setSigFunc(SIGINT, func);
+    setSigFunc(SIGHUP, func);
+}
+
+
+void __eglInteruptHandler(void)
+{
+    pCurrentDRIDisplay = gcvNULL;
+    exit(1);
+}
+
 static gceSTATUS _CreateOnScreenSurfaceWrapper(
     __DRIdrawablePriv * drawable,
       gceSURF_FORMAT Format
@@ -664,7 +711,6 @@ static gceSTATUS _LockVideoNode(
 
     memset(&iface, 0, sizeof(gcsHAL_INTERFACE));
 
-    /* TODO: Better to use cacheable! */
     iface.engine = gcvENGINE_RENDER;
     iface.command = gcvHAL_LOCK_VIDEO_MEMORY;
     iface.u.LockVideoMemory.node = Node;
@@ -689,6 +735,7 @@ static gceSTATUS _UnlockVideoNode(
     gcmASSERT(Node != 0);
 
     memset(&iface, 0, sizeof(gcsHAL_INTERFACE));
+    iface.ignoreTLS = gcvFALSE;
     iface.engine = gcvENGINE_RENDER;
     iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
     iface.u.UnlockVideoMemory.node = Node;
@@ -873,17 +920,16 @@ static void _destroyPixmapInfo(
 #ifdef DRI_PIXMAPRENDER_ASYNC
 static void renderThread(void* refData)
 {
-
-    __DRIcontextPriv * context;
     __DRIdrawablePriv * drawable = (__DRIdrawablePriv *)refData;
 
     int i = 0;
+    Display                        *dpy = gcvNULL;
 
-
-    if ( drawable )
-        context = drawable->contextPriv;
-    else
+    if ( drawable == gcvNULL )
         return ;
+
+    XInitThreads();
+    dpy = XOpenDisplay(NULL);
 
     while( 1 && drawable->frameMutex ) {
 
@@ -915,8 +961,15 @@ static void renderThread(void* refData)
                         continue;
                     }
 
-
+/* We don't need lock any more cause backpixmap is used and 3D will not draw the window directly*/
+/*
+                    LINUX_LOCK_FRAMEBUFFER(context);
+*/
+                    XCopyArea(dpy, drawable->ascframe[i].backPixmap, drawable->ascframe[i].Drawable, drawable->ascframe[i].xgc, 0, 0, drawable->ascframe[i].w, drawable->ascframe[i].h, 0, 0);
+                    XFlush(dpy);
+/*
                     LINUX_UNLOCK_FRAMEBUFFER(context);
+*/
 
                     gcoOS_AcquireMutex(gcvNULL, drawable->frameMutex, gcvINFINITE);
                     drawable->ascframe[i].busy = _FRAME_FREE;
@@ -934,6 +987,9 @@ static void renderThread(void* refData)
 
     if ( drawable->exitSIG)
     gcoOS_Signal(gcvNULL, drawable->exitSIG, gcvTRUE);
+
+    if ( dpy )
+    XCloseDisplay(dpy);
 
 }
 
@@ -1150,7 +1206,7 @@ static void asyncRenderBegin(__DRIdrawablePriv * drawable, PlatformWindowType Dr
 static void asyncRenderEnd(__DRIdrawablePriv * drawable, PlatformWindowType Drawable, int index)
 {
     gcsHAL_INTERFACE iface;
-    __DRIDisplay * display;
+
 
     if (drawable == gcvNULL || drawable->frameMutex == gcvNULL)
         return;
@@ -1165,7 +1221,6 @@ static void asyncRenderEnd(__DRIdrawablePriv * drawable, PlatformWindowType Draw
         || drawable->busySIG == gcvNULL )
         goto ENDUNLOCK;
 
-    display = drawable->display;
 
     drawable->ascframe[index].busy = _FRAME_BUSY;
     drawable->ascframe[index].Drawable = Drawable;
@@ -1183,9 +1238,6 @@ static void asyncRenderEnd(__DRIdrawablePriv * drawable, PlatformWindowType Draw
     if ( drawable->busySIG)
     gcoOS_Signal(gcvNULL,drawable->busySIG, gcvTRUE);
 
-    XCopyArea(display->dpy, drawable->ascframe[index].backPixmap, drawable->ascframe[index].Drawable, drawable->ascframe[index].xgc, 0, 0, drawable->ascframe[index].w, drawable->ascframe[index].h, 0, 0);
-
-    XFlush(display->dpy);
 
 ENDUNLOCK:
     gcoOS_ReleaseMutex(gcvNULL, drawable->frameMutex);
@@ -2103,6 +2155,7 @@ dri_CreateContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
     __DRIcontextPriv *context;
     __DRIDisplay* display;
     gceSTATUS status = gcvSTATUS_OK;
+    static int setSig = 0;
 
     gcmHEADER_ARG("localDisplay=0x%x, Context=0x%x\n", localDisplay, Context);
 
@@ -2139,6 +2192,12 @@ dri_CreateContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
             _CreateBackPixmapForDrawable(context->drawablePriv);
     }
 #endif
+
+    if ( setSig == 0 )
+    {
+        setSignalHandlingFunc(__eglInteruptHandler);
+        setSig = 1;
+    }
 
 OnError:
     /* Success. */
@@ -2570,7 +2629,6 @@ dri_SwapBuffersXwinAsync(
     OUT gctUINT *Height
     )
 {
-    __DRIcontextPriv * context;
     __DRIdrawablePriv * drawable;
     __DRIDisplay* driDisplay;
     gceSTATUS status = gcvSTATUS_OK;
@@ -2590,7 +2648,6 @@ dri_SwapBuffersXwinAsync(
 
     if ( drawable )
     {
-        context = drawable->contextPriv;
         gcoSURF_GetFormat(ResolveTarget, &drawable->surftype, &drawable->surfformat);
         /* To check Win by DRI */
         /*LINUX_LOCK_FRAMEBUFFER(context);*/
@@ -2632,16 +2689,17 @@ dri_SwapBuffersXwinAsync(
 
         if (gcmIS_ERROR(status))
         {
+            index = -1;
             goto ENDXWINEX;
         }
-        gcoHAL_Commit(gcvNULL, gcvFALSE);
+
     }
 
 ENDXWINEX:
 
     *Width = drawable->w;
     *Height = drawable->h;
-    LINUX_LOCK_FRAMEBUFFER(context);
+
     asyncRenderEnd(drawable, Drawable, index);
 
     gcmFOOTER();
@@ -3912,6 +3970,7 @@ dri_InitLocalDisplayInfo(
         _GetDisplayInfo(display, screen);
 
         *localDisplay = (gctPOINTER)display;
+        pCurrentDRIDisplay = display;
         gcmFOOTER_ARG("*localDisplay=0x%x", *localDisplay);
         return status;
     }
@@ -3938,7 +3997,7 @@ dri_DeinitLocalDisplayInfo(
         free(display);
         *localDisplay = gcvNULL;
     }
-
+    pCurrentDRIDisplay = (__DRIDisplay *)gcvNULL;
     return gcvSTATUS_OK;
 }
 
@@ -4302,9 +4361,6 @@ dri_ResizeWindow(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-/******************************************************************************/
-/* TODO: merge functions. */
-
 #include <gc_egl_precomp.h>
 
 
@@ -4320,9 +4376,6 @@ dri_ResizeWindow(
  * are synchronized.
  * The idea is to wait until buffer is displayed before next time return back
  * to GPU rendering.
- *
- * TODO: But this will break frame skipping because skipped back buffer post
- * will cause infinite wait in getWindowBackBuffer.
  */
 #define SYNC_TEMPORARY_RESOLVE_SURFACES     0
 
@@ -4556,12 +4609,6 @@ _CreateWindowBuffers(
 
             for (i = 0; i < Info->multiBuffer; i++)
             {
-                /*
-                 * TODO: Check wrapper limitations.
-                 * Allocate temporary surface objects if can not wrap.
-                 *
-                 * Current logic follows former code without changes.
-                 */
                 gctUINT    offset;
                 gctPOINTER logical;
                 gctUINT    physical;
@@ -4573,6 +4620,23 @@ _CreateWindowBuffers(
 
                 gcoOS_ZeroMemory(pointer, sizeof (struct eglNativeBuffer));
                 buffer = pointer;
+
+                /* Add into buffer list. */
+                if (Info->bufferList != gcvNULL)
+                {
+                    VEGLNativeBuffer prev = Info->bufferList->prev;
+
+                    buffer->prev = prev;
+                    buffer->next = Info->bufferList;
+
+                    prev->next = buffer;
+                    Info->bufferList->prev = buffer;
+                }
+                else
+                {
+                    buffer->prev = buffer->next = buffer;
+                    Info->bufferList = buffer;
+                }
 
                 /* Bytes offset to the buffer. */
                 offset = (gctUINT) (Info->stride * alignedHeight * i);
@@ -4631,23 +4695,6 @@ _CreateWindowBuffers(
                 buffer->origin.x = 0;
                 buffer->origin.y = alignedHeight * i;
 
-                /* Add into buffer list. */
-                if (Info->bufferList != gcvNULL)
-                {
-                    VEGLNativeBuffer prev = Info->bufferList->prev;
-
-                    buffer->prev = prev;
-                    buffer->next = Info->bufferList;
-
-                    prev->next = buffer;
-                    Info->bufferList->prev = buffer;
-                }
-                else
-                {
-                    buffer->prev = buffer->next = buffer;
-                    Info->bufferList = buffer;
-                }
-
                 gcmTRACE(gcvLEVEL_INFO,
                          "%s(%d): buffer[%d]: yoffset=%-4d physical=%x",
                          __FUNCTION__, __LINE__,
@@ -4680,23 +4727,6 @@ _CreateWindowBuffers(
             gcoOS_ZeroMemory(pointer, sizeof (struct eglNativeBuffer));
             buffer = pointer;
 
-            /* Construct temporary resolve surfaces. */
-            gcmONERROR(gcoSURF_Construct(gcvNULL,
-                                         Info->width,
-                                         Info->height, 1,
-                                         gcvSURF_BITMAP,
-                                         Info->format,
-                                         gcvPOOL_DEFAULT,
-                                         &buffer->surface));
-
-#if SYNC_TEMPORARY_RESOLVE_SURFACES
-            /* Create the buffer lock. */
-            gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvTRUE, &buffer->lock));
-
-            /* Set initial 'unlocked' state. */
-            gcmVERIFY_OK(gcoOS_Signal(gcvNULL, buffer->lock, gcvTRUE));
-#endif
-
             /* Add into buffer list. */
             if (Info->bufferList != gcvNULL)
             {
@@ -4713,6 +4743,23 @@ _CreateWindowBuffers(
                 buffer->prev = buffer->next = buffer;
                 Info->bufferList = buffer;
             }
+
+            /* Construct temporary resolve surfaces. */
+            gcmONERROR(gcoSURF_Construct(gcvNULL,
+                                         Info->width,
+                                         Info->height, 1,
+                                         gcvSURF_BITMAP,
+                                         Info->format,
+                                         gcvPOOL_DEFAULT,
+                                         &buffer->surface));
+
+#if SYNC_TEMPORARY_RESOLVE_SURFACES
+            /* Create the buffer lock. */
+            gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvTRUE, &buffer->lock));
+
+            /* Set initial 'unlocked' state. */
+            gcmVERIFY_OK(gcoOS_Signal(gcvNULL, buffer->lock, gcvTRUE));
+#endif
 
             gcmTRACE(gcvLEVEL_INFO,
                      "%s(%d): buffer[%d]: surface=%p",
@@ -5793,7 +5840,6 @@ _UpdateBufferAge(
     IN struct eglBackBuffer * BackBuffer
     )
 {
-    /* TODO */
     return EGL_TRUE;
 }
 
@@ -5805,7 +5851,6 @@ _QueryBufferAge(
     OUT EGLint *BufferAge
     )
 {
-    /* TODO */
     return EGL_FALSE;
 }
 

@@ -109,6 +109,9 @@ typedef enum _cleCOMMAND_TYPE
     clvCOMMAND_COPY_IMAGE,
     clvCOMMAND_COPY_IMAGE_TO_BUFFER,
     clvCOMMAND_COPY_BUFFER_TO_IMAGE,
+#if BUILD_OPENCL_12
+    clvCOMMAND_MIGRATE_MEM_OBJECTS,
+#endif
     clvCOMMAND_MAP_BUFFER,
     clvCOMMAND_MAP_IMAGE,
     clvCOMMAND_UNMAP_MEM_OBJECT,
@@ -329,12 +332,22 @@ typedef struct {
 typedef struct {
     gctUINT             numObjects;
     const clsMem_PTR *  memObjects;
+    void**              objectsDatas;
+    /*size_t              *x,*y,*z;*/
+    size_t              *w,*h,*d;
+    cl_image_format     *imFormats;
+    /*cl_int              *elementSize;*/
 } clsCommandAcquireGLObjects,
 * clsCommandAcquireGLObjects_PTR;
 
 typedef struct {
     gctUINT             numObjects;
     const clsMem_PTR *  memObjects;
+    void**              objectsDatas;
+    /*size_t              *x,*y,*z;*/
+    size_t              *w,*h,*d;
+    cl_image_format     *imFormats;
+    cl_int              *elementSize;
 } clsCommandReleaseGLObjects,
 * clsCommandReleaseGLObjects_PTR;
 
@@ -406,6 +419,7 @@ clsCommand;
     (type) == clvCOMMAND_COPY_IMAGE           ? CL_COMMAND_COPY_IMAGE           : \
     (type) == clvCOMMAND_COPY_IMAGE_TO_BUFFER ? CL_COMMAND_COPY_IMAGE_TO_BUFFER : \
     (type) == clvCOMMAND_COPY_BUFFER_TO_IMAGE ? CL_COMMAND_COPY_BUFFER_TO_IMAGE : \
+    (type) == clvCOMMAND_MIGRATE_MEM_OBJECTS  ? CL_COMMAND_MIGRATE_MEM_OBJECTS  : \
     (type) == clvCOMMAND_MAP_BUFFER           ? CL_COMMAND_MAP_BUFFER           : \
     (type) == clvCOMMAND_MAP_IMAGE            ? CL_COMMAND_MAP_IMAGE            : \
     (type) == clvCOMMAND_UNMAP_MEM_OBJECT     ? CL_COMMAND_UNMAP_MEM_OBJECT     : \
@@ -462,6 +476,28 @@ clsCommand;
 
 
 /* Return true if command is a buffer operation */
+#if BUILD_OPENCL_12
+
+#define clmCOMMAND_BUFFER_OPERATION(type) ( \
+    (type) == clvCOMMAND_READ_BUFFER             ? gcvTRUE : \
+    (type) == clvCOMMAND_READ_BUFFER_RECT        ? gcvTRUE : \
+    (type) == clvCOMMAND_WRITE_BUFFER            ? gcvTRUE : \
+    (type) == clvCOMMAND_FILL_BUFFER             ? gcvTRUE : \
+    (type) == clvCOMMAND_WRITE_BUFFER_RECT       ? gcvTRUE : \
+    (type) == clvCOMMAND_COPY_BUFFER             ? gcvTRUE : \
+    (type) == clvCOMMAND_COPY_BUFFER_RECT        ? gcvTRUE : \
+    (type) == clvCOMMAND_READ_IMAGE              ? gcvTRUE : \
+    (type) == clvCOMMAND_WRITE_IMAGE             ? gcvTRUE : \
+    (type) == clvCOMMAND_FILL_IMAGE              ? gcvTRUE : \
+    (type) == clvCOMMAND_COPY_IMAGE              ? gcvTRUE : \
+    (type) == clvCOMMAND_COPY_IMAGE_TO_BUFFER    ? gcvTRUE : \
+    (type) == clvCOMMAND_COPY_BUFFER_TO_IMAGE    ? gcvTRUE : \
+    (type) == clvCOMMAND_MIGRATE_MEM_OBJECTS     ? gcvTRUE : \
+    (type) == clvCOMMAND_MAP_BUFFER              ? gcvTRUE : \
+    (type) == clvCOMMAND_MAP_IMAGE               ? gcvTRUE : gcvFALSE )
+
+#else
+
 #define clmCOMMAND_BUFFER_OPERATION(type) ( \
     (type) == clvCOMMAND_READ_BUFFER             ? gcvTRUE : \
     (type) == clvCOMMAND_READ_BUFFER_RECT        ? gcvTRUE : \
@@ -476,6 +512,8 @@ clsCommand;
     (type) == clvCOMMAND_COPY_BUFFER_TO_IMAGE    ? gcvTRUE : \
     (type) == clvCOMMAND_MAP_BUFFER              ? gcvTRUE : \
     (type) == clvCOMMAND_MAP_IMAGE               ? gcvTRUE : gcvFALSE )
+
+#endif
 
 /*****************************************************************************\
 |*                         Supporting functions                              *|

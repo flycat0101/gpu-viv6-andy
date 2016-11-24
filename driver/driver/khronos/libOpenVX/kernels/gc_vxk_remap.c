@@ -18,6 +18,8 @@ vx_status vxRemap(vx_node node, vx_image input, vx_remap remap, vx_enum policy, 
     vx_status status = VX_SUCCESS;
     vx_uint32 width = 0, height = 0;
     gcoVX_Kernel_Context * kernelContext = gcvNULL;
+    vx_int32 uniformNum = 0;
+    vx_int32 index = 0;
 
 #if gcdVX_OPTIMIZER
     if (node && node->kernelContext)
@@ -34,6 +36,7 @@ vx_status vxRemap(vx_node node, vx_image input, vx_remap remap, vx_enum policy, 
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryRemap(remap, VX_REMAP_ATTRIBUTE_DESTINATION_WIDTH, &width, sizeof(width));
@@ -50,7 +53,9 @@ vx_status vxRemap(vx_node node, vx_image input, vx_remap remap, vx_enum policy, 
 
     kernelContext->params.kernel = gcvVX_KERNEL_REMAP;
     kernelContext->params.xstep = 16;
-    kernelContext->params.policy           = (policy == VX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR)?gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR:(policy == VX_INTERPOLATION_TYPE_BILINEAR?gcvVX_INTERPOLATION_TYPE_BILINEAR:gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR);
+    kernelContext->params.policy           = (policy == VX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR)?
+gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR:(policy == VX_INTERPOLATION_TYPE_BILINEAR?
+gcvVX_INTERPOLATION_TYPE_BILINEAR:gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR);
 #if gcdVX_OPTIMIZER
     kernelContext->borders                 = borders->mode;
 #else
@@ -69,11 +74,26 @@ vx_status vxRemap(vx_node node, vx_image input, vx_remap remap, vx_enum policy, 
         bin[2] =
         bin[3] = FORMAT_VALUE(borders->mode == VX_BORDER_MODE_CONSTANT?borders->constant_value:0xcd);
 
-        gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
-        kernelContext->uniforms[0].num = 4 * 4;
-        kernelContext->uniforms[0].index = 4;
-        kernelContext->uniform_num = 1;
+        gcoOS_MemCopy(&kernelContext->uniforms[index].uniform, bin, sizeof(bin));
+        kernelContext->uniforms[index].num = 4 * 4;
+        kernelContext->uniforms[index++].index = 4;
+        uniformNum++;
     }
+
+    if (node->base.context->evisNoInst.noBilinear)
+    {
+        vx_uint32 constantData[8] = {0, 8, 16, 24, 0, 0, 0, 0};
+        gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData, sizeof(constantData));
+        kernelContext->uniforms[index].num = vxmLENGTH_OF(constantData);
+        kernelContext->uniforms[index++].index = 5;
+        uniformNum++;
+    }
+
+    kernelContext->uniform_num = uniformNum;
+
+    kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -86,3 +106,4 @@ vx_status vxRemap(vx_node node, vx_image input, vx_remap remap, vx_enum policy, 
 
     return status;
 }
+

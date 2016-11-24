@@ -53,6 +53,9 @@ LOCAL_SRC_FILES += \
 
 endif
 
+LOCAL_GENERATED_SOURCES := \
+    $(AQREG)
+
 LOCAL_CFLAGS := \
     $(CFLAGS) \
     -Wno-unused-function \
@@ -83,9 +86,6 @@ LOCAL_CFLAGS := \
     $(CFLAGS)
 
 endif
-
-LOCAL_GENERATED_SOURCES := \
-    $(AQREG)
 
 LOCAL_MODULE         := libhalarchuser
 LOCAL_MODULE_TAGS    := optional

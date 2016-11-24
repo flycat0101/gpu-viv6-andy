@@ -1,0 +1,88 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# This is the SOURCES file for OpenGL code
+#
+include ../../makefile.linux.def
+
+ifeq ($(gcdSTATIC_LINK), 1)
+    STATIC = 1
+else
+    DYNAMIC = 1
+endif
+
+ifeq ($(STATIC), 1)
+    TARGET_NAME = vivante_dri.a
+else
+    TARGET_NAME = vivante_dri.so
+endif
+
+OBJECTS :=  \
+    $(OBJ_DIR)/gc_glcore_dri.o \
+    $(OBJ_DIR)/gc_es_api.o \
+    $(OBJ_DIR)/gc_es_api_profiler.o \
+    $(OBJ_DIR)/gc_es_bufobj.o \
+    $(OBJ_DIR)/gc_es_context.o \
+    $(OBJ_DIR)/gc_es_dispatch.o \
+    $(OBJ_DIR)/gc_es_draw.o \
+    $(OBJ_DIR)/gc_es_egl.o \
+    $(OBJ_DIR)/gc_es_extensions.o \
+    $(OBJ_DIR)/gc_es_fbo.o \
+    $(OBJ_DIR)/gc_es_formats.o \
+    $(OBJ_DIR)/gc_es_fragop.o \
+    $(OBJ_DIR)/gc_es_misc.o \
+    $(OBJ_DIR)/gc_es_names.o \
+    $(OBJ_DIR)/gc_es_pixelop.o \
+    $(OBJ_DIR)/gc_es_query.o \
+    $(OBJ_DIR)/gc_es_raster.o \
+    $(OBJ_DIR)/gc_es_shader.o \
+    $(OBJ_DIR)/gc_es_teximage.o \
+    $(OBJ_DIR)/gc_es_texstate.o \
+    $(OBJ_DIR)/gc_es_varray.o \
+    $(OBJ_DIR)/gc_es_profiler.o \
+    $(OBJ_DIR)/gc_gl_attrib.o \
+    $(OBJ_DIR)/gc_gl_eval.o \
+    $(OBJ_DIR)/gc_gl_feed.o \
+    $(OBJ_DIR)/gc_gl_fog.o \
+    $(OBJ_DIR)/gc_gl_image.o \
+    $(OBJ_DIR)/gc_gl_light.o \
+    $(OBJ_DIR)/gc_gl_material.o \
+    $(OBJ_DIR)/gc_gl_math.o \
+    $(OBJ_DIR)/gc_gl_memmgr.o \
+    $(OBJ_DIR)/gc_gl_prim.o \
+    $(OBJ_DIR)/gc_gl_px_util.o \
+    $(OBJ_DIR)/gc_gl_pushpop.o \
+    $(OBJ_DIR)/gc_gl_rect.o \
+    $(OBJ_DIR)/gc_gl_select.o \
+    $(OBJ_DIR)/gc_gl_varray.o \
+    $(OBJ_DIR)/gc_gl_xform.o
+
+
+CFLAGS += -D_GNU_SOURCE
+
+# Specify Vivante library paths.
+LIBS += -L $(ROOTDIR)/src/chip/$(OBJ_DIR)
+LIBS += -L $(ROOTDIR)/src/glcore/api/$(OBJ_DIR)
+LIBS += -L $(ROOTDIR)/src/glcore/display_list/$(OBJ_DIR)
+# Path to libGL.so
+LIBS += -L $(ROOTDIR)/src/GLX/client/$(OBJ_DIR)
+
+LIBS += -lgl4chip -lgl4display_list  -lgl4api
+LIBS += -lm -lpthread -lGAL -lGL
+
+LFLAGS += -Wl,--version-script=glCoreSymExport
+
+INSTALL_DIR = $(SDK_DIR)/drivers/dri
+
+include $(AQROOT)/common.target

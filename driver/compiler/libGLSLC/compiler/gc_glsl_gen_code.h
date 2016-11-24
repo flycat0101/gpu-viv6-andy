@@ -86,10 +86,10 @@ typedef enum _sleOPCODE
     slvOPCODE_EQUAL,
     slvOPCODE_NOT_EQUAL,
 
-    slvOPCODE_BITWISE_AND,
-    slvOPCODE_BITWISE_OR,
-    slvOPCODE_BITWISE_XOR,
-    slvOPCODE_BITWISE_NOT,
+    slvOPCODE_AND_BITWISE,
+    slvOPCODE_OR_BITWISE,
+    slvOPCODE_XOR_BITWISE,
+    slvOPCODE_NOT_BITWISE,
 
     slvOPCODE_LSHIFT,
     slvOPCODE_RSHIFT,
@@ -187,6 +187,11 @@ typedef enum _sleOPCODE
     /* local memory */
     slvOPCODE_LOAD_L,
     slvOPCODE_STORE_L,
+
+    /* misc */
+    slvOPCODE_PARAM_CHAIN,
+    slvOPCODE_INTRINSIC,
+    slvOPCODE_INTRINSIC_ST,
 
     /* The max opcode. */
     slvOPCODE_MAXOPCODE
@@ -1195,6 +1200,8 @@ typedef struct _slsITERATION_CONTEXT
             sluCONSTANT_VALUE        loopIndexValue;
 
             gctLABEL                bodyEndLabel;
+
+            gctUINT                 loopCount;
         }
         unrolledInfo;
 
@@ -1408,6 +1415,7 @@ slGenDefineUnrolledIterationBegin(
     IN sloCODE_GENERATOR CodeGenerator,
     IN slsNAME * LoopIndexName,
     IN gctBOOL OnlyDoTheCheck,
+    IN gctUINT loopCount,
     OUT slsITERATION_CONTEXT * CurrentIterationContext
     );
 

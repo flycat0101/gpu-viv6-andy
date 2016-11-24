@@ -314,41 +314,117 @@ static const GLubyte rangeIndices[82][9] =
 };
 
 /* Set bits in a value. */
-static GLuint
+static GLubyte
 __glUtilSetBits(
-    GLvoid *Data,
+    GLubyte *Data,
     const GLuint Start,
     const GLuint End,
-    const GLuint Value
+    const GLubyte Value
     )
 {
     if (End >= Start)
     {
         /* Compute the mask. */
-        const GLuint _Mask =  (GLuint)((~0ULL >> (63 - End + Start)) << Start);
+        const GLubyte _Mask =  (GLubyte)((~0ULL >> (63 - End + Start)) << Start);
 
         /* Zero out the destination. */
-        *(GLuint*)Data &= ~_Mask;
+        *Data &= ~_Mask;
 
         /* Set the destination to the value. */
-        *(GLuint*)Data |= (((GLuint) Value) << Start) & _Mask;
+        *Data |= (Value << Start) & _Mask;
 
         /* Return the result value. */
-        return *(GLuint*)Data;
+        return *Data;
     }
     else
     {
         /* Compute the mask. */
-        const GLuint _Mask =  (GLuint)((~0ULL >> (63 - Start + End)) << End);
+        const GLubyte _Mask =  (GLubyte)((~0ULL >> (63 - Start + End)) << End);
 
         /* Zero out the destination. */
-        *(GLuint*)Data &= ~_Mask;
+        *Data &= ~_Mask;
 
         /* Set the destination to the value. */
-        *(GLuint*)Data |= (((GLuint) Value) << End) & _Mask;
+        *Data |= (Value << End) & _Mask;
 
         /* Return the result value. */
-        return *(GLuint*)Data;
+        return *Data;
+    }
+}
+
+static GLushort
+__glUtilSetShortBits(
+    GLushort *Data,
+    const GLuint Start,
+    const GLuint End,
+    const GLushort Value
+    )
+{
+    if (End >= Start)
+    {
+        /* Compute the mask. */
+        const GLushort _Mask =  (GLushort)((~0ULL >> (63 - End + Start)) << Start);
+
+        /* Zero out the destination. */
+        *Data &= ~_Mask;
+
+        /* Set the destination to the value. */
+        *Data |= (Value << Start) & _Mask;
+
+        /* Return the result value. */
+        return *Data;
+    }
+    else
+    {
+        /* Compute the mask. */
+        const GLushort _Mask =  (GLushort)((~0ULL >> (63 - Start + End)) << End);
+
+        /* Zero out the destination. */
+        *Data &= ~_Mask;
+
+        /* Set the destination to the value. */
+        *Data |= (Value << End) & _Mask;
+
+        /* Return the result value. */
+        return *Data;
+    }
+}
+
+static GLuint64
+__glUtilSet64Bits(
+    GLuint64 *Data,
+    const GLuint Start,
+    const GLuint End,
+    const GLuint64 Value
+    )
+{
+    if (End >= Start)
+    {
+        /* Compute the mask. */
+        const GLuint64 _Mask =  (GLuint64)((~0ULL >> (63 - End + Start)) << Start);
+
+        /* Zero out the destination. */
+        *Data &= ~_Mask;
+
+        /* Set the destination to the value. */
+        *Data |= (Value << Start) & _Mask;
+
+        /* Return the result value. */
+        return *Data;
+    }
+    else
+    {
+        /* Compute the mask. */
+        const GLuint64 _Mask =  (GLuint64)((~0ULL >> (63 - Start + End)) << End);
+
+        /* Zero out the destination. */
+        *Data &= ~_Mask;
+
+        /* Set the destination to the value. */
+        *Data |= (Value << End) & _Mask;
+
+        /* Return the result value. */
+        return *Data;
     }
 }
 
@@ -439,7 +515,7 @@ __glUtilReadBlock(
         for (i = 0; i < count; i += 1)
         {
             bitpos = (GLubyte)(count - i - 1);
-            __glUtilSetBits(&value, i, i, __glUtilGetBits(temp, shift + bitpos, shift + bitpos));
+            __glUtilSet64Bits(&value, i, i, (GLuint64) __glUtilGetBits(temp, shift + bitpos, shift + bitpos));
         }
     }
     else
@@ -524,7 +600,7 @@ __glUtilDecodeBlockMode(
     /* If true, this means we've got the first 5 lines (see table). */
     if (__glUtilGetBits(BlockMode, 0, 1) != 0)
     {
-        __glUtilSetBits(&R, 1, 2, (GLuint) __glUtilGetBits(BlockMode, 0, 1));
+        __glUtilSetBits(&R, 1, 2, (GLubyte) __glUtilGetBits(BlockMode, 0, 1));
         B = (GLubyte) __glUtilGetBits(BlockMode, 7, 8);
 
         switch (__glUtilGetBits(BlockMode, 2, 3))
@@ -571,7 +647,7 @@ __glUtilDecodeBlockMode(
         if (__glUtilGetBits(BlockMode, 6, 8) == 7)
             return 0;
 
-        __glUtilSetBits(&R, 1, 2, (GLuint) __glUtilGetBits(BlockMode, 2, 3));
+        __glUtilSetBits(&R, 1, 2, (GLubyte) __glUtilGetBits(BlockMode, 2, 3));
         B = (GLubyte) __glUtilGetBits(BlockMode, 9, 10);
 
         switch (__glUtilGetBits(BlockMode, 7, 8))
@@ -660,7 +736,7 @@ __glUtilDecodeISE(
         {
             GLuint64 packedbits;
             GLubyte T = 0;
-            GLubyte C;
+            GLubyte C = 0;
             GLubyte t0, t1, t2, t3, t4;
 
             /* Determine the number of bits to read. */
@@ -692,11 +768,11 @@ __glUtilDecodeISE(
                 break;
 
             case 1:
-                __glUtilSetBits(&T, 0, 1, (GLuint) __glUtilGetBits(packedbits,  1,  2));
-                __glUtilSetBits(&T, 2, 3, (GLuint) __glUtilGetBits(packedbits,  4,  5));
-                __glUtilSetBits(&T, 4, 4, (GLuint) __glUtilGetBits(packedbits,  7,  7));
-                __glUtilSetBits(&T, 5, 6, (GLuint) __glUtilGetBits(packedbits,  9, 10));
-                __glUtilSetBits(&T, 7, 7, (GLuint) __glUtilGetBits(packedbits, 12, 12));
+                __glUtilSetBits(&T, 0, 1, (GLubyte) __glUtilGetBits(packedbits,  1,  2));
+                __glUtilSetBits(&T, 2, 3, (GLubyte) __glUtilGetBits(packedbits,  4,  5));
+                __glUtilSetBits(&T, 4, 4, (GLubyte) __glUtilGetBits(packedbits,  7,  7));
+                __glUtilSetBits(&T, 5, 6, (GLubyte) __glUtilGetBits(packedbits,  9, 10));
+                __glUtilSetBits(&T, 7, 7, (GLubyte) __glUtilGetBits(packedbits, 12, 12));
 
                 Items[0] = (GLubyte) __glUtilGetBits((GLuint)packedbits,  0, 0);
                 Items[1] = (GLubyte) __glUtilGetBits((GLuint)packedbits,  3, 3);
@@ -706,11 +782,11 @@ __glUtilDecodeISE(
                 break;
 
             case 2:
-                __glUtilSetBits(&T, 0, 1, (GLuint) __glUtilGetBits(packedbits,  2,  3));
-                __glUtilSetBits(&T, 2, 3, (GLuint) __glUtilGetBits(packedbits,  6,  7));
-                __glUtilSetBits(&T, 4, 4, (GLuint) __glUtilGetBits(packedbits, 10, 10));
-                __glUtilSetBits(&T, 5, 6, (GLuint) __glUtilGetBits(packedbits, 13, 14));
-                __glUtilSetBits(&T, 7, 7, (GLuint) __glUtilGetBits(packedbits, 17, 17));
+                __glUtilSetBits(&T, 0, 1, (GLubyte) __glUtilGetBits(packedbits,  2,  3));
+                __glUtilSetBits(&T, 2, 3, (GLubyte) __glUtilGetBits(packedbits,  6,  7));
+                __glUtilSetBits(&T, 4, 4, (GLubyte) __glUtilGetBits(packedbits, 10, 10));
+                __glUtilSetBits(&T, 5, 6, (GLubyte) __glUtilGetBits(packedbits, 13, 14));
+                __glUtilSetBits(&T, 7, 7, (GLubyte) __glUtilGetBits(packedbits, 17, 17));
 
                 Items[0] = (GLubyte) __glUtilGetBits(packedbits,  0,  1);
                 Items[1] = (GLubyte) __glUtilGetBits(packedbits,  4,  5);
@@ -720,11 +796,11 @@ __glUtilDecodeISE(
                 break;
 
             case 3:
-                __glUtilSetBits(&T, 0, 1, (GLuint) __glUtilGetBits(packedbits,  3,  4));
-                __glUtilSetBits(&T, 2, 3, (GLuint) __glUtilGetBits(packedbits,  8,  9));
-                __glUtilSetBits(&T, 4, 4, (GLuint) __glUtilGetBits(packedbits, 13, 13));
-                __glUtilSetBits(&T, 5, 6, (GLuint) __glUtilGetBits(packedbits, 17, 18));
-                __glUtilSetBits(&T, 7, 7, (GLuint) __glUtilGetBits(packedbits, 22, 22));
+                __glUtilSetBits(&T, 0, 1, (GLubyte) __glUtilGetBits(packedbits,  3,  4));
+                __glUtilSetBits(&T, 2, 3, (GLubyte) __glUtilGetBits(packedbits,  8,  9));
+                __glUtilSetBits(&T, 4, 4, (GLubyte) __glUtilGetBits(packedbits, 13, 13));
+                __glUtilSetBits(&T, 5, 6, (GLubyte) __glUtilGetBits(packedbits, 17, 18));
+                __glUtilSetBits(&T, 7, 7, (GLubyte) __glUtilGetBits(packedbits, 22, 22));
 
                 Items[0] = (GLubyte) __glUtilGetBits(packedbits,  0,  2);
                 Items[1] = (GLubyte) __glUtilGetBits(packedbits,  5,  7);
@@ -734,11 +810,11 @@ __glUtilDecodeISE(
                 break;
 
             case 4:
-                __glUtilSetBits(&T, 0, 1, (GLuint) __glUtilGetBits(packedbits,  4,  5));
-                __glUtilSetBits(&T, 2, 3, (GLuint) __glUtilGetBits(packedbits, 10, 11));
-                __glUtilSetBits(&T, 4, 4, (GLuint) __glUtilGetBits(packedbits, 16, 16));
-                __glUtilSetBits(&T, 5, 6, (GLuint) __glUtilGetBits(packedbits, 21, 22));
-                __glUtilSetBits(&T, 7, 7, (GLuint) __glUtilGetBits(packedbits, 27, 27));
+                __glUtilSetBits(&T, 0, 1, (GLubyte) __glUtilGetBits(packedbits,  4,  5));
+                __glUtilSetBits(&T, 2, 3, (GLubyte) __glUtilGetBits(packedbits, 10, 11));
+                __glUtilSetBits(&T, 4, 4, (GLubyte) __glUtilGetBits(packedbits, 16, 16));
+                __glUtilSetBits(&T, 5, 6, (GLubyte) __glUtilGetBits(packedbits, 21, 22));
+                __glUtilSetBits(&T, 7, 7, (GLubyte) __glUtilGetBits(packedbits, 27, 27));
 
                 Items[0] = (GLubyte) __glUtilGetBits(packedbits,  0,  3);
                 Items[1] = (GLubyte) __glUtilGetBits(packedbits,  6,  9);
@@ -748,11 +824,11 @@ __glUtilDecodeISE(
                 break;
 
             case 5:
-                __glUtilSetBits(&T, 0, 1, (GLuint) __glUtilGetBits(packedbits,  5,  6));
-                __glUtilSetBits(&T, 2, 3, (GLuint) __glUtilGetBits(packedbits, 12, 13));
-                __glUtilSetBits(&T, 4, 4, (GLuint) __glUtilGetBits(packedbits, 19, 19));
-                __glUtilSetBits(&T, 5, 6, (GLuint) __glUtilGetBits(packedbits, 25, 26));
-                __glUtilSetBits(&T, 7, 7, (GLuint) __glUtilGetBits(packedbits, 32, 32));
+                __glUtilSetBits(&T, 0, 1, (GLubyte) __glUtilGetBits(packedbits,  5,  6));
+                __glUtilSetBits(&T, 2, 3, (GLubyte) __glUtilGetBits(packedbits, 12, 13));
+                __glUtilSetBits(&T, 4, 4, (GLubyte) __glUtilGetBits(packedbits, 19, 19));
+                __glUtilSetBits(&T, 5, 6, (GLubyte) __glUtilGetBits(packedbits, 25, 26));
+                __glUtilSetBits(&T, 7, 7, (GLubyte) __glUtilGetBits(packedbits, 32, 32));
 
                 Items[0] = (GLubyte) __glUtilGetBits(packedbits,  0,  4);
                 Items[1] = (GLubyte) __glUtilGetBits(packedbits,  7, 11);
@@ -762,11 +838,11 @@ __glUtilDecodeISE(
                 break;
 
             case 6:
-                __glUtilSetBits(&T, 0, 1, (GLuint) __glUtilGetBits(packedbits,  6,  7));
-                __glUtilSetBits(&T, 2, 3, (GLuint) __glUtilGetBits(packedbits, 14, 15));
-                __glUtilSetBits(&T, 4, 4, (GLuint) __glUtilGetBits(packedbits, 22, 22));
-                __glUtilSetBits(&T, 5, 6, (GLuint) __glUtilGetBits(packedbits, 29, 30));
-                __glUtilSetBits(&T, 7, 7, (GLuint) __glUtilGetBits(packedbits, 37, 37));
+                __glUtilSetBits(&T, 0, 1, (GLubyte) __glUtilGetBits(packedbits,  6,  7));
+                __glUtilSetBits(&T, 2, 3, (GLubyte) __glUtilGetBits(packedbits, 14, 15));
+                __glUtilSetBits(&T, 4, 4, (GLubyte) __glUtilGetBits(packedbits, 22, 22));
+                __glUtilSetBits(&T, 5, 6, (GLubyte) __glUtilGetBits(packedbits, 29, 30));
+                __glUtilSetBits(&T, 7, 7, (GLubyte) __glUtilGetBits(packedbits, 37, 37));
 
                 Items[0] = (GLubyte) __glUtilGetBits(packedbits,  0,  5);
                 Items[1] = (GLubyte) __glUtilGetBits(packedbits,  8, 13);
@@ -782,15 +858,15 @@ __glUtilDecodeISE(
             /* Derive t0 to t4 from T. */
             if (__glUtilGetBits(T, 2, 4) == 7)
             {
-                __glUtilSetBits(&C, 0, 1, (GLuint) __glUtilGetBits(T, 0, 1));
-                __glUtilSetBits(&C, 2, 4, (GLuint) __glUtilGetBits(T, 5, 7));
+                __glUtilSetBits(&C, 0, 1, (GLubyte) __glUtilGetBits(T, 0, 1));
+                __glUtilSetBits(&C, 2, 4, (GLubyte) __glUtilGetBits(T, 5, 7));
 
                 t3 = 2;
                 t4 = 2;
             }
             else
             {
-                __glUtilSetBits(&C, 0, 4, (GLuint) __glUtilGetBits(T, 0, 4));
+                __glUtilSetBits(&C, 0, 4, (GLubyte) __glUtilGetBits(T, 0, 4));
 
                 if (__glUtilGetBits(T, 5, 6) == 3)
                 {
@@ -807,8 +883,8 @@ __glUtilDecodeISE(
             if (__glUtilGetBits(C, 0, 1) == 3)
             {
                 t0 = 0;
-                __glUtilSetBits(&t0, 0, 0, __glUtilGetBits(C, 2, 2) & ~__glUtilGetBits(C, 3, 3));
-                __glUtilSetBits(&t0, 1, 1, __glUtilGetBits(C, 3, 3));
+                __glUtilSetBits(&t0, 0, 0, (GLubyte) __glUtilGetBits(C, 2, 2) & ~__glUtilGetBits(C, 3, 3));
+                __glUtilSetBits(&t0, 1, 1, (GLubyte) __glUtilGetBits(C, 3, 3));
                 t1 = (GLubyte) __glUtilGetBits(C, 4, 4);
                 t2 = 2;
             }
@@ -821,8 +897,8 @@ __glUtilDecodeISE(
             else
             {
                 t0 = 0;
-                __glUtilSetBits(&t0, 0, 0, __glUtilGetBits(C, 0, 0) & ~__glUtilGetBits(C, 1, 1));
-                __glUtilSetBits(&t0, 1, 1, __glUtilGetBits(C, 1, 1));
+                __glUtilSetBits(&t0, 0, 0, (GLubyte) __glUtilGetBits(C, 0, 0) & ~__glUtilGetBits(C, 1, 1));
+                __glUtilSetBits(&t0, 1, 1, (GLubyte) __glUtilGetBits(C, 1, 1));
                 t1 = (GLubyte) __glUtilGetBits(C, 2, 3);
                 t2 = (GLubyte) __glUtilGetBits(C, 4, 4);
             }
@@ -844,7 +920,7 @@ __glUtilDecodeISE(
         for (itemsleft = ItemCount; itemsleft != 0;)
         {
             GLubyte Q = 0;
-            GLubyte C;
+            GLubyte C = 0;
             GLubyte q0, q1, q2;
             GLuint packedbits;
             /* Determine the number of bits to read. */
@@ -874,9 +950,9 @@ __glUtilDecodeISE(
                 break;
 
             case 1:
-                __glUtilSetBits(&Q, 0, 2, (GLuint) __glUtilGetBits(packedbits,  1, 3));
-                __glUtilSetBits(&Q, 3, 4, (GLuint) __glUtilGetBits(packedbits,  5, 6));
-                __glUtilSetBits(&Q, 5, 6, (GLuint) __glUtilGetBits(packedbits,  8, 9));
+                __glUtilSetBits(&Q, 0, 2, (GLubyte) __glUtilGetBits(packedbits,  1, 3));
+                __glUtilSetBits(&Q, 3, 4, (GLubyte) __glUtilGetBits(packedbits,  5, 6));
+                __glUtilSetBits(&Q, 5, 6, (GLubyte) __glUtilGetBits(packedbits,  8, 9));
 
                 Items[0] = (GLubyte) __glUtilGetBits(packedbits, 0, 0);
                 Items[1] = (GLubyte) __glUtilGetBits(packedbits, 4, 4);
@@ -884,9 +960,9 @@ __glUtilDecodeISE(
                 break;
 
             case 2:
-                __glUtilSetBits(&Q, 0, 2, (GLuint) __glUtilGetBits(packedbits,  2,  4));
-                __glUtilSetBits(&Q, 3, 4, (GLuint) __glUtilGetBits(packedbits,  7,  8));
-                __glUtilSetBits(&Q, 5, 6, (GLuint) __glUtilGetBits(packedbits, 11, 12));
+                __glUtilSetBits(&Q, 0, 2, (GLubyte) __glUtilGetBits(packedbits,  2,  4));
+                __glUtilSetBits(&Q, 3, 4, (GLubyte) __glUtilGetBits(packedbits,  7,  8));
+                __glUtilSetBits(&Q, 5, 6, (GLubyte) __glUtilGetBits(packedbits, 11, 12));
 
                 Items[0] = (GLubyte) __glUtilGetBits(packedbits, 0,  1);
                 Items[1] = (GLubyte) __glUtilGetBits(packedbits, 5,  6);
@@ -894,9 +970,9 @@ __glUtilDecodeISE(
                 break;
 
             case 3:
-                __glUtilSetBits(&Q, 0, 2, (GLuint) __glUtilGetBits(packedbits,  3,  5));
-                __glUtilSetBits(&Q, 3, 4, (GLuint) __glUtilGetBits(packedbits,  9, 10));
-                __glUtilSetBits(&Q, 5, 6, (GLuint) __glUtilGetBits(packedbits, 14, 15));
+                __glUtilSetBits(&Q, 0, 2, (GLubyte) __glUtilGetBits(packedbits,  3,  5));
+                __glUtilSetBits(&Q, 3, 4, (GLubyte) __glUtilGetBits(packedbits,  9, 10));
+                __glUtilSetBits(&Q, 5, 6, (GLubyte) __glUtilGetBits(packedbits, 14, 15));
 
                 Items[0] = (GLubyte) __glUtilGetBits(packedbits,  0,  2);
                 Items[1] = (GLubyte) __glUtilGetBits(packedbits,  6,  8);
@@ -904,9 +980,9 @@ __glUtilDecodeISE(
                 break;
 
             case 4:
-                __glUtilSetBits(&Q, 0, 2, (GLuint) __glUtilGetBits(packedbits,  4,  6));
-                __glUtilSetBits(&Q, 3, 4, (GLuint) __glUtilGetBits(packedbits, 11, 12));
-                __glUtilSetBits(&Q, 5, 6, (GLuint) __glUtilGetBits(packedbits, 17, 18));
+                __glUtilSetBits(&Q, 0, 2, (GLubyte) __glUtilGetBits(packedbits,  4,  6));
+                __glUtilSetBits(&Q, 3, 4, (GLubyte) __glUtilGetBits(packedbits, 11, 12));
+                __glUtilSetBits(&Q, 5, 6, (GLubyte) __glUtilGetBits(packedbits, 17, 18));
 
                 Items[0] = (GLubyte) __glUtilGetBits(packedbits,  0,  3);
                 Items[1] = (GLubyte) __glUtilGetBits(packedbits,  7, 10);
@@ -914,9 +990,9 @@ __glUtilDecodeISE(
                 break;
 
             case 5:
-                __glUtilSetBits(&Q, 0, 2, (GLuint) __glUtilGetBits(packedbits,  5,  7));
-                __glUtilSetBits(&Q, 3, 4, (GLuint) __glUtilGetBits(packedbits, 13, 14));
-                __glUtilSetBits(&Q, 5, 6, (GLuint) __glUtilGetBits(packedbits, 20, 21));
+                __glUtilSetBits(&Q, 0, 2, (GLubyte) __glUtilGetBits(packedbits,  5,  7));
+                __glUtilSetBits(&Q, 3, 4, (GLubyte) __glUtilGetBits(packedbits, 13, 14));
+                __glUtilSetBits(&Q, 5, 6, (GLubyte) __glUtilGetBits(packedbits, 20, 21));
 
                 Items[0] = (GLubyte) __glUtilGetBits(packedbits,  0,  4);
                 Items[1] = (GLubyte) __glUtilGetBits(packedbits,  8, 12);
@@ -933,17 +1009,17 @@ __glUtilDecodeISE(
                 q0 = 4;
                 q1 = 4;
                 q2 = 0;
-                __glUtilSetBits(&q2, 0, 0, __glUtilGetBits(Q, 3, 3) & ~__glUtilGetBits(Q, 0, 0));
-                __glUtilSetBits(&q2, 1, 1, __glUtilGetBits(Q, 4, 4) & ~__glUtilGetBits(Q, 0, 0));
-                __glUtilSetBits(&q2, 2, 2, __glUtilGetBits(Q, 0, 0));
+                __glUtilSetBits(&q2, 0, 0, (GLubyte) __glUtilGetBits(Q, 3, 3) & ~__glUtilGetBits(Q, 0, 0));
+                __glUtilSetBits(&q2, 1, 1, (GLubyte) __glUtilGetBits(Q, 4, 4) & ~__glUtilGetBits(Q, 0, 0));
+                __glUtilSetBits(&q2, 2, 2, (GLubyte) __glUtilGetBits(Q, 0, 0));
             }
             else
             {
                 if (__glUtilGetBits(Q, 1, 2) == 3)
                 {
-                    __glUtilSetBits(&C, 0, 0,  (GLuint) __glUtilGetBits(Q, 0, 0));
-                    __glUtilSetBits(&C, 1, 2, ~((GLuint) __glUtilGetBits(Q, 5, 6)));
-                    __glUtilSetBits(&C, 3, 4,  (GLuint) __glUtilGetBits(Q, 3, 4));
+                    __glUtilSetBits(&C, 0, 0,  (GLubyte) __glUtilGetBits(Q, 0, 0));
+                    __glUtilSetBits(&C, 1, 2, ~((GLubyte) __glUtilGetBits(Q, 5, 6)));
+                    __glUtilSetBits(&C, 3, 4,  (GLubyte) __glUtilGetBits(Q, 3, 4));
                     q2 = 4;
                 }
                 else
@@ -1060,7 +1136,7 @@ __glUtilUnquantizeWeights(
             {
                 GLubyte bits = (GLubyte) __glUtilGetBits(Items[i], 0, 3);
                 __glUtilSetBits(&Items[i], 2, 5, bits);
-                __glUtilSetBits(&Items[i], 0, 1, (GLuint)__glUtilGetBits(bits, 2, 3));
+                __glUtilSetBits(&Items[i], 0, 1, (GLubyte)__glUtilGetBits(bits, 2, 3));
             }
             break;
 
@@ -1069,7 +1145,7 @@ __glUtilUnquantizeWeights(
             {
                 GLubyte bits = (GLubyte) __glUtilGetBits(Items[i], 0, 4);
                 __glUtilSetBits(&Items[i], 1, 5, bits);
-                __glUtilSetBits(&Items[i], 0, 0, (GLuint)__glUtilGetBits(bits, 4, 4));
+                __glUtilSetBits(&Items[i], 0, 0, (GLubyte)__glUtilGetBits(bits, 4, 4));
             }
             break;
 
@@ -1095,9 +1171,9 @@ __glUtilUnquantizeWeights(
             case 7:
                 /* 0..11 (1 trit + 2 bits) */
                 B = 0;
-                __glUtilSetBits(&B, 0, 0, __glUtilGetBits(Items[i], 1, 1));
-                __glUtilSetBits(&B, 2, 2, __glUtilGetBits(Items[i], 1, 1));
-                __glUtilSetBits(&B, 6, 6, __glUtilGetBits(Items[i], 1, 1));
+                __glUtilSetBits(&B, 0, 0, (GLubyte) __glUtilGetBits(Items[i], 1, 1));
+                __glUtilSetBits(&B, 2, 2, (GLubyte) __glUtilGetBits(Items[i], 1, 1));
+                __glUtilSetBits(&B, 6, 6, (GLubyte) __glUtilGetBits(Items[i], 1, 1));
                 C = 23;
                 D = (GLubyte) __glUtilGetBits(Items[i], 2, 3);
                 break;
@@ -1105,8 +1181,8 @@ __glUtilUnquantizeWeights(
             case 9:
                 /* 0..19 (1 quint + 2 bits) */
                 B = 0;
-                __glUtilSetBits(&B, 1, 1, __glUtilGetBits(Items[i], 1, 1));
-                __glUtilSetBits(&B, 6, 6, __glUtilGetBits(Items[i], 1, 1));
+                __glUtilSetBits(&B, 1, 1, (GLubyte) __glUtilGetBits(Items[i], 1, 1));
+                __glUtilSetBits(&B, 6, 6, (GLubyte) __glUtilGetBits(Items[i], 1, 1));
                 C = 13;
                 D = (GLubyte) __glUtilGetBits(Items[i], 2, 4);
                 break;
@@ -1114,8 +1190,8 @@ __glUtilUnquantizeWeights(
             case 10:
                 /* 0..23 (1 trit + 3 bits) */
                 B = 0;
-                __glUtilSetBits(&B, 0, 1, (GLuint) __glUtilGetBits(Items[i], 1, 2));
-                __glUtilSetBits(&B, 5, 6, (GLuint) __glUtilGetBits(Items[i], 1, 2));
+                __glUtilSetBits(&B, 0, 1, (GLubyte) __glUtilGetBits(Items[i], 1, 2));
+                __glUtilSetBits(&B, 5, 6, (GLubyte) __glUtilGetBits(Items[i], 1, 2));
                 C = 11;
                 D = (GLubyte) __glUtilGetBits(Items[i], 3, 4);
                 break;
@@ -1221,7 +1297,7 @@ __glUtilUnquantizeCEM(
                 GLubyte bits = (GLubyte) __glUtilGetBits(Items[i], 0, 2);
                 __glUtilSetBits(&Items[i], 5, 7, bits);
                 __glUtilSetBits(&Items[i], 2, 4, bits);
-                __glUtilSetBits(&Items[i], 0, 1, (GLuint) __glUtilGetBits(bits, 1, 2));
+                __glUtilSetBits(&Items[i], 0, 1, (GLubyte) __glUtilGetBits(bits, 1, 2));
             }
             break;
 
@@ -1239,7 +1315,7 @@ __glUtilUnquantizeCEM(
             {
                 GLubyte bits = (GLubyte) __glUtilGetBits(Items[i], 0, 4);
                 __glUtilSetBits(&Items[i], 3, 7, bits);
-                __glUtilSetBits(&Items[i], 0, 2, (GLuint) __glUtilGetBits(bits, 2, 4));
+                __glUtilSetBits(&Items[i], 0, 2, (GLubyte) __glUtilGetBits(bits, 2, 4));
             }
             break;
 
@@ -1248,7 +1324,7 @@ __glUtilUnquantizeCEM(
             {
                 GLubyte bits = (GLubyte) __glUtilGetBits(Items[i], 0, 5);
                 __glUtilSetBits(&Items[i], 2, 7, bits);
-                __glUtilSetBits(&Items[i], 0, 1, (GLuint) __glUtilGetBits(bits, 4, 5));
+                __glUtilSetBits(&Items[i], 0, 1, (GLubyte) __glUtilGetBits(bits, 4, 5));
             }
             break;
 
@@ -1257,7 +1333,7 @@ __glUtilUnquantizeCEM(
             {
                 GLubyte bits = (GLubyte) __glUtilGetBits(Items[i], 0, 6);
                 __glUtilSetBits(&Items[i], 1, 7, bits);
-                __glUtilSetBits(&Items[i], 0, 0, (GLuint) __glUtilGetBits(bits, 6, 6));
+                __glUtilSetBits(&Items[i], 0, 0, (GLubyte) __glUtilGetBits(bits, 6, 6));
             }
             break;
 
@@ -1287,10 +1363,10 @@ __glUtilUnquantizeCEM(
             case 7:
                 /* 0..11 (1 trit + 2 bits) */
                 B = 0;
-                __glUtilSetBits(&B, 1, 1, __glUtilGetBits(Items[i], 1, 1));
-                __glUtilSetBits(&B, 2, 2, __glUtilGetBits(Items[i], 1, 1));
-                __glUtilSetBits(&B, 4, 4, __glUtilGetBits(Items[i], 1, 1));
-                __glUtilSetBits(&B, 8, 8, __glUtilGetBits(Items[i], 1, 1));
+                __glUtilSetShortBits(&B, 1, 1, (GLushort) __glUtilGetBits(Items[i], 1, 1));
+                __glUtilSetShortBits(&B, 2, 2, (GLushort) __glUtilGetBits(Items[i], 1, 1));
+                __glUtilSetShortBits(&B, 4, 4, (GLushort) __glUtilGetBits(Items[i], 1, 1));
+                __glUtilSetShortBits(&B, 8, 8, (GLushort) __glUtilGetBits(Items[i], 1, 1));
                 C = 93;
                 D = (GLubyte) __glUtilGetBits(Items[i], 2, 3);
                 break;
@@ -1298,9 +1374,9 @@ __glUtilUnquantizeCEM(
             case 9:
                 /* 0..19 (1 quint + 2 bits) */
                 B = 0;
-                __glUtilSetBits(&B, 2, 2, __glUtilGetBits(Items[i], 1, 1));
-                __glUtilSetBits(&B, 3, 3, __glUtilGetBits(Items[i], 1, 1));
-                __glUtilSetBits(&B, 8, 8, __glUtilGetBits(Items[i], 1, 1));
+                __glUtilSetShortBits(&B, 2, 2, (GLushort) __glUtilGetBits(Items[i], 1, 1));
+                __glUtilSetShortBits(&B, 3, 3, (GLushort) __glUtilGetBits(Items[i], 1, 1));
+                __glUtilSetShortBits(&B, 8, 8, (GLushort) __glUtilGetBits(Items[i], 1, 1));
                 C = 54;
                 D = (GLubyte) __glUtilGetBits(Items[i], 2, 4);
                 break;
@@ -1308,9 +1384,9 @@ __glUtilUnquantizeCEM(
             case 10:
                 /* 0..23 (1 trit + 3 bits) */
                 B = 0;
-                __glUtilSetBits(&B, 0, 1, (GLuint) __glUtilGetBits(Items[i], 1, 2));
-                __glUtilSetBits(&B, 2, 3, (GLuint) __glUtilGetBits(Items[i], 1, 2));
-                __glUtilSetBits(&B, 7, 8, (GLuint) __glUtilGetBits(Items[i], 1, 2));
+                __glUtilSetShortBits(&B, 0, 1, (GLushort) __glUtilGetBits(Items[i], 1, 2));
+                __glUtilSetShortBits(&B, 2, 3, (GLushort) __glUtilGetBits(Items[i], 1, 2));
+                __glUtilSetShortBits(&B, 7, 8, (GLushort) __glUtilGetBits(Items[i], 1, 2));
                 C = 44;
                 D = (GLubyte) __glUtilGetBits(Items[i], 3, 4);
                 break;
@@ -1318,9 +1394,9 @@ __glUtilUnquantizeCEM(
             case 12:
                 /* 0..39 (1 quint + 3 bits) */
                 B = 0;
-                __glUtilSetBits(&B, 0, 0, (GLuint) __glUtilGetBits(Items[i], 2, 2));
-                __glUtilSetBits(&B, 1, 2, (GLuint) __glUtilGetBits(Items[i], 1, 2));
-                __glUtilSetBits(&B, 7, 8, (GLuint) __glUtilGetBits(Items[i], 1, 2));
+                __glUtilSetShortBits(&B, 0, 0, (GLushort) __glUtilGetBits(Items[i], 2, 2));
+                __glUtilSetShortBits(&B, 1, 2, (GLushort) __glUtilGetBits(Items[i], 1, 2));
+                __glUtilSetShortBits(&B, 7, 8, (GLushort) __glUtilGetBits(Items[i], 1, 2));
                 C = 26;
                 D = (GLubyte) __glUtilGetBits(Items[i], 3, 5);
                 break;
@@ -1328,8 +1404,8 @@ __glUtilUnquantizeCEM(
             case 13:
                 /* 0..47 (1 trit + 4 bits) */
                 B = 0;
-                __glUtilSetBits(&B, 0, 2, (GLuint) __glUtilGetBits(Items[i], 1, 3));
-                __glUtilSetBits(&B, 6, 8, (GLuint) __glUtilGetBits(Items[i], 1, 3));
+                __glUtilSetShortBits(&B, 0, 2, (GLushort) __glUtilGetBits(Items[i], 1, 3));
+                __glUtilSetShortBits(&B, 6, 8, (GLushort) __glUtilGetBits(Items[i], 1, 3));
                 C = 22;
                 D = (GLubyte) __glUtilGetBits(Items[i], 4, 5);
                 break;
@@ -1337,8 +1413,8 @@ __glUtilUnquantizeCEM(
             case 15:
                 /* 0..79 (1 quint + 4 bits) */
                 B = 0;
-                __glUtilSetBits(&B, 0, 1, (GLuint) __glUtilGetBits(Items[i], 2, 3));
-                __glUtilSetBits(&B, 6, 8, (GLuint) __glUtilGetBits(Items[i], 1, 3));
+                __glUtilSetShortBits(&B, 0, 1, (GLushort) __glUtilGetBits(Items[i], 2, 3));
+                __glUtilSetShortBits(&B, 6, 8, (GLushort) __glUtilGetBits(Items[i], 1, 3));
                 C = 13;
                 D = (GLubyte) __glUtilGetBits(Items[i], 4, 6);
                 break;
@@ -1346,8 +1422,8 @@ __glUtilUnquantizeCEM(
             case 16:
                 /* 0..95 (1 trit + 5 bits) */
                 B = 0;
-                __glUtilSetBits(&B, 0, 1, (GLuint) __glUtilGetBits(Items[i], 3, 4));
-                __glUtilSetBits(&B, 5, 8, (GLuint) __glUtilGetBits(Items[i], 1, 4));
+                __glUtilSetShortBits(&B, 0, 1, (GLushort) __glUtilGetBits(Items[i], 3, 4));
+                __glUtilSetShortBits(&B, 5, 8, (GLushort) __glUtilGetBits(Items[i], 1, 4));
                 C = 11;
                 D = (GLubyte) __glUtilGetBits(Items[i], 5, 6);
                 break;
@@ -1355,8 +1431,8 @@ __glUtilUnquantizeCEM(
             case 18:
                 /* 0..159 (1 quint + 5 bits) */
                 B = 0;
-                __glUtilSetBits(&B, 0, 0, (GLuint) __glUtilGetBits(Items[i], 4, 4));
-                __glUtilSetBits(&B, 5, 8, (GLuint) __glUtilGetBits(Items[i], 1, 4));
+                __glUtilSetShortBits(&B, 0, 0, (GLushort) __glUtilGetBits(Items[i], 4, 4));
+                __glUtilSetShortBits(&B, 5, 8, (GLushort) __glUtilGetBits(Items[i], 1, 4));
                 C = 6;
                 D = (GLubyte) __glUtilGetBits(Items[i], 5, 7);
                 break;
@@ -1364,8 +1440,8 @@ __glUtilUnquantizeCEM(
             case 19:
                 /* 0..191 (1 trit + 6 bits) */
                 B = 0;
-                __glUtilSetBits(&B, 0, 0, (GLuint) __glUtilGetBits(Items[i], 5, 5));
-                __glUtilSetBits(&B, 4, 8, (GLuint) __glUtilGetBits(Items[i], 1, 5));
+                __glUtilSetShortBits(&B, 0, 0, (GLushort) __glUtilGetBits(Items[i], 5, 5));
+                __glUtilSetShortBits(&B, 4, 8, (GLushort) __glUtilGetBits(Items[i], 1, 5));
                 C = 5;
                 D = (GLubyte) __glUtilGetBits(Items[i], 6, 7);
                 break;
@@ -2112,47 +2188,47 @@ __glUtilComputeColor(
 
     if (sRGB)
     {
-        __glUtilSetBits(&color0r, 0, 7, 0x80);
-        __glUtilSetBits(&color0g, 0, 7, 0x80);
-        __glUtilSetBits(&color0b, 0, 7, 0x80);
-        __glUtilSetBits(&color0a, 0, 7, 0x80);
+        __glUtilSetShortBits(&color0r, 0, 7, 0x80);
+        __glUtilSetShortBits(&color0g, 0, 7, 0x80);
+        __glUtilSetShortBits(&color0b, 0, 7, 0x80);
+        __glUtilSetShortBits(&color0a, 0, 7, 0x80);
 
-        __glUtilSetBits(&color1r, 0, 7, 0x80);
-        __glUtilSetBits(&color1g, 0, 7, 0x80);
-        __glUtilSetBits(&color1b, 0, 7, 0x80);
-        __glUtilSetBits(&color1a, 0, 7, 0x80);
+        __glUtilSetShortBits(&color1r, 0, 7, 0x80);
+        __glUtilSetShortBits(&color1g, 0, 7, 0x80);
+        __glUtilSetShortBits(&color1b, 0, 7, 0x80);
+        __glUtilSetShortBits(&color1a, 0, 7, 0x80);
 
-        __glUtilSetBits(&color0r, 8, 15, Color0.r);
-        __glUtilSetBits(&color0g, 8, 15, Color0.g);
-        __glUtilSetBits(&color0b, 8, 15, Color0.b);
-        __glUtilSetBits(&color0a, 8, 15, Color0.a);
+        __glUtilSetShortBits(&color0r, 8, 15, Color0.r);
+        __glUtilSetShortBits(&color0g, 8, 15, Color0.g);
+        __glUtilSetShortBits(&color0b, 8, 15, Color0.b);
+        __glUtilSetShortBits(&color0a, 8, 15, Color0.a);
 
-        __glUtilSetBits(&color1r, 8, 15, Color1.r);
-        __glUtilSetBits(&color1g, 8, 15, Color1.g);
-        __glUtilSetBits(&color1b, 8, 15, Color1.b);
-        __glUtilSetBits(&color1a, 8, 15, Color1.a);
+        __glUtilSetShortBits(&color1r, 8, 15, Color1.r);
+        __glUtilSetShortBits(&color1g, 8, 15, Color1.g);
+        __glUtilSetShortBits(&color1b, 8, 15, Color1.b);
+        __glUtilSetShortBits(&color1a, 8, 15, Color1.a);
     }
     else
     {
-        __glUtilSetBits(&color0r, 0, 7, Color0.r);
-        __glUtilSetBits(&color0g, 0, 7, Color0.g);
-        __glUtilSetBits(&color0b, 0, 7, Color0.b);
-        __glUtilSetBits(&color0a, 0, 7, Color0.a);
+        __glUtilSetShortBits(&color0r, 0, 7, Color0.r);
+        __glUtilSetShortBits(&color0g, 0, 7, Color0.g);
+        __glUtilSetShortBits(&color0b, 0, 7, Color0.b);
+        __glUtilSetShortBits(&color0a, 0, 7, Color0.a);
 
-        __glUtilSetBits(&color1r, 0, 7, Color1.r);
-        __glUtilSetBits(&color1g, 0, 7, Color1.g);
-        __glUtilSetBits(&color1b, 0, 7, Color1.b);
-        __glUtilSetBits(&color1a, 0, 7, Color1.a);
+        __glUtilSetShortBits(&color1r, 0, 7, Color1.r);
+        __glUtilSetShortBits(&color1g, 0, 7, Color1.g);
+        __glUtilSetShortBits(&color1b, 0, 7, Color1.b);
+        __glUtilSetShortBits(&color1a, 0, 7, Color1.a);
 
-        __glUtilSetBits(&color0r, 8, 15, Color0.r);
-        __glUtilSetBits(&color0g, 8, 15, Color0.g);
-        __glUtilSetBits(&color0b, 8, 15, Color0.b);
-        __glUtilSetBits(&color0a, 8, 15, Color0.a);
+        __glUtilSetShortBits(&color0r, 8, 15, Color0.r);
+        __glUtilSetShortBits(&color0g, 8, 15, Color0.g);
+        __glUtilSetShortBits(&color0b, 8, 15, Color0.b);
+        __glUtilSetShortBits(&color0a, 8, 15, Color0.a);
 
-        __glUtilSetBits(&color1r, 8, 15, Color1.r);
-        __glUtilSetBits(&color1g, 8, 15, Color1.g);
-        __glUtilSetBits(&color1b, 8, 15, Color1.b);
-        __glUtilSetBits(&color1a, 8, 15, Color1.a);
+        __glUtilSetShortBits(&color1r, 8, 15, Color1.r);
+        __glUtilSetShortBits(&color1g, 8, 15, Color1.g);
+        __glUtilSetShortBits(&color1b, 8, 15, Color1.b);
+        __glUtilSetShortBits(&color1a, 8, 15, Color1.a);
     }
 
     r = ((color0r * w0r) + (color1r * w1r) + 32) >> 6;
@@ -2193,7 +2269,7 @@ __glUtilDecodeBlock(
     GLushort encodedCEM = 0;
     GLubyte partCount;
     GLubyte lowerBits;
-    GLubyte CEM[4];
+    GLubyte CEM[4] = {0};
     GLbyte remainingBits;
     GLushort CEMindex;
     GLushort CEMpairs = 0;
@@ -2251,7 +2327,7 @@ __glUtilDecodeBlock(
     if (partCount == 0)
     {
         /* Get CEM. */
-        __glUtilSetBits(&encodedCEM, 0, 3, (GLuint) __glUtilReadBlock(blockData, 13, 4, GL_FALSE));
+        __glUtilSetShortBits(&encodedCEM, 0, 3, (GLushort) __glUtilReadBlock(blockData, 13, 4, GL_FALSE));
 
         /* Fixed configuration bits. */
         fixedConfig = 11 + 2 + 4;
@@ -2259,10 +2335,10 @@ __glUtilDecodeBlock(
     else
     {
         /* Get base class. */
-        __glUtilSetBits(&baseClass,  0, 1, (GLuint) __glUtilReadBlock(blockData, 23, 2, GL_FALSE));
+        __glUtilSetBits(&baseClass,  0, 1, (GLubyte) __glUtilReadBlock(blockData, 23, 2, GL_FALSE));
 
         /* Get CEM. */
-        __glUtilSetBits(&encodedCEM, 0, 3, (GLuint) __glUtilReadBlock(blockData, 25, 4, GL_FALSE));
+        __glUtilSetShortBits(&encodedCEM, 0, 3, (GLushort) __glUtilReadBlock(blockData, 25, 4, GL_FALSE));
 
         /* Fixed configuration bits. */
         fixedConfig = 11 + 2 + 10 + 6;
@@ -2307,7 +2383,7 @@ __glUtilDecodeBlock(
             lowerBits -= 2;
 
             /* Get the rest of the bits. */
-            __glUtilSetBits(&encodedCEM, 4, 5, (GLuint) __glUtilReadBlock(blockData, lowerBits, 2, GL_FALSE));
+            __glUtilSetShortBits(&encodedCEM, 4, 5, (GLushort) __glUtilReadBlock(blockData, lowerBits, 2, GL_FALSE));
 
             /* Extract the color modes. */
             M0 = (GLubyte) __glUtilGetBits(encodedCEM, 2, 3);
@@ -2319,7 +2395,7 @@ __glUtilDecodeBlock(
             lowerBits -= 5;
 
             /* Get the rest of the bits. */
-            __glUtilSetBits(&encodedCEM, 4, 8, (GLuint) __glUtilReadBlock(blockData, lowerBits, 5, GL_FALSE));
+            __glUtilSetShortBits(&encodedCEM, 4, 8, (GLushort) __glUtilReadBlock(blockData, lowerBits, 5, GL_FALSE));
 
             /* Extract the color modes. */
             M0 = (GLubyte) __glUtilGetBits(encodedCEM, 3, 4);
@@ -2332,7 +2408,7 @@ __glUtilDecodeBlock(
             lowerBits -= 8;
 
             /* Get the rest of the bits.*/
-            __glUtilSetBits(&encodedCEM, 4, 11, (GLuint) __glUtilReadBlock(blockData, lowerBits, 8, GL_FALSE));
+            __glUtilSetShortBits(&encodedCEM, 4, 11, (GLushort) __glUtilReadBlock(blockData, lowerBits, 8, GL_FALSE));
 
             /* Extract the color modes. */
             M0 = (GLubyte) __glUtilGetBits(encodedCEM,  4,  5);
@@ -2352,23 +2428,23 @@ __glUtilDecodeBlock(
             /* Four partitions. */
             CEM[3] = 0;
             __glUtilSetBits(&CEM[3], 0, 1, M3);
-            __glUtilSetBits(&CEM[3], 2, 3, baseClass + __glUtilGetBits(encodedCEM, 3, 3));
+            __glUtilSetBits(&CEM[3], 2, 3, baseClass + (GLubyte) __glUtilGetBits(encodedCEM, 3, 3));
 
         case 2:
             /* Three partitions. */
             CEM[2] = 0;
             __glUtilSetBits(&CEM[2], 0, 1, M2);
-            __glUtilSetBits(&CEM[2], 2, 3, baseClass + __glUtilGetBits(encodedCEM, 2, 2));
+            __glUtilSetBits(&CEM[2], 2, 3, baseClass + (GLubyte) __glUtilGetBits(encodedCEM, 2, 2));
 
         case 1:
             /* Two partitions. */
             CEM[1] = 0;
             __glUtilSetBits(&CEM[1], 0, 1, M1);
-            __glUtilSetBits(&CEM[1], 2, 3, baseClass + __glUtilGetBits(encodedCEM, 1, 1));
+            __glUtilSetBits(&CEM[1], 2, 3, baseClass + (GLubyte) __glUtilGetBits(encodedCEM, 1, 1));
 
             CEM[0] = 0;
             __glUtilSetBits(&CEM[0], 0, 1, M0);
-            __glUtilSetBits(&CEM[0], 2, 3, baseClass + __glUtilGetBits(encodedCEM, 0, 0));
+            __glUtilSetBits(&CEM[0], 2, 3, baseClass + (GLubyte) __glUtilGetBits(encodedCEM, 0, 0));
         }
     }
 

@@ -74,7 +74,7 @@ GLvoid __glBuildTexEnableDim(__GLcontext * gc, __GLattribute* cs, __GLattribute*
     (*gc->dp.buildTexEnableDim)(gc);
 
     /* Mark texture enable dimension changed */
-    for (unit = 0; unit < (GLint)gc->constants.shaderCaps.maxCombinedTextureImageUnits; ++unit)
+    for (unit = 0; unit < (GLint)gc->shaderProgram.maxUnit; ++unit)
     {
         if (ds->texture.texUnits[unit].enableDim != cs->texture.texUnits[unit].enableDim)
         {
@@ -629,7 +629,7 @@ __GL_INLINE GLvoid __glEvaluateProgramAttrib(__GLcontext* gc, __GLattribute* cs,
         /* Current sampler2TexUnit will be build in __glBuildTexEnableDim */
         __glBuildTexEnableDim(gc, cs, ds);
 
-        for (sampler = 0; sampler < gc->constants.shaderCaps.maxTextureSamplers; ++sampler)
+        for (sampler = 0; sampler < gc->shaderProgram.maxSampler; ++sampler)
         {
             if (oldSampler2TexUnit[sampler] != newSampler2TexUnit[sampler])
             {
@@ -700,8 +700,8 @@ __GL_INLINE GLboolean __glDrawValidateState(__GLcontext *gc)
         __glOverturnCommitStates(gc);
         __glSetAttributeStatesDirty(gc);
 
-        gc->invalidCommonCommit = GL_FALSE;
-        gc->invalidDrawCommit = GL_FALSE;
+        gc->shaderProgram.maxSampler = gc->constants.shaderCaps.maxTextureSamplers;
+        gc->shaderProgram.maxUnit = gc->constants.shaderCaps.maxCombinedTextureImageUnits;
     }
 
     if (gc->globalDirtyState[__GL_ALL_ATTRS])
@@ -752,6 +752,9 @@ __GL_INLINE GLboolean __glDrawEnd(__GLcontext *gc)
     if (ret)
     {
         GLuint index;
+        __GLprogramObject *progObj;
+        __GLSLStage stage;
+
         for (index = 0; index < __GL_MAX_BUFFER_INDEX; index++)
         {
             __glBitmaskSetAll(&gc->bufferObject.bindingDirties[index], GL_FALSE);
@@ -768,6 +771,29 @@ __GL_INLINE GLboolean __glDrawEnd(__GLcontext *gc)
         }
 
         gc->vertexArray.varrayDirty = 0;
+
+        if (gc->invalidCommonCommit || gc->invalidDrawCommit)
+        {
+            gc->invalidCommonCommit = GL_FALSE;
+            gc->invalidDrawCommit = GL_FALSE;
+
+            if (gc->shaderProgram.mode == __GLSL_MODE_GRAPHICS)
+            {
+                /* reset valude.*/
+                gc->shaderProgram.maxSampler = 0;
+                gc->shaderProgram.maxUnit = 0;
+
+                for (stage = __GLSL_STAGE_VS; stage <= __GLSL_STAGE_FS; ++stage)
+                {
+                    progObj = __glGetCurrentStageProgram(gc, stage);
+                    if (progObj)
+                    {
+                        gc->shaderProgram.maxSampler = gcmMAX(gc->shaderProgram.maxSampler, progObj->maxSampler);
+                        gc->shaderProgram.maxUnit = gcmMAX(gc->shaderProgram.maxUnit, progObj->maxUnit);
+                    }
+                }
+            }
+        }
 
         /* Temp disable the dirty in case to affect perf */
     }

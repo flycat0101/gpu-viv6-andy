@@ -783,13 +783,13 @@ vdkCompileShader(
     }
     else
     {
-        int ret;
-        if(fseek(in, 0, SEEK_END))
+        size_t len;
+        if (fseek(in, 0, SEEK_END))
         {
             goto error;
         }
         length = ftell(in);
-        if(fseek(in, 0, SEEK_SET))
+        if (fseek(in, 0, SEEK_SET))
         {
             goto error;
         }
@@ -805,8 +805,11 @@ vdkCompileShader(
             goto error;
         }
 
-        ret = fread(source, length, 1, in);
-        assert(ret);
+        len = fread(source, length, 1, in);
+        if (!len)
+        {
+            goto error;
+        }
         source[length] = '\0';
     }
 

@@ -96,13 +96,17 @@ LOCAL_CFLAGS := \
 
 LOCAL_C_INCLUDES := \
 	bionic \
-	external/stlport/stlport \
 	$(AQROOT)/sdk/inc \
 	$(AQROOT)/hal/inc \
 	$(AQROOT)/hal/user \
 	$(AQROOT)/hal/os/linux/user \
 	$(AQROOT)/compiler/libVSC/include \
 	$(LOCAL_PATH)/$(GC_CLC_DIR)/inc
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) "<" 23),1)
+LOCAL_C_INCLUDES += \
+	external/stlport/stlport
+endif
 
 LOCAL_MODULE         := libclCompiler
 LOCAL_MODULE_TAGS    := optional
@@ -137,9 +141,13 @@ LOCAL_C_INCLUDES := \
 	$(AQROOT)/hal/user \
 	$(AQROOT)/hal/os/linux/user \
 	bionic \
-	external/stlport/stlport \
 	$(AQROOT)/compiler/libVSC/include \
 	$(LOCAL_PATH)/$(GC_CLC_DIR)/inc
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) "<" 23),1)
+LOCAL_C_INCLUDES += \
+	external/stlport/stlport
+endif
 
 LOCAL_MODULE         := libclPreprocessor
 LOCAL_MODULE_TAGS    := optional
@@ -294,7 +302,6 @@ LOCAL_C_INCLUDES := \
 	$(AQROOT)/hal/user \
 	$(AQROOT)/hal/os/linux/user \
 	bionic \
-	external/stlport/stlport \
 	$(AQROOT)/compiler/libVSC/include \
 	$(AQROOT)/compiler/libCLC/compiler \
 	$(LOCAL_PATH)/$(GC_CLC_DIR)/inc \
@@ -303,16 +310,25 @@ LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/$(GC_CLC_DIR)/llvm/lib/System/Unix \
     $(LOCAL_PATH)/$(GC_CLC_DIR)/llvm/tools/clang/include
 
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) "<" 23),1)
+LOCAL_C_INCLUDES += \
+	external/stlport/stlport
+endif
+
 LOCAL_LDFLAGS := \
 	-Wl,-z,defs \
 	-Wl,--version-script=$(LOCAL_PATH)/$(GC_CLC_DIR)/llvm/libLLVM.map
 
 LOCAL_SHARED_LIBRARIES := \
-	libstlport \
 	liblog \
 	libdl \
 	libVSC \
 	libGAL
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) "<" 23),1)
+LOCAL_SHARED_LIBRARIES += \
+	libstlport
+endif
 
 LOCAL_STATIC_LIBRARIES := \
 	libclCompiler \
@@ -355,12 +371,16 @@ LOCAL_LDFLAGS := \
 	-Wl,--version-script=$(LOCAL_PATH)/$(GC_CLC_DIR)/entry/libCLC.map
 
 LOCAL_SHARED_LIBRARIES := \
-	libstlport \
 	liblog \
 	libdl \
 	libLLVM_viv \
 	libVSC \
 	libGAL
+
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) "<" 23),1)
+LOCAL_SHARED_LIBRARIES += \
+	libstlport
+endif
 
 LOCAL_STATIC_LIBRARIES := \
 	libclCompiler \

@@ -50,8 +50,10 @@ include $(BUILD_STATIC_LIBRARY)
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-	framebuffer.cpp \
 	gralloc.cpp
+
+LOCAL_SRC_FILES += \
+	framebuffer.cpp
 
 # ION allocator reference code in ion_gralloc.cpp
 # LOCAL_SRC_FILES += ion_gralloc.cpp
@@ -82,13 +84,13 @@ LOCAL_STATIC_LIBRARIES := \
 # ION allocator needs libion
 # LOCAL_SHARED_LIBRARIES += libion
 
-ifneq ($(TARGET_2ND_ARCH),)
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 21),1)
   LOCAL_MODULE_RELATIVE_PATH := hw
 else
   LOCAL_MODULE_PATH          := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 endif
 
-LOCAL_MODULE         := gralloc.$(PROPERTY)
+LOCAL_MODULE         := gralloc.$(HAL_MODULE_VARIANT)
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)

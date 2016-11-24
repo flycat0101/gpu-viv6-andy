@@ -579,8 +579,9 @@ Path::getDirectoryContents(std::set<Path>& result, std::string* ErrMsg) const {
       if (0 != lstat(aPath.path.c_str(), &st)) {
         if (S_ISLNK(st.st_mode))
           continue; // dangling symlink -- ignore
-        return MakeErrMsg(ErrMsg,
-                          aPath.path +  ": can't determine file object type");
+        MakeErrMsg(ErrMsg,
+                   aPath.path +  ": can't determine file object type");
+        break;
       }
       result.insert(aPath);
     }

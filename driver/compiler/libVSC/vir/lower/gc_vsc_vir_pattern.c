@@ -14,6 +14,7 @@
 #include "vir/lower/gc_vsc_vir_pattern.h"
 
 #define VIR_DEBUG_PATTERN 0
+
 #define VIR_Covers(bits1, bits2)       \
     ((((bits1) ^ (bits2)) | (bits1)) == (bits1))
 
@@ -69,7 +70,9 @@ _Pattern_Dump_Pattern(
 VSC_ErrCode
 VIR_PatternContext_Initialize(
     IN OUT VIR_PatternContext      *Context,
+    IN PVSC_CONTEXT                vscContext,
     IN VIR_Shader                  *Shader,
+    IN VSC_MM                      *pMM,
     IN VIR_PatnContextFlag          Flag,
     IN VIR_PATTERN_GET_PATTERN_PTR  GetPatrernPtr,
     IN VIR_PATTERN_CMP_OPCODE_PTR   CmpOpcodePtr,
@@ -85,28 +88,22 @@ VIR_PatternContext_Initialize(
     Context->flag         = Flag;
     Context->getPattern   = GetPatrernPtr;
     Context->cmpOpcode    = CmpOpcodePtr;
+    Context->vscContext   = vscContext;
 
     memset(Context->tmpRegSymbol, 0, sizeof(Context->tmpRegSymbol));
 
-    if (Size > 0)
-    {
-        vscPMP_Intialize(&Context->memPool, gcvNULL, Size, sizeof(char), gcvTRUE/*pooling*/);
-    }
+    Context->pMM = pMM;
 
     return errCode;
 }
 
 VSC_ErrCode
 VIR_PatternContext_Finalize(
-    IN OUT VIR_PatternContext      *Context,
-    IN gctSIZE_T                    Size
+    IN OUT VIR_PatternContext      *Context
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
-    if (Size > 0)
-    {
-        vscPMP_Finalize(&Context->memPool);
-    }
+
     return errCode;
 }
 
@@ -122,38 +119,41 @@ _Pattern_SetOperand(
 
     if (No == 0)
     {
-        index = VIR_Operand_GetIndex(Inst->dest);
-        *Inst->dest = *Opnd;
-        VIR_Operand_SetIndex(Inst->dest, index);
+        VIR_Operand     *dest = VIR_Inst_GetDest(Inst);
+        index = VIR_Operand_GetIndex(dest);
+        VIR_Operand_Copy(dest, Opnd);
+        VIR_Operand_SetIndex(dest, index);
 
         if (!VIR_Operand_isLvalue(Opnd))
         {
-            VIR_Operand_SetLvalue(Inst->dest, gcvTRUE);
-            VIR_Operand_SetEnable(Inst->dest,
+            VIR_Operand_SetLvalue(dest, gcvTRUE);
+            VIR_Operand_SetEnable(dest,
                 VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(Opnd)));
-            VIR_Operand_SetRoundMode(Inst->dest, VIR_ROUND_DEFAULT);
-            VIR_Operand_SetModifier(Inst->dest, VIR_MOD_NONE);
+            VIR_Operand_SetRoundMode(dest, VIR_ROUND_DEFAULT);
+            VIR_Operand_SetModifier(dest, VIR_MOD_NONE);
         }
     }
     else
     {
+        VIR_Operand     *src;
         gcmASSERT(No - 1 < VIR_MAX_SRC_NUM);
 
+        src = VIR_Inst_GetSource(Inst, No - 1);
         /* copy operand */
-        index = VIR_Operand_GetIndex(Inst->src[No - 1]);
-        *Inst->src[No - 1] = *Opnd;
-        VIR_Operand_SetIndex(Inst->src[No - 1], index);
+        index = VIR_Operand_GetIndex(src);
+        VIR_Operand_Copy(src, Opnd);
+        VIR_Operand_SetIndex(src, index);
 
         if (VIR_Operand_isLvalue(Opnd))
         {
             /* the operand is copied from pervious inst's dest,
                reset its lvalue attribute */
-            VIR_Operand_SetLvalue(Inst->src[No - 1], gcvFALSE);
+            VIR_Operand_SetLvalue(src, gcvFALSE);
             /* convert dest operand's enable to new operand's swizzzle */
-            VIR_Operand_SetSwizzle(Inst->src[No - 1],
+            VIR_Operand_SetSwizzle(src,
                 VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(Opnd)));
-            VIR_Operand_SetRoundMode(Inst->src[No - 1], VIR_ROUND_DEFAULT);
-            VIR_Operand_SetModifier(Inst->src[No - 1], VIR_MOD_NONE);
+            VIR_Operand_SetRoundMode(src, VIR_ROUND_DEFAULT);
+            VIR_Operand_SetModifier(src, VIR_MOD_NONE);
         }
     }
 }
@@ -171,12 +171,12 @@ _Pattern_GetOperand(
 
     if (No == 0)
     {
-        return Inst->dest;
+        return VIR_Inst_GetDest(Inst);
     }
     else
     {
         gcmASSERT(No - 1 < VIR_MAX_SRC_NUM);
-        return Inst->src[No - 1];
+        return VIR_Inst_GetSource(Inst, No - 1);
     }
 }
 
@@ -213,12 +213,14 @@ _Pattern_GetTempOperandByPattern(
 
 static VIR_Operand*
 _Pattern_GetOperandByPattern(
-    IN VIR_PatternMatchInst  *Pattern,
+    IN VIR_Pattern      *Pattern,
     IN gctINT            Num,
     IN VIR_Instruction  *Inst
     )
 {
-    while(Pattern != gcvNULL)
+    VIR_PatternMatchInst  *matchInsts = Pattern->matchInsts;
+
+    while(matchInsts != gcvNULL)
     {
         gctSIZE_T               i = 0;
         VIR_Operand_Iterator    opndIter;
@@ -229,20 +231,20 @@ _Pattern_GetOperandByPattern(
             return gcvNULL;
         }
 
-        VIR_Operand_Iterator_Init(Inst, &opndIter, gcvFALSE);
+        VIR_Operand_Iterator_Init(Inst, &opndIter, !(Pattern->flags & VIR_PATN_FLAG_NOT_EXPAND_SPECIAL_NODE), gcvFALSE);
 
         for (i = 0, opnd = VIR_Operand_Iterator_First(&opndIter);
             i < VIR_PATTERN_OPND_COUNT && opnd != gcvNULL;
             ++i, opnd = VIR_Operand_Iterator_Next(&opndIter))
         {
-            if (Pattern->opnd[i] == Num)
+            if (matchInsts->opnd[i] == Num)
             {
                 return opnd;
             }
         }
 
         Inst = VIR_Inst_GetNext(Inst);
-        ++Pattern;
+        ++matchInsts;
     }
 
     gcmASSERT(0);
@@ -289,7 +291,8 @@ _Pattern_CmpOperand(
                 return gcvFALSE;
             }
 
-            return Opnd0->u1.uConst == Opnd1->u1.uConst;
+            return VIR_Operand_GetImmediateUint(Opnd0) ==
+                        VIR_Operand_GetImmediateUint(Opnd1);
         }
     case VIR_OPND_SYMBOL:
     case VIR_OPND_SAMPLER_INDEXING:
@@ -470,6 +473,9 @@ _Pattern_isMatched(
     VIR_Pattern      *curPattern = *Pattern;
     VIR_Instruction  *curInst    =  gcvNULL;
 
+    if ((curPattern->flags & VIR_PATN_FLAG_ALREADY_MATCHED_AND_REPLACED) !=0)
+        return gcvTRUE;
+
     while(curPattern->matchCount != 0)
     {
         gctSIZE_T i         = 0;
@@ -492,11 +498,11 @@ _Pattern_isMatched(
                 break;
             }
 
-            isMatched &= Context->cmpOpcode(Context, patternInst, curInst);
+            isMatched = isMatched && Context->cmpOpcode(Context, patternInst, curInst);
 
             if (isMatched && patternInst->condOp != VIR_PATTERN_ANYCOND)
             {
-                isMatched &= ((gctINT)(patternInst->condOp) == (gctINT)VIR_Inst_GetConditionOp(curInst));
+                isMatched = ((gctINT)(patternInst->condOp) == (gctINT)VIR_Inst_GetConditionOp(curInst));
             }
 
             if (!isMatched)   break;
@@ -525,7 +531,7 @@ _Pattern_isMatched(
                 {
                     if (patternInst->function[j] != gcvNULL)
                     {
-                        isMatched &= patternInst->function[j](Context, curInst);
+                        isMatched = isMatched && patternInst->function[j](Context, curInst);
 
                         if (!isMatched) break;
                     }
@@ -539,7 +545,7 @@ _Pattern_isMatched(
             if (!isMatched)   break;
 
 
-            VIR_Operand_Iterator_Init(curInst, &opndIter, gcvFALSE);
+            VIR_Operand_Iterator_Init(curInst, &opndIter, !(curPattern->flags & VIR_PATN_FLAG_NOT_EXPAND_SPECIAL_NODE), gcvFALSE);
 
             for (j = 0, curOpnd = VIR_Operand_Iterator_First(&opndIter);
                 j < VIR_PATTERN_OPND_COUNT;
@@ -562,9 +568,9 @@ _Pattern_isMatched(
 
                 if (!isMatched)   break;
 
-                orgOpnd = _Pattern_GetOperandByPattern(curPattern->matchInsts, ptnOpnd, Inst);
+                orgOpnd = _Pattern_GetOperandByPattern(curPattern, ptnOpnd, Inst);
 
-                isMatched &= _Pattern_CmpOperand(Context->shader, curOpnd, orgOpnd);
+                isMatched = isMatched && _Pattern_CmpOperand(Context->shader, curOpnd, orgOpnd);
                 if (!isMatched)   break;
             }
 
@@ -601,28 +607,32 @@ _Pattern_FreeMatchedInsts(
 
     gcmASSERT(*Inst != gcvNULL);
     *Inst = VIR_Inst_GetPrev(curInst);
+
     for (i = 0; i < Pattern->matchCount; ++i)
     {
         gcmASSERT(curInst != gcvNULL);
 
-        if (!(Pattern->flags & VIR_PATN_FLAG_DELETE_MANUAL))
+        nxtInst = VIR_Inst_GetNext(curInst);
+        if ((Pattern->flags & VIR_PATN_FLAG_DELETE_MANUAL))
         {
             gctSIZE_T j = 0;
-            for (j = 0; j < VIR_PATTERN_OPND_COUNT; ++j)
+            /* reset all sources */
+            for (j = 0; j < VIR_Inst_GetSrcNum(curInst); ++j)
             {
-                VIR_Operand *opnd = _Pattern_GetOperand(curInst, j);
-                if (opnd != gcvNULL)
-                {
-                    VIR_Function_FreeOperand(Function, opnd);
-                }
+                VIR_Inst_SetSource(curInst, j, gcvNULL);
             }
+            /* reset dest */
+            VIR_Inst_SetDest(curInst, gcvNULL);
         }
 
-        nxtInst = VIR_Inst_GetNext(curInst);
-        VIR_Function_RemoveInstruction(Function, curInst);
+        VIR_Function_DeleteInstruction(Function, curInst);
         curInst = nxtInst;
     }
 
+    if (*Inst == gcvNULL)
+    {
+        *Inst = Function->instList.pHead;;
+    }
 
     return errCode;
 }
@@ -639,6 +649,7 @@ _Pattern_ReplaceNormal(
     gctSIZE_T               i = 0;
     VIR_PatternReplaceInst *replacedPtnInst = gcvNULL;
     VSC_ErrCode             errCode         = VSC_ERR_NONE;
+    VIR_RES_OP_TYPE         resOpType = VIR_Inst_GetResOpType(Inst);
 
 #if VIR_DEBUG_PATTERN
         _Pattern_Dump_Pattern(Context, Inst, Pattern);
@@ -655,8 +666,18 @@ _Pattern_ReplaceNormal(
             replacedPtnInst->opcode,
             VIR_TYPE_UNKNOWN,
             Inst,
+            gcvTRUE,
             &insertedInst);
         if (errCode != VSC_ERR_NONE) return errCode;
+
+        insertedInst->sourceLoc = Inst->sourceLoc;
+        insertedInst->_isPatternRep = gcvTRUE;
+
+        /* Update the resOpType. */
+        if (VIR_OPCODE_isTexLd(replacedPtnInst->opcode))
+        {
+            VIR_Inst_SetResOpType(insertedInst, resOpType);
+        }
 
         if (VIR_Inst_GetOpcode(insertedInst) == VIR_OP_LABEL)
         {
@@ -666,7 +687,7 @@ _Pattern_ReplaceNormal(
             errCode = VIR_Function_AddLabel(Function, gcvNULL, &labelID);
             virLabel = VIR_GetLabelFromId(Function, labelID);
             virLabel->defined = insertedInst;
-            VIR_Operand_SetLabel(insertedInst->dest, virLabel);
+            VIR_Operand_SetLabel(VIR_Inst_GetDest(insertedInst), virLabel);
         }
 
         if (Inst->_parentUseBB)
@@ -699,18 +720,6 @@ _Pattern_ReplaceNormal(
                 gctINT      regNo     = -(1 + ptnOpnd);
                 gcmASSERT(regNo < VIR_PATTERN_TEMP_COUNT);
 
-                if (Context->flag & VIR_PATN_CONTEXT_FLAG_RECURSION)
-                {
-                    regNo += Context->baseTmpRegNo;
-
-                    gcmASSERT(regNo < VIR_PATTERN_TEMP_COUNT);
-
-                    if (regNo > Context->maxTmpRegNo)
-                    {
-                        Context->maxTmpRegNo = regNo;
-                    }
-                }
-
                 if (j == 0)
                 {
                     if (Context->tmpRegSymbol[regNo] == gcvNULL)
@@ -742,14 +751,14 @@ _Pattern_ReplaceNormal(
                         if (VIR_PATTERN_DefaultTempType(replacedPtnInst))
                         {
                             VIR_Instruction *lastPatternInst = _Pattern_GetInstruction(Inst, Pattern->matchCount - 1);
-                            templeteOpnd = lastPatternInst->dest;
+                            templeteOpnd = VIR_Inst_GetDest(lastPatternInst);
                         }
                         else if (VIR_PATTERN_SpecialTempType(replacedPtnInst))
                         {
                             if (VIR_Covers(VIR_PATTERN_TEMP_TYPE_XYZW, VIR_PATTERN_GetTempType(replacedPtnInst)))
                             {
                                 VIR_Instruction *lastPatternInst = _Pattern_GetInstruction(Inst, Pattern->matchCount - 1);
-                                templeteOpnd = lastPatternInst->dest;
+                                templeteOpnd = VIR_Inst_GetDest(lastPatternInst);
                             }
                             else
                             {
@@ -758,7 +767,7 @@ _Pattern_ReplaceNormal(
                         }
                         else
                         {
-                            templeteOpnd = _Pattern_GetOperandByPattern(Pattern->matchInsts, VIR_PATTERN_GetReferNo(replacedPtnInst), Inst);
+                            templeteOpnd = _Pattern_GetOperandByPattern(Pattern, VIR_PATTERN_GetReferNo(replacedPtnInst), Inst);
                         }
 
                         if (templeteOpnd != gcvNULL)
@@ -773,7 +782,14 @@ _Pattern_ReplaceNormal(
                             {
                                 VIR_Operand_SetEnable(opnd, VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(templeteOpnd)));
                             }
-                            VIR_Operand_SetRoundMode(opnd, VIR_ROUND_DEFAULT);
+                            if (replacedPtnInst->flag & VIR_PATN_FLAG_COPY_ROUNDING_MODE)
+                            {
+                                VIR_Operand_SetRoundMode(opnd, VIR_Operand_GetRoundMode(templeteOpnd));
+                            }
+                            else
+                            {
+                               VIR_Operand_SetRoundMode(opnd, VIR_ROUND_DEFAULT);
+                            }
                             VIR_Operand_SetModifier(opnd, VIR_MOD_NONE);
 
                             if (VIR_PATTERN_SpecialTempType(replacedPtnInst) &&
@@ -798,7 +814,7 @@ _Pattern_ReplaceNormal(
             }
             else
             {
-                opnd = _Pattern_GetOperandByPattern(Pattern->matchInsts, ptnOpnd, Inst);
+                opnd = _Pattern_GetOperandByPattern(Pattern, ptnOpnd, Inst);
             }
 
             _Pattern_SetOperand(insertedInst, j, opnd);
@@ -861,13 +877,13 @@ _Pattern_ClonePattern(
 {
     VIR_Pattern *clonedPattern = gcvNULL;
 
-    clonedPattern = (VIR_Pattern *)vscMM_Alloc(&Context->memPool.mmWrapper, sizeof(VIR_Pattern));
+    clonedPattern = (VIR_Pattern *)vscMM_Alloc(Context->pMM, sizeof(VIR_Pattern));
     memcpy(clonedPattern, Pattern, sizeof(VIR_Pattern));
 
-    clonedPattern->matchInsts = (VIR_PatternMatchInst *)vscMM_Alloc(&Context->memPool.mmWrapper, sizeof(VIR_PatternMatchInst));
+    clonedPattern->matchInsts = (VIR_PatternMatchInst *)vscMM_Alloc(Context->pMM, sizeof(VIR_PatternMatchInst));
     memcpy(clonedPattern->matchInsts, Pattern->matchInsts, sizeof(VIR_PatternMatchInst) * Pattern->matchCount);
 
-    clonedPattern->replaceInsts = (VIR_PatternReplaceInst *)vscMM_Alloc(&Context->memPool.mmWrapper, sizeof(VIR_PatternReplaceInst));
+    clonedPattern->replaceInsts = (VIR_PatternReplaceInst *)vscMM_Alloc(Context->pMM, sizeof(VIR_PatternReplaceInst));
     memcpy(clonedPattern->replaceInsts, Pattern->replaceInsts, sizeof(VIR_PatternReplaceInst) * Pattern->repalceCount);
 
     return clonedPattern;
@@ -879,9 +895,9 @@ _Pattern_DestroyClonedPattern(
     IN VIR_Pattern          *Pattern
     )
 {
-    vscMM_Free(&Context->memPool.mmWrapper, Pattern->matchInsts);
-    vscMM_Free(&Context->memPool.mmWrapper, Pattern->replaceInsts);
-    vscMM_Free(&Context->memPool.mmWrapper, Pattern);
+    vscMM_Free(Context->pMM, Pattern->matchInsts);
+    vscMM_Free(Context->pMM, Pattern->replaceInsts);
+    vscMM_Free(Context->pMM, Pattern);
 }
 
 static gctBOOL
@@ -897,7 +913,7 @@ _Pattern_NotExpand(
     {
         VIR_OperandInfo opndInfo;
         VIR_Swizzle     swiz;
-        VIR_Operand_GetOperandInfo(Inst, Inst->src[i], &opndInfo);
+        VIR_Operand_GetOperandInfo(Inst, VIR_Inst_GetSource(Inst, i), &opndInfo);
 
         if (opndInfo.isImmVal)
         {
@@ -909,7 +925,7 @@ _Pattern_NotExpand(
             return gcvFALSE;
         }
 
-        swiz = VIR_Operand_GetSwizzle(Inst->src[i]);
+        swiz = VIR_Operand_GetSwizzle(VIR_Inst_GetSource(Inst, i));
 
         if (!(swiz == VIR_SWIZZLE_XXXX ||
            swiz == VIR_SWIZZLE_YYYY ||
@@ -934,11 +950,11 @@ _Pattern_NotAddMov(
 
 
     gcmASSERT(Inst != gcvNULL &&
-        Inst->dest != gcvNULL);
+        VIR_Inst_GetDest(Inst) != gcvNULL);
 
     for (i = 0; i < VIR_Inst_GetSrcNum(Inst); i++)
     {
-        if (VIR_Operand_SameSymbol(Inst->dest, Inst->src[i]))
+        if (VIR_Operand_SameSymbol(VIR_Inst_GetDest(Inst), VIR_Inst_GetSource(Inst, i)))
         {
             notSame = gcvFALSE;
             break;
@@ -953,8 +969,8 @@ _Pattern_NotAddMov(
     for (i = 0; i < VIR_Inst_GetSrcNum(Inst); i++)
     {
         gctSIZE_T   j       = 0;
-        VIR_Enable  enable  = VIR_Operand_GetEnable(Inst->dest);
-        VIR_Swizzle swizzle = VIR_Operand_GetSwizzle(Inst->src[i]);
+        VIR_Enable  enable  = VIR_Operand_GetEnable(VIR_Inst_GetDest(Inst));
+        VIR_Swizzle swizzle = VIR_Operand_GetSwizzle(VIR_Inst_GetSource(Inst, i));
 
         for (j = 0; j < VIR_CHANNEL_COUNT; j++)
         {
@@ -987,7 +1003,7 @@ _Pattern_ReplaceInline(
     gctSIZE_T        i                  = 0;
     VIR_Enable       expandEnable       = VIR_ENABLE_NONE;
 
-    gcmASSERT(Inst->dest != gcvNULL &&
+    gcmASSERT(VIR_Inst_GetDest(Inst) != gcvNULL &&
         Pattern->matchCount == 1);
 
     if (_Pattern_NotExpand(Context->shader, Inst))
@@ -1028,13 +1044,13 @@ _Pattern_ReplaceInline(
     }
     else
     {
-        expandEnable = VIR_Operand_GetEnable(Inst->dest);
+        expandEnable = VIR_Operand_GetEnable(VIR_Inst_GetDest(Inst));
     }
 
     for (component = 0x1, i = 0; i < 4; component <<= 1, ++i)
     {
-        gcmASSERT(Inst->dest != gcvNULL &&
-            VIR_Operand_isLvalue(Inst->dest));
+        gcmASSERT(VIR_Inst_GetDest(Inst) != gcvNULL &&
+            VIR_Operand_isLvalue(VIR_Inst_GetDest(Inst)));
 
         if (expandEnable & component)
         {
@@ -1052,15 +1068,17 @@ _Pattern_ReplaceInline(
             VIR_OP_MOV,
             VIR_TYPE_UNKNOWN,
             Inst,
+            gcvTRUE,
             &movTemp2Dest);
         if (errCode != VSC_ERR_NONE) return errCode;
+        movTemp2Dest->_isPatternRep = gcvTRUE;
 
-        _Pattern_SetOperand(movTemp2Dest, 0, Inst->dest);
-        _Pattern_SetOperand(movTemp2Dest, 1, lastReplacedInst->dest);
+        _Pattern_SetOperand(movTemp2Dest, 0, VIR_Inst_GetDest(Inst));
+        _Pattern_SetOperand(movTemp2Dest, 1, VIR_Inst_GetDest(lastReplacedInst));
 
-        VIR_Operand_SetType(movTemp2Dest->src[0], VIR_Operand_GetType(Inst->dest));
-        VIR_Operand_SetSwizzle(movTemp2Dest->src[0],
-            VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(Inst->dest)));
+        VIR_Operand_SetType(VIR_Inst_GetSource(movTemp2Dest, 0), VIR_Operand_GetType(VIR_Inst_GetDest(Inst)));
+        VIR_Operand_SetSwizzle(VIR_Inst_GetSource(movTemp2Dest, 0),
+            VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(VIR_Inst_GetDest(Inst))));
     }
 
     if (!notAddMov)
@@ -1081,6 +1099,7 @@ _Pattern_Replace(
 {
     VSC_ErrCode       errCode = VSC_ERR_NONE;
 
+    if (Pattern->flags & VIR_PATN_FLAG_ALREADY_MATCHED_AND_REPLACED) return errCode;
     if (Pattern->flags & VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE)
     {
         errCode = _Pattern_ReplaceInline(Context, Function, Inst, Pattern);
@@ -1101,13 +1120,17 @@ static VSC_ErrCode
 _Pattern_TransformByInstruction(
     IN VIR_PatternContext   *Context,
     IN VIR_Function         *Function,
-    IN OUT VIR_Instruction  **Inst
+    IN OUT VIR_Instruction  **Inst,
+    OUT gctBOOL             *MoveToNextInst
     )
 {
     VSC_ErrCode       errCode  = VSC_ERR_NONE;
-    VIR_Pattern      *patterns = Context->getPattern(Context, *Inst);
-    VIR_Instruction **preInst  = gcvNULL;
+    VIR_Pattern      *patterns;
+    VIR_Instruction  *preInst;
 
+    *MoveToNextInst = gcvTRUE;
+    preInst = VIR_Inst_GetPrev(*Inst);
+    patterns = Context->getPattern(Context, *Inst);
     if (patterns == gcvNULL ||
         _Pattern_isMatched(Context, *Inst, &patterns) == gcvFALSE)
     {
@@ -1119,51 +1142,51 @@ _Pattern_TransformByInstruction(
 
     ++Context->changed;
 
-    if (VIR_Inst_GetPrev(*Inst) != gcvNULL)
+    errCode = _Pattern_Replace(Context, Function, *Inst, patterns);
+    if (errCode != VSC_ERR_NONE)
     {
-        VIR_Instruction *tempInst = VIR_Inst_GetPrev(*Inst);
-        preInst = &tempInst;
+        return errCode;
+    }
+    memset(Context->tmpRegSymbol, 0, sizeof(Context->tmpRegSymbol));
+
+    if ((patterns->flags & VIR_PATN_FLAG_ALREADY_MATCHED_AND_REPLACED) == 0)
+    {
+        errCode = _Pattern_FreeMatchedInsts(Context, Function, Inst, patterns);
+        if (errCode != VSC_ERR_NONE)        return errCode;
     }
 
-    errCode = _Pattern_Replace(Context, Function, *Inst, patterns);
-    if (errCode != VSC_ERR_NONE)        return errCode;
-
-    if ((Context->flag & VIR_PATN_CONTEXT_FLAG_RECURSION) &&
-        !(patterns->flags & VIR_PATN_FLAG_NO_RECURSION))
+    if ((patterns->flags & VIR_PATN_FLAG_RECURSIVE_SCAN_NEWINST) !=0)
     {
-        gctINT preBaseTmpRegNo = Context->baseTmpRegNo;
-
-        Context->baseTmpRegNo = Context->maxTmpRegNo + 1;
-
-        if (preInst != gcvNULL)
+        VIR_Instruction * nextInstToTransform;
+        *MoveToNextInst = gcvFALSE;
+        /* find the first replace inst */
+        if (preInst)
         {
-            VIR_Instruction *tempInst = VIR_Inst_GetNext(*Inst);
-            preInst = &tempInst;
+            nextInstToTransform = VIR_Inst_GetNext(preInst);
         }
         else
         {
-            preInst = &Function->instList.pHead;
+            /* get the first inst of the function */
+            nextInstToTransform = Function->instList.pHead;
         }
-
-        for (; *preInst != VIR_Inst_GetNext(*Inst); *preInst = VIR_Inst_GetNext(*preInst))
-        {
-            errCode = _Pattern_TransformByInstruction(Context, Function, preInst);
-            if (errCode != VSC_ERR_NONE)        return errCode;
-        }
-
-        memset(Context->tmpRegSymbol + Context->baseTmpRegNo, 0,
-            sizeof(Context->tmpRegSymbol[0]) * (VIR_PATTERN_TEMP_COUNT - Context->baseTmpRegNo));
-
-        Context->baseTmpRegNo = preBaseTmpRegNo;
-        Context->maxTmpRegNo  = preBaseTmpRegNo;
+        *Inst = nextInstToTransform;  /* need to rescan the instruction from new added inst */
     }
-    else
+    else if ((patterns->flags & VIR_PATN_FLAG_RECURSIVE_SCAN) != 0 )
     {
-        memset(Context->tmpRegSymbol, 0, sizeof(Context->tmpRegSymbol));
+        VIR_Instruction * nextInstToTransform;
+        *MoveToNextInst = gcvFALSE;
+        /* find the first replace inst */
+        if (preInst)
+        {
+            nextInstToTransform = preInst;
+        }
+        else
+        {
+            /* get the first inst of the function */
+            nextInstToTransform = Function->instList.pHead;
+        }
+        *Inst = nextInstToTransform;  /* need to rescan the instruction from new added inst */
     }
-
-    errCode = _Pattern_FreeMatchedInsts(Context, Function, Inst, patterns);
-    if (errCode != VSC_ERR_NONE)        return errCode;
 
     return errCode;
 }
@@ -1176,10 +1199,19 @@ _Pattern_TransformByFunction(
 {
     VIR_Instruction  *inst      = Function->instList.pHead;
     VSC_ErrCode       errCode   = VSC_ERR_NONE;
+    gctBOOL           moveToNextInst = gcvTRUE;
 
-    for (; inst != gcvNULL; inst = VIR_Inst_GetNext(inst))
+    while (inst != gcvNULL)
     {
-        _Pattern_TransformByInstruction(Context, Function, &inst);
+        _Pattern_TransformByInstruction(Context, Function, &inst, &moveToNextInst);
+        if (inst == gcvNULL)
+        {
+            break;
+        }
+        if (moveToNextInst)
+        {
+             inst = VIR_Inst_GetNext(inst);
+        }
     }
 
     return errCode;

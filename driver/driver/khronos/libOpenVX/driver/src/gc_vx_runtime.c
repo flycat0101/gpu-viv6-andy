@@ -784,3 +784,4 @@ VX_INTERNAL_API vx_bool vxoThreadpool_IsCompleted(vx_threadpool threadPool, vx_b
 }
 #endif /* VX_USE_THREADPOOL */
 
+

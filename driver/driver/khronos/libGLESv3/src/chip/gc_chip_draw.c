@@ -18,10 +18,10 @@
 #define _GC_OBJ_ZONE    __GLES3_ZONE_DRAW
 
 #if gcdFRAMEINFO_STATISTIC
-GLint g_dbgDumpImagePerDraw = __GL_PERDRAW_DUMP_NONE;
-GLboolean g_dbgPerDrawKickOff = GL_FALSE;
-GLboolean g_dbgSkipDraw = GL_FALSE;
-GLint   g_dbgReleasePhony = 0;
+GLbitfield g_dbgDumpImagePerDraw = __GL_PERDRAW_DUMP_NONE;
+GLboolean  g_dbgPerDrawKickOff = GL_FALSE;
+GLboolean  g_dbgSkipDraw = GL_FALSE;
+GLint      g_dbgReleasePhony = 0;
 #endif
 
 extern __GLSLStage __glChipHALShaderStageToGL[];
@@ -330,13 +330,12 @@ gcChipComputeWlimitArg(
     {
         gcmONERROR(gco3D_SetWPlaneLimitF(chipCtx->engine, 0.0f));
         gcmONERROR(gco3D_SetWClipEnable(chipCtx->engine, gcvFALSE));
-        chipCtx->wLimitSettled = gcvTRUE;
         if(chipCtx->patchId == gcvPATCH_DEQP)
         {
             gcmONERROR(gco3D_SetWPlaneLimitF(chipCtx->engine, 0.1f));
             gcmONERROR(gco3D_SetWClipEnable(chipCtx->engine, gcvTRUE));
         }
-
+        chipCtx->wLimitSettled = gcvTRUE;
         gcmFOOTER();
         return status;
     }
@@ -1006,19 +1005,34 @@ OnError:
 }
 #endif
 
+#define gcmES30_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, bInstance) \
+    streamInfo.attribMask = instantDraw->attribMask; \
+    streamInfo.u.es30.attributes = instantDraw->attributes; \
+    streamInfo.first = instantDraw->first; \
+    streamInfo.count = instantDraw->count; \
+    streamInfo.instanced = bInstance; \
+    streamInfo.instanceCount = gc->vertexArray.instanceCount; \
+    streamInfo.primMode = instantDraw->primMode; \
+    streamInfo.vertexInstIndex = gcSHADER_GetVertexInstIdInputIndex(chipCtx->activePrograms[__GLSL_STAGE_VS]->masterPgInstance->binaries[__GLSL_STAGE_VS]); \
+    streamInfo.primCount = instantDraw->primCount
+
+#define gcmES30_COLLECT_INDEX_INFO(indexInfo, instantDraw) \
+    indexInfo.count = instantDraw->count; \
+    indexInfo.indexType = instantDraw->indexType; \
+    indexInfo.u.es30.indexBuffer = instantDraw->indexBuffer; \
+    indexInfo.indexMemory = instantDraw->indexMemory
+
 __GL_INLINE gceSTATUS
-gcChipSetVertexArrayBind(
+gcChipSetVertexArrayBindBegin(
     IN __GLcontext*         gc,
     IN __GLchipInstantDraw* instantDraw,
-    IN gctBOOL              fixWLimit,
-    IN gctBOOL              instanced
+    IN gctBOOL              fixWLimit
     )
 {
-    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
-    gctINT vertexInstIndex = -1;
     gceSTATUS status = gcvSTATUS_OK;
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
-    gcmHEADER_ARG("gc=0x%x instanced=%d", gc, instanced);
+    gcmHEADER();
 
 #if gcdUSE_WCLIP_PATCH
     /* WClipping Patch. */
@@ -1040,49 +1054,29 @@ gcChipSetVertexArrayBind(
     }
 #endif
 
-    /* Check vertex or instance attribute is used by the current shader */
-    vertexInstIndex = gcSHADER_GetVertexInstIdInputIndex(chipCtx->activePrograms[__GLSL_STAGE_VS]->masterPgInstance->binaries[__GLSL_STAGE_VS]);
+    /* Need to convert to triangle list? */
+    if(instantDraw->primMode == gcvPRIMITIVE_LINE_LOOP)
+    {
+        /*for line loop the last line is automatic added in hw implementation*/
+        instantDraw->primCount = instantDraw->primCount - 1;
+    }
 
-    /* Bind the vertex array to the hardware. */
-#if gcdUSE_WCLIP_PATCH
-    gcmONERROR(gcoVERTEXARRAY_Bind_Ex2(chipCtx->vertexArray,
-                                       instantDraw->attribMask,
-                                       instantDraw->attributes,
-                                       instantDraw->first,
-                                       &instantDraw->count,
-                                       instanced,
-                                       gc->vertexArray.instanceCount,
-                                       instantDraw->indexType,
-                                       instantDraw->indexBuffer,
-                                       instantDraw->indexMemory,
-                                       instantDraw->primitiveRestart,
-                                       &instantDraw->primMode,
-                                       &instantDraw->spilitDraw,
-                                       &instantDraw->spilitCount,
-                                       &instantDraw->spilitPrimMode,
-                                       &instantDraw->primCount,
-                                       (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRms,
-                                       (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRmsDirty,
-                                       vertexInstIndex));
-#else
-    gcmONERROR(gcoVERTEXARRAY_Bind_Ex2(chipCtx->vertexArray,
-                                       instantDraw->vsInputMask,
-                                       instantDraw->attributes,
-                                       instantDraw->first,
-                                       &instantDraw->count,
-                                       instanced,
-                                       gc->vertexArray.instanceCount,
-                                       instantDraw->indexType,
-                                       instantDraw->indexBuffer,
-                                       instantDraw->indexMemory,
-                                       instantDraw->primitiveRestart,
-                                       &instantDraw->primMode,
-                                       &instantDraw->spilitDraw,
-                                       &instantDraw->spilitCount,
-                                       &instantDraw->spilitPrimMode,
-                                       &instantDraw->primCount,
-                                       vertexInstIndex));
-#endif
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+__GL_INLINE gceSTATUS
+gcChipSetVertexArrayBindEnd(
+    IN __GLcontext*         gc,
+    IN __GLchipInstantDraw* instantDraw,
+    IN gctBOOL              fixWLimit
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+
+    gcmHEADER();
 
 #if gcdUSE_WCLIP_PATCH
     /* WClipping Patch. */
@@ -1095,6 +1089,49 @@ gcChipSetVertexArrayBind(
         gcmONERROR(gcChipFixWlimit(gc));
     }
 #endif
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+__GL_INLINE gceSTATUS
+gcChipSetVertexArrayBind(
+    IN __GLcontext*         gc,
+    IN __GLchipInstantDraw* instantDraw,
+    IN gctBOOL              fixWLimit,
+    IN gctBOOL              instanced
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gcsVERTEXARRAY_STREAM_INFO streamInfo;
+    gcsVERTEXARRAY_INDEX_INFO  indexInfo;
+
+    gcmHEADER_ARG("gc=0x%x instanced=%d", gc, instanced);
+
+    gcmONERROR(gcChipSetVertexArrayBindBegin(gc, instantDraw, fixWLimit));
+    /* Collect info for hal level.*/
+    gcmES30_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, instanced);
+    gcmES30_COLLECT_INDEX_INFO(indexInfo, instantDraw);
+
+    /* Bind the vertex array to the hardware. */
+#if gcdUSE_WCLIP_PATCH
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRms,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRmsDirty,
+                                         &streamInfo,
+                                         &indexInfo));
+#else
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         &streamInfo,
+                                         &indexInfo));
+#endif
+
+    gcmONERROR(gcoVERTEXARRAY_IndexBind(chipCtx->vertexArray,
+                                        &indexInfo));
+
+    gcmONERROR(gcChipSetVertexArrayBindEnd(gc, instantDraw, fixWLimit));
 
 OnError:
     gcmFOOTER();
@@ -1141,7 +1178,8 @@ gcChipPatchLineStripIndexed(
 {
     gctSIZE_T newIndexCount = 0;
     gctSIZE_T oldIndexCount = instantDraw->count;
-    gctSIZE_T requiredSize  = instantDraw->primCount * 2 * instantDraw->indexBytes;
+    gctSIZE_T indexSize     = 0;
+    gctSIZE_T requiredSize  = 0;
     GLvoid * indexMemory = instantDraw->indexMemory;
     GLvoid * tempIndices = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
@@ -1152,6 +1190,8 @@ gcChipPatchLineStripIndexed(
     /* Header */
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
+    gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+    requiredSize  = instantDraw->primCount * 2 * indexSize;
     /* Get index buffer */
     if (oldIndexBuffer)
     {
@@ -1376,7 +1416,8 @@ gcChipPatchLineLoopIndexed(
 {
     gctSIZE_T newIndexCount = 0;
     gctSIZE_T oldIndexCount = instantDraw->count;
-    gctSIZE_T requiredSize  = instantDraw->primCount * 2 * instantDraw->indexBytes;
+    gctSIZE_T indexSize     = 0;
+    gctSIZE_T requiredSize  = 0;
     GLvoid * indexMemory = instantDraw->indexMemory;
     GLvoid * tempIndices = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
@@ -1388,6 +1429,8 @@ gcChipPatchLineLoopIndexed(
     /* Header */
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
+    gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+    requiredSize  = instantDraw->primCount * 2 * indexSize;
     /* Get index buffer */
     if (oldIndexBuffer)
     {
@@ -1719,16 +1762,18 @@ gcChipPatchTriangleStripIndexed_cached(
     gcoBUFOBJ * pShadowIdxObj = gcvNULL;
     GLboolean   newCreated  = GL_FALSE;
     gctSIZE_T   indexOffset = __GL_PTR2SIZE(instantDraw->indexMemory);
-    gctSIZE_T   elementSize = instantDraw->indexBytes;
+    gctSIZE_T   elementSize = 0;
     GLboolean   oddOffset;    /* Whether start from an odd offset from the buffer? */
     GLubyte *   pSrcAddr = gcvNULL;
     GLubyte *   pDstAddr = gcvNULL;
     gceSTATUS   status = gcvSTATUS_OK;
-    gctSIZE_T   unAlignedStep = indexOffset % elementSize;
+    gctSIZE_T   unAlignedStep = 0;
 
     /* Header */
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
+    gcmGET_INDEX_SIZE(instantDraw->indexType, elementSize);
+    unAlignedStep = indexOffset % elementSize;
     /* There must be index buffer bound for this draw */
     GL_ASSERT(idxBufObj);
     bufInfo = (__GLchipVertexBufferInfo*)idxBufObj->privateData;
@@ -1867,7 +1912,8 @@ gcChipPatchTriangleStripIndexed(
 {
     gctSIZE_T newIndexCount = 0;
     gctSIZE_T oldIndexCount = instantDraw->count;
-    gctSIZE_T requiredSize  = instantDraw->primCount * 3 * instantDraw->indexBytes;
+    gctSIZE_T indexSize     = 0;
+    gctSIZE_T requiredSize  = 0;
     GLvoid * indexMemory = instantDraw->indexMemory;
     GLvoid * tempIndices = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
@@ -1878,6 +1924,8 @@ gcChipPatchTriangleStripIndexed(
     /* Header */
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
+    gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+    requiredSize  = instantDraw->primCount * 3 * indexSize;
     /* Get index buffer */
     if (oldIndexBuffer)
     {
@@ -2118,7 +2166,8 @@ gcChipPatchTriangleFanIndexed(
 {
     gctSIZE_T newIndexCount = 0;
     gctSIZE_T oldIndexCount = instantDraw->count;
-    gctSIZE_T requiredSize  = instantDraw->primCount * 3 * instantDraw->indexBytes;
+    gctSIZE_T indexSize     = 0;
+    gctSIZE_T requiredSize  = 0;
     GLvoid * indexMemory = instantDraw->indexMemory;
     GLvoid * tempIndices = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
@@ -2131,6 +2180,8 @@ gcChipPatchTriangleFanIndexed(
     /* Header */
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
+    gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+    requiredSize  = instantDraw->primCount * 3 * indexSize;
     /* Get index buffer */
     if (oldIndexBuffer)
     {
@@ -2381,7 +2432,8 @@ gcChipPatchIndexedPR(
 {
     gctSIZE_T newIndexCount = 0;
     gctSIZE_T oldIndexCount = instantDraw->count;
-    gctSIZE_T requiredSize  = oldIndexCount * instantDraw->indexBytes;
+    gctSIZE_T indexSize     = 0;
+    gctSIZE_T requiredSize  = 0;
     GLvoid * indexMemory = instantDraw->indexMemory;
     GLvoid * tempIndices = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
@@ -2392,6 +2444,8 @@ gcChipPatchIndexedPR(
     /* Header */
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x", gc, chipCtx);
 
+    gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+    requiredSize  = oldIndexCount * indexSize;
     /* Get index buffer */
     if (oldIndexBuffer)
     {
@@ -2545,8 +2599,12 @@ gcChipPatchShiftIndex(
     if (instantDraw->first < 0)
     {
         gctSIZE_T indexOffset = __GL_PTR2SIZE(instantDraw->indexMemory);
-        gctSIZE_T elementSize = instantDraw->indexBytes;
-        gctSIZE_T unAlignedStep = indexOffset % elementSize;
+        gctSIZE_T unAlignedStep = 0;
+        gctSIZE_T indexSize     = 0;
+
+        gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+
+        unAlignedStep = indexOffset % indexSize;
 
         /* Create shadow shift bufObj if needed */
         if (!bufInfo->shiftObj)
@@ -2561,7 +2619,7 @@ gcChipPatchShiftIndex(
             bufInfo->indexType != instantDraw->indexType)
         {
             gctSIZE_T i;
-            gctSIZE_T count = (bufInfo->size - unAlignedStep) / elementSize;
+            gctSIZE_T count = (bufInfo->size - unAlignedStep) / indexSize;
 
             gcmONERROR(gcoBUFOBJ_Lock(bufInfo->bufObj, gcvNULL, (gctPOINTER*)&pSrcBase));
             gcmONERROR(gcoBUFOBJ_Lock(bufInfo->shiftObj, gcvNULL, (gctPOINTER*)&pDstBase));
@@ -3378,12 +3436,21 @@ gcChipValidateDrawPath(
             {
                 gctBOOL hwIndirect = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DRAW_INDIRECT);
 
-                if (chipCtx->anyAttibGeneric || !hwIndirect)
+                if (chipCtx->anyAttibGeneric
+                ||  !hwIndirect
+                ||  (gc->vertexArray.primMode == GL_PATCHES_EXT
+                    && !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_FE_PATCHLIST_FETCH_FIX)
+                    && chipCtx->patchId != gcvPATCH_CAR_CHASE)
+                )
                 {
                     gcmONERROR(gcChipLockOutDrawIndirectBuf(gc));
                 }
 
-                if (!hwIndirect)
+                if (!hwIndirect
+                ||  (gc->vertexArray.primMode == GL_PATCHES_EXT
+                    && !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_FE_PATCHLIST_FETCH_FIX)
+                    && chipCtx->patchId != gcvPATCH_CAR_CHASE)
+                )
                 {
                     gc->vertexArray.drawIndirect = gcvFALSE;
                 }
@@ -3397,8 +3464,6 @@ gcChipValidateDrawPath(
             defaultInstant->attributes = chipCtx->attributeArray;
             defaultInstant->positionIndex = chipCtx->positionIndex;
             defaultInstant->primitiveRestart = gc->state.enables.primitiveRestart;
-            defaultInstant->spilitDraw = gcvFALSE;
-            defaultInstant->spilitCount = 0;
 
             /* Is it an indexed draw? */
             if (gc->vertexArray.indexCount == 0)
@@ -3422,15 +3487,12 @@ gcChipValidateDrawPath(
                 {
                 case GL_UNSIGNED_BYTE:
                     defaultInstant->indexType = gcvINDEX_8;
-                    defaultInstant->indexBytes = 1;
                     break;
                 case GL_UNSIGNED_SHORT:
                     defaultInstant->indexType = gcvINDEX_16;
-                    defaultInstant->indexBytes = 2;
                     break;
                 case GL_UNSIGNED_INT:
                     defaultInstant->indexType = gcvINDEX_32;
-                    defaultInstant->indexBytes = 4;
                     break;
                 default:
                     gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
@@ -3529,8 +3591,6 @@ gcChipValidateDrawPath(
                 gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
             }
 
-            defaultInstant->spilitPrimMode = defaultInstant->primMode;
-
             /* Skip the incomplete primitive draw */
             if (defaultInstant->primCount <= 0)
             {
@@ -3541,10 +3601,15 @@ gcChipValidateDrawPath(
 #if VIVANTE_PROFILER
             if (gc->profiler.enable)
             {
-                __glChipProfiler(&gc->profiler, GL3_PROFILER_PRIMITIVE_TYPE, (gctHANDLE)(gctUINTPTR_T)defaultInstant->primMode);
-                __glChipProfiler(&gc->profiler, GL3_PROFILER_PRIMITIVE_COUNT, (gctHANDLE)(gctUINTPTR_T)(defaultInstant->primCount * gc->vertexArray.instanceCount));
+                /*__glChipProfiler(&gc->profiler, GL3_PROFILER_PRIMITIVE_TYPE, (gctHANDLE)(gctUINTPTR_T)defaultInstant->primMode);
+                __glChipProfiler(&gc->profiler, GL3_PROFILER_PRIMITIVE_COUNT, (gctHANDLE)(gctUINTPTR_T)(defaultInstant->primCount * gc->vertexArray.instanceCount));*/
             }
 #endif
+            if (gc->profiler.enable)
+            {
+                __glChipProfiler_NEW_Set(gc, GL3_PROFILER_PRIMITIVE_TYPE, (gctHANDLE)(gctUINTPTR_T)defaultInstant->primMode);
+                __glChipProfiler_NEW_Set(gc, GL3_PROFILER_PRIMITIVE_COUNT, (gctHANDLE)(gctUINTPTR_T)(defaultInstant->primCount * gc->vertexArray.instanceCount));
+            }
 
             /* Is any of the attrib need SW converted? */
             if (chipCtx->anyAttibConverted)
@@ -3706,7 +3771,7 @@ gcChipValidateDrawPath(
                             gcmONERROR(gcChipPatchTriangleFan(gc, chipCtx, defaultInstant));
                         }
                     }
-                     else if (chipCtx->indexLoops &&
+                    else if (chipCtx->indexLoops &&
                              chipCtx->chipFeature.patchTriangleStrip &&
                              chipCtx->patchId == gcvPATCH_DEQP)
                     {
@@ -4364,6 +4429,11 @@ gcChipValidateRenderTargetState(
                 chipCtx->drawRTnum = halRTIndex;
             }
 
+            if (pgInstance->pLastFragData)
+            {
+                chipDirty->uBuffer.sBuffer.rtNumberDirty = 1;
+                chipCtx->drawRTnum = 0;
+            }
             /* Update ps output mapping to HAL */
             gcmONERROR(gco3D_SetPSOutputMapping(chipCtx->engine, newPSOutputMapping));
 
@@ -4383,7 +4453,7 @@ gcChipValidateRenderTargetState(
             {
                 GLint rtIndex = psOutputMapping[i];
                 GL_ASSERT(pRTView[rtIndex].surf);
-                gcmONERROR(gco3D_SetTarget(chipCtx->engine, i, pRTView[rtIndex].surf, pRTView[rtIndex].firstSlice, rtLayerIndex[rtIndex]));
+                gcmONERROR(gco3D_SetTarget(chipCtx->engine, i, &pRTView[rtIndex], rtLayerIndex[rtIndex]));
             }
 
             /* Clear unused RT */
@@ -4392,7 +4462,7 @@ gcChipValidateRenderTargetState(
                 if (oldPSOutputMapping[i] != -1)
                 {
                     GL_ASSERT((oldPSOutputMapping[i] >= 0) && (oldPSOutputMapping[i] < (GLint)chipCtx->maxDrawRTs));
-                    gcmONERROR(gco3D_SetTarget(chipCtx->engine, i, gcvNULL, 0, 0));
+                    gcmONERROR(gco3D_SetTarget(chipCtx->engine, i, gcvNULL, 0));
                 }
             }
         }
@@ -4404,7 +4474,7 @@ gcChipValidateRenderTargetState(
             chipDirty->uBuffer.sBuffer.sOffsetDirty
            )
         {
-            gcmONERROR(gco3D_SetDepth(chipCtx->engine, dsView->surf, dsView->firstSlice));
+            gcmONERROR(gco3D_SetDepth(chipCtx->engine, dsView));
 
             if (chipDirty->uBuffer.sBuffer.zSurfDirty)
             {
@@ -4518,6 +4588,205 @@ gcChipValidatePatchState(
 
 OnError:
     gcmFOOTER();
+    return status;
+}
+
+__GL_INLINE gceSTATUS
+gcChipValidateLastFragDataUniform(
+__GLcontext *gc,
+__GLchipSLUniform *uniform
+)
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gceSURF_FORMAT format = gcvSURF_UNKNOWN;
+    gceTILING tiling = gcvINVALIDTILED;
+    gctPOINTER logicalAddress[3] = {gcvNULL};
+    gctUINT32 baseAddress[3] = {0};
+    GLuint width = 0, height = 0;
+    gctINT stride = 0;
+    GLuint imageInfo = 0;
+    gctUINT *data;
+    GLuint arrayIndex;
+
+    if (uniform->category != gceTK_IMAGE || uniform->subUsage != __GL_CHIP_UNIFORM_SUB_USAGE_RT_IMAGE)
+    {
+        gcmASSERT(0);
+    }
+
+    for (arrayIndex = 0; arrayIndex < uniform->arraySize; ++arrayIndex)
+    {
+        if (chipCtx->drawRtViews[arrayIndex].surf)
+        {
+            gcsSURF_VIEW *rtView = &chipCtx->drawRtViews[arrayIndex];
+            width = (gctUINT)chipCtx->drawRTWidth;
+            height = (gctUINT)chipCtx->drawRTHeight;
+            gcmASSERT(rtView->surf);
+            gcmONERROR(gcoSURF_GetFormat(rtView->surf, gcvNULL, &format));
+
+            gcmONERROR(gcoSURF_Lock(rtView->surf, baseAddress, logicalAddress));
+            gcmONERROR(gcoSURF_GetAlignedSize(rtView->surf, gcvNULL, gcvNULL, &stride));
+
+            gcmONERROR(gcoSURF_DisableTileStatus(rtView, gcvTRUE));
+            gcmONERROR(gcoSURF_GetTiling(rtView->surf, &tiling));
+            gcmONERROR(gco3D_Semaphore(chipCtx->engine, gcvWHERE_RASTER, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE));
+
+            switch (tiling)
+            {
+            case gcvLINEAR:
+                /* imageInfo = gcmSETFIELDVALUE(0, GCREG_SH_IMAGE, TILING, LINEAR); */
+                imageInfo = 0;
+                break;
+            case gcvTILED:
+                /* imageInfo = gcmSETFIELDVALUE(0, GCREG_SH_IMAGE, TILING, TILED); */
+                imageInfo = 1 << 10;
+                break;
+            case gcvSUPERTILED:
+                /* imageInfo = gcmSETFIELDVALUE(0, GCREG_SH_IMAGE, TILING, SUPER_TILED); */
+                imageInfo = 2 << 10;
+                break;
+            case gcvYMAJOR_SUPERTILED:
+                /* imageInfo = gcmSETFIELDVALUE(0, GCREG_SH_IMAGE, TILING, SUPER_TILED_YMAJOR); */
+                imageInfo = 3 << 10;
+                break;
+            default:
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                break;
+            }
+            /*
+            imageInfo |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ?
+ 12:12) + 1))))))) << (0 ? 12:12))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ?
+ 12:12) + 1))))))) << (0 ? 12:12)));
+            */
+            imageInfo |= (1 << 12);
+            /* load image from render target*/
+            switch (format)
+            {
+            case gcvSURF_A8R8G8B8:
+                /* imageInfo |= gcmSETFIELDVALUE(0, GCREG_SH_IMAGE, CONVERSION, UNORM8) |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (GCREG_SH_IMAGE_SHIFT_2 & ((gctUINT32) ((((1 ? 2:0) - (0 ?
+ 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0)))           |
+                gcmSETFILEDVALUE(0, GCREG_SH_IMAGE, COMPONENT_COUNT, 0);
+                */
+                imageInfo |= 0xF << 6 | 2 | 0 << 14;
+                /*
+                imageInfo |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ? 18:16))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
+ 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ? 18:16)))    |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20)))    |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ? 26:24))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ? 26:24)))    |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ?
+ 30:28) + 1))))))) << (0 ? 30:28))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
+ 30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ?
+ 30:28) + 1))))))) << (0 ? 30:28)));
+                */
+                imageInfo |= (2 << 16) | (1 << 20) | (0 << 24) | (3 << 28);
+
+                imageInfo |= 1 << 4;
+                break;
+            case gcvSURF_X8R8G8B8:
+                /* imageInfo |= gcmSETFIELDVALUE(0, GCREG_SH_IMAGE, CONVERSION, UNORM8) |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (GCREG_SH_IMAGE_SHIFT_2 & ((gctUINT32) ((((1 ? 2:0) - (0 ?
+ 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0)))           |
+                gcmSETFILEDVALUE(0, GCREG_SH_IMAGE, COMPONENT_COUNT, 3);
+                */
+                imageInfo |= 0xF << 6 | 2 | 3 << 14;
+                /*
+                imageInfo |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ? 18:16))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
+ 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ? 18:16)))    |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20)))    |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ? 26:24))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ? 26:24)))    |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ?
+ 30:28) + 1))))))) << (0 ? 30:28))) | (((gctUINT32) (0x4 & ((gctUINT32) ((((1 ?
+ 30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ?
+ 30:28) + 1))))))) << (0 ? 30:28)));
+                */
+                imageInfo |= (2 << 16) | (1 << 20) | (0 << 24) | (4 << 28);
+
+                imageInfo |= 1 << 4;
+                break;
+            case gcvSURF_R5G6B5:
+                /* imageInfo |= gcmSETFIELDVALUE(0, GCREG_SH_IMAGE, CONVERSION, PACKED565) |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) (GCREG_SH_IMAGE_SHIFT_1 & ((gctUINT32) ((((1 ? 2:0) - (0 ?
+ 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0)))           |
+                gcmSETFILEDVALUE(0, GCREG_SH_IMAGE, COMPONENT_COUNT, 3);
+                */
+                imageInfo |= 0x9 << 6 | 1 | 3 << 14;
+                /*
+                imageInfo |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ? 18:16))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
+ 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ? 18:16)))    |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20)))    |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ? 26:24))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ? 26:24)))    |
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ?
+ 30:28) + 1))))))) << (0 ? 30:28))) | (((gctUINT32) (0x4 & ((gctUINT32) ((((1 ?
+ 30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ?
+ 30:28) + 1))))))) << (0 ? 30:28)));
+                */
+                imageInfo |= (2 << 16) | (1 << 20) | (0 << 24) | (4 << 28);
+
+                imageInfo |= 1 << 4;
+                break;
+            default:
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+                break;
+            }
+            data = (gctUINT*)((GLubyte*)uniform->data + arrayIndex * sizeof(gctFLOAT) * 4);
+            data[0] = (gctUINT)(baseAddress[0] + gcChipGetSurfOffset(rtView));
+            data[1] = (gctUINT)stride;
+            data[2] = width | (height << 16);
+            data[3] = imageInfo;
+        }
+    }
+    uniform->dirty = GL_TRUE;
+
+OnError:
     return status;
 }
 
@@ -4693,6 +4962,16 @@ gcChipValidateChipDirty(
             else
             {
                 GL_ASSERT(0);
+            }
+        }
+
+        /* Validate RT info into the lastFragData image uniform*/
+        if (chipCtx->chipDirty.uDefer.sDefer.lastFragData)
+        {
+            __GLchipSLProgramInstance* pgInstance = chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance;
+            if (pgInstance->pLastFragData)
+            {
+                gcChipValidateLastFragDataUniform(gc, pgInstance->pLastFragData);
             }
         }
     }
@@ -4897,7 +5176,961 @@ OnError:
     return ret;
 }
 
+/*****************************************************************************
+** split draw func
+******************************************************************************/
+gceSTATUS
+gcChipSplitDrawXFB(
+    IN gctPOINTER GC,
+    IN gctPOINTER InstantDraw,
+    IN gctPOINTER SplitDrawInfo
+    )
+{
+    gceSTATUS status                 = gcvSTATUS_OK;
+    __GLcontext* gc                  = (__GLcontext*)(GC);
+    __GLchipInstantDraw* instantDraw = (__GLchipInstantDraw*)(InstantDraw);
+    __GLchipContext *chipCtx         = CHIP_CTXINFO(gc);
 
+    gctSIZE_T i;
+    gctSIZE_T vertices = 0;
+    __GLchipInstantDraw tmpInstantDraw;
+
+    gcmHEADER();
+
+    switch (instantDraw->primMode)
+    {
+    case gcvPRIMITIVE_POINT_LIST:
+        vertices = 1;
+        break;
+    case gcvPRIMITIVE_LINE_LIST:
+        vertices = 2;
+        break;
+    case gcvPRIMITIVE_TRIANGLE_LIST:
+        vertices = 3;
+        break;
+    default:
+        break;
+    }
+
+    __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
+    tmpInstantDraw.primCount = 1;
+    tmpInstantDraw.count = vertices;
+
+    for (i = 0; i < instantDraw->count / vertices; ++i)
+    {
+        /* Bind vertex array */
+        gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
+
+        /* Draw */
+        gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                                                 tmpInstantDraw.primMode,
+                                                 gcvFALSE,
+                                                 tmpInstantDraw.first,
+                                                 0,
+                                                 tmpInstantDraw.primCount,
+                                                 tmpInstantDraw.count,
+                                                 gc->vertexArray.instanceCount));
+
+        tmpInstantDraw.first += (gctINT)vertices;
+
+        gcmONERROR(gco3D_Semaphore(chipCtx->engine, gcvWHERE_COMMAND, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE_STALL));
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcChipSplitDraw1(
+    IN gctPOINTER GC,
+    IN gctPOINTER InstantDraw,
+    IN gctPOINTER SplitDrawInfo
+    )
+{
+    gceSTATUS status                 = gcvSTATUS_OK;
+    __GLcontext* gc                  = (__GLcontext*)(GC);
+    __GLchipInstantDraw* instantDraw = (__GLchipInstantDraw*)(InstantDraw);
+    __GLchipContext *chipCtx         = CHIP_CTXINFO(gc);
+    gctSIZE_T i;
+    __GLchipInstantDraw tmpInstantDraw;
+
+    gcmHEADER();
+
+    __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
+    tmpInstantDraw.primCount = 1;
+
+    for (i = 0; i < instantDraw->count - 1 ; ++i)
+    {
+        tmpInstantDraw.count = 2;
+        /* Bind vertex array */
+        gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
+
+        /* Draw */
+        gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                                                 tmpInstantDraw.primMode,
+                                                 gcvTRUE,
+                                                 tmpInstantDraw.first,
+                                                 0,
+                                                 tmpInstantDraw.primCount,
+                                                 tmpInstantDraw.count,
+                                                 gc->vertexArray.instanceCount));
+
+        tmpInstantDraw.indexMemory = (gctUINT8_PTR)(1 + __GL_PTR2SIZE(tmpInstantDraw.indexMemory));
+        gco3D_Semaphore(chipCtx->engine, gcvWHERE_RASTER, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE_STALL);
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcChipSplitDraw2(
+    IN gctPOINTER GC,
+    IN gctPOINTER InstantDraw,
+    IN gctPOINTER SplitDrawInfo
+    )
+{
+    gceSTATUS status                 = gcvSTATUS_OK;
+    __GLcontext* gc                  = (__GLcontext*)(GC);
+    __GLchipInstantDraw* instantDraw = (__GLchipInstantDraw*)(InstantDraw);
+    __GLchipContext *chipCtx         = CHIP_CTXINFO(gc);
+    gctSIZE_T indexSize              = 0;
+    gctSIZE_T i;
+    __GLchipInstantDraw tmpInstantDraw;
+    gctUINT mask, writeMask;
+    gctUINT8 reference;
+
+    gcmHEADER();
+
+    gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+    __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
+    tmpInstantDraw.primCount = 1;
+    tmpInstantDraw.count = 3;
+
+    for (i = 0; i < instantDraw->count / 3; ++i)
+    {
+        gctBOOL frontFace;
+        frontFace = gcChipCheckTriangle2CCW(gc, &tmpInstantDraw);
+        if (gc->state.polygon.frontFace == GL_CW)
+        {
+            frontFace = !frontFace;
+        }
+
+        if (frontFace)
+        {
+            mask = gc->state.stencil.front.mask;
+            writeMask = gc->state.stencil.front.writeMask;
+            reference = (gctUINT8)__glClampi(gc->state.stencil.front.reference, 0, chipCtx->drawStencilMask);
+        }
+        else
+        {
+            mask = gc->state.stencil.back.mask;
+            writeMask = gc->state.stencil.back.writeMask;
+            reference = (gctUINT8)__glClampi(gc->state.stencil.back.reference, 0, chipCtx->drawStencilMask);
+        }
+
+        gcmONERROR(gco3D_SetStencilWriteMask(chipCtx->engine, (gctUINT8)(writeMask & 0x00FF)));
+        gcmONERROR(gco3D_SetStencilMask(chipCtx->engine, (gctUINT8)mask));
+        gcmONERROR(gco3D_SetStencilReference(chipCtx->engine, reference, gcvTRUE));
+
+        /* Bind vertex array */
+        gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
+
+        /* Draw */
+        gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                                                 tmpInstantDraw.primMode,
+                                                 gcvTRUE,
+                                                 tmpInstantDraw.first,
+                                                 0,
+                                                 tmpInstantDraw.primCount,
+                                                 tmpInstantDraw.count,
+                                                 gc->vertexArray.instanceCount));
+
+        tmpInstantDraw.indexMemory = (gctUINT8_PTR)(3 * indexSize + __GL_PTR2SIZE(tmpInstantDraw.indexMemory));
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcChipSplitDraw3(
+    IN gctPOINTER GC,
+    IN gctPOINTER InstantDraw,
+    IN gctPOINTER SplitDrawInfo
+    )
+{
+    gceSTATUS status                 = gcvSTATUS_OK;
+    __GLcontext* gc                  = (__GLcontext*)(GC);
+    __GLchipInstantDraw* instantDraw = (__GLchipInstantDraw*)(InstantDraw);
+    __GLchipContext *chipCtx         = CHIP_CTXINFO(gc);
+    gctSIZE_T i;
+    __GLchipInstantDraw tmpInstantDraw;
+
+    gcmHEADER();
+
+    __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
+    tmpInstantDraw.primCount = 1;
+    tmpInstantDraw.count = 2;
+
+    for (i = 0; i < instantDraw->count - 1 ; ++i)
+    {
+        /* Bind vertex array */
+        gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
+
+        /* Draw */
+        gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                                                 tmpInstantDraw.primMode,
+                                                 gcvFALSE,
+                                                 tmpInstantDraw.first,
+                                                 0,
+                                                 tmpInstantDraw.primCount,
+                                                 tmpInstantDraw.count,
+                                                 gc->vertexArray.instanceCount));
+
+        tmpInstantDraw.first += 1;
+        gco3D_Semaphore(chipCtx->engine, gcvWHERE_RASTER, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE_STALL);
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcChipCopySpilitIndex(
+    IN __GLchipInstantDraw* instantDraw,
+    IN OUT gcsSPLIT_DRAW_INFO_PTR splitDrawInfo,
+    IN OUT gctPOINTER * Buffer
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctPOINTER indexBase = gcvNULL;
+    gctPOINTER tempIndices = gcvNULL;
+    gctPOINTER indexMemory = gcvNULL;
+    gctSIZE_T count, primCount, i, j, bytes;
+    gctSIZE_T indexSize = 0;
+    gctSIZE_T offset = 0;
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
+
+    gcmHEADER();
+
+    gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+    offset = (instantDraw->count - splitDrawInfo->u.info_index_fetch.splitCount) * indexSize;
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
+
+    /* Lock the index buffer. */
+#if gcdSYNC
+    if (patchId == gcvPATCH_GTFES30)
+    {
+        gcoBUFOBJ_WaitFence(instantDraw->indexBuffer, gcvFENCE_TYPE_WRITE);
+    }
+#endif
+    gcmONERROR(gcoBUFOBJ_FastLock(instantDraw->indexBuffer, gcvNULL, &indexBase));
+
+    indexBase = (gctUINT8_PTR)indexBase + gcmPTR2INT32(instantDraw->indexMemory);
+    bytes = splitDrawInfo->u.info_index_fetch.splitCount * indexSize;
+
+    splitDrawInfo->u.info_index_fetch.splitPrimMode = instantDraw->primMode;
+
+    switch (instantDraw->primMode)
+    {
+    case gcvPRIMITIVE_POINT_LIST:
+    case gcvPRIMITIVE_LINE_LIST:
+    case gcvPRIMITIVE_TRIANGLE_LIST:
+        {
+            indexMemory = (gctUINT8_PTR)indexBase + offset;
+
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      bytes,
+                                      &tempIndices));
+            gcoOS_MemCopy(tempIndices, indexMemory, bytes);
+        }
+        break;
+    case gcvPRIMITIVE_LINE_STRIP:
+        {
+            indexMemory = (gctUINT8_PTR)indexBase + offset - indexSize;
+            bytes += indexSize;
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      bytes,
+                                      &tempIndices));
+            /* line strip need copy the last data */
+            gcoOS_MemCopy(tempIndices, indexMemory, bytes);
+        }
+        break;
+    case gcvPRIMITIVE_LINE_LOOP:
+        {
+            indexMemory = (gctUINT8_PTR)indexBase + offset - indexSize;
+            bytes += 2 * indexSize;
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      bytes,
+                                      &tempIndices));
+
+            /* line loop need copy the last data and the first data */
+            gcoOS_MemCopy(tempIndices, indexMemory, bytes - indexSize);
+            gcoOS_MemCopy((gctUINT8_PTR)tempIndices + bytes - indexSize, indexBase, indexSize);
+            splitDrawInfo->u.info_index_fetch.splitPrimMode = gcvPRIMITIVE_LINE_STRIP;
+        }
+        break;
+    case gcvPRIMITIVE_TRIANGLE_STRIP:
+        {
+            primCount = bytes / indexSize;
+            bytes = 3 * primCount * indexSize;
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      bytes,
+                                      &tempIndices));
+            count = offset / indexSize;
+            switch (instantDraw->indexType)
+            {
+            case gcvINDEX_8:
+                {
+                    gctUINT8_PTR src = (gctUINT8_PTR)indexBase;
+                    gctUINT8_PTR dst = (gctUINT8_PTR)tempIndices;
+                    for(i = 0, j = count - 2; i < primCount; i++, j++)
+                    {
+                        dst[i * 3]     = src[(j % 2) == 0? j : j + 1];
+                        dst[i * 3 + 1] = src[(j % 2) == 0? j + 1 : j];
+                        dst[i * 3 + 2] = src[j + 2];
+                    }
+                }
+                break;
+            case gcvINDEX_16:
+                {
+                    gctUINT16_PTR src = (gctUINT16_PTR)indexBase;
+                    gctUINT16_PTR dst = (gctUINT16_PTR)tempIndices;
+                    for(i = 0, j = count - 2; i < primCount; i++, j++)
+                    {
+                        dst[i * 3]     = src[(j % 2) == 0? j : j + 1];
+                        dst[i * 3 + 1] = src[(j % 2) == 0? j + 1 : j];
+                        dst[i * 3 + 2] = src[j + 2];
+                    }
+                }
+                break;
+            case gcvINDEX_32:
+                {
+                    gctUINT32_PTR src = (gctUINT32_PTR)indexBase;
+                    gctUINT32_PTR dst = (gctUINT32_PTR)tempIndices;
+                    for(i = 0, j = count - 2; i < primCount; i++, j++)
+                    {
+                        dst[i * 3]     = src[(j % 2) == 0? j : j + 1];
+                        dst[i * 3 + 1] = src[(j % 2) == 0? j + 1 : j];
+                        dst[i * 3 + 2] = src[j + 2];
+                    }
+                }
+                break;
+            default:
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
+            splitDrawInfo->u.info_index_fetch.splitPrimMode = gcvPRIMITIVE_TRIANGLE_LIST;
+        }
+        break;
+    case gcvPRIMITIVE_TRIANGLE_FAN:
+        {
+            indexMemory = (gctUINT8_PTR)indexBase + offset - indexSize;
+            bytes += 2 * indexSize;
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      bytes,
+                                      &tempIndices));
+
+            /* trianglefan need copy the first data */
+            gcoOS_MemCopy(tempIndices, indexBase, indexSize);
+            gcoOS_MemCopy((gctUINT8_PTR)tempIndices + indexSize, indexMemory, bytes - indexSize);
+        }
+        break;
+    default:
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    splitDrawInfo->u.info_index_fetch.splitCount = bytes / indexSize;
+
+    /* Translate primitive count. */
+    switch (splitDrawInfo->u.info_index_fetch.splitPrimMode)
+    {
+    case gcvPRIMITIVE_POINT_LIST:
+        splitDrawInfo->u.info_index_fetch.splitPrimCount = splitDrawInfo->u.info_index_fetch.splitCount;
+        break;
+
+    case gcvPRIMITIVE_LINE_LIST:
+        splitDrawInfo->u.info_index_fetch.splitPrimCount = splitDrawInfo->u.info_index_fetch.splitCount / 2;
+        break;
+
+    case gcvPRIMITIVE_LINE_LOOP:
+        splitDrawInfo->u.info_index_fetch.splitPrimCount = splitDrawInfo->u.info_index_fetch.splitCount;
+        break;
+
+    case gcvPRIMITIVE_LINE_STRIP:
+        splitDrawInfo->u.info_index_fetch.splitPrimCount = splitDrawInfo->u.info_index_fetch.splitCount - 1;
+        break;
+
+    case gcvPRIMITIVE_TRIANGLE_LIST:
+        splitDrawInfo->u.info_index_fetch.splitPrimCount = splitDrawInfo->u.info_index_fetch.splitCount / 3;
+        break;
+
+    case gcvPRIMITIVE_TRIANGLE_STRIP:
+    case gcvPRIMITIVE_TRIANGLE_FAN:
+        splitDrawInfo->u.info_index_fetch.splitPrimCount = splitDrawInfo->u.info_index_fetch.splitCount - 2;
+        break;
+
+    default:
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    *Buffer = tempIndices;
+
+OnError:
+
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcChipSplitDrawIndexFetch(
+    IN gctPOINTER GC,
+    IN gctPOINTER InstantDraw,
+    IN gctPOINTER SplitDrawInfo
+    )
+{
+    gceSTATUS status                     = gcvSTATUS_OK;
+    __GLcontext* gc                      = (__GLcontext*)(GC);
+    __GLchipInstantDraw* instantDraw     = (__GLchipInstantDraw*)(InstantDraw);
+    __GLchipContext *chipCtx             = CHIP_CTXINFO(gc);
+    gcsSPLIT_DRAW_INFO_PTR splitDrawInfo = (gcsSPLIT_DRAW_INFO_PTR)(SplitDrawInfo);
+
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
+    gctPOINTER splitIndexMemory = gcvNULL;
+    gctBOOL bAllocate = gcvFALSE;
+    __GLchipInstantDraw tmpInstantDraw;
+    gcsVERTEXARRAY_STREAM_INFO streamInfo;
+    gcsVERTEXARRAY_INDEX_INFO  indexInfo;
+
+    gcmHEADER();
+
+    gcmONERROR(gcChipSetVertexArrayBindBegin(gc, instantDraw, gcvTRUE));
+
+    /* Stream data not change, only need bind once.*/
+    /* Collect info for hal level.*/
+    gcmES30_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, gcvTRUE);
+    gcmES30_COLLECT_INDEX_INFO(indexInfo, instantDraw);
+
+#if gcdUSE_WCLIP_PATCH
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRms,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRmsDirty,
+                                         &streamInfo,
+                                         &indexInfo));
+#else
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         &streamInfo,
+                                         &indexInfo));
+#endif
+
+    /************************************************************************************
+    **              first draw
+    ************************************************************************************/
+    __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
+
+#if gcdSYNC
+    if (patchId == gcvPATCH_GTFES30)
+    {
+        gcoBUFOBJ_WaitFence(instantDraw->indexBuffer, gcvFENCE_TYPE_WRITE);
+    }
+#endif
+    if (instantDraw->primitiveRestart || instantDraw->count <= splitDrawInfo->u.info_index_fetch.splitCount)
+    {
+        tmpInstantDraw.count = 0;
+    }
+    else
+    {
+        tmpInstantDraw.count = instantDraw->count - splitDrawInfo->u.info_index_fetch.splitCount;
+        if (instantDraw->primMode == gcvPRIMITIVE_LINE_LOOP)
+        {
+            tmpInstantDraw.primMode = gcvPRIMITIVE_LINE_STRIP;
+        }
+    }
+
+    if (tmpInstantDraw.count > 0)
+    {
+        /* Update index */
+        indexInfo.count = tmpInstantDraw.count;
+        gcmONERROR(gcoVERTEXARRAY_IndexBind(chipCtx->vertexArray,
+                                            &indexInfo));
+
+        /* Draw */
+        gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                                                 tmpInstantDraw.primMode,
+                                                 gcvTRUE,
+                                                 tmpInstantDraw.first,
+                                                 0,
+                                                 tmpInstantDraw.primCount,
+                                                 tmpInstantDraw.count,
+                                                 gc->vertexArray.instanceCount));
+    }
+
+
+    /************************************************************************************
+    **              second draw
+    ************************************************************************************/
+    __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
+
+    if (instantDraw->primitiveRestart || instantDraw->count <= splitDrawInfo->u.info_index_fetch.splitCount)
+    {
+        /* Already lock when collect info.*/
+        gcmONERROR(gcoBUFOBJ_FastLock(instantDraw->indexBuffer, gcvNULL, &splitIndexMemory));
+        splitIndexMemory =(gctUINT8_PTR)splitIndexMemory + gcmPTR2INT32(instantDraw->indexMemory);
+        tmpInstantDraw.count = instantDraw->count;
+    }
+    else
+    {
+        gcmONERROR(gcChipCopySpilitIndex(&tmpInstantDraw,
+                                         splitDrawInfo,
+                                         &splitIndexMemory));
+        bAllocate = gcvTRUE;
+        tmpInstantDraw.count = splitDrawInfo->u.info_index_fetch.splitCount;
+        tmpInstantDraw.primMode = splitDrawInfo->u.info_index_fetch.splitPrimMode;
+        tmpInstantDraw.primCount = splitDrawInfo->u.info_index_fetch.splitPrimCount;
+    }
+    /* set tmpInstantDraw.*/
+    tmpInstantDraw.indexMemory = splitIndexMemory;
+    tmpInstantDraw.indexBuffer = gcvNULL;
+
+    /* Update index */
+    indexInfo.count = tmpInstantDraw.count;
+    indexInfo.indexMemory = tmpInstantDraw.indexMemory;
+    indexInfo.u.es30.indexBuffer = tmpInstantDraw.indexBuffer;
+    gcmONERROR(gcoVERTEXARRAY_IndexBind(chipCtx->vertexArray,
+                                        &indexInfo));
+
+    /* Draw */
+    gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                                             tmpInstantDraw.primMode,
+                                             gcvTRUE,
+                                             tmpInstantDraw.first,
+                                             0,
+                                             tmpInstantDraw.primCount,
+                                             tmpInstantDraw.count,
+                                             gc->vertexArray.instanceCount));
+
+    /* end split draw.*/
+    gcmONERROR(gcChipSetVertexArrayBindEnd(gc, instantDraw, gcvTRUE));
+
+OnError:
+    if (bAllocate && splitIndexMemory != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, splitIndexMemory);
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+__GL_INLINE gceSTATUS
+gcChipCollectSplitDrawArraysInfo(
+    IN __GLcontext*         gc,
+    IN __GLchipInstantDraw* instantDraw,
+    IN OUT gcsSPLIT_DRAW_INFO_PTR splitDrawInfo
+    )
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    __GLchipSLProgram *vsProgram = chipCtx->activePrograms[__GLSL_STAGE_VS];
+
+    if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
+    &&  vsProgram->xfbCount > 0
+    &&  gc->vertexArray.instanceCount == 1
+    /* If gcvFEATURE_FE_START_VERTEX_SUPPORT not support, VertexId after split draw is not correct. */
+    &&  gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_FE_START_VERTEX_SUPPORT)
+    && (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_B2B_PIXEL_FIX) ||
+        !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_V2_MSAA_COHERENCY_FIX))
+    && (
+        instantDraw->primMode == gcvPRIMITIVE_POINT_LIST ||
+        instantDraw->primMode == gcvPRIMITIVE_LINE_LIST ||
+        instantDraw->primMode == gcvPRIMITIVE_TRIANGLE_LIST
+        )
+    )
+    {
+        splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_XFB;
+        splitDrawInfo->splitDrawFunc = gcChipSplitDrawXFB;
+        return gcvSTATUS_OK;
+    }
+
+    if (chipCtx->patchId == gcvPATCH_DEQP
+    &&  gc->vertexArray.instanceCount == 1
+    &&  (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_B2B_PIXEL_FIX) ||
+         !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_V2_MSAA_COHERENCY_FIX))
+    &&  instantDraw->primMode == gcvPRIMITIVE_LINE_STRIP
+    &&  instantDraw->count == 129
+    )
+    {
+        splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_3;
+        splitDrawInfo->splitDrawFunc = gcChipSplitDraw3;
+        return gcvSTATUS_OK;
+    }
+
+    return gcvSTATUS_OK;
+}
+
+#define SPILIT_INDEX_OFFSET       48
+#define SPILIT_INDEX_CHUNCK_BYTE  64
+
+gceSTATUS
+gcChipSplitIndexFetch(
+    IN __GLchipInstantDraw* instantDraw,
+    IN OUT gcsSPLIT_DRAW_INFO_PTR splitDrawInfo
+    )
+{
+    gceSTATUS status = gcvSTATUS_TRUE;
+    gctUINT32 address = 0, tempAddress;
+    gctUINT32 indexSize = 0;
+    gctUINT32 spilitIndexMod;
+    gctSIZE_T cutCount = 0;
+
+    gcmHEADER();
+
+    gcmASSERT(instantDraw->indexBuffer != gcvNULL);
+
+    gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+    gcmONERROR(gcoBUFOBJ_Lock(instantDraw->indexBuffer, &address, gcvNULL));
+    /* Add offset */
+    address += gcmPTR2INT32(instantDraw->indexMemory);
+    /* Unlock the bufobj buffer. */
+    gcmONERROR(gcoBUFOBJ_Unlock(instantDraw->indexBuffer));
+
+    if (instantDraw->primMode == gcvPRIMITIVE_TRIANGLE_LIST)
+    {
+        cutCount = instantDraw->count % 3;
+    }
+    else if (instantDraw->primMode == gcvPRIMITIVE_LINE_LIST)
+    {
+        cutCount = instantDraw->count % 2;
+    }
+
+    /* compute the last index address.*/
+    tempAddress = address + (gctUINT32)(instantDraw->count-cutCount-1) * indexSize;
+    spilitIndexMod = tempAddress % SPILIT_INDEX_CHUNCK_BYTE;
+
+    if (spilitIndexMod >= SPILIT_INDEX_OFFSET)
+    {
+        gcmFOOTER();
+        return gcvSTATUS_FALSE;
+    }
+
+    /* Get primMode and split count.*/
+    switch (instantDraw->primMode)
+    {
+        case gcvPRIMITIVE_POINT_LIST:
+        case gcvPRIMITIVE_LINE_STRIP:
+        case gcvPRIMITIVE_TRIANGLE_STRIP:
+        case gcvPRIMITIVE_TRIANGLE_FAN:
+            splitDrawInfo->u.info_index_fetch.splitCount = spilitIndexMod /indexSize +1;
+            break;
+        case gcvPRIMITIVE_LINE_LOOP:
+            splitDrawInfo->u.info_index_fetch.splitCount = spilitIndexMod /indexSize +1;
+            break;
+        case gcvPRIMITIVE_TRIANGLE_LIST:
+            splitDrawInfo->u.info_index_fetch.splitCount = ((spilitIndexMod /(indexSize*3))+1)*3 + cutCount;
+            break;
+        case gcvPRIMITIVE_LINE_LIST:
+            splitDrawInfo->u.info_index_fetch.splitCount = ((spilitIndexMod /(indexSize*2))+1)*2 + cutCount;
+            break;
+        default:
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    gcmFOOTER();
+    return gcvSTATUS_TRUE;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcChipSplitDrawTCS(
+    IN gctPOINTER GC,
+    IN gctPOINTER InstantDraw,
+    IN gctPOINTER SplitDrawInfo
+    )
+{
+    gceSTATUS status                     = gcvSTATUS_OK;
+    __GLcontext* gc                      = (__GLcontext*)(GC);
+    __GLchipInstantDraw* instantDraw     = (__GLchipInstantDraw*)(InstantDraw);
+    __GLchipContext *chipCtx             = CHIP_CTXINFO(gc);
+    gcsSPLIT_DRAW_INFO_PTR splitDrawInfo = (gcsSPLIT_DRAW_INFO_PTR)(SplitDrawInfo);
+    gctSIZE_T indexSize                  = 0;
+
+    gctUINT copyOffset = 0;
+    gctUINT copyLen    = 0;
+    gctUINT alignLen   = 64;
+    gctUINT i          = 0;
+    gctUINT indexBufferSize    = 0;
+    gctUINT bytesPerPatch      = 0;
+    gctUINT alignBytesPerPatch = 0;
+
+    gcsVERTEXARRAY_STREAM_INFO streamInfo;
+    gcsVERTEXARRAY_INDEX_INFO  indexInfo;
+    __GLchipInstantDraw tmpInstantDraw;
+
+    gcmHEADER();
+
+    gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+
+    indexBufferSize    = (gctUINT)(indexSize * instantDraw->count);
+    bytesPerPatch      = splitDrawInfo->u.info_tcs.indexPerPatch * (gctUINT)indexSize;
+    alignBytesPerPatch = bytesPerPatch - (gctUINT)indexSize;
+    gcmONERROR(gcChipSetVertexArrayBindBegin(gc, instantDraw, gcvTRUE));
+
+    /* Stream data not change, only need bind once.*/
+    /* Collect info for hal level.*/
+    gcmES30_COLLECT_STREAM_INFO(streamInfo, instantDraw, gc, chipCtx, gcvTRUE);
+    gcmES30_COLLECT_INDEX_INFO(indexInfo, instantDraw);
+    __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
+
+#if gcdUSE_WCLIP_PATCH
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRms,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRmsDirty,
+                                         &streamInfo,
+                                         &indexInfo));
+#else
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         &streamInfo,
+                                         &indexInfo));
+#endif
+
+    /****************** draw command ********************************/
+    do
+    {
+        gctBOOL doCopy = gcvFALSE;
+
+        if (copyOffset >= indexBufferSize)
+        {
+            /* done.*/
+            break;
+        }
+
+        /* compute copyLen.*/
+        for (i = 1; (alignLen * i) < indexBufferSize - copyOffset; ++i)
+        {
+            /* only one index beyond 64 bytes.*/
+            if (((alignLen * i) % bytesPerPatch) == alignBytesPerPatch)
+            {
+                doCopy = gcvTRUE;
+                break;
+            }
+        }
+
+        if (doCopy)
+        {
+            copyLen = alignLen * i - alignBytesPerPatch;
+        }
+        else
+        {
+            copyLen = indexBufferSize - copyOffset;
+        }
+
+        /* No split draw for this time.*/
+        if (copyLen == 0)
+        {
+            continue;
+        }
+
+        /* Update index */
+        indexInfo.count = copyLen / (gctUINT)indexSize;
+        indexInfo.indexMemory = ((gctUINT8_PTR)splitDrawInfo->u.info_tcs.indexPtr + copyOffset);
+        indexInfo.u.es30.indexBuffer = gcvNULL;
+        gcmONERROR(gcoVERTEXARRAY_IndexBind(chipCtx->vertexArray,
+                                            &indexInfo));
+
+        /* compute draw parameter.*/
+        tmpInstantDraw.count = indexInfo.count;
+        tmpInstantDraw.primCount = indexInfo.count / splitDrawInfo->u.info_tcs.indexPerPatch;
+
+        /* Call the gcoHARDWARE object. */
+        gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                                                 tmpInstantDraw.primMode,
+                                                 gcvTRUE,
+                                                 tmpInstantDraw.first,
+                                                 0,
+                                                 tmpInstantDraw.primCount,
+                                                 tmpInstantDraw.count,
+                                                 gc->vertexArray.instanceCount));
+
+        /* Update offset.*/
+        copyOffset += copyLen;
+    }
+    while(copyOffset < indexBufferSize);
+
+    /* end split draw.*/
+    gcmONERROR(gcChipSetVertexArrayBindEnd(gc, instantDraw, gcvTRUE));
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcChipSplitTCS(
+    IN __GLchipInstantDraw* instantDraw,
+    IN OUT gcsSPLIT_DRAW_INFO_PTR splitDrawInfo)
+{
+    gceSTATUS   status = gcvSTATUS_FALSE;
+    gctUINT32   indexSize = 0;
+    gctPOINTER  indexBase = gcvNULL;
+    gctUINT32   alignBytes = 64;
+    gctUINT32   bytesPerPatch = 0;
+    gctUINT32   alignBytesPerPatch = 0;
+    gctBOOL     indexLocked = gcvFALSE;
+    gctUINT     indexBufferSize = 0;
+    gctUINT     i = 0;
+    gctUINT     baseOffset = 0;
+
+    gcmHEADER();
+
+    gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+    /* Lock the index buffer. */
+    if (instantDraw->indexBuffer)
+    {
+#if gcdSYNC
+        gcoBUFOBJ_WaitFence(instantDraw->indexBuffer, gcvFENCE_TYPE_WRITE);
+#endif
+        gcmONERROR(gcoBUFOBJ_Lock(instantDraw->indexBuffer, gcvNULL, &indexBase));
+        indexLocked = gcvTRUE;
+    }
+
+    /* Get index ptr.*/
+    if (instantDraw->indexBuffer != gcvNULL)
+    {
+        gctUINT32 tempAddr = 0;
+        splitDrawInfo->u.info_tcs.indexPtr = (gctUINT8_PTR)indexBase + gcmPTR2INT32(instantDraw->indexMemory);
+
+        /* The alignment of physical address should be the same as physical address,
+        ** So, use logical address to compute address offset when align to 64.*/
+        tempAddr = gcmPTR2INT32(splitDrawInfo->u.info_tcs.indexPtr);
+        baseOffset = gcmALIGN(tempAddr, alignBytes) - tempAddr;
+    }
+    else if (instantDraw->indexMemory != gcvNULL)
+    {
+        /* For index pointer, address always align to 64 after updating to dynamic cache.*/
+        splitDrawInfo->u.info_tcs.indexPtr = instantDraw->indexMemory;
+        baseOffset = 0;
+    }
+    else
+    {
+        /* no need split.*/
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    splitDrawInfo->u.info_tcs.indexPerPatch = (gctUINT)(instantDraw->count / instantDraw->primCount);
+    indexBufferSize = indexSize * (gctUINT)instantDraw->count;
+    bytesPerPatch = splitDrawInfo->u.info_tcs.indexPerPatch * indexSize;
+    alignBytesPerPatch = ((splitDrawInfo->u.info_tcs.indexPerPatch - 1) * indexSize);
+
+    if (alignBytesPerPatch == alignBytes ||
+        (baseOffset == 0 && splitDrawInfo->u.info_tcs.indexPerPatch % 2 == 0))
+    {
+        /* alignBytesPerPatch == alignBytes is corner case, can not handle.*/
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    /* check need do split.*/
+    for (i = 0; (alignBytes * i + baseOffset) < indexBufferSize; ++i)
+    {
+        /* only one index beyond 64 bytes.*/
+        if (((alignBytes * i + baseOffset) % bytesPerPatch) == alignBytesPerPatch)
+        {
+            gcmFOOTER();
+            return gcvSTATUS_OK;
+        }
+    }
+
+OnError:
+    if (indexLocked)
+    {
+        /* Unlock the index buffer. */
+        if (instantDraw->indexBuffer)
+        {
+            gcmVERIFY_OK(gcoBUFOBJ_Unlock(instantDraw->indexBuffer));
+        }
+    }
+
+    /* Return the status. */
+    gcmFOOTER();
+    return gcvSTATUS_FALSE;
+}
+
+__GL_INLINE gceSTATUS
+gcChipCollectSplitDrawElementInfo(
+    IN __GLcontext*         gc,
+    IN __GLchipInstantDraw* instantDraw,
+    IN OUT gcsSPLIT_DRAW_INFO_PTR splitDrawInfo
+    )
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+
+    /* Collect split draw info.*/
+    if (chipCtx->patchId == gcvPATCH_DEQP
+    &&  gc->vertexArray.instanceCount == 1
+    &&  instantDraw->primMode == gcvPRIMITIVE_LINE_STRIP
+    &&  instantDraw->count == 0x81
+    )
+    {
+        splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_1;
+        splitDrawInfo->splitDrawFunc = gcChipSplitDraw1;
+        return gcvSTATUS_OK;
+    }
+
+    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PE_ENHANCEMENTS2)
+    &&  (chipCtx->patchId == gcvPATCH_DEQP)
+    &&  (gc->vertexArray.instanceCount == 1 && instantDraw->primMode == gcvPRIMITIVE_TRIANGLE_LIST &&
+         gc->state.enables.stencilTest &&
+         (
+          gc->state.stencil.back.writeMask != gc->state.stencil.front.writeMask ||
+          gc->state.stencil.back.mask != gc->state.stencil.front.mask ||
+          gc->state.stencil.back.reference != gc->state.stencil.front.reference
+          )
+         && chipCtx->directPositionIndex != -1
+         )
+    )
+    {
+        splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_2;
+        splitDrawInfo->splitDrawFunc = gcChipSplitDraw2;
+        return gcvSTATUS_OK;
+    }
+
+    /* Index split draw.*/
+    if ((gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) != gcvSTATUS_TRUE)
+    &&  instantDraw->indexBuffer != gcvNULL
+    &&  splitDrawInfo->u.info_index_fetch.instanceCount == 1
+    &&  (instantDraw->primitiveRestart || gcvSTATUS_TRUE == gcChipSplitIndexFetch(instantDraw, splitDrawInfo))
+    )
+    {
+        splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_INDEX_FETCH;
+        splitDrawInfo->splitDrawFunc = gcChipSplitDrawIndexFetch;
+        return gcvSTATUS_OK;
+    }
+
+    /* Tcs split draw.*/
+    if (instantDraw->primMode == gcvPRIMITIVE_PATCH_LIST
+    &&  instantDraw->first == 0
+    &&  !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FE_PATCHLIST_FETCH_FIX)
+    &&  gcvSTATUS_OK == gcChipSplitTCS(instantDraw, splitDrawInfo)
+    )
+    {
+        /* The two kind split draw should be exclusive.*/
+        gcmASSERT(gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) == gcvSTATUS_TRUE);
+
+        splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_TCS;
+        splitDrawInfo->splitDrawFunc = gcChipSplitDrawTCS;
+        return gcvSTATUS_OK;
+    }
+
+    return gcvSTATUS_OK;
+}
 
 GLboolean
 __glChipDrawArraysInstanced(
@@ -4934,102 +6167,16 @@ __glChipDrawArraysInstanced(
 
     if (instantDraw->count > 0 && instantDraw->primCount > 0)
     {
-        __GLchipSLProgram *vsProgram = chipCtx->activePrograms[__GLSL_STAGE_VS];
-        GLboolean splitDraw = chipCtx->patchId == gcvPATCH_DEQP &&
-                              vsProgram->xfbCount > 0 &&
-                              gc->vertexArray.instanceCount == 1 &&
-                              (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_B2B_PIXEL_FIX) ||
-                               !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_V2_MSAA_COHERENCY_FIX)) &&
-                              (instantDraw->primMode == gcvPRIMITIVE_POINT_LIST ||
-                               instantDraw->primMode == gcvPRIMITIVE_LINE_LIST ||
-                               instantDraw->primMode == gcvPRIMITIVE_TRIANGLE_LIST
-                              );
+        gcsSPLIT_DRAW_INFO splitDrawInfo;
 
-         GLboolean splitDraw2 = (chipCtx->patchId == gcvPATCH_DEQP &&
-                                gc->vertexArray.instanceCount == 1 &&
-                                (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_B2B_PIXEL_FIX) ||
-                                 !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_V2_MSAA_COHERENCY_FIX)) &&
-                                instantDraw->primMode == gcvPRIMITIVE_LINE_STRIP &&
-                                instantDraw->count == 129);
+        __GL_MEMZERO(&splitDrawInfo, sizeof(gcsSPLIT_DRAW_INFO));
 
-        if (splitDraw)
+        /* Collect split draw info.*/
+        gcChipCollectSplitDrawArraysInfo(gc, instantDraw, &splitDrawInfo);
+
+        if (splitDrawInfo.splitDrawType != gcvSPLIT_DRAW_UNKNOWN)
         {
-            gctSIZE_T i;
-            gctSIZE_T vertices = 0;
-            __GLchipInstantDraw tmpInstantDraw;
-
-            switch (instantDraw->primMode)
-            {
-            case gcvPRIMITIVE_POINT_LIST:
-                vertices = 1;
-                break;
-            case gcvPRIMITIVE_LINE_LIST:
-                vertices = 2;
-                break;
-            case gcvPRIMITIVE_TRIANGLE_LIST:
-                vertices = 3;
-                break;
-            default:
-                break;
-            }
-
-            __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
-            tmpInstantDraw.primCount = 1;
-            tmpInstantDraw.count = vertices;
-
-            for (i = 0; i < instantDraw->count / vertices; ++i)
-            {
-                /* Bind vertex array */
-                gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
-
-                /* Draw */
-                gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
-                                                         tmpInstantDraw.primMode,
-                                                         gcvFALSE,
-                                                         tmpInstantDraw.first,
-                                                         0,
-                                                         tmpInstantDraw.primCount,
-                                                         tmpInstantDraw.count,
-                                                         tmpInstantDraw.spilitDraw,
-                                                         tmpInstantDraw.spilitCount,
-                                                         tmpInstantDraw.spilitPrimMode,
-                                                         gc->vertexArray.instanceCount));
-
-                tmpInstantDraw.first += (gctINT)vertices;
-
-                gcmONERROR(gco3D_Semaphore(chipCtx->engine, gcvWHERE_COMMAND, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE_STALL));
-            }
-        }
-        else if (splitDraw2)
-        {
-            gctSIZE_T i;
-            __GLchipInstantDraw tmpInstantDraw;
-
-            __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
-            tmpInstantDraw.primCount = 1;
-            tmpInstantDraw.count = 2;
-
-            for (i = 0; i < instantDraw->count - 1 ; ++i)
-            {
-                /* Bind vertex array */
-                gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
-
-                /* Draw */
-                gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
-                                                         tmpInstantDraw.primMode,
-                                                         gcvFALSE,
-                                                         tmpInstantDraw.first,
-                                                         0,
-                                                         tmpInstantDraw.primCount,
-                                                         tmpInstantDraw.count,
-                                                         tmpInstantDraw.spilitDraw,
-                                                         tmpInstantDraw.spilitCount,
-                                                         tmpInstantDraw.spilitPrimMode,
-                                                         gc->vertexArray.instanceCount));
-
-                tmpInstantDraw.first += 1;
-                gco3D_Semaphore(chipCtx->engine, gcvWHERE_RASTER, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE_STALL);
-            }
+            gcmONERROR((*splitDrawInfo.splitDrawFunc)(gc, instantDraw, &splitDrawInfo));
         }
         else
         {
@@ -5049,9 +6196,6 @@ __glChipDrawArraysInstanced(
                                                      0,
                                                      instantDraw->primCount,
                                                      instantDraw->count,
-                                                     instantDraw->spilitDraw,
-                                                     instantDraw->spilitCount,
-                                                     instantDraw->spilitPrimMode,
                                                      gc->vertexArray.instanceCount));
         }
     }
@@ -5081,7 +6225,6 @@ OnError:
         gcmFOOTER_ARG("return=%d", GL_TRUE);
         return GL_TRUE;
     }
-
 }
 
 GLboolean
@@ -5146,127 +6289,34 @@ __glChipDrawElementsInstanced(
 
         if (instantDraw->count > 0 && instantDraw->primCount > 0)
         {
-            GLboolean splitDraw = chipCtx->patchId == gcvPATCH_DEQP &&
-                gc->vertexArray.instanceCount == 1 &&
-                instantDraw->primMode == gcvPRIMITIVE_LINE_STRIP &&
-                instantDraw->count == 0x81;
+            gcsSPLIT_DRAW_INFO splitDrawInfo;
 
-                GLboolean splitDraw3 = !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PE_ENHANCEMENTS2)
-                && (chipCtx->patchId == gcvPATCH_DEQP)
-                && (gc->vertexArray.instanceCount == 1 &&
-                instantDraw->primMode == gcvPRIMITIVE_TRIANGLE_LIST &&
-                gc->state.enables.stencilTest &&
-                (
-                gc->state.stencil.back.writeMask != gc->state.stencil.front.writeMask ||
-                gc->state.stencil.back.mask != gc->state.stencil.front.mask ||
-                gc->state.stencil.back.reference != gc->state.stencil.front.reference
-                )
-                && chipCtx->directPositionIndex != -1
-                );
+            __GL_MEMZERO(&splitDrawInfo, sizeof(gcsSPLIT_DRAW_INFO));
 
-            if (splitDraw3)
+            /* Collect split draw info.*/
+            splitDrawInfo.u.info_index_fetch.instanceCount = gc->vertexArray.instanceCount;
+            gcChipCollectSplitDrawElementInfo(gc, instantDraw, &splitDrawInfo);
+
+            if (splitDrawInfo.splitDrawType != gcvSPLIT_DRAW_UNKNOWN)
             {
-                gctSIZE_T i;
-                __GLchipInstantDraw tmpInstantDraw;
-                gctUINT mask, writeMask;
-                gctUINT8 reference;
-
-                __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
-                tmpInstantDraw.primCount = 1;
-                tmpInstantDraw.count = 3;
-
-                for (i = 0; i < instantDraw->count / 3; ++i)
-                {
-
-                    gctBOOL frontFace;
-                    frontFace = gcChipCheckTriangle2CCW(gc, &tmpInstantDraw);
-                    if (gc->state.polygon.frontFace == GL_CW)
-                    {
-                        frontFace = !frontFace;
-                    }
-
-                    if (frontFace)
-                    {
-                        mask = gc->state.stencil.front.mask;
-                        writeMask = gc->state.stencil.front.writeMask;
-                        reference = (gctUINT8)__glClampi(gc->state.stencil.front.reference, 0, chipCtx->drawStencilMask);
-                    }
-                    else
-                    {
-                        mask = gc->state.stencil.back.mask;
-                        writeMask = gc->state.stencil.back.writeMask;
-                        reference = (gctUINT8)__glClampi(gc->state.stencil.back.reference, 0, chipCtx->drawStencilMask);
-                    }
-
-                    gcmONERROR(gco3D_SetStencilWriteMask(chipCtx->engine, (gctUINT8)(writeMask & 0x00FF)));
-                    gcmONERROR(gco3D_SetStencilMask(chipCtx->engine, (gctUINT8)mask));
-                    gcmONERROR(gco3D_SetStencilReference(chipCtx->engine, reference, gcvTRUE));
-
-                    /* Bind vertex array */
-                    gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, gcvTRUE, gcvTRUE));
-
-                    /* Draw */
-                    gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
-                        tmpInstantDraw.primMode,
-                        gcvTRUE,
-                        tmpInstantDraw.first,
-                        0,
-                        tmpInstantDraw.primCount,
-                        tmpInstantDraw.count,
-                        tmpInstantDraw.spilitDraw,
-                        tmpInstantDraw.spilitCount,
-                        tmpInstantDraw.spilitPrimMode,
-                        gc->vertexArray.instanceCount));
-
-                    tmpInstantDraw.indexMemory = (gctUINT8_PTR)(3 * tmpInstantDraw.indexBytes + __GL_PTR2SIZE(tmpInstantDraw.indexMemory));
-                }
-            }
-            else if (splitDraw)
-            {
-                gctSIZE_T i;
-                __GLchipInstantDraw tmpInstantDraw;
-
-                __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
-                tmpInstantDraw.primCount = 1;
-
-                for (i = 0; i < instantDraw->count - 1 ; ++i)
-                {
-                    tmpInstantDraw.count = 2;
-                    /* Bind vertex array */
-                    gcmONERROR(gcChipSetVertexArrayBind(gc, &tmpInstantDraw, (__GL_DEFAULT_LOOP == loop), gcvTRUE));
-
-                    /* Draw */
-                    gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
-                                                             tmpInstantDraw.primMode,
-                                                             gcvTRUE,
-                                                             tmpInstantDraw.first,
-                                                             0,
-                                                             tmpInstantDraw.primCount,
-                                                             tmpInstantDraw.count,
-                                                             tmpInstantDraw.spilitDraw,
-                                                             tmpInstantDraw.spilitCount,
-                                                             tmpInstantDraw.spilitPrimMode,
-                                                             gc->vertexArray.instanceCount));
-
-                    tmpInstantDraw.indexMemory = (gctUINT8_PTR)(1 + __GL_PTR2SIZE(tmpInstantDraw.indexMemory));
-                    gco3D_Semaphore(chipCtx->engine, gcvWHERE_RASTER, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE_STALL);
-                }
+                gcmONERROR((*splitDrawInfo.splitDrawFunc)(gc, instantDraw, &splitDrawInfo));
             }
             else
             {
                 /* Bind vertex array */
                 if (gc->vertexArray.varrayDirty            ||
-                        instantDraw->indexBuffer == gcvNULL ||
-                        chipCtx->patchId != gcvPATCH_REALRACING)
+                    instantDraw->indexBuffer == gcvNULL    ||
+                    chipCtx->patchId != gcvPATCH_REALRACING)
                 {
                     gcmONERROR(gcChipSetVertexArrayBind(gc, instantDraw, (__GL_DEFAULT_LOOP == loop), gcvTRUE));
                 }
                 else
                 {
-                    gcmONERROR(gcoVERTEXARRAY_IndexUpdate(&instantDraw->count,
-                                                          instantDraw->indexType,
-                                                          instantDraw->indexBuffer,
-                                                          instantDraw->indexMemory));
+                    gcsVERTEXARRAY_INDEX_INFO indexInfo;
+
+                    gcmES30_COLLECT_INDEX_INFO(indexInfo, instantDraw);
+                    gcmONERROR(gcoVERTEXARRAY_IndexBind(chipCtx->vertexArray,
+                                                        &indexInfo));
                 }
 
                 /* Draw */
@@ -5277,9 +6327,6 @@ __glChipDrawElementsInstanced(
                                                          0,
                                                          instantDraw->primCount,
                                                          instantDraw->count,
-                                                         instantDraw->spilitDraw,
-                                                         instantDraw->spilitCount,
-                                                         instantDraw->spilitPrimMode,
                                                          gc->vertexArray.instanceCount));
             }
         }
@@ -5423,17 +6470,18 @@ __glChipDrawElements(
         {
             /* Bind vertex array */
             if (gc->vertexArray.varrayDirty            ||
-                    instantDraw->indexBuffer == gcvNULL ||
-                    chipCtx->patchId != gcvPATCH_REALRACING)
+                 instantDraw->indexBuffer == gcvNULL    ||
+                 chipCtx->patchId != gcvPATCH_REALRACING)
             {
                 gcmONERROR(gcChipSetVertexArrayBind(gc, instantDraw, (__GL_DEFAULT_LOOP == loop), gcvFALSE));
             }
             else
             {
-                gcmONERROR(gcoVERTEXARRAY_IndexUpdate(&instantDraw->count,
-                                                      instantDraw->indexType,
-                                                      instantDraw->indexBuffer,
-                                                      instantDraw->indexMemory));
+                gcsVERTEXARRAY_INDEX_INFO indexInfo;
+
+                gcmES30_COLLECT_INDEX_INFO(indexInfo, instantDraw);
+                gcmONERROR(gcoVERTEXARRAY_IndexBind(chipCtx->vertexArray,
+                                                    &indexInfo));
             }
 
             /* Draw */
@@ -5441,10 +6489,7 @@ __glChipDrawElements(
                                                    instantDraw->primMode,
                                                    0,
                                                    0,
-                                                   instantDraw->primCount,
-                                                   instantDraw->spilitDraw,
-                                                   instantDraw->spilitCount,
-                                                   instantDraw->spilitPrimMode));
+                                                   instantDraw->primCount));
         }
     }
 
@@ -5590,7 +6635,6 @@ __glChipMultiDrawArraysIndirect(
                                             stride,
                                             bufInfo->bufObj));
 
-    /* Intentional fall through */
 #if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
     __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_END, 0);
 #endif
@@ -5642,7 +6686,6 @@ __glChipMultiDrawElementsIndirect(
                                             stride,
                                             bufInfo->bufObj));
 
-    /* Intentional fall through */
 #if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
     __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_END, 0);
 #endif
@@ -5727,12 +6770,16 @@ __glChipFinish(
     gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
 
 #if VIVANTE_PROFILER
-    if (gc->profiler.enable && gc->profiler.useGlfinish)
+    /*if (gc->profiler.enable && gc->profiler.useGlfinish)
     {
         __glChipProfiler(&gc->profiler, GL3_PROFILER_FRAME_END, (gctHANDLE)(gctUINTPTR_T)1);
-    }
+    }*/
 #endif
 
+    if (gc->profiler.enable && gc->profiler.useGlfinish)
+    {
+        __glChipProfiler_NEW_Set(gc, GL3_PROFILER_FRAME_END, (gctHANDLE)(gctUINTPTR_T)1);
+    }
 OnError:
     if (gcmIS_SUCCESS(status))
     {
@@ -5891,6 +6938,11 @@ __glChipDrawBegin(
         }
 #endif
 
+        if (gc->profiler.enable)
+        {
+            __glChipProfiler_NEW_Set(gc, GL3_PROFILER_DRAW_BEGIN, 0);
+        }
+
         /* Special patch for fishnoodle.*/
         if (chipCtx->patchId == gcvPATCH_FISHNOODLE &&
             gc->vertexArray.indices == gcvNULL &&
@@ -5930,6 +6982,25 @@ __glChipDrawBegin(
             {
                 __GLES_PRINT("ES30:skip draw because of no program object nor program pipeline object was active");
                 break;
+            }
+        }
+
+        /* update max unit /sampler.*/
+        if (gc->globalDirtyState[__GL_PROGRAM_ATTRS] & (__GL_DIRTY_GLSL_PROGRAM_SWITCH |
+                                                        __GL_DIRTY_GLSL_MODE_SWITCH    |
+                                                        __GL_DIRTY_GLSL_UNIFORM))
+        {
+            __GLSLStage stage;
+            __GLprogramObject *progObj;
+
+            for (stage = __GLSL_STAGE_VS; stage <= __GLSL_STAGE_FS; ++stage)
+            {
+                progObj = __glGetCurrentStageProgram(gc, stage);
+                if (progObj)
+                {
+                    gc->shaderProgram.maxSampler = gcmMAX(gc->shaderProgram.maxSampler, progObj->maxSampler);
+                    gc->shaderProgram.maxUnit = gcmMAX(gc->shaderProgram.maxUnit, progObj->maxUnit);
+                }
             }
         }
 
@@ -6157,6 +7228,8 @@ __glChipDrawBegin(
             if (layoutBit != gcvLAYOUT_QUALIFIER_NONE)
             {
                 GLuint i;
+                GLenum *pDrawBuffers = gcvNULL;
+                GLuint drawbufferCount = 0;
                 gceLAYOUT_QUALIFIER qualifier = gcvLAYOUT_QUALIFIER_NONE;
 
                 for (i = 0; i < fsProgram->outCount; i++)
@@ -6164,10 +7237,26 @@ __glChipDrawBegin(
                     qualifier |= fsProgram->outputs[i].layout;
                 }
 
+                if (DRAW_FRAMEBUFFER_BINDING_NAME)
+                {
+                    pDrawBuffers = gc->frameBuffer.drawFramebufObj->drawBuffers;
+                }
+                else
+                {
+                    pDrawBuffers = gc->state.raster.drawBuffers;
+                }
+
+                for (i = 1; i < gc->constants.shaderCaps.maxDrawBuffers; ++i)
+                {
+                    if (pDrawBuffers[i] != GL_NONE)
+                    {
+                        drawbufferCount++;
+                    }
+                }
                 /* Advanced blending equations are supported only when rendering
                 ** to a single color buffer using fragment color zero
                 */
-                if (qualifier != gcvLAYOUT_QUALIFIER_NONE && fsProgram->outCount > 1)
+                if (qualifier != gcvLAYOUT_QUALIFIER_NONE && (fsProgram->outCount > 1 || drawbufferCount > 0))
                 {
                     __GL_ERROR(GL_INVALID_OPERATION);
                     break;
@@ -6247,6 +7336,10 @@ __glChipDrawBegin(
         ret = GL_TRUE;
     } while (0);
 
+    if (ret == GL_FALSE && gc->profiler.enable)
+    {
+        __glChipProfiler_NEW_Set(gc, GL3_PROFILER_DRAW_END, 0);
+    }
     gcmFOOTER_ARG("return=%d", ret);
     return ret;
 }
@@ -6386,6 +7479,11 @@ __glChipDrawEnd(
                 frameCount, drawCount,
                 gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
                 gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name);
+    }
+
+    if (gc->profiler.enable)
+    {
+        __glChipProfiler_NEW_Set(gc, GL3_PROFILER_DRAW_END, 0);
     }
 
     if (g_dbgPerDrawKickOff)
@@ -6906,6 +8004,19 @@ __glChipComputeBegin(
         }
     }
 
+    /* update maxUnit / maxSampler.*/
+    if (gc->globalDirtyState[__GL_PROGRAM_ATTRS] & (__GL_DIRTY_GLSL_PROGRAM_SWITCH |
+                                                    __GL_DIRTY_GLSL_MODE_SWITCH    |
+                                                    __GL_DIRTY_GLSL_UNIFORM))
+    {
+        progObj = __glGetCurrentStageProgram(gc, __GLSL_STAGE_CS);
+        if (progObj)
+        {
+            gc->shaderProgram.maxSampler = gc->constants.shaderCaps.maxTextureSamplers;
+            gc->shaderProgram.maxUnit = gc->constants.shaderCaps.maxCombinedTextureImageUnits;
+        }
+    }
+
     gcmFOOTER_NO();
     return ret;
 }
@@ -7048,20 +8159,22 @@ __glChipComputeEnd(
                     {
                         gcsSURF_VIEW texView;
                         __GLtextureObject *texObj = imageUnit->texObj;
-                        GLboolean layered = GL_FALSE;
+                        GLboolean layered = ((imageUnit->type != __GL_IMAGE_2D) && !imageUnit->singleLayered);
                         gctSTRING fileName;
                         /* Build file name.*/
                         gctUINT fileNameOffset = 0;
-                        gcsSURF_FORMAT_INFO_PTR formatInfo;
 
-                        texView = gcChipGetTextureSurface(chipCtx, texObj, imageUnit->level, imageUnit->actualLayer);
-
-                        gcmVERIFY_OK(gcoSURF_GetFormatInfo(texView.surf, &formatInfo));
+                        texView = gcChipGetTextureSurface(chipCtx, texObj, layered, imageUnit->level, imageUnit->actualLayer);
 
                         if ((imageUnit->type != __GL_IMAGE_2D) && !imageUnit->singleLayered)
                         {
                             texView.firstSlice = 0;
                             layered = GL_TRUE;
+                        }
+
+                        if (imageUnit->singleLayered)
+                        {
+                            texView.numSlices = 1;
                         }
                         /* Allocate memory for output file name string. */
                         gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, __GLES_MAX_FILENAME_LEN, (gctPOINTER *) &fileName));
@@ -7069,19 +8182,18 @@ __glChipComputeEnd(
                         gcmVERIFY_OK(gcoOS_PrintStrSafe(fileName,
                                                         __GLES_MAX_FILENAME_LEN,
                                                         &fileNameOffset,
-                                                        "fID%04d_dID%04d(compute)_pID%04d_imageUnit%02d(tex[%s]ID%04d_%s_level%02d_layer_%02d_layered=%d)",
+                                                        "fID%04d_dID%04d(compute)_pID%04d_imageUnit%02d(tex[%s]ID%04d_level%02d_layer_%02d_layered=%d)",
                                                         frameCount,
                                                         drawCount,
                                                         gc->shaderProgram.activeProgObjs[__GLSL_STAGE_CS]->objectInfo.id,
                                                         unit,
                                                         txTypeStr[texObj->targetIndex],
                                                         texObj->name,
-                                                        formatInfo->formatName,
                                                         imageUnit->level,
                                                         imageUnit->actualLayer,
                                                         layered));
 
-                        gcmONERROR(gcChipUtilsDumpSurface(gc, &texView, fileName, gcvFALSE));
+                        gcmONERROR(gcChipUtilsDumpSurface(gc, &texView, fileName, gcvFALSE, (g_dbgDumpImagePerDraw >> 16)));
 
                         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, fileName));
                     }
@@ -7206,7 +8318,7 @@ __glChipDispatchCompute(
                 break;
             }
         }
-
+        info.barrierUsed = program->curPgInstance->programState.hints->threadGroupSync;
         gcmERR_BREAK(gco3D_InvokeThreadWalker(chipCtx->engine, &info));
     } while (GL_FALSE);
 

@@ -50,7 +50,10 @@ ifneq ($(ABI), 0)
 endif
 
 CCFLAGS += -Werror
-CCFLAGS += -ansi
+
+# We have commented this in order to allow some extensions not contemplated in C89 see: http://reviews.ott.qnx.com/r/118143/
+#CCFLAGS += -ansi
+
 #CCFLAGS += -pedantic
 #CCFLAGS += -fmudflap
 #LDFLAGS += -lmudflap
@@ -66,6 +69,30 @@ endif
 
 ifeq ($(PLATFORM), iMX8DV)
         CCFLAGS += -DIMX8X
+endif
+
+ifeq ($(PLATFORM), iMX6X)
+	CCFLAGS += -DIMX6X
+endif
+
+ifeq ($(PLATFORM), iMX6X_vProfile)
+	CCFLAGS += -DIMX6X
+endif
+
+ifeq ($(PLATFORM), iMX6DLS)
+	CCFLAGS += -DIMX6X
+endif
+
+ifeq ($(PLATFORM), iMX6DLS_vProfile)
+	CCFLAGS += -DIMX6X
+endif
+
+ifeq ($(PLATFORM), iMX6DQP)
+	CCFLAGS += -DIMX6X
+endif
+
+ifeq ($(PLATFORM), iMX6DQP_vProfile)
+	CCFLAGS += -DIMX6X
 endif
 
 ifeq ($(USE_VDK), 1)
@@ -96,6 +123,10 @@ ifeq ($(ENABLE_CL_GL), 1)
 	CCFLAGS += -DgcdENABLE_CL_GL=1
 else
 	CCFLAGS += -DgcdENABLE_CL_GL=0
+endif
+
+ifeq ($(ENABLE_DUAL_CORE), 1)
+	CCFLAGS += -DgcdDUAL_CORE
 endif
 
 ifeq ($(VIVANTE_ENABLE_VG), 1)
@@ -191,6 +222,8 @@ ifeq ($(ENABLE_BUILD_TIME_SYMBOL_CHECK),1)
 else
    SCREEN_LIBS =
 endif
+
+LIBS += screen socket
 
 ################################################################################
 # Build for bank alignment setting

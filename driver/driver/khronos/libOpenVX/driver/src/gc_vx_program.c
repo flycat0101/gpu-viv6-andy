@@ -25,7 +25,7 @@ VX_INTERNAL_CALLBACK_API void vxoProgram_Destructor(vx_reference ref)
     if (program->binary) gcSHADER_Destroy((gcSHADER)program->binary);
 }
 
-VX_PUBLIC_API vx_program vxCreateProgramWithSource(
+VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithSource(
         vx_context context, vx_uint32 count, const vx_char * strings[], vx_size lengths[])
 {
     vx_program  program;
@@ -109,7 +109,7 @@ OnError:
     return VX_NULL;
 }
 
-VX_PUBLIC_API vx_program vxCreateProgramWithBinary(
+VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithBinary(
         vx_context context, const vx_uint8 * binary, vx_size size)
 {
     vx_program program;
@@ -123,7 +123,7 @@ VX_PUBLIC_API vx_program vxCreateProgramWithBinary(
     if (vxoReference_GetStatus((vx_reference)program) != VX_SUCCESS) return program;
 
     /* Construct binary. */
-    gcmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_CL, &shaderBinary));
+    gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &shaderBinary));
 
     /* Load binary */
     gcmONERROR(gcSHADER_LoadEx(shaderBinary, (gctPOINTER)binary, (gctUINT32)size));
@@ -136,19 +136,19 @@ OnError:
     return VX_NULL;
 }
 
-VX_PUBLIC_API vx_status vxReleaseProgram(vx_program *program)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseProgram(vx_program *program)
 {
     return vxoReference_Release((vx_reference_ptr)program, (vx_type_e)VX_TYPE_PROGRAM, VX_REF_EXTERNAL);
 }
 
 
-VX_PUBLIC_API vx_status vxBuildProgram(vx_program program, vx_const_string options)
+VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_string options)
 {
     gctPOINTER          pointer;
     gctSIZE_T           length;
     gcSHADER            binary;
     gctUINT             binarySize;
-    gceSTATUS           status;
+    gceSTATUS           status = gcvSTATUS_OK;
     vx_status           vStatus = VX_FAILURE;
 
     if (!vxoReference_IsValidAndSpecific(&program->base, (vx_type_e)VX_TYPE_PROGRAM)) return VX_ERROR_INVALID_REFERENCE;
@@ -199,13 +199,25 @@ VX_PUBLIC_API vx_status vxBuildProgram(vx_program program, vx_const_string optio
         }
 
         program->binary = (unsigned char *) binary;
-        gcmONERROR(gcSHADER_SaveEx(binary,  gcvNULL,  &binarySize));
+        gcmONERROR(gcSHADER_SaveEx(binary, gcvNULL, &binarySize));
         program->binarySize = binarySize;
     }
 
     vStatus = VX_SUCCESS;
 
 OnError:
+        if (gcmIS_ERROR(status))
+        {
+            binary = gcvNULL;
+
+            if (program->buildLog != gcvNULL)
+            {
+                fprintf(stderr, "%s\n", program->buildLog);
+            }
+
+            fprintf(stderr, "ERROR: Failed to compile vx shader. (error: %X)\n", status);
+        }
+
 
     if(program != gcvNULL)
     {
@@ -215,7 +227,7 @@ OnError:
     return vStatus;
 }
 
-VX_PUBLIC_API vx_status vxQueryProgram(vx_program program, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryProgram(vx_program program, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoReference_IsValidAndSpecific(&program->base, (vx_type_e)VX_TYPE_PROGRAM)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -233,3 +245,4 @@ VX_PUBLIC_API vx_status vxQueryProgram(vx_program program, vx_enum attribute, vo
 
     return VX_SUCCESS;
 }
+

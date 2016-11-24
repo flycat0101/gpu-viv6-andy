@@ -15,6 +15,7 @@
 #define __gc_cl_gen_code_h_
 
 #include "gc_cl_ir.h"
+#define _GEN_PACKED_LOAD_STORE_AS_BUILTIN 1
 
 #define cldHandleHighPrecisionInFrontEnd gcvFALSE
 #define cldSupportMultiKernelFunction  1
@@ -106,12 +107,13 @@ clsGEN_CODE_DATA_TYPE;
 #define clmGEN_CODE_matrixColumnCount_SET(d, c) (d).matrixSize.columnCount = (c)
 
 #define clmGEN_CODE_IsScalarDataType(d) \
- ((clmGEN_CODE_matrixRowCount_GET(d) == 0  && clmGEN_CODE_matrixColumnCount_GET(d) == 0))
+ ((clmGEN_CODE_matrixRowCount_GET(d) == 0  && clmGEN_CODE_matrixColumnCount_GET(d) == 0) && \
+  !clmIsElementTypePackedGenType((d).elementType))
 
-#define clmGEN_CODE_IsVectorDataType(d) (clmGEN_CODE_vectorSize_GET(d) !=0)
+#define clmGEN_CODE_IsVectorDataType(d) ((clmGEN_CODE_vectorSize_GET(d) !=0) || clmIsElementTypePackedGenType((d).elementType))
 
 #define clmGEN_CODE_IsExtendedVectorType(d) \
-  (clmIsElementTypePackedType((d).elementType) || \
+  (clmIsElementTypePacked((d).elementType) || \
    (clmGEN_CODE_IsVectorDataType(d) && \
     clmGEN_CODE_vectorSize_NOCHECK_GET(d) > cldBASIC_VECTOR_SIZE))
 
@@ -132,7 +134,8 @@ clsGEN_CODE_DATA_TYPE;
   } while (gcvFALSE)
 
 #define _clmGetTempRegIndexOffset(SectionIndex, ElementType) \
-    (clmIsElementTypeHighPrecision(ElementType) ? (SectionIndex) << 1 : (SectionIndex))
+    ((clmIsElementTypeHighPrecision(ElementType) || clmIsElementTypeImage(ElementType)) \
+     ? (SectionIndex) << 1 : (SectionIndex))
 
 #define clmROPERAND_vectorComponent_GET(component, vector, idx) \
   clGetVectorROperandSlice(vector, idx, 1, component)
@@ -157,6 +160,11 @@ clGetDefaultComponentSelection(
     IN clsGEN_CODE_DATA_TYPE DataType
     );
 
+gctBOOL
+clIsDefaultComponentSelection(
+IN clsCOMPONENT_SELECTION  *ComponentSelection
+);
+
 gceSTATUS
 clGetStartComponentDefaultComponentSelection(
     IN gctUINT8 StartComponent,
@@ -172,8 +180,7 @@ IN gctUINT8 NumComponents
 /* OPCODE */
 typedef enum _cleOPCODE
 {
-    clvOPCODE_INVALID                    = 0,
-
+    clvOPCODE_INVALID  = 0,
     clvOPCODE_NOP,
 
     /* Assignment Operation */
@@ -247,10 +254,10 @@ typedef enum _cleOPCODE
     clvOPCODE_EQUAL,
     clvOPCODE_NOT_EQUAL,
 
-    clvOPCODE_BITWISE_AND,
-    clvOPCODE_BITWISE_OR,
-    clvOPCODE_BITWISE_XOR,
-    clvOPCODE_BITWISE_NOT,
+    clvOPCODE_AND_BITWISE,
+    clvOPCODE_OR_BITWISE,
+    clvOPCODE_XOR_BITWISE,
+    clvOPCODE_NOT_BITWISE,
 
     clvOPCODE_RSHIFT,
     clvOPCODE_LSHIFT,
@@ -366,8 +373,24 @@ typedef enum _cleOPCODE
     clvOPCODE_MOV_LONG,
     clvOPCODE_MADSAT,
     clvOPCODE_COPY,
+    clvOPCODE_PARAM_CHAIN,
+    clvOPCODE_INTRINSIC,
+    clvOPCODE_INTRINSIC_ST,
+
+    clvOPCODE_FMA_MUL,
+    clvOPCODE_FMA_ADD,
+
+    clvOPCODE_MAXOPCODE    /* All new opcode should be inserted before this */
 }
 cleOPCODE;
+
+/* VIR intrinsics kind */
+#define VIR_INTRINSIC_INFO(Intrinsic)   CL_VIR_IK_##Intrinsic
+typedef enum _clvVIR_IK
+{
+#include "vir/ir/gc_vsc_vir_intrinsic_kind.def.h"
+} clvVIR_IK;
+#undef VIR_INTRINSIC_INFO
 
 #define cldFirstConvOpcode  clvOPCODE_CONV
 #define cldLastConvOpcode   clvOPCODE_CONV_SAT_RTP
@@ -1054,6 +1077,7 @@ clGenScaledIndexOperand(
     IN gctUINT StringNo,
     IN clsROPERAND *IndexOperand,
     IN gctINT32 ElementDataTypeSize,
+    IN gctBOOL  needShift,
     OUT clsROPERAND *ScaledOperand
     );
 
@@ -1306,6 +1330,7 @@ typedef struct _clsITERATION_CONTEXT
             clsNAME *       loopIndexName;
             cluCONSTANT_VALUE  loopIndexValue;
             gctLABEL        bodyEndLabel;
+            gctUINT         loopCount;
         }
         unrolledInfo;
 
@@ -1477,6 +1502,44 @@ IN OUT clsGEN_CODE_PARAMETERS * Parameters,
 IN clsDECL * Decl
 );
 
+gctSIZE_T
+clGEN_CODE_DataTypeByteSize(
+cloCOMPILER Compiler,
+clsGEN_CODE_DATA_TYPE DataType
+);
+
+gceSTATUS
+clGenIntrinsicAssignCode(
+    IN cloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
+    IN clsLOPERAND * LOperand,
+    IN clvVIR_IK IntrinsicKind,
+    IN clsROPERAND * ROperand
+    );
+
+gceSTATUS
+clGenIntrinsicAsmCode(
+    IN cloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
+    IN clvVIR_IK IntrinsicKind,
+    IN clsLOPERAND * LOperand,
+    IN gctUINT OperandCount,
+    IN clsROPERAND * ROperands
+);
+
+gceSTATUS
+clGenBuiltinToIntrinsicAsmCode(
+IN cloCOMPILER Compiler,
+IN cloCODE_GENERATOR CodeGenerator,
+IN cloIR_POLYNARY_EXPR PolynaryExpr,
+IN gctUINT OperandCount,
+IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+IN clsIOPERAND * IOperand,
+IN clvVIR_IK IntrinsicKind
+);
+
 gceSTATUS
 clAllocateFuncResources(
 IN cloCOMPILER Compiler,
@@ -1501,6 +1564,16 @@ IN gctUINT StringNo,
 IN gctCONST_STRING Name,
 IN cloIR_EXPR Expr
 );
+
+gceSTATUS
+clGenBuiltInAsmCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS *OperandsParameters,
+    IN clsIOPERAND  *IOperand
+    );
 
 gceSTATUS
 clGenCheckAndImplicitConvertOperand(
@@ -1563,7 +1636,17 @@ struct _cloCODE_GENERATOR
     slsSLINK_LIST    *derivedTypeVariables;
     gctINT16         currentUniformBlockMember;
     gcsUNIFORM_BLOCK uniformBlock;
+    union {
+       gctBOOL       vectorMemoryDeref;  /* tell shared codegen function _GenVloadCode, _GenVstoreCode that it is effective by vector memory dereference */
+    } codeGenHandShakeFlag;
 };
+
+#define clmCODE_GENERATOR_IsVectorMemoryDeref(CG) \
+   ((CG)->codeGenHandShakeFlag.vectorMemoryDeref)
+#define clmCODE_GENERATOR_SetVectorMemoryDeref(CG) \
+   ((CG)->codeGenHandShakeFlag.vectorMemoryDeref = gcvTRUE)
+#define clmCODE_GENERATOR_ClrVectorMemoryDeref(CG) \
+   ((CG)->codeGenHandShakeFlag.vectorMemoryDeref = gcvFALSE)
 
 gceSTATUS
 cloCODE_GENERATOR_Construct(

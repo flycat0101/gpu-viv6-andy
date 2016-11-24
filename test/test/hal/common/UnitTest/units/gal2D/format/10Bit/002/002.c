@@ -211,8 +211,8 @@ gceSURF_FORMAT sFormat[] =
     gcvSURF_A2B10G10R10,
     gcvSURF_NV12_10BIT,
     gcvSURF_NV21_10BIT,
-    gcvSURF_NV16_10BIT,
-    gcvSURF_NV61_10BIT,
+    gcvSURF_NV12_10BIT,
+    gcvSURF_NV21_10BIT,
 };
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
@@ -379,12 +379,22 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     gcmONERROR(gcoHAL_Commit(t2d->runtime->hal, gcvTRUE));
 
-    return gcvTRUE;
-
 OnError:
-    GalOutput(GalOutputType_Error | GalOutputType_Console,
-        "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
-    return gcvFALSE;
+    if (tempSurf)
+    {
+        GalDeleteTSurf(gcvNULL, tempSurf);
+    }
+
+    if (status != gcvSTATUS_OK)
+    {
+        GalOutput(GalOutputType_Error | GalOutputType_Console,
+            "%s(%d) failed:%s\n",__FUNCTION__, __LINE__, gcoOS_DebugStatus2Name(status));
+        return gcvFALSE;
+    }
+    else
+    {
+        return gcvTRUE;
+    }
 }
 
 static void CDECL Destroy(Test2D *t2d)

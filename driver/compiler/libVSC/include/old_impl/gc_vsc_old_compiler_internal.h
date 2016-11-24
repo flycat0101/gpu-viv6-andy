@@ -232,6 +232,7 @@ typedef struct _gcBuiltinsTempIndex
    gctINT       InPositionTempIndex;
    gctINT       InPointSizeTempIndex;
    gctINT       BoundingBoxTempIndex;
+   gctINT       LastFragDataTempIndex;
 } gcBuiltinsTempIndex;
 
 typedef struct _gcShaderCodeInfo
@@ -531,6 +532,8 @@ typedef struct _gcLINKTREE
 {
     /* Pointer to the gcSHADER object. */
     gcSHADER                        shader;
+
+    VSC_HW_CONFIG                   hwCfg;
 
     /* Process name of this shader. */
     gcePATCH_ID                     patchID;
@@ -930,6 +933,7 @@ struct _gcsCODE_GENERATOR
     gctINT                          positionIndex;
     gctUINT                         positionPhysical;
 
+
     /* FrontFacing usage. */
     gctBOOL                         useFace;
     gctUINT                         facePhysical;
@@ -1199,13 +1203,13 @@ gceSTATUS
 gcSHADER_Conv2VIR(
     IN gcSHADER Shader,
     IN VSC_HW_CONFIG * hwCfg,
-    IN OUT VIR_Shader* VirShader
+    IN OUT SHADER_HANDLE hVirShader
     );
 
 gceSTATUS
 gcSHADER_ConvFromVIR(
     IN OUT gcSHADER Shader,
-    IN VIR_Shader * VirShader,
+    IN SHADER_HANDLE hVirShader,
     IN gceSHADER_FLAGS Flags
     );
 
@@ -1287,6 +1291,48 @@ gcSHADER_FindMainFunction(
     IN   gcSHADER           Shader,
     OUT  gctINT *           StartCode,
     OUT  gctINT *           EndCode
+    );
+
+gceSTATUS
+gcSHADER_AddOutputLocation(
+    IN gcSHADER             Shader,
+    IN gctINT               Location,
+    IN gctUINT32            Length
+    );
+
+gctUINT
+gcSHADER_GetFunctionByCodeId(
+    IN gcSHADER             Shader,
+    IN gctUINT              codeID,
+    OUT gctBOOL            *IsKernelFunc
+    );
+
+gctUINT
+gcSHADER_GetFunctionByFuncHead(
+    IN gcSHADER             Shader,
+    IN gctUINT              codeID,
+    OUT gctBOOL            *IsKernelFunc
+    );
+
+gceSTATUS
+gcDoPreprocess(
+    IN gcSHADER *           Shaders,
+    IN gceSHADER_FLAGS      Flags
+    );
+
+VIRCGKind
+gcGetVIRCGKind(
+    IN gctBOOL              HasHalti2
+    );
+
+gctBOOL
+gcUseFullNewLinker(
+    IN gctBOOL              HasHalti2
+    );
+
+gctUINT
+gcGetDualFP16Mode(
+    IN gctBOOL              HasHalti2
     );
 
 END_EXTERN_C()

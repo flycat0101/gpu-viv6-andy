@@ -218,6 +218,7 @@ gcChipInitDevicePipeline(
     gc->dp.compressedTexImage3D = __glChipCompressedTexImage3D;
     gc->dp.compressedTexSubImage3D = __glChipCompressedTexSubImage3D;
     gc->dp.generateMipmaps = __glChipGenerateMipMap;
+    gc->dp.getTexImage = __glChipGetTexImage;
 
     gc->dp.copyTexBegin = __glChipCopyTexBegin;
     gc->dp.copyTexValidateState = __glChipCopyTexValidateState;
@@ -365,11 +366,11 @@ gcChipInitDevicePipeline(
 
     /* profiler */
 #if VIVANTE_PROFILER
-    gc->dp.profiler = __glChipProfiler;
+    /*gc->dp.profiler = __glChipProfiler;*/
 #else
     gc->dp.profiler = NULL;
 #endif
-
+    gc->dp.profiler = __glChipProfiler_NEW_Set;
     /* Patches. */
 #if __GL_CHIP_PATCH_ENABLED
     gc->dp.patchBlend = __glChipPatchBlend;
@@ -471,6 +472,11 @@ gcChipInitExtension(
         }
     }
 
+    if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PSIO_INTERLOCK) == gcvSTATUS_TRUE)
+    {
+        __glExtension[__GL_EXTID_EXT_shader_framebuffer_fetch].bEnabled = GL_TRUE;
+    }
+
     /* extension enabled only for context 3.0 and later */
     if (constants->majorVersion == 3 && constants->minorVersion >= 0)
     {
@@ -479,7 +485,7 @@ gcChipInitExtension(
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_MSAA_SHADING) == gcvSTATUS_TRUE)
         {
-            __glExtension[__GL_EXTID_OES_sample_shading].bEnabled = gcvTRUE;
+            __glExtension[__GL_EXTID_OES_sample_shading].bEnabled   = gcvTRUE;
             __glExtension[__GL_EXTID_OES_sample_variables].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_OES_sample_variables].bGLSL    = gcvTRUE;
             __glExtension[__GL_EXTID_OES_shader_multisample_interpolation].bEnabled = gcvTRUE;
@@ -488,8 +494,8 @@ gcChipInitExtension(
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_BLT_ENGINE) == gcvSTATUS_TRUE)
         {
-            __glExtension[__GL_EXTID_EXT_copy_image].bEnabled = gcvFALSE;
-            __glExtension[__GL_EXTID_OES_copy_image].bEnabled = gcvFALSE;
+            __glExtension[__GL_EXTID_EXT_copy_image].bEnabled = gcvTRUE;
+            __glExtension[__GL_EXTID_OES_copy_image].bEnabled = gcvTRUE;
         }
 
         if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_STENCIL_TEXTURE) == gcvSTATUS_TRUE)
@@ -519,15 +525,17 @@ gcChipInitExtension(
             }
         }
 
-        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_HALTI2) == gcvSTATUS_TRUE)
+        if (chipCtx->chipFeature.haltiLevel > __GL_CHIP_HALTI_LEVEL_2)
         {
             __glExtension[__GL_EXTID_OES_shader_image_atomic].bEnabled = GL_TRUE;
         }
-    }
 
-    if(constants->majorVersion < 3)
-    {
-        __glFormatInfoTable[__GL_FMT_RGB10_A2].renderable = gcvFALSE;
+        __glFormatInfoTable[__GL_FMT_RGB10_A2].renderable = GL_TRUE;
+
+        if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SECURITY) == gcvSTATUS_TRUE)
+        {
+            __glExtension[__GL_EXTID_EXT_protected_textures].bEnabled = GL_TRUE;
+        }
     }
 
     /* extension enabled only for context 3.1 and later */
@@ -535,7 +543,7 @@ gcChipInitExtension(
     {
         __glExtension[__GL_EXTID_KHR_blend_equation_advanced].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_OES_texture_storage_multisample_2d_array].bEnabled = GL_TRUE;
-        __glExtension[__GL_EXTID_OES_shader_image_atomic].bEnabled = GL_TRUE;
+        __glExtension[__GL_EXTID_OES_shader_image_atomic].bEnabled    = GL_TRUE;
         __glExtension[__GL_EXTID_KHR_debug].bEnabled = GL_TRUE;
         __glExtension[__GL_EXTID_KHR_robustness].bEnabled = GL_TRUE;
 
@@ -586,6 +594,8 @@ gcChipInitExtension(
             __glExtension[__GL_EXTID_OES_tessellation_shader].bEnabled = gcvTRUE;
             __glExtension[__GL_EXTID_OES_tessellation_point_size].bEnabled = gcvTRUE;
 
+            /* Enable these extensions when TS is on to make Android CTS happy */
+            __glExtension[__GL_EXTID_ANDROID_extension_pack_es31a].bEnabled = GL_TRUE;
             __glExtension[__GL_EXTID_EXT_primitive_bounding_box].bEnabled = GL_TRUE;
             __glExtension[__GL_EXTID_EXT_primitive_bounding_box].bGLSL    = GL_TRUE;
             __glExtension[__GL_EXTID_OES_primitive_bounding_box].bEnabled = GL_TRUE;
@@ -617,8 +627,12 @@ gcChipInitExtension(
     {
         __glFormatInfoTable[__GL_FMT_R32F].renderable =
         __glFormatInfoTable[__GL_FMT_RG32F].renderable =
-        __glFormatInfoTable[__GL_FMT_RGBA32F].renderable =
-        __glFormatInfoTable[__GL_FMT_R11F_G11F_B10F].renderable = GL_TRUE;
+        __glFormatInfoTable[__GL_FMT_RGBA32F].renderable = GL_TRUE;
+
+        if (chipCtx->chipFeature.haltiLevel > __GL_CHIP_HALTI_LEVEL_2)
+        {
+            __glFormatInfoTable[__GL_FMT_R11F_G11F_B10F].renderable = GL_TRUE;
+        }
     }
 
     /*Generate compressed texture format table base on extension status*/
@@ -674,21 +688,21 @@ gcChipInitExtension(
         pCurFmt += sizeof(__glCompressedTextureFormats_palette);
     }
 
-
     /* Go through the extension table to get the extension string length */
-    curExt = __glExtension;
-    while (curExt->index < __GL_EXTID_EXT_LAST)
+    for (curExt = __glExtension; curExt->name; curExt++)
     {
         if (curExt->bEnabled)
         {
+            gctSIZE_T len = gcoOS_StrLen(curExt->name, gcvNULL) + 1;
+
             /* Add one more space to separate extension strings*/
-            extLen += (gcoOS_StrLen(curExt->name, gcvNULL) + 1);
+            extLen += len;
+
             if (curExt->bGLSL)
             {
-                extGLSLLen += (gcoOS_StrLen(curExt->name, gcvNULL) + 1);
+                extGLSLLen += len;
             }
         }
-        curExt++;
     }
     extLen++; /* One more for the null character */
     extGLSLLen++;
@@ -704,8 +718,7 @@ gcChipInitExtension(
     constants->shaderCaps.extensions[0] = '\0';
 
     /* Go through the extension table again to construct the extension string */
-    curExt = __glExtension;
-    while (curExt->index < __GL_EXTID_EXT_LAST)
+    for (curExt = __glExtension; curExt->name; curExt++)
     {
         if (curExt->bEnabled)
         {
@@ -720,7 +733,6 @@ gcChipInitExtension(
                 gcoOS_StrCatSafe(constants->shaderCaps.extensions, extGLSLLen, " ");
             }
         }
-        curExt++;
     }
     GL_ASSERT(extLen == gcoOS_StrLen(constants->extensions, gcvNULL) + 1);
     GL_ASSERT(extGLSLLen == gcoOS_StrLen(constants->shaderCaps.extensions, gcvNULL) + 1);
@@ -928,7 +940,6 @@ OnError:
 
 }
 
-
 GLboolean
 __glChipMakeCurrent(
     __GLcontext *gc
@@ -936,11 +947,13 @@ __glChipMakeCurrent(
 {
     gceSTATUS status = gcvSTATUS_OK;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    VSC_HW_CONFIG hwCfg;
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
     gcmONERROR(gco3D_Set3DEngine(chipCtx->engine));
-    gcmONERROR(chipCtx->pfInitCompiler(chipCtx->hal, &gc->constants.shaderCaps));
+    gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg));
+    gcmONERROR(chipCtx->pfInitCompiler(chipCtx->patchId, &hwCfg, &gc->constants.shaderCaps));
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
@@ -962,7 +975,7 @@ __glChipLoseCurrent(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-    gcmONERROR(chipCtx->pfFinalizeCompiler(chipCtx->hal));
+    gcmONERROR(chipCtx->pfFinalizeCompiler());
     gcmONERROR(gco3D_UnSet3DEngine(chipCtx->engine));
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
@@ -1054,7 +1067,7 @@ __glChipGetDeviceConstants(
         constants->minorVersion = 2;
     }
     else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2) ||
-        (chipModel == gcv900 && chipRevision == 0x5250))
+            (chipModel == gcv900 && chipRevision == 0x5250))
     {
         if (patchId == gcvPATCH_ANTUTU6X)
         {
@@ -1242,6 +1255,7 @@ __glChipGetDeviceConstants(
     shaderCaps->maxImageUnit = shaderCaps->maxCombinedImageUniform;
 
     if (gcvFALSE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HELPER_INVOCATION)
+        && gc->apiVersion < __GL_API_VERSION_ES32
        )
     {
         shaderCaps->maxFragAtomicCounters = 0;
@@ -1423,14 +1437,14 @@ __glChipGetDeviceConstants(
 
         if (tsAvailable)
         {
-            shaderCaps->maxTcsOutVectors = 32;
-            shaderCaps->maxTesOutVectors = 32;
-            shaderCaps->maxTcsInVectors  = 32;
-            shaderCaps->maxTesInVectors  = 32;
+            shaderCaps->maxTcsOutVectors = shaderCaps->maxUserVertAttributes;
+            shaderCaps->maxTesOutVectors = shaderCaps->maxUserVertAttributes;
+            shaderCaps->maxTcsInVectors  = shaderCaps->maxUserVertAttributes;
+            shaderCaps->maxTesInVectors  = shaderCaps->maxUserVertAttributes;
         }
         if (gsAvailable)
         {
-            shaderCaps->maxGsOutVectors = 32;
+            shaderCaps->maxGsOutVectors = shaderCaps->maxUserVertAttributes;
             shaderCaps->maxGsInVectors  = 16;
         }
 
@@ -1587,8 +1601,9 @@ __glChipDestroyContext(
     (*gc->imports.free)(0, gc->constants.pCompressedTexturesFormats);
 #if VIVANTE_PROFILER
     /* Destroy the profiler. */
-    gcChipDestroyProfiler(gc);
+    /*gcChipDestroyProfiler(gc);*/
 #endif
+    gcmVERIFY_OK(gcChipProfiler_NEW_Destroy(gc));
 
     if (chipCtx->rtTexture)
     {
@@ -1624,6 +1639,7 @@ __glChipDestroyContext(
     gcmVERIFY_OK(gcoOS_Destroy(chipCtx->os));
 
     gcmVERIFY_OK(gcSHADER_FreeRecompilerLibrary());
+
     gcmVERIFY_OK(gcSHADER_FreeBlendLibrary());
 
     dpGlobalInfo.numContext--;
@@ -1648,7 +1664,6 @@ __glChipDestroyContext(
     return GL_TRUE;
 }
 
-
 GLboolean
 __glChipCreateContext(
     __GLcontext *gc
@@ -1657,6 +1672,7 @@ __glChipCreateContext(
     __GLchipContext *chipCtx = gcvNULL;
     gceSTATUS status = gcvSTATUS_OK;
     __GLdeviceConstants *constants = &gc->constants;
+    __GLchipContext * shareCtx;
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
@@ -1848,9 +1864,9 @@ __glChipCreateContext(
     gcmONERROR(gcChipLoadCompiler(gc));
     gcmONERROR(gcChipInitDeafultObjects(gc));
 #if VIVANTE_PROFILER
-    gcChipInitializeProfiler(gc);
+    /*gcChipInitializeProfiler(gc);*/
 #endif
-
+    gcmONERROR(gcChipProfiler_NEW_Initialize(gc));
     dpGlobalInfo.numContext++;
 
     if (chipCtx->patchId == gcvPATCH_GLBM25   ||
@@ -1879,6 +1895,19 @@ __glChipCreateContext(
     gcmONERROR(gcChipGetSampleLocations(gc, chipCtx));
 
     chipCtx->robust = (gc->imports.robustAccess && chipCtx->chipFeature.hasRobustness);
+
+    chipCtx->needRTRecompile = gcvFALSE;
+    chipCtx->needTexRecompile = (chipCtx->chipFeature.haltiLevel < __GL_CHIP_HALTI_LEVEL_3) ||
+                                 chipCtx->chipFeature.patchNP2Texture ||
+                                 !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_INTEGER_SIGNEXT_FIX) ||
+                                 !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_INTEGER32_FIX);
+
+    if (gc->shareCtx != gcvNULL)
+    {
+        shareCtx = (__GLchipContext*)(gc->shareCtx->dp.privateData);
+        chipCtx->needRTRecompile = chipCtx->needRTRecompile || shareCtx->needRTRecompile;
+        chipCtx->needTexRecompile = chipCtx->needTexRecompile || shareCtx->needTexRecompile;
+    }
 
 OnError:
     if (gcmIS_ERROR(status) && chipCtx)

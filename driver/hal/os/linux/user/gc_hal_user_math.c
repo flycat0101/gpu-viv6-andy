@@ -11,9 +11,9 @@
 *****************************************************************************/
 
 
+#include "gc_hal_types.h"
 #include "gc_hal_user_math.h"
 #include "gc_hal_user_linux.h"
-
 
 gctUINT32
 gcoMATH_Log2in5dot5(
@@ -201,7 +201,7 @@ gcoMATH_Float16ToFloat(
 
 
 #define  gcdFLOAT16_SIGNBIT            15
-#define  gcdFLOAT16_EXPONENTBIAS       ((1 << (gcdFLOAT16_EXPONENTSIZE - 1)) - 1)                /* Exponent bias */
+#define  gcdFLOAT16_EXPONENTBIAS       ((1U << (gcdFLOAT16_EXPONENTSIZE - 1)) - 1)                /* Exponent bias */
 #define  gcdFLOAT16_EXPONENTMAX        gcdFLOAT16_EXPONENTBIAS                                   /* Max exponent  */
 #define  gcdFLOAT16_EXPONENTMIN        (-gcdFLOAT16_EXPONENTBIAS + 1)                            /* MIn exponent  */
 #define  gcdFLOAT16_MAXNORMAL          (((gcdFLOAT16_EXPONENTMAX + 127) << 23) | 0x7FE000)
@@ -309,7 +309,7 @@ gcoMATH_Float11ToFloat(
 }
 
 
-#define  gcdFLOAT11_EXPONENTBIAS        ((1 << (gcdFLOAT11_EXPONENTSIZE - 1)) - 1)                /* Exponent bias */
+#define  gcdFLOAT11_EXPONENTBIAS        ((1U << (gcdFLOAT11_EXPONENTSIZE - 1)) - 1)                /* Exponent bias */
 #define  gcdFLOAT11_EXPONENTMAX         gcdFLOAT11_EXPONENTBIAS                                   /* Max exponent */
 #define  gcdFLOAT11_EXPONENTMIN         (-gcdFLOAT11_EXPONENTBIAS + 1)                            /* MIn exponent */
 #define  gcdFLOAT11_MAXNORMAL           (((gcdFLOAT11_EXPONENTMAX + 127) << 23) | 0x7FE000)
@@ -448,7 +448,7 @@ gcoMATH_Float10ToFloat(
 }
 
 
-#define  gcdFLOAT10_EXPONENTBIAS          ((1 << (gcdFLOAT10_EXPONENTSIZE - 1)) - 1)                /* Exponent bias */
+#define  gcdFLOAT10_EXPONENTBIAS          ((1U << (gcdFLOAT10_EXPONENTSIZE - 1)) - 1)                /* Exponent bias */
 #define  gcdFLOAT10_EXPONENTMAX           gcdFLOAT10_EXPONENTBIAS                                   /* Max exponent */
 #define  gcdFLOAT10_EXPONENTMIN           (-gcdFLOAT10_EXPONENTBIAS + 1)                            /* MIn exponent */
 #define  gcdFLOAT10_MAXNORMAL             (((gcdFLOAT10_EXPONENTMAX + 127) << 23) | 0x7FE000)

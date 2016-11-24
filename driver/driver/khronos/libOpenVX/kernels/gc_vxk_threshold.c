@@ -36,6 +36,7 @@ vx_status vxThreshold(vx_node node, vx_image src_image, vx_threshold threshold, 
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryThreshold(threshold, VX_THRESHOLD_ATTRIBUTE_TYPE, &type, sizeof(type));
@@ -76,6 +77,8 @@ vx_status vxThreshold(vx_node node, vx_image src_image, vx_threshold threshold, 
 
     kernelContext->params.evisNoInst = node->base.context->evisNoInst;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -87,3 +90,4 @@ vx_status vxThreshold(vx_node node, vx_image src_image, vx_threshold threshold, 
 
     return status;
 }
+

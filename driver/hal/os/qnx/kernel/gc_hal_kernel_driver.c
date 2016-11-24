@@ -40,6 +40,12 @@ int             irqLine             = gcd3D_IRQ;
 long            registerMemBase     = gcd3D_REG_BASE;
 unsigned long   registerMemSize     = gcd3D_REG_SIZE;
 
+#ifdef gcdDUAL_CORE
+int             irqLine3D1          = gcd3D1_IRQ;
+long            registerMemBase3D1  = gcd3D1_REG_BASE;
+unsigned long   registerMemSize3D1  = gcd3D1_REG_SIZE;
+#endif
+
 unsigned long   baseAddress         = gcdDEVICE_BASE_ADDRESS;
 
 int             irqLine2D           = gcd2D_IRQ;
@@ -1968,11 +1974,41 @@ static int drv_init(void)
 {
     gcsDEVICE_CONSTRUCT_ARGS args;
 
+    int i;
+
+    memset(&args, 0, sizeof(args));
+
+    for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++) {
+        args.irqs[i] = -1;
+    }
+
     args.recovery        = recovery;
     args.stuckDump       = stuckDump;
     args.powerManagement = powerManagement;
     args.mmu             = mmu;
     args.gpuProfiler     = gpuProfiler;
+
+    args.irqs[gcvCORE_MAJOR] = irqLine;
+    args.registerBases[gcvCORE_MAJOR] = registerMemBase;
+    args.registerSizes[gcvCORE_MAJOR] = registerMemSize;
+    args.chipIDs[gcvCORE_MAJOR] = gcvCORE_MAJOR;
+
+#ifdef gcdDUAL_CORE
+    args.irqs[gcvCORE_3D1] = irqLine3D1;
+    args.registerBases[gcvCORE_3D1] = registerMemBase3D1;
+    args.registerSizes[gcvCORE_3D1] = registerMemSize3D1;
+    args.chipIDs[gcvCORE_3D1] = gcvCORE_3D1;
+#endif
+
+    args.irqs[gcvCORE_2D] = irqLine2D;
+    args.registerBases[gcvCORE_2D] = registerMemBase2D;
+    args.registerSizes[gcvCORE_2D] = registerMemSize2D;
+    args.chipIDs[gcvCORE_2D] = gcvCORE_2D;
+
+    args.irqs[gcvCORE_VG] = irqLine2D;
+    args.registerBases[gcvCORE_VG] = registerMemBaseVG;
+    args.registerSizes[gcvCORE_VG] = registerMemSizeVG;
+    args.chipIDs[gcvCORE_VG] = gcvCORE_VG;
 
     /* TODO: Enable clock by driver support? */
     gcmkTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_DRIVER,

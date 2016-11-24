@@ -41,6 +41,12 @@ VIVANTE_MAKEFILES += \
   endif
 endif
 
+# Build hwvulkan for android-n and later
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 24),1)
+VIVANTE_MAKEFILES += \
+    $(LOCAL_PATH)/driver/android/hwvulkan/Android.mk
+endif
+
 ifeq ($(USE_2D_COMPOSITION),1)
 VIVANTE_MAKEFILES += \
     $(LOCAL_PATH)/driver/android/copybit/Android.mk
@@ -80,6 +86,12 @@ ifeq ($(VIVANTE_ENABLE_VG), 1)
 VIVANTE_MAKEFILES += \
     $(LOCAL_PATH)/driver/khronos/libEGL/Android.mk
 endif
+endif
+
+ifeq ($(VIVANTE_ENABLE_3D)_$(USE_VULKAN),1_1)
+VIVANTE_MAKEFILES += \
+    $(LOCAL_PATH)/compiler/libSPIRV/Android.mk \
+    $(LOCAL_PATH)/driver/khronos/libVulkan10/Android.mk
 endif
 
 ifeq ($(VIVANTE_ENABLE_VG), 1)

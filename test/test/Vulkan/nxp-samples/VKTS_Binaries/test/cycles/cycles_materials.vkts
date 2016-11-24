@@ -1,0 +1,94 @@
+#
+# VulKan ToolS materials.
+#
+
+texture_library cycles_textures.vkts
+
+#
+# Material.
+#
+
+shading BSDF
+
+name InvertMaterial
+
+fragment_shader InvertMaterial.frag.spv
+
+attributes 3
+
+#
+# Material.
+#
+
+shading BSDF
+
+name NormalMapMaterial
+
+fragment_shader NormalMapMaterial.frag.spv
+
+add_texture NormalMapMaterial_Image_Texture_texture
+
+attributes 1f
+
+#
+# Material.
+#
+
+shading BSDF
+
+name TextureMaterial
+
+fragment_shader TextureMaterial.frag.spv
+
+add_texture TextureMaterial_Image_Texture_texture
+
+attributes 13
+
+#
+# Material.
+#
+
+shading BSDF
+
+name MultiMaterial
+
+fragment_shader MultiMaterial.frag.spv
+
+attributes 3
+
+#
+# Material.
+#
+
+shading BSDF
+
+name BasicMaterial
+
+fragment_shader BasicMaterial.frag.spv
+
+attributes 3
+
+#
+# Material.
+#
+
+shading BSDF
+
+name MixMaterial
+
+fragment_shader MixMaterial.frag.spv
+
+attributes 3
+
+#
+# Material.
+#
+
+shading BSDF
+
+name AlphaMask
+
+fragment_shader AlphaMask.frag.spv
+
+attributes 13
+

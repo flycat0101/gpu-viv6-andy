@@ -12,9 +12,11 @@
 
 
 /***********************************************************************************
-   All following definitions are designed for DX/openGL(ES)/openCL drivers to manage
-   to do shaders' HW-level linkage programming, shader flush programming and shader
-   level recompiler.
+   All following definitions are designed for DX/openGL(ES)/Vulkan/openCL drivers to
+   manage to do shaders' HW-level linkage programming, shader flush programming and
+   shader level recompiler. NOTE that only info that shader uses (these info must be
+   assigned specific HW resource for them) are recorded in SEP, any other redundant
+   info will not be recorded in SEP.
 ************************************************************************************/
 #ifndef __gc_vsc_drvi_shader_profile_h_
 #define __gc_vsc_drvi_shader_profile_h_
@@ -101,8 +103,6 @@ typedef enum SHADER_TYPE
 
     /* It is not a shader, but indicates a fixed-function unit. */
     SHADER_TYPE_FFU                 = SHADER_TYPE_UNKNOWN,
-
-    SHADER_TYPE_GL_SUPPORTED_COUNT  = SHADER_TYPE_PIXEL,
 }
 SHADER_TYPE;
 
@@ -113,6 +113,7 @@ typedef enum SHADER_CLIENT
     SHADER_CLIENT_GL                = 2,
     SHADER_CLIENT_GLES              = 3,
     SHADER_CLIENT_CL                = 4,
+    SHADER_CLIENT_VK                = 5,
 }
 SHADER_CLIENT;
 
@@ -300,6 +301,7 @@ typedef enum SHADER_UAV_ACCESS_MODE
     SHADER_UAV_ACCESS_MODE_TYPE              = 0,
     SHADER_UAV_ACCESS_MODE_RAW               = 1,
     SHADER_UAV_ACCESS_MODE_STRUCTURED        = 2,
+    SHADER_UAV_ACCESS_MODE_RESIZABLE         = 3,
 }
 SHADER_UAV_ACCESS_MODE;
 
@@ -310,13 +312,14 @@ typedef enum SHADER_HW_ACCESS_MODE
 }
 SHADER_HW_ACCESS_MODE;
 
-typedef enum SHADER_PATCH_CONSTANT_MODE
+typedef enum SHADER_HW_MEM_ACCESS_MODE
 {
-    SHADER_PATCH_CONSTANT_MODE_CTC           = 0,
-    SHADER_PATCH_CONSTANT_MODE_VAL_2_INST    = 1,
-    SHADER_PATCH_CONSTANT_MODE_VAL_2_MEMORREG= 2,
+    SHADER_HW_MEM_ACCESS_MODE_PLACE_HOLDER   = 0,
+    SHADER_HW_MEM_ACCESS_MODE_DIRECT_MEM_ADDR= 1,
+    SHADER_HW_MEM_ACCESS_MODE_SRV            = 2,
+    SHADER_HW_MEM_ACCESS_MODE_UAV            = 3,
 }
-SHADER_PATCH_CONSTANT_MODE;
+SHADER_HW_MEM_ACCESS_MODE;
 
 typedef enum SHADER_TESSELLATOR_DOMAIN_TYPE
 {
@@ -417,31 +420,6 @@ typedef enum SHADER_IO_CATEGORY
     SHADER_IO_CATEGORY_PER_VTX_PXL               = 0,
     SHADER_IO_CATEGORY_PER_PRIM                  = 1,
 }SHADER_IO_CATEGORY;
-
-/* Define Shader Static Patch constant flag */
-#define SSP_CONSTANT_FLAG_CL_KERNEL_ARG                0x00000001
-#define SSP_CONSTANT_FLAG_CL_KERNEL_ARG_LOCAL          0x00000002
-#define SSP_CONSTANT_FLAG_CL_KERNEL_ARG_SAMPLER        0x00000004
-#define SSP_CONSTANT_FLAG_CL_LOCAL_ADDRESS_SPACE       0x00000008
-#define SSP_CONSTANT_FLAG_CL_PRIVATE_ADDRESS_SPACE     0x00000010
-#define SSP_CONSTANT_FLAG_CL_CONSTANT_ADDRESS_SPACE    0x00000020
-#define SSP_CONSTANT_FLAG_CL_GLOBAL_SIZE               0x00000040
-#define SSP_CONSTANT_FLAG_CL_LOCAL_SIZE                0x00000080
-#define SSP_CONSTANT_FLAG_CL_NUM_GROUPS                0x00000100
-#define SSP_CONSTANT_FLAG_CL_GLOBAL_OFFSET             0x00000200
-#define SSP_CONSTANT_FLAG_CL_WORK_DIM                  0x00000400
-#define SSP_CONSTANT_FLAG_CL_KERNEL_ARG_CONSTANT       0x00000800
-#define SSP_CONSTANT_FLAG_CL_KERNEL_ARG_LOCAL_MEM_SIZE 0x00001000
-#define SSP_CONSTANT_FLAG_CL_KERNEL_ARG_PRIVATE        0x00002000
-#define SSP_CONSTANT_FLAG_HALTI_FX_BUFFER              0x00010000
-#define SSP_CONSTANT_FLAG_HALTI_FX_STATE               0x00020000
-#define SSP_CONSTANT_FLAG_GPR_SPILL_MEM_ADDR           0x00040000
-
-/* Define Shader Static Patch common flag */
-#define SSP_COMMON_FLAG_STREAMOUT_BY_STORE             0x00000001
-#define SSP_COMMON_FLAG_GPR_SPILL_MEMORY               0x00000002 /* For register spillage */
-#define SSP_COMMON_FLAG_CL_PRIVATE_MEMORY              0x00000004 /* For CL private mem */
-#define SSP_COMMON_FLAG_SHARED_MEMORY                  0x00000008 /* For CL local memory or DirectCompute shared mem */
 
 /* IO mapping table definitions, for v# and o#
 
@@ -574,7 +552,7 @@ typedef struct SHADER_IO_CHANNEL_MAPPING
 }
 SHADER_IO_CHANNEL_MAPPING;
 
-typedef struct SHADER_IO_REG_MAPPING
+struct _SHADER_IO_REG_MAPPING
 {
     SHADER_IO_CHANNEL_MAPPING                   ioChannelMapping[CHANNEL_NUM];
 
@@ -603,8 +581,7 @@ typedef struct SHADER_IO_REG_MAPPING
     /* Reg io-mode. NOTE that this reg io-mode might be different with io mode defined
        in SHADER_IO_MAPPING_PER_EXE_OBJ, see comments in that structure */
     SHADER_IO_MODE                              regIoMode;
-}
-SHADER_IO_REG_MAPPING;
+};
 
 typedef struct USAGE_2_IO
 {
@@ -676,52 +653,73 @@ SHADER_IO_MAPPING;
    They are used to update constant values
 */
 
-typedef struct SHADER_CONSTANT_HW_LOCATION_MAPPING
+typedef struct _SHADER_CONSTANT_HW_LOCATION_MAPPING SHADER_CONSTANT_HW_LOCATION_MAPPING;
+struct _SHADER_CONSTANT_HW_LOCATION_MAPPING
 {
-    SHADER_HW_ACCESS_MODE                       hwAccessMode;
+    SHADER_HW_ACCESS_MODE                            hwAccessMode;
 
     union
     {
         /* Case to map to constant register */
-        gctUINT                                 hwRegNo;
+        gctUINT                                      hwRegNo;
 
         /* Case to map to constant memory
 
-           CAUTION:
-           Currently, memory layout is designed to 4-tuples based as constant register,that means
-           every element of scalar/vec2~4 array will be put into separated room of 4-tuples.With
-           such layout design, we can support both DX1x cb#/icb# and GL named uniform block. But
-           GL named uniform block has more loose layout requirement based on spec (for example,
-           there could be no padding between any pair of GL type of data, but it is unfriendly for
-           DX), so HW may design a different layout requirement for constant buffer, or directly
-           use similar ld as GPGPU uses. If so, we should re-design followings and their users.
+           CAUTION for memory layout:
+           1. For non-CTC spilled mem, currently, memory layout is designed to 4-tuples based as
+              constant register,that means every element of scalar/vec2~4 array will be put into
+              separated room of 4-tuples. With such layout design, we can support both DX1x cb#/icb#
+              and GL named uniform block. So offsetInConstantArray must be at 4-tuples alignment.
+
+              But GL named uniform block has more loose layout requirement based on spec (for example,
+              there could be no padding between any pair of GL type of data, but it is unfriendly
+              for DX), so HW may design a different layout requirement for constant buffer, or directly
+              use similar ld as GPGPU uses. If so, we should re-design followings and their users.
+
+           2. For CTC spilled mem, first channel might be started at any location (offsetInConstantArray
+              does not need to be at 4-tuples alignment), and at this case, firstValidHwChannel must
+              be started at X-channel which is located at offsetInConstantArray.
         */
         struct
         {
+            SHADER_HW_MEM_ACCESS_MODE                hwMemAccessMode;
+
             union
             {
-                /* For address case, it is relative address */
-                gctUINT                         hwConstantArrayBase;
-
                 /* For place-holder # case */
-                gctUINT                         hwConstantArraySlot;
+                gctUINT                              hwConstantArraySlot;
+
+                /* For direct mem address case, if it is used for vulkan resources table maintained
+                   by PEP, PEP generator will allocate/free it; if it is used for SEP, just pointing
+                   to field of SHADER_CONSTANT_HW_LOCATION_MAPPING of one of entry of constant array
+                   table. The pHwDirectAddrBase::hwAccessMode must be SHADER_HW_ACCESS_MODE_REGISTER */
+                SHADER_CONSTANT_HW_LOCATION_MAPPING* pHwDirectAddrBase;
+
+                /* For the case that constant array is mapped to SRV, if it is used for vulkan resources
+                   table maintained by PEP, PEP generator will allocate/free it; if it is used for SEP,
+                   just pointing to one of entry of SRV table */
+                SHADER_RESOURCE_SLOT_MAPPING*        pSrv;
+
+                /* For the case that constant array is mapped to UAV, if it is used for vulkan resources
+                   table maintained by PEP, PEP generator will allocate/free it; if it is used for SEP,
+                   just pointing to one of entry of UAV table */
+                SHADER_UAV_SLOT_MAPPING*             pUav;
             } memBase;
 
-            /* Must be at 4-tuples alignment */
-            gctUINT                             offsetInConstantArray;
+            /* At channel boundary. See CAUTION!! */
+            gctUINT                                  offsetInConstantArray;
         } memAddr;
     } hwLoc;
 
     /* Which channels of this HW location are valid for this 4-tuples constant */
-    gctUINT                                     validHWChannelMask;
-}
-SHADER_CONSTANT_HW_LOCATION_MAPPING;
+    gctUINT                                          validHWChannelMask;
 
-typedef struct SHADER_CONSTANT_SUB_ARRAY_MAPPING
+    /* First valid channel based on validHWChannelMask */
+    gctUINT                                          firstValidHwChannel;
+};
+
+struct _SHADER_CONSTANT_SUB_ARRAY_MAPPING
 {
-    /* Which constant array owns this sub-array */
-    struct SHADER_CONSTANT_ARRAY_MAPPING*       pParentConstantArray;
-
     /* Start and size of sub array. 'startIdx' is the index within 'arrayRange' of parent */
     gctUINT                                     startIdx;
     gctUINT                                     subArrayRange;
@@ -738,12 +736,11 @@ typedef struct SHADER_CONSTANT_SUB_ARRAY_MAPPING
        Note that all elements in each sub-array must have same channel mask designated by validChannelMask
        and validHWChannelMask respectively */
     SHADER_CONSTANT_HW_LOCATION_MAPPING         hwFirstConstantLocation;
-}
-SHADER_CONSTANT_SUB_ARRAY_MAPPING;
+};
 
 typedef struct SHADER_CONSTANT_ARRAY_MAPPING
 {
-    /* It is the same as index of constantArrayMapping which owns it */
+    /* It is the same as index of pConstantArrayMapping which owns it */
     gctUINT                                     constantArrayIndex;
 
     SHADER_CONSTANT_USAGE                       constantUsage;
@@ -764,15 +761,14 @@ typedef struct SHADER_CONSTANT_ARRAY_MAPPING
 }
 SHADER_CONSTANT_ARRAY_MAPPING;
 
-typedef struct SHADER_COMPILE_TIME_CONSTANT
+struct _SHADER_COMPILE_TIME_CONSTANT
 {
     gctUINT                                     constantValue[CHANNEL_NUM];
 
     /* HW constant location that this CTC maps to. Just use validHWChannelMask to indicate which channels
        have an immedidate CTC value */
     SHADER_CONSTANT_HW_LOCATION_MAPPING         hwConstantLocation;
-}
-SHADER_COMPILE_TIME_CONSTANT;
+};
 
 typedef struct SHADER_CONSTANT_MAPPING
 {
@@ -780,8 +776,7 @@ typedef struct SHADER_CONSTANT_MAPPING
     SHADER_CONSTANT_ARRAY_MAPPING*              pConstantArrayMapping;
 
     /* Number of constant buffer arrays allocated for pConstantArrayMapping. Can not be greater than
-       MAX_SHADER_CONSTANT_ARRAY_NUM. It must be (maxUsed# + 1). Hole is permitted except for OGL(ES)
-       which must squeeze valid constant buffer arrays together */
+       MAX_SHADER_CONSTANT_ARRAY_NUM. It must be (maxUsed# + 1). Hole is permitted. */
     gctUINT                                     countOfConstantArrayMapping;
 
     /* Indicate which arrays are used */
@@ -806,7 +801,7 @@ SHADER_CONSTANT_MAPPING;
    They are used to update sampler state
 */
 
-typedef struct SHADER_SAMPLER_SLOT_MAPPING
+struct _SHADER_SAMPLER_SLOT_MAPPING
 {
     /* It is the same as index of sampler which owns it */
     gctUINT                                     samplerSlotIndex;
@@ -823,8 +818,7 @@ typedef struct SHADER_SAMPLER_SLOT_MAPPING
 
     /* HW slot number */
     gctUINT                                     hwSamplerSlot;
-}
-SHADER_SAMPLER_SLOT_MAPPING;
+};
 
 typedef struct SHADER_SAMPLER_MAPPING
 {
@@ -851,7 +845,7 @@ SHADER_SAMPLER_MAPPING;
    They are used to update shader resource state
 */
 
-typedef struct SHADER_RESOURCE_SLOT_MAPPING
+struct _SHADER_RESOURCE_SLOT_MAPPING
 {
     /* It is the same as index of resource which owns it */
     gctUINT                                     resourceSlotIndex;
@@ -876,8 +870,7 @@ typedef struct SHADER_RESOURCE_SLOT_MAPPING
 
     /* HW slot number */
     gctUINT                                     hwResourceSlot;
-}
-SHADER_RESOURCE_SLOT_MAPPING;
+};
 
 typedef struct SHADER_RESOURCE_MAPPING
 {
@@ -900,18 +893,20 @@ SHADER_RESOURCE_MAPPING;
    They are used to update global memory state, such as UAV
 */
 
-typedef struct SHADER_UAV_SLOT_MAPPING
+struct _SHADER_UAV_SLOT_MAPPING
 {
     /* It is the same as index of UAV which owns it */
     gctUINT                                     uavSlotIndex;
 
     SHADER_UAV_ACCESS_MODE                      accessMode;
+    SHADER_HW_MEM_ACCESS_MODE                   hwMemAccessMode;
 
-    /* This is not meaningful for user's UAVs because the size is passed down from app.
-       But for compiler internally generated UAVs (for patch for the most of cases), we
-       need tell driver the total flattened UAV size which driver will allocate them on
-       vid-mem */
-    gctUINT                                     flattenedUavSize;
+    /* There are two following reasons for this. The default is 0.
+       1. For compiler internally generated UAVs (for patch for the most of cases), we need tell driver
+          the total flattened UAV size, so driver can allocate it on vid-mem.
+       2 .For sizable access mode, we need know the size of fixed size part.
+    */
+    gctUINT                                     sizeInByte;
 
     union
     {
@@ -925,20 +920,25 @@ typedef struct SHADER_UAV_SLOT_MAPPING
             SHADER_UAV_TYPE                     uavType;
         } s;
 
+        /* For resizable access mode */
+        gctUINT                                 sizableEleSize;
+
         /* For structured of access mode */
         gctUINT                                 structureSize;
     } u;
 
     union
     {
-        /* For address case, it is relative address */
-        gctUINT                                 hwAddressBase;
-
         /* For place-holder # case */
         gctUINT                                 hwUavSlot;
+
+        /* For direct mem address case, if it is used for vulkan resources table maintained
+           by PEP, PEP generator will allocate/free it; if it is used for SEP, just pointing
+           to field of SHADER_CONSTANT_HW_LOCATION_MAPPING of one of entry of constant array
+           table. The pHwDirectAddrBase::hwAccessMode must be SHADER_HW_ACCESS_MODE_REGISTER */
+        SHADER_CONSTANT_HW_LOCATION_MAPPING*    pHwDirectAddrBase;
     } hwLoc;
-}
-SHADER_UAV_SLOT_MAPPING;
+};
 
 typedef struct SHADER_UAV_MAPPING
 {
@@ -955,90 +955,6 @@ typedef struct SHADER_UAV_MAPPING
     gctUINT                                     dim2UavSlotMask[SHADER_UAV_DIMENSION_TOTAL_COUNT];
 }
 SHADER_UAV_MAPPING;
-
-/* Common defintion for shader patch.
-
-   Not only for static compiling, but also for draw time recompiling
-*/
-
-typedef struct SHADER_PATCH_COMMON_ENTRY
-{
-    /* These are similiar with identical members of SHADER_PATCH_CONSTANT_ENTRY */
-    gctUINT                                     patchFlag;
-    gctUINT                                     patchFlagIndex;
-    void*                                       pPrivateData;  /*IT MUST BE PUT AT LAST!!! */
-}
-SHADER_PATCH_COMMON_ENTRY;
-
-typedef struct SHADER_PATCH_COMMON
-{
-    SHADER_PATCH_COMMON_ENTRY*                  pPatchCommonEntries;
-    gctUINT                                     countOfEntries;
-}
-SHADER_PATCH_COMMON;
-
-/* Constants defintion for shader patch.
-
-   Not only for static compiling, but also for draw time recompiling
-*/
-
-typedef struct SHADER_PATCH_CONSTANT_AS_INST_IMM
-{
-    gctUINT                                     patchedPC;
-    gctUINT                                     srcNo;
-}
-SHADER_PATCH_CONSTANT_AS_INST_IMM;
-
-typedef struct SHADER_PATCH_CONSTANT_ENTRY
-{
-    /* Each patch flag needs determine which constant value is put to which channel of which
-       HW location by itself. */
-    gctUINT                                     patchFlag;
-
-    /* For some flags, there might be multiple different patch constants, so we need an index
-       to differiate them. It is numbered from zero. */
-    gctUINT                                     patchFlagIndex;
-
-    /* To select method to set constant after patching */
-    SHADER_PATCH_CONSTANT_MODE                  mode;
-
-    union
-    {
-        /*SHADER_CONSTANT_SUB_ARRAY_MAPPING*      pSubCBMapping;*/ /* SHADER_PATCH_CONSTANT_MODE_VAL_2_MEMORREG */
-        SHADER_CONSTANT_SUB_ARRAY_MAPPING       subCBMapping; /* SHADER_PATCH_CONSTANT_MODE_VAL_2_MEMORREG */
-        SHADER_COMPILE_TIME_CONSTANT            ctcConstant;   /* SHADER_PATCH_CONSTANT_MODE_CTC */
-        SHADER_PATCH_CONSTANT_AS_INST_IMM       instImm;       /* SHADER_PATCH_CONSTANT_MODE_VAL_2_INST */
-    } u;
-
-    /* For some flags, such as SHADER_RECOMPILE_CONSTANT_TEXCOORD, they will have their private
-       data to tell driver how to fetch/generate constants. NOTE IT MUST BE PUT AT LAST!!! */
-    void*                                       pPrivateData;
-}
-SHADER_PATCH_CONSTANT_ENTRY;
-
-typedef struct SHADER_PATCH_CONSTANT
-{
-    SHADER_PATCH_CONSTANT_ENTRY*                pPatchConstantEntries;
-    gctUINT                                     countOfEntries;
-}
-SHADER_PATCH_CONSTANT;
-
-/* Shader static patch stream out private structure definition for SSP_COMMON_FLAG_STREAMOUT_BY_STORE */
-typedef struct SSP_STREAMOUT_BY_STORE_PRIV
-{
-    /* patchFlagIndex of SHADER_PATCH_COMMON_ENTRY indicates stream buffer index which can not be greater
-       than MAX_SHADER_STREAM_OUT_BUFFER_NUM */
-    SHADER_UAV_SLOT_MAPPING*                    pSOBuffer;
-}
-SSP_STREAMOUT_BY_STORE_PRIV;
-
-/* Shader static patch gpr register spill private structure definition for SSP_COMMON_FLAG_GPR_SPILL_MEMORY */
-typedef struct SSP_GPR_SPILL_PRIV
-{
-    /*SHADER_UAV_SLOT_MAPPING*                    pSpillBuffer;*/
-    SHADER_UAV_SLOT_MAPPING                     spillBuffer;
-}
-SSP_GPR_SPILL_PRIV;
 
 /* For these hints, they must be natively provided by original shader or shader owner, such as HS/DS/GS,
    there are special hints for them, such as vertex/pixel/CP (sub executable object) count and tessellation
@@ -1177,11 +1093,14 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
         /* Whether the shader has GPR register spills */
         gctUINT                   bGprSpilled                     : 1;
 
+        /* Whether the shader has constant register spills */
+        gctUINT                   bCrSpilled                      : 1;
+
         /****************************************/
         /* Followings are OPTIONAL global hints */
         /****************************************/
 
-        /* What kind of memory access operations shader holds */
+        /* What kind of memory access operations shader holds, see SHADER_EDH_MEM_ACCESS_HINT */
         gctUINT                   memoryAccessHint                : 6;
 
         /* First HW reg and its channel that will be used to store addresses
@@ -1194,7 +1113,7 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
            output are all LE 4 */
         gctUINT                   bIoUSCAddrsPackedToOneReg       : 1;
 
-        gctUINT                   reserved                        : 13;
+        gctUINT                   reserved                        : 12;
     } globalStates;
 
     struct
@@ -1232,10 +1151,8 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
             /* To determine which io-index of output mapping have alpha write */
             gctUINT               alphaWriteOutputIndexMask       : 8;
 
-            /* Shader has operation to calc gradient on x of RT */
+            /* Shader has operation to calc gradient on x/y of RT */
             gctUINT               bDerivRTx                       : 1;
-
-            /* Shader has operation to calc gradient on y of RT */
             gctUINT               bDerivRTy                       : 1;
 
             /* Shader has operation to discard pixel (such as texkill/discard) */
@@ -1258,13 +1175,26 @@ typedef struct SHADER_EXECUTABLE_DERIVED_HINTS
             gctUINT               inputPosChannelValid            : 4;
             gctUINT               inputPntCoordChannelValid       : 2;
 
+            /* To determine whether shader needs read RT data (for example, shader
+               implements alpha-blend, or for OGL, lastFragData is presented) */
+            gctUINT               bNeedRtRead                     : 1;
+
 #if gcdALPHA_KILL_IN_SHADER
             gctUINT               alphaClrKillInstsGened          : 1;
-            gctUINT               reserved                        : 2;
+            gctUINT               reserved                        : 1;
 #else
-            gctUINT               reserved                        : 3;
+            gctUINT               reserved                        : 2;
 #endif
         } ps;
+
+        /* States acted on gps */
+        struct
+        {
+            /* Whether whole thread group needs sync */
+            gctUINT               bThreadGroupSync                : 1;
+
+            gctUINT               reserved                        : 31;
+        } gps;
     } prvStates;
 }SHADER_EXECUTABLE_DERIVED_HINTS;
 
@@ -1273,6 +1203,7 @@ typedef struct SHADER_EXECUTABLE_HINTS
     SHADER_EXECUTABLE_NATIVE_HINTS          nativeHints;
     SHADER_EXECUTABLE_DERIVED_HINTS         derivedHints;
 }SHADER_EXECUTABLE_HINTS;
+
 
 struct SHADER_EXECUTABLE_INSTANCE;
 
@@ -1306,8 +1237,8 @@ typedef struct SHADER_EXECUTABLE_PROFILE
        rely on this special execute hints */
     SHADER_EXECUTABLE_HINTS                     exeHints;
 
-    /* Low level mapping tables from # to HW resource. Add new mapping tables here, for example,
-       function table for DX11+ */
+    /* Low level mapping tables (mapping pool) from # to HW resource. Add new mapping tables here,
+       for example, function table for DX11+ */
     SHADER_IO_MAPPING                           inputMapping;
     SHADER_IO_MAPPING                           outputMapping;
     SHADER_CONSTANT_MAPPING                     constantMapping;
@@ -1315,16 +1246,13 @@ typedef struct SHADER_EXECUTABLE_PROFILE
     SHADER_RESOURCE_MAPPING                     resourceMapping;
     SHADER_UAV_MAPPING                          uavMapping;
 
-    /* New added constants which need driver set values for from state side after statically compiling,
-       such as transform feedback states, which will be as constants when SO is handled by ST. Note for
-       static patch constant, staticPatchConstants.mode can not be SHADER_PATCH_CONSTANT_MODE_CTC. */
-    SHADER_PATCH_CONSTANT                       staticPatchConstants;
+    /* All private mapping tables for static patches. Every entry has a member pointing to a slot in
+       above mapping pool */
+    SHADER_STATIC_PRIV_MAPPING                  staticPrivMapping;
 
-    /* New added global memory that needs driver additionally allocate or set after statically compiling.
-       All patches using extra global memory must use LD or ST instructions. For example, register spill
-       needs driver allocate extra memory to put spilled data, or SO hanled by ST need set SO buffers to
-       */
-    SHADER_PATCH_COMMON                         staticPatchExtraMems;
+    /* All private mapping tables for dynamic (lib-link) patches. Every entry has a member pointing
+       to a slot in above mapping pool */
+    SHADER_DYNAMIC_PRIV_MAPPING                 dynamicPrivMapping;
 
     /* TODO: LTC-folding gcSL insts and constants here.
        1. Do we need convert constants used by LTC-folding gcSL insts to # based?? If so, UpdateUniform can
@@ -1348,15 +1276,40 @@ gctBOOL vscIsValidSEP(SHADER_EXECUTABLE_PROFILE* pSEP);
 gceSTATUS vscInitializeIoRegMapping(SHADER_IO_REG_MAPPING* pIoRegMapping);
 gceSTATUS vscFinalizeIoRegMapping(SHADER_IO_REG_MAPPING* pIoRegMapping);
 
+gceSTATUS vscInitializeCnstHwLocMapping(SHADER_CONSTANT_HW_LOCATION_MAPPING* pCnstHwLocMapping);
+gceSTATUS vscFinalizeCnstHwLocMapping(SHADER_CONSTANT_HW_LOCATION_MAPPING* pCnstHwLocMapping);
+
 gceSTATUS vscInitializeCTC(SHADER_COMPILE_TIME_CONSTANT* pCompileTimeConstant);
 gceSTATUS vscFinalizeCTC(SHADER_COMPILE_TIME_CONSTANT* pCompileTimeConstant);
 
+gceSTATUS vscInitializeCnstArrayMapping(SHADER_CONSTANT_ARRAY_MAPPING* pCnstArrayMapping);
+gceSTATUS vscFinalizeCnstArrayMapping(SHADER_CONSTANT_ARRAY_MAPPING* pCnstArrayMapping);
+
+gceSTATUS vscInitializeCnstSubArrayMapping(SHADER_CONSTANT_SUB_ARRAY_MAPPING* pCnstSubArrayMapping);
+gceSTATUS vscFinalizeCnstSubArrayMapping(SHADER_CONSTANT_SUB_ARRAY_MAPPING* pCnstSubArrayMapping);
+
+gceSTATUS vscInitializeSamplerSlotMapping(SHADER_SAMPLER_SLOT_MAPPING* pSamplerSlotMapping);
+gceSTATUS vscFinalizeSamplerSlotMapping(SHADER_SAMPLER_SLOT_MAPPING* pSamplerSlotMapping);
+
+gceSTATUS vscInitializeUavSlotMapping(SHADER_UAV_SLOT_MAPPING* pUavSlotMapping);
+gceSTATUS vscFinalizeUavSlotMapping(SHADER_UAV_SLOT_MAPPING* pUavSlotMapping);
+
 void vscSortIOsByHwLoc(SHADER_IO_MAPPING_PER_EXE_OBJ* pIoMappingPerExeObj, gctUINT* pSortedIoIdxArray);
 
-/* If pShader != NULL, mapping 'symbol->#->hw resource' is dumped, otherwise
+/* If hShader != NULL, mapping 'symbol->#->hw resource' is dumped, otherwise
    only '#->hw' is dumped. For the 2nd case, it is easy for driver to dump any
    SEP when flushing to hw to triage bugs */
-void vscPrintSEP(SHADER_EXECUTABLE_PROFILE* pSEP, void* pShader);
+void vscPrintSEP(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, SHADER_HANDLE hShader);
+
+/* For saver, it always returns how many bytes it saves to binary buffer, and
+              1). if ppOutBinary == NULL (szBinaryInByte will be igored), then not doing real saving, just return byte size
+              2). if ppOutBinary != NULL and *ppOutBinary == NULL (szBinaryInByte will be igored), then saver will allocate a
+                  binary for user.
+              3). *ppOutBinary != NULL, then szBinaryInByte must be the size of the binary (generally, this size got by first usage
+                  of this function).
+   For loader, szBinaryInByte must be size of binary, and return value is the real sparsed size of binary. */
+gctUINT vscSaveSEPToBinary(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, void** ppOutBinary, gctUINT szBinaryInByte);
+gctUINT vscLoadSEPFromBinary(VSC_SYS_CONTEXT* pSysCtx, void* pInBinary, gctUINT szBinaryInByte, SHADER_EXECUTABLE_PROFILE* pSEP);
 
 /* Linkage info */
 typedef struct SHADER_IO_REG_LINKAGE

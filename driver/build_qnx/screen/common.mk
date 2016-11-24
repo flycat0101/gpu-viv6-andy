@@ -49,7 +49,7 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LIBS += GAL-$(HARDWARENAME)
+LIBS += GAL
 ifeq ($(USE_FAST_MEM_COPY), 1)
 LIBS += fastmemcpyS
 endif
@@ -62,6 +62,6 @@ else
 	LIBS += m
 endif
 
-INSTALLDIR=$(firstword $(INSTALLDIR_$(OS)) lib/dll)
+INSTALLDIR=$(firstword $(INSTALLDIR_$(OS)) usr/lib/graphics/$(PLATFORM))
 
 include $(MKFILES_ROOT)/qtargets.mk

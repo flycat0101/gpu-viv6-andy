@@ -33,3 +33,4 @@ VX_INTERNAL_API vx_status vxoTarget_Unload(vx_context context, vx_uint32 index, 
 EXTERN_C_END
 
 #endif /* __GC_VX_TARGET_H__ */
+

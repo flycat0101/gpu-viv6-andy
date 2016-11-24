@@ -184,6 +184,9 @@ struct __GLmipMapLevelRec
     /* Requested internal format */
     GLint requestedFormat;
 
+    /* internal format */
+    GLint interalFormat;
+
     /* Base internal format */
     GLenum baseFormat;
 
@@ -457,5 +460,7 @@ typedef struct __GLimageStateRec
 {
     __GLimageUnitState  imageUnit[__GL_MAX_IMAGE_UNITS];
 } __GLimageState;
+
+extern GLvoid __glUnBindTextureBuffer(__GLcontext *gc, __GLtextureObject *tex, __GLbufferObject *bufObj);
 
 #endif /* __gc_es_texture_h__ */

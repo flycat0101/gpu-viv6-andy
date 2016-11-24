@@ -214,6 +214,9 @@ yylex(
     );
 
 void
+yyInitScanner(void);
+
+void
 slScanDeleteBuffer(
 IN sloCOMPILER Compiler
 );

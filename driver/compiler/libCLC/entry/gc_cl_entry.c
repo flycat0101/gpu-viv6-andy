@@ -67,10 +67,11 @@ static void __clChipUtilsDecrypt( IN OUT gctSTRING Source)
 */
 gceSTATUS
 gcLoadKernelCompiler(
-void
-)
+    IN gcsHWCaps *HWCaps
+    )
 {
     gceSTATUS status;
+
 #if cldPatchKernel
     lookup * lookup;
 
@@ -80,9 +81,18 @@ void
         __clChipUtilsDecrypt(lookup->source2);
     }
 #endif
-    status = cloCOMPILER_Load();
-    if (gcmIS_ERROR(status)) return status;
-    return gcInitializeRecompilation();
+
+    if (HWCaps)
+    {
+        *gcGetHWCaps() = *HWCaps;
+    }
+
+    gcmONERROR(cloCOMPILER_Load());
+
+    gcmONERROR(gcInitializeRecompilation());
+
+OnError:
+    return status;
 }
 
 /*******************************************************************************

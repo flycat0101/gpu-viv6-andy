@@ -1,0 +1,51 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# This is the SOURCES file for OpenGL code
+#
+include ../../makefile.linux.def
+
+STATIC = 1
+TARGET_NAME=libgl4chip.a
+
+OBJECTS = \
+    $(OBJ_DIR)/gc_chip_basic_types.o \
+    $(OBJ_DIR)/gc_chip_buffer.o \
+    $(OBJ_DIR)/gc_chip_clear.o \
+    $(OBJ_DIR)/gc_chip_codec.o \
+    $(OBJ_DIR)/gc_chip_context.o \
+    $(OBJ_DIR)/gc_chip_depth.o \
+    $(OBJ_DIR)/gc_chip_device.o \
+    $(OBJ_DIR)/gc_chip_draw.o \
+    $(OBJ_DIR)/gc_chip_drawable.o \
+    $(OBJ_DIR)/gc_chip_fbo.o \
+    $(OBJ_DIR)/gc_chip_misc.o \
+    $(OBJ_DIR)/gc_chip_patch.o \
+    $(OBJ_DIR)/gc_chip_pixel.o \
+    $(OBJ_DIR)/gc_chip_profiler.o \
+    $(OBJ_DIR)/gc_chip_hash.o \
+    $(OBJ_DIR)/gc_chip_fragment_shader.o \
+    $(OBJ_DIR)/gc_chip_func.o \
+    $(OBJ_DIR)/gc_chip_vertex_shader.o \
+    $(OBJ_DIR)/gc_chip_shader.o \
+    $(OBJ_DIR)/gc_chip_state.o \
+    $(OBJ_DIR)/gc_chip_texture.o \
+    $(OBJ_DIR)/gc_chip_utils.o
+
+ifeq ($(gcdSTATIC_LINK), 1)
+INSTALL_DIR = $(SDK_DIR)/drivers
+endif
+
+include $(AQROOT)/common.target
+

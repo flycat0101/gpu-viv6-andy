@@ -19,7 +19,9 @@
    Note this BMS is built on PMP (primary memory pool system).
 */
 
-#define BMS_GET_BUDDY_BLOCK_PTR(pAvailListNode)    ((VSC_BUDDY_MEM_BLOCK_NODE*)vscBLNDEXT_GetContainedUserData((pAvailListNode)))
+#define BMS_GET_BUDDY_BLOCK_PTR(pAvailListNode)    ((pAvailListNode) ? \
+                                                    (VSC_BUDDY_MEM_BLOCK_NODE*)vscBLNDEXT_GetContainedUserData((pAvailListNode)) : \
+                                                    (VSC_BUDDY_MEM_BLOCK_NODE*)gcvNULL)
 
 /* Global buddy mem sys counter */
 static gctINT bmsCounter = 0;
@@ -428,6 +430,8 @@ void vscBMS_Initialize(VSC_BUDDY_MEM_SYS* pBMS, VSC_PRIMARY_MEM_POOL* pBaseMemPo
     pBMS->overSizedFreedTimes = 0;
 
     vscMM_Initialize(&pBMS->mmWrapper, pBMS, VSC_MM_TYPE_BMS);
+
+    pBMS->flags.bInitialized = gcvTRUE;
 }
 
 void* vscBMS_Alloc(VSC_BUDDY_MEM_SYS* pBMS, gctUINT reqSize)
@@ -490,12 +494,18 @@ void* vscBMS_Realloc(VSC_BUDDY_MEM_SYS* pBMS, void* pOrgAddress, gctUINT newReqS
     gctUINT                   orgReqSizeWithHeader, newReqSizeWithHeader;
     gctINT                    orgLog2Size, newLog2Size;
 
+    if (pOrgAddress == gcvNULL)
+    {
+        /* If pOrgAddress is NULL, realloc behaves the same way as malloc
+         * and allocates a new block of newReqSize bytes */
+        return vscBMS_Alloc(pBMS, newReqSize);
+    }
+
     /* Retrieve block corresponding to requested memory content */
     pOrgBlock = (VSC_BUDDY_MEM_BLOCK_NODE *)((gctUINT8*)pOrgAddress - BUDDY_BLOCK_HEADER_SIZE);
-    gcmASSERT(newReqSize >= pOrgBlock->blkHeader.cmnBlkHeader.userReqSize);
 
     /* Just return original if no resize */
-    if (newReqSize == pOrgBlock->blkHeader.cmnBlkHeader.userReqSize)
+    if (newReqSize <= pOrgBlock->blkHeader.cmnBlkHeader.userReqSize)
     {
         return pOrgAddress;
     }
@@ -627,6 +637,12 @@ void vscBMS_Finalize(VSC_BUDDY_MEM_SYS* pBMS, gctBOOL bDeleteHugeUnderlyingMem)
 {
     gctINT i;
 
+    /* No need to go on if it was not initialized before */
+    if (!pBMS->flags.bInitialized)
+    {
+        return;
+    }
+
     for (i = 0; i <= LOG2_MAX_BUDDY_BLOCK_SIZE; i++)
     {
         vscBILST_Finalize(&pBMS->freeAvailList[i]);
@@ -639,9 +655,17 @@ void vscBMS_Finalize(VSC_BUDDY_MEM_SYS* pBMS, gctBOOL bDeleteHugeUnderlyingMem)
     }
 
     vscMM_Finalize(&pBMS->mmWrapper);
+
+    pBMS->flags.bInitialized = gcvFALSE;
 }
 
 void vscBMS_PrintStatistics(VSC_BUDDY_MEM_SYS* pBMS)
 {
 }
+
+gctBOOL vscBMS_IsInitialized(VSC_BUDDY_MEM_SYS* pBMS)
+{
+    return pBMS->flags.bInitialized;
+}
+
 

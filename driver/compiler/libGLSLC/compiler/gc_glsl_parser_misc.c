@@ -165,19 +165,10 @@ sloCOMPILER_Parse(
     gcoOS_ZeroMemory(&token, gcmSIZEOF(token));
 #endif
 
-    status = sloCOMPILER_Lock(Compiler);
-
-    if (gcmIS_ERROR(status))
-    {
-        gcmFOOTER();
-        return status;
-    }
-
     status = sloCOMPILER_MakeCurrent(Compiler, StringCount, Strings);
 
     if (gcmIS_ERROR(status))
     {
-        gcmVERIFY_OK(sloCOMPILER_Unlock(Compiler));
         gcmFOOTER();
         return status;
     }
@@ -189,7 +180,8 @@ sloCOMPILER_Parse(
 
         globalSpace = sloCOMPILER_GetGlobalSpace(Compiler);
         parentSpace = globalSpace->parent;
-        if(parentSpace) {
+        if(parentSpace)
+        {
             /* Propogate default precision value from parent */
 
             gcoOS_MemCopy(globalSpace->defaultPrecision,
@@ -201,13 +193,12 @@ sloCOMPILER_Parse(
 #ifdef SL_SCAN_ONLY
     while (sloCOMPILER_Scan(Compiler, &token) != T_EOF);
 #else
+    yyInitScanner();
     yyrestart(gcvNULL);
 
     if (yyparse(Compiler) != 0) status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
     slScanDeleteBuffer(Compiler);
 #endif
-
-    gcmVERIFY_OK(sloCOMPILER_Unlock(Compiler));
 
     gcmFOOTER();
     return status;
@@ -269,7 +260,7 @@ _CheckErrorForArraysOfArrays(
     gcmHEADER_ARG("Compiler=0x%x Identifier=0x%x DataType=0x%x",
                   Compiler, Identifier, DataType);
 
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+    shaderType = Compiler->shaderType;
 
     if (DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_IN &&
         shaderType != slvSHADER_TYPE_TCS &&
@@ -720,7 +711,8 @@ slParseVariableIdentifier(
         return gcvNULL;
     }
 
-    if(name->dataType->qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM_BLOCK_MEMBER) {
+    if(name->dataType->qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM_BLOCK_MEMBER)
+    {
         status = _SetUniformBlockMemberActive(name->u.variableInfo.interfaceBlock, 0, name);
         if (gcmIS_ERROR(status)) {
             gcmFOOTER_ARG("<return>=%s", "<nil>");
@@ -1401,11 +1393,14 @@ _CheckErrorForSubscriptExpr(
             }
         }
     }
-    else  {
-        if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+    else
+    {
+        if (sloCOMPILER_IsHaltiVersion(Compiler))
+        {
             if(slsDATA_TYPE_IsUnderlyingInterfaceBlock(LeftOperand->dataType) &&
                !slsDATA_TYPE_IsUnderlyingIOBlock(LeftOperand->dataType) &&
-               !sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_GPU_SHADER5)) {
+               !sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_GPU_SHADER5))
+            {
                 gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                 RightOperand->base.lineNo,
                                                 RightOperand->base.stringNo,
@@ -1415,6 +1410,7 @@ _CheckErrorForSubscriptExpr(
                 gcmFOOTER();
                 return status;
             }
+
             if(LeftOperand->dataType->qualifiers.storage == slvSTORAGE_QUALIFIER_FRAGMENT_OUT)
             {
                 gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
@@ -1468,7 +1464,6 @@ slParseSubscriptExpr(
     gcmHEADER_ARG("Compiler=0x%x LeftOperand=0x%x RightOperand=0x%x",
                   Compiler, LeftOperand, RightOperand);
 
-
     if (LeftOperand == gcvNULL || RightOperand == gcvNULL)
     {
         gcmFOOTER_ARG("<return>=%s", "<nil>");
@@ -1513,6 +1508,7 @@ slParseSubscriptExpr(
                                         Compiler,
                                         LeftOperand->base.lineNo,
                                         LeftOperand->base.stringNo,
+                                        LeftOperand->base.lineNo,
                                         slvBINARY_SUBSCRIPT,
                                         LeftOperand,
                                         RightOperand,
@@ -1605,8 +1601,8 @@ _CheckErrorAsScalarConstructor(
 
 static gceSTATUS
 _CheckErrorAsArrayConstructor(
-IN sloCOMPILER Compiler,
-IN OUT sloIR_POLYNARY_EXPR PolynaryExpr
+    IN sloCOMPILER Compiler,
+    IN OUT sloIR_POLYNARY_EXPR PolynaryExpr
 )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -1623,17 +1619,20 @@ IN OUT sloIR_POLYNARY_EXPR PolynaryExpr
 
     gcmASSERT(slsDATA_TYPE_IsArray(PolynaryExpr->exprBase.dataType));
 
-    if (PolynaryExpr->operands == gcvNULL) {
+    if (PolynaryExpr->operands == gcvNULL)
+    {
         operandCount = 0;
     }
-    else {
+    else
+    {
         gcmVERIFY_OK(sloIR_SET_GetMemberCount(Compiler,
                                               PolynaryExpr->operands,
                                               &operandCount));
     }
 
     if(PolynaryExpr->exprBase.dataType->arrayLength > 0 &&
-       (gctINT)operandCount != PolynaryExpr->exprBase.dataType->arrayLength) {
+       (gctINT)operandCount != PolynaryExpr->exprBase.dataType->arrayLength)
+    {
         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
@@ -1643,7 +1642,9 @@ IN OUT sloIR_POLYNARY_EXPR PolynaryExpr
         gcmFOOTER();
         return status;
     }
-    if (PolynaryExpr->operands == gcvNULL) {
+
+    if (PolynaryExpr->operands == gcvNULL)
+    {
         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
@@ -1662,7 +1663,8 @@ IN OUT sloIR_POLYNARY_EXPR PolynaryExpr
     refDataType->arrayLength =
     refDataType->arrayLengthList[0] = 0;
 
-    FOR_EACH_DLINK_NODE(&PolynaryExpr->operands->members, struct _sloIR_EXPR, operand) {
+    FOR_EACH_DLINK_NODE(&PolynaryExpr->operands->members, struct _sloIR_EXPR, operand)
+    {
         gcmASSERT(operand);
         gcmASSERT(operand->dataType);
 
@@ -1694,7 +1696,8 @@ IN OUT sloIR_POLYNARY_EXPR PolynaryExpr
             sloIR_EXPR_SetToBeTheSameDataType(operand);
         }
 
-        if (!slsDATA_TYPE_IsInitializableTo(refDataType, operand->toBeDataType)) {
+        if (!slsDATA_TYPE_IsInitializableTo(refDataType, operand->toBeDataType))
+        {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             operand->base.lineNo,
                                             operand->base.stringNo,
@@ -2213,7 +2216,7 @@ _CreateUnnamedConstantExpr(
     gcmASSERT (ConstantExpr);
     if (!slsDATA_TYPE_IsVectorType(DataType) ||
         Constant->variable || Constant->allValuesEqual ||
-        !sloCOMPILER_OptimizationEnabled(Compiler, slvOPTIMIZATION_SHARE_VEC_CONSTANTS))
+        !(Compiler->context.optimizationOptions & slvOPTIMIZATION_SHARE_VEC_CONSTANTS))
     {
        *ConstantExpr = &Constant->exprBase;
        return gcvSTATUS_OK;
@@ -2337,13 +2340,11 @@ slParseFuncCallExprAsExpr(
     case slvPOLYNARY_CONSTRUCT_UINT:
     case slvPOLYNARY_CONSTRUCT_BOOL:
         status = _CheckErrorAsScalarConstructor(Compiler, FuncCall);
-
-    if (gcmIS_ERROR(status))
+        if (gcmIS_ERROR(status))
         {
             gcmFOOTER_ARG("<return>=%s", "<nil>");
             return gcvNULL;
         }
-
         break;
 
     case slvPOLYNARY_CONSTRUCT_ARRAY:
@@ -2377,13 +2378,11 @@ slParseFuncCallExprAsExpr(
     case slvPOLYNARY_CONSTRUCT_UVEC3:
     case slvPOLYNARY_CONSTRUCT_UVEC4:
         status = _CheckErrorAsVectorOrMatrixConstructor(Compiler, FuncCall, gcvTRUE);
-
         if (gcmIS_ERROR(status))
         {
             gcmFOOTER_ARG("<return>=%s", "<nil>");
             return gcvNULL;
         }
-
         break;
 
     case slvPOLYNARY_CONSTRUCT_MAT2:
@@ -2396,18 +2395,15 @@ slParseFuncCallExprAsExpr(
     case slvPOLYNARY_CONSTRUCT_MAT4X2:
     case slvPOLYNARY_CONSTRUCT_MAT4X3:
         status = _CheckErrorAsVectorOrMatrixConstructor(Compiler, FuncCall, gcvFALSE);
-
         if (gcmIS_ERROR(status))
         {
             gcmFOOTER_ARG("<return>=%s", "<nil>");
             return gcvNULL;
         }
-
         break;
 
     case slvPOLYNARY_CONSTRUCT_STRUCT:
         status = _CheckErrorAsStructConstructor(Compiler, FuncCall);
-
         if (gcmIS_ERROR(status))
         {
             gcmFOOTER_ARG("<return>=%s", "<nil>");
@@ -2418,7 +2414,6 @@ slParseFuncCallExprAsExpr(
 
     case slvPOLYNARY_FUNC_CALL:
         status = sloCOMPILER_BindFuncCall(Compiler, FuncCall);
-
         if (gcmIS_ERROR(status))
         {
             gcmFOOTER_ARG("<return>=%s", "<nil>");
@@ -2426,7 +2421,6 @@ slParseFuncCallExprAsExpr(
         }
 
         status = _CheckErrorAsFuncCall(Compiler, FuncCall);
-
         if (gcmIS_ERROR(status))
         {
             gcmFOOTER_ARG("<return>=%s", "<nil>");
@@ -2913,6 +2907,21 @@ slParseFuncCallHeaderExpr(
             return gcvNULL;
         }
 
+        /* check if this is builtin function and if the corresponding extension is enabled */
+        status = sloCOMPILER_BuiltinFuncEnabled(Compiler, funcSymbol);
+        if (gcmIS_ERROR(status))
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                FuncIdentifier->lineNo,
+                FuncIdentifier->stringNo,
+                slvREPORT_ERROR,
+                "invalid call function '%s', require enabling the extension",
+                funcSymbol));
+
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return gcvNULL;
+        }
+
         break;
 
     default:
@@ -2976,6 +2985,81 @@ slParseFuncCallArgument(
 
         if (gcmIS_ERROR(status))
         {
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return gcvNULL;
+        }
+    }
+
+    if (FuncCall->funcSymbol &&
+        gcoOS_StrNCmp(FuncCall->funcSymbol, "imageStore", 10) == gcvSTATUS_OK &&
+        slsDATA_TYPE_IsImage(Argument->dataType) &&
+        Argument->dataType->qualifiers.memoryAccess & slvMEMORY_ACCESS_QUALIFIER_READONLY)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        Argument->base.lineNo,
+                                        Argument->base.stringNo,
+                                        slvREPORT_ERROR,
+                                        "readonly image cannot be used in imageStore"));
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return gcvNULL;
+    }
+
+    if (FuncCall->funcSymbol &&
+        gcoOS_StrNCmp(FuncCall->funcSymbol, "imageLoad", 9) == gcvSTATUS_OK &&
+        slsDATA_TYPE_IsImage(Argument->dataType) &&
+        Argument->dataType->qualifiers.memoryAccess & slvMEMORY_ACCESS_QUALIFIER_WRITEONLY)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        Argument->base.lineNo,
+                                        Argument->base.stringNo,
+                                        slvREPORT_ERROR,
+                                        "writeonly image cannot be used in imageLoad"));
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return gcvNULL;
+    }
+
+    if (FuncCall->funcSymbol &&
+        gcoOS_StrNCmp(FuncCall->funcSymbol, "imageAtomic", 11) == gcvSTATUS_OK &&
+        slsDATA_TYPE_IsImage(Argument->dataType))
+    {
+        if(Argument->dataType->qualifiers.memoryAccess & slvMEMORY_ACCESS_QUALIFIER_READONLY ||
+           Argument->dataType->qualifiers.memoryAccess & slvMEMORY_ACCESS_QUALIFIER_WRITEONLY)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            Argument->base.lineNo,
+                                            Argument->base.stringNo,
+                                            slvREPORT_ERROR,
+                                            "readonly/writeonly image cannot be used in imageAtomicXXX"));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return gcvNULL;
+        }
+        if(slsDATA_TYPE_IsFloatImage(Argument->dataType) && Argument->dataType->qualifiers.layout.imageFormat != slvLAYOUT_IMAGE_FORMAT_R32F)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            Argument->base.lineNo,
+                                            Argument->base.stringNo,
+                                            slvREPORT_ERROR,
+                                            "float image used in imageAtomicXXX must be in r32f format"));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return gcvNULL;
+        }
+        if(slsDATA_TYPE_IsIntImage(Argument->dataType) && Argument->dataType->qualifiers.layout.imageFormat != slvLAYOUT_IMAGE_FORMAT_R32I)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            Argument->base.lineNo,
+                                            Argument->base.stringNo,
+                                            slvREPORT_ERROR,
+                                            "integer image used in imageAtomicXXX must be in r32i format"));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return gcvNULL;
+        }
+        if(slsDATA_TYPE_IsUintImage(Argument->dataType) && Argument->dataType->qualifiers.layout.imageFormat != slvLAYOUT_IMAGE_FORMAT_R32UI)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            Argument->base.lineNo,
+                                            Argument->base.stringNo,
+                                            slvREPORT_ERROR,
+                                            "unsigned integer image used in imageAtomicXXX must be in r32ui format"));
             gcmFOOTER_ARG("<return>=%s", "<nil>");
             return gcvNULL;
         }
@@ -3148,7 +3232,6 @@ slParseAsmAppendModifier(
 
     if (!Modifiers)
     {
-
         gcoOS_MemFill((gctPOINTER)&modifiers, (gctUINT8)-1, sizeof(slsASM_MODIFIERS));
 
         Modifiers = (slsASM_MODIFIERS *) &modifiers;
@@ -3426,6 +3509,7 @@ slParseAsmCreateOpcode(
     else STRING_MATCH_OPCODE(SUB)
     else STRING_MATCH_OPCODE(KILL)
     else STRING_MATCH_OPCODE(TEXLD)
+    else STRING_MATCH_OPCODE(TEXLD_U)
     else STRING_MATCH_OPCODE(CALL)
     else STRING_MATCH_OPCODE(RET)
     else STRING_MATCH_OPCODE(NORM)
@@ -3542,6 +3626,9 @@ slParseAsmCreateOpcode(
     else STRING_MATCH_OPCODE(ARCTRIG0)
     else STRING_MATCH_OPCODE(ARCTRIG1)
     else STRING_MATCH_OPCODE(MUL_Z)
+    else STRING_MATCH_OPCODE(PARAM_CHAIN)
+    else STRING_MATCH_OPCODE(INTRINSIC)
+    else STRING_MATCH_OPCODE(INTRINSIC_ST)
     else {
         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
             Opcode->lineNo,
@@ -3690,18 +3777,21 @@ slParseFieldSelectionExpr(
         fieldName->u.variableInfo.isReferenced = gcvTRUE;
 
         gcmASSERT(fieldName->type == slvFIELD_NAME);
-        if(slsDATA_TYPE_IsUniformBlock(Operand->dataType)) {
+        if(slsDATA_TYPE_IsUniformBlock(Operand->dataType))
+        {
             slsNAME *blockName;
             gctINT arrayIndex;
             status = _GetUniformBlockInfo(Compiler, Operand, &blockName, &arrayIndex);
-            if (gcmIS_ERROR(status)) {
+            if (gcmIS_ERROR(status))
+            {
                 gcmFOOTER_ARG("<return>=%s", "<nil>");
                 return gcvNULL;
             }
             gcmASSERT(fieldName->dataType->qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM_BLOCK_MEMBER);
             gcmASSERT(arrayIndex >= 0 || (arrayIndex == -1 && sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_GPU_SHADER5)));
             status = _SetUniformBlockMemberActive(blockName, arrayIndex, fieldName);
-            if (gcmIS_ERROR(status)) {
+            if (gcmIS_ERROR(status))
+            {
                 gcmFOOTER_ARG("<return>=%s", "<nil>");
                 return gcvNULL;
             }
@@ -3867,7 +3957,7 @@ slParseLengthMethodExpr(
     gcmHEADER_ARG("Compiler=0x%x Operand=0x%x",
                   Compiler, Operand);
 
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+    shaderType = Compiler->shaderType;
 
     if (Operand == gcvNULL)
     {
@@ -3971,7 +4061,7 @@ slParseCheckStorage(
 
     gcmHEADER_ARG("Compiler=0x%x", Compiler);
 
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+    shaderType = Compiler->shaderType;
 
     if (InOrOut.type == T_IN)
     {
@@ -4041,6 +4131,7 @@ slParseFuncDefinitionBegin(
     if (!sloCOMPILER_IsHaltiVersion(Compiler))
     {
         status = sloCOMPILER_CreateNameSpace(Compiler,
+                                             FuncName->symbol,
                                              &nameSpace);
 
         if (gcmIS_ERROR(status))
@@ -4369,7 +4460,7 @@ slParseNormalUnaryExpr(
     case '~':
         if (sloCOMPILER_IsHaltiVersion(Compiler))
         {
-            exprType = slvUNARY_BITWISE_NOT;
+            exprType = slvUNARY_NOT_BITWISE;
 
             /* The operand of operator (~) must be of type signed or unsigned integer or integer vector. */
             status = _CheckErrorForBitwiseNotExpr(
@@ -4566,10 +4657,11 @@ _CheckErrorForArithmeticExpr(
     if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
     {
         status = slMakeImplicitConversionForOperandPair(Compiler,
-                                              LeftOperand,
-                                              RightOperand,
-                                              gcvFALSE);
-        if (gcmIS_ERROR(status)) {
+                                                      LeftOperand,
+                                                      RightOperand,
+                                                      gcvFALSE);
+        if (gcmIS_ERROR(status))
+        {
             return status;
         }
     }
@@ -4784,9 +4876,9 @@ _CheckErrorForRelationalExpr(
     if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
     {
         status = slMakeImplicitConversionForOperandPair(Compiler,
-                                              LeftOperand,
-                                              RightOperand,
-                                              gcvFALSE);
+                                                      LeftOperand,
+                                                      RightOperand,
+                                                      gcvFALSE);
         if (gcmIS_ERROR(status)) {
             return status;
         }
@@ -4875,9 +4967,9 @@ _CheckErrorForEqualityExpr(
     if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
     {
         status = slMakeImplicitConversionForOperandPair(Compiler,
-                                              LeftOperand,
-                                              RightOperand,
-                                              gcvFALSE);
+                                                      LeftOperand,
+                                                      RightOperand,
+                                                      gcvFALSE);
         if (gcmIS_ERROR(status)) {
             return status;
         }
@@ -4960,138 +5052,146 @@ _CheckBitwiseShiftExpr(
     IN sloIR_EXPR RightOperand
 )
 {
-  gceSTATUS status = gcvSTATUS_OK;
+    gceSTATUS status = gcvSTATUS_OK;
 
-  gcmHEADER_ARG("Compiler=0x%x LeftOperand=0x%x RightOperand=0x%x",
-                  Compiler, LeftOperand, RightOperand);
+    gcmHEADER_ARG("Compiler=0x%x LeftOperand=0x%x RightOperand=0x%x",
+        Compiler, LeftOperand, RightOperand);
 
-  gcmASSERT(LeftOperand);
-  gcmASSERT(LeftOperand->dataType);
-  gcmASSERT(RightOperand);
-  gcmASSERT(RightOperand->dataType);
+    gcmASSERT(LeftOperand);
+    gcmASSERT(LeftOperand->dataType);
+    gcmASSERT(RightOperand);
+    gcmASSERT(RightOperand->dataType);
 
-  if(!slmDATA_TYPE_IsIntegerType(LeftOperand->dataType)) {
-    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                    LeftOperand->base.lineNo,
-                    LeftOperand->base.stringNo,
-                    slvREPORT_ERROR,
-                    "require an integer expression"));
+    if(!slmDATA_TYPE_IsIntegerType(LeftOperand->dataType))
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        LeftOperand->base.lineNo,
+                                        LeftOperand->base.stringNo,
+                                        slvREPORT_ERROR,
+                                        "require an integer expression"));
         status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
         gcmFOOTER();
         return status;
-  }
+    }
 
-  if(!slmDATA_TYPE_IsIntegerType(RightOperand->dataType)) {
-    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                    RightOperand->base.lineNo,
-                    RightOperand->base.stringNo,
-                    slvREPORT_ERROR,
-                    "require an integer expression"));
+    if(!slmDATA_TYPE_IsIntegerType(RightOperand->dataType))
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        RightOperand->base.lineNo,
+                                        RightOperand->base.stringNo,
+                                        slvREPORT_ERROR,
+                                        "require an integer expression"));
         status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
         gcmFOOTER();
         return status;
-  }
+    }
 
-  if (slsDATA_TYPE_IsScalar(LeftOperand->dataType)) {
-       if(!slsDATA_TYPE_IsScalar(RightOperand->dataType)) {
+    if (slsDATA_TYPE_IsScalar(LeftOperand->dataType))
+    {
+        if(!slsDATA_TYPE_IsScalar(RightOperand->dataType))
+        {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             RightOperand->base.lineNo,
                                             RightOperand->base.stringNo,
-                            slvREPORT_ERROR,
-                            "Right operand of shift operator has to be scalar to match with the left operand"));
+                                            slvREPORT_ERROR,
+                                            "Right operand of shift operator has to be scalar to match with the left operand"));
             status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
             gcmFOOTER();
             return status;
-       }
-  }
-  else if(slsDATA_TYPE_IsVectorType(LeftOperand->dataType)) {
-      if(slsDATA_TYPE_IsVectorType(RightOperand->dataType)) {
-          if(slmDATA_TYPE_vectorSize_NOCHECK_GET(LeftOperand->dataType) !=
-             slmDATA_TYPE_vectorSize_NOCHECK_GET(RightOperand->dataType)) {
-             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                             LeftOperand->base.lineNo,
-                             LeftOperand->base.stringNo,
-                             slvREPORT_ERROR,
-                             "require the right and left operands of matching vector size"));
-             status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
-             gcmFOOTER();
-             return status;
-         }
-     }
-     else if (!slsDATA_TYPE_IsScalar(RightOperand->dataType)) {
-         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                         RightOperand->base.lineNo,
-                                         RightOperand->base.stringNo,
-                         slvREPORT_ERROR,
-                         "require the right operand of shift operator to be scalar to match with the left operand"));
-         status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
-         gcmFOOTER();
-         return status;
-     }
-  }
+        }
+    }
+    else if(slsDATA_TYPE_IsVectorType(LeftOperand->dataType))
+    {
+        if(slsDATA_TYPE_IsVectorType(RightOperand->dataType))
+        {
+            if(slmDATA_TYPE_vectorSize_NOCHECK_GET(LeftOperand->dataType) !=
+                slmDATA_TYPE_vectorSize_NOCHECK_GET(RightOperand->dataType))
+            {
+                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                LeftOperand->base.lineNo,
+                                                LeftOperand->base.stringNo,
+                                                slvREPORT_ERROR,
+                                                "require the right and left operands of matching vector size"));
+                status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+                gcmFOOTER();
+                return status;
+            }
+        }
+        else if (!slsDATA_TYPE_IsScalar(RightOperand->dataType))
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            RightOperand->base.lineNo,
+                                            RightOperand->base.stringNo,
+                                            slvREPORT_ERROR,
+                                            "require the right operand of shift operator to be scalar to match with the left operand"));
+            status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            gcmFOOTER();
+            return status;
+        }
+    }
 
-  gcmFOOTER_NO();
-  return gcvSTATUS_OK;
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
 }
 
 static gceSTATUS
 _CheckAssignImplicitOperability(
-IN sloCOMPILER Compiler,
-IN sloIR_EXPR LeftOperand,
-IN sloIR_EXPR RightOperand
-)
+    IN sloCOMPILER Compiler,
+    IN sloIR_EXPR LeftOperand,
+    IN sloIR_EXPR RightOperand
+    )
 {
-  gceSTATUS status = gcvSTATUS_OK;
-  slsDATA_TYPE *leftDataType;
-  slsDATA_TYPE *rightDataType;
+    gceSTATUS status = gcvSTATUS_OK;
+    slsDATA_TYPE *leftDataType;
+    slsDATA_TYPE *rightDataType;
 
-  gcmHEADER_ARG("Compiler=0x%x LeftOperand=0x%x RightOperand=0x%x",
-                  Compiler, LeftOperand, RightOperand);
+    gcmHEADER_ARG("Compiler=0x%x LeftOperand=0x%x RightOperand=0x%x",
+                   Compiler, LeftOperand, RightOperand);
 
-  gcmASSERT(LeftOperand->dataType);
-  gcmASSERT(RightOperand->dataType);
+    gcmASSERT(LeftOperand->dataType);
+    gcmASSERT(RightOperand->dataType);
 
-  leftDataType = LeftOperand->dataType;
-  rightDataType = RightOperand->dataType;
+    leftDataType = LeftOperand->dataType;
+    rightDataType = RightOperand->dataType;
 
-  /* Check the operands */
-  if(!slmDATA_TYPE_IsArithmeticType(leftDataType)) {
-    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                    LeftOperand->base.lineNo,
-                                    LeftOperand->base.stringNo,
-                                    slvREPORT_ERROR,
-                                    "arithmetic operand required"));
-    status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
-    gcmFOOTER();
-    return status;
-  }
-  if(!slmDATA_TYPE_IsArithmeticType(rightDataType)) {
-    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                    RightOperand->base.lineNo,
-                                    RightOperand->base.stringNo,
-                                    slvREPORT_ERROR,
-                                    "arithmetic operand required"));
-    status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
-    gcmFOOTER();
-    return status;
-  }
-
-  if(slsDATA_TYPE_IsVectorType(leftDataType)) {
-    if(!slsDATA_TYPE_IsScalar(rightDataType) &&
-       !slmDATA_TYPE_IsSameVectorType(leftDataType, rightDataType)) {
-            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                            RightOperand->base.lineNo,
-                            RightOperand->base.stringNo,
-                            slvREPORT_ERROR,
-                            "require a scalar or a matching vector typed expression"));
-         status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
-         gcmFOOTER();
-         return status;
+    /* Check the operands */
+    if(!slmDATA_TYPE_IsArithmeticType(leftDataType)) {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        LeftOperand->base.lineNo,
+                                        LeftOperand->base.stringNo,
+                                        slvREPORT_ERROR,
+                                        "arithmetic operand required"));
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        gcmFOOTER();
+        return status;
     }
-  }
+    if(!slmDATA_TYPE_IsArithmeticType(rightDataType)) {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        RightOperand->base.lineNo,
+                                        RightOperand->base.stringNo,
+                                        slvREPORT_ERROR,
+                                        "arithmetic operand required"));
+        status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        gcmFOOTER();
+        return status;
+    }
 
-  gcmFOOTER_NO();
-  return gcvSTATUS_OK;
+    if(slsDATA_TYPE_IsVectorType(leftDataType)) {
+        if(!slsDATA_TYPE_IsScalar(rightDataType) &&
+            !slmDATA_TYPE_IsSameVectorType(leftDataType, rightDataType)) {
+                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                RightOperand->base.lineNo,
+                                                RightOperand->base.stringNo,
+                                                slvREPORT_ERROR,
+                                                "require a scalar or a matching vector typed expression"));
+                status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+                gcmFOOTER();
+                return status;
+        }
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
 }
 
 static gceSTATUS
@@ -5306,6 +5406,7 @@ slParseNormalBinaryExpr(
         gcmFOOTER_ARG("<return>=%s", "<nil>");
         return gcvNULL;
     }
+
     /* check if the left operand is writeonly */
     if ((LeftOperand->dataType->qualifiers.memoryAccess & slvMEMORY_ACCESS_QUALIFIER_WRITEONLY) != 0)
     {
@@ -5320,6 +5421,7 @@ slParseNormalBinaryExpr(
         gcmFOOTER_ARG("<return>=%s", "<nil>");
         return gcvNULL;
     }
+
     if ((RightOperand->dataType->qualifiers.memoryAccess & slvMEMORY_ACCESS_QUALIFIER_WRITEONLY) != 0)
     {
         gcmVERIFY_OK(sloCOMPILER_Report(
@@ -5337,7 +5439,8 @@ slParseNormalBinaryExpr(
     switch (Operator->u.operator)
     {
     case '%':
-        if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+        if (sloCOMPILER_IsHaltiVersion(Compiler))
+        {
             status = _CheckErrorForArithmeticExpr(Compiler,
                                                   gcvFALSE,
                                                   LeftOperand,
@@ -5350,7 +5453,8 @@ slParseNormalBinaryExpr(
             }
             exprType = slvBINARY_MOD;
         }
-        else {
+        else
+        {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             Operator->lineNo,
                                             Operator->stringNo,
@@ -5359,36 +5463,42 @@ slParseNormalBinaryExpr(
                                             _GetBinaryOperatorName(Operator->u.operator)));
 
             gcmFOOTER_ARG("<return>=%s", "<nil>");
-        return gcvNULL;
+            return gcvNULL;
         }
         break;
 
     case '&':
     case '^':
     case '|':
-        if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+        if (sloCOMPILER_IsHaltiVersion(Compiler))
+        {
              status = _CheckBitwiseLogicalExpr(Compiler,
                                                LeftOperand,
                                                RightOperand);
-             if (gcmIS_ERROR(status)) {
+
+             if (gcmIS_ERROR(status))
+             {
                   gcmFOOTER_ARG("<return>=%s", "<nil>");
-              return gcvNULL;
+                  return gcvNULL;
              }
-             switch (Operator->u.operator) {
+
+             switch (Operator->u.operator)
+             {
              case '&':
-                  exprType = slvBINARY_BITWISE_AND;
+                  exprType = slvBINARY_AND_BITWISE;
                   break;
 
              case '|':
-                  exprType = slvBINARY_BITWISE_OR;
+                  exprType = slvBINARY_OR_BITWISE;
                   break;
 
              case '^':
-                  exprType = slvBINARY_BITWISE_XOR;
+                  exprType = slvBINARY_XOR_BITWISE;
                   break;
              }
         }
-        else {
+        else
+        {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             Operator->lineNo,
                                             Operator->stringNo,
@@ -5397,22 +5507,25 @@ slParseNormalBinaryExpr(
                                             _GetBinaryOperatorName(Operator->u.operator)));
 
             gcmFOOTER_ARG("<return>=%s", "<nil>");
-        return gcvNULL;
+            return gcvNULL;
         }
         break;
 
     case T_LEFT_OP:
     case T_RIGHT_OP:
-        if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+        if (sloCOMPILER_IsHaltiVersion(Compiler))
+        {
              status = _CheckBitwiseShiftExpr(Compiler,
                                              LeftOperand,
                                              RightOperand);
-             if (gcmIS_ERROR(status)) {
+             if (gcmIS_ERROR(status))
+             {
                   gcmFOOTER_ARG("<return>=%s", "<nil>");
-              return gcvNULL;
+                  return gcvNULL;
              }
 
-             switch (Operator->u.operator) {
+             switch (Operator->u.operator)
+             {
              case T_LEFT_OP:
                   exprType = slvBINARY_LSHIFT;
                   break;
@@ -5422,7 +5535,8 @@ slParseNormalBinaryExpr(
                   break;
              }
         }
-        else {
+        else
+        {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             Operator->lineNo,
                                             Operator->stringNo,
@@ -5431,7 +5545,7 @@ slParseNormalBinaryExpr(
                                             _GetBinaryOperatorName(Operator->u.operator)));
 
             gcmFOOTER_ARG("<return>=%s", "<nil>");
-        return gcvNULL;
+            return gcvNULL;
         }
         break;
 
@@ -5498,7 +5612,7 @@ slParseNormalBinaryExpr(
                                         LeftOperand,
                                         RightOperand);
 
-    if (gcmIS_ERROR(status))
+        if (gcmIS_ERROR(status))
         {
             gcmFOOTER_ARG("<return>=%s", "<nil>");
             return gcvNULL;
@@ -5521,7 +5635,7 @@ slParseNormalBinaryExpr(
                                         LeftOperand,
                                         RightOperand);
 
-    if (gcmIS_ERROR(status))
+        if (gcmIS_ERROR(status))
         {
             gcmFOOTER_ARG("<return>=%s", "<nil>");
             return gcvNULL;
@@ -5563,6 +5677,7 @@ slParseNormalBinaryExpr(
     {
         LeftOperand = _MakeImplicitConversionExpr(Compiler, LeftOperand);
     }
+
     if (sloIR_EXPR_ImplicitConversionDone(RightOperand))
     {
         RightOperand = _MakeImplicitConversionExpr(Compiler, RightOperand);
@@ -5595,6 +5710,7 @@ slParseNormalBinaryExpr(
                                         Compiler,
                                         LeftOperand->base.lineNo,
                                         LeftOperand->base.stringNo,
+                                        LeftOperand->base.lineNo,
                                         exprType,
                                         LeftOperand,
                                         RightOperand,
@@ -5747,12 +5863,15 @@ slParseSelectionExpr(
     }
 
     if(slmDATA_TYPE_IsHigherPrecision(FalseOperand->dataType,
-                                      TrueOperand->dataType)) {
+                                      TrueOperand->dataType))
+    {
         precision = FalseOperand->dataType->qualifiers.precision;
     }
-    else {
+    else
+    {
         precision = TrueOperand->dataType->qualifiers.precision;
     }
+
     /* Create the selection */
     status = sloCOMPILER_CloneDataType(Compiler,
                                        slvSTORAGE_QUALIFIER_CONST,
@@ -5868,9 +5987,9 @@ _CheckErrorForAssignmentExpr(
     if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
     {
         status = slMakeImplicitConversionForOperandPair(Compiler,
-                                              LeftOperand,
-                                              RightOperand,
-                                              gcvTRUE);
+                                                      LeftOperand,
+                                                      RightOperand,
+                                                      gcvTRUE);
         if (gcmIS_ERROR(status)) {
             return status;
         }
@@ -5959,10 +6078,11 @@ _CheckErrorForArithmeticAssignmentExpr(
     if(sloCOMPILER_ExtensionEnabled(Compiler, slvEXTENSION_EXT_SHADER_IMPLICIT_CONVERSIONS))
     {
         status = slMakeImplicitConversionForOperandPair(Compiler,
-                                              LeftOperand,
-                                              RightOperand,
-                                              gcvTRUE);
-        if (gcmIS_ERROR(status)) {
+                                                        LeftOperand,
+                                                        RightOperand,
+                                                        gcvTRUE);
+        if (gcmIS_ERROR(status))
+        {
             return status;
         }
     }
@@ -6089,10 +6209,10 @@ _CheckErrorForArithmeticAssignmentExpr(
 
 static gceSTATUS
 _CheckLogicalAssignmentExpr(
-IN sloCOMPILER Compiler,
-IN slsLexToken *Operator,
-IN sloIR_EXPR LeftOperand,
-IN sloIR_EXPR RightOperand
+    IN sloCOMPILER Compiler,
+    IN slsLexToken *Operator,
+    IN sloIR_EXPR LeftOperand,
+    IN sloIR_EXPR RightOperand
 )
 {
   gceSTATUS status;
@@ -6115,7 +6235,8 @@ IN sloIR_EXPR RightOperand
   }
 
   if(Operator->u.operator == T_LEFT_ASSIGN ||
-     Operator->u.operator == T_RIGHT_ASSIGN) {
+     Operator->u.operator == T_RIGHT_ASSIGN)
+  {
      status = _CheckBitwiseShiftExpr(Compiler,
                                      LeftOperand,
                                      RightOperand);
@@ -6125,9 +6246,11 @@ IN sloIR_EXPR RightOperand
          return status;
      }
   }
-  else {
-     if (!slsDATA_TYPE_IsIntOrIVec(LeftOperand->dataType)) {
-    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+  else
+  {
+     if (!slsDATA_TYPE_IsIntOrIVec(LeftOperand->dataType))
+     {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                     LeftOperand->base.lineNo,
                     LeftOperand->base.stringNo,
                     slvREPORT_ERROR,
@@ -6137,8 +6260,9 @@ IN sloIR_EXPR RightOperand
         return status;
      }
 
-     if (!slsDATA_TYPE_IsIntOrIVec(RightOperand->dataType)) {
-    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+     if (!slsDATA_TYPE_IsIntOrIVec(RightOperand->dataType))
+     {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                     RightOperand->base.lineNo,
                     RightOperand->base.stringNo,
                     slvREPORT_ERROR,
@@ -6147,6 +6271,7 @@ IN sloIR_EXPR RightOperand
         gcmFOOTER();
         return status;
      }
+
      status =  _CheckAssignImplicitOperability(Compiler,
                                                RightOperand,
                                                LeftOperand);
@@ -6189,16 +6314,20 @@ slParseAssignmentExpr(
     case T_AND_ASSIGN:
     case T_XOR_ASSIGN:
     case T_OR_ASSIGN:
-        if (sloCOMPILER_IsHaltiVersion(Compiler)) {
-            if (Operator->u.operator == T_MOD_ASSIGN) {
+        if (sloCOMPILER_IsHaltiVersion(Compiler))
+        {
+            if (Operator->u.operator == T_MOD_ASSIGN)
+            {
                  exprType = slvBINARY_MOD_ASSIGN;
                  status = _CheckErrorForArithmeticAssignmentExpr(Compiler,
                                                                  gcvFALSE,
                                                                  LeftOperand,
                                                                  RightOperand);
             }
-            else {
-                 switch(Operator->u.operator) {
+            else
+            {
+                 switch(Operator->u.operator)
+                 {
                  case T_LEFT_ASSIGN:
                       exprType = slvBINARY_LEFT_ASSIGN;
                       break;
@@ -6221,12 +6350,15 @@ slParseAssignmentExpr(
                                                       LeftOperand,
                                                       RightOperand);
             }
-            if (gcmIS_ERROR(status)) {
+
+            if (gcmIS_ERROR(status))
+            {
                 gcmFOOTER_ARG("<return>=%s", "<nil>");
                 return gcvNULL;
             }
         }
-        else {
+        else
+        {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             Operator->lineNo,
                                             Operator->stringNo,
@@ -6294,6 +6426,7 @@ slParseAssignmentExpr(
     status = sloIR_BINARY_EXPR_Construct(Compiler,
                                          LeftOperand->base.lineNo,
                                          LeftOperand->base.stringNo,
+                                         LeftOperand->base.lineNo,
                                          exprType,
                                          LeftOperand,
                                          RightOperand,
@@ -6601,7 +6734,7 @@ _ParseUpdateHaltiQualifiers(
 
     gcmASSERT(DataType);
 
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+    shaderType = Compiler->shaderType;
 
     if (DataType->qualifiers.layout.id  != slvLAYOUT_NONE &&
         storage== slvSTORAGE_QUALIFIER_UNIFORM &&
@@ -6834,7 +6967,7 @@ _CheckDataTypePrecision(
     gcmHEADER_ARG("Compiler=0x%x DataType=0x%x Identifier=0x%x",
                   Compiler, DataType, Identifier);
 
-    clientVersion = sloCOMPILER_GetClientApiVersion(Compiler);
+    clientVersion = Compiler->clientApiVersion;
 
     if(clientVersion == gcvAPI_OPENGL)
     {
@@ -6843,16 +6976,21 @@ _CheckDataTypePrecision(
     }
 
     if(slmIsElementTypeFloating(DataType->elementType) &&
-       DataType->qualifiers.precision == slvPRECISION_QUALIFIER_DEFAULT) {
+       DataType->qualifiers.precision == slvPRECISION_QUALIFIER_DEFAULT)
+    {
        sleSHADER_TYPE shaderType;
 
-       gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
-       if(shaderType == slvSHADER_TYPE_FRAGMENT) {
-           if (sloCOMPILER_IsHaltiVersion(Compiler)) {
-               if(gcmGetOptimizerOption()->fragmentFPPrecision != gcSHADER_PRECISION_DEFAULT) {
+        shaderType = Compiler->shaderType;
+        if(shaderType == slvSHADER_TYPE_FRAGMENT)
+        {
+           if (sloCOMPILER_IsHaltiVersion(Compiler))
+           {
+               if(gcmGetOptimizerOption()->fragmentFPPrecision != gcSHADER_PRECISION_DEFAULT)
+               {
                    gctSTRING precisionStr;
 
-                   switch (gcmGetOptimizerOption()->fragmentFPPrecision) {
+                   switch (gcmGetOptimizerOption()->fragmentFPPrecision)
+                   {
                    case gcSHADER_PRECISION_HIGH:
                        DataType->qualifiers.precision = slvPRECISION_QUALIFIER_HIGH;
                        precisionStr = "highp";
@@ -6888,7 +7026,8 @@ _CheckDataTypePrecision(
                                                    " set to %s as given by VC_OPTION -FRAGMENT_FP_PRECISION",
                                                    Identifier->u.identifier, precisionStr));
                }
-               else {
+               else
+               {
                    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                    Identifier->lineNo,
                                                    Identifier->stringNo,
@@ -6899,7 +7038,8 @@ _CheckDataTypePrecision(
                    status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
                }
            }
-           else {
+           else
+           {
                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                Identifier->lineNo,
                                                Identifier->stringNo,
@@ -6911,7 +7051,7 @@ _CheckDataTypePrecision(
        }
     }
     else if ((slsDATA_TYPE_IsSampler(DataType) || slsDATA_TYPE_IsImage(DataType)) &&
-             DataType->qualifiers.precision == slvPRECISION_QUALIFIER_DEFAULT )
+             DataType->qualifiers.precision == slvPRECISION_QUALIFIER_DEFAULT)
     {
         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                         Identifier->lineNo,
@@ -6937,13 +7077,14 @@ _CheckQualifiers(
     sleSHADER_TYPE shaderType;
     gctUINT lineNo = sloCOMPILER_GetCurrentLineNo(Compiler);
     gctUINT stringNo = sloCOMPILER_GetCurrentStringNo(Compiler);
-    gceAPI clientVersion = sloCOMPILER_GetClientApiVersion(Compiler);
+    gceAPI clientVersion = Compiler->clientApiVersion;
     gcmHEADER_ARG("Compiler=0x%x Qualifiers=0x%x",
                   Compiler, Qualifiers);
 
     gcmASSERT(Qualifiers);
 
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+    shaderType = Compiler->shaderType;
+
     if(Qualifiers->u.qualifiers.storage == slvSTORAGE_QUALIFIER_SHARED &&
        shaderType != slvSHADER_TYPE_COMPUTE)
     {
@@ -7175,7 +7316,8 @@ _ParseVariableDecl(
     gcmASSERT(DataType);
     gcmASSERT(Identifier);
 
-    if(DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_CONST) {
+    if(DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_CONST)
+    {
         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                         Identifier->lineNo,
                                         Identifier->stringNo,
@@ -7233,7 +7375,8 @@ _ParseVariableDecl(
         return status;
     }
 
-    if(DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_SHARED) {
+    if(DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_SHARED)
+    {
         status = sloCOMPILER_AddSharedVariable(Compiler,
                                                variableName);
         if (gcmIS_ERROR(status))
@@ -7284,11 +7427,14 @@ _ParseArrayVariableDecl(
         return status;
     }
 
-    if (DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_ATTRIBUTE) {
+    if (DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_ATTRIBUTE)
+    {
         sleSHADER_TYPE shaderType;
 
-        gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
-        if(shaderType == slvSHADER_TYPE_VERTEX) {
+        shaderType = Compiler->shaderType;
+
+        if(shaderType == slvSHADER_TYPE_VERTEX)
+        {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                            Identifier->lineNo,
                                            Identifier->stringNo,
@@ -7307,7 +7453,8 @@ _ParseArrayVariableDecl(
                                 DataType,
                                 Identifier);
 
-    if (gcmIS_ERROR(status)) {
+    if (gcmIS_ERROR(status))
+    {
         gcmFOOTER();
         return status;
     }
@@ -7421,6 +7568,7 @@ _ParseVariableDeclWithInitializer(
                                             Compiler,
                                             Identifier->lineNo,
                                             Identifier->stringNo,
+                                            Identifier->lineNo,
                                             slvBINARY_ASSIGN,
                                             &variable->exprBase,
                                             Initializer,
@@ -7473,11 +7621,13 @@ _ParseArrayVariableDeclWithInitializer(
         return status;
     }
 
-    if (DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_ATTRIBUTE) {
+    if (DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_ATTRIBUTE)
+    {
         sleSHADER_TYPE shaderType;
 
-        gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
-        if(shaderType == slvSHADER_TYPE_VERTEX) {
+        shaderType = Compiler->shaderType;
+        if(shaderType == slvSHADER_TYPE_VERTEX)
+        {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                            Identifier->lineNo,
                                            Identifier->stringNo,
@@ -7649,17 +7799,19 @@ slParseNonArrayVariableDecl(
     status = _CheckDataTypePrecision(Compiler,
                                      DataType,
                                      Identifier);
-    if(gcmIS_ERROR(status)) {
+    if(gcmIS_ERROR(status))
+    {
         gcmFOOTER_ARG("<return>=0x%x", declOrDeclList);
         return declOrDeclList;
     }
 
     status = _CheckImageFormat(Compiler, DataType);
 
-    if(gcmIS_ERROR(status)) {
-           gcmFOOTER_ARG("<return>=0x%x", declOrDeclList);
-           return declOrDeclList;
-        }
+    if(gcmIS_ERROR(status))
+    {
+       gcmFOOTER_ARG("<return>=0x%x", declOrDeclList);
+       return declOrDeclList;
+    }
 
     if (slsDATA_TYPE_IsArrayHasImplicitLength(Compiler, DataType))
     {
@@ -7673,15 +7825,18 @@ slParseNonArrayVariableDecl(
         return declOrDeclList;
     }
 
-    if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+    if (sloCOMPILER_IsHaltiVersion(Compiler))
+    {
         status = _ParseUpdateHaltiQualifiers(Compiler,
                                              Identifier,
                                              gcvFALSE,
                                              declOrDeclList.dataType);
-        if(gcmIS_ERROR(status)) {
+        if(gcmIS_ERROR(status))
+        {
            gcmFOOTER_ARG("<return>=0x%x", declOrDeclList);
            return declOrDeclList;
         }
+
         if (slsDATA_TYPE_IsArray(declOrDeclList.dataType))
         {
             if (!slsDATA_TYPE_IsArraysOfArrays(declOrDeclList.dataType))
@@ -7768,12 +7923,15 @@ _CheckErrorForArray(
     gcmHEADER_ARG("Compiler=0x%x Identifier=0x%x DataType=0x%x",
                   Compiler, Identifier, DataType);
 
-    if (sloCOMPILER_IsHaltiVersion(Compiler)) {
-       if (DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_IN) {
+    if (sloCOMPILER_IsHaltiVersion(Compiler))
+    {
+       if (DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_IN)
+       {
            sleSHADER_TYPE shaderType;
 
-           gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
-           if(shaderType == slvSHADER_TYPE_VERTEX) {
+           shaderType = Compiler->shaderType;
+           if(shaderType == slvSHADER_TYPE_VERTEX)
+           {
               gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                               Identifier->lineNo,
                                               Identifier->stringNo,
@@ -7786,7 +7944,8 @@ _CheckErrorForArray(
               return status;
            }
        }
-       if(slsDATA_TYPE_IsArray(DataType) && !slmIsLanguageVersion3_1(Compiler)) {
+       if(slsDATA_TYPE_IsArray(DataType) && !slmIsLanguageVersion3_1(Compiler))
+       {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                            Identifier->lineNo,
                                            Identifier->stringNo,
@@ -7799,9 +7958,11 @@ _CheckErrorForArray(
            return status;
        }
     }
-    else {
+    else
+    {
        if (DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_CONST ||
-           DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_ATTRIBUTE) {
+           DataType->qualifiers.storage == slvSTORAGE_QUALIFIER_ATTRIBUTE)
+       {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                            Identifier->lineNo,
                                            Identifier->stringNo,
@@ -7900,7 +8061,7 @@ slParseArrayVariableDecl(
 
     gcmASSERT(Identifier);
 
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+    shaderType = Compiler->shaderType;
 
     declOrDeclList.dataType         = DataType;
     declOrDeclList.initStatement    = gcvNULL;
@@ -8548,7 +8709,8 @@ slParseNonArrayVariableDecl2(
         return declOrDeclList;
     }
 
-    if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+    if (sloCOMPILER_IsHaltiVersion(Compiler))
+    {
         if(slsDATA_TYPE_IsArray(declOrDeclList.dataType))
         {
             if (!slsDATA_TYPE_IsArraysOfArrays(declOrDeclList.dataType))
@@ -8569,10 +8731,11 @@ slParseNonArrayVariableDecl2(
 
     status = _CheckImageFormat(Compiler, declOrDeclList.dataType);
 
-    if(gcmIS_ERROR(status)) {
-           gcmFOOTER_ARG("<return>=0x%x", declOrDeclList);
-           return declOrDeclList;
-        }
+    if(gcmIS_ERROR(status))
+    {
+        gcmFOOTER_ARG("<return>=0x%x", declOrDeclList);
+        return declOrDeclList;
+    }
 
     status = _ParseVariableDecl(Compiler,
                                 declOrDeclList.dataType,
@@ -8854,6 +9017,7 @@ _ParseFuncCallExprAsExpr(
 
     status = sloCOMPILER_CreateNameSpace(
                                    Compiler,
+                                   gcvNULL,
                                    &nameSpace);
 
     if(gcmIS_ERROR(status)) {
@@ -9214,6 +9378,7 @@ slParseFuncHeader(
     }
 
     status = sloCOMPILER_CreateNameSpace(Compiler,
+                                         Identifier->u.identifier,
                                          &name->u.funcInfo.localSpace);
 
     if (gcmIS_ERROR(status))
@@ -9356,11 +9521,6 @@ slParseDefaultPrecisionQualifier(
     switch(DataType->type) {
     case T_INT:
     case T_FLOAT:
-        sloCOMPILER_SetDefaultPrecision(Compiler,
-                                        DataType->elementType,
-                                        PrecisionQualifier->u.qualifiers.precision);
-        break;
-
     case T_SAMPLER2D:
     case T_SAMPLERCUBE:
     case T_SAMPLERCUBEARRAY:
@@ -9414,8 +9574,8 @@ slParseDefaultPrecisionQualifier(
     case T_IIMAGEBUFFER:
     case T_UIMAGEBUFFER:
         sloCOMPILER_SetDefaultPrecision(Compiler,
-                                       DataType->elementType,
-                                       PrecisionQualifier->u.qualifiers.precision);
+                                        DataType->elementType,
+                                        PrecisionQualifier->u.qualifiers.precision);
         break;
 
     default:
@@ -9456,6 +9616,7 @@ slParseCompoundStatementBegin(
 
     status = sloCOMPILER_CreateNameSpace(
                                         Compiler,
+                                        gcvNULL,
                                         &nameSpace);
 
     if (gcmIS_ERROR(status))
@@ -9727,7 +9888,7 @@ slParseQualifierAsStatement(
         return gcvNULL;
     }
 
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+    shaderType = Compiler->shaderType;
 
     /* check layout extension, for TS/GS. */
     if (Qualifier->u.qualifiers.layout.ext_id != slvLAYOUT_EXT_NONE)
@@ -9735,7 +9896,7 @@ slParseQualifierAsStatement(
         sleSHADER_TYPE shaderType;
         sleLAYOUT_ID_EXT layoutIdExt = Qualifier->u.qualifiers.layout.ext_id;
 
-        gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+        shaderType = Compiler->shaderType;
 
         /* Check TS layout. */
         if (layoutIdExt & slvLAYOUT_EXT_VERTICES)
@@ -10720,6 +10881,7 @@ slParseWhileStatementBegin(
 
     status = sloCOMPILER_CreateNameSpace(
                                         Compiler,
+                                        gcvNULL,
                                         &nameSpace);
 
     if (gcmIS_ERROR(status))
@@ -10888,6 +11050,7 @@ slParseForStatementBegin(
 
     status = sloCOMPILER_CreateNameSpace(
                                         Compiler,
+                                        gcvNULL,
                                         &nameSpace);
 
     if (gcmIS_ERROR(status))
@@ -11055,7 +11218,7 @@ _CheckErrorForJump(
 
     if (Type == slvDISCARD)
     {
-        gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+        shaderType = Compiler->shaderType;
 
         if (shaderType != slvSHADER_TYPE_FRAGMENT)
         {
@@ -11392,7 +11555,7 @@ slParseInvariantOrPreciseDecl(
         status = slsNAME_SPACE_Search(Compiler,
                                       sloCOMPILER_GetBuiltInSpace(Compiler),
                                       Identifier->u.identifier,
-                                      gcvFALSE,
+                                      gcvTRUE,
                                       gcvFALSE,
                                       &Name);
 
@@ -11459,7 +11622,8 @@ slParseNonArrayParameterDecl(
     }
 
     if(slsQUALIFIERS_KIND_ISNOT(&DataType->qualifiers, slvQUALIFIERS_FLAG_PRECISION) &&
-       slsQUALIFIERS_KIND_ISNOT(&DataType->qualifiers, slvQUALIFIERS_FLAG_NONE)) {
+       slsQUALIFIERS_KIND_ISNOT(&DataType->qualifiers, slvQUALIFIERS_FLAG_NONE))
+    {
         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                         Identifier->lineNo,
                                         Identifier->stringNo,
@@ -11636,7 +11800,10 @@ slParseQualifiedParameterDecl(
         ParameterQualifiers->u.qualifiers.storage = slvSTORAGE_QUALIFIER_CONST_IN;
     }
 
-    ParameterDecl->dataType->qualifiers.storage =  slsQUALIFIERS_HAS_FLAG(&ParameterQualifiers->u.qualifiers, slvQUALIFIERS_FLAG_STORAGE) ? ParameterQualifiers->u.qualifiers.storage : slvSTORAGE_QUALIFIER_IN;
+    ParameterDecl->dataType->qualifiers.storage =  slsQUALIFIERS_HAS_FLAG(&ParameterQualifiers->u.qualifiers, slvQUALIFIERS_FLAG_STORAGE)
+                                                ? ParameterQualifiers->u.qualifiers.storage
+                                                : slvSTORAGE_QUALIFIER_IN;
+
     if(ParameterQualifiers->u.qualifiers.precision)
     {
         ParameterDecl->dataType->qualifiers.precision = ParameterQualifiers->u.qualifiers.precision;
@@ -11647,6 +11814,7 @@ slParseQualifiedParameterDecl(
                                         ParameterDecl->dataType->elementType,
                                         &ParameterDecl->dataType->qualifiers.precision);
     }
+
     if(slsQUALIFIERS_HAS_FLAG(&ParameterQualifiers->u.qualifiers, slvQUALIFIERS_FLAG_PRECISE))
     {
         slsQUALIFIERS_SET_FLAG(&ParameterDecl->dataType->qualifiers, slvQUALIFIERS_FLAG_PRECISE);
@@ -11682,7 +11850,8 @@ slParseFullySpecifiedType(
         return gcvNULL;
     }
 
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+    shaderType = Compiler->shaderType;
+
     if(TypeQualifier && TypeQualifier->u.qualifiers.storage == slvSTORAGE_QUALIFIER_SHARED &&
        shaderType != slvSHADER_TYPE_COMPUTE)
     {
@@ -11765,6 +11934,20 @@ slParseFullySpecifiedType(
             return gcvNULL;
         }
 
+        if (slsQUALIFIERS_HAS_FLAG(&TypeQualifier->u.qualifiers, slvQUALIFIERS_FLAG_PRECISION) &&
+            TypeQualifier->u.qualifiers.precision != slvPRECISION_QUALIFIER_HIGH)
+        {
+            gctUINT lineNo   = sloCOMPILER_GetCurrentLineNo(Compiler);
+            gctUINT stringNo = sloCOMPILER_GetCurrentStringNo(Compiler);
+
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            TypeQualifier == gcvNULL ? lineNo : TypeQualifier->lineNo,
+                                            TypeQualifier == gcvNULL ? stringNo : TypeQualifier->stringNo,
+                                            slvREPORT_ERROR,
+                                            "atomic counter can't have non-highp precision."));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return gcvNULL;
+        }
     }
 
     if(TypeQualifier == gcvNULL)
@@ -11773,32 +11956,40 @@ slParseFullySpecifiedType(
         return DataType;
     }
 
-    if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+    if (sloCOMPILER_IsHaltiVersion(Compiler))
+    {
        sleSHADER_TYPE shaderType;
 
-       gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+        shaderType = Compiler->shaderType;
 
-       if(slsQUALIFIERS_HAS_FLAG(&TypeQualifier->u.qualifiers, slvQUALIFIERS_FLAG_LAYOUT)) {
-          switch(TypeQualifier->u.qualifiers.storage) {
+       if(slsQUALIFIERS_HAS_FLAG(&TypeQualifier->u.qualifiers, slvQUALIFIERS_FLAG_LAYOUT))
+       {
+          switch(TypeQualifier->u.qualifiers.storage)
+          {
           case slvSTORAGE_QUALIFIER_UNIFORM:
              if((TypeQualifier->u.qualifiers.layout.id & ~(slvLAYOUT_LOCATION |
-                                                          slvLAYOUT_BINDING |
-                                                          slvLAYOUT_OFFSET |
-                                                          slvLAYOUT_IMAGE_FORMAT)) &&
+                                                           slvLAYOUT_BINDING |
+                                                           slvLAYOUT_OFFSET |
+                                                           slvLAYOUT_IMAGE_FORMAT)) &&
                 /* default block uniform should be in global name space */
-                sloCOMPILER_GetCurrentSpace(Compiler) == sloCOMPILER_GetGlobalSpace(Compiler)) {
+                sloCOMPILER_GetCurrentSpace(Compiler) == sloCOMPILER_GetGlobalSpace(Compiler))
+             {
+
                 gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                 TypeQualifier->lineNo,
                                                 TypeQualifier->stringNo,
                                                 slvREPORT_ERROR,
                                                 "layout id's other than location, binding or offset are not applicable "
                                                 " to default block uniform"));
+
                 gcmFOOTER_ARG("<return>=%s", "<nil>");
                 return gcvNULL;
              }
+
              if(TypeQualifier->u.qualifiers.layout.id & slvLAYOUT_LOCATION)
              {
-                if(!sloCOMPILER_IsES31VersionOrAbove(Compiler)) {
+                if(!sloCOMPILER_IsES31VersionOrAbove(Compiler))
+                {
                    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                 TypeQualifier->lineNo,
                                                 TypeQualifier->stringNo,
@@ -11815,7 +12006,8 @@ slParseFullySpecifiedType(
                    status = sloCOMPILER_SetUniformLocationInUse(Compiler,
                                                                 TypeQualifier->u.qualifiers.layout.location,
                                                                 length);
-                   if(gcmIS_ERROR(status)) {
+                   if(gcmIS_ERROR(status))
+                   {
                       gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                       TypeQualifier->lineNo,
                                                       TypeQualifier->stringNo,
@@ -11826,21 +12018,22 @@ slParseFullySpecifiedType(
                    }
                 }
              }
-             else {
-                gcmVERIFY_OK(sloCOMPILER_GetCompilerFlag(Compiler, &flag));
+             else
+             {
+                flag = Compiler->context.compilerFlags;;
                 slsCOMPILER_SetUnspecifiedUniformLocation(flag);
-                gcmVERIFY_OK(sloCOMPILER_SetCompilerFlag(Compiler, flag));
+                Compiler->context.compilerFlags = flag;
              }
 
              if(TypeQualifier->u.qualifiers.layout.id & slvLAYOUT_IMAGE_FORMAT)
              {
                 slmDATA_TYPE_imageFormat_SET(DataType, TypeQualifier->u.qualifiers.layout.imageFormat);
              }
-
              break;
 
           case slvSTORAGE_QUALIFIER_OUT:
-             if(shaderType == slvSHADER_TYPE_VERTEX && !sloCOMPILER_IsES31VersionOrAbove(Compiler)) {
+             if(shaderType == slvSHADER_TYPE_VERTEX && !sloCOMPILER_IsES31VersionOrAbove(Compiler))
+             {
                 gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                 TypeQualifier->lineNo,
                                                 TypeQualifier->stringNo,
@@ -11849,14 +12042,17 @@ slParseFullySpecifiedType(
                 gcmFOOTER_ARG("<return>=%s", "<nil>");
                 return gcvNULL;
              }
-             else { /* fragment shader assumed */
-                if(TypeQualifier->u.qualifiers.layout.id) {
-                    if(TypeQualifier->u.qualifiers.layout.id & slvLAYOUT_LOCATION) {
-
+             else
+             { /* fragment shader assumed */
+                if(TypeQualifier->u.qualifiers.layout.id)
+                {
+                    if(TypeQualifier->u.qualifiers.layout.id & slvLAYOUT_LOCATION)
+                    {
                        status = sloCOMPILER_SetOutputLocationInUse(Compiler,
                                                              TypeQualifier->u.qualifiers.layout.location,
                                                              DataType->arrayLength > 0 ? DataType->arrayLength : 1);
-                       if(gcmIS_ERROR(status)) {
+                       if(gcmIS_ERROR(status))
+                       {
                           gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                           TypeQualifier->lineNo,
                                                           TypeQualifier->stringNo,
@@ -11866,7 +12062,8 @@ slParseFullySpecifiedType(
                           return gcvNULL;
                        }
                     }
-                    else {
+                    else
+                    {
                        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                        TypeQualifier->lineNo,
                                                        TypeQualifier->stringNo,
@@ -11877,9 +12074,11 @@ slParseFullySpecifiedType(
                        return gcvNULL;
                    }
                 }
-                else { /* no location specified */
+                else
+                { /* no location specified */
                     status = sloCOMPILER_SetUnspecifiedOutputLocationExist(Compiler);
-                    if(gcmIS_ERROR(status)) {
+                    if(gcmIS_ERROR(status))
+                    {
                        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                        TypeQualifier->lineNo,
                                                        TypeQualifier->stringNo,
@@ -11893,7 +12092,8 @@ slParseFullySpecifiedType(
              break;
 
           case slvSTORAGE_QUALIFIER_IN:
-             if(shaderType == slvSHADER_TYPE_FRAGMENT && !sloCOMPILER_IsES31VersionOrAbove(Compiler)) {
+             if(shaderType == slvSHADER_TYPE_FRAGMENT && !sloCOMPILER_IsES31VersionOrAbove(Compiler))
+             {
                  gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                  TypeQualifier->lineNo,
                                                  TypeQualifier->stringNo,
@@ -11902,13 +12102,17 @@ slParseFullySpecifiedType(
                  gcmFOOTER_ARG("<return>=%s", "<nil>");
                  return gcvNULL;
              }
-             else { /* vertex shader assumed */
-                 if(TypeQualifier->u.qualifiers.layout.id) {
-                    if(TypeQualifier->u.qualifiers.layout.id & slvLAYOUT_LOCATION) {
+             else
+             { /* vertex shader assumed */
+                 if(TypeQualifier->u.qualifiers.layout.id)
+                 {
+                    if(TypeQualifier->u.qualifiers.layout.id & slvLAYOUT_LOCATION)
+                    {
                        status = sloCOMPILER_SetInputLocationInUse(Compiler,
                                                              TypeQualifier->u.qualifiers.layout.location,
                                                              1);
-                       if(gcmIS_ERROR(status)) {
+                       if(gcmIS_ERROR(status))
+                       {
                           gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                           TypeQualifier->lineNo,
                                                           TypeQualifier->stringNo,
@@ -11918,7 +12122,8 @@ slParseFullySpecifiedType(
                           return gcvNULL;
                        }
                     }
-                    else {
+                    else
+                    {
                        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                  TypeQualifier->lineNo,
                                                  TypeQualifier->stringNo,
@@ -11950,17 +12155,23 @@ slParseFullySpecifiedType(
            }
            slmDATA_TYPE_layoutId_SET(DataType, TypeQualifier->u.qualifiers.layout.id);
        }
-       else { /* no layout(especially, no location) specified */
+       else
+       { /* no layout(especially, no location) specified */
            if(TypeQualifier->u.qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM &&
-              sloCOMPILER_GetCurrentSpace(Compiler) == sloCOMPILER_GetGlobalSpace(Compiler)) {
-               gcmVERIFY_OK(sloCOMPILER_GetCompilerFlag(Compiler, &flag));
+              sloCOMPILER_GetCurrentSpace(Compiler) == sloCOMPILER_GetGlobalSpace(Compiler))
+           {
+               flag = Compiler->context.compilerFlags;
                slsCOMPILER_SetUnspecifiedUniformLocation(flag);
-               gcmVERIFY_OK(sloCOMPILER_SetCompilerFlag(Compiler, flag));
+               Compiler->context.compilerFlags = flag;
            }
+
            if(shaderType == slvSHADER_TYPE_FRAGMENT &&
-              TypeQualifier->u.qualifiers.storage == slvSTORAGE_QUALIFIER_OUT) {
+              TypeQualifier->u.qualifiers.storage == slvSTORAGE_QUALIFIER_OUT)
+           {
                status = sloCOMPILER_SetUnspecifiedOutputLocationExist(Compiler);
-               if(gcmIS_ERROR(status)) {
+
+               if(gcmIS_ERROR(status))
+               {
                   gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                   TypeQualifier->lineNo,
                                                   TypeQualifier->stringNo,
@@ -11973,9 +12184,12 @@ slParseFullySpecifiedType(
        }
 
        DataType->qualifiers.interpolation = TypeQualifier->u.qualifiers.interpolation;
-       if(shaderType == slvSHADER_TYPE_VERTEX) {
+
+       if(shaderType == slvSHADER_TYPE_VERTEX)
+       {
           if(TypeQualifier->u.qualifiers.interpolation != slvINTERPOLATION_QUALIFIER_DEFAULT &&
-              TypeQualifier->u.qualifiers.storage == slvSTORAGE_QUALIFIER_IN) {
+              TypeQualifier->u.qualifiers.storage == slvSTORAGE_QUALIFIER_IN)
+          {
              gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                              TypeQualifier->lineNo,
                                              TypeQualifier->stringNo,
@@ -11985,9 +12199,11 @@ slParseFullySpecifiedType(
              return gcvNULL;
           }
        }
-       else if(shaderType == slvSHADER_TYPE_FRAGMENT) {
+       else if(shaderType == slvSHADER_TYPE_FRAGMENT)
+       {
           if(TypeQualifier->u.qualifiers.interpolation != slvINTERPOLATION_QUALIFIER_DEFAULT &&
-              TypeQualifier->u.qualifiers.storage == slvSTORAGE_QUALIFIER_OUT) {
+              TypeQualifier->u.qualifiers.storage == slvSTORAGE_QUALIFIER_OUT)
+          {
              gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                              TypeQualifier->lineNo,
                                              TypeQualifier->stringNo,
@@ -12003,12 +12219,14 @@ slParseFullySpecifiedType(
     {
         DataType->qualifiers.storage = TypeQualifier->u.qualifiers.storage;
     }
+
     switch (DataType->qualifiers.storage)
     {
     case slvSTORAGE_QUALIFIER_UNIFORM:
         if (sloCOMPILER_IsHaltiVersion(Compiler) &&
             !sloCOMPILER_IsES31VersionOrAbove(Compiler) &&
-            TypeQualifier->u.qualifiers.layout.id & slvLAYOUT_LOCATION) {
+            TypeQualifier->u.qualifiers.layout.id & slvLAYOUT_LOCATION)
+        {
            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                            TypeQualifier->lineNo,
                                            TypeQualifier->stringNo,
@@ -12019,7 +12237,6 @@ slParseFullySpecifiedType(
         }
 
         mustAtGlobalNameSpace = gcvTRUE;
-
         break;
 
     case slvSTORAGE_QUALIFIER_ATTRIBUTE:
@@ -12039,7 +12256,6 @@ slParseFullySpecifiedType(
         }
 
         mustAtGlobalNameSpace = gcvTRUE;
-
         break;
 
     case slvSTORAGE_QUALIFIER_VARYING_OUT:
@@ -12064,7 +12280,8 @@ slParseFullySpecifiedType(
 
     case slvSTORAGE_QUALIFIER_OUT:
     case slvSTORAGE_QUALIFIER_IN:
-        if (!sloCOMPILER_IsHaltiVersion(Compiler)) {
+        if (!sloCOMPILER_IsHaltiVersion(Compiler))
+        {
                 gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                                 TypeQualifier->lineNo,
                                                 TypeQualifier->stringNo,
@@ -12183,6 +12400,8 @@ slMergeTypeQualifiers(
 
     gcmASSERT(ComingQualifier);
 
+    token.lineNo = ComingQualifier->lineNo;
+    token.stringNo = ComingQualifier->stringNo;
     if (Qualifiers == gcvNULL)
     {
         slsLAYOUT_Initialize(&token.u.qualifiers.layout);
@@ -12624,8 +12843,8 @@ _ParseSearchLayoutId(
     sleSHADER_TYPE      shaderType;
     sleCOMPILER_FLAGS   flag;
 
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
-    gcmVERIFY_OK(sloCOMPILER_GetCompilerFlag(Compiler, &flag));
+    shaderType = Compiler->shaderType;
+    flag = Compiler->context.compilerFlags;
 
     /* Match layoutId1. */
     if (gcmIS_SUCCESS(gcoOS_StrCmp(LayoutId->u.identifier, "location"))) {
@@ -12859,7 +13078,7 @@ _ParseSearchLayoutId(
         *LayoutId2 = layoutId2;
     }
 
-    sloCOMPILER_SetCompilerFlag(Compiler, flag);
+    Compiler->context.compilerFlags = flag;
 }
 
 slsLexToken
@@ -13287,6 +13506,7 @@ slParseStructDeclBegin(
 
     status = sloCOMPILER_CreateNameSpace(
                                         Compiler,
+                                        gcvNULL,
                                         &nameSpace);
 
     if (gcmIS_ERROR(status))
@@ -13399,8 +13619,14 @@ slParseInterfaceBlockImplicitArrayLength(
     gcmHEADER_ARG("Compiler=0x%x Block=0x%x BlockInstance=0x%x",
                   Compiler, Block, BlockInstance);
 
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+    shaderType = Compiler->shaderType;
 
+    if (Block == gcvNULL)
+    {
+        /* must have parsing error prior to this */
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return gcvNULL;
+    }
     if (!(((shaderType == slvSHADER_TYPE_TCS || shaderType == slvSHADER_TYPE_TES) &&
           (Block->dataType->qualifiers.storage == slvSTORAGE_QUALIFIER_IN_IO_BLOCK ||
            Block->dataType->qualifiers.storage == slvSTORAGE_QUALIFIER_OUT_IO_BLOCK))
@@ -13540,7 +13766,7 @@ slParseInterfaceBlock(
        return gcvNULL;
     }
 
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+    shaderType = Compiler->shaderType;
 
     addMember = slsDLINK_LIST_IsEmpty(&Block->u.interfaceBlockContent.members);
 
@@ -13879,9 +14105,8 @@ slParseInterfaceBlockDeclBegin(
                                         BlockType->lineNo,
                                         BlockType->stringNo,
                                         slvREPORT_ERROR,
-                                        "Unrecognizable interface block qualifier."));
-        gcmFOOTER_NO();
-        return;
+                                        "Unrecognizable interface block qualifier -",
+                                        " GL_EXT_shader_io_blocks may need to be enabled."));
     }
 
     if (BlockType->u.qualifiers.storage == slvSTORAGE_QUALIFIER_UNIFORM)
@@ -14414,6 +14639,19 @@ slParseTypeSpecifiedFieldDeclList(
             break;
         }
 
+        if (slsDATA_TYPE_IsAtomic(DataType))
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(
+                                            Compiler,
+                                            fieldDecl->field->lineNo,
+                                            fieldDecl->field->stringNo,
+                                            slvREPORT_ERROR,
+                                            "atomic_uint field '%s' can not be contained in struct",
+                                            fieldDecl->field->symbol));
+
+            break;
+        }
+
         if (fieldDecl->arrayLength == 0)
         {
             fieldDecl->field->dataType = DataType;
@@ -14506,6 +14744,7 @@ slParseArrayLengthList(
     {
         gcmONERROR(_CreateArrayLengthExpr(Compiler, -1, &ArrayLengthExpr1));
     }
+
     gcmONERROR(_EvaluateExprToArrayLength(Compiler,
                                           ArrayLengthExpr1,
                                           gcvFALSE,
@@ -14518,11 +14757,12 @@ slParseArrayLengthList(
         {
             gcmONERROR(_CreateArrayLengthExpr(Compiler, -1, &ArrayLengthExpr2));
         }
+
         gcmONERROR(_EvaluateExprToArrayLength(Compiler,
-                                                       ArrayLengthExpr2,
-                                                       gcvFALSE,
-                                                       gcvFALSE,
-                                                       &arrayLength));
+                                              ArrayLengthExpr2,
+                                              gcvFALSE,
+                                              gcvFALSE,
+                                              &arrayLength));
     }
 
     /* If this list is empty, create a list and insert this EXPR to this list. */

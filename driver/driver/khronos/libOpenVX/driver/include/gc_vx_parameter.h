@@ -21,3 +21,4 @@ VX_INTERNAL_CALLBACK_API void vxoParameter_Destructor(vx_reference ref);
 EXTERN_C_END
 
 #endif /* __GC_VX_PARAMETER_H__ */
+

@@ -41,3 +41,4 @@ VX_INLINE_API vx_bool vxIsPowerOfTwo(vx_uint32 value)
 }
 
 #endif /* __OPENVX_INLINES_C__ */
+

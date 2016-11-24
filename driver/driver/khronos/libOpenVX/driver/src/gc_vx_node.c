@@ -269,23 +269,26 @@ Exit:
     *nodePtr = VX_NULL;
 }
 
-VX_PRIVATE_API void vxoNode_Remove(vx_node *nodePtr)
+VX_PRIVATE_API vx_status vxoNode_Remove(vx_node *nodePtr)
 {
+    vx_status status = VX_FAILURE;
     vx_node node;
 
-    if (nodePtr == VX_NULL) return;
+    if (nodePtr == VX_NULL) return status;
 
     node = *nodePtr;
 
     *nodePtr = VX_NULL;
 
-    if (node == VX_NULL) return;
+    if (node == VX_NULL) return status;
 
-    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return;
+    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return status;
 
     vxoNode_RemoveFromGraph(&node);
 
-    vxoReference_Release((vx_reference_ptr)&node, VX_TYPE_NODE, VX_REF_EXTERNAL);
+    status = vxoReference_Release((vx_reference_ptr)&node, VX_TYPE_NODE, VX_REF_EXTERNAL);
+
+    return status;
 }
 
 
@@ -417,6 +420,7 @@ VX_INTERNAL_API vx_status vxoNode_SetChildGraph(vx_node node, vx_graph graph)
 #if gcdVX_OPTIMIZER
             node->childGraph->isSubGraph = vx_false_e;
 #endif
+            node->childGraph->isChildGraph = vx_false_e;
             vxoReference_Release((vx_reference *)&node->childGraph, VX_TYPE_GRAPH, VX_REF_INTERNAL);
         }
     }
@@ -461,8 +465,12 @@ VX_INTERNAL_API vx_status vxoNode_SetChildGraph(vx_node node, vx_graph graph)
         vxmASSERT(!graph->isSubGraph);
         graph->isSubGraph = vx_true_e;
 #endif
+        /*the flag isChildGraph is the same with isSubGraph. add it because isSubGraph only use in optimize mode.*/
+        vxmASSERT(!graph->isChildGraph);
+        graph->isChildGraph = vx_true_e;
 
         node->childGraph = graph;
+
 
         vxoReference_Increment(&graph->base, VX_REF_INTERNAL);
     }
@@ -508,11 +516,17 @@ VX_INTERNAL_API vx_status vxoNode_Record(vx_node node)
     gctPOINTER CmdBuffer = NULL;
     gctUINT32  CmdSizeBytes = 0;
     gceSTATUS gcStatus = gcvSTATUS_OK;
+    gcoHARDWARE savedHardware;
 
     if (!node->kernelAttributes.isAllGPU)
         return VX_ERROR_NOT_IMPLEMENTED;
 
+    gcoVX_SaveContext(&savedHardware);
+
     gcStatus = gcoVX_Commit(gcvFALSE, gcvFALSE, &CmdBuffer, &CmdSizeBytes);
+
+    gcoVX_RestoreContext(savedHardware);
+
     if (gcStatus != gcvSTATUS_OK)
         return VX_FAILURE;
 
@@ -543,8 +557,10 @@ VX_INTERNAL_API vx_status vxoNode_Record(vx_node node)
 VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
 {
     gceSTATUS gcStatus = gcvSTATUS_OK;
+    gcoHARDWARE savedHardware;
 
     if (!node->kernelAttributes.isAllGPU)
+
         return VX_ERROR_NOT_IMPLEMENTED;
 
     if ((node->cmdBuffer == NULL) || (node->cmdSizeBytes == 0))
@@ -552,13 +568,26 @@ VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
 
     vxoPerf_Begin(&node->perf);
 
+    gcoVX_SaveContext(&savedHardware);
+
     gcStatus = gcoVX_Replay((gctPOINTER)node->cmdBuffer, (gctUINT32)node->cmdSizeBytes);
+
+    if (gcStatus != gcvSTATUS_OK)
+    {
+        gcoVX_RestoreContext(savedHardware);
+        return VX_FAILURE;
+    }
+
+    gcStatus = gcoVX_Commit(gcvFALSE, gcvFALSE, NULL, NULL);
+
+    gcoVX_RestoreContext(savedHardware);
+
     if (gcStatus != gcvSTATUS_OK)
         return VX_FAILURE;
 
-    gcStatus = gcoVX_Commit(gcvFALSE, gcvFALSE, NULL, NULL);
-    if (gcStatus != gcvSTATUS_OK)
-        return VX_FAILURE;
+#if gcdDUMP
+    vxoDumpOutput(node, node->paramTable, node->kernel->signature.paramCount);
+#endif
 
     node->executed = vx_true_e;
     node->status = VX_SUCCESS;
@@ -587,7 +616,6 @@ VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr)
 
         for (i = 0; i < GC_VX_MAX_HARDWARE_CONTEXT; i++)
         {
-            //hardwareContext = kernelContext->hwContext[i];
             if (kernelContext->hwContext[i])
             {
                 if (kernelContext->hwContext[i]->node && kernelContext->hwContext[i]->node->pool != gcvPOOL_UNKNOWN)
@@ -608,12 +636,12 @@ VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr)
     return vxoReference_Release((vx_reference_ptr)nodePtr, VX_TYPE_NODE, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_node vxCreateGenericNode(vx_graph graph, vx_kernel kernel)
+VX_API_ENTRY vx_node VX_API_CALL vxCreateGenericNode(vx_graph graph, vx_kernel kernel)
 {
     return vxoNode_CreateGeneric(graph, kernel);
 }
 
-VX_PUBLIC_API vx_status vxQueryNode(vx_node node, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryNode(vx_node node, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -699,7 +727,7 @@ VX_PUBLIC_API vx_status vxQueryNode(vx_node node, vx_enum attribute, void *ptr, 
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxSetNodeAttribute(vx_node node, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxSetNodeAttribute(vx_node node, vx_enum attribute, const void *ptr, vx_size size)
 {
     if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE))
     {
@@ -753,17 +781,17 @@ VX_PUBLIC_API vx_status vxSetNodeAttribute(vx_node node, vx_enum attribute, void
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxReleaseNode(vx_node *node)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseNode(vx_node *node)
 {
     return vxoNode_Release(node);
 }
 
-VX_PUBLIC_API void vxRemoveNode(vx_node *node)
+VX_API_ENTRY vx_status  VX_API_CALL vxRemoveNode(vx_node *node)
 {
-    vxoNode_Remove(node);
+    return vxoNode_Remove(node);
 }
 
-VX_PUBLIC_API vx_status vxAssignNodeCallback(vx_node node, vx_nodecomplete_f callback)
+VX_API_ENTRY vx_status VX_API_CALL vxAssignNodeCallback(vx_node node, vx_nodecomplete_f callback)
 {
     if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -778,25 +806,25 @@ VX_PUBLIC_API vx_status vxAssignNodeCallback(vx_node node, vx_nodecomplete_f cal
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_nodecomplete_f vxRetrieveNodeCallback(vx_node node)
+VX_API_ENTRY vx_nodecomplete_f VX_API_CALL vxRetrieveNodeCallback(vx_node node)
 {
     if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_NULL;
 
     return node->completeCallback;
 }
 
-VX_PUBLIC_API vx_status vxSetChildGraphOfNode(vx_node node, vx_graph graph)
+VX_API_ENTRY vx_status VX_API_CALL vxSetChildGraphOfNode(vx_node node, vx_graph graph)
 {
     return vxoNode_SetChildGraph(node, graph);
 }
 
-VX_PUBLIC_API vx_graph vxGetChildGraphOfNode(vx_node node)
+VX_API_ENTRY vx_graph VX_API_CALL vxGetChildGraphOfNode(vx_node node)
 {
     return vxoNode_GetChildGraph(node);
 }
 
 #if defined(OPENVX_USE_VARIANTS)
-VX_PUBLIC_API vx_status vxChooseKernelVariant(vx_node node, vx_char variantName[VX_MAX_VARIANT_NAME])
+VX_API_ENTRY vx_status VX_API_CALL vxChooseKernelVariant(vx_node node, vx_char variantName[VX_MAX_VARIANT_NAME])
 {
     vx_target   target;
     vx_string   kernelName;
@@ -828,3 +856,4 @@ VX_PUBLIC_API vx_status vxChooseKernelVariant(vx_node node, vx_char variantName[
     return VX_SUCCESS;
 }
 #endif
+

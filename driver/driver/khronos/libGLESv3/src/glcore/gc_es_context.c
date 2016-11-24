@@ -30,7 +30,6 @@ const char * _GLESV2_VERSION = "\n\0$VERSION$"
 
 extern GLvoid *__eglMalloc(size_t size);
 extern GLvoid __eglFree(GLvoid *ptr);
-extern __GLthreadPriv* __eglGetThreadEsPrivData(void* thrData);
 
 extern GLboolean __glDpInitialize(__GLdeviceStruct deviceEntry[]);
 
@@ -728,13 +727,33 @@ GLvoid __glSetDrawable(__GLcontext* gc, __GLdrawablePrivate* drawable, __GLdrawa
 /* Dispatch window system render buffer changes */
 GLvoid __glEvaluateSystemDrawableChange(__GLcontext *gc, GLbitfield flags)
 {
-    if (gc->drawablePrivate->flags & __GL_DRAWABLE_FLAG_ZERO_WH)
+    GLboolean complete = GL_TRUE;
+
+    if (flags & __GL_BUFFER_DRAW_BIT)
     {
-        gc->flags |= __GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER;
+        __GLdrawablePrivate *drawable = gc->drawablePrivate;
+        if (!drawable || (drawable->flags & __GL_DRAWABLE_FLAG_ZERO_WH))
+        {
+            complete = GL_FALSE;
+        }
+    }
+
+    if (flags & __GL_BUFFER_READ_BIT)
+    {
+        __GLdrawablePrivate *readable = gc->readablePrivate;
+        if (!readable || (readable->flags & __GL_DRAWABLE_FLAG_ZERO_WH))
+        {
+            complete = GL_FALSE;
+        }
+    }
+
+    if (complete)
+    {
+        gc->flags &= ~__GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER;
     }
     else
     {
-        gc->flags &= ~__GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER;
+        gc->flags |= __GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER;
     }
 }
 
@@ -1088,16 +1107,25 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
 
     __glFormatGLModes(&gc->modes, (VEGLConfig)imports->config);
 
-    /* Fill in the export functions.
-    */
-    gc->exports.createContext  = __glCreateContext;
-    gc->exports.destroyContext = __glDestroyContext;
-    gc->exports.setDrawable    = __glSetDrawable;
-    gc->exports.makeCurrent    = __glMakeCurrent;
-    gc->exports.loseCurrent    = __glLoseCurrent;
-    gc->exports.getThreadData  = __eglGetThreadEsPrivData;
-    gc->apiVersion = apiVersion;
-    gc->shareCtx   = (__GLcontext*)sharedCtx;
+
+    gc->apiVersion   = apiVersion;
+    gc->shareCtx     = (__GLcontext*)sharedCtx;
+    gc->contextFlags = 0;
+
+    if (imports->contextFlags & EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR)
+    {
+        gc->contextFlags |= GL_CONTEXT_FLAG_DEBUG_BIT_KHR;
+    }
+
+    if (imports->contextFlags & EGL_CONTEXT_OPENGL_ROBUST_ACCESS_BIT_KHR)
+    {
+        gc->contextFlags |= GL_CONTEXT_FLAG_ROBUST_ACCESS_BIT;
+    }
+
+    if (imports->protectedContext)
+    {
+        gc->contextFlags |= GL_CONTEXT_FLAG_PROTECTED_CONTENT_BIT_EXT;
+    }
 
     /* Initialize the device constants with GL defaults.
     */

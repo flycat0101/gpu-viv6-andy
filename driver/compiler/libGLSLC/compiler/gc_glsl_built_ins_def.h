@@ -1786,11 +1786,6 @@ static slsBUILT_IN_FUNCTION CommonBuiltInFunctions[] =
     {slvEXTENSION_NONE,     "cos", _EvaluateCos, _GenCosCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
     {slvEXTENSION_NONE,     "cos", _EvaluateCos, _GenCosCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
 
-    {slvEXTENSION_NONE,     "tan", _EvaluateTan, _GenTanCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}},
-    {slvEXTENSION_NONE,     "tan", _EvaluateTan, _GenTanCode, T_VEC2,     1, {T_VEC2}, {0}, {0}},
-    {slvEXTENSION_NONE,     "tan", _EvaluateTan, _GenTanCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
-    {slvEXTENSION_NONE,     "tan", _EvaluateTan, _GenTanCode, T_VEC4,     1, {T_VEC4}, {0}, {0}},
-
     {slvEXTENSION_HALTI,     "sinh", _EvaluateSinh, _GenSinhCode, T_FLOAT,    1, {T_FLOAT}, {0}, {0}},
     {slvEXTENSION_HALTI,     "sinh", _EvaluateSinh, _GenSinhCode, T_VEC2,     1, {T_VEC2}, {0}, {0}},
     {slvEXTENSION_HALTI,     "sinh", _EvaluateSinh, _GenSinhCode, T_VEC3,     1, {T_VEC3}, {0}, {0}},
@@ -2524,6 +2519,28 @@ static slsBUILT_IN_FUNCTION ExtensionBuiltInFunctions[] =
 static gctUINT ExtensionBuiltInFunctionCount =
                     sizeof(ExtensionBuiltInFunctions) / sizeof(slsBUILT_IN_FUNCTION);
 
+typedef struct _slsBUILTIN_FUNCTION_EXTENSION
+{
+    sleEXTENSION                extension;
+    gctCONST_STRING             symbol;
+}
+slsBUILTIN_FUNCTION_EXTENSION;
+
+static slsBUILTIN_FUNCTION_EXTENSION builtinFunctionExtensionTable[] =
+{
+    { slvEXTENSION_IMAGE_ATOMIC, "imageAtomicAdd" },
+    { slvEXTENSION_IMAGE_ATOMIC, "imageAtomicMin" },
+    { slvEXTENSION_IMAGE_ATOMIC, "imageAtomicMax" },
+    { slvEXTENSION_IMAGE_ATOMIC, "imageAtomicAnd" },
+    { slvEXTENSION_IMAGE_ATOMIC, "imageAtomicOr" },
+    { slvEXTENSION_IMAGE_ATOMIC, "imageAtomicXor" },
+    { slvEXTENSION_IMAGE_ATOMIC, "imageAtomicExchange" },
+    { slvEXTENSION_IMAGE_ATOMIC, "imageAtomicCompSwap" },
+};
+
+static gctUINT builtinFunctionExtensionCount =
+                sizeof(builtinFunctionExtensionTable) / sizeof(slsBUILTIN_FUNCTION_EXTENSION);
+
 /*******************************Intrinsic functions*******************************/
 /* builtin functions that used intrinsic mechanism to implement
    the old builtin function assume the parameters are only slvSTORAGE_QUALIFIER_IN.
@@ -2569,30 +2586,35 @@ slsINTRINSIC_BUILTIN_FUNCTION;
 
 static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
 {
-    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,                 T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_1", {0}, {0}},
-    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,                 T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_2", {0}, {0}},
-    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,                 T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_3", {0}, {0}},
-    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,                 T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_4", {0}, {0}},
+    {slvEXTENSION_NONE,     "tan", _EvaluateTan, gcvNULL,                  T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_tan_1", {0}, {0}},
+    {slvEXTENSION_NONE,     "tan", _EvaluateTan, gcvNULL,                  T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_tan_2", {0}, {0}},
+    {slvEXTENSION_NONE,     "tan", _EvaluateTan, gcvNULL,                  T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_tan_3", {0}, {0}},
+    {slvEXTENSION_NONE,     "tan", _EvaluateTan, gcvNULL,                  T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_tan_4", {0}, {0}},
 
-    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,                 T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_1", {0}, {0}},
-    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,                 T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_2", {0}, {0}},
-    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,                 T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_3", {0}, {0}},
-    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,                 T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_4", {0}, {0}},
+    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,                 T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_float", {0}, {0}},
+    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,                 T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_vec2", {0}, {0}},
+    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,                 T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_vec3", {0}, {0}},
+    {slvEXTENSION_NONE,     "asin", _EvaluateAsin, gcvNULL,                 T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_asin_vec4", {0}, {0}},
+
+    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,                 T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_float", {0}, {0}},
+    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,                 T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_vec2", {0}, {0}},
+    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,                 T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_vec3", {0}, {0}},
+    {slvEXTENSION_NONE,     "acos", _EvaluateAcos, gcvNULL,                 T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_acos_vec4", {0}, {0}},
 
     {slvEXTENSION_NONE,     "acosh", _EvaluateAcosh, gcvNULL,                T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_acosh_1", {0}, {0}},
     {slvEXTENSION_NONE,     "acosh", _EvaluateAcosh, gcvNULL,                T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_acosh_2", {0}, {0}},
     {slvEXTENSION_NONE,     "acosh", _EvaluateAcosh, gcvNULL,                T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_acosh_3", {0}, {0}},
     {slvEXTENSION_NONE,     "acosh", _EvaluateAcosh, gcvNULL,                T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_acosh_4", {0}, {0}},
 
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_1", {0}, {0}},
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_2", {0}, {0}},
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_3", {0}, {0}},
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_4", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_FLOAT,    ANY,  1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_float", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC2,     ANY,  1, {T_VEC2}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_vec2", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC3,     ANY,  1, {T_VEC3}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_vec3", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC4,     ANY,  1, {T_VEC4}, {_IN}, {ANY},gceINTRIN_source, "_viv_atan_vec4", {0}, {0}},
 
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_FLOAT,    ANY,  2, {T_FLOAT, T_FLOAT}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_1", {0}, {0}},
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC2,     ANY,  2, {T_VEC2, T_VEC2}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_2", {0}, {0}},
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC3,     ANY,  2, {T_VEC3, T_VEC3}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_3", {0}, {0}},
-    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC4,     ANY,  2, {T_VEC4, T_VEC4}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_4", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_FLOAT,    ANY,  2, {T_FLOAT, T_FLOAT}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_float", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC2,     ANY,  2, {T_VEC2, T_VEC2}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_vec2", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC3,     ANY,  2, {T_VEC3, T_VEC3}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_vec3", {0}, {0}},
+    {slvEXTENSION_NONE,     "atan", _EvaluateAtan, gcvNULL,                 T_VEC4,     ANY,  2, {T_VEC4, T_VEC4}, {_IN, _IN}, {ANY, ANY},gceINTRIN_source, "_viv_atan2_vec4", {0}, {0}},
 #if MIX_AS_INTRINCIS
     /* genFType mix (genFType x, genFType y, float a); */
     {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,                 T_FLOAT,     ANY, 3, {T_FLOAT, T_FLOAT, T_FLOAT}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_float", {0}, {0}},
@@ -2605,12 +2627,12 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {slvEXTENSION_NONE,     "mix", _EvaluateMix, gcvNULL,                 T_VEC4,      ANY, 3, {T_VEC4, T_VEC4, T_VEC4}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_mix_vec4_vec4", {0}, {0}},
 #endif
 
-    {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,                 T_FLOAT,  ANY,   1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_round", {0}, {0}},
+    {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,                 T_FLOAT,  ANY,   1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_round_float", {0}, {0}},
     {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,                 T_VEC2,   ANY,   1, {T_VEC2},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec2", {0}, {0}},
     {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,                 T_VEC3,   ANY,   1, {T_VEC3},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec3", {0}, {0}},
     {slvEXTENSION_HALTI,    "round", _EvaluateRound, gcvNULL,                 T_VEC4,   ANY,   1, {T_VEC4},  {_IN}, {ANY},gceINTRIN_source, "_viv_round_vec4", {0}, {0}},
 
-    {slvEXTENSION_HALTI,    "roundEven", _EvaluateRoundEven, gcvNULL,             T_FLOAT, ANY,   1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_roundEven", {0}, {0}},
+    {slvEXTENSION_HALTI,    "roundEven", _EvaluateRoundEven, gcvNULL,             T_FLOAT, ANY,   1, {T_FLOAT}, {_IN}, {ANY},gceINTRIN_source, "_viv_roundEven_float", {0}, {0}},
     {slvEXTENSION_HALTI,    "roundEven", _EvaluateRoundEven, gcvNULL,             T_VEC2,  ANY,   1, {T_VEC2},  {_IN}, {ANY},gceINTRIN_source, "_viv_roundEven_vec2", {0}, {0}},
     {slvEXTENSION_HALTI,    "roundEven", _EvaluateRoundEven, gcvNULL,             T_VEC3,  ANY,   1, {T_VEC3},  {_IN}, {ANY},gceINTRIN_source, "_viv_roundEven_vec3", {0}, {0}},
     {slvEXTENSION_HALTI,    "roundEven", _EvaluateRoundEven, gcvNULL,             T_VEC4,  ANY,   1, {T_VEC4},  {_IN}, {ANY},gceINTRIN_source, "_viv_roundEven_vec4", {0}, {0}},
@@ -2659,64 +2681,64 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {slvEXTENSION_ES_31,    "bitfieldInsert", gcvNULL, gcvNULL,         T_UVEC3,ANY,    4, {T_UVEC3, T_UVEC3, T_INT, T_INT},  {_IN,  _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_source, "_viv_bitfieldInsert_uvec3", {0}, {0}},
     {slvEXTENSION_ES_31,    "bitfieldInsert", gcvNULL, gcvNULL,         T_UVEC4,ANY,    4, {T_UVEC4, T_UVEC4, T_INT, T_INT},  {_IN,  _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_source, "_viv_bitfieldInsert_uvec4", {0}, {0}},
 
-    {slvEXTENSION_ES_31,    "uaddCarry", gcvNULL, gcvNULL,              T_UINT, _HP,    3, {T_UINT,  T_UINT,  T_UINT},  {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_uaddCarry_1", {0}, {0}},
-    {slvEXTENSION_ES_31,    "uaddCarry", gcvNULL, gcvNULL,              T_UVEC2,_HP,    3, {T_UVEC2, T_UVEC2, T_UVEC2},  {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_uaddCarry_2", {0}, {0}},
-    {slvEXTENSION_ES_31,    "uaddCarry", gcvNULL, gcvNULL,              T_UVEC3,_HP,    3, {T_UVEC3, T_UVEC3, T_UVEC3},  {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_uaddCarry_3", {0}, {0}},
-    {slvEXTENSION_ES_31,    "uaddCarry", gcvNULL, gcvNULL,              T_UVEC4,_HP,    3, {T_UVEC4, T_UVEC4, T_UVEC4},  {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_uaddCarry_4", {0}, {0}},
+    {slvEXTENSION_ES_31,    "uaddCarry", gcvNULL, gcvNULL,              T_UINT, _HP,    3, {T_UINT,  T_UINT,  T_UINT},  {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_uaddCarry_uint", {0}, {0}},
+    {slvEXTENSION_ES_31,    "uaddCarry", gcvNULL, gcvNULL,              T_UVEC2,_HP,    3, {T_UVEC2, T_UVEC2, T_UVEC2},  {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_uaddCarry_uvec2", {0}, {0}},
+    {slvEXTENSION_ES_31,    "uaddCarry", gcvNULL, gcvNULL,              T_UVEC3,_HP,    3, {T_UVEC3, T_UVEC3, T_UVEC3},  {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_uaddCarry_uvec3", {0}, {0}},
+    {slvEXTENSION_ES_31,    "uaddCarry", gcvNULL, gcvNULL,              T_UVEC4,_HP,    3, {T_UVEC4, T_UVEC4, T_UVEC4},  {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_uaddCarry_uvec4", {0}, {0}},
 
-    {slvEXTENSION_ES_31,    "usubBorrow", gcvNULL, gcvNULL,             T_UINT, _HP,    3, {T_UINT,  T_UINT,  T_UINT},  {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_usubBorrow_1", {0}, {0}},
-    {slvEXTENSION_ES_31,    "usubBorrow", gcvNULL, gcvNULL,             T_UVEC2,_HP,    3, {T_UVEC2, T_UVEC2, T_UVEC2}, {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_usubBorrow_2", {0}, {0}},
-    {slvEXTENSION_ES_31,    "usubBorrow", gcvNULL, gcvNULL,             T_UVEC3,_HP,    3, {T_UVEC3, T_UVEC3, T_UVEC3}, {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_usubBorrow_3", {0}, {0}},
-    {slvEXTENSION_ES_31,    "usubBorrow", gcvNULL, gcvNULL,             T_UVEC4,_HP,    3, {T_UVEC4, T_UVEC4, T_UVEC4}, {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_usubBorrow_4", {0}, {0}},
+    {slvEXTENSION_ES_31,    "usubBorrow", gcvNULL, gcvNULL,             T_UINT, _HP,    3, {T_UINT,  T_UINT,  T_UINT},  {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_usubBorrow_uint", {0}, {0}},
+    {slvEXTENSION_ES_31,    "usubBorrow", gcvNULL, gcvNULL,             T_UVEC2,_HP,    3, {T_UVEC2, T_UVEC2, T_UVEC2}, {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_usubBorrow_uvec2", {0}, {0}},
+    {slvEXTENSION_ES_31,    "usubBorrow", gcvNULL, gcvNULL,             T_UVEC3,_HP,    3, {T_UVEC3, T_UVEC3, T_UVEC3}, {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_usubBorrow_uvec3", {0}, {0}},
+    {slvEXTENSION_ES_31,    "usubBorrow", gcvNULL, gcvNULL,             T_UVEC4,_HP,    3, {T_UVEC4, T_UVEC4, T_UVEC4}, {_IN,  _IN,  _OT}, {_HP, _HP, _LP},gceINTRIN_source, "_viv_usubBorrow_uvec4", {0}, {0}},
 
-    {slvEXTENSION_ES_31,    "ldexp", gcvNULL, gcvNULL,                  T_FLOAT,_HP,     2, {T_FLOAT,  T_INT}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_1", {0}, {0}},
-    {slvEXTENSION_ES_31,    "ldexp", gcvNULL, gcvNULL,                  T_VEC2, _HP,     2, {T_VEC2, T_IVEC2}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_2", {0}, {0}},
-    {slvEXTENSION_ES_31,    "ldexp", gcvNULL, gcvNULL,                  T_VEC3, _HP,     2, {T_VEC3, T_IVEC3}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_3", {0}, {0}},
-    {slvEXTENSION_ES_31,    "ldexp", gcvNULL, gcvNULL,                  T_VEC4, _HP,     2, {T_VEC4, T_IVEC4}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_4", {0}, {0}},
+    {slvEXTENSION_ES_31,    "ldexp", gcvNULL, gcvNULL,                  T_FLOAT,_HP,     2, {T_FLOAT,  T_INT}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_float", {0}, {0}},
+    {slvEXTENSION_ES_31,    "ldexp", gcvNULL, gcvNULL,                  T_VEC2, _HP,     2, {T_VEC2, T_IVEC2}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_vec2", {0}, {0}},
+    {slvEXTENSION_ES_31,    "ldexp", gcvNULL, gcvNULL,                  T_VEC3, _HP,     2, {T_VEC3, T_IVEC3}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_vec3", {0}, {0}},
+    {slvEXTENSION_ES_31,    "ldexp", gcvNULL, gcvNULL,                  T_VEC4, _HP,     2, {T_VEC4, T_IVEC4}, {_IN,  _IN}, {_HP, _HP},gceINTRIN_source, "_viv_ldexp_vec4", {0}, {0}},
 
-    {slvEXTENSION_ES_31,    "frexp", gcvNULL, gcvNULL,                  T_FLOAT,_HP,     2, {T_FLOAT,  T_INT}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_1", {0}, {0}},
-    {slvEXTENSION_ES_31,    "frexp", gcvNULL, gcvNULL,                  T_VEC2, _HP,     2, {T_VEC2, T_IVEC2}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_2", {0}, {0}},
-    {slvEXTENSION_ES_31,    "frexp", gcvNULL, gcvNULL,                  T_VEC3, _HP,     2, {T_VEC3, T_IVEC3}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_3", {0}, {0}},
-    {slvEXTENSION_ES_31,    "frexp", gcvNULL, gcvNULL,                  T_VEC4, _HP,     2, {T_VEC4, T_IVEC4}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_4", {0}, {0}},
+    {slvEXTENSION_ES_31,    "frexp", gcvNULL, gcvNULL,                  T_FLOAT,_HP,     2, {T_FLOAT,  T_INT}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_float", {0}, {0}},
+    {slvEXTENSION_ES_31,    "frexp", gcvNULL, gcvNULL,                  T_VEC2, _HP,     2, {T_VEC2, T_IVEC2}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_vec2", {0}, {0}},
+    {slvEXTENSION_ES_31,    "frexp", gcvNULL, gcvNULL,                  T_VEC3, _HP,     2, {T_VEC3, T_IVEC3}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_vec3", {0}, {0}},
+    {slvEXTENSION_ES_31,    "frexp", gcvNULL, gcvNULL,                  T_VEC4, _HP,     2, {T_VEC4, T_IVEC4}, {_IN,  _OT}, {_HP, _HP},gceINTRIN_source, "_viv_frexp_vec4", {0}, {0}},
 
     /* Floating-Point Pack and Unpack Functions for es3.0 */
-    {slvEXTENSION_HALTI,    "packUnorm2x16", _EvaluatePackUnorm2x16, gcvNULL,          T_UINT, _HP,     1, {T_VEC2},          {_IN}, {ANY},gceINTRIN_source, "_viv_packUnorm2x16", {0}, {0}},
-    {slvEXTENSION_HALTI,    "packSnorm2x16", _EvaluatePackSnorm2x16, gcvNULL,          T_UINT, _HP,     1, {T_VEC2},          {_IN}, {ANY},gceINTRIN_source, "_viv_packSnorm2x16", {0}, {0}},
-    {slvEXTENSION_HALTI,    "unpackUnorm2x16", _EvaluateUnpackUnorm2x16, gcvNULL,        T_VEC2, _HP,     1, {T_UINT},          {_IN}, {_HP},gceINTRIN_source, "_viv_unpackUnorm2x16", {0}, {0}},
-    {slvEXTENSION_HALTI,    "unpackSnorm2x16", _EvaluateUnpackSnorm2x16, gcvNULL,        T_VEC2, _HP,     1, {T_UINT},          {_IN}, {_HP},gceINTRIN_source, "_viv_unpackSnorm2x16", {0}, {0}},
-    {slvEXTENSION_HALTI,    "packHalf2x16", _EvaluatePackHalf2x16, gcvNULL,           T_UINT, _HP,     1, {T_VEC2},          {_IN}, {_MP},gceINTRIN_source, "_viv_packHalf2x16", {0}, {0}},
-    {slvEXTENSION_HALTI,    "unpackHalf2x16", _EvaluateUnpackHalf2x16, gcvNULL,         T_VEC2, _MP,     1, {T_UINT},          {_IN}, {_HP},gceINTRIN_source, "_viv_unpackHalf2x16", {0}, {0}},
+    {slvEXTENSION_HALTI,    "packUnorm2x16", _EvaluatePackUnorm2x16, gcvNULL,          T_UINT, _HP,     1, {T_VEC2},          {_IN}, {ANY},gceINTRIN_source, "_viv_packUnorm2x16_vec2", {0}, {0}},
+    {slvEXTENSION_HALTI,    "packSnorm2x16", _EvaluatePackSnorm2x16, gcvNULL,          T_UINT, _HP,     1, {T_VEC2},          {_IN}, {ANY},gceINTRIN_source, "_viv_packSnorm2x16_vec2", {0}, {0}},
+    {slvEXTENSION_HALTI,    "unpackUnorm2x16", _EvaluateUnpackUnorm2x16, gcvNULL,        T_VEC2, _HP,     1, {T_UINT},          {_IN}, {_HP},gceINTRIN_source, "_viv_unpackUnorm2x16_uint", {0}, {0}},
+    {slvEXTENSION_HALTI,    "unpackSnorm2x16", _EvaluateUnpackSnorm2x16, gcvNULL,        T_VEC2, _HP,     1, {T_UINT},          {_IN}, {_HP},gceINTRIN_source, "_viv_unpackSnorm2x16_uint", {0}, {0}},
+    {slvEXTENSION_HALTI,    "packHalf2x16", _EvaluatePackHalf2x16, gcvNULL,           T_UINT, _HP,     1, {T_VEC2},          {_IN}, {_MP},gceINTRIN_source, "_viv_packHalf2x16_vec2", {0}, {0}},
+    {slvEXTENSION_HALTI,    "unpackHalf2x16", _EvaluateUnpackHalf2x16, gcvNULL,         T_VEC2, _MP,     1, {T_UINT},          {_IN}, {_HP},gceINTRIN_source, "_viv_unpackHalf2x16_uint", {0}, {0}},
 
     /* Floating-Point Pack and Unpack Functions for es3.1 */
-    {slvEXTENSION_ES_31,    "packUnorm4x8", gcvNULL, gcvNULL,           T_UINT, _HP,     1, {T_VEC4},          {_IN}, {_MP},gceINTRIN_source, "_viv_packUnorm4x8", {0}, {0}},
-    {slvEXTENSION_ES_31,    "packSnorm4x8", gcvNULL, gcvNULL,           T_UINT, _HP,     1, {T_VEC4},          {_IN}, {_MP},gceINTRIN_source, "_viv_packSnorm4x8", {0}, {0}},
-    {slvEXTENSION_ES_31,    "unpackUnorm4x8", gcvNULL, gcvNULL,         T_VEC4, _MP,     1, {T_UINT},          {_IN}, {_HP},gceINTRIN_source, "_viv_unpackUnorm4x8", {0}, {0}},
-    {slvEXTENSION_ES_31,    "unpackSnorm4x8", gcvNULL, gcvNULL,         T_VEC4, _MP,     1, {T_UINT},          {_IN}, {_HP},gceINTRIN_source, "_viv_unpackSnorm4x8", {0}, {0}},
+    {slvEXTENSION_ES_31,    "packUnorm4x8", gcvNULL, gcvNULL,           T_UINT, _HP,     1, {T_VEC4},          {_IN}, {_MP},gceINTRIN_source, "_viv_packUnorm4x8_vec4", {0}, {0}},
+    {slvEXTENSION_ES_31,    "packSnorm4x8", gcvNULL, gcvNULL,           T_UINT, _HP,     1, {T_VEC4},          {_IN}, {_MP},gceINTRIN_source, "_viv_packSnorm4x8_vec4", {0}, {0}},
+    {slvEXTENSION_ES_31,    "unpackUnorm4x8", gcvNULL, gcvNULL,         T_VEC4, _MP,     1, {T_UINT},          {_IN}, {_HP},gceINTRIN_source, "_viv_unpackUnorm4x8_uint", {0}, {0}},
+    {slvEXTENSION_ES_31,    "unpackSnorm4x8", gcvNULL, gcvNULL,         T_VEC4, _MP,     1, {T_UINT},          {_IN}, {_HP},gceINTRIN_source, "_viv_unpackSnorm4x8_uint", {0}, {0}},
 
-    {slvEXTENSION_ES_31,    "umulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_UINT,  T_UINT,  T_UINT,  T_UINT},   {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_umulExtended_1", {0}, {0}},
-    {slvEXTENSION_ES_31,    "umulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_UVEC2, T_UVEC2, T_UVEC2, T_UVEC2},  {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_umulExtended_2", {0}, {0}},
-    {slvEXTENSION_ES_31,    "umulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_UVEC3, T_UVEC3, T_UVEC3, T_UVEC3},  {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_umulExtended_3", {0}, {0}},
-    {slvEXTENSION_ES_31,    "umulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_UVEC4, T_UVEC4, T_UVEC4, T_UVEC4},  {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_umulExtended_4", {0}, {0}},
+    {slvEXTENSION_ES_31,    "umulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_UINT,  T_UINT,  T_UINT,  T_UINT},   {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_umulExtended_uint", {0}, {0}},
+    {slvEXTENSION_ES_31,    "umulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_UVEC2, T_UVEC2, T_UVEC2, T_UVEC2},  {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_umulExtended_uvec2", {0}, {0}},
+    {slvEXTENSION_ES_31,    "umulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_UVEC3, T_UVEC3, T_UVEC3, T_UVEC3},  {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_umulExtended_uvec3", {0}, {0}},
+    {slvEXTENSION_ES_31,    "umulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_UVEC4, T_UVEC4, T_UVEC4, T_UVEC4},  {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_umulExtended_uvec4", {0}, {0}},
 
-    {slvEXTENSION_ES_31,    "imulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_INT, T_INT, T_INT, T_INT},              {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_imulExtended_1", {0}, {0}},
-    {slvEXTENSION_ES_31,    "imulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_IVEC2, T_IVEC2, T_IVEC2, T_IVEC2},      {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_imulExtended_2", {0}, {0}},
-    {slvEXTENSION_ES_31,    "imulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_IVEC3, T_IVEC3, T_IVEC3, T_IVEC3},      {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_imulExtended_3", {0}, {0}},
-    {slvEXTENSION_ES_31,    "imulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_IVEC4, T_IVEC4, T_IVEC4, T_IVEC4},      {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_imulExtended_4", {0}, {0}},
+    {slvEXTENSION_ES_31,    "imulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_INT, T_INT, T_INT, T_INT},              {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_imulExtended_int", {0}, {0}},
+    {slvEXTENSION_ES_31,    "imulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_IVEC2, T_IVEC2, T_IVEC2, T_IVEC2},      {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_imulExtended_ivec2", {0}, {0}},
+    {slvEXTENSION_ES_31,    "imulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_IVEC3, T_IVEC3, T_IVEC3, T_IVEC3},      {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_imulExtended_ivec3", {0}, {0}},
+    {slvEXTENSION_ES_31,    "imulExtended", gcvNULL, gcvNULL,           T_VOID, _DP,     4, {T_IVEC4, T_IVEC4, T_IVEC4, T_IVEC4},      {_IN, _IN, _OT, _OT}, {_HP, _HP, _HP, _HP},gceINTRIN_source, "_viv_imulExtended_ivec4", {0}, {0}},
 
-    {slvEXTENSION_HALTI,    "modf", gcvNULL, gcvNULL,                   T_FLOAT,ANY,     2, {T_FLOAT, T_FLOAT},  {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_1", {0}, {0}},
-    {slvEXTENSION_HALTI,    "modf", gcvNULL, gcvNULL,                   T_VEC2, ANY,     2, {T_VEC2,  T_VEC2},   {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_2", {0}, {0}},
-    {slvEXTENSION_HALTI,    "modf", gcvNULL, gcvNULL,                   T_VEC3, ANY,     2, {T_VEC3,  T_VEC3},   {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_3", {0}, {0}},
-    {slvEXTENSION_HALTI,    "modf", gcvNULL, gcvNULL,                   T_VEC4, ANY,     2, {T_VEC4,  T_VEC4},   {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_4", {0}, {0}},
+    {slvEXTENSION_HALTI,    "modf", gcvNULL, gcvNULL,                   T_FLOAT,ANY,     2, {T_FLOAT, T_FLOAT},  {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_float", {0}, {0}},
+    {slvEXTENSION_HALTI,    "modf", gcvNULL, gcvNULL,                   T_VEC2, ANY,     2, {T_VEC2,  T_VEC2},   {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_vec2", {0}, {0}},
+    {slvEXTENSION_HALTI,    "modf", gcvNULL, gcvNULL,                   T_VEC3, ANY,     2, {T_VEC3,  T_VEC3},   {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_vec3", {0}, {0}},
+    {slvEXTENSION_HALTI,    "modf", gcvNULL, gcvNULL,                   T_VEC4, ANY,     2, {T_VEC4,  T_VEC4},   {_IN,  _OT}, {ANY, ANY},gceINTRIN_source, "_viv_modf_vec4", {0}, {0}},
 
-    {slvEXTENSION_GPU_SHADER5,  "fma", gcvNULL, gcvNULL,                 T_FLOAT,ANY,     3, {T_FLOAT, T_FLOAT, T_FLOAT},  {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_1", {0}, {0}},
-    {slvEXTENSION_GPU_SHADER5,  "fma", gcvNULL, gcvNULL,                 T_VEC2, ANY,     3, {T_VEC2,  T_VEC2,  T_VEC2},   {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_2", {0}, {0}},
-    {slvEXTENSION_GPU_SHADER5,  "fma", gcvNULL, gcvNULL,                 T_VEC3, ANY,     3, {T_VEC3,  T_VEC3,  T_VEC3},   {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_3", {0}, {0}},
-    {slvEXTENSION_GPU_SHADER5,  "fma", gcvNULL, gcvNULL,                 T_VEC4, ANY,     3, {T_VEC4,  T_VEC4,  T_VEC4},   {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_4", {0}, {0}},
+    {slvEXTENSION_GPU_SHADER5,  "fma", gcvNULL, gcvNULL,                 T_FLOAT,ANY,     3, {T_FLOAT, T_FLOAT, T_FLOAT},  {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_float", {0}, {0}},
+    {slvEXTENSION_GPU_SHADER5,  "fma", gcvNULL, gcvNULL,                 T_VEC2, ANY,     3, {T_VEC2,  T_VEC2,  T_VEC2},   {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_vec2", {0}, {0}},
+    {slvEXTENSION_GPU_SHADER5,  "fma", gcvNULL, gcvNULL,                 T_VEC3, ANY,     3, {T_VEC3,  T_VEC3,  T_VEC3},   {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_vec3", {0}, {0}},
+    {slvEXTENSION_GPU_SHADER5,  "fma", gcvNULL, gcvNULL,                 T_VEC4, ANY,     3, {T_VEC4,  T_VEC4,  T_VEC4},   {_IN,  _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_source, "_viv_fma_vec4", {0}, {0}},
 
-    {slvEXTENSION_NONE,     "reflect", _EvaluateReflect, gcvNULL,                T_FLOAT,ANY,     2, {T_FLOAT, T_FLOAT},  {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_1", {0}, {0}},
-    {slvEXTENSION_NONE,     "reflect", _EvaluateReflect, gcvNULL,                T_VEC2, ANY,     2, {T_VEC2,  T_VEC2},   {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_2", {0}, {0}},
-    {slvEXTENSION_NONE,     "reflect", _EvaluateReflect, gcvNULL,                T_VEC3, ANY,     2, {T_VEC3,  T_VEC3},   {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_3", {0}, {0}},
-    {slvEXTENSION_NONE,     "reflect", _EvaluateReflect, gcvNULL,                T_VEC4, ANY,     2, {T_VEC4,  T_VEC4},   {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_4", {0}, {0}},
+    {slvEXTENSION_NONE,     "reflect", _EvaluateReflect, gcvNULL,                T_FLOAT,ANY,     2, {T_FLOAT, T_FLOAT},  {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_float", {0}, {0}},
+    {slvEXTENSION_NONE,     "reflect", _EvaluateReflect, gcvNULL,                T_VEC2, ANY,     2, {T_VEC2,  T_VEC2},   {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_vec2", {0}, {0}},
+    {slvEXTENSION_NONE,     "reflect", _EvaluateReflect, gcvNULL,                T_VEC3, ANY,     2, {T_VEC3,  T_VEC3},   {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_vec3", {0}, {0}},
+    {slvEXTENSION_NONE,     "reflect", _EvaluateReflect, gcvNULL,                T_VEC4, ANY,     2, {T_VEC4,  T_VEC4},   {_IN,  _IN}, {ANY, ANY},gceINTRIN_source, "_viv_reflect_vec4", {0}, {0}},
 
     /* texture size function. */
     {slvEXTENSION_HALTI,    "textureSize", gcvNULL, gcvNULL,            T_IVEC2,_HP,     2, {T_SAMPLER2D,    T_INT},                     {_IN, _IN}, {ANY, ANY},gceINTRIN_create_size_for_sampler, "_viv_textureSize_float_2D", {0}, {0}},
@@ -2806,22 +2828,22 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
     {slvEXTENSION_ES_31,    "textureGatherOffset", gcvNULL, gcvNULL,    T_UVEC4, ANY,   4, {T_USAMPLER2DARRAY,       T_VEC3, T_IVEC2, T_INT},     {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offset, "_viv_textureGatherOffset_uint_2DArray_WithComp", {0}, {0}},
 
     /* texture gather offsets functions. */
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_VEC4, ANY,    3, {T_SAMPLER2D,             T_VEC2, T_TYPE_MATCH_CALLBACK0},            {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_float_NoComp", {0}, {slConstructIVEC2Array4}},
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_VEC4, ANY,    3, {T_SAMPLER2DARRAY,        T_VEC3, T_TYPE_MATCH_CALLBACK0},            {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_float_2DArray_NoComp", {0}, {slConstructIVEC2Array4}},
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_VEC4, ANY,    4, {T_SAMPLER2D,             T_VEC2, T_TYPE_MATCH_CALLBACK0, T_INT},     {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_float_WithComp", {0}, {slConstructIVEC2Array4}},
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_VEC4, ANY,    4, {T_SAMPLER2DARRAY,        T_VEC3, T_TYPE_MATCH_CALLBACK0, T_INT},     {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_float_2DArray_WithComp", {0}, {slConstructIVEC2Array4}},
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_VEC4, ANY,    4, {T_SAMPLER2DSHADOW,       T_VEC2, T_FLOAT, T_TYPE_MATCH_CALLBACK0},   {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_float_2DShadow", {0}, {slConstructIVEC2Array4}},
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_VEC4, ANY,    4, {T_SAMPLER2DARRAYSHADOW,  T_VEC3, T_FLOAT, T_TYPE_MATCH_CALLBACK0},   {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_float_2DArrayShadow", {0}, {slConstructIVEC2Array4}},
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_VEC4, ANY,    3, {T_SAMPLER2D,             T_VEC2, T_TYPE_MATCH_CALLBACK0},            {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_float_NoComp", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_VEC4, ANY,    3, {T_SAMPLER2DARRAY,        T_VEC3, T_TYPE_MATCH_CALLBACK0},            {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_float_2DArray_NoComp", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_VEC4, ANY,    4, {T_SAMPLER2D,             T_VEC2, T_TYPE_MATCH_CALLBACK0, T_INT},     {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_float_WithComp", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_VEC4, ANY,    4, {T_SAMPLER2DARRAY,        T_VEC3, T_TYPE_MATCH_CALLBACK0, T_INT},     {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_float_2DArray_WithComp", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_VEC4, ANY,    4, {T_SAMPLER2DSHADOW,       T_VEC2, T_FLOAT, T_TYPE_MATCH_CALLBACK0},   {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_float_2DShadow", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_VEC4, ANY,    4, {T_SAMPLER2DARRAYSHADOW,  T_VEC3, T_FLOAT, T_TYPE_MATCH_CALLBACK0},   {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_float_2DArrayShadow", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
 
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_IVEC4, ANY,   3, {T_ISAMPLER2D,            T_VEC2, T_TYPE_MATCH_CALLBACK0},            {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_int_NoComp", {0}, {slConstructIVEC2Array4}},
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_IVEC4, ANY,   3, {T_ISAMPLER2DARRAY,       T_VEC3, T_TYPE_MATCH_CALLBACK0},            {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_int_2DArray_NoComp", {0}, {slConstructIVEC2Array4}},
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_IVEC4, ANY,   4, {T_ISAMPLER2D,            T_VEC2, T_TYPE_MATCH_CALLBACK0, T_INT},     {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_int_WithComp", {0}, {slConstructIVEC2Array4}},
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_IVEC4, ANY,   4, {T_ISAMPLER2DARRAY,       T_VEC3, T_TYPE_MATCH_CALLBACK0, T_INT},     {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_int_2DArray_WithComp", {0}, {slConstructIVEC2Array4}},
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_IVEC4, ANY,   3, {T_ISAMPLER2D,            T_VEC2, T_TYPE_MATCH_CALLBACK0},            {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_int_NoComp", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_IVEC4, ANY,   3, {T_ISAMPLER2DARRAY,       T_VEC3, T_TYPE_MATCH_CALLBACK0},            {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_int_2DArray_NoComp", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_IVEC4, ANY,   4, {T_ISAMPLER2D,            T_VEC2, T_TYPE_MATCH_CALLBACK0, T_INT},     {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_int_WithComp", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_IVEC4, ANY,   4, {T_ISAMPLER2DARRAY,       T_VEC3, T_TYPE_MATCH_CALLBACK0, T_INT},     {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_int_2DArray_WithComp", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
 
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_UVEC4, ANY,   3, {T_USAMPLER2D,            T_VEC2, T_TYPE_MATCH_CALLBACK0},            {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_uint_NoComp", {0}, {slConstructIVEC2Array4}},
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_UVEC4, ANY,   3, {T_USAMPLER2DARRAY,       T_VEC3, T_TYPE_MATCH_CALLBACK0},            {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_uint_2DArray_NoComp", {0}, {slConstructIVEC2Array4}},
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_UVEC4, ANY,   4, {T_USAMPLER2D,            T_VEC2, T_TYPE_MATCH_CALLBACK0, T_INT},     {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_uint_WithComp", {0}, {slConstructIVEC2Array4}},
-    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_UVEC4, ANY,   4, {T_USAMPLER2DARRAY,       T_VEC3, T_TYPE_MATCH_CALLBACK0, T_INT},     {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_uint_2DArray_WithComp", {0}, {slConstructIVEC2Array4}},
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_UVEC4, ANY,   3, {T_USAMPLER2D,            T_VEC2, T_TYPE_MATCH_CALLBACK0},            {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_uint_NoComp", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_UVEC4, ANY,   3, {T_USAMPLER2DARRAY,       T_VEC3, T_TYPE_MATCH_CALLBACK0},            {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_uint_2DArray_NoComp", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_UVEC4, ANY,   4, {T_USAMPLER2D,            T_VEC2, T_TYPE_MATCH_CALLBACK0, T_INT},     {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_uint_WithComp", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
+    {slvEXTENSION_GPU_SHADER5,  "textureGatherOffsets", gcvNULL, gcvNULL,    T_UVEC4, ANY,   4, {T_USAMPLER2DARRAY,       T_VEC3, T_TYPE_MATCH_CALLBACK0, T_INT},     {_IN, _IN, _IN, _IN}, {ANY, ANY, ANY, ANY},gceINTRIN_texture_gather_offsets, "_viv_textureGatherOffsets_uint_2DArray_WithComp", {0}, {slConstructIVEC2Array4}, slFuncCheckForTextureGatherOffsets },
 
     /* texelFetch function for MSAA. */
     {slvEXTENSION_ES_31,    "texelFetch", gcvNULL, _GenTexelFetchCode,             T_VEC4,   ANY,  3, {T_SAMPLER2DMS,           T_IVEC2,     T_INT},                                        {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_texelFetch_for_MSAA, "_viv_texelFetch_float", {0}, {0}},
@@ -2856,54 +2878,54 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
 
 
     /* Image load functions. */
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_VEC4,  _HP,    2, {T_IMAGE2D,       T_IVEC2}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_2D_float", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_IVEC4, _HP,    2, {T_IIMAGE2D,      T_IVEC2}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_2D_int", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_UVEC4, _HP,    2, {T_UIMAGE2D,      T_IVEC2}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_VEC4,  _HP,    2, {T_IMAGE2D,       T_IVEC2}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_image_2d", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_IVEC4, _HP,    2, {T_IIMAGE2D,      T_IVEC2}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_iimage_2d", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_UVEC4, _HP,    2, {T_UIMAGE2D,      T_IVEC2}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_uimage_2d", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_VEC4,  _HP,    2, {T_IMAGE3D,       T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_3D_float", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_IVEC4, _HP,    2, {T_IIMAGE3D,      T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_3D_int", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_UVEC4, _HP,    2, {T_UIMAGE3D,      T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_VEC4,  _HP,    2, {T_IMAGE3D,       T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_image_3d", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_IVEC4, _HP,    2, {T_IIMAGE3D,      T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_iimage_3d", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_UVEC4, _HP,    2, {T_UIMAGE3D,      T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_uimage_3d", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_VEC4,  _HP,    2, {T_IMAGECUBE,     T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_cube_float", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_IVEC4, _HP,    2, {T_IIMAGECUBE,    T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_cube_int", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_UVEC4, _HP,    2, {T_UIMAGECUBE,    T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_cube_uint", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_VEC4,  _HP,    2, {T_IMAGECUBE,     T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_image_cube", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_IVEC4, _HP,    2, {T_IIMAGECUBE,    T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_iimage_cube", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_UVEC4, _HP,    2, {T_UIMAGECUBE,    T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_uimage_cube", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_VEC4,  _HP,    2, {T_IMAGE2DARRAY,  T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_2DArray_float", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_IVEC4, _HP,    2, {T_IIMAGE2DARRAY, T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_2DArray_int", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_UVEC4, _HP,    2, {T_UIMAGE2DARRAY, T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_2DArray_uint", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_VEC4,  _HP,    2, {T_IMAGE2DARRAY,  T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_image_2d_array", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_IVEC4, _HP,    2, {T_IIMAGE2DARRAY, T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_iimage_2d_array", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_UVEC4, _HP,    2, {T_UIMAGE2DARRAY, T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_uimage_2d_array", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_VEC4,  _HP,    2, {T_IMAGECUBEARRAY,  T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_CubeArray_float", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_IVEC4, _HP,    2, {T_IIMAGECUBEARRAY, T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_CubeArray_int", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_UVEC4, _HP,    2, {T_UIMAGECUBEARRAY, T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_CubeArray_uint", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_VEC4,  _HP,    2, {T_IMAGECUBEARRAY,  T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_image_cube_array", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_IVEC4, _HP,    2, {T_IIMAGECUBEARRAY, T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_iimage_cube_array", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageLoad", gcvNULL, gcvNULL,               T_UVEC4, _HP,    2, {T_UIMAGECUBEARRAY, T_IVEC3}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_uimage_cube_array", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,   "imageLoad", gcvNULL, gcvNULL,  T_VEC4,  _HP,    2, {T_IMAGEBUFFER, T_INT},  {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_buffer_float", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,   "imageLoad", gcvNULL, gcvNULL,  T_IVEC4, _HP,    2, {T_IIMAGEBUFFER, T_INT}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,   "imageLoad", gcvNULL, gcvNULL,  T_UVEC4, _HP,    2, {T_UIMAGEBUFFER, T_INT}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_buffer_uint", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,   "imageLoad", gcvNULL, gcvNULL,  T_VEC4,  _HP,    2, {T_IMAGEBUFFER, T_INT},  {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_imageBuffer", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,   "imageLoad", gcvNULL, gcvNULL,  T_IVEC4, _HP,    2, {T_IIMAGEBUFFER, T_INT}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_iimageBuffer", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,   "imageLoad", gcvNULL, gcvNULL,  T_UVEC4, _HP,    2, {T_UIMAGEBUFFER, T_INT}, {_IN, _IN}, {_HP, ANY},gceINTRIN_image_load, "_viv_image_load_uimageBuffer", {slvMEMORY_ACCESS_QUALIFIER_READONLY, 0}, {0}, gcvNULL, MEM_ACCESS},
 
      /* Image store function. */
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IMAGE2D, T_IVEC2, T_VEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_2D_float", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IIMAGE2D, T_IVEC2, T_IVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_2D_int", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_UIMAGE2D, T_IVEC2, T_UVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IMAGE2D, T_IVEC2, T_VEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_image_2d", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IIMAGE2D, T_IVEC2, T_IVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_iimage_2d", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_UIMAGE2D, T_IVEC2, T_UVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_uimage_2d", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IMAGE3D, T_IVEC3, T_VEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_3D_float", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IIMAGE3D, T_IVEC3, T_IVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_3D_int", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_UIMAGE3D, T_IVEC3, T_UVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IMAGE3D, T_IVEC3, T_VEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_image_3d", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IIMAGE3D, T_IVEC3, T_IVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_iimage_3d", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_UIMAGE3D, T_IVEC3, T_UVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_uimage_3d", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IMAGECUBE, T_IVEC3, T_VEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_cube_float", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IIMAGECUBE, T_IVEC3, T_IVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_cube_int", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_UIMAGECUBE, T_IVEC3, T_UVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_cube_uint", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IMAGECUBE, T_IVEC3, T_VEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_image_cube", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IIMAGECUBE, T_IVEC3, T_IVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_iimage_cube", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_UIMAGECUBE, T_IVEC3, T_UVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_uimage_cube", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IMAGE2DARRAY, T_IVEC3, T_VEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_2DArray_float", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_IVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_2DArray_int", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_2DArray_uint", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IMAGE2DARRAY, T_IVEC3, T_VEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_image_2d_array", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_IVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_iimage_2d_array", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_uimage_2d_array", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IMAGECUBEARRAY, T_IVEC3, T_VEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_CubeArray_float", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IIMAGECUBEARRAY, T_IVEC3, T_IVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_CubeArray_int", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_UIMAGECUBEARRAY, T_IVEC3, T_UVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_CubeArray_uint", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IMAGECUBEARRAY, T_IVEC3, T_VEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_image_cube_array", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_IIMAGECUBEARRAY, T_IVEC3, T_IVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_iimage_cube_array", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageStore", gcvNULL, gcvNULL,              T_VOID,  _DP,   3, {T_UIMAGECUBEARRAY, T_IVEC3, T_UVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_uimage_cube_array", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,   "imageStore", gcvNULL, gcvNULL, T_VOID,  _DP,   3, {T_IMAGEBUFFER,  T_INT, T_VEC4},  {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_buffer_float", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,   "imageStore", gcvNULL, gcvNULL, T_VOID,  _DP,   3, {T_IIMAGEBUFFER, T_INT, T_IVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,   "imageStore", gcvNULL, gcvNULL, T_VOID,  _DP,   3, {T_UIMAGEBUFFER, T_INT, T_UVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_buffer_uint", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,   "imageStore", gcvNULL, gcvNULL, T_VOID,  _DP,   3, {T_IMAGEBUFFER,  T_INT, T_VEC4},  {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_imageBuffer", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,   "imageStore", gcvNULL, gcvNULL, T_VOID,  _DP,   3, {T_IIMAGEBUFFER, T_INT, T_IVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_iimageBuffer", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,   "imageStore", gcvNULL, gcvNULL, T_VOID,  _DP,   3, {T_UIMAGEBUFFER, T_INT, T_UVEC4}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_store, "_viv_image_store_uimageBuffer", {slvMEMORY_ACCESS_QUALIFIER_WRITEONLY, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
     /* Image atomic functions. */
     /* imageAtomicAddXXX */
@@ -3082,9 +3104,6 @@ static gctUINT FSIntrinsicBuiltInFunctionCount =
 #undef TREAT_F_AS_I
 
 /*******************************Normal variables*******************************/
-
-#define BUILTIN_MATRIX   "#ff_MVP_Matrix"
-
 typedef gceSTATUS
 (*sltBUILT_IN_VAR_UPDATE_FUNC_PTR)(
     IN sloCOMPILER,
@@ -3140,7 +3159,7 @@ static slsBUILT_IN_VARIABLE VSBuiltInVariables[] =
     {slvEXTENSION_NONE,  "gl_DepthRange.diff",       "#DepthRange.diff",  slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_DepthRange",            "#DepthRange",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_STRUCT,   (gctUINT)-1,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
 
-    {slvEXTENSION_NONE,  BUILTIN_MATRIX,             BUILTIN_MATRIX,      slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_MAT4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {slvEXTENSION_NONE,  "gl_ModelViewProjectionMatrix",             "#ff_MVP_Matrix",      slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_UNIFORM,      T_MAT4,     0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_Color",                 "#AttrColor",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_ATTRIBUTE,    T_VEC4,     0,    slvSTORAGE_QUALIFIER_ATTRIBUTE, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_SecondaryColor",        "#AttrSecondaryColor",slvPRECISION_QUALIFIER_HIGH,   slvSTORAGE_QUALIFIER_ATTRIBUTE,    T_VEC4,     0,    slvSTORAGE_QUALIFIER_ATTRIBUTE, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_Normal",                "#Normal",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_ATTRIBUTE,    T_VEC3,     0,    slvSTORAGE_QUALIFIER_ATTRIBUTE, gcvNULL, gcvNULL, 0, gcvFALSE},
@@ -3172,6 +3191,7 @@ static slsBUILT_IN_VARIABLE FSBuiltInVariables[] =
     {slvEXTENSION_NONE,      "gl_FrontFacing",      "#FrontFacing", slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_VARYING_IN,    T_BOOL,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NON_HALTI, "gl_FragColor",        "#Color",       slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NON_HALTI, "gl_FragData",         "#Color",       slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_VEC4,     1,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE, updateForFragData},
+    {slvEXTENSION_SHADER_FRAMEBUFFER_FETCH, "gl_LastFragData",     "#LastFragData",       slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_VARYING_IN,  T_VEC4,     1,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE, updateForFragData},
     {slvEXTENSION_NONE,      "gl_PointCoord",       "#PointCoord",  slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_VARYING_IN,    T_VEC2,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_FRAG_DEPTH,"gl_FragDepthEXT",     "#Depth",       slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_HALTI,     "gl_FragDepth",        "#Depth",       slvPRECISION_QUALIFIER_HIGH,     slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},

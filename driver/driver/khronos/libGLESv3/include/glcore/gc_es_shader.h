@@ -219,6 +219,9 @@ typedef struct __GLprogramObjectRec
     GLuint xfbVaryingNum;
     GLchar **ppXfbVaryingNames;
 
+    GLuint maxSampler;
+    GLuint maxUnit;
+
     GLvoid *privateData;
 } __GLprogramObject;
 
@@ -298,6 +301,9 @@ typedef struct __GLshaderProgramMachineRec
 
     /* Input patch vertex number for TCS input */
     GLint                   patchVertices;
+
+    GLuint                  maxSampler;
+    GLuint                  maxUnit;
 
 } __GLshaderProgramMachine;
 

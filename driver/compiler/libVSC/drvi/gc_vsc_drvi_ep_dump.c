@@ -11,10 +11,6 @@
 *****************************************************************************/
 
 
-/* This file includes all jobs that needs linkage, such as GL program linkage among
-   shader stages, file modules linkage for kernel program, HW linkage for programming,
-   etc */
-
 #include "gc_vsc.h"
 
 void _PrintMachineCode(VSC_MC_RAW_INST* pMcCode,
@@ -279,9 +275,14 @@ void _PrintConstantMapping(SHADER_CONSTANT_MAPPING* pConstantMapping, VIR_Shader
     {
         SHADER_COMPILE_TIME_CONSTANT* pCTC = &pConstantMapping->pCompileTimeConstant[ctcIdx];
 
-        gcmASSERT(pCTC->hwConstantLocation.hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER);
-
-        vscDumper_PrintStrSafe(pDumper, "c%d = {", pCTC->hwConstantLocation.hwLoc.hwRegNo);
+        if (pCTC->hwConstantLocation.hwAccessMode == SHADER_HW_ACCESS_MODE_REGISTER)
+        {
+            vscDumper_PrintStrSafe(pDumper, "c%d = {", pCTC->hwConstantLocation.hwLoc.hwRegNo);
+        }
+        else
+        {
+            vscDumper_PrintStrSafe(pDumper, "m@%d = {", pCTC->hwConstantLocation.hwLoc.memAddr.offsetInConstantArray);
+        }
 
         for (i = 0; i < CHANNEL_NUM; i ++)
         {
@@ -326,7 +327,7 @@ void _PrintMappingTables(SHADER_EXECUTABLE_PROFILE* pSEP, VIR_Shader* pShader, V
 
 void _PrintSEPMisc(SHADER_EXECUTABLE_PROFILE* pSEP, VSC_DUMPER* pDumper)
 {
-    gctCHAR*   strClientType[] = {"UNKNOWN", "dx", "gl", "gles", "cl"};
+    gctCHAR*   strClientType[] = {"UNKNOWN", "dx", "gl", "gles", "cl", "vk"};
     gctCHAR*   strShaderType[] = {"UNKNOWN", "vs", "ps", "gs", "hs", "ds", "gps"};
 
     /* Print shader type */
@@ -454,6 +455,7 @@ void _PrintExeHints(SHADER_EXECUTABLE_PROFILE* pSEP, VSC_DUMPER* pDumper)
     vscDumper_PrintStrSafe(pDumper, "allocCrByUnifiedMode: %s\n", strURFAllocStrategy[pExeHints->derivedHints.globalStates.unifiedConstRegAllocStrategy]);
     vscDumper_PrintStrSafe(pDumper, "allocSrByUnifiedMode: %s\n", strURFAllocStrategy[pExeHints->derivedHints.globalStates.unifiedSamplerRegAllocStrategy]);
     vscDumper_PrintStrSafe(pDumper, "gprSpilled: %s\n", strYesNo[pExeHints->derivedHints.globalStates.bGprSpilled]);
+    vscDumper_PrintStrSafe(pDumper, "crSpilled: %s\n", strYesNo[pExeHints->derivedHints.globalStates.bCrSpilled]);
 
     if (DECODE_SHADER_TYPE(pSEP->shVersionType) == SHADER_TYPE_HULL ||
         DECODE_SHADER_TYPE(pSEP->shVersionType) == SHADER_TYPE_DOMAIN)
@@ -491,24 +493,22 @@ void _PrintExeHints(SHADER_EXECUTABLE_PROFILE* pSEP, VSC_DUMPER* pDumper)
     vscDumper_DumpBuffer(pDumper);
 }
 
-void vscPrintSEP(SHADER_EXECUTABLE_PROFILE* pSEP, void* pVirShader)
+void vscPrintSEP(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, SHADER_HANDLE hShader)
 {
     VSC_DUMPER    sepDumper;
     gctUINT       dumpBufferSize = 1024;
     gctCHAR*      pDumpBuffer;
-    VIR_Shader*   pShader = (VIR_Shader*)pVirShader;
+    VIR_Shader*   pShader = (VIR_Shader*)hShader;
     gctCHAR*      strShaderType[] = {"UNKNOWN", "VS", "PS", "GS", "HS", "DS", "GPS"};
-    VSC_HW_CONFIG hwCfg;
 
     /* We support cross-HW SEP dump. So ideally, we should get vscHWCFG based on chip model
        and its revision which is stored in SEP. However, we have no such framework yet, so
-       we just get it by gcQueryShaderCompilerHwCfg, which means we can not support cross-HW
-       SEP dump so far.
+       we just get it from VSC_SYS_CONTEXT now, which means we can not support cross-HW SEP
+       dump so far.
 
        Actually, although VSC compile interfaces have supported cross-compilation, driver can
        not get vsc-HWCFG for not-current HW, we also dont support cross-compilation in fact.
        So we need consider it later. */
-    gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg);
 
     if (gcoOS_Allocate(gcvNULL, dumpBufferSize, (gctPOINTER*)&pDumpBuffer) != gcvSTATUS_OK)
     {
@@ -554,9 +554,11 @@ void vscPrintSEP(SHADER_EXECUTABLE_PROFILE* pSEP, void* pVirShader)
     /* Print code */
     _PrintMachineCode((VSC_MC_RAW_INST*)pSEP->pMachineCode,
                       pSEP->countOfMCInst,
-                      &hwCfg,
+                      &pSysCtx->pCoreSysCtx->hwCfg,
                       pSEP->exeHints.derivedHints.globalStates.bExecuteOnDual16,
                       &sepDumper);
+
+    vscDIDumpLineTable(pShader->debugInfo);
 
     /* Release dumper buffer */
     gcoOS_Free(gcvNULL, pDumpBuffer);

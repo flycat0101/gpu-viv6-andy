@@ -486,7 +486,7 @@ static void _Liveness_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
                not kill indexing dsts because they are potentially killed, not definitely
                killed. So to be easy, we dont kill all indexings now! */
             if (!bIndexing &&
-                !VIR_OPCODE_CONDITIONAL_WRITE(opcode) &&
+                !VIR_Inst_ConditionalWrite(pInst) &&
                 !VIR_OPCODE_DestOnlyUseEnable(opcode))
             {
                 _Update_Liveness_Local_Kill(pDuInfo,
@@ -794,6 +794,9 @@ static VSC_ErrCode _DoLivenessAnalysis(VIR_CALL_GRAPH* pCg, VIR_LIVENESS_INFO* p
         startBitOrdinal = defIdx + 1;
     }
 
+    /* Mark we have successfully built the LV flow */
+    vscVIR_SetDFAFlowBuilt(&pLvInfo->baseTsDFA.baseDFA, gcvTRUE);
+
     return errCode;
 }
 
@@ -816,9 +819,6 @@ VSC_ErrCode vscVIR_BuildLivenessInfo(VIR_CALL_GRAPH* pCg,
     errCode = _DoLivenessAnalysis(pCg, pLvInfo);
     CHECK_ERROR(errCode, "Do liveness analysis");
 
-    /* Mark we have successfully built the LV info */
-    vscVIR_SetDFAValidity(&pLvInfo->baseTsDFA.baseDFA, gcvTRUE);
-
     return errCode;
 }
 
@@ -826,13 +826,13 @@ VSC_ErrCode vscVIR_DestroyLivenessInfo(VIR_LIVENESS_INFO* pLvInfo)
 {
     VSC_ErrCode            errCode = VSC_ERR_NONE;
 
-    if (vscVIR_GetDFAValidity(&pLvInfo->baseTsDFA.baseDFA))
+    if (vscVIR_CheckDFAFlowBuilt(&pLvInfo->baseTsDFA.baseDFA))
     {
         vscVIR_FinalizeBaseTsDFA(&pLvInfo->baseTsDFA);
         vscPMP_Finalize(&pLvInfo->pmp);
 
         /* Mark LV info has been invalid */
-        vscVIR_SetDFAValidity(&pLvInfo->baseTsDFA.baseDFA, gcvFALSE);
+        vscVIR_SetDFAFlowBuilt(&pLvInfo->baseTsDFA.baseDFA, gcvFALSE);
     }
 
     return errCode;

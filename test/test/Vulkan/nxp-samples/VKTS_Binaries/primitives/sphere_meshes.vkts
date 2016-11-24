@@ -1,0 +1,16 @@
+#
+# VulKan ToolS meshes.
+#
+
+submesh_library sphere_submeshes.vkts
+
+#
+# Mesh.
+#
+
+name Sphere
+
+submesh Sphere_0
+
+aabb 0.000000 0.000000 -0.000000 1.000000 1.000000 1.000000
+

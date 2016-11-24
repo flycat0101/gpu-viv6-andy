@@ -123,10 +123,12 @@ void _VIR_ReplaceLDARR(
         VIR_Instruction         *pUseInst;
         gctBOOL                 hasOtherDef = gcvFALSE;
         gctUINT                 defIdx = VIR_INVALID_DEF_INDEX, srcIndex;
+        VIR_Operand *           opnd;
 
-        if(VIR_MOD_NONE != VIR_Operand_GetModifier(pInst->dest) ||
+        opnd = VIR_Inst_GetDest(pInst);
+        if(VIR_MOD_NONE != VIR_Operand_GetModifier(opnd) ||
            VIR_MOD_NONE != VIR_Operand_GetModifier(pSrc1Opnd) ||
-           VIR_ROUND_DEFAULT != VIR_Operand_GetRoundMode(pInst->dest) ||
+           VIR_ROUND_DEFAULT != VIR_Operand_GetRoundMode(opnd) ||
            VIR_ROUND_DEFAULT != VIR_Operand_GetRoundMode(pSrc1Opnd) ||
            !VIR_Operand_GetSymbol(pSrc0Opnd)
            )
@@ -135,7 +137,7 @@ void _VIR_ReplaceLDARR(
         }
 
         /* get ldarr's dst LR */
-        VIR_Operand_GetOperandInfo(pInst, pInst->dest, &dstOpndInfo);
+        VIR_Operand_GetOperandInfo(pInst, opnd, &dstOpndInfo);
 
         if (VIR_OpndInfo_Is_Virtual_Reg(&dstOpndInfo))
         {
@@ -216,7 +218,7 @@ void _VIR_ReplaceLDARR(
                 VIR_Function_DupOperand(pFunc, pSrc0Opnd, &pUseOpnd);
 
                 /* we need to set useOpnd's type to the LDARR's dst type */
-                VIR_Operand_SetType(pUseOpnd, VIR_Operand_GetType(pInst->dest));
+                VIR_Operand_SetType(pUseOpnd, VIR_Operand_GetType(VIR_Inst_GetDest(pInst)));
 
                 /* use the swizzle of pUseOpnd
                    add t1, base[i].yzyz, t2
@@ -245,7 +247,7 @@ void _VIR_ReplaceLDARR(
                         VIR_HALF_CHANNEL_MASK_FULL,
                         gcvNULL);
 
-                pUseInst->src[srcIndex] = pUseOpnd;
+                VIR_Inst_ChangeSource(pUseInst, srcIndex, pUseOpnd);
             }
             defIdx = pDef->nextDefIdxOfSameRegNo;
         }
@@ -257,12 +259,14 @@ void _VIR_ReplaceLDARR(
         }
         else
         {
-            /* case 2: change to MOV */
-            VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
-            VIR_Inst_SetSrcNum(pInst, 1);
-
+            /* case 2: change LDARR to MOV
+               LDARR t1, base, offset ==>
+               MOV   t1, base[offset] */
             /* relIndex is sym id */
             _VIR_ReplaceIndexOpnd(pSrc1Opnd, pSrc0Opnd, &src1OpndInfo);
+
+            VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
+            VIR_Inst_ChangeSrcNum(pInst, 1);
         }
     }
 }
@@ -273,8 +277,9 @@ void _VIR_ReplaceSTARR(
     VIR_DEF_USAGE_INFO  *pDuInfo,
     VIR_Instruction     *pInst)
 {
-    VIR_Operand             *src0Opnd = VIR_Inst_GetSource(pInst, 0);
-    VIR_OperandInfo          src0OpndInfo, destInfo;
+    VIR_Operand *       src0Opnd = VIR_Inst_GetSource(pInst, 0);
+    VIR_OperandInfo     src0OpndInfo, destInfo;
+    VIR_Operand *       opnd;
 
     gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_STARR);
 
@@ -290,8 +295,10 @@ void _VIR_ReplaceSTARR(
             mov dest[src0.x], src1.x
         */
         VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
-        VIR_Inst_SetSource(pInst, 0, pInst->src[VIR_Operand_Src1]);
-        VIR_Inst_SetSrcNum(pInst, 1);
+        opnd = VIR_Inst_GetSource(pInst, VIR_Operand_Src1);
+        VIR_Inst_SetSource(pInst, VIR_Operand_Src1, gcvNULL);
+        VIR_Inst_ChangeSource(pInst, 0, opnd);
+        VIR_Inst_ChangeSrcNum(pInst, 1);
     }
     else
     {
@@ -304,7 +311,6 @@ void _VIR_ReplaceSTARR(
         gctUINT     newDstRegNo = VIR_Shader_NewVirRegId(pShader, 1);
         VIR_SymId   newDstSymId = VIR_INVALID_ID;
         VIR_Instruction *pNewInsertedInst;
-        VIR_Operand *newOpnd;
 
         VIR_Shader_AddSymbol(pShader,
                             VIR_SYM_VIRREG,
@@ -317,29 +323,31 @@ void _VIR_ReplaceSTARR(
             mov new-temp-reg.x, src0
         */
         VIR_Function_AddInstructionBefore(pFunc,
-            VIR_OP_MOV, VIR_Operand_GetType(src0Opnd),
+            VIR_OP_MOV,
+            VIR_Operand_GetType(src0Opnd),
             pInst,
+            gcvTRUE,
             &pNewInsertedInst);
 
         /* dst */
-        VIR_Operand_SetSymbol(pNewInsertedInst->dest, pFunc, newDstSymId);
-        VIR_Operand_SetEnable(pNewInsertedInst->dest, VIR_ENABLE_X);
+        opnd = VIR_Inst_GetDest(pNewInsertedInst);
+        VIR_Operand_SetSymbol(opnd, pFunc, newDstSymId);
+        VIR_Operand_SetEnable(opnd, VIR_ENABLE_X);
+        VIR_Operand_GetOperandInfo(pNewInsertedInst, opnd, &destInfo);
+
+        _VIR_ReplaceIndexOpnd(opnd, VIR_Inst_GetDest(pInst), &destInfo);
 
         /* src */
-        VIR_Function_DupOperand(pFunc, src0Opnd, &newOpnd);
-        pNewInsertedInst->src[VIR_Operand_Src0] = newOpnd;
-        VIR_Operand_SetType(newOpnd, VIR_Operand_GetType(src0Opnd));
+        opnd = VIR_Inst_GetSource(pNewInsertedInst, VIR_Operand_Src0);
+        VIR_Operand_Copy(opnd, src0Opnd);
 
-        VIR_Operand_GetOperandInfo(pNewInsertedInst, pNewInsertedInst->dest, &destInfo);
-
-        _VIR_ReplaceIndexOpnd(pNewInsertedInst->dest, VIR_Inst_GetDest(pInst), &destInfo);
 
         VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
-        VIR_Inst_SetSource(pInst, 0, pInst->src[VIR_Operand_Src1]);
-        VIR_Inst_SetSrcNum(pInst, 1);
+        opnd = VIR_Inst_GetSource(pInst, VIR_Operand_Src1);
+        VIR_Inst_SetSource(pInst, 1, gcvNULL);
+        VIR_Inst_ChangeSource(pInst, 0, opnd);
+        VIR_Inst_ChangeSrcNum(pInst, 1);
     }
-
-
 }
 
 /* in dual16 shader, we need to insert precison conv for
@@ -361,7 +369,7 @@ _InsertPrecisionConvInst(
     VIR_Function        *pFunc,
     VIR_Instruction     *pInst,
     VIR_DEF_USAGE_INFO  *pDuInfo,
-    VSC_PRIMARY_MEM_POOL    *pMP)
+    VSC_MM              *pMM)
 {
     VSC_ErrCode     errCode = VSC_ERR_NONE;
     gctUINT         usageIdx, defIdx, newDstRegNo = VIR_INVALID_ID;
@@ -373,11 +381,11 @@ _InsertPrecisionConvInst(
     VIR_USAGE           *pUsage = gcvNULL;
     VIR_DEF             *pDef = gcvNULL;
     VIR_Instruction     *pNewInsertedInst = gcvNULL;
-    VIR_Operand         *newOpnd = gcvNULL;
     VIR_Enable          srcEnable = VIR_ENABLE_NONE;
     VIR_OperandInfo     srcInfo;
     VIR_Symbol          *pSym = gcvNULL;
     gctUINT             *defIdxArray = gcvNULL, defCount = 0;
+    VIR_Operand         *opnd;
 
     destOpnd = VIR_Inst_GetDest(pInst);
     if (!destOpnd)
@@ -419,7 +427,7 @@ _InsertPrecisionConvInst(
                 /* save the defIdx for the udChain, since the update inside the loop
                    will change the udChain */
                 defCount = UD_CHAIN_GET_DEF_COUNT(&pUsage->udChain);
-                defIdxArray = (gctUINT*)vscMM_Alloc(&pMP->mmWrapper, defCount * sizeof(gctUINT));
+                defIdxArray = (gctUINT*)vscMM_Alloc(pMM, defCount * sizeof(gctUINT));
                 for (j = 0; j < defCount; j ++)
                 {
                     defIdx = UD_CHAIN_GET_DEF(&pUsage->udChain, j);
@@ -457,7 +465,7 @@ _InsertPrecisionConvInst(
                                     vscVIR_AddNewUsageToDef(pDuInfo,
                                             pDef->defKey.pDefInst,
                                             pNewInsertedInst,
-                                            newOpnd,
+                                            VIR_Inst_GetSource(pNewInsertedInst, VIR_Operand_Src0),
                                             gcvFALSE,
                                             srcInfo.u1.virRegInfo.virReg,
                                             1,
@@ -498,12 +506,14 @@ _InsertPrecisionConvInst(
                                 errCode = VIR_Function_AddInstructionBefore(pFunc,
                                     VIR_OP_MOV, VIR_Operand_GetType(srcOpnd),
                                     pInst,
+                                    gcvTRUE,
                                     &pNewInsertedInst);
 
                                 /* dst */
-                                VIR_Operand_SetSymbol(pNewInsertedInst->dest, pFunc, newDstSymId);
-                                VIR_Operand_SetEnable(pNewInsertedInst->dest, VIR_ENABLE_XYZW);
-                                VIR_Operand_SetPrecision(pNewInsertedInst->dest, VIR_Operand_GetPrecision(destOpnd));
+                                opnd = VIR_Inst_GetDest(pNewInsertedInst);
+                                VIR_Operand_SetSymbol(opnd, pFunc, newDstSymId);
+                                VIR_Operand_SetEnable(opnd, VIR_ENABLE_XYZW);
+                                VIR_Operand_SetPrecision(opnd, VIR_Operand_GetPrecision(destOpnd));
                                 VIR_Symbol_SetPrecision(pSym, VIR_Operand_GetPrecision(destOpnd));
                                 if (VIR_Operand_GetPrecision(srcOpnd) == VIR_PRECISION_HIGH ||
                                     VIR_Operand_GetPrecision(destOpnd) == VIR_PRECISION_HIGH)
@@ -517,9 +527,9 @@ _InsertPrecisionConvInst(
                                     gcvNULL, gcvNULL);
 
                                 /* src */
-                                VIR_Function_DupOperand(pFunc, srcOpnd, &newOpnd);
-                                pNewInsertedInst->src[VIR_Operand_Src0] = newOpnd;
-                                VIR_Operand_SetType(newOpnd, VIR_Operand_GetType(defDest));
+                                opnd = VIR_Inst_GetSource(pNewInsertedInst, VIR_Operand_Src0);
+                                VIR_Operand_Copy(opnd, srcOpnd);
+                                VIR_Operand_SetType(opnd, VIR_Operand_GetType(defDest));
 
                                 if (srcEnable & (1 << pDef->defKey.channel))
                                 {
@@ -537,7 +547,7 @@ _InsertPrecisionConvInst(
                                     vscVIR_AddNewUsageToDef(pDuInfo,
                                             pDef->defKey.pDefInst,
                                             pNewInsertedInst,
-                                            newOpnd,
+                                            opnd,
                                             gcvFALSE,
                                             srcInfo.u1.virRegInfo.virReg,
                                             1,
@@ -574,9 +584,182 @@ _InsertPrecisionConvInst(
             }
             if (defIdxArray)
             {
-                vscMM_Free(&pMP->mmWrapper, defIdxArray);
+                vscMM_Free(pMM, defIdxArray);
+                defIdxArray = gcvNULL;
             }
         }
+    }
+
+    return errCode;
+}
+
+/* in dual16 shader, we need to insert CMP for single-t branch
+branch.gt.t0 16, src0, src1
+branch.gt.t1 16, src0, src1
+==>
+cmp.gt.t0 dst, src0, src1
+cmp.gt.t1 dst, src0, src1
+branch.gt 16, dst
+
+*/
+VSC_ErrCode
+_InsertCMPInst(
+    VIR_Shader          *pShader,
+    VIR_Function        *pFunc,
+    VIR_Instruction     *pInst,
+    VIR_DEF_USAGE_INFO  *pDuInfo,
+    VSC_MM              *pMM)
+{
+    VSC_ErrCode     errCode = VSC_ERR_NONE;
+    gctUINT         i;
+    VIR_VirRegId regId;
+    VIR_SymId    dstSymId;
+    VIR_Operand  *srcOpnd = gcvNULL;
+    VIR_GENERAL_UD_ITERATOR udIter;
+    VIR_OperandInfo         operandInfo;
+    VIR_DEF     *pDef = gcvNULL;
+    gctUINT     swizzle;
+    VIR_TypeId  dstTy;
+    VIR_Instruction *newInst = gcvNULL;
+
+    if ((VIR_Inst_GetOpcode(pInst) == VIR_OP_JMPC ||
+         VIR_Inst_GetOpcode(pInst) == VIR_OP_JMP_ANY) &&
+         VIR_Inst_GetThreadMode(pInst) == VIR_THREAD_D16_DUAL_32)
+    {
+        dstTy = VIR_Operand_GetType(VIR_Inst_GetSource(pInst, 0));
+
+            /* add a COMP instruction */
+        errCode = VIR_Function_AddInstructionBefore(pFunc,
+                VIR_OP_AQ_CMP,
+                dstTy,
+                pInst,
+                gcvTRUE,
+                &newInst);
+        CHECK_ERROR(errCode, "VIR_Function_AddInstructionBefore failed.");
+
+        for (i = 0; i < VIR_Inst_GetSrcNum(pInst); ++i)
+        {
+            srcOpnd = VIR_Inst_GetSource(pInst, i);
+            swizzle = VIR_Operand_GetSwizzle(srcOpnd);
+            VIR_Operand_Copy(VIR_Inst_GetSource(newInst, i), srcOpnd);
+
+            /* update du information*/
+            vscVIR_InitGeneralUdIterator(&udIter, pDuInfo, pInst, srcOpnd, gcvFALSE, gcvFALSE);
+
+            VIR_Operand_GetOperandInfo(pInst,
+                srcOpnd,
+                &operandInfo);
+
+            for (pDef = vscVIR_GeneralUdIterator_First(&udIter); pDef != gcvNULL;
+                pDef = vscVIR_GeneralUdIterator_Next(&udIter))
+            {
+                vscVIR_AddNewUsageToDef(pDuInfo,
+                    pDef->defKey.pDefInst,
+                    newInst,
+                    VIR_Inst_GetSource(newInst, i),
+                    gcvFALSE,
+                    operandInfo.u1.virRegInfo.virReg,
+                    1,
+                    (1 << pDef->defKey.channel),
+                    VIR_HALF_CHANNEL_MASK_FULL,
+                    gcvNULL);
+            }
+
+            vscVIR_DeleteUsage(pDuInfo,
+                VIR_ANY_DEF_INST,
+                pInst,
+                srcOpnd,
+                gcvFALSE,
+                operandInfo.u1.virRegInfo.virReg,
+                1,
+                VIR_Swizzle_2_Enable(swizzle),
+                VIR_HALF_CHANNEL_MASK_FULL,
+                gcvNULL);
+        }
+
+        if (VIR_GetTypeFlag(dstTy) & VIR_TYFLAG_ISFLOAT)
+        {
+            VIR_ScalarConstVal imm0;
+
+            imm0.fValue = 1.0f;
+
+            VIR_Operand_SetImmediate(VIR_Inst_GetSource(newInst, 2),
+            VIR_TYPE_FLOAT32,
+            imm0);
+        }
+        else
+        {
+            VIR_ScalarConstVal imm0;
+
+            imm0.iValue = -1;
+
+            VIR_Operand_SetImmediate(VIR_Inst_GetSource(newInst, 2),
+            VIR_TYPE_INT32,
+            imm0);
+
+        }
+        regId = VIR_Shader_NewVirRegId(pShader, 1);
+        errCode = VIR_Shader_AddSymbol(
+            pShader,
+            VIR_SYM_VIRREG,
+            regId,
+            VIR_Shader_GetTypeFromId(pShader, dstTy),
+            VIR_STORAGE_UNKNOWN,
+            &dstSymId);
+        CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
+        VIR_Symbol_SetPrecision(VIR_Shader_GetSymFromId(pShader, dstSymId), VIR_PRECISION_MEDIUM);
+
+        VIR_Operand_SetTempRegister(VIR_Inst_GetDest(newInst),
+            pFunc,
+            dstSymId,
+            dstTy);
+        VIR_Operand_SetEnable(VIR_Inst_GetDest(newInst), VIR_ENABLE_XYZW);
+        VIR_Inst_SetConditionOp(newInst, VIR_Inst_GetConditionOp(pInst));
+
+        vscVIR_AddNewDef(pDuInfo,
+            newInst,
+            regId,
+            1,
+            VIR_ENABLE_XYZW,
+            VIR_HALF_CHANNEL_MASK_FULL,
+            gcvNULL,
+            gcvNULL);
+
+        VIR_Inst_SetThreadMode(newInst, VIR_THREAD_D16_DUAL_32);
+
+        /* change the original inst - make sure change everything needed */
+        srcOpnd = VIR_Inst_GetSource(pInst, VIR_Operand_Src0);
+        VIR_Operand_SetTempRegister(srcOpnd,
+            pFunc,
+            dstSymId,
+            dstTy);
+        VIR_Operand_SetIsConstIndexing(srcOpnd, gcvFALSE);
+        VIR_Operand_SetRelAddrMode(srcOpnd, 0);
+        VIR_Operand_SetMatrixConstIndex(srcOpnd, 0);
+        VIR_Operand_SetRelAddrLevel(srcOpnd, 0);
+        VIR_Operand_SetRelIndex(srcOpnd, 0);
+        VIR_Operand_SetModifier(srcOpnd, VIR_MOD_NONE);
+
+        VIR_Operand_SetSwizzle(srcOpnd, VIR_SWIZZLE_XYZW);
+        VIR_Inst_SetConditionOp(pInst, VIR_COP_NOT_ZERO);
+        VIR_Inst_ChangeSrcNum(pInst, 1);
+        if (VIR_Inst_GetSrcNum(pInst) == 2)
+        {
+            VIR_Inst_FreeSource(pInst, VIR_Operand_Src1);
+        }
+
+        vscVIR_AddNewUsageToDef(pDuInfo,
+            newInst,
+            pInst,
+            srcOpnd,
+            gcvFALSE,
+            regId,
+            1,
+            VIR_ENABLE_XYZW,
+            VIR_HALF_CHANNEL_MASK_FULL,
+            gcvNULL);
+
+        VIR_Inst_SetThreadMode(pInst, VIR_THREAD_D16_DUAL_16);
     }
 
     return errCode;
@@ -585,6 +768,7 @@ _InsertPrecisionConvInst(
 static VSC_ErrCode _VIR_MergeICASTP(
     IN VIR_DEF_USAGE_INFO  *du_info,
     IN VIR_Shader* shader,
+    IN VSC_OPTN_FCPOptions *options,
     IN VIR_Instruction* icast,
     IN VSC_MM*     pMM,
     IN VIR_Dumper* dumper
@@ -592,14 +776,13 @@ static VSC_ErrCode _VIR_MergeICASTP(
 {
     VSC_ErrCode errCode  = VSC_ERR_NONE;
     VIR_Function* func = VIR_Shader_GetCurrentFunction(shader);
-    VSC_OPTN_PHOptions* options = VSC_OPTN_Options_GetPHOptions(VSC_OPTN_Get_Options());
     VIR_Swizzle icast_src0_swizzle;
     VIR_Enable icast_enable, icast_src0_enable;
     VIR_Operand *icast_dest, *icast_src0, *usage_opnd_of_icast;
     VIR_Instruction* usage_inst_of_icast;
     VIR_OperandInfo icast_dest_info, icast_src0_info;
     gctBOOL bIsIndexingRegUsage;
-    gctBOOL     trace = VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_ICAST);
+    gctBOOL     trace = VSC_UTILS_MASK(VSC_OPTN_FCPOptions_GetTrace(options), VSC_OPTN_FCPOptions_TRACE_ICAST);
 
     if(trace)
     {
@@ -669,8 +852,8 @@ static VSC_ErrCode _VIR_MergeICASTP(
             {
                 if (icast_dest_usage ==  VIR_Inst_GetSource(vx_inst, srcNo))
                 {
+                    VIR_Inst_FreeSource(vx_inst, srcNo);
                     VIR_Inst_SetSource(vx_inst, srcNo, vx_inst_src0);
-                    VIR_Function_FreeOperand(func, icast_dest_usage);
                     break;
                 }
             }
@@ -737,6 +920,7 @@ static VSC_ErrCode _VIR_MergeICASTP(
 static VSC_ErrCode _VIR_MergeICASTD(
     IN VIR_DEF_USAGE_INFO  *du_info,
     IN VIR_Shader* shader,
+    IN VSC_OPTN_FCPOptions *options,
     IN VIR_Instruction* icast,
     IN VSC_MM*     pMM,
     IN VIR_Dumper* dumper
@@ -744,11 +928,10 @@ static VSC_ErrCode _VIR_MergeICASTD(
 {
     VSC_ErrCode errCode  = VSC_ERR_NONE;
     VIR_Function* func = VIR_Shader_GetCurrentFunction(shader);
-    VSC_OPTN_PHOptions* options = VSC_OPTN_Options_GetPHOptions(VSC_OPTN_Get_Options());
     VIR_Enable icast_enable;
     VIR_Operand *icast_dest, *icast_src0;
     VIR_OperandInfo icast_dest_info, icast_src0_info;
-    gctBOOL     trace = VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_ICAST);
+    gctBOOL     trace = VSC_UTILS_MASK(VSC_OPTN_FCPOptions_GetTrace(options), VSC_OPTN_FCPOptions_TRACE_ICAST);
 
     VIR_Instruction * def_vx_inst = gcvNULL;
 
@@ -809,6 +992,7 @@ static VSC_ErrCode _VIR_MergeICASTD(
             }
 
             /* replace the vx_inst's dest with icast's dest  */
+            VIR_Inst_FreeDest(vx_inst);
             VIR_Inst_SetDest(vx_inst, vx_inst_dest_new);
 
             vscVIR_AddNewDef(du_info, vx_inst, icast_dest_info.u1.virRegInfo.virReg, 1,
@@ -869,13 +1053,100 @@ static VSC_ErrCode _VIR_MergeICASTD(
                 VIR_LOG_FLUSH(dumper);
                 VIR_Inst_Dump(dumper, vx_inst);
                 VIR_LOG_FLUSH(dumper);
-            }            VIR_Function_RemoveInstruction(func, icast);
+            }
+            VIR_Function_RemoveInstruction(func, icast);
         }
         return errCode;
     }
     /* otherwise change icast to mov */
     VIR_Inst_SetOpcode(icast, VIR_OP_MOV);
     return errCode;
+}
+
+VSC_ErrCode
+_ConvEvisInst(
+    VIR_Shader          *pShader,
+    VIR_Function        *pFunc,
+    VIR_Instruction     *pInst)
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_Operand        *pSrc2Opnd = VIR_Inst_GetSource(pInst, 2);
+    /*
+    ** For some EVIS instructions, HW doesn't decode src2's swizzle if src2 it is not a IMMEDIATE,
+    ** so we insert a MOV instruction whose enable is XYZW to replace the src2.
+    */
+    if (pSrc2Opnd                       &&
+        VIR_OPCODE_isVXOnly(opCode)     &&
+        opCode != VIR_OP_VX_IACCSQ      &&
+        opCode != VIR_OP_VX_LERP        &&
+        opCode != VIR_OP_VX_MULSHIFT    &&
+        opCode != VIR_OP_VX_BILINEAR    &&
+        opCode != VIR_OP_VX_ATOMICADD
+        )
+    {
+        VIR_TypeId       src2TypeId = VIR_Operand_GetType(pSrc2Opnd);
+        VIR_Swizzle      src2Swizzle = VIR_Operand_GetSwizzle(pSrc2Opnd);
+
+        if ((VIR_Operand_isVirReg(pSrc2Opnd) || VIR_Operand_isSymbol(pSrc2Opnd) || VIR_Operand_isConst(pSrc2Opnd))
+            &&
+            src2Swizzle != VIR_SWIZZLE_XYZW)
+        {
+            VIR_VirRegId    regId;
+            VIR_SymId       regSymId;
+            VIR_TypeId      regTypeId;
+            VIR_Instruction*pMovInst = gcvNULL;
+            VIR_Operand    *pOpnd = gcvNULL;
+
+            /* Create a temp with 4 components to hold the src2. */
+            regTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(src2TypeId), 4, 1);
+            regId = VIR_Shader_NewVirRegId(pShader, 1);
+            errCode = VIR_Shader_AddSymbol(pShader,
+                                           VIR_SYM_VIRREG,
+                                           regId,
+                                           VIR_Shader_GetTypeFromId(pShader, regTypeId),
+                                           VIR_STORAGE_UNKNOWN,
+                                           &regSymId);
+            ON_ERROR(errCode, "Add symbol failed");
+
+            /* Insert a MOV. */
+            errCode = VIR_Function_AddInstructionBefore(pFunc,
+                                                        VIR_OP_MOV,
+                                                        regTypeId,
+                                                        pInst,
+                                                        gcvTRUE,
+                                                        &pMovInst);
+            ON_ERROR(errCode, "Insert instruction failed");
+
+            /* Set DEST. */
+            pOpnd = VIR_Inst_GetDest(pMovInst);
+            VIR_Operand_SetTempRegister(pOpnd,
+                                        pFunc,
+                                        regSymId,
+                                        regTypeId);
+            VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_XYZW);
+
+            /* Set SRC0. */
+            pOpnd = VIR_Inst_GetSource(pMovInst, 0);
+            VIR_Operand_Copy(pOpnd, pSrc2Opnd);
+
+            /* Update the SRC2 of EVIS instruction. */
+            VIR_Operand_Copy(pSrc2Opnd, VIR_Inst_GetDest(pMovInst));
+            VIR_Operand_SetLvalue(pSrc2Opnd, gcvFALSE);
+            VIR_Operand_SetSwizzle(pSrc2Opnd, VIR_SWIZZLE_XYZW);
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_PreCleanup)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_FCP;
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
 }
 
 /*********************************************
@@ -887,19 +1158,18 @@ static VSC_ErrCode _VIR_MergeICASTD(
    ...
 *********************************************/
 VSC_ErrCode vscVIR_PreCleanup(
-    VIR_Shader          *pShader,
-    VIR_DEF_USAGE_INFO  *pDuInfo,
-    VIR_Dumper          *pDumper
+    VSC_SH_PASS_WORKER* pPassWorker
     )
 {
-    VSC_ErrCode       status = VSC_ERR_NONE;
-
-    VIR_FuncIterator  func_iter;
-    VIR_FunctionNode* func_node;
-
-    VSC_PRIMARY_MEM_POOL           pmp;
-
-    vscPMP_Intialize(&pmp, gcvNULL, 512, sizeof(void*), gcvTRUE);
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Shader          *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_DEF_USAGE_INFO  *pDuInfo = pPassWorker->pDuInfo;
+    VIR_Dumper          *pDumper = pPassWorker->basePassWorker.pDumper;
+    VSC_OPTN_FCPOptions *pOptions = (VSC_OPTN_FCPOptions*)pPassWorker->basePassWorker.pBaseOption;
+    VIR_FuncIterator    func_iter;
+    VIR_FunctionNode*   func_node;
+    VSC_MM*             pMM = pPassWorker->basePassWorker.pMM;
+    gctBOOL             bRAEnabled = *(gctBOOL*)pPassWorker->basePassWorker.pPrvData;
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
     for (func_node = VIR_FuncIterator_First(&func_iter);
@@ -913,40 +1183,47 @@ VSC_ErrCode vscVIR_PreCleanup(
         for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
                 inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
         {
+            VIR_OpCode opCode = VIR_Inst_GetOpcode(inst);
+
             /* disable this when RA enabled for now, since DU and RA has not supported indexed opnd yet */
-            if (!VSC_OPTN_RAOptions_GetSwitchOn(VSC_OPTN_Options_GetRAOptions(VSC_OPTN_Get_Options())))
+            if (!bRAEnabled)
             {
-                if (VIR_Inst_GetOpcode(inst) == VIR_OP_LDARR)
+                if (opCode == VIR_OP_LDARR)
                 {
                     _VIR_ReplaceLDARR(pShader, func, pDuInfo, inst);
                 }
 
-                if (VIR_Inst_GetOpcode(inst) == VIR_OP_STARR)
+                if (opCode == VIR_OP_STARR)
                 {
                     _VIR_ReplaceSTARR(pShader, func, pDuInfo, inst);
                 }
             }
 
-            if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetOPTS(VSC_OPTN_Options_GetPHOptions(VSC_OPTN_Get_Options())), VSC_OPTN_PHOptions_OPTS_ICAST))
+            if (VSC_UTILS_MASK(VSC_OPTN_FCPOptions_GetOPTS(pOptions), VSC_OPTN_FCPOptions_OPTS_ICAST))
             {
-                if (VIR_Inst_GetOpcode(inst) == VIR_OP_VX_ICASTP)
+                if (opCode == VIR_OP_VX_ICASTP)
                 {
-                    _VIR_MergeICASTP(pDuInfo, pShader, inst, &pmp.mmWrapper, pDumper);
+                    _VIR_MergeICASTP(pDuInfo, pShader, pOptions, inst, pMM, pDumper);
                 }
-                else if (VIR_Inst_GetOpcode(inst) == VIR_OP_VX_ICASTD)
+                else if (opCode == VIR_OP_VX_ICASTD)
                 {
-                    _VIR_MergeICASTD(pDuInfo, pShader, inst, &pmp.mmWrapper, pDumper);
+                    _VIR_MergeICASTD(pDuInfo, pShader, pOptions, inst, pMM, pDumper);
                 }
             }
 
             if (VIR_Shader_isDual16Mode(pShader))
             {
-                status = _InsertPrecisionConvInst(pShader, func, inst, pDuInfo, &pmp);
+                errCode = _InsertPrecisionConvInst(pShader, func, inst, pDuInfo, pMM);
+                ON_ERROR(errCode, "Insert precision conversion inst");
+
+                errCode = _InsertCMPInst(pShader, func, inst, pDuInfo, pMM);
+                ON_ERROR(errCode, "Insert precision conversion inst");
             }
+
+            errCode = _ConvEvisInst(pShader, func, inst);
+            ON_ERROR(errCode, "Convert evis instruction");
         }
     }
-
-    vscPMP_Finalize(&pmp);
 
     if (VirSHADER_DumpCodeGenVerbose(pShader->_id))
     {
@@ -954,7 +1231,8 @@ VSC_ErrCode vscVIR_PreCleanup(
         VIR_LOG_FLUSH(pDumper);
     }
 
-    return status;
+OnError:
+    return errCode;
 }
 
 void _VIR_FCP_ReplaceDUAL32(
@@ -963,14 +1241,15 @@ void _VIR_FCP_ReplaceDUAL32(
     VIR_Instruction     *pInst)
 {
     VIR_Instruction     *newInst = gcvNULL;
-    VIR_Operand         *newOpnd;
     gctUINT             i;
 
     VIR_Function_AddInstructionAfter(pFunc,
                 VIR_Inst_GetOpcode(pInst),
                 VIR_TYPE_UINT16,
                 pInst,
+                gcvTRUE,
                 &newInst);
+    VIR_Inst_SetConditionOp(newInst, VIR_Inst_GetConditionOp(pInst));
 
     if (pInst->_parentUseBB)
     {
@@ -984,57 +1263,54 @@ void _VIR_FCP_ReplaceDUAL32(
     /* copy source */
     for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
     {
-        VIR_Function_DupOperand(pFunc, pInst->src[i], &newOpnd);
+        VIR_Operand_Copy(newInst->src[i], pInst->src[i]);
+
         if (VIR_Operand_GetPrecision(pInst->src[i]) == VIR_PRECISION_HIGH)
         {
             gcmASSERT(VIR_Operand_GetHIHwRegId(pInst->src[i]) != VIR_FCP_INVALID_REG);
-            VIR_Operand_SetHwRegId(newOpnd, VIR_Operand_GetHIHwRegId(pInst->src[i]));
-            VIR_Operand_SetHwShift(newOpnd, VIR_Operand_GetHIHwShift(pInst->src[i]));
+            VIR_Operand_SetHwRegId(newInst->src[i], VIR_Operand_GetHIHwRegId(pInst->src[i]));
+            VIR_Operand_SetHwShift(newInst->src[i], VIR_Operand_GetHIHwShift(pInst->src[i]));
         }
-        if (VIR_Operand_GetRelAddrMode(newOpnd) != VIR_INDEXED_NONE)
+        if (VIR_Operand_GetRelAddrMode(newInst->src[i]) != VIR_INDEXED_NONE)
         {
-            VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, VIR_Operand_GetRelIndexing(newOpnd));
+            VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, VIR_Operand_GetRelIndexing(newInst->src[i]));
             gcmASSERT(sym);
             if (VIR_Symbol_GetPrecision(sym) == VIR_PRECISION_HIGH)
             {
                 /* newOpnd's relAddrMode saves the low shift, add the difference of
                    high shift and low shift */
-                gctUINT relMode = VIR_Operand_GetRelAddrMode(newOpnd);
+                gctUINT relMode = VIR_Operand_GetRelAddrMode(newInst->src[i]);
                 relMode = relMode + VIR_Symbol_GetHIHwShift(sym) - VIR_Symbol_GetHwShift(sym);
-                VIR_Operand_SetRelAddrMode(newOpnd, relMode);
+                VIR_Operand_SetRelAddrMode(newInst->src[i], relMode);
             }
         }
-        newInst->src[i] = newOpnd;
     }
-    VIR_Inst_SetSrcNum(newInst, VIR_Inst_GetSrcNum(pInst));
 
     /* duplicate dest and copy dest */
     if (pInst->dest)
     {
-        VIR_Function_DupOperand(pFunc, pInst->dest, &newOpnd);
+        VIR_Operand_Copy(newInst->dest, pInst->dest);
+
         if (VIR_Operand_GetPrecision(pInst->dest) == VIR_PRECISION_HIGH)
         {
             gcmASSERT(VIR_Operand_GetHIHwRegId(pInst->dest) != VIR_FCP_INVALID_REG);
-            VIR_Operand_SetHwRegId(newOpnd, VIR_Operand_GetHIHwRegId(pInst->dest));
-            VIR_Operand_SetHwShift(newOpnd, VIR_Operand_GetHIHwShift(pInst->dest));
+            VIR_Operand_SetHwRegId(newInst->dest, VIR_Operand_GetHIHwRegId(pInst->dest));
+            VIR_Operand_SetHwShift(newInst->dest, VIR_Operand_GetHIHwShift(pInst->dest));
         }
-        if (VIR_Operand_GetRelAddrMode(newOpnd) != VIR_INDEXED_NONE)
+        if (VIR_Operand_GetRelAddrMode(newInst->dest) != VIR_INDEXED_NONE)
         {
-            VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, VIR_Operand_GetRelIndexing(newOpnd));
+            VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, VIR_Operand_GetRelIndexing(newInst->dest));
             gcmASSERT(sym);
             if (VIR_Symbol_GetPrecision(sym) == VIR_PRECISION_HIGH)
             {
                 /* newOpnd's relAddrMode saves the low shift, add the difference of
                    high shift and low shift */
-                gctUINT relMode = VIR_Operand_GetRelAddrMode(newOpnd);
+                gctUINT relMode = VIR_Operand_GetRelAddrMode(newInst->dest);
                 relMode = relMode + VIR_Symbol_GetHIHwShift(sym) - VIR_Symbol_GetHwShift(sym);
-                VIR_Operand_SetRelAddrMode(newOpnd, relMode);
+                VIR_Operand_SetRelAddrMode(newInst->dest, relMode);
             }
         }
-        newInst->dest = newOpnd;
     }
-
-    VIR_Inst_SetConditionOp(newInst, VIR_Inst_GetConditionOp(pInst));
 
     /* set thread mode*/
     VIR_Inst_SetThreadMode(pInst, VIR_THREAD_D16_SINGLE_T0);
@@ -1100,6 +1376,63 @@ _changeConvSrc1(IN VIR_Instruction    *Inst)
     }
 }
 
+DEF_QUERY_PASS_PROP(vscVIR_PostCleanup)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
+
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
+}
+
+static VSC_ErrCode _SetResOpBitsForSampler(VIR_Shader *pShader,
+                                           VIR_Instruction* texldInst,
+                                           VIR_Instruction* InstGetSamplerIdx)
+{
+    VIR_Operand* src0;
+    VIR_Operand *src1;
+    VIR_Symbol  *sym;
+    gctUINT     index;
+
+    if (InstGetSamplerIdx)
+    {
+        src0 = VIR_Inst_GetSource(InstGetSamplerIdx, 0);
+        src1 = VIR_Inst_GetSource(InstGetSamplerIdx, 1);
+        sym = VIR_Operand_GetSymbol(src0);
+
+        gcmASSERT(VIR_Symbol_GetKind(sym) == VIR_SYM_SAMPLER);
+
+        if (VIR_Operand_GetOpKind(src1) == VIR_OPND_IMMEDIATE)
+        {
+            index = VIR_Operand_GetImmediateUint(src1);
+        }
+        else
+        {
+            index = NOT_ASSIGNED;
+        }
+    }
+    else
+    {
+        src0 = VIR_Inst_GetSource(texldInst, 0);
+        sym = VIR_Operand_GetSymbol(src0);
+
+        gcmASSERT(VIR_Symbol_GetKind(sym) == VIR_SYM_SAMPLER);
+
+        if (VIR_Operand_GetRelAddrMode(src0) != VIR_INDEXED_NONE)
+        {
+            index = NOT_ASSIGNED;
+        }
+        else
+        {
+            index = VIR_Operand_GetMatrixConstIndex(src0) + VIR_Operand_GetRelIndexing(src0);
+        }
+    }
+
+    return VIR_Sampler_UpdateResOpBits(pShader,
+                                       VIR_Symbol_GetSampler(sym),
+                                       VIR_Inst_GetResOpType(texldInst),
+                                       index);
+}
+
+
 /*********************************************
 * vscVIR_PostCleanup
 * After register allocation, perform
@@ -1107,29 +1440,29 @@ _changeConvSrc1(IN VIR_Instruction    *Inst)
    ...
 *********************************************/
 VSC_ErrCode vscVIR_PostCleanup(
-    VIR_Shader          *pShader,
-    VIR_DEF_USAGE_INFO  *pDuInfo,
-    VIR_Dumper          *pDumper
+    VSC_SH_PASS_WORKER* pPassWorker
     )
 {
-    VSC_ErrCode       status = VSC_ERR_NONE;
+    VSC_ErrCode         status = VSC_ERR_NONE;
+    VIR_Shader          *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_Dumper          *pDumper = pPassWorker->basePassWorker.pDumper;
+    VIR_FuncIterator    func_iter;
+    VIR_FunctionNode*   func_node;
+    VIR_Instruction*    instGetSamplerIdx = gcvNULL;
 
-    VIR_FuncIterator  func_iter;
-    VIR_FunctionNode* func_node;
-
-    if (VIR_Shader_isDual16Mode(pShader))
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+            func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
     {
-        VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
-        for (func_node = VIR_FuncIterator_First(&func_iter);
-                func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
-        {
-            VIR_Function*    func = func_node->function;
-            VIR_InstIterator inst_iter;
-            VIR_Instruction* inst;
+        VIR_Function*    func = func_node->function;
+        VIR_InstIterator inst_iter;
+        VIR_Instruction* inst;
 
-            VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
-            for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
-                    inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+                inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            if (VIR_Shader_isDual16Mode(pShader))
             {
                 if (VIR_Inst_GetThreadMode(inst) == VIR_THREAD_D16_DUAL_32)
                 {
@@ -1142,6 +1475,17 @@ VSC_ErrCode vscVIR_PostCleanup(
                 {
                     _changeConvSrc1(inst);
                 }
+            }
+
+            if (VIR_Inst_GetOpcode(inst) == VIR_OP_GET_SAMPLER_IDX)
+            {
+                instGetSamplerIdx = inst;
+            }
+            else if (VIR_Inst_GetResOpType(inst) != VIR_RES_OP_TYPE_UNKNOWN &&
+                     VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(inst)))
+            {
+                _SetResOpBitsForSampler(pShader, inst, instGetSamplerIdx);
+                instGetSamplerIdx = gcvNULL;
             }
         }
     }

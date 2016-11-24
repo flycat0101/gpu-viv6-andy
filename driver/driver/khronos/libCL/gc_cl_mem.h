@@ -119,6 +119,7 @@ typedef struct _cl_mem
     gctBOOL                 fromGL;
     cl_GLuint               glObj;
     cl_gl_object_type       glObjType;
+    cl_GLenum               glTexTarget; /* cube map, it's multi map to one condition need add a field */
 
     /* Modify mutex lock. */
     gctPOINTER              mutex;
@@ -251,6 +252,13 @@ clfExecuteCommandCopyBufferToImage(
     clsCommand_PTR  Command
     );
 
+#if BUILD_OPENCL_12
+gctINT
+clfExecuteCommandMigrateMemObjects(
+    clsCommand_PTR  Command
+    );
+#endif
+
 gctINT
 clfExecuteCommandMapBuffer(
     clsCommand_PTR  Command
@@ -305,6 +313,41 @@ clfPackImagePixelf(
     const cl_image_format *imageFormat,
     void *outData );
 #endif
+
+cl_int clfCLGLShareBufferData(
+    cl_context   Context,
+    cl_mem_flags Flags,
+    size_t       Size,
+    void *       HostPtr,
+    cl_int *     ErrcodeRet,
+    cl_mem       buffer);
+cl_mem clfCLGLShareBufferWrapper(
+    cl_context   Context,
+    cl_mem_flags Flags,
+    size_t       Size,
+    void *       HostPtr,
+    cl_int *     ErrcodeRet);
+#if BUILD_OPENCL_12
+cl_int clfCLGLShareCreateImageData(
+    cl_context               context ,
+    cl_mem                   image,
+    void *                   hostPtr
+    );
+cl_mem clfCLGLShareCreateImageWrapper(
+    cl_context               Context ,
+    cl_mem_flags             Flags ,
+    const cl_image_format *  ImageFormat ,
+    const cl_image_desc *    ImageDesc ,
+    void *                   HostPtr ,
+    cl_int *                 ErrcodeRet
+    );
+#endif
+cl_int clfCLGLShareReleaseMemObjectData(
+    cl_mem MemObj
+    );
+cl_int clfCLGLShareReleaseMemObjectWrapper(
+    cl_mem MemObj
+    );
 
 #ifdef __cplusplus
 }

@@ -22,3 +22,4 @@ VX_INTERNAL_CALLBACK_API void vxoProgram_Destructor(vx_reference ref);
 EXTERN_C_END
 
 #endif /* __GC_VX_PROGRAM_H__ */
+

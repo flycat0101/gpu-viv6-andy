@@ -21,10 +21,15 @@
 #define __SUPPORT_128_BPP_DATA__               0
 
 gceSTATUS
+slLoadGeneralBuiltIns(
+    IN sloCOMPILER Compiler,
+    IN sleSHADER_TYPE ShaderType
+    );
+
+gceSTATUS
 slLoadBuiltIns(
     IN sloCOMPILER Compiler,
-    IN sleSHADER_TYPE ShaderType,
-    IN gctBOOL LoadPrecisionOnly
+    IN sleSHADER_TYPE ShaderType
     );
 
 gceSTATUS
@@ -72,5 +77,17 @@ slFuncCheckForInterpolate(
     IN struct _slsNAME * FuncName,
     IN struct _sloIR_POLYNARY_EXPR * PolynaryExpr
     );
+
+gceSTATUS
+slFuncCheckForTextureGatherOffsets(
+    IN sloCOMPILER Compiler,
+    IN struct _slsNAME * FuncName,
+    IN struct _sloIR_POLYNARY_EXPR * PolynaryExpr
+    );
+
+sleEXTENSION
+slGetBuiltinFunctionExtension(
+    IN gctSTRING Symbol
+);
 
 #endif /* __gc_glsl_built_ins_h_ */

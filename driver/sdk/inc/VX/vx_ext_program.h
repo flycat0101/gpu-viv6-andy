@@ -1,16 +1,3 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
-
 #ifndef _VX_EXT_PROGRAM_H_
 #define _VX_EXT_PROGRAM_H_
 
@@ -18,22 +5,22 @@
 
 /***********************************************************************************/
 
-#define VX_512BITS_DISABLE        0
-#define VX_512BITS_ADD            0x1
-#define VX_512BITS_SUBTRACT        0x2
-#define VX_512BITS_ACCUMULATOR    0x3
+#define VX_512BITS_DISABLE      0
+#define VX_512BITS_ADD          0x1
+#define VX_512BITS_SUBTRACT     0x2
+#define VX_512BITS_ACCUMULATOR  0x3
 
-#define VX_512BITS_TYPE_FLOAT32        0x0
-#define VX_512BITS_TYPE_FLOAT16        0x1
+#define VX_512BITS_TYPE_FLOAT32     0x0
+#define VX_512BITS_TYPE_FLOAT16     0x1
 #define VX_512BITS_TYPE_SIGNED32    0x2
 #define VX_512BITS_TYPE_SIGNED16    0x3
-#define VX_512BITS_TYPE_SIGNED8        0x4
-#define VX_512BITS_TYPE_UNSIGNED32    0x5
-#define VX_512BITS_TYPE_UNSIGNED16    0x6
-#define VX_512BITS_TYPE_UNSIGNED8    0x7
+#define VX_512BITS_TYPE_SIGNED8     0x4
+#define VX_512BITS_TYPE_UNSIGNED32  0x5
+#define VX_512BITS_TYPE_UNSIGNED16  0x6
+#define VX_512BITS_TYPE_UNSIGNED8   0x7
 
-#define VX_512BITS_SELECT_SRC0        0
-#define VX_512BITS_SELECT_SRC1        1
+#define VX_512BITS_SELECT_SRC0      0
+#define VX_512BITS_SELECT_SRC1      1
 #define VX_512BITS_SELECT_CONSTANTS 2
 
 typedef union _vx_512bits_bin_t
@@ -85,11 +72,11 @@ vx_512bits_config_t;
 typedef struct _vx_512bits_miscconfig_t
 {
     vx_uint32 post_shift    :5; /*[0:4]*/
-    vx_uint32 resolve1        :3; /*[5:7]*/
+    vx_uint32 resolve1      :3; /*[5:7]*/
     vx_uint32 constant_type :3; /*[8:10]*/
-    vx_uint32 resolve2        :1; /*[11:11]*/
-    vx_uint32 accu_type        :3; /*[12:14]*/
-    vx_uint32 resolve3        :17;/*[15:31]*/
+    vx_uint32 resolve2      :1; /*[11:11]*/
+    vx_uint32 accu_type     :3; /*[12:14]*/
+    vx_uint32 resolve3      :17;/*[15:31]*/
 }
 vx_512bits_miscconfig_t;
 
@@ -147,30 +134,32 @@ extern "C" {
 #endif
 
 
-VX_API vx_program vxCreateProgramWithSource(
+VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithSource(
         vx_context context, vx_uint32 count, const vx_char *  strings[], vx_size lengths[]);
 
-VX_API vx_program vxCreateProgramWithBinary(
+VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithBinary(
         vx_context context, const vx_uint8 * binary, vx_size size);
 
-VX_API vx_status vxReleaseProgram(vx_program *program);
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseProgram(vx_program *program);
 
-VX_API vx_status vxBuildProgram(vx_program program, const vx_char *  options);
+VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, const vx_char *  options);
 
 
-VX_API vx_status vxQueryProgram(vx_program program, vx_enum attribute, void *ptr, vx_size size);
+VX_API_ENTRY vx_status VX_API_CALL vxQueryProgram(vx_program program, vx_enum attribute, void *ptr, vx_size size);
 
-VX_API vx_kernel vxAddKernelInProgram(
+VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernelInProgram(
         vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration, vx_uint32 num_params, vx_kernel_input_validate_f input,
         vx_kernel_output_validate_f output, vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize);
 
-VX_API vx_status vxSetNodeUniform(vx_node node, const vx_char * name, vx_size count, void * value);
+VX_API_ENTRY vx_status VX_API_CALL vxSetNodeUniform(vx_node node, const vx_char * name, vx_size count, void * value);
 
-VX_API vx_status vxSetChildGraphOfNode(vx_node node, vx_graph graph);
+VX_API_ENTRY vx_status VX_API_CALL vxSetChildGraphOfNode(vx_node node, vx_graph graph);
 
-VX_API vx_graph vxGetChildGraphOfNode(vx_node node);
+VX_API_ENTRY vx_graph VX_API_CALL vxGetChildGraphOfNode(vx_node node);
 
-VX_API vx_status vxSetArrayAttribute(vx_array array, vx_enum attribute, void *ptr, vx_size size);
+VX_API_ENTRY vx_status VX_API_CALL vxSetArrayAttribute(vx_array array, vx_enum attribute, void *ptr, vx_size size);
+
+VX_API_ENTRY vx_status VX_API_CALL vxSelectKernelSubname(vx_node node, const vx_char * subname);
 
 #if defined(__cplusplus)
 }

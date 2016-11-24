@@ -15,31 +15,31 @@
 #include "gc_hal_user.h"
 
 #define clmOPCODE_U8(opcode, temp, enable) \
-gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_UINT8, gcSHADER_PRECISION_DEFAULT))
+gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_UINT8, gcSHADER_PRECISION_DEFAULT, 0))
 
 #define clmOPCODE_U16(opcode, temp, enable) \
-gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_UINT16, gcSHADER_PRECISION_DEFAULT))
+gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_UINT16, gcSHADER_PRECISION_DEFAULT, 0))
 
 #define clmOPCODE_U32(opcode, temp, enable) \
-gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_UINT32, gcSHADER_PRECISION_DEFAULT))
+gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_UINT32, gcSHADER_PRECISION_DEFAULT, 0))
 
 #define clmOPCODE_S16(opcode, temp, enable) \
-gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_INT16, gcSHADER_PRECISION_DEFAULT))
+gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_INT16, gcSHADER_PRECISION_DEFAULT, 0))
 
 #define clmOPCODE_S32(opcode, temp, enable) \
-gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_INT32, gcSHADER_PRECISION_DEFAULT))
+gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_INT32, gcSHADER_PRECISION_DEFAULT, 0))
 
 #define clmOPCODE(opcode, temp, enable) \
-gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_FLOAT, gcSHADER_PRECISION_DEFAULT))
+gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_##opcode, (gctUINT16) (tempStart + temp), gcSL_ENABLE_##enable, gcSL_FLOAT, gcSHADER_PRECISION_DEFAULT, 0))
 
 #define clmJUMP(condition, label) \
-gcmONERROR(gcSHADER_AddOpcodeConditional(shader, gcSL_JMP, gcSL_##condition, label))
+gcmONERROR(gcSHADER_AddOpcodeConditional(shader, gcSL_JMP, gcSL_##condition, label, 0))
 
 #define clmJUMP_U32(condition, label) \
-gcmONERROR(gcSHADER_AddOpcodeConditionalFormatted(shader, gcSL_JMP, gcSL_##condition, gcSL_UINT32, label))
+gcmONERROR(gcSHADER_AddOpcodeConditionalFormatted(shader, gcSL_JMP, gcSL_##condition, gcSL_UINT32, label, 0))
 
 #define clmJUMP_S32(condition, label) \
-gcmONERROR(gcSHADER_AddOpcodeConditionalFormatted(shader, gcSL_JMP, gcSL_##condition, gcSL_INT32, label))
+gcmONERROR(gcSHADER_AddOpcodeConditionalFormatted(shader, gcSL_JMP, gcSL_##condition, gcSL_INT32, label, 0))
 
 #define clmTEMP(temp, swizzle) \
 gcmONERROR(gcSHADER_AddSource(shader, gcSL_TEMP, (gctUINT16) (tempStart + temp), gcSL_SWIZZLE_##swizzle, gcSL_FLOAT, gcSHADER_PRECISION_DEFAULT))
@@ -91,10 +91,10 @@ gcmONERROR(gcSHADER_BeginKernelFunction(shader, kernel)); \
 tempStart = gcSHADER_NewTempRegs(shader, tempCount, gcSHADER_FLOAT_X4)
 
 #define clmMAIN() \
-gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_RET, 0, gcSL_ENABLE_NONE, gcSL_FLOAT, gcSHADER_PRECISION_DEFAULT)); \
+gcmONERROR(gcSHADER_AddOpcode(shader, gcSL_RET, 0, gcSL_ENABLE_NONE, gcSL_FLOAT, gcSHADER_PRECISION_DEFAULT, 0)); \
 gcmONERROR(gcKERNEL_FUNCTION_SetCodeEnd(kernel)); \
 { gctUINT32 label; gcKERNEL_FUNCTION_GetLabel(kernel, &label); \
-gcmONERROR(gcSHADER_AddOpcodeConditional(shader, gcSL_CALL, gcSL_ALWAYS, label)); } \
+gcmONERROR(gcSHADER_AddOpcodeConditional(shader, gcSL_CALL, gcSL_ALWAYS, label, 0)); } \
 gcmONERROR(gcKERNEL_FUNCTION_AddKernelFunctionProperties(kernel, 1, 3, property)); \
 gcmONERROR(gcSHADER_EndKernelFunction(shader, kernel, 0))
 
@@ -145,7 +145,7 @@ static gcSHADER clTune_10(IN gcSHADER Shader)
     gctUINT32 compilerVersion[2];
 
     /* Construct a new shader. */
-    gcmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_CL, &shader));
+    gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &shader));
 
     /* Set OpenCL arguments. */
     cloCOMPILER_GetVersion(gcvNULL, clvSHADER_TYPE_CL, compilerVersion);
@@ -530,7 +530,7 @@ static gcSHADER clTune_20(IN gcSHADER Shader)
     gctUINT32 compilerVersion[2];
 
     /* Construct a new shader. */
-    gcmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_CL, &shader));
+    gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &shader));
 
     /* Set OpenCL arguments. */
     cloCOMPILER_GetVersion(gcvNULL, clvSHADER_TYPE_CL, compilerVersion);
@@ -1225,7 +1225,7 @@ static gcSHADER clTune_21(IN gcSHADER Shader)
     gctUINT32 compilerVersion[2];
 
     /* Construct a new shader. */
-    gcmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_CL, &shader));
+    gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &shader));
 
     /* Set OpenCL arguments. */
     cloCOMPILER_GetVersion(gcvNULL, clvSHADER_TYPE_CL, compilerVersion);

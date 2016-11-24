@@ -45,7 +45,10 @@
 #include <utils/Log.h>
 #include <ui/PixelFormat.h>
 #include <ui/DisplayInfo.h>
-#include <ui/FramebufferNativeWindow.h>
+
+#if ANDROID_SDK_VERSION < 24
+# include <ui/FramebufferNativeWindow.h>
+#endif
 
 #if ANDROID_SDK_VERSION <= 7
 # include <surfaceflinger/SurfaceComposerClient.h>
@@ -237,13 +240,16 @@ private:
     Vector<DisplayContainer *>  mDisplayList;
     Vector<WindowContainer *>   mWindowList;
     Vector<PixmapContainer *>   mPixmapList;
+    WindowContainer *           mFbWindow;
     Mutex                       mMutex;
 
     /* false for framebuffer mode(linux mode). */
     /* true for composition mode(android mode). */
     bool                        mCompositionMode;
     sp<SurfaceComposerClient>   mSession;
+#if ANDROID_SDK_VERSION < 24
     sp<FramebufferNativeWindow> mFramebuffer;
+#endif
 
     static Manager *            mSelf;
 };
@@ -332,11 +338,17 @@ Manager::Manager()
     }
     else
     {
+#if ANDROID_SDK_VERSION < 24
         printf("Running in \'FramebufferNativeWindow\' mode\n");
         printf("Directly to framebuffer, bypass composition\n");
 
         /* Get display surface immediately if using mode 1. */
         mFramebuffer = static_cast<FramebufferNativeWindow *>(android_createDisplaySurface());
+#else
+        printf("No \'FramebufferNativeWindow\' mode in this android version\n");
+        printf("Force \'Composition\' mode\n");
+        mCompositionMode = true;
+#endif
     }
 }
 
@@ -369,6 +381,12 @@ Manager::~Manager()
     }
     mDisplayList.clear();
 
+    if (mFbWindow)
+    {
+        delete mFbWindow;
+        mFbWindow = NULL;
+    }
+
     if (mCompositionMode)
     {
         /* Composition mode. */
@@ -377,8 +395,10 @@ Manager::~Manager()
     }
     else
     {
+#if ANDROID_SDK_VERSION < 24
         /* Framebuffer mode. */
         mFramebuffer = 0;
+#endif
     }
 }
 
@@ -430,6 +450,7 @@ void * Manager::getDisplay(int index)
     }
     else
     {
+#if ANDROID_SDK_VERSION < 24
         /* Framebuffer mode. */
         ANativeWindow * fb =
             static_cast<ANativeWindow *>(mFramebuffer.get());
@@ -437,6 +458,11 @@ void * Manager::getDisplay(int index)
         fb->query(fb, NATIVE_WINDOW_WIDTH,  &width);
         fb->query(fb, NATIVE_WINDOW_HEIGHT, &height);
         fb->query(fb, NATIVE_WINDOW_FORMAT, &format);
+#else
+        width  = 0;
+        height = 0;
+        format = 0;
+#endif
     }
 
     {
@@ -528,20 +554,24 @@ ANativeWindow * Manager::createWindow(const char *name, int x, int y, int width,
     }
     else
     {
-        control = NULL;
-        surface = NULL;
-
+#if ANDROID_SDK_VERSION < 24
+        Mutex::Autolock lock(mMutex);
         ANativeWindow *win = static_cast<ANativeWindow *>(mFramebuffer.get());
 
-        win->query(win, NATIVE_WINDOW_WIDTH,  &width);
-        win->query(win, NATIVE_WINDOW_HEIGHT, &height);
-        win->query(win, NATIVE_WINDOW_FORMAT, &format);
+        if (!mFbWindow)
+        {
+            win->query(win, NATIVE_WINDOW_WIDTH,  &width);
+            win->query(win, NATIVE_WINDOW_HEIGHT, &height);
+            win->query(win, NATIVE_WINDOW_FORMAT, &format);
+            w = new WindowContainer(control, surface, 0, 0, width, height, format);
 
-        Mutex::Autolock lock(mMutex);
-        w = new WindowContainer(control, surface, 0, 0, width, height, format);
-        mWindowList.add(w);
+            mFbWindow = w;
+        }
 
-        return static_cast<ANativeWindow *>(mFramebuffer.get());
+        return win;
+#else
+        return NULL;
+#endif
     }
 }
 
@@ -549,16 +579,24 @@ void Manager::destroyWindow(ANativeWindow *win)
 {
     Mutex::Autolock lock(mMutex);
 
-    for (size_t i = 0; i < mWindowList.size(); i++)
+    if (mCompositionMode)
     {
-        WindowContainer *w = mWindowList[i];
-
-        if (w->isContainerOf(win))
+        for (size_t i = 0; i < mWindowList.size(); i++)
         {
-            mWindowList.removeAt(i);
-            delete w;
-            break;
+            WindowContainer *w = mWindowList[i];
+
+            if (w->isContainerOf(win))
+            {
+                mWindowList.removeAt(i);
+                delete w;
+                break;
+            }
         }
+    }
+    else
+    {
+        delete mFbWindow;
+        mFbWindow = NULL;
     }
 }
 
@@ -566,13 +604,21 @@ bool Manager::getWindowInfo(ANativeWindow *win,
         int *x, int *y, int *width, int *height, int *format)
 {
     WindowContainer * w = NULL;
-    for (size_t i = 0; i < mWindowList.size(); i++)
+
+    if (mCompositionMode)
     {
-        if (mWindowList[i]->isContainerOf(win))
+        for (size_t i = 0; i < mWindowList.size(); i++)
         {
-            w = mWindowList[i];
-            break;
+            if (mWindowList[i]->isContainerOf(win))
+            {
+                w = mWindowList[i];
+                break;
+            }
         }
+    }
+    else
+    {
+        w = mFbWindow;
     }
 
     if (!w)
@@ -663,6 +709,15 @@ vdkGetDisplay(
 {
     Manager * manager = Manager::getInstance();
     return (vdkDisplay) manager->getDisplay(0);
+}
+
+VDKAPI vdkDisplay VDKLANG
+vdkGetDisplayByIndex(
+    vdkPrivate Private,
+    int DisplayIndex
+    )
+{
+    return vdkGetDisplay(Private);
 }
 
 VDKAPI int VDKLANG
@@ -771,6 +826,15 @@ vdkCreateWindow(
     Manager * manager = Manager::getInstance();
 
     ret = manager->getDisplayInfo((void *) 0, &xres, &yres, &format);
+
+    switch (format)
+    {
+    case HAL_PIXEL_FORMAT_RGB_565:
+        break;
+    default:
+        format = HAL_PIXEL_FORMAT_RGBX_8888;
+        break;
+    }
 
     if (!ret)
     {

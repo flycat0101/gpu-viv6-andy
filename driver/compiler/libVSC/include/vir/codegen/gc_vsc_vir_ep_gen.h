@@ -16,13 +16,23 @@
 
 BEGIN_EXTERN_C()
 
+typedef struct _VSC_PEP_GEN_PRIV_DATA
+{
+    PROGRAM_EXECUTABLE_PROFILE*  pOutPEP;
+    PEP_CLIENT                   client;
+}VSC_PEP_GEN_PRIV_DATA;
+
 VSC_ErrCode
 vscVIR_GenerateSEP(
-    IN  VIR_Shader*                pShader,
-    IN  VSC_HW_CONFIG*             pHwCfg,
-    IN  gctBOOL                    bDumpSEP,
-    OUT SHADER_EXECUTABLE_PROFILE* pOutSEP
+    VSC_SH_PASS_WORKER* pPassWorker
     );
+DECLARE_QUERY_PASS_PROP(vscVIR_GenerateSEP);
+
+VSC_ErrCode
+vscVIR_GeneratePEP(
+    VSC_GPG_PASS_WORKER* pPassWorker
+    );
+DECLARE_QUERY_PASS_PROP(vscVIR_GeneratePEP);
 
 END_EXTERN_C()
 

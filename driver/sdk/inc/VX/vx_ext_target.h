@@ -1,18 +1,5 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
-
 /*
- * Copyright (c) 2012-2013 The Khronos Group Inc.
+ * Copyright (c) 2012-2015 The Khronos Group Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and/or associated documentation files (the
@@ -41,7 +28,6 @@
 
 /*! \file
  * \brief The OpenVX Target API Definition
- * \author Erik Rainey <erik.rainey@ti.com>
  */
 
 /*! \brief The extension name.
@@ -108,7 +94,7 @@ extern "C" {
  * \note Use <tt>\ref vxQueryContext</tt> with <tt>\ref VX_CONTEXT_ATTRIBUTE_NUMTARGETS</tt> to retrieve the upper limit of targets.
  * \ingroup group_target
  */
-VX_API vx_target vxGetTargetByIndex(vx_context context, vx_uint32 index);
+VX_API_ENTRY vx_target VX_API_CALL vxGetTargetByIndex(vx_context context, vx_uint32 index);
 
 /*! \brief Used to get a reference to named target when the name is known beforehand.
  * \param [in] context The reference to the overall context.
@@ -118,7 +104,7 @@ VX_API vx_target vxGetTargetByIndex(vx_context context, vx_uint32 index);
  * \retval * A target reference.
  * \ingroup group_target
  */
-VX_API vx_target vxGetTargetByName(vx_context context, const vx_char *name);
+VX_API_ENTRY vx_target VX_API_CALL vxGetTargetByName(vx_context context, const vx_char *name);
 
 /*! \brief Releases a reference to a target object.
  * The object may not be garbage collected until its total reference count is zero.
@@ -129,7 +115,7 @@ VX_API vx_target vxGetTargetByName(vx_context context, const vx_char *name);
  * \note After returning from this function the reference will be zeroed.
  * \ingroup group_target
  */
-VX_API vx_status vxReleaseTarget(vx_target *target);
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseTarget(vx_target *target);
 
 /*! \brief Used to query the target about it's properties.
  * \param [in] target The reference to the target.
@@ -140,7 +126,7 @@ VX_API vx_status vxReleaseTarget(vx_target *target);
  * \pre <tt>\ref vxGetTargetByName</tt> or <tt>\ref vxGetTargetByIndex</tt>
  * \ingroup group_target
  */
-VX_API vx_status vxQueryTarget(vx_target target, vx_enum attribute, void *ptr, vx_size size);
+VX_API_ENTRY vx_status VX_API_CALL vxQueryTarget(vx_target target, vx_enum attribute, void *ptr, vx_size size);
 
 /*! \brief Used to assign target affinity to a node.
  * \note This assignment overrides implementation chosen behavior.
@@ -153,7 +139,7 @@ VX_API vx_status vxQueryTarget(vx_target target, vx_enum attribute, void *ptr, v
  * \retval VX_ERROR_INVALID_REFERENCE Either node or target was not a valid reference.
  * \retval VX_ERROR_NOT_SUPPORTED The node can not be executed on that target.
  */
-VX_API vx_status vxAssignNodeAffinity(vx_node node, vx_target target);
+VX_API_ENTRY vx_status VX_API_CALL vxAssignNodeAffinity(vx_node node, vx_target target);
 
 #if defined(__cplusplus)
 }

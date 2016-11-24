@@ -190,6 +190,10 @@ extern "C" {
 #define GL1_PROFILER_DRAW_END      41
 #define GLES1_BINDFRAMEBUFFER       43
 
+#define GL1_PROFILER_WRITE_HEADER 90
+#define GL1_PROFILER_WRITE_FRAME_BEGIN 91
+#define GL1_PROFILER_WRITE_FRAME_END 92
+#define GL1_PROFILER_WRITE_FRAME_RESET 93
 
 /* Profile information. */
 typedef struct _glsPROFILER
@@ -203,11 +207,13 @@ typedef struct _glsPROFILER
     gctBOOL         useFBO;
     gctBOOL         useGlfinish;
 
+    gctBOOL         need_dump;
     gctUINT32       frameBegun;
     gctUINT32       frameCount;       /* for VIV_PROFILE = 1 */
     gctBOOL         enableOutputCounters;  /* for VIV_PROFILE = 2 */
     gctUINT32       frameStartNumber; /* for VIV_PROFILE = 3 */
     gctUINT32       frameEndNumber;   /* for VIV_PROFILE = 3 */
+    gctUINT32       curFrameNumber;
 
     /* Aggregate Information */
     gctUINT64       frameStart;
@@ -248,6 +254,29 @@ typedef struct _glsPROFILER
 glsPROFILER;
 
 void
+_glffProfiler_NEW_Initialize(
+    glsCONTEXT_PTR Context
+    );
+
+void
+_glffProfiler_NEW_Destroy(
+    glsCONTEXT_PTR Context
+    );
+
+gceSTATUS
+_glffProfiler_NEW_Write(
+    glsCONTEXT_PTR Context,
+    GLuint Enum
+    );
+
+GLboolean
+_glffProfiler_NEW_Set(
+    glsCONTEXT_PTR Context,
+    GLuint Enum,
+    gctHANDLE Value
+    );
+
+void
 _glffInitializeProfiler(
     glsCONTEXT_PTR Context
     );
@@ -276,7 +305,7 @@ _glffProfiler(
                 } \
                 else \
                 { \
-                        _glffProfiler(&c->profiler, e, (gctHANDLE)v); \
+                        _glffProfiler_NEW_Set(c, e, (gctHANDLE)v); \
                 } \
         } \
         while (gcvFALSE)

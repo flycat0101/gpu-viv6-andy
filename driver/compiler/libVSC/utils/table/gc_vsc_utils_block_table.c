@@ -13,12 +13,19 @@
 
 #include "gc_vsc.h"
 
+static VSC_BT_FREE_ENTRY* _DefaultGetFreeEntry(void* pEntry)
+{
+    /* Free entry is located at start portion of entry */
+    return (VSC_BT_FREE_ENTRY*)pEntry;
+}
+
 VSC_BLOCK_TABLE* vscBT_Create(
     VSC_MM*                 pMM,
     gctUINT                 flag,
     gctUINT                 entrySize,
     gctUINT                 blockSize,
     gctUINT                 initBlockCount,
+    PFN_VSC_GET_FREE_ENTRY  pfnGetFreeEntry,
     PFN_VSC_HASH_FUNC       pfnHashFunc,
     PFN_VSC_KEY_CMP         pfnKeyCmp,
     gctINT                  hashTableSize)
@@ -28,7 +35,8 @@ VSC_BLOCK_TABLE* vscBT_Create(
     pBT = (VSC_BLOCK_TABLE*)vscMM_Alloc(pMM, sizeof(VSC_BLOCK_TABLE));
 
     vscBT_Initialize(pBT, pMM, flag, entrySize, blockSize,
-                     initBlockCount, pfnHashFunc, pfnKeyCmp, hashTableSize);
+                     initBlockCount, pfnGetFreeEntry,
+                     pfnHashFunc, pfnKeyCmp, hashTableSize);
 
     return pBT;
 }
@@ -40,6 +48,7 @@ void vscBT_Initialize(
     gctUINT                 entrySize,
     gctUINT                 blockSize,
     gctUINT                 initBlockCount,
+    PFN_VSC_GET_FREE_ENTRY  pfnGetFreeEntry,
     PFN_VSC_HASH_FUNC       pfnHashFunc,
     PFN_VSC_KEY_CMP         pfnKeyCmp,
     gctINT                  hashTableSize)
@@ -67,7 +76,15 @@ void vscBT_Initialize(
 
     pBT->curBlockIdx = 0;
     pBT->nextOffsetInCurBlock = 0;
-    pBT->pFreeEntryList = gcvNULL;
+    if (BT_FREELIST_USE_PTR(pBT))
+    {
+        pBT->firstFreeEntry.nextFreeEntryPtr = gcvNULL;
+    }
+    else
+    {
+        pBT->firstFreeEntry.nextFreeEntryId = INVALID_BT_ENTRY_ID;
+    }
+    pBT->pfnGetFreeEntry = (pfnGetFreeEntry != gcvNULL) ? pfnGetFreeEntry : _DefaultGetFreeEntry;
     pBT->pMM = pMM;
 
     if (flag & VSC_BLOCK_TABLE_FLAG_HASH_ENTRIES)
@@ -91,7 +108,14 @@ void vscBT_Finalize(VSC_BLOCK_TABLE* pBT)
     pBT->blockSize = 0;
     pBT->blockCount = 0;
 
-    pBT->pFreeEntryList = gcvNULL;
+    if (BT_FREELIST_USE_PTR(pBT))
+    {
+        pBT->firstFreeEntry.nextFreeEntryPtr = gcvNULL;
+    }
+    else
+    {
+        pBT->firstFreeEntry.nextFreeEntryId = INVALID_BT_ENTRY_ID;
+    }
 
     for (i = 0; i < pBT->blockCount; i ++)
     {
@@ -119,18 +143,109 @@ void vscBT_Destroy(VSC_BLOCK_TABLE* pBT)
     }
 }
 
-static gctUINT _AllocContinuousEntries(VSC_BLOCK_TABLE* pBT, void* pData, gctUINT entryCount)
+VSC_ErrCode vscBT_Copy(VSC_BLOCK_TABLE* pDstBT, VSC_BLOCK_TABLE* pSrcBT)
 {
-    gctUINT   totalReqSize, firstEntryId = INVALID_BT_ENTRY_ID;
+    VSC_ErrCode  errCode    = VSC_ERR_NONE;
+    gcmASSERT(pDstBT && pSrcBT);
+    vscBT_Finalize(pDstBT);
+
+    pDstBT->flag = pSrcBT->flag;
+    pDstBT->pHashTable = gcvNULL;
+    pDstBT->entrySize = pSrcBT->entrySize;
+    pDstBT->blockSize = pSrcBT->blockSize;
+    pDstBT->entryCountPerBlock = pDstBT->blockSize / pDstBT->entrySize;
+    gcmASSERT(pDstBT->entrySize <= pDstBT->blockSize);
+
+    pDstBT->blockCount = pSrcBT->blockCount;
+    pDstBT->ppBlockArray = (VSC_BT_BLOCK_PTR*)vscMM_Alloc(pDstBT->pMM, pDstBT->blockCount*sizeof(VSC_BT_BLOCK_PTR));
+    if (pDstBT->ppBlockArray == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+    }
+    else
+    {
+        memset(pDstBT->ppBlockArray, 0, pDstBT->blockCount*sizeof(VSC_BT_BLOCK_PTR));
+
+        pDstBT->curBlockIdx = 0;
+        pDstBT->nextOffsetInCurBlock = 0;
+        if (BT_FREELIST_USE_PTR(pDstBT))
+        {
+            pDstBT->firstFreeEntry.nextFreeEntryPtr = gcvNULL;
+        }
+        else
+        {
+            pDstBT->firstFreeEntry.nextFreeEntryId = INVALID_BT_ENTRY_ID;
+        }
+        pDstBT->pfnGetFreeEntry = pSrcBT->pfnGetFreeEntry;
+
+        if (pDstBT->flag & VSC_BLOCK_TABLE_FLAG_HASH_ENTRIES)
+        {
+            pDstBT->pHashTable = vscHTBL_Create(pDstBT->pMM, pSrcBT->pHashTable->pfnHashFunc,
+                                                pSrcBT->pHashTable->pfnKeyCmp,
+                                                pSrcBT->pHashTable->tableSize);
+            if (pDstBT->pHashTable == gcvNULL)
+            {
+                errCode = VSC_ERR_OUT_OF_MEMORY;
+            }
+        }
+    }
+
+    return errCode;
+}
+
+VSC_ErrCode vscBT_ResizeBlockArray(VSC_BLOCK_TABLE* pBT, gctUINT newBlockCount, gctBOOL bPreAllocBlock)
+{
+    gctUINT            i;
+
+    if (pBT->blockCount < newBlockCount)
+    {
+        pBT->blockCount = newBlockCount;
+        pBT->ppBlockArray = (VSC_BT_BLOCK_PTR*) vscMM_Realloc(pBT->pMM,
+                                                              pBT->ppBlockArray,
+                                                              pBT->blockCount*sizeof(VSC_BT_BLOCK_PTR));
+
+        if (pBT->ppBlockArray == gcvNULL)
+        {
+            return VSC_ERR_OUT_OF_MEMORY;
+        }
+        else
+        {
+            memset(pBT->ppBlockArray + pBT->curBlockIdx, 0,
+                    (pBT->blockCount - pBT->curBlockIdx)*sizeof(VSC_BT_BLOCK_PTR));
+
+        }
+    }
+
+    if (bPreAllocBlock)
+    {
+        for (i = 0; i < newBlockCount; i++)
+        {
+            if (pBT->ppBlockArray[i] == gcvNULL)
+            {
+                pBT->ppBlockArray[i] = (VSC_BT_BLOCK_PTR)vscMM_Alloc(pBT->pMM, pBT->blockSize);
+                if (pBT->ppBlockArray[i] == gcvNULL)
+                {
+                    return VSC_ERR_OUT_OF_MEMORY;
+                }
+            }
+        }
+    }
+
+    return VSC_ERR_NONE;
+}
+
+static gctUINT8 * _AllocContinuousEntriesPtr(VSC_BLOCK_TABLE* pBT, gctUINT entryCount)
+{
+    gctUINT   totalReqSize;
     gctUINT8* pFirstEntry;
 
     totalReqSize = pBT->entrySize * entryCount;
 
-    if (totalReqSize >= pBT->blockSize)
+    if (totalReqSize > pBT->blockSize)
     {
-        /* fatal error, the table is not big enough for requested entries */
+        /* Fatal error, the table is not big enough for requested entries */
         gcmASSERT(gcvFALSE);
-        return INVALID_BT_ENTRY_ID;
+        return gcvNULL;
     }
 
     /* If current block can not accomodate requested size, then move to next block */
@@ -144,15 +259,10 @@ static gctUINT _AllocContinuousEntries(VSC_BLOCK_TABLE* pBT, void* pData, gctUIN
     if (pBT->curBlockIdx == pBT->blockCount)
     {
         /* Increase the block array size by double */
-        pBT->blockCount *= 2;
-        pBT->ppBlockArray = (VSC_BT_BLOCK_PTR*) vscMM_Realloc(pBT->pMM,
-                                                              pBT->ppBlockArray,
-                                                              pBT->blockCount*sizeof(VSC_BT_BLOCK_PTR));
-
-        gcmASSERT(pBT->ppBlockArray != gcvNULL);
-
-        memset(pBT->ppBlockArray + pBT->curBlockIdx, 0,
-               (pBT->blockCount - pBT->curBlockIdx)*sizeof(VSC_BT_BLOCK_PTR));
+       if (vscBT_ResizeBlockArray(pBT, pBT->blockCount * 2, gcvFALSE) != VSC_ERR_NONE)
+       {
+            return gcvNULL;
+       }
     }
 
     /* If the block has not been allocated, now allocate it */
@@ -164,6 +274,23 @@ static gctUINT _AllocContinuousEntries(VSC_BLOCK_TABLE* pBT, void* pData, gctUIN
     pFirstEntry = pBT->ppBlockArray[pBT->curBlockIdx] + pBT->nextOffsetInCurBlock;
     pBT->nextOffsetInCurBlock += totalReqSize;
 
+    return pFirstEntry;
+}
+
+static gctUINT _AllocContinuousEntries(VSC_BLOCK_TABLE* pBT, void* pData, gctUINT entryCount)
+{
+    gctUINT   totalReqSize, firstEntryId = INVALID_BT_ENTRY_ID;
+    gctUINT8* pFirstEntry;
+
+    totalReqSize = pBT->entrySize * entryCount;
+
+    pFirstEntry = _AllocContinuousEntriesPtr(pBT, entryCount);
+
+    if (pFirstEntry == gcvNULL)
+    {
+        return INVALID_BT_ENTRY_ID;
+    }
+
     if (pData != gcvNULL)
         memcpy(pFirstEntry, pData, totalReqSize);
     else
@@ -171,69 +298,79 @@ static gctUINT _AllocContinuousEntries(VSC_BLOCK_TABLE* pBT, void* pData, gctUIN
 
     firstEntryId = BT_MAKE_ENTRY_ID(pBT, pBT->curBlockIdx,
                                     (gctINT)((gctUINT8*)pFirstEntry - pBT->ppBlockArray[pBT->curBlockIdx]));
-    if (BT_AUTO_HASH(pBT))
+
+    if (BT_HAS_HASHTABLE(pBT) && BT_AUTO_HASH(pBT))
     {
-        /* add the newly added entry to hash table */
+        gcmASSERT(pData);
+
+        /* Add the newly added entry to hash table */
         vscBT_AddToHash(pBT, firstEntryId, pFirstEntry);
     }
+
     return firstEntryId;
 }
 
 gctUINT vscBT_NewEntry(VSC_BLOCK_TABLE* pBT)
 {
-    /* cannot use NewEntry if the table has auto hash attribute, you need to
-     * use AddEntry with non-empty data  */
+    /* Cannot use NewEntry if the table has auto hash attribute, you need to
+       use AddEntry with non-empty data  */
     gcmASSERT(!BT_AUTO_HASH(pBT));
+
     return vscBT_AddEntry(pBT, gcvNULL);
+}
+
+/* return a new entry pointer the table */
+void * vscBT_NewEntryPtr(VSC_BLOCK_TABLE* pBT)
+{
+    void*              pEntry = gcvNULL;
+
+    /* Cannot use NewEntryPtr if the table has auto hash attribute, you need to
+       use AddEntry with non-empty data  */
+    gcmASSERT(!BT_AUTO_HASH(pBT));
+    if (BT_FREELIST_USE_PTR(pBT) && pBT->firstFreeEntry.nextFreeEntryPtr != gcvNULL )
+    {
+        pEntry = pBT->firstFreeEntry.nextFreeEntryPtr;
+        pBT->firstFreeEntry.nextFreeEntryPtr = pBT->pfnGetFreeEntry(pEntry)->nextFreeEntryPtr;
+
+        return pEntry;
+    }
+
+    return _AllocContinuousEntriesPtr(pBT, 1);
 }
 
 gctUINT vscBT_AddEntry(VSC_BLOCK_TABLE* pBT, void* pData)
 {
-    gctUINT            i;
-    VSC_BT_FREE_ENTRY* pEntry = gcvNULL;
+    gctUINT            id;
+    void*              pEntry = gcvNULL;
 
     /* Firstly, try to allocate from free list, always get the header */
-    if (pBT->pFreeEntryList)
+    gcmASSERT(!BT_FREELIST_USE_PTR(pBT));
+    if (pBT->firstFreeEntry.nextFreeEntryId != INVALID_BT_ENTRY_ID)
     {
         gcmASSERT(BT_HAS_FREELIST(pBT));
 
-        if (pBT->pFreeEntryList)
+        id = pBT->firstFreeEntry.nextFreeEntryId;
+        pEntry = BT_GET_ENTRY_DATA(pBT, id);
+        pBT->firstFreeEntry.nextFreeEntryId = pBT->pfnGetFreeEntry(pEntry)->nextFreeEntryId;
+
+        if (pData != gcvNULL)
         {
-            gctUINT id;
-            pEntry = pBT->pFreeEntryList;
-            pBT->pFreeEntryList = pEntry->pNextEntry;
-
-            if (pData != gcvNULL)
-            {
-                memcpy(pEntry, pData, pBT->entrySize);
-            }
-            else
-            {
-                memset(pEntry, 0, pBT->entrySize);
-            }
-
-            /* To find which block own this entry */
-            for (i = 0; i <= pBT->curBlockIdx; i ++)
-            {
-                gcmASSERT(pBT->ppBlockArray[i]);
-
-                if ((gctUINT8*)pEntry >= pBT->ppBlockArray[i] &&
-                    (gctUINT8*)pEntry < pBT->ppBlockArray[i] + pBT->blockSize)
-                {
-                    break;
-                }
-            }
-
-            id = BT_MAKE_ENTRY_ID(pBT, i, (gctINT)((gctUINT8*)pEntry - pBT->ppBlockArray[i]));
-
-            if (BT_AUTO_HASH(pBT))
-            {
-                /* add to hash table */
-                vscBT_AddToHash(pBT, id, pData);
-            }
-
-            return id;
+            memcpy(pEntry, pData, pBT->entrySize);
         }
+        else
+        {
+            memset(pEntry, 0, pBT->entrySize);
+        }
+
+        if (BT_HAS_HASHTABLE(pBT) && BT_AUTO_HASH(pBT))
+        {
+            gcmASSERT(pData);
+
+            /* Add to hash table */
+            vscBT_AddToHash(pBT, id, pData);
+        }
+
+        return id;
     }
 
     /* Secondly, allocate the entry in normal block */
@@ -247,18 +384,33 @@ gctUINT vscBT_AddContinuousEntries(VSC_BLOCK_TABLE* pBT, void* pData, gctUINT en
 
 void* vscBT_RemoveEntry(VSC_BLOCK_TABLE* pBT, gctUINT entryId)
 {
-    void*   pRemovedData = BT_GET_ENTRY_DATA(pBT, entryId);
+    void*    pRemovedData = BT_GET_ENTRY_DATA(pBT, entryId);
+
+    gcmASSERT(entryId != INVALID_BT_ENTRY_ID);
+    gcmASSERT(!BT_FREELIST_USE_PTR(pBT));
 
     /* Try to add it to free list */
     if (BT_HAS_FREELIST(pBT))
     {
-        ((VSC_BT_FREE_ENTRY*)pRemovedData)->pNextEntry = pBT->pFreeEntryList;
-        pBT->pFreeEntryList = (VSC_BT_FREE_ENTRY*)pRemovedData;
+        pBT->pfnGetFreeEntry(pRemovedData)->nextFreeEntryId = pBT->firstFreeEntry.nextFreeEntryId;
+        pBT->firstFreeEntry.nextFreeEntryId = entryId;
     }
 
     return pRemovedData;
 }
 
+void vscBT_RemoveEntryPtr(VSC_BLOCK_TABLE* pBT, void * entryPtr)
+{
+    /* Try to add it to free list */
+    if (BT_HAS_FREELIST(pBT))
+    {
+        gcmASSERT(BT_FREELIST_USE_PTR(pBT));
+        pBT->pfnGetFreeEntry(entryPtr)->nextFreeEntryPtr = pBT->firstFreeEntry.nextFreeEntryPtr;
+        pBT->firstFreeEntry.nextFreeEntryPtr = entryPtr;
+    }
+
+    return;
+}
 void vscBT_AddToHash(VSC_BLOCK_TABLE* pBT, gctUINT entryId, void* pHashKey)
 {
     gcmASSERT(BT_HAS_HASHTABLE(pBT));
@@ -291,11 +443,6 @@ gctUINT vscBT_Find(VSC_BLOCK_TABLE* pBT, void* pHashKey)
     if (entryId == INVALID_BT_ENTRY_ID)
     {
         entryId =  vscBT_AddEntry(pBT, pHashKey);
-        if (!BT_AUTO_HASH(pBT))
-        {
-            /* add to hash table if it is not automatically added */
-            vscBT_AddToHash(pBT, entryId, pHashKey);
-        }
     }
 
     return entryId;
@@ -307,5 +454,12 @@ gctUINT vscBT_RemoveFromHash(VSC_BLOCK_TABLE* pBT, void* pHashKey)
     gcmASSERT(pBT->pHashTable);
 
     return (gctUINT)(gctUINTPTR_T)vscHTBL_DirectRemove(pBT->pHashTable, pHashKey);
+}
+
+gctUINT vscBT_GetUsedSize(VSC_BLOCK_TABLE* pBT)
+{
+    gctUINT sz = pBT->curBlockIdx * pBT->blockSize + pBT->nextOffsetInCurBlock;
+
+    return sz;
 }
 

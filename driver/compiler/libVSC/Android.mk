@@ -27,6 +27,7 @@ LOCAL_SRC_FILES := \
 	old_impl/optimizer/gc_vsc_old_optimizer_util.c \
 	old_impl/gc_vsc_old_compiler.c \
 	old_impl/gc_vsc_old_recompile.c \
+	old_impl/gc_vsc_old_preprocess.c \
 	old_impl/gc_vsc_old_linker.c \
 	old_impl/gc_vsc_old_hw_code_gen.c \
 	old_impl/gc_vsc_old_hw_linker.c \
@@ -34,12 +35,15 @@ LOCAL_SRC_FILES := \
 	old_impl/gc_vsc_gcsl_vir_converter.c \
 	drvi/gc_vsc_drvi_compile.c \
 	drvi/gc_vsc_drvi_ep_dump.c \
+	drvi/gc_vsc_drvi_ep_io.c \
 	drvi/gc_vsc_drvi_link.c \
-	chip/gc_vsc_chip_state_programming.c \
-	chip/gc_vsc_chip_uarch_caps.c \
-	chip/gc_vsc_chip_mc_codec.c \
-	chip/gc_vsc_chip_mc_dump.c \
+	chip/gpu/gc_vsc_chip_state_programming.c \
+	chip/gpu/gc_vsc_chip_uarch_caps.c \
+	chip/gpu/gc_vsc_chip_mc_codec.c \
+	chip/gpu/gc_vsc_chip_mc_dump.c \
 	asm/gc_vsc_asm_al_codec.c \
+	lib/gc_vsc_lib_gl_builtin.c \
+	lib/gc_vsc_lib_gl_patch.c \
 	utils/array/gc_vsc_utils_array.c \
 	utils/base/gc_vsc_utils_base_node.c \
 	utils/base/gc_vsc_utils_bit_op.c \
@@ -70,12 +74,15 @@ LOCAL_SRC_FILES := \
 	vir/analysis/gc_vsc_vir_ssa.c \
 	vir/codegen/gc_vsc_vir_inst_scheduler.c \
 	vir/codegen/gc_vsc_vir_reg_alloc.c \
+	vir/codegen/gc_vsc_vir_uniform_alloc.c \
 	vir/codegen/gc_vsc_vir_mc_gen.c \
 	vir/codegen/gc_vsc_vir_ep_gen.c \
 	vir/codegen/gc_vsc_vir_ep_back_patch.c \
 	vir/ir/gc_vsc_vir_dump.c \
 	vir/ir/gc_vsc_vir_ir.c \
+	vir/ir/gc_vsc_vir_io.c \
 	vir/ir/gc_vsc_vir_symbol_table.c \
+	vir/lower/gc_vsc_vir_hl_2_hl_expand.c \
 	vir/lower/gc_vsc_vir_hl_2_ml.c \
 	vir/lower/gc_vsc_vir_hl_2_ml_expand.c \
 	vir/lower/gc_vsc_vir_ll_2_ll_expand.c \
@@ -85,6 +92,7 @@ LOCAL_SRC_FILES := \
 	vir/lower/gc_vsc_vir_pattern.c \
 	vir/lower/gc_vsc_vir_ml_2_ll.c \
 	vir/lower/gc_vsc_vir_ll_2_mc.c \
+	vir/linker/gc_vsc_vir_linker.c\
 	vir/passmanager/gc_vsc_options.c \
 	vir/passmanager/gc_vsc_vir_pass_mnger.c \
 	vir/transform/gc_vsc_vir_misc_opts.c \
@@ -101,6 +109,11 @@ LOCAL_SRC_FILES := \
 	vir/transform/gc_vsc_vir_cpf.c \
 	vir/transform/gc_vsc_vir_static_patch.c \
 	vir/transform/gc_vsc_vir_vectorization.c \
+	vir/transform/gc_vsc_vir_loop.c \
+	debug/gc_vsc_debug.c \
+
+LOCAL_GENERATED_SOURCES := \
+	$(AQREG)
 
 LOCAL_CFLAGS := \
 	$(CFLAGS)

@@ -105,9 +105,13 @@ typedef enum
     __GL_EXTID_EXT_draw_elements_base_vertex,
     __GL_EXTID_EXT_texture_rg,
     __GL_EXTID_EXT_primitive_bounding_box,
+    __GL_EXTID_EXT_shader_framebuffer_fetch,
+    __GL_EXTID_EXT_protected_textures,
+    __GL_EXTID_ANDROID_extension_pack_es31a,
 
     /* Vendor extensions */
     __GL_EXTID_VIV_tex_direct,
+    /* __GL_EXTID_VIV_texture_protected, */
 
 
     __GL_EXTID_EXT_LAST,
@@ -116,7 +120,6 @@ typedef enum
 
 typedef struct __GLextensionRec
 {
-    __GLextID       index;          /* the extension index */
     const GLchar *  name;           /* the extension name */
     GLboolean       bEnabled;       /* is this extension enabled ? */
     GLboolean       bGLSL;          /* the extension need support from glsl? */

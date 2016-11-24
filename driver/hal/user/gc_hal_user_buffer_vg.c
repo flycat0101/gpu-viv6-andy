@@ -2342,7 +2342,7 @@ gcoVGBUFFER_MarkRestart(
 **
 **  gcoVGBUFFER_GetCurrentAddress
 **
-**  Return the current address inside the current command buffe.
+**  Return the current address inside the current command buffer.
 **
 **  INPUT:
 **
@@ -3355,6 +3355,7 @@ gcoVGBUFFER_Commit(
             );
 
         /* Send command and context buffer to hardware. */
+        halInterface.ignoreTLS = gcvFALSE;
         halInterface.command = gcvHAL_COMMIT;
         halInterface.u.VGCommit.context    = gcmPTR_TO_UINT64(Buffer->context);
         halInterface.u.VGCommit.queue      = gcmPTR_TO_UINT64(Buffer->queueFirst);

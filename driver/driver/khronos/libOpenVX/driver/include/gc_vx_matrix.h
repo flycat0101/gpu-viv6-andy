@@ -21,3 +21,4 @@ VX_INTERNAL_CALLBACK_API void vxoMatrix_Destructor(vx_reference ref);
 EXTERN_C_END
 
 #endif /* __GC_VX_MATRIX_H__ */
+

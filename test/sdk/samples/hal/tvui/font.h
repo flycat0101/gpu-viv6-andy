@@ -26,8 +26,6 @@
 *****************************************************************************/
 
 
-
-
 typedef struct _gcsGLYPH *        gcsGLYPH_PTR;
 typedef struct _gcsFONTTABLE *    gcsFONTTABLE_PTR;
 

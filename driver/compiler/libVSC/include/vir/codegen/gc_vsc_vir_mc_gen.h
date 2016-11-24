@@ -27,7 +27,7 @@ typedef struct _VSC_MC_GEN
     VIR_Shader            *Shader;
     VSC_MC_InstMask       *InstMark;
     gctUINT                InstCount;
-    VSC_PRIMARY_MEM_POOL   PMP;
+    VSC_MM                *pMM;
     VSC_COMPILER_CONFIG   *pComCfg;
     VSC_MC_CODEC           MCCodec;
     VIR_Dumper            *Dumper;
@@ -38,11 +38,9 @@ typedef struct _VSC_MC_GEN
 
 VSC_ErrCode
 VSC_MC_GEN_MachineCodeGen(
-    IN  VIR_Shader            *Shader,
-    IN  VSC_COMPILER_CONFIG   *pComCfg,
-    IN  VSC_OPTN_MCGenOptions *Options,
-    IN  VIR_Dumper            *Dumper
+    VSC_SH_PASS_WORKER* pPassWorker
     );
+DECLARE_QUERY_PASS_PROP(VSC_MC_GEN_MachineCodeGen);
 
 END_EXTERN_C()
 

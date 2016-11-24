@@ -62,7 +62,7 @@ CFLAGS += $(INCLUDE)
 # Add extra flags for object files.
 
 
-ifneq ($(USE_ARMCC), 1)
+ifneq ($(USE_ARMCC),1)
   CFLAGS += -fPIC -Wno-unused-function -Werror
 
     CFLAGS += -ansi
@@ -118,7 +118,7 @@ clean:
 
 install: all
 
-ifeq ($(gcdSTATIC_LINK), 1)
+ifeq ($(gcdSTATIC_LINK),1)
 install:
 	@mkdir -p $(INSTALL_DIR)
 	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
@@ -129,7 +129,7 @@ endif
 
 $(TARGET_MODULE): $(OBJECTS)
 	$(AR) -r -c $@ $(OBJECTS)
-ifneq ($(USE_ARMCC), 1)
+ifneq ($(USE_ARMCC),1)
 	$(RANLIB) $@
 endif
 

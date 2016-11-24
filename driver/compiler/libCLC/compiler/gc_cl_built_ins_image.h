@@ -855,7 +855,7 @@ _GenSoftReadImageFCode(
     gcmONERROR(clGenBitwiseExprCode(Compiler,
                                     PolynaryExpr->exprBase.base.lineNo,
                                     PolynaryExpr->exprBase.base.stringNo,
-                                    clvOPCODE_BITWISE_AND,
+                                    clvOPCODE_AND_BITWISE,
                                     iOperandAddr,
                                     &OperandsParameters[1].rOperands[0],
                                     &constROperandAddr));
@@ -877,7 +877,7 @@ _GenSoftReadImageFCode(
         gcmONERROR(clGenBitwiseExprCode(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
-                                        clvOPCODE_BITWISE_AND,
+                                        clvOPCODE_AND_BITWISE,
                                         iOperandFilt,
                                         &OperandsParameters[1].rOperands[0],
                                         &constROperandFilter));
@@ -1222,7 +1222,7 @@ _GenSoftReadImageFCode(
         gcmONERROR(clGenArithmeticExprCode(Compiler,
                                            PolynaryExpr->exprBase.base.lineNo,
                                            PolynaryExpr->exprBase.base.stringNo,
-                                           clvOPCODE_BITWISE_AND,
+                                           clvOPCODE_AND_BITWISE,
                                            &iOperand[5],
                                            &rOperand[4],
                                            &constROperand1));
@@ -1273,7 +1273,7 @@ _GenSoftReadImageFCode(
         gcmONERROR(clGenArithmeticExprCode(Compiler,
                                            PolynaryExpr->exprBase.base.lineNo,
                                            PolynaryExpr->exprBase.base.stringNo,
-                                           clvOPCODE_BITWISE_AND,
+                                           clvOPCODE_AND_BITWISE,
                                            &iOperand[5],
                                            &rOperand[4],
                                            &constROperand1));
@@ -1528,7 +1528,7 @@ _GenSoftReadImageFCode(
         gcmONERROR(clGenBitwiseExprCode(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
-                                        clvOPCODE_BITWISE_AND,
+                                        clvOPCODE_AND_BITWISE,
                                         iOperandNorm,
                                         &OperandsParameters[1].rOperands[0],
                                         &constROperandNorm));
@@ -3721,7 +3721,7 @@ _GenSoftReadImageICode(
     gcmONERROR(clGenBitwiseExprCode(Compiler,
                                     PolynaryExpr->exprBase.base.lineNo,
                                     PolynaryExpr->exprBase.base.stringNo,
-                                    clvOPCODE_BITWISE_AND,
+                                    clvOPCODE_AND_BITWISE,
                                     &iOperand[4],
                                     &OperandsParameters[1].rOperands[0],
                                     &constROperandAddr));
@@ -4112,7 +4112,7 @@ _GenSoftReadImageICode(
         gcmONERROR(clGenBitwiseExprCode(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
-                                        clvOPCODE_BITWISE_AND,
+                                        clvOPCODE_AND_BITWISE,
                                         &iOperand[3],
                                         &OperandsParameters[1].rOperands[0],
                                         &constROperandNorm));
@@ -5038,7 +5038,7 @@ _GenSoftReadImageUICode(
     gcmONERROR(clGenBitwiseExprCode(Compiler,
                                     PolynaryExpr->exprBase.base.lineNo,
                                     PolynaryExpr->exprBase.base.stringNo,
-                                    clvOPCODE_BITWISE_AND,
+                                    clvOPCODE_AND_BITWISE,
                                     &iOperand[4],
                                     &OperandsParameters[1].rOperands[0],
                                     &constROperandAddr));
@@ -5429,7 +5429,7 @@ _GenSoftReadImageUICode(
         gcmONERROR(clGenBitwiseExprCode(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
-                                        clvOPCODE_BITWISE_AND,
+                                        clvOPCODE_AND_BITWISE,
                                         &iOperand[3],
                                         &OperandsParameters[1].rOperands[0],
                                         &constROperandNorm));
@@ -7930,9 +7930,9 @@ _GenQueryImageCallCode(
     gcmONERROR(cloCOMPILER_SetHasImageQuery(Compiler));
 
 OnError:
-   gcmVERIFY_OK(cloCOMPILER_Unlock(Compiler));
-   clsGEN_CODE_PARAMETERS_Finalize(parameters);
-   return status;
+    gcmVERIFY_OK(cloCOMPILER_Unlock(Compiler));
+    clsGEN_CODE_PARAMETERS_Finalize(parameters);
+    return status;
 }
 
 static gceSTATUS

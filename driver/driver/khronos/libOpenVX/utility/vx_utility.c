@@ -14,7 +14,7 @@
 #include <VX/vx.h>
 #include <VX/vxu.h>
 
-vx_status vxuColorConvert(vx_context context, vx_image src, vx_image dst)
+VX_API_ENTRY vx_status VX_API_CALL vxuColorConvert(vx_context context, vx_image src, vx_image dst)
 {
     vx_status status = VX_FAILURE;
     vx_node   node = NULL;
@@ -38,7 +38,7 @@ vx_status vxuColorConvert(vx_context context, vx_image src, vx_image dst)
     return status;
 }
 
-vx_status vxuChannelExtract(vx_context context, vx_image src, vx_enum channel, vx_image dst)
+VX_API_ENTRY vx_status VX_API_CALL vxuChannelExtract(vx_context context, vx_image src, vx_enum channel, vx_image dst)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -62,7 +62,7 @@ vx_status vxuChannelExtract(vx_context context, vx_image src, vx_enum channel, v
     return status;
 }
 
-vx_status vxuChannelCombine(vx_context context,
+VX_API_ENTRY vx_status VX_API_CALL vxuChannelCombine(vx_context context,
                             vx_image plane0,
                             vx_image plane1,
                             vx_image plane2,
@@ -104,7 +104,7 @@ static vx_status vx_useImmediateBorderMode(vx_context context, vx_node node)
     return status;
 }
 
-vx_status vxuSobel3x3(vx_context context, vx_image src, vx_image output_x, vx_image output_y)
+VX_API_ENTRY vx_status VX_API_CALL vxuSobel3x3(vx_context context, vx_image src, vx_image output_x, vx_image output_y)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -132,7 +132,7 @@ vx_status vxuSobel3x3(vx_context context, vx_image src, vx_image output_x, vx_im
     return status;
 }
 
-vx_status vxuMagnitude(vx_context context, vx_image grad_x, vx_image grad_y, vx_image dst)
+VX_API_ENTRY vx_status VX_API_CALL vxuMagnitude(vx_context context, vx_image grad_x, vx_image grad_y, vx_image dst)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -156,7 +156,7 @@ vx_status vxuMagnitude(vx_context context, vx_image grad_x, vx_image grad_y, vx_
     return status;
 }
 
-vx_status vxuPhase(vx_context context, vx_image grad_x, vx_image grad_y, vx_image dst)
+VX_API_ENTRY vx_status VX_API_CALL vxuPhase(vx_context context, vx_image grad_x, vx_image grad_y, vx_image dst)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -180,7 +180,7 @@ vx_status vxuPhase(vx_context context, vx_image grad_x, vx_image grad_y, vx_imag
     return status;
 }
 
-vx_status vxuScaleImage(vx_context context, vx_image src, vx_image dst, vx_enum type)
+VX_API_ENTRY vx_status VX_API_CALL vxuScaleImage(vx_context context, vx_image src, vx_image dst, vx_enum type)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -207,7 +207,7 @@ vx_status vxuScaleImage(vx_context context, vx_image src, vx_image dst, vx_enum 
     return status;
 }
 
-vx_status vxuTableLookup(vx_context context, vx_image input, vx_lut lut, vx_image output)
+VX_API_ENTRY vx_status VX_API_CALL vxuTableLookup(vx_context context, vx_image input, vx_lut lut, vx_image output)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -231,7 +231,7 @@ vx_status vxuTableLookup(vx_context context, vx_image input, vx_lut lut, vx_imag
     return status;
 }
 
-vx_status vxuHistogram(vx_context context, vx_image input, vx_distribution distribution)
+VX_API_ENTRY vx_status VX_API_CALL vxuHistogram(vx_context context, vx_image input, vx_distribution distribution)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -255,7 +255,7 @@ vx_status vxuHistogram(vx_context context, vx_image input, vx_distribution distr
     return status;
 }
 
-vx_status vxuEqualizeHist(vx_context context, vx_image input, vx_image output)
+VX_API_ENTRY vx_status VX_API_CALL vxuEqualizeHist(vx_context context, vx_image input, vx_image output)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -279,7 +279,7 @@ vx_status vxuEqualizeHist(vx_context context, vx_image input, vx_image output)
     return status;
 }
 
-vx_status vxuAbsDiff(vx_context context, vx_image in1, vx_image in2, vx_image out)
+VX_API_ENTRY vx_status VX_API_CALL vxuAbsDiff(vx_context context, vx_image in1, vx_image in2, vx_image out)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -303,7 +303,7 @@ vx_status vxuAbsDiff(vx_context context, vx_image in1, vx_image in2, vx_image ou
     return status;
 }
 
-vx_status vxuMeanStdDev(vx_context context, vx_image input, vx_float32 *mean, vx_float32 *stddev)
+VX_API_ENTRY vx_status VX_API_CALL vxuMeanStdDev(vx_context context, vx_image input, vx_float32 *mean, vx_float32 *stddev)
 {
     vx_status status   = VX_FAILURE;
     vx_graph  graph    = NULL;
@@ -323,8 +323,8 @@ vx_status vxuMeanStdDev(vx_context context, vx_image input, vx_float32 *mean, vx
     if (status == VX_SUCCESS)
     {
         status = vxProcessGraph(graph);
-        vxAccessScalarValue(s_mean, mean);
-        vxAccessScalarValue(s_stddev, stddev);
+        vxReadScalarValue(s_mean, mean);
+        vxReadScalarValue(s_stddev, stddev);
     }
 
     vxReleaseNode(&node);
@@ -335,7 +335,7 @@ vx_status vxuMeanStdDev(vx_context context, vx_image input, vx_float32 *mean, vx
     return status;
 }
 
-vx_status vxuThreshold(vx_context context, vx_image input, vx_threshold thresh, vx_image output)
+VX_API_ENTRY vx_status VX_API_CALL vxuThreshold(vx_context context, vx_image input, vx_threshold thresh, vx_image output)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -358,7 +358,7 @@ vx_status vxuThreshold(vx_context context, vx_image input, vx_threshold thresh, 
     return status;
 }
 
-vx_status vxuIntegralImage(vx_context context, vx_image input, vx_image output)
+VX_API_ENTRY vx_status VX_API_CALL vxuIntegralImage(vx_context context, vx_image input, vx_image output)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -382,7 +382,7 @@ vx_status vxuIntegralImage(vx_context context, vx_image input, vx_image output)
     return status;
 }
 
-vx_status vxuErode3x3(vx_context context, vx_image input, vx_image output)
+VX_API_ENTRY vx_status VX_API_CALL vxuErode3x3(vx_context context, vx_image input, vx_image output)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -410,7 +410,7 @@ vx_status vxuErode3x3(vx_context context, vx_image input, vx_image output)
     return status;
 }
 
-vx_status vxuDilate3x3(vx_context context, vx_image input, vx_image output)
+VX_API_ENTRY vx_status VX_API_CALL vxuDilate3x3(vx_context context, vx_image input, vx_image output)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -435,7 +435,7 @@ vx_status vxuDilate3x3(vx_context context, vx_image input, vx_image output)
     return status;
 }
 
-vx_status vxuMedian3x3(vx_context context, vx_image input, vx_image output)
+VX_API_ENTRY vx_status VX_API_CALL vxuMedian3x3(vx_context context, vx_image input, vx_image output)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -460,7 +460,7 @@ vx_status vxuMedian3x3(vx_context context, vx_image input, vx_image output)
     return status;
 }
 
-vx_status vxuBox3x3(vx_context context, vx_image input, vx_image output)
+VX_API_ENTRY vx_status VX_API_CALL vxuBox3x3(vx_context context, vx_image input, vx_image output)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -488,7 +488,7 @@ vx_status vxuBox3x3(vx_context context, vx_image input, vx_image output)
     return status;
 }
 
-vx_status vxuGaussian3x3(vx_context context, vx_image input, vx_image output)
+VX_API_ENTRY vx_status VX_API_CALL vxuGaussian3x3(vx_context context, vx_image input, vx_image output)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -516,7 +516,7 @@ vx_status vxuGaussian3x3(vx_context context, vx_image input, vx_image output)
     return status;
 }
 
-vx_status vxuConvolve(vx_context context, vx_image input, vx_convolution conv, vx_image output)
+VX_API_ENTRY vx_status VX_API_CALL vxuConvolve(vx_context context, vx_image input, vx_convolution conv, vx_image output)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -543,7 +543,7 @@ vx_status vxuConvolve(vx_context context, vx_image input, vx_convolution conv, v
     return status;
 }
 
-vx_status vxuGaussianPyramid(vx_context context, vx_image input, vx_pyramid gaussian)
+VX_API_ENTRY vx_status VX_API_CALL vxuGaussianPyramid(vx_context context, vx_image input, vx_pyramid gaussian)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -571,7 +571,7 @@ vx_status vxuGaussianPyramid(vx_context context, vx_image input, vx_pyramid gaus
     return status;
 }
 
-vx_status vxuAccumulateImage(vx_context context, vx_image input, vx_image accum)
+VX_API_ENTRY vx_status VX_API_CALL vxuAccumulateImage(vx_context context, vx_image input, vx_image accum)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -595,7 +595,7 @@ vx_status vxuAccumulateImage(vx_context context, vx_image input, vx_image accum)
     return status;
 }
 
-vx_status vxuAccumulateWeightedImage(vx_context context, vx_image input, vx_scalar scale, vx_image accum)
+VX_API_ENTRY vx_status VX_API_CALL vxuAccumulateWeightedImage(vx_context context, vx_image input, vx_scalar scale, vx_image accum)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -619,7 +619,7 @@ vx_status vxuAccumulateWeightedImage(vx_context context, vx_image input, vx_scal
     return status;
 }
 
-vx_status vxuAccumulateSquareImage(vx_context context, vx_image input, vx_scalar scale, vx_image accum)
+VX_API_ENTRY vx_status VX_API_CALL vxuAccumulateSquareImage(vx_context context, vx_image input, vx_scalar scale, vx_image accum)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -643,7 +643,7 @@ vx_status vxuAccumulateSquareImage(vx_context context, vx_image input, vx_scalar
     return status;
 }
 
-vx_status vxuMinMaxLoc(vx_context context, vx_image input,
+VX_API_ENTRY vx_status VX_API_CALL vxuMinMaxLoc(vx_context context, vx_image input,
                         vx_scalar minVal, vx_scalar maxVal,
                         vx_array minLoc, vx_array maxLoc,
                         vx_scalar minCount, vx_scalar maxCount)
@@ -670,7 +670,7 @@ vx_status vxuMinMaxLoc(vx_context context, vx_image input,
     return status;
 }
 
-vx_status vxuConvertDepth(vx_context context, vx_image input, vx_image output, vx_enum policy, vx_int32 shift)
+VX_API_ENTRY vx_status VX_API_CALL vxuConvertDepth(vx_context context, vx_image input, vx_image output, vx_enum policy, vx_int32 shift)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -697,7 +697,7 @@ vx_status vxuConvertDepth(vx_context context, vx_image input, vx_image output, v
     return status;
 }
 
-vx_status vxuCannyEdgeDetector(vx_context context, vx_image input, vx_threshold hyst,
+VX_API_ENTRY vx_status VX_API_CALL vxuCannyEdgeDetector(vx_context context, vx_image input, vx_threshold hyst,
                                vx_int32 gradient_size, vx_enum norm_type,
                                vx_image output)
 {
@@ -723,7 +723,7 @@ vx_status vxuCannyEdgeDetector(vx_context context, vx_image input, vx_threshold 
     return status;
 }
 
-vx_status vxuHalfScaleGaussian(vx_context context, vx_image input, vx_image output, vx_int32 kernel_size)
+VX_API_ENTRY vx_status VX_API_CALL vxuHalfScaleGaussian(vx_context context, vx_image input, vx_image output, vx_int32 kernel_size)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -751,7 +751,7 @@ vx_status vxuHalfScaleGaussian(vx_context context, vx_image input, vx_image outp
     return status;
 }
 
-vx_status vxuAnd(vx_context context, vx_image in1, vx_image in2, vx_image out)
+VX_API_ENTRY vx_status VX_API_CALL vxuAnd(vx_context context, vx_image in1, vx_image in2, vx_image out)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -775,7 +775,7 @@ vx_status vxuAnd(vx_context context, vx_image in1, vx_image in2, vx_image out)
     return status;
 }
 
-vx_status vxuOr(vx_context context, vx_image in1, vx_image in2, vx_image out)
+VX_API_ENTRY vx_status VX_API_CALL vxuOr(vx_context context, vx_image in1, vx_image in2, vx_image out)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -799,7 +799,7 @@ vx_status vxuOr(vx_context context, vx_image in1, vx_image in2, vx_image out)
     return status;
 }
 
-vx_status vxuXor(vx_context context, vx_image in1, vx_image in2, vx_image out)
+VX_API_ENTRY vx_status VX_API_CALL vxuXor(vx_context context, vx_image in1, vx_image in2, vx_image out)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -823,7 +823,7 @@ vx_status vxuXor(vx_context context, vx_image in1, vx_image in2, vx_image out)
     return status;
 }
 
-vx_status vxuNot(vx_context context, vx_image input, vx_image out)
+VX_API_ENTRY vx_status VX_API_CALL vxuNot(vx_context context, vx_image input, vx_image out)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -847,7 +847,7 @@ vx_status vxuNot(vx_context context, vx_image input, vx_image out)
     return status;
 }
 
-vx_status vxuMultiply(vx_context context, vx_image in1, vx_image in2, vx_float32 scale, vx_enum overflow_policy, vx_enum rounding_policy, vx_image out)
+VX_API_ENTRY vx_status VX_API_CALL vxuMultiply(vx_context context, vx_image in1, vx_image in2, vx_float32 scale, vx_enum overflow_policy, vx_enum rounding_policy, vx_image out)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -875,7 +875,7 @@ vx_status vxuMultiply(vx_context context, vx_image in1, vx_image in2, vx_float32
     return status;
 }
 
-vx_status vxuAdd(vx_context context, vx_image in1, vx_image in2, vx_enum policy, vx_image out)
+VX_API_ENTRY vx_status VX_API_CALL vxuAdd(vx_context context, vx_image in1, vx_image in2, vx_enum policy, vx_image out)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -899,7 +899,7 @@ vx_status vxuAdd(vx_context context, vx_image in1, vx_image in2, vx_enum policy,
     return status;
 }
 
-vx_status vxuSubtract(vx_context context, vx_image in1, vx_image in2, vx_enum policy, vx_image out)
+VX_API_ENTRY vx_status VX_API_CALL vxuSubtract(vx_context context, vx_image in1, vx_image in2, vx_enum policy, vx_image out)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -923,7 +923,7 @@ vx_status vxuSubtract(vx_context context, vx_image in1, vx_image in2, vx_enum po
     return status;
 }
 
-vx_status vxuWarpAffine(vx_context context, vx_image input, vx_matrix matrix, vx_enum type, vx_image output)
+VX_API_ENTRY vx_status VX_API_CALL vxuWarpAffine(vx_context context, vx_image input, vx_matrix matrix, vx_enum type, vx_image output)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -951,7 +951,7 @@ vx_status vxuWarpAffine(vx_context context, vx_image input, vx_matrix matrix, vx
     return status;
 }
 
-vx_status vxuWarpPerspective(vx_context context, vx_image input, vx_matrix matrix, vx_enum type, vx_image output)
+VX_API_ENTRY vx_status VX_API_CALL vxuWarpPerspective(vx_context context, vx_image input, vx_matrix matrix, vx_enum type, vx_image output)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -979,7 +979,7 @@ vx_status vxuWarpPerspective(vx_context context, vx_image input, vx_matrix matri
     return status;
 }
 
-vx_status vxuHarrisCorners(vx_context context, vx_image input,
+VX_API_ENTRY vx_status VX_API_CALL vxuHarrisCorners(vx_context context, vx_image input,
         vx_scalar strength_thresh,
         vx_scalar min_distance,
         vx_scalar sensitivity,
@@ -1010,7 +1010,7 @@ vx_status vxuHarrisCorners(vx_context context, vx_image input,
     return status;
 }
 
-vx_status vxuFastCorners(vx_context context, vx_image input, vx_scalar sens, vx_bool nonmax, vx_array corners, vx_scalar num_corners)
+VX_API_ENTRY vx_status VX_API_CALL vxuFastCorners(vx_context context, vx_image input, vx_scalar sens, vx_bool nonmax, vx_array corners, vx_scalar num_corners)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;
@@ -1034,7 +1034,7 @@ vx_status vxuFastCorners(vx_context context, vx_image input, vx_scalar sens, vx_
     return status;
 }
 
-vx_status vxuOpticalFlowPyrLK(vx_context context, vx_pyramid old_images,
+VX_API_ENTRY vx_status VX_API_CALL vxuOpticalFlowPyrLK(vx_context context, vx_pyramid old_images,
                               vx_pyramid new_images,
                               vx_array old_points,
                               vx_array new_points_estimates,
@@ -1068,7 +1068,7 @@ vx_status vxuOpticalFlowPyrLK(vx_context context, vx_pyramid old_images,
     return status;
 }
 
-vx_status vxuRemap(vx_context context, vx_image input, vx_remap table, vx_enum policy, vx_image output)
+VX_API_ENTRY vx_status VX_API_CALL vxuRemap(vx_context context, vx_image input, vx_remap table, vx_enum policy, vx_image output)
 {
     vx_status status = VX_FAILURE;
     vx_graph  graph  = NULL;

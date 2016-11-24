@@ -988,7 +988,6 @@ gctINT32 TessellateStroke(
         if (patternLen < 0 || dashLen <= 0)
         {
             OVG_SAFE_FREE(context->os, memStart);
-
             if (context->strokeCapStyle == VG_CAP_BUTT)
             {
                 gcmFOOTER_ARG("return=%d", 0);
@@ -1106,7 +1105,16 @@ gctINT32 TessellateStroke(
 
         /* Allocate the buffer. */
         OVG_MALLOC(context->os, streamPipe.stream, sizeof(_VGVector2) * streamPipe.numStreamPts);
-        OVG_MALLOC(context->os, streamPipe.indices, sizeof(_VGuint32) * streamPipe.numIndices);
+        if ((streamPipe.numIndices > 65535) && (streamPipe.numStreamPts > 65535))
+        {
+            streamPipe.isLargePath = 1;
+            OVG_MALLOC(context->os, streamPipe.indices_32, sizeof(_VGuint32) * streamPipe.numIndices);
+        }
+        else
+        {
+            streamPipe.isLargePath = 0;
+            OVG_MALLOC(context->os, streamPipe.indices_16, sizeof(_VGuint16) * streamPipe.numIndices);
+        }
 
         streamPipe.currIndex = streamPipe.currStreamPts = 0;
     }
@@ -1119,7 +1127,8 @@ BEGIN_PROFILE("ConstructStroke")
     if (TESS_ABS(context->tessContext.strokeWidth * context->tessContext.strokeScale - 1.0f) < 0.1f)
     {
         int vertCount = 0;
-        unsigned short *indStart;
+        unsigned short *indStart_16;
+        unsigned int *indStart_32;
         unsigned short loopStart;
         /*Determine the count of points.*/
         if (streamPipe.numStreamPts < numTotalPoints)
@@ -1133,35 +1142,72 @@ BEGIN_PROFILE("ConstructStroke")
         }
 
         streamPipe.currIndex = 0;
-        indStart = streamPipe.indices;
-        for (i = 0; i < numSubs; ++i)
+        if (streamPipe.isLargePath)
         {
-            if (!isDashed && subPathClosed[i])
-                loopStart = vertCount;
+            indStart_32 = streamPipe.indices_32;
 
-            *indStart = vertCount;
-            streamPipe.currIndex++;
-            *(indStart + 1) = *indStart + 1;
-            streamPipe.currIndex++;
-            indStart += 2;
-            for (j = 2; j < counts[i]; j++)
+            for (i = 0; i < numSubs; ++i)
             {
-                *indStart = *(indStart - 1);
-                streamPipe.currIndex++;
-                *(indStart + 1) = *indStart + 1;
-                streamPipe.currIndex++;
-                indStart += 2;
-            }
+                if (!isDashed && subPathClosed[i])
+                    loopStart = vertCount;
 
-            if (!isDashed && subPathClosed[i])
-            {
-                *indStart = *(indStart - 1);
+                *indStart_32 = vertCount;
                 streamPipe.currIndex++;
-                *(indStart + 1) = loopStart;
+                *(indStart_32 + 1) = *indStart_32 + 1;
                 streamPipe.currIndex++;
-                indStart += 2;
+                indStart_32 += 2;
+                for (j = 2; j < counts[i]; j++)
+                {
+                    *indStart_32 = *(indStart_32 - 1);
+                    streamPipe.currIndex++;
+                    *(indStart_32 + 1) = *indStart_32 + 1;
+                    streamPipe.currIndex++;
+                    indStart_32 += 2;
+                }
+
+                if (!isDashed && subPathClosed[i])
+                {
+                    *indStart_32 = *(indStart_32 - 1);
+                    streamPipe.currIndex++;
+                    *(indStart_32 + 1) = loopStart;
+                    streamPipe.currIndex++;
+                    indStart_32 += 2;
+                }
+                vertCount += counts[i];
             }
-            vertCount += counts[i];
+        }
+        else
+        {
+            indStart_16 = streamPipe.indices_16;
+            for (i = 0; i < numSubs; ++i)
+            {
+                if (!isDashed && subPathClosed[i])
+                    loopStart = vertCount;
+
+                *indStart_16 = vertCount;
+                streamPipe.currIndex++;
+                *(indStart_16 + 1) = *indStart_16 + 1;
+                streamPipe.currIndex++;
+                indStart_16 += 2;
+                for (j = 2; j < counts[i]; j++)
+                {
+                    *indStart_16 = *(indStart_16 - 1);
+                    streamPipe.currIndex++;
+                    *(indStart_16 + 1) = *indStart_16 + 1;
+                    streamPipe.currIndex++;
+                    indStart_16 += 2;
+                }
+
+                if (!isDashed && subPathClosed[i])
+                {
+                    *indStart_16 = *(indStart_16 - 1);
+                    streamPipe.currIndex++;
+                    *(indStart_16 + 1) = loopStart;
+                    streamPipe.currIndex++;
+                    indStart_16 += 2;
+                }
+                vertCount += counts[i];
+            }
         }
         streamPipe.numStreamPts = numTotalPoints;
         streamPipe.numIndices = streamPipe.currIndex;
@@ -1204,7 +1250,14 @@ END_PROFILE
 
     if (streamPipe.numStreamPts < 3)
     {
-        OVG_SAFE_FREE(context->os, streamPipe.indices);
+        if (streamPipe.isLargePath)
+        {
+            OVG_SAFE_FREE(context->os, streamPipe.indices_32);
+        }
+        else
+        {
+            OVG_SAFE_FREE(context->os, streamPipe.indices_16);
+        }
         OVG_SAFE_FREE(context->os, streamPipe.stream);
         gcmFOOTER_ARG("return=%d", 0);
         return 0;
@@ -1220,7 +1273,6 @@ END_PROFILE
 
 
     path->tessellateResult.strokeIndexBuffer.count = streamPipe.numIndices;
-    path->tessellateResult.strokeIndexBuffer.indexType = gcvINDEX_32;
 
 #if SPECIAL_1PX_STROKE
     if (TESS_ABS(context->tessContext.strokeWidth * context->tessContext.strokeScale - 1.0f) < 0.1f)
@@ -1243,8 +1295,18 @@ END_PROFILE
 
     /* Index stream. */
     gcmASSERT(path->tessellateResult.strokeIndexBuffer.data.items == gcvNULL);
-    path->tessellateResult.strokeIndexBuffer.data.items = (_VGubyte*)streamPipe.indices;
-    path->tessellateResult.strokeIndexBuffer.data.size = path->tessellateResult.strokeIndexBuffer.data.allocated = streamPipe.numIndices * sizeof(_VGuint32);
+    if (streamPipe.isLargePath)
+    {
+        path->tessellateResult.strokeIndexBuffer.indexType = gcvINDEX_32;
+        path->tessellateResult.strokeIndexBuffer.data.items = (_VGubyte*)streamPipe.indices_32;
+        path->tessellateResult.strokeIndexBuffer.data.size = path->tessellateResult.strokeIndexBuffer.data.allocated = streamPipe.numIndices * sizeof(_VGuint32);
+    }
+    else
+    {
+        path->tessellateResult.strokeIndexBuffer.indexType = gcvINDEX_16;
+        path->tessellateResult.strokeIndexBuffer.data.items = (_VGubyte*)streamPipe.indices_16;
+        path->tessellateResult.strokeIndexBuffer.data.size = path->tessellateResult.strokeIndexBuffer.data.allocated = streamPipe.numIndices * sizeof(_VGuint16);
+    }
 
     numTotalPoints = streamPipe.numStreamPts;
 
@@ -1733,7 +1795,11 @@ gctINT32 _BezierFlatten(
     tContext->segments[tContext->segCount++].coord = cp[3];
 
 #if USE_FTA
-    TA_Resize(os, (void**)points, sizeof(_VGTessPoint) * tContext->segCount, 1);
+    if (gcvSTATUS_OK != TA_Resize(os, (void**)points, sizeof(_VGTessPoint) * tContext->segCount, 1))
+    {
+        gcmFOOTER_ARG("return=%d", 0);
+        return 0;
+    }
 #else
     OVG_MALLOC(context->os, *points, sizeof(_VGTessPoint) * tContext->segCount);
 #endif
@@ -2398,7 +2464,11 @@ gctINT32 _EllipseFlatten(
 
     /* reflecting to the real quadrants */
 #if USE_FTA
-    TA_Resize(os, (void**)result, sizeof(_VGTessPoint) * tContext->segCount * 4 + offset, 1);
+    if (gcvSTATUS_OK != TA_Resize(os, (void**)result, sizeof(_VGTessPoint) * tContext->segCount * 4 + offset, 1))
+    {
+        gcmFOOTER_ARG("return=%d", 0);
+        return 0;
+    }
 #else
     OVG_MALLOC(context->os, *result, sizeof(_VGTessPoint) * tContext->segCount * 4 + offset);
     OVG_MEMSET(*result, 0, sizeof(_VGTessPoint) * tContext->segCount * 4 + offset);
@@ -3037,9 +3107,13 @@ gctINT32 _FlattenPath(
 
     /* The memory address from the path can be reused here sometimes, I think. */
 #if USE_FTA
-    TA_Resize(os, (void**)&fContext->pointsInSegment, sizeof(_VGTessPoint*) * numSegments, 2);
-    TA_Resize(os, (void**)&fContext->numPointsInSegment, sizeof(gctINT32) * numSegments, 1);
-    TA_Resize(os, (void**)&fContext->numSegsInSubPath, sizeof(gctINT32) * (*numSubPaths), 1);
+    if((gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->pointsInSegment, sizeof(_VGTessPoint*) * numSegments, 2)) ||
+       (gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->numPointsInSegment, sizeof(gctINT32) * numSegments, 1)) ||
+       (gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->numSegsInSubPath, sizeof(gctINT32) * (*numSubPaths), 1)))
+    {
+        gcmFOOTER_ARG("return=%d", 0);
+        return  0;
+    }
 #else
     OVG_MALLOC(context->os, pointsInSegment, sizeof(_VGTessPoint*) * numSegments);
     OVG_MEMSET(pointsInSegment, 0, sizeof(_VGTessPoint*) * numSegments);
@@ -3099,6 +3173,7 @@ gctINT32 _FlattenPath(
     context->tessContext.strokeWidth = strokeWidth;
     context->tessContext.strokeError = context->strokeDashPattern.size > 0 ? 1.0f : 4.0f;
 
+    gcoOS_MemFill(&ellipse, 0, gcmSIZEOF(ellipse));
     prevCommand = VG_MOVE_TO;
     for (i = 0; i < numCommands; ++i)
     {
@@ -3128,7 +3203,11 @@ gctINT32 _FlattenPath(
 #if USE_FTA
                     ++fContext->numSegsInSubPath[currentSubPath];
                     fContext->numPointsInSegment[currentSegment] = 1;
-                    TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint), 1);
+                    if (gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint), 1))
+                    {
+                        gcmFOOTER_ARG("return=%d", 0);
+                        return  0;
+                    }
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
                     fContext->pointsInSegment[currentSegment][0].inTan.x = UN_INIT_TAN_VALUE;
                     /* Get points coordinate from data pointer. */
@@ -3237,7 +3316,12 @@ gctINT32 _FlattenPath(
                 ++currentSegment;
 #if USE_FTA
                 fContext->numPointsInSegment[currentSegment] = 2;
-                TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1);
+                if (gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1))
+                {
+                    gcmFOOTER_ARG("return=%d", 0);
+                    return  0;
+                }
+
                 fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
                 fContext->pointsInSegment[currentSegment][0].inTan.x = UN_INIT_TAN_VALUE;
                 fContext->pointsInSegment[currentSegment][1].flags = POINT_FLAT;
@@ -3314,7 +3398,12 @@ gctINT32 _FlattenPath(
                 ++currentSegment;
 #if USE_FTA
                 fContext->numPointsInSegment[currentSegment] = 2;
-                TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1);
+                if(gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1))
+                {
+                    gcmFOOTER_ARG("return=%d", 0);
+                    return  0;
+                }
+
                 fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
                 fContext->pointsInSegment[currentSegment][0].inTan.x = UN_INIT_TAN_VALUE;
                 fContext->pointsInSegment[currentSegment][1].flags = POINT_FLAT;
@@ -3398,7 +3487,12 @@ gctINT32 _FlattenPath(
                 ++currentSegment;
 #if USE_FTA
                 fContext->numPointsInSegment[currentSegment] = 2;
-                TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1);
+                if (gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1))
+                {
+                    gcmFOOTER_ARG("return=%d", 0);
+                    return  0;
+                }
+
                 fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
                 fContext->pointsInSegment[currentSegment][0].inTan.x = UN_INIT_TAN_VALUE;
                 fContext->pointsInSegment[currentSegment][1].flags = POINT_FLAT;
@@ -3508,7 +3602,12 @@ gctINT32 _FlattenPath(
                     /* The whole bezier shrinks to a single point. */
 #if USE_FTA
                     fContext->numPointsInSegment[currentSegment] = 2;
-                    TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1);
+                    if (gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1))
+                    {
+                        gcmFOOTER_ARG("return=%d", 0);
+                        return  0;
+                    }
+
                     fContext->pointsInSegment[currentSegment][0].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][1].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
@@ -3632,7 +3731,12 @@ gctINT32 _FlattenPath(
                     /* The whole bezier shrinks to a single point. */
 #if USE_FTA
                     fContext->numPointsInSegment[currentSegment] = 2;
-                    TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1);
+                    if (gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1))
+                    {
+                        gcmFOOTER_ARG("return=%d", 0);
+                        return  0;
+                    }
+
                     fContext->pointsInSegment[currentSegment][0].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][1].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
@@ -3764,7 +3868,12 @@ gctINT32 _FlattenPath(
                     /* The whole bezier shrinks to a single point. */
 #if USE_FTA
                     fContext->numPointsInSegment[currentSegment] = 2;
-                    TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1);
+                    if (gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1))
+                    {
+                        gcmFOOTER_ARG("return=%d", 0);
+                        return  0;
+                    }
+
                     fContext->pointsInSegment[currentSegment][0].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][1].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][0].inTan.x = UN_INIT_TAN_VALUE;
@@ -3890,7 +3999,12 @@ gctINT32 _FlattenPath(
                     /* The whole bezier shrinks to a single point. */
 #if USE_FTA
                     fContext->numPointsInSegment[currentSegment] = 2;
-                    TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1);
+                    if (gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1))
+                    {
+                        gcmFOOTER_ARG("return=%d", 0);
+                        return  0;
+                    }
+
                     fContext->pointsInSegment[currentSegment][0].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][1].coord = oPoint;
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
@@ -3982,9 +4096,6 @@ gctINT32 _FlattenPath(
 
                 ++currentSegment;
 
-                ellipse.center.x = 0.0f;
-                ellipse.center.y = 0.0f;
-                ellipse.angle = 0.0f;
                 /* Setup the ellipse object for flattening. */
                 ellipse.hAxis = TESS_ABS(TESS_MUL(getValue(dataPointer),  pathScale) + pathBias);    dataPointer += dataTypeSize;
                 ellipse.vAxis = TESS_ABS(TESS_MUL(getValue(dataPointer),  pathScale) + pathBias);    dataPointer += dataTypeSize;
@@ -4008,7 +4119,12 @@ gctINT32 _FlattenPath(
                 {
 #if USE_FTA
                     fContext->numPointsInSegment[currentSegment] = 2;
-                    TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1);
+                    if (gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1))
+                    {
+                        gcmFOOTER_ARG("return=%d", 0);
+                        return  0;
+                    }
+
                     fContext->pointsInSegment[currentSegment][0].coord = currentPoints[0];
                     fContext->pointsInSegment[currentSegment][1].coord = currentPoints[3];
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
@@ -4151,7 +4267,12 @@ gctINT32 _FlattenPath(
                 {
 #if USE_FTA
                     fContext->numPointsInSegment[currentSegment] = 2;
-                    TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1);
+                    if (gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1))
+                    {
+                        gcmFOOTER_ARG("return=%d", 0);
+                        return  0;
+                    }
+
                     fContext->pointsInSegment[currentSegment][0].coord = currentPoints[0];
                     fContext->pointsInSegment[currentSegment][1].coord = currentPoints[3];
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
@@ -4297,7 +4418,12 @@ gctINT32 _FlattenPath(
                 {
 #if USE_FTA
                     fContext->numPointsInSegment[currentSegment] = 2;
-                    TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1);
+                    if (gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1))
+                    {
+                        gcmFOOTER_ARG("return=%d", 0);
+                        return  0;
+                    }
+
                     fContext->pointsInSegment[currentSegment][0].coord = currentPoints[0];
                     fContext->pointsInSegment[currentSegment][1].coord = currentPoints[3];
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
@@ -4435,7 +4561,12 @@ gctINT32 _FlattenPath(
                 {
 #if USE_FTA
                     fContext->numPointsInSegment[currentSegment] = 2;
-                    TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1);
+                    if (gcvSTATUS_OK != TA_Resize(os, (void**)&fContext->pointsInSegment[currentSegment], sizeof(_VGTessPoint) * 2, 1))
+                    {
+                        gcmFOOTER_ARG("return=%d", 0);
+                        return  0;
+                    }
+
                     fContext->pointsInSegment[currentSegment][0].coord = currentPoints[0];
                     fContext->pointsInSegment[currentSegment][1].coord = currentPoints[3];
                     fContext->pointsInSegment[currentSegment][0].flags = POINT_FLAT;
@@ -5092,11 +5223,13 @@ void    _ConstructStartCap(
     _VGVector2        **stream;
     gctINT32        *currStreamPts;
     gctINT32        *numStreamPts;
-    _VGuint32        **indices;
+    _VGuint16        **indices_16 = gcvNULL;
+    _VGuint32        **indices_32 = gcvNULL;
     gctINT32        *currIndex;
     gctINT32        *numIndices;
     _VGVector2        *tempVert;
-    _VGuint32        *tempIndx;
+    _VGuint16        *tempIndx_16;
+    _VGuint32        *tempIndx_32;
     int i;
 
     gcmHEADER_ARG("context=0x%x linePoints=0x%x streamPipe=0x%x",
@@ -5109,9 +5242,16 @@ void    _ConstructStartCap(
     stream = &streamPipe->stream;
     currStreamPts = &streamPipe->currStreamPts;
     numStreamPts = &streamPipe->numStreamPts;
-    indices = &streamPipe->indices;
     currIndex = &streamPipe->currIndex;
     numIndices = &streamPipe->numIndices;
+    if (streamPipe->isLargePath)
+    {
+        indices_32 = &streamPipe->indices_32;
+    }
+    else
+    {
+        indices_16 = &streamPipe->indices_16;
+    }
 
     if (cap == VG_CAP_BUTT)
     {
@@ -5143,10 +5283,16 @@ void    _ConstructStartCap(
             {
                 _ExpandPipe(context, streamPipe, *currStreamPts + numPoints + 3, *currIndex + (numPoints + 1) * 3);
                 stream = &streamPipe->stream;
-                indices = &streamPipe->indices;
+                if (streamPipe->isLargePath)
+                {
+                    indices_32 = &streamPipe->indices_32;
+                }
+                else
+                {
+                    indices_16 = &streamPipe->indices_16;
+                }
             }
             tempVert = *stream + *currStreamPts;
-            tempIndx = *indices + *currIndex;
 
             /* Vertex Stream */
             tempVert[0] = linePoints[0].coord;
@@ -5156,11 +5302,25 @@ void    _ConstructStartCap(
             numPoints++;
 
             /* Index buffer */
-            for (i = 0; i < numPoints; i++)
+            if (streamPipe->isLargePath)
             {
-                tempIndx[i * 3 + 0] = (_VGuint32)(*currStreamPts);
-                tempIndx[i * 3 + 1] = (_VGuint32)(*currStreamPts + i + 1);
-                tempIndx[i * 3 + 2] = (_VGuint32)(*currStreamPts + i + 2);
+                tempIndx_32 = *indices_32 + *currIndex;
+                for (i = 0; i < numPoints; i++)
+                {
+                    tempIndx_32[i * 3 + 0] = (_VGuint32)(*currStreamPts);
+                    tempIndx_32[i * 3 + 1] = (_VGuint32)(*currStreamPts + i + 1);
+                    tempIndx_32[i * 3 + 2] = (_VGuint32)(*currStreamPts + i + 2);
+                }
+            }
+            else
+            {
+                tempIndx_16 = *indices_16 + *currIndex;
+                for (i = 0; i < numPoints; i++)
+                {
+                    tempIndx_16[i * 3 + 0] = (_VGuint16)(*currStreamPts);
+                    tempIndx_16[i * 3 + 1] = (_VGuint16)(*currStreamPts + i + 1);
+                    tempIndx_16[i * 3 + 2] = (_VGuint16)(*currStreamPts + i + 2);
+                }
             }
 
             /* Update Counter. */
@@ -5176,11 +5336,17 @@ void    _ConstructStartCap(
             {
                 _ExpandPipe(context, streamPipe, *currStreamPts + 5, *currIndex + 9);
                 stream = &streamPipe->stream;
-                indices = &streamPipe->indices;
+                if (streamPipe->isLargePath)
+                {
+                    indices_32 = &streamPipe->indices_32;
+                }
+                else
+                {
+                    indices_16 = &streamPipe->indices_16;
+                }
             }
 
             tempVert = *stream + *currStreamPts;
-            tempIndx = *indices + *currIndex;
 
             /*
                 0--2
@@ -5199,15 +5365,32 @@ void    _ConstructStartCap(
             tempVert[1].y = p1.y - tempVar;
 
             /* Index buffer. */
-            tempIndx[0] = (_VGuint32)(*currStreamPts + 3);
-            tempIndx[1] = (_VGuint32)(*currStreamPts + 2);
-            tempIndx[2] = (_VGuint32)(*currStreamPts);
-            tempIndx[3] = (_VGuint32)(*currStreamPts + 3);
-            tempIndx[4] = (_VGuint32)(*currStreamPts);
-            tempIndx[5] = (_VGuint32)(*currStreamPts + 1);
-            tempIndx[6] = (_VGuint32)(*currStreamPts + 3);
-            tempIndx[7] = (_VGuint32)(*currStreamPts + 1);
-            tempIndx[8] = (_VGuint32)(*currStreamPts + 4);
+            if (streamPipe->isLargePath)
+            {
+                tempIndx_32 = *indices_32 + *currIndex;
+                tempIndx_32[0] = (_VGuint32)(*currStreamPts + 3);
+                tempIndx_32[1] = (_VGuint32)(*currStreamPts + 2);
+                tempIndx_32[2] = (_VGuint32)(*currStreamPts);
+                tempIndx_32[3] = (_VGuint32)(*currStreamPts + 3);
+                tempIndx_32[4] = (_VGuint32)(*currStreamPts);
+                tempIndx_32[5] = (_VGuint32)(*currStreamPts + 1);
+                tempIndx_32[6] = (_VGuint32)(*currStreamPts + 3);
+                tempIndx_32[7] = (_VGuint32)(*currStreamPts + 1);
+                tempIndx_32[8] = (_VGuint32)(*currStreamPts + 4);
+            }
+            else
+            {
+                tempIndx_16 = *indices_16 + *currIndex;
+                tempIndx_16[0] = (_VGuint16)(*currStreamPts + 3);
+                tempIndx_16[1] = (_VGuint16)(*currStreamPts + 2);
+                tempIndx_16[2] = (_VGuint16)(*currStreamPts);
+                tempIndx_16[3] = (_VGuint16)(*currStreamPts + 3);
+                tempIndx_16[4] = (_VGuint16)(*currStreamPts);
+                tempIndx_16[5] = (_VGuint16)(*currStreamPts + 1);
+                tempIndx_16[6] = (_VGuint16)(*currStreamPts + 3);
+                tempIndx_16[7] = (_VGuint16)(*currStreamPts + 1);
+                tempIndx_16[8] = (_VGuint16)(*currStreamPts + 4);
+            }
 
             /* Update counter. */
             *currStreamPts += 5;
@@ -5234,7 +5417,8 @@ void    _ConstructStrokeBody(
 
     gctINT32    sizeVert, sizeIndx;
     _VGVector2    *tempVert = gcvNULL;
-    _VGuint32    *tempIndx  = gcvNULL;
+    _VGuint16    *tempIndx_16  = gcvNULL;
+    _VGuint32    *tempIndx_32  = gcvNULL;
 
     gcmHEADER_ARG("context=0x%x strokeWidth=%f linePoints=0x%x streamPipe=0x%x",
         context, strokeWidth, linePoints, streamPipe);
@@ -5256,7 +5440,6 @@ void    _ConstructStrokeBody(
     2-------5
     */
     tempVert = streamPipe->stream + streamPipe->currStreamPts;
-    tempIndx = streamPipe->indices + streamPipe->currIndex;
 
     tempVert[0].x = TESS_MUL(radius, (-vLine0.y)) + linePoints[0].coord.x;
     tempVert[0].y = TESS_MUL(radius, vLine0.x) + linePoints[0].coord.y;
@@ -5270,12 +5453,27 @@ void    _ConstructStrokeBody(
     tempVert[5].x = tempVert[4].x + tempVert[4].x - tempVert[3].x;
     tempVert[5].y = tempVert[4].y + tempVert[4].y - tempVert[3].y;
 
-    tempIndx[11]= (_VGuint32)streamPipe->currStreamPts;
-    tempIndx[0] = tempIndx[3] = tempIndx[6] = tempIndx[9] = tempIndx[11] + 1;
-    tempIndx[1] = tempIndx[11] + 2;
-    tempIndx[2] = tempIndx[4] = tempIndx[11] + 5;
-    tempIndx[5] = tempIndx[7] = tempIndx[11] + 4;
-    tempIndx[8] = tempIndx[10]= tempIndx[11] + 3;
+    if (streamPipe->isLargePath)
+    {
+        tempIndx_32 = streamPipe->indices_32 + streamPipe->currIndex;
+        tempIndx_32[11]= (_VGuint32)streamPipe->currStreamPts;
+        tempIndx_32[0] = tempIndx_32[3] = tempIndx_32[6] = tempIndx_32[9] = tempIndx_32[11] + 1;
+        tempIndx_32[1] = tempIndx_32[11] + 2;
+        tempIndx_32[2] = tempIndx_32[4] = tempIndx_32[11] + 5;
+        tempIndx_32[5] = tempIndx_32[7] = tempIndx_32[11] + 4;
+        tempIndx_32[8] = tempIndx_32[10]= tempIndx_32[11] + 3;
+    }
+    else
+    {
+        tempIndx_16 = streamPipe->indices_16 + streamPipe->currIndex;
+        tempIndx_16[11]= (_VGuint16)streamPipe->currStreamPts;
+        tempIndx_16[0] = tempIndx_16[3] = tempIndx_16[6] = tempIndx_16[9] = tempIndx_16[11] + 1;
+        tempIndx_16[1] = tempIndx_16[11] + 2;
+        tempIndx_16[2] = tempIndx_16[4] = tempIndx_16[11] + 5;
+        tempIndx_16[5] = tempIndx_16[7] = tempIndx_16[11] + 4;
+        tempIndx_16[8] = tempIndx_16[10]= tempIndx_16[11] + 3;
+    }
+
 
     streamPipe->currStreamPts = sizeVert;
     streamPipe->currIndex = sizeIndx;
@@ -5302,11 +5500,13 @@ void    _ConstructEndCap(
     _VGVector2        **stream;
     gctINT32        *currStreamPts;
     gctINT32        *numStreamPts;
-    _VGuint32        **indices;
+    _VGuint16        **indices_16 = gcvNULL;
+    _VGuint32        **indices_32 = gcvNULL;
     gctINT32        *currIndex;
     gctINT32        *numIndices;
     _VGVector2        *tempVert;
-    _VGuint32        *tempIndx;
+    _VGuint16        *tempIndx_16;
+    _VGuint32        *tempIndx_32;
     int i;
 
     gcmHEADER_ARG("context=0x%x linePoints=0x%x streamPipe=0x%x", context, linePoints, streamPipe);
@@ -5321,10 +5521,16 @@ void    _ConstructEndCap(
     stream = &streamPipe->stream;
     currStreamPts = &streamPipe->currStreamPts;
     numStreamPts = &streamPipe->numStreamPts;
-    indices = &streamPipe->indices;
     currIndex = &streamPipe->currIndex;
     numIndices = &streamPipe->numIndices;
-
+    if (streamPipe->isLargePath)
+    {
+        indices_32 = &streamPipe->indices_32;
+    }
+    else
+    {
+        indices_16 = &streamPipe->indices_16;
+    }
     /* Get Vector along the line(vLine) and ortho the line(vDLine) [to the left]. */
     vLine = linePoints[1].inTan;
     vDLine.x = -vLine.y;
@@ -5348,10 +5554,16 @@ void    _ConstructEndCap(
             {
                 _ExpandPipe(context, streamPipe, *currStreamPts + numPoints + 3, *currIndex + (numPoints + 1) * 3);
                 stream = &streamPipe->stream;
-                indices = &streamPipe->indices;
+                if (streamPipe->isLargePath)
+                {
+                    indices_32 = &streamPipe->indices_32;
+                }
+                else
+                {
+                    indices_16 = &streamPipe->indices_16;
+                }
             }
             tempVert = *stream + *currStreamPts;
-            tempIndx = *indices + *currIndex;
 
             tempVert[0] = linePoints[1].coord;
             tempVert[1] = p0;
@@ -5359,11 +5571,25 @@ void    _ConstructEndCap(
             tempVert[numPoints + 2] = p1;
             numPoints++;
 
-            for (i = 0; i < numPoints; i++)
+            if (streamPipe->isLargePath)
             {
-                tempIndx[i * 3 + 0] = (_VGuint32)(*currStreamPts);
-                tempIndx[i * 3 + 1] = (_VGuint32)(*currStreamPts + i + 1);
-                tempIndx[i * 3 + 2] = (_VGuint32)(*currStreamPts + i + 2);
+                tempIndx_32 = *indices_32 + *currIndex;
+                for (i = 0; i < numPoints; i++)
+                {
+                    tempIndx_32[i * 3 + 0] = (_VGuint32)(*currStreamPts);
+                    tempIndx_32[i * 3 + 1] = (_VGuint32)(*currStreamPts + i + 1);
+                    tempIndx_32[i * 3 + 2] = (_VGuint32)(*currStreamPts + i + 2);
+                }
+            }
+            else
+            {
+                tempIndx_16 = *indices_16 + *currIndex;
+                for (i = 0; i < numPoints; i++)
+                {
+                    tempIndx_16[i * 3 + 0] = (_VGuint16)(*currStreamPts);
+                    tempIndx_16[i * 3 + 1] = (_VGuint16)(*currStreamPts + i + 1);
+                    tempIndx_16[i * 3 + 2] = (_VGuint16)(*currStreamPts + i + 2);
+                }
             }
 
             *currStreamPts += numPoints + 2;
@@ -5378,10 +5604,16 @@ void    _ConstructEndCap(
             {
                 _ExpandPipe(context, streamPipe, *currStreamPts + 5, *currIndex + 9);
                 stream = &streamPipe->stream;
-                indices = &streamPipe->indices;
+                if (streamPipe->isLargePath)
+                {
+                    indices_32 = &streamPipe->indices_32;
+                }
+                else
+                {
+                    indices_16 = &streamPipe->indices_16;
+                }
             }
             tempVert = *stream + *currStreamPts;
-            tempIndx = *indices + *currIndex;
 
             /*
             Vertex Layout. line direction --> right
@@ -5399,17 +5631,32 @@ void    _ConstructEndCap(
             tempVert[3].y = p1.y + tempVar;
             tempVert[4].y = p0.y + tempVar;
 
-            tempIndx[0] = (_VGuint32)(*currStreamPts + 1);
-            tempIndx[1] = (_VGuint32)(*currStreamPts + 3);
-            tempIndx[2] = (_VGuint32)(*currStreamPts);
-
-            tempIndx[3] = (_VGuint32)(*currStreamPts + 1);
-            tempIndx[4] = (_VGuint32)(*currStreamPts + 4);
-            tempIndx[5] = (_VGuint32)(*currStreamPts + 3);
-
-            tempIndx[6] = (_VGuint32)(*currStreamPts + 1);
-            tempIndx[7] = (_VGuint32)(*currStreamPts + 2);
-            tempIndx[8] = (_VGuint32)(*currStreamPts + 4);
+            if (streamPipe->isLargePath)
+            {
+                tempIndx_32 = *indices_32 + *currIndex;
+                tempIndx_32[0] = (_VGuint32)(*currStreamPts + 1);
+                tempIndx_32[1] = (_VGuint32)(*currStreamPts + 3);
+                tempIndx_32[2] = (_VGuint32)(*currStreamPts);
+                tempIndx_32[3] = (_VGuint32)(*currStreamPts + 1);
+                tempIndx_32[4] = (_VGuint32)(*currStreamPts + 4);
+                tempIndx_32[5] = (_VGuint32)(*currStreamPts + 3);
+                tempIndx_32[6] = (_VGuint32)(*currStreamPts + 1);
+                tempIndx_32[7] = (_VGuint32)(*currStreamPts + 2);
+                tempIndx_32[8] = (_VGuint32)(*currStreamPts + 4);
+            }
+            else
+            {
+                tempIndx_16 = *indices_16 + *currIndex;
+                tempIndx_16[0] = (_VGuint16)(*currStreamPts + 1);
+                tempIndx_16[1] = (_VGuint16)(*currStreamPts + 3);
+                tempIndx_16[2] = (_VGuint16)(*currStreamPts);
+                tempIndx_16[3] = (_VGuint16)(*currStreamPts + 1);
+                tempIndx_16[4] = (_VGuint16)(*currStreamPts + 4);
+                tempIndx_16[5] = (_VGuint16)(*currStreamPts + 3);
+                tempIndx_16[6] = (_VGuint16)(*currStreamPts + 1);
+                tempIndx_16[7] = (_VGuint16)(*currStreamPts + 2);
+                tempIndx_16[8] = (_VGuint16)(*currStreamPts + 4);
+            }
 
             *currStreamPts += 5;
             *currIndex += 9;
@@ -5441,8 +5688,9 @@ void    _ConstructStrokeJoin(
      VGJoinStyle    join;
     _VGTesstype        strokeWidth;
 
-    _VGVector2        *tempVert = gcvNULL;
-    _VGuint32        *tempIndx  = gcvNULL;
+    _VGVector2      *tempVert = gcvNULL;
+    _VGuint16       *tempIndx_16  = gcvNULL;
+    _VGuint32       *tempIndx_32  = gcvNULL;
     gctINT32        sizeVert, sizeIndx;
     gctINT32        step;
     gctINT32        angle0, angle1;
@@ -5503,7 +5751,6 @@ void    _ConstructStrokeJoin(
                     _ExpandPipe(context, streamPipe, sizeVert, sizeIndx);
                 }
                 tempVert = streamPipe->stream + streamPipe->currStreamPts;
-                tempIndx = streamPipe->indices + streamPipe->currIndex;
 
                 tempVert[0] = currLinePoints[0].coord;
                 tempVert[1] = p0;
@@ -5518,16 +5765,34 @@ void    _ConstructStrokeJoin(
                 }
 
                 numPoints = (numPoints - 1) * 2 - 1;
-                for (i = 0; i < numPoints; i++)
+                if (streamPipe->isLargePath)
                 {
-                    *tempIndx++ = (_VGuint32)streamPipe->currStreamPts;
-                    *tempIndx++ = (_VGuint32)(streamPipe->currStreamPts + i + 1);
-                    *tempIndx++ = (_VGuint32)(streamPipe->currStreamPts + i + 2);
-                }
+                    tempIndx_32 = streamPipe->indices_32 + streamPipe->currIndex;
+                    for (i = 0; i < numPoints; i++)
+                    {
+                        *tempIndx_32++ = (_VGuint32)streamPipe->currStreamPts;
+                        *tempIndx_32++ = (_VGuint32)(streamPipe->currStreamPts + i + 1);
+                        *tempIndx_32++ = (_VGuint32)(streamPipe->currStreamPts + i + 2);
+                    }
 
-                tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
-                tempIndx[1] = (_VGuint32)(streamPipe->currStreamPts + i + 1);
-                tempIndx[2] = (_VGuint32)(streamPipe->currStreamPts + 1);
+                    tempIndx_32[0] = (_VGuint32)streamPipe->currStreamPts;
+                    tempIndx_32[1] = (_VGuint32)(streamPipe->currStreamPts + i + 1);
+                    tempIndx_32[2] = (_VGuint32)(streamPipe->currStreamPts + 1);
+                }
+                else
+                {
+                    tempIndx_16 = streamPipe->indices_16 + streamPipe->currIndex;
+                    for (i = 0; i < numPoints; i++)
+                    {
+                        *tempIndx_16++ = (_VGuint16)streamPipe->currStreamPts;
+                        *tempIndx_16++ = (_VGuint16)(streamPipe->currStreamPts + i + 1);
+                        *tempIndx_16++ = (_VGuint16)(streamPipe->currStreamPts + i + 2);
+                    }
+
+                    tempIndx_16[0] = (_VGuint16)streamPipe->currStreamPts;
+                    tempIndx_16[1] = (_VGuint16)(streamPipe->currStreamPts + i + 1);
+                    tempIndx_16[2] = (_VGuint16)(streamPipe->currStreamPts + 1);
+                }
 
                 streamPipe->currStreamPts = sizeVert;
                 streamPipe->currIndex = sizeIndx;
@@ -5582,7 +5847,6 @@ void    _ConstructStrokeJoin(
                 _ExpandPipe(context, streamPipe, sizeVert, sizeIndx);
             }
             tempVert = streamPipe->stream + streamPipe->currStreamPts;
-            tempIndx = streamPipe->indices + streamPipe->currIndex;
 
             _FlattenCircle(&currLinePoints[0].coord, radius, angle0, angle1, context->tessContext.strokeJoinStep, tempVert);
             tempX = currLinePoints[0].coord.x + currLinePoints[0].coord.x;
@@ -5594,42 +5858,90 @@ void    _ConstructStrokeJoin(
                 tempVert++;
             }
 
-            tempIndx[0] = tempIndx[3] = tempIndx[6] = tempIndx[9] = (_VGuint32)(streamPipe->currStreamPts - 2);
-            if (prod > 0)    /* Left turn */
+            if (streamPipe->isLargePath)
             {
-                /* The four triangles on the edges. */
-                tempIndx[1] = (_VGuint32)(streamPipe->currStreamPts - 3);
-                tempIndx[2] = (_VGuint32)(streamPipe->currStreamPts);
-                tempIndx[4] = (_VGuint32)(streamPipe->currStreamPts + numPoints - 1);
-                tempIndx[5] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints);
-                tempIndx[7] = (_VGuint32)(streamPipe->currStreamPts - 1);
-                tempIndx[8] = (_VGuint32)(streamPipe->currStreamPts + numPoints);
-                tempIndx[10] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints - 1);
-                tempIndx[11] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints + 2);
+                tempIndx_32 = streamPipe->indices_32 + streamPipe->currIndex;
+                tempIndx_32[0] = tempIndx_32[3] = tempIndx_32[6] = tempIndx_32[9] = (_VGuint32)(streamPipe->currStreamPts - 2);
+                if (prod > 0)    /* Left turn */
+                {
+                    /* The four triangles on the edges. */
+                    tempIndx_32[1] = (_VGuint32)(streamPipe->currStreamPts - 3);
+                    tempIndx_32[2] = (_VGuint32)(streamPipe->currStreamPts);
+                    tempIndx_32[4] = (_VGuint32)(streamPipe->currStreamPts + numPoints - 1);
+                    tempIndx_32[5] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints);
+                    tempIndx_32[7] = (_VGuint32)(streamPipe->currStreamPts - 1);
+                    tempIndx_32[8] = (_VGuint32)(streamPipe->currStreamPts + numPoints);
+                    tempIndx_32[10] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints - 1);
+                    tempIndx_32[11] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints + 2);
+                }
+                else
+                {
+                    /* The four triangles on the edges. */
+                    tempIndx_32[1] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints);
+                    tempIndx_32[2] = (_VGuint32)(streamPipe->currStreamPts);
+                    tempIndx_32[4] = (_VGuint32)(streamPipe->currStreamPts + numPoints - 1);
+                    tempIndx_32[5] = (_VGuint32)(streamPipe->currStreamPts - 3);
+                    tempIndx_32[7] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints + 2);
+                    tempIndx_32[8] = (_VGuint32)(streamPipe->currStreamPts + numPoints);
+                    tempIndx_32[10] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints - 1);
+                    tempIndx_32[11] = (_VGuint32)(streamPipe->currStreamPts - 1);
+                }
+
+                tempIndx_32 += 12;
+                step = numPoints * 3 - 3;
+
+                for (i = 0; i < numPoints - 1; i++)
+                {
+                    *(tempIndx_32 + step) = *tempIndx_32 = (_VGuint32)(streamPipe->currStreamPts - 2);
+                    tempIndx_32++;
+                    *(tempIndx_32 + step) = (_VGuint32)(streamPipe->currStreamPts + numPoints + i);
+                    *tempIndx_32++ = (_VGuint32)(streamPipe->currStreamPts + i);
+                    *(tempIndx_32 + step) = (_VGuint32)(streamPipe->currStreamPts + numPoints + i + 1);
+                    *tempIndx_32++ = (_VGuint32)(streamPipe->currStreamPts + i + 1);
+                }
             }
             else
             {
-                /* The four triangles on the edges. */
-                tempIndx[1] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints);
-                tempIndx[2] = (_VGuint32)(streamPipe->currStreamPts);
-                tempIndx[4] = (_VGuint32)(streamPipe->currStreamPts + numPoints - 1);
-                tempIndx[5] = (_VGuint32)(streamPipe->currStreamPts - 3);
-                tempIndx[7] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints + 2);
-                tempIndx[8] = (_VGuint32)(streamPipe->currStreamPts + numPoints);
-                tempIndx[10] = (_VGuint32)(streamPipe->currStreamPts + numPoints + numPoints - 1);
-                tempIndx[11] = (_VGuint32)(streamPipe->currStreamPts - 1);
-            }
-            tempIndx += 12;
+                 tempIndx_16 = streamPipe->indices_16 + streamPipe->currIndex;
+                tempIndx_16[0] = tempIndx_16[3] = tempIndx_16[6] = tempIndx_16[9] = (_VGuint16)(streamPipe->currStreamPts - 2);
 
-            step = numPoints * 3 - 3;
-            for (i = 0; i < numPoints - 1; i++)
-            {
-                *(tempIndx + step) = *tempIndx = (_VGuint32)(streamPipe->currStreamPts - 2);
-                tempIndx++;
-                *(tempIndx + step) = (_VGuint32)(streamPipe->currStreamPts + numPoints + i);
-                *tempIndx++ = (_VGuint32)(streamPipe->currStreamPts + i);
-                *(tempIndx + step) = (_VGuint32)(streamPipe->currStreamPts + numPoints + i + 1);
-                *tempIndx++ = (_VGuint32)(streamPipe->currStreamPts + i + 1);
+                if (prod > 0)    /* Left turn */
+                {
+                    /* The four triangles on the edges. */
+                    tempIndx_16[1] = (_VGuint16)(streamPipe->currStreamPts - 3);
+                    tempIndx_16[2] = (_VGuint16)(streamPipe->currStreamPts);
+                    tempIndx_16[4] = (_VGuint16)(streamPipe->currStreamPts + numPoints - 1);
+                    tempIndx_16[5] = (_VGuint16)(streamPipe->currStreamPts + numPoints + numPoints);
+                    tempIndx_16[7] = (_VGuint16)(streamPipe->currStreamPts - 1);
+                    tempIndx_16[8] = (_VGuint16)(streamPipe->currStreamPts + numPoints);
+                    tempIndx_16[10] = (_VGuint16)(streamPipe->currStreamPts + numPoints + numPoints - 1);
+                    tempIndx_16[11] = (_VGuint16)(streamPipe->currStreamPts + numPoints + numPoints + 2);
+                }
+                else
+                {
+                    /* The four triangles on the edges. */
+                    tempIndx_16[1] = (_VGuint16)(streamPipe->currStreamPts + numPoints + numPoints);
+                    tempIndx_16[2] = (_VGuint16)(streamPipe->currStreamPts);
+                    tempIndx_16[4] = (_VGuint16)(streamPipe->currStreamPts + numPoints - 1);
+                    tempIndx_16[5] = (_VGuint16)(streamPipe->currStreamPts - 3);
+                    tempIndx_16[7] = (_VGuint16)(streamPipe->currStreamPts + numPoints + numPoints + 2);
+                    tempIndx_16[8] = (_VGuint16)(streamPipe->currStreamPts + numPoints);
+                    tempIndx_16[10] = (_VGuint16)(streamPipe->currStreamPts + numPoints + numPoints - 1);
+                    tempIndx_16[11] = (_VGuint16)(streamPipe->currStreamPts - 1);
+                }
+
+                tempIndx_16 += 12;
+                step = numPoints * 3 - 3;
+
+                for (i = 0; i < numPoints - 1; i++)
+                {
+                    *(tempIndx_16 + step) = *tempIndx_16 = (_VGuint16)(streamPipe->currStreamPts - 2);
+                    tempIndx_16++;
+                    *(tempIndx_16 + step) = (_VGuint16)(streamPipe->currStreamPts + numPoints + i);
+                    *tempIndx_16++ = (_VGuint16)(streamPipe->currStreamPts + i);
+                    *(tempIndx_16 + step) = (_VGuint16)(streamPipe->currStreamPts + numPoints + i + 1);
+                    *tempIndx_16++ = (_VGuint16)(streamPipe->currStreamPts + i + 1);
+                }
             }
 
             streamPipe->currStreamPts = sizeVert;
@@ -5645,7 +5957,6 @@ void    _ConstructStrokeJoin(
                 _ExpandPipe(context, streamPipe, sizeVert, sizeIndx);
             }
             tempVert = streamPipe->stream + streamPipe->currStreamPts;
-            tempIndx = streamPipe->indices + streamPipe->currIndex;
 
             tempVert[0] = p2;
             tempVert[1] = p0;
@@ -5655,11 +5966,24 @@ void    _ConstructStrokeJoin(
             tempVert[4].x = p2.x + p2.x - p1.x;
             tempVert[4].y = p2.y + p2.y - p1.y;
 
-            tempIndx[0] = tempIndx[3] = (_VGuint32)streamPipe->currStreamPts;
-            tempIndx[1] = tempIndx[0] + 1;
-            tempIndx[2] = tempIndx[0] + 2;
-            tempIndx[4] = tempIndx[0] + 4;
-            tempIndx[5] = tempIndx[0] + 3;
+            if (streamPipe->isLargePath)
+            {
+                tempIndx_32 = streamPipe->indices_32 + streamPipe->currIndex;
+                tempIndx_32[0] = tempIndx_32[3] = (_VGuint32)streamPipe->currStreamPts;
+                tempIndx_32[1] = tempIndx_32[0] + 1;
+                tempIndx_32[2] = tempIndx_32[0] + 2;
+                tempIndx_32[4] = tempIndx_32[0] + 4;
+                tempIndx_32[5] = tempIndx_32[0] + 3;
+            }
+            else
+            {
+                tempIndx_16 = streamPipe->indices_16 + streamPipe->currIndex;
+                tempIndx_16[0] = tempIndx_16[3] = (_VGuint16)streamPipe->currStreamPts;
+                tempIndx_16[1] = tempIndx_16[0] + 1;
+                tempIndx_16[2] = tempIndx_16[0] + 2;
+                tempIndx_16[4] = tempIndx_16[0] + 4;
+                tempIndx_16[5] = tempIndx_16[0] + 3;
+            }
 
             streamPipe->currStreamPts = sizeVert;
             streamPipe->currIndex = sizeIndx;
@@ -5700,7 +6024,6 @@ void    _ConstructStrokeJoin(
                         _ExpandPipe(context, streamPipe, sizeVert, sizeIndx);
                     }
                     tempVert = streamPipe->stream + streamPipe->currStreamPts;
-                    tempIndx = streamPipe->indices + streamPipe->currIndex;
 
                     tempVert[0] = currLinePoints[0].coord;
                     tempVert[1] = p0;
@@ -5708,12 +6031,27 @@ void    _ConstructStrokeJoin(
                     _FlattenCircle(&tempVert[0], radius, angle0, angle1, context->tessContext.strokeJoinStep, tempVert + 2);
                     tempVert[numPoints] = p1;
 
-                    for (i = 1; i < numPoints; i++)
+                    if (streamPipe->isLargePath)
                     {
-                        tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
-                        tempIndx[1] = (_VGuint32) (tempIndx[0] + i);
-                        tempIndx[2] = (_VGuint32) (tempIndx[1] + 1);
-                        tempIndx += 3;
+                        tempIndx_32 = streamPipe->indices_32 + streamPipe->currIndex;
+                        for (i = 1; i < numPoints; i++)
+                        {
+                            tempIndx_32[0] = (_VGuint32)streamPipe->currStreamPts;
+                            tempIndx_32[1] = (_VGuint32) (tempIndx_32[0] + i);
+                            tempIndx_32[2] = (_VGuint32) (tempIndx_32[1] + 1);
+                            tempIndx_32 += 3;
+                        }
+                    }
+                    else
+                    {
+                        tempIndx_16 = streamPipe->indices_16 + streamPipe->currIndex;
+                        for (i = 1; i < numPoints; i++)
+                        {
+                            tempIndx_16[0] = (_VGuint16)streamPipe->currStreamPts;
+                            tempIndx_16[1] = (_VGuint16) (tempIndx_16[0] + i);
+                            tempIndx_16[2] = (_VGuint16) (tempIndx_16[1] + 1);
+                            tempIndx_16 += 3;
+                        }
                     }
 
                     streamPipe->currStreamPts = sizeVert;
@@ -5730,16 +6068,25 @@ void    _ConstructStrokeJoin(
                         _ExpandPipe(context, streamPipe, sizeVert, sizeIndx);
                     }
                     tempVert = streamPipe->stream + streamPipe->currStreamPts;
-                    tempIndx = streamPipe->indices + streamPipe->currIndex;
 
                     tempVert[0] = p2;
                     tempVert[1] = p0;
                     tempVert[2] = p1;
 
-                    tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
-                    tempIndx[1] = tempIndx[0] + 1;
-                    tempIndx[2] = tempIndx[0] + 2;
-
+                    if (streamPipe->isLargePath)
+                    {
+                        tempIndx_32 = streamPipe->indices_32 + streamPipe->currIndex;
+                        tempIndx_32[0] = (_VGuint32)streamPipe->currStreamPts;
+                        tempIndx_32[1] = tempIndx_32[0] + 1;
+                        tempIndx_32[2] = tempIndx_32[0] + 2;
+                    }
+                    else
+                    {
+                        tempIndx_16 = streamPipe->indices_16 + streamPipe->currIndex;
+                        tempIndx_16[0] = (_VGuint16)streamPipe->currStreamPts;
+                        tempIndx_16[1] = tempIndx_16[0] + 1;
+                        tempIndx_16[2] = tempIndx_16[0] + 2;
+                    }
                     streamPipe->currStreamPts = sizeVert;
                     streamPipe->currIndex = sizeIndx;
                 }
@@ -5770,7 +6117,6 @@ void    _ConstructStrokeJoin(
                         _ExpandPipe(context, streamPipe, sizeVert, sizeIndx);
                     }
                     tempVert = streamPipe->stream + streamPipe->currStreamPts;
-                    tempIndx = streamPipe->indices + streamPipe->currIndex;
 
                     tempVert[0] = currLinePoints[0].coord;
                     tempVert[1] = p0;
@@ -5778,12 +6124,27 @@ void    _ConstructStrokeJoin(
                     _FlattenCircle(&tempVert[0], radius, angle0, angle1, context->tessContext.strokeJoinStep, tempVert + 2);
                     tempVert[numPoints] = p1;
 
-                    for (i = 1; i < numPoints; i++)
+                    if (streamPipe->isLargePath)
                     {
-                        tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
-                        tempIndx[1] = (_VGuint32) (tempIndx[0] + i);
-                        tempIndx[2] = (_VGuint32) (tempIndx[1] + 1);
-                        tempIndx += 3;
+                        tempIndx_32 = streamPipe->indices_32 + streamPipe->currIndex;
+                        for (i = 1; i < numPoints; i++)
+                        {
+                            tempIndx_32[0] = (_VGuint32)streamPipe->currStreamPts;
+                            tempIndx_32[1] = (_VGuint32) (tempIndx_32[0] + i);
+                            tempIndx_32[2] = (_VGuint32) (tempIndx_32[1] + 1);
+                            tempIndx_32 += 3;
+                        }
+                    }
+                    else
+                    {
+                        tempIndx_16 = streamPipe->indices_16 + streamPipe->currIndex;
+                        for (i = 1; i < numPoints; i++)
+                        {
+                            tempIndx_16[0] = (_VGuint16)streamPipe->currStreamPts;
+                            tempIndx_16[1] = (_VGuint16) (tempIndx_16[0] + i);
+                            tempIndx_16[2] = (_VGuint16) (tempIndx_16[1] + 1);
+                            tempIndx_16 += 3;
+                        }
                     }
 
                     streamPipe->currStreamPts = sizeVert;
@@ -5799,15 +6160,25 @@ void    _ConstructStrokeJoin(
                         _ExpandPipe(context, streamPipe, sizeVert, sizeIndx);
                     }
                     tempVert = streamPipe->stream + streamPipe->currStreamPts;
-                    tempIndx = streamPipe->indices + streamPipe->currIndex;
 
                     tempVert[0] = p2;
                     tempVert[1] = p1;
                     tempVert[2] = p0;
 
-                    tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
-                    tempIndx[1] = tempIndx[0] + 1;
-                    tempIndx[2] = tempIndx[0] + 2;
+                    if (streamPipe->isLargePath)
+                    {
+                        tempIndx_32 = streamPipe->indices_32 + streamPipe->currIndex;
+                        tempIndx_32[0] = (_VGuint32)streamPipe->currStreamPts;
+                        tempIndx_32[1] = tempIndx_32[0] + 1;
+                        tempIndx_32[2] = tempIndx_32[0] + 2;
+                    }
+                    else
+                    {
+                        tempIndx_16 = streamPipe->indices_16 + streamPipe->currIndex;
+                        tempIndx_16[0] = (_VGuint16)streamPipe->currStreamPts;
+                        tempIndx_16[1] = tempIndx_16[0] + 1;
+                        tempIndx_16[2] = tempIndx_16[0] + 2;
+                    }
 
                     streamPipe->currStreamPts = sizeVert;
                     streamPipe->currIndex = sizeIndx;
@@ -5870,19 +6241,32 @@ void    _ConstructStrokeJoin(
                         _ExpandPipe(context, streamPipe, sizeVert, sizeIndx);
                     }
                     tempVert = streamPipe->stream + streamPipe->currStreamPts;
-                    tempIndx = streamPipe->indices + streamPipe->currIndex;
 
                     tempVert[0] = p3;
                     tempVert[1] = p0;
                     tempVert[2] = p1;
                     tempVert[3] = p2;
 
-                    tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
-                    tempIndx[1] = (_VGuint32)(streamPipe->currStreamPts + 1);
-                    tempIndx[2] = (_VGuint32)(streamPipe->currStreamPts + 2);
-                    tempIndx[3] = (_VGuint32)streamPipe->currStreamPts;
-                    tempIndx[4] = (_VGuint32)(streamPipe->currStreamPts + 2);
-                    tempIndx[5] = (_VGuint32)(streamPipe->currStreamPts + 3);
+                    if (streamPipe->isLargePath)
+                    {
+                        tempIndx_32 = streamPipe->indices_32 + streamPipe->currIndex;
+                        tempIndx_32[0] = (_VGuint32)streamPipe->currStreamPts;
+                        tempIndx_32[1] = (_VGuint32)(streamPipe->currStreamPts + 1);
+                        tempIndx_32[2] = (_VGuint32)(streamPipe->currStreamPts + 2);
+                        tempIndx_32[3] = (_VGuint32)streamPipe->currStreamPts;
+                        tempIndx_32[4] = (_VGuint32)(streamPipe->currStreamPts + 2);
+                        tempIndx_32[5] = (_VGuint32)(streamPipe->currStreamPts + 3);
+                    }
+                    else
+                    {
+                        tempIndx_16 = streamPipe->indices_16 + streamPipe->currIndex;
+                        tempIndx_16[0] = (_VGuint16)streamPipe->currStreamPts;
+                        tempIndx_16[1] = (_VGuint16)(streamPipe->currStreamPts + 1);
+                        tempIndx_16[2] = (_VGuint16)(streamPipe->currStreamPts + 2);
+                        tempIndx_16[3] = (_VGuint16)streamPipe->currStreamPts;
+                        tempIndx_16[4] = (_VGuint16)(streamPipe->currStreamPts + 2);
+                        tempIndx_16[5] = (_VGuint16)(streamPipe->currStreamPts + 3);
+                    }
 
                     streamPipe->currStreamPts = sizeVert;
                     streamPipe->currIndex = sizeIndx;
@@ -5907,20 +6291,32 @@ void    _ConstructStrokeJoin(
                         _ExpandPipe(context, streamPipe, sizeVert, sizeIndx);
                     }
                     tempVert = streamPipe->stream + streamPipe->currStreamPts;
-                    tempIndx = streamPipe->indices + streamPipe->currIndex;
 
                     tempVert[0] = p0;
                     tempVert[1] = p1;
                     tempVert[2] = p2;
                     tempVert[3] = p3;
 
-                    tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
-                    tempIndx[1] = (_VGuint32)(streamPipe->currStreamPts + 1);
-                    tempIndx[2] = (_VGuint32)(streamPipe->currStreamPts + 2);
-                    tempIndx[3] = (_VGuint32)streamPipe->currStreamPts;
-                    tempIndx[4] = (_VGuint32)(streamPipe->currStreamPts + 2);
-                    tempIndx[5] = (_VGuint32)(streamPipe->currStreamPts + 3);
-
+                    if (streamPipe->isLargePath)
+                    {
+                        tempIndx_32 = streamPipe->indices_32 + streamPipe->currIndex;
+                        tempIndx_32[0] = (_VGuint32)streamPipe->currStreamPts;
+                        tempIndx_32[1] = (_VGuint32)(streamPipe->currStreamPts + 1);
+                        tempIndx_32[2] = (_VGuint32)(streamPipe->currStreamPts + 2);
+                        tempIndx_32[3] = (_VGuint32)streamPipe->currStreamPts;
+                        tempIndx_32[4] = (_VGuint32)(streamPipe->currStreamPts + 2);
+                        tempIndx_32[5] = (_VGuint32)(streamPipe->currStreamPts + 3);
+                    }
+                    else
+                    {
+                        tempIndx_16 = streamPipe->indices_16 + streamPipe->currIndex;
+                        tempIndx_16[0] = (_VGuint16)streamPipe->currStreamPts;
+                        tempIndx_16[1] = (_VGuint16)(streamPipe->currStreamPts + 1);
+                        tempIndx_16[2] = (_VGuint16)(streamPipe->currStreamPts + 2);
+                        tempIndx_16[3] = (_VGuint16)streamPipe->currStreamPts;
+                        tempIndx_16[4] = (_VGuint16)(streamPipe->currStreamPts + 2);
+                        tempIndx_16[5] = (_VGuint16)(streamPipe->currStreamPts + 3);
+                    }
                     streamPipe->currStreamPts = sizeVert;
                     streamPipe->currIndex = sizeIndx;
                 }
@@ -5942,7 +6338,6 @@ void    _ConstructStrokeJoin(
                     _ExpandPipe(context, streamPipe, sizeVert, sizeIndx);
                 }
                 tempVert = streamPipe->stream + streamPipe->currStreamPts;
-                tempIndx = streamPipe->indices + streamPipe->currIndex;
 
                 tempVert[0] = currLinePoints[0].coord;
                 tempVert[1].x = currLinePoints[0].coord.x + radius * vDLine1.x;
@@ -5950,9 +6345,20 @@ void    _ConstructStrokeJoin(
                 tempVert[2].x = currLinePoints[0].coord.x + radius * vDLine0.x;
                 tempVert[2].y = currLinePoints[0].coord.y + radius * vDLine0.y;
 
-                tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
-                tempIndx[1] = (_VGuint32)streamPipe->currStreamPts + 1;
-                tempIndx[2] = (_VGuint32)streamPipe->currStreamPts + 2;
+                if (streamPipe->isLargePath)
+                {
+                    tempIndx_32 = streamPipe->indices_32 + streamPipe->currIndex;
+                    tempIndx_32[0] = (_VGuint32)streamPipe->currStreamPts;
+                    tempIndx_32[1] = (_VGuint32)(streamPipe->currStreamPts + 1);
+                    tempIndx_32[2] = (_VGuint32)(streamPipe->currStreamPts + 2);
+                }
+                else
+                {
+                    tempIndx_16 = streamPipe->indices_16 + streamPipe->currIndex;
+                    tempIndx_16[0] = (_VGuint16)streamPipe->currStreamPts;
+                    tempIndx_16[1] = (_VGuint16)(streamPipe->currStreamPts + 1);
+                    tempIndx_16[2] = (_VGuint16)(streamPipe->currStreamPts + 2);
+                }
 
                 streamPipe->currStreamPts = sizeVert;
                 streamPipe->currIndex = sizeIndx;
@@ -5967,7 +6373,6 @@ void    _ConstructStrokeJoin(
                     _ExpandPipe(context, streamPipe, sizeVert, sizeIndx);
                 }
                 tempVert = streamPipe->stream + streamPipe->currStreamPts;
-                tempIndx = streamPipe->indices + streamPipe->currIndex;
 
                 tempVert[0] = currLinePoints[0].coord;
                 tempVert[1].x = currLinePoints[0].coord.x - radius * vDLine0.x;
@@ -5975,9 +6380,20 @@ void    _ConstructStrokeJoin(
                 tempVert[2].x = currLinePoints[0].coord.x - radius * vDLine1.x;
                 tempVert[2].y = currLinePoints[0].coord.y - radius * vDLine1.y;
 
-                tempIndx[0] = (_VGuint32)streamPipe->currStreamPts;
-                tempIndx[1] = (_VGuint32)(streamPipe->currStreamPts + 1);
-                tempIndx[2] = (_VGuint32)(streamPipe->currStreamPts + 2);
+                if (streamPipe->isLargePath)
+                {
+                    tempIndx_32 = streamPipe->indices_32 + streamPipe->currIndex;
+                    tempIndx_32[0] = (_VGuint32)streamPipe->currStreamPts;
+                    tempIndx_32[1] = (_VGuint32)(streamPipe->currStreamPts + 1);
+                    tempIndx_32[2] = (_VGuint32)(streamPipe->currStreamPts + 2);
+                }
+                else
+                {
+                    tempIndx_16 = streamPipe->indices_16 + streamPipe->currIndex;
+                    tempIndx_16[0] = (_VGuint16)streamPipe->currStreamPts;
+                    tempIndx_16[1] = (_VGuint16)(streamPipe->currStreamPts + 1);
+                    tempIndx_16[2] = (_VGuint16)(streamPipe->currStreamPts + 2);
+                }
 
                 streamPipe->currStreamPts = sizeVert;
                 streamPipe->currIndex = sizeIndx;
@@ -6013,7 +6429,8 @@ void    _ConstructStroke(
     _VGVector2        **stream     = gcvNULL;
     gctINT32        *currStreamPts = gcvNULL;
     gctINT32        *numStreamPts  = gcvNULL;
-    _VGuint32        **indices     = gcvNULL;
+    _VGuint16        **indices_16  = gcvNULL;
+    _VGuint32        **indices_32  = gcvNULL;
     gctINT32        *currIndex     = gcvNULL;
     gctINT32        *numIndices    = gcvNULL;
 
@@ -6026,9 +6443,16 @@ void    _ConstructStroke(
     stream    = &streamPipe->stream;
     currStreamPts = &streamPipe->currStreamPts;
     numStreamPts = &streamPipe->numStreamPts;
-    indices = &streamPipe->indices;
     currIndex = &streamPipe->currIndex;
     numIndices = &streamPipe->numIndices;
+    if (streamPipe->isLargePath)
+    {
+        indices_32 = &streamPipe->indices_32;
+    }
+    else
+    {
+        indices_16 = &streamPipe->indices_16;
+    }
 
     OVG_MALLOC(context->os, pointsCopy, sizeof(_VGTessPoint) * numPoints);
     j = 0;
@@ -6099,7 +6523,8 @@ void    _ConstructStroke(
             {
                 /* Handle zero dash length here. */
                 _VGVector2        *tempVert;
-                _VGuint32        *tempIndx;
+                _VGuint16        *tempIndx_16;
+                _VGuint32        *tempIndx_32;
                 _VGVector2        tp0;
 
                 tp0.x = points[0].coord.x + radius;
@@ -6110,26 +6535,50 @@ void    _ConstructStroke(
                 {
                     _ExpandPipe(context, streamPipe, *currStreamPts + numPoints + 1, *currIndex + numPoints * 3);
                     stream = &streamPipe->stream;
-                    indices = &streamPipe->indices;
+                    if (streamPipe->isLargePath)
+                    {
+                        indices_32 = &streamPipe->indices_32;
+                    }
+                    else
+                    {
+                        indices_16 = &streamPipe->indices_16;
+                    }
                 }
                 tempVert = *stream + *currStreamPts;
-                tempIndx = *indices + *currIndex;
 
                 tempVert[0] = points[0].coord;
                 tempVert[1] = tp0;
                 _FlattenCircle(&tempVert[0], radius, 1, 359, context->tessContext.strokeJoinStep, tempVert + 2);
                 numPoints += 1;
 
-                for (i = 0; i < numPoints - 1; i++)
+                if (streamPipe->isLargePath)
                 {
-                    tempIndx[i * 3] = (_VGuint32)(*currStreamPts);
-                    tempIndx[i * 3 + 1] = (_VGuint32)(*currStreamPts + i + 1);
-                    tempIndx[i * 3 + 2] = (_VGuint32)(*currStreamPts + i + 2);
+                    tempIndx_32 = *indices_32 + *currIndex;
+                    for (i = 0; i < numPoints - 1; i++)
+                    {
+                        tempIndx_32[i * 3] = (_VGuint32)(*currStreamPts);
+                        tempIndx_32[i * 3 + 1] = (_VGuint32)(*currStreamPts + i + 1);
+                        tempIndx_32[i * 3 + 2] = (_VGuint32)(*currStreamPts + i + 2);
+                    }
+                    /* The last triangle. */
+                    tempIndx_32[i * 3] = (_VGuint32)(*currStreamPts);
+                    tempIndx_32[i * 3 + 1] = (_VGuint32)(*currStreamPts + i + 1);
+                    tempIndx_32[i * 3 + 2] = (_VGuint32)(*currStreamPts + 1);
                 }
-                /* The last triangle. */
-                tempIndx[i * 3] = (_VGuint32)(*currStreamPts);
-                tempIndx[i * 3 + 1] = (_VGuint32)(*currStreamPts + i + 1);
-                tempIndx[i * 3 + 2] = (_VGuint32)(*currStreamPts + 1);
+                else
+                {
+                    tempIndx_16 = *indices_16 + *currIndex;
+                    for (i = 0; i < numPoints - 1; i++)
+                    {
+                        tempIndx_16[i * 3] = (_VGuint16)(*currStreamPts);
+                        tempIndx_16[i * 3 + 1] = (_VGuint16)(*currStreamPts + i + 1);
+                        tempIndx_16[i * 3 + 2] = (_VGuint16)(*currStreamPts + i + 2);
+                    }
+                    /* The last triangle. */
+                    tempIndx_16[i * 3] = (_VGuint16)(*currStreamPts);
+                    tempIndx_16[i * 3 + 1] = (_VGuint16)(*currStreamPts + i + 1);
+                    tempIndx_16[i * 3 + 2] = (_VGuint16)(*currStreamPts + 1);
+                }
 
                 *currStreamPts += numPoints + 1;
                 *currIndex += numPoints * 3;
@@ -7081,19 +7530,24 @@ _VGint16 *_Triangulation(
     return tContext->triangles;
 
 on_memory:
+#if LOCAL_MEM_OPTIM
+    if (mountains != gcvNULL)
+    {
+        _FreeIntp(tContext->IntpPool, mountains);
+        mountains = gcvNULL;
+    }
+    if (mountainsLengths != gcvNULL)
+    {
+        _FreeInt(tContext->IntPool, mountainsLengths);
+        mountainsLengths = gcvNULL;
+    }
+#else
+    OVG_SAFE_FREE(context->os, mountainsLengths);
+#endif
     OVG_SAFE_FREE(context->os, regionHead);
     OVG_SAFE_FREE(context->os, tContext->triangles);
     _VGTessellationContextDtor(context);
     _VGTessellationContextCtor(os, tContext);
-
-    if (mountainsLengths != gcvNULL)
-    {
-#if LOCAL_MEM_OPTIM
-        _FreeInt(tContext->IntPool, mountainsLengths);
-#else
-        OVG_SAFE_FREE(context->os, mountainsLengths);
-#endif
-    }
 
     gcmFOOTER_ARG("return=0x%x", gcvNULL);
     return gcvNULL;
@@ -7479,11 +7933,14 @@ gceSTATUS _AddEdge(
                     _BreakEdgeBunch(context, otherRegions, otherRegionsLength, currPoint, 0))
                 {
 #if LOCAL_MEM_OPTIM
-                    _FreeInt(tContext->IntPool, otherRegions);
+                    if (otherRegions != gcvNULL)
+                    {
+                        _FreeInt(tContext->IntPool, otherRegions);
+                        otherRegions = gcvNULL;
+                    }
 #else
                     OVG_SAFE_FREE(context->os, otherRegions);
 #endif
-
                     gcmFOOTER_ARG("status=%d", gcvSTATUS_OUT_OF_MEMORY);
 
                     return gcvSTATUS_OUT_OF_MEMORY;
@@ -7727,7 +8184,6 @@ gceSTATUS _AddEdge(
                 /* locate other region */
                 if (TESS_ABS((gctFLOAT)currIntersection) < 3)
                 {
-                    gceSTATUS status = gcvSTATUS_OK;
                     otherRegionsLength = 0;
                     otherRegions = _FindOtherRegions(context, currRegion, leftIndex, (gctINT32)TESS_SIGN((long long)currIntersection), tContext->regions[currRegion].lowerVertex, &otherRegionsLength);
 
@@ -7754,7 +8210,6 @@ gceSTATUS _AddEdge(
 #else
                             OVG_SAFE_FREE(context->os, otherRegions);
 #endif
-
                             gcmFOOTER_ARG("status=%d", gcvSTATUS_OUT_OF_MEMORY);
 
                             return gcvSTATUS_OUT_OF_MEMORY;
@@ -7766,8 +8221,6 @@ gceSTATUS _AddEdge(
                         if (gcvSTATUS_OK !=
                             _BreakEdgeBunch(context, otherRegions, otherRegionsLength, leftIndex, -1))
                         {
-                            gcmFOOTER_ARG("status=%d", gcvSTATUS_OUT_OF_MEMORY);
-
 #if LOCAL_MEM_OPTIM
                             if (otherRegions != gcvNULL)
                             {
@@ -7777,6 +8230,8 @@ gceSTATUS _AddEdge(
 #else
                             OVG_SAFE_FREE(context->os, otherRegions);
 #endif
+                            gcmFOOTER_ARG("status=%d", gcvSTATUS_OUT_OF_MEMORY);
+
                             return gcvSTATUS_OUT_OF_MEMORY;
                         }
 
@@ -7785,9 +8240,18 @@ gceSTATUS _AddEdge(
                         if (gcvSTATUS_OK !=
                             _BreakOneEdge2(context, currRegion, index, leftIndex, newEdge2))
                         {
+#if LOCAL_MEM_OPTIM
+                            if (otherRegions != gcvNULL)
+                            {
+                                _FreeInt(tContext->IntPool, otherRegions);
+                                otherRegions = gcvNULL;
+                            }
+#else
+                            OVG_SAFE_FREE(context->os, otherRegions);
+#endif
                             gcmFOOTER_ARG("status=%d", gcvSTATUS_OUT_OF_MEMORY);
 
-                            status = gcvSTATUS_OUT_OF_MEMORY;
+                            return gcvSTATUS_OUT_OF_MEMORY;
                         }
 
                         toContinue = gcvTRUE;    /* need to insert lower half */
@@ -7798,9 +8262,18 @@ gceSTATUS _AddEdge(
                         if (gcvSTATUS_OK !=
                             _BreakEdgeBunch(context, otherRegions, otherRegionsLength, leftIndex, 0))
                         {
+#if LOCAL_MEM_OPTIM
+                            if (otherRegions != gcvNULL)
+                            {
+                                _FreeInt(tContext->IntPool, otherRegions);
+                                otherRegions = gcvNULL;
+                            }
+#else
+                            OVG_SAFE_FREE(context->os, otherRegions);
+#endif
                             gcmFOOTER_ARG("status=%d", gcvSTATUS_OUT_OF_MEMORY);
 
-                            status = gcvSTATUS_OUT_OF_MEMORY;
+                            return gcvSTATUS_OUT_OF_MEMORY;
                         }
                     }
 #if LOCAL_MEM_OPTIM
@@ -7812,10 +8285,6 @@ gceSTATUS _AddEdge(
 #else
                     OVG_SAFE_FREE(context->os, otherRegions);
 #endif
-                    if(status != gcvSTATUS_OK)
-                    {
-                        return status;
-                    }
                 }
                 else
                 {
@@ -10579,7 +11048,7 @@ void    _ExpandPipe(
                     int             indexMin
                     )
 {
-    void *temp;
+    void *temp, *temp_16, *temp_32;
     int sizeVert, sizeInd;
 
     gcmHEADER_ARG("context=0x%x pipe=0x%x vertexMin=%d indexMin=%d",
@@ -10600,16 +11069,33 @@ void    _ExpandPipe(
         pipe->numStreamPts = sizeVert;
     }
 
-    if (indexMin >= pipe->numIndices)
+    if (pipe->isLargePath)
     {
-        OVG_MALLOC(context->os, temp, sizeof(_VGuint32) * sizeInd);
-        if (pipe->currIndex > 0)
+        if (indexMin >= pipe->numIndices)
         {
-            OVG_MEMCOPY(temp, pipe->indices, sizeof(_VGuint32) * pipe->currIndex);
+            OVG_MALLOC(context->os, temp_32, sizeof(_VGuint32) * sizeInd);
+            if (pipe->currIndex > 0)
+            {
+                OVG_MEMCOPY(temp_32, pipe->indices_32, sizeof(_VGuint32) * pipe->currIndex);
+            }
+            OVG_SAFE_FREE(context->os, pipe->indices_32);
+            pipe->indices_32 = (_VGuint32*)temp_32;
+            pipe->numIndices = sizeInd;
         }
-        OVG_SAFE_FREE(context->os, pipe->indices);
-        pipe->indices = (_VGuint32*)temp;
-        pipe->numIndices = sizeInd;
+    }
+    else
+    {
+        if (indexMin >= pipe->numIndices)
+        {
+            OVG_MALLOC(context->os, temp_16, sizeof(_VGuint16) * sizeInd);
+            if (pipe->currIndex > 0)
+            {
+                OVG_MEMCOPY(temp_16, pipe->indices_16, sizeof(_VGuint16) * pipe->currIndex);
+            }
+            OVG_SAFE_FREE(context->os, pipe->indices_16);
+            pipe->indices_16 = (_VGuint16*)temp_16;
+            pipe->numIndices = sizeInd;
+        }
     }
 
     gcmFOOTER_NO();

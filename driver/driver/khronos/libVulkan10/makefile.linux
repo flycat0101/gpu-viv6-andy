@@ -1,0 +1,182 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Linux build file for libvulkan
+#
+
+################################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+
+ifeq ($(USE_ARMCC),1)
+  $(error ARMCC not ready)
+endif
+
+ifeq ($(gcdSTATIC_LINK),1)
+  TARGET_MODULE     := $(OBJ_DIR)/libvulkan.a
+else
+  TARGET_MODULE     := $(OBJ_DIR)/libvulkan.so
+  TARGET_SONAME     := libvulkan.so.1
+  TARGET_LINKS      := libvulkan.so.1
+endif
+
+################################################################################
+# Installation directory.
+
+INSTALL_DIR         := $(SDK_DIR)/drivers
+
+
+OBJECTS := \
+    $(OBJ_DIR)/gc_halti5_chip.o \
+    $(OBJ_DIR)/gc_halti2_chip.o \
+    $(OBJ_DIR)/gc_halti3_chip.o \
+    $(OBJ_DIR)/gc_halti5_cmdbuf.o \
+    $(OBJ_DIR)/gc_halti5_pipeline.o \
+    $(OBJ_DIR)/gc_halti5_resource.o \
+    $(OBJ_DIR)/gc_halti5_computeblit.o \
+    $(OBJ_DIR)/gc_halti5_tweak.o \
+    $(OBJ_DIR)/gc_vk_api.o \
+    $(OBJ_DIR)/gc_vk_chip.o \
+    $(OBJ_DIR)/gc_vk_cmdbuf.o \
+    $(OBJ_DIR)/gc_vk_context.o \
+    $(OBJ_DIR)/gc_vk_devqueue.o \
+    $(OBJ_DIR)/gc_vk_descriptor.o \
+    $(OBJ_DIR)/gc_vk_dispatch.o \
+    $(OBJ_DIR)/gc_vk_framebuffer.o \
+    $(OBJ_DIR)/gc_vk_icd.o \
+    $(OBJ_DIR)/gc_vk_instance.o \
+    $(OBJ_DIR)/gc_vk_noop.o \
+    $(OBJ_DIR)/gc_vk_object.o \
+    $(OBJ_DIR)/gc_vk_phydevice.o \
+    $(OBJ_DIR)/gc_vk_pipeline.o \
+    $(OBJ_DIR)/gc_vk_query.o \
+    $(OBJ_DIR)/gc_vk_resource.o \
+    $(OBJ_DIR)/gc_vk_shader.o \
+    $(OBJ_DIR)/gc_vk_sync.o \
+    $(OBJ_DIR)/gc_vk_utils.o \
+    $(OBJ_DIR)/gc_vk_validation.o \
+    $(OBJ_DIR)/gc_wsi_surface.o \
+    $(OBJ_DIR)/gc_wsi_swapchain.o
+
+# fbdev display.
+OBJECTS += \
+    $(OBJ_DIR)/gc_wsi_display_fbdev.o
+
+ifeq ($(EGL_API_WL),1)
+OBJECTS += \
+    $(OBJ_DIR)/gc_wsi_surface_wayland.o \
+    $(OBJ_DIR)/wayland-viv-protocol.o
+endif
+
+
+vpath %.c src
+vpath %.c src/chip
+vpath %.c src/wsi
+
+ifeq ($(EGL_API_WL),1)
+  vpath %.c ../../wayland
+endif
+
+CFLAGS += \
+    -I$(AQROOT)/sdk/inc \
+    -I$(AQROOT)/hal/inc \
+    -I$(AQROOT)/hal/os/linux/user \
+    -I$(AQROOT)/compiler/libVSC/include \
+    -I$(AQROOT)/compiler/libSPIRV/spvconverter \
+    -I$(CURDIR)/include
+
+CFLAGS += \
+    -I$(AQROOT)/hal/user \
+    -I$(AQROOT)/hal/user/arch
+
+CFLAGS += \
+    -I$(AQARCH)/cmodel/inc
+
+ifeq ($(EGL_API_WL),1)
+CFLAGS += \
+    -I$(AQROOT)/driver/wayland \
+    -I$(WAYLAND_DIR)/include
+
+CFLAGS += \
+    -DVK_USE_PLATFORM_WAYLAND_KHR
+endif
+
+CFLAGS += \
+    -fPIC \
+    -std=c99 \
+    -Wno-unused-function
+
+LDFLAGS := \
+    $(LFLAGS) \
+    -shared \
+    -Wl,-z,defs \
+    -Wl,-soname,$(TARGET_SONAME) \
+    -Wl,--version-script=$(CURDIR)/libVulkan.map
+
+LDLIBS := \
+    -lm \
+    -L$(SDK_DIR)/drivers \
+    -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL \
+    -L$(AQROOT)/compiler/libSPIRV/$(OBJ_DIR) -lSPIRV \
+    -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR) -lVSC \
+    -L$(AQROOT)/compiler/libGLSLC/entry/$(OBJ_DIR) -lGLSLC
+
+ifeq ($(EGL_API_WL),1)
+LDLIBS += \
+    -L$(WAYLAND_DIR)/lib \
+    -lwayland-client
+endif
+
+.PHONY: all clean install
+
+all: $(TARGET_MODULE)
+
+clean:
+	@-rm -rf $(TARGET_MODULE) $(OBJ_DIR)
+
+install: all
+	@mkdir -p $(INSTALL_DIR)
+	@cp $(TARGET_MODULE) $(INSTALL_DIR)
+	@mkdir -p $(SDK_DIR)/include/vulkan
+	@cp -f $(AQROOT)/sdk/inc/vulkan/*.h $(SDK_DIR)/include/vulkan
+	@for lib in $(TARGET_LINKS); do \
+	    ln -sf $(notdir $(TARGET_MODULE)) $(INSTALL_DIR)/$$lib; \
+	done
+
+ifeq ($(gcdSTATIC_LINK),1)
+$(TARGET_MODULE): $(OBJECTS)
+	$(AR) -r -c $@ $(OBJECTS)
+
+else
+# module dependencies
+$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so) \
+                  $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so) \
+                  $(wildcard $(AQROOT)/compiler/libSPIRV/$(OBJ_DIR)/libSPIRV.so) \
+                  $(wildcard $(AQROOT)/compiler/libGLSLC/entry/$(OBJ_DIR)/libGLSLC.so)
+
+$(TARGET_MODULE): $(OBJECTS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
+endif
+
+$(OBJ_DIR)/%.o: %.c
+	@-mkdir -p $(dir $@)
+	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+
+
+-include $(OBJECTS:.o=.d)
+
+# generate required files.
+
+

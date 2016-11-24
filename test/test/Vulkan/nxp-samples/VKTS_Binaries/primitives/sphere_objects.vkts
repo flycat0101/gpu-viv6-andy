@@ -1,0 +1,24 @@
+#
+# VulKan ToolS objects.
+#
+
+mesh_library sphere_meshes.vkts
+
+animation_library sphere_animations.vkts
+
+#
+# Object.
+#
+
+name Sphere
+
+# Node.
+
+node Sphere -
+
+translate 0.000000 0.000000 -0.000000
+rotate 0.000000 0.000000 0.000000
+scale 1.000000 1.000000 1.000000
+
+mesh Sphere
+

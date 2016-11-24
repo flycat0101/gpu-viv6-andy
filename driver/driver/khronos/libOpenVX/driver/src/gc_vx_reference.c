@@ -345,7 +345,7 @@ VX_PRIVATE_API void vxoReference_Destroy(vx_reference ref)
 
     ref->signature = VX_REF_SIGNATURE_RELEASED;
 
-    if (!vxDataType_IsStatic(ref->type)) vxFree(ref);
+    if (!(vxDataType_IsStatic(ref->type) || ref->type == (vx_type_e)VX_TYPE_TARGET)) vxFree(ref);
 }
 
 VX_INTERNAL_API vx_status vxoReference_Release(
@@ -420,7 +420,7 @@ VX_INTERNAL_API void vxoReference_IncrementReadCount(vx_reference ref)
     vxReleaseMutex(ref->lock);
 }
 
-VX_PUBLIC_API vx_status vxQueryReference(vx_reference ref, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryReference(vx_reference ref, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoContext_IsValid((vx_context_s *)ref)
         && !vxoReference_IsValidAndNoncontext(ref))
@@ -450,7 +450,7 @@ VX_PUBLIC_API vx_status vxQueryReference(vx_reference ref, vx_enum attribute, vo
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxGetStatus(vx_reference reference)
+VX_API_ENTRY vx_status VX_API_CALL vxGetStatus(vx_reference reference)
 {
     vx_status status = vxoReference_GetStatus(reference);
 
@@ -552,4 +552,5 @@ vx_status vxCommitSurfaceNode(vx_reference reference)
 
     return status;
 }
+
 

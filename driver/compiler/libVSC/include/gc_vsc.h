@@ -40,7 +40,7 @@
 /* HW ISA arch definition */
 
 /* Driver interface */
-#include "gc_vsc_drvi_interface.h"
+#include "drvi/gc_vsc_drvi_interface.h"
 
 /* Old-implementation (gcSL) headers */
 #include "old_impl/gc_vsc_old_compiler_internal.h"
@@ -84,6 +84,7 @@
 /* VIR analysis */
 #include "vir/analysis/gc_vsc_vir_cfa.h"
 #include "vir/analysis/gc_vsc_vir_dfa.h"
+#include "vir/analysis/gc_vsc_vir_ssa.h"
 
 /* VIR dump */
 #include "vir/ir/gc_vsc_vir_dump.h"
@@ -92,9 +93,29 @@
 #include "vir/passmanager/gc_vsc_vir_pass_mnger.h"
 
 /* Chip */
-#include "chip/gc_vsc_chip_uarch_caps.h"
-#include "chip/gc_vsc_chip_mc_codec.h"
-#include "chip/gc_vsc_chip_mc_dump.h"
+#include "chip/gpu/gc_vsc_chip_uarch_caps.h"
+#include "chip/gpu/gc_vsc_chip_mc_codec.h"
+#include "chip/gpu/gc_vsc_chip_mc_dump.h"
+#include "debug/gc_vsc_debug.h"
+
+/* A device wide VSC private data */
+typedef struct _VSC_PRIV_DATA
+{
+    /* Intrinsic (builtin) lib */
+    union
+    {
+        struct
+        {
+            VIR_Shader*       pGraphicsIntrinsicLib;
+            VIR_Shader*       pComputeIntrinsicLib;
+        } GLLib;
+
+        VIR_Shader*           pCLIntrinsicLib;
+    } IntrinsicLib;
+
+    /* Memory pool that this priv-data is built on */
+    VSC_PRIMARY_MEM_POOL      pmp;
+}VSC_PRIV_DATA;
 
 #endif /* __gc_vsc_h_ */
 

@@ -622,7 +622,15 @@ __GL_INLINE GLvoid __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint ta
         }
         else
         {
-            __GL_ERROR_RET(GL_INVALID_VALUE);
+            if ((__GL_TEXTURE_2D_MS_INDEX == targetIdx) ||
+                (__GL_TEXTURE_2D_MS_ARRAY_INDEX == targetIdx))
+            {
+                __GL_ERROR_RET(GL_INVALID_OPERATION);
+            }
+            else
+            {
+                __GL_ERROR_RET(GL_INVALID_VALUE);
+            }
         }
         break;
 
@@ -761,14 +769,22 @@ __GL_INLINE GLvoid __glTexParameterfv(__GLcontext *gc, GLuint unitIdx, GLuint ta
         break;
 
     case GL_TEXTURE_BORDER_COLOR_EXT:
+        if ((__GL_TEXTURE_2D_MS_INDEX == targetIdx) ||
+            (__GL_TEXTURE_2D_MS_ARRAY_INDEX == targetIdx))
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
+
         if (__glExtension[__GL_EXTID_EXT_texture_border_clamp].bEnabled)
         {
             __GL_MEMCOPY(tex->params.sampler.borderColor.fv, pv, 4 * sizeof(GLfloat));
             dirty = __GL_TEXPARAM_BORDER_COLOR_BIT;
             break;
         }
+        __GL_ERROR_RET(GL_INVALID_ENUM);
 
     case GL_TEXTURE_PROTECTED_VIV:
+    case GL_TEXTURE_PROTECTED_EXT:
         tex->params.contentProtected = (GLboolean)param;
         break;
 
@@ -802,21 +818,24 @@ GLvoid GL_APIENTRY __gles_TexParameterfv(__GLcontext *gc, GLenum target, GLenum 
     case GL_TEXTURE_CUBE_MAP:
         targetIdx = __GL_TEXTURE_CUBEMAP_INDEX;
         break;
+
     case GL_TEXTURE_EXTERNAL_OES:
         targetIdx = __GL_TEXTURE_EXTERNAL_INDEX;
         break;
     case GL_TEXTURE_2D_MULTISAMPLE:
         targetIdx = __GL_TEXTURE_2D_MS_INDEX;
         break;
-    case GL_TEXTURE_2D_MULTISAMPLE_ARRAY_OES:
+    case GL_TEXTURE_2D_MULTISAMPLE_ARRAY:
         targetIdx = __GL_TEXTURE_2D_MS_ARRAY_INDEX;
         break;
+
     case GL_TEXTURE_CUBE_MAP_ARRAY_EXT:
         if (__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
         {
             targetIdx = __GL_TEXTURE_CUBEMAP_ARRAY_INDEX;
             break;
         }
+
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
@@ -872,6 +891,7 @@ GLvoid GL_APIENTRY __gles_TexParameterf(__GLcontext *gc, GLenum target, GLenum p
     case GL_TEXTURE_MAX_ANISOTROPY_EXT:
     case GL_TEXTURE_SRGB_DECODE_EXT:
     case GL_TEXTURE_PROTECTED_VIV:
+    case GL_TEXTURE_PROTECTED_EXT:
         break;
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
@@ -978,7 +998,15 @@ GLvoid GL_APIENTRY __gles_TexParameteriv(__GLcontext *gc, GLenum target, GLenum 
 
     if (pname == GL_TEXTURE_BORDER_COLOR_EXT)
     {
-        __GL_MEMCOPY(tmpf, pv, 4 * sizeof(GLfloat));
+        if ((__GL_TEXTURE_2D_MS_INDEX == targetIdx) ||
+            (__GL_TEXTURE_2D_MS_ARRAY_INDEX == targetIdx))
+        {
+            __GL_ERROR_RET(GL_INVALID_ENUM);
+        }
+        else
+        {
+            __GL_MEMCOPY(tmpf, pv, 4 * sizeof(GLfloat));
+        }
     }
     else
     {
@@ -1036,6 +1064,7 @@ GLvoid GL_APIENTRY __gles_TexParameteri(__GLcontext *gc, GLenum target, GLenum p
     case GL_TEXTURE_MAX_ANISOTROPY_EXT:
     case GL_TEXTURE_SRGB_DECODE_EXT:
     case GL_TEXTURE_PROTECTED_VIV:
+    case GL_TEXTURE_PROTECTED_EXT:
         break;
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
@@ -1230,8 +1259,10 @@ __glGetTexParameterfv(__GLcontext *gc, GLenum target, GLenum pname, GLfloat *v)
             __GL_MEMCOPY(v, params->sampler.borderColor.fv, 4 * sizeof(GLfloat));
             break;
         }
+        __GL_ERROR_RET(GL_INVALID_ENUM);
 
     case GL_TEXTURE_PROTECTED_VIV:
+    case GL_TEXTURE_PROTECTED_EXT:
         v[0] = (GLfloat) params->contentProtected;
         break;
 
@@ -1327,6 +1358,8 @@ __glGetTexLevelParameteriv(__GLcontext *gc, GLenum target, GLint level, GLenum p
             tex = unit->boundTextures[__GL_TEXTURE_CUBEMAP_ARRAY_INDEX];
             break;
         }
+        __GL_ERROR_RET(GL_INVALID_VALUE);
+
     case GL_TEXTURE_BUFFER_EXT:
         tex = unit->boundTextures[__GL_TEXTURE_BINDING_BUFFER_EXT];
         if (level != 0)
@@ -1608,6 +1641,7 @@ GLvoid GL_APIENTRY __gles_BindTexture(__GLcontext *gc, GLenum target, GLuint tex
             targetIndex = __GL_TEXTURE_CUBEMAP_ARRAY_INDEX;
             break;
         }
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
 
     case GL_TEXTURE_BUFFER_EXT:
         if(__glExtension[__GL_EXTID_EXT_texture_buffer].bEnabled)
@@ -1748,6 +1782,12 @@ GLboolean __glDeleteTextureObject(__GLcontext *gc, __GLtextureObject *tex)
         /* Set the flag to indicate the object is marked for delete */
         tex->flag |= __GL_OBJECT_IS_DELETED;
         return GL_FALSE;
+    }
+
+    /* If we really want to delete texture, delete the buffer attached too */
+    if (tex->bufObj)
+    {
+        __glUnBindTextureBuffer(gc, tex, tex->bufObj);
     }
 
     if (tex->label)

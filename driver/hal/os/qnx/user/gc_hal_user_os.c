@@ -1109,9 +1109,6 @@ gcoOS_GetPLSValue(
         case gcePLS_VALUE_EGL_DISPLAY_INFO :
             return gcPLS.eglDisplayInfo;
 
-        case gcePLS_VALUE_EGL_SURFACE_INFO :
-            return gcPLS.eglSurfaceInfo;
-
         case gcePLS_VALUE_EGL_CONFIG_FORMAT_INFO :
             return (gctPOINTER) gcPLS.eglConfigFormat;
 
@@ -1151,10 +1148,6 @@ gcoOS_SetPLSValue(
     {
         case gcePLS_VALUE_EGL_DISPLAY_INFO :
             gcPLS.eglDisplayInfo = value;
-            return;
-
-        case gcePLS_VALUE_EGL_SURFACE_INFO :
-            gcPLS.eglSurfaceInfo = value;
             return;
 
         case gcePLS_VALUE_EGL_CONFIG_FORMAT_INFO :
@@ -1575,6 +1568,7 @@ gcoOS_QueryVideoMemory(
     gcmHEADER();
 
     /* Call kernel HAL to query video memory. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_QUERY_VIDEO_MEMORY;
 
     /* Call kernel service. */
@@ -1672,6 +1666,7 @@ gcoOS_GetBaseAddress(
         if (gcPLS.os->baseAddress == gcvINVALID_ADDRESS)
         {
             /* Query base address. */
+            iface.ignoreTLS = gcvFALSE;
             iface.command = gcvHAL_GET_BASE_ADDRESS;
 
             /* Call kernel driver. */
@@ -2155,15 +2150,18 @@ gcoOS_DeviceControl(
     gcsVGCONTEXT_PTR context;
 #endif
 
-    /* Set current hardware type */
-    status = gcoOS_GetTLS(&tls);
-    if (gcmIS_ERROR(status))
+    if (!iface->ignoreTLS)
     {
-        return status;
-    }
+        /* Set current hardware type */
+        status = gcoOS_GetTLS(&tls);
+        if (gcmIS_ERROR(status))
+        {
+            return status;
+        }
 
-    iface->hardwareType = tls->currentType;
-    iface->coreIndex    = tls->currentCoreIndex;
+        iface->hardwareType = tls->currentType;
+        iface->coreIndex    = tls->currentCoreIndex;
+    }
 
     switch (iface->command)
     {
@@ -2410,6 +2408,7 @@ gcoOS_AllocateNonPagedMemory(
     gcmDEBUG_VERIFY_ARGUMENT(Logical != gcvNULL);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_ALLOCATE_NON_PAGED_MEMORY;
     iface.u.AllocateNonPagedMemory.bytes = *Bytes;
 
@@ -2487,6 +2486,7 @@ gcoOS_FreeNonPagedMemory(
                   Bytes, Physical, Logical);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_FREE_NON_PAGED_MEMORY;
     iface.u.FreeNonPagedMemory.bytes    = Bytes;
     iface.u.FreeNonPagedMemory.physical = gcmPTR2INT32(Physical);
@@ -2550,6 +2550,7 @@ gcoOS_FreeContiguous(
     do
     {
         /* Initialize the gcsHAL_INTERFACE structure. */
+        iface.ignoreTLS = gcvFALSE;
         iface.command = gcvHAL_FREE_CONTIGUOUS_MEMORY;
         iface.u.FreeContiguousMemory.bytes    = Bytes;
         iface.u.FreeContiguousMemory.physical = gcmPTR2INT32(Physical);
@@ -4211,36 +4212,28 @@ gcoOS_PrintStrSafe(
     ...
     )
 {
-    va_list arguments;
+    gctARGUMENTS arguments;
+    gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("String=0x%x StringSize=%u *Offset=%u Format=0x%x",
-                  String, StringSize, *Offset, Format);
+    gcmHEADER_ARG("String=0x%x StringSize=%lu *Offset=%u Format=0x%x",
+                  String, StringSize, gcmOPT_VALUE(Offset), Format);
 
     /* Verify the arguments. */
-    gcmDEBUG_VERIFY_ARGUMENT(String != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(Offset != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(Format != gcvNULL);
+    gcmVERIFY_ARGUMENT(String != gcvNULL);
+    gcmVERIFY_ARGUMENT(StringSize > 0);
+    gcmVERIFY_ARGUMENT(Format != gcvNULL);
 
-    va_start(arguments, Format);
+    /* Route through gcoOS_PrintStrVSafe. */
+    gcmARGUMENTS_START(arguments, Format);
+    gcmONERROR(gcoOS_PrintStrVSafe(String, StringSize,
+                                   Offset,
+                                   Format, arguments));
 
-    if (*Offset < StringSize)
-    {
-        /* Format the string. */
-        gctINT n = vsnprintf(String + *Offset,
-                             StringSize - *Offset - 1,
-                             Format,
-                             arguments);
+OnError:
+    gcmARGUMENTS_END(arguments);
 
-        if (n > 0)
-        {
-            *Offset += n;
-        }
-    }
-
-    va_end(arguments);
-
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
+    gcmFOOTER_ARG("*Offset=%u", gcmOPT_VALUE(Offset));
+    return status;
 }
 
 /*******************************************************************************
@@ -4283,32 +4276,42 @@ gcoOS_PrintStrVSafe(
     IN gctARGUMENTS Arguments
     )
 {
-    gcmHEADER_ARG("String=0x%x StringSize=%lu *Offset=%u Format=0x%x "
-                  "Arguments=0x%x",
-                  String, StringSize, gcmOPT_VALUE(Offset), Format, Arguments);
+    gctUINT offset = gcmOPT_VALUE(Offset);
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("String=0x%x StringSize=%lu *Offset=%u Format=0x%x Arguments=0x%x",
+                  String, StringSize, offset, Format, Arguments);
 
     /* Verify the arguments. */
-    gcmDEBUG_VERIFY_ARGUMENT(String != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(Offset != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(Format != gcvNULL);
+    gcmVERIFY_ARGUMENT(String != gcvNULL);
+    gcmVERIFY_ARGUMENT(StringSize > 0);
+    gcmVERIFY_ARGUMENT(Format != gcvNULL);
 
-    if (*Offset < StringSize)
+    if (offset < StringSize - 1)
     {
-        /* Format the string. */
-        gctINT n = vsnprintf(String + *Offset,
-                             StringSize - *Offset - 1,
+        /* Print into the string. */
+        gctINT n = vsnprintf(String + offset,
+                             StringSize - offset,
                              Format,
                              Arguments);
 
-        if (n > 0)
+        if (n < 0 || n >= (gctINT)(StringSize - offset))
         {
-            *Offset += n;
+            status = gcvSTATUS_GENERIC_IO;
         }
+        else if (Offset)
+        {
+            *Offset = offset + n;
+        }
+    }
+    else
+    {
+        status = gcvSTATUS_BUFFER_TOO_SMALL;
     }
 
     /* Success. */
-    gcmFOOTER_ARG("*Offset=%u", *Offset);
-    return gcvSTATUS_OK;
+    gcmFOOTER_ARG("*Offset=%u", offset);
+    return status;
 }
 
 /*******************************************************************************
@@ -4763,6 +4766,7 @@ gcoOS_SetProfileSetting(
     }*/
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_SET_PROFILE_SETTING;
     iface.u.SetProfileSetting.enable = Enable;
 
@@ -5128,6 +5132,7 @@ gcoOS_ReadRegister(
     gcmDEBUG_VERIFY_ARGUMENT(Data != gcvNULL);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_READ_REGISTER;
     iface.u.ReadRegisterData.address = Address;
     iface.u.ReadRegisterData.data    = 0xDEADDEAD;
@@ -5185,6 +5190,7 @@ gcoOS_WriteRegister(
     gcmHEADER_ARG("Address=0x%x Data=0x%08x", Address, Data);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_WRITE_REGISTER;
     iface.u.WriteRegisterData.address = Address;
     iface.u.WriteRegisterData.data    = Data;

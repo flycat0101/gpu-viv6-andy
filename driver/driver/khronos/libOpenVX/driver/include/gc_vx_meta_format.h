@@ -23,3 +23,4 @@ VX_INTERNAL_API vx_meta_format vxoMetaFormat_Create(vx_context context);
 EXTERN_C_END
 
 #endif /* __GC_VX_META_FORMAT_H__ */
+

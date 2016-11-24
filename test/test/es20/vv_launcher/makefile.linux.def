@@ -64,6 +64,7 @@ endif
 
 CFLAGS += $(INCLUDE)
 
+ LIBS += -L$(VIVANTE_SDK_LIB) -Wl,-rpath-link,$(VIVANTE_SDK_LIB) -lGLESv2
 ################################################################################
 # Supply necessary libraries.
 

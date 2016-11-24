@@ -14,6 +14,8 @@
 #ifndef __gc_cl_built_ins_common_h_
 #define __gc_cl_built_ins_common_h_
 
+#define _USE_CMP_SET_FOR_SELECT 1
+
 static clsBUILTIN_FUNCTION CommonBuiltinFunctions[] =
 {
     /* Common Functions */
@@ -848,7 +850,7 @@ _GenScalarMinCode(
         status = clGenBitwiseExprCode(Compiler,
                 PolynaryExpr->exprBase.base.lineNo,
                 PolynaryExpr->exprBase.base.stringNo,
-                clvOPCODE_BITWISE_AND,
+                clvOPCODE_AND_BITWISE,
                 &intermIOperands[i],
                 &unsignROperand,
                 &OperandsParameters[i].rOperands[0]);
@@ -1083,7 +1085,7 @@ _GenScalarMaxCode(
         status = clGenBitwiseExprCode(Compiler,
                 PolynaryExpr->exprBase.base.lineNo,
                 PolynaryExpr->exprBase.base.stringNo,
-                clvOPCODE_BITWISE_AND,
+                clvOPCODE_AND_BITWISE,
                 &intermIOperands[i],
                 &unsignROperand,
                 &OperandsParameters[i].rOperands[0]);
@@ -1398,7 +1400,7 @@ _GenFDimCode(
         status = clGenBitwiseExprCode(Compiler,
                 PolynaryExpr->exprBase.base.lineNo,
                 PolynaryExpr->exprBase.base.stringNo,
-                clvOPCODE_BITWISE_AND,
+                clvOPCODE_AND_BITWISE,
                 &intermIOperands[i],
                 &unsignROperand,
                 &OperandsParameters[i].rOperands[0]);
@@ -1937,7 +1939,7 @@ _GenLengthCode(
                 status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &expIOperands[0],
                                 &maskROperand,
                                 &tempROperand);
@@ -1946,7 +1948,7 @@ _GenLengthCode(
                 status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &expIOperands[1],
                                 &maskROperand,
                                 &tempROperand);
@@ -2326,7 +2328,7 @@ _GenNormalizeCode(
         status = clGenArithmeticExprCode(Compiler,
                     PolynaryExpr->exprBase.base.lineNo,
                     PolynaryExpr->exprBase.base.stringNo,
-                    clvOPCODE_BITWISE_AND,
+                    clvOPCODE_AND_BITWISE,
                     &intermIOperands[0],
                     &unsignROperand,
                     &OperandsParameters[0].rOperands[0]);
@@ -2382,7 +2384,7 @@ _GenNormalizeCode(
         status = clGenArithmeticExprCode(Compiler,
                     PolynaryExpr->exprBase.base.lineNo,
                     PolynaryExpr->exprBase.base.stringNo,
-                    clvOPCODE_BITWISE_AND,
+                    clvOPCODE_AND_BITWISE,
                     &intermIOperands[0],
                     &signROperand,
                     &OperandsParameters[0].rOperands[0]);
@@ -2394,7 +2396,7 @@ _GenNormalizeCode(
             status = clGenArithmeticExprCode(Compiler,
                     PolynaryExpr->exprBase.base.lineNo,
                     PolynaryExpr->exprBase.base.stringNo,
-                    clvOPCODE_BITWISE_OR,
+                    clvOPCODE_OR_BITWISE,
                     IOperand,
                     &intermROperands[0],
                     &floatOneROperand);
@@ -2431,7 +2433,7 @@ _GenNormalizeCode(
         status = clGenArithmeticExprCode(Compiler,
                     PolynaryExpr->exprBase.base.lineNo,
                     PolynaryExpr->exprBase.base.stringNo,
-                    clvOPCODE_BITWISE_AND,
+                    clvOPCODE_AND_BITWISE,
                     &intermIOperands[0],
                     &unsignROperand,
                     &OperandsParameters[0].rOperands[0]);
@@ -2527,7 +2529,7 @@ _GenNormalizeCode(
         status = clGenArithmeticExprCode(Compiler,
                     PolynaryExpr->exprBase.base.lineNo,
                     PolynaryExpr->exprBase.base.stringNo,
-                    clvOPCODE_BITWISE_AND,
+                    clvOPCODE_AND_BITWISE,
                     &intermIOperands[1],
                     &floatOneROperand,
                     &intermROperands[1]);
@@ -2544,7 +2546,7 @@ _GenNormalizeCode(
         status = clGenArithmeticExprCode(Compiler,
                     PolynaryExpr->exprBase.base.lineNo,
                     PolynaryExpr->exprBase.base.stringNo,
-                    clvOPCODE_BITWISE_AND,
+                    clvOPCODE_AND_BITWISE,
                     &intermIOperands[2],
                     &neg1ROperand,
                     &intermROperands[2]);
@@ -2569,7 +2571,7 @@ _GenNormalizeCode(
         status = clGenArithmeticExprCode(Compiler,
                     PolynaryExpr->exprBase.base.lineNo,
                     PolynaryExpr->exprBase.base.stringNo,
-                    clvOPCODE_BITWISE_AND,
+                    clvOPCODE_AND_BITWISE,
                     &intermIOperands[3],
                     &expROperand,
                     &intermROperands[3]);
@@ -3460,7 +3462,7 @@ _GenLessGreaterCode(
     status = clGenArithmeticExprCode(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_OR,
+                        clvOPCODE_OR_BITWISE,
                         IOperand,
                         &intermROperands[0],
                         &intermROperands[1]);
@@ -3501,7 +3503,7 @@ _GenFiniteCode(
     status = clGenArithmeticExprCode(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_AND,
+                        clvOPCODE_AND_BITWISE,
                         &intermIOperands[0],
                         &unsignROperand,
                         &OperandsParameters[0].rOperands[0]);
@@ -3559,7 +3561,7 @@ _GenIsNormalCode(
     status = clGenArithmeticExprCode(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_AND,
+                        clvOPCODE_AND_BITWISE,
                         &intermIOperands[0],
                         &unsignROperand,
                         &OperandsParameters[0].rOperands[0]);
@@ -3587,7 +3589,7 @@ _GenIsNormalCode(
     status = clGenArithmeticExprCode(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_AND,
+                        clvOPCODE_AND_BITWISE,
                         IOperand,
                         &intermROperands[0],
                         &intermROperands[1]);
@@ -3634,7 +3636,7 @@ _GenOrderedCode(
     status = clGenArithmeticExprCode(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_AND,
+                        clvOPCODE_AND_BITWISE,
                         IOperand,
                         &intermROperands[0],
                         &intermROperands[1]);
@@ -3765,7 +3767,7 @@ _GenIsNanCode(
     status = clGenArithmeticExprCode(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_AND,
+                        clvOPCODE_AND_BITWISE,
                         &intermIOperands[0],
                         &unsignROperand,
                         &OperandsParameters[0].rOperands[0]);
@@ -3817,7 +3819,7 @@ _GenIsInfCode(
     status = clGenArithmeticExprCode(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_AND,
+                        clvOPCODE_AND_BITWISE,
                         &intermIOperands[0],
                         &unsignROperand,
                         &OperandsParameters[0].rOperands[0]);
@@ -3837,6 +3839,232 @@ _GenIsInfCode(
 
 
 /*klc: - use SET.Z and SET.NZ instead */
+#if _USE_CMP_SET_FOR_SELECT
+static gceSTATUS
+_GenSelectCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+   gceSTATUS    status;
+   cltELEMENT_TYPE copyType = OperandsParameters[2].rOperands[0].dataType.elementType;
+
+   /* Verify the arguments. */
+   clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+   clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+   gcmASSERT(OperandCount == 3);
+   gcmASSERT(OperandsParameters);
+
+   if(clmGEN_CODE_IsScalarDataType(OperandsParameters[2].dataTypes[0].def)) { /*Scalar type select */
+      clsROPERAND zeroROperand;
+
+      clsROPERAND_InitializeIntOrIVecConstant(&zeroROperand,
+                                              clmGenCodeDataType(T_INT),
+                                              (gctUINT)0);
+      if(OperandsParameters[2].rOperands[0].dataType.elementType == clvTYPE_FLOAT)
+         OperandsParameters[2].rOperands[0].dataType.elementType = clvTYPE_INT; /* Use integer comparison*/
+
+      clmGEN_CODE_IF(Compiler,
+                     CodeGenerator,
+                     PolynaryExpr->exprBase.base.lineNo,
+                     PolynaryExpr->exprBase.base.stringNo,
+                     &OperandsParameters[2].rOperands[0],
+                     clvCONDITION_EQUAL,
+                     &zeroROperand);
+
+          if(IOperand) {
+              gcmONERROR(clGenGenericCode1(Compiler,
+                                           PolynaryExpr->exprBase.base.lineNo,
+                                           PolynaryExpr->exprBase.base.stringNo,
+                                           clvOPCODE_ASSIGN,
+                                           IOperand,
+                                           &OperandsParameters[0].rOperands[0]));
+
+              /* The false part, "!==0" */
+              clmGEN_CODE_ELSE(Compiler,
+                               CodeGenerator,
+                               PolynaryExpr->exprBase.base.lineNo,
+                               PolynaryExpr->exprBase.base.stringNo);
+
+                  gcmONERROR(clGenGenericCode1(Compiler,
+                                               PolynaryExpr->exprBase.base.lineNo,
+                                               PolynaryExpr->exprBase.base.stringNo,
+                                               clvOPCODE_ASSIGN,
+                                               IOperand,
+                                               &OperandsParameters[1].rOperands[0]));
+         }
+
+      clmGEN_CODE_ENDIF(Compiler,
+                        CodeGenerator,
+                        PolynaryExpr->exprBase.base.lineNo,
+                        PolynaryExpr->exprBase.base.stringNo);
+   }
+   else if(clmIsElementTypeHighPrecision(IOperand->dataType.elementType)) {
+        clsROPERAND lshiftROperand, rshiftROperand;
+        clsIOPERAND                intermIOperands[3];
+        clsROPERAND                intermROperands[3];
+        cltELEMENT_TYPE elementType;
+
+        if(clmIsElementTypeHighPrecision(copyType)) {
+             elementType = clvTYPE_LONG;
+             clsROPERAND_InitializeIntOrIVecConstant(&rshiftROperand,
+                                                     clmGenCodeDataType(T_INT),
+                                                     (gctUINT)63);
+        }
+        else {
+             elementType = clvTYPE_INT;
+             clsROPERAND_InitializeIntOrIVecConstant(&rshiftROperand,
+                                                     clmGenCodeDataType(T_INT),
+                                                     (gctUINT)31);
+        }
+
+        /*ideally, if we have clGenGenericCode3, then use select function, perfect*/
+        /*Avoid branch for different component, we get sign(c), r1 = min(sign(c), 0) */
+        /* return X + r1*X - r1*Y                                                   */
+
+        /* Always use integer operation, avoid Nan, Inf, denorm*/
+        OperandsParameters[2].rOperands[0].dataType.elementType = elementType;
+        clsIOPERAND_New(Compiler, &intermIOperands[0], OperandsParameters[0].dataTypes[0].def);
+        intermIOperands[0].dataType.elementType = elementType;
+        clsIOPERAND_New(Compiler, &intermIOperands[1], OperandsParameters[0].dataTypes[0].def);
+        intermIOperands[1].dataType.elementType = elementType;
+        clsIOPERAND_New(Compiler, &intermIOperands[2], OperandsParameters[0].dataTypes[0].def);
+        intermIOperands[2].dataType.elementType = elementType;
+
+        clsROPERAND_InitializeUsingIOperand(&intermROperands[0], &intermIOperands[0]);
+        clsROPERAND_InitializeUsingIOperand(&intermROperands[1], &intermIOperands[1]);
+        clsROPERAND_InitializeUsingIOperand(&intermROperands[2], &intermIOperands[2]);
+
+        switch(copyType) {
+        case clvTYPE_FLOAT:
+        case clvTYPE_UINT:
+        case clvTYPE_INT:
+        case clvTYPE_SHORT:
+        case clvTYPE_CHAR:
+        case clvTYPE_LONG:
+        case clvTYPE_ULONG:
+             gcmONERROR(clGenShiftExprCode(Compiler,
+                                           PolynaryExpr->exprBase.base.lineNo,
+                                           PolynaryExpr->exprBase.base.stringNo,
+                                           clvOPCODE_RSHIFT,
+                                           &intermIOperands[1],
+                                           &OperandsParameters[2].rOperands[0],
+                                           &rshiftROperand));
+             break;
+
+        case clvTYPE_USHORT:
+             clsROPERAND_InitializeIntOrIVecConstant(&lshiftROperand,
+                                                     clmGenCodeDataType(T_INT),
+                                                     (gctUINT)16);
+
+             gcmONERROR(clGenShiftExprCode(Compiler,
+                                           PolynaryExpr->exprBase.base.lineNo,
+                                           PolynaryExpr->exprBase.base.stringNo,
+                                           clvOPCODE_LSHIFT,
+                                           &intermIOperands[0],
+                                           &OperandsParameters[2].rOperands[0],
+                                           &lshiftROperand));
+
+             gcmONERROR(clGenShiftExprCode(Compiler,
+                                           PolynaryExpr->exprBase.base.lineNo,
+                                           PolynaryExpr->exprBase.base.stringNo,
+                                           clvOPCODE_RSHIFT,
+                                           &intermIOperands[1],
+                                           &intermROperands[0],
+                                           &rshiftROperand));
+             break;
+
+        case clvTYPE_UCHAR:
+             clsROPERAND_InitializeIntOrIVecConstant(&lshiftROperand,
+                                                     clmGenCodeDataType(T_USHORT),
+                                                     (gctUINT)24);
+             gcmONERROR(clGenShiftExprCode(Compiler,
+                                           PolynaryExpr->exprBase.base.lineNo,
+                                           PolynaryExpr->exprBase.base.stringNo,
+                                           clvOPCODE_LSHIFT,
+                                           &intermIOperands[0],
+                                           &OperandsParameters[2].rOperands[0],
+                                           &lshiftROperand));
+
+             gcmONERROR(clGenShiftExprCode(Compiler,
+                                           PolynaryExpr->exprBase.base.lineNo,
+                                           PolynaryExpr->exprBase.base.stringNo,
+                                           clvOPCODE_RSHIFT,
+                                           &intermIOperands[1],
+                                           &intermROperands[0],
+                                           &rshiftROperand));
+             break;
+        default:
+             break;
+        }
+
+        /*now r1 = 0 or 0xffffffff */
+        gcmONERROR(clGenGenericCode1(Compiler,
+                                     PolynaryExpr->exprBase.base.lineNo,
+                                     PolynaryExpr->exprBase.base.stringNo,
+                                     clvOPCODE_NOT_BITWISE,
+                                     &intermIOperands[0],
+                                     &intermROperands[1]));
+
+        {
+             cltELEMENT_TYPE copyTypeR = OperandsParameters[0].rOperands[0].dataType.elementType;
+             OperandsParameters[0].rOperands[0].dataType.elementType = elementType;
+             gcmONERROR(clGenArithmeticExprCode(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
+                                                clvOPCODE_AND_BITWISE,
+                                                &intermIOperands[2],
+                                                &intermROperands[0],
+                                                &OperandsParameters[0].rOperands[0]));
+
+             OperandsParameters[0].rOperands[0].dataType.elementType = copyTypeR;
+
+             copyTypeR = OperandsParameters[1].rOperands[0].dataType.elementType;
+             OperandsParameters[1].rOperands[0].dataType.elementType = elementType;
+             gcmONERROR(clGenArithmeticExprCode(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
+                                                clvOPCODE_AND_BITWISE,
+                                                &intermIOperands[0],
+                                                &intermROperands[1],
+                                                &OperandsParameters[1].rOperands[0]));
+             OperandsParameters[1].rOperands[0].dataType.elementType = copyTypeR;
+        }
+
+        if(IOperand)
+        {
+             cltELEMENT_TYPE copyTypeI = IOperand->dataType.elementType;
+             IOperand->dataType.elementType = elementType;
+             gcmONERROR(clGenArithmeticExprCode(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
+                                                clvOPCODE_ADD,
+                                                IOperand,
+                                                &intermROperands[2],
+                                                &intermROperands[0]));
+             IOperand->dataType.elementType = copyTypeI;
+        }
+   }
+   else{
+      return clGenSelectExprCode(Compiler,
+                                 PolynaryExpr->exprBase.base.lineNo,
+                                 PolynaryExpr->exprBase.base.stringNo,
+                                 clvOPCODE_SELECT,
+                                 IOperand,
+                                 OperandsParameters[2].rOperands,
+                                 OperandsParameters[0].rOperands,
+                                 OperandsParameters[1].rOperands);
+   }
+
+OnError:
+   OperandsParameters[2].rOperands[0].dataType.elementType = copyType;
+   return status;
+}
+#else
 static gceSTATUS
 _GenSelectCode(
     IN cloCOMPILER Compiler,
@@ -4002,7 +4230,7 @@ _GenSelectCode(
         gcmONERROR(clGenGenericCode1(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
                                      PolynaryExpr->exprBase.base.stringNo,
-                                     clvOPCODE_BITWISE_NOT,
+                                     clvOPCODE_NOT_BITWISE,
                                      &intermIOperands[0],
                                      &intermROperands[1]));
 
@@ -4012,7 +4240,7 @@ _GenSelectCode(
              gcmONERROR(clGenArithmeticExprCode(Compiler,
                                                 PolynaryExpr->exprBase.base.lineNo,
                                                 PolynaryExpr->exprBase.base.stringNo,
-                                                clvOPCODE_BITWISE_AND,
+                                                clvOPCODE_AND_BITWISE,
                                                 &intermIOperands[2],
                                                 &intermROperands[0],
                                                 &OperandsParameters[0].rOperands[0]));
@@ -4024,7 +4252,7 @@ _GenSelectCode(
              gcmONERROR(clGenArithmeticExprCode(Compiler,
                                                 PolynaryExpr->exprBase.base.lineNo,
                                                 PolynaryExpr->exprBase.base.stringNo,
-                                                clvOPCODE_BITWISE_AND,
+                                                clvOPCODE_AND_BITWISE,
                                                 &intermIOperands[0],
                                                 &intermROperands[1],
                                                 &OperandsParameters[1].rOperands[0]));
@@ -4050,6 +4278,7 @@ OnError:
    OperandsParameters[2].rOperands[0].dataType.elementType = copyType;
    return status;
 }
+#endif
 
 static gceSTATUS
 _GenBitSelectCode(
@@ -4077,6 +4306,13 @@ _GenBitSelectCode(
     if(clmIsElementTypeHighPrecision(copyType2)) {
         elementType = clvTYPE_LONG;
     }
+    else if(clmIsElementTypePacked(copyType2)) {
+        elementType = copyType2;
+
+        if(copyType2 == clvTYPE_HALF) {
+            elementType = clvTYPE_SHORT_PACKED;
+        }
+    }
     else {
         elementType = clvTYPE_INT;
     }
@@ -4096,7 +4332,7 @@ _GenBitSelectCode(
     status = clGenGenericCode1(Compiler,
                                PolynaryExpr->exprBase.base.lineNo,
                                PolynaryExpr->exprBase.base.stringNo,
-                               clvOPCODE_BITWISE_NOT,
+                               clvOPCODE_NOT_BITWISE,
                                &intermIOperands[0],
                                &OperandsParameters[2].rOperands[0]);
 
@@ -4106,7 +4342,7 @@ _GenBitSelectCode(
        status = clGenArithmeticExprCode(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
-                                        clvOPCODE_BITWISE_AND,
+                                        clvOPCODE_AND_BITWISE,
                                         &intermIOperands[2],
                                         &intermROperands[0],
                                         &OperandsParameters[0].rOperands[0]);
@@ -4117,7 +4353,7 @@ _GenBitSelectCode(
        status = clGenArithmeticExprCode(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
-                                        clvOPCODE_BITWISE_AND,
+                                        clvOPCODE_AND_BITWISE,
                                         &intermIOperands[0],
                                         &OperandsParameters[1].rOperands[0],
                                         &OperandsParameters[2].rOperands[0]);
@@ -4280,7 +4516,7 @@ _GenShuffleCode(
        status = clGenArithmeticExprCode(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
-                                        clvOPCODE_BITWISE_AND,
+                                        clvOPCODE_AND_BITWISE,
                                         &intermIndexIOperand,
                                         maskComponent,
                                         &maskROperand);
@@ -4475,7 +4711,7 @@ _GenShufflePtrCode(
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
-                                             clvOPCODE_BITWISE_AND,
+                                             clvOPCODE_AND_BITWISE,
                                              intermIOperand,
                                              maskComponent,
                                              &maskROperand);
@@ -4615,7 +4851,7 @@ _GenShufflePtrCode(
            status = clGenArithmeticExprCode(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_AND,
+                        clvOPCODE_AND_BITWISE,
                         &intermIndexIOperand,
                         maskComponent,
                         &maskROperand);
@@ -4781,7 +5017,7 @@ _GenShufflePtr1Code(
            status = clGenArithmeticExprCode(Compiler,
                                             PolynaryExpr->exprBase.base.lineNo,
                                             PolynaryExpr->exprBase.base.stringNo,
-                                            clvOPCODE_BITWISE_AND,
+                                            clvOPCODE_AND_BITWISE,
                                             intermIOperand,
                                             maskComponent,
                                             &maskROperand);
@@ -4911,7 +5147,7 @@ _GenShufflePtr1Code(
            status = clGenArithmeticExprCode(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_AND,
+                        clvOPCODE_AND_BITWISE,
                         &intermIndexIOperand,
                         maskComponent,
                         &maskROperand);
@@ -5074,7 +5310,7 @@ _GenShuffle2Code(
        status = clGenArithmeticExprCode(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
-                                        clvOPCODE_BITWISE_AND,
+                                        clvOPCODE_AND_BITWISE,
                                         &intermIndexIOperand,
                                         maskComponent,
                                         &maskROperand);
@@ -5290,7 +5526,7 @@ _GenShuffle2PtrCode(
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
-                                             clvOPCODE_BITWISE_AND,
+                                             clvOPCODE_AND_BITWISE,
                                              intermIOperand1,
                                              maskComponent,
                                              &maskROperand);
@@ -5299,7 +5535,7 @@ _GenShuffle2PtrCode(
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
-                                             clvOPCODE_BITWISE_AND,
+                                             clvOPCODE_AND_BITWISE,
                                              intermIOperand,
                                              intermROperand1,
                                              vectorSizeConstant);
@@ -5484,7 +5720,7 @@ _GenShuffle2PtrCode(
            status = clGenArithmeticExprCode(Compiler,
                                                 PolynaryExpr->exprBase.base.lineNo,
                                                 PolynaryExpr->exprBase.base.stringNo,
-                                                clvOPCODE_BITWISE_AND,
+                                                clvOPCODE_AND_BITWISE,
                                                 &intermIndexIOperand,
                                                 maskComponent,
                                                 &maskROperand);
@@ -5672,7 +5908,7 @@ _GenShuffle2Ptr1Code(
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
-                                             clvOPCODE_BITWISE_AND,
+                                             clvOPCODE_AND_BITWISE,
                                              intermIOperand1,
                                              maskComponent,
                                              &maskROperand);
@@ -5681,7 +5917,7 @@ _GenShuffle2Ptr1Code(
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
-                                             clvOPCODE_BITWISE_AND,
+                                             clvOPCODE_AND_BITWISE,
                                              intermIOperand,
                                              intermROperand1,
                                              vectorSizeConstant);
@@ -5849,7 +6085,7 @@ _GenShuffle2Ptr1Code(
            status = clGenArithmeticExprCode(Compiler,
                                                 PolynaryExpr->exprBase.base.lineNo,
                                                 PolynaryExpr->exprBase.base.stringNo,
-                                                clvOPCODE_BITWISE_AND,
+                                                clvOPCODE_AND_BITWISE,
                                                 &intermIndexIOperand,
                                                 maskComponent,
                                                 &maskROperand);
@@ -5912,7 +6148,16 @@ _GenAnyAllCode(
 
     dataType = OperandsParameters[0].dataTypes[0].def;
     rOperand = &OperandsParameters[0].rOperands[0];
-    if(clmIsElementTypeHighPrecision(dataType.elementType)) {
+    if(clmIsElementTypePacked(dataType.elementType)) {
+        return clGenBuiltinToIntrinsicAsmCode(Compiler,
+                                              CodeGenerator,
+                                              PolynaryExpr,
+                                              OperandCount,
+                                              OperandsParameters,
+                                              IOperand,
+                                              strstr(PolynaryExpr->funcName->symbol, "all") ? CL_VIR_IK_all: CL_VIR_IK_any);
+    }
+    else if(clmIsElementTypeHighPrecision(dataType.elementType)) {
         clsIOPERAND iOperand[1];
 
         if(dataType.elementType == clvTYPE_LONG) {
@@ -5937,10 +6182,12 @@ _GenAnyAllCode(
     else {
         switch(dataType.elementType) {
         case clvTYPE_USHORT:
+        case clvTYPE_USHORT_PACKED:
             rshiftBits = 15;
             break;
 
         case clvTYPE_UCHAR:
+            case clvTYPE_UCHAR_PACKED:
             rshiftBits = 7;
             break;
 
@@ -5972,7 +6219,7 @@ _GenAnyAllCode(
        IOperand->dataType.elementType = copyElementType;
     }
     else{
-       cleOPCODE andOrOp = strstr(PolynaryExpr->funcName->symbol, "all") ? clvOPCODE_BITWISE_AND: clvOPCODE_BITWISE_OR;
+       cleOPCODE andOrOp = strstr(PolynaryExpr->funcName->symbol, "all") ? clvOPCODE_AND_BITWISE: clvOPCODE_OR_BITWISE;
        status = clGenShiftExprCode(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,

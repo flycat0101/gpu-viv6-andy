@@ -981,7 +981,7 @@ vgmVALID_VALUE_ARRAY(VG_IMAGE_MODE)
 
 vgmSETSTATE_FUNCTION(VG_IMAGE_MODE)
 {
-    static gceVG_BLEND _imageMode[] =
+    static gceVG_IMAGE _imageMode[] =
     {
         gcvVG_IMAGE_NORMAL,     /* VG_DRAW_IMAGE_NORMAL   */
         gcvVG_IMAGE_MULTIPLY,   /* VG_DRAW_IMAGE_MULTIPLY */

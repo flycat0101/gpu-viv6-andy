@@ -448,6 +448,10 @@
 #define GL3_PROFILER_COMPUTE_BEGIN 80
 #define GL3_PROFILER_COMPUTE_END 81
 
+#define GL3_PROFILER_WRITE_HEADER 90
+#define GL3_PROFILER_WRITE_FRAME_BEGIN 91
+#define GL3_PROFILER_WRITE_FRAME_END 92
+#define GL3_PROFILER_WRITE_FRAME_RESET 93
 /* Profile information. */
 typedef struct _glsPROFILER
 {
@@ -460,12 +464,16 @@ typedef struct _glsPROFILER
     gctBOOL         perFrame;
     gctBOOL         useFBO;
     gctBOOL         useGlfinish;
+    gctBOOL         syncMode;
     gctBOOL         enableOutputCounters;  /* for VIV_PROFILE = 2 */
+    gctBOOL         enableProbe;
 
+    gctBOOL         need_dump;
     gctUINT32       frameBegun;
     gctUINT32       frameCount;       /* for VIV_PROFILE = 1 */
     gctUINT32       frameStartNumber; /* for VIV_PROFILE = 3 */
     gctUINT32       frameEndNumber;   /* for VIV_PROFILE = 3 */
+    gctUINT32       curFrameNumber;
 
     /* Aggregate Information */
     gctUINT64       frameStart;
@@ -498,7 +506,7 @@ typedef struct _glsPROFILER
     gctUINT32       redundantStateChangeCalls;
 
     gctUINT64       apiTimes[GLES3_NUM_API_CALLS];
-     gctUINT64      totalDriverTime;
+    gctUINT64       totalDriverTime;
 
     gctUINT32       textureUploadSize;
     gctUINT32       drawCount;

@@ -18,6 +18,7 @@
 
 typedef struct _clsLexToken
 {
+    gctUINT    fileNo;
     gctUINT    lineNo;
     gctUINT    stringNo;
     gctINT    type;

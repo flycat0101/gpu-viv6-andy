@@ -86,16 +86,26 @@ OnError:
 gceSTATUS FreeVideoNode(
         IN gcoHAL Hal,
         IN gctUINT32 Node) {
-    gcsHAL_INTERFACE iface;
+        gcsHAL_INTERFACE iface;
+        gceSTATUS status;
 
-    gcmASSERT(Node != gcvNULL);
+        gcmASSERT(Node != gcvNULL);
 
-    iface.command = gcvHAL_RELEASE_VIDEO_MEMORY;
-    iface.u.ReleaseVideoMemory.node = Node;
+        iface.command = gcvHAL_RELEASE_VIDEO_MEMORY;
+        iface.u.ReleaseVideoMemory.node = Node;
 
-    /* Call kernel API. */
-    return gcoHAL_Call(Hal, &iface);
+        /* Call kernel API. */
+        status = gcoHAL_Call(Hal, &iface);
+
+    /* When unlock the video memory node, set event to the kernel,
+     * That is why Commit is needed here to make it work.
+     */
+        gcoHAL_Commit(gcvNULL, gcvFALSE);
+
+        return status;
 }
+
+
 
 /**
  *  Use for  getting the physical and logical address
@@ -151,6 +161,7 @@ gceSTATUS UnlockVideoNode(
     gcmASSERT(Node != gcvNULL);
 
     iface.engine = gcvENGINE_RENDER;
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
     iface.u.UnlockVideoMemory.node = Node;
     iface.u.UnlockVideoMemory.type = surftype;

@@ -52,3 +52,4 @@ VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr);
 EXTERN_C_END
 
 #endif /* __GC_VX_NODE_H__ */
+

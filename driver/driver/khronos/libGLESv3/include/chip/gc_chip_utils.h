@@ -18,6 +18,21 @@
 extern "C" {
 #endif
 
+enum {
+    __GL_SAVE_SURF_AS_TGA = 1 << 0,
+    __GL_SAVE_SURF_AS_RAW = 1 << 1,
+
+    __GL_SAVE_SURF_AS_BOTH = __GL_SAVE_SURF_AS_TGA | __GL_SAVE_SURF_AS_RAW,
+};
+
+typedef struct __GLsurfRawHeadRec {
+    GLuint width;
+    GLuint height;
+    GLuint stride;
+    GLuint layerSize;
+    GLchar formatName[64];
+} __GLsurfRawHead;
+
 /* A general object who may be used in chip layer. It is a wrapper
    of user data. This object can be used in any data structure, such
    as array, link, hash, etc */
@@ -135,7 +150,8 @@ gcChipUtilsDumpSurface(
     __GLcontext *gc,
     gcsSURF_VIEW *surfView,
     gctCONST_STRING fileName,
-    GLboolean yInverted
+    GLboolean yInverted,
+    GLbitfield saveMask
 );
 
 gceSTATUS

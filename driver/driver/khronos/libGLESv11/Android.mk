@@ -16,7 +16,7 @@ include $(LOCAL_PATH)/../../../Android.mk.def
 
 
 #
-# libGLESv1_CM_$(TAG)
+# libGLESv1_CM_$(GPU_VENDOR)
 #
 include $(CLEAR_VARS)
 
@@ -31,7 +31,6 @@ LOCAL_SRC_FILES := \
 	gc_glff_cull.c \
 	gc_glff_depth.c \
 	gc_glff_draw.c \
-	gc_glff_egl.c \
 	gc_glff_enable.c \
 	gc_glff_fixed_func.c \
 	gc_glff_fog.c \
@@ -79,13 +78,13 @@ LOCAL_SHARED_LIBRARIES := \
 	libGAL \
 	libVSC
 
-ifneq ($(TARGET_2ND_ARCH),)
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 21),1)
   LOCAL_MODULE_RELATIVE_PATH := egl
 else
   LOCAL_MODULE_PATH          := $(TARGET_OUT_SHARED_LIBRARIES)/egl
 endif
 
-LOCAL_MODULE         := libGLESv1_CM_$(TAG)
+LOCAL_MODULE         := libGLESv1_CM_$(GPU_VENDOR)
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)

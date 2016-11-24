@@ -23,7 +23,7 @@
 #include "gc_hal_user.h"
 #include "gc_hal_driver.h"
 #include "gc_hal_types.h"
-#include "gc_vsc_drvi_interface.h"
+#include "drvi/gc_vsc_drvi_interface.h"
 
 typedef char *            gctCHAR_PTR;
 typedef const char *    gctCONST_CHAR_PTR;

@@ -68,24 +68,27 @@ static slsEXTENSION_INFO _DefinedExtensions[] =
     {"GL_EXT_texture_buffer", slvEXTENSION_EXT_TEXTURE_BUFFER, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, "GL_OES_texture_buffer"},
     /* primitive bounding box extension. */
     {"GL_EXT_primitive_bounding_box", slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, gcvNULL},
-
+    /* frame buffer fetch extension. */
+    {"GL_EXT_shader_framebuffer_fetch", slvEXTENSION_SHADER_FRAMEBUFFER_FETCH, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, 0, "EXT_shader_framebuffer_fetch"},
+    /* ANDROID_extension_pack_es31a extension. */
+    {"GL_ANDROID_extension_pack_es31a", slvEXTENSION_ANDROID_EXTENSION_PACK_ES31A, gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE, _SHADER_ES31_VERSION, gcvNULL},
 
     {"GL_VIV_asm", slvEXTENSION_VASM, gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, 0, gcvNULL }, /* It is a internal option. */
 };
 
 #define __sldDefinedExtensionsCount (gcmSIZEOF(_DefinedExtensions) / gcmSIZEOF(slsEXTENSION_INFO))
 
-gceSTATUS _AddExtensionMacro(
+static gceSTATUS _AddExtensionMacro(
     ppoPREPROCESSOR         PP,
     slsEXTENSION_INFO *     ExtInfo
-)
+    )
 {
     gceSTATUS status = gcvSTATUS_OK;
     ExtInfo->require     =
     ExtInfo->enable      =
     ExtInfo->disable     =
     ExtInfo->warn        =
-    gcoOS_StrStr(GetGLExtensionString(), ExtInfo->str, gcvNULL);
+    gcoOS_StrStr(PP->extensionString, ExtInfo->str, gcvNULL);
 
     return status;
 }
@@ -155,6 +158,14 @@ gceSTATUS ppoPREPROCESSOR_InitExtensionTable(ppoPREPROCESSOR PP)
             break;
 
         case slvEXTENSION_EXT_PRIMITIVE_BOUNDING_BOX:
+            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+            break;
+
+        case slvEXTENSION_SHADER_FRAMEBUFFER_FETCH:
+            _AddExtensionMacro(PP, &_DefinedExtensions[i]);
+            break;
+
+        case slvEXTENSION_ANDROID_EXTENSION_PACK_ES31A:
             _AddExtensionMacro(PP, &_DefinedExtensions[i]);
             break;
 
@@ -2280,6 +2291,7 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
     gctBOOL                doWeInValidArea        = PP->doWeInValidArea;
     gctBOOL                redefined    = gcvFALSE;
     gctBOOL                redefError    = gcvFALSE;
+    gctBOOL             hasPara = gcvFALSE;
     ppoTOKEN            ntokenNext    = gcvNULL;
     ppoTOKEN            mstokenNext    = gcvNULL;
 
@@ -2349,6 +2361,7 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
     if (ntoken->poolString == PP->keyword->lpara)
     {
         /*macro with (arguments-opt)*/
+        hasPara = gcvTRUE;
 
         /*collect argv*/
 
@@ -2356,10 +2369,6 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
         ntoken = gcvNULL;
 
         gcmONERROR(ppoPREPROCESSOR_Define_BufferArgs(PP, &argv, &argc));
-        if (argc == 0)
-        {
-            ppoPREPROCESSOR_Report(PP,slvREPORT_WARN, "No argument in () of macro.");
-        }
     }
     else if (ntoken->type != ppvTokenType_WS)
     {
@@ -2460,6 +2469,7 @@ ppoPREPROCESSOR_Define(ppoPREPROCESSOR PP)
         argv,
         rlst,
         &ms));
+    ms->hasPara = hasPara;
 
     return ppoMACRO_MANAGER_AddMacroSymbol(
         PP,

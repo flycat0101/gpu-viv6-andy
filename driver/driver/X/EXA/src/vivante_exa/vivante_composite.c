@@ -106,6 +106,10 @@ VivCheckComposite(int op, PicturePtr pSrc, PicturePtr pMsk, PicturePtr pDst) {
     pViv = VIVPTR_FROM_PIXMAP(pxDst);
     pBlt = &pViv->mGrCtx.mBlitInfo;
 
+#ifdef DISABLE_V2D
+    TRACE_EXIT(FALSE);
+#endif
+
     /*Nothing*/
     if (pxDst == NULL) {
         TRACE_EXIT(FALSE);

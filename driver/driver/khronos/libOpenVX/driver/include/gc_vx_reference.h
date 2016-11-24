@@ -63,3 +63,4 @@ VX_INTERNAL_API vx_status vxCommitSurfaceNode(vx_reference reference);
 EXTERN_C_END
 
 #endif /* __GC_VX_REFERENCE_H__ */
+

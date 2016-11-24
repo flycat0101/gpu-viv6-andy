@@ -59,7 +59,7 @@ LIBS +=  $(LIB_DIR)/libdl.a
 LIBS +=  $(LIB_DIR)/librt.a
 else
 # Specify Vivante OpenCL libraries.
-LIBS += -L $(VIVANTE_SDK_LIB) -l OpenCL
+LIBS += -L $(VIVANTE_SDK_LIB) -Wl,-rpath-link,$(VIVANTE_SDK_LIB) -l OpenCL
 LIBS += -L $(VIVANTE_SDK_LIB) -l CLC
 
 LIBS += -l m -l pthread -l dl -l stdc++ -l rt

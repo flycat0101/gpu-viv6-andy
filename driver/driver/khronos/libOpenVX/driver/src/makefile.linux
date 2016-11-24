@@ -70,6 +70,7 @@ OBJECTS         =  \
                     $(OBJ_DIR)/gc_vx_scalar.o  \
                     $(OBJ_DIR)/gc_vx_threshold.o   \
                     $(OBJ_DIR)/gc_vx_program.o  \
+                    $(OBJ_DIR)/gc_vx_profiler.o  \
 
 # API
 OBJECTS         +=    \

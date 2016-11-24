@@ -30,62 +30,77 @@
 # OpenGL ES JNI sample
 # This makefile builds both an activity and a shared library.
 #########################################################################
-ifneq ($(TARGET_SIMULATOR),true) # not 64 bit clean
-
 
 # Build activity
 
 LOCAL_PATH:= $(call my-dir)
-include $(CLEAR_VARS)
-VIV_TARGET_ABI ?= $(TARGET_ARCH)
-ifneq ($(findstring 64,$(VIV_TARGET_ABI)),)
-    VIV_MULTILIB=64
+ifdef TARGET_2ND_ARCH
+
+  # build for 64
+  include $(CLEAR_VARS)
+
+  LOCAL_SRC_FILES := $(call all-subdir-java-files)
+
+  LOCAL_JNI_SHARED_LIBRARIES := libgl2sample6_jni
+  LOCAL_PACKAGE_NAME := GL2Sample6_android-64
+  LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
+  LOCAL_MULTILIB     := 64
+  include $(BUILD_PACKAGE)
+
+  # build for 32
+  include $(CLEAR_VARS)
+
+  LOCAL_SRC_FILES := $(call all-subdir-java-files)
+
+  LOCAL_JNI_SHARED_LIBRARIES := libgl2sample6_jni
+
+  LOCAL_PACKAGE_NAME := GL2Sample6_android-32
+  LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
+  LOCAL_MULTILIB     := 32
+  include $(BUILD_PACKAGE)
+
+  # build for multilib
+  include $(CLEAR_VARS)
+
+  LOCAL_SRC_FILES := $(call all-subdir-java-files)
+
+  LOCAL_JNI_SHARED_LIBRARIES := libgl2sample6_jni
+
+  LOCAL_PACKAGE_NAME := GL2Sample6_android-multilib
+  LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
+  LOCAL_MULTILIB     := both
+  include $(BUILD_PACKAGE)
+
 else
-    VIV_MULTILIB=32
+
+include $(CLEAR_VARS)
+
+  LOCAL_SRC_FILES := $(call all-subdir-java-files)
+  LOCAL_JNI_SHARED_LIBRARIES := libgl2sample6_jni
+  LOCAL_PACKAGE_NAME := GL2Sample6_android
+  LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
+  include $(BUILD_PACKAGE)
 endif
-
-
-LOCAL_MODULE_TAGS := optional
-
-LOCAL_SRC_FILES := $(call all-subdir-java-files)
-
-LOCAL_PACKAGE_NAME := GL2Sample6
-
-LOCAL_JNI_SHARED_LIBRARIES := libgl2sample6_jni
-
-LOCAL_MULTILIB := $(VIV_MULTILIB)
-LOCAL_MODULE_PATH := $(AQROOT)/bin/$(VIV_TARGET_ABI)/vdk
-include $(BUILD_PACKAGE)
 
 #########################################################################
 # Build JNI Shared Library
 # #########################################################################
 
-LOCAL_PATH:= $(LOCAL_PATH)/jni
+LOCAL_PATH:= $(LOCAL_PATH)/..
 
 include $(CLEAR_VARS)
-VIV_TARGET_ABI ?= $(TARGET_ARCH)
-ifneq ($(findstring 64,$(VIV_TARGET_ABI)),)
-    VIV_MULTILIB=64
-else
-    VIV_MULTILIB=32
-endif
-
-
-# Optional tag would mean it doesn't get installed by default
-LOCAL_MODULE_TAGS := optional
 
 LOCAL_CFLAGS := -Werror -Wno-unused-parameter -Wno-strict-aliasing -DANDROID_SDK_VERSION=$(PLATFORM_SDK_VERSION)
 
 LOCAL_SRC_FILES:= 	 \
-					sample6.cpp \
-					../../ball.c  \
-					../../bounce_main.c  \
-					../../terrain.c	\
-					../../../Common/vdk_sample_common.c
+					android/jni/sample6.cpp \
+					ball.c  \
+					bounce_main.c  \
+					terrain.c	\
+					../Common/vdk_sample_common.c
 
-LOCAL_C_INCLUDES := $(LOCAL_PATH)/../.. \
-					$(LOCAL_PATH)/../../../Common \
+LOCAL_C_INCLUDES := $(LOCAL_PATH) \
+					$(LOCAL_PATH)/../Common \
 #LOCAL_SRC_FILES:=  gl_code.cpp
 
 LOCAL_SHARED_LIBRARIES := \
@@ -100,13 +115,8 @@ LOCAL_SHARED_LIBRARIES += \
 endif
 
 LOCAL_MODULE := libgl2sample6_jni
-
+LOCAL_MODULE_TAGS := optional
 LOCAL_PRELINK_MODULE := false
-
-
-LOCAL_ARM_MODE := $(VIV_TARGET_ABI)
-LOCAL_MODULE_PATH := $(LOCAL_PATH)/../libs/$(VIV_TARGET_ABI)
-LOCAL_MULTILIB := $(VIV_MULTILIB)
+LOCAL_MULTILIB := both
 include $(BUILD_SHARED_LIBRARY)
 
-endif # TARGET_SIMULATOR

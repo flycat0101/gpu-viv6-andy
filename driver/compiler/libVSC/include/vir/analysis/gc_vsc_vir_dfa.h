@@ -48,12 +48,13 @@ typedef enum _VIR_DFA_TYPE
     VIR_DFA_TYPE_REACH_DEF = 0, /* Forward */
     VIR_DFA_TYPE_LIVE_VAR, /* Backward */
     VIR_DFA_TYPE_HELPER, /* Any direction, not for real flow */
+    VIR_DFA_TYPE_SCCP, /* Constant propagation */
     VIR_DFA_TYPE_COUNT
 }VIR_DFA_TYPE;
 
 typedef struct _VIR_DFA_COMMON_FLAGS
 {
-    gctUINT                      bValid            : 1;  /* Means DFA info has been built */
+    gctUINT                      bFlowBuilt        : 1;  /* Means DFA flow has been built */
     gctUINT                      bFlowInvalidated  : 1;  /* See comments for VIR_BASE_DFA */
     gctUINT                      reserved          : 30;
 }VIR_DFA_COMMON_FLAGS;
@@ -85,8 +86,8 @@ void vscVIR_InitializeBaseDFA(VIR_BASE_DFA* pBaseDFA, VIR_CALL_GRAPH* pCg, VIR_D
 void vscVIR_UpdateBaseDFAFlowSize(VIR_BASE_DFA* pBaseDFA, gctINT newFlowSize);
 void vscVIR_FinalizeBaseDFA(VIR_BASE_DFA* pBaseDFA);
 
-void vscVIR_SetDFAValidity(VIR_BASE_DFA* pBaseDFA, gctBOOL bValid);
-gctBOOL vscVIR_GetDFAValidity(VIR_BASE_DFA* pBaseDFA);
+void vscVIR_SetDFAFlowBuilt(VIR_BASE_DFA* pBaseDFA, gctBOOL bFlowBuilt);
+gctBOOL vscVIR_CheckDFAFlowBuilt(VIR_BASE_DFA* pBaseDFA);
 
 /*
  *  Generic two-states (TS) DFA interface (fast version with bit-vector)
@@ -327,11 +328,18 @@ typedef struct VIR_NATIVE_DEF_FLAGS
 
 typedef struct VIR_DEDUCED_DEF_FLAGS
 {
-    gctUINT                      bNoUsageCrossRoutine : 1; /* Means all usages are in same routine as this def */
-    gctUINT                      bDynIndexed          : 1; /* This def will be dynamically indexed access by indexing reg */
-    gctUINT                      bIndexingReg         : 1; /* This def is for indexing reg Ro of Rb[Ro.single_channel] */
+    gctUINT         bNoUsageCrossRoutine       : 1; /* Means all usages are in same routine as this def */
+    gctUINT         bDynIndexed                : 1; /* This def will be dynamically indexed access by indexing reg */
+    gctUINT         bIndexingReg               : 1; /* This def is for indexing reg Ro of Rb[Ro.single_channel] */
+    gctUINT         bHasUsageOnNoSwizzleInst   : 1; /* This def has an usage on no swizzle support instruction (for example,
+                                                       EVIS instruction, swizzle instruction).
+                                                       NOTE it will be removed after bin is considered as bin implies
+                                                       concept of swizzle!!! */
+    gctUINT         bHasUsageOnFalseDepInst    : 1; /* This def has an usage on ST as src2.
+                                                       On some HW, there is no per-component dependency support
+                                                       for LD/ST def. For ST, def is src2, if it is temp. */
 
-    gctUINT                      reserved             : 29;
+    gctUINT         reserved                   : 27;
 
 }VIR_DEDUCED_DEF_FLAGS;
 
@@ -528,6 +536,11 @@ typedef struct _VIR_DEF_USAGE_INFO
     /* Maximum virtual reg number that this DU-info maintains */
     gctUINT                      maxVirRegNo;
 
+    /* Client can make DU-chain (as well as UD-chain) built not
+       along with building of reach-def flow DFA. This is for
+       CPU performance consideration. So we need trace its status */
+    gctBOOL                      bDUUDChainBuilt;
+
     /* Client can make web table built not along with building
        of def table and usage table. This is for CPU performance
        consideration. So we need trace its status */
@@ -558,9 +571,14 @@ gctBOOL vscVIR_QueryRealWriteVirRegInfo(VIR_Shader* pShader,
 
 VSC_ErrCode vscVIR_BuildDefUsageInfo(VIR_CALL_GRAPH*     pCg,
                                      VIR_DEF_USAGE_INFO* pDuInfo,
-                                     gctBOOL             bBuildWeb /* Web-table will also be
-                                                                      built if set to TRUE */
+                                     gctBOOL             bBuildDUUDChain, /* DUUD-chain will also be built if TRUE */
+                                     gctBOOL             bBuildWeb /* Web-table will also be built if TRUE */
                                      );
+VSC_ErrCode vscVIR_BuildDUUDChain(VIR_CALL_GRAPH*     pCg,
+                                  VIR_DEF_USAGE_INFO* pDuInfo,
+                                  gctBOOL             bForceToBuild  /* If set to TRUE, previous DUUD
+                                                                        chain will be destroyed firstly */
+                                  );
 VSC_ErrCode vscVIR_BuildWebs(VIR_CALL_GRAPH*     pCg,
                              VIR_DEF_USAGE_INFO* pDuInfo,
                              gctBOOL             bForceToBuild  /* If set to TRUE, previous web
@@ -568,6 +586,7 @@ VSC_ErrCode vscVIR_BuildWebs(VIR_CALL_GRAPH*     pCg,
                              );
 
 VSC_ErrCode vscVIR_DestroyDefUsageInfo(VIR_DEF_USAGE_INFO* pDuInfo); /* All du info including web will be destroyed */
+VSC_ErrCode vscVIR_DestoryDUUDChain(VIR_DEF_USAGE_INFO* pDuInfo); /* Only DUUD chain will be destroyed */
 VSC_ErrCode vscVIR_DestoryWebs(VIR_DEF_USAGE_INFO* pDuInfo); /* Only web table will be destroyed */
 
 /* Partially update routines */

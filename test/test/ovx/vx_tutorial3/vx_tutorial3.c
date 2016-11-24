@@ -101,10 +101,11 @@ char vxcGaussian3x3Source[] = {
         int2 coord = (int2)(get_global_id(0), get_global_id(1)); \n\
 \n\
         int2 coord1 = coord + (int2)(-1, -1); \n\
-        vxc_uchar16 v0 = viv_intrinsic_vx_read_imageuc(in_image, coord1); \n\
+        vxc_uchar16 v0, v1; \n\
+        VXC_ReadImage(v0, in_image, coord1, 0, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
 \n\
         int2 coord2 = coord + (int2)(-1, 0); \n\
-        vxc_uchar16 v1 = viv_intrinsic_vx_read_imageuc(in_image, coord2); \n\
+        VXC_ReadImage(v1, in_image, coord2, 0, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
 \n\
         int info = VXC_MODIFIER(0, 13, 0, VXC_RM_TowardZero, 0); \n\
         int infox = VXC_MODIFIER_FILTER(0, 13, 0, VXC_FM_Guassian, 0); \n\
@@ -112,10 +113,12 @@ char vxcGaussian3x3Source[] = {
         do \n\
         { \n\
             int2 coord3 = coord + (int2)(-1, 1); \n\
-            vxc_uchar16 v2 = viv_intrinsic_vx_read_imageuc(in_image, coord3); \n\
+            vxc_uchar16 v2; \n\
+            VXC_ReadImage(v2, in_image, coord3, 0, VXC_MODIFIER(0, 15, 0, VXC_RM_TowardZero, 0)); \n\
 \n\
-            vxc_uchar16 max = viv_intrinsic_vxmc_Filter_uc(v0, v1, v2, infox); \n\
-            viv_intrinsic_vxmc_write_imageuc(out_image, coord, max, info); \n\
+            vxc_uchar16 max; \n\
+            VXC_Filter(max, v0, v1, v2, infox); \n\
+            VXC_WriteImage(out_image, coord, max, info) ; \n\
 \n\
             v0 = v1; \n\
             v1 = v2; \n\
@@ -132,9 +135,9 @@ static vx_param_description_s paramsGaussian3x3[] =
 };
 
 int freeRes(FILE** srcFile, FILE** destFile, u08** tmpBuf, u08** tmpBuf2, u08** imgBuf, vx_image imgObj[], vx_kernel* vxKernel, vx_node* vxNode, vx_graph* GraphVX, vx_context* ContextVX);
-vx_status vxcGaussian3x3ValidateInput(vx_node node, vx_uint32 index);
-vx_status vxcGaussian3x3ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
-vx_status vxcGaussian3x3Initialize(vx_node node, vx_reference *parameters, vx_uint32 num);
+vx_status VX_CALLBACK vxcGaussian3x3ValidateInput(vx_node node, vx_uint32 index);
+vx_status VX_CALLBACK vxcGaussian3x3ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
+vx_status VX_CALLBACK vxcGaussian3x3Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_status vxcGaussian3x3RegisterKernel(vx_context context);
 
 int main(int argc, char* argv[])
@@ -372,7 +375,7 @@ int freeRes(FILE** srcFile, FILE** destFile, u08** tmpBuf, u08** tmpBuf2, u08** 
     return 0;
 }
 
-vx_status vxcGaussian3x3ValidateInput(vx_node node, vx_uint32 index)
+vx_status VX_CALLBACK vxcGaussian3x3ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_image     imgObj = NULL;
     vx_df_image  imgFmt = VX_DF_IMAGE_U8;
@@ -402,7 +405,7 @@ OnError:
     return status;
 }
 
-vx_status vxcGaussian3x3ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+vx_status VX_CALLBACK vxcGaussian3x3ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
 {
     vx_image     imgObj = NULL;
     vx_df_image  imgFmt = VX_DF_IMAGE_U8;
@@ -442,7 +445,7 @@ OnError:
     return status;
 }
 
-vx_status vxcGaussian3x3Initialize(vx_node node, vx_reference *parameters, vx_uint32 num)
+vx_status VX_CALLBACK vxcGaussian3x3Initialize(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     /* workdim,    globel offset,    globel scale,    local size,    globel size */
     vx_kernel_execution_parameters_t shaderParam = {2,    {0, 0, 0},    {0, 0, 0},    {8, 1, 0},    {0, 0, 0}};

@@ -35,6 +35,11 @@ VX_INTERNAL_API vx_bool vxoImage_AllocateMemory(vx_image image);
 
 VX_INTERNAL_API void vxoImage_FreeMemory(vx_image image);
 
+VX_INTERNAL_API vx_bool vxoImage_WrapUserMemory(vx_image image);
+
+VX_INTERNAL_API void vxoImage_FreeWrappedMemory(vx_image image);
+
 EXTERN_C_END
 
 #endif /* __GC_VX_IMAGE_H__ */
+

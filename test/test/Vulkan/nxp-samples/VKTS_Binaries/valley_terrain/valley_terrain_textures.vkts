@@ -1,0 +1,22 @@
+#
+# VulKan ToolS textures.
+#
+
+image_library valley_terrain_images.vkts
+
+#
+# Texture.
+#
+
+name Normal_Texture_texture
+
+image valley_normal_image
+
+#
+# Texture.
+#
+
+name Displacement_Texture_texture
+
+image valley_displacement_image
+

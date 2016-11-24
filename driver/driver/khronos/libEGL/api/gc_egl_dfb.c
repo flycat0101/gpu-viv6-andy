@@ -353,7 +353,7 @@ static keyMap keys[] =
 ** Display.
 */
 
-gceSTATUS
+static gceSTATUS
 dfb_GetDisplay(
     OUT PlatformDisplayType * Display,
     IN gctPOINTER Context
@@ -426,35 +426,6 @@ dfb_GetDisplay(
     return status;
 }
 
-gceSTATUS
-dfb_GetDisplayByIndex(
-    IN gctINT DisplayIndex,
-    OUT PlatformDisplayType * Display,
-    IN gctPOINTER Context
-    )
-{
-    return dfb_GetDisplay(Display, Context);
-}
-
-gceSTATUS
-dfb_GetDisplayInfo(
-    IN PlatformDisplayType Display,
-    OUT gctINT * Width,
-    OUT gctINT * Height,
-    OUT gctSIZE_T * Physical,
-    OUT gctINT * Stride,
-    OUT gctINT * BitsPerPixel
-    )
-{
-    if(Display == gcvNULL)
-        return gcvSTATUS_NOT_SUPPORTED;
-    if(Width != gcvNULL)
-        *Width = Display->winWidth;
-    if(Height != gcvNULL)
-        *Height = Display->winHeight;
-    return gcvSTATUS_OK;
-}
-
 typedef struct _dfbDISPLAY_INFO
 {
     /* The size of the display in pixels. */
@@ -504,7 +475,7 @@ typedef struct _dfbDISPLAY_INFO
 dfbDISPLAY_INFO;
 
 
-gceSTATUS
+static gceSTATUS
 dfb_GetDisplayInfoEx(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -529,7 +500,7 @@ dfb_GetDisplayInfoEx(
     return status;
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_GetDisplayVirtual(
     IN PlatformDisplayType Display,
     OUT gctINT * Width,
@@ -539,7 +510,7 @@ dfb_GetDisplayVirtual(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_GetDisplayBackbuffer(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -573,19 +544,7 @@ dfb_GetDisplayBackbuffer(
     return status;
 }
 
-gceSTATUS
-dfb_SetDisplayVirtual(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
-    IN gctUINT Offset,
-    IN gctINT X,
-    IN gctINT Y
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
+static gceSTATUS
 dfb_SetDisplayVirtualEx(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -633,7 +592,7 @@ dfb_SetDisplayVirtualEx(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_CancelDisplayBackbuffer(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -648,35 +607,7 @@ dfb_CancelDisplayBackbuffer(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-gceSTATUS
-dfb_SetSwapInterval(
-    IN PlatformDisplayType Display,
-    IN gctINT Interval
-)
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-dfb_SetSwapIntervalEx(
-    IN PlatformDisplayType Display,
-    IN gctINT Interval,
-    IN gctPOINTER localDisplay)
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-dfb_GetSwapInterval(
-    IN PlatformDisplayType Display,
-    IN gctINT_PTR Min,
-    IN gctINT_PTR Max
-)
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
+static gceSTATUS
 dfb_DestroyDisplay(
     IN PlatformDisplayType Display
     )
@@ -702,63 +633,11 @@ dfb_DestroyDisplay(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
-dfb_DisplayBufferRegions(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
-    IN gctINT NumRects,
-    IN gctINT_PTR Rects
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-/*******************************************************************************
-** Context
-*/
-gceSTATUS
-dfb_CreateContext(IN gctPOINTER Display, IN gctPOINTER Context)
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-dfb_DestroyContext(IN gctPOINTER Display, IN gctPOINTER Context)
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-dfb_MakeCurrent(IN gctPOINTER Display,
-    IN PlatformWindowType DrawDrawable,
-    IN PlatformWindowType ReadDrawable,
-    IN gctPOINTER Context,
-    IN gcoSURF ResolveTarget)
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-
-/*******************************************************************************
-** Drawable
-*/
-gceSTATUS
-dfb_CreateDrawable(IN gctPOINTER Display, IN PlatformWindowType Drawable)
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-dfb_DestroyDrawable(IN gctPOINTER Display, IN PlatformWindowType Drawable)
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
 /*******************************************************************************
 ** Windows
 */
-void
-dfb_DestoryBackBuffers(
+static void
+_DestoryBackBuffers(
     IN PlatformWindowType Window
     )
 {
@@ -783,8 +662,8 @@ dfb_DestoryBackBuffers(
     }
 }
 
-gceSTATUS
-dfb_CreateBackBuffers(
+static gceSTATUS
+_CreateBackBuffers(
     IN PlatformDisplayType Display,
     IN gctINT X,
     IN gctINT Y,
@@ -856,12 +735,12 @@ dfb_CreateBackBuffers(
     return status;
 
 OnError:
-    dfb_DestoryBackBuffers(window);
+    _DestoryBackBuffers(window);
     status = gcvSTATUS_OUT_OF_RESOURCES;
     return status;
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_CreateWindow(
     IN PlatformDisplayType Display,
     IN gctINT X,
@@ -922,7 +801,7 @@ dfb_CreateWindow(
         window->AttachEventBuffer(window, Display->pEventBuffer);
         Display->pLayer->EnableCursor(Display->pLayer, 0);
 
-        status = dfb_CreateBackBuffers(Display, X, Y, Width, Height, DFBWindow);
+        status = _CreateBackBuffers(Display, X, Y, Width, Height, DFBWindow);
         if(status != gcvSTATUS_OK)
             break;
         *Window = DFBWindow;
@@ -939,7 +818,7 @@ dfb_CreateWindow(
     return status;
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_GetWindowInfo(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -1005,7 +884,7 @@ dfb_GetWindowInfo(
     return status;
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_DestroyWindow(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window
@@ -1019,72 +898,17 @@ dfb_DestroyWindow(
 
     Window->pWindow->Release(Window->pWindow);
 
-    dfb_DestoryBackBuffers(Window);
+    _DestoryBackBuffers(Window);
 
     free(Window);
     return gcvSTATUS_OK;
-}
-
-gceSTATUS
-dfb_RSForSwap(
-    IN gctPOINTER localDisplay,
-    IN PlatformWindowType Drawable,
-    IN gctPOINTER resolve
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-dfb_SwapBuffers(
-    IN gctPOINTER Display,
-    IN PlatformWindowType Drawable,
-    IN gcoSURF RenderTarget,
-    IN gcoSURF ResolveTarget,
-    IN gctPOINTER ResolveBits,
-    OUT gctUINT *Width,
-    OUT gctUINT *Height
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-dfb_DrawImage(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
-    IN gctINT Left,
-    IN gctINT Top,
-    IN gctINT Right,
-    IN gctINT Bottom,
-    IN gctINT Width,
-    IN gctINT Height,
-    IN gctINT BitsPerPixel,
-    IN gctPOINTER Bits
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-dfb_GetImage(
-    IN PlatformWindowType Window,
-    IN gctINT Left,
-    IN gctINT Top,
-    IN gctINT Right,
-    IN gctINT Bottom,
-    OUT gctINT * BitsPerPixel,
-    OUT gctPOINTER * Bits
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
 }
 
 /*******************************************************************************
 ** Pixmaps. ********************************************************************
 */
 
-gceSTATUS
+static gceSTATUS
 dfb_CreatePixmap(
     IN PlatformDisplayType Display,
     IN gctINT Width,
@@ -1143,7 +967,7 @@ dfb_CreatePixmap(
     return status;
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_GetPixmapInfo(
     IN PlatformDisplayType Display,
     IN PlatformPixmapType Pixmap,
@@ -1194,7 +1018,7 @@ dfb_GetPixmapInfo(
     return status;
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_DestroyPixmap(
     IN PlatformDisplayType Display,
     IN PlatformPixmapType Pixmap
@@ -1215,7 +1039,7 @@ dfb_DestroyPixmap(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_DrawPixmap(
     IN PlatformDisplayType Display,
     IN PlatformPixmapType Pixmap,
@@ -1233,7 +1057,7 @@ dfb_DrawPixmap(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_ShowWindow(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window
@@ -1248,7 +1072,7 @@ dfb_ShowWindow(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_HideWindow(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window
@@ -1263,30 +1087,7 @@ dfb_HideWindow(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
-dfb_SetWindowTitle(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
-    IN gctCONST_STRING Title
-    )
-{
-
-    if((Display == gcvNULL) || (Window == 0))
-        return gcvSTATUS_INVALID_ARGUMENT;
-
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS
-dfb_CapturePointer(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
+static gceSTATUS
 dfb_GetEvent(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -1370,57 +1171,7 @@ dfb_GetEvent(
     return gcvSTATUS_NOT_FOUND;
 }
 
-gceSTATUS
-dfb_CreateClientBuffer(
-    IN gctINT Width,
-    IN gctINT Height,
-    IN gctINT Format,
-    IN gctINT Type,
-    OUT gctPOINTER * ClientBuffer
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-dfb_GetClientBufferInfo(
-    IN gctPOINTER ClientBuffer,
-    OUT gctINT * Width,
-    OUT gctINT * Height,
-    OUT gctINT * Stride,
-    OUT gctPOINTER * Bits
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-dfb_DestroyClientBuffer(
-    IN gctPOINTER ClientBuffer
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-dfb_InitLocalDisplayInfo(
-    IN PlatformDisplayType Display,
-    IN OUT gctPOINTER * localDisplay
-    )
-{
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS
-dfb_DeinitLocalDisplayInfo(
-    IN PlatformDisplayType Display,
-    IN OUT gctPOINTER * localDisplay
-    )
-{
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS
+static gceSTATUS
 dfb_GetDisplayInfoEx2(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -1432,7 +1183,7 @@ dfb_GetDisplayInfoEx2(
     return dfb_GetDisplayInfoEx(Display,Window,DisplayInfoSize,DisplayInfo);
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_GetDisplayBackbufferEx(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -1447,34 +1198,7 @@ dfb_GetDisplayBackbufferEx(
     return dfb_GetDisplayBackbuffer(Display, Window, context, surface, Offset, X, Y);
 }
 
-gceSTATUS
-dfb_IsValidDisplay(
-    IN PlatformDisplayType Display
-    )
-{
-    if(Display != gcvNULL)
-        return gcvSTATUS_OK;
-    return gcvSTATUS_INVALID_ARGUMENT;
-}
-
-gctBOOL
-dfb_SynchronousFlip(
-    IN PlatformDisplayType Display
-    )
-{
-    return gcvFALSE;
-}
-
-gceSTATUS
-dfb_GetNativeVisualId(
-    IN PlatformDisplayType Display,
-    OUT gctINT* nativeVisualId
-    )
-{
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS
+static gceSTATUS
 dfb_GetWindowInfoEx(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -1548,52 +1272,7 @@ dfb_GetWindowInfoEx(
     return gcvSTATUS_INVALID_ARGUMENT;
 }
 
-gceSTATUS
-dfb_DrawImageEx(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
-    IN gctINT Left,
-    IN gctINT Top,
-    IN gctINT Right,
-    IN gctINT Bottom,
-    IN gctINT Width,
-    IN gctINT Height,
-    IN gctINT BitsPerPixel,
-    IN gctPOINTER Bits,
-    IN gceSURF_FORMAT Format
-    )
-{
-    gctPOINTER logical;
-    gctINT pitch;
-    IDirectFBSurface *pDFBSurf;
-
-    if((Display == gcvNULL) || (Window == 0) || Window->pWindow == gcvNULL)
-        return gcvSTATUS_INVALID_ARGUMENT;
-
-    pDFBSurf = Window->pDFBSurf;
-    if (pDFBSurf == gcvNULL)
-    {
-        if(Window->pWindow->GetSurface( Window->pWindow, &pDFBSurf ) != DFB_OK)
-            return gcvSTATUS_INVALID_ARGUMENT;
-        Window->pDFBSurf = pDFBSurf;
-    }
-
-    if (pDFBSurf->Lock(pDFBSurf,
-        DSLF_WRITE,
-        &logical,
-        &pitch) != DFB_OK)
-    {
-        return gcvSTATUS_INVALID_ARGUMENT;
-    }
-    memcpy(logical, Bits, ((Width * BitsPerPixel / 8 + 3) & ~3) * gcmABS(Height));
-    pDFBSurf->Unlock(pDFBSurf);
-    pDFBSurf->Flip( pDFBSurf, NULL, DSFLIP_WAITFORSYNC );
-    Display->pDirectFB->WaitIdle( Display->pDirectFB );
-
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS
+static gceSTATUS
 dfb_SetWindowFormat(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -1608,10 +1287,28 @@ dfb_SetWindowFormat(
      *   gcvSURF_RENDER_TARGET_NO_COMPRESSION
      *   gcvSURF_RENDER_TARGET_NO_TILE_STATUS
      */
-    return gcvSTATUS_NOT_SUPPORTED;
+    IDirectFBSurface *pDFBSurf;
+    gceSURF_FORMAT format;
+
+    /* Only BITMAP. */
+    if (Type != gcvSURF_BITMAP)
+    {
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    pDFBSurf = Window->pDFBSurf;
+
+    /* Can not change format. */
+    if (!GetDFBSurfFormat(pDFBSurf, &format, gcvNULL) ||
+        Format != format)
+    {
+        return gcvSTATUS_NOT_SUPPORTED;
+    }
+
+    return gcvSTATUS_OK;
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_GetPixmapInfoEx(
     IN PlatformDisplayType Display,
     IN PlatformPixmapType Pixmap,
@@ -1653,7 +1350,7 @@ dfb_GetPixmapInfoEx(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
+static gceSTATUS
 dfb_CopyPixmapBits(
     IN PlatformDisplayType Display,
     IN PlatformPixmapType Pixmap,
@@ -1662,17 +1359,6 @@ dfb_CopyPixmapBits(
     IN gctINT DstStride,
     IN gceSURF_FORMAT DstFormat,
     OUT gctPOINTER DstBits
-    )
-{
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-dfb_ResizeWindow(
-    IN gctPOINTER localDisplay,
-    IN PlatformWindowType Drawable,
-    IN gctUINT Width,
-    IN gctUINT Height
     )
 {
     return gcvSTATUS_NOT_SUPPORTED;
@@ -1730,12 +1416,12 @@ _IsValidDisplay(
     IN void * Display
     )
 {
-    if (gcmIS_ERROR(dfb_IsValidDisplay((PlatformDisplayType) Display)))
+    if (Display != NULL)
     {
-        return EGL_FALSE;
+        return EGL_TRUE;
     }
 
-    return EGL_TRUE;
+    return EGL_FALSE;
 }
 
 static EGLBoolean
@@ -1743,16 +1429,6 @@ _InitLocalDisplayInfo(
     IN VEGLDisplay Display
     )
 {
-    gceSTATUS status;
-
-    status = dfb_InitLocalDisplayInfo((PlatformDisplayType) Display->hdc,
-                                        &Display->localInfo);
-
-    if (gcmIS_ERROR(status))
-    {
-        return EGL_FALSE;
-    }
-
     return EGL_TRUE;
 }
 
@@ -1761,16 +1437,6 @@ _DeinitLocalDisplayInfo(
     IN VEGLDisplay Display
     )
 {
-    gceSTATUS status;
-
-    status = dfb_DeinitLocalDisplayInfo((PlatformDisplayType) Display->hdc,
-                                          &Display->localInfo);
-
-    if (gcmIS_ERROR(status))
-    {
-        return EGL_FALSE;
-    }
-
     return EGL_TRUE;
 }
 
@@ -1781,8 +1447,6 @@ _GetNativeVisualId(
     )
 {
     EGLint visualId = 0;
-
-    dfb_GetNativeVisualId((PlatformDisplayType) Display->hdc, &visualId);
     return visualId;
 }
 
@@ -1794,18 +1458,8 @@ _GetSwapInterval(
     OUT EGLint * Max
     )
 {
-    gceSTATUS status;
-
-    /* Get swap interval from HAL OS layer. */
-    status = dfb_GetSwapInterval((PlatformDisplayType) Display->hdc,
-                                   Min, Max);
-
-    if (gcmIS_ERROR(status))
-    {
-        return EGL_FALSE;
-    }
-
-    return EGL_TRUE;
+    /* Not supported. */
+    return EGL_FALSE;
 }
 
 static EGLBoolean
@@ -1814,73 +1468,18 @@ _SetSwapInterval(
     IN EGLint Interval
     )
 {
-    gceSTATUS status;
-
-    status = dfb_SetSwapInterval((PlatformDisplayType) Display->hdc,
-                                   Interval);
-
-    if (status == gcvSTATUS_NOT_SUPPORTED)
-    {
-        /*
-         * return true to maintain legacy behavior. If the feature is not there
-         * we were ignoring it. And now we are ignoring it too.
-         */
-        return EGL_TRUE;
-    }
-    else if (gcmIS_ERROR(status))
-    {
-        return EGL_FALSE;
-    }
-
+    /*
+     * return true to maintain legacy behavior. If the feature is not there
+     * we were ignoring it. And now we are ignoring it too.
+     */
     return EGL_TRUE;
 }
 
 /******************************************************************************/
 /* Window. */
 
-typedef struct eglNativeBuffer * VEGLNativeBuffer;
-
-struct eglNativeBuffer
-{
-    gctPOINTER          context;
-    gcsPOINT            origin;
-    gcoSURF             surface;
-
-    /* Buffer lock. */
-    gctSIGNAL           lock;
-
-    VEGLNativeBuffer    prev;
-    VEGLNativeBuffer    next;
-};
-
 struct eglWindowInfo
 {
-    /*
-     * Can directly access window memory?
-     * True  for FBDEV, DFB, QNX, DDraw, etc.
-     * False for GDI, X11, DRI, etc.
-     *
-     * As descripted in comments in 'bindWindow' in header file, 4 conditions
-     * for window back buffer:
-     * If 'fbDirect' window memory: ('fbDirect' = 'True')
-     *   1. Direct window back buffer surface ('wrapFB' = 'False')
-     *   2. Wrapped surface ('wrapFB' = 'True')
-     *   3. Temporary surface ('wrapFB' = 'False') (Not supported for now.)
-     * Else:
-     *   4. Temporary surface. ('fbDirect' = 'False')
-     */
-    EGLBoolean          fbDirect;
-
-    /*
-     * Wrap window back buffer as HAL surface object?
-     * Invalid if 'fbDirect' is 'False'.
-     */
-    EGLBoolean          wrapFB;
-
-    /* Window back buffer list, wrappers or temporary surface objects. */
-    VEGLNativeBuffer    bufferList;
-    gctPOINTER          bufferListMutex;
-
     /* Information obtained by dfb_GetDisplayInfoEx2. */
     gctPOINTER          logical;
     unsigned long       physical;
@@ -1894,309 +1493,6 @@ struct eglWindowInfo
     gctUINT             yresVirtual;
     gctUINT             multiBuffer;
 };
-
-
-
-/*
- * Create wrappers or temporary surface object(s) for native window (conditions
- * 2, 3 and 4 mentioned above).
- *
- * o 2. Wrapped surface ('wrapFB' = 'True')
- * o 3. Temporary surface ('wrapFB' = 'False') (Not supported for now.)
- * o 4. Temporary surface. ('fbDirect' = 'False')
- */
-static gceSTATUS
-_CreateWindowBuffers(
-    void * Window,
-    VEGLWindowInfo Info
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    VEGLNativeBuffer buffer;
-
-    if (Info->fbDirect)
-    {
-        if (Info->wrapFB)
-        {
-            gctPOINTER pointer;
-            gctUINT alignedHeight;
-            gceSURF_TYPE baseType;
-            gctUINT i;
-
-            baseType = (gceSURF_TYPE) ((gctUINT32) Info->type & 0xFF);
-
-            /* Lock. */
-            gcoOS_AcquireMutex(gcvNULL, Info->bufferListMutex, gcvINFINITE);
-
-            alignedHeight = Info->yresVirtual / Info->multiBuffer;
-
-            for (i = 0; i < Info->multiBuffer; i++)
-            {
-                /*
-                 * TODO: Check wrapper limitations.
-                 * Allocate temporary surface objects if can not wrap.
-                 *
-                 * Current logic follows former code without changes.
-                 */
-                gctUINT    offset;
-                gctPOINTER logical;
-                gctUINT    physical;
-
-                /* Allocate native buffer object. */
-                gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                          sizeof (struct eglNativeBuffer),
-                                          &pointer));
-
-                gcoOS_ZeroMemory(pointer, sizeof (struct eglNativeBuffer));
-                buffer = pointer;
-
-                /* Bytes offset to the buffer. */
-                offset = (gctUINT) (Info->stride * alignedHeight * i);
-
-                /* Calculate buffer addresses. */
-                logical  = (gctUINT8_PTR) Info->logical + offset;
-                physical = Info->physical + offset;
-
-                /* Construct the wrapper. */
-                gcmONERROR(gcoSURF_Construct(gcvNULL,
-                                             Info->width,
-                                             Info->height, 1,
-                                             Info->type,
-                                             Info->format,
-                                             gcvPOOL_USER,
-                                             &buffer->surface));
-
-                /* Set the underlying framebuffer surface. */
-                gcmONERROR(gcoSURF_SetBuffer(buffer->surface,
-                                             Info->type,
-                                             Info->format,
-                                             Info->stride,
-                                             logical,
-                                             physical));
-
-                /* For a new surface, clear it to get rid of noises. */
-                gcoOS_ZeroMemory(logical, alignedHeight * Info->stride);
-
-                gcmONERROR(gcoSURF_SetWindow(buffer->surface,
-                                             0, 0,
-                                             Info->width, Info->height));
-
-                /* Initial lock for user-pool surface. */
-                gcmONERROR(gcoSURF_Lock(buffer->surface, gcvNULL, gcvNULL));
-
-                (void) baseType;
-
-#if gcdENABLE_3D
-                if (baseType == gcvSURF_RENDER_TARGET)
-                {
-                    /* Render target surface orientation is different. */
-                    gcmVERIFY_OK(
-                        gcoSURF_SetFlags(buffer->surface,
-                                         gcvSURF_FLAG_CONTENT_YINVERTED,
-                                         gcvTRUE));
-
-                    if (!(Info->type & gcvSURF_NO_TILE_STATUS))
-                    {
-                        /* Append tile status to this user-pool rt. */
-                        gcmVERIFY_OK(gcoSURF_AppendTileStatus(buffer->surface));
-                    }
-                }
-#endif
-
-                buffer->context  = gcvNULL;
-                buffer->origin.x = 0;
-                buffer->origin.y = alignedHeight * i;
-
-                /* Add into buffer list. */
-                if (Info->bufferList != gcvNULL)
-                {
-                    VEGLNativeBuffer prev = Info->bufferList->prev;
-
-                    buffer->prev = prev;
-                    buffer->next = Info->bufferList;
-
-                    prev->next = buffer;
-                    Info->bufferList->prev = buffer;
-                }
-                else
-                {
-                    buffer->prev = buffer->next = buffer;
-                    Info->bufferList = buffer;
-                }
-
-                gcmTRACE(gcvLEVEL_INFO,
-                         "%s(%d): buffer[%d]: yoffset=%-4d physical=%x",
-                         __FUNCTION__, __LINE__,
-                         i, alignedHeight * i, physical);
-            }
-
-            gcoOS_ReleaseMutex(gcvNULL, Info->bufferListMutex);
-        }
-        else
-        {
-            gcmPRINT("%s(%d): Invalid integration!", __FUNCTION__, __LINE__);
-            return gcvSTATUS_OK;
-        }
-    }
-    else
-    {
-        /* Create temporary surface objects */
-        gctINT i;
-        gctPOINTER pointer;
-
-        gcoOS_AcquireMutex(gcvNULL, Info->bufferListMutex, gcvINFINITE);
-
-        for (i = 0; i < NUM_TEMPORARY_RESOLVE_SURFACES; i++)
-        {
-            /* Allocate native buffer object. */
-            gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                      sizeof (struct eglNativeBuffer),
-                                      &pointer));
-
-            gcoOS_ZeroMemory(pointer, sizeof (struct eglNativeBuffer));
-            buffer = pointer;
-
-            /* Construct temporary resolve surfaces. */
-            gcmONERROR(gcoSURF_Construct(gcvNULL,
-                                         Info->width,
-                                         Info->height, 1,
-                                         gcvSURF_BITMAP,
-                                         Info->format,
-                                         gcvPOOL_DEFAULT,
-                                         &buffer->surface));
-
-#if SYNC_TEMPORARY_RESOLVE_SURFACES
-            /* Create the buffer lock. */
-            gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvTRUE, &buffer->lock));
-
-            /* Set initial 'unlocked' state. */
-            gcmVERIFY_OK(gcoOS_Signal(gcvNULL, buffer->lock, gcvTRUE));
-#endif
-
-            /* Add into buffer list. */
-            if (Info->bufferList != gcvNULL)
-            {
-                VEGLNativeBuffer prev = Info->bufferList->prev;
-
-                buffer->prev = prev;
-                buffer->next = Info->bufferList;
-
-                prev->next = buffer;
-                Info->bufferList->prev = buffer;
-            }
-            else
-            {
-                buffer->prev = buffer->next = buffer;
-                Info->bufferList = buffer;
-            }
-
-            gcmTRACE(gcvLEVEL_INFO,
-                     "%s(%d): buffer[%d]: surface=%p",
-                     __FUNCTION__, __LINE__,
-                     i, buffer->surface);
-        }
-
-        gcoOS_ReleaseMutex(gcvNULL, Info->bufferListMutex);
-    }
-
-    return EGL_TRUE;
-
-OnError:
-    /* Error roll back. */
-    if ((buffer = Info->bufferList) != gcvNULL)
-    {
-        do
-        {
-            VEGLNativeBuffer next = buffer->next;
-
-            /* Destroy the surface. */
-            gcoSURF_Destroy(buffer->surface);
-            buffer->surface = gcvNULL;
-
-            if (buffer->lock != gcvNULL)
-            {
-                /* Destroy the signal. */
-                gcoOS_DestroySignal(gcvNULL, buffer->lock);
-                buffer->lock = gcvNULL;
-            }
-
-            gcmOS_SAFE_FREE(gcvNULL, buffer);
-
-            /* Go to next. */
-            buffer = next;
-        }
-        while (buffer != Info->bufferList);
-
-        /* All buffers free'ed. */
-        Info->bufferList = gcvNULL;
-    }
-
-    /* The buffer list mutex must be acquired. */
-    gcoOS_ReleaseMutex(gcvNULL, Info->bufferListMutex);
-
-    /* Commit accumulated commands. */
-    gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
-
-    return status;
-}
-
-static void
-_FreeWindowBuffers(
-    VEGLSurface Surface,
-    void * Window,
-    VEGLWindowInfo Info
-    )
-{
-    if (Info->bufferList)
-    {
-        VEGLNativeBuffer buffer;
-
-        /* Make sure all workers have been processed. */
-        if (Surface->workerDoneSignal != gcvNULL)
-        {
-            gcmVERIFY_OK(gcoOS_WaitSignal(gcvNULL,
-                                          Surface->workerDoneSignal,
-                                          gcvINFINITE));
-        }
-
-        /* Lock buffers. */
-        gcoOS_AcquireMutex(gcvNULL, Info->bufferListMutex, gcvINFINITE);
-
-        /* Go through all buffers. */
-        buffer = Info->bufferList;
-
-        do
-        {
-            VEGLNativeBuffer next = buffer->next;
-
-            /* Destroy the surface. */
-            gcoSURF_Destroy(buffer->surface);
-            buffer->surface = gcvNULL;
-
-            if (buffer->lock != gcvNULL)
-            {
-                /* Destroy the signal. */
-                gcoOS_DestroySignal(gcvNULL, buffer->lock);
-                buffer->lock = gcvNULL;
-            }
-
-            gcmOS_SAFE_FREE(gcvNULL, buffer);
-
-            /* Go to next. */
-            buffer = next;
-        }
-        while (buffer != Info->bufferList);
-
-        /* All buffers free'ed. */
-        Info->bufferList = gcvNULL;
-
-        /* Unlock. */
-        gcoOS_ReleaseMutex(gcvNULL, Info->bufferListMutex);
-    }
-
-    /* Commit accumulated commands. */
-    gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
-}
 
 static
 EGLBoolean
@@ -2248,22 +1544,13 @@ _QueryWindowInfo(
 
     if (gcmIS_ERROR(status))
     {
-        Info->fbDirect     = EGL_FALSE;
-        Info->logical      = gcvNULL;
-        Info->physical     = gcvINVALID_ADDRESS;
-        Info->stride       = 0;
-        Info->wrapFB       = gcvFALSE;
-        Info->multiBuffer  = 1;
+        return EGL_FALSE;
     }
-    else
-    {
-        Info->fbDirect     = EGL_TRUE;
-        Info->logical      = dInfo.logical;
-        Info->physical     = dInfo.physical;
-        Info->stride       = dInfo.stride;
-        Info->wrapFB       = dInfo.wrapFB;
-        Info->multiBuffer  = dInfo.multiBuffer > 1 ? dInfo.multiBuffer : 1;
-    }
+
+    Info->logical      = dInfo.logical;
+    Info->physical     = dInfo.physical;
+    Info->stride       = dInfo.stride;
+    Info->multiBuffer  = dInfo.multiBuffer > 1 ? dInfo.multiBuffer : 1;
 
     /* Get virtual size. */
     status = dfb_GetDisplayVirtual((PlatformDisplayType) Display->hdc,
@@ -2274,11 +1561,6 @@ _QueryWindowInfo(
     {
         Info->xresVirtual = Info->width;
         Info->yresVirtual = Info->height;
-
-        if (Info->multiBuffer > 1)
-        {
-            Info->multiBuffer = 1;
-        }
     }
 
     return EGL_TRUE;
@@ -2293,11 +1575,10 @@ _ConnectWindow(
 {
     gceSTATUS status;
     VEGLWindowInfo info = gcvNULL;
-    void * win = Window;
     gctPOINTER pointer;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
-    gcmASSERT(win != gcvNULL);
+    gcmASSERT(Window != gcvNULL);
     gcmASSERT(Surface->winInfo == gcvNULL);
 
     /* Allocate memory. */
@@ -2315,15 +1596,6 @@ _ConnectWindow(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
-    /* Create buffer mutex. */
-    gcmONERROR(gcoOS_CreateMutex(gcvNULL, &info->bufferListMutex));
-
-    /* Create window drawable? */
-    dfb_CreateDrawable(Display->localInfo, (PlatformWindowType) win);
-
-    /* Create window buffers to represent window native bufers. */
-    gcmONERROR(_CreateWindowBuffers(Window, info));
-
     /* Save window info structure. */
     Surface->winInfo = info;
     return EGL_TRUE;
@@ -2331,12 +1603,6 @@ _ConnectWindow(
 OnError:
     if (info)
     {
-        if (info->bufferListMutex)
-        {
-            gcoOS_DeleteMutex(gcvNULL, info->bufferListMutex);
-            info->bufferListMutex = gcvNULL;
-        }
-
         gcmOS_SAFE_FREE(gcvNULL, info);
         Surface->winInfo = gcvNULL;
     }
@@ -2351,20 +1617,10 @@ _DisconnectWindow(
     )
 {
     /* Get shortcut. */
-    void * win = Surface->hwnd;
     VEGLWindowInfo info = Surface->winInfo;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
     gcmASSERT(info);
-
-    /* Free native window buffers. */
-    _FreeWindowBuffers(Surface, win, info);
-
-    /* Delete the mutex. */
-    gcoOS_DeleteMutex(gcvNULL, info->bufferListMutex);
-    info->bufferListMutex = gcvNULL;
-
-    dfb_DestroyDrawable(Display->localInfo, (PlatformWindowType) win);
 
     /* Commit accumulated commands. */
     gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
@@ -2436,12 +1692,6 @@ _BindWindow(
         do
         {
             EGLBoolean formatSupported = EGL_FALSE;
-
-            if (!info->fbDirect)
-            {
-                /* No direct access to back buffer. */
-                break;
-            }
 
             if (Surface->config.samples > 1)
             {
@@ -2529,10 +1779,6 @@ _BindWindow(
         {
             /* Query window info again in case other parameters chagned. */
             _QueryWindowInfo(Display, win, info);
-
-            /* Recreate window buffers. */
-            _FreeWindowBuffers(Surface, win, info);
-            gcmONERROR(_CreateWindowBuffers(win, info));
         }
     }
     else
@@ -2550,12 +1796,6 @@ _BindWindow(
             EGLint i;
             gcePATCH_ID patchId = gcvPATCH_INVALID;
             EGLBoolean indirect = EGL_FALSE;
-
-            if (!info->fbDirect)
-            {
-                /* No direct access to back buffer. */
-                break;
-            }
 
             /* Get patch id. */
             gcoHAL_GetPatchID(gcvNULL, &patchId);
@@ -2619,67 +1859,64 @@ _BindWindow(
                 break;
             }
 
-            if (!info->wrapFB)
+            /* Try many direct rendering levels here. */
+            /* 1. The best, direct rendering with compression. */
+            if ((type != gcvSURF_RENDER_TARGET) ||
+                (info->type != gcvSURF_RENDER_TARGET)  ||
+                (info->format != reqFormat))
             {
-                /* Try many direct rendering levels here. */
-                /* 1. The best, direct rendering with compression. */
-                if ((type != gcvSURF_RENDER_TARGET) ||
-                    (info->type != gcvSURF_RENDER_TARGET)  ||
-                    (info->format != reqFormat))
+                status = dfb_SetWindowFormat((PlatformDisplayType) Display->hdc,
+                                               (PlatformWindowType) win,
+                                               gcvSURF_RENDER_TARGET,
+                                               reqFormat);
+
+                if (gcmIS_SUCCESS(status))
                 {
-                    status = dfb_SetWindowFormat((PlatformDisplayType) Display->hdc,
-                                                   (PlatformWindowType) win,
-                                                   gcvSURF_RENDER_TARGET,
-                                                   reqFormat);
-
-                    if (gcmIS_SUCCESS(status))
-                    {
-                        /* Should use direct rendering with compression. */
-                        renderMode = VEGL_DIRECT_RENDERING;
-
-                        /* Window is changed. */
-                        winChanged = EGL_TRUE;
-                        break;
-                    }
-
-                    /* Not an error. */
-                    status = gcvSTATUS_OK;
-                }
-                else
-                {
-                    /* Already rendering with compression. */
+                    /* Should use direct rendering with compression. */
                     renderMode = VEGL_DIRECT_RENDERING;
+
+                    /* Window is changed. */
+                    winChanged = EGL_TRUE;
+                    break;
                 }
 
-                /* 2. Second, with tile status, no compression. */
-                if ((type != gcvSURF_RENDER_TARGET_NO_COMPRESSION) ||
-                    (info->type != gcvSURF_RENDER_TARGET_NO_COMPRESSION) ||
-                    (info->format != reqFormat))
+                /* Not an error. */
+                status = gcvSTATUS_OK;
+            }
+            else
+            {
+                /* Already rendering with compression. */
+                renderMode = VEGL_DIRECT_RENDERING;
+            }
+
+            /* 2. Second, with tile status, no compression. */
+            if ((type != gcvSURF_RENDER_TARGET_NO_COMPRESSION) ||
+                (info->type != gcvSURF_RENDER_TARGET_NO_COMPRESSION) ||
+                (info->format != reqFormat))
+            {
+
+                status = dfb_SetWindowFormat((PlatformDisplayType) Display->hdc,
+                                               (PlatformWindowType) win,
+                                               gcvSURF_RENDER_TARGET_NO_COMPRESSION,
+                                               reqFormat);
+
+                if (gcmIS_SUCCESS(status))
                 {
-
-                    status = dfb_SetWindowFormat((PlatformDisplayType) Display->hdc,
-                                                   (PlatformWindowType) win,
-                                                   gcvSURF_RENDER_TARGET_NO_COMPRESSION,
-                                                   reqFormat);
-
-                    if (gcmIS_SUCCESS(status))
-                    {
-                        /* Should use direct rendering without compression. */
-                        renderMode = VEGL_DIRECT_RENDERING_FC_NOCC;
-
-                        /* Window is changed. */
-                        winChanged = EGL_TRUE;
-                        break;
-                    }
-
-                    /* Not an error. */
-                    status = gcvSTATUS_OK;
-                }
-                else
-                {
-                    /* Already direct rendering without compression. */
+                    /* Should use direct rendering without compression. */
                     renderMode = VEGL_DIRECT_RENDERING_FC_NOCC;
+
+                    /* Window is changed. */
+                    winChanged = EGL_TRUE;
+                    break;
                 }
+
+                /* Not an error. */
+                status = gcvSTATUS_OK;
+            }
+            else
+            {
+                /* Already direct rendering without compression. */
+                renderMode = VEGL_DIRECT_RENDERING_FC_NOCC;
             }
 
             if (!fcFill)
@@ -2754,10 +1991,6 @@ _BindWindow(
                 /* Special for FC-FILL mode: tile status is required. */
                 info->type = gcvSURF_RENDER_TARGET_NO_COMPRESSION;
             }
-
-            /* Recreate window buffers. */
-            _FreeWindowBuffers(Surface, win, info);
-            gcmONERROR(_CreateWindowBuffers(win, info));
         }
 
 
@@ -2779,9 +2012,6 @@ _BindWindow(
 
     *RenderMode = renderMode;
     return EGL_TRUE;
-
-OnError:
-    return EGL_FALSE;
 }
 
 static EGLBoolean
@@ -2846,159 +2076,35 @@ _GetWindowBackBuffer(
 {
     gceSTATUS status;
     void * win = Surface->hwnd;
-    VEGLWindowInfo info  = Surface->winInfo;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
-    gcmASSERT(info);
 
-    if (info->fbDirect)
+    gctUINT offset;
+
+    BackBuffer->surface  = gcvNULL;
+    BackBuffer->context  = gcvNULL;
+    BackBuffer->origin.x = 0;
+    BackBuffer->origin.y = 0;
+    BackBuffer->flip     = gcvTRUE;
+
+    /* Formerly veglGetDisplayBackBuffer. */
+    status = dfb_GetDisplayBackbufferEx((PlatformDisplayType) Display->hdc,
+                                          (PlatformWindowType) win,
+                                           Display->localInfo,
+                                           &BackBuffer->context,
+                                           &BackBuffer->surface,
+                                           &offset,
+                                           &BackBuffer->origin.x,
+                                           &BackBuffer->origin.y);
+
+    /* Should return the surface directly. */
+    if (gcmIS_ERROR(status) ||
+        !BackBuffer->surface)
     {
-        gctUINT offset;
-
-        BackBuffer->surface  = gcvNULL;
-        BackBuffer->context  = gcvNULL;
-        BackBuffer->origin.x = 0;
-        BackBuffer->origin.y = 0;
-        BackBuffer->flip     = gcvTRUE;
-
-        /* Formerly veglGetDisplayBackBuffer. */
-        status = dfb_GetDisplayBackbufferEx((PlatformDisplayType) Display->hdc,
-                                              (PlatformWindowType) win,
-                                               Display->localInfo,
-                                               &BackBuffer->context,
-                                               &BackBuffer->surface,
-                                               &offset,
-                                               &BackBuffer->origin.x,
-                                               &BackBuffer->origin.y);
-
-        if (gcmIS_ERROR(status))
-        {
-            /*
-             * Fomerly, returns flip=false, then it will use first wrapper.
-             */
-            VEGLNativeBuffer buffer = info->bufferList;
-
-            if (!buffer)
-            {
-                /* No wrappers? Bad native window. */
-                return EGL_FALSE;
-            }
-
-            /* Copy out back buffer. */
-            BackBuffer->context = buffer->context;
-            BackBuffer->origin  = buffer->origin;
-            BackBuffer->surface = buffer->surface;
-
-            /* Increase reference count. */
-            /* gcoSURF_ReferenceSurface(BackBuffer->surface); */
-
-            return EGL_TRUE;
-        }
-
-        if (BackBuffer->surface)
-        {
-            /* Returned the surface directly. */
-            return EGL_TRUE;
-        }
-        else
-        {
-            VEGLNativeBuffer buffer = gcvNULL;
-
-            /* WrapFB or temporary surface, go through bufferList to find */
-            gcmASSERT(info->wrapFB);
-
-            if (info->bufferList != gcvNULL)
-            {
-                VEGLNativeBuffer buf = info->bufferList;
-
-                gcoOS_AcquireMutex(gcvNULL, info->bufferListMutex, gcvINFINITE);
-
-                do
-                {
-                    if ((buf->context  == BackBuffer->context)  &&
-                        (buf->origin.x == BackBuffer->origin.x) &&
-                        (buf->origin.y == BackBuffer->origin.y))
-                    {
-                        /* Found. */
-                        buffer = buf;
-                        break;
-                    }
-
-                    buf = buf->next;
-                }
-                while (buffer != info->bufferList);
-
-                gcoOS_ReleaseMutex(gcvNULL, info->bufferListMutex);
-            }
-
-            if (buffer != gcvNULL)
-            {
-                /* Return the found surface. */
-                BackBuffer->surface  = buffer->surface;
-                BackBuffer->context  = buffer->context;
-                BackBuffer->origin.x = buffer->origin.x;
-                BackBuffer->origin.y = buffer->origin.y;
-
-                /* Increase reference count. */
-                /* gcoSURF_ReferenceSurface(BackBuffer->surface); */
-                return EGL_TRUE;
-            }
-            else
-            {
-                /* Bad native window. */
-                return EGL_FALSE;
-            }
-        }
+        return EGL_FALSE;
     }
-    else
-    {
-        /* Return the temorary surface object. */
-        VEGLNativeBuffer buffer;
 
-        gcoOS_AcquireMutex(gcvNULL, info->bufferListMutex, gcvINFINITE);
-
-        buffer = info->bufferList;
-
-        BackBuffer->surface  = buffer->surface;
-        BackBuffer->context  = buffer;
-        BackBuffer->origin.x = 0;
-        BackBuffer->origin.y = 0;
-        BackBuffer->flip     = gcvTRUE;
-
-        info->bufferList = buffer->next;
-
-        gcoOS_ReleaseMutex(gcvNULL, info->bufferListMutex);
-
-        if (buffer->lock != gcvNULL)
-        {
-            /* Wait for buffer lock. */
-            for (;;)
-            {
-                status = gcoOS_WaitSignal(gcvNULL, buffer->lock, 5000);
-
-                if (status == gcvSTATUS_TIMEOUT)
-                {
-                    gcmPRINT("Wait for buffer lock timeout");
-                    continue;
-                }
-
-                break;
-            }
-
-            /*
-             * Set the buffer to 'locked' state.
-             * It will be 'unlocked' when buffer posted to display.
-             * This can make sure next time GetWindowBackBuffer, the buffer
-             * is 'posted' before returns for GPU rendering.
-             */
-            gcoOS_Signal(gcvNULL, buffer->lock, gcvFALSE);
-        }
-
-        /* Increase reference count. */
-        /* gcoSURF_ReferenceSurface(BackBuffer->surface); */
-
-        return EGL_TRUE;
-    }
+    return EGL_TRUE;
 }
 
 static EGLBoolean
@@ -3011,110 +2117,21 @@ _PostWindowBackBuffer(
     )
 {
     void * win = Surface->hwnd;
-    VEGLWindowInfo info = Surface->winInfo;
-    gcoSURF surface;
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
-    gcmASSERT(info);
 
-    (void) surface;
-
-    if (info->fbDirect)
-    {
-        surface = info->wrapFB ? gcvNULL : BackBuffer->surface;
-
-        status = dfb_SetDisplayVirtualEx((PlatformDisplayType) Display->hdc,
-                                           (PlatformWindowType) win,
-                                           BackBuffer->context,
-                                           surface,
-                                           0,
-                                           BackBuffer->origin.x,
-                                           BackBuffer->origin.y);
-
-        if (gcmIS_ERROR(status))
-        {
-            return EGL_FALSE;
-        }
-    }
-    else
-    {
-        VEGLNativeBuffer buffer;
-        gctINT alignedWidth, alignedHeight;
-        gceORIENTATION orientation;
-        gceSURF_FORMAT format = gcvSURF_UNKNOWN;
-        gcsSURF_FORMAT_INFO_PTR formatInfo;
-        gctPOINTER memory[3] = {gcvNULL};
-        gctINT i;
-
-        /* Cast type. */
-        buffer = (VEGLNativeBuffer) BackBuffer->context;
-
-        /* Get aligned size. */
-        gcmVERIFY_OK(gcoSURF_GetAlignedSize(BackBuffer->surface,
-                                            (gctUINT_PTR) &alignedWidth,
-                                            (gctUINT_PTR) &alignedHeight,
-                                            gcvNULL));
-
-        gcmVERIFY_OK(gcoSURF_QueryOrientation(BackBuffer->surface, &orientation));
-
-        if (orientation == gcvORIENTATION_BOTTOM_TOP)
-        {
-            alignedHeight = -alignedHeight;
-        }
-
-        /* Gather source information. */
-        gcmVERIFY_OK(gcoSURF_GetFormat(BackBuffer->surface,
-                                       gcvNULL,
-                                       &format));
-
-        /* Query format. */
-        if (gcoSURF_QueryFormat(format, &formatInfo))
-        {
-            return EGL_FALSE;
-        }
-
-        /* Lock surface for memory. */
-        if (gcoSURF_Lock(BackBuffer->surface, gcvNULL, memory))
-        {
-            return EGL_FALSE;
-        }
-
-        for (i = 0; i < NumRects; i++)
-        {
-            EGLint left   = Rects[i * 4 + 0];
-            EGLint top    = Rects[i * 4 + 1];
-            EGLint width  = Rects[i * 4 + 2];
-            EGLint height = Rects[i * 4 + 3];
-
-            /* Draw image. */
-            status = dfb_DrawImageEx((PlatformDisplayType) Display->hdc,
+    status = dfb_SetDisplayVirtualEx((PlatformDisplayType) Display->hdc,
                                        (PlatformWindowType) win,
-                                       left, top, left + width, top + height,
-                                       alignedWidth, alignedHeight,
-                                       formatInfo->bitsPerPixel,
-                                       memory[0],
-                                       format);
+                                       BackBuffer->context,
+                                       BackBuffer->surface,
+                                       0,
+                                       BackBuffer->origin.x,
+                                       BackBuffer->origin.y);
 
-            if (gcmIS_ERROR(status))
-            {
-                break;
-            }
-        }
-
-        /* Unlock the surface. */
-        gcmVERIFY_OK(gcoSURF_Unlock(BackBuffer->surface, memory[0]));
-
-        if (buffer->lock != gcvNULL)
-        {
-            /* The buffer is now posted. */
-            gcmVERIFY_OK(gcoOS_Signal(gcvNULL, buffer->lock, gcvTRUE));
-        }
-
-        if (gcmIS_ERROR(status))
-        {
-            return EGL_FALSE;
-        }
+    if (gcmIS_ERROR(status))
+    {
+        return EGL_FALSE;
     }
 
     return EGL_TRUE;
@@ -3128,19 +2145,14 @@ _CancelWindowBackBuffer(
     )
 {
     void * win = Surface->hwnd;
-    VEGLWindowInfo info = Surface->winInfo;
-    gcoSURF surface;
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
-    gcmASSERT(info);
-
-    surface = info->wrapFB ? gcvNULL : BackBuffer->surface;
 
     status = dfb_CancelDisplayBackbuffer((PlatformDisplayType) Display->hdc,
                                            (PlatformWindowType) win,
                                            BackBuffer->context,
-                                           surface,
+                                           BackBuffer->surface,
                                            0,
                                            BackBuffer->origin.x,
                                            BackBuffer->origin.y);
@@ -3159,7 +2171,7 @@ _SynchronousPost(
     IN VEGLSurface Surface
     )
 {
-    return dfb_SynchronousFlip((PlatformDisplayType)Display->hdc);
+    return EGL_FALSE;
 }
 
 static EGLBoolean
@@ -3848,6 +2860,28 @@ dfbGetEvent(
     )
 {
     if (gcmIS_SUCCESS(dfb_GetEvent(Display, Window, Event)))
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+int
+dfbGetWindowInfo(
+    void * Window,
+    int * X,
+    int * Y,
+    int * Width,
+    int * Height,
+    int * BitsPerPixel,
+    unsigned int * Offset
+    )
+{
+    if (gcmIS_SUCCESS(dfb_GetWindowInfo(gcvNULL,
+                                        Window,
+                                        X, Y, Width, Height,
+                                        BitsPerPixel, Offset)))
     {
         return 1;
     }

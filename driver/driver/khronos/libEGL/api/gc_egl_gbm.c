@@ -289,7 +289,7 @@ gbm_GetHALFormat(
 
     if (HalFormat)
     {
-        for (i = 0; i < gcmSIZEOF(formatTable); i++)
+        for (i = 0; i < gcmSIZEOF(formatTable) / gcmSIZEOF(formatTable[0]); i++)
         {
             if (GbmFormat == formatTable[i].gbmFormat)
             {
@@ -982,7 +982,7 @@ _GetPixmapInfo(
 
         format = gbm_bo_get_format(Pixmap);
 
-        for (i = 0; i < gcmSIZEOF(formatTable); i++)
+        for (i = 0; i < gcmSIZEOF(formatTable) / gcmSIZEOF(formatTable[0]); i++)
         {
             if (format == formatTable[i].gbmFormat)
             {
@@ -1006,7 +1006,7 @@ _GetPixmapInfo(
         int i;
         int format = gbm_bo_get_format(Pixmap);
 
-        for (i = 0; i < gcmSIZEOF(formatTable); i++)
+        for (i = 0; i < gcmSIZEOF(formatTable) / gcmSIZEOF(formatTable[0]); i++)
         {
             if (format == formatTable[i].gbmFormat)
             {
@@ -1276,7 +1276,7 @@ gbm_GetWindowInfoEx(
 
         format = surf->format;
 
-        for (i = 0; i < gcmSIZEOF(formatTable); i++)
+        for (i = 0; i < gcmSIZEOF(formatTable) / gcmSIZEOF(formatTable[0]); i++)
         {
             if (format == formatTable[i].gbmFormat)
             {
@@ -1387,14 +1387,6 @@ gbm_CopyPixmapBits(
     )
 {
     return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gctBOOL
-gbm_SynchronousFlip(
-    IN PlatformDisplayType Display
-    )
-{
-    return gcvTRUE;
 }
 
 gceSTATUS
@@ -1653,7 +1645,7 @@ _CreateWindowBuffers(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    VEGLNativeBuffer buffer;
+    VEGLNativeBuffer buffer = gcvNULL;
 
     if (Info->fbDirect)
     {
@@ -1765,6 +1757,8 @@ _CreateWindowBuffers(
                     Info->bufferList = buffer;
                 }
 
+                buffer = gcvNULL;
+
                 gcmTRACE(gcvLEVEL_INFO,
                          "%s(%d): buffer[%d]: yoffset=%-4d physical=%x",
                          __FUNCTION__, __LINE__,
@@ -1844,6 +1838,23 @@ _CreateWindowBuffers(
 
 OnError:
     /* Error roll back. */
+    /* Must ensure that it will not happen any ONERROR after add into buffer list */
+    if (buffer != gcvNULL)
+    {
+        if (buffer->surface != gcvNULL)
+        {
+            gcoSURF_Destroy(buffer->surface);
+            buffer->surface = gcvNULL;
+        }
+
+        if (buffer->lock != gcvNULL)
+        {
+            gcoOS_DestroySignal(gcvNULL, buffer->lock);
+            buffer->lock = gcvNULL;
+        }
+        gcmOS_SAFE_FREE(gcvNULL, buffer);
+    }
+
     if ((buffer = Info->bufferList) != gcvNULL)
     {
         do
@@ -2878,7 +2889,7 @@ _SynchronousPost(
     IN VEGLSurface Surface
     )
 {
-    return gbm_SynchronousFlip((PlatformDisplayType)Display->hdc);
+    return EGL_FALSE;
 }
 
 static EGLBoolean

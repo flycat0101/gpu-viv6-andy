@@ -42,8 +42,8 @@ VX_INTERNAL_API vx_bool vxoMemory_Allocate(vx_context context, vx_memory memory)
             size *= (vx_size)abs(memory->dims[planeIndex][dimIndex]);
         }
 
-        status = gcoVX_AllocateMemory((gctUINT32)size, (gctUINT32_PTR)&memory->logicals[planeIndex],
-                                        (gctUINT32_PTR)&memory->physicals[planeIndex],
+        status = gcoVX_AllocateMemory((gctUINT32)size, (gctPOINTER*)&memory->logicals[planeIndex],
+                                        (gctPHYS_ADDR*)&memory->physicals[planeIndex],
                                         &memory->nodePtrs[planeIndex]);
 
         if (gcmIS_ERROR(status)) goto ErrorExit;
@@ -118,6 +118,138 @@ VX_INTERNAL_API vx_bool vxoMemory_Free(vx_context context, vx_memory memory)
     return vx_true_e;
 }
 
+VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory memory)
+{
+    vx_int32 planeIndex, dimIndex;
+
+    vxmASSERT(context);
+    vxmASSERT(memory);
+
+    if (memory->allocated) return vx_true_e;
+
+    memory->allocated = vx_true_e;
+
+    for (planeIndex = 0; (vx_uint32) planeIndex < memory->planeCount; planeIndex++)
+    {
+        gctUINT32    size = sizeof(vx_uint8);
+        gceSTATUS   status;
+
+        gcsUSER_MEMORY_DESC desc;
+
+        if (memory->strides[planeIndex][VX_DIM_CHANNEL] != 0)
+        {
+            size = (gctUINT32)abs(memory->strides[planeIndex][VX_DIM_CHANNEL]);
+        }
+
+        for (dimIndex = 0; (vx_uint32)dimIndex < memory->dimCount; dimIndex++)
+        {
+            memory->strides[planeIndex][dimIndex] = (gctUINT32)size;
+            size *= (gctUINT32)abs(memory->dims[planeIndex][dimIndex]);
+        }
+
+        gcoOS_ZeroMemory(&desc, gcmSIZEOF(desc));
+
+        desc.flag     = memory->wrapFlag;
+        desc.logical  = gcmPTR_TO_UINT64(memory->logicals[planeIndex]);
+        desc.physical = gcvINVALID_ADDRESS;
+        desc.size     = (gctUINT32)size;
+
+        memory->wrappedSize[planeIndex] = (gctUINT32)size;
+
+        /* Map the host ptr to a vidmem node. */
+        status = gcoHAL_WrapUserMemory(&desc,
+                              &memory->wrappedNode[planeIndex]);
+
+        if (gcmIS_ERROR(status)) goto ErrorExit;
+
+        /* Get the physical address. */
+        status = gcoHAL_LockVideoMemory(memory->wrappedNode[planeIndex],
+                               gcvFALSE,
+                               &memory->physicals[planeIndex],
+                               gcvNULL);
+
+        if (gcmIS_ERROR(status)) goto ErrorExit;
+
+        if (!vxCreateMutex(OUT &memory->writeLocks[planeIndex]))
+        {
+            memory->writeLocks[planeIndex] = VX_NULL;
+            planeIndex++;
+            goto ErrorExit;
+        }
+    }
+
+    memory->allocated = vx_true_e;
+
+    vxoMemory_Dump(memory);
+
+    return vx_true_e;
+
+ErrorExit:
+    for (planeIndex = planeIndex - 1; planeIndex >= 0; planeIndex--)
+    {
+        if (memory->wrappedNode[planeIndex] != 0)
+        {
+            gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(
+                            memory->wrappedNode[planeIndex],
+                            gcvSURF_BITMAP));
+
+            gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(
+                            memory->wrappedNode[planeIndex]));
+
+            memory->logicals[planeIndex]     = VX_NULL;
+            memory->wrappedNode[planeIndex]  = 0;
+        }
+
+        if (memory->writeLocks[planeIndex] != VX_NULL)
+        {
+            vxDestroyMutex(memory->writeLocks[planeIndex]);
+            memory->writeLocks[planeIndex]  = VX_NULL;
+        }
+    }
+
+    memory->allocated = vx_false_e;
+
+    return vx_false_e;
+}
+
+VX_INTERNAL_API vx_bool vxoMemory_FreeWrappedMemory(vx_context context, vx_memory memory)
+{
+    vx_uint32 planeIndex;
+
+    vxmASSERT(context);
+    vxmASSERT(memory);
+
+    if (!memory->allocated) return vx_true_e;
+
+    vxoMemory_Dump(memory);
+
+    for (planeIndex = 0; planeIndex < memory->planeCount; planeIndex++)
+    {
+        if (memory->wrappedNode[planeIndex] != 0)
+        {
+            gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(
+                            memory->wrappedNode[planeIndex],
+                            gcvSURF_BITMAP));
+
+            gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(
+                            memory->wrappedNode[planeIndex]));
+
+            memory->logicals[planeIndex]     = VX_NULL;
+            memory->wrappedNode[planeIndex]  = 0;
+        }
+
+        if (memory->writeLocks[planeIndex] != VX_NULL)
+        {
+            vxDestroyMutex(memory->writeLocks[planeIndex]);
+            memory->writeLocks[planeIndex]  = VX_NULL;
+        }
+    }
+
+    memory->allocated = vx_false_e;
+
+    return vx_true_e;
+}
+
 VX_INTERNAL_API void vxoMemory_Dump(vx_memory memory)
 {
     vx_uint32 planeIndex, dimIndex;
@@ -153,7 +285,7 @@ VX_INTERNAL_API void vxoMemory_Dump(vx_memory memory)
             vxTrace(VX_TRACE_MEMORY, "        </plane%d>\n", planeIndex);
         }
 
-        vxTrace(VX_TRACE_MEMORY,  "    </planes>");
+        vxTrace(VX_TRACE_MEMORY, "    </planes>");
 
         vxTrace(VX_TRACE_MEMORY,
                 "    <allocated>%s</allocated>",
@@ -172,4 +304,5 @@ VX_INTERNAL_API vx_size vxoMemory_ComputeSize(vx_memory memory, vx_uint32 planeI
 
     return memory->dims[planeIndex][memory->dimCount - 1] * memory->strides[planeIndex][memory->dimCount - 1];
 }
+
 

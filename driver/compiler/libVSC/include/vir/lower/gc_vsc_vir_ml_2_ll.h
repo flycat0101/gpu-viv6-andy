@@ -27,6 +27,7 @@ typedef struct _VIR_PATTERN_LOWER_CONTEXT
 {
     VIR_PatternContext          header;
     VSC_HW_CONFIG*              hwCfg;
+    VSC_MM*                     pMM;
     gctBOOL                     generateImmediate;
     gctBOOL                     hasNEW_TEXLD;
     gctBOOL                     isCL_X;
@@ -39,9 +40,9 @@ typedef struct _VIR_PATTERN_LOWER_CONTEXT
 
 VSC_ErrCode
 VIR_Lower_MiddleLevel_To_LowLevel(
-    IN  VIR_Shader *    Shader,
-    IN  VSC_HW_CONFIG*  HwCfg
+    IN VSC_SH_PASS_WORKER* pPassWorker
     );
+DECLARE_QUERY_PASS_PROP(VIR_Lower_MiddleLevel_To_LowLevel);
 
 END_EXTERN_C()
 #endif

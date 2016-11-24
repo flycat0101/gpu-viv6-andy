@@ -77,6 +77,7 @@ typedef enum __GCPatchNum_enum
     GC_CHIP_PATCH_GLBENCH25_FILL_RATE,
     GC_CHIP_PATCH_GLBENCH27_RC,
     GC_CHIP_PATCH_YOUILABS_ROAD,
+    GC_CHIP_PATCH_YOUILABS_FLOW_NOISE,
     GC_CHIP_PATCH_HOVERJET_TERRAIN_BAKED_SHADOW2,
 #if gcdSHADER_SRC_BY_MACHINECODE
     GC_CHIP_PATCH_TAIJI_NORMALMAPPED,
@@ -152,16 +153,21 @@ typedef enum __GCPatchNum_enum
     GC_CHIP_PATCH_DEQP_MSAA_OQ,
     GC_CHIP_PATCH_DEQP_ALPHA_BLEND_1,
     GC_CHIP_PATCH_DEQP_ALPHA_BLEND_2,
+    GC_CHIP_PATCH_DEQP_HELPER_INVOCATION_DFDX,
+    GC_CHIP_PATCH_DEQP_HELPER_INVOCATION_DFDY,
+    GC_CHIP_PATCH_DEQP_HELPER_INVOCATION_FWIDTH,
+    GC_CHIP_PATCH_CAR_CHASE,
+
     GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_1, /* dEQP-GLES31.functional.ssbo.layout.random.arrays_of_arrays.6 */
     GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_2, /* dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.3 */
     GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_3, /* dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.5 */
     GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_4, /* dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.23 */
     GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_5, /* dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.0 */
-    GC_CHIP_PATCH_DEQP_COMPILE_TIME_3,
-    GC_CHIP_PATCH_DEQP_COMPILE_TIME_4, /* dEQP-GLES31.functional.ubo.random.all_per_block_buffers.13 */
-    GC_CHIP_PATCH_DEQP_HELPER_INVOCATION_DFDX,
-    GC_CHIP_PATCH_DEQP_HELPER_INVOCATION_DFDY,
-    GC_CHIP_PATCH_DEQP_HELPER_INVOCATION_FWIDTH,
+    GC_CHIP_PATCH_DEQP_COMPILE_TIME_S_6, /* dEQP-GLES31.functional.ubo.random.all_per_block_buffers.20 */
+    GC_CHIP_PATCH_DEQP_COMPILE_TIME_3,   /* dEQP-GLES3.functional.uniform_api.random.83 */
+    GC_CHIP_PATCH_DEQP_COMPILE_TIME_4,   /* dEQP-GLES3.functional.uniform_api.random.13 */
+
+    GC_CHIP_PATCH_GFX4_FILL2,
 
     GC_CHIP_PATCH_LAST
 } __GCPatchNum;

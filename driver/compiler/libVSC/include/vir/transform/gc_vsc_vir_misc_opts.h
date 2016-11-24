@@ -18,25 +18,45 @@
 
 BEGIN_EXTERN_C()
 
-VSC_ErrCode vscVIR_RemoveNop(VIR_Shader* pShader);
+VSC_ErrCode vscVIR_RemoveNop(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_RemoveNop);
 
-VSC_ErrCode vscVIR_PutImmValueToUniform(VIR_Shader* pShader, VSC_HW_CONFIG* pHwCfg);
+VSC_ErrCode vscVIR_VX_ReplaceDest(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_VX_ReplaceDest);
 
-VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VIR_Shader* pShader, VSC_HW_CONFIG* pHwCfg);
+VSC_ErrCode vscVIR_PutScalarConstToImm(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_PutScalarConstToImm);
 
-VSC_ErrCode vscVIR_CheckPosAndDepthConflict(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo);
+VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_PutImmValueToUniform);
 
-VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo, VSC_HW_CONFIG* pHwCfg);
+VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_CheckCstRegFileReadPortLimitation);
 
-VSC_ErrCode vscVIR_AdjustPrecision(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo, VSC_HW_CONFIG* pHwCfg);
+VSC_ErrCode vscVIR_CheckPosAndDepthConflict(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_CheckPosAndDepthConflict);
 
-VSC_ErrCode vscVIR_PatchDual16Shader(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo);
+VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(VIR_Shader_CheckDual16able);
 
-VSC_ErrCode vscVIR_ConvertVirtualInstructions(VIR_Shader* pShader);
+VSC_ErrCode vscVIR_AddOutOfBoundCheckSupport(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_AddOutOfBoundCheckSupport);
 
-VSC_ErrCode vscVIR_PrecisionUpdate(VIR_Shader* pShader, VSC_OPTN_PUOptions* puOptions, VIR_Dumper* dumper);
+VSC_ErrCode vscVIR_AdjustPrecision(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_AdjustPrecision);
 
-VSC_ErrCode vscVIR_ConvertIntegerToFloat(IN OUT VIR_Shader* pShader, IN gctBOOL supportInteger, IN gctBOOL hasSignFloorCeil);
+VSC_ErrCode vscVIR_ConvertVirtualInstructions(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_ConvertVirtualInstructions);
+
+VSC_ErrCode vscVIR_PreprocessLLShader(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_PreprocessLLShader);
+
+VSC_ErrCode vscVIR_CheckVariableUsage(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_CheckVariableUsage);
+
+VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_InitializeVariables);
+
 END_EXTERN_C()
 
 #endif /* __gc_vsc_vir_misc_opts_h_ */

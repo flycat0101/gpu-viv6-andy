@@ -208,7 +208,7 @@ static gceSTATUS _uploadBlitBlt(
     }
 
     /* sync mode */
-    if(gcoHAL_GetOption(gcvNULL, gcvOPTION_ASYNC_BLT))
+    if(gcoHAL_GetOption(gcvNULL, gcvOPTION_ASYNC_PIPE))
     {
         /* use blt engine cmd buffer*/
         engine = gcvENGINE_BLT;
@@ -252,6 +252,19 @@ static gceSTATUS _uploadBlitBlt(
         gcoOS_ZeroMemory(pointer, gcmSIZEOF(struct _gcoSURF));
 
         srcSurf = (gcoSURF)pointer;
+
+#if gcdENABLE_3D
+        gcmERR_BREAK(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctUINT), (gctPOINTER*)&srcSurf->fcValue));
+        gcmERR_BREAK(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctUINT), (gctPOINTER*)&srcSurf->fcValueUpper));
+        gcmERR_BREAK(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctBOOL), (gctPOINTER*)&srcSurf->tileStatusDisabled));
+        gcmERR_BREAK(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctBOOL), (gctPOINTER*)&srcSurf->dirty));
+
+        gcoOS_ZeroMemory(srcSurf->fcValue, gcmSIZEOF(gctUINT));
+        gcoOS_ZeroMemory(srcSurf->fcValueUpper, gcmSIZEOF(gctUINT));
+        gcoOS_ZeroMemory(srcSurf->tileStatusDisabled, gcmSIZEOF(gctBOOL));
+        gcoOS_ZeroMemory(srcSurf->dirty, gcmSIZEOF(gctBOOL));
+#endif
+
         srcView.surf = srcSurf;
 
         /* init srcSurfInfo.*/
@@ -259,6 +272,12 @@ static gceSTATUS _uploadBlitBlt(
         srcSurf->sampleInfo = args->dstSurf->sampleInfo;
         srcSurf->isMsaa = args->dstSurf->isMsaa;
         srcSurf->vMsaa = args->dstSurf->vMsaa;
+        srcSurf->requestW = args->dstSurf->requestW;
+        srcSurf->requestH = args->dstSurf->requestH;
+        srcSurf->allocedW = args->dstSurf->allocedW;
+        srcSurf->allocedH = args->dstSurf->allocedH;
+        srcSurf->alignedW = args->dstSurf->alignedW;
+        srcSurf->alignedH = args->dstSurf->alignedH;
 
         /* update size.*/
         width  *= srcSurf->sampleInfo.x;
@@ -356,6 +375,24 @@ static gceSTATUS _uploadBlitBlt(
             /* Mark the memory as freed. */
             srcSurf->node.pool = gcvPOOL_UNKNOWN;
         }
+#if gcdENABLE_3D
+        if (srcSurf->fcValue)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, srcSurf->fcValue));
+        }
+        if (srcSurf->fcValueUpper)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, srcSurf->fcValueUpper));
+        }
+        if (srcSurf->tileStatusDisabled)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, srcSurf->tileStatusDisabled));
+        }
+        if (srcSurf->dirty)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, srcSurf->dirty));
+        }
+#endif
 
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, srcSurf));
     }
@@ -876,9 +913,10 @@ gcoTEXTURE_Upload(
     gcoSURF srcSurf = gcvNULL;
     gceSTATUS status;
     gctUINT32 offset, sliceSize, width, height, stride;
+    gcsSURF_VIEW texView = {gcvNULL, 0, 1};
 
-    gcmHEADER_ARG("Texture=0x%x MipMap=%d Face=%d Width=%d Height=%d "
-                  "Slice=%d Memory=0x%x Stride=%d Format=%d, SrcColorSpace=%u",
+    gcmHEADER_ARG("Texture=0x%x MipMap=%d Face=%d Width=%zu Height=%zu "
+                  "Slice=%d Memory=0x%x Stride=%zu Format=%d, SrcColorSpace=%u",
                   Texture, MipMap, Face, Width, Height,
                   Slice, Memory, Stride, Format, SrcColorSpace);
 
@@ -978,6 +1016,9 @@ gcoTEXTURE_Upload(
     /* Compute offset. */
     offset = index * sliceSize;
 
+    texView.surf = map->surface;
+    texView.firstSlice = index;
+
     if (gcoHAL_GetOption(gcvNULL, gcvOPTION_GPU_TEX_UPLOAD)            &&
         gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE))
     {
@@ -1011,7 +1052,7 @@ gcoTEXTURE_Upload(
               !_UseAccurateUpload(Format, map->surface))
         {
             /* Copy the data. */
-            gcmONERROR(gcoHARDWARE_UploadTexture(map->surface, offset, 0, 0,
+            gcmONERROR(gcoHARDWARE_UploadTexture(&texView, offset, 0, 0,
                 width, height, Memory, stride, Format));
 
             /* Flush the CPU cache. */
@@ -1039,10 +1080,11 @@ gcoTEXTURE_Upload(
             gcoOS_ZeroMemory(&arg, sizeof(arg));
             arg.srcSurface = srcSurf;
             arg.dstZ = (gctINT)index;
-            arg.dstSurface = map->surface;
-            arg.srcWidth   = arg.dstWidth  = (gctINT)width;
-            arg.srcHeight  = arg.dstHeight = (gctINT)height;
-            arg.srcDepth   = arg.dstDepth  = 1;
+            arg.dstSurface  = map->surface;
+            arg.srcWidth    = arg.dstWidth    = (gctINT)width;
+            arg.srcHeight   = arg.dstHeight   = (gctINT)height;
+            arg.srcDepth    = arg.dstDepth    = 1;
+            arg.srcNumSlice = arg.dstNumSlice = 1;
             gcmONERROR(gcoSURF_BlitCPU(&arg));
         }
 
@@ -1140,9 +1182,10 @@ gcoTEXTURE_UploadSub(
     gctUINT index;
     gctUINT32 offset, sliceSize, width, height, stride, xOffset, yOffset;
     gctBOOL forceSW = gcvFALSE;
+    gcsSURF_VIEW texView = {gcvNULL, 0, 1};
 
-    gcmHEADER_ARG("Texture=0x%x MipMap=%d Face=%d XOffset=%d YOffset=%d Width=%d Height=%d "
-                  "Slice=%d Memory=0x%x Stride=%d Format=%d, SrcColorSpace=%u",
+    gcmHEADER_ARG("Texture=0x%x MipMap=%d Face=%d XOffset=%zu YOffset=%zu Width=%zu Height=%zu "
+                  "Slice=%d Memory=0x%x Stride=%zu Format=%d, SrcColorSpace=%u",
                   Texture, MipMap, Face, XOffset, YOffset, Width, Height,
                   Slice, Memory, Stride, Format, SrcColorSpace);
 
@@ -1236,6 +1279,9 @@ gcoTEXTURE_UploadSub(
     gcmSAFECASTSIZET(sliceSize, map->sliceSize);
     offset = index * sliceSize;
 
+    texView.surf = map->surface;
+    texView.firstSlice = index;
+
     /* Lock the surface. */
     gcmONERROR(gcoSURF_Lock(map->surface, address, memory));
 
@@ -1321,7 +1367,7 @@ gcoTEXTURE_UploadSub(
         if (_UseAccurateUpload(Format, map->surface) == gcvFALSE)
         {
             /* Copy the data. */
-            gcmONERROR(gcoHARDWARE_UploadTexture(map->surface,
+            gcmONERROR(gcoHARDWARE_UploadTexture(&texView,
                                                  offset,
                                                  xOffset,
                                                  yOffset,
@@ -1358,10 +1404,11 @@ gcoTEXTURE_UploadSub(
                 arg.dstX = (gctINT)XOffset;
                 arg.dstY = (gctINT)YOffset;
                 arg.dstZ = (gctINT)index;
-                arg.dstSurface = map->surface;
-                arg.srcWidth   = arg.dstWidth  = (gctINT)Width;
-                arg.srcHeight  = arg.dstHeight = (gctINT)Height;
-                arg.srcDepth   = arg.dstDepth  = 1;
+                arg.dstSurface  = map->surface;
+                arg.srcWidth    = arg.dstWidth    = (gctINT)Width;
+                arg.srcHeight   = arg.dstHeight   = (gctINT)Height;
+                arg.srcDepth    = arg.dstDepth    = 1;
+                arg.srcNumSlice = arg.dstNumSlice = 1;
                 gcmERR_BREAK(gcoSURF_BlitCPU(&arg));
             } while (gcvFALSE);
 
@@ -1798,8 +1845,8 @@ gcoTEXTURE_AddMipMapEx(
     gceSURF_FORMAT format;
     gctUINT width, height, depth, faces;
 
-    gcmHEADER_ARG("Texture=0x%x Level=%d Format=%d Width=%d Height=%d "
-                    "Depth=%d Faces=0x%x Pool=%d",
+    gcmHEADER_ARG("Texture=0x%x Level=%d Format=%d Width=%zu Height=%zu "
+                    "Depth=%zu Faces=0x%x Pool=%d",
                     Texture, Level, Format, Width, Height,
                     Depth, Faces, Pool);
 
@@ -2962,7 +3009,7 @@ gcoTEXTURE_UploadCompressed(
     gceSTATUS status;
     gctUINT32 offset, width, height, size;
 
-    gcmHEADER_ARG("Texture=0x%x Mipmap=%d, Face=%d Width=%d Height=%d Slice=%d Memory=0x%x Size=%d",
+    gcmHEADER_ARG("Texture=0x%x Mipmap=%d, Face=%d Width=%zu Height=%zu Slice=%d Memory=0x%x Size=%zu",
                     Texture, MipMap, Face, Width, Height, Slice, Memory, Size);
 
     /* Verify the arguments. */
@@ -3132,7 +3179,7 @@ gcoTEXTURE_UploadCompressedSub(
     gceSTATUS status;
     gctUINT32 offset, width, height, size, xOffset, yOffset;
 
-    gcmHEADER_ARG("Texture=0x%x Face=%d Width=%d Height=%d Slice=%d Memory=0x%x Size=%d",
+    gcmHEADER_ARG("Texture=0x%x Face=%d Width=%zu Height=%zu Slice=%d Memory=0x%x Size=%zu",
                    Texture, Face, Width, Height, Slice, Memory, Size);
 
     /* Verify the arguments. */
@@ -3307,7 +3354,8 @@ gcoTEXTURE_RenderIntoMipMap(
                           == gcvSTATUS_TRUE)
     {
 
-        status = gcoSURF_DisableTileStatus(map->surface, gcvTRUE);
+        gcsSURF_VIEW texView = {map->surface, 0, 1};
+        status = gcoSURF_DisableTileStatus(&texView, gcvTRUE);
 
         /* Surface is already renderable!. */
         /*status = gcvSTATUS_OK;*/
@@ -3468,6 +3516,7 @@ gcoTEXTURE_PrepareForRender(
     gcsMIPMAP_PTR map;
     gceSTATUS status = gcvSTATUS_OK;
     gcoSURF surface;
+    gcsSURF_VIEW texView = {gcvNULL, 0, 1};
 
     gcmHEADER_ARG("Texture=0x%x Level=%d", Texture, Level);
 
@@ -3500,6 +3549,9 @@ gcoTEXTURE_PrepareForRender(
 
     surface = map->surface;
 
+    texView.surf = map->surface;
+    texView.numSlices = map->surface->requestD;
+
     /*
     ** The surface can be directly rendered.
     */
@@ -3524,7 +3576,7 @@ gcoTEXTURE_PrepareForRender(
         if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_TILE_STATUS_READ) == gcvFALSE) &&
             (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TILE_FILLER) == gcvFALSE))
         {
-            gcmONERROR(gcoSURF_DisableTileStatus(surface, gcvTRUE));
+            gcmONERROR(gcoSURF_DisableTileStatus(&texView, gcvTRUE));
         }
         else
         {
@@ -3992,7 +4044,7 @@ _UpdateTextureDesc(
                gcoOS_ZeroMemory((gctPOINTER)pDescNode->descNode[layerIndex], gcmSIZEOF(gcsSURF_NODE));
                gcmONERROR(gcsSURF_NODE_Construct(pDescNode->descNode[layerIndex],
                                                  256,
-                                                 64,
+                                                 256,
                                                  gcvSURF_TXDESC,
                                                  0,
                                                  gcvPOOL_DEFAULT
@@ -4104,6 +4156,10 @@ gcoTEXTURE_BindTextureDesc(
     gcoSURF texSurf;
     gcsSAMPLER samplerInfo;
     gcsTXDescNode *pDescNode;
+    gcsSURF_VIEW texView = {gcvNULL, 0, 1};
+    gctBOOL canTsEnable = gcvTRUE;
+    gctBOOL anyTsEnableForMultiSlice = gcvFALSE;
+    gctUINT i = 0;
 
     gcmHEADER_ARG("Texture=0x%x Sampler=%d Info=0x%x TextureLayer=%d",
                   Texture, Sampler, Info, TextureLayer);
@@ -4163,18 +4219,30 @@ gcoTEXTURE_BindTextureDesc(
             ** Later we may can squeeze all mipmap surface into a big to use a big tile status buffer
             ** Then we can support render into mipmap/multi-slice texture.
             */
+            texView.surf = map->surface;
+            texView.firstSlice = 0;
+            texView.numSlices = texSurf->requestD;
+            for (i = texView.firstSlice; i < (texView.firstSlice + texView.numSlices); i++)
+            {
+                if ((texView.surf->tileStatusNode.pool != gcvPOOL_UNKNOWN) &&
+                    (texView.surf->tileStatusDisabled[i] == gcvFALSE))
+                {
+                    anyTsEnableForMultiSlice = gcvTRUE;
+                    break;
+                }
+            }
+
             if (((gctINT)maxLevel > baseLevel) &&
                 (texSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN) &&
-                (!texSurf->tileStatusDisabled))
+                anyTsEnableForMultiSlice)
             {
                 /*
                 ** We have no way to sample MSAA surface for now as we can't resolve MSAA into itself.
                 ** MSAA texture has been put into shadow rendering path.
                 */
                 gcmASSERT(!texSurf->isMsaa);
-
-                gcoSURF_DisableTileStatus(map->surface, gcvTRUE);
-
+                gcoSURF_DisableTileStatus(&texView, gcvTRUE);
+                samplerInfo.hasTileStatus = gcvFALSE;
             }
         }
 
@@ -4196,6 +4264,10 @@ gcoTEXTURE_BindTextureDesc(
 
 
         texSurf = baseMipMap->surface;
+        anyTsEnableForMultiSlice = gcvFALSE;
+        texView.surf = texSurf;
+        texView.firstSlice = 0;
+        texView.numSlices = baseMipMap->surface->requestD;
 
         samplerInfo.formatInfo = &texSurf->formatInfo;
         samplerInfo.textureInfo = pTexParams;
@@ -4204,7 +4276,54 @@ gcoTEXTURE_BindTextureDesc(
         samplerInfo.filterable = Texture->filterable;
         samplerInfo.descNode = pDescNode->descNode[TextureLayer];
 
-        if ((texSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN) && (!texSurf->tileStatusDisabled))
+        for (i = texView.firstSlice; i < (texView.firstSlice + texView.numSlices); i++)
+        {
+            if ((texView.surf->tileStatusNode.pool != gcvPOOL_UNKNOWN) &&
+                (texView.surf->tileStatusDisabled[i] == gcvFALSE))
+            {
+                anyTsEnableForMultiSlice = gcvTRUE;
+                break;
+            }
+        }
+
+        if (texView.numSlices > 1)
+        {
+            if (texView.surf->tileStatusNode.pool != gcvPOOL_UNKNOWN)
+            {
+                gctUINT i = 0;
+                for (; i < texView.numSlices; i++)
+                {
+                    if (texView.surf->tileStatusDisabled[i] == gcvTRUE)
+                    {
+                        canTsEnable = gcvFALSE;
+                        break;
+                    }
+                    if (texView.surf->fcValue[i] != texView.surf->fcValue[0])
+                    {
+                        canTsEnable = gcvFALSE;
+                        break;
+                    }
+                    if (texView.surf->fcValueUpper[i] != texView.surf->fcValueUpper[0])
+                    {
+                        canTsEnable = gcvFALSE;
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                canTsEnable = gcvFALSE;
+            }
+        }
+        else
+        {
+            if ((texView.surf->tileStatusNode.pool == gcvPOOL_UNKNOWN) || (texView.surf->tileStatusDisabled[texView.firstSlice] == gcvTRUE))
+            {
+                canTsEnable = gcvFALSE;
+            }
+        }
+
+        if ((texSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN) && anyTsEnableForMultiSlice)
         {
             /*
             ** 1, ES3.1 MSAA texture.
@@ -4217,9 +4336,13 @@ gcoTEXTURE_BindTextureDesc(
                 (texSurf->compressed && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_DECOMPRESSOR) == gcvFALSE) ||
                 (gcoHAL_IsSwwaNeeded(gcvNULL, gcvSWWA_1165)) ||
                 ((texSurf->bitsPerPixel < 16) &&
-                 (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_8BPP_TS_FIX) == gcvFALSE)))
+                (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_8BPP_TS_FIX) == gcvFALSE)) ||
+                !canTsEnable
+                )
             {
-                gcoSURF_DisableTileStatus(baseMipMap->surface, gcvTRUE);
+                texView.surf = baseMipMap->surface;
+                texView.numSlices = baseMipMap->surface->requestD;
+                gcoSURF_DisableTileStatus(&texView, gcvTRUE);
                 samplerInfo.hasTileStatus = gcvFALSE;
             }
             else
@@ -4303,6 +4426,10 @@ gcoTEXTURE_BindTextureEx(
     gceTEXTURE_FILTER mip = gcvTEXTURE_NONE;
     gctBOOL np2_forced = gcvFALSE;
 #endif
+    gcsSURF_VIEW texView = {gcvNULL, 0, 1};
+    gctBOOL canTsEnable = gcvTRUE;
+    gctBOOL anyTsEnableForMultiSlice = gcvFALSE;
+    gctUINT i = 0;
     gcmHEADER_ARG("Texture=0x%x Sampler=%d", Texture, Sampler);
 
     /* Verify the arguments. */
@@ -4603,6 +4730,20 @@ gcoTEXTURE_BindTextureEx(
                         }
                     }
 
+                    texView.surf = map->surface;
+                    texView.firstSlice = 0;
+                    texView.numSlices = map->surface->requestD;
+
+                    for (i = texView.firstSlice; i < (texView.firstSlice + texView.numSlices); i++)
+                    {
+                        if ((texView.surf->tileStatusNode.pool != gcvPOOL_UNKNOWN) &&
+                            (texView.surf->tileStatusDisabled[i] == gcvFALSE))
+                        {
+                            anyTsEnableForMultiSlice = gcvTRUE;
+                            break;
+                        }
+                    }
+
                     /*
                     ** For mipmap texture, we have to disable all mipmap's tile status buffer if it has.
                     ** Later we may can squeeze all mipmap surface into a big to use a big tile status buffer
@@ -4610,16 +4751,15 @@ gcoTEXTURE_BindTextureEx(
                     */
                     if (((gctINT)maxLevel > baseLevel) &&
                         (baseSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN) &&
-                        (!baseSurf->tileStatusDisabled))
+                        anyTsEnableForMultiSlice)
                     {
                         /*
                         ** We have no way to sample MSAA surface for now as we can't resolve MSAA into itself.
                         ** MSAA texture has been put into shadow rendering path.
                         */
                         gcmASSERT(!baseSurf->isMsaa);
-
-                        gcoSURF_DisableTileStatus(map->surface, gcvTRUE);
-
+                        gcoSURF_DisableTileStatus(&texView, gcvTRUE);
+                        samplerInfo.hasTileStatus = gcvFALSE;
                     }
 
                     samplerInfo.lodAddr[lod]   = map->address + textureLayer * baseSurf->layerSize;
@@ -4638,8 +4778,59 @@ gcoTEXTURE_BindTextureEx(
             }
 
             baseSurf = baseMipMap->surface;
+            anyTsEnableForMultiSlice = gcvFALSE;
+            texView.surf = baseSurf;
+            texView.firstSlice = 0;
+            texView.numSlices = baseSurf->requestD;
 
-            if ((baseSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN) && (!baseSurf->tileStatusDisabled))
+            for (i = texView.firstSlice; i < (texView.firstSlice + texView.numSlices); i++)
+            {
+                if ((texView.surf->tileStatusNode.pool != gcvPOOL_UNKNOWN) &&
+                    (texView.surf->tileStatusDisabled[i] == gcvFALSE))
+                {
+                    anyTsEnableForMultiSlice = gcvTRUE;
+                    break;
+                }
+            }
+
+            if (texView.numSlices > 1)
+            {
+                if (texView.surf->tileStatusNode.pool != gcvPOOL_UNKNOWN)
+                {
+                    gctUINT i = 0;
+                    for (; i < texView.numSlices; i++)
+                    {
+                        if (texView.surf->tileStatusDisabled[i] == gcvTRUE)
+                        {
+                            canTsEnable = gcvFALSE;
+                            break;
+                        }
+                        if (texView.surf->fcValue[i] != texView.surf->fcValue[0])
+                        {
+                            canTsEnable = gcvFALSE;
+                            break;
+                        }
+                        if (texView.surf->fcValueUpper[i] != texView.surf->fcValueUpper[0])
+                        {
+                            canTsEnable = gcvFALSE;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    canTsEnable = gcvFALSE;
+                }
+            }
+            else
+            {
+                if ((texView.surf->tileStatusNode.pool == gcvPOOL_UNKNOWN) || (texView.surf->tileStatusDisabled[texView.firstSlice] == gcvTRUE))
+                {
+                    canTsEnable = gcvFALSE;
+                }
+            }
+
+            if ((baseSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN) && anyTsEnableForMultiSlice)
             {
                 /*
                 ** 1, ES3.1 MSAA texture.
@@ -4652,15 +4843,20 @@ gcoTEXTURE_BindTextureEx(
                     (baseSurf->compressed && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_DECOMPRESSOR) == gcvFALSE) ||
                     (gcoHAL_IsSwwaNeeded(gcvNULL, gcvSWWA_1165)) ||
                     ((baseSurf->bitsPerPixel < 16) &&
-                     (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_8BPP_TS_FIX) == gcvFALSE))||
-                    (baseSurf->isMsaa && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MSAA_TEXTURE) == gcvFALSE))
+                    (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_8BPP_TS_FIX) == gcvFALSE))||
+                    (baseSurf->isMsaa && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MSAA_TEXTURE) == gcvFALSE) ||
+                    !canTsEnable
+                    )
                 {
-                    gcoSURF_DisableTileStatus(baseMipMap->surface, gcvTRUE);
+                    texView.surf = baseMipMap->surface;
+                    texView.numSlices = baseMipMap->surface->requestD;
+                    texView.firstSlice = 0;
+                    gcoSURF_DisableTileStatus(&texView, gcvTRUE);
                     samplerInfo.hasTileStatus = gcvFALSE;
                 }
                 else
                 {
-                    samplerInfo.hasTileStatus = !baseSurf->tileStatusDisabled;
+                    samplerInfo.hasTileStatus = !baseSurf->tileStatusDisabled[0];
                     samplerInfo.compressedDecFormat = baseSurf->compressDecFormat;
                 }
             }
@@ -5033,6 +5229,8 @@ OnError:
                 blitArgs.xReverse           = gcvFALSE;
                 blitArgs.yReverse           = gcvFALSE;
                 blitArgs.scissorTest        = gcvFALSE;
+                blitArgs.srcNumSlice        = 1;
+                blitArgs.dstNumSlice        = 1;
                 status = gcoSURF_BlitCPU(&blitArgs);
                 prevMap = map;
             }

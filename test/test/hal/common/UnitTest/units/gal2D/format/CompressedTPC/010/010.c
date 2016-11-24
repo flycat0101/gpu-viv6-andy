@@ -311,7 +311,7 @@ static gceSTATUS CDECL InitSourceSurface(Test2D *t2d, gctUINT index)
     gcmONERROR(GalCreateTSurf(
         t2d->runtime->hal, sFormat[index % gcmCOUNTOF(sFormat)],
         gcvLINEAR,
-        gcv2D_TSC_TPC_COMPRESSED,
+        gcv2D_TSC_TPC_COMPRESSED_V10,
         480, 480, &surf));
 
     dstRect.left   = 0;

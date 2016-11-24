@@ -1124,6 +1124,11 @@ static void _DumpArray(
 
     gcmASSERT(Array != gcvNULL);
 
+    if (Array == gcvNULL)
+    {
+        return;
+    }
+
     data  = (gctUINT8_PTR) Array;
     width = _width[DataType];
 

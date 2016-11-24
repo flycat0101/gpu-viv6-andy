@@ -214,6 +214,8 @@ extern const gctSTRING clgEmptyStr;
 
 #define cldSYNC_MEMORY              0
 
+#define cldFSL_OPT                  0
+
 #ifdef __cplusplus
 }
 #endif

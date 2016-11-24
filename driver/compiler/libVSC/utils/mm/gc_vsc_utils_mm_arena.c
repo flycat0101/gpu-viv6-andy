@@ -75,6 +75,8 @@ void vscAMS_Initialize(VSC_ARENA_MEM_SYS* pAMS, VSC_BUDDY_MEM_SYS* pBaseMemPool,
     _CreateNewChunk(pAMS);
 
     vscMM_Initialize(&pAMS->mmWrapper, pAMS, VSC_MM_TYPE_AMS);
+
+    pAMS->flags.bInitialized = gcvTRUE;
 }
 
 void* vscAMS_Alloc(VSC_ARENA_MEM_SYS* pAMS, gctUINT reqSize)
@@ -130,12 +132,17 @@ void* vscAMS_Realloc(VSC_ARENA_MEM_SYS* pAMS, void* pOrgAddress, gctUINT newReqS
     VSC_COMMON_BLOCK_HEADER* pOrgCmnBlkHeader;
     void*                    pNewAddress = gcvNULL;
 
+    if (pOrgAddress == gcvNULL)
+    {
+        /* If pOrgAddress is NULL, realloc behaves the same way as malloc
+         * and allocates a new block of newReqSize bytes */
+        return vscAMS_Alloc(pAMS, newReqSize);
+    }
+
     pOrgCmnBlkHeader = (VSC_COMMON_BLOCK_HEADER*)((gctUINT8*)pOrgAddress - COMMON_BLOCK_HEADER_SIZE);
 
-    gcmASSERT(newReqSize >= pOrgCmnBlkHeader->userReqSize);
-
     /* Just return original if no resize */
-    if (newReqSize == pOrgCmnBlkHeader->userReqSize)
+    if (newReqSize <= pOrgCmnBlkHeader->userReqSize)
     {
         return pOrgAddress;
     }
@@ -168,6 +175,12 @@ void vscAMS_Finalize(VSC_ARENA_MEM_SYS* pAMS)
     VSC_ARENA_MEM_CHUNK*    pChunk;
     VSC_UNI_LIST_NODE_EXT*  pThisChunkNode;
 
+    /* No need to go on if it was not initialized before */
+    if (!pAMS->flags.bInitialized)
+    {
+        return;
+    }
+
     for (pThisChunkNode = CAST_ULN_2_ULEN(vscUNILST_GetHead(&pAMS->chunkChain));
          pThisChunkNode != gcvNULL;
          pThisChunkNode = CAST_ULN_2_ULEN(vscUNILST_GetHead(&pAMS->chunkChain)))
@@ -187,10 +200,18 @@ void vscAMS_Finalize(VSC_ARENA_MEM_SYS* pAMS)
     pAMS->pCurChunk = gcvNULL;
 
     vscMM_Finalize(&pAMS->mmWrapper);
+
+    pAMS->flags.bInitialized = gcvFALSE;
 }
 
 void  vscAMS_PrintStatistics(VSC_ARENA_MEM_SYS* pAMS)
 {
 
 }
+
+gctBOOL vscAMS_IsInitialized(VSC_ARENA_MEM_SYS* pAMS)
+{
+    return pAMS->flags.bInitialized;
+}
+
 

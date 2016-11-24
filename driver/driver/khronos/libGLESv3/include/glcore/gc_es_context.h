@@ -382,21 +382,6 @@ if (localMask & bit)                                \
     }                                               \
 }
 
-/*
-** Procedures which are exported by the GLcore to the surroundings,
-** so that it can manage multiple GL context's.
-*/
-typedef struct __GLexportsRec
-{
-    /* Context management (return GL_FALSE on failure) */
-    GLvoid* (*createContext)(GLint clientVersion, VEGLimports *imports, GLvoid* sharedCtx);
-    GLboolean (*destroyContext)(GLvoid *gc);
-    GLvoid  (*setDrawable)(__GLcontext* gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable);
-    GLboolean (*makeCurrent)(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable, GLboolean flushDrawChange);
-    GLboolean (*loseCurrent)(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable);
-    __GLthreadPriv* (*getThreadData)(GLvoid *eglThreadData);
-
-} __GLexports;
 
 typedef enum __GLApiVersionRec
 {
@@ -471,8 +456,6 @@ struct __GLcontextRec
     /* EGL imported functions which might be OS specific */
     VEGLimports imports;
 
-    /* GLcore exported functions for other layers' use */
-    __GLexports exports;
 
     /* Pointer to the GL readable and drawable currently bound to this context. */
     __GLdrawablePrivate *readablePrivate;
@@ -480,6 +463,9 @@ struct __GLcontextRec
 
     /* Record which context this one will share with */
     __GLcontext *shareCtx;
+
+    /* GL_CONTEXT_FLAGS. */
+    GLbitfield contextFlags;
 
     /*
     ** Mode information that describes the kind of buffers and rendering
@@ -762,6 +748,9 @@ enum
     __GL_PERDRAW_DUMP_TEXTURE       = 1 << 4,
     __GL_PERDRAW_DUMP_BLITFBO_RT    = 1 << 5,
     __GL_PERDRAW_DUMP_BLITFBO_DS    = 1 << 6,
+
+    __GL_PERDRAW_DUMP_AS_TGA        = 1 << 16,
+    __GL_PERDRAW_DUMP_AS_RAW        = 1 << 17,
 
     __GL_PERDRAW_DUMP_NONE      = 0x0,
     __GL_PERDRAW_DUMP_ALL       = 0xFFFFFFFF,

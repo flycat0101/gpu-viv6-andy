@@ -172,12 +172,13 @@ clfCreateReadImageDirective(
     IN gctUINT                  ChannelDataType,
     IN gctUINT                  ChannelOrder,
     IN gceTILING                Tiling,
+    gctBOOL                     PatchUnnormReadImage,
     OUT clsPatchDirective  **   PatchDirectivePtr
     )
 {
     gceSTATUS                   status = gcvSTATUS_OK;
-    clsPatchDirective *         pointer;
-    clsPatchReadImage *         readImage;
+    clsPatchDirective *         pointer = gcvNULL;
+    clsPatchReadImage *         readImage = gcvNULL;
 
     gcmHEADER_ARG("SamplerNum=%d SamplerValue=0x%x PatchDirectivePtr=0x%x",
                   SamplerNum, SamplerValue, PatchDirectivePtr);
@@ -190,7 +191,8 @@ clfCreateReadImageDirective(
 
     /* link the new directive to existing directive */
     pointer->next      = *PatchDirectivePtr;
-    pointer->kind      = gceRK_PATCH_READ_IMAGE;
+    pointer->kind      = PatchUnnormReadImage ? gceRK_PATCH_READ_IMAGE_UNNORM
+                                              : gceRK_PATCH_READ_IMAGE;
     *PatchDirectivePtr = pointer;
 
     clmONERROR(gcoOS_Allocate(gcvNULL,
@@ -222,8 +224,8 @@ clfCreateWriteImageDirective(
     )
 {
     gceSTATUS                   status = gcvSTATUS_OK;
-    clsPatchDirective *         pointer;
-    clsPatchWriteImage *        writeImage;
+    clsPatchDirective *         pointer = gcvNULL;
+    clsPatchWriteImage *        writeImage = gcvNULL;
 
     gcmHEADER_ARG("ImageHeader=0x%x PatchDirectivePtr=0x%x",
                   ImageHeader, PatchDirectivePtr);
@@ -277,6 +279,7 @@ clfDestroyPatchDirective(
             break;
 
         case gceRK_PATCH_READ_IMAGE:
+        case gceRK_PATCH_READ_IMAGE_UNNORM:
             gcmONERROR(gcoOS_Free(gcvNULL,
                            curDirective->patchValue.readImage));
             break;
@@ -522,8 +525,8 @@ clfDynamicPatchKernel(
     gctPOINTER              buffer = gcvNULL, pointer = gcvNULL;
     gcsHINT_PTR             hints = gcvNULL;
     clsKernelStates_PTR     patchedStates = gcvNULL;
-    clsPatchDirective_PTR   patchDirective;
-    clsPatchDirective_PTR   patchDirective1;
+    clsPatchDirective_PTR   patchDirective = gcvNULL;
+    clsPatchDirective_PTR   patchDirective1 = gcvNULL;
     gcPatchDirective_PTR    gcPatchDirective = gcvNULL;
     gctUINT                 oldNumArgs, numToUpdate = *NumArgs, i;
     gctUINT                 isScalar = 0;
@@ -553,7 +556,7 @@ clfDynamicPatchKernel(
 
         if (patchedStates != Kernel->patchedStates)
         {
-            clsKernelStates_PTR prevPatchedStates;
+            clsKernelStates_PTR prevPatchedStates = gcvNULL;
 
             /* Move the matched states to the front. */
             for (prevPatchedStates = Kernel->patchedStates;
@@ -665,7 +668,7 @@ DoReLink:
                CL_OUT_OF_HOST_MEMORY);
 
     /* Construct kernel binary. */
-    clmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_CL, &kernelBinary),
+    clmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &kernelBinary),
                CL_OUT_OF_HOST_MEMORY);
 
     /* Load kernel binary from program binary */
@@ -692,8 +695,12 @@ DoReLink:
         gctBOOL                 found1, found2;
         gctUINT                 foundCount;
         gcUNIFORM               gcUniform1, gcUniform2/*, gcUniform3*/;
-        gctUINT dstFormat;
-        gctUINT opcode;
+        gctUINT                 dstFormat;
+        gctUINT                 opcode;
+#if gcdOCL_READ_IMAGE_OPTIMIZATION
+        gctFLOAT                rcpImageSize[3];
+        gcSHADER_TYPE           imageType = 0;
+#endif
 
         switch (patchDirective->kind)
         {
@@ -849,9 +856,78 @@ DoReLink:
                                                   readImage->channelDataType & 0xF,
                                                   readImage->channelOrder & 0xF,
                                                   imageHeader->imageType,
+                                                  gcvFALSE,
                                                   &gcPatchDirective),
                        CL_OUT_OF_HOST_MEMORY);
             break;
+
+#if gcdOCL_READ_IMAGE_OPTIMIZATION
+        case gceRK_PATCH_READ_IMAGE_UNNORM:
+            readImage = patchDirective->patchValue.readImage;
+            imageHeader = readImage->imageHeader;
+
+            /* Add new uniforms. */
+            oldNumArgs = *NumArgs;
+            *NumArgs += 1;
+            clmONERROR(clfReallocateKernelArgs(oldNumArgs,
+                                               *NumArgs,
+                                               Args),
+                       CL_OUT_OF_HOST_MEMORY);
+            gcoOS_ZeroMemory(*Args + oldNumArgs, gcmSIZEOF(clsArgument));
+
+            /* Recipical of image's size. */
+            clmONERROR(gcSHADER_AddUniform(kernelBinary, "#rcp_image_size", gcSHADER_FLOAT_X3, 1, gcSHADER_PRECISION_DEFAULT, &gcUniform1),
+                        CL_OUT_OF_HOST_MEMORY);
+            SetUniformFlag(gcUniform1, gcvUNIFORM_FLAG_KERNEL_ARG_PATCH);
+            clmONERROR(gcUNIFORM_SetFormat(gcUniform1, gcSL_UINT32, gcvFALSE),
+                        CL_OUT_OF_HOST_MEMORY);
+            argument = &((*Args)[oldNumArgs]);
+            bytes = gcmSIZEOF(cl_float) * 3;
+            clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
+            rcpImageSize[0] = 1.0f / (gctFLOAT) gcmMAX(imageHeader->width, 1);
+            rcpImageSize[1] = 1.0f / (gctFLOAT) gcmMAX(imageHeader->height, 1);
+            rcpImageSize[2] = 1.0f / (gctFLOAT) gcmMAX(imageHeader->depth, 1);
+            gcoOS_MemCopy(argument->data, rcpImageSize, bytes);
+            argument->uniform    = gcUniform1;
+            argument->size       = bytes;
+            argument->set        = gcvTRUE;
+
+            readImage->imageSizeIndex = GetUniformIndex(gcUniform1);
+
+            switch (imageHeader->imageType)
+            {
+            case  CL_MEM_OBJECT_IMAGE2D:
+                imageType = gcSHADER_IMAGE_2D;
+                break;
+            case  CL_MEM_OBJECT_IMAGE1D_ARRAY:
+                imageType = gcSHADER_IMAGE_1D_ARRAY;
+                break;
+            case  CL_MEM_OBJECT_IMAGE3D:
+                imageType = gcSHADER_IMAGE_3D;
+                break;
+            case  CL_MEM_OBJECT_IMAGE2D_ARRAY:
+                imageType = gcSHADER_IMAGE_2D_ARRAY;
+                break;
+            case  CL_MEM_OBJECT_IMAGE1D:
+                imageType = gcSHADER_IMAGE_1D;
+                break;
+            default:
+                gcmASSERT(gcvFALSE); /* Invalid argument type, should not be here */
+                break;
+            }
+
+            clmONERROR(gcCreateReadImageDirective(readImage->samplerNum,
+                                                  GetUniformIndex(gcUniform1),
+                                                  GetUniformIndex(gcUniform1),
+                                                  readImage->samplerValue,
+                                                  readImage->channelDataType & 0xF,
+                                                  readImage->channelOrder & 0xF,
+                                                  imageType,
+                                                  gcvTRUE,
+                                                  &gcPatchDirective),
+                       CL_OUT_OF_HOST_MEMORY);
+            break;
+#endif
 
         case gceRK_PATCH_WRITE_IMAGE:
             writeImage = patchDirective->patchValue.writeImage;
@@ -1074,7 +1150,6 @@ OnError:
     {
         gcmOS_SAFE_FREE(gcvNULL, pointer);
     }
-
 #if BUILD_OPENCL_FP
     if(orgArgs)
     {
@@ -1184,7 +1259,6 @@ clEnqueueReadBuffer(
     }
 #endif
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
 
     if (EventWaitList && (NumEventsInWaitList > 0))
@@ -1395,7 +1469,6 @@ clEnqueueReadBufferRect(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
 
     if (EventWaitList && (NumEventsInWaitList > 0))
@@ -1546,7 +1619,6 @@ clEnqueueWriteBuffer(
         clmRETURN_ERROR(CL_INVALID_OPERATION);
     }
 #endif
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -1751,7 +1823,6 @@ clEnqueueWriteBufferRect(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -1909,7 +1980,6 @@ clEnqueueCopyBuffer(
         clmRETURN_ERROR(CL_MEM_COPY_OVERLAP);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -2133,7 +2203,6 @@ clEnqueueCopyBufferRect(
             clmRETURN_ERROR(CL_MEM_COPY_OVERLAP);
         }
     }
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -2433,7 +2502,6 @@ clEnqueueReadImage(
         }
     }
 #endif
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -2731,7 +2799,6 @@ clEnqueueWriteImage(
         }
     }
 #endif
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -2775,7 +2842,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -2949,7 +3015,6 @@ clEnqueueFillImage(
     }
 
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -3341,7 +3406,6 @@ clEnqueueCopyImage(
             clmRETURN_ERROR(CL_MEM_COPY_OVERLAP);
         }
     }
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -3385,7 +3449,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -3603,7 +3666,6 @@ clEnqueueCopyImageToBuffer(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -3645,7 +3707,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -3863,7 +3924,6 @@ clEnqueueCopyBufferToImage(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -3905,7 +3965,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -4018,7 +4077,6 @@ clEnqueueMapBuffer(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -4322,7 +4380,6 @@ clEnqueueMapImage(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -4486,7 +4543,6 @@ clEnqueueUnmapMemObject(
         }
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -4538,7 +4594,10 @@ clEnqueueMigrateMemObjects(
     cl_event *              Event
     )
 {
+    clsCommand_PTR      command = gcvNULL;
+    gctPOINTER          pointer = gcvNULL;
     gctINT              status;
+    gctUINT             i;
 
     gcmHEADER_ARG("CommandQueue=0x%x MemObjects=0x%x Flags=%u",
                   CommandQueue, MemObjects, Flags);
@@ -4555,12 +4614,10 @@ clEnqueueMigrateMemObjects(
 
     if (MemObjects)
     {
-        gctUINT i = 0;
-
         for (i = 0; i < NumMemObjects; i++)
         {
             if (MemObjects[i] == gcvNULL ||
-                MemObjects[i]->objectType != clvOBJECT_MEM )
+                MemObjects[i]->objectType != clvOBJECT_MEM)
             {
                 clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
             }
@@ -4572,7 +4629,7 @@ clEnqueueMigrateMemObjects(
         }
     }
 
-    if (Flags & ~((cl_mem_migration_flags)(CL_MIGRATE_MEM_OBJECT_HOST|CL_MIGRATE_MEM_OBJECT_CONTENT_UNDEFINED)))
+    if (Flags & ~((cl_mem_migration_flags)(CL_MIGRATE_MEM_OBJECT_HOST | CL_MIGRATE_MEM_OBJECT_CONTENT_UNDEFINED)))
     {
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
@@ -4584,7 +4641,6 @@ clEnqueueMigrateMemObjects(
 
     if (EventWaitList)
     {
-        gctUINT i = 0;
         clmCHECK_ERROR(NumEventsInWaitList == 0, CL_INVALID_EVENT_WAIT_LIST);
         for (i = 0; i < NumEventsInWaitList; i++)
         {
@@ -4594,6 +4650,23 @@ clEnqueueMigrateMemObjects(
             }
         }
     }
+
+    clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
+
+    if (EventWaitList && (NumEventsInWaitList > 0))
+    {
+        clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gctPOINTER) * NumEventsInWaitList, &pointer), CL_OUT_OF_HOST_MEMORY);
+        gcoOS_MemCopy(pointer, (gctPOINTER)EventWaitList, sizeof(gctPOINTER) * NumEventsInWaitList);
+    }
+
+    command->type                   = clvCOMMAND_MIGRATE_MEM_OBJECTS;
+    command->handler                = &clfExecuteCommandMigrateMemObjects;
+    command->outEvent               = Event;
+    command->numEventsInWaitList    = NumEventsInWaitList;
+    command->eventWaitList          = (clsEvent_PTR *)pointer;
+
+    clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE), CL_OUT_OF_HOST_MEMORY);
+
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -4602,6 +4675,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010304: (clEnqueueMigrateMemObjects) Run out of memory.\n");
+    }
+
+    if(command != gcvNULL)
+    {
+        clfReleaseCommand(command);
     }
 
     gcmFOOTER_ARG("%d", status);
@@ -4658,7 +4736,6 @@ gctBOOL gcNeedRecomile64(
 
     return recompile;
 }
-
 #endif
 
 CL_API_ENTRY cl_int CL_API_CALL
@@ -4682,6 +4759,9 @@ clEnqueueNDRangeKernel(
     size_t                      workGroupSize = 1;
     clsPatchDirective_PTR       patchDirective = gcvNULL;
     gctPOINTER                  pointer = gcvNULL;
+    size_t                      fakeGlobalWorkOffset[2] = {0};
+    size_t                      fakeGlobalWorkSize[2] = {0};
+    size_t                      fakeLocalWorkSize[2] = {0};
 
     gcmHEADER_ARG("CommandQueue=0x%x Kernel=0x%x "
                   "GlobalWorkOffset=0x%x GlobalWorkSize=0x%x GlobalWorkSize=0x%x",
@@ -4743,23 +4823,20 @@ clEnqueueNDRangeKernel(
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010171: (clEnqueueNDRangeKernel) invalid WorkDim (%d).\n",
             WorkDim);
-        clmRETURN_ERROR(CL_INVALID_EVENT_WAIT_LIST);
+        clmRETURN_ERROR(CL_INVALID_WORK_DIMENSION);
     }
 
     if (GlobalWorkSize == gcvNULL)
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010172: (clEnqueueNDRangeKernel) GlobalWorkSize is NULL.\n");
-        clmRETURN_ERROR(CL_INVALID_EVENT_WAIT_LIST);
+        clmRETURN_ERROR(CL_INVALID_GLOBAL_WORK_SIZE);
     }
 
     /* convert 1D -> 2D */
     if((WorkDim == 1) &&
        (GlobalWorkSize[0] > CommandQueue->device->deviceInfo.maxGlobalWorkSize))
     {
-        size_t  fakeGlobalWorkOffset[2] = {0};
-        size_t  fakeGlobalWorkSize[2] = {0};
-        size_t  fakeLocalWorkSize[2] = {0};
         size_t  size0, size1;
         gctSIZE_T attribCount;
         gcSHADER kernelBinary = (gcSHADER)Kernel->states.binary;
@@ -4931,6 +5008,23 @@ clEnqueueNDRangeKernel(
             workGroupSize, Kernel->maxWorkGroupSize);
         clmRETURN_ERROR(CL_INVALID_WORK_GROUP_SIZE);
     }
+    else if (workGroupSize < 128)
+    {
+        /* during compile time, we compute the temp register count to fit the local memory size
+           based on workgroupsize is 128. If the real workgroupSize is smaller than 128, we need
+           to adjust hw temp count to fit the local memory requirements. */
+        gcSHADER    kernelBinary = (gcSHADER) Kernel->states.binary;
+        if (gcShaderUseLocalMem(kernelBinary))
+        {
+            gcKERNEL_FUNCTION   kernelFunction = GetShaderCurrentKernelFunction(kernelBinary);
+            gctUINT localMemoryReq = (gctUINT)(CommandQueue->device->deviceInfo.localMemSize / kernelFunction->localMemorySize);
+            gctUINT maxFreeReg = 113;
+            gctUINT threadCount = 4 * CommandQueue->device->deviceInfo.maxComputeUnits;
+            gctUINT hwRegCount = (maxFreeReg * threadCount) / (localMemoryReq * workGroupSize);
+            kernelBinary->RARegWaterMark = gcmMAX(kernelBinary->RARegWaterMark, hwRegCount);
+        }
+    }
+
 
     for (i = 0; i < Kernel->numArgs; i++)
     {
@@ -4944,7 +5038,6 @@ clEnqueueNDRangeKernel(
         }
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -4958,10 +5051,13 @@ clEnqueueNDRangeKernel(
     command->numEventsInWaitList    = NumEventsInWaitList;
     command->eventWaitList          = (clsEvent_PTR *)pointer;
 
-    /* Create the release signal for the deferred command release. */
-    clmONERROR(gcoCL_CreateSignal(gcvTRUE,
-                                  &command->releaseSignal),
-               CL_OUT_OF_HOST_MEMORY);
+    if (Kernel->hasPrintf)
+    {
+        /* Create the release signal for the deferred command release. */
+        clmONERROR(gcoCL_CreateSignal(gcvTRUE,
+                                      &command->releaseSignal),
+                   CL_OUT_OF_HOST_MEMORY);
+    }
 
     NDRangeKernel                       = &command->u.NDRangeKernel;
     NDRangeKernel->kernel               = Kernel;
@@ -4997,6 +5093,7 @@ clEnqueueNDRangeKernel(
         }
         gcmASSERT(kernelFunction);
 
+        /* Patch for write_image funtions. */
         {
 #if BUILD_OPENCL_FP
             gctUINT uniformIndex[128] = {(gctUINT) ~0};
@@ -5222,10 +5319,12 @@ clEnqueueNDRangeKernel(
                     clsMem_PTR              image;
                     clsImageHeader_PTR      imageHeader;
                     gctUINT                 samplerValue;
-                    cleSAMPLER              normalizedMode;
-                    cleSAMPLER              filterMode;
+                    cleSAMPLER              normalizedMode = CLK_NORMALIZED_COORDS_FALSE;
+                    cleSAMPLER              filterMode = CLK_FILTER_NEAREST;
                     gctUINT                 channelDataType;
                     gctUINT                 channelOrder;
+                    gctBOOL                 isConstantSamplerType;
+                    gctBOOL                 patchUnnormReadImage = gcvFALSE;
 
                     /* Check if recompilation is needed. */
 
@@ -5245,7 +5344,8 @@ clEnqueueNDRangeKernel(
                     channelOrder = imageHeader->channelOrder;
 
                     /* Get sampler value. */
-                    if (GetImageSamplerIsConstantSamplerType(imageSampler))
+                    isConstantSamplerType = GetImageSamplerIsConstantSamplerType(imageSampler);
+                    if (isConstantSamplerType)
                     {
                         samplerValue = GetImageSamplerType(imageSampler);
                     }
@@ -5253,43 +5353,103 @@ clEnqueueNDRangeKernel(
                     {
                         samplerValue = *((gctUINT *) NDRangeKernel->args[GetImageSamplerType(imageSampler)].data);
                     }
+
                     if (CommandQueue->device->deviceInfo.computeOnlyGpu != gcvTRUE)  /*use texld*/
                     {
                         normalizedMode = samplerValue & CLK_NORMALIZED_COORDS_TRUE;
                         filterMode  = samplerValue & 0xF00;
 
-                        /* Check channel data type. */
-                        /* TODO - gc4000 can handle more data types. */
-                        if ((sampler < maxSampler) &&
-                            (channelDataType == CL_UNORM_INT8))
+#if gcdOCL_READ_IMAGE_OPTIMIZATION
+                        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI2))
                         {
-                            arg->needImageSampler = gcvTRUE;
-                            arg->image            = image;
-                            arg->samplerValue     = samplerValue;
-
-                            if ((image->type != CL_MEM_OBJECT_IMAGE3D)
+                            /* Check imgae type and channel data type. */
+                            if (( Kernel->patchNeeded == gcvFALSE) &&
+                                (sampler < maxSampler) &&
+                                (image->type != CL_MEM_OBJECT_IMAGE3D) &&
 #if BUILD_OPENCL_12
-                                &&
-                                (image->type != CL_MEM_OBJECT_IMAGE2D_ARRAY)
-                                &&
-                                (image->type != CL_MEM_OBJECT_IMAGE1D_ARRAY)
+                                (image->type != CL_MEM_OBJECT_IMAGE2D_ARRAY) &&
+                                (image->type != CL_MEM_OBJECT_IMAGE1D_ARRAY) &&
 #endif
-                                )
+                                (channelDataType != CL_FLOAT) &&
+                                (channelDataType != CL_UNSIGNED_INT32) &&
+                                (channelDataType != CL_SIGNED_INT32) &&
+                                (channelDataType != CL_UNORM_INT16))
                             {
-                                /* Check filter mode and normalized mode. */
-                                if ((filterMode == CLK_FILTER_NEAREST) &&
-                                    (normalizedMode == CLK_NORMALIZED_COORDS_TRUE) &&
-                                    ((shadeType != gcSHADER_TYPE_VERTEX) || (samplerValue & 0xF) != CLK_ADDRESS_CLAMP))
+                                if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE) ||  /* v55 */
+                                    gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE_V2)) /* v60 and above */
                                 {
+                                    if (isConstantSamplerType)
+                                    {
+                                        arg->needImageSampler = gcvTRUE;
+                                        arg->image            = image;
+                                        arg->samplerValue     = samplerValue;
+
+                                        ++sampler;
+                                        continue;
+                                    }
+                                }
+                                else    /* v542 */
+                                {
+                                    arg->needImageSampler = gcvTRUE;
+                                    arg->image            = image;
+                                    arg->samplerValue     = samplerValue;
+
                                     ++sampler;
-                                    continue;
+
+                                    /* Check normalized mode. */
+                                    if (normalizedMode == CLK_NORMALIZED_COORDS_TRUE)
+                                    {
+                                        continue;
+                                    }
+                                    else
+                                    {
+                                        if (isConstantSamplerType)
+                                            patchUnnormReadImage = gcvTRUE;
+                                        else
+                                            patchUnnormReadImage = gcvFALSE;
+                                    }
+                                }
+                            }
+                        }
+                        else
+#endif
+                        {
+                            /* Check channel data type. */
+                            /* TODO - gc4000 can handle more data types. */
+                            if ((sampler < maxSampler) &&
+                                (channelDataType == CL_UNORM_INT8))
+                            {
+                                arg->needImageSampler = gcvTRUE;
+                                arg->image            = image;
+                                arg->samplerValue     = samplerValue;
+
+                                if ((image->type != CL_MEM_OBJECT_IMAGE3D)
+#if BUILD_OPENCL_12
+                                    &&
+                                    (image->type != CL_MEM_OBJECT_IMAGE2D_ARRAY)
+                                    &&
+                                    (image->type != CL_MEM_OBJECT_IMAGE1D_ARRAY)
+#endif
+                                    )
+                                {
+                                    /* Check filter mode and normalized mode. */
+                                    if ((filterMode == CLK_FILTER_NEAREST) &&
+                                        (normalizedMode == CLK_NORMALIZED_COORDS_TRUE) &&
+                                        ((shadeType != gcSHADER_TYPE_VERTEX) || (samplerValue & 0xF) != CLK_ADDRESS_CLAMP))
+                                    {
+                                        ++sampler;
+                                        continue;
+                                    }
                                 }
                             }
                         }
                     }
 
-                    /* Use SW function to replace texld. */
-                    arg->needImageSampler = gcvFALSE;
+                    if (!patchUnnormReadImage)
+                    {
+                        /* Use SW function to replace texld. */
+                        arg->needImageSampler = gcvFALSE;
+                    }
 
                     /* Create patch directive. */
                     clmONERROR(clfCreateReadImageDirective(imageHeader,
@@ -5298,6 +5458,7 @@ clEnqueueNDRangeKernel(
                                                            channelDataType,
                                                            channelOrder,
                                                            imageHeader->tiling,
+                                                           patchUnnormReadImage,
                                                            &patchDirective),
                                CL_OUT_OF_HOST_MEMORY);
 
@@ -5361,9 +5522,11 @@ clEnqueueNDRangeKernel(
     }
     else if(patchDirective && (Kernel->isPatched == gcvTRUE))
     {
-        clmONERROR(clfUpdateKernelArgs(Kernel, &NDRangeKernel->numArgs,
-                                        &NDRangeKernel->args,
-                                        patchDirective), status);
+        clmONERROR(clfUpdateKernelArgs(Kernel,
+                                       &NDRangeKernel->numArgs,
+                                       &NDRangeKernel->args,
+                                       patchDirective),
+                   status);
         NDRangeKernel->states = Kernel->patchedStates;
         if(patchDirective) clfDestroyPatchDirective(&patchDirective);
     }
@@ -5397,7 +5560,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -5474,7 +5636,6 @@ clEnqueueTask(
 
     /* TODO - return CL_INVALID_WORK_GROUP_SIZE if workgroup size is not (1, 1, 1) */
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -5488,10 +5649,13 @@ clEnqueueTask(
     command->numEventsInWaitList    = NumEventsInWaitList;
     command->eventWaitList          = (clsEvent_PTR *)pointer;
 
-    /* Create the release signal for the deferred command release. */
-    clmONERROR(gcoCL_CreateSignal(gcvTRUE,
-                                  &command->releaseSignal),
-               CL_OUT_OF_HOST_MEMORY);
+    if (Kernel->hasPrintf)
+    {
+        /* Create the release signal for the deferred command release. */
+        clmONERROR(gcoCL_CreateSignal(gcvTRUE,
+                                      &command->releaseSignal),
+                   CL_OUT_OF_HOST_MEMORY);
+    }
 
     task                            = &command->u.task;
     task->kernel                    = Kernel;
@@ -5536,7 +5700,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -5654,7 +5817,6 @@ clEnqueueNativeKernel(
         clmRETURN_ERROR(CL_INVALID_OPERATION);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -5693,7 +5855,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -5810,7 +5971,6 @@ clEnqueueNativeKernel(
         clmRETURN_ERROR(CL_INVALID_OPERATION);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -5849,7 +6009,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -5880,7 +6039,6 @@ clEnqueueMarker(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
 
     command->type       = clvCOMMAND_MARKER;
@@ -5904,7 +6062,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -5939,7 +6096,6 @@ clEnqueueMarkerWithWaitList(
         clmRETURN_ERROR(CL_INVALID_EVENT_WAIT_LIST);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -5970,7 +6126,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -6004,7 +6159,6 @@ clEnqueueBarrierWithWaitList(
         clmRETURN_ERROR(CL_INVALID_EVENT_WAIT_LIST);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -6035,7 +6189,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -6085,7 +6238,6 @@ clEnqueueWaitForEvents(
         }
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventList && (NumEvents > 0))
     {
@@ -6116,7 +6268,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -6138,7 +6289,6 @@ clEnqueueBarrier(
         clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
 
     command->type       = clvCOMMAND_BARRIER;
@@ -6162,7 +6312,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -6249,7 +6398,6 @@ clEnqueueFillBuffer(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    gcoCL_SetHardware();
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -6287,7 +6435,6 @@ OnError:
     {
         clfReleaseCommand(command);
     }
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }

@@ -26,10 +26,44 @@
 #define GLFFPROFILER_HAL Context->hal
 #endif
 
-gctBOOL _glffIsSyncMode = gcvTRUE;
+GLboolean _glffIsSyncMode = gcvTRUE;
 gctINT _glffProfileMode = -1;
 
 #if gcdNEW_PROFILER_FILE
+
+#define gcmWRITE_CONST_NEW(ConstValue) \
+    do \
+    { \
+        gceSTATUS status; \
+        gctINT32 value = ConstValue; \
+        gcmERR_BREAK(gcoPROFILER_NEW_Write(profiler, gcmSIZEOF(value), &value)); \
+    } \
+    while (gcvFALSE)
+
+#define gcmWRITE_VALUE_NEW(IntData) \
+    do \
+    { \
+        gceSTATUS status; \
+        gctINT32 value = IntData; \
+        gcmERR_BREAK(gcoPROFILER_NEW_Write(profiler, gcmSIZEOF(value), &value)); \
+    } \
+    while (gcvFALSE)
+
+#define gcmWRITE_COUNTER_NEW(Counter, Value) \
+    gcmWRITE_CONST_NEW(Counter); \
+    gcmWRITE_VALUE_NEW(Value)
+
+/* Write a string value (char*). */
+#define gcmWRITE_STRING_NEW(String) \
+    do \
+    { \
+        gceSTATUS status; \
+        gctINT32 length; \
+        length = (gctINT32) gcoOS_StrLen((gctSTRING)String, gcvNULL); \
+        gcmERR_BREAK(gcoPROFILER_NEW_Write(profiler, gcmSIZEOF(length), &length)); \
+        gcmERR_BREAK(gcoPROFILER_NEW_Write(profiler, length, String)); \
+    } \
+    while (gcvFALSE)
 
 #define gcmWRITE_CONST(ConstValue) \
     do \
@@ -251,6 +285,592 @@ OnError:
     return status;
 }
 #endif
+
+void
+_glffProfiler_NEW_Initialize(
+    glsCONTEXT_PTR Context
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctCHAR *env = gcvNULL;
+    glsPROFILER * profiler = &Context->profiler;
+#ifdef ANDROID
+    gctBOOL matchResult = gcvFALSE;
+#endif
+
+    gcmHEADER_ARG("Context=0x%x", Context);
+
+    _glffProfileMode = -1;
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &env)) && env)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(env, "0")))
+        {
+            _glffProfileMode = 0;
+        }
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(env, "1")))
+        {
+            _glffProfileMode = 1;
+        }
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(env, "2")))
+        {
+            _glffProfileMode = 2;
+        }
+        else if (gcmIS_SUCCESS(gcoOS_StrCmp(env, "3")))
+        {
+            _glffProfileMode = 3;
+        }
+    }
+
+    /* Clear the profiler. */
+    gcoOS_ZeroMemory(&Context->profiler, gcmSIZEOF(glsPROFILER));
+
+    switch (_glffProfileMode)
+    {
+    case -1:
+        profiler->enable = gcvFALSE;
+        gcmFOOTER_NO();
+        return;
+    case 0:
+        gcoPROFILER_NEW_Disable();
+        profiler->enable = gcvFALSE;
+        gcmFOOTER_NO();
+        return;
+    case 1:
+        profiler->enableOutputCounters = gcvTRUE;
+
+        gcoOS_GetEnv(gcvNULL, "VP_FRAME_NUM", &env);
+        if ((env != gcvNULL) && (env[0] != 0))
+        {
+            gctINT32 frameNum;
+            gcoOS_StrToInt(env, &frameNum);
+            if (frameNum > 1)
+                profiler->frameCount = frameNum;
+        }
+        break;
+    case 2:
+        profiler->enableOutputCounters = gcvFALSE;
+        break;
+    case 3:
+        profiler->enableOutputCounters = gcvFALSE;
+        gcoOS_GetEnv(gcvNULL, "VP_FRAME_START", &env);
+        if ((env != gcvNULL) && (env[0] != 0))
+        {
+            gctINT32 frameNum;
+            gcoOS_StrToInt(env, &frameNum);
+            if (frameNum > 1)
+                profiler->frameStartNumber = frameNum;
+        }
+        gcoOS_GetEnv(gcvNULL, "VP_FRAME_END", &env);
+        if ((env != gcvNULL) && (env[0] != 0))
+        {
+            gctINT32 frameNum;
+            gcoOS_StrToInt(env, &frameNum);
+            if (frameNum > 1)
+                profiler->frameEndNumber = frameNum;
+        }
+        break;
+    default:
+        profiler->enable = gcvFALSE;
+        gcmFOOTER_NO();
+        return;
+    }
+    gcmONERROR(gcoPROFILER_NEW_Construct(&Context->profilerObj));
+
+    profiler->useGlfinish = gcvFALSE;
+    gcoOS_GetEnv(gcvNULL, "VP_USE_GLFINISH", &env);
+    if ((env != gcvNULL) && (env[0] == '1'))
+    {
+        profiler->useGlfinish = gcvTRUE;
+    }
+
+    gcoOS_GetEnv(gcvNULL, "VP_SYNC_MODE", &env);
+    if ((env != gcvNULL) && gcmIS_SUCCESS(gcoOS_StrCmp(env, "0")))
+    {
+        Context->profilerObj->isSyncMode =
+        _glffIsSyncMode = gcvFALSE;
+    }
+
+    gcoOS_GetEnv(gcvNULL, "VP_OUTPUT", &env);
+    if ((env != gcvNULL) && *env != '\0')
+    {
+        Context->profilerObj->fileName = env;
+    }
+
+#ifdef ANDROID
+    gcoOS_GetEnv(gcvNULL, "VP_PROCESS_NAME", &env);
+    if ((env != gcvNULL) && (env[0] != 0)) matchResult = (gcoOS_DetectProcessByName(env) ? gcvTRUE : gcvFALSE);
+    if (matchResult != gcvTRUE) {
+        gcmFOOTER_NO();
+        return;
+    }
+#endif
+
+    if (gcoPROFILER_NEW_Enable(Context->profilerObj) != gcvSTATUS_OK)
+    {
+        profiler->enable = gcvFALSE;
+        gcmFOOTER_NO();
+        return;
+    }
+    profiler->enable = gcvTRUE;
+
+    profiler->curFrameNumber = 0;
+    profiler->drawCount = 0;
+    profiler->perDraw = gcvFALSE;
+    profiler->perFrame = gcvFALSE;
+    profiler->useFBO = gcvFALSE;
+
+    gcoOS_GetTime(&profiler->frameStart);
+    profiler->frameStartTimeusec = profiler->frameStart;
+    profiler->primitiveStartTimeusec = profiler->frameStart;
+    gcoOS_GetCPUTime(&profiler->frameStartCPUTimeusec);
+
+    _glffProfiler_NEW_Write(Context, GL1_PROFILER_WRITE_HEADER);
+
+OnError:
+    /* Return the error. */
+    gcmFOOTER_NO();
+}
+
+void
+_glffProfiler_NEW_Destroy(
+    glsCONTEXT_PTR Context
+    )
+{
+    glsPROFILER * profiler = &Context->profiler;
+
+    gcmHEADER_ARG("Context=0x%x", Context);
+
+    if (profiler->enable)
+    {
+        profiler->enable = gcvFALSE;
+        gcmVERIFY_OK(gcoPROFILER_NEW_Destroy(Context->profilerObj));
+    }
+
+    /* Success. */
+    gcmFOOTER_NO();
+}
+
+gceSTATUS
+_glffProfiler_NEW_Write(
+    glsCONTEXT_PTR Context,
+    GLuint Enum
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT rev;
+    gcoPROFILER profiler = Context->profilerObj;
+    gctSTRING infoCompany = "Vivante Corporation";
+    gctSTRING infoVersion = "1.3";
+    gctCHAR infoRevision[255] = { '\0' };   /* read from hw */
+    gctSTRING infoRenderer = Context->chipName;
+    gctSTRING infoDriver = "OpenGL ES 1.1";
+    gctUINT offset = 0;
+    gctUINT32 totalCalls_11 = 0;
+    gctUINT32 totalDrawCalls_11 = 0;
+    gctUINT32 totalStateChangeCalls_11 = 0;
+    gctUINT32 maxrss, ixrss, idrss, isrss;
+    gctINT32 i;
+
+    gcmHEADER_ARG("Context=0x%x, Enum=%d", Context, Enum);
+
+    switch (Enum)
+    {
+    case GL1_PROFILER_WRITE_HEADER:
+        /* Write Generic Info. */
+        rev = Context->chipRevision;
+#define BCD(digit)      ((rev >> (digit * 4)) & 0xF)
+        gcoOS_MemFill(infoRevision, 0, gcmSIZEOF(infoRevision));
+        if (BCD(3) == 0)
+        {
+            /* Old format. */
+            gcoOS_PrintStrSafe(infoRevision, gcmSIZEOF(infoRevision),
+                &offset, "revision=\"%d.%d\" ", BCD(1), BCD(0));
+        }
+        else
+        {
+            /* New format. */
+            gcoOS_PrintStrSafe(infoRevision, gcmSIZEOF(infoRevision),
+                &offset, "revision=\"%d.%d.%d_rc%d\" ",
+                BCD(3), BCD(2), BCD(1), BCD(0));
+        }
+
+        gcmWRITE_CONST_NEW(VPG_INFO);
+
+        gcmWRITE_CONST_NEW(VPC_INFOCOMPANY);
+        gcmWRITE_STRING_NEW(infoCompany);
+        gcmWRITE_CONST_NEW(VPC_INFOVERSION);
+        gcmWRITE_STRING_NEW(infoVersion);
+        gcmWRITE_CONST_NEW(VPC_INFORENDERER);
+        gcmWRITE_STRING_NEW(infoRenderer);
+        gcmWRITE_CONST_NEW(VPC_INFOREVISION);
+        gcmWRITE_STRING_NEW(infoRevision);
+        gcmWRITE_CONST_NEW(VPC_INFODRIVER);
+        gcmWRITE_STRING_NEW(infoDriver);
+#if gcdNULL_DRIVER >= 2
+        {
+            char* infoDiverMode = "NULL Driver";
+            gcmWRITE_CONST(VPC_INFODRIVERMODE);
+            gcmWRITE_STRING(infoDiverMode);
+        }
+#endif
+        break;
+
+    case GL1_PROFILER_WRITE_FRAME_BEGIN:
+        if (!Context->profiler.frameBegun && Context->profiler.need_dump)
+        {
+            if (Context->profiler.frameNumber == 0 && Context->draw)
+            {
+                gctUINT width, height;
+                gctUINT offset = 0;
+                gctCHAR  infoScreen[255] = { '\0' };
+                gcoOS_MemFill(infoScreen, 0, gcmSIZEOF(infoScreen));
+                gcoSURF_GetSize(Context->draw, &width, &height, gcvNULL);
+                gcoOS_PrintStrSafe(infoScreen, gcmSIZEOF(infoScreen),
+                    &offset, "%d x %d", width, height);
+                gcmWRITE_CONST_NEW(VPC_INFOSCREENSIZE);
+                gcmWRITE_STRING_NEW(infoScreen);
+
+                gcmWRITE_CONST_NEW(VPG_END);
+            }
+            gcmWRITE_COUNTER_NEW(VPG_FRAME, Context->profiler.frameNumber);
+            Context->profiler.frameBegun = 1;
+        }
+        break;
+
+    case GL1_PROFILER_WRITE_FRAME_END:
+
+        gcmONERROR(gcoPROFILER_NEW_EndFrame(profiler));
+
+        /*write time*/
+        if (Context->profiler.need_dump)
+        {
+            gcmWRITE_CONST_NEW(VPG_TIME);
+            gcmWRITE_COUNTER_NEW(VPC_ELAPSETIME, (gctINT32)(Context->profiler.frameEndTimeusec - Context->profiler.frameStartTimeusec));
+            gcmWRITE_COUNTER_NEW(VPC_CPUTIME, (gctINT32)Context->profiler.totalDriverTime);
+            gcmWRITE_CONST_NEW(VPG_END);
+
+            gcoOS_GetMemoryUsage(&maxrss, &ixrss, &idrss, &isrss);
+
+            gcmWRITE_CONST_NEW(VPG_MEM);
+
+            gcmWRITE_COUNTER_NEW(VPC_MEMMAXRES, maxrss);
+            gcmWRITE_COUNTER_NEW(VPC_MEMSHARED, ixrss);
+            gcmWRITE_COUNTER_NEW(VPC_MEMUNSHAREDDATA, idrss);
+            gcmWRITE_COUNTER_NEW(VPC_MEMUNSHAREDSTACK, isrss);
+
+            gcmWRITE_CONST_NEW(VPG_END);
+
+            /* write api time counters */
+            gcmWRITE_CONST_NEW(VPG_ES11_TIME);
+            for (i = 0; i < GLES1_NUM_API_CALLS; ++i)
+            {
+                if (Context->profiler.apiCalls[i] > 0)
+                {
+                    gcmWRITE_COUNTER_NEW(VPG_ES11_TIME + 1 + i, (gctINT32)Context->profiler.apiTimes[i]);
+                }
+            }
+            gcmWRITE_CONST_NEW(VPG_END);
+
+            gcmWRITE_CONST_NEW(VPG_ES11);
+
+
+            for (i = 0; i < GLES1_NUM_API_CALLS; ++i)
+            {
+                if (Context->profiler.apiCalls[i] > 0)
+                {
+                    gcmWRITE_COUNTER(VPG_ES11 + 1 + i, Context->profiler.apiCalls[i]);
+                    totalCalls_11 += Context->profiler.apiCalls[i];
+
+                    switch (GLES1_APICALLBASE + i)
+                    {
+                    case GLES1_DRAWARRAYS:
+                    case GLES1_DRAWELEMENTS:
+                        totalDrawCalls_11 += Context->profiler.apiCalls[i];
+                        break;
+
+                    case    GLES1_ACTIVETEXTURE:
+                    case    GLES1_ALPHAFUNC:
+                    case    GLES1_ALPHAFUNCX:
+                    case    GLES1_BLENDFUNC:
+                    case    GLES1_CLEARCOLOR:
+                    case    GLES1_CLEARCOLORX:
+                    case    GLES1_CLEARDEPTHF:
+                    case    GLES1_CLEARDEPTHX:
+                    case    GLES1_CLEARSTENCIL:
+                    case    GLES1_CLIENTACTIVETEXTURE:
+                    case    GLES1_CLIPPLANEF:
+                    case    GLES1_CLIPPLANEX:
+                    case    GLES1_COLOR4F:
+                    case    GLES1_COLOR4UB:
+                    case    GLES1_COLOR4X:
+                    case    GLES1_COLORMASK:
+                    case    GLES1_CULLFACE:
+                    case    GLES1_DEPTHFUNC:
+                    case    GLES1_DEPTHMASK:
+                    case    GLES1_DEPTHRANGEF:
+                    case    GLES1_DEPTHRANGEX:
+                    case    GLES1_DISABLE:
+                    case    GLES1_DISABLECLIENTSTATE:
+                    case    GLES1_ENABLE:
+                    case    GLES1_ENABLECLIENTSTATE:
+                    case    GLES1_FOGF:
+                    case    GLES1_FOGFV:
+                    case    GLES1_FOGX:
+                    case    GLES1_FOGXV:
+                    case    GLES1_FRONTFACE:
+                    case    GLES1_FRUSTUMF:
+                    case    GLES1_FRUSTUMX:
+                    case    GLES1_LIGHTF:
+                    case    GLES1_LIGHTFV:
+                    case    GLES1_LIGHTMODELF:
+                    case    GLES1_LIGHTMODELFV:
+                    case    GLES1_LIGHTMODELX:
+                    case    GLES1_LIGHTMODELXV:
+                    case    GLES1_LIGHTX:
+                    case    GLES1_LIGHTXV:
+                    case    GLES1_LINEWIDTH:
+                    case    GLES1_LINEWIDTHX:
+                    case    GLES1_LOGICOP:
+                    case    GLES1_MATERIALF:
+                    case    GLES1_MATERIALFV:
+                    case    GLES1_MATERIALX:
+                    case    GLES1_MATERIALXV:
+                    case    GLES1_MATRIXMODE:
+                    case    GLES1_NORMAL3F:
+                    case    GLES1_NORMAL3X:
+                    case    GLES1_ORTHOF:
+                    case    GLES1_ORTHOX:
+                    case    GLES1_PIXELSTOREI:
+                    case    GLES1_POINTPARAMETERF:
+                    case    GLES1_POINTPARAMETERFV:
+                    case    GLES1_POINTPARAMETERX:
+                    case    GLES1_POINTPARAMETERXV:
+                    case    GLES1_POINTSIZE:
+                    case    GLES1_POINTSIZEX:
+                    case    GLES1_POLYGONOFFSET:
+                    case    GLES1_POLYGONOFFSETX:
+                    case    GLES1_SAMPLECOVERAGE:
+                    case    GLES1_SAMPLECOVERAGEX:
+                    case    GLES1_SCISSOR:
+                    case    GLES1_SHADEMODEL:
+                    case    GLES1_STENCILFUNC:
+                    case    GLES1_STENCILMASK:
+                    case    GLES1_STENCILOP:
+                    case    GLES1_TEXENVF:
+                    case    GLES1_TEXENVFV:
+                    case    GLES1_TEXENVI:
+                    case    GLES1_TEXENVIV:
+                    case    GLES1_TEXENVX:
+                    case    GLES1_TEXENVXV:
+                    case    GLES1_TEXPARAMETERF:
+                    case    GLES1_TEXPARAMETERFV:
+                    case    GLES1_TEXPARAMETERI:
+                    case    GLES1_TEXPARAMETERIV:
+                    case    GLES1_TEXPARAMETERX:
+                    case    GLES1_TEXPARAMETERXV:
+                    case    GLES1_VIEWPORT:
+                    case    GLES1_BLENDEQUATIONOES:
+                    case    GLES1_BLENDFUNCSEPERATEOES:
+                    case    GLES1_BLENDEQUATIONSEPARATEOES:
+                        totalStateChangeCalls_11 += Context->profiler.apiCalls[i];
+                        break;
+
+                    default:
+                        break;
+                    }
+                }
+
+                /* Clear variables for next frame. */
+                Context->profiler.apiCalls[i] = 0;
+                Context->profiler.apiTimes[i] = 0;
+            }
+
+            gcmWRITE_COUNTER_NEW(VPC_ES11CALLS, totalCalls_11);
+            gcmWRITE_COUNTER_NEW(VPC_ES11DRAWCALLS, totalDrawCalls_11);
+            gcmWRITE_COUNTER_NEW(VPC_ES11STATECHANGECALLS, totalStateChangeCalls_11);
+
+            gcmWRITE_COUNTER_NEW(VPC_ES11POINTCOUNT, Context->profiler.drawPointCount_11);
+            gcmWRITE_COUNTER_NEW(VPC_ES11LINECOUNT, Context->profiler.drawLineCount_11);
+            gcmWRITE_COUNTER_NEW(VPC_ES11TRIANGLECOUNT, Context->profiler.drawTriangleCount_11);
+            gcmWRITE_CONST_NEW(VPG_END);
+
+            gcmWRITE_CONST_NEW(VPG_END);
+        }
+        break;
+
+    case GL1_PROFILER_WRITE_FRAME_RESET:
+        for (i = 0; i < GLES1_NUM_API_CALLS; ++i)
+        {
+            Context->profiler.apiCalls[i] = 0;
+            Context->profiler.apiTimes[i] = 0;
+            Context->profiler.totalDriverTime = 0;
+        }
+
+        /* Clear variables for next frame. */
+        Context->profiler.drawPointCount_11 = 0;
+        Context->profiler.drawLineCount_11 = 0;
+        Context->profiler.drawTriangleCount_11 = 0;
+        Context->profiler.drawVertexCount_11 = 0;
+        Context->profiler.textureUploadSize = 0;
+        Context->profiler.drawCount = 0;
+        Context->profiler.totalDriverTime = 0;
+
+        if (Context->profiler.timeEnable)
+        {
+            Context->profiler.frameStartCPUTimeusec =
+                Context->profiler.frameEndCPUTimeusec;
+            gcoOS_GetTime(&Context->profiler.frameStartTimeusec);
+        }
+        break;
+    default:
+        gcmASSERT(0);
+        break;
+    }
+
+OnError:
+
+    gcmFOOTER_NO();
+    return status;
+}
+
+GLboolean
+_glffProfiler_NEW_Set(
+    IN glsCONTEXT_PTR Context,
+    IN GLuint Enum,
+    IN gctHANDLE Value
+)
+{
+    glsPROFILER * profiler = &Context->profiler;
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Context=0x%x, Enum=%d, Value=0x%x", Context, Enum, Value);
+    gcmASSERT(Context);
+
+    if (!profiler->enable)
+    {
+        gcmFOOTER_ARG("return=%d", GL_FALSE);
+        return GL_FALSE;
+    }
+
+    switch (_glffProfileMode)
+    {
+    case 1:
+        if (profiler->frameCount == 0 || profiler->frameNumber < profiler->frameCount)
+        {
+            Context->profilerObj->needDump = profiler->need_dump = gcvTRUE;
+        }
+        else
+        {
+            Context->profilerObj->needDump = profiler->need_dump = GL_FALSE;
+        }
+        break;
+    case 2:
+        if (profiler->enableOutputCounters)
+        {
+            Context->profilerObj->needDump = profiler->need_dump = gcvTRUE;
+        }
+        else
+        {
+            Context->profilerObj->needDump = profiler->need_dump = GL_FALSE;
+        }
+        break;
+    case 3:
+        if ((profiler->frameStartNumber == 0 && profiler->frameEndNumber == 0) ||
+            (profiler->curFrameNumber >= profiler->frameStartNumber && profiler->curFrameNumber <= profiler->frameEndNumber))
+        {
+            Context->profilerObj->needDump = profiler->need_dump = gcvTRUE;
+        }
+        else
+        {
+            Context->profilerObj->needDump = profiler->need_dump = GL_FALSE;
+        }
+        break;
+    default:
+        gcmFOOTER_ARG("return=%d", GL_FALSE);
+        return GL_FALSE;
+    }
+
+    switch (Enum)
+    {
+    case GL1_PROFILER_FRAME_END:
+
+        gcmONERROR(gcoOS_GetTime(&profiler->frameEndTimeusec));
+        gcoOS_GetCPUTime(&profiler->frameEndCPUTimeusec);
+        profiler->drawCount = 0;
+        profiler->curFrameNumber++;
+        gcmONERROR(_glffProfiler_NEW_Write(Context, GL1_PROFILER_WRITE_FRAME_BEGIN));
+        gcmONERROR(_glffProfiler_NEW_Write(Context, GL1_PROFILER_WRITE_FRAME_END));
+        gcmONERROR(gcoPROFILER_NEW_Flush(Context->profilerObj));
+
+        gcmONERROR(_glffProfiler_NEW_Write(Context, GL1_PROFILER_WRITE_FRAME_RESET));
+        gcmONERROR(gcoOS_GetTime(&profiler->frameStartTimeusec));
+        /* Next frame. */
+        if (profiler->need_dump)
+        profiler->frameNumber++;
+        profiler->frameBegun = 0;
+        break;
+
+    case GL1_PROFILER_PRIMITIVE_TYPE:
+        profiler->primitiveType = gcmPTR2INT32(Value);
+        break;
+
+    case GL1_PROFILER_PRIMITIVE_COUNT:
+        profiler->primitiveCount = gcmPTR2INT32(Value);
+        switch (profiler->primitiveType)
+        {
+        case GL_POINTS:
+            profiler->drawPointCount_11 += gcmPTR2INT32(Value);
+            break;
+
+        case GL_LINES:
+        case GL_LINE_LOOP:
+        case GL_LINE_STRIP:
+            profiler->drawLineCount_11 += gcmPTR2INT32(Value);
+            break;
+
+        case GL_TRIANGLES:
+        case GL_TRIANGLE_STRIP:
+        case GL_TRIANGLE_FAN:
+            profiler->drawTriangleCount_11 += gcmPTR2INT32(Value);
+            break;
+        }
+        break;
+
+    case GL1_PROFILER_DRAW_BEGIN:
+        if (profiler->perDraw == gcvFALSE)
+        {
+            profiler->perDraw = gcvTRUE;
+            profiler->drawCount = 0;
+        }
+        gcmONERROR(_glffProfiler_NEW_Write(Context, GL1_PROFILER_WRITE_FRAME_BEGIN));
+        gcmONERROR(gcoPROFILER_NEW_Begin(Context->profilerObj, gcvCOUNTER_OP_DRAW));
+
+        break;
+
+    case GL1_PROFILER_DRAW_END:
+        gcoPROFILER_NEW_End(Context->profilerObj, profiler->drawCount);
+        profiler->drawCount++;
+        break;
+
+    case GL1_TEXUPLOAD_SIZE:
+        Context->profiler.textureUploadSize += gcmPTR2INT32(Value);
+        break;
+    case GL1_PROFILER_SYNC_MODE:
+        gcmFOOTER_NO();
+        return _glffIsSyncMode;
+
+    default:
+        break;
+    }
+
+    gcmFOOTER_ARG("return=%d", GL_TRUE);
+    return GL_TRUE;
+
+OnError:
+    gcmFOOTER_ARG("return=%d", GL_FALSE);
+    return GL_FALSE;
+}
+
 /*******************************************************************************
 **    _glffInitializeProfiler
 **
@@ -311,7 +931,7 @@ _glffInitializeProfiler(
             gcoOS_MemFill(pointer,0,gcmSIZEOF(struct _gcoHAL));
             GLFFPROFILER_HAL = (gcoHAL) pointer;
         }
-        gcoPROFILER_Initialize(GLFFPROFILER_HAL, gcvFALSE);
+        gcoPROFILER_Initialize(GLFFPROFILER_HAL, gcvNULL, gcvFALSE);
 #endif
         gcmFOOTER_NO();
         return;
@@ -336,9 +956,9 @@ _glffInitializeProfiler(
             gcoOS_MemFill(pointer,0,gcmSIZEOF(struct _gcoHAL));
             GLFFPROFILER_HAL = (gcoHAL) pointer;
         }
-        gcoPROFILER_Initialize(GLFFPROFILER_HAL, gcvFALSE);
+        gcoPROFILER_Initialize(GLFFPROFILER_HAL, gcvNULL, gcvFALSE);
 #else
-        gcoPROFILER_Initialize(gcvNULL, gcvFALSE);
+        gcoPROFILER_Initialize(gcvNULL, gcvNULL, gcvFALSE);
 #endif
 #endif
         gcmFOOTER_NO();
@@ -362,7 +982,7 @@ _glffInitializeProfiler(
     }
 #endif
 
-    status = gcoPROFILER_Initialize(GLFFPROFILER_HAL, gcvTRUE);
+    status = gcoPROFILER_Initialize(GLFFPROFILER_HAL, gcvNULL, gcvTRUE);
     switch (status)
     {
         case gcvSTATUS_OK:

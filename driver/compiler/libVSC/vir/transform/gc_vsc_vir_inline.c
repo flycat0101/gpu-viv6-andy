@@ -13,6 +13,8 @@
 
 #include "vir/transform/gc_vsc_vir_inline.h"
 
+extern gctUINT vscHFUNC_Label(const char *);
+extern gctBOOL vcsHKCMP_Label(const char *, const char *);
 
 /* ===========================================================================
    _VSC_IL_UpdateMaxCallDepth:
@@ -41,40 +43,6 @@ static void _VSC_IL_UpdateMaxCallDepth(
     }
 }
 
-/* ===========================================================================
-   _VSC_IL_RemoveFuncBlockFromCallGraph:
-   remove the func block from the call graph
-   ===========================================================================
-*/
-static void _VSC_IL_RemoveFuncBlockFromCallGraph(
-    VIR_CALL_GRAPH* pCG,
-    VIR_FUNC_BLOCK* pFuncBlk)
-{
-    VSC_ADJACENT_LIST_ITERATOR   edgeIter;
-    VIR_CG_EDGE*                 pEdge;
-
-    /* Uninitialize callsite array, note that we only use successors */
-    VSC_ADJACENT_LIST_ITERATOR_INIT(&edgeIter, &pFuncBlk->dgNode.succList);
-    pEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&edgeIter);
-    for (; pEdge != gcvNULL; pEdge = (VIR_CG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&edgeIter))
-    {
-        vscSRARR_Finalize(&pEdge->callSiteArray);
-    }
-
-    vscSRARR_Finalize(&pFuncBlk->mixedCallSiteArray);
-
-    /* Remove node from graph */
-    vscDG_RemoveNode(&pCG->dgGraph, &pFuncBlk->dgNode);
-
-    /* Remove func from shader */
-    VIR_Shader_RemoveFunction(pCG->pOwnerShader, pFuncBlk->pVIRFunc);
-
-    vscDGND_Finalize(&pFuncBlk->dgNode);
-
-    /* Free this node */
-    vscMM_Free(&pCG->pmp.mmWrapper, pFuncBlk);
-}
-
 /* Duplicate a new instruction in Function based on OrigInst */
 VSC_ErrCode
 VSC_IL_DupInstruction(
@@ -90,7 +58,7 @@ VSC_IL_DupInstruction(
     VSC_ErrCode     errCode = VSC_ERR_NONE;
 
     VIR_Instruction *inst = (VIR_Instruction *)vscMM_Alloc(
-                                               &Function->hostShader->mempool,
+                                               &Function->hostShader->pmp.mmWrapper,
                                                sizeof(VIR_Instruction));
     gctUINT srcNum = VIR_OPCODE_GetSrcOperandNum(VIR_Inst_GetOpcode(OrigInst));
     gcmASSERT(srcNum <= VIR_MAX_SRC_NUM);
@@ -111,6 +79,7 @@ VSC_IL_DupInstruction(
         VIR_Inst_SetSrcNum(inst, srcNum);
         VIR_Inst_SetInstType(inst, VIR_Inst_GetInstType(OrigInst));
         VIR_Inst_SetConditionOp(inst, VIR_Inst_GetConditionOp(OrigInst));
+        VIR_Inst_SetResOpType(inst, VIR_Inst_GetResOpType(OrigInst));
         VIR_Inst_SetFunction(inst, Function);
         VIR_Inst_SetId(inst, VIR_Function_GetAndIncressLastInstId(Function));
 
@@ -127,13 +96,7 @@ VSC_IL_DupInstruction(
         {
             origSrc = VIR_Inst_GetSource(OrigInst, i);
             errCode = VIR_Function_DupOperand(Function, origSrc, &src);
-            inst->src[i] = src;
-        }
-
-        /* reset rest source operands */
-        for (i = srcNum; i < VIR_MAX_SRC_NUM; i++)
-        {
-            inst->src[i] = gcvNULL;
+            VIR_Inst_SetSource(inst, i, src);
         }
 
         opcode = VIR_Inst_GetOpcode(OrigInst);
@@ -395,7 +358,8 @@ VSC_ErrCode VSC_IL_InlineSingleFunction(
 */
 VSC_ErrCode VSC_IL_SelectInlineFunctions(
     VIR_Inliner       *pInliner,
-    VIR_Function      *pFunc
+    VIR_Function      *pFunc,
+    gctBOOL            AlwayInline
     )
 {
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
@@ -403,6 +367,7 @@ VSC_ErrCode VSC_IL_SelectInlineFunctions(
     VSC_HASH_TABLE      *pCandidates = VSC_IL_GetCandidates(pInliner);
     VIR_FUNC_BLOCK      *pFuncBlk = VIR_Function_GetFuncBlock(pFunc);
     gctINT              instCount = VIR_Function_GetInstCount(pFunc);
+    gctINT              leftBudget;
     gctINT              callSites = 0;
 
     VSC_ADJACENT_LIST_ITERATOR   edgeIter;
@@ -413,7 +378,6 @@ VSC_ErrCode VSC_IL_SelectInlineFunctions(
         /* main func */
         VSC_IL_SetInlineBudget(pInliner,
                 VSC_IL_GetInlineBudget(pInliner) - instCount);
-
     }
     else
     {
@@ -427,14 +391,18 @@ VSC_ErrCode VSC_IL_SelectInlineFunctions(
             callSites += vscSRARR_GetElementCount(&pEdge->callSiteArray);
         }
         instCount  = instCount * callSites;
+        leftBudget = VSC_IL_GetInlineBudget(pInliner) - instCount;
 
-        /* only use the code size as the heuristic for now */
-        if (VSC_IL_GetInlineBudget(pInliner) - instCount > 0)
+        if (AlwayInline)
         {
             vscHTBL_DirectSet(pCandidates, (void*) pFunc, gcvNULL);
-
-            VSC_IL_SetInlineBudget(pInliner,
-                VSC_IL_GetInlineBudget(pInliner) - instCount);
+            VSC_IL_SetInlineBudget(pInliner, leftBudget);
+        }
+        /* only use the code size as the heuristic for now */
+        else if (leftBudget > 0)
+        {
+            vscHTBL_DirectSet(pCandidates, (void*) pFunc, gcvNULL);
+            VSC_IL_SetInlineBudget(pInliner, leftBudget);
         }
     }
 
@@ -509,7 +477,7 @@ VSC_ErrCode VSC_IL_OptimizeCallStackDepth(
             if (pFuncBlk->maxCallDepth == 0)
             {
                 /* remove this function block from the call graph */
-                _VSC_IL_RemoveFuncBlockFromCallGraph(pCG, pFuncBlk);
+                vscVIR_RemoveFuncBlockFromCallGraph(pCG, pFuncBlk, gcvTRUE);
             }
         }
     }
@@ -551,21 +519,46 @@ VSC_ErrCode VSC_IL_TopDownInline(
 
     /* Seperate the hueristic with the transformation */
 
-    /* 1. select the inline candidates into the worklist */
+    /* 1. select the ALWAYSINLINE function into the worklist first. */
     for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
     {
         pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
-        if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
-            VSC_OPTN_ILOptions_TRACE))
+
+        /* Check ALWAYSINLINE functions. */
+        if (VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_ALWAYSINLINE))
         {
-            VIR_LOG(pDumper, "\nSelect Inline Candidate for Function:\t[%s]\n",
-                VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
-            VIR_LOG_FLUSH(pDumper);
+            if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
+                VSC_OPTN_ILOptions_TRACE))
+            {
+                VIR_LOG(pDumper, "\nSelect Inline Candidate for Function:\t[%s]\n",
+                    VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
+                VIR_LOG_FLUSH(pDumper);
+            }
+            VSC_IL_SelectInlineFunctions(pInliner, pFunc, gcvTRUE);
         }
-        VSC_IL_SelectInlineFunctions(pInliner, pFunc);
     }
 
-    /* 2. do the inline transformation */
+    /* 2. select the inline candidates into the worklist */
+    for (funcIdx = 0; funcIdx < countOfFuncBlk; funcIdx ++)
+    {
+        pFunc = ppFuncBlkRPO[funcIdx]->pVIRFunc;
+
+        /* Skip ALWAYSINLINE and NOINLIEN functions. */
+        if (!VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_ALWAYSINLINE) &&
+            !VIR_Function_HasFlag(pFunc, VIR_FUNCFLAG_NOINLINE))
+        {
+            if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
+                VSC_OPTN_ILOptions_TRACE))
+            {
+                VIR_LOG(pDumper, "\nSelect Inline Candidate for Function:\t[%s]\n",
+                    VIR_Shader_GetSymNameString(pShader, VIR_Function_GetSymbol(pFunc)));
+                VIR_LOG_FLUSH(pDumper);
+            }
+            VSC_IL_SelectInlineFunctions(pInliner, pFunc, gcvFALSE);
+        }
+    }
+
+    /* 3. do the inline transformation */
     {
         VSC_HASH_TABLE        *pCandidates = VSC_IL_GetCandidates(pInliner);
         VSC_ADJACENT_LIST_ITERATOR   edgeIter;
@@ -608,7 +601,7 @@ VSC_ErrCode VSC_IL_TopDownInline(
                 if (pFuncBlk->maxCallDepth == 0)
                 {
                     /* remove this function block from the call graph */
-                    _VSC_IL_RemoveFuncBlockFromCallGraph(pCG, pFuncBlk);
+                    vscVIR_RemoveFuncBlockFromCallGraph(pCG, pFuncBlk, gcvTRUE);
                 }
             }
         }
@@ -619,14 +612,52 @@ VSC_ErrCode VSC_IL_TopDownInline(
     return retValue;
 }
 
-void VSC_IL_Init(
+static VSC_ErrCode VSC_IL_CleanupLables(
+    VIR_Inliner       *pInliner)
+{
+    VSC_ErrCode       errCode = VSC_ERR_NONE;
+    VIR_Shader*       pShader = pInliner->pShader;
+    VIR_FuncIterator  func_iter;
+    VIR_FunctionNode* func_node;
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function        *func = func_node->function;
+        VIR_InstIterator    inst_iter;
+        VIR_Instruction     *inst, *next_inst;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+        while (inst != gcvNULL)
+        {
+            next_inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter);
+
+            if (VIR_Inst_GetOpcode(inst) == VIR_OP_LABEL &&
+                VIR_Inst_GetJmpLabel(inst)->referenced == gcvNULL)
+            {
+                VIR_Function_DeleteInstruction(func, inst);
+            }
+
+            inst = next_inst;
+        }
+    }
+
+    return errCode;
+}
+
+static void _VSC_IL_Init(
     VIR_Inliner         *pInliner,
     VIR_Shader          *pShader,
     VSC_HW_CONFIG       *pHwCfg,
     VSC_OPTN_ILOptions  *pOptions,
     VIR_Dumper          *pDumper,
-    VIR_CALL_GRAPH      *pCG)
+    VIR_CALL_GRAPH      *pCG,
+    VSC_MM*             pMM)
 {
+    gctUINT             maxInstCount = 0;
+
     VSC_IL_SetShader(pInliner, pShader);
     VSC_IL_SetHwCfg(pInliner, pHwCfg);
     VSC_IL_SetDumper(pInliner, pDumper);
@@ -634,25 +665,59 @@ void VSC_IL_Init(
     VSC_IL_SetCallGraph(pInliner, pCG);
 
     /* initialize the memory pool */
-    vscPMP_Intialize(VSC_IL_GetPmp(pInliner), gcvNULL,
-        VSC_IL_MEM_BLK_SIZE, sizeof(void*), gcvTRUE);
+    pInliner->pMM = pMM;
 
     pInliner->pCandidates = vscHTBL_Create(VSC_IL_GetMM(pInliner),
                 vscHFUNC_Default, vscHKCMP_Default, 512);
 
-    VSC_IL_SetInlineBudget(pInliner, pHwCfg->maxTotalInstCount);
+    if (pHwCfg->hwFeatureFlags.instBufferUnified)
+    {
+        maxInstCount = pHwCfg->maxTotalInstCount;
+    }
+    else
+    {
+        switch (VIR_Shader_GetKind(pShader))
+        {
+        case VIR_SHADER_VERTEX:
+        case VIR_SHADER_TESSELLATION_CONTROL:
+        case VIR_SHADER_TESSELLATION_EVALUATION:
+        case VIR_SHADER_GEOMETRY:
+            maxInstCount = pHwCfg->maxVSInstCount;
+            break;
+
+        case VIR_SHADER_FRAGMENT:
+        case VIR_SHADER_COMPUTE:
+            maxInstCount = pHwCfg->maxPSInstCount;
+            break;
+
+        default:
+            gcmASSERT(gcvFALSE);
+            break;
+        }
+    }
+
+    /* If HW has iCache, maybe we can assume more budget. */
+
+    VSC_IL_SetInlineBudget(pInliner, maxInstCount);
 }
 
-void VSC_IL_Final(
+static void _VSC_IL_Final(
     VIR_Inliner           *pInliner)
 {
-
     VSC_IL_SetShader(pInliner, gcvNULL);
     VSC_IL_SetOptions(pInliner, gcvNULL);
     VSC_IL_SetDumper(pInliner, gcvNULL);
     VSC_IL_SetCallGraph(pInliner, gcvNULL);
+}
 
-    vscPMP_Finalize(VSC_IL_GetPmp(pInliner));
+DEF_QUERY_PASS_PROP(VSC_IL_PerformOnShader)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_INLINER;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+
+    pPassProp->passFlag.resCreationReq.s.bNeedCg = gcvTRUE;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
 }
 
 /* ===========================================================================
@@ -661,14 +726,19 @@ void VSC_IL_Final(
    ===========================================================================
 */
 VSC_ErrCode VSC_IL_PerformOnShader(
-    VIR_Inliner       *pInliner)
+    VSC_SH_PASS_WORKER* pPassWorker
+    )
 {
     VSC_ErrCode         retValue  = VSC_ERR_NONE;
-    VIR_Shader          *pShader = VSC_IL_GetShader(pInliner);
-    VIR_CALL_GRAPH      *pCG = VSC_IL_GetCallGraph(pInliner);
-    VIR_Dumper          *pDumper = VSC_IL_GetDumper(pInliner);
-    VSC_OPTN_ILOptions  *pOption = VSC_IL_GetOptions(pInliner);
+    VIR_Inliner         inliner;
+    VIR_Shader          *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_CALL_GRAPH      *pCG = pPassWorker->pCallGraph;
+    VIR_Dumper          *pDumper = pPassWorker->basePassWorker.pDumper;
+    VSC_OPTN_ILOptions  *pOption = (VSC_OPTN_ILOptions*)pPassWorker->basePassWorker.pBaseOption;
     gctUINT             countOfFuncBlk = vscDG_GetNodeCount(&pCG->dgGraph);
+
+    _VSC_IL_Init(&inliner, pShader, &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
+                 pOption, pDumper, pCG, pPassWorker->basePassWorker.pMM);
 
     /* dump */
     if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
@@ -684,24 +754,29 @@ VSC_ErrCode VSC_IL_PerformOnShader(
         if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetHeuristics(pOption),
             VSC_OPTN_ILOptions_CALL_DEPTH))
         {
-            retValue = VSC_IL_OptimizeCallStackDepth(pInliner);
+            retValue = VSC_IL_OptimizeCallStackDepth(&inliner);
         }
 
         /* top down traverse the call graph */
         if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetHeuristics(pOption),
             VSC_OPTN_ILOptions_TOP_DOWN))
         {
-            retValue = VSC_IL_TopDownInline(pInliner);
-
+            retValue = VSC_IL_TopDownInline(&inliner);
         }
     }
 
+    /* clean up the unused labels to avoid unnecessary basic blocks */
+    retValue = VSC_IL_CleanupLables(&inliner);
+
     if (VSC_UTILS_MASK(VSC_OPTN_ILOptions_GetTrace(pOption),
-        VSC_OPTN_ILOptions_TRACE) || gcSHADER_DumpCodeGenVerbose(pShader))
+        VSC_OPTN_ILOptions_TRACE) ||
+        VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "Shader after Inliner", pShader, gcvTRUE);
         VIR_LOG_FLUSH(pDumper);
     }
+
+    _VSC_IL_Final(&inliner);
 
     return retValue;
 }

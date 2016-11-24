@@ -16,9 +16,10 @@
    etc */
 
 #include "gc_vsc.h"
-#include "chip/gc_vsc_chip_state_programming.h"
+#include "chip/gpu/gc_vsc_chip_state_programming.h"
 #include "vir/transform/gc_vsc_vir_uniform.h"
 #include "vir/transform/gc_vsc_vir_vectorization.h"
+#include "vir/codegen/gc_vsc_vir_ep_gen.h"
 
 #define SUPPORT_ATTR_ALIAS   0
 
@@ -111,12 +112,12 @@ gceSTATUS vscInitializePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
     gceSTATUS                  status = gcvSTATUS_OK;
     gctUINT                    stageIdx;
 
+    gcoOS_ZeroMemory(pPEP, sizeof(PROGRAM_EXECUTABLE_PROFILE));
+
     for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        gcmONERROR(vscInitializeSEP(&pPEP->sep[stageIdx]));
+        gcmONERROR(vscInitializeSEP(&pPEP->seps[stageIdx]));
     }
-
-    /* TODO: Initialize HL tables */
 
 OnError:
     return status;
@@ -124,15 +125,311 @@ OnError:
 
 gceSTATUS vscFinalizePEP(PROGRAM_EXECUTABLE_PROFILE* pPEP)
 {
-    gceSTATUS                  status = gcvSTATUS_OK;
-    gctUINT                    stageIdx;
+    gceSTATUS                                    status = gcvSTATUS_OK;
+    gctUINT                                      stageIdx, i, j;
+    SHADER_CONSTANT_HW_LOCATION_MAPPING*         pCnstHwLocMapping;
+    SHADER_UAV_SLOT_MAPPING*                     pUavSlotMapping;
+    PROG_VK_COMBINED_TEXTURE_SAMPLER_HW_MAPPING* pCtsHwMapping;
+    PROG_VK_SEPARATED_SAMPLER_HW_MAPPING*        pSeparatedSampMapping;
+    PROG_VK_SEPARATED_TEXTURE_HW_MAPPING*        pSeparatedTextureMapping;
+    PROG_VK_UNIFORM_TEXEL_BUFFER_HW_MAPPING*     pUtbHwMapping;
 
     for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        gcmONERROR(vscFinalizeSEP(&pPEP->sep[stageIdx]));
+        gcmONERROR(vscFinalizeSEP(&pPEP->seps[stageIdx]));
     }
 
-    /* TODO: Uninitialize HL tables */
+    if (pPEP->attribTable.countOfEntries)
+    {
+        gcmASSERT(pPEP->attribTable.pAttribEntries);
+
+        for (i = 0; i < pPEP->attribTable.countOfEntries; i ++)
+        {
+            if (pPEP->attribTable.pAttribEntries[i].name)
+            {
+                gcoOS_Free(gcvNULL, (gctPOINTER)pPEP->attribTable.pAttribEntries[i].name);
+                pPEP->attribTable.pAttribEntries[i].name = gcvNULL;
+            }
+
+            if (pPEP->attribTable.pAttribEntries[i].pLocation)
+            {
+                gcoOS_Free(gcvNULL, pPEP->attribTable.pAttribEntries[i].pLocation);
+                pPEP->attribTable.pAttribEntries[i].pLocation = gcvNULL;
+            }
+        }
+
+        gcoOS_Free(gcvNULL, pPEP->attribTable.pAttribEntries);
+        pPEP->attribTable.pAttribEntries = gcvNULL;
+    }
+
+    if (pPEP->fragOutTable.countOfEntries)
+    {
+        gcmASSERT(pPEP->fragOutTable.pFragOutEntries);
+
+        for (i = 0; i < pPEP->fragOutTable.countOfEntries; i ++)
+        {
+            if (pPEP->fragOutTable.pFragOutEntries[i].name)
+            {
+                gcoOS_Free(gcvNULL, (gctPOINTER)pPEP->fragOutTable.pFragOutEntries[i].name);
+                pPEP->fragOutTable.pFragOutEntries[i].name = gcvNULL;
+            }
+
+            if (pPEP->fragOutTable.pFragOutEntries[i].pLocation)
+            {
+                gcoOS_Free(gcvNULL, pPEP->fragOutTable.pFragOutEntries[i].pLocation);
+                pPEP->fragOutTable.pFragOutEntries[i].pLocation = gcvNULL;
+            }
+        }
+
+        gcoOS_Free(gcvNULL, pPEP->fragOutTable.pFragOutEntries);
+        pPEP->fragOutTable.pFragOutEntries = gcvNULL;
+    }
+
+    if (pPEP->pepClient == PEP_CLIENT_GL)
+    {
+    }
+    else if (pPEP->pepClient == PEP_CLIENT_VK)
+    {
+        if (pPEP->u.vk.pResourceSets)
+        {
+            for (i = 0; i < pPEP->u.vk.resourceSetCount; i ++)
+            {
+                if (pPEP->u.vk.pResourceSets[i].combinedSampTexTable.countOfEntries)
+                {
+                    for (j = 0; j < pPEP->u.vk.pResourceSets[i].combinedSampTexTable.countOfEntries; j ++)
+                    {
+                        for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
+                        {
+                            if (pPEP->u.vk.pResourceSets[i].combinedSampTexTable.pCombTsEntries[j].stageBits &
+                                VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx))
+                            {
+                                pCtsHwMapping = &pPEP->u.vk.pResourceSets[i].combinedSampTexTable.pCombTsEntries[j].hwMappings[stageIdx];
+
+                                if (pCtsHwMapping->ppExtraSamplerArray)
+                                {
+                                    gcoOS_Free(gcvNULL, pCtsHwMapping->ppExtraSamplerArray);
+                                    pCtsHwMapping->ppExtraSamplerArray = gcvNULL;
+                                }
+
+                                if (pCtsHwMapping->samplerHwMappingList.arraySize)
+                                {
+                                    gcoOS_Free(gcvNULL, pCtsHwMapping->samplerHwMappingList.pPctsHmEntryIdxArray);
+                                    pCtsHwMapping->samplerHwMappingList.pPctsHmEntryIdxArray = gcvNULL;
+                                }
+
+                                if (pCtsHwMapping->texHwMappingList.arraySize)
+                                {
+                                    gcoOS_Free(gcvNULL, pCtsHwMapping->texHwMappingList.pPctsHmEntryIdxArray);
+                                    pCtsHwMapping->texHwMappingList.pPctsHmEntryIdxArray = gcvNULL;
+                                }
+                            }
+
+                            if (pPEP->u.vk.pResourceSets[i].combinedSampTexTable.pCombTsEntries[j].pResOpBits)
+                            {
+                                gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].combinedSampTexTable.pCombTsEntries[j].pResOpBits);
+                                pPEP->u.vk.pResourceSets[i].combinedSampTexTable.pCombTsEntries[j].pResOpBits = gcvNULL;
+                            }
+                        }
+                    }
+
+                    gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].combinedSampTexTable.pCombTsEntries);
+                    pPEP->u.vk.pResourceSets[i].combinedSampTexTable.pCombTsEntries = gcvNULL;
+                }
+
+                if (pPEP->u.vk.pResourceSets[i].separatedSamplerTable.countOfEntries)
+                {
+                    for (j = 0; j < pPEP->u.vk.pResourceSets[i].separatedSamplerTable.countOfEntries; j ++)
+                    {
+                        for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
+                        {
+                            if (pPEP->u.vk.pResourceSets[i].separatedSamplerTable.pSamplerEntries[j].bUsingHwMppingList &&
+                                (pPEP->u.vk.pResourceSets[i].separatedSamplerTable.pSamplerEntries[j].stageBits &
+                                 VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx)))
+                            {
+                                pSeparatedSampMapping = &pPEP->u.vk.pResourceSets[i].separatedSamplerTable.pSamplerEntries[j].hwMappings[stageIdx];
+
+                                if (pSeparatedSampMapping->samplerHwMappingList.arraySize)
+                                {
+                                    gcoOS_Free(gcvNULL, pSeparatedSampMapping->samplerHwMappingList.pPctsHmEntryIdxArray);
+                                    pSeparatedSampMapping->samplerHwMappingList.pPctsHmEntryIdxArray = gcvNULL;
+                                }
+                            }
+                        }
+
+                        if (pPEP->u.vk.pResourceSets[i].separatedSamplerTable.pSamplerEntries[j].pResOpBits)
+                        {
+                            gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].separatedSamplerTable.pSamplerEntries[j].pResOpBits);
+                            pPEP->u.vk.pResourceSets[i].separatedSamplerTable.pSamplerEntries[j].pResOpBits = gcvNULL;
+                        }
+                    }
+
+                    gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].separatedSamplerTable.pSamplerEntries);
+                    pPEP->u.vk.pResourceSets[i].separatedSamplerTable.pSamplerEntries = gcvNULL;
+                }
+
+                if (pPEP->u.vk.pResourceSets[i].separatedTexTable.pTextureEntries)
+                {
+                    for (j = 0; j < pPEP->u.vk.pResourceSets[i].separatedTexTable.countOfEntries; j ++)
+                    {
+                        for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
+                        {
+                            if (pPEP->u.vk.pResourceSets[i].separatedTexTable.pTextureEntries[j].bUsingHwMppingList &&
+                                (pPEP->u.vk.pResourceSets[i].separatedTexTable.pTextureEntries[j].stageBits &
+                                 VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx)))
+                            {
+                                pSeparatedTextureMapping = &pPEP->u.vk.pResourceSets[i].separatedTexTable.pTextureEntries[j].hwMappings[stageIdx];
+
+                                if (pSeparatedTextureMapping->texHwMappingList.arraySize)
+                                {
+                                    gcoOS_Free(gcvNULL, pSeparatedTextureMapping->texHwMappingList.pPctsHmEntryIdxArray);
+                                    pSeparatedTextureMapping->texHwMappingList.pPctsHmEntryIdxArray = gcvNULL;
+                                }
+                            }
+                        }
+
+                        if (pPEP->u.vk.pResourceSets[i].separatedTexTable.pTextureEntries[j].pResOpBits)
+                        {
+                            gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].separatedTexTable.pTextureEntries[j].pResOpBits);
+                            pPEP->u.vk.pResourceSets[i].separatedTexTable.pTextureEntries[j].pResOpBits = gcvNULL;
+                        }
+                    }
+
+                    gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].separatedTexTable.pTextureEntries);
+                    pPEP->u.vk.pResourceSets[i].separatedTexTable.pTextureEntries = gcvNULL;
+                }
+
+                if (pPEP->u.vk.pResourceSets[i].uniformTexBufTable.pUtbEntries)
+                {
+                    for (j = 0; j < pPEP->u.vk.pResourceSets[i].uniformTexBufTable.countOfEntries; j ++)
+                    {
+                        for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
+                        {
+                            pUtbHwMapping = &pPEP->u.vk.pResourceSets[i].uniformTexBufTable.pUtbEntries[j].hwMappings[stageIdx];
+                            if (pUtbHwMapping->s.ppExtraSamplerArray)
+                            {
+                                gcoOS_Free(gcvNULL, pUtbHwMapping->s.ppExtraSamplerArray);
+                                pUtbHwMapping->s.ppExtraSamplerArray = gcvNULL;
+                            }
+                        }
+
+                        if (pPEP->u.vk.pResourceSets[i].uniformTexBufTable.pUtbEntries[j].pResOpBits)
+                        {
+                            gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].uniformTexBufTable.pUtbEntries[j].pResOpBits);
+                            pPEP->u.vk.pResourceSets[i].uniformTexBufTable.pUtbEntries[j].pResOpBits = gcvNULL;
+                        }
+                    }
+
+                    gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].uniformTexBufTable.pUtbEntries);
+                    pPEP->u.vk.pResourceSets[i].uniformTexBufTable.pUtbEntries = gcvNULL;
+                }
+
+                if (pPEP->u.vk.pResourceSets[i].inputAttachmentTable.pIaEntries)
+                {
+                    gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].inputAttachmentTable.pIaEntries);
+                    pPEP->u.vk.pResourceSets[i].inputAttachmentTable.pIaEntries = gcvNULL;
+                }
+
+                if (pPEP->u.vk.pResourceSets[i].storageTable.pStorageEntries)
+                {
+                    for (j = 0; j < pPEP->u.vk.pResourceSets[i].storageTable.countOfEntries; j ++)
+                    {
+                        for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
+                        {
+                            if (pPEP->u.vk.pResourceSets[i].storageTable.pStorageEntries[j].stageBits &
+                                VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx))
+                            {
+                                pUavSlotMapping = &pPEP->u.vk.pResourceSets[i].storageTable.pStorageEntries[j].hwMappings[stageIdx];
+
+                                if (pUavSlotMapping->hwMemAccessMode != SHADER_HW_MEM_ACCESS_MODE_PLACE_HOLDER)
+                                {
+                                    gcmASSERT(pUavSlotMapping->hwLoc.pHwDirectAddrBase);
+
+                                    gcoOS_Free(gcvNULL, pUavSlotMapping->hwLoc.pHwDirectAddrBase);
+                                    pUavSlotMapping->hwLoc.pHwDirectAddrBase = gcvNULL;
+                                }
+                            }
+                        }
+                    }
+
+                    gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].storageTable.pStorageEntries);
+                    pPEP->u.vk.pResourceSets[i].storageTable.pStorageEntries = gcvNULL;
+                }
+
+                if (pPEP->u.vk.pResourceSets[i].uniformBufferTable.pUniformBufferEntries)
+                {
+                    for (j = 0; j < pPEP->u.vk.pResourceSets[i].uniformBufferTable.countOfEntries; j ++)
+                    {
+                        for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
+                        {
+                            if (pPEP->u.vk.pResourceSets[i].uniformBufferTable.pUniformBufferEntries[j].stageBits &
+                                VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx))
+                            {
+                                pCnstHwLocMapping = &pPEP->u.vk.pResourceSets[i].uniformBufferTable.pUniformBufferEntries[j].
+                                                                                    hwMappings[stageIdx];
+
+                                if (pCnstHwLocMapping->hwAccessMode == SHADER_HW_ACCESS_MODE_MEMORY &&
+                                    pCnstHwLocMapping->hwLoc.memAddr.hwMemAccessMode != SHADER_HW_MEM_ACCESS_MODE_PLACE_HOLDER)
+                                {
+                                    gcmASSERT(pCnstHwLocMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase);
+
+                                    gcoOS_Free(gcvNULL, pCnstHwLocMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase);
+                                    pCnstHwLocMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase = gcvNULL;
+                                }
+                            }
+                        }
+                    }
+
+                    gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets[i].uniformBufferTable.pUniformBufferEntries);
+                    pPEP->u.vk.pResourceSets[i].uniformBufferTable.pUniformBufferEntries = gcvNULL;
+                }
+            }
+
+            gcoOS_Free(gcvNULL, pPEP->u.vk.pResourceSets);
+            pPEP->u.vk.pResourceSets = gcvNULL;
+        }
+
+        if (pPEP->u.vk.pushConstantTable.pPushConstantEntries)
+        {
+            for (j = 0; j < pPEP->u.vk.pushConstantTable.countOfEntries; j ++)
+            {
+                for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
+                {
+                    if (pPEP->u.vk.pushConstantTable.pPushConstantEntries[j].stageBits &
+                        VSC_SHADER_STAGE_2_STAGE_BIT(stageIdx))
+                    {
+                        pCnstHwLocMapping = &pPEP->u.vk.pushConstantTable.pPushConstantEntries[j].hwMappings[stageIdx];
+
+                        if (pCnstHwLocMapping->hwAccessMode == SHADER_HW_ACCESS_MODE_MEMORY &&
+                            pCnstHwLocMapping->hwLoc.memAddr.hwMemAccessMode != SHADER_HW_MEM_ACCESS_MODE_PLACE_HOLDER)
+                        {
+                            gcmASSERT(pCnstHwLocMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase);
+
+                            gcoOS_Free(gcvNULL, pCnstHwLocMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase);
+                            pCnstHwLocMapping->hwLoc.memAddr.memBase.pHwDirectAddrBase = gcvNULL;
+                        }
+                    }
+                }
+            }
+
+            gcoOS_Free(gcvNULL, pPEP->u.vk.pushConstantTable.pPushConstantEntries);
+            pPEP->u.vk.pushConstantTable.pPushConstantEntries = gcvNULL;
+        }
+
+        if (pPEP->u.vk.privateCombTsHwMappingPool.pPrivCombTsHwMappingArray)
+        {
+            for (i = 0; i < pPEP->u.vk.privateCombTsHwMappingPool.countOfArray; i ++)
+            {
+                if (pPEP->u.vk.privateCombTsHwMappingPool.pPrivCombTsHwMappingArray[i].ppExtraSamplerArray)
+                {
+                    gcoOS_Free(gcvNULL, pPEP->u.vk.privateCombTsHwMappingPool.pPrivCombTsHwMappingArray[i].ppExtraSamplerArray);
+                    pPEP->u.vk.privateCombTsHwMappingPool.pPrivCombTsHwMappingArray[i].ppExtraSamplerArray = gcvNULL;
+                }
+            }
+
+            gcoOS_Free(gcvNULL, pPEP->u.vk.privateCombTsHwMappingPool.pPrivCombTsHwMappingArray);
+            pPEP->u.vk.privateCombTsHwMappingPool.pPrivCombTsHwMappingArray = gcvNULL;
+        }
+    }
 
 OnError:
     return status;
@@ -142,7 +439,7 @@ gceSTATUS vscInitializeKEP(KERNEL_EXECUTABLE_PROFILE* pKEP)
 {
     gceSTATUS                  status = gcvSTATUS_OK;
 
-    gcmONERROR(vscInitializeSEP(&pKEP->ExecutableKernel));
+    gcmONERROR(vscInitializeSEP(&pKEP->sep));
 
     /* TODO: Initialize HL tables */
 
@@ -154,33 +451,30 @@ gceSTATUS vscFinalizeKEP(KERNEL_EXECUTABLE_PROFILE* pKEP)
 {
     gceSTATUS                  status = gcvSTATUS_OK;
 
-    gcmONERROR(vscFinalizeSEP(&pKEP->ExecutableKernel));
+    gcmONERROR(vscFinalizeSEP(&pKEP->sep));
 
     /* TODO: Uninitialize HL tables */
 
 OnError:
     return status;
 }
+
 typedef struct _VSC_BASE_LINKER_HELPER
 {
-    VSC_PRIMARY_MEM_POOL              pmp;
+    VSC_MM*                           pMM;
     PVSC_HW_CONFIG                    pHwCfg;
 }VSC_BASE_LINKER_HELPER;
 
 typedef struct _VSC_PROGRAM_LINKER_HELPER
 {
     VSC_BASE_LINKER_HELPER            baseHelper;
-    PVSC_GL_API_CONFIG                pGlApiCfg;
-    VSC_PROGRAM_LINKER_PARAM*         pPgLinkParam;
-
-    VSC_SHADER_COMPILER_PARAM*        pShCompParamArray;
-    VSC_PASS_MANAGER*                 pPassMngerArray;
+    VSC_GPG_PASS_MANAGER              pgPassMnger;
 }VSC_PROGRAM_LINKER_HELPER;
 
 typedef struct _VSC_KERNEL_PROGRAM_LINKER_HELPER
 {
     VSC_BASE_LINKER_HELPER            baseHelper;
-    VSC_KERNEL_PROGRAM_LINKER_PARAM*  pKrnlPgLinkParam;
+    VSC_KPG_PASS_MANAGER              pgPassMnger;
 }VSC_KERNEL_PROGRAM_LINKER_HELPER;
 
 typedef enum FSL_STAGE
@@ -451,14 +745,15 @@ static VSC_ErrCode _CheckIoAliasedLocationPerExeObj(VSC_BASE_LINKER_HELPER* pBas
     gctUINT                    i, virIo, thisVirIoRegCount, location;
     gctUINT                    virIoCount = VIR_IdList_Count(pVirIoIdLsts);
 
-    vscBV_Initialize(&locationMask, &pBaseLinkHelper->pmp.mmWrapper, MAX_SHADER_IO_NUM);
+    vscBV_Initialize(&locationMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM);
 
     for (virIo = 0; virIo < virIoCount; virIo ++)
     {
         pVirIoSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirIoIdLsts, virIo));
 
-        if (VIR_Symbol_GetName(pVirIoSym) > VIR_NAME_UNKNOWN &&
-            VIR_Symbol_GetName(pVirIoSym) <= VIR_NAME_BUILTIN_LAST)
+        /* we could have not enabled attributes/outputs */
+        if (VIR_Shader_IsNameBuiltIn(pShader, VIR_Symbol_GetName(pVirIoSym)) ||
+            !isSymEnabled(pVirIoSym))
         {
             continue;
         }
@@ -559,7 +854,7 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
         CHECK_ERROR(errCode, "Check io aliased location");
     }
 
-    vscBV_Initialize(&outputWorkingMask, &pBaseLinkHelper->pmp.mmWrapper, outputCount);
+    vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, outputCount);
 
     /* Mark all outputs of upper-shader as not used */
     for (outputIdx = 0; outputIdx < outputCount; outputIdx ++)
@@ -590,8 +885,8 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
         }
 
         /* Skip SGV now */
-        if (VIR_Symbol_GetName(pAttrSym) > VIR_NAME_UNKNOWN &&
-            VIR_Symbol_GetName(pAttrSym) <= VIR_NAME_BUILTIN_LAST &&
+        if (VIR_Shader_IsNameBuiltIn(pLowerShader, VIR_Symbol_GetName(pAttrSym))
+            &&
             !_IsFakeSGV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pAttrSym),
                         (fslStage == FSL_STAGE_LL_SLOT_CALC)))
         {
@@ -718,8 +1013,8 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
     {
         pOutputSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(pOutputIdLstsOfUpperShader, outputIdx));
 
-        if (VIR_Symbol_GetName(pOutputSym) > VIR_NAME_UNKNOWN &&
-            VIR_Symbol_GetName(pOutputSym) <= VIR_NAME_BUILTIN_LAST &&
+        if (VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym))
+            &&
             !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym),
                         (fslStage == FSL_STAGE_LL_SLOT_CALC)))
         {
@@ -748,8 +1043,8 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
                 continue;
             }
 
-            if (VIR_Symbol_GetName(pAttrSym) > VIR_NAME_UNKNOWN &&
-                VIR_Symbol_GetName(pAttrSym) <= VIR_NAME_BUILTIN_LAST &&
+            if (VIR_Shader_IsNameBuiltIn(pLowerShader, VIR_Symbol_GetName(pAttrSym))
+                &&
                 !_IsFakeSGV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pAttrSym),
                             (fslStage == FSL_STAGE_LL_SLOT_CALC)))
             {
@@ -844,11 +1139,11 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBaseLi
     VIR_AttributeIdList        workingPerVtxPxlAttrIdLstOfLowerShader, workingPerPrimAttrIdLstOfLowerShader;
     VIR_OutputIdList           workingPerVtxPxlAttrIdLstOfUpperShader, workingPerPrimAttrIdLstOfUpperShader;
 
-    _ConvertVirPerVtxPxlAndPerPrimIoList(pLowerShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pLowerShader, pBaseLinkHelper->pMM,
                                          gcvTRUE, &workingPerVtxPxlAttrIdLstOfLowerShader,
                                          &workingPerPrimAttrIdLstOfLowerShader);
 
-    _ConvertVirPerVtxPxlAndPerPrimIoList(pUpperShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pUpperShader, pBaseLinkHelper->pMM,
                                          gcvFALSE, &workingPerVtxPxlAttrIdLstOfUpperShader,
                                          &workingPerPrimAttrIdLstOfUpperShader);
 
@@ -863,6 +1158,10 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBaseLi
                                                      &workingPerPrimAttrIdLstOfLowerShader,
                                                      &workingPerPrimAttrIdLstOfUpperShader);
     ON_ERROR(errCode, "Link Io between two shader stages per prim");
+
+    /* Record linked shader stage type each other */
+    pUpperShader->outLinkedShaderStage = pLowerShader->shaderKind;
+    pLowerShader->inLinkedShaderStage = pUpperShader->shaderKind;
 
 OnError:
     return errCode;
@@ -883,7 +1182,7 @@ static VSC_ErrCode _CalcInputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBase
     gctBOOL                    bHasNoAssignedLocation = gcvFALSE;
     gctBOOL                    bDirectlyUseLocation = (pShader->shaderKind != VIR_SHADER_VERTEX) && bSeperatedShaders;
 
-    vscBV_Initialize(&inputWorkingMask, &pBaseLinkHelper->pmp.mmWrapper, MAX_SHADER_IO_NUM);
+    vscBV_Initialize(&inputWorkingMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM);
 
     for (attrIdx = 0; attrIdx < attrCount; attrIdx ++)
     {
@@ -1036,7 +1335,7 @@ static VSC_ErrCode _CalcInputLowLevelSlot(VSC_BASE_LINKER_HELPER* pBaseLinkHelpe
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VIR_AttributeIdList        workingPerVtxPxlAttrIdLst, workingPerPrimAttrIdLst;
 
-    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, pBaseLinkHelper->pMM,
                                          gcvTRUE, &workingPerVtxPxlAttrIdLst, &workingPerPrimAttrIdLst);
 
     /* Per vtx/Pxl */
@@ -1068,7 +1367,7 @@ static VSC_ErrCode _CalcOutputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBas
     VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper = gcvNULL;
     gctBOOL                    bHasNoAssignedLocation = gcvFALSE;
 
-    vscBV_Initialize(&outputWorkingMask, &pBaseLinkHelper->pmp.mmWrapper, MAX_SHADER_IO_NUM);
+    vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, MAX_SHADER_IO_NUM);
 
     for (outputIdx = 0; outputIdx < outputCount; outputIdx ++)
     {
@@ -1085,8 +1384,8 @@ static VSC_ErrCode _CalcOutputLowLevelSlotPerExeObj(VSC_BASE_LINKER_HELPER* pBas
             pPgLinkHelper = (VSC_PROGRAM_LINKER_HELPER*)pBaseLinkHelper;
 
             if ((VIR_Symbol_GetLocation(pOutputSym) + thisOutputRegCount - 1) >=
-                ((pPgLinkHelper->pPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_RECOMPILING) ?
-                 pBaseLinkHelper->pHwCfg->maxRenderTargetCount : pPgLinkHelper->pGlApiCfg->maxDrawBuffers))
+                ((pPgLinkHelper->pgPassMnger.pPgmLinkerParam->pInMasterPEP != gcvNULL) ?
+                 pBaseLinkHelper->pHwCfg->maxRenderTargetCount : pPgLinkHelper->pgPassMnger.pPgmLinkerParam->pGlApiCfg->maxDrawBuffers))
             {
                 errCode = VSC_ERR_TOO_MANY_OUTPUTS;
                 ON_ERROR(errCode, "Calc output ll slot");
@@ -1184,7 +1483,7 @@ static VSC_ErrCode _CalcOutputLowLevelSlot(VSC_BASE_LINKER_HELPER* pBaseLinkHelp
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VIR_OutputIdList           workingPerVtxPxlAttrIdLst, workingPerPrimAttrIdLst;
 
-    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, pBaseLinkHelper->pMM,
                                          gcvFALSE, &workingPerVtxPxlAttrIdLst, &workingPerPrimAttrIdLst);
 
     /* Per vtx/Pxl */
@@ -1207,7 +1506,7 @@ static VSC_ErrCode _CheckInputAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLinkH
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VIR_AttributeIdList        workingPerVtxPxlAttrIdLst, workingPerPrimAttrIdLst;
 
-    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, pBaseLinkHelper->pMM,
                                          gcvTRUE, &workingPerVtxPxlAttrIdLst, &workingPerPrimAttrIdLst);
 
     /* Per vtx/Pxl */
@@ -1228,7 +1527,7 @@ static VSC_ErrCode _CheckOutputAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLink
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VIR_OutputIdList           workingPerVtxPxlAttrIdLst, workingPerPrimAttrIdLst;
 
-    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, pBaseLinkHelper->pMM,
                                          gcvFALSE, &workingPerVtxPxlAttrIdLst, &workingPerPrimAttrIdLst);
 
     /* Per vtx/Pxl */
@@ -1258,7 +1557,7 @@ static VSC_ErrCode _CheckUniformAliasedLocation(VSC_BASE_LINKER_HELPER* pBaseLin
         return VSC_ERR_NONE;
     }
 
-    vscBV_Initialize(&locationMask, &pBaseLinkHelper->pmp.mmWrapper, GetGLMaxUniformLocations());
+    vscBV_Initialize(&locationMask, pBaseLinkHelper->pMM, GetGLMaxUniformLocations());
 
     for (uniformIdx = 0; uniformIdx < uniformCount; uniformIdx++)
     {
@@ -1303,12 +1602,13 @@ static VSC_ErrCode _LinkUniformBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pB
     gctUINT                    upperUniformCount = VIR_IdList_Count(upperUniformList);
     gctUINT                    uniformIdx;
     VIR_Symbol*                upperUniformSym;
-    gctBOOL                    checkPrecision = gcvTRUE;
+    gctBOOL                    bCheckPrecision = gcvTRUE;
+    VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper = (VSC_PROGRAM_LINKER_HELPER*)pBaseLinkHelper;
 
     /* Skip uniform precision check for some APPs to make link pass. */
-    if (VIR_Shader_GetPatchId(pUpperShader) == gcvPATCH_AXX_SAMPLE)
+    if (pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.cFlags & VSC_COMPILER_FLAG_API_UNIFORM_PRECISION_CHECK)
     {
-        checkPrecision = gcvFALSE;
+        bCheckPrecision = gcvFALSE;
     }
 
     for (uniformIdx = 0; uniformIdx < upperUniformCount; uniformIdx++)
@@ -1335,7 +1635,7 @@ static VSC_ErrCode _LinkUniformBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pB
                                         pLowerUniformSym,
                                         pUpperShader,
                                         upperUniformSym,
-                                        checkPrecision,
+                                        bCheckPrecision,
                                         &matched);
 
         ON_ERROR(errCode, "Check uniform error");
@@ -1369,7 +1669,7 @@ static VSC_ErrCode _LinkUniformsBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* p
         return VSC_ERR_NONE;
     }
 
-    vscBV_Initialize(&uniformWorkingMask, &pBaseLinkHelper->pmp.mmWrapper, upperUniformCount);
+    vscBV_Initialize(&uniformWorkingMask, pBaseLinkHelper->pMM, upperUniformCount);
 
     for (uniformIdx = 0; uniformIdx < lowerUniformCount; uniformIdx++)
     {
@@ -1458,7 +1758,7 @@ static VSC_ErrCode _LinkUbosBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBase
         return VSC_ERR_NONE;
     }
 
-    vscBV_Initialize(&uboWorkingMask, &pBaseLinkHelper->pmp.mmWrapper, upperUBOCount);
+    vscBV_Initialize(&uboWorkingMask, pBaseLinkHelper->pMM, upperUBOCount);
 
     for (uboIdx = 0; uboIdx < lowerUBOCount; uboIdx++)
     {
@@ -1505,14 +1805,54 @@ static void _CountIOBlockList(VIR_Shader* pShader, VSC_MM* pMM, gctBOOL bInput,
 
         storage =  VIR_IOBLOCK_GetStorage(ioBlock);
 
-        if ((storage == VIR_STORAGE_INPUT && !bInput) ||
-            (storage == VIR_STORAGE_OUTPUT && bInput))
+        if (((storage == VIR_STORAGE_INPUT || storage == VIR_STORAGE_PERPATCH_INPUT) && !bInput)
+            ||
+            ((storage == VIR_STORAGE_OUTPUT || storage == VIR_STORAGE_PERPATCH_OUTPUT) && bInput))
         {
             continue;
         }
 
         VIR_IdList_Add(pIOBlockList, VIR_IdList_GetId(pOrgIOBlockList, idx));
     }
+}
+
+static gctBOOL _IsBlockBuiltin(VIR_Shader* pShader,
+                               VIR_Symbol* pBlock,
+                               VIR_Type*   pType)
+{
+    if (VIR_Shader_IsNameBuiltIn(pShader, VIR_Symbol_GetName(pBlock)))
+    {
+        return gcvTRUE;
+    }
+    else
+    {
+        VIR_Type*   type = VIR_Symbol_GetType(pBlock);
+
+        while (VIR_Type_isArray(type))
+        {
+            type = VIR_Shader_GetTypeFromId(pShader, VIR_Type_GetBaseTypeId(type));
+        }
+
+        if (VIR_Type_isStruct(type))
+        {
+            VIR_SymIdList*  fields = VIR_Type_GetFields(type);
+            gctUINT         i;
+
+            for (i = 0; i < VIR_IdList_Count(fields); i++)
+            {
+                VIR_Id      id = VIR_IdList_GetId(VIR_Type_GetFields(type), i);
+                VIR_Symbol* fieldSym = VIR_Shader_GetSymFromId(pShader, id);
+
+                /* Any field is builtin, then this block is builtin. */
+                if (_IsBlockBuiltin(pShader, fieldSym, VIR_Symbol_GetType(fieldSym)))
+                {
+                    return gcvTRUE;
+                }
+            }
+        }
+    }
+
+    return gcvFALSE;
 }
 
 static VSC_ErrCode _LinkIOBlockBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
@@ -1536,20 +1876,18 @@ static VSC_ErrCode _LinkIOBlockBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pB
         return VSC_ERR_NONE;
     }
 
-    vscBV_Initialize(&outputWorkingMask, &pBaseLinkHelper->pmp.mmWrapper, outputCount);
+    vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, outputCount);
 
     for (inputIdx = 0; inputIdx < inputCount; inputIdx ++)
     {
         pInputSym = VIR_Shader_GetSymFromId(pLowerShader, VIR_IdList_GetId(pInputIdListsOfLowerShader, inputIdx));
+        pInputType = VIR_Symbol_GetType(pInputSym);
 
         /* skip built-in IO blocks. */
-        if (VIR_Symbol_GetName(pInputSym) > VIR_NAME_UNKNOWN &&
-            VIR_Symbol_GetName(pInputSym) <= VIR_NAME_BUILTIN_LAST)
+        if (_IsBlockBuiltin(pLowerShader, pInputSym, pInputType))
         {
             continue;
         }
-
-        pInputType = VIR_Symbol_GetType(pInputSym);
 
         for (outputIdx = 0; outputIdx < outputCount; outputIdx ++)
         {
@@ -1561,8 +1899,15 @@ static VSC_ErrCode _LinkIOBlockBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pB
             pOutputSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(pOutputIdListOfUpperShader, outputIdx));
             pOutputType = VIR_Symbol_GetType(pOutputSym);
 
-            /* Check IO block itself. */
-            if (!VIR_Symbol_isNameMatch(pLowerShader, pInputSym, pUpperShader, pOutputSym))
+            /* If input IOB has SkipNameCheck flag, then check location, instead of checking name string. */
+            if (isSymSkipNameCheck(pInputSym))
+            {
+                if (VIR_Symbol_GetLocation(pOutputSym) != VIR_Symbol_GetLocation(pInputSym))
+                {
+                    continue;
+                }
+            }
+            else if (!VIR_Symbol_isNameMatch(pLowerShader, pInputSym, pUpperShader, pOutputSym))
             {
                 continue;
             }
@@ -1612,10 +1957,10 @@ static VSC_ErrCode _LinkIOBBetweenTwoShaderStages(VSC_BASE_LINKER_HELPER* pBaseL
     VIR_IOBIdList              outputBlockOfUpperShader;
     VIR_IOBIdList              intputBlockOfLowerShader;
 
-    _CountIOBlockList(pUpperShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _CountIOBlockList(pUpperShader, pBaseLinkHelper->pMM,
                       gcvFALSE, &outputBlockOfUpperShader);
 
-    _CountIOBlockList(pLowerShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _CountIOBlockList(pLowerShader, pBaseLinkHelper->pMM,
                       gcvTRUE, &intputBlockOfLowerShader);
 
     errCode = _LinkIOBlockBetweenTwoShaderStages(pBaseLinkHelper, pUpperShader, pLowerShader,
@@ -1630,11 +1975,14 @@ static VSC_ErrCode _LinkIoAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* pPgLinkHe
 {
     VSC_ErrCode  errCode = VSC_ERR_NONE;
     VIR_Shader*  pPreStage = gcvNULL;
+    VIR_Shader*  pCurStage;
     gctUINT      stageIdx;
 
     for (stageIdx = 0; stageIdx < VSC_MAX_GFX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        if (pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx])
+        pCurStage = (VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[stageIdx];
+
+        if (pCurStage)
         {
             if (pPreStage)
             {
@@ -1642,7 +1990,7 @@ static VSC_ErrCode _LinkIoAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* pPgLinkHe
                 errCode = _LinkIoBetweenTwoShaderStages(&pPgLinkHelper->baseHelper,
                                                         fslStage,
                                                         pPreStage,
-                                                        pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
+                                                        pCurStage);
                 ON_ERROR(errCode, "Link Io between two shader stages");
             }
             else
@@ -1652,19 +2000,19 @@ static VSC_ErrCode _LinkIoAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* pPgLinkHe
                 if (fslStage == FSL_STAGE_API_SPEC_CHECK)
                 {
                     errCode = _CheckInputAliasedLocation(&pPgLinkHelper->baseHelper,
-                                                         pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
+                                                         pCurStage);
                     ON_ERROR(errCode, "Check input aliased location");
                 }
                 else if (fslStage == FSL_STAGE_LL_SLOT_CALC)
                 {
                     errCode = _CalcInputLowLevelSlot(&pPgLinkHelper->baseHelper,
-                                                     pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx],
+                                                     pCurStage,
                                                      gcvFALSE);
                     ON_ERROR(errCode, "Calc LL slot of input");
                 }
             }
 
-            pPreStage = pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx];
+            pPreStage = pCurStage;
         }
     }
 
@@ -1703,27 +2051,33 @@ static VSC_ErrCode _LinkUniformAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* pPgL
 {
     VSC_ErrCode  errCode = VSC_ERR_NONE;
     gctUINT      stageIdx, stageIdx1;
+    VIR_Shader*  pCurStage;
+    VIR_Shader*  pTempStage;
 
     for (stageIdx = 0; stageIdx < VSC_MAX_GFX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        if (pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx])
+        pCurStage = (VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[stageIdx];
+
+        if (pCurStage)
         {
             errCode = _CheckUniformAliasedLocation(&pPgLinkHelper->baseHelper,
-                                                   pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
+                                                   pCurStage);
             ON_ERROR(errCode, "Link Uniforms between two shader stages");
 
             for (stageIdx1 = 0; stageIdx1 < stageIdx; stageIdx1 ++)
             {
-                if (pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx1])
+                pTempStage = (VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[stageIdx1];
+
+                if (pTempStage)
                 {
                     errCode = _LinkUniformsBetweenTwoShaderStages(&pPgLinkHelper->baseHelper,
-                                                                  pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx1],
-                                                                  pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
+                                                                  pTempStage,
+                                                                  pCurStage);
                     ON_ERROR(errCode, "Link Uniforms between two shader stages");
 
                     errCode = _LinkUbosBetweenTwoShaderStages(&pPgLinkHelper->baseHelper,
-                                                             pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx1],
-                                                             pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
+                                                             pTempStage,
+                                                             pCurStage);
                     ON_ERROR(errCode, "Link Uniform blocks between two shader stages");
                 }
             }
@@ -1738,21 +2092,24 @@ static VSC_ErrCode _LinkIobAmongShaderStages(VSC_PROGRAM_LINKER_HELPER* pPgLinkH
 {
     VSC_ErrCode  errCode = VSC_ERR_NONE;
     VIR_Shader*  pPreStage = gcvNULL;
+    VIR_Shader*  pCurStage;
     gctUINT      stageIdx;
 
     for (stageIdx = 0; stageIdx < VSC_MAX_GFX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        if (pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx])
+        pCurStage= (VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[stageIdx];
+
+        if (pCurStage)
         {
             if (pPreStage)
             {
                 errCode = _LinkIOBBetweenTwoShaderStages(&pPgLinkHelper->baseHelper,
                                                          pPreStage,
-                                                         pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
+                                                         pCurStage);
                 ON_ERROR(errCode, "Link IOB between two shader stages");
             }
 
-            pPreStage = pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx];
+            pPreStage = pCurStage;
         }
     }
 
@@ -1965,8 +2322,8 @@ static void _CollectVectorizableIoPacketsFromNormalPairs(VSC_BASE_LINKER_HELPER*
     {
         if (pNormalPairArraySize[i])
         {
-            vscBV_Initialize(&globalChannelsPairMask[i], &pBaseLinkHelper->pmp.mmWrapper, pNormalPairArraySize[i]);
-            vscBV_Initialize(&localChannelsPairMask[i], &pBaseLinkHelper->pmp.mmWrapper, pNormalPairArraySize[i]);
+            vscBV_Initialize(&globalChannelsPairMask[i], pBaseLinkHelper->pMM, pNormalPairArraySize[i]);
+            vscBV_Initialize(&localChannelsPairMask[i], pBaseLinkHelper->pMM, pNormalPairArraySize[i]);
         }
     }
 
@@ -2121,7 +2478,7 @@ static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
        2. Normal user defined IOs. For SVs, dont consider them.
     */
 
-    vscBV_Initialize(&outputWorkingMask, &pBaseLinkHelper->pmp.mmWrapper, outputCount);
+    vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, outputCount);
 
     /* Collect SO related pairs */
     if (pUpperShader->transformFeedback.varyings)
@@ -2143,8 +2500,7 @@ static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
 
                 pSoIoPairArray[*pSoPairArraySize].pAttrSym = gcvNULL;
 
-                if ((VIR_Symbol_GetName(pOutputSym) > VIR_NAME_UNKNOWN &&
-                     VIR_Symbol_GetName(pOutputSym) <= VIR_NAME_BUILTIN_LAST &&
+                if ((VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym)) &&
                      !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym), gcvTRUE)) ||
                      pSoSym != pOutputSym ||
                      VIR_Symbol_GetVirIoRegCount(pUpperShader, pOutputSym) > 1)
@@ -2188,8 +2544,7 @@ static void _CollectVectorizableIoPairs(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
         }
 
         /* Don't consider SGV */
-        if (VIR_Symbol_GetName(pAttrSym) > VIR_NAME_UNKNOWN &&
-            VIR_Symbol_GetName(pAttrSym) <= VIR_NAME_BUILTIN_LAST &&
+        if (VIR_Shader_IsNameBuiltIn(pLowerShader, VIR_Symbol_GetName(pAttrSym)) &&
             !_IsFakeSGV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pAttrSym), gcvTRUE))
         {
             continue;
@@ -2294,10 +2649,10 @@ static VSC_ErrCode _FindVectorizableIoPackets(VSC_BASE_LINKER_HELPER* pBaseLinkH
     /* Initialize */
     for (i = 0; i < 3; i ++)
     {
-        pNormalIoPairArray[i] = (ATTR_OUTPUT_PAIR*)vscMM_Alloc(&pBaseLinkHelper->pmp.mmWrapper,
+        pNormalIoPairArray[i] = (ATTR_OUTPUT_PAIR*)vscMM_Alloc(pBaseLinkHelper->pMM,
                                                                MAX_SHADER_IO_NUM * sizeof(ATTR_OUTPUT_PAIR));
     }
-    pSoIoPairArray = (ATTR_OUTPUT_PAIR*)vscMM_Alloc(&pBaseLinkHelper->pmp.mmWrapper,
+    pSoIoPairArray = (ATTR_OUTPUT_PAIR*)vscMM_Alloc(pBaseLinkHelper->pMM,
                                                     2 * MAX_SHADER_IO_NUM * sizeof(ATTR_OUTPUT_PAIR));
 
     /* Collect io-pairs */
@@ -2319,7 +2674,7 @@ static VSC_ErrCode _FindVectorizableIoPackets(VSC_BASE_LINKER_HELPER* pBaseLinkH
     {
         if (VIR_IdList_Count(pAttrIdLstsOfLowerShader) > 0)
         {
-            pAVPArray = (VIR_IO_VECTORIZABLE_PACKET*)vscMM_Alloc(&pBaseLinkHelper->pmp.mmWrapper,
+            pAVPArray = (VIR_IO_VECTORIZABLE_PACKET*)vscMM_Alloc(pBaseLinkHelper->pMM,
                                                                  MAX_SHADER_IO_NUM * sizeof(VIR_IO_VECTORIZABLE_PACKET));
             memset(pAVPArray, 0, MAX_SHADER_IO_NUM * sizeof(VIR_IO_VECTORIZABLE_PACKET));
             for (i = 0; i < MAX_SHADER_IO_NUM; i ++)
@@ -2330,7 +2685,7 @@ static VSC_ErrCode _FindVectorizableIoPackets(VSC_BASE_LINKER_HELPER* pBaseLinkH
 
         if (VIR_IdList_Count(pOutputIdLstsOfUpperShader) > 0)
         {
-            pOVPArray = (VIR_IO_VECTORIZABLE_PACKET*)vscMM_Alloc(&pBaseLinkHelper->pmp.mmWrapper,
+            pOVPArray = (VIR_IO_VECTORIZABLE_PACKET*)vscMM_Alloc(pBaseLinkHelper->pMM,
                                                                  MAX_SHADER_IO_NUM * sizeof(VIR_IO_VECTORIZABLE_PACKET));
             memset(pOVPArray, 0, MAX_SHADER_IO_NUM * sizeof(VIR_IO_VECTORIZABLE_PACKET));
             for (i = 0; i < MAX_SHADER_IO_NUM; i ++)
@@ -2369,15 +2724,15 @@ static VSC_ErrCode _FindVectorizableIoPackets(VSC_BASE_LINKER_HELPER* pBaseLinkH
     /* Finalization */
     for (i = 0; i < 3; i ++)
     {
-        vscMM_Free(&pBaseLinkHelper->pmp.mmWrapper, pNormalIoPairArray[i]);
+        vscMM_Free(pBaseLinkHelper->pMM, pNormalIoPairArray[i]);
     }
-    vscMM_Free(&pBaseLinkHelper->pmp.mmWrapper, pSoIoPairArray);
+    vscMM_Free(pBaseLinkHelper->pMM, pSoIoPairArray);
 
     if (pAVPArray)
     {
         if (avpArraySize == 0)
         {
-            vscMM_Free(&pBaseLinkHelper->pmp.mmWrapper, pAVPArray);
+            vscMM_Free(pBaseLinkHelper->pMM, pAVPArray);
         }
         else if (avpArraySize > 0)
         {
@@ -2391,7 +2746,7 @@ static VSC_ErrCode _FindVectorizableIoPackets(VSC_BASE_LINKER_HELPER* pBaseLinkH
     {
         if (ovpArraySize == 0)
         {
-            vscMM_Free(&pBaseLinkHelper->pmp.mmWrapper, pOVPArray);
+            vscMM_Free(pBaseLinkHelper->pMM, pOVPArray);
         }
         else if (ovpArraySize > 0)
         {
@@ -2416,6 +2771,7 @@ static VSC_ErrCode _DoIoVectorizationBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
     VIR_IO_VECTORIZABLE_PACKET* pAttrVectorizablePackets = gcvNULL;
     VIR_IO_VECTORIZABLE_PACKET* pOutputVectorizablePackets = gcvNULL;
     gctUINT                     numOfInputPackets = 0, numOfOutputPackets = 0;
+    VIR_IO_VECTORIZE_PARAM      ioVecParam;
 
     /* No need to go on if there are obvious results */
     if (outputCount == 0 && attrCount == 0)
@@ -2435,30 +2791,40 @@ static VSC_ErrCode _DoIoVectorizationBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
                                          &numOfOutputPackets);
     ON_ERROR(errCode, "Find vectorizable IO-packets");
 
+    ioVecParam.pMM = pBaseLinkHelper->pMM;
+
     /* If we have candidates (packets), yes, vectorize them now */
     if (numOfInputPackets > 0)
     {
         gcmASSERT(pAttrVectorizablePackets);
-        errCode = vscVIR_VectorizeIoPackets(pLowerShader, pAttrVectorizablePackets, numOfInputPackets);
+
+        ioVecParam.pShader = pLowerShader;
+        ioVecParam.pIoVectorizablePackets = pAttrVectorizablePackets;
+        ioVecParam.numOfPackets = numOfInputPackets;
+        errCode = vscVIR_VectorizeIoPackets(&ioVecParam);
         ON_ERROR(errCode, "Vectorize attribute packets");
     }
 
     if (numOfOutputPackets)
     {
         gcmASSERT(pOutputVectorizablePackets);
-        errCode = vscVIR_VectorizeIoPackets(pUpperShader, pOutputVectorizablePackets, numOfOutputPackets);
+
+        ioVecParam.pShader = pUpperShader;
+        ioVecParam.pIoVectorizablePackets = pOutputVectorizablePackets;
+        ioVecParam.numOfPackets = numOfOutputPackets;
+        errCode = vscVIR_VectorizeIoPackets(&ioVecParam);
         ON_ERROR(errCode, "Vectorize outputs packets");
     }
 
 OnError:
     if (pAttrVectorizablePackets)
     {
-        vscMM_Free(&pBaseLinkHelper->pmp.mmWrapper, pAttrVectorizablePackets);
+        vscMM_Free(pBaseLinkHelper->pMM, pAttrVectorizablePackets);
     }
 
     if (pOutputVectorizablePackets)
     {
-        vscMM_Free(&pBaseLinkHelper->pmp.mmWrapper, pOutputVectorizablePackets);
+        vscMM_Free(pBaseLinkHelper->pMM, pOutputVectorizablePackets);
     }
 
     return errCode;
@@ -2472,11 +2838,11 @@ static VSC_ErrCode _DoIoVectorizationBetweenTwoShaderStages(VSC_BASE_LINKER_HELP
     VIR_AttributeIdList        workingPerVtxPxlAttrIdLstOfLowerShader, workingPerPrimAttrIdLstOfLowerShader;
     VIR_OutputIdList           workingPerVtxPxlAttrIdLstOfUpperShader, workingPerPrimAttrIdLstOfUpperShader;
 
-    _ConvertVirPerVtxPxlAndPerPrimIoList(pLowerShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pLowerShader, pBaseLinkHelper->pMM,
                                          gcvTRUE, &workingPerVtxPxlAttrIdLstOfLowerShader,
                                          &workingPerPrimAttrIdLstOfLowerShader);
 
-    _ConvertVirPerVtxPxlAndPerPrimIoList(pUpperShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pUpperShader, pBaseLinkHelper->pMM,
                                          gcvFALSE, &workingPerVtxPxlAttrIdLstOfUpperShader,
                                          &workingPerPrimAttrIdLstOfUpperShader);
 
@@ -2500,17 +2866,20 @@ static VSC_ErrCode _DoIoVectorizationAmongShaderStages(VSC_PROGRAM_LINKER_HELPER
 {
     VSC_ErrCode  errCode = VSC_ERR_NONE;
     VIR_Shader*  pPreStage = gcvNULL;
+    VIR_Shader*  pCurStage;
     gctUINT      stageIdx;
 
     for (stageIdx = 0; stageIdx < VSC_MAX_GFX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        if (pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx])
+        pCurStage = (VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[stageIdx];
+
+        if (pCurStage)
         {
             if (pPreStage)
             {
                 errCode = _DoIoVectorizationBetweenTwoShaderStages(&pPgLinkHelper->baseHelper,
                                                                    pPreStage,
-                                                                   pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
+                                                                   pCurStage);
                 ON_ERROR(errCode, "Do Io vectorization between two shader stages");
             }
             else
@@ -2521,7 +2890,7 @@ static VSC_ErrCode _DoIoVectorizationAmongShaderStages(VSC_PROGRAM_LINKER_HELPER
                    we hit issues on it, we can implement it */
             }
 
-            pPreStage = pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx];
+            pPreStage = pCurStage;
         }
     }
 
@@ -2739,7 +3108,7 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
         hwChannelIdx = CHANNEL_NUM;
     }
 
-    vscBV_Initialize(&outputWorkingMask, &pBaseLinkHelper->pmp.mmWrapper, outputCount);
+    vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM, outputCount);
 
     /* For each attribute of lower-shader, find whether upper-shader has corresponding output */
     for (attrIdx = 0; attrIdx < attrCount; attrIdx ++)
@@ -2753,8 +3122,7 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
         }
 
         /* Skip SGV now */
-        if (VIR_Symbol_GetName(pAttrSym) > VIR_NAME_UNKNOWN &&
-            VIR_Symbol_GetName(pAttrSym) <= VIR_NAME_BUILTIN_LAST &&
+        if (VIR_Shader_IsNameBuiltIn(pLowerShader, VIR_Symbol_GetName(pAttrSym)) &&
             !_IsFakeSGV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pAttrSym), gcvTRUE))
         {
             continue;
@@ -2769,6 +3137,11 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
             }
 
             pOutputSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(pOutputIdLstsOfUpperShader, outputIdx));
+
+            if (isSymVectorizedOut(pOutputSym))
+            {
+                continue;
+            }
 
             /* Name or location of the output and attribute must be matched */
            if (!(VIR_Symbol_isNameMatch(pLowerShader, pAttrSym, pUpperShader, pOutputSym) ||
@@ -2941,8 +3314,7 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
                 pOutputSym = VIR_Symbol_GetIndexingInfo(pUpperShader, pSoSym).underlyingSym;
 
                 /* Skip SIV now */
-                if (VIR_Symbol_GetName(pOutputSym) > VIR_NAME_UNKNOWN &&
-                    VIR_Symbol_GetName(pOutputSym) <= VIR_NAME_BUILTIN_LAST &&
+                if (VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym)) &&
                     !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym), gcvTRUE))
                 {
                     continue;
@@ -2978,8 +3350,7 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
             pOutputSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(pOutputIdLstsOfUpperShader, outputIdx));
 
             /* Skip SIV now */
-            if (VIR_Symbol_GetName(pOutputSym) > VIR_NAME_UNKNOWN &&
-                VIR_Symbol_GetName(pOutputSym) <= VIR_NAME_BUILTIN_LAST &&
+            if (VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym)) &&
                 !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym), gcvTRUE))
             {
                 continue;
@@ -3017,8 +3388,7 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
         pOutputSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(pOutputIdLstsOfUpperShader, outputIdx));
 
         /* Only consider SIVs */
-        if (!(VIR_Symbol_GetName(pOutputSym) > VIR_NAME_UNKNOWN &&
-              VIR_Symbol_GetName(pOutputSym) <= VIR_NAME_BUILTIN_LAST &&
+        if (!(VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym)) &&
               !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym), gcvTRUE)))
         {
             continue;
@@ -3042,8 +3412,7 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
         }
 
         /* Only consider SGVs */
-        if (!(VIR_Symbol_GetName(pAttrSym) > VIR_NAME_UNKNOWN &&
-              VIR_Symbol_GetName(pAttrSym) <= VIR_NAME_BUILTIN_LAST &&
+        if (!(VIR_Shader_IsNameBuiltIn(pLowerShader, VIR_Symbol_GetName(pAttrSym)) &&
               !_IsFakeSGV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pAttrSym), gcvTRUE)))
         {
             continue;
@@ -3075,11 +3444,11 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStages(VSC_BASE_LINKER_HELP
         return VSC_ERR_NONE;
     }
 
-    _ConvertVirPerVtxPxlAndPerPrimIoList(pLowerShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pLowerShader, pBaseLinkHelper->pMM,
                                          gcvTRUE, &workingPerVtxPxlAttrIdLstOfLowerShader,
                                          &workingPerPrimAttrIdLstOfLowerShader);
 
-    _ConvertVirPerVtxPxlAndPerPrimIoList(pUpperShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pUpperShader, pBaseLinkHelper->pMM,
                                          gcvFALSE, &workingPerVtxPxlAttrIdLstOfUpperShader,
                                          &workingPerPrimAttrIdLstOfUpperShader);
 
@@ -3123,7 +3492,7 @@ static VSC_ErrCode _CalcInputHwCompIndexPerExeObj(VSC_BASE_LINKER_HELPER* pBaseL
     VIR_Symbol*                pAttrSym;
     gctBOOL                    bNeedIoMemPacked, bHasNoAssignedLocation = gcvFALSE;;
 
-    vscBV_Initialize(&inputWorkingMask, &pBaseLinkHelper->pmp.mmWrapper,
+    vscBV_Initialize(&inputWorkingMask, pBaseLinkHelper->pMM,
                      pBaseLinkHelper->pHwCfg->maxAttributeCount * CHANNEL_NUM);
 
     bNeedIoMemPacked = _NeedInputHwMemPacked(pBaseLinkHelper, pShader, pAttrIdLsts);
@@ -3248,7 +3617,7 @@ static VSC_ErrCode _CalcInputHwCompIndex(VSC_BASE_LINKER_HELPER* pBaseLinkHelper
         return VSC_ERR_NONE;
     }
 
-    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, pBaseLinkHelper->pMM,
                                          gcvTRUE, &workingPerVtxPxlAttrIdLst, &workingPerPrimAttrIdLst);
 
     /* Per vtx/Pxl */
@@ -3285,7 +3654,7 @@ static VSC_ErrCode _CalcOutputHwCompIndexPerExeObj(VSC_BASE_LINKER_HELPER* pBase
     gctINT                     location, ioIdx = 0;
     gctBOOL                    bNeedIoMemPacked, bHasNoAssignedLocation = gcvFALSE;
 
-    vscBV_Initialize(&outputWorkingMask, &pBaseLinkHelper->pmp.mmWrapper,
+    vscBV_Initialize(&outputWorkingMask, pBaseLinkHelper->pMM,
                      pBaseLinkHelper->pHwCfg->maxAttributeCount * CHANNEL_NUM);
 
     bNeedIoMemPacked = _NeedOutputHwMemPacked(pBaseLinkHelper, pShader, pOutputIdLsts);
@@ -3401,7 +3770,7 @@ static VSC_ErrCode _CalcOutputHwCompIndex(VSC_BASE_LINKER_HELPER* pBaseLinkHelpe
         return VSC_ERR_NONE;
     }
 
-    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, &pBaseLinkHelper->pmp.mmWrapper,
+    _ConvertVirPerVtxPxlAndPerPrimIoList(pShader, pBaseLinkHelper->pMM,
                                          gcvFALSE, &workingPerVtxPxlAttrIdLst, &workingPerPrimAttrIdLst);
 
     /* Per vtx/Pxl */
@@ -3420,29 +3789,32 @@ static VSC_ErrCode _CalcHwCompIndexForIOs(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelp
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VIR_Shader*                pPreStage = gcvNULL;
+    VIR_Shader*                pCurStage;
     gctUINT                    stageIdx;
 
     for (stageIdx = 0; stageIdx < VSC_MAX_GFX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        if (pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx])
+        pCurStage= (VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[stageIdx];
+
+        if (pCurStage)
         {
             if (pPreStage)
             {
                 /* Calc io hw component index between two shader stages */
                 errCode = _CalcIoHwCompIndexBetweenTwoShaderStages(&pPgLinkHelper->baseHelper,
                                                                    pPreStage,
-                                                                   pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
+                                                                   pCurStage);
                 ON_ERROR(errCode, "Calc io hw component index between two shader stages");
             }
             else
             {
                 /* Only consider input of first active stage */
                 errCode = _CalcInputHwCompIndex(&pPgLinkHelper->baseHelper,
-                                                pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx]);
+                                                pCurStage);
                 ON_ERROR(errCode, "Calc hw component index of input");
             }
 
-            pPreStage = pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx];
+            pPreStage = pCurStage;
         }
     }
 
@@ -3457,49 +3829,6 @@ OnError:
     return errCode;
 }
 
-static VSC_ErrCode _DoProgramLevelConstantRegSpillage(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper)
-{
-    VSC_ErrCode                errCode = VSC_ERR_NONE;
-    VSC_PRIMARY_MEM_POOL       pmp;
-    VSC_AllShaders             all_shaders;
-    VSC_OPTN_UF_AUBO_Options*  aubo_options;
-    char                       buffer[4096];
-    VIR_Dumper                 dumper;
-
-    vscPMP_Intialize(&pmp, gcvNULL, 512*1024, sizeof(void *), gcvTRUE /*pooling*/);
-
-    gcoOS_ZeroMemory(&dumper, sizeof(dumper));
-    vscDumper_Initialize(&dumper.baseDumper, gcvNULL, gcvNULL, buffer, sizeof(buffer));
-
-    VSC_AllShaders_Initialize(&all_shaders,
-                              pPgLinkHelper->pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_VS],
-                              pPgLinkHelper->pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_HS],
-                              pPgLinkHelper->pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_DS],
-                              pPgLinkHelper->pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_GS],
-                              pPgLinkHelper->pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_PS],
-                              pPgLinkHelper->pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_CS],
-                              pPgLinkHelper->pPgLinkParam->cfg.pHwCfg,
-                              &dumper,
-                              &pmp.mmWrapper
-                              );
-
-    /* Create Default UBO now */
-    errCode = VSC_AllShaders_LinkUniforms(&all_shaders);
-    ON_ERROR(errCode, "Link uniforms");
-
-    aubo_options = VSC_OPTN_Options_GetAUBOOptions(VSC_OPTN_Get_Options());
-    if (VSC_OPTN_UF_AUBO_Options_GetSwitchOn(aubo_options) &&
-        (pPgLinkHelper->pPgLinkParam->cfg.optFlags & VSC_COMPILER_OPT_CONSTANT_REG_SPILLABLE))
-    {
-        errCode = VSC_UF_UtilizeAuxUBO(&all_shaders, aubo_options);
-        ON_ERROR(errCode, "utilize default UBO");
-    }
-
-OnError:
-    vscPMP_Finalize(&pmp);
-    return errCode;
-}
-
 static VSC_ErrCode _CalcSamplerBaseOffset(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper)
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
@@ -3507,7 +3836,7 @@ static VSC_ErrCode _CalcSamplerBaseOffset(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelp
     gctINT                     samplerBaseOffset, samplerCount, maxSamplerCount = 0;
     gctUINT                    stageIdx;
 
-    if (!(pPgLinkHelper->pPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC))
+    if (!(pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.cFlags & VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC))
     {
         return errCode;
     }
@@ -3517,7 +3846,8 @@ static VSC_ErrCode _CalcSamplerBaseOffset(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelp
     /* We pack all GPipe shaders one by one, and use the bottom sampler memory for GPipe. */
     for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        pShader = pPgLinkHelper->pPgLinkParam->pShaderArray[stageIdx];
+        pShader = (VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[stageIdx];
+
         if (pShader)
         {
             /* Check the uniform usage first. */
@@ -3562,6 +3892,7 @@ OnError:
 static VSC_ErrCode _DoSecondStageOfLinkage(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper)
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VSC_GPG_PASS_MANAGER*      pPgPassMnger = &pPgLinkHelper->pgPassMnger;
 
     /* 1. Calc IO hw component index among stages. Note that this is actually doing hw
           shader linkage, so the real HW shader linkage called before state-programming
@@ -3571,8 +3902,7 @@ static VSC_ErrCode _DoSecondStageOfLinkage(VSC_PROGRAM_LINKER_HELPER* pPgLinkHel
 
     /* 2. Program-level constant reg spillage needs full program info, so entry of this
           kind of reg spillage is put in link time */
-    errCode = _DoProgramLevelConstantRegSpillage(pPgLinkHelper);
-    ON_ERROR(errCode, "Do program-level constant-reg spillage");
+    CALL_GPG_PASS(VSC_UF_CreateAUBO, gcvNULL);
 
     /* 3. Calc the sampler base offset for unified sampler mode. */
     errCode = _CalcSamplerBaseOffset(pPgLinkHelper);
@@ -3585,7 +3915,31 @@ OnError:
 static VSC_ErrCode _GeneratePepHLMappingTables(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper,
                                                PROGRAM_EXECUTABLE_PROFILE* pOutPEP)
 {
-    return VSC_ERR_NONE;
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VSC_GPG_PASS_MANAGER*      pPgPassMnger = &pPgLinkHelper->pgPassMnger;
+    VSC_PEP_GEN_PRIV_DATA      pepGenPrvData;
+
+    pepGenPrvData.pOutPEP = pOutPEP;
+    if (pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.ctx.clientAPI == gcvAPI_OPENVK)
+    {
+        pepGenPrvData.client = PEP_CLIENT_VK;
+    }
+    else
+    {
+        gcmASSERT(pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.ctx.clientAPI == gcvAPI_OPENGL_ES11 ||
+                  pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.ctx.clientAPI == gcvAPI_OPENGL_ES20 ||
+                  pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.ctx.clientAPI == gcvAPI_OPENGL_ES30 ||
+                  pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.ctx.clientAPI == gcvAPI_OPENGL_ES31 ||
+                  pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.ctx.clientAPI == gcvAPI_OPENGL_ES32 ||
+                  pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.ctx.clientAPI == gcvAPI_OPENGL);
+
+        pepGenPrvData.client = PEP_CLIENT_GL;
+    }
+
+    CALL_GPG_PASS(vscVIR_GeneratePEP, &pepGenPrvData);
+
+OnError:
+    return errCode;
 }
 
 static VSC_ErrCode _GenerateKepHLMappingTables(VIR_Shader*                 pKernelShader,
@@ -3609,7 +3963,7 @@ static VSC_ErrCode _ValidateProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
     /* Must have shaders included */
     for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        if (pPgLinkParam->pShaderArray[stageIdx])
+        if (pPgLinkParam->hShaderArray[stageIdx])
         {
             if (stageIdx == VSC_SHADER_STAGE_HS ||
                 stageIdx == VSC_SHADER_STAGE_DS ||
@@ -3633,12 +3987,12 @@ static VSC_ErrCode _ValidateProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
     }
 
     /* Compute and graphics can not be mixed together for un-seperated program */
-    if (pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_CS] &&
+    if (pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_CS] &&
         !(pPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_SEPERATED_SHADERS))
     {
         for (stageIdx = 0; stageIdx < VSC_MAX_GFX_SHADER_STAGE_COUNT; stageIdx ++)
         {
-            if (pPgLinkParam->pShaderArray[stageIdx])
+            if (pPgLinkParam->hShaderArray[stageIdx])
             {
                 return VSC_ERR_INVALID_ARGUMENT;
             }
@@ -3654,33 +4008,268 @@ static VSC_ErrCode _ValidateProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
        PS is optional is because of SO
     */
     if (!(pPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_SEPERATED_SHADERS) &&
-        !(pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_CS]))
+        !(pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_CS]))
     {
-        if (!pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_VS])
+        if (!pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_VS])
         {
             return VSC_ERR_INVALID_ARGUMENT;
         }
 
-        if ((pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_HS] && !pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_DS]) ||
-            (pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_DS] && !pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_HS]))
+        if ((pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_HS] && !pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_DS]) ||
+            (pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_DS] && !pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_HS]))
         {
             return VSC_ERR_INVALID_ARGUMENT;
         }
     }
 
-    *pGfxOnlyProgram = (pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_CS] == gcvNULL);
-    *pComputeOnlyProgram = (pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_CS] &&
-                            pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_VS] == gcvNULL &&
-                            pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_HS] == gcvNULL &&
-                            pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_DS] == gcvNULL &&
-                            pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_GS] == gcvNULL &&
-                            pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_PS] == gcvNULL);
+    *pGfxOnlyProgram = (pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_CS] == gcvNULL);
+    *pComputeOnlyProgram = (pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_CS] &&
+                            pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_VS] == gcvNULL &&
+                            pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_HS] == gcvNULL &&
+                            pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_DS] == gcvNULL &&
+                            pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_GS] == gcvNULL &&
+                            pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_PS] == gcvNULL);
 
     return VSC_ERR_NONE;
 }
 
-extern VSC_ErrCode _CompileShaderInternal(VSC_PASS_MANAGER*          pPassMnger,
+static gctBOOL _InitializeShResLayout(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                      VSC_PROGRAM_RESOURCE_LAYOUT* pPgResourceLayout,
+                                      gctUINT shStage,
+                                      VSC_SHADER_RESOURCE_LAYOUT* pOutShResourceLayout)
+{
+    gctUINT  i, j, resBindingCount = 0, pushCnstRangeCount = 0;
+
+    gcmASSERT (pPgResourceLayout);
+
+    /* Res binding */
+    if (pPgResourceLayout->resourceSetCount)
+    {
+        for (i = 0; i < pPgResourceLayout->resourceSetCount; i ++)
+        {
+            for (j = 0; j < pPgResourceLayout->pResourceSets[i].resourceBindingCount; j ++)
+            {
+                if (pPgResourceLayout->pResourceSets[i].pResouceBindings[j].stageBits &
+                    VSC_SHADER_STAGE_2_STAGE_BIT(shStage))
+                {
+                    resBindingCount ++;
+                }
+            }
+        }
+
+        if (resBindingCount)
+        {
+            pOutShResourceLayout->resourceBindingCount = resBindingCount;
+            pOutShResourceLayout->pResBindings = (VSC_SHADER_RESOURCE_BINDING*)vscMM_Alloc(pBaseLinkHelper->pMM,
+                                                                      resBindingCount*sizeof(VSC_SHADER_RESOURCE_BINDING));
+
+            resBindingCount = 0;
+            for (i = 0; i < pPgResourceLayout->resourceSetCount; i ++)
+            {
+                for (j = 0; j < pPgResourceLayout->pResourceSets[i].resourceBindingCount; j ++)
+                {
+                    if (pPgResourceLayout->pResourceSets[i].pResouceBindings[j].stageBits &
+                        VSC_SHADER_STAGE_2_STAGE_BIT(shStage))
+                    {
+                        memcpy(&pOutShResourceLayout->pResBindings[resBindingCount],
+                               &pPgResourceLayout->pResourceSets[i].pResouceBindings[j].shResBinding,
+                               sizeof(VSC_SHADER_RESOURCE_BINDING));
+
+                        resBindingCount ++;
+                    }
+                }
+            }
+        }
+    }
+
+    /* Push-constant */
+    if (pPgResourceLayout->pushConstantRangeCount)
+    {
+        for (i = 0; i < pPgResourceLayout->pushConstantRangeCount; i ++)
+        {
+            if (pPgResourceLayout->pPushConstantRanges[i].stageBits &
+                VSC_SHADER_STAGE_2_STAGE_BIT(shStage))
+            {
+                pushCnstRangeCount ++;
+            }
+        }
+
+        if (pushCnstRangeCount)
+        {
+            pOutShResourceLayout->pushConstantRangeCount = pushCnstRangeCount;
+            pOutShResourceLayout->pPushConstantRanges = (VSC_SHADER_PUSH_CONSTANT_RANGE*)vscMM_Alloc(pBaseLinkHelper->pMM,
+                                                                    pushCnstRangeCount*sizeof(VSC_SHADER_PUSH_CONSTANT_RANGE));
+
+            pushCnstRangeCount = 0;
+            for (i = 0; i < pPgResourceLayout->pushConstantRangeCount; i ++)
+            {
+                if (pPgResourceLayout->pPushConstantRanges[i].stageBits &
+                    VSC_SHADER_STAGE_2_STAGE_BIT(shStage))
+                {
+                    memcpy(&pOutShResourceLayout->pPushConstantRanges[pushCnstRangeCount],
+                           &pPgResourceLayout->pPushConstantRanges[i],
+                           sizeof(VSC_SHADER_PUSH_CONSTANT_RANGE));
+
+                    pushCnstRangeCount ++;
+                }
+            }
+        }
+    }
+
+    return ((resBindingCount > 0) || (pushCnstRangeCount > 0));
+}
+
+static void _FinalizeShResLayout(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                 VSC_SHADER_RESOURCE_LAYOUT* pShResourceLayout)
+{
+    if (pShResourceLayout == gcvNULL)
+    {
+        return;
+    }
+
+    if (pShResourceLayout->pPushConstantRanges)
+    {
+        vscMM_Free(pBaseLinkHelper->pMM, pShResourceLayout->pPushConstantRanges);
+    }
+
+    if (pShResourceLayout->pResBindings)
+    {
+        vscMM_Free(pBaseLinkHelper->pMM, pShResourceLayout->pResBindings);
+    }
+}
+
+/* Defined in drvi_compile.c */
+extern VSC_ErrCode _CompileShaderInternal(VSC_SHADER_PASS_MANAGER*   pShPassMnger,
                                           SHADER_EXECUTABLE_PROFILE* pOutSEP);
+extern gctUINT _GetCompLevelFromExpectedShaderLevel(VIR_ShLevel expectedShLevel);
+extern VIR_ShLevel _GetExpectedLastLevel(VSC_SHADER_COMPILER_PARAM* pCompilerParam);
+
+static gctBOOL _InitializeShLibLinkTable(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                         gctBOOL bGfxOnlyProgram,
+                                         VSC_PROG_LIB_LINK_TABLE* pPgLibLinkTable,
+                                         VIR_ShLevel maxShLevelAmongLinkLibs,
+                                         gctUINT shStage,
+                                         VIR_ShLevel* pTrueLibShLevel,
+                                         VSC_SHADER_LIB_LINK_TABLE* pOutShLibLinkTable)
+{
+    gctUINT                     i, libLinkEntryCount = 0;
+    VSC_SHADER_COMPILER_PARAM   compParam;
+    VSC_PROGRAM_LINKER_HELPER*  pPgLinkHelper = (VSC_PROGRAM_LINKER_HELPER*)pBaseLinkHelper;
+    VIR_ShLevel                 thisShLevel, expectedShLevel;
+    gctBOOL                     bSeperatedShaders = (pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg.cFlags &
+                                                     VSC_COMPILER_FLAG_SEPERATED_SHADERS);
+
+    gcmASSERT (pPgLibLinkTable);
+
+    memset(&compParam, 0, sizeof(VSC_SHADER_COMPILER_PARAM));
+
+    if (pPgLibLinkTable->progLinkEntryCount)
+    {
+        for (i = 0; i < pPgLibLinkTable->progLinkEntryCount; i ++)
+        {
+            thisShLevel = VIR_Shader_GetLevel((((VIR_Shader*)pPgLibLinkTable->pProgLibLinkEntries[i].shLibLinkEntry.hShaderLib)));
+
+            expectedShLevel = vscMAX(thisShLevel, maxShLevelAmongLinkLibs);
+
+            /* We need make sure lib is not at high-level because we will do lib
+               link at ML or below level (this is then because main shader in program will be performed API
+               spec check at high-level at first linkage stage, while lib linked main shader will break such
+               check) */
+             if (!bSeperatedShaders && bGfxOnlyProgram)
+             {
+                if (gcUseFullNewLinker(pBaseLinkHelper->pHwCfg->hwFeatureFlags.hasHalti2))
+                {
+                    expectedShLevel = vscMAX(expectedShLevel, VIR_SHLEVEL_Pre_Medium);
+                }
+             }
+
+            /* We need make sure shader level of lib is not smaller than start shader level of main shader */
+            expectedShLevel = vscMAX(expectedShLevel,
+                              VIR_Shader_GetLevel(((VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[shStage])));
+
+            if (thisShLevel < expectedShLevel)
+            {
+                compParam.hShader = pPgLibLinkTable->pProgLibLinkEntries[i].shLibLinkEntry.hShaderLib;
+                memcpy(&compParam.cfg, &pPgLinkHelper->pgPassMnger.pPgmLinkerParam->cfg, sizeof(VSC_COMPILER_CONFIG));
+                compParam.cfg.cFlags &= ~(VSC_COMPILER_FLAG_COMPILE_TO_HL |
+                                          VSC_COMPILER_FLAG_COMPILE_TO_ML |
+                                          VSC_COMPILER_FLAG_COMPILE_TO_LL |
+                                          VSC_COMPILER_FLAG_COMPILE_TO_MC);
+                compParam.cfg.cFlags |= _GetCompLevelFromExpectedShaderLevel(expectedShLevel);
+
+                if (vscCompileShader(&compParam, gcvNULL) != gcvSTATUS_OK)
+                {
+                    return gcvFALSE;
+                }
+
+                *pTrueLibShLevel = _GetExpectedLastLevel(&compParam);
+            }
+            else
+            {
+                *pTrueLibShLevel = thisShLevel;
+            }
+
+            if (pPgLibLinkTable->pProgLibLinkEntries[i].mainShaderStageBits & VSC_SHADER_STAGE_2_STAGE_BIT(shStage))
+            {
+                libLinkEntryCount ++;
+            }
+        }
+
+        if (libLinkEntryCount)
+        {
+            pOutShLibLinkTable->shLinkEntryCount = libLinkEntryCount;
+            pOutShLibLinkTable->pShLibLinkEntries = (VSC_SHADER_LIB_LINK_ENTRY*)vscMM_Alloc(pBaseLinkHelper->pMM,
+                                                                      libLinkEntryCount*sizeof(VSC_SHADER_LIB_LINK_ENTRY));
+
+            libLinkEntryCount = 0;
+            for (i = 0; i < pPgLibLinkTable->progLinkEntryCount; i ++)
+            {
+                if (pPgLibLinkTable->pProgLibLinkEntries[i].mainShaderStageBits & VSC_SHADER_STAGE_2_STAGE_BIT(shStage))
+                {
+                    memcpy(&pOutShLibLinkTable->pShLibLinkEntries[libLinkEntryCount],
+                           &pPgLibLinkTable->pProgLibLinkEntries[i].shLibLinkEntry,
+                           sizeof(VSC_SHADER_LIB_LINK_ENTRY));
+
+                    libLinkEntryCount ++;
+                }
+            }
+        }
+    }
+
+    return (libLinkEntryCount > 0);
+}
+
+static void _FinalizeShLibLinkTable(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                    VSC_SHADER_LIB_LINK_TABLE* pShLibLinkTable)
+{
+    if (pShLibLinkTable == gcvNULL)
+    {
+        return;
+    }
+
+    if (pShLibLinkTable->pShLibLinkEntries)
+    {
+        vscMM_Free(pBaseLinkHelper->pMM, pShLibLinkTable->pShLibLinkEntries);
+    }
+}
+
+static VIR_ShLevel _GetMaximumShaderLevelAmongLinkLibs(VSC_PROG_LIB_LINK_TABLE* pPgLibLinkTable)
+{
+    gctUINT                     i;
+    VIR_ShLevel                 thisShLevel, maxShLevel = VIR_SHLEVEL_Unknown;
+
+    for (i = 0; i < pPgLibLinkTable->progLinkEntryCount; i ++)
+    {
+        thisShLevel = VIR_Shader_GetLevel((((VIR_Shader*)pPgLibLinkTable->pProgLibLinkEntries[i].shLibLinkEntry.hShaderLib)));
+
+        if (thisShLevel > maxShLevel)
+        {
+            maxShLevel = thisShLevel;
+        }
+    }
+
+    return maxShLevel;
+}
 
 gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
                          PROGRAM_EXECUTABLE_PROFILE* pOutPEP,
@@ -3689,11 +4278,15 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
     gceSTATUS                     status = gcvSTATUS_OK;
     VSC_ErrCode                   errCode = VSC_ERR_NONE;
     VSC_PROGRAM_LINKER_HELPER     pgLinkHelper;
-    VSC_HW_PIPELINE_SHADERS_PARAM hwPipelineShsParam = {0};
+    VSC_HW_PIPELINE_SHADERS_PARAM hwPipelineShsParam;
     PROGRAM_EXECUTABLE_PROFILE*   pPEP = gcvNULL;
     SHADER_EXECUTABLE_PROFILE*    pSEPToGen;
     VSC_SHADER_COMPILER_PARAM     shCompParamArray[VSC_MAX_SHADER_STAGE_COUNT];
-    VSC_PASS_MANAGER              passMngerArray[VSC_MAX_SHADER_STAGE_COUNT];
+    VSC_SHADER_RESOURCE_LAYOUT    shResLayoutArray[VSC_MAX_SHADER_STAGE_COUNT];
+    VSC_SHADER_LIB_LINK_TABLE     shLibLinkTableArray[VSC_MAX_SHADER_STAGE_COUNT];
+    VSC_SHADER_LIB_LINK_TABLE*    pShLibLinkTablePointerArray[VSC_MAX_SHADER_STAGE_COUNT];
+    VSC_SHADER_PASS_MANAGER       shPassMngerArray[VSC_MAX_SHADER_STAGE_COUNT];
+    VSC_SHADER_PASS_RES*          pShPassResArray[VSC_MAX_SHADER_STAGE_COUNT];
     gctBOOL                       bNeedSSL = gcvFALSE, bSkipSepGen = gcvFALSE;
     gctBOOL                       bComputeOnlyProgram, bGfxOnlyProgram;
     gctUINT                       stageIdx, processedStageCount, firstValidStage = VSC_MAX_SHADER_STAGE_COUNT;
@@ -3701,17 +4294,40 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
     gctUINT64                     realOptFlags;
     gctBOOL                       bSeperatedShaders = (pPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_SEPERATED_SHADERS);
     gctBOOL                       bHasTsOrGs = gcvFALSE, bNeedActiveIo = gcvFALSE;
+    VSC_OPTN_Options              options;
+    char                          buffer[4096];
+    VIR_Dumper                    dumper;
+    VIR_Shader*                   pShader;
+    VIR_ShLevel                   maxShLevelAmongLinkLibs = VIR_SHLEVEL_Unknown, finalTrueLibShLevel = VIR_SHLEVEL_Unknown;
+    VIR_ShLevel                   trueLibShLevel = VIR_SHLEVEL_Unknown;
 
     gcmASSERT(pPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_COMPILE_TO_MC);
-    gcmASSERT(pPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
 
+    if (pOutPEP || pOutPgStates)
+    {
+        gcmASSERT(pPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
+    }
+
+    memset(&hwPipelineShsParam, 0, sizeof(VSC_HW_PIPELINE_SHADERS_PARAM));
     memset(&shCompParamArray[0], 0, sizeof(VSC_SHADER_COMPILER_PARAM)*VSC_MAX_SHADER_STAGE_COUNT);
-    memset(&passMngerArray[0], 0, sizeof(VSC_PASS_MANAGER)*VSC_MAX_SHADER_STAGE_COUNT);
+    memset(&shResLayoutArray[0], 0, sizeof(VSC_SHADER_RESOURCE_LAYOUT)*VSC_MAX_SHADER_STAGE_COUNT);
+    memset(&shPassMngerArray[0], 0, sizeof(VSC_SHADER_PASS_MANAGER)*VSC_MAX_SHADER_STAGE_COUNT);
+    memset(&pShPassResArray[0], 0, sizeof(VSC_SHADER_PASS_RES*)*VSC_MAX_SHADER_STAGE_COUNT);
+    memset(&shLibLinkTableArray[0], 0, sizeof(VSC_SHADER_LIB_LINK_TABLE)*VSC_MAX_SHADER_STAGE_COUNT);
+    memset(&pShLibLinkTablePointerArray[0], 0, sizeof(VSC_SHADER_LIB_LINK_TABLE*)*VSC_MAX_SHADER_STAGE_COUNT);
 
-    pgLinkHelper.pPgLinkParam = pPgLinkParam;
-    pgLinkHelper.baseHelper.pHwCfg = pPgLinkParam->cfg.pHwCfg;
-    pgLinkHelper.pGlApiCfg = pPgLinkParam->pGlApiCfg;
-    vscPMP_Intialize(&pgLinkHelper.baseHelper.pmp, gcvNULL, 512, sizeof(void*), gcvTRUE);
+    gcoOS_ZeroMemory(&dumper, sizeof(dumper));
+    vscDumper_Initialize(&dumper.baseDumper, gcvNULL, gcvNULL, buffer, sizeof(buffer));
+
+    vscInitializeOptions(&options,
+                         &pPgLinkParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
+                         pPgLinkParam->cfg.cFlags,
+                         pPgLinkParam->cfg.optFlags);
+
+    vscGPPM_Initialize(&pgLinkHelper.pgPassMnger, pPgLinkParam, &dumper, &options, VSC_PM_MODE_SEMI_AUTO);
+
+    pgLinkHelper.baseHelper.pHwCfg = &pPgLinkParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    pgLinkHelper.baseHelper.pMM = &pgLinkHelper.pgPassMnger.basePgmPM.pgMmPool.sharedPMP.mmWrapper;
 
     /* Parameter legality check */
     pPEP = pOutPEP;
@@ -3721,7 +4337,7 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
 
         if (pOutPgStates != gcvNULL)
         {
-            pPEP = (PROGRAM_EXECUTABLE_PROFILE*)vscMM_Alloc(&pgLinkHelper.baseHelper.pmp.mmWrapper,
+            pPEP = (PROGRAM_EXECUTABLE_PROFILE*)vscMM_Alloc(pgLinkHelper.baseHelper.pMM,
                                                             sizeof(PROGRAM_EXECUTABLE_PROFILE));
         }
         else
@@ -3740,26 +4356,71 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
     errCode = _ValidateProgram(pPgLinkParam, &bGfxOnlyProgram, &bComputeOnlyProgram, &bHasTsOrGs, &firstValidStage);
     ON_ERROR(errCode, "Check program validation");
 
-    /* Initialize our pass manager who will take over all passes
+    if (pPgLinkParam->pProgLibLinkTable)
+    {
+        maxShLevelAmongLinkLibs = _GetMaximumShaderLevelAmongLinkLibs(pPgLinkParam->pProgLibLinkTable);
+    }
+
+    /* Initialize our shader pass manager who will take over all passes
        whether to trigger or not */
     for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        if (pPgLinkParam->pShaderArray[stageIdx])
+        if (pPgLinkParam->hShaderArray[stageIdx])
         {
             shCompParamArray[stageIdx].cfg = pPgLinkParam->cfg;
-            shCompParamArray[stageIdx].pShader = pPgLinkParam->pShaderArray[stageIdx];
+            shCompParamArray[stageIdx].hShader = pPgLinkParam->hShaderArray[stageIdx];
+
+            if (pPgLinkParam->pPgResourceLayout)
+            {
+                if (_InitializeShResLayout(&pgLinkHelper.baseHelper, pPgLinkParam->pPgResourceLayout,
+                                           stageIdx, &shResLayoutArray[stageIdx]))
+                {
+                    shCompParamArray[stageIdx].pShResourceLayout = &shResLayoutArray[stageIdx];
+                }
+            }
+
+            if (pPgLinkParam->pProgLibLinkTable)
+            {
+                if (_InitializeShLibLinkTable(&pgLinkHelper.baseHelper, bGfxOnlyProgram, pPgLinkParam->pProgLibLinkTable,
+                                              maxShLevelAmongLinkLibs, stageIdx, &trueLibShLevel,
+                                              &shLibLinkTableArray[stageIdx]))
+                {
+                    pShLibLinkTablePointerArray[stageIdx] = &shLibLinkTableArray[stageIdx];
+
+                    if (finalTrueLibShLevel < trueLibShLevel)
+                    {
+                        finalTrueLibShLevel = trueLibShLevel;
+                    }
+                }
+            }
+
+            pShader = (VIR_Shader*)shCompParamArray[stageIdx].hShader;
 
             if (bSeperatedShaders)
             {
-                VIR_Shader_SetFlag(shCompParamArray[stageIdx].pShader, VIR_SHFLAG_SEPARATED);
+                VIR_Shader_SetFlag(pShader, VIR_SHFLAG_SEPARATED);
+            }
+            else if (stageIdx == VSC_SHADER_STAGE_DS)
+            {
+                gcmASSERT(shCompParamArray[VSC_SHADER_STAGE_HS].hShader);
+                pShader->shaderLayout.tes.tessPatchInputVertices =
+                    ((VIR_Shader*)shCompParamArray[VSC_SHADER_STAGE_HS].hShader)->shaderLayout.tcs.tcsPatchOutputVertices;
             }
 
-            vscInitializePassManager(&passMngerArray[stageIdx], &shCompParamArray[stageIdx]);
+            vscSPM_Initialize(&shPassMngerArray[stageIdx],
+                              &shCompParamArray[stageIdx],
+                              &pgLinkHelper.pgPassMnger.basePgmPM.shMmPool,
+                              gcvFALSE,
+                              pShader->dumper,
+                              &options,
+                              VSC_PM_MODE_SEMI_AUTO);
+
+            pShPassResArray[stageIdx] = &shPassMngerArray[stageIdx].passRes;
         }
     }
 
-    pgLinkHelper.pShCompParamArray = &shCompParamArray[0];
-    pgLinkHelper.pPassMngerArray = &passMngerArray[0];
+    /* Pass-resources of graphics-program pass manager are pointed to counterpart of each shader pass manager */
+    vscGPPM_SetPassRes(&pgLinkHelper.pgPassMnger, pShPassResArray);
 
     realOptFlags = pPgLinkParam->cfg.optFlags;
     bNeedActiveIo = ((realOptFlags & VSC_COMPILER_OPT_FULL_ACTIVE_IO) || bHasTsOrGs);
@@ -3768,7 +4429,7 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
 
     for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        if (pPgLinkParam->pShaderArray[stageIdx])
+        if (pPgLinkParam->hShaderArray[stageIdx])
         {
             shCompParamArray[stageIdx].cfg.cFlags = pPgLinkParam->cfg.cFlags;
             shCompParamArray[stageIdx].cfg.cFlags &= ~(VSC_COMPILER_FLAG_COMPILE_TO_ML |
@@ -3776,7 +4437,18 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
                                                        VSC_COMPILER_FLAG_COMPILE_TO_LL |
                                                        VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
 
-            errCode = _CompileShaderInternal(&passMngerArray[stageIdx], gcvNULL);
+            if (pShLibLinkTablePointerArray[stageIdx] &&
+                (finalTrueLibShLevel == VIR_SHLEVEL_Pre_High ||
+                 finalTrueLibShLevel == VIR_SHLEVEL_Post_High))
+            {
+                shCompParamArray[stageIdx].pShLibLinkTable = pShLibLinkTablePointerArray[stageIdx];
+            }
+            else
+            {
+                shCompParamArray[stageIdx].pShLibLinkTable = gcvNULL;
+            }
+
+            errCode = _CompileShaderInternal(&shPassMngerArray[stageIdx], gcvNULL);
             ON_ERROR(errCode, "Compiler internal");
         }
     }
@@ -3792,10 +4464,15 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
 
     if (!bSeperatedShaders && bGfxOnlyProgram)
     {
-        if (ENABLE_FULL_NEW_LINKER)
+        if (gcUseFullNewLinker(pPgLinkParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2))
         {
-            errCode = _DoFirstStageOfLinkage(&pgLinkHelper, FSL_STAGE_API_SPEC_CHECK);
-            ON_ERROR(errCode, "First stage of linkage");
+            /* For recompilation, we dont need do api-spec check as it has been done when linking
+               master program */
+            if (pPgLinkParam->pInMasterPEP == gcvNULL)
+            {
+                errCode = _DoFirstStageOfLinkage(&pgLinkHelper, FSL_STAGE_API_SPEC_CHECK);
+                ON_ERROR(errCode, "First stage of linkage");
+            }
         }
 
         /*
@@ -3815,22 +4492,24 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
     {
         for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
         {
-            if (pPgLinkParam->pShaderArray[stageIdx])
+            pShader = (VIR_Shader*)pPgLinkParam->hShaderArray[stageIdx];
+
+            if (pShader)
             {
                 /* Aliased location check */
 
-                errCode = _CheckInputAliasedLocation(&pgLinkHelper.baseHelper, pPgLinkParam->pShaderArray[stageIdx]);
+                errCode = _CheckInputAliasedLocation(&pgLinkHelper.baseHelper, pShader);
                 ON_ERROR(errCode, "Check input aliased location");
 
-                errCode = _CheckOutputAliasedLocation(&pgLinkHelper.baseHelper, pPgLinkParam->pShaderArray[stageIdx]);
+                errCode = _CheckOutputAliasedLocation(&pgLinkHelper.baseHelper, pShader);
                 ON_ERROR(errCode, "Check output aliased location");
 
                 /* LL-slot calculation */
 
-                errCode = _CalcInputLowLevelSlot(&pgLinkHelper.baseHelper, pPgLinkParam->pShaderArray[stageIdx], gcvTRUE);
+                errCode = _CalcInputLowLevelSlot(&pgLinkHelper.baseHelper, pShader, gcvTRUE);
                 ON_ERROR(errCode, "CalcInputLowLevelSlot of linkage");
 
-                errCode = _CalcOutputLowLevelSlot(&pgLinkHelper.baseHelper, pPgLinkParam->pShaderArray[stageIdx], gcvTRUE);
+                errCode = _CalcOutputLowLevelSlot(&pgLinkHelper.baseHelper, pShader, gcvTRUE);
                 ON_ERROR(errCode, "CalcOutputLowLevelSlot of linkage");
             }
         }
@@ -3845,11 +4524,11 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
         }
     }
 
-    /* 3. At sencond fork link process, only do ML level compiling */
+    /* 3. At second fork link process, only do ML level compiling */
 
     for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        if (pPgLinkParam->pShaderArray[stageIdx])
+        if (pPgLinkParam->hShaderArray[stageIdx])
         {
             shCompParamArray[stageIdx].cfg.cFlags = pPgLinkParam->cfg.cFlags;
             shCompParamArray[stageIdx].cfg.cFlags &= ~(VSC_COMPILER_FLAG_COMPILE_TO_HL |
@@ -3857,7 +4536,18 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
                                                        VSC_COMPILER_FLAG_COMPILE_TO_LL |
                                                        VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
 
-            errCode = _CompileShaderInternal(&passMngerArray[stageIdx], gcvNULL);
+            if (pShLibLinkTablePointerArray[stageIdx] &&
+                (finalTrueLibShLevel == VIR_SHLEVEL_Pre_Medium ||
+                 finalTrueLibShLevel == VIR_SHLEVEL_Post_Medium))
+            {
+                shCompParamArray[stageIdx].pShLibLinkTable = pShLibLinkTablePointerArray[stageIdx];
+            }
+            else
+            {
+                shCompParamArray[stageIdx].pShLibLinkTable = gcvNULL;
+            }
+
+            errCode = _CompileShaderInternal(&shPassMngerArray[stageIdx], gcvNULL);
             ON_ERROR(errCode, "Compiler internal");
         }
     }
@@ -3874,14 +4564,14 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
 
     if (!bSeperatedShaders && bGfxOnlyProgram)
     {
-        if (ENABLE_FULL_NEW_LINKER)
+        if (gcUseFullNewLinker(pPgLinkParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2))
         {
             /* At least do one pass of ll-slot-calc-stage of 1st join stage because previous api-spec-check-stage
                does not calc ll slot for IO. */
             processedStageCount = 0;
             for (sStageIdx = VSC_MAX_SHADER_STAGE_COUNT - 1; sStageIdx >= VSC_SHADER_STAGE_VS; sStageIdx --)
             {
-                if (pPgLinkParam->pShaderArray[sStageIdx])
+                if (pPgLinkParam->hShaderArray[sStageIdx])
                 {
                     errCode = _DoFirstStageOfLinkage(&pgLinkHelper, FSL_STAGE_INTERMEDIUM);
                     ON_ERROR(errCode, "First stage of linkage");
@@ -3904,8 +4594,9 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
                     /* Note that we're still under ML level compiling because last fork process is on ML level,
                        so we revert post-ML to pre-ML level and do only DCE */
                     shCompParamArray[sStageIdx].cfg.optFlags = VSC_COMPILER_OPT_DCE;
-                    VIR_Shader_SetLevel(shCompParamArray[sStageIdx].pShader, VIR_SHLEVEL_Pre_Medium);
-                    errCode = _CompileShaderInternal(&passMngerArray[sStageIdx], gcvNULL);
+                    VIR_Shader_SetLevel((VIR_Shader*)shCompParamArray[sStageIdx].hShader, VIR_SHLEVEL_Pre_Medium);
+                    shCompParamArray[sStageIdx].pShLibLinkTable = gcvNULL;
+                    errCode = _CompileShaderInternal(&shPassMngerArray[sStageIdx], gcvNULL);
                     ON_ERROR(errCode, "Compiler internal");
 
                     /* Restore the opt flags */
@@ -3913,7 +4604,7 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
                 }
             }
 
-            if (pPgLinkParam->cfg.optFlags | VSC_COMPILER_OPT_VECTORIZATION)
+            if (pPgLinkParam->cfg.optFlags | VSC_COMPILER_OPT_VEC)
             {
                 errCode = _DoFirstStageOfLinkage(&pgLinkHelper, FSL_STAGE_IO_VECTORIZATION);
                 ON_ERROR(errCode, "First stage of linkage");
@@ -3929,14 +4620,27 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
 
     for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        if (pPgLinkParam->pShaderArray[stageIdx])
+        if (pPgLinkParam->hShaderArray[stageIdx])
         {
             shCompParamArray[stageIdx].cfg.cFlags = pPgLinkParam->cfg.cFlags;
             shCompParamArray[stageIdx].cfg.cFlags &= ~(VSC_COMPILER_FLAG_COMPILE_TO_HL |
                                                        VSC_COMPILER_FLAG_COMPILE_TO_ML |
                                                        VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
 
-            errCode = _CompileShaderInternal(&passMngerArray[stageIdx], gcvNULL);
+            if (pShLibLinkTablePointerArray[stageIdx] &&
+                (finalTrueLibShLevel == VIR_SHLEVEL_Pre_Low ||
+                 finalTrueLibShLevel == VIR_SHLEVEL_Post_Low ||
+                 finalTrueLibShLevel == VIR_SHLEVEL_Pre_Machine ||
+                 finalTrueLibShLevel == VIR_SHLEVEL_Post_Machine))
+            {
+                shCompParamArray[stageIdx].pShLibLinkTable = pShLibLinkTablePointerArray[stageIdx];
+            }
+            else
+            {
+                shCompParamArray[stageIdx].pShLibLinkTable = gcvNULL;
+            }
+
+            errCode = _CompileShaderInternal(&shPassMngerArray[stageIdx], gcvNULL);
             ON_ERROR(errCode, "Compiler internal");
         }
     }
@@ -3966,10 +4670,10 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
 
         for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
         {
-            if (pPgLinkParam->pShaderArray[stageIdx])
+            if (pPgLinkParam->hShaderArray[stageIdx])
             {
-                _CalcInputHwCompIndex(&pgLinkHelper.baseHelper, pPgLinkParam->pShaderArray[stageIdx]);
-                _CalcOutputHwCompIndex(&pgLinkHelper.baseHelper, pPgLinkParam->pShaderArray[stageIdx]);
+                _CalcInputHwCompIndex(&pgLinkHelper.baseHelper, pPgLinkParam->hShaderArray[stageIdx]);
+                _CalcOutputHwCompIndex(&pgLinkHelper.baseHelper, pPgLinkParam->hShaderArray[stageIdx]);
             }
         }
     }
@@ -3978,14 +4682,16 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
 
     for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        if (pPgLinkParam->pShaderArray[stageIdx])
+        if (pPgLinkParam->hShaderArray[stageIdx])
         {
             shCompParamArray[stageIdx].cfg.cFlags = pPgLinkParam->cfg.cFlags;
             shCompParamArray[stageIdx].cfg.cFlags &= ~VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS;
 
-            pSEPToGen = bSkipSepGen ? gcvNULL : &pPEP->sep[stageIdx];
+            pSEPToGen = bSkipSepGen ? gcvNULL : &pPEP->seps[stageIdx];
 
-            errCode = _CompileShaderInternal(&passMngerArray[stageIdx], pSEPToGen);
+            shCompParamArray[stageIdx].pShLibLinkTable = gcvNULL;
+
+            errCode = _CompileShaderInternal(&shPassMngerArray[stageIdx], pSEPToGen);
             ON_ERROR(errCode, "Compiler internal");
         }
     }
@@ -4011,7 +4717,7 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
             for (stageIdx = 0; stageIdx < VSC_MAX_GFX_SHADER_STAGE_COUNT; stageIdx ++)
             {
                 hwPipelineShsParam.pSEPArray[stageIdx] =
-                    (pPgLinkParam->pShaderArray[stageIdx]) ? &pPEP->sep[stageIdx] : gcvNULL;
+                    (pPgLinkParam->hShaderArray[stageIdx]) ? &pPEP->seps[stageIdx] : gcvNULL;
             }
         }
         else
@@ -4022,12 +4728,12 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
             hwPipelineShsParam.pSEPArray[VSC_GFX_SHADER_STAGE_GS] = gcvNULL;
             hwPipelineShsParam.pSEPArray[VSC_GFX_SHADER_STAGE_PS] = gcvNULL;
             hwPipelineShsParam.pSEPArray[VSC_CPT_SHADER_STAGE_CS] =
-                (pPgLinkParam->pShaderArray[VSC_SHADER_STAGE_CS]) ? &pPEP->sep[VSC_SHADER_STAGE_CS] : gcvNULL;
+                (pPgLinkParam->hShaderArray[VSC_SHADER_STAGE_CS]) ? &pPEP->seps[VSC_SHADER_STAGE_CS] : gcvNULL;
         }
 
-        hwPipelineShsParam.pHwCfg = pPgLinkParam->cfg.pHwCfg;
+        hwPipelineShsParam.pSysCtx = pPgLinkParam->cfg.ctx.pSysCtx;
 
-        gcmONERROR(vscProgramHwShaderStages(&hwPipelineShsParam, pOutPgStates));
+        gcmONERROR(vscProgramHwShaderStages(&hwPipelineShsParam, pOutPgStates, bSeperatedShaders));
     }
 
 OnError:
@@ -4041,34 +4747,41 @@ OnError:
 
     for (stageIdx = 0; stageIdx < VSC_MAX_SHADER_STAGE_COUNT; stageIdx ++)
     {
-        if (pPgLinkParam->pShaderArray[stageIdx])
+        if (pPgLinkParam->hShaderArray[stageIdx])
         {
-            vscFinalizePassManager(&passMngerArray[stageIdx]);
+            vscSPM_Finalize(&shPassMngerArray[stageIdx], gcvFALSE);
+            _FinalizeShResLayout(&pgLinkHelper.baseHelper, &shResLayoutArray[stageIdx]);
+            _FinalizeShLibLinkTable(&pgLinkHelper.baseHelper, &shLibLinkTableArray[stageIdx]);
         }
     }
 
-    vscPMP_Finalize(&pgLinkHelper.baseHelper.pmp);
+    vscFinalizeOptions(&options);
+    vscGPPM_Finalize(&pgLinkHelper.pgPassMnger);
 
     return (status == gcvSTATUS_OK) ? vscERR_CastErrCode2GcStatus(errCode) : status;
 }
 
-gceSTATUS vscCreateKernel(VSC_SHADER_COMPILER_PARAM*      pCompilerParam,
-                          KERNEL_EXECUTABLE_PROFILE*      pOutKEP,
-                          VSC_HW_PIPELINE_SHADERS_STATES* pOutKrnlStates
-                         )
+VSC_ErrCode _CreateKernelInternal(VSC_SHADER_PASS_MANAGER*        pShPassMnger,
+                                  KERNEL_EXECUTABLE_PROFILE*      pOutKEP,
+                                  VSC_HW_PIPELINE_SHADERS_STATES* pOutKrnlStates
+                                  )
 {
     gceSTATUS                         status = gcvSTATUS_OK;
     VSC_ErrCode                       errCode = VSC_ERR_NONE;
     VSC_HW_PIPELINE_SHADERS_PARAM     hwPipelineShsParam;
     KERNEL_EXECUTABLE_PROFILE*        pKEP = gcvNULL;
     gctBOOL                           bSkipSepGen = gcvFALSE;
-    VSC_BASE_LINKER_HELPER            baseHepler;
+    VSC_BASE_LINKER_HELPER            baseHelper;
+    VIR_Shader*                       pKernel = (VIR_Shader*)pShPassMnger->pCompilerParam->hShader;
 
-    gcmASSERT(pCompilerParam->pShader);
-    gcmASSERT(pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_COMPILE_TO_MC);
-    gcmASSERT(pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
+    gcmASSERT(pKernel);
+    gcmASSERT(pShPassMnger->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_COMPILE_TO_MC);
+    gcmASSERT(pShPassMnger->pCompilerParam->cfg.cFlags & VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
 
-    vscPMP_Intialize(&baseHepler.pmp, gcvNULL, 512, sizeof(void*), gcvTRUE);
+    memset(&hwPipelineShsParam, 0, sizeof(VSC_HW_PIPELINE_SHADERS_PARAM));
+
+    baseHelper.pHwCfg = &pShPassMnger->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    baseHelper.pMM = &pShPassMnger->pMmPool->sharedPMP.mmWrapper;
 
     /* Parameter legality check */
     pKEP = pOutKEP;
@@ -4078,7 +4791,7 @@ gceSTATUS vscCreateKernel(VSC_SHADER_COMPILER_PARAM*      pCompilerParam,
 
         if (pOutKrnlStates != gcvNULL)
         {
-            pKEP = (KERNEL_EXECUTABLE_PROFILE*)vscMM_Alloc(&baseHepler.pmp.mmWrapper,
+            pKEP = (KERNEL_EXECUTABLE_PROFILE*)vscMM_Alloc(baseHelper.pMM,
                                                            sizeof(KERNEL_EXECUTABLE_PROFILE));
         }
         else
@@ -4094,16 +4807,17 @@ gceSTATUS vscCreateKernel(VSC_SHADER_COMPILER_PARAM*      pCompilerParam,
         gcmONERROR(vscInitializeKEP(pKEP));
     }
 
-    _CalcInputLowLevelSlot(&baseHepler, pCompilerParam->pShader, gcvTRUE);
-    _CalcOutputLowLevelSlot(&baseHepler, pCompilerParam->pShader, gcvTRUE);
+    _CalcInputLowLevelSlot(&baseHelper, pKernel, gcvTRUE);
+    _CalcOutputLowLevelSlot(&baseHelper, pKernel, gcvTRUE);
 
     /* 1. Compile kernel */
-    gcmONERROR(vscCompileShader(pCompilerParam, bSkipSepGen ? gcvNULL : &pKEP->ExecutableKernel));
+    errCode = _CompileShaderInternal(pShPassMnger, bSkipSepGen ? gcvNULL : &pKEP->sep);
+    ON_ERROR(errCode, "Compiler internal");
 
     /* 2. Generate HL mapping tables */
     if (pOutKEP)
     {
-        errCode = _GenerateKepHLMappingTables(pCompilerParam->pShader, pOutKEP);
+        errCode = _GenerateKepHLMappingTables(pKernel, pOutKEP);
         ON_ERROR(errCode, "Generate HL mapping tables");
     }
 
@@ -4115,11 +4829,11 @@ gceSTATUS vscCreateKernel(VSC_SHADER_COMPILER_PARAM*      pCompilerParam,
         hwPipelineShsParam.pSEPArray[VSC_GFX_SHADER_STAGE_DS] = gcvNULL;
         hwPipelineShsParam.pSEPArray[VSC_GFX_SHADER_STAGE_GS] = gcvNULL;
         hwPipelineShsParam.pSEPArray[VSC_GFX_SHADER_STAGE_PS] = gcvNULL;
-        hwPipelineShsParam.pSEPArray[VSC_CPT_SHADER_STAGE_CS] = &pKEP->ExecutableKernel;
+        hwPipelineShsParam.pSEPArray[VSC_CPT_SHADER_STAGE_CS] = &pKEP->sep;
 
-        hwPipelineShsParam.pHwCfg = pCompilerParam->cfg.pHwCfg;
+        hwPipelineShsParam.pSysCtx = pShPassMnger->pCompilerParam->cfg.ctx.pSysCtx;
 
-        gcmONERROR(vscProgramHwShaderStages(&hwPipelineShsParam, pOutKrnlStates));
+        gcmONERROR(vscProgramHwShaderStages(&hwPipelineShsParam, pOutKrnlStates, gcvTRUE));
     }
 
 OnError:
@@ -4131,7 +4845,42 @@ OnError:
         }
     }
 
-    vscPMP_Finalize(&baseHepler.pmp);
+    return (status != gcvSTATUS_OK) ? VSC_ERR_INVALID_ARGUMENT : errCode;
+}
+
+gceSTATUS vscCreateKernel(VSC_SHADER_COMPILER_PARAM*      pCompilerParam,
+                          KERNEL_EXECUTABLE_PROFILE*      pOutKEP,
+                          VSC_HW_PIPELINE_SHADERS_STATES* pOutKrnlStates
+                         )
+{
+    gceSTATUS                         status = gcvSTATUS_OK;
+    VSC_ErrCode                       errCode = VSC_ERR_NONE;
+    VSC_SHADER_PASS_MANAGER           shPassMnger;
+    VSC_PASS_MM_POOL                  passMemPool;
+    VSC_OPTN_Options                  options;
+    VIR_Shader*                       pKernel = (VIR_Shader*)pCompilerParam->hShader;
+
+    vscInitializePassMMPool(&passMemPool);
+    vscInitializeOptions(&options,
+                         &pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
+                         pCompilerParam->cfg.cFlags,
+                         pCompilerParam->cfg.optFlags);
+
+    vscSPM_Initialize(&shPassMnger,
+                      pCompilerParam,
+                      &passMemPool,
+                      gcvTRUE,
+                      pKernel->dumper,
+                      &options,
+                      VSC_PM_MODE_SEMI_AUTO);
+
+    errCode = _CreateKernelInternal(&shPassMnger, pOutKEP, pOutKrnlStates);
+    ON_ERROR(errCode, "Create kernel internal");
+
+OnError:
+    vscFinalizeOptions(&options);
+    vscSPM_Finalize(&shPassMnger, gcvTRUE);
+    vscFinalizePassMMPool(&passMemPool);
 
     return (status == gcvSTATUS_OK) ? vscERR_CastErrCode2GcStatus(errCode) : status;
 }
@@ -4146,28 +4895,44 @@ static VSC_ErrCode _LinkKernelModules(VSC_KERNEL_PROGRAM_LINKER_HELPER* pKrnlPgL
 
 gceSTATUS vscLinkKernelProgram(VSC_KERNEL_PROGRAM_LINKER_PARAM*  pKrnlPgLinkParam,
                                gctUINT*                          pKernelCount,
-                               VIR_Shader*                       pOutLinkedProgram,
+                               SHADER_HANDLE                     hOutLinkedProgram,
                                KERNEL_EXECUTABLE_PROFILE**       ppOutKEPArray,
                                VSC_HW_PIPELINE_SHADERS_STATES**  ppOutKrnlStates
                               )
 {
     gceSTATUS                         status = gcvSTATUS_OK;
     VSC_ErrCode                       errCode = VSC_ERR_NONE;
+    VIR_Shader*                       pOutLinkedProgram = (VIR_Shader*)hOutLinkedProgram;
     gctUINT                           kernelCount = 0, kernelIdx;
     VSC_KERNEL_PROGRAM_LINKER_HELPER  krnlPgLinkHelper;
     VIR_Shader                        linkedProgram;
     VIR_Shader                        kernel;
     VSC_SHADER_COMPILER_PARAM         compilerParam;
+    VSC_SHADER_PASS_MANAGER           shPassMnger;
     char**                            ppKrnlNameList = gcvNULL;
+    VSC_OPTN_Options                  options;
+    char                              buffer[4096];
+    VIR_Dumper                        dumper;
 
-    gcmASSERT(pKrnlPgLinkParam->ppKrnlModulesArray);
+    gcmASSERT(pKrnlPgLinkParam->pKrnlModuleHandlesArray);
     gcmASSERT(pKrnlPgLinkParam->moduleCount > 0);
     gcmASSERT(pKrnlPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_COMPILE_TO_MC);
     gcmASSERT(pKrnlPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_COMPILE_CODE_GEN);
 
-    krnlPgLinkHelper.pKrnlPgLinkParam = pKrnlPgLinkParam;
-    krnlPgLinkHelper.baseHelper.pHwCfg = pKrnlPgLinkParam->cfg.pHwCfg;
-    vscPMP_Intialize(&krnlPgLinkHelper.baseHelper.pmp, gcvNULL, 512, sizeof(void*), gcvTRUE);
+    memset(&shPassMnger, 0, sizeof(VSC_SHADER_PASS_MANAGER));
+
+    gcoOS_ZeroMemory(&dumper, sizeof(dumper));
+    vscDumper_Initialize(&dumper.baseDumper, gcvNULL, gcvNULL, buffer, sizeof(buffer));
+
+    vscInitializeOptions(&options,
+                         &pKrnlPgLinkParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
+                         pKrnlPgLinkParam->cfg.cFlags,
+                         pKrnlPgLinkParam->cfg.optFlags);
+
+    vscKPPM_Initialize(&krnlPgLinkHelper.pgPassMnger, pKrnlPgLinkParam, &dumper, &options, VSC_PM_MODE_SEMI_AUTO);
+
+    krnlPgLinkHelper.baseHelper.pHwCfg = &pKrnlPgLinkParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    krnlPgLinkHelper.baseHelper.pMM = &krnlPgLinkHelper.pgPassMnger.basePgmPM.pgMmPool.sharedPMP.mmWrapper;
 
     /* 1. Link all modules together */
 
@@ -4200,18 +4965,31 @@ gceSTATUS vscLinkKernelProgram(VSC_KERNEL_PROGRAM_LINKER_PARAM*  pKrnlPgLinkPara
     }
 
     compilerParam.cfg = pKrnlPgLinkParam->cfg;
+    compilerParam.pShResourceLayout = gcvNULL;
     for (kernelIdx = 0; kernelIdx < kernelCount; kernelIdx ++)
     {
         /* Extract kernel from linkedProgram */
-        vscExtractKernel(&linkedProgram, ppKrnlNameList[kernelIdx], &kernel);
+        vscExtractSubShader(&linkedProgram, ppKrnlNameList[kernelIdx], &kernel);
 
         /* A kernel must be separated */
         VIR_Shader_SetFlag(&kernel, VIR_SHFLAG_SEPARATED);
 
-        compilerParam.pShader = &kernel;
-        gcmONERROR(vscCreateKernel(&compilerParam,
-                                   ppOutKEPArray ? ppOutKEPArray[kernelIdx] : gcvNULL,
-                                   ppOutKrnlStates ? ppOutKrnlStates[kernelIdx] : gcvNULL));
+        compilerParam.hShader = &kernel;
+
+        vscSPM_Initialize(&shPassMnger,
+                          &compilerParam,
+                          &krnlPgLinkHelper.pgPassMnger.basePgmPM.shMmPool,
+                          gcvTRUE,
+                          kernel.dumper,
+                          &options,
+                          VSC_PM_MODE_SEMI_AUTO);
+
+        errCode = _CreateKernelInternal(&shPassMnger,
+                                        ppOutKEPArray ? ppOutKEPArray[kernelIdx] : gcvNULL,
+                                        ppOutKrnlStates ? ppOutKrnlStates[kernelIdx] : gcvNULL);
+        ON_ERROR(errCode, "Link kernel modules");
+
+        vscSPM_Finalize(&shPassMnger, gcvTRUE);
     }
 
 OnError:
@@ -4230,13 +5008,112 @@ OnError:
         }
     }
 
-    vscPMP_Finalize(&krnlPgLinkHelper.baseHelper.pmp);
+    vscFinalizeOptions(&options);
+    vscSPM_Finalize(&shPassMnger, gcvFALSE);
+    vscKPPM_Finalize(&krnlPgLinkHelper.pgPassMnger);
 
     return (status == gcvSTATUS_OK) ? vscERR_CastErrCode2GcStatus(errCode) : status;
 }
 
-static VSC_ErrCode _ProgramHwShadersStates(VSC_HW_SHADERS_LINK_INFO*       pHwShsLinkInfo,
-                                           PVSC_HW_CONFIG                  pHwCfg,
+gceSTATUS vscInitializeHwPipelineShadersStates(VSC_SYS_CONTEXT* pSysCtx, VSC_HW_PIPELINE_SHADERS_STATES* pHwShdsStates)
+{
+    gceSTATUS                         status = gcvSTATUS_OK;
+    gctUINT                           ftEntryIdx;
+
+    /* Initialize output states */
+    pHwShdsStates->stateBufferSize = 0;
+    pHwShdsStates->pStateBuffer = gcvNULL;
+
+    /* Initialize hints */
+    gcoOS_ZeroMemory(&pHwShdsStates->hints, sizeof(struct _gcsHINT));
+
+    for (ftEntryIdx = 0; ftEntryIdx < GC_ICACHE_PREFETCH_TABLE_SIZE; ftEntryIdx++)
+    {
+        pHwShdsStates->hints.vsICachePrefetch[ftEntryIdx] = -1;
+        pHwShdsStates->hints.tcsICachePrefetch[ftEntryIdx] = -1;
+        pHwShdsStates->hints.tesICachePrefetch[ftEntryIdx] = -1;
+        pHwShdsStates->hints.gsICachePrefetch[ftEntryIdx] = -1;
+        pHwShdsStates->hints.fsICachePrefetch[ftEntryIdx] = -1;
+    }
+
+    pHwShdsStates->hints.unifiedStatus.instVSEnd         = -1;
+    pHwShdsStates->hints.unifiedStatus.instPSStart       = -1;
+    pHwShdsStates->hints.unifiedStatus.constGPipeEnd     = -1;
+    pHwShdsStates->hints.unifiedStatus.constPSStart      = -1;
+    pHwShdsStates->hints.unifiedStatus.samplerGPipeStart = pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalSamplerCount;
+    pHwShdsStates->hints.unifiedStatus.samplerPSEnd      = 0;
+
+    pHwShdsStates->hints.sampleMaskLoc = -1;
+    pHwShdsStates->hints.psOutCntl0to3 = -1;
+    pHwShdsStates->hints.psOutCntl4to7 = -1;
+
+#if TEMP_SHADER_PATCH
+    pHwShdsStates->hints.pachedShaderIdentifier = gcvMACHINECODE_COUNT;
+#endif
+
+    return status;
+}
+
+gceSTATUS vscFinalizeHwPipelineShadersStates(VSC_SYS_CONTEXT* pSysCtx, VSC_HW_PIPELINE_SHADERS_STATES* pHwShdsStates)
+{
+    gceSTATUS                         status = gcvSTATUS_OK;
+    gctUINT                           i;
+
+    if (pHwShdsStates->pStateBuffer)
+    {
+        gcoOS_Free(gcvNULL, pHwShdsStates->pStateBuffer);
+        pHwShdsStates->pStateBuffer = gcvNULL;
+    }
+
+    /* Destroy vid mems for i-caches */
+    for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i ++)
+    {
+        if (pHwShdsStates->hints.shaderVidNodes.instVidmemNode[i])
+        {
+            (*pSysCtx->drvCBs.pfnFreeVidMemCb)(pSysCtx->hDrv,
+                                               gcvSURF_ICACHE,
+                                               "instruction memory",
+                                               pHwShdsStates->hints.shaderVidNodes.instVidmemNode[i]);
+
+            pHwShdsStates->hints.shaderVidNodes.instVidmemNode[i] = gcvNULL;
+        }
+
+        if (pHwShdsStates->hints.shaderVidNodes.gprSpillVidmemNode[i])
+        {
+            (*pSysCtx->drvCBs.pfnFreeVidMemCb)(pSysCtx->hDrv,
+                                               gcvSURF_VERTEX,
+                                               "temp register spill memory",
+                                               pHwShdsStates->hints.shaderVidNodes.gprSpillVidmemNode[i]);
+
+            pHwShdsStates->hints.shaderVidNodes.gprSpillVidmemNode[i] = gcvNULL;
+        }
+
+        if (pHwShdsStates->hints.shaderVidNodes.crSpillVidmemNode[i])
+        {
+            (*pSysCtx->drvCBs.pfnFreeVidMemCb)(pSysCtx->hDrv,
+                                               gcvSURF_VERTEX,
+                                               "immediate constant spill memory",
+                                               pHwShdsStates->hints.shaderVidNodes.crSpillVidmemNode[i]);
+
+            pHwShdsStates->hints.shaderVidNodes.crSpillVidmemNode[i] = gcvNULL;
+        }
+
+        if (pHwShdsStates->hints.shaderVidNodes.sharedMemVidMemNode)
+        {
+            (*pSysCtx->drvCBs.pfnFreeVidMemCb)(pSysCtx->hDrv,
+                                               gcvSURF_VERTEX,
+                                               "share variable memory",
+                                               pHwShdsStates->hints.shaderVidNodes.sharedMemVidMemNode);
+
+            pHwShdsStates->hints.shaderVidNodes.sharedMemVidMemNode = gcvNULL;
+        }
+    }
+
+    return status;
+}
+
+static VSC_ErrCode _ProgramHwShadersStates(VSC_SYS_CONTEXT*                pSysCtx,
+                                           VSC_HW_SHADERS_LINK_INFO*       pHwShsLinkInfo,
                                            VSC_HW_PIPELINE_SHADERS_STATES* pOutHwShdsStates)
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
@@ -4246,12 +5123,10 @@ static VSC_ErrCode _ProgramHwShadersStates(VSC_HW_SHADERS_LINK_INFO*       pHwSh
     gcmASSERT(pOutHwShdsStates);
 
     /* Initialize output states */
-    pOutHwShdsStates->stateBufferSize = 0;
-    pOutHwShdsStates->pStateBuffer = gcvNULL;
+    vscInitializeHwPipelineShadersStates(pSysCtx, pOutHwShdsStates);
 
     /* Initialize chip states programer */
-    gcoOS_ZeroMemory(&chipStatesPgmer, sizeof(VSC_CHIP_STATES_PROGRAMMER));
-    errCode = vscInitializeChipStatesProgrammer(&chipStatesPgmer, pHwCfg, &pOutHwShdsStates->hints);
+    errCode = vscInitializeChipStatesProgrammer(&chipStatesPgmer, pSysCtx, &pOutHwShdsStates->hints);
     ON_ERROR(errCode, "Intialize chip states-programmer");
 
     /* Do programming for each shader stage. Note that seq of calling vscProgramShaderStates must
@@ -4358,7 +5233,8 @@ static VSC_ErrCode _ValidateHwPipelineShaders(VSC_HW_PIPELINE_SHADERS_PARAM* pHw
 }
 
 gceSTATUS vscProgramHwShaderStages(VSC_HW_PIPELINE_SHADERS_PARAM*       pHwPipelineShsParam,
-                                   VSC_HW_PIPELINE_SHADERS_STATES*      pOutHwShdsStates)
+                                   VSC_HW_PIPELINE_SHADERS_STATES*      pOutHwShdsStates,
+                                   gctBOOL                              bSeperatedShaders)
 {
     VSC_ErrCode                         errCode = VSC_ERR_NONE;
     gceSTATUS                           status = gcvSTATUS_OK;
@@ -4370,10 +5246,10 @@ gceSTATUS vscProgramHwShaderStages(VSC_HW_PIPELINE_SHADERS_PARAM*       pHwPipel
     ON_ERROR(errCode, "Hw pipeline validation");
 
     /* Firstly, do HW level linkage */
-    gcmONERROR(vscLinkHwShaders(pHwPipelineShsParam, &hwShsLinkInfo));
+    gcmONERROR(vscLinkHwShaders(pHwPipelineShsParam, &hwShsLinkInfo, bSeperatedShaders));
 
     /* Secondly, do states programming */
-    errCode = _ProgramHwShadersStates(&hwShsLinkInfo, pHwPipelineShsParam->pHwCfg, pOutHwShdsStates);
+    errCode = _ProgramHwShadersStates(pHwPipelineShsParam->pSysCtx, &hwShsLinkInfo, pOutHwShdsStates);
     ON_ERROR(errCode, "Program shaders-states");
 
 OnError:
@@ -4402,6 +5278,7 @@ static VSC_ErrCode _FindAndLinkAnOuputForAnInput(SHADER_HW_INFO* pUpperHwShader,
 
     if (shClient == SHADER_CLIENT_GL   ||
         shClient == SHADER_CLIENT_GLES ||
+        shClient == SHADER_CLIENT_VK   ||
         /* Assume unknown client as GL for now */
         shClient == SHADER_CLIENT_UNKNOWN
        )
@@ -4567,6 +5444,7 @@ static VSC_ErrCode _LinkVtxPxlIoBetweenTwoHwShaderStages(VSC_HW_PIPELINE_SHADERS
 
     bGLClient = (DECODE_SHADER_CLIENT(pUpperHwShader->pSEP->shVersionType) == SHADER_CLIENT_GL ||
                  DECODE_SHADER_CLIENT(pUpperHwShader->pSEP->shVersionType) == SHADER_CLIENT_GLES ||
+                 DECODE_SHADER_CLIENT(pUpperHwShader->pSEP->shVersionType) == SHADER_CLIENT_VK ||
                  /* Assume unknown client as GL for now */
                  DECODE_SHADER_CLIENT(pUpperHwShader->pSEP->shVersionType) == SHADER_CLIENT_UNKNOWN);
 
@@ -4948,7 +5826,7 @@ static VSC_ErrCode _LinkVtxPxlIoBetweenTwoHwShaderStages(VSC_HW_PIPELINE_SHADERS
 #endif
 
     /* Link stream-out */
-    if (pVtxPxlOutputMapping->soIoIndexMask != 0 && pHwPipelineShsParam->pHwCfg->hwFeatureFlags.supportStreamOut)
+    if (pVtxPxlOutputMapping->soIoIndexMask != 0 && pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportStreamOut)
     {
         for (outputIdx = 0; outputIdx < pVtxPxlOutputMapping->countOfIoRegMapping; outputIdx ++)
         {
@@ -5375,7 +6253,7 @@ static VSC_ErrCode _LinkOutputOfLastHwShaderStage(VSC_HW_PIPELINE_SHADERS_PARAM*
         DECODE_SHADER_TYPE(pHwShader->pSEP->shVersionType) == SHADER_TYPE_GEOMETRY ||
         DECODE_SHADER_TYPE(pHwShader->pSEP->shVersionType) == SHADER_TYPE_DOMAIN)
     {
-        if (pVtxPxlOutputMapping->soIoIndexMask != 0 && pHwPipelineShsParam->pHwCfg->hwFeatureFlags.supportStreamOut)
+        if (pVtxPxlOutputMapping->soIoIndexMask != 0 && pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.supportStreamOut)
         {
             for (outputIdx = 0; outputIdx < pVtxPxlOutputMapping->countOfIoRegMapping; outputIdx ++)
             {
@@ -5446,8 +6324,8 @@ static VSC_ErrCode _AnalyzeHwInstProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM*
     SHADER_TYPE                shType;
     gctUINT                    stageIdx;
 
-    if (pHwPipelineShsParam->pHwCfg->hwFeatureFlags.hasInstCache &&
-        pHwPipelineShsParam->pHwCfg->hwFeatureFlags.hasInstCachePrefetch)
+    if (pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasInstCache &&
+        pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasInstCachePrefetch)
     {
         bLoadInstToCache = gcvTRUE;
     }
@@ -5458,10 +6336,10 @@ static VSC_ErrCode _AnalyzeHwInstProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM*
                   pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_DS].pSEP == gcvNULL &&
                   pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_GS].pSEP == gcvNULL);
 
-        if (pHwPipelineShsParam->pHwCfg->hwFeatureFlags.instBufferUnified)
+        if (pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.instBufferUnified)
         {
             /* Case 1, each shader stage has float size of inst space in inst-buffer */
-            bCanPutInstToIB = (totalMachineCodeSize <= pHwPipelineShsParam->pHwCfg->maxHwNativeTotalInstCount);
+            bCanPutInstToIB = (totalMachineCodeSize <= pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalInstCount);
 
             /* Case 2, each shader stage has fixed size of inst space in inst-buffer */
         }
@@ -5473,21 +6351,21 @@ static VSC_ErrCode _AnalyzeHwInstProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM*
                                       pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].pSEP->shVersionType);
 
                 bCanPutInstToIB = (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].pSEP->countOfMCInst <=
-                                   ((shType == SHADER_TYPE_GENERAL) ? pHwPipelineShsParam->pHwCfg->maxPSInstCount :
-                                                                      pHwPipelineShsParam->pHwCfg->maxVSInstCount));
+                                   ((shType == SHADER_TYPE_GENERAL) ? pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxPSInstCount :
+                                                                      pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxVSInstCount));
             }
 
             if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_PS].pSEP)
             {
                 bCanPutInstToIB = ((pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_PS].pSEP->countOfMCInst <=
-                                    pHwPipelineShsParam->pHwCfg->maxPSInstCount) && bCanPutInstToIB);
+                                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxPSInstCount) && bCanPutInstToIB);
             }
         }
 
         /* Inst-buffer is preferred against non-prefetchable cache */
-        if (pHwPipelineShsParam->pHwCfg->hwFeatureFlags.hasInstCache && !bCanPutInstToIB)
+        if (pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasInstCache && !bCanPutInstToIB)
         {
-            gcmASSERT(!pHwPipelineShsParam->pHwCfg->hwFeatureFlags.hasInstCachePrefetch);
+            gcmASSERT(!pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasInstCachePrefetch);
 
             bLoadInstToCache = gcvTRUE;
         }
@@ -5517,13 +6395,13 @@ static VSC_ErrCode _AnalyzeHwInstProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM*
         }
         else
         {
-            if (pHwPipelineShsParam->pHwCfg->maxHwNativeTotalInstCount > 1024)
+            if (pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalInstCount > 1024)
             {
-                gcmASSERT(pHwPipelineShsParam->pHwCfg->hwFeatureFlags.instBufferUnified);
+                gcmASSERT(pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.instBufferUnified);
 
                 ppActiveShHwInfoArray[0]->hwProgrammingHints.hwInstFetchMode = HW_INST_FETCH_MODE_UNIFIED_BUFFER_1;
                 ppActiveShHwInfoArray[0]->hwProgrammingHints.hwInstBufferAddrOffset =
-                    RESOLVE_UNIFIED_INST_BASE_ADDR_OFFSET(pHwPipelineShsParam->pHwCfg->maxHwNativeTotalInstCount,
+                    RESOLVE_UNIFIED_INST_BASE_ADDR_OFFSET(pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalInstCount,
                                                           ppActiveShHwInfoArray[0]->pSEP);
 
                 if (activeHwShaderStageCount == 2)
@@ -5531,17 +6409,17 @@ static VSC_ErrCode _AnalyzeHwInstProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM*
                     ppActiveShHwInfoArray[1]->hwProgrammingHints.hwInstFetchMode = HW_INST_FETCH_MODE_UNIFIED_BUFFER_1;
 
                     ppActiveShHwInfoArray[1]->hwProgrammingHints.hwInstBufferAddrOffset =
-                        RESOLVE_UNIFIED_INST_BASE_ADDR_OFFSET(pHwPipelineShsParam->pHwCfg->maxHwNativeTotalInstCount,
+                        RESOLVE_UNIFIED_INST_BASE_ADDR_OFFSET(pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalInstCount,
                                                               ppActiveShHwInfoArray[1]->pSEP);
                 }
             }
-            else if (pHwPipelineShsParam->pHwCfg->maxHwNativeTotalInstCount > 256)
+            else if (pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalInstCount > 256)
             {
-                gcmASSERT(pHwPipelineShsParam->pHwCfg->hwFeatureFlags.instBufferUnified);
+                gcmASSERT(pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.instBufferUnified);
 
                 ppActiveShHwInfoArray[0]->hwProgrammingHints.hwInstFetchMode = HW_INST_FETCH_MODE_UNIFIED_BUFFER_0;
                 ppActiveShHwInfoArray[0]->hwProgrammingHints.hwInstBufferAddrOffset =
-                    RESOLVE_UNIFIED_INST_BASE_ADDR_OFFSET(pHwPipelineShsParam->pHwCfg->maxHwNativeTotalInstCount,
+                    RESOLVE_UNIFIED_INST_BASE_ADDR_OFFSET(pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalInstCount,
                                                           ppActiveShHwInfoArray[0]->pSEP);
 
                 if (activeHwShaderStageCount == 2)
@@ -5549,14 +6427,14 @@ static VSC_ErrCode _AnalyzeHwInstProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM*
                     ppActiveShHwInfoArray[1]->hwProgrammingHints.hwInstFetchMode = HW_INST_FETCH_MODE_UNIFIED_BUFFER_0;
 
                     ppActiveShHwInfoArray[1]->hwProgrammingHints.hwInstBufferAddrOffset =
-                        RESOLVE_UNIFIED_INST_BASE_ADDR_OFFSET(pHwPipelineShsParam->pHwCfg->maxHwNativeTotalInstCount,
+                        RESOLVE_UNIFIED_INST_BASE_ADDR_OFFSET(pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalInstCount,
                                                               ppActiveShHwInfoArray[1]->pSEP);
                 }
             }
             else
             {
-                gcmASSERT(pHwPipelineShsParam->pHwCfg->maxHwNativeTotalInstCount == 256);
-                gcmASSERT(!pHwPipelineShsParam->pHwCfg->hwFeatureFlags.instBufferUnified);
+                gcmASSERT(pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalInstCount == 256);
+                gcmASSERT(!pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.instBufferUnified);
 
                 ppActiveShHwInfoArray[0]->hwProgrammingHints.hwInstFetchMode = HW_INST_FETCH_MODE_UNUNIFIED_BUFFER;
                 ppActiveShHwInfoArray[0]->hwProgrammingHints.hwInstBufferAddrOffset = 0;
@@ -5583,7 +6461,7 @@ static VSC_ErrCode _AnalyzeHwConstantRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_
     gctUINT                    stageIdx;
     UNIFIED_RF_ALLOC_STRATEGY  unifiedAllocStrategy;
 
-    if (pHwPipelineShsParam->pHwCfg->hwFeatureFlags.constRegFileUnified)
+    if (pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.constRegFileUnified)
     {
         unifiedAllocStrategy = ppActiveShHwInfoArray[0]->pSEP->exeHints.derivedHints.globalStates.unifiedConstRegAllocStrategy;
 
@@ -5603,14 +6481,14 @@ static VSC_ErrCode _AnalyzeHwConstantRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_
         }
         else if (unifiedAllocStrategy == UNIFIED_RF_ALLOC_STRATEGY_FLOAT_ADDR_OFFSET)
         {
-            if (totalConstRegCount > pHwPipelineShsParam->pHwCfg->maxHwNativeTotalConstRegCount)
+            if (totalConstRegCount > pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalConstRegCount)
             {
                 return VSC_ERR_OUT_OF_RESOURCE;
             }
 
             ppActiveShHwInfoArray[0]->hwProgrammingHints.hwConstantFetchMode = HW_CONSTANT_FETCH_MODE_UNIFIED_REG_FILE;
             ppActiveShHwInfoArray[0]->hwProgrammingHints.hwConstantRegAddrOffset =
-                RESOLVE_UNIFIED_CONST_RF_BASE_ADDR_OFFSET(pHwPipelineShsParam->pHwCfg->maxHwNativeTotalConstRegCount,
+                RESOLVE_UNIFIED_CONST_RF_BASE_ADDR_OFFSET(pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalConstRegCount,
                                                           ppActiveShHwInfoArray[0]->pSEP);
 
             if (activeHwShaderStageCount == 2)
@@ -5622,7 +6500,7 @@ static VSC_ErrCode _AnalyzeHwConstantRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_
                                                                          HW_CONSTANT_FETCH_MODE_UNIFIED_REG_FILE;
 
                 ppActiveShHwInfoArray[1]->hwProgrammingHints.hwConstantRegAddrOffset =
-                    RESOLVE_UNIFIED_CONST_RF_BASE_ADDR_OFFSET(pHwPipelineShsParam->pHwCfg->maxHwNativeTotalConstRegCount,
+                    RESOLVE_UNIFIED_CONST_RF_BASE_ADDR_OFFSET(pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalConstRegCount,
                                                               ppActiveShHwInfoArray[1]->pSEP);
             }
             else
@@ -5644,6 +6522,98 @@ static VSC_ErrCode _AnalyzeHwConstantRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_
         }
         else if (unifiedAllocStrategy == UNIFIED_RF_ALLOC_STRATEGY_FIXED_ADDR_OFFSET)
         {
+            for (stageIdx = 0; stageIdx < activeHwShaderStageCount; stageIdx ++)
+            {
+                gcmASSERT(ppActiveShHwInfoArray[stageIdx]->pSEP->exeHints.derivedHints.globalStates.unifiedConstRegAllocStrategy ==
+                          (gctUINT)unifiedAllocStrategy);
+
+                 ppActiveShHwInfoArray[stageIdx]->hwProgrammingHints.hwConstantFetchMode =
+                                                                   HW_CONSTANT_FETCH_MODE_UNIFIED_REG_FILE;
+            }
+
+            /* Check VS/CS. */
+            if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].pSEP)
+            {
+                shType = (SHADER_TYPE)DECODE_SHADER_TYPE(
+                                      pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].pSEP->shVersionType);
+
+                if (shType == SHADER_TYPE_GENERAL)
+                {
+                    if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_CPT_SHADER_STAGE_CS].pSEP->constantMapping.hwConstRegCount >
+                        pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxPSConstRegCount)
+                    {
+                        return VSC_ERR_OUT_OF_RESOURCE;
+                    }
+                    pOutHwShdsLinkInfo->shHwInfoArray[VSC_CPT_SHADER_STAGE_CS].hwProgrammingHints.hwConstantRegAddrOffset =
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxVSConstRegCount +
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxTCSConstRegCount +
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxTESConstRegCount +
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxGSConstRegCount;
+                }
+                else
+                {
+                    if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].pSEP->constantMapping.hwConstRegCount >
+                        pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxVSConstRegCount)
+                    {
+                        return VSC_ERR_OUT_OF_RESOURCE;
+                    }
+                    pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].hwProgrammingHints.hwConstantRegAddrOffset = 0;
+                }
+            }
+
+            /* Check HS. */
+            if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_HS].pSEP)
+            {
+                if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_HS].pSEP->constantMapping.hwConstRegCount >
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxTCSConstRegCount)
+                {
+                    return VSC_ERR_OUT_OF_RESOURCE;
+                }
+                pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_HS].hwProgrammingHints.hwConstantRegAddrOffset =
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxVSConstRegCount;
+            }
+
+            /* Check DS. */
+            if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_DS].pSEP)
+            {
+                if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_DS].pSEP->constantMapping.hwConstRegCount >
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxTESConstRegCount)
+                {
+                    return VSC_ERR_OUT_OF_RESOURCE;
+                }
+                pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_DS].hwProgrammingHints.hwConstantRegAddrOffset =
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxVSConstRegCount +
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxTCSConstRegCount;
+            }
+
+            /* Check GS. */
+            if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_GS].pSEP)
+            {
+                if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_GS].pSEP->constantMapping.hwConstRegCount >
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxGSConstRegCount)
+                {
+                    return VSC_ERR_OUT_OF_RESOURCE;
+                }
+                pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_GS].hwProgrammingHints.hwConstantRegAddrOffset =
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxVSConstRegCount +
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxTCSConstRegCount +
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxTESConstRegCount;
+            }
+
+            /* Check PS. */
+            if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_PS].pSEP)
+            {
+                if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_PS].pSEP->constantMapping.hwConstRegCount >
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxPSConstRegCount)
+                {
+                    return VSC_ERR_OUT_OF_RESOURCE;
+                }
+                pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_PS].hwProgrammingHints.hwConstantRegAddrOffset =
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxVSConstRegCount +
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxTCSConstRegCount +
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxTESConstRegCount +
+                                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxGSConstRegCount;
+            }
         }
         else
         {
@@ -5663,8 +6633,8 @@ static VSC_ErrCode _AnalyzeHwConstantRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_
                                   pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].pSEP->shVersionType);
 
             if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].pSEP->constantMapping.hwConstRegCount >
-                ((shType == SHADER_TYPE_GENERAL) ? pHwPipelineShsParam->pHwCfg->maxPSConstRegCount:
-                                                   pHwPipelineShsParam->pHwCfg->maxVSConstRegCount))
+                ((shType == SHADER_TYPE_GENERAL) ? pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxPSConstRegCount:
+                                                   pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxVSConstRegCount))
             {
                 return VSC_ERR_OUT_OF_RESOURCE;
             }
@@ -5677,7 +6647,7 @@ static VSC_ErrCode _AnalyzeHwConstantRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_
         if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_PS].pSEP)
         {
             if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_PS].pSEP->constantMapping.hwConstRegCount >
-                pHwPipelineShsParam->pHwCfg->maxPSConstRegCount)
+                pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxPSConstRegCount)
             {
                 return VSC_ERR_OUT_OF_RESOURCE;
             }
@@ -5701,12 +6671,12 @@ static VSC_ErrCode _AnalyzeHwSamplerRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_P
     gctUINT                    stageIdx;
     UNIFIED_RF_ALLOC_STRATEGY  unifiedAllocStrategy;
 
-    if (totalSamplerRegCount > pHwPipelineShsParam->pHwCfg->maxHwNativeTotalSamplerCount)
+    if (totalSamplerRegCount > pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalSamplerCount)
     {
         return VSC_ERR_OUT_OF_RESOURCE;
     }
 
-    if (pHwPipelineShsParam->pHwCfg->hwFeatureFlags.samplerRegFileUnified)
+    if (pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.samplerRegFileUnified)
     {
         unifiedAllocStrategy = ppActiveShHwInfoArray[0]->pSEP->exeHints.derivedHints.globalStates.unifiedSamplerRegAllocStrategy;
 
@@ -5729,7 +6699,7 @@ static VSC_ErrCode _AnalyzeHwSamplerRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_P
             for (stageIdx = 0; stageIdx < activeHwShaderStageCount; stageIdx ++)
             {
                 if (ppActiveShHwInfoArray[stageIdx]->pSEP->samplerMapping.hwSamplerRegCount >
-                    pHwPipelineShsParam->pHwCfg->maxSamplerCountPerShader)
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxSamplerCountPerShader)
                 {
                     return VSC_ERR_OUT_OF_RESOURCE;
                 }
@@ -5740,7 +6710,7 @@ static VSC_ErrCode _AnalyzeHwSamplerRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_P
                 ppActiveShHwInfoArray[stageIdx]->hwProgrammingHints.hwSamplerFetchMode =
                                                                    HW_SAMPLER_FETCH_MODE_UNIFIED_REG_FILE;
 
-                if (pHwPipelineShsParam->pHwCfg->hwFeatureFlags.hasSamplerBaseOffset)
+                if (pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasSamplerBaseOffset)
                 {
                     shType = (SHADER_TYPE)DECODE_SHADER_TYPE(
                                           ppActiveShHwInfoArray[stageIdx]->pSEP->shVersionType);
@@ -5755,7 +6725,7 @@ static VSC_ErrCode _AnalyzeHwSamplerRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_P
                         if (stageIdx == 0)
                         {
                             ppActiveShHwInfoArray[stageIdx]->hwProgrammingHints.hwSamplerRegAddrOffset =
-                                    pHwPipelineShsParam->pHwCfg->maxHwNativeTotalSamplerCount -
+                                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxHwNativeTotalSamplerCount -
                                     ppActiveShHwInfoArray[stageIdx]->pSEP->samplerMapping.hwSamplerRegCount;
                         }
                         else
@@ -5792,22 +6762,22 @@ static VSC_ErrCode _AnalyzeHwSamplerRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_P
                 if (shType == SHADER_TYPE_GENERAL)
                 {
                     if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_CPT_SHADER_STAGE_CS].pSEP->samplerMapping.hwSamplerRegCount >
-                        pHwPipelineShsParam->pHwCfg->maxCSSamplerCount)
+                        pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxCSSamplerCount)
                     {
                         return VSC_ERR_OUT_OF_RESOURCE;
                     }
                     pOutHwShdsLinkInfo->shHwInfoArray[VSC_CPT_SHADER_STAGE_CS].hwProgrammingHints.hwSamplerRegAddrOffset =
-                        pHwPipelineShsParam->pHwCfg->csSamplerRegNoBase;
+                        pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.csSamplerRegNoBase;
                 }
                 else
                 {
                     if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].pSEP->samplerMapping.hwSamplerRegCount >
-                        pHwPipelineShsParam->pHwCfg->maxVSSamplerCount)
+                        pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxVSSamplerCount)
                     {
                         return VSC_ERR_OUT_OF_RESOURCE;
                     }
                     pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].hwProgrammingHints.hwSamplerRegAddrOffset =
-                        pHwPipelineShsParam->pHwCfg->vsSamplerRegNoBase;
+                        pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.vsSamplerRegNoBase;
                 }
             }
 
@@ -5815,48 +6785,48 @@ static VSC_ErrCode _AnalyzeHwSamplerRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_P
             if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_HS].pSEP)
             {
                 if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_HS].pSEP->samplerMapping.hwSamplerRegCount >
-                    pHwPipelineShsParam->pHwCfg->maxTCSSamplerCount)
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxTCSSamplerCount)
                 {
                     return VSC_ERR_OUT_OF_RESOURCE;
                 }
                 pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_HS].hwProgrammingHints.hwSamplerRegAddrOffset =
-                    pHwPipelineShsParam->pHwCfg->tcsSamplerRegNoBase;
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.tcsSamplerRegNoBase;
             }
 
             /* Check DS. */
             if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_DS].pSEP)
             {
                 if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_DS].pSEP->samplerMapping.hwSamplerRegCount >
-                    pHwPipelineShsParam->pHwCfg->maxTESSamplerCount)
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxTESSamplerCount)
                 {
                     return VSC_ERR_OUT_OF_RESOURCE;
                 }
                 pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_DS].hwProgrammingHints.hwSamplerRegAddrOffset =
-                    pHwPipelineShsParam->pHwCfg->tesSamplerRegNoBase;
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.tesSamplerRegNoBase;
             }
 
             /* Check GS. */
             if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_GS].pSEP)
             {
                 if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_GS].pSEP->samplerMapping.hwSamplerRegCount >
-                    pHwPipelineShsParam->pHwCfg->maxGSSamplerCount)
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxGSSamplerCount)
                 {
                     return VSC_ERR_OUT_OF_RESOURCE;
                 }
                 pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_GS].hwProgrammingHints.hwSamplerRegAddrOffset =
-                    pHwPipelineShsParam->pHwCfg->gsSamplerRegNoBase;
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.gsSamplerRegNoBase;
             }
 
             /* Check PS. */
             if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_PS].pSEP)
             {
                 if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_PS].pSEP->samplerMapping.hwSamplerRegCount >
-                    pHwPipelineShsParam->pHwCfg->maxPSSamplerCount)
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxPSSamplerCount)
                 {
                     return VSC_ERR_OUT_OF_RESOURCE;
                 }
                 pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_PS].hwProgrammingHints.hwSamplerRegAddrOffset =
-                    pHwPipelineShsParam->pHwCfg->psSamplerRegNoBase;
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.psSamplerRegNoBase;
             }
         }
         else
@@ -5886,22 +6856,22 @@ static VSC_ErrCode _AnalyzeHwSamplerRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_P
             if (shType == SHADER_TYPE_GENERAL)
             {
                 if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_CPT_SHADER_STAGE_CS].pSEP->samplerMapping.hwSamplerRegCount >
-                    pHwPipelineShsParam->pHwCfg->maxCSSamplerCount)
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxCSSamplerCount)
                 {
                     return VSC_ERR_OUT_OF_RESOURCE;
                 }
                 pOutHwShdsLinkInfo->shHwInfoArray[VSC_CPT_SHADER_STAGE_CS].hwProgrammingHints.hwSamplerRegAddrOffset =
-                    pHwPipelineShsParam->pHwCfg->csSamplerRegNoBase;
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.csSamplerRegNoBase;
             }
             else
             {
                 if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].pSEP->samplerMapping.hwSamplerRegCount >
-                    pHwPipelineShsParam->pHwCfg->maxVSSamplerCount)
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxVSSamplerCount)
                 {
                     return VSC_ERR_OUT_OF_RESOURCE;
                 }
                 pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].hwProgrammingHints.hwSamplerRegAddrOffset =
-                    pHwPipelineShsParam->pHwCfg->vsSamplerRegNoBase;
+                    pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.vsSamplerRegNoBase;
             }
         }
 
@@ -5909,12 +6879,12 @@ static VSC_ErrCode _AnalyzeHwSamplerRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_P
         if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_PS].pSEP)
         {
             if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_PS].pSEP->samplerMapping.hwSamplerRegCount >
-                pHwPipelineShsParam->pHwCfg->maxPSSamplerCount)
+                pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxPSSamplerCount)
             {
                 return VSC_ERR_OUT_OF_RESOURCE;
             }
             pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_PS].hwProgrammingHints.hwSamplerRegAddrOffset =
-                pHwPipelineShsParam->pHwCfg->psSamplerRegNoBase;
+                pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.psSamplerRegNoBase;
         }
     }
 
@@ -6332,7 +7302,8 @@ static gctUINT _GetInputVerticesCountPerHwTGForGs(SHADER_EXECUTABLE_PROFILE* pGs
 
 static gctBOOL _NeedAnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM*  pHwPipelineShsParam,
                                                  VSC_HW_SHADERS_LINK_INFO*       pOutHwShdsLinkInfo,
-                                                 gctUINT                         maxHwTGThreadCount)
+                                                 gctUINT                         maxHwTGThreadCount,
+                                                 gctBOOL                         bSeperatedShaders)
 {
     SHADER_EXECUTABLE_PROFILE*          pSEP;
     SHADER_IO_LINKAGE_INFO*             pLinkInfo;
@@ -6356,7 +7327,7 @@ static gctBOOL _NeedAnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
     }
 
     /* If no USC armed on chip, just bail out */
-    if (pHwPipelineShsParam->pHwCfg->maxUSCSizeInKbyte == 0)
+    if (pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxUSCSizeInKbyte == 0)
     {
         for (stageIdx = 0; stageIdx < VSC_MAX_HW_PIPELINE_SHADER_STAGE_COUNT; stageIdx ++)
         {
@@ -6376,10 +7347,10 @@ static gctBOOL _NeedAnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
 
 #if PROGRAMING_STATES_FOR_SEPERATED_PROGRAM
     /* If any pre-RA shader is
-       1. not linked to any SHADER unit
-       2. or linked to FFU but no outputs of that shader will go to FFU memory
-       3. or there are no pre-RA shaders
-       then we dont need consider USC because they can not be ran on HW at all */
+        1. not linked to any SHADER unit
+        2. or linked to FFU but no outputs of that shader will go to FFU memory
+        3. or there are no pre-RA shaders
+        then we dont need consider USC because they can not be ran on HW at all */
 
     if (!bHasPreRAShaderStages && bNeedAnalyze)
     {
@@ -6401,11 +7372,14 @@ static gctBOOL _NeedAnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
                     continue;
                 }
 
-                if (pLinkInfo->linkedShaderStage == SHADER_TYPE_FFU &&
-                    pLinkInfo->vtxPxlLinkage.totalLinkNoCount == 0)
+                if (bSeperatedShaders)
                 {
-                    bNeedAnalyze = gcvFALSE;
-                    break;
+                    if (pLinkInfo->linkedShaderStage == SHADER_TYPE_FFU &&
+                        pLinkInfo->vtxPxlLinkage.totalLinkNoCount == 0)
+                    {
+                        bNeedAnalyze = gcvFALSE;
+                        break;
+                    }
                 }
             }
         }
@@ -6437,7 +7411,8 @@ static gctBOOL _NeedAnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
 static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM*  pHwPipelineShsParam,
                                                  SHADER_HW_INFO**                ppActiveShHwInfoArray,
                                                  gctUINT                         activeHwShaderStageCount,
-                                                 VSC_HW_SHADERS_LINK_INFO*       pOutHwShdsLinkInfo)
+                                                 VSC_HW_SHADERS_LINK_INFO*       pOutHwShdsLinkInfo,
+                                                 gctBOOL                         bSeperatedShaders)
 {
     typedef enum _USC_ANALYZE_TRIAL_TYPE
     {
@@ -6464,14 +7439,14 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
     gctUINT                             totalExpectedUSCSize, stageIdx, i, perVtxOutputSize;
     gctINT                              totalAllocatedUSCSizeInKbyte = 0, unAllocatedUSCSizeInKbyte, deltaUSCSizeInKbyte;
     gctUINT                             vsDownStreamVerticesCountPerHwTG, dsDownStreamVerticesCountPerHwTG;
-    gctUINT                             maxHwTGThreadCount = pHwPipelineShsParam->pHwCfg->maxCoreCount * 4;
-    gctUINT                             realMaxHwUSCSizeInKbyte = pHwPipelineShsParam->pHwCfg->maxUSCSizeInKbyte;
-    gctUINT                             maxResCashWinSize = pHwPipelineShsParam->pHwCfg->maxResultCacheWinSize;
+    gctUINT                             maxHwTGThreadCount = pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxCoreCount * 4;
+    gctUINT                             realMaxHwUSCSizeInKbyte = pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxUSCSizeInKbyte;
+    gctUINT                             maxResCashWinSize = pHwPipelineShsParam->pSysCtx->pCoreSysCtx->hwCfg.maxResultCacheWinSize;
     USC_ANALYZE_TRIAL_TYPE              anaTrialType;
     gctBOOL                             bUSCAlloced;
 
     /* Check whether we need go on to analyze USC programming hints */
-    if (!_NeedAnalyzeHwUSCProgrammingHints(pHwPipelineShsParam, pOutHwShdsLinkInfo, maxHwTGThreadCount))
+    if (!_NeedAnalyzeHwUSCProgrammingHints(pHwPipelineShsParam, pOutHwShdsLinkInfo, maxHwTGThreadCount, bSeperatedShaders))
     {
         return VSC_ERR_NONE;
     }
@@ -6501,23 +7476,38 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
                                                                         &pLinkInfo->vtxPxlLinkage,
                                                                         gcvFALSE);
 
-            maxRawThreadCount[VSC_GFX_SHADER_STAGE_VS] = (realUSCThreshold[VSC_GFX_SHADER_STAGE_VS] * 1024) / vsOutputSizePerThread;
+            for (i = 1; ; i ++)
+            {
+                _AnalyzeHwUSCSizeForVs(1,
+                                       realUSCThreshold[VSC_GFX_SHADER_STAGE_VS],
+                                       maxHwTGThreadCount,
+                                       maxResCashWinSize,
+                                       i,
+                                       gcvTRUE,
+                                       vsOutputSizePerThread,
+                                       3,
+                                       &maxRawThreadCount[VSC_GFX_SHADER_STAGE_VS],
+                                       &maxAlignedThreadCount[VSC_GFX_SHADER_STAGE_VS],
+                                       &realUsedMaxThreadCount[VSC_GFX_SHADER_STAGE_VS],
+                                       &expectedMaxThreadsPerHwTG[VSC_GFX_SHADER_STAGE_VS],
+                                       &expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS],
+                                       &bExceedThreshold[VSC_GFX_SHADER_STAGE_VS]);
 
-            expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS] = (maxRawThreadCount[VSC_GFX_SHADER_STAGE_VS] < 128) ?
-                                                              (maxRawThreadCount[VSC_GFX_SHADER_STAGE_VS] / 4) :
-                                                              (maxRawThreadCount[VSC_GFX_SHADER_STAGE_VS] / 2);
-            expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS] = (expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS] > maxResCashWinSize) ?
-                                                              maxResCashWinSize : expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS];
-            expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS] = vscMAX(3, expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS]);
+                if (bExceedThreshold[VSC_GFX_SHADER_STAGE_VS])
+                {
+                    break;
+                }
 
-            pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].hwProgrammingHints.uscSizeInKbyte =
+                pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].hwProgrammingHints.uscSizeInKbyte =
                                                                          realUSCThreshold[VSC_GFX_SHADER_STAGE_VS];
 
-            pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].hwProgrammingHints.resultCacheWindowSize =
-                                                                         expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS];
+                pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].hwProgrammingHints.resultCacheWindowSize =
+                                                                             expectedResCashWinSize[VSC_GFX_SHADER_STAGE_VS];
 
-            pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].hwProgrammingHints.maxThreadsPerHwTG =
-                                                                         maxHwTGThreadCount;
+                gcmASSERT(expectedMaxThreadsPerHwTG[VSC_GFX_SHADER_STAGE_VS] <= maxHwTGThreadCount);
+                pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].hwProgrammingHints.maxThreadsPerHwTG =
+                                                                             expectedMaxThreadsPerHwTG[VSC_GFX_SHADER_STAGE_VS];
+            }
 
             return VSC_ERR_NONE;
         }
@@ -6887,7 +7877,8 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
 }
 
 static VSC_ErrCode _AnalyzeHwProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM*  pHwPipelineShsParam,
-                                              VSC_HW_SHADERS_LINK_INFO*       pOutHwShdsLinkInfo)
+                                              VSC_HW_SHADERS_LINK_INFO*       pOutHwShdsLinkInfo,
+                                              gctBOOL                         bSeperatedShaders)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
     gctUINT             stageIdx, activeHwShaderStageCount = 0;
@@ -6934,7 +7925,8 @@ static VSC_ErrCode _AnalyzeHwProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM*  pH
     errCode = _AnalyzeHwUSCProgrammingHints(pHwPipelineShsParam,
                                             pActiveShHwInfoArray,
                                             activeHwShaderStageCount,
-                                            pOutHwShdsLinkInfo);
+                                            pOutHwShdsLinkInfo,
+                                            bSeperatedShaders);
     ON_ERROR(errCode, "Analyze HW USC progrmamming hints");
 
 OnError:
@@ -6942,7 +7934,8 @@ OnError:
 }
 
 gceSTATUS vscLinkHwShaders(VSC_HW_PIPELINE_SHADERS_PARAM*  pHwPipelineShsParam,
-                           VSC_HW_SHADERS_LINK_INFO*       pOutHwShdsLinkInfo)
+                           VSC_HW_SHADERS_LINK_INFO*       pOutHwShdsLinkInfo,
+                           gctBOOL                         bSeperatedShaders)
 {
     VSC_ErrCode      errCode = VSC_ERR_NONE;
     SHADER_HW_INFO*  pPreShaderStageHwInfo = gcvNULL;
@@ -6987,7 +7980,7 @@ gceSTATUS vscLinkHwShaders(VSC_HW_PIPELINE_SHADERS_PARAM*  pHwPipelineShsParam,
     }
 
     /* 2. Determine some HW programming hints */
-    errCode = _AnalyzeHwProgrammingHints(pHwPipelineShsParam, pOutHwShdsLinkInfo);
+    errCode = _AnalyzeHwProgrammingHints(pHwPipelineShsParam, pOutHwShdsLinkInfo, bSeperatedShaders);
     ON_ERROR(errCode, "Analyze hw programming hints");
 
 OnError:

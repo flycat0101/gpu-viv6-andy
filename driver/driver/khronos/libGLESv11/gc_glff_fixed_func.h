@@ -280,8 +280,8 @@ gleSTENCILOPERATIONS, * gleSTENCILOPERATIONS_PTR;
         TempRegister, \
         gcSL_ENABLE_##ComponentEnable, \
         gcSL_FLOAT, \
-        Precision \
-        ))
+        Precision, \
+        0))
 
 #define glmOPCODE_COND(Opcode, Condition, TempRegister, ComponentEnable) \
     gcmASSERT(TempRegister != 0); \
@@ -291,8 +291,9 @@ gleSTENCILOPERATIONS, * gleSTENCILOPERATIONS_PTR;
         gcSL_##Condition, \
         TempRegister, \
         gcSL_ENABLE_##ComponentEnable, \
-        gcSL_FLOAT \
-        ))
+        gcSL_FLOAT, \
+        0, \
+        0))
 
 #define glmOPCODEV(Opcode, TempRegister, ComponentEnable, Precision) \
     gcmASSERT(TempRegister != 0); \
@@ -303,16 +304,16 @@ gleSTENCILOPERATIONS, * gleSTENCILOPERATIONS_PTR;
         TempRegister, \
         ComponentEnable, \
         gcSL_FLOAT, \
-        Precision \
-        ))
+        Precision, \
+        0))
 
 #define glmOPCODE_BRANCH(Opcode, Condition, Target) \
     gcmERR_BREAK(gcSHADER_AddOpcodeConditional( \
         ShaderControl->i->shader, \
         gcSL_##Opcode, \
         gcSL_##Condition, \
-        Target \
-        ))
+        Target, \
+        0))
 
 #define glmCONST(Value) \
     gcmERR_BREAK(gcSHADER_AddSourceConstant( \
@@ -484,6 +485,7 @@ gleSTENCILOPERATIONS, * gleSTENCILOPERATIONS_PTR;
         ShaderControl->i->shader, \
         gcSL_RET, \
         gcSL_ALWAYS, \
+        0, \
         0 \
         ))
 
@@ -864,7 +866,8 @@ glsATTRIBUTEINFO;
 
 typedef gceSTATUS (*glfUNIFORMSET) (
     glsCONTEXT_PTR,
-    gcUNIFORM
+    gcUNIFORM,
+    GLubyte*
     );
 
 typedef struct _glsUNIFORMWRAP * glsUNIFORMWRAP_PTR;
@@ -892,6 +895,9 @@ typedef struct _glsSHADERCONTROL
     glsUNIFORMWRAP_PTR      uniforms;
     glsATTRIBUTEWRAP_PTR    attributes;
     glsUNIFORMWRAP_PTR      texture[glvMAX_TEXTURES];
+    gctSIZE_T               dataSize;
+    gcoBUFOBJ               halBufObj;
+    gctPOINTER              logicalAddress;
 }
 glsSHADERCONTROL;
 

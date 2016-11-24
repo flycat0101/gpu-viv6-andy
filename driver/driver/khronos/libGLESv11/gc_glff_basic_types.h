@@ -21,6 +21,11 @@ extern "C" {
 /******************************************************************************\
 ********************************* Mutable Types ********************************
 \******************************************************************************/
+#if defined(_WIN32)
+#define __GL_INLINE static __forceinline
+#else
+#define __GL_INLINE static __inline
+#endif
 
 typedef enum _gleTYPE
 {
@@ -227,12 +232,6 @@ glsMATRIX;
 
 #define glmABS(Value) \
     (((Value) > 0)? (Value) : -(Value))
-
-#if defined(COMMON_LITE)
-#   define glvGLESDRIVERNAME            "OpenGL ES-CL 1.1"
-#else
-#   define glvGLESDRIVERNAME            "OpenGL ES-CM 1.1"
-#endif
 
 #   define gco3D_SetClearDepth          gco3D_SetClearDepthF
 #   define gco3D_SetDepthScaleBias      gco3D_SetDepthScaleBiasF

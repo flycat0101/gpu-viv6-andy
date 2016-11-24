@@ -19,7 +19,7 @@ EXTERN_C_BEGIN
 VX_INTERNAL_API vx_status vxoKernel_Initialize(
     vx_context context,
     vx_kernel kernel,
-    vx_char name[VX_MAX_KERNEL_NAME],
+    const vx_char name[VX_MAX_KERNEL_NAME],
     vx_enum kernelEnum,
     vx_program program,
     vx_kernel_f function,
@@ -30,9 +30,11 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
     vx_kernel_initialize_f initializeFunction,
     vx_kernel_deinitialize_f deinitializeFunction
 #if gcdVX_OPTIMIZER
-    , vx_kernel_optimization_attribute_s optAttributes
+, vx_kernel_optimization_attribute_s optAttributes
 #endif
     );
+
+VX_INTERNAL_API vx_status vxoDumpOutput(vx_node node, const vx_reference parameters[], vx_uint32 paramCount);
 
 VX_INTERNAL_API void vxoKernel_Dump(vx_kernel kernel);
 
@@ -49,3 +51,4 @@ VX_INTERNAL_CALLBACK_API void vxoKernel_Destructor(vx_reference ref);
 EXTERN_C_END
 
 #endif /* __GC_VX_KERNEL_H__ */
+

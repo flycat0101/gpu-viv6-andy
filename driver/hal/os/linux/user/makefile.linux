@@ -53,12 +53,17 @@ endif
 ################################################################################
 # Describe object files.
 
-PLATFORM_CALLBACK_OBJ :=$(notdir $(PLATFORM_CALLBACK)).o
+platform_option := \
+    $(firstword $(wildcard \
+        platform/$(soc_vendor)/gc_hal_user_platform_$(soc_board).c \
+        platform/default/gc_hal_user_platform_default.c))
+
+platform_option_obj := $(patsubst %.c,%.o,$(notdir $(platform_option)))
 
 OBJECTS := $(OBJ_DIR)/gc_hal_user_debug.o \
            $(OBJ_DIR)/gc_hal_user_os.o \
            $(OBJ_DIR)/gc_hal_user_math.o \
-           $(OBJ_DIR)/$(PLATFORM_CALLBACK_OBJ) \
+           $(OBJ_DIR)/$(platform_option_obj) \
 
 ################################################################################
 # Define targets.
@@ -94,9 +99,8 @@ $(OBJ_DIR)/%.o: %.c
 	@mkdir -p $(OBJ_DIR)
 	$(CC) -c $(CFLAGS) -MMD -o $@ $<
 
-$(OBJ_DIR)/$(PLATFORM_CALLBACK_OBJ): $(PLATFORM_CALLBACK).c
-	@mkdir -p $(OBJ_DIR)
-	$(CC) -c $(CFLAGS) -MMD -o $@ $<
+vpath %.c platform/default
+vpath %.c platform/$(soc_vendor)
 
 # object dependencies.
 -include $(OBJECTS:.o=.d)

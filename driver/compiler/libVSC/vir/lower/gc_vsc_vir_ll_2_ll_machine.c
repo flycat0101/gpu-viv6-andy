@@ -60,8 +60,82 @@ static VIR_PatternReplaceInst _divRepInst0[] = {
     { VIR_OP_MUL, 0, 0, {  1, -1, -1, 0 }, { 0, VIR_Lower_SetSwizzleX, VIR_Lower_SetSwizzleY } },
 };
 
+/* same algorithm as old optimizer's _Implement32BitModulus
+  to-do: optimize? */
+static VIR_PatternMatchInst _divPatInst1[] = {
+    { VIR_OP_DIV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasNot32IntDIV, VIR_Lower_IsIntOpcode, VIR_Lower_IsDstInt32, VIR_Lower_IsDstSigned }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _divRepInst1[] = {
+    { VIR_OP_SIGN, 0, 0, { -1, 3, 0, 0 }, { 0 } },
+    { VIR_OP_SIGN, 0, 0, { -2, 2, 0, 0 }, { 0 } },
+    { VIR_OP_MUL, 0, 0, { -1, -1, -2, 0 }, { 0 } },
+    { VIR_OP_ABS, 0, 0, { -3, 2, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_ABS, 0, 0, { -4, 3, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_JMPC, VIR_COP_LESS_OR_EQUAL, 0, { 0, -4, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne } },
+    { VIR_OP_AQ_I2F, 0, 0, { -5, -4, 0, 0 }, { VIR_Lower_SetOpndFloat } },
+    { VIR_OP_ADD, 0, 0, { -6, -5, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, _SetUIntFloatFour } },
+    { VIR_OP_RCP, 0, 0, { -7, -6, 0, 0 }, { VIR_Lower_SetOpndFloat, VIR_Lower_SetOpndFloat } },
+    { VIR_OP_AQ_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_SUB, 0, 0, { -9, 0, -4, 0 }, { VIR_Lower_SetOpndUINT32, VIR_Lower_SetIntZero} },
+    { VIR_OP_MUL, 0, 0, { -10, -9, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_MULHI, 0, 0, { -11, -10, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_ADD, 0, 0, { -12, -11, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_MUL, 0, 0, { -13, -12, -4, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_JMPC, VIR_COP_GREATER, 0, { 0, -13, -9, 0 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, { -12, -12, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, VIR_Lower_SetUIntOne} },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg2 } },
+    { VIR_OP_MULHI, 0, 0, { -13, -12, -3, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_MUL, 0, 0, { -14, -13, -9, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_ADD, 0, 0, { -14, -3, -14, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_JMPC, VIR_COP_LESS, 0, { 0, -14, -4, 0 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, { 1, -13, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne} },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } },
+    { VIR_OP_MOV, 0, 0, { 1, -13, 0, 0 }, { 0 } },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg22 } },
+    { VIR_OP_MOV, 0, 0, { 1, -3, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, 0, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3_6 } },
+    { VIR_OP_MUL, 0, 0, { 1, -1, 1, 0 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _divPatInst2[] = {
+    { VIR_OP_DIV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _hasNot32IntDIV, VIR_Lower_IsIntOpcode, VIR_Lower_IsDstInt32 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _divRepInst2[] = {
+    { VIR_OP_JMPC, VIR_COP_LESS_OR_EQUAL, 0, { 0, 3, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne } },
+    { VIR_OP_AQ_I2F, 0, 0, { -5, 3, 0, 0 }, { VIR_Lower_SetOpndFloat } },
+    { VIR_OP_ADD, 0, 0, { -6, -5, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, _SetUIntFloatFour } },
+    { VIR_OP_RCP, 0, 0, { -7, -6, 0, 0 }, { VIR_Lower_SetOpndFloat, VIR_Lower_SetOpndFloat } },
+    { VIR_OP_AQ_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_SUB, 0, 0, { -9, 0, 3, 0 }, { VIR_Lower_SetOpndUINT32, VIR_Lower_SetIntZero} },
+    { VIR_OP_MUL, 0, 0, { -10, -9, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_MULHI, 0, 0, { -11, -10, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_ADD, 0, 0, { -12, -11, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_MUL, 0, 0, { -13, -12, 3, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_JMPC, VIR_COP_GREATER, 0, { 0, -13, -9, 0 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, { -12, -12, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, VIR_Lower_SetUIntOne} },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg2 } },
+    { VIR_OP_MULHI, 0, 0, { -13, -12, 2, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_MUL, 0, 0, { -14, -13, -9, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_ADD, 0, 0, { -14, 2, -14, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_JMPC, VIR_COP_LESS, 0, { 0, -14, 3, 0 }, { 0 } },
+    { VIR_OP_ADD, 0, 0, { 1, -13, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne} },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } },
+    { VIR_OP_MOV, 0, 0, { 1, -13, 0, 0 }, { 0 } },
+    { VIR_OP_JMP, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg22 } },
+    { VIR_OP_MOV, 0, 0, { 1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, 0, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3_6 } },
+};
+
 static VIR_Pattern _divPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_div, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_div, 1) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_div, 2) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -95,7 +169,7 @@ static VIR_PatternReplaceInst _modRepInst1[] = {
     { VIR_OP_JMPC, VIR_COP_LESS_OR_EQUAL, 0, { 0, -4, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne } },
     { VIR_OP_AQ_I2F, 0, 0, { -5, -4, 0, 0 }, { VIR_Lower_SetOpndFloat } },
     { VIR_OP_ADD, 0, 0, { -6, -5, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, _SetUIntFloatFour } },
-    { VIR_OP_RCP, 0, 0, { -7, -6, 0, 0 }, { VIR_Lower_SetOpndFloat } },
+    { VIR_OP_RCP, 0, 0, { -7, -6, 0, 0 }, { VIR_Lower_SetOpndFloat, VIR_Lower_SetOpndFloat } },
     { VIR_OP_AQ_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_SUB, 0, 0, { -9, 0, -4, 0 }, { VIR_Lower_SetOpndUINT32, VIR_Lower_SetIntZero} },
     { VIR_OP_MUL, 0, 0, { -10, -9, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
@@ -130,7 +204,7 @@ static VIR_PatternReplaceInst _modRepInst2[] = {
     { VIR_OP_JMPC, VIR_COP_LESS_OR_EQUAL, 0, { 0, 3, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne } },
     { VIR_OP_AQ_I2F, 0, 0, { -5, 3, 0, 0 }, { VIR_Lower_SetOpndFloat } },
     { VIR_OP_ADD, 0, 0, { -6, -5, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, _SetUIntFloatFour } },
-    { VIR_OP_RCP, 0, 0, { -7, -6, 0, 0 }, { VIR_Lower_SetOpndFloat } },
+    { VIR_OP_RCP, 0, 0, { -7, -6, 0, 0 }, { VIR_Lower_SetOpndFloat, VIR_Lower_SetOpndFloat } },
     { VIR_OP_AQ_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_SUB, 0, 0, { -9, 0, 3, 0 }, { VIR_Lower_SetOpndUINT32, VIR_Lower_SetIntZero} },
     { VIR_OP_MUL, 0, 0, { -10, -9, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
@@ -169,6 +243,34 @@ static VIR_Pattern _modPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_mod, 1) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_mod, 2) },
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_mod, 3) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+/*
+** FIX, temp(1), temp(2)
+** -->
+** JMP.G    1, temp(2), 0
+** CEIL     temp(1), temp(2)
+** JMP      2
+** LABEL    1
+** FLOOR    temp(1), temp(2)
+** LABEL    2
+*/
+static VIR_PatternMatchInst _fixPatInst0[] = {
+    { VIR_OP_FIX, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _fixRepInst0[] = {
+    { VIR_OP_JMPC, VIR_COP_GREATER, 0, { 0, 2, 0, 0 }, { 0, 0, VIR_Lower_SetZero } },
+    { VIR_OP_CEIL, 0, 0, { 1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_JMP, 0, 0, { 0, 0, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } },
+    { VIR_OP_FLOOR, 0, 0, { 1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_LABEL, VIR_PATTERN_ANYCOND, 0, { 0, 0, 0, 0 }, { VIR_Lower_label_set_jmp_neg3 } },
+};
+
+static VIR_Pattern _fixPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_fix, 0) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -299,6 +401,8 @@ _GetLowerPatternPhaseMachine(
         return _divPattern;
     case VIR_OP_MOD:
         return _modPattern;
+    case VIR_OP_FIX:
+        return _fixPattern;
     case VIR_OP_PRE_LOG2:
         return _logPattern;
     case VIR_OP_SINPI:
@@ -328,18 +432,19 @@ _CmpInstuction(
 VSC_ErrCode
 VIR_Lower_MiddleLevel_To_LowLevel_Machine(
     IN  VIR_Shader              *Shader,
-    IN  VSC_HW_CONFIG           *HwCfg,
+    IN  PVSC_CONTEXT            VscContext,
     IN  VIR_PatternLowerContext *Context
     )
 {
     VSC_ErrCode errCode  = VSC_ERR_NONE;
 
-    VIR_PatternContext_Initialize(&Context->header, Shader, VIR_PATN_CONTEXT_FLAG_NONE, _GetLowerPatternPhaseMachine, _CmpInstuction, 512);
+    VIR_PatternContext_Initialize(&Context->header, VscContext, Shader, Context->pMM, VIR_PATN_CONTEXT_FLAG_NONE,
+                                  _GetLowerPatternPhaseMachine, _CmpInstuction, 512);
 
     errCode = VIR_Pattern_Transform((VIR_PatternContext *)Context);
     CHECK_ERROR(errCode, "VIR_Lower_MiddleLevel_To_LowLevel_Machine failed.");
 
-    VIR_PatternContext_Finalize(&Context->header, 512);
+    VIR_PatternContext_Finalize(&Context->header);
 
     return errCode;
 }

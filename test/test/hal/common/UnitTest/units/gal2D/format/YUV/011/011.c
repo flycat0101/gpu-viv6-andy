@@ -106,7 +106,7 @@ static gceSTATUS CDECL ReloadSourceSurface(Test2D *t2d, const char * sourcefile)
     // destroy source surface
     if (t2d->srcSurf != gcvNULL)
     {
-        if (t2d->srcLgcAddr)
+        if (t2d->srcLgcAddr[0])
         {
             gcmONERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr));
             t2d->srcLgcAddr[0] = 0;
@@ -239,7 +239,7 @@ static void CDECL Destroy(Test2D *t2d)
     // destroy source surface
     if (t2d->srcSurf != gcvNULL)
     {
-        if (t2d->srcLgcAddr)
+        if (t2d->srcLgcAddr[0])
         {
             if (gcmIS_ERROR(gcoSURF_Unlock(t2d->srcSurf, t2d->srcLgcAddr)))
             {

@@ -49,10 +49,10 @@ VX_INTERNAL_API vx_bool vxoContext_AddObject(vx_context context, vx_reference re
 
 VX_INTERNAL_API vx_bool vxoContext_RemoveObject(vx_context context, vx_reference ref);
 
-VX_INTERNAL_API vx_status vxContext_LoadKernels(vx_context context, vx_string module);
+VX_INTERNAL_API vx_status vxContext_LoadKernels(vx_context context, const vx_string module);
 
 VX_INTERNAL_API vx_bool vxoContext_AddAccessor(
-        vx_context context, vx_size size, vx_enum usage, vx_ptr ptr, vx_reference ref, OUT vx_uint32_ptr indexPtr);
+        vx_context context, vx_size size, vx_enum usage, vx_ptr ptr, vx_reference ref, OUT vx_uint32_ptr indexPtr, vx_ptr extraDataPtr);
 
 VX_INTERNAL_API void vxoContext_RemoveAccessor(vx_context context, vx_uint32 index);
 
@@ -61,3 +61,4 @@ VX_INTERNAL_API vx_bool vxoContext_SearchAccessor(vx_context context, vx_ptr ptr
 EXTERN_C_END
 
 #endif /* __GC_VX_CONTEXT_H__ */
+

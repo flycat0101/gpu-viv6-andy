@@ -1,0 +1,59 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+!IF "$(VIVANTE_ENABLE_3D)" != "1"
+SKIPBUILD=1
+!ENDIF
+
+!IF "$(USE_OPENCL)" == "0"
+SKIPBUILD=1
+!ENDIF
+
+INCLUDES= \
+  $(INCLUDES); \
+  $(AQROOT)\hal\inc; \
+  $(AQROOT)\hal\user; \
+  $(AQROOT)\hal\os\ce\user; \
+  $(AQROOT)\compiler\libVSC\include; \
+  $(AQROOT)\compiler\libCLC\inc; \
+  $(AQROOT)\compiler\libCLC\llvm\include; \
+  $(AQROOT)\compiler\libCLC\llvm\tools\clang\include; \
+
+DOSYSGEN=1
+SYNCHRONIZE_DRAIN=1
+TARGETNAME=libCLC_clangLex
+TARGETTYPE=LIBRARY
+WARNLEVEL=0
+
+SOURCES= \
+    ../Lexer.cpp \
+    ../PreprocessorLexer.cpp \
+    ../PPDirectives.cpp \
+    ../LiteralSupport.cpp \
+    ../Preprocessor.cpp \
+    ../PPMacroExpansion.cpp \
+    ../TokenConcatenation.cpp \
+    ../HeaderSearch.cpp \
+    ../Pragma.cpp \
+    ../HeaderMap.cpp \
+    ../MacroInfo.cpp \
+    ../PTHLexer.cpp \
+    ../ScratchBuffer.cpp \
+    ../PPExpressions.cpp \
+    ../PreprocessingRecord.cpp \
+    ../TokenLexer.cpp \
+    ../PPCaching.cpp \
+    ../MacroArgs.cpp \
+    ../PPLexerChange.cpp \
+
+EXCEPTION_CPP=NO_SEH_NO_C_THROW

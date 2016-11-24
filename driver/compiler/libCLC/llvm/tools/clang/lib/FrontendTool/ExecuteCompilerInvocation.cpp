@@ -373,8 +373,8 @@ _LoadFileToBuffer(cloCOMPILER Compiler, gctUINT StringNo, const char *FName)
                                               fullpathname));
           }
           source[byteRead] = '\0';
-          gcoOS_Close(gcvNULL, fptr);
     }
+    gcoOS_Close(gcvNULL, fptr);
     return source;
 }
 
@@ -660,6 +660,7 @@ unsigned *pped_count)
                              fptr,
                              gcoOS_StrLen(source[i], gcvNULL),
                              source[i]);
+        gcoOS_Close(gcvNULL, fptr);
         if(gcmIS_ERROR(status)) {
            cloCOMPILER_Report(Compiler,
                               0,
@@ -670,7 +671,6 @@ unsigned *pped_count)
            break;
         }
 
-        gcoOS_Close(gcvNULL, fptr);
         Frontendopts.Inputs.clear();
         Frontendopts.Inputs.push_back(std::make_pair(IK_OpenCL, &tmpfile_name[0]));
         gcmVERIFY_OK(gcoOS_PrintStrSafe(name_suffix, gcmSIZEOF(name_suffix), &offset, "_%d_PPED", i));

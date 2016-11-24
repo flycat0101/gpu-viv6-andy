@@ -382,7 +382,7 @@ static VSC_ErrCode _DoForwardIterativeMsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
 
             if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_EXIT)
             {
-                vscSV_Copy(&pThisBasicBlk->pMsWorkDataFlow->outFlow, &pThisBasicBlk->pMsWorkDataFlow->inFlow);
+                pMsDFA->msDfaResolvers.ms_iterateBlockFlow_resolver(pMsDFA, pThisBasicBlk->pMsWorkDataFlow);
                 vscSV_Copy(&pFuncFlow->outFlow, &pThisBasicBlk->pMsWorkDataFlow->outFlow);
 
                 if (bIPA)
@@ -638,7 +638,7 @@ static VSC_ErrCode _DoBackwardIterativeMsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
 
             if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_ENTRY)
             {
-                vscSV_Copy(&pThisBasicBlk->pMsWorkDataFlow->inFlow, &pThisBasicBlk->pMsWorkDataFlow->outFlow);
+                pMsDFA->msDfaResolvers.ms_iterateBlockFlow_resolver(pMsDFA, pThisBasicBlk->pMsWorkDataFlow);
                 vscSV_Copy(&pFuncFlow->inFlow, &pThisBasicBlk->pMsWorkDataFlow->inFlow);
 
                 if (bIPA)

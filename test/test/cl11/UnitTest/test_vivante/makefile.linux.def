@@ -39,7 +39,7 @@ CC ?= $(CROSS_COMPILE)g++
 ##############################################
 # Supply additional include directories.
 
-INCLUDE += -I$(SDK_DIR)/include
+INCLUDE += -I$(VIVANTE_SDK_DIR)/include
 CFLAGS += $(INCLUDE)
 
 ifeq ($(ARCH_TYPE), e2k)
@@ -61,7 +61,7 @@ LIBS +=  $(LIB_DIR)/libdl.a
 LIBS +=  $(LIB_DIR)/librt.a
 else
 # Specify Vivante libraries.
-LIBS += -L $(VIVANTE_SDK_LIB) -l OpenCL -l GLESv2
+LIBS += -L $(VIVANTE_SDK_LIB) -Wl,-rpath-link,$(VIVANTE_SDK_LIB) -l OpenCL -l GLESv2
 LIBS += -l m -l pthread -l dl -l stdc++ -l rt
 ifeq ($(EGL_API_DRI), 1)
     LIBS += -L$(X11_ARM_DIR)/lib -Wl,-rpath-link,$(X11_ARM_DIR)/lib -lX11

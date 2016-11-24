@@ -111,6 +111,21 @@ _GetValidKernel(
         return Device->kernels[gcvCORE_MAJOR];
     }
     else
+    if (Device->kernels[gcvCORE_3D1])
+    {
+        return Device->kernels[gcvCORE_3D1];
+    }
+    else
+    if (Device->kernels[gcvCORE_3D2])
+    {
+        return Device->kernels[gcvCORE_3D2];
+    }
+    else
+    if (Device->kernels[gcvCORE_3D3])
+    {
+        return Device->kernels[gcvCORE_3D3];
+    }
+    else
     if (Device->kernels[gcvCORE_2D])
     {
         return Device->kernels[gcvCORE_2D];

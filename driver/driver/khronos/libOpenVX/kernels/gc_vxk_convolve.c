@@ -13,7 +13,7 @@
 
 #include <gc_vxk_common.h>
 
-vx_status Convolve(vx_node node, vx_image src, vx_image dst, vx_int16* matrix,  vx_uint32 scale, vx_bool clamp,
+vx_status Convolve(vx_node node, vx_image src, vx_image dst, vx_int16* matrix, vx_uint32 scale, vx_bool clamp,
                    vx_size conv_width, vx_size conv_height, vx_border_mode_t *bordermode)
 {
     vx_status status  = VX_SUCCESS;
@@ -34,6 +34,7 @@ vx_status Convolve(vx_node node, vx_image src, vx_image dst, vx_int16* matrix,  
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     /*index = 0*/
@@ -73,6 +74,8 @@ vx_status Convolve(vx_node node, vx_image src, vx_image dst, vx_int16* matrix,  
         kernelContext->uniform_num = 1;
     }
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -89,16 +92,17 @@ vx_status vxConvolve(vx_node node, vx_image src, vx_convolution conv, vx_image d
 {
     vx_status status  = VX_SUCCESS;
     vx_size conv_width, conv_height;
-    vx_size scale = 1;
+    vx_uint32 scale = 1;
     vx_int16 conv_mat[C_MAX_CONVOLUTION_DIM * C_MAX_CONVOLUTION_DIM] = {0};
 
     status |= vxQueryConvolution(conv, VX_CONVOLUTION_ATTRIBUTE_COLUMNS, &conv_width, sizeof(conv_width));
     status |= vxQueryConvolution(conv, VX_CONVOLUTION_ATTRIBUTE_ROWS, &conv_height, sizeof(conv_height));
     status |= vxQueryConvolution(conv, VX_CONVOLUTION_ATTRIBUTE_SCALE, &scale, sizeof(scale));
 
-    status |= vxAccessConvolutionCoefficients(conv, conv_mat);
-    status |= vxCommitConvolutionCoefficients(conv, NULL);
+    status |= vxReadConvolutionCoefficients(conv, conv_mat);
+    status |= vxWriteConvolutionCoefficients(conv, NULL);
 
     status = Convolve(node, src, dst, conv_mat, (vx_uint32)scale, vx_true_e, conv_width, conv_height, bordermode);
     return status;
 }
+

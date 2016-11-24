@@ -40,13 +40,14 @@ vx_status vxConvertDepth(vx_node node, vx_image input, vx_image output, vx_scala
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(input, VX_IMAGE_ATTRIBUTE_FORMAT, &inputFormat, sizeof(inputFormat));
     vxQueryImage(output, VX_IMAGE_ATTRIBUTE_FORMAT, &outputFormat, sizeof(outputFormat));
 
-    status = vxAccessScalarValue(spol, &policy);
-    status = vxAccessScalarValue(sshf, &shift);
+    status = vxReadScalarValue(spol, &policy);
+    status = vxReadScalarValue(sshf, &shift);
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
@@ -81,6 +82,8 @@ vx_status vxConvertDepth(vx_node node, vx_image input, vx_image output, vx_scala
 
     kernelContext->params.evisNoInst = node->base.context->evisNoInst;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -90,8 +93,9 @@ vx_status vxConvertDepth(vx_node node, vx_image input, vx_image output, vx_scala
     }
 #endif
 
-    status = vxCommitScalarValue(spol, &policy);
-    status = vxCommitScalarValue(sshf, &shift);
+    status = vxWriteScalarValue(spol, &policy);
+    status = vxWriteScalarValue(sshf, &shift);
 
     return status;
 }
+

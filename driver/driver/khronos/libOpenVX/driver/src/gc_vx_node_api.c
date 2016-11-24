@@ -13,7 +13,7 @@
 
 #include <gc_vx_common.h>
 
-VX_PUBLIC_API vx_node vxColorConvertNode(vx_graph graph, vx_image input, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxColorConvertNode(vx_graph graph, vx_image input, vx_image output)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -23,7 +23,7 @@ VX_PUBLIC_API vx_node vxColorConvertNode(vx_graph graph, vx_image input, vx_imag
     return vxoNode_CreateSpecific(graph, VX_KERNEL_COLOR_CONVERT, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxChannelExtractNode(vx_graph graph, vx_image input, vx_enum channelNum, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxChannelExtractNode(vx_graph graph, vx_image input, vx_enum channelNum, vx_image output)
 {
     vx_scalar       scalar;
     vx_node         node;
@@ -46,7 +46,7 @@ VX_PUBLIC_API vx_node vxChannelExtractNode(vx_graph graph, vx_image input, vx_en
     return node;
 }
 
-VX_PUBLIC_API vx_node vxChannelCombineNode(
+VX_API_ENTRY vx_node VX_API_CALL vxChannelCombineNode(
         vx_graph graph, vx_image plane0, vx_image plane1, vx_image plane2, vx_image plane3, vx_image output)
 {
     vx_reference parameters[] = {
@@ -60,7 +60,7 @@ VX_PUBLIC_API vx_node vxChannelCombineNode(
     return vxoNode_CreateSpecific(graph, VX_KERNEL_CHANNEL_COMBINE, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxSobel3x3Node(vx_graph graph, vx_image input, vx_image output_x, vx_image output_y)
+VX_API_ENTRY vx_node VX_API_CALL vxSobel3x3Node(vx_graph graph, vx_image input, vx_image output_x, vx_image output_y)
 {
     vx_reference parameters[] = {
        (vx_reference)input,
@@ -71,7 +71,7 @@ VX_PUBLIC_API vx_node vxSobel3x3Node(vx_graph graph, vx_image input, vx_image ou
     return vxoNode_CreateSpecific(graph, VX_KERNEL_SOBEL_3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxMagnitudeNode(vx_graph graph, vx_image grad_x, vx_image grad_y, vx_image mag)
+VX_API_ENTRY vx_node VX_API_CALL vxMagnitudeNode(vx_graph graph, vx_image grad_x, vx_image grad_y, vx_image mag)
 {
     vx_reference parameters[] = {
        (vx_reference)grad_x,
@@ -82,7 +82,7 @@ VX_PUBLIC_API vx_node vxMagnitudeNode(vx_graph graph, vx_image grad_x, vx_image 
     return vxoNode_CreateSpecific(graph, VX_KERNEL_MAGNITUDE, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxPhaseNode(vx_graph graph, vx_image grad_x, vx_image grad_y, vx_image orientation)
+VX_API_ENTRY vx_node VX_API_CALL vxPhaseNode(vx_graph graph, vx_image grad_x, vx_image grad_y, vx_image orientation)
 {
     vx_reference parameters[] = {
        (vx_reference)grad_x,
@@ -93,7 +93,7 @@ VX_PUBLIC_API vx_node vxPhaseNode(vx_graph graph, vx_image grad_x, vx_image grad
     return vxoNode_CreateSpecific(graph, VX_KERNEL_PHASE, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxScaleImageNode(vx_graph graph, vx_image src, vx_image dst, vx_enum type)
+VX_API_ENTRY vx_node VX_API_CALL vxScaleImageNode(vx_graph graph, vx_image src, vx_image dst, vx_enum type)
 {
     vx_scalar       scalar;
     vx_node         node;
@@ -116,7 +116,7 @@ VX_PUBLIC_API vx_node vxScaleImageNode(vx_graph graph, vx_image src, vx_image ds
     return node;
 }
 
-VX_PUBLIC_API vx_node vxTableLookupNode(vx_graph graph, vx_image input, vx_lut lut, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxTableLookupNode(vx_graph graph, vx_image input, vx_lut lut, vx_image output)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -127,7 +127,7 @@ VX_PUBLIC_API vx_node vxTableLookupNode(vx_graph graph, vx_image input, vx_lut l
     return vxoNode_CreateSpecific(graph, VX_KERNEL_TABLE_LOOKUP, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxHistogramNode(vx_graph graph, vx_image input, vx_distribution distribution)
+VX_API_ENTRY vx_node VX_API_CALL vxHistogramNode(vx_graph graph, vx_image input, vx_distribution distribution)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -137,7 +137,7 @@ VX_PUBLIC_API vx_node vxHistogramNode(vx_graph graph, vx_image input, vx_distrib
     return vxoNode_CreateSpecific(graph, VX_KERNEL_HISTOGRAM, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxEqualizeHistNode(vx_graph graph, vx_image input, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxEqualizeHistNode(vx_graph graph, vx_image input, vx_image output)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -147,7 +147,7 @@ VX_PUBLIC_API vx_node vxEqualizeHistNode(vx_graph graph, vx_image input, vx_imag
     return vxoNode_CreateSpecific(graph, VX_KERNEL_EQUALIZE_HISTOGRAM, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxAbsDiffNode(vx_graph graph, vx_image in1, vx_image in2, vx_image out)
+VX_API_ENTRY vx_node VX_API_CALL vxAbsDiffNode(vx_graph graph, vx_image in1, vx_image in2, vx_image out)
 {
     vx_reference parameters[] = {
        (vx_reference)in1,
@@ -158,7 +158,7 @@ VX_PUBLIC_API vx_node vxAbsDiffNode(vx_graph graph, vx_image in1, vx_image in2, 
     return vxoNode_CreateSpecific(graph, VX_KERNEL_ABSDIFF, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxMeanStdDevNode(vx_graph graph, vx_image input, vx_scalar mean, vx_scalar stddev)
+VX_API_ENTRY vx_node VX_API_CALL vxMeanStdDevNode(vx_graph graph, vx_image input, vx_scalar mean, vx_scalar stddev)
 {
     vx_reference parameters[] = {
        (vx_reference)input,
@@ -169,7 +169,7 @@ VX_PUBLIC_API vx_node vxMeanStdDevNode(vx_graph graph, vx_image input, vx_scalar
     return vxoNode_CreateSpecific(graph, VX_KERNEL_MEAN_STDDEV, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxThresholdNode(vx_graph graph, vx_image input, vx_threshold thesh, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxThresholdNode(vx_graph graph, vx_image input, vx_threshold thesh, vx_image output)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -180,7 +180,7 @@ VX_PUBLIC_API vx_node vxThresholdNode(vx_graph graph, vx_image input, vx_thresho
     return vxoNode_CreateSpecific(graph, VX_KERNEL_THRESHOLD, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxIntegralImageNode(vx_graph graph, vx_image input, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxIntegralImageNode(vx_graph graph, vx_image input, vx_image output)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -190,7 +190,7 @@ VX_PUBLIC_API vx_node vxIntegralImageNode(vx_graph graph, vx_image input, vx_ima
     return vxoNode_CreateSpecific(graph, VX_KERNEL_INTEGRAL_IMAGE, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxErode3x3Node(vx_graph graph, vx_image input, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxErode3x3Node(vx_graph graph, vx_image input, vx_image output)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -200,7 +200,7 @@ VX_PUBLIC_API vx_node vxErode3x3Node(vx_graph graph, vx_image input, vx_image ou
     return vxoNode_CreateSpecific(graph, VX_KERNEL_ERODE_3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxDilate3x3Node(vx_graph graph, vx_image input, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxDilate3x3Node(vx_graph graph, vx_image input, vx_image output)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -210,7 +210,7 @@ VX_PUBLIC_API vx_node vxDilate3x3Node(vx_graph graph, vx_image input, vx_image o
     return vxoNode_CreateSpecific(graph, VX_KERNEL_DILATE_3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxMedian3x3Node(vx_graph graph, vx_image input, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxMedian3x3Node(vx_graph graph, vx_image input, vx_image output)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -220,7 +220,7 @@ VX_PUBLIC_API vx_node vxMedian3x3Node(vx_graph graph, vx_image input, vx_image o
     return vxoNode_CreateSpecific(graph, VX_KERNEL_MEDIAN_3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxBox3x3Node(vx_graph graph, vx_image input, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxBox3x3Node(vx_graph graph, vx_image input, vx_image output)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -230,7 +230,7 @@ VX_PUBLIC_API vx_node vxBox3x3Node(vx_graph graph, vx_image input, vx_image outp
     return vxoNode_CreateSpecific(graph, VX_KERNEL_BOX_3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxGaussian3x3Node(vx_graph graph, vx_image input, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxGaussian3x3Node(vx_graph graph, vx_image input, vx_image output)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -240,7 +240,7 @@ VX_PUBLIC_API vx_node vxGaussian3x3Node(vx_graph graph, vx_image input, vx_image
     return vxoNode_CreateSpecific(graph, VX_KERNEL_GAUSSIAN_3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxConvolveNode(vx_graph graph, vx_image input, vx_convolution conv, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxConvolveNode(vx_graph graph, vx_image input, vx_convolution conv, vx_image output)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -248,10 +248,12 @@ VX_PUBLIC_API vx_node vxConvolveNode(vx_graph graph, vx_image input, vx_convolut
         (vx_reference)output
     };
 
+    vxReadConvolutionCoefficients(conv, NULL);
+
     return vxoNode_CreateSpecific(graph, VX_KERNEL_CUSTOM_CONVOLUTION, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxGaussianPyramidNode(vx_graph graph, vx_image input, vx_pyramid gaussian)
+VX_API_ENTRY vx_node VX_API_CALL vxGaussianPyramidNode(vx_graph graph, vx_image input, vx_pyramid gaussian)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -261,7 +263,7 @@ VX_PUBLIC_API vx_node vxGaussianPyramidNode(vx_graph graph, vx_image input, vx_p
     return vxoNode_CreateSpecific(graph, VX_KERNEL_GAUSSIAN_PYRAMID, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxAccumulateImageNode(vx_graph graph, vx_image input, vx_image accum)
+VX_API_ENTRY vx_node VX_API_CALL vxAccumulateImageNode(vx_graph graph, vx_image input, vx_image accum)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -271,7 +273,7 @@ VX_PUBLIC_API vx_node vxAccumulateImageNode(vx_graph graph, vx_image input, vx_i
     return vxoNode_CreateSpecific(graph, VX_KERNEL_ACCUMULATE, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxAccumulateWeightedImageNode(vx_graph graph, vx_image input, vx_scalar alpha, vx_image accum)
+VX_API_ENTRY vx_node VX_API_CALL vxAccumulateWeightedImageNode(vx_graph graph, vx_image input, vx_scalar alpha, vx_image accum)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -282,7 +284,7 @@ VX_PUBLIC_API vx_node vxAccumulateWeightedImageNode(vx_graph graph, vx_image inp
     return vxoNode_CreateSpecific(graph, VX_KERNEL_ACCUMULATE_WEIGHTED, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxAccumulateSquareImageNode(vx_graph graph, vx_image input, vx_scalar scalar, vx_image accum)
+VX_API_ENTRY vx_node VX_API_CALL vxAccumulateSquareImageNode(vx_graph graph, vx_image input, vx_scalar scalar, vx_image accum)
 {
     vx_reference parameters[] = {
         (vx_reference)input,
@@ -293,7 +295,7 @@ VX_PUBLIC_API vx_node vxAccumulateSquareImageNode(vx_graph graph, vx_image input
     return vxoNode_CreateSpecific(graph, VX_KERNEL_ACCUMULATE_SQUARE, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxMinMaxLocNode(vx_graph graph,
+VX_API_ENTRY vx_node VX_API_CALL vxMinMaxLocNode(vx_graph graph,
                         vx_image input,
                         vx_scalar minVal, vx_scalar maxVal,
                         vx_array minLoc, vx_array maxLoc,
@@ -312,7 +314,7 @@ VX_PUBLIC_API vx_node vxMinMaxLocNode(vx_graph graph,
     return vxoNode_CreateSpecific(graph, VX_KERNEL_MINMAXLOC, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxConvertDepthNode(
+VX_API_ENTRY vx_node VX_API_CALL vxConvertDepthNode(
         vx_graph graph, vx_image input, vx_image output, vx_enum policy, vx_scalar shift)
 {
     vx_scalar       scalar;
@@ -337,7 +339,7 @@ VX_PUBLIC_API vx_node vxConvertDepthNode(
     return node;
 }
 
-VX_PUBLIC_API vx_node vxCannyEdgeDetectorNode(
+VX_API_ENTRY vx_node VX_API_CALL vxCannyEdgeDetectorNode(
         vx_graph graph, vx_image input, vx_threshold hyst, vx_int32 gradient_size,
         vx_enum norm_type, vx_image output)
 {
@@ -372,7 +374,7 @@ VX_PUBLIC_API vx_node vxCannyEdgeDetectorNode(
     return node;
 }
 
-VX_PUBLIC_API vx_node vxAndNode(vx_graph graph, vx_image in1, vx_image in2, vx_image out)
+VX_API_ENTRY vx_node VX_API_CALL vxAndNode(vx_graph graph, vx_image in1, vx_image in2, vx_image out)
 {
     vx_reference parameters[] = {
        (vx_reference)in1,
@@ -383,7 +385,7 @@ VX_PUBLIC_API vx_node vxAndNode(vx_graph graph, vx_image in1, vx_image in2, vx_i
     return vxoNode_CreateSpecific(graph, VX_KERNEL_AND, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxOrNode(vx_graph graph, vx_image in1, vx_image in2, vx_image out)
+VX_API_ENTRY vx_node VX_API_CALL vxOrNode(vx_graph graph, vx_image in1, vx_image in2, vx_image out)
 {
     vx_reference parameters[] = {
        (vx_reference)in1,
@@ -394,7 +396,7 @@ VX_PUBLIC_API vx_node vxOrNode(vx_graph graph, vx_image in1, vx_image in2, vx_im
     return vxoNode_CreateSpecific(graph, VX_KERNEL_OR, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxXorNode(vx_graph graph, vx_image in1, vx_image in2, vx_image out)
+VX_API_ENTRY vx_node VX_API_CALL vxXorNode(vx_graph graph, vx_image in1, vx_image in2, vx_image out)
 {
     vx_reference parameters[] = {
        (vx_reference)in1,
@@ -405,7 +407,7 @@ VX_PUBLIC_API vx_node vxXorNode(vx_graph graph, vx_image in1, vx_image in2, vx_i
     return vxoNode_CreateSpecific(graph, VX_KERNEL_XOR, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxNotNode(vx_graph graph, vx_image input, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxNotNode(vx_graph graph, vx_image input, vx_image output)
 {
     vx_reference parameters[] = {
        (vx_reference)input,
@@ -415,7 +417,7 @@ VX_PUBLIC_API vx_node vxNotNode(vx_graph graph, vx_image input, vx_image output)
     return vxoNode_CreateSpecific(graph, VX_KERNEL_NOT, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_PUBLIC_API vx_node vxMultiplyNode(vx_graph graph, vx_image in1, vx_image in2, vx_scalar scale, vx_enum overflow_policy, vx_enum rounding_policy, vx_image out)
+VX_API_ENTRY vx_node VX_API_CALL vxMultiplyNode(vx_graph graph, vx_image in1, vx_image in2, vx_scalar scale, vx_enum overflow_policy, vx_enum rounding_policy, vx_image out)
 {
     vx_scalar       scalarOverflowPolicy, scalarRoundingPolicy;
     vx_node         node;
@@ -449,7 +451,7 @@ VX_PUBLIC_API vx_node vxMultiplyNode(vx_graph graph, vx_image in1, vx_image in2,
     return node;
 }
 
-VX_PUBLIC_API vx_node vxAddNode(vx_graph graph, vx_image in1, vx_image in2, vx_enum policy, vx_image out)
+VX_API_ENTRY vx_node VX_API_CALL vxAddNode(vx_graph graph, vx_image in1, vx_image in2, vx_enum policy, vx_image out)
 {
     vx_scalar       scalarPolicy;
     vx_node         node;
@@ -473,7 +475,7 @@ VX_PUBLIC_API vx_node vxAddNode(vx_graph graph, vx_image in1, vx_image in2, vx_e
     return node;
 }
 
-VX_PUBLIC_API vx_node vxSubtractNode(vx_graph graph, vx_image in1, vx_image in2, vx_enum policy, vx_image out)
+VX_API_ENTRY vx_node VX_API_CALL vxSubtractNode(vx_graph graph, vx_image in1, vx_image in2, vx_enum policy, vx_image out)
 {
     vx_scalar       scalarPolicy;
     vx_node         node;
@@ -497,7 +499,7 @@ VX_PUBLIC_API vx_node vxSubtractNode(vx_graph graph, vx_image in1, vx_image in2,
     return node;
 }
 
-VX_PUBLIC_API vx_node vxWarpAffineNode(
+VX_API_ENTRY vx_node VX_API_CALL vxWarpAffineNode(
         vx_graph graph, vx_image input, vx_matrix matrix, vx_enum type, vx_image output)
 {
     vx_scalar       scalar;
@@ -522,7 +524,7 @@ VX_PUBLIC_API vx_node vxWarpAffineNode(
     return node;
 }
 
-VX_PUBLIC_API vx_node vxWarpPerspectiveNode(
+VX_API_ENTRY vx_node VX_API_CALL vxWarpPerspectiveNode(
         vx_graph graph, vx_image input, vx_matrix matrix, vx_enum type, vx_image output)
 {
     vx_scalar       scalar;
@@ -547,7 +549,7 @@ VX_PUBLIC_API vx_node vxWarpPerspectiveNode(
     return node;
 }
 
-VX_PUBLIC_API vx_node vxHarrisCornersNode(
+VX_API_ENTRY vx_node VX_API_CALL vxHarrisCornersNode(
         vx_graph graph, vx_image input, vx_scalar strength_thresh, vx_scalar min_distance, vx_scalar sensitivity,
         vx_int32 gradient_size, vx_int32 block_size, vx_array corners, vx_scalar num_corners)
 {
@@ -585,7 +587,7 @@ VX_PUBLIC_API vx_node vxHarrisCornersNode(
     return node;
 }
 
-VX_PUBLIC_API vx_node vxFastCornersNode(
+VX_API_ENTRY vx_node VX_API_CALL vxFastCornersNode(
         vx_graph graph, vx_image input, vx_scalar strength_thresh,
         vx_bool nonmax_suppression, vx_array corners, vx_scalar num_corners)
 {
@@ -612,7 +614,7 @@ VX_PUBLIC_API vx_node vxFastCornersNode(
     return node;
 }
 
-VX_PUBLIC_API vx_node vxOpticalFlowPyrLKNode(
+VX_API_ENTRY vx_node VX_API_CALL vxOpticalFlowPyrLKNode(
         vx_graph graph, vx_pyramid old_images, vx_pyramid new_images, vx_array old_points,
         vx_array new_points_estimates, vx_array new_points, vx_enum termination,
         vx_scalar epsilon, vx_scalar num_iterations, vx_scalar use_initial_estimate, vx_size window_dimension)
@@ -653,7 +655,7 @@ VX_PUBLIC_API vx_node vxOpticalFlowPyrLKNode(
     return node;
 }
 
-VX_PUBLIC_API vx_node vxRemapNode(vx_graph graph, vx_image input, vx_remap table, vx_enum policy, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxRemapNode(vx_graph graph, vx_image input, vx_remap table, vx_enum policy, vx_image output)
 {
     vx_scalar       scalarPolicy;
     vx_node         node;
@@ -677,7 +679,7 @@ VX_PUBLIC_API vx_node vxRemapNode(vx_graph graph, vx_image input, vx_remap table
     return node;
 }
 
-VX_PUBLIC_API vx_node vxHalfScaleGaussianNode(vx_graph graph, vx_image input, vx_image output, vx_int32 kernel_size)
+VX_API_ENTRY vx_node VX_API_CALL vxHalfScaleGaussianNode(vx_graph graph, vx_image input, vx_image output, vx_int32 kernel_size)
 {
     vx_scalar       scalarKernelSize;
     vx_node         node;
@@ -700,12 +702,14 @@ VX_PUBLIC_API vx_node vxHalfScaleGaussianNode(vx_graph graph, vx_image input, vx
     return node;
 }
 
-VX_PUBLIC_API vx_node vxExampleNode(vx_graph graph, vx_image input, vx_image output)
+VX_API_ENTRY vx_node VX_API_CALL vxSgmNode(vx_graph graph, vx_image right_img, vx_image left_img, vx_image output)
 {
     vx_reference parameters[] = {
-        (vx_reference)input,
+        (vx_reference)right_img,
+        (vx_reference)left_img,
         (vx_reference)output
     };
 
-    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_EXAMPLE, parameters, vxmLENGTH_OF(parameters));
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_SGM, parameters, vxmLENGTH_OF(parameters));
 }
+

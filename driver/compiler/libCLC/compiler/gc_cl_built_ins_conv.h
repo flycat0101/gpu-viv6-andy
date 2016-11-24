@@ -1129,7 +1129,7 @@ _GenConvert_Code(
                     status = clGenBitwiseExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[1],
                                 &unsignROperand,
                                 &OperandsParameters[0].rOperands[0]);
@@ -1202,7 +1202,7 @@ _GenConvert_Code(
                         status = clGenBitwiseExprCode(Compiler,
                                     PolynaryExpr->exprBase.base.lineNo,
                                     PolynaryExpr->exprBase.base.stringNo,
-                                    clvOPCODE_BITWISE_AND,
+                                    clvOPCODE_AND_BITWISE,
                                     &intermIOperands[1],
                                     &oneROperand,
                                     &intermROperands[1]);
@@ -1376,7 +1376,7 @@ _GenConvert_Code(
             status = clGenArithmeticExprCode(Compiler,
                             PolynaryExpr->exprBase.base.lineNo,
                             PolynaryExpr->exprBase.base.stringNo,
-                            clvOPCODE_BITWISE_AND,
+                            clvOPCODE_AND_BITWISE,
                             IOperand,
                             &outputTypeMaskROperand,
                             &intermROperands[1]);
@@ -1567,7 +1567,7 @@ _GenConvert_Code(
                     status = clGenBitwiseExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[0],
                                 &intermROperands[4],
                                 &oneROperand);
@@ -1972,7 +1972,7 @@ _GenConvert_Code(
             status = clGenArithmeticExprCode(Compiler,
                             PolynaryExpr->exprBase.base.lineNo,
                             PolynaryExpr->exprBase.base.stringNo,
-                            clvOPCODE_BITWISE_AND,
+                            clvOPCODE_AND_BITWISE,
                             IOperand,
                             &outputTypeMaskROperand,
                             &intermROperands[0]);
@@ -2045,7 +2045,9 @@ _GenOldConvert_Code(
 
     elementType = OperandsParameters[0].rOperands[0].dataType.elementType;
     if (clmIsElementTypeHighPrecision(elementType) ||
-        clmIsElementTypeHighPrecision(IOperand->dataType.elementType)) {
+        clmIsElementTypeHighPrecision(IOperand->dataType.elementType) ||
+        clmIsElementTypePacked(elementType) ||
+        clmIsElementTypePacked(IOperand->dataType.elementType)) {
         return _GenConvert_Code(Compiler,
                                 CodeGenerator,
                                 PolynaryExpr,
@@ -2421,7 +2423,7 @@ _GenOldConvert_Code(
                     status = clGenBitwiseExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[1],
                                 &unsignROperand,
                                 &OperandsParameters[0].rOperands[0]);
@@ -2494,7 +2496,7 @@ _GenOldConvert_Code(
                         status = clGenBitwiseExprCode(Compiler,
                                     PolynaryExpr->exprBase.base.lineNo,
                                     PolynaryExpr->exprBase.base.stringNo,
-                                    clvOPCODE_BITWISE_AND,
+                                    clvOPCODE_AND_BITWISE,
                                     &intermIOperands[1],
                                     &oneROperand,
                                     &intermROperands[1]);
@@ -2668,7 +2670,7 @@ _GenOldConvert_Code(
             status = clGenArithmeticExprCode(Compiler,
                             PolynaryExpr->exprBase.base.lineNo,
                             PolynaryExpr->exprBase.base.stringNo,
-                            clvOPCODE_BITWISE_AND,
+                            clvOPCODE_AND_BITWISE,
                             IOperand,
                             &outputTypeMaskROperand,
                             &intermROperands[1]);
@@ -2859,7 +2861,7 @@ _GenOldConvert_Code(
                     status = clGenBitwiseExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[0],
                                 &intermROperands[4],
                                 &oneROperand);
@@ -3264,7 +3266,7 @@ _GenOldConvert_Code(
             status = clGenArithmeticExprCode(Compiler,
                             PolynaryExpr->exprBase.base.lineNo,
                             PolynaryExpr->exprBase.base.stringNo,
-                            clvOPCODE_BITWISE_AND,
+                            clvOPCODE_AND_BITWISE,
                             IOperand,
                             &outputTypeMaskROperand,
                             &intermROperands[0]);
@@ -4396,20 +4398,36 @@ _GenAs_TypeCode(
             clsROPERAND_InitializeUsingIOperand(&rOperand, intermIOperand);
         }
         else {
-            if(clmGEN_CODE_vectorSize_GET(rOperand.dataType) >
-               clmGEN_CODE_vectorSize_GET(IOperand->dataType)) {
-                clGetVectorROperandSlice(&rOperand,
-                                         0,
-                                         clmGEN_CODE_vectorSize_GET(IOperand->dataType),
-                                         &rOperand);
+            gctSIZE_T lSize, rSize;
+
+            lSize = clGEN_CODE_DataTypeByteSize(Compiler, IOperand->dataType);
+            rSize = clGEN_CODE_DataTypeByteSize(Compiler, rOperand.dataType);
+            if(lSize != rSize) {
+                gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
+                                                clvREPORT_ERROR,
+                                                "As_type reinterpretation of data to a type of different byte size"));
+                return gcvSTATUS_INVALID_DATA;
             }
-            else if(clmGEN_CODE_vectorSize_GET(IOperand->dataType) >
-                    clmGEN_CODE_vectorSize_GET(rOperand.dataType)) {
-                clGetVectorIOperandSlice(IOperand,
-                                         0,
-                                         clmGEN_CODE_vectorSize_GET(rOperand.dataType),
-                                         iOperandBuf);
-                iOperand = iOperandBuf;
+
+            if(!(clmIsElementTypePacked(IOperand->dataType.elementType) ||
+                 clmIsElementTypePacked(rOperand.dataType.elementType))) {
+                if(clmGEN_CODE_vectorSize_GET(rOperand.dataType) >
+                   clmGEN_CODE_vectorSize_GET(IOperand->dataType)) {
+                    clGetVectorROperandSlice(&rOperand,
+                                             0,
+                                             clmGEN_CODE_vectorSize_GET(IOperand->dataType),
+                                             &rOperand);
+                }
+                else if(clmGEN_CODE_vectorSize_GET(IOperand->dataType) >
+                        clmGEN_CODE_vectorSize_GET(rOperand.dataType)) {
+                    clGetVectorIOperandSlice(IOperand,
+                                             0,
+                                             clmGEN_CODE_vectorSize_GET(rOperand.dataType),
+                                             iOperandBuf);
+                    iOperand = iOperandBuf;
+                }
             }
         }
     }

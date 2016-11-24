@@ -16,6 +16,9 @@
 #include "gc_glsl_built_ins.h"
 #include "gc_glsl_gen_code.h"
 
+#define FE_IR_MAX_LINE(n, m)  ((gcmMAX(n,m) == 0) ? 0 : gcmMAX(n,m))
+#define FE_IR_MIN_LINE(n, m)  ((gcmMIN(n,m) == 0) ? gcmMAX(n,m) : (gcmMIN(n,m) == 0))
+
 /* Data type */
 gceSTATUS
 slsDATA_TYPE_Construct(
@@ -46,25 +49,12 @@ slsDATA_TYPE_Construct(
         if (gcmIS_ERROR(status)) break;
 
         gcoOS_ZeroMemory(pointer, gcmSIZEOF(slsDATA_TYPE));
+
         dataType = pointer;
 
         dataType->qualifiers.storage                    = slvSTORAGE_QUALIFIER_NONE;
 
         dataType->qualifiers.memoryAccess                 = slvMEMORY_ACCESS_QUALIFIER_NONE;
-
-        dataType->arrayLength                  = 0;
-
-        dataType->arrayLengthCount             = 0;
-
-        dataType->arrayLengthList              = gcvNULL;
-
-        dataType->arrayLevel                   = 0;
-
-        dataType->isInheritFromUnsizedDataType = gcvFALSE;
-
-        dataType->isPerVertexArray             = gcvFALSE;
-
-        dataType->fieldSpace    = gcvNULL;
 
         dataType->type = TokenType;
 
@@ -804,8 +794,9 @@ slsDATA_TYPE_Clone(
                                     Compiler,
                                     (gctSIZE_T)sizeof(slsDATA_TYPE),
                                     &pointer);
-
         if (gcmIS_ERROR(status)) break;
+
+        gcoOS_ZeroMemory(pointer, gcmSIZEOF(slsDATA_TYPE));
 
         dataType = pointer;
 
@@ -959,66 +950,68 @@ slGetStorageQualifierName(
     IN sltSTORAGE_QUALIFIER Qualifier
     )
 {
-    if (sloCOMPILER_IsHaltiVersion(Compiler)) {
-       switch (Qualifier)
-       {
-       case slvSTORAGE_QUALIFIER_NONE:                     return "none";
+    if (sloCOMPILER_IsHaltiVersion(Compiler))
+    {
+        switch (Qualifier)
+        {
+        case slvSTORAGE_QUALIFIER_NONE:                     return "none";
 
-       case slvSTORAGE_QUALIFIER_CONST:                    return "const";
+        case slvSTORAGE_QUALIFIER_CONST:                    return "const";
 
-       case slvSTORAGE_QUALIFIER_UNIFORM:                  return "uniform";
-       case slvSTORAGE_QUALIFIER_UNIFORM_BLOCK_MEMBER:     return "uniform";
+        case slvSTORAGE_QUALIFIER_UNIFORM:                  return "uniform";
+        case slvSTORAGE_QUALIFIER_UNIFORM_BLOCK_MEMBER:     return "uniform";
 
-       case slvSTORAGE_QUALIFIER_ATTRIBUTE:                return "in";
+        case slvSTORAGE_QUALIFIER_ATTRIBUTE:                return "in";
 
-       case slvSTORAGE_QUALIFIER_VARYING_OUT:              return "out";
-       case slvSTORAGE_QUALIFIER_VARYING_IN:               return "in";
-       case slvSTORAGE_QUALIFIER_FRAGMENT_OUT:             return "out";
-       case slvSTORAGE_QUALIFIER_STORAGE_BLOCK_MEMBER:     return "buffer";
+        case slvSTORAGE_QUALIFIER_VARYING_OUT:              return "out";
+        case slvSTORAGE_QUALIFIER_VARYING_IN:               return "in";
+        case slvSTORAGE_QUALIFIER_FRAGMENT_OUT:             return "out";
+        case slvSTORAGE_QUALIFIER_STORAGE_BLOCK_MEMBER:     return "buffer";
 
-       case slvSTORAGE_QUALIFIER_CONST_IN:                 return "const in";
-       case slvSTORAGE_QUALIFIER_IN:                       return "in";
-       case slvSTORAGE_QUALIFIER_OUT:                      return "out";
-       case slvSTORAGE_QUALIFIER_INOUT:                    return "inout";
+        case slvSTORAGE_QUALIFIER_CONST_IN:                 return "const in";
+        case slvSTORAGE_QUALIFIER_IN:                       return "in";
+        case slvSTORAGE_QUALIFIER_OUT:                      return "out";
+        case slvSTORAGE_QUALIFIER_INOUT:                    return "inout";
 
-       case slvSTORAGE_QUALIFIER_VERTEX_ID:                return "vertex_id";
-       case slvSTORAGE_QUALIFIER_INSTANCE_ID:              return "instance_id";
+        case slvSTORAGE_QUALIFIER_VERTEX_ID:                return "vertex_id";
+        case slvSTORAGE_QUALIFIER_INSTANCE_ID:              return "instance_id";
 
-       case slvSTORAGE_QUALIFIER_SHARED:                   return "shared";
-       case slvSTORAGE_QUALIFIER_IN_IO_BLOCK:              return "in IO block";
-       case slvSTORAGE_QUALIFIER_OUT_IO_BLOCK:             return "out IO block";
-       case slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER:       return "in IO block member";
-       case slvSTORAGE_QUALIFIER_OUT_IO_BLOCK_MEMBER:      return "out IO block member";
+        case slvSTORAGE_QUALIFIER_SHARED:                   return "shared";
+        case slvSTORAGE_QUALIFIER_IN_IO_BLOCK:              return "in IO block";
+        case slvSTORAGE_QUALIFIER_OUT_IO_BLOCK:             return "out IO block";
+        case slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER:       return "in IO block member";
+        case slvSTORAGE_QUALIFIER_OUT_IO_BLOCK_MEMBER:      return "out IO block member";
 
-       default:
-           gcmASSERT(0);
-           return "invalid";
-       }
+        default:
+            gcmASSERT(0);
+            return "invalid";
+        }
     }
-    else {
-       switch (Qualifier)
-       {
-       case slvSTORAGE_QUALIFIER_NONE:                     return "none";
+    else
+    {
+        switch (Qualifier)
+        {
+        case slvSTORAGE_QUALIFIER_NONE:                     return "none";
 
-       case slvSTORAGE_QUALIFIER_CONST:                    return "const";
+        case slvSTORAGE_QUALIFIER_CONST:                    return "const";
 
-       case slvSTORAGE_QUALIFIER_UNIFORM:                  return "uniform";
+        case slvSTORAGE_QUALIFIER_UNIFORM:                  return "uniform";
 
-       case slvSTORAGE_QUALIFIER_ATTRIBUTE:                return "attribute";
+        case slvSTORAGE_QUALIFIER_ATTRIBUTE:                return "attribute";
 
-       case slvSTORAGE_QUALIFIER_VARYING_OUT:              return "varying";
-       case slvSTORAGE_QUALIFIER_VARYING_IN:               return "varying";
-       case slvSTORAGE_QUALIFIER_FRAGMENT_OUT:             return "fragment out";
+        case slvSTORAGE_QUALIFIER_VARYING_OUT:              return "varying out";
+        case slvSTORAGE_QUALIFIER_VARYING_IN:               return "varying in";
+        case slvSTORAGE_QUALIFIER_FRAGMENT_OUT:             return "fragment out";
 
-       case slvSTORAGE_QUALIFIER_CONST_IN:                 return "const in";
-       case slvSTORAGE_QUALIFIER_IN:                       return "in";
-       case slvSTORAGE_QUALIFIER_OUT:                      return "out";
-       case slvSTORAGE_QUALIFIER_INOUT:                    return "inout";
+        case slvSTORAGE_QUALIFIER_CONST_IN:                 return "const in";
+        case slvSTORAGE_QUALIFIER_IN:                       return "in";
+        case slvSTORAGE_QUALIFIER_OUT:                      return "out";
+        case slvSTORAGE_QUALIFIER_INOUT:                    return "inout";
 
-       default:
-           gcmASSERT(0);
-           return "invalid";
-       }
+        default:
+            gcmASSERT(0);
+            return "invalid";
+        }
     }
 }
 
@@ -1034,6 +1027,7 @@ _GetPrecisionName(
     case slvPRECISION_QUALIFIER_HIGH:     return "high";
     case slvPRECISION_QUALIFIER_MEDIUM:   return "medium";
     case slvPRECISION_QUALIFIER_LOW:      return "low";
+    case slvPRECISION_QUALIFIER_ANY:      return "any";
 
     default:
         gcmASSERT(0);
@@ -1053,20 +1047,22 @@ slsDATA_TYPE_Dump(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     gcmVERIFY_ARGUMENT(DataType);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<DATA_TYPE this=\"0x%x\" qualifier=\"%s\" precision=\"%s\""
-                                " elementType=\"%s\" vectorSize=\"%d\""
-                                " matrixSize=\"%d\" arrayLength=\"%d\" fieldSpace=\"0x%x\" />",
-                                DataType,
-                                slGetStorageQualifierName(Compiler, DataType->qualifiers.storage),
-                                _GetPrecisionName(DataType->qualifiers.precision),
-                                _GetElementTypeName(DataType->elementType),
-                                slmDATA_TYPE_vectorSize_GET(DataType),
-                                slmDATA_TYPE_matrixSize_GET(DataType),
-                                DataType->arrayLength,
-                                DataType->fieldSpace));
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    "DataType qualifier=%s precision=%s"
+                                    " elementType=%s vectorSize=%d"
+                                    " matrixSize=%d arrayLength=%d fieldSpace=0x%x",
+                                    slGetStorageQualifierName(Compiler, DataType->qualifiers.storage),
+                                    _GetPrecisionName(DataType->qualifiers.precision),
+                                    _GetElementTypeName(DataType->elementType),
+                                    slmDATA_TYPE_vectorSize_GET(DataType),
+                                    slmDATA_TYPE_matrixSize_GET(DataType),
+                                    DataType->arrayLength,
+                                    DataType->fieldSpace));
+    }
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -1747,6 +1743,73 @@ slsDATA_TYPE_GetLogicalOperandCount(
     return count;
 }
 
+gceSTATUS
+slsNAME_Initialize(
+    IN sloCOMPILER Compiler,
+    IN slsNAME * Name,
+    IN gctBOOL InitGeneralPart
+    )
+{
+    gcmHEADER();
+
+    do
+    {
+        Name->isPerVertexArray          = gcvFALSE;
+        Name->isPerVertexNotAnArray     = gcvFALSE;
+
+        switch (Name->type)
+        {
+        case slvVARIABLE_NAME:
+            Name->u.variableInfo.constant                   = gcvNULL;
+            Name->u.variableInfo.interfaceBlock             = gcvNULL;
+            Name->u.variableInfo.lodMinMax                  = gcvNULL;
+            Name->u.variableInfo.levelBaseSize              = gcvNULL;
+            Name->u.variableInfo.isLocal                    = gcvFALSE;
+            Name->u.variableInfo.isReferenced               = gcvFALSE;
+            Name->u.variableInfo.isCanUsedAsUnRollLoopIndex = gcvTRUE;
+            break;
+
+        case slvPARAMETER_NAME:
+            Name->u.parameterInfo.aliasName = gcvNULL;
+            break;
+
+        case slvFUNC_NAME:
+            if (InitGeneralPart)
+            {
+                Name->u.funcInfo.localSpace                 = gcvNULL;
+                Name->u.funcInfo.intrinsicKind              = gceINTRIN_NONE;
+                Name->u.funcInfo.mangled_symbol             = gcvNULL;
+                Name->u.funcInfo.function                   = gcvNULL;
+                Name->u.funcInfo.evaluate                   = gcvNULL;
+                Name->u.funcInfo.genCode                    = gcvNULL;
+                Name->u.funcInfo.flags                      = slvFUNC_NONE;
+            }
+            Name->u.funcInfo.functionBodySpace          = gcvNULL;
+            Name->u.funcInfo.funcBody                   = gcvNULL;
+            break;
+
+        case slvINTERFACE_BLOCK_NAME:
+            slsDLINK_LIST_Initialize(&Name->u.interfaceBlockContent.members);
+            Name->u.interfaceBlockContent.u.interfaceBlockInfo  = gcvNULL;
+            Name->u.interfaceBlockContent.flags                 = slvIB_NONE;
+            break;
+
+        default:
+            break;
+        }
+
+        Name->context.logicalRegCount   = 0;
+        Name->context.logicalRegs       = gcvNULL;
+        Name->context.isCounted         = 0;
+        Name->context.useAsTextureCoord = gcvFALSE;
+        Name->context.function          = gcvNULL;
+    }
+    while (gcvFALSE);
+
+    gcmFOOTER();
+    return gcvSTATUS_OK;
+}
+
 /* Name and Name space. */
 gceSTATUS
 slsNAME_Construct(
@@ -1798,52 +1861,9 @@ slsNAME_Construct(
         name->symbol                    = Symbol;
         name->isBuiltIn                 = IsBuiltIn;
         name->extension                 = Extension;
-        name->isPerVertexArray          = gcvFALSE;
-        name->isPerVertexNotAnArray     = gcvFALSE;
 
-        switch (Type)
-        {
-        case slvVARIABLE_NAME:
-            name->u.variableInfo.constant                   = gcvNULL;
-            name->u.variableInfo.interfaceBlock             = gcvNULL;
-            name->u.variableInfo.lodMinMax                  = gcvNULL;
-            name->u.variableInfo.levelBaseSize              = gcvNULL;
-            name->u.variableInfo.isLocal                    = gcvFALSE;
-            name->u.variableInfo.isReferenced               = gcvFALSE;
-            name->u.variableInfo.isCanUsedAsUnRollLoopIndex = gcvTRUE;
-            break;
-
-        case slvPARAMETER_NAME:
-            name->u.parameterInfo.aliasName = gcvNULL;
-            break;
-
-        case slvFUNC_NAME:
-            name->u.funcInfo.localSpace                 = gcvNULL;
-            name->u.funcInfo.functionBodySpace          = gcvNULL;
-            name->u.funcInfo.funcBody                   = gcvNULL;
-            name->u.funcInfo.intrinsicKind              = gceINTRIN_NONE;
-            name->u.funcInfo.mangled_symbol             = gcvNULL;
-            name->u.funcInfo.function                   = gcvNULL;
-            name->u.funcInfo.evaluate                   = gcvNULL;
-            name->u.funcInfo.genCode                    = gcvNULL;
-            name->u.funcInfo.flags                      = slvFUNC_NONE;
-            break;
-
-        case slvINTERFACE_BLOCK_NAME:
-            slsDLINK_LIST_Initialize(&name->u.interfaceBlockContent.members);
-            name->u.interfaceBlockContent.u.interfaceBlockInfo  = gcvNULL;
-            name->u.interfaceBlockContent.flags                 = slvIB_NONE;
-            break;
-
-        default:
-            break;
-        }
-
-        name->context.logicalRegCount   = 0;
-        name->context.logicalRegs       = gcvNULL;
-        name->context.isCounted         = 0;
-        name->context.useAsTextureCoord = gcvFALSE;
-        name->context.function          = gcvNULL;
+        status = slsNAME_Initialize(Compiler, name, gcvTRUE);
+        if (gcmIS_ERROR(status)) break;
 
         *Name = name;
 
@@ -2079,81 +2099,87 @@ slsNAME_Dump(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     gcmASSERT(Name);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<NAME this=\"0x%x\" mySpace=\"0x%x\" line=\"%d\" string=\"%d\""
-                                " type=\"%s\" dataType=\"0x%x\" symbol=\"%s\" isBuiltIn=\"%s\"",
-                                Name,
-                                Name->mySpace,
-                                Name->lineNo,
-                                Name->stringNo,
-                                _GetNameTypeName(Name->type),
-                                Name->dataType,
-                                Name->symbol,
-                                (Name->isBuiltIn)? "true" : "false"));
-
-    switch (Name->type)
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
     {
-    case slvVARIABLE_NAME:
         gcmVERIFY_OK(sloCOMPILER_Dump(
                                     Compiler,
                                     slvDUMP_IR,
-                                    " constant=\"0x%x\" />",
-                                    Name->u.variableInfo.constant));
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    " interfaceBlock=\"0x%x\" />",
-                                    Name->u.variableInfo.interfaceBlock));
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    " lodMinMax=\"0x%x\" />",
-                                    Name->u.variableInfo.lodMinMax));
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    " levelBaseSize=\"0x%x\" />",
-                                    Name->u.variableInfo.levelBaseSize));
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    " isLocal=%d />",
-                                    Name->u.variableInfo.isLocal));
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    " isReferenced=%d />",
-                                    Name->u.variableInfo.isReferenced));
-        break;
+                                    "name \"%s\"",
+                                    Name->symbol));
 
-    case slvPARAMETER_NAME:
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    " aliasName=\"0x%x\" />",
-                                    Name->u.parameterInfo.aliasName));
-        break;
-
-    case slvFUNC_NAME:
-        gcmASSERT(Name->u.funcInfo.localSpace);
-
-        /* gcmVERIFY_OK(slsNAME_SPACE_Dump(Compiler, Name->localSpace)); */
+        sloCOMPILER_IncrDumpOffset(Compiler);
 
         gcmVERIFY_OK(sloCOMPILER_Dump(
                                     Compiler,
                                     slvDUMP_IR,
-                                    " localSpace=\"0x%x\" funcBody=\"0x%x\" />",
-                                    Name->u.funcInfo.localSpace,
-                                    Name->u.funcInfo.funcBody));
-        break;
+                                    "namespace=\"%s\" line=%d string=%d"
+                                    " type=%s isBuiltIn=%s",
+                                    Name->mySpace->spaceName,
+                                    Name->lineNo,
+                                    Name->stringNo,
+                                    _GetNameTypeName(Name->type),
+                                    (Name->isBuiltIn)? "true" : "false"));
 
-    default:
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    " />"));
+        switch (Name->type)
+        {
+        case slvVARIABLE_NAME:
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "constant=0x%x interfaceBlock=0x%x "
+                                        "lodMinMax=0x%x "
+                                        "levelBaseSize=0x%x "
+                                        "isLocal=%d "
+                                        "isReferenced=%d",
+                                        Name->u.variableInfo.constant,
+                                        Name->u.variableInfo.interfaceBlock,
+                                        Name->u.variableInfo.lodMinMax,
+                                        Name->u.variableInfo.levelBaseSize,
+                                        Name->u.variableInfo.isLocal,
+                                        Name->u.variableInfo.isReferenced));
+            break;
+
+        case slvPARAMETER_NAME:
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "aliasName=0x%x",
+                                        Name->u.parameterInfo.aliasName));
+            break;
+
+        case slvFUNC_NAME:
+            gcmASSERT(Name->u.funcInfo.localSpace);
+
+            /* gcmVERIFY_OK(slsNAME_SPACE_Dump(Compiler, Name->localSpace)); */
+
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "localSpace=\"%s\" funcBody=0x%x",
+                                        Name->u.funcInfo.localSpace->spaceName,
+                                        Name->u.funcInfo.funcBody));
+            break;
+
+        default:
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "</>"));
+        }
+
+        if (Name->dataType)
+        {
+            slsDATA_TYPE_Dump(Compiler, Name->dataType);
+        }
+        else
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "DataType=NULL"));
+        }
+
+        sloCOMPILER_DecrDumpOffset(Compiler);
     }
 
     gcmFOOTER_NO();
@@ -2161,8 +2187,24 @@ slsNAME_Dump(
 }
 
 gceSTATUS
+slsNAME_SPACE_SetSpaceName(
+    IN slsNAME_SPACE * Space,
+    IN sltPOOL_STRING SpaceName
+    )
+{
+    gcmHEADER_ARG("Space=0x%x SpaceName=0x%x",
+                   Space, SpaceName);
+
+    Space->spaceName = SpaceName;
+
+    gcmFOOTER();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
 slsNAME_SPACE_Construct(
     IN sloCOMPILER Compiler,
+    IN sltPOOL_STRING SpaceName,
     IN slsNAME_SPACE * Parent,
     OUT slsNAME_SPACE ** NameSpace
     )
@@ -2190,6 +2232,8 @@ slsNAME_SPACE_Construct(
         nameSpace = pointer;
 
         nameSpace->parent = Parent;
+
+        nameSpace->spaceName = SpaceName;
 
         slsDLINK_LIST_Initialize(&nameSpace->names);
 
@@ -2281,29 +2325,44 @@ slsNAME_SPACE_Dump(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     gcmASSERT(NameSpace);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<NAME_SPACE this=\"0x%x\" parent=\"0x%x\">",
-                                NameSpace,
-                                NameSpace->parent));
-
-    /* Dump all names */
-    FOR_EACH_DLINK_NODE(&NameSpace->names, slsNAME, name)
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
     {
-        gcmVERIFY_OK(slsNAME_Dump(Compiler, name));
-    }
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    "--------------NAME_SPACE %s parent=%s-----------",
+                                    NameSpace->spaceName,
+                                    NameSpace->parent->spaceName));
 
-    /* Dump all sub name spaces */
-    FOR_EACH_DLINK_NODE(&NameSpace->subSpaces, slsNAME_SPACE, subSpace)
-    {
-        gcmVERIFY_OK(slsNAME_SPACE_Dump(Compiler, subSpace));
-    }
+        /* Dump all names */
+        FOR_EACH_DLINK_NODE(&NameSpace->names, slsNAME, name)
+        {
+            gcmVERIFY_OK(slsNAME_Dump(Compiler, name));
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "</NAME_SPACE>"));
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        ""));
+        }
+
+        /* Dump all sub name spaces */
+        FOR_EACH_DLINK_NODE(&NameSpace->subSpaces, slsNAME_SPACE, subSpace)
+        {
+            gcmVERIFY_OK(slsNAME_SPACE_Dump(Compiler, subSpace));
+        }
+
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    "--------------NAME_SPACE %s parent=%s end-----------",
+                                    NameSpace->spaceName,
+                                    NameSpace->parent->spaceName));
+
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    ""));
+    }
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -2553,9 +2612,11 @@ slsNAME_SPACE_CheckNewFuncName(
             if (name->type == slvFUNC_NAME
                 && _IsSameFuncName(Compiler, name, FuncName, &areAllParamQualifiersEqual))
             {
+                gctBOOL hasDefined = slsFUNC_HAS_FLAG(&(name->u.funcInfo), slvFUNC_DEFINED);
+                gctBOOL curDefined = slsFUNC_HAS_FLAG(&(FuncName->u.funcInfo), slvFUNC_DEFINED);
+
                 /* A function can only have one definition. */
-                if (slsFUNC_HAS_FLAG(&(FuncName->u.funcInfo), slvFUNC_DEFINED) &&
-                    slsFUNC_HAS_FLAG(&(name->u.funcInfo), slvFUNC_DEFINED))
+                if (hasDefined && curDefined)
                 {
                     gcmVERIFY_OK(sloCOMPILER_Report(
                                                     Compiler,
@@ -2596,6 +2657,22 @@ slsNAME_SPACE_CheckNewFuncName(
                                                     slvREPORT_ERROR,
                                                     "the function: '%s' has different"
                                                     " parameter qualifier(s)",
+                                                    FuncName->symbol));
+
+                    status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+                    gcmFOOTER();
+                    return status;
+                }
+
+                if (!hasDefined && !curDefined &&
+                    !sloCOMPILER_IsHaltiVersion(Compiler))
+                {
+                    gcmVERIFY_OK(sloCOMPILER_Report(
+                                                    Compiler,
+                                                    FuncName->lineNo,
+                                                    FuncName->stringNo,
+                                                    slvREPORT_ERROR,
+                                                    "the function: '%s' repeated definition.",
                                                     FuncName->symbol));
 
                     status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
@@ -2870,6 +2947,7 @@ slsNAME_SPACE_BindFuncName(
 {
     gceSTATUS       status;
     slsNAME *       name;
+    sltPRECISION_QUALIFIER returnPrecision = slvPRECISION_QUALIFIER_ANY;
 
     gcmHEADER_ARG("Compiler=0x%x NameSpace=0x%x PolynaryExpr=0x%x",
                    Compiler, NameSpace, PolynaryExpr);
@@ -2901,9 +2979,11 @@ slsNAME_SPACE_BindFuncName(
                 if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
             }
 
+            sloCOMPILER_GetDefaultPrecision(Compiler, name->dataType->elementType, &returnPrecision);
+
             status = sloCOMPILER_CloneDataType(Compiler,
                                                slvSTORAGE_QUALIFIER_CONST,
-                                               name->dataType->qualifiers.precision,
+                                               returnPrecision,
                                                name->dataType,
                                                &PolynaryExpr->exprBase.dataType);
 
@@ -3026,7 +3106,8 @@ slsNAME_SPACE_CreateName(
             if (IsBuiltIn)
             {
                 sleSHADER_TYPE shaderType;
-                sloCOMPILER_GetShaderType(Compiler, &shaderType);
+
+                shaderType = Compiler->shaderType;
 
                 status = _SearchBuiltinVariable(Compiler,
                                                 NameSpace,
@@ -3140,13 +3221,16 @@ sloIR_BASE_Dump(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     gcmASSERT(This);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<IR_BASE line=\"%d\" string=\"%d\" realType=\"%s\" />",
-                                This->lineNo,
-                                This->stringNo,
-                                _GetIRObjectTypeName(This->vptr->type)));
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    "<IR_BASE line=\"%d\" string=\"%d\" realType=\"%s\" />",
+                                    This->lineNo,
+                                    This->stringNo,
+                                    _GetIRObjectTypeName(This->vptr->type)));
+    }
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -3219,36 +3303,39 @@ sloIR_SET_Dump(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_IR_OBJECT(set, slvIR_SET);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<IR_SET this=\"0x%x\" line=\"%d\" string=\"%d\""
-                                " type=\"%s\" asFunc=\"%s\">",
-                                set,
-                                set->base.lineNo,
-                                set->base.stringNo,
-                                _GetIRSetTypeName(set->type),
-                                (set->funcName == gcvNULL)? "none" : set->funcName->symbol));
-
-    if (set->funcName != gcvNULL)
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
     {
         gcmVERIFY_OK(sloCOMPILER_Dump(
                                     Compiler,
                                     slvDUMP_IR,
-                                    "<!-- Function Name -->"));
+                                    "set 0x%x type=%s line=%d string=%d"
+                                    " asFunc=%s",
+                                    set,
+                                    _GetIRSetTypeName(set->type),
+                                    set->base.lineNo,
+                                    set->base.stringNo,
+                                    (set->funcName == gcvNULL)? "none" : set->funcName->symbol));
 
-        gcmVERIFY_OK(slsNAME_Dump(Compiler, set->funcName));
+        if (set->funcName != gcvNULL)
+        {
+            gcmVERIFY_OK(slsNAME_Dump(Compiler, set->funcName));
+        }
+
+        sloCOMPILER_IncrDumpOffset(Compiler);
+
+        FOR_EACH_DLINK_NODE(&set->members, struct _sloIR_BASE, member)
+        {
+            gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, member));
+        }
+
+        sloCOMPILER_DecrDumpOffset(Compiler);
+
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    "set 0x%x end",
+                                    set));
     }
-
-    FOR_EACH_DLINK_NODE(&set->members, struct _sloIR_BASE, member)
-    {
-        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, member));
-    }
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "</IR_SET>"));
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -3325,7 +3412,7 @@ sloIR_SET_Construct(
 
         set = pointer;
 
-        sloIR_BASE_Initialize(&set->base, &s_setVTab, LineNo, StringNo);
+        sloIR_BASE_Initialize(&set->base, &s_setVTab, LineNo, StringNo, LineNo);
 
         set->type       = Type;
 
@@ -3468,72 +3555,70 @@ sloIR_ITERATION_Dump(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_IR_OBJECT(iteration, slvIR_ITERATION);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<IR_ITERATION line=\"%d\" string=\"%d\" type=\"%s\"",
-                                iteration->base.lineNo,
-                                iteration->base.stringNo,
-                                _GetIRIterationTypeName(iteration->type)));
-
-    if (iteration->forSpace != gcvNULL)
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
     {
         gcmVERIFY_OK(sloCOMPILER_Dump(
                                     Compiler,
                                     slvDUMP_IR,
-                                    " forSpace=\"0x%x\"",
-                                    iteration->forSpace));
-    }
+                                    "iteration line=%d string=%d type=%s",
+                                    iteration->base.lineNo,
+                                    iteration->base.stringNo,
+                                    _GetIRIterationTypeName(iteration->type)));
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                ">"));
+        if (iteration->forSpace != gcvNULL)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        " forSpace=\"0x%x\"",
+                                        iteration->forSpace));
+        }
 
-    if (iteration->condExpr != gcvNULL)
-    {
+        if (iteration->condExpr != gcvNULL)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "-- Condition Expression --"));
+
+            gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &iteration->condExpr->base));
+        }
+
+        if (iteration->loopBody != gcvNULL)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "-- Loop Body --"));
+
+            gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, iteration->loopBody));
+        }
+
+        if (iteration->forInitStatement != gcvNULL)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "-- For Init Statement --"));
+
+            gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, iteration->forInitStatement));
+        }
+
+        if (iteration->forRestExpr != gcvNULL)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "-- For Rest Expression --"));
+
+            gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &iteration->forRestExpr->base));
+        }
+
         gcmVERIFY_OK(sloCOMPILER_Dump(
                                     Compiler,
                                     slvDUMP_IR,
-                                    "<!-- Condition Expression -->"));
-
-        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &iteration->condExpr->base));
+                                    "iteration end"));
     }
-
-    if (iteration->loopBody != gcvNULL)
-    {
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    "<!-- Loop Body -->"));
-
-        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, iteration->loopBody));
-    }
-
-    if (iteration->forInitStatement != gcvNULL)
-    {
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    "<!-- For Init Statement -->"));
-
-        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, iteration->forInitStatement));
-    }
-
-    if (iteration->forRestExpr != gcvNULL)
-    {
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    "<!-- For Rest Expression -->"));
-
-        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &iteration->forRestExpr->base));
-    }
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "</IR_ITERATION>"));
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -3617,7 +3702,7 @@ sloIR_ITERATION_Construct(
         gcoOS_ZeroMemory(pointer, gcmSIZEOF(struct _sloIR_ITERATION));
         iteration = (sloIR_ITERATION)pointer;
 
-        sloIR_BASE_Initialize(&iteration->base, &s_iterationVTab, LineNo, StringNo);
+        sloIR_BASE_Initialize(&iteration->base, &s_iterationVTab, LineNo, StringNo, LineNo);
 
         iteration->type             = Type;
         iteration->condExpr         = CondExpr;
@@ -3700,35 +3785,38 @@ sloIR_JUMP_Dump(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_IR_OBJECT(jump, slvIR_JUMP);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<IR_JUMP line=\"%d\" string=\"%d\" type=\"%s\">",
-                                jump->base.lineNo,
-                                jump->base.stringNo,
-                                slGetIRJumpTypeName(jump->type)));
-
-    if (jump->type == slvRETURN)
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
     {
-        if (jump->returnExpr != gcvNULL)
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    "<IR_JUMP line=\"%d\" string=\"%d\" type=\"%s\">",
+                                    jump->base.lineNo,
+                                    jump->base.stringNo,
+                                    slGetIRJumpTypeName(jump->type)));
+
+        if (jump->type == slvRETURN)
         {
-            gcmVERIFY_OK(sloCOMPILER_Dump(
-                                        Compiler,
-                                        slvDUMP_IR,
-                                        "<!-- Return Expression -->"));
+            if (jump->returnExpr != gcvNULL)
+            {
+                gcmVERIFY_OK(sloCOMPILER_Dump(
+                                            Compiler,
+                                            slvDUMP_IR,
+                                            "<!-- Return Expression -->"));
 
-            gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &jump->returnExpr->base));
+                gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &jump->returnExpr->base));
+            }
         }
-    }
-    else
-    {
-        gcmASSERT(jump->returnExpr == gcvNULL);
-    }
+        else
+        {
+            gcmASSERT(jump->returnExpr == gcvNULL);
+        }
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "</IR_JUMP>"));
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    "</IR_JUMP>"));
+    }
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -3805,7 +3893,7 @@ sloIR_JUMP_Construct(
 
         jump = pointer;
 
-        sloIR_BASE_Initialize(&jump->base, &s_jumpVTab, LineNo, StringNo);
+        sloIR_BASE_Initialize(&jump->base, &s_jumpVTab, LineNo, StringNo, LineNo);
 
         jump->type          = Type;
         jump->returnExpr    = ReturnExpr;
@@ -3859,34 +3947,35 @@ IN sloIR_BASE This
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_IR_OBJECT(label, slvIR_LABEL);
 
-    switch(label->type) {
-    case slvCASE:
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                      slvDUMP_IR,
-                      "<IR_LABEL line=\"%d\" string=\"%d\" type=\"%s\" %d:>",
-                      label->base.lineNo,
-                      label->base.stringNo,
-                      "case", label->caseValue));
-    break;
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
+    {
+        switch(label->type)
+        {
+        case slvCASE:
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                          slvDUMP_IR,
+                          "label line=%d string=%d type=%s caseValue=%d",
+                          label->base.lineNo,
+                          label->base.stringNo,
+                          "case", label->caseValue->values->uintValue));
+        break;
 
-    case slvDEFAULT:
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                      slvDUMP_IR,
-                      "<IR_LABEL line=\"%d\" string=\"%d\" type=\"%s\">",
-                      label->base.lineNo,
-                      label->base.stringNo,
-                      "default:"));
-    break;
+        case slvDEFAULT:
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                          slvDUMP_IR,
+                          "label line=%d string=%d type=%s",
+                          label->base.lineNo,
+                          label->base.stringNo,
+                          "default:"));
+        break;
 
-    default:
-        gcmASSERT(0);
-        gcmFOOTER_NO();
-        return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        default:
+            gcmASSERT(0);
+            gcmFOOTER_NO();
+            return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+        }
     }
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_IR,
-                                  "</IR_LABEL>"));
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }
@@ -3940,7 +4029,7 @@ IN OUT sloIR_LABEL Label
     gcmASSERT(Label);
 
     (void)gcoOS_ZeroMemory((gctPOINTER)Label, sizeof(struct _sloIR_LABEL));
-    sloIR_BASE_Initialize(&Label->base, &s_LabelVTab, LineNo, StringNo);
+    sloIR_BASE_Initialize(&Label->base, &s_LabelVTab, LineNo, StringNo, LineNo);
     gcmFOOTER_NO();
 }
 
@@ -3967,7 +4056,7 @@ OUT sloIR_LABEL *Label
                                       (gctPOINTER *) &label);
         if (gcmIS_ERROR(status)) break;
         (void)gcoOS_ZeroMemory((gctPOINTER)label, sizeof(struct _sloIR_LABEL));
-        sloIR_BASE_Initialize(&label->base, &s_LabelVTab, LineNo, StringNo);
+        sloIR_BASE_Initialize(&label->base, &s_LabelVTab, LineNo, StringNo, LineNo);
         *Label = label;
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
@@ -4015,20 +4104,18 @@ sloIR_VARIABLE_Dump(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_IR_OBJECT(variable, slvIR_VARIABLE);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<IR_VARIABLE line=\"%d\" string=\"%d\">",
-                                variable->exprBase.base.lineNo,
-                                variable->exprBase.base.stringNo));
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    "variable line=%d string=%d",
+                                    variable->exprBase.base.lineNo,
+                                    variable->exprBase.base.stringNo));
 
-    gcmASSERT(variable->name);
-    gcmVERIFY_OK(slsNAME_Dump(Compiler, variable->name));
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "</IR_VARIABLE>"));
+        gcmASSERT(variable->name);
+        gcmVERIFY_OK(slsNAME_Dump(Compiler, variable->name));
+    }
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -4119,9 +4206,9 @@ sloIR_VARIABLE_Construct(
 
         variable = pointer;
 
-        sloIR_EXPR_Initialize(&variable->exprBase, &s_variableVTab, LineNo, StringNo, Name->dataType);
+        sloIR_EXPR_Initialize(&variable->exprBase, &s_variableVTab, LineNo, StringNo, LineNo, Name->dataType);
 
-        variable->name              = Name;
+        variable->name = Name;
 
         *Variable = variable;
 
@@ -4181,32 +4268,30 @@ sloIR_CONSTANT_Dump(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_IR_OBJECT(constant, slvIR_CONSTANT);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<IR_CONSTANT line=\"%d\" string=\"%d\" dataType=\"0x%x\""
-                                " valueCount=\"%d\" value=\"0x%x\" >",
-                                constant->exprBase.base.lineNo,
-                                constant->exprBase.base.stringNo,
-                                constant->exprBase.dataType,
-                                constant->valueCount,
-                                constant->values));
-
-    for (i = 0; i < constant->valueCount; i++)
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
     {
         gcmVERIFY_OK(sloCOMPILER_Dump(
                                     Compiler,
                                     slvDUMP_IR,
-                                    "<VALUE bool=\"%s\" int=\"%d\" float=\"%f\" />",
-                                    (constant->values[i].boolValue) ? "true" : "false",
-                                    constant->values[i].intValue,
-                                    constant->values[i].floatValue));
-    }
+                                    "const line=\"%d\" string=\"%d\" dataType=\"0x%x\""
+                                    " valueCount=\"%d\" value=\"0x%x\" >",
+                                    constant->exprBase.base.lineNo,
+                                    constant->exprBase.base.stringNo,
+                                    constant->exprBase.dataType,
+                                    constant->valueCount,
+                                    constant->values));
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "</IR_CONSTANT>"));
+        for (i = 0; i < constant->valueCount; i++)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "      value bool=%s int=%d float=%f",
+                                        (constant->values[i].boolValue) ? "true" : "false",
+                                        constant->values[i].intValue,
+                                        constant->values[i].floatValue));
+        }
+    }
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -4283,7 +4368,7 @@ sloIR_CONSTANT_Construct(
 
         constant = pointer;
 
-        sloIR_EXPR_Initialize(&constant->exprBase, &s_constantVTab, LineNo, StringNo, DataType);
+        sloIR_EXPR_Initialize(&constant->exprBase, &s_constantVTab, LineNo, StringNo, LineNo,DataType);
 
         constant->valueCount        = 0;
         constant->values            = gcvNULL;
@@ -4332,7 +4417,7 @@ sloIR_CONSTANT_Initialize(
 #endif
     gcmASSERT(componentCount == ValueCount);
 
-    sloIR_EXPR_Initialize(&Constant->exprBase, &s_constantVTab, LineNo, StringNo, DataType);
+    sloIR_EXPR_Initialize(&Constant->exprBase, &s_constantVTab, LineNo, StringNo, LineNo, DataType);
 
     Constant->valueCount = ValueCount;
     Constant->values = Values;
@@ -4402,6 +4487,7 @@ sloIR_CONSTANT_Clone(
                               &s_constantVTab,
                               LineNo,
                               StringNo,
+                              LineNo,
                               dataType);
 
         constant->valueCount        = Source->valueCount;
@@ -6356,19 +6442,19 @@ _sloIR_CONSTANT_BitwiseLogical(
     }
 
     switch (ExprType) {
-    case slvBINARY_BITWISE_AND:
+    case slvBINARY_AND_BITWISE:
         for(i=0; i < vectorSize; i++) {
             resultConstant->values[i].intValue &= valuesPtr[i].intValue;
         }
         break;
 
-    case slvBINARY_BITWISE_OR:
+    case slvBINARY_OR_BITWISE:
         for(i=0; i < vectorSize; i++) {
             resultConstant->values[i].intValue |= valuesPtr[i].intValue;
         }
         break;
 
-    case slvBINARY_BITWISE_XOR:
+    case slvBINARY_XOR_BITWISE:
         for(i=0; i < vectorSize; i++) {
             resultConstant->values[i].intValue ^= valuesPtr[i].intValue;
         }
@@ -6714,6 +6800,7 @@ slGetIRUnaryExprTypeName(
     case slvUNARY_PRE_DEC:              return "--x";
     case slvUNARY_NEG:                  return "-";
     case slvUNARY_NOT:                  return "!";
+    case slvUNARY_NOT_BITWISE:          return "~";
 
     default:
         gcmASSERT(0);
@@ -6731,6 +6818,7 @@ sloIR_UNARY_EXPR_Dump(
     gctUINT8            i, component;
     const gctCHAR       componentNames[4] = {'x', 'y', 'z', 'w'};
     gceSTATUS           status;
+    gctCHAR             selecttNames[sldMAX_VECTOR_COMPONENT + 1] = {'\0'};
 
     gcmHEADER();
 
@@ -6738,84 +6826,78 @@ sloIR_UNARY_EXPR_Dump(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_IR_OBJECT(unaryExpr, slvIR_UNARY_EXPR);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<IR_UNARY_EXPR line=\"%d\" string=\"%d\""
-                                " dataType=\"0x%x\" type=\"%s\">",
-                                unaryExpr->exprBase.base.lineNo,
-                                unaryExpr->exprBase.base.stringNo,
-                                unaryExpr->exprBase.dataType,
-                                slGetIRUnaryExprTypeName(unaryExpr->type)));
-
-    gcmASSERT(unaryExpr->operand);
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<!-- Operand -->"));
-
-    gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &unaryExpr->operand->base));
-
-    switch (unaryExpr->type)
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
     {
-    case slvUNARY_FIELD_SELECTION:
-        gcmASSERT(unaryExpr->u.fieldName);
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    "unary_expr type=%s line=%d string=%d"
+                                    " dataType=0x%x",
+                                    slGetIRUnaryExprTypeName(unaryExpr->type),
+                                    unaryExpr->exprBase.base.lineNo,
+                                    unaryExpr->exprBase.base.stringNo,
+                                    unaryExpr->exprBase.dataType));
+
+        gcmASSERT(unaryExpr->operand);
+
+        sloCOMPILER_IncrDumpOffset(Compiler);
 
         gcmVERIFY_OK(sloCOMPILER_Dump(
                                     Compiler,
                                     slvDUMP_IR,
-                                    "<!-- Field -->"));
+                                    "-- Operand --"));
 
-        gcmVERIFY_OK(slsNAME_Dump(Compiler, unaryExpr->u.fieldName));
+        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &unaryExpr->operand->base));
 
-        break;
-
-    case slvUNARY_COMPONENT_SELECTION:
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    "<COMPONMENT_SELECTION value=\""));
-
-        for (i = 0; i < unaryExpr->u.componentSelection.components; i++)
+        switch (unaryExpr->type)
         {
-            switch (i)
-            {
-            case 0: component = unaryExpr->u.componentSelection.x; break;
-            case 1: component = unaryExpr->u.componentSelection.y; break;
-            case 2: component = unaryExpr->u.componentSelection.z; break;
-            case 3: component = unaryExpr->u.componentSelection.w; break;
-
-            default:
-                gcmASSERT(0);
-
-                status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
-                gcmFOOTER();
-                return status;
-            }
+        case slvUNARY_FIELD_SELECTION:
+            gcmASSERT(unaryExpr->u.fieldName);
 
             gcmVERIFY_OK(sloCOMPILER_Dump(
                                         Compiler,
                                         slvDUMP_IR,
-                                        "%c",
-                                        componentNames[component]));
+                                        "-- Field --"));
+
+            gcmVERIFY_OK(slsNAME_Dump(Compiler, unaryExpr->u.fieldName));
+
+            break;
+
+        case slvUNARY_COMPONENT_SELECTION:
+            for (i = 0; i < unaryExpr->u.componentSelection.components; i++)
+            {
+                switch (i)
+                {
+                case 0: component = unaryExpr->u.componentSelection.x; break;
+                case 1: component = unaryExpr->u.componentSelection.y; break;
+                case 2: component = unaryExpr->u.componentSelection.z; break;
+                case 3: component = unaryExpr->u.componentSelection.w; break;
+
+                default:
+                    gcmASSERT(0);
+
+                    status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+                    gcmFOOTER();
+                    return status;
+                }
+
+                selecttNames[i] = componentNames[component];
+            }
+
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                         Compiler,
+                                         slvDUMP_IR,
+                                         "componet_select value = %s",
+                                         selecttNames));
+
+            break;
+
+        default:
+            break;
         }
 
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    "\" />"));
-
-        break;
-
-    default:
-        break;
+        sloCOMPILER_DecrDumpOffset(Compiler);
     }
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "</IR_UNARY_EXPR>"));
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -6949,7 +7031,7 @@ _GetUnaryExprDataType(
 
     case slvUNARY_NEG:
     case slvUNARY_NOT:
-    case slvUNARY_BITWISE_NOT:
+    case slvUNARY_NOT_BITWISE:
         status = sloCOMPILER_CloneDataType(Compiler,
                                            slvSTORAGE_QUALIFIER_CONST,
                                            Operand->dataType->qualifiers.precision,
@@ -7015,7 +7097,7 @@ sloIR_UNARY_EXPR_Construct(
 
         unaryExpr = pointer;
 
-        sloIR_EXPR_Initialize(&unaryExpr->exprBase, &s_unaryExprVTab, LineNo, StringNo, dataType);
+        sloIR_EXPR_Initialize(&unaryExpr->exprBase, &s_unaryExprVTab, LineNo, StringNo, LineNo, dataType);
 
         unaryExpr->type     = Type;
         unaryExpr->operand  = Operand;
@@ -7193,7 +7275,7 @@ sloIR_UNARY_EXPR_Evaluate(
         evaluate = &_NotConstantValue;
         break;
 
-    case slvUNARY_BITWISE_NOT:
+    case slvUNARY_NOT_BITWISE:
         evaluate = &_BitwiseNotConstantValue;
         break;
 
@@ -7269,9 +7351,9 @@ _GetIRBinaryExprTypeName(
 
     case slvBINARY_MOD:                 return "mod";
 
-    case slvBINARY_BITWISE_AND:         return "bitwise_and";
-    case slvBINARY_BITWISE_OR:          return "bitwise_or";
-    case slvBINARY_BITWISE_XOR:         return "bitwise_xor";
+    case slvBINARY_AND_BITWISE:         return "and_bitwise";
+    case slvBINARY_OR_BITWISE:          return "or_bitwise";
+    case slvBINARY_XOR_BITWISE:         return "xor_bitwise";
 
     case slvBINARY_LSHIFT:              return "lshift";
     case slvBINARY_RSHIFT:              return "rshift";
@@ -7324,38 +7406,40 @@ sloIR_BINARY_EXPR_Dump(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_IR_OBJECT(binaryExpr, slvIR_BINARY_EXPR);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<IR_BINARY_EXPR line=\"%d\" string=\"%d\""
-                                " dataType=\"0x%x\" type=\"%s\">",
-                                binaryExpr->exprBase.base.lineNo,
-                                binaryExpr->exprBase.base.stringNo,
-                                binaryExpr->exprBase.dataType,
-                                _GetIRBinaryExprTypeName(binaryExpr->type)));
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    "binary_expr type=%s line=%d string=%d"
+                                    " dataType=0x%x",
+                                    _GetIRBinaryExprTypeName(binaryExpr->type),
+                                    binaryExpr->exprBase.base.lineNo,
+                                    binaryExpr->exprBase.base.stringNo,
+                                    binaryExpr->exprBase.dataType));
 
-    gcmASSERT(binaryExpr->leftOperand);
+        gcmASSERT(binaryExpr->leftOperand);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<!-- Left Operand -->"));
+        sloCOMPILER_IncrDumpOffset(Compiler);
 
-    gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &binaryExpr->leftOperand->base));
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    "-- Left Operand --"));
 
-    gcmASSERT(binaryExpr->rightOperand);
+        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &binaryExpr->leftOperand->base));
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<!-- Right Operand -->"));
+        gcmASSERT(binaryExpr->rightOperand);
 
-    gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &binaryExpr->rightOperand->base));
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    "-- Right Operand --"));
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "</IR_BINARY_EXPR>"));
+        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &binaryExpr->rightOperand->base));
+
+        sloCOMPILER_DecrDumpOffset(Compiler);
+    }
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -7683,9 +7767,9 @@ _GetBinaryExprDataType(
 
         break;
 
-    case slvBINARY_BITWISE_AND:
-    case slvBINARY_BITWISE_OR:
-    case slvBINARY_BITWISE_XOR:
+    case slvBINARY_AND_BITWISE:
+    case slvBINARY_OR_BITWISE:
+    case slvBINARY_XOR_BITWISE:
         status = _GetBitwiseLogicalExprDataType(Compiler,
                                                 LeftOperand,
                                                 RightOperand,
@@ -7750,6 +7834,7 @@ sloIR_BINARY_EXPR_Construct(
     IN sloCOMPILER Compiler,
     IN gctUINT LineNo,
     IN gctUINT StringNo,
+    IN gctUINT LineEndNo,
     IN sleBINARY_EXPR_TYPE Type,
     IN sloIR_EXPR LeftOperand,
     IN sloIR_EXPR RightOperand,
@@ -7792,7 +7877,7 @@ sloIR_BINARY_EXPR_Construct(
 
         binaryExpr = pointer;
 
-        sloIR_EXPR_Initialize(&binaryExpr->exprBase, &s_binaryExprVTab, LineNo, StringNo, dataType);
+        sloIR_EXPR_Initialize(&binaryExpr->exprBase, &s_binaryExprVTab, LineNo, StringNo, LineNo, dataType);
 
         binaryExpr->type            = Type;
         binaryExpr->leftOperand     = LeftOperand;
@@ -7892,9 +7977,9 @@ sloIR_BINARY_EXPR_Evaluate(
         gcmFOOTER();
         return status;
 
-    case slvBINARY_BITWISE_AND:
-    case slvBINARY_BITWISE_OR:
-    case slvBINARY_BITWISE_XOR:
+    case slvBINARY_AND_BITWISE:
+    case slvBINARY_OR_BITWISE:
+    case slvBINARY_XOR_BITWISE:
         status = _sloIR_CONSTANT_BitwiseLogical(Compiler,
                                                 Type,
                                                 LeftConstant,
@@ -7978,47 +8063,54 @@ sloIR_SELECTION_Dump(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_IR_OBJECT(selection, slvIR_SELECTION);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<IR_SELECTION line=\"%d\" string=\"%d\" dataType=\"0x%x\">",
-                                selection->exprBase.base.lineNo,
-                                selection->exprBase.base.stringNo,
-                                selection->exprBase.dataType));
-
-    gcmASSERT(selection->condExpr);
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<!-- Condition Expression -->"));
-
-    gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &selection->condExpr->base));
-
-    if (selection->trueOperand != gcvNULL)
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
     {
         gcmVERIFY_OK(sloCOMPILER_Dump(
                                     Compiler,
                                     slvDUMP_IR,
-                                    "<!-- True Operand -->"));
+                                    "selection line=%d string=%d dataType=0x%x",
+                                    selection->exprBase.base.lineNo,
+                                    selection->exprBase.base.stringNo,
+                                    selection->exprBase.dataType));
 
-        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, selection->trueOperand));
-    }
+        gcmASSERT(selection->condExpr);
 
-    if (selection->falseOperand != gcvNULL)
-    {
+        sloCOMPILER_IncrDumpOffset(Compiler);
+
         gcmVERIFY_OK(sloCOMPILER_Dump(
                                     Compiler,
                                     slvDUMP_IR,
-                                    "<!-- False Operand -->"));
+                                    "-- Condition Expression --"));
 
-        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, selection->falseOperand));
+        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &selection->condExpr->base));
+
+        if (selection->trueOperand != gcvNULL)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "-- True Operand --"));
+
+            gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, selection->trueOperand));
+        }
+
+        if (selection->falseOperand != gcvNULL)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "-- False Operand --"));
+
+            gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, selection->falseOperand));
+        }
+
+        sloCOMPILER_DecrDumpOffset(Compiler);
+
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_IR,
+                                    "selection end"));
     }
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "</IR_SELECTION>"));
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -8096,7 +8188,7 @@ sloIR_SELECTION_Construct(
 
         selection = pointer;
 
-        sloIR_EXPR_Initialize(&selection->exprBase, &s_selectionVTab, LineNo, StringNo, DataType);
+        sloIR_EXPR_Initialize(&selection->exprBase, &s_selectionVTab, LineNo, StringNo, LineNo, DataType);
 
         selection->condExpr     = CondExpr;
         selection->trueOperand  = TrueOperand;
@@ -8155,41 +8247,51 @@ IN sloIR_BASE This
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_IR_OBJECT(selection, slvIR_SWITCH);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_IR,
-                                  "<IR_SWITCH line=\"%d\" string=\"%d\" dataType=\"0x%x\">",
-                                  selection->exprBase.base.lineNo,
-                                  selection->exprBase.base.stringNo,
-                                  selection->exprBase.dataType));
-
-    gcmASSERT(selection->condExpr);
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_IR,
-                                  "<!-- Condition Expression -->"));
-
-    gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &selection->condExpr->base));
-
-    if (selection->switchBody != gcvNULL) {
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
+    {
         gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
                                       slvDUMP_IR,
-                                      "<!-- Switch Body -->"));
+                                      "switch line=%d string=%d dataType=0x%x",
+                                      selection->exprBase.base.lineNo,
+                                      selection->exprBase.base.stringNo,
+                                      selection->exprBase.dataType));
 
-        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, selection->switchBody));
-    }
+        sloCOMPILER_IncrDumpOffset(Compiler);
 
-    if (selection->cases != gcvNULL) {
+        gcmASSERT(selection->condExpr);
+
         gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
                                       slvDUMP_IR,
-                                      "<!-- cases -->"));
-        /** to do **
+                                      "-- Condition Expression --"));
 
-         ** Print the cases **/
+        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &selection->condExpr->base));
+
+        if (selection->switchBody != gcvNULL)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_IR,
+                                          "-- Switch Body --"));
+
+            gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, selection->switchBody));
+        }
+
+        if (selection->cases != gcvNULL)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_IR,
+                                          "-- cases --"));
+            /** to do **
+
+             ** Print the cases **/
+        }
+
+        sloCOMPILER_DecrDumpOffset(Compiler);
+
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                      slvDUMP_IR,
+                                      "switch end"));
     }
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_IR,
-                                  "</IR_SWITCH>"));
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }
@@ -8255,7 +8357,7 @@ OUT sloIR_SWITCH * SwitchSelect
 
         switchSelect = pointer;
         sloIR_EXPR_Initialize(&switchSelect->exprBase, &s_switchVTab, LineNo, StringNo,
-                              gcvNULL);
+                              LineNo, gcvNULL);
 
         switchSelect->condExpr    = CondExpr;
         switchSelect->switchBody = SwitchBody;
@@ -8404,58 +8506,53 @@ sloIR_POLYNARY_EXPR_Dump(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_IR_OBJECT(polynaryExpr, slvIR_POLYNARY_EXPR);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "<IR_POLYNARY_EXPR line=\"%d\" string=\"%d\""
-                                " dataType=\"0x%x\" type=\"%s\"",
-                                polynaryExpr->exprBase.base.lineNo,
-                                polynaryExpr->exprBase.base.stringNo,
-                                polynaryExpr->exprBase.dataType,
-                                slGetIRPolynaryExprTypeName(polynaryExpr->type)));
-
-    if (polynaryExpr->type == slvPOLYNARY_FUNC_CALL)
-    {
-        gcmASSERT(polynaryExpr->funcName);
-
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    " funcSymbol=\"%s\">",
-                                    polynaryExpr->funcSymbol));
-    }
-    else
+    if (Compiler->context.dumpOptions & slvDUMP_IR)
     {
         gcmVERIFY_OK(sloCOMPILER_Dump(
                                     Compiler,
                                     slvDUMP_IR,
-                                    ">"));
+                                    "polynary_expr type=%s line=%d string=%d"
+                                    " dataType=0x%x",
+                                    slGetIRPolynaryExprTypeName(polynaryExpr->type),
+                                    polynaryExpr->exprBase.base.lineNo,
+                                    polynaryExpr->exprBase.base.stringNo,
+                                    polynaryExpr->exprBase.dataType));
+
+        if (polynaryExpr->type == slvPOLYNARY_FUNC_CALL)
+        {
+            gcmASSERT(polynaryExpr->funcName);
+
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        " funcSymbol=%s",
+                                        polynaryExpr->funcSymbol));
+        }
+
+        if (polynaryExpr->funcName != gcvNULL)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "-- Function Name --"));
+
+            gcmVERIFY_OK(slsNAME_Dump(Compiler, polynaryExpr->funcName));
+        }
+
+        sloCOMPILER_IncrDumpOffset(Compiler);
+
+        if (polynaryExpr->operands != gcvNULL)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_IR,
+                                        "-- Operands --"));
+
+            gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &polynaryExpr->operands->base));
+        }
+
+        sloCOMPILER_DecrDumpOffset(Compiler);
     }
-
-    if (polynaryExpr->funcName != gcvNULL)
-    {
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    "<!-- Function Name -->"));
-
-        gcmVERIFY_OK(slsNAME_Dump(Compiler, polynaryExpr->funcName));
-    }
-
-    if (polynaryExpr->operands != gcvNULL)
-    {
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_IR,
-                                    "<!-- Operands -->"));
-
-        gcmVERIFY_OK(sloIR_OBJECT_Dump(Compiler, &polynaryExpr->operands->base));
-    }
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_IR,
-                                "</IR_POLYNARY_EXPR>"));
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -8531,7 +8628,7 @@ sloIR_POLYNARY_EXPR_Construct(
 
         polynaryExpr = pointer;
 
-        sloIR_EXPR_Initialize(&polynaryExpr->exprBase, &s_polynaryExprVTab, LineNo, StringNo, DataType);
+        sloIR_EXPR_Initialize(&polynaryExpr->exprBase, &s_polynaryExprVTab, LineNo, StringNo, LineNo, DataType);
 
         polynaryExpr->type          = Type;
         polynaryExpr->funcSymbol    = FuncSymbol;
@@ -8569,14 +8666,14 @@ sloIR_VIV_ASM_Dump(
     gcmVERIFY_OK(sloCOMPILER_Dump(
                                 Compiler,
                                 slvDUMP_IR,
-                                "<IR_POLYNARY_EXPR line=\"%d\" string=\"%d\"",
+                                "polynary_expr line=\"%d\" string=\"%d\"",
                                 vivAsm->base.lineNo,
                                 vivAsm->base.stringNo));
 
     gcmVERIFY_OK(sloCOMPILER_Dump(
                                 Compiler,
                                 slvDUMP_IR,
-                                "</IR_POLYNARY_EXPR>"));
+                                "polynary_expr end"));
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -8652,7 +8749,7 @@ sloIR_VIV_ASM_Construct(
 
         vivAsm = pointer;
 
-        sloIR_BASE_Initialize(&vivAsm->base, &s_vivASMVTab, LineNo, StringNo);
+        sloIR_BASE_Initialize(&vivAsm->base, &s_vivASMVTab, LineNo, StringNo, LineNo);
 
         vivAsm->opcode        = *AsmOpcode;
 
@@ -9842,9 +9939,12 @@ slMakeImplicitConversionForOperandPair(
     if(!RightOnly)
     {
         status = slMakeImplicitConversionForOperand(Compiler, LeftOperand, RightOperand->dataType);
-        if (gcmIS_ERROR(status)) {
+
+        if (gcmIS_ERROR(status))
+        {
             return status;
         }
+
         if(sloIR_EXPR_ImplicitConversionDone(LeftOperand))
         {
             return status;

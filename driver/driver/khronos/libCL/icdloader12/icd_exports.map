@@ -45,10 +45,10 @@
         clCreateCommandQueue;
         clCreateContext;
         clCreateContextFromType;
-        clCreateFromGLBuffer;
-        clCreateFromGLRenderbuffer;
-        clCreateFromGLTexture2D;
-        clCreateFromGLTexture3D;
+        clCreateFromGLBuffer*;
+        clCreateFromGLRenderbuffer*;
+        clCreateFromGLTexture2D*;
+        clCreateFromGLTexture3D*;
         clCreateImage2D;
         clCreateImage3D;
         clCreateKernel;
@@ -56,7 +56,7 @@
         clCreateProgramWithBinary;
         clCreateProgramWithSource;
         clCreateSampler;
-        clEnqueueAcquireGLObjects;
+        clEnqueueAcquireGLObjects*;
         clEnqueueBarrier;
         clEnqueueCopyBuffer;
         clEnqueueCopyBufferToImage;
@@ -69,7 +69,7 @@
         clEnqueueNativeKernel;
         clEnqueueReadBuffer;
         clEnqueueReadImage;
-        clEnqueueReleaseGLObjects;
+        clEnqueueReleaseGLObjects*;
         clEnqueueTask;
         clEnqueueUnmapMemObject;
         clEnqueueWaitForEvents;
@@ -84,8 +84,8 @@
         clGetEventInfo;
         clGetEventProfilingInfo;
         clGetExtensionFunctionAddress;
-        clGetGLObjectInfo;
-        clGetGLTextureInfo;
+        clGetGLObjectInfo*;
+        clGetGLTextureInfo*;
         clGetImageInfo;
         clGetKernelInfo;
         clGetKernelWorkGroupInfo;

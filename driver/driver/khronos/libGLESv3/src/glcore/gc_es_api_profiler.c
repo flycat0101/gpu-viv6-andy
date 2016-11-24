@@ -8245,23 +8245,23 @@ GLvoid GL_APIENTRY __glesProfile_TexDirectInvalidateVIV(__GLcontext *gc, GLenum 
     }
 }
 
-GLvoid GL_APIENTRY __glesProfile_TexDirectVIVMap(__GLcontext *gc, GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** logical, const GLuint * physical, GLboolean tiled)
+GLvoid GL_APIENTRY __glesProfile_TexDirectVIVMap(__GLcontext *gc, GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** logical, const GLuint * physical)
 {
     __GLES_PROFILE_VARS();
 
     if (__glesApiTraceMode == gcvTRACEMODE_FULL || __glesApiTraceMode == gcvTRACEMODE_PRE)
     {
-        __GLES_LOG_API("(gc=%p, tid=%p): glTexDirectVIVMap 0x%04X %d %d 0x%04X 0x%08X 0x%08X %d\n",
-                        gc, tid, target, width, height, format, __GL_PTR2UINT(logical), __GL_PTR2UINT(physical), tiled);
+        __GLES_LOG_API("(gc=%p, tid=%p): glTexDirectVIVMap 0x%04X %d %d 0x%04X 0x%08X 0x%08X\n",
+                        gc, tid, target, width, height, format, __GL_PTR2UINT(logical), __GL_PTR2UINT(physical));
     }
 
     __GLES_PROFILE_HEADER();
-    __gles_TexDirectVIVMap(gc, target, width, height, format, logical, physical, GL_FALSE);
+    __gles_TexDirectVIVMap(gc, target, width, height, format, logical, physical);
     __GLES_PROFILE_FOOTER(GLES3_TEXDIRECTVIVMAP);
 
     if (__glesTracerDispatchTable.TexDirectVIVMap)
     {
-        (*__glesTracerDispatchTable.TexDirectVIVMap)(target, width, height, format, logical, physical, GL_FALSE);
+        (*__glesTracerDispatchTable.TexDirectVIVMap)(target, width, height, format, logical, physical);
     }
 }
 
@@ -8327,6 +8327,11 @@ GLvoid GL_APIENTRY __glesProfile_MultiDrawElementsIndirectEXT(__GLcontext *gc, G
     }
 }
 #endif
+
+GLvoid GL_APIENTRY __glesProfile_GetTexImage(__GLcontext *gc, GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels)
+{
+    __gles_GetTexImage(gc, target, level, format, type, pixels);
+}
 
 
 /* GLES API Profiler function dispatch table */

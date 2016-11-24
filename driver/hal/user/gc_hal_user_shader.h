@@ -134,34 +134,28 @@ gcoSHADER_BindBufferBlock(
     IN gcSHADER_KIND Type
     );
 
-gceSTATUS
-gcCreateInstVidMem(
-    IN gcoHAL Hal,
-    IN gctPOINTER InstPtr,
-    IN gctSIZE_T  instSize,
-    OUT gcsSURF_NODE_PTR* Node,
-    OUT gctUINT32* PhysicalAddr
-);
+void
+gcoSHADER_AllocateVidMem(
+    gctPOINTER context,
+    gceSURF_TYPE type,
+    gctSTRING tag,
+    gctSIZE_T size,
+    gctUINT32 align,
+    gctPOINTER *opaqueNode,
+    gctPOINTER *memory,
+    gctUINT32 *physical,
+    gctPOINTER initialData,
+    gctBOOL zeroMemory
+    );
 
-gceSTATUS
-gcDestroyInstVidMem(
-    IN gcoHAL Hal,
-    IN gcsSURF_NODE_PTR Node
-);
+void
+gcoSHADER_FreeVidMem(
+    gctPOINTER context,
+    gceSURF_TYPE type,
+    gctSTRING tag,
+    gctPOINTER opaqueNode
+    );
 
-gceSTATUS
-gcCreateSpillVidMem(
-    IN gcoHAL Hal,
-    IN gctSIZE_T  spillSize,
-    OUT gcsSURF_NODE_PTR* Node,
-    OUT gctUINT32* PhysicalAddr
-);
-
-gceSTATUS
-gcDestroySpillVidMem(
-    IN gcoHAL Hal,
-    IN gcsSURF_NODE_PTR Node
-);
 
 #ifdef __cplusplus
 }

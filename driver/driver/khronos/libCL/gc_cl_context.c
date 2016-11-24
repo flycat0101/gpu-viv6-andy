@@ -13,11 +13,385 @@
 
 #include "gc_cl_precomp.h"
 
-#define __NEXT_MSG_ID__     002015
+#define __NEXT_MSG_ID__     002016
 
 /*****************************************************************************\
 |*                         Supporting functions                              *|
 \*****************************************************************************/
+
+#define gcmWRITE_CONST(ConstValue) \
+    do \
+    { \
+        gceSTATUS status; \
+        gctINT32 value = ConstValue; \
+        gcmERR_BREAK(gcoPROFILER_Write(Context->phal, gcmSIZEOF(value), &value)); \
+    } \
+    while (gcvFALSE)
+
+#define gcmWRITE_VALUE(IntData) \
+    do \
+    { \
+        gceSTATUS status; \
+        gctINT32 value = IntData; \
+        gcmERR_BREAK(gcoPROFILER_Write(Context->phal, gcmSIZEOF(value), &value)); \
+    } \
+    while (gcvFALSE)
+
+#define gcmWRITE_COUNTER(Counter, Value) \
+    gcmWRITE_CONST(Counter); \
+    gcmWRITE_VALUE(Value)
+
+/* Write a string value (char*). */
+#define gcmWRITE_STRING(String) \
+    do \
+    { \
+        gceSTATUS status; \
+        gctINT32 length; \
+        length = (gctINT32) gcoOS_StrLen((gctSTRING)String, gcvNULL); \
+        gcmERR_BREAK(gcoPROFILER_Write(Context->phal, gcmSIZEOF(length), &length)); \
+        gcmERR_BREAK(gcoPROFILER_Write(Context->phal, length, String)); \
+    } \
+    while (gcvFALSE)
+
+#if VIVANTE_PROFILER_PROBE
+#define gcmWRITE_XML_STRING(String) \
+    do \
+    { \
+    gceSTATUS status; \
+    gctINT32 length; \
+    length = (gctINT32) gcoOS_StrLen((gctSTRING) String, gcvNULL); \
+    gcmERR_BREAK(gcoPROFILER_Write(Context->phal, length, String)); \
+    } \
+    while (gcvFALSE)
+
+#endif
+
+gctINT
+clfInitializeProfiler(
+    clsContext_PTR Context
+    )
+{
+    gctINT status = gcvSTATUS_OK;
+    gctINT profileMode = 0;
+    char *env = gcvNULL;
+
+    gcmHEADER_ARG("Context=0x%x ", Context);
+
+    clmCHECK_ERROR(Context == gcvNULL ||
+                   Context->objectType != clvOBJECT_CONTEXT,
+                   CL_INVALID_CONTEXT);
+
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_CL_PROFILE", &env)) && env)
+    {
+        if gcmIS_SUCCESS(gcoOS_StrCmp(env, "1"))
+        {
+            profileMode = 1;
+        }
+        if gcmIS_SUCCESS(gcoOS_StrCmp(env, "2"))
+        {
+            profileMode = 2;
+        }
+    }
+
+    if (profileMode == 0)
+    {
+        Context->profiler.enable = gcvFALSE;
+        Context->profiler.perClfinish = gcvFALSE;
+#if VIVANTE_PROFILER_PROBE
+        if(Context->phal == gcvNULL)
+        {
+            gctPOINTER pointer = gcvNULL;
+            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                           gcmSIZEOF(struct _gcoHAL),
+                           &pointer)))
+            {
+                gcmFATAL("%s(%d): gcoOS_Allocate failed", __FUNCTION__, __LINE__);
+                gcmFOOTER_ARG("%d", status);
+                return status;
+            }
+            gcoOS_MemFill(pointer,0,gcmSIZEOF(struct _gcoHAL));
+            Context->phal = (gcoHAL) pointer;
+            Context->profiler.enableProbe = gcvTRUE;
+            if (gcoPROFILER_Initialize(Context->phal, gcvNULL, gcvFALSE) != gcvSTATUS_OK)
+                Context->profiler.enableProbe = gcvFALSE;
+            if (Context->profiler.enableProbe)
+                gcmWRITE_XML_STRING("<DrawCounter>\n");
+        }
+#endif
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
+
+    if(Context->phal == gcvNULL)
+    {
+        gctPOINTER pointer = gcvNULL;
+        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
+                       gcmSIZEOF(struct _gcoHAL),
+                       &pointer)))
+        {
+            gcmFATAL("%s(%d): gcoOS_Allocate failed", __FUNCTION__, __LINE__);
+            gcmFOOTER_ARG("%d", status);
+            return status;
+        }
+        gcoOS_MemFill(pointer,0,gcmSIZEOF(struct _gcoHAL));
+        Context->phal = (gcoHAL) pointer;
+    }
+
+    status = gcoPROFILER_Initialize(Context->phal, gcvNULL, gcvTRUE);
+    switch (status)
+    {
+        case gcvSTATUS_OK:
+            break;
+        case gcvSTATUS_MISMATCH: /*fall through*/
+        case gcvSTATUS_NOT_SUPPORTED:
+        default:
+            Context->profiler.enable = gcvFALSE;
+            if(Context->phal != gcvNULL)
+                gcoOS_Free(gcvNULL, Context->phal);
+            gcmFOOTER_ARG("%d", status);
+            return status;
+    }
+
+    /* Clear the profiler. */
+    gcoOS_ZeroMemory(&Context->profiler, gcmSIZEOF(Context->profiler));
+    Context->profiler.enable = gcvTRUE;
+
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VP_FRAME_NUM", &env)))
+    {
+        if ((env != gcvNULL) && (env[0] !=0))
+        {
+            int frameNum;
+            gcoOS_StrToInt(env, &frameNum);
+            if (frameNum > 1)
+                Context->profiler.frameMaxNum = (gctUINT32)frameNum;
+        }
+    }
+
+    if (profileMode == 2)
+    {
+        Context->profiler.perClfinish = gcvTRUE;
+    }
+
+    {
+        /* Write Generic Info. */
+        char* infoCompany = "Vivante Corporation";
+        char* infoVersion = "1.3";
+        char  infoRevision[255] = {'\0'};   /* read from hw */
+        char  infoRenderer[255] = {'\0'};
+        char* infoDriver = "OpenCL 1.2";
+        gceCHIPMODEL chipModel;
+        gctUINT32 chipRevision;
+        gctUINT offset = 0;
+        gctSTRING productName = gcvNULL;
+
+        gcoHAL_QueryChipIdentity(gcvNULL,&chipModel, &chipRevision,gcvNULL,gcvNULL);
+
+#define BCD(digit)      ((chipRevision >> (digit * 4)) & 0xF)
+        gcoOS_MemFill(infoRevision, 0, gcmSIZEOF(infoRevision));
+        if (BCD(3) == 0)
+        {
+            /* Old format. */
+            gcoOS_PrintStrSafe(infoRevision, gcmSIZEOF(infoRevision),
+                &offset, "revision=\"%d.%d\" ", BCD(1), BCD(0));
+        }
+        else
+        {
+            /* New format. */
+            gcoOS_PrintStrSafe(infoRevision, gcmSIZEOF(infoRevision),
+                &offset, "revision=\"%d.%d.%d_rc%d\" ",
+                BCD(3), BCD(2), BCD(1), BCD(0));
+        }
+
+        gcoHAL_GetProductName(gcvNULL, &productName);
+        gcoOS_StrCatSafe(infoRenderer, 9, "Vivante ");
+        gcoOS_StrCatSafe(infoRenderer, 23, productName);
+        gcmOS_SAFE_FREE(gcvNULL, productName);
+
+        gcmWRITE_CONST(VPG_INFO);
+
+        gcmWRITE_CONST(VPC_INFOCOMPANY);
+        gcmWRITE_STRING(infoCompany);
+        gcmWRITE_CONST(VPC_INFOVERSION);
+        gcmWRITE_STRING(infoVersion);
+        gcmWRITE_CONST(VPC_INFORENDERER);
+        gcmWRITE_STRING(infoRenderer);
+        gcmWRITE_CONST(VPC_INFOREVISION);
+        gcmWRITE_STRING(infoRevision);
+        gcmWRITE_CONST(VPC_INFODRIVER);
+        gcmWRITE_STRING(infoDriver);
+
+        gcmWRITE_CONST(VPG_END);
+    }
+
+    gcoOS_GetTime(&Context->profiler.frameStartTimeusec);
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+void
+clfDestroyProfiler(
+    clsContext_PTR Context
+    )
+{
+    gcsHAL_INTERFACE iface;
+    gcmHEADER_ARG("Context=0x%x", Context);
+    if (Context->profiler.enable)
+    {
+        /* disable profiler in kernel. */
+        iface.ignoreTLS = gcvFALSE;
+        iface.command = gcvHAL_SET_PROFILE_SETTING;
+        iface.u.SetProfileSetting.enable = gcvFALSE;
+
+        /* Call the kernel. */
+        gcoOS_DeviceControl(gcvNULL,
+            IOCTL_GCHAL_INTERFACE,
+            &iface, gcmSIZEOF(iface),
+            &iface, gcmSIZEOF(iface));
+
+        Context->profiler.enable = gcvFALSE;
+        gcmVERIFY_OK(gcoPROFILER_Destroy(Context->phal));
+        if(Context->phal != gcvNULL)
+            gcoOS_Free(gcvNULL, Context->phal);
+    }
+    else
+    {
+#if VIVANTE_PROFILER_PROBE
+        if (Context->profiler.enableProbe)
+            gcmVERIFY_OK(gcoPROFILER_Destroy(Context->phal));
+        if (Context->phal != gcvNULL)
+            gcoOS_Free(gcvNULL, Context->phal);
+#endif
+    }
+    gcmFOOTER_NO();
+}
+
+gctINT
+clfBeginProfiler(
+    cl_command_queue CommandQueue
+    )
+{
+    gctINT status = gcvSTATUS_OK;
+    clsContext_PTR      Context;
+
+    gcmHEADER_ARG("CommandQueue=0x%x ", CommandQueue);
+
+    if (!CommandQueue)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
+    Context = CommandQueue->context;
+    if (!Context)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
+    if(!Context->profiler.enable)
+    {
+#if VIVANTE_PROFILER_PROBE
+        if (Context->profiler.enableProbe)
+            gcoPROFILER_Begin(Context->phal, gcvCOUNTER_OP_NONE);
+#endif
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
+
+    gcoOS_GetTime(&Context->profiler.frameStartTimeusec);
+    gcoPROFILER_Begin(Context->phal, 0);
+
+    /* Return the status. */
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+gctINT
+clfEndProfiler(
+    cl_command_queue CommandQueue,
+    clsKernel_PTR Kernel
+    )
+{
+    gctINT status = gcvSTATUS_OK;
+    clsContext_PTR      Context;
+
+    gcmHEADER_ARG("CommandQueue=0x%x ", CommandQueue);
+
+    if (!CommandQueue)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
+    Context = CommandQueue->context;
+    if (!Context)
+    {
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
+    if(!Context->profiler.enable)
+    {
+#if VIVANTE_PROFILER_PROBE
+        if (Context->profiler.enableProbe)
+        {
+            gcoPROFILER_EndFrame(Context->phal);
+            gcoPROFILER_Flush(Context->phal);
+            Context->profiler.frameNumber++;
+        }
+#endif
+        gcmFOOTER_ARG("%d", status);
+        return status;
+    }
+    /* write frame number */
+    gcmWRITE_COUNTER(VPG_FRAME, Context->profiler.frameNumber);
+
+    /* write gpu counters */
+    gcoPROFILER_EndFrame(Context->phal);
+
+    /* write kernel info */
+    gcmWRITE_CONST(VPG_PROG);
+    gcmWRITE_COUNTER(VPC_PROGRAMHANDLE, gcmPTR2INT32(Kernel));
+    gcmWRITE_CONST(VPG_PVS);
+    gcmWRITE_CONST(VPC_PVSSOURCE);
+    gcmWRITE_STRING(Kernel->name);
+    gcmWRITE_CONST(VPG_END);
+    gcmWRITE_CONST(VPG_PPS);
+    /* TODO: need to find these data
+    gcmWRITE_COUNTER(VPC_PPSINSTRCOUNT, (tex + alu));
+    gcmWRITE_COUNTER(VPC_PPSALUINSTRCOUNT, alu);
+    gcmWRITE_COUNTER(VPC_PPSTEXINSTRCOUNT, tex);
+    gcmWRITE_COUNTER(VPC_PPSATTRIBCOUNT, (GetShaderAttributeCount(Shader)));
+    gcmWRITE_COUNTER(VPC_PPSUNIFORMCOUNT, (GetShaderUniformCount(Shader)));
+    gcmWRITE_COUNTER(VPC_PPSFUNCTIONCOUNT, (GetShaderFunctionCount(Shader))); */
+    if (Kernel->program && Kernel->program->source)
+    {
+        gcmWRITE_CONST(VPC_PPSSOURCE);
+        gcmWRITE_STRING(Kernel->program->source);
+    }
+    gcmWRITE_CONST(VPG_END);
+    gcmWRITE_CONST(VPG_END);
+
+    /* write frame time */
+    gcoOS_GetTime(&Context->profiler.frameEndTimeusec);
+    gcmWRITE_CONST(VPG_TIME);
+    gcmWRITE_COUNTER(VPC_ELAPSETIME, (gctINT32) (Context->profiler.frameEndTimeusec
+                     - Context->profiler.frameStartTimeusec));
+    gcmWRITE_CONST(VPG_END);
+
+    gcmWRITE_CONST(VPG_END);
+
+    gcoPROFILER_Flush(Context->phal);
+    gcmPRINT("VPC_KERNELNAME: %s\n", Kernel->name);
+    gcmPRINT("VPC_ELAPSETIME: %d\n", (gctINT32) (Context->profiler.frameEndTimeusec
+                     - Context->profiler.frameStartTimeusec));
+    gcmPRINT("*********\n");
+    Context->profiler.frameNumber++;
+
+    /* Return the status. */
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
 
 /*****************************************************************************\
 |*                          OpenCL Context API                               *|
@@ -126,6 +500,9 @@ clCreateContext(
 #if cldTUNING
     context->sortRects       = gcvFALSE;
 #endif
+#if VIVANTE_PROFILER
+    context->phal            = gcvNULL;
+#endif
 
     /* Create a reference count object and set it to 1. */
     clmONERROR(gcoOS_AtomConstruct(gcvNULL, &context->referenceCount),
@@ -225,9 +602,13 @@ clCreateContext(
     gcmFOOTER_ARG("0x%x *ErrcodeRet=%d",
                   context, gcmOPT_VALUE(ErrcodeRet));
 
+#if VIVANTE_PROFILER
+    clfInitializeProfiler(context);
+#endif
+
 #if !gcdFPGA_BUILD
     gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
-    if((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
+    if((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
     {
         gcoHAL_SetTimeOut(gcvNULL, 1200*gcdGPU_TIMEOUT);
     }
@@ -305,7 +686,37 @@ clCreateContextFromType(
 
     clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 0, gcvNULL, gcvNULL);
 
-    context = clCreateContext(Properties, platform->numDevices, &platform->devices, PfnNotify, UserData, &status);
+    if (platform->numDevices == 1)
+    {
+        context = clCreateContext(Properties, platform->numDevices, &platform->devices, PfnNotify, UserData, &status);
+    }
+    else
+    {
+        gctPOINTER      pointer = gcvNULL;
+        cl_device_id*           devices = gcvNULL;
+        int i;
+        /* Allocate device array. */
+        status = gcoOS_Allocate(gcvNULL, sizeof(cl_device_id*) * platform->numDevices, &pointer);
+        if (gcmIS_ERROR(status))
+        {
+            gcmUSER_DEBUG_ERROR_MSG(
+                "OCL-002016: (clCreateContextFromType) cannot allocate memory for devices.\n");
+            clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+        }
+        devices = (cl_device_id*) pointer;
+        for( i = 0; i < (gctINT)platform->numDevices; i++)
+        {
+            devices[i] = &platform->devices[i];
+        }
+
+        context = clCreateContext(Properties, platform->numDevices, devices, PfnNotify, UserData, &status);
+
+        if(pointer)
+        {
+            gcoOS_Free(gcvNULL, pointer);
+            pointer = gcvNULL;
+        }
+    }
 
 OnError:
     if (ErrcodeRet)
@@ -366,6 +777,11 @@ clReleaseContext(
 
     if (oldReference == 1)
     {
+#if VIVANTE_PROFILER
+        /* Destroy the profiler. */
+        clfDestroyProfiler(Context);
+#endif
+
         /* Send signal to stop event list worker thread. */
         gcmONERROR(gcoCL_SetSignal(Context->eventListWorkerStopSignal));
 
@@ -424,7 +840,7 @@ clReleaseContext(
     }
 
     gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
-    if((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
+    if((chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
     {
         gcoHAL_SetTimeOut(gcvNULL, gcdGPU_TIMEOUT);
     }

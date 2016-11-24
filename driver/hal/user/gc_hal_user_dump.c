@@ -484,7 +484,7 @@ gcoDUMP_DumpData(
     gceSTATUS status;
     gcsDUMP_DATA header;
 
-    gcmHEADER_ARG("Dump=0x%x Type=%d Address=%x ByteCount=%d Data=0x%x",
+    gcmHEADER_ARG("Dump=0x%x Type=%d Address=%x ByteCount=%zu Data=0x%x",
                     Dump, Type, Address, ByteCount, Data);
 
     /* Verify the arguments. */
@@ -566,7 +566,7 @@ gcoDUMP_AddSurface(
     gcsDUMP_SURFACE surface;
 
     gcmHEADER_ARG("Dump=0x%x Width=%d Height=%d PixelFormat=%d Address=%x "
-                  "ByteCount=%d",
+                  "ByteCount=%zu",
                   Dump, Width, Height, PixelFormat, Address, ByteCount);
 
     /* Verify the arguments. */
@@ -755,6 +755,7 @@ gcfDump(
                                      Message, args));
     gcmARGUMENTS_END(args);
 
+    ioctl.ignoreTLS   = gcvFALSE;
     ioctl.command     = gcvHAL_DEBUG;
     ioctl.u.Debug.set = gcvFALSE;
 #if gcdDUMP

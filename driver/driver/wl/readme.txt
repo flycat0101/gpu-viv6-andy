@@ -96,31 +96,10 @@ This will create and install libwayland-server.so and libwayland-client.so.
 
 This build is performed on the host PC.
 
-Please build vivante driver with the next:
-(No wayland option)
-export ROOTFS=<Set this to rootfs directory>
-export ROOTFS_USR=$ROOTFS/usr
-export ROOTFS_DIR=$ROOTFS/usr
-export EGL_API_FB=1
-export EGL_API_DRI=0
-export USE_VDK=0
-export VIVANTE_NO_VG=1
-
-After finishing the building, do the next:
-The step above is only to generate libgal for building the next.
-Please go to <project_directory>/driver/wl
-please do the next at the same TERM as the one for building the driver above, otherwise there will lack environment variables
-make -f gcmakefile.linux
-make -f gcmakefile.linux install
-
-
 Please build a directory named wayland-viv under $WLD/include
 and copy <project_directory>/driver/wl/gc_wayland_protocol.h and wayland-viv-client-protocol.h and wayland-viv-server-protocol.h   $WLD/include/wayland-viv
-and copy <project_directory>/build/sdk/drivers/libgc_wayland_protocol**   $WLD/lib
 
-
-Then rebuild vivante driver with the next:
-(The user should use this built driver to run weston and Apps)
+Please build vivante driver with the next:
 
 export ROOTFS=<Set this to rootfs directo>
 export ROOTFS_USR=$ROOTFS/usr
@@ -135,7 +114,6 @@ export VIVANTE_NO_VG=1
 
 With these settings run the build script to create driver binaries for Wayland-based driver.
 
-After the building is done, please copy <project_directory>/build/sdk/drivers/libwayland-viv**  $WLD/lib
 
 5.3. BUILDING WESTON AND SAMPLE APPLICATIONS
 

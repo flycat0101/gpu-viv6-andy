@@ -19,6 +19,8 @@
  */
 #define LOG_NDEBUG 1
 
+#define ANDROID_DUMMY (31415926)
+
 #include <cutils/log.h>
 
 #include <pixelflinger/format.h>
@@ -46,6 +48,10 @@
 
 #include <gc_gralloc_priv.h>
 #include <errno.h>
+
+#if gcdENABLE_VG
+#  include <gc_hal_engine_vg.h>
+#endif
 
 typedef struct ANativeWindow *       PlatformWindowType;
 typedef struct egl_native_pixmap_t * PlatformPixmapType;
@@ -1781,7 +1787,7 @@ _PostWindowBackBufferFence(
 {
     PlatformWindowType win = Surface->hwnd;
     android_native_buffer_t * buffer;
-    gctSYNC_POINT syncPoint;
+    gctSIGNAL signal;
     int fenceFd = -1;
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
@@ -1801,10 +1807,36 @@ _PostWindowBackBufferFence(
     do
     {
         gceSTATUS status;
-        gcsHAL_INTERFACE iface;
+#if gcdENABLE_VG
+        gcsTASK_SIGNAL_PTR task;
+#endif
+#if gcdENABLE_3D && gcdENABLE_VG
+        gceHARDWARE_TYPE hwType = gcvHARDWARE_3D;
+
+        gcoHAL_GetHardwareType(gcvNULL, &hwType);
+
+        if (hwType == gcvHARDWARE_VG)
+#endif
+        {
+#if gcdENABLE_VG
+            if (gcmIS_ERROR(gcoHAL_ReserveTask(gcvNULL,
+#if gcdGC355_PROFILER
+                                               gcvNULL,
+                                               0,0,0,
+#   endif
+                                               gcvBLOCK_PIXEL,
+                                               1,
+                                               gcmSIZEOF(gcsTASK_SIGNAL),
+                                               (gctPOINTER *) &task)))
+            {
+                gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
+                break;
+            }
+#endif
+        }
 
         /* Create sync point. */
-        status = gcoOS_CreateSyncPoint(gcvNULL, &syncPoint);
+        status = gcoOS_CreateSignal(gcvNULL, gcvTRUE, &signal);
 
         if (gcmIS_ERROR(status))
         {
@@ -1813,7 +1845,7 @@ _PostWindowBackBufferFence(
         }
 
         /* Create native fence. */
-        status = gcoOS_CreateNativeFence(gcvNULL, syncPoint, &fenceFd);
+        status = gcoOS_CreateNativeFence(gcvNULL, signal, &fenceFd);
 
         if (gcmIS_ERROR(status))
         {
@@ -1821,18 +1853,39 @@ _PostWindowBackBufferFence(
             break;
         }
 
-        /* Submit the sync point. */
-        iface.command               = gcvHAL_SYNC_POINT;
-        iface.u.SyncPoint.command   = gcvSYNC_POINT_SIGNAL;
-        iface.u.SyncPoint.syncPoint = gcmPTR_TO_UINT64(syncPoint);
-        iface.u.Signal.fromWhere    = gcvKERNEL_PIXEL;
+#if gcdENABLE_3D && gcdENABLE_VG
+        if (hwType == gcvHARDWARE_VG)
+#endif
+        {
+#if gcdENABLE_VG
+            task->id     = gcvTASK_SIGNAL;
+            task->signal = signal;
+#endif
+        }
+#if gcdENABLE_3D && gcdENABLE_VG
+        else
+#endif
+        {
+#if gcdENABLE_3D
+            gcsHAL_INTERFACE iface;
 
-        /* Send event. */
-        gcoHAL_ScheduleEvent(gcvNULL, &iface);
+            /* Submit the sync point. */
+            iface.command            = gcvHAL_SIGNAL;
+            iface.u.Signal.signal    = gcmPTR_TO_UINT64(signal);
+            iface.u.Signal.auxSignal = 0;
+            iface.u.Signal.process   = gcmPTR_TO_UINT64(Display->process);
+            iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
+
+            /* Send event. */
+            gcoHAL_ScheduleEvent(gcvNULL, &iface);
+#endif
+        }
+
+        /* Commit commands. */
         gcoHAL_Commit(gcvNULL, gcvFALSE);
 
         /* Now destroy the sync point. */
-        gcmVERIFY_OK(gcoOS_DestroySyncPoint(gcvNULL, syncPoint));
+        gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, signal));
     }
     while (gcvFALSE);
 

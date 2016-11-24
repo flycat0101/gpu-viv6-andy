@@ -22,9 +22,9 @@
 
 gcSL_FORMAT
 slConvDataTypeToFormat(
-sloCOMPILER Compiler,
-gcSHADER_TYPE DataType
-);
+    sloCOMPILER Compiler,
+    gcSHADER_TYPE DataType
+    );
 
 gctUINT
 gcGetDataTypeSize(
@@ -457,25 +457,6 @@ slGetUniformSamplerIndex(
     IN sloCOMPILER Compiler,
     IN gcUNIFORM UniformSampler,
     OUT gctREG_INDEX * Index
-    );
-
-gceSTATUS
-slNewOutput(
-    IN sloCOMPILER Compiler,
-    IN gctUINT LineNo,
-    IN gctUINT StringNo,
-    IN gctCONST_STRING Name,
-    IN gcSHADER_TYPE DataType,
-    IN gcSHADER_PRECISION Precision,
-    IN gctBOOL IsArray,
-    IN gctUINT Length,
-    IN gctREG_INDEX TempRegIndex,
-    IN gctINT FieldIndex,
-    IN gctBOOL IsInvariant,
-    IN gctBOOL IsPrecise,
-    IN gcSHADER_SHADERMODE ShaderMode,
-    IN gceLAYOUT_QUALIFIER LayoutQual,
-    OUT gcOUTPUT* Output
     );
 
 gceSTATUS

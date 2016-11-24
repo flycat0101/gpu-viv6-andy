@@ -73,47 +73,6 @@ GLvoid __eglFree(GLvoid *ptr)
     gcoOS_Free(gcvNULL, ptr);
 }
 
-static void __eglDestroyThreadArea(void *thrArea)
-{
-    __GLthreadPriv *esThrArea = thrArea;
-
-    /* Destroy 3d blit state */
-    if (esThrArea->p3DBlitState)
-    {
-        esThrArea->destroy3DBlitState(esThrArea->p3DBlitState);
-        esThrArea->p3DBlitState = gcvNULL;
-    }
-
-    __eglFree(esThrArea);
-
-    return;
-}
-
-
-__GLthreadPriv* __eglGetThreadEsPrivData(void* thrData)
-{
-    VEGLThreadData eglThreadData = (VEGLThreadData)thrData;
-    __GLthreadPriv *esThreadData = gcvNULL;
-
-    /* Return if the esPrivate was already allocated
-    */
-    if (eglThreadData->esPrivate)
-    {
-        esThreadData = (__GLthreadPriv *)eglThreadData->esPrivate;
-        return esThreadData;
-    }
-
-    esThreadData = (__GLthreadPriv*)__eglCalloc(1, sizeof(__GLthreadPriv));
-    if (!esThreadData)
-    {
-        return gcvNULL;
-    }
-
-    eglThreadData->esPrivate = esThreadData;
-    eglThreadData->destroyESPrivate = __eglDestroyThreadArea;
-
-    return esThreadData;
-}
 
 
 #if defined(_WINDOWS)
@@ -193,15 +152,7 @@ void __eglDestruct(void)
 #error "Unsupported compiler version for TLS"
 #endif
 
-static void* veglCreateContext_es3(
-    void *thrData,
-#if gcdGC355_PROFILER
-    gctUINT64 appStartTime,
-    gctFILE apiTimeFile,
-#endif
-    gctINT ClientVersion,
-    VEGLimports *Imports,
-    gctPOINTER SharedContext)
+static void* veglCreateContext_es3(void *thrData, gctINT ClientVersion, VEGLimports *Imports, gctPOINTER SharedContext)
 {
     __GLcontext *gc = __glCreateContext((GLint)ClientVersion, Imports, SharedContext);
 
@@ -348,7 +299,7 @@ veglCreateImageRenderbuffer_es3(void * Context, gctUINT renderbuffer,
 }
 
 
-static EGLBoolean veglSwapBuffer_es3(EGLDisplay Dpy,
+static EGLBoolean veglSwapBuffers_es3(EGLDisplay Dpy,
                                      EGLSurface Draw,
                                      gcfEGL_DO_SWAPBUFFER Callback)
 {
@@ -358,23 +309,13 @@ static EGLBoolean veglSwapBuffer_es3(EGLDisplay Dpy,
     return EGL_TRUE;
 }
 
-static void veglSyncImage_es3(GLvoid *pCtxPriv)
-{
-    __GLcontext *gc = (__GLcontext*)pCtxPriv;
-
-    (*gc->dp.syncImage)(gc);
-}
-
-static EGLenum
-veglBindTexImage_es3(
-    void * Surface,
-    EGLenum Format,
-    EGLBoolean Mipmap,
-    EGLint Level,
-    EGLint Width,
-    EGLint Height,
-    void ** Binder
-    )
+static EGLenum veglBindTexImage_es3(void * Surface,
+                                    EGLenum Format,
+                                    EGLBoolean Mipmap,
+                                    EGLint Level,
+                                    EGLint Width,
+                                    EGLint Height,
+                                    void ** Binder)
 {
     EGLenum error = EGL_BAD_ACCESS;
 
@@ -413,6 +354,20 @@ veglBindTexImage_es3(
     return error;
 }
 
+static gctBOOL veglProfiler_es3(void * Profiler, gctUINT32 Enum, gctHANDLE Value)
+{
+#if VIVANTE_PROFILER
+    return __glProfiler(Profiler, Enum, Value);
+#else
+    return gcvFALSE;
+#endif
+}
+
+static EGL_PROC veglGetProcAddr_es3(const char *procname)
+{
+    return (EGL_PROC)__glGetProcAddr(procname);
+}
+
 
 /* Dispatch table. */
 veglDISPATCH GLESv2_DISPATCH_TABLE =
@@ -423,30 +378,16 @@ veglDISPATCH GLESv2_DISPATCH_TABLE =
     /* loseCurrent              */  veglLoseCurrent_es3,
     /* setDrawable              */  veglSetDrawable_es3,
     /* flushContext             */  veglFlushContext_es3,
-
     /* flush                    */  veglFlush_es3,
     /* finish                   */  veglFinish_es3,
-
-    /* setBuffer                */  gcvNULL,
     /* getClientBuffer          */  gcvNULL,
-
     /* createImageTexture       */  veglCreateImageTexture_es3,
     /* createImageRenderbuffer  */  veglCreateImageRenderbuffer_es3,
     /* createImageParentImage   */  gcvNULL,
     /* bindTexImage             */  veglBindTexImage_es3,
-
-#if VIVANTE_PROFILER
-    /* profiler                 */  __glProfiler,
-#else
-    /* profiler                 */  gcvNULL,
-#endif
-    /* getProcAddr              */  __glGetProcAddr,
-
+    /* profiler                 */  veglProfiler_es3,
+    /* getProcAddr              */  veglGetProcAddr_es3,
+    /* swapBuffers              */  veglSwapBuffers_es3,
     /* queryHWVG                */  gcvNULL,
-    /* renderThread             */  gcvNULL,
-    /* swapBuffer               */  veglSwapBuffer_es3,
     /* resolveVG                */  gcvNULL,
-
-   /* syncImage                 */  veglSyncImage_es3,
 };
-

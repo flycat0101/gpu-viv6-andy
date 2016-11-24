@@ -346,7 +346,8 @@ gceSTATUS glfUsingVarying(
 
 static gceSTATUS _Set_uTexCoord(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLint i;
@@ -446,7 +447,11 @@ static gceSTATUS _LoadUniforms(
     )
 {
     gceSTATUS status;
-    gctUINT i, uniformCount;
+    gctUINT i, uniformCount, uboCount;
+    GLubyte*  ubPtr = gcvNULL;
+    gctUINT32 physical = 0;
+    gcUNIFORM ubUniform = gcvNULL;
+
     gcmHEADER_ARG("Context=0x%x ShaderControl=0x%x", Context, ShaderControl);
 
     /* Query the number of attributes. */
@@ -454,6 +459,68 @@ static gceSTATUS _LoadUniforms(
         ShaderControl->shader,
         &uniformCount
         ));
+
+    gcmONERROR(gcSHADER_GetUniformBlockCount(
+        ShaderControl->shader,
+        &uboCount
+        ));
+
+    if (ShaderControl->logicalAddress && !Context->programDirty)
+    {
+        ubPtr = ShaderControl->logicalAddress;
+    }
+    /*todo: now we just only have default ubo uniform*/
+    else if (uboCount == 1 && Context->programDirty)
+    {
+        gcsUNIFORM_BLOCK uniformBlock;
+
+        gcmONERROR(gcSHADER_GetUniformBlock(ShaderControl->shader, 0, &uniformBlock));
+
+        if (!uniformBlock || GetUBBlockIndex(uniformBlock) == -1)
+        {
+            gcmONERROR(gcvSTATUS_INVALID_DATA);
+        }
+
+        gcSHADER_GetUniform(ShaderControl->shader, GetUBIndex(uniformBlock), &ubUniform);
+
+        /* Skip inactive uniform blocks */
+        gcmASSERT(!isUniformInactive(ubUniform));
+
+        if (GetUBBlockSize(uniformBlock) != ShaderControl->dataSize)
+        {
+            /* reallocated bufObj */
+            if (ShaderControl->halBufObj != gcvNULL)
+            {
+                gcmVERIFY_OK(gcoBUFOBJ_Destroy(ShaderControl->halBufObj));
+                ShaderControl->halBufObj = gcvNULL;
+            }
+
+            gcmONERROR(gcoBUFOBJ_Construct(gcvNULL, gcvBUFOBJ_TYPE_GENERIC_BUFFER, &ShaderControl->halBufObj));
+
+            gcmONERROR(gcoBUFOBJ_Upload(ShaderControl->halBufObj, gcvNULL, 0, GetUBBlockSize(uniformBlock), gcvBUFOBJ_USAGE_STATIC_READ));
+
+            ShaderControl->dataSize = GetUBBlockSize(uniformBlock);
+
+        }
+
+        gcoBUFOBJ_FastLock(ShaderControl->halBufObj, &physical, (gctPOINTER *)&ubPtr);
+
+        /* this is DUBO uniform */
+        gcUNIFORM_SetValue_Ex(ubUniform, 1, Context->currProgram->hints, (gctINT *)&physical);
+
+        ShaderControl->logicalAddress = (gctPOINTER)ubPtr;
+    }
+
+    /* Mark defaultUBO will be used by this draw */
+    if (ubPtr)
+    {
+#if gcdSYNC
+        if (ShaderControl->halBufObj)
+        {
+            gcoBUFOBJ_WaitFence(ShaderControl->halBufObj, gcvFENCE_TYPE_WRITE);
+        }
+#endif
+    }
 
     /* Iterate though the attributes. */
     for (i = 0; i < uniformCount; i++)
@@ -468,7 +535,7 @@ static gceSTATUS _LoadUniforms(
             (FlushALL || *(wrap->dirty)) &&
             !isUniformInactive(wrap->uniform))
         {
-            gcmONERROR((*wrap->set) (Context, wrap->uniform));
+            gcmONERROR((*wrap->set) (Context, wrap->uniform, ubPtr));
 
             *(wrap->dirty) = gcvFALSE;
         }

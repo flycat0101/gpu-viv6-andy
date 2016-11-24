@@ -398,7 +398,7 @@ _isSourceHasIndexedAssigment(
 
 /* for source in Code's SourceNo (0 or 1), check if it is a loadtime constant */
 static gctBOOL
-_isLoadtimeConastant(
+_isLoadtimeConstant(
        IN gcOPTIMIZER          Optimizer,
        IN gcOPT_CODE           Code,
        IN gctINT               SourceNo,
@@ -447,6 +447,12 @@ _isLoadtimeConastant(
         ||  isUniformUBOAddress(uniform)
            )
         {
+            if (isUniformTransfromFeedbackState(uniform) ||
+                isUniformTransfromFeedbackBuffer(uniform))
+            {
+                return gcvFALSE;
+            }
+
             /* check if it is indexed and index is LTC */
             if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED)
             {
@@ -478,7 +484,7 @@ _isLoadtimeConastant(
     }
 
     return sourceIsLTC;
-} /* _isLoadtimeConastant */
+} /* _isLoadtimeConstant */
 
 static gceSTATUS
 _RemoveTempComponentsFromLTCTempRegList(
@@ -719,9 +725,9 @@ _addInstructionToLTCList(
         }
 
         if ((gcmSL_SOURCE_GET(inst->source0, Type) != gcSL_NONE
-             && !_isLoadtimeConastant(Optimizer, code, 0, &Optimizer->theLTCTempRegList)) ||
+             && !_isLoadtimeConstant(Optimizer, code, 0, &Optimizer->theLTCTempRegList)) ||
             (gcmSL_SOURCE_GET(inst->source1, Type) != gcSL_NONE
-             && !_isLoadtimeConastant(Optimizer, code, 1, &Optimizer->theLTCTempRegList)) ||
+             && !_isLoadtimeConstant(Optimizer, code, 1, &Optimizer->theLTCTempRegList)) ||
              (opcode != inst->opcode && opcode != gcSL_CONV))
         {
             /* the source0/source1 is not loadtime constant, or inst->opcode has rounding mode
@@ -765,6 +771,7 @@ _addInstructionToLTCList(
         case gcSL_ATAN:
         case gcSL_I2F:
         case gcSL_F2I:
+        case gcSL_NOT_BITWISE:
             /* One-operand computational instruction. */
         case gcSL_ADD:
         case gcSL_SUB:
@@ -784,6 +791,10 @@ _addInstructionToLTCList(
         case gcSL_SET:
 
         case gcSL_LOAD:
+
+        case gcSL_AND_BITWISE:
+        case gcSL_OR_BITWISE:
+        case gcSL_XOR_BITWISE:
             /* Two-operand computational instruction. */
 
             /* all these operators are supported in
@@ -883,10 +894,6 @@ _addInstructionToLTCList(
         case gcSL_FWIDTH:
         case gcSL_DIV:
         case gcSL_MOD:
-        case gcSL_AND_BITWISE:
-        case gcSL_OR_BITWISE:
-        case gcSL_XOR_BITWISE:
-        case gcSL_NOT_BITWISE:
         case gcSL_ROTATE:
         case gcSL_BITSEL:
         case gcSL_LEADZERO:
@@ -2564,6 +2571,9 @@ _LTCEvaluateUnioperator(
                     iDst = (gctINT32)gcmCLAMP(i64temp, iMin, iMax);
                 }
                 break;
+            case gcSL_NOT_BITWISE:
+                iDst = ~i0;
+                break;
             default:
                 gcmASSERT(gcvFALSE);
                 break;
@@ -2615,6 +2625,9 @@ _LTCEvaluateUnioperator(
                     gctUINT64 u64temp = (gctUINT64)(v.f32);
                     uDst = (gctUINT32)gcmCLAMP(u64temp, uMin, uMax);
                 }
+                break;
+            case gcSL_NOT_BITWISE:
+                uDst = ~u0;
                 break;
             default:
                 gcmASSERT(gcvFALSE);
@@ -3243,6 +3256,15 @@ _LTCEvaluateBioperator(
                 gcmASSERT(i1 >= 0);
                 iDst = i0 >> i1;
                 break;
+            case gcSL_AND_BITWISE:
+                iDst = i0 & i1;
+                break;
+            case gcSL_OR_BITWISE:
+                iDst = i0 | i1;
+                break;
+            case gcSL_XOR_BITWISE:
+                iDst = i0 ^ i1;
+                break;
             default:
                 gcmASSERT(gcvFALSE);
                 break;
@@ -3283,6 +3305,15 @@ _LTCEvaluateBioperator(
                 break;
             case gcSL_RSHIFT:
                 iDst = i0 >> i1;
+                break;
+            case gcSL_AND_BITWISE:
+                iDst = i0 & i1;
+                break;
+            case gcSL_OR_BITWISE:
+                iDst = i0 | i1;
+                break;
+            case gcSL_XOR_BITWISE:
+                iDst = i0 ^ i1;
                 break;
             default:
                 gcmASSERT(gcvFALSE);
@@ -3806,6 +3837,7 @@ gceSTATUS gcOPT_DoConstantFoldingLTC(
     case gcSL_ATAN:
     case gcSL_I2F:
     case gcSL_F2I:
+    case gcSL_NOT_BITWISE:
         /* One-operand computational instruction. */
         gcmONERROR(_LTCEvaluateUnioperator(opcode,
             source0Value,
@@ -3830,6 +3862,9 @@ gceSTATUS gcOPT_DoConstantFoldingLTC(
     case gcSL_RSHIFT:
     case gcSL_MOD:
     case gcSL_CONV:
+    case gcSL_AND_BITWISE:
+    case gcSL_OR_BITWISE:
+    case gcSL_XOR_BITWISE:
         /* Two-operand computational instruction. */
         gcmONERROR(_LTCEvaluateBioperator(instruction,
             source0Value,
@@ -3866,10 +3901,6 @@ gceSTATUS gcOPT_DoConstantFoldingLTC(
     case gcSL_DSY:
     case gcSL_FWIDTH:
     case gcSL_DIV:
-    case gcSL_AND_BITWISE:
-    case gcSL_OR_BITWISE:
-    case gcSL_XOR_BITWISE:
-    case gcSL_NOT_BITWISE:
     case gcSL_ROTATE:
     case gcSL_BITSEL:
     case gcSL_LEADZERO:

@@ -68,7 +68,7 @@ VIR_Lower_SetZeroOrSamllestPositive(
     IN VIR_Operand        *Opnd
     )
 {
-    if(VIR_Lower_HasHalt4(Context, Inst) || VIR_Shader_GetKind(Context->shader) == VIR_SHADER_CL)
+    if(VIR_Lower_HasHalt4(Context, Inst) || VIR_Shader_IsCL(Context->shader))
     {
         VIR_Lower_SetZero(Context, Inst, Opnd);
     }
@@ -88,6 +88,22 @@ VIR_Lower_SetIntZero(
 {
     VIR_ScalarConstVal imm0;
     imm0.iValue = 0;
+
+    VIR_Operand_SetImmediate(Opnd,
+        VIR_TYPE_INT32,
+        imm0);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetIntHighBitOne(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_ScalarConstVal imm0;
+    imm0.iValue = 0x80000000;
 
     VIR_Operand_SetImmediate(Opnd,
         VIR_TYPE_INT32,
@@ -181,6 +197,65 @@ VIR_Lower_SetIntMinusOne(
 }
 
 gctBOOL
+VIR_Lower_SetEnableX(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_X);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_Y);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableZ(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_Z);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableW(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_W);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableXYZWAndSymType(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Symbol*     symbol = VIR_Operand_GetSymbol(Opnd);
+    VIR_TypeId      typeId =  VIR_GetTypeComponentType(VIR_Operand_GetType(Opnd));
+
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_XYZW);
+    VIR_Symbol_SetTypeId(symbol, VIR_TypeId_ComposeNonOpaqueType(typeId, 4, 1));
+    return gcvTRUE;
+}
+
+gctBOOL
 VIR_Lower_SetSwizzleX(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -198,7 +273,7 @@ VIR_Lower_AdjustCoordSwizzleForShadow(
     IN VIR_Operand        *Opnd
     )
 {
-    VIR_TypeId samplerType = Inst->src[0]->_opndType;
+    VIR_TypeId samplerType = VIR_Operand_GetType(VIR_Inst_GetSource(Inst, 0));
     VIR_Swizzle newSwizzle = VIR_Operand_GetSwizzle(Opnd);
 
     switch (samplerType)
@@ -267,7 +342,7 @@ VIR_Lower_SetSwizzleByCoord(
 {
     VIR_Instruction * prevInst = VIR_Inst_GetPrev(Inst);
 
-    VIR_Operand_SetSwizzle(Opnd, VIR_Enable_2_Swizzle(VIR_Operand_GetEnable(prevInst->dest)));
+    VIR_Operand_SetSwizzle(Opnd, VIR_Enable_2_Swizzle(VIR_Operand_GetEnable(VIR_Inst_GetDest(prevInst))));
     return gcvTRUE;
 }
 
@@ -379,7 +454,6 @@ VIR_Lower_GetBaseType(
     return baseType;
 }
 
-
 gctBOOL
 VIR_Lower_IsIntOpcode(
     IN VIR_PatternContext *Context,
@@ -388,9 +462,9 @@ VIR_Lower_IsIntOpcode(
 {
     VIR_PrimitiveTypeId baseType;
 
-    gcmASSERT(Inst->dest != gcvNULL);
+    gcmASSERT(VIR_Inst_GetDest(Inst) != gcvNULL);
 
-    baseType = VIR_Lower_GetBaseType(Context->shader, Inst->dest);
+    baseType = VIR_Lower_GetBaseType(Context->shader, VIR_Inst_GetDest(Inst));
 
     if(VIR_GetTypeFlag(baseType) & VIR_TYFLAG_ISINTEGER)
     {
@@ -406,7 +480,7 @@ VIR_Lower_IsDstFloat(
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId   typeId   = VIR_Operand_GetType(Inst->dest);
+    VIR_TypeId   typeId   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
 
     gcmASSERT(typeId < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
@@ -419,7 +493,7 @@ VIR_Lower_IsDstInt32(
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId   ty   = VIR_Operand_GetType(Inst->dest);
+    VIR_TypeId   ty   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
     gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
     return VIR_GetTypeComponentType(ty) == VIR_TYPE_INT32
@@ -432,7 +506,7 @@ VIR_Lower_IsDstInt16(
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId   ty   = VIR_Operand_GetType(Inst->dest);
+    VIR_TypeId   ty   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
     gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
     return VIR_GetTypeComponentType(ty) == VIR_TYPE_INT16
@@ -445,7 +519,7 @@ VIR_Lower_IsDstSigned(
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId   ty   = VIR_Operand_GetType(Inst->dest);
+    VIR_TypeId   ty   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
     gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
     return VIR_GetTypeComponentType(ty) == VIR_TYPE_INT32
@@ -459,7 +533,7 @@ VIR_Lower_IsDstUnsigned(
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId   ty   = VIR_Operand_GetType(Inst->dest);
+    VIR_TypeId   ty   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
     gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
     return VIR_GetTypeComponentType(ty) == VIR_TYPE_UINT32
@@ -476,9 +550,9 @@ VIR_Lower_IsFloatOpcode(
 {
     VIR_PrimitiveTypeId baseType;
 
-    gcmASSERT(Inst->dest != gcvNULL);
+    gcmASSERT(VIR_Inst_GetDest(Inst) != gcvNULL);
 
-    baseType = VIR_Lower_GetBaseType(Context->shader, Inst->dest);
+    baseType = VIR_Lower_GetBaseType(Context->shader, VIR_Inst_GetDest(Inst));
 
     if(VIR_GetTypeFlag(baseType) & VIR_TYFLAG_ISFLOAT)
     {
@@ -495,7 +569,7 @@ VIR_Lower_IsNotCLShader(
     IN VIR_Instruction    *Inst
     )
 {
-    return (Context->shader->shaderKind != VIR_SHADER_CL);
+    return !VIR_Shader_IsCL(Context->shader);
 }
 
 gctBOOL
@@ -513,7 +587,7 @@ VIR_Lower_enableFullNewLinker(
     IN VIR_Instruction    *Inst
     )
 {
-    return ENABLE_FULL_NEW_LINKER;
+    return gcUseFullNewLinker(Context->vscContext->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2);
 }
 
 gctBOOL
@@ -522,7 +596,44 @@ VIR_Lower_disableFullNewLinker(
     IN VIR_Instruction    *Inst
     )
 {
-    return !ENABLE_FULL_NEW_LINKER;
+    return !gcUseFullNewLinker(Context->vscContext->pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2);
+}
+
+gctBOOL
+VIR_Lower_HasTexldModifier(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_OpCode             opcode = VIR_Inst_GetOpcode(Inst);
+    VIR_Operand           *opnd = gcvNULL;
+    VIR_ParmPassing       *parmOpnd = gcvNULL;
+
+    /* For intrinsic, the texld modifier should be saved in 3nd param.*/
+    if (opcode == VIR_OP_INTRINSIC)
+    {
+        opnd = VIR_Inst_GetSource(Inst, 1);
+        parmOpnd = VIR_Operand_GetParameters(opnd);
+
+        if (parmOpnd->argNum > 2)
+        {
+            opnd = parmOpnd->args[2];
+            if (VIR_Operand_GetOpKind(opnd) == VIR_OPND_TEXLDPARM)
+            {
+                return gcvTRUE;
+            }
+        }
+    }
+    /* For other, the modifier should be saved in 3nd source. */
+    else if (VIR_Inst_GetSrcNum(Inst) > 2)
+    {
+        opnd = VIR_Inst_GetSource(Inst, 2);
+        if (VIR_Operand_GetOpKind(opnd) == VIR_OPND_TEXLDPARM)
+        {
+            return gcvTRUE;
+        }
+    }
+    return gcvFALSE;
 }
 
 static gctBOOL
@@ -689,5 +800,89 @@ VIR_Lower_SetOpndFloat(
 {
     _SetValueType0(Context, Opnd, VIR_TYPE_FLOAT32);
     return gcvTRUE;
+}
+
+static gctBOOL
+_SetEnableBaseOnSrc(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *SrcOpnd,
+    OUT VIR_Operand       *Opnd)
+{
+    VIR_TypeId            opndTypeId;
+    VIR_Enable            enable = VIR_ENABLE_NONE;
+    VIR_ParmPassing       *parm;
+
+    if (VIR_Operand_isParameters(SrcOpnd))
+    {
+        parm = VIR_Operand_GetParameters(SrcOpnd);
+        gcmASSERT(parm->argNum >= 1);
+
+        opndTypeId = VIR_Operand_GetType(parm->args[0]);
+    }
+    else
+    {
+        opndTypeId = VIR_Operand_GetType(SrcOpnd);
+    }
+
+    /* Change enable and type. */
+    switch(VIR_GetTypeComponents(opndTypeId))
+    {
+    case 1:
+        enable = VIR_ENABLE_X;
+        break;
+    case 2:
+        enable = VIR_ENABLE_XY;
+        break;
+    case 3:
+        enable = VIR_ENABLE_XYZ;
+        break;
+    case 4:
+        enable = VIR_ENABLE_XYZW;
+        break;
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
+
+    VIR_Operand_SetEnable(Opnd, enable);
+    VIR_Operand_SetType(Opnd, opndTypeId);
+
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableBaseOnSrc0(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+    _SetEnableBaseOnSrc(Context, Inst, VIR_Inst_GetSource(Inst, 0), Opnd);
+
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetEnableBaseOnSrc1(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd)
+{
+    _SetEnableBaseOnSrc(Context, Inst, VIR_Inst_GetSource(Inst, 1), Opnd);
+
+    return gcvTRUE;
+}
+
+VIR_TexModifier_Flag
+VIR_Lower_GetTexModifierKind(
+    IN VIR_Operand        *Opnd
+    )
+{
+    if (Opnd == gcvNULL || VIR_Operand_GetOpKind(Opnd) != VIR_OPND_TEXLDPARM)
+    {
+        return VIR_TMFLAG_NONE;
+    }
+
+    return (VIR_TexModifier_Flag)VIR_Operand_GetTexModifierFlag(Opnd);
 }
 

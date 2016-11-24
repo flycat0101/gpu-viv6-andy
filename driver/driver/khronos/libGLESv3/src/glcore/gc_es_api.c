@@ -2443,7 +2443,7 @@ GLvoid GL_APIENTRY __GLES_APINAME(TexDirectInvalidateVIV)(GLenum target)
 GLvoid GL_APIENTRY __GLES_APINAME(TexDirectVIVMap)(GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** logical, const GLuint * physical)
 {
     __GL_GET_CONTEXT;
-    gc->apiDispatchTable.TexDirectVIVMap(gc, target, width, height, format, logical, physical, GL_FALSE);
+    gc->apiDispatchTable.TexDirectVIVMap(gc, target, width, height, format, logical, physical);
 }
 
 GLvoid GL_APIENTRY __GLES_APINAME(TexDirectTiledMapVIV)(GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** logical, const GLuint * physical)
@@ -2540,4 +2540,10 @@ GLvoid GL_APIENTRY __GLES_APINAME(GetnUniformivEXT)(GLuint program, GLint locati
     gc->apiDispatchTable.GetnUniformiv(gc, program, location, bufSize, params);
 }
 #endif
+
+GLvoid GL_APIENTRY __GLES_APINAME(GetTexImage)( GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels)
+{
+    __GL_GET_CONTEXT;
+    gc->apiDispatchTable.GetTexImage(gc, target, level, format, type, pixels);
+}
 

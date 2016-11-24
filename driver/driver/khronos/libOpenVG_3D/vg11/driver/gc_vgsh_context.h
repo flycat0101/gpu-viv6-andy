@@ -156,6 +156,11 @@ struct _VGContext
     VGint   image_max_height;
     VGint   image_max_pixels;
     VGint   image_max_bytes;
+
+    /* GLSL Compiler. */
+    gctHANDLE                   dll;
+    gctGLSLInitCompiler         pfInitCompiler;
+    gctGLSLFinalizeCompiler     pfFinalizeCompiler;
 };
 
 

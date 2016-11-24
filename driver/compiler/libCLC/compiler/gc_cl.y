@@ -1221,7 +1221,6 @@ jump_statement :
 /* Grammar Note: No 'goto'. Gotos are not supported. */
 
 translation_unit :
-	external_declaration
 	| translation_unit external_declaration
 	;
 

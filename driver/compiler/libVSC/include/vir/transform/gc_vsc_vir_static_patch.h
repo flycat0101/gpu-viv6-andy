@@ -18,7 +18,8 @@
 
 BEGIN_EXTERN_C()
 
-VSC_ErrCode vscVIR_PerformSpecialHwPatches(VIR_Shader* pShader);
+VSC_ErrCode vscVIR_PerformSpecialHwPatches(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_PerformSpecialHwPatches);
 
 END_EXTERN_C()
 

@@ -116,160 +116,6 @@ struct _FBPixmap
 #endif
 };
 
-/* Structure that defined keyboard mapping. */
-typedef struct _keyMap
-{
-    /* Normal key. */
-    platKeyCode normal;
-
-    /* Extended key. */
-    platKeyCode extended;
-}
-keyMap;
-
-static keyMap keys[] =
-{
-    /* 00 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 01 */ { KEYCODE_ESCAPE,          KEYCODE_UNKNOWN     },
-    /* 02 */ { KEYCODE_1,               KEYCODE_UNKNOWN     },
-    /* 03 */ { KEYCODE_2,               KEYCODE_UNKNOWN     },
-    /* 04 */ { KEYCODE_3,               KEYCODE_UNKNOWN     },
-    /* 05 */ { KEYCODE_4,               KEYCODE_UNKNOWN     },
-    /* 06 */ { KEYCODE_5,               KEYCODE_UNKNOWN     },
-    /* 07 */ { KEYCODE_6,               KEYCODE_UNKNOWN     },
-    /* 08 */ { KEYCODE_7,               KEYCODE_UNKNOWN     },
-    /* 09 */ { KEYCODE_8,               KEYCODE_UNKNOWN     },
-    /* 0A */ { KEYCODE_9,               KEYCODE_UNKNOWN     },
-    /* 0B */ { KEYCODE_0,               KEYCODE_UNKNOWN     },
-    /* 0C */ { KEYCODE_HYPHEN,          KEYCODE_UNKNOWN     },
-    /* 0D */ { KEYCODE_EQUAL,           KEYCODE_UNKNOWN     },
-    /* 0E */ { KEYCODE_BACKSPACE,       KEYCODE_UNKNOWN     },
-    /* 0F */ { KEYCODE_TAB,             KEYCODE_UNKNOWN     },
-    /* 10 */ { KEYCODE_Q,               KEYCODE_UNKNOWN     },
-    /* 11 */ { KEYCODE_W,               KEYCODE_UNKNOWN     },
-    /* 12 */ { KEYCODE_E,               KEYCODE_UNKNOWN     },
-    /* 13 */ { KEYCODE_R,               KEYCODE_UNKNOWN     },
-    /* 14 */ { KEYCODE_T,               KEYCODE_UNKNOWN     },
-    /* 15 */ { KEYCODE_Y,               KEYCODE_UNKNOWN     },
-    /* 16 */ { KEYCODE_U,               KEYCODE_UNKNOWN     },
-    /* 17 */ { KEYCODE_I,               KEYCODE_UNKNOWN     },
-    /* 18 */ { KEYCODE_O,               KEYCODE_UNKNOWN     },
-    /* 19 */ { KEYCODE_P,               KEYCODE_UNKNOWN     },
-    /* 1A */ { KEYCODE_LBRACKET,        KEYCODE_UNKNOWN     },
-    /* 1B */ { KEYCODE_RBRACKET,        KEYCODE_UNKNOWN     },
-    /* 1C */ { KEYCODE_ENTER,           KEYCODE_PAD_ENTER   },
-    /* 1D */ { KEYCODE_LCTRL,           KEYCODE_RCTRL       },
-    /* 1E */ { KEYCODE_A,               KEYCODE_UNKNOWN     },
-    /* 1F */ { KEYCODE_S,               KEYCODE_UNKNOWN     },
-    /* 20 */ { KEYCODE_D,               KEYCODE_UNKNOWN     },
-    /* 21 */ { KEYCODE_F,               KEYCODE_UNKNOWN     },
-    /* 22 */ { KEYCODE_G,               KEYCODE_UNKNOWN     },
-    /* 23 */ { KEYCODE_H,               KEYCODE_UNKNOWN     },
-    /* 24 */ { KEYCODE_J,               KEYCODE_UNKNOWN     },
-    /* 25 */ { KEYCODE_K,               KEYCODE_UNKNOWN     },
-    /* 26 */ { KEYCODE_L,               KEYCODE_UNKNOWN     },
-    /* 27 */ { KEYCODE_SEMICOLON,       KEYCODE_UNKNOWN     },
-    /* 28 */ { KEYCODE_SINGLEQUOTE,     KEYCODE_UNKNOWN     },
-    /* 29 */ { KEYCODE_BACKQUOTE,       KEYCODE_UNKNOWN     },
-    /* 2A */ { KEYCODE_LSHIFT,          KEYCODE_UNKNOWN     },
-    /* 2B */ { KEYCODE_BACKSLASH,       KEYCODE_UNKNOWN     },
-    /* 2C */ { KEYCODE_Z,               KEYCODE_UNKNOWN     },
-    /* 2D */ { KEYCODE_X,               KEYCODE_UNKNOWN     },
-    /* 2E */ { KEYCODE_C,               KEYCODE_UNKNOWN     },
-    /* 2F */ { KEYCODE_V,               KEYCODE_UNKNOWN     },
-    /* 30 */ { KEYCODE_B,               KEYCODE_UNKNOWN     },
-    /* 31 */ { KEYCODE_N,               KEYCODE_UNKNOWN     },
-    /* 32 */ { KEYCODE_M,               KEYCODE_UNKNOWN     },
-    /* 33 */ { KEYCODE_COMMA,           KEYCODE_UNKNOWN     },
-    /* 34 */ { KEYCODE_PERIOD,          KEYCODE_UNKNOWN     },
-    /* 35 */ { KEYCODE_SLASH,           KEYCODE_PAD_SLASH   },
-    /* 36 */ { KEYCODE_RSHIFT,          KEYCODE_UNKNOWN     },
-    /* 37 */ { KEYCODE_PAD_ASTERISK,    KEYCODE_PRNTSCRN    },
-    /* 38 */ { KEYCODE_LALT,            KEYCODE_RALT        },
-    /* 39 */ { KEYCODE_SPACE,           KEYCODE_UNKNOWN     },
-    /* 3A */ { KEYCODE_CAPSLOCK,        KEYCODE_UNKNOWN     },
-    /* 3B */ { KEYCODE_F1,              KEYCODE_UNKNOWN     },
-    /* 3C */ { KEYCODE_F2,              KEYCODE_UNKNOWN     },
-    /* 3D */ { KEYCODE_F3,              KEYCODE_UNKNOWN     },
-    /* 3E */ { KEYCODE_F4,              KEYCODE_UNKNOWN     },
-    /* 3F */ { KEYCODE_F5,              KEYCODE_UNKNOWN     },
-    /* 40 */ { KEYCODE_F6,              KEYCODE_UNKNOWN     },
-    /* 41 */ { KEYCODE_F7,              KEYCODE_UNKNOWN     },
-    /* 42 */ { KEYCODE_F8,              KEYCODE_UNKNOWN     },
-    /* 43 */ { KEYCODE_F9,              KEYCODE_UNKNOWN     },
-    /* 44 */ { KEYCODE_F10,             KEYCODE_UNKNOWN     },
-    /* 45 */ { KEYCODE_NUMLOCK,         KEYCODE_UNKNOWN     },
-    /* 46 */ { KEYCODE_SCROLLLOCK,      KEYCODE_BREAK       },
-    /* 47 */ { KEYCODE_PAD_7,           KEYCODE_HOME        },
-    /* 48 */ { KEYCODE_PAD_8,           KEYCODE_UP          },
-    /* 49 */ { KEYCODE_PAD_9,           KEYCODE_PGUP        },
-    /* 4A */ { KEYCODE_PAD_HYPHEN,      KEYCODE_UNKNOWN     },
-    /* 4B */ { KEYCODE_PAD_4,           KEYCODE_LEFT        },
-    /* 4C */ { KEYCODE_PAD_5,           KEYCODE_UNKNOWN     },
-    /* 4D */ { KEYCODE_PAD_6,           KEYCODE_RIGHT       },
-    /* 4E */ { KEYCODE_PAD_PLUS,        KEYCODE_UNKNOWN     },
-    /* 4F */ { KEYCODE_PAD_1,           KEYCODE_END         },
-    /* 50 */ { KEYCODE_PAD_2,           KEYCODE_DOWN        },
-    /* 51 */ { KEYCODE_PAD_3,           KEYCODE_PGDN        },
-    /* 52 */ { KEYCODE_PAD_0,           KEYCODE_INSERT      },
-    /* 53 */ { KEYCODE_PAD_PERIOD,      KEYCODE_DELETE      },
-    /* 54 */ { KEYCODE_SYSRQ,           KEYCODE_UNKNOWN     },
-    /* 55 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 56 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 57 */ { KEYCODE_F11,             KEYCODE_UNKNOWN     },
-    /* 58 */ { KEYCODE_F12,             KEYCODE_UNKNOWN     },
-    /* 59 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 5A */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 5B */ { KEYCODE_UNKNOWN,         KEYCODE_LWINDOW     },
-    /* 5C */ { KEYCODE_UNKNOWN,         KEYCODE_RWINDOW     },
-    /* 5D */ { KEYCODE_UNKNOWN,         KEYCODE_MENU        },
-    /* 5E */ { KEYCODE_UNKNOWN,         KEYCODE_POWER       },
-    /* 5F */ { KEYCODE_UNKNOWN,         KEYCODE_SLEEP       },
-    /* 60 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 61 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 62 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 63 */ { KEYCODE_UNKNOWN,         KEYCODE_WAKE        },
-    /* 64 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 65 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* For TTC Board only */
-    /* 66 */ { KEYCODE_HOME,            KEYCODE_UNKNOWN     },
-    /* 67 */ { KEYCODE_UP,              KEYCODE_UNKNOWN     },
-    /* 68 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 69 */ { KEYCODE_LEFT,            KEYCODE_UNKNOWN     },
-    /* 6A */ { KEYCODE_RIGHT,           KEYCODE_UNKNOWN     },
-    /* 6B */ { KEYCODE_ESCAPE,          KEYCODE_UNKNOWN     },
-    /* 6C */ { KEYCODE_DOWN,            KEYCODE_UNKNOWN     },
-    /* 6D */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 6E */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 6F */ { KEYCODE_BACKSPACE,       KEYCODE_UNKNOWN     },
-    /* End */
-    /* 70 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 71 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 72 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 73 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 74 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 75 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 76 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 77 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 78 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 79 */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 7A */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 7B */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 7C */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 7D */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 7E */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-    /* 7F */ { KEYCODE_UNKNOWN,         KEYCODE_UNKNOWN     },
-};
-
-gctCHAR            name[11];
-gctINT             uid, gid;
-gctINT             active;
-gctINT             file = -1;
-gctINT             mice = -1;
-gctINT             mode;
-struct termios  tty;
-gctINT ignore;
-
 static struct _FBDisplay *displayStack = gcvNULL;
 static pthread_mutex_t displayMutex;
 
@@ -309,41 +155,6 @@ destroyDisplays(
     pthread_mutex_unlock(&displayMutex);
 }
 
-static void
-hideWindow(
-    void
-    )
-{
-    if (file > 0)
-    {
-        ioctl(file, KDSKBMODE, mode);
-        tcsetattr(file, TCSANOW, &tty);
-
-        ioctl(file, KDSETMODE, KD_TEXT);
-
-        if (active != -1)
-        {
-            ioctl(file, VT_ACTIVATE, active);
-            ioctl(file, VT_WAITACTIVE, active);
-        }
-
-        close(file);
-
-        if (uid != -1)
-        {
-            ignore = chown(name, uid, gid);
-        }
-    }
-
-    if (mice > 0)
-    {
-        close(mice);
-    }
-
-    file    = -1;
-    mice    = -1;
-}
-
 static void sig_handler(gctINT signo)
 {
     static int hookSEGV = 0;
@@ -354,7 +165,6 @@ static void sig_handler(gctINT signo)
         hookSEGV = 1;
     }
 
-    hideWindow();
     destroyDisplays();
 
     signal(SIGINT,  SIG_DFL);
@@ -372,7 +182,6 @@ halOnExit(
     signal(SIGQUIT, SIG_DFL);
     signal(SIGTERM, SIG_DFL);
 
-    hideWindow();
     destroyDisplays();
 }
 
@@ -1447,8 +1256,6 @@ fbdev_DestroyWindow(
     IN PlatformWindowType Window
     )
 {
-    hideWindow();
-
     if (Window != gcvNULL)
     {
         free(Window);
@@ -1564,6 +1371,7 @@ fbdev_CreatePixmap(
     struct _FBPixmap* pixmap;
 #if gcdUSE_PIXMAP_SURFACE
     gceSURF_FORMAT format;
+    gctPOINTER memAddr[3] = {gcvNULL};
 #endif
     gcmHEADER_ARG("Display=0x%x Width=%d Height=%d BitsPerPixel=%d", Display, Width, Height, BitsPerPixel);
 
@@ -1577,6 +1385,7 @@ fbdev_CreatePixmap(
     do
     {
         pixmap = (struct _FBPixmap*) malloc(sizeof (struct _FBPixmap));
+        memset(pixmap, 0, sizeof (struct _FBPixmap));
 
         if (pixmap == gcvNULL)
         {
@@ -1608,8 +1417,9 @@ fbdev_CreatePixmap(
         gcmERR_BREAK(gcoSURF_Lock(
             pixmap->surface,
                     &pixmap->gpu,
-            &pixmap->bits
+            memAddr
         ));
+        pixmap->bits = memAddr[0];
 
         gcmERR_BREAK(gcoSURF_GetSize(
             pixmap->surface,
@@ -1774,190 +1584,6 @@ fbdev_DrawPixmap(
 }
 
 gceSTATUS
-fbdev_ShowWindow(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window
-    )
-{
-    int i, fd = 0, term = -1;
-    struct stat st;
-    struct vt_stat v;
-    struct termios t;
-    char *p;
-    struct _FBDisplay* display;
-
-    if (file != -1)
-    {
-        return gcvSTATUS_OK;
-    }
-
-    /* Get shortcut. */
-    display = (struct _FBDisplay*)Display;
-
-    if (display == NULL)
-    {
-        return gcvSTATUS_INVALID_ARGUMENT;
-    }
-
-    p = getenv("USE_INPUT_DEVICE");
-
-    if (p != NULL)
-    {
-        if (atoi(p) == 0)
-        {
-            /* Force disabled input device. */
-            return gcvSTATUS_OK;
-        }
-    }
-#if !gcdUSE_INPUT_DEVICE
-    else
-    {
-        /* Use default option. */
-        return gcvSTATUS_OK;
-    }
-#endif
-
-    do
-    {
-        pthread_mutex_lock(&displayMutex);
-
-        /* Try opening the TTY device. */
-        for (i = 0; i < 2; ++i)
-        {
-            static const char * dev[] = { "/dev/tty0", "/dev/vc/0" };
-
-            /* Open the TTY device. */
-            fd = open(dev[i], O_RDWR, 0);
-
-            if (fd >= 0)
-            {
-                /* Break on success. */
-                break;
-            }
-        }
-
-        if (fd < 0)
-        {
-            /* Break when TTY device cannot be opened. */
-            break;
-        }
-
-        if ((ioctl(fd, VT_OPENQRY, &term) < 0) || (term == -1))
-        {
-            break;
-        }
-
-        close(fd);
-        fd = -1;
-
-        for (i = 0; i < 2; ++i)
-        {
-            static const char * dev[] = { "/dev/tty%d", "/dev/vc/%d" };
-
-            sprintf(name, dev[i], term);
-            file = open(name, O_RDWR | O_NONBLOCK, 0);
-
-            if (file >= 0)
-            {
-                break;
-            }
-        }
-
-        if (file < 0)
-        {
-            break;
-        }
-
-        if (stat(name, &st) == 0)
-        {
-            uid = st.st_uid;
-            gid = st.st_gid;
-
-            ignore = chown(name, getuid(), getgid());
-        }
-        else
-        {
-            uid = -1;
-        }
-
-        if (ioctl(file, VT_GETSTATE, &v) >= 0)
-        {
-            active = v.v_active;
-        }
-
-        ioctl(file, VT_ACTIVATE, term);
-        ioctl(file, VT_WAITACTIVE, term);
-        ioctl(file, KDSETMODE, KD_GRAPHICS);
-
-        /* Put VSCREENINFO again since it may be affected by VT_ACTIVATE. */
-        if (ioctl(display->file, FBIOPUT_VSCREENINFO, &display->varInfo) >= 0)
-        {
-            ioctl(display->file, FBIOGET_VSCREENINFO, &(display->varInfo));
-
-            if (display->varInfo.yres_virtual !=
-                Display->alignedHeight * Display->multiBuffer)
-            {
-                /* Fallback to single buffer. */
-                Display->multiBuffer = 1;
-                Display->backBufferY = 0;
-            }
-        }
-        else
-        {   /* Fallback to single buffer. */
-            Display->multiBuffer = 1;
-            Display->backBufferY = 0;
-        }
-
-        ioctl(file, KDGKBMODE, &mode);
-        tcgetattr(file, &tty);
-
-        ioctl(file, KDSKBMODE, K_RAW);
-
-        t = tty;
-        t.c_iflag = (IGNPAR | IGNBRK) & (~PARMRK) & (~ISTRIP);
-        t.c_oflag = 0;
-        t.c_cflag = CREAD | CS8;
-        t.c_lflag = 0;
-        t.c_cc[VTIME] = 0;
-        t.c_cc[VMIN] = 1;
-        tcsetattr(file, TCSANOW, &t);
-
-        if (mice == -1)
-        {
-            mice = open("/dev/input/mice", O_RDONLY | O_NONBLOCK, 0);
-        }
-
-        pthread_mutex_unlock(&displayMutex);
-        return gcvSTATUS_OK;
-    }
-    while (0);
-
-    if (fd >= 0)
-    {
-        close(fd);
-    }
-
-    pthread_mutex_unlock(&displayMutex);
-    return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-fbdev_HideWindow(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window
-    )
-{
-    if (file < 0)
-    {
-        return gcvSTATUS_OK;
-    }
-
-    hideWindow();
-
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS
 fbdev_SetWindowTitle(
     IN PlatformDisplayType Display,
     IN PlatformWindowType Window,
@@ -1974,108 +1600,6 @@ fbdev_CapturePointer(
     )
 {
     return gcvSTATUS_NOT_SUPPORTED;
-}
-
-gceSTATUS
-fbdev_GetEvent(
-    IN PlatformDisplayType Display,
-    IN PlatformWindowType Window,
-    OUT platEvent * Event
-    )
-{
-    static int prefix = 0;
-    unsigned char buffer;
-
-    signed char mouse[3];
-    static int x, y;
-    static char left, right, middle;
-
-    if ((Window == gcvNULL) || (Event == gcvNULL))
-    {
-        return gcvSTATUS_INVALID_ARGUMENT;
-    }
-
-    if (file >= 0)
-    {
-        while (read(file, &buffer, 1) == 1)
-        {
-            platKeyCode scancode;
-
-            if ((buffer == 0xE0) || (buffer == 0xE1))
-            {
-                prefix = buffer;
-                continue;
-            }
-
-            if (prefix)
-            {
-                scancode = keys[buffer & 0x7F].extended;
-                prefix = 0;
-            }
-            else
-            {
-                scancode = keys[buffer & 0x7F].normal;
-            }
-
-            if (scancode == KEYCODE_UNKNOWN)
-            {
-                continue;
-            }
-
-            Event->type              = EVENT_KEYBOARD;
-            Event->data.keyboard.scancode = scancode;
-            Event->data.keyboard.pressed  = (buffer < 0x80);
-            Event->data.keyboard.key      = (  (scancode < KEYCODE_SPACE)
-                || (scancode >= KEYCODE_F1)
-                )
-                ? 0
-                : (char) scancode;
-            return gcvSTATUS_OK;
-        }
-    }
-
-    if (mice >= 0)
-    {
-        if (read(mice, mouse, 3) == 3)
-        {
-            char l, m, r;
-
-            x += mouse[1];
-            y -= mouse[2];
-
-            /*
-            x = (x < 0) ? 0 : x;
-            x = (x > Window->display->width) ? Window->display->width : x;
-
-            y = (y < 0) ? 0 : y;
-            y = (y > Window->display->height) ? Window->display->height : y;
-            */
-
-            l = mouse[0] & 0x01;
-            r = mouse[0] & 0x02;
-            m = mouse[0] & 0x04;
-
-            if ((l ^ left) || (r ^ right) || (m ^ middle))
-            {
-                Event->type                 = EVENT_BUTTON;
-                Event->data.button.left     = left      = l;
-                Event->data.button.right    = right     = r;
-                Event->data.button.middle   = middle    = m;
-                Event->data.button.x        = x;
-                Event->data.button.y        = y;
-            }
-            else
-            {
-                Event->type                 = EVENT_POINTER;
-                Event->data.pointer.x       = x;
-                Event->data.pointer.y       = y;
-            }
-
-            return gcvSTATUS_OK;
-        }
-    }
-
-    return gcvSTATUS_NOT_FOUND;
 }
 
 gceSTATUS
@@ -2756,6 +2280,23 @@ _CreateWindowBuffers(
                 gcoOS_ZeroMemory(pointer, sizeof (struct eglNativeBuffer));
                 buffer = pointer;
 
+                /* Add into buffer list. */
+                if (Info->bufferList != gcvNULL)
+                {
+                    VEGLNativeBuffer prev = Info->bufferList->prev;
+
+                    buffer->prev = prev;
+                    buffer->next = Info->bufferList;
+
+                    prev->next = buffer;
+                    Info->bufferList->prev = buffer;
+                }
+                else
+                {
+                    buffer->prev = buffer->next = buffer;
+                    Info->bufferList = buffer;
+                }
+
                 /* Bytes offset to the buffer. */
                 offset = (gctUINT) (Info->stride * alignedHeight * i);
 
@@ -2813,23 +2354,6 @@ _CreateWindowBuffers(
                 buffer->origin.x = 0;
                 buffer->origin.y = alignedHeight * i;
 
-                /* Add into buffer list. */
-                if (Info->bufferList != gcvNULL)
-                {
-                    VEGLNativeBuffer prev = Info->bufferList->prev;
-
-                    buffer->prev = prev;
-                    buffer->next = Info->bufferList;
-
-                    prev->next = buffer;
-                    Info->bufferList->prev = buffer;
-                }
-                else
-                {
-                    buffer->prev = buffer->next = buffer;
-                    Info->bufferList = buffer;
-                }
-
                 gcmTRACE(gcvLEVEL_INFO,
                          "%s(%d): buffer[%d]: yoffset=%-4d physical=%x",
                          __FUNCTION__, __LINE__,
@@ -2862,23 +2386,6 @@ _CreateWindowBuffers(
             gcoOS_ZeroMemory(pointer, sizeof (struct eglNativeBuffer));
             buffer = pointer;
 
-            /* Construct temporary resolve surfaces. */
-            gcmONERROR(gcoSURF_Construct(gcvNULL,
-                                         Info->width,
-                                         Info->height, 1,
-                                         gcvSURF_BITMAP,
-                                         Info->format,
-                                         gcvPOOL_DEFAULT,
-                                         &buffer->surface));
-
-#if SYNC_TEMPORARY_RESOLVE_SURFACES
-            /* Create the buffer lock. */
-            gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvTRUE, &buffer->lock));
-
-            /* Set initial 'unlocked' state. */
-            gcmVERIFY_OK(gcoOS_Signal(gcvNULL, buffer->lock, gcvTRUE));
-#endif
-
             /* Add into buffer list. */
             if (Info->bufferList != gcvNULL)
             {
@@ -2895,6 +2402,23 @@ _CreateWindowBuffers(
                 buffer->prev = buffer->next = buffer;
                 Info->bufferList = buffer;
             }
+
+            /* Construct temporary resolve surfaces. */
+            gcmONERROR(gcoSURF_Construct(gcvNULL,
+                                         Info->width,
+                                         Info->height, 1,
+                                         gcvSURF_BITMAP,
+                                         Info->format,
+                                         gcvPOOL_DEFAULT,
+                                         &buffer->surface));
+
+#if SYNC_TEMPORARY_RESOLVE_SURFACES
+            /* Create the buffer lock. */
+            gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvTRUE, &buffer->lock));
+
+            /* Set initial 'unlocked' state. */
+            gcmVERIFY_OK(gcoOS_Signal(gcvNULL, buffer->lock, gcvTRUE));
+#endif
 
             gcmTRACE(gcvLEVEL_INFO,
                      "%s(%d): buffer[%d]: surface=%p",
@@ -4687,39 +4211,6 @@ fbGetWindowInfo(
     )
 {
     fbdev_GetWindowInfo(gcvNULL, (PlatformWindowType)Window, X, Y, Width, Height, BitsPerPixel, Offset);
-}
-
-void
-fbShowWindow(
-    void * Display,
-    void * Window
-    )
-{
-    fbdev_ShowWindow(Display, Window);
-}
-
-void
-fbHideWindow(
-    void * Display,
-    void * Window
-    )
-{
-    fbdev_HideWindow(Display, Window);
-}
-
-int
-fbGetEvent(
-    void * Display,
-    void * Window,
-    platEvent * Event
-    )
-{
-    if (gcmIS_SUCCESS(fbdev_GetEvent(Display, Window, Event)))
-    {
-        return 1;
-    }
-
-    return 0;
 }
 
 void

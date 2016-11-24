@@ -503,6 +503,9 @@ static gctCONST_STRING OpName[] =
     "gcSL_GET_SAMPLER_LMM",               /* 0x8D */
     "gcSL_GET_SAMPLER_LBS",               /* 0x8E */
     "gcSL_TEXLD_U",                       /* 0x8F */
+    "gcSL_PARAM_CHAIN",                   /* 0x90 */
+    "gcSL_INTRINSIC",                     /* 0x91 */
+    "gcSL_INTRINSIC_ST",                  /* 0x92 */
 };
 char _checkOpName_size[sizeof(OpName)/sizeof(OpName[0]) == gcSL_MAXOPCODE];
 
@@ -920,6 +923,25 @@ gcIsImageDataType(
     }
 }
 
+static
+void _DumpLastIR(gcSHADER Shader)
+{
+    gctUINT pc;
+    gcSL_INSTRUCTION code;
+
+    if (Shader->instrIndex == gcSHADER_OPCODE)
+    {
+        pc = Shader->lastInstruction - 1;
+    }
+    else
+    {
+        pc = Shader->lastInstruction;
+    }
+    code = Shader->code + pc;
+
+    dbg_dumpIR(code,pc);
+}
+
 gctBOOL
 gcIsAtomicDataType(
     IN gcSHADER_TYPE DataType
@@ -982,7 +1004,8 @@ gcIsScalarDataType(
     IN gcSHADER_TYPE DataType
     )
 {
-    switch (DataType) {
+    switch (DataType)
+    {
     case gcSHADER_FLOAT_X1:
     case gcSHADER_BOOLEAN_X1:
     case gcSHADER_INTEGER_X1:
@@ -1066,12 +1089,14 @@ gcIsFloatDataType(
     IN gcSHADER_TYPE DataType
     )
 {
-    if(gcIsMatrixDataType(DataType)) {
+    if(gcIsMatrixDataType(DataType))
+    {
          return gcvTRUE;
     }
-    else {
-        switch (DataType)
+    else
     {
+        switch (DataType)
+        {
         case gcSHADER_FLOAT_X1:
         case gcSHADER_FLOAT_X2:
         case gcSHADER_FLOAT_X3:
@@ -1173,7 +1198,8 @@ gcGetVectorSliceDataType(
     IN gctUINT8 Components
     )
 {
-    switch (DataType) {
+    switch (DataType)
+    {
     case gcSHADER_FLOAT_X2:
     case gcSHADER_FLOAT_X3:
     case gcSHADER_FLOAT_X4:
@@ -1564,13 +1590,16 @@ _AddAttributeWithLocation(
 
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "gcSHADER_AddAttributeWithLocation(Shader, \"%s\", %s, %d, %s);",
-                                  Name,
-                                  gcGetDataTypeName(Type),
-                                  Length,
-                                  (IsTexture)? "true" : "false"));
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                      slvDUMP_CODE_EMITTER,
+                                      "gcSHADER_AddAttributeWithLocation(Shader, \"%s\", %s, %d, %s);",
+                                      Name,
+                                      gcGetDataTypeName(Type),
+                                      Length,
+                                      (IsTexture)? "true" : "false"));
+    }
 
     status = gcSHADER_AddAttributeWithLocation(binary,
                                                Name,
@@ -1612,12 +1641,15 @@ _AddUniform(
 
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                      slvDUMP_CODE_EMITTER,
-                      "gcSHADER_AddUniformEx1(Shader, \"%s\", %s, %d);",
-                      Name,
-                      gcGetDataTypeName(UniformInfo->type),
-                      UniformInfo->arraySize));
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                          slvDUMP_CODE_EMITTER,
+                          "gcSHADER_AddUniformEx1(Shader, \"%s\", %s, %d);",
+                          Name,
+                          gcGetDataTypeName(UniformInfo->type),
+                          UniformInfo->arraySize));
+    }
 
     status = gcSHADER_AddUniformEx1(binary,
                                     Name,
@@ -1636,7 +1668,8 @@ _AddUniform(
                                     ThisUniformIndex,
                                     Uniform);
 
-    if (gcmIS_ERROR(status)) {
+    if (gcmIS_ERROR(status))
+    {
         gcmFOOTER();
         return status;
     }
@@ -1725,64 +1758,6 @@ _AddUniform(
 }
 
 static gceSTATUS
-_AddOutput(
-    IN sloCOMPILER Compiler,
-    IN gctCONST_STRING Name,
-    IN gcSHADER_TYPE Type,
-    IN gcSHADER_PRECISION Precision,
-    IN gctBOOL IsArray,
-    IN gctUINT Length,
-    IN gctREG_INDEX TempRegister,
-    IN gctINT FieldIndex,
-    IN gctBOOL IsInvariant,
-    IN gctBOOL IsPrecise,
-    IN gcSHADER_SHADERMODE ShaderMode,
-    IN gceLAYOUT_QUALIFIER LayoutQual,
-    OUT gcOUTPUT* Oupput
-    )
-{
-    gcSHADER    binary;
-    gceSTATUS   status;
-
-    gcmHEADER();
-
-    gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddOutputEx(Shader, \"%s\", %s, %d, %d);",
-                                      Name,
-                                      gcGetDataTypeName(Type),
-                                      Length,
-                                      TempRegister));
-
-    status = gcSHADER_AddOutputEx(binary,
-                                  Name,
-                                  Type,
-                                  Precision,
-                                  IsArray,
-                                  Length,
-                                  (gctUINT16) TempRegister,
-                                  FieldIndex,
-                                  IsInvariant,
-                                  IsPrecise,
-                                  ShaderMode,
-                                  Oupput);
-
-    if (gcmIS_ERROR(status))
-    {
-        gcmFOOTER();
-        return status;
-    }
-
-    status = gcOUTPUT_SetLayoutQualifier(*Oupput, LayoutQual);
-    SetShaderOutputBlends(binary, LayoutQual);
-
-    gcmFOOTER();
-    return status;
-}
-
-static gceSTATUS
 _AddOutputWithLocation(
     IN sloCOMPILER Compiler,
     IN gctCONST_STRING Name,
@@ -1808,13 +1783,16 @@ _AddOutputWithLocation(
 
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddOutputWithLocation(Shader, \"%s\", %s, %d, %d);",
-                                      Name,
-                                      gcGetDataTypeName(Type),
-                                      Length,
-                                      TempRegister));
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddOutputWithLocation(Shader, \"%s\", %s, %d, %d);",
+                                          Name,
+                                          gcGetDataTypeName(Type),
+                                          Length,
+                                          TempRegister));
+    }
 
     status = gcSHADER_AddOutputWithLocation(binary,
                                             Name,
@@ -1893,13 +1871,16 @@ _AddVariable(
 
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                slvDUMP_CODE_EMITTER,
-                "gcSHADER_AddVariableEx1(Shader, \"%s\", %s, %d, %d);",
-                Name,
-                gcGetDataTypeName(VarInfo->type),
-                VarInfo->arraySize,
-                TempRegister));
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                    slvDUMP_CODE_EMITTER,
+                    "gcSHADER_AddVariableEx1(Shader, \"%s\", %s, %d, %d);",
+                    Name,
+                    gcGetDataTypeName(VarInfo->type),
+                    VarInfo->arraySize,
+                    TempRegister));
+    }
 
     status = gcSHADER_AddVariableEx1(binary,
                                     Name,
@@ -1973,10 +1954,13 @@ _GetSampler(
 
     gcmASSERT(Uniform);
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "gcUNIFORM_GetSampler(\"%s\", Sampler);",
-                                  gcGetUniformName(Uniform)));
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                      slvDUMP_CODE_EMITTER,
+                                      "gcUNIFORM_GetSampler(\"%s\", Sampler);",
+                                      gcGetUniformName(Uniform)));
+    }
 
     status = gcUNIFORM_GetSampler(Uniform, Sampler);
 
@@ -2099,14 +2083,17 @@ _AddFunctionArgument(
 
     gcmHEADER();
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "gcFUNCTION_AddArgument(Function, %d, Variable, %d, gcSL_ENABLE_%s, %s, %s);",
-                                  TempIndex,
-                                  VariableIndex,
-                                  _GetEnableName(Enable, buf),
-                                  _GetQualifierName((gceINPUT_OUTPUT) Qualifier),
-                                  _GetPrecisionName((gcSHADER_PRECISION) Precision)));
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                      slvDUMP_CODE_EMITTER,
+                                      "gcFUNCTION_AddArgument(Function, %d, Variable, %d, gcSL_ENABLE_%s, %s, %s);",
+                                      TempIndex,
+                                      VariableIndex,
+                                      _GetEnableName(Enable, buf),
+                                      _GetQualifierName((gceINPUT_OUTPUT) Qualifier),
+                                      _GetPrecisionName((gcSHADER_PRECISION) Precision)));
+    }
 
     status = gcFUNCTION_AddArgument(Function, VariableIndex, (gctUINT16)TempIndex, Enable, Qualifier, Precision, IsPrecise);
 
@@ -2161,7 +2148,8 @@ gcSHADER_TYPE DataType
     gcSL_FORMAT format = gcSL_FLOAT;
 
 #if TREAT_ES20_INTEGER_AS_FLOAT
-    if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+    if (sloCOMPILER_IsHaltiVersion(Compiler))
+    {
 #endif
         switch (DataType) {
         case gcSHADER_FLOAT_X1:
@@ -2290,6 +2278,7 @@ _EmitOpcodeAndTargetFormatted(
     gceSTATUS status;
     gcSHADER binary;
     gctCHAR  buf[5];
+    gctUINT32 srcLoc;
 
     gcmHEADER();
 
@@ -2297,32 +2286,41 @@ _EmitOpcodeAndTargetFormatted(
 
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
+    srcLoc = GCSL_Build_SRC_LOC(LineNo, StringNo);
+
     if (!Target)
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddOpcode(Shader, %s);",
-                                      GetOpcodeName(Opcode)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddOpcode(Shader, %s);",
+                                          GetOpcodeName(Opcode)));
+        }
 
         status = gcSHADER_AddOpcode(binary,
                                     Opcode,
                                     0,
                                     gcSL_ENABLE_NONE,
                                     gcSL_FLOAT,
-                                    gcSHADER_PRECISION_DEFAULT);
+                                    gcSHADER_PRECISION_DEFAULT,
+                                    srcLoc);
     }
     else if (Target->indexMode == gcSL_NOT_INDEXED)
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddOpcodeIndexedWithPrecision(Shader, %s, %d, gcSL_ENABLE_%s, %s, %d, %s, %s);",
-                                      GetOpcodeName(Opcode),
-                                      Target->tempRegIndex,
-                                      _GetEnableName(Target->enable, buf),
-                                      _GetIndexModeName(gcSL_NOT_INDEXED),
-                                      0,
-                                      _GetFormatName(Format),
-                                      _GetPrecisionName(Target->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddOpcodeIndexedWithPrecision(Shader, %s, dst = r%d, gcSL_ENABLE_%s, %s, %d, %s, %s);",
+                                          GetOpcodeName(Opcode),
+                                          Target->tempRegIndex,
+                                          _GetEnableName(Target->enable, buf),
+                                          _GetIndexModeName(gcSL_NOT_INDEXED),
+                                          0,
+                                          _GetFormatName(Format),
+                                          _GetPrecisionName(Target->precision)));
+        }
 
         status = gcSHADER_AddOpcodeIndexedWithPrecision(binary,
                                                         Opcode,
@@ -2331,20 +2329,24 @@ _EmitOpcodeAndTargetFormatted(
                                                         gcSL_NOT_INDEXED,
                                                         0,
                                                         Format,
-                                                        Target->precision);
+                                                        Target->precision,
+                                                        srcLoc);
     }
     else
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddOpcodeIndexedWithPrecision(Shader, %s, %d, gcSL_ENABLE_%s, %s, %d, %s, %s);",
-                                      GetOpcodeName(Opcode),
-                                      Target->tempRegIndex,
-                                      _GetEnableName(Target->enable, buf),
-                                      _GetIndexModeName(Target->indexMode),
-                                      Target->indexRegIndex,
-                                      _GetFormatName(Format),
-                                      _GetPrecisionName(Target->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddOpcodeIndexedWithPrecision(Shader, %s, dst = r%d, gcSL_ENABLE_%s, %s, index = r%d, %s, %s);",
+                                          GetOpcodeName(Opcode),
+                                          Target->tempRegIndex,
+                                          _GetEnableName(Target->enable, buf),
+                                          _GetIndexModeName(Target->indexMode),
+                                          Target->indexRegIndex,
+                                          _GetFormatName(Format),
+                                          _GetPrecisionName(Target->precision)));
+        }
 
         status = gcSHADER_AddOpcodeIndexedWithPrecision(binary,
                                                         Opcode,
@@ -2353,7 +2355,8 @@ _EmitOpcodeAndTargetFormatted(
                                                         Target->indexMode,
                                                         (gctUINT16) Target->indexRegIndex,
                                                         Format,
-                                                        Target->precision);
+                                                        Target->precision,
+                                                        srcLoc);
     }
 
    if (gcmIS_ERROR(status))
@@ -2385,10 +2388,13 @@ _EmitOpcodeAndTargetFormatted(
     gceSTATUS status;
     gcSHADER binary;
     gctCHAR  buf[5];
+    gctUINT32 srcLoc;
 
     gcmHEADER();
 
     gcmASSERT(Target);
+
+    srcLoc = GCSL_Build_SRC_LOC(LineNo, StringNo);
 
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
     if (Target->indexMode == gcSL_NOT_INDEXED)
@@ -2405,7 +2411,8 @@ _EmitOpcodeAndTargetFormatted(
                                     Opcode,
                                     (gctUINT16) Target->tempRegIndex,
                                     Target->enable,
-                                    Format);
+                                    Format,
+                                    srcLoc);
    }
    else
    {
@@ -2425,7 +2432,8 @@ _EmitOpcodeAndTargetFormatted(
                                            Target->enable,
                                            Target->indexMode,
                                            (gctUINT16)Target->indexRegIndex,
-                                           Format);
+                                           Format,
+                                           srcLoc);
    }
 
    if (gcmIS_ERROR(status))
@@ -2458,34 +2466,45 @@ _EmitOpcodeConditional(
 {
     gceSTATUS    status;
     gcSHADER    binary;
+    gctUINT32   srcLoc;
 
     gcmHEADER();
 
+    srcLoc = GCSL_Build_SRC_LOC(LineNo, StringNo);
+
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
-    if(Source) {
+    if(Source)
+    {
         gcSL_FORMAT format;
 
         format = slConvDataTypeToFormat(Compiler, Source->dataType);
 
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddOpcodeConditionalFormatted(Shader, %s, %s, %s, %d);",
-                                      GetOpcodeName(Opcode),
-                                      _GetConditionName(Condition),
-                                      _GetFormatName(format),
-                                      Label));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddOpcodeConditionalFormatted(Shader, %s, %s, %s, label = l%d);",
+                                          GetOpcodeName(Opcode),
+                                          _GetConditionName(Condition),
+                                          _GetFormatName(format),
+                                          Label));
+        }
 
-        status = gcSHADER_AddOpcodeConditionalFormatted(binary, Opcode, Condition, format, Label);
+        status = gcSHADER_AddOpcodeConditionalFormatted(binary, Opcode, Condition, format, Label, srcLoc);
     }
-    else {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddOpcodeConditional(Shader, %s, %s, %d);",
-                                      GetOpcodeName(Opcode),
-                                      _GetConditionName(Condition),
-                                      Label));
+    else
+    {
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddOpcodeConditional(Shader, %s, %s, label = l%d);",
+                                          GetOpcodeName(Opcode),
+                                          _GetConditionName(Condition),
+                                          Label));
+        }
 
-        status = gcSHADER_AddOpcodeConditional(binary, Opcode, Condition, Label);
+        status = gcSHADER_AddOpcodeConditional(binary, Opcode, Condition, Label, srcLoc);
     }
 
     if (gcmIS_ERROR(status))
@@ -2527,15 +2546,18 @@ _EmitSourceTemp(
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
     if (IsSamplerIndex)
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceSamplerIndexedFormattedwithPrecision(Shader,"
-                                      " gcSL_SWIZZLE_%s, %s, %d, %s, %s);",
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      _GetIndexModeName(Source->u.sourceReg.indexMode),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetFormatName(format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceSamplerIndexedFormattedwithPrecision(Shader,"
+                                          " gcSL_SWIZZLE_%s, %s, src=r%d, %s, %s);",
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          _GetIndexModeName(Source->u.sourceReg.indexMode),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetFormatName(format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceSamplerIndexedFormattedWithPrecision(binary,
                                                                         gcSL_SWIZZLE_XYZW,
@@ -2546,16 +2568,19 @@ _EmitSourceTemp(
     }
     else if (Source->u.sourceReg.indexMode == gcSL_NOT_INDEXED)
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceIndexedWithPrecision(Shader, %s, %d, gcSL_SWIZZLE_%s, %s, %d, %s, %s);",
-                                      _GetTypeName(gcSL_TEMP),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      _GetIndexModeName(gcSL_NOT_INDEXED),
-                                      0,
-                                      _GetFormatName(format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceIndexedWithPrecision(Shader, %s, src = r%d, gcSL_SWIZZLE_%s, %s, %d, %s, %s);",
+                                          _GetTypeName(gcSL_TEMP),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          _GetIndexModeName(gcSL_NOT_INDEXED),
+                                          0,
+                                          _GetFormatName(format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceIndexedWithPrecision(binary,
                                                         gcSL_TEMP,
@@ -2568,16 +2593,19 @@ _EmitSourceTemp(
     }
     else
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceIndexedWithPrecision(Shader, %s, %d, gcSL_SWIZZLE_%s, %s, %d, %s, %s);",
-                                      _GetTypeName(gcSL_TEMP),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      _GetIndexModeName(Source->u.sourceReg.indexMode),
-                                      Source->u.sourceReg.indexRegIndex,
-                                      _GetFormatName(format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceIndexedWithPrecision(Shader, %s, src = r%d, gcSL_SWIZZLE_%s, %s, %d, %s, %s);",
+                                          _GetTypeName(gcSL_TEMP),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          _GetIndexModeName(Source->u.sourceReg.indexMode),
+                                          Source->u.sourceReg.indexRegIndex,
+                                          _GetFormatName(format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceIndexedWithPrecision(binary,
                                                         gcSL_TEMP,
@@ -2627,15 +2655,18 @@ _EmitSourceTempWithFormat(
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
     if (IsSamplerIndex)
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceSamplerIndexedFormattedwithPrecision(Shader,"
-                                      " gcSL_SWIZZLE_%s, %s, %d, %s, %s);",
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      _GetIndexModeName(Source->u.sourceReg.indexMode),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetFormatName(Format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceSamplerIndexedFormattedwithPrecision(Shader,"
+                                          " gcSL_SWIZZLE_%s, %s, src = r%d, %s, %s);",
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          _GetIndexModeName(Source->u.sourceReg.indexMode),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetFormatName(Format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceSamplerIndexedFormattedWithPrecision(binary,
                                                                         gcSL_SWIZZLE_XYZW,
@@ -2646,16 +2677,19 @@ _EmitSourceTempWithFormat(
     }
     else if (Source->u.sourceReg.indexMode == gcSL_NOT_INDEXED)
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceIndexedWithPrecision(Shader, %s, %d, gcSL_SWIZZLE_%s, %s, %d, %s, %s);",
-                                      _GetTypeName(gcSL_TEMP),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      _GetIndexModeName(gcSL_NOT_INDEXED),
-                                      0,
-                                      _GetFormatName(Format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceIndexedWithPrecision(Shader, %s, src = r%d, gcSL_SWIZZLE_%s, %s, %d, %s, %s);",
+                                          _GetTypeName(gcSL_TEMP),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          _GetIndexModeName(gcSL_NOT_INDEXED),
+                                          0,
+                                          _GetFormatName(Format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceIndexedWithPrecision(binary,
                                                         gcSL_TEMP,
@@ -2668,16 +2702,19 @@ _EmitSourceTempWithFormat(
     }
     else
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceIndexedWithPrecision(Shader, %s, %d, gcSL_SWIZZLE_%s, %s, %d, %s, %s);",
-                                      _GetTypeName(gcSL_TEMP),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      _GetIndexModeName(Source->u.sourceReg.indexMode),
-                                      Source->u.sourceReg.indexRegIndex,
-                                      _GetFormatName(Format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceIndexedWithPrecision(Shader, %s, src = r%d, gcSL_SWIZZLE_%s, %s, index = r%d, %s, %s);",
+                                          _GetTypeName(gcSL_TEMP),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          _GetIndexModeName(Source->u.sourceReg.indexMode),
+                                          Source->u.sourceReg.indexRegIndex,
+                                          _GetFormatName(Format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceIndexedWithPrecision(binary,
                                                         gcSL_TEMP,
@@ -2725,18 +2762,20 @@ _EmitSourceAttributeWithFormat(
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
     if (Source->u.sourceReg.indexMode == gcSL_NOT_INDEXED)
     {
-
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(Shader, \"%s\","
-                                      " gcSL_SWIZZLE_%s, %d, %s, %s);",
-                                      gcGetAttributeName(binary, Source->u.sourceReg.u.attribute),
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetIndexModeName(gcSL_NOT_INDEXED),
-                                      0,
-                                      _GetFormatName(Format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(Shader, \"%s\","
+                                          " gcSL_SWIZZLE_%s, src = r%d, %s, %s);",
+                                          gcGetAttributeName(binary, Source->u.sourceReg.u.attribute),
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetIndexModeName(gcSL_NOT_INDEXED),
+                                          0,
+                                          _GetFormatName(Format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(binary,
                                                                           Source->u.sourceReg.u.attribute,
@@ -2749,17 +2788,20 @@ _EmitSourceAttributeWithFormat(
     }
     else
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(Shader, \"%s\","
-                                      " gcSL_SWIZZLE_%s, %d, %s, %d, %s, %s);",
-                                      gcGetAttributeName(binary, Source->u.sourceReg.u.attribute),
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetIndexModeName(Source->u.sourceReg.indexMode),
-                                      Source->u.sourceReg.indexRegIndex,
-                                      _GetFormatName(Format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(Shader, \"%s\","
+                                          " gcSL_SWIZZLE_%s, src = r%d, %s, index = r%d, %s, %s);",
+                                          gcGetAttributeName(binary, Source->u.sourceReg.u.attribute),
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetIndexModeName(Source->u.sourceReg.indexMode),
+                                          Source->u.sourceReg.indexRegIndex,
+                                          _GetFormatName(Format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(binary,
                                                                           Source->u.sourceReg.u.attribute,
@@ -2808,18 +2850,20 @@ _EmitSourceAttribute(
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
     if (Source->u.sourceReg.indexMode == gcSL_NOT_INDEXED)
     {
-
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(Shader, \"%s\","
-                                      " gcSL_SWIZZLE_%s, %d, %s, %s);",
-                                      gcGetAttributeName(binary, Source->u.sourceReg.u.attribute),
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetIndexModeName(gcSL_NOT_INDEXED),
-                                      0,
-                                      _GetFormatName(format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(Shader, \"%s\","
+                                          " gcSL_SWIZZLE_%s, src = r%d, %s, %s);",
+                                          gcGetAttributeName(binary, Source->u.sourceReg.u.attribute),
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetIndexModeName(gcSL_NOT_INDEXED),
+                                          0,
+                                          _GetFormatName(format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(binary,
                                                                           Source->u.sourceReg.u.attribute,
@@ -2832,17 +2876,20 @@ _EmitSourceAttribute(
     }
     else
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(Shader, \"%s\","
-                                      " gcSL_SWIZZLE_%s, %d, %s, %d, %s, %s);",
-                                      gcGetAttributeName(binary, Source->u.sourceReg.u.attribute),
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetIndexModeName(Source->u.sourceReg.indexMode),
-                                      Source->u.sourceReg.indexRegIndex,
-                                      _GetFormatName(format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(Shader, \"%s\","
+                                          " gcSL_SWIZZLE_%s, src = r%d, %s, index = r%d, %s, %s);",
+                                          gcGetAttributeName(binary, Source->u.sourceReg.u.attribute),
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetIndexModeName(Source->u.sourceReg.indexMode),
+                                          Source->u.sourceReg.indexRegIndex,
+                                          _GetFormatName(format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceAttributeIndexedFormattedWithPrecision(binary,
                                                                           Source->u.sourceReg.u.attribute,
@@ -2891,17 +2938,20 @@ _EmitSourceUniformWithFormat(
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
     if (Source->u.sourceReg.indexMode == gcSL_NOT_INDEXED)
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceUniformIndexedFormattedWithPrecision(Shader, \"%s\","
-                                      " gcSL_SWIZZLE_%s, %d, %s, %d, %s, %s);",
-                                      gcGetUniformName(Source->u.sourceReg.u.uniform),
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetIndexModeName(gcSL_NOT_INDEXED),
-                                      0,
-                                      _GetFormatName(Format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceUniformIndexedFormattedWithPrecision(Shader, \"%s\","
+                                          " gcSL_SWIZZLE_%s, src = r%d, %s, %d, %s, %s);",
+                                          gcGetUniformName(Source->u.sourceReg.u.uniform),
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetIndexModeName(gcSL_NOT_INDEXED),
+                                          0,
+                                          _GetFormatName(Format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceUniformIndexedFormattedWithPrecision(binary,
                                                                         Source->u.sourceReg.u.uniform,
@@ -2915,17 +2965,20 @@ _EmitSourceUniformWithFormat(
     }
     else
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceUniformIndexedFormattedWithPrecision(Shader, \"%s\","
-                                      " gcSL_SWIZZLE_%s, %d, %s, %d, %s, %s);",
-                                      gcGetUniformName(Source->u.sourceReg.u.uniform),
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetIndexModeName(Source->u.sourceReg.indexMode),
-                                      Source->u.sourceReg.indexRegIndex,
-                                      _GetFormatName(Format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceUniformIndexedFormattedWithPrecision(Shader, \"%s\","
+                                          " gcSL_SWIZZLE_%s, src = r%d, %s, index = r%d, %s, %s);",
+                                          gcGetUniformName(Source->u.sourceReg.u.uniform),
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetIndexModeName(Source->u.sourceReg.indexMode),
+                                          Source->u.sourceReg.indexRegIndex,
+                                          _GetFormatName(Format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceUniformIndexedFormattedWithPrecision(binary,
                                                                         Source->u.sourceReg.u.uniform,
@@ -2987,17 +3040,20 @@ _EmitSourceUniform(
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
     if (Source->u.sourceReg.indexMode == gcSL_NOT_INDEXED)
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceUniformIndexedFormattedWithPrecision(Shader, \"%s\","
-                                      " gcSL_SWIZZLE_%s, %d, %s, %d, %s, %s);",
-                                      gcGetUniformName(Source->u.sourceReg.u.uniform),
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetIndexModeName(gcSL_NOT_INDEXED),
-                                      0,
-                                      _GetFormatName(format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceUniformIndexedFormattedWithPrecision(Shader, \"%s\","
+                                          " gcSL_SWIZZLE_%s, src = r%d, %s, %d, %s, %s);",
+                                          gcGetUniformName(Source->u.sourceReg.u.uniform),
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetIndexModeName(gcSL_NOT_INDEXED),
+                                          0,
+                                          _GetFormatName(format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceUniformIndexedFormattedWithPrecision(binary,
                                                                         Source->u.sourceReg.u.uniform,
@@ -3011,17 +3067,20 @@ _EmitSourceUniform(
     }
     else
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceUniformIndexedFormattedWithPrecision(Shader, \"%s\","
-                                      " gcSL_SWIZZLE_%s, %d, %s, %d, %s, %s);",
-                                      gcGetUniformName(Source->u.sourceReg.u.uniform),
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetIndexModeName(Source->u.sourceReg.indexMode),
-                                      Source->u.sourceReg.indexRegIndex,
-                                      _GetFormatName(format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceUniformIndexedFormattedWithPrecision(Shader, \"%s\","
+                                          " gcSL_SWIZZLE_%s, src = r%d, %s, index = r%d, %s, %s);",
+                                          gcGetUniformName(Source->u.sourceReg.u.uniform),
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetIndexModeName(Source->u.sourceReg.indexMode),
+                                          Source->u.sourceReg.indexRegIndex,
+                                          _GetFormatName(format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceUniformIndexedFormattedWithPrecision(binary,
                                                                         Source->u.sourceReg.u.uniform,
@@ -3071,17 +3130,19 @@ _EmitSourceOutput(
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
     if (Source->u.sourceReg.indexMode == gcSL_NOT_INDEXED)
     {
-
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceOutputIndexedFormattedWithPrecision(Shader,"
-                                      " gcSL_SWIZZLE_%s, %d, %s, %s);",
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetIndexModeName(gcSL_NOT_INDEXED),
-                                      0,
-                                      _GetFormatName(format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceOutputIndexedFormattedWithPrecision(Shader,"
+                                          " gcSL_SWIZZLE_%s, src = r%d, %s, %s);",
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetIndexModeName(gcSL_NOT_INDEXED),
+                                          0,
+                                          _GetFormatName(format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceOutputIndexedFormattedWithPrecision(binary,
                                                                        Source->u.sourceReg.u.output,
@@ -3094,16 +3155,19 @@ _EmitSourceOutput(
     }
     else
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceOutputIndexedFormattedWithPrecision(Shader,"
-                                      " gcSL_SWIZZLE_%s, %d, %s, %d, %s, %s);",
-                                      _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
-                                      Source->u.sourceReg.regIndex,
-                                      _GetIndexModeName(Source->u.sourceReg.indexMode),
-                                      Source->u.sourceReg.indexRegIndex,
-                                      _GetFormatName(format),
-                                      _GetPrecisionName(Source->precision)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceOutputIndexedFormattedWithPrecision(Shader,"
+                                          " gcSL_SWIZZLE_%s, src = r%d, %s, index = r%d, %s, %s);",
+                                          _GetSwizzleName(Source->u.sourceReg.swizzle, buf),
+                                          Source->u.sourceReg.regIndex,
+                                          _GetIndexModeName(Source->u.sourceReg.indexMode),
+                                          Source->u.sourceReg.indexRegIndex,
+                                          _GetFormatName(format),
+                                          _GetPrecisionName(Source->precision)));
+        }
 
         status = gcSHADER_AddSourceOutputIndexedFormattedWithPrecision(binary,
                                                                        Source->u.sourceReg.u.output,
@@ -3153,9 +3217,11 @@ _EmitSourceConstantWithFormat(
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
 #if TREAT_ES20_INTEGER_AS_FLOAT
-    if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+    if (sloCOMPILER_IsHaltiVersion(Compiler))
+    {
 #endif
-        switch (Format) {
+        switch (Format)
+        {
         case gcSL_FLOAT:
         case gcSL_FLOAT16:
             floatConstant[0] = Source->u.sourceConstant.u.floatConstant;
@@ -3189,8 +3255,10 @@ _EmitSourceConstantWithFormat(
         }
 #if TREAT_ES20_INTEGER_AS_FLOAT
     }
-    else {
-        switch (Format) {
+    else
+    {
+        switch (Format)
+        {
         case gcSL_FLOAT:
         case gcSL_FLOAT16:
             floatConstant[0] = Source->u.sourceConstant.u.floatConstant;
@@ -3224,14 +3292,18 @@ _EmitSourceConstantWithFormat(
     }
 #endif
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "gcSHADER_AddSourceConstantFormattedWithPrecision(Shader, 0x%x, \"%s\", \"%s\");",
-                                  constantPtr, _GetFormatName(Format), _GetPrecisionName(Source->precision)));
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                      slvDUMP_CODE_EMITTER,
+                                      "gcSHADER_AddSourceConstantFormattedWithPrecision(Shader, 0x%x, \"%s\", \"%s\");",
+                                      constantPtr, _GetFormatName(Format), _GetPrecisionName(Source->precision)));
+    }
 
     status = gcSHADER_AddSourceConstantFormattedWithPrecision(binary, constantPtr, Format, Source->precision);
 
-    if (gcmIS_ERROR(status)) {
+    if (gcmIS_ERROR(status))
+    {
         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                         LineNo,
                                         StringNo,
@@ -3266,9 +3338,11 @@ _EmitSourceConstant(
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
 #if TREAT_ES20_INTEGER_AS_FLOAT
-    if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+    if (sloCOMPILER_IsHaltiVersion(Compiler))
+    {
 #endif
-        switch (Source->dataType) {
+        switch (Source->dataType)
+        {
         case gcSHADER_FLOAT_X1:
         case gcSHADER_FLOAT_X2:
         case gcSHADER_FLOAT_X3:
@@ -3313,8 +3387,10 @@ _EmitSourceConstant(
         }
 #if TREAT_ES20_INTEGER_AS_FLOAT
     }
-    else {
-        switch (Source->dataType) {
+    else
+    {
+        switch (Source->dataType)
+        {
         case gcSHADER_FLOAT_X1:
         case gcSHADER_FLOAT_X2:
         case gcSHADER_FLOAT_X3:
@@ -3354,15 +3430,18 @@ _EmitSourceConstant(
         format = gcSL_FLOAT;
     }
 #endif
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "gcSHADER_AddSourceConstantFormattedWithPrecision(Shader, 0x%x, \"%s\", \"%s\");",
-                                  constantPtr, _GetFormatName(format), _GetPrecisionName(Source->precision)));
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                      slvDUMP_CODE_EMITTER,
+                                      "gcSHADER_AddSourceConstantFormattedWithPrecision(Shader, 0x%x, \"%s\", \"%s\");",
+                                      constantPtr, _GetFormatName(format), _GetPrecisionName(Source->precision)));
+    }
 
     status = gcSHADER_AddSourceConstantFormattedWithPrecision(binary, constantPtr, format, Source->precision);
 
-    if (gcmIS_ERROR(status)) {
+    if (gcmIS_ERROR(status))
+    {
         gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                         LineNo,
                                         StringNo,
@@ -3636,9 +3715,11 @@ _EmitSourceConstant(
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
 #if TREAT_ES20_INTEGER_AS_FLOAT
-    if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+    if (sloCOMPILER_IsHaltiVersion(Compiler))
+    {
 #endif
-        switch (Source->dataType) {
+        switch (Source->dataType)
+        {
         case gcSHADER_FLOAT_X1:
         case gcSHADER_FLOAT_X2:
         case gcSHADER_FLOAT_X3:
@@ -3683,8 +3764,10 @@ _EmitSourceConstant(
         }
 #if TREAT_ES20_INTEGER_AS_FLOAT
     }
-    else {
-        switch (Source->dataType) {
+    else
+    {
+        switch (Source->dataType)
+        {
         case gcSHADER_FLOAT_X1:
         case gcSHADER_FLOAT_X2:
         case gcSHADER_FLOAT_X3:
@@ -3732,7 +3815,8 @@ _EmitSourceConstant(
 
     status =  gcSHADER_AddSourceConstantFormatted(binary, constantPtr, format);
 
-    if (gcmIS_ERROR(status)) {
+    if (gcmIS_ERROR(status))
+    {
     gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                     LineNo,
                     StringNo,
@@ -3840,14 +3924,18 @@ _EmitSourceWithModifiers(
 
         gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceConstantFormatted(binary, 0x%x, \"%s\");",
-                                      format, _GetFormatName(gcSL_UINT32)));
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddSourceConstantFormatted(binary, 0x%x, \"%s\");",
+                                          format, _GetFormatName(gcSL_UINT32)));
+        }
 
         status = gcSHADER_AddSourceConstantFormatted(binary, &format, gcSL_UINT32);
 
-        if (gcmIS_ERROR(status)) {
+        if (gcmIS_ERROR(status))
+        {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             LineNo,
                                             StringNo,
@@ -3904,75 +3992,80 @@ _EmitSource(
     {
     case gcvSOURCE_TEMP:
         status = _EmitSourceTemp(Compiler,
-                                 LineNo,
-                                 StringNo,
-                                 gcIsSamplerDataType(Source->dataType),
-                                 Source);
+                                LineNo,
+                                StringNo,
+                                gcIsSamplerDataType(Source->dataType),
+                                Source);
         break;
 
     case gcvSOURCE_VERTEX_ID:
     case gcvSOURCE_INSTANCE_ID:
         status = _EmitSourceTemp(Compiler,
-                                 LineNo,
-                                 StringNo,
-                                 gcvFALSE,
-                                 Source);
+                                LineNo,
+                                StringNo,
+                                gcvFALSE,
+                                Source);
         break;
 
-   case gcvSOURCE_ATTRIBUTE:
+    case gcvSOURCE_ATTRIBUTE:
         status = _EmitSourceAttribute(Compiler,
-                                      LineNo,
-                                      StringNo,
-                                      Source);
+                                    LineNo,
+                                    StringNo,
+                                    Source);
         break;
 
-   case gcvSOURCE_UNIFORM:
+    case gcvSOURCE_UNIFORM:
         status = _EmitSourceUniform(Compiler,
                                     LineNo,
                                     StringNo,
                                     Source);
         break;
 
-  case gcvSOURCE_OUTPUT:
+    case gcvSOURCE_OUTPUT:
         status = _EmitSourceOutput(Compiler,
-                                   LineNo,
-                                   StringNo,
-                                   Source);
+                                    LineNo,
+                                    StringNo,
+                                    Source);
         break;
 
-   case gcvSOURCE_CONSTANT:
+    case gcvSOURCE_CONSTANT:
         status = _EmitSourceConstant(Compiler,
-                                     LineNo,
-                                     StringNo,
-                                     Source);
+                                    LineNo,
+                                    StringNo,
+                                    Source);
         break;
 
     case gcvSOURCE_TARGET_FORMAT:
-    {
-        gctUINT32 format[1];
-        gcSHADER binary;
+        {
+            gctUINT32 format[1];
+            gcSHADER binary;
 
-        gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
+            gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
-        format[0] = slConvDataTypeToFormat(Compiler, Source->dataType);
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddSourceConstantFormatted(binary, 0x%x, \"%s\");",
-                                      format, _GetFormatName(gcSL_UINT32)));
+            format[0] = slConvDataTypeToFormat(Compiler, Source->dataType);
 
-        status = gcSHADER_AddSourceConstantFormatted(binary, format, gcSL_UINT32);
+            if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+            {
+                gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                            slvDUMP_CODE_EMITTER,
+                                            "gcSHADER_AddSourceConstantFormatted(binary, 0x%x, \"%s\");",
+                                            format, _GetFormatName(gcSL_UINT32)));
+            }
 
-        if (gcmIS_ERROR(status)) {
-            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                            LineNo,
-                                            StringNo,
-                                            slvREPORT_INTERNAL_ERROR,
-                                            "failed to add the source constant"));
-            gcmFOOTER();
-            return status;
+            status = gcSHADER_AddSourceConstantFormatted(binary, format, gcSL_UINT32);
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                LineNo,
+                                                StringNo,
+                                                slvREPORT_INTERNAL_ERROR,
+                                                "failed to add the source constant"));
+                gcmFOOTER();
+                return status;
+            }
+            break;
         }
-        break;
-    }
 
     default:
         gcmASSERT(0);
@@ -4008,16 +4101,21 @@ slNewAttributeWithLocation(
 
     gcmHEADER();
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "<ATTRIBUTE line=\"%d\" string=\"%d\" name=\"%s\""
-                                  "dataType=\"%s\" length=\"%d\" lengthCount=\"%d\">",
-                                  LineNo,
-                                  StringNo,
-                                  Name,
-                                  gcGetDataTypeName(DataType),
-                                  Length,
-                                  ArrayLengthCount));
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                      slvDUMP_CODE_EMITTER,
+                                      "attribute line=%d string=%d name=\"%s\""
+                                      "dataType=%s length=%d lengthCount=%d",
+                                      LineNo,
+                                      StringNo,
+                                      Name,
+                                      gcGetDataTypeName(DataType),
+                                      Length,
+                                      ArrayLengthCount));
+    }
+
+    sloCOMPILER_IncrDumpOffset(Compiler);
 
     status = _AddAttributeWithLocation(Compiler,
                                        Name,
@@ -4033,8 +4131,9 @@ slNewAttributeWithLocation(
                                        IsPrecise,
                                        Attribute);
 
-    if (gcmIS_ERROR(status)) {
-    gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+    if (gcmIS_ERROR(status))
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                         LineNo,
                                         StringNo,
                                         slvREPORT_INTERNAL_ERROR,
@@ -4043,9 +4142,7 @@ slNewAttributeWithLocation(
         return status;
     }
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "</ATTRIBUTE>"));
+    sloCOMPILER_DecrDumpOffset(Compiler);
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -4066,15 +4163,20 @@ slNewUniform(
 
     gcmHEADER();
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                      slvDUMP_CODE_EMITTER,
-                      "<UNIFORM line=\"%d\" string=\"%d\" name=\"%s\""
-                      " dataType=\"%s\" length=\"%d\">",
-                      LineNo,
-                      StringNo,
-                      Name,
-                      gcGetDataTypeName(UniformInfo->type),
-                      UniformInfo->arraySize));
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                          slvDUMP_CODE_EMITTER,
+                          "uniform line=%d string=%d name=\"%s\""
+                          " dataType=%s length=%d",
+                          LineNo,
+                          StringNo,
+                          Name,
+                          gcGetDataTypeName(UniformInfo->type),
+                          UniformInfo->arraySize));
+    }
+
+    sloCOMPILER_IncrDumpOffset(Compiler);
 
     status = _AddUniform(Compiler,
                              Name,
@@ -4094,9 +4196,7 @@ slNewUniform(
             return status;
     }
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                      slvDUMP_CODE_EMITTER,
-                      "</UNIFORM>"));
+    sloCOMPILER_DecrDumpOffset(Compiler);
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -4135,97 +4235,6 @@ slGetUniformSamplerIndex(
 }
 
 gceSTATUS
-slNewOutput(
-    IN sloCOMPILER Compiler,
-    IN gctUINT LineNo,
-    IN gctUINT StringNo,
-    IN gctCONST_STRING Name,
-    IN gcSHADER_TYPE DataType,
-    IN gcSHADER_PRECISION Precision,
-    IN gctBOOL IsArray,
-    IN gctUINT Length,
-    IN gctREG_INDEX TempRegIndex,
-    IN gctINT FieldIndex,
-    IN gctBOOL IsInvariant,
-    IN gctBOOL IsPrecise,
-    IN gcSHADER_SHADERMODE ShaderMode,
-    IN gceLAYOUT_QUALIFIER LayoutQual,
-    OUT gcOUTPUT* Oupput
-    )
-{
-    gceSTATUS    status;
-    gctUINT      i;
-    gctUINT      rows;
-
-    gcmHEADER();
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                      slvDUMP_CODE_EMITTER,
-                      "<OUTPUT line=\"%d\" string=\"%d\" name=\"%s\""
-                      " dataType=\"%s\" length=\"%d\" tempRegIndex=\"%d\">",
-                      LineNo,
-                      StringNo,
-                      Name,
-                      gcGetDataTypeName(DataType),
-                      Length,
-                      TempRegIndex));
-
-    status = _AddOutput(Compiler,
-                        Name,
-                        DataType,
-                        Precision,
-                        IsArray,
-                        Length,
-                        TempRegIndex,
-                        FieldIndex,
-                        IsInvariant,
-                        IsPrecise,
-                        ShaderMode,
-                        LayoutQual,
-                        Oupput);
-
-    if (gcmIS_ERROR(status))
-    {
-        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                        LineNo,
-                                        StringNo,
-                                        slvREPORT_INTERNAL_ERROR,
-                                        "failed to add the output"));
-
-            gcmFOOTER();
-            return status;
-    }
-
-    rows = gcGetDataTypeSize(DataType);
-    for (i = 1; i < Length; i++)
-    {
-        status = _AddOutputIndexed(Compiler,
-                                   Name,
-                                   i,
-                                   TempRegIndex + (i*rows));
-
-        if (gcmIS_ERROR(status))
-        {
-            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                            LineNo,
-                                            StringNo,
-                                            slvREPORT_INTERNAL_ERROR,
-                                            "failed to add the indexed output"));
-
-            gcmFOOTER();
-            return status;
-        }
-    }
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "</OUTPUT>"));
-
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS
 slNewOutputWithLocation(
     IN sloCOMPILER Compiler,
     IN gctUINT LineNo,
@@ -4251,16 +4260,21 @@ slNewOutputWithLocation(
 
     gcmHEADER();
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                      slvDUMP_CODE_EMITTER,
-                      "<OUTPUT line=\"%d\" string=\"%d\" name=\"%s\""
-                      " dataType=\"%s\" length=\"%d\" tempRegIndex=\"%d\">",
-                      LineNo,
-                      StringNo,
-                      Name,
-                      gcGetDataTypeName(DataType),
-                      Length,
-                      TempRegIndex));
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                          slvDUMP_CODE_EMITTER,
+                          "output line=%d string=%d name=\"%s\""
+                          " dataType=%s length=%d tempRegIndex=%d",
+                          LineNo,
+                          StringNo,
+                          Name,
+                          gcGetDataTypeName(DataType),
+                          Length,
+                          TempRegIndex));
+    }
+
+    sloCOMPILER_IncrDumpOffset(Compiler);
 
     status = _AddOutputWithLocation(Compiler,
                                     Name,
@@ -4310,9 +4324,7 @@ slNewOutputWithLocation(
         }
     }
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "</OUTPUT>"));
+    sloCOMPILER_DecrDumpOffset(Compiler);
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -4333,17 +4345,22 @@ slNewVariable(
 
     gcmHEADER();
 
-    gcmVERIFY_OK(
-        sloCOMPILER_Dump(Compiler,
-                slvDUMP_CODE_EMITTER,
-                "<VARIABLE line=\"%d\" string=\"%d\" name=\"%s\" "
-                "dataType=\"%s\" length=\"%d\" tempRegIndex=\"%d\">",
-                LineNo,
-                StringNo,
-                Name,
-                gcGetDataTypeName(VarInfo->type),
-                VarInfo->arraySize,
-                TempRegIndex));
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+    {
+        gcmVERIFY_OK(
+            sloCOMPILER_Dump(Compiler,
+                    slvDUMP_CODE_EMITTER,
+                    "variable line=%d string=%d name=\"%s\" "
+                    "dataType=%s length=%d tempRegIndex=%d",
+                    LineNo,
+                    StringNo,
+                    Name,
+                    gcGetDataTypeName(VarInfo->type),
+                    VarInfo->arraySize,
+                    TempRegIndex));
+    }
+
+    sloCOMPILER_IncrDumpOffset(Compiler);
 
     status = _AddVariable(Compiler,
                               Name,
@@ -4353,19 +4370,17 @@ slNewVariable(
 
     if (gcmIS_ERROR(status))
     {
-           gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                           LineNo,
-                                           StringNo,
-                                           slvREPORT_INTERNAL_ERROR,
-                                           "failed to add the variable"));
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        LineNo,
+                                        StringNo,
+                                        slvREPORT_INTERNAL_ERROR,
+                                        "failed to add the variable"));
 
-           gcmFOOTER();
-           return status;
-        }
+        gcmFOOTER();
+        return status;
+    }
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "</VARIABLE>"));
+    sloCOMPILER_DecrDumpOffset(Compiler);
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -4416,7 +4431,7 @@ slSetLabel(
 
     gcmHEADER();
 
-    codeEmitter = sloCOMPILER_GetCodeEmitter(Compiler);
+    codeEmitter = Compiler->codeEmitter;
     gcmASSERT(codeEmitter);
 
     status = sloCODE_EMITTER_NewBasicBlock(Compiler, codeEmitter);
@@ -4757,10 +4772,18 @@ _MakeNewSource(
     OUT gcsSOURCE * NewSource
     )
 {
-    gceSTATUS    status;
-    gcsTARGET    tempTarget;
+    gceSTATUS           status;
+    gcsTARGET           tempTarget;
+    sloCODE_EMITTER     codeEmitter;
 
     gcmHEADER();
+
+    codeEmitter = Compiler->codeEmitter;
+    gcmASSERT(codeEmitter);
+
+    /* flush out previous instructions */
+    status = sloCODE_EMITTER_EndBasicBlock(Compiler, codeEmitter);
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     gcsTARGET_Initialize(&tempTarget,
                              Source->dataType,
@@ -4807,10 +4830,18 @@ _MakeNewSourceForUniformInUBO(
     gcsTARGET tempTarget;
     gcsSOURCE tempSource;
     gcSHADER_TYPE dataType;
+    sloCODE_EMITTER codeEmitter;
 
     gcmHEADER();
 
     gcmASSERT(Source->type == gcvSOURCE_UNIFORM);
+
+    codeEmitter = Compiler->codeEmitter;
+    gcmASSERT(codeEmitter);
+
+    /* flush out previous instructions */
+    status = sloCODE_EMITTER_EndBasicBlock(Compiler, codeEmitter);
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     dataType = Source->u.sourceReg.u.uniform->u.type;
     if(gcIsMatrixDataType(dataType))
@@ -4861,7 +4892,7 @@ _PrepareSource(
     )
 {
     gceSTATUS    status;
-    sloCODE_GENERATOR codeGenerator = sloCOMPILER_GetCodeGenerator(Compiler);
+    sloCODE_GENERATOR codeGenerator = Compiler->codeGenerator;
 
     gcmHEADER();
 
@@ -4925,7 +4956,7 @@ _PrepareAnotherSource(
     )
 {
     gceSTATUS    status;
-    sloCODE_GENERATOR codeGenerator = sloCOMPILER_GetCodeGenerator(Compiler);
+    sloCODE_GENERATOR codeGenerator = Compiler->codeGenerator;
 
     gcmHEADER();
 
@@ -5084,10 +5115,10 @@ _ConvOpcode(
     case slvOPCODE_STORE1:                  return gcSL_STORE1;
     case slvOPCODE_ATTR_LD:                 return gcSL_ATTR_LD;
     case slvOPCODE_ATTR_ST:                 return gcSL_ATTR_ST;
-    case slvOPCODE_BITWISE_AND:             return gcSL_AND_BITWISE;
-    case slvOPCODE_BITWISE_OR:              return gcSL_OR_BITWISE;
-    case slvOPCODE_BITWISE_XOR:             return gcSL_XOR_BITWISE;
-    case slvOPCODE_BITWISE_NOT:             return gcSL_NOT_BITWISE;
+    case slvOPCODE_AND_BITWISE:             return gcSL_AND_BITWISE;
+    case slvOPCODE_OR_BITWISE:              return gcSL_OR_BITWISE;
+    case slvOPCODE_XOR_BITWISE:             return gcSL_XOR_BITWISE;
+    case slvOPCODE_NOT_BITWISE:             return gcSL_NOT_BITWISE;
     case slvOPCODE_LSHIFT:                  return gcSL_LSHIFT;
     case slvOPCODE_RSHIFT:                  return gcSL_RSHIFT;
 
@@ -5132,6 +5163,9 @@ _ConvOpcode(
 
     case slvOPCODE_LOAD_L:                  return gcSL_LOAD_L;
     case slvOPCODE_STORE_L:                 return gcSL_STORE_L;
+    case slvOPCODE_PARAM_CHAIN:             return gcSL_PARAM_CHAIN;
+    case slvOPCODE_INTRINSIC:               return gcSL_INTRINSIC;
+    case slvOPCODE_INTRINSIC_ST:            return gcSL_INTRINSIC_ST;
     default:
         gcmASSERT(0);
         return gcSL_NOP;
@@ -5151,6 +5185,9 @@ _EmitCode(
 {
     gceSTATUS    status = gcvSTATUS_OK;
     gcSL_FORMAT  format = gcSL_FLOAT;
+    gcSHADER binary;
+    gctUINT ps;
+    gctBOOL      dump;
 
     gcmHEADER();
 
@@ -5161,31 +5198,49 @@ _EmitCode(
         goto OnError;
     }
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "<INSTRUCTION line=\"%d\" string=\"%d\" opcode=\"%s\""
-                                  " targetDataType=\"%s\"",
-                                  LineNo,
-                                  StringNo,
-                                  GetOpcodeName(Opcode),
-                                  Target ? gcGetDataTypeName(Target->dataType): "none"));
+    dump = (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER);
 
-    if (Source0 && !Source1)
+    if (dump)
     {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      " sourceDataType=\"%s\">",
-                                      gcGetDataTypeName(Source0->dataType)));
-    }
-    else if (Source0 && Source1)
-    {
-        gcmASSERT(!gcIsMatrixDataType(Source1->dataType));
+        gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
+
+        gcmVERIFY_OK(gcSHADER_GetInstructionCount(binary, &ps));
+
+        if (binary->instrIndex != gcSHADER_OPCODE)
+            ps++;
 
         gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
                                       slvDUMP_CODE_EMITTER,
-                                      " source0DataType=\"%s\" source1DataType=\"%s\">",
-                                      gcGetDataTypeName(Source0->dataType),
-                                      gcGetDataTypeName(Source1->dataType)));
+                                      "%04u: opcode=\"%s\" line=\"%d\" string=\"%d\" ",
+                                      ps,
+                                      GetOpcodeName(Opcode),
+                                      LineNo,
+                                      StringNo));
+
+        sloCOMPILER_IncrDumpOffset(Compiler);
+
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                      slvDUMP_CODE_EMITTER,
+                                      "targetDataType=%s",
+                                      Target ? gcGetDataTypeName(Target->dataType): "none"));
+
+        if (Source0 && !Source1)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "sourceDataType=%s",
+                                          gcGetDataTypeName(Source0->dataType)));
+        }
+        else if (Source0 && Source1)
+        {
+            gcmASSERT(!gcIsMatrixDataType(Source1->dataType));
+
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "source0DataType=%s source1DataType=%s",
+                                          gcGetDataTypeName(Source0->dataType),
+                                          gcGetDataTypeName(Source1->dataType)));
+        }
     }
 
     if (Target && (gctINT)(Target->format) != -1)
@@ -5206,11 +5261,10 @@ _EmitCode(
 
     if (Source0 != gcvNULL)
     {
-
-    gcmONERROR(_EmitSource(Compiler,
-                         LineNo,
-                         StringNo,
-                         Source0));
+        gcmONERROR(_EmitSource(Compiler,
+                             LineNo,
+                             StringNo,
+                             Source0));
     }
 
     if (Source1 != gcvNULL)
@@ -5221,9 +5275,17 @@ _EmitCode(
                              Source1));
     }
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "</INSTRUCTION>"));
+    if (dump)
+    {
+        gcSHADER binary = gcvNULL;
+
+        gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
+
+        _DumpLastIR(binary);
+
+        sloCOMPILER_DecrDumpOffset(Compiler);
+    }
+
 
 OnError:
     gcmFOOTER_NO();
@@ -5251,6 +5313,8 @@ slEmitBuiltinAsmCode(
     gcSL_FORMAT         format;
     gcSL_CONDITION      condition;
     gcSHADER_PRECISION  precision;
+    gctUINT32           srcLoc;
+
     gcmHEADER();
 
     if ((Target && gcIsMatrixDataType(Target->dataType)) ||
@@ -5261,40 +5325,43 @@ slEmitBuiltinAsmCode(
         goto OnError;
     }
 
-    codeEmitter = sloCOMPILER_GetCodeEmitter(Compiler);
+    codeEmitter = Compiler->codeEmitter;
     gcmASSERT(codeEmitter);
 
     /* flush out previous instructions */
     status = sloCODE_EMITTER_EndBasicBlock(Compiler, codeEmitter);
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "<INSTRUCTION line=\"%d\" string=\"%d\" opcode=\"%s\""
-                                  " targetDataType=\"%s\"",
-                                  LineNo,
-                                  StringNo,
-                                  GetOpcodeName(Opcode),
-                                  Target ? gcGetDataTypeName(Target->dataType): "none"));
-
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
-    if (Source0 && !Source1)
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
     {
         gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
                                       slvDUMP_CODE_EMITTER,
-                                      " sourceDataType=\"%s\">",
-                                      gcGetDataTypeName(Source0->dataType)));
-    }
-    else if (Source0 && Source1)
-    {
-        gcmASSERT(!gcIsMatrixDataType(Source1->dataType));
+                                      "<INSTRUCTION line=\"%d\" string=\"%d\" opcode=\"%s\""
+                                      " targetDataType=\"%s\"",
+                                      LineNo,
+                                      StringNo,
+                                      GetOpcodeName(Opcode),
+                                      Target ? gcGetDataTypeName(Target->dataType): "none"));
 
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      " source0DataType=\"%s\" source1DataType=\"%s\">",
-                                      gcGetDataTypeName(Source0->dataType),
-                                      gcGetDataTypeName(Source1->dataType)));
+        if (Source0 && !Source1)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          " sourceDataType=\"%s\">",
+                                          gcGetDataTypeName(Source0->dataType)));
+        }
+        else if (Source0 && Source1)
+        {
+            gcmASSERT(!gcIsMatrixDataType(Source1->dataType));
+
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          " source0DataType=\"%s\" source1DataType=\"%s\">",
+                                          gcGetDataTypeName(Source0->dataType),
+                                          gcGetDataTypeName(Source1->dataType)));
+        }
     }
 
     if (TargetModifiers && TargetModifiers->modifiers[sleASM_MODIFIER_OPND_FORMAT].value != -1)
@@ -5335,6 +5402,7 @@ slEmitBuiltinAsmCode(
     {
         precision = (gcSHADER_PRECISION)gcSL_PRECISION_HIGH;
     }
+    srcLoc = GCSL_Build_SRC_LOC(LineNo, StringNo);
 
     if (Target)
     {
@@ -5354,7 +5422,8 @@ slEmitBuiltinAsmCode(
                                     0,
                                     gcSL_ENABLE_NONE,
                                     format,
-                                    gcSHADER_PRECISION_DEFAULT));
+                                    gcSHADER_PRECISION_DEFAULT,
+                                    srcLoc));
     }
 
     if ((gctINT)(AsmOpcode->round) != -1)
@@ -5503,50 +5572,53 @@ _EmitBranchCode(
 
     gcmHEADER();
 
-    codeEmitter = sloCOMPILER_GetCodeEmitter(Compiler);
+    codeEmitter = Compiler->codeEmitter;
     gcmASSERT(codeEmitter);
 
     status = sloCODE_EMITTER_EndBasicBlock(Compiler, codeEmitter);
 
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_CODE_EMITTER,
-                                "<INSTRUCTION line=\"%d\" string=\"%d\" opcode=\"%s\""
-                                " condition=\"%s\" label=\"%d\"",
-                                LineNo,
-                                StringNo,
-                                GetOpcodeName(Opcode),
-                                _GetConditionName(Condition),
-                                Label));
-
-    if (Source0 != gcvNULL)
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
     {
-        gcmASSERT(!gcIsMatrixDataType(Source0->dataType));
+        gcmVERIFY_OK(sloCOMPILER_Dump(
+                                    Compiler,
+                                    slvDUMP_CODE_EMITTER,
+                                    "<INSTRUCTION line=\"%d\" string=\"%d\" opcode=\"%s\""
+                                    " condition=\"%s\" label=\"%d\"",
+                                    LineNo,
+                                    StringNo,
+                                    GetOpcodeName(Opcode),
+                                    _GetConditionName(Condition),
+                                    Label));
+
+        if (Source0 != gcvNULL)
+        {
+            gcmASSERT(!gcIsMatrixDataType(Source0->dataType));
+
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_CODE_EMITTER,
+                                        " source0DataType=\"%s\"",
+                                        gcGetDataTypeName(Source0->dataType)));
+        }
+
+        if (Source1 != gcvNULL)
+        {
+            gcmASSERT(!gcIsMatrixDataType(Source1->dataType));
+
+            gcmVERIFY_OK(sloCOMPILER_Dump(
+                                        Compiler,
+                                        slvDUMP_CODE_EMITTER,
+                                        " source1DataType=\"%s\"",
+                                        gcGetDataTypeName(Source1->dataType)));
+        }
 
         gcmVERIFY_OK(sloCOMPILER_Dump(
                                     Compiler,
                                     slvDUMP_CODE_EMITTER,
-                                    " source0DataType=\"%s\"",
-                                    gcGetDataTypeName(Source0->dataType)));
+                                    ">"));
     }
-
-    if (Source1 != gcvNULL)
-    {
-        gcmASSERT(!gcIsMatrixDataType(Source1->dataType));
-
-        gcmVERIFY_OK(sloCOMPILER_Dump(
-                                    Compiler,
-                                    slvDUMP_CODE_EMITTER,
-                                    " source1DataType=\"%s\"",
-                                    gcGetDataTypeName(Source1->dataType)));
-    }
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(
-                                Compiler,
-                                slvDUMP_CODE_EMITTER,
-                                ">"));
 
     status = _EmitOpcodeConditional(Compiler,
                     LineNo,
@@ -5609,53 +5681,60 @@ _EmitNullTargetCode(
     gcSHADER binary;
 
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
-    codeEmitter = sloCOMPILER_GetCodeEmitter(Compiler);
+    codeEmitter = Compiler->codeEmitter;
     gcmASSERT(codeEmitter);
 
     status = sloCODE_EMITTER_EndBasicBlock(Compiler, codeEmitter);
     if (gcmIS_ERROR(status)) return status;
 
     opcode = _ConvOpcode(Opcode);
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "<INSTRUCTION line=\"%d\" string=\"%d\" opcode=\"%s\"",
-                                  LineNo,
-                                  StringNo,
-                                  GetOpcodeName(opcode)));
 
-    if (Source0 != gcvNULL)
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
     {
-        gcmASSERT(!gcIsMatrixDataType(Source0->dataType));
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                      slvDUMP_CODE_EMITTER,
+                                      "<INSTRUCTION line=\"%d\" string=\"%d\" opcode=\"%s\"",
+                                      LineNo,
+                                      StringNo,
+                                      GetOpcodeName(opcode)));
+
+        if (Source0 != gcvNULL)
+        {
+            gcmASSERT(!gcIsMatrixDataType(Source0->dataType));
+
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          " source0DataType=\"%s\"",
+                                          gcGetDataTypeName(Source0->dataType)));
+        }
+
+        if (Source1 != gcvNULL)
+        {
+            gcmASSERT(!gcIsMatrixDataType(Source1->dataType));
+
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          " source1DataType=\"%s\"",
+                                          gcGetDataTypeName(Source1->dataType)));
+        }
 
         gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
                                       slvDUMP_CODE_EMITTER,
-                                      " source0DataType=\"%s\"",
-                                      gcGetDataTypeName(Source0->dataType)));
+                                      ">"));
     }
-
-    if (Source1 != gcvNULL)
-    {
-        gcmASSERT(!gcIsMatrixDataType(Source1->dataType));
-
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      " source1DataType=\"%s\"",
-                                      gcGetDataTypeName(Source1->dataType)));
-    }
-
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  ">"));
 
     status = gcSHADER_AddOpcode(binary,
                                 opcode,
                                 0,
                                 gcSL_ENABLE_NONE,
                                 gcSL_FLOAT,
-                                gcSHADER_PRECISION_DEFAULT);
+                                gcSHADER_PRECISION_DEFAULT,
+                                GCSL_Build_SRC_LOC(LineNo, StringNo));
+
     if (gcmIS_ERROR(status)) return status;
 
-    if (Source0 != gcvNULL) {
+    if (Source0 != gcvNULL)
+    {
         status = _EmitSource(Compiler,
                              LineNo,
                              StringNo,
@@ -5663,7 +5742,8 @@ _EmitNullTargetCode(
         if (gcmIS_ERROR(status)) return status;
     }
 
-    if (Source1 != gcvNULL) {
+    if (Source1 != gcvNULL)
+    {
         status = _EmitSource(Compiler,
                              LineNo,
                              StringNo,
@@ -5692,7 +5772,8 @@ slEmitNullTargetCode(
     gcsSOURCE *source1;
     gcsSOURCE newSource1;
 
-    if(Source0 && Source1) {
+    if(Source0 && Source1)
+    {
        status = _PrepareAnotherSource(Compiler,
                                       LineNo,
                                       StringNo,
@@ -5703,7 +5784,10 @@ slEmitNullTargetCode(
        if (gcmIS_ERROR(status)) return status;
        source1 = &newSource1;
     }
-    else source1 = Source1;
+    else
+    {
+        source1 = Source1;
+    }
 
     return _EmitNullTargetCode(Compiler,
                                LineNo,
@@ -5734,29 +5818,6 @@ slEmitConvCode(
                Target,
                Source,
                source1);
-}
-
-gceSTATUS
-_EmitConvCode(
-    IN sloCOMPILER Compiler,
-    IN gctUINT LineNo,
-    IN gctUINT StringNo,
-    IN gcsTARGET * Target,
-    IN gcsSOURCE * Source,
-    IN gcSHADER_TYPE DataType
-    )
-{
-
-    gcsSOURCE source1[1];
-
-    gcsSOURCE_InitializeTargetFormat(source1, DataType);
-    return _EmitCode(Compiler,
-             LineNo,
-             StringNo,
-             gcSL_CONV,
-             Target,
-             Source,
-             source1);
 }
 
 gceSTATUS
@@ -5843,7 +5904,8 @@ _EmitFloatToIntCode(
 #endif
 #else
 #if TREAT_ES20_INTEGER_AS_FLOAT
-    if (sloCOMPILER_IsHaltiVersion(Compiler)) {
+    if (sloCOMPILER_IsHaltiVersion(Compiler))
+    {
 #endif
         status = _EmitCode(Compiler,
                            LineNo,
@@ -5855,7 +5917,8 @@ _EmitFloatToIntCode(
         if (gcmIS_ERROR(status)) return status;
 #if TREAT_ES20_INTEGER_AS_FLOAT
     }
-    else {
+    else
+    {
         slsIOPERAND    intermIOperands[3];
         gcsTARGET    intermTargets[3];
         gcsSOURCE    intermSources[3];
@@ -6828,16 +6891,15 @@ _EmitCodeImpl1(
 
     if (Source)
     {
+        status = _PrepareSource(
+                                Compiler,
+                                LineNo,
+                                StringNo,
+                                Target,
+                                Source,
+                                &newSource);
 
-    status = _PrepareSource(
-                            Compiler,
-                            LineNo,
-                            StringNo,
-                            Target,
-                            Source,
-                            &newSource);
-
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
     }
 
     for (i = 0; i < SpecialCodeEmitterCount1; i++)
@@ -6907,7 +6969,7 @@ slEmitCode1(
     }
     else
     {
-        codeEmitter = sloCOMPILER_GetCodeEmitter(Compiler);
+        codeEmitter = Compiler->codeEmitter;
         gcmASSERT(codeEmitter);
 
         status = sloCODE_EMITTER_EmitCode1(Compiler,
@@ -7206,7 +7268,6 @@ _EmitDivCode(
     return gcvSTATUS_OK;
 }
 
-
 static gceSTATUS
 _EmitDP2Code(
     IN sloCOMPILER Compiler,
@@ -7388,24 +7449,30 @@ _EmitOpcodeConditionAndTarget(
     gcSL_FORMAT format;
     gcSHADER binary;
     gctCHAR  buf[5];
+    gctUINT32 srcLoc;
 
     gcmASSERT(Target);
 
+    srcLoc = GCSL_Build_SRC_LOC(LineNo, StringNo);
     format = slConvDataTypeToFormat(Compiler, Target->dataType);
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
-    if (Target->indexMode == gcSL_NOT_INDEXED) {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddOpcodeConditionIndexedWithPrecision(Shader, %s, %s, %d, gcSL_ENABLE_%s, %s, %d, %s, %s);",
-                                      GetOpcodeName(Opcode),
-                                      _GetConditionName(Condition),
-                                      Target->tempRegIndex,
-                                      _GetEnableName(Target->enable, buf),
-                                      _GetIndexModeName(gcSL_NOT_INDEXED),
-                                      0,
-                                      _GetFormatName(format),
-                                      _GetPrecisionName(Target->precision)));
+    if (Target->indexMode == gcSL_NOT_INDEXED)
+    {
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddOpcodeConditionIndexedWithPrecision(Shader, %s, %s, %d, gcSL_ENABLE_%s, %s, %d, %s, %s);",
+                                          GetOpcodeName(Opcode),
+                                          _GetConditionName(Condition),
+                                          Target->tempRegIndex,
+                                          _GetEnableName(Target->enable, buf),
+                                          _GetIndexModeName(gcSL_NOT_INDEXED),
+                                          0,
+                                          _GetFormatName(format),
+                                          _GetPrecisionName(Target->precision)));
+        }
 
         status = gcSHADER_AddOpcodeConditionIndexedWithPrecision(binary,
                                                                  Opcode,
@@ -7415,20 +7482,25 @@ _EmitOpcodeConditionAndTarget(
                                                                  gcSL_NOT_INDEXED,
                                                                  0,
                                                                  format,
-                                                                 Target->precision);
+                                                                 Target->precision,
+                                                                 srcLoc);
     }
-    else {
-        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                      slvDUMP_CODE_EMITTER,
-                                      "gcSHADER_AddOpcodeConditionIndexedWithPrecision(Shader, %s, %s, %d, gcSL_ENABLE_%s, %s, %d, %s, %s);",
-                                      GetOpcodeName(Opcode),
-                                      _GetConditionName(Condition),
-                                      Target->tempRegIndex,
-                                      _GetEnableName(Target->enable, buf),
-                                      _GetIndexModeName(Target->indexMode),
-                                      Target->indexRegIndex,
-                                      _GetFormatName(format),
-                                      _GetPrecisionName(Target->precision)));
+    else
+    {
+        if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_CODE_EMITTER,
+                                          "gcSHADER_AddOpcodeConditionIndexedWithPrecision(Shader, %s, %s, %d, gcSL_ENABLE_%s, %s, %d, %s, %s);",
+                                          GetOpcodeName(Opcode),
+                                          _GetConditionName(Condition),
+                                          Target->tempRegIndex,
+                                          _GetEnableName(Target->enable, buf),
+                                          _GetIndexModeName(Target->indexMode),
+                                          Target->indexRegIndex,
+                                          _GetFormatName(format),
+                                          _GetPrecisionName(Target->precision)));
+        }
 
         status = gcSHADER_AddOpcodeConditionIndexedWithPrecision(binary,
                                                                  Opcode,
@@ -7438,10 +7510,12 @@ _EmitOpcodeConditionAndTarget(
                                                                  Target->indexMode,
                                                                  (gctUINT16) Target->indexRegIndex,
                                                                  format,
-                                                                 Target->precision);
+                                                                 Target->precision,
+                                                                 srcLoc);
     }
 
-    if (gcmIS_ERROR(status)) {
+    if (gcmIS_ERROR(status))
+    {
         sloCOMPILER_Report(Compiler,
                            LineNo,
                            StringNo,
@@ -7468,11 +7542,14 @@ _EmitOpcodeConditionAndTarget(
     gcSL_FORMAT format;
     gcSHADER binary;
     gctCHAR  buf[5];
+    gctUINT32 srcLoc;
 
     gcmASSERT(Target);
 
     format = slConvDataTypeToFormat(Compiler, Target->dataType);
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
+
+    srcLoc = GCSL_Build_SRC_LOC(LineNo, StringNo);
 
     if (Target->indexMode == gcSL_NOT_INDEXED) {
         gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
@@ -7493,7 +7570,8 @@ _EmitOpcodeConditionAndTarget(
                                                     Target->enable,
                                                     gcSL_NOT_INDEXED,
                                                     0,
-                                                    format);
+                                                    format,
+                                                    srcLoc);
     }
     else {
         gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
@@ -7514,7 +7592,8 @@ _EmitOpcodeConditionAndTarget(
                                                     Target->enable,
                                                     Target->indexMode,
                                                     (gctUINT16) Target->indexRegIndex,
-                                                    format);
+                                                    format,
+                                                    srcLoc);
     }
 
     if (gcmIS_ERROR(status)) {
@@ -7551,17 +7630,20 @@ _EmitOpcodeConditionAndFormat(
 
     gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
 
-    gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                  slvDUMP_CODE_EMITTER,
-                                  "gcSHADER_AddOpcodeConditionIndexedWithPrecision(Shader, %s, %s, %d, gcSL_ENABLE_%s, %s, %d, %s, %s);",
-                                  GetOpcodeName(Opcode),
-                                  _GetConditionName(Condition),
-                                  Target->tempRegIndex,
-                                  _GetEnableName(Target->enable, buf),
-                                  _GetIndexModeName(Target->indexMode),
-                                  Target->indexRegIndex,
-                                  _GetFormatName(Format),
-                                  _GetPrecisionName(Precision)));
+    if (Compiler->context.dumpOptions & slvDUMP_CODE_EMITTER)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                      slvDUMP_CODE_EMITTER,
+                                      "gcSHADER_AddOpcodeConditionIndexedWithPrecision(Shader, %s, %s, %d, gcSL_ENABLE_%s, %s, %d, %s, %s);",
+                                      GetOpcodeName(Opcode),
+                                      _GetConditionName(Condition),
+                                      Target->tempRegIndex,
+                                      _GetEnableName(Target->enable, buf),
+                                      _GetIndexModeName(Target->indexMode),
+                                      Target->indexRegIndex,
+                                      _GetFormatName(Format),
+                                      _GetPrecisionName(Precision)));
+    }
 
     status = gcSHADER_AddOpcodeConditionIndexedWithPrecision(binary,
                                                              Opcode,
@@ -7571,9 +7653,11 @@ _EmitOpcodeConditionAndFormat(
                                                              Target->indexMode,
                                                              (gctUINT16) Target->indexRegIndex,
                                                              Format,
-                                                             Precision);
+                                                             Precision,
+                                                             GCSL_Build_SRC_LOC(LineNo, StringNo));
 
-    if (gcmIS_ERROR(status)) {
+    if (gcmIS_ERROR(status))
+    {
         sloCOMPILER_Report(Compiler,
                            LineNo,
                            StringNo,
@@ -7808,7 +7892,7 @@ slEmitSelectCode(
     gcmASSERT(Source0);
     gcmASSERT(Source1);
 
-    codeEmitter = sloCOMPILER_GetCodeEmitter(Compiler);
+    codeEmitter = Compiler->codeEmitter;
     gcmASSERT(codeEmitter);
 
     /* flush out previous instructions */
@@ -7921,7 +8005,7 @@ _EmitCompareCode(
         gctUINT i;
 
         /* Don't generate cmp/set instructions for compare functions for the chips that don't support cmp/set. */
-        if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI0))
+        if (GetHWHasHalti0())
         {
             status = slEmitCompareSetCode(Compiler,
                                           LineNo,
@@ -8220,7 +8304,6 @@ _EmitDotCode(
     return status;
 }
 
-
 static gceSTATUS
 _EmitScalarOrVectorModDivCode(
                               IN sloCOMPILER Compiler,
@@ -8244,15 +8327,18 @@ _EmitScalarOrVectorModDivCode(
     gcmASSERT(Source0);
     gcmASSERT(Source1);
 
-    if(gcGetDataTypeComponentCount(Target->dataType) != 1) {
+    if(gcGetDataTypeComponentCount(Target->dataType) != 1)
+    {
         for (i = 0; i < gcGetVectorDataTypeComponentCount(Target->dataType); i++) {
 
             gcsTARGET_InitializeAsVectorComponent(&componentTarget, Target, i);
 
-            if(gcGetDataTypeComponentCount(Source0->dataType) != 1) {
+            if(gcGetDataTypeComponentCount(Source0->dataType) != 1)
+            {
                 gcsSOURCE_InitializeAsVectorComponent(&componentSource0, Source0, i);
             }
-            else {
+            else
+            {
                 status = _MakeNewSource(
                     Compiler,
                     LineNo,
@@ -8263,10 +8349,12 @@ _EmitScalarOrVectorModDivCode(
                 if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
             }
 
-            if(gcGetDataTypeComponentCount(Source1->dataType) != 1) {
+            if(gcGetDataTypeComponentCount(Source1->dataType) != 1)
+            {
                 gcsSOURCE_InitializeAsVectorComponent(&componentSource1, Source1, i);
             }
-            else {
+            else
+            {
                 status = _MakeNewSource(
                     Compiler,
                     LineNo,
@@ -8277,12 +8365,27 @@ _EmitScalarOrVectorModDivCode(
                 if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
             }
 
-            status = _EmitCodeFormatted(Compiler, LineNo, StringNo, Opcode, Format, &componentTarget, &componentSource0, &componentSource1);
+            status = _EmitCodeFormatted(Compiler,
+                                        LineNo,
+                                        StringNo,
+                                        Opcode,
+                                        Format,
+                                        &componentTarget,
+                                        &componentSource0,
+                                        &componentSource1);
             if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
         }
     }
-    else {
-        status = _EmitCodeFormatted(Compiler, LineNo, StringNo, Opcode, Format, Target, Source0, Source1);
+    else
+    {
+        status = _EmitCodeFormatted(Compiler,
+                                    LineNo,
+                                    StringNo,
+                                    Opcode,
+                                    Format,
+                                    Target,
+                                    Source0,
+                                    Source1);
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
     }
 
@@ -8429,7 +8532,8 @@ _EmitIdivCode(
     if(format == gcSL_INT8 ||
         format == gcSL_UINT8 ||
         format == gcSL_INT16 ||
-        format == gcSL_UINT16){
+        format == gcSL_UINT16)
+    {
 
             status = _EmitCodeFormatted(Compiler,
                 LineNo,
@@ -8827,11 +8931,13 @@ _EmitCodeImpl2(
        Opcode == slvOPCODE_LOAD_L ||
        Opcode == slvOPCODE_STORE_L ||
        Opcode == slvOPCODE_ATTR_LD ||
-       Opcode == slvOPCODE_ATTR_ST) {
+       Opcode == slvOPCODE_ATTR_ST)
+    {
         newSource0 = *Source0;
         newSource1 = *Source1;
     }
-    else {
+    else
+    {
         status = _PrepareSource(Compiler,
                                 LineNo,
                                 StringNo,
@@ -8908,7 +9014,7 @@ slEmitCode2(
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
 
-    codeEmitter = sloCOMPILER_GetCodeEmitter(Compiler);
+    codeEmitter = Compiler->codeEmitter;
     gcmASSERT(codeEmitter);
 
     status = sloCODE_EMITTER_EmitCode2(
@@ -9039,7 +9145,7 @@ slEmitCompareBranchCode(
     gcsSOURCE source0Buf[1];
     gcsSOURCE *newSource0;
     gcsSOURCE newSource1[1];
-    sloCODE_GENERATOR codeGenerator = sloCOMPILER_GetCodeGenerator(Compiler);
+    sloCODE_GENERATOR codeGenerator = Compiler->codeGenerator;
 
     gcmHEADER();
 
@@ -9052,15 +9158,6 @@ slEmitCompareBranchCode(
         && !gcIsImageDataType(Source0->u.sourceReg.u.uniform->u.type)
         && !isUniformBlockAddress(Source0->u.sourceReg.u.uniform))
     {
-        sloCODE_EMITTER    codeEmitter;
-
-        codeEmitter = sloCOMPILER_GetCodeEmitter(Compiler);
-        gcmASSERT(codeEmitter);
-
-        /* flush out previous instructions */
-        status = sloCODE_EMITTER_EndBasicBlock(Compiler, codeEmitter);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
         status = _MakeNewSourceForUniformInUBO(Compiler,
                                                LineNo,
                                                StringNo,
@@ -9108,7 +9205,7 @@ slBeginMainFunction(
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
 
-    codeEmitter = sloCOMPILER_GetCodeEmitter(Compiler);
+    codeEmitter = Compiler->codeEmitter;
     gcmASSERT(codeEmitter);
 
     status = sloCODE_EMITTER_NewBasicBlock(Compiler, codeEmitter);
@@ -9132,7 +9229,7 @@ slEndMainFunction(
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
 
-    codeEmitter = sloCOMPILER_GetCodeEmitter(Compiler);
+    codeEmitter = Compiler->codeEmitter;
     gcmASSERT(codeEmitter);
 
     status = sloCODE_EMITTER_EndBasicBlock(Compiler, codeEmitter);
@@ -9284,7 +9381,7 @@ slBeginFunction(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     gcmASSERT(Function);
 
-    codeEmitter = sloCOMPILER_GetCodeEmitter(Compiler);
+    codeEmitter = Compiler->codeEmitter;
     gcmASSERT(codeEmitter);
 
     status = sloCODE_EMITTER_NewBasicBlock(Compiler, codeEmitter);
@@ -9325,7 +9422,7 @@ slEndFunction(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     gcmASSERT(Function);
 
-    codeEmitter = sloCOMPILER_GetCodeEmitter(Compiler);
+    codeEmitter = Compiler->codeEmitter;
     gcmASSERT(codeEmitter);
 
     status = sloCODE_EMITTER_EndBasicBlock(Compiler, codeEmitter);
@@ -9811,7 +9908,7 @@ sloCODE_EMITTER_EmitCode1(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_OBJECT(CodeEmitter, slvOBJ_CODE_EMITTER);
 
-    if (!sloCOMPILER_OptimizationEnabled(Compiler, slvOPTIMIZATION_DATA_FLOW))
+    if (!(Compiler->context.optimizationOptions & slvOPTIMIZATION_DATA_FLOW))
     {
         status = _EmitCodeImpl1(
                             Compiler,
@@ -10014,7 +10111,7 @@ sloCODE_EMITTER_EmitCode2(
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_OBJECT(CodeEmitter, slvOBJ_CODE_EMITTER);
 
-    if (!sloCOMPILER_OptimizationEnabled(Compiler, slvOPTIMIZATION_DATA_FLOW))
+    if (!(Compiler->context.optimizationOptions & slvOPTIMIZATION_DATA_FLOW))
     {
         status = _EmitCodeImpl2(
                             Compiler,

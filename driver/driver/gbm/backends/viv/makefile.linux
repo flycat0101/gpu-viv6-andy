@@ -31,11 +31,7 @@ INSTALL_DIR = $(SDK_DIR)/drivers
 CFLAGS += -fPIC -Werror
 
 CFLAGS += -I../../main \
-          -I$(AQROOT)/hal/inc \
-          -I$(AQROOT)/hal/user \
-          -I$(AQROOT)/hal/os/linux/user \
-          -I$(AQROOT)/compiler/libVSC/include \
-		  -I$(ROOTFS)/usr/include/libdrm
+          -I$(ROOTFS)/usr/include/libdrm
 
 ################################################################################
 # Define flags for the linker.
@@ -45,7 +41,6 @@ LDFLAGS := $(LFLAGS) -Wl,-z,defs
 ################################################################################
 # Supply necessary libraries.
 
-LDLIBS := -L$(SDK_DIR)/drivers -L$(AQROOT)/hal/user/$(OBJ_DIR) -l GAL
 LDLIBS += -ldrm
 
 ################################################################################

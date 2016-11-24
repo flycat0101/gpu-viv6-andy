@@ -11,6 +11,7 @@
 *****************************************************************************/
 
 
+#include "gc_hal_types.h"
 #include "gc_hal_user_math.h"
 #include "gc_hal_user_qnx.h"
 

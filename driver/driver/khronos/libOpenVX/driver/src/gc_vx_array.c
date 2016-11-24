@@ -158,8 +158,9 @@ VX_INTERNAL_API vx_bool vxoArray_AllocateMemory(vx_array array)
 }
 
 VX_INTERNAL_API vx_status vxoArray_AccessRange(
-        vx_array array, vx_size start, vx_size end, vx_ptr_ptr ptrPtr, vx_enum usage)
+        vx_array array, vx_size start, vx_size end, vx_size* pStride, vx_ptr_ptr ptrPtr, vx_enum usage)
 {
+
     vxmASSERT(array);
 
     if (usage < VX_READ_ONLY || VX_READ_AND_WRITE < usage) return VX_ERROR_INVALID_PARAMETERS;
@@ -184,10 +185,20 @@ VX_INTERNAL_API vx_status vxoArray_AccessRange(
     }
     else
     {
+        vx_size *strideSave;
         vx_size size = (end - start) * array->itemSize;
         vx_uint32 index;
+        strideSave = vxAllocate(sizeof(vx_size));
 
-        if (!vxoContext_AddAccessor(array->base.context, size, usage, *ptrPtr, &array->base, OUT &index))
+        if (pStride == NULL) {
+            *strideSave = array->itemSize;
+            pStride = strideSave;
+        }
+        else {
+            *strideSave = *pStride;
+        }
+
+        if (!vxoContext_AddAccessor(array->base.context, size, usage, *ptrPtr, &array->base, OUT &index, strideSave))
         {
             return VX_ERROR_NO_MEMORY;
         }
@@ -199,7 +210,25 @@ VX_INTERNAL_API vx_status vxoArray_AccessRange(
             if (!vxAcquireMutex(array->memory.writeLocks[0])) return VX_ERROR_NO_RESOURCES;
         }
 
-        vxMemCopy(*ptrPtr, &array->memory.logicals[0][start * array->itemSize], size);
+        if (usage != VX_WRITE_ONLY)
+        {
+            vx_size i;
+            vx_uint8 *pSrc, *pDest;
+            vx_size stride = *pStride;
+            if (stride == array->itemSize)
+            {
+                vxMemCopy(*ptrPtr, &array->memory.logicals[0][start * array->itemSize], size);
+            }
+            else
+            {
+                for (i = start, pDest = (vx_uint8*)(*ptrPtr), pSrc = &array->memory.logicals[0][start * array->itemSize];
+                     i < end;
+                     i++, pDest += stride, pSrc += array->itemSize)
+                {
+                    vxMemCopy(pDest, pSrc, array->itemSize);
+                }
+            }
+        }
     }
 
     vxoReference_IncrementReadCount(&array->base);
@@ -258,7 +287,24 @@ VX_INTERNAL_API vx_status vxoArray_CommitRange(vx_array array, vx_size start, vx
 
             if (isExternal || foundAccessor)
             {
-                vxMemCopy(&memoryPtr[start * array->itemSize], ptr, (end - start) * array->itemSize);
+                vx_size stride = *(vx_size *)array->base.context->accessorTable[index].extraDataPtr;
+
+                if (stride == array->itemSize)
+                {
+                    vxMemCopy(&memoryPtr[start * array->itemSize], ptr, (end - start) * array->itemSize);
+                }
+                else
+                {
+                    vx_size i;
+                    const vx_uint8 *pSrc; vx_uint8 *pDest;
+
+                    for (i = start, pSrc = ptr, pDest= &memoryPtr[start * array->itemSize];
+                         i < end;
+                         i++, pSrc += stride, pDest += array->itemSize)
+                    {
+                        vxMemCopy(pDest, pSrc, array->itemSize);
+                    }
+                }
 
                 if (foundAccessor) vxoContext_RemoveAccessor(array->base.context, index);
             }
@@ -274,7 +320,7 @@ VX_INTERNAL_API vx_status vxoArray_CommitRange(vx_array array, vx_size start, vx
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_array vxCreateArray(vx_context context, vx_enum itemType, vx_size capacity)
+VX_API_ENTRY vx_array VX_API_CALL vxCreateArray(vx_context context, vx_enum itemType, vx_size capacity)
 {
     if (!vxoContext_IsValid(context)) return VX_NULL;
 
@@ -286,7 +332,7 @@ VX_PUBLIC_API vx_array vxCreateArray(vx_context context, vx_enum itemType, vx_si
     return (vx_array)vxoArray_Create(context, itemType, capacity, vx_false_e, VX_TYPE_ARRAY);
 }
 
-VX_PUBLIC_API vx_array vxCreateVirtualArray(vx_graph graph, vx_enum itemType, vx_size capacity)
+VX_API_ENTRY vx_array VX_API_CALL vxCreateVirtualArray(vx_graph graph, vx_enum itemType, vx_size capacity)
 {
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_NULL;
 
@@ -301,12 +347,12 @@ VX_PUBLIC_API vx_array vxCreateVirtualArray(vx_graph graph, vx_enum itemType, vx
     return (vx_array)vxoArray_Create(graph->base.context, itemType, capacity, vx_true_e, VX_TYPE_ARRAY);
 }
 
-VX_PUBLIC_API vx_status vxReleaseArray(vx_array *array)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseArray(vx_array *array)
 {
     return vxoReference_Release((vx_reference_ptr)array, VX_TYPE_ARRAY, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_status vxQueryArray(vx_array array, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryArray(vx_array array, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoArray_IsValid(array)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -344,7 +390,7 @@ VX_PUBLIC_API vx_status vxQueryArray(vx_array array, vx_enum attribute, void *pt
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxSetArrayAttribute(vx_array array, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxSetArrayAttribute(vx_array array, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoArray_IsValid(array)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -382,7 +428,7 @@ VX_PUBLIC_API vx_status vxSetArrayAttribute(vx_array array, vx_enum attribute, v
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxAddArrayItems(vx_array array, vx_size count, void *ptr, vx_size stride)
+VX_API_ENTRY vx_status VX_API_CALL vxAddArrayItems(vx_array array, vx_size count, const void *ptr, vx_size stride)
 {
     vx_size         destOffset;
     vx_uint8_ptr    destPtr;
@@ -424,7 +470,7 @@ VX_PUBLIC_API vx_status vxAddArrayItems(vx_array array, vx_size count, void *ptr
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxTruncateArray(vx_array array, vx_size new_num_items)
+VX_API_ENTRY vx_status VX_API_CALL vxTruncateArray(vx_array array, vx_size new_num_items)
 {
     if (!vxoArray_IsValid(array)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -437,7 +483,7 @@ VX_PUBLIC_API vx_status vxTruncateArray(vx_array array, vx_size new_num_items)
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxAccessArrayRange(
+VX_API_ENTRY vx_status VX_API_CALL vxAccessArrayRange(
         vx_array array, vx_size start, vx_size end, vx_size *stride, void **ptr, vx_enum usage)
 {
     vx_status status;
@@ -446,18 +492,20 @@ VX_PUBLIC_API vx_status vxAccessArrayRange(
 
     if (stride == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
 
-    status = vxoArray_AccessRange(array, start, end, ptr, usage);
+    if (*ptr ==  VX_NULL)
+    {
+        *stride = array->itemSize;
+    }
 
-    if (status != VX_SUCCESS) return status;
+    status = vxoArray_AccessRange(array, start, end, stride, ptr, usage);
 
-    *stride = array->itemSize;
-
-    return VX_SUCCESS;
+    return status;
 }
 
-VX_PUBLIC_API vx_status vxCommitArrayRange(vx_array array, vx_size start, vx_size end, void *ptr)
+VX_API_ENTRY vx_status VX_API_CALL vxCommitArrayRange(vx_array array, vx_size start, vx_size end, const void *ptr)
 {
     if (!vxoArray_IsValid(array)) return VX_ERROR_INVALID_REFERENCE;
 
-    return vxoArray_CommitRange(array, start, end, ptr);
+    return vxoArray_CommitRange(array, start, end, (vx_ptr)ptr);
 }
+

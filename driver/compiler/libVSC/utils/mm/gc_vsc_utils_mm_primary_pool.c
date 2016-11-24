@@ -21,7 +21,11 @@
   sys can only see our big chunks.
 */
 
-#define PMP_GET_CHUNK_PTR(pChunkListNode)    ((VSC_PRIMARY_MEM_CHUNK*)vscBLNDEXT_GetContainedUserData((pChunkListNode)))
+#define ENABLE_PMP_DEBUG_DUMP                0
+
+#define PMP_GET_CHUNK_PTR(pChunkListNode)    ((pChunkListNode) ? \
+                                              (VSC_PRIMARY_MEM_CHUNK*)vscBLNDEXT_GetContainedUserData((pChunkListNode)) : \
+                                              (VSC_PRIMARY_MEM_CHUNK*)gcvNULL)
 
 /* Global PMP counter */
 static gctINT pmpCounter = 0;
@@ -117,6 +121,12 @@ void vscPMP_Intialize(VSC_PRIMARY_MEM_POOL* pPMP, VSC_MEMORY_MANAGEMENT_PARAM* p
     }
 
     vscMM_Initialize(&pPMP->mmWrapper, pPMP, VSC_MM_TYPE_PMP);
+
+    pPMP->flags.bInitialized = gcvTRUE;
+
+#if ENABLE_PMP_DEBUG_DUMP
+    vscERR_ReportWarning(gcvNULL, 0, 0, "PMP %d is initialized", pPMP->id);
+#endif
 }
 
 void* vscPMP_Alloc(VSC_PRIMARY_MEM_POOL* pPMP, gctUINT reqSize)
@@ -214,6 +224,13 @@ void* vscPMP_Realloc(VSC_PRIMARY_MEM_POOL* pPMP, void* pOrgAddress, gctUINT newR
     gctINT                   chunkHeaderSize;
     gctUINT                  orgAlignedSize, newAlignedSize, deltaSize;
 
+    if (pOrgAddress == gcvNULL)
+    {
+        /* If pOrgAddress is NULL, realloc behaves the same way as malloc
+         * and allocates a new block of newReqSize bytes */
+        return vscPMP_Alloc(pPMP, newReqSize);
+    }
+
     /* If we are not at pooling status, just call underlying alloc */
     if (!pPMP->flags.bPooling)
     {
@@ -247,10 +264,8 @@ void* vscPMP_Realloc(VSC_PRIMARY_MEM_POOL* pPMP, void* pOrgAddress, gctUINT newR
 
     pOrgCmnBlkHeader = (VSC_COMMON_BLOCK_HEADER*)((gctUINT8*)pOrgAddress - COMMON_BLOCK_HEADER_SIZE);
 
-    gcmASSERT(newReqSize >= pOrgCmnBlkHeader->userReqSize);
-
     /* Just return original if no resize */
-    if (newReqSize == pOrgCmnBlkHeader->userReqSize)
+    if (newReqSize <= pOrgCmnBlkHeader->userReqSize)
     {
         return pOrgAddress;
     }
@@ -423,6 +438,12 @@ void vscPMP_Finalize(VSC_PRIMARY_MEM_POOL* pPMP)
     VSC_BI_LIST_NODE_EXT*  pThisNativeAddrNode;
     void*                  pThisNativeAddr;
 
+    /* No need to go on if it was not initialized before */
+    if (!pPMP->flags.bInitialized)
+    {
+        return;
+    }
+
     if (!pPMP->flags.bPooling)
     {
         for (pThisNativeAddrNode = CAST_BLN_2_BLEN(vscBILST_GetHead(&pPMP->nativeAddrChain));
@@ -459,6 +480,12 @@ void vscPMP_Finalize(VSC_PRIMARY_MEM_POOL* pPMP)
     vscBILST_Finalize(&pPMP->biChunkChain);
 
     vscMM_Finalize(&pPMP->mmWrapper);
+
+    pPMP->flags.bInitialized = gcvFALSE;
+
+#if ENABLE_PMP_DEBUG_DUMP
+    vscERR_ReportWarning(gcvNULL, 0, 0, "PMP %d is finalized", pPMP->id);
+#endif
 }
 
 gctUINT vscPMP_GetLowLimitOfChunkSize(VSC_PRIMARY_MEM_POOL* pPMP)
@@ -470,4 +497,10 @@ void vscPMP_PrintStatistics(VSC_PRIMARY_MEM_POOL* pPMP)
 {
 
 }
+
+gctBOOL vscPMP_IsInitialized(VSC_PRIMARY_MEM_POOL* pPMP)
+{
+    return pPMP->flags.bInitialized;
+}
+
 

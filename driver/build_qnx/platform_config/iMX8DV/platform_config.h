@@ -39,6 +39,10 @@
 #define gcd3D_REG_BASE          (0x53100000)
 #define gcd3D_REG_SIZE          (0x40000)
 
+#define gcd3D1_IRQ              (97)
+#define gcd3D1_REG_BASE         (0x54100000)
+#define gcd3D1_REG_SIZE         (0x40000)
+
 #define gcd2D_IRQ               (-1)
 #define gcd2D_REG_BASE          (0)
 #define gcd2D_REG_SIZE          (0)

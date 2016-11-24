@@ -26,7 +26,6 @@
 *****************************************************************************/
 
 
-
 /*
  *  Feature:    Filter Blit - color format conversion
  *  API:        gco2D_FilterBlit

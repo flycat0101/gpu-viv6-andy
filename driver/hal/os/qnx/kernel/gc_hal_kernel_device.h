@@ -25,6 +25,12 @@ typedef struct _gcsDEVICE_CONSTRUCT_ARGS
     gctBOOL             powerManagement;
     gctBOOL             mmu;
     gctBOOL             gpuProfiler;
+
+    gctINT              irqs[gcvCORE_COUNT];
+    gctUINT             registerBases[gcvCORE_COUNT];
+    gctUINT             registerSizes[gcvCORE_COUNT];
+    gctUINT             chipIDs[gcvCORE_COUNT];
+
 }
 gcsDEVICE_CONSTRUCT_ARGS;
 

@@ -36,6 +36,7 @@ vx_status vxTableLookup(vx_node node, vx_image src, vx_lut lut, vx_image dst)
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     /*index = 0*/
@@ -59,6 +60,8 @@ vx_status vxTableLookup(vx_node node, vx_image src, vx_lut lut, vx_image dst)
     kernelContext->params.kernel = gcvVX_KERNEL_TABLE_LOOKUP;
     kernelContext->params.xstep = 16;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -70,3 +73,4 @@ vx_status vxTableLookup(vx_node node, vx_image src, vx_lut lut, vx_image dst)
 
     return status;
 }
+

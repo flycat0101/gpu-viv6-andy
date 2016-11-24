@@ -14,7 +14,7 @@
 #include "gc_vgsh_precomp.h"
 #include "gc_egl_common.h"
 
-gltCONTEXT_FUNCTION veglGetCurVG11CtxFunc = gcvNULL;
+static void * (* veglGetCurVG11CtxFunc)(EGLenum) = gcvNULL;
 
 #if VIVANTE_PROFILER
 static void _ConstructChipName(
@@ -86,8 +86,80 @@ _AddSurface(
 }
 #endif
 
+static gceSTATUS
+_LoadCompiler(
+    _VGContext * Context
+    )
+{
+    gceSTATUS status;
+    VSC_HW_CONFIG hwCfg;
+
+    gcmHEADER();
+    gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg);
+
+    do
+    {
+        union __GLinitializerUnion
+        {
+            gctGLSLInitCompiler initGLSL;
+            gctPOINTER          ptr;
+        } intializer;
+
+        union __GLfinalizerUnion
+        {
+            gctGLSLFinalizeCompiler finalizeGLSL;
+            gctPOINTER ptr;
+        } finalizer;
+
+        status = gcoOS_LoadLibrary(gcvNULL,
+#if defined(__APPLE__)
+                                   "libGLSLC.dylib",
+#elif defined(LINUXEMULATOR)
+                                   "libGLSLC.so",
+#elif defined(__QNXNTO__)
+                                   "glesv2-sc-dlls",
+#else
+                                   "libGLSLC",
+#endif
+                                   &Context->dll);
+
+        if (gcmIS_ERROR(status))
+        {
+            break;
+        }
+
+        gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, Context->dll, "gcInitializeCompiler", &intializer.ptr));
+        gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, Context->dll, "gcFinalizeCompiler", &finalizer.ptr));
+
+        Context->pfInitCompiler = intializer.initGLSL;
+        Context->pfFinalizeCompiler = finalizer.finalizeGLSL;
+
+        gcmERR_BREAK(Context->pfInitCompiler(gcvPATCH_INVALID, &hwCfg, gcvNULL));
+    } while (gcvFALSE);
+
+    gcmFOOTER_NO();
+    return status;
+}
+
+static gceSTATUS
+_ReleaseCompiler(
+    _VGContext * Context
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER();
+
+    gcmONERROR(Context->pfFinalizeCompiler());
+
+OnError:
+    gcmFOOTER_NO();
+    return status;
+}
+
 static void *
 veglCreateContext(
+    void * Thread,
     gctINT ClientVersion,
     VEGLimports *Imports,
     void * SharedContext
@@ -109,8 +181,6 @@ veglCreateContext(
         gcmERR_BREAK(gcoHAL_Construct(gcvNULL, os, &hal));
 
         gcmERR_BREAK(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
-
-        gcmERR_BREAK(gcInitGLSLCaps(gcvNULL, gcGetGLSLCaps()));
 
         NEWOBJ(_VGContext, os, context);
 
@@ -226,6 +296,9 @@ veglCreateContext(
 
         gcmERR_BREAK(gco3D_SetLastPixelEnable(context->engine, gcvTRUE));
 
+        /* Load compiler. */
+        gcmERR_BREAK(_LoadCompiler(context));
+
         /* succeed to create context */
         gcmFOOTER_ARG("return=0x%x", context);
         return context;
@@ -258,21 +331,6 @@ veglCreateContext(
     return gcvNULL;
 }
 
-static void *
-veglCreateContextEx(
-    void * Thread,
-#if gcdGC355_PROFILER
-    gctUINT64 appStartTime,
-    gctFILE apiTimeFile,
-#endif
-    gctINT ClientVersion,
-    VEGLimports *Imports,
-    void * SharedContext
-    )
-{
-    return veglCreateContext(ClientVersion, Imports, SharedContext);
-}
-
 static EGLBoolean
 veglDestroyContext(
     void * Thread,
@@ -296,6 +354,11 @@ veglDestroyContext(
     if (context->os)
     {
         gcmVERIFY_OK(gcoOS_Destroy(context->os));
+    }
+
+    if (context->dll)
+    {
+        gcmVERIFY_OK(_ReleaseCompiler(context));
     }
 
     if (context != gcvNULL)
@@ -349,8 +412,8 @@ veglSetContext(
         if ((Drawable == gcvNULL) && (Readable == gcvNULL))
         {
 
-            gcmVERIFY_OK(gco3D_SetTarget(context->engine, 0, gcvNULL, 0, 0));
-            gcmVERIFY_OK(gco3D_SetDepth(context->engine, gcvNULL, 0));
+            gcmVERIFY_OK(gco3D_SetTarget(context->engine, 0, gcvNULL, 0));
+            gcmVERIFY_OK(gco3D_SetDepth(context->engine, gcvNULL));
             gcmVERIFY_OK(gco3D_UnSet3DEngine(context->engine));
             gcmFOOTER_NO();
             return EGL_TRUE;
@@ -563,7 +626,10 @@ vgshGetCurrentContext(void)
     return context;
 }
 
-static EGLBoolean veglQueryHWVG(void)
+static EGLBoolean
+veglQueryHWVG(
+    void
+    )
 {
     return EGL_FALSE;
 }
@@ -572,6 +638,8 @@ gceSTATUS
 SetTarget(_VGContext *context, gcoSURF Draw, gcoSURF Read, gcoSURF Depth)
 {
     gceSTATUS status;
+    gcsSURF_VIEW drawView = {Draw, 0, 1};
+    gcsSURF_VIEW dsView = {Depth, 0, 1};
 
     gcmHEADER_ARG("context=0x%x Draw=0x%x Read=0x%x Depth=0x%x",
                   context, Draw, Read, Depth);
@@ -580,8 +648,8 @@ SetTarget(_VGContext *context, gcoSURF Draw, gcoSURF Read, gcoSURF Depth)
         gctUINT width, height;
         gcmASSERT(context != gcvNULL);
 
-        gcmERR_BREAK(gco3D_SetTarget(context->engine, 0, Draw, 0, 0));
-        gcmERR_BREAK(gco3D_SetDepth(context->engine, Depth, 0));
+        gcmERR_BREAK(gco3D_SetTarget(context->engine, 0, &drawView, 0));
+        gcmERR_BREAK(gco3D_SetDepth(context->engine, &dsView));
         gcmERR_BREAK(gco3D_SetColorOutCount(context->engine, 1));
 
         /*gcmERR_BREAK(_SetCentroids(context->engine, Draw));*/
@@ -878,7 +946,7 @@ veglCreateImageParentImage(
         khImage->u.vgimage.format = (gctUINT)vgimage_obj->internalColorDesc.format;
         khImage->u.vgimage.allowedQuality = (gctUINT)vgimage_obj->allowedQuality;
         khImage->u.vgimage.dirty = vgimage_obj->dirty;
-        khImage->u.vgimage.dirtyPtr = (khronos_int32_t *)vgimage_obj->dirtyPtr;
+        khImage->u.vgimage.dirtyPtr =  (khronos_int32_t *)vgimage_obj->dirtyPtr;
         khImage->u.vgimage.rootOffsetX = vgimage_obj->rootOffsetX;
         khImage->u.vgimage.rootOffsetY = vgimage_obj->rootOffsetY;
         khImage->u.vgimage.rootWidth = vgimage_obj->rootWidth;
@@ -941,6 +1009,30 @@ veglCreateImageParentImage(
     gcmFOOTER_ARG("return=0x%x", EGL_SUCCESS);
     return EGL_SUCCESS;
 }
+
+static gctBOOL
+veglProfiler(
+    void * Profiler,
+    gctUINT32 Enum,
+    gctHANDLE Value
+    )
+{
+#if VIVANTE_PROFILER
+    return vgProfiler(Profiler, Enum, Value);
+#else
+    return gcvFALSE;
+#endif
+}
+
+typedef struct _veglLOOKUP
+{
+    const char *                                name;
+    __eglMustCastToProperFunctionPointerType    function;
+}
+veglLOOKUP;
+
+#define eglMAKE_LOOKUP(function) \
+    { #function, (__eglMustCastToProperFunctionPointerType) function }
 
 static veglLOOKUP
 _glaLookup[] =
@@ -1054,7 +1146,10 @@ _glaLookup[] =
     { gcvNULL, gcvNULL }
 };
 
-EGL_PROC veglGetProcAddrOf3DVG(const char *procName)
+static EGL_PROC
+veglGetProcAddr(
+    const char *procName
+    )
 {
     veglLOOKUP *lookup = _glaLookup;
 
@@ -1080,32 +1175,22 @@ VG_API_CALL
 veglDISPATCH
 OpenVG_DISPATCH_TABLE =
 {
-    /* createContext            */  veglCreateContextEx,
+    /* createContext            */  veglCreateContext,
     /* destroyContext           */  veglDestroyContext,
     /* makeCurrent              */  veglSetContext,
     /* loseCurrent              */  veglUnsetContext,
     /* setDrawable              */  veglSetContext,
     /* flushContext             */  veglFlushContext,
-
     /* flush                    */  veglFlush,
     /* finish                   */  veglFinish,
-
-    /* setBuffer                */  gcvNULL,
     /* getClientBuffer          */  veglGetClientBuffer,
-
     /* createImageTexture       */  gcvNULL,
     /* createImageRenderbuffer  */  gcvNULL,
     /* createImageParentImage   */  veglCreateImageParentImage,
     /* bindTexImage             */  gcvNULL,
-
-#if VIVANTE_PROFILER
-    /* profiler                 */  vgProfiler,
-#else
-    /* profiler                 */  gcvNULL,
-#endif
-    /* getProcAddr;             */  veglGetProcAddrOf3DVG,
-
+    /* profiler                 */  veglProfiler,
+    /* getProcAddr              */  veglGetProcAddr,
+    /* swapBuffers              */  gcvNULL,
     /* queryHWVG                */  veglQueryHWVG,
-
-    /* renderThread             */  gcvNULL,
+    /* resolveVG                */  gcvNULL,
 };

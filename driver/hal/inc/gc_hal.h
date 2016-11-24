@@ -1061,6 +1061,7 @@ gceSTATUS
 gckOS_WaitSignal(
     IN gckOS Os,
     IN gctSIGNAL Signal,
+    IN gctBOOL Interruptable,
     IN gctUINT32 Wait
     );
 
@@ -1152,41 +1153,10 @@ gckOS_DestroySyncTimeline(
     );
 
 gceSTATUS
-gckOS_CreateSyncPoint(
-    IN gckOS Os,
-    OUT gctSYNC_POINT * SyncPoint
-    );
-
-gceSTATUS
-gckOS_ReferenceSyncPoint(
-    IN gckOS Os,
-    IN gctSYNC_POINT SyncPoint
-    );
-
-gceSTATUS
-gckOS_DestroySyncPoint(
-    IN gckOS Os,
-    IN gctSYNC_POINT SyncPoint
-    );
-
-gceSTATUS
-gckOS_SignalSyncPoint(
-    IN gckOS Os,
-    IN gctSYNC_POINT SyncPoint
-    );
-
-gceSTATUS
-gckOS_QuerySyncPoint(
-    IN gckOS Os,
-    IN gctSYNC_POINT SyncPoint,
-    OUT gctBOOL_PTR State
-    );
-
-gceSTATUS
 gckOS_CreateNativeFence(
     IN gckOS Os,
     IN gctHANDLE Timeline,
-    IN gctSYNC_POINT SyncPoint,
+    IN gctSIGNAL Signal,
     OUT gctINT * FenceFD
     );
 
@@ -1746,6 +1716,7 @@ gckKERNEL_Destroy(
 gceSTATUS
 gckKERNEL_Dispatch(
     IN gckKERNEL Kernel,
+    IN gckDEVICE Device,
     IN gctBOOL FromUser,
     IN OUT struct _gcsHAL_INTERFACE * Interface
     );
@@ -1806,6 +1777,14 @@ gckKERNEL_UnlockVideoMemory(
     IN gckKERNEL Kernel,
     IN gctUINT32 ProcessID,
     IN OUT gcsHAL_INTERFACE * Interface
+    );
+
+/* Unlock video memory from gpu immediately w/o considering gpu cache flush. */
+gceSTATUS
+gckKERNEL_BottomHalfUnlockVideoMemory(
+    IN gckKERNEL Kernel,
+    IN gctUINT32 ProcessID,
+    IN gctUINT32 Node
     );
 
 /* Map video memory. */
@@ -2025,6 +2004,7 @@ gceSTATUS
 gckHARDWARE_End(
     IN gckHARDWARE Hardware,
     IN gctPOINTER Logical,
+    IN gctUINT32 Address,
     IN OUT gctUINT32 * Bytes
     );
 
@@ -2604,7 +2584,9 @@ gckCOMMAND_Commit(
     IN gcsQUEUE_PTR EventQueue,
     IN gctUINT32 ProcessID,
     IN gctBOOL Shared,
-    IN gctUINT32 Index
+    IN gctUINT32 Index,
+    OUT gctUINT64_PTR CommitStamp,
+    OUT gctBOOL_PTR ContextSwitched
     );
 
 /* Reserve space in the command buffer. */
@@ -2768,6 +2750,21 @@ gckHARDWARE_UpdateContextProfile(
     IN gckCONTEXT Context
     );
 #endif
+
+gceSTATUS
+gckHARDWARE_QueryContextNewProfile(
+    IN gckHARDWARE Hardware,
+    IN gctBOOL Reset,
+    IN gckCONTEXT Context,
+    OUT gcsPROFILER_NEW_COUNTERS_PART1 * Counters_part1,
+    OUT gcsPROFILER_NEW_COUNTERS_PART2 * Counters_part2
+    );
+
+gceSTATUS
+gckHARDWARE_UpdateContextNewProfile(
+    IN gckHARDWARE Hardware,
+    IN gckCONTEXT Context
+    );
 
 gceSTATUS
 gckHARDWARE_InitProfiler(

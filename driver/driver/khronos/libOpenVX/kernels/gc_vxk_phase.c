@@ -34,6 +34,7 @@ vx_status vxPhase(vx_node node, vx_image grad_x, vx_image grad_y, vx_image outpu
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
@@ -68,6 +69,8 @@ vx_status vxPhase(vx_node node, vx_image grad_x, vx_image grad_y, vx_image outpu
 
     kernelContext->params.evisNoInst = node->base.context->evisNoInst;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -79,3 +82,4 @@ vx_status vxPhase(vx_node node, vx_image grad_x, vx_image grad_y, vx_image outpu
 
     return status;
 }
+

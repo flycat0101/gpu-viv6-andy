@@ -166,7 +166,6 @@ _ConstructBasicBuiltInTypeInfos(
                                                 basicBuiltInTypeInfos[i].type,
                                                 gcvNULL,
                                                 &basicBuiltInTypeInfos[i].normalDataType);
-
             if (gcmIS_ERROR(status)) break;
 
             status = sloCOMPILER_CreateDataType(
@@ -174,9 +173,7 @@ _ConstructBasicBuiltInTypeInfos(
                                                 basicBuiltInTypeInfos[i].type,
                                                 gcvNULL,
                                                 &basicBuiltInTypeInfos[i].inDataType);
-
             if (gcmIS_ERROR(status)) break;
-
             basicBuiltInTypeInfos[i].inDataType->qualifiers.storage = slvSTORAGE_QUALIFIER_IN;
 
             status = sloCOMPILER_CreateDataType(
@@ -184,9 +181,7 @@ _ConstructBasicBuiltInTypeInfos(
                                                 basicBuiltInTypeInfos[i].type,
                                                 gcvNULL,
                                                 &basicBuiltInTypeInfos[i].anypDataType);
-
             if (gcmIS_ERROR(status)) break;
-
             basicBuiltInTypeInfos[i].anypDataType->qualifiers.precision = slvPRECISION_QUALIFIER_ANY;
 
             status = sloCOMPILER_CreateDataType(
@@ -194,9 +189,7 @@ _ConstructBasicBuiltInTypeInfos(
                                                 basicBuiltInTypeInfos[i].type,
                                                 gcvNULL,
                                                 &basicBuiltInTypeInfos[i].anypInDataType);
-
             if (gcmIS_ERROR(status)) break;
-
             basicBuiltInTypeInfos[i].anypInDataType->qualifiers.storage = slvSTORAGE_QUALIFIER_IN;
             basicBuiltInTypeInfos[i].anypInDataType->qualifiers.precision = slvPRECISION_QUALIFIER_ANY;
         }
@@ -273,6 +266,7 @@ static slsDEFAULT_PRECISION_DECL    VSDefaultPrecisionDecls[] =
     /* Default Precision Declarations */
     {slvPRECISION_QUALIFIER_MEDIUM,   slvTYPE_BOOL},
     {slvPRECISION_QUALIFIER_HIGH,     slvTYPE_INT},
+    {slvPRECISION_QUALIFIER_HIGH,     slvTYPE_UINT},
     {slvPRECISION_QUALIFIER_HIGH,     slvTYPE_FLOAT},
     {slvPRECISION_QUALIFIER_LOW,      slvTYPE_SAMPLER2D},
     {slvPRECISION_QUALIFIER_LOW,      slvTYPE_SAMPLERCUBE},
@@ -288,6 +282,7 @@ static slsDEFAULT_PRECISION_DECL    FSDefaultPrecisionDecls[] =
     /* Default Precision Declarations */
     {slvPRECISION_QUALIFIER_MEDIUM,   slvTYPE_BOOL},
     {slvPRECISION_QUALIFIER_MEDIUM,   slvTYPE_INT},
+    {slvPRECISION_QUALIFIER_MEDIUM,   slvTYPE_UINT},
     {slvPRECISION_QUALIFIER_LOW,      slvTYPE_SAMPLER2D},
     {slvPRECISION_QUALIFIER_LOW,      slvTYPE_SAMPLERCUBE},
     {slvPRECISION_QUALIFIER_LOW,      slvTYPE_SAMPLEREXTERNALOES},
@@ -302,6 +297,7 @@ static slsDEFAULT_PRECISION_DECL    LIBDefaultPrecisionDecls[] =
     /* Default Precision Declarations */
     {slvPRECISION_QUALIFIER_MEDIUM,   slvTYPE_BOOL},
     {slvPRECISION_QUALIFIER_ANY,      slvTYPE_INT},
+    {slvPRECISION_QUALIFIER_ANY,      slvTYPE_UINT},
     {slvPRECISION_QUALIFIER_ANY,      slvTYPE_FLOAT},
     {slvPRECISION_QUALIFIER_ANY,      slvTYPE_SAMPLER2D},
     {slvPRECISION_QUALIFIER_ANY,      slvTYPE_SAMPLERCUBE},
@@ -359,7 +355,8 @@ _LoadDefaultPrecisionDecls(
     gcmVERIFY_ARGUMENT(DefaultPrecisionDeclCount > 0);
     gcmVERIFY_ARGUMENT(DefaultPrecisionDecls);
 
-    for(i = 0; i < DefaultPrecisionDeclCount; i++) {
+    for(i = 0; i < DefaultPrecisionDeclCount; i++)
+    {
        status = sloCOMPILER_SetDefaultPrecision(Compiler,
                                                 DefaultPrecisionDecls[i].type,
                                                 DefaultPrecisionDecls[i].precision);
@@ -494,9 +491,7 @@ _LoadBuiltInConstants(
     )
 {
     gceSTATUS           status;
-    gcoHAL              hal;
     gceAPI              apiVersion;
-    gctINT              i;
     static BuiltinConstInfo    constantInfos[] =
     {
         {"gl_MaxVertexAttribs",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, 0 },
@@ -536,12 +531,18 @@ _LoadBuiltInConstants(
         {"gl_MaxTessControlInputComponents",       T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
         {"gl_MaxTessControlOutputComponents",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
         {"gl_MaxTessControlTextureImageUnits",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
+        {"gl_MaxTessControlImageUniforms",         T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
         {"gl_MaxTessControlUniformComponents",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
         {"gl_MaxTessControlTotalOutputComponents", T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
+        {"gl_MaxTessControlAtomicCounters",        T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
+        {"gl_MaxTessControlAtomicCounterBuffers",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
         {"gl_MaxTessEvaluationInputComponents",    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
         {"gl_MaxTessEvaluationOutputComponents",   T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
         {"gl_MaxTessEvaluationTextureImageUnits",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
+        {"gl_MaxTessEvaluationImageUniforms",      T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
         {"gl_MaxTessEvaluationUniformComponents",  T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
+        {"gl_MaxTessEvaluationAtomicCounters",     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
+        {"gl_MaxTessEvaluationAtomicCounterBuffers", T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
         {"gl_MaxTessPatchComponents",              T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
         {"gl_MaxPatchVertices",                    T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
         {"gl_MaxTessGenLevel",                     T_INT, slvPRECISION_QUALIFIER_MEDIUM, 1, {{0}}, slvEXTENSION_TESSELLATION_SHADER},
@@ -562,203 +563,106 @@ _LoadBuiltInConstants(
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
 
-    /* Grab the HAL object. */
-    gcmVERIFY_OK(
-        sloCOMPILER_GetHAL(Compiler, &hal));
 #if !GC_INIT_BUILTIN_CONSTANTS_BY_DRIVER
     /* initialize the builtin constant if it is not done by driver */
-    gcmVERIFY_OK(gcInitGLSLCaps(hal, gcGetGLSLCaps()));
+    gcmVERIFY_OK(gcInitGLSLCaps(gcGetGLSLCaps()));
 #endif
 
-    apiVersion = sloCOMPILER_GetClientApiVersion(Compiler);
+    apiVersion = Compiler->clientApiVersion;
 
-    for (i = 0; i < gcBIConst_Count; i++)
+    constantInfos[gcBIConst_MaxVertexAttribs].value[0].intValue = GetGLMaxVertexAttribs();
+    constantInfos[gcBIConst_MaxVertexUniformVectors].value[0].intValue = GetGLMaxVertexUniformVectors();
+    constantInfos[gcBIConst_MaxVertexOutputVectors].value[0].intValue = GetGLMaxVertexOutputVectors();
+
+    constantInfos[gcBIConst_MaxFragmentInputVectors].value[0].intValue = GetGLMaxFragmentInputVectors();
+
+    constantInfos[gcBIConst_MaxVertexTextureImageUnits].value[0].intValue = GetGLMaxVertexTextureImageUnits();
+    constantInfos[gcBIConst_MaxCombinedTextureImageUnits].value[0].intValue = GetGLMaxCombinedTextureImageUnits();
+    constantInfos[gcBIConst_MaxTextureImageUnits].value[0].intValue = GetGLMaxFragTextureImageUnits();
+
+    constantInfos[gcBIConst_MaxFragmentUniformVectors].value[0].intValue = GetGLMaxFragmentUniformVectors();
+
+    constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue = GetGLMaxDrawBuffers();
+
+    if (apiVersion == gcvAPI_OPENGL_ES20)
     {
-        switch(i) {
-        case gcBIConst_MaxVertexAttribs:
-            constantInfos[i].value[0].intValue = GetGLMaxVertexAttribs();
-            break;
-        case gcBIConst_MaxVertexUniformVectors:
-            constantInfos[i].value[0].intValue = GetGLMaxVertexUniformVectors();
-            break;
-        case gcBIConst_MaxVertexOutputVectors:
-            constantInfos[i].value[0].intValue = GetGLMaxVertexOutputVectors();
-            break;
-        case gcBIConst_MaxFragmentInputVectors:
-            constantInfos[i].value[0].intValue = GetGLMaxFragmentInputVectors();
-            break;
-        case gcBIConst_MaxVertexTextureImageUnits:
-            constantInfos[i].value[0].intValue = GetGLMaxVertexTextureImageUnits();
-            break;
-        case gcBIConst_MaxCombinedTextureImageUnits:
-            constantInfos[i].value[0].intValue = GetGLMaxCombinedTextureImageUnits();
-            break;
-        case gcBIConst_MaxTextureImageUnits:
-            constantInfos[i].value[0].intValue = GetGLMaxFragTextureImageUnits();
-            break;
-        case gcBIConst_MaxFragmentUniformVectors:
-            constantInfos[i].value[0].intValue = GetGLMaxFragmentUniformVectors();
-            break;
-        case gcBIConst_MaxDrawBuffers:
-            constantInfos[i].value[0].intValue = GetGLMaxDrawBuffers();
-            if (apiVersion == gcvAPI_OPENGL_ES20)
-            {
-                constantInfos[i].value[0].intValue = 1;
-            }
-            else if (apiVersion == gcvAPI_OPENGL_ES30 || apiVersion == gcvAPI_OPENGL_ES31)
-            {
-                constantInfos[i].value[0].intValue = (constantInfos[i].value[0].intValue > 4)
-                                                        ? constantInfos[i].value[0].intValue : 4;
-            }
-            break;
-        case gcBIConst_MaxSamples:
-            constantInfos[i].value[0].intValue = GetGLMaxSamples();
-            break;
-        case gcBIConst_MinProgramTexelOffset:
-            constantInfos[i].value[0].intValue = GetGLMinProgramTexelOffset();
-            break;
-        case gcBIConst_MaxProgramTexelOffset:
-            constantInfos[i].value[0].intValue = GetGLMaxProgramTexelOffset();
-            break;
-        case gcBIConst_MaxImageUnits:
-            constantInfos[i].value[0].intValue = GetGLMaxImageUnits();
-            break;
-        case gcBIConst_MaxVertexImageUniforms:
-            constantInfos[i].value[0].intValue = GetGLMaxVertexImageUniforms();
-            break;
-        case gcBIConst_MaxFragmentImageUniforms:
-            constantInfos[i].value[0].intValue = GetGLMaxFragmentImageUniforms();
-            break;
-        case gcBIConst_MaxComputeImageUniforms:
-            constantInfos[i].value[0].intValue = GetGLMaxComputeImageUniforms();
-            break;
-        case gcBIConst_MaxCombinedImageUniforms:
-            constantInfos[i].value[0].intValue = GetGLMaxCombinedImageUniforms();
-            break;
-        case gcBIConst_MaxCombinedShaderOutputResources:
-            constantInfos[i].value[0].intValue = GetGLMaxCombinedShaderOutputResources();
-            break;
-        case gcBIConst_MaxComputeWorkGroupCount:
-            gcmASSERT(constantInfos[i].valueCount == 3);
-            constantInfos[i].value[0].intValue = GetGLMaxComputeWorkGroupCount(0);
-            constantInfos[i].value[1].intValue = GetGLMaxComputeWorkGroupCount(1);
-            constantInfos[i].value[2].intValue = GetGLMaxComputeWorkGroupCount(2);
-            break;
-        case gcBIConst_MaxComputeWorkGroupSize:
-            gcmASSERT(constantInfos[i].valueCount == 3);
-            constantInfos[i].value[0].intValue = GetGLMaxComputeWorkGroupSize(0);
-            constantInfos[i].value[1].intValue = GetGLMaxComputeWorkGroupSize(1);
-            constantInfos[i].value[2].intValue = GetGLMaxComputeWorkGroupSize(2);
-            break;
-        case gcBIConst_MaxComputeUniformComponents:
-            constantInfos[i].value[0].intValue = GetGLMaxComputeUniformComponents();
-            break;
-        case gcBIConst_MaxComputeTextureImageUnits:
-            constantInfos[i].value[0].intValue = GetGLMaxComputeTextureImageUnits();
-            break;
-        case gcBIConst_MaxComputeAtomicCounters:
-            constantInfos[i].value[0].intValue = GetGLMaxComputeAtomicCounters();
-            break;
-        case gcBIConst_MaxComputeAtomicCounterBuffers:
-            constantInfos[i].value[0].intValue = GetGLMaxComputeAtomicCounterBuffers();
-            break;
-        case gcBIConst_MaxVertexAtomicCounters:
-            constantInfos[i].value[0].intValue = GetGLMaxVertexAtomicCounters();
-            break;
-        case gcBIConst_MaxFragmentAtomicCounters:
-            constantInfos[i].value[0].intValue = GetGLMaxFragmentAtomicCounters();
-            break;
-        case gcBIConst_MaxCombinedAtomicCounters:
-            constantInfos[i].value[0].intValue = GetGLMaxCombinedAtomicCounters();
-            break;
-        case gcBIConst_MaxAtomicCounterBindings:
-            constantInfos[i].value[0].intValue = GetGLMaxAtomicCounterBindings();
-            break;
-        case gcBIConst_MaxVertexAtomicCounterBuffers:
-            constantInfos[i].value[0].intValue = GetGLMaxVertexAtomicCounterBuffers();
-            break;
-        case gcBIConst_MaxFragmentAtomicCounterBuffers:
-            constantInfos[i].value[0].intValue = GetGLMaxFragmentAtomicCounterBuffers();
-            break;
-        case gcBIConst_MaxCombinedAtomicCounterBuffers:
-            constantInfos[i].value[0].intValue = GetGLMaxCombinedAtomicCounterBuffers();
-            break;
-        case gcBIConst_MaxAtomicCounterBufferSize:
-            constantInfos[i].value[0].intValue = (gctINT32)GetGLMaxAtomicCounterBufferSize();
-            break;
-        case gcBIConst_MaxVaryingVectors:
-            constantInfos[i].value[0].intValue = GetGLMaxVaryingVectors();
-            break;
-        /* TS EXT constants. */
-        case gcBIConst_MaxTessControlInputComponents:
-            constantInfos[i].value[0].intValue = GetGLMaxTCSInputVectors() * 4;
-            break;
-        case gcBIConst_MaxTessControlOutputComponents:
-            constantInfos[i].value[0].intValue = GetGLMaxTCSOutputVectors() * 4;
-            break;
-        case gcBIConst_MaxTessControlTextureImageUnits:
-            constantInfos[i].value[0].intValue = GetGLMaxTCSTextureImageUnits();
-            break;
-        case gcBIConst_MaxTessControlUniformComponents:
-            constantInfos[i].value[0].intValue = GetGLMaxTCSUniformVectors() * 4;
-            break;
-        case gcBIConst_MaxTessControlTotalOutputComponents:
-            constantInfos[i].value[0].intValue = GetGLMaxTCSOutTotalVectors() * 4;
-            break;
-        case gcBIConst_MaxTessEvaluationInputComponents:
-            constantInfos[i].value[0].intValue = GetGLMaxTESInputVectors() * 4;
-            break;
-        case gcBIConst_MaxTessEvaluationOutputComponents:
-            constantInfos[i].value[0].intValue = GetGLMaxTESOutputVectors() * 4;
-            break;
-        case gcBIConst_MaxTessEvaluationTextureImageUnits:
-            constantInfos[i].value[0].intValue = GetGLMaxTESTextureImageUnits();
-            break;
-        case gcBIConst_MaxTessEvaluationUniformComponents:
-            constantInfos[i].value[0].intValue = GetGLMaxTESUniformVectors() * 4;
-            break;
-        case gcBIConst_MaxTessPatchComponents:
-            constantInfos[i].value[0].intValue = GetGLMaxTessPatchVectors() * 4;
-            break;
-        case gcBIConst_MaxPatchVertices:
-            constantInfos[i].value[0].intValue = GetGLMaxTessPatchVertices();
-            break;
-        case gcBIConst_MaxTessGenLevel:
-            constantInfos[i].value[0].intValue = GetGLMaxTessGenLevel();
-            break;
-        /* GS EXT constants. */
-        case gcBIConst_MaxGSInputComponents:
-            constantInfos[i].value[0].intValue = GetGLMaxGSInVectors() * 4;
-            break;
-        case gcBIConst_MaxGSOutputComponents:
-            constantInfos[i].value[0].intValue = GetGLMaxGSOutVectors() * 4;
-            break;
-        case gcBIConst_MaxGSImageUniforms:
-            constantInfos[i].value[0].intValue = GetGLMaxGSImageUniforms();
-            break;
-        case gcBIConst_MaxGSTextureImageUnits:
-            constantInfos[i].value[0].intValue = GetGLMaxGSTextureImageUnits();
-            break;
-        case gcBIConst_MaxGSOutputVertices:
-            constantInfos[i].value[0].intValue = GetGLMaxGSOutVertices();
-            break;
-        case gcBIConst_MaxGSTotalOutputComponents:
-            constantInfos[i].value[0].intValue = GetGLMaxGSOutTotalVectors() * 4;
-            break;
-        case gcBIConst_MaxGSUniformComponents:
-            constantInfos[i].value[0].intValue = GetGLMaxGSUniformVectors() * 4;
-            break;
-        case gcBIConst_MaxGSAtomicCounters:
-            constantInfos[i].value[0].intValue = GetGLMaxGSAtomicCounters();
-            break;
-        case gcBIConst_MaxGSAtomicCounterBuffers:
-            constantInfos[i].value[0].intValue = GetGLMaxGSAtomicCounters();
-            break;
-        default:
-            gcmASSERT(gcvFALSE);
-            break;
-        }
+        constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue = 1;
     }
+    else if (apiVersion == gcvAPI_OPENGL_ES30 || apiVersion == gcvAPI_OPENGL_ES31)
+    {
+        constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue = (constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue > 4)
+            ? constantInfos[gcBIConst_MaxDrawBuffers].value[0].intValue : 4;
+    }
+
+    constantInfos[gcBIConst_MaxSamples].value[0].intValue = GetGLMaxSamples();
+    constantInfos[gcBIConst_MinProgramTexelOffset].value[0].intValue = GetGLMinProgramTexelOffset();
+    constantInfos[gcBIConst_MaxProgramTexelOffset].value[0].intValue = GetGLMaxProgramTexelOffset();
+
+    constantInfos[gcBIConst_MaxImageUnits].value[0].intValue = GetGLMaxImageUnits();
+    constantInfos[gcBIConst_MaxVertexImageUniforms].value[0].intValue = GetGLMaxVertexImageUniforms();
+    constantInfos[gcBIConst_MaxFragmentImageUniforms].value[0].intValue = GetGLMaxFragmentImageUniforms();
+    constantInfos[gcBIConst_MaxComputeImageUniforms].value[0].intValue = GetGLMaxComputeImageUniforms();
+    constantInfos[gcBIConst_MaxCombinedImageUniforms].value[0].intValue = GetGLMaxCombinedImageUniforms();
+
+    constantInfos[gcBIConst_MaxCombinedShaderOutputResources].value[0].intValue = GetGLMaxCombinedShaderOutputResources();
+
+    gcmASSERT(constantInfos[gcBIConst_MaxComputeWorkGroupCount].valueCount == 3);
+    constantInfos[gcBIConst_MaxComputeWorkGroupCount].value[0].intValue = GetGLMaxComputeWorkGroupCount(0);
+    constantInfos[gcBIConst_MaxComputeWorkGroupCount].value[1].intValue = GetGLMaxComputeWorkGroupCount(1);
+    constantInfos[gcBIConst_MaxComputeWorkGroupCount].value[2].intValue = GetGLMaxComputeWorkGroupCount(2);
+
+    gcmASSERT(constantInfos[gcBIConst_MaxComputeWorkGroupSize].valueCount == 3);
+    constantInfos[gcBIConst_MaxComputeWorkGroupSize].value[0].intValue = GetGLMaxComputeWorkGroupSize(0);
+    constantInfos[gcBIConst_MaxComputeWorkGroupSize].value[1].intValue = GetGLMaxComputeWorkGroupSize(1);
+    constantInfos[gcBIConst_MaxComputeWorkGroupSize].value[2].intValue = GetGLMaxComputeWorkGroupSize(2);
+
+    constantInfos[gcBIConst_MaxComputeUniformComponents].value[0].intValue = GetGLMaxComputeUniformComponents();
+    constantInfos[gcBIConst_MaxComputeTextureImageUnits].value[0].intValue = GetGLMaxComputeTextureImageUnits();
+    constantInfos[gcBIConst_MaxComputeAtomicCounters].value[0].intValue = GetGLMaxComputeAtomicCounters();
+
+    constantInfos[gcBIConst_MaxComputeAtomicCounterBuffers].value[0].intValue = GetGLMaxComputeAtomicCounterBuffers();
+    constantInfos[gcBIConst_MaxVertexAtomicCounters].value[0].intValue = GetGLMaxVertexAtomicCounters();
+    constantInfos[gcBIConst_MaxFragmentAtomicCounters].value[0].intValue = GetGLMaxFragmentAtomicCounters();
+    constantInfos[gcBIConst_MaxCombinedAtomicCounters].value[0].intValue = GetGLMaxCombinedAtomicCounters();
+    constantInfos[gcBIConst_MaxAtomicCounterBindings].value[0].intValue = GetGLMaxAtomicCounterBindings();
+
+    constantInfos[gcBIConst_MaxVertexAtomicCounterBuffers].value[0].intValue = GetGLMaxVertexAtomicCounterBuffers();
+    constantInfos[gcBIConst_MaxFragmentAtomicCounterBuffers].value[0].intValue = GetGLMaxFragmentAtomicCounterBuffers();
+    constantInfos[gcBIConst_MaxCombinedAtomicCounterBuffers].value[0].intValue = GetGLMaxCombinedAtomicCounterBuffers();
+
+    constantInfos[gcBIConst_MaxAtomicCounterBufferSize].value[0].intValue = (gctINT32)GetGLMaxAtomicCounterBufferSize();
+
+    constantInfos[gcBIConst_MaxVaryingVectors].value[0].intValue = GetGLMaxVaryingVectors();
+
+    constantInfos[gcBIConst_MaxTessControlInputComponents].value[0].intValue = GetGLMaxTCSInputVectors() * 4;
+    constantInfos[gcBIConst_MaxTessControlOutputComponents].value[0].intValue = GetGLMaxTCSOutputVectors() * 4;
+    constantInfos[gcBIConst_MaxTessControlTextureImageUnits].value[0].intValue = GetGLMaxTCSTextureImageUnits();
+    constantInfos[gcBIConst_MaxTessControlImageUniforms].value[0].intValue = GetGLMaxTCSImageUniforms();
+    constantInfos[gcBIConst_MaxTessControlUniformComponents].value[0].intValue = GetGLMaxTCSUniformVectors() * 4;
+    constantInfos[gcBIConst_MaxTessControlTotalOutputComponents].value[0].intValue = GetGLMaxTCSOutTotalVectors() * 4;
+    constantInfos[gcBIConst_MaxTessControlAtomicCounters].value[0].intValue = GetGLMaxTCSAtomicCounters();
+    constantInfos[gcBIConst_MaxTessControlAtomicCounterBuffers].value[0].intValue = GetGLMaxTCSAtomicCounterBuffers();
+
+    constantInfos[gcBIConst_MaxTessEvaluationInputComponents].value[0].intValue = GetGLMaxTESInputVectors() * 4;
+    constantInfos[gcBIConst_MaxTessEvaluationOutputComponents].value[0].intValue = GetGLMaxTESOutputVectors() * 4;
+    constantInfos[gcBIConst_MaxTessEvaluationTextureImageUnits].value[0].intValue = GetGLMaxTESTextureImageUnits();
+    constantInfos[gcBIConst_MaxTessEvaluationImageUniforms].value[0].intValue = GetGLMaxTESImageUniforms();
+    constantInfos[gcBIConst_MaxTessEvaluationUniformComponents].value[0].intValue = GetGLMaxTESUniformVectors() * 4;
+    constantInfos[gcBIConst_MaxTessEvaluationAtomicCounters].value[0].intValue = GetGLMaxTESAtomicCounters();
+    constantInfos[gcBIConst_MaxTessEvaluationAtomicCounterBuffers].value[0].intValue = GetGLMaxTESAtomicCounterBuffers();
+    constantInfos[gcBIConst_MaxTessPatchComponents].value[0].intValue = GetGLMaxTessPatchVectors() * 4;
+    constantInfos[gcBIConst_MaxPatchVertices].value[0].intValue = GetGLMaxTessPatchVertices();
+    constantInfos[gcBIConst_MaxTessGenLevel].value[0].intValue = GetGLMaxTessGenLevel();
+
+    constantInfos[gcBIConst_MaxGSInputComponents].value[0].intValue = GetGLMaxGSInVectors() * 4;
+    constantInfos[gcBIConst_MaxGSOutputComponents].value[0].intValue = GetGLMaxGSOutVectors() * 4;
+    constantInfos[gcBIConst_MaxGSImageUniforms].value[0].intValue = GetGLMaxGSImageUniforms();
+    constantInfos[gcBIConst_MaxGSTextureImageUnits].value[0].intValue = GetGLMaxGSTextureImageUnits();
+    constantInfos[gcBIConst_MaxGSOutputVertices].value[0].intValue = GetGLMaxGSOutVertices();
+    constantInfos[gcBIConst_MaxGSTotalOutputComponents].value[0].intValue = GetGLMaxGSOutTotalVectors() * 4;
+    constantInfos[gcBIConst_MaxGSUniformComponents].value[0].intValue = GetGLMaxGSUniformVectors() * 4;
+    constantInfos[gcBIConst_MaxGSAtomicCounters].value[0].intValue = GetGLMaxGSAtomicCounters();
+    constantInfos[gcBIConst_MaxGSAtomicCounterBuffers].value[0].intValue = GetGLMaxGSAtomicCounters();
 
     status = _AddBuiltInConstants(Compiler,
                                   BasicBuiltInTypeInfos,
@@ -797,6 +701,7 @@ _LoadBuiltInUniformState(
     {
         /* Create the struct field: near, far, diff */
         status = sloCOMPILER_CreateNameSpace(Compiler,
+                                             gcvNULL,
                                              &fieldNameSpace);
 
         if (gcmIS_ERROR(status)) break;
@@ -851,6 +756,8 @@ _LoadBuiltInUniformState(
                                                 &structSymbol);
 
         if (gcmIS_ERROR(status)) break;
+
+        slsNAME_SPACE_SetSpaceName(fieldNameSpace, structSymbol);
 
         status = sloCOMPILER_CreateName(Compiler,
                                         0,
@@ -1288,8 +1195,9 @@ slConstructIVEC2Array4(
                                         gcvNULL,
                                         &dataType);
 
-    if(status != gcvSTATUS_OK)
+    if(gcmIS_ERROR(status))
     {
+        return status;
     }
 
     status = sloCOMPILER_CreateArrayDataType(Compiler,
@@ -1384,12 +1292,67 @@ slFuncCheckForInterpolate(
     */
     if (slsQUALIFIERS_GET_AUXILIARY(&variable->name->dataType->qualifiers) == slvAUXILIARY_QUALIFIER_CENTROID)
     {
-        gcmVERIFY_OK(sloCOMPILER_GetCompilerFlag(Compiler, &flag));
+        flag = Compiler->context.compilerFlags;
+
         slsCOMPILER_SetPatchForCentroidVarying(flag);
-        gcmVERIFY_OK(sloCOMPILER_SetCompilerFlag(Compiler, flag));
+
+        Compiler->context.compilerFlags = flag;
     }
 
     slsQUALIFIERS_SET_FLAG(&variable->name->dataType->qualifiers, slvQUALIFIERS_FLAG_USE_AS_INTERPOLATE_FUNCTION);
+
+    return status;
+}
+
+gceSTATUS
+slFuncCheckForTextureGatherOffsets(
+    IN sloCOMPILER Compiler,
+    IN struct _slsNAME * FuncName,
+    IN struct _sloIR_POLYNARY_EXPR * PolynaryExpr
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    sloIR_EXPR argument;
+    sloIR_EXPR offsetsArg = gcvNULL;
+    sleIR_OBJECT_TYPE exprType;
+    gctBOOL isOffsetsConstant = gcvFALSE;
+
+    /* Get the offsets expr. */
+    FOR_EACH_DLINK_NODE(&PolynaryExpr->operands->members, struct _sloIR_EXPR, argument)
+    {
+        if (argument->dataType->arrayLength == 4)
+        {
+            offsetsArg = argument;
+            break;
+        }
+    }
+
+    if (!offsetsArg)
+    {
+        gcmASSERT(gcvFALSE);
+        return status;
+    }
+
+    /* The offsets of textureGatherOffsets must be an constant array. */
+    offsetsArg = _GetArgumentVariable(offsetsArg);
+    exprType = sloIR_OBJECT_GetType(&offsetsArg->base);
+
+    if (exprType == slvIR_CONSTANT)
+    {
+        isOffsetsConstant = gcvTRUE;
+    }
+
+    if (!isOffsetsConstant)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
+                                        slvREPORT_ERROR,
+                                        "The first argument of %s "
+                                        "must be a input of a fragment shader.",
+                                        PolynaryExpr->funcSymbol));
+        return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+    }
 
     return status;
 }
@@ -1432,8 +1395,7 @@ _LoadBuiltInFunctions(
 
         gcmASSERT(basicBuiltInTypeInfo);
 
-        if (basicBuiltInTypeInfo == gcvNULL)
-            break;
+        if (basicBuiltInTypeInfo == gcvNULL) break;
 
         status = sloCOMPILER_AllocatePoolString(Compiler,
                                                 BuiltInFunctions[i].symbol,
@@ -1455,6 +1417,7 @@ _LoadBuiltInFunctions(
 
         status = sloCOMPILER_CreateNameSpace(
                                             Compiler,
+                                            symbolInPool,
                                             &funcName->u.funcInfo.localSpace);
 
         if (gcmIS_ERROR(status)) break;
@@ -1464,6 +1427,7 @@ _LoadBuiltInFunctions(
         {
             slsDATA_TYPE * dataType = gcvNULL;
             paramDataTypeConstructor callback = gcvNULL;
+
             /* Create parameter name */
             switch (BuiltInFunctions[i].paramTypes[j])
             {
@@ -1477,6 +1441,7 @@ _LoadBuiltInFunctions(
                     callback = BuiltInFunctions[i].paramDataTypeConstructors[2];
                     break;
             }
+
             if (callback)
             {
                 callback(Compiler, &dataType);
@@ -1502,8 +1467,7 @@ _LoadBuiltInFunctions(
 
             gcmASSERT(dataType);
 
-            if (dataType == gcvNULL)
-                break;
+            if (dataType == gcvNULL) break;
 
             status = sloCOMPILER_CreateName(Compiler,
                                             0,
@@ -1620,6 +1584,7 @@ _LoadIntrinsicBuiltInFunctions(
         }
 
         status = sloCOMPILER_CreateNameSpace(Compiler,
+                                             symbolInPool,
                                              &funcName->u.funcInfo.localSpace);
 
         if (gcmIS_ERROR(status)) break;
@@ -1648,6 +1613,7 @@ _LoadIntrinsicBuiltInFunctions(
                     callback = IntrinsicFunctions[i].paramDataTypeConstructors[2];
                     break;
             }
+
             if (callback)
             {
                 callback(Compiler, &data_type);
@@ -1667,12 +1633,15 @@ _LoadIntrinsicBuiltInFunctions(
                 else if (IntrinsicFunctions[i].paramPrecisions[j] != slvPRECISION_QUALIFIER_DEFAULT &&
                    IntrinsicFunctions[i].paramPrecisions[j] != data_type->qualifiers.precision)
                 {
-                    slsDATA_TYPE_Clone(Compiler, data_type->qualifiers.storage, IntrinsicFunctions[i].paramPrecisions[j], data_type, &data_type);
+                    slsDATA_TYPE_Clone(Compiler,
+                                       data_type->qualifiers.storage,
+                                       IntrinsicFunctions[i].paramPrecisions[j],
+                                       data_type,
+                                       &data_type);
                 }
             }
 
-            if (data_type == gcvNULL)
-                break;
+            if (data_type == gcvNULL) break;
 
             if (IntrinsicFunctions[i].paramQualifiers[j] == slvSTORAGE_QUALIFIER_OUT ||
                 IntrinsicFunctions[i].paramQualifiers[j] == slvSTORAGE_QUALIFIER_INOUT)
@@ -1740,10 +1709,9 @@ _LoadIntrinsicBuiltInFunctions(
 }
 
 gceSTATUS
-slLoadBuiltIns(
+slLoadGeneralBuiltIns(
     IN sloCOMPILER Compiler,
-    IN sleSHADER_TYPE ShaderType,
-    IN gctBOOL LoadPrecisionOnly
+    IN sleSHADER_TYPE ShaderType
     )
 {
     gceSTATUS                       status;
@@ -1754,39 +1722,6 @@ slLoadBuiltIns(
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
 
-    if (LoadPrecisionOnly)
-    {
-        /* Load default precision declarations */
-        /* All languages except for the fragment language have the default precision. */
-        if (ShaderType != slvSHADER_TYPE_FRAGMENT && ShaderType != slvSHADER_TYPE_LIBRARY)
-        {
-           status = _LoadDefaultPrecisionDecls(Compiler,
-                                               VSDefaultPrecisionDeclCount,
-                                               VSDefaultPrecisionDecls);
-
-           if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-        }
-        else if (ShaderType != slvSHADER_TYPE_LIBRARY)
-        {
-           status = _LoadDefaultPrecisionDecls(Compiler,
-                                               FSDefaultPrecisionDeclCount,
-                                               FSDefaultPrecisionDecls);
-
-           if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-        }
-        else
-        {
-           status = _LoadDefaultPrecisionDecls(Compiler,
-                                               LIBDefaultPrecisionDeclCount,
-                                               LIBDefaultPrecisionDecls);
-
-           if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-        }
-
-        gcmFOOTER();
-        return status;
-    }
-
     status = _ConstructBasicBuiltInTypeInfos(Compiler,
                                              &basicBuiltInTypeInfos);
 
@@ -1794,72 +1729,31 @@ slLoadBuiltIns(
 
     do
     {
-        /* Load built-in constant state */
-        status = _LoadBuiltInConstants(Compiler,
-                                       basicBuiltInTypeInfos);
-
-        if (gcmIS_ERROR(status)) break;
-
-        /* Load built-in uniform state */
-        status = _LoadBuiltInUniformState(Compiler,
-                                          basicBuiltInTypeInfos);
-
-        if (gcmIS_ERROR(status)) break;
-
-        /* Load built-in variables */
-        if (ShaderType == slvSHADER_TYPE_VERTEX)
+        /* Load default precision declarations */
+        /* All languages except for the fragment language have the default precision. */
+        if (ShaderType != slvSHADER_TYPE_FRAGMENT && ShaderType != slvSHADER_TYPE_LIBRARY)
         {
-            status = _LoadBuiltInVariables(Compiler,
-                                           basicBuiltInTypeInfos,
-                                           VSBuiltInVariableCount,
-                                           VSBuiltInVariables);
+            status = _LoadDefaultPrecisionDecls(Compiler,
+                                                VSDefaultPrecisionDeclCount,
+                                                VSDefaultPrecisionDecls);
 
-            if (gcmIS_ERROR(status)) break;
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
         }
-        else if (ShaderType == slvSHADER_TYPE_FRAGMENT)
+        else if (ShaderType != slvSHADER_TYPE_LIBRARY)
         {
-            status = _LoadBuiltInVariables(Compiler,
-                                           basicBuiltInTypeInfos,
-                                           FSBuiltInVariableCount,
-                                           FSBuiltInVariables);
+            status = _LoadDefaultPrecisionDecls(Compiler,
+                                                FSDefaultPrecisionDeclCount,
+                                                FSDefaultPrecisionDecls);
 
-            if (gcmIS_ERROR(status)) break;
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
         }
-        else if (ShaderType == slvSHADER_TYPE_COMPUTE)
+        else
         {
-            status = _LoadBuiltInVariables(Compiler,
-                                           basicBuiltInTypeInfos,
-                                           CSBuiltInVariableCount,
-                                           CSBuiltInVariables);
+            status = _LoadDefaultPrecisionDecls(Compiler,
+                                                LIBDefaultPrecisionDeclCount,
+                                                LIBDefaultPrecisionDecls);
 
-            if (gcmIS_ERROR(status)) break;
-        }
-        else if (ShaderType == slvSHADER_TYPE_TCS)
-        {
-            status = _LoadBuiltInVariables(Compiler,
-                                           basicBuiltInTypeInfos,
-                                           TCSBuiltInVariableCount,
-                                           TCSBuiltInVariables);
-
-            if (gcmIS_ERROR(status)) break;
-        }
-        else if (ShaderType == slvSHADER_TYPE_TES)
-        {
-            status = _LoadBuiltInVariables(Compiler,
-                                           basicBuiltInTypeInfos,
-                                           TESBuiltInVariableCount,
-                                           TESBuiltInVariables);
-
-            if (gcmIS_ERROR(status)) break;
-        }
-        else if (ShaderType == slvSHADER_TYPE_GS)
-        {
-            status = _LoadBuiltInVariables(Compiler,
-                                           basicBuiltInTypeInfos,
-                                           GSBuiltInVariableCount,
-                                           GSBuiltInVariables);
-
-            if (gcmIS_ERROR(status)) break;
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
         }
 
         /* Load built-in functions */
@@ -1939,6 +1833,109 @@ slLoadBuiltIns(
 }
 
 gceSTATUS
+slLoadBuiltIns(
+    IN sloCOMPILER Compiler,
+    IN sleSHADER_TYPE ShaderType
+    )
+{
+    gceSTATUS                       status;
+    slsBASIC_BUILT_IN_TYPE_INFO *   basicBuiltInTypeInfos;
+
+    gcmHEADER();
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+
+    status = _ConstructBasicBuiltInTypeInfos(Compiler,
+                                             &basicBuiltInTypeInfos);
+
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    do
+    {
+        /* Load built-in constant state */
+        status = _LoadBuiltInConstants(Compiler,
+                                       basicBuiltInTypeInfos);
+
+        if (gcmIS_ERROR(status)) break;
+
+        /* Load built-in uniform state */
+        status = _LoadBuiltInUniformState(Compiler,
+                                          basicBuiltInTypeInfos);
+
+        if (gcmIS_ERROR(status)) break;
+
+        /* Load built-in variables */
+        if (ShaderType == slvSHADER_TYPE_VERTEX)
+        {
+            status = _LoadBuiltInVariables(Compiler,
+                                           basicBuiltInTypeInfos,
+                                           VSBuiltInVariableCount,
+                                           VSBuiltInVariables);
+
+            if (gcmIS_ERROR(status)) break;
+        }
+        else if (ShaderType == slvSHADER_TYPE_FRAGMENT)
+        {
+            status = _LoadBuiltInVariables(Compiler,
+                                           basicBuiltInTypeInfos,
+                                           FSBuiltInVariableCount,
+                                           FSBuiltInVariables);
+
+            if (gcmIS_ERROR(status)) break;
+        }
+        else if (ShaderType == slvSHADER_TYPE_COMPUTE)
+        {
+            status = _LoadBuiltInVariables(Compiler,
+                                           basicBuiltInTypeInfos,
+                                           CSBuiltInVariableCount,
+                                           CSBuiltInVariables);
+
+            if (gcmIS_ERROR(status)) break;
+        }
+        else if (ShaderType == slvSHADER_TYPE_TCS)
+        {
+            status = _LoadBuiltInVariables(Compiler,
+                                           basicBuiltInTypeInfos,
+                                           TCSBuiltInVariableCount,
+                                           TCSBuiltInVariables);
+
+            if (gcmIS_ERROR(status)) break;
+        }
+        else if (ShaderType == slvSHADER_TYPE_TES)
+        {
+            status = _LoadBuiltInVariables(Compiler,
+                                           basicBuiltInTypeInfos,
+                                           TESBuiltInVariableCount,
+                                           TESBuiltInVariables);
+
+            if (gcmIS_ERROR(status)) break;
+        }
+        else if (ShaderType == slvSHADER_TYPE_GS)
+        {
+            status = _LoadBuiltInVariables(Compiler,
+                                           basicBuiltInTypeInfos,
+                                           GSBuiltInVariableCount,
+                                           GSBuiltInVariables);
+
+            if (gcmIS_ERROR(status)) break;
+        }
+
+        /* Return */
+        gcmVERIFY_OK(_DestroyBasicBuiltInTypeInfos(Compiler, basicBuiltInTypeInfos));
+
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+
+    gcmVERIFY_OK(_DestroyBasicBuiltInTypeInfos(Compiler, basicBuiltInTypeInfos));
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 slGetBuiltInVariableImplSymbol(
     IN sloCOMPILER Compiler,
     IN gctCONST_STRING Symbol,
@@ -1960,7 +1957,7 @@ slGetBuiltInVariableImplSymbol(
     gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "ImplSymbol=%x", gcmOPT_POINTER(ImplSymbol));
     gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_COMPILER, "*ImplQualifier=%u", gcmOPT_VALUE(ImplQualifier));
 
-    sloCOMPILER_GetShaderType(Compiler, &shaderType);
+    shaderType = Compiler->shaderType;
 
     if(shaderType == slvSHADER_TYPE_VERTEX)
     {
@@ -1973,8 +1970,11 @@ slGetBuiltInVariableImplSymbol(
                 break;
             }
         }
+
         gcmASSERT(i < VSBuiltInVariableCount);
-        if(!(i < VSBuiltInVariableCount)) {
+
+        if(!(i < VSBuiltInVariableCount))
+        {
             *ImplSymbol = gcvNULL;
             *ImplQualifier = slvSTORAGE_QUALIFIER_NONE;
             gcmFOOTER_NO();
@@ -1992,8 +1992,11 @@ slGetBuiltInVariableImplSymbol(
                 break;
             }
         }
+
         gcmASSERT(i < FSBuiltInVariableCount);
-        if(!(i < FSBuiltInVariableCount)) {
+
+        if(!(i < FSBuiltInVariableCount))
+        {
             *ImplSymbol = gcvNULL;
             *ImplQualifier = slvSTORAGE_QUALIFIER_NONE;
             gcmFOOTER_NO();
@@ -2011,8 +2014,11 @@ slGetBuiltInVariableImplSymbol(
                 break;
             }
         }
+
         gcmASSERT(i < CSBuiltInVariableCount);
-        if(!(i < CSBuiltInVariableCount)) {
+
+        if(!(i < CSBuiltInVariableCount))
+        {
             *ImplSymbol = gcvNULL;
             *ImplQualifier = slvSTORAGE_QUALIFIER_NONE;
             gcmFOOTER_NO();
@@ -2030,8 +2036,11 @@ slGetBuiltInVariableImplSymbol(
                 break;
             }
         }
+
         gcmASSERT(i < TCSBuiltInVariableCount);
-        if(!(i < TCSBuiltInVariableCount)) {
+
+        if(!(i < TCSBuiltInVariableCount))
+        {
             *ImplSymbol = gcvNULL;
             *ImplQualifier = slvSTORAGE_QUALIFIER_NONE;
             gcmFOOTER_NO();
@@ -2049,8 +2058,11 @@ slGetBuiltInVariableImplSymbol(
                 break;
             }
         }
+
         gcmASSERT(i < TESBuiltInVariableCount);
-        if(!(i < TESBuiltInVariableCount)) {
+
+        if(!(i < TESBuiltInVariableCount))
+        {
             *ImplSymbol = gcvNULL;
             *ImplQualifier = slvSTORAGE_QUALIFIER_NONE;
             gcmFOOTER_NO();
@@ -2068,15 +2080,17 @@ slGetBuiltInVariableImplSymbol(
                 break;
             }
         }
+
         gcmASSERT(i < GSBuiltInVariableCount);
-        if(!(i < GSBuiltInVariableCount)) {
+
+        if(!(i < GSBuiltInVariableCount))
+        {
             *ImplSymbol = gcvNULL;
             *ImplQualifier = slvSTORAGE_QUALIFIER_NONE;
             gcmFOOTER_NO();
             return gcvSTATUS_NAME_NOT_FOUND;
         }
     }
-
 
     gcmFOOTER_ARG("*ImplSymbol=%u *ImplQualifier=%u", *ImplSymbol, *ImplQualifier);
     return gcvSTATUS_OK;
@@ -3400,7 +3414,9 @@ _GenTextureCode(
     gcmASSERT(!slsDLINK_LIST_IsEmpty(&PolynaryExpr->operands->members));
 
     expr = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
-    switch(expr->dataType->elementType) {
+
+    switch(expr->dataType->elementType)
+    {
     case slvTYPE_SAMPLER2D:
     case slvTYPE_ISAMPLER2D:
     case slvTYPE_USAMPLER2D:
@@ -3457,10 +3473,12 @@ _GenTextureCode(
         break;
     }
 
-    if(!genCode) {
+    if(!genCode)
+    {
         gcmFOOTER_NO();
         return gcvSTATUS_INVALID_ARGUMENT;
     }
+
     status = (*genCode)(Compiler,
                         CodeGenerator,
                         PolynaryExpr,
@@ -3497,7 +3515,9 @@ _GenTextureLodCode(
     gcmASSERT(!slsDLINK_LIST_IsEmpty(&PolynaryExpr->operands->members));
 
     expr = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
-    switch(expr->dataType->elementType) {
+
+    switch(expr->dataType->elementType)
+    {
     case slvTYPE_SAMPLER2D:
     case slvTYPE_ISAMPLER2D:
     case slvTYPE_USAMPLER2D:
@@ -3542,10 +3562,12 @@ _GenTextureLodCode(
         break;
     }
 
-    if(!genCode) {
+    if(!genCode)
+    {
         gcmFOOTER_NO();
         return gcvSTATUS_INVALID_ARGUMENT;
     }
+
     status = (*genCode)(Compiler,
                         CodeGenerator,
                         PolynaryExpr,
@@ -3582,7 +3604,8 @@ _GenTextureProjCode(
     gcmASSERT(!slsDLINK_LIST_IsEmpty(&PolynaryExpr->operands->members));
 
     expr = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
-    switch(expr->dataType->elementType) {
+    switch(expr->dataType->elementType)
+    {
     case slvTYPE_SAMPLER2D:
     case slvTYPE_ISAMPLER2D:
     case slvTYPE_USAMPLER2D:
@@ -3604,7 +3627,8 @@ _GenTextureProjCode(
         break;
     }
 
-    if(!genCode) {
+    if(!genCode)
+    {
         gcmFOOTER_NO();
         return gcvSTATUS_INVALID_ARGUMENT;
     }
@@ -3644,7 +3668,8 @@ _GenTextureProjLodCode(
     gcmASSERT(!slsDLINK_LIST_IsEmpty(&PolynaryExpr->operands->members));
 
     expr = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
-    switch(expr->dataType->elementType) {
+    switch(expr->dataType->elementType)
+    {
     case slvTYPE_SAMPLER2D:
     case slvTYPE_ISAMPLER2D:
     case slvTYPE_USAMPLER2D:
@@ -3666,7 +3691,8 @@ _GenTextureProjLodCode(
         break;
     }
 
-    if(!genCode) {
+    if(!genCode)
+    {
         gcmFOOTER_NO();
         return gcvSTATUS_INVALID_ARGUMENT;
     }
@@ -3872,7 +3898,8 @@ _GenSamplerSizeCode(
     if(sampler->type == slvVARIABLE_NAME)
     {
         slsLOGICAL_REG logicalReg[1];
-        if(sampler->u.variableInfo.levelBaseSize == gcvNULL) {
+        if(sampler->u.variableInfo.levelBaseSize == gcvNULL)
+        {
             status = slAllocSamplerLevelBaseSize(Compiler,
                                                  sampler,
                                                  gcSHADER_FLOAT_X4);
@@ -3916,7 +3943,8 @@ _GenSamplerSizeCode(
                     IOperand->dataType,
                     rOperand->u.reg.precision);
 
-    if(numCoordComponents == numComponents) {
+    if(numCoordComponents == numComponents)
+    {
         status = slGenGenericCode2(Compiler,
                                    LineNo,
                                    StringNo,
@@ -3926,7 +3954,8 @@ _GenSamplerSizeCode(
                                    Lod);
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
     }
-    else {
+    else
+    {
         slsROPERAND intermROperand[1];
         slsIOPERAND intermIOperand[1];
         slsLOPERAND intermLOperand[1], lOperand[1];
@@ -4104,7 +4133,8 @@ _ComputeLod(
     gcmASSERT(sampler->type == slvVARIABLE_NAME);
 
     if(sampler->type == slvVARIABLE_NAME &&
-       sampler->u.variableInfo.lodMinMax == gcvNULL) {
+       sampler->u.variableInfo.lodMinMax == gcvNULL)
+    {
         status = slAllocSamplerLodMinMax(Compiler,
                                          sampler);
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
@@ -4212,7 +4242,7 @@ _ComputeLod(
     status = slGenGenericCode2(Compiler,
                                  PolynaryExpr->exprBase.base.lineNo,
                                  PolynaryExpr->exprBase.base.stringNo,
-                                 slvOPCODE_BITWISE_AND,
+                                 slvOPCODE_AND_BITWISE,
                                  intermIOperand,
                                  ilod,
                                  maxShortUIntROperand);
@@ -4227,7 +4257,7 @@ _ComputeLod(
     status = slGenGenericCode2(Compiler,
                                  PolynaryExpr->exprBase.base.lineNo,
                                  PolynaryExpr->exprBase.base.stringNo,
-                                 slvOPCODE_BITWISE_AND,
+                                 slvOPCODE_AND_BITWISE,
                                  &intermIOperand[1],
                                  ilod,
                                  topBitofShortIntROperand);
@@ -4242,7 +4272,7 @@ _ComputeLod(
     status = slGenGenericCode2(Compiler,
                                  PolynaryExpr->exprBase.base.lineNo,
                                  PolynaryExpr->exprBase.base.stringNo,
-                                 slvOPCODE_BITWISE_OR,
+                                 slvOPCODE_OR_BITWISE,
                                  &intermIOperand[2],
                                  ilod,
                                  hiIntBitsROperand);
@@ -4320,8 +4350,9 @@ _ComputeLod(
 
     slsROPERAND_InitializeUsingIOperand(Lod, intermIOperand);
 
-/* add bias if exists */
-    if(Bias) {
+    /* add bias if exists */
+    if(Bias)
+    {
         slsROPERAND minLodBias[1];
         slsROPERAND maxLodBias[1];
         slsROPERAND clampedBias[1];
@@ -4357,7 +4388,8 @@ _ComputeLod(
     }
 
     slsIOPERAND_New(Compiler, intermIOperand, gcSHADER_FLOAT_X1, Lod->u.reg.precision);
-    if(sampler->type == slvVARIABLE_NAME) {
+    if(sampler->type == slvVARIABLE_NAME)
+    {
         lodMinMax = sampler->u.variableInfo.lodMinMax;
     }
     gcmASSERT(lodMinMax);
@@ -4500,6 +4532,7 @@ _ComputeLodByTextureGrad(
 #endif
     gctUINT8 numCoordComponents;
     gctBOOL isCubeSampler = gcvFALSE;
+    gcSHADER_TYPE ty;
 
     gcmHEADER();
 
@@ -4514,18 +4547,21 @@ _ComputeLodByTextureGrad(
 
     /* Create lodMinMax and levelBaseSize uniforms if needed. */
     numCoordComponents = gcGetDataTypeComponentCount(Dx->dataType);
-    if(sampler->type == slvVARIABLE_NAME) {
-        if(sampler->u.variableInfo.lodMinMax == gcvNULL) {
-            status = slAllocSamplerLodMinMax(Compiler,
-                                             sampler);
+    if(sampler->type == slvVARIABLE_NAME)
+    {
+        if(sampler->u.variableInfo.lodMinMax == gcvNULL)
+        {
+            status = slAllocSamplerLodMinMax(Compiler, sampler);
             if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
         }
-        if(sampler->u.variableInfo.levelBaseSize == gcvNULL) {
+        if(sampler->u.variableInfo.levelBaseSize == gcvNULL)
+        {
             gctUINT8 sizeComponents;
             gcSHADER_TYPE dataType;
 
             sizeComponents = 3;
-            if(slmIsElementTypeSamplerArray(sampler->dataType->elementType)) {
+            if(slmIsElementTypeSamplerArray(sampler->dataType->elementType))
+            {
                 sizeComponents++;
             }
             dataType = gcConvScalarToVectorDataType(gcSHADER_INTEGER_X1, sizeComponents);
@@ -4541,9 +4577,10 @@ _ComputeLodByTextureGrad(
     gcmASSERT(lodMinMax);
     gcmASSERT(sampler->u.variableInfo.levelBaseSize);
 
+    ty = gcConvScalarToVectorDataType(gcSHADER_INTEGER_X1, numCoordComponents);
     slsLOGICAL_REG_InitializeUniform(sizeReg,
                                      slvSTORAGE_QUALIFIER_UNIFORM,
-                                     gcConvScalarToVectorDataType(gcSHADER_INTEGER_X1, numCoordComponents),
+                                     ty,
                                      gcSHADER_PRECISION_MEDIUM,
                                      sampler->u.variableInfo.levelBaseSize,
                                      0);
@@ -4559,7 +4596,8 @@ _ComputeLodByTextureGrad(
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
 
-    if(numCoordComponents != gcGetDataTypeComponentCount(sizeOperand->dataType)) {
+    if(numCoordComponents != gcGetDataTypeComponentCount(sizeOperand->dataType))
+    {
         slGetVectorROperandSlice(sizeOperand,
                                  0,
                                  numCoordComponents,
@@ -4591,7 +4629,7 @@ _ComputeLodByTextureGrad(
 
 /*klc*/
 #if _DO_MIPMAPPED_CHECK
-    codeGenerator = sloCOMPILER_GetCodeGenerator(Compiler);
+    codeGenerator = Compiler->codeGenerator;
     slmGEN_CODE_IF(Compiler,
                    codeGenerator,
                    PolynaryExpr->exprBase.base.lineNo,
@@ -4763,7 +4801,8 @@ _ComputeLodByTextureGrad(
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     /* 3D sampler */
-    if(Is3D) {
+    if(Is3D)
+    {
         slsROPERAND_InitializeUsingIOperand(max1, intermIOperand);
         slsIOPERAND_New(Compiler,
                         intermIOperand,
@@ -4821,7 +4860,8 @@ _ComputeLodByTextureGrad(
 
     slsROPERAND_InitializeUsingIOperand(Lod, intermLod);
 
-    if(NeedClamping) {
+    if(NeedClamping)
+    {
         slsROPERAND minLevel[1];
         slsROPERAND maxLevel[1];
 
@@ -4885,7 +4925,7 @@ _ComputeOffsetCoords(
     gcmHEADER();
 
     /* compute texture size */
-    gcmVERIFY_OK(sloCOMPILER_GetShaderType(Compiler, &shaderType));
+    shaderType = Compiler->shaderType;
 
     gcmASSERT(PolynaryExpr->operands);
     samplerOperand = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
@@ -4899,12 +4939,13 @@ _ComputeOffsetCoords(
 
     if(samplerName->type == slvVARIABLE_NAME && samplerName->u.variableInfo.lodMinMax == gcvNULL)
     {
-        status = slAllocSamplerLodMinMax(Compiler,
-                                    samplerName);
+        status = slAllocSamplerLodMinMax(Compiler, samplerName);
+
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
     }
 
-    if(samplerName->type == slvVARIABLE_NAME) {
+    if(samplerName->type == slvVARIABLE_NAME)
+    {
         lodMinMax = samplerName->u.variableInfo.lodMinMax;
     }
     gcmASSERT(lodMinMax);
@@ -4957,7 +4998,8 @@ _ComputeOffsetCoords(
 
         *lod = *Lod;
     }
-    else {
+    else
+    {
         slsROPERAND integerZero[1];
         lod = lodBuf;
 
@@ -4966,7 +5008,9 @@ _ComputeOffsetCoords(
                                                 gcSHADER_PRECISION_MEDIUM,
                                                 (gctINT) 0);
 
-        if (shaderType == slvSHADER_TYPE_FRAGMENT) { /* fragment shader */
+        if (shaderType == slvSHADER_TYPE_FRAGMENT)
+        {
+            /* fragment shader */
             slsROPERAND dx[2], dy[2];
             slsROPERAND texCoords[1];
             slsROPERAND zeroROperand[1];
@@ -4975,6 +5019,7 @@ _ComputeOffsetCoords(
             gcUNIFORM levelBaseSize = gcvNULL;
             slsLOGICAL_REG logicalRegLevelBaseSize[1];
             slsROPERAND internRlevelBaseSize[1];
+            gcSHADER_TYPE ty;
 
             if(samplerName->type == slvVARIABLE_NAME &&
                 samplerName->u.variableInfo.levelBaseSize == gcvNULL)
@@ -5013,7 +5058,7 @@ _ComputeOffsetCoords(
                             intermLod,
                             gcSHADER_INTEGER_X1,
                             gcSHADER_PRECISION_MEDIUM);
-            codeGenerator = sloCOMPILER_GetCodeGenerator(Compiler);
+            codeGenerator = Compiler->codeGenerator;
             slmGEN_CODE_IF(Compiler,
                            codeGenerator,
                            PolynaryExpr->exprBase.base.lineNo,
@@ -5055,10 +5100,11 @@ _ComputeOffsetCoords(
                                        texCoords);
             if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
+            ty = gcConvScalarToVectorDataType(gcSHADER_INTEGER_X1, numCoordComponents);
             /* Multiply the derivatives with the base texture size. */
             slsLOGICAL_REG_InitializeUniform(logicalRegLevelBaseSize,
                                              slvSTORAGE_QUALIFIER_UNIFORM,
-                                             gcConvScalarToVectorDataType(gcSHADER_INTEGER_X1, numCoordComponents),
+                                             ty,
                                              gcSHADER_PRECISION_MEDIUM,
                                              levelBaseSize,
                                              0);
@@ -5152,7 +5198,8 @@ _ComputeOffsetCoords(
 
             slsROPERAND_InitializeUsingIOperand(lod, intermLod);
         }
-        else {
+        else
+        {
             *lod = *integerZero;
         }
     }
@@ -5166,7 +5213,8 @@ _ComputeOffsetCoords(
 
     numCoordComponents = gcGetDataTypeComponentCount(Offset->dataType);
     sizeComponents = numCoordComponents;
-    if(slmIsElementTypeSamplerArray(samplerName->dataType->elementType)) {
+    if(slmIsElementTypeSamplerArray(samplerName->dataType->elementType))
+    {
         sizeComponents++;
     }
     sizeElementType = gcGetVectorComponentDataType(Offset->dataType);
@@ -5676,7 +5724,8 @@ _GenTexelFetchCode(
     samplerOperand = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
 
     if(slsDATA_TYPE_IsSamplerMS(samplerOperand->dataType) ||
-       slsDATA_TYPE_IsSamplerMSARRAY(samplerOperand->dataType)) {
+       slsDATA_TYPE_IsSamplerMSARRAY(samplerOperand->dataType))
+    {
        return _GenTexelFetchMSCode(Compiler,
                                    CodeGenerator,
                                    PolynaryExpr,
@@ -5707,7 +5756,7 @@ _GenTexelFetchCode(
     ** If HW can support INTEGER coord, we don't need to convert it to FLOAT.
     ** And we generate TEXLD_U instead of TEXLD.
     */
-    if (0  && gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE_V2))
+    if (GetHWHasUniversalTexldV2() && GetHWHasTexldUFix())
     {
         textureParameters[0] = OperandsParameters[0];
         textureParameters[1] = OperandsParameters[1];
@@ -5751,7 +5800,8 @@ _GenTexelFetchCode(
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
         numCoordComponents = gcGetDataTypeComponentCount(floatType);
-        if(gcIsSamplerArrayDataType(OperandsParameters[0].dataTypes[0])) {
+        if(gcIsSamplerArrayDataType(OperandsParameters[0].dataTypes[0]))
+        {
             numCoordComponents--;
         }
 
@@ -5879,7 +5929,7 @@ _GenTexelFetchOffsetCode(
     ** If HW can support INTEGER coord, we don't need to convert it to FLOAT.
     ** And we generate TEXLD_U instead of TEXLD.
     */
-    if (0  && gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE_V2))
+    if (GetHWHasUniversalTexldV2() && GetHWHasTexldUFix())
     {
         /* Slice coords if needed. */
         if (numCoordComponents != numOffsetComponents)
@@ -6285,7 +6335,7 @@ _GenTextureNonShadowGradCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2))
+    if (GetHWHasHalti2())
     {
         status = slGenGenericCode2(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
@@ -6355,7 +6405,7 @@ _GenTextureShadowGradCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2))
+    if (GetHWHasHalti2())
     {
         status = slGenGenericCode2(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
@@ -6430,14 +6480,16 @@ _GenTextureNonShadowGatherCode(
                                                   gcSHADER_FLOAT_X1,
                                                   gcSHADER_PRECISION_MEDIUM,
                                                   (gctFLOAT)0.0);
-    if(OperandCount == 2) {
+    if(OperandCount == 2)
+    {
         slsROPERAND_InitializeIntOrIVecConstant(intConstantZero,
                                                 gcSHADER_INTEGER_X1,
                                                 gcSHADER_PRECISION_MEDIUM,
                                                 0);
         component = intConstantZero;
     }
-    else {
+    else
+    {
         component = &OperandsParameters[2].rOperands[0];
     }
 
@@ -6537,14 +6589,17 @@ _GenTextureGatherCode(
     gcmASSERT(!slsDLINK_LIST_IsEmpty(&PolynaryExpr->operands->members));
 
     expr = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
-    if(slsDATA_TYPE_IsSamplerShadow(expr->dataType)) {
+    if(slsDATA_TYPE_IsSamplerShadow(expr->dataType))
+    {
         genCode = _GenTextureShadowGatherCode;
     }
-    else {
+    else
+    {
         genCode = _GenTextureNonShadowGatherCode;
     }
 
-    if(!genCode) {
+    if(!genCode)
+    {
         gcmFOOTER_NO();
         return gcvSTATUS_INVALID_ARGUMENT;
     }
@@ -6687,7 +6742,8 @@ _GenTextureGradCode(
     gcmASSERT(!slsDLINK_LIST_IsEmpty(&PolynaryExpr->operands->members));
 
     expr = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
-    switch(expr->dataType->elementType) {
+    switch(expr->dataType->elementType)
+    {
     case slvTYPE_SAMPLER2DSHADOW:
     case slvTYPE_SAMPLERCUBESHADOW:
     case slvTYPE_SAMPLER2DARRAYSHADOW:
@@ -6699,7 +6755,8 @@ _GenTextureGradCode(
         break;
     }
 
-    if(!genCode) {
+    if(!genCode)
+    {
         gcmFOOTER_NO();
         return gcvSTATUS_INVALID_ARGUMENT;
     }
@@ -6804,7 +6861,7 @@ _GenTextureNonShadowProjGradCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2))
+    if (GetHWHasHalti2())
     {
         status = slGenGenericCode2(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
@@ -6874,7 +6931,7 @@ _GenTextureShadowProjGradCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2))
+    if (GetHWHasHalti2())
     {
         status = slGenGenericCode2(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
@@ -6948,7 +7005,8 @@ _GenTextureProjGradCode(
     gcmASSERT(!slsDLINK_LIST_IsEmpty(&PolynaryExpr->operands->members));
 
     expr = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _sloIR_EXPR);
-    switch(expr->dataType->elementType) {
+    switch(expr->dataType->elementType)
+    {
     case slvTYPE_SAMPLER2DSHADOW:
     case slvTYPE_SAMPLERCUBESHADOW:
         genCode = _GenTextureShadowProjGradCode;
@@ -6959,7 +7017,8 @@ _GenTextureProjGradCode(
         break;
     }
 
-    if(!genCode) {
+    if(!genCode)
+    {
         gcmFOOTER_NO();
         return gcvSTATUS_INVALID_ARGUMENT;
     }
@@ -9086,7 +9145,7 @@ _GenPowCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    if (sloCOMPILER_OptimizationEnabled(Compiler, slvOPTIMIZATION_CALCULATION))
+    if (Compiler->context.optimizationOptions & slvOPTIMIZATION_CALCULATION)
     {
         for (i = 0; i < POW_N_COUNT; i++)
         {
@@ -9936,7 +9995,8 @@ _EvaluateTrunc(
                  OperandConstants[0]->values[i].floatValue : -OperandConstants[0]->values[i].floatValue;
 
         values[i].floatValue = gcoMATH_Floor(absVal);
-        if(OperandConstants[0]->values[i].floatValue < 0.0f) {
+        if(OperandConstants[0]->values[i].floatValue < 0.0f)
+        {
             values[i].floatValue = -values[i].floatValue;
         }
 
@@ -10061,7 +10121,8 @@ _EvaluateRound(
                  OperandConstants[0]->values[i].floatValue : -OperandConstants[0]->values[i].floatValue;
 
         values[i].floatValue = gcoMATH_Floor(absVal + 0.5f);
-        if(OperandConstants[0]->values[i].floatValue < 0.0f) {
+        if(OperandConstants[0]->values[i].floatValue < 0.0f)
+        {
             values[i].floatValue = -values[i].floatValue;
         }
     }
@@ -10159,20 +10220,25 @@ _EvaluateRoundEven(
     for (i = 0; i < componentCount; i++)
     {
         intermRes.uintValue = OperandConstants[0]->values[i].uintValue & 0x7fffffff;
-        if(intermRes.floatValue >= (float) (1 << 24)) {
+        if(intermRes.floatValue >= (float) (1 << 24))
+        {
             values[i].floatValue = OperandConstants[0]->values[i].floatValue;
         }
-        else {
+        else
+        {
             r1 = intermRes.floatValue - gcoMATH_Floor(intermRes.floatValue);
             r2 = gcoMATH_Floor(intermRes.floatValue + 0.5f);
-            if(r1 == 0.5) {
+            if(r1 == 0.5)
+            {
                  intermRes.intValue = ((int) r2) & 0x00000001;
                  r2 -= (float) intermRes.intValue;
             }
-            if(OperandConstants[0]->values[i].floatValue > 0.0f) {
+            if(OperandConstants[0]->values[i].floatValue > 0.0f)
+            {
                 values[i].floatValue = r2;
             }
-            else {
+            else
+            {
                 values[i].floatValue = -r2;
             }
         }
@@ -10822,7 +10888,7 @@ _GenClampCodeInner(
     gceSTATUS status;
     gcmHEADER();
 
-    if (sloCOMPILER_OptimizationEnabled(Compiler, slvOPTIMIZATION_CALCULATION)
+    if ((Compiler->context.optimizationOptions & slvOPTIMIZATION_CALCULATION)
         && slsROPERAND_IsFloatOrVecConstant(MinVal, 0.0)
         && slsROPERAND_IsFloatOrVecConstant(MaxVal, 1.0))
     {
@@ -10968,13 +11034,16 @@ _EvaluateMix(
 
     gcmASSERT(componentCount[0] == componentCount[1]);
 
-    if(slmIsElementTypeBoolean(OperandConstants[2]->exprBase.dataType->elementType)) {
+    if(slmIsElementTypeBoolean(OperandConstants[2]->exprBase.dataType->elementType))
+    {
         for (i = 0; i < componentCount[0]; i++)
         {
-            if(OperandConstants[2]->values[i].boolValue) {
+            if(OperandConstants[2]->values[i].boolValue)
+            {
                 values[i].intValue = OperandConstants[1]->values[i].intValue;
             }
-            else {
+            else
+            {
                 values[i].intValue = OperandConstants[0]->values[i].intValue;
             }
         }
@@ -11045,7 +11114,8 @@ _GenMixCode(
         gcmASSERT(OperandsParameters);
         gcmASSERT(IOperand);
 
-        if(gcGetComponentDataType(OperandsParameters[2].dataTypes[0]) == gcSHADER_BOOLEAN_X1) {
+        if(gcGetComponentDataType(OperandsParameters[2].dataTypes[0]) == gcSHADER_BOOLEAN_X1)
+        {
             status = slGenSelectExprCode(Compiler,
                 PolynaryExpr->exprBase.base.lineNo,
                 PolynaryExpr->exprBase.base.stringNo,
@@ -11122,7 +11192,8 @@ _GenMixCode(
         gcmASSERT(OperandsParameters);
         gcmASSERT(IOperand);
 
-        if(gcGetComponentDataType(OperandsParameters[2].dataTypes[0]) == gcSHADER_BOOLEAN_X1) {
+        if(gcGetComponentDataType(OperandsParameters[2].dataTypes[0]) == gcSHADER_BOOLEAN_X1)
+        {
             status = slGenSelectExprCode(Compiler,
                 PolynaryExpr->exprBase.base.lineNo,
                 PolynaryExpr->exprBase.base.stringNo,
@@ -11667,11 +11738,12 @@ _GenIsNanCode(
     status = slGenGenericCode2(Compiler,
                                PolynaryExpr->exprBase.base.lineNo,
                                PolynaryExpr->exprBase.base.stringNo,
-                               slvOPCODE_BITWISE_AND,
+                               slvOPCODE_AND_BITWISE,
                                intermIOperand,
                                &unsignROperand,
                                &OperandsParameters[0].rOperands[0]);
-    if (gcmIS_ERROR(status)) {
+    if (gcmIS_ERROR(status))
+    {
         gcmFOOTER();
         return status;
     }
@@ -11683,7 +11755,8 @@ _GenIsNanCode(
                                IOperand,
                                intermROperand,
                                &infROperand);
-    if (gcmIS_ERROR(status)) {
+    if (gcmIS_ERROR(status))
+    {
         gcmFOOTER();
         return status;
     }
@@ -11778,11 +11851,13 @@ _GenIsInfCode(
     status = slGenGenericCode2(Compiler,
                                PolynaryExpr->exprBase.base.lineNo,
                                PolynaryExpr->exprBase.base.stringNo,
-                               slvOPCODE_BITWISE_AND,
+                               slvOPCODE_AND_BITWISE,
                                intermIOperand,
                                &unsignROperand,
                                &OperandsParameters[0].rOperands[0]);
-    if (gcmIS_ERROR(status)) {
+
+    if (gcmIS_ERROR(status))
+    {
         gcmFOOTER();
         return status;
     }
@@ -11794,7 +11869,9 @@ _GenIsInfCode(
                                IOperand,
                                intermROperand,
                                &infROperand);
-    if (gcmIS_ERROR(status)) {
+
+    if (gcmIS_ERROR(status))
+    {
         gcmFOOTER();
         return status;
     }
@@ -12120,10 +12197,13 @@ _EvaluatePackSnorm2x16(
                                         resConst->values));
 
 OnError:
-    if(tempConst) {
+    if(tempConst)
+    {
        sloIR_CONSTANT_Destroy(Compiler, &tempConst->exprBase.base);
     }
-    if(resConst) {
+
+    if(resConst)
+    {
        sloIR_CONSTANT_Destroy(Compiler, &resConst->exprBase.base);
     }
 
@@ -12305,10 +12385,13 @@ _EvaluatePackUnorm2x16(
                                         resConst->values));
 
 OnError:
-    if(tempConst) {
+    if(tempConst)
+    {
        sloIR_CONSTANT_Destroy(Compiler, &tempConst->exprBase.base);
     }
-    if(resConst) {
+
+    if(resConst)
+    {
        sloIR_CONSTANT_Destroy(Compiler, &resConst->exprBase.base);
     }
 
@@ -12662,10 +12745,12 @@ _GenDistanceCode(
 
     /* mul t0, m[0], v.x */
     if(slmROPERAND_IsHigherPrecision(OperandsParameters[1].rOperands,
-                                     OperandsParameters[0].rOperands)) {
+                                     OperandsParameters[0].rOperands))
+    {
         precision = OperandsParameters[1].rOperands[0].u.reg.precision;
     }
-    else {
+    else
+    {
         precision = OperandsParameters[0].rOperands[0].u.reg.precision;
     }
     /* sub t0, p0, p1 */
@@ -13088,6 +13173,7 @@ _GenNormalizeCode(
             gcmFOOTER();
             return status;
         }
+
         /* Generate the code of the true operand:
         mov intermIOperand 0.0;
         */
@@ -13133,8 +13219,9 @@ _GenNormalizeCode(
             Compiler,
             CodeGenerator,
             &selectionContext);
+
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-        /************************************************************/
+
         status = slGenGenericCode1(
             Compiler,
             PolynaryExpr->exprBase.base.lineNo,
@@ -13142,20 +13229,24 @@ _GenNormalizeCode(
             slvOPCODE_NORMALIZE,
             IOperand,
             &OperandsParameters[0].rOperands[0]);
+
         if (gcmIS_ERROR(status))
         {
             gcmFOOTER();
             return status;
         }
+
         status = slDefineSelectionFalseOperandEnd(
             Compiler,
             CodeGenerator,
             &selectionContext);
+
         if (gcmIS_ERROR(status))
         {
             gcmFOOTER();
             return status;
         }
+
         /* Selection End */
         status = slDefineSelectionEnd(
             Compiler,
@@ -14062,13 +14153,18 @@ _EvaluateOuterProduct(
     res = values;
 
     rightValues = OperandConstants[1]->values;
-    for(i = 0; i < columnCount; i++) {
+
+    for(i = 0; i < columnCount; i++)
+    {
        leftValues = OperandConstants[0]->values;
-       for(j = 0; j < rowCount; j++) {
+
+       for(j = 0; j < rowCount; j++)
+       {
           res->floatValue = rightValues->floatValue * leftValues->floatValue;
           leftValues++;
           res++;
        }
+
        rightValues++;
     }
 
@@ -14076,6 +14172,7 @@ _EvaluateOuterProduct(
                                       ResultConstant,
                                       componentCount,
                                       values);
+
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     gcmFOOTER_NO();
@@ -14194,19 +14291,25 @@ _EvaluateTranspose(
 
     values = pointer;
     fromValues = OperandConstants[0]->values;
-    if(OperandConstants[0]->valueCount == 1) {
-       for(i = 0; i < componentCount; i++) {
+
+    if(OperandConstants[0]->valueCount == 1)
+    {
+       for(i = 0; i < componentCount; i++)
+       {
           values[i].floatValue = fromValues[0].floatValue;
        }
     }
-    else {
+    else
+    {
        gctUINT columnCount, rowCount, j;
 
        columnCount = slmDATA_TYPE_matrixColumnCount_GET(OperandConstants[0]->exprBase.dataType);
        rowCount = slmDATA_TYPE_matrixRowCount_GET(OperandConstants[0]->exprBase.dataType);
 
-       for (i = 0; i < columnCount; i++) {
-           for(j = 0; j < rowCount; j++) {
+       for (i = 0; i < columnCount; i++)
+       {
+           for(j = 0; j < rowCount; j++)
+           {
                values[j * columnCount + i].floatValue = fromValues[i * rowCount + j].floatValue;
            }
        }
@@ -14244,13 +14347,15 @@ _ComputeTranspose(
     columnCount = gcGetMatrixDataTypeColumnCount(TransposedMatrix->dataType);
     rowCount = gcGetMatrixDataTypeRowCount(TransposedMatrix->dataType);
 
-    for (i = 0; i < columnCount; i++) {
+    for (i = 0; i < columnCount; i++)
+    {
         slsIOPERAND_InitializeAsMatrixColumn(columnIOperand,
                                              TransposedMatrix,
                                              i);
         slsLOPERAND_InitializeUsingIOperand(columnLOperand, columnIOperand);
 
-        for (j = 0; j < rowCount; j++) {
+        for (j = 0; j < rowCount; j++)
+        {
             slsLOPERAND_InitializeAsVectorComponent(lOperand, columnLOperand, j);
 
             slsROPERAND_InitializeAsMatrixColumn(columnROperand,
@@ -14380,13 +14485,15 @@ _EvalConstDet(
 
     rowCount = (gctUINT8)slmDATA_TYPE_matrixRowCount_GET(ConstMatrix->exprBase.dataType);
     values = ConstMatrix->values;
-    if(ActiveSize == 2) {
+    if(ActiveSize == 2)
+    {
         *Det = Negate * (values[ActiveColumns[0] * rowCount + ActiveRows[0]].floatValue *
                          values[ActiveColumns[1] * rowCount + ActiveRows[1]].floatValue -
                          values[ActiveColumns[1] * rowCount + ActiveRows[0]].floatValue *
                          values[ActiveColumns[0] * rowCount + ActiveRows[1]].floatValue);
     }
-    else {
+    else
+    {
         gceSTATUS status;
         gctUINT8 activeRows[sldMAX_MATRIX_SIZE];
         gctUINT8 activeColumns[sldMAX_MATRIX_SIZE];
@@ -14396,14 +14503,17 @@ _EvalConstDet(
         float minor;
         float det;
 
-        for(i = 0; i < activeSize; i++) {
+        for(i = 0; i < activeSize; i++)
+        {
             activeColumns[i] = ActiveColumns[i+1];
         }
 
         det = 0;
-        for(i = 0; i < ActiveSize; i++) {
+        for(i = 0; i < ActiveSize; i++)
+        {
             k = 0;
-            for(j = 0; j < ActiveSize; j++) {
+            for(j = 0; j < ActiveSize; j++)
+            {
                 if(j == i) continue;
                 activeRows[k] =  ActiveRows[j];
                 k++;
@@ -14447,7 +14557,8 @@ _ComputeDeterminant(
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
 
-    if(ActiveSize == 2) {
+    if(ActiveSize == 2)
+    {
         _slmCompute2x2Determinant(Compiler,
                                   LineNo,
                                   StringNo,
@@ -14461,7 +14572,8 @@ _ComputeDeterminant(
                                   status);
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
     }
-    else {
+    else
+    {
         gctUINT8 activeRows[sldMAX_MATRIX_SIZE];
         gctUINT8 activeColumns[sldMAX_MATRIX_SIZE];
         gctUINT8 i, j, k;
@@ -14477,7 +14589,8 @@ _ComputeDeterminant(
         gcSHADER_TYPE columnType;
         gcSHADER_TYPE componentSelectionDataType;
 
-        for(i = 0; i < activeSize; i++) {
+        for(i = 0; i < activeSize; i++)
+        {
             activeColumns[i] = ActiveColumns[i+1];
         }
 
@@ -14489,9 +14602,11 @@ _ComputeDeterminant(
         slsLOPERAND_InitializeUsingIOperand(minorColumnLOperand, minorColumnIOperand);
         slsROPERAND_InitializeUsingIOperand(minorColumnROperand, minorColumnIOperand);
 
-        for(i = 0; i < ActiveSize; i++) {
+        for(i = 0; i < ActiveSize; i++)
+        {
             k = 0;
-            for(j = 0; j < ActiveSize; j++) {
+            for(j = 0; j < ActiveSize; j++)
+            {
                 if(j == i) continue;
                 activeRows[k] =  ActiveRows[j];
                 k++;
@@ -14532,7 +14647,8 @@ _ComputeDeterminant(
         columnROperand->u.reg.componentSelection.components = ActiveSize;
         minorColumnROperand->u.reg.componentSelection.components = ActiveSize;
 
-        for(i = 0; i < ActiveSize; i++) {
+        for(i = 0; i < ActiveSize; i++)
+        {
             switch(i) {
             case 0:
                  columnROperand->u.reg.componentSelection.x = ActiveRows[0];
@@ -14616,7 +14732,8 @@ _EvaluateAdjunct(
     values = pointer;
 
     /* Special handling for 2x2 matrix */
-    if(columnCount == 2) {
+    if(columnCount == 2)
+    {
        sluCONSTANT_VALUE *fromValues = gcvNULL;
 
        fromValues = OperandConstants[0]->values;
@@ -14633,7 +14750,8 @@ _EvaluateAdjunct(
        gcmFOOTER();
        return status;
     }
-    else {
+    else
+    {
        gctINT columnNegate                        = 1;
        gctINT negate                              = 0;
        gctUINT8 activeRows[sldMAX_MATRIX_SIZE]    = {0};
@@ -14642,9 +14760,11 @@ _EvaluateAdjunct(
        sluCONSTANT_VALUE *coFactor                = gcvNULL;
 
        coFactor = values;
-       for (i = 0; i < columnCount; i++) {
+       for (i = 0; i < columnCount; i++)
+       {
             activeSize = 0;
-            for(k = 0; k < columnCount; k++) {
+            for(k = 0; k < columnCount; k++)
+            {
                if(k == i) continue;
                activeColumns[activeSize] = k;
                activeSize++;
@@ -14652,9 +14772,11 @@ _EvaluateAdjunct(
 
             negate = columnNegate;
             /* Compute the co-factors */
-            for (j = 0; j < rowCount; j++) {
+            for (j = 0; j < rowCount; j++)
+            {
                 activeSize = 0;
-                for(k = 0; k < rowCount; k++) {
+                for(k = 0; k < rowCount; k++)
+                {
                     if(k == j) continue;
                     activeRows[activeSize] = k;
                     activeSize++;
@@ -14725,7 +14847,8 @@ _GenAdjunctCode(
     gcmASSERT(columnCount == rowCount);
 
     /* Special handling for 2x2 matrix */
-    if(columnCount == 2) {
+    if(columnCount == 2)
+    {
        slsIOPERAND  columnIOperand1[1];
        slsROPERAND  columnROperand1[1];
        slsLOPERAND  columnLOperand1[1];
@@ -14812,7 +14935,8 @@ _GenAdjunctCode(
                                 rOperand);
        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
     }
-    else {
+    else
+    {
        gctINT columnNegate = 1;
        gctINT negate;
        gctUINT8 activeRows[sldMAX_MATRIX_SIZE] = {0};
@@ -14822,19 +14946,20 @@ _GenAdjunctCode(
        slsIOPERAND coFactorMatrix[1];
        gcSHADER_TYPE componentType;
 
-
        componentType = gcGetComponentDataType(OperandsParameters[0].rOperands[0].dataType);
        slsIOPERAND_New(Compiler, coFactorMatrix, IOperand->dataType, OperandsParameters[0].rOperands[0].u.reg.precision);
        slsIOPERAND_New(Compiler, coFactor, componentType, OperandsParameters[0].rOperands[0].u.reg.precision);
 
-       for (i = 0; i < columnCount; i++) {
+       for (i = 0; i < columnCount; i++)
+       {
             slsIOPERAND_InitializeAsMatrixColumn(columnIOperand,
                                                  coFactorMatrix,
                                                  i);
             slsLOPERAND_InitializeUsingIOperand(columnLOperand, columnIOperand);
 
             activeSize = 0;
-            for(k = 0; k < columnCount; k++) {
+            for(k = 0; k < columnCount; k++)
+            {
                if(k == i) continue;
                activeColumns[activeSize] = k;
                activeSize++;
@@ -14842,9 +14967,11 @@ _GenAdjunctCode(
 
             negate = columnNegate;
             /* Compute the co-factors */
-            for (j = 0; j < rowCount; j++) {
+            for (j = 0; j < rowCount; j++)
+            {
                 activeSize = 0;
-                for(k = 0; k < rowCount; k++) {
+                for(k = 0; k < rowCount; k++)
+                {
                     if(k == j) continue;
                     activeRows[activeSize] = k;
                     activeSize++;
@@ -14875,7 +15002,7 @@ _GenAdjunctCode(
             columnNegate *= -1;
         }
 
-/* This can be eliminated if embedding the transpose in cofactor computation */
+        /* This can be eliminated if embedding the transpose in cofactor computation */
         slsROPERAND_InitializeUsingIOperand(rOperand, coFactorMatrix);
         status = _ComputeTranspose(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
@@ -14917,19 +15044,22 @@ _EvaluateDeterminant(
     gcmASSERT(columnCount == rowCount);
 
     /* Special handling for 2x2 matrix */
-    if(columnCount == 2) {
+    if(columnCount == 2)
+    {
        sluCONSTANT_VALUE *values;
 
        values = OperandConstants[0]->values;
        det.floatValue = values[0].floatValue * values[3].floatValue -
                         values[2].floatValue * values[1].floatValue;
     }
-    else {
+    else
+    {
         gctUINT8 activeRows[sldMAX_MATRIX_SIZE];
         gctUINT8 activeColumns[sldMAX_MATRIX_SIZE];
         gctUINT8 i;
 
-        for(i = 0; i < columnCount; i++) {
+        for(i = 0; i < columnCount; i++)
+        {
            activeRows[i] = activeColumns[i] = i;
         }
         status = _EvalConstDet(OperandConstants[0],
@@ -14979,7 +15109,9 @@ _GenDeterminantCode(
 #endif
     gcmASSERT(columnCount == rowCount);
 
-    if(columnCount == 2) { /* 2x2 matrix */
+    if(columnCount == 2)
+    {
+        /* 2x2 matrix */
         _slmCompute2x2Determinant(Compiler,
                                   PolynaryExpr->exprBase.base.lineNo,
                                   PolynaryExpr->exprBase.base.stringNo,
@@ -14987,12 +15119,14 @@ _GenDeterminantCode(
                                   0, 1, 0, 1, gcvFALSE, IOperand, status);
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
     }
-    else {
+    else
+    {
         gctUINT8 activeRows[sldMAX_MATRIX_SIZE];
         gctUINT8 activeColumns[sldMAX_MATRIX_SIZE];
         gctUINT8 i;
 
-        for(i = 0; i < columnCount; i++) {
+        for(i = 0; i < columnCount; i++)
+        {
            activeRows[i] = activeColumns[i] = i;
         }
         status = _ComputeDeterminant(Compiler,
@@ -15042,10 +15176,13 @@ _EvaluateInverse(
                               OperandConstants,
                               ResultConstant);
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
     values = ResultConstant->values;
     matrixValues = OperandConstants[0]->values;
     det = 0;
-    for(i = 0; i < columnCount; i++) {
+
+    for(i = 0; i < columnCount; i++)
+    {
        det += values[i * rowCount].floatValue * matrixValues[i].floatValue;
     }
 
@@ -15053,11 +15190,13 @@ _EvaluateInverse(
     det = 1/det;
 
     gcmASSERT(det != 0.0);
-    if(det == 0.0) {
+    if(det == 0.0)
+    {
        gcmFOOTER_NO();
        return gcvSTATUS_INVALID_ARGUMENT;
     }
-    for(i = 0; i < componentCount; i++) {
+    for(i = 0; i < componentCount; i++)
+    {
         values[i].floatValue *= det;
     }
 
@@ -15115,7 +15254,8 @@ _GenInverseCode(
     componentType = gcGetVectorComponentDataType(columnROperand->dataType);
 
     columnCount = gcGetMatrixDataTypeColumnCount(OperandsParameters->rOperands->dataType);
-    for (i = 0; i < columnCount; i++) {
+    for (i = 0; i < columnCount; i++)
+    {
         slsIOPERAND_InitializeAsMatrixColumn(columnIOperand,
                                              adjunctMatrix,
                                              i);
@@ -15134,7 +15274,8 @@ _GenInverseCode(
                                          rOperand);
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
-        if(i != 0) {
+        if(i != 0)
+        {
             slsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
             slsIOPERAND_New(Compiler, iOperand, componentType, GetHigherPrecison(rOperand->u.reg.precision, determinant->u.reg.precision));
             status = slGenArithmeticExprCode(Compiler,
@@ -16416,11 +16557,11 @@ _GenBarrierOpCode(
         gcmASSERT(0);
     }
 
-    if (!((vertexShaderOK && sloCOMPILER_IsShaderType(Compiler, slvSHADER_TYPE_VERTEX)) ||
-          (fragmentShaderOK && sloCOMPILER_IsShaderType(Compiler, slvSHADER_TYPE_FRAGMENT)) ||
-          (computeShaderOK && sloCOMPILER_IsShaderType(Compiler, slvSHADER_TYPE_COMPUTE)) ||
-          (tcsOK && sloCOMPILER_IsShaderType(Compiler, slvSHADER_TYPE_TCS)) ||
-          (tesOK && sloCOMPILER_IsShaderType(Compiler, slvSHADER_TYPE_TES))
+    if (!((vertexShaderOK && (Compiler->shaderType == slvSHADER_TYPE_VERTEX)) ||
+        (fragmentShaderOK && (Compiler->shaderType == slvSHADER_TYPE_FRAGMENT)) ||
+        (computeShaderOK && (Compiler->shaderType == slvSHADER_TYPE_COMPUTE)) ||
+        (tcsOK && (Compiler->shaderType == slvSHADER_TYPE_TCS)) ||
+        (tesOK && (Compiler->shaderType == slvSHADER_TYPE_TES))
          )
        )
     {
@@ -16474,13 +16615,13 @@ _GenFtransformCode(
     gcmASSERT(IOperand);
 
     gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler, "gl_Vertex", &position_pool));
-    gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler, BUILTIN_MATRIX,   &matrix_pool));
+    gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler, "gl_ModelViewProjectionMatrix", &matrix_pool));
 
     gcmONERROR(slsNAME_SPACE_Search(
                                 Compiler,
                                 sloCOMPILER_GetBuiltInSpace(Compiler),
                                 position_pool,
-                                gcvFALSE,
+                                gcvTRUE,
                                 gcvFALSE,
                                 &position));
 
@@ -16488,7 +16629,7 @@ _GenFtransformCode(
                                 Compiler,
                                 sloCOMPILER_GetBuiltInSpace(Compiler),
                                 matrix_pool,
-                                gcvFALSE,
+                                gcvTRUE,
                                 gcvFALSE,
                                 &matrix));
 
@@ -16664,4 +16805,24 @@ slGenBuiltInFunctionCode(
                     IOperand);
     gcmFOOTER();
     return status;
+}
+
+sleEXTENSION
+slGetBuiltinFunctionExtension(
+    IN gctSTRING Symbol
+)
+{
+    sleEXTENSION extension = slvEXTENSION_NONE;
+    gctUINT i;
+
+    for (i = 0; i < builtinFunctionExtensionCount; i++)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(Symbol, builtinFunctionExtensionTable[i].symbol)))
+        {
+            extension = builtinFunctionExtensionTable[i].extension;
+            break;
+        }
+    }
+
+    return extension;
 }

@@ -325,11 +325,7 @@ static gceSTATUS _CreateBuffer(
         glsCONTEXT_PTR shared = gcvNULL;
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (Context->shared != gcvNULL) ? Context->shared : Context;
-#else
         shared = Context;
-#endif
 
         /* Attempt to allocate a new buffer. */
         gcmERR_BREAK(glfCreateNamedObject(
@@ -633,11 +629,7 @@ GL_API void GL_APIENTRY glDeleteBuffers(
         glmPROFILE(context, GLES1_DELETEBUFFERS, 0);
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (context->shared != gcvNULL) ? context->shared : context;
-#else
         shared = context;
-#endif
 
         /* Validate count. */
         if (Count < 0)
@@ -721,11 +713,7 @@ GL_API GLboolean GL_APIENTRY glIsBuffer(
         glmPROFILE(context, GLES1_ISBUFFER, 0);
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (context->shared != gcvNULL) ? context->shared : context;
-#else
         shared = context;
-#endif
 
         /* Find the object. */
         wrapper = glfFindNamedObject(shared->bufferList, Buffer);
@@ -844,11 +832,7 @@ GL_API void GL_APIENTRY glBindBuffer(
         glmPROFILE(context, GLES1_BINDBUFFER, 0);
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (context->shared != gcvNULL) ? context->shared : context;
-#else
         shared = context;
-#endif
 
         /* Translate the target. */
         if (Target == GL_ARRAY_BUFFER)

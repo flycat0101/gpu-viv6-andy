@@ -24,14 +24,16 @@ _CountFuncResources(
     gceSTATUS       status = gcvSTATUS_OK;
     gcmHEADER_ARG("Compiler=0x%x ObjectCounter=0x%x FuncName=0x%x",
                   Compiler, ObjectCounter, FuncName);
+
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_OBJECT(ObjectCounter, slvOBJ_OBJECT_COUNTER);
     gcmASSERT(FuncName);
 
-    if(FuncName->context.isCounted) {
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
+    if(FuncName->context.isCounted)
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
     }
 
     ObjectCounter->functionCount++;
@@ -55,53 +57,82 @@ sloIR_ITERATION_CountForCode(
 
     gcmHEADER_ARG("Compiler=0x%x ObjectCounter=0x%x Iteration=0x%x",
                   Compiler, ObjectCounter, Iteration);
+
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
     slmVERIFY_IR_OBJECT(Iteration, slvIR_ITERATION);
     gcmASSERT(Iteration->type == slvFOR);
 
     /* The init part */
-    if (Iteration->forInitStatement != gcvNULL) {
+    if (Iteration->forInitStatement != gcvNULL)
+    {
         slsGEN_CODE_PARAMETERS_Initialize(&initParameters, gcvFALSE, gcvFALSE);
+
         status = sloIR_OBJECT_Accept(Compiler,
                                      Iteration->forInitStatement,
                                      &ObjectCounter->visitor,
                                      &initParameters);
         slsGEN_CODE_PARAMETERS_Finalize(&initParameters);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
     }
 
     /* The rest part */
-    if (Iteration->forRestExpr != gcvNULL) {
+    if (Iteration->forRestExpr != gcvNULL)
+    {
         slsGEN_CODE_PARAMETERS_Initialize(&restParameters, gcvFALSE, gcvFALSE);
+
         status = sloIR_OBJECT_Accept(Compiler,
                                      &Iteration->forRestExpr->base,
                                      &ObjectCounter->visitor,
                                      &restParameters);
         slsGEN_CODE_PARAMETERS_Finalize(&restParameters);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
     }
 
     /* The condition part */
-    if (Iteration->condExpr != gcvNULL) {
+    if (Iteration->condExpr != gcvNULL)
+    {
         slsGEN_CODE_PARAMETERS_Initialize(&condParameters, gcvFALSE, gcvTRUE);
+
         status = sloIR_OBJECT_Accept(Compiler,
                                      &Iteration->condExpr->base,
                                      &ObjectCounter->visitor,
                                      &condParameters);
         slsGEN_CODE_PARAMETERS_Finalize(&condParameters);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
     }
 
     /* The body part */
-    if (Iteration->loopBody != gcvNULL) {
+    if (Iteration->loopBody != gcvNULL)
+    {
         slsGEN_CODE_PARAMETERS_Initialize(&bodyParameters, gcvFALSE, gcvFALSE);
+
         status = sloIR_OBJECT_Accept(Compiler,
                                      Iteration->loopBody,
                                      &ObjectCounter->visitor,
                                      &bodyParameters);
         slsGEN_CODE_PARAMETERS_Finalize(&bodyParameters);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+}
     }
     gcmFOOTER_ARG("*Parameters=0x%x", *Parameters);
     return gcvSTATUS_OK;
@@ -126,24 +157,38 @@ sloIR_ITERATION_CountWhileCode(
     gcmASSERT(Iteration->type == slvWHILE);
 
     /* The condition part */
-    if (Iteration->condExpr != gcvNULL) {
+    if (Iteration->condExpr != gcvNULL)
+    {
         slsGEN_CODE_PARAMETERS_Initialize(&condParameters, gcvFALSE, gcvTRUE);
+
         status = sloIR_OBJECT_Accept(Compiler,
                                      &Iteration->condExpr->base,
                                      &ObjectCounter->visitor,
                                      &condParameters);
         slsGEN_CODE_PARAMETERS_Finalize(&condParameters);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
     }
     /* The loop body */
-    if (Iteration->loopBody != gcvNULL) {
+    if (Iteration->loopBody != gcvNULL)
+    {
         slsGEN_CODE_PARAMETERS_Initialize(&bodyParameters, gcvFALSE, gcvFALSE);
+
         status = sloIR_OBJECT_Accept(Compiler,
                                      Iteration->loopBody,
                                      &ObjectCounter->visitor,
                                      &bodyParameters);
         slsGEN_CODE_PARAMETERS_Finalize(&bodyParameters);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
     }
     gcmFOOTER_ARG("*Parameters=0x%x", *Parameters);
     return gcvSTATUS_OK;
@@ -167,24 +212,36 @@ sloIR_ITERATION_CountDoWhileCode(
     slmVERIFY_IR_OBJECT(Iteration, slvIR_ITERATION);
     gcmASSERT(Iteration->type == slvDO_WHILE);
 
-    if (Iteration->loopBody != gcvNULL) {
+    if (Iteration->loopBody != gcvNULL)
+    {
         slsGEN_CODE_PARAMETERS_Initialize(&bodyParameters, gcvFALSE, gcvFALSE);
         status = sloIR_OBJECT_Accept(Compiler,
                                      Iteration->loopBody,
                                      &ObjectCounter->visitor,
                                      &bodyParameters);
         slsGEN_CODE_PARAMETERS_Finalize(&bodyParameters);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
     }
     /* The condition part */
-    if (Iteration->condExpr != gcvNULL) {
+    if (Iteration->condExpr != gcvNULL)
+    {
         slsGEN_CODE_PARAMETERS_Initialize(&condParameters, gcvFALSE, gcvTRUE);
         status = sloIR_OBJECT_Accept(Compiler,
                                      &Iteration->condExpr->base,
                                      &ObjectCounter->visitor,
                                      &condParameters);
         slsGEN_CODE_PARAMETERS_Finalize(&condParameters);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
     }
 
     gcmFOOTER_ARG("*Parameters=0x%x", *Parameters);
@@ -223,6 +280,7 @@ sloIR_ITERATION_Count(
         {
             break;
         }
+
         binaryExpr = (sloIR_BINARY_EXPR)Iteration->forInitStatement;
 
         if (binaryExpr->type != slvBINARY_ASSIGN ||
@@ -230,6 +288,7 @@ sloIR_ITERATION_Count(
         {
             break;
         }
+
         loopIndexName = ((sloIR_VARIABLE)binaryExpr->leftOperand)->name;
 
         /* The init part */
@@ -241,7 +300,12 @@ sloIR_ITERATION_Count(
                                          &ObjectCounter->visitor,
                                          &initParameters);
             slsGEN_CODE_PARAMETERS_Finalize(&initParameters);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
         }
 
         /* The rest part */
@@ -253,7 +317,12 @@ sloIR_ITERATION_Count(
                                          &ObjectCounter->visitor,
                                          &restParameters);
             slsGEN_CODE_PARAMETERS_Finalize(&restParameters);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
         }
 
         /* The condition part */
@@ -265,15 +334,26 @@ sloIR_ITERATION_Count(
                                          &ObjectCounter->visitor,
                                          &condParameters);
             slsGEN_CODE_PARAMETERS_Finalize(&condParameters);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
         }
 
         status = slGenDefineUnrolledIterationBegin(Compiler,
                                                    ObjectCounter->codeGenerator,
                                                    loopIndexName,
                                                    gcvTRUE,
+                                                   0,
                                                    &iterationContext);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
 
         /* The body part */
         if (Iteration->loopBody != gcvNULL)
@@ -285,7 +365,12 @@ sloIR_ITERATION_Count(
                                          &ObjectCounter->visitor,
                                          &bodyParameters);
             slsGEN_CODE_PARAMETERS_Finalize(&bodyParameters);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
 
             Iteration->atomicOpCount =
                 ObjectCounter->opcodeCount[slvOPCODE_ATOMADD] - beginAtomicOpCount;
@@ -294,7 +379,12 @@ sloIR_ITERATION_Count(
         status = slGenDefineUnrolledIterationEnd(Compiler,
                                                  ObjectCounter->codeGenerator,
                                                  gcvTRUE);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
 
         gcmFOOTER_ARG("*Parameters=0x%x", *Parameters);
         return gcvSTATUS_OK;
@@ -328,10 +418,13 @@ sloIR_ITERATION_Count(
         gcmFOOTER_ARG("status=%d", gcvSTATUS_COMPILER_FE_PARSER_ERROR);
         return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
     }
-    if (gcmIS_ERROR(status)) {
+
+    if (gcmIS_ERROR(status))
+    {
        gcmFOOTER();
        return status;
     }
+
     gcmFOOTER_ARG("*Parameters=0x%x", *Parameters);
     return gcvSTATUS_OK;
 }
@@ -380,7 +473,8 @@ _CountVariableOrArray(
 
     logicalRegCount = slsDATA_TYPE_GetLogicalCountForAnArray(DataType);
 
-    switch (qualifier) {
+    switch (qualifier)
+    {
     case slvSTORAGE_QUALIFIER_NONE:
     case slvSTORAGE_QUALIFIER_CONST_IN:
     case slvSTORAGE_QUALIFIER_IN:
@@ -389,13 +483,15 @@ _CountVariableOrArray(
     case slvSTORAGE_QUALIFIER_INSTANCE_ID:
     case slvSTORAGE_QUALIFIER_VERTEX_ID:
     case slvSTORAGE_QUALIFIER_SHARED:
-        if (Name->type == slvFUNC_NAME || Name->type == slvPARAMETER_NAME) {
-/** SKIP THE COUNT FOR FUNCTION ARGUMENTS - DELAY TILL CODE GENERATION */
-        ;
+        if (Name->type == slvFUNC_NAME || Name->type == slvPARAMETER_NAME)
+        {
+            /** SKIP THE COUNT FOR FUNCTION ARGUMENTS - DELAY TILL CODE GENERATION */
+            ;
         }
-        else {
-        ObjectCounter->variableCount++;
-        Name->context.isCounted = gcvTRUE;
+        else
+        {
+            ObjectCounter->variableCount++;
+            Name->context.isCounted = gcvTRUE;
         }
         break;
 
@@ -419,7 +515,8 @@ _CountVariableOrArray(
         ObjectCounter->outputCount += logicalRegCount;
         Name->context.isCounted = gcvTRUE;
 
-        if (qualifier == slvSTORAGE_QUALIFIER_VARYING_OUT) {
+        if (qualifier == slvSTORAGE_QUALIFIER_VARYING_OUT)
+        {
             ObjectCounter->variableCount++;
         }
         break;
@@ -478,8 +575,11 @@ _CountVariable(
         count = slsDATA_TYPE_GetLogicalCountForAnArray(DataType);
 
         gcmASSERT(Name->dataType->fieldSpace);
-        for (i = 0; i < count; i++) {
-            FOR_EACH_DLINK_NODE(&DataType->fieldSpace->names, slsNAME, fieldName) {
+
+        for (i = 0; i < count; i++)
+        {
+            FOR_EACH_DLINK_NODE(&DataType->fieldSpace->names, slsNAME, fieldName)
+            {
                 gcmASSERT(fieldName->dataType);
 
                 status = _CountVariable(Compiler,
@@ -487,20 +587,23 @@ _CountVariable(
                                         Name,
                                         fieldName->dataType);
 
-                if (gcmIS_ERROR(status)) {
+                if (gcmIS_ERROR(status))
+                {
                     gcmFOOTER();
                     return status;
                 }
             }
         }
     }
-    else {
+    else
+    {
         status = _CountVariableOrArray(Compiler,
                                        ObjectCounter,
                                        Name,
                                        DataType);
 
-        if (gcmIS_ERROR(status)) {
+        if (gcmIS_ERROR(status))
+        {
             gcmFOOTER();
             return status;
         }
@@ -537,7 +640,8 @@ slsNAME_Count(
         return gcvSTATUS_OK;
     }
 
-    if (Name->type == slvPARAMETER_NAME && Name->u.parameterInfo.aliasName != gcvNULL) {
+    if (Name->type == slvPARAMETER_NAME && Name->u.parameterInfo.aliasName != gcvNULL)
+    {
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
     }
@@ -547,7 +651,9 @@ slsNAME_Count(
                                 ObjectCounter,
                                 Name,
                                 Name->dataType);
-        if (gcmIS_ERROR(status)) break;
+
+        if (gcmIS_ERROR(status))
+            break;
 
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
@@ -589,7 +695,12 @@ sloIR_VARIABLE_Count(
     status = slsNAME_Count(Compiler,
                            ObjectCounter,
                            Variable->name);
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
 
     gcmFOOTER_ARG("*Parameters=0x%x", *Parameters);
     return gcvSTATUS_OK;
@@ -614,9 +725,11 @@ sloIR_SET_Count(
     slmVERIFY_OBJECT(ObjectCounter, slvOBJ_OBJECT_COUNTER);
     slmVERIFY_IR_OBJECT(Set, slvIR_SET);
 
-    switch (Set->type) {
+    switch (Set->type)
+    {
     case slvDECL_SET:
-        FOR_EACH_DLINK_NODE(&Set->members, struct _sloIR_BASE, member) {
+        FOR_EACH_DLINK_NODE(&Set->members, struct _sloIR_BASE, member)
+        {
             slsGEN_CODE_PARAMETERS_Initialize(&memberParameters, gcvFALSE, gcvFALSE);
             /* Count through members in the set */
             status = sloIR_OBJECT_Accept(Compiler,
@@ -624,26 +737,45 @@ sloIR_SET_Count(
                                          &ObjectCounter->visitor,
                                          &memberParameters);
             slsGEN_CODE_PARAMETERS_Finalize(&memberParameters);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
         }
         break;
 
     case slvSTATEMENT_SET:
-        if (Set->funcName != gcvNULL) {
+        if (Set->funcName != gcvNULL)
+        {
             status = _CountFuncResources(Compiler,
                                          ObjectCounter,
                                          Set->funcName);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
         }
 
-        FOR_EACH_DLINK_NODE(&Set->members, struct _sloIR_BASE, member) {
+        FOR_EACH_DLINK_NODE(&Set->members, struct _sloIR_BASE, member)
+        {
             slsGEN_CODE_PARAMETERS_Initialize(&memberParameters, gcvFALSE, gcvFALSE);
+
             status = sloIR_OBJECT_Accept(Compiler,
                                          member,
                                          &ObjectCounter->visitor,
                                          &memberParameters);
+
             slsGEN_CODE_PARAMETERS_Finalize(&memberParameters);
-            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER();
+                return status;
+            }
         }
         break;
 
@@ -738,7 +870,7 @@ sloIR_UNARY_EXPR_Count(
 
     case slvUNARY_NEG:
     case slvUNARY_NOT:
-    case slvUNARY_BITWISE_NOT:
+    case slvUNARY_NOT_BITWISE:
         slsGEN_CODE_PARAMETERS_Initialize(&operandParameters,
                                           gcvFALSE,
                                           Parameters->needROperand);
@@ -811,9 +943,9 @@ sloIR_BINARY_EXPR_Count(
 
     case slvBINARY_OR:
 
-    case slvBINARY_BITWISE_AND:
-    case slvBINARY_BITWISE_OR:
-    case slvBINARY_BITWISE_XOR:
+    case slvBINARY_AND_BITWISE:
+    case slvBINARY_OR_BITWISE:
+    case slvBINARY_XOR_BITWISE:
 
     case slvBINARY_LSHIFT:
     case slvBINARY_RSHIFT:
@@ -881,7 +1013,9 @@ sloIR_BINARY_EXPR_Count(
                                  &BinaryExpr->rightOperand->base,
                                  &ObjectCounter->visitor,
                                  &rightParameters);
-    if (gcmIS_ERROR(status)) {
+
+    if (gcmIS_ERROR(status))
+    {
        gcmFOOTER();
        return status;
     }
@@ -916,8 +1050,10 @@ sloIR_SELECTION_Count(
 
     emptySelection = (Selection->trueOperand == gcvNULL && Selection->falseOperand == gcvNULL);
 
-    if (emptySelection) {
+    if (emptySelection)
+    {
         slsGEN_CODE_PARAMETERS_Initialize(&condParameters, gcvFALSE, gcvFALSE);
+
         status = sloIR_OBJECT_Accept(Compiler,
                                      &Selection->condExpr->base,
                                      &ObjectCounter->visitor,
@@ -936,9 +1072,14 @@ sloIR_SELECTION_Count(
                                  &condParameters);
     slsGEN_CODE_PARAMETERS_Finalize(&condParameters);
 
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
 
-    if (Selection->trueOperand != gcvNULL) {
+    if (Selection->trueOperand != gcvNULL)
+    {
         slsGEN_CODE_PARAMETERS_Initialize(&trueParameters,
                                           gcvFALSE,
                                           Parameters->needROperand);
@@ -947,11 +1088,17 @@ sloIR_SELECTION_Count(
                                      &ObjectCounter->visitor,
                                      &trueParameters);
         slsGEN_CODE_PARAMETERS_Finalize(&trueParameters);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
     }
 
     /* Generate the code of the false operand */
-    if (Selection->falseOperand != gcvNULL) {
+    if (Selection->falseOperand != gcvNULL)
+    {
         slsGEN_CODE_PARAMETERS_Initialize(&falseParameters,
                                           gcvFALSE,
                                           Parameters->needROperand);
@@ -960,7 +1107,12 @@ sloIR_SELECTION_Count(
                                      &ObjectCounter->visitor,
                                      &falseParameters);
         slsGEN_CODE_PARAMETERS_Finalize(&falseParameters);
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
     }
     gcmFOOTER_ARG("*Parameters=0x%x", *Parameters);
     return gcvSTATUS_OK;
@@ -995,12 +1147,14 @@ sloIR_SWITCH_Count(
                                  &condParameters);
     slsGEN_CODE_PARAMETERS_Finalize(&condParameters);
 
-    if (gcmIS_ERROR(status)) {
+    if (gcmIS_ERROR(status))
+    {
        gcmFOOTER();
        return status;
     }
 
-    if (Switch->switchBody != gcvNULL) {
+    if (Switch->switchBody != gcvNULL)
+    {
         slsGEN_CODE_PARAMETERS_Initialize(&switchBodyParameters, gcvFALSE, gcvFALSE);
         status = sloIR_OBJECT_Accept(Compiler,
                                      Switch->switchBody,
@@ -1008,7 +1162,8 @@ sloIR_SWITCH_Count(
                                      &switchBodyParameters);
         slsGEN_CODE_PARAMETERS_Finalize(&switchBodyParameters);
 
-        if (gcmIS_ERROR(status)) {
+        if (gcmIS_ERROR(status))
+        {
            gcmFOOTER();
            return status;
         }
@@ -1046,15 +1201,22 @@ sloIR_POLYNARY_EXPR_Count(
             /* Currently always save atomic-related opcode into ATOMADD. */
             ObjectCounter->opcodeCount[slvOPCODE_ATOMADD]++;
         }
+
         /* Allocate the function resources */
         if (!PolynaryExpr->funcName->isBuiltIn)
         {
            status = _CountFuncResources(Compiler,
                                         ObjectCounter,
                                         PolynaryExpr->funcName);
-           if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+           if (gcmIS_ERROR(status))
+           {
+               gcmFOOTER();
+               return status;
+           }
         }
     }
+
     if (PolynaryExpr->operands == gcvNULL)
     {
         gcmFOOTER();
@@ -1072,7 +1234,11 @@ sloIR_POLYNARY_EXPR_Count(
                                         &operandsParameters);
         slsGEN_CODE_PARAMETERS_Finalize(&operandsParameters);
 
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
     }
 
     gcmFOOTER_ARG("*Parameters=0x%x", *Parameters);
@@ -1101,12 +1267,14 @@ sloIR_VIV_Asm_Count(
 
     ObjectCounter->vivAsmCount++;
 
-    if (VivAsm->operands == gcvNULL) {
+    if (VivAsm->operands == gcvNULL)
+    {
         gcmFOOTER();
         return gcvSTATUS_OK;
     }
 
-    FOR_EACH_DLINK_NODE(&VivAsm->operands->members, struct _sloIR_EXPR, operand) {
+    FOR_EACH_DLINK_NODE(&VivAsm->operands->members, struct _sloIR_EXPR, operand)
+    {
         slsGEN_CODE_PARAMETERS_Initialize(&operandsParameters,
                                           gcvFALSE,
                                           gcvTRUE);
@@ -1116,7 +1284,11 @@ sloIR_VIV_Asm_Count(
                                         &operandsParameters);
         slsGEN_CODE_PARAMETERS_Finalize(&operandsParameters);
 
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        if (gcmIS_ERROR(status))
+        {
+            gcmFOOTER();
+            return status;
+        }
     }
     gcmFOOTER_ARG("*Parameters=0x%x", *Parameters);
     return gcvSTATUS_OK;
@@ -1131,7 +1303,6 @@ sloOBJECT_COUNTER_Construct(
     gceSTATUS           status;
     sloOBJECT_COUNTER   objectCounter;
     gctPOINTER          pointer;
-    gctINT              i = 0;
 
     gcmHEADER_ARG("Compiler=0x%x", Compiler);
     /* Verify the arguments. */
@@ -1141,7 +1312,12 @@ sloOBJECT_COUNTER_Construct(
     status = sloCOMPILER_Allocate(Compiler,
                                   (gctSIZE_T)sizeof(struct _sloOBJECT_COUNTER),
                                   &pointer);
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER();
+        return status;
+    }
 
     gcoOS_ZeroMemory(pointer, (gctSIZE_T)sizeof(struct _sloOBJECT_COUNTER));
 
@@ -1185,19 +1361,6 @@ sloOBJECT_COUNTER_Construct(
 
     objectCounter->visitor.visitVivAsm          =
                     (sltVISIT_VIV_ASM_FUNC_PTR)sloIR_VIV_Asm_Count;
-
-    /* Initialize other data members */
-    objectCounter->attributeCount= 0;
-    objectCounter->uniformCount = 0;
-    objectCounter->variableCount = 0;
-    objectCounter->outputCount = 0;
-    objectCounter->functionCount = 0;
-    objectCounter->vivAsmCount = 0;
-
-    for (i = 0; i < slvOPCODE_MAXOPCODE; i++)
-    {
-        objectCounter->opcodeCount[i] = 0;
-    }
 
     *ObjectCounter = objectCounter;
     gcmFOOTER_ARG("*ObjectCounter=0x%x", *ObjectCounter);

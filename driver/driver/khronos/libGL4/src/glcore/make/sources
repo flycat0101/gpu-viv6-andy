@@ -1,0 +1,60 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# This is the SOURCES file for OpenGL code
+#
+TARGETNAME=glcore
+TARGETTYPE=LIBRARY
+
+MODULEINCDIR=
+
+SOURCES= \
+../gc_glcore_dri.o \
+../gc_es_api.o \
+../gc_es_api_profiler.o \
+../gc_es_bufobj.o \
+../gc_es_context.o \
+../gc_es_dispatch.o \
+../gc_es_draw.o \
+../gc_es_egl.o \
+../gc_es_extensions.o \
+../gc_es_fbo.o \
+../gc_es_formats.o \
+../gc_es_fragop.o \
+../gc_es_misc.o \
+../gc_es_names.o \
+../gc_es_pixelop.o \
+../gc_es_query.o \
+../gc_es_raster.o \
+../gc_es_shader.o \
+../gc_es_teximage.o \
+../gc_es_texstate.o \
+../gc_es_varray.o \
+../gc_es_profiler.o \
+../gc_gl_attrib.o \
+../gc_gl_eval.o \
+../gc_gl_feed.o \
+../gc_gl_fog.o \
+../gc_gl_image.o \
+../gc_gl_light.o \
+../gc_gl_material.o \
+../gc_gl_math.o \
+../gc_gl_memmgr.o \
+../gc_gl_prim.o \
+../gc_gl_px_util.o \
+../gc_gl_pushpop.o \
+../gc_gl_rect.o \
+../gc_gl_select.o \
+../gc_gl_varray.o \
+../gc_gl_xform.o

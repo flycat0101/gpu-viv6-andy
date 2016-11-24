@@ -66,8 +66,10 @@ echo copy gc_hal_rename.h ...
 copy /y %AQROOT%\hal\inc\gc_hal_rename.h %VIVANTE_SDK_DIR%\inc\HAL\
 echo copy gc_hal_driver.h ...
 copy /y %AQROOT%\hal\inc\gc_hal_driver.h %VIVANTE_SDK_DIR%\inc\HAL\
-echo copy gc_hal_cl.h ...
-copy /y %AQROOT%\hal\inc\gc_hal_cl.h %VIVANTE_SDK_DIR%\inc\HAL\
+if exist %AQROOT%\hal\inc\gc_hal_cl.h (
+    echo copy gc_hal_cl.h ...
+    copy /y %AQROOT%\hal\inc\gc_hal_cl.h %VIVANTE_SDK_DIR%\inc\HAL\
+)
 echo copy gc_hal_profiler.h ...
 copy /y %AQROOT%\hal\inc\gc_hal_profiler.h %VIVANTE_SDK_DIR%\inc\HAL\
 echo copy gc_hal_driver_vg.h ...
@@ -95,6 +97,18 @@ echo copy GLES2 header files ...
 if not exist %VIVANTE_SDK_INC%\GLES2 mkdir %VIVANTE_SDK_INC%\GLES2
 copy /y %AQROOT%\sdk\inc\GLES2\*.h %VIVANTE_SDK_DIR%\inc\GLES2\
 
+echo copy GLES2 header files ...
+if not exist %VIVANTE_SDK_INC%\GLES3 mkdir %VIVANTE_SDK_INC%\GLES3
+copy /y %AQROOT%\sdk\inc\GLES3\*.h %VIVANTE_SDK_DIR%\inc\GLES3\
+
+if exist %AQROOT%\sdk\inc\CL (
+    echo copy CL header files ...
+    if not exist %VIVANTE_SDK_INC%\CL mkdir %VIVANTE_SDK_INC%\CL
+    copy /y %AQROOT%\sdk\inc\CL\*.h %VIVANTE_SDK_DIR%\inc\CL\
+    copy /y %AQROOT%\sdk\inc\CL\*.hpp %VIVANTE_SDK_DIR%\inc\CL\
+    copy /y %AQROOT%\sdk\inc\CL\*.txt %VIVANTE_SDK_DIR%\inc\CL\
+)
+
 echo copy VG header files ...
 if not exist %VIVANTE_SDK_INC%\VG mkdir %VIVANTE_SDK_INC%\VG
 copy /y %AQROOT%\sdk\inc\VG\*.h %VIVANTE_SDK_DIR%\inc\VG\
@@ -102,10 +116,6 @@ copy /y %AQROOT%\sdk\inc\VG\*.h %VIVANTE_SDK_DIR%\inc\VG\
 echo copy VDK header files ...
 copy /y %AQROOT%\sdk\inc\gc_vdk_types.h %VIVANTE_SDK_DIR%\inc\gc_vdk_types.h
 copy /y %AQROOT%\sdk\inc\gc_vdk.h %VIVANTE_SDK_DIR%\inc\gc_vdk.h
-
-echo copy opneCL header files ...
-if not exist %VIVANTE_SDK_INC%\CL mkdir %VIVANTE_SDK_INC%\CL
-copy /y %AQROOT%\sdk\inc\CL\*.* %VIVANTE_SDK_DIR%\inc\CL\
 
 set CELIBPATH=%_TARGETPLATROOT%\lib\%_TGTCPU%\%WINCEDEBUG%
 if "%_WINCEOSVER%" GEQ "700" set CELIBPATH=%SG_OUTPUT_ROOT%\platform\%_TGTPLAT%\lib\%_TGTCPU%\%WINCEDEBUG%
@@ -163,19 +173,30 @@ copy /y libGLESv2.lib %VIVANTE_SDK_LIB%\
 echo copy libOpenVG.lib ...
 copy /y libOpenVG.lib %VIVANTE_SDK_LIB%\
 
+if exist %CELIBPATH%\libCLC.lib (
+    echo copy libCLC.lib ...
+    copy /y libCLC.lib %VIVANTE_SDK_LIB%\
+)
+
+if exist %CELIBPATH%\libLLVM_viv.lib (
+    echo copy libCLC.lib ...
+    copy /y libLLVM_viv.lib %VIVANTE_SDK_LIB%\
+)
+
+if exist %CELIBPATH%\libOpenCL.lib (
+    echo copy libOpenCL.lib ...
+    copy /y libOpenCL.lib %VIVANTE_SDK_LIB%\
+)
+
+if exist %CELIBPATH%\libVivanteOpenCL.lib (
+    echo copy libVivanteOpenCL.lib ...
+    copy /y libVivanteOpenCL.lib %VIVANTE_SDK_LIB%\
+)
+
 if exist %CELIBPATH%\libVDK.lib (
 	echo copy libVDK.lib ...
 	copy /y libVDK.lib %VIVANTE_SDK_LIB%\
 )
-
-echo copy libOpenCL.lib ...
-copy /y libOpenCL.lib %VIVANTE_SDK_LIB%\
-
-echo copy libCLC.lib ...
-copy /y libCLC.lib %VIVANTE_SDK_LIB%\
-
-echo copy libLLVM_viv.lib ...
-copy /y libLLVM_viv.lib %VIVANTE_SDK_LIB%\
 
 set CETGTPATH=%_TARGETPLATROOT%\target\%_TGTCPU%\%WINCEDEBUG%
 if "%_WINCEOSVER%" GEQ "700" set CETGTPATH=%SG_OUTPUT_ROOT%\platform\%_TGTPLAT%\target\%_TGTCPU%\%WINCEDEBUG%
@@ -220,19 +241,29 @@ copy /y libGLESv2.dll %VIVANTE_SDK_BIN%\
 echo copy libOpenVG.dll ...
 copy /y libOpenVG.dll %VIVANTE_SDK_BIN%\
 
+if exist %CETGTPATH%\libCLC.dll (
+    echo copy libCLC.dll ...
+    copy /y libCLC.dll %VIVANTE_SDK_BIN%\
+)
+
+if exist %CETGTPATH%\libLLVM_viv.dll (
+    echo copy libCLC.dll ...
+    copy /y libLLVM_viv.dll %VIVANTE_SDK_BIN%\
+)
+
+if exist %CETGTPATH%\libOpenCL.dll (
+    echo copy libOpenCL.dll ...
+    copy /y libOpenCL.dll %VIVANTE_SDK_BIN%\
+)
+
+if exist %CETGTPATH%\libVivanteOpenCL.dll (
+    echo copy libVivanteOpenCL.dll ...
+    copy /y libVivanteOpenCL.dll %VIVANTE_SDK_BIN%\
+)
 if exist %CETGTPATH%\libVDK.dll (
 	echo copy libVDK.dll ...
 	copy /y libVDK.dll %VIVANTE_SDK_BIN%\
 )
-
-echo copy libOpenCL.dll ...
-copy /y libOpenCL.dll %VIVANTE_SDK_BIN%\
-
-echo copy libCLC.dll ...
-copy /y libCLC.dll %VIVANTE_SDK_BIN%\
-
-echo copy libLLVM_viv.dll ...
-copy /y libLLVM_viv.dll %VIVANTE_SDK_BIN%\
 
 echo.
 echo  Vivante Driver SDK file list:

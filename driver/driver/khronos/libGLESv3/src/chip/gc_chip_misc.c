@@ -65,8 +65,12 @@ __glChipBeginQuery(
     {
         if (chipQuery->queryHeader == gcvNULL)
         {
+            gctUINT32 gpuCount = 0;
+
+            gcmONERROR(gcoHAL_Query3DCoreCount(chipCtx->hal, &gpuCount));
+
             queryHeader = (__GLchipQueryHeader*)(*gc->imports.calloc)(gc, 1, sizeof(__GLchipQueryHeader));
-            queryHeader->headerSize = 64 * gcmSIZEOF(gctUINT64);
+            queryHeader->headerSize = 64 * gcmSIZEOF(gctUINT64) * gpuCount;
             queryHeader->headerIndex = -1;
             queryHeader->headerSurfType = gcvSURF_INDEX;
             chipQuery->type = gcvQUERY_OCCLUSION;
@@ -111,19 +115,20 @@ __glChipBeginQuery(
                                           0,
                                           gcvPOOL_DEFAULT));
 
-        gcoSURF_LockNode(&queryHeader->headerNode, gcvNULL, &queryHeader->headerLocked);
-
-        gcoOS_ZeroMemory(queryHeader->headerLocked, queryHeader->headerSize);
-
-    }
-    else
-    {
-        gcmASSERT(queryHeader->headerLocked != gcvNULL);
-
-        gcoOS_ZeroMemory(queryHeader->headerLocked, queryHeader->headerSize);
+        gcmONERROR(gcoSURF_LockNode(&queryHeader->headerNode, gcvNULL, &queryHeader->headerLocked));
     }
 
+    gcoOS_ZeroMemory(queryHeader->headerLocked, queryHeader->headerSize);
     gcmGETHARDWAREADDRESS(queryHeader->headerNode, physical);
+
+#if gcdDUMP
+    gcmDUMP_BUFFER(gcvNULL,
+                   "memory",
+                   physical,
+                   queryHeader->headerLocked,
+                   0,
+                   queryHeader->headerSize);
+#endif
 
     gcmONERROR(gco3D_SetQuery(chipCtx->engine, physical, chipQuery->type, gcvTRUE));
 
@@ -246,7 +251,7 @@ __glChipGetQueryObject(
                                   queryHeader->headerLocked,
                                   &queryHeader->headerIndex));
 
-        for (i = 0; i <= queryHeader->headerIndex; i++)
+        for (i = 0; i < queryHeader->headerIndex; i++)
         {
             queryObj->count += *((GLint64*)queryHeader->headerLocked + i);
         }
@@ -298,10 +303,11 @@ __glChipGetQueryObject(
                            physical,
                            queryHeader->headerLocked,
                            0,
-                           queryHeader->headerSize
+                           queryHeader->headerIndex * sizeof(gctUINT64)
                            );
         }
 #endif
+
         queryObj->resultAvailable = GL_TRUE;
     }
 
@@ -650,42 +656,73 @@ __glChipEndXFB(
     if (chipCtx->chipFeature.hasHwTFB)
     {
         gcmONERROR(gco3D_SetXfbCmd(chipCtx->engine, gcvXFBCMD_END));
-        gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
     }
     else
     {
         gcmONERROR(gco3D_FlushSHL1Cache(chipCtx->engine));
-        gcmONERROR(gco3D_Semaphore(chipCtx->engine,
-                                   chipCtx->chipFeature.hasCommandPrefetch ? gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND,
-                                   gcvWHERE_PIXEL,
-                                   gcvHOW_SEMAPHORE));
     }
 
-#if gcdDUMP
+    gcmONERROR(gco3D_Semaphore(chipCtx->engine,
+                               chipCtx->chipFeature.hasCommandPrefetch ? gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND,
+                               gcvWHERE_PIXEL,
+                               gcvHOW_SEMAPHORE));
+
     if (gc->xfb.boundXfbObj)
     {
         __GLBufBindPoint *pXfbBindingPoints = gc->xfb.boundXfbObj->boundBufBinding;
+        __GLprogramObject *progObj = gc->xfb.boundXfbObj->programObj;
         GLuint i;
-
+        __GLchipVertexBufferInfo *chipBufInfo;
+#if gcdDUMP
+        gctPOINTER buffer;
+        gctUINT32 physical;
+        gctSIZE_T size;
         /* Flush the cache. */
         gcmONERROR(gcoSURF_Flush(gcvNULL));
 
         /* Commit command buffer. */
         gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
+#endif
 
-        for (i = 0; i < __GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS; i++)
+        if (progObj->bindingInfo.xfbMode == GL_INTERLEAVED_ATTRIBS)
         {
-            if (pXfbBindingPoints[i].boundBufName != 0)
+            GL_ASSERT(pXfbBindingPoints[0].boundBufObj);
+            chipBufInfo = (__GLchipVertexBufferInfo *)pXfbBindingPoints[0].boundBufObj->privateData;
+            gcmONERROR(gcoBUFOBJ_GetFence(chipBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
+#if gcdDUMP
+            gcmVERIFY_OK(gcoBUFOBJ_Lock(chipBufInfo->bufObj,
+                                        &physical,
+                                        &buffer));
+            gcmVERIFY_OK(gcoBUFOBJ_GetSize(chipBufInfo->bufObj, &size));
+
+            gcmDUMP(gcvNULL, "#[info: verify xfb buffer when endxfb");
+            gcmDUMP_BUFFER(gcvNULL,
+                           "verify",
+                           physical,
+                           buffer,
+                           0,
+                           size);
+
+            gcmDUMP(gcvNULL, "#[info: upload stream with xfb out in case 2nd pass rendering");
+            gcmDUMP_BUFFER(gcvNULL,
+                           "stream",
+                           physical,
+                           buffer,
+                           0,
+                           size);
+
+            gcmVERIFY_OK(gcoBUFOBJ_Unlock(chipBufInfo->bufObj));
+#endif
+        }
+        else
+        {
+            GL_ASSERT(progObj->bindingInfo.xfbMode == GL_SEPARATE_ATTRIBS);
+            for (i = 0; i < progObj->bindingInfo.numActiveXFB; i++)
             {
-                __GLchipVertexBufferInfo *chipBufInfo;
-                gctPOINTER buffer;
-                gctUINT32 physical;
-                gctSIZE_T size;
                 GL_ASSERT(pXfbBindingPoints[i].boundBufObj);
                 chipBufInfo = (__GLchipVertexBufferInfo *)pXfbBindingPoints[i].boundBufObj->privateData;
-
-
-
+                gcmONERROR(gcoBUFOBJ_GetFence(chipBufInfo->bufObj, gcvFENCE_TYPE_WRITE));
+#if gcdDUMP
                 gcmVERIFY_OK(gcoBUFOBJ_Lock(chipBufInfo->bufObj,
                                             &physical,
                                             &buffer));
@@ -708,19 +745,17 @@ __glChipEndXFB(
                                size);
 
                 gcmVERIFY_OK(gcoBUFOBJ_Unlock(chipBufInfo->bufObj));
-
+#endif
             }
         }
     }
-#endif
+
     gcmFOOTER();
     return;
 OnError:
    gcChipSetError(chipCtx, status);
    gcmFOOTER();
    return;
-
-
 }
 
 
@@ -1025,4 +1060,29 @@ OnError:
     return;
 }
 
+GLboolean
+gcChipCheckRecompileEnable(
+    __GLcontext *gc,
+    gceSURF_FORMAT format
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsSURF_FORMAT_INFO_PTR formatInfo = gcvNULL;
+
+    gcmHEADER_ARG("gc=0x%x", gc);
+
+    gcmONERROR(gcoSURF_QueryFormat(format, &formatInfo));
+
+    if ((formatInfo->fakedFormat) ||
+        (formatInfo->fmtDataType != gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED &&
+         formatInfo->fmtDataType != gcvFORMAT_DATATYPE_FLOAT16))
+    {
+        gcmFOOTER();
+        return gcvTRUE;
+    }
+
+OnError:
+    gcmFOOTER_NO();
+    return gcvFALSE;
+}
 

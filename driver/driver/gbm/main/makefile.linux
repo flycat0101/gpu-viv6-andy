@@ -58,6 +58,8 @@ clean:
 
 install: all
 	@-cp $(TARGET_MODULE) $(INSTALL_DIR)
+	@mkdir -p $(SDK_DIR)/include
+	@-cp -f gbm.h $(SDK_DIR)/include
 
 $(TARGET_MODULE): $(OBJECTS)
 	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(TARGET_SONAME) -o $@ $(OBJECTS) $(LDLIBS)

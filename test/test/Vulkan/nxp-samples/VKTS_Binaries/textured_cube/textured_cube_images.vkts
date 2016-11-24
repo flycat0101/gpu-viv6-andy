@@ -1,0 +1,13 @@
+#
+# VulKan ToolS images.
+#
+
+#
+# Image.
+#
+
+name crate_image
+
+mipmap true
+image_data crate.tga
+

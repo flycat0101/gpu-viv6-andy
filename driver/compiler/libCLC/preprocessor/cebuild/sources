@@ -1,0 +1,45 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+!IF "$(VIVANTE_ENABLE_3D)" != "1"
+SKIPBUILD=1
+!ENDIF
+
+DOSYSGEN=1
+SYNCHRONIZE_DRAIN=1
+TARGETNAME=libCLC_preprocessor
+TARGETTYPE=LIBRARY
+
+SOURCES= \
+    ../gc_cl_base.c \
+    ../gc_cl_api.c \
+    ../gc_cl_expression.c \
+    ../gc_cl_hide_set.c \
+    ../gc_cl_input_stream.c \
+    ../gc_cl_macro_manager.c \
+    ../gc_cl_syntax.c \
+    ../gc_cl_syntax_util.c \
+    ../gc_cl_token.c \
+    ../gc_cl_macro_expand.c \
+    ../gc_cl_preprocessor.c \
+
+INCLUDES= \
+  $(INCLUDES); \
+  $(AQROOT)\hal\inc; \
+  $(AQROOT)\hal\user; \
+  $(AQROOT)\hal\os\ce\user; \
+  $(AQROOT)\compiler\libVSC\include; \
+  $(AQROOT)\compiler\libCLC\inc; \
+
+
+WARNLEVEL=0

@@ -72,6 +72,7 @@ check_hardware_types(
     )
 {
     gcsHAL_INTERFACE iface;
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_CHIP_INFO;
 
     defaultHwType = gcvHARDWARE_INVALID;
@@ -506,7 +507,7 @@ gc_gralloc_alloc_buffer(
 
 #if gcdENABLE_3D
     /* Set tile status disabled by default for compositor. */
-    surface->tileStatusDisabled = gcvTRUE;
+    surface->tileStatusDisabled[0] = gcvTRUE;
 #endif
 
 #if gcdANDROID_IMPLICIT_NATIVE_BUFFER_SYNC

@@ -16,7 +16,7 @@ include $(LOCAL_PATH)/../../../Android.mk.def
 
 
 #
-# libGLESv2_$(TAG)
+# libGLESv2_$(GPU_VENDOR)
 #
 include $(CLEAR_VARS)
 
@@ -91,13 +91,13 @@ LOCAL_SHARED_LIBRARIES := \
 	libVSC \
 	libGAL
 
-ifneq ($(TARGET_2ND_ARCH),)
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 21),1)
   LOCAL_MODULE_RELATIVE_PATH := egl
 else
   LOCAL_MODULE_PATH          := $(TARGET_OUT_SHARED_LIBRARIES)/egl
 endif
 
-LOCAL_MODULE         := libGLESv2_$(TAG)
+LOCAL_MODULE         := libGLESv2_$(GPU_VENDOR)
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)

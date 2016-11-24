@@ -26,7 +26,6 @@
 *****************************************************************************/
 
 
-
 /*
  *  Feature:    Filter Blit - one pass filter color format conversion with TILE
  *  API:        gco2D_FilterBlit

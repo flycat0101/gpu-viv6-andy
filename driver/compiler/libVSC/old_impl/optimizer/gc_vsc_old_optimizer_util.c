@@ -45,6 +45,7 @@ gcOPTIMIZER_OPTION theOptimizerOption =
     gcvFALSE, /* IR:   dump BE final IR */
     gcvFALSE, /* LOG:  dump FE log file in case of compiler error */
     gcvFALSE, /* UNIFORM: dump uniform value when setting uniform */
+    gcvFALSE, /* SPIRV: dump VIR shader convert from SPIRV */
     0, /* _dumpStart; */
     0x7fffffff, /* _dumpEnd */
 
@@ -144,6 +145,13 @@ gcOPTIMIZER_OPTION theOptimizerOption =
     gcvFALSE,
 #endif
 
+    /* debug:
+
+        VC_OPTION=-DEBUG:0|1
+
+     */
+    gcvFALSE,
+
     /* VC_OPTION=-Ddef1[=value1] -Ddef2[=value2] -Uundef1 */
     gcvNULL, /* macroDefines; */
 
@@ -196,6 +204,7 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      *       2:  auto-on mode for all applications.
      *       3:  force dual16 on for all applications no matter highp is specified or not.
      */
+    gcvFALSE, /* dual16Specified */
     DUAL16_AUTO_BENCH, /* dual16Mode; */
     0, /* _dual16Start; */
     0x7fffffff, /* _dual16End */
@@ -259,7 +268,7 @@ gcOPTIMIZER_OPTION theOptimizerOption =
 
     VIRCG_WITH_TREECG, /* useVIRCodeGen; */
     VIRCG_WITH_TREECG, /* origUseVIRCodeGen; */
-
+    gcvFALSE, /* virCodeGenSpecified; */
     0, /* _vircgStart; */
     0x7fffffff, /* _vircgEnd */
 
@@ -269,6 +278,14 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      *
      */
     gcvFALSE, /* createDefaultUBO; */
+
+   /*
+    * Handle OCL basic type as packed
+    *
+    *   VC_OPTION=-OCLPACKEDBASICTYPE:0|1
+    *
+    */
+    gcvFALSE, /* oclPackedBasicType; */
 
    /*
     * Handle OCL  relaxing local address space in OCV
@@ -741,7 +758,7 @@ gcSHADER_GoVIRPass(gcSHADER Shader)
     }
     else
     {
-        if (gcmOPT_UseVIRCodeGen() != VIRCG_None)
+        if (gcGetVIRCGKind(gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2))) != VIRCG_None)
         {
             gctINT   startId = gcmOPT_VIRCGStart();
             gctINT   endId   = gcmOPT_VIRCGEnd();
@@ -2371,6 +2388,7 @@ _BuildGlobalUsage(
         gcmFOOTER();
         return gcvSTATUS_OUT_OF_MEMORY;
     }
+
     enableUseArray = (gctUINT8*)malloc(Optimizer->tempCount * sizeof(gctUINT8));
     if(enableDefArray == gcvNULL)
     {
@@ -6024,6 +6042,7 @@ _BuildDataFlowForCode(
     case gcSL_ATOMXOR:
 
     case gcSL_ATTR_ST:
+    case gcSL_INTRINSIC_ST:
         /* Add output usage. */
         gcmERR_RETURN(gcOpt_AddIndexToList(Optimizer, &Code->users, gcvOPT_OUTPUT_REGISTER));
         /* fall thruogh */
@@ -6134,7 +6153,7 @@ _BuildDataFlowForCode(
     }
 
     if (gcmSL_SOURCE_GET(source, Indexed) != gcSL_NOT_INDEXED ||
-        opcode == gcSL_COPY)
+        (opcode == gcSL_COPY && gcmSL_SOURCE_GET(source, Type) != gcSL_CONSTANT))
     {
         gctUINT enable = 0;
 

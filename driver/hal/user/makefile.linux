@@ -23,7 +23,7 @@ include $(AQROOT)/makefile.linux.def
 ################################################################################
 # Define target module name.
 
-ifeq ($(gcdSTATIC_LINK), 1)
+ifeq ($(gcdSTATIC_LINK),1)
   STATIC            := 1
   TARGET_MODULE     := $(OBJ_DIR)/libGAL.a
 else
@@ -51,20 +51,20 @@ CFLAGS += $(INCLUDE)
 ################################################################################
 # Add extra flags for object files.
 
-ifneq ($(USE_ARMCC), 1)
+ifneq ($(USE_ARMCC),1)
   CFLAGS += -fPIC -Werror
 
     CFLAGS += -Werror -ansi
 endif
 
-ifeq ($(BUILD_OPENCL_FP), 1)
+ifeq ($(BUILD_OPENCL_FP),1)
   CFLAGS += -DBUILD_OPENCL_FP=1
 endif
 
 ################################################################################
 # Define flags for the linker.
 
-ifneq ($(USE_ARMCC), 1)
+ifneq ($(USE_ARMCC),1)
   LFLAGS += -Wl,--version-script=libGAL.map
 endif
 
@@ -78,7 +78,7 @@ endif
 # Supply dependent libraries.
 
 # Specify Vivante libraries twice to resolve references between libraries.
-ifeq ($(VIVANTE_ENABLE_VG), 1)
+ifeq ($(VIVANTE_ENABLE_VG),1)
   LIBS := -Wl,-whole-archive \
           -lhalarchuser -lhalarchuser_vg -lhalosuser \
           -Wl,-no-whole-archive
@@ -93,7 +93,7 @@ LIBS += -L$(AQROOT)/hal/user/arch/$(OBJ_DIR)
 
   LIBS += -L $(AQROOT)/hal/os/linux/user/$(OBJ_DIR)
 
-ifeq ($(VIVANTE_ENABLE_VG), 1)
+ifeq ($(VIVANTE_ENABLE_VG),1)
   LIBS += -L$(AQROOT)/hal/user/archvg/$(OBJ_DIR)
 endif
 
@@ -133,7 +133,8 @@ ifeq ($(VIVANTE_ENABLE_3D),1)
              $(OBJ_DIR)/gc_hal_user_mem.o \
              $(OBJ_DIR)/gc_hal_user_bufobj.o \
              $(OBJ_DIR)/gc_hal_user_statistics.o \
-             $(OBJ_DIR)/gc_hal_user_shader.o
+             $(OBJ_DIR)/gc_hal_user_shader.o \
+             $(OBJ_DIR)/gc_hal_user_resource.o
 
   ifeq ($(USE_OPENCL),1)
     OBJECTS += $(OBJ_DIR)/gc_hal_user_cl.o

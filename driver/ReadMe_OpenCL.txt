@@ -25,7 +25,7 @@ Contents
                 +---driver            : OpenCL driver;
 
 
-1. Build instruction
+2. Build instruction
 ====================
 
   1) Make sure you have installed Vivante standard GAL driver package;
@@ -47,7 +47,8 @@ Contents
 
   6) Check out build result.
      By default, openCL driver and frontend driver will be save to:
-        $AQROOT/build/sdk/drivers/libCL.so
+        $AQROOT/build/sdk/drivers/libOpenCL.so
+        $AQROOT/build/sdk/drivers/libVivanteOpenCL.so
         $AQROOT/build/sdk/drivers/libCLC.so
         $AQROOT/build/sdk/drivers/libLLVM_viv.so
 

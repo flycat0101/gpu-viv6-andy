@@ -367,6 +367,7 @@ _MapMemory(
     gcmVERIFY_ARGUMENT(Logical != gcvNULL);
 
     /* Call kernel API to unmap the memory. */
+    iface.ignoreTLS            = gcvFALSE;
     iface.command              = gcvHAL_MAP_MEMORY;
     iface.u.MapMemory.physical = gcmPTR2INT(Physical);
     iface.u.MapMemory.bytes    = NumberOfBytes;
@@ -409,6 +410,7 @@ _UnmapMemory(
     gcmVERIFY_ARGUMENT(Logical != gcvNULL);
 
     /* Call kernel API to unmap the memory. */
+    iface.ignoreTLS              = gcvFALSE;
     iface.command                = gcvHAL_UNMAP_MEMORY;
     iface.u.UnmapMemory.physical = gcmPTR2INT(Physical);
     iface.u.UnmapMemory.bytes    = NumberOfBytes;
@@ -756,9 +758,6 @@ gcoOS_GetPLSValue(
         case gcePLS_VALUE_EGL_DISPLAY_INFO :
             return gcPLS.eglDisplayInfo;
 
-        case gcePLS_VALUE_EGL_SURFACE_INFO :
-            return gcPLS.eglSurfaceInfo;
-
         case gcePLS_VALUE_EGL_CONFIG_FORMAT_INFO :
             return (gctPOINTER) gcPLS.eglConfigFormat;
     }
@@ -794,10 +793,6 @@ gcoOS_SetPLSValue(
     {
         case gcePLS_VALUE_EGL_DISPLAY_INFO :
             gcPLS.eglDisplayInfo = value;
-            return;
-
-        case gcePLS_VALUE_EGL_SURFACE_INFO :
-            gcPLS.eglSurfaceInfo = value;
             return;
 
         case gcePLS_VALUE_EGL_CONFIG_FORMAT_INFO :
@@ -1254,11 +1249,12 @@ gcoOS_QueryVideoMemory(
     gcmHEADER();
 
         /* Call kernel HAL to query video memory. */
+    iface.ignoreTLS            = gcvFALSE;
     iface.command = gcvHAL_QUERY_VIDEO_MEMORY;
 
         /* Call kernel service. */
     gcmONERROR(gcoOS_DeviceControl(gcvNULL,
-            IOCTL_GCHAL_INTERFACE,
+                                   IOCTL_GCHAL_INTERFACE,
                                    &iface, gcmSIZEOF(iface),
                                    &iface, gcmSIZEOF(iface)));
 
@@ -1351,6 +1347,7 @@ gcoOS_GetBaseAddress(
         if (gcPLS.os->baseAddress == gcvINVALID_ADDRESS)
         {
             /* Query base address. */
+            iface.ignoreTLS            = gcvFALSE;
             iface.command = gcvHAL_GET_BASE_ADDRESS;
 
             /* Call kernel driver. */
@@ -1745,23 +1742,26 @@ gcoOS_DeviceControl(
     gcsHAL_INTERFACE_PTR inputBuffer = (gcsHAL_INTERFACE_PTR) InputBuffer;
     gcsHAL_INTERFACE_PTR outputBuffer = (gcsHAL_INTERFACE_PTR) OutputBuffer;
 
-    /* Set current hardware type */
-    switch (inputBuffer->command)
+    if (!inputBuffer->ignoreTLS)
     {
-    case gcvHAL_GET_BASE_ADDRESS:
-    case gcvHAL_VERSION:
-    case gcvHAL_CHIP_INFO:
-    case gcvHAL_UNMAP_MEMORY:
-        inputBuffer->hardwareType = gcvHARDWARE_3D;
-        inputBuffer->coreIndex    = 0;
-        break;
+        /* Set current hardware type */
+        switch (inputBuffer->command)
+        {
+        case gcvHAL_GET_BASE_ADDRESS:
+        case gcvHAL_VERSION:
+        case gcvHAL_CHIP_INFO:
+        case gcvHAL_UNMAP_MEMORY:
+            inputBuffer->hardwareType = gcvHARDWARE_3D;
+            inputBuffer->coreIndex    = 0;
+            break;
 
-    default:
-        status = gcoOS_GetTLS(&tls);
-        if (gcmIS_ERROR(status)) return status;
-        inputBuffer->hardwareType = tls->currentType;
-        inputBuffer->coreIndex    = tls->currentCoreIndex;
-        break;
+        default:
+            status = gcoOS_GetTLS(&tls);
+            if (gcmIS_ERROR(status)) return status;
+            inputBuffer->hardwareType = tls->currentType;
+            inputBuffer->coreIndex    = tls->currentCoreIndex;
+            break;
+        }
     }
 
 #ifdef VIV_DIRECT_IO
@@ -1853,6 +1853,7 @@ gcoOS_AllocateNonPagedMemory(
     gcmVERIFY_ARGUMENT(Logical != gcvNULL);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS            = gcvFALSE;
     iface.command = gcvHAL_ALLOCATE_NON_PAGED_MEMORY;
     iface.u.AllocateNonPagedMemory.bytes = *Bytes;
 
@@ -1926,6 +1927,7 @@ gcoOS_FreeNonPagedMemory(
                   Bytes, Physical, Logical);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_FREE_NON_PAGED_MEMORY;
     iface.u.FreeNonPagedMemory.bytes    = Bytes;
     iface.u.FreeNonPagedMemory.physical = gcmPTR2INT(Physical);
@@ -1984,6 +1986,7 @@ gcoOS_FreeContiguous(
                   Physical, Logical, Bytes);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_FREE_CONTIGUOUS_MEMORY;
     iface.u.FreeContiguousMemory.bytes    = Bytes;
     iface.u.FreeContiguousMemory.physical = gcmPTR2INT(Physical);
@@ -3703,18 +3706,29 @@ gcoOS_PrintStrSafe(
     ...
     )
 {
-    gceSTATUS status;
-    gctARGUMENTS args;
+    gctARGUMENTS arguments;
+    gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("String=0x%x StringSize=%lu *Offset=%u Format=0x%x",
                   String, StringSize, gcmOPT_VALUE(Offset), Format);
 
-    /* Pass through to the V case. */
-    gcmARGUMENTS_START(args, Format);
-    status = gcoOS_PrintStrVSafe(String, StringSize, Offset, Format, args);
+    /* Verify the arguments. */
+    gcmVERIFY_ARGUMENT(String != gcvNULL);
+    gcmVERIFY_ARGUMENT(StringSize > 0);
+    gcmVERIFY_ARGUMENT(Format != gcvNULL);
 
-    gcmFOOTER();
+    /* Route through gcoOS_PrintStrVSafe. */
+    gcmARGUMENTS_START(arguments, Format);
+    gcmONERROR(gcoOS_PrintStrVSafe(String, StringSize,
+                                   Offset,
+                                   Format, arguments));
+
+OnError:
+    gcmARGUMENTS_END(arguments);
+
+    gcmFOOTER_ARG("*Offset=%u", gcmOPT_VALUE(Offset));
     return status;
+
 }
 
 /*******************************************************************************
@@ -3757,32 +3771,42 @@ gcoOS_PrintStrVSafe(
     IN gctARGUMENTS Arguments
     )
 {
-    gcmHEADER_ARG("String=0x%x StringSize=%lu *Offset=%u Format=0x%x "
-                  "Arguments=0x%x",
-                  String, StringSize, gcmOPT_VALUE(Offset), Format, Arguments);
+    gctUINT offset = gcmOPT_VALUE(Offset);
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("String=0x%x StringSize=%lu *Offset=%u Format=0x%x Arguments=0x%x",
+                  String, StringSize, offset, Format, Arguments);
 
     /* Verify the arguments. */
     gcmVERIFY_ARGUMENT(String != gcvNULL);
-    gcmVERIFY_ARGUMENT(Offset != gcvNULL);
+    gcmVERIFY_ARGUMENT(StringSize > 0);
     gcmVERIFY_ARGUMENT(Format != gcvNULL);
 
-    if (*Offset < StringSize)
+    if ((gctSIZE_T)offset < StringSize - 1)
     {
-        /* Format the string. */
-        gctINT n = _vsnprintf(String + *Offset,
-                             StringSize - *Offset,
+        /* Print into the string. */
+        gctINT n = _vsnprintf(String + offset,
+                             StringSize - (gctSIZE_T)offset,
                              Format,
                              Arguments);
 
-        if (n > 0)
+        if (n < 0 || n >= (gctINT)(StringSize - offset))
         {
-            *Offset += n;
+            status = gcvSTATUS_GENERIC_IO;
         }
+        else if (Offset)
+        {
+            *Offset = offset + n;
+        }
+    }
+    else
+    {
+        status = gcvSTATUS_BUFFER_TOO_SMALL;
     }
 
     /* Success. */
-    gcmFOOTER_ARG("*Offset=%u", *Offset);
-    return gcvSTATUS_OK;
+    gcmFOOTER_ARG("*Offset=%u", offset);
+    return status;
 }
 
 /*******************************************************************************
@@ -4506,6 +4530,7 @@ gcoOS_ReadRegister(
     gcmVERIFY_ARGUMENT(Data != gcvNULL);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_READ_REGISTER;
     iface.u.ReadRegisterData.address = Address;
     iface.u.ReadRegisterData.data    = 0xDEADDEAD;
@@ -4563,6 +4588,7 @@ gcoOS_WriteRegister(
     gcmHEADER_ARG("Address=0x%x Data=0x%08x", Address, Data);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_WRITE_REGISTER;
     iface.u.WriteRegisterData.address = Address;
     iface.u.WriteRegisterData.data   = Data;
@@ -4602,6 +4628,7 @@ gcoOS_Cache(
     gcmVERIFY_ARGUMENT(Bytes > 0);
 
     /* Set up the cache. */
+    ioctl.ignoreTLS          = gcvFALSE;
     ioctl.command            = gcvHAL_CACHE;
     ioctl.u.Cache.operation  = Operation;
     ioctl.u.Cache.node       = Node;

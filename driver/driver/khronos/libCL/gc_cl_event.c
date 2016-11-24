@@ -13,7 +13,7 @@
 
 #include "gc_cl_precomp.h"
 
-#define __NEXT_MSG_ID__     008018
+#define __NEXT_MSG_ID__     008019
 
 /*****************************************************************************\
 |*                         Supporting functions                              *|
@@ -255,7 +255,6 @@ clfAddEventCallback(
     gctINT                  status;
     clsContext_PTR          context;
     clsEventCallback_PTR    eventCallback;
-    gctPOINTER              pointer;
 
     gcmHEADER_ARG("EventCallback=0x%x", EventCallback);
 
@@ -263,17 +262,10 @@ clfAddEventCallback(
 
     clRetainEvent(EventCallback->event);
 
-    EventCallback->added = gcvTRUE;
-
     context = EventCallback->event->context;
 
-    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsEventCallback), &pointer), CL_OUT_OF_HOST_MEMORY);
-
-    eventCallback               = (clsEventCallback_PTR) pointer;
-    eventCallback->pfnNotify    = EventCallback->pfnNotify;
-    eventCallback->userData     = EventCallback->userData;
-    eventCallback->event        = EventCallback->event;
-    eventCallback->next         = gcvNULL;
+    eventCallback       = EventCallback;
+    eventCallback->next = gcvNULL;
 
     gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL,
                                     context->eventCallbackListMutex,
@@ -444,7 +436,6 @@ clfFinishEvent(
     )
 {
     gctINT                  status;
-    clsEventCallback_PTR    eventCallback;
 
     gcmHEADER_ARG("Event=0x%x Status=%d", Event, Status);
 
@@ -458,18 +449,66 @@ clfFinishEvent(
     /* Wake up all command queue workers */
     clfWakeUpAllCommandQueueWorkers(Event->context);
 
-    gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, Event->callbackMutex, gcvINFINITE));
+    /* Invoke the event callbacks. */
+    status = clfScheduleEventCallback(Event, Status);
 
-    eventCallback = Event->callback;
+OnError:
+    gcmFOOTER_ARG("%d", status);
 
-    /* Invoke event callbacks in separate threads */
-    while (eventCallback != gcvNULL)
+    return status;
+}
+
+gctINT
+clfScheduleEventCallback(
+    cl_event        Event,
+    gctINT          ExecutionStatus
+    )
+{
+    gctINT                  status;
+    clsEventCallback_PTR    eventCallback, prev, next;
+
+    gcmHEADER_ARG("Event=0x%x Status=%d", Event, ExecutionStatus);
+
+    clmASSERT(Event, CL_INVALID_VALUE);
+
+#if BUILD_OPENCL_12
+    if (ExecutionStatus <= CL_SUBMITTED)
+#else
+    if (ExecutionStatus <= CL_COMPLETE)
+#endif
     {
-        if (!eventCallback->added) clfAddEventCallback(eventCallback);
-        eventCallback = eventCallback->next;
-    }
+        gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, Event->callbackMutex, gcvINFINITE));
 
-    gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, Event->callbackMutex));
+        prev = eventCallback = Event->callback;
+
+        /* Invoke event callbacks in separate threads */
+        while (eventCallback != gcvNULL)
+        {
+            next = eventCallback->next;
+
+            if (ExecutionStatus <= eventCallback->type)
+            {
+                if (eventCallback == Event->callback)
+                {
+                    prev = Event->callback = next;
+                }
+                else
+                {
+                    prev->next = next;
+                }
+
+                clfAddEventCallback(eventCallback);
+            }
+            else
+            {
+                prev = eventCallback;
+            }
+
+            eventCallback = next;
+        }
+
+        gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, Event->callbackMutex));
+    }
 
     status = CL_SUCCESS;
 
@@ -608,6 +647,8 @@ clfProcessEventList(
         if ((event->executionStatus > CL_RUNNING) && gcmIS_SUCCESS(gcoCL_WaitSignal(event->runSignal, 0)))
         {
             clfSetEventExecutionStatus(event, CL_RUNNING);
+
+            clfScheduleEventCallback(event, CL_RUNNING);
         }
 
         if (gcmIS_SUCCESS(gcoCL_WaitSignal(event->finishSignal, 0)))
@@ -803,8 +844,13 @@ clfEventCallbackWorker(
 
             if (eventCallback != gcvNULL)
             {
-                eventCallback->pfnNotify(eventCallback->event, CL_COMPLETE, eventCallback->userData);
+                eventCallback->pfnNotify(
+                    eventCallback->event,
+                    eventCallback->type,
+                    eventCallback->userData);
+
                 clReleaseEvent(eventCallback->event);
+
                 gcoOS_Free(gcvNULL, eventCallback);
             }
             else
@@ -839,7 +885,6 @@ clCreateUserEvent(
         clmRETURN_ERROR(CL_INVALID_CONTEXT);
     }
 
-    gcoCL_SetHardware();
     status = clfAllocateEvent(Context, &event);
     if (gcmIS_ERROR(status))
     {
@@ -913,7 +958,6 @@ clReleaseEvent(
         clmRETURN_ERROR(CL_INVALID_EVENT);
     }
 
-    gcoCL_SetHardware();
     gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, Event->referenceCount, &oldReference));
 
     gcmASSERT(oldReference > 0);
@@ -996,7 +1040,6 @@ clSetUserEventStatus(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    gcoCL_SetHardware();
     clfFinishEvent(Event, ExecutionStatus);
 
     gcmFOOTER_ARG("%d", CL_SUCCESS);
@@ -1025,7 +1068,6 @@ clWaitForEvents(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    gcoCL_SetHardware();
     for (i = 0; i < NumEvents; i++)
     {
         if (EventList[i] == gcvNULL || EventList[i]->objectType != clvOBJECT_EVENT)
@@ -1173,13 +1215,26 @@ clSetEventCallback(
         clmRETURN_ERROR(CL_INVALID_EVENT);
     }
 
+#if BUILD_OPENCL_12
+    if ((CommandExecCallbackType != CL_SUBMITTED) &&
+        (CommandExecCallbackType != CL_RUNNING) &&
+        (CommandExecCallbackType != CL_COMPLETE)
+       )
+#else
+    if (CommandExecCallbackType != CL_COMPLETE)
+#endif
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-008018: (clSetEventCallback) invalid CommandExecCallbackType.\n");
+        clmRETURN_ERROR(CL_INVALID_VALUE);
+    }
+
     if (PfnNotify == gcvNULL)
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-008015: (clSetEventCallback) PfnNotify is NULL.\n");
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
-
 
     status = gcoOS_Allocate(gcvNULL, sizeof(clsEventCallback), &pointer);
     if (gcmIS_ERROR(status))
@@ -1189,21 +1244,27 @@ clSetEventCallback(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    gcoCL_SetHardware();
     gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, Event->callbackMutex, gcvINFINITE));
 
     eventCallback               = (clsEventCallback_PTR) pointer;
     eventCallback->pfnNotify    = PfnNotify;
     eventCallback->userData     = UserData;
     eventCallback->event        = Event;
-    eventCallback->next         = Event->callback;
-    eventCallback->added        = gcvFALSE;
-    Event->callback             = eventCallback;
+    eventCallback->type         = CommandExecCallbackType;
+    eventCallback->next         = gcvNULL;
 
-    /* Invoke callback if the event has completed already */
-    if (clfGetEventExecutionStatus(Event) == CL_COMPLETE)
+    if (clfGetEventExecutionStatus(Event) <= eventCallback->type)
     {
+        /* Invoke callback if the event execution status is equal to or past
+         * the eventCallback->type.
+         */
         clfAddEventCallback(eventCallback);
+    }
+    else
+    {
+        /* Add to the list and it will be invoked later. */
+        eventCallback->next     = Event->callback;
+        Event->callback         = eventCallback;
     }
 
     gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, Event->callbackMutex));

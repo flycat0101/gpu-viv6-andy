@@ -1,0 +1,11 @@
+{
+    global:
+        gcSPV_Conv2VIR;
+        gcSPV_Decode;
+		gcSPV_CreateSPV;
+        gcSPV_PreDecode;
+        gcSPV_PostDecode;
+
+    local:
+        *;
+};

@@ -15,13 +15,13 @@
 #define __gc_vsc_vir_ep_back_patch_h_
 
 BEGIN_EXTERN_C()
+
 VSC_ErrCode
 vscVIR_PerformSEPBackPatch(
-    IN  VIR_Shader*                pShader,
-    IN  VSC_HW_CONFIG*             pHwCfg,
-    IN  SHADER_EXECUTABLE_PROFILE* pOutSEP,
-    IN  gctBOOL                    bDumpSEP
+    VSC_SH_PASS_WORKER* pPassWorker
     );
+DECLARE_QUERY_PASS_PROP(vscVIR_PerformSEPBackPatch);
+
 END_EXTERN_C()
 
 #endif /* __gc_vsc_vir_ep_back_patch_h_ */

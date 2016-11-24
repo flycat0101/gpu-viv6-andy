@@ -16,7 +16,7 @@ include $(LOCAL_PATH)/../../../Android.mk.def
 
 
 #
-# libEGL_$(TAG)
+# libEGL_$(GPU_VENDOR)
 #
 include $(CLEAR_VARS)
 
@@ -37,10 +37,8 @@ LOCAL_CFLAGS := \
 	-Werror \
 	-DLOG_TAG=\"v_egl\"
 
-ifeq ($(gcdDUMP_FRAME_TGA),1)
 LOCAL_CFLAGS += \
-	-DgcdDUMP_FRAME_TGA=1
-endif
+    -DGPU_VENDOR=\"$(GPU_VENDOR)\"
 
 ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 20),1)
 LOCAL_C_INCLUDES += \
@@ -66,6 +64,7 @@ LOCAL_LDFLAGS := \
 LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libdl \
+	libcutils \
 	libhardware \
 	libpixelflinger \
 	libGAL
@@ -75,18 +74,13 @@ LOCAL_SHARED_LIBRARIES += \
 	libsync
 endif
 
-ifeq ($(gcdDUMP_FRAME_TGA),1)
-LOCAL_SHARED_LIBRARIES += \
-	libcutils
-endif
-
-ifneq ($(TARGET_2ND_ARCH),)
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 21),1)
   LOCAL_MODULE_RELATIVE_PATH := egl
 else
   LOCAL_MODULE_PATH          := $(TARGET_OUT_SHARED_LIBRARIES)/egl
 endif
 
-LOCAL_MODULE         := libEGL_$(TAG)
+LOCAL_MODULE         := libEGL_$(GPU_VENDOR)
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)

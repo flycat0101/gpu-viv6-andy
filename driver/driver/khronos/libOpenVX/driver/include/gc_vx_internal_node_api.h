@@ -22,7 +22,7 @@ EXTERN_C_BEGIN
 VX_INTERNAL_API vx_node vxSobelMxNNode(vx_graph graph, vx_image input, vx_scalar ws, vx_image gx, vx_image gy);
 
 VX_INTERNAL_API vx_node vxHarrisScoreNode(
-        vx_graph graph, vx_image gx, vx_image gy, vx_scalar sensitivity, vx_scalar blockSize, vx_image score);
+        vx_graph graph, vx_image gx, vx_image gy, vx_scalar sensitivity, vx_scalar winSize, vx_scalar blockSize, vx_image score);
 
 VX_INTERNAL_API vx_node vxEuclideanNonMaxNode(
         vx_graph graph, vx_image input, vx_scalar strengthThresh, vx_scalar minDistance, vx_image output);
@@ -71,6 +71,15 @@ VX_INTERNAL_API vx_node vxEqualizeHistGcdfNode(vx_graph graph, vx_image histImag
 VX_INTERNAL_API vx_node vxEqualizeHistCdfNode(vx_graph graph, vx_image srcImage, vx_image cdfImage, vx_scalar minValueScalar, vx_image histImage);
 VX_INTERNAL_API vx_node vxEqualizeHistLutNode(vx_graph graph, vx_image srcImage, vx_image histImage, vx_image dstImage);
 
+VX_INTERNAL_API vx_node vxSgmCostNode(vx_graph graph, vx_image right_img, vx_image left_img, vx_scalar range, vx_image cost);
+VX_INTERNAL_API vx_node vxSgmCostPath90Node(vx_graph graph, vx_image cost, vx_scalar range, vx_image path);
+VX_INTERNAL_API vx_node vxSgmCostPath45Node(vx_graph graph, vx_image cost, vx_scalar range, vx_image path);
+VX_INTERNAL_API vx_node vxSgmCostPath135Node(vx_graph graph, vx_image cost, vx_scalar range, vx_image path);
+VX_INTERNAL_API vx_node vxSgmCostPath0Node(vx_graph graph, vx_image cost, vx_scalar range, vx_image path);
+VX_INTERNAL_API vx_node vxSgmGetDispNode(vx_graph graph, vx_image path, vx_scalar range, vx_image depth);
+VX_INTERNAL_API vx_node vxLaplacian3x3Node(vx_graph graph, vx_image src, vx_image dst);
+
 EXTERN_C_END
 
 #endif /* __GC_VX_INTERNAL_NODE_API_H__ */
+

@@ -13,7 +13,6 @@
 
 #include "gc_vsc.h"
 
-
 /*
  *    Call graph related code
  */
@@ -60,6 +59,7 @@ static VIR_FUNC_BLOCK* _TryAddFuncBlockToCallGraph(VIR_CALL_GRAPH* pCg, VIR_Func
         pVIRFunc->pFuncBlock = pFuncBlk;
         pFuncBlk->maxCallDepth = 0;
         pFuncBlk->minCallDepth = VIR_INFINITE_CALL_DEPTH;
+        memset(&pFuncBlk->cfg, 0, sizeof(VIR_CONTROL_FLOW_GRAPH));
         vscSRARR_Initialize(&pFuncBlk->mixedCallSiteArray, &pCg->pmp.mmWrapper, 2, sizeof(VIR_Instruction*), CALL_SITE_CMP);
         vscDG_AddNode(&pCg->dgGraph, &pFuncBlk->dgNode);
     }
@@ -126,6 +126,7 @@ static void _RemoveUnreachableFunctions(VIR_CALL_GRAPH* pCg)
                       gcvNULL,
                       gcvNULL,
                       gcvNULL,
+                      gcvNULL,
                       gcvNULL);
 
     CG_ITERATOR_INIT(&funcBlkIter, pCg);
@@ -140,7 +141,7 @@ static void _RemoveUnreachableFunctions(VIR_CALL_GRAPH* pCg)
     }
 }
 
-/* Parameter passing into traversal callbacks */
+/* Parameter passing into traversal callbacks of CG */
 typedef struct _VSC_CALL_DEPTH_HELPER
 {
     VIR_FUNC_BLOCK** ppCallStack;
@@ -289,6 +290,7 @@ VSC_ErrCode vscVIR_BuildCallGraph(VIR_Shader* pShader, VIR_CALL_GRAPH* pCg)
                       (PFN_DG_NODE_HANLDER)_OwnFuncBlkHandlerDFSPost,
                       (PFN_DG_NODE_HANLDER)_SuccFuncBlkHandlerDFSPre,
                       (PFN_DG_NODE_HANLDER)_SuccFuncBlkHandlerDFSPost,
+                      gcvNULL,
                       &callDepth);
 
     vscMM_Free(&pCg->pmp.mmWrapper, callDepth.ppCallStack);
@@ -303,10 +305,10 @@ VSC_ErrCode vscVIR_DestroyCallGraph(VIR_CALL_GRAPH* pCg)
     VIR_FUNC_BLOCK*         pThisFuncBlk;
     VIR_FUNC_BLOCK*         pNextFuncBlk;
 
-    /* If no shader bound, just return */
-    if (pCg->pOwnerShader == gcvNULL)
+    /* If CG has not been built, just return */
+    if (!vscVIR_IsCallGraphBuilt(pCg))
     {
-        return VSC_ERR_CG_NOT_BUILT;
+        return errCode;
     }
 
     CG_ITERATOR_INIT(&funcBlkIter, pCg);
@@ -328,6 +330,19 @@ VSC_ErrCode vscVIR_DestroyCallGraph(VIR_CALL_GRAPH* pCg)
     return errCode;
 }
 
+gctBOOL vscVIR_IsCallGraphBuilt(VIR_CALL_GRAPH* pCg)
+{
+    return (pCg->pOwnerShader != gcvNULL);
+}
+
+VSC_ErrCode vscVIR_RemoveFuncBlockFromCallGraph(VIR_CALL_GRAPH* pCg,
+                                                VIR_FUNC_BLOCK* pFuncBlk,
+                                                gctBOOL bRemoveFuncInShader)
+{
+    _RemoveFuncBlockFromCallGraph(pCg, pFuncBlk, bRemoveFuncInShader);
+
+    return VSC_ERR_NONE;
+}
 
 /*
  *    Control flow graph related code
@@ -342,6 +357,7 @@ static void _IntializeCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VIR_FUNC_BLOCK* pFuncBlk
 
     vscTREE_Initialize(&pCfg->domTree.tree, &pCfg->pmp.mmWrapper, 4);
     vscTREE_Initialize(&pCfg->postDomTree.tree, &pCfg->pmp.mmWrapper, 4);
+
     pCfg->domTree.pOwnerCFG = pCfg;
     pCfg->postDomTree.pOwnerCFG = pCfg;
 
@@ -417,6 +433,8 @@ static VIR_BASIC_BLOCK* _AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCfg)
     pBasicBlock->pPostDomTreeNode = gcvNULL;
     pBasicBlock->flags = 0;
     pBasicBlock->globalBbId = pCfg->pOwnerFuncBlk->pOwnerCG->nextGlobalBbId ++;
+    pBasicBlock->dfsPreVisitOrderIdx = NOT_ASSIGNED;
+    pBasicBlock->dfsPostVisitOrderIdx = NOT_ASSIGNED;
     vscHTBL_DirectSet(&pCfg->pOwnerFuncBlk->pOwnerCG->globalBbHashTable,
                       (void*)(gctUINTPTR_T)pBasicBlock->globalBbId, pBasicBlock);
 
@@ -431,6 +449,19 @@ static VIR_BASIC_BLOCK* _AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCfg)
     vscDG_AddNode(&pCfg->dgGraph, &pBasicBlock->dgNode);
 
     return pBasicBlock;
+}
+
+static void _AssociateAnInstToBasicBlock(VIR_BASIC_BLOCK* pBasicBlock, VIR_Instruction* pInst)
+{
+    VIR_Inst_SetBasicBlock(pInst, pBasicBlock);
+    pBasicBlock->instCount ++;
+
+    if (VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(pInst)) ||
+        VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(pInst)) ||
+        VIR_OPCODE_isAttrLd(VIR_Inst_GetOpcode(pInst)))
+    {
+        BB_FLAGS_SET_LLI(pBasicBlock);
+    }
 }
 
 static void _AddBasicBlocksToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_Function* pFunc)
@@ -484,14 +515,7 @@ static void _AddBasicBlocksToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_Function* pFu
             pThisBlock->pStartInst = pThisInst;
         }
 
-        VIR_Inst_SetBasicBlock(pThisInst, pThisBlock);
-        pThisBlock->instCount ++;
-
-        if (VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(pThisInst)) ||
-            VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(pThisInst)))
-        {
-            BB_FLAGS_SET_LLI(pThisBlock);
-        }
+        _AssociateAnInstToBasicBlock(pThisBlock, pThisInst);
 
         pPrevInst = pThisInst;
     }
@@ -501,7 +525,7 @@ static void _AddBasicBlocksToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_Function* pFu
     pThisBlock->flowType = _GetFlowType(VIR_Inst_GetOpcode(pPrevInst));
 }
 
-static void _AddEdgeForCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VIR_BASIC_BLOCK* pFromBB,
+static VIR_CFG_EDGE* _AddEdgeForCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VIR_BASIC_BLOCK* pFromBB,
                            VIR_BASIC_BLOCK* pToBB, VIR_CFG_EDGE_TYPE edgeType)
 {
     VIR_CFG_EDGE*           pEdge;
@@ -509,6 +533,9 @@ static void _AddEdgeForCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VIR_BASIC_BLOCK* pFromB
     /* We only consider successor edge */
     pEdge = (VIR_CFG_EDGE*)vscDG_AddEdge(&pCfg->dgGraph, &pFromBB->dgNode, &pToBB->dgNode, gcvNULL);
     pEdge->type = edgeType;
+    pEdge->dfsType = VIR_CFG_DFS_EDGE_TYPE_NORMAL;
+
+    return pEdge;
 }
 
 static void _AddEdgesForCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
@@ -644,7 +671,7 @@ static void _RemoveBasicBlockFromCFG(
 
         if (bDeleteInst)
         {
-            VIR_Function_RemoveInstruction(pCFG->pOwnerFuncBlk->pVIRFunc, pInst);
+            VIR_Function_DeleteInstruction(pCFG->pOwnerFuncBlk->pVIRFunc, pInst);
         }
         else
         {
@@ -672,11 +699,12 @@ static void _RemoveUnreachableBasicBlocks(VIR_CONTROL_FLOW_GRAPH* pCFG)
     CFG_ITERATOR            basicBlkIter;
     VIR_BASIC_BLOCK*        pThisBlock;
 
-    /* Firstly do traversal CG to find unreachable func-blocks which are not visisted ones */
+    /* Firstly do traversal CFG to find unreachable basic-blocks which are not visisted ones */
     vscDG_TraversalCB(&pCFG->dgGraph,
                       VSC_GRAPH_SEARCH_MODE_DEPTH_FIRST,
                       gcvFALSE,
                       (PFN_DG_NODE_HANLDER)_RootBasicBlkHandlerDFSPost,
+                      gcvNULL,
                       gcvNULL,
                       gcvNULL,
                       gcvNULL,
@@ -737,7 +765,7 @@ VSC_ErrCode vscVIR_DestroyCFGPerFunc(VIR_Function* pFunc)
     /* If no CG built, just return */
     if (pFunc->pFuncBlock == gcvNULL)
     {
-        return VSC_ERR_CG_NOT_BUILT;
+        return errCode;
     }
 
     pCFG = &pFunc->pFuncBlock->cfg;
@@ -788,6 +816,11 @@ VSC_ErrCode vscVIR_DestroyCFG(VIR_Shader* pShader)
     VIR_FunctionNode*      pFuncNode;
     VIR_FuncIterator       funcIter;
 
+    if (!vscVIR_IsCFGBuilt(pShader))
+    {
+        return errCode;
+    }
+
     errCode = vscVIR_DestroyBbReachRelation(pShader);
     if (errCode != VSC_ERR_NONE)
     {
@@ -805,6 +838,533 @@ VSC_ErrCode vscVIR_DestroyCFG(VIR_Shader* pShader)
         {
             return errCode;
         }
+    }
+
+    return errCode;
+}
+
+gctBOOL vscVIR_IsCFGBuilt(VIR_Shader* pShader)
+{
+    if (pShader->mainFunction->pFuncBlock)
+    {
+        return (pShader->mainFunction->pFuncBlock->cfg.pOwnerFuncBlk != gcvNULL);
+    }
+
+    return gcvFALSE;
+}
+
+VIR_BASIC_BLOCK* vscVIR_AddBasicBlockToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG,
+                                           VIR_Instruction*        pStartInst,
+                                           VIR_Instruction*        pEndInst,
+                                           VIR_FLOW_TYPE           flowType)
+{
+    VIR_Instruction*        pThisInst = pStartInst;
+    VIR_BASIC_BLOCK*        pNewBasicBlk = gcvNULL;
+
+    gcmASSERT(pCFG->pOwnerFuncBlk != gcvNULL);
+    gcmASSERT(VIR_Inst_GetBasicBlock(pStartInst) == gcvNULL && VIR_Inst_GetBasicBlock(pEndInst) == gcvNULL);
+
+    pNewBasicBlk = _AddBasicBlockToCFG(pCFG);
+
+    pNewBasicBlk->pStartInst = pStartInst;
+    pNewBasicBlk->pEndInst = pEndInst;
+    pNewBasicBlk->flowType = flowType;
+
+    while (pThisInst)
+    {
+        _AssociateAnInstToBasicBlock(pNewBasicBlk, pThisInst);
+
+        /* If current inst is the last inst of block, just bail out */
+        if (pThisInst == pEndInst)
+        {
+            break;
+        }
+
+        /* Move to next inst */
+        pThisInst = VIR_Inst_GetNext(pThisInst);
+    }
+
+    return pNewBasicBlk;
+}
+
+VSC_ErrCode vscVIR_RemoveBasicBlockFromCFG(VIR_CONTROL_FLOW_GRAPH* pCFG,
+                                           VIR_BASIC_BLOCK* pBasicBlk,
+                                           gctBOOL bDeleteInst)
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+
+    gcmASSERT(pCFG->pOwnerFuncBlk != gcvNULL);
+
+    _RemoveBasicBlockFromCFG(pCFG, pBasicBlk, bDeleteInst);
+
+    return errCode;
+}
+
+VSC_ErrCode vscVIR_AddEdgeToCFG(VIR_CONTROL_FLOW_GRAPH* pCFG,
+                                VIR_BASIC_BLOCK*        pFromBasicBlk,
+                                VIR_BASIC_BLOCK*        pToBasicBlk,
+                                VIR_CFG_EDGE_TYPE       edgeType)
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_CFG_EDGE*           pEdge;
+
+    gcmASSERT(pCFG->pOwnerFuncBlk != gcvNULL);
+
+    pEdge = _AddEdgeForCFG(pCFG, pFromBasicBlk, pToBasicBlk, edgeType);
+
+    if(pEdge == gcvNULL)
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
+        return errCode;
+    }
+
+    return errCode;
+}
+
+VSC_ErrCode vscVIR_RemoveEdgeFromCFG(VIR_CONTROL_FLOW_GRAPH* pCFG,
+                                     VIR_BASIC_BLOCK*        pFromBasicBlk,
+                                     VIR_BASIC_BLOCK*        pToBasicBlk)
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+
+    gcmASSERT(pCFG->pOwnerFuncBlk != gcvNULL);
+    gcmASSERT(vscVIR_GetCfgEdge(pCFG, pFromBasicBlk, pToBasicBlk));
+
+    vscDG_RemoveEdge(&pCFG->dgGraph, &pFromBasicBlk->dgNode, &pToBasicBlk->dgNode);
+
+    return errCode;
+}
+
+VIR_CFG_EDGE* vscVIR_GetCfgEdge(VIR_CONTROL_FLOW_GRAPH* pCFG,
+                                VIR_BASIC_BLOCK* pFromBasicBlk,
+                                VIR_BASIC_BLOCK* pToBasicBlk)
+{
+    gcmASSERT(pCFG->pOwnerFuncBlk != gcvNULL);
+
+    return (VIR_CFG_EDGE*)vscDG_GetEdge(&pCFG->dgGraph, &pFromBasicBlk->dgNode, &pToBasicBlk->dgNode);
+}
+
+VIR_BASIC_BLOCK* VIR_BB_GetFollowingBB(VIR_BASIC_BLOCK* bb)
+{
+    VIR_Instruction* bbEnd = BB_GET_END_INST(bb);
+
+    if(bbEnd == gcvNULL)
+    {
+        return gcvNULL;
+    }
+    else
+    {
+        VIR_Instruction* bbEndNext = VIR_Inst_GetNext(bbEnd);
+
+        if(bbEndNext == gcvNULL)
+        {
+            return gcvNULL;
+        }
+        else
+        {
+            return VIR_Inst_GetBasicBlock(bbEndNext);
+        }
+    }
+}
+
+VIR_BASIC_BLOCK* VIR_BB_GetLeadingBB(VIR_BASIC_BLOCK* bb)
+{
+    VIR_Instruction* bbStart = BB_GET_START_INST(bb);
+
+    if(bbStart == gcvNULL)
+    {
+        return gcvNULL;
+    }
+    else
+    {
+        VIR_Instruction* bbStartPrev = VIR_Inst_GetPrev(bbStart);
+
+        if(bbStartPrev == gcvNULL)
+        {
+            return gcvNULL;
+        }
+        else
+        {
+            return VIR_Inst_GetBasicBlock(bbStartPrev);
+        }
+    }
+}
+
+VIR_BASIC_BLOCK* VIR_BB_GetJumpToBB(VIR_BASIC_BLOCK* bb)
+{
+    VIR_Instruction* bbEnd = BB_GET_END_INST(bb);
+
+    if(bbEnd == gcvNULL || !VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(bbEnd)))
+    {
+        return gcvNULL;
+    }
+    else
+    {
+        return VIR_Inst_GetBranchTargetBB(bbEnd);
+    }
+}
+
+VSC_ErrCode
+VIR_BB_ChangeSuccBBs(
+    VIR_BASIC_BLOCK* bb,
+    VIR_BASIC_BLOCK* newJmpTo,
+    VIR_BASIC_BLOCK* newFallThru
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_Function* func = BB_GET_FUNC(bb);
+    VIR_Instruction* bbEnd = BB_GET_END_INST(bb);
+    VIR_Operand* bbEndDest = VIR_Inst_GetDest(bbEnd);
+    VIR_OpCode bbEndOp = VIR_Inst_GetOpcode(bbEnd);
+
+    VSC_ADJACENT_LIST_ITERATOR succEdgeIter;
+    VIR_CFG_EDGE* succEdge;
+
+    gcmASSERT(VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(bbEnd)));
+
+    /* update bb's succ bb */
+    VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &bb->dgNode.succList);
+    succEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succEdgeIter);
+    for (; succEdge != gcvNULL; succEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succEdgeIter))
+    {
+        VIR_BB* succBB = CFG_EDGE_GET_TO_BB(succEdge);
+        gctBOOL remove = gcvFALSE;
+        VIR_Label* label = gcvNULL;
+
+        if((newJmpTo && CFG_EDGE_GET_TYPE(succEdge) == VIR_CFG_EDGE_TYPE_FALSE))
+        {
+            gcmASSERT(bbEndOp == VIR_OP_JMPC);
+            label = VIR_Operand_GetLabel(bbEndDest);
+            remove = gcvTRUE;
+        }
+        else if((newJmpTo && CFG_EDGE_GET_TYPE(succEdge) == VIR_CFG_EDGE_TYPE_ALWAYS))
+        {
+            gcmASSERT(bbEndOp == VIR_OP_JMP);
+            label = VIR_Operand_GetLabel(bbEndDest);
+            remove = gcvTRUE;
+        }
+        else if((newFallThru && CFG_EDGE_GET_TYPE(succEdge) == VIR_CFG_EDGE_TYPE_ALWAYS))
+        {
+            gcmASSERT(!VIR_OPCODE_isBranch(bbEndOp));
+            remove = gcvTRUE;
+        }
+        else if((newFallThru && CFG_EDGE_GET_TYPE(succEdge) == VIR_CFG_EDGE_TYPE_TRUE))
+        {
+            gcmASSERT(bbEndOp == VIR_OP_JMPC);
+            remove = gcvTRUE;
+        }
+
+        if(remove)
+        {
+            vscVIR_RemoveEdgeFromCFG(BB_GET_CFG(bb), bb, succBB);
+        }
+        if(label)
+        {
+            VIR_Link* link = VIR_Link_RemoveLink(VIR_Label_GetReferenceAddr(label), (gctUINTPTR_T)bbEnd);
+
+            if(link)
+            {
+                VIR_Function_FreeLink(func, link);
+            }
+        }
+    }
+
+    /* add new edges */
+    if(newJmpTo)
+    {
+        VIR_Instruction* newJmpToStart = BB_GET_START_INST(newJmpTo);
+        VIR_Label* label;
+        VIR_Link* link;
+
+        gcmASSERT(bbEndOp == VIR_OP_JMP ||
+                  bbEndOp == VIR_OP_JMPC);
+
+        errCode = vscVIR_AddEdgeToCFG(BB_GET_CFG(bb),
+                                      bb,
+                                      newJmpTo,
+                                      bbEndOp == VIR_OP_JMP ? VIR_CFG_EDGE_TYPE_ALWAYS : VIR_CFG_EDGE_TYPE_FALSE);
+        if(errCode)
+        {
+            return errCode;
+        }
+
+        if(bbEndOp == VIR_OP_JMP && newJmpTo == VIR_BB_GetFollowingBB(bb))
+        {
+            VIR_Function_FreeOperand(func, VIR_Inst_GetDest(bbEnd));
+            VIR_Inst_SetDest(bbEnd, gcvNULL);
+            VIR_Inst_SetOpcode(bbEnd, VIR_OP_NOP);  /*it's better to keep the instruction here, because removing it may empty the bb */
+            BB_SET_FLOWTYPE(bb, VIR_FLOW_TYPE_NONE);
+        }
+        else
+        {
+            /* reset label in jmp instruction */
+            if(VIR_Inst_GetOpcode(newJmpToStart) == VIR_OP_LABEL)
+            {
+                label = VIR_Operand_GetLabel(VIR_Inst_GetDest(newJmpToStart));
+            }
+            else
+            {
+                VIR_LabelId newLabelId;
+                VIR_Label* newLabel;
+                VIR_Instruction* newLabelInst;
+
+                VIR_Function_AddLabel(func, gcvNULL, &newLabelId);
+                newLabel = VIR_Function_GetLabelFromId(func, newLabelId);
+                VIR_Function_AddInstructionBefore(func, VIR_OP_LABEL, VIR_TYPE_UNKNOWN, newJmpToStart, gcvTRUE, &newLabelInst);
+                VIR_Operand_SetLabel(VIR_Inst_GetDest(newLabelInst), newLabel);
+                VIR_Label_SetDefInst(newLabel, newLabelInst);
+                label = newLabel;
+            }
+            VIR_Operand_SetLabel(bbEndDest, label);
+            VIR_Function_NewLink(func, &link);
+            VIR_Link_SetReference(link, (gctUINTPTR_T)bbEnd);
+            VIR_Link_AddLink(VIR_Label_GetReferenceAddr(label), link);
+        }
+    }
+
+    if(newFallThru)
+    {
+        gcmASSERT(VIR_BB_GetFollowingBB(bb) == newFallThru);
+
+        errCode = vscVIR_AddEdgeToCFG(BB_GET_CFG(bb),
+                                      bb,
+                                      newFallThru,
+                                      VIR_Inst_GetOpcode(bbEnd) == VIR_OP_JMPC ? VIR_CFG_EDGE_TYPE_TRUE : VIR_CFG_EDGE_TYPE_ALWAYS);
+        if(errCode)
+        {
+            return errCode;
+        }
+    }
+
+    return errCode;
+}
+
+void
+VIR_BB_RemoveBranch(
+    VIR_BASIC_BLOCK* bb
+    )
+{
+    VIR_Instruction* bbEnd = BB_GET_END_INST(bb);
+
+    gcmASSERT(VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(bbEnd)));
+
+    VIR_Function_RemoveInstruction(BB_GET_FUNC(bb), bbEnd);
+    {
+        VSC_ADJACENT_LIST_ITERATOR succEdgeIter;
+        VIR_CFG_EDGE* succEdge;
+
+
+        /* update bb's succ bb */
+        VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &bb->dgNode.succList);
+        succEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succEdgeIter);
+        for (; succEdge != gcvNULL; succEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succEdgeIter))
+        {
+            VIR_BB* succBB = CFG_EDGE_GET_TO_BB(succEdge);
+
+            vscVIR_RemoveEdgeFromCFG(BB_GET_CFG(bb), bb, succBB);
+        }
+        vscVIR_AddEdgeToCFG(BB_GET_CFG(bb), bb, VIR_BB_GetFollowingBB(bb), VIR_CFG_EDGE_TYPE_ALWAYS);
+    }
+}
+
+VSC_ErrCode
+VIR_BB_Append(
+    VIR_BASIC_BLOCK* target,
+    VIR_BASIC_BLOCK* source,
+    gctBOOL beforeTargetBranch,
+    gctBOOL sourceBranchExcluded
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_Function* func = BB_GET_FUNC(target);
+    VIR_Instruction* targetEnd = BB_GET_END_INST(target);
+    VIR_Instruction* sourceIter = BB_GET_START_INST(source);
+
+    while(VIR_Inst_GetOpcode(sourceIter) == VIR_OP_LABEL)
+    {
+        sourceIter = VIR_Inst_GetNext(sourceIter);
+    }
+
+    if(beforeTargetBranch && VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(targetEnd)))
+    {
+        targetEnd = VIR_Inst_GetPrev(targetEnd);
+        gcmASSERT(!VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(targetEnd)));
+    }
+
+    while(gcvTRUE)
+    {
+        if(sourceBranchExcluded && VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(sourceIter)))
+        {
+            break;
+        }
+
+        errCode = VIR_Function_AddCopiedInstructionAfter(func, sourceIter, targetEnd, gcvTRUE, &targetEnd);
+
+        if(errCode == VSC_ERR_NONE && sourceIter == BB_GET_END_INST(source))
+        {
+            break;
+        }
+
+        sourceIter = VIR_Inst_GetNext(sourceIter);
+    }
+
+    return errCode;
+}
+
+VSC_ErrCode
+VIR_BB_CopyBBBefore(
+    VIR_BASIC_BLOCK* source,
+    VIR_BASIC_BLOCK* before,
+    VIR_BASIC_BLOCK** copy
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_Function* func = BB_GET_FUNC(source);
+    VIR_Instruction* newBBStart = gcvNULL;
+    VIR_Instruction* newBBEnd = gcvNULL;
+    VIR_Instruction* bbInst = BB_GET_START_INST(source);
+    VIR_Instruction* beforeHead = BB_GET_START_INST(before);
+    VIR_BB* newBB;
+
+    gcmASSERT(func == BB_GET_FUNC(before));
+    gcmASSERT(BB_GET_LENGTH(source));
+
+    while(gcvTRUE)
+    {
+        VIR_Instruction* newBBInst;
+
+        errCode = VIR_Function_AddCopiedInstructionBefore(func, bbInst, beforeHead, gcvFALSE, &newBBInst);
+        if(errCode)
+        {
+            return errCode;
+        }
+
+        if(newBBStart == gcvNULL)
+        {
+            newBBStart = newBBInst;
+        }
+
+        if(bbInst == BB_GET_END_INST(source))
+        {
+            newBBEnd = newBBInst;
+            break;
+        }
+        else
+        {
+            bbInst = VIR_Inst_GetNext(bbInst);
+        }
+    }
+
+    newBB = vscVIR_AddBasicBlockToCFG(BB_GET_CFG(source), newBBStart, newBBEnd, BB_GET_FLOWTYPE(source));
+
+    if(copy)
+    {
+        *copy = newBB;
+    }
+
+    return errCode;
+}
+
+VSC_ErrCode
+VIR_BB_CopyBBAfter(
+    VIR_BASIC_BLOCK* source,
+    VIR_BASIC_BLOCK* after,
+    VIR_BASIC_BLOCK** copy
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_Function* func = BB_GET_FUNC(source);
+    VIR_Instruction* newBBStart = gcvNULL;
+    VIR_Instruction* newBBEnd = gcvNULL;
+    VIR_Instruction* bbInst = BB_GET_END_INST(source);
+    VIR_Instruction* afterEnd = BB_GET_END_INST(after);
+    VIR_BB* newBB;
+
+    gcmASSERT(func == BB_GET_FUNC(after));
+
+    while(gcvTRUE)
+    {
+        VIR_Instruction* newBBInst;
+
+        errCode = VIR_Function_AddCopiedInstructionAfter(func, bbInst, afterEnd, gcvFALSE, &newBBInst);
+        if(errCode)
+        {
+            return errCode;
+        }
+
+        if(newBBEnd == gcvNULL)
+        {
+            newBBEnd = newBBInst;
+        }
+
+        if(bbInst == BB_GET_START_INST(source))
+        {
+            newBBStart = newBBInst;
+            break;
+        }
+        else
+        {
+            bbInst = VIR_Inst_GetPrev(bbInst);
+        }
+    }
+
+    newBB = vscVIR_AddBasicBlockToCFG(BB_GET_CFG(source), newBBStart, newBBEnd, BB_GET_FLOWTYPE(source));
+
+    if(copy)
+    {
+        *copy = newBB;
+    }
+
+    return errCode;
+}
+
+VSC_ErrCode
+VIR_BB_InsertBBAfter(
+    VIR_BB* after,
+    VIR_OpCode opcode,
+    VIR_BB** newBB
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_Function* func = BB_GET_FUNC(after);
+    VIR_Instruction* newInst;
+    VIR_BB* bb;
+    VIR_FLOW_TYPE flowType;
+
+    gcmASSERT(opcode == VIR_OP_NOP ||
+              opcode == VIR_OP_LABEL ||
+              opcode == VIR_OP_JMP ||
+              opcode == VIR_OP_JMPC);
+
+    errCode = VIR_Function_AddInstructionAfter(func, opcode, VIR_TYPE_UNKNOWN, BB_GET_END_INST(after), gcvFALSE, &newInst);
+    if(errCode)
+    {
+        return errCode;
+    }
+
+    switch(opcode)
+    {
+        case VIR_OP_JMP:
+            flowType = VIR_FLOW_TYPE_JMP;
+            break;
+        case VIR_OP_JMPC:
+            flowType = VIR_FLOW_TYPE_JMPC;
+            break;
+        default:
+            flowType = VIR_FLOW_TYPE_NONE;
+    }
+    bb = vscVIR_AddBasicBlockToCFG(BB_GET_CFG(after), newInst, newInst, flowType);
+
+    if(bb)
+    {
+        if(newBB)
+        {
+            *newBB = bb;
+        }
+    }
+    else
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
     }
 
     return errCode;
@@ -891,11 +1451,13 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     VIR_BB_WORKITEM*             pWorkItemArray;
     VIR_BB_WORKLIST              workItemList;
     VSC_MM*                      pMM = &pCFG->pmp.mmWrapper;
-    gctUINT                      bbIdx, bbIdxS, bbIdxT, idomBBIdx;
+    gctUINT                      bbIdx, idomBBIdx, domCount;
+    gctINT                       bbIdxS, bbIdxT;
     VSC_BIT_VECTOR               workingSet;
     VSC_BIT_VECTOR*              pIdomSetArray;
+    VSC_BIT_VECTOR*              pDomSetArray;
     VSC_BIT_VECTOR*              pCurIdomSet;
-    VSC_BIT_VECTOR*              pIdomSetS;
+    VSC_BIT_VECTOR*              pDomSetS;
     VIR_BASIC_BLOCK*             pThisBasicBlk;
     VIR_BASIC_BLOCK*             pPredBasicBlk;
     VIR_BASIC_BLOCK*             pSuccBasicBlk;
@@ -1009,6 +1571,9 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     pIdomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pMM,
                                                    sizeof(VSC_BIT_VECTOR)*
                                                    hisCountOfBasicBlk);
+    pDomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pMM,
+                                                sizeof(VSC_BIT_VECTOR)*
+                                                hisCountOfBasicBlk);
     ppHisBlockArray = (VIR_BASIC_BLOCK**)vscMM_Alloc(pMM,
                                                      sizeof(VIR_BASIC_BLOCK*)*
                                                      hisCountOfBasicBlk);
@@ -1019,6 +1584,9 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
         vscBV_Initialize(&pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pMM, hisCountOfBasicBlk);
         vscBV_Copy(&pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], &ppBasicBlkPO[bbIdx]->domSet);
         vscBV_ClearBit(&pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], ppBasicBlkPO[bbIdx]->dgNode.id);
+
+        vscBV_Initialize(&pDomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pMM, hisCountOfBasicBlk);
+        vscBV_Copy(&pDomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], &pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
 
         /* Initialize worklist again for tree build in last stage */
         vscBBWKL_AddBBToWorkItemList(&workItemList,
@@ -1035,21 +1603,38 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
         }
 
         pCurIdomSet = &pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id];
+        domCount = vscBV_CountBits(pCurIdomSet);
 
-        for (bbIdxS = 0; bbIdxS < countOfBasicBlk; bbIdxS ++)
+        if (domCount == 1)
+        {
+            continue;
+        }
+
+        for (bbIdxS = (gctINT)(bbIdx - 1); bbIdxS >= 0; bbIdxS --)
         {
             if (vscBV_TestBit(pCurIdomSet, ppBasicBlkPO[bbIdxS]->dgNode.id))
             {
-                pIdomSetS = &pIdomSetArray[ppBasicBlkPO[bbIdxS]->dgNode.id];
+                pDomSetS = &pDomSetArray[ppBasicBlkPO[bbIdxS]->dgNode.id];
 
-                for (bbIdxT = 0; bbIdxT < countOfBasicBlk; bbIdxT ++)
+                for (bbIdxT = bbIdxS - 1; bbIdxT >= 0; bbIdxT --)
                 {
-                    if ((bbIdxT != bbIdxS) &&
-                        vscBV_TestBit(pIdomSetS, ppBasicBlkPO[bbIdxT]->dgNode.id))
+                    if (vscBV_TestBit(pDomSetS, ppBasicBlkPO[bbIdxT]->dgNode.id) &&
+                        vscBV_TestBit(pCurIdomSet, ppBasicBlkPO[bbIdxT]->dgNode.id))
                     {
                         vscBV_ClearBit(pCurIdomSet, ppBasicBlkPO[bbIdxT]->dgNode.id);
+                        domCount --;
+
+                        if (domCount == 1)
+                        {
+                            break;
+                        }
                     }
                 }
+            }
+
+            if (domCount == 1)
+            {
+                break;
             }
         }
     }
@@ -1092,8 +1677,10 @@ VSC_ErrCode vscVIR_BuildDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     for (bbIdx = 0; bbIdx < countOfBasicBlk; bbIdx ++)
     {
         vscBV_Finalize(&pIdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
+        vscBV_Finalize(&pDomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
     }
     vscMM_Free(pMM, pIdomSetArray);
+    vscMM_Free(pMM, pDomSetArray);
     vscMM_Free(pMM, ppBasicBlkPO);
     vscMM_Free(pMM, pWorkItemArray);
     vscMM_Free(pMM, ppHisBlockArray);
@@ -1127,11 +1714,13 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     VIR_BB_WORKITEM*             pWorkItemArray;
     VIR_BB_WORKLIST              workItemList;
     VSC_MM*                      pMM = &pCFG->pmp.mmWrapper;
-    gctUINT                      bbIdx, bbIdxS, bbIdxT, ipdomBBIdx;
+    gctUINT                      bbIdx, ipdomBBIdx, pdomCount;
+    gctINT                       bbIdxS, bbIdxT;
     VSC_BIT_VECTOR               workingSet;
     VSC_BIT_VECTOR*              pIpdomSetArray;
+    VSC_BIT_VECTOR*              pPdomSetArray;
     VSC_BIT_VECTOR*              pCurIpdomSet;
-    VSC_BIT_VECTOR*              pIpdomSetS;
+    VSC_BIT_VECTOR*              pPdomSetS;
     VIR_BASIC_BLOCK*             pThisBasicBlk;
     VIR_BASIC_BLOCK*             pPredBasicBlk;
     VIR_BASIC_BLOCK*             pSuccBasicBlk;
@@ -1245,6 +1834,9 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     pIpdomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pMM,
                                                    sizeof(VSC_BIT_VECTOR)*
                                                    hisCountOfBasicBlk);
+    pPdomSetArray = (VSC_BIT_VECTOR*)vscMM_Alloc(pMM,
+                                                 sizeof(VSC_BIT_VECTOR)*
+                                                 hisCountOfBasicBlk);
     ppHisBlockArray = (VIR_BASIC_BLOCK**)vscMM_Alloc(pMM,
                                                      sizeof(VIR_BASIC_BLOCK*)*
                                                      hisCountOfBasicBlk);
@@ -1255,6 +1847,9 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
         vscBV_Initialize(&pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pMM, hisCountOfBasicBlk);
         vscBV_Copy(&pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], &ppBasicBlkPO[bbIdx]->postDomSet);
         vscBV_ClearBit(&pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], ppBasicBlkPO[bbIdx]->dgNode.id);
+
+        vscBV_Initialize(&pPdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], pMM, hisCountOfBasicBlk);
+        vscBV_Copy(&pPdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id], &pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
 
         /* Initialize worklist again for tree build in last stage */
         vscBBWKL_AddBBToWorkItemList(&workItemList,
@@ -1271,21 +1866,38 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
         }
 
         pCurIpdomSet = &pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id];
+        pdomCount = vscBV_CountBits(pCurIpdomSet);
 
-        for (bbIdxS = 0; bbIdxS < countOfBasicBlk; bbIdxS ++)
+        if (pdomCount == 1)
+        {
+            continue;
+        }
+
+        for (bbIdxS = (gctINT)(bbIdx - 1); bbIdxS >= 0; bbIdxS --)
         {
             if (vscBV_TestBit(pCurIpdomSet, ppBasicBlkPO[bbIdxS]->dgNode.id))
             {
-                pIpdomSetS = &pIpdomSetArray[ppBasicBlkPO[bbIdxS]->dgNode.id];
+                pPdomSetS = &pPdomSetArray[ppBasicBlkPO[bbIdxS]->dgNode.id];
 
-                for (bbIdxT = 0; bbIdxT < countOfBasicBlk; bbIdxT ++)
+                for (bbIdxT = bbIdxS - 1; bbIdxT >= 0; bbIdxT --)
                 {
-                    if ((bbIdxT != bbIdxS) &&
-                        vscBV_TestBit(pIpdomSetS, ppBasicBlkPO[bbIdxT]->dgNode.id))
+                    if (vscBV_TestBit(pPdomSetS, ppBasicBlkPO[bbIdxT]->dgNode.id) &&
+                        vscBV_TestBit(pCurIpdomSet, ppBasicBlkPO[bbIdxT]->dgNode.id))
                     {
                         vscBV_ClearBit(pCurIpdomSet, ppBasicBlkPO[bbIdxT]->dgNode.id);
+                        pdomCount --;
+
+                        if (pdomCount == 1)
+                        {
+                            break;
+                        }
                     }
                 }
+            }
+
+            if (pdomCount == 1)
+            {
+                break;
             }
         }
     }
@@ -1328,8 +1940,10 @@ VSC_ErrCode vscVIR_BuildPostDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     for (bbIdx = 0; bbIdx < countOfBasicBlk; bbIdx ++)
     {
         vscBV_Finalize(&pIpdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
+        vscBV_Finalize(&pPdomSetArray[ppBasicBlkPO[bbIdx]->dgNode.id]);
     }
     vscMM_Free(pMM, pIpdomSetArray);
+    vscMM_Free(pMM, pPdomSetArray);
     vscMM_Free(pMM, ppBasicBlkPO);
     vscMM_Free(pMM, pWorkItemArray);
     vscMM_Free(pMM, ppHisBlockArray);
@@ -1395,7 +2009,7 @@ VSC_ErrCode vscVIR_DestroyDOMTree(VIR_Shader* pShader)
         pFunc = pFuncNode->function;
         if (pFunc->pFuncBlock == gcvNULL)
         {
-            return VSC_ERR_CG_NOT_BUILT;
+            continue;
         }
 
         errCode = vscVIR_DestroyDOMTreePerCFG(&pFunc->pFuncBlock->cfg);
@@ -1449,7 +2063,7 @@ VSC_ErrCode vscVIR_DestroyPostDOMTree(VIR_Shader* pShader)
         pFunc = pFuncNode->function;
         if (pFunc->pFuncBlock == gcvNULL)
         {
-            return VSC_ERR_CG_NOT_BUILT;
+            continue;
         }
 
         errCode = vscVIR_DestroyPostDOMTreePerCFG(&pFunc->pFuncBlock->cfg);
@@ -1683,7 +2297,7 @@ VSC_ErrCode vscVIR_DestroyControlDep(VIR_Shader* pShader)
         pFunc = pFuncNode->function;
         if (pFunc->pFuncBlock == gcvNULL)
         {
-            return VSC_ERR_CG_NOT_BUILT;
+            continue;
         }
 
         errCode = vscVIR_DestroyControlDepPerCFG(&pFunc->pFuncBlock->cfg);
@@ -1737,7 +2351,7 @@ VSC_ErrCode vscVIR_DestroyDomFrontier(VIR_Shader* pShader)
         pFunc = pFuncNode->function;
         if (pFunc->pFuncBlock == gcvNULL)
         {
-            return VSC_ERR_CG_NOT_BUILT;
+            continue;
         }
 
         errCode = vscVIR_DestroyDomFrontierPerCFG(&pFunc->pFuncBlock->cfg);
@@ -2033,7 +2647,7 @@ VSC_ErrCode vscVIR_DestroyBbReachRelation(VIR_Shader* pShader)
 
     if (pShader->mainFunction->pFuncBlock == gcvNULL)
     {
-        return VSC_ERR_CG_NOT_BUILT;
+        return errCode;
     }
 
     pCg = pShader->mainFunction->pFuncBlock->pOwnerCG;
@@ -2053,5 +2667,39 @@ VSC_ErrCode vscVIR_DestroyBbReachRelation(VIR_Shader* pShader)
 
     return errCode;
 }
+
+#if LOOP_HIERARCHY_SUPPORT_IN_CFG
+/*
+ * Loop hierarchy related functions
+ */
+
+VSC_ErrCode vscVIR_BuildLoopHierarchyPerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_LOOP_HIERARCHY* pLoopHierarchy)
+{
+    VSC_ErrCode            errCode  = VSC_ERR_NONE;
+
+    return errCode;
+}
+
+VSC_ErrCode vscVIR_DestroyLoopHierarchyPerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG, VIR_LOOP_HIERARCHY* pLoopHierarchy)
+{
+    VSC_ErrCode            errCode  = VSC_ERR_NONE;
+
+    return errCode;
+}
+
+VSC_ErrCode vscVIR_BuildLoopHierarchy(VIR_Shader* pShader, VIR_LOOP_HIERARCHY* pLoopHierarchy)
+{
+    VSC_ErrCode            errCode  = VSC_ERR_NONE;
+
+    return errCode;
+}
+
+VSC_ErrCode vscVIR_DestroyLoopHierarchy(VIR_Shader* pShader, VIR_LOOP_HIERARCHY* pLoopHierarchy)
+{
+    VSC_ErrCode            errCode  = VSC_ERR_NONE;
+
+    return errCode;
+}
+#endif
 
 

@@ -13,8 +13,8 @@
 
 #include "gc_egl_precomp.h"
 
-#if defined(ANDROID)
-#define TAG "VIVANTE"
+#if defined(ANDROID) && !defined(GPU_VENDOR)
+#  define GPU_VENDOR "VIVANTE"
 #endif
 
 
@@ -25,12 +25,12 @@
 static const char * _dlls[] =
 {
 #if defined(ANDROID)
-    "libEGL_" TAG ".so",                /* EGL */
-    "libGLESv1_CL_" TAG ".so",          /* OpenGL ES 1.1 Common Lite */
-    "libGLESv1_CM_" TAG ".so",          /* OpenGL ES 1.1 Common */
-    "libGLESv2_" TAG ".so",             /* OpenGL ES 2.0 */
-    "libGLESv2_" TAG ".so",             /* OpenGL ES 3.0 */
-    "libOpenVG",                        /* OpenVG 1.0 */
+    "libEGL_" GPU_VENDOR ".so",         /* EGL */
+    "libGLESv1_CL_" GPU_VENDOR ".so",   /* OpenGL ES 1.1 Common Lite */
+    "libGLESv1_CM_" GPU_VENDOR ".so",   /* OpenGL ES 1.1 Common */
+    "libGLESv2_" GPU_VENDOR ".so",      /* OpenGL ES 2.0 */
+    "libGLESv2_" GPU_VENDOR ".so",      /* OpenGL ES 3.0 */
+    "libOpenVG.so",                     /* OpenVG 1.0 */
 #elif defined(__QNXNTO__)
     "libEGL_viv",                       /* EGL */
     "glesv1-dlls",                      /* OpenGL ES 1.1 Common Lite */
@@ -65,10 +65,69 @@ static const char * _dispatchNames[] =
     "OpenVG_DISPATCH_TABLE",            /* OpenVG 1.0 */
 };
 
-#if gcdGC355_PROFILER
-extern gctUINT64 AppstartTimeusec;
-gctFILE ApiTimeFile;
+gctHANDLE
+veglGetModule(
+    IN gcoOS Os,
+    IN veglAPIINDEX Index,
+    IN veglDISPATCH **Dispatch
+    )
+{
+    gctHANDLE library = gcvNULL;
+
+    if (Index < vegl_API_LAST)
+    {
+#if defined(ANDROID)
+        gctCHAR path[64];
+        gctCONST_STRING subdir;
+        gctUINT offset;
+
+#ifdef __LP64__
+#    define LIBRARY_PATH1 "/vendor/lib64/"
+#    define LIBRARY_PATH2 "/system/lib64/"
+#  else
+#    define LIBRARY_PATH1 "/vendor/lib/"
+#    define LIBRARY_PATH2 "/system/lib/"
+#  endif
+        /*
+         * Put OpenVG library to /system/lib or /vendor/lib because there's no
+         * OpenVG wrapper library in android framework.
+         */
+        subdir = (Index == vegl_OPENVG) ? "" : "egl/";
+
+        /* Try load library. */
+        offset = 0;
+        gcoOS_PrintStrSafe(path, 64, &offset, "%s%s%s", LIBRARY_PATH1, subdir, _dlls[Index]);
+        gcoOS_LoadLibrary(Os, path, &library);
+
+        /* Try 2nd path for Android */
+        if (!library)
+        {
+            /* Try load library in 2d path. */
+            offset = 0;
+            gcoOS_PrintStrSafe(path, 64, &offset, "%s%s%s", LIBRARY_PATH2, subdir, _dlls[Index]);
+            gcoOS_LoadLibrary(Os, path, &library);
+        }
+#else
+        gcoOS_LoadLibrary(Os, _dlls[Index], &library);
+
+        /* Query the CL handle if CM not available. */
+        if (!library && Index == vegl_OPENGL_ES11)
+        {
+            Index = vegl_OPENGL_ES11_CL;
+            gcoOS_LoadLibrary(Os, _dlls[vegl_OPENGL_ES11_CL], &library);
+        }
 #endif
+
+        if (Dispatch && library)
+        {
+            gcoOS_GetProcAddress(Os, library, _dispatchNames[Index], (gctPOINTER*)Dispatch);
+        }
+    }
+
+    /* Return result. */
+    return library;
+}
+#endif /* gcdSTATIC_LINK */
 
 static veglAPIINDEX
 _GetAPIIndex(
@@ -135,75 +194,6 @@ _GetAPIIndex(
     return index;
 }
 
-gctHANDLE
-veglGetModule(
-    IN gcoOS Os,
-    IN veglAPIINDEX Index,
-    IN veglDISPATCH **Dispatch
-    )
-{
-    gctHANDLE library = gcvNULL;
-#if defined(ANDROID)
-    gctUINT offset = 0;
-    gctCONST_STRING libName = (gcmSIZEOF(gctPOINTER) == 8) ? "lib64" : "lib";
-#endif
-
-    if (Index < vegl_API_LAST)
-    {
-        gctCHAR dllName[gcdMAX_PATH];
-
-#if defined(ANDROID)
-        gcoOS_PrintStrSafe(dllName, gcdMAX_PATH, &offset, "/vendor/%s/egl/%s", libName, _dlls[Index]);
-#else
-        gcoOS_StrCopySafe(dllName, gcdMAX_PATH, _dlls[Index]);
-#endif
-
-        gcoOS_LoadLibrary(Os, dllName, &library);
-
-#if defined(ANDROID)
-        /* Try 2nd path for Android */
-        if (!library)
-        {
-            offset = 0;
-            gcoOS_PrintStrSafe(dllName, gcdMAX_PATH, &offset, "/system/%s/egl/%s", libName, _dlls[Index]);
-            gcoOS_LoadLibrary(Os, dllName, &library);
-        }
-#endif
-
-        /* Query the CL handle if CM not available. */
-        if (!library && Index == vegl_OPENGL_ES11)
-        {
-            --Index;
-#if defined(ANDROID)
-            offset = 0;
-            gcoOS_PrintStrSafe(dllName, gcdMAX_PATH, &offset, "/vendor/%s/egl/%s", libName, _dlls[Index]);
-#else
-            gcoOS_StrCopySafe(dllName, gcdMAX_PATH, _dlls[Index]);
-#endif
-
-            gcoOS_LoadLibrary(Os, _dlls[vegl_OPENGL_ES11_CL], &library);
-
-#if defined(ANDROID)
-            /* Try 2nd path for Android */
-            if (!library)
-            {
-                offset = 0;
-                gcoOS_PrintStrSafe(dllName, gcdMAX_PATH, &offset, "/system/%s/egl/%s", libName, _dlls[Index]);
-                gcoOS_LoadLibrary(Os, dllName, &library);
-            }
-#endif
-        }
-
-        if (Dispatch && library)
-        {
-            gcoOS_GetProcAddress(Os, library, _dispatchNames[Index], (gctPOINTER*)Dispatch);
-        }
-    }
-
-    /* Return result. */
-    return library;
-}
-#endif /* gcdSTATIC_LINK */
 
 veglDISPATCH *
 _GetDispatch(
@@ -212,6 +202,7 @@ _GetDispatch(
     )
 {
     struct eglContext context;
+    veglAPIINDEX index;
 
     if (Thread == gcvNULL)
     {
@@ -232,67 +223,20 @@ _GetDispatch(
             context.sharedContext = EGL_NO_CONTEXT;
             context.draw          = EGL_NO_SURFACE;
             context.read          = EGL_NO_SURFACE;
-            context.dispatch      = gcvNULL;
 
             Context = &context;
         }
     }
 
-    if (Context->dispatch == gcvNULL)
+    index = _GetAPIIndex(Context);
+
+    if (index >= vegl_API_LAST)
     {
-#if gcdSTATIC_LINK
-#if gcdENABLE_3D
-        extern veglDISPATCH GLES_CM_DISPATCH_TABLE;
-        extern veglDISPATCH GLESv2_DISPATCH_TABLE;
-
-        veglDISPATCH *esDispatchTables[] = {
-            &GLES_CM_DISPATCH_TABLE,
-            &GLESv2_DISPATCH_TABLE,
-            &GLESv2_DISPATCH_TABLE,
-        };
-#endif
-#ifndef VIVANTE_NO_VG
-        extern veglDISPATCH OpenVG_DISPATCH_TABLE;
-#endif /* VIVANTE_NO_VG */
-
-        switch (Context->api)
-        {
-        case EGL_OPENGL_ES_API:
-#if gcdENABLE_3D
-            /*Added for openVG core static link*/
-            Context->dispatch = esDispatchTables[MAJOR_API_VER(Context->client) - 1];
-#else
-            Context->dispatch = gcvNULL;
-#endif
-            break;
-
-        case EGL_OPENVG_API:
-#ifndef VIVANTE_NO_VG
-            Context->dispatch = &OpenVG_DISPATCH_TABLE;
-#else
-            gcmTRACE_ZONE(gcvLEVEL_WARNING, gcdZONE_EGL_CONTEXT,
-                          "%s(%d): %s",
-                          __FUNCTION__, __LINE__,
-                          "VG driver is not available.");
-
-            return gcvNULL;
-#endif
-            break;
-
-        default:
-            Context->dispatch = gcvNULL;
-            break;
-        }
-#else /*gcdSTATIC_LINK*/
-        if (gcvNULL == veglGetModule(gcvNULL, _GetAPIIndex(Context), &Context->dispatch))
-        {
-            return gcvNULL;
-        }
-#endif
+        return gcvNULL;
     }
 
     /* Return dispatch table. */
-    return Context->dispatch;
+    return Thread->dispatchTables[index];
 }
 
 
@@ -524,6 +468,14 @@ _CreateApiContext(
         gcvFALSE,                /* robustAccess */
         0,                       /* resetNotification */
         gcvFALSE,                /* debuggable */
+        0,                       /* contextFlags.*/
+
+        gcvFALSE,                /* protected content. */
+
+#if gcdGC355_PROFILER
+        Context->appStartTime,   /* appStartTime */
+        Context->apiTimeFile,    /* appTileFile */
+#endif
     };
 
     veglDISPATCH * dispatch = _GetDispatch(Thread, Context);
@@ -543,13 +495,21 @@ _CreateApiContext(
     imports.config = Config;
     imports.robustAccess = Context->robustAccess;
     imports.resetNotification = Context->resetNotification;
+    imports.contextFlags = Context->flags;
     imports.debuggable = (Context->flags & EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR) ? gcvTRUE : gcvFALSE;
 
-#if gcdGC355_PROFILER
-    return (*dispatch->createContext)(Thread, Context->appStartTime, Context->apiTimeFile, MAJOR_API_VER(Context->client), &imports, SharedContext);
-#else
+    /*
+     * EGL_EXT_protected_context.
+     * Notice, should still behave as protected context if this flag is 'false',
+     * because EGL_EXT_protected_surface is supported.
+     * SPEC:
+     * ... However, if EGL_EXT_protected_surface is also supported, a regular
+     * (not protected) context will execute stages where one or more protected
+     * resources is accessed as if it were a protected context.
+     */
+    imports.protectedContext = Context->protectedContent;
+
     return (*dispatch->createContext)(Thread, Context->client, &imports, SharedContext);
-#endif
 }
 
 
@@ -675,29 +635,6 @@ _SetDrawable(
     return (*dispatch->setDrawable)(Thread, ApiContext, Draw, Read);
 }
 
-gceSTATUS
-_SetBuffer(
-    VEGLThreadData Thread,
-    gcoSURF Draw
-    )
-{
-    veglDISPATCH * dispatch = _GetDispatch(Thread, gcvNULL);
-
-    gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcdZONE_EGL_CONTEXT,
-                  "%s(%d): 0x%x,0x%x",
-                  __FUNCTION__, __LINE__,
-                  Thread, Draw);
-
-    if ((dispatch == gcvNULL)
-    ||  (dispatch->setBuffer == gcvNULL)
-    )
-    {
-        return gcvSTATUS_INVALID_ARGUMENT;
-    }
-
-    return (*dispatch->setBuffer)(Draw);
-}
-
 EGLBoolean
 _Flush(
     VEGLThreadData Thread
@@ -777,7 +714,7 @@ _GetClientBuffer(
 }
 
 EGLBoolean
-_eglProfileCallback(
+_ProfilerCallback(
     VEGLThreadData Thread,
     gctUINT32 Enum,
     gctHANDLE Value
@@ -834,6 +771,17 @@ veglBindAPI(
     {
     case EGL_OPENGL_ES_API:
         /* OpenGL ES API. */
+        if (!thread->dispatchTables[vegl_OPENGL_ES11_CL] &&
+            !thread->dispatchTables[vegl_OPENGL_ES11] &&
+            !thread->dispatchTables[vegl_OPENGL_ES20] &&
+            !thread->dispatchTables[vegl_OPENGL_ES30])
+        {
+            /* OpenGL ES API not supported. */
+            veglSetEGLerror(thread,  EGL_BAD_PARAMETER);;
+            gcmFOOTER_ARG("%d", EGL_FALSE);
+            return EGL_FALSE;
+        }
+
         if (thread->api != api)
         {
             thread->api = api;
@@ -849,6 +797,14 @@ veglBindAPI(
 
     case EGL_OPENVG_API:
         /* OpenVG API. */
+        if (!thread->dispatchTables[vegl_OPENVG])
+        {
+            /* OpenVG API not supported. */
+            veglSetEGLerror(thread,  EGL_BAD_PARAMETER);;
+            gcmFOOTER_ARG("%d", EGL_FALSE);
+            return EGL_FALSE;
+        }
+
         if (thread->api != api)
         {
             thread->context = thread->vgContext;
@@ -961,6 +917,7 @@ eglCreateContext(
     gctBOOL robustAccess = EGL_FALSE;
     gctINT resetNotification = EGL_NO_RESET_NOTIFICATION_EXT;
     gctBOOL robustAttribSet = gcvFALSE;
+    EGLBoolean protectedContent = gcvFALSE;
 
     gcmHEADER_ARG("Dpy=0x%x config=0x%x SharedContext=0x%x attrib_list=0x%x",
                   Dpy, config, SharedContext, attrib_list);
@@ -1029,6 +986,7 @@ eglCreateContext(
     if (attrib_list != gcvNULL)
     {
         EGLint i = 0;
+        EGLBoolean needCheckRobustAndVersion = EGL_FALSE;
 
         for (i = 0; attrib_list[i] != EGL_NONE; i += 2)
         {
@@ -1078,12 +1036,17 @@ eglCreateContext(
                         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
                     }
 
-                    if (flags & EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR)
+                    if (flags & (EGL_CONTEXT_OPENGL_DEBUG_BIT_KHR |
+                                 EGL_CONTEXT_OPENGL_ROBUST_ACCESS_BIT_KHR))
                     {
                         switch (thread->api)
                         {
                         case EGL_OPENGL_API:
                         case EGL_OPENGL_ES_API:
+                            if (flags & EGL_CONTEXT_OPENGL_ROBUST_ACCESS_BIT_KHR)
+                            {
+                                needCheckRobustAndVersion = EGL_TRUE;
+                            }
                             break;
                         default:
                             veglSetEGLerror(thread,  EGL_BAD_ATTRIBUTE);
@@ -1091,8 +1054,7 @@ eglCreateContext(
                         }
                     }
 
-                    if (flags & (EGL_CONTEXT_OPENGL_FORWARD_COMPATIBLE_BIT_KHR |
-                                 EGL_CONTEXT_OPENGL_ROBUST_ACCESS_BIT_KHR))
+                    if (flags & EGL_CONTEXT_OPENGL_FORWARD_COMPATIBLE_BIT_KHR)
                     {
                         if (thread->api != EGL_OPENGL_API)
                         {
@@ -1143,7 +1105,22 @@ eglCreateContext(
                 robustAttribSet = gcvTRUE;
                 break;
 
+            case EGL_PROTECTED_CONTENT_EXT:
+                protectedContent = attrib_list[i + 1];
+                break;
+
             default:
+                veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
+        }
+
+        /* check robust access.*/
+        if (needCheckRobustAndVersion)
+        {
+            /* for opengl es context, es3.0 support it.*/
+            if (major < 3)
+            {
                 veglSetEGLerror(thread, EGL_BAD_ATTRIBUTE);
                 gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
             }
@@ -1286,21 +1263,22 @@ eglCreateContext(
     context->sharedContext = sharedContext;
     context->draw          = EGL_NO_SURFACE;
     context->read          = EGL_NO_SURFACE;
-    context->dispatch      = gcvNULL;
     context->resObj.signature = EGL_CONTEXT_SIGNATURE;
     context->flags         = flags;
     context->robustAccess  = robustAccess;
     context->resetNotification = resetNotification;
+    context->protectedContent  = protectedContent;
 
 #if gcdGC355_PROFILER
-    context->appStartTime = AppstartTimeusec;
-
     {
+        extern gctUINT64 _AppstartTimeusec;
         gctCHAR fileName[256] = {'\0'};
 
         gctUINT offset = 0;
         gctHANDLE pid = gcoOS_GetCurrentProcessID();
         gctHANDLE tid = gcoOS_GetCurrentThreadID();
+
+        context->appStartTime = _AppstartTimeusec;
 
         gcoOS_PrintStrSafe(
             fileName,
@@ -1321,8 +1299,6 @@ eglCreateContext(
             gcvFILE_CREATE,
             &context->apiTimeFile
             );
-
-        ApiTimeFile = context->apiTimeFile;
     }
 #endif
 
@@ -1778,7 +1754,7 @@ veglMakeCurrent(
         if (thread->context != EGL_NO_CONTEXT)
         {
 #if VIVANTE_PROFILER
-            if (thread->context->draw != gcvNULL && thread->context->draw != draw && _eglProfileCallback(thread, 0, 0))
+            if (thread->context->draw != gcvNULL && thread->context->draw != draw && _ProfilerCallback(thread, 0, 0))
             {
 #if defined(ANDROID)
                 veglSuspendSwapWorker(dpy);
@@ -1794,17 +1770,17 @@ veglMakeCurrent(
                     if (MAJOR_API_VER(thread->context->client) == 1)
                     {
                         /* GL_PROFILER_FRAME_END */
-                        _eglProfileCallback(thread, 10, 0);
+                        _ProfilerCallback(thread, 10, 0);
                     }
                     else if (MAJOR_API_VER(thread->context->client) == 2 || MAJOR_API_VER(thread->context->client) == 3)
                     {
                         /* GL3_PROFILER_FRAME_END */
-                        _eglProfileCallback(thread, 10, 0);
+                        _ProfilerCallback(thread, 10, 0);
                     }
                 }
                 else if (thread->api == EGL_OPENVG_API)
                 {
-                    _eglProfileCallback(thread, 10, 0);
+                    _ProfilerCallback(thread, 10, 0);
                 }
 #if defined(ANDROID)
                 veglResumeSwapWorker(dpy);

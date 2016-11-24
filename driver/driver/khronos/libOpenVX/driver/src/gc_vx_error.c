@@ -28,3 +28,4 @@ VX_INTERNAL_API vx_status vxError_Release(vx_error_ptr errorPtr)
 {
     return vxoReference_Release((vx_reference_ptr)errorPtr, VX_TYPE_ERROR, VX_REF_INTERNAL);
 }
+

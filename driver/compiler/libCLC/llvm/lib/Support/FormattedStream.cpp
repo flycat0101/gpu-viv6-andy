@@ -59,11 +59,13 @@ void formatted_raw_ostream::ComputeColumn(const char *Ptr, size_t Size) {
 /// \param NewCol - The column to move to.
 ///
 formatted_raw_ostream &formatted_raw_ostream::PadToColumn(unsigned NewCol) {
+  int columns;
   // Figure out what's in the buffer and add it to the column count.
   ComputeColumn(getBufferStart(), GetNumBytesInBuffer());
 
+  columns = int(NewCol - ColumnScanned);
   // Output spaces until we reach the desired column.
-  indent(std::max(int(NewCol - ColumnScanned), 1));
+  indent((columns > 1) ? columns : 1);
   return *this;
 }
 

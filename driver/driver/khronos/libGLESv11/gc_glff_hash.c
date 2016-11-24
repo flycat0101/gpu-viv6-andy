@@ -129,14 +129,12 @@ static gceSTATUS _CreateShaderEntry(
 
         /* Construct the vertex shader object. */
         gcmERR_BREAK(gcSHADER_Construct(
-            Context->hal,
             gcSHADER_TYPE_VERTEX,
             &entry->program.vs.shader
             ));
 
         /* Construct the fragment shader object. */
         gcmERR_BREAK(gcSHADER_Construct(
-            Context->hal,
             gcSHADER_TYPE_FRAGMENT,
             &entry->program.fs.shader
             ));
@@ -191,10 +189,30 @@ static gceSTATUS _FreeShaderEntry(
         }
     }
 
+    /* Free the buf object in vertex shader */
+    if (Entry->program.vs.halBufObj)
+    {
+        last = gcoBUFOBJ_Destroy(Entry->program.vs.halBufObj);
+        if (gcmIS_ERROR(last))
+        {
+            status = last;
+        }
+    }
+
     /* Free the fragment shader object. */
     if (Entry->program.fs.shader)
     {
         last = gcSHADER_Destroy(Entry->program.fs.shader);
+        if (gcmIS_ERROR(last))
+        {
+            status = last;
+        }
+    }
+
+    /* Free the buf object in fragment shader */
+    if (Entry->program.fs.halBufObj)
+    {
+        last = gcoBUFOBJ_Destroy(Entry->program.fs.halBufObj);
         if (gcmIS_ERROR(last))
         {
             status = last;

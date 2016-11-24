@@ -26,7 +26,6 @@
 ##############################################################################
 
 
-
 DOSYSGEN = 1
 SYNCHRONIZE_DRAIN = 1
 
@@ -43,7 +42,7 @@ SOURCES = 	\
           	../window.c\
           	../bitmap.c
 
-INCLUDES = $(INCLUDES);$(VIVANTE_SDK_INC)
+INCLUDES = $(INCLUDES);$(AQROOT)\sdk\inc
 INCLUDES = $(INCLUDES);$(AQROOT)\sdk\samples\hal\tvui
 
 TARGETLIBS = $(_SYSGENSDKROOT)\lib\$(_CPUINDPATH)\coredll.lib \

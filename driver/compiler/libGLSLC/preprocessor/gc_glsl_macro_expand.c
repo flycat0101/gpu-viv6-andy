@@ -113,6 +113,8 @@ ppoPREPROCESSOR_MacroExpand(
     if (match_case == gcvTRUE)
     {
         _SkipSpaceOnMacro(PP, Head, End);
+        gcmONERROR(ppoTOKEN_Destroy(PP, id));
+        id = gcvNULL;
         return gcvSTATUS_OK;
     }
 
@@ -199,6 +201,7 @@ ppoPREPROCESSOR_MacroExpand(
 
     _SkipSpaceOnMacro(PP, Head, End);
     gcmONERROR(ppoTOKEN_Destroy(PP, id));
+    id = gcvNULL;
 
     return gcvSTATUS_OK;
 
@@ -209,7 +212,8 @@ OnError:
         {
             if (headtail[i *2] == headtail[i *2 + 1])
             {
-                gcmONERROR(ppoTOKEN_Destroy(PP, headtail[i *2 + 1]));
+                gcmVERIFY_OK(ppoTOKEN_Destroy(PP, headtail[i *2 + 1]));
+                headtail[i *2 + 1] = gcvNULL;
             }
             else
             {
@@ -218,7 +222,8 @@ OnError:
 
                 while(nhead)
                 {
-                    gcmONERROR(ppoTOKEN_Destroy(PP, nhead));
+                    gcmVERIFY_OK(ppoTOKEN_Destroy(PP, nhead));
+                    nhead = gcvNULL;
                     nhead = ntoken;
                     if (nhead)
                         ntoken = (ppoTOKEN)(nhead->inputStream.base.node.next);
@@ -233,6 +238,12 @@ OnError:
     {
         gcmVERIFY_OK(sloCOMPILER_Free(PP->compiler, expanded_headtail));
         expanded_headtail = gcvNULL;
+    }
+
+    if (id != gcvNULL)
+    {
+        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, id));
+        id = gcvNULL;
     }
     return status;
 }
@@ -292,12 +303,8 @@ ppoPREPROCESSOR_MacroExpand_0_SelfContain(
 
         return gcvSTATUS_OK;
     }
+
 OnError:
-    if (id != gcvNULL)
-    {
-        gcmVERIFY_OK(ppoTOKEN_Destroy(PP, id));
-        id = gcvNULL;
-    }
     return status;
 }
 
@@ -376,6 +383,8 @@ ppoPREPROCESSOR_MacroExpand_2_NoFormalArgs(
 
     ppoTOKEN replacement_list = gcvNULL;
 
+    ppoTOKEN lpara = gcvNULL, rpara = gcvNULL;
+
     gcmHEADER_ARG("PP=0x%x IS=0x%x Head=0x%x End=0x%x AnyExpanationHappened=0x%x MatchCase=0x%x ID=0x%x MS=0x%x",
                   PP, IS, Head, End, AnyExpanationHappened, MatchCase, ID, MS);
 
@@ -384,6 +393,50 @@ ppoPREPROCESSOR_MacroExpand_2_NoFormalArgs(
     if (ms->argc == 0)
     {
         gcmTRACE(gcvLEVEL_VERBOSE, "ME : macro %s has no arg(s).",id->poolString);
+
+        if (ms->hasPara && (*IS))
+        {
+            gcmONERROR(
+                (*IS)->GetToken(PP, IS, &lpara, !ppvICareWhiteSpace)
+                );
+
+            /* Skip "()" if existed. */
+            if (lpara->poolString == PP->keyword->lpara)
+            {
+                gcmONERROR(
+                    (*IS)->GetToken(PP, IS, &rpara, !ppvICareWhiteSpace)
+                    );
+
+                if (rpara->poolString != PP->keyword->rpara)
+                {
+                    ppoPREPROCESSOR_Report(
+                        PP,
+                        slvREPORT_ERROR,
+                        "too many actual parameters for macro '%s'.",
+                        id->poolString);
+                    status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+                }
+
+                gcmVERIFY_OK(ppoINPUT_STREAM_UnGetToken(PP, (ppoINPUT_STREAM *)IS, rpara));
+                gcmVERIFY_OK(ppoINPUT_STREAM_UnGetToken(PP, (ppoINPUT_STREAM *)IS, lpara));
+
+                gcmVERIFY_OK(ppoTOKEN_Destroy(PP,rpara));
+                rpara = gcvNULL;
+                gcmVERIFY_OK(ppoTOKEN_Destroy(PP,lpara));
+                lpara = gcvNULL;
+
+                if (status != gcvSTATUS_OK)
+                {
+                    gcmFOOTER();
+                    return status;
+                }
+            }
+            else
+            {
+                gcmONERROR(ppoINPUT_STREAM_UnGetToken(PP, (ppoINPUT_STREAM *)IS, lpara));
+                gcmONERROR(ppoTOKEN_Destroy(PP,lpara));
+            }
+        }
 
         if (ms->replacementList == gcvNULL)
         {
@@ -394,19 +447,9 @@ ppoPREPROCESSOR_MacroExpand_2_NoFormalArgs(
             *AnyExpanationHappened = gcvTRUE;
             *MatchCase = gcvTRUE;
 
-            status = ppoTOKEN_Destroy(PP,id);
-
-            if (gcmIS_SUCCESS(status))
-            {
-                gcmFOOTER_ARG("*Head=0x%x *End=0x%x *AnyExpanationHappened=%d *MatchCase=%d",
-                              *Head, *End, *AnyExpanationHappened, *MatchCase);
-                return gcvSTATUS_OK;
-            }
-            else
-            {
-                gcmFOOTER();
-                return status;
-            }
+            gcmFOOTER_ARG("*Head=0x%x *End=0x%x *AnyExpanationHappened=%d *MatchCase=%d",
+                            *Head, *End, *AnyExpanationHappened, *MatchCase);
+            return gcvSTATUS_OK;
         }
 
         gcmTRACE(gcvLEVEL_VERBOSE, "ME : macro %s, has replacement-list.",id->poolString);
@@ -450,19 +493,9 @@ ppoPREPROCESSOR_MacroExpand_2_NoFormalArgs(
 
         *MatchCase = gcvTRUE;
 
-        status = ppoTOKEN_Destroy(PP,id);
-
-        if (gcmIS_SUCCESS(status))
-        {
-            gcmFOOTER_ARG("*Head=0x%x *End=0x%x *AnyExpanationHappened=%d *MatchCase=%d",
-                          *Head, *End, *AnyExpanationHappened, *MatchCase);
-            return gcvSTATUS_OK;
-        }
-        else
-        {
-            gcmFOOTER();
-            return status;
-        }
+        gcmFOOTER_ARG("*Head=0x%x *End=0x%x *AnyExpanationHappened=%d *MatchCase=%d",
+                        *Head, *End, *AnyExpanationHappened, *MatchCase);
+        return gcvSTATUS_OK;
 
     }
     else/*if (ms->argc == 0)*/
@@ -645,10 +678,6 @@ ppoPREPROCESSOR_MacroExpand_5_BufferRealArgs(
                 "unexpected end of file when expand the macro %s.",
                 id->poolString);
 
-            gcmONERROR(
-                ppoTOKEN_Destroy(PP, ID)
-                );
-
             return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
         }
 
@@ -671,10 +700,6 @@ ppoPREPROCESSOR_MacroExpand_5_BufferRealArgs(
                     " unexpected token when expand the macro %s.",
                     id->poolString);
             }
-
-            gcmONERROR(
-                ppoTOKEN_Destroy(PP, id)
-                );
 
             gcmONERROR(
                 ppoTOKEN_Destroy(PP, ahead)
@@ -713,6 +738,7 @@ ppoPREPROCESSOR_MacroExpand_5_BufferRealArgs(
     gcmTRACE(gcvLEVEL_VERBOSE, "ME : %s,finish real-arg(s)-buffering.", id->poolString);
 
     return gcvSTATUS_OK;
+
 OnError:
     if (ahead != gcvNULL)
     {
@@ -946,7 +972,6 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
 
             if(status != gcvSTATUS_OK)
             {
-                gcmONERROR(ppoTOKEN_Destroy(PP, ID));
                 return status;
             }
 
@@ -1029,7 +1054,6 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
 
                 if(status != gcvSTATUS_OK)
                 {
-                    gcmONERROR(ppoTOKEN_Destroy(PP, ID));
                     return status;
                 }
 
@@ -1123,7 +1147,6 @@ ppoPREPROCESSOR_MacroExpand_7_ParseReplacementList(
     return gcvSTATUS_OK;
 
 OnError:
-    gcmONERROR(ppoTOKEN_Destroy(PP, ID));
     return status;
 }
 

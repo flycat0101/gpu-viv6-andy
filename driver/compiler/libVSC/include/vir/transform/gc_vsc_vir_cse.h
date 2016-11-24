@@ -23,10 +23,9 @@
 BEGIN_EXTERN_C()
 
 extern VSC_ErrCode VSC_LCSE_PerformOnShader(
-    IN VIR_Shader           *shader,
-    IN VSC_OPTN_LCSEOptions *options,
-    IN VIR_Dumper           *dumper
+    IN VSC_SH_PASS_WORKER* pPassWorker
     );
+DECLARE_QUERY_PASS_PROP(VSC_LCSE_PerformOnShader);
 
 END_EXTERN_C()
 

@@ -101,7 +101,7 @@ STATIC_LIBS += khronosS
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPREF_$(lib) = -Bstatic))
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
 
-LIBS += VSC GAL-$(HARDWARENAME) EGL_viv $(STATIC_LIBS)
+LIBS += VSC GAL EGL_viv $(STATIC_LIBS)
 
 CCFLAGS += -DGL_GLEXT_PROTOTYPES -fms-extensions
 

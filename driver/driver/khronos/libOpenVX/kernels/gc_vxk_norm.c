@@ -22,7 +22,7 @@ vx_status vxNorm(vx_node node, vx_image input_x, vx_image input_y, vx_scalar nor
     vx_uint32 width;
     vx_uint32 height;
 
-    vxAccessScalarValue(norm_type, &norm_type_value);
+    vxReadScalarValue(norm_type, &norm_type_value);
 
 #if gcdVX_OPTIMIZER
     if (node && node->kernelContext)
@@ -39,6 +39,7 @@ vx_status vxNorm(vx_node node, vx_image input_x, vx_image input_y, vx_scalar nor
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(output, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
@@ -78,9 +79,11 @@ vx_status vxNorm(vx_node node, vx_image input_x, vx_image input_y, vx_scalar nor
 
     kernelContext->params.evisNoInst = node->base.context->evisNoInst;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
-    vxCommitScalarValue(norm_type, &norm_type_value);
+    vxWriteScalarValue(norm_type, &norm_type_value);
 #if gcdVX_OPTIMIZER
     if (!node || !node->kernelContext)
     {
@@ -120,6 +123,7 @@ vx_status vxEdgeTraceThreshold(vx_node node, vx_image input, vx_threshold thresh
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     constantData[0] = FV2(15);
@@ -152,6 +156,8 @@ vx_status vxEdgeTraceThreshold(vx_node node, vx_image input, vx_threshold thresh
     kernelContext->params.kernel               = gcvVX_KERNEL_EDGE_TRACE;
 
     kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -188,6 +194,7 @@ vx_status vxEdgeTraceHysteresis(vx_node node, vx_image input, vx_scalar flag)
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(input, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
@@ -247,6 +254,8 @@ vx_status vxEdgeTraceHysteresis(vx_node node, vx_image input, vx_scalar flag)
 
     kernelContext->params.evisNoInst = node->base.context->evisNoInst;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -280,6 +289,7 @@ vx_status vxEdgeTraceClamp(vx_node node, vx_image input, vx_image output)
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     bin[0] = FORMAT_VALUE(7);
@@ -302,6 +312,8 @@ vx_status vxEdgeTraceClamp(vx_node node, vx_image input, vx_image output)
 
     kernelContext->params.evisNoInst = node->base.context->evisNoInst;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -315,3 +327,4 @@ vx_status vxEdgeTraceClamp(vx_node node, vx_image input, vx_image output)
 }
 
 #endif
+

@@ -20,12 +20,12 @@ VX_INTERNAL_CALLBACK_API void vxoConvolution_Destructor(vx_reference ref)
     vxoMatrix_Destructor((vx_reference)&convolution->matrix);
 }
 
-VX_PUBLIC_API vx_status vxReleaseConvolution(vx_convolution *convolution)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseConvolution(vx_convolution *convolution)
 {
     return vxoReference_Release((vx_reference_ptr)convolution, VX_TYPE_CONVOLUTION, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_convolution vxCreateConvolution(vx_context context, vx_size columns, vx_size rows)
+VX_API_ENTRY vx_convolution VX_API_CALL vxCreateConvolution(vx_context context, vx_size columns, vx_size rows)
 {
     vx_convolution convolution;
 
@@ -54,7 +54,7 @@ VX_PUBLIC_API vx_convolution vxCreateConvolution(vx_context context, vx_size col
     return convolution;
 }
 
-VX_PUBLIC_API vx_status vxQueryConvolution(vx_convolution convolution, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryConvolution(vx_convolution convolution, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoReference_IsValidAndSpecific(&convolution->matrix.base, VX_TYPE_CONVOLUTION))
     {
@@ -95,7 +95,7 @@ VX_PUBLIC_API vx_status vxQueryConvolution(vx_convolution convolution, vx_enum a
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxSetConvolutionAttribute(vx_convolution convolution, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxSetConvolutionAttribute(vx_convolution convolution, vx_enum attribute, const void *ptr, vx_size size)
 {
     vx_uint32 scale;
 
@@ -124,7 +124,7 @@ VX_PUBLIC_API vx_status vxSetConvolutionAttribute(vx_convolution convolution, vx
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxAccessConvolutionCoefficients(vx_convolution convolution, vx_int16 *array)
+VX_API_ENTRY vx_status VX_API_CALL vxReadConvolutionCoefficients(vx_convolution convolution, vx_int16 *array)
 {
     if (!vxoReference_IsValidAndSpecific(&convolution->matrix.base, VX_TYPE_CONVOLUTION))
     {
@@ -154,7 +154,7 @@ VX_PUBLIC_API vx_status vxAccessConvolutionCoefficients(vx_convolution convoluti
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxCommitConvolutionCoefficients(vx_convolution convolution, vx_int16 *array)
+VX_API_ENTRY vx_status VX_API_CALL vxWriteConvolutionCoefficients(vx_convolution convolution, const vx_int16 *array)
 {
     if (!vxoReference_IsValidAndSpecific(&convolution->matrix.base, VX_TYPE_CONVOLUTION))
     {
@@ -183,3 +183,4 @@ VX_PUBLIC_API vx_status vxCommitConvolutionCoefficients(vx_convolution convoluti
 
     return VX_SUCCESS;
 }
+

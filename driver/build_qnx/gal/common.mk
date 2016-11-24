@@ -23,7 +23,7 @@ define PINFO
 PINFO DESCRIPTION="Vivante GAL"
 endef
 
-NAME=GAL-$(HARDWARENAME)
+NAME=GAL
 
 include $(qnx_build_dir)/common.mk
 
@@ -60,6 +60,7 @@ SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_format.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_texture.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_mem.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_statistics.o
+SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_resource.o
 
 ifeq ($(USE_OPENCL), 1)
 SOURCE_OBJECTS += $(driver_root)/hal/user/gc_hal_user_cl.o
@@ -116,8 +117,8 @@ ifeq ($(filter dll so, $(VARIANT_LIST)),)
 INSTALLDIR=/dev/null
 else
 
-INSTALLDIR=$(firstword $(INSTALLDIR_$(OS)) usr/lib)
-POST_INSTALL=$(RM_HOST) $(INSTALL_ROOT_$(OS))/$(CPU)$(filter le be, $(VARIANT_LIST))$(CPUVARDIR_SUFFIX)/$(INSTALLDIR)/libGAL-$(HARDWARENAME)S.a
+INSTALLDIR=$(firstword $(INSTALLDIR_$(OS)) usr/lib/graphics/$(PLATFORM))
+POST_INSTALL=$(RM_HOST) $(INSTALL_ROOT_$(OS))/$(CPU)$(filter le be, $(VARIANT_LIST))$(CPUVARDIR_SUFFIX)/$(INSTALLDIR)/libGALS.a
 
 endif
 

@@ -116,6 +116,9 @@ typedef struct _gcoVX_Kernel_Context
     gctUINT32                       uniform_num;
 
     vx_evis_no_inst_s               evisNoInst;
+
+    vx_node                         node;
+
 }
 gcoVX_Kernel_Context;
 
@@ -162,7 +165,7 @@ gcfVX_GetImageInfo(
     );
 
 /* base kernel function */
-vx_status Convolve(vx_node node, vx_image src, vx_image dst, vx_int16* matrix,  vx_uint32 scale, vx_bool clamp,
+vx_status Convolve(vx_node node, vx_image src, vx_image dst, vx_int16* matrix, vx_uint32 scale, vx_bool clamp,
                    vx_size conv_width, vx_size conv_height, vx_border_mode_t *bordermode);
 
 vx_status vxAbsDiff(vx_node node, vx_image in1, vx_image in2, vx_image output);
@@ -199,7 +202,7 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
 
 vx_status vxEqualizeHist_hist(vx_node node, vx_image src, vx_image hist, vx_scalar min);
 vx_status vxEqualizeHist_gcdf(vx_node node, vx_image hist, vx_scalar minIndex, vx_image cdf, vx_scalar minValue);
-vx_status vxEqualizeHist_cdf(vx_node node, vx_image cdf, vx_uint32 wxh,  vx_scalar min, vx_image hist);
+vx_status vxEqualizeHist_cdf(vx_node node, vx_image cdf, vx_uint32 wxh, vx_scalar min, vx_image hist);
 vx_status vxEqualizeHist_lut(vx_node node, vx_image src, vx_image hist, vx_image dst);
 
 vx_status vxIntegralImage(vx_node node, vx_image src, vx_uint32 step, vx_image dst);
@@ -218,7 +221,7 @@ vx_status vxMultiply(vx_node node, vx_image in0, vx_image in1, vx_scalar scale_p
 vx_status vxOpticalFlowPyrLK(vx_node node, vx_reference *parameters, vx_uint32 num);
 
 vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyramid, vx_pyramid gradXPyramid, vx_pyramid gradYPyramid,
-    const vx_array prevPts,  const vx_array estimatedPts, vx_array nextPts,
+    const vx_array prevPts, const vx_array estimatedPts, vx_array nextPts,
     vx_scalar criteriaScalar, vx_scalar epsilonScalar, vx_scalar numIterationsScalar, vx_bool isUseInitialEstimate, vx_scalar winSizeScalar,
     vx_int32 maxLevel, vx_float32 pyramidScaleValue
     );
@@ -246,7 +249,7 @@ vx_status vxEdgeTraceThreshold(vx_node node, vx_image input, vx_threshold thresh
 vx_status vxEdgeTraceHysteresis(vx_node node, vx_image input, vx_scalar flag);
 vx_status vxEdgeTraceClamp(vx_node node, vx_image input, vx_image output);
 
-vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image dst, vx_scalar winds, vx_scalar sens, vx_border_mode_t borders);
+vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image dst, vx_scalar scales, vx_scalar winds, vx_scalar sens, vx_border_mode_t borders);
 vx_status vxEuclideanNonMaxSuppression(vx_node node, vx_image src, vx_scalar thr, vx_scalar rad, vx_image dst);
 
 vx_status vxImageLister(vx_node node, vx_image src, vx_array arrays, vx_scalar num, vx_reference* staging);
@@ -266,10 +269,26 @@ vx_status vxMinMaxGetLocation(vx_node node, vx_image img, vx_scalar minVal, vx_s
 
 vx_status vxMinMaxPackLocation(vx_node node, vx_image inputImage, vx_array inputArray, vx_scalar width, vx_scalar height, vx_scalar countScalar, vx_size itemSize, vx_size cap, vx_array outputArray);
 
-vx_status vxExample(vx_node node, vx_image input, vx_image output);
+vx_status vxSGMCost(vx_node node, vx_image right, vx_image left, vx_image cost, vx_uint32 width, vx_uint32 height, vx_uint32 range);
 
+vx_status vxPathCost_90(vx_node node, vx_image cost, vx_image lr, vx_uint32 disp_range, vx_uint32 width, vx_uint32 height);
+
+vx_status vxPathCost_45(vx_node node, vx_image cost, vx_image lr, vx_uint32 disp_range, vx_uint32 width, vx_uint32 height);
+
+vx_status vxPathCost_135(vx_node node, vx_image cost, vx_image lr, vx_uint32 disp_range, vx_uint32 width, vx_uint32 height);
+
+vx_status vxPathCost_0(vx_node node, vx_image cost, vx_image lr, vx_uint32 disp_range, vx_uint32 width, vx_uint32 height);
+
+vx_status vxSelectDisp(vx_node node, vx_image path, vx_image depth, vx_uint32 disp_range, vx_uint32 width, vx_uint32 height);
+
+vx_status vxLaplacian3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *bordermode);
+
+vx_status vxCensus3x3(vx_node node, vx_image src, vx_image dst);
+
+vx_status vxCopyImage(vx_node node, vx_image src, vx_image dst);
 #ifdef __cplusplus
 }
 #endif
 
 #endif
+

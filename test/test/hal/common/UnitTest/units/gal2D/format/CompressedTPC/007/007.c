@@ -237,7 +237,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->runtime->hal,
         sFormat[(frameNo / gcmCOUNTOF(sSrcFile)) % gcmCOUNTOF(sFormat)],
         gcvLINEAR,
-        gcv2D_TSC_TPC_COMPRESSED,
+        gcv2D_TSC_TPC_COMPRESSED_V10,
         len * 6,
         len * 4,
         &surf));

@@ -2999,7 +2999,7 @@ _AddStrokeSubPath(
     return status;
 }
 
-gcmINLINE gceSTATUS
+static gceSTATUS
 _AddAPointToRightStrokePointListTail(
     vgsCONTEXT_PTR Context,
     vgsSTROKECONVERSION_PTR StrokeConversion,
@@ -3026,7 +3026,7 @@ _AddAPointToRightStrokePointListTail(
     return status;
 }
 
-gcmINLINE gceSTATUS
+static gceSTATUS
 _AddAPointToLeftStrokePointListHead(
     vgsCONTEXT_PTR Context,
     vgsSTROKECONVERSION_PTR StrokeConversion,
@@ -3265,7 +3265,7 @@ _EndAStrokeSubPath(
     return status;
 }
 
-gcmINLINE void
+static void
 _GetNextDashLength(
     vgsCONTEXT_PTR Context,
     vgsSTROKECONVERSION_PTR StrokeConversion,
@@ -7368,7 +7368,7 @@ _AddStrokeSubPath_I(
     return status;
 }
 
-gcmINLINE gceSTATUS
+static gceSTATUS
 _AddAPointToRightStrokePointListTail_I(
     vgsCONTEXT_PTR Context,
     vgsSTROKECONVERSION_I_PTR StrokeConversion,
@@ -7394,7 +7394,7 @@ _AddAPointToRightStrokePointListTail_I(
     return status;
 }
 
-gcmINLINE gceSTATUS
+static gceSTATUS
 _AddAPointToLeftStrokePointListHead_I(
     vgsCONTEXT_PTR Context,
     vgsSTROKECONVERSION_I_PTR StrokeConversion,
@@ -7655,7 +7655,7 @@ _EndAStrokeSubPath_I(
     return status;
 }
 
-gcmINLINE void
+static void
 _GetNextDashLength_I(
     vgsCONTEXT_PTR Context,
     vgsSTROKECONVERSION_I_PTR StrokeConversion,

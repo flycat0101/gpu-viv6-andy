@@ -72,7 +72,8 @@ enum gceRecompileKind
     gceRK_PATCH_TCS_INPUT_COUNT_MISMATCH,
     gceRK_PATCH_CL_LONGULONG,
     gceRK_PATCH_COLOR_KILL,
-    gceRK_PATCH_ALPHA_BLEND
+    gceRK_PATCH_READ_IMAGE_UNNORM,
+    gceRK_PATCH_ALPHA_BLEND,
 };
 
 typedef enum _gceConvertFunctionKind
@@ -181,6 +182,8 @@ typedef struct _gcsInputConversion
     /* 1: use depth, 0: use stencil */
     gctBOOL                 depthStencilMode;
     gceTEXTURE_SWIZZLE      swizzle[gcvTEXTURE_COMPONENT_NUM];
+
+    gcSHADER_KIND           shaderKind;
 }
 gcsInputConversion;
 
@@ -188,9 +191,12 @@ typedef struct _gcsOutputConversion
 {
     gctINT                  layers;       /* numberof layers the input format
                                              represented internally (up to 4) */
-    gcOUTPUT                outputs[4];
     gcsSURF_FORMAT_INFO     formatInfo;  /* */
     gctINT                  outputLocation;
+
+    /* private data.
+       It is not used in the VIR recompilation */
+    gcOUTPUT                outputs[4];
 }
 gcsOutputConversion;
 
@@ -297,11 +303,11 @@ typedef struct _gcsPatchLongULong
 }
 gcsPatchLongULong;
 
-typedef struct _gcsPatchyFlippedTexture
+typedef struct _gcsPatchYFlippedTexture
 {
     gcUNIFORM yFlippedTexture;  /* uniform need to filp y component. */
 }
-gcsPatchyFlippedTexture;
+gcsPatchYFlippedTexture;
 
 typedef struct _gcsPatchYFlippedShader
 {
@@ -368,6 +374,7 @@ typedef struct _gcsPatchAlphaBlend
     gcUNIFORM   blendConstColor;
     gcUNIFORM   rtSampler;     /* sampler */
     gcUNIFORM   yInvert;
+
 }
 gcsPatchAlphaBlend;
 
@@ -388,7 +395,7 @@ typedef struct _gcRecompileDirective
         gcsPatchGlobalWorkSize *  globalWorkSize;
         gcsPatchReadImage *       readImage;
         gcsPatchWriteImage *      writeImage;
-        gcsPatchyFlippedTexture * yFlippedTexture;
+        gcsPatchYFlippedTexture * yFlippedTexture;
         gcsPatchRemoveAssignmentForAlphaChannel * removeOutputAlpha;
         gcsPatchYFlippedShader *  yFlippedShader;
         gcsPatchSampleMask *      sampleMask;
@@ -450,7 +457,9 @@ gcsPROGRAM_UNIFIED_STATUS;
 typedef struct _gcSHADER_VID_NODES
 {
     gctPOINTER  instVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* SURF Node for instruction buffer for I-Cache. */
-    gctPOINTER  spillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* SURF Node for spill memory. */
+    gctPOINTER  gprSpillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* SURF Node for gpr spill memory. */
+    gctPOINTER  crSpillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* SURF Node for cr spill memory. */
+    gctPOINTER  sharedMemVidMemNode;
 }gcSHADER_VID_NODES;
 
 typedef enum _gceMEMORY_ACCESS_FLAG
@@ -471,6 +480,13 @@ typedef enum _gceMEMORY_ACCESS_FLAG
     gceMA_FLAG_BARRIER              = 0x0020,
 }
 gceMEMORY_ACCESS_FLAG;
+
+typedef struct _gcWORK_GROUP_SIZE
+{
+    gctUINT       x;
+    gctUINT       y;
+    gctUINT       z;
+}gcWORK_GROUP_SIZE;
 
 struct _gcsHINT
 {
@@ -554,14 +570,19 @@ struct _gcsHINT
 
     /* flag if the shader uses gl_FragCoord, gl_FrontFacing, gl_PointCoord */
     gctBOOL     useFragCoord[4];
+    gctBOOL     useSamplePosition;
     gctBOOL     useFrontFacing;
     gctBOOL     usePointCoord[4];
     gctBOOL     useDSX;
     gctBOOL     useDSY;
+    gctBOOL     useRtImage[4];
     gctBOOL     yInvertAware;
 
     /* flag if PS uses any inputs defined as centroid. */
     gctBOOL     hasCentroidInput;
+
+    /* flag if PS uses early fragment tests. */
+    gctBOOL     useEarlyFragmentTest;
 
     /* They're component index after packing */
     gctINT      pointCoordComponent;
@@ -600,22 +621,17 @@ struct _gcsHINT
     gcePROGRAM_STAGE_BIT  stageBits;
 
     gctUINT     usedSamplerMask;
-    gctUINT     useSamplePosition;
     gctUINT     usedRTMask;
 
     /* For CL and CS, global/group/local id order. */
     gctUINT32   valueOrder;
+    gctBOOL     threadGroupSync;
 
     /* Deferred-program when flushing as they are in VS output ctrl reg */
     gctINT      vsOutput16RegNo;
     gctINT      vsOutput17RegNo;
     gctINT      vsOutput18RegNo;
-    gctUINT32   vsConstBase;
-    gctUINT32   tcsConstBase;
-    gctUINT32   tesConstBase;
-    gctUINT32   gsConstBase;
-    gctUINT32   psConstBase;
-
+    gctUINT32   hwConstRegBases[gcvPROGRAM_STAGE_LAST];
     /* For sample shading. */
     gctINT      sampleMaskLoc; /* -1 means loc can be determined by driver */
     gctBOOL     usedSampleIdOrSamplePosition;
@@ -625,6 +641,7 @@ struct _gcsHINT
     /* Pre-PA hints */
     gctBOOL     prePaShaderHasPointSize;  /* Flag whether pre-PA has point size or not */
     gctBOOL     isPtSizeStreamedOut;/* Flag point size will be streamed out */
+    gctBOOL     hasAttrStreamOuted; /* Flag any attribute that will be streamed out */
     gctINT32    shader2PaOutputCount; /* Output count from pre-pa shader (excluding pure TFX count) */
     gctUINT     ptSzAttrIndex;
     gctBOOL     prePaShaderHasPrimitiveId;
@@ -632,11 +649,18 @@ struct _gcsHINT
     /* Sampler Base offset. */
     gctUINT32   samplerBaseOffset[gcvPROGRAM_STAGE_LAST];
 
+    /* const regNo base */
+    gctUINT32   constRegNoBase[gcvPROGRAM_STAGE_LAST];
+
     gctINT      psOutCntl0to3;
     gctINT      psOutCntl4to7;
 
+    gcWORK_GROUP_SIZE workGrpSize;
+
     /* per-vertex attributeCount. */
     gctUINT     tcsPerVertexAttributeCount;
+
+    gctUINT     vsInputState;
 };
 
 #define gcsHINT_isCLShader(Hint)            ((Hint)->clShader)
@@ -669,22 +693,30 @@ typedef enum _gcSHADER_TYPE_KIND
 typedef struct _gcSHADER_TYPEINFO
 {
     gcSHADER_TYPE      type;              /* e.g. gcSHADER_FLOAT_2X4 */
-    gctUINT            components;        /* e.g. 4 components each row */
+    gctUINT            components;        /* e.g. 4 components each row
+                                           * for packed type it is real component
+                                           * number in vec4 register: CHAR_P3 takes 1
+                                           * component */
+    gctUINT            packedComponents;  /* number of components in packed type,
+                                           * it is 3 for CHAR_P3.
+                                           * same as components for non-packed type */
     gctUINT            rows;              /* e.g. 2 rows             */
     gcSHADER_TYPE      rowType;           /* e.g. gcSHADER_FLOAT_X4  */
     gcSHADER_TYPE      componentType;     /* e.g. gcSHADER_FLOAT_X1  */
     gcSHADER_TYPE_KIND kind;              /* e.g. gceTK_FLOAT */
     gctCONST_STRING    name;              /* e.g. "FLOAT_2X4" */
+    gctBOOL            isPacked;          /* e.g. gcvTRUE if of packed type such as gcSHADER_UINT8_P2 ... */
 } gcSHADER_TYPEINFO;
 
 extern const gcSHADER_TYPEINFO gcvShaderTypeInfo[];
 
-#define gcmType_Comonents(Type)    (gcvShaderTypeInfo[Type].components)
-#define gcmType_Rows(Type)         (gcvShaderTypeInfo[Type].rows)
-#define gcmType_RowType(Type)      (gcvShaderTypeInfo[Type].rowType)
-#define gcmType_ComonentType(Type) (gcvShaderTypeInfo[Type].componentType)
-#define gcmType_Kind(Type)         (gcvShaderTypeInfo[Type].kind)
-#define gcmType_Name(Type)         (gcvShaderTypeInfo[Type].name)
+#define gcmType_Comonents(Type)         (gcvShaderTypeInfo[Type].components)
+#define gcmType_PackedComonents(Type)   (gcvShaderTypeInfo[Type].packedComponents)
+#define gcmType_Rows(Type)              (gcvShaderTypeInfo[Type].rows)
+#define gcmType_RowType(Type)           (gcvShaderTypeInfo[Type].rowType)
+#define gcmType_ComonentType(Type)      (gcvShaderTypeInfo[Type].componentType)
+#define gcmType_Kind(Type)              (gcvShaderTypeInfo[Type].kind)
+#define gcmType_Name(Type)              (gcvShaderTypeInfo[Type].name)
 
 #define gcmType_ComponentByteSize       4
 
@@ -783,56 +815,52 @@ typedef enum _gceSHADER_FLAGS
     /* Remove unused uniforms on shader, only enable for es20 shader. */
     gcvSHADER_REMOVE_UNUSED_UNIFORMS    = 0x2000,
 
-    /* All optimizer without this flag would not be done on recompiler.  */
-    gcvSHADER_ONCE_OPTIMIZER            = 0x4000,
-
     /* Force linking when either vertex or fragment shader not present */
-    gcvSHADER_FORCE_LINKING             = 0x8000,
+    gcvSHADER_FORCE_LINKING             = 0x4000,
 
     /* Disable default UBO for vertex and fragment shader. */
-    gcvSHADER_DISABLE_DEFAULT_UBO       = 0x10000,
+    gcvSHADER_DISABLE_DEFAULT_UBO       = 0x8000,
 
     /* This shader is from recompier. */
-    gcvSHADER_RECOMPILER                = 0x20000,
+    gcvSHADER_RECOMPILER                = 0x10000,
 
     /* This is a seperated program link */
-    gcvSHADER_SEPERATED_PROGRAM         = 0x40000,
+    gcvSHADER_SEPERATED_PROGRAM         = 0x20000,
 
     /* disable dual16 for this ps shader */
-    gcvSHADER_DISABLE_DUAL16            = 0x80000,
+    gcvSHADER_DISABLE_DUAL16            = 0x40000,
 
     /* set inline level 0 */
-    gcvSHADER_SET_INLINE_LEVEL_0        = 0x100000,
+    gcvSHADER_SET_INLINE_LEVEL_0        = 0x80000,
 
     /* set inline level 1 */
-    gcvSHADER_SET_INLINE_LEVEL_1        = 0x200000,
+    gcvSHADER_SET_INLINE_LEVEL_1        = 0x100000,
 
     /* set inline level 2 */
-    gcvSHADER_SET_INLINE_LEVEL_2        = 0x400000,
+    gcvSHADER_SET_INLINE_LEVEL_2        = 0x200000,
 
     /* set inline level 3 */
-    gcvSHADER_SET_INLINE_LEVEL_3        = 0x800000,
+    gcvSHADER_SET_INLINE_LEVEL_3        = 0x400000,
 
     /* set inline level 4 */
-    gcvSHADER_SET_INLINE_LEVEL_4        = 0x1000000,
+    gcvSHADER_SET_INLINE_LEVEL_4        = 0x800000,
 
     /* resets inline level to default */
-    gcvSHADER_RESET_INLINE_LEVEL        = 0x2000000,
+    gcvSHADER_RESET_INLINE_LEVEL        = 0x1000000,
 
     /* Need add robustness check code */
-    gcvSHADER_NEED_ROBUSTNESS_CHECK     = 0x4000000,
+    gcvSHADER_NEED_ROBUSTNESS_CHECK     = 0x2000000,
 
     /* Denormalize flag */
-    gcvSHADER_FLUSH_DENORM_TO_ZERO      = 0x8000000,
+    gcvSHADER_FLUSH_DENORM_TO_ZERO      = 0x4000000,
 
     /* Has image in kernel source code of OCL kernel program */
-    gcSHADER_HAS_IMAGE_IN_KERNEL        = 0x10000000,
+    gcSHADER_HAS_IMAGE_IN_KERNEL        = 0x8000000,
 
-    gcvSHADER_VIRCG_NONE                = 0x20000000,
-    gcvSHADER_VIRCG_ONE                 = 0x40000000,
+    gcvSHADER_VIRCG_NONE                = 0x10000000,
+    gcvSHADER_VIRCG_ONE                 = 0x20000000,
 
-    gcvSHADER_MIN_COMP_TIME             = 0x80000000,
-
+    gcvSHADER_MIN_COMP_TIME             = 0x40000000,
 }
 gceSHADER_FLAGS;
 
@@ -895,8 +923,8 @@ typedef enum _gceSHADER_OPTIMIZATION
      */
     gcvOPTIMIZATION_POWER_OPTIMIZATION          = 1 << 10,
 
-    /*  Optimize intrinsics */
-    gcvOPTIMIZATION_INTRINSICS                  = 1 << 11,
+    /*  Update precision */
+    gcvOPTIMIZATION_UPDATE_PRECISION            = 1 << 11,
 
     /*  Loop rerolling */
     gcvOPTIMIZATION_LOOP_REROLLING              = 1 << 12,
@@ -920,7 +948,7 @@ typedef enum _gceSHADER_OPTIMIZATION
 
     /* limit some optimization for minimal compile-time */
     /* VIV: specifically for dEQP-GLES3.functional.uniform_api.random.83 */
-    gcvOPTIMIZATION_MIN_COMP_TIME              = 1 << 21,
+    gcvOPTIMIZATION_MIN_COMP_TIME               = 1 << 21,
 
     /*  Full optimization. */
     /*  Note that gcvOPTIMIZATION_LOAD_SW_W is off. */
@@ -1036,12 +1064,12 @@ struct _InlineStringList
     InlineStringList *   next;
 };
 
-enum VIRCGKind
+typedef enum _VIRCGKind
 {
     VIRCG_None,
     VIRCG_WITH_TREECG, /* go through VIR pass, but use gcSL LinkerTree to generate MC */
     VIRCG_FULL          /* go through VIR pass and use VIR Full linker to generate MC */
-};
+}VIRCGKind;
 
 typedef struct _gcOPTIMIZER_OPTION
 {
@@ -1076,6 +1104,7 @@ typedef struct _gcOPTIMIZER_OPTION
     gctBOOL     dumpBEFinalIR;         /* dump BE final IR */
     gctBOOL     dumpFELog;             /* dump FE log file in case of compiler error */
     gctBOOL     dumpUniform;           /* dump uniform value when setting uniform */
+    gctBOOL     dumpSpirvIR;           /* dump VIR shader convert from SPIRV */
     gctINT      _dumpStart;            /* shader id start to dump */
     gctINT      _dumpEnd;              /* shader id end to dump */
 
@@ -1185,6 +1214,13 @@ typedef struct _gcOPTIMIZER_OPTION
     */
     gctBOOL     enableLTC;
 
+    /* debug option:
+
+        VC_OPTION=-DEBUG:0|1
+
+    */
+    gctBOOL     enableDebug;
+
     /* VC_OPTION=-Ddef1[=value1] -Ddef2[=value2] -Uundef1 */
     MacroDefineList * macroDefines;
 
@@ -1239,6 +1275,7 @@ typedef struct _gcOPTIMIZER_OPTION
      *       2:  auto-on mode for all applications.
      *       3:  force dual16 on for all applications ignoring the heuristic.
      */
+    gctBOOL     dual16Specified;
     gctUINT     dual16Mode;
     gctINT      _dual16Start;           /* shader id start to enable dual16 */
     gctINT      _dual16End;             /* shader id end to enalbe dual16 */
@@ -1299,9 +1336,11 @@ typedef struct _gcOPTIMIZER_OPTION
      *    T-m,n: turn off VIRCG for shader id is in range of [m, n]
      *
      */
-    gctBOOL     useVIRCodeGen;
+    VIRCGKind   useVIRCodeGen;
     /* useVIRCodeGen maybe changed for specific test, we need to save the orignal option */
     gctBOOL     origUseVIRCodeGen;
+
+    gctBOOL     virCodeGenSpecified;
     gctINT      _vircgStart;
     gctINT      _vircgEnd;
 
@@ -1311,6 +1350,14 @@ typedef struct _gcOPTIMIZER_OPTION
      *
      */
     gctBOOL     createDefaultUBO;
+
+    /*
+     * Handle OCL basic type as packed
+     *
+     *   VC_OPTION=-OCLPACKEDBASICTYPE:0|1
+     *
+     */
+    gctBOOL     oclPackedBasicType;
 
     /*
      * Handle OCL  relaxing local address space in OCV
@@ -1416,14 +1463,16 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_DUMP_Start()     (gcmGetOptimizerOption()->_dumpStart)
 #define gcmOPT_DUMP_End()     (gcmGetOptimizerOption()->_dumpEnd)
 
+#define gcmOPT_DUMP_SHADER_SRC()        (gcmGetOptimizerOption()->dumpShaderSource != 0)
+#define gcmOPT_DUMP_OPTIMIZER_VERBOSE() (gcmGetOptimizerOption()->dumpOptimizerVerbose != 0)
+#define gcmOPT_DUMP_OPTIMIZER()         (gcmGetOptimizerOption()->dumpOptimizer != 0 || gcmOPT_DUMP_OPTIMIZER_VERBOSE())
+#define gcmOPT_DUMP_CODEGEN_VERBOSE()   (gcmGetOptimizerOption()->dumpBEVerbose != 0)
+#define gcmOPT_DUMP_CODEGEN()           (gcmGetOptimizerOption()->dumpBEGenertedCode != 0 || gcmOPT_DUMP_CODEGEN_VERBOSE())
+#define gcmOPT_DUMP_FINAL_IR()          (gcmGetOptimizerOption()->dumpBEFinalIR != 0)
+#define gcmOPT_DUMP_UNIFORM()           (gcmGetOptimizerOption()->dumpUniform != 0)
+#define gcmOPT_DUMP_FELOG()             (gcmGetOptimizerOption()->dumpFELog != 0)
 
-#define gcmOPT_DUMP_UNIFORM()    \
-             (gcmGetOptimizerOption()->dumpUniform != 0)
-#define gcmOPT_DUMP_FELOG()    \
-             (gcmGetOptimizerOption()->dumpFELog != 0)
-
-#define gcmOPT_SET_DUMP_SHADER_SRC(v)   \
-             gcmGetOptimizerOption()->dumpShaderSource = (v)
+#define gcmOPT_SET_DUMP_SHADER_SRC(v)   (gcmGetOptimizerOption()->dumpShaderSource = (v)
 
 #define gcmOPT_PATCH_TEXLD()  (gcmGetOptimizerOption()->patchDummyTEXLDs != 0)
 #define gcmOPT_INSERT_NOP()   (gcmGetOptimizerOption()->insertNOP == gcvTRUE)
@@ -1446,11 +1495,13 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_MacroDefines()     (gcmGetOptimizerOption()->macroDefines)
 
 #define gcmOPT_EnableLTC()          (gcmGetOptimizerOption()->enableLTC)
+#define gcmOPT_EnableDebug()        (gcmGetOptimizerOption()->enableDebug)
 #define gcmOPT_INLINERKIND()        (gcmGetOptimizerOption()->inlinerKind)
 #define gcmOPT_INLINELEVEL()        (gcmGetOptimizerOption()->inlineLevel)
 #define gcmOPT_SetINLINELEVEL(v)    (gcmGetOptimizerOptionVariable()->inlineLevel = (v))
 #define gcmOPT_INLINEDEPTHCOMP()    (gcmGetOptimizerOption()->inlineDepthComparison)
 #define gcmOPT_INLINEFORMATCONV()   (gcmGetOptimizerOption()->inlineFormatConversion)
+#define gcmOPT_DualFP16Specified()  (gcmGetOptimizerOption()->dual16Specified)
 #define gcmOPT_DualFP16Mode()       (gcmGetOptimizerOption()->dual16Mode)
 #define gcmOPT_DualFP16Start()      (gcmGetOptimizerOption()->_dual16Start)
 #define gcmOPT_DualFP16End()        (gcmGetOptimizerOption()->_dual16End)
@@ -1461,12 +1512,14 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_ForceInline()        (gcmGetOptimizerOption()->forceInline)
 #define gcmOPT_UploadUBO()          (gcmGetOptimizerOption()->uploadUBO)
 #define gcmOPT_oclFpCaps()          (gcmGetOptimizerOption()->oclFpCaps)
+#define gcmOPT_oclPackedBasicType() (gcmGetOptimizerOption()->oclPackedBasicType)
 #define gcmOPT_oclOcvLocalAddressSpace() (gcmGetOptimizerOption()->oclOcvLocalAddressSpace)
 #define gcmOPT_oclHasLong()         (gcmGetOptimizerOption()->oclHasLong)
 #define gcmOPT_oclUseNeg()          (gcmGetOptimizerOption()->oclUseNeg)
 #define gcmOPT_oclUseImgIntrinsicQuery()   (gcmGetOptimizerOption()->oclUseImgIntrinsicQuery)
 #define gcmOPT_oclPassKernelStructArgByValue()   (gcmGetOptimizerOption()->oclPassKernelStructArgByValue)
 #define gcmOPT_UseVIRCodeGen()      (gcmGetOptimizerOption()->useVIRCodeGen)
+#define gcmOPT_VirCodeGenSpecified()(gcmGetOptimizerOption()->virCodeGenSpecified)
 #define gcmOPT_VIRCGStart()         (gcmGetOptimizerOption()->_vircgStart)
 #define gcmOPT_VIRCGEnd()           (gcmGetOptimizerOption()->_vircgEnd)
 #define gcmOPT_CLUseVIRCodeGen()    (gcmGetOptimizerOption()->CLUseVIRCodeGen)
@@ -1670,15 +1723,45 @@ typedef struct _gcsGLSLCaps
     gctSTRING extensions;
 } gcsGLSLCaps;
 
-extern gcsGLSLCaps gcGSLSCaps;
+/* PatchID*/
+extern gcePATCH_ID gcPatchId;
+extern gcePATCH_ID *
+    gcGetPatchId(
+    void
+    );
 
+#define GetPatchID()                          (gcGetPatchId())
+
+/* HW caps.*/
+typedef struct _VSC_HW_CONFIG gcsHWCaps;
+extern gcsHWCaps gcHWCaps;
+extern gcsHWCaps *
+    gcGetHWCaps(
+    void
+    );
+
+/* Get HW features. */
+#define GetHWHasHalti0()                      (gcGetHWCaps()->hwFeatureFlags.hasHalti0)
+#define GetHWHasHalti1()                      (gcGetHWCaps()->hwFeatureFlags.hasHalti1)
+#define GetHWHasHalti2()                      (gcGetHWCaps()->hwFeatureFlags.hasHalti2)
+#define GetHWHasTS()                          (gcGetHWCaps()->hwFeatureFlags.supportTS)
+#define GetHWHasGS()                          (gcGetHWCaps()->hwFeatureFlags.supportGS)
+#define GetHWHasSamplerBaseOffset()           (gcGetHWCaps()->hwFeatureFlags.hasSamplerBaseOffset)
+#define GetHWHasUniversalTexldV2()            (gcGetHWCaps()->hwFeatureFlags.hasUniversalTexldV2)
+#define GetHWHasTexldUFix()                   (gcGetHWCaps()->hwFeatureFlags.hasTexldUFix)
+#define GetHWHasImageOutBoundaryFix()         (gcGetHWCaps()->hwFeatureFlags.hasImageOutBoundaryFix)
+
+/* Get HW caps. */
+#define GetHWVertexSamplerBase()              (gcGetHWCaps()->vsSamplerRegNoBase)
+#define GetHWFragmentSamplerBase()            (gcGetHWCaps()->psSamplerRegNoBase)
+
+/* GLSL caps. */
+extern gcsGLSLCaps gcGLSLCaps;
 extern gcsGLSLCaps *
     gcGetGLSLCaps(
     void
     );
-
 extern gceSTATUS gcInitGLSLCaps(
-    IN  gcoHAL Hal,
     OUT gcsGLSLCaps *Caps
     );
 
@@ -1729,6 +1812,7 @@ extern gceSTATUS gcInitGLSLCaps(
 #define GetGLMaxTCSInputVectors()             (gcGetGLSLCaps()->maxTcsInVectors)
 #define GetGLMaxTCSOutputVectors()            (gcGetGLSLCaps()->maxTcsOutVectors)
 #define GetGLMaxTCSAtomicCounters()           (gcGetGLSLCaps()->maxTcsAtomicCounters)
+#define GetGLMaxTCSAtomicCounterBuffers()     (gcGetGLSLCaps()->maxTcsAtomicCounters)
 #define GetGLMaxTCSImageUniforms()            (gcGetGLSLCaps()->maxTcsImageUniform)
 
 #define GetGLMaxTESTextureImageUnits()        (gcGetGLSLCaps()->maxTesTextureImageUnits)
@@ -1737,6 +1821,7 @@ extern gceSTATUS gcInitGLSLCaps(
 #define GetGLMaxTESInputVectors()             (gcGetGLSLCaps()->maxTesInVectors)
 #define GetGLMaxTESOutputVectors()            (gcGetGLSLCaps()->maxTesOutVectors)
 #define GetGLMaxTESAtomicCounters()           (gcGetGLSLCaps()->maxTesAtomicCounters)
+#define GetGLMaxTESAtomicCounterBuffers()     (gcGetGLSLCaps()->maxTesAtomicCounters)
 #define GetGLMaxTESImageUniforms()            (gcGetGLSLCaps()->maxTesImageUniform)
 
 #define GetGLMaxTessPatchVertices()           (gcGetGLSLCaps()->maxTessPatchVertices)
@@ -1775,18 +1860,18 @@ gcGetOptimizerOption(void);
 gcOPTIMIZER_OPTION *
 gcGetOptimizerOptionVariable(void);
 
-typedef gceSTATUS (*gctGLSLCompiler)(IN  gcoHAL Hal,
-                                     IN  gctINT ShaderType,
+typedef gceSTATUS (*gctGLSLCompiler)(IN  gctINT ShaderType,
                                      IN  gctUINT SourceSize,
                                      IN  gctCONST_STRING Source,
                                      OUT gcSHADER *Binary,
                                      OUT gctSTRING *Log);
 
-typedef gceSTATUS (*gctGLSLInitCompiler)(IN gcoHAL Hal,
+typedef gceSTATUS (*gctGLSLInitCompiler)(IN gcePATCH_ID PatchId,
+                                         IN gcsHWCaps *HWCaps,
                                          IN gcsGLSLCaps *Caps);
 
 
-typedef gceSTATUS (*gctGLSLFinalizeCompiler)(IN gcoHAL Hal);
+typedef gceSTATUS (*gctGLSLFinalizeCompiler)(void);
 
 void
 gcSetGLSLCompiler(
@@ -2032,7 +2117,6 @@ gcSHADER_AlignId(void);
 */
 gceSTATUS
 gcSHADER_Construct(
-    IN gcoHAL Hal,
     IN gctINT ShaderType,
     OUT gcSHADER * Shader
     );
@@ -3511,8 +3595,8 @@ gcSHADER_GetUniformByPhysicalAddress(
 **
 **    INPUT:
 **
-**        gctUINT32 VsBaseAddress
-**            Vertex Base physical address for the uniform.
+**        gctUINT32 HwConstRegBases
+**            Base physical addresses for the uniform.
 **
 **        gctUINT32 PsBaseAddress
 **            Fragment Base physical address for the uniform.
@@ -3527,11 +3611,7 @@ gcSHADER_GetUniformByPhysicalAddress(
 */
 gceSTATUS
 gcSHADER_ComputeUniformPhysicalAddress(
-    IN gctUINT32 VsBaseAddress,
-    IN gctUINT32 PsBaseAddress,
-    IN gctUINT32 TcsBaseAddress,
-    IN gctUINT32 TesBaseAddress,
-    IN gctUINT32 GsBaseAddress,
+    IN gctUINT32 HwConstRegBases[],
     IN gcUNIFORM Uniform,
     OUT gctUINT32 * PhysicalAddress
     );
@@ -3773,53 +3853,7 @@ gcSHADER_AddOutput(
     IN gcSHADER_TYPE Type,
     IN gctUINT32 Length,
     IN gctUINT16 TempRegister,
-    IN gcSHADER_PRECISION gcSHADER_PRECISION_DEFAULT
-    );
-
-/*******************************************************************************
-**  gcSHADER_AddOutputEx
-**
-**  Add an output to a gcSHADER object.
-**
-**  INPUT:
-**
-**      gcSHADER Shader
-**          Pointer to a gcSHADER object.
-**
-**      gctCONST_STRING Name
-**          Name of the output to add.
-**
-**      gcSHADER_TYPE Type
-**          Type of the output to add.
-**
-**    gcSHADER_PRECISION Precision
-**          Precision of the output.
-**
-**      gctUINT32 Length
-**          Array length of the output to add.  'Length' must be at least 1.
-**
-**      gctUINT16 TempRegister
-**          Temporary register index that holds the output value.
-**
-**  OUTPUT:
-**
-**      gcOUTPUT * Output
-**          Pointer to an output receiving the gcOUTPUT object pointer.
-*/
-gceSTATUS
-gcSHADER_AddOutputEx(
-    IN gcSHADER Shader,
-    IN gctCONST_STRING Name,
-    IN gcSHADER_TYPE Type,
-    IN gcSHADER_PRECISION Precision,
-    IN gctBOOL IsArray,
-    IN gctUINT32 Length,
-    IN gctUINT16 TempRegister,
-    IN gctINT FieldIndex,
-    IN gctBOOL IsInvariant,
-    IN gctBOOL IsPrecise,
-    IN gcSHADER_SHADERMODE shaderMode,
-    OUT gcOUTPUT * Output
+    IN gcSHADER_PRECISION Precision
     );
 
 /*******************************************************************************
@@ -3872,6 +3906,11 @@ gcSHADER_AddOutputWithLocation(
     OUT gcOUTPUT * Output
     );
 
+gctINT
+gcSHADER_GetOutputDefaultLocation(
+    IN gcSHADER Shader
+    );
+
 gctBOOL
 gcSHADER_IsESCompiler(
     IN gcSHADER Shader
@@ -3898,13 +3937,6 @@ gcSHADER_AddOutputIndexed(
     IN gctCONST_STRING Name,
     IN gctUINT32 Index,
     IN gctUINT16 TempIndex
-    );
-
-gceSTATUS
-gcSHADER_AddOutputLocation(
-    IN gcSHADER Shader,
-    IN gctINT Location,
-    IN gctUINT32 Length
     );
 
 /*******************************************************************************
@@ -4364,7 +4396,8 @@ gcSHADER_AddOpcode(
     IN gctUINT16 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_FORMAT Format,
-    IN gcSHADER_PRECISION Precision
+    IN gcSHADER_PRECISION Precision,
+    IN gctUINT32 srcLoc
     );
 
 gceSTATUS
@@ -4375,7 +4408,8 @@ gcSHADER_AddOpcode2(
     IN gctUINT16 TempRegister,
     IN gctUINT8 Enable,
     IN gcSL_FORMAT Format,
-    IN gcSHADER_PRECISION Precision
+    IN gcSHADER_PRECISION Precision,
+    IN gctUINT32 srcLoc
     );
 
 /*******************************************************************************
@@ -4428,7 +4462,8 @@ gcSHADER_AddOpcodeIndexed(
     IN gcSL_INDEXED Mode,
     IN gctUINT16 IndexRegister,
     IN gcSL_FORMAT Format,
-    IN gcSHADER_PRECISION Precision
+    IN gcSHADER_PRECISION Precision,
+    IN gctUINT32 srcLoc
     );
 
 /*******************************************************************************
@@ -4480,7 +4515,8 @@ gcSHADER_AddOpcodeIndexedWithPrecision(
     IN gcSL_INDEXED Mode,
     IN gctUINT16 IndexRegister,
     IN gcSL_FORMAT Format,
-    IN gcSHADER_PRECISION Precision
+    IN gcSHADER_PRECISION Precision,
+    IN gctUINT32 srcLoc
     );
 
 /*******************************************************************************
@@ -4533,7 +4569,8 @@ gcSHADER_AddOpcodeConditionIndexed(
     IN gcSL_INDEXED Indexed,
     IN gctUINT16 IndexRegister,
     IN gcSL_FORMAT Format,
-    IN gcSHADER_PRECISION Precision
+    IN gcSHADER_PRECISION Precision,
+    IN gctUINT32 srcLoc
     );
 
 /*******************************************************************************
@@ -4589,7 +4626,8 @@ gcSHADER_AddOpcodeConditionIndexedWithPrecision(
     IN gcSL_INDEXED Indexed,
     IN gctUINT16 IndexRegister,
     IN gcSL_FORMAT Format,
-    IN gcSHADER_PRECISION Precision
+    IN gcSHADER_PRECISION Precision,
+    IN gctUINT32 srcLoc
     );
 
 /*******************************************************************************
@@ -4622,7 +4660,8 @@ gcSHADER_AddOpcodeConditional(
     IN gcSHADER Shader,
     IN gcSL_OPCODE Opcode,
     IN gcSL_CONDITION Condition,
-    IN gctUINT Label
+    IN gctUINT Label,
+    IN gctUINT32 srcLoc
     );
 
 /*******************************************************************************
@@ -4658,7 +4697,8 @@ gcSHADER_AddOpcodeConditionalFormatted(
     IN gcSL_OPCODE Opcode,
     IN gcSL_CONDITION Condition,
     IN gcSL_FORMAT Format,
-    IN gctUINT Label
+    IN gctUINT Label,
+    IN gctUINT32 srcLoc
     );
 
 /*******************************************************************************
@@ -4698,7 +4738,8 @@ gcSHADER_AddOpcodeConditionalFormattedEnable(
     IN gcSL_CONDITION Condition,
     IN gcSL_FORMAT Format,
     IN gctUINT8 Enable,
-    IN gctUINT Label
+    IN gctUINT Label,
+    IN gctUINT32 srcLoc
     );
 
 /*******************************************************************************
@@ -5569,27 +5610,6 @@ gceSTATUS
 gcSHADER_ExpandArraysOfArrays(
     IN gcSHADER Shader
     );
-
-/*******************************************************************************
-**                   gcSHADER_ConvertSamplerAssignForParameter
-********************************************************************************
-**
-**    Convert sampler assign for parameter from sampler_assign to mov.
-**
-**    INPUT:
-**
-**        gcSHADER Shader
-**            Pointer to a gcSHADER object.
-**
-**    OUTPUT:
-**
-**        Nothing.
-*/
-gceSTATUS
-gcSHADER_ConvertSamplerAssignForParameter(
-    IN gcSHADER Shader
-    );
-
 
 /*******************************************************************************
 **                                  gcSHADER_AnalyzeFunctions
@@ -6856,8 +6876,11 @@ gcKERNEL_FUNCTION_SetCodeEnd(
 **  Initialize compiler global variables.
 **
 **  Input:
-**      gcoHAL Hal
-**      Pointer to HAL object
+**      gcePATCH_ID PatchId,
+**      patch ID
+**
+**      gcsHWCaps HWCaps,
+**      HW capabilities filled in by driver and passed to compiler
 **
 **      gcsGLSLCaps *Caps
 **      Min/Max capabilities filled in by driver and passed to compiler
@@ -6868,8 +6891,9 @@ gcKERNEL_FUNCTION_SetCodeEnd(
 */
 gceSTATUS
 gcInitializeCompiler(
-    IN gcoHAL Hal,
-    IN gcsGLSLCaps *Cap
+    IN gcePATCH_ID PatchId,
+    IN gcsHWCaps *HWCaps,
+    IN gcsGLSLCaps *Caps
     );
 
 /*******************************************************************************
@@ -6877,18 +6901,13 @@ gcInitializeCompiler(
 ********************************************************************************
 **  Finalize compiler global variables.
 **
-**  Input:
-**      gcoHAL Hal
-**      Pointer to HAL object
 **
 **  Output:
 **      Nothing
 **
 */
 gceSTATUS
-gcFinalizeCompiler(
-    IN gcoHAL Hal
-    );
+gcFinalizeCompiler(void);
 
 /*******************************************************************************
 **                              gcCompileShader
@@ -6897,9 +6916,6 @@ gcFinalizeCompiler(
 **    Compile a shader.
 **
 **    INPUT:
-**
-**        gcoOS Hal
-**            Pointer to an gcoHAL object.
 **
 **        gctINT ShaderType
 **            Shader type to compile.  Can be one of the following values:
@@ -6928,12 +6944,23 @@ gcFinalizeCompiler(
 */
 gceSTATUS
 gcCompileShader(
-    IN gcoHAL Hal,
     IN gctINT ShaderType,
     IN gctUINT SourceSize,
     IN gctCONST_STRING Source,
     OUT gcSHADER * Binary,
     OUT gctSTRING * Log
+    );
+
+/*******************************************************************************
+**                              gcLoadKernelCompiler
+********************************************************************************
+**
+**    OpenCL kernel shader compiler load.
+**
+*/
+gceSTATUS
+gcLoadKernelCompiler(
+    IN gcsHWCaps *HWCaps
     );
 
 /*******************************************************************************
@@ -7162,6 +7189,7 @@ gcCreateInputConversionDirective(
     IN gctBOOL                 AppendToLast,
     IN gctBOOL                 DepthStencilMode,
     IN gctBOOL                 NeedFormatConvert,
+    IN gcSHADER_KIND           ShaderKind,
     OUT gcPatchDirective  **   PatchDirectivePtr
     );
 
@@ -7246,6 +7274,7 @@ gcCreateReadImageDirective(
     IN gctUINT                  ChannelDataType,
     IN gctUINT                  ChannelOrder,
     IN gctUINT                  ImageType,
+    IN gctBOOL                  PatchUnnormReadImage,
     OUT gcPatchDirective  **    PatchDirectivePtr
     );
 
@@ -7270,6 +7299,7 @@ gcCreateCLLongULongDirective(
 gceSTATUS
 gcCreateRemoveAssignmentForAlphaChannel(
     IN gctBOOL *               RemoveOutputAlpha,
+    IN gctUINT                 OutputCount,
     OUT gcPatchDirective  **   PatchDirectivePtr
     );
 
@@ -7599,6 +7629,11 @@ gcTYPE_GetTypeInfo(
     OUT gctCONST_STRING * Name
     );
 
+gctBOOL
+gcTYPE_IsTypePacked(
+    IN gcSHADER_TYPE      Type
+    );
+
 void
 gcTYPE_GetFormatInfo(
     IN  gcSL_FORMAT       ElemFormat,
@@ -7783,10 +7818,19 @@ gcSHADER_GetGSLayout(
 
 gceSTATUS
 gcSHADER_InsertNOP2BeforeCode(
-    IN OUT gcSHADER                Shader,
-    OUT gctUINT                    CodeIndex,
-    OUT gctUINT                    AddCodeCount,
-    IN  gctBOOL                    ReplaceJmp
+    IN OUT gcSHADER                 Shader,
+    OUT gctUINT                     CodeIndex,
+    OUT gctUINT                     AddCodeCount,
+    IN  gctBOOL                     ReplaceJmp,
+    IN  gctBOOL                     MergeWithCodeIndexFunc
+    );
+
+gceSTATUS
+gcSHADER_MoveCodeListBeforeCode(
+    IN OUT gcSHADER                 Shader,
+    IN  gctUINT                     CodeIndex,
+    IN  gctUINT                     CodeHead,
+    IN  gctUINT                     CodeTail
     );
 
 gceSTATUS
@@ -7809,6 +7853,17 @@ gcSHADER_SetNotStagesRelatedLinkError(
 gceSTATUS
 gcSHADER_Has64BitOperation(
     IN gcSHADER                    Shader
+    );
+
+void
+gcSHADER_SetDebugInfo(
+    IN gcSHADER             Shader,
+    IN void *                DebugInfoContext
+    );
+
+gctPOINTER
+gcSHADER_GetDebugInfo(
+    IN gcSHADER             Shader
     );
 
 gctBOOL
@@ -7843,10 +7898,16 @@ gcIsSBUnsized(
     IN gcsSTORAGE_BLOCK  StorageBlock
     );
 
+gctUINT
+gcHINTS_GetSamplerBaseOffset(
+    IN gcsHINT_PTR Hints,
+    IN gcSHADER Shader
+    );
+
 gceSTATUS
 gcHINTS_Destroy(
     IN gcsHINT_PTR Hints
-);
+    );
 
 gctINT
 gcSL_GetName(

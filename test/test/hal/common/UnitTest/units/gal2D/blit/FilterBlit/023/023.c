@@ -26,7 +26,6 @@
 *****************************************************************************/
 
 
-
 /*
  *  Feature:    Filter Blit - check non-aligned YUV420 source
  *  API:        gco2D_FilterBlit

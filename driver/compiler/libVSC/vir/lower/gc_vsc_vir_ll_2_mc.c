@@ -20,6 +20,7 @@ typedef struct _VIR_PATTERN_MC_LOWER_CONTEXT
 {
     VIR_PatternContext          header;
     VSC_HW_CONFIG*              hwCfg;
+    VSC_MM*                     pMM;
     gctBOOL                     generateImmediate;
     gctBOOL                     hasNEW_TEXLD;
     gctBOOL                     isCL_X;
@@ -102,10 +103,36 @@ _setIntegerType(
 }
 
 static gctBOOL
+_setIntegerType_EnableXY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetType(Opnd, VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_INT32,
+        VIR_GetTypeComponents(VIR_Lower_GetBaseType(Context->shader, Opnd)), 1));
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_XY);
+    return gcvTRUE;
+}
+
+static gctBOOL
+_setIntegerType_EnableXYZ(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetType(Opnd, VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_INT32,
+        VIR_GetTypeComponents(VIR_Lower_GetBaseType(Context->shader, Opnd)), 1));
+    VIR_Operand_SetEnable(Opnd, VIR_ENABLE_XYZ);
+    return gcvTRUE;
+}
+
+static gctBOOL
 _isCL_X(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
-)
+    )
 {
     return ((VIR_PatternMCLowerContext *)Context)->isCL_X;
 }
@@ -114,7 +141,7 @@ static gctBOOL
 _isHWNotSupportJmpAny(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
-)
+    )
 {
     if (((VIR_PatternMCLowerContext *)Context)->hwCfg->hwFeatureFlags.hasHalti5)
     {
@@ -124,25 +151,11 @@ _isHWNotSupportJmpAny(
     return gcvTRUE;
 }
 
-/* return true if Instruction dest is float type */
-static gctBOOL
-_isDstFloat(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    VIR_TypeId   ty   = VIR_Operand_GetType(Inst->dest);
-    VIR_TyFlag   tyFlag = VIR_GetTypeFlag(ty);
-    gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
-
-    return (tyFlag & VIR_TYFLAG_ISFLOAT) != 0;
-}
-
 static gctBOOL
 _isTypeEqualTo(
     IN VIR_Operand *Opnd,
     IN VIR_TyFlag   TyFlag
-)
+    )
 {
     VIR_TypeId   ty   = VIR_Operand_GetType(Opnd);
     gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
@@ -156,11 +169,11 @@ _sameType(
     IN VIR_Instruction    *Inst
     )
 {
-    return (VIR_GetTypeComponentType(VIR_Operand_GetType(Inst->dest))
-        == VIR_GetTypeComponentType(VIR_Operand_GetType(Inst->src[0])))
-        && VIR_Operand_GetRoundMode(Inst->src[0]) == VIR_ROUND_DEFAULT
-        && VIR_Operand_GetModifier(Inst->src[0]) == VIR_MOD_NONE
-        && VIR_Operand_GetModifier(Inst->dest) == VIR_MOD_NONE;
+    return (VIR_GetTypeComponentType(VIR_Operand_GetType(VIR_Inst_GetDest(Inst)))
+        == VIR_GetTypeComponentType(VIR_Operand_GetType(VIR_Inst_GetSource(Inst, 0))))
+        && VIR_Operand_GetRoundMode(VIR_Inst_GetSource(Inst, 0)) == VIR_ROUND_DEFAULT
+        && VIR_Operand_GetModifier(VIR_Inst_GetSource(Inst, 0)) == VIR_MOD_NONE
+        && VIR_Operand_GetModifier(VIR_Inst_GetDest(Inst)) == VIR_MOD_NONE;
 }
 
 static gctBOOL
@@ -169,74 +182,45 @@ _notSameSizeType(
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId dstTyId = VIR_GetTypeComponentType(VIR_Operand_GetType(Inst->dest));
-    VIR_TypeId srcTyId = VIR_GetTypeComponentType(VIR_Operand_GetType(Inst->src[0]));
+    VIR_TypeId dstTyId = VIR_GetTypeComponentType(VIR_Operand_GetType(VIR_Inst_GetDest(Inst)));
+    VIR_TypeId srcTyId = VIR_GetTypeComponentType(VIR_Operand_GetType(VIR_Inst_GetSource(Inst, 0)));
 
     return (VIR_GetTypeSize(dstTyId) != VIR_GetTypeSize(srcTyId))
-        || (VIR_Operand_GetRoundMode(Inst->src[0]) != VIR_ROUND_DEFAULT)
-        || (VIR_Operand_GetModifier(Inst->src[0]) != VIR_MOD_NONE)
-        || (VIR_Operand_GetModifier(Inst->dest) != VIR_MOD_NONE);
+        || (VIR_Operand_GetRoundMode(VIR_Inst_GetSource(Inst, 0)) != VIR_ROUND_DEFAULT)
+        || (VIR_Operand_GetModifier(VIR_Inst_GetSource(Inst, 0)) != VIR_MOD_NONE)
+        || (VIR_Operand_GetModifier(VIR_Inst_GetDest(Inst)) != VIR_MOD_NONE);
 }
 
+
 static gctBOOL
-_isDstInteger(
+_isSrc1FloatType(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId   ty   = VIR_Operand_GetType(Inst->dest);
-    VIR_TyFlag   tyFlag = VIR_GetTypeFlag(ty);
-    gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
-
-    return (tyFlag & VIR_TYFLAG_ISINTEGER) != 0;
-}
-
-static gctBOOL
-isDstInt32(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    VIR_TypeId   ty   = VIR_Operand_GetType(Inst->dest);
-    gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
-
-    return VIR_GetTypeComponentType(ty) == VIR_TYPE_INT32
-        || VIR_GetTypeComponentType(ty) == VIR_TYPE_UINT32;
-}
-
-static gctBOOL
-isDstInt16(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst
-    )
-{
-    VIR_TypeId   ty   = VIR_Operand_GetType(Inst->dest);
-    gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
-
-    return VIR_GetTypeComponentType(ty) == VIR_TYPE_INT16
-        || VIR_GetTypeComponentType(ty) == VIR_TYPE_UINT16;
+    return _isTypeEqualTo(VIR_Inst_GetSource(Inst, 1), VIR_TYFLAG_ISFLOAT);
 }
 
 static gctBOOL
 _isF2I(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
-)
+    )
 {
-    return _isTypeEqualTo(Inst->dest, VIR_TYFLAG_ISINTEGER) &&
-        _isTypeEqualTo(Inst->src[0], VIR_TYFLAG_ISFLOAT) &&
-        (VIR_Operand_GetRoundMode(Inst->dest) == VIR_ROUND_DEFAULT||
-         VIR_Operand_GetRoundMode(Inst->dest) == VIR_ROUND_RTZ );
+    return _isTypeEqualTo(VIR_Inst_GetDest(Inst), VIR_TYFLAG_ISINTEGER) &&
+        _isTypeEqualTo(VIR_Inst_GetSource(Inst, 0), VIR_TYFLAG_ISFLOAT) &&
+        (VIR_Operand_GetRoundMode(VIR_Inst_GetDest(Inst)) == VIR_ROUND_DEFAULT||
+         VIR_Operand_GetRoundMode(VIR_Inst_GetDest(Inst)) == VIR_ROUND_RTZ );
 }
 
 static gctBOOL
 _isI2F(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
-)
+    )
 {
-    return _isTypeEqualTo(Inst->dest, VIR_TYFLAG_ISFLOAT) &&
-        _isTypeEqualTo(Inst->src[0], VIR_TYFLAG_ISINTEGER);
+    return _isTypeEqualTo(VIR_Inst_GetDest(Inst), VIR_TYFLAG_ISFLOAT) &&
+        _isTypeEqualTo(VIR_Inst_GetSource(Inst, 0), VIR_TYFLAG_ISINTEGER);
 }
 
 static gctBOOL
@@ -257,27 +241,28 @@ static gctBOOL
 _isI2I(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
-)
+    )
 {
-    return _isTypeEqualTo(Inst->dest, VIR_TYFLAG_ISINTEGER) &&
-        _isTypeEqualTo(Inst->src[0], VIR_TYFLAG_ISINTEGER);
+    return _isTypeEqualTo(VIR_Inst_GetDest(Inst), VIR_TYFLAG_ISINTEGER) &&
+        _isTypeEqualTo(VIR_Inst_GetSource(Inst, 0), VIR_TYFLAG_ISINTEGER);
 }
 
 static gctBOOL
 _isF2IRnd(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
-)
+    )
 {
-    return _isTypeEqualTo(Inst->dest, VIR_TYFLAG_ISINTEGER) &&
-        _isTypeEqualTo(Inst->src[0], VIR_TYFLAG_ISFLOAT) &&
-        VIR_Operand_GetRoundMode(Inst->dest) != VIR_ROUND_DEFAULT;
+    return _isTypeEqualTo(VIR_Inst_GetDest(Inst), VIR_TYFLAG_ISINTEGER) &&
+        _isTypeEqualTo(VIR_Inst_GetSource(Inst, 0), VIR_TYFLAG_ISFLOAT) &&
+        VIR_Operand_GetRoundMode(VIR_Inst_GetDest(Inst)) != VIR_ROUND_DEFAULT;
 }
 
 static gctBOOL
 _isActOn3DImg(
     IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst)
+    IN VIR_Instruction    *Inst
+    )
 {
     VIR_Operand         *opndSrc0 = VIR_Inst_GetSource(Inst, 0);
     VIR_Symbol          *sym = VIR_Operand_GetSymbol(opndSrc0);
@@ -286,9 +271,9 @@ _isActOn3DImg(
     if (VIR_Operand_GetOpKind(opndSrc0) == VIR_OPND_SYMBOL &&
         VIR_Symbol_GetKind(sym) == VIR_SYM_IMAGE)
     {
-        primTypeId = VIR_Type_GetBaseTypeId(sym->type);
+        primTypeId = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(sym));
 
-        if (VIR_TypeId_is3DImage(primTypeId))
+        if (VIR_TypeId_isImage3D(primTypeId))
         {
             return gcvTRUE;
         }
@@ -360,12 +345,12 @@ _setConv(
 )
 {
     VIR_ScalarConstVal imm0;
-    VIR_TypeId         ty           = VIR_Operand_GetType(Inst->src[0]);
+    VIR_TypeId         ty           = VIR_Operand_GetType(VIR_Inst_GetSource(Inst, 0));
     VIR_TypeId         componentTy  = VIR_GetTypeComponentType(ty);
 
     imm0.iValue = _ConvType(componentTy),
 
-    VIR_Operand_SetImmediate(Inst->src[1],
+    VIR_Operand_SetImmediate(VIR_Inst_GetSource(Inst, 1),
         VIR_TYPE_INT32,
         imm0);
 
@@ -380,13 +365,13 @@ _setI2I(
 )
 {
     VIR_ScalarConstVal imm0;
-    VIR_TypeId         ty           = VIR_Operand_GetType(Inst->dest);
+    VIR_TypeId         ty           = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
     VIR_TypeId         componentTy  = VIR_GetTypeComponentType(ty);
 
     imm0.iValue = _ConvType(componentTy);
     imm0.iValue <<= 4;
 
-    VIR_Operand_SetImmediate(Inst->src[1],
+    VIR_Operand_SetImmediate(VIR_Inst_GetSource(Inst, 1),
         VIR_TYPE_INT32,
         imm0);
 
@@ -402,8 +387,8 @@ _shouldSetHelper(
     IN VIR_Instruction    *Inst
 )
 {
-    VIR_Operand *src0        = Inst->src[0];
-    VIR_Operand *src1        = Inst->src[1];
+    VIR_Operand *src0        = VIR_Inst_GetSource(Inst, 0);
+    VIR_Operand *src1        = VIR_Inst_GetSource(Inst, 1);
 
     VIR_Symbol  *src0_symbol = VIR_Operand_GetSymbol(src0);
     VIR_TypeId   ty0         = VIR_Operand_GetType(src0);
@@ -437,7 +422,7 @@ _shouldSetHelper(
         return gcvFALSE;
     }
 
-    if (src1->u1.uConst != 1)
+    if (VIR_Operand_GetImmediateUint(src1) != 1)
     {
         return gcvFALSE;
     }
@@ -481,7 +466,7 @@ static VIR_Pattern _imgaddrPattern[] = {
 };
 
 static VIR_PatternMatchInst _madPatInst0[] = {
-    { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { _isDstInteger, isDstInt16, _hasNotHalti4 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsIntOpcode, VIR_Lower_IsDstInt16, _hasNotHalti4 }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _madRepInst0[] = {
@@ -490,7 +475,7 @@ static VIR_PatternReplaceInst _madRepInst0[] = {
 };
 
 static VIR_PatternMatchInst _madPatInst1[] = {
-    { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { _isDstInteger }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsIntOpcode }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _madRepInst1[] = {
@@ -504,7 +489,7 @@ static VIR_Pattern _madPattern[] = {
 };
 
 static VIR_PatternMatchInst _cmpPatInst0[] = {
-    { VIR_OP_CMP, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isDstFloat }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_CMP, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsFloatOpcode }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _cmpRepInst0[] = {
@@ -620,7 +605,7 @@ static VIR_Pattern _setPattern[] = {
 };
 
 static VIR_PatternMatchInst _negPatInst0[] = {
-    { VIR_OP_NEG, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isDstInteger }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_NEG, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { VIR_Lower_IsIntOpcode }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _negRepInst0[] = {
@@ -633,7 +618,7 @@ static VIR_Pattern _negPattern[] = {
 };
 
 static VIR_PatternMatchInst _absPatInst0[] = {
-    { VIR_OP_ABS, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isDstFloat }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_ABS, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { VIR_Lower_IsFloatOpcode }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _absRepInst0[] = {
@@ -672,7 +657,7 @@ static VIR_Pattern _mulloSclPattern[] = {
 };
 
 static VIR_PatternMatchInst _mulSclPatInst0[] = {
-    { VIR_OP_MUL, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { isDstInt32 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_MUL, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsDstInt32 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _mulSclRepInst0[] = {
@@ -685,7 +670,7 @@ static VIR_Pattern _mulSclPattern[] = {
 };
 
 static VIR_PatternMatchInst _mulsatSclPatInst0[] = {
-    { VIR_OP_MULSAT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { isDstInt32 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_MULSAT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsDstInt32 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _mulsatSclRepInst0[] = {
@@ -697,8 +682,285 @@ static VIR_Pattern _mulsatSclPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+static gctUINT
+_getConstValueFit5Bits(
+    VIR_Const *      pConstVal
+    )
+{
+    gctUINT imm = 0;
+    VIR_TypeId tyId  = pConstVal->type;
+    if (VIR_TypeId_isPrimitive(tyId))
+    {
+        gctINT components = VIR_GetTypeComponents(tyId);
+        int i;
+        if (components > 3)
+            return imm;
+
+        for (i = 0; i < components; i++)
+        {
+            if (VIR_TypeId_isSignedInteger(tyId))
+            {
+                gctINT value = pConstVal->value.vecVal.i32Value[i];
+                gcmASSERT (!((value >= 16) || (value < -16)));
+                imm = (imm | (value & 0x1f) << (5*i));
+            }
+            else if (VIR_TypeId_isUnSignedInteger(tyId))
+            {
+                gctUINT value = pConstVal->value.vecVal.u32Value[i];
+                gcmASSERT((value < 16));
+                imm = (imm | (value & 0x0f) << (5*i));
+            }
+            else
+            {
+                gcmASSERT(0);
+            }
+        }
+        /* all values are in 5 bits range */
+    }
+    return imm;
+}
+
+static gctBOOL
+_isConstValueFit5Bits(
+    VIR_Const *      pConstVal
+    )
+{
+    VIR_TypeId tyId  = pConstVal->type;
+    if (VIR_TypeId_isPrimitive(tyId))
+    {
+        gctINT components = VIR_GetTypeComponents(tyId);
+        int i;
+        if (components > 3)
+            return gcvFALSE;
+
+        for (i = 0; i < components; i++)
+        {
+            if (VIR_TypeId_isSignedInteger(tyId))
+            {
+                gctINT value = pConstVal->value.vecVal.i32Value[i];
+                if ((value >= 16) || (value < -16))
+                {
+                    return gcvFALSE;
+                }
+            }
+            else if (VIR_TypeId_isUnSignedInteger(tyId))
+            {
+                gctUINT value = pConstVal->value.vecVal.u32Value[i];
+                if ((value >= 16))
+                {
+                    return gcvFALSE;
+                }
+            }
+            else
+            {
+                return gcvFALSE;
+            }
+        }
+        /* all values are in 5 bits range */
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+static gctBOOL
+_isSrc1ConstFit5Bits(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Operand * src1 = VIR_Inst_GetSource(Inst, 1);
+    VIR_TypeId    tyId;
+    if (VIR_Operand_GetOpKind(src1) == VIR_OPND_IMMEDIATE)
+    {
+        tyId = VIR_Operand_GetType(src1);
+        if (VIR_TypeId_isPrimitive(tyId))
+        {
+            if (VIR_TypeId_isSignedInteger(tyId))
+            {
+                gctINT value = VIR_Operand_GetImmediateInt(src1);
+                return (value < 16) && (value >= -16);
+            }
+            else if (VIR_TypeId_isUnSignedInteger(tyId))
+            {
+                gctUINT uValue = VIR_Operand_GetImmediateUint(src1);
+                return (uValue < 16);
+            }
+        }
+    }
+    else
+    {
+        if (VIR_Operand_GetOpKind(src1) == VIR_OPND_CONST)
+        {
+            VIR_ConstId constID = VIR_Operand_GetConstId(src1);
+            VIR_Const*  cValue  = VIR_Shader_GetConstFromId(Context->shader, constID);
+            return _isConstValueFit5Bits(cValue);
+        }
+        else if (VIR_Operand_isSymbol(src1))
+        {
+            VIR_Symbol *  sym = VIR_Operand_GetSymbol(src1);
+            if (VIR_Symbol_isUniform(sym) && isSymUniformCompiletimeInitialized(sym))
+            {
+                VIR_Const * cValue =
+                    (VIR_Const *)VIR_GetSymFromId(&Context->shader->constTable,
+                                              VIR_Uniform_GetInitializer(sym->u2.uniform));
+                return _isConstValueFit5Bits(cValue);
+            }
+        }
+    }
+    return gcvFALSE;
+}
+
+static gctBOOL
+_noOffsetAndPrevInstUseAllComponents(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Operand * src2 = VIR_Inst_GetSource(Inst, 2);
+    VIR_Instruction * prevInst;
+    if (src2 && !VIR_Operand_isUndef(src2))
+    {
+        return gcvFALSE;
+    }
+    prevInst = VIR_Inst_GetPrev(Inst);
+    if (prevInst)
+    {
+        /* check inst components are the same as coordinate components */
+        VIR_Enable    prevEnable = VIR_Inst_GetEnable(prevInst);
+        VIR_Operand * src1 = VIR_Inst_GetSource(Inst, 1);
+        VIR_Swizzle   src1Swizzle = VIR_Operand_GetSwizzle(src1);
+        VIR_Enable    src1Enable = VIR_Swizzle_2_Enable(src1Swizzle);
+        gcmASSERT(VIR_Inst_GetOpcode(prevInst) == VIR_OP_ADD && src1);
+        return VIR_Enable_Covers(prevEnable, src1Enable);
+    }
+    return gcvTRUE;
+}
+static gctBOOL
+_SetImmOffset(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_TypeId    tyId;
+    gctUINT imm = 0;
+    if (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_IMMEDIATE)
+    {
+        tyId = VIR_Operand_GetType(Opnd);
+        if (VIR_TypeId_isPrimitive(tyId))
+        {
+            if (VIR_TypeId_isSignedInteger(tyId))
+            {
+                gctINT value = VIR_Operand_GetImmediateInt(Opnd);
+                gcmASSERT ((value < 16) && (value >= -16));
+                imm = ((value & 0x1f) << 5) | (value & 0x1f);
+            }
+            else if (VIR_TypeId_isUnSignedInteger(tyId))
+            {
+                gctUINT uValue = VIR_Operand_GetImmediateUint(Opnd);
+                gcmASSERT (uValue < 16);
+                imm = ((uValue & 0x0f) << 5) | (uValue & 0x0f);
+            }
+        }
+    }
+    else
+    {
+        if (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_CONST)
+        {
+            VIR_ConstId constID = VIR_Operand_GetConstId(Opnd);
+            VIR_Const*  cValue  = VIR_Shader_GetConstFromId(Context->shader, constID);
+            imm = _getConstValueFit5Bits(cValue);
+        }
+        else if (VIR_Operand_isSymbol(Opnd))
+        {
+            VIR_Symbol *  sym = VIR_Operand_GetSymbol(Opnd);
+            if (VIR_Symbol_isUniform(sym) && isSymUniformCompiletimeInitialized(sym))
+            {
+                VIR_Const * cValue =
+                    (VIR_Const *)VIR_GetSymFromId(&Context->shader->constTable,
+                                              VIR_Uniform_GetInitializer(sym->u2.uniform));
+                imm = _getConstValueFit5Bits(cValue);
+            }
+        }
+    }
+    if (imm != 0)
+    {
+        /* change operand to Immediate */
+        VIR_Operand_SetImmediateInt(Opnd, imm);
+    }
+    return gcvTRUE;
+}
+
+/*
+add      1, 2, 3
+img_load   4, 5, 1, 6
+    img_load 4, 5, 2, 3
+*/
+static VIR_PatternMatchInst _addPatInst2[] = {
+    { VIR_OP_ADD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isSrc1ConstFit5Bits }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 4, 5, 1, 6 }, { _noOffsetAndPrevInstUseAllComponents }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _addRepInst2[] = {
+    { VIR_OP_ADD, 0, 0, { 1, 2, 3, 0 }, { 0 } }, /* keep the add in case it is used by other inst */
+    { VIR_OP_IMG_LOAD, 0, 0, { 4, 5, 2, 3 }, { 0, 0, 0, _SetImmOffset } },
+};
+
+/*
+add      1, 2, 3
+img_load_3d   4, 5, 1, 6
+    img_load_3d 4, 5, 2, 3
+*/
+static VIR_PatternMatchInst _addPatInst3[] = {
+    { VIR_OP_ADD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isSrc1ConstFit5Bits }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, { 4, 5, 1, 6 }, { _noOffsetAndPrevInstUseAllComponents }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _addRepInst3[] = {
+    { VIR_OP_ADD, 0, 0, { 1, 2, 3, 0 }, { 0 } }, /* keep the add in case it is used by other inst */
+    { VIR_OP_IMG_LOAD_3D, 0, 0, { 4, 5, 2, 3 }, { 0, 0, 0, _SetImmOffset } },
+};
+
+/*
+add      1, 2, 3
+vx_img_load   4, 5, 1, 6, 7
+    vx_img_load 4, 5, 2, 3
+*/
+static VIR_PatternMatchInst _addPatInst4[] = {
+    { VIR_OP_ADD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isSrc1ConstFit5Bits }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_VX_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 4, 5, 1, 6, 7 }, { _noOffsetAndPrevInstUseAllComponents }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _addRepInst4[] = {
+    { VIR_OP_ADD, 0, 0, { 1, 2, 3, 0 }, { 0 } }, /* keep the add in case it is used by other inst */
+    { VIR_OP_VX_IMG_LOAD, 0, 0, { 4, 5, 2, 3, 7 }, {0, 0, 0, _SetImmOffset } },
+};
+
+/*
+add      1, 2, 3
+vx_img_load_3d   4, 5, 1, 6, 7
+    vx_img_load_3d 4, 5, 2, 3
+*/
+static VIR_PatternMatchInst _addPatInst5[] = {
+    { VIR_OP_ADD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isSrc1ConstFit5Bits }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_VX_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, { 4, 5, 1, 6, 7 }, { _noOffsetAndPrevInstUseAllComponents }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _addRepInst5[] = {
+    { VIR_OP_ADD, 0, 0, { 1, 2, 3, 0 }, { 0 } }, /* keep the add in case it is used by other inst */
+    { VIR_OP_VX_IMG_LOAD_3D, 0, 0, { 4, 5, 2, 3, 7 }, { 0, 0, 0, _SetImmOffset } },
+};
+
+static VIR_Pattern _addPattern[] = {
+    { VIR_PATN_FLAG_RECURSIVE_SCAN, CODEPATTERN(_add, 2) },
+    { VIR_PATN_FLAG_RECURSIVE_SCAN, CODEPATTERN(_add, 3) },
+    { VIR_PATN_FLAG_RECURSIVE_SCAN, CODEPATTERN(_add, 4) },
+    { VIR_PATN_FLAG_RECURSIVE_SCAN, CODEPATTERN(_add, 5) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 static VIR_PatternMatchInst _addSclPatInst0[] = {
-    { VIR_OP_ADD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { isDstInt32, _isCL_X }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_ADD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsDstInt32, _isCL_X }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _addSclRepInst0[] = {
@@ -712,7 +974,7 @@ static VIR_Pattern _addSclPattern[] = {
 
 
 static VIR_PatternMatchInst _madSclPatInst0[] = {
-    { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { _isDstInteger }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsIntOpcode }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _madSclRepInst0[] = {
@@ -726,7 +988,7 @@ static VIR_Pattern _madSclPattern[] = {
 
 
 static VIR_PatternMatchInst _madsatSclPatInst0[] = {
-    { VIR_OP_MADSAT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { isDstInt32 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_MADSAT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsDstInt32 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _madsatSclRepInst0[] = {
@@ -766,7 +1028,7 @@ static VIR_Pattern _imadhi1SclPattern[] = {
 };
 
 static VIR_PatternMatchInst _imadlo0SclPatInst0[] = {
-    { VIR_OP_AQ_IMADLO0, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { isDstInt32 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_AQ_IMADLO0, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsDstInt32 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _imadlo0SclRepInst0[] = {
@@ -832,15 +1094,62 @@ static VIR_Pattern _xorSclPattern[] = {
 };
 
 static VIR_PatternMatchInst _notSclPatInst0[] = {
-    { VIR_OP_NOT_BITWISE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isCL_X }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_NOT_BITWISE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isCL_X }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _notSclRepInst0[] = {
-    { VIR_OP_NOT_BITWISE, 0, 0, { 1, 2, 3, 0 }, { 0 } },
+    { VIR_OP_NOT_BITWISE, 0, 0, { 1, 2, 0, 0 }, { 0 } },
 };
 
 static VIR_Pattern _notSclPattern[] = {
     { VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE | VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O, CODEPATTERN(_notScl, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static gctBOOL
+_constb_false(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_ScalarConstVal     imm;
+    imm.uValue = 0;
+
+    VIR_Operand_SetImmediate(Opnd, VIR_TYPE_BOOLEAN, imm);
+
+    return gcvTRUE;
+}
+static gctBOOL
+_constb_true(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_ScalarConstVal     imm;
+    imm.uValue = 1;
+
+    VIR_Operand_SetImmediate(Opnd, VIR_TYPE_BOOLEAN, imm);
+
+    return gcvTRUE;
+}
+
+/*
+** LOGICAL_NOT, temp(1), temp(2)
+** ==>
+** SELECT.nz, temp(1), temp(2), false, true
+*/
+static VIR_PatternMatchInst _logicalNotSclPatInst0[] = {
+    { VIR_OP_LOGICAL_NOT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _logicalNotSclRepInst0[] = {
+    { VIR_OP_AQ_SELECT, VIR_COP_NOT_ZERO, 0, { 1, 2, 0, 0 }, { 0, 0, _constb_false, _constb_true } },
+};
+
+static VIR_Pattern _logicalNotSclPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_logicalNotScl, 0) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -937,7 +1246,7 @@ _OnlyXEnabled(
     IN VIR_Instruction    *Inst
     )
 {
-    return VIR_Operand_GetEnable(Inst->dest) == VIR_ENABLE_X;
+    return VIR_Operand_GetEnable(VIR_Inst_GetDest(Inst)) == VIR_ENABLE_X;
 }
 
 static gctBOOL
@@ -946,7 +1255,7 @@ _OnlyXYEnabled(
     IN VIR_Instruction    *Inst
     )
 {
-    return VIR_Operand_GetEnable(Inst->dest) == VIR_ENABLE_XY;
+    return VIR_Operand_GetEnable(VIR_Inst_GetDest(Inst)) == VIR_ENABLE_XY;
 }
 
 static gctBOOL
@@ -955,7 +1264,7 @@ _OnlyXYZEnabled(
     IN VIR_Instruction    *Inst
     )
 {
-    return VIR_Operand_GetEnable(Inst->dest) == VIR_ENABLE_XYZ;
+    return VIR_Operand_GetEnable(VIR_Inst_GetDest(Inst)) == VIR_ENABLE_XYZ;
 }
 
 static gctBOOL
@@ -964,7 +1273,7 @@ _XYZWEnabled(
     IN VIR_Instruction    *Inst
     )
 {
-    return VIR_Operand_GetEnable(Inst->dest) == VIR_ENABLE_XYZW;
+    return VIR_Operand_GetEnable(VIR_Inst_GetDest(Inst)) == VIR_ENABLE_XYZW;
 }
 
 static gctBOOL
@@ -973,10 +1282,10 @@ _DstSrcDiffPrecision(
     IN VIR_Instruction    *Inst
     )
 {
-    return ((VIR_Operand_GetPrecision(Inst->dest) == VIR_PRECISION_HIGH &&
-             VIR_Operand_GetPrecision(Inst->src[0]) != VIR_PRECISION_HIGH) ||
-            (VIR_Operand_GetPrecision(Inst->dest) != VIR_PRECISION_HIGH &&
-             VIR_Operand_GetPrecision(Inst->src[0]) == VIR_PRECISION_HIGH));
+    return ((VIR_Operand_GetPrecision(VIR_Inst_GetDest(Inst)) == VIR_PRECISION_HIGH &&
+             VIR_Operand_GetPrecision(VIR_Inst_GetSource(Inst, 0)) != VIR_PRECISION_HIGH) ||
+            (VIR_Operand_GetPrecision(VIR_Inst_GetDest(Inst)) != VIR_PRECISION_HIGH &&
+             VIR_Operand_GetPrecision(VIR_Inst_GetSource(Inst, 0)) == VIR_PRECISION_HIGH));
 }
 
 static gctBOOL
@@ -986,7 +1295,7 @@ _destEnableX(
     IN VIR_Operand        *Opnd
     )
 {
-    VIR_Operand_SetEnable(Inst->dest, VIR_ENABLE_X);
+    VIR_Operand_SetEnable(VIR_Inst_GetDest(Inst), VIR_ENABLE_X);
     return gcvTRUE;
 }
 
@@ -997,8 +1306,8 @@ _swizzleDxS0x(
     IN VIR_Operand        *Opnd
     )
 {
-    gctUINT8            swizzle = VIR_Operand_GetSwizzle(Inst->src[0]) & 0x3;
-    VIR_Type            *ty    = VIR_Shader_GetTypeFromId(Context->shader, VIR_Operand_GetType(Inst->dest));
+    gctUINT8            swizzle = VIR_Operand_GetSwizzle(VIR_Inst_GetSource(Inst, 0)) & 0x3;
+    VIR_Type            *ty    = VIR_Shader_GetTypeFromId(Context->shader, VIR_Operand_GetType(VIR_Inst_GetDest(Inst)));
     VIR_PrimitiveTypeId  baseType;
     VIR_PrimitiveTypeId  dstTy;
 
@@ -1008,10 +1317,10 @@ _swizzleDxS0x(
 
     dstTy = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(baseType), 1, 1);
 
-    VIR_Operand_SetType(Inst->dest, dstTy);
+    VIR_Operand_SetType(VIR_Inst_GetDest(Inst), dstTy);
 
-    VIR_Operand_SetEnable(Inst->dest, VIR_ENABLE_X);
-    VIR_Operand_SetSwizzle(Inst->src[0],
+    VIR_Operand_SetEnable(VIR_Inst_GetDest(Inst), VIR_ENABLE_X);
+    VIR_Operand_SetSwizzle(VIR_Inst_GetSource(Inst, 0),
         (VIR_Swizzle)(swizzle | (swizzle << 2) | (swizzle << 4) | (swizzle << 6)));
 
     return gcvTRUE;
@@ -1134,6 +1443,153 @@ static VIR_Pattern _normPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+static
+gctBOOL _needSetConstBorderValue(
+    IN VIR_PatternContext   *Context,
+    IN VIR_Instruction      *Inst
+    )
+{
+    return gcmOPT_hasFeature(FB_ENABLE_CONST_BORDER);
+}
+
+static gctBOOL
+_setConstBorderValue(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Shader *  shader = Context->shader;
+    VIR_Uniform * uniform = VIR_Shader_GetConstBorderValueUniform(shader);
+    VIR_TypeId    tyId = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
+    VIR_TypeId    compTyId;
+    VIR_Swizzle   swizzle = VIR_SWIZZLE_XXXX;
+
+    VIR_Operand_SetLvalue(Opnd, 0);
+    VIR_Operand_SetUniform(Opnd, uniform, shader);
+    /* set swizzle by dest's type: U8 => .x, U16 => .y, U32 => .z, F32 => .w */
+    compTyId = VIR_GetTypeComponentType(tyId);
+    switch(compTyId) {
+    case VIR_TYPE_UINT8:
+    case VIR_TYPE_INT8:
+        swizzle = VIR_SWIZZLE_XXXX;
+        break;
+    case VIR_TYPE_UINT16:
+    case VIR_TYPE_INT16:
+        swizzle = VIR_SWIZZLE_YYYY;
+        break;
+    case VIR_TYPE_UINT32:
+    case VIR_TYPE_INT32:
+        swizzle = VIR_SWIZZLE_ZZZZ;
+        break;
+    case VIR_TYPE_FLOAT32:
+        swizzle = VIR_SWIZZLE_WWWW;
+        break;
+    default:
+        break;
+    }
+
+    VIR_Operand_SetSwizzle(Opnd, swizzle);
+
+    return gcvTRUE;
+}
+
+static VIR_PatternMatchInst _vxImgLoadPatInst0[] = {
+    { VIR_OP_VX_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, {_isSrc1FloatType }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoadRepInst0[] = {
+    { VIR_OP_CONV, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXY } },
+    { VIR_OP_VX_IMG_LOAD, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _vxImgLoadPatInst1[] = {
+    { VIR_OP_VX_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, { _needSetConstBorderValue }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoadRepInst1[] = {
+    { VIR_OP_MOV, 0, 0, {  1, 0, 0 ,0 }, {0, _setConstBorderValue } },
+    { VIR_OP_VX_IMG_LOAD, 0, 0, {  1, 2, 3, 4, 5 }, { 0 } },
+};
+
+static VIR_Pattern _vxImgLoadPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad, 1) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static VIR_PatternMatchInst _vxImgLoad3DPatInst0[] = {
+    { VIR_OP_VX_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, {_isSrc1FloatType }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoad3DRepInst0[] = {
+    { VIR_OP_CONV, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXYZ } },
+    { VIR_OP_VX_IMG_LOAD_3D, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _vxImgLoad3DPatInst1[] = {
+    { VIR_OP_VX_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, {  1, 2, 3, 4, 5}, { _needSetConstBorderValue }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _vxImgLoad3DRepInst1[] = {
+    { VIR_OP_MOV, 0, 0, {  1, 0, 0 ,0 }, {0, _setConstBorderValue } },
+    { VIR_OP_VX_IMG_LOAD_3D, 0, 0, { 1, 2, 3, 4, 5 }, { 0 } },
+};
+
+static VIR_Pattern _vxImgLoad3DPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad3D, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad3D, 1) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static VIR_PatternMatchInst _imgLoadPatInst0[] = {
+    { VIR_OP_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, {_isSrc1FloatType }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _imgLoadRepInst0[] = {
+    { VIR_OP_CONV, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXY } },
+    { VIR_OP_IMG_LOAD, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _imgLoadPatInst1[] = {
+    { VIR_OP_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, { _needSetConstBorderValue }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _imgLoadRepInst1[] = {
+    { VIR_OP_MOV, 0, 0, {  1, 0, 0 ,0 }, {0, _setConstBorderValue } },
+    { VIR_OP_IMG_LOAD, 0, 0, {  1, 2, 3, 4, 5 }, { 0 } },
+};
+
+static VIR_Pattern _imgLoadPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad, 1) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static VIR_PatternMatchInst _imgLoad3DPatInst0[] = {
+    { VIR_OP_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, {_isSrc1FloatType }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _imgLoad3DRepInst0[] = {
+    { VIR_OP_CONV, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXYZ } },
+    { VIR_OP_IMG_LOAD_3D, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
+};
+
+static VIR_PatternMatchInst _imgLoad3DPatInst1[] = {
+    { VIR_OP_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, {  1, 2, 3, 4, 5}, { _needSetConstBorderValue }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _imgLoad3DRepInst1[] = {
+    { VIR_OP_MOV, 0, 0, {  1, 0, 0 ,0 }, {0, _setConstBorderValue } },
+    { VIR_OP_IMG_LOAD_3D, 0, 0, { 1, 2, 3, 4, 5 }, { 0 } },
+};
+
+static VIR_Pattern _imgLoad3DPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad3D, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad3D, 1) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 static VIR_Pattern*
 _GetPattern0(
     IN VIR_PatternContext      *Context,
@@ -1166,6 +1622,8 @@ _GetPattern1(
     VIR_OpCode opcode = VIR_Inst_GetOpcode(Inst);
     switch(opcode)
     {
+    case VIR_OP_ADD:
+        return _addPattern;
     case VIR_OP_CMP:
         return _cmpPattern;
     case VIR_OP_SELECT:
@@ -1180,6 +1638,14 @@ _GetPattern1(
         return _negPattern;
     case VIR_OP_ABS:
         return _absPattern;
+    case VIR_OP_VX_IMG_LOAD:
+        return _vxImgLoadPattern;
+    case VIR_OP_VX_IMG_LOAD_3D:
+        return _vxImgLoad3DPattern;
+    case VIR_OP_IMG_LOAD:
+        return _imgLoadPattern;
+    case VIR_OP_IMG_LOAD_3D:
+        return _imgLoad3DPattern;
     default:
         break;
     }
@@ -1229,6 +1695,8 @@ _GetPatternScalar(
         return _orSclPattern;
     case VIR_OP_NOT_BITWISE:
         return _notSclPattern;
+    case VIR_OP_LOGICAL_NOT:
+        return _logicalNotSclPattern;
     case VIR_OP_ROTATE:
         return _rotateSclPattern;
     case VIR_OP_LSHIFT:
@@ -1247,10 +1715,12 @@ static void
 _Lower_Initialize(
     IN VIR_Shader                *Shader,
     IN VIR_PatternMCLowerContext *Context,
-    IN VSC_HW_CONFIG             *HwCfg
+    IN VSC_HW_CONFIG             *HwCfg,
+    IN VSC_MM                    *pMM
     )
 {
     Context->hwCfg = HwCfg;
+    Context->pMM = pMM;
 
     Context->hasNEW_TEXLD = HwCfg->hwFeatureFlags.hasHalti2;
 
@@ -1275,47 +1745,75 @@ _Lower_Initialize(
     Context->hasSHEnhancements2 = (gctBOOL)HwCfg->hwFeatureFlags.hasSHEnhance2;
 }
 
+DEF_QUERY_PASS_PROP(VIR_Lower_LowLevel_To_MachineCodeLevel)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+
+    /* Lower must invalidate all analyzed resources */
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateCfg = gcvTRUE;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateRdFlow = gcvTRUE;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateDu = gcvTRUE;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateWeb = gcvTRUE;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateLvFlow = gcvTRUE;
+}
+
 VSC_ErrCode
 VIR_Lower_LowLevel_To_MachineCodeLevel(
-    IN  VIR_Shader *    Shader,
-    IN  VSC_HW_CONFIG*  HwCfg
+    IN VSC_SH_PASS_WORKER* pPassWorker
     )
 {
     VSC_ErrCode errCode  = VSC_ERR_NONE;
+    VIR_Shader * Shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    PVSC_CONTEXT VscContext = &pPassWorker->pCompilerParam->cfg.ctx;
+    VSC_HW_CONFIG* HwCfg = &VscContext->pSysCtx->pCoreSysCtx->hwCfg;
     VIR_PatternMCLowerContext context;
 
-    gcmASSERT(VIR_Shader_GetLevel(Shader) == VIR_SHLEVEL_Post_Low);
+    if (VIR_Shader_GetLevel(Shader) != VIR_SHLEVEL_Post_Low)
+    {
+        return errCode;
+    }
 
-    _Lower_Initialize(Shader, &context, HwCfg);
+    if (!gcUseFullNewLinker(HwCfg->hwFeatureFlags.hasHalti2))
+    {
+        VIR_Shader_SetLevel(Shader, VIR_SHLEVEL_Pre_Machine);
+        return errCode;
+    }
+
+    _Lower_Initialize(Shader, &context, HwCfg, pPassWorker->basePassWorker.pMM);
 
     {
-        VIR_PatternContext_Initialize(&context.header, Shader, VIR_PATN_CONTEXT_FLAG_NONE, _GetPattern0, _CmpInstuction, 512);
+        VIR_PatternContext_Initialize(&context.header, VscContext, Shader, context.pMM, VIR_PATN_CONTEXT_FLAG_NONE,
+                                      _GetPattern0, _CmpInstuction, 512);
 
         errCode = VIR_Pattern_Transform((VIR_PatternContext *)&context);
         CHECK_ERROR(errCode, "VIR_Lower_LowLevel_To_MachineCodeLevel failed.");
 
-        VIR_PatternContext_Finalize(&context.header, 512);
+        VIR_PatternContext_Finalize(&context.header);
     }
 
     {
-        VIR_PatternContext_Initialize(&context.header, Shader, VIR_PATN_CONTEXT_FLAG_NONE, _GetPattern1, _CmpInstuction, 512);
+        VIR_PatternContext_Initialize(&context.header, VscContext, Shader, context.pMM, VIR_PATN_CONTEXT_FLAG_NONE,
+                                      _GetPattern1, _CmpInstuction, 512);
 
         errCode = VIR_Pattern_Transform((VIR_PatternContext *)&context);
         CHECK_ERROR(errCode, "VIR_Lower_LowLevel_To_MachineCodeLevel failed.");
 
-        VIR_PatternContext_Finalize(&context.header, 512);
+        VIR_PatternContext_Finalize(&context.header);
     }
 
     {
-        VIR_PatternContext_Initialize(&context.header, Shader, VIR_PATN_CONTEXT_FLAG_NONE, _GetPatternScalar, _CmpInstuction, 512);
+        VIR_PatternContext_Initialize(&context.header, VscContext, Shader, context.pMM, VIR_PATN_CONTEXT_FLAG_NONE,
+                                      _GetPatternScalar, _CmpInstuction, 512);
 
         errCode = VIR_Pattern_Transform((VIR_PatternContext *)&context);
         CHECK_ERROR(errCode, "VIR_Lower_LowLevel_To_MachineCodeLevel failed.");
 
-        VIR_PatternContext_Finalize(&context.header, 512);
+        VIR_PatternContext_Finalize(&context.header);
     }
 
-    if (gcSHADER_DumpCodeGenVerbose(Shader))
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(Shader), VIR_Shader_GetId(Shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "After Lowered to MachineLevel.", Shader, gcvTRUE);
     }

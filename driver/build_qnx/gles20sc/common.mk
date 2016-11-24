@@ -86,7 +86,7 @@ STATIC_LIBS += khronosS
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPREF_$(lib) = -Bstatic))
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
 
-LIBS += VSC GAL-$(HARDWARENAME) $(STATIC_LIBS)
+LIBS += VSC GAL $(STATIC_LIBS)
 
 ifneq ($(filter v7, $(VARIANT_LIST)), v7)
 	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp

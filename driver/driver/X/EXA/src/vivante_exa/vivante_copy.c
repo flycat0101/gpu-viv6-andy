@@ -71,6 +71,10 @@ VivPrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap,
     int fgop = 0xCC;
     int bgop = 0xCC;
 
+#ifdef DISABLE_V2D
+    TRACE_EXIT(FALSE);
+#endif
+
     if ( psrc->mHWPath == FALSE && pdst->mHWPath == FALSE )
     {
         SURF_SIZE_FOR_SW(pSrcPixmap->drawable.width, pSrcPixmap->drawable.height);

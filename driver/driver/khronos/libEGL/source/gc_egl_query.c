@@ -17,8 +17,10 @@
 #define _GC_OBJ_ZONE    gcdZONE_EGL_API
 
 #if defined(WL_EGL_PLATFORM)
-#include <gc_hal_eglplatform.h>
-#include "wayland-server.h"
+#  include <wayland-server.h>
+#ifndef USE_VIV_WAYLAND
+#    include <gc_wayland_protocol.h>
+#  endif
 #endif
 
 EGLAPI EGLBoolean EGLAPIENTRY
@@ -1058,38 +1060,52 @@ void GL_APIENTRY glTexDirectTiledMapVIV_Entry(EGLenum target, EGLint width, EGLi
 EGLAPI EGLBoolean EGLAPIENTRY eglBindWaylandDisplayWL(EGLDisplay dpy, struct wl_display *display)
 {
     VEGLDisplay d = VEGL_DISPLAY(dpy);
-    return veglBindWaylandDisplayWL(d, display);
+    return veglBindWaylandDisplay(d, display);
 }
 
 EGLAPI EGLBoolean EGLAPIENTRY eglUnbindWaylandDisplayWL(EGLDisplay dpy, struct wl_display *display)
 {
     VEGLDisplay d = VEGL_DISPLAY(dpy);
-    return veglUnbindWaylandDisplayWL(d, display);
+    return veglUnbindWaylandDisplay(d, display);
 }
 
 EGLAPI EGLBoolean EGLAPIENTRY eglQueryWaylandBufferWL(EGLDisplay dpy, struct wl_resource *buffer, EGLint attribute, EGLint *value)
 {
-    gcsWL_VIV_BUFFER *wl_viv_buffer;
-    wl_viv_buffer = wl_resource_get_user_data(buffer);
+    VEGLDisplay d = VEGL_DISPLAY(dpy);
+
     switch (attribute)
     {
-        case EGL_TEXTURE_FORMAT:
-            *value = EGL_TEXTURE_RGB;
-            return EGL_TRUE;
-        case EGL_WIDTH:
-            *value = wl_viv_buffer->width;
-            return EGL_TRUE;
-        case EGL_HEIGHT:
-            *value = wl_viv_buffer->height;
-            return EGL_TRUE;
-        case EGL_WAYLAND_Y_INVERTED_WL:
-            *value = 1;
-            return EGL_TRUE;
-        default: ;
+    case EGL_TEXTURE_FORMAT:
+        *value = EGL_TEXTURE_RGB;
+        break;
+    case EGL_WIDTH:
+        return veglQueryWaylandBuffer(d, buffer, value, gcvNULL, gcvNULL);
+    case EGL_HEIGHT:
+        return veglQueryWaylandBuffer(d, buffer, gcvNULL, value, gcvNULL);
+        break;
+    case EGL_WAYLAND_Y_INVERTED_WL:
+        *value = 1;
+        break;
+    default:
+        return EGL_FALSE;
     }
-    return EGL_FALSE;
+
+    return EGL_TRUE;
 }
 #endif
+
+typedef struct _veglLOOKUP
+{
+    const char *                                name;
+    __eglMustCastToProperFunctionPointerType    function;
+}
+veglLOOKUP;
+
+#define eglMAKE_LOOKUP(function) \
+    { #function, (__eglMustCastToProperFunctionPointerType) function }
+
+#define eglMAKE_EXT_ENTRY(function) \
+    { #function, (__eglMustCastToProperFunctionPointerType) function##_Entry }
 
 static veglLOOKUP _veglLookup[] =
 {
@@ -1414,7 +1430,7 @@ eglGetProcAddress(const char *procname)
 #endif
 
     /* Try loading from libEGL. */
-    library = veglGetModule(gcvNULL, vegl_EGL, gcvNULL);
+    library = thread->clientHandles[vegl_EGL];
 
     if (library != gcvNULL)
     {
@@ -1468,8 +1484,8 @@ eglGetProcAddress(const char *procname)
     /* Try iterate all client library. */
     for (index = 0; index < vegl_API_LAST; ++index)
     {
-        dispatch = gcvNULL;
-        library = veglGetModule(gcvNULL, index, &dispatch);
+        library  = thread->clientHandles[index];
+        dispatch = thread->dispatchTables[index];
 
         if (library != gcvNULL)
         {

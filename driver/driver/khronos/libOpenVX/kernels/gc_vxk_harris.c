@@ -15,20 +15,21 @@
 
 #if VIV_HARRIS_SCORE
 vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image dst,
-                        vx_scalar winds, vx_scalar sens, vx_border_mode_t borders)
+                        vx_scalar scales, vx_scalar winds, vx_scalar sens, vx_border_mode_t borders)
 {
     vx_status status = VX_SUCCESS;
     if (borders.mode == VX_BORDER_MODE_UNDEFINED)
     {
         vx_uint32 block_size = 0, i = 0;
         vx_float32 k = 0.0f;
-        vx_uint32 width = 0, height = 0;
+        vx_uint32 width = 0, height = 0, scale = 0;
+        vx_float64 s;
         gcoVX_Index indexs[]            = {
-            /* index,  num,             shift0,         shift1,      mask0,        mask1 */
-            {    3,   4 * 4, {             1,              0,      0xffffffff,   0xfffffffe  }  }, /* y start */
-            {    4,   4 * 4, {             1,              0,      0xffffffff,   0xfffffffe  }  }, /* y end */
-            {    5,   4 * 4, {             1,              0,      0xffffffff,   0xfffffffe  }  }, /* x start */
-            {    6,   4 * 4, {             1,              0,      0xffffffff,   0xfffffffe  }  }, /* x end */
+            /* index, num, shift0, shift1, mask0, mask1 */
+            {    3, 4 * 4, {             1, 0, 0xffffffff, 0xfffffffe  }  }, /* y start */
+            {    4, 4 * 4, {             1, 0, 0xffffffff, 0xfffffffe  }  }, /* y end */
+            {    5, 4 * 4, {             1, 0, 0xffffffff, 0xfffffffe  }  }, /* x start */
+            {    6, 4 * 4, {             1, 0, 0xffffffff, 0xfffffffe  }  }, /* x end */
         };
         gcoVX_Kernel_Context * kernelContext = gcvNULL;
 
@@ -47,10 +48,16 @@ vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image
             }
             kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
             kernelContext->objects_num = 0;
+            kernelContext->uniform_num = 0;
         }
 
-        status |= vxAccessScalarValue(winds, &block_size);
-        status |= vxAccessScalarValue(sens, &k);
+        status |= vxReadScalarValue(winds, &block_size);
+        status |= vxReadScalarValue(sens, &k);
+        status |= vxReadScalarValue(scales, &scale);
+
+        s = (1 / ((1 << (scale - 1)) * block_size * 255.0));
+
+        s = s * s * s * s;
 
         status |= vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
         status |= vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
@@ -73,7 +80,8 @@ vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image
 #endif
 
         kernelContext->params.volume               = block_size;
-        kernelContext->params.scale                = k;
+        kernelContext->params.factor               = k;
+        kernelContext->params.scale                = (vx_float32)s;
 
         kernelContext->params.col                  = width;
         kernelContext->params.row                  = height;
@@ -84,7 +92,7 @@ vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image
 
         for(i = 0; i < kernelContext->uniform_num; i++)
         {
-                                /* y start,                 y end,                  x start,                x end */
+                                /* y start, y end, x start, x end */
             vx_int32 base[4] = {block_size/2 + 1, height - (block_size/2 + 1), (block_size/2 + 1), width - (block_size/2 + 1)};
             vx_int32 offset = (i>1)?1:0;
             indexs[i].bin[0] = base[i];                                  /* y start */
@@ -96,6 +104,8 @@ vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image
             kernelContext->uniforms[i].num = indexs[i].num;
             kernelContext->uniforms[i].index = indexs[i].index;
         }
+
+        kernelContext->node = node;
 
         status = gcfVX_Kernel(kernelContext);
 
@@ -142,10 +152,11 @@ vx_status vxPackArrays(vx_node node, vx_image inputImage, vx_array inputArray, v
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
-    vxAccessScalarValue(widthScalar, &width);
-    vxAccessScalarValue(heightScalar, &height);
+    vxReadScalarValue(widthScalar, &width);
+    vxReadScalarValue(heightScalar, &height);
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, inputImage, GC_VX_INDEX_AUTO);
@@ -172,6 +183,8 @@ vx_status vxPackArrays(vx_node node, vx_image inputImage, vx_array inputArray, v
     kernelContext->params.clamp            = (vx_uint32)itemSize * width;
     kernelContext->params.col              = height;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
     status = gcfVX_Flush(gcvTRUE);
@@ -192,7 +205,7 @@ vx_status vxPackArrays(vx_node node, vx_image inputImage, vx_array inputArray, v
 
     if (num)
     {
-        status = vxCommitScalarValue(num, &numCorners);
+        status = vxWriteScalarValue(num, &numCorners);
     }
 
 #if gcdVX_OPTIMIZER
@@ -227,6 +240,7 @@ vx_status vxCreateLister(vx_node node, vx_image src, vx_image countImg, vx_array
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     /*index = 0*/
@@ -258,6 +272,8 @@ vx_status vxCreateLister(vx_node node, vx_image src, vx_image countImg, vx_array
     kernelContext->params.volume           = (vx_uint32)itemSize;
     kernelContext->params.clamp            = (vx_uint32)itemSize * width;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -268,3 +284,4 @@ vx_status vxCreateLister(vx_node node, vx_image src, vx_image countImg, vx_array
 #endif
     return status;
 }
+

@@ -29,165 +29,277 @@ export AQROOT AQARCH AQVGARCH
 
 include $(AQROOT)/makefile.linux.def
 
+.PHONY: default_target all clean install drivers
+default_target: all
+
 ################################################################################
 # Components of the project.
 
-# libraries
-#
-LIB_GAL             := $(GAL_DIR)
-
-ifneq ($(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG),0_0)
-  LIB_EGL           := $(EGL_DIR)
+# Register header
+ifeq ($(VIVANTE_ENABLE_VG),1)
+REG_HEAD            := $(AQARCH)/reg $(AQVGARCH)/reg
+else
+REG_HEAD            := $(AQARCH)/reg
 endif
 
-ifeq ($(VIVANTE_ENABLE_3D),1)
-  LIB_GLES11        := $(GLES11_DIR)
-  LIB_GLES2X        := $(GLES2X_DIR)
-  LIB_GLSLC         := $(GLSLC_DIR)
-  LIB_VSC           := $(VSC_DIR)
-endif
-
-ifneq ($(VIVANTE_NO_VG),1)
-  ifeq ($(VIVANTE_ENABLE_3D),1)
-    LIB_VG113D      := $(VG113D_DIR)
-
-    VG11_DIR        := $(VG113D_DIR)
-    LIB_VG11        := $(VG11_DIR)
-  endif
-
-  ifeq ($(VIVANTE_ENABLE_VG),1)
-    LIB_VG112D      := $(VG112D_DIR)
-
-    VG11_DIR        := $(VG112D_DIR)
-    LIB_VG11        := $(VG11_DIR)
-  endif
-endif
-
-ifeq ($(VIVANTE_ENABLE_2D),1)
-  LIB_GFX           := $(GFX_DIR)
-  LIB_EXA           := $(EXA_DIR)
-endif
-
-ifeq ($(VIVANTE_ENABLE_3D)_$(EGL_API_DRI),1_1)
-  LIB_GL21          := $(GL21_DIR)
-endif
-
-ifeq ($(VIVANTE_ENABLE_3D),1)
-  ifeq ($(USE_OPENCL),1)
-    LIB_CLC         := $(CLC_DIR)
-    LIB_CL11        := $(CL11_DIR)
-    ifeq ($(BUILD_OPENCL_ICD),1)
-      LIB_CL11_ICD  := $(CL11_ICD_DIR)
-    endif
-  endif
-endif
-
-ifeq ($(VIVANTE_ENABLE_3D),1)
-  ifeq ($(USE_OPENVX),1)
-    LIB_CLC         := $(CLC_DIR)
-    LIB_VX          := $(OPENVX_DIR)
-  endif
-endif
-
-ifneq ($(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG),0_0)
-  ifeq ($(USE_VDK),1)
-    LIB_VDK         := $(VDK_DIR)
-  endif
-endif
-
-ifeq ($(VIVANTE_ENABLE_3D), 1)
-  LIB_VIVANTE       := $(VIVANTE_LIB_DIR)
-endif
-
-
-ifeq ($(EGL_API_GBM),1)
-  ifeq ($(shell $(PKG_CONFIG) --libs gbm 2>/dev/null),)
-    LIB_GBM_VIV      := $(AQROOT)/driver/gbm/backends/viv
-    LIB_GBM          := $(AQROOT)/driver/gbm/main
-  endif
-endif
 
 # galcore
-  GAL_CORE          := ./
+GAL_CORE            := ./
 
-# register header
-ifeq ($(VIVANTE_ENABLE_VG), 1)
-  REG_HEAD          := $(AQARCH)/reg $(AQVGARCH)/reg
-else
-  REG_HEAD          := $(AQARCH)/reg
-endif
+$(GAL_CORE):        $(REG_HEAD)
 
+.PHONY: gal_core
+gal_core:           $(GAL_CORE)
+
+
+# libGAL
+LIB_GAL             := $(AQROOT)/hal
 LIB_LIST            := $(LIB_GAL)
 
-ifneq ($(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG),0_0)
-  LIB_LIST          += $(LIB_EGL)
-endif
+$(LIB_GAL):         $(REG_HEAD)
+
+.PHONY: gal hal_user hal_drv
+gal hal_user:       $(LIB_GAL)
+hal_drv:            $(LIB_GAL)
+
+
+
+
+ifneq ($(VIVANTE_ENABLE_3D)$(VIVANTE_ENABLE_VG),00)
+# libEGL
+LIB_EGL             := $(AQROOT)/driver/khronos/libEGL
+LIB_LIST            += $(LIB_EGL)
+
+$(LIB_EGL):         $(LIB_GAL)
+
+.PHONY: egl
+egl:                $(LIB_EGL)
+drivers:            $(LIB_EGL)
+
+
+ifeq ($(USE_VDK),1)
+# libVDK
+LIB_VDK             := $(AQROOT)/sdk/vdk
+LIB_LIST            += $(LIB_VDK)
+
+$(LIB_VDK):         $(LIB_EGL)
+
+.PHONY: vdk
+vdk:                $(LIB_VDK)
+drivers:            $(LIB_VDK)
+endif # USE_VDK
+endif # VIVANTE_ENABLE_3D or VIVANTE_ENABLE_VG
+
 
 ifeq ($(VIVANTE_ENABLE_3D),1)
-  LIB_LIST          += $(LIB_GLES11)
-  LIB_LIST          += $(LIB_GLES2X)
-  LIB_LIST          += $(LIB_GLSLC)
-  LIB_LIST          += $(LIB_VSC)
+# libGLESv1, libGLESv2, libGLSLC, libVSC
+LIB_GLES11          := $(AQROOT)/driver/khronos/libGLESv11
+LIB_GLES2X          := $(AQROOT)/driver/khronos/libGLESv3
+LIB_GLSLC           := $(AQROOT)/compiler/libGLSLC
+LIB_VSC             := $(AQROOT)/compiler/libVSC
+LIB_LIST            += $(LIB_GLES11) $(LIB_GLES2X) $(LIB_GLSLC) $(LIB_VSC)
+
+$(LIB_GLES11):      $(LIB_GAL) $(LIB_VSC)
+$(LIB_GLES2X):      $(LIB_GAL) $(LIB_VSC) $(LIB_GLSLC)
+$(LIB_GLSLC):       $(LIB_GAL) $(LIB_VSC)
+$(LIB_VSC):         $(LIB_GAL)
+
+.PHONY: oes11_drv gles11 oes2x_drv gles2x glslc vsc
+oes11_drv gles11:   $(LIB_GLES11)
+oes2x_drv gles2x:   $(LIB_GLES2X)
+glslc:              $(LIB_GLSLC)
+vsc:                $(LIB_VSC)
+
+drivers:            $(LIB_EGL) $(LIB_GLES11) $(LIB_GLES2X)
+endif # VIVANTE_ENABLE_3D
+
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+ifneq ($(USE_OPENCL)$(USE_OPENVX),00)
+# libCLC
+LIB_CLC             := $(AQROOT)/compiler/libCLC
+LIB_LIST            += $(LIB_CLC)
+
+$(LIB_CLC):         $(LIB_GAL) $(LIB_VSC)
+
+.PHONY: clc
+clc:                $(LIB_CLC)
+endif # USE_OPENCL or USE_OPENVX
+endif # VIVANTE_ENABLE_3D
+
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+ifeq ($(USE_OPENCL),1)
+# libOpenCL
+LIB_CL11            := $(AQROOT)/driver/khronos/libCL
+LIB_LIST            += $(LIB_CL11)
+
+$(LIB_CL11):        $(LIB_GAL) $(LIB_GLES2X) $(LIB_CLC)
+
+.PHONY: cl11 ocl11_drv
+cl11:               $(LIB_CL11)
+ocl11_drv:          $(LIB_CLC) $(LIB_CL11)
+
+ifeq ($(BUILD_OPENCL_ICD),1)
+LIB_CL11_ICD        := $(AQROOT)/driver/khronos/libCL/icdloader12
+LIB_LIST            += $(LIB_CL11_ICD)
+
+cl11:               $(LIB_CL11_ICD)
+ocl11_drv:          $(LIB_CL11_ICD)
+endif # BUILD_OPENCL_ICD
+endif # USE_OPENCL
+endif # VIVANTE_ENABLE_3D
+
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+ifeq ($(USE_OPENVX),1)
+# libOpenVX
+LIB_VX              := $(AQROOT)/driver/khronos/libOpenVX
+LIB_LIST            += $(LIB_VX)
+
+$(LIB_VX):          $(LIB_GAL) $(LIB_CLC)
+
+.PHONY: ovx_drv
+ovx_drv:            $(LIB_VX)
+endif # USE_OPENVX
+endif # VIVANTE_ENABLE_3D
+
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+ifeq ($(USE_VULKAN),1)
+# libvulkan
+LIB_VULKAN          := $(AQROOT)/driver/khronos/libVulkan10
+LIB_SPIRV           := $(AQROOT)/compiler/libSPIRV
+LIB_LIST            += $(LIB_VULKAN) $(LIB_SPIRV)
+
+$(LIB_VULKAN):      $(LIB_GAL) $(LIB_SPIRV) $(LIB_VSC) $(LIB_GLSLC)
+$(LIB_SPIRV):       $(LIB_GAL) $(LIB_VSC)
+
+.PHONY: vulkan_drv
+vulkan_drv:         $(LIB_VULKAN)
+
+drivers:            $(LIB_VULKAN)
+endif # USE_VULKAN
+endif # VIVANTE_ENABLE_3D
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+ifeq ($(EGL_API_DRI),1)
+
+ifeq ($(GL4_LINUX_ENABLE),1)
+LIB_GL21            := $(AQROOT)/driver/khronos/libGL4
+else
+LIB_GL21            := $(AQROOT)/driver/khronos/libGL2
 endif
+
+
+LIB_LIST            += $(LIB_GL21)
+
+$(LIB_GL21):        $(LIB_GAL) $(LIB_VSC)
+
+.PHONY: gl21
+gl21:               $(LIB_GL21)
+endif # EGL_API_DRI
+endif # VIVANTE_ENABLE_3D
+
 
 ifneq ($(VIVANTE_NO_VG),1)
-  LIB_LIST          += $(LIB_VG11)
-endif
+ifeq ($(VIVANTE_ENABLE_VG),1)
+LIB_VG11            := $(AQROOT)/driver/khronos/libOpenVG
+LIB_LIST            += $(LIB_VG11)
+
+$(LIB_VG11):        $(LIB_GAL)
+
+.PHONY: ovg11_drv vg11 vg112d
+ovg11_drv vg11:     $(LIB_VG11)
+vg112d:             $(LIB_VG11)
+drivers:            $(LIB_VG11)
+
+else
+ifeq ($(VIVANTE_ENABLE_3D),1)
+LIB_VG11            := $(AQROOT)/driver/khronos/libOpenVG_3D/vg11/driver
+LIB_LIST            += $(LIB_VG11)
+
+$(LIB_VG11):        $(LIB_GAL) $(LIB_VSC)
+
+.PHONY: ovg11_drv vg11 vg113d
+ovg11_drv vg11:     $(LIB_VG11)
+vg113d:             $(LIB_VG11)
+drivers:            $(LIB_VG11)
+endif # VIVANTE_ENABLE_3D
+endif # VIVANTE_ENABLE_VG
+endif # not VIVANTE_NO_VG
+
 
 ifeq ($(VIVANTE_ENABLE_2D),1)
-  LIB_LIST          += $(LIB_GFX)
-  ifeq ($(EGL_API_DRI),1)
-    LIB_LIST       += $(LIB_EXA)
-  endif
+LIB_DFB             := $(AQROOT)/driver/dfb
+LIB_LIST            += $(LIB_DFB)
+
+$(LIB_DFB):         $(LIB_GAL)
+
+.PHONY: gfx dfb
+gfx dfb:            $(LIB_DFB)
 endif
 
-ifeq ($(VIVANTE_ENABLE_3D)_$(EGL_API_DRI),1_1)
-  LIB_LIST          += $(LIB_GL21)
+ifeq ($(USE_EXA_G2D),1)
+LIB_EXA             := $(AQROOT)/driver/X/EXA_G2D/src
+
+ifeq ($(EGL_API_DRI),1)
+LIB_LIST            += $(LIB_EXA)
+
+$(LIB_EXA):         $(LIB_GAL)
+endif # EGL_API_DRI
+
+else
+
+ifeq ($(VIVANTE_ENABLE_2D),1)
+
+LIB_EXA             := $(AQROOT)/driver/X/EXA/src
+ifeq ($(EGL_API_DRI),1)
+LIB_LIST            += $(LIB_EXA)
+
+$(LIB_EXA):         $(LIB_GAL)
+endif # EGL_API_DRI
+
+endif
+
 endif
 
 ifeq ($(VIVANTE_ENABLE_3D),1)
-  ifeq ($(USE_OPENCL),1)
-    LIB_LIST        += $(LIB_CLC)
-    LIB_LIST        += $(LIB_CL11)
-    ifeq ($(BUILD_OPENCL_ICD),1)
-      LIB_LIST      += $(LIB_CL11_ICD)
-    endif
-  endif
-endif
+LIB_VIVANTE         := $(AQROOT)/sdk/vivante
+LIB_LIST            += $(LIB_VIVANTE)
 
-ifeq ($(VIVANTE_ENABLE_3D),1)
-  ifeq ($(USE_OPENVX),1)
-    LIB_LIST        += $(LIB_CLC)
-    LIB_LIST        += $(LIB_VX)
-  endif
-endif
+$(LIB_VIVANTE):     $(REG_HEAD)
 
-ifneq ($(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG),0_0)
-  ifeq ($(USE_VDK),1)
-    LIB_LIST        += $(LIB_VDK)
-  endif
-endif
-
-ifeq ($(VIVANTE_ENABLE_3D), 1)
-  LIB_LIST          += $(LIB_VIVANTE)
-endif
+.PHONY: libvivante
+libvivante:         $(LIB_VIVANTE) $(GAL_CORE)
+endif # VIVANTE_ENABLE_3D
 
 ifeq ($(EGL_API_GBM),1)
-  LIB_LIST          += $(LIB_GBM) $(LIB_GBM_VIV)
+ifeq ($(GBM_LIBS),)
+
+LIB_GBM_VIV         := $(AQROOT)/driver/gbm/backends/viv
+LIB_GBM             := $(AQROOT)/driver/gbm/main
+LIB_LIST            += $(LIB_GBM_VIV) $(LIB_GBM)
+
+$(LIB_GBM_VIV):     $(LIB_GAL)
+$(LIB_GBM):         $(LIB_GBM_VIV)
+
+.PHONY: gbm
+gbm:                $(LIB_GBM_VIV) $(LIB_GBM)
+
+$(LIB_VIVANTE):     $(LIB_GBM)
+$(LIB_EGL):         $(LIB_GBM)
+endif
 endif
 
 ################################################################################
 # Define the macros used in the common makefile.
 
 SUBDIRS             := $(REG_HEAD) $(LIB_LIST)
-
-
 MAIN_MODULE         := $(LIB_LIST) $(GAL_CORE)
 
 ################################################################################
 # Targets
-
-.PHONY: all clean install $(SUBDIRS)
 
 all:     $(MAIN_MODULE)
 
@@ -201,127 +313,22 @@ install: all
 	@mkdir -p $(SDK_DIR)
 	@-cp -f $(AQROOT)/release/SW/ReadMe_Linux_SDK.txt $(SDK_DIR)/ReadMe.txt
 
+.PHONY: $(SUBDIRS)
 $(SUBDIRS):
 	@test ! -d $@ || $(MAKE) -f makefile.linux -C $@ $(V_TARGET) gcdSTATIC_LINK=$(gcdSTATIC_LINK)
 
-
 .PHONY: $(GAL_CORE)
 
-  ifeq ($(KERNEL_DIR),)
-    $(warning -------------------------------------------------)
-    $(warning Warning: KERNEL_DIR not set)
-    $(warning Warning: kernel driver will not be built)
-    $(warning -------------------------------------------------)
+ifeq ($(KERNEL_DIR),)
+$(warning "-------------------------------------------------")
+$(warning "Warning: KERNEL_DIR not set")
+$(warning "Warning: kernel driver will not be built")
+$(warning "-------------------------------------------------")
 
-  else
-$(GAL_CORE): $(REG_HEAD)
+else
+$(GAL_CORE):
 	@test ! -d $@ || $(MAKE) -f Kbuild -C $@ $(V_TARGET)
 
-  endif
-
-################################################################################
-# Define the dependencies.
-
-  $(LIB_GAL):       $(REG_HEAD)
-
-ifneq ($(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG),0_0)
-  $(LIB_EGL):       $(LIB_GAL)
+drivers:            $(GAL_CORE)
 endif
 
-ifeq ($(VIVANTE_ENABLE_3D),1)
-  $(LIB_GLES11):    $(LIB_EGL) $(LIB_VSC)
-  $(LIB_GLES2X):    $(LIB_EGL) $(LIB_VSC) $(LIB_GLSLC)
-  $(LIB_GLSLC):     $(LIB_GAL) $(LIB_VSC)
-  $(LIB_VSC):       $(LIB_GAL)
-endif
-
-ifneq ($(VIVANTE_NO_VG),1)
-  ifeq ($(VIVANTE_ENABLE_3D),1)
-    $(LIB_VG113D):  $(LIB_EGL) $(LIB_VSC)
-  endif
-
-  ifeq ($(VIVANTE_ENABLE_VG),1)
-    $(LIB_VG112D):  $(LIB_EGL)
-  endif
-endif
-
-ifeq ($(VIVANTE_ENABLE_2D),1)
-  $(LIB_GFX):       $(LIB_GAL)
-  $(LIB_EXA):       $(LIB_GAL)
-endif
-
-ifeq ($(VIVANTE_ENABLE_3D)_$(EGL_API_DRI),1_1)
-  $(LIB_GL21):      $(LIB_GAL) $(LIB_VSC)
-endif
-
-ifeq ($(VIVANTE_ENABLE_3D),1)
-  ifeq ($(USE_OPENCL),1)
-    $(LIB_CLC):     $(LIB_GAL) $(LIB_VSC)
-    $(LIB_CL11):    $(LIB_GLES2X)
-  endif
-endif
-
-ifeq ($(VIVANTE_ENABLE_3D),1)
-  ifeq ($(USE_OPENVX),1)
-    $(LIB_CLC):     $(LIB_GAL) $(LIB_VSC)
-    $(LIB_VX):      $(LIB_CLC)
-  endif
-endif
-
-ifneq ($(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG),0_0)
-  ifeq ($(USE_VDK),1)
-    $(LIB_VDK):     $(LIB_EGL)
-  endif
-endif
-
-ifeq ($(VIVANTE_ENABLE_3D), 1)
-  $(LIB_VIVANTE):   $(REG_HEAD)
-endif
-
-ifeq ($(EGL_API_GBM),1)
-  ifneq ($(LIB_GBM),)
-    $(LIB_GBM_VIV): $(LIB_GAL)
-    $(LIB_GBM):     $(LIB_GBM_VIV)
-
-    $(LIB_EGL):     $(LIB_GBM)
-    $(LIB_VIVANTE): $(LIB_GBM)
-  endif
-endif
-
-################################################################################
-# Shortcuts.
-
-gal_core:           $(GAL_CORE)
-gal hal_user:       $(LIB_GAL)
-hal_drv:            $(LIB_GAL) $(GAL_CORE)
-egl:                $(LIB_EGL)
-oes11_drv gles11:   $(LIB_GLES11)
-oes2x_drv gles2x:   $(LIB_GLES2X)
-glslc:              $(LIB_GLSLC)
-vsc:                $(LIB_VSC)
-ovg11_drv vg11:     $(LIB_VG11)
-vg112d:             $(LIB_VG112D)
-vg113d:             $(LIB_VG113D)
-gfx dfb:            $(LIB_GFX)
-gl21:               $(LIB_GL21)
-clc:                $(LIB_CLC)
-cl11:               $(LIB_CL11) $(LIB_CL11_ICD)
-ocl11_drv:          $(LIB_CLC) $(LIB_CL11) $(LIB_CL11_ICD)
-ovx_drv:            $(LIB_VX)
-vdk:                $(LIB_VDK)
-libvivante:         $(LIB_VIVANTE) $(GAL_CORE)
-drivers:            $(LIB_GLES11) $(LIB_GLES2X) $(LIB_VG11) $(LIB_VDK) $(GAL_CORE)
-
-egl_only:
-	@test ! -d $(EGL_DIR) || $(MAKE) -f makefile.linux -C $(EGL_DIR) $(V_TARGET) gcdSTATIC_LINK=$(gcdSTATIC_LINK)
-
-es11_only:
-	@test ! -d $(GLES11_DIR) || $(MAKE) -f makefile.linux -C $(GLES11_DIR) $(V_TARGET) gcdSTATIC_LINK=$(gcdSTATIC_LINK)
-
-es20_only:
-	@test ! -d $(GLES2X_DIR) || $(MAKE) -f makefile.linux -C $(GLES2X_DIR) $(V_TARGET) gcdSTATIC_LINK=$(gcdSTATIC_LINK)
-
-ifneq ($(VIVANTE_NO_VG),1)
-vg11_only:
-	@test ! -d $(VG11_DIR) || $(MAKE) -f makefile.linux -C $(VG11_DIR) $(V_TARGET) gcdSTATIC_LINK=$(gcdSTATIC_LINK)
-endif

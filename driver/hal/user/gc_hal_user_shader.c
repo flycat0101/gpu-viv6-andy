@@ -73,7 +73,7 @@ gcLoadShaders(
     gceSTATUS status;
     gcsPROGRAM_STATE programState;
 
-    gcmHEADER_ARG("Hal=0x%x StateBufferSize=%d StateBuffer=0x%x Hints=0x%x",
+    gcmHEADER_ARG("Hal=0x%x StateBufferSize=%zu StateBuffer=0x%x Hints=0x%x",
         Hal, StateBufferSize, StateBuffer, Hints);
 
     programState.stateBuffer = StateBuffer;
@@ -118,7 +118,7 @@ gcLoadKernel(
 {
     gceSTATUS status;
 
-    gcmHEADER_ARG("Hardware=0x%x StateBufferSize=%d StateBuffer=0x%x Hints=0x%x",
+    gcmHEADER_ARG("Hardware=0x%x StateBufferSize=%zu StateBuffer=0x%x Hints=0x%x",
         Hardware, StateBufferSize, StateBuffer, Hints);
 
     /* Call down to the hardware object. */
@@ -255,8 +255,8 @@ gcoSHADER_ProgramUniformEx(
     gceSTATUS status;
     gctUINT32 columns, rows, arrays, matrixStride, arrayStride;
 
-    gcmHEADER_ARG("Hal=0x%x, Address=%u Columns=%u Rows=%u Arrays=%u IsRowMajor=%d "
-                  "MatrixStride=%d ArrayStride=%d Values=%p Convert=%d Type=%d",
+    gcmHEADER_ARG("Hal=0x%x, Address=%u Columns=%zu Rows=%zu Arrays=%zu IsRowMajor=%d "
+                  "MatrixStride=%zu ArrayStride=%zu Values=%p Convert=%d Type=%d",
                   Hal, Address, Columns, Rows, Arrays, IsRowMajor,
                   MatrixStride, ArrayStride, Values, Convert, Type);
 
@@ -293,25 +293,33 @@ gcoSHADER_BindBufferBlock(
     return status;
 }
 
-gceSTATUS
-gcCreateInstVidMem(
-    IN gcoHAL Hal,
-    IN gctPOINTER InstPtr,
-    IN gctSIZE_T  instSize,
-    OUT gcsSURF_NODE_PTR* Node,
-    OUT gctUINT32* PhysicalAddr
-)
+void
+gcoSHADER_AllocateVidMem(
+    gctPOINTER context,
+    gceSURF_TYPE type,
+    gctSTRING tag,
+    gctSIZE_T size,
+    gctUINT32 align,
+    gctPOINTER *opaqueNode,
+    gctPOINTER *memory,
+    gctUINT32 *physical,
+    gctPOINTER initialData,
+    gctBOOL zeroMemory
+    )
 {
-    gctUINT32           physical = (gctUINT32)~0;
-    gctPOINTER          logical = gcvNULL;
     gceSTATUS           status = gcvSTATUS_OK;
     gcsSURF_NODE_PTR    node = gcvNULL;
     gctPOINTER          pointer;
+    gctPOINTER          logical = gcvNULL;
 
-    gcmHEADER_ARG("Hal=0x%x, InstPtr=%u instSize=%u Node=%p PhysicalAddr=%p",
-        Hal, InstPtr, instSize, Node, PhysicalAddr);
+    gcmHEADER_ARG("context=%p type=%d ta%s size=%zu align=%u opaqueNode=%p"
+                  "memory=%p physical=%p initialData=%p zeroMemory=%d",
+                  context, type, tag, size, align, opaqueNode,
+                  memory, physical, initialData, zeroMemory);
 
-    if (instSize && InstPtr)
+    gcmASSERT(physical);
+    gcmASSERT(opaqueNode);
+    if (size)
     {
         /* Allocate node. */
         gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -322,30 +330,42 @@ gcCreateInstVidMem(
 
         gcmONERROR(gcsSURF_NODE_Construct(
             node,
-            instSize,
-            256,
-            gcvSURF_ICACHE,
+            size,
+            align,
+            type,
             gcvALLOC_FLAG_NONE,
             gcvPOOL_DEFAULT
             ));
 
         /* Lock the inst buffer. */
         gcmONERROR(gcoSURF_LockNode(node,
-                                    &physical,
+                                    physical,
                                     &logical));
+        gcmDUMP(gcvNULL, "#[info: video memory allocate for VSC %s", tag);
 
-        gcoOS_MemCopy(logical, InstPtr, instSize);
+        if (initialData)
+        {
+            gcoOS_MemCopy(logical, initialData, size);
+        }
+        else if (zeroMemory)
+        {
+            gcoOS_ZeroMemory(logical, size);
+        }
 
-        gcmDUMP_BUFFER(gcvNULL, "memory", physical, logical, 0, instSize);
+        gcmDUMP_BUFFER(gcvNULL, "memory", *physical, logical, 0, size);
 
         if (node->pool == gcvPOOL_VIRTUAL)
         {
-            gcmONERROR(gcoOS_CacheFlush(gcvNULL, node->u.normal.node, logical, instSize));
+            gcmONERROR(gcoOS_CacheFlush(gcvNULL, node->u.normal.node, logical, size));
         }
     }
 
-    *Node = node;
-    *PhysicalAddr = physical;
+    *opaqueNode = (gctPOINTER)node;
+
+    if (memory)
+    {
+        *memory = logical;
+    }
 
 OnError:
     if (gcmIS_ERROR(status) && node != gcvNULL)
@@ -353,127 +373,39 @@ OnError:
         gcoOS_Free(gcvNULL, node);
     }
     gcmFOOTER();
-    return status;
+    return;
 }
 
-gceSTATUS
-gcDestroyInstVidMem(
-    IN gcoHAL Hal,
-    IN gcsSURF_NODE_PTR Node
-)
+void
+gcoSHADER_FreeVidMem(
+    gctPOINTER context,
+    gceSURF_TYPE type,
+    gctSTRING tag,
+    gctPOINTER opaqueNode
+    )
 {
     gceSTATUS           status = gcvSTATUS_OK;
+    gcsSURF_NODE_PTR    node = (gcsSURF_NODE_PTR)opaqueNode;
 
-    gcmHEADER_ARG("Hal=0x%x, Node=%p", Hal, Node);
+    gcmHEADER_ARG("context=%p type=%d tag=%s opaqueNode=%p", context, type, tag, opaqueNode);
 
-    if (Node && Node->pool != gcvPOOL_UNKNOWN)
+    if (node && node->pool != gcvPOOL_UNKNOWN)
     {
         /* Borrow as index buffer. */
-        gcmONERROR(gcoHARDWARE_Unlock(Node,
-                                      gcvSURF_ICACHE));
+        gcmONERROR(gcoHARDWARE_Unlock(node,
+                                      type));
 
         /* Create an event to free the video memory. */
-        gcmONERROR(gcsSURF_NODE_Destroy(Node));
+        gcmONERROR(gcsSURF_NODE_Destroy(node));
 
         /* Free node. */
-        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Node));
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, node));
     }
 
 OnError:
     gcmFOOTER();
-    return status;
+    return;
 }
-
-/* create video memory for register spill */
-gceSTATUS
-gcCreateSpillVidMem(
-    IN gcoHAL Hal,
-    IN gctSIZE_T  spillSize,
-    OUT gcsSURF_NODE_PTR* Node,
-    OUT gctUINT32* PhysicalAddr
-)
-{
-    gctUINT32           physical = (gctUINT32)~0;
-    gctPOINTER          logical = gcvNULL;
-    gceSTATUS           status = gcvSTATUS_OK;
-    gcsSURF_NODE_PTR    node = gcvNULL;
-    gctPOINTER          pointer;
-
-    gcmHEADER_ARG("Hal=0x%x, instSize=%u Node=%p PhysicalAddr=%p",
-        Hal, spillSize, Node, PhysicalAddr);
-
-    if (spillSize)
-    {
-        /* Allocate node. */
-        gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                  gcmSIZEOF(gcsSURF_NODE),
-                                  &pointer));
-
-        node = pointer;
-
-        gcmONERROR(gcsSURF_NODE_Construct(
-            node,
-            spillSize,
-            64,
-            gcvSURF_VERTEX,
-            gcvALLOC_FLAG_NONE,
-            gcvPOOL_DEFAULT
-            ));
-
-        /* Lock the inst buffer. */
-        gcmONERROR(gcoSURF_LockNode(node,
-                                    &physical,
-                                    &logical));
-
-        gcoOS_ZeroMemory(logical, 4);
-
-        gcmDUMP_BUFFER(gcvNULL, "memory", physical, logical, 0, spillSize);
-
-        if (node->pool == gcvPOOL_VIRTUAL)
-        {
-            gcmONERROR(gcoOS_CacheFlush(gcvNULL, node->u.normal.node, logical, spillSize));
-        }
-    }
-
-    *Node = node;
-    *PhysicalAddr = physical;
-
-OnError:
-    if (gcmIS_ERROR(status) && node != gcvNULL)
-    {
-        gcoOS_Free(gcvNULL, node);
-    }
-    gcmFOOTER();
-    return status;
-}
-gceSTATUS
-gcDestroySpillVidMem(
-    IN gcoHAL Hal,
-    IN gcsSURF_NODE_PTR Node
-)
-{
-    gceSTATUS           status = gcvSTATUS_OK;
-
-    gcmHEADER_ARG("Hal=0x%x, Node=%p", Hal, Node);
-
-    if (Node && Node->pool != gcvPOOL_UNKNOWN)
-    {
-        /* Borrow as index buffer. */
-        gcmONERROR(gcoHARDWARE_Unlock(Node,
-                                      gcvSURF_VERTEX));
-
-        /* Create an event to free the video memory. */
-        gcmONERROR(gcsSURF_NODE_Destroy(Node));
-
-        /* Free node. */
-        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Node));
-    }
-
-OnError:
-    gcmFOOTER();
-    return status;
-}
-
 
 #endif /*gcdENABLE_3D*/
 

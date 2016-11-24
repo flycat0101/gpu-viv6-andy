@@ -128,6 +128,8 @@ gceSTATUS vgshCORE_SetTarget(_vgCORE *core, gcoSURF target)
 {
     gceSTATUS status = gcvSTATUS_OK;
 
+    gcsSURF_VIEW drawView = {target, 0, 1};
+
     gcmHEADER_ARG("core=0x%x target=0x%x",
                   core, target);
 
@@ -136,7 +138,7 @@ gceSTATUS vgshCORE_SetTarget(_vgCORE *core, gcoSURF target)
         gctUINT width, height, samples;
 
         /* set the render target */
-        gcmERR_BREAK(gco3D_SetTarget(core->engine, 0, target, 0, 0));
+        gcmERR_BREAK(gco3D_SetTarget(core->engine, 0, &drawView, 0));
 
         gcmVERIFY_OK(gcoSURF_GetSize(target,
                                          &width,
@@ -505,7 +507,7 @@ gceSTATUS vgshCORE_DrawPrimitives(_vgCORE *core)
                     core->start,
                     core->base,
                     core->primitiveCount,
-                    vertCount, gcvFALSE, 0, 0, 1
+                    vertCount, 1
                     ));
             }
             else
@@ -514,8 +516,7 @@ gceSTATUS vgshCORE_DrawPrimitives(_vgCORE *core)
                                  core->primitiveType,
                                  core->base,
                                  core->start,
-                                 core->primitiveCount,
-                                 gcvFALSE, 0, 0));
+                                 core->primitiveCount));
             }
         }
         else
@@ -529,7 +530,7 @@ gceSTATUS vgshCORE_DrawPrimitives(_vgCORE *core)
                     core->start,
                     0,
                     core->primitiveCount,
-                    vertCount, gcvFALSE, 0, 0, 1
+                    vertCount, 1
                     ));
             }
             else
@@ -2211,16 +2212,16 @@ gceSTATUS SetUniform_Scissor(_vgHARDWARE *hardware, gcUNIFORM uniform)
         TempRegister, \
         gcSL_ENABLE_##ComponentEnable, \
         gcSL_FLOAT, \
-        vgvDEFAULT_PRECISION \
-        ))
+        vgvDEFAULT_PRECISION, \
+        0))
 
 #define vgmOPCODE_COND(Opcode, Condition, Target) \
     gcmERR_BREAK(gcSHADER_AddOpcodeConditional( \
         Shader->binary, \
         gcSL_##Opcode, \
         gcSL_##Condition, \
-        Target \
-        ))
+        Target, \
+        0))
 
 #define vgmCONST(Value) \
     gcmERR_BREAK(gcSHADER_AddSourceConstant( \
@@ -6068,9 +6069,11 @@ static gceSTATUS _CreateProgramEntry(_vgHARDWARE *hardware, _vgPROGRAMTABLE *tab
             return status;
         }
 
-        gcmERR_BREAK(gcSHADER_Construct(hardware->core.hal, VGShaderType_Vertex, &program->vertexShader.binary));
-        gcmERR_BREAK(gcSHADER_Construct(hardware->core.hal, VGShaderType_Fragment, &program->fragmentShader.binary));
-
+        gcmERR_BREAK(gcSHADER_Construct(VGShaderType_Vertex, &program->vertexShader.binary));
+        gcmERR_BREAK(gcSHADER_Construct(VGShaderType_Fragment, &program->fragmentShader.binary));
+        /* since client api has to be es20 so far, use compiler version to mark VG shaders */
+        program->vertexShader.binary->compilerVersion[0] = (program->vertexShader.binary->compilerVersion[0] & 0xffff0000) | _SHADER_VG_TYPE;
+        program->fragmentShader.binary->compilerVersion[0] = (program->fragmentShader.binary->compilerVersion[0] & 0xffff0000) | _SHADER_VG_TYPE;
         table->program = program;
 
         gcmFOOTER();
@@ -6934,7 +6937,8 @@ gceSTATUS _LoadUniforms(_vgHARDWARE *hardware)
         gctUINT32 samplerBase = 0;
         if (uniform && !isUniformInactive(uniform))
         {
-            samplerBase = GetShaderSamplerBaseOffset(fragShader->binary);
+            samplerBase = gcHINTS_GetSamplerBaseOffset(hardware->program->hints,
+                                                       fragShader->binary);
             gcmONERROR((*fragShader->samplers[i].setfunc)(hardware, (uniform->physical + samplerBase)));
         }
     }

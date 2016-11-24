@@ -104,11 +104,11 @@ vx_object_data_s;
 const vx_size gaussian5x5scale = 256;
 const vx_int16 gaussian5x5[5][5] =
 {
-    {1,  4,  6,  4, 1},
+    {1, 4, 6, 4, 1},
     {4, 16, 24, 16, 4},
     {6, 24, 36, 24, 6},
     {4, 16, 24, 16, 4},
-    {1,  4,  6,  4, 1}
+    {1, 4, 6, 4, 1}
 };
 
 void vxoFillMetaData(vx_meta_format_s *ptr, vx_enum type, vx_df_image format, vx_uint32 width, vx_uint32 height, vx_enum dataInfoType)
@@ -174,7 +174,7 @@ vx_status vxoGetObjAttributeByNodeIndex(vx_node node, vx_uint32 index, vx_enum t
             vxQueryScalar(scalar, VX_SCALAR_ATTRIBUTE_TYPE, &objData->u.scalarInfo.dataType, sizeof(vx_enum));
             if (objData->u.scalarInfo.scalarValuePtr != VX_NULL)
             {
-                vxAccessScalarValue(scalar, objData->u.scalarInfo.scalarValuePtr);
+                vxReadScalarValue(scalar, objData->u.scalarInfo.scalarValuePtr);
             }
 
             break;
@@ -295,23 +295,23 @@ vx_status vxoAddParameterToGraphByIndex(vx_graph graph, vx_node node, vx_uint32 
 }
 
 /*functions for invalid kernel*/
-VX_PRIVATE_API vx_status vxoBaseKernel_Invalid(vx_node node, vx_reference paramTable[], vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Invalid(vx_node node, const vx_reference paramTable[], vx_uint32 num)
 {
     return VX_ERROR_NOT_SUPPORTED;
 }
 
-VX_PRIVATE_API vx_status vxoInvalid_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInvalid_ValidateInput(vx_node node, vx_uint32 index)
 {
     return VX_ERROR_INVALID_PARAMETERS;
 }
 
-VX_PRIVATE_API vx_status vxoInvalid_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *info)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInvalid_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *info)
 {
     return VX_ERROR_INVALID_PARAMETERS;
 }
 
 /*functions for colorConvert kernel*/
-VX_PRIVATE_API vx_status vxoBaseKernel_ColorConvert(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_ColorConvert(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image srcImg;
     vx_image dstImg;
@@ -324,7 +324,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_ColorConvert(vx_node node, vx_reference *
     return vxConvertColor(node, srcImg, dstImg);
 }
 
-VX_PRIVATE_API vx_status vxoColorConvert_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoColorConvert_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_status        status = VX_SUCCESS;
     vx_object_data_s objData = {0};
@@ -362,7 +362,7 @@ VX_PRIVATE_API vx_status vxoColorConvert_ValidateInput(vx_node node, vx_uint32 i
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoColorConvert_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoColorConvert_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_status    status = VX_ERROR_INVALID_PARAMETERS;
     vx_object_data_s srcObjData = {0};
@@ -391,7 +391,7 @@ VX_PRIVATE_API vx_status vxoColorConvert_ValidateOutput(vx_node node, vx_uint32 
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_ChannelExtract(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_ChannelExtract(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image  srcImg;
     vx_scalar channel;
@@ -406,7 +406,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_ChannelExtract(vx_node node, vx_reference
     return vxChannelExtract(node, srcImg, channel, dstImg);
 }
 
-VX_PRIVATE_API vx_status vxoChannelExtract_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoChannelExtract_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_status        status = VX_SUCCESS;
     vx_object_data_s objData0 = {0};
@@ -449,7 +449,6 @@ VX_PRIVATE_API vx_status vxoChannelExtract_ValidateInput(vx_node node, vx_uint32
     else if (index == 1)
     {
         vx_enum channel = 0;
-        vx_enum max_channel = 0;
         objData1.u.scalarInfo.scalarValuePtr = &channel;
 
         if (vxoGetObjAttributeByNodeIndex(node, 1, VX_TYPE_SCALAR, &objData1) != VX_SUCCESS)
@@ -458,9 +457,8 @@ VX_PRIVATE_API vx_status vxoChannelExtract_ValidateInput(vx_node node, vx_uint32
         if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objData0) != VX_SUCCESS)
             return VX_ERROR_INVALID_PARAMETERS;
 
-        max_channel = (objData0.u.imageInfo.format == VX_DF_IMAGE_RGBX ? VX_CHANNEL_3 : VX_CHANNEL_2);
 
-        if (VX_CHANNEL_0 <= channel && channel <= max_channel)
+        if (VX_CHANNEL_0 <= channel && channel <= VX_CHANNEL_V)
         {
             status = VX_SUCCESS;
         }
@@ -473,7 +471,7 @@ VX_PRIVATE_API vx_status vxoChannelExtract_ValidateInput(vx_node node, vx_uint32
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoChannelExtract_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoChannelExtract_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_enum          channel = 0;
     vx_object_data_s objData0 = {0};
@@ -489,7 +487,7 @@ VX_PRIVATE_API vx_status vxoChannelExtract_ValidateOutput(vx_node node, vx_uint3
     if (vxoGetObjAttributeByNodeIndex(node, 1, VX_TYPE_SCALAR, &objData1) != VX_SUCCESS)
         return VX_ERROR_INVALID_PARAMETERS;
 
-    if (channel != VX_CHANNEL_0)
+    if (channel != VX_CHANNEL_0 && channel != VX_CHANNEL_R && channel != VX_CHANNEL_Y)
     {
         if (objData0.u.imageInfo.format == VX_DF_IMAGE_IYUV ||
             objData0.u.imageInfo.format == VX_DF_IMAGE_NV12 ||
@@ -510,7 +508,7 @@ VX_PRIVATE_API vx_status vxoChannelExtract_ValidateOutput(vx_node node, vx_uint3
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_ChannelCombine(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_ChannelCombine(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage[4];
     vx_image outputImage;
@@ -528,7 +526,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_ChannelCombine(vx_node node, vx_reference
     return vxChannelCombine(node, inputImage, outputImage);
 }
 
-VX_PRIVATE_API vx_status vxoChannelCombine_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoChannelCombine_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -540,7 +538,7 @@ VX_PRIVATE_API vx_status vxoChannelCombine_ValidateInput(vx_node node, vx_uint32
     return (objData.u.imageInfo.format == VX_DF_IMAGE_U8) ? VX_SUCCESS : VX_ERROR_INVALID_PARAMETERS;
 }
 
-VX_PRIVATE_API vx_status vxoChannelCombine_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoChannelCombine_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_uint32        i;
     vx_uint32        uv_x_scale           = 0;
@@ -596,7 +594,7 @@ VX_PRIVATE_API vx_status vxoChannelCombine_ValidateOutput(vx_node node, vx_uint3
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Sobel3x3(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Sobel3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_border_mode_t bordermode;
     vx_image         input;
@@ -619,7 +617,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Sobel3x3(vx_node node, vx_reference *para
     }
 }
 
-VX_PRIVATE_API vx_status vxoSobel3x3_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSobel3x3_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -638,7 +636,7 @@ VX_PRIVATE_API vx_status vxoSobel3x3_ValidateInput(vx_node node, vx_uint32 index
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoSobel3x3_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSobel3x3_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -652,7 +650,7 @@ VX_PRIVATE_API vx_status vxoSobel3x3_ValidateOutput(vx_node node, vx_uint32 inde
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Magnitude(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Magnitude(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image grad_x;
     vx_image grad_y;
@@ -668,7 +666,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Magnitude(vx_node node, vx_reference *par
     return vxMagnitude(node, grad_x, grad_y, output);
 }
 
-VX_PRIVATE_API vx_status vxoMagnitude_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMagnitude_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[2] = {{0}};
 
@@ -708,7 +706,7 @@ VX_PRIVATE_API vx_status vxoMagnitude_ValidateInput(vx_node node, vx_uint32 inde
 
 }
 
-VX_PRIVATE_API vx_status vxoMagnitude_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMagnitude_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData0 = {0};
     vx_object_data_s objData2 = {0};
@@ -728,7 +726,7 @@ VX_PRIVATE_API vx_status vxoMagnitude_ValidateOutput(vx_node node, vx_uint32 ind
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Phase(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Phase(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image grad_x;
     vx_image grad_y;
@@ -739,11 +737,12 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Phase(vx_node node, vx_reference *paramet
     grad_x = (vx_image)parameters[0];
     grad_y = (vx_image)parameters[1];
     output = (vx_image)parameters[2];
+    node->kernelAttributes.isAllGPU = vx_true_e;
 
     return vxPhase(node, grad_x, grad_y, output);
 }
 
-VX_PRIVATE_API vx_status vxoPhase_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoPhase_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[2] = {{0}};
 
@@ -779,7 +778,7 @@ VX_PRIVATE_API vx_status vxoPhase_ValidateInput(vx_node node, vx_uint32 index)
     }
 }
 
-VX_PRIVATE_API vx_status vxoPhase_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoPhase_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData;
 
@@ -793,7 +792,7 @@ VX_PRIVATE_API vx_status vxoPhase_ValidateOutput(vx_node node, vx_uint32 index, 
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_TableLookup(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_TableLookup(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image srcImage;
     vx_lut   lut;
@@ -808,7 +807,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_TableLookup(vx_node node, vx_reference *p
     return vxTableLookup(node, srcImage, lut, dstImage);
 }
 
-VX_PRIVATE_API vx_status vxoTableLookup_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTableLookup_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -835,7 +834,7 @@ VX_PRIVATE_API vx_status vxoTableLookup_ValidateInput(vx_node node, vx_uint32 in
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoTableLookup_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoTableLookup_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -849,7 +848,7 @@ VX_PRIVATE_API vx_status vxoTableLookup_ValidateOutput(vx_node node, vx_uint32 i
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_ScaleImage(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_ScaleImage(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image         srcImage;
     vx_image         dstImage;
@@ -874,7 +873,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_ScaleImage(vx_node node, vx_reference *pa
     return vxScaleImage(node, srcImage, dstImage, type, &borderMode, localDataPtr, size);
 }
 
-VX_PRIVATE_API vx_status vxoScaleImage_Initializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoScaleImage_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_size size = 1;
 
@@ -883,7 +882,7 @@ VX_PRIVATE_API vx_status vxoScaleImage_Initializer(vx_node node, vx_reference *p
     return vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_LOCAL_DATA_SIZE, &size, sizeof(size));
 }
 
-VX_PRIVATE_API vx_status vxoScaleImage_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoScaleImage_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -919,7 +918,7 @@ VX_PRIVATE_API vx_status vxoScaleImage_ValidateInput(vx_node node, vx_uint32 ind
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoScaleImage_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoScaleImage_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData[2] = {{0}};
 
@@ -949,7 +948,7 @@ VX_PRIVATE_API vx_status vxoScaleImage_ValidateOutput(vx_node node, vx_uint32 in
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBasekernel_HalfscaleGaussian(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBasekernel_HalfscaleGaussian(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph;
 
@@ -960,7 +959,7 @@ VX_PRIVATE_API vx_status vxoBasekernel_HalfscaleGaussian(vx_node node, vx_refere
     return vxProcessGraph(graph);
 }
 
-VX_PRIVATE_API vx_status vxoHalfscaleGaussian_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHalfscaleGaussian_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData0 = {0};
     vx_object_data_s objData2 = {0};
@@ -990,7 +989,7 @@ VX_PRIVATE_API vx_status vxoHalfscaleGaussian_ValidateInput(vx_node node, vx_uin
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoHalfscaleGaussian_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHalfscaleGaussian_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData0 = {0};
     vx_object_data_s objData1 = {0};
@@ -1018,10 +1017,8 @@ VX_PRIVATE_API vx_convolution vxCreateGaussian5x5Convolution(vx_context context)
     vx_status      status;
 
     conv = vxCreateConvolution(context, 5, 5);
-    status = vxAccessConvolutionCoefficients(conv, NULL);
-    if (status != VX_SUCCESS) goto ErrorExit;
 
-    status = vxCommitConvolutionCoefficients(conv, (vx_int16 *)gaussian5x5);
+    status = vxWriteConvolutionCoefficients(conv, (vx_int16 *)gaussian5x5);
     if (status != VX_SUCCESS) goto ErrorExit;
 
     vxSetConvolutionAttribute(conv, VX_CONVOLUTION_ATTRIBUTE_SCALE, (void *)&gaussian5x5scale, sizeof(vx_uint32));
@@ -1034,7 +1031,7 @@ ErrorExit:
     return VX_NULL;
 }
 
-VX_PRIVATE_API vx_status vxoHalfscaleGaussian_Initializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHalfscaleGaussian_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image         inputImage     = VX_NULL;
     vx_image         outputImage    = VX_NULL;
@@ -1057,7 +1054,7 @@ VX_PRIVATE_API vx_status vxoHalfscaleGaussian_Initializer(vx_node node, vx_refer
 
     if (graph == NULL) return VX_ERROR_INVALID_PARAMETERS;
 
-    vxAccessScalarValue((vx_scalar)parameters[2], &kernelSize);
+    vxReadScalarValue((vx_scalar)parameters[2], &kernelSize);
 
     if (kernelSize != 3 && kernelSize != 5) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -1102,14 +1099,14 @@ VX_PRIVATE_API vx_status vxoHalfscaleGaussian_Initializer(vx_node node, vx_refer
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoHalfscaleGaussian_Deinitializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHalfscaleGaussian_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     if (num != 3) return VX_ERROR_INVALID_PARAMETERS;
 
     return vxoNode_SetChildGraph(node, 0);
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Histogram(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Histogram(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image        srcImage;
     vx_distribution dist;
@@ -1124,7 +1121,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Histogram(vx_node node, vx_reference *par
     return vxHistogram(node, srcImage, dist, node->kernelAttributes.stagings);
 }
 
-VX_PRIVATE_API vx_status vxoHistogram_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHistogram_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -1139,7 +1136,7 @@ VX_PRIVATE_API vx_status vxoHistogram_ValidateInput(vx_node node, vx_uint32 inde
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoHistogram_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHistogram_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData0 = {0};
     vx_object_data_s objData1 = {0};
@@ -1158,7 +1155,7 @@ VX_PRIVATE_API vx_status vxoHistogram_ValidateOutput(vx_node node, vx_uint32 ind
 }
 
 
-VX_PRIVATE_API vx_status vxoBaseKernel_EqualizeHist(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_EqualizeHist(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph;
 
@@ -1171,7 +1168,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_EqualizeHist(vx_node node, vx_reference *
     return vxProcessGraph(graph);
 }
 
-VX_PRIVATE_API vx_status vxoEqualizeHist_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHist_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -1185,7 +1182,7 @@ VX_PRIVATE_API vx_status vxoEqualizeHist_ValidateInput(vx_node node, vx_uint32 i
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoEqualizeHist_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHist_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -1202,7 +1199,7 @@ VX_PRIVATE_API vx_status vxoEqualizeHist_ValidateOutput(vx_node node, vx_uint32 
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoEqualizeHist_Initializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHist_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image    srcImage, dstImage;
     vx_image    histImage[2] = {NULL};
@@ -1302,7 +1299,7 @@ VX_PRIVATE_API vx_status vxoEqualizeHist_Initializer(vx_node node, vx_reference 
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoEqualizeHist_Deinitializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHist_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph = VX_NULL;
 
@@ -1317,7 +1314,7 @@ VX_PRIVATE_API vx_status vxoEqualizeHist_Deinitializer(vx_node node, vx_referenc
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_AbsDiff(vx_node node, vx_reference parameters[], vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_AbsDiff(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_image inputImage1;
     vx_image inputImage2;
@@ -1333,7 +1330,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_AbsDiff(vx_node node, vx_reference parame
     return vxAbsDiff(node, inputImage1, inputImage2, outputImage);
 }
 
-VX_PRIVATE_API vx_status vxoAbsDiff_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoAbsDiff_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData0 = {0};
     vx_object_data_s objData1 = {0};
@@ -1371,7 +1368,7 @@ VX_PRIVATE_API vx_status vxoAbsDiff_ValidateInput(vx_node node, vx_uint32 index)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoAbsDiff_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoAbsDiff_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData0 = {0};
     vx_object_data_s objData1 = {0};
@@ -1391,7 +1388,8 @@ VX_PRIVATE_API vx_status vxoAbsDiff_ValidateOutput(vx_node node, vx_uint32 index
     }
 
     if (objData0.u.imageInfo.format != VX_DF_IMAGE_U8 &&
-        objData0.u.imageInfo.format != VX_DF_IMAGE_U16)
+        objData0.u.imageInfo.format != VX_DF_IMAGE_U16 &&
+        objData0.u.imageInfo.format != VX_DF_IMAGE_S16)
     {
         return VX_ERROR_INVALID_FORMAT;
     }
@@ -1405,7 +1403,7 @@ VX_PRIVATE_API vx_status vxoAbsDiff_ValidateOutput(vx_node node, vx_uint32 index
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_MeanStdDev(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_MeanStdDev(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image  inputImage;
     vx_scalar meanScalar;
@@ -1421,7 +1419,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_MeanStdDev(vx_node node, vx_reference *pa
     return vxMeanStdDev(node, inputImage, meanScalar, stddevScalar);
 }
 
-VX_PRIVATE_API vx_status vxoMeanStdDev_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMeanStdDev_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -1436,7 +1434,7 @@ VX_PRIVATE_API vx_status vxoMeanStdDev_ValidateInput(vx_node node, vx_uint32 ind
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoMeanStdDev_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMeanStdDev_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     if (index != 1 && index != 2) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -1445,7 +1443,7 @@ VX_PRIVATE_API vx_status vxoMeanStdDev_ValidateOutput(vx_node node, vx_uint32 in
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Threshold(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Threshold(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image     srcImage;
     vx_threshold threshold;
@@ -1460,7 +1458,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Threshold(vx_node node, vx_reference *par
     return vxThreshold(node, srcImage, threshold, dstImage);
 }
 
-VX_PRIVATE_API vx_status vxoThreshold_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoThreshold_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -1486,7 +1484,7 @@ VX_PRIVATE_API vx_status vxoThreshold_ValidateInput(vx_node node, vx_uint32 inde
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoThreshold_ValidatorOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoThreshold_ValidatorOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -1504,7 +1502,7 @@ VX_PRIVATE_API vx_status vxoThreshold_ValidatorOutput(vx_node node, vx_uint32 in
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_IntegralImage(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_IntegralImage(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph;
 
@@ -1517,7 +1515,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_IntegralImage(vx_node node, vx_reference 
     return vxProcessGraph(graph);
 }
 
-VX_PRIVATE_API vx_status vxoIntegral_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegral_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData;
 
@@ -1531,7 +1529,7 @@ VX_PRIVATE_API vx_status vxoIntegral_ValidateInput(vx_node node, vx_uint32 index
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoIntegral_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegral_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData;
 
@@ -1545,7 +1543,7 @@ VX_PRIVATE_API vx_status vxoIntegral_ValidateOutput(vx_node node, vx_uint32 inde
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoIntegral_Initializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegral_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage, outputImage, tempImage;
     vx_context context;
@@ -1614,7 +1612,7 @@ VX_PRIVATE_API vx_status vxoIntegral_Initializer(vx_node node, vx_reference *par
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoIntegral_Deinitializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegral_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph = VX_NULL;
 
@@ -1629,7 +1627,7 @@ VX_PRIVATE_API vx_status vxoIntegral_Deinitializer(vx_node node, vx_reference *p
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Erode3x3(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Erode3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_border_mode_t bordermode;
     vx_image srcImage;
@@ -1648,7 +1646,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Erode3x3(vx_node node, vx_reference *para
     return VX_ERROR_INVALID_PARAMETERS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Dilate3x3(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Dilate3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_border_mode_t bordermode;
     vx_image srcImage;
@@ -1667,7 +1665,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Dilate3x3(vx_node node, vx_reference *par
     return VX_ERROR_INVALID_PARAMETERS;
 }
 
-VX_PRIVATE_API vx_status vxoMorphology_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMorphology_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -1681,7 +1679,7 @@ VX_PRIVATE_API vx_status vxoMorphology_ValidateInput(vx_node node, vx_uint32 ind
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoMorphology_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s*ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMorphology_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s*ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -1695,7 +1693,7 @@ VX_PRIVATE_API vx_status vxoMorphology_ValidateOutput(vx_node node, vx_uint32 in
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Median3x3(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Median3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_border_mode_t bordermode;
     vx_image         srcImage;
@@ -1715,7 +1713,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Median3x3(vx_node node, vx_reference *par
     return VX_ERROR_INVALID_PARAMETERS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Box3x3(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Box3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_border_mode_t bordermode;
     vx_image         srcImage;
@@ -1735,7 +1733,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Box3x3(vx_node node, vx_reference *parame
     return VX_ERROR_INVALID_PARAMETERS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Gaussian3x3(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Gaussian3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_border_mode_t bordermode;
     vx_image         srcImage;
@@ -1755,7 +1753,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Gaussian3x3(vx_node node, vx_reference *p
     return VX_ERROR_INVALID_PARAMETERS;
 }
 
-VX_PRIVATE_API vx_status vxoFilter_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFilter_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData;
 
@@ -1769,7 +1767,7 @@ VX_PRIVATE_API vx_status vxoFilter_ValidateInput(vx_node node, vx_uint32 index)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoFilter_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFilter_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData;
 
@@ -1783,7 +1781,7 @@ VX_PRIVATE_API vx_status vxoFilter_ValidateOutput(vx_node node, vx_uint32 index,
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBasekernel_Convolve(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBasekernel_Convolve(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_border_mode_t bordermode;
     vx_image         srcImage;
@@ -1795,13 +1793,14 @@ VX_PRIVATE_API vx_status vxoBasekernel_Convolve(vx_node node, vx_reference *para
     srcImage  = (vx_image)parameters[0];
     conv = (vx_convolution)parameters[1];
     dstImage  = (vx_image)parameters[2];
+    node->kernelAttributes.isAllGPU = vx_true_e;
 
     vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &bordermode, sizeof(bordermode));
 
     return vxConvolve(node, srcImage, conv, dstImage, &bordermode);
 }
 
-VX_PRIVATE_API vx_status vxoConvolve_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoConvolve_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -1840,7 +1839,7 @@ VX_PRIVATE_API vx_status vxoConvolve_ValidateInput(vx_node node, vx_uint32 index
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoConvolve_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoConvolve_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData0 = {0};
     vx_object_data_s objData2 = {0};
@@ -1865,7 +1864,7 @@ VX_PRIVATE_API vx_status vxoConvolve_ValidateOutput(vx_node node, vx_uint32 inde
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Pyramid(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Pyramid(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph = VX_NULL;
     vx_size  size  = 0;
@@ -1882,7 +1881,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Pyramid(vx_node node, vx_reference *param
     return vxProcessGraph(graph);
 }
 
-VX_PRIVATE_API vx_status vxoPyramid_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramid_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -1896,7 +1895,7 @@ VX_PRIVATE_API vx_status vxoPyramid_ValidateInput(vx_node node, vx_uint32 index)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoPyramid_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramid_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData[2] = {{0}};
 
@@ -1918,52 +1917,8 @@ VX_PRIVATE_API vx_status vxoPyramid_ValidateOutput(vx_node node, vx_uint32 index
     return VX_SUCCESS;
 }
 
-vx_status vxoCopyImage(vx_image input, vx_image output)
-{
-    vx_imagepatch_addressing_t srcAddrInfo;
-    vx_imagepatch_addressing_t dstAddrInfo;
-    vx_rectangle_t             rect;
-    void *                     baseAddressSrc = VX_NULL;
-    void *                     baseAddressDst = VX_NULL;
-    void *                     srcPixelValue  = VX_NULL;
-    void *                     dstPixelValue  = VX_NULL;
-    vx_size                    numplanes = 0;
-    vx_uint32                  plane = 0, y = 0, len = 0;
 
-    if (vxQueryImage(input, VX_IMAGE_ATTRIBUTE_PLANES, &numplanes, sizeof(vx_size)) != VX_SUCCESS)
-        return VX_ERROR_INVALID_PARAMETERS;
-
-    if (vxGetValidRegionImage(input, &rect) != VX_SUCCESS)
-        return VX_ERROR_INVALID_PARAMETERS;
-
-    for (plane = 0; plane < numplanes; plane++)
-    {
-        baseAddressSrc = baseAddressDst = NULL;
-
-        if (vxAccessImagePatch(input, &rect, plane, &srcAddrInfo, &baseAddressSrc, VX_READ_ONLY) != VX_SUCCESS)
-            return VX_ERROR_INVALID_PARAMETERS;
-
-        if (vxAccessImagePatch(output, &rect, plane, &dstAddrInfo, &baseAddressDst, VX_WRITE_ONLY) != VX_SUCCESS)
-            return VX_ERROR_INVALID_PARAMETERS;
-
-        for (y = 0; y < srcAddrInfo.dim_y; y += srcAddrInfo.step_y)
-        {
-            srcPixelValue = vxFormatImagePatchAddress2d(baseAddressSrc, 0, y, &srcAddrInfo);
-            dstPixelValue = vxFormatImagePatchAddress2d(baseAddressDst, 0, y, &dstAddrInfo);
-
-            len = (srcAddrInfo.stride_x * srcAddrInfo.dim_x * srcAddrInfo.scale_x) / VX_SCALE_UNITY;
-
-            memcpy(dstPixelValue, srcPixelValue, len);
-        }
-
-        vxCommitImagePatch(input, NULL, plane, &srcAddrInfo, baseAddressSrc);
-        vxCommitImagePatch(output, &rect, plane, &dstAddrInfo, baseAddressDst);
-    }
-
-    return VX_SUCCESS;
-}
-
-VX_PRIVATE_API vx_status vxoPyramid_Initializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramid_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_status        status = VX_SUCCESS;
     vx_size          level, numLevels = 1;
@@ -1985,6 +1940,9 @@ VX_PRIVATE_API vx_status vxoPyramid_Initializer(vx_node node, vx_reference *para
     graph    = vxCreateGraph(context);
 
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+
+    /* set graph as child graph */
+    graph->isChildGraph = vx_true_e;
 
     if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border)) != VX_SUCCESS)
         return VX_ERROR_INVALID_PARAMETERS;
@@ -2049,7 +2007,7 @@ VX_PRIVATE_API vx_status vxoPyramid_Initializer(vx_node node, vx_reference *para
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoPyramid_Deinitializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramid_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
     vx_graph  graph  = 0;
@@ -2074,7 +2032,7 @@ VX_PRIVATE_API vx_status vxoPyramid_Deinitializer(vx_node node, vx_reference *pa
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Accumulate(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Accumulate(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage;
     vx_image accumImage;
@@ -2088,7 +2046,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Accumulate(vx_node node, vx_reference *pa
     return vxAccumulate(node, inputImage, accumImage);
 }
 
-VX_PRIVATE_API vx_status vxoAccumulate_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoAccumulate_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData0 = {0};
     vx_object_data_s objData1 = {0};
@@ -2122,7 +2080,7 @@ VX_PRIVATE_API vx_status vxoAccumulate_ValidateInput(vx_node node, vx_uint32 ind
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_AccumulateWeighted(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_AccumulateWeighted(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage;
     vx_scalar scalar;
@@ -2138,7 +2096,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_AccumulateWeighted(vx_node node, vx_refer
     return vxAccumulateWeighted(node, inputImage, scalar, accumImage);
 }
 
-VX_PRIVATE_API vx_status vxoAccumulateWeighted_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoAccumulateWeighted_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[3] = {{0}};
     if (index != 0 && index != 1 && index != 2) return VX_ERROR_INVALID_PARAMETERS;
@@ -2182,12 +2140,12 @@ VX_PRIVATE_API vx_status vxoAccumulateWeighted_ValidateInput(vx_node node, vx_ui
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoAccumulate_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoAccumulate_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     return VX_ERROR_INVALID_PARAMETERS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_AccumulateSquare(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_AccumulateSquare(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage;
     vx_scalar scalar;
@@ -2203,7 +2161,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_AccumulateSquare(vx_node node, vx_referen
     return vxAccumulateSquare(node, inputImage, scalar, accumImage);
 }
 
-VX_PRIVATE_API vx_status vxoAccumulateSquared_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoAccumulateSquared_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[3] = {{0}};
 
@@ -2246,7 +2204,7 @@ VX_PRIVATE_API vx_status vxoAccumulateSquared_ValidateInput(vx_node node, vx_uin
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_MinMaxLoc(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_MinMaxLoc(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph;
 
@@ -2259,7 +2217,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_MinMaxLoc(vx_node node, vx_reference *par
     return vxProcessGraph(graph);
 }
 
-VX_PRIVATE_API vx_status vxoMinMaxLoc_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxLoc_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData;
 
@@ -2280,7 +2238,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_ValidateInput(vx_node node, vx_uint32 inde
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoMinMaxLoc_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxLoc_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData;
     vx_enum          type = VX_TYPE_INVALID;
@@ -2334,7 +2292,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_ValidateOutput(vx_node node, vx_uint32 ind
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoMinMaxLoc_Initializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxLoc_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image    inputImage;
     vx_scalar   minVal, maxVal, widthScalar, heightScalar;
@@ -2412,7 +2370,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Initializer(vx_node node, vx_reference *pa
     }
     else
     {
-        vxCommitScalarValue(minCount, &count);
+        vxWriteScalarValue(minCount, &count);
     }
 
     if (maxCount == NULL)
@@ -2422,7 +2380,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Initializer(vx_node node, vx_reference *pa
     }
     else
     {
-        vxCommitScalarValue(maxCount, &count);
+        vxWriteScalarValue(maxCount, &count);
     }
 
     minImage    = vxCreateImage(context, 2, height, VX_DF_IMAGE_U16);
@@ -2449,7 +2407,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Initializer(vx_node node, vx_reference *pa
         vxQueryArray(maxLocArray, VX_ARRAY_ATTRIBUTE_ITEMTYPE, &itemType, sizeof(itemType));
         maxArray = vxCreateArray(context, itemType, width*height);
 
-        if ( !vxoArray_AllocateMemory(maxArray))
+        if (!vxoArray_AllocateMemory(maxArray))
         {
             status |= VX_ERROR_NO_MEMORY;
         }
@@ -2464,6 +2422,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Initializer(vx_node node, vx_reference *pa
         nodes[2] = vxMinMaxLocPackArrayNode(graph, minImage, minArray, widthScalar, heightScalar, minCount, minLocArray);
         nodes[3] = vxMinMaxLocPackArrayNode(graph, maxImage, maxArray, widthScalar, heightScalar, maxCount, maxLocArray);
     }
+
 
     status = VX_SUCCESS;
     status |= vxoAddParameterToGraphByIndex(graph, nodes[0], 0);
@@ -2556,7 +2515,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Initializer(vx_node node, vx_reference *pa
 
 }
 
-VX_PRIVATE_API vx_status vxoMinMaxLoc_Deinitializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxLoc_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph = VX_NULL;
 
@@ -2571,7 +2530,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLoc_Deinitializer(vx_node node, vx_reference *
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_ConvertDepth(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_ConvertDepth(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image  inputImage;
     vx_image  outputImage;
@@ -2588,7 +2547,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_ConvertDepth(vx_node node, vx_reference *
     return vxConvertDepth(node, inputImage, outputImage, spol, sshf);
 }
 
-VX_PRIVATE_API vx_status vxoConvertDepth_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoConvertDepth_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData;
     vx_enum          overflow_policy = 0;
@@ -2644,7 +2603,7 @@ VX_PRIVATE_API vx_status vxoConvertDepth_ValidateInput(vx_node node, vx_uint32 i
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoConvertDepth_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoConvertDepth_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_status        status = VX_ERROR_INVALID_PARAMETERS;
     vx_object_data_s objData[2] = {{0}};
@@ -2672,18 +2631,19 @@ VX_PRIVATE_API vx_status vxoConvertDepth_ValidateOutput(vx_node node, vx_uint32 
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_CannyEdge(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_CannyEdge(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph;
 
     if (num != 5) return VX_ERROR_INVALID_PARAMETERS;
+    node->kernelAttributes.isAllGPU = vx_true_e;
 
     graph = vxoNode_GetChildGraph(node);
 
     return vxProcessGraph(graph);
 }
 
-VX_PRIVATE_API vx_status vxoCannyEdge_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCannyEdge_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
     vx_int32         gs      = 0;
@@ -2730,7 +2690,7 @@ VX_PRIVATE_API vx_status vxoCannyEdge_ValidateInput(vx_node node, vx_uint32 inde
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoCannyEdge_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCannyEdge_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -2744,7 +2704,7 @@ VX_PRIVATE_API vx_status vxoCannyEdge_ValidateOutput(vx_node node, vx_uint32 ind
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoCannyEdge_Initializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCannyEdge_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_status        status;
     vx_context       context;
@@ -2816,14 +2776,14 @@ VX_PRIVATE_API vx_status vxoCannyEdge_Initializer(vx_node node, vx_reference *pa
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoCannyEdge_Deinitializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCannyEdge_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     if (num != 5) return VX_ERROR_INVALID_PARAMETERS;
 
     return vxoNode_SetChildGraph(node, 0);
 }
 
-VX_PRIVATE_API vx_status vxoBinaryBitwise_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBinaryBitwise_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[2] = {{0}};
 
@@ -2855,7 +2815,7 @@ VX_PRIVATE_API vx_status vxoBinaryBitwise_ValidateInput(vx_node node, vx_uint32 
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBinaryBitwise_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBinaryBitwise_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData;
 
@@ -2869,7 +2829,7 @@ VX_PRIVATE_API vx_status vxoBinaryBitwise_ValidateOutput(vx_node node, vx_uint32
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_And(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_And(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage1;
     vx_image inputImage2;
@@ -2885,7 +2845,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_And(vx_node node, vx_reference *parameter
     return vxAnd(node, inputImage1, inputImage2, outputImage);
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Or(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Or(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage1;
     vx_image inputImage2;
@@ -2900,7 +2860,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Or(vx_node node, vx_reference *parameters
     return vxOr(node, inputImage1, inputImage2, outputImage);
 }
 
-VX_PRIVATE_API vx_status vxoBasekernel_Xor(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBasekernel_Xor(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage1;
     vx_image inputImage2;
@@ -2917,7 +2877,7 @@ VX_PRIVATE_API vx_status vxoBasekernel_Xor(vx_node node, vx_reference *parameter
     return vxXor(node, inputImage1, inputImage2, outputImage);
 }
 
-VX_PRIVATE_API vx_status vxoUnaryBitwise_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoUnaryBitwise_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
     if (index != 0) return VX_ERROR_INVALID_PARAMETERS;
@@ -2930,7 +2890,7 @@ VX_PRIVATE_API vx_status vxoUnaryBitwise_ValidateInput(vx_node node, vx_uint32 i
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoUnaryBitwise_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoUnaryBitwise_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData;
 
@@ -2944,7 +2904,7 @@ VX_PRIVATE_API vx_status vxoUnaryBitwise_ValidateOutput(vx_node node, vx_uint32 
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Not(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Not(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage;
     vx_image outputImage;
@@ -2958,7 +2918,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Not(vx_node node, vx_reference *parameter
     return vxNot(node, inputImage, outputImage);
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Multiply(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Multiply(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image  inputImage0;
     vx_image  inputImage1;
@@ -2981,7 +2941,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Multiply(vx_node node, vx_reference *para
 }
 
 
-VX_PRIVATE_API vx_status vxoMultiply_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMultiply_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[2] = {{0}};
     vx_float32       scale = 0.0f;
@@ -3070,7 +3030,7 @@ VX_PRIVATE_API vx_status vxoMultiply_ValidateInput(vx_node node, vx_uint32 index
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoMultiply_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMultiply_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData[3] = {{0}};
 
@@ -3099,7 +3059,7 @@ VX_PRIVATE_API vx_status vxoMultiply_ValidateOutput(vx_node node, vx_uint32 inde
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Add(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Add(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image  inputImage0;
     vx_image  inputImage1;
@@ -3117,7 +3077,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Add(vx_node node, vx_reference *parameter
     return vxAddition(node, inputImage0, inputImage1, policy_param, outputImage);
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Sub(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Sub(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image  inputImage0;
     vx_image  inputImage1;
@@ -3134,7 +3094,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Sub(vx_node node, vx_reference *parameter
     return vxSubtraction(node, inputImage0, inputImage1, policy_param, outputImage);
 }
 
-VX_PRIVATE_API vx_status vxoAddSubtract_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoAddSubtract_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[3] = {{0}};
     vx_enum          overflowPolicy = 0;
@@ -3189,7 +3149,7 @@ VX_PRIVATE_API vx_status vxoAddSubtract_ValidateInput(vx_node node, vx_uint32 in
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoAddSubtract_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoAddSubtract_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData[3] = {{0}};
     if (index != 3) return VX_ERROR_INVALID_PARAMETERS;
@@ -3217,7 +3177,7 @@ VX_PRIVATE_API vx_status vxoAddSubtract_ValidateOutput(vx_node node, vx_uint32 i
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_WarpPerspective(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_WarpPerspective(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image        inputImage;
     vx_matrix        matrix;
@@ -3237,7 +3197,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_WarpPerspective(vx_node node, vx_referenc
     return vxWarpPerspective(node, inputImage, matrix, scalarType, outputImage, &borders);
 }
 
-VX_PRIVATE_API vx_status vxWarpAffineKernel(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxWarpAffineKernel(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image        inputImage;
     vx_matrix        matrix;
@@ -3257,7 +3217,7 @@ VX_PRIVATE_API vx_status vxWarpAffineKernel(vx_node node, vx_reference *paramete
     return vxWarpAffine(node, inputImage, matrix, scalarType, outputImage, &borders);
 }
 
-VX_PRIVATE_API vx_status vxoWarp_ValidateInput(vx_node node, vx_uint32 index, vx_size mat_columns)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoWarp_ValidateInput(vx_node node, vx_uint32 index, vx_size mat_columns)
 {
     vx_object_data_s objData[3] = {{0}};
     vx_enum          interp = 0;
@@ -3302,17 +3262,17 @@ VX_PRIVATE_API vx_status vxoWarp_ValidateInput(vx_node node, vx_uint32 index, vx
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoWarpAffine_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoWarpAffine_ValidateInput(vx_node node, vx_uint32 index)
 {
     return vxoWarp_ValidateInput(node, index, 2);
 }
 
-VX_PRIVATE_API vx_status vxoWarpPerspective_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoWarpPerspective_ValidateInput(vx_node node, vx_uint32 index)
 {
     return vxoWarp_ValidateInput(node, index, 3);
 }
 
-VX_PRIVATE_API vx_status vxoWarp_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoWarp_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -3331,7 +3291,7 @@ VX_PRIVATE_API vx_status vxoWarp_ValidateOutput(vx_node node, vx_uint32 index, v
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_HarrisCorners(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_HarrisCorners(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph;
 
@@ -3344,7 +3304,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_HarrisCorners(vx_node node, vx_reference 
     return vxProcessGraph(graph);
 }
 
-VX_PRIVATE_API vx_status vxoHarris_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHarris_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[5] = {{0}};
     vx_float32       d          = 0.0f;
@@ -3405,7 +3365,7 @@ VX_PRIVATE_API vx_status vxoHarris_ValidateInput(vx_node node, vx_uint32 index)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoHarris_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHarris_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     if (index != 6 && index != 7) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -3418,14 +3378,14 @@ VX_PRIVATE_API vx_status vxoHarris_ValidateOutput(vx_node node, vx_uint32 index,
             break;
 
         case 7:
-            ptr->u.scalarInfo.type    = VX_TYPE_UINT32;
+            ptr->u.scalarInfo.type    = VX_TYPE_SIZE;
             break;
     }
 
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoHarris_Initializer(vx_node node, vx_reference parameters[], vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHarris_Initializer(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_status  status = VX_FAILURE;
     vx_image   srcImage;
@@ -3444,6 +3404,7 @@ VX_PRIVATE_API vx_status vxoHarris_Initializer(vx_node node, vx_reference parame
     vx_scalar shiftScalar;
     vx_image virtImages[5];
     vx_node nodes[4];
+    vx_size numCorners;
 
     if (num != vxmLENGTH_OF(basekernel_harris_params)) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -3463,6 +3424,10 @@ VX_PRIVATE_API vx_status vxoHarris_Initializer(vx_node node, vx_reference parame
     i = 0;
     ds = 4;
     shiftScalar = vxCreateScalar(context, VX_TYPE_INT32, &ds);
+    vxReadScalarValue(numCornersScalar, &numCorners);
+
+
+    vxWriteScalarValue(numCornersScalar, &numCorners);
 
     for (i = 0; i < vxmLENGTH_OF(virtImages); i++)
     {
@@ -3471,7 +3436,7 @@ VX_PRIVATE_API vx_status vxoHarris_Initializer(vx_node node, vx_reference parame
     }
 
     nodes[0] = vxSobelMxNNode(graph, srcImage, winScalar, virtImages[0], virtImages[1]),
-    nodes[1] = vxHarrisScoreNode(graph, virtImages[0], virtImages[1], senScalar, blkScalar, virtImages[2]),
+    nodes[1] = vxHarrisScoreNode(graph, virtImages[0], virtImages[1], senScalar, winScalar, blkScalar, virtImages[2]),
     nodes[2] = vxEuclideanNonMaxNode(graph, virtImages[2], strScalar, minScalar, virtImages[3]),
     nodes[3] = vxImageListerNode(graph, virtImages[3], array, numCornersScalar);
 
@@ -3509,7 +3474,7 @@ VX_PRIVATE_API vx_status vxoHarris_Initializer(vx_node node, vx_reference parame
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoHarris_Deinitializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHarris_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph = VX_NULL;
 
@@ -3524,7 +3489,7 @@ VX_PRIVATE_API vx_status vxoHarris_Deinitializer(vx_node node, vx_reference *par
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Fast9Corners(vx_node node, vx_reference parameters[], vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Fast9Corners(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_graph graph;
 
@@ -3537,7 +3502,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Fast9Corners(vx_node node, vx_reference p
     return vxProcessGraph(graph);
 }
 
-VX_PRIVATE_API vx_status vxoFast9_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[3] = {{0}};
     vx_float32       k = 0.0f;
@@ -3579,7 +3544,7 @@ VX_PRIVATE_API vx_status vxoFast9_ValidateInput(vx_node node, vx_uint32 index)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoFast9_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     if (index != 3 && index != 4) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -3591,14 +3556,14 @@ VX_PRIVATE_API vx_status vxoFast9_ValidateOutput(vx_node node, vx_uint32 index, 
         ptr->u.arrayInfo.capacity = 0;
         break;
     case 4:
-        ptr->u.scalarInfo.type    = VX_TYPE_UINT32;
+        ptr->u.scalarInfo.type    = VX_TYPE_SIZE;//VX_TYPE_UINT32;
         break;
     }
 
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoFast9_Initializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_rectangle_t rect;
     vx_int32 i;
@@ -3654,7 +3619,7 @@ VX_PRIVATE_API vx_status vxoFast9_Initializer(vx_node node, vx_reference *parame
                 s_num_corners_b = vx_true_e;
 
             if(s_num_corners_b)
-                s_num_corners = vxCreateScalar(vxGetContext((vx_reference)src), VX_TYPE_UINT32, 0);
+                s_num_corners = vxCreateScalar(vxGetContext((vx_reference)src), VX_TYPE_SIZE, 0);
 
             nodes[0] = vxFast9CornersStrengthNode(graph, src, sens, nonm, output[0]);
             nodes[1] = vxFast9CornersNonMaxNode(graph, output[0], sens, nonm, output[1]);
@@ -3705,7 +3670,7 @@ VX_PRIVATE_API vx_status vxoFast9_Initializer(vx_node node, vx_reference *parame
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoFast9_Deinitializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph = VX_NULL;
 
@@ -3720,7 +3685,7 @@ VX_PRIVATE_API vx_status vxoFast9_Deinitializer(vx_node node, vx_reference *para
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_OpticalFlowPyrLK(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_OpticalFlowPyrLK(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph;
 
@@ -3733,7 +3698,7 @@ VX_PRIVATE_API vx_status vxoBaseKernel_OpticalFlowPyrLK(vx_node node, vx_referen
     return vxProcessGraph(graph);
 }
 
-VX_PRIVATE_API vx_status vxoOpticalFlowPyrLK_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoOpticalFlowPyrLK_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -3803,7 +3768,7 @@ VX_PRIVATE_API vx_status vxoOpticalFlowPyrLK_ValidateInput(vx_node node, vx_uint
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoOpticalFlowPyrLK_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoOpticalFlowPyrLK_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData;
 
@@ -3819,7 +3784,7 @@ VX_PRIVATE_API vx_status vxoOpticalFlowPyrLK_ValidateOutput(vx_node node, vx_uin
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoOpticalFlowPyrLK_Initializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoOpticalFlowPyrLK_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
     vx_node   *nodes;
@@ -3929,7 +3894,7 @@ VX_PRIVATE_API vx_status vxoOpticalFlowPyrLK_Initializer(vx_node node, vx_refere
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoOpticalFlowPyrLK_Deinitializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoOpticalFlowPyrLK_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph = VX_NULL;
 
@@ -3944,7 +3909,7 @@ VX_PRIVATE_API vx_status vxoOpticalFlowPyrLK_Deinitializer(vx_node node, vx_refe
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoBaseKernel_Remap(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Remap(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image         inputImage;
     vx_remap         remapTable;
@@ -3960,14 +3925,14 @@ VX_PRIVATE_API vx_status vxoBaseKernel_Remap(vx_node node, vx_reference *paramet
     scalarType = (vx_scalar)parameters[2];
     outputImage = (vx_image)parameters[3];
 
-    vxAccessScalarValue(scalarType, &policy);
+    vxReadScalarValue(scalarType, &policy);
 
     vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borders, sizeof(borders));
 
     return vxRemap(node, inputImage, remapTable, policy, &borders, outputImage);
 }
 
-VX_PRIVATE_API vx_status vxoRemap_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoRemap_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[3] = {{0}};
     vx_enum          policy     = 0;
@@ -4008,7 +3973,7 @@ VX_PRIVATE_API vx_status vxoRemap_ValidateInput(vx_node node, vx_uint32 index)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoRemap_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoRemap_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData[3] = {{0}};
 
@@ -4035,7 +4000,7 @@ VX_PRIVATE_API vx_status vxoRemap_ValidateOutput(vx_node node, vx_uint32 index, 
 }
 
 /* internal kernel */
-VX_PRIVATE_API vx_status vxoInternalKernel_SobelMxN(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SobelMxN(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage      = VX_NULL;
     vx_scalar winScalar      = VX_NULL;
@@ -4050,6 +4015,8 @@ VX_PRIVATE_API vx_status vxoInternalKernel_SobelMxN(vx_node node, vx_reference *
     grad_x      = (vx_image)parameters[2];
     grad_y      = (vx_image)parameters[3];
 
+    node->kernelAttributes.isAllGPU = vx_true_e;
+
     if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borders, sizeof(borders)) == VX_SUCCESS)
     {
         return vxSobelMxN(node, inputImage, winScalar, grad_x, grad_y, &borders);
@@ -4058,7 +4025,7 @@ VX_PRIVATE_API vx_status vxoInternalKernel_SobelMxN(vx_node node, vx_reference *
     return VX_FAILURE;
 }
 
-VX_PRIVATE_API vx_status vxoGradientMxN_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoGradientMxN_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
     vx_uint32        winSize = 0;
@@ -4091,7 +4058,7 @@ VX_PRIVATE_API vx_status vxoGradientMxN_ValidateInput(vx_node node, vx_uint32 in
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoGradientMxN_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoGradientMxN_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
 {
     vx_object_data_s objData = {0};
 
@@ -4105,37 +4072,39 @@ VX_PRIVATE_API vx_status vxoGradientMxN_ValidateOutput(vx_node node, vx_uint32 i
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_HarrisScore(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_HarrisScore(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image         grad_x   = VX_NULL;
     vx_image         grad_y   = VX_NULL;
+    vx_scalar        scales   = VX_NULL;
     vx_scalar        sens     = VX_NULL;
     vx_scalar        winds    = VX_NULL;
     vx_image         dstImage = VX_NULL;
     vx_border_mode_t borders  = {VX_BORDER_MODE_UNDEFINED, 0};
 
-    if (num != 5) return VX_ERROR_INVALID_PARAMETERS;
+    if (num != 6) return VX_ERROR_INVALID_PARAMETERS;
 
      grad_x   = (vx_image)parameters[0];
      grad_y   = (vx_image)parameters[1];
      sens     = (vx_scalar)parameters[2];
-     winds    = (vx_scalar)parameters[3];
-     dstImage = (vx_image)parameters[4];
+     scales   = (vx_scalar)parameters[3];
+     winds    = (vx_scalar)parameters[4];
+     dstImage = (vx_image)parameters[5];
 
      if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borders, sizeof(borders)) == VX_SUCCESS)
      {
-         return vxHarrisScore(node, grad_x, grad_y, dstImage, winds, sens, borders);
+         return vxHarrisScore(node, grad_x, grad_y, dstImage, scales, winds, sens, borders);
      }
 
      return VX_FAILURE;
 }
 
-VX_PRIVATE_API vx_status vxoHarrisScore_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHarrisScore_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
     vx_int32 size = 0;
 
-    if (index != 0 && index != 1 && index != 2 && index != 3) return VX_ERROR_INVALID_PARAMETERS;
+    if (index != 0 && index != 1 && index != 2 && index != 3 && index != 4) return VX_ERROR_INVALID_PARAMETERS;
 
     switch (index)
     {
@@ -4160,6 +4129,17 @@ VX_PRIVATE_API vx_status vxoHarrisScore_ValidateInput(vx_node node, vx_uint32 in
                 return VX_ERROR_INVALID_PARAMETERS;
 
             if (objData.u.scalarInfo.dataType != VX_TYPE_INT32) return VX_ERROR_INVALID_TYPE;
+            size = (1 << (size - 1));
+
+            if (size != 4 && size != 16 && size != 64) return VX_ERROR_INVALID_VALUE;
+
+            break;
+        case 4:
+            objData.u.scalarInfo.scalarValuePtr = &size;
+            if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_SCALAR, &objData) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+
+            if (objData.u.scalarInfo.dataType != VX_TYPE_INT32) return VX_ERROR_INVALID_TYPE;
 
             if (size != 3 && size != 5 && size != 7) return VX_ERROR_INVALID_VALUE;
 
@@ -4169,11 +4149,11 @@ VX_PRIVATE_API vx_status vxoHarrisScore_ValidateInput(vx_node node, vx_uint32 in
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoHarrisScore_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoHarrisScore_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
 {
     vx_object_data_s objData = {0};
 
-    if (index != 4) return VX_ERROR_INVALID_PARAMETERS;
+    if (index != 5) return VX_ERROR_INVALID_PARAMETERS;
 
     if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
         return VX_ERROR_INVALID_PARAMETERS;
@@ -4183,7 +4163,7 @@ VX_PRIVATE_API vx_status vxoHarrisScore_ValidateOutput(vx_node node, vx_uint32 i
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_EuclideanNonMaxSuppression(vx_node node, vx_reference parameters[], vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EuclideanNonMaxSuppression(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_image  srcImage;
     vx_scalar thresh;
@@ -4200,7 +4180,7 @@ VX_PRIVATE_API vx_status vxoInternalKernel_EuclideanNonMaxSuppression(vx_node no
     return vxEuclideanNonMaxSuppression(node, srcImage, thresh, radius, dstImage);
 }
 
-VX_PRIVATE_API vx_status vxoEuclideanNonMax_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEuclideanNonMax_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
     vx_float32 radius = 0;
@@ -4242,7 +4222,7 @@ VX_PRIVATE_API vx_status vxoEuclideanNonMax_ValidateInput(vx_node node, vx_uint3
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoEuclideanNonMax_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEuclideanNonMax_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
 {
     vx_object_data_s objData = {0};
 
@@ -4256,7 +4236,7 @@ VX_PRIVATE_API vx_status vxoEuclideanNonMax_ValidateOutput(vx_node node, vx_uint
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_ImageLister(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_ImageLister(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph;
 
@@ -4269,7 +4249,7 @@ VX_PRIVATE_API vx_status vxoInternalKernel_ImageLister(vx_node node, vx_referenc
     return vxProcessGraph(graph);
 }
 
-VX_PRIVATE_API vx_status vxoLister_Initializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLister_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
     vx_enum    itemType;
@@ -4310,6 +4290,7 @@ VX_PRIVATE_API vx_status vxoLister_Initializer(vx_node node, vx_reference *param
     nodes[0] = vxCreateListerNode(graph, inputImage, countImage, tempArray);
     nodes[1] = vxPackArraysNode(graph, countImage, tempArray, widthScalar, heightScalar, outputArray, numScalar);
 
+
     status = VX_SUCCESS;
     status |= vxoAddParameterToGraphByIndex(graph, nodes[0], 0);
     status |= vxoAddParameterToGraphByIndex(graph, nodes[1], 4);
@@ -4342,7 +4323,7 @@ VX_PRIVATE_API vx_status vxoLister_Initializer(vx_node node, vx_reference *param
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoLister_Deinitializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLister_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph = VX_NULL;
 
@@ -4357,7 +4338,7 @@ VX_PRIVATE_API vx_status vxoLister_Deinitializer(vx_node node, vx_reference *par
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoLister_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLister_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -4377,7 +4358,7 @@ VX_PRIVATE_API vx_status vxoLister_ValidateInput(vx_node node, vx_uint32 index)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoLister_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLister_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
 {
     if (index != 1 && index != 2) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -4388,14 +4369,14 @@ VX_PRIVATE_API vx_status vxoLister_ValidateOutput(vx_node node, vx_uint32 index,
         meta->u.arrayInfo.itemType = VX_TYPE_KEYPOINT;
         break;
     case 2:
-        meta->u.scalarInfo.type = VX_TYPE_UINT32;
+        meta->u.scalarInfo.type = VX_TYPE_SIZE;
         break;
     }
 
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_Norm(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Norm(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image  inputX;
     vx_image  inputY;
@@ -4408,11 +4389,12 @@ VX_PRIVATE_API vx_status vxoInternalKernel_Norm(vx_node node, vx_reference *para
     inputY   = (vx_image)parameters[1];
     normType = (vx_scalar)parameters[2];
     output   = (vx_image)parameters[3];
+    node->kernelAttributes.isAllGPU = vx_true_e;
 
     return vxNorm(node, inputX, inputY, normType, output);
 }
 
-VX_PRIVATE_API vx_status vxoNorm_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNorm_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[2] = {{0}};
     vx_enum          value;
@@ -4459,7 +4441,7 @@ VX_PRIVATE_API vx_status vxoNorm_ValidateInput(vx_node node, vx_uint32 index)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoNorm_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNorm_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
 {
     vx_object_data_s objData = {0};
 
@@ -4473,7 +4455,7 @@ VX_PRIVATE_API vx_status vxoNorm_ValidateOutput(vx_node node, vx_uint32 index, v
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_NonMaxSuppression(vx_node node, vx_reference parameters[], vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_NonMaxSuppression(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_image i_mag;
     vx_image i_ang;
@@ -4485,14 +4467,14 @@ VX_PRIVATE_API vx_status vxoInternalKernel_NonMaxSuppression(vx_node node, vx_re
     i_mag  = (vx_image)parameters[0];
     i_ang  = (vx_image)parameters[1];
     i_edge = (vx_image)parameters[2];
-
+    node->kernelAttributes.isAllGPU = vx_true_e;
     vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borders, sizeof(borders));
 
     return vxNonMaxSuppression(node, i_mag, i_ang, i_edge, &borders);
 
 }
 
-VX_PRIVATE_API vx_status vxoNonMaxSuppression_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNonMaxSuppression_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[2] = {{0}};
 
@@ -4532,7 +4514,7 @@ VX_PRIVATE_API vx_status vxoNonMaxSuppression_ValidateInput(vx_node node, vx_uin
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoNonMaxSuppression_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoNonMaxSuppression_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
 {
     vx_object_data_s objData = {0};
 
@@ -4546,20 +4528,20 @@ VX_PRIVATE_API vx_status vxoNonMaxSuppression_ValidateOutput(vx_node node, vx_ui
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_EdgeTrace(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EdgeTrace(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph;
 
     if (num != vxmLENGTH_OF(internalkernel_edge_trace_params)) return VX_ERROR_INVALID_PARAMETERS;
 
-    node->kernelAttributes.isAllGPU = vx_false_e;
+    node->kernelAttributes.isAllGPU = vx_true_e;
 
     graph = vxoNode_GetChildGraph(node);
 
     return vxProcessGraph(graph);
 }
 
-VX_PRIVATE_API vx_status vxoEdgeTrace_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEdgeTrace_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -4586,7 +4568,7 @@ VX_PRIVATE_API vx_status vxoEdgeTrace_ValidateInput(vx_node node, vx_uint32 inde
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoEdgeTrace_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEdgeTrace_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
 {
     vx_object_data_s objData = {0};
 
@@ -4600,7 +4582,7 @@ VX_PRIVATE_API vx_status vxoEdgeTrace_ValidateOutput(vx_node node, vx_uint32 ind
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoEdgeTrace_Initializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEdgeTrace_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_status status = VX_SUCCESS;
     vx_rectangle_t rect;
@@ -4629,7 +4611,7 @@ VX_PRIVATE_API vx_status vxoEdgeTrace_Initializer(vx_node node, vx_reference *pa
 
     if (!vxoImage_AllocateMemory(image))
         status |= VX_ERROR_NO_MEMORY;
-    vxCommitScalarValue(flag, &count);
+    vxWriteScalarValue(flag, &count);
 
     nodes[0] = vxEdgeTraceThresholdNode(graph, normImage, threshold, image);
     nodes[1] = vxEdgeTraceHysteresisNode(graph, image, flag);
@@ -4668,7 +4650,7 @@ VX_PRIVATE_API vx_status vxoEdgeTrace_Initializer(vx_node node, vx_reference *pa
     return status;
 }
 
-VX_PRIVATE_API vx_status vxoEdgeTrace_Deinitializer(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEdgeTrace_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph = VX_NULL;
 
@@ -4683,7 +4665,7 @@ VX_PRIVATE_API vx_status vxoEdgeTrace_Deinitializer(vx_node node, vx_reference *
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_EdgeTraceThreshold(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EdgeTraceThreshold(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image norm;
     vx_threshold threshold;
@@ -4691,7 +4673,7 @@ VX_PRIVATE_API vx_status vxoInternalKernel_EdgeTraceThreshold(vx_node node, vx_r
 
     if (num != vxmLENGTH_OF(internalkernel_edgeTrace_threshold_params))
         return VX_ERROR_INVALID_PARAMETERS;
-
+    node->kernelAttributes.isAllGPU = vx_true_e;
     norm = (vx_image)parameters[0];
     threshold = (vx_threshold)parameters[1];
     img = (vx_image)parameters[2];
@@ -4699,12 +4681,12 @@ VX_PRIVATE_API vx_status vxoInternalKernel_EdgeTraceThreshold(vx_node node, vx_r
     return vxEdgeTraceThreshold(node, norm, threshold, img);
 }
 
-VX_PRIVATE_API vx_status vxoEdgeTraceThreshold_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEdgeTraceThreshold_ValidateInput(vx_node node, vx_uint32 index)
 {
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoEdgeTraceThreshold_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEdgeTraceThreshold_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s dstObjData = {0};
 
@@ -4725,7 +4707,7 @@ VX_PRIVATE_API vx_status vxoEdgeTraceThreshold_ValidateOutput(vx_node node, vx_u
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_EdgeTraceHysteresis(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EdgeTraceHysteresis(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image img;
     vx_scalar flag;
@@ -4735,16 +4717,17 @@ VX_PRIVATE_API vx_status vxoInternalKernel_EdgeTraceHysteresis(vx_node node, vx_
 
     img = (vx_image)parameters[0];
     flag = (vx_scalar)parameters[1];
+    node->kernelAttributes.isAllGPU = vx_true_e;
 
     return vxEdgeTraceHysteresis(node, img, flag);
 }
 
-VX_PRIVATE_API vx_status vxoEdgeTraceHysteresis_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEdgeTraceHysteresis_ValidateInput(vx_node node, vx_uint32 index)
 {
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoEdgeTraceHysteresis_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEdgeTraceHysteresis_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s dstObjData = {0};
 
@@ -4758,7 +4741,7 @@ VX_PRIVATE_API vx_status vxoEdgeTraceHysteresis_ValidateOutput(vx_node node, vx_
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_EdgeTraceClamp(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EdgeTraceClamp(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage;
     vx_image outputImage;
@@ -4767,16 +4750,17 @@ VX_PRIVATE_API vx_status vxoInternalKernel_EdgeTraceClamp(vx_node node, vx_refer
 
     inputImage = (vx_image)parameters[0];
     outputImage = (vx_image)parameters[1];
+    node->kernelAttributes.isAllGPU = vx_true_e;
 
     return vxEdgeTraceClamp(node, inputImage, outputImage);
 }
 
-VX_PRIVATE_API vx_status vxoEdgeTraceClamp_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEdgeTraceClamp_ValidateInput(vx_node node, vx_uint32 index)
 {
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoEdgeTraceClamp_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEdgeTraceClamp_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s dstObjData = {0};
 
@@ -4790,7 +4774,198 @@ VX_PRIVATE_API vx_status vxoEdgeTraceClamp_ValidateOutput(vx_node node, vx_uint3
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_Example(vx_node node, vx_reference parameters[], vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SGM(vx_node node, const vx_reference parameters[], vx_uint32 num)
+{
+    vx_graph graph;
+
+    if (num != 3) return VX_ERROR_INVALID_PARAMETERS;
+    node->kernelAttributes.isAllGPU = vx_false_e;
+
+    graph = vxoNode_GetChildGraph(node);
+
+    return vxProcessGraph(graph);
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSGM_ValidateInput(vx_node node, vx_uint32 index)
+{
+    vx_object_data_s objData = {0};
+
+    if (index != 0 && index != 1) return VX_ERROR_INVALID_PARAMETERS;
+
+    if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSGM_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+{
+    vx_object_data_s objData = {0};
+
+    if (index != 2) return VX_ERROR_INVALID_PARAMETERS;
+
+    if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    vxoFillMetaData(meta, VX_TYPE_IMAGE, objData.u.imageInfo.format, objData.u.imageInfo.width, objData.u.imageInfo.height, 0);
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSGM_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 width;
+    vx_uint32 height;
+    vx_graph graph;
+    vx_uint32 range = 48;
+    vx_uint32 i;
+    vx_node nodes[6] = {NULL};
+    vx_image cost = VX_NULL;
+    vx_image path = VX_NULL;
+    vx_context context = VX_NULL;
+    vx_scalar disp_range;
+    vx_image right = (vx_image)parameters[0];
+    vx_image left = (vx_image)parameters[1];
+    vx_image depth = (vx_image)parameters[2];
+
+    status |= vxQueryImage(right, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
+    status |= vxQueryImage(right, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    context = vxGetContext((vx_reference)node);
+    graph = vxCreateGraph(context);
+    cost = vxCreateImage(context, width * range, height, VX_DF_IMAGE_U16);
+    path = vxCreateImage(context, width * range, height, VX_DF_IMAGE_U16);
+    disp_range = vxCreateScalar(context, VX_TYPE_UINT32, &range);
+
+    if (!vxoImage_AllocateMemory(cost)
+        || !vxoImage_AllocateMemory(path))
+        status |= VX_ERROR_NO_MEMORY;
+
+    nodes[0] = vxSgmCostNode(graph, right, left, disp_range, cost);
+    nodes[1] = vxSgmCostPath90Node(graph, cost, disp_range, path);
+    nodes[2] = vxSgmCostPath45Node(graph, cost, disp_range, path);
+    nodes[3] = vxSgmCostPath135Node(graph, cost, disp_range, path);
+    nodes[4] = vxSgmCostPath0Node(graph, cost, disp_range, path);
+    nodes[5] = vxSgmGetDispNode(graph, path, disp_range, depth);
+
+    status |= vxoAddParameterToGraphByIndex(graph, nodes[0], 0);
+    status |= vxoAddParameterToGraphByIndex(graph, nodes[0], 1);
+    status |= vxoAddParameterToGraphByIndex(graph, nodes[5], 2);
+
+    for (i = 0; i < vxmLENGTH_OF(nodes); i++)
+    {
+        status |= vxReleaseNode(&nodes[i]);
+    }
+    status |= vxReleaseScalar(&disp_range);
+    status |= vxReleaseImage(&cost);
+    status |= vxReleaseImage(&path);
+
+    status |= vxVerifyGraph(graph);
+
+    if (status == VX_SUCCESS)
+    {
+        status = vxoNode_SetChildGraph(node, graph);
+    }
+    else
+    {
+        vxReleaseGraph(&graph);
+    }
+    return status;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSGM_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_status status = VX_SUCCESS;
+    vx_graph graph = VX_NULL;
+
+    graph = vxoNode_GetChildGraph(node);
+
+    status |= vxReleaseGraph(&graph);
+
+    status |= vxoNode_SetChildGraph(node, 0);
+    return status;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Laplacian3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_image src;
+    vx_image dst;
+    vx_border_mode_t bordermode;
+
+    if (num != 2) return VX_ERROR_INVALID_PARAMETERS;
+
+    src = (vx_image)parameters[0];
+    dst = (vx_image)parameters[1];
+
+    if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
+    {
+        return vxLaplacian3x3(node, src, dst, &bordermode);
+    }
+    else
+    {
+        return VX_ERROR_INVALID_PARAMETERS;
+    }
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacian3x3_ValidateInput(vx_node node, vx_uint32 index)
+{
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacian3x3_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+{
+    vx_object_data_s objData = {0};
+
+    if (index == 1)
+    {
+        if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
+
+        vxoFillMetaData(ptr, VX_TYPE_IMAGE, objData.u.imageInfo.format, objData.u.imageInfo.width, objData.u.imageInfo.height, 0);
+
+        return VX_SUCCESS;
+    }
+    else
+        return VX_ERROR_INVALID_PARAMETERS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Census3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_image src;
+    vx_image dst;
+
+    if (num != 2) return VX_ERROR_INVALID_PARAMETERS;
+
+    src = (vx_image)parameters[0];
+    dst = (vx_image)parameters[1];
+
+    return vxCensus3x3(node, src, dst);
+
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCensus3x3_ValidateInput(vx_node node, vx_uint32 index)
+{
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCensus3x3_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+{
+    vx_object_data_s objData = {0};
+
+    if (index == 1)
+    {
+        if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
+
+        vxoFillMetaData(ptr, VX_TYPE_IMAGE, objData.u.imageInfo.format, objData.u.imageInfo.width, objData.u.imageInfo.height, 0);
+
+        return VX_SUCCESS;
+    }
+    else
+        return VX_ERROR_INVALID_PARAMETERS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_CopyImage(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_image input;
     vx_image output;
@@ -4800,11 +4975,11 @@ VX_PRIVATE_API vx_status vxoInternalKernel_Example(vx_node node, vx_reference pa
     input  = (vx_image)parameters[0];
     output  = (vx_image)parameters[1];
 
-    return vxExample(node, input, output);
+    return vxCopyImage(node, input, output);
 
 }
 
-VX_PRIVATE_API vx_status vxoExample_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -4816,7 +4991,7 @@ VX_PRIVATE_API vx_status vxoExample_ValidateInput(vx_node node, vx_uint32 index)
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoExample_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
 {
     vx_object_data_s objData = {0};
 
@@ -4830,47 +5005,7 @@ VX_PRIVATE_API vx_status vxoExample_ValidateOutput(vx_node node, vx_uint32 index
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_CopyImage(vx_node node, vx_reference parameters[], vx_uint32 num)
-{
-    vx_image input;
-    vx_image output;
-
-    if (num != 2) return VX_ERROR_INVALID_PARAMETERS;
-
-    input  = (vx_image)parameters[0];
-    output  = (vx_image)parameters[1];
-
-    return vxoCopyImage(input, output);
-
-}
-
-VX_PRIVATE_API vx_status vxoCopyImage_ValidateInput(vx_node node, vx_uint32 index)
-{
-    vx_object_data_s objData = {0};
-
-    if (index != 0) return VX_ERROR_INVALID_PARAMETERS;
-
-    if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
-        return VX_ERROR_INVALID_PARAMETERS;
-
-    return VX_SUCCESS;
-}
-
-VX_PRIVATE_API vx_status vxoCopyImage_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
-{
-    vx_object_data_s objData = {0};
-
-    if (index != 1) return VX_ERROR_INVALID_PARAMETERS;
-
-    if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
-        return VX_ERROR_INVALID_PARAMETERS;
-
-    vxoFillMetaData(meta, VX_TYPE_IMAGE, objData.u.imageInfo.format, objData.u.imageInfo.width, objData.u.imageInfo.height, 0);
-
-    return VX_SUCCESS;
-}
-
-VX_PRIVATE_API vx_status vxoInternalKernel_Fast9CornersStrength(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Fast9CornersStrength(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage      = VX_NULL;
     vx_scalar tolerance      = VX_NULL;
@@ -4888,7 +5023,7 @@ VX_PRIVATE_API vx_status vxoInternalKernel_Fast9CornersStrength(vx_node node, vx
 
 }
 
-VX_PRIVATE_API vx_status vxoFast9CornersStrength_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[3] = {{0}};
     vx_float32       k = 0.0f;
@@ -4930,7 +5065,7 @@ VX_PRIVATE_API vx_status vxoFast9CornersStrength_ValidateInput(vx_node node, vx_
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoFast9CornersStrength_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s srcObjData = {0};
     vx_object_data_s dstObjData = {0};
@@ -4946,7 +5081,7 @@ VX_PRIVATE_API vx_status vxoFast9CornersStrength_ValidateOutput(vx_node node, vx
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_Fast9CornersNonMax(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Fast9CornersNonMax(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage      = VX_NULL;
     vx_scalar tolerance      = VX_NULL;
@@ -4964,7 +5099,7 @@ VX_PRIVATE_API vx_status vxoInternalKernel_Fast9CornersNonMax(vx_node node, vx_r
 
 }
 
-VX_PRIVATE_API vx_status vxoFast9CornersNonMax_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData[3] = {{0}};
     vx_float32       k = 0.0f;
@@ -5006,7 +5141,7 @@ VX_PRIVATE_API vx_status vxoFast9CornersNonMax_ValidateInput(vx_node node, vx_ui
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoFast9CornersNonMax_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s srcObjData = {0};
     vx_object_data_s dstObjData = {0};
@@ -5022,7 +5157,7 @@ VX_PRIVATE_API vx_status vxoFast9CornersNonMax_ValidateOutput(vx_node node, vx_u
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_CreateLister(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_CreateLister(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage     = VX_NULL;
     vx_image outputImage    = VX_NULL;
@@ -5049,7 +5184,7 @@ VX_PRIVATE_API vx_status vxoInternalKernel_CreateLister(vx_node node, vx_referen
 
 }
 
-VX_PRIVATE_API vx_status vxoCreateLister_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCreateLister_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -5069,7 +5204,7 @@ VX_PRIVATE_API vx_status vxoCreateLister_ValidateInput(vx_node node, vx_uint32 i
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoCreateLister_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCreateLister_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s dstObjData = {0};
 
@@ -5093,7 +5228,7 @@ VX_PRIVATE_API vx_status vxoCreateLister_ValidateOutput(vx_node node, vx_uint32 
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_PackArrays(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_PackArrays(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage     = VX_NULL;
     vx_array inputArray     = VX_NULL;
@@ -5114,8 +5249,8 @@ VX_PRIVATE_API vx_status vxoInternalKernel_PackArrays(vx_node node, vx_reference
     outputArray  = (vx_array)parameters[4];
     numScalar    = (vx_scalar)parameters[5];
 
-    vxAccessScalarValue(widthScalar, &width);
-    vxAccessScalarValue(heightScalar, &height);
+    vxReadScalarValue(widthScalar, &width);
+    vxReadScalarValue(heightScalar, &height);
 
     if (outputArray)
     {
@@ -5127,7 +5262,7 @@ VX_PRIVATE_API vx_status vxoInternalKernel_PackArrays(vx_node node, vx_reference
     return vxPackArrays(node, inputImage, inputArray, widthScalar, heightScalar, itemSize, cap, outputArray, numScalar);
 }
 
-VX_PRIVATE_API vx_status vxoPackArrays_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoPackArrays_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -5164,7 +5299,7 @@ VX_PRIVATE_API vx_status vxoPackArrays_ValidateInput(vx_node node, vx_uint32 ind
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoPackArrays_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoPackArrays_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     switch(index)
     {
@@ -5173,7 +5308,7 @@ VX_PRIVATE_API vx_status vxoPackArrays_ValidateOutput(vx_node node, vx_uint32 in
         ptr->u.arrayInfo.itemType = VX_TYPE_KEYPOINT;
         break;
     case 5:
-        ptr->u.scalarInfo.type = VX_TYPE_UINT32;
+        ptr->u.scalarInfo.type = VX_TYPE_SIZE;
         break;
     default:
         return VX_ERROR_INVALID_PARAMETERS;
@@ -5182,7 +5317,7 @@ VX_PRIVATE_API vx_status vxoPackArrays_ValidateOutput(vx_node node, vx_uint32 in
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_MinMaxlocPackArrays(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_MinMaxlocPackArrays(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage     = VX_NULL;
     vx_array inputArray     = VX_NULL;
@@ -5203,8 +5338,8 @@ VX_PRIVATE_API vx_status vxoInternalKernel_MinMaxlocPackArrays(vx_node node, vx_
     countScalar = (vx_scalar)parameters[4];
     outputArray  = (vx_array)parameters[5];
 
-    vxAccessScalarValue(widthScalar, &width);
-    vxAccessScalarValue(heightScalar, &height);
+    vxReadScalarValue(widthScalar, &width);
+    vxReadScalarValue(heightScalar, &height);
 
     if (outputArray)
     {
@@ -5216,7 +5351,7 @@ VX_PRIVATE_API vx_status vxoInternalKernel_MinMaxlocPackArrays(vx_node node, vx_
     return vxMinMaxPackLocation(node, inputImage, inputArray, widthScalar, heightScalar, countScalar, itemSize, cap, outputArray);
 }
 
-VX_PRIVATE_API vx_status vxoMinMaxLocPackArrays_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxLocPackArrays_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -5254,7 +5389,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLocPackArrays_ValidateInput(vx_node node, vx_u
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoMinMaxLocPackArrays_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxLocPackArrays_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     switch(index)
     {
@@ -5275,7 +5410,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLocPackArrays_ValidateOutput(vx_node node, vx_
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_MinMaxLocFilter(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_MinMaxLocFilter(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage;
     vx_scalar filterMin;
@@ -5290,7 +5425,7 @@ VX_PRIVATE_API vx_status vxoInternalKernel_MinMaxLocFilter(vx_node node, vx_refe
     return vxMinMaxLocFilter(node, inputImage, filterMin, filterMax);
 }
 
-VX_PRIVATE_API vx_status vxoMinMaxLocFilter_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxLocFilter_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData;
 
@@ -5311,7 +5446,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLocFilter_ValidateInput(vx_node node, vx_uint3
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoMinMaxLocFilter_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxLocFilter_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData;
     vx_enum          type = VX_TYPE_INVALID;
@@ -5351,7 +5486,7 @@ VX_PRIVATE_API vx_status vxoMinMaxLocFilter_ValidateOutput(vx_node node, vx_uint
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_MinMaxGetLocation(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_MinMaxGetLocation(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage, minImage, maxImage;
     vx_scalar minVal, maxVal, minCount, maxCount;
@@ -5373,7 +5508,7 @@ VX_PRIVATE_API vx_status vxoInternalKernel_MinMaxGetLocation(vx_node node, vx_re
     return vxMinMaxGetLocation(node, inputImage, minVal, maxVal, format, minImage, maxImage, minCount, maxCount, minArray, maxArray);
 }
 
-VX_PRIVATE_API vx_status vxoMinMaxGetLocation_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_ValidateInput(vx_node node, vx_uint32 index)
 {
     vx_object_data_s objData = {0};
 
@@ -5413,7 +5548,7 @@ VX_PRIVATE_API vx_status vxoMinMaxGetLocation_ValidateInput(vx_node node, vx_uin
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoMinMaxGetLocation_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -5442,7 +5577,7 @@ VX_PRIVATE_API vx_status vxoMinMaxGetLocation_ValidateOutput(vx_node node, vx_ui
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_IntegralImageStep(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_IntegralImageStep(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage;
     vx_image outputImage;
@@ -5455,17 +5590,17 @@ VX_PRIVATE_API vx_status vxoInternalKernel_IntegralImageStep(vx_node node, vx_re
     stepScalar  = (vx_scalar)parameters[1];
     outputImage = (vx_image)parameters[2];
 
-    vxAccessScalarValue(stepScalar, &stepValue);
+    vxReadScalarValue(stepScalar, &stepValue);
 
     return vxIntegralImage(node, inputImage, stepValue, outputImage);
 }
 
-VX_PRIVATE_API vx_status vxoIntegralImageStep_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegralImageStep_ValidateInput(vx_node node, vx_uint32 index)
 {
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoIntegralImageStep_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegralImageStep_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -5479,7 +5614,7 @@ VX_PRIVATE_API vx_status vxoIntegralImageStep_ValidateOutput(vx_node node, vx_ui
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_Scharr3x3(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Scharr3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image inputImage;
     vx_image gradXImage;
@@ -5494,12 +5629,12 @@ VX_PRIVATE_API vx_status vxoInternalKernel_Scharr3x3(vx_node node, vx_reference 
     return vxScharr3x3(node, inputImage, gradXImage, gradYImage);
 }
 
-VX_PRIVATE_API vx_status vxoScharr3x3_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoScharr3x3_ValidateInput(vx_node node, vx_uint32 index)
 {
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoScharr3x3_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoScharr3x3_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -5520,7 +5655,7 @@ VX_PRIVATE_API vx_status vxoScharr3x3_ValidateOutput(vx_node node, vx_uint32 ind
     }
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_VLKTracker(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_VLKTracker(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_pyramid oldPyramid, newPyramid, gradXPyramid, gradYPyramid;
     vx_array   prevPts, estimatedPts, nextPts;
@@ -5544,10 +5679,10 @@ VX_PRIVATE_API vx_status vxoInternalKernel_VLKTracker(vx_node node, vx_reference
     winSizeScalar              = (vx_scalar)parameters[11];
 
     vxQueryPyramid(oldPyramid, VX_PYRAMID_ATTRIBUTE_LEVELS, &maxLevel, sizeof(maxLevel));
-    vxQueryPyramid(oldPyramid, VX_PYRAMID_ATTRIBUTE_SCALE , &pyramidScaleValue, sizeof(pyramidScaleValue));
+    vxQueryPyramid(oldPyramid, VX_PYRAMID_ATTRIBUTE_SCALE, &pyramidScaleValue, sizeof(pyramidScaleValue));
 
     /* checking and preparing */
-    vxAccessScalarValue(isUseInitialEstimateScalar, &isUseInitialEstimate);
+    vxReadScalarValue(isUseInitialEstimateScalar, &isUseInitialEstimate);
     vxQueryArray(prevPts, VX_ARRAY_ATTRIBUTE_NUMITEMS, &listLength, sizeof(listLength));
     if (isUseInitialEstimate)
     {
@@ -5564,12 +5699,12 @@ VX_PRIVATE_API vx_status vxoInternalKernel_VLKTracker(vx_node node, vx_reference
                         (vx_int32)maxLevel, pyramidScaleValue);
 }
 
-VX_PRIVATE_API vx_status vxoVLKTracker_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoVLKTracker_ValidateInput(vx_node node, vx_uint32 index)
 {
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoVLKTracker_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoVLKTracker_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData;
 
@@ -5585,7 +5720,7 @@ VX_PRIVATE_API vx_status vxoVLKTracker_ValidateOutput(vx_node node, vx_uint32 in
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_EqualizeHistogramHist(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EqualizeHistogramHist(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image srcImage;
     vx_image histImage;
@@ -5600,12 +5735,12 @@ VX_PRIVATE_API vx_status vxoInternalKernel_EqualizeHistogramHist(vx_node node, v
     return vxEqualizeHist_hist(node, srcImage, histImage, minIndexScalar);
 }
 
-VX_PRIVATE_API vx_status vxoEqualizeHistogramHist_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHistogramHist_ValidateInput(vx_node node, vx_uint32 index)
 {
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoEqualizeHistogramHist_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHistogramHist_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -5628,7 +5763,7 @@ VX_PRIVATE_API vx_status vxoEqualizeHistogramHist_ValidateOutput(vx_node node, v
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_EqualizeHistogramGcdf(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EqualizeHistogramGcdf(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image histImage, cdfImage;
     vx_scalar minIndexScalar, minValueScalar;
@@ -5643,12 +5778,12 @@ VX_PRIVATE_API vx_status vxoInternalKernel_EqualizeHistogramGcdf(vx_node node, v
     return vxEqualizeHist_gcdf(node, histImage, minIndexScalar, cdfImage, minValueScalar);
 }
 
-VX_PRIVATE_API vx_status vxoEqualizeHistogramGcdf_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHistogramGcdf_ValidateInput(vx_node node, vx_uint32 index)
 {
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoEqualizeHistogramGcdf_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHistogramGcdf_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -5671,7 +5806,7 @@ VX_PRIVATE_API vx_status vxoEqualizeHistogramGcdf_ValidateOutput(vx_node node, v
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_EqualizeHistogramCdf(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EqualizeHistogramCdf(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image srcImage, cdfImage, histImage;
     vx_scalar minValueScalar;
@@ -5692,12 +5827,12 @@ VX_PRIVATE_API vx_status vxoInternalKernel_EqualizeHistogramCdf(vx_node node, vx
     return vxEqualizeHist_cdf(node, cdfImage, wxh, minValueScalar, histImage);
 }
 
-VX_PRIVATE_API vx_status vxoEqualizeHistogramCdf_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHistogramCdf_ValidateInput(vx_node node, vx_uint32 index)
 {
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoEqualizeHistogramCdf_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHistogramCdf_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -5711,7 +5846,7 @@ VX_PRIVATE_API vx_status vxoEqualizeHistogramCdf_ValidateOutput(vx_node node, vx
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoInternalKernel_EqualizeHistogramLut(vx_node node, vx_reference *parameters, vx_uint32 num)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EqualizeHistogramLut(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_image srcImage, histImage, dstImage;
 
@@ -5725,12 +5860,12 @@ VX_PRIVATE_API vx_status vxoInternalKernel_EqualizeHistogramLut(vx_node node, vx
 
 }
 
-VX_PRIVATE_API vx_status vxoEqualizeHistogramLut_ValidateInput(vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHistogramLut_ValidateInput(vx_node node, vx_uint32 index)
 {
     return VX_SUCCESS;
 }
 
-VX_PRIVATE_API vx_status vxoEqualizeHistogramLut_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHistogramLut_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
 {
     vx_object_data_s objData = {0};
 
@@ -5740,6 +5875,338 @@ VX_PRIVATE_API vx_status vxoEqualizeHistogramLut_ValidateOutput(vx_node node, vx
             return VX_ERROR_INVALID_PARAMETERS;
 
     vxoFillMetaData(ptr, VX_TYPE_IMAGE, objData.u.imageInfo.format, objData.u.imageInfo.width, objData.u.imageInfo.height, 0);
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmCost(vx_node node, const vx_reference parameters[], vx_uint32 num)
+{
+    vx_image right, left, cost;
+    vx_scalar disp_range;
+    vx_uint32 width, height, range;
+    right = (vx_image)parameters[0];
+    left = (vx_image)parameters[1];
+    cost = (vx_image)parameters[3];
+    disp_range = (vx_scalar)parameters[2];
+    if (num != 4) return VX_ERROR_INVALID_PARAMETERS;
+
+    vxQueryImage(right, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
+    vxQueryImage(right, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxReadScalarValue(disp_range, &range);
+    vxWriteScalarValue(disp_range, &range);
+    return vxSGMCost(node, right, left, cost, width, height, range);
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSgmCost_ValidateInput(vx_node node, vx_uint32 index)
+{
+    vx_object_data_s objData = {0};
+
+    switch (index)
+    {
+        case 0:
+        case 1:
+            if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+            break;
+        case 2:
+            if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_SCALAR, &objData) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+
+            if (objData.u.scalarInfo.dataType != VX_TYPE_UINT32) return VX_ERROR_INVALID_TYPE;
+
+            break;
+        default:
+            return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSgmCost_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+{
+    vx_object_data_s objData = {0};
+
+    if (index != 3) return VX_ERROR_INVALID_PARAMETERS;
+
+    if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    vxoFillMetaData(meta, VX_TYPE_IMAGE, objData.u.imageInfo.format, objData.u.imageInfo.width, objData.u.imageInfo.height, 0);
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmPath90(vx_node node, const vx_reference parameters[], vx_uint32 num)
+{
+    vx_image path, cost;
+    vx_scalar disp_range;
+    vx_uint32 width, height, range;
+    cost = (vx_image)parameters[0];
+    path = (vx_image)parameters[2];
+    disp_range = (vx_scalar)parameters[1];
+
+    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
+    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxReadScalarValue(disp_range, &range);
+    vxWriteScalarValue(disp_range, &range);
+    width /= range;
+
+    return vxPathCost_90(node, cost, path, range, width, height);
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSgmPath90_ValidateInput(vx_node node, vx_uint32 index)
+{
+    vx_object_data_s objData = {0};
+
+    switch (index)
+    {
+        case 0:
+            if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+
+            if (objData.u.imageInfo.format != VX_DF_IMAGE_U16)
+                return VX_ERROR_INVALID_FORMAT;
+
+            break;
+        case 1:
+            if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_SCALAR, &objData) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+
+            if (objData.u.scalarInfo.dataType != VX_TYPE_UINT32) return VX_ERROR_INVALID_TYPE;
+
+            break;
+        default:
+            return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSgmPath90_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+{
+    vx_object_data_s objData = {0};
+
+    if (index != 2) return VX_ERROR_INVALID_PARAMETERS;
+
+    if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    vxoFillMetaData(meta, VX_TYPE_IMAGE, objData.u.imageInfo.format, objData.u.imageInfo.width, objData.u.imageInfo.height, 0);
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmPath45(vx_node node, const vx_reference parameters[], vx_uint32 num)
+{
+    vx_image path, cost;
+    vx_scalar disp_range;
+    vx_uint32 width, height, range;
+    cost = (vx_image)parameters[0];
+    path = (vx_image)parameters[2];
+    disp_range = (vx_scalar)parameters[1];
+
+    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
+    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxReadScalarValue(disp_range, &range);
+    vxWriteScalarValue(disp_range, &range);
+    width /= range;
+
+    return vxPathCost_45(node, cost, path, range, width, height);
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSgmPath45_ValidateInput(vx_node node, vx_uint32 index)
+{
+    vx_object_data_s objData = {0};
+
+    switch (index)
+    {
+        case 0:
+        case 2:
+            if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+
+            if (objData.u.imageInfo.format != VX_DF_IMAGE_U16)
+                return VX_ERROR_INVALID_FORMAT;
+
+            break;
+        case 1:
+            if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_SCALAR, &objData) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+
+            if (objData.u.scalarInfo.dataType != VX_TYPE_UINT32) return VX_ERROR_INVALID_TYPE;
+
+            break;
+        default:
+            return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSgmPath45_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+{
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmPath135(vx_node node, const vx_reference parameters[], vx_uint32 num)
+{
+    vx_image path, cost;
+    vx_scalar disp_range;
+    vx_uint32 width, height, range;
+    cost = (vx_image)parameters[0];
+    path = (vx_image)parameters[2];
+    disp_range = (vx_scalar)parameters[1];
+
+    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
+    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxReadScalarValue(disp_range, &range);
+    vxWriteScalarValue(disp_range, &range);
+    width /= range;
+
+    return vxPathCost_135(node, cost, path, range, width, height);
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSgmPath135_ValidateInput(vx_node node, vx_uint32 index)
+{
+    vx_object_data_s objData = {0};
+
+    switch (index)
+    {
+        case 0:
+        case 2:
+            if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+
+            if (objData.u.imageInfo.format != VX_DF_IMAGE_U16)
+                return VX_ERROR_INVALID_FORMAT;
+
+            break;
+        case 1:
+            if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_SCALAR, &objData) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+
+            if (objData.u.scalarInfo.dataType != VX_TYPE_UINT32) return VX_ERROR_INVALID_TYPE;
+
+            break;
+        default:
+            return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSgmPath135_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+{
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmPath0(vx_node node, const vx_reference parameters[], vx_uint32 num)
+{
+    vx_image path, cost;
+    vx_scalar disp_range;
+    vx_uint32 width, height, range;
+    cost = (vx_image)parameters[0];
+    path = (vx_image)parameters[2];
+    disp_range = (vx_scalar)parameters[1];
+
+    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
+    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxReadScalarValue(disp_range, &range);
+    vxWriteScalarValue(disp_range, &range);
+    width /= range;
+
+    return vxPathCost_0(node, cost, path, range, width, height);
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSgmPath0_ValidateInput(vx_node node, vx_uint32 index)
+{
+    vx_object_data_s objData = {0};
+
+    switch (index)
+    {
+        case 0:
+        case 2:
+            if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+
+            if (objData.u.imageInfo.format != VX_DF_IMAGE_U16)
+                return VX_ERROR_INVALID_FORMAT;
+
+            break;
+        case 1:
+            if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_SCALAR, &objData) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+
+            if (objData.u.scalarInfo.dataType != VX_TYPE_UINT32) return VX_ERROR_INVALID_TYPE;
+
+            break;
+        default:
+            return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSgmPath0_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+{
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmDisp(vx_node node, const vx_reference parameters[], vx_uint32 num)
+{
+    vx_image path, depth;
+    vx_scalar disp_range;
+    vx_uint32 width, height, range;
+    path = (vx_image)parameters[0];
+    depth = (vx_image)parameters[2];
+    disp_range = (vx_scalar)parameters[1];
+
+    vxQueryImage(depth, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
+    vxQueryImage(depth, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxReadScalarValue(disp_range, &range);
+    vxWriteScalarValue(disp_range, &range);
+
+    return vxSelectDisp(node, path, depth,range, width, height);
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSgmDisp_ValidateInput(vx_node node, vx_uint32 index)
+{
+    vx_object_data_s objData = {0};
+
+    switch (index)
+    {
+        case 0:
+            if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+
+            if (objData.u.imageInfo.format != VX_DF_IMAGE_U16)
+                return VX_ERROR_INVALID_FORMAT;
+
+            break;
+        case 1:
+            if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_SCALAR, &objData) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+
+            if (objData.u.scalarInfo.dataType != VX_TYPE_UINT32) return VX_ERROR_INVALID_TYPE;
+
+            break;
+        default:
+            return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoSgmDisp_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta)
+{
+    vx_object_data_s objData = {0};
+
+    if (index != 2) return VX_ERROR_INVALID_PARAMETERS;
+
+    if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    vxoFillMetaData(meta, VX_TYPE_IMAGE, objData.u.imageInfo.format, objData.u.imageInfo.width, objData.u.imageInfo.height, 0);
 
     return VX_SUCCESS;
 }
@@ -5813,11 +6280,20 @@ vx_kernel_description_s *target_kernels[] = {
     &internalKernel_EqualizeHistogramGcdf,
     &internalKernel_EqualizeHistogramCdf,
     &internalKernel_EqualizeHistogramLut,
-    &internalkernel_example
+    &internalkernel_sgm,
+    &internalkernel_sgm_cost,
+    &internalkernel_sgm_path90,
+    &internalkernel_sgm_path45,
+    &internalkernel_sgm_path135,
+    &internalkernel_sgm_path0,
+    &internalkernel_sgm_disp,
+    &internalKernel_Laplacian3x3,
+    &internalKernel_census3x3
 
 };
 
 vx_uint32 num_target_kernels = vxmLENGTH_OF(target_kernels);
+
 
 
 

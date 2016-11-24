@@ -117,7 +117,7 @@ VX_INTERNAL_API void vxoScalar_Dump(vx_scalar scalar)
     }
 }
 
-VX_PRIVATE_API vx_status vxoScalar_CommitValue(vx_scalar scalar, void *ptr)
+VX_PRIVATE_API vx_status vxoScalar_CommitValue(vx_scalar scalar, const void *ptr)
 {
     if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -225,7 +225,7 @@ VX_INTERNAL_CALLBACK_API void vxoScalar_Destructor(vx_reference ref)
     }
 }
 
-VX_PUBLIC_API vx_scalar vxCreateScalar(vx_context context, vx_enum dataType, void *ptr)
+VX_API_ENTRY vx_scalar VX_API_CALL vxCreateScalar(vx_context context, vx_enum dataType, const void *ptr)
 {
     vx_scalar scalar;
 
@@ -243,22 +243,22 @@ VX_PUBLIC_API vx_scalar vxCreateScalar(vx_context context, vx_enum dataType, voi
 
     scalar->dataType = dataType;
 
-    gcoVX_AllocateMemory(sizeof(vx_scalar_data), (gctUINT32_PTR)&scalar->value, (gctUINT32_PTR)&scalar->physical, (gcsSURF_NODE_PTR*)&scalar->node);
+    gcoVX_AllocateMemory(sizeof(vx_scalar_data), (gctPOINTER*)&scalar->value, (gctPHYS_ADDR*)&scalar->physical, (gcsSURF_NODE_PTR*)&scalar->node);
     memset(scalar->value, 0, sizeof(vx_scalar_data));
 
-    vxoScalar_CommitValue(scalar, ptr);
+    vxoScalar_CommitValue(scalar, (vx_ptr)ptr);
 
     vxoScalar_Dump(scalar);
 
     return scalar;
 }
 
-VX_PUBLIC_API vx_status vxReleaseScalar(vx_scalar *scalar)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseScalar(vx_scalar *scalar)
 {
     return vxoReference_Release((vx_reference *)scalar, VX_TYPE_SCALAR, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_status vxQueryScalar(vx_scalar scalar, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryScalar(vx_scalar scalar, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -278,7 +278,7 @@ VX_PUBLIC_API vx_status vxQueryScalar(vx_scalar scalar, vx_enum attribute, void 
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxAccessScalarValue(vx_scalar scalar, void *ptr)
+VX_API_ENTRY vx_status VX_API_CALL vxReadScalarValue(vx_scalar scalar, void *ptr)
 {
     if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -372,7 +372,8 @@ VX_PUBLIC_API vx_status vxAccessScalarValue(vx_scalar scalar, void *ptr)
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxCommitScalarValue(vx_scalar scalar, void *ptr)
+VX_API_ENTRY vx_status VX_API_CALL vxWriteScalarValue(vx_scalar scalar, const void *ptr)
 {
     return vxoScalar_CommitValue(scalar, ptr);
 }
+

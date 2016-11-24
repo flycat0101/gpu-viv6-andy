@@ -130,6 +130,7 @@ cl_int cliIcdDispatchTableCreate(CLIicdDispatchTable **outDispatchTable)
     ICD_DISPATCH_TABLE_ENTRY ( clEnqueueBarrier              );
     ICD_DISPATCH_TABLE_ENTRY ( clGetExtensionFunctionAddress );
 #if gcdENABLE_CL_GL
+    /* cl_khr_gl_sharing */
     ICD_DISPATCH_TABLE_ENTRY ( clCreateFromGLBuffer          );
     ICD_DISPATCH_TABLE_ENTRY ( clCreateFromGLTexture2D       );
     ICD_DISPATCH_TABLE_ENTRY ( clCreateFromGLTexture3D       );
@@ -140,15 +141,15 @@ cl_int cliIcdDispatchTableCreate(CLIicdDispatchTable **outDispatchTable)
     ICD_DISPATCH_TABLE_ENTRY ( clEnqueueReleaseGLObjects     );
     ICD_DISPATCH_TABLE_ENTRY ( clGetGLContextInfoKHR         );
 #else
-    ICD_DISPATCH_TABLE_ENTRY ( NULL );
-    ICD_DISPATCH_TABLE_ENTRY ( NULL );
-    ICD_DISPATCH_TABLE_ENTRY ( NULL );
-    ICD_DISPATCH_TABLE_ENTRY ( NULL );
-    ICD_DISPATCH_TABLE_ENTRY ( NULL );
-    ICD_DISPATCH_TABLE_ENTRY ( NULL );
-    ICD_DISPATCH_TABLE_ENTRY ( NULL );
-    ICD_DISPATCH_TABLE_ENTRY ( NULL );
-    ICD_DISPATCH_TABLE_ENTRY ( NULL );
+    ICD_DISPATCH_TABLE_ENTRY( NULL );
+    ICD_DISPATCH_TABLE_ENTRY( NULL );
+    ICD_DISPATCH_TABLE_ENTRY( NULL );
+    ICD_DISPATCH_TABLE_ENTRY( NULL );
+    ICD_DISPATCH_TABLE_ENTRY( NULL );
+    ICD_DISPATCH_TABLE_ENTRY( NULL );
+    ICD_DISPATCH_TABLE_ENTRY( NULL );
+    ICD_DISPATCH_TABLE_ENTRY( NULL );
+    ICD_DISPATCH_TABLE_ENTRY( NULL );
 #endif
 
     /* cl_khr_d3d10_sharing (windows-only) */

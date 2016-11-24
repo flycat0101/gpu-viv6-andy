@@ -65,47 +65,47 @@ extern "C" {
 #define glvZONE_EGL_RENDER_THREAD   (gcvZONE_API_EGL | (1 << 10))
 
 
-typedef struct eglDisplay       *VEGLDisplay;
-typedef struct eglResObj        *VEGLResObj;
-typedef struct eglContext       *VEGLContext;
-typedef struct eglConfig        *VEGLConfig;
-typedef struct eglSurface       *VEGLSurface;
-typedef struct eglImage         *VEGLImage;
-typedef struct eglSync          *VEGLSync;
-typedef struct eglImageRef      *VEGLImageRef;
-typedef struct eglThreadData    *VEGLThreadData;
-typedef struct eglWorkerInfo    *VEGLWorkerInfo;
-typedef struct eglBackBuffer    *VEGLBackBuffer;
+typedef struct eglDisplay         * VEGLDisplay;
+typedef struct eglResObj          * VEGLResObj;
+typedef struct eglContext         * VEGLContext;
+typedef struct eglConfig          * VEGLConfig;
+typedef struct eglSurface         * VEGLSurface;
+typedef struct eglImage           * VEGLImage;
+typedef struct eglSync            * VEGLSync;
+typedef struct eglImageRef        * VEGLImageRef;
+typedef struct eglThreadData      * VEGLThreadData;
+typedef struct eglWorkerInfo      * VEGLWorkerInfo;
+typedef struct eglBackBuffer      * VEGLBackBuffer;
 
 /* Wraps up platform operations. */
 typedef struct eglPlatform        * VEGLPlatform;
 
 /* Wraps up native display/window/pixmap variables/operations. */
 
-typedef struct eglDisplayInfo   *VEGLDisplayInfo;
-typedef struct eglWindowInfo    *VEGLWindowInfo;
-typedef struct eglPixmapInfo    *VEGLPixmapInfo;
+typedef struct eglDisplayInfo     * VEGLDisplayInfo;
+typedef struct eglWindowInfo      * VEGLWindowInfo;
+typedef struct eglPixmapInfo      * VEGLPixmapInfo;
 
-#define VEGL_DISPLAY(p)         ((VEGLDisplay) (p))
-#define VEGL_RESOBJ(p)          ((VEGLResObj)  (p))
-#define VEGL_CONTEXT(p)         ((VEGLContext) (p))
-#define VEGL_CONFIG(p)          ((VEGLConfig)  (p))
-#define VEGL_SURFACE(p)         ((VEGLSurface) (p))
-#define VEGL_IMAGE(p)           ((VEGLImage)   (p))
-#define VEGL_SYNC(p)            ((VEGLSync)    (p))
+#define VEGL_DISPLAY(p)             ((VEGLDisplay) (p))
+#define VEGL_RESOBJ(p)              ((VEGLResObj)  (p))
+#define VEGL_CONTEXT(p)             ((VEGLContext) (p))
+#define VEGL_CONFIG(p)              ((VEGLConfig)  (p))
+#define VEGL_SURFACE(p)             ((VEGLSurface) (p))
+#define VEGL_IMAGE(p)               ((VEGLImage)   (p))
+#define VEGL_SYNC(p)                ((VEGLSync)    (p))
 
-#define EGL_DISPLAY_SIGNATURE   gcmCC('E','G','L','D')
-#define EGL_SURFACE_SIGNATURE   gcmCC('E','G','L','S')
-#define EGL_CONTEXT_SIGNATURE   gcmCC('E','G','L','C')
-#define EGL_IMAGE_SIGNATURE     gcmCC('E','G','L','I')
-#define EGL_SYNC_SIGNATURE      gcmCC('E','G','L','Y')
+#define EGL_DISPLAY_SIGNATURE       gcmCC('E','G','L','D')
+#define EGL_SURFACE_SIGNATURE       gcmCC('E','G','L','S')
+#define EGL_CONTEXT_SIGNATURE       gcmCC('E','G','L','C')
+#define EGL_IMAGE_SIGNATURE         gcmCC('E','G','L','I')
+#define EGL_SYNC_SIGNATURE          gcmCC('E','G','L','Y')
 
-#define veglUSE_HAL_DUMP        0
+#define veglUSE_HAL_DUMP            0
 
-#define  __EGL_INVALID_CONFIG__ 0
+#define  __EGL_INVALID_CONFIG__     0
 
-#define MAJOR_API_VER(x) ((x) >> 4)
-#define MINOR_API_VER(x) ((x) & 0xF)
+#define MAJOR_API_VER(x)            ((x) >> 4)
+#define MINOR_API_VER(x)            ((x) & 0xF)
 
 
 struct eglResObj
@@ -155,6 +155,20 @@ struct eglWorkerInfo
 
 typedef void (* VEGL_ESPrivDestructor) (gctPOINTER priv);
 
+typedef enum _veglAPIINDEX
+{
+    vegl_EGL,
+    vegl_OPENGL_ES11_CL,
+    vegl_OPENGL_ES11,
+    vegl_OPENGL_ES20,
+    vegl_OPENGL_ES30,
+    vegl_OPENVG,
+
+    vegl_API_LAST,
+}
+veglAPIINDEX;
+
+
 struct eglThreadData
 {
     /* gcoDUMP object. */
@@ -175,6 +189,19 @@ struct eglThreadData
 
     /* fastMSAA and small MSAA only support 4x mode */
     gctBOOL                     fastMSAA;
+
+    /* Security feature. */
+    gctBOOL                     security;
+
+    /* Extension strings. */
+    char *                      extString;
+    char *                      clientExtString;
+
+    /* Dispatch tables of client APIs, non-null means client API available. */
+    veglDISPATCH *              dispatchTables[vegl_API_LAST];
+
+    /* Client handles, better to close when exit. */
+    gctHANDLE                   clientHandles[vegl_API_LAST];
 
     /* Current context of current rendering API
     ** Shortcut to below three sorts of current contexts.
@@ -218,7 +245,7 @@ struct eglThreadData
     gctINT32                    chipCount;
     gcsHAL_LIMITS               chipLimits[gcdCHIP_COUNT];
 
-    struct eglWorkerInfo *      worker;
+    struct eglWorkerInfo      * worker;
 
 #if gcdGC355_MEM_PRINT
     gctINT                      fbMemSize;
@@ -245,8 +272,8 @@ struct eglDisplay
     VEGLPlatform                platform;
 
     /* Native screen and native display. */
-    void *                      nativeScreen;
-    void *                      nativeDisplay;
+    void                      * nativeScreen;
+    void                      * nativeDisplay;
 
     /* Handle to device context. */
     void *                      hdc;
@@ -536,9 +563,6 @@ struct eglContext
     EGLenum                     api;
     EGLint                      client;
 
-    /* Context dispatch table for API. */
-    veglDISPATCH *              dispatch;
-
     /* Attached display. */
     VEGLDisplay                 display;
 
@@ -567,6 +591,9 @@ struct eglContext
     /* EGL_CONTEXT_OPENGL_RESET_NOTIFICATION_STRATEGY_EXT value */
     gctINT                      resetNotification;
 
+    /* Context protection, EGL_EXT_protected_content. */
+    EGLBoolean                  protectedContent;
+
 #if gcdGC355_PROFILER
     gctUINT64                   appStartTime;
     gctFILE                     apiTimeFile;
@@ -588,13 +615,48 @@ struct eglSync
     gctSIGNAL                   signal;
 
 #if gcdANDROID_NATIVE_FENCE_SYNC
-    /* Sync point. */
-    gctSYNC_POINT               pt;
-
     /* Native sync fence fd. */
     EGLint                      fenceFD;
 #endif
 };
+
+struct eglExtension
+{
+    const char *                string;
+    EGLBoolean                  enabled;
+};
+
+typedef enum _VEGL_EXTID
+{
+    VEGL_EXTID_KHR_fence_sync,
+    VEGL_EXTID_KHR_reusable_sync,
+    VEGL_EXTID_KHR_wait_sync,
+    VEGL_EXTID_KHR_image,
+    VEGL_EXTID_KHR_image_base,
+    VEGL_EXTID_KHR_image_pixmap,
+    VEGL_EXTID_KHR_gl_texture_2D_image,
+    VEGL_EXTID_KHR_gl_texture_cubemap_image,
+    VEGL_EXTID_KHR_gl_renderbuffer_image,
+    VEGL_EXTID_EXT_image_dma_buf_import,
+    VEGL_EXTID_EXT_client_extensions,
+    VEGL_EXTID_KHR_lock_surface,
+    VEGL_EXTID_KHR_create_context,
+    VEGL_EXTID_KHR_surfaceless_context,
+    VEGL_EXTID_EXT_create_context_robustness,
+    VEGL_EXTID_EXT_protected_surface,
+    VEGL_EXTID_EXT_protected_content,
+    VEGL_EXTID_EXT_buffer_age,
+    VEGL_EXTID_ANDROID_image_native_buffer,
+    VEGL_EXTID_ANDROID_swap_rectangle,
+    VEGL_EXTID_ANDROID_blob_cache,
+    VEGL_EXTID_ANDROID_recordable,
+    VEGL_EXTID_ANDROID_native_fence_sync,
+    VEGL_EXTID_WL_bind_wayland_display,
+    VEGL_EXTID_WL_create_wayland_buffer_from_image,
+
+    VEGL_EXTID_COUNT,
+}
+VEGL_EXTID;
 
 typedef enum _VEGL_COLOR_FORMAT
 {
@@ -633,7 +695,6 @@ typedef struct EGL_CONFIG_DEPTH
 }
 * VEGLConfigDepth;
 
-
 /*******************************************************************************
 ** Thread API functions.
 */
@@ -650,7 +711,7 @@ veglGetThreadData(
 void
 veglDereferenceDisplay(
     IN VEGLThreadData Thread,
-    IN VEGLDisplay Display,
+    IN VEGLDisplay    Display,
     EGLBoolean Always
     );
 
@@ -666,7 +727,7 @@ veglGetDisplay(
 void
 veglSyncNative(
     IN VEGLThreadData Thread,
-    IN VEGLDisplay Display
+    IN VEGLDisplay    Display
     );
 
 /*******************************************************************************
@@ -676,16 +737,16 @@ veglSyncNative(
 EGLBoolean
 veglReferenceSurface(
     IN VEGLThreadData Thread,
-    IN VEGLDisplay Display,
-    IN VEGLSurface Surface
+    IN VEGLDisplay    Display,
+    IN VEGLSurface    Surface
     );
 
 void
 veglDereferenceSurface(
     IN VEGLThreadData Thread,
-    IN VEGLDisplay Display,
-    IN VEGLSurface Surface,
-    IN EGLBoolean Always
+    IN VEGLDisplay    Display,
+    IN VEGLSurface    Surface,
+    IN EGLBoolean     Always
     );
 
 EGLBoolean
@@ -697,15 +758,15 @@ veglDestroySurface(
 EGLBoolean
 veglCreateRenderTarget(
     IN VEGLThreadData Thread,
-    IN VEGLSurface Surface
+    IN VEGLSurface    Surface
     );
 
 EGLint
 veglResizeSurface(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
-    IN gctUINT Width,
-    IN gctUINT Height
+    IN gctUINT     Width,
+    IN gctUINT     Height
     );
 
 /*******************************************************************************
@@ -728,22 +789,22 @@ veglReleaseThread(
 void
 veglDestroyImage(
     IN VEGLThreadData Thread,
-    IN VEGLDisplay Display,
-    IN VEGLImage Image
+    IN VEGLDisplay    Display,
+    IN VEGLImage      Image
     );
 
 void
 veglReferenceImage(
     IN VEGLThreadData Thread,
-    IN VEGLDisplay Display,
-    IN VEGLImage Image
+    IN VEGLDisplay    Display,
+    IN VEGLImage      Image
     );
 
 void
 veglDereferenceImage(
     IN VEGLThreadData Thread,
-    IN VEGLDisplay Display,
-    IN VEGLImage Image
+    IN VEGLDisplay    Display,
+    IN VEGLImage      Image
     );
 
 /*******************************************************************************
@@ -752,7 +813,7 @@ veglDereferenceImage(
 EGLBoolean
 veglDestroySync(
     IN EGLDisplay Dpy,
-    IN EGLSync Sync
+    IN EGLSync    Sync
     );
 
 /*******************************************************************************
@@ -772,8 +833,8 @@ veglResumeSwapWorker(
 VEGLWorkerInfo
 veglGetWorker(
     IN VEGLThreadData Thread,
-    IN VEGLDisplay Display,
-    IN VEGLSurface Surface
+    IN VEGLDisplay    Display,
+    IN VEGLSurface    Surface
     );
 
 VEGLWorkerInfo
@@ -784,9 +845,9 @@ veglFreeWorker(
 gctBOOL
 veglSubmitWorker(
     IN VEGLThreadData Thread,
-    IN VEGLDisplay Display,
+    IN VEGLDisplay    Display,
     IN VEGLWorkerInfo Worker,
-    IN gctBOOL ScheduleSignals
+    IN gctBOOL        ScheduleSignals
     );
 
 /*******************************************************************************
@@ -796,52 +857,52 @@ veglSubmitWorker(
 void
 veglSetEGLerror(
     VEGLThreadData Thread,
-    EGLint Error
+    EGLint         Error
     );
 
 void
 veglGetFormat(
-    IN VEGLThreadData Thread,
-    IN VEGLConfig Config,
+    IN VEGLThreadData    Thread,
+    IN VEGLConfig        Config,
     OUT gceSURF_FORMAT * RenderTarget,
     OUT gceSURF_FORMAT * DepthBuffer
     );
 
 VEGLResObj
 veglGetResObj(
-    IN VEGLDisplay Dpy,
-    IN VEGLResObj *pResHead,
-    IN EGLResObj   ResObj,
-    IN gctUINT     ResSig
+    IN VEGLDisplay  Dpy,
+    IN VEGLResObj * pResHead,
+    IN EGLResObj    ResObj,
+    IN gctUINT      ResSig
     );
 
 void
 veglPushResObj(
-    IN VEGLDisplay Dpy,
-    INOUT VEGLResObj *pResHead,
-    IN VEGLResObj ResObj
+    IN VEGLDisplay     Dpy,
+    INOUT VEGLResObj * pResHead,
+    IN VEGLResObj      ResObj
     );
 
 void
 veglPopResObj(
-    IN VEGLDisplay Dpy,
-    INOUT VEGLResObj *pResHead,
-    IN VEGLResObj ResObj
+    IN VEGLDisplay     Dpy,
+    INOUT VEGLResObj * pResHead,
+    IN VEGLResObj      ResObj
     );
 
 EGLsizeiANDROID
 veglGetBlobCache(
-    const void* key,
+    const void    * key,
     EGLsizeiANDROID keySize,
-    void* value,
+    void          * value,
     EGLsizeiANDROID valueSize
     );
 
 void
 veglSetBlobCache(
-    const void* key,
+    const void    * key,
     EGLsizeiANDROID keySize,
-    const void* value,
+    const void    * value,
     EGLsizeiANDROID valueSize
     );
 
@@ -858,28 +919,15 @@ veglSetBlobCache(
 veglTHREAD_RETURN
 WINAPI
 veglSwapWorker(
-    void* Display
+    void * Display
     );
 
 
-typedef enum _veglAPIINDEX
-{
-    vegl_EGL,
-    vegl_OPENGL_ES11_CL,
-    vegl_OPENGL_ES11,
-    vegl_OPENGL_ES20,
-    vegl_OPENGL_ES30,
-    vegl_OPENVG,
-
-    vegl_API_LAST,
-}
-veglAPIINDEX;
-
 gctHANDLE
 veglGetModule(
-    IN gcoOS Os,
-    IN veglAPIINDEX Index,
-    IN veglDISPATCH **Dispatch
+    IN gcoOS           Os,
+    IN veglAPIINDEX    Index,
+    IN veglDISPATCH ** Dispatch
     );
 
 
@@ -890,43 +938,37 @@ veglGetModule(
 veglDISPATCH *
 _GetDispatch(
     VEGLThreadData Thread,
-    VEGLContext Context
+    VEGLContext    Context
     );
 
 void *
 _CreateApiContext(
     VEGLThreadData Thread,
-    VEGLContext Context,
-    VEGLConfig Config,
-    void * SharedContext
+    VEGLContext    Context,
+    VEGLConfig     Config,
+    void         * SharedContext
     );
 
 EGLBoolean
 _DestroyApiContext(
     VEGLThreadData Thread,
-    VEGLContext Context,
-    void * ApiContext
+    VEGLContext    Context,
+    void         * ApiContext
     );
 
 EGLBoolean
 _FlushApiContext(
     VEGLThreadData Thread,
-    VEGLContext Context,
-    void * ApiContext
+    VEGLContext    Context,
+    void         * ApiContext
     );
 
 EGLBoolean
 _SetDrawable(
     VEGLThreadData Thread,
-    VEGLContext Context,
-    VEGLDrawable Draw,
-    VEGLDrawable Read
-    );
-
-gceSTATUS
-_SetBuffer(
-    VEGLThreadData Thread,
-    gcoSURF Draw
+    VEGLContext    Context,
+    VEGLDrawable   Draw,
+    VEGLDrawable   Read
     );
 
 EGLBoolean
@@ -940,62 +982,66 @@ _Finish(
     );
 
 EGLBoolean
-_eglProfileCallback(
+_ProfilerCallback(
     VEGLThreadData Thread,
-    IN gctUINT32 Enum,
-    IN gctHANDLE Value
+    IN gctUINT32   Enum,
+    IN gctHANDLE   Value
     );
 
 gcoSURF
 _GetClientBuffer(
     VEGLThreadData Thread,
-    void * Context,
+    void         * Context,
     EGLClientBuffer buffer
     );
 
 EGLenum
 _BindTexImage(
     VEGLThreadData Thread,
-    gcoSURF Surface,
-    EGLenum Format,
-    EGLBoolean Mipmap,
-    EGLint Level,
-    EGLint Width,
-    EGLint Height,
-    gcoSURF *BindTo
+    gcoSURF        Surface,
+    EGLenum        Format,
+    EGLBoolean     Mipmap,
+    EGLint         Level,
+    EGLint         Width,
+    EGLint         Height,
+    gcoSURF      * BindTo
     );
 
 EGLenum
 _CreateImageTexture(
     VEGLThreadData Thread,
-    VEGLContext Context,
-    EGLenum Target,
-    gctINT Texture,
-    gctINT Level,
-    gctINT Depth,
-    gctPOINTER Image
+    VEGLContext    Context,
+    EGLenum        Target,
+    gctINT         Texture,
+    gctINT         Level,
+    gctINT         Depth,
+    gctPOINTER     Image
     );
 
 EGLenum
 _CreateImageFromRenderBuffer(
     VEGLThreadData Thread,
-    VEGLContext Context,
-    gctUINT Framebuffer,
-    gctPOINTER Image
+    VEGLContext    Context,
+    gctUINT        Framebuffer,
+    gctPOINTER     Image
     );
 
 EGLenum
 _CreateImageFromVGParentImage(
-    VEGLThreadData  Thread,
-    VEGLContext Context,
-    unsigned int    vgimage_obj,
-    VEGLImage       eglimage
+    VEGLThreadData Thread,
+    VEGLContext    Context,
+    unsigned int   vgimage_obj,
+    VEGLImage      eglimage
     );
 
-#define VEGL_TRACE_API(func) if (veglTracerDispatchTable.func)(*veglTracerDispatchTable.func)
-#define VEGL_TRACE_API_PRE(func) if (veglTracerDispatchTable.func##_pre)(*veglTracerDispatchTable.func##_pre)
-#define VEGL_TRACE_API_POST(func) if (veglTracerDispatchTable.func##_post)(*veglTracerDispatchTable.func##_post)
+#define VEGL_TRACE_API(func) \
+    if (veglTracerDispatchTable.func)(*veglTracerDispatchTable.func)
 
+#define VEGL_TRACE_API_PRE(func) \
+    if (veglTracerDispatchTable.func##_pre)(*veglTracerDispatchTable.func##_pre)
+
+#define VEGL_TRACE_API_POST(func) \
+    if (veglTracerDispatchTable.func##_post)(*veglTracerDispatchTable.func##_post)
 
 #define VEGL_LOCK_DISPLAY(dpy)   \
     if (dpy->accessMutex) \
@@ -1023,7 +1069,6 @@ _CreateImageFromVGParentImage(
     }\
 
 
-
 /* EGL Tracer Dispatch Function Table */
 typedef struct
 {
@@ -1031,72 +1076,72 @@ typedef struct
     ** The following 36 interfaces are used to link with vTracer EGL entry functions in libGLES_vlogger.so.
     ** So the following interfaces must match with vTracer EGL entry functions.
     */
-    EGLint     (*GetError_pre)(void);
-    EGLDisplay (*GetDisplay_post)(EGLNativeDisplayType display_id, EGLDisplay ret_dpy);
-    EGLBoolean (*Initialize)(EGLDisplay dpy, EGLint *major, EGLint *minor);
-    EGLBoolean (*Terminate)(EGLDisplay dpy);
-    const char * (*QueryString_pre)(EGLDisplay dpy, EGLint name);
-    EGLBoolean (*GetConfigs_pre)(EGLDisplay dpy, EGLConfig *configs, EGLint config_size, EGLint *num_config);
-    EGLBoolean (*ChooseConfig_pre)(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
-    EGLBoolean (*GetConfigAttrib_post)(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value);
-    EGLSurface (*CreateWindowSurface_post)(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list, EGLSurface ret_surface);
-    EGLSurface (*CreatePbufferSurface_post)(EGLDisplay dpy, EGLConfig config, const EGLint *attrib_list, EGLSurface ret_surface);
-    EGLSurface (*CreatePixmapSurface_post)(EGLDisplay dpy, EGLConfig config, EGLNativePixmapType pixmap, const EGLint *attrib_list, EGLSurface ret_surface);
-    EGLBoolean (*DestroySurface)(EGLDisplay dpy, EGLSurface surface);
-    EGLBoolean (*QuerySurface_pre)(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint *value);
-    EGLBoolean (*BindAPI)(EGLenum api);
-    EGLenum    (*QueryAPI_pre)(void);
-    EGLBoolean (*WaitClient)(void);
-    EGLBoolean (*ReleaseThread)(void);
-    EGLSurface (*CreatePbufferFromClientBuffer_post)(EGLDisplay dpy, EGLenum buftype, EGLClientBuffer buffer, EGLConfig config, const EGLint *attrib_list, EGLSurface ret_surface);
-    EGLBoolean (*SurfaceAttrib)(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint value);
-    EGLBoolean (*BindTexImage)(EGLDisplay dpy, EGLSurface surface, EGLint buffer);
-    EGLBoolean (*ReleaseTexImage)(EGLDisplay dpy, EGLSurface surface, EGLint buffer);
-    EGLBoolean (*SwapInterval)(EGLDisplay dpy, EGLint interval);
-    EGLContext (*CreateContext_post)(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list, EGLContext ret_ctx);
-    EGLBoolean (*DestroyContext)(EGLDisplay dpy, EGLContext ctx);
-    EGLBoolean (*MakeCurrent)(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext ctx);
-    EGLContext (*GetCurrentContext_post)(EGLContext ret_ctx);
-    EGLSurface (*GetCurrentSurface_post)(EGLint readdraw, EGLSurface ret_furface);
-    EGLDisplay (*GetCurrentDisplay_post)(EGLDisplay ret_dpy);
-    EGLBoolean (*QueryContext_pre)(EGLDisplay dpy, EGLContext ctx, EGLint attribute, EGLint *value);
-    EGLBoolean (*WaitGL)(void);
-    EGLBoolean (*WaitNative)(EGLint engine);
-    EGLBoolean (*SwapBuffers)(EGLDisplay dpy, EGLSurface surface);
-    EGLBoolean (*CopyBuffers)(EGLDisplay dpy, EGLSurface surface, EGLNativePixmapType target);
-    __eglMustCastToProperFunctionPointerType (*GetProcAddress_pre)(const char *procname);
+    EGLint     (* GetError_pre)(void);
+    EGLDisplay (* GetDisplay_post)(EGLNativeDisplayType display_id, EGLDisplay ret_dpy);
+    EGLBoolean (* Initialize)(EGLDisplay dpy, EGLint *major, EGLint *minor);
+    EGLBoolean (* Terminate)(EGLDisplay dpy);
+    const char * (* QueryString_pre)(EGLDisplay dpy, EGLint name);
+    EGLBoolean (* GetConfigs_pre)(EGLDisplay dpy, EGLConfig *configs, EGLint config_size, EGLint *num_config);
+    EGLBoolean (* ChooseConfig_pre)(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
+    EGLBoolean (* GetConfigAttrib_post)(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value);
+    EGLSurface (* CreateWindowSurface_post)(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list, EGLSurface ret_surface);
+    EGLSurface (* CreatePbufferSurface_post)(EGLDisplay dpy, EGLConfig config, const EGLint *attrib_list, EGLSurface ret_surface);
+    EGLSurface (* CreatePixmapSurface_post)(EGLDisplay dpy, EGLConfig config, EGLNativePixmapType pixmap, const EGLint *attrib_list, EGLSurface ret_surface);
+    EGLBoolean (* DestroySurface)(EGLDisplay dpy, EGLSurface surface);
+    EGLBoolean (* QuerySurface_pre)(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint *value);
+    EGLBoolean (* BindAPI)(EGLenum api);
+    EGLenum    (* QueryAPI_pre)(void);
+    EGLBoolean (* WaitClient)(void);
+    EGLBoolean (* ReleaseThread)(void);
+    EGLSurface (* CreatePbufferFromClientBuffer_post)(EGLDisplay dpy, EGLenum buftype, EGLClientBuffer buffer, EGLConfig config, const EGLint *attrib_list, EGLSurface ret_surface);
+    EGLBoolean (* SurfaceAttrib)(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint value);
+    EGLBoolean (* BindTexImage)(EGLDisplay dpy, EGLSurface surface, EGLint buffer);
+    EGLBoolean (* ReleaseTexImage)(EGLDisplay dpy, EGLSurface surface, EGLint buffer);
+    EGLBoolean (* SwapInterval)(EGLDisplay dpy, EGLint interval);
+    EGLContext (* CreateContext_post)(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list, EGLContext ret_ctx);
+    EGLBoolean (* DestroyContext)(EGLDisplay dpy, EGLContext ctx);
+    EGLBoolean (* MakeCurrent)(EGLDisplay dpy, EGLSurface draw, EGLSurface read, EGLContext ctx);
+    EGLContext (* GetCurrentContext_post)(EGLContext ret_ctx);
+    EGLSurface (* GetCurrentSurface_post)(EGLint readdraw, EGLSurface ret_furface);
+    EGLDisplay (* GetCurrentDisplay_post)(EGLDisplay ret_dpy);
+    EGLBoolean (* QueryContext_pre)(EGLDisplay dpy, EGLContext ctx, EGLint attribute, EGLint *value);
+    EGLBoolean (* WaitGL)(void);
+    EGLBoolean (* WaitNative)(EGLint engine);
+    EGLBoolean (* SwapBuffers)(EGLDisplay dpy, EGLSurface surface);
+    EGLBoolean (* CopyBuffers)(EGLDisplay dpy, EGLSurface surface, EGLNativePixmapType target);
+    __eglMustCastToProperFunctionPointerType (* GetProcAddress_pre)(const char *procname);
 
     /* EGL 1.5 */
-    EGLSync    (*CreateSync_post)(EGLDisplay dpy, EGLenum type, const EGLAttrib *attrib_list, EGLSync ret_sync);
-    EGLBoolean (*DestroySync)(EGLDisplay dpy, EGLSync sync);
-    EGLint     (*ClientWaitSync)(EGLDisplay dpy, EGLSync sync, EGLint flags, EGLTime timeout);
-    EGLBoolean (*GetSyncAttrib_post)(EGLDisplay dpy, EGLSync sync, EGLint attribute, EGLAttrib *value, EGLAttrib ret_value);
-    EGLImage   (*CreateImage_post)(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLAttrib *attrib_list, EGLImage ret_image);
-    EGLBoolean (*DestroyImage)(EGLDisplay dpy, EGLImage image);
-    EGLDisplay (*GetPlatformDisplay_post)(EGLenum platform, void *native_display, const EGLAttrib *attrib_list, EGLDisplay ret_dpy);
-    EGLSurface (*CreatePlatformWindowSurface_post)(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLAttrib *attrib_list, EGLSurface ret_surface);
-    EGLSurface (*CreatePlatformPixmapSurface_post)(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLAttrib *attrib_list, EGLSurface ret_surface);
-    EGLBoolean (*WaitSync)(EGLDisplay dpy, EGLSync sync, EGLint flags);
+    EGLSync    (* CreateSync_post)(EGLDisplay dpy, EGLenum type, const EGLAttrib *attrib_list, EGLSync ret_sync);
+    EGLBoolean (* DestroySync)(EGLDisplay dpy, EGLSync sync);
+    EGLint     (* ClientWaitSync)(EGLDisplay dpy, EGLSync sync, EGLint flags, EGLTime timeout);
+    EGLBoolean (* GetSyncAttrib_post)(EGLDisplay dpy, EGLSync sync, EGLint attribute, EGLAttrib *value, EGLAttrib ret_value);
+    EGLImage   (* CreateImage_post)(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLAttrib *attrib_list, EGLImage ret_image);
+    EGLBoolean (* DestroyImage)(EGLDisplay dpy, EGLImage image);
+    EGLDisplay (* GetPlatformDisplay_post)(EGLenum platform, void *native_display, const EGLAttrib *attrib_list, EGLDisplay ret_dpy);
+    EGLSurface (* CreatePlatformWindowSurface_post)(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLAttrib *attrib_list, EGLSurface ret_surface);
+    EGLSurface (* CreatePlatformPixmapSurface_post)(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLAttrib *attrib_list, EGLSurface ret_surface);
+    EGLBoolean (* WaitSync)(EGLDisplay dpy, EGLSync sync, EGLint flags);
 
     /* EGL_KHR_lock_surface. */
     EGLBoolean (* LockSurfaceKHR)(EGLDisplay dpy, EGLSurface surface, const EGLint *attrib_list);
     EGLBoolean (* UnlockSurfaceKHR)(EGLDisplay dpy, EGLSurface surface);
 
     /* EGL_KHR_image. */
-    EGLImageKHR (*CreateImageKHR_post)(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLint *attrib_list, EGLImageKHR ret_image);
-    EGLBoolean (*DestroyImageKHR)(EGLDisplay dpy, EGLImageKHR image);
+    EGLImageKHR (* CreateImageKHR_post)(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLint *attrib_list, EGLImageKHR ret_image);
+    EGLBoolean (* DestroyImageKHR)(EGLDisplay dpy, EGLImageKHR image);
 
     /* EGL_KHR_fence_sync. */
-    EGLSyncKHR (*CreateSyncKHR_post)(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list, EGLSyncKHR ret_sync);
-    EGLBoolean (*DestroySyncKHR)(EGLDisplay dpy, EGLSyncKHR sync);
-    EGLint     (*ClientWaitSyncKHR)(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags, EGLTimeKHR timeout);
-    EGLBoolean (*GetSyncAttribKHR_post)(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value, EGLint ret_value);
+    EGLSyncKHR (* CreateSyncKHR_post)(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list, EGLSyncKHR ret_sync);
+    EGLBoolean (* DestroySyncKHR)(EGLDisplay dpy, EGLSyncKHR sync);
+    EGLint     (* ClientWaitSyncKHR)(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags, EGLTimeKHR timeout);
+    EGLBoolean (* GetSyncAttribKHR_post)(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value, EGLint ret_value);
 
     /* EGL_KHR_wait_sync. */
-    EGLint     (*WaitSyncKHR)(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags);
+    EGLint     (* WaitSyncKHR)(EGLDisplay dpy, EGLSyncKHR sync, EGLint flags);
 
     /* EGL_KHR_reusable_sync. */
-    EGLBoolean (*SignalSyncKHR)(EGLDisplay dpy, EGLSyncKHR sync, EGLenum mode);
+    EGLBoolean (* SignalSyncKHR)(EGLDisplay dpy, EGLSyncKHR sync, EGLenum mode);
 
     /* EGL_EXT_platform_base. */
     EGLDisplay (* GetPlatformDisplayEXT_post)(EGLenum platform, void *native_display, const EGLint *attrib_list, EGLDisplay ret_dpy);
@@ -1105,40 +1150,40 @@ typedef struct
 
     /******  The above interfaces are used to link with external vTracer library libGLES_vlogger.so ******/
 
-    EGLDisplay (*GetDisplay_pre)(EGLNativeDisplayType display_id);
-    EGLBoolean (*GetConfigAttrib_pre)(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value);
-    EGLSurface (*CreateWindowSurface_pre)(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list);
-    EGLSurface (*CreatePbufferSurface_pre)(EGLDisplay dpy, EGLConfig config, const EGLint *attrib_list);
-    EGLSurface (*CreatePixmapSurface_pre)(EGLDisplay dpy, EGLConfig config, EGLNativePixmapType pixmap, const EGLint *attrib_list);
-    EGLSurface (*CreatePbufferFromClientBuffer_pre)(EGLDisplay dpy, EGLenum buftype, EGLClientBuffer buffer, EGLConfig config, const EGLint *attrib_list);
-    EGLContext (*CreateContext_pre)(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list);
-    EGLContext (*GetCurrentContext_pre)();
-    EGLSurface (*GetCurrentSurface_pre)(EGLint readdraw);
-    EGLDisplay (*GetCurrentDisplay_pre)();
-    __eglMustCastToProperFunctionPointerType (*GetProcAddress_post)(const char *procname, EGLint *func);
+    EGLDisplay (* GetDisplay_pre)(EGLNativeDisplayType display_id);
+    EGLBoolean (* GetConfigAttrib_pre)(EGLDisplay dpy, EGLConfig config, EGLint attribute, EGLint *value);
+    EGLSurface (* CreateWindowSurface_pre)(EGLDisplay dpy, EGLConfig config, EGLNativeWindowType win, const EGLint *attrib_list);
+    EGLSurface (* CreatePbufferSurface_pre)(EGLDisplay dpy, EGLConfig config, const EGLint *attrib_list);
+    EGLSurface (* CreatePixmapSurface_pre)(EGLDisplay dpy, EGLConfig config, EGLNativePixmapType pixmap, const EGLint *attrib_list);
+    EGLSurface (* CreatePbufferFromClientBuffer_pre)(EGLDisplay dpy, EGLenum buftype, EGLClientBuffer buffer, EGLConfig config, const EGLint *attrib_list);
+    EGLContext (* CreateContext_pre)(EGLDisplay dpy, EGLConfig config, EGLContext share_context, const EGLint *attrib_list);
+    EGLContext (* GetCurrentContext_pre)();
+    EGLSurface (* GetCurrentSurface_pre)(EGLint readdraw);
+    EGLDisplay (* GetCurrentDisplay_pre)();
+    __eglMustCastToProperFunctionPointerType (* GetProcAddress_post)(const char *procname, EGLint *func);
 
-    EGLint     (*GetError_post)(EGLint err);
-    const char * (*QueryString_post)(EGLDisplay dpy, EGLint name, const char* str);
-    EGLBoolean (*GetConfigs_post)(EGLDisplay dpy, EGLConfig *configs, EGLint config_size, EGLint *num_config);
-    EGLBoolean (*ChooseConfig_post)(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
-    EGLBoolean (*QuerySurface_post)(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint *value);
-    EGLenum    (*QueryAPI_post)(EGLenum api);
-    EGLBoolean (*QueryContext_post)(EGLDisplay dpy, EGLContext ctx, EGLint attribute, EGLint *value);
+    EGLint     (* GetError_post)(EGLint err);
+    const char * (* QueryString_post)(EGLDisplay dpy, EGLint name, const char* str);
+    EGLBoolean (* GetConfigs_post)(EGLDisplay dpy, EGLConfig *configs, EGLint config_size, EGLint *num_config);
+    EGLBoolean (* ChooseConfig_post)(EGLDisplay dpy, const EGLint *attrib_list, EGLConfig *configs, EGLint config_size, EGLint *num_config);
+    EGLBoolean (* QuerySurface_post)(EGLDisplay dpy, EGLSurface surface, EGLint attribute, EGLint *value);
+    EGLenum    (* QueryAPI_post)(EGLenum api);
+    EGLBoolean (* QueryContext_post)(EGLDisplay dpy, EGLContext ctx, EGLint attribute, EGLint *value);
 
     /* EGL 1.5 */
-    EGLSync    (*CreateSync_pre)(EGLDisplay dpy, EGLenum type, const EGLAttrib *attrib_list);
-    EGLBoolean (*GetSyncAttrib_pre)(EGLDisplay dpy, EGLSync sync, EGLint attribute, EGLAttrib *value);
-    EGLImage   (*CreateImage_pre)(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLAttrib *attrib_list);
-    EGLDisplay (*GetPlatformDisplay_pre)(EGLenum platform, void *native_display, const EGLAttrib *attrib_list);
-    EGLSurface (*CreatePlatformWindowSurface_pre)(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLAttrib *attrib_list);
-    EGLSurface (*CreatePlatformPixmapSurface_pre)(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLAttrib *attrib_list);
+    EGLSync    (* CreateSync_pre)(EGLDisplay dpy, EGLenum type, const EGLAttrib *attrib_list);
+    EGLBoolean (* GetSyncAttrib_pre)(EGLDisplay dpy, EGLSync sync, EGLint attribute, EGLAttrib *value);
+    EGLImage   (* CreateImage_pre)(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLAttrib *attrib_list);
+    EGLDisplay (* GetPlatformDisplay_pre)(EGLenum platform, void *native_display, const EGLAttrib *attrib_list);
+    EGLSurface (* CreatePlatformWindowSurface_pre)(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLAttrib *attrib_list);
+    EGLSurface (* CreatePlatformPixmapSurface_pre)(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLAttrib *attrib_list);
 
     /* EGL_KHR_image */
-    EGLImageKHR (*CreateImageKHR_pre)(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLint *attrib_list);
+    EGLImageKHR (* CreateImageKHR_pre)(EGLDisplay dpy, EGLContext ctx, EGLenum target, EGLClientBuffer buffer, const EGLint *attrib_list);
 
     /* EGL_KHR_fence_sync*/
-    EGLSyncKHR (*CreateSyncKHR_pre)(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list);
-    EGLBoolean (*GetSyncAttribKHR_pre)(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value);
+    EGLSyncKHR (* CreateSyncKHR_pre)(EGLDisplay dpy, EGLenum type, const EGLint *attrib_list);
+    EGLBoolean (* GetSyncAttribKHR_pre)(EGLDisplay dpy, EGLSyncKHR sync, EGLint attribute, EGLint *value);
 
     /* EGL_EXT_platform_base. */
     EGLDisplay (* GetPlatformDisplayEXT_pre)(EGLenum platform, void *native_display, const EGLint *attrib_list);
@@ -1146,7 +1191,6 @@ typedef struct
     EGLSurface (* CreatePlatformPixmapSurfaceEXT_pre)(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLint *attrib_list);
 }
 eglTracerDispatchTableStruct;
-
 
 EGLBoolean
 veglInitTracerDispatchTable(
@@ -1156,7 +1200,6 @@ veglInitTracerDispatchTable(
 extern eglTracerDispatchTableStruct veglTracerDispatchTable;
 extern eglTracerDispatchTableStruct veglLogFunctionTable;
 extern gceTRACEMODE veglTraceMode;
-
 
 #ifdef __cplusplus
 }

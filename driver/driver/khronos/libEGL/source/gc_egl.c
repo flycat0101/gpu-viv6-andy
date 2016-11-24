@@ -83,6 +83,18 @@ _DestroyThreadData(
             }
         }
 
+        if (thread->extString)
+        {
+            gcoOS_Free(gcvNULL, thread->extString);
+            thread->extString = gcvNULL;
+        }
+
+        if (thread->clientExtString)
+        {
+            gcoOS_Free(gcvNULL, thread->clientExtString);
+            thread->clientExtString = gcvNULL;
+        }
+
         gcoOS_Free(gcvNULL, TLS->context);
         TLS->context = gcvNULL;
     }
@@ -91,35 +103,6 @@ _DestroyThreadData(
 
     gcmFOOTER_NO();
 }
-
-#if gcdENABLE_VG
-static EGLBoolean _IsHWVGDriverAvailable(VEGLThreadData thread)
-{
-    struct eglContext context;
-    veglDISPATCH * dispatch;
-
-    context.thread        = thread;
-    context.api           = EGL_OPENVG_API;
-    context.client        = 1;
-    context.display       = EGL_NO_DISPLAY;
-    context.sharedContext = EGL_NO_CONTEXT;
-    context.draw          = EGL_NO_SURFACE;
-    context.read          = EGL_NO_SURFACE;
-    context.dispatch      = gcvNULL;
-
-    dispatch = _GetDispatch(thread, &context);
-
-    if ((dispatch == gcvNULL)
-    ||  (dispatch->queryHWVG == gcvNULL)
-    )
-    {
-        return EGL_FALSE;
-    }
-
-    return (*dispatch->queryHWVG)();
-}
-#endif
-
 
 VEGLResObj veglGetResObj(
     IN VEGLDisplay Dpy,
@@ -210,6 +193,50 @@ void veglPopResObj(
     return;
 }
 
+static void
+_InitDispatchTables(
+    VEGLThreadData Thread
+    )
+{
+#if gcdSTATIC_LINK
+#if gcdENABLE_3D
+    extern veglDISPATCH GLES_CM_DISPATCH_TABLE;
+    extern veglDISPATCH GLESv2_DISPATCH_TABLE;
+#  endif
+#ifndef VIVANTE_NO_VG
+    extern veglDISPATCH OpenVG_DISPATCH_TABLE;
+#  endif
+
+    Thread->dispatchTables[vegl_EGL]            = gcvNULL;
+#if gcdENABLE_3D
+    Thread->dispatchTables[vegl_OPENGL_ES11_CL] = gcvNULL;
+    Thread->dispatchTables[vegl_OPENGL_ES11]    = &GLES_CM_DISPATCH_TABLE;
+    Thread->dispatchTables[vegl_OPENGL_ES20]    = &GLESv2_DISPATCH_TABLE;
+    Thread->dispatchTables[vegl_OPENGL_ES30]    = &GLESv2_DISPATCH_TABLE;
+#  endif
+#ifndef VIVANTE_NO_VG
+    Thread->dispatchTables[vegl_OPENVG]         = &OpenVG_DISPATCH_TABLE;
+#  endif
+#else
+    gctSIZE_T i;
+
+    for (i = 0; i < vegl_API_LAST; i++)
+    {
+        veglAPIINDEX index = (veglAPIINDEX) i;
+
+        Thread->clientHandles[i] =
+            veglGetModule(gcvNULL, index, &Thread->dispatchTables[i]);
+
+        gcmTRACE_ZONE(
+            gcvLEVEL_VERBOSE, gcdZONE_EGL_API,
+            "%s(%d): APIIndex=%d library=%p dispatch=%p",
+            __FUNCTION__, __LINE__,
+            index, Thread->clientHandles[i], Thread->dispatchTables[i]
+            );
+    }
+#endif
+}
+
 
 VEGLThreadData
 veglGetThreadData(
@@ -252,6 +279,7 @@ veglGetThreadData(
         thread->maxSamples        = 0;
         /* Default feature bits. */
         thread->fastMSAA          = gcvFALSE;
+        thread->security          = gcvFALSE;
         thread->openVGpipe        = gcvFALSE;
 
 #if gcdGC355_MEM_PRINT
@@ -266,6 +294,9 @@ veglGetThreadData(
 #endif
 
         gcmONERROR(gcoHAL_QueryChipCount(gcvNULL, &thread->chipCount));
+
+        /* Initialize client dispatch tables. */
+        _InitDispatchTables(thread);
 
         for (i = 0; i < thread->chipCount; i++)
         {
@@ -294,7 +325,12 @@ veglGetThreadData(
         {
             if (gcoHAL_QueryChipFeature(gcvNULL, i, gcvFEATURE_PIPE_VG))
             {
-                thread->openVGpipe = _IsHWVGDriverAvailable(thread);
+                veglDISPATCH * dispatch = thread->dispatchTables[vegl_OPENVG];
+
+                if (dispatch && dispatch->queryHWVG)
+                {
+                    thread->openVGpipe = (*dispatch->queryHWVG)();
+                }
                 break;
             }
         }
@@ -307,6 +343,15 @@ veglGetThreadData(
                 (gcoHAL_QueryChipFeature(gcvNULL, i, gcvFEATURE_SMALL_MSAA)))
             {
                 thread->fastMSAA = gcvTRUE;
+                break;
+            }
+        }
+
+        for (i = 0; i < thread->chipCount; i++)
+        {
+            if (gcoHAL_QueryChipFeature(gcvNULL, i, gcvFEATURE_SECURITY))
+            {
+                thread->security = gcvTRUE;
                 break;
             }
         }

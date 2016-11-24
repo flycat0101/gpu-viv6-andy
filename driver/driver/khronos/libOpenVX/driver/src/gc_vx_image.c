@@ -87,7 +87,7 @@ VX_PRIVATE_API vx_bool vxImageFormat_IsValidWidthAndHeight(vx_uint32 width, vx_u
     return vx_true_e;
 }
 
-VX_PRIVATE_API vx_uint32 vxComputePatchOffset(vx_uint32 x, vx_uint32 y, vx_imagepatch_addressing_t *patchAddr)
+VX_PRIVATE_API vx_uint32 vxComputePatchOffset(vx_uint32 x, vx_uint32 y, const vx_imagepatch_addressing_t *patchAddr)
 {
     vxmASSERT(patchAddr);
 
@@ -323,6 +323,10 @@ VX_INTERNAL_CALLBACK_API void vxoImage_Destructor(vx_reference ref)
     {
         vx_uint32 planeIndex;
 
+        vxmASSERT(image->importType == VX_IMPORT_TYPE_HOST);
+
+        vxoImage_FreeWrappedMemory(image);
+
         for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
         {
             image->memory.logicals[planeIndex]                  = VX_NULL;
@@ -371,6 +375,7 @@ VX_INTERNAL_API vx_bool vxoImage_AllocateMemory(vx_image image)
     return vxoMemory_Allocate(image->base.context, &image->memory);
 }
 
+
 VX_INTERNAL_API void vxoImage_FreeMemory(vx_image image)
 {
     vxmASSERT(image);
@@ -378,7 +383,25 @@ VX_INTERNAL_API void vxoImage_FreeMemory(vx_image image)
     vxoMemory_Free(image->base.context, &image->memory);
 }
 
-VX_PUBLIC_API vx_image vxCreateImageFromROI(vx_image image, vx_rectangle_t *rect)
+
+VX_INTERNAL_API vx_bool vxoImage_WrapUserMemory(vx_image image)
+{
+    vxmASSERT(image);
+#ifdef WIN32
+    return vx_true_e;
+#else
+    return vxoMemory_WrapUserMemory(image->base.context, &image->memory);
+#endif
+}
+
+VX_INTERNAL_API void vxoImage_FreeWrappedMemory(vx_image image)
+{
+    vxmASSERT(image);
+
+    vxoMemory_FreeWrappedMemory(image->base.context, &image->memory);
+}
+
+VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromROI(vx_image image, const vx_rectangle_t *rect)
 {
     vx_image    subImage;
     vx_uint32   planeIndex;
@@ -455,7 +478,7 @@ VX_PRIVATE_API vx_image vxoImage_Create(
     return image;
 }
 
-VX_PUBLIC_API vx_image vxCreateImage(vx_context context, vx_uint32 width, vx_uint32 height, vx_df_image format)
+VX_API_ENTRY vx_image VX_API_CALL vxCreateImage(vx_context context, vx_uint32 width, vx_uint32 height, vx_df_image format)
 {
     if (!vxoContext_IsValid(context)) return VX_NULL;
 
@@ -472,7 +495,7 @@ VX_PUBLIC_API vx_image vxCreateImage(vx_context context, vx_uint32 width, vx_uin
     return vxoImage_Create(context, width, height, format, vx_false_e);
 }
 
-VX_PUBLIC_API vx_image vxCreateVirtualImage(vx_graph graph, vx_uint32 width, vx_uint32 height, vx_df_image format)
+VX_API_ENTRY vx_image VX_API_CALL vxCreateVirtualImage(vx_graph graph, vx_uint32 width, vx_uint32 height, vx_df_image format)
 {
     vx_image image;
 
@@ -487,8 +510,8 @@ VX_PUBLIC_API vx_image vxCreateVirtualImage(vx_graph graph, vx_uint32 width, vx_
     return image;
 }
 
-VX_PUBLIC_API vx_image vxCreateUniformImage(
-        vx_context context, vx_uint32 width, vx_uint32 height, vx_df_image format, void *value)
+VX_API_ENTRY vx_image VX_API_CALL vxCreateUniformImage(
+        vx_context context, vx_uint32 width, vx_uint32 height, vx_df_image format, const void *value)
 {
     vx_image image;
     vx_uint32 x, y, planeIndex;
@@ -684,7 +707,7 @@ VX_PUBLIC_API vx_image vxCreateUniformImage(
     return image;
 }
 
-VX_PUBLIC_API vx_image vxCreateImageFromHandle(
+VX_API_ENTRY vx_image VX_API_CALL vxCreateImageFromHandle(
         vx_context context, vx_df_image format, vx_imagepatch_addressing_t addrs[],
         void *ptrs[], vx_enum import_type)
 {
@@ -713,7 +736,15 @@ VX_PUBLIC_API vx_image vxCreateImageFromHandle(
     if (vxoReference_GetStatus((vx_reference)image) != VX_SUCCESS) return image;
 
     image->importType       = import_type;
-    image->memory.allocated = vx_true_e;
+
+    if (import_type == VX_IMPORT_TYPE_HOST)
+    {
+        image->memory.wrapFlag  = gcvALLOC_FLAG_USERMEMORY;
+    }
+    else if(import_type == VX_IMPORT_TYPE_DMABUF)
+    {
+        image->memory.wrapFlag  = gcvALLOC_FLAG_DMABUF;
+    }
 
     for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
     {
@@ -724,34 +755,35 @@ VX_PUBLIC_API vx_image vxCreateImageFromHandle(
 
         if (!vxCreateMutex(OUT &image->memory.writeLocks[planeIndex]))
         {
-            image->memory.writeLocks[planeIndex] = VX_NULL;
-
-            for (planeIndex = planeIndex - 1; planeIndex >= 0; planeIndex--)
-            {
-                if (image->memory.writeLocks[planeIndex] != VX_NULL)
-                {
-                    vxDestroyMutex(image->memory.writeLocks[planeIndex]);
-                    image->memory.writeLocks[planeIndex]  = VX_NULL;
-                }
-            }
-
-            image->memory.allocated = vx_false_e;
-
-            vxReleaseImage(&image);
-
-            return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_NO_RESOURCES);
+            goto OnError;
         }
     }
 
+    if (!vxoImage_WrapUserMemory(image)) goto OnError;
+
     return image;
+
+OnError:
+    for (planeIndex = 0; planeIndex < image->planeCount; planeIndex++)
+    {
+        if (image->memory.writeLocks[planeIndex] != VX_NULL)
+        {
+            vxDestroyMutex(image->memory.writeLocks[planeIndex]);
+            image->memory.writeLocks[planeIndex]  = VX_NULL;
+        }
+    }
+
+    vxReleaseImage(&image);
+
+    return (vx_image)vxoContext_GetErrorObject(context, VX_ERROR_NO_RESOURCES);
 }
 
-VX_PUBLIC_API vx_status vxReleaseImage(vx_image *image)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseImage(vx_image *image)
 {
     return vxoReference_Release((vx_reference_ptr)image, VX_TYPE_IMAGE, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_status vxQueryImage(vx_image image, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryImage(vx_image image, vx_enum attribute, void *ptr, vx_size size)
 {
     vx_size     imageSize = 0;
     vx_uint32   planeIndex;
@@ -815,7 +847,7 @@ VX_PUBLIC_API vx_status vxQueryImage(vx_image image, vx_enum attribute, void *pt
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxSetImageAttribute(vx_image image, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxSetImageAttribute(vx_image image, vx_enum attribute, const void *ptr, vx_size size)
 {
     if (!vxoImage_IsValid(image)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -841,8 +873,8 @@ VX_PUBLIC_API vx_status vxSetImageAttribute(vx_image image, vx_enum attribute, v
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_size vxComputeImagePatchSize(
-        vx_image image, vx_rectangle_t *rect, vx_uint32 plane_index)
+VX_API_ENTRY vx_size VX_API_CALL vxComputeImagePatchSize(
+        vx_image image, const vx_rectangle_t *rect, vx_uint32 plane_index)
 {
     vx_size pixelCount, pixelSize;
 
@@ -865,8 +897,8 @@ VX_PUBLIC_API vx_size vxComputeImagePatchSize(
     return pixelCount * pixelSize;
 }
 
-VX_PUBLIC_API vx_status vxAccessImagePatch(
-        vx_image image, vx_rectangle_t *rect, vx_uint32 plane_index,
+VX_API_ENTRY vx_status VX_API_CALL vxAccessImagePatch(
+        vx_image image, const vx_rectangle_t *rect, vx_uint32 plane_index,
         vx_imagepatch_addressing_t *patchAddr, void **ptr, vx_enum usage)
 {
     vx_bool         mapped = vx_false_e;
@@ -933,8 +965,12 @@ VX_PUBLIC_API vx_status vxAccessImagePatch(
     {
         vx_uint32 accessorIndex;
 
+        vx_imagepatch_addressing_t *addrSave = vxAllocate(sizeof(vx_imagepatch_addressing_t));
+        addrSave->stride_x = patchAddr->stride_x;
+        addrSave->stride_y = patchAddr->stride_y;
+
         if (!vxoContext_AddAccessor(image->base.context, vxComputeImagePatchSize(image, rect, plane_index),
-                                    usage, *ptr, &image->base, OUT &accessorIndex))
+                                    usage, *ptr, &image->base, OUT &accessorIndex, addrSave))
         {
             return VX_ERROR_NO_MEMORY;
         }
@@ -945,6 +981,7 @@ VX_PUBLIC_API vx_status vxAccessImagePatch(
     if (*ptr != VX_NULL && !mapped)
     {
         vx_uint32 y;
+        vx_imagepatch_addressing_t *addrSave = (vx_imagepatch_addressing_t*)image->base.context->accessorTable->extraDataPtr;
 
         memoryPtr = (vx_uint8_ptr)(*ptr);
 
@@ -955,8 +992,6 @@ VX_PUBLIC_API vx_status vxAccessImagePatch(
 
         patchAddr->dim_x    = rect->end_x - rect->start_x;
         patchAddr->dim_y    = rect->end_y - rect->start_y;
-        patchAddr->stride_x = image->memory.strides[plane_index][VX_DIM_X];
-        patchAddr->stride_y = patchAddr->dim_x / image->scales[plane_index][VX_DIM_X] * patchAddr->stride_x;
         patchAddr->step_x   = image->scales[plane_index][VX_DIM_X];
         patchAddr->step_y   = image->scales[plane_index][VX_DIM_Y];
         patchAddr->scale_x  = VX_SCALE_UNITY / image->scales[plane_index][VX_DIM_X];
@@ -964,15 +999,42 @@ VX_PUBLIC_API vx_status vxAccessImagePatch(
 
         if (usage == VX_READ_ONLY || usage == VX_READ_AND_WRITE)
         {
-            for (y = rect->start_y; y < rect->end_y; y+=patchAddr->step_y)
+            if (addrSave->stride_x == image->memory.strides[plane_index][VX_DIM_X])
             {
-                vx_uint32 planeOffset, patchOffset, rangeSize;
+                for (y = rect->start_y; y < rect->end_y; y+=patchAddr->step_y)
+                {
+                    vx_uint32 planeOffset, patchOffset, rangeSize;
 
-                planeOffset = vxComputePlaneOffset(image, rect->start_x, y, plane_index);
-                patchOffset = vxComputePatchOffset(0, (y - rect->start_y), patchAddr);
-                rangeSize = vxComputePlaneRangeSize(image, patchAddr->dim_x, plane_index);
+                    planeOffset = vxComputePlaneOffset(image, rect->start_x, y, plane_index);
+                    patchOffset = vxComputePatchOffset(0, (y - rect->start_y), patchAddr);
+                    rangeSize = vxComputePlaneRangeSize(image, patchAddr->dim_x, plane_index);
 
-                vxMemCopy(&memoryPtr[patchOffset], &image->memory.logicals[plane_index][planeOffset], rangeSize);
+                    vxMemCopy(&memoryPtr[patchOffset], &image->memory.logicals[plane_index][planeOffset], rangeSize);
+                }
+            }
+            else
+            {
+                vx_uint8 *tmp = (vx_uint8*)*ptr;
+                vx_uint32 x;
+
+                vx_uint8 *pDestLine = &tmp[0];
+                for (y = rect->start_y; y < rect->end_y; y+=patchAddr->step_y)
+                {
+                    vx_uint8 *pDest = pDestLine;
+
+                    vx_uint32 offset = vxComputePlaneOffset(image, rect->start_x, y, plane_index);
+                    vx_uint8 *pSrc = &image->memory.logicals[plane_index][offset];
+
+                    for (x = rect->start_x; x < rect->end_x; x+=patchAddr->step_x)
+                    {
+                        memcpy(pDest, pSrc, image->memory.strides[plane_index][VX_DIM_X]);
+
+                        pSrc += image->memory.strides[plane_index][VX_DIM_X];
+                        pDest += addrSave->stride_x;
+                    }
+
+                    pDestLine += addrSave->stride_y;
+                }
             }
 
             vxoReference_IncrementReadCount(&image->base);
@@ -984,9 +1046,9 @@ VX_PUBLIC_API vx_status vxAccessImagePatch(
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxCommitImagePatch(
+VX_API_ENTRY vx_status VX_API_CALL vxCommitImagePatch(
         vx_image image, vx_rectangle_t *rect, vx_uint32 plane_index,
-        vx_imagepatch_addressing_t *patchAddr, void *ptr)
+        vx_imagepatch_addressing_t *patchAddr, const void *ptr)
 {
     vx_bool     isZeroRect = vx_true_e;
     vx_bool     foundAccessor;
@@ -1031,7 +1093,7 @@ VX_PUBLIC_API vx_status vxCommitImagePatch(
         }
     }
 
-    foundAccessor = vxoContext_SearchAccessor(image->base.context, ptr, &accessorIndex);
+    foundAccessor = vxoContext_SearchAccessor(image->base.context, (vx_ptr)ptr, &accessorIndex);
 
     if (!isZeroRect)
     {
@@ -1080,17 +1142,43 @@ VX_PUBLIC_API vx_status vxCommitImagePatch(
 
             if (isExternalMemory || foundAccessor)
             {
-                vx_uint32 y;
+                vx_uint32 x, y;
+                vx_imagepatch_addressing_t * addrSave = (vx_imagepatch_addressing_t *)image->base.context->accessorTable->extraDataPtr;
 
-                for (y = rect->start_y; y < rect->end_y; y += patchAddr->step_y)
+                if (addrSave->stride_x == image->memory.strides[plane_index][VX_DIM_X])
                 {
-                    vx_uint32 planOffset, patchOffset, rangeSize;
+                    for (y = rect->start_y; y < rect->end_y; y += patchAddr->step_y)
+                    {
+                        vx_uint32 planOffset, patchOffset, rangeSize;
 
-                    planOffset  = vxComputePlaneOffset(image, rect->start_x, y, plane_index);
-                    patchOffset = vxComputePatchOffset(0, y - rect->start_y, patchAddr);
-                    rangeSize   = vxComputePatchRangeSize(rect->end_x - rect->start_x, patchAddr);
+                        planOffset  = vxComputePlaneOffset(image, rect->start_x, y, plane_index);
+                        patchOffset = vxComputePatchOffset(0, y - rect->start_y, patchAddr);
+                        rangeSize   = vxComputePatchRangeSize(rect->end_x - rect->start_x, patchAddr);
 
-                    vxMemCopy(&image->memory.logicals[plane_index][planOffset], &memoryPtr[patchOffset], rangeSize);
+                        vxMemCopy(&image->memory.logicals[plane_index][planOffset], &memoryPtr[patchOffset], rangeSize);
+                    }
+                }
+                else
+                {
+                    vx_uint8 *tmp = (vx_uint8*)ptr;
+                    vx_uint8 *pDestLine = &tmp[0];
+                    for (y = rect->start_y; y < rect->end_y; y+=patchAddr->step_y)
+                    {
+                        vx_uint8 *pSrc = pDestLine;
+
+                        vx_uint32 offset = vxComputePlaneOffset(image, rect->start_x, y, plane_index);
+                        vx_uint8 *pDest = &image->memory.logicals[plane_index][offset];
+
+                        for (x = rect->start_x; x < rect->end_x; x+=patchAddr->step_x)
+                        {
+                            memcpy(pDest, pSrc, image->memory.strides[plane_index][VX_DIM_X]);
+
+                            pDest += image->memory.strides[plane_index][VX_DIM_X];
+                            pSrc += addrSave->stride_x;
+                        }
+
+                        pDestLine += addrSave->stride_y;
+                    }
                 }
 
                 if (foundAccessor) vxoContext_RemoveAccessor(image->base.context, accessorIndex);
@@ -1111,8 +1199,8 @@ VX_PUBLIC_API vx_status vxCommitImagePatch(
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API void *vxFormatImagePatchAddress1d(
-        void *ptr, vx_uint32 planeIndex, vx_imagepatch_addressing_t *patchAddr)
+VX_API_ENTRY void * VX_API_CALL vxFormatImagePatchAddress1d(
+        void *ptr, vx_uint32 planeIndex, const vx_imagepatch_addressing_t *patchAddr)
 {
     if (ptr == VX_NULL) return VX_NULL;
 
@@ -1122,8 +1210,8 @@ VX_PUBLIC_API void *vxFormatImagePatchAddress1d(
             + vxComputePatchOffset(planeIndex % patchAddr->dim_x, planeIndex / patchAddr->dim_x, patchAddr);
 }
 
-VX_PUBLIC_API void *vxFormatImagePatchAddress2d(
-        void *ptr, vx_uint32 x, vx_uint32 y, vx_imagepatch_addressing_t *patchAddr)
+VX_API_ENTRY void * VX_API_CALL vxFormatImagePatchAddress2d(
+        void *ptr, vx_uint32 x, vx_uint32 y, const vx_imagepatch_addressing_t *patchAddr)
 {
     if (ptr == VX_NULL) return VX_NULL;
 
@@ -1132,7 +1220,7 @@ VX_PUBLIC_API void *vxFormatImagePatchAddress2d(
     return (vx_uint8_ptr)ptr + vxComputePatchOffset(x, y, patchAddr);
 }
 
-VX_PUBLIC_API vx_status vxGetValidRegionImage(vx_image image, vx_rectangle_t *rect)
+VX_API_ENTRY vx_status VX_API_CALL vxGetValidRegionImage(vx_image image, vx_rectangle_t *rect)
 {
     if (!vxoImage_IsValid(image)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -1155,3 +1243,4 @@ VX_PUBLIC_API vx_status vxGetValidRegionImage(vx_image image, vx_rectangle_t *re
 
     return VX_SUCCESS;
 }
+

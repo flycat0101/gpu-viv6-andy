@@ -25,7 +25,7 @@
 /* FIXME: Force to recompute for now. */
 #define vgvFORCE_PAINT_RECOMPUTE 1
 
-
+#if gcdENABLE_PERFORMANCE_PRIOR
 #define vgmFIXED_LERP(v1, v2, w) \
     ( vgmFIXED_MUL(v1, w) + vgmFIXED_MUL(v2 ,vgvFIXED_ONE - w))
 
@@ -95,7 +95,7 @@ gcmINLINE  gctFIXED vgfFixedMul(
 
         return (gctFIXED)(result >> 16);
 }
-
+#endif
 
 /*******************************************************************************
 **

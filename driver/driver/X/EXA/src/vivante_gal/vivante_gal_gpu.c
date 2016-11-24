@@ -66,6 +66,7 @@ static gctBOOL SetupDriver
         TRACE_EXIT(gcvFALSE);
     }
 
+#ifndef DISABLE_V2D
     /*If Seperated*/
     pDrvHandle->mIsSeperated = gcoHAL_QuerySeparated2D(pDrvHandle->mHal) == gcvSTATUS_TRUE;
 
@@ -81,6 +82,15 @@ static gctBOOL SetupDriver
         TRACE_ERROR("2D PIPE IS NOT AVAIBLE");
         TRACE_EXIT(gcvFALSE);
     }
+#else
+
+    status = gcoHAL_SetHardwareType(pDrvHandle->mHal, gcvHARDWARE_3D);
+    if (status < 0) {
+       TRACE_ERROR("Unable to gcoHAL_SetHardwareType, status = %d\n", status);
+       TRACE_EXIT(gcvFALSE);
+    }
+
+#endif
 
 
     /* Query the amount of video memory. */
@@ -154,12 +164,18 @@ static gctBOOL SetupDriver
     CHIP_SUPPORTA8 = gcoHAL_IsFeatureAvailable(pDrvHandle->mHal, gcvFEATURE_2D_A8_TARGET) == gcvSTATUS_TRUE;
 
     /*Getting the 2d engine*/
+#ifndef DISABLE_V2D
+
     status = gcoHAL_Get2DEngine(pDrvHandle->mHal, &(pDrvHandle->m2DEngine));
 
     if (status < 0) {
         TRACE_ERROR("Unable to construct 2DEngine object, status = %d\n", status);
         TRACE_EXIT(gcvFALSE);
     }
+#else
+    pDrvHandle->m2DEngine = gcvNULL;
+#endif
+
     *driver = pDrvHandle;
     TRACE_EXIT(gcvTRUE);
 }
@@ -385,6 +401,7 @@ Bool VIV2DGPUBlitComplete(GALINFOPTR galInfo, Bool wait) {
 }
 
 Bool VIV2DGPUFlushGraphicsPipe(GALINFOPTR galInfo) {
+#ifdef DISABLE_V2D
     TRACE_ENTER();
     gceSTATUS status = gcvSTATUS_OK;
     VIVGPUPtr gpuctx = (galInfo->mGpu);
@@ -393,6 +410,7 @@ Bool VIV2DGPUFlushGraphicsPipe(GALINFOPTR galInfo) {
         TRACE_ERROR("Flush Failed\n");
         TRACE_EXIT(FALSE);
     }
+#endif
     TRACE_EXIT(TRUE);
 }
 

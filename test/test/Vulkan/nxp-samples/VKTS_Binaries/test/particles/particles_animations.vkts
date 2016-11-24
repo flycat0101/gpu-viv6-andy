@@ -1,0 +1,6 @@
+#
+# VulKan ToolS animations.
+#
+
+channel_library particles_channels.vkts
+

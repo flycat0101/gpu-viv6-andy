@@ -173,10 +173,6 @@ static gctBOOL _IsNeedClearTexture()
 void *
 glfCreateContext(
     void * Thread,
-#if gcdGC355_PROFILER
-    gctUINT64 appStartTime,
-    gctFILE apiTimeFile,
-#endif
     gctINT ClientVersion,
     VEGLimports *Imports,
     void * SharedContext
@@ -417,8 +413,6 @@ glfCreateContext(
 
         gcmERR_BREAK(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
-        gcmERR_BREAK(gcInitGLSLCaps(Hal, gcGetGLSLCaps()));
-
         /* Allocate the context structure. */
         gcmERR_BREAK(gcoOS_Allocate(
             Os,
@@ -436,6 +430,9 @@ glfCreateContext(
 
         /* Set OS object. */
         context->os  = Os;
+
+        /* Set patch ID. */
+        context->patchId = patchId;
 
         /* Set 3D object */
         context->hw = Engine;
@@ -501,7 +498,11 @@ glfCreateContext(
         /* Initialize driver strings. */
         context->chipInfo.vendor     = (GLubyte*) "Vivante Corporation";
         context->chipInfo.renderer   = (GLubyte*) context->chipName;
-        context->chipInfo.version    = (GLubyte*) glvGLESDRIVERNAME;
+#if defined(COMMON_LITE)
+        context->chipInfo.version    = (GLubyte*) "OpenGL ES-CL 1.1";
+#else
+        context->chipInfo.version    = (GLubyte*) "OpenGL ES-CM 1.1";
+#endif
 
         /* Save EGL callback functions. */
         context->imports             = *Imports;
@@ -703,6 +704,9 @@ glfCreateContext(
 
         context->isQuadrant = (patchId == gcvPATCH_QUADRANT);
         context->curFrameBufferID = 0;
+
+        /* Load compiler. */
+        gcmERR_BREAK(glfLoadCompiler(context));
     }
     while (GL_FALSE);
 
@@ -738,7 +742,7 @@ glfCreateContext(
 #if VIVANTE_PROFILER
     if (context != gcvNULL)
     {
-        _glffInitializeProfiler(context);
+        _glffProfiler_NEW_Initialize(context);
     }
 #endif
 
@@ -837,8 +841,8 @@ glfDestroyContext(
     gcmCHECK_STATUS(glfDeinitializeDraw(context));
 
     /* Free up the render target and depth surface. */
-    gcmCHECK_STATUS(gco3D_SetTarget(context->hw, 0, gcvNULL, 0, 0));
-    gcmCHECK_STATUS(gco3D_SetDepth(context->hw, gcvNULL, 0));
+    gcmCHECK_STATUS(gco3D_SetTarget(context->hw, 0, gcvNULL, 0));
+    gcmCHECK_STATUS(gco3D_SetDepth(context->hw, gcvNULL));
 
 #if VIVANTE_PROFILER
     _glffDestroyProfiler(context);
@@ -847,6 +851,12 @@ glfDestroyContext(
     if (context->chipInfo.extensions != gcvNULL)
     {
         gcmVERIFY_OK(gcmOS_SAFE_FREE(context->os, context->chipInfo.extensions));
+    }
+
+    /* Release compiler */
+    if (context->dll)
+    {
+        gcmVERIFY_OK(glfReleaseCompiler(context));
     }
 
     /* Destroy 3D object */
@@ -912,6 +922,8 @@ glfSetContext(
     gcoSURF draw;
     gcoSURF read;
     gcoSURF depth;
+    gcsSURF_VIEW drawView = {gcvNULL, 0, 1};
+    gcsSURF_VIEW dsView = {gcvNULL, 0, 1};
 
     gcmHEADER_ARG("Context=0x%x Drawable=0x%x Readable=0x%x",
                   Context, Drawable, Readable);
@@ -994,8 +1006,10 @@ glfSetContext(
         context->read  = read;
         context->depth = depth;
 
+        drawView.surf = draw;
+
         /* Set surfaces into hardware context. */
-        gco3D_SetTarget(context->hw, 0, draw, 0, 0);
+        gco3D_SetTarget(context->hw, 0, &drawView, 0);
 
         if (depth != gcvNULL)
         {
@@ -1009,7 +1023,9 @@ glfSetContext(
                         context->depthStates.depthMask : gcvFALSE));
         }
 
-        gco3D_SetDepth(context->hw, depth, 0);
+        dsView.surf = depth;
+
+        gco3D_SetDepth(context->hw, &dsView);
 
         gco3D_SetColorCacheMode(context->hw);
 
@@ -1166,13 +1182,13 @@ glfUnsetContext(
         gcmASSERT(context);
 
         /* Release context */
-        gcmERR_BREAK(gco3D_SetTarget(context->hw, 0, gcvNULL, 0, 0));
+        gcmERR_BREAK(gco3D_SetTarget(context->hw, 0, gcvNULL, 0));
 
         gcmERR_BREAK(gco3D_SetDepthMode(context->hw, gcvDEPTH_NONE));
 
         gcmERR_BREAK(gco3D_EnableDepthWrite(context->hw, gcvFALSE));
 
-        gcmERR_BREAK(gco3D_SetDepth(context->hw, gcvNULL, 0));
+        gcmERR_BREAK(gco3D_SetDepth(context->hw, gcvNULL));
 
         gcmERR_BREAK(gco3D_UnSet3DEngine(context->hw));
 
@@ -1335,6 +1351,23 @@ glfFinish(
     glmLEAVE();
 }
 
+static gctBOOL
+glfProfiler(
+    void * Profiler,
+    gctUINT32 Enum,
+    gctHANDLE Value
+    )
+{
+#if VIVANTE_PROFILER
+    glsCONTEXT_PTR context;
+    context = GetCurrentContext();
+    return _glffProfiler_NEW_Set(context, Enum, Value);
+#else
+    return gcvFALSE;
+#endif
+}
+
+
 /*******************************************************************************
 **
 **  glFlush
@@ -1492,6 +1525,87 @@ SetCurrentContext(
     gcmFOOTER_NO();
 }
 
+gceSTATUS
+glfLoadCompiler(
+    glsCONTEXT_PTR      Context
+    )
+{
+    gceSTATUS status;
+    VSC_HW_CONFIG hwCfg;
+
+    gcmHEADER();
+
+    gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg);
+
+    do
+    {
+        union __GLinitializerUnion
+        {
+            gctGLSLInitCompiler initGLSL;
+            gctPOINTER          ptr;
+        } intializer;
+
+        union __GLfinalizerUnion
+        {
+            gctGLSLFinalizeCompiler finalizeGLSL;
+            gctPOINTER ptr;
+        } finalizer;
+
+        status = gcoOS_LoadLibrary(gcvNULL,
+#if defined(__APPLE__)
+                                   "libGLSLC.dylib",
+#elif defined(LINUXEMULATOR)
+                                   "libGLSLC.so",
+#elif defined(__QNXNTO__)
+                                   "glesv2-sc-dlls",
+#else
+                                   "libGLSLC",
+#endif
+                                   &Context->dll);
+
+        if (gcmIS_ERROR(status))
+        {
+            break;
+        }
+
+        gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, Context->dll, "gcInitializeCompiler", &intializer.ptr));
+        gcmERR_BREAK(gcoOS_GetProcAddress(gcvNULL, Context->dll, "gcFinalizeCompiler", &finalizer.ptr));
+
+        Context->pfInitCompiler = intializer.initGLSL;
+        Context->pfFinalizeCompiler = finalizer.finalizeGLSL;
+
+        gcmERR_BREAK(Context->pfInitCompiler(Context->patchId, &hwCfg, gcvNULL));
+    } while (gcvFALSE);
+
+    gcmFOOTER_NO();
+    return status;
+}
+
+gceSTATUS
+glfReleaseCompiler(
+    glsCONTEXT_PTR      Context
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER();
+
+    gcmONERROR(Context->pfFinalizeCompiler());
+
+OnError:
+    gcmFOOTER_NO();
+    return status;
+}
+
+typedef struct _veglLOOKUP
+{
+    const char *                                name;
+    __eglMustCastToProperFunctionPointerType    function;
+}
+veglLOOKUP;
+
+#define eglMAKE_LOOKUP(function) \
+    { #function, (__eglMustCastToProperFunctionPointerType) function }
 
 static veglLOOKUP _glaLookup[] =
 {
@@ -1748,7 +1862,10 @@ static veglLOOKUP _glaLookup[] =
     { gcvNULL, gcvNULL }
 };
 
-EGL_PROC veglGetProcAddr(const GLchar *procName)
+static EGL_PROC
+glfGetProcAddr(
+    const GLchar *procName
+    )
 {
     veglLOOKUP *lookup = _glaLookup;
 
@@ -1767,6 +1884,7 @@ EGL_PROC veglGetProcAddr(const GLchar *procName)
     return gcvNULL;
 }
 
+
 GL_API veglDISPATCH
 #ifdef COMMON_LITE
 GLES_CL_DISPATCH_TABLE =
@@ -1780,35 +1898,16 @@ GLES_CM_DISPATCH_TABLE =
     /* loseCurrent              */  glfUnsetContext,
     /* setDrawable              */  glfSetContext,
     /* flushContext             */  glfFlushContext,
-
     /* flush                    */  glfFlush,
     /* finish                   */  glfFinish,
-
-    /* setBuffer                */  gcvNULL,
     /* getClientBuffer          */  gcvNULL,
-
     /* createImageTexture       */  glfCreateImageTexture,
     /* createImageRenderbuffer  */  glfCreateImageRenderBuffer,
     /* createImageParentImage   */  gcvNULL,
     /* bindTexImage             */  glfBindTexImage,
-
-#if VIVANTE_PROFILER
-    /* profiler                 */  _glffProfiler,
-#else
-    /* profiler                 */  gcvNULL,
-#endif
-    /* getProcAddr;             */  veglGetProcAddr,
-
+    /* profiler                 */  glfProfiler,
+    /* getProcAddr              */  glfGetProcAddr,
+    /* swapBuffers              */  gcvNULL,
     /* queryHWVG                */  gcvNULL,
-
-#if gcdRENDER_THREADS
-    /* renderThread             */  glfRenderThread,
-#else
-    /* renderThread             */  gcvNULL,
-#endif
-
-    /* swapBuffer               */  gcvNULL,
     /* resolveVG                */  gcvNULL,
-
-    /* syncImage                 */    gcvNULL,
 };

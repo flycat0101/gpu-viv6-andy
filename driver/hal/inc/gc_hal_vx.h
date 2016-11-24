@@ -31,6 +31,7 @@ typedef gcoVX_Hardware_Context *    gcsVX_KERNEL_PARAMETERS_PTR;
 /* VX kernel parameters. */
 typedef struct _gcsVX_KERNEL_PARAMETERS * gcsVX_KERNEL_PARAMETERS_PTR;
 
+
 typedef struct _gcsVX_KERNEL_PARAMETERS
 {
     gctUINT32           kernel;
@@ -52,6 +53,7 @@ typedef struct _gcsVX_KERNEL_PARAMETERS
     gctUINT32           policy;
     gctUINT32           rounding;
     gctFLOAT            scale;
+    gctFLOAT            factor;
     gctUINT32           borders;
     gctUINT32           constant_value;
     gctUINT32           volume;
@@ -83,6 +85,12 @@ typedef struct _gcsVX_KERNEL_PARAMETERS
     gcoVX_Instructions  instructions;
 
     vx_evis_no_inst_s   evisNoInst;
+
+    gctUINT32               curDeviceID;
+    gctUINT32               usedDeviceCount;
+    gcsTHREAD_WALKER_INFO   splitInfo[4];
+    gctUINT32               deviceCount;
+    gctPOINTER              *devices;
 }
 gcsVX_KERNEL_PARAMETERS;
 #endif
@@ -139,8 +147,8 @@ gcoVX_Upload(
 gceSTATUS
 gcoVX_AllocateMemory(
     IN gctUINT32        Size,
-    OUT gctUINT32_PTR   Logical,
-    OUT gctUINT32_PTR   Physical,
+    OUT gctPOINTER*     Logical,
+    OUT gctPHYS_ADDR*   Physical,
     OUT gcsSURF_NODE_PTR* Node
     );
 
@@ -158,6 +166,7 @@ gceSTATUS
 gcoVX_KernelConstruct(
     IN OUT gcoVX_Hardware_Context   *Context
     );
+
 
 gceSTATUS
 gcoVX_LockKernel(
@@ -206,6 +215,47 @@ gcoVX_FreeMemoryEx(
     IN gctPOINTER           Logical,
     IN gctUINT              Bytes,
     IN gcsSURF_NODE_PTR     Node
+    );
+
+
+gceSTATUS
+gcoVX_CreateDevices(
+    IN gctUINT     maxDeviceCount,
+    IN gctPOINTER   *devices,
+    OUT gctUINT    *deviceCount
+    );
+
+gceSTATUS
+gcoVX_DestroyDevices(
+    IN gctUINT      deviceCount,
+    IN gctPOINTER   *devices
+    );
+
+gceSTATUS
+gcoVX_GetCurrentDevice(
+    OUT gctPOINTER   *devices
+    );
+
+gceSTATUS
+gcoVX_SetCurrentDevice(
+    IN gctPOINTER   device,
+    IN gctINT       deviceID
+    );
+
+gceSTATUS
+gcoVX_MultiDeviceSync(
+    IN gctPOINTER   device
+    );
+
+
+gceSTATUS
+gcoVX_SaveContext(
+    OUT gcoHARDWARE *Hardware
+    );
+
+gceSTATUS
+gcoVX_RestoreContext(
+    IN gcoHARDWARE Hardware
     );
 
 #ifdef __cplusplus

@@ -211,6 +211,31 @@ gctBOOL vscHTBL_TestAndGet(VSC_HASH_TABLE* pHT, void* pHashKey, VSC_HASH_NODE** 
     return gcvFALSE;
 }
 
+/* count items in the hashTable */
+gctINT vscHTBL_CountItems(VSC_HASH_TABLE* pHT)
+{
+    gctINT              i, count = 0;
+    VSC_HASH_NODE_LIST* pList;
+    VSC_HASH_NODE*      pHashNode;
+
+    if (pHT == gcvNULL)
+    {
+        return 0;
+    }
+    for (i = 0; i < pHT->tableSize; i++)
+    {
+        pList = &(pHT->pTable[i]);
+        for (pHashNode = HNLST_GET_FIRST_HASH_NODE(pList);
+             pHashNode != NULL;
+             pHashNode = HND_GET_NEXT_HASH_NODE(pHashNode))
+        {
+            count++;
+        }
+
+    }
+    return count;
+}
+
 VSC_HASH_NODE* vscHTBL_Get(VSC_HASH_TABLE* pHT, void* pHashKey)
 {
     VSC_HASH_NODE* pHashNode;
@@ -371,6 +396,7 @@ void vscHTBLIterator_Init(VSC_HASH_ITERATOR* pIter, VSC_HASH_TABLE* pHtbl)
     pIter->pHashTable = pHtbl;
     vscULIterator_Init(&pIter->htblEntryIterator, &pHtbl->pTable[0]);
     pIter->curEntryIdx = 0;
+    pIter->count = 0;
 }
 
 VSC_HASH_NODE *vscHTBLIterator_First(VSC_HASH_ITERATOR* pIter)
@@ -383,6 +409,7 @@ VSC_HASH_NODE *vscHTBLIterator_First(VSC_HASH_ITERATOR* pIter)
 
         if (pRetHashNode)
         {
+            pIter->count++;
             return pRetHashNode;
         }
         else
@@ -409,6 +436,7 @@ VSC_HASH_NODE *vscHTBLIterator_Next(VSC_HASH_ITERATOR* pIter)
 
     if (pRetHashNode)
     {
+        pIter->count++;
         return pRetHashNode;
     }
     else

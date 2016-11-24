@@ -385,7 +385,6 @@
 
 
 /* Copy the first part of user declarations.  */
-#line 1 "gc_glsl.y"
 
 #include "gc_glsl_parser.h"
 #ifndef FILE
@@ -428,7 +427,6 @@ static int yyfprintf(FILE *file, const char * msg, ...)
 #endif
 
 #if !defined (YYSTYPE) && ! defined (YYSTYPE_IS_DECLARED)
-#line 25 "gc_glsl.y"
 typedef union YYSTYPE {
     slsLexToken                 token;
 
@@ -467,7 +465,6 @@ typedef union YYSTYPE {
     slsASM_MODIFIERS            asmModifiers;
 } YYSTYPE;
 /* Line 191 of yacc.c.  */
-#line 451 "gc_glsl_parser.c"
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 # define YYSTYPE_IS_TRIVIAL 1
@@ -479,7 +476,6 @@ typedef union YYSTYPE {
 
 
 /* Line 214 of yacc.c.  */
-#line 463 "gc_glsl_parser.c"
 
 #if !defined (yyoverflow) || YYERROR_VERBOSE
 
@@ -2892,806 +2888,646 @@ yyreduce:
   switch (yyn)
     {
         case 2:
-#line 184 "gc_glsl.y"
     { yyval.expr = slParseVariableIdentifier(Compiler, &yyvsp[0].token); ;}
     break;
 
   case 3:
-#line 189 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 4:
-#line 191 "gc_glsl.y"
     { yyval.expr = slParseIntConstant(Compiler, &yyvsp[0].token); ;}
     break;
 
   case 5:
-#line 193 "gc_glsl.y"
     { yyval.expr = slParseUintConstant(Compiler, &yyvsp[0].token); ;}
     break;
 
   case 6:
-#line 195 "gc_glsl.y"
     { yyval.expr = slParseFloatConstant(Compiler, &yyvsp[0].token); ;}
     break;
 
   case 7:
-#line 197 "gc_glsl.y"
     { yyval.expr = slParseBoolConstant(Compiler, &yyvsp[0].token); ;}
     break;
 
   case 8:
-#line 199 "gc_glsl.y"
     { yyval.expr = yyvsp[-1].expr; ;}
     break;
 
   case 9:
-#line 204 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 10:
-#line 206 "gc_glsl.y"
     { yyval.expr = slParseSubscriptExpr(Compiler, yyvsp[-3].expr, yyvsp[-1].expr); ;}
     break;
 
   case 11:
-#line 208 "gc_glsl.y"
     { yyval.expr = slParseFuncCallExprAsExpr(Compiler, yyvsp[0].funcCall); ;}
     break;
 
   case 12:
-#line 210 "gc_glsl.y"
     { yyval.expr = slParseFieldSelectionExpr(Compiler, yyvsp[-2].expr, &yyvsp[0].token); ;}
     break;
 
   case 13:
-#line 212 "gc_glsl.y"
     { yyval.expr = slParseLengthMethodExpr(Compiler, yyvsp[-2].expr); ;}
     break;
 
   case 14:
-#line 214 "gc_glsl.y"
     { yyval.expr = slParseIncOrDecExpr(Compiler, gcvNULL, slvUNARY_POST_INC, yyvsp[-1].expr); ;}
     break;
 
   case 15:
-#line 216 "gc_glsl.y"
     { yyval.expr = slParseIncOrDecExpr(Compiler, gcvNULL, slvUNARY_POST_DEC, yyvsp[-1].expr); ;}
     break;
 
   case 16:
-#line 221 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 17:
-#line 226 "gc_glsl.y"
     { yyval.statement = slParseAsmAsStatement(Compiler, yyvsp[-2].vivAsm); ;}
     break;
 
   case 18:
-#line 231 "gc_glsl.y"
     { yyval.vivAsm = slParseAsmOpcode(Compiler, &yyvsp[0].asmOpcode); ;}
     break;
 
   case 19:
-#line 233 "gc_glsl.y"
     { yyval.vivAsm = slParseAsmOperand(Compiler, yyvsp[-2].vivAsm, yyvsp[0].expr); ;}
     break;
 
   case 20:
-#line 238 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 21:
-#line 240 "gc_glsl.y"
     { yyval.expr = slParseAsmAppendOperandModifiers(Compiler, yyvsp[-3].expr, &yyvsp[-1].asmModifiers); ;}
     break;
 
   case 22:
-#line 245 "gc_glsl.y"
     { yyval.asmModifiers = slParseAsmAppendModifier(Compiler, gcvNULL, &yyvsp[0].asmModifier); ;}
     break;
 
   case 23:
-#line 247 "gc_glsl.y"
     { yyval.asmModifiers = slParseAsmAppendModifier(Compiler, &yyvsp[-2].asmModifiers, &yyvsp[0].asmModifier); ;}
     break;
 
   case 24:
-#line 252 "gc_glsl.y"
     { yyval.asmModifier = slParseAsmModifier(Compiler, &yyvsp[-2].token, &yyvsp[0].token); ;}
     break;
 
   case 25:
-#line 257 "gc_glsl.y"
     { yyval.asmOpcode = slParseAsmCreateOpcode(Compiler, &yyvsp[0].token, gcvNULL); ;}
     break;
 
   case 26:
-#line 259 "gc_glsl.y"
     { yyval.asmOpcode = slParseAsmCreateOpcode(Compiler, &yyvsp[-3].token, &yyvsp[-1].asmModifiers); ;}
     break;
 
   case 27:
-#line 264 "gc_glsl.y"
     { yyval.funcCall = yyvsp[0].funcCall; ;}
     break;
 
   case 28:
-#line 269 "gc_glsl.y"
     { yyval.funcCall = yyvsp[-1].funcCall; ;}
     break;
 
   case 29:
-#line 271 "gc_glsl.y"
     { yyval.funcCall = yyvsp[-1].funcCall; ;}
     break;
 
   case 30:
-#line 276 "gc_glsl.y"
     { yyval.funcCall = yyvsp[-1].funcCall; ;}
     break;
 
   case 31:
-#line 278 "gc_glsl.y"
     { yyval.funcCall = yyvsp[0].funcCall; ;}
     break;
 
   case 32:
-#line 283 "gc_glsl.y"
     { yyval.funcCall = slParseFuncCallArgument(Compiler, yyvsp[-1].funcCall, yyvsp[0].expr); ;}
     break;
 
   case 33:
-#line 285 "gc_glsl.y"
     { yyval.funcCall = slParseFuncCallArgument(Compiler, yyvsp[-2].funcCall, yyvsp[0].expr); ;}
     break;
 
   case 34:
-#line 290 "gc_glsl.y"
     { yyval.funcCall = slParseFuncCallHeaderExpr(Compiler, &yyvsp[-1].token); ;}
     break;
 
   case 35:
-#line 295 "gc_glsl.y"
     { yyval.token = slParseBasicType(Compiler, yyvsp[0].dataType); ;}
     break;
 
   case 36:
-#line 297 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 37:
-#line 302 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 38:
-#line 304 "gc_glsl.y"
     { yyval.expr = slParseIncOrDecExpr(Compiler, &yyvsp[-1].token, slvUNARY_PRE_INC, yyvsp[0].expr); ;}
     break;
 
   case 39:
-#line 306 "gc_glsl.y"
     { yyval.expr = slParseIncOrDecExpr(Compiler, &yyvsp[-1].token, slvUNARY_PRE_DEC, yyvsp[0].expr); ;}
     break;
 
   case 40:
-#line 308 "gc_glsl.y"
     { yyval.expr = slParseNormalUnaryExpr(Compiler, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 41:
-#line 315 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 42:
-#line 317 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 43:
-#line 319 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 44:
-#line 321 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 45:
-#line 328 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 46:
-#line 330 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 47:
-#line 332 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 48:
-#line 334 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 49:
-#line 339 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 50:
-#line 341 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 51:
-#line 343 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 52:
-#line 348 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 53:
-#line 350 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 54:
-#line 352 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 55:
-#line 357 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 56:
-#line 359 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 57:
-#line 361 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 58:
-#line 363 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 59:
-#line 365 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 60:
-#line 370 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 61:
-#line 372 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 62:
-#line 374 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 63:
-#line 379 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 64:
-#line 381 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 65:
-#line 386 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 66:
-#line 388 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 67:
-#line 393 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 68:
-#line 395 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 69:
-#line 400 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 70:
-#line 402 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 71:
-#line 407 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 72:
-#line 409 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 73:
-#line 414 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 74:
-#line 416 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 75:
-#line 421 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 76:
-#line 423 "gc_glsl.y"
     { yyval.expr = slParseSelectionExpr(Compiler, yyvsp[-4].expr, yyvsp[-2].expr, yyvsp[0].expr); ;}
     break;
 
   case 77:
-#line 428 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 78:
-#line 430 "gc_glsl.y"
     { yyval.expr = slParseAssignmentExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 79:
-#line 435 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 80:
-#line 437 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 81:
-#line 439 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 82:
-#line 441 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 83:
-#line 443 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 84:
-#line 445 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 85:
-#line 447 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 86:
-#line 449 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 87:
-#line 451 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 88:
-#line 453 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 89:
-#line 455 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 90:
-#line 460 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 91:
-#line 462 "gc_glsl.y"
     { yyval.expr = slParseNormalBinaryExpr(Compiler, yyvsp[-2].expr, &yyvsp[-1].token, yyvsp[0].expr); ;}
     break;
 
   case 92:
-#line 467 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 93:
-#line 472 "gc_glsl.y"
     { yyval.fieldDeclList = slParseArrayLengthList(Compiler, gcvNULL, gcvNULL, gcvNULL); ;}
     break;
 
   case 94:
-#line 474 "gc_glsl.y"
     { yyval.fieldDeclList = slParseArrayLengthList(Compiler, gcvNULL, gcvNULL, yyvsp[-1].expr); ;}
     break;
 
   case 95:
-#line 476 "gc_glsl.y"
     { yyval.fieldDeclList = slParseArrayLengthList(Compiler, gcvNULL, yyvsp[-3].expr, gcvNULL); ;}
     break;
 
   case 96:
-#line 478 "gc_glsl.y"
     { yyval.fieldDeclList = slParseArrayLengthList(Compiler, gcvNULL, yyvsp[-4].expr, yyvsp[-1].expr); ;}
     break;
 
   case 97:
-#line 480 "gc_glsl.y"
     { yyval.fieldDeclList = slParseArrayLengthList2(Compiler, yyvsp[-2].fieldDeclList, gcvNULL, gcvNULL); ;}
     break;
 
   case 98:
-#line 482 "gc_glsl.y"
     { yyval.fieldDeclList = slParseArrayLengthList2(Compiler, yyvsp[-3].fieldDeclList, yyvsp[-1].expr, gcvNULL); ;}
     break;
 
   case 99:
-#line 487 "gc_glsl.y"
     { yyval.statement = slParseFuncDecl(Compiler, yyvsp[-1].funcName); ;}
     break;
 
   case 100:
-#line 489 "gc_glsl.y"
     { yyval.statement = slParseDeclaration(Compiler, yyvsp[-1].declOrDeclList); ;}
     break;
 
   case 101:
-#line 491 "gc_glsl.y"
     { yyval.statement = slParseDefaultPrecisionQualifier(Compiler, &yyvsp[-3].token, &yyvsp[-2].token, yyvsp[-1].dataType); ;}
     break;
 
   case 102:
-#line 493 "gc_glsl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 103:
-#line 495 "gc_glsl.y"
     { yyval.statement = slParseQualifierAsStatement(Compiler, &yyvsp[-1].token); ;}
     break;
 
   case 104:
-#line 500 "gc_glsl.y"
     { yyval.funcName = yyvsp[-1].funcName; ;}
     break;
 
   case 105:
-#line 505 "gc_glsl.y"
     { yyval.funcName = yyvsp[0].funcName; ;}
     break;
 
   case 106:
-#line 507 "gc_glsl.y"
     { yyval.funcName = yyvsp[0].funcName; ;}
     break;
 
   case 107:
-#line 512 "gc_glsl.y"
     { yyval.funcName = slParseParameterList(Compiler, yyvsp[-1].funcName, yyvsp[0].paramName); ;}
     break;
 
   case 108:
-#line 514 "gc_glsl.y"
     { yyval.funcName = slParseParameterList(Compiler, yyvsp[-2].funcName, yyvsp[0].paramName); ;}
     break;
 
   case 109:
-#line 519 "gc_glsl.y"
     { yyval.funcName = slParseFuncHeader(Compiler, yyvsp[-2].dataType, &yyvsp[-1].token); ;}
     break;
 
   case 110:
-#line 524 "gc_glsl.y"
     { yyval.funcName = slParseNonArrayParameterDecl(Compiler, yyvsp[-1].dataType, &yyvsp[0].token); ;}
     break;
 
   case 111:
-#line 526 "gc_glsl.y"
     { yyval.funcName = slParseArrayParameterDecl(Compiler, yyvsp[-4].dataType, &yyvsp[-3].token, yyvsp[-1].expr); ;}
     break;
 
   case 112:
-#line 528 "gc_glsl.y"
     { yyval.funcName = slParseArrayListParameterDecl(Compiler, yyvsp[-2].dataType, &yyvsp[-1].token, yyvsp[0].fieldDeclList); ;}
     break;
 
   case 113:
-#line 533 "gc_glsl.y"
     { yyval.paramName = slParseQualifiedParameterDecl(Compiler, gcvNULL, yyvsp[0].funcName); ;}
     break;
 
   case 114:
-#line 535 "gc_glsl.y"
     { yyval.paramName = slParseQualifiedParameterDecl(Compiler, gcvNULL, yyvsp[0].funcName); ;}
     break;
 
   case 115:
-#line 537 "gc_glsl.y"
     { yyval.paramName = slParseQualifiedParameterDecl(Compiler, &yyvsp[-1].token, yyvsp[0].funcName); ;}
     break;
 
   case 116:
-#line 539 "gc_glsl.y"
     { yyval.paramName = slParseQualifiedParameterDecl(Compiler, &yyvsp[-1].token, yyvsp[0].funcName); ;}
     break;
 
   case 117:
-#line 544 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 118:
-#line 546 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 119:
-#line 548 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 120:
-#line 554 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 121:
-#line 556 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 122:
-#line 558 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 123:
-#line 562 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 124:
-#line 564 "gc_glsl.y"
     { yyval.token = slMergeParameterQualifiers(Compiler, &yyvsp[-1].token, &yyvsp[0].token); ;}
     break;
 
   case 125:
-#line 569 "gc_glsl.y"
     { yyval.funcName = slParseNonArrayParameterDecl(Compiler, yyvsp[0].dataType, gcvNULL); ;}
     break;
 
   case 126:
-#line 583 "gc_glsl.y"
     { yyval.declOrDeclList = yyvsp[0].declOrDeclList; ;}
     break;
 
   case 127:
-#line 585 "gc_glsl.y"
     { yyval.declOrDeclList = slParseNonArrayVariableDecl2(Compiler, yyvsp[-2].declOrDeclList, &yyvsp[0].token); ;}
     break;
 
   case 128:
-#line 587 "gc_glsl.y"
     { yyval.declOrDeclList = slParseArrayVariableDecl2(Compiler, yyvsp[-5].declOrDeclList, &yyvsp[-3].token, yyvsp[-1].expr); ;}
     break;
 
   case 129:
-#line 589 "gc_glsl.y"
     { yyval.declOrDeclList = slParseArrayVariableDecl2(Compiler, yyvsp[-4].declOrDeclList, &yyvsp[-2].token, gcvNULL); ;}
     break;
 
   case 130:
-#line 591 "gc_glsl.y"
     { yyval.declOrDeclList = slParseArrayListVariableDecl2(Compiler, yyvsp[-3].declOrDeclList, &yyvsp[-1].token, yyvsp[0].fieldDeclList); ;}
     break;
 
   case 131:
-#line 593 "gc_glsl.y"
     { yyval.declOrDeclList = slParseVariableDeclWithInitializer2(Compiler, yyvsp[-4].declOrDeclList, &yyvsp[-2].token, yyvsp[0].expr); ;}
     break;
 
   case 132:
-#line 595 "gc_glsl.y"
     { yyval.declOrDeclList = slParseArrayVariableDeclWithInitializer2(Compiler, yyvsp[-6].declOrDeclList, &yyvsp[-4].token, gcvNULL, yyvsp[0].expr); ;}
     break;
 
   case 133:
-#line 597 "gc_glsl.y"
     { yyval.declOrDeclList = slParseArrayVariableDeclWithInitializer2(Compiler, yyvsp[-7].declOrDeclList, &yyvsp[-5].token, yyvsp[-3].expr, yyvsp[0].expr); ;}
     break;
 
   case 134:
-#line 599 "gc_glsl.y"
     { yyval.declOrDeclList = slParseArrayListVariableDeclWithInitializer2(Compiler, yyvsp[-5].declOrDeclList, &yyvsp[-3].token, yyvsp[-2].fieldDeclList, yyvsp[0].expr); ;}
     break;
 
   case 135:
-#line 604 "gc_glsl.y"
     { yyval.declOrDeclList = slParseTypeDecl(Compiler, yyvsp[0].dataType); ;}
     break;
 
   case 136:
-#line 606 "gc_glsl.y"
     { yyval.declOrDeclList = slParseNonArrayVariableDecl(Compiler, yyvsp[-1].dataType, &yyvsp[0].token); ;}
     break;
 
   case 137:
-#line 608 "gc_glsl.y"
     { yyval.declOrDeclList = slParseArrayVariableDecl(Compiler, yyvsp[-4].dataType, &yyvsp[-3].token, yyvsp[-1].expr); ;}
     break;
 
   case 138:
-#line 610 "gc_glsl.y"
     { yyval.declOrDeclList = slParseArrayVariableDecl(Compiler, yyvsp[-3].dataType, &yyvsp[-2].token, gcvNULL); ;}
     break;
 
   case 139:
-#line 612 "gc_glsl.y"
     { yyval.declOrDeclList = slParseArrayListVariableDecl(Compiler, yyvsp[-2].dataType, &yyvsp[-1].token, yyvsp[0].fieldDeclList); ;}
     break;
 
   case 140:
-#line 614 "gc_glsl.y"
     { yyval.declOrDeclList = slParseArrayVariableDeclWithInitializer(Compiler, yyvsp[-5].dataType, &yyvsp[-4].token, gcvNULL, yyvsp[0].expr); ;}
     break;
 
   case 141:
-#line 616 "gc_glsl.y"
     { yyval.declOrDeclList = slParseArrayVariableDeclWithInitializer(Compiler, yyvsp[-6].dataType, &yyvsp[-5].token, yyvsp[-3].expr, yyvsp[0].expr); ;}
     break;
 
   case 142:
-#line 618 "gc_glsl.y"
     { yyval.declOrDeclList = slParseVariableDeclWithInitializer(Compiler, yyvsp[-3].dataType, &yyvsp[-2].token, yyvsp[0].expr); ;}
     break;
 
   case 143:
-#line 620 "gc_glsl.y"
     { yyval.declOrDeclList = slParseInvariantOrPreciseDecl(Compiler, &yyvsp[-1].token, &yyvsp[0].token); ;}
     break;
 
   case 144:
-#line 622 "gc_glsl.y"
     { yyval.declOrDeclList = slParseArrayListVariableDeclWithInitializer(Compiler, yyvsp[-4].dataType, &yyvsp[-3].token, yyvsp[-2].fieldDeclList, yyvsp[0].expr); ;}
     break;
 
   case 145:
-#line 629 "gc_glsl.y"
     { yyval.dataType = slParseFullySpecifiedType(Compiler, gcvNULL, yyvsp[0].dataType); ;}
     break;
 
   case 146:
-#line 631 "gc_glsl.y"
     { yyval.dataType = slParseFullySpecifiedType(Compiler, &yyvsp[-1].token, yyvsp[0].dataType); ;}
     break;
 
   case 147:
-#line 636 "gc_glsl.y"
     { yyval.token = slMergeTypeQualifiers(Compiler, gcvNULL, &yyvsp[0].token); ;}
     break;
 
   case 148:
-#line 638 "gc_glsl.y"
     { yyval.token = slMergeTypeQualifiers(Compiler, &yyvsp[-1].token, &yyvsp[0].token); ;}
     break;
 
   case 149:
-#line 643 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 150:
-#line 645 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 151:
-#line 647 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 152:
-#line 649 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 153:
-#line 651 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 154:
-#line 653 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 155:
-#line 655 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 156:
-#line 657 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 157:
-#line 662 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 158:
-#line 664 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 159:
-#line 669 "gc_glsl.y"
     {
           sloCOMPILER_SetScannerState(Compiler, slvSCANNER_NORMAL);
         ;}
     break;
 
   case 160:
-#line 673 "gc_glsl.y"
     {
            yyval.token = slParseLayoutQualifier(Compiler, &yyvsp[-2].token);
         ;}
     break;
 
   case 161:
-#line 677 "gc_glsl.y"
     {
           sloCOMPILER_SetScannerState(Compiler, slvSCANNER_NORMAL);
                   yyval.token = yyvsp[-3].token;
@@ -3699,592 +3535,474 @@ yyreduce:
     break;
 
   case 162:
-#line 685 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 163:
-#line 687 "gc_glsl.y"
     { yyval.token = slParseAddLayoutId(Compiler, &yyvsp[-2].token, &yyvsp[0].token); ;}
     break;
 
   case 164:
-#line 692 "gc_glsl.y"
     { yyval.token = slParseLayoutId(Compiler, &yyvsp[0].token, gcvNULL); ;}
     break;
 
   case 165:
-#line 694 "gc_glsl.y"
     { yyval.token = slParseLayoutId(Compiler, &yyvsp[-2].token, &yyvsp[0].token) ; ;}
     break;
 
   case 166:
-#line 696 "gc_glsl.y"
     { yyval.token = slParseLayoutId(Compiler, &yyvsp[-2].token, &yyvsp[0].token) ; ;}
     break;
 
   case 167:
-#line 701 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 168:
-#line 703 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 169:
-#line 708 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 170:
-#line 710 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 171:
-#line 715 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 172:
-#line 717 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 173:
-#line 719 "gc_glsl.y"
     { yyval.token = slParseCheckStorage(Compiler, yyvsp[-1].token, yyvsp[0].token); ;}
     break;
 
   case 174:
-#line 721 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 175:
-#line 723 "gc_glsl.y"
     { yyval.token = slParseCheckStorage(Compiler, yyvsp[-1].token, yyvsp[0].token); ;}
     break;
 
   case 176:
-#line 725 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 177:
-#line 727 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 178:
-#line 729 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 179:
-#line 731 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 180:
-#line 733 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 182:
-#line 739 "gc_glsl.y"
     { yyval.dataType = slParseArrayDataType(Compiler, yyvsp[-2].dataType, gcvNULL); ;}
     break;
 
   case 183:
-#line 741 "gc_glsl.y"
     { yyval.dataType = slParseArrayDataType(Compiler, yyvsp[-3].dataType, yyvsp[-1].expr); ;}
     break;
 
   case 184:
-#line 743 "gc_glsl.y"
     { yyval.dataType = slParseArrayListDataType(Compiler, yyvsp[-1].dataType, yyvsp[0].fieldDeclList); ;}
     break;
 
   case 185:
-#line 748 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLER2D); ;}
     break;
 
   case 186:
-#line 750 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLERCUBE); ;}
     break;
 
   case 187:
-#line 752 "gc_glsl.y"
     { yyval.dataType = slParseStructType(Compiler, yyvsp[0].dataType); ;}
     break;
 
   case 188:
-#line 754 "gc_glsl.y"
     { yyval.dataType = slParseNamedType(Compiler, &yyvsp[0].token); ;}
     break;
 
   case 189:
-#line 756 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLER3D); ;}
     break;
 
   case 190:
-#line 758 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLER1DARRAY); ;}
     break;
 
   case 191:
-#line 760 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLER2DARRAY); ;}
     break;
 
   case 192:
-#line 762 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLER1DARRAYSHADOW); ;}
     break;
 
   case 193:
-#line 764 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLER2DSHADOW); ;}
     break;
 
   case 194:
-#line 766 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLER2DARRAYSHADOW); ;}
     break;
 
   case 195:
-#line 768 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLERCUBESHADOW); ;}
     break;
 
   case 196:
-#line 770 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLERCUBEARRAYSHADOW); ;}
     break;
 
   case 197:
-#line 772 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_ISAMPLER2D); ;}
     break;
 
   case 198:
-#line 774 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_ISAMPLERCUBE); ;}
     break;
 
   case 199:
-#line 776 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_ISAMPLER3D); ;}
     break;
 
   case 200:
-#line 778 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_ISAMPLER2DARRAY); ;}
     break;
 
   case 201:
-#line 780 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_USAMPLER2D); ;}
     break;
 
   case 202:
-#line 782 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_USAMPLERCUBE); ;}
     break;
 
   case 203:
-#line 784 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_USAMPLER3D); ;}
     break;
 
   case 204:
-#line 786 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_USAMPLER2DARRAY); ;}
     break;
 
   case 205:
-#line 788 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLEREXTERNALOES); ;}
     break;
 
   case 206:
-#line 790 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLER2DMS); ;}
     break;
 
   case 207:
-#line 792 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_ISAMPLER2DMS); ;}
     break;
 
   case 208:
-#line 794 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_USAMPLER2DMS); ;}
     break;
 
   case 209:
-#line 796 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLER2DMSARRAY); ;}
     break;
 
   case 210:
-#line 798 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_ISAMPLER2DMSARRAY); ;}
     break;
 
   case 211:
-#line 800 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_USAMPLER2DMSARRAY); ;}
     break;
 
   case 212:
-#line 802 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLERCUBEARRAY); ;}
     break;
 
   case 213:
-#line 804 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_ISAMPLERCUBEARRAY); ;}
     break;
 
   case 214:
-#line 806 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_USAMPLERCUBEARRAY); ;}
     break;
 
   case 215:
-#line 808 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IMAGE2D); ;}
     break;
 
   case 216:
-#line 810 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IIMAGE2D); ;}
     break;
 
   case 217:
-#line 812 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_UIMAGE2D); ;}
     break;
 
   case 218:
-#line 814 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IMAGE2DARRAY); ;}
     break;
 
   case 219:
-#line 816 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IIMAGE2DARRAY); ;}
     break;
 
   case 220:
-#line 818 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_UIMAGE2DARRAY); ;}
     break;
 
   case 221:
-#line 820 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IMAGE3D); ;}
     break;
 
   case 222:
-#line 822 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IIMAGE3D); ;}
     break;
 
   case 223:
-#line 824 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_UIMAGE3D); ;}
     break;
 
   case 224:
-#line 826 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IMAGECUBE); ;}
     break;
 
   case 225:
-#line 828 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IMAGECUBEARRAY); ;}
     break;
 
   case 226:
-#line 830 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IIMAGECUBE); ;}
     break;
 
   case 227:
-#line 832 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IIMAGECUBEARRAY); ;}
     break;
 
   case 228:
-#line 834 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_UIMAGECUBE); ;}
     break;
 
   case 229:
-#line 836 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_UIMAGECUBEARRAY); ;}
     break;
 
   case 230:
-#line 838 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_ATOMIC_UINT); ;}
     break;
 
   case 231:
-#line 840 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_SAMPLERBUFFER); ;}
     break;
 
   case 232:
-#line 842 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_ISAMPLERBUFFER); ;}
     break;
 
   case 233:
-#line 844 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_USAMPLERBUFFER); ;}
     break;
 
   case 234:
-#line 846 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IMAGEBUFFER); ;}
     break;
 
   case 235:
-#line 848 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IIMAGEBUFFER); ;}
     break;
 
   case 236:
-#line 850 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_UIMAGEBUFFER); ;}
     break;
 
   case 237:
-#line 855 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_VOID); ;}
     break;
 
   case 238:
-#line 857 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_FLOAT); ;}
     break;
 
   case 239:
-#line 859 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_INT); ;}
     break;
 
   case 240:
-#line 861 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_UINT); ;}
     break;
 
   case 241:
-#line 863 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_BOOL); ;}
     break;
 
   case 242:
-#line 865 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_VEC2); ;}
     break;
 
   case 243:
-#line 867 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_VEC3); ;}
     break;
 
   case 244:
-#line 869 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_VEC4); ;}
     break;
 
   case 245:
-#line 871 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_BVEC2); ;}
     break;
 
   case 246:
-#line 873 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_BVEC3); ;}
     break;
 
   case 247:
-#line 875 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_BVEC4); ;}
     break;
 
   case 248:
-#line 877 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IVEC2); ;}
     break;
 
   case 249:
-#line 879 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IVEC3); ;}
     break;
 
   case 250:
-#line 881 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_IVEC4); ;}
     break;
 
   case 251:
-#line 883 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_UVEC2); ;}
     break;
 
   case 252:
-#line 885 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_UVEC3); ;}
     break;
 
   case 253:
-#line 887 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_UVEC4); ;}
     break;
 
   case 254:
-#line 889 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_MAT2); ;}
     break;
 
   case 255:
-#line 891 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_MAT2X3); ;}
     break;
 
   case 256:
-#line 893 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_MAT2X4); ;}
     break;
 
   case 257:
-#line 895 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_MAT3); ;}
     break;
 
   case 258:
-#line 897 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_MAT3X2); ;}
     break;
 
   case 259:
-#line 899 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_MAT3X4); ;}
     break;
 
   case 260:
-#line 901 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_MAT4); ;}
     break;
 
   case 261:
-#line 903 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_MAT4X2); ;}
     break;
 
   case 262:
-#line 905 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_MAT4X3); ;}
     break;
 
   case 263:
-#line 907 "gc_glsl.y"
     { yyval.dataType = yyvsp[0].dataType; ;}
     break;
 
   case 264:
-#line 912 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_FLOAT); ;}
     break;
 
   case 265:
-#line 914 "gc_glsl.y"
     { yyval.dataType = slParseNonStructType(Compiler, &yyvsp[0].token, T_INT); ;}
     break;
 
   case 266:
-#line 916 "gc_glsl.y"
     { yyval.dataType = yyvsp[0].dataType; ;}
     break;
 
   case 267:
-#line 921 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 268:
-#line 923 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 269:
-#line 925 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 270:
-#line 930 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 271:
-#line 932 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 272:
-#line 934 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 273:
-#line 936 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 274:
-#line 938 "gc_glsl.y"
     { yyval.token = yyvsp[0].token; ;}
     break;
 
   case 275:
-#line 943 "gc_glsl.y"
     { slParseStructDeclBegin(Compiler); ;}
     break;
 
   case 276:
-#line 945 "gc_glsl.y"
     { yyval.dataType = slParseStructDeclEnd(Compiler, &yyvsp[-5].token, &yyvsp[-4].token); ;}
     break;
 
   case 277:
-#line 947 "gc_glsl.y"
     { slParseStructDeclBegin(Compiler); ;}
     break;
 
   case 278:
-#line 949 "gc_glsl.y"
     { yyval.dataType = slParseStructDeclEnd(Compiler, &yyvsp[-4].token, gcvNULL); ;}
     break;
 
   case 281:
-#line 959 "gc_glsl.y"
     { slParseTypeSpecifiedFieldDeclList(Compiler, yyvsp[-2].dataType, yyvsp[-1].fieldDeclList); ;}
     break;
 
   case 282:
-#line 961 "gc_glsl.y"
     {
            yyvsp[-2].dataType->qualifiers.precision = yyvsp[-3].token.u.qualifiers.precision;
            slsQUALIFIERS_SET_FLAG(&(yyvsp[-2].dataType->qualifiers), slvQUALIFIERS_FLAG_PRECISION);
@@ -4293,67 +4011,54 @@ yyreduce:
     break;
 
   case 283:
-#line 970 "gc_glsl.y"
     { yyval.fieldDeclList = slParseFieldDeclList(Compiler, yyvsp[0].fieldDecl); ;}
     break;
 
   case 284:
-#line 972 "gc_glsl.y"
     { yyval.fieldDeclList = slParseFieldDeclList2(Compiler, yyvsp[-2].fieldDeclList, yyvsp[0].fieldDecl); ;}
     break;
 
   case 285:
-#line 977 "gc_glsl.y"
     { yyval.fieldDecl = slParseFieldDecl(Compiler, &yyvsp[0].token, gcvNULL); ;}
     break;
 
   case 286:
-#line 979 "gc_glsl.y"
     { yyval.fieldDecl = slParseFieldDecl(Compiler, &yyvsp[-3].token, yyvsp[-1].expr); ;}
     break;
 
   case 287:
-#line 981 "gc_glsl.y"
     { yyval.fieldDecl = slParseFieldListDecl(Compiler, &yyvsp[-1].token, yyvsp[0].fieldDeclList, gcvFALSE); ;}
     break;
 
   case 288:
-#line 986 "gc_glsl.y"
     { yyval.statement = slParseInterfaceBlock(Compiler, yyvsp[-1].blockName, gcvNULL, gcvNULL, gcvTRUE); ;}
     break;
 
   case 289:
-#line 988 "gc_glsl.y"
     { yyval.statement = slParseInterfaceBlock(Compiler, yyvsp[-2].blockName, &yyvsp[-1].token, gcvNULL, gcvTRUE); ;}
     break;
 
   case 290:
-#line 990 "gc_glsl.y"
     { yyval.statement = slParseInterfaceBlock(Compiler, yyvsp[-5].blockName, &yyvsp[-4].token, yyvsp[-2].expr, gcvTRUE); ;}
     break;
 
   case 291:
-#line 992 "gc_glsl.y"
     { yyval.statement = slParseInterfaceBlockImplicitArrayLength(Compiler, yyvsp[-4].blockName, &yyvsp[-3].token); ;}
     break;
 
   case 292:
-#line 997 "gc_glsl.y"
     { slParseInterfaceBlockDeclBegin(Compiler, &yyvsp[-2].token); ;}
     break;
 
   case 293:
-#line 999 "gc_glsl.y"
     { yyval.blockName = slParseInterfaceBlockDeclEnd(Compiler, &yyvsp[-5].token, &yyvsp[-4].token); ;}
     break;
 
   case 294:
-#line 1001 "gc_glsl.y"
     { slParseInterfaceBlockDeclBegin(Compiler, &yyvsp[-2].token); ;}
     break;
 
   case 295:
-#line 1003 "gc_glsl.y"
     {
             yyclearin;
             yyerrok;
@@ -4362,325 +4067,261 @@ yyreduce:
     break;
 
   case 298:
-#line 1017 "gc_glsl.y"
     { yyval.dataType = slParseInterfaceBlockMember(Compiler, yyvsp[-1].dataType, yyvsp[0].fieldDecl); ;}
     break;
 
   case 299:
-#line 1019 "gc_glsl.y"
     { yyval.dataType = slParseInterfaceBlockMember(Compiler, yyvsp[-2].dataType, yyvsp[0].fieldDecl); ;}
     break;
 
   case 301:
-#line 1028 "gc_glsl.y"
     { yyval.fieldDecl = slParseFieldDecl(Compiler, &yyvsp[0].token, gcvNULL); ;}
     break;
 
   case 302:
-#line 1030 "gc_glsl.y"
     { yyval.fieldDecl = slParseFieldDecl(Compiler, &yyvsp[-3].token, yyvsp[-1].expr); ;}
     break;
 
   case 303:
-#line 1032 "gc_glsl.y"
     { yyval.fieldDecl = slParseImplicitArraySizeFieldDecl(Compiler, &yyvsp[-2].token); ;}
     break;
 
   case 304:
-#line 1034 "gc_glsl.y"
     { yyval.fieldDecl = slParseFieldListDecl(Compiler, &yyvsp[-1].token, yyvsp[0].fieldDeclList, gcvTRUE); ;}
     break;
 
   case 305:
-#line 1039 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 306:
-#line 1044 "gc_glsl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 307:
-#line 1049 "gc_glsl.y"
     { yyval.statement = slParseCompoundStatementAsStatement(Compiler, yyvsp[0].statements); ;}
     break;
 
   case 308:
-#line 1051 "gc_glsl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 309:
-#line 1058 "gc_glsl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 310:
-#line 1060 "gc_glsl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 311:
-#line 1062 "gc_glsl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 312:
-#line 1064 "gc_glsl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 313:
-#line 1066 "gc_glsl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 314:
-#line 1068 "gc_glsl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 315:
-#line 1073 "gc_glsl.y"
     { yyval.statements = gcvNULL; ;}
     break;
 
   case 316:
-#line 1075 "gc_glsl.y"
     { slParseCompoundStatementBegin(Compiler); ;}
     break;
 
   case 317:
-#line 1077 "gc_glsl.y"
     { yyval.statements = slParseCompoundStatementEnd(Compiler, &yyvsp[-3].token, yyvsp[-1].statements); ;}
     break;
 
   case 318:
-#line 1082 "gc_glsl.y"
     { yyval.statement = slParseCompoundStatementNoNewScopeAsStatementNoNewScope(Compiler, yyvsp[0].statements); ;}
     break;
 
   case 319:
-#line 1084 "gc_glsl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 320:
-#line 1089 "gc_glsl.y"
     { yyval.statements = gcvNULL; ;}
     break;
 
   case 321:
-#line 1091 "gc_glsl.y"
     { slParseCompoundStatementNoNewScopeBegin(Compiler); ;}
     break;
 
   case 322:
-#line 1093 "gc_glsl.y"
     { yyval.statements = slParseCompoundStatementNoNewScopeEnd(Compiler, &yyvsp[-3].token, yyvsp[-1].statements); ;}
     break;
 
   case 323:
-#line 1098 "gc_glsl.y"
     { yyval.statements = slParseStatementList(Compiler, yyvsp[0].statement); ;}
     break;
 
   case 324:
-#line 1100 "gc_glsl.y"
     { yyval.statements = slParseStatementList2(Compiler, yyvsp[-1].statements, yyvsp[0].statement); ;}
     break;
 
   case 325:
-#line 1105 "gc_glsl.y"
     { yyval.statement = gcvNULL; ;}
     break;
 
   case 326:
-#line 1107 "gc_glsl.y"
     { yyval.statement = slParseExprAsStatement(Compiler, yyvsp[-1].expr); ;}
     break;
 
   case 327:
-#line 1112 "gc_glsl.y"
     { slParseCompoundStatementBegin(Compiler); ;}
     break;
 
   case 328:
-#line 1114 "gc_glsl.y"
     { yyval.statement = slParseSelectionStatement(Compiler, &yyvsp[-5].token, yyvsp[-3].expr, yyvsp[0].selectionStatementPair); ;}
     break;
 
   case 329:
-#line 1116 "gc_glsl.y"
     { yyval.statement = slParseSwitchStatement(Compiler, &yyvsp[-4].token, yyvsp[-2].expr, yyvsp[0].statement); ;}
     break;
 
   case 330:
-#line 1121 "gc_glsl.y"
     { yyval.statements = slParseStatementList(Compiler, yyvsp[0].statement); ;}
     break;
 
   case 331:
-#line 1123 "gc_glsl.y"
     { yyval.statements = slParseStatementList2(Compiler, yyvsp[-1].statements, yyvsp[0].statement); ;}
     break;
 
   case 332:
-#line 1128 "gc_glsl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 333:
-#line 1130 "gc_glsl.y"
     { yyval.statement = slParseCaseStatement(Compiler, &yyvsp[-2].token, yyvsp[-1].expr); ;}
     break;
 
   case 334:
-#line 1132 "gc_glsl.y"
     { yyval.statement = slParseDefaultStatement(Compiler, &yyvsp[-1].token); ;}
     break;
 
   case 335:
-#line 1137 "gc_glsl.y"
     { yyval.statement = gcvNULL; ;}
     break;
 
   case 336:
-#line 1139 "gc_glsl.y"
     { slParseSwitchBodyBegin(Compiler); ;}
     break;
 
   case 337:
-#line 1141 "gc_glsl.y"
     { yyval.statement = slParseSwitchBodyEnd(Compiler, &yyvsp[-3].token, yyvsp[-1].statements); ;}
     break;
 
   case 338:
-#line 1147 "gc_glsl.y"
     { slParseCompoundStatementEnd(Compiler, gcvNULL, gcvNULL);
           slParseCompoundStatementBegin(Compiler); ;}
     break;
 
   case 339:
-#line 1150 "gc_glsl.y"
     { slParseCompoundStatementEnd(Compiler, gcvNULL, gcvNULL);
           yyval.selectionStatementPair = slParseSelectionRestStatement(Compiler, yyvsp[-3].statement, yyvsp[0].statement); ;}
     break;
 
   case 340:
-#line 1153 "gc_glsl.y"
     { slParseCompoundStatementEnd(Compiler, gcvNULL, gcvNULL);
           yyval.selectionStatementPair = slParseSelectionRestStatement(Compiler, yyvsp[0].statement, gcvNULL); ;}
     break;
 
   case 341:
-#line 1161 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 342:
-#line 1163 "gc_glsl.y"
     { yyval.expr = slParseCondition(Compiler, yyvsp[-3].dataType, &yyvsp[-2].token, yyvsp[0].expr); ;}
     break;
 
   case 343:
-#line 1168 "gc_glsl.y"
     { slParseWhileStatementBegin(Compiler); ;}
     break;
 
   case 344:
-#line 1170 "gc_glsl.y"
     { yyval.statement = slParseWhileStatementEnd(Compiler, &yyvsp[-5].token, yyvsp[-2].expr, yyvsp[0].statement); ;}
     break;
 
   case 345:
-#line 1172 "gc_glsl.y"
     { yyval.statement = slParseDoWhileStatement(Compiler, &yyvsp[-6].token, yyvsp[-5].statement, yyvsp[-2].expr); ;}
     break;
 
   case 346:
-#line 1174 "gc_glsl.y"
     { slParseForStatementBegin(Compiler); ;}
     break;
 
   case 347:
-#line 1176 "gc_glsl.y"
     { yyval.statement = slParseForStatementEnd(Compiler, &yyvsp[-6].token, yyvsp[-3].statement, yyvsp[-2].forExprPair, yyvsp[0].statement); ;}
     break;
 
   case 348:
-#line 1181 "gc_glsl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 349:
-#line 1183 "gc_glsl.y"
     { yyval.statement = yyvsp[0].statement; ;}
     break;
 
   case 350:
-#line 1188 "gc_glsl.y"
     { yyval.expr = yyvsp[0].expr; ;}
     break;
 
   case 351:
-#line 1190 "gc_glsl.y"
     { yyval.expr = gcvNULL; ;}
     break;
 
   case 352:
-#line 1195 "gc_glsl.y"
     { yyval.forExprPair = slParseForRestStatement(Compiler, yyvsp[-1].expr, gcvNULL); ;}
     break;
 
   case 353:
-#line 1197 "gc_glsl.y"
     { yyval.forExprPair = slParseForRestStatement(Compiler, yyvsp[-2].expr, yyvsp[0].expr); ;}
     break;
 
   case 354:
-#line 1202 "gc_glsl.y"
     { yyval.statement = slParseJumpStatement(Compiler, slvCONTINUE, &yyvsp[-1].token, gcvNULL); ;}
     break;
 
   case 355:
-#line 1204 "gc_glsl.y"
     { yyval.statement = slParseJumpStatement(Compiler, slvBREAK, &yyvsp[-1].token, gcvNULL); ;}
     break;
 
   case 356:
-#line 1206 "gc_glsl.y"
     { yyval.statement = slParseJumpStatement(Compiler, slvRETURN, &yyvsp[-1].token, gcvNULL); ;}
     break;
 
   case 357:
-#line 1208 "gc_glsl.y"
     { yyval.statement = slParseJumpStatement(Compiler, slvRETURN, &yyvsp[-2].token, yyvsp[-1].expr); ;}
     break;
 
   case 358:
-#line 1210 "gc_glsl.y"
     { yyval.statement = slParseJumpStatement(Compiler, slvDISCARD, &yyvsp[-1].token, gcvNULL); ;}
     break;
 
   case 362:
-#line 1223 "gc_glsl.y"
     { slParseExternalDecl(Compiler, yyvsp[0].statement); ;}
     break;
 
   case 363:
-#line 1228 "gc_glsl.y"
     { slParseFuncDefinitionBegin(Compiler, yyvsp[0].funcName); ;}
     break;
 
   case 364:
-#line 1230 "gc_glsl.y"
     { slParseFuncDefinitionEnd(Compiler, yyvsp[-2].funcName); ;}
     break;
 
   case 365:
-#line 1231 "gc_glsl.y"
     { slParseFuncDef(Compiler, yyvsp[-3].funcName, yyvsp[-1].statements); ;}
     break;
 
@@ -4688,8 +4329,7 @@ yyreduce:
     }
 
 /* Line 1000 of yacc.c.  */
-#line 4674 "gc_glsl_parser.c"
-
+
   yyvsp -= yylen;
   yyssp -= yylen;
 
@@ -4913,7 +4553,6 @@ yyreturn:
 }
 
 
-#line 1234 "gc_glsl.y"
 
 
 

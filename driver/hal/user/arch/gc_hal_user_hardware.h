@@ -81,6 +81,7 @@ typedef struct _gcsCOLOR_TARGET
     gctUINT32                   sliceIndex;
     /* layerIndx to indicate which layer is */
     gctUINT32                   layerIndex;
+    gctUINT32                   sliceNum;
 
     gctUINT8                    colorWrite;
 
@@ -120,6 +121,7 @@ typedef struct _gcsDEPTH_INFO
 {
     gcoSURF                     surface;
     gctUINT32                   sliceIndex;
+    gctUINT32                   sliceNum;
     gctUINT32                   cacheMode;
 
     /* Some depth related register value */
@@ -558,8 +560,7 @@ struct _gcoENGINE
 */
 typedef struct _gcsFESTATES
 {
-    gctUINT32                   indexHeadAddress;
-    gctUINT32                   indexTailAddress;
+    gctUINT32                   indexAddress;
     gctUINT32                   indexEndAddress;
     gctUINT32                   indexFormat;
     gctUINT32                   indexEndian;
@@ -572,8 +573,6 @@ typedef struct _gcsFESTATES
 typedef struct _gcsFEDIRTY
 {
     gctBOOL                     indexDirty;
-    gctBOOL                     indexHeadDirty;
-    gctBOOL                     indexTailDirty;
 }gcsFEDIRTY;
 
 /******* PA/SE states ****************************
@@ -711,6 +710,7 @@ typedef struct _gcsPESTATES
     gctBOOL                     hasOne8BitRT;
 
     gctBOOL                     singlePEpipe;
+    gctUINT32                   peConfigExReg;
 }gcsPESTATES;
 
 /********* PE dirty *********************************
@@ -798,6 +798,7 @@ typedef struct _gcsTXDIRTY
 {
     gctBOOL                     hwTxFlushVS;
     gctBOOL                     hwTxFlushPS;
+    gctBOOL                     hwTxFlushL1Cache;
     gctBOOL                     hwTxDirty;
     gctUINT32                   hwTxSamplerModeDirty;
     gctUINT32                   hwTxSamplerSizeDirty;
@@ -955,6 +956,9 @@ struct _gcoHARDWARE
 
     gcsSTATE_DELTA_PTR          *deltas;
 
+    /* Count of deltas it is needed because gpuCoreCount will be changed. */
+    gctUINT32                    deltasCount;
+
     /* Chip configuration. */
     gcsHARDWARE_CONFIG *        config;
     gctBOOL                     features[gcvFEATURE_COUNT];
@@ -1066,6 +1070,7 @@ struct _gcoHARDWARE
     gcsTXSTATES                 *TXStates;
     gcsXFBSTATES                *XFBStates;
     gcsQUERYSTATES              *QUERYStates;
+    gcsPROBESTATES              *PROBEStates;
 
     /* HW Module states dirty. */
     gcsFEDIRTY                  *FEDirty;
@@ -1209,6 +1214,7 @@ struct _gcoHARDWARE
     gceHARDWARE_TYPE            constructType;
 
     gcsPROBEBUFFER              *probeBuffer;
+
 };
 
 #if gcdENABLE_3D

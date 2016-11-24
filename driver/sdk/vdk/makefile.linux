@@ -56,10 +56,8 @@ INSTALL_DIR         := $(SDK_DIR)/drivers
 ################################################################################
 # Supply additional include directories.
 
-INCLUDE += -I$(AQROOT)/sdk/inc
-INCLUDE += -I$(AQROOT)/hal/inc
-
-INCLUDE += -I$(AQROOT)/hal/os/linux/user
+INCLUDE += -I$(AQROOT)/sdk/inc \
+           -I$(AQROOT)/hal/inc
 
 ifeq ($(EGL_API_X),1)
   INCLUDE += -I$(X11_ARM_DIR)/include
@@ -73,10 +71,8 @@ ifeq ($(EGL_API_DRI),1)
 endif
 
 ifeq ($(EGL_API_GBM),1)
-  GBM_INCLUDE := $(shell $(PKG_CONFIG) --cflags gbm 2>/dev/null)
-
-  ifneq ($(GBM_INCLUDE),)
-    INCLUDE += $(GBM_INCLUDE)
+  ifneq ($(GBM_LIBS),)
+    INCLUDE += $(GBM_CFLAGS)
   else
     INCLUDE += -I$(AQROOT)/driver/gbm/main
   endif
@@ -113,8 +109,6 @@ ifneq ($(USE_ARMCC), 1)
   endif
 endif
 
-CFLAGS += -D__VDK_EXPORT
-
 ################################################################################
 # Define flags for the linker.
 
@@ -147,8 +141,6 @@ ifeq ($(EGL_API_X),1)
 endif
 
 ifeq ($(EGL_API_GBM),1)
-  GBM_LIBS := $(shell $(PKG_CONFIG) --libs gbm 2>/dev/null)
-
   ifneq ($(GBM_LIBS),)
     LDLIBS += $(GBM_LIBS)
   else

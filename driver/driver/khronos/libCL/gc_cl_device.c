@@ -135,9 +135,7 @@ clGetDeviceIDs(
         /* Borrow compiler mutex for hardware initialization. */
         gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, platform->compilerMutex, gcvINFINITE));
 
-        /* Initialize hardware. */
-        status = gcoCL_InitializeHardware();
-        if (gcmIS_ERROR(status))
+        if (gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PIPE_CL))
         {
             gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, platform->compilerMutex));
 
@@ -236,7 +234,7 @@ clGetDeviceIDs(
         platform->devices    = device;
     }
 
-    switch(DeviceType)
+    switch((DeviceType)&0xFFFFFFFF)
     {
     case CL_DEVICE_TYPE_CPU:
     case CL_DEVICE_TYPE_ACCELERATOR:
@@ -536,7 +534,7 @@ clGetDeviceInfo(
     case CL_DEVICE_PARTITION_TYPE:
         /*sub device is not supported*/
         retValue_size_t[0] = 0;
-        retParamSize = gcmSIZEOF(retValue_size_t[0]);
+        retParamSize = gcmSIZEOF((cl_uint)retValue_size_t[0]);
         retParamPtr = retValue_size_t;
         break;
     case CL_DEVICE_PARTITION_AFFINITY_DOMAIN:
@@ -564,7 +562,27 @@ clGetDeviceInfo(
     case CL_DEVICE_MAX_WORK_GROUP_SIZE:
         /*retParamSize = gcmSIZEOF(Device->deviceInfo.maxWorkGroupSize);
         retParamPtr = &Device->deviceInfo.maxWorkGroupSize;*/
-        retValue_size_t[0] = Device->deviceInfo.maxWorkGroupSize;
+        {
+            char *env = gcvNULL;
+            static gctINT isOpencvMode = -1;
+            if (isOpencvMode == -1)
+            {
+                if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_CL_OPENCV", &env))
+                    && env
+                    && gcmIS_SUCCESS(gcoOS_StrCmp(env, "1")))
+                {
+                    isOpencvMode = 1;
+                }
+                else
+                {
+                    isOpencvMode = 0;
+                }
+            }
+            if (isOpencvMode == 1)
+                retValue_size_t[0] = 256;
+            else
+                retValue_size_t[0] = Device->deviceInfo.maxWorkGroupSize;
+        }
         retParamSize = gcmSIZEOF(retValue_size_t[0]);
         retParamPtr = retValue_size_t;
         break;
@@ -829,7 +847,7 @@ clGetDeviceInfo(
     case CL_DEVICE_REFERENCE_COUNT:
         /* Always root device, value 1 is returned. */
         retValue_size_t[0] = 1;
-        retParamSize = gcmSIZEOF(retValue_size_t[0]);
+        retParamSize = gcmSIZEOF((cl_uint)retValue_size_t[0]);
         retParamPtr = retValue_size_t;
         break;
 

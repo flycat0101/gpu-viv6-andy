@@ -17,7 +17,7 @@
 vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_reference* staging)
 {
     vx_status status = VX_SUCCESS;
-    vx_size offset = 0;
+    vx_int32 offset = 0;
     vx_size numBins = 0;
     vx_uint32 window_size = 0, count = 0;
     vx_uint32* dist_ptr = NULL;
@@ -40,6 +40,7 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     status = vxQueryDistribution(dist, VX_DISTRIBUTION_ATTRIBUTE_BINS, &numBins, sizeof(numBins));
@@ -94,7 +95,7 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
         */
 
         kernelContext->params.kernel        = gcvVX_KERNEL_HISTOGRAM;
-        kernelContext->params.xstep            = 16;
+        kernelContext->params.xstep         = 16;
         kernelContext->params.ystep         = 1;
         kernelContext->params.policy        = (gctUINT32)offset;
 
@@ -184,12 +185,14 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
         kernelContext->uniforms[kernelContext->uniform_num++].num = sizeof(height) / sizeof(vx_uint32);
 
         kernelContext->params.kernel        = gcvVX_KERNEL_HISTOGRAM;
-        kernelContext->params.xstep            = 16;
+        kernelContext->params.xstep         = 16;
         kernelContext->params.ystep         = height;
         kernelContext->params.volume        = count;
 
         kernelContext->params.evisNoInst = node->base.context->evisNoInst;
     }
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -232,6 +235,7 @@ vx_status vxEqualizeHist_hist(vx_node node, vx_image src, vx_image hist, vx_scal
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
@@ -260,7 +264,9 @@ vx_status vxEqualizeHist_hist(vx_node node, vx_image src, vx_image hist, vx_scal
     kernelContext->uniforms[1].index       = 4;
     kernelContext->uniforms[1].num         = sizeof(height) / sizeof(vx_uint32);
 
-    kernelContext->uniform_num        = 2;
+    kernelContext->uniform_num      = 2;
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -274,7 +280,7 @@ vx_status vxEqualizeHist_hist(vx_node node, vx_image src, vx_image hist, vx_scal
     return status;
 }
 
-vx_status vxEqualizeHist_cdf(vx_node node, vx_image cdf, vx_uint32 wxh,  vx_scalar min, vx_image hist)
+vx_status vxEqualizeHist_cdf(vx_node node, vx_image cdf, vx_uint32 wxh, vx_scalar min, vx_image hist)
 {
     vx_status status = VX_SUCCESS;
     gcoVX_Kernel_Context * kernelContext = gcvNULL;
@@ -295,6 +301,7 @@ vx_status vxEqualizeHist_cdf(vx_node node, vx_image cdf, vx_uint32 wxh,  vx_scal
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     /*index = 0*/
@@ -316,11 +323,13 @@ vx_status vxEqualizeHist_cdf(vx_node node, vx_image cdf, vx_uint32 wxh,  vx_scal
     kernelContext->uniforms[kernelContext->uniform_num++].index = 4;
 
     /*step is step index*/
-    kernelContext->params.step      = EQUAL_HISTOGRAM_CDF;
+    kernelContext->params.step    = EQUAL_HISTOGRAM_CDF;
 
     kernelContext->params.kernel  = gcvVX_KERNEL_EQUALIZE_HISTOGRAM;
     kernelContext->params.xstep   = 4;
     kernelContext->params.volume  = wxh;
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -356,6 +365,7 @@ vx_status vxEqualizeHist_lut(vx_node node, vx_image src, vx_image hist, vx_image
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
@@ -384,7 +394,9 @@ vx_status vxEqualizeHist_lut(vx_node node, vx_image src, vx_image hist, vx_image
     kernelContext->uniforms[1].index       = 4;
     kernelContext->uniforms[1].num         = sizeof(height) / sizeof(vx_uint32);
 
-    kernelContext->uniform_num        = 2;
+    kernelContext->uniform_num      = 2;
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -419,6 +431,7 @@ vx_status vxEqualizeHist_gcdf(vx_node node, vx_image hist, vx_scalar minIndex, v
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(hist, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
@@ -443,6 +456,8 @@ vx_status vxEqualizeHist_gcdf(vx_node node, vx_image hist, vx_scalar minIndex, v
     kernelContext->params.xstep            = width;
     kernelContext->params.ystep            = height;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -454,3 +469,4 @@ vx_status vxEqualizeHist_gcdf(vx_node node, vx_image hist, vx_scalar minIndex, v
 
     return status;
 }
+

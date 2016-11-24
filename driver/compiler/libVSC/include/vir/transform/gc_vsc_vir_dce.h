@@ -37,7 +37,7 @@ typedef struct _VSC_DCE
     VIR_DEF_USAGE_INFO  *du_info;
     VSC_OPTN_DCEOptions *options;
     VIR_Dumper          *dumper;
-    VSC_PRIMARY_MEM_POOL pmp;
+    VSC_MM              *pMM;
     VSC_DCE_Mark        *mark;
     VSC_DCE_BBInfo      *BBInfo;
     VSC_BI_LIST          jmpList;
@@ -56,8 +56,7 @@ typedef struct _VSC_DCE
 #define VSC_DCE_SetOptions(dce, o)              ((dce)->options = (o))
 #define VSC_DCE_GetDumper(dce)                  ((dce)->dumper)
 #define VSC_DCE_SetDumper(dce, d)               ((dce)->dumper = (d))
-#define VSC_DCE_GetPmp(dce)                     (&((dce)->pmp))
-#define VSC_DCE_GetMM(dce)                      (&((dce)->pmp.mmWrapper))
+#define VSC_DCE_GetMM(dce)                      ((dce)->pMM)
 #define VSC_DCE_GetOptCount(dce)                ((dce)->optCount)
 #define VSC_DCE_SetOptCount(dce, s)             ((dce)->optCount = (s))
 #define VSC_DCE_GetMarkByInst(dce, inst)        (VIR_Inst_GetId(inst) < (dce)->maxInstCount ? VSC_DCE_GetMark(dce)[VIR_Inst_GetId(inst)] : emptyMark)
@@ -73,12 +72,9 @@ typedef struct _VSC_DCE
 #define VSC_DCE_SetJmpList(dce, j)              ((dce)->jmpList = (j))
 
 extern VSC_ErrCode VSC_DCE_Perform(
-    IN VIR_Shader           *shader,
-    IN VIR_DEF_USAGE_INFO   *du_info,
-    IN VSC_OPTN_DCEOptions  *options,
-    IN VIR_Dumper           *dumper,
-    IN gctBOOL              *rebuildCFG
+    IN VSC_SH_PASS_WORKER* pPassWorker
     );
+DECLARE_QUERY_PASS_PROP(VSC_DCE_Perform);
 
 END_EXTERN_C()
 

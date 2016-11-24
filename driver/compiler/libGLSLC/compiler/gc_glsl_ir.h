@@ -14,10 +14,13 @@
 #ifndef __gc_glsl_ir_h_
 #define __gc_glsl_ir_h_
 
-#include "gc_glsl_compiler_int.h"
+#include "gc_glsl_compiler.h"
+#include "debug/gc_vsc_debug.h"
 
 #define sldMAX_VECTOR_COMPONENT  4  /*maximum number of components in a vector */
 #define sldMAX_MATRIX_SIZE  4  /*maximum size of a matrix*/
+
+typedef gctUINT           gctLABEL;
 
 #define slmF2B(f)        (((f) != (gctFLOAT)0.0)? gcvTRUE : gcvFALSE)
 #define slmF2I(f)        ((gctINT32)(f))
@@ -540,9 +543,7 @@ typedef struct _slsDATA_TYPE
     ** 0 means not array. If this is an arrays of arrays, the value means the current level array size.
     */
     gctINT            arrayLength;
-
     gctINT            arrayLengthCount;  /* arrayLengthCount > 1 means it is an array of arrays. */
-
     gctINT *          arrayLengthList; /* Array length list for an array of arrays. */
 
     /* The array level for this datatype, the left-most is 0, the right-most is arrayLengthCount - 1. */
@@ -1204,9 +1205,6 @@ typedef struct _slsNAME
             */
             /* function's definition name space. */
             struct _slsNAME_SPACE *         localSpace;
-            /* function's body name space. */
-            struct _slsNAME_SPACE *         functionBodySpace;
-            struct _sloIR_SET     *         funcBody;
             gceINTRINSICS_KIND              intrinsicKind;
             /* this is used to find the builtin function in library */
             sltPOOL_STRING                  mangled_symbol;
@@ -1215,6 +1213,9 @@ typedef struct _slsNAME
             slsBuiltInGenCodeFunc           genCode;
             /* Function flag. */
             sltFUNC_FLAG                    flags;
+            /* function's body name space. */
+            struct _slsNAME_SPACE *         functionBodySpace;
+            struct _sloIR_SET     *         funcBody;
         }
         funcInfo;
 
@@ -1338,7 +1339,7 @@ typedef struct _slsNAME_SPACE
 {
     slsDLINK_NODE            node;
 
-    struct _slsNAME_SPACE *    parent;
+    struct _slsNAME_SPACE *  parent;
 
     slsDLINK_LIST            names;
 
@@ -1348,7 +1349,11 @@ typedef struct _slsNAME_SPACE
     /* in namespace to better management. Only used for parsing */
     /* time, codegen does not use it */
     /* Now, precision is used in Low power shader FP16 medium feature */
-    sltPRECISION_QUALIFIER defaultPrecision[slvTYPE_TOTAL_COUNT];
+    sltPRECISION_QUALIFIER   defaultPrecision[slvTYPE_TOTAL_COUNT];
+
+    sltPOOL_STRING           spaceName;
+
+    VSC_DIE                  die;
 }
 slsNAME_SPACE;
 
@@ -1359,8 +1364,15 @@ slsNAME_Destory(
     );
 
 gceSTATUS
+slsNAME_SPACE_SetSpaceName(
+    IN slsNAME_SPACE * Space,
+    IN sltPOOL_STRING SpaceName
+    );
+
+gceSTATUS
 slsNAME_SPACE_Construct(
     IN sloCOMPILER Compiler,
+    IN sltPOOL_STRING SpaceName,
     IN slsNAME_SPACE * Parent,
     OUT slsNAME_SPACE ** NameSpace
     );
@@ -1427,6 +1439,13 @@ slsNAME_SPACE_CreateName(
     );
 
 gceSTATUS
+slsNAME_Initialize(
+    IN sloCOMPILER Compiler,
+    IN slsNAME * Name,
+    IN gctBOOL InitGeneralPart
+    );
+
+gceSTATUS
 sloCOMPILER_CreateName(
     IN sloCOMPILER Compiler,
     IN gctUINT LineNo,
@@ -1488,6 +1507,7 @@ sloCOMPILER_CheckNewFuncName(
 gceSTATUS
 sloCOMPILER_CreateNameSpace(
     IN sloCOMPILER Compiler,
+    IN sltPOOL_STRING SpaceName,
     OUT slsNAME_SPACE ** NameSpace
     );
 
@@ -1637,6 +1657,8 @@ struct _sloIR_BASE
     gctUINT                lineNo;
 
     gctUINT                stringNo;
+
+    gctUINT                lineEnd;
 };
 
 typedef struct _sloIR_BASE *            sloIR_BASE;
@@ -1675,12 +1697,13 @@ typedef struct _slsVTAB
 }
 slsVTAB;
 
-#define sloIR_BASE_Initialize(base, finalVPtr, finalLineNo, finalStringNo) \
+#define sloIR_BASE_Initialize(base, finalVPtr, finalLineNo, finalStringNo, finalLineEndNo) \
     do \
     { \
         (base)->vptr        = (finalVPtr); \
         (base)->lineNo        = (finalLineNo); \
         (base)->stringNo    = (finalStringNo); \
+        (base)->lineEnd     = (finalLineEndNo);\
     } \
     while (gcvFALSE)
 
@@ -1757,13 +1780,6 @@ sloIR_SET_GetMemberCount(
     );
 
 gceSTATUS
-sloIR_SET_IsRoot(
-    IN sloCOMPILER Compiler,
-    IN sloIR_SET Set,
-    OUT gctBOOL * IsRoot
-    );
-
-gceSTATUS
 sloCOMPILER_AddExternalDecl(
     IN sloCOMPILER Compiler,
     IN sloIR_BASE ExternalDecl
@@ -1783,10 +1799,10 @@ struct _sloIR_EXPR
 
 typedef struct _sloIR_EXPR *            sloIR_EXPR;
 
-#define sloIR_EXPR_Initialize(expr, finalVPtr, finalLineNo, finalStringNo, exprDataType) \
+#define sloIR_EXPR_Initialize(expr, finalVPtr, finalLineNo, finalStringNo, finalLineEndNo, exprDataType) \
     do \
     { \
-        sloIR_BASE_Initialize(&(expr)->base, (finalVPtr), (finalLineNo), (finalStringNo)); \
+        sloIR_BASE_Initialize(&(expr)->base, (finalVPtr), (finalLineNo), (finalStringNo), (finalLineEndNo)); \
         \
         (expr)->dataType = (exprDataType); \
         (expr)->toBeDataType = gcvNULL; \
@@ -1797,7 +1813,7 @@ typedef struct _sloIR_EXPR *            sloIR_EXPR;
 #define sloIR_EXPR_Initialize_With_ASM_Opnd_Mods(expr, finalVPtr, finalLineNo, finalStringNo, exprDataType, asmOpndMods) \
     do \
     { \
-        sloIR_BASE_Initialize(&(expr)->base, (finalVPtr), (finalLineNo), (finalStringNo)); \
+        sloIR_BASE_Initialize(&(expr)->base, (finalVPtr), (finalLineNo), (finalStringNo), (finalLineNo)); \
         \
         (expr)->dataType = (exprDataType); \
         (expr)->toBeDataType = gcvNULL; \
@@ -2067,7 +2083,7 @@ typedef enum _sleUNARY_EXPR_TYPE
 
     slvUNARY_NEG,
 
-    slvUNARY_BITWISE_NOT,
+    slvUNARY_NOT_BITWISE,
     slvUNARY_NOT
 }
 sleUNARY_EXPR_TYPE;
@@ -2165,9 +2181,9 @@ typedef enum _sleBINARY_EXPR_TYPE
     slvBINARY_DIV,
     slvBINARY_MOD,
 
-    slvBINARY_BITWISE_AND,
-    slvBINARY_BITWISE_OR,
-    slvBINARY_BITWISE_XOR,
+    slvBINARY_AND_BITWISE,
+    slvBINARY_OR_BITWISE,
+    slvBINARY_XOR_BITWISE,
 
     slvBINARY_LSHIFT,
     slvBINARY_RSHIFT,
@@ -2230,6 +2246,7 @@ sloIR_BINARY_EXPR_Construct(
     IN sloCOMPILER Compiler,
     IN gctUINT LineNo,
     IN gctUINT StringNo,
+    IN gctUINT LineEndNo,
     IN sleBINARY_EXPR_TYPE Type,
     IN sloIR_EXPR LeftOperand,
     IN sloIR_EXPR RightOperand,

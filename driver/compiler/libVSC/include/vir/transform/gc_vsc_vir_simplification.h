@@ -66,10 +66,9 @@ extern VSC_ErrCode VSC_SIMP_Simplification_PerformOnFunction(
     );
 
 extern VSC_ErrCode VSC_SIMP_Simplification_PerformOnShader(
-    IN OUT VIR_Shader* shader,
-    IN VSC_OPTN_SIMPOptions* options,
-    IN VIR_Dumper* dumper
+    IN VSC_SH_PASS_WORKER* pPassWorker
     );
+DECLARE_QUERY_PASS_PROP(VSC_SIMP_Simplification_PerformOnShader);
 
 END_EXTERN_C()
 #endif

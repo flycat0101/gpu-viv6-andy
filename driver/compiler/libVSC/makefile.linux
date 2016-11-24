@@ -96,10 +96,13 @@ LIBS := -L$(SDK_DIR)/drivers -L$(GAL_DIR)/user/$(OBJ_DIR) -lGAL -lm
 # Describe object files.
 
 OBJECTS := \
+	$(OBJ_DIR)/gc_vsc_lib_gl_builtin.o \
+	$(OBJ_DIR)/gc_vsc_lib_gl_patch.o \
 	$(OBJ_DIR)/gc_vsc_old_hw_code_gen.o \
 	$(OBJ_DIR)/gc_vsc_old_hw_linker.o \
 	$(OBJ_DIR)/gc_vsc_old_compiler.o \
 	$(OBJ_DIR)/gc_vsc_old_recompile.o \
+	$(OBJ_DIR)/gc_vsc_old_preprocess.o \
 	$(OBJ_DIR)/gc_vsc_old_linker.o \
 	$(OBJ_DIR)/gc_vsc_old_optimizer_dump.o \
 	$(OBJ_DIR)/gc_vsc_old_optimizer.o \
@@ -115,8 +118,8 @@ OBJECTS += \
 	$(OBJ_DIR)/gc_vsc_chip_state_programming.o \
 	$(OBJ_DIR)/gc_vsc_drvi_compile.o \
 	$(OBJ_DIR)/gc_vsc_drvi_ep_dump.o \
+	$(OBJ_DIR)/gc_vsc_drvi_ep_io.o \
 	$(OBJ_DIR)/gc_vsc_drvi_link.o \
-	$(OBJ_DIR)/gc_vsc_drvi_recompile.o \
 	$(OBJ_DIR)/gc_vsc_gcsl_vir_converter.o \
 	$(OBJ_DIR)/gc_vsc_vir_gcsl_converter.o \
 	$(OBJ_DIR)/gc_vsc_utils_array.o \
@@ -150,18 +153,22 @@ OBJECTS += \
 	$(OBJ_DIR)/gc_vsc_vir_inst_scheduler.o \
 	$(OBJ_DIR)/gc_vsc_vir_mc_gen.o \
 	$(OBJ_DIR)/gc_vsc_vir_reg_alloc.o \
+	$(OBJ_DIR)/gc_vsc_vir_uniform_alloc.o \
 	$(OBJ_DIR)/gc_vsc_vir_dump.o \
 	$(OBJ_DIR)/gc_vsc_vir_ir.o \
+	$(OBJ_DIR)/gc_vsc_vir_io.o \
 	$(OBJ_DIR)/gc_vsc_vir_symbol_table.o \
 	$(OBJ_DIR)/gc_vsc_vir_ll_2_ll_expand.o \
 	$(OBJ_DIR)/gc_vsc_vir_ll_2_ll_scalar.o \
 	$(OBJ_DIR)/gc_vsc_vir_ll_2_ll_machine.o \
 	$(OBJ_DIR)/gc_vsc_vir_lower_common_func.o \
 	$(OBJ_DIR)/gc_vsc_vir_pattern.o \
+	$(OBJ_DIR)/gc_vsc_vir_hl_2_hl_expand.o \
 	$(OBJ_DIR)/gc_vsc_vir_hl_2_ml.o \
 	$(OBJ_DIR)/gc_vsc_vir_hl_2_ml_expand.o \
 	$(OBJ_DIR)/gc_vsc_vir_ll_2_mc.o \
 	$(OBJ_DIR)/gc_vsc_vir_ml_2_ll.o \
+	$(OBJ_DIR)/gc_vsc_vir_linker.o \
 	$(OBJ_DIR)/gc_vsc_options.o \
 	$(OBJ_DIR)/gc_vsc_vir_pass_mnger.o \
 	$(OBJ_DIR)/gc_vsc_vir_cfo.o \
@@ -180,6 +187,8 @@ OBJECTS += \
 	$(OBJ_DIR)/gc_vsc_vir_ep_back_patch.o \
 	$(OBJ_DIR)/gc_vsc_vir_static_patch.o \
 	$(OBJ_DIR)/gc_vsc_vir_vectorization.o \
+	$(OBJ_DIR)/gc_vsc_vir_loop.o \
+	$(OBJ_DIR)/gc_vsc_debug.o \
 
 endif
 
@@ -221,12 +230,13 @@ endif
 # Object rules.
 
 vpath
+vpath %.c lib
 vpath %.c old_impl
 vpath %.c old_impl/optimizer
 
 ifeq ($(VSC_VIR_BUILD),1)
   vpath %.c asm
-  vpath %.c chip
+  vpath %.c chip/gpu
   vpath %.c drvi
   vpath %.c utils
   vpath %.c utils/array
@@ -243,8 +253,10 @@ ifeq ($(VSC_VIR_BUILD),1)
   vpath %.c vir/codegen
   vpath %.c vir/ir
   vpath %.c vir/lower
+  vpath %.c vir/linker
   vpath %.c vir/passmanager
   vpath %.c vir/transform
+  vpath %.c debug
 endif
 
 $(OBJ_DIR)/%.o: %.c

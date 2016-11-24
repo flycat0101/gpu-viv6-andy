@@ -26,7 +26,7 @@ typedef struct VIR_PH_PEEPHOLE
     VSC_HW_CONFIG* hwCfg;
     VSC_OPTN_PHOptions* options;
     VIR_Dumper* dumper;
-    VSC_PRIMARY_MEM_POOL pmp;
+    VSC_MM* pMM;
 
     gctBOOL     cfgChanged;
     gctBOOL     exprChanged;
@@ -45,34 +45,16 @@ typedef struct VIR_PH_PEEPHOLE
 #define VSC_PH_Peephole_SetOptions(ph, o)      ((ph)->options = (o))
 #define VSC_PH_Peephole_GetDumper(ph)          ((ph)->dumper)
 #define VSC_PH_Peephole_SetDumper(ph, d)       ((ph)->dumper = (d))
-#define VSC_PH_Peephole_GetPmp(ph)             (&((ph)->pmp))
-#define VSC_PH_Peephole_GetMM(ph)              (&((ph)->pmp.mmWrapper))
+#define VSC_PH_Peephole_GetMM(ph)              ((ph)->pMM)
 #define VSC_PH_Peephole_GetCfgChanged(ph)      ((ph)->cfgChanged)
 #define VSC_PH_Peephole_SetCfgChanged(ph, c)   ((ph)->cfgChanged = (c))
 #define VSC_PH_Peephole_GetExprChanged(ph)     ((ph)->exprChanged)
 #define VSC_PH_Peephole_SetExprChanged(ph, e)  ((ph)->exprChanged = (e))
 
-
-extern void VSC_PH_Peephole_Init(
-    IN OUT VSC_PH_Peephole* ph,
-    IN VIR_Shader* shader,
-    IN VIR_DEF_USAGE_INFO* du_info,
-    IN VSC_HW_CONFIG* hwCfg,
-    IN VSC_OPTN_PHOptions* options,
-    IN VIR_Dumper* dumper
-    );
-
-extern void VSC_PH_Peephole_Final(
-    IN OUT VSC_PH_Peephole* ph
-    );
-
-extern VSC_ErrCode VSC_PH_Peephole_PerformOnFunction(
-    IN OUT VSC_PH_Peephole* ph
-    );
-
 extern VSC_ErrCode VSC_PH_Peephole_PerformOnShader(
-    IN OUT VSC_PH_Peephole* ph
+    IN VSC_SH_PASS_WORKER* pPassWorker
     );
+DECLARE_QUERY_PASS_PROP(VSC_PH_Peephole_PerformOnShader);
 
 END_EXTERN_C()
 

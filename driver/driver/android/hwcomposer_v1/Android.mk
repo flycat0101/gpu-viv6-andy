@@ -55,13 +55,13 @@ LOCAL_SHARED_LIBRARIES := \
 	libEGL \
 	libGAL
 
-ifneq ($(TARGET_2ND_ARCH),)
+ifeq ($(shell expr $(PLATFORM_SDK_VERSION) ">=" 21),1)
   LOCAL_MODULE_RELATIVE_PATH := hw
 else
   LOCAL_MODULE_PATH          := $(TARGET_OUT_SHARED_LIBRARIES)/hw
 endif
 
-LOCAL_MODULE         := hwcomposer.$(PROPERTY)
+LOCAL_MODULE         := hwcomposer.$(HAL_MODULE_VARIANT)
 LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)

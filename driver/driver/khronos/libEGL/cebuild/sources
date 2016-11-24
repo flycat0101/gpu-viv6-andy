@@ -1,0 +1,74 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+!IF "$(VIVANTE_ENABLE_3D)_$(VIVANTE_ENABLE_VG)" == "0_0"
+SKIPBUILD=1
+!ENDIF
+
+DOSYSGEN=1
+SYNCHRONIZE_DRAIN=1
+TARGETNAME=libEGL
+TARGETTYPE=DYNLINK
+DLLENTRY=DllMain
+
+CDEFINES = \
+    $(CDEFINES) \
+    -D__EGL_EXPORTS
+
+SOURCES= \
+    ../source/gc_egl.c \
+    ../source/gc_egl_config.c \
+    ../source/gc_egl_context.c \
+    ../source/gc_egl_image.c \
+    ../source/gc_egl_init.c \
+    ../source/gc_egl_query.c \
+    ../source/gc_egl_surface.c \
+    ../source/gc_egl_swap.c \
+    ../source/gc_egl_sync.c \
+    ../api/gc_egl_nullws.c \
+    ../api/gc_egl_win32.c
+
+INCLUDES= \
+    $(INCLUDES); \
+    $(AQROOT)\sdk\inc; \
+    $(AQROOT)\hal\inc; \
+    $(AQROOT)\hal\user; \
+    $(AQROOT)\hal\os\ce\user; \
+    $(AQROOT)\compiler\libVSC\include; \
+    $(AQROOT)\driver\khronos\libEGL\os; \
+    $(AQROOT)\driver\khronos\libEGL\api; \
+    $(AQROOT)\driver\khronos\libEGL\inc; \
+    ..\source;
+
+{..\source}.c{$(_OBJDIR)\}.obj :
+    @$(GCHAL_C_COMPILING_COMMAND)
+
+{..\api}.c{$(_OBJDIR)\}.obj :
+    @$(GCHAL_C_COMPILING_COMMAND)
+
+TARGETLIBS= \
+    $(GCLIB_PATH)\libGAL.lib \
+    $(_SYSGENSDKROOT)\lib\$(_CPUINDPATH)\coredll.lib \
+
+LIBDEFINES=$(LIBDEFINES) -ignore:4197
+
+DEFFILE = ../source/libEGL.def
+
+##########################################################
+# Install results
+
+EXTRA_COMMAND = \
+    xcopy /I /R /Y $(AQROOT)\sdk\inc\EGL\* $(VIVANTE_SDK_INC)\EGL\ & \
+    xcopy /I /R /Y $(AQROOT)\sdk\inc\KHR\*.h $(VIVANTE_SDK_INC)\KHR\
+
+!INCLUDE $(AQROOT)\wince_install.inc

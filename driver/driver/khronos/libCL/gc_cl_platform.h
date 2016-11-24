@@ -61,7 +61,7 @@ typedef struct _cl_platform_id
                                 OUT gctSTRING * Log
                                 );
 
-    gceSTATUS   (*loadCompiler)(void);
+    gceSTATUS   (*loadCompiler)(IN gcsHWCaps *HWCaps);
     gceSTATUS   (*unloadCompiler)(void);
 }
 clsPlatformId;

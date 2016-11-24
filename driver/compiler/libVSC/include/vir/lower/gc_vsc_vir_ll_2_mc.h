@@ -20,9 +20,9 @@ BEGIN_EXTERN_C()
 
 extern VSC_ErrCode
 VIR_Lower_LowLevel_To_MachineCodeLevel(
-    IN  VIR_Shader *    Shader,
-    IN  VSC_HW_CONFIG*  HwCfg
+    IN VSC_SH_PASS_WORKER* pPassWorker
     );
+DECLARE_QUERY_PASS_PROP(VIR_Lower_LowLevel_To_MachineCodeLevel);
 
 END_EXTERN_C()
 #endif

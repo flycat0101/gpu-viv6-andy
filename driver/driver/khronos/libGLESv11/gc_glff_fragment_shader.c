@@ -226,7 +226,8 @@ static gctUINT _AllocateLabel(
 
 static gceSTATUS _Set_uColor(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4];
@@ -272,7 +273,8 @@ static gceSTATUS _Set_uColor(
 
 static gceSTATUS _Set_uFogFactors(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     gceSTATUS status;
@@ -329,7 +331,8 @@ static gceSTATUS _Set_uFogFactors(
 
 static gceSTATUS _Set_uFogColor(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray[4];
@@ -348,7 +351,8 @@ static gceSTATUS _Set_uFogColor(
 
 static gceSTATUS _Set_uTexColor(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLint i;
@@ -381,7 +385,8 @@ static gceSTATUS _Set_uTexColor(
 
 static gceSTATUS _Set_uTexCombScale(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLint i;
@@ -413,7 +418,8 @@ static gceSTATUS _Set_uTexCombScale(
 
 static gceSTATUS _Set_uFlipPointSprite(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     gceSTATUS status;
@@ -442,7 +448,8 @@ static gceSTATUS _Set_uFlipPointSprite(
 
 static gceSTATUS _Set_uAlphaRef(
     glsCONTEXT_PTR Context,
-    gcUNIFORM Uniform
+    gcUNIFORM Uniform,
+    GLubyte* pointer
     )
 {
     GLfloat valueArray;
@@ -3787,7 +3794,6 @@ gceSTATUS glfGenerateFSFixedFunction(
         {
             /* Shader may have been deleted. Construct again. */
             gcmONERROR(gcSHADER_Construct(
-                Context->hal,
                 gcSHADER_TYPE_FRAGMENT,
                 &fsControl.i->shader
                 ));

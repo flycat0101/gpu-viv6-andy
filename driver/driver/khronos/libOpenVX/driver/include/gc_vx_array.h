@@ -29,12 +29,13 @@ VX_INTERNAL_API vx_bool vxoArray_CheckItemTypeAndCapacity(vx_array array, vx_enu
 
 VX_INTERNAL_API vx_bool vxoArray_AllocateMemory(vx_array array);
 
-VX_INTERNAL_API vx_status vxoArray_AccessRange(vx_array array, vx_size start, vx_size end, void **ptr, vx_enum usage);
+VX_INTERNAL_API vx_status vxoArray_AccessRange(vx_array array, vx_size start, vx_size end, vx_size* pStride, void **ptr, vx_enum usage);
 
 VX_INTERNAL_API vx_status vxoArray_CommitRange(vx_array array, vx_size start, vx_size end, void *ptr);
 
-VX_INTERNAL_API vx_status vxSetArrayAttribute(vx_array array, vx_enum attribute, void *ptr, vx_size size);
+//VX_INTERNAL_API vx_status vxSetArrayAttribute(vx_array array, vx_enum attribute, void *ptr, vx_size size);
 
 EXTERN_C_END
 
 #endif /* __GC_VX_ARRAY_H__*/
+

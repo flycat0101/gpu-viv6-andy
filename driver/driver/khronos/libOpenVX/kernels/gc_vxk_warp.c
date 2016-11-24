@@ -21,6 +21,8 @@ static vx_status vxVivWarpGeneric(vx_node node, vx_image src_image, vx_matrix ma
     vx_float32 m[9];
     vx_enum type = 0;
     gcoVX_Kernel_Context * kernelContext = gcvNULL;
+    vx_int32 uniformNum = 0;
+    vx_int32 index = 0;
 
 #if gcdVX_OPTIMIZER
     if (node && node->kernelContext)
@@ -37,13 +39,14 @@ static vx_status vxVivWarpGeneric(vx_node node, vx_image src_image, vx_matrix ma
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(dst_image, VX_IMAGE_ATTRIBUTE_WIDTH, &dst_width, sizeof(dst_width));
     vxQueryImage(dst_image, VX_IMAGE_ATTRIBUTE_HEIGHT, &dst_height, sizeof(dst_height));
 
-    status |= vxAccessMatrix(matrix, m);
-    status |= vxAccessScalarValue(stype, &type);
+    status |= vxReadMatrix(matrix, m);
+    status |= vxReadScalarValue(stype, &type);
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src_image, GC_VX_INDEX_AUTO);
@@ -73,26 +76,38 @@ static vx_status vxVivWarpGeneric(vx_node node, vx_image src_image, vx_matrix ma
         bin[2] =
         bin[3] = FORMAT_VALUE(borders->mode == VX_BORDER_MODE_CONSTANT?borders->constant_value:0xcd);
 
-        gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
-        kernelContext->uniforms[0].num     = 4 * 4;
-        kernelContext->uniforms[0].index   = 4;
+        gcoOS_MemCopy(&kernelContext->uniforms[index].uniform, bin, sizeof(bin));
+        kernelContext->uniforms[index].num     = 4 * 4;
+        kernelContext->uniforms[index++].index   = 4;
+        uniformNum++;
     }
 
     /* upload matrix */
     if(kernel == gcvVX_KERNEL_WARP_PERSPECTIVE)
     {
-        gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, m, 3*sizeof(vx_float32));
-        gcoOS_MemCopy(&kernelContext->uniforms[1].uniform.termConfig + 4, &m[3], 3*sizeof(vx_float32));
-        gcoOS_MemCopy(&kernelContext->uniforms[1].uniform.termConfig + 8, &m[6], 3*sizeof(vx_float32));
+        gcoOS_MemCopy(&kernelContext->uniforms[index].uniform, m, 3*sizeof(vx_float32));
+        gcoOS_MemCopy(&kernelContext->uniforms[index].uniform.termConfig + 4, &m[3], 3*sizeof(vx_float32));
+        gcoOS_MemCopy(&kernelContext->uniforms[index].uniform.termConfig + 8, &m[6], 3*sizeof(vx_float32));
     }
     else
-        gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, m, sizeof(m));
+        gcoOS_MemCopy(&kernelContext->uniforms[index].uniform, m, sizeof(m));
 
-    kernelContext->uniforms[1].num         = 4 * 4;
-    kernelContext->uniforms[1].index       = 8;
-    kernelContext->uniform_num             = 2;
+    kernelContext->uniforms[index].num         = 4 * 4;
+    kernelContext->uniforms[index++].index       = 8;
+    uniformNum++;
 
-    status |= vxCommitMatrix(matrix, m);
+    if (node->base.context->evisNoInst.noBilinear)
+    {
+        vx_uint32 constantData[8] = {0, 8, 16, 24, 0, 0, 0, 0};
+        gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, constantData, sizeof(constantData));
+        kernelContext->uniforms[index].num = vxmLENGTH_OF(constantData);
+        kernelContext->uniforms[index++].index = 12;
+        uniformNum++;
+    }
+
+    kernelContext->uniform_num = uniformNum;
+
+    kernelContext->node = node;
 
     status |= gcfVX_Kernel(kernelContext);
 
@@ -115,3 +130,4 @@ vx_status vxWarpPerspective(vx_node node, vx_image src_image, vx_matrix matrix, 
 {
     return vxVivWarpGeneric(node, src_image, matrix, stype, dst_image, borders, gcvVX_KERNEL_WARP_PERSPECTIVE);
 }
+

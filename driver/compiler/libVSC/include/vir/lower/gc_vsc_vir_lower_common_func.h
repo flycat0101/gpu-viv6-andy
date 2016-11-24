@@ -62,6 +62,13 @@ VIR_Lower_SetOne(
     );
 
 gctBOOL
+VIR_Lower_SetIntHighBitOne(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
 VIR_Lower_SetMinusOne(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -84,6 +91,41 @@ VIR_Lower_SetUIntOne(
 
 gctBOOL
 VIR_Lower_SetIntMinusOne(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetEnableX(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetEnableY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetEnableZ(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetEnableW(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetEnableXYZWAndSymType(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd
@@ -239,6 +281,12 @@ VIR_Lower_disableFullNewLinker(
     );
 
 gctBOOL
+VIR_Lower_HasTexldModifier(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
 VIR_Lower_label_set_jmp_neg2(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
@@ -305,6 +353,25 @@ gctBOOL
 VIR_Lower_SetOpndFloat(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetEnableBaseOnSrc0(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
+VIR_Lower_SetEnableBaseOnSrc1(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+VIR_TexModifier_Flag
+VIR_Lower_GetTexModifierKind(
     IN VIR_Operand        *Opnd
     );
 

@@ -193,6 +193,7 @@ EXPORTS
     gcoOS_SwapBuffers
     gcoOS_SetDisplayVirtualEx
     gcoOS_QuerySystemInfo
+	gcoOS_CPUPhysicalToGPUPhysical
 
     ; gcsMEM
     gcfMEM_InitFSMemPool
@@ -210,6 +211,7 @@ EXPORTS
 
     ; gcoHAL
     gcoHAL_GetHardware
+    gcoHAL_GetUserDebugOption
     gcoHAL_AddFrameDB
     gcoHAL_Call
     gcoHAL_Commit
@@ -218,6 +220,8 @@ EXPORTS
     gcoHAL_Destroy
     gcoHAL_DumpFrameDB
     gcoHAL_GetDump
+	gcoHAL_InitGPUProfile
+	gcoHAL_DumpGPUProfile
 
 !IF "$(VIVANTE_ENABLE_2D)" == "1"
     gcoHAL_Get2DEngine
@@ -225,10 +229,10 @@ EXPORTS
 
 !IF "$(VIVANTE_ENABLE_3D)" == "1"
     gcoHAL_GetSpecialHintData
+!ENDIF
     gcoHAL_GetPatchID
     gcoHAL_SetPatchID
     gcoHAL_SetGlobalPatchID
-!ENDIF
 
     gcoHAL_GetTimerTime
     gcoHAL_IsFeatureAvailable
@@ -237,6 +241,7 @@ EXPORTS
     gcoHAL_ProfileEnd
     gcoHAL_ProfileStart
     gcoHAL_QueryChipCount
+    gcoHAL_Query3DCoreCount
     gcoHAL_QueryChipFeature
     gcoHAL_QueryChipIdentity
     gcoHAL_QueryChipLimits
@@ -261,6 +266,7 @@ EXPORTS
     gcoHAL_LockVideoMemory
     gcoHAL_UnlockVideoMemory
     gcoHAL_ReleaseVideoMemory
+    gcoHAL_ScheduleSignal
 
 !IF "$(VIVANTE_ENABLE_3D)" == "1"
     gcoHAL_QueryShaderCaps
@@ -388,11 +394,13 @@ EXPORTS
     gcoSURF_WaitFence
     gcoSURF_AlignResolveRect
  	gcoSURF_DrawBlit
-    gcoSURF_3DBlitCopy
     gcsSURF_NODE_Construct
     gcsSURF_NODE_Destroy
+	gcsSURF_NODE_Lock
+	gcsSURF_NODE_Unlock
     gcsSURF_NODE_GetHardwareAddress
     gcsSURF_NODE_SetHardwareAddress
+	gcsSURF_NODE_GetHWAddress
 
     gcoSURF_FlushTileStatus
     gcoSURF_AppendTileStatus
@@ -728,10 +736,8 @@ EXPORTS
     gcoSHADER_ProgramUniform
     gcoSHADER_ProgramUniformEx
     gcoSHADER_BindBufferBlock
-    gcCreateInstVidMem
-    gcDestroyInstVidMem
-    gcCreateSpillVidMem
-    gcDestroySpillVidMem
+    gcoSHADER_AllocateVidMem
+    gcoSHADER_FreeVidMem
 
     ; gcoSTREAM
     gcoSTREAM_SetSharedLock
@@ -761,10 +767,13 @@ EXPORTS
 
     gcoVERTEXARRAY_Construct
     gcoVERTEXARRAY_Destroy
-    gcoVERTEXARRAY_IndexUpdate
+    gcoVERTEXARRAY_IndexBind
+    gcoVERTEXARRAY_StreamBind
     gcoVERTEXARRAY_Bind
     gcoVERTEXARRAY_Bind_Ex
     gcoVERTEXARRAY_Bind_Ex2
+    gcoVERTEXARRAY_IndexBind_Ex
+    gcoVERTEXARRAY_StreamBind_Ex
 
     ; gcoBUFFER
     gcoBUFFER_Construct
@@ -806,6 +815,7 @@ EXPORTS
     gcoCL_InvokeKernel
     gcoCL_InvokeThreadWalker
     gcoCL_SetSignal
+    gcoCL_MultiGPUSync
 
     ; gcoPROFILER
     gcoPROFILER_Initialize
@@ -817,6 +827,17 @@ EXPORTS
     gcoPROFILER_End
     gcoPROFILER_ShaderFS
     gcoPROFILER_ShaderVS
+    gcoPROFILER_NEW_Construct
+    gcoPROFILER_NEW_Destroy
+    gcoPROFILER_NEW_Enable
+	gcoPROFILER_NEW_Disable
+    gcoPROFILER_NEW_Begin
+    gcoPROFILER_NEW_End
+    gcoPROFILER_NEW_EndFrame
+    gcoPROFILER_NEW_RecordCounters
+    gcoPROFILER_NEW_WriteCounters
+    gcoPROFILER_NEW_Write
+    gcoPROFILER_NEW_Flush
 
     ; gcoMATH
     gcoMATH_Log2in5dot5
@@ -954,9 +975,9 @@ EXPORTS
     gcoHAL_GetAlignedSurfaceSize
     gcoHAL_QueryCommandBuffer
     gcoHAL_ReserveTask
-    gcoHAL_Query3DCoreCount
 !ENDIF
     gcoHAL_GetHardwareType
+    gcoHAL_QueryCoreCount
 
 !IF "$(VIVANTE_ENABLE_3D)" == "1"
     gcoBUFOBJ_Construct
@@ -982,6 +1003,9 @@ EXPORTS
     gcfSTATISTICS_AddData
     gcfSTATISTICS_MarkFrameEnd
     gcfSTATISTICS_DisableDynamicEarlyZ
+
+    gcoQUEUE_Construct
+    gcoQUEUE_Destroy
 !ENDIF
 
 !IF "$(VIVANTE_ENABLE_VX)" == "1"
@@ -1002,7 +1026,23 @@ EXPORTS
     gcoVX_Flush
     gcoVX_AllocateMemoryEx
     gcoVX_FreeMemoryEx
+    gcoVX_CreateDevices
+    gcoVX_DestroyDevices
+    gcoVX_GetCurrentDevice
+    gcoVX_SetCurrentDevice
+    gcoVX_MultiDeviceSync
+    gcoVX_SaveContext
+    gcoVX_RestoreContext
+
+!IF "$(VSIMULATOR_DEBUG)" == "1"
+	gcoOS_SetSimulatorCallback
+    gcoVX_addDebugShader
+    gcoVX_QueryShader
+    gcoVX_QueryShaderList
+    gcoVX_cleanDebugShader
 !ENDIF
-    gcGetUserDebugOption
+
+!ENDIF
+
 
 <<

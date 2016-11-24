@@ -21,7 +21,7 @@
 #if gcdENABLE_3D
 
 
-#define gcdGET_FIELD(data, start, bits) (((data) >> (start)) & (~(~0 << bits)))
+#define gcdGET_FIELD(data, start, bits) (((data) >> (start)) & (~(~0U << bits)))
 #define gcdUNORM_MAX(n)                 ((gctFLOAT)(((gctUINT64)1 << (n)) - 1))
 
 #define gcdUNORM_TO_FLOAT(ub, n)        (gctFLOAT)((ub) / gcdUNORM_MAX(n))
@@ -1199,6 +1199,18 @@ void _ReadPixelFrom_A8B8G8R8UI_1_A8R8G8B8(gctPOINTER inAddr[gcdMAX_SURF_LAYERS],
     outPixel->s = 0;
 }
 
+void _ReadPixelFrom_X16B16G16R16I(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctINT16* pI = (gctINT16*)inAddr[0];
+
+    outPixel->color.i.r = pI[0];
+    outPixel->color.i.g = pI[1];
+    outPixel->color.i.b = pI[2];
+    outPixel->color.i.a = 1;
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
 void _ReadPixelFrom_A16B16G16R16I(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
 {
     gctINT16* pI = (gctINT16*)inAddr[0];
@@ -1207,6 +1219,19 @@ void _ReadPixelFrom_A16B16G16R16I(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXE
     outPixel->color.i.g = pI[1];
     outPixel->color.i.b = pI[2];
     outPixel->color.i.a = pI[3];
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_X16B16G16R16I_2_A8R8G8B8(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctINT16* pI0 = (gctINT16*)inAddr[0];
+    gctINT16* pI1 = (gctINT16*)inAddr[1];
+
+    outPixel->color.i.r = pI0[0];
+    outPixel->color.i.g = pI0[1];
+    outPixel->color.i.b = pI1[0];
+    outPixel->color.i.a = 1;
     outPixel->d = 0.0f;
     outPixel->s = 0;
 }
@@ -1224,6 +1249,17 @@ void _ReadPixelFrom_A16B16G16R16I_2_A8R8G8B8(gctPOINTER inAddr[gcdMAX_SURF_LAYER
     outPixel->s = 0;
 }
 
+void _ReadPixelFrom_X16B16G16R16UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT16* pI = (gctUINT16*)inAddr[0];
+
+    outPixel->color.ui.r = pI[0];
+    outPixel->color.ui.g = pI[1];
+    outPixel->color.ui.b = pI[2];
+    outPixel->color.ui.a = 1u;
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
 
 void _ReadPixelFrom_A16B16G16R16UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
 {
@@ -1233,6 +1269,19 @@ void _ReadPixelFrom_A16B16G16R16UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIX
     outPixel->color.ui.g = pI[1];
     outPixel->color.ui.b = pI[2];
     outPixel->color.ui.a = pI[3];
+    outPixel->d = 0.0f;
+    outPixel->s = 0;
+}
+
+void _ReadPixelFrom_X16B16G16R16UI_2_A8R8G8B8(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
+{
+    gctUINT16* pI0 = (gctUINT16*)inAddr[0];
+    gctUINT16* pI1 = (gctUINT16*)inAddr[1];
+
+    outPixel->color.ui.r = pI0[0];
+    outPixel->color.ui.g = pI0[1];
+    outPixel->color.ui.b = pI1[0];
+    outPixel->color.ui.a = 1u;
     outPixel->d = 0.0f;
     outPixel->s = 0;
 }
@@ -1734,12 +1783,27 @@ _PFNreadPixel gcoSURF_GetReadPixelFunc(gcoSURF surf)
     case gcvSURF_A8B8G8R8UI_1_A8R8G8B8:
         return _ReadPixelFrom_A8B8G8R8UI_1_A8R8G8B8;
 
+
+    case gcvSURF_X16B16G16R16I:
+    case gcvSURF_X16B16G16R16I_1_G32R32F:
+        return _ReadPixelFrom_X16B16G16R16I;
+
+    case gcvSURF_X16B16G16R16I_2_A8R8G8B8:
+        return _ReadPixelFrom_X16B16G16R16I_2_A8R8G8B8;
+
     case gcvSURF_A16B16G16R16I:
     case gcvSURF_A16B16G16R16I_1_G32R32F:
         return _ReadPixelFrom_A16B16G16R16I;
 
     case gcvSURF_A16B16G16R16I_2_A8R8G8B8:
         return _ReadPixelFrom_A16B16G16R16I_2_A8R8G8B8;
+
+    case gcvSURF_X16B16G16R16UI:
+    case gcvSURF_X16B16G16R16UI_1_G32R32F:
+        return _ReadPixelFrom_X16B16G16R16UI;
+
+    case gcvSURF_X16B16G16R16UI_2_A8R8G8B8:
+        return _ReadPixelFrom_X16B16G16R16UI_2_A8R8G8B8;
 
     case gcvSURF_A16B16G16R16UI:
     case gcvSURF_A16B16G16R16UI_1_G32R32F:

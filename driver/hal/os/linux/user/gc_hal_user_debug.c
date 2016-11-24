@@ -515,6 +515,7 @@ _Print(
 #if gcdDEBUG_IN_KERNEL
     gcsHAL_INTERFACE iface;
 
+    iface.ignoreTLS      = gcvFALSE;
     iface.command        = gcvHAL_DEBUG;
     iface.u.Debug.set    = gcvTRUE;
     iface.u.Debug.level  = _debugLevel;

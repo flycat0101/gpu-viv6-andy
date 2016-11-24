@@ -354,6 +354,15 @@ __glChipReadPixels(
     */
     srcView = gcChipFboSyncFromShadowSurface(gc, &chipCtx->readRtView, GL_TRUE);
 
+    /* When commands such as ReadPixels read from a layered framebuffer,
+    ** the image at layer zero of the selected attachment is always used to obtain pixel values
+    */
+    if (srcView.numSlices > 1)
+    {
+        srcView.firstSlice = 0;
+        srcView.numSlices = 1;
+    }
+
     switch (type)
     {
     case GL_UNSIGNED_BYTE:

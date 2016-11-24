@@ -14,6 +14,8 @@
 #include "gc_cl_precomp.h"
 
 #define __NEXT_MSG_ID__     006030
+/* varible to record the status of VXC instruction using in OCL */
+static gctBOOL useVXC = gcvFALSE;
 
 /*****************************************************************************\
 |*                         Supporting functions                              *|
@@ -153,8 +155,7 @@ OnError:
             "OCL-006003: (clCreateProgramWithSource) cannot create program.  Maybe run out of memory.\n");
     }
 
-    if(sizes) gcmOS_SAFE_FREE(gcvNULL, sizes);
-    if(source != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, source);
+    if (sizes) gcmOS_SAFE_FREE(gcvNULL, sizes);
     if(program != gcvNULL && program->devices != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, program->devices);
     if(program != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, program);
 
@@ -252,7 +253,7 @@ clCreateProgramWithBinary(
     }
 
     /* Construct binary. */
-    clmONERROR(gcSHADER_Construct(gcvNULL, gcSHADER_TYPE_CL, &binary),
+    clmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &binary),
                CL_OUT_OF_HOST_MEMORY);
 
     /* Load binary */
@@ -403,6 +404,7 @@ clfLoadCompiler(
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    VSC_HW_CONFIG hwCfg;
 
     gcmHEADER();
     {
@@ -445,8 +447,8 @@ clfLoadCompiler(
                                           "gcUnloadKernelCompiler",
                                           (gctPOINTER*)&platform->unloadCompiler));
 
-
-            gcmVERIFY_OK((*platform->loadCompiler)());
+            gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg));
+            gcmVERIFY_OK((*platform->loadCompiler)(&hwCfg));
         }
     }
 
@@ -457,6 +459,42 @@ OnError:
     return status;
 }
 
+static void clfGetCLEnvOption(gctBOOL * useVXC)
+{
+    static gctINT envChecked    = 0;
+    if (!envChecked)
+    {
+        char* p = gcvNULL;
+        gctSTRING pos = gcvNULL;
+
+        gcoOS_GetEnv(gcvNULL, "OCL_OPTION", &p);
+        if (p)
+        {
+            gcoOS_StrStr(p, "-USEVXC:", &pos);
+            if (pos)
+            {
+                pos += sizeof("-USEVXC") -1;
+
+                while (pos[0] == ':')
+                {
+                    ++pos;
+
+                    if (*pos == '0')
+                    {
+                        *useVXC = gcvFALSE;
+                        ++pos;
+                    }
+                    else if (*pos == '1')
+                    {
+                        *useVXC = gcvTRUE;
+                        ++pos;
+                    }
+                }
+            }
+            envChecked = 1;
+        }
+    }
+}
 
 CL_API_ENTRY cl_int CL_API_CALL
 clBuildProgram(
@@ -478,7 +516,7 @@ clBuildProgram(
     gcmHEADER_ARG("Program=0x%x NumDevices=%u DeviceList=0x%x Options=%s",
                   Program, NumDevices, DeviceList, Options);
 
-    gcoCL_InitializeHardware();
+    clfGetCLEnvOption(&useVXC);
 
     if (Program == gcvNULL || Program->objectType != clvOBJECT_PROGRAM)
     {
@@ -518,6 +556,10 @@ clBuildProgram(
     if (Options)
     {
         length = gcoOS_StrLen(Options, gcvNULL) + 1;
+        if(useVXC == gcvTRUE)
+        {
+            length += 21;
+        }
         status = gcoOS_Allocate(gcvNULL, length, &pointer);
         if (gcmIS_ERROR(status))
         {
@@ -525,12 +567,35 @@ clBuildProgram(
                 "OCL-006013: (clBuildProgram) Run out of memory.\n");
             clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
         }
-        gcmVERIFY_OK(gcoOS_StrCopySafe(pointer, length, Options));
+        if(useVXC == gcvFALSE)
+        {
+            gcoOS_StrCopySafe(pointer, length, Options);
+        }
+        else
+        {
+            gcoOS_StrCopySafe(pointer, 21, "-cl-viv-vx-extension ");
+            gcoOS_StrCatSafe(pointer, length, Options);
+        }
         Program->buildOptions = (gctSTRING) pointer;
     }
     else
     {
-        Program->buildOptions = gcvNULL;
+        if(useVXC == gcvTRUE)
+        {
+            status = gcoOS_Allocate(gcvNULL, 20, &pointer);
+            if (gcmIS_ERROR(status))
+            {
+                gcmUSER_DEBUG_ERROR_MSG(
+                    "OCL-006013: (clBuildProgram) Run out of memory.\n");
+                clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+            }
+            gcoOS_StrCopySafe(pointer, 20, "-cl-viv-vx-extension");
+            Program->buildOptions = (gctSTRING) pointer;
+        }
+        else
+        {
+            Program->buildOptions = gcvNULL;
+        }
     }
 
     Program->buildStatus = CL_BUILD_IN_PROGRESS;
@@ -656,8 +721,6 @@ clCompileProgram(
 
     gcmHEADER_ARG("Program=0x%x NumDevices=%u DeviceList=0x%x Options=%s",
                   Program, NumDevices, DeviceList, Options);
-
-    gcoCL_InitializeHardware();
 
     if (Program == gcvNULL || Program->objectType != clvOBJECT_PROGRAM)
     {
@@ -826,8 +889,6 @@ clLinkProgram(
 
     gcmHEADER_ARG("Context=0x%x NumDevices=%u DeviceList=0x%x Options=%s",
                   Context, NumDevices, DeviceList, Options);
-
-    gcoCL_InitializeHardware();
 
     if ((NumInputPrograms != 0 && !InputPrograms) ||
         (NumInputPrograms == 0 && InputPrograms))
@@ -1045,6 +1106,7 @@ clGetProgramInfo(
 {
     gctSIZE_T           retParamSize = 0;
     gctPOINTER          retParamPtr = NULL;
+    gctPOINTER          pointer = NULL;
     size_t              retValue_size_t[2];
     gctINT              status;
     gctUINT             i;
@@ -1116,7 +1178,6 @@ clGetProgramInfo(
         break;
     case CL_PROGRAM_KERNEL_NAMES:
         {
-            gctPOINTER pointer;
             gctSTRING  name;
             size_t     strLen = 0;
             size_t     totalLen = 0;
@@ -1199,8 +1260,11 @@ clGetProgramInfo(
 #if BUILD_OPENCL_12
             else if (ParamName == CL_PROGRAM_KERNEL_NAMES)
             {
-                gcoOS_MemCopy(ParamValue, retParamPtr, retParamSize);
-                gcoOS_Free(gcvNULL, retParamPtr);
+                if (ParamValue)
+                {
+                    gcoOS_MemCopy(ParamValue, retParamPtr, retParamSize);
+                    gcoOS_Free(gcvNULL, retParamPtr);
+                }
             }
 #endif
             else
@@ -1220,6 +1284,10 @@ clGetProgramInfo(
     return CL_SUCCESS;
 
 OnError:
+    if(pointer != NULL)
+    {
+        gcoOS_Free(gcvNULL, pointer);
+    }
     gcmFOOTER_ARG("%d", status);
     return status;
 }

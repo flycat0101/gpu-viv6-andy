@@ -111,6 +111,9 @@ GLboolean __glInitProgramObject(__GLcontext *gc, __GLprogramObject *programObjec
     programObject->ppXfbVaryingNames = gcvNULL;
     programObject->xfbRefCount = 0;
 
+    programObject->maxSampler = 0;
+    programObject->maxUnit = 0;
+
     __GL_MEMZERO(programObject->bindingInfo.workGroupSize, 3 * sizeof(GLuint));
 
     programObject->programInfo.infoLog = (GLchar*)(*gc->imports.calloc)(gc, __GLSL_LOG_INFO_SIZE, sizeof(GLchar));
@@ -366,6 +369,8 @@ GLboolean __glDeleteXfbObj(__GLcontext *gc, __GLxfbObject *xfbObj)
 GLvoid __glInitShaderProgramState(__GLcontext *gc)
 {
     __GLSLStage stage;
+    GLuint unit;
+    GLuint sampler;
 
     /* Shader and program objects can be shared across contexts */
     if (gc->shareCtx)
@@ -435,6 +440,19 @@ GLvoid __glInitShaderProgramState(__GLcontext *gc)
         gc->shaderProgram.lastProgObjs[stage] = gcvNULL;
         gc->shaderProgram.lastCodeSeqs[stage] = 0xFFFFFFFF;
     }
+
+    for (unit = 0; unit < gc->constants.shaderCaps.maxCombinedTextureImageUnits; unit++)
+    {
+        gc->state.texture.texUnits[unit].enableDim = __GL_MAX_TEXTURE_UNITS;
+        gc->shaderProgram.texUnit2Sampler[unit].numSamplers = 0;
+    }
+
+    for (sampler = 0; sampler < gc->constants.shaderCaps.maxTextureSamplers; sampler++)
+    {
+        gc->state.program.sampler2TexUnit[sampler] = __GL_MAX_TEXTURE_UNITS;
+    }
+
+    gc->shaderProgram.maxSampler = 0;
 }
 
 GLvoid __glFreeShaderProgramState(__GLcontext * gc)
@@ -477,18 +495,10 @@ GLuint GL_APIENTRY __gles_CreateShader(__GLcontext *gc,  GLenum type)
     case GL_VERTEX_SHADER:
     case GL_FRAGMENT_SHADER:
     case GL_COMPUTE_SHADER:
-        break;
     case GL_TESS_CONTROL_SHADER_EXT:
     case GL_TESS_EVALUATION_SHADER_EXT:
-        if (__glExtension[__GL_EXTID_EXT_tessellation_shader].bEnabled)
-        {
-            break;
-        }
     case GL_GEOMETRY_SHADER_EXT:
-        if (__glExtension[__GL_EXTID_EXT_geometry_shader].bEnabled)
-        {
-            break;
-        }
+        break;
     default:
         shader = 0;
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
@@ -1950,6 +1960,12 @@ GLvoid __glUniform(__GLcontext *gc, GLint location, GLint type, GLsizei count,
         {
             __GL_ERROR_RET(GL_INVALID_OPERATION);
         }
+    }
+
+    if (gc->apiVersion == __GL_API_VERSION_ES20 &&
+        transpose)
+    {
+        __GL_ERROR_RET(GL_INVALID_VALUE);
     }
 
     if (location == -1)
@@ -3701,6 +3717,11 @@ GLvoid GL_APIENTRY __gles_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
 
     __GL_HEADER();
 
+    if (count < 0)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+    }
+
     switch (bufferMode)
     {
     case GL_INTERLEAVED_ATTRIBS:
@@ -3722,7 +3743,14 @@ GLvoid GL_APIENTRY __gles_TransformFeedbackVaryings(__GLcontext *gc, GLuint prog
     }
     else if (programObject->objectInfo.objectType != __GL_PROGRAM_OBJECT_TYPE)
     {
-        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+        if(programObject->objectInfo.objectType == __GL_SHADER_OBJECT_TYPE)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
+        else
+        {
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
+        }
     }
 
     /* Free previous name records */

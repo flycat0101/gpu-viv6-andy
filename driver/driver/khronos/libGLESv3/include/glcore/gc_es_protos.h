@@ -430,7 +430,7 @@ extern GLvoid GL_APIENTRY __gles_FramebufferTexture2DMultisampleEXT(__GLcontext 
 #if GL_VIV_direct_texture
 extern GLvoid GL_APIENTRY __gles_TexDirectVIV(__GLcontext *gc, GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** pixels);
 extern GLvoid GL_APIENTRY __gles_TexDirectInvalidateVIV(__GLcontext *gc, GLenum target);
-extern GLvoid GL_APIENTRY __gles_TexDirectVIVMap(__GLcontext *gc, GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** logical, const GLuint * physical, GLboolean tiled);
+extern GLvoid GL_APIENTRY __gles_TexDirectVIVMap(__GLcontext *gc, GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** logical, const GLuint * physical);
 extern GLvoid GL_APIENTRY __gles_TexDirectTiledMapVIV(__GLcontext *gc, GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** logical, const GLuint * physical);
 #endif
 
@@ -439,4 +439,5 @@ extern GLvoid GL_APIENTRY __gles_MultiDrawArraysIndirectEXT(__GLcontext *gc, GLe
 extern GLvoid GL_APIENTRY __gles_MultiDrawElementsIndirectEXT(__GLcontext *gc, GLenum mode, GLenum type, const void *indirect, GLsizei drawcount, GLsizei stride);
 #endif
 
+extern GLvoid GL_APIENTRY __gles_GetTexImage(__GLcontext *gc, GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels);
 #endif /* __gc_es_protos_h__ */

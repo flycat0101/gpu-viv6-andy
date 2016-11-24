@@ -14,6 +14,7 @@
 #include "gc_vsc.h"
 #include "vir/lower/gc_vsc_vir_ml_2_ll.h"
 #include "vir/lower/gc_vsc_vir_lower_common_func.h"
+#include "vir/linker/gc_vsc_vir_linker.h"
 
 /* lowering middle level vir to lower level vir (Machine code level) */
 VSC_ErrCode
@@ -26,21 +27,21 @@ VIR_Lower_MiddleLevel_To_LowLevel_Preprocess(
 VSC_ErrCode
 VIR_Lower_MiddleLevel_To_LowLevel_Expand(
     IN  VIR_Shader              *Shader,
-    IN  VSC_HW_CONFIG           *HwCfg,
+    IN  PVSC_CONTEXT            VscContext,
     IN  VIR_PatternLowerContext *Context
     );
 
 VSC_ErrCode
 VIR_Lower_MiddleLevel_To_LowLevel_Scalar(
     IN  VIR_Shader              *Shader,
-    IN  VSC_HW_CONFIG           *HwCfg,
+    IN  PVSC_CONTEXT            VscContext,
     IN  VIR_PatternLowerContext *Context
     );
 
 VSC_ErrCode
 VIR_Lower_MiddleLevel_To_LowLevel_Machine(
     IN  VIR_Shader              *Shader,
-    IN  VSC_HW_CONFIG           *HwCfg,
+    IN  PVSC_CONTEXT            VscContext,
     IN  VIR_PatternLowerContext *Context
     );
 
@@ -48,10 +49,12 @@ static void
 _Lower_Initialize(
     IN VIR_Shader               *Shader,
     IN VIR_PatternLowerContext  *Context,
-    IN VSC_HW_CONFIG            *HwCfg
+    IN VSC_HW_CONFIG            *HwCfg,
+    IN VSC_MM                   *pMM
     )
 {
     Context->hwCfg = HwCfg;
+    Context->pMM = pMM;
 
     Context->hasNEW_TEXLD = HwCfg->hwFeatureFlags.hasHalti2;
 
@@ -77,39 +80,61 @@ _Lower_Initialize(
     Context->hasHalti4 = (gctBOOL)HwCfg->hwFeatureFlags.hasHalti4;
 }
 
+DEF_QUERY_PASS_PROP(VIR_Lower_MiddleLevel_To_LowLevel)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_M2LLOWER;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+
+    /* Lower must invalidate all analyzed resources */
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateCg = gcvTRUE;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateCfg = gcvTRUE;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateRdFlow = gcvTRUE;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateDu = gcvTRUE;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateWeb = gcvTRUE;
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateLvFlow = gcvTRUE;
+}
+
 VSC_ErrCode
 VIR_Lower_MiddleLevel_To_LowLevel(
-    IN  VIR_Shader *    Shader,
-    IN  VSC_HW_CONFIG*  HwCfg
+    IN  VSC_SH_PASS_WORKER* pPassWorker
     )
 {
     VSC_ErrCode             errCode  = VSC_ERR_NONE;
     VIR_PatternLowerContext context;
+    VIR_Shader *            shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VSC_HW_CONFIG*          hwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    gctBOOL                 bRAEnabled = *(gctBOOL*)pPassWorker->basePassWorker.pPrvData;
 
-    gcmASSERT(VIR_Shader_GetLevel(Shader) == VIR_SHLEVEL_Post_Medium);
-
-    _Lower_Initialize(Shader, &context, HwCfg);
-
-    errCode = VIR_Lower_MiddleLevel_To_LowLevel_Preprocess(Shader, HwCfg, &context);
-    CHECK_ERROR(errCode, "VIR_Lower_MiddleLevel_To_LowLevel failed.");
-
-    errCode = VIR_Lower_MiddleLevel_To_LowLevel_Expand(Shader, HwCfg, &context);
-    CHECK_ERROR(errCode, "VIR_Lower_MiddleLevel_To_LowLevel failed.");
-
-    errCode = VIR_Lower_MiddleLevel_To_LowLevel_Scalar(Shader, HwCfg, &context);
-    CHECK_ERROR(errCode, "VIR_Lower_MiddleLevel_To_LowLevel failed.");
-
-    if (ENABLE_FULL_NEW_LINKER)
+    if (VIR_Shader_GetLevel(shader) != VIR_SHLEVEL_Post_Medium)
     {
-        errCode = VIR_Lower_MiddleLevel_To_LowLevel_Machine(Shader, HwCfg, &context);
+        return errCode;
+    }
+
+    VIR_Shader_SetRAEnabled(shader, bRAEnabled);
+
+    _Lower_Initialize(shader, &context, hwCfg, pPassWorker->basePassWorker.pMM);
+
+    errCode = VIR_Lower_MiddleLevel_To_LowLevel_Preprocess(shader, hwCfg, &context);
+    CHECK_ERROR(errCode, "VIR_Lower_MiddleLevel_To_LowLevel failed.");
+
+    errCode = VIR_Lower_MiddleLevel_To_LowLevel_Expand(shader, &pPassWorker->pCompilerParam->cfg.ctx, &context);
+    CHECK_ERROR(errCode, "VIR_Lower_MiddleLevel_To_LowLevel failed.");
+
+    errCode = VIR_Lower_MiddleLevel_To_LowLevel_Scalar(shader, &pPassWorker->pCompilerParam->cfg.ctx, &context);
+    CHECK_ERROR(errCode, "VIR_Lower_MiddleLevel_To_LowLevel failed.");
+
+    if (gcUseFullNewLinker(hwCfg->hwFeatureFlags.hasHalti2))
+    {
+        errCode = VIR_Lower_MiddleLevel_To_LowLevel_Machine(shader, &pPassWorker->pCompilerParam->cfg.ctx, &context);
         CHECK_ERROR(errCode, "VIR_Lower_MiddleLevel_To_LowLevel failed.");
     }
 
-    VIR_Shader_SetLevel(Shader, VIR_SHLEVEL_Pre_Low);
+    VIR_Shader_SetLevel(shader, VIR_SHLEVEL_Pre_Low);
 
-    if (gcSHADER_DumpCodeGenVerbose(Shader))
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(shader), VIR_Shader_GetId(shader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
-        VIR_Shader_Dump(gcvNULL, "After Lowered to LowLevel.", Shader, gcvTRUE);
+        VIR_Shader_Dump(gcvNULL, "After Lowered to LowLevel.", shader, gcvTRUE);
     }
 
     return errCode;

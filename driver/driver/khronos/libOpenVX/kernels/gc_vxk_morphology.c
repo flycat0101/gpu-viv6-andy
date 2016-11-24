@@ -35,6 +35,7 @@ vx_status _gcfVX_Morphology(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
@@ -110,6 +111,8 @@ vx_status _gcfVX_Morphology(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_
 
     kernelContext->params.evisNoInst = node->base.context->evisNoInst;
 
+    kernelContext->node = node;
+
     status = gcfVX_Kernel(kernelContext);
 
 #if gcdVX_OPTIMIZER
@@ -133,3 +136,4 @@ vx_status vxDilate3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t
 {
     return _gcfVX_Morphology(node, gcvVX_KERNEL_DILATE_3x3, src, dst, bordermode);
 }
+

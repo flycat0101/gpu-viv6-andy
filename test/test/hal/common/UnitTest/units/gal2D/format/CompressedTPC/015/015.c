@@ -429,7 +429,7 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
             t2d->runtime->hal,
             sFormat[i % gcmCOUNTOF(sFormat)],
             gcvLINEAR,
-            gcv2D_TSC_TPC_COMPRESSED,
+            gcv2D_TSC_TPC_COMPRESSED_V10,
             640, 640, &t2d->surf[i]));
 
         gcmONERROR(gco2D_SetGenericTarget(

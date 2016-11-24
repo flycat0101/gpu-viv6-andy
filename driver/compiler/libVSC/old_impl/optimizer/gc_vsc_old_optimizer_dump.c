@@ -253,6 +253,7 @@ gcSL_GetName(
     _print_name(gcSL_IN_POSITION, "#In_Position");
     _print_name(gcSL_IN_POINT_SIZE, "#In_PointSize");
     _print_name(gcSL_BOUNDING_BOX, "#BoundingBox");
+    _print_name(gcSL_LAST_FRAG_DATA, "#LastFragData");
     default:
         gcmASSERT((gctINT)Length > 0);
         break;
@@ -402,6 +403,7 @@ static gctINT
 _DumpRegister(
     IN gcSL_TYPE        Type,
     IN gcSL_FORMAT      Format,
+    IN gctUINT          PackedComponents,
     IN gctUINT16        Index,
     IN gcSL_INDEXED     Mode,
     IN gctINT           Indexed,
@@ -428,16 +430,16 @@ _DumpRegister(
         ".int",
         ".bool",
         ".uint",
-        ".int8",
-        ".uint8",
-        ".int16",
-        ".uint16",
-        ".int64",
-        ".uint64",
+        ".char",
+        ".uchar",
+        ".short",
+        ".ushort",
+        ".long",
+        ".ulong",
         ".snorm8",
         ".unorm8",
-        ".float16",
-        ".float64",
+        ".half",
+        ".double",
         ".snorm16",
         ".unorm16",
         ".invalid"
@@ -453,9 +455,19 @@ _DumpRegister(
     gcmVERIFY_OK(
         gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
                            "%s", type[Type]));
-    gcmVERIFY_OK(
-        gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
-                           "%s(%d", format[Format], gcmSL_INDEX_GET(Index, Index)));
+    if (PackedComponents > 1)
+    {
+        gcmVERIFY_OK(
+            gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
+                               "%s_P%d(%d", format[Format], PackedComponents,
+                               gcmSL_INDEX_GET(Index, Index)));
+    }
+    else
+    {
+        gcmVERIFY_OK(
+            gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
+                               "%s(%d", format[Format], gcmSL_INDEX_GET(Index, Index)));
+    }
 
     if (gcmSL_INDEX_GET(Index, ConstValue) > 0)
     {
@@ -532,8 +544,10 @@ _DumpSource(
     IN gctSIZE_T BufferSize
     )
 {
-    gctUINT   offset = 0;
-    gcSL_TYPE type   = gcmSL_SOURCE_GET(Source, Type);
+    gctUINT   offset     = 0;
+    gcSL_TYPE type       = (gcSL_TYPE)gcmSL_SOURCE_GET(Source, Type);
+    gctUINT   components = gcmSL_SOURCE_GET(Source, PackedComponents);
+
     /* Only process source operand if it is valid. */
     if (type != gcSL_NONE)
     {
@@ -587,6 +601,7 @@ _DumpSource(
             /* Decode the register. */
             offset += _DumpRegister(type,
                                     (gcSL_FORMAT) gcmSL_SOURCE_GET(Source, Format),
+                                    components,
                                     Index,
                                     (gcSL_INDEXED) gcmSL_SOURCE_GET(Source, Indexed),
                                     Indexed,
@@ -710,19 +725,19 @@ _DumpSourceTargetFormat(
         "int",
         "bool",
         "uint",
-        "int8",
-        "uint8",
-        "int16",
-        "uint16",
-        "int64",
-        "uint64",
+        "char",
+        "uchar",
+        "short",
+        "ushort",
+        "long",
+        "ulong",
         "snorm8",
         "unorm8",
-        "float16",
-        "float64",
+        "half",
+        "double",
         "snorm16",
         "unorm16",
-        "invalid",
+        "invalid"
     };
     gctUINT offset = 0;
     gctUINT32 value = Index | (Indexed << 16);
@@ -1136,6 +1151,9 @@ decode[] =
     { "GET_SAMPLER_LMM",gcvTRUE, gcvFALSE },
     { "GET_SAMPLER_LBS",gcvTRUE, gcvFALSE },
     { "TEXLD_U", gcvTRUE, gcvFALSE },
+    { "PARAM_CHAIN", gcvTRUE, gcvFALSE },
+    { "INTRINSIC", gcvTRUE, gcvFALSE },
+    { "INTRINSIC_ST", gcvTRUE, gcvFALSE },
 };
 
 char _checkDecodeArray_size[sizeof(decode)/sizeof(decode[0]) == gcSL_MAXOPCODE];
@@ -1238,9 +1256,11 @@ _DumpIR(
     /* Does the instruction specify a target? */
     if (decode[gcmSL_OPCODE_GET(code->opcode, Opcode)].hasTarget)
     {
+        gctUINT components = gcmSL_TARGET_GET(target, PackedComponents);
         /* Decode register. */
         offset += _DumpRegister(gcSL_TEMP,
                                 (gcSL_FORMAT) gcmSL_TARGET_GET(target, Format),
+                                components,
                                 code->tempIndex,
                                 (gcSL_INDEXED) gcmSL_TARGET_GET(target, Indexed),
                                 code->tempIndexed,
@@ -1329,12 +1349,34 @@ _DumpIR(
     }
 
     /* Append source operand 0. */
-    offset += _DumpSource(code->source0,
-                          code->source0Index,
-                          code->source0Indexed,
-                          offset > 24,
-                          buffer + offset, gcmSIZEOF(buffer) - offset);
+    if(gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_INTRINSIC ||
+       gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_INTRINSIC_ST)
+    {
+        gcSL_FORMAT fmt;
+        gctINT32 value = code->source0Index | (code->source0Indexed << 16);
 
+        gcmASSERT(gcmSL_SOURCE_GET(code->source0, Type) == gcSL_CONSTANT);
+        /* Assemble the 32-bit value. */
+        fmt = (gcSL_FORMAT) gcmSL_SOURCE_GET(code->source0, Format);
+
+        if (fmt != gcSL_INT32)
+        {
+            gcmASSERT(gcmSL_SOURCE_GET(code->source0, Format) == gcSL_INT32);
+
+        }
+
+        gcmVERIFY_OK(
+            gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
+                               ", %s", VIR_Intrinsic_GetName(value)));
+    }
+    else
+    {
+        offset += _DumpSource(code->source0,
+                              code->source0Index,
+                              code->source0Indexed,
+                              offset > 24,
+                              buffer + offset, gcmSIZEOF(buffer) - offset);
+    }
     /* Append source operand 1. */
     if(gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_CONV) {
        offset += _DumpSourceTargetFormat(code->source1,
@@ -1350,6 +1392,13 @@ _DumpIR(
                           offset > 24,
                           buffer + offset, gcmSIZEOF(buffer) - offset);
     }
+
+#if gcdCOMPILER_DEBUGOUTPUT
+    /* Append source loc */
+    gcmVERIFY_OK(
+            gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
+                               ", srcLoc(line = %d, col = %d)", GCSL_SRC_LOC_LINENO(code->srcLoc), GCSL_SRC_LOC_COLNO(code->srcLoc)));
+#endif
 
     /* Dump the instruction. */
     gcmVERIFY_OK(
@@ -1752,7 +1801,59 @@ gcDump_Shader(
     offset = 0;
     gcmVERIFY_OK(
         gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
-        "%s\n[SHADER (id:%d)]\n\n", dashLine, shader->_id));
+        "%s\n[", dashLine));
+    /* Dump the client API version. */
+
+    switch (shader->clientApiVersion)
+    {
+    case gcvAPI_D3D:
+        gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset, "D3D:");
+        break;
+
+    case gcvAPI_OPENGL_ES11:
+        gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset, "ES11:");
+        break;
+
+    case gcvAPI_OPENGL_ES20:
+        gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset, "ES20:");
+        break;
+
+    case gcvAPI_OPENGL_ES30:
+        gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset, "ES30:");
+        break;
+
+    case gcvAPI_OPENGL_ES31:
+        gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset, "ES31:");
+        break;
+
+    case gcvAPI_OPENGL_ES32:
+        gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset, "ES32:");
+        break;
+
+    case gcvAPI_OPENGL:
+        gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset, "GL:");
+        break;
+
+    case gcvAPI_OPENVG:
+        gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset, "VG:");
+        break;
+
+    case gcvAPI_OPENCL:
+        gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset, "CL:");
+        break;
+
+    case gcvAPI_OPENVK:
+        gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset, "VK:");
+        break;
+
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
+
+    gcmVERIFY_OK(
+        gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
+        "SHADER (id:%d)]\n\n", shader->_id));
     gcOpt_DumpBuffer(os, File, buffer, offset);
 
     /* Walk all attributes. */
@@ -2067,6 +2168,18 @@ gcDump_Shader(
                 gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
                                    " :location %d",
                                    GetUniformLayoutLocation(uniform)));
+
+            /* Dump the binding. */
+            gcmVERIFY_OK(
+                gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
+                                   " :binding %d",
+                                   GetUniformBinding(uniform)));
+
+            /* Dump the binding. */
+            gcmVERIFY_OK(
+                gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
+                                   " :parent %d",
+                                   GetUniformParent(uniform)));
 
             /* dump the flags */
             gcmVERIFY_OK(gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,

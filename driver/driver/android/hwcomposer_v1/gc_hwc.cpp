@@ -219,6 +219,7 @@ hwc_device_open(
         gcoHAL_Construct(gcvNULL, context->os, &context->hal));
 
     /* Query chip info */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_CHIP_INFO;
 
     gcmONERROR(gcoOS_DeviceControl(gcvNULL,

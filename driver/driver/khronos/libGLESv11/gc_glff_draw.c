@@ -201,7 +201,7 @@ static gceSTATUS _LogicOpPreProcess(
         gcmERR_BREAK(gcoSURF_GetSamples(Context->draw, &samples));
 
         /* Disable tile status on the render target. */
-        gcmERR_BREAK(gcoSURF_DisableTileStatus(Context->draw, gcvTRUE));
+        gcmERR_BREAK(gcoSURF_DisableTileStatus(&drawView, gcvTRUE));
 
         /* Create a linear buffer of the same size and format as frame buffer. */
         gcmERR_BREAK(gcoSURF_Construct(
@@ -238,8 +238,10 @@ static gceSTATUS _LogicOpPreProcess(
             samples
             ));
 
+        tmpView.surf = Context->tempDraw;
+
         /* Program the PE with the temporary frame buffer. */
-        gcmERR_BREAK(gco3D_SetTarget(Context->hw, 0, Context->tempDraw, 0, 0));
+        gcmERR_BREAK(gco3D_SetTarget(Context->hw, 0, &tmpView, 0));
 
         /* Clear the temporary frame buffer with an ugly background color. */
         gcmERR_BREAK(gco3D_SetClearColor(
@@ -263,7 +265,6 @@ static gceSTATUS _LogicOpPreProcess(
                                 ((gctUINT8)Context->colorMask[3] << 3);
         clearArgs.flags = gcvCLEAR_COLOR;
 
-        tmpView.surf = Context->tempDraw;
         gcmERR_BREAK(gcoSURF_Clear(&tmpView, &clearArgs));
     }
     while (gcvFALSE);
@@ -357,11 +358,11 @@ static gceSTATUS _LogicOpPostProcess(
             ));
 
         /* Reprogram the PE. */
-        gcmONERROR(gco3D_SetTarget(Context->hw, 0, Context->draw, 0, 0));
+        gcmONERROR(gco3D_SetTarget(Context->hw, 0, &drawView, 0));
 
         /* Disable tile status on the render target. */
         gcmONERROR(
-            gcoSURF_DisableTileStatus(Context->draw, gcvFALSE));
+            gcoSURF_DisableTileStatus(&drawView, gcvFALSE));
     }
     while (gcvFALSE);
 
@@ -403,6 +404,50 @@ OnError:
 **      HalPrimitive
 **          Primitive type for HAL.
 */
+static gceSTATUS
+glfGetPrimitiveCount(
+    IN gcePRIMITIVE PrimitiveMode,
+    IN gctINT VertexCount,
+    OUT gctINT * PrimitiveCount
+    )
+{
+    gceSTATUS result = gcvSTATUS_OK;
+
+    /* Translate primitive count. */
+    switch (PrimitiveMode)
+    {
+    case gcvPRIMITIVE_POINT_LIST:
+        *PrimitiveCount = VertexCount;
+        break;
+
+    case gcvPRIMITIVE_LINE_LIST:
+        *PrimitiveCount = VertexCount / 2;
+        break;
+
+    case gcvPRIMITIVE_LINE_LOOP:
+        *PrimitiveCount = VertexCount;
+        break;
+
+    case gcvPRIMITIVE_LINE_STRIP:
+        *PrimitiveCount = VertexCount - 1;
+        break;
+
+    case gcvPRIMITIVE_TRIANGLE_LIST:
+        *PrimitiveCount = VertexCount / 3;
+        break;
+
+    case gcvPRIMITIVE_TRIANGLE_STRIP:
+    case gcvPRIMITIVE_TRIANGLE_FAN:
+        *PrimitiveCount = VertexCount - 2;
+        break;
+
+    default:
+        result = gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    /* Return result. */
+    return result;
+}
 
 static GLboolean _GetPrimitiveCount(
     IN GLenum PrimitiveMode,
@@ -558,30 +603,18 @@ static GLboolean _InvalidPalette(
     return GL_FALSE;
 }
 
-static gceSTATUS _VertexArray(
+__GL_INLINE gceSTATUS
+_computeAttribMask(
     IN glsCONTEXT_PTR Context,
-    IN GLint First,
-    IN GLsizei * Count,
-    IN gceINDEX_TYPE IndexType,
-    IN gcoINDEX IndexBuffer,
-    IN const void * Indices,
-    IN OUT gcePRIMITIVE * PrimitiveType,
-    IN OUT gctBOOL * SpilitDraw,
-    IN OUT gctSIZE_T * SpilitCount,
-    IN OUT gcePRIMITIVE * SpilitPrimitiveType,
-    IN OUT gctUINT * PrimitiveCount
+    OUT gctUINT* AttribMask
     )
 {
+    gceSTATUS status = gcvSTATUS_OK;
     gctUINT i, count;
-    gctUINT enableBits = 0;
-    gcoINDEX index;
-    gceSTATUS status;
     gctUINT attr = 0, j;
-    gctSIZE_T vertexCount = *Count;
+    gctUINT enableBits = 0;
 
     gcmHEADER();
-
-    index = IndexBuffer;
 
     /* Get number of attributes for the vertex shader. */
     gcmONERROR(gcSHADER_GetAttributeCount(Context->currProgram->vs.shader,
@@ -633,13 +666,44 @@ static gceSTATUS _VertexArray(
         }
     }
 
+    *AttribMask = enableBits;
+
+    gcmFOOTER();
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS _VertexArray(
+    IN glsCONTEXT_PTR Context,
+    IN GLint First,
+    IN GLsizei * Count,
+    IN gceINDEX_TYPE IndexType,
+    IN gcoINDEX IndexBuffer,
+    IN const void * Indices,
+    IN OUT gcePRIMITIVE * PrimitiveType,
+    IN OUT gctUINT * PrimitiveCount
+    )
+{
+    gctUINT enableBits = 0;
+    gcoINDEX index;
+    gceSTATUS status;
+    gctSIZE_T vertexCount = *Count;
+
+    gcmHEADER();
+
+    index = IndexBuffer;
+
+    gcmONERROR(_computeAttribMask(Context, &enableBits));
+
     /* Bind the vertex array to the hardware. */
     gcmONERROR(gcoVERTEXARRAY_Bind(Context->vertexArray,
                                    enableBits, Context->attributeArray,
                                    First, &vertexCount,
                                    IndexType, index, (gctPOINTER) Indices,
                                    PrimitiveType,
-                                   SpilitDraw, SpilitCount, SpilitPrimitiveType,
                                    PrimitiveCount,
                                    gcvNULL,
                                    gcvNULL));
@@ -1303,6 +1367,635 @@ void _fixWlimit(
 /******************************************************************************\
 ************************* OpenGL Primitive Drawing Code ************************
 \******************************************************************************/
+gceSTATUS
+glfDrawArrays(
+    glsCONTEXT_PTR Context,
+    glsINSTANT_DRAW_PTR instantDraw
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctBOOL lineLoopPatch = gcvFALSE;
+    gctBOOL instanceDraw = gcvFALSE;
+    gctINT i = 0;
+
+    gcmHEADER();
+
+    /* Test for line loop patch. */
+    lineLoopPatch = (instantDraw->primMode == gcvPRIMITIVE_LINE_LOOP) && !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_LINE_LOOP);
+
+    /* Setup the vertex array. */
+    gcmONERROR(_VertexArray(Context,
+                            instantDraw->first,
+                            &instantDraw->count,
+                            gcvINDEX_8, gcvNULL, gcvNULL,
+                            &instantDraw->primMode,
+                            (gctUINT *)(&instantDraw->primCount)));
+
+    instanceDraw = gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_HALTI5);
+
+    /* LOGICOP enabled? */
+    if (Context->logicOp.perform)
+    {
+        /* In LOGICOP we have to do one primitive at a time. */
+        for (i = 0; i < instantDraw->primCount ; i++)
+        {
+            /* Create temporary target as destination. */
+            gcmONERROR(_LogicOpPreProcess(Context));
+
+            if (lineLoopPatch)
+            {
+                if (instanceDraw)
+                {
+                    /* Draw the primitives. */
+                    gcmONERROR(gco3D_DrawInstancedPrimitives(Context->hw,
+                                                             gcvPRIMITIVE_LINE_STRIP,
+                                                             gcvTRUE, i, 0, 1, 2,
+                                                             1
+                                                             ));
+                }
+                else
+                {
+                    /* Draw the primitives. */
+                    gcmONERROR(gco3D_DrawIndexedPrimitives(Context->hw,
+                                                           gcvPRIMITIVE_LINE_STRIP,
+                                                           0, i, 1
+                                                           ));
+                }
+            }
+            else
+            {
+                if (instanceDraw)
+                {
+                    /* Draw the primitives. */
+                    gcmONERROR(gco3D_DrawInstancedPrimitives(Context->hw,
+                                                             instantDraw->primMode,
+                                                             gcvFALSE, instantDraw->first + i, 0, 1, 3, /* Point,line,triangle all send count = 3 */
+                                                             1
+                                                             ));
+                }
+                else
+                {
+                    /* Draw the primitives. */
+                    gcmONERROR(gco3D_DrawPrimitives(Context->hw,
+                                                    instantDraw->primMode,
+                                                    instantDraw->first + i, 1
+                                                    ));
+                }
+            }
+
+            /* Run the post processing pass. */
+            gcmONERROR(_LogicOpPostProcess(Context));
+        }
+    }
+    else
+    {
+        if (lineLoopPatch)
+        {
+            if (instanceDraw)
+            {
+                /* Draw the primitives. */
+                gcmONERROR(gco3D_DrawInstancedPrimitives(Context->hw,
+                                                         gcvPRIMITIVE_LINE_STRIP,
+                                                         gcvTRUE, 0, 0, instantDraw->primCount, instantDraw->count,
+                                                         1
+                                                         ));
+            }
+            else
+            {
+                /* Draw the primitives. */
+                gcmONERROR(gco3D_DrawIndexedPrimitives(Context->hw,
+                                                       gcvPRIMITIVE_LINE_STRIP,
+                                                       0, 0, instantDraw->primCount
+                                                       ));
+            }
+        }
+        else
+        {
+            if (instanceDraw)
+            {
+                /* Draw the primitives. */
+                gcmONERROR(gco3D_DrawInstancedPrimitives(Context->hw,
+                                                         instantDraw->primMode,
+                                                         gcvFALSE, instantDraw->first, 0, instantDraw->primCount, instantDraw->count,
+                                                         1
+                                                         ));
+            }
+            else
+            {
+                /* Draw the primitives. */
+                gcmONERROR(gco3D_DrawPrimitives(Context->hw,
+                                                instantDraw->primMode,
+                                                instantDraw->first, instantDraw->primCount
+                                                ));
+            }
+        }
+    }
+
+    gcmFOOTER();
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+glfCollectSplitDrawArraysInfo(
+    IN glsCONTEXT_PTR Context,
+    IN glsINSTANT_DRAW_PTR instantDraw,
+    IN OUT gcsSPLIT_DRAW_INFO_PTR splitDrawInfo
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    /* Fake line loop path, converte triangle list can move the this level.
+    ** now, there is no split draw path for draw array.*/
+    return status;
+}
+
+#define SPILIT_INDEX_OFFSET       48
+#define SPILIT_INDEX_CHUNCK_BYTE  64
+
+gceSTATUS
+glfSplitIndexFetch(
+    IN glsINSTANT_DRAW_PTR instantDraw,
+    IN OUT gcsSPLIT_DRAW_INFO_PTR splitDrawInfo
+    )
+{
+    gceSTATUS status = gcvSTATUS_TRUE;
+    gctUINT32 address = 0, tempAddress;
+    gctUINT32 indexSize = 0;
+    gctUINT32 spilitIndexMod;
+    gctSIZE_T cutCount = 0;
+
+    gcmHEADER();
+
+    gcmASSERT(instantDraw->indexBuffer != gcvNULL);
+
+    gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+    gcmONERROR(gcoINDEX_Lock(instantDraw->indexBuffer, &address, gcvNULL));
+    /* Add offset */
+    address += gcmPTR2INT32(instantDraw->indexMemory);
+    /* Unlock the bufobj buffer. */
+    gcmONERROR(gcoINDEX_Unlock(instantDraw->indexBuffer));
+
+    if (instantDraw->primMode == gcvPRIMITIVE_TRIANGLE_LIST)
+    {
+        cutCount = instantDraw->count % 3;
+    }
+    else if (instantDraw->primMode == gcvPRIMITIVE_LINE_LIST)
+    {
+        cutCount = instantDraw->count % 2;
+    }
+
+    /* compute the last index address.*/
+    tempAddress = address + (gctUINT32)(instantDraw->count-cutCount-1) * indexSize;
+    spilitIndexMod = tempAddress % SPILIT_INDEX_CHUNCK_BYTE;
+
+    if (spilitIndexMod >= SPILIT_INDEX_OFFSET)
+    {
+        gcmFOOTER();
+        return gcvSTATUS_FALSE;
+    }
+
+    /* Get primMode and split count.*/
+    switch (instantDraw->primMode)
+    {
+        case gcvPRIMITIVE_POINT_LIST:
+        case gcvPRIMITIVE_LINE_STRIP:
+        case gcvPRIMITIVE_TRIANGLE_STRIP:
+        case gcvPRIMITIVE_TRIANGLE_FAN:
+            splitDrawInfo->u.info_index_fetch.splitCount = spilitIndexMod /indexSize +1;
+            break;
+        case gcvPRIMITIVE_LINE_LOOP:
+            splitDrawInfo->u.info_index_fetch.splitCount = spilitIndexMod /indexSize +1;
+            break;
+        case gcvPRIMITIVE_TRIANGLE_LIST:
+            splitDrawInfo->u.info_index_fetch.splitCount = ((spilitIndexMod /(indexSize*3))+1)*3 + cutCount;
+            break;
+        case gcvPRIMITIVE_LINE_LIST:
+            splitDrawInfo->u.info_index_fetch.splitCount = ((spilitIndexMod /(indexSize*2))+1)*2 + cutCount;
+            break;
+        default:
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    gcmFOOTER();
+    return gcvSTATUS_TRUE;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+glfCopySpilitIndex(
+    IN glsINSTANT_DRAW_PTR instantDraw,
+    IN OUT gcsSPLIT_DRAW_INFO_PTR splitDrawInfo,
+    IN OUT gctPOINTER * Buffer
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctPOINTER indexBase = gcvNULL;
+    gctPOINTER tempIndices = gcvNULL;
+    gctPOINTER indexMemory = gcvNULL;
+    gctSIZE_T count, primCount, i, j, bytes;
+    gctSIZE_T indexSize = 0;
+    gctSIZE_T offset = 0;
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
+
+    gcmHEADER();
+
+    gcmGET_INDEX_SIZE(instantDraw->indexType, indexSize);
+    offset = (instantDraw->count - splitDrawInfo->u.info_index_fetch.splitCount) * indexSize;
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
+
+    /* Lock the index buffer. */
+#if gcdSYNC
+    if (patchId == gcvPATCH_GTFES30)
+    {
+        gcoINDEX_WaitFence(instantDraw->indexBuffer, gcvFENCE_TYPE_WRITE);
+    }
+#endif
+    gcmONERROR(gcoINDEX_Lock(instantDraw->indexBuffer, gcvNULL, &indexBase));
+    indexBase = (gctUINT8_PTR)indexBase + gcmPTR2INT32(instantDraw->indexMemory);
+    gcmONERROR(gcoINDEX_Unlock(instantDraw->indexBuffer));
+    bytes = splitDrawInfo->u.info_index_fetch.splitCount * indexSize;
+
+    splitDrawInfo->u.info_index_fetch.splitPrimMode = instantDraw->primMode;
+
+    switch (instantDraw->primMode)
+    {
+    case gcvPRIMITIVE_POINT_LIST:
+    case gcvPRIMITIVE_LINE_LIST:
+    case gcvPRIMITIVE_TRIANGLE_LIST:
+        {
+            indexMemory = (gctUINT8_PTR)indexBase + offset;
+
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      bytes,
+                                      &tempIndices));
+            gcoOS_MemCopy(tempIndices , indexMemory, bytes);
+        }
+        break;
+    case gcvPRIMITIVE_LINE_STRIP:
+        {
+            indexMemory = (gctUINT8_PTR)indexBase + offset - indexSize;
+            bytes += indexSize;
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      bytes,
+                                      &tempIndices));
+            /* line strip need copy the last data */
+            gcoOS_MemCopy(tempIndices , indexMemory, bytes);
+        }
+        break;
+    case gcvPRIMITIVE_LINE_LOOP:
+        {
+            indexMemory = (gctUINT8_PTR)indexBase + offset - indexSize;
+            bytes += 2 * indexSize;
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      bytes,
+                                      &tempIndices));
+
+            /* line loop need copy the last data and the first data */
+            gcoOS_MemCopy(tempIndices , indexMemory, bytes - indexSize);
+            gcoOS_MemCopy((gctUINT8_PTR)tempIndices + bytes - indexSize, indexBase, indexSize);
+            splitDrawInfo->u.info_index_fetch.splitPrimMode = gcvPRIMITIVE_LINE_STRIP;
+        }
+        break;
+    case gcvPRIMITIVE_TRIANGLE_STRIP:
+        {
+            primCount = bytes / indexSize;
+            bytes = 3 * primCount * indexSize;
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      bytes,
+                                      &tempIndices));
+            count = offset / indexSize;
+            switch (instantDraw->indexType)
+            {
+            case gcvINDEX_8:
+                {
+                    gctUINT8_PTR src = (gctUINT8_PTR)indexBase;
+                    gctUINT8_PTR dst = (gctUINT8_PTR)tempIndices;
+                    for(i = 0, j = count - 2; i < primCount; i++, j++)
+                    {
+                        dst[i * 3]     = src[(j % 2) == 0? j : j + 1];
+                        dst[i * 3 + 1] = src[(j % 2) == 0? j + 1 : j];
+                        dst[i * 3 + 2] = src[j + 2];
+                    }
+                }
+                break;
+            case gcvINDEX_16:
+                {
+                    gctUINT16_PTR src = (gctUINT16_PTR)indexBase;
+                    gctUINT16_PTR dst = (gctUINT16_PTR)tempIndices;
+                    for(i = 0, j = count - 2; i < primCount; i++, j++)
+                    {
+                        dst[i * 3]     = src[(j % 2) == 0? j : j + 1];
+                        dst[i * 3 + 1] = src[(j % 2) == 0? j + 1 : j];
+                        dst[i * 3 + 2] = src[j + 2];
+                    }
+                }
+                break;
+            case gcvINDEX_32:
+                {
+                    gctUINT32_PTR src = (gctUINT32_PTR)indexBase;
+                    gctUINT32_PTR dst = (gctUINT32_PTR)tempIndices;
+                    for(i = 0, j = count - 2; i < primCount; i++, j++)
+                    {
+                        dst[i * 3]     = src[(j % 2) == 0? j : j + 1];
+                        dst[i * 3 + 1] = src[(j % 2) == 0? j + 1 : j];
+                        dst[i * 3 + 2] = src[j + 2];
+                    }
+                }
+                break;
+            default:
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
+            splitDrawInfo->u.info_index_fetch.splitPrimMode = gcvPRIMITIVE_TRIANGLE_LIST;
+        }
+        break;
+    case gcvPRIMITIVE_TRIANGLE_FAN:
+        {
+            indexMemory = (gctUINT8_PTR)indexBase + offset - indexSize;
+            bytes += 2 * indexSize;
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                      bytes,
+                                      &tempIndices));
+
+            /* trianglefan need copy the first data */
+            gcoOS_MemCopy(tempIndices , indexBase, indexSize);
+            gcoOS_MemCopy((gctUINT8_PTR)tempIndices + indexSize, indexMemory, bytes - indexSize);
+        }
+        break;
+    default:
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    splitDrawInfo->u.info_index_fetch.splitCount = bytes / indexSize;
+
+    /* Translate primitive count. */
+    switch (splitDrawInfo->u.info_index_fetch.splitPrimMode)
+    {
+    case gcvPRIMITIVE_POINT_LIST:
+        splitDrawInfo->u.info_index_fetch.splitPrimCount = splitDrawInfo->u.info_index_fetch.splitCount;
+        break;
+
+    case gcvPRIMITIVE_LINE_LIST:
+        splitDrawInfo->u.info_index_fetch.splitPrimCount = splitDrawInfo->u.info_index_fetch.splitCount / 2;
+        break;
+
+    case gcvPRIMITIVE_LINE_LOOP:
+        splitDrawInfo->u.info_index_fetch.splitPrimCount = splitDrawInfo->u.info_index_fetch.splitCount;
+        break;
+
+    case gcvPRIMITIVE_LINE_STRIP:
+        splitDrawInfo->u.info_index_fetch.splitPrimCount = splitDrawInfo->u.info_index_fetch.splitCount - 1;
+        break;
+
+    case gcvPRIMITIVE_TRIANGLE_LIST:
+        splitDrawInfo->u.info_index_fetch.splitPrimCount = splitDrawInfo->u.info_index_fetch.splitCount / 3;
+        break;
+
+    case gcvPRIMITIVE_TRIANGLE_STRIP:
+    case gcvPRIMITIVE_TRIANGLE_FAN:
+        splitDrawInfo->u.info_index_fetch.splitPrimCount = splitDrawInfo->u.info_index_fetch.splitCount - 2;
+        break;
+
+    default:
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    *Buffer = tempIndices;
+
+OnError:
+
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+#define gcmES11_COLLECT_STREAM_INFO(streamInfo, instantDraw) \
+    streamInfo.attribMask = instantDraw->attribMask; \
+    streamInfo.u.es11.attributes = instantDraw->attributes; \
+    streamInfo.first = instantDraw->first; \
+    streamInfo.count = instantDraw->count; \
+    streamInfo.instanced = gcvFALSE; \
+    streamInfo.instanceCount = 1; \
+    streamInfo.primMode = instantDraw->primMode; \
+    streamInfo.primCount = instantDraw->primCount
+
+#define gcmES11_COLLECT_INDEX_INFO(indexInfo, instantDraw) \
+    indexInfo.count = instantDraw->count; \
+    indexInfo.indexType = instantDraw->indexType; \
+    indexInfo.u.es11.indexBuffer = instantDraw->indexBuffer; \
+    indexInfo.indexMemory = instantDraw->indexMemory
+
+gceSTATUS
+glfSplitDrawIndexFetch(
+    IN gctPOINTER Context,
+    IN gctPOINTER InstantDraw,
+    IN gctPOINTER SplitDrawInfo
+    )
+{
+    gceSTATUS status                     = gcvSTATUS_OK;
+    glsCONTEXT_PTR context               = (glsCONTEXT_PTR)(Context);
+    glsINSTANT_DRAW_PTR instantDraw      = (glsINSTANT_DRAW_PTR)(InstantDraw);
+    gcsSPLIT_DRAW_INFO_PTR splitDrawInfo = (gcsSPLIT_DRAW_INFO_PTR)(SplitDrawInfo);
+
+    gcePATCH_ID patchId = gcvPATCH_INVALID;
+    gctPOINTER splitIndexMemory = gcvNULL;
+    gctBOOL bAllocate = gcvFALSE;
+    glsINSTANT_DRAW tmpInstantDraw;
+    gctBOOL instanceDraw = gcvFALSE;
+    gcsVERTEXARRAY_STREAM_INFO streamInfo;
+    gcsVERTEXARRAY_INDEX_INFO  indexInfo;
+
+    gcmHEADER();
+
+    gcmONERROR(_computeAttribMask(context, &instantDraw->attribMask));
+    instantDraw->attributes = context->attributeArray;
+    /* Stream data not change, only need bind once.*/
+    /* Collect info for hal level.*/
+    gcmES11_COLLECT_STREAM_INFO(streamInfo, instantDraw);
+    gcmES11_COLLECT_INDEX_INFO(indexInfo, instantDraw);
+
+#if gcdUSE_WCLIP_PATCH
+    gcmONERROR(gcoVERTEXARRAY_StreamBind_Ex(context->vertexArray,
+                                            gcvNULL,
+                                            gcvNULL,
+                                            &streamInfo,
+                                            &indexInfo));
+#else
+    gcmONERROR(gcoVERTEXARRAY_StreamBind_Ex(chipCtx->vertexArray,
+                                            &streamInfo,
+                                            &indexInfo));
+#endif
+
+    /************************************************************************************
+    **              first draw
+    ************************************************************************************/
+    gcoOS_MemCopy(&tmpInstantDraw, instantDraw, sizeof(glsINSTANT_DRAW));
+    /* es11 driver will update streaminfo.*/
+    tmpInstantDraw.primMode = streamInfo.primMode;
+    tmpInstantDraw.primCount = (gctINT)streamInfo.primCount;
+
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
+
+#if gcdSYNC
+    if (patchId == gcvPATCH_GTFES30)
+    {
+        gcoINDEX_WaitFence(instantDraw->indexBuffer, gcvFENCE_TYPE_WRITE);
+    }
+#endif
+    if ((gctUINT)instantDraw->count <= splitDrawInfo->u.info_index_fetch.splitCount)
+    {
+        tmpInstantDraw.count = 0;
+    }
+    else
+    {
+        tmpInstantDraw.count = instantDraw->count - (gctINT)splitDrawInfo->u.info_index_fetch.splitCount;
+        if (instantDraw->primMode == gcvPRIMITIVE_LINE_LOOP)
+        {
+            tmpInstantDraw.primMode = gcvPRIMITIVE_LINE_STRIP;
+        }
+    }
+
+    instanceDraw = gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_HALTI5);
+
+    if (tmpInstantDraw.count > 0)
+    {
+        /* Update index */
+        indexInfo.count = tmpInstantDraw.count;
+        gcmONERROR(gcoVERTEXARRAY_IndexBind_Ex(context->vertexArray,
+                                               &streamInfo,
+                                               &indexInfo));
+
+        if (instanceDraw)
+        {
+            /* Draw */
+            gcmONERROR(gco3D_DrawInstancedPrimitives(context->hw,
+                                                    tmpInstantDraw.primMode,
+                                                    gcvTRUE,
+                                                    tmpInstantDraw.first,
+                                                    0,
+                                                    tmpInstantDraw.primCount,
+                                                    tmpInstantDraw.count,
+                                                    1));
+        }
+        else
+        {
+            /* For es11, non instance draw need update primCount.*/
+            gcmONERROR(glfGetPrimitiveCount(tmpInstantDraw.primMode, tmpInstantDraw.count, &tmpInstantDraw.primCount));
+            /* Draw the primitives. */
+            gcmONERROR(gco3D_DrawIndexedPrimitives(context->hw,
+                                                   tmpInstantDraw.primMode,
+                                                   0,
+                                                   0,
+                                                   tmpInstantDraw.primCount
+                                                   ));
+        }
+    }
+
+    /************************************************************************************
+    **              second draw
+    ************************************************************************************/
+    gcoOS_MemCopy(&tmpInstantDraw, instantDraw, sizeof(glsINSTANT_DRAW));
+    /* es11 driver will update streaminfo.*/
+    tmpInstantDraw.primMode = streamInfo.primMode;
+    tmpInstantDraw.primCount = (gctINT)streamInfo.primCount;
+
+    if ((gctUINT)instantDraw->count <= splitDrawInfo->u.info_index_fetch.splitCount)
+    {
+        /* Already lock when collect info.*/
+        gcmONERROR(gcoINDEX_Lock(instantDraw->indexBuffer, gcvNULL, &splitIndexMemory));
+        splitIndexMemory =(gctUINT8_PTR)splitIndexMemory + gcmPTR2INT32(instantDraw->indexMemory);
+        gcmONERROR(gcoINDEX_Unlock(instantDraw->indexBuffer));
+        tmpInstantDraw.count = instantDraw->count;
+    }
+    else
+    {
+        gcmONERROR(glfCopySpilitIndex(&tmpInstantDraw,
+                                      splitDrawInfo,
+                                      &splitIndexMemory));
+        bAllocate = gcvTRUE;
+        tmpInstantDraw.count = (gctINT)splitDrawInfo->u.info_index_fetch.splitCount;
+        tmpInstantDraw.primMode = splitDrawInfo->u.info_index_fetch.splitPrimMode;
+        tmpInstantDraw.primCount = (gctINT)splitDrawInfo->u.info_index_fetch.splitPrimCount;
+    }
+    /* set tmpInstantDraw.*/
+    tmpInstantDraw.indexMemory = splitIndexMemory;
+    tmpInstantDraw.indexBuffer = gcvNULL;
+
+    /* Update index */
+    indexInfo.count = tmpInstantDraw.count;
+    indexInfo.indexMemory = tmpInstantDraw.indexMemory;
+    indexInfo.u.es11.indexBuffer = tmpInstantDraw.indexBuffer;
+    gcmONERROR(gcoVERTEXARRAY_IndexBind_Ex(context->vertexArray,
+                                           &streamInfo,
+                                           &indexInfo));
+
+    /* Draw */
+    if (instanceDraw)
+    {
+        /* Draw */
+        gcmONERROR(gco3D_DrawInstancedPrimitives(context->hw,
+                                                tmpInstantDraw.primMode,
+                                                gcvTRUE,
+                                                tmpInstantDraw.first,
+                                                0,
+                                                tmpInstantDraw.primCount,
+                                                tmpInstantDraw.count,
+                                                1));
+    }
+    else
+    {
+        /* Draw the primitives. */
+        gcmONERROR(gco3D_DrawIndexedPrimitives(context->hw,
+                                               tmpInstantDraw.primMode,
+                                               0,
+                                               0,
+                                               tmpInstantDraw.primCount
+                                               ));
+    }
+
+
+OnError:
+    if (bAllocate && splitIndexMemory != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(context->os, splitIndexMemory);
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+glfCollectSplitDrawElementInfo(
+    IN glsCONTEXT_PTR Context,
+    IN glsINSTANT_DRAW_PTR instantDraw,
+    IN OUT gcsSPLIT_DRAW_INFO_PTR splitDrawInfo
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER();
+
+    if ((gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_INDEX_FETCH_FIX) != gcvSTATUS_TRUE)
+    &&  instantDraw->indexBuffer != gcvNULL
+    &&  (gcvSTATUS_TRUE == glfSplitIndexFetch(instantDraw, splitDrawInfo))
+    )
+    {
+        splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_INDEX_FETCH;
+        splitDrawInfo->splitDrawFunc = glfSplitDrawIndexFetch;
+
+        gcmFOOTER();
+        return gcvSTATUS_OK;
+    }
+
+    gcmFOOTER();
+    return status;
+}
 
 /*******************************************************************************
 **
@@ -1349,11 +2042,10 @@ GL_API void GL_APIENTRY glDrawArrays(
     GLsizei Count
     )
 {
-    gceSTATUS status = gcvSTATUS_OK;
-    GLsizei count = Count;
-    GLboolean lineLoopPatch;
+    gceSTATUS status          = gcvSTATUS_OK;
     GLboolean flippedTextures = GL_FALSE;
-    GLboolean instanceDraw = GL_FALSE;
+    glsINSTANT_DRAW instantDraw;
+    gcsSPLIT_DRAW_INFO splitDrawInfo;
 
     glmENTER3(glmARGENUM, Mode, glmARGINT, First, glmARGINT, Count)
     {
@@ -1361,11 +2053,13 @@ GL_API void GL_APIENTRY glDrawArrays(
         glmPROFILE(context, GLES1_DRAWARRAYS, 0);
         _glffProfiler(&context->profiler, GL1_PROFILER_DRAW_BEGIN, 0);
 #endif
+        glmPROFILE(context, GLES1_DRAWARRAYS, 0);
+        if (context->profiler.enable)
+        {
+            _glffProfiler_NEW_Set(context, GL1_PROFILER_DRAW_BEGIN, 0);
+        }
         do
         {
-            GLsizei i, primitiveCount;
-            gcePRIMITIVE halPrimitive = gcvPRIMITIVE_POINT_LIST;
-
 #if gcdDUMP_API
             gcmDUMP_API("${ES11 glDrawArrays 0x%08X 0x%08X 0x%08X",
                         Mode, First, Count);
@@ -1410,18 +2104,24 @@ GL_API void GL_APIENTRY glDrawArrays(
                 break;
             }
 
+            /* init instantDraw.*/
+            gcoOS_ZeroMemory(&instantDraw, gcmSIZEOF(glsINSTANT_DRAW));
+            instantDraw.first = First;
+            instantDraw.count = Count;
+            instantDraw.primMode = gcvPRIMITIVE_POINT_LIST;
+
             /* Validate mode and determine the number of primitives. */
             if (!_GetPrimitiveCount(Mode,
                                     Count,
-                                    &primitiveCount,
-                                    &halPrimitive))
+                                    (GLsizei*) &instantDraw.primCount,
+                                    &instantDraw.primMode))
             {
                 glmERROR(GL_INVALID_ENUM);
                 break;
             }
 
             /* Don't do anything if primitive count is invalid. */
-            if ((primitiveCount <= 0)
+            if ((instantDraw.primCount <= 0)
                 /* Or primitive is fully culled. */
             ||  _IsFullCulled(context, Mode)
                 /* Or matrix palette is invalid. */
@@ -1432,8 +2132,8 @@ GL_API void GL_APIENTRY glDrawArrays(
             }
 
             /* Count the primitives. */
-            glmPROFILE(context, GL1_PROFILER_PRIMITIVE_TYPE,  (gctUINTPTR_T)halPrimitive);
-            glmPROFILE(context, GL1_PROFILER_PRIMITIVE_COUNT, (gctUINTPTR_T)primitiveCount);
+            glmPROFILE(context, GL1_PROFILER_PRIMITIVE_TYPE,  (gctUINTPTR_T)instantDraw.primMode);
+            glmPROFILE(context, GL1_PROFILER_PRIMITIVE_COUNT, (gctUINTPTR_T)instantDraw.primCount);
 
             /* Update stencil states. */
             gcmERR_BREAK(glfUpdateStencil(context));
@@ -1489,127 +2189,18 @@ GL_API void GL_APIENTRY glDrawArrays(
             /* Load texture states. */
             gcmERR_BREAK(glfLoadTexture(context));
 
-            /* Setup the vertex array. */
-            gcmERR_BREAK(_VertexArray(context,
-                                      First, &count,
-                                      gcvINDEX_8, gcvNULL, gcvNULL,
-                                      &halPrimitive,
-                                      gcvNULL, gcvNULL, gcvNULL,
-                                      (gctUINT *)(&primitiveCount)));
+            /* Collect split draw info.*/
+            gcoOS_ZeroMemory(&splitDrawInfo, sizeof(gcsSPLIT_DRAW_INFO));
+            gcmERR_BREAK(glfCollectSplitDrawArraysInfo(context, &instantDraw, &splitDrawInfo));
 
-            /* Test for line loop patch. */
-            lineLoopPatch = (Mode == GL_LINE_LOOP)
-                         && (halPrimitive != gcvPRIMITIVE_LINE_LOOP);
-
-            instanceDraw = gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_HALTI5);
-
-            /* LOGICOP enabled? */
-            if (context->logicOp.perform)
+            if (splitDrawInfo.splitDrawType != gcvSPLIT_DRAW_UNKNOWN)
             {
-                /* In LOGICOP we have to do one primitive at a time. */
-                for (i = 0; i < primitiveCount; i++)
-                {
-                    /* Create temporary target as destination. */
-                    gcmERR_BREAK(_LogicOpPreProcess(context));
-
-                    if (lineLoopPatch)
-                    {
-                        if (instanceDraw)
-                        {
-                            /* Draw the primitives. */
-                            gcmERR_BREAK(gco3D_DrawInstancedPrimitives(
-                                context->hw,
-                                gcvPRIMITIVE_LINE_STRIP,
-                                gcvTRUE, i, 0, 1, 2,
-                                gcvFALSE, 0, 0, 1
-                               ));
-                        }
-                        else
-                        {
-                            /* Draw the primitives. */
-                            gcmERR_BREAK(gco3D_DrawIndexedPrimitives(
-                                context->hw,
-                                gcvPRIMITIVE_LINE_STRIP,
-                                0, i, 1,
-                                gcvFALSE, 0, 0
-                               ));
-                        }
-                    }
-                    else
-                    {
-                        if (instanceDraw)
-                        {
-                            /* Draw the primitives. */
-                            gcmERR_BREAK(gco3D_DrawInstancedPrimitives(
-                                context->hw,
-                                halPrimitive,
-                                gcvFALSE, First + i, 0, 1, 3, /* Point,line,triangle all send count = 3 */
-                                gcvFALSE, 0, 0, 1
-                               ));
-                        }
-                        else
-                        {
-                            /* Draw the primitives. */
-                            gcmERR_BREAK(gco3D_DrawPrimitives(
-                                context->hw,
-                                halPrimitive,
-                                First + i, 1
-                                ));
-                        }
-                    }
-
-                    /* Run the post processing pass. */
-                    gcmERR_BREAK(_LogicOpPostProcess(context));
-                }
+                gcmERR_BREAK((*splitDrawInfo.splitDrawFunc)(context, &instantDraw, &splitDrawInfo));
             }
             else
             {
-                if (lineLoopPatch)
-                {
-                    if (instanceDraw)
-                    {
-                        /* Draw the primitives. */
-                        gcmERR_BREAK(gco3D_DrawInstancedPrimitives(
-                            context->hw,
-                            gcvPRIMITIVE_LINE_STRIP,
-                            gcvTRUE, 0, 0, primitiveCount, Count,
-                            gcvFALSE, 0, 0, 1
-                           ));
-                    }
-                    else
-                    {
-                        /* Draw the primitives. */
-                        gcmERR_BREAK(gco3D_DrawIndexedPrimitives(
-                                context->hw,
-                                gcvPRIMITIVE_LINE_STRIP,
-                                0, 0, primitiveCount,
-                                gcvFALSE, 0, 0
-                                ));
-                    }
-                }
-                else
-                {
-                    if (instanceDraw)
-                    {
-                        /* Draw the primitives. */
-                        gcmERR_BREAK(gco3D_DrawInstancedPrimitives(
-                            context->hw,
-                            halPrimitive,
-                            gcvFALSE, First, 0, primitiveCount, Count,
-                            gcvFALSE, 0, 0, 1
-                           ));
-                    }
-                    else
-                    {
-                        /* Draw the primitives. */
-                        gcmERR_BREAK(gco3D_DrawPrimitives(
-                            context->hw,
-                            halPrimitive,
-                            First, primitiveCount
-                            ));
-                    }
+                gcmERR_BREAK(glfDrawArrays(context, &instantDraw));
             }
-        }
 
             /* Restore flipped bottom-top textures. */
             if (flippedTextures)
@@ -1682,8 +2273,12 @@ GL_API void GL_APIENTRY glDrawArrays(
             }
 
 #if VIVANTE_PROFILER
-            glmPROFILE(context, GL1_PROFILER_PRIMITIVE_END, (gctUINTPTR_T)halPrimitive);
+            glmPROFILE(context, GL1_PROFILER_PRIMITIVE_END, (gctUINTPTR_T)instantDraw.primMode);
 
+            if (context->profiler.enable)
+            {
+                _glffProfiler_NEW_Set(context, GL1_PROFILER_DRAW_END, 0);
+            }
 #if VIVANTE_PROFILER_PERDRAW
             if (context->profiler.enable)
             {
@@ -1936,6 +2531,60 @@ _PatchIndex(
 #endif
 }
 
+gceSTATUS
+glfDrawElements(
+    glsCONTEXT_PTR Context,
+    glsINSTANT_DRAW_PTR instantDraw
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctBOOL instanceDraw = gcvFALSE;
+
+    gcmHEADER();
+
+    /* Setup the vertex array. */
+    gcmONERROR(_VertexArray(Context,
+                            0,
+                            (GLsizei *)&instantDraw->count,
+                            instantDraw->indexType,
+                            instantDraw->indexBuffer,
+                            instantDraw->indexMemory,
+                            &instantDraw->primMode,
+                            (gctUINT *)(&instantDraw->primCount)));
+
+    instanceDraw = gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_HALTI5);
+
+    if (instanceDraw)
+    {
+        gcmONERROR(gco3D_DrawInstancedPrimitives(Context->hw,
+                                                 instantDraw->primMode,
+                                                 gcvTRUE,
+                                                 0,
+                                                 0,
+                                                 instantDraw->primCount,
+                                                 instantDraw->count,
+                                                 1
+                                                 ));
+    }
+    else
+    {
+        /* Draw the primitives. */
+        gcmONERROR(gco3D_DrawIndexedPrimitives(Context->hw,
+                                               instantDraw->primMode,
+                                               0,
+                                               0,
+                                               instantDraw->primCount
+                                               ));
+    }
+
+    gcmFOOTER();
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
 /*******************************************************************************
 **
 **  glDrawElements
@@ -1989,18 +2638,13 @@ GL_API void GL_APIENTRY glDrawElements(
 {
     gceSTATUS       status          = gcvSTATUS_OK;
     GLboolean        indexPatched = GL_FALSE;
-    GLsizei         primitiveCount  = 0;
-    gcePRIMITIVE    halPrimitive;
-    gceINDEX_TYPE   indexType = 0;
     glsNAMEDOBJECT_PTR    elementBuffer;
-    gcoINDEX              indexBuffer = gcvNULL;
-    gctBOOL         newIndices = gcvFALSE;
+    gctBOOL         bNewIndices = gcvFALSE;
     GLsizei         origCount = Count;
     const   GLvoid* origIndices = Indices;
-    gctBOOL         spilitDraw = gcvFALSE;
-    gctSIZE_T       spilitCount = 0;
-    gcePRIMITIVE    spilitPrimitiveType;
     gctBOOL         instanceDraw = gcvFALSE;
+    glsINSTANT_DRAW instantDraw;
+    gcsSPLIT_DRAW_INFO splitDrawInfo;
 
     glmENTER4(glmARGENUM, Mode, glmARGINT, Count, glmARGENUM, Type,
               glmARGPTR, Indices)
@@ -2010,6 +2654,11 @@ GL_API void GL_APIENTRY glDrawElements(
         glmPROFILE(context, GLES1_DRAWELEMENTS, 0);
         _glffProfiler(&context->profiler, GL1_PROFILER_DRAW_BEGIN, 0);
 #endif
+        glmPROFILE(context, GLES1_DRAWELEMENTS, 0);
+        if (context->profiler.enable)
+        {
+            _glffProfiler_NEW_Set(context, GL1_PROFILER_DRAW_BEGIN, 0);
+        }
         do
         {
 
@@ -2029,6 +2678,9 @@ GL_API void GL_APIENTRY glDrawElements(
                 break;
             }
 
+            /* init instantDraw.*/
+            gcoOS_ZeroMemory(&instantDraw, gcmSIZEOF(glsINSTANT_DRAW));
+
             elementBuffer = context->elementArrayBuffer;
 
             if (context->patchStrip)
@@ -2047,33 +2699,37 @@ GL_API void GL_APIENTRY glDrawElements(
                                            &Indices,
                                            &Mode,
                                            &Count,
-                                           &indexBuffer,
-                                           &newIndices);
+                                           &instantDraw.indexBuffer,
+                                           &bNewIndices);
                 }
                 else
                 {
-                    indexBuffer = ((elementBuffer != gcvNULL) && (elementBuffer->object != gcvNULL))
+                    instantDraw.indexBuffer = ((elementBuffer != gcvNULL) && (elementBuffer->object != gcvNULL))
                                 ? ((glsBUFFER_PTR)elementBuffer->object)->index
                                 : gcvNULL;
 
 #if gcdSYNC
-                    gcoINDEX_GetFence(indexBuffer);
+                    gcoINDEX_GetFence(instantDraw.indexBuffer);
 #endif
                 }
             }
             else
             {
-                indexBuffer = ((elementBuffer != gcvNULL) && (elementBuffer->object != gcvNULL))
+                instantDraw.indexBuffer = ((elementBuffer != gcvNULL) && (elementBuffer->object != gcvNULL))
                             ? ((glsBUFFER_PTR)elementBuffer->object)->index
                             : gcvNULL;
 
 #if gcdSYNC
-                    gcoINDEX_GetFence(indexBuffer);
+                    gcoINDEX_GetFence(instantDraw.indexBuffer);
 #endif
             }
 
+            /* update count/ indices.*/
+            instantDraw.count = Count;
+            instantDraw.indexMemory = (gctPOINTER)Indices;
+
             /* Validate mode and determine the number of primitives. */
-            if (!_GetPrimitiveCount(Mode, Count, &primitiveCount, &halPrimitive))
+            if (!_GetPrimitiveCount(Mode, Count, &instantDraw.primCount, &instantDraw.primMode))
             {
                 glmERROR(GL_INVALID_ENUM);
                 break;
@@ -2082,15 +2738,15 @@ GL_API void GL_APIENTRY glDrawElements(
             /* Validate and translate the index type. */
             if (Type == GL_UNSIGNED_BYTE)
             {
-                indexType = gcvINDEX_8;
+                instantDraw.indexType = gcvINDEX_8;
             }
             else if (Type == GL_UNSIGNED_SHORT)
             {
-                indexType = gcvINDEX_16;
+                instantDraw.indexType = gcvINDEX_16;
             }
             else if (Type == GL_UNSIGNED_INT)
             {
-                indexType = gcvINDEX_32;
+                instantDraw.indexType = gcvINDEX_32;
             }
             else
             {
@@ -2098,11 +2754,9 @@ GL_API void GL_APIENTRY glDrawElements(
                 break;
             }
 
-            if
-            (
-                   (primitiveCount <= 0)        /* ...primitive count is invalid. */
-                || _IsFullCulled(context, Mode) /* ...primitive is fully culled. */
-                || _InvalidPalette(context)     /* ...matrix palette is invalid. */
+            if((instantDraw.primCount <= 0)  /* ...primitive count is invalid. */
+            ||  _IsFullCulled(context, Mode) /* ...primitive is fully culled. */
+            ||  _InvalidPalette(context)     /* ...matrix palette is invalid. */
             )
             {
                 break;
@@ -2130,8 +2784,8 @@ GL_API void GL_APIENTRY glDrawElements(
             gcmERR_BREAK(glfUpdateCulling(context));
 
             /* Count the primitives. */
-            glmPROFILE(context, GL1_PROFILER_PRIMITIVE_TYPE,  (gctUINTPTR_T)halPrimitive);
-            glmPROFILE(context, GL1_PROFILER_PRIMITIVE_COUNT, (gctUINTPTR_T)primitiveCount);
+            glmPROFILE(context, GL1_PROFILER_PRIMITIVE_TYPE,  (gctUINTPTR_T)instantDraw.primMode);
+            glmPROFILE(context, GL1_PROFILER_PRIMITIVE_COUNT, (gctUINTPTR_T)instantDraw.primCount);
 
             /* Update polygon offset states. */
             gcmERR_BREAK(glfUpdatePolygonOffset(context));
@@ -2290,49 +2944,17 @@ GL_API void GL_APIENTRY glDrawElements(
                 }
             }
 
-            /* Setup the vertex array. */
-            gcmERR_BREAK(_VertexArray(context,
-                                      0, &Count,
-                                      indexType,
-                                      indexBuffer,
-                                      Indices,
-                                      &halPrimitive,
-                                      &spilitDraw,
-                                      &spilitCount,
-                                      &spilitPrimitiveType,
-                                      (gctUINT *)(&primitiveCount)));
+            /* Collect split draw info.*/
+            gcoOS_ZeroMemory(&splitDrawInfo, sizeof(gcsSPLIT_DRAW_INFO));
+            gcmERR_BREAK(glfCollectSplitDrawElementInfo(context, &instantDraw, &splitDrawInfo));
 
-            instanceDraw = gcoHAL_IsFeatureAvailable(gcvNULL,gcvFEATURE_HALTI5);
-
-            if (instanceDraw)
+            if (splitDrawInfo.splitDrawType != gcvSPLIT_DRAW_UNKNOWN)
             {
-                gcmERR_BREAK(gco3D_DrawInstancedPrimitives(
-                   context->hw,
-                   halPrimitive,
-                   gcvTRUE,
-                   0,
-                   0,
-                   primitiveCount,
-                   Count,
-                   spilitDraw,
-                   spilitCount,
-                   spilitPrimitiveType,
-                   1
-                   ));
+                gcmERR_BREAK((*splitDrawInfo.splitDrawFunc)(context, &instantDraw, &splitDrawInfo));
             }
             else
             {
-                /* Draw the primitives. */
-                gcmERR_BREAK(gco3D_DrawIndexedPrimitives(
-                    context->hw,
-                    halPrimitive,
-                    0,
-                    0,
-                    primitiveCount,
-                    spilitDraw,
-                    spilitCount,
-                    spilitPrimitiveType
-                    ));
+                gcmERR_BREAK(glfDrawElements(context, &instantDraw));
             }
 
             /* Set drawableDirty flag. */
@@ -2361,7 +2983,12 @@ GL_API void GL_APIENTRY glDrawElements(
             }
 
 #if VIVANTE_PROFILER
-            glmPROFILE(context, GL1_PROFILER_PRIMITIVE_END, (gctUINTPTR_T)halPrimitive);
+            glmPROFILE(context, GL1_PROFILER_PRIMITIVE_END, (gctUINTPTR_T)instantDraw.primMode);
+
+            if (context->profiler.enable)
+            {
+                _glffProfiler_NEW_Set(context, GL1_PROFILER_DRAW_END, 0);
+            }
 
 #if VIVANTE_PROFILER_PERDRAW
             if (context->profiler.enable)
@@ -2396,8 +3023,8 @@ GL_API void GL_APIENTRY glDrawElements(
                 gcmERR_BREAK(_BuildStream(context,
                                           0,
                                           0,
-                                          Count,
-                                          indexType,
+                                          (GLsizei)instantDraw.count,
+                                          instantDraw.indexType,
                                           Indices,
                                           &stream,
                                           &first));
@@ -2406,30 +3033,24 @@ GL_API void GL_APIENTRY glDrawElements(
 
                 if (instanceDraw)
                 {
-                    gcmERR_BREAK(gco3D_DrawInstancedPrimitives(
-                       context->hw,
-                       halPrimitive,
-                       gcvTRUE,
-                       first,
-                       0,
-                       primitiveCount,
-                       Count,
-                       gcvFALSE,
-                       0,
-                       0,
-                       1
-                       ));
+                    gcmERR_BREAK(gco3D_DrawInstancedPrimitives(context->hw,
+                                                               instantDraw.primMode,
+                                                               gcvTRUE,
+                                                               first,
+                                                               0,
+                                                               instantDraw.primCount,
+                                                               Count,
+                                                               1
+                                                               ));
                 }
                 else
                 {
-                    gcmERR_BREAK(gco3D_DrawIndexedPrimitives(
-                        context->hw,
-                        halPrimitive,
-                        0,
-                        first,
-                        primitiveCount,
-                        gcvFALSE, 0, 0
-                        ));
+                    gcmERR_BREAK(gco3D_DrawIndexedPrimitives(context->hw,
+                                                             instantDraw.primMode,
+                                                             0,
+                                                             first,
+                                                             instantDraw.primCount
+                                                             ));
                 }
 
                 /* Set drawableDirty flag. */
@@ -2463,7 +3084,7 @@ GL_API void GL_APIENTRY glDrawElements(
             _FreeStream(context, &stream);
         }
 
-        if (indexPatched && newIndices)
+        if (indexPatched && bNewIndices)
         {
             gcmVERIFY_OK(gcoOS_Free(context->os, (gctPOINTER)Indices));
         }
@@ -2643,7 +3264,6 @@ GL_API void GL_APIENTRY glMultiDrawArraysEXT(
                                           first, &count,
                                           gcvINDEX_8, gcvNULL, gcvNULL,
                                           &halPrimitive,
-                                          gcvNULL, gcvNULL, gcvNULL,
                                           (gctUINT *)(&primitiveCount)));
 
                 if (instanceDraw)
@@ -2659,7 +3279,7 @@ GL_API void GL_APIENTRY glMultiDrawArraysEXT(
                             context->hw,
                             halPrimitive,
                             gcvFALSE, First[i], 0, primitiveCount, Count[i],
-                            gcvFALSE, 0, 0, 1
+                            1
                            ));
                     }
                 }
@@ -2696,7 +3316,6 @@ GL_API void GL_APIENTRY glMultiDrawArraysEXT(
                                               First[j], &count,
                                               gcvINDEX_8, gcvNULL, gcvNULL,
                                               &halPrimitive,
-                                              gcvNULL, gcvNULL, gcvNULL,
                                               (gctUINT *)(&primitiveCount)));
 
                     /* Test for line loop patch. */
@@ -2722,7 +3341,7 @@ GL_API void GL_APIENTRY glMultiDrawArraysEXT(
                                         context->hw,
                                         gcvPRIMITIVE_LINE_STRIP,
                                         gcvTRUE, i, 0, 1, 2,
-                                        gcvFALSE, 0, 0, 1
+                                        1
                                         ));
                                 }
                                 else
@@ -2731,8 +3350,7 @@ GL_API void GL_APIENTRY glMultiDrawArraysEXT(
                                     gcmERR_BREAK(gco3D_DrawIndexedPrimitives(
                                         context->hw,
                                         gcvPRIMITIVE_LINE_STRIP,
-                                        0, i, 1,
-                                        gcvFALSE, 0, 0
+                                        0, i, 1
                                         ));
                                 }
                             }
@@ -2745,7 +3363,7 @@ GL_API void GL_APIENTRY glMultiDrawArraysEXT(
                                         context->hw,
                                         halPrimitive,
                                         gcvFALSE, First[j] + i, 0, 1, 3, /* Point,line,triangle all send count = 3 */
-                                        gcvFALSE, 0, 0, 1
+                                        1
                                         ));
                                 }
                                 else
@@ -2774,7 +3392,7 @@ GL_API void GL_APIENTRY glMultiDrawArraysEXT(
                                     context->hw,
                                     gcvPRIMITIVE_LINE_STRIP,
                                     gcvTRUE, 0, 0, primitiveCount, Count[j],
-                                    gcvFALSE, 0, 0, 1
+                                    1
                                     ));
                             }
                             else
@@ -2782,8 +3400,7 @@ GL_API void GL_APIENTRY glMultiDrawArraysEXT(
                                 gcmERR_BREAK(gco3D_DrawIndexedPrimitives(
                                     context->hw,
                                     gcvPRIMITIVE_LINE_STRIP,
-                                    0, 0, primitiveCount,
-                                    gcvFALSE, 0, 0
+                                    0, 0, primitiveCount
                                     ));
                             }
                         }
@@ -2796,7 +3413,7 @@ GL_API void GL_APIENTRY glMultiDrawArraysEXT(
                                     context->hw,
                                     halPrimitive,
                                     gcvFALSE, First[j], 0, primitiveCount, Count[j],
-                                    gcvFALSE, 0, 0, 1
+                                    1
                                     ));
                             }
                             else

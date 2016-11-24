@@ -1,0 +1,4313 @@
+/****************************************************************************
+*
+*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*
+*    The material in this file is confidential and contains trade secrets
+*    of Vivante Corporation. This is proprietary information owned by
+*    Vivante Corporation. No part of this work may be disclosed,
+*    reproduced, copied, transmitted, or used in any way for any purpose,
+*    without the express written permission of Vivante Corporation.
+*
+*****************************************************************************/
+
+
+#include "gc_vsc.h"
+#include "vir/linker/gc_vsc_vir_linker.h"
+#include "vir/lower/gc_vsc_vir_hl_2_hl.h"
+
+#define __LL_LIB_LENGTH__       (65535 * 2)
+#define __LIB_NAME_LENGTH__     256
+#define __LIB_SHADER_PMP     512
+
+extern gctGLSLCompiler gcGLSLCompiler;
+extern gctCLCompiler gcCLCompiler;
+extern gctUINT vscHFUNC_Label(const char *);
+extern gctBOOL vcsHKCMP_Label(const char *, const char *);
+
+#define     CompileInstrisicLibfromSrc                1
+#define     CompileInstrisicLibList                   0
+
+#if CompileInstrisicLibfromSrc
+
+/* library for gl built-in functions that are written in high level shader */
+#include "lib/gc_vsc_lib_gl_builtin.h"
+
+/* library for cl built-in functions that are written in high level shader */
+#include "lib/gc_vsc_lib_cl_builtin.h"
+
+#if CompileInstrisicLibList
+static VSC_ErrCode
+VIR_intrinsic_LibSource(
+    IN VSC_HW_CONFIG            *pHwCfg,
+    IN VSC_MM                   *pMM,
+    IN VIR_Intrinsic_LibList    *pIntrinsicLibList,
+    IN VIR_Intrinsic_LibSource  *pLibSource,
+    IN gctBOOL                   ForOCL,
+    IN gctBOOL                   DumpShader
+    )
+{
+    VSC_ErrCode                  errCode = VSC_ERR_NONE;
+    VIR_Shader                  *virIntrinsicLibrary = gcvNULL;
+    gceSTATUS                    status = gcvSTATUS_OK;
+    gcSHADER                     binary = gcvNULL;
+    gctSTRING                    log = gcvNULL;
+    gctSTRING                    source = gcvNULL;
+    gctBOOL                      catString = gcvFALSE;
+    gctUINT                      i, stringNum;
+
+    gcmASSERT(pIntrinsicLibList);
+
+    /* Allocate the string. */
+    source = (gctSTRING) vscMM_Alloc(pMM, __LL_LIB_LENGTH__ * sizeof(char));
+
+    /* Add header. */
+    if (pLibSource->header)
+    {
+        gcoOS_StrCopySafe(source, gcoOS_StrLen(pLibSource->header, gcvNULL) + 1, pLibSource->header);
+        catString = gcvTRUE;
+    }
+
+    /* Add extension. */
+    if (pLibSource->extension)
+    {
+        if (catString)
+        {
+            gcoOS_StrCatSafe(source, __LL_LIB_LENGTH__, pLibSource->extension);
+        }
+        else
+        {
+            gcoOS_StrCopySafe(source, gcoOS_StrLen(pLibSource->extension, gcvNULL) + 1, pLibSource->extension);
+            catString = gcvTRUE;
+        }
+    }
+
+    /* Add source. */
+    stringNum = sizeof(pLibSource->body) / sizeof(gctSTRING);
+    for (i = 0; i < stringNum; i++)
+    {
+        if (catString)
+        {
+            gcoOS_StrCatSafe(source, __LL_LIB_LENGTH__, pLibSource->body[i]);
+        }
+        else
+        {
+            gcoOS_StrCopySafe(source, gcoOS_StrLen(pLibSource->body[i], gcvNULL) + 1, pLibSource->body[i]);
+            catString = gcvTRUE;
+        }
+    }
+
+    /* Compile the source. */
+    if (ForOCL)
+    {
+        gcmONERROR((*gcCLCompiler)(gcvNULL,
+                                   gcoOS_StrLen(source, gcvNULL),
+                                   source,
+                                   "",
+                                   &binary,
+                                   &log));
+    }
+    else
+    {
+        gcmONERROR((*gcGLSLCompiler)(gcSHADER_TYPE_LIBRARY,
+                                     gcoOS_StrLen(source, gcvNULL),
+                                     source,
+                                     &binary,
+                                     &log));
+    }
+
+    /* Create the VIR shader. */
+    gcmONERROR(gcoOS_Allocate(gcvNULL,
+                              sizeof(VIR_Shader),
+                              (gctPOINTER*)&virIntrinsicLibrary));
+    gcmASSERT(virIntrinsicLibrary != gcvNULL);
+
+    errCode = VIR_Shader_Construct(gcvNULL,
+                                   VIR_SHADER_LIBRARY,
+                                   virIntrinsicLibrary);
+    ON_ERROR(errCode, "VIR_CompileIntrinsicLib");
+
+    gcSHADER_Conv2VIR(binary, pHwCfg, virIntrinsicLibrary);
+
+    if (DumpShader)
+    {
+        VIR_Shader_Dump(gcvNULL, "VIR library shader IR.", virIntrinsicLibrary, gcvTRUE);
+    }
+
+    /* Insert the shader into the lib list. */
+    VIR_Intrinsic_LibList_AppendNode(pIntrinsicLibList,
+                                     virIntrinsicLibrary,
+                                     pLibSource->libKind);
+OnError:
+    if (source)
+    {
+        vscMM_Free(pMM, source);
+    }
+
+    if (binary)
+    {
+        gcSHADER_Destroy(binary);
+    }
+
+    if (log)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, log);
+    }
+
+    return errCode;
+}
+#endif /* CompileInstrisicLibList */
+
+/* this is for test only, compile the library from the FE and GCSL->VIR converter */
+static VSC_ErrCode
+_CreateIntrinsicLib(
+    IN VSC_HW_CONFIG            *pHwCfg,
+    IN VSC_MM                   *pMM,
+    IN gctBOOL                   forGraphics,
+    IN gctBOOL                   DumpShader,
+    OUT VIR_Shader              **pOutLib
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    gceSTATUS   status  = gcvSTATUS_OK;
+    gctSTRING   sloBuiltinSource = gcvNULL;
+    gcSHADER    Binary = gcvNULL;
+    gctSIZE_T   length;
+    gctINT      i, stringNum = 0;
+    gctSTRING   log    = gcvNULL;
+    gctBOOL     supportTexldU = pHwCfg->hwFeatureFlags.hasUniversalTexldV2 && pHwCfg->hwFeatureFlags.hasTexldUFix;
+    gctBOOL     supportTexelFetchForMSAA = pHwCfg->hwFeatureFlags.supportMSAATexture;
+    gctBOOL     supportTexMSAA2DArray = gcoOS_StrStr(GetGLExtensionString(), "GL_OES_texture_storage_multisample_2d_array", gcvNULL);
+    gctBOOL     supportImgAddr = pHwCfg->hwFeatureFlags.supportImgAddr;
+    gctBOOL     supportImgInst = supportImgAddr;
+    VIR_Shader* virIntrinsicLibrary = gcvNULL;
+
+    /* built-in function library */
+    gctSTRING   BuiltinLib_common[] =
+    {
+        gcLibMODF_Func,
+        gcLibCommon_Func,
+        gcLibBitfieldExtract_Func,
+        gcLibBitfieldInsert_Func,
+        gcLibFREXP_Func,
+        gcLibFREXPSTRUCT_Func,
+        gcLibLDEXP_Func,
+        gcLibPack_Func,
+        gcLibUnpack_Func,
+        gcLibQuantizeToF16_Funcs,
+        gcLibUaddCarry_Func_VK_hati4,
+        gcLibUsubBorrow_Func_VK,
+        gcLibUmulExtended_Func_VK,
+        gcLibImulExtended_Func_VK,
+        gcLibMatrixTranspose_Func,
+        gcLibTextureCommon_Func,
+    };
+
+    gctSTRING   BuiltinLib_Reflect[] =
+    {
+        gcLibREFLECT_Func_float,
+        gcLibREFLECT_Func_vec2,
+        gcLibREFLECT_Func_vec3,
+        gcLibREFLECT_Func_vec4,
+    };
+
+    gctSTRING   BuiltinLib_Reflect_fmaSupported[] =
+    {
+        gcLibREFLECT_Func_float_fmaSupported,
+        gcLibREFLECT_Func_vec2_fmaSupported,
+        gcLibREFLECT_Func_vec3_fmaSupported,
+        gcLibREFLECT_Func_vec4_fmaSupported,
+    };
+
+    /* image size. */
+    gctSTRING ImageLib_common[] =
+    {
+        gcLibImageSize_halti4,
+    };
+
+    /* image query. */
+    gctSTRING ImageQuery_halti4[] =
+    {
+        gcLibImageQuery_halti4,
+    };
+
+    /* image_load, image_store gc3000/5000 implementation */
+    gctSTRING ImageLib[] =
+    {
+        /* gcLibImageAddr must be the first element. */
+        gcLibImageAddr,
+        gcLibImageAddr_intrinsic,
+        gcLibImageSwizzle,
+        gcLibImageStoreSwizzle,
+
+        gcLibImageLoad_2D_int, /* 16i */
+        gcLibImageLoad_2D_int_rgba32i,
+        gcLibImageLoad_2D_int_rgba8i,
+        gcLibImageLoad_2D_int_r32i,
+        gcLibImageLoad_2D_uint, /* 16ui */
+        gcLibImageLoad_2D_uint_rgba32ui,
+        gcLibImageLoad_2D_uint_rgba8ui,
+        gcLibImageLoad_2D_uint_r32ui,
+        gcLibImageLoad_2D_float, /* 16f */
+        gcLibImageLoad_2D_float_rgba8,
+        gcLibImageLoad_2D_float_rgba8_snorm,
+        gcLibImageLoad_2D_float_rgba32f,
+        gcLibImageLoad_2D_float_r32f,
+
+        gcLibImageLoad_1D_int, /* 16i */
+        gcLibImageLoad_1D_int_rgba32i,
+        gcLibImageLoad_1D_int_rgba8i,
+        gcLibImageLoad_1D_int_r32i,
+        gcLibImageLoad_1D_uint, /* 16ui */
+        gcLibImageLoad_1D_uint_rgba32ui,
+        gcLibImageLoad_1D_uint_rgba8ui,
+        gcLibImageLoad_1D_uint_r32ui,
+        gcLibImageLoad_1D_float, /* 16f */
+        gcLibImageLoad_1D_float_rgba8,
+        gcLibImageLoad_1D_float_rgba8_snorm,
+        gcLibImageLoad_1D_float_rgba32f,
+        gcLibImageLoad_1D_float_r32f,
+        gcLibImageLoad_1D_float_r32i,
+        gcLibImageLoad_1D_float_r32ui,
+
+        gcLibImageLoad_Buffer_int, /* 16i */
+        gcLibImageLoad_Buffer_int_rgba32i,
+        gcLibImageLoad_Buffer_int_rgba8i,
+        gcLibImageLoad_Buffer_int_r32i,
+        gcLibImageLoad_Buffer_uint, /* 16ui */
+        gcLibImageLoad_Buffer_uint_rgba32ui,
+        gcLibImageLoad_Buffer_uint_rgba8ui,
+        gcLibImageLoad_Buffer_uint_r32ui,
+        gcLibImageLoad_Buffer_float, /* 16f */
+        gcLibImageLoad_Buffer_float_rgba8,
+        gcLibImageLoad_Buffer_float_rgba8_snorm,
+        gcLibImageLoad_Buffer_float_rgba32f,
+        gcLibImageLoad_Buffer_float_r32f,
+
+        gcLibImageLoad_3Dcommon,
+        gcLibImageLoad_3D,
+        gcLibImageLoad_cube,
+        gcLibImageLoad_1DArray,
+        gcLibImageLoad_2DArray,
+        gcLibImageLoad_CubeArray,
+
+        gcLibImageStore_2D_float, /* 16f */
+        gcLibImageStore_2D_float_rgba32f,
+        gcLibImageStore_2D_float_r32f,
+        gcLibImageStore_2D_float_rgba8,
+        gcLibImageStore_2D_float_rgba8_snorm,
+        gcLibImageStore_2D_int, /* 16i */
+        gcLibImageStore_2D_int_rgba32i,
+        gcLibImageStore_2D_int_r32i,
+        gcLibImageStore_2D_int_rgba8i,
+        gcLibImageStore_2D_uint, /* 16ui */
+        gcLibImageStore_2D_uint_rgba32ui,
+        gcLibImageStore_2D_uint_r32ui,
+        gcLibImageStore_2D_uint_rgba8ui,
+
+        gcLibImageStore_1D_float, /* 16f */
+        gcLibImageStore_1D_float_rgba32f,
+        gcLibImageStore_1D_float_r32f,
+        gcLibImageStore_1D_float_r32i,
+        gcLibImageStore_1D_float_r32ui,
+        gcLibImageStore_1D_float_rgba8,
+        gcLibImageStore_1D_float_rgba8_snorm,
+        gcLibImageStore_1D_int, /* 16i */
+        gcLibImageStore_1D_int_rgba32i,
+        gcLibImageStore_1D_int_r32i,
+        gcLibImageStore_1D_int_rgba8i,
+        gcLibImageStore_1D_uint, /* 16ui */
+        gcLibImageStore_1D_uint_rgba32ui,
+        gcLibImageStore_1D_uint_r32ui,
+        gcLibImageStore_1D_uint_rgba8ui,
+
+        gcLibImageStore_Buffer_float, /* 16f */
+        gcLibImageStore_Buffer_float_rgba32f,
+        gcLibImageStore_Buffer_float_r32f,
+        gcLibImageStore_Buffer_float_rgba8,
+        gcLibImageStore_Buffer_float_rgba8_snorm,
+        gcLibImageStore_Buffer_int, /* 16i */
+        gcLibImageStore_Buffer_int_rgba32i,
+        gcLibImageStore_Buffer_int_r32i,
+        gcLibImageStore_Buffer_int_rgba8i,
+        gcLibImageStore_Buffer_uint, /* 16ui */
+        gcLibImageStore_Buffer_uint_rgba32ui,
+        gcLibImageStore_Buffer_uint_r32ui,
+        gcLibImageStore_Buffer_uint_rgba8ui,
+
+        gcLibImageStore_3Dcommon,
+        gcLibImageStore_3D,
+        gcLibImageStore_cube,
+        gcLibImageStore_1DArray,
+        gcLibImageStore_2DArray,
+        gcLibImageStore_CubeArray,
+    };
+
+    /* image load/store. */
+    gctSTRING ImageLib_hati4[] =
+    {
+        gcLibImageAddr_halti4,
+        gcLibImageAddr_intrinsic,
+        gcLibImageLoad_1D_float_hati4,
+        gcLibImageLoad_1D_float_1_hati4,
+        gcLibImageLoad_1D_int_hati4,
+        gcLibImageLoad_1D_int_1_hati4,
+        gcLibImageLoad_1D_uint_hati4,
+        gcLibImageLoad_1D_uint_1_hati4,
+
+        gcLibImageLoad_1D_array_float_hati4,
+        gcLibImageLoad_1D_array_float_1_hati4,
+        gcLibImageLoad_1D_array_int_hati4,
+        gcLibImageLoad_1D_array_int_1_hati4,
+        gcLibImageLoad_1D_array_uint_hati4,
+        gcLibImageLoad_1D_array_uint_1_hati4,
+
+        gcLibImageLoad_2D_float_hati4,
+        gcLibImageLoad_2D_float_1_hati4,
+        gcLibImageLoad_2D_int_hati4,
+        gcLibImageLoad_2D_int_1_hati4,
+        gcLibImageLoad_2D_uint_hati4,
+        gcLibImageLoad_2D_uint_1_hati4,
+
+        gcLibImageLoad_2DArray_float_hati4,
+        gcLibImageLoad_2DArray_float_1_hati4,
+        gcLibImageLoad_2DArray_int_hati4,
+        gcLibImageLoad_2DArray_int_1_hati4,
+        gcLibImageLoad_2DArray_uint_hati4,
+        gcLibImageLoad_2DArray_uint_1_hati4,
+
+        gcLibImageLoad_3D_float_hati4,
+        gcLibImageLoad_3D_float_1_hati4,
+        gcLibImageLoad_3D_int_hati4,
+        gcLibImageLoad_3D_int_1_hati4,
+        gcLibImageLoad_3D_uint_hati4,
+        gcLibImageLoad_3D_uint_1_hati4,
+
+        gcLibImageLoad_cube_float_hati4,
+        gcLibImageLoad_cube_float_1_hati4,
+        gcLibImageLoad_cube_int_hati4,
+        gcLibImageLoad_cube_int_1_hati4,
+        gcLibImageLoad_cube_uint_hati4,
+        gcLibImageLoad_cube_uint_1_hati4,
+
+        gcLibImageLoad_CubeArray_float_img_access,
+        gcLibImageLoad_CubeArray_float_1_img_access,
+        gcLibImageLoad_CubeArray_int_img_access,
+        gcLibImageLoad_CubeArray_int_1_img_access,
+        gcLibImageLoad_CubeArray_uint_img_access,
+        gcLibImageLoad_CubeArray_uint_1_img_access,
+
+        gcLibImageLoad_Buffer_float_img_access,
+        gcLibImageLoad_Buffer_int_img_access,
+        gcLibImageLoad_Buffer_uint_img_access,
+
+        gcLibImageStore_1D_float_hati4,
+        gcLibImageStore_1D_float_1_hati4,
+        gcLibImageStore_1D_int_hati4,
+        gcLibImageStore_1D_int_1_hati4,
+        gcLibImageStore_1D_uint_hati4,
+        gcLibImageStore_1D_uint_1_hati4,
+
+        gcLibImageStore_1D_array_float_hati4,
+        gcLibImageStore_1D_array_float_1_hati4,
+        gcLibImageStore_1D_array_int_hati4,
+        gcLibImageStore_1D_array_int_1_hati4,
+        gcLibImageStore_1D_array_uint_hati4,
+        gcLibImageStore_1D_array_uint_1_hati4,
+
+        gcLibImageStore_2D_float_hati4,
+        gcLibImageStore_2D_float_1_hati4,
+        gcLibImageStore_2D_int_hati4,
+        gcLibImageStore_2D_int_1_hati4,
+        gcLibImageStore_2D_uint_hati4,
+        gcLibImageStore_2D_uint_1_hati4,
+
+        gcLibImageStore_2DArray_float_hati4,
+        gcLibImageStore_2DArray_float_1_hati4,
+        gcLibImageStore_2DArray_int_hati4,
+        gcLibImageStore_2DArray_int_1_hati4,
+        gcLibImageStore_2DArray_uint_hati4,
+        gcLibImageStore_2DArray_uint_1_hati4,
+
+        gcLibImageStore_3D_float_hati4,
+        gcLibImageStore_3D_float_1_hati4,
+        gcLibImageStore_3D_int_hati4,
+        gcLibImageStore_3D_int_1_hati4,
+        gcLibImageStore_3D_uint_hati4,
+        gcLibImageStore_3D_uint_1_hati4,
+
+        gcLibImageStore_cube_float_hati4,
+        gcLibImageStore_cube_float_1_hati4,
+        gcLibImageStore_cube_int_hati4,
+        gcLibImageStore_cube_int_1_hati4,
+        gcLibImageStore_cube_uint_hati4,
+        gcLibImageStore_cube_uint_1_hati4,
+
+        gcLibImageStore_CubeArray_float_img_access,
+        gcLibImageStore_CubeArray_float_1_img_access,
+        gcLibImageStore_CubeArray_int_img_access,
+        gcLibImageStore_CubeArray_int_1_img_access,
+        gcLibImageStore_CubeArray_uint_img_access,
+        gcLibImageStore_CubeArray_uint_1_img_access,
+
+        gcLibImageStore_Buffer_float_img_access,
+        gcLibImageStore_Buffer_int_img_access,
+        gcLibImageStore_Buffer_uint_img_access,
+    };
+
+    /* texel fetch. */
+    gctSTRING TexelFetchLib[] =
+    {
+        gcLibTexelFetch_Sampler2D,
+        gcLibTexelFetch_Sampler2DArray,
+        gcLibTexelFetch_Sampler3D,
+        gcLibTexelFetch_SamplerBuffer,
+    };
+
+    gctSTRING TexelFetchLib_halti4[] =
+    {
+        gcLibTexelFetch_Sampler2D_halti4,
+        gcLibTexelFetch_Sampler2DArray_halti4,
+        gcLibTexelFetch_Sampler3D_halti4,
+        gcLibTexelFetch_SamplerBuffer_halti4,
+    };
+
+    gctSTRING texelFetchMSLib_halti4[] =
+    {
+        gcLibTexelFetch_Sampler2DMS_halti4,
+        gcLibTexelFetch_Sampler2DMSArray_halti4,
+    };
+
+    /* texld-related. */
+    gctSTRING TexLdLib_hati4[] =
+    {
+        /* texld for sampler1DArray */
+        gcLibTexLd_sampler_1d_array,
+        gcLibTexLd_sampler_1d_array_lod,
+        gcLibTexLd_sampler_1d_array_bias,
+        /* texld for sampler2DArray */
+        gcLibTexLd_sampler_2d_array,
+        gcLibTexLd_sampler_2d_array_lod,
+        gcLibTexLd_sampler_2d_array_bias,
+
+        gcLibGetLod,
+    };
+
+    /* For halti5 chips, if they don't have USC_GOS_ADDR_FIX feature, then they can't use IMG_LOAD/IMG_STORE for vs/ts/gs/ps. */
+    if (supportImgInst &&
+        pHwCfg->hwFeatureFlags.hasHalti5 &&
+        !pHwCfg->hwFeatureFlags.hasUscGosAddrFix &&
+        forGraphics)
+    {
+        supportImgInst = gcvFALSE;
+    }
+
+    if (supportImgAddr && !supportImgInst)
+    {
+        ImageLib[0] = gcLibImageAddr_halti4;
+    }
+
+    if (pHwCfg->hwFeatureFlags.hasHalti4)
+    {
+        BuiltinLib_common[2] = gcLibBitfieldExtract_Func_halti4;
+        BuiltinLib_common[3] = gcLibBitfieldInsert_Func_halti4;
+    }
+
+    sloBuiltinSource = (gctSTRING) vscMM_Alloc(pMM, __LL_LIB_LENGTH__ * sizeof(char));
+
+    /* add the extension source */
+    length = gcoOS_StrLen(gcLibFunc_Extension, gcvNULL);
+    gcoOS_StrCopySafe(sloBuiltinSource, length + 1, gcLibFunc_Extension);
+
+    /* add the extension source */
+    if (supportTexMSAA2DArray)
+    {
+        gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLibFunc_Extension_For_TexMS2DArray);
+    }
+
+    /* add the header source */
+    gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLibFunc_TextureBufferSize_For_VK);
+    gcoOS_StrCatSafe(sloBuiltinSource, __LL_LIB_LENGTH__, gcLibFunc_BuiltinHeader);
+
+    stringNum = sizeof(BuiltinLib_common) / sizeof(gctSTRING);
+    for (i = 0; i < stringNum; i++)
+    {
+        gcoOS_StrCatSafe(sloBuiltinSource,
+            __LL_LIB_LENGTH__, BuiltinLib_common[i]);
+    }
+
+    /* fma supported */
+    if (pHwCfg->hwFeatureFlags.supportAdvancedInsts &&
+        pHwCfg->hwFeatureFlags.hasHalti5)
+    {
+        gcoOS_StrCatSafe(sloBuiltinSource,
+                __LL_LIB_LENGTH__, gcLibFMA_Func_fmaSupported);
+
+        gcoOS_StrCatSafe(sloBuiltinSource,
+                __LL_LIB_LENGTH__, gcLibASIN_ACOS_Funcs_halti5_fmaSupported);
+
+        gcoOS_StrCatSafe(sloBuiltinSource,
+                __LL_LIB_LENGTH__, gcLibATAN2_Funcs_halti5_fmaSupported);
+
+        /* Use FMA to implement reflect. */
+        stringNum = sizeof(BuiltinLib_Reflect_fmaSupported) / sizeof(gctSTRING);
+        for (i = 0; i < stringNum; i++)
+        {
+            gcoOS_StrCatSafe(sloBuiltinSource,
+                __LL_LIB_LENGTH__, BuiltinLib_Reflect_fmaSupported[i]);
+        }
+    }
+    else
+    {
+        gcoOS_StrCatSafe(sloBuiltinSource,
+                __LL_LIB_LENGTH__, gcLibFMA_Func_fmaNotSupported);
+
+        gcoOS_StrCatSafe(sloBuiltinSource,
+                __LL_LIB_LENGTH__, gcLibATAN_Funcs_halti2);
+
+        gcoOS_StrCatSafe(sloBuiltinSource,
+                __LL_LIB_LENGTH__, gcLibASIN_ACOS_Funcs_halti2);
+
+        gcoOS_StrCatSafe(sloBuiltinSource,
+                __LL_LIB_LENGTH__, gcLibATAN2_Funcs_halti2);
+
+        /* Use normal MAD to implement reflect. */
+        stringNum = sizeof(BuiltinLib_Reflect) / sizeof(gctSTRING);
+        for (i = 0; i < stringNum; i++)
+        {
+            gcoOS_StrCatSafe(sloBuiltinSource,
+                __LL_LIB_LENGTH__, BuiltinLib_Reflect[i]);
+        }
+    }
+
+    stringNum = sizeof(ImageLib_common) / sizeof(gctSTRING);
+    for (i = 0; i < stringNum; i++)
+    {
+        gcoOS_StrCatSafe(sloBuiltinSource,
+            __LL_LIB_LENGTH__, ImageLib_common[i]);
+    }
+
+    /* imageQuery. */
+    stringNum = sizeof(ImageQuery_halti4) / sizeof(gctSTRING);
+    for (i = 0; i < stringNum; i++)
+    {
+        gcoOS_StrCatSafe(sloBuiltinSource,
+            __LL_LIB_LENGTH__, ImageQuery_halti4[i]);
+    }
+
+    /* imageLoad/imageStore. */
+    if (supportImgInst)
+    {
+        stringNum = sizeof(ImageLib_hati4) / sizeof(gctSTRING);
+        for (i = 0; i < stringNum; i++)
+        {
+            gcoOS_StrCatSafe(sloBuiltinSource,
+                __LL_LIB_LENGTH__, ImageLib_hati4[i]);
+        }
+    }
+    else
+    {
+        stringNum = sizeof(ImageLib) / sizeof(gctSTRING);
+        for (i = 0; i < stringNum; i++)
+        {
+            gcoOS_StrCatSafe(sloBuiltinSource,
+                __LL_LIB_LENGTH__, ImageLib[i]);
+        }
+    }
+
+    /* texelFetch. */
+    if (supportTexldU)
+    {
+        stringNum = sizeof(TexelFetchLib_halti4) / sizeof(gctSTRING);
+        for (i = 0; i < stringNum; i++)
+        {
+            gcoOS_StrCatSafe(sloBuiltinSource,
+                __LL_LIB_LENGTH__, TexelFetchLib_halti4[i]);
+        }
+    }
+    else
+    {
+        stringNum = sizeof(TexelFetchLib) / sizeof(gctSTRING);
+        for (i = 0; i < stringNum; i++)
+        {
+            gcoOS_StrCatSafe(sloBuiltinSource,
+                __LL_LIB_LENGTH__, TexelFetchLib[i]);
+        }
+    }
+
+    /* texelFetch for MSAA. */
+    if (supportTexMSAA2DArray)
+    {
+        if (supportTexelFetchForMSAA)
+        {
+            stringNum = sizeof(texelFetchMSLib_halti4) / sizeof(gctSTRING);
+            for (i = 0; i < stringNum; i++)
+            {
+                gcoOS_StrCatSafe(sloBuiltinSource,
+                    __LL_LIB_LENGTH__, texelFetchMSLib_halti4[i]);
+            }
+        }
+    }
+
+    /* texld. */
+    stringNum = sizeof(TexLdLib_hati4) / sizeof(gctSTRING);
+    for (i = 0; i < stringNum; i++)
+    {
+        gcoOS_StrCatSafe(sloBuiltinSource,
+            __LL_LIB_LENGTH__, TexLdLib_hati4[i]);
+    }
+
+    (*gcGLSLCompiler)(gcSHADER_TYPE_LIBRARY,
+                      gcoOS_StrLen(sloBuiltinSource, gcvNULL),
+                      sloBuiltinSource,
+                      &Binary,
+                      &log);
+
+    gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                sizeof(VIR_Shader),
+                                (gctPOINTER*)&virIntrinsicLibrary));
+    gcmASSERT(virIntrinsicLibrary != gcvNULL);
+
+    errCode = VIR_Shader_Construct(gcvNULL,
+                                   VIR_SHADER_LIBRARY,
+                                   virIntrinsicLibrary);
+    ON_ERROR(errCode, "VIR_CompileIntrinsicLib");
+
+    gcSHADER_Conv2VIR(Binary, pHwCfg, virIntrinsicLibrary);
+
+#if _DEBUG_VIR_IO_COPY
+    {
+        VIR_Shader *copiedShader;
+
+        gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                    sizeof(VIR_Shader),
+                                    (gctPOINTER*)&copiedShader));
+
+        gcmASSERT(copiedShader != gcvNULL);
+
+        VIR_Shader_Copy(copiedShader, virIntrinsicLibrary);
+        VIR_Shader_Destroy(virIntrinsicLibrary);
+        gcoOS_Free(gcvNULL, virIntrinsicLibrary);
+
+        if (DumpShader)
+        {
+            VIR_Shader_Dump(gcvNULL, "Converted and Copied VIR library Shader", copiedShader, gcvTRUE);
+        }
+        {
+            VIR_Shader_IOBuffer buf;
+            VIR_Shader * readShader;
+
+            VIR_Shader_Save(copiedShader, &buf);
+
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                        sizeof(VIR_Shader),
+                                        (gctPOINTER*)&readShader));
+
+            errCode = VIR_Shader_Construct(gcvNULL,
+                                            VIR_Shader_GetKind(copiedShader),
+                                            readShader);
+            buf.shader = readShader;
+            buf.curPos = 0;
+
+            VIR_Shader_Read(readShader, &buf);
+
+            VIR_Shader_Destroy(copiedShader);
+            gcoOS_Free(gcvNULL, copiedShader);
+            VIR_IO_Finalize(&buf);
+
+            virIntrinsicLibrary = readShader;
+        }
+    }
+#endif
+
+    if (DumpShader)
+    {
+        VIR_Shader_Dump(gcvNULL, "VIR library shader IR.", virIntrinsicLibrary, gcvTRUE);
+    }
+
+    *pOutLib = virIntrinsicLibrary;
+
+OnError:
+    if (sloBuiltinSource)
+    {
+        vscMM_Free(pMM, sloBuiltinSource);
+    }
+
+    if (Binary)
+    {
+        gcSHADER_Destroy(Binary);
+        Binary = gcvNULL;
+    }
+
+    if (log)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, log);
+    }
+
+    return errCode;
+}
+
+/* this is for test only, compile the library from the OCL FE and GCSL->VIR converter */
+static VSC_ErrCode
+_CreateCLIntrinsicLib(
+    IN VSC_HW_CONFIG            *pHwCfg,
+    IN VSC_MM                   *pMM,
+    IN gctBOOL                   DumpShader,
+    OUT VIR_Shader              **pOutLib
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    gceSTATUS   status  = gcvSTATUS_OK;
+    gctSTRING   builtinSource = gcvNULL;
+    gcSHADER    Binary = gcvNULL;
+    gctSIZE_T   length;
+    gctINT      i, stringNum = 0;
+    gctSTRING   log    = gcvNULL;
+    VIR_Shader* virCLIntrinsicLibrary = gcvNULL;
+
+    /* built-in function library */
+    gctSTRING   builtinLib_common_packed[] =
+    {
+        gcCLLibRelational_Funcs_packed,
+    };
+
+    builtinSource = (gctSTRING) vscMM_Alloc(pMM, __LL_LIB_LENGTH__ * sizeof(char));
+
+    /* add the header source */
+    length = gcoOS_StrLen(gcCLLibHeader, gcvNULL);
+    gcoOS_StrCopySafe(builtinSource, length + 1, gcCLLibHeader);
+
+    /* add the extension source */
+    gcoOS_StrCatSafe(builtinSource, __LL_LIB_LENGTH__, gcCLLibFunc_Extension);
+
+    if(gcmOPT_oclPackedBasicType())
+    {
+        stringNum = sizeof(builtinLib_common_packed) / sizeof(gctSTRING);
+        for (i = 0; i < stringNum; i++)
+        {
+            gcoOS_StrCatSafe(builtinSource,
+                             __LL_LIB_LENGTH__, builtinLib_common_packed[i]);
+        }
+    }
+
+    gcmONERROR((*gcCLCompiler)(gcvNULL,
+                                gcoOS_StrLen(builtinSource, gcvNULL),
+                                builtinSource,
+                                "",
+                                &Binary,
+                                &log));
+
+    gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                sizeof(VIR_Shader),
+                                (gctPOINTER*)&virCLIntrinsicLibrary));
+    gcmASSERT(virCLIntrinsicLibrary != gcvNULL);
+
+    errCode = VIR_Shader_Construct(gcvNULL,
+                                    VIR_SHADER_LIBRARY,
+                                    virCLIntrinsicLibrary);
+    ON_ERROR(errCode, "VIR_CompileCLIntrinsicLib");
+
+    gcSHADER_Conv2VIR(Binary, pHwCfg, virCLIntrinsicLibrary);
+
+#if _DEBUG_VIR_IO_COPY
+    {
+        VIR_Shader *copiedShader;
+
+        gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                    sizeof(VIR_Shader),
+                                    (gctPOINTER*)&copiedShader));
+
+        gcmASSERT(copiedShader != gcvNULL);
+
+        VIR_Shader_Copy(copiedShader, virCLIntrinsicLibrary);
+        VIR_Shader_Destroy(virCLIntrinsicLibrary);
+        gcoOS_Free(gcvNULL, virCLIntrinsicLibrary);
+
+        if (DumpShader)
+        {
+            VIR_Shader_Dump(gcvNULL, "Converted and Copied VIR library Shader", copiedShader, gcvTRUE);
+        }
+        {
+            VIR_Shader_IOBuffer buf;
+            VIR_Shader * readShader;
+
+            VIR_Shader_Save(copiedShader, &buf);
+
+            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                        sizeof(VIR_Shader),
+                                        (gctPOINTER*)&readShader));
+
+            errCode = VIR_Shader_Construct(gcvNULL,
+                                            VIR_Shader_GetKind(copiedShader),
+                                            readShader);
+            buf.shader = readShader;
+            buf.curPos = 0;
+
+            VIR_Shader_Read(readShader, &buf);
+
+            VIR_Shader_Destroy(copiedShader);
+            gcoOS_Free(gcvNULL, copiedShader);
+            VIR_IO_Finalize(&buf);
+
+            virCLIntrinsicLibrary = readShader;
+        }
+    }
+#endif
+
+    if (DumpShader)
+    {
+        VIR_Shader_Dump(gcvNULL, "VIR library shader IR.", virCLIntrinsicLibrary, gcvTRUE);
+    }
+
+    *pOutLib = virCLIntrinsicLibrary;
+
+OnError:
+    if (builtinSource)
+    {
+        vscMM_Free(pMM, builtinSource);
+    }
+
+    if (Binary)
+    {
+        gcSHADER_Destroy(Binary);
+        Binary = gcvNULL;
+    }
+
+    if (log)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, log);
+    }
+
+    return errCode;
+}
+
+#else
+VSC_ErrCode
+VIR_ReadIntrinsicLib(
+    IN VSC_HW_CONFIG            *pHwCfg,
+    IN VSC_MM                   *pMM
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+
+    return errCode;
+}
+#endif  /* CompileInstrisicLibfromSrc */
+
+VSC_ErrCode
+VIR_CreateIntrinsicLib(
+    IN VSC_HW_CONFIG            *pHwCfg,
+    IN VSC_MM                   *pMM,
+    IN gctBOOL                  forOCL,
+    IN gctBOOL                  forGraphics,
+    IN gctBOOL                   DumpShader,
+    OUT VIR_Shader              **pOutLib
+    )
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+
+#if CompileInstrisicLibList
+    gctSTRING                   builtinLib_common_packed[] =
+    {
+        gcCLLibRelational_Funcs_packed,
+    };
+    VIR_Intrinsic_LibSource     libSource[] =
+    {
+        {
+            VIR_INTRINSIC_LIB_CL,
+            gcCLLibHeader,
+            gcCLLibFunc_Extension,
+            builtinLib_common_packed,
+        }
+    };
+#else
+#if CompileInstrisicLibfromSrc
+    if (forOCL)
+    {
+        if(gcmOPT_oclPackedBasicType())
+        {
+            errCode = _CreateCLIntrinsicLib(pHwCfg, pMM, DumpShader, pOutLib);
+        }
+    }
+    else
+    {
+        errCode = _CreateIntrinsicLib(pHwCfg, pMM, forGraphics, DumpShader, pOutLib);
+    }
+
+#else
+#endif /* CompileInstrisicLibfromSrc */
+#endif /* CompileInstrisicLibList */
+
+    return errCode;
+}
+
+VSC_ErrCode
+VIR_DestroyIntrinsicLib(
+    IN VIR_Shader              *pLib
+    )
+{
+    VIR_Shader_Destroy(pLib);
+    gcoOS_Free(gcvNULL, pLib);
+
+    return VSC_ERR_NONE;
+}
+
+/* queue for lib functions that are needed to be linked in */
+void
+VIR_LIB_WorkListQueue(
+    IN VSC_MM                   *pMM,
+    IN VIR_LIB_WORKLIST         *WorkList,
+    IN VIR_Function             *Func
+    )
+{
+    VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)vscMM_Alloc(pMM,
+        sizeof(VSC_UNI_LIST_NODE_EXT));
+
+    vscULNDEXT_Initialize(worklistNode, Func);
+    QUEUE_PUT_ENTRY(WorkList, worklistNode);
+}
+
+void
+VIR_LIB_WorkListDequeue(
+    IN VSC_MM                   *pMM,
+    IN VIR_LIB_WORKLIST         *WorkList,
+    OUT VIR_Function            **Func
+    )
+{
+    VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)QUEUE_GET_ENTRY(WorkList);
+
+    *Func = (VIR_Function *)vscULNDEXT_GetContainedUserData(worklistNode);
+
+    vscMM_Free(pMM, worklistNode);
+}
+
+/* queue for call instruction that are needed to be updated */
+void
+VIR_LIB_CallSitesQueue(
+    IN VSC_MM                   *pMM,
+    IN VIR_LIB_CALLSITES        *pCallSites,
+    IN VIR_LINKER_CALL_INST_NODE*InstNode
+    )
+{
+    VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)vscMM_Alloc(pMM,
+        sizeof(VSC_UNI_LIST_NODE_EXT));
+
+    vscULNDEXT_Initialize(worklistNode, InstNode);
+    QUEUE_PUT_ENTRY(pCallSites, worklistNode);
+}
+
+void
+VIR_LIB_CallSitesDequeue(
+    IN VSC_MM                   *pMM,
+    IN VIR_LIB_CALLSITES        *pCallSites,
+    OUT VIR_LINKER_CALL_INST_NODE**InstNode
+    )
+{
+    VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)QUEUE_GET_ENTRY(pCallSites);
+
+    *InstNode = (VIR_LINKER_CALL_INST_NODE *)vscULNDEXT_GetContainedUserData(worklistNode);
+
+    vscMM_Free(pMM, worklistNode);
+}
+
+/* convert the type, for the primitive type, they should be the same,
+   for the non-primitive type, we should add the type into the master shader */
+VIR_TypeId VIR_LinkLib_TypeConv(
+    IN VIR_Shader   *pShader,
+    IN VIR_Type     *inType,
+    IN gctBOOL       ConvertSampler)
+{
+    VIR_TypeId inTyId = VIR_Type_GetIndex(inType);
+    VIR_TypeId outTyId = VIR_TYPE_VOID;
+
+    /* primitive type should be the same for both shader */
+    if (VIR_TypeId_isPrimitive(inTyId))
+    {
+        if (ConvertSampler && VIR_TypeId_isSampler(inTyId))
+        {
+            outTyId = VIR_TYPE_UINT_X4;
+        }
+        else
+        {
+            outTyId = inTyId;
+        }
+    }
+    else
+    {
+        switch (VIR_Type_GetKind(inType)) {
+        case VIR_TY_ARRAY:
+            VIR_Shader_AddArrayType(pShader,
+                                    VIR_Type_GetBaseTypeId(inType),
+                                    VIR_Type_GetArrayLength(inType),
+                                    0,
+                                    &outTyId);
+            break;
+        default:
+            gcmASSERT(gcvFALSE);
+            break;
+        }
+    }
+
+    return outTyId;
+};
+
+static VIR_TypeId
+_ConvImageTypeId(
+    VIR_TypeId       ImageTypeId,
+    VIR_LayoutQual   ImageFormat
+    )
+{
+    VIR_TypeId       fixedTypeId = ImageTypeId;
+    VIR_TypeId       imageFormatTypeId = VIR_TYPE_VOID;
+
+    switch (ImageFormat)
+    {
+    /* Floating format. */
+    case VIR_LAYQUAL_IMAGE_FORMAT_RGBA32F:
+    case VIR_LAYQUAL_IMAGE_FORMAT_RGBA16F:
+    case VIR_LAYQUAL_IMAGE_FORMAT_R32F:
+    case VIR_LAYQUAL_IMAGE_FORMAT_RGBA8:
+    case VIR_LAYQUAL_IMAGE_FORMAT_RGBA8_SNORM:
+        imageFormatTypeId = VIR_TYPE_FLOAT32;
+        break;
+
+    /* Signed integer format. */
+    case VIR_LAYQUAL_IMAGE_FORMAT_RGBA32I:
+    case VIR_LAYQUAL_IMAGE_FORMAT_RGBA16I:
+    case VIR_LAYQUAL_IMAGE_FORMAT_RGBA8I:
+    case VIR_LAYQUAL_IMAGE_FORMAT_R32I:
+        imageFormatTypeId = VIR_TYPE_INT32;
+        break;
+
+    /* Unsigned integer format. */
+    case VIR_LAYQUAL_IMAGE_FORMAT_RGBA32UI:
+    case VIR_LAYQUAL_IMAGE_FORMAT_RGBA16UI:
+    case VIR_LAYQUAL_IMAGE_FORMAT_RGBA8UI:
+    case VIR_LAYQUAL_IMAGE_FORMAT_R32UI:
+        imageFormatTypeId = VIR_TYPE_UINT32;
+        break;
+
+    default:
+        break;
+    }
+
+    if (imageFormatTypeId == VIR_TYPE_INT32)
+    {
+        if (VIR_TypeId_isImageDataFloat(fixedTypeId))
+        {
+            switch (fixedTypeId)
+            {
+            /* 1D */
+            case VIR_TYPE_IMAGE_1D:
+                fixedTypeId = VIR_TYPE_IIMAGE_1D;
+                break;
+            case VIR_TYPE_IMAGE_1D_ARRAY:
+                fixedTypeId = VIR_TYPE_IIMAGE_1D_ARRAY;
+                break;
+            /* 2D */
+            case VIR_TYPE_IMAGE_2D:
+                fixedTypeId = VIR_TYPE_IIMAGE_2D;
+                break;
+            case VIR_TYPE_IMAGE_2D_ARRAY:
+                fixedTypeId = VIR_TYPE_IIMAGE_2D_ARRAY;
+                break;
+            /* 3D */
+            case VIR_TYPE_IMAGE_3D:
+                fixedTypeId = VIR_TYPE_IIMAGE_3D;
+                break;
+            /* CUBE */
+            case VIR_TYPE_IMAGE_CUBE:
+                fixedTypeId = VIR_TYPE_IIMAGE_CUBE;
+                break;
+            case VIR_TYPE_IMAGE_CUBE_DEPTH:
+                fixedTypeId = VIR_TYPE_IIMAGE_CUBE_DEPTH;
+                break;
+            case VIR_TYPE_IMAGE_CUBE_ARRAY:
+                fixedTypeId = VIR_TYPE_IIMAGE_CUBE_ARRAY;
+                break;
+            /* BUFFER */
+            case VIR_TYPE_IMAGE_BUFFER:
+                fixedTypeId = VIR_TYPE_IIMAGE_BUFFER;
+                break;
+            default:
+                break;
+            }
+        }
+    }
+    else if (imageFormatTypeId == VIR_TYPE_UINT32)
+    {
+        if (VIR_TypeId_isImageDataFloat(fixedTypeId))
+        {
+            switch (fixedTypeId)
+            {
+            /* 1D */
+            case VIR_TYPE_IMAGE_1D:
+                fixedTypeId = VIR_TYPE_UIMAGE_1D;
+                break;
+            case VIR_TYPE_IMAGE_1D_ARRAY:
+                fixedTypeId = VIR_TYPE_UIMAGE_1D_ARRAY;
+                break;
+            /* 2D */
+            case VIR_TYPE_IMAGE_2D:
+                fixedTypeId = VIR_TYPE_UIMAGE_2D;
+                break;
+            case VIR_TYPE_IMAGE_2D_ARRAY:
+                fixedTypeId = VIR_TYPE_UIMAGE_2D_ARRAY;
+                break;
+            /* 3D */
+            case VIR_TYPE_IMAGE_3D:
+                fixedTypeId = VIR_TYPE_UIMAGE_3D;
+                break;
+            /* CUBE */
+            case VIR_TYPE_IMAGE_CUBE:
+                fixedTypeId = VIR_TYPE_UIMAGE_CUBE;
+                break;
+            case VIR_TYPE_IMAGE_CUBE_DEPTH:
+                fixedTypeId = VIR_TYPE_UIMAGE_CUBE_DEPTH;
+                break;
+            case VIR_TYPE_IMAGE_CUBE_ARRAY:
+                fixedTypeId = VIR_TYPE_UIMAGE_CUBE_ARRAY;
+                break;
+            /* BUFFER */
+            case VIR_TYPE_IMAGE_BUFFER:
+                fixedTypeId = VIR_TYPE_UIMAGE_BUFFER;
+                break;
+            default:
+                break;
+            }
+        }
+    }
+    else if (imageFormatTypeId == VIR_TYPE_FLOAT32)
+    {
+    }
+
+    return fixedTypeId;
+}
+
+static void
+_IntrisicImageRelatedFuncName(
+    VIR_Shader      *pShader,
+    VSC_HW_CONFIG   *pHwCfg,
+    VIR_Instruction *pInst,
+    VIR_Symbol      *pImageSym,
+    VIR_TypeId       TypeId,
+    gctSTRING       *pLibName
+    )
+{
+    VIR_TypeId       fixedTypeId = TypeId;
+    VIR_TypeId       imageTypeId = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pImageSym));
+    VIR_LayoutQual   imageFormat = (VIR_Symbol_GetLayoutQualifier(pImageSym) & VIR_LAYQUAL_IMAGE_FORMAT_MASK);
+    gctBOOL          useImgInst = gcvFALSE;
+
+    /* Check if chip can support IMG_LOAD/IMG_STORE. */
+    useImgInst = pHwCfg->hwFeatureFlags.supportImgAddr;
+
+    /* For halti5 chips, if they don't have USC_GOS_ADDR_FIX feature, then they can't use IMG_LOAD/IMG_STORE for vs/ts/gs/ps. */
+    if (useImgInst &&
+        pHwCfg->hwFeatureFlags.hasHalti5 &&
+        !pHwCfg->hwFeatureFlags.hasUscGosAddrFix &&
+        VIR_Shader_IsGraphics(pShader))
+    {
+        useImgInst = gcvFALSE;
+    }
+
+    /* Convert the image type if needed. */
+    if (!useImgInst)
+    {
+        fixedTypeId = _ConvImageTypeId(fixedTypeId, imageFormat);
+    }
+
+    gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__,
+        VIR_Shader_GetTypeNameString(pShader, VIR_Shader_GetTypeFromId(pShader, fixedTypeId)));
+
+    if (useImgInst)
+    {
+        /* whether can support 128 bpp image. */
+        if (!pHwCfg->hwFeatureFlags.support128BppImage)
+        {
+            if (VIR_Symbol_Is128Bpp(pImageSym) && !VIR_TypeId_isImageBuffer(imageTypeId))
+            {
+                gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_1");
+            }
+        }
+    }
+    else
+    {
+        switch (imageFormat)
+        {
+        /* Floating format. */
+        case VIR_LAYQUAL_IMAGE_FORMAT_RGBA32F:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rgba32f");
+            break;
+
+        case VIR_LAYQUAL_IMAGE_FORMAT_R32F:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_r32f");
+            break;
+
+        case VIR_LAYQUAL_IMAGE_FORMAT_RGBA8:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rgba8");
+            break;
+
+        case VIR_LAYQUAL_IMAGE_FORMAT_RGBA8_SNORM:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rgba8_snorm");
+            break;
+
+        /* Signed integer format. */
+        case VIR_LAYQUAL_IMAGE_FORMAT_RGBA32I:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rgba32i");
+            break;
+
+        case VIR_LAYQUAL_IMAGE_FORMAT_RGBA8I:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rgba8i");
+            break;
+
+        case VIR_LAYQUAL_IMAGE_FORMAT_R32I:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_r32i");
+            break;
+
+        /* Unsigned integer format. */
+        case VIR_LAYQUAL_IMAGE_FORMAT_RGBA32UI:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rgba32ui");
+            break;
+
+        case VIR_LAYQUAL_IMAGE_FORMAT_RGBA8UI:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_rgba8ui");
+            break;
+
+        case VIR_LAYQUAL_IMAGE_FORMAT_R32UI:
+            gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_r32ui");
+            break;
+
+        default:
+            break;
+        }
+    }
+}
+
+static void
+_IntrisicTexldFuncName(
+    VIR_Shader      *pShader,
+    VSC_HW_CONFIG   *pHwCfg,
+    VIR_Instruction *pInst,
+    gctSTRING       *pLibName
+    )
+{
+    VIR_ParmPassing *parmOpnd = VIR_Operand_GetParameters(VIR_Inst_GetSource(pInst, 1));
+    VIR_Operand     *pOpnd;
+    VIR_Operand  *texldOperand;
+
+    if (parmOpnd->argNum < 3)
+    {
+        return;
+    }
+    pOpnd = parmOpnd->args[2];
+
+    /* Not optional bias, lod or gradient exist. */
+    if (VIR_Operand_GetOpKind(pOpnd) != VIR_OPND_TEXLDPARM)
+    {
+        return;
+    }
+
+    texldOperand = (VIR_Operand*)pOpnd;
+
+    /* Check bias. */
+    if (VIR_Operand_GetTexldBias(texldOperand) != gcvNULL)
+    {
+        gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_bias");
+    }
+    /* Check lod. */
+    if (VIR_Operand_GetTexldLod(texldOperand) != gcvNULL)
+    {
+        gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_lod");
+    }
+}
+
+static void
+_IntrisicImageAddrFuncName(
+    VIR_Shader      *pShader,
+    VSC_HW_CONFIG   *pHwCfg,
+    VIR_Instruction *pInst,
+    VIR_Symbol      *pImageSym,
+    gctSTRING       *pLibName
+    )
+{
+    VIR_TypeId       imageTypeId = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(pImageSym));
+
+    if (VIR_TypeId_isImage3D(imageTypeId) ||
+        VIR_TypeId_isImageCube(imageTypeId) ||
+        VIR_TypeId_isImageArray(imageTypeId))
+    {
+        if (VIR_TypeId_isImage1D(imageTypeId))
+        {
+            gcoOS_StrCopySafe(*pLibName, __LIB_NAME_LENGTH__, "_viv_image_addr_image_1d_array");
+        }
+        else if (VIR_TypeId_isImage2D(imageTypeId))
+        {
+            gcoOS_StrCopySafe(*pLibName, __LIB_NAME_LENGTH__, "_viv_image_addr_image_2d_array");
+        }
+        else
+        {
+            gcoOS_StrCopySafe(*pLibName, __LIB_NAME_LENGTH__, "_viv_image_addr_image_3d");
+        }
+    }
+    else if (VIR_TypeId_isImage1D(imageTypeId))
+    {
+        gcoOS_StrCopySafe(*pLibName, __LIB_NAME_LENGTH__, "_viv_image_addr_image_1d");
+    }
+    else
+    {
+        gcoOS_StrCopySafe(*pLibName, __LIB_NAME_LENGTH__, "_viv_image_addr_image_2d");
+    }
+}
+
+
+static void
+_IntrisicImageFetchFuncName(
+    VIR_Shader      *pShader,
+    VSC_HW_CONFIG   *pHwCfg,
+    VIR_Instruction *pInst,
+    gctSTRING       *pLibName
+    )
+{
+    VIR_ParmPassing *parmOpnd = VIR_Operand_GetParameters(VIR_Inst_GetSource(pInst, 1));
+    VIR_Operand     *pOpnd;
+    VIR_Operand  *texldOperand;
+
+    if (parmOpnd->argNum < 3)
+    {
+        return;
+    }
+    pOpnd = parmOpnd->args[2];
+
+    /* Not optional bias, lod or gradient exist. */
+    if (VIR_Operand_GetOpKind(pOpnd) != VIR_OPND_TEXLDPARM)
+    {
+        return;
+    }
+
+    texldOperand = (VIR_Operand*)pOpnd;
+
+    /* Check offset. */
+    if (VIR_Operand_GetTexldOffset(texldOperand) != gcvNULL)
+    {
+        gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_offset");
+    }
+}
+
+static void
+_IntrisicFuncName(
+    VIR_Shader      *pShader,
+    VSC_HW_CONFIG   *pHwCfg,
+    VIR_Instruction *pInst,
+    gctSTRING       *pLibName
+    )
+{
+    VIR_Operand *src0Opnd = VIR_Inst_GetSource(pInst, 0);
+    VIR_Operand *src1Opnd = VIR_Inst_GetSource(pInst, 1);
+    VIR_ParmPassing *parmOpnd;
+    VIR_TypeId   opndTypeId;
+    VIR_IntrinsicsKind intrinsicKind = VIR_Operand_GetIntrinsicKind(src0Opnd);
+    VIR_Operand *imageOpnd = gcvNULL;
+    VIR_Symbol *imageSym = gcvNULL;
+    VIR_TypeId imageTypeId = VIR_INVALID_ID;
+
+    /* Get parameters */
+    parmOpnd = VIR_Operand_GetParameters(src1Opnd);
+
+    /* If it is image-related function, get image symbol. */
+    if (VIR_Intrinsics_isImageRelated(intrinsicKind) ||
+        VIR_Intrinsics_isImageAddr(intrinsicKind) ||
+        VIR_Intrinsics_isImageFetch(intrinsicKind))
+    {
+        imageOpnd = parmOpnd->args[0];
+        imageSym = VIR_Operand_GetSymbol(imageOpnd);
+        imageTypeId = VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(imageSym));
+
+        if (VIR_Intrinsics_isImageFetch(intrinsicKind) && VIR_TypeId_isImageBuffer(imageTypeId))
+        {
+            intrinsicKind = VIR_IK_image_load;
+        }
+    }
+
+    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_INTRINSIC);
+
+    gcoOS_StrCopySafe(*pLibName, 6, "_viv_");
+    gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, VIR_Intrinsic_GetName(intrinsicKind));
+
+    /* since transpose lib function's input is already lowered to vec
+       its src0 could not distinguish the function */
+    if (intrinsicKind == VIR_IK_transpose)
+    {
+        opndTypeId = VIR_Operand_GetType(VIR_Inst_GetDest(pInst));
+    }
+    else
+    {
+        opndTypeId = VIR_Operand_GetType(parmOpnd->args[0]);
+    }
+
+    /* We don't need to get data type for image query. */
+    if (VIR_Intrinsics_isImageQuery(intrinsicKind))
+    {
+        gctCHAR buffer[128];
+        gctUINT offset = 0;
+
+        if (VIR_Intrinsics_isImageQueryDimRelated(intrinsicKind))
+        {
+            if (VIR_TypeId_isImage1D(imageTypeId) || VIR_TypeId_isImageBuffer(imageTypeId) ||
+                VIR_TypeId_isSampler1D(imageTypeId) || VIR_TypeId_isSamplerBuffer(imageTypeId))
+            {
+                gcoOS_PrintStrSafe(buffer, 128, &offset, "_1d");
+                gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, buffer);
+            }
+            else if (VIR_TypeId_isImage2D(imageTypeId) ||
+                     VIR_TypeId_isSampler2D(imageTypeId))
+            {
+                gcoOS_PrintStrSafe(buffer, 128, &offset, "_2d");
+                gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, buffer);
+            }
+            else if (VIR_TypeId_isImageCube(imageTypeId) ||
+                     VIR_TypeId_isSamplerCube(imageTypeId))
+            {
+                gcoOS_PrintStrSafe(buffer, 128, &offset, "_cube");
+                gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, buffer);
+            }
+            else if (VIR_TypeId_isImage3D(imageTypeId) ||
+                     VIR_TypeId_isSampler3D(imageTypeId))
+            {
+                gcoOS_PrintStrSafe(buffer, 128, &offset, "_3d");
+                gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, buffer);
+            }
+
+            /* Check if it is an array. */
+            if (VIR_TypeId_isImageArray(imageTypeId) ||
+                VIR_TypeId_isSamplerArray(imageTypeId))
+            {
+                offset = 0;
+                gcoOS_PrintStrSafe(buffer, 128, &offset, "_array");
+                gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, buffer);
+            }
+        }
+        else if (VIR_Intrinsics_isImageQueryLod(intrinsicKind))
+        {
+            if (VIR_TypeId_isImage3D(imageTypeId) || VIR_TypeId_isSampler3D(imageTypeId))
+            {
+                gcoOS_PrintStrSafe(buffer, 128, &offset, "_3d");
+                gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, buffer);
+            }
+            else if (VIR_TypeId_isImageCube(imageTypeId) || VIR_TypeId_isSamplerCube(imageTypeId))
+            {
+                gcoOS_PrintStrSafe(buffer, 128, &offset, "_cube");
+                gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, buffer);
+            }
+            else
+            {
+                gcoOS_PrintStrSafe(buffer, 128, &offset, "_2d");
+                gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, buffer);
+            }
+        }
+        return;
+    }
+
+    gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__, "_");
+
+    /* Check for imageLoad/imageStore. */
+    if (VIR_Intrinsics_isImageLoad(intrinsicKind) || VIR_Intrinsics_isImageStore(intrinsicKind))
+    {
+        _IntrisicImageRelatedFuncName(pShader, pHwCfg, pInst, imageSym, opndTypeId, pLibName);
+    }
+    else
+    {
+        gcoOS_StrCatSafe(*pLibName, __LIB_NAME_LENGTH__,
+            VIR_Shader_GetTypeNameString(pShader, VIR_Shader_GetTypeFromId(pShader, opndTypeId)));
+
+        /* Check for texld related. */
+        if (VIR_Intrinsics_isTexLdRelated(intrinsicKind))
+        {
+            _IntrisicTexldFuncName(pShader, pHwCfg, pInst, pLibName);
+        }
+        /* Check for image addr. */
+        else if (VIR_Intrinsics_isImageAddr(intrinsicKind))
+        {
+            _IntrisicImageAddrFuncName(pShader, pHwCfg, pInst, imageSym, pLibName);
+        }
+        /* Check for image fetch. */
+        else if (VIR_Intrinsics_isImageFetch(intrinsicKind))
+        {
+            _IntrisicImageFetchFuncName(pShader, pHwCfg, pInst, pLibName);
+        }
+    }
+}
+
+VSC_ErrCode
+_VIR_LinkIntrinsicLib_CopyOpnd(
+    IN VIR_Shader               *pShader,
+    IN VIR_Shader               *pLibShader,
+    IN VIR_Function             *pFunc,
+    IN VIR_Function             *libFunc,
+    IN VIR_Instruction          *libInst,
+    IN VIR_Operand              *libOpnd,
+    IN VIR_Instruction          *pInst,
+    IN VIR_Operand              *pOpnd,
+    OUT VSC_HASH_TABLE          *pTempSet,
+    OUT gctUINT                  *tempIndexStart)
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_OperandKind     opndKind = VIR_Operand_GetOpKind(libOpnd);
+    VIR_Symbol          *libSym = gcvNULL;
+    VIR_Symbol          *newVirRegSym = gcvNULL;
+    VIR_Symbol          *newVarSym = gcvNULL;
+    VIR_TypeId          pTyId = VIR_TYPE_UNKNOWN;
+    VIR_TypeId          origTypeId = VIR_Operand_GetType(libOpnd);
+    VIR_SymId           newVirRegId = VIR_INVALID_ID;
+    VIR_SymId           newVarId = VIR_INVALID_ID;
+    VIR_NameId          nameId;
+    gctSTRING           libName;
+
+    if (VIR_Operand_isLvalue(libOpnd))
+    {
+        VIR_Operand_SetEnable(pOpnd, VIR_Operand_GetEnable(libOpnd));
+    }
+    else
+    {
+        VIR_Operand_SetSwizzle(pOpnd, VIR_Operand_GetSwizzle(libOpnd));
+    }
+
+    if (opndKind == VIR_OPND_SYMBOL || opndKind == VIR_OPND_SAMPLER_INDEXING)
+    {
+        libSym = VIR_Operand_GetSymbol(libOpnd);
+        pTyId = VIR_LinkLib_TypeConv(pShader, VIR_Symbol_GetType(libSym), gcvFALSE);
+
+        if (VIR_Symbol_GetKind(libSym) == VIR_SYM_VIRREG)
+        {
+            if (vscHTBL_DirectTestAndGet(pTempSet, (void*) libSym, (void **)&newVirRegSym))
+            {
+                newVirRegId = VIR_Symbol_GetIndex(newVirRegSym);
+            }
+            else
+            {
+                VIR_Shader_AddSymbol(pShader,
+                                     VIR_SYM_VIRREG,
+                                     *tempIndexStart,
+                                     VIR_Shader_GetTypeFromId(pShader, pTyId),
+                                     VIR_STORAGE_UNKNOWN,
+                                     &newVirRegId);
+
+                newVirRegSym = VIR_Function_GetSymFromId(pFunc, newVirRegId);
+
+                *tempIndexStart = *tempIndexStart +
+                    VIR_Type_GetRegCount(pShader, VIR_Symbol_GetType(newVirRegSym), gcvFALSE);
+
+                vscHTBL_DirectSet(pTempSet, (void*) libSym, (void*) newVirRegSym);
+            }
+
+            VIR_Operand_SetSymbol(pOpnd, pFunc, newVirRegId);
+
+            libSym = VIR_Symbol_GetVregVariable(libSym); /* set the sym to corresponding variable */
+        }
+        else
+        {
+            libName = VIR_Shader_GetSymNameString(pLibShader, libSym);
+            newVarSym = VIR_Shader_FindSymbolByName(pShader, VIR_SYM_VARIABLE, libName);
+
+            if (newVarSym == gcvNULL)
+            {
+                errCode = VIR_Shader_AddString(pShader,
+                                               libName,
+                                               &nameId);
+
+                VIR_Shader_AddSymbol(pShader,
+                                     VIR_Symbol_GetKind(libSym),
+                                     nameId,
+                                     VIR_Shader_GetTypeFromId(pShader, pTyId),
+                                     VIR_STORAGE_UNKNOWN,
+                                     &newVarId);
+
+                newVarSym = VIR_Function_GetSymFromId(pFunc, newVarId);
+
+                if (VIR_Symbol_GetIndex(libSym) == VIR_Shader_GetBaseSamplerId(pLibShader))
+                {
+                    VIR_Shader_SetBaseSamplerId(pShader, newVarId);
+                }
+            }
+            VIR_Operand_SetSymbol(pOpnd, pFunc, VIR_Symbol_GetIndex(newVarSym));
+        }
+        /* Copy the operand type. */
+        VIR_Operand_SetType(pOpnd, origTypeId);
+
+        if (libSym != gcvNULL)
+        {
+            if (VIR_Symbol_isVariable(libSym))
+            {
+                libName = VIR_Shader_GetSymNameString(pLibShader, libSym);
+                newVarSym = VIR_Shader_FindSymbolByName(pShader, VIR_SYM_VARIABLE, libName);
+
+                if (newVarSym == gcvNULL)
+                {
+                    errCode = VIR_Shader_AddString(pShader,
+                                                   libName,
+                                                   &nameId);
+                    /* add a variable */
+                    errCode = VIR_Shader_AddSymbol(pShader,
+                                                   VIR_Symbol_GetKind(libSym),
+                                                   nameId,
+                                                   VIR_Shader_GetTypeFromId(pShader, pTyId),
+                                                   VIR_STORAGE_UNKNOWN,
+                                                   &newVarId);
+
+                    newVarSym = VIR_Function_GetSymFromId(pFunc, newVarId);
+                }
+
+                gcmASSERT(newVirRegSym && newVarSym);
+                VIR_Symbol_SetVregVariable(newVirRegSym, newVarSym);
+            }
+            else
+            {
+                /* get the variable of struct type which this field is in */
+                gcmASSERT(VIR_Symbol_isField(libSym) ||
+                          opndKind == VIR_OPND_SAMPLER_INDEXING);
+            }
+        }
+    }
+    else if (opndKind == VIR_OPND_IMMEDIATE)
+    {
+        switch(VIR_Operand_GetType(libOpnd))
+        {
+        case VIR_TYPE_FLOAT32:
+        case VIR_TYPE_FLOAT16:
+            VIR_Operand_SetImmediateFloat(pOpnd, VIR_Operand_GetImmediateFloat(libOpnd));
+            break;
+
+        case VIR_TYPE_INT32:
+        case VIR_TYPE_INT16:
+            VIR_Operand_SetImmediateInt(pOpnd, VIR_Operand_GetImmediateInt(libOpnd));
+            break;
+
+        case VIR_TYPE_UINT32:
+        case VIR_TYPE_UINT16:
+        case VIR_TYPE_BOOLEAN:
+            VIR_Operand_SetImmediateUint(pOpnd, VIR_Operand_GetImmediateUint(libOpnd));
+            break;
+
+        default:
+            gcmASSERT(gcvFALSE);
+            break;
+        }
+    }
+    else if (opndKind == VIR_OPND_CONST)
+    {
+    }
+    else if (opndKind == VIR_OPND_TEXLDPARM)
+    {
+        VIR_Operand *libTexldOperand;
+        VIR_Operand *newOperand = gcvNULL;
+
+        VIR_Operand_SetOpKind(pOpnd, VIR_OPND_TEXLDPARM);
+        VIR_Operand_SetRoundMode(pOpnd, VIR_ROUND_DEFAULT);
+        VIR_Operand_SetModifier(pOpnd, VIR_MOD_NONE);
+
+        libTexldOperand = (VIR_Operand*)libOpnd;
+
+        /* Check bias. */
+        if (VIR_Operand_hasBiasFlag(libTexldOperand))
+        {
+            VIR_Function_NewOperand(pFunc, &newOperand);
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+                                                     pLibShader,
+                                                     pFunc,
+                                                     libFunc,
+                                                     libInst,
+                                                     VIR_Operand_GetTexldBias(libTexldOperand),
+                                                     pInst,
+                                                     newOperand,
+                                                     pTempSet,
+                                                     tempIndexStart);
+            VIR_Operand_SetTexldBias(pOpnd, newOperand);
+        }
+        /* Check lod. */
+        if (VIR_Operand_hasLodFlag(libTexldOperand))
+        {
+            VIR_Function_NewOperand(pFunc, &newOperand);
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+                                                     pLibShader,
+                                                     pFunc,
+                                                     libFunc,
+                                                     libInst,
+                                                     VIR_Operand_GetTexldLod(libTexldOperand),
+                                                     pInst,
+                                                     newOperand,
+                                                     pTempSet,
+                                                     tempIndexStart);
+            VIR_Operand_SetTexldLod(pOpnd, newOperand);
+        }
+        /* Check offset. */
+        if (VIR_Operand_hasOffsetFlag(libTexldOperand))
+        {
+            VIR_Function_NewOperand(pFunc, &newOperand);
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+                                                     pLibShader,
+                                                     pFunc,
+                                                     libFunc,
+                                                     libInst,
+                                                     VIR_Operand_GetTexldOffset(libTexldOperand),
+                                                     pInst,
+                                                     newOperand,
+                                                     pTempSet,
+                                                     tempIndexStart);
+            VIR_Operand_SetTexldOffset(pOpnd, newOperand);
+        }
+        /* Check grad. */
+        if (VIR_Operand_hasGradFlag(libTexldOperand))
+        {
+            VIR_Function_NewOperand(pFunc, &newOperand);
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+                                                     pLibShader,
+                                                     pFunc,
+                                                     libFunc,
+                                                     libInst,
+                                                     VIR_Operand_GetTexldGrad_dx(libTexldOperand),
+                                                     pInst,
+                                                     newOperand,
+                                                     pTempSet,
+                                                     tempIndexStart);
+            VIR_Operand_SetTexldGradientDx(pOpnd, newOperand);
+
+            VIR_Function_NewOperand(pFunc, &newOperand);
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+                                                     pLibShader,
+                                                     pFunc,
+                                                     libFunc,
+                                                     libInst,
+                                                     VIR_Operand_GetTexldGrad_dy(libTexldOperand),
+                                                     pInst,
+                                                     newOperand,
+                                                     pTempSet,
+                                                     tempIndexStart);
+            VIR_Operand_SetTexldGradientDy(pOpnd, newOperand);
+        }
+        /* Check gather. */
+        if (VIR_Operand_hasGatherFlag(libTexldOperand))
+        {
+            VIR_Function_NewOperand(pFunc, &newOperand);
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+                                                     pLibShader,
+                                                     pFunc,
+                                                     libFunc,
+                                                     libInst,
+                                                     VIR_Operand_GetTexldGather_comp(libTexldOperand),
+                                                     pInst,
+                                                     newOperand,
+                                                     pTempSet,
+                                                     tempIndexStart);
+            VIR_Operand_SetTexldGatherComp(pOpnd, newOperand);
+
+            VIR_Function_NewOperand(pFunc, &newOperand);
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+                                                     pLibShader,
+                                                     pFunc,
+                                                     libFunc,
+                                                     libInst,
+                                                     VIR_Operand_GetTexldGather_refz(libTexldOperand),
+                                                     pInst,
+                                                     newOperand,
+                                                     pTempSet,
+                                                     tempIndexStart);
+            VIR_Operand_SetTexldGatherRefZ(pOpnd, newOperand);
+        }
+        /* Check fetch ms. */
+        if (VIR_Operand_hasFetchMSFlag(libTexldOperand))
+        {
+            VIR_Function_NewOperand(pFunc, &newOperand);
+            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+                                                     pLibShader,
+                                                     pFunc,
+                                                     libFunc,
+                                                     libInst,
+                                                     VIR_Operand_GetTexldFetchMS_sample(libTexldOperand),
+                                                     pInst,
+                                                     newOperand,
+                                                     pTempSet,
+                                                     tempIndexStart);
+            VIR_Operand_SetTexldFetchMS(pOpnd, newOperand);
+        }
+    }
+    else if (opndKind == VIR_OPND_INTRINSIC)
+    {
+        VIR_Operand_SetIntrinsic(pOpnd, VIR_Operand_GetIntrinsicKind(libOpnd));
+    }
+    else if (opndKind == VIR_OPND_PARAMETERS)
+    {
+        VIR_ParmPassing *libParm = VIR_Operand_GetParameters(libOpnd);
+        VIR_ParmPassing *parmOpnd = gcvNULL;
+        gctUINT i;
+        VIR_Operand     *newOperand = gcvNULL;
+
+        VIR_Function_NewParameters(pFunc, libParm->argNum, &parmOpnd);
+        if (libParm->argNum > 0)
+        {
+            for (i = 0; i < libParm->argNum; i++)
+            {
+                VIR_Function_NewOperand(pFunc, &newOperand);
+                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+                                                         pLibShader,
+                                                         pFunc,
+                                                         libFunc,
+                                                         libInst,
+                                                         libParm->args[i],
+                                                         pInst,
+                                                         newOperand,
+                                                         pTempSet,
+                                                         tempIndexStart);
+                parmOpnd->args[i] = newOperand;
+            }
+        }
+        VIR_Operand_SetParameters(pOpnd, parmOpnd);
+    }
+    else
+    {
+        /* We may hit VIR_OPND_UNDEF for some opcodes, e.g, IMG_LOAD. */
+    }
+
+    /* Copy the index from orig operand to new operand. */
+    VIR_Operand_SetIsConstIndexing(pOpnd, VIR_Operand_GetIsConstIndexing(libOpnd));
+    VIR_Operand_SetRelAddrMode(pOpnd, VIR_Operand_GetRelAddrMode(libOpnd));
+    VIR_Operand_SetMatrixConstIndex(pOpnd, VIR_Operand_GetMatrixConstIndex(libOpnd));
+    VIR_Operand_SetRelAddrLevel(pOpnd, VIR_Operand_GetRelAddrLevel(libOpnd));
+    VIR_Operand_SetRoundMode(pOpnd, VIR_Operand_GetRoundMode(libOpnd));
+
+    /* If it is constant index, just copy; if it is reg indexed, need to map to the new reg. */
+    if (VIR_Operand_GetIsConstIndexing(libOpnd))
+    {
+        VIR_Operand_SetRelIndex(pOpnd, VIR_Operand_GetRelIndexing(libOpnd));
+    }
+    else if (VIR_Operand_GetRelAddrMode(libOpnd) != VIR_INDEXED_NONE)
+    {
+        libSym = VIR_Function_GetSymFromId(libFunc, VIR_Operand_GetRelIndexing(libOpnd));
+        /* This must be a vreg symbol. */
+        gcmASSERT(VIR_Symbol_isVreg(libSym));
+
+        if (vscHTBL_DirectTestAndGet(pTempSet, (void*) libSym, (void **)&newVirRegSym))
+        {
+            newVirRegId = VIR_Symbol_GetIndex(newVirRegSym);
+        }
+        else
+        {
+            if (VIR_TypeId_isSampler(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(libSym))))
+            {
+                pTyId = VIR_TYPE_UINT_X4;
+            }
+            else
+            {
+                pTyId = VIR_Type_GetIndex(VIR_Symbol_GetType(libSym));
+            }
+
+            VIR_Shader_AddSymbol(pShader,
+                                 VIR_SYM_VIRREG,
+                                 *tempIndexStart,
+                                 VIR_Shader_GetTypeFromId(pShader, pTyId),
+                                 VIR_STORAGE_UNKNOWN,
+                                 &newVirRegId);
+
+            newVirRegSym = VIR_Function_GetSymFromId(pFunc, newVirRegId);
+
+            *tempIndexStart = *tempIndexStart +
+                VIR_Type_GetRegCount(pShader, VIR_Symbol_GetType(newVirRegSym), gcvFALSE);
+
+            vscHTBL_DirectSet(pTempSet, (void*) libSym, (void*) newVirRegSym);
+        }
+        VIR_Operand_SetRelIndex(pOpnd, newVirRegId);
+    }
+
+    return errCode;
+}
+
+VSC_ErrCode
+_VIR_LinkIntrinsicLib_CopyInst(
+    IN  VIR_Shader              *pShader,
+    IN  VIR_Shader              *pLibShader,
+    IN  VIR_Function            *libFunc,
+    IN  VIR_Function            *pFunc,
+    IN  VIR_Instruction         *libInst,
+    IN  VSC_MM                  *pMM,
+    OUT VSC_HASH_TABLE          *pLabelSet,
+    OUT VSC_HASH_TABLE          *pJmpSet,
+    OUT VSC_HASH_TABLE          *pTempSet,
+    OUT VIR_LIB_WORKLIST        *pWorkList,
+    OUT VIR_LIB_CALLSITES       *pCallSites,
+    OUT gctUINT                 *tempIndexStart
+    )
+{
+    VSC_ErrCode     errCode = VSC_ERR_NONE;
+    VIR_OpCode      libOpcode = VIR_Inst_GetOpcode(libInst);
+    gctUINT         srcNum = VIR_OPCODE_GetSrcOperandNum(libOpcode);
+    VIR_Operand     *origDest = gcvNULL, *origSrc = gcvNULL;
+    gctUINT i;
+    VIR_Instruction *newInst = gcvNULL;
+    VIR_TypeId  newTyId = VIR_TYPE_UNKNOWN;
+
+    switch (libOpcode)
+    {
+    case VIR_OP_CALL:
+        {
+            /* if function is in the pShader, it is OK,
+                otherwise, add it to the queue */
+            VIR_Function *libCallee = gcvNULL, *pCallee = gcvNULL;
+            VIR_LINKER_CALL_INST_NODE *callInstNode;
+
+            origDest = VIR_Inst_GetDest(libInst);
+            libCallee = VIR_Operand_GetFunction(origDest);
+            newTyId = VIR_LinkLib_TypeConv(pShader, VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetType(origDest)), gcvFALSE);
+
+            VIR_Shader_GetFunctionByName(pShader, VIR_Function_GetNameString(libCallee), &pCallee);
+            if (pCallee == gcvNULL)
+            {
+                /* add pCallee to the pShader */
+                errCode = VIR_Shader_AddFunction(pShader,
+                                        VIR_Function_GetFlags(libCallee),
+                                        VIR_Function_GetNameString(libCallee),
+                                        newTyId,
+                                        &pCallee);
+                ON_ERROR(errCode, "_VIR_LinkIntrinsicLib_CopyInst");
+
+                VIR_LIB_WorkListQueue(pMM, pWorkList, pCallee);
+            }
+
+
+            errCode = VIR_Function_AddInstruction(pFunc, VIR_OP_CALL, newTyId, &newInst);
+            VIR_Operand_SetFunction(VIR_Inst_GetDest(newInst), pCallee);
+            ON_ERROR(errCode, "_VIR_LinkIntrinsicLib_CopyInst");
+
+            callInstNode = (VIR_LINKER_CALL_INST_NODE *) vscMM_Alloc(pMM, sizeof(VIR_LINKER_CALL_INST_NODE));
+            callInstNode->inst = newInst;
+            callInstNode->intrinsicKind = VIR_IK_NONE;
+
+            VIR_LIB_CallSitesQueue(pMM, pCallSites, callInstNode);
+
+            break;
+        }
+    case VIR_OP_LABEL:
+        {
+            VIR_LabelId newLabelId;
+            VIR_Label   *newLabel = gcvNULL, *libLabel;
+            VIR_Symbol  *libSym;
+            gctSTRING   labelName = gcvNULL;
+
+            /* the label should have new name to avoid the same name */
+            labelName = (gctSTRING) vscMM_Alloc(pMM, __LIB_NAME_LENGTH__ * sizeof(char));
+
+            libLabel = VIR_Operand_GetLabel(libInst->dest);
+            libSym = VIR_Function_GetSymFromId(libFunc, libLabel->sym);
+
+            gcoOS_StrCopySafe(labelName, __LIB_NAME_LENGTH__, "_viv_");
+            gcoOS_StrCatSafe(labelName, __LIB_NAME_LENGTH__, VIR_Shader_GetSymNameString(pLibShader, libSym));
+
+            errCode = VIR_Function_AddLabel(pFunc,
+                                             labelName,
+                                             &newLabelId);
+            ON_ERROR(errCode, "_VIR_LinkIntrinsicLib_CopyInst");
+
+            errCode = VIR_Function_AddInstruction(pFunc, VIR_OP_LABEL, newTyId, &newInst);
+            ON_ERROR(errCode, "_VIR_LinkIntrinsicLib_CopyInst");
+
+            newLabel = VIR_GetLabelFromId(pFunc, newLabelId);
+            newLabel->defined = newInst;
+            VIR_Operand_SetLabel(newInst->dest, newLabel);
+            vscHTBL_DirectSet(pLabelSet, (void*) libLabel, (void*) newLabel);
+
+            vscMM_Free(pMM, labelName);
+
+            break;
+        }
+    case VIR_OP_JMP:
+    case VIR_OP_JMPC:
+    case VIR_OP_JMP_ANY:
+        {
+            VIR_Label       *label = VIR_Operand_GetLabel(VIR_Inst_GetDest(libInst));
+            VIR_Label       *pNewLabel = gcvNULL;
+            VIR_Link        *pNewLink     = gcvNULL;
+
+            errCode = VIR_Function_AddInstruction(pFunc, libOpcode, newTyId, &newInst);
+            ON_ERROR(errCode, "_VIR_LinkIntrinsicLib_CopyInst");
+
+            if (vscHTBL_DirectTestAndGet(pLabelSet, (void*) label, (void **)&pNewLabel))
+            {
+                VIR_Operand_SetLabel(VIR_Inst_GetDest(newInst), pNewLabel);
+                VIR_Function_NewLink(pFunc, &pNewLink);
+                VIR_Link_SetReference(pNewLink, (gctUINTPTR_T)newInst);
+                VIR_Link_AddLink(&(pNewLabel->referenced), pNewLink);
+            }
+            else
+            {
+                /* we need to save the unchanged jmp into a list, its label willl be changed
+                    at the end */
+                vscHTBL_DirectSet(pJmpSet, (void*) libInst, (void*) newInst);
+            }
+
+            VIR_Inst_SetConditionOp(newInst, VIR_Inst_GetConditionOp(libInst));
+
+            /* handle source operand */
+            for (i = 0; i < srcNum; i++)
+            {
+                origSrc = VIR_Inst_GetSource(libInst, i);
+                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader, pLibShader, pFunc, libFunc, libInst,
+                                                          origSrc, newInst, newInst->src[i], pTempSet, tempIndexStart);
+            }
+
+            break;
+        }
+    default:
+        {
+            errCode = VIR_Function_AddInstruction(pFunc, VIR_Inst_GetOpcode(libInst), newTyId, &newInst);
+
+            VIR_Inst_SetConditionOp(newInst, VIR_Inst_GetConditionOp(libInst));
+
+            VIR_Inst_SetResOpType(newInst, VIR_Inst_GetResOpType(libInst));
+
+            /* handle dest operand */
+            if (VIR_OPCODE_hasDest(libOpcode))
+            {
+                origDest = VIR_Inst_GetDest(libInst);
+                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader, pLibShader, pFunc, libFunc, libInst,
+                                                          origDest, newInst, VIR_Inst_GetDest(newInst), pTempSet, tempIndexStart);
+
+                VIR_Inst_SetInstType(newInst, VIR_Operand_GetType(VIR_Inst_GetDest(newInst)));
+            }
+
+            /* handle source operand */
+            for (i = 0; i < srcNum; i++)
+            {
+                origSrc = VIR_Inst_GetSource(libInst, i);
+                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader, pLibShader, pFunc, libFunc, libInst,
+                                                          origSrc, newInst, newInst->src[i], pTempSet, tempIndexStart);
+            }
+        }
+        break;
+    }
+
+OnError:
+    return errCode;
+}
+
+/* link the functions in the worklist from library to the shader */
+VSC_ErrCode
+VIR_Lib_LinkFunctions(
+    IN  VIR_Shader              *pShader,
+    IN  VIR_Shader              *pLibShader,
+    IN  VSC_MM                  *pMM,
+    OUT VIR_LIB_WORKLIST        *pWorkList,
+    OUT VIR_LIB_CALLSITES       *pCallSites)
+{
+    VSC_ErrCode     errCode = VSC_ERR_NONE;
+    VIR_Function    *pFunc = gcvNULL;
+    VIR_Function    *libFunc = gcvNULL;
+    gctSTRING       libName = gcvNULL;
+    gctUINT         tempIndexStart;
+
+    VIR_InstIterator inst_iter;
+    VIR_Instruction *inst;
+
+    VSC_HASH_TABLE       *pLabelSet;
+    VSC_HASH_TABLE       *pJmpSet;
+    VSC_HASH_TABLE       *pTempSet;
+
+    /* label map to update the jmp target (forward jmp could not find label when processing) */
+    pLabelSet = vscHTBL_Create(pMM,
+                (PFN_VSC_HASH_FUNC)vscHFUNC_Label, (PFN_VSC_KEY_CMP)vcsHKCMP_Label, 64);
+
+    /* jmp to be updated at the end of the shader processing */
+    pJmpSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 64);
+
+    /* vreg map from libShader to the current shader */
+    pTempSet = vscHTBL_Create(pMM, vscHFUNC_Default, vscHKCMP_Default, 64);
+
+    while(!QUEUE_CHECK_EMPTY(pWorkList))
+    {
+        VIR_LIB_WorkListDequeue(pMM, pWorkList, &pFunc);
+
+        /* clean the label/jmp/temp hash table */
+        vscHTBL_Reset(pLabelSet);
+        vscHTBL_Reset(pJmpSet);
+        vscHTBL_Reset(pTempSet);
+
+        libName = VIR_Function_GetNameString(pFunc);
+
+        VIR_Shader_GetFunctionByName(pLibShader, libName, &libFunc);
+
+        gcmASSERT(libFunc != gcvNULL);
+
+        /* create temp registers in Shader */
+        tempIndexStart = VIR_Shader_NewVirRegId(pShader, libFunc->tempIndexCount);
+
+        /* copy arguments. */
+        if (VIR_IdList_Count(&libFunc->paramters) > 0)
+        {
+            VIR_Symbol  *libParam, *newParam, *newVirReg = gcvNULL;
+            VIR_SymId   libParamId, libVirRegId, newParamId, newVirRegId;
+            gctUINT     i, j, regCount;
+            VIR_TypeId  pTyId = VIR_TYPE_VOID;
+            VIR_TypeId  pBaseTyId = VIR_TYPE_VOID;
+
+            for (i = 0; i < VIR_IdList_Count(&libFunc->paramters); i++)
+            {
+                libParamId = VIR_IdList_GetId(&libFunc->paramters, i);
+                libParam = VIR_Function_GetSymFromId(libFunc, libParamId);
+
+                libVirRegId = VIR_Symbol_GetVariableVregIndex(libParam);
+
+                pTyId = VIR_LinkLib_TypeConv(pShader, VIR_Symbol_GetType(libParam), gcvTRUE);
+
+                pBaseTyId = VIR_Type_GetBaseTypeId(VIR_Shader_GetTypeFromId(pShader, pTyId));
+
+                /* add parameter symbol */
+                errCode = VIR_Function_AddParameter(pFunc,
+                                                    VIR_Shader_GetSymNameString(pLibShader, libParam),
+                                                    pTyId,
+                                                    VIR_Symbol_GetStorageClass(libParam),
+                                                    &newParamId);
+
+                newParam = VIR_Function_GetSymFromId(pFunc, newParamId);
+
+                /* add parameter virreg */
+                regCount = VIR_Type_GetRegOrOpaqueCount(pShader,
+                                                        VIR_Shader_GetTypeFromId(pShader, pTyId),
+                                                        VIR_TypeId_isSampler(pBaseTyId),
+                                                        VIR_TypeId_isImage(pBaseTyId),
+                                                        VIR_TypeId_isAtomicCounters(pBaseTyId),
+                                                        gcvFALSE);
+
+                for (j = 0; j < regCount; j++)
+                {
+                    VIR_VirRegId    tmpVregId;
+                    VIR_Symbol      *tmpVirReg = gcvNULL;
+
+                    VIR_Shader_AddSymbol(pShader,
+                                        VIR_SYM_VIRREG,
+                                        tempIndexStart + j,
+                                        VIR_Shader_GetTypeFromId(pShader, pBaseTyId),
+                                        VIR_STORAGE_UNKNOWN,
+                                        &newVirRegId);
+
+                    newVirReg = VIR_Function_GetSymFromId(pFunc, newVirRegId);
+
+                    VIR_Symbol_SetVregVariable(newVirReg, newParam);
+                    VIR_Symbol_SetStorageClass(newVirReg, VIR_Symbol_GetStorageClass(libParam));
+                    VIR_Symbol_SetParamFuncSymId(newVirReg, VIR_Function_GetSymId(pFunc));
+
+                    /* save temp to the temp hash table */
+                    tmpVregId = libVirRegId + j;
+                    tmpVirReg = VIR_Shader_FindSymbolByTempIndex(pLibShader, tmpVregId);
+                    vscHTBL_DirectSet(pTempSet, (void*) tmpVirReg, (void*) newVirReg);
+                }
+
+                newParam->u2.tempIndex = tempIndexStart;
+                tempIndexStart = tempIndexStart + regCount;
+            }
+        }
+
+        /* Copy the local variable */
+        if (VIR_IdList_Count(&libFunc->localVariables) > 0)
+        {
+            VIR_Symbol  *libVar, *libVirReg, *newVar, *newVirReg;
+            VIR_SymId   libVarId, libVirRegId, newVarId, newVirRegId;
+            gctUINT     i, regCount;
+            VIR_TypeId  pTyId = VIR_TYPE_VOID;
+
+            for (i = 0; i < VIR_IdList_Count(&libFunc->localVariables); i++)
+            {
+                libVarId = VIR_IdList_GetId(&libFunc->localVariables, i);
+                libVar = VIR_Function_GetSymFromId(libFunc, libVarId);
+
+                libVirRegId = VIR_Symbol_GetVariableVregIndex(libVar);
+                libVirReg = VIR_Shader_FindSymbolByTempIndex(pLibShader, libVirRegId);
+
+                pTyId = VIR_LinkLib_TypeConv(pShader, VIR_Symbol_GetType(libVar), gcvFALSE);
+
+                /* add local variable symbol */
+                errCode = VIR_Function_AddLocalVar(pFunc,
+                                                    VIR_Shader_GetSymNameString(pLibShader, libVar),
+                                                    pTyId,
+                                                    &newVarId);
+                ON_ERROR(errCode, "VIR_Lib_LinkFunctions");
+
+                newVar = VIR_Function_GetSymFromId(pFunc, newVarId);
+
+                /* add local variable virreg */
+                errCode = VIR_Shader_AddSymbol(pShader,
+                                                VIR_SYM_VIRREG,
+                                                tempIndexStart,
+                                                VIR_Shader_GetTypeFromId(pShader, pTyId),
+                                                VIR_STORAGE_UNKNOWN,
+                                                &newVirRegId);
+                ON_ERROR(errCode, "VIR_Lib_LinkFunctions");
+
+                newVirReg = VIR_Function_GetSymFromId(pFunc, newVirRegId);
+
+                VIR_Symbol_SetVregVariable(newVirReg, newVar);
+
+                newVar->u2.tempIndex = tempIndexStart;
+                regCount = VIR_Type_GetRegCount(pShader, VIR_Symbol_GetType(libVar), gcvFALSE);
+                tempIndexStart = tempIndexStart + regCount;
+
+                /* save temp to the temp hash table */
+                vscHTBL_DirectSet(pTempSet, (void*) libVirReg, (void*) newVirReg);
+            }
+        }
+
+        /* merge the global variable:
+           for all the global variable in libFunc,
+           if it is also in pShader, combine them, otherwise */
+
+        /* copy the instructions
+            1) change its tempIndex
+            2) chnage its input/out to the mapped temp
+        */
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(libFunc));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            _VIR_LinkIntrinsicLib_CopyInst(pShader, pLibShader, libFunc, pFunc, inst, pMM, pLabelSet, pJmpSet, pTempSet, pWorkList, pCallSites, &tempIndexStart);
+        }
+
+        /* fixup the jmp instruction's label */
+        {
+            VSC_HASH_ITERATOR jmpSetIter;
+            VSC_DIRECT_HNODE_PAIR jmpSetPair;
+            vscHTBLIterator_Init(&jmpSetIter, pJmpSet);
+            for(jmpSetPair = vscHTBLIterator_DirectFirst(&jmpSetIter);
+                IS_VALID_DIRECT_HNODE_PAIR(&jmpSetPair); jmpSetPair = vscHTBLIterator_DirectNext(&jmpSetIter))
+            {
+                VIR_Instruction* libInst = (VIR_Instruction*)VSC_DIRECT_HNODE_PAIR_FIRST(&jmpSetPair);
+                VIR_Instruction* pInst = (VIR_Instruction*)VSC_DIRECT_HNODE_PAIR_SECOND(&jmpSetPair);
+                VIR_Label       *libLabel = VIR_Operand_GetLabel(VIR_Inst_GetDest(libInst));
+                VIR_Label       *newLabel = gcvNULL;
+                VIR_Link        *pNewLink = gcvNULL;
+
+                if (vscHTBL_DirectTestAndGet(pLabelSet, (void*) libLabel, (void **)&newLabel) != gcvTRUE)
+                {
+                    gcmASSERT(gcvFALSE);
+                }
+                VIR_Operand_SetLabel(VIR_Inst_GetDest(pInst), newLabel);
+                VIR_Function_NewLink(pFunc, &pNewLink);
+                VIR_Link_SetReference(pNewLink, (gctUINTPTR_T)pInst);
+                VIR_Link_AddLink(&(newLabel->referenced), pNewLink);
+            }
+        }
+   }
+
+OnError:
+   if (pLabelSet)
+    {
+        vscHTBL_Destroy(pLabelSet);
+    }
+
+    if (pJmpSet)
+    {
+        vscHTBL_Destroy(pJmpSet);
+    }
+
+    if (pTempSet)
+    {
+        vscHTBL_Destroy(pTempSet);
+    }
+
+    /* Return the status. */
+    return errCode;
+
+}
+
+/* based on the underlaying symbol of the vreg to find the MOV param instruction */
+VIR_Instruction*
+_VIR_LinkIntrinsicLib_FindParmInst(
+    VIR_Instruction *pCallInst,
+    gctBOOL          forward,
+    VIR_Symbol      *parmSym)
+{
+    VIR_Instruction *pInst = pCallInst;
+    VIR_Symbol      *pSym = gcvNULL;
+
+    while (pInst != gcvNULL)
+    {
+        if (forward)
+        {
+            pInst = VIR_Inst_GetPrev(pInst);
+            if (VIR_Inst_GetOpcode(pInst) == VIR_OP_MOV)
+            {
+                pSym = VIR_Operand_GetUnderlyingSymbol(VIR_Inst_GetDest(pInst));
+                if (pSym == parmSym)
+                {
+                    break;
+                }
+            }
+        }
+        else
+        {
+            pInst = VIR_Inst_GetNext(pInst);
+            if (VIR_Inst_GetOpcode(pInst) == VIR_OP_MOV)
+            {
+                pSym = VIR_Operand_GetUnderlyingSymbol(VIR_Inst_GetSource(pInst, 0));
+                if (pSym == parmSym)
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    gcmASSERT(pInst != gcvNULL);
+
+    return pInst;
+}
+
+static gctBOOL
+_NeedAddExtraImageLayer(
+    IN  VSC_HW_CONFIG           *pHwCfg,
+    IN  VIR_IntrinsicsKind       IntrinsicsKind,
+    IN  VIR_Symbol              *ImageSym,
+    IN  VIR_Type                *ImageType
+    )
+{
+    gctBOOL result = gcvFALSE;
+
+    if ((VIR_Intrinsics_isImageLoad(IntrinsicsKind)  || VIR_Intrinsics_isImageStore(IntrinsicsKind)) &&
+        !pHwCfg->hwFeatureFlags.support128BppImage &&
+        VIR_Symbol_Is128Bpp(ImageSym) &&
+        !VIR_TypeId_isImageBuffer(VIR_Type_GetIndex(ImageType)))
+    {
+        result = gcvTRUE;
+    }
+
+    return result;
+}
+
+VSC_ErrCode
+_UpdateOperandParameterForIntrinsicCall(
+    IN  VIR_Shader              *pShader,
+    IN  VSC_HW_CONFIG           *pHwCfg,
+    IN  VIR_Instruction         *pCallInst,
+    IN  VIR_IntrinsicsKind       IntrinsicsKind
+    )
+{
+    VSC_ErrCode                  errCode = VSC_ERR_NONE;
+    VIR_Function                *func = VIR_Inst_GetFunction(pCallInst);
+    VIR_Operand                 *paramOperand = VIR_Inst_GetSource(pCallInst, 1);
+    VIR_ParmPassing             *opndParm = gcvNULL;
+    VIR_ParmPassing             *newOpndParam = gcvNULL;
+    VIR_Operand                 *newOperand = gcvNULL;
+    gctUINT                      argNum, newArgNum;
+    gctUINT                      i;
+
+    opndParm = VIR_Operand_GetParameters(paramOperand);
+    argNum = opndParm->argNum;
+
+    /* Check image-related. */
+    if (VIR_Intrinsics_isImageRelated(IntrinsicsKind))
+    {
+        VIR_Operand             *imageOpnd = opndParm->args[0];
+        VIR_Symbol              *imageSym = VIR_Operand_GetSymbol(imageOpnd);
+        VIR_Uniform             *image = VIR_Symbol_GetImage(imageSym);
+        VIR_Type                *imageType = VIR_Symbol_GetType(imageSym);
+        VIR_SymId                extraLayerSymId;
+
+        /* Check if we need to add extra layer image for this image, and put it to the second parameter. */
+        if (_NeedAddExtraImageLayer(pHwCfg, IntrinsicsKind, imageSym, imageType))
+        {
+            extraLayerSymId = image->u.samplerOrImageAttr.extraImageLayer;
+            if (extraLayerSymId == VIR_INVALID_ID)
+            {
+                VIR_Symbol          *extraLayerSym;
+                VIR_Uniform         *extraLayer;
+                VIR_NameId           nameId;
+                gctCHAR              name[128] = "#";
+
+                gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, imageSym));
+                gcoOS_StrCatSafe(name, gcmSIZEOF(name), "$ExtraLayer");
+                errCode = VIR_Shader_AddString(pShader,
+                                               name,
+                                               &nameId);
+                ON_ERROR(errCode, "VIR_Shader_AddString");
+
+                errCode = VIR_Shader_AddSymbol(pShader,
+                                               VIR_SYM_IMAGE,
+                                               nameId,
+                                               imageType,
+                                               VIR_STORAGE_UNKNOWN,
+                                               &extraLayerSymId);
+                ON_ERROR(errCode, "VIR_Shader_AddSymbol");
+
+                extraLayerSym = VIR_Shader_GetSymFromId(pShader, extraLayerSymId);
+                image->u.samplerOrImageAttr.extraImageLayer = extraLayerSymId;
+                VIR_Symbol_SetFlag(extraLayerSym, VIR_SYMFLAG_COMPILER_GEN);
+                VIR_Symbol_SetPrecision(extraLayerSym, VIR_Symbol_GetPrecision(imageSym));
+                VIR_Symbol_SetUniformKind(extraLayerSym, VIR_UNIFORM_EXTRA_LAYER);
+                VIR_Symbol_SetAddrSpace(extraLayerSym, VIR_AS_CONSTANT);
+                VIR_Symbol_SetTyQualifier(extraLayerSym, VIR_Symbol_GetTyQualifier(imageSym));
+                extraLayerSym->layout = imageSym->layout;
+
+                extraLayer = VIR_Symbol_GetImage(extraLayerSym);
+                extraLayer->u.samplerOrImageAttr.parentSamplerSymId = image->sym;
+                extraLayer->u.samplerOrImageAttr.arrayIdxInParent = NOT_ASSIGNED;
+            }
+
+            /* New a operand with this extra image layer.  */
+            errCode = VIR_Function_NewOperand(func, &newOperand);
+            ON_ERROR(errCode, "VIR_Function_NewOperand");
+
+            VIR_Operand_SetSymbol(newOperand, func, extraLayerSymId);
+            VIR_Operand_SetType(newOperand, VIR_Operand_GetType(imageOpnd));
+            VIR_Operand_SetSwizzle(newOperand, VIR_SWIZZLE_XYZW);
+            VIR_Operand_SetRoundMode(newOperand, VIR_ROUND_DEFAULT);
+            VIR_Operand_SetModifier(newOperand, VIR_MOD_NONE);
+            /* Copy the index from image operand. */
+            VIR_Operand_SetIsConstIndexing(newOperand, VIR_Operand_GetIsConstIndexing(imageOpnd));
+            VIR_Operand_SetRelIndex(newOperand, VIR_Operand_GetRelIndexing(imageOpnd));
+            VIR_Operand_SetRelAddrMode(newOperand, VIR_Operand_GetRelAddrMode(imageOpnd));
+            VIR_Operand_SetMatrixConstIndex(newOperand, VIR_Operand_GetMatrixConstIndex(imageOpnd));
+            VIR_Operand_SetRelAddrLevel(newOperand, VIR_Operand_GetRelAddrLevel(imageOpnd));
+
+            /* Put the new operand it into the para list. */
+            newArgNum = argNum + 1;
+            VIR_Function_NewParameters(func, newArgNum, &newOpndParam);
+
+            newOpndParam->args[0] = opndParm->args[0];
+            newOpndParam->args[1] = newOperand;
+            for (i = 2; i < newArgNum; i++)
+            {
+                newOpndParam->args[i] = opndParm->args[i - 1];
+            }
+
+            /* Update the parameter operand. */
+            VIR_Operand_SetParameters(paramOperand, newOpndParam);
+            opndParm = newOpndParam;
+            argNum = newArgNum;
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_UpdateResOpType(
+    IN  VIR_RES_OP_TYPE         ResOpType,
+    IN  VIR_Function           *pCalleeFunc
+    )
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_InstIterator            inst_iter;
+    VIR_Instruction            *inst;
+
+    if (ResOpType == VIR_RES_OP_TYPE_UNKNOWN)
+    {
+        return errCode;
+    }
+
+    VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(pCalleeFunc));
+    for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+         inst != gcvNULL;
+         inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+    {
+        /* Skip none texld-related instructions. */
+        if (!VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(inst)))
+        {
+            continue;
+        }
+
+        VIR_Inst_SetResOpType(inst, ResOpType);
+    }
+    return errCode;
+}
+
+/* update each call site in pCallSites
+   INTRINSIC: insert MOV for input/output and change the instruction to CALL
+   CALL:  change the MOV for input/output to the new renamed vreg */
+VSC_ErrCode
+VIR_Lib_UpdateCallSites(
+    IN  VIR_Shader              *pShader,
+    IN  VSC_HW_CONFIG           *pHwCfg,
+    IN  VSC_MM                  *pMM,
+    OUT VIR_LIB_CALLSITES       *pCallSites)
+{
+    VSC_ErrCode     errCode = VSC_ERR_NONE;
+
+    VIR_LINKER_CALL_INST_NODE *pCallInstNode = gcvNULL;
+    VIR_IntrinsicsKind  intrinsicsKind;
+    VIR_Function        *pCallerFunc = gcvNULL, *pCalleeFunc = gcvNULL;
+    VIR_Instruction     *pCallerInst = gcvNULL, *newInst = gcvNULL;
+    VIR_RES_OP_TYPE     callerInstResOpType;
+    VIR_ParmPassing     *opndParm = gcvNULL;
+    VIR_SymId           parmSymId, parmVregId;
+    VIR_Symbol          *parmSym, *parmVregSym, *varSym;
+    VIR_Operand         *destOpnd = gcvNULL;
+    VIR_Operand         *opnd = gcvNULL;
+    VIR_Operand         *newOpnd = gcvNULL;
+    VIR_Operand *texldOperand = gcvNULL;
+    VIR_Function        *func;
+    VIR_OpCode          opcode;
+    VIR_Enable          movEnable = VIR_ENABLE_NONE;
+    VIR_Type            *parmType = gcvNULL, *dstType = gcvNULL;
+    VIR_TypeId          typeId;
+    gctUINT             i, argIndex, texldModifierIndex = 0;
+    gctUINT             argCount = 0;
+
+    while(!QUEUE_CHECK_EMPTY(pCallSites))
+    {
+        VIR_LIB_CallSitesDequeue(pMM, pCallSites, &pCallInstNode);
+        pCallerInst = pCallInstNode->inst;
+        intrinsicsKind = pCallInstNode->intrinsicKind;
+
+        callerInstResOpType = VIR_Inst_GetResOpType(pCallerInst);
+        destOpnd = VIR_Inst_GetDest(pCallerInst);
+
+        pCallerFunc = VIR_Inst_GetFunction(pCallerInst);
+
+        if (VIR_Inst_GetOpcode(pCallerInst) == VIR_OP_INTRINSIC)
+        {
+            /* Update operand parameter list if needed. */
+            _UpdateOperandParameterForIntrinsicCall(pShader, pHwCfg, pCallerInst, intrinsicsKind);
+
+            func = VIR_Inst_GetFunction(pCallerInst);
+            opndParm = VIR_Operand_GetParameters(VIR_Inst_GetSource(pCallerInst, 1));
+
+            pCalleeFunc = VIR_Operand_GetFunction(VIR_Inst_GetSource(pCallerInst, 0));
+
+            /* Update the instructions of callee function. */
+            _UpdateResOpType(callerInstResOpType, pCalleeFunc);
+
+            /* Init index. */
+            argIndex = 0;
+            texldModifierIndex = 0;
+            texldOperand = gcvNULL;
+            argCount = opndParm->argNum;
+            /* input and output parameter */
+            for (i = 0; i < VIR_IdList_Count(&pCalleeFunc->paramters); i++)
+            {
+                parmSymId = VIR_IdList_GetId(&pCalleeFunc->paramters, i);
+                parmSym = VIR_Function_GetSymFromId(pCalleeFunc, parmSymId);
+
+                parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
+                parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
+
+                parmType = VIR_Symbol_GetType(parmVregSym);
+                movEnable = VIR_Type_Conv2Enable(parmType);
+
+                /* If the argument index is bigger than argNum, it must be the return value. */
+                if (argIndex >= argCount)
+                {
+                    opnd = gcvNULL;
+                }
+                /* If this operand is a texld modifier, check all modifiers first. */
+                else if (texldOperand)
+                {
+                    while (texldModifierIndex < VIR_TEXLDMODIFIER_COUNT && VIR_Operand_GetTexldModifier(texldOperand, texldModifierIndex) == gcvNULL)
+                    {
+                        texldModifierIndex++;
+                    }
+                    /* If all modifiers are been check, then move back to arg list. */
+                    if (texldModifierIndex == VIR_TEXLDMODIFIER_COUNT)
+                    {
+                        texldOperand = gcvNULL;
+                        opnd = opndParm->args[argIndex];
+                        if (VIR_Operand_isUndef(opnd))
+                        {
+                            argCount--;
+                        }
+                        argIndex++;
+                    }
+                    else
+                    {
+                        opnd = VIR_Operand_GetTexldModifier(texldOperand, texldModifierIndex);
+                        texldModifierIndex++;
+                    }
+                }
+                else
+                {
+                    opnd = opndParm->args[argIndex];
+                    if (VIR_Operand_isUndef(opnd))
+                    {
+                        argCount--;
+                    }
+                    argIndex++;
+                    if (VIR_Operand_GetOpKind(opnd) == VIR_OPND_TEXLDPARM)
+                    {
+                        texldOperand = (VIR_Operand*)opnd;
+                        while (texldModifierIndex < VIR_TEXLDMODIFIER_COUNT &&
+                               VIR_Operand_GetTexldModifier(texldOperand, texldModifierIndex) == gcvNULL)
+                        {
+                            texldModifierIndex++;
+                        }
+                        gcmASSERT(texldModifierIndex < VIR_TEXLDMODIFIER_COUNT);
+                        opnd = VIR_Operand_GetTexldModifier(texldOperand, texldModifierIndex);
+                        texldModifierIndex++;
+                    }
+                }
+
+                if (VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INPARM)
+                {
+                    opcode = VIR_OP_MOV;
+                    typeId = VIR_Operand_GetType(opnd);
+                    if (VIR_TypeId_isSampler(VIR_Operand_GetType(opnd)))
+                    {
+                        opcode = VIR_OP_GET_SAMPLER_IDX;
+                        typeId = VIR_TYPE_UINT_X4;
+                    }
+                    /* matrix and struct's input is already lowered */
+                    VIR_Function_AddInstructionBefore(pCallerFunc,
+                                                      opcode,
+                                                      VIR_TYPE_UNKNOWN,
+                                                      pCallerInst,
+                                                      gcvTRUE,
+                                                      &newInst);
+
+                    VIR_Operand_SetTempRegister(newInst->dest,
+                                                pCallerFunc,
+                                                VIR_Symbol_GetIndex(parmVregSym),
+                                                typeId);
+                    VIR_Operand_SetEnable(newInst->dest, movEnable);
+
+                    newOpnd = VIR_Inst_GetSource(newInst, VIR_Operand_Src0);
+                    VIR_Operand_Copy(newOpnd, opnd);
+                    VIR_Operand_SetSwizzle(newOpnd, VIR_Enable_2_Swizzle(movEnable));
+
+                    /* Set the offset.*/
+                    if (VIR_TypeId_isSampler(VIR_Operand_GetType(opnd)))
+                    {
+                        VIR_Operand    *offsetOpnd = gcvNULL;
+
+                        newOpnd = VIR_Inst_GetSource(newInst, 0);
+                        offsetOpnd = VIR_Inst_GetSource(newInst, 1);
+
+                        if (VIR_Operand_GetIsConstIndexing(newOpnd))
+                        {
+                            VIR_Operand_SetImmediateUint(offsetOpnd, VIR_Operand_GetConstIndexingImmed(newOpnd));
+                        }
+                        else if (VIR_Operand_GetRelAddrMode(newOpnd) != VIR_INDEXED_NONE)
+                        {
+                            VIR_Operand_SetSymbol(offsetOpnd, func, VIR_Operand_GetRelIndexing(newOpnd));
+                            VIR_Operand_SetSwizzle(offsetOpnd, VIR_Enable_2_Swizzle_WShift((VIR_Enable)VIR_Operand_GetRelAddrMode(newOpnd)));
+                        }
+                        else if (VIR_Operand_GetRelAddrMode(newOpnd) == VIR_INDEXED_NONE)
+                        {
+                            VIR_Operand_SetImmediateUint(offsetOpnd, 0);
+                        }
+                        VIR_Operand_SetIsConstIndexing(newOpnd, 0);
+                        VIR_Operand_SetRelAddrMode(newOpnd, 0);
+                        VIR_Operand_SetMatrixConstIndex(newOpnd, 0);
+                        VIR_Operand_SetRelAddrLevel(newOpnd, 0);
+                        VIR_Operand_SetRelIndex(newOpnd, 0);
+                    }
+                }
+                else if (VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_OUTPARM)
+                {
+                    dstType = VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetType(destOpnd));
+
+                    VIR_Function_AddInstructionAfter(pCallerFunc,
+                                                     VIR_OP_MOV,
+                                                     VIR_TYPE_UNKNOWN,
+                                                     pCallerInst,
+                                                     gcvTRUE,
+                                                     &newInst);
+
+                    VIR_Operand_SetTempRegister(newInst->src[0],
+                                                pCallerFunc,
+                                                VIR_Symbol_GetIndex(parmVregSym),
+                                                VIR_Type_GetIndex(parmType));
+
+                    VIR_Operand_SetEnable(newInst->dest, movEnable);
+
+                    if (i < argCount)
+                    {
+                        gcmASSERT(opnd && !VIR_Operand_isUndef(opnd));
+                        /* matrix and struct's output in parameter list is already lowered */
+                        VIR_Operand_SetTempRegister(newInst->dest,
+                                                    pCallerFunc,
+                                                    VIR_Operand_GetSymbolId_(opnd),
+                                                    VIR_Operand_GetType(opnd));
+                    }
+                    else
+                    {
+                        /* matrix and struct's output is not lowered */
+                        if (VIR_TypeId_isPrimitive(VIR_Operand_GetType(destOpnd)) &&
+                            VIR_GetTypeRows(VIR_Operand_GetType(destOpnd)) == 1)
+                        {
+                            VIR_Operand_SetTempRegister(newInst->dest,
+                                                        pCallerFunc,
+                                                        VIR_Operand_GetSymbolId_(destOpnd),
+                                                        VIR_Operand_GetType(destOpnd));
+                        }
+                        else if ((VIR_TypeId_isPrimitive(VIR_Operand_GetType(destOpnd)) &&
+                                  VIR_GetTypeRows(VIR_Operand_GetType(destOpnd)) > 1) ||
+                                  VIR_Type_GetKind(dstType) == VIR_TY_STRUCT)
+                        {
+                            VIR_SymId           subVregId;
+                            VIR_Symbol          *subVregSym;
+
+                            subVregId = VIR_Symbol_GetVariableVregIndex(VIR_Operand_GetUnderlyingSymbol(destOpnd));
+                            subVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, subVregId + i - opndParm->argNum);
+
+                            /* make sure the order of parameters is the same as struct fields */
+                            gcmASSERT(VIR_Symbol_GetType(subVregSym) == parmType);
+
+                            VIR_Operand_SetTempRegister(newInst->dest,
+                                                        pCallerFunc,
+                                                        VIR_Symbol_GetIndex(subVregSym),
+                                                        VIR_Type_GetIndex(parmType));
+                        }
+                        else
+                        {
+                            /* to-do */
+                            gcmASSERT(gcvFALSE);
+                        }
+                    }
+
+                    VIR_Operand_SetSwizzle(newInst->src[0], VIR_Enable_2_Swizzle(movEnable));
+                }
+                else
+                {
+                    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
+
+                    /* to-do */
+                }
+            }
+
+            /* change the instruction to call */
+            VIR_Inst_SetOpcode(pCallerInst, VIR_OP_CALL);
+            VIR_Inst_SetConditionOp(pCallerInst, VIR_COP_ALWAYS);
+            for (i=0; i < VIR_Inst_GetSrcNum(pCallerInst); i++)
+            {
+                if (VIR_Inst_GetSource(pCallerInst, i) != gcvNULL)
+                {
+                    VIR_Function_FreeOperand(pCallerFunc, VIR_Inst_GetSource(pCallerInst, i));
+                    VIR_Inst_SetSource(pCallerInst, i, gcvNULL);
+                }
+            }
+            VIR_Inst_SetSrcNum(pCallerInst, 0);
+            VIR_Operand_SetFunction(pCallerInst->dest, pCalleeFunc);
+        }
+        else
+        {
+            pCalleeFunc = VIR_Operand_GetFunction(VIR_Inst_GetDest(pCallerInst));
+
+            /* Update the instructions of callee function. */
+            _UpdateResOpType(callerInstResOpType, pCalleeFunc);
+
+            for (i = 0; i < VIR_IdList_Count(&pCalleeFunc->paramters); i++)
+            {
+                parmSymId = VIR_IdList_GetId(&pCalleeFunc->paramters, i);
+                /* param symbol in func */
+                parmSym = VIR_Function_GetSymFromId(pCalleeFunc, parmSymId);
+                parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
+                /* param vreg symbol */
+                parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
+                /* param global symbol */
+                varSym = VIR_Symbol_GetVregVariable(parmVregSym);
+
+                if (VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INPARM)
+                {
+                    newInst = _VIR_LinkIntrinsicLib_FindParmInst(pCallerInst, gcvTRUE, varSym);
+
+                    VIR_Operand_SetTempRegister(newInst->dest,
+                                                pCallerFunc,
+                                                VIR_Symbol_GetIndex(parmVregSym),
+                                                VIR_Operand_GetType(newInst->dest));
+                }
+                else if (VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_OUTPARM)
+                {
+                    newInst = _VIR_LinkIntrinsicLib_FindParmInst(pCallerInst, gcvFALSE, varSym);
+
+                    VIR_Operand_SetTempRegister(newInst->src[0],
+                                                pCallerFunc,
+                                                VIR_Symbol_GetIndex(parmVregSym),
+                                                VIR_Operand_GetType(newInst->src[0]));
+                }
+                else
+                {
+                    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
+
+                    /* to-do */
+                }
+            }
+        }
+
+        /* Free the call inst node. */
+        vscMM_Free(pMM, pCallInstNode);
+    }
+
+    return errCode;
+}
+
+/* Intrinsic library list. */
+void
+VIR_Intrinsic_LibList_Initialize(
+    IN  VSC_MM                   *pMM,
+    IN  VIR_Intrinsic_LibList    *pIntrinsicLibList
+    )
+{
+    VIR_Intrinsic_LibList_SetMM(pIntrinsicLibList, pMM);
+    vscUNILST_Initialize(VIR_Intrinsic_LibList_GetList(pIntrinsicLibList), gcvFALSE);
+}
+
+void
+VIR_Intrinsic_LibList_Finalize(
+    IN  VIR_Intrinsic_LibList    *pIntrinsicLibList
+    )
+{
+    VSC_UNI_LIST                 *list = VIR_Intrinsic_LibList_GetList(pIntrinsicLibList);
+
+    while (!vscUNILST_IsEmpty(list))
+    {
+        VSC_UNI_LIST_NODE *node = list->pHead;
+
+        vscUNILST_RemoveHead(list);
+        vscMM_Free(VIR_Intrinsic_LibList_GetMM(pIntrinsicLibList), node);
+    }
+
+    VIR_Intrinsic_LibList_SetMM(pIntrinsicLibList, gcvNULL);
+    vscUNILST_Finalize(&pIntrinsicLibList->intrinsicLibList);
+}
+
+void
+VIR_Intrinsic_LibList_AppendNode(
+    IN  VIR_Intrinsic_LibList    *pIntrinsicLibList,
+    IN  VIR_Shader               *pIntrinsicLib,
+    IN  VIR_Intrinsic_LibKind    libKind
+    )
+{
+    VIR_Intrinsic_LibNode        *lib_node = (VIR_Intrinsic_LibNode *)vscMM_Alloc(VIR_Intrinsic_LibList_GetMM(pIntrinsicLibList),
+                                                                                  sizeof(VIR_Intrinsic_LibNode));
+
+    VIR_Intrinsic_LibNode_SetLib(lib_node, pIntrinsicLib);
+    VIR_Intrinsic_LibNode_SetLibKind(lib_node, libKind);
+
+    vscUNILST_Append(VIR_Intrinsic_LibList_GetList(pIntrinsicLibList), VIR_Intrinsic_LibNode_GetNode(lib_node));
+}
+
+VIR_Intrinsic_LibNode*
+VIR_Intrinsic_LibList_GetNodeByLibKind(
+    IN  VIR_Intrinsic_LibList    *pIntrinsicLibList,
+    IN  VIR_Intrinsic_LibKind    libKind
+    )
+{
+    VIR_Intrinsic_LibNode        *lib_node = gcvNULL;
+    VSC_UL_ITERATOR              lib_iter;
+
+    vscULIterator_Init(&lib_iter, VIR_Intrinsic_LibList_GetList(pIntrinsicLibList));
+
+    for (lib_node = (VIR_Intrinsic_LibNode*)vscULIterator_First(&lib_iter);
+         lib_node != gcvNULL;
+         lib_node = (VIR_Intrinsic_LibNode*)vscULIterator_Next(&lib_iter))
+    {
+        if (VIR_Intrinsic_LibNode_GetLibKind(lib_node) == libKind)
+        {
+            return lib_node;
+        }
+    }
+
+    return gcvNULL;
+}
+
+/******************************************************************************
+ Functions for LinkLib and link lib functions
+******************************************************************************/
+static void
+_TranspointsQueue(
+    IN VSC_MM                   *pMM,
+    IN VIR_TRANS_WORKLIST       *TranList,
+    IN void                     *TranPoint
+    )
+{
+    VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)vscMM_Alloc(pMM,
+        sizeof(VSC_UNI_LIST_NODE_EXT));
+
+    vscULNDEXT_Initialize(worklistNode, TranPoint);
+    QUEUE_PUT_ENTRY(TranList, worklistNode);
+}
+
+static void
+_TranspointsDequeue(
+    IN VSC_MM                   *pMM,
+    IN VIR_TRANS_WORKLIST       *TranList,
+    OUT void                    **TranPoint
+    )
+{
+    VSC_UNI_LIST_NODE_EXT *worklistNode = (VSC_UNI_LIST_NODE_EXT *)QUEUE_GET_ENTRY(TranList);
+
+    *TranPoint = vscULNDEXT_GetContainedUserData(worklistNode);
+
+    vscMM_Free(pMM, worklistNode);
+}
+
+/*********** functions for intrinsic function name LinkLib *************/
+static void
+_GetIntrinsicFunc(
+    IN VIR_LinkLibContext         *Context,
+    OUT VIR_TRANS_WORKLIST        *Worklist
+    )
+{
+    VIR_Shader              *pShader = Context->shader;
+    VIR_FuncIterator        func_iter;
+    VIR_FunctionNode        *func_node;
+    VIR_Function            *func;
+    VSC_MM                  *pMM = Context->pMM;
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+         func_node != gcvNULL;
+         func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_InstIterator            inst_iter;
+        VIR_Instruction             *inst;
+        VIR_LINKER_CALL_INST_NODE   *callInstNode;
+
+        func = func_node->function;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             inst != gcvNULL;
+             inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            if (VIR_Inst_GetOpcode(inst) == VIR_OP_INTRINSIC)
+            {
+                VIR_Operand *   src0 = VIR_Inst_GetSource(inst, 0);
+                VIR_IntrinsicsKind ik = VIR_Operand_GetIntrinsicKind(src0);
+
+                callInstNode = (VIR_LINKER_CALL_INST_NODE *) vscMM_Alloc(pMM, sizeof(VIR_LINKER_CALL_INST_NODE));
+                callInstNode->inst = inst;
+                callInstNode->intrinsicKind = ik;
+
+                _TranspointsQueue(Context->pMM, Worklist, (void *) callInstNode);
+            }
+        }
+    }
+}
+
+static VSC_ErrCode
+_GetIntrinsicFuncName(
+    IN  VIR_LinkLibContext          *Context,
+    IN void                         *TransPoint,
+    IN  gctSTRING                   *LibFuncName
+    )
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_Shader                  *pShader = Context->shader;
+    VSC_HW_CONFIG               *pHwCfg = Context->pHwCfg;
+    VIR_LINKER_CALL_INST_NODE   *callInstNode = (VIR_LINKER_CALL_INST_NODE*) TransPoint;
+
+    /* Get the intrisic function name. */
+    _IntrisicFuncName(pShader,
+                      pHwCfg,
+                      callInstNode->inst,
+                      LibFuncName);
+
+    return errCode;
+}
+
+static VSC_ErrCode
+_InsertIntrinsicFunc(
+    IN VIR_LinkLibContext     *Context,
+    IN void                   *TransPoint,
+    IN VIR_Function           *pFunc
+    )
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_LINKER_CALL_INST_NODE   *callInstNode = (VIR_LINKER_CALL_INST_NODE*) TransPoint;
+    VIR_Instruction             *pInst = callInstNode->inst;
+
+    /* Set the function into this instruction. */
+    VIR_Operand_SetFunction(VIR_Inst_GetSource(pInst, 0), pFunc);
+
+    return errCode;
+}
+
+/*********** functions for output format LinkLib *************/
+static void
+_GetTranspointOutputFmt(
+    IN VIR_LinkLibContext         *Context,
+    OUT VIR_TRANS_WORKLIST        *Worklist
+    )
+{
+    VIR_Shader              *pShader = Context->shader;
+    VSC_LIB_LINK_POINT      *pLinkPoint = Context->linkPoint;
+    VIR_OutputIdList        *pOutputs = VIR_Shader_GetOutputs(pShader);
+    gctUINT                 curOutput;
+
+    for (curOutput = 0; curOutput < VIR_IdList_Count(pOutputs); curOutput ++)
+    {
+        VIR_Symbol  *output = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pOutputs, curOutput));
+
+        if (output->layout.location == pLinkPoint->u.clrOutput.location)
+        {
+            _TranspointsQueue(Context->pMM, Worklist, (void *) output);
+            break;
+        }
+    }
+}
+
+static VSC_ErrCode _InsertInstAtEoMF(IN  VIR_Function *  Function,
+                                     IN  VIR_OpCode      Opcode,
+                                     OUT VIR_Instruction **Inst)
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_Instruction         *endInst = VIR_Function_GetInstEnd(Function);
+
+    if (endInst->_opcode == VIR_OP_RET)
+    {
+        errCode = VIR_Function_AddInstructionBefore(Function, Opcode, VIR_TYPE_UNKNOWN, endInst, gcvTRUE, Inst);
+    }
+    else
+    {
+        errCode = VIR_Function_AddInstruction(Function, Opcode, VIR_TYPE_UNKNOWN, Inst);
+    }
+
+    return errCode;
+}
+
+/* insert the argument passing and call to the libfunc,
+   and mov back the return value
+   at the end of the main function */
+static VSC_ErrCode
+_InsertCallOutputFmt(
+    IN VIR_LinkLibContext     *Context,
+    IN void                   *Transpoint,
+    IN VIR_Function           *LibFunc
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_Shader              *pShader = Context->shader;
+    VIR_Function            *pFunc = VIR_Shader_GetMainFunction(pShader);
+    VSC_LIB_LINK_POINT      *pLinkPoint = Context->linkPoint;
+    VIR_Symbol              *output = (VIR_Symbol *) Transpoint;
+    VIR_Instruction         *newInst = gcvNULL;
+    VIR_SymId               outputVregId, parmSymId, parmVregId;
+    VIR_Symbol              *outputVreg, *parmSym, *parmVregSym;
+    gctUINT                 i;
+    VIR_TypeId              symTy;
+    VIR_Enable              movEnable = VIR_ENABLE_NONE;
+
+    gcmASSERT(VIR_Symbol_isOutput(output));
+
+    symTy = VIR_Type_GetIndex(VIR_Symbol_GetType(output));
+
+    /* insert the MOV to pass arguement
+       MOV arg1, output */
+    errCode =_InsertInstAtEoMF(pFunc, VIR_OP_MOV, &newInst);
+    ON_ERROR(errCode, "_InsertCallOutputFmt");
+
+    outputVregId = VIR_Symbol_GetVariableVregIndex(output);
+    outputVreg = VIR_Shader_FindSymbolByTempIndex(pShader, outputVregId);
+
+    /* assume input is the first parameter */
+    parmSymId = VIR_IdList_GetId(&LibFunc->paramters, 0);
+    parmSym = VIR_Function_GetSymFromId(LibFunc, parmSymId);
+    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INPARM ||
+              VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
+    parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
+    parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
+
+    VIR_Operand_SetTempRegister(newInst->dest,
+                                pFunc,
+                                VIR_Symbol_GetIndex(parmVregSym),
+                                symTy);
+    movEnable = VIR_Type_Conv2Enable(VIR_Symbol_GetType(outputVreg));
+    VIR_Operand_SetEnable(newInst->dest, movEnable);
+
+    VIR_Operand_SetTempRegister(newInst->src[0],
+                                pFunc,
+                                VIR_Symbol_GetIndex(outputVreg),
+                                symTy);
+    VIR_Operand_SetSwizzle(newInst->src[0], VIR_Enable_2_Swizzle(movEnable));
+
+    if (VIR_Symbol_GetComponents(output) < 4)
+    {
+        VIR_TypeId  newTy = symTy;
+        VIR_Enable  newEnable = VIR_ENABLE_NONE;
+        switch (VIR_Symbol_GetComponents(output))
+        {
+        case 1:
+            newEnable = VIR_ENABLE_YZW;
+            newTy = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(symTy), 3, 1);
+            break;
+        case 2:
+            newEnable = VIR_ENABLE_ZW;
+            newTy = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(symTy), 2, 1);
+            break;
+        case 3:
+            newEnable = VIR_ENABLE_W;
+            newTy = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(symTy), 1, 1);
+            break;
+        default:
+            gcmASSERT(gcvFALSE);
+            newEnable = VIR_ENABLE_XYZW;
+            break;
+        }
+
+        /* since we assume the color output is a vec4, to avoid undefined other channel
+           we generate MOV arg1, 0 */
+        errCode = _InsertInstAtEoMF(pFunc, VIR_OP_MOV, &newInst);
+        ON_ERROR(errCode, "_InsertCallOutputFmt");
+
+        VIR_Operand_SetTempRegister(newInst->dest,
+                                    pFunc,
+                                    VIR_Symbol_GetIndex(parmVregSym),
+                                    newTy);
+        VIR_Operand_SetEnable(newInst->dest, newEnable);
+        VIR_Operand_SetImmediateInt(newInst->src[0], 0);
+    }
+
+    /* insert the call instruction */
+    errCode = _InsertInstAtEoMF(pFunc, VIR_OP_CALL, &newInst);
+    ON_ERROR(errCode, "_InsertCallOutputFmt");
+
+    VIR_Inst_SetConditionOp(newInst, VIR_COP_ALWAYS);
+    VIR_Operand_SetFunction(newInst->dest, LibFunc);
+
+    /* insert the MOV to get the return value
+       MOV output, arg[] */
+    for (i = 0; i < (gctUINT) pLinkPoint->u.clrOutput.layers; i++)
+    {
+        errCode = _InsertInstAtEoMF(pFunc, VIR_OP_MOV, &newInst);
+        ON_ERROR(errCode, "_InsertCallOutputFmt");
+
+        /* add an output for layer > 1 */
+        if (i >= 1)
+        {
+            VIR_NameId      nameId;
+            VIR_SymId       symId;
+            VIR_VirRegId    regId;
+            VIR_Symbol      *outputSym;
+
+            gctCONST_STRING    outputName    = VIR_Shader_GetSymNameString(pShader, output);
+            gctCHAR            name[256];
+            gctUINT            offset   = 0;
+
+            gcoOS_PrintStrSafe(name, sizeof(name), &offset,
+                               "%s_layer%d", outputName, i+1);
+
+            errCode = VIR_Shader_AddString(pShader,
+                                 name,
+                                 &nameId);
+            ON_ERROR(errCode, "_InsertCallOutputFmt");
+
+            errCode = VIR_Shader_AddSymbol(pShader,
+                                 VIR_SYM_VARIABLE,
+                                 nameId,
+                                 VIR_Symbol_GetType(output),
+                                 VIR_STORAGE_OUTPUT,
+                                 &symId);
+            ON_ERROR(errCode, "_InsertCallOutputFmt");
+
+            outputSym = VIR_Shader_GetSymFromId(pShader, symId);
+
+            VIR_Symbol_SetTyQualifier(outputSym, VIR_TYQUAL_NONE);
+            VIR_Symbol_SetPrecision(outputSym, VIR_PRECISION_HIGH);
+
+            VIR_Symbol_SetFlag(outputSym, VIR_Symbol_GetFlag(output));
+            VIR_Symbol_SetFlag(outputSym, VIR_SYMFLAG_COMPILER_GEN);
+
+            /* set layout info */
+            VIR_Symbol_SetLayoutQualifier(outputSym, VIR_LAYQUAL_NONE);
+            VIR_Symbol_SetLocation(outputSym, NOT_ASSIGNED);
+            VIR_Symbol_SetMasterLocation(outputSym, output->layout.location);
+
+            /* generate the vreg */
+            regId = VIR_Shader_NewVirRegId(pShader, 1);
+            errCode = VIR_Shader_AddSymbol(pShader,
+                                 VIR_SYM_VIRREG,
+                                 regId,
+                                 VIR_Symbol_GetType(output),
+                                 VIR_STORAGE_UNKNOWN,
+                                 &outputVregId);
+            ON_ERROR(errCode, "_InsertCallOutputFmt");
+
+            outputVreg = VIR_Shader_GetSymFromId(pShader, outputVregId);
+
+            VIR_Symbol_SetVregVariable(outputVreg, outputSym);
+
+            VIR_Symbol_SetVariableVregIndex(outputSym, regId);
+        }
+
+        VIR_Operand_SetTempRegister(newInst->dest,
+                                    pFunc,
+                                    VIR_Symbol_GetIndex(outputVreg),
+                                    symTy);
+
+        VIR_Operand_SetEnable(newInst->dest, movEnable);
+
+        /* we assume output is the second parameter */
+        parmSymId = VIR_IdList_GetId(&LibFunc->paramters, 1);
+        parmSym = VIR_Function_GetSymFromId(LibFunc, parmSymId);
+        gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_OUTPARM ||
+              VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
+        parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym) + i;
+        parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
+
+        gcmASSERT(parmVregSym != gcvNULL);
+
+        VIR_Operand_SetTempRegister(newInst->src[0],
+                                    pFunc,
+                                    VIR_Symbol_GetIndex(parmVregSym),
+                                    symTy);
+
+        VIR_Operand_SetSwizzle(newInst->src[0], VIR_Enable_2_Swizzle(movEnable));
+    }
+
+OnError:
+    return errCode;
+}
+
+/*********** functions for texld format LinkLib *************/
+extern VSC_RES_OP_BIT _VirResOpType2DrviResOpBit(gctUINT resOpType);
+
+static void
+_GetTranspointTexldFmt(
+    IN VIR_LinkLibContext         *Context,
+    OUT VIR_TRANS_WORKLIST        *Worklist
+    )
+{
+    VIR_Shader              *pShader = Context->shader;
+    VSC_LIB_LINK_POINT      *pLinkPoint = Context->linkPoint;
+
+    VIR_FuncIterator    func_iter;
+    VIR_FunctionNode    *func_node;
+    VIR_Function        *func;
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_InstIterator    inst_iter;
+        VIR_Instruction     *inst;
+        VIR_Operand         *srcOpnd;
+        VIR_Symbol          *srcSym;
+        VSC_RES_OP_BIT      resOpBit;
+
+        func = func_node->function;
+
+        /* we don't need to go through the library functions */
+        if ((func->flags & VIR_FUNCFLAG_LINKED_LIB) == 0)
+        {
+            VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+            for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+                 inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+            {
+                /* find the texld to patch */
+                if (VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(inst)))
+                {
+                    srcOpnd = VIR_Inst_GetSource(inst, 0);
+                    srcSym = VIR_Operand_GetSymbol(srcOpnd);
+
+                    resOpBit = _VirResOpType2DrviResOpBit(VIR_Inst_GetResOpType(inst));
+                    if (pLinkPoint->u.resource.set == srcSym->layout.descriptorSet &&
+                        pLinkPoint->u.resource.binding == srcSym->layout.binding &&
+                        ((pLinkPoint->u.resource.opTypeBits & resOpBit) != 0))
+                    {
+                        _TranspointsQueue(Context->pMM, Worklist, (void *) inst);
+                    }
+                }
+            }
+        }
+    }
+}
+
+static VSC_ErrCode
+_InsertMovToArgs(
+    IN VIR_Shader               *pShader,
+    IN VIR_Function             *pFunc,
+    IN VIR_Function             *pCalleeFunc,
+    IN gctUINT                  ParmIdx,
+    IN VIR_Instruction          *MeInst,
+    OUT VIR_Instruction         **newInst
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_SymId               parmSymId, parmVregId;
+    VIR_Symbol              *parmSym, *parmVregSym;
+    VIR_TypeId              symTy;
+
+    errCode = VIR_Function_AddInstructionBefore(pFunc,
+        VIR_OP_MOV,
+        VIR_TYPE_UNKNOWN,
+        MeInst,
+        gcvTRUE,
+        newInst);
+    ON_ERROR(errCode, "_InsertMovToArgs");
+
+    parmSymId = VIR_IdList_GetId(&pCalleeFunc->paramters, ParmIdx);
+    parmSym = VIR_Function_GetSymFromId(pCalleeFunc, parmSymId);
+    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INPARM ||
+                VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
+    parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
+    parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
+    symTy = VIR_Symbol_GetTypeId(parmSym);
+
+    VIR_Operand_SetTempRegister((*newInst)->dest,
+                                pFunc,
+                                VIR_Symbol_GetIndex(parmVregSym),
+                                symTy);
+
+    VIR_Operand_SetEnable((*newInst)->dest, VIR_TypeId_Conv2Enable(symTy));
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_InsertMovFromArgs(
+    IN VIR_Shader               *pShader,
+    IN VIR_Function             *pFunc,
+    IN VIR_Function             *pCalleeFunc,
+    IN gctUINT                  ParmIdx,
+    IN VIR_Instruction          *MeInst,
+    OUT VIR_Instruction         **newInst
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_SymId               parmSymId, parmVregId;
+    VIR_Symbol              *parmSym, *parmVregSym;
+    VIR_TypeId              symTy;
+
+    errCode = VIR_Function_AddInstructionAfter(pFunc,
+        VIR_OP_MOV,
+        VIR_TYPE_UNKNOWN,
+        MeInst,
+        gcvTRUE,
+        newInst);
+    ON_ERROR(errCode, "_InsertMovFromArgs");
+
+    parmSymId = VIR_IdList_GetId(&pCalleeFunc->paramters, ParmIdx);
+    parmSym = VIR_Function_GetSymFromId(pCalleeFunc, parmSymId);
+    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_OUTPARM ||
+                VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
+    parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
+    parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
+    symTy = VIR_Symbol_GetTypeId(parmSym);
+
+    VIR_Operand_SetTempRegister((*newInst)->src[0],
+                                pFunc,
+                                VIR_Symbol_GetIndex(parmVregSym),
+                                symTy);
+
+    VIR_Operand_SetSwizzle((*newInst)->src[0],
+        VIR_Enable_2_Swizzle_WShift(VIR_TypeId_Conv2Enable(symTy)));
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_AddExtraSampler(
+    IN VIR_Shader       *pShader,
+    IN VIR_Function     *pFunc,
+    IN VIR_Operand      *samplerOpnd,
+    IN gctUINT          arrayIndex,
+    OUT VIR_Operand     **newOpnd
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Symbol          *samplerSym = VIR_Operand_GetSymbol(samplerOpnd);
+    VIR_Uniform         *sampler = VIR_Symbol_GetSampler(samplerSym);
+    VIR_Symbol          *extraLayerSym;
+    VIR_Uniform         *extraLayer;
+    VIR_SymId           extraLayerSymId;
+    VIR_NameId          nameId;
+    gctCHAR             name[128] = "#";
+
+    gcmASSERT(sampler);
+
+    gcoOS_StrCatSafe(name, gcmSIZEOF(name), VIR_Shader_GetSymNameString(pShader, samplerSym));
+    gcoOS_StrCatSafe(name, gcmSIZEOF(name), "$ExtraLayer");
+    errCode = VIR_Shader_AddString(pShader,
+                                    name,
+                                    &nameId);
+    ON_ERROR(errCode, "VIR_Shader_AddString");
+
+    errCode = VIR_Shader_AddSymbol(pShader,
+                                   VIR_SYM_SAMPLER,
+                                   nameId,
+                                   VIR_Symbol_GetType(samplerSym),
+                                   VIR_STORAGE_UNKNOWN,
+                                   &extraLayerSymId);
+
+    ON_ERROR(errCode, "VIR_Shader_AddSymbol");
+
+    extraLayerSym = VIR_Shader_GetSymFromId(pShader, extraLayerSymId);
+    sampler->u.samplerOrImageAttr.extraImageLayer = extraLayerSymId;
+    VIR_Symbol_SetFlag(extraLayerSym, VIR_SYMFLAG_COMPILER_GEN);
+    VIR_Symbol_SetPrecision(extraLayerSym, VIR_Symbol_GetPrecision(samplerSym));
+    VIR_Symbol_SetUniformKind(extraLayerSym, VIR_UNIFORM_EXTRA_LAYER);
+    VIR_Symbol_SetAddrSpace(extraLayerSym, VIR_AS_CONSTANT);
+    VIR_Symbol_SetTyQualifier(extraLayerSym, VIR_Symbol_GetTyQualifier(samplerSym));
+    extraLayerSym->layout = samplerSym->layout;
+
+    extraLayer = VIR_Symbol_GetSampler(extraLayerSym);
+    extraLayer->u.samplerOrImageAttr.parentSamplerSymId = sampler->sym;
+    extraLayer->u.samplerOrImageAttr.arrayIdxInParent = arrayIndex;
+
+    /* New a operand with this extra image layer.  */
+    errCode = VIR_Function_NewOperand(pFunc, newOpnd);
+    ON_ERROR(errCode, "VIR_Function_NewOperand");
+
+    VIR_Operand_SetSymbol(*newOpnd, pFunc, extraLayerSymId);
+    VIR_Operand_SetType(*newOpnd, VIR_Operand_GetType(samplerOpnd));
+    VIR_Operand_SetSwizzle(*newOpnd, VIR_SWIZZLE_XYZW);
+    VIR_Operand_SetRoundMode(*newOpnd, VIR_ROUND_DEFAULT);
+    VIR_Operand_SetModifier(*newOpnd, VIR_MOD_NONE);
+
+    /* Copy the index from image operand. */
+    VIR_Operand_SetIsConstIndexing(*newOpnd, VIR_Operand_GetIsConstIndexing(samplerOpnd));
+    VIR_Operand_SetRelIndex(*newOpnd, VIR_Operand_GetRelIndexing(samplerOpnd));
+    VIR_Operand_SetRelAddrMode(*newOpnd, VIR_Operand_GetRelAddrMode(samplerOpnd));
+    VIR_Operand_SetMatrixConstIndex(*newOpnd, VIR_Operand_GetMatrixConstIndex(samplerOpnd));
+    VIR_Operand_SetRelAddrLevel(*newOpnd, VIR_Operand_GetRelAddrLevel(samplerOpnd));
+
+OnError:
+    return errCode;
+}
+
+static gctUINT
+_texldInstMod(
+    IN VIR_Instruction      *pInst)
+{
+    gctUINT retValue = TEXLDMOD_NONE;
+
+    switch (VIR_Inst_GetResOpType(pInst))
+    {
+    case VIR_RES_OP_TYPE_TEXLD_BIAS:
+    case VIR_RES_OP_TYPE_TEXLDP_BIAS:
+        retValue = TEXLDMOD_BIAS;
+        break;
+    case VIR_RES_OP_TYPE_TEXLD_LOD:
+    case VIR_RES_OP_TYPE_TEXLDP_LOD:
+        retValue = TEXLDMOD_LOD;
+        break;
+    case VIR_RES_OP_TYPE_GATHER:
+    case VIR_RES_OP_TYPE_GATHER_PCF:
+        retValue = TEXLDMOD_GATHER;
+        break;
+    default:
+        retValue = TEXLDMOD_NONE;
+        break;
+    }
+
+    return retValue;
+}
+
+static gctUINT
+_texldInstType(
+    IN VIR_Instruction      *pInst)
+{
+    gctUINT retValue = TEXLDTYPE_NORMAL;
+
+    switch (VIR_Inst_GetResOpType(pInst))
+    {
+    case VIR_RES_OP_TYPE_TEXLD:
+    case VIR_RES_OP_TYPE_TEXLD_GRAD:
+    case VIR_RES_OP_TYPE_TEXLD_BIAS:
+    case VIR_RES_OP_TYPE_TEXLD_LOD:
+        retValue = TEXLDTYPE_NORMAL;
+        break;
+    case VIR_RES_OP_TYPE_TEXLDP:
+    case VIR_RES_OP_TYPE_TEXLDP_GRAD:
+    case VIR_RES_OP_TYPE_TEXLDP_BIAS:
+    case VIR_RES_OP_TYPE_TEXLDP_LOD:
+        retValue = TEXLDTYPE_PROJ;
+        break;
+    case VIR_RES_OP_TYPE_GATHER:
+        retValue = TEXLDTYPE_GATHER;
+        break;
+    case VIR_RES_OP_TYPE_GATHER_PCF:
+        retValue = TEXLDTYPE_GATHERPCF;
+        break;
+    case VIR_RES_OP_TYPE_FETCH:
+    case VIR_RES_OP_TYPE_FETCH_MS:
+        retValue = TEXLDTYPE_FETCHMS;
+        break;
+    default:
+        retValue = TEXLDTYPE_U;
+        break;
+    }
+
+    return retValue;
+}
+
+static Vir_TexldModifier_Name instMod2TexldMod(gctUINT instMod)
+{
+    switch (instMod)
+    {
+    case TEXLDMOD_BIAS:
+        return VIR_TEXLDMODIFIER_BIAS;
+    case TEXLDMOD_LOD:
+        return VIR_TEXLDMODIFIER_LOD;
+    default:
+        break;
+    }
+
+    return VIR_TEXLDMODIFIER_COUNT;
+}
+
+static gctSTRING _GetLibFuncParam(IN VIR_Function             *pCalleeFunc,
+                                  IN gctUINT                   ParmIdx)
+{
+    VIR_SymId               parmSymId;
+    VIR_Symbol              *parmSym;
+
+    parmSymId = VIR_IdList_GetId(&pCalleeFunc->paramters, ParmIdx);
+    parmSym = VIR_Function_GetSymFromId(pCalleeFunc, parmSymId);
+
+    if (VIR_Symbol_GetName(parmSym) > VIR_NAME_BUILTIN_LAST)
+    {
+        return VIR_Shader_GetSymNameString(pCalleeFunc->hostShader, parmSym);
+    }
+    else
+    {
+        return "";
+    }
+}
+
+/* insert the argument passing and call to the libfunc, and mov back the return value */
+static VSC_ErrCode
+_InsertCallTexld(
+    IN VIR_LinkLibContext     *Context,
+    IN void                   *Transpoint,
+    IN VIR_Function           *LibFunc
+    )
+{
+    VSC_ErrCode                      errCode = VSC_ERR_NONE;
+    VIR_Shader                       *pShader = Context->shader;
+    VIR_Instruction                  *texldInst = (VIR_Instruction *) Transpoint;
+    VIR_Function                     *pFunc = VIR_Inst_GetFunction(texldInst);
+    VIR_Instruction                  *newInst = gcvNULL;
+    VSC_LIB_SPECIALIZATION_CONSTANT  *specializationConst;
+
+    VIR_Operand                      *texldSrc = gcvNULL, *newOpnd = gcvNULL;
+    gctUINT                          argIdx = 0, i;
+    gctUINT                          instMod = _texldInstMod(texldInst);
+    Vir_TexldModifier_Name           texldMod = instMod2TexldMod(instMod);
+    gctSTRING                        paramName;
+
+    gcmASSERT(VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(texldInst)));
+
+    /* _inputcvt_R32G32B32A32SINT_2_R32G32SINT(isampler3D origSampler,
+                                               vec4 coord,
+                                               int mod,
+                                               float lod_bias,
+                                               int type,
+                                               isampler3D extraSampler,
+                                               ivec4 swizzles) */
+
+    /* insert the MOV to pass arguement
+       MOV arg1, sampler
+       MOV arg2, coord */
+    for (argIdx = 0; argIdx < 2; argIdx++)
+    {
+        errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx, texldInst, &newInst);
+        ON_ERROR(errCode, "_InsertCallTexld");
+
+        texldSrc = VIR_Inst_GetSource(texldInst, argIdx);
+
+        VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), texldSrc);
+    }
+
+    /* mod */
+    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, 2, texldInst, &newInst);
+    ON_ERROR(errCode, "_InsertCallTexld");
+    VIR_Operand_SetImmediateInt(newInst->src[0], instMod);
+
+    /* lod_bias */
+    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, 3, texldInst, &newInst);
+    ON_ERROR(errCode, "_InsertCallTexld");
+    if (texldMod < VIR_TEXLDMODIFIER_COUNT)
+    {
+        VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0),
+                         VIR_Operand_GetTexldModifier((VIR_Operand *)VIR_Inst_GetSource(texldInst, 2), texldMod));
+    }
+    else
+    {
+        VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), VIR_Inst_GetSource(texldInst, 2));
+    }
+
+    /* type */
+    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, 4, texldInst, &newInst);
+    ON_ERROR(errCode, "_InsertCallTexld");
+    VIR_Operand_SetImmediateInt(newInst->src[0], _texldInstType(texldInst));
+
+    /* create extra sampler */
+    errCode = _AddExtraSampler(pShader, pFunc, VIR_Inst_GetSource(texldInst, 0),
+                               Context->linkPoint->u.resource.arrayIndex, &newOpnd);
+    ON_ERROR(errCode, "_InsertCallTexld");
+
+    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, 5, texldInst, &newInst);
+    ON_ERROR(errCode, "_InsertCallTexld");
+    newInst->src[0] = newOpnd;
+
+    /* swizzle */
+    paramName = _GetLibFuncParam(LibFunc, 6);
+    for (i = 0; i < Context->libSpecializationConstantCount; i ++)
+    {
+        specializationConst = &Context->libSpecializationConsts[i];
+
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(specializationConst->varName, paramName)) &&
+            specializationConst->type == VSC_SHADER_DATA_TYPE_IVEC4)
+        {
+            VIR_ConstVal    new_const_val;
+            VIR_ConstId     new_const_id;
+            VIR_Const       *new_const;
+
+            errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, 6, texldInst, &newInst);
+            ON_ERROR(errCode, "_InsertCallTexld");
+
+            new_const_val.vecVal.u32Value[0] = specializationConst->value.iValue[0];
+            new_const_val.vecVal.u32Value[1] = specializationConst->value.iValue[1];
+            new_const_val.vecVal.u32Value[2] = specializationConst->value.iValue[2];
+            new_const_val.vecVal.u32Value[3] = specializationConst->value.iValue[3];
+
+            VIR_Shader_AddConstant(pShader,
+                                   VIR_TYPE_UINT_X4, &new_const_val, &new_const_id);
+            new_const = VIR_Shader_GetConstFromId(pShader, new_const_id);
+            new_const->type = VIR_TYPE_UINT_X4;
+            VIR_Operand_SetConstId(newInst->src[0], new_const_id);
+            VIR_Operand_SetOpKind(newInst->src[0], VIR_OPND_CONST);
+            VIR_Operand_SetType(newInst->src[0], VIR_TYPE_UINT_X4);
+            VIR_Operand_SetSwizzle(newInst->src[0], VIR_SWIZZLE_XYZW);
+
+            break;
+        }
+    }
+
+    /* insert the MOV to get the return value
+       MOV destination, arg[6] */
+    errCode = _InsertMovFromArgs(pShader, pFunc, LibFunc, 7, texldInst, &newInst);
+    VIR_Operand_Copy(VIR_Inst_GetDest(newInst), texldInst->dest);
+
+    /* change texldInst to the call instruction */
+    VIR_Inst_SetOpcode(texldInst, VIR_OP_CALL);
+    VIR_Inst_SetConditionOp(texldInst, VIR_COP_ALWAYS);
+    VIR_Operand_SetFunction(texldInst->dest, LibFunc);
+
+    for (i = 0; i < VIR_Inst_GetSrcNum(texldInst); i++)
+    {
+        if (VIR_Inst_GetSource(texldInst, i) != gcvNULL)
+        {
+            VIR_Function_FreeOperand(pFunc, VIR_Inst_GetSource(texldInst, i));
+            VIR_Inst_SetSource(texldInst, i, gcvNULL);
+        }
+    }
+    VIR_Inst_SetSrcNum(texldInst, 0);
+
+OnError:
+    return errCode;
+};
+
+static VSC_ErrCode
+_InsertCallTexldGather(
+    IN VIR_LinkLibContext     *Context,
+    IN void                   *Transpoint,
+    IN VIR_Function           *LibFunc
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_Shader              *pShader = Context->shader;
+    VIR_Instruction         *texldInst = (VIR_Instruction *) Transpoint;
+    VIR_Function            *pFunc = VIR_Inst_GetFunction(texldInst);
+    VIR_Instruction         *newInst = gcvNULL;
+
+    VIR_SymId               parmSymId, parmVregId;
+    VIR_Symbol              *parmSym, *parmVregSym;
+    VIR_TypeId              symTy;
+    VIR_Operand             *texldSrc = gcvNULL;
+    VIR_Enable              movEnable = VIR_ENABLE_NONE;
+    gctUINT                 i;
+
+    /* _inputgather_R32SINT(isampler2DArray origSampler, vec3 coord, int mod, int type, isampler2DArray extraSampler) */
+    /* insert the MOV to pass arguement
+       MOV arg1, sampler */
+    errCode = VIR_Function_AddInstructionBefore(pFunc,
+        VIR_OP_MOV,
+        VIR_TYPE_UNKNOWN,
+        texldInst,
+        gcvTRUE,
+        &newInst);
+    ON_ERROR(errCode, "_InsertCallTexldFmt");
+
+    parmSymId = VIR_IdList_GetId(&LibFunc->paramters, 0);
+    parmSym = VIR_Function_GetSymFromId(LibFunc, parmSymId);
+    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INPARM ||
+              VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
+    parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
+    parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
+    symTy = VIR_Symbol_GetTypeId(parmSym);
+
+    texldSrc = VIR_Inst_GetSource(texldInst, 0);
+    VIR_Operand_SetTempRegister(newInst->dest,
+                                pFunc,
+                                VIR_Symbol_GetIndex(parmVregSym),
+                                symTy);
+    movEnable = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(texldSrc));
+    VIR_Operand_SetEnable(newInst->dest, movEnable);
+    newInst->src[0] = texldSrc;
+
+    /* insert the MOV to pass arguement
+       MOV arg2, coord */
+    errCode = VIR_Function_AddInstructionBefore(pFunc,
+        VIR_OP_MOV,
+        VIR_TYPE_UNKNOWN,
+        texldInst,
+        gcvTRUE,
+        &newInst);
+    ON_ERROR(errCode, "_InsertCallTexldFmt");
+
+    parmSymId = VIR_IdList_GetId(&LibFunc->paramters, 1);
+    parmSym = VIR_Function_GetSymFromId(LibFunc, parmSymId);
+    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INPARM ||
+              VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
+    parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
+    parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
+    symTy = VIR_Symbol_GetTypeId(parmSym);
+
+    texldSrc = VIR_Inst_GetSource(texldInst, 1);
+    VIR_Operand_SetTempRegister(newInst->dest,
+                                pFunc,
+                                VIR_Symbol_GetIndex(parmVregSym),
+                                symTy);
+    movEnable = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(texldSrc));
+    VIR_Operand_SetEnable(newInst->dest, movEnable);
+    newInst->src[0] = texldSrc;
+
+    /* insert the MOV to get the return value
+       MOV destination, arg[5] */
+    errCode = VIR_Function_AddInstructionAfter(pFunc,
+                VIR_OP_MOV,
+                VIR_TYPE_UNKNOWN,
+                texldInst,
+                gcvTRUE,
+                &newInst);
+
+    parmSymId = VIR_IdList_GetId(&LibFunc->paramters, 5);
+    parmSym = VIR_Function_GetSymFromId(LibFunc, parmSymId);
+    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_OUTPARM ||
+            VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
+    parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
+    parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
+    symTy = VIR_Symbol_GetTypeId(parmVregSym);
+    movEnable = VIR_Inst_GetEnable(texldInst);
+
+    gcmASSERT(parmVregSym != gcvNULL);
+
+    VIR_Operand_SetTempRegister(newInst->src[0],
+                                pFunc,
+                                VIR_Symbol_GetIndex(parmVregSym),
+                                symTy);
+
+    VIR_Operand_SetSwizzle(newInst->src[0], VIR_Enable_2_Swizzle(movEnable));
+    VIR_Operand_Copy(VIR_Inst_GetDest(newInst), texldInst->dest);
+
+     /* change texldInst to the call instruction */
+    VIR_Inst_SetOpcode(texldInst, VIR_OP_CALL);
+    VIR_Inst_SetConditionOp(texldInst, VIR_COP_ALWAYS);
+    VIR_Operand_SetFunction(texldInst->dest, LibFunc);
+    for (i = 0; i < VIR_Inst_GetSrcNum(texldInst); i++)
+    {
+        if (VIR_Inst_GetSource(texldInst, i) != gcvNULL)
+        {
+            VIR_Function_FreeOperand(pFunc, VIR_Inst_GetSource(texldInst, i));
+            VIR_Inst_SetSource(texldInst, i, gcvNULL);
+        }
+    }
+    VIR_Inst_SetSrcNum(texldInst, 0);
+
+OnError:
+    return errCode;
+};
+
+static VSC_ErrCode
+_InsertCallTexldFmt(
+    IN VIR_LinkLibContext     *Context,
+    IN void                   *Transpoint,
+    IN VIR_Function           *LibFunc
+    )
+{
+    VSC_ErrCode             errCode = VSC_ERR_NONE;
+    VIR_Instruction         *texldInst = (VIR_Instruction *) Transpoint;
+    VIR_OpCode              texldOp = VIR_Inst_GetOpcode(texldInst);
+
+    if (VIR_OPCODE_isTexLd(texldOp))
+    {
+        switch (texldOp)
+        {
+        case VIR_OP_TEXLD:
+        case VIR_OP_TEXLDPROJ:
+            errCode = _InsertCallTexld(Context, Transpoint, LibFunc);
+            break;
+        case VIR_OP_TEXLD_GATHER:
+            errCode = _InsertCallTexldGather(Context, Transpoint, LibFunc);
+            break;
+        default:
+            break;
+        }
+    }
+    else
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    return errCode;
+};
+
+static void
+_LinkLibContext_Initialize(
+    IN OUT VIR_LinkLibContext               *Context,
+    IN VSC_HW_CONFIG                        *pHwCfg,
+    IN VSC_MM                               *pMM,
+    IN VIR_Shader                           *Shader,
+    IN VIR_Shader                           *LibShader,
+    IN VIR_ShaderKind                       shaderKind,
+    IN VSC_LIB_LINK_POINT                   *pLinkPoint,
+    IN gctUINT                              libSpecializationConstantCount,
+    IN VSC_LIB_SPECIALIZATION_CONSTANT      *libSpecializationConsts,
+    IN VIR_LinkLib_GET_TRANSPOINT_PTR       GetTranspoint,
+    IN VIR_LinkLib_GET_LIB_FUNC_NAME_PTR    GetLibFuncName,
+    IN VIR_LinkLib_INSERT_CALL_PTR          InsertCallPtr
+    )
+{
+    Context->pMM = pMM;
+    Context->pHwCfg = pHwCfg;
+    Context->shader     = Shader;
+    Context->libShader = LibShader;
+    Context->shaderKind = shaderKind;
+    Context->linkPoint  = pLinkPoint;
+    Context->libSpecializationConstantCount = libSpecializationConstantCount;
+    Context->libSpecializationConsts = libSpecializationConsts;
+
+    Context->changed    = gcvFALSE;
+
+    Context->getTranspoint  = GetTranspoint;
+    Context->getLibFuncName = GetLibFuncName;
+    Context->insertCall     = InsertCallPtr;
+}
+
+void
+_LinkLibContext_Finalize(
+    IN VIR_LinkLibContext     *Context
+    )
+{
+}
+
+/* main function for lib-link */
+VSC_ErrCode
+_LinkLib_Transform(
+    IN VIR_LinkLibContext *Context
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VSC_HW_CONFIG       *pHwCfg = Context->pHwCfg;
+    VSC_MM              *pMM = Context->pMM;
+    VIR_Shader          *pShader = Context->shader;
+    gctSTRING           str = gcvNULL;
+
+    VIR_TRANS_WORKLIST  vTranspointslist;
+    VIR_LIB_WORKLIST    vFuncList;
+    VIR_LIB_CALLSITES   vCallSites;
+
+    QUEUE_INITIALIZE(&vTranspointslist);
+    QUEUE_INITIALIZE(&vFuncList);
+    QUEUE_INITIALIZE(&vCallSites);
+
+    /* transform the shader based on lib-link shaderKind */
+    if (Context->shaderKind != VIR_SHADER_UNKNOWN &&
+        Context->shaderKind != VIR_SHADER_LIBRARY &&
+        pShader->shaderKind != Context->shaderKind)
+    {
+        return errCode;
+    }
+
+    /* step1: get the transform points (where lib-link is needed) into a worklist */
+    Context->getTranspoint(Context, &vTranspointslist);
+
+    /* for each transpoint in the worklist  */
+    while(!QUEUE_CHECK_EMPTY(&vTranspointslist))
+    {
+        void            *transPoint;
+        VIR_TypeId      tyId = VIR_TYPE_VOID;
+        VIR_Function    *pFunc = gcvNULL;
+        VIR_Function    *libFunc = gcvNULL;
+        gctSTRING       libFuncName = gcvNULL;
+
+        _TranspointsDequeue(pMM, &vTranspointslist, &transPoint);
+
+        /* Get the lib function name. */
+        if (Context->getLibFuncName)
+        {
+            if (str == gcvNULL)
+            {
+                str = (gctSTRING) vscMM_Alloc(pMM, __LIB_NAME_LENGTH__ * sizeof(char));
+            }
+            Context->getLibFuncName(Context, transPoint, &str);
+            libFuncName = str;
+
+            VIR_LIB_CallSitesQueue(pMM, &vCallSites, (VIR_LINKER_CALL_INST_NODE*)transPoint);
+        }
+        else
+        {
+            libFuncName = (gctSTRING) Context->linkPoint->strFunc;
+        }
+
+        VIR_Shader_GetFunctionByName(pShader, libFuncName, &pFunc);
+
+        if (pFunc == gcvNULL)
+        {
+            VIR_NameId nameId;
+
+            /* if we could not find the function in the library, linkError */
+            VIR_Shader_GetFunctionByName(Context->libShader, libFuncName, &libFunc);
+            {
+                if (libFunc == gcvNULL)
+                {
+                    errCode = VSC_ERR_UNSAT_LIB_SYMBOL;
+                    ON_ERROR(errCode, "_LinkLib_Transform");
+                }
+            }
+
+            /* add the libFunc to the pShader */
+            tyId = VIR_LinkLib_TypeConv(pShader, VIR_Function_GetType(libFunc), gcvFALSE);
+            errCode = VIR_Shader_AddString(pShader,
+                                           libFuncName,
+                                           &nameId);
+            ON_ERROR(errCode, "_LinkLib_Transform");
+
+            errCode = VIR_Shader_AddFunction(pShader,
+                                             gcvFALSE,
+                                             VIR_Shader_GetStringFromId(pShader, nameId),
+                                             tyId,
+                                             &pFunc);
+            ON_ERROR(errCode, "_LinkLib_Transform");
+
+            VIR_LIB_WorkListQueue(pMM, &vFuncList, pFunc);
+
+            VIR_Function_SetFlag(pFunc, VIR_FUNCFLAG_LINKED_LIB);
+
+            /* step2.2 linkin the lib-link function */
+            errCode = VIR_Lib_LinkFunctions(pShader, Context->libShader, pMM, &vFuncList, &vCallSites);
+            ON_ERROR(errCode, "_LinkLib_Transform");
+        }
+
+        /* step2.3 insert the argument passing, call and return value passing instructions */
+        Context->insertCall(Context, transPoint, pFunc);
+
+        /* step2.4 update the call sites, this is particular for the calls inside the lib function,
+           since the lib call site itself already has the right parameters/return passing*/
+        errCode = VIR_Lib_UpdateCallSites(pShader, pHwCfg, pMM, &vCallSites);
+        ON_ERROR(errCode, "_LinkLib_Transform");
+    }
+
+OnError:
+
+    if (str)
+    {
+        vscMM_Free(pMM, str);
+    }
+
+    QUEUE_FINALIZE(&vTranspointslist);
+    QUEUE_FINALIZE(&vFuncList);
+    QUEUE_FINALIZE(&vCallSites);
+
+    return errCode;
+}
+
+VSC_ErrCode
+VIR_Shader_ReverseFacingValue(
+    IN OUT VIR_Shader               *pShader
+    )
+{
+    VSC_ErrCode         errCode  = VSC_ERR_NONE;
+    VIR_FuncIterator    func_iter;
+    VIR_FunctionNode    *func_node;
+    VIR_Function        *func;
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_InstIterator    inst_iter;
+        VIR_Instruction     *inst;
+
+        func = func_node->function;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+                inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            VIR_SrcOperand_Iterator srcOpndIter;
+            VIR_Operand             *pOpnd;
+            VIR_Operand             *reversedFacingOpnd = gcvNULL;
+
+            VIR_SrcOperand_Iterator_Init(inst, &srcOpndIter);
+            pOpnd = VIR_SrcOperand_Iterator_First(&srcOpndIter);
+
+            for (; pOpnd != gcvNULL; pOpnd = VIR_SrcOperand_Iterator_Next(&srcOpndIter))
+            {
+                /* find if any operand using gl_FrontFace */
+                if (VIR_Operand_GetOpKind(pOpnd) == VIR_OPND_SYMBOL &&
+                     VIR_Symbol_GetName(VIR_Operand_GetSymbol(pOpnd)) == VIR_NAME_FRONT_FACING)
+                {
+                    /* reuse reversedFacingOpnd if it is already created */
+                    if (reversedFacingOpnd != gcvNULL)
+                    {
+                        VIR_Operand_Copy(pOpnd, reversedFacingOpnd);
+                        VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+                    }
+                    else
+                    {
+                        /* add instruction to reverse facing value */
+                        VIR_Instruction     *select_inst;
+                        VIR_Operand         *select_dest;
+                        VIR_VirRegId        select_regid;
+                        VIR_SymId           select_symid;
+                        VIR_Symbol          *select_sym;
+                        errCode = VIR_Function_AddInstructionBefore(func, VIR_OP_AQ_SELECT, VIR_TYPE_BOOLEAN, inst, gcvTRUE, &select_inst);
+
+                        VIR_Inst_SetConditionOp(select_inst, VIR_COP_NOT_ZERO);
+
+                        select_regid = VIR_Shader_NewVirRegId(pShader, 1);
+                        errCode = VIR_Shader_AddSymbol(pShader,
+                                                          VIR_SYM_VIRREG,
+                                                          select_regid,
+                                                          VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_BOOLEAN),
+                                                          VIR_STORAGE_UNKNOWN,
+                                                          &select_symid);
+                        if(errCode != VSC_ERR_NONE) return errCode;
+
+                        select_sym = VIR_Shader_GetSymFromId(pShader, select_symid);
+                        VIR_Symbol_SetPrecision(select_sym, VIR_PRECISION_MEDIUM);
+                        select_dest = VIR_Inst_GetDest(select_inst);
+                        VIR_Operand_SetTempRegister(select_dest, func, select_symid, VIR_TYPE_BOOLEAN);
+                        VIR_Operand_SetEnable(select_dest, VIR_ENABLE_X);
+
+                        VIR_Operand_Copy(VIR_Inst_GetSource(select_inst, 0), pOpnd);
+                        VIR_Operand_SetSwizzle(VIR_Inst_GetSource(select_inst, 0), VIR_SWIZZLE_XXXX);
+
+                        /* src1 = 0 */
+                        VIR_Operand_SetImmediateBoolean(VIR_Inst_GetSource(select_inst, 1), 0);
+
+                        /* src2 = 1 */
+                        VIR_Operand_SetImmediateBoolean(VIR_Inst_GetSource(select_inst, 2), 1);
+
+                        reversedFacingOpnd = select_dest;
+
+                        /* change the operand to use reverse value */
+                        VIR_Operand_SetSym(pOpnd, select_sym);
+                    }
+                }
+            }
+        }
+    }
+
+    return errCode;
+}
+
+
+VSC_ErrCode
+VIR_LinkLibLibrary(
+    IN VSC_HW_CONFIG            *pHwCfg,
+    IN VSC_MM                   *pMM,
+    IN VIR_Shader               *pShader,
+    IN VSC_SHADER_LIB_LINK_TABLE*pLibLinkTable
+    )
+{
+    VSC_ErrCode                errCode  = VSC_ERR_NONE;
+    VSC_SHADER_LIB_LINK_ENTRY* libEntry;
+    VIR_LinkLibContext         vContext;
+    gctUINT                    i, j;
+
+    /* If no lib need to be linked, just return */
+    if (pLibLinkTable == gcvNULL)
+    {
+        return errCode;
+    }
+
+    for (i = 0; i < pLibLinkTable->shLinkEntryCount; i ++)
+    {
+        libEntry = &pLibLinkTable->pShLibLinkEntries[i];
+
+        /* for each link point */
+        for (j = 0; j < libEntry->linkPointCount; j++)
+        {
+            VSC_LIB_LINK_POINT *linkPoint = &libEntry->linkPoint[j];
+
+            switch(linkPoint->libLinkType)
+            {
+            case VSC_LIB_LINK_TYPE_FUNC_NAME:
+                _LinkLibContext_Initialize(
+                        &vContext,
+                        pHwCfg,
+                        pMM,
+                        pShader,
+                        (VIR_Shader *)libEntry->hShaderLib,
+                        VIR_SHADER_LIBRARY,
+                        linkPoint,
+                        0,
+                        gcvNULL,
+                        _GetIntrinsicFunc,
+                        _GetIntrinsicFuncName,
+                        _InsertIntrinsicFunc);
+                break;
+
+            case VSC_LIB_LINK_TYPE_COLOR_OUTPUT:
+                _LinkLibContext_Initialize(
+                        &vContext,
+                        pHwCfg,
+                        pMM,
+                        pShader,
+                        (VIR_Shader *)libEntry->hShaderLib,
+                        VIR_SHADER_FRAGMENT,
+                        linkPoint,
+                        libEntry->libSpecializationConstantCount,
+                        libEntry->pLibSpecializationConsts,
+                        _GetTranspointOutputFmt,
+                        gcvNULL,
+                        _InsertCallOutputFmt);
+                break;
+
+            case VSC_LIB_LINK_TYPE_RESOURCE:
+                _LinkLibContext_Initialize(
+                        &vContext,
+                        pHwCfg,
+                        pMM,
+                        pShader,
+                        (VIR_Shader *)libEntry->hShaderLib,
+                        VIR_SHADER_UNKNOWN,
+                        linkPoint,
+                        libEntry->libSpecializationConstantCount,
+                        libEntry->pLibSpecializationConsts,
+                        _GetTranspointTexldFmt,
+                        gcvNULL,
+                        _InsertCallTexldFmt);
+                break;
+            case VSC_LIB_LINK_TYPE_FRONTFACING_CCW:
+                errCode = VIR_Shader_ReverseFacingValue(pShader);
+                ON_ERROR(errCode, "VIR_LinkLibLibrary: FRONTFACING_CCW");
+                continue;
+                break;
+            default:
+                gcmASSERT(gcvFALSE);
+                break;
+            }
+
+            errCode = _LinkLib_Transform(&vContext);
+            ON_ERROR(errCode, "VIR_LinkLibLibrary");
+        }
+    }
+
+    _LinkLibContext_Finalize(&vContext);
+
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "Shader after linking library", pShader, gcvTRUE);
+    }
+
+OnError:
+    return errCode;
+}
+
+DEF_QUERY_PASS_PROP(VIR_LinkExternalLibFunc)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_HL |
+                                 VSC_PASS_LEVEL_ML |
+                                 VSC_PASS_LEVEL_LL |
+                                 VSC_PASS_LEVEL_MC |
+                                 VSC_PASS_LEVEL_CG;
+
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+}
+
+VSC_ErrCode
+VIR_LinkExternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode                errCode  = VSC_ERR_NONE;
+
+    errCode = VIR_LinkLibLibrary(&pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
+                                 pPassWorker->basePassWorker.pMM,
+                                 (VIR_Shader *)pPassWorker->pCompilerParam->hShader,
+                                 pPassWorker->pCompilerParam->pShLibLinkTable);
+    ON_ERROR(errCode, "VIR_LinkExternalLibFunc");
+
+OnError:
+    return errCode;
+}
+
+
+DEF_QUERY_PASS_PROP(VIR_LinkInternalLibFunc)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_HL |
+                                 VSC_PASS_LEVEL_ML |
+                                 VSC_PASS_LEVEL_LL |
+                                 VSC_PASS_LEVEL_MC |
+                                 VSC_PASS_LEVEL_CG;
+
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+}
+
+VSC_ErrCode
+VIR_LinkInternalLibFunc(IN VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode                 errCode  = VSC_ERR_NONE;
+    VIR_Shader *                pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    PVSC_SYS_CONTEXT            pSysCtx = pPassWorker->pCompilerParam->cfg.ctx.pSysCtx;
+    VSC_PRIV_DATA*              pPrivData = (VSC_PRIV_DATA*)pSysCtx->pCoreSysCtx->hPrivData;
+    VSC_HW_CONFIG*              pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    VIR_Shader **               pIntrinsicLib = gcvNULL;
+    VSC_LIB_LINK_POINT          libLinkPoint;
+    VSC_SHADER_LIB_LINK_ENTRY   libLinkEntry;
+    VSC_SHADER_LIB_LINK_TABLE   libLinkTable;
+
+    /* Create intrinsic lib shader. */
+    if (pPrivData)
+    {
+        /* Initialize pmp first. */
+        if (!vscPMP_IsInitialized(&pPrivData->pmp))
+        {
+            vscPMP_Intialize(&pPrivData->pmp, gcvNULL, 512, sizeof(void*), gcvTRUE);
+        }
+
+        pIntrinsicLib = VIR_Shader_IsCL(pShader) ? &pPrivData->IntrinsicLib.pCLIntrinsicLib :
+            (VIR_Shader_IsGraphics(pShader) ? &pPrivData->IntrinsicLib.GLLib.pGraphicsIntrinsicLib : &pPrivData->IntrinsicLib.GLLib.pComputeIntrinsicLib);
+
+        if (*pIntrinsicLib == gcvNULL)
+        {
+            errCode = VIR_CreateIntrinsicLib(pHwCfg,
+                                             &pPrivData->pmp.mmWrapper,
+                                             (pPassWorker->pCompilerParam->cfg.ctx.clientAPI == gcvAPI_OPENCL),
+                                             VIR_Shader_IsGraphics(pShader),
+                                             gcvFALSE,
+                                             pIntrinsicLib);
+            CHECK_ERROR(errCode, "VIR_CreateIntrinsicLib failed.");
+        }
+    }
+
+    if (pIntrinsicLib && gcUseFullNewLinker(pHwCfg->hwFeatureFlags.hasHalti2))
+    {
+        /* Construct the lib link point. */
+        gcoOS_ZeroMemory(&libLinkPoint, sizeof(VSC_LIB_LINK_POINT));
+        libLinkPoint.libLinkType = VSC_LIB_LINK_TYPE_FUNC_NAME;
+        libLinkPoint.strFunc = gcvNULL;
+
+        /* Construct the lib link entry. */
+        gcoOS_ZeroMemory(&libLinkEntry, sizeof(VSC_SHADER_LIB_LINK_ENTRY));
+        libLinkEntry.hShaderLib = *pIntrinsicLib;
+        libLinkEntry.libSpecializationConstantCount = 0;
+        libLinkEntry.pLibSpecializationConsts = gcvNULL;
+        libLinkEntry.linkPointCount = 1;
+        libLinkEntry.linkPoint[0] = libLinkPoint;
+
+        /* Construct the lib link table. */
+        gcoOS_ZeroMemory(&libLinkTable, sizeof(VSC_SHADER_LIB_LINK_TABLE));
+        libLinkTable.shLinkEntryCount = 1;
+        libLinkTable.pShLibLinkEntries = &libLinkEntry;
+
+        errCode = VIR_LinkLibLibrary(&pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg,
+                                     pPassWorker->basePassWorker.pMM,
+                                     (VIR_Shader *)pPassWorker->pCompilerParam->hShader,
+                                     &libLinkTable);
+        ON_ERROR(errCode, "VIR_LinkExternalLibFunc");
+    }
+
+OnError:
+    return errCode;
+}
+

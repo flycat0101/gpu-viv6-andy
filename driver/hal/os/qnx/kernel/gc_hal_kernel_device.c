@@ -22,6 +22,9 @@
 
 #define GC_HAL_QNX_PULSEVAL_INTR    (_PULSE_CODE_MINAVAIL)
 #define GC_HAL_QNX_PULSEVAL_MAJOR   (GC_HAL_QNX_PULSEVAL_INTR + gcvCORE_MAJOR)
+#define GC_HAL_QNX_PULSEVAL_3D1     (GC_HAL_QNX_PULSEVAL_INTR + gcvCORE_3D1)
+#define GC_HAL_QNX_PULSEVAL_3D2     (GC_HAL_QNX_PULSEVAL_INTR + gcvCORE_3D2)
+#define GC_HAL_QNX_PULSEVAL_3D3     (GC_HAL_QNX_PULSEVAL_INTR + gcvCORE_3D3)
 #define GC_HAL_QNX_PULSEVAL_2D      (GC_HAL_QNX_PULSEVAL_INTR + gcvCORE_2D)
 #define GC_HAL_QNX_PULSEVAL_VG      (GC_HAL_QNX_PULSEVAL_INTR + gcvCORE_VG)
 
@@ -235,6 +238,126 @@ fail1:
 
     return (void *)1;
 }
+
+#ifdef gcdDUAL_CORE
+const struct sigevent* isrRoutine3D1(void* arg, int id)
+{
+    gckGALDEVICE device = (gckGALDEVICE)arg;
+
+    atomic_add(&g_nQnxInIsrs, 1);
+
+    if (gckKERNEL_Notify(device->kernels[gcvCORE_3D1],
+                         gcvNOTIFY_INTERRUPT,
+                         gcvTRUE) == gcvSTATUS_OK)
+    {
+        atomic_add((volatile unsigned *)&device->interrupts[gcvCORE_3D1], 1);
+        atomic_sub(&g_nQnxInIsrs, 1);
+
+        return &gIntrEvents[gcvCORE_3D1];
+    }
+    atomic_sub(&g_nQnxInIsrs, 1);
+    return gcvNULL;
+}
+
+static void* threadRoutine3D1(void *ctxt)
+{
+    int rc;
+    struct _pulse pulse;
+
+    gckGALDEVICE device = (gckGALDEVICE) ctxt;
+
+    gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_DRIVER,
+                "Starting ISR Thread for 3D core 1 with irq:%d\n",
+                device->irqLines[gcvCORE_3D1]);
+
+    device->isrInitializeds[gcvCORE_3D1] = gcvFALSE;
+
+    if ((gIntrChids[gcvCORE_3D1] = ChannelCreate(_NTO_CHF_DISCONNECT | _NTO_CHF_UNBLOCK)) == -1) {
+        gcmkTRACE_ZONE(gcvLEVEL_ERROR,
+                        gcvZONE_DRIVER,
+                        "[galcore] gckGALDEVICE_Setup_ISR for 3D core 1: "
+                        "Could not create channel (%s)\n",
+                        strerror(errno));
+        return (void *)1;
+    }
+
+    if ((gIntrCoids[gcvCORE_3D1] = ConnectAttach(0, 0, gIntrChids[gcvCORE_3D1], _NTO_SIDE_CHANNEL, 0)) == -1) {
+        gcmkTRACE_ZONE(gcvLEVEL_ERROR,
+                        gcvZONE_DRIVER,
+                        "[galcore] gckGALDEVICE_Setup_ISR for 3D core 1: "
+                        "Could not create connection (%s)\n",
+                        strerror(errno));
+        goto fail1;
+    }
+
+    SIGEV_PULSE_INIT(&gIntrEvents[gcvCORE_3D1], gIntrCoids[gcvCORE_3D1],
+            21, GC_HAL_QNX_PULSEVAL_3D1, gcvNULL);
+
+    /* Obtain I/O privileges */
+    ThreadCtl( _NTO_TCTL_IO_PRIV, 0 );
+
+    device->irqIds[gcvCORE_3D1] = InterruptAttach(device->irqLines[gcvCORE_3D1],
+                                    isrRoutine3D1,
+                                    (void*)device,
+                                    gcmSIZEOF(struct _gckGALDEVICE),
+                                    _NTO_INTR_FLAGS_TRK_MSK);
+
+    if (device->irqIds[gcvCORE_3D1] < 0) {
+        gcmkTRACE_ZONE(gcvLEVEL_ERROR,
+                gcvZONE_DRIVER,
+                "[galcore] gckGALDEVICE_Setup_ISR for 3D core 1: "
+                "Could not register irq line->%d\n",
+                device->irqLines[gcvCORE_3D1]);
+
+        goto fail2;
+    }
+
+    gcmkTRACE_ZONE(gcvLEVEL_INFO,
+                    gcvZONE_DRIVER,
+                    "irqId:%d\n",
+                    device->irqIds[gcvCORE_3D1]);
+
+    gcmkPRINT("[Interrupt] int rutine Attached irqLine %d with id %d.\n",
+        device->irqLines[gcvCORE_3D1], device->irqIds[gcvCORE_3D1]);
+
+    device->isrInitializeds[gcvCORE_3D1] = gcvTRUE;
+
+    while (1)
+    {
+        rc = MsgReceivePulse_r(gIntrChids[gcvCORE_3D1], &pulse, gcmSIZEOF(pulse), gcvNULL);
+
+        if (rc == (-1 * EINTR))
+        {
+            continue;
+        }
+
+        if (rc == (-1 * ESRCH))
+        {
+            break;
+        }
+
+        if (rc != EOK)
+        {
+            continue;
+        }
+
+        if (pulse.code == GC_HAL_QNX_PULSEVAL_3D1)
+        {
+            gckKERNEL_Notify(device->kernels[gcvCORE_3D1], gcvNOTIFY_INTERRUPT, gcvFALSE);
+        }
+    }
+
+    return (void *)0;
+
+fail2:
+    ConnectDetach(gIntrCoids[gcvCORE_3D1]);
+
+fail1:
+    ChannelDestroy(gIntrChids[gcvCORE_3D1]);
+
+    return (void *)1;
+}
+#endif
 
 const struct sigevent* isrRoutine2D(void* arg, int id)
 {
@@ -594,6 +717,22 @@ gckGALDEVICE_Construct(
         device->requestedRegisterMemSizes[gcvCORE_VG]       = RegisterMemSizeVG;
     }
 
+    for (i = gcvCORE_MAJOR; i < gcvCORE_COUNT; i++)
+    {
+        if (Args->irqs[i] != -1)
+        {
+            device->requestedRegisterMemBases[i] = Args->registerBases[i];
+            device->requestedRegisterMemSizes[i] = Args->registerSizes[i];
+            device->irqLines[i] = Args->irqs[i];
+
+            gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_DEVICE,
+                           "%s(%d): Core = %d, RegiseterBase = %x, IRQ Line = %d",
+                           __FUNCTION__, __LINE__,
+                           i, Args->registerBases[i], device->irqLines[i]
+                           );
+        }
+    }
+
     device->requestedContiguousBase  = 0;
     device->requestedContiguousSize  = 0;
 
@@ -647,26 +786,29 @@ gckGALDEVICE_Construct(
     /* Construct the gckDEVICE object for os independent core management. */
     gcmkONERROR(gckDEVICE_Construct(device->os, &device->device));
 
-    if (IrqLine != -1)
+    for (i = gcvCORE_MAJOR; i <= gcvCORE_3D3; i++)
     {
-        gckDEVICE_AddCore(device->device, gcvCORE_MAJOR, gcvCHIP_ID_DEFAULT, device, &device->kernels[gcvCORE_MAJOR]);
+      if (Args->irqs[i] != -1)
+      {
+      gckDEVICE_AddCore(device->device, i, Args->chipIDs[i], device, &device->kernels[i]);
 
-        gcmkONERROR(
-                gckHARDWARE_SetFastClear(device->kernels[gcvCORE_MAJOR]->hardware,
-                    FastClear,
-                    Compression));
+      gcmkONERROR(
+          gckHARDWARE_SetFastClear(device->kernels[i]->hardware,
+              FastClear,
+              Compression));
 
-        gcmkONERROR(gckHARDWARE_SetPowerManagement(
-            device->kernels[gcvCORE_MAJOR]->hardware, PowerManagement
-            ));
+      gcmkONERROR(gckHARDWARE_SetPowerManagement(
+          device->kernels[i]->hardware, PowerManagement
+          ));
 
-        gcmkONERROR(gckHARDWARE_SetGpuProfiler(
-            device->kernels[gcvCORE_MAJOR]->hardware, GpuProfiler
-            ));
-    }
-    else
-    {
-        device->kernels[gcvCORE_MAJOR] = gcvNULL;
+      gcmkONERROR(gckHARDWARE_SetGpuProfiler(
+          device->kernels[i]->hardware, GpuProfiler
+          ));
+      }
+      else
+      {
+      device->kernels[i] = gcvNULL;
+      }
     }
 
     if (IrqLine2D != -1)
@@ -1245,6 +1387,30 @@ gckGALDEVICE_Start_Threads(
                 "Start the daemon thread.");
     }
 
+#ifdef gcdDUAL_CORE
+    if (Device->kernels[gcvCORE_3D1] != gcvNULL)
+    {
+        /* Start the interrupt service thread */
+        if ((ret = pthread_create(&Device->threadCtxts[gcvCORE_3D1], gcvNULL, threadRoutine3D1, Device)) != 0)
+        {
+            gcmkTRACE_ZONE(gcvLEVEL_ERROR,
+                    gcvZONE_DRIVER,
+                    "[galcore] gckGALDEVICE_Start_Threads: Core 3D1: Failed with code %d\n",
+                    ret);
+
+            gcmkONERROR(gcvSTATUS_OUT_OF_RESOURCES);
+        }
+
+        pthread_setname_np(Device->threadCtxts[gcvCORE_3D1], "galcore-IST-3D1");
+
+        Device->threadInitializeds[gcvCORE_3D1] = gcvTRUE;
+        gcmkTRACE_ZONE(gcvLEVEL_INFO,
+                gcvZONE_DRIVER,
+                "[galcore] gckGALDEVICE_Start_Threads: Core 3D1:"
+                "Start the daemon thread.");
+    }
+#endif
+
     if (Device->kernels[gcvCORE_2D] != gcvNULL)
     {
         /* Start the interrupt service thread */
@@ -1403,6 +1569,15 @@ gckGALDEVICE_Start(
             Device->kernels[gcvCORE_MAJOR]->hardware, gcvPOWER_OFF_BROADCAST
             ));
     }
+#ifdef gcdDUAL_CORE
+    if (Device->kernels[gcvCORE_3D1] != gcvNULL)
+    {
+        /* Switch to SUSPEND power state. */
+        gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+            Device->kernels[gcvCORE_3D1]->hardware, gcvPOWER_OFF_BROADCAST
+            ));
+    }
+#endif
 
     if (Device->kernels[gcvCORE_2D] != gcvNULL)
     {
@@ -1468,6 +1643,16 @@ gckGALDEVICE_Stop(
             Device->kernels[gcvCORE_MAJOR]->hardware, gcvPOWER_OFF
             ));
     }
+
+#ifdef gcdDUAL_CORE
+    if (Device->kernels[gcvCORE_3D1] != gcvNULL)
+    {
+        /* Switch to OFF power state. */
+        gcmkONERROR(gckHARDWARE_SetPowerManagementState(
+            Device->kernels[gcvCORE_3D1]->hardware, gcvPOWER_OFF
+            ));
+    }
+#endif
 
     if (Device->kernels[gcvCORE_2D] != gcvNULL)
     {

@@ -23,29 +23,27 @@ include $(AQROOT)/makefile.linux.def
 ################################################################################
 # Define target module name.
 
-OBJ_DIR_CL          := $(OBJ_DIR)_cl
-OBJ_DIR_V1_CL       := $(OBJ_DIR)_v1_cl
-OBJ_DIR_CM          := $(OBJ_DIR)_cm
-OBJ_DIR_V1_CM       := $(OBJ_DIR)
-
 ifeq ($(gcdSTATIC_LINK), 1)
-  STATIC            := 1
-  GLES_CL           := $(OBJ_DIR_CL)/libGLES_CL.a
-  GLES_CM           := $(OBJ_DIR_CM)/libGLES_CM.a
-  GLES_V1_CL        := $(OBJ_DIR_V1_CL)/libGLESv1_CL.a
-  GLES_V1_CM        := $(OBJ_DIR_V1_CM)/libGLESv1_CM.a
+  GLES_CL           := $(OBJ_DIR)/libGLES_CL.a
+  GLES_CM           := $(OBJ_DIR)/libGLES_CM.a
+  GLES_V1_CL        := $(OBJ_DIR)/libGLESv1_CL.a
+  GLES_V1_CM        := $(OBJ_DIR)/libGLESv1_CM.a
 else
-  DYNAMIC           := 1
-  GLES_CL           := $(OBJ_DIR_CL)/libGLES_CL.so
-  GLES_CM           := $(OBJ_DIR_CM)/libGLES_CM.so
-  GLES_V1_CL        := $(OBJ_DIR_V1_CL)/libGLESv1_CL.so
-  GLES_V1_CM        := $(OBJ_DIR_V1_CM)/libGLESv1_CM.so
+  GLES_CL           := $(OBJ_DIR)/libGLES_CL.so
+  GLES_CM           := $(OBJ_DIR)/libGLES_CM.so
+  GLES_V1_CL        := $(OBJ_DIR)/libGLESv1_CL.so
+  GLES_V1_CM        := $(OBJ_DIR)/libGLESv1_CM.so
 
   # Define target soname.
   GLES_CL_SONAME    := libGLES_CL.so
   GLES_CM_SONAME    := libGLES_CM.so
   GLES_V1_CL_SONAME := libGLESv1_CL.so
   GLES_V1_CM_SONAME := libGLESv1_CM.so
+
+  GLES_CL_LINKS     :=
+  GLES_CM_LINKS     :=
+  GLES_V1_CL_LINKS  :=
+  GLES_V1_CM_LINKS  :=
 endif
 
 TARGET_MODULES      := $(GLES_CL)
@@ -88,16 +86,19 @@ CFLAGS += -D__GL_EXPORTS
 ################################################################################
 # Define flags for the linker.
 
+LDFLAGS := \
+    $(LFLAGS)
+
 ifneq ($(USE_ARMCC),1)
   ifeq ($(GL_11_APPENDIX),)
-    LFLAGS += -Wl,--version-script=libGLESv11.map
+    LDFLAGS += -Wl,--version-script=libGLESv11.map
   endif
 endif
 
 ifeq ($(USE_ARMCC),1)
-  LFAGS += --shared
+  LDFLAGS += --shared
 else
-  LFLAGS += -Wall -shared -Wl,-z,defs
+  LDFLAGS += -Wall -shared -Wl,-z,defs
 endif
 
 ifeq ($(USE_ARMCC),1)
@@ -109,10 +110,10 @@ endif
 ################################################################################
 # Supply dependent libraries.
 
-LIBS := -L$(SDK_DIR)/drivers \
-        -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL \
-        -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR) -lVSC \
-        -L$(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR) -lEGL -lm
+LDLIBS := -L$(SDK_DIR)/drivers \
+          -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL \
+          -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR) -lVSC \
+          -lm
 
 ################################################################################
 # Describe object files.
@@ -123,11 +124,9 @@ OBJECTS := gc_glff.o \
            gc_glff_buffer.o \
            gc_glff_clear.o \
            gc_glff_clip_plane.o \
-           gc_glff_context.o \
            gc_glff_cull.o \
            gc_glff_depth.o \
            gc_glff_draw.o \
-           gc_glff_egl.o \
            gc_glff_enable.o \
            gc_glff_fixed_func.o \
            gc_glff_fragment_shader.o \
@@ -144,7 +143,6 @@ OBJECTS := gc_glff.o \
            gc_glff_point.o \
            gc_glff_query.o \
            gc_glff_renderbuffer.o \
-           gc_glff_render_thread.o \
            gc_glff_states.o \
            gc_glff_stream.o \
            gc_glff_texture.o \
@@ -152,10 +150,19 @@ OBJECTS := gc_glff.o \
            gc_glff_viewport.o \
            gc_glff_profiler.o
 
-GLES_CL_OBJECTS     := $(addprefix $(OBJ_DIR_CL)/,$(OBJECTS))
-GLES_CM_OBJECTS     := $(addprefix $(OBJ_DIR_CM)/,$(OBJECTS))
-GLES_V1_CL_OBJECTS  := $(addprefix $(OBJ_DIR_V1_CL)/,$(OBJECTS))
-GLES_V1_CM_OBJECTS  := $(addprefix $(OBJ_DIR_V1_CM)/,$(OBJECTS))
+OBJECTS_EGL := \
+           gc_glff_egl.o
+
+OBJECTS_CL := \
+           gc_glff_context-cl.o
+
+OBJECTS_CM := \
+           gc_glff_context.o
+
+GLES_CL_OBJECTS     := $(addprefix $(OBJ_DIR)/,$(OBJECTS) $(OBJECTS_EGL) $(OBJECTS_CL))
+GLES_CM_OBJECTS     := $(addprefix $(OBJ_DIR)/,$(OBJECTS) $(OBJECTS_EGL) $(OBJECTS_CM))
+GLES_V1_CL_OBJECTS  := $(addprefix $(OBJ_DIR)/,$(OBJECTS) $(OBJECTS_CL))
+GLES_V1_CM_OBJECTS  := $(addprefix $(OBJ_DIR)/,$(OBJECTS) $(OBJECTS_CM))
 
 ################################################################################
 # Define targets.
@@ -165,7 +172,7 @@ GLES_V1_CM_OBJECTS  := $(addprefix $(OBJ_DIR_V1_CM)/,$(OBJECTS))
 all: $(TARGET_MODULES)
 
 clean:
-	@rm -rf $(OBJ_DIR_CL) $(OBJ_DIR_CM) $(OBJ_DIR_V1_CL) $(OBJ_DIR_V1_CM)
+	@rm -rf $(OBJ_DIR)
 
 install: all
 	@mkdir -p $(INSTALL_DIR)
@@ -173,11 +180,23 @@ install: all
 	@mkdir -p $(SDK_DIR)/drivers
 	@mkdir -p $(SDK_DIR)/include/GLES
 	@-cp -f $(AQROOT)/sdk/inc/GLES/*.h $(SDK_DIR)/include/GLES
+	@for lib in $(GLES_CL_LINKS); do \
+	    ln -sf $(notdir $(GLES_CL)) $(INSTALL_DIR)/$$lib; \
+	done
+	@for lib in $(GLES_CM_LINKS); do \
+	    ln -sf $(notdir $(GLES_CM)) $(INSTALL_DIR)/$$lib; \
+	done
+	@for lib in $(GLES_V1_CL_LINKS); do \
+	    ln -sf $(notdir $(GLES_V1_CL)) $(INSTALL_DIR)/$$lib; \
+	done
+	@for lib in $(GLES_V1_CM_LINKS); do \
+	    ln -sf $(notdir $(GLES_V1_CM)) $(INSTALL_DIR)/$$lib; \
+	done
 
 ################################################################################
 # Module rules.
 
-ifeq ($(STATIC),1)
+ifeq ($(gcdSTATIC_LINK),1)
 
 $(GLES_CL): $(GLES_CL_OBJECTS)
 	$(AR) -r -c $@ $(GLES_CL_OBJECTS)
@@ -203,59 +222,37 @@ ifneq ($(USE_ARMCC),1)
 	$(RANLIB) $@
 endif
 
-endif # End STATIC
-
-ifeq ($(DYNAMIC),1)
+else
 
 # module dependencies
-$(TARGET_MODULES): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
-                              $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.a) \
-                   $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so \
-                              $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.a) \
-                   $(wildcard $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.so \
-                              $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.a)
-
-$(GLES_CL):     TARGET_SONAME := $(GLES_CL_SONAME)
-$(GLES_CM):     TARGET_SONAME := $(GLES_CM_SONAME)
-$(GLES_V1_CL):  TARGET_SONAME := $(GLES_V1_CL_SONAME)
-$(GLES_V1_CM):  TARGET_SONAME := $(GLES_V1_CM_SONAME)
+$(TARGET_MODULES): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so) \
+                   $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so)
 
 $(GLES_CL): $(GLES_CL_OBJECTS)
-	$(CC) $(LFLAGS) $(SONAME_OPTION)$(TARGET_SONAME) -o $@ $(GLES_CL_OBJECTS) $(LIBS)
+	$(CC) $(LDFLAGS) $(SONAME_OPTION)$(GLES_CL_SONAME) -o $@ $(GLES_CL_OBJECTS) $(LDLIBS)
 
 $(GLES_CM): $(GLES_CM_OBJECTS)
-	$(CC) $(LFLAGS) $(SONAME_OPTION)$(TARGET_SONAME) -o $@ $(GLES_CM_OBJECTS) $(LIBS)
+	$(CC) $(LDFLAGS) $(SONAME_OPTION)$(GLES_CM_SONAME) -o $@ $(GLES_CM_OBJECTS) $(LDLIBS)
 
 $(GLES_V1_CL): $(GLES_V1_CL_OBJECTS)
-	$(CC) $(LFLAGS) $(SONAME_OPTION)$(TARGET_SONAME) -o $@ $(GLES_V1_CL_OBJECTS) $(LIBS)
+	$(CC) $(LDFLAGS) $(SONAME_OPTION)$(GLES_V1_CL_SONAME) -o $@ $(GLES_V1_CL_OBJECTS) $(LDLIBS)
 
 $(GLES_V1_CM): $(GLES_V1_CM_OBJECTS)
-	$(CC) $(LFLAGS) $(SONAME_OPTION)$(TARGET_SONAME) -o $@ $(GLES_V1_CM_OBJECTS) $(LIBS)
+	$(CC) $(LDFLAGS) $(SONAME_OPTION)$(GLES_V1_CM_SONAME) -o $@ $(GLES_V1_CM_OBJECTS) $(LDLIBS)
 
-endif # End DYNAMIC
+endif
 
 ################################################################################
 # Object rules.
 
-$(OBJ_DIR_CL)/%.o: %.c
-	@mkdir -p $(OBJ_DIR_CL)
-	$(CC) -c $(CFLAGS) -DCOMMON_LITE -DgcdES11_CORE_WITH_EGL -MMD -o $@ $<
+$(OBJ_DIR)/%.o: %.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -MMD -o $@ $<
 
-$(OBJ_DIR_CM)/%.o: %.c
-	@mkdir -p $(OBJ_DIR_CM)
-	$(CC) -c $(CFLAGS) -UCOMMON_LITE -DgcdES11_CORE_WITH_EGL -MMD -o $@ $<
-
-$(OBJ_DIR_V1_CL)/%.o: %.c
-	@mkdir -p $(OBJ_DIR_V1_CL)
-	$(CC) -c $(CFLAGS) -DCOMMON_LITE -UgcdES11_CORE_WITH_EGL -MMD -o $@ $<
-
-$(OBJ_DIR_V1_CM)/%.o: %.c
-	@mkdir -p $(OBJ_DIR_V1_CM)
-	$(CC) -c $(CFLAGS) -UCOMMON_LITE -UgcdES11_CORE_WITH_EGL -MMD -o $@ $<
+$(OBJ_DIR)/%-cl.o: %.c
+	@mkdir -p $(OBJ_DIR)
+	$(CC) -c $(CFLAGS) -DCOMMON_LITE -MMD -o $@ $<
 
 # object dependencies.
--include $(GLES_CL_OBJECTS:.o=.d)
 -include $(GLES_CM_OBJECTS:.o=.d)
--include $(GLES_V1_CL_OBJECTS:.o=.d)
--include $(GLES_V1_CM_OBJECTS:.o=.d)
 

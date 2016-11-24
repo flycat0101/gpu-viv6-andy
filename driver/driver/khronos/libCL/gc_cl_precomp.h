@@ -16,7 +16,7 @@
 
 #include <gc_hal.h>
 #include <gc_hal_user.h>
-#include <gc_vsc_drvi_interface.h>
+#include <drvi/gc_vsc_drvi_interface.h>
 #include <gc_hal_user_os_memory.h>
 #include <gc_hal_cl.h>
 

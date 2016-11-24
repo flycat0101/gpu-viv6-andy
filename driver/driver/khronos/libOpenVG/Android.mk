@@ -68,8 +68,8 @@ LOCAL_SHARED_LIBRARIES := \
     libdl \
     libGAL
 
-LOCAL_MODULE        := libOpenVG
-LOCAL_MODULE_TAGS   := optional
+LOCAL_MODULE         := libOpenVG
+LOCAL_MODULE_TAGS    := optional
 LOCAL_PRELINK_MODULE := false
 include $(BUILD_SHARED_LIBRARY)
 

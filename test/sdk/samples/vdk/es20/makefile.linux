@@ -35,7 +35,6 @@ include makefile.linux.def
 # Components of the project.
 
 SAMPLES	:= tutorial1 tutorial2 tutorial3 tutorial4 tutorial5 tutorial6 tutorial7 samples
-SAMPLES += pixels cube
 
 ######################################################
 # Define the macros used in the common file.

@@ -13,7 +13,6 @@
 
 #include "gc_glff_precomp.h"
 
-#ifdef gcdES11_CORE_WITH_EGL
 
 static gctHANDLE eglModule;
 static const char * _eglLib = "libEGL";
@@ -964,4 +963,3 @@ eglCopyBuffers(
     return (*peglCopyBuffers)(dpy, surface, target);
 }
 
-#endif /* gcdES11_CORE_WITH_EGL */

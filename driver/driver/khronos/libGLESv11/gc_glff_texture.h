@@ -146,6 +146,8 @@ typedef struct _glsEGLIMAGETEXTURE
     gctBOOL                 directSample;   /* Can bypass uploading. */
     gceSURF_FORMAT          textureFormat;  /* Closet supported tx format. */
 
+    gctBOOL                 genMipmap;      /* If need generate mipap. */
+
     gctPOINTER              nativeBuffer;   /* EGL_ANDROID_image_native_buffer. */
     void *                  image;          /* Reference khr EGL Image. */
 }
@@ -174,6 +176,7 @@ typedef struct _glsTEXTUREWRAPPER
     GLsizei                 width;          /* Texture width at LOD 0. */
     GLsizei                 height;         /* Texture height at LOD 0. */
     GLint                   maxLevel;       /* The number of mipmaps. */
+    GLint                   maxLevelUsed;   /* The max level that will be sampled by HW, was evaluated at draw time.*/
     GLenum                  format;         /* Texture base internal format */
     gleTARGETTYPE           targetType;     /* texture type */
     glsTEXTURESAMPLER_PTR   binding;        /* Pointer to the bound sampler. */

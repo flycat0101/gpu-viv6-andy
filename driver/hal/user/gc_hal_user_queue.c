@@ -248,6 +248,7 @@ gcoQUEUE_Commit(
     if (Queue->head != gcvNULL)
     {
         /* Initialize event commit command. */
+        iface.ignoreTLS     = gcvFALSE;
         iface.command       = gcvHAL_EVENT_COMMIT;
         iface.u.Event.queue = gcmPTR_TO_UINT64(Queue->head);
 

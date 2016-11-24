@@ -32,7 +32,7 @@
 
 #define _GC_OBJ_ZONE    gcvZONE_COMPILER
 
-#define SHADER_TOO_MANY_CODE        4500
+#define SHADER_TOO_MANY_CODE        5000
 #define SHADER_TOO_MANY_JMP         600
 
 /******************************************************************************\
@@ -236,6 +236,31 @@ gcOpt_RemoveDeadCode(
             /* Skip GS control instructions. */
             break;
 
+        case gcSL_INTRINSIC:
+        case gcSL_INTRINSIC_ST:
+            /* Skip intrinsic instructions. */
+            {
+                gcOPT_CODE definingCode;
+                union
+                {
+                    VIR_IntrinsicsKind intrinsicKind;
+                    gctUINT16 hex[2];
+                }
+                value;
+                value.hex[0] = code->instruction.source0Index;
+                value.hex[1] = code->instruction.source0Indexed;
+                if(value.intrinsicKind != VIR_IK_swizzle) break;
+                /* Skip if no prevDefines or more than one preDefines. */
+                if (code->prevDefines == gcvNULL ||
+                    code->prevDefines->next) break;
+                definingCode = code->prevDefines->code;
+                if (definingCode->users == gcvNULL)
+                {
+                    gcOpt_AddCodeToList(Optimizer, &definingCode->users, code);
+                }
+            }
+            break;
+
         case gcSL_JMP:
             if (! code->backwardJump)
             {
@@ -298,10 +323,15 @@ gcOpt_RemoveDeadCode(
                 }
 
                 /* The target is not used. */
-                /* Change the instruction to NOP. */
-                gcmVERIFY_OK(gcOpt_ChangeCodeToNOP(Optimizer, code));
-
-                codeRemoved++;
+                /* Change the instruction to NOP for non-VX shader.
+                   VX shader is tricky, since it has instructions (e.g., select_add)
+                   whose def are partially defined. In old optimizer there is no such partial define concept and
+                   mistakenly remove "dead" instructions. Thus disable it for non-VX shader. */
+                if (!gcShaderHasVivVxExtension(Optimizer->shader))
+                {
+                    gcmVERIFY_OK(gcOpt_ChangeCodeToNOP(Optimizer, code));
+                    codeRemoved++;
+                }
             }
             else if (opcode == gcSL_SET || opcode == gcSL_CMP)
             {
@@ -947,6 +977,13 @@ gcOpt_OptimizeMOVInstructions(
             continue;
         }
 
+        /* skip if the src is a variable for VX shader */
+        if (gcShaderHasVivVxExtension(Optimizer->shader) &&
+            Optimizer->tempArray[code->instruction.source0Index].arrayVariable)
+        {
+            continue;
+        }
+
         if (isdepOpcodeSourceComponentWised && needToChangeSwizzle)
         {
             orgDepSource0 = depCode->instruction.source0;
@@ -1383,6 +1420,7 @@ gcOpt_OptimizeMOVInstructions(
         gctBOOL usageRemoved = gcvFALSE;
         gctBOOL propagateUniform = gcvFALSE;
         gctBOOL samplerIndexed = gcvFALSE;
+        gctBOOL callDependent = gcvFALSE;
 
         /* Test for MOV instruction. */
         if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) != gcSL_MOV) continue;
@@ -1476,6 +1514,22 @@ gcOpt_OptimizeMOVInstructions(
             }
         }
 
+        /* skip MOV which depends on CALL:
+             *    CALL  120
+             *    MOV   temp(20), temp(64)      // temp(64) is return value
+             *    CALL  120
+             *    MOV   temp(21), temp(64)
+             *    ..
+             *    MOV   temp(120), temp(20)    // should not be copied, since call 120 in between
+             *    MOV   temp(121), temp(21)
+             */
+        if (code->dependencies0 &&
+            code->dependencies0->code &&
+            gcmSL_OPCODE_GET(code->dependencies0->code->instruction.opcode, Opcode) == gcSL_CALL)
+        {
+            callDependent = gcvTRUE;
+        }
+
         for (list = code->users; list; list = list->next)
         {
             gcOPT_CODE userCode;
@@ -1531,6 +1585,22 @@ gcOpt_OptimizeMOVInstructions(
             }
 
             if (cannotReplace) break;
+
+            if (callDependent)
+            {
+                for (iterCode = userCode; iterCode != code; iterCode = iterCode->prev)
+                {
+                    if (gcmSL_OPCODE_GET(iterCode->instruction.opcode, Opcode) == gcSL_JMP ||
+                        gcmSL_OPCODE_GET(iterCode->instruction.opcode, Opcode) == gcSL_CALL)
+                    {
+                        break;
+                    }
+                }
+                if (iterCode != code)
+                {
+                    break;
+                }
+            }
 
             if (userCode->dependencies0 &&
                 userCode->dependencies0->code == code &&
@@ -1595,7 +1665,7 @@ gcOpt_OptimizeMOVInstructions(
 
             /* gcSL does not allow target temp register the same as any of the source temp register. */
             if ((gcmSL_SOURCE_GET(source, Type) == gcSL_TEMP) &&
-                (userCode->instruction.tempIndex == gcmSL_INDEX_GET(code->instruction.source0Index, Index)) &&
+                userCode->instruction.tempIndex == code->instruction.source0Index &&
                 !samplerIndexed)
             {
                 continue;
@@ -1612,7 +1682,7 @@ gcOpt_OptimizeMOVInstructions(
 
                 /* Test if source0 is the target of the MOV. */
                 gcmASSERT(gcmSL_SOURCE_GET(source0, Type) == gcSL_TEMP &&
-                          gcmSL_INDEX_GET(userCode->instruction.source0Index, Index) == code->instruction.tempIndex);
+                          userCode->instruction.source0Index == code->instruction.tempIndex);
 
                 /* Change userCode's source0 to code's source0. */
                 source0 = gcmSL_SOURCE_SET(source0, Type, gcmSL_SOURCE_GET(source, Type));
@@ -1656,7 +1726,8 @@ gcOpt_OptimizeMOVInstructions(
 
                 /* Test if source1 is the target of the MOV. */
                 gcmASSERT(gcmSL_SOURCE_GET(source1, Type) == gcSL_TEMP &&
-                          gcmSL_INDEX_GET(userCode->instruction.source1Index, Index) == code->instruction.tempIndex);
+                          gcmSL_INDEX_GET(userCode->instruction.source1Index, Index) == gcmSL_INDEX_GET(code->instruction.tempIndex, Index) &&
+                          gcmSL_INDEX_GET(userCode->instruction.source1Index, ConstValue) == gcmSL_INDEX_GET(code->instruction.tempIndex, ConstValue) );
 
                 /* Change userCode's source0 to code's source0. */
                 source1 = gcmSL_SOURCE_SET(source1, Type, gcmSL_SOURCE_GET(source, Type));
@@ -2750,13 +2821,14 @@ _findRerollPattern(
             Code->nextDefines != gcvNULL ||
             Code->dependencies0 != gcvNULL ||
             Code->dependencies1 != gcvNULL ||
-            Code->callers       != gcvNULL)
+            Code->callers       != gcvNULL ||
+            gcmSL_INDEX_GET(Code->instruction.tempIndex, ConstValue) != 0)
             return gcvFALSE;
 
         /* record pattern */
         Info->patterns[patternLength++] = Code;
 
-        loadResultTemp = Code->instruction.tempIndex;
+        loadResultTemp = gcmSL_INDEX_GET(Code->instruction.tempIndex, Index);
         curCode = Code->next;
         if (curCode == gcvNULL) return gcvFALSE;
 
@@ -2767,9 +2839,10 @@ _findRerollPattern(
             curCode->users->next == gcvNULL &&
             curCode->callers == gcvNULL         )
         {
-            gcmASSERT(Code->instruction.tempIndex ==
-                        gcmSL_INDEX_GET(curCode->instruction.source0Index, Index));
-            loadResultTemp = curCode->instruction.tempIndex;
+            gcmASSERT(gcmSL_INDEX_GET(Code->instruction.tempIndex, Index) == gcmSL_INDEX_GET(curCode->instruction.source0Index, Index) &&
+                      gcmSL_INDEX_GET(Code->instruction.tempIndex, ConstValue) == gcmSL_INDEX_GET(curCode->instruction.source0Index, ConstValue) );
+
+            loadResultTemp = gcmSL_INDEX_GET(curCode->instruction.tempIndex, Index);
             /* record pattern */
             Info->patterns[patternLength++] = curCode;
             curCode = curCode->next;
@@ -2912,7 +2985,8 @@ _findNextRerollPattern(
             Code->nextDefines != gcvNULL ||
             Code->dependencies0 != gcvNULL ||
             Code->dependencies1 != gcvNULL ||
-            Code->callers       != gcvNULL)
+            Code->callers       != gcvNULL||
+            gcmSL_INDEX_GET(Code->instruction.tempIndex, ConstValue) != 0)
             return gcvFALSE;
 
         /* goto next code*/
@@ -2929,8 +3003,7 @@ _findNextRerollPattern(
             curCode->users->next == gcvNULL &&
             curCode->callers == gcvNULL         )
         {
-            gcmASSERT(Code->instruction.tempIndex ==
-                        gcmSL_INDEX_GET(curCode->instruction.source0Index, Index));
+            gcmASSERT(Code->instruction.tempIndex == curCode->instruction.source0Index);
             loadResultTemp = curCode->instruction.tempIndex;
             /* goto next code*/
             patternLength++;
@@ -3974,6 +4047,7 @@ _ExpandOneFunctionCall(
     gctBOOL FunctionwithCall = gcvFALSE;
     gcOPT_FUNCTION callerFunction = Caller->function;
     gctUINT32 newTempStart = 0, newTempEnd = 0;
+    gctBOOL renamed = gcvFALSE;
 
     gcmHEADER_ARG("Optimizer=0x%x Function=0x%x Caller=0x%x WillRemoveFunction=%d",
                    Optimizer, Function, Caller, WillRemoveFunction);
@@ -4080,6 +4154,8 @@ _ExpandOneFunctionCall(
         {
             *RenameArgument = gcvTRUE;
         }
+
+        renamed = gcvTRUE;
     }
 
     if (callerFunction != gcvNULL)
@@ -4088,7 +4164,14 @@ _ExpandOneFunctionCall(
 
         tempStart = gcmMIN(newTempStart, callerFunction->tempIndexStart);
         tempEnd = gcmMAX(newTempEnd, callerFunction->tempIndexEnd);
-        tempCount = callerFunction->tempIndexEnd - callerFunction->tempIndexStart + 1;
+        if (renamed)
+        {
+            tempCount = callerFunction->tempIndexEnd - callerFunction->tempIndexStart + 1;
+        }
+        else
+        {
+            tempCount = tempEnd - tempStart + 1;
+        }
 
         callerFunction->tempIndexStart = tempStart;
         callerFunction->tempIndexEnd = tempEnd;
@@ -4534,16 +4617,13 @@ gcOpt_InlineFunctions(
 
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
 
-    if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_0) ||
-        Optimizer->functionCount == 0)
-    {
-        gcmFOOTER();
-        return status;
-    }
-
     imagePatch = gcdHasOptimization(Optimizer->option, gcvOPTIMIZATION_IMAGE_PATCHING);
 
-    if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_1))
+    if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_0))
+    {
+        inlineLevel = 0;
+    }
+    else if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_1))
     {
         inlineLevel = 1;
     }
@@ -4747,7 +4827,7 @@ gcOpt_UpdatePrecision(
                             break;
 
                         case gcSL_INTEGER:
-                            if(CAN_EXACTLY_CVT_S32_2_S16(value))
+                            if(CAN_EXACTLY_CVT_S32_2_S16((gctINT)value))
                             {
                                 inst->source0 = gcmSL_SOURCE_SET(inst->source0, Precision, gcSHADER_PRECISION_MEDIUM);
                             }
@@ -4833,7 +4913,7 @@ gcOpt_UpdatePrecision(
                             break;
 
                         case gcSL_INTEGER:
-                            if(CAN_EXACTLY_CVT_S32_2_S16(value))
+                            if(CAN_EXACTLY_CVT_S32_2_S16((gctINT)value))
                             {
                                 inst->source1 = gcmSL_SOURCE_SET(inst->source1, Precision, gcSHADER_PRECISION_MEDIUM);
                             }
@@ -5080,16 +5160,8 @@ gcOpt_OptimizeCallStackDepth(
     gctINT  currentBudget = (inlineLevel == 4) ? 0x7fffffff
                                                : _GetInlineBudget(Optimizer);
     gctUINT savedShaderTempCount = Optimizer->shader->_tempRegCount;
-    gctUINT option = Optimizer->shader->optimizationOption;
 
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
-
-    if (Optimizer->functionCount == 0 ||
-        gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_LEVEL_0))
-    {
-        gcmFOOTER();
-        return status;
-    }
 
     /* Update the call stack information. */
     status = gcOpt_UpdateCallStackDepth(Optimizer, gcvFALSE);
@@ -5398,13 +5470,16 @@ static gceSTATUS _EvaluateConstantInstruction(
             }
             break;
 
+        /* Two-operand integer computational instruction. */
         case gcSL_AND_BITWISE:
         case gcSL_OR_BITWISE:
+        case gcSL_XOR_BITWISE:
+        case gcSL_LSHIFT:
+        case gcSL_RSHIFT:
             /* Skip if dest is volatile. */
             variable = tempArray[code->instruction.tempIndex].arrayVariable;
             if (variable && (variable->qualifier & gcvTYPE_QUALIFIER_VOLATILE)) break;
 
-            /* Two-operand computational instruction. */
             source  = code->instruction.source0;
             format0 = (gcSL_FORMAT) gcmSL_SOURCE_GET(source, Format);
             source1 = code->instruction.source1;
@@ -5421,20 +5496,73 @@ static gceSTATUS _EvaluateConstantInstruction(
             value0 = (code->instruction.source0Index & 0xFFFF) | (code->instruction.source0Indexed << 16);
             value1 = (code->instruction.source1Index & 0xFFFF) | (code->instruction.source1Indexed << 16);
 
-            if (opcode == gcSL_AND_BITWISE)
+            switch (opcode)
+            {
+            case gcSL_AND_BITWISE:
                 value = value0 & value1;
-            else
+                break;
+
+            case gcSL_OR_BITWISE:
                 value = value0 | value1;
+                break;
+
+            case gcSL_XOR_BITWISE:
+                value = value0 ^ value1;
+                break;
+
+            case gcSL_LSHIFT:
+                value = value0 << value1;
+                break;
+
+            case gcSL_RSHIFT:
+                value = value0 >> value1;
+                break;
+
+            default:
+                gcmASSERT(gcvFALSE);
+                break;
+            }
 
             sourceUint = code->instruction.source0;
             sourceIndex = value & 0xFFFF;
             sourceIndexed = (value >> 16) & 0xFFFF;
             needToPropagate = gcvTRUE;
             break;
-        case gcSL_XOR_BITWISE:
+
+        /* One-operand integer computational instruction. */
         case gcSL_NOT_BITWISE:
-        case gcSL_LSHIFT:
-        case gcSL_RSHIFT:
+            /* Skip if dest is volatile. */
+            variable = tempArray[code->instruction.tempIndex].arrayVariable;
+            if (variable && (variable->qualifier & gcvTYPE_QUALIFIER_VOLATILE)) break;
+
+            source  = code->instruction.source0;
+            format0 = (gcSL_FORMAT) gcmSL_SOURCE_GET(source, Format);
+
+            if (gcmSL_SOURCE_GET(source, Type) != (gctUINT16) gcSL_CONSTANT)
+            {
+                break;
+            }
+
+            /* Assemble the 32-bit value. */
+            value0 = (code->instruction.source0Index & 0xFFFF) | (code->instruction.source0Indexed << 16);
+
+            switch (opcode)
+            {
+            case gcSL_NOT_BITWISE:
+                value = ~value0;
+                break;
+
+            default:
+                gcmASSERT(gcvFALSE);
+                break;
+            }
+
+            sourceUint = code->instruction.source0;
+            sourceIndex = value & 0xFFFF;
+            sourceIndexed = (value >> 16) & 0xFFFF;
+            needToPropagate = gcvTRUE;
+            break;
+
         case gcSL_ROTATE:
             /* Two-operand integer computational instruction. */
             break;
@@ -6503,18 +6631,6 @@ gcOpt_PropagateConstants(
 #endif
 
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
-#if !DX_SHADER
-    if (0 && gcmOPT_UseVIRCodeGen() != VIRCG_None) /* not ready yet to disable old ConstPropagation */
-    {
-        /* use VIR ConstantPropagation */
-        VSC_OPTN_CPFOptions* cpf_options = VSC_OPTN_Options_GetCPFOptions(VSC_OPTN_Get_Options());
-        if (VSC_OPTN_CPFOptions_GetSwitchOn(cpf_options))
-        {
-            gcmFOOTER();
-            return gcvSTATUS_OK;
-        }
-    }
-#endif  /* !DX_SHADER */
 
     /* Set round-to-zero mode to match GPU. */
     if (Optimizer->shader->type == gcSHADER_TYPE_CL)
@@ -7835,77 +7951,6 @@ static gctINT isUserOnlyDependsOn(gcOPT_CODE User, gcOPT_CODE Def)
     return gcvFALSE;
 }
 
-#if TEMP_OPT_CONSTANT_TEXLD_COORD
-
-static gceSTATUS
-_gcConvertTEXLD2MOV(
-    IN gcOPTIMIZER Optimizer
-)
-{
-    gceSTATUS  status = gcvSTATUS_OK;
-    gcOPT_CODE code, coordMOV;
-    gcUNIFORM  constantTexel;
-    gctUINT16  srcConfig0, srcConfig1;
-    char       constTexelName[64];
-    gctUINT    offset = 0;
-    gcePATCH_ID patchId = Optimizer->patchID;
-
-    if (Optimizer->shader->type != gcSHADER_TYPE_FRAGMENT)
-        return status;
-
-    if (patchId == gcvPATCH_GLBM21 || patchId == gcvPATCH_GLBM25)
-    {
-        for (code = Optimizer->codeHead; code; code = code->next)
-        {
-            if (code->instruction.opcode == gcSL_TEXLD &&
-                code->dependencies1 != gcvNULL && code->dependencies1->next == gcvNULL &&
-                code->dependencies1->index >= 0 &&
-                code->dependencies1->code->instruction.opcode == gcSL_MOV &&
-                gcmSL_SOURCE_GET(code->dependencies1->code->instruction.source0, Type) == gcSL_CONSTANT &&
-                code->dependencies1->code->instruction.source0Index == 0 &&
-                code->dependencies1->code->instruction.source0Indexed == 0)
-            {
-                coordMOV = code->dependencies1->code;
-
-                /* Change 'texld r#, s#, vec2(0,0)' to 'MOV r#, c#' */
-                code->instruction.opcode = gcSL_MOV;
-
-                gcoOS_PrintStrSafe(constTexelName, 64, &offset, "#Constant_Texel_s%d_x%d_y%d",
-                               code->instruction.source0Index, 0, 0);
-
-                /* Add new uniform for constant texel */
-                gcSHADER_AddUniformEx(Optimizer->shader,
-                                  constTexelName,
-                                  gcSHADER_FLOAT_X4,
-                                  gcSHADER_PRECISION_HIGH,
-                                  1,
-                                  &constantTexel);
-
-                /* Please refine the patch to make the uniform be immediate constant,
-                ** thus client driver need not prepare for the messy patch.
-                */
-                SetUniformFlag(constantTexel, gcvUNIFORM_KIND_OPT_CONSTANT_TEXLD_COORD);
-
-                /* Set src of MOV to this new uniform */
-                srcConfig0 = gcmSL_SOURCE_SET(code->instruction.source0, Type, gcSL_UNIFORM);
-                code->instruction.source0 = srcConfig0;
-                code->instruction.source0Index = constantTexel->index;
-
-                /* 2nd src is now obsolete */
-                srcConfig1 = gcmSL_SOURCE_SET(code->instruction.source1, Type, gcSL_NONE);
-                code->instruction.source1 = srcConfig1;
-
-                /* Update DU/UD chain */
-                gcmVERIFY_OK(gcOpt_DeleteCodeFromList(Optimizer, &code->dependencies1, coordMOV));
-                gcmVERIFY_OK(gcOpt_DeleteCodeFromList(Optimizer, &coordMOV->users, code));
-            }
-        }
-    }
-
-    return status;
-}
-#endif
-
 /*******************************************************************************
 **                          gcOpt_ConditionalizeCode
 ********************************************************************************
@@ -7931,8 +7976,6 @@ gcOpt_ConditionalizeCode(
     )
 {
     gctUINT codeMoved = 0;
-    /*gcOPT_TEMP tempArray = Optimizer->tempArray;*/
-    /*gcOPT_TEMP temp;*/
     gcOPT_CODE code, theUserCode, iterCode, theNextCode;
     gcOPT_LIST caller;
 
@@ -9699,73 +9742,6 @@ OnError:
 }
 #endif
 
-/*******************************************************************************
-**                          gcOpt_MovTexLodCode
-********************************************************************************
-**
-**  If a texbias, texgrad, texgather, texfetch_ms or texlod code is not before its user, we must move the code before its user.
-**  Otherwise, there is no such pattern to generate these instructions.
-**
-**  Legality Check:
-**
-**
-**  INPUT:
-**
-**      gcOPTIMIZER Optimizer
-**          Pointer to a gcOPTIMIZER structure.
-*/
-gceSTATUS
-gcOpt_MovTexLodCode(
-    IN gcOPTIMIZER Optimizer
-    )
-{
-    gctUINT codeMoved = 0;
-    gcOPT_CODE code, userCode;
-    gcSL_OPCODE opcode;
-
-    gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
-
-    gcOpt_UpdateCodeId(Optimizer);
-
-    for (code = Optimizer->codeHead; code; code = code->next)
-    {
-        opcode = gcmSL_OPCODE_GET(code->instruction.opcode, Opcode);
-
-        /* Test for texld modifier instruction. */
-        if (!gcSL_isOpcodeTexldModifier(opcode))
-            continue;
-
-        for (userCode = code->next; userCode; userCode = userCode->next)
-        {
-            gcSL_OPCODE opcode = gcmSL_OPCODE_GET(userCode->instruction.opcode, Opcode);
-
-            /* Test for TEXLD instruction. */
-            if (!gcSL_isOpcodeTexld(opcode))
-            {
-                continue;
-            }
-
-            gcOpt_MoveCodeListBefore(Optimizer, code, code, userCode);
-            codeMoved++;
-            break;
-        }
-    }
-
-    if (codeMoved != 0)
-    {
-        gcOpt_UpdateCodeId(Optimizer);
-        DUMP_OPTIMIZER("Moved gcSL_TEXBIAS instruction before its user", Optimizer);
-        gcmFOOTER_ARG("status=%d", gcvSTATUS_CHANGED);
-        return gcvSTATUS_CHANGED;
-    }
-    else
-    {
-        /* Code unchanged. */
-        gcmFOOTER_NO();
-        return gcvSTATUS_OK;
-    }
-}
-
 /* Right now, we only check four sequential jump instructions. */
 #define __MAX_MERGE_BRANCH_NUMBER__ 4
 
@@ -10156,6 +10132,7 @@ gcOptimizeShader(
     gctUINT option;
     gcOPTIMIZER optimizer = gcvNULL;
     gctBOOL   dumpOptimizer = gcSHADER_DumpOptimizer(Shader);
+    gctBOOL   useFullNewLinker = gcvFALSE;
 
     gcmHEADER_ARG("Shader=0x%x LogFile=0x%x", Shader, LogFile);
 
@@ -10169,11 +10146,7 @@ gcOptimizeShader(
         return gcvSTATUS_OK;
     }
 
-    option = Shader->optimizationOption;
-
-    /*gcOpt_GenShader(Shader, LogFile);*/
-
-    if (option == gcvOPTIMIZATION_NONE)
+    if (Shader->optimizationOption == gcvOPTIMIZATION_NONE)
     {
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
@@ -10187,11 +10160,35 @@ gcOptimizeShader(
     {
         /* Construct the optimizer. */
         gcmERR_BREAK(gcOpt_ConstructOptimizer(Shader, &optimizer));
+        useFullNewLinker = gcUseFullNewLinker(optimizer->hwCfg.hwFeatureFlags.hasHalti2);
 
-        if (gcdHasOptimization(option, gcvOPTIMIZATION_DEAD_CODE))
+        if (useFullNewLinker)
         {
-            gcmERR_BREAK(gcOpt_RemoveDeadCode(optimizer));
+            optimizer->option &= ~gcvOPTIMIZATION_VECTOR_INSTRUCTION_MERGE;
+            optimizer->option &= ~gcvOPTIMIZATION_MAD_INSTRUCTION;
+            optimizer->option &= ~gcvOPTIMIZATION_LOAD_SW_W;
+            optimizer->option &= ~gcvOPTIMIZATION_CONDITIONALIZE;
+            optimizer->option &= ~gcvOPTIMIZATION_POWER_OPTIMIZATION;
+            optimizer->option &= ~gcvOPTIMIZATION_CONSTANT_ARGUMENT_PROPAGATION;
         }
+        if (gcdHasOptimization(optimizer->option, gcvOPTIMIZATION_MIN_COMP_TIME))
+        {
+            optimizer->option &= ~gcvOPTIMIZATION_CONSTANT_PROPAGATION;
+            optimizer->option &= ~gcvOPTIMIZATION_LOADTIME_CONSTANT;
+            optimizer->option &= ~gcvOPTIMIZATION_VECTOR_INSTRUCTION_MERGE;
+            optimizer->option &= ~gcvOPTIMIZATION_MAD_INSTRUCTION;
+            optimizer->option &= ~gcvOPTIMIZATION_LOAD_SW_W;
+            optimizer->option &= ~gcvOPTIMIZATION_CONDITIONALIZE;
+            optimizer->option &= ~gcvOPTIMIZATION_POWER_OPTIMIZATION;
+            optimizer->option &= ~gcvOPTIMIZATION_CONSTANT_ARGUMENT_PROPAGATION;
+        }
+        if (gcdHasOptimization(optimizer->option, gcvOPTIMIZATION_INLINE_LEVEL_0))
+        {
+            optimizer->option &= ~gcvOPTIMIZATION_INLINE_EXPANSION;
+        }
+        option = optimizer->option;
+
+        gcmERR_BREAK(gcOpt_RemoveDeadCode(optimizer));
 
 #if _REMAP_TEMP_INDEX_FOR_FUNCTION_
         gcmERR_BREAK(gcOpt_RemapTempIndex(&optimizer));
@@ -10204,18 +10201,11 @@ gcOptimizeShader(
         /* Analysis the code. */
         gcmERR_BREAK(gcOpt_AnalysisCode(optimizer));
 
-        /* Move the texbias, texgrad, texgather, texfetch_ms texlod code. */
-        gcmERR_BREAK(gcOpt_MovTexLodCode(optimizer));
-
         if (option != gcvOPTIMIZATION_NONE &&
             !gcdHasOptimization(option, gcvOPTIMIZATION_UNIT_TEST))
         {
             /* The normal full optimization mode. */
             status = gcvSTATUS_OK;
-
-#if TEMP_OPT_CONSTANT_TEXLD_COORD
-            gcmERR_BREAK(_gcConvertTEXLD2MOV(optimizer));
-#endif
 
             /* TODO - need to add more features and adjust the sequence. */
 
@@ -10245,8 +10235,7 @@ gcOptimizeShader(
                     gcmERR_BREAK(gcOpt_PropagateConstants(optimizer));
                 }
 
-                if (!ENABLE_FULL_NEW_LINKER &&
-                    gcdHasOptimization(option, gcvOPTIMIZATION_CONSTANT_ARGUMENT_PROPAGATION))
+                if (gcdHasOptimization(option, gcvOPTIMIZATION_CONSTANT_ARGUMENT_PROPAGATION))
                 {
                     /* Propagate argument constants. */
                     gcmERR_BREAK(gcOpt_PropagateArgumentConstants(optimizer));
@@ -10256,7 +10245,8 @@ gcOptimizeShader(
                    the inlineKind is GCSL_INLINER_KIND, which is set through
                    VC_OPTION=-INLINER:0 */
                 if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_EXPANSION) &&
-                    (gcmOPT_UseVIRCodeGen() == VIRCG_None || gcmOPT_INLINERKIND() == GCSL_INLINER_KIND))
+                    (gcGetVIRCGKind(optimizer->hwCfg.hwFeatureFlags.hasHalti2) == VIRCG_None || gcmOPT_INLINERKIND() == GCSL_INLINER_KIND) &&
+                    !gcdHasOptimization(option, gcvOPTIMIZATION_MIN_COMP_TIME))
                 {
                     /* Remove nops before inline function optimization, so there can be more code budget for expand functions. */
                     gcmERR_BREAK(gcOpt_RemoveNOP(optimizer));
@@ -10267,10 +10257,14 @@ gcOptimizeShader(
 
                     gcOpt_UpdateCodeFunction(optimizer);
                 }
-                gcOpt_UpdatePrecision(optimizer);
+
+                if (gcdHasOptimization(option, gcvOPTIMIZATION_UPDATE_PRECISION))
+                {
+                    gcOpt_UpdatePrecision(optimizer);
+                }
+
                 if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_EXPANSION) &&
-                    (gcmOPT_UseVIRCodeGen() == VIRCG_None || gcmOPT_INLINERKIND() == GCSL_INLINER_KIND) &&
-                    !gcdHasOptimization(option, gcvOPTIMIZATION_MIN_COMP_TIME))
+                    (gcGetVIRCGKind(optimizer->hwCfg.hwFeatureFlags.hasHalti2) == VIRCG_None || gcmOPT_INLINERKIND() == GCSL_INLINER_KIND))
                 {
                     if (status == gcvSTATUS_CHANGED)
                     {
@@ -10308,8 +10302,7 @@ gcOptimizeShader(
                     }
                 }
 
-                if (!ENABLE_FULL_NEW_LINKER &&
-                    gcdHasOptimization(option, gcvOPTIMIZATION_CONSTANT_ARGUMENT_PROPAGATION))
+                if (gcdHasOptimization(option, gcvOPTIMIZATION_CONSTANT_ARGUMENT_PROPAGATION))
                 {
                     /* Propagate argument constants. */
                     gcmERR_BREAK(gcOpt_PropagateArgumentConstants(optimizer));
@@ -10327,25 +10320,8 @@ gcOptimizeShader(
                     /* Get accurate function codeCount after optimizaton. */
                     gcmERR_BREAK(gcOpt_RemoveNOP(optimizer));
                 }
-
-                if (gcdHasOptimization(option, gcvOPTIMIZATION_INTRINSICS) &&
-                    !gcdHasOptimization(option, gcvOPTIMIZATION_MIN_COMP_TIME))
-                {
-                    /* optimize the instrinsics. */
-                    gcmERR_BREAK(gcOpt_OptimizeIntrinsics(optimizer));
-
-                    if (status == gcvSTATUS_CHANGED)
-                    {
-                        /* Remove dead code. */
-                        gcmERR_BREAK(gcOpt_RemoveDeadCode(optimizer));
-
-                        /* Optimize MOV instructions for arguments and outputs. */
-                        gcOpt_OptimizeMOVInstructions(optimizer);
-                    }
-                }
-
             }
-            else
+            else if (gcdHasOptimization(option, gcvOPTIMIZATION_UPDATE_PRECISION))
             {
                 gcOpt_UpdatePrecision(optimizer);
             }
@@ -10395,8 +10371,7 @@ gcOptimizeShader(
                     gcmERR_BREAK(gcOpt_PropagateConstants(optimizer));
                 }
 
-                if (!ENABLE_FULL_NEW_LINKER &&
-                    gcdHasOptimization(option, gcvOPTIMIZATION_CONSTANT_ARGUMENT_PROPAGATION))
+                if (gcdHasOptimization(option, gcvOPTIMIZATION_CONSTANT_ARGUMENT_PROPAGATION))
                 {
                     /* Propagate argument constants. */
                     gcmERR_BREAK(gcOpt_PropagateArgumentConstants(optimizer));
@@ -10456,8 +10431,7 @@ gcOptimizeShader(
                 }
             }
 
-            if (!ENABLE_FULL_NEW_LINKER &&
-                gcdHasOptimization(option, gcvOPTIMIZATION_CONSTANT_ARGUMENT_PROPAGATION))
+            if (gcdHasOptimization(option, gcvOPTIMIZATION_CONSTANT_ARGUMENT_PROPAGATION))
             {
                 /* Propagate argument constants. */
                 gcmERR_BREAK(gcOpt_PropagateArgumentConstants(optimizer));
@@ -10509,7 +10483,7 @@ gcOptimizeShader(
                the inlineKind is GCSL_INLINER_KIND, which is set through
                VC_OPTION=-INLINER:0 */
             if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_EXPANSION) &&
-                (gcmOPT_UseVIRCodeGen() == VIRCG_None || gcmOPT_INLINERKIND() == GCSL_INLINER_KIND))
+                (gcGetVIRCGKind(optimizer->hwCfg.hwFeatureFlags.hasHalti2) == VIRCG_None || gcmOPT_INLINERKIND() == GCSL_INLINER_KIND))
             {
                 gcmERR_BREAK(gcOpt_OptimizeCallStackDepth(&optimizer));
                 gcOpt_UpdateCodeFunction(optimizer);
@@ -10546,7 +10520,7 @@ gcOptimizeShader(
             if (optimizer->functionCount > 0)
             {
                 if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_EXPANSION) &&
-                    (gcmOPT_UseVIRCodeGen() == VIRCG_None || gcmOPT_INLINERKIND() == GCSL_INLINER_KIND))
+                    (gcGetVIRCGKind(optimizer->hwCfg.hwFeatureFlags.hasHalti2) == VIRCG_None || gcmOPT_INLINERKIND() == GCSL_INLINER_KIND))
                 {
                     /* Remove nops before inline function optimization, so there can be more code budget for expand functions. */
                     gcmERR_BREAK(gcOpt_RemoveNOP(optimizer));
@@ -10586,12 +10560,16 @@ gcOptimizeShader(
                the inlineKind is GCSL_INLINER_KIND, which is set through
                VC_OPTION=-INLINER:0 */
             if (gcdHasOptimization(option, gcvOPTIMIZATION_INLINE_EXPANSION) &&
-                (gcmOPT_UseVIRCodeGen() == VIRCG_None || gcmOPT_INLINERKIND() == GCSL_INLINER_KIND))
+                (gcGetVIRCGKind(optimizer->hwCfg.hwFeatureFlags.hasHalti2) == VIRCG_None || gcmOPT_INLINERKIND() == GCSL_INLINER_KIND))
             {
                 status = gcOpt_InlineFunctions(&optimizer, gcvFALSE);
                 gcOpt_UpdateCodeFunction(optimizer);
             }
-            gcOpt_UpdatePrecision(optimizer);
+
+            if (gcdHasOptimization(option, gcvOPTIMIZATION_UPDATE_PRECISION))
+            {
+                gcOpt_UpdatePrecision(optimizer);
+            }
 
             if (gcdHasOptimization(option, gcvOPTIMIZATION_CONSTANT_PROPAGATION))
             {
@@ -10612,7 +10590,6 @@ gcOptimizeShader(
 
             if (gcdHasOptimization(option, gcvOPTIMIZATION_LOAD_SW_W))
             {
-                /* Merge separate vector instructions into one vector instruction. */
                 gcmERR_BREAK(gcOpt_LoadSWW(optimizer));
             }
         }
@@ -10631,7 +10608,7 @@ gcOptimizeShader(
         optimizer = gcvNULL;
     }
 
-    if(!ENABLE_FULL_NEW_LINKER)
+    if (!useFullNewLinker)
     {
         gcmVERIFY_OK(_removeUnusedArguments(Shader));
     }

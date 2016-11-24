@@ -29,8 +29,9 @@ SOURCES = \
 INCLUDES = \
     $(INCLUDES); \
     $(AQROOT)\hal\user; \
-    $(AQROOT)\hal\os\ce\user; \
     $(AQROOT)\hal\user\arch; \
+    $(AQROOT)\hal\os\ce\user; \
+
 
 !IF "$(VIVANTE_ENABLE_3D)" == "1"
 INCLUDES = \

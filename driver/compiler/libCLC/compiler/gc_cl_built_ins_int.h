@@ -403,7 +403,7 @@ _GenHaddCode(
     status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[3],
                                 &OperandsParameters[0].rOperands[0],
                                 &maskROperand);
@@ -415,7 +415,7 @@ _GenHaddCode(
     status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[4],
                                 &OperandsParameters[1].rOperands[0],
                                 &intermROperands[3]);
@@ -514,7 +514,7 @@ _GenRhaddCode(
     status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[4],
                                 &OperandsParameters[0].rOperands[0],
                                 &maskROperand);
@@ -525,7 +525,7 @@ _GenRhaddCode(
     status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[5],
                                 &OperandsParameters[1].rOperands[0],
                                 &maskROperand);
@@ -539,7 +539,7 @@ _GenRhaddCode(
     status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_OR,
+                                clvOPCODE_OR_BITWISE,
                                 &intermIOperands[6],
                                 &intermROperands[5],
                                 &intermROperands[4]);
@@ -636,7 +636,7 @@ _GenAddSubSatCode(
             status = clGenGenericCode1(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_NOT,
+                        clvOPCODE_NOT_BITWISE,
                         &intermIOperands[1],
                         PolynaryExpr->funcName->symbol[0] == 's' ?&intermROperands[4]: &OperandsParameters[1].rOperands[0]);
 
@@ -750,7 +750,7 @@ _GenAddSubSatCode(
             status = clGenGenericCode1(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_NOT,
+                        clvOPCODE_NOT_BITWISE,
                         &intermIOperands[1],
                         &intermROperands[3]);
 
@@ -758,7 +758,7 @@ _GenAddSubSatCode(
             status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[0],
                                 &intermROperands[0],
                                 &intermROperands[1]);
@@ -766,7 +766,7 @@ _GenAddSubSatCode(
             status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[1],
                                 &intermROperands[2],
                                 &intermROperands[3]);
@@ -774,7 +774,7 @@ _GenAddSubSatCode(
             status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_OR,
+                                clvOPCODE_OR_BITWISE,
                                 IOperand,
                                 &intermROperands[1],
                                 &intermROperands[0]);
@@ -821,7 +821,7 @@ _GenAddSubSatCode(
                 status = clGenGenericCode1(Compiler,
                             PolynaryExpr->exprBase.base.lineNo,
                             PolynaryExpr->exprBase.base.stringNo,
-                            clvOPCODE_BITWISE_NOT,
+                            clvOPCODE_NOT_BITWISE,
                             &intermIOperands[1],
                             &OperandsParameters[1].rOperands[0]);
                 status = clGenGenericCode2(
@@ -852,7 +852,7 @@ _GenAddSubSatCode(
                 status = clGenArithmeticExprCode(Compiler,
                     PolynaryExpr->exprBase.base.lineNo,
                     PolynaryExpr->exprBase.base.stringNo,
-                    clvOPCODE_BITWISE_AND,
+                    clvOPCODE_AND_BITWISE,
                     IOperand,
                     &intermROperands[0],
                     &intermROperands[3]);
@@ -862,7 +862,7 @@ _GenAddSubSatCode(
                 status = clGenGenericCode1(Compiler,
                             PolynaryExpr->exprBase.base.lineNo,
                             PolynaryExpr->exprBase.base.stringNo,
-                            clvOPCODE_BITWISE_NOT,
+                            clvOPCODE_NOT_BITWISE,
                             &intermIOperands[1],
                             &intermROperands[3]);
 
@@ -871,7 +871,7 @@ _GenAddSubSatCode(
                 status = clGenArithmeticExprCode(Compiler,
                                     PolynaryExpr->exprBase.base.lineNo,
                                     PolynaryExpr->exprBase.base.stringNo,
-                                    clvOPCODE_BITWISE_AND,
+                                    clvOPCODE_AND_BITWISE,
                                     &intermIOperands[0],
                                     &intermROperands[0],
                                     &intermROperands[3]);
@@ -879,7 +879,7 @@ _GenAddSubSatCode(
                 status = clGenArithmeticExprCode(Compiler,
                                     PolynaryExpr->exprBase.base.lineNo,
                                     PolynaryExpr->exprBase.base.stringNo,
-                                    clvOPCODE_BITWISE_AND,
+                                    clvOPCODE_AND_BITWISE,
                                     &intermIOperands[1],
                                     &maxUintROperand,
                                     &intermROperands[1]);
@@ -887,7 +887,7 @@ _GenAddSubSatCode(
                 status = clGenArithmeticExprCode(Compiler,
                                     PolynaryExpr->exprBase.base.lineNo,
                                     PolynaryExpr->exprBase.base.stringNo,
-                                    clvOPCODE_BITWISE_OR,
+                                    clvOPCODE_OR_BITWISE,
                                     IOperand,
                                     &intermROperands[1],
                                     &intermROperands[0]);
@@ -978,7 +978,7 @@ _GenMadSatVec4Code(
             status = clGenGenericCode1(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_NOT,
+                        clvOPCODE_NOT_BITWISE,
                         &intermIOperands[2],
                         &OperandsParameters[2].rOperands[0]);
 
@@ -1082,7 +1082,7 @@ _GenMadSatVec4Code(
             status = clGenGenericCode1(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_NOT,
+                        clvOPCODE_NOT_BITWISE,
                         &intermIOperands[1],
                         &intermROperands[3]);
 
@@ -1090,7 +1090,7 @@ _GenMadSatVec4Code(
             status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[0],
                                 &intermROperands[0],
                                 &intermROperands[1]);
@@ -1098,7 +1098,7 @@ _GenMadSatVec4Code(
             status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[1],
                                 &intermROperands[2],
                                 &intermROperands[3]);
@@ -1106,7 +1106,7 @@ _GenMadSatVec4Code(
             status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_OR,
+                                clvOPCODE_OR_BITWISE,
                                 IOperand,
                                 &intermROperands[1],
                                 &intermROperands[0]);
@@ -1147,7 +1147,7 @@ _GenMadSatVec4Code(
             status = clGenGenericCode1(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_NOT,
+                        clvOPCODE_NOT_BITWISE,
                         &intermIOperands[2],
                         &OperandsParameters[2].rOperands[0]);
 
@@ -1205,7 +1205,7 @@ _GenMadSatVec4Code(
             status = clGenGenericCode1(Compiler,
                         PolynaryExpr->exprBase.base.lineNo,
                         PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_BITWISE_NOT,
+                        clvOPCODE_NOT_BITWISE,
                         &intermIOperands[1],
                         &intermROperands[3]);
 
@@ -1213,7 +1213,7 @@ _GenMadSatVec4Code(
             status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[0],
                                 &intermROperands[0],
                                 &intermROperands[1]);
@@ -1221,7 +1221,7 @@ _GenMadSatVec4Code(
             status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_AND,
+                                clvOPCODE_AND_BITWISE,
                                 &intermIOperands[1],
                                 &maxUintROperand,
                                 &intermROperands[3]);
@@ -1229,7 +1229,7 @@ _GenMadSatVec4Code(
             status = clGenArithmeticExprCode(Compiler,
                                 PolynaryExpr->exprBase.base.lineNo,
                                 PolynaryExpr->exprBase.base.stringNo,
-                                clvOPCODE_BITWISE_OR,
+                                clvOPCODE_OR_BITWISE,
                                 IOperand,
                                 &intermROperands[1],
                                 &intermROperands[0]);
@@ -1689,7 +1689,7 @@ _GenUpsampleCode(
     status = clGenArithmeticExprCode(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
                                      PolynaryExpr->exprBase.base.stringNo,
-                                     clvOPCODE_BITWISE_OR,
+                                     clvOPCODE_OR_BITWISE,
                                      IOperand,
                                      &destROperand,
                                      lowerOperand);

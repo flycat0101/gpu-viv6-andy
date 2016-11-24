@@ -2649,7 +2649,7 @@ hwc_set(
         do
         {
             int fenceFd = -1;
-            gctSYNC_POINT syncPoint;
+            gctSIGNAL signal;
             gcsHAL_INTERFACE iface;
             gceSTATUS status;
 
@@ -2660,7 +2660,7 @@ hwc_set(
             }
 
             /* Create sync point. */
-            status = gcoOS_CreateSyncPoint(gcvNULL, &syncPoint);
+            status = gcoOS_CreateSignal(gcvNULL, gcvTRUE, &signal);
 
             if (gcmIS_ERROR(status))
             {
@@ -2669,26 +2669,27 @@ hwc_set(
             }
 
             /* Create native fence. */
-            status = gcoOS_CreateNativeFence(gcvNULL, syncPoint, &fenceFd);
+            status = gcoOS_CreateNativeFence(gcvNULL, signal, &fenceFd);
 
             if (gcmIS_ERROR(status) || fenceFd < 0)
             {
-                gcmVERIFY_OK(gcoOS_DestroySyncPoint(gcvNULL, syncPoint));
+                gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, signal));
                 gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
                 break;
             }
 
             /* Submit the sync point. */
-            iface.command               = gcvHAL_SYNC_POINT;
-            iface.u.SyncPoint.command   = gcvSYNC_POINT_SIGNAL;
-            iface.u.SyncPoint.syncPoint = gcmPTR_TO_UINT64(syncPoint);
-            iface.u.Signal.fromWhere    = gcvKERNEL_PIXEL;
+            iface.command            = gcvHAL_SIGNAL;
+            iface.u.Signal.signal    = gcmPTR_TO_UINT64(signal);
+            iface.u.Signal.auxSignal = 0;
+            iface.u.Signal.process   = 0; /* TODO */
+            iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
 
             /* Send event. */
             gcoHAL_ScheduleEvent(gcvNULL, &iface);
 
             /* Now destroy the sync point. */
-            gcmVERIFY_OK(gcoOS_DestroySyncPoint(gcvNULL, syncPoint));
+            gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, signal));
 
             for (gctUINT i = 0; i < dpy->layerCount; i++)
             {

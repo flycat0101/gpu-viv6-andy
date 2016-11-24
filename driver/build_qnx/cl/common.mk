@@ -48,12 +48,12 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_platform.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_program.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_profiler.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_sampler.o
-
 ifeq ($(ENABLE_CL_GL), 1)
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_gl.o
 endif
 
 EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libCL
+
 EXTRA_LIBVPATH += $(LOCAL_INSTALL)
 
 OBJECTS_FROM_SRCVPATH := $(basename $(wildcard $(foreach dir, $(EXTRA_SRCVPATH), $(addprefix $(dir)/*., s S c cc cpp))))
@@ -67,7 +67,7 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LIBS += GAL-$(HARDWARENAME) GLESv2 VSC
+LIBS += GAL GLESv2 EGL VSC $(STATIC_LIBS)
 
 CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS
 CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_1_APIS

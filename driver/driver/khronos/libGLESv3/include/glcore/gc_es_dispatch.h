@@ -400,7 +400,8 @@
     esApiMacro(TexDirectTiledMapVIV), \
     /* GL_EXT_multi_draw_indirect */ \
     esApiMacro(MultiDrawArraysIndirectEXT), \
-    esApiMacro(MultiDrawElementsIndirectEXT)
+    esApiMacro(MultiDrawElementsIndirectEXT), \
+    esApiMacro(GetTexImage)
 
 
 
@@ -789,20 +790,20 @@
     /* GL_VIV_direct_texture */ \
     GLvoid         (GL_APIENTRY *TexDirectVIV) (_gcArgComma_ GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** pixels); \
     GLvoid         (GL_APIENTRY *TexDirectInvalidateVIV) (_gcArgComma_ GLenum target); \
-    GLvoid         (GL_APIENTRY *TexDirectVIVMap) (_gcArgComma_ GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** logical, const GLuint * physical, GLboolean tiled); \
+    GLvoid         (GL_APIENTRY *TexDirectVIVMap) (_gcArgComma_ GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** logical, const GLuint * physical); \
     GLvoid         (GL_APIENTRY *TexDirectTiledMapVIV) (_gcArgComma_ GLenum target, GLsizei width, GLsizei height, GLenum format, GLvoid ** logical, const GLuint * physical); \
     /* GL_EXT_multi_draw_indirect */ \
     GLvoid         (GL_APIENTRY *MultiDrawArraysIndirectEXT) (_gcArgComma_ GLenum mode, const void *indirect, GLsizei drawcount, GLsizei stride); \
-    GLvoid         (GL_APIENTRY *MultiDrawElementsIndirectEXT) (_gcArgComma_ GLenum mode, GLenum type, const void *indirect, GLsizei drawcount, GLsizei stride);
-
+    GLvoid         (GL_APIENTRY *MultiDrawElementsIndirectEXT) (_gcArgComma_ GLenum mode, GLenum type, const void *indirect, GLsizei drawcount, GLsizei stride); \
+    GLvoid         (GL_APIENTRY *GetTexImage) (_gcArgComma_ GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels);
 
 /* Define GLES 3.0 API Dispatch Table */
 #define _gcArgComma_  __GLcontext* gc,
 #define _gcArgOnly_  __GLcontext* gc
 #define _retProgram_
 #define _retShader_
-#define _retLocation_
 #define _retIndex_
+#define _retLocation_
 #define _retSync_
 #define _retPointer
 
@@ -815,8 +816,8 @@ struct __GLesDispatchTableRec
 #undef _gcArgOnly_
 #undef _retProgram_
 #undef _retShader_
-#undef _retLocation_
 #undef _retIndex_
+#undef _retLocation_
 #undef _retSync_
 #undef _retPointer
 
@@ -824,12 +825,12 @@ struct __GLesDispatchTableRec
 /* Define GLES 3.0 API Tracer Dispatch Table */
 #define _gcArgComma_
 #define _gcArgOnly_
-#define _retProgram_ GLuint retval
-#define _retShader_  ,GLuint retval
-#define _retLocation_ ,GLint retloc
-#define _retIndex_ ,GLuint retidx
-#define _retSync_ ,GLsync retsync
-#define _retPointer ,GLvoid* retptr
+#define _retProgram_     GLuint retval
+#define _retShader_     ,GLuint retval
+#define _retIndex_      ,GLuint retidx
+#define _retLocation_   ,GLint retloc
+#define _retSync_       ,GLsync retsync
+#define _retPointer     ,GLvoid* retptr
 
 typedef struct __GLtraceDispatchTableRec{
 
@@ -841,8 +842,8 @@ typedef struct __GLtraceDispatchTableRec{
 #undef _gcArgOnly_
 #undef _retProgram_
 #undef _retShader_
-#undef _retLocation_
 #undef _retIndex_
+#undef _retLocation_
 #undef _retSync_
 #undef _retPointer
 

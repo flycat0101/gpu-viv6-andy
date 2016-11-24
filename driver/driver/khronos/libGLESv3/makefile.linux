@@ -24,12 +24,11 @@ include $(AQROOT)/makefile.linux.def
 # Define target module name.
 
 ifeq ($(gcdSTATIC_LINK),1)
-  STATIC            := 1
   TARGET_MODULE     := $(OBJ_DIR)/libGLESv2.a
 else
-  DYNAMIC           := 1
   TARGET_MODULE     := $(OBJ_DIR)/libGLESv2.so
   TARGET_SONAME     := libGLESv2.so
+  TARGET_LINKS      :=
 endif
 
 ################################################################################
@@ -70,25 +69,28 @@ CFLAGS += -D_LINUX_ -DGL_GLEXT_PROTOTYPES
 ################################################################################
 # Define flags for the linker.
 
+LDFLAGS := \
+    $(LFLAGS)
+
 ifneq ($(USE_ARMCC), 1)
   ifeq (,$(GL_3_APPENDIX))
-    LFLAGS += -Wl,--version-script=libGLESv3.map
+    LDFLAGS += -Wl,--version-script=libGLESv3.map
   endif
 endif
 
 ifeq ($(USE_ARMCC),1)
-  LFLAGS += --shared -L--soname=,$(TARGET_SONAME)
+  LDFLAGS += --shared -L--soname=,$(TARGET_SONAME)
 else
-  LFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
+  LDFLAGS += -Wall -Wl,-z,defs -shared -Wl,-soname,$(TARGET_SONAME)
 endif
 
 ################################################################################
 # Supply dependent libraries.
 
-LIBS := -L$(SDK_DIR)/drivers \
-        -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL \
-        -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR) -lVSC \
-        -L$(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR) -lEGL -lm
+LDLIBS := -L$(SDK_DIR)/drivers \
+          -L$(AQROOT)/hal/user/$(OBJ_DIR) -lGAL \
+          -L$(AQROOT)/compiler/libVSC/$(OBJ_DIR) -lVSC \
+          -lm
 
 ################################################################################
 # Describe object files.
@@ -150,30 +152,28 @@ install: all
 	@-cp -f $(AQROOT)/sdk/inc/GLES2/*.h $(SDK_DIR)/include/GLES2
 	@mkdir -p $(SDK_DIR)/include/GLES3
 	@-cp -f $(AQROOT)/sdk/inc/GLES3/*.h $(SDK_DIR)/include/GLES3
+	@for lib in $(TARGET_LINKS); do \
+	    ln -sf $(notdir $(TARGET_MODULE)) $(INSTALL_DIR)/$$lib; \
+	done
 
 ################################################################################
 # Module rules.
 
-ifeq ($(STATIC),1)
+ifeq ($(gcdSTATIC_LINK),1)
 $(TARGET_MODULE): $(OBJECTS)
 	$(AR) -r -c $@ $(OBJECTS)
 ifneq ($(USE_ARMCC), 1)
 	$(RANLIB) $@
 endif
-endif
 
-ifeq ($(DYNAMIC),1)
+else
 
 # module dependencies
-$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
-                             $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.a) \
-                  $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so \
-                             $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.a) \
-                  $(wildcard $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.so \
-                             $(AQROOT)/driver/khronos/libEGL/$(OBJ_DIR)/libEGL.a)
+$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so) \
+                  $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so)
 
 $(TARGET_MODULE): $(OBJECTS)
-	$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJECTS) $(LDLIBS)
 endif
 
 ################################################################################

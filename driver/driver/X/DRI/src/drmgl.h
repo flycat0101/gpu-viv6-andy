@@ -87,7 +87,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
     #elif defined(__e2k__)
 
-    #define DRM_CAS(lock, old, new, __ret)                         \
+    #define DRMGL_CAS(lock, old, new, __ret)                         \
     do {                                                           \
            __ret = !__sync_bool_compare_and_swap(                  \
                            &__drm_dummy_lock(lock),                \
@@ -100,7 +100,14 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 #ifndef DRMGL_CAS
-#define DRMGL_CAS(lock,old,new,ret) do { ret=1; } while (0) /* FAST LOCK FAILS */
+
+    #define DRMGL_CAS(lock, old, new, __ret)                         \
+    do {                                                           \
+           __ret = !__sync_bool_compare_and_swap(                  \
+                           &__drm_dummy_lock(lock),                \
+                           old, new);                              \
+    } while (0)
+
 #endif
 
 #if defined(__alpha__) || defined(__powerpc__)

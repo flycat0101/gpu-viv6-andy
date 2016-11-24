@@ -161,6 +161,17 @@ typedef float4    vxc_float4;
 typedef float8    vxc_float8;
 typedef float16   vxc_float16;
 
+/* half (float16) vector 2/4/8/16 */
+typedef half                  vxc_half;
+typedef _viv_half2_packed     vxc_half2;
+typedef _viv_half4_packed     vxc_half4;
+typedef _viv_half8_packed     vxc_half8;
+typedef struct _vxc_half16
+{
+    vxc_half8  hi;
+    vxc_half8  lo;
+} vxc_half16;
+
 typedef uint16 vxc_512bits;
 
 typedef struct
@@ -300,19 +311,13 @@ typedef struct
     global int* ptr;
 } vx_distribution;
 
-typedef struct
+typedef struct _vxc_pyramid
 {
     float scale;
     uint width;
     uint height;
     uint format;
     uint levelCount;
-/*    global image2d_t* levels;*/
-} vx_pyramid;
-
-typedef struct _vxc_pyramid
-{
-    int level;
     _viv_image2d_array_t  imageArray;
 } vxc_pyramid;
 
@@ -320,6 +325,203 @@ typedef vxc_512bits VXC_512Bits;
 typedef vxc_modifier VXC_Modifier_t ;
 typedef vxc_round_mode VXC_RoundMode;
 typedef vxc_filter_mode VXC_FilterMode;
+
+#ifndef VX_USE_INTRINSIC
+#define VX_USE_INTRINSIC 0    /* default to use macro style interface */
+#endif
+
+enum VXC_OP {
+    VXC_OP_abs_diff = 3, /* it must be the same value as VIR_IK_abs_diff */
+    VXC_OP_iadd,
+    VXC_OP_iacc_sq,
+    VXC_OP_lerp,
+    VXC_OP_filter,
+    VXC_OP_mag_phase,
+    VXC_OP_mul_shift,
+    VXC_OP_dp16x1,
+    VXC_OP_dp8x2,
+    VXC_OP_dp4x4,
+    VXC_OP_dp2x8,
+    VXC_OP_clamp,
+    VXC_OP_bi_linear,
+    VXC_OP_select_add,
+    VXC_OP_atomic_add,
+    VXC_OP_bit_extract,
+    VXC_OP_bit_replace,
+    VXC_OP_dp32x1,
+    VXC_OP_dp16x2,
+    VXC_OP_dp8x4,
+    VXC_OP_dp4x8,
+    VXC_OP_dp2x16,
+    VXC_OP_dp32x1_b,
+    VXC_OP_dp16x2_b,
+    VXC_OP_dp8x4_b,
+    VXC_OP_dp4x8_b,
+    VXC_OP_dp2x16_b,
+    VXC_OP_img_load,
+    VXC_OP_img_load_3d,
+    VXC_OP_img_store,
+    VXC_OP_img_store_3d,
+    VXC_OP_vload2,
+    VXC_OP_vload3,
+    VXC_OP_vload4,
+    VXC_OP_vload8,
+    VXC_OP_vload16,
+    VXC_OP_vstore2,
+    VXC_OP_vstore3,
+    VXC_OP_vstore4,
+    VXC_OP_vstore8,
+    VXC_OP_vstore16,
+    VXC_OP_index_add,
+    VXC_OP_vert_min3,
+    VXC_OP_vert_max3,
+    VXC_OP_vert_median3,
+    VXC_OP_hori_min3,
+    VXC_OP_hori_max3,
+    VXC_OP_hori_median3,
+};
+
+#define VXC_OP1(Op, Dest, Src0)   _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, Src0)
+
+#define VXC_OP2(Op, Dest, Src0, Src1)                  \
+    do {                                               \
+        int t1;                                        \
+        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);         \
+        _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, t1);    \
+    } while(0)
+
+#define VXC_OP3(Op, Dest, Src0, Src1, Src2)            \
+    do {                                               \
+        int t1, t2;                                    \
+        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);         \
+        _viv_asm(PARAM_CHAIN, t2, t1, Src2);           \
+        _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, t2);    \
+    } while(0)
+
+#define VXC_OP3_NoDest(Op, Src0, Src1, Src2)           \
+    do {                                               \
+        int t1, t2, t3;                                \
+        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);         \
+        _viv_asm(PARAM_CHAIN, t2, t1, Src2);           \
+        _viv_asm(INTRINSIC_ST, t3, VXC_OP_##Op, t2);   \
+    } while(0)
+
+
+#define VXC_OP4(Op, Dest, Src0, Src1, Src2, Src3)      \
+    do {                                               \
+        int t1, t2, t3;                                \
+        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);         \
+        _viv_asm(PARAM_CHAIN, t2, t1, Src2);           \
+        _viv_asm(PARAM_CHAIN, t3, t2, Src3);           \
+        _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, t3);    \
+    } while(0)
+
+#define VXC_OP4_NoDest(Op, Src0, Src1, Src2, Src3)     \
+    do {                                               \
+        int t1, t2, t3, t4;                            \
+        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);         \
+        _viv_asm(PARAM_CHAIN, t2, t1, Src2);           \
+        _viv_asm(PARAM_CHAIN, t3, t2, Src3);           \
+        _viv_asm(INTRINSIC_ST, t4, VXC_OP_##Op, t3);   \
+    } while(0)
+
+#define VXC_OP4_ST(Op, Dest, Src0, Src1, Src2, Src3)   \
+    do {                                               \
+        int t1, t2, t3;                                \
+        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);         \
+        _viv_asm(PARAM_CHAIN, t2, t1, Src2);           \
+        _viv_asm(PARAM_CHAIN, t3, t2, Src3);           \
+        _viv_asm(INTRINSIC_ST, Dest, VXC_OP_##Op, t3); \
+    } while(0)
+
+#define VXC_OP5(Op, Dest, Src0, Src1, Src2, Src3, Src4)   \
+    do {                                                  \
+        int t1, t2, t3, t4;                               \
+        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);            \
+        _viv_asm(PARAM_CHAIN, t2, t1, Src2);              \
+        _viv_asm(PARAM_CHAIN, t3, t2, Src3);              \
+        _viv_asm(PARAM_CHAIN, t4, t3, Src4);              \
+        _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, t4);       \
+    } while(0)
+
+/* make sure the immediate value offsetX and offsetY are in range of [-16, 15] */
+#define VXC_5BITOFFSET_XY(offsetX, offsetY)  ((((offsetY) & 0x1F) << 5) | ((offsetX) & 0x1F))
+
+#if !VX_USE_INTRINSIC
+
+#define VXC_AbsDiff(Dest, Src0, Src1, Info)         VXC_OP3(abs_diff, Dest, Src0, Src1, Info)
+#define VXC_IAdd(Dest, Src0, Src1, Src2, Info)      VXC_OP4(iadd, Dest, Src0, Src1, Src2, Info)
+#define VXC_IAccSq(Dest, Src0, Src1, Imm, Info)     VXC_OP4(iacc_sq, Dest, Src0, Src1, Imm, Info)
+#define VXC_Lerp(Dest, Src0, Src1, Src2, Info)      VXC_OP4(lerp, Dest, Src0, Src1, Src2, Info)
+#define VXC_Filter(Dest, Src0, Src1, Src2, Info)    VXC_OP4(filter, Dest, Src0, Src1, Src2, Info)
+#define VXC_MagPhase(Dest, Src0, Src1, Info)        VXC_OP3(mag_phase, Dest, Src0, Src1, Info)
+/* MulShift: Multiples two 8- or 16-bit integers and shifts
+ *
+ * Syntax:
+ *      r = MulShift(a, b, Imm) ;    // Imm must be an immediate value
+ *
+ * Semantics:
+ *      r[i] = (a[i] * b[i]) >> Imm ;  i E [0, elem(r) )
+ */
+#define VXC_MulShift(Dest, Src0, Src1, Imm, Info)   VXC_OP4(mul_shift, Dest, Src0, Src1, Imm, Info)
+
+#define VXC_DP16x1(Dest, Src0, Src1, Info, U512)    VXC_OP4(dp16x1, Dest, Src0, Src1, Info, U512)
+#define VXC_DP8x2(Dest, Src0, Src1, Info, U512)     VXC_OP4(dp8x2, Dest, Src0, Src1, Info, U512)
+#define VXC_DP4x4(Dest, Src0, Src1, Info, U512)     VXC_OP4(dp4x4, Dest, Src0, Src1, Info, U512)
+#define VXC_DP2x8(Dest, Src0, Src1, Info, U512)     VXC_OP4(dp2x8, Dest, Src0, Src1, Info, U512)
+
+#define VXC_DP32x1(Dest, Src0, Src1, Info, U512)    VXC_OP4(dp32x1, Dest, Src0, Src1, Info, U512)
+#define VXC_DP16x2(Dest, Src0, Src1, Info, U512)    VXC_OP4(dp16x2, Dest, Src0, Src1, Info, U512)
+#define VXC_DP8x4(Dest, Src0, Src1, Info, U512)     VXC_OP4(dp8x4,  Dest, Src0, Src1, Info, U512)
+#define VXC_DP4x8(Dest, Src0, Src1, Info, U512)     VXC_OP4(dp4x8,  Dest, Src0, Src1, Info, U512)
+#define VXC_DP2x16(Dest, Src0, Src1, Info, U512)    VXC_OP4(dp2x16, Dest, Src0, Src1, Info, U512)
+
+/* DP32 <a, b> dot c
+ *  vxc_char32 a;
+ *  vxc_char16 b;
+ *  vxc_int result;
+ *  VXC_DP32x1_b(result, a.hi, a.lo, b, modifier, u);
+ *
+ * Src0 must be hi part of 256 bit value, Src1 must be lo part
+ *
+ */
+#define VXC_DP32x1_b(Dest, Src0, Src1, Src2, Info, U512)    VXC_OP5(dp32x1_b, Dest, Src0, Src1, Src2, Info, U512)
+#define VXC_DP16x2_b(Dest, Src0, Src1, Src2, Info, U512)    VXC_OP5(dp16x2_b, Dest, Src0, Src1, Src2, Info, U512)
+#define VXC_DP8x4_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp8x4_b,  Dest, Src0, Src1, Src2, Info, U512)
+#define VXC_DP4x8_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp4x8_b,  Dest, Src0, Src1, Src2, Info, U512)
+#define VXC_DP2x16_b(Dest, Src0, Src1, Src2, Info, U512)    VXC_OP5(dp2x16_b, Dest, Src0, Src1, Src2, Info, U512)
+
+#define VXC_Clamp(Dest, Src0, Src1, Src2, Info)        VXC_OP4(clamp, Dest, Src0, Src1, Src2, Info)
+#define VXC_BiLinear(Dest, Src0, Src1, Src2, Info)     VXC_OP4(bi_linear, Dest, Src0, Src1, Src2, Info)
+#define VXC_SelectAdd(Dest, Src0, Src1, U512, Info)    VXC_OP4(select_add, Dest, Src0, Src1, U512, Info)
+#define VXC_AtomicAdd(Dest, Base, Offset, Data, Info)  VXC_OP4_ST(atomic_add, Dest, Base, Offset, Data, Info)
+#define VXC_BitExtract(Dest, Src0, Src1, Src2, Info)   VXC_OP4(bit_extract, Dest, Src0, Src1, Src2, Info)
+#define VXC_BitReplace(Dest, Src0, Src1, Src2, Info)   VXC_OP4(bit_replace, Dest, Src0, Src1, Src2, Info)
+
+/* offset should be composed by using VXC_5BITOFFSET_XY(x, y) */
+#define VXC_ReadImage(Dest, Image, Coord, Offset, Info)   VXC_OP4(img_load, Dest, Image, Coord, Offset, Info)
+#define VXC_WriteImage(Image, Coord, Color, Info)         VXC_OP4_NoDest(img_store, Image, Coord, Color, Info)
+
+#define VXC_Vload2(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload2, Dest, Pointer, byteOffset); } while(0)
+#define VXC_Vload4(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload4, Dest, Pointer,  byteOffset); } while(0)
+#define VXC_Vload8(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload8, Dest, Pointer,  byteOffset); } while(0)
+#define VXC_Vload16(Dest, Pointer, Offset)   do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload16, Dest, Pointer,  byteOffset); } while(0)
+
+#define VXC_Vstore2(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*Offset; VXC_OP3_NoDest(vstore2, Pointer, byteOffset, Data); } while(0)
+#define VXC_Vstore4(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*Offset; VXC_OP3_NoDest(vstore4, Pointer, byteOffset, Data); } while(0)
+#define VXC_Vstore8(Pointer, Offset, Data)   do { int byteOffset = ((int)sizeof((Data)))*Offset; VXC_OP3_NoDest(vstore8, Pointer, byteOffset, Data); } while(0)
+#define VXC_Vstore16(Pointer, Offset, Data)  do { int byteOffset = ((int)sizeof((Data)))*Offset; VXC_OP3_NoDest(vstore16, Pointer, byteOffset, Data); } while(0)
+
+/* VX2 only instructions*/
+#define VXC_IndexAdd(Dest, Src0, Src1, Src2)        VXC_OP3(index_add, Dest, Src0, Src1, Src2)
+#define VXC_VertMin3(Dest, Src0, Src1, Src2)        VXC_OP3(vert_min3, Dest, Src0, Src1, Src2)
+#define VXC_VertMax3(Dest, Src0, Src1, Src2)        VXC_OP3(vert_max3, Dest, Src0, Src1, Src2)
+#define VXC_VertMed3(Dest, Src0, Src1, Src2)        VXC_OP3(vert_med3, Dest, Src0, Src1, Src2)
+#define VXC_HorzMin3(Dest, Src0)                    VXC_OP1(horz_min3, Dest, Src0)
+#define VXC_HorzMax3(Dest, Src0)                    VXC_OP1(horz_max3, Dest, Src0)
+#define VXC_HorzMed3(Dest, Src0)                    VXC_OP1(horz_med3, Dest, Src0)
+
+#else
 
 #ifdef __cplusplus
 extern "c" {
@@ -348,6 +550,9 @@ _EXT_ vxc_uchar8  viv_intrinsic_vx_icastP_uc(vxc_short4 a)  _RET0_
 _EXT_ vxc_uchar16  viv_intrinsic_vx_icastP_uc(vxc_ushort8 a)  _RET0_
 _EXT_ vxc_uchar8  viv_intrinsic_vx_icastP_uc(vxc_ushort4 a)  _RET0_
 
+_EXT_ vxc_uchar16  viv_intrinsic_vx_icastP_uc(vxc_half8 a)  _RET0_
+_EXT_ vxc_uchar8  viv_intrinsic_vx_icastP_uc(vxc_half4 a)  _RET0_
+
 /* char */
 _EXT_ vxc_char16 viv_intrinsic_vx_icastP_c(vxc_uchar16 a) _RET0_
 _EXT_ vxc_char8  viv_intrinsic_vx_icastP_c(vxc_uchar8 a)  _RET0_
@@ -357,6 +562,9 @@ _EXT_ vxc_char8  viv_intrinsic_vx_icastP_c(vxc_short4 a)  _RET0_
 
 _EXT_ vxc_char16  viv_intrinsic_vx_icastP_c(vxc_ushort8 a)  _RET0_
 _EXT_ vxc_char8  viv_intrinsic_vx_icastP_c(vxc_ushort4 a)  _RET0_
+
+_EXT_ vxc_char16  viv_intrinsic_vx_icastP_c(vxc_half8 a)  _RET0_
+_EXT_ vxc_char8  viv_intrinsic_vx_icastP_c(vxc_half4 a)  _RET0_
 
 /* ushort */
 _EXT_ vxc_ushort8  viv_intrinsic_vx_icastP_us(vxc_uchar16 a) _RET0_
@@ -368,6 +576,9 @@ _EXT_ vxc_ushort4  viv_intrinsic_vx_icastP_us(vxc_char8 a)  _RET0_
 _EXT_ vxc_ushort8  viv_intrinsic_vx_icastP_us(vxc_short8 a)  _RET0_
 _EXT_ vxc_ushort4  viv_intrinsic_vx_icastP_us(vxc_short4 a)  _RET0_
 
+_EXT_ vxc_ushort8  viv_intrinsic_vx_icastP_us(vxc_half8 a)  _RET0_
+_EXT_ vxc_ushort4  viv_intrinsic_vx_icastP_us(vxc_half4 a)  _RET0_
+
 /* short */
 _EXT_ vxc_short8  viv_intrinsic_vx_icastP_s(vxc_uchar16 a) _RET0_
 _EXT_ vxc_short4  viv_intrinsic_vx_icastP_s(vxc_uchar8 a)  _RET0_
@@ -377,6 +588,23 @@ _EXT_ vxc_short4  viv_intrinsic_vx_icastP_s(vxc_char8 a)  _RET0_
 
 _EXT_ vxc_short8  viv_intrinsic_vx_icastP_s(vxc_ushort8 a)  _RET0_
 _EXT_ vxc_short4  viv_intrinsic_vx_icastP_s(vxc_ushort4 a)  _RET0_
+
+_EXT_ vxc_short8  viv_intrinsic_vx_icastP_s(vxc_half8 a)  _RET0_
+_EXT_ vxc_short4  viv_intrinsic_vx_icastP_s(vxc_half4 a)  _RET0_
+
+/* half */
+_EXT_ vxc_half8  viv_intrinsic_vx_icastP_h(vxc_uchar16 a) _RET0_
+_EXT_ vxc_half4  viv_intrinsic_vx_icastP_h(vxc_uchar8 a)  _RET0_
+
+_EXT_ vxc_half8  viv_intrinsic_vx_icastP_h(vxc_char16 a) _RET0_
+_EXT_ vxc_half4  viv_intrinsic_vx_icastP_h(vxc_char8 a)  _RET0_
+
+_EXT_ vxc_half8  viv_intrinsic_vx_icastP_h(vxc_ushort8 a)  _RET0_
+_EXT_ vxc_half4  viv_intrinsic_vx_icastP_h(vxc_ushort4 a)  _RET0_
+
+_EXT_ vxc_half8  viv_intrinsic_vx_icastP_h(vxc_short8 a)  _RET0_
+_EXT_ vxc_half4  viv_intrinsic_vx_icastP_h(vxc_short4 a)  _RET0_
+
 
 /* implicit cast for vx_inst dest */
 /* uchar */
@@ -388,6 +616,9 @@ _EXT_ vxc_uchar4  viv_intrinsic_vx_icastD_uc(vxc_short4 a)  _RET0_
 
 _EXT_ vxc_uchar8 viv_intrinsic_vx_icastD_uc(vxc_ushort8 a)  _RET0_
 _EXT_ vxc_uchar4  viv_intrinsic_vx_icastD_uc(vxc_ushort4 a)  _RET0_
+
+_EXT_ vxc_uchar8 viv_intrinsic_vx_icastD_uc(vxc_half8 a)  _RET0_
+_EXT_ vxc_uchar4  viv_intrinsic_vx_icastD_uc(vxc_half4 a)  _RET0_
 
 _EXT_ vxc_uchar4 viv_intrinsic_vx_icastD_uc(vxc_int4 a)  _RET0_
 _EXT_ vxc_uchar2  viv_intrinsic_vx_icastD_uc(vxc_int2 a)  _RET0_
@@ -405,6 +636,9 @@ _EXT_ vxc_char4  viv_intrinsic_vx_icastD_c(vxc_short4 a)  _RET0_
 _EXT_ vxc_char8 viv_intrinsic_vx_icastD_c(vxc_ushort8 a)  _RET0_
 _EXT_ vxc_char4  viv_intrinsic_vx_icastD_c(vxc_ushort4 a)  _RET0_
 
+_EXT_ vxc_char8 viv_intrinsic_vx_icastD_c(vxc_half8 a)  _RET0_
+_EXT_ vxc_char4  viv_intrinsic_vx_icastD_c(vxc_half4 a)  _RET0_
+
 _EXT_ vxc_char4 viv_intrinsic_vx_icastD_c(vxc_int4 a)  _RET0_
 _EXT_ vxc_char2  viv_intrinsic_vx_icastD_c(vxc_int2 a)  _RET0_
 
@@ -420,6 +654,9 @@ _EXT_ vxc_ushort4  viv_intrinsic_vx_icastD_us(vxc_char4 a)  _RET0_
 
 _EXT_ vxc_ushort8  viv_intrinsic_vx_icastD_us(vxc_short8 a)  _RET0_
 _EXT_ vxc_ushort4  viv_intrinsic_vx_icastD_us(vxc_short4 a)  _RET0_
+
+_EXT_ vxc_ushort8  viv_intrinsic_vx_icastD_us(vxc_half8 a)  _RET0_
+_EXT_ vxc_ushort4  viv_intrinsic_vx_icastD_us(vxc_half4 a)  _RET0_
 
 _EXT_ vxc_ushort4  viv_intrinsic_vx_icastD_us(vxc_int4 a)  _RET0_
 _EXT_ vxc_ushort2  viv_intrinsic_vx_icastD_us(vxc_int2 a)  _RET0_
@@ -437,17 +674,40 @@ _EXT_ vxc_short4  viv_intrinsic_vx_icastD_s(vxc_char4 a)  _RET0_
 _EXT_ vxc_short8  viv_intrinsic_vx_icastD_s(vxc_ushort8 a)  _RET0_
 _EXT_ vxc_short4  viv_intrinsic_vx_icastD_s(vxc_ushort4 a)  _RET0_
 
+_EXT_ vxc_short8  viv_intrinsic_vx_icastD_s(vxc_half8 a)  _RET0_
+_EXT_ vxc_short4  viv_intrinsic_vx_icastD_s(vxc_half4 a)  _RET0_
+
 _EXT_ vxc_short4  viv_intrinsic_vx_icastD_s(vxc_int4 a)  _RET0_
 _EXT_ vxc_short2  viv_intrinsic_vx_icastD_s(vxc_int2 a)  _RET0_
 
 _EXT_ vxc_short4  viv_intrinsic_vx_icastD_s(vxc_uint4 a)  _RET0_
 _EXT_ vxc_short2  viv_intrinsic_vx_icastD_s(vxc_uint2 a)  _RET0_
 
+/* half */
+_EXT_ vxc_half8  viv_intrinsic_vx_icastD_h(vxc_uchar8 a) _RET0_
+_EXT_ vxc_half4  viv_intrinsic_vx_icastD_h(vxc_uchar4 a)  _RET0_
+
+_EXT_ vxc_half8  viv_intrinsic_vx_icastD_h(vxc_char8 a) _RET0_
+_EXT_ vxc_half4  viv_intrinsic_vx_icastD_h(vxc_char4 a)  _RET0_
+
+_EXT_ vxc_half8  viv_intrinsic_vx_icastD_h(vxc_ushort8 a)  _RET0_
+_EXT_ vxc_half4  viv_intrinsic_vx_icastD_h(vxc_ushort4 a)  _RET0_
+
+_EXT_ vxc_half8  viv_intrinsic_vx_icastD_h(vxc_short8 a)  _RET0_
+_EXT_ vxc_half4  viv_intrinsic_vx_icastD_h(vxc_short4 a)  _RET0_
+
+_EXT_ vxc_half4  viv_intrinsic_vx_icastD_h(vxc_int4 a)  _RET0_
+_EXT_ vxc_half2  viv_intrinsic_vx_icastD_h(vxc_int2 a)  _RET0_
+
+_EXT_ vxc_half4  viv_intrinsic_vx_icastD_h(vxc_uint4 a)  _RET0_
+_EXT_ vxc_half2  viv_intrinsic_vx_icastD_h(vxc_uint2 a)  _RET0_
+
 /* int32 */
 _EXT_ vxc_int4  viv_intrinsic_vx_icastD_i(vxc_char4 a)  _RET0_
 _EXT_ vxc_int4  viv_intrinsic_vx_icastD_i(vxc_uchar4 a)  _RET0_
 _EXT_ vxc_int4  viv_intrinsic_vx_icastD_i(vxc_short4 a)  _RET0_
 _EXT_ vxc_int4  viv_intrinsic_vx_icastD_i(vxc_ushort4 a)  _RET0_
+_EXT_ vxc_int4  viv_intrinsic_vx_icastD_i(vxc_half4 a)  _RET0_
 _EXT_ vxc_int4  viv_intrinsic_vx_icastD_i(vxc_uint4 a)  _RET0_
 _EXT_ vxc_int4  viv_intrinsic_vx_icastD_i(vxc_float4 a)  _RET0_
 
@@ -455,6 +715,7 @@ _EXT_ vxc_int2  viv_intrinsic_vx_icastD_i(vxc_char2 a)  _RET0_
 _EXT_ vxc_int2  viv_intrinsic_vx_icastD_i(vxc_uchar2 a)  _RET0_
 _EXT_ vxc_int2  viv_intrinsic_vx_icastD_i(vxc_short2 a)  _RET0_
 _EXT_ vxc_int2  viv_intrinsic_vx_icastD_i(vxc_ushort2 a)  _RET0_
+_EXT_ vxc_int2  viv_intrinsic_vx_icastD_i(vxc_half2 a)  _RET0_
 _EXT_ vxc_int2  viv_intrinsic_vx_icastD_i(vxc_uint2 a)  _RET0_
 _EXT_ vxc_int2  viv_intrinsic_vx_icastD_i(vxc_float2 a)  _RET0_
 
@@ -463,6 +724,7 @@ _EXT_ vxc_uint4  viv_intrinsic_vx_icastD_ui(vxc_char4 a)  _RET0_
 _EXT_ vxc_uint4  viv_intrinsic_vx_icastD_ui(vxc_uchar4 a)  _RET0_
 _EXT_ vxc_uint4  viv_intrinsic_vx_icastD_ui(vxc_short4 a)  _RET0_
 _EXT_ vxc_uint4  viv_intrinsic_vx_icastD_ui(vxc_ushort4 a)  _RET0_
+_EXT_ vxc_uint4  viv_intrinsic_vx_icastD_ui(vxc_half4 a)  _RET0_
 _EXT_ vxc_uint4  viv_intrinsic_vx_icastD_ui(vxc_int4 a)  _RET0_
 _EXT_ vxc_uint4  viv_intrinsic_vx_icastD_ui(vxc_float4 a)  _RET0_
 
@@ -470,6 +732,7 @@ _EXT_ vxc_uint2  viv_intrinsic_vx_icastD_ui(vxc_char2 a)  _RET0_
 _EXT_ vxc_uint2  viv_intrinsic_vx_icastD_ui(vxc_uchar2 a)  _RET0_
 _EXT_ vxc_uint2  viv_intrinsic_vx_icastD_ui(vxc_short2 a)  _RET0_
 _EXT_ vxc_uint2  viv_intrinsic_vx_icastD_ui(vxc_ushort2 a)  _RET0_
+_EXT_ vxc_uint2  viv_intrinsic_vx_icastD_ui(vxc_half2 a)  _RET0_
 _EXT_ vxc_uint2  viv_intrinsic_vx_icastD_ui(vxc_int2 a)  _RET0_
 _EXT_ vxc_uint2  viv_intrinsic_vx_icastD_ui(vxc_float2 a)  _RET0_
 
@@ -478,12 +741,14 @@ _EXT_ vxc_float4  viv_intrinsic_vx_icastD_f(vxc_char4 a)  _RET0_
 _EXT_ vxc_float4  viv_intrinsic_vx_icastD_f(vxc_uchar4 a)  _RET0_
 _EXT_ vxc_float4  viv_intrinsic_vx_icastD_f(vxc_short4 a)  _RET0_
 _EXT_ vxc_float4  viv_intrinsic_vx_icastD_f(vxc_ushort4 a)  _RET0_
+_EXT_ vxc_float4  viv_intrinsic_vx_icastD_f(vxc_half4 a)  _RET0_
 _EXT_ vxc_float4  viv_intrinsic_vx_icastD_f(vxc_int4 a)  _RET0_
 
 _EXT_ vxc_float2  viv_intrinsic_vx_icastD_f(vxc_char2 a)  _RET0_
 _EXT_ vxc_float2  viv_intrinsic_vx_icastD_f(vxc_uchar2 a)  _RET0_
 _EXT_ vxc_float2  viv_intrinsic_vx_icastD_f(vxc_short2 a)  _RET0_
 _EXT_ vxc_float2  viv_intrinsic_vx_icastD_f(vxc_ushort2 a)  _RET0_
+_EXT_ vxc_float2  viv_intrinsic_vx_icastD_f(vxc_half2 a)  _RET0_
 _EXT_ vxc_float2  viv_intrinsic_vx_icastD_f(vxc_int2 a)  _RET0_
 
 /* data selection */
@@ -517,32 +782,38 @@ _EXT_ vxc_char16  viv_intrinsic_vx_read_imagec   (image2d_t image, int2 coord) _
 _EXT_ vxc_uchar16 viv_intrinsic_vx_read_imageuc  (image2d_t image, int2 coord) _RET0_
 _EXT_ vxc_short8  viv_intrinsic_vx_read_images   (image2d_t image, int2 coord) _RET0_
 _EXT_ vxc_ushort8 viv_intrinsic_vx_read_imageus  (image2d_t image, int2 coord) _RET0_
+_EXT_ vxc_half8   viv_intrinsic_vx_read_imageh   (image2d_t image, int2 coord) _RET0_
 
 _EXT_ vxc_char16  viv_intrinsic_vx_read_imagec   (image1d_t image, int coord) _RET0_
 _EXT_ vxc_uchar16 viv_intrinsic_vx_read_imageuc  (image1d_t image, int coord) _RET0_
 _EXT_ vxc_short8  viv_intrinsic_vx_read_images   (image1d_t image, int coord) _RET0_
 _EXT_ vxc_ushort8 viv_intrinsic_vx_read_imageus  (image1d_t image, int coord) _RET0_
+_EXT_ vxc_half8   viv_intrinsic_vx_read_imageh   (image1d_t image, int coord) _RET0_
 
 _EXT_ vxc_char16  viv_intrinsic_vx_read_imagec   (image1d_array_t image, int2 coord) _RET0_
 _EXT_ vxc_uchar16 viv_intrinsic_vx_read_imageuc  (image1d_array_t image, int2 coord) _RET0_
 _EXT_ vxc_short8  viv_intrinsic_vx_read_images   (image1d_array_t image, int2 coord) _RET0_
 _EXT_ vxc_ushort8 viv_intrinsic_vx_read_imageus  (image1d_array_t image, int2 coord) _RET0_
+_EXT_ vxc_half8   viv_intrinsic_vx_read_imageh   (image1d_array_t image, int2 coord) _RET0_
 
 /* image write */
 _EXT_ void viv_intrinsic_vx_write_imagec  (image2d_t image, int2 coord, vxc_char16 color) _RET_
 _EXT_ void viv_intrinsic_vx_write_imageuc (image2d_t image, int2 coord, vxc_uchar16 color) _RET_
 _EXT_ void viv_intrinsic_vx_write_images  (image2d_t image, int2 coord, vxc_short8 color) _RET_
 _EXT_ void viv_intrinsic_vx_write_imageus (image2d_t image, int2 coord, vxc_ushort8 color) _RET_
+_EXT_ void viv_intrinsic_vx_write_imageh  (image2d_t image, int2 coord, vxc_half8 color) _RET_
 
 _EXT_ void viv_intrinsic_vx_write_imagec  (image1d_t image, int coord, vxc_char16 color) _RET_
 _EXT_ void viv_intrinsic_vx_write_imageuc (image1d_t image, int coord, vxc_uchar16 color) _RET_
 _EXT_ void viv_intrinsic_vx_write_images  (image1d_t image, int coord, vxc_short8 color) _RET_
 _EXT_ void viv_intrinsic_vx_write_imageus (image1d_t image, int coord, vxc_ushort8 color) _RET_
+_EXT_ void viv_intrinsic_vx_write_imageh  (image1d_t image, int coord, vxc_half8 color) _RET_
 
 _EXT_ void viv_intrinsic_vx_write_imagec  (image1d_array_t image, int2 coord, vxc_char16 color) _RET_
 _EXT_ void viv_intrinsic_vx_write_imageuc (image1d_array_t image, int2 coord, vxc_uchar16 color) _RET_
 _EXT_ void viv_intrinsic_vx_write_images  (image1d_array_t image, int2 coord, vxc_short8 color) _RET_
 _EXT_ void viv_intrinsic_vx_write_imageus (image1d_array_t image, int2 coord, vxc_ushort8 color) _RET_
+_EXT_ void viv_intrinsic_vx_write_imageh  (image1d_array_t image, int2 coord, vxc_half8 color) _RET_
 
 /* AbsDiff
  *
@@ -627,7 +898,7 @@ _EXT_ vxc_char16  viv_intrinsic_vx_MagPhase_c(vxc_char16 a, vxc_char16 b) _RET0_
 _EXT_ vxc_short8  viv_intrinsic_vx_MagPhase_s(vxc_short8 a, vxc_short8 b) _RET0_
 _EXT_ vxc_ushort8 viv_intrinsic_vx_MagPhase_us(vxc_ushort8 a, vxc_ushort8 b) _RET0_
 
-/* MulShift: squares a value and adds it to an accumulator
+/* MulShift: Multiples two 8- or 16-bit integers and shifts
  *
  * Syntax:
  *      r = MulShift(a, b, Imm) ;    // Imm must be an immediate value
@@ -680,9 +951,8 @@ _EXT_ vxc_ushort8 viv_intrinsic_vx_BiLinear_us(vxc_ushort8 a, vxc_ushort8 b, flo
 
 /* SelectAdd: either adds the pixel value or increments a counter
  *            inside a number of distribution (histogram) bins
- *
  * Syntax:
- *      r = SelectAdd(a, b, c) ;
+ *      r = SelectAdd(a, b, c, r) ;
  * Semantics:
  *      r[i] =   a[c[i]]  + b[c[i]] ;  i E [0, 7]
  */
@@ -724,73 +994,10 @@ _EXT_ vxc_uchar8  viv_intrinsic_vx_BitExtract_uc(vxc_uchar16 a, vxc_uchar16 b, v
 _EXT_ vxc_ushort8 viv_intrinsic_vx_BitReplace_us(vxc_ushort8 a, vxc_ushort8 b, vxc_uchar16 c) _RET0_
 _EXT_ vxc_uchar16 viv_intrinsic_vx_BitReplace_uc(vxc_uchar16 a, vxc_uchar16 b, vxc_uchar16 c) _RET0_
 
-/* vloadn: read packed vector type from memory as packed in register
-           where n takes the value of 2, 3, 4, 8, 16
- * Syntax:
- *    _viv_gentypen_packed dest;
- *    dest = vloadn(offset, gentype *p);
- * Semantics:
- *    gentype is the generic type to indicate the built-in data types
- *    char, uchar, short, ushort.
- *    Return sizeof(gentypen) bytes of data read
- *    from address (p + (offset * n)). The
- *    address computed as (p + (offset * n)) must
- *    be 8-bit aligned if gentype is char, uchar;
- *    16-bit aligned if gentype is short, ushort;
- */
-_EXT_ vxc_char2 viv_intrinsic_vx_vload2(size_t offset, char *p)  _RET0_
-_EXT_ vxc_char4 viv_intrinsic_vx_vload4(size_t offset, char *p)  _RET0_
-_EXT_ vxc_char8 viv_intrinsic_vx_vload8(size_t offset, char *p)  _RET0_
-_EXT_ vxc_char16 viv_intrinsic_vx_vload16(size_t offset, char *p)  _RET0_
-
-_EXT_ vxc_uchar2 viv_intrinsic_vx_vload2(size_t offset, uchar *p)  _RET0_
-_EXT_ vxc_uchar4 viv_intrinsic_vx_vload4(size_t offset, uchar *p)  _RET0_
-_EXT_ vxc_uchar8 viv_intrinsic_vx_vload8(size_t offset, uchar *p)  _RET0_
-_EXT_ vxc_uchar16 viv_intrinsic_vx_vload16(size_t offset, uchar *p)  _RET0_
-
-_EXT_ vxc_short2 viv_intrinsic_vx_vload2(size_t offset, short *p)  _RET0_
-_EXT_ vxc_short4 viv_intrinsic_vx_vload4(size_t offset, short *p)  _RET0_
-_EXT_ vxc_short8 viv_intrinsic_vx_vload8(size_t offset, short *p)  _RET0_
-
-_EXT_ vxc_ushort2 viv_intrinsic_vx_vload2(size_t offset, ushort *p)  _RET0_
-_EXT_ vxc_ushort4 viv_intrinsic_vx_vload4(size_t offset, ushort *p)  _RET0_
-_EXT_ vxc_ushort8 viv_intrinsic_vx_vload8(size_t offset, ushort *p)  _RET0_
-
-/* storen: write packed vector type to memory
-          where n takes the value of 2, 3, 4, 8, 16
-* Syntax:
-*    _viv_gentypen_packed dest;
-*    void vloadn(_viv_gentypen_packed data, offset, gentype *p);
-* Semantics:
-*    gentype is the generic type to indicate the built-in data types
-*    char, uchar, short, ushort.
-*    Write sizeof (_viv_gentypen_packed) bytes given by
-*    data to address (p + (offset * n)). The
-*    address computed as (p + (offset * n)) must
-*    be 8-bit aligned if gentype is char, uchar;
-*    16-bit aligned if gentype is short, ushort;
-*/
-_EXT_ void viv_intrinsic_vx_vstore2(vxc_char2, size_t offset, char *p) _RET_
-_EXT_ void viv_intrinsic_vx_vstore4(vxc_char4, size_t offset, char *p) _RET_
-_EXT_ void viv_intrinsic_vx_vstore8(vxc_char8, size_t offset, char *p) _RET_
-_EXT_ void viv_intrinsic_vx_vstore16(vxc_char16, size_t offset, char *p) _RET_
-
-_EXT_ void viv_intrinsic_vx_vstore2(vxc_uchar2, size_t offset, uchar *p) _RET_
-_EXT_ void viv_intrinsic_vx_vstore4(vxc_uchar4, size_t offset, uchar *p) _RET_
-_EXT_ void viv_intrinsic_vx_vstore8(vxc_uchar8, size_t offset, uchar *p) _RET_
-_EXT_ void viv_intrinsic_vx_vstore16(vxc_uchar16, size_t offset, uchar *p) _RET_
-
-_EXT_ void viv_intrinsic_vx_vstore2(vxc_short2, size_t offset, short *p) _RET_
-_EXT_ void viv_intrinsic_vx_vstore4(vxc_short4, size_t offset, short *p) _RET_
-_EXT_ void viv_intrinsic_vx_vstore8(vxc_short8, size_t offset, short *p) _RET_
-
-_EXT_ void viv_intrinsic_vx_vstore2(vxc_ushort2, size_t offset, ushort *p) _RET_
-_EXT_ void viv_intrinsic_vx_vstore4(vxc_ushort4, size_t offset, ushort *p) _RET_
-_EXT_ void viv_intrinsic_vx_vstore8(vxc_ushort8, size_t offset, ushort *p) _RET_
-
 /* direct mapping to machine code, with bin and rounding mode info */
 /* samplerless image read */
 
+/*  offsetXY should be composed by using VXC_5BITOFFSET_XY(x, y) */
 /*  offsetXY [ 4: 0] S05 relative x offset
  *           [ 9: 5] S05 relative y offset
  */
@@ -798,32 +1005,38 @@ _EXT_ vxc_char16  viv_intrinsic_vxmc_read_imagec   (image2d_t image, int2 coord,
 _EXT_ vxc_uchar16 viv_intrinsic_vxmc_read_imageuc  (image2d_t image, int2 coord, int offsetXY, vxc_modifier modifier) _RET0_
 _EXT_ vxc_short8  viv_intrinsic_vxmc_read_images   (image2d_t image, int2 coord, int offsetXY, vxc_modifier modifier) _RET0_
 _EXT_ vxc_ushort8 viv_intrinsic_vxmc_read_imageus  (image2d_t image, int2 coord, int offsetXY, vxc_modifier modifier) _RET0_
+_EXT_ vxc_half8   viv_intrinsic_vxmc_read_imageh   (image2d_t image, int2 coord, int offsetXY, vxc_modifier modifier) _RET0_
 
 _EXT_ vxc_char16  viv_intrinsic_vxmc_read_imagec   (image1d_t image, int coord, int offsetX, vxc_modifier modifier) _RET0_
 _EXT_ vxc_uchar16 viv_intrinsic_vxmc_read_imageuc  (image1d_t image, int coord, int offsetX, vxc_modifier modifier) _RET0_
 _EXT_ vxc_short8  viv_intrinsic_vxmc_read_images   (image1d_t image, int coord, int offsetX, vxc_modifier modifier) _RET0_
 _EXT_ vxc_ushort8 viv_intrinsic_vxmc_read_imageus  (image1d_t image, int coord, int offsetX, vxc_modifier modifier) _RET0_
+_EXT_ vxc_half8   viv_intrinsic_vxmc_read_imageh   (image1d_t image, int coord, int offsetX, vxc_modifier modifier) _RET0_
 
 _EXT_ vxc_char16  viv_intrinsic_vxmc_read_imagec   (image1d_array_t image, int2 coord, int offsetXY, vxc_modifier modifier) _RET0_
 _EXT_ vxc_uchar16 viv_intrinsic_vxmc_read_imageuc  (image1d_array_t image, int2 coord, int offsetXY, vxc_modifier modifier) _RET0_
 _EXT_ vxc_short8  viv_intrinsic_vxmc_read_images   (image1d_array_t image, int2 coord, int offsetXY, vxc_modifier modifier) _RET0_
 _EXT_ vxc_ushort8 viv_intrinsic_vxmc_read_imageus  (image1d_array_t image, int2 coord, int offsetXY, vxc_modifier modifier) _RET0_
+_EXT_ vxc_half8   viv_intrinsic_vxmc_read_imageh   (image1d_array_t image, int2 coord, int offsetXY, vxc_modifier modifier) _RET0_
 
 /* image write */
 _EXT_ void viv_intrinsic_vxmc_write_imagec  (image2d_t image, int2 coord, vxc_char16 color, vxc_modifier modifier) _RET_
 _EXT_ void viv_intrinsic_vxmc_write_imageuc (image2d_t image, int2 coord, vxc_uchar16 color, vxc_modifier modifier) _RET_
 _EXT_ void viv_intrinsic_vxmc_write_images  (image2d_t image, int2 coord, vxc_short8 color, vxc_modifier modifier) _RET_
 _EXT_ void viv_intrinsic_vxmc_write_imageus (image2d_t image, int2 coord, vxc_ushort8 color, vxc_modifier modifier) _RET_
+_EXT_ void viv_intrinsic_vxmc_write_imageh  (image2d_t image, int2 coord, vxc_half8 color, vxc_modifier modifier) _RET_
 
 _EXT_ void viv_intrinsic_vxmc_write_imagec  (image1d_t image, int coord, vxc_char16 color, vxc_modifier modifier) _RET_
 _EXT_ void viv_intrinsic_vxmc_write_imageuc (image1d_t image, int coord, vxc_uchar16 color, vxc_modifier modifier) _RET_
 _EXT_ void viv_intrinsic_vxmc_write_images  (image1d_t image, int coord, vxc_short8 color, vxc_modifier modifier) _RET_
 _EXT_ void viv_intrinsic_vxmc_write_imageus (image1d_t image, int coord, vxc_ushort8 color, vxc_modifier modifier) _RET_
+_EXT_ void viv_intrinsic_vxmc_write_imageh  (image1d_t image, int coord, vxc_half8 color, vxc_modifier modifier) _RET_
 
 _EXT_ void viv_intrinsic_vxmc_write_imagec  (image1d_array_t image, int2 coord, vxc_char16 color, vxc_modifier modifier) _RET_
 _EXT_ void viv_intrinsic_vxmc_write_imageuc (image1d_array_t image, int2 coord, vxc_uchar16 color, vxc_modifier modifier) _RET_
 _EXT_ void viv_intrinsic_vxmc_write_images  (image1d_array_t image, int2 coord, vxc_short8 color, vxc_modifier modifier) _RET_
 _EXT_ void viv_intrinsic_vxmc_write_imageus (image1d_array_t image, int2 coord, vxc_ushort8 color, vxc_modifier modifier) _RET_
+_EXT_ void viv_intrinsic_vxmc_write_imageh  (image1d_array_t image, int2 coord, vxc_half8 color, vxc_modifier modifier) _RET_
 
 /* AbsDiff */
 _EXT_ vxc_uchar16 viv_intrinsic_vxmc_AbsDiff_uc(vxc_uchar16 a, vxc_uchar16 b, vxc_modifier modifier) _RET0_
@@ -877,6 +1090,7 @@ _EXT_ vxc_ushort8 viv_intrinsic_vxmc_MulShift_us(vxc_ushort8 a, vxc_ushort8 b, u
  */
 _EXT_ vxc_uint   viv_intrinsic_vxmc_DP16x1(vxc_uchar16 a,  vxc_uchar16 b, vxc_modifier modifier, vxc_512bits u) _RET0_
 _EXT_ vxc_int    viv_intrinsic_vxmc_DP16x1(vxc_char16 a,   vxc_char16 b, vxc_modifier modifier, vxc_512bits u) _RET0_
+_EXT_ vxc_float  viv_intrinsic_vxmc_DP16x1(vxc_half8 a,    vxc_half8 b, vxc_modifier modifier, vxc_512bits u) _RET0_
 
 /* DP8x2: performs two dot-product of two 8-component values.
  *
@@ -889,6 +1103,7 @@ _EXT_ vxc_int    viv_intrinsic_vxmc_DP16x1(vxc_char16 a,   vxc_char16 b, vxc_mod
  */
 _EXT_ vxc_uint2   viv_intrinsic_vxmc_DP8x2(vxc_uchar16 a,  vxc_uchar16 b, vxc_modifier modifier, vxc_512bits u) _RET0_
 _EXT_ vxc_int2    viv_intrinsic_vxmc_DP8x2(vxc_char16 a,   vxc_char16 b, vxc_modifier modifier, vxc_512bits u) _RET0_
+_EXT_ vxc_float2  viv_intrinsic_vxmc_DP8x2(vxc_half8 a,    vxc_half8 b, vxc_modifier modifier, vxc_512bits u) _RET0_
 
 /* DP4x4: performs four dot-product of two 4-component values.
  *
@@ -903,6 +1118,7 @@ _EXT_ vxc_int2    viv_intrinsic_vxmc_DP8x2(vxc_char16 a,   vxc_char16 b, vxc_mod
  */
 _EXT_ vxc_uint4   viv_intrinsic_vxmc_DP4x4(vxc_uchar16 a,  vxc_uchar16 b, vxc_modifier modifier, vxc_512bits u) _RET0_
 _EXT_ vxc_int4    viv_intrinsic_vxmc_DP4x4(vxc_char16 a,   vxc_char16 b, vxc_modifier modifier, vxc_512bits u) _RET0_
+_EXT_ vxc_float4  viv_intrinsic_vxmc_DP4x4(vxc_half8 a,    vxc_half8 b, vxc_modifier modifier, vxc_512bits u) _RET0_
 
 /* DP2x8: performs eight dot-product of two 2-component values.
  *
@@ -921,6 +1137,7 @@ _EXT_ vxc_int4    viv_intrinsic_vxmc_DP4x4(vxc_char16 a,   vxc_char16 b, vxc_mod
  */
 _EXT_ vxc_uchar8  viv_intrinsic_vxmc_DP2x8(vxc_uchar16 a,  vxc_uchar16 b, vxc_modifier modifier, vxc_512bits u) _RET0_
 _EXT_ vxc_char8   viv_intrinsic_vxmc_DP2x8(vxc_char16 a,   vxc_char16 b, vxc_modifier modifier, vxc_512bits u) _RET0_
+_EXT_ vxc_half8   viv_intrinsic_vxmc_DP2x8(vxc_half8 a,    vxc_half8 b, vxc_modifier modifier, vxc_512bits u) _RET0_
 
 /* DP32 <a, b> dot constant */
 _EXT_ vxc_uint    viv_intrinsic_vxmc_DP32x1(vxc_uchar16 a,  vxc_uchar16 b, vxc_modifier modifier, vxc_512bits u) _RET0_
@@ -990,13 +1207,242 @@ _EXT_ vxc_uchar8  viv_intrinsic_vxmc_BitExtract_uc(vxc_uchar16 a, vxc_uchar16 b,
 _EXT_ vxc_ushort8 viv_intrinsic_vxmc_BitReplace_us(vxc_ushort8 a, vxc_ushort8 b, vxc_uchar16 c, vxc_modifier modifier) _RET0_
 _EXT_ vxc_uchar16 viv_intrinsic_vxmc_BitReplace_uc(vxc_uchar16 a, vxc_uchar16 b, vxc_uchar16 c, vxc_modifier modifier) _RET0_
 
+/* vloadn: read packed vector type from memory as packed in register
+           where n takes the value of 2, 3, 4, 8, 16
+ * Syntax:
+ *    _viv_gentypen_packed dest;
+ *    dest = vloadn(offset, gentype *p);
+ * Semantics:
+ *    gentype is the generic type to indicate the built-in data types
+ *    char, uchar, short, ushort.
+ *    Return sizeof(_viv_gentypen) bytes of data read
+ *    from address (p + n * offset). The
+ *    address computed as (p + n * offset) must
+ *    be 8-bit aligned if gentype is char, uchar;
+ *    16-bit aligned if gentype is short, ushort, half;
+ */
+vxc_char2 viv_intrinsic_vx_vload2(size_t Offset, char *Pointer)  {
+    vxc_char2 dest;
+    VXC_OP2(vload2, dest, Pointer, Offset * sizeof(vxc_char2));
+    return dest;
+}
+
+vxc_char4 viv_intrinsic_vx_vload4(size_t Offset, char *Pointer)  {
+    vxc_char4 dest;
+    VXC_OP2(vload4, dest, Pointer, Offset * sizeof(vxc_char4));
+    return dest;
+}
+
+vxc_char8 viv_intrinsic_vx_vload8(size_t Offset, char *Pointer)  {
+    vxc_char8 dest;
+    VXC_OP2(vload8, dest, Pointer, Offset * sizeof(vxc_char8));
+    return dest;
+}
+
+vxc_char16 viv_intrinsic_vx_vload16(size_t Offset, char *Pointer)  {
+    vxc_char16 dest;
+    VXC_OP2(vload16, dest, Pointer, Offset * sizeof(vxc_char16));
+    return dest;
+}
+
+vxc_uchar2 viv_intrinsic_vx_vload2(size_t Offset, uchar *Pointer)  {
+    vxc_uchar2 dest;
+    VXC_OP2(vload2, dest, Pointer, Offset * sizeof(vxc_uchar2));
+    return dest;
+}
+
+vxc_uchar4 viv_intrinsic_vx_vload4(size_t Offset, uchar *Pointer)  {
+    vxc_uchar4 dest;
+    VXC_OP2(vload4, dest, Pointer, Offset * sizeof(vxc_uchar4));
+    return dest;
+}
+
+vxc_uchar8 viv_intrinsic_vx_vload8(size_t Offset, uchar *Pointer)  {
+    vxc_uchar8 dest;
+    VXC_OP2(vload8, dest, Pointer, Offset * sizeof(vxc_uchar8));
+    return dest;
+}
+
+vxc_uchar16 viv_intrinsic_vx_vload16(size_t Offset, uchar *Pointer)  {
+    vxc_uchar16 dest;
+    VXC_OP2(vload16, dest, Pointer, Offset * sizeof(vxc_uchar16));
+    return dest;
+}
+
+vxc_short2 viv_intrinsic_vx_vload2(size_t Offset, short *Pointer)  {
+    vxc_short2 dest;
+    VXC_OP2(vload2, dest, Pointer, Offset * sizeof(vxc_short2));
+    return dest;
+}
+
+vxc_short4 viv_intrinsic_vx_vload4(size_t Offset, short *Pointer)  {
+    vxc_short4 dest;
+    VXC_OP2(vload4, dest, Pointer, Offset * sizeof(vxc_short4));
+    return dest;
+}
+
+vxc_short8 viv_intrinsic_vx_vload8(size_t Offset, short *Pointer)  {
+    vxc_short8 dest;
+    VXC_OP2(vload8, dest, Pointer, Offset * sizeof(vxc_short8));
+    return dest;
+}
+
+vxc_short16 viv_intrinsic_vx_vload16(size_t Offset, short *Pointer)  {
+    vxc_short16 dest;
+    VXC_OP2(vload16, dest, Pointer, Offset * sizeof(vxc_short16));
+    return dest;
+}
+
+vxc_ushort2 viv_intrinsic_vx_vload2(size_t Offset, ushort *Pointer)  {
+    vxc_ushort2 dest;
+    VXC_OP2(vload2, dest, Pointer, Offset * sizeof(vxc_ushort2));
+    return dest;
+}
+
+vxc_ushort4 viv_intrinsic_vx_vload4(size_t Offset, ushort *Pointer)  {
+    vxc_ushort4 dest;
+    VXC_OP2(vload4, dest, Pointer, Offset * sizeof(vxc_ushort4));
+    return dest;
+}
+
+vxc_ushort8 viv_intrinsic_vx_vload8(size_t Offset, ushort *Pointer)  {
+    vxc_ushort8 dest;
+    VXC_OP2(vload8, dest, Pointer, Offset * sizeof(vxc_ushort8));
+    return dest;
+}
+
+vxc_ushort16 viv_intrinsic_vx_vload16(size_t Offset, ushort *Pointer)  {
+    vxc_ushort16 dest;
+    VXC_OP2(vload16, dest, Pointer, Offset * sizeof(vxc_ushort16));
+    return dest;
+}
+
+vxc_half2 viv_intrinsic_vx_vload2(size_t Offset, half *Pointer)  {
+    vxc_half2 dest;
+    VXC_OP2(vload2, dest, Pointer, Offset * sizeof(vxc_half2));
+    return dest;
+}
+
+vxc_half4 viv_intrinsic_vx_vload4(size_t Offset, half *Pointer)  {
+    vxc_half4 dest;
+    VXC_OP2(vload4, dest, Pointer, Offset * sizeof(vxc_half4));
+    return dest;
+}
+
+vxc_half8 viv_intrinsic_vx_vload8(size_t Offset, half *Pointer)  {
+    vxc_half8 dest;
+    VXC_OP2(vload8, dest, Pointer, Offset * sizeof(vxc_half8));
+    return dest;
+}
+
+vxc_half16 viv_intrinsic_vx_vload16(size_t Offset, half *Pointer)  {
+    vxc_half16 dest;
+    VXC_OP2(vload16, dest, Pointer, Offset * sizeof(vxc_half16));
+    return dest;
+}
+
+/* storen: write packed vector type to memory
+          where n takes the value of 2, 3, 4, 8, 16
+* Syntax:
+*    _viv_gentypen_packed dest;
+*    void vstoren(_viv_gentypen_packed data, int offet, gentype *p);
+* Semantics:
+*    gentype is the generic type to indicate the built-in data types
+*    char, uchar, short, ushort.
+*    Write sizeof (_viv_gentypen_packed) bytes given by
+*    data to address (p + n * offset). The
+*    address computed as (p + n * offset) must
+*    be 8-bit aligned if gentype is char, uchar;
+*    16-bit aligned if gentype is short, ushort, half;
+*/
+void viv_intrinsic_vx_vstore2(vxc_char2 Data, size_t Offset, char * Pointer)  {
+   VXC_OP3_NoDest(vstore2, Pointer, Offset * sizeof(vxc_char2), Data);
+}
+
+void viv_intrinsic_vx_vstore4(vxc_char4 Data, size_t Offset, char * Pointer)  {
+   VXC_OP3_NoDest(vstore4, Pointer, Offset * sizeof(vxc_char4), Data);
+}
+
+void viv_intrinsic_vx_vstore8(vxc_char8 Data, size_t Offset, char * Pointer)  {
+   VXC_OP3_NoDest(vstore8, Pointer, Offset * sizeof(vxc_char8), Data);
+}
+
+void viv_intrinsic_vx_vstore16(vxc_char16 Data, size_t Offset, char * Pointer)  {
+   VXC_OP3_NoDest(vstore16, Pointer, Offset * sizeof(vxc_char16), Data);
+}
+
+void viv_intrinsic_vx_vstore2(vxc_uchar2 Data, size_t Offset, uchar * Pointer)  {
+   VXC_OP3_NoDest(vstore2, Pointer, Offset * sizeof(vxc_uchar2), Data);
+}
+
+void viv_intrinsic_vx_vstore4(vxc_uchar4 Data, size_t Offset, uchar * Pointer)  {
+   VXC_OP3_NoDest(vstore4, Pointer, Offset * sizeof(vxc_uchar4), Data);
+}
+
+void viv_intrinsic_vx_vstore8(vxc_uchar8 Data, size_t Offset, uchar * Pointer)  {
+   VXC_OP3_NoDest(vstore8, Pointer, Offset * sizeof(vxc_uchar8), Data);
+}
+
+void viv_intrinsic_vx_vstore16(vxc_uchar16 Data, size_t Offset, uchar * Pointer)  {
+   VXC_OP3_NoDest(vstore16, Pointer, Offset * sizeof(vxc_uchar16), Data);
+}
+
+void viv_intrinsic_vx_vstore2(vxc_short2 Data, size_t Offset, short * Pointer)  {
+   VXC_OP3_NoDest(vstore2, Pointer, Offset * sizeof(vxc_short2), Data);
+}
+
+void viv_intrinsic_vx_vstore4(vxc_short4 Data, size_t Offset, short * Pointer)  {
+   VXC_OP3_NoDest(vstore4, Pointer, Offset * sizeof(vxc_short4), Data);
+}
+
+void viv_intrinsic_vx_vstore8(vxc_short8 Data, size_t Offset, short * Pointer)  {
+   VXC_OP3_NoDest(vstore8, Pointer, Offset * sizeof(vxc_short8), Data);
+}
+
+void viv_intrinsic_vx_vstore16(vxc_short16 Data, size_t Offset, short * Pointer)  {
+   VXC_OP3_NoDest(vstore16, Pointer, Offset * sizeof(vxc_short16), Data);
+}
+
+void viv_intrinsic_vx_vstore2(vxc_ushort2 Data, size_t Offset, ushort * Pointer)  {
+   VXC_OP3_NoDest(vstore2, Pointer, Offset * sizeof(vxc_ushort2), Data);
+}
+
+void viv_intrinsic_vx_vstore4(vxc_ushort4 Data, size_t Offset, ushort * Pointer)  {
+   VXC_OP3_NoDest(vstore4, Pointer, Offset * sizeof(vxc_ushort4), Data);
+}
+
+void viv_intrinsic_vx_vstore8(vxc_ushort8 Data, size_t Offset, ushort * Pointer)  {
+   VXC_OP3_NoDest(vstore8, Pointer, Offset * sizeof(vxc_ushort8), Data);
+}
+
+void viv_intrinsic_vx_vstore16(vxc_ushort16 Data, size_t Offset, ushort * Pointer)  {
+   VXC_OP3_NoDest(vstore16, Pointer, Offset * sizeof(vxc_ushort16), Data);
+}
+
+void viv_intrinsic_vx_vstore2(vxc_half2 Data, size_t Offset, half * Pointer)  {
+   VXC_OP3_NoDest(vstore2, Pointer, Offset * sizeof(vxc_half2), Data);
+}
+
+void viv_intrinsic_vx_vstore4(vxc_half4 Data, size_t Offset, half * Pointer)  {
+   VXC_OP3_NoDest(vstore4, Pointer, Offset * sizeof(vxc_half4), Data);
+}
+
+void viv_intrinsic_vx_vstore8(vxc_half8 Data, size_t Offset, half * Pointer)  {
+   VXC_OP3_NoDest(vstore8, Pointer, Offset * sizeof(vxc_half8), Data);
+}
+
+void viv_intrinsic_vx_vstore16(vxc_half16 Data, size_t Offset, half * Pointer)  {
+   VXC_OP3_NoDest(vstore16, Pointer, Offset * sizeof(vxc_half16), Data);
+}
+
 #undef _RET0_
 #undef _RET_
 #undef _EXT_
 
-
 #ifdef __cplusplus
 }
+#endif
+
 #endif
 
 #endif /* _VIV_VX_EXTENSION */

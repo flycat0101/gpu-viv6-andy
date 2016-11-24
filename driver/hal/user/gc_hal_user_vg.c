@@ -529,13 +529,14 @@ gcoHAL_WaitCompletion(
 */
 gceSTATUS
 gcoHAL_Flush(
-    IN gcoHAL Hal
 #if gcdGC355_PROFILER
-    ,
+    IN gcoHAL Hal,
     IN gcoVG Vg,
     IN gctUINT TreeDepth,
     IN gctUINT saveLayerTreeDepth,
     IN gctUINT varTreeDepth
+#else
+    IN gcoHAL Hal
 #endif
     )
 {
@@ -1730,7 +1731,7 @@ gcoVG_SetScissor(
     gceSTATUS status, last;
     gctUINT8_PTR bits = gcvNULL;
 
-    gcmHEADER_ARG("Vg=0x%x RectangleCount=0x%x  Rectangles=0x%x",
+    gcmHEADER_ARG("Vg=0x%x RectangleCount=%zu  Rectangles=0x%x",
         Vg, RectangleCount, Rectangles);
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Vg, gcvOBJ_VG);
@@ -2561,7 +2562,6 @@ gcoVG_DrawPath(
                     tessellationBuffer,
                     gcvNULL
                     ));
-                gcoHAL_Commit(Vg->hal, gcvFALSE);
             }
         }
 #else

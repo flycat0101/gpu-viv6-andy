@@ -541,6 +541,7 @@ _MapMemory(
     gcmDEBUG_VERIFY_ARGUMENT(Logical != gcvNULL);
 
     /* Call kernel API to unmap the memory. */
+    iface.ignoreTLS            = gcvFALSE;
     iface.command              = gcvHAL_MAP_MEMORY;
     iface.u.MapMemory.physical = gcmPTR2INT32(Physical);
     iface.u.MapMemory.bytes    = NumberOfBytes;
@@ -583,6 +584,7 @@ _UnmapMemory(
     gcmDEBUG_VERIFY_ARGUMENT(Logical != gcvNULL);
 
     /* Call kernel API to unmap the memory. */
+    iface.ignoreTLS              = gcvFALSE;
     iface.command                = gcvHAL_UNMAP_MEMORY;
     iface.u.UnmapMemory.physical = gcmPTR2INT32(Physical);
     iface.u.UnmapMemory.bytes    = NumberOfBytes;
@@ -610,77 +612,111 @@ _OpenGalLib(
     gcsTLS_PTR TLS
     )
 {
-#if gcdSTATIC_LINK
-    return;
-#else
-    gcsTLS_PTR  tls;
+#if !gcdSTATIC_LINK
+#if defined(ANDROID)
+    gctHANDLE handle;
+
+    gcmHEADER_ARG("TLS=0x%x", TLS);
+
+    gcmASSERT(TLS != gcvNULL);
+
+    /* Only two possibilities on android. */
+#if defined(__LP64__)
+    handle = dlopen("/system/vendor/lib64/libGAL.so", RTLD_NOW);
+#     else
+    handle = dlopen("/system/vendor/lib/libGAL.so", RTLD_NOW);
+#     endif
+
+    if (handle == gcvNULL)
+    {
+#if defined(__LP64__)
+        handle = dlopen("/system/lib64/libGAL.so", RTLD_NOW);
+#     else
+        handle = dlopen("/system/lib/libGAL.so", RTLD_NOW);
+#     endif
+    }
+
+    if (handle != gcvNULL)
+    {
+        TLS->handle = handle;
+    }
+
+    gcmFOOTER_NO();
+#   else
     gctSTRING   path;
-    gctSTRING   env_path = gcvNULL;
-    gctSTRING   one_env_path;
-    gctSTRING   full_path = gcvNULL;
+    gctSTRING   envPath = gcvNULL;
+    gctSTRING   oneEnvPath;
+    gctSTRING   fullPath = gcvNULL;
     gctINT32    len;
     gctHANDLE   handle = gcvNULL;
 
     gcmHEADER_ARG("TLS=0x%x", TLS);
 
-    tls = (gcsTLS_PTR) TLS;
-    gcmASSERT(tls != gcvNULL);
+    gcmASSERT(TLS != gcvNULL);
 
-    do {
-        gcoOS_GetEnv(gcvNULL, "LD_LIBRARY_PATH", &path);
+    do
+    {
+        path = getenv("LD_LIBRARY_PATH");
+
         if (path != gcvNULL)
         {
             len = strlen(path) + 1;
-            env_path = malloc(len);
-            full_path = malloc(len+10);
-            if (env_path == NULL || full_path == NULL)
+
+            envPath  = malloc(len);
+            fullPath = malloc(len + 10);
+
+            if (envPath == NULL || fullPath == NULL)
             {
                 break;
             }
-            strncpy(env_path, path, len);
-            one_env_path = strtok(env_path, ":");
-            while (one_env_path != NULL)
+
+            strncpy(envPath, path, len);
+            oneEnvPath = strtok(envPath, ":");
+
+            while (oneEnvPath != NULL)
             {
-                snprintf(full_path, len+10, "%s/libGAL.so", one_env_path);
-#if defined(ANDROID)
-                handle = dlopen(full_path, RTLD_NOW);
-#else
-                handle = dlopen(full_path, RTLD_NOW | RTLD_NODELETE);
-#endif
+                snprintf(fullPath, len+10, "%s/libGAL.so", oneEnvPath);
+
+                handle = dlopen(fullPath, RTLD_NOW | RTLD_NODELETE);
+
                 if (handle != gcvNULL)
                 {
                     break;
                 }
-                one_env_path = strtok(NULL, ":");
+
+                oneEnvPath = strtok(NULL, ":");
             }
         }
+
         if (handle == gcvNULL)
         {
-#if defined(ANDROID)
-            handle = dlopen("/system/lib/libGAL.so", RTLD_NOW);
-#else
             handle = dlopen("/usr/lib/libGAL.so", RTLD_NOW | RTLD_NODELETE);
-            if (handle == gcvNULL)
-            {
-                handle = dlopen("/lib/libGAL.so", RTLD_NOW | RTLD_NODELETE);
-            }
-#endif
         }
 
-    } while (gcvFALSE);
+        if (handle == gcvNULL)
+        {
+            handle = dlopen("/lib/libGAL.so", RTLD_NOW | RTLD_NODELETE);
+        }
+    }
+    while (gcvFALSE);
 
-    if (env_path != gcvNULL)
-        free(env_path);
-    if (full_path != gcvNULL)
-        free(full_path);
+    if (envPath != gcvNULL)
+    {
+        free(envPath);
+    }
+
+    if (fullPath != gcvNULL)
+    {
+        free(fullPath);
+    }
 
     if (handle != gcvNULL)
     {
-        tls->handle = handle;
+        TLS->handle = handle;
     }
 
     gcmFOOTER_NO();
-    return;
+#   endif
 #endif
 }
 
@@ -689,17 +725,14 @@ _CloseGalLib(
     gcsTLS_PTR TLS
     )
 {
-    gcsTLS_PTR tls;
-
     gcmHEADER_ARG("TLS=0x%x", TLS);
 
-    tls = (gcsTLS_PTR) TLS;
-    gcmASSERT(tls != gcvNULL);
+    gcmASSERT(TLS != gcvNULL);
 
-    if (tls->handle != gcvNULL)
+    if (TLS->handle != gcvNULL)
     {
-        gcoOS_FreeLibrary(gcvNULL, tls->handle);
-        tls->handle = gcvNULL;
+        gcoOS_FreeLibrary(gcvNULL, TLS->handle);
+        TLS->handle = gcvNULL;
     }
 
     gcmFOOTER_NO();
@@ -937,11 +970,11 @@ void _AtForkChild(
     pthread_key_create(&gcProcessKey, _TLSDestructor);
 }
 
-static void _ModuleConstructor(
+static gceSTATUS _ModuleConstructor(
     void
     )
 {
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_OK;
     int result;
     static pthread_once_t onceControl = PTHREAD_ONCE_INIT;
 
@@ -1056,7 +1089,7 @@ static void _ModuleConstructor(
         gcPLS.internalLogical, gcPLS.externalLogical, gcPLS.contiguousLogical
         );
 
-    return;
+    return status;
 
 OnError:
 
@@ -1073,6 +1106,7 @@ OnError:
     }
 
     gcmFOOTER();
+    return status;
 }
 
 static void
@@ -1140,9 +1174,6 @@ gcoOS_GetPLSValue(
         case gcePLS_VALUE_EGL_DISPLAY_INFO :
             return gcPLS.eglDisplayInfo;
 
-        case gcePLS_VALUE_EGL_SURFACE_INFO :
-            return gcPLS.eglSurfaceInfo;
-
         case gcePLS_VALUE_EGL_CONFIG_FORMAT_INFO :
             return (gctPOINTER) gcPLS.eglConfigFormat;
 
@@ -1182,10 +1213,6 @@ gcoOS_SetPLSValue(
     {
         case gcePLS_VALUE_EGL_DISPLAY_INFO :
             gcPLS.eglDisplayInfo = value;
-            return;
-
-        case gcePLS_VALUE_EGL_SURFACE_INFO :
-            gcPLS.eglSurfaceInfo = value;
             return;
 
         case gcePLS_VALUE_EGL_CONFIG_FORMAT_INFO :
@@ -1231,15 +1258,11 @@ gcoOS_GetTLS(
     if (!gcPLS.processID)
     {
         pthread_mutex_lock(&plsMutex);
-
-        if (!gcPLS.processID)
-        {
-            _ModuleConstructor();
-
-            tls = NULL;
-        }
-
+        status = _ModuleConstructor();
+        tls = NULL;
         pthread_mutex_unlock(&plsMutex);
+
+        gcmONERROR(status);
     }
 
     if (tls == NULL)
@@ -1636,6 +1659,7 @@ gcoOS_QueryVideoMemory(
     gcmHEADER();
 
     /* Call kernel HAL to query video memory. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_QUERY_VIDEO_MEMORY;
 
     /* Call kernel service. */
@@ -1733,6 +1757,7 @@ gcoOS_GetBaseAddress(
         if (gcPLS.os->baseAddress == gcvINVALID_ADDRESS)
         {
             /* Query base address. */
+            iface.ignoreTLS = gcvFALSE;
             iface.command = gcvHAL_GET_BASE_ADDRESS;
 
             /* Call kernel driver. */
@@ -1978,6 +2003,8 @@ gcoOS_FreeSharedMemory(
     return gcoOS_Free(Os, Memory);
 }
 
+#define VP_MALLOC_OFFSET        (16)
+
 /*******************************************************************************
  **
  ** gcoOS_AllocateMemory
@@ -2016,7 +2043,7 @@ gcoOS_AllocateMemory(
 
     /* Allocate the memory. */
 #if VIVANTE_PROFILER
-    memory = malloc(Bytes + gcmSIZEOF(gctSIZE_T));
+    memory = malloc(Bytes + VP_MALLOC_OFFSET);
 #else
     memory = malloc(Bytes);
 #endif
@@ -2050,7 +2077,7 @@ gcoOS_AllocateMemory(
 
         /* Return pointer to the memory allocation. */
         *(gctSIZE_T *) memory = Bytes;
-        *Memory = (gctPOINTER) ((gctSIZE_T *) memory + 1);
+        *Memory = (gctPOINTER) ((gctUINT8 *) memory + VP_MALLOC_OFFSET);
     }
 #else
     /* Return pointer to the memory allocation. */
@@ -2100,18 +2127,21 @@ gcoOS_FreeMemory(
 #if VIVANTE_PROFILER
     {
         gcoOS os = (gcPLS.os != gcvNULL) ? gcPLS.os : Os;
+        gctPOINTER memory;
+
+        memory = (gctUINT8 *) Memory - VP_MALLOC_OFFSET;
 
         if (os != gcvNULL)
         {
 #if gcdGC355_MEM_PRINT
             if (os->oneRecording == 1)
             {
-                os->oneSize -= (gctINT32)(*((gctSIZE_T *) Memory - 1));
+                os->oneSize -= (gctINT32)(*(gctSIZE_T *) memory);
             }
 #endif
-            os->allocSize -= *((gctSIZE_T *) Memory - 1);
-            os->freeSize += *((gctSIZE_T *) Memory - 1);
-            free((gctSIZE_T *) Memory - 1);
+            os->allocSize -= *(gctSIZE_T *) memory;
+            os->freeSize += *(gctSIZE_T *) memory;
+            free(memory);
             ++ (os->freeCount);
         }
     }
@@ -2185,17 +2215,20 @@ gcoOS_DeviceControl(
     inputBuffer  = (gcsHAL_INTERFACE_PTR) InputBuffer;
     outputBuffer = (gcsHAL_INTERFACE_PTR) OutputBuffer;
 
-    /* Set current hardware type */
-    if (gcPLS.processID)
+    if (!inputBuffer->ignoreTLS)
     {
-        gcmONERROR(gcoOS_GetTLS(&tls));
-        inputBuffer->hardwareType = tls->currentType;
-        inputBuffer->coreIndex = tls->currentCoreIndex;
-    }
-    else
-    {
-        inputBuffer->hardwareType = gcvHARDWARE_2D;
-        inputBuffer->coreIndex = 0;
+        /* Set current hardware type */
+        if (gcPLS.processID)
+        {
+            gcmONERROR(gcoOS_GetTLS(&tls));
+            inputBuffer->hardwareType = tls->currentType;
+            inputBuffer->coreIndex = tls->currentCoreIndex;
+        }
+        else
+        {
+            inputBuffer->hardwareType = gcvHARDWARE_2D;
+            inputBuffer->coreIndex = 0;
+        }
     }
 
     switch (inputBuffer->command)
@@ -2325,6 +2358,7 @@ gcoOS_AllocateNonPagedMemory(
     gcmDEBUG_VERIFY_ARGUMENT(Logical != gcvNULL);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_ALLOCATE_NON_PAGED_MEMORY;
     iface.u.AllocateNonPagedMemory.bytes = *Bytes;
 
@@ -2398,6 +2432,7 @@ gcoOS_FreeNonPagedMemory(
                   Bytes, Physical, Logical);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_FREE_NON_PAGED_MEMORY;
     iface.u.FreeNonPagedMemory.bytes    = Bytes;
     iface.u.FreeNonPagedMemory.physical = gcmPTR2INT32(Physical);
@@ -2458,6 +2493,7 @@ gcoOS_FreeContiguous(
     do
     {
         /* Initialize the gcsHAL_INTERFACE structure. */
+        iface.ignoreTLS = gcvFALSE;
         iface.command = gcvHAL_FREE_CONTIGUOUS_MEMORY;
         iface.u.FreeContiguousMemory.bytes    = Bytes;
         iface.u.FreeContiguousMemory.physical = gcmPTR2INT32(Physical);
@@ -2558,6 +2594,7 @@ gcoOS_AllocateVideoMemory(
         flag |= gcvALLOC_FLAG_CACHEABLE;
     }
 
+    iface.ignoreTLS = gcvFALSE;
     iface.command     = gcvHAL_ALLOCATE_LINEAR_VIDEO_MEMORY;
     iface.u.AllocateLinearVideoMemory.bytes     = *Bytes;
 
@@ -2581,6 +2618,7 @@ gcoOS_AllocateVideoMemory(
     *Handle = gcmUINT64_TO_PTR(iface.u.AllocateLinearVideoMemory.node);
 
     /* Fill in the kernel call structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.engine = gcvENGINE_RENDER;
     iface.command = gcvHAL_LOCK_VIDEO_MEMORY;
     iface.u.LockVideoMemory.node = iface.u.AllocateLinearVideoMemory.node;
@@ -2663,6 +2701,7 @@ gcoOS_FreeVideoMemory(
         gcuVIDMEM_NODE_PTR Node = (gcuVIDMEM_NODE_PTR)Handle;
 
         /* Free first to set freed flag since asynchroneous unlock is needed for the contiguous memory. */
+        iface.ignoreTLS = gcvFALSE;
         iface.command = gcvHAL_RELEASE_VIDEO_MEMORY;
         iface.u.ReleaseVideoMemory.node = gcmPTR_TO_UINT64(Node);
 
@@ -2783,6 +2822,7 @@ gcoOS_LockVideoMemory(
     gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
 
     /* Fill in the kernel call structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.engine = gcvENGINE_RENDER;
     iface.command = gcvHAL_LOCK_VIDEO_MEMORY;
     iface.u.LockVideoMemory.node = gcmPTR_TO_UINT64(Node);
@@ -3396,16 +3436,6 @@ gcoOS_Send(
     }
 }
 
-#ifdef ANDROID
-#define MAX_ENV_ITEM 20
-typedef struct _Property_Table {
-    gctCHAR property[PROPERTY_VALUE_MAX];
-    gctCHAR name[PROPERTY_KEY_MAX];
-} Property_Table;
-Property_Table pt[MAX_ENV_ITEM];
-
-#endif
-
 /* Get environment variable value. */
 gceSTATUS
 gcoOS_GetEnv(
@@ -3415,60 +3445,48 @@ gcoOS_GetEnv(
     )
 {
 #ifdef ANDROID
-    static gctINT index=0;
-    gctCHAR property[PROPERTY_VALUE_MAX];
-    gctSIZE_T nlen=0,plen=0;
-#endif
-    gcmHEADER_ARG("VarName=%s", gcmOPT_STRING(VarName));
-    if (Value == gcvNULL)
-    {
-        gcmFOOTER_ARG("Value=%s", "NULL");
-        return gcvSTATUS_OK;
-    }
-#ifdef ANDROID
-    if (property_get(VarName, property, gcvNULL) != 0)
-    {
+    static char properties[512];
+    static int currentIndex;
+    static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
-        gctINT loopi;
-        gctINT found = -1 ;
-        for(loopi = 0; loopi < MAX_ENV_ITEM;loopi++)
+    gctSTRING value = gcvNULL;
+
+    gcmHEADER_ARG("VarName=%s", gcmOPT_STRING(VarName));
+
+    pthread_mutex_lock(&mutex);
+
+    /* Get property value. */
+    if (property_get(VarName, &properties[currentIndex], NULL) != 0)
+    {
+        /* Property exists. */
+        value = &properties[currentIndex];
+
+        /* Pointer to space for next property. */
+        currentIndex += strlen(value) + 1;
+
+        if (currentIndex + PROPERTY_VALUE_MAX >= 512)
         {
-            if(gcoOS_StrCmp(pt[loopi].name, VarName) == gcvSTATUS_OK) /*Found name*/
-            {
-                if(gcoOS_StrCmp(pt[loopi].property, property) != gcvSTATUS_OK ) /*Value changed*/
-                {
-                    plen = gcoOS_StrLen(property, gcvNULL);
-                    gcoOS_StrCopySafe(pt[loopi].property, plen + 1, property);
-                }
-                *Value = pt[loopi].property;
-                found = 1;
-                break;
-            }
-        }
-        if(found == -1) /*Not exist*/
-        {
-            nlen = gcoOS_StrLen(VarName, gcvNULL);
-            plen = gcoOS_StrLen(property, gcvNULL);
-            gcoOS_StrCopySafe(pt[index].name, nlen + 1, VarName);
-            gcoOS_StrCopySafe(pt[index].property, plen + 1, property);
-            *Value = pt[index].property;
-            index++;
-            if (index >= MAX_ENV_ITEM)
-            {
-                index=0; /*cover old variable*/
-            }
+            /* Rewind, will overrite old values. */
+            currentIndex = 0;
         }
     }
-    else
-    {
-    *Value = gcvNULL;
-     }
-#else
-    *Value = getenv(VarName);
-#endif
+
+    pthread_mutex_unlock(&mutex);
+
+    *Value = value;
+
     /* Success. */
     gcmFOOTER_ARG("*Value=%s", gcmOPT_STRING(*Value));
     return gcvSTATUS_OK;
+#else
+    gcmHEADER_ARG("VarName=%s", gcmOPT_STRING(VarName));
+
+    *Value = getenv(VarName);
+
+    /* Success. */
+    gcmFOOTER_ARG("*Value=%s", gcmOPT_STRING(*Value));
+    return gcvSTATUS_OK;
+#endif
 }
 
 /* Set environment variable value. */
@@ -4496,36 +4514,28 @@ gcoOS_PrintStrSafe(
     ...
     )
 {
-    va_list arguments;
+    gctARGUMENTS arguments;
+    gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("String=0x%x StringSize=%u *Offset=%u Format=0x%x",
-                  String, StringSize, *Offset, Format);
+    gcmHEADER_ARG("String=0x%x StringSize=%lu *Offset=%u Format=0x%x",
+                  String, StringSize, gcmOPT_VALUE(Offset), Format);
 
     /* Verify the arguments. */
-    gcmDEBUG_VERIFY_ARGUMENT(String != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(Offset != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(Format != gcvNULL);
+    gcmVERIFY_ARGUMENT(String != gcvNULL);
+    gcmVERIFY_ARGUMENT(StringSize > 0);
+    gcmVERIFY_ARGUMENT(Format != gcvNULL);
 
-    va_start(arguments, Format);
+    /* Route through gcoOS_PrintStrVSafe. */
+    gcmARGUMENTS_START(arguments, Format);
+    gcmONERROR(gcoOS_PrintStrVSafe(String, StringSize,
+                                   Offset,
+                                   Format, arguments));
 
-    if (*Offset < StringSize)
-    {
-        /* Format the string. */
-        gctINT n = vsnprintf(String + *Offset,
-                             StringSize - *Offset,
-                             Format,
-                             arguments);
+OnError:
+    gcmARGUMENTS_END(arguments);
 
-        if (n > 0)
-        {
-            *Offset += n;
-        }
-    }
-
-    va_end(arguments);
-
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
+    gcmFOOTER_ARG("*Offset=%u", gcmOPT_VALUE(Offset));
+    return status;
 }
 
 /*******************************************************************************
@@ -4568,32 +4578,42 @@ gcoOS_PrintStrVSafe(
     IN gctARGUMENTS Arguments
     )
 {
-    gcmHEADER_ARG("String=0x%x StringSize=%lu *Offset=%u Format=0x%x "
-                  "Arguments=0x%x",
-                  String, StringSize, gcmOPT_VALUE(Offset), Format, Arguments);
+    gctUINT offset = gcmOPT_VALUE(Offset);
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("String=0x%x StringSize=%lu *Offset=%u Format=0x%x Arguments=0x%x",
+                  String, StringSize, offset, Format, Arguments);
 
     /* Verify the arguments. */
-    gcmDEBUG_VERIFY_ARGUMENT(String != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(Offset != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(Format != gcvNULL);
+    gcmVERIFY_ARGUMENT(String != gcvNULL);
+    gcmVERIFY_ARGUMENT(StringSize > 0);
+    gcmVERIFY_ARGUMENT(Format != gcvNULL);
 
-    if (*Offset < StringSize)
+    if (offset < StringSize - 1)
     {
-        /* Format the string. */
-        gctINT n = vsnprintf(String + *Offset,
-                             StringSize - *Offset - 1,
+        /* Print into the string. */
+        gctINT n = vsnprintf(String + offset,
+                             StringSize - offset,
                              Format,
                              Arguments);
 
-        if (n > 0)
+        if (n < 0 || n >= (gctINT)(StringSize - offset))
         {
-            *Offset += n;
+            status = gcvSTATUS_GENERIC_IO;
         }
+        else if (Offset)
+        {
+            *Offset = offset + n;
+        }
+    }
+    else
+    {
+        status = gcvSTATUS_BUFFER_TOO_SMALL;
     }
 
     /* Success. */
-    gcmFOOTER_ARG("*Offset=%u", *Offset);
-    return gcvSTATUS_OK;
+    gcmFOOTER_ARG("*Offset=%u", offset);
+    return status;
 }
 
 /*******************************************************************************
@@ -4853,15 +4873,15 @@ gcoOS_LoadLibrary(
         if (*Handle == gcvNULL)
         {
             gcmTRACE(
-                gcvLEVEL_ERROR, "%s(%d): %s", __FUNCTION__, __LINE__, Library
+                gcvLEVEL_VERBOSE, "%s(%d): %s", __FUNCTION__, __LINE__, Library
                 );
 
             gcmTRACE(
-                gcvLEVEL_ERROR, "%s(%d): %s", __FUNCTION__, __LINE__, dlerror()
+                gcvLEVEL_VERBOSE, "%s(%d): %s", __FUNCTION__, __LINE__, dlerror()
                 );
 
             /* Library could not be loaded. */
-            gcmONERROR(gcvSTATUS_NOT_FOUND);
+            status = gcvSTATUS_NOT_FOUND;
         }
     }
 
@@ -5050,6 +5070,7 @@ gcoOS_SetProfileSetting(
     }
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_SET_PROFILE_SETTING;
     iface.u.SetProfileSetting.enable = Enable;
 
@@ -5467,6 +5488,7 @@ gcoOS_ReadRegister(
     gcmDEBUG_VERIFY_ARGUMENT(Data != gcvNULL);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_READ_REGISTER;
     iface.u.ReadRegisterData.address = Address;
     iface.u.ReadRegisterData.data    = 0xDEADDEAD;
@@ -5524,6 +5546,7 @@ gcoOS_WriteRegister(
     gcmHEADER_ARG("Address=0x%x Data=0x%08x", Address, Data);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_WRITE_REGISTER;
     iface.u.WriteRegisterData.address = Address;
     iface.u.WriteRegisterData.data    = Data;
@@ -5563,6 +5586,7 @@ gcoOS_Cache(
     gcmDEBUG_VERIFY_ARGUMENT(Bytes > 0);
 
     /* Set up the cache. */
+    ioctl.ignoreTLS          = gcvFALSE;
     ioctl.command            = gcvHAL_CACHE;
     ioctl.u.Cache.operation  = Operation;
     ioctl.u.Cache.node       = Node;
@@ -6113,6 +6137,7 @@ gcoOS_CreateSignal(
     gcmDEBUG_VERIFY_ARGUMENT(Signal != gcvNULL);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_USER_SIGNAL;
     iface.u.UserSignal.command     = gcvUSER_SIGNAL_CREATE;
     iface.u.UserSignal.manualReset = ManualReset;
@@ -6169,6 +6194,7 @@ gcoOS_DestroySignal(
         );
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_USER_SIGNAL;
     iface.u.UserSignal.command = gcvUSER_SIGNAL_DESTROY;
     iface.u.UserSignal.id      = (gctINT)(gctUINTPTR_T) Signal;
@@ -6219,6 +6245,7 @@ gcoOS_Signal(
     gcmHEADER_ARG("Signal=0x%x State=%d", Signal, State);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_USER_SIGNAL;
     iface.u.UserSignal.command = gcvUSER_SIGNAL_SIGNAL;
     iface.u.UserSignal.id      = (gctINT)(gctUINTPTR_T) Signal;
@@ -6272,6 +6299,7 @@ gcoOS_WaitSignal(
     gcmHEADER_ARG("Signal=0x%x Wait=%u", Signal, Wait);
 
     /* Initialize the gcsHAL_INTERFACE structure. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_USER_SIGNAL;
     iface.u.UserSignal.command = gcvUSER_SIGNAL_WAIT;
     iface.u.UserSignal.id      = (gctINT)(gctUINTPTR_T) Signal;
@@ -6316,7 +6344,7 @@ gcoOS_MapSignal(
 
     gcmDEBUG_VERIFY_ARGUMENT(RemoteSignal != gcvNULL);
     gcmDEBUG_VERIFY_ARGUMENT(LocalSignal != gcvNULL);
-
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_USER_SIGNAL;
     iface.u.UserSignal.command  = gcvUSER_SIGNAL_MAP;
     iface.u.UserSignal.id = (gctINT)(gctUINTPTR_T) RemoteSignal;
@@ -6368,7 +6396,7 @@ gcoOS_UnmapSignal(
         "gcoOS_UnmapSignal: signal->%d.",
         (gctINT)(gctUINTPTR_T)Signal
         );
-
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_USER_SIGNAL;
     iface.u.UserSignal.command = gcvUSER_SIGNAL_UNMAP;
     iface.u.UserSignal.id      = (gctINT)(gctUINTPTR_T) Signal;
@@ -6848,89 +6876,23 @@ OnError:
 #include <sync/sync.h>
 
 gceSTATUS
-gcoOS_CreateSyncPoint(
-    IN gcoOS Os,
-    OUT gctSYNC_POINT * SyncPoint
-    )
-{
-    gceSTATUS status;
-    gcsHAL_INTERFACE iface;
-
-    gcmHEADER_ARG("Os=0x%x", Os);
-
-    /* Call kernel API to dup signal to native fence fd. */
-    iface.command                       = gcvHAL_SYNC_POINT;
-    iface.u.SyncPoint.command           = gcvSYNC_POINT_CREATE;
-
-    gcmONERROR(gcoOS_DeviceControl(
-        gcvNULL,
-        IOCTL_GCHAL_INTERFACE,
-        &iface, gcmSIZEOF(iface),
-        &iface, gcmSIZEOF(iface)
-        ));
-
-    /* Return created sync point. */
-    *SyncPoint = gcmUINT64_TO_PTR(iface.u.SyncPoint.syncPoint);
-
-    /* Success. */
-    gcmFOOTER_ARG("*SyncPoint=%u", (gctUINT) iface.u.SyncPoint.syncPoint);
-    return gcvSTATUS_OK;
-
-OnError:
-    *SyncPoint = gcvNULL;
-
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
-gcoOS_DestroySyncPoint(
-    IN gcoOS Os,
-    IN gctSYNC_POINT SyncPoint
-    )
-{
-    gceSTATUS status;
-    gcsHAL_INTERFACE iface;
-
-    gcmHEADER_ARG("Os=0x%x SyncPoint=%u",
-                  Os, (gctUINT) (gctUINTPTR_T) SyncPoint);
-
-    /* Call kernel API to dup signal to native fence fd. */
-    iface.command                       = gcvHAL_SYNC_POINT;
-    iface.u.SyncPoint.command           = gcvSYNC_POINT_DESTROY;
-    iface.u.SyncPoint.syncPoint         = gcmPTR_TO_UINT64(SyncPoint);
-
-    gcmONERROR(gcoOS_DeviceControl(
-        gcvNULL,
-        IOCTL_GCHAL_INTERFACE,
-        &iface, gcmSIZEOF(iface),
-        &iface, gcmSIZEOF(iface)
-        ));
-
-OnError:
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
 gcoOS_CreateNativeFence(
     IN gcoOS Os,
-    IN gctSYNC_POINT SyncPoint,
+    IN gctSIGNAL Signal,
     OUT gctINT * FenceFD
     )
 {
     gceSTATUS status;
     gcsHAL_INTERFACE iface;
 
-    gcmHEADER_ARG("Os=0x%x SyncPoint=%d",
-                  Os, (gctUINT) (gctUINTPTR_T) SyncPoint);
+    gcmHEADER_ARG("Os=0x%x Signal=%d",
+                  Os, (gctUINT) (gctUINTPTR_T) Signal);
 
     /* Call kernel API to dup signal to native fence fd. */
-    iface.command                       = gcvHAL_CREATE_NATIVE_FENCE;
-    iface.u.CreateNativeFence.syncPoint = gcmPTR_TO_UINT64(SyncPoint);
-    iface.u.CreateNativeFence.fenceFD   = -1;
+    iface.ignoreTLS                   = gcvFALSE;
+    iface.command                     = gcvHAL_CREATE_NATIVE_FENCE;
+    iface.u.CreateNativeFence.signal  = gcmPTR_TO_UINT64(Signal);
+    iface.u.CreateNativeFence.fenceFD = -1;
 
     gcmONERROR(gcoOS_DeviceControl(
         gcvNULL,
@@ -7015,6 +6977,7 @@ gcoOS_WaitNativeFence(
     gcmHEADER_ARG("Os=0x%x FenceFD=%d Timeout=%d", Os, FenceFD, Timeout);
 
     /* Call kernel API to dup signal to native fence fd. */
+    iface.ignoreTLS                 = gcvFALSE;
     iface.command                   = gcvHAL_WAIT_NATIVE_FENCE;
     iface.u.WaitNativeFence.fenceFD = FenceFD;
     iface.u.WaitNativeFence.timeout = Timeout;
@@ -7133,3 +7096,4 @@ gcoOS_QuerySystemInfo(
 
     return gcvSTATUS_OK;
 }
+

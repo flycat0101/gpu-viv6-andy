@@ -26,24 +26,56 @@
 ##############################################################################
 
 
-LOCAL_PATH:= $(call my-dir)
-include $(CLEAR_VARS)
-VIV_TARGET_ABI ?= $(TARGET_ARCH)
-ifneq ($(findstring 64,$(VIV_TARGET_ABI)),)
-    VIV_MULTILIB=64
+LOCAL_PATH := $(call my-dir)
+
+ifdef TARGET_2ND_ARCH
+
+  # build for 64
+  include $(CLEAR_VARS)
+
+  LOCAL_SRC_FILES := $(call all-subdir-java-files)
+
+  LOCAL_JNI_SHARED_LIBRARIES := libvv_launcher
+
+  LOCAL_PACKAGE_NAME := vv_launcher-64
+  LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
+  LOCAL_MULTILIB     := 64
+  include $(BUILD_PACKAGE)
+
+  # build for 32
+  include $(CLEAR_VARS)
+
+  LOCAL_SRC_FILES := $(call all-subdir-java-files)
+
+  LOCAL_JNI_SHARED_LIBRARIES := libvv_launcher
+
+  LOCAL_PACKAGE_NAME := vv_launcher-32
+  LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
+  LOCAL_MULTILIB     := 32
+  include $(BUILD_PACKAGE)
+
+  # build for multilib
+  include $(CLEAR_VARS)
+
+  LOCAL_SRC_FILES := $(call all-subdir-java-files)
+
+  LOCAL_JNI_SHARED_LIBRARIES := libvv_launcher
+
+  LOCAL_PACKAGE_NAME := vv_launcher-multilib
+  LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
+  LOCAL_MULTILIB     := both
+  include $(BUILD_PACKAGE)
+
 else
-    VIV_MULTILIB=32
+include $(CLEAR_VARS)
+
+  LOCAL_SRC_FILES := $(call all-subdir-java-files)
+
+  LOCAL_JNI_SHARED_LIBRARIES := libvv_launcher
+
+  LOCAL_PACKAGE_NAME := vv_launcher
+  LOCAL_MODULE_PATH  := $(LOCAL_PATH)/bin/
+  include $(BUILD_PACKAGE)
 endif
 
-
-LOCAL_MODULE_TAGS := eng development
-LOCAL_SRC_FILES := $(call all-subdir-java-files)
-LOCAL_JNI_SHARED_LIBRARIES := libvv_launcher
-LOCAL_PACKAGE_NAME := vv_launcher
-
-LOCAL_MULTILIB := $(VIV_MULTILIB)
-LOCAL_MODULE_PATH := $(AQROOT)/bin/$(VIV_TARGET_ABI)
-include $(BUILD_PACKAGE)
-
 include $(LOCAL_PATH)/jni/Android.mk
-

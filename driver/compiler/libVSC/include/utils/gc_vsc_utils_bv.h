@@ -281,6 +281,8 @@ typedef struct _VSC_STATE_VECTOR
          (pSV)->pBVs != gcvNULL &&                                 \
          (pSV)->pMM != gcvNULL)
 
+#define INVALID_STATE_LOC   (-1)
+
 /* Creation, resize and destroy */
 VSC_STATE_VECTOR* vscSV_Create(VSC_MM* pMM, gctINT svSize, gctUINT stateCount);
 void vscSV_Initialize(VSC_STATE_VECTOR* pSV, VSC_MM* pMM, gctINT svSize, gctUINT stateCount);
@@ -298,6 +300,9 @@ gctBOOL vscSV_TestAndSet(VSC_STATE_VECTOR* pSV, gctINT ordinal, gctUINT state);
 void vscSV_SetInRange(VSC_STATE_VECTOR* pSV, gctINT startOrdinal, gctINT szRange, gctUINT state);
 gctBOOL vscSV_TestInRange(VSC_STATE_VECTOR* pSV, gctINT startOrdinal, gctINT szRange, gctUINT state);
 gctBOOL vscSV_TestAndSetInRange(VSC_STATE_VECTOR* pSV, gctINT startOrdinal, gctINT szRange, gctUINT state);
+
+/* State search */
+gctINT vscSV_FindStateForward(VSC_STATE_VECTOR* pSV, gctINT startOrdinal, gctUINT state);
 
 /* Condition op */
 gctBOOL vscSV_Any(VSC_STATE_VECTOR* pSV, gctUINT state);

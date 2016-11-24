@@ -1160,6 +1160,10 @@ VivPreInit(ScrnInfoPtr pScrn, int flags) {
     if ( vivEnableXrandr )
         imxDisplayPreInit(pScrn);
 #endif
+
+
+    pScrn->videoRam = fbdevHWGetVidmem(pScrn);
+
     /* make sure display width is correctly aligned */
     pScrn->displayWidth = gcmALIGN(pScrn->virtualX, fPtr->fbAlignWidth);
     xf86DrvMsg(pScrn->scrnIndex, X_INFO, "VivPreInit: adjust display width %d\n",pScrn->displayWidth);
@@ -1210,7 +1214,6 @@ VivScreenInit(SCREEN_INIT_ARGS_DECL)
     /*Init the hardware in current mode*/
     if (!fbdevHWModeInit(pScrn, pScrn->currentMode)) {
         xf86DrvMsg(pScrn->scrnIndex, X_ERROR, "mode initialization failed\n");
-        TRACE_EXIT(FALSE);
     }
 
     /*Mapping the Video memory*/

@@ -13,8 +13,8 @@
 
 /*********************************************************************************
    Following definitions are ONLY used for openCL(ES) to communicate with client
-   query/binding request. NOTE that ONLY active parts are collected into each high
-   level table.
+   query/binding request from kernel. NOTE that ONLY active parts are collected
+   into each high level table.
 **********************************************************************************/
 
 #ifndef __gc_vsc_drvi_kernel_profile_h_
@@ -27,7 +27,7 @@ BEGIN_EXTERN_C()
 typedef struct KERNEL_EXECUTABLE_PROFILE
 {
     /* The shaders that this kernel contains. */
-    SHADER_EXECUTABLE_PROFILE                   ExecutableKernel;
+    SHADER_EXECUTABLE_PROFILE                   sep;
 
     /* High level mapping tables from high level variables to # */
 }

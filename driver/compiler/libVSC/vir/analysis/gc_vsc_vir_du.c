@@ -81,6 +81,8 @@ static void _InitializeDef(VIR_DEF* pDef,
     pDef->flags.deducedDefFlags.bNoUsageCrossRoutine = gcvTRUE;
     pDef->flags.deducedDefFlags.bDynIndexed = gcvFALSE;
     pDef->flags.deducedDefFlags.bIndexingReg = gcvFALSE;
+    pDef->flags.deducedDefFlags.bHasUsageOnNoSwizzleInst = gcvFALSE;
+    pDef->flags.deducedDefFlags.bHasUsageOnFalseDepInst = gcvFALSE;
 
     pDef->defKey.regNo = regNo;
     pDef->OrgEnableMask = enableMask;
@@ -104,6 +106,8 @@ static void _FinalizeDef(VIR_DEF* pDef)
     pDef->flags.deducedDefFlags.bNoUsageCrossRoutine = gcvTRUE;
     pDef->flags.deducedDefFlags.bDynIndexed = gcvFALSE;
     pDef->flags.deducedDefFlags.bIndexingReg = gcvFALSE;
+    pDef->flags.deducedDefFlags.bHasUsageOnNoSwizzleInst = gcvFALSE;
+    pDef->flags.deducedDefFlags.bHasUsageOnFalseDepInst = gcvFALSE;
     pDef->defKey.regNo = VIR_INVALID_REG_NO;
     pDef->OrgEnableMask = VIR_ENABLE_NONE;
     pDef->halfChannelMask = VIR_HALF_CHANNEL_MASK_NONE;
@@ -474,16 +478,21 @@ gctBOOL vscVIR_QueryRealWriteVirRegInfo(VIR_Shader* pShader,
                                         VIR_NATIVE_DEF_FLAGS* pNativeDefFlags,
                                         gctBOOL* pIsIndexing)
 {
-    VIR_OperandInfo        operandInfo, operandInfo0;
+    VIR_OperandInfo         operandInfo, operandInfo0;
+    VIR_Enable              defEnableMask;
+    gctUINT8                halfChannelMask = 0;
+    gctUINT                 firstRegNo = 0, regNoRange = 0;
+    VIR_NATIVE_DEF_FLAGS    nativeDefFlags;
+    gctBOOL                 bIsIndexing = gcvFALSE;
 
-    if (pInst->dest == gcvNULL)
+    if (pInst == gcvNULL || VIR_Inst_GetDest(pInst) == gcvNULL)
     {
         return gcvFALSE;
     }
 
     /* Get dst operand info */
     VIR_Operand_GetOperandInfo(pInst,
-                               pInst->dest,
+                               VIR_Inst_GetDest(pInst),
                                &operandInfo);
 
     if (!VIR_OpndInfo_Is_Virtual_Reg(&operandInfo))
@@ -491,37 +500,23 @@ gctBOOL vscVIR_QueryRealWriteVirRegInfo(VIR_Shader* pShader,
         return gcvFALSE;
     }
 
-    *pDefEnableMask = VIR_Operand_GetEnable(pInst->dest);
+    defEnableMask = VIR_Operand_GetEnable(VIR_Inst_GetDest(pInst));
 
-    if (pHalfChannelMask)
-    {
-        *pHalfChannelMask = (gctUINT8)operandInfo.halfChannelMask;
-    }
+    halfChannelMask = (gctUINT8)operandInfo.halfChannelMask;
 
-    if (pNativeDefFlags)
-    {
-        pNativeDefFlags->bIsInput = gcvFALSE;
-        pNativeDefFlags->bHwSpecialInput = operandInfo.needHwSpecialDef;
-        pNativeDefFlags->bIsOutput = operandInfo.isOutput;
-        pNativeDefFlags->bIsPerPrim = operandInfo.isPerPrim;
-        pNativeDefFlags->bIsPerVtxCp = operandInfo.isPerVtxCp;
-    }
-
-    if (pIsIndexing)
-    {
-        *pIsIndexing = gcvFALSE;
-    }
+    nativeDefFlags.bIsInput = gcvFALSE;
+    nativeDefFlags.bHwSpecialInput = operandInfo.needHwSpecialDef;
+    nativeDefFlags.bIsOutput = operandInfo.isOutput;
+    nativeDefFlags.bIsPerPrim = operandInfo.isPerPrim;
+    nativeDefFlags.bIsPerVtxCp = operandInfo.isPerVtxCp;
+    nativeDefFlags.reserved = 0;
 
     /* For the case of Rb[Ro.single_channel] access */
     if (operandInfo.indexingVirRegNo != VIR_INVALID_REG_NO)
     {
-        *pFirstRegNo = operandInfo.u1.virRegInfo.startVirReg;
-        *pRegNoRange = operandInfo.u1.virRegInfo.virRegCount;
-
-        if (pIsIndexing)
-        {
-            *pIsIndexing = gcvTRUE;
-        }
+        firstRegNo = operandInfo.u1.virRegInfo.startVirReg;
+        regNoRange = operandInfo.u1.virRegInfo.virRegCount;
+        bIsIndexing = gcvTRUE;
     }
     /* A starr inst may potentially write all elements in array */
     else if (VIR_Inst_GetOpcode(pInst) == VIR_OP_STARR)
@@ -532,27 +527,54 @@ gctBOOL vscVIR_QueryRealWriteVirRegInfo(VIR_Shader* pShader,
 
         if (operandInfo0.isImmVal)
         {
-            *pFirstRegNo = operandInfo.u1.virRegInfo.virReg + operandInfo0.u1.immValue.iValue;
-            *pRegNoRange = 1;
+            firstRegNo = operandInfo.u1.virRegInfo.virReg + operandInfo0.u1.immValue.iValue;
+            regNoRange = 1;
         }
         else
         {
             gcmASSERT(VIR_OpndInfo_Is_Virtual_Reg(&operandInfo));
-            *pFirstRegNo = operandInfo.u1.virRegInfo.startVirReg;
-            *pRegNoRange = operandInfo.u1.virRegInfo.virRegCount;
-
-            if (pIsIndexing)
-            {
-                *pIsIndexing = gcvTRUE;
-            }
+            firstRegNo = operandInfo.u1.virRegInfo.startVirReg;
+            regNoRange = operandInfo.u1.virRegInfo.virRegCount;
+            bIsIndexing = gcvTRUE;
         }
     }
     /* Normal def */
     else if (VIR_OPCODE_isWritten2Dest(VIR_Inst_GetOpcode(pInst)))
     {
         /* Then add each def for each reg no */
-        *pFirstRegNo = operandInfo.u1.virRegInfo.virReg;
-        *pRegNoRange = 1;
+        firstRegNo = operandInfo.u1.virRegInfo.virReg;
+        regNoRange = 1;
+    }
+
+    /* Save the result. */
+    if (pDefEnableMask)
+    {
+        *pDefEnableMask = defEnableMask;
+    }
+
+    if (pHalfChannelMask)
+    {
+        *pHalfChannelMask = halfChannelMask;
+    }
+
+    if (pFirstRegNo)
+    {
+        *pFirstRegNo = firstRegNo;
+    }
+
+    if (pRegNoRange)
+    {
+        *pRegNoRange = regNoRange;
+    }
+
+    if (pNativeDefFlags)
+    {
+        *pNativeDefFlags = nativeDefFlags;
+    }
+
+    if (pIsIndexing)
+    {
+        *pIsIndexing = bIsIndexing;
     }
 
     return gcvTRUE;
@@ -770,6 +792,7 @@ static VSC_ErrCode _BuildDefTable(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuIn
                      sizeof(VIR_DEF),
                      40*sizeof(VIR_DEF),
                      1,
+                     gcvNULL,
                      _HFUNC_DefPassThroughRegNo,
                      _HKCMP_DefKeyEqual,
                      DEF_USAGE_HASH_TABLE_SIZE);
@@ -985,7 +1008,7 @@ static void _ReachDef_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
                                             &bIndexing))
         {
             bCertainWrite = (!bIndexing &&
-                             !VIR_OPCODE_CONDITIONAL_WRITE(VIR_Inst_GetOpcode(pInst)) &&
+                             !VIR_Inst_ConditionalWrite(pInst) &&
                              !VIR_OPCODE_DestOnlyUseEnable(VIR_Inst_GetOpcode(pInst)));
 
             _Update_ReachDef_Local_GenKill(pDefTable,
@@ -1140,17 +1163,23 @@ static gctBOOL _ReachDef_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA
     VSC_BIT_VECTOR*        pInFlow = &pCallerTsBlockFlow->inFlow;
     VIR_FUNC_BLOCK*        pCallee = VIR_Inst_GetCallee(pBasicBlock->pStartInst)->pFuncBlock;
     VIR_TS_FUNC_FLOW*      pCalleeFuncFlow = (VIR_TS_FUNC_FLOW*)vscSRARR_GetElement(&pBaseTsDFA->tsFuncFlowArray, pCallee->dgNode.id);
-    VSC_BIT_VECTOR         tmpFlow;
+    VSC_BIT_VECTOR         tmpFlow, tmpFlow1, tmpFlow2;
     gctBOOL                bChanged = gcvFALSE;
 
     gcmASSERT(pBasicBlock->flowType == VIR_FLOW_TYPE_CALL);
 
     vscBV_Initialize(&tmpFlow, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow1, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
+    vscBV_Initialize(&tmpFlow2, pBaseTsDFA->baseDFA.pMM, pBaseTsDFA->baseDFA.flowSize);
 
-    /* U flow that not flows into callee and out flow of callee */
-    vscBV_And2(&tmpFlow, &pCalleeFuncFlow->inFlow, pInFlow);
-    vscBV_Minus2(&tmpFlow, pInFlow, &tmpFlow);
-    vscBV_Or1(&tmpFlow, &pCalleeFuncFlow->outFlow);
+    /* U flow that not flows into callee and out flow of callee excluding flows that are from other callers */
+    vscBV_And2(&tmpFlow1, &pCalleeFuncFlow->inFlow, pInFlow);
+    vscBV_Minus2(&tmpFlow, pInFlow, &tmpFlow1);
+    vscBV_Minus2(&tmpFlow1, &pCalleeFuncFlow->inFlow, &tmpFlow1);
+    vscBV_Minus2(&tmpFlow1, &pCalleeFuncFlow->outFlow, &tmpFlow1);
+    vscBV_And2(&tmpFlow2, &pCalleeFuncFlow->inFlow, &pCalleeFuncFlow->outFlow);
+    vscBV_Or1(&tmpFlow, &tmpFlow1);
+    vscBV_Or1(&tmpFlow, &tmpFlow2);
 
     bChanged = !vscBV_Equal(pOutFlow, &tmpFlow);
     if (bChanged)
@@ -1159,6 +1188,8 @@ static gctBOOL _ReachDef_Block_Flow_Combine_From_Callee_Resolver(VIR_BASE_TS_DFA
     }
 
     vscBV_Finalize(&tmpFlow);
+    vscBV_Finalize(&tmpFlow1);
+    vscBV_Finalize(&tmpFlow2);
 
     return bChanged;
 }
@@ -1332,6 +1363,9 @@ static VSC_ErrCode _DoReachDefAnalysis(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* 
                                    gcvFALSE
 #endif
                                    );
+
+    /* Mark we have successfully built the reach-def flow */
+    vscVIR_SetDFAFlowBuilt(&pDuInfo->baseTsDFA.baseDFA, gcvTRUE);
 
     return errCode;
 }
@@ -1554,15 +1588,31 @@ static gctBOOL _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
                         if (pDef->defKey.pDefInst < VIR_INPUT_DEF_INST && pUsageInst < VIR_OUTPUT_USAGE_INST)
                         {
                             pDef->flags.deducedDefFlags.bNoUsageCrossRoutine &=
-                                (VIR_Inst_GetFunction(pUsageInst) == VIR_Inst_GetFunction(pDef->defKey.pDefInst));
+                                ((VIR_Inst_GetFunction(pUsageInst) == VIR_Inst_GetFunction(pDef->defKey.pDefInst)) ? gcvTRUE : gcvFALSE);
                         }
 
-                        /* Take care of bDynIndexed */
                         if (!VIR_IS_OUTPUT_USAGE_INST(pUsageInst))
                         {
                             VIR_Operand_GetOperandInfo(pUsageInst, pOperand, &operandInfo);
 
-                            if (VIR_Inst_GetOpcode(pUsageInst) == VIR_OP_LDARR)
+                            if (VIR_OPCODE_isVXOnly(VIR_Inst_GetOpcode(pUsageInst)) ||
+                                VIR_Inst_GetOpcode(pUsageInst) == VIR_OP_SWIZZLE)
+                            {
+                                pDef->flags.deducedDefFlags.bHasUsageOnNoSwizzleInst = gcvTRUE;
+                            }
+
+                            /* On some HW, there is no per-component dependence support for LD/ST/TEXLD def.
+                               For ST instruction, the def is same as src2 if it is temp. */
+                            if ((VIR_OPCODE_isMemSt(VIR_Inst_GetOpcode(pUsageInst)) ||
+                                 VIR_OPCODE_isImgSt(VIR_Inst_GetOpcode(pUsageInst)) ||
+                                 VIR_OPCODE_isAttrSt(VIR_Inst_GetOpcode(pUsageInst))) &&
+                                VIR_Inst_GetSourceIndex(pUsageInst, pOperand) == 2)
+                            {
+                                pDef->flags.deducedDefFlags.bHasUsageOnFalseDepInst = gcvTRUE;
+                            }
+
+                            /* Take care of bDynIndexed */
+                            else if (VIR_Inst_GetOpcode(pUsageInst) == VIR_OP_LDARR)
                             {
                                 /* For the case of LDARR */
                                 if (VIR_Inst_GetSourceIndex(pUsageInst, pOperand) == 0)
@@ -1614,7 +1664,6 @@ static gctBOOL _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
                    ingore following check for range */
                 if (regNoRange == 1)
                 {
-                    gcmASSERT(gcvFALSE);
                 }
             }
         }
@@ -1710,6 +1759,9 @@ static gctBOOL _DeleteUsageFromTable(VIR_DEF_USAGE_INFO* pDuInfo,
 
                             /* Remove this usage from du chain of this def */
                             DU_CHAIN_REMOVE_USAGE(&pDef->duChain, pUsageNode);
+
+                            /* Usage node is no longer used any more */
+                            vscMM_Free(&pDuInfo->pmp.mmWrapper, pUsageNode);
 
                             /* Remove def from this usage */
                             UD_CHAIN_REMOVE_DEF(&pTmpUsage->udChain, defIdx);
@@ -2161,7 +2213,7 @@ static void _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAGE_INFO*
                                             &bIndexing))
         {
             bCertainWrite = (!bIndexing &&
-                             !VIR_OPCODE_CONDITIONAL_WRITE(VIR_Inst_GetOpcode(pInst)) &&
+                             !VIR_Inst_ConditionalWrite(pInst) &&
                              !VIR_OPCODE_DestOnlyUseEnable(VIR_Inst_GetOpcode(pInst)));
 
             _Update_ReachDef_Local_GenKill(pDefTable,
@@ -2225,6 +2277,7 @@ static VSC_ErrCode _BuildDUUDChain(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuI
                      sizeof(VIR_USAGE),
                      (gctUINT)((defCount*1.5)*sizeof(VIR_USAGE)),
                      1,
+                     gcvNULL,
                      _HFUNC_UsageInstLSB8,
                      _HKCMP_UsageKeyEqual,
                      DEF_USAGE_HASH_TABLE_SIZE);
@@ -2239,13 +2292,6 @@ static VSC_ErrCode _BuildDUUDChain(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuI
         pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_FIRST(&basicBlkIter);
         for (; pThisBlock != gcvNULL; pThisBlock = (VIR_BASIC_BLOCK *)CFG_ITERATOR_NEXT(&basicBlkIter))
         {
-            /* No usage exists in entry and exit basic block */
-            if (BB_GET_FLOWTYPE(pThisBlock) == VIR_FLOW_TYPE_ENTRY ||
-                BB_GET_FLOWTYPE(pThisBlock) == VIR_FLOW_TYPE_EXIT)
-            {
-                continue;
-            }
-
             /* For each basic block, build du/ud chain */
             _BuildDUUDChainPerBB(pThisBlock, pDuInfo);
         }
@@ -2258,6 +2304,54 @@ static VSC_ErrCode _BuildDUUDChain(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuI
     /* Outputs have special implicit usages from next stage. All false outputs will be
        also corrected by setting bIsOutput as FALSE */
     _AddOutputUsages(pDuInfo, pMainFlowOut, VIR_OUTPUT_USAGE_INST);
+
+    pDuInfo->bDUUDChainBuilt = gcvTRUE;
+
+    return errCode;
+}
+
+VSC_ErrCode _DestoryDUUDChain(VIR_DEF_USAGE_INFO* pDuInfo, gctBOOL bOnlyFinalizeUsageTable)
+{
+    VSC_ErrCode              errCode = VSC_ERR_NONE;
+    gctUINT                  defCount, defIdx;
+    VSC_BLOCK_TABLE*         pDefTable = &pDuInfo->defTable;
+    VIR_DEF*                 pDef;
+    VIR_DU_CHAIN_USAGE_NODE* pUsageNode;
+    VSC_DU_ITERATOR          duIter;
+
+    if (pDuInfo->bDUUDChainBuilt)
+    {
+        /* We need remove any du chain info for each def if it is requested */
+        if (!bOnlyFinalizeUsageTable)
+        {
+            /* For def */
+            defCount = BT_GET_MAX_VALID_ID(&pDuInfo->defTable);
+            for (defIdx = 0; defIdx < defCount; defIdx ++)
+            {
+                pDef = GET_DEF_BY_IDX(pDefTable, defIdx);
+                if (IS_VALID_DEF(pDef))
+                {
+                    VSC_DU_ITERATOR_INIT(&duIter, &pDef->duChain);
+                    pUsageNode = VSC_DU_ITERATOR_FIRST(&duIter);
+                    for (; pUsageNode != gcvNULL; pUsageNode = VSC_DU_ITERATOR_NEXT(&duIter))
+                    {
+                        /* Remove this usage from du chain of this def */
+                        DU_CHAIN_REMOVE_USAGE(&pDef->duChain, pUsageNode);
+
+                        /* Usage node is no longer used any more */
+                        vscMM_Free(&pDuInfo->pmp.mmWrapper, pUsageNode);
+                    }
+
+                    DU_CHAIN_INITIALIZE(&pDef->duChain);
+                }
+            }
+        }
+
+        vscBT_Finalize(&pDuInfo->usageTable);
+
+        /* Mark DUUD chain has been destoryed */
+        pDuInfo->bDUUDChainBuilt = gcvFALSE;
+    }
 
     return errCode;
 }
@@ -2336,7 +2430,7 @@ static void _MergeTwoWebs(VIR_DEF_USAGE_INFO* pDuInfo,
 
 static void _PostProcessNewWeb(VIR_DEF_USAGE_INFO* pDuInfo, gctUINT newWebIdx)
 {
-    PVSC_HW_CONFIG           pHwCfg = pDuInfo->baseTsDFA.baseDFA.pOwnerCG->pOwnerShader->passMnger->passWorker.pCompilerParam->cfg.pHwCfg;
+    PVSC_HW_CONFIG           pHwCfg = &pDuInfo->baseTsDFA.baseDFA.pOwnerCG->pOwnerShader->pCompilerCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg;
     VSC_BLOCK_TABLE*         pDefTable = &pDuInfo->defTable;
     VSC_BLOCK_TABLE*         pWebTable = &pDuInfo->webTable;
     VIR_WEB*                 pNewWeb = GET_WEB_BY_IDX(pWebTable, newWebIdx);
@@ -2768,6 +2862,7 @@ static VSC_ErrCode _BuildWebs(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuInfo)
                      1,
                      gcvNULL,
                      gcvNULL,
+                     gcvNULL,
                      0);
 
     /* Mark web has been built */
@@ -2884,11 +2979,13 @@ VSC_ErrCode _DestoryWebs(VIR_DEF_USAGE_INFO* pDuInfo, gctBOOL bOnlyFinalizeWebTa
 
 VSC_ErrCode vscVIR_BuildDefUsageInfo(VIR_CALL_GRAPH* pCg,
                                      VIR_DEF_USAGE_INFO* pDuInfo,
+                                     gctBOOL bBuildDUUDChain,
                                      gctBOOL bBuildWeb)
 {
     VSC_ErrCode            errCode = VSC_ERR_NONE;
 
-    /* Initialize web not built */
+    /* Initialize duud-chain/web not built */
+    pDuInfo->bDUUDChainBuilt = gcvFALSE;
     pDuInfo->bWebTableBuilt = gcvFALSE;
 
     /* Initialize our pmp, you can also use other MM if you want */
@@ -2907,8 +3004,11 @@ VSC_ErrCode vscVIR_BuildDefUsageInfo(VIR_CALL_GRAPH* pCg,
     CHECK_ERROR(errCode, "Do reach-def analysis");
 
     /* Build DU chain, as well as UD chain */
-    errCode = _BuildDUUDChain(pCg, pDuInfo);
-    CHECK_ERROR(errCode, "Build du/ud chain");
+    if (bBuildDUUDChain)
+    {
+        errCode = _BuildDUUDChain(pCg, pDuInfo);
+        CHECK_ERROR(errCode, "Build du/ud chain");
+    }
 
     /* Build Web */
     if (bBuildWeb)
@@ -2917,17 +3017,35 @@ VSC_ErrCode vscVIR_BuildDefUsageInfo(VIR_CALL_GRAPH* pCg,
         CHECK_ERROR(errCode, "Build web");
     }
 
-    /* Mark we have successfully built the DU info */
-    vscVIR_SetDFAValidity(&pDuInfo->baseTsDFA.baseDFA, gcvTRUE);
-
     return errCode;
+}
+
+VSC_ErrCode vscVIR_BuildDUUDChain(VIR_CALL_GRAPH* pCg,
+                                  VIR_DEF_USAGE_INFO* pDuInfo,
+                                  gctBOOL bForceToBuild
+                                  )
+{
+    gcmASSERT(vscVIR_CheckDFAFlowBuilt(&pDuInfo->baseTsDFA.baseDFA));
+
+    if (pDuInfo->bDUUDChainBuilt)
+    {
+        if (!bForceToBuild)
+        {
+            return VSC_ERR_NONE;
+        }
+
+        /* If DUUD chain is forced to built, we need destory previous one firstly */
+        _DestoryDUUDChain(pDuInfo, gcvFALSE);
+    }
+
+    return _BuildDUUDChain(pCg, pDuInfo);
 }
 
 VSC_ErrCode vscVIR_BuildWebs(VIR_CALL_GRAPH* pCg,
                              VIR_DEF_USAGE_INFO* pDuInfo,
                              gctBOOL bForceToBuild)
 {
-    gcmASSERT(vscVIR_GetDFAValidity(&pDuInfo->baseTsDFA.baseDFA));
+    gcmASSERT(pDuInfo->bDUUDChainBuilt);
 
     if (pDuInfo->bWebTableBuilt)
     {
@@ -2947,10 +3065,11 @@ VSC_ErrCode vscVIR_DestroyDefUsageInfo(VIR_DEF_USAGE_INFO* pDuInfo)
 {
     VSC_ErrCode            errCode = VSC_ERR_NONE;
 
-    if (vscVIR_GetDFAValidity(&pDuInfo->baseTsDFA.baseDFA))
+    if (vscVIR_CheckDFAFlowBuilt(&pDuInfo->baseTsDFA.baseDFA))
     {
         vscBT_Finalize(&pDuInfo->defTable);
-        vscBT_Finalize(&pDuInfo->usageTable);
+
+        _DestoryDUUDChain(pDuInfo, gcvTRUE);
 
         _DestoryWebs(pDuInfo, gcvTRUE);
 
@@ -2958,10 +3077,15 @@ VSC_ErrCode vscVIR_DestroyDefUsageInfo(VIR_DEF_USAGE_INFO* pDuInfo)
         vscPMP_Finalize(&pDuInfo->pmp);
 
         /* Mark DU info has been invalid */
-        vscVIR_SetDFAValidity(&pDuInfo->baseTsDFA.baseDFA, gcvFALSE);
+        vscVIR_SetDFAFlowBuilt(&pDuInfo->baseTsDFA.baseDFA, gcvFALSE);
     }
 
     return errCode;
+}
+
+VSC_ErrCode vscVIR_DestoryDUUDChain(VIR_DEF_USAGE_INFO* pDuInfo)
+{
+    return _DestoryDUUDChain(pDuInfo, gcvFALSE);
 }
 
 VSC_ErrCode vscVIR_DestoryWebs(VIR_DEF_USAGE_INFO* pDuInfo)

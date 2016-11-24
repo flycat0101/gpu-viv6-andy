@@ -1244,7 +1244,7 @@ test(
     cl_float fdst[8] = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
     cl_float prefdst[8] = { 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f};
     cl_long srcLong[2] = {1, 0x4};
-    cl_long dstLong[2] = {0xffffffffffffff00, 0x3fffffff00ff0fff};
+    cl_long dstLong[2] = {static_cast<cl_long>(0xffffffffffffff00), 0x3fffffff00ff0fff};
     const cl_uint  offset = 16;
     cl_float foffset = 1.0f;
     const cl_float fabsolute = 1.5f;

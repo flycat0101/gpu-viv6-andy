@@ -256,7 +256,7 @@ VX_INTERNAL_API vx_bool vxoParameterValue_UnbindFromDelay(vx_reference value, vx
     return vx_true_e;
 }
 
-VX_PUBLIC_API vx_delay vxCreateDelay(vx_context context, vx_reference exemplar, vx_size count)
+VX_API_ENTRY vx_delay VX_API_CALL vxCreateDelay(vx_context context, vx_reference exemplar, vx_size count)
 {
     if (!vxoContext_IsValid(context)) return VX_NULL;
 
@@ -264,6 +264,9 @@ VX_PUBLIC_API vx_delay vxCreateDelay(vx_context context, vx_reference exemplar, 
     {
         return (vx_delay)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_REFERENCE);
     }
+
+    if (exemplar->type == (vx_type_e)VX_TYPE_TARGET)
+        return (vx_delay)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_TYPE);
 
     switch (exemplar->type)
     {
@@ -283,7 +286,6 @@ VX_PUBLIC_API vx_delay vxCreateDelay(vx_context context, vx_reference exemplar, 
         case VX_TYPE_GRAPH:
         case VX_TYPE_NODE:
         case VX_TYPE_KERNEL:
-        case VX_TYPE_TARGET:
         case VX_TYPE_PARAMETER:
         case VX_TYPE_REFERENCE:
         case VX_TYPE_DELAY:
@@ -297,12 +299,12 @@ VX_PUBLIC_API vx_delay vxCreateDelay(vx_context context, vx_reference exemplar, 
     return vxoDelay_Create(context, exemplar, count);
 }
 
-VX_PUBLIC_API vx_status vxReleaseDelay(vx_delay *delay)
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseDelay(vx_delay *delay)
 {
     return vxoReference_Release((vx_reference_ptr)delay, VX_TYPE_DELAY, VX_REF_EXTERNAL);
 }
 
-VX_PUBLIC_API vx_reference vxGetReferenceFromDelay(vx_delay delay, vx_int32 index)
+VX_API_ENTRY vx_reference VX_API_CALL vxGetReferenceFromDelay(vx_delay delay, vx_int32 index)
 {
     if (!vxoReference_IsValidAndSpecific((vx_reference)delay, VX_TYPE_DELAY)) return VX_NULL;
 
@@ -311,7 +313,7 @@ VX_PUBLIC_API vx_reference vxGetReferenceFromDelay(vx_delay delay, vx_int32 inde
     return delay->refTable[(delay->index + abs(index)) % (vx_int32)delay->count];
 }
 
-VX_PUBLIC_API vx_status vxQueryDelay(vx_delay delay, vx_enum attribute, void *ptr, vx_size size)
+VX_API_ENTRY vx_status VX_API_CALL vxQueryDelay(vx_delay delay, vx_enum attribute, void *ptr, vx_size size)
 {
     if (!vxoReference_IsValidAndSpecific((vx_reference)delay, VX_TYPE_DELAY)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -323,10 +325,10 @@ VX_PUBLIC_API vx_status vxQueryDelay(vx_delay delay, vx_enum attribute, void *pt
             *(vx_enum *)ptr = delay->type;
             break;
 
-        case VX_DELAY_ATTRIBUTE_COUNT:
-            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
+        case VX_DELAY_ATTRIBUTE_SLOTS:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
-            *(vx_uint32 *)ptr = (vx_uint32)delay->count;
+            *(vx_size *)ptr = delay->count;
             break;
 
         default:
@@ -337,7 +339,7 @@ VX_PUBLIC_API vx_status vxQueryDelay(vx_delay delay, vx_enum attribute, void *pt
     return VX_SUCCESS;
 }
 
-VX_PUBLIC_API vx_status vxAgeDelay(vx_delay delay)
+VX_API_ENTRY vx_status VX_API_CALL vxAgeDelay(vx_delay delay)
 {
     vx_uint32 index, refIndex;
 
@@ -379,4 +381,5 @@ VX_PUBLIC_API vx_status vxAgeDelay(vx_delay delay)
 
     return VX_SUCCESS;
 }
+
 

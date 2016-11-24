@@ -157,11 +157,7 @@ static gceSTATUS _CreateFrameBuffer(
         glsCONTEXT_PTR shared;
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (Context->shared != gcvNULL) ? Context->shared : Context;
-#else
         shared = Context;
-#endif
 
         /* Attempt to allocate a new buffer. */
         gcmERR_BREAK(glfCreateNamedObject(
@@ -616,6 +612,8 @@ gceSTATUS glfUpdateFrameBuffer(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctBOOL yInverted = gcvFALSE;
+    gcsSURF_VIEW drawView = {gcvNULL, 0, 1};
+    gcsSURF_VIEW dsView = {gcvNULL, 0, 1};
 
     gcmHEADER_ARG("Context=0x%x", Context);
 
@@ -643,8 +641,12 @@ gceSTATUS glfUpdateFrameBuffer(
             {
                 yInverted = (gcoSURF_QueryFlags(Context->depth, gcvSURF_FLAG_CONTENT_YINVERTED) == gcvSTATUS_TRUE);
             }
-            gcmONERROR(gco3D_SetTarget(Context->hw, 0, Context->draw, 0, 0));
-            gcmONERROR(gco3D_SetDepth(Context->hw, Context->depth, 0));
+
+            drawView.surf = Context->draw;
+            dsView.surf = Context->depth;
+
+            gcmONERROR(gco3D_SetTarget(Context->hw, 0, &drawView, 0));
+            gcmONERROR(gco3D_SetDepth(Context->hw, &dsView));
 
             gcmONERROR(gcoSURF_GetSamples(Context->draw, &Context->drawSamples));
 
@@ -655,8 +657,6 @@ gceSTATUS glfUpdateFrameBuffer(
         }
         else
         {
-            gcoSURF color, depth;
-
             if (glfIsFramebufferComplete(Context) != GL_FRAMEBUFFER_COMPLETE_OES)
             {
                 glmERROR(GL_INVALID_FRAMEBUFFER_OPERATION_OES);
@@ -666,27 +666,27 @@ gceSTATUS glfUpdateFrameBuffer(
             Context->frameBuffer->dirty = GL_FALSE;
 
             /* Get color surface. */
-            color = glfGetFramebufferSurface(&Context->frameBuffer->color);
+            drawView.surf = glfGetFramebufferSurface(&Context->frameBuffer->color);
 
             /* Get depth surface. */
-            depth = glfGetFramebufferSurface(&Context->frameBuffer->depth);
+            dsView.surf = glfGetFramebufferSurface(&Context->frameBuffer->depth);
 
             /* Set the render target. */
-            gcmONERROR(gco3D_SetTarget(Context->hw, 0, color, 0, 0));
+            gcmONERROR(gco3D_SetTarget(Context->hw, 0, &drawView, 0));
 
             /* Set the depth buffer. */
-            gcmONERROR(gco3D_SetDepth(Context->hw, depth, 0));
+            gcmONERROR(gco3D_SetDepth(Context->hw, &dsView));
 
-            if (color != gcvNULL)
+            if (drawView.surf != gcvNULL)
             {
                 gcmONERROR(gcoSURF_GetSize(
-                    color,
+                    drawView.surf,
                     &Context->effectiveWidth, &Context->effectiveHeight,
                     gcvNULL
                     ));
 
                 gcmONERROR(gcoSURF_GetSamples(
-                    color, &Context->drawSamples
+                    drawView.surf, &Context->drawSamples
                     ));
 
                 gcmONERROR(gco3D_SetDepthOnly(
@@ -701,7 +701,7 @@ gceSTATUS glfUpdateFrameBuffer(
             else
             {
                 gcmONERROR(gcoSURF_GetSize(
-                    depth, &Context->effectiveWidth, &Context->effectiveHeight,  gcvNULL
+                    dsView.surf, &Context->effectiveWidth, &Context->effectiveHeight,  gcvNULL
                     ));
 
                 gcmONERROR(gco3D_SetDepthOnly(
@@ -709,10 +709,10 @@ gceSTATUS glfUpdateFrameBuffer(
                     ));
             }
 
-            if (depth != gcvNULL)
+            if (dsView.surf != gcvNULL)
             {
                 gcmONERROR(gcoSURF_GetSamples(
-                    depth, &Context->drawSamples
+                    dsView.surf, &Context->drawSamples
                     ));
 
                 if (Context->frameBuffer->depth.texture)
@@ -844,11 +844,7 @@ GL_API void GL_APIENTRY glDeleteFramebuffersOES(
         glsCONTEXT_PTR shared;
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (context->shared != gcvNULL) ? context->shared : context;
-#else
         shared = context;
-#endif
 
         /* Validate count. */
         if (Count < 0)
@@ -871,7 +867,6 @@ GL_API void GL_APIENTRY glDeleteFramebuffersOES(
         for (i = 0; i < Count; i++)
         {
             glsNAMEDOBJECT_PTR wrapper = glfFindNamedObject(shared->frameBufferList, FrameBuffers[i]);
-            glsFRAME_BUFFER_PTR object = gcvNULL;
 
             if (gcvNULL == wrapper)
             {
@@ -885,26 +880,6 @@ GL_API void GL_APIENTRY glDeleteFramebuffersOES(
                 context->curFrameBufferID    = 0;
                 context->frameBufferChanged  = gcvTRUE;
                 context->stencilStates.dirty = gcvTRUE;
-            }
-
-            /* dereference attached name object */
-            object = wrapper->object;
-            if (object)
-            {
-                if (object->color.texture == gcvFALSE)
-                {
-                    glfDereferenceNamedObject(context, object->color.object);
-                }
-
-                if (object->depth.texture == gcvFALSE)
-                {
-                    glfDereferenceNamedObject(context, object->depth.object);
-                }
-
-                if (object->stencil.texture == gcvFALSE)
-                {
-                    glfDereferenceNamedObject(context, object->stencil.object);
-                }
             }
 
             gcmVERIFY_OK(glfDeleteNamedObject(
@@ -946,11 +921,7 @@ GL_API GLboolean GL_APIENTRY glIsFramebufferOES(
         glsCONTEXT_PTR shared;
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (context->shared != gcvNULL) ? context->shared : context;
-#else
         shared = context;
-#endif
 
         result = glfFindNamedObject(shared->frameBufferList, FrameBuffer)
                ? GL_TRUE
@@ -995,15 +966,12 @@ GL_API void GL_APIENTRY glBindFramebufferOES(
         glsCONTEXT_PTR shared;
         gcsSURF_VIEW surfView = {gcvNULL, 0, 1};
         gcsSURF_VIEW tgtView  = {gcvNULL, 0, 1};
+        gcsSURF_VIEW tmpView = {gcvNULL, 0, 1};
 
         gcmDUMP_API("${ES11 glBindFramebufferOES 0x%08X 0x%08X}", Target, FrameBuffer);
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (context->shared != gcvNULL) ? context->shared : context;
-#else
         shared = context;
-#endif
 
         /* Verify the target. */
         if (Target != GL_FRAMEBUFFER_OES)
@@ -1123,8 +1091,9 @@ GL_API void GL_APIENTRY glBindFramebufferOES(
         {
             if (((glsTEXTUREWRAPPER_PTR) object->color.object)->dirty)
             {
+                tmpView.surf = object->color.surface;
                 gcmERR_BREAK(gcoSURF_DisableTileStatus(
-                    object->color.target, gcvTRUE
+                    &tmpView, gcvTRUE
                     ));
 
                 surfView.surf = object->color.surface;
@@ -1141,8 +1110,9 @@ GL_API void GL_APIENTRY glBindFramebufferOES(
         {
             if (((glsTEXTUREWRAPPER_PTR) object->depth.object)->dirty)
             {
+                tmpView.surf = object->depth.surface;
                 gcmERR_BREAK(gcoSURF_DisableTileStatus(
-                    object->depth.target, gcvTRUE
+                    &tmpView, gcvTRUE
                     ));
 
                 surfView.surf = object->depth.surface;
@@ -1980,12 +1950,6 @@ GL_API void GL_APIENTRY glFramebufferRenderbufferOES(
             }
             context->frameBuffer->color.surface = surface;
 
-            if (context->frameBuffer->color.surface)
-            {
-                /* Reference the surface. */
-                gcoSURF_ReferenceSurface(context->frameBuffer->color.surface);
-            }
-
             if (context->frameBuffer->color.target != gcvNULL &&
                 context->frameBuffer->color.surface != gcvNULL)
             {
@@ -2038,12 +2002,6 @@ GL_API void GL_APIENTRY glFramebufferRenderbufferOES(
                 gcoSURF_Destroy(context->frameBuffer->depth.surface);
             }
             context->frameBuffer->depth.surface = surface;
-
-            if (context->frameBuffer->depth.surface)
-            {
-                /* Reference the surface. */
-                gcoSURF_ReferenceSurface(context->frameBuffer->depth.surface);
-            }
 
             /* Merge the depth and stencil buffers. */
             _MergeDepthAndStencil(context);

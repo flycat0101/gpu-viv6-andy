@@ -80,8 +80,8 @@ GCHAL_CPP_COMPILING_COMMAND= \
 ##########################################################
 # Include board specific setting of macros if existing.
 
-!IF EXIST ($(BUILDROOT)\board_specific_$(_TGTPLAT).inc)
-!  INCLUDE $(BUILDROOT)\board_specific_$(_TGTPLAT).inc
+!IF EXIST ($(BUILDROOT)\cebuild\board_specific_$(_TGTPLAT).inc)
+!  INCLUDE $(BUILDROOT)\cebuild\board_specific_$(_TGTPLAT).inc
 !ENDIF
 
 ##########################################################

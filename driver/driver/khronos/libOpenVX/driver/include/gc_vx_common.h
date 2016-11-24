@@ -58,6 +58,8 @@
 
 #include "gc_vxk_common.h"
 
+#include <gc_vx_profiler.h>
+
 /*
 ** Macro definitions
 */
@@ -126,7 +128,7 @@
 
 
 #define VX_HOST_CORE_COUNT                  1
-
+#define VX_MAX_DEVICES                      4
 
 
 
@@ -258,7 +260,23 @@ enum vx_kernel_internal_e
 
     VX_KERNEL_INTERNAL_EQUALIZE_HISTOGRAM_LUT      = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x18,
 
-    VX_KERNEL_INTERNAL_EXAMPLE                     = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x19,
+    VX_KERNEL_INTERNAL_SGM                         = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x19,
+
+    VX_KERNEL_INTERNAL_SGM_COST                    = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x1A,
+
+    VX_KERNEL_INTERNAL_SGM_PATH90                  = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x1B,
+
+    VX_KERNEL_INTERNAL_SGM_PATH45                  = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x1C,
+
+    VX_KERNEL_INTERNAL_SGM_PATH135                 = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x1D,
+
+    VX_KERNEL_INTERNAL_SGM_PATH0                   = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x1E,
+
+    VX_KERNEL_INTERNAL_SGM_DISP                    = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x1F,
+
+    VX_KERNEL_INTERNAL_LAPLACIAN3x3                = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x20,
+
+    VX_KERNEL_INTERNAL_CENSUS3x3                = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x21,
 };
 
 
@@ -531,6 +549,8 @@ typedef struct _vx_kernel_attribute_s
 
     vx_bool                                 isAllGPU;
 
+    vx_bool                                 isGPUKernel;
+
 #ifdef OPENVX_KHR_TILING
     vx_tile_block_size_t                    tileBlockSize;
 
@@ -670,7 +690,9 @@ typedef struct _vx_kernel
 
     vx_kernel_f                             function;
 
-    vx_kernel_shader                        kernelShader[2];
+    vx_kernel_shader                        *kernelShader;
+    vx_uint32                               kernelShaderCount;
+    vx_char                                 subname[VX_MAX_KERNEL_NAME];
 
     vx_signature_s                          signature;
 
@@ -716,7 +738,7 @@ typedef vx_status (* vx_target_iskernelsupported_f) (
         vx_uint32_ptr indexPtr);
 
 typedef vx_kernel (*vx_target_addkernel_f)          (
-        vx_target target, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration,
+        vx_target target, const vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration,
         vx_program program, vx_kernel_f funcPtr, vx_uint32 paramCount,
         vx_kernel_input_validate_f inputValidator, vx_kernel_output_validate_f outputValidator,
         vx_kernel_initialize_f initializer, vx_kernel_deinitialize_f deinitializer);
@@ -780,6 +802,8 @@ typedef struct _vx_accessor
     vx_bool                                 allocated;
 
     vx_reference                            ref;
+
+    vx_ptr                                  extraDataPtr;
 }
 vx_accessor_s;
 
@@ -825,6 +849,15 @@ typedef struct _vx_context
     vx_border_mode_t                        immediateBorderMode;
 
     vx_evis_no_inst_s                       evisNoInst;
+
+    /* Profiler */
+#if VIVANTE_PROFILER
+    vx_profiler_s                           profiler;
+    gcoHAL                                  phal;
+#endif
+
+    gctPOINTER                              devices[VX_MAX_DEVICES];
+    vx_uint32                               deviceCount;
 }
 vx_context_s;
 
@@ -959,6 +992,8 @@ typedef struct _vx_graph
 
     vx_value_set_s                          data;
 
+    vx_bool                                 isChildGraph;
+
 #if gcdVX_OPTIMIZER
     vx_bool                                 isSubGraph;
     vx_bool                                 optimized;
@@ -968,6 +1003,7 @@ typedef struct _vx_graph
     vx_uint32                               nodeBatchCount;
     vx_node_batch_s                         nodeBatch[VX_MAX_NODE_COUNT];
 #endif
+
 }
 vx_graph_s;
 
@@ -1005,6 +1041,10 @@ typedef struct _vx_memory_s
     vx_uint8_ptr                            logicals[VX_MAX_PLANES];
     vx_uint32                               physicals[VX_MAX_PLANES];
     gcsSURF_NODE_PTR                        nodePtrs[VX_MAX_PLANES];
+
+    gctUINT32                               wrappedNode[VX_MAX_PLANES];
+    gctUINT32                               wrappedSize[VX_MAX_PLANES];
+    gctUINT32                               wrapFlag;
 
     vx_mutex                                writeLocks[VX_MAX_PLANES];
 }
@@ -1116,8 +1156,8 @@ typedef struct _vx_distribution
     vx_uint32                               windowX;
     vx_uint32                               windowY;
 
-    vx_uint32                               offsetX;
-    vx_uint32                               offsetY;
+    vx_int32                                offsetX;
+    vx_int32                                offsetY;
 
     vx_mem_alloc_info_s                     memAllocInfo;
 }
@@ -1281,7 +1321,7 @@ typedef struct _vx_kernel_description_s
 #endif
 
     struct{
-        vx_char*                             source;
+        vx_char*                            source;
     }extension;
 }
 vx_kernel_description_s;
@@ -1318,3 +1358,4 @@ EXTERN_C_BEGIN
 EXTERN_C_END
 
 #endif /* __GC_VX_COMMON_H__ */
+

@@ -11,6 +11,9 @@
 *****************************************************************************/
 
 
+#ifndef __gc_hal_user_math_h_
+#define __gc_hal_user_math_h_
+
 #include <math.h>
 
 #define gcoMATH_ModuloInt(X, Y)  (gctINT)((X) % (Y))
@@ -64,4 +67,25 @@
 #define gcoMATH_MIN(X, Y) (((X) < (Y))?(X):(Y))
 #define gcoMATH_MAX(X, Y) (((X) > (Y))?(X):(Y))
 
+static gcmINLINE gctUINT gcoMath_Float2UINT_STICKROUNDING(IN gctFLOAT Value)
+{
+    gctUINT ret = 0;
+    gctFLOAT dp = 0.0f;
 
+    if (Value < 0.0f)
+    {
+        return 0;
+    }
+
+    ret = (gctUINT)(Value);
+    dp = Value - (gctFLOAT)ret;
+
+    if ((dp == 0.5f && (ret & 0x1u)) || dp > 0.5f)
+    {
+        ret++;
+    }
+
+    return ret;
+}
+
+#endif

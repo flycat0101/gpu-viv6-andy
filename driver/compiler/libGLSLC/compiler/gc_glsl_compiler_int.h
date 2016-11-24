@@ -16,34 +16,31 @@
 
 #include "gc_glsl_compiler.h"
 #include "gc_glsl_preprocessor.h"
+#include "gc_glsl_ir.h"
+
+#include "debug/gc_vsc_debug.h"
+
+#define __USE_VSC_MP__              0
+#define __ENABLE_VSC_MP_POOL__      (gcvTRUE)
+#define __VSC_GENERAL_MP_SIZE__     (512 * 1024)
+#define __VSC_PRIVATE_SIZE__        (32 * 1024)
 
 /* Debug macros */
 /*#define SL_SCAN_ONLY*/
 /*#define SL_SCAN_NO_ACTION*/
 /*#define SL_SCAN_NO_PREPROCESSOR*/
 
-typedef    gctUINT            gctLABEL;
-
 struct _sloIR_LABEL;
 struct _slsNAME;
 
 gceSTATUS
-sloCOMPILER_Lock(
-    IN sloCOMPILER Compiler
-    );
-
-gceSTATUS
-sloCOMPILER_Unlock(
-    IN sloCOMPILER Compiler
-    );
-
-gceSTATUS
 sloCOMPILER_EmptyMemoryPool(
-    IN sloCOMPILER Compiler
+    IN sloCOMPILER Compiler,
+    IN gctBOOL     IsGeneralMemoryPool
     );
 
 gceSTATUS
-    sloCOMPILER_SetUnspecifiedOutputLocationExist(
+sloCOMPILER_SetUnspecifiedOutputLocationExist(
     IN sloCOMPILER Compiler
     );
 
@@ -188,25 +185,9 @@ typedef struct _slsSHARED_VARIABLE
 }
 slsSHARED_VARIABLE;
 
-sloPREPROCESSOR
-sloCOMPILER_GetPreprocessor(
-    IN sloCOMPILER Compiler
-    );
-
-sloCODE_EMITTER
-sloCOMPILER_GetCodeEmitter(
-    IN sloCOMPILER Compiler
-    );
-
-sloCODE_GENERATOR
-sloCOMPILER_GetCodeGenerator(
-    IN sloCOMPILER Compiler
-    );
-
 gctBOOL
-sloCOMPILER_OptimizationEnabled(
-    IN sloCOMPILER Compiler,
-    IN sleOPTIMIZATION_OPTION OptimizationOption
+sloCOMPILER_ExpandNorm(
+    IN sloCOMPILER Compiler
     );
 
 gctBOOL
@@ -266,9 +247,9 @@ slReport(
     );
 
 gceSTATUS
-sloCOMPILER_LoadingBuiltIns(
+sloCOMPILER_BuiltinFuncEnabled(
     IN sloCOMPILER Compiler,
-    IN gctBOOL LoadingBuiltIns
+    IN gctSTRING Symbol
     );
 
 gceSTATUS
@@ -289,19 +270,93 @@ sloCOMPILER_DumpIR(
     );
 
 gceSTATUS
+sloCOMPILER_CheckExtensions(
+    IN sloCOMPILER Compiler
+    );
+
+gceSTATUS
 sloCOMPILER_SetLayout(
     IN sloCOMPILER Compiler
     );
 
-gceSTATUS
-sloCOMPILER_SetNotStagesRelatedLinkError(
-    IN sloCOMPILER Compiler,
-    IN gceSTATUS   NotStagesRelatedLinkError
-    );
+/* sloCOMPILER object. */
+struct _sloCOMPILER
+{
+    slsOBJECT                   object;
+#if __USE_VSC_MP__
+    VSC_PRIMARY_MEM_POOL        generalPMP;
+    VSC_PRIMARY_MEM_POOL        privatePMP;
+    VSC_PRIMARY_MEM_POOL       *currentPMP;
+#else
+    slsDLINK_LIST               generalMemoryPool;
+    slsDLINK_LIST               privateMemoryPool;
+#endif
+    gcePATCH_ID                 patchId;
+    gctUINT                     langVersion;
+    gceAPI                      clientApiVersion;
+    sleSHADER_TYPE              shaderType;
+    gcSHADER                    binary;
+    gctSTRING                   log;
+    gctUINT                     logBufSize;
+    gctBOOL                     createDefaultUBO;
+    struct
+    {
+        /* general variables. */
+        slsNAME_SPACE *         generalBuiltinSpace;
+        slsHASH_TABLE           generalStringPool;
+        /* private variables. */
+        gctUINT16               errorCount;
+        gctUINT16               warnCount;
+        slsHASH_TABLE           privateStringPool;
+        sltOPTIMIZATION_OPTIONS optimizationOptions;
+        sltEXTENSIONS           extensions;
+        sltDUMP_OPTIONS         dumpOptions;
+        gctUINT16               dumpOffset;
+        sleSCANNER_STATE        scannerState;
+        slsSLINK_LIST           switchScope;
+        gctUINT                 stringCount;
+        gctCONST_STRING *       strings;
+        gctUINT                 currentLineNo;
+        gctUINT                 currentStringNo;
+        gctUINT                 currentCharNo;
+        slsNAME_SPACE *         unnamedSpace;
+        slsNAME_SPACE *         builtinSpace;
+        slsNAME_SPACE *         globalSpace;
+        slsNAME_SPACE *         auxGlobalSpace;
+        slsNAME_SPACE *         currentSpace;
+        slsLAYOUT_QUALIFIER     uniformDefaultLayout;
+        slsLAYOUT_QUALIFIER     bufferDefaultLayout;
+        slsLAYOUT_QUALIFIER     outDefaultLayout;
+        slsLAYOUT_QUALIFIER     inDefaultLayout;
+        sloIR_SET               rootSet;
+        gctUINT                 tempRegCount;
+        gctUINT                 labelCount;
+        gctBOOL                 loadingGeneralBuiltIns;
+        gctBOOL                 loadingBuiltIns;
+        gctBOOL                 mainDefined;
+        gctBOOL                 debug;
+        gctBOOL                 optimize;
+        gctBOOL                 outputInvariant;
+        gctUINT32               outputLocationSettings;
+        gctUINT32               uniformLocationMaxLength;
+        slsSLINK_LIST           layoutOffset;
+        gctINT                  currentIterationCount;
+        struct {
+           slsDLINK_LIST        typeFloat[sldMAX_VECTOR_COMPONENT];
+           slsDLINK_LIST        typeInt[sldMAX_VECTOR_COMPONENT];
+           slsDLINK_LIST        typeUInt[sldMAX_VECTOR_COMPONENT];
+           slsDLINK_LIST        typeBool[sldMAX_VECTOR_COMPONENT];
+        } vecConstants;
+        slsSLINK_LIST           sharedVariables;
+        gceSTATUS               hasNotStagesRelatedLinkError;
+        sleCOMPILER_FLAGS       compilerFlags;
+        VSC_DIContext *         debugInfo;
+    }
+    context;
 
-gceSTATUS
-sloCOMPILER_GetNotStagesRelatedLinkError(
-    IN sloCOMPILER Compiler
-    );
+    sloPREPROCESSOR             preprocessor;
+    sloCODE_EMITTER             codeEmitter;
+    sloCODE_GENERATOR           codeGenerator;
+};
 
 #endif /* __gc_glsl_compiler_int_h_ */

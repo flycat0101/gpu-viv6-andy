@@ -147,7 +147,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->runtime->hal,
         sFormat[frameNo % gcmCOUNTOF(sFormat)],
         gcvLINEAR,
-        gcv2D_TSC_TPC_COMPRESSED,
+        gcv2D_TSC_TPC_COMPRESSED_V10,
         480, 480, &t2d->surf[9]));
 
     gcmONERROR(gco2D_SetGenericTarget(
@@ -410,7 +410,7 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     {
         T2D_SURF_PTR srcImage;
         gcsRECT srect, rect, tmpRect, clipRect;
-        gce2D_TILE_STATUS_CONFIG tileStatus = gcv2D_TSC_TPC_COMPRESSED;
+        gce2D_TILE_STATUS_CONFIG tileStatus = gcv2D_TSC_TPC_COMPRESSED_V10;
 
         gcmONERROR(GalLoadFileToTSurf(
             sourceARGBfile[i], &srcImage));

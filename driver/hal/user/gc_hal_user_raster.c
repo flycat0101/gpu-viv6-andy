@@ -261,6 +261,8 @@ static gceSTATUS _CheckSurface(
     case gcvTILED_64X4:
     case gcvTILED_8X8_XMAJOR:
     case gcvTILED_8X8_YMAJOR:
+    case gcvSUPERTILED_128B:
+    case gcvSUPERTILED_256B:
         if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) != gcvTRUE)
         {
             return gcvSTATUS_NOT_SUPPORTED;
@@ -377,6 +379,18 @@ static gceSTATUS _CheckSurface(
                     }
                 }
             }
+            else if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE)
+            {
+                if (Format == gcvSURF_NV12 || Format == gcvSURF_P010)
+                {
+                    if (((Address[0] | Address[1]) & 255) ||
+                        (( Stride[0] |  Stride[1]) &  15) ||
+                        (Width & 15))
+                    {
+                        return gcvSTATUS_NOT_ALIGNED;
+                    }
+                }
+            }
 
             if (((Address[0] | Address[1]) & 63)
                 || ((Stride[0] | Stride[1]) & 7))
@@ -395,12 +409,30 @@ static gceSTATUS _CheckSurface(
             if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TPCV11_COMPRESSION) == gcvTRUE)
             {
                 if (((Address[0] + Address[1]) % 320) ||
-                    ((Stride[0] + Stride[1]) % 320)   ||
-                    (Width & 255))
+                    ((Stride[0] + Stride[1]) % 320))
+                {
+                    return gcvSTATUS_NOT_ALIGNED;
+                }
+
+                if (Width & 255)
                 {
                     return gcvSTATUS_NOT_ALIGNED;
                 }
             }
+            else if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE)
+            {
+                if (((Address[0] + Address[1]) % 80) ||
+                    ((Stride[0] + Stride[1]) % 80))
+                {
+                    return gcvSTATUS_NOT_ALIGNED;
+                }
+
+                if (Width & 7)
+                {
+                    return gcvSTATUS_NOT_ALIGNED;
+                }
+            }
+            break;
 
         case gcvSURF_NV16_10BIT:
         case gcvSURF_NV61_10BIT:
@@ -5815,6 +5847,7 @@ gco2D_ProfileEngine(
     gcmVERIFY_OBJECT(Engine, gcvOBJ_2D);
 
     /* Read all 2D profile registers. */
+    iface.ignoreTLS = gcvFALSE;
     iface.command = gcvHAL_PROFILE_REGISTERS_2D;
     iface.u.RegisterProfileData2D.hwProfile2D = gcmPTR_TO_UINT64(Profile);
 
@@ -6413,6 +6446,20 @@ gco2D_MultiSourceBlit(
                 }
                 break;
 
+            case gcvTILED_4X8:
+            case gcvTILED_8X4:
+            case gcvTILED_8X8_XMAJOR:
+            case gcvTILED_8X8_YMAJOR:
+            case gcvTILED_32X4:
+            case gcvTILED_64X4:
+            case gcvSUPERTILED_128B:
+            case gcvSUPERTILED_256B:
+                if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC400_COMPRESSION) != gcvTRUE)
+                {
+                    return gcvSTATUS_NOT_SUPPORTED;
+                }
+                break;
+
             /*Fall through*/
 
             default:
@@ -6621,8 +6668,7 @@ gco2D_SetSourceTileStatus(
     }
     else if (TileStatusConfig & gcv2D_TSC_DEC_COMPRESSED)
     {
-        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC_COMPRESSION) != gcvTRUE &&
-            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_2D_FC_SOURCE) != gcvTRUE)
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_DEC_COMPRESSION) != gcvTRUE)
         {
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }

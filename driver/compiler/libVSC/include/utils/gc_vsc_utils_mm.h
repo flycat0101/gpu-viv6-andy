@@ -112,8 +112,9 @@ struct _VSC_PRIMARY_MEM_POOL
 {
     struct
     {
-        gctUINT32                  bPooling : 1; /* Are we pooling? */
-        gctUINT32                  reserved : 31;
+        gctUINT32                  bPooling     : 1; /* Are we pooling? */
+        gctUINT32                  bInitialized : 1; /* Is PMP initialized? */
+        gctUINT32                  reserved     : 30;
     } flags;
 
     VSC_MEMORY_MANAGEMENT_PARAM    mmParam;
@@ -171,6 +172,9 @@ void  vscPMP_PrintStatistics(VSC_PRIMARY_MEM_POOL* pPMP);
 
 gctUINT vscPMP_GetLowLimitOfChunkSize(VSC_PRIMARY_MEM_POOL* pPMP);
 
+/* Check whether PMP has been initialized, if yes, we can do allocation/deallocation now */
+gctBOOL vscPMP_IsInitialized(VSC_PRIMARY_MEM_POOL* pPMP);
+
 /*
  * Buddy memory system definition
  */
@@ -217,6 +221,12 @@ typedef struct _VSC_BUDDY_MEM_HUGE_ALLOC_IN_PMP
 
 struct _VSC_BUDDY_MEM_SYS
 {
+    struct
+    {
+        gctUINT32                  bInitialized : 1; /* Is PMP initialized? */
+        gctUINT32                  reserved     : 31;
+    } flags;
+
     /* Underlying memory pool */
     VSC_PRIMARY_MEM_POOL*     pPriMemPool;
 
@@ -266,6 +276,9 @@ void  vscBMS_Finalize(VSC_BUDDY_MEM_SYS* pBMS, gctBOOL bDeleteHugeUnderlyingMem)
 /* Print statistics info for user's debug */
 void  vscBMS_PrintStatistics(VSC_BUDDY_MEM_SYS* pBMS);
 
+/* Check whether BMS has been initialized, if yes, we can do allocation/deallocation now */
+gctBOOL vscBMS_IsInitialized(VSC_BUDDY_MEM_SYS* pBMS);
+
 /*
  * Arena memory system definition
  */
@@ -282,6 +295,12 @@ typedef struct _VSC_ARENA_MEM_CHUNK
 
 struct _VSC_ARENA_MEM_SYS
 {
+    struct
+    {
+        gctUINT32                  bInitialized : 1; /* Is PMP initialized? */
+        gctUINT32                  reserved     : 31;
+    } flags;
+
     /* Underlying memory pool */
     VSC_BUDDY_MEM_SYS*        pBuddyMemSys;
 
@@ -319,6 +338,9 @@ void  vscAMS_Finalize(VSC_ARENA_MEM_SYS* pAMS);
 
 /* Print statistics info for user's debug */
 void  vscAMS_PrintStatistics(VSC_ARENA_MEM_SYS* pAMS);
+
+/* Check whether AMS has been initialized, if yes, we can do allocation/deallocation now */
+gctBOOL vscAMS_IsInitialized(VSC_ARENA_MEM_SYS* pAMS);
 
 END_EXTERN_C()
 

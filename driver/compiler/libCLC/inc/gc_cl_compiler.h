@@ -18,6 +18,7 @@
 #define clmDUMP_OPTIONS        ((cltDUMP_OPTIONS)clvDUMP_NONE)
 
 #include "gc_cl_common.h"
+#include "debug/gc_vsc_debug.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -359,6 +360,13 @@ cloCOMPILER_Dump(
     IN cleDUMP_OPTION DumpOption,
     IN gctCONST_STRING Message,
     IN ...
+    );
+
+gceSTATUS
+cloCOMPILER_DumpDIE(
+    IN cloCOMPILER Compiler,
+    IN cleDUMP_OPTION DumpOption,
+    IN gctUINT16 id
     );
 
 /* Allocate pool string */

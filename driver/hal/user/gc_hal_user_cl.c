@@ -201,6 +201,8 @@ gcoCL_InitializeHardware()
     /* Set the hardware type. */
     gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
+    gcmONERROR(gcoHARDWARE_SetMultiGPUMode(gcvNULL, gcvMULTI_GPU_MODE_INDEPENDENT));
+
     /* Switch to the 3D pipe. */
     gcmONERROR(gcoHARDWARE_SelectPipe(gcvNULL, gcvPIPE_3D, gcvNULL));
 
@@ -513,7 +515,7 @@ gcoCL_FlushMemory(
     /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("Node=0x%x Logical=0x%x Bytes=%u",
+    gcmHEADER_ARG("Node=0x%x Logical=0x%x Bytes=%zu",
                   Node, Logical, Bytes);
 
     /*gcmSWITCHHARDWARE();*/
@@ -571,7 +573,7 @@ gcoCL_InvalidateMemoryCache(
     /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status = gcvSTATUS_OK;
 
-    gcmHEADER_ARG("Node=0x%x Logical=0x%x Bytes=%u",
+    gcmHEADER_ARG("Node=0x%x Logical=0x%x Bytes=%zu",
                   Node, Logical, Bytes);
 
     /*gcmSWITCHHARDWARE();*/
@@ -947,7 +949,6 @@ gcoCL_CreateTexture(
 
     /*gcmSWITCHHARDWARE();*/
 
-    gcoCL_SetHardware();
     gcmASSERT(gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_LINEAR));
 
     /* Try to map host memory first. */
@@ -989,6 +990,11 @@ gcoCL_CreateTexture(
                                      Width,
                                      Height,
                                      Depth));
+
+                if(Slice != 0)
+                {
+                    surface->sliceSize = Slice;
+                }
 
                 gcoSURF_Lock(surface, gcvNULL, gcvNULL);
             } while (gcvFALSE);
@@ -1490,12 +1496,14 @@ gcoCL_QueryDeviceCount(
     OUT gctUINT32 * Count
     )
 {
+    gctUINT chipIDs[32];
+
     gcmHEADER();
 
     /* Verify the arguments. */
     gcmDEBUG_VERIFY_ARGUMENT(Count != gcvNULL);
 
-    gcoHAL_Query3DCoreCount(gcvNULL, Count);
+    gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D, Count, chipIDs);
 
     gcmFOOTER_ARG("*Count=%d", *Count);
     return gcvSTATUS_OK;
@@ -1506,14 +1514,11 @@ gcoCL_SelectDevice(
     IN gctUINT32    DeviceId
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("DeviceId=%d", DeviceId);
 
-    /*gcmSWITCHHARDWARE();*/
-
-    /*gcmRESTOREHARDWARE();*/
+    status = gcoHAL_SetCoreIndex(gcvNULL, DeviceId);
 
     gcmFOOTER();
     return status;
@@ -1822,7 +1827,7 @@ gcoCL_LoadKernel(
     /*gcmSWITCHHARDWAREVAR*/
     gceSTATUS status;
 
-    gcmHEADER_ARG("StateBufferSize=%d StateBuffer=0x%x Hints=0x%x",
+    gcmHEADER_ARG("StateBufferSize=%zu StateBuffer=0x%x Hints=0x%x",
                   StateBufferSize, StateBuffer, Hints);
 
     /*gcmSWITCHHARDWARE();*/
@@ -1865,6 +1870,7 @@ gcoCL_InvokeThreadWalker(
     gceSTATUS status;
     gceAPI currentApi;
 
+
     gcmHEADER_ARG("Info=0x%x", Info);
 
     /* Get Current API. */
@@ -1898,7 +1904,8 @@ gcoCL_InvokeKernel(
     IN size_t              GlobalWorkOffset[3],
     IN size_t              GlobalWorkSize[3],
     IN size_t              LocalWorkSize[3],
-    IN gctUINT             ValueOrder
+    IN gctUINT             ValueOrder,
+    IN gctBOOL             BarrierUsed
     )
 {
     gcsTHREAD_WALKER_INFO   info;
@@ -1941,6 +1948,7 @@ gcoCL_InvokeKernel(
     info.swathSizeY       = 0;
     info.swathSizeZ       = 0;
     info.valueOrder       = ValueOrder;
+    info.barrierUsed      = BarrierUsed;
 
     gcmONERROR(gcoCL_InvokeThreadWalker(&info));
 
@@ -1948,5 +1956,15 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
+
+gceSTATUS
+gcoCL_MultiGPUSync(
+    IN gctUINT32 GPUCount,
+    IN gctUINT_PTR ChipIDs
+    )
+{
+    return gcoHARDWARE_MultiGPUSyncV2(gcvNULL, GPUCount, ChipIDs, gcvNULL);
+}
+
 #endif /* gcdENABLE_3D */
 

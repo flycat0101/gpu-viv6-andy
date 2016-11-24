@@ -4189,6 +4189,11 @@ gcoHARDWARE_InitializeFormatArrayTable(
             info->closestRenderFormat = gcvSURF_G8R8;
             info->renderFormat        = 0x1F;
             info->pixelSwizzle        = baseComponents_rgba;
+
+            info = gcmGET_SURF_FORMAT_INFO(gcvSURF_A8);
+            info->closestRenderFormat = gcvSURF_A8;
+            info->renderFormat = 0x10;
+            info->pixelSwizzle = baseComponents_rgba;
         }
     }
     else if ((Hardware->config->chipModel == gcv1000) &&
@@ -4205,6 +4210,10 @@ gcoHARDWARE_InitializeFormatArrayTable(
         info->renderFormat        = 0x1F;
         info->pixelSwizzle        = baseComponents_rgba;
 
+        info = gcmGET_SURF_FORMAT_INFO(gcvSURF_A8);
+        info->closestRenderFormat = gcvSURF_A8;
+        info->renderFormat = 0x10;
+        info->pixelSwizzle = baseComponents_rgba;
     }
 
     /* ASTC textures */
@@ -4733,6 +4742,10 @@ gcoHARDWARE_QueryBPP(
 
             case gcvSURF_NV12_10BIT:
             case gcvSURF_NV21_10BIT:
+                bpps[0] = 1.25;
+                bpps[1] = 1.25;
+                break;
+
             case gcvSURF_NV16_10BIT:
             case gcvSURF_NV61_10BIT:
                 bpps[0] = 1.25;
@@ -4916,7 +4929,7 @@ gcoHARDWARE_QueryCommandBuffer(
     )
 {
     gceSTATUS status;
-    gctUINT32 mGpuFlushBytes = 0;
+    gctUINT32 gpuFlushBytes = gcdRESERVED_FLUSHCACHE_LENGTH;
     gctUINT32 mGpuSyncBytes = 0;
     gctUINT32 mGpuModeSwitchBytes = 0;
 
@@ -4975,23 +4988,34 @@ gcoHARDWARE_QueryCommandBuffer(
 
     if (Hardware->config->gpuCoreCount > 1)
     {
-        gcoHARDWARE_QueryMultiGPUSyncLength(Hardware, &mGpuSyncBytes);
-        mGpuModeSwitchBytes = (mGpuSyncBytes * 2) + 4 * gcmSIZEOF(gctUINT32);
+        mGpuModeSwitchBytes = 4 * gcmSIZEOF(gctUINT32);
 
-        gcoHARDWARE_QueryMultiGPUCacheFlushLength(Hardware, &mGpuFlushBytes);
+        gcoHARDWARE_QueryMultiGPUSyncLength(Hardware, &mGpuSyncBytes);
+        gcoHARDWARE_QueryMultiGPUCacheFlushLength(Hardware, &gpuFlushBytes);
     }
 
     if (ReservedUser != gcvNULL)
     {
-        *ReservedUser  = (gcdRESERVED_FLUSHCACHE_LENGTH + mGpuFlushBytes + mGpuSyncBytes);
-        *ReservedUser += (gcdRESERVED_HW_FENCE + mGpuModeSwitchBytes - mGpuSyncBytes);
-        *ReservedUser += (gcdRESERVED_PAUSE_OQ_LENGTH + mGpuModeSwitchBytes);
+        *ReservedUser  = (gpuFlushBytes + mGpuSyncBytes);
+        *ReservedUser += (gcdRESERVED_HW_FENCE + mGpuModeSwitchBytes);
+        *ReservedUser += gcdRESERVED_PAUSE_OQ_LENGTH;
 
         if (Hardware->features[gcvFEATURE_HW_TFB])
         {
             *ReservedUser += (gcdRESERVED_PAUSE_XFBWRITTEN_QUERY_LENGTH + mGpuModeSwitchBytes);
             *ReservedUser += (gcdRESERVED_PAUSE_PRIMGEN_QUERY_LENGTH    + mGpuModeSwitchBytes);
             *ReservedUser += (gcdRESERVED_PAUSE_XFB_LENGTH              + mGpuModeSwitchBytes);
+        }
+
+        if (Hardware->features[gcvFEATURE_PROBE])
+        {
+            gctSTRING profilemode = gcvNULL;
+            gcmONERROR(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &profilemode));
+            if (profilemode != gcvNULL &&
+                gcoOS_StrCmp(profilemode, "1") == gcvSTATUS_OK)
+            {
+                *ReservedUser += gcdRESERVED_PAUSE_PROBE_LENGTH;
+            }
         }
     }
 
@@ -6529,6 +6553,8 @@ gcoHARDWARE_QueryTileStatus(
     IN gctUINT Height,
     IN gctSIZE_T Bytes,
     IN gctBOOL edgeAA,
+    IN gctBOOL isMsaa,
+    IN gctINT bpp,
     OUT gctSIZE_T_PTR Size,
     OUT gctUINT_PTR Alignment,
     OUT gctUINT32_PTR Filler
@@ -6538,7 +6564,7 @@ gcoHARDWARE_QueryTileStatus(
     gctUINT width, height;
     gctBOOL is2BitPerTile;
 
-    gcmHEADER_ARG("Hardware=0x%x Width=%d Height=%d Bytes=%d Size=0x%x "
+    gcmHEADER_ARG("Hardware=0x%x Width=%d Height=%d Bytes=%zu Size=0x%x "
                   "Alignment=0x%x Filler=0x%x",
                   Hardware, Width, Height, Bytes, Size, Alignment, Filler);
 
@@ -6570,18 +6596,23 @@ gcoHARDWARE_QueryTileStatus(
     }
     else if (Hardware->features[gcvFEATURE_128BTILE])
     {
-        gctUINT alignment = Hardware->features[gcvFEATURE_BLT_ENGINE] ? 1 :
-                              (Hardware->resolveAlignmentX *
-                               Hardware->resolveAlignmentY * 4);
+        gctUINT alignment = (Hardware->features[gcvFEATURE_BLT_ENGINE] ? 1 :
+                              (Hardware->resolveAlignmentX * Hardware->resolveAlignmentY)) * 4;
 
         /* Assume 128B cache mode, every 128B->4bit */
-        *Size = gcmALIGN (Bytes >> 8, alignment);
+        if (DEFAULT_CACHE_MODE == gcvCACHE_128)
+        {
+            *Size = gcmALIGN (Bytes >> 8, alignment);
+        }
+        else if (DEFAULT_CACHE_MODE == gcvCACHE_256)
+        {
+            *Size = gcmALIGN (Bytes >> 9, alignment);
+        }
     }
     else
     {
-        gctUINT32 alignment = Hardware->resolveAlignmentX *
-                              Hardware->resolveAlignmentY *
-                              4;
+        gctUINT32 alignment = (Hardware->features[gcvFEATURE_BLT_ENGINE] ? 1 :
+                                (Hardware->resolveAlignmentX * Hardware->resolveAlignmentY)) * 4;
 
         if ((Width == 0) && (Height == 0))
         {
@@ -6591,6 +6622,15 @@ gcoHARDWARE_QueryTileStatus(
         {
             /* Return the linear size. */
             *Size = is2BitPerTile ? (Bytes >> 8) : (Bytes >> 7);
+        }
+
+        if (isMsaa)
+        {
+            if (Hardware->features[gcvFEATURE_FAST_MSAA] || Hardware->features[gcvFEATURE_SMALL_MSAA])
+            {
+                gcmASSERT(is2BitPerTile);
+                *Size = *Size >> 2;
+            }
         }
 
         /* Align the tile status. */
@@ -6605,8 +6645,9 @@ gcoHARDWARE_QueryTileStatus(
 
     if (Filler != gcvNULL)
     {
-        *Filler = (edgeAA || ((Hardware->config->chipModel == gcv500)
-                                && (Hardware->config->chipRevision > 2))
+        *Filler = ((Hardware->features[gcvFEATURE_COMPRESSION_DEC400]) ||
+                    edgeAA ||
+                    ((Hardware->config->chipModel == gcv500) && (Hardware->config->chipRevision > 2))
                   )
                   ? 0xFFFFFFFF
                   : is2BitPerTile ? 0x55555555

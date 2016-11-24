@@ -16,10 +16,13 @@
 
 #include "gc_vsc.h"
 
+#define VIR_DUMP_OPNDIDX       0
+
 struct _VIR_DUMPER
 {
     VSC_DUMPER      baseDumper;
     VIR_Shader *    Shader;
+    gctBOOL         dumpOperandId;
 };
 
 #define VIR_LOG(pVirDumper, ...)    vscDumper_PrintStrSafe(&(pVirDumper)->baseDumper, __VA_ARGS__)
@@ -42,6 +45,14 @@ VSC_ErrCode
 VIR_BasicBlock_Dump(
     IN OUT VIR_Dumper  *Dumper,
     IN VIR_BASIC_BLOCK *Bb,
+    IN gctBOOL          Indent
+    );
+
+VSC_ErrCode
+VIR_BasicBlock_DumpRange(
+    IN OUT VIR_Dumper  *Dumper,
+    IN VIR_BASIC_BLOCK *BbStart,
+    IN VIR_BASIC_BLOCK *BbEnd,
     IN gctBOOL          Indent
     );
 
@@ -80,6 +91,12 @@ VSC_ErrCode
 VIR_UniformBlock_Dump(
     IN OUT VIR_Dumper       *Dumper,
     IN     VIR_UniformBlock *UniformBlock
+    );
+
+VSC_ErrCode
+VIR_StorageBlock_Dump(
+    IN OUT VIR_Dumper       *Dumper,
+    IN     VIR_StorageBlock *StorageBlock
     );
 
 VSC_ErrCode

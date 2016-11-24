@@ -52,7 +52,7 @@ typedef struct VIR_INLINER
     VIR_Shader                  *pShader;
     VIR_Dumper                  *pDumper;
     VSC_OPTN_ILOptions          *pOptions;
-    VSC_PRIMARY_MEM_POOL        pmp;
+    VSC_MM                      *pMM;
     VSC_HW_CONFIG               *pHwCfg;
     VIR_CALL_GRAPH              *pCG;
     VSC_HASH_TABLE              *pCandidates; /* inline candidate */
@@ -68,8 +68,7 @@ typedef struct VIR_INLINER
 #define VSC_IL_SetDumper(inliner, d)       ((inliner)->pDumper = (d))
 #define VSC_IL_GetOptions(inliner)         ((inliner)->pOptions)
 #define VSC_IL_SetOptions(inliner, o)      ((inliner)->pOptions = (o))
-#define VSC_IL_GetPmp(inliner)             (&((inliner)->pmp))
-#define VSC_IL_GetMM(inliner)              (&((inliner)->pmp.mmWrapper))
+#define VSC_IL_GetMM(inliner)              ((inliner)->pMM)
 #define VSC_IL_GetHwCfg(inliner)           ((inliner)->pHwCfg)
 #define VSC_IL_SetHwCfg(inliner, hc)       ((inliner)->pHwCfg = (hc))
 #define VSC_IL_GetCallGraph(inliner)       ((inliner)->pCG)
@@ -78,20 +77,9 @@ typedef struct VIR_INLINER
 #define VSC_IL_GetInlineBudget(inliner)     ((inliner)->inlineBudget)
 #define VSC_IL_SetInlineBudget(inliner, bg) ((inliner)->inlineBudget = (bg))
 
-
-extern void VSC_IL_Init(
-    VIR_Inliner         *pInliner,
-    VIR_Shader          *pShader,
-    VSC_HW_CONFIG       *pHwCfg,
-    VSC_OPTN_ILOptions  *pOptions,
-    VIR_Dumper          *pDumper,
-    VIR_CALL_GRAPH      *pCG);
-
-extern void VSC_IL_Final(
-    VIR_Inliner           *pInliner);
-
 extern VSC_ErrCode VSC_IL_PerformOnShader(
-    VIR_Inliner           *pInliner);
+    VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(VSC_IL_PerformOnShader);
 
 END_EXTERN_C()
 

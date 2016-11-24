@@ -21,7 +21,7 @@ gceTRACEMODE veglTraceMode = gcvTRACEMODE_NONE;
 static gctBOOL enableSwapWorker = gcvTRUE;
 
 #if gcdGC355_PROFILER
-gctUINT64 AppstartTimeusec = 0;
+gctUINT64 _AppstartTimeusec;
 #endif
 
 static struct EGL_CONFIG_COLOR eglConfigColor[] =
@@ -49,104 +49,154 @@ static struct EGL_CONFIG_DEPTH eglConfigDepth[] =
     {  0, 8 },  /* S8 || X24S8*/
 };
 
-static const char extension[] =
-    "EGL_KHR_fence_sync"
-    " "
-    "EGL_KHR_reusable_sync"
-    " "
-    "EGL_KHR_wait_sync"
-    " "
-    "EGL_KHR_image"
-    " "
-    "EGL_KHR_image_base"
-    " "
-    "EGL_KHR_image_pixmap"
-    " "
-    "EGL_KHR_gl_texture_2D_image"
-    " "
-    "EGL_KHR_gl_texture_cubemap_image"
-    " "
-    "EGL_KHR_gl_renderbuffer_image"
-#if defined(LINUX)
-    " "
-    "EGL_EXT_image_dma_buf_import"
-    " "
-    "EGL_EXT_platform_base"
-    " "
-    "EGL_EXT_client_extensions"
+static struct eglExtension extensions[] =
+{
+    {"EGL_KHR_fence_sync",                      EGL_TRUE },
+    {"EGL_KHR_reusable_sync",                   EGL_TRUE },
+    {"EGL_KHR_wait_sync",                       EGL_TRUE },
+    {"EGL_KHR_image",                           EGL_TRUE },
+    {"EGL_KHR_image_base",                      EGL_TRUE },
+    {"EGL_KHR_image_pixmap",                    EGL_TRUE },
+    {"EGL_KHR_gl_texture_2D_image",             EGL_TRUE },
+    {"EGL_KHR_gl_texture_cubemap_image",        EGL_TRUE },
+    {"EGL_KHR_gl_renderbuffer_image",           EGL_TRUE },
+    {"EGL_EXT_image_dma_buf_import",            EGL_FALSE},
+    {"EGL_EXT_client_extensions",               EGL_FALSE},
+    {"EGL_KHR_lock_surface",                    EGL_TRUE },
+    {"EGL_KHR_create_context",                  EGL_TRUE },
+    {"EGL_KHR_surfaceless_context",             EGL_TRUE },
+    {"EGL_EXT_create_context_robustness",       EGL_TRUE },
+    {"EGL_EXT_protected_surface",               EGL_FALSE},
+    {"EGL_EXT_protected_content",               EGL_FALSE},
+    {"EGL_EXT_buffer_age",                      EGL_FALSE},
+    {"EGL_ANDROID_image_native_buffer",         EGL_FALSE},
+    {"EGL_ANDROID_swap_rectangle",              EGL_FALSE},
+    {"EGL_ANDROID_blob_cache",                  EGL_FALSE},
+    {"EGL_ANDROID_recordable",                  EGL_FALSE},
+    {"EGL_ANDROID_native_fence_sync",           EGL_FALSE},
+    {"EGL_WL_bind_wayland_display",             EGL_FALSE},
+    {"EGL_WL_create_wayland_buffer_from_image", EGL_FALSE},
+    {gcvNULL,                                   EGL_FALSE},
+};
+
+static void
+_GenExtension(
+    VEGLThreadData Thread
+    )
+{
+    char * str;
+    gctSIZE_T len = 0;
+    struct eglExtension * ext;
+
+#if defined(__linux__)
+    extensions[VEGL_EXTID_EXT_image_dma_buf_import].enabled = EGL_TRUE;
+    extensions[VEGL_EXTID_EXT_client_extensions].enabled    = EGL_TRUE;
 #endif
-    " "
-    "EGL_KHR_lock_surface"
-    " "
-    "EGL_KHR_create_context"
-    " "
-    "EGL_KHR_surfaceless_context"
-    " "
-    "EGL_EXT_create_context_robustness"
-    " "
-    "EGL_EXT_protected_surface"
+
 #if defined(ANDROID)
-    " "
-    "EGL_EXT_buffer_age"
-    " "
-    "EGL_ANDROID_image_native_buffer"
-    " "
-    "EGL_ANDROID_swap_rectangle"
-    " "
-    "EGL_ANDROID_blob_cache"
-    " "
-    "EGL_ANDROID_recordable"
+    extensions[VEGL_EXTID_EXT_buffer_age].enabled              = EGL_TRUE;
+    extensions[VEGL_EXTID_ANDROID_image_native_buffer].enabled = EGL_TRUE;
+    extensions[VEGL_EXTID_ANDROID_swap_rectangle].enabled      = EGL_TRUE;
+    extensions[VEGL_EXTID_ANDROID_blob_cache].enabled          = EGL_TRUE;
+    extensions[VEGL_EXTID_ANDROID_recordable].enabled          = EGL_TRUE;
 #if gcdANDROID_NATIVE_FENCE_SYNC
-    " "
-    "EGL_ANDROID_native_fence_sync"
-#   endif
-#endif
-#if defined(WL_EGL_PLATFORM)
-    " "
-    "EGL_WL_bind_wayland_display"
-    " "
-    "EGL_WL_create_wayland_buffer_from_image"
-#endif
-    ;
-
-#undef __CLIENT_EXTENSION_STARTED
-
-/* See EGL SPEC 1.5 or EGL_EXT_client_extensions. */
-static const char clientExtension[] =
-#if defined(ANDROID)
-    "EGL_KHR_platform_android"
-#  define __CLIENT_EXTENSION_STARTED
-#endif
-
-#if defined(WL_EGL_PLATFORM)
-#ifdef __CLIENT_EXTENSION_STARTED
-    " "
+    extensions[VEGL_EXTID_ANDROID_native_fence_sync].enabled   = EGL_TRUE;
 #  endif
+#endif
+
+#if defined(WL_EGL_PLATFORM)
+    extensions[VEGL_EXTID_WL_bind_wayland_display].enabled             = EGL_TRUE;
+    extensions[VEGL_EXTID_WL_create_wayland_buffer_from_image].enabled = EGL_TRUE;
+#endif
+
+    if (Thread->security)
+    {
+        extensions[VEGL_EXTID_EXT_protected_surface].enabled = EGL_TRUE;
+        extensions[VEGL_EXTID_EXT_protected_content].enabled = EGL_TRUE;
+    }
+
+    for (ext = extensions; ext->string; ext++)
+    {
+        if (ext->enabled)
+        {
+            len += gcoOS_StrLen(ext->string, gcvNULL) + 1;
+        }
+    }
+
+    /* One more for the null terminator. */
+    len++;
+
+    /* Modify size if require dynamic extension name. */
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, len, (gctPOINTER *) &str)))
+    {
+        return;
+    }
+
+    str[0] = '\0';
+
+    for (ext = extensions; ext->string; ext++)
+    {
+        if (ext->enabled)
+        {
+            gcoOS_StrCatSafe(str, len, ext->string);
+            gcoOS_StrCatSafe(str, len, " ");
+        }
+    }
+
+    /* Remove the tail space. */
+    str[len - 2] = '\0';
+    Thread->extString = str;
+}
+
+static const char clientExtension[] =
+    "EGL_EXT_platform_base"
+#if defined(ANDROID)
+    " "
+    "EGL_KHR_platform_android"
+#endif
+#if defined(WL_EGL_PLATFORM)
+    " "
     "EGL_KHR_platform_wayland"
     " "
     "EGL_EXT_platform_wayland"
-#  define __CLIENT_EXTENSION_STARTED
 #endif
-
 #if defined(__GBM__)
-#ifdef __CLIENT_EXTENSION_STARTED
     " "
-#  endif
     "EGL_KHR_platform_gbm"
-#  define __CLIENT_EXTENSION_STARTED
 #endif
-
 #if defined(X11)
-#ifdef __CLIENT_EXTENSION_STARTED
     " "
-#  endif
     "EGL_KHR_platform_x11"
     " "
     "EGL_EXT_platform_x11"
-#  define __CLIENT_EXTENSION_STARTED
 #endif
-    ""
     ;
+
+/* See EGL SPEC 1.5 for EGL_EXT_client_extensions. */
+static void
+_GenClientExtension(
+    VEGLThreadData Thread
+    )
+{
+    char * str;
+    const char * src = clientExtension;
+    gctUINT len = sizeof(clientExtension);
+
+    /* Modify size if require dynamic extension name. */
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, len, (gctPOINTER *) &str)))
+    {
+        return;
+    }
+
+    if (clientExtension[0] == ' ')
+    {
+        /* Skipp the heading space. */
+        src += 1;
+    }
+
+    gcoOS_StrCopySafe(str, len, src);
+    Thread->clientExtString = str;
+}
 
 #if defined(_WINDOWS)
 
@@ -357,31 +407,52 @@ _FillIn(
 
 #if gcdENABLE_3D
     {
-    gcePATCH_ID patchId   = gcvPATCH_INVALID;
-
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
-
-    if (patchId == gcvPATCH_GTFES30)
-    {
-        /* Only enable RGBA8888/RGB565 + D24S8 for OpenGL ES3 context to reduce ES3.x CTS running time */
-        if (!((Color->formatFlags & VEGL_8888) == VEGL_8888 ||
-              (Color->formatFlags & VEGL_565) == VEGL_565
-             ) ||
-            !(config->depthSize == 24 && config->stencilSize == 8)
-           )
+        gcePATCH_ID patchId   = gcvPATCH_INVALID;
+        gcoHAL_GetPatchID(gcvNULL, &patchId);
+        if (patchId == gcvPATCH_GTFES30)
         {
-            config->renderableType &= ~EGL_OPENGL_ES3_BIT_KHR;
-            config->conformant     &= ~EGL_OPENGL_ES3_BIT_KHR;
+            gctSTRING env;
+            gctINT enableAllConfig = 1;
+            static gctBOOL printed = gcvFALSE;
+            gcoOS_GetEnv(gcvNULL, "VIV_EGL_ALL_CONFIG", &env);
+            if (env)
+            {
+                gcoOS_StrToInt(env, &enableAllConfig);
+            }
+            if (!enableAllConfig)
+            {
+                if (!printed)
+                {
+                    gcmPRINT("EGL: enable default configs for conformance test");
+                    printed = gcvTRUE;
+                }
+                /* Only enable RGBA8888/RGB565 + D24S8 for ES2/ES3 context to reduce ES CTS running time */
+                if (!((Color->formatFlags & VEGL_8888) == VEGL_8888 ||
+                      (Color->formatFlags & VEGL_565) == VEGL_565
+                     ) ||
+                 !(config->depthSize == 24 && config->stencilSize == 8)
+                )
+                {
+                    config->renderableType &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR);
+                    config->conformant     &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR);
+                }
+            }
+            else if (!printed)
+            {
+                gcmPRINT("EGL: enable all configs for conformance test");
+                printed = gcvTRUE;
+            }
         }
-    }
     }
 #endif
 
+#if gcdENABLE_3D
     if (!(gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI0)))
     {
         config->renderableType &= ~EGL_OPENGL_ES3_BIT_KHR;
         config->conformant     &= ~EGL_OPENGL_ES3_BIT_KHR;
     }
+#endif
 
     config->alphaMaskSize = 8;
 
@@ -594,11 +665,6 @@ veglGetPlatformDisplay(
     gctBOOL releaseDpy = gcvFALSE;
     void * nativeScreen = gcvNULL;
     VEGLPlatform eglPlatform = gcvNULL;
-
-#if gcdGC355_PROFILER
-    gcoOS_GetTime(&AppstartTimeusec);
-    gcoOS_Print("App start at %llu(microsec)", AppstartTimeusec);
-#endif
 
     gcoOS_LockPLS();
     _SetTraceMode();
@@ -834,6 +900,10 @@ veglGetPlatformDisplay(
         display->next = (VEGLDisplay) gcoOS_GetPLSValue(gcePLS_VALUE_EGL_DISPLAY_INFO);
         gcoOS_SetPLSValue(gcePLS_VALUE_EGL_DISPLAY_INFO, (gctPOINTER) display);
 
+#if gcdGC355_PROFILER
+        gcoOS_GetTime(&_AppstartTimeusec);
+        gcoOS_Print("App start at %llu(microsec)", _AppstartTimeusec);
+#endif
     }
 
     /* Success. */
@@ -1777,7 +1847,12 @@ eglQueryString(
         {
         case EGL_EXTENSIONS:
             /* client extensions. */
-            ptr = clientExtension;
+            if (!thread->clientExtString)
+            {
+                _GenClientExtension(thread);
+            }
+
+            ptr = thread->clientExtString;
             break;
 
         case EGL_VERSION:
@@ -1813,11 +1888,31 @@ eglQueryString(
         switch (name)
         {
         case EGL_CLIENT_APIS:
-            ptr = "OpenGL_ES OpenVG";
+            if (thread->dispatchTables[vegl_OPENVG] &&
+                (thread->dispatchTables[vegl_OPENGL_ES11_CL] ||
+                 thread->dispatchTables[vegl_OPENGL_ES11] ||
+                 thread->dispatchTables[vegl_OPENGL_ES20] ||
+                 thread->dispatchTables[vegl_OPENGL_ES30]))
+            {
+                ptr = "OpenGL_ES OpenVG";
+            }
+            else if (thread->dispatchTables[vegl_OPENVG])
+            {
+                ptr = "OpenVG";
+            }
+            else
+            {
+                ptr = "OpenGL_ES";
+            }
             break;
 
         case EGL_EXTENSIONS:
-            ptr = extension;
+            if (!thread->extString)
+            {
+                _GenExtension(thread);
+            }
+
+            ptr = thread->extString;
             break;
 
         case EGL_VENDOR:

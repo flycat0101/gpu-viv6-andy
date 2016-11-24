@@ -37,44 +37,6 @@
 
 ******************************************************************************/
 
-/* VSC_CPF_DF_VECTOR utility functions */
-/* Creation, resize and destroy */
-void vscCPF_DV_Initialize(VSC_CPF_DF_VECTOR* pCPF_DV, VSC_MM* pMM, gctINT dvSize)
-{
-    vscBV_Initialize(&pCPF_DV->hi, pMM, dvSize);
-    vscBV_Initialize(&pCPF_DV->low, pMM, dvSize);
-}
-
-VSC_CPF_DF_VECTOR* vscCPF_DV_Create(VSC_MM* pMM, gctINT dvSize)
-{
-    VSC_CPF_DF_VECTOR*   pCPF_DV = gcvNULL;
-
-    pCPF_DV = (VSC_CPF_DF_VECTOR*)vscMM_Alloc(pMM, sizeof(VSC_CPF_DF_VECTOR));
-
-    vscCPF_DV_Initialize(pCPF_DV, pMM, dvSize);
-
-    return pCPF_DV;
-}
-
-void vscCPF_DV_Destroy(VSC_CPF_DF_VECTOR* pCPF_DV)
-{
-    vscBV_Destroy(&pCPF_DV->hi);
-    vscBV_Destroy(&pCPF_DV->low);
-}
-
-void vscCPF_DV_Finalize(VSC_CPF_DF_VECTOR* pCPF_DV)
-{
-    vscBV_Finalize(&pCPF_DV->hi);
-    vscBV_Finalize(&pCPF_DV->low);
-}
-
-gctUINT vscCPF_DV_BitCount(VSC_CPF_DF_VECTOR* pCPF_DV)
-{
-    gcmASSERT(pCPF_DV->hi.bitCount == pCPF_DV->low.bitCount);
-
-    return (gctUINT) pCPF_DV->hi.bitCount;
-}
-
 /* we need to save const value for each const variable at each block,
    since the variable is changed inside the block (from const -> non-const,
    from value1->value2), we need to save the value coming to the block,
@@ -151,18 +113,33 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_FLOAT_X2:
     case VIR_TYPE_FLOAT_X3:
     case VIR_TYPE_FLOAT_X4:
+    case VIR_TYPE_FLOAT_2X2:
+    case VIR_TYPE_FLOAT_3X3:
+    case VIR_TYPE_FLOAT_4X4:
+    case VIR_TYPE_FLOAT_2X3:
+    case VIR_TYPE_FLOAT_2X4:
+    case VIR_TYPE_FLOAT_3X2:
+    case VIR_TYPE_FLOAT_3X4:
+    case VIR_TYPE_FLOAT_4X2:
+    case VIR_TYPE_FLOAT_4X3:
+    case VIR_TYPE_FLOAT_X8:
+    case VIR_TYPE_FLOAT_X16:
         *toType = VIR_TYPE_FLOAT32;
         break;
     case VIR_TYPE_INT32:
     case VIR_TYPE_INTEGER_X2:
     case VIR_TYPE_INTEGER_X3:
     case VIR_TYPE_INTEGER_X4:
+    case VIR_TYPE_INTEGER_X8:
+    case VIR_TYPE_INTEGER_X16:
         *toType = VIR_TYPE_INT32;
         break;
     case VIR_TYPE_UINT32:
     case VIR_TYPE_UINT_X2:
     case VIR_TYPE_UINT_X3:
     case VIR_TYPE_UINT_X4:
+    case VIR_TYPE_UINT_X8:
+    case VIR_TYPE_UINT_X16:
         *toType = VIR_TYPE_UINT32;
         break;
     case VIR_TYPE_INT16:
@@ -170,6 +147,7 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_INT16_X3:
     case VIR_TYPE_INT16_X4:
     case VIR_TYPE_INT16_X8:
+    case VIR_TYPE_INT16_X16:
         *toType = VIR_TYPE_INT16;
         break;
     case VIR_TYPE_UINT16:
@@ -177,6 +155,7 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_UINT16_X3:
     case VIR_TYPE_UINT16_X4:
     case VIR_TYPE_UINT16_X8:
+    case VIR_TYPE_UINT16_X16:
         *toType = VIR_TYPE_UINT16;
         break;
     case VIR_TYPE_INT8:
@@ -201,6 +180,15 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_BOOLEAN_X4:
         *toType = VIR_TYPE_BOOLEAN;
         break;
+    case VIR_TYPE_FLOAT16:
+    case VIR_TYPE_FLOAT16_P2:
+    case VIR_TYPE_FLOAT16_P3:
+    case VIR_TYPE_FLOAT16_P4:
+    case VIR_TYPE_FLOAT16_P8:
+    case VIR_TYPE_FLOAT16_P16:
+    case VIR_TYPE_FLOAT16_P32:
+        *toType = VIR_TYPE_FLOAT16;
+        break;
     default:
         retValue = gcvFALSE;
         *toType = VIR_TYPE_FLOAT32;
@@ -208,7 +196,8 @@ _VSC_CPF_typeToChannelType(
     }
 
     /* this is a basic assumption during CPF: const could only be of the following types */
-    gcmASSERT(*toType == VIR_TYPE_FLOAT32 ||
+    gcmASSERT(*toType == VIR_TYPE_FLOAT16 ||
+              *toType == VIR_TYPE_FLOAT32 ||
               *toType == VIR_TYPE_INT32 ||
               *toType == VIR_TYPE_INT16 ||
               *toType == VIR_TYPE_INT8 ||
@@ -218,18 +207,6 @@ _VSC_CPF_typeToChannelType(
               *toType == VIR_TYPE_BOOLEAN);
 
     return retValue;
-}
-
-static gctBOOL
-_VSC_CPF_isTypeFloat(
-    VIR_PrimitiveTypeId type
-    )
-{
-    if (type == VIR_TYPE_FLOAT32)
-    {
-        return gcvTRUE;
-    }
-    return gcvFALSE;
 }
 
 static gctBOOL
@@ -339,17 +316,18 @@ _VSC_CPF_InWorkList(
 static void
 _VSC_CPF_Init(
     IN OUT VSC_CPF          *pCPF,
+    IN VSC_SH_PASS_WORKER   *pPassWorker,
     IN VIR_Shader           *pShader,
     IN VSC_OPTN_CPFOptions  *pOptions,
-    IN VIR_Dumper           *pDumper
+    IN VIR_Dumper           *pDumper,
+    IN VSC_MM               *pMM
     )
 {
     VSC_CPF_SetShader(pCPF, pShader);
+    VSC_CPF_SetHwCfg(pCPF, &(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg));
     VSC_CPF_SetOptions(pCPF, pOptions);
     VSC_CPF_SetDumper(pCPF, pDumper);
-
-    vscPMP_Intialize(VSC_CPF_GetPmp(pCPF), gcvNULL, 1024,
-                     sizeof(void*), gcvTRUE);
+    pCPF->pMM = pMM;
 }
 
 static void
@@ -360,7 +338,6 @@ _VSC_CPF_Final(
     VSC_CPF_SetShader(pCPF, gcvNULL);
     VSC_CPF_SetOptions(pCPF, gcvNULL);
     VSC_CPF_SetDumper(pCPF, gcvNULL);
-    vscPMP_Finalize(VSC_CPF_GetPmp(pCPF));
 }
 
 /* initialize the pBlkFlowArray, which is indexed by BB id.
@@ -368,14 +345,18 @@ _VSC_CPF_Final(
 
 static VSC_ErrCode
 _VSC_CPF_InitializeBlkFlow(
+    VSC_CPF                     *pCPF,
     VIR_FUNC_BLOCK              *pOwnerFB,
     VSC_SIMPLE_RESIZABLE_ARRAY  *pBlkFlowArray,
     VSC_MM                      *pMM,
-    gctINT                      flowSize)
+    gctINT                      tempCount)
 {
     VSC_ErrCode        errCode     = VSC_ERR_NONE;
     CFG_ITERATOR       basicBlkIter;
     VIR_BASIC_BLOCK*   pBasicBlk;
+    gctUINT            flowSize = tempCount * 4; /* every vreg has 4 components. */
+
+    pCPF->flowSize = flowSize;
 
     vscSRARR_Initialize(pBlkFlowArray,
                         pMM,
@@ -395,9 +376,8 @@ _VSC_CPF_InitializeBlkFlow(
         VSC_CPF_BLOCK_FLOW  *pBlkFlow = (VSC_CPF_BLOCK_FLOW*)
             vscSRARR_GetElement(pBlkFlowArray, pBasicBlk->dgNode.id);
 
-        /* every vreg has 4 components. */
-        vscCPF_DV_Initialize(&pBlkFlow->inFlow, pMM, flowSize * 4);
-        vscCPF_DV_Initialize(&pBlkFlow->outFlow, pMM, flowSize * 4);
+        vscSV_Initialize(&pBlkFlow->inFlow, pMM, flowSize, 4);
+        vscSV_Initialize(&pBlkFlow->outFlow, pMM, flowSize, 4);
     }
 
     return errCode;
@@ -420,8 +400,8 @@ _VSC_CPF_FinallizeBlkFlow(
         VSC_CPF_BLOCK_FLOW *pBlkFlow = (VSC_CPF_BLOCK_FLOW*)
             vscSRARR_GetElement(pBlkFlowArray, pBasicBlk->dgNode.id);
 
-        vscCPF_DV_Finalize(&pBlkFlow->inFlow);
-        vscCPF_DV_Finalize(&pBlkFlow->outFlow);
+        vscSV_Finalize(&pBlkFlow->inFlow);
+        vscSV_Finalize(&pBlkFlow->outFlow);
     }
 
     vscSRARR_Finalize(pBlkFlowArray);
@@ -443,6 +423,7 @@ _VSC_CPF_InitFunction(
 
     /* init the constant data flow*/
     errCode = _VSC_CPF_InitializeBlkFlow(
+                pCPF,
                 pFunc->pFuncBlock,
                 VSC_CPF_GetBlkFlowArray(pCPF),
                 VSC_CPF_GetMM(pCPF),
@@ -488,41 +469,29 @@ _VSC_CPF_FinalizeFunction(
 /* lattice data structure utility functions */
 static VSC_CPF_LATTICE
 _VSC_CPF_DF_GetLattice(
-    VSC_CPF_DF_VECTOR           *tmpFlow,
+    VSC_STATE_VECTOR           *tmpFlow,
     gctUINT                     index
     )
 {
-    VSC_CPF_LATTICE value = VSC_CPF_UNDEFINE;
-    if (vscBV_TestBit(&tmpFlow->hi, index) && vscBV_TestBit(&tmpFlow->low, index))
-    {
-        value = VSC_CPF_NOT_CONSTANT;
-    }
-    else if (!vscBV_TestBit(&tmpFlow->hi, index) && vscBV_TestBit(&tmpFlow->low, index))
-    {
-        value = VSC_CPF_CONSTANT;
-    }
-
-    return value;
+    return (VSC_CPF_LATTICE)vscSV_Get(tmpFlow, index);
 }
 
 static void
 _VSC_CPF_DF_SetLatticeNotConst(
-    VSC_CPF_DF_VECTOR           *tmpFlow,
+    VSC_STATE_VECTOR           *tmpFlow,
     gctUINT                     index
     )
 {
-    vscBV_SetBit(&tmpFlow->hi, index);
-    vscBV_SetBit(&tmpFlow->low, index);
+    vscSV_Set(tmpFlow, index, VSC_CPF_NOT_CONSTANT);
 }
 
 static void
 _VSC_CPF_DF_SetLatticeConst(
-    VSC_CPF_DF_VECTOR           *tmpFlow,
+    VSC_STATE_VECTOR           *tmpFlow,
     gctUINT                     index
     )
 {
-    vscBV_SetBit(&tmpFlow->low, index);
-    vscBV_ClearBit(&tmpFlow->hi, index);
+    vscSV_Set(tmpFlow, index, VSC_CPF_CONSTANT);
 }
 
 static VSC_CPF_Const*
@@ -614,7 +583,7 @@ _VSC_CPF_RemoveConstVal(
 static void
 _VSC_CPF_SetConst(
     VSC_CPF             *pCPF,
-    VSC_CPF_DF_VECTOR   *tmpFlow,
+    VSC_STATE_VECTOR    *tmpFlow,
     gctUINT             bbId,
     gctUINT             index,
     gctBOOL             isIN,
@@ -632,7 +601,7 @@ _VSC_CPF_SetConst(
 static void
 _VSC_CPF_SetNotConst(
     VSC_CPF             *pCPF,
-    VSC_CPF_DF_VECTOR   *tmpFlow,
+    VSC_STATE_VECTOR    *tmpFlow,
     gctUINT             bbId,
     gctUINT             index,
     gctBOOL             isIN
@@ -653,19 +622,15 @@ _VSC_CPF_CopyConstKey(
     VSC_CPF_BLOCK_FLOW  *pBlkFlow = (VSC_CPF_BLOCK_FLOW*)
         vscSRARR_GetElement(VSC_CPF_GetBlkFlowArray(pCPF), bbId);
 
-    VSC_CPF_DF_VECTOR       *tmpFlow = &pBlkFlow->inFlow;
+    VSC_STATE_VECTOR       *tmpFlow = &pBlkFlow->inFlow;
     gctUINT                 i = 0, constIdx;
 
     /* copy the const hash table */
-    while ((constIdx = vscBV_FindSetBitForward(&tmpFlow->low, i)) != (gctUINT)INVALID_BIT_LOC)
+    while ((constIdx = vscSV_FindStateForward(tmpFlow, i, VSC_CPF_CONSTANT)) != (gctUINT)INVALID_STATE_LOC)
     {
-        /* VSC_CPF_CONSTANT */
-        if (!vscBV_TestBit(&tmpFlow->hi, constIdx))
-        {
-            VSC_CPF_Const   *constVal = _VSC_CPF_GetConstVal(pCPF, bbId, constIdx, gcvTRUE);
-            gcmASSERT(constVal);
-            _VSC_CPF_SetConstVal(pCPF, bbId, constIdx, gcvFALSE, constVal->value, constVal->type);
-        }
+        VSC_CPF_Const   *constVal = _VSC_CPF_GetConstVal(pCPF, bbId, constIdx, gcvTRUE);
+        gcmASSERT(constVal);
+        _VSC_CPF_SetConstVal(pCPF, bbId, constIdx, gcvFALSE, constVal->value, constVal->type);
 
         i = constIdx + 1;
     }
@@ -676,71 +641,67 @@ static void
 _VSC_CPF_DataFlow_Dump(
     VSC_CPF                 *pCPF,
     gctUINT                 bbId,
-    VSC_CPF_DF_VECTOR       *tmpFlow,
+    VSC_STATE_VECTOR        *tmpFlow,
     gctBOOL                 isIN
     )
 {
     VIR_Dumper      *pDumper = VSC_CPF_GetDumper(pCPF);
     gctUINT          i = 0, constIdx;
 
-    gcmASSERT(BV_IS_VALID(&tmpFlow->hi));
-    gcmASSERT(BV_IS_VALID(&tmpFlow->low));
+    gcmASSERT(SV_IS_VALID(tmpFlow));
 
     /* copy the const hash table */
-    while ((constIdx = vscBV_FindSetBitForward(&tmpFlow->low, i)) != (gctUINT)INVALID_BIT_LOC)
+    while ((constIdx = vscSV_FindStateForward(tmpFlow, i, VSC_CPF_CONSTANT)) != (gctUINT)INVALID_STATE_LOC)
     {
         /* VSC_CPF_CONSTANT */
         gctUINT         regNo = constIdx / 4;
         gctUINT         channel = constIdx % 4;
 
-        if (!vscBV_TestBit(&tmpFlow->hi, constIdx))
+        VSC_CPF_Const   *constVal = _VSC_CPF_GetConstVal(pCPF, bbId, constIdx, isIN);
+
+        if (constVal != gcvNULL)
         {
-            VSC_CPF_Const   *constVal = _VSC_CPF_GetConstVal(pCPF, bbId, constIdx, isIN);
-
-            if (constVal != gcvNULL)
+            if (VIR_TypeId_isFloat(constVal->type))
             {
-                if (_VSC_CPF_isTypeFloat(constVal->type))
-                {
-                    gctFLOAT f = *(gctFLOAT*)&(constVal->value);
-                    VIR_LOG(pDumper, "\ttemp[%d].%s(%f)",
-                        regNo,
-                        _VSC_CPF_GetChannelName(channel),
-                        f);
-                }
-                else if (_VSC_CPF_isTypeINT(constVal->type))
-                {
-                    VIR_LOG(pDumper, "\ttemp[%d].%s(%d)",
-                        regNo,
-                        _VSC_CPF_GetChannelName(channel),
-                        constVal->value);
-                }
-                else if (_VSC_CPF_isTypeUINT(constVal->type))
-                {
-                    VIR_LOG(pDumper, "\ttemp[%d].%s(%u)",
-                        regNo,
-                        _VSC_CPF_GetChannelName(channel),
-                        constVal->value);
-                }
-                else if (_VSC_CPF_isTypeBOOL(constVal->type))
-                {
-                    VIR_LOG(pDumper, "\ttemp[%d].%s(%u)",
-                        regNo,
-                        _VSC_CPF_GetChannelName(channel),
-                        constVal->value);
-                }
-                else
-                {
-                    gcmASSERT(gcvFALSE);
-                }
-
+                gctFLOAT f = *(gctFLOAT*)&(constVal->value);
+                VIR_LOG(pDumper, "\ttemp[%d].%s(%f)",
+                    regNo,
+                    _VSC_CPF_GetChannelName(channel),
+                    f);
+            }
+            else if (_VSC_CPF_isTypeINT(constVal->type))
+            {
+                VIR_LOG(pDumper, "\ttemp[%d].%s(%d)",
+                    regNo,
+                    _VSC_CPF_GetChannelName(channel),
+                    constVal->value);
+            }
+            else if (_VSC_CPF_isTypeUINT(constVal->type))
+            {
+                VIR_LOG(pDumper, "\ttemp[%d].%s(%u)",
+                    regNo,
+                    _VSC_CPF_GetChannelName(channel),
+                    constVal->value);
+            }
+            else if (_VSC_CPF_isTypeBOOL(constVal->type))
+            {
+                VIR_LOG(pDumper, "\ttemp[%d].%s(%u)",
+                    regNo,
+                    _VSC_CPF_GetChannelName(channel),
+                    constVal->value);
             }
             else
             {
-                /* the const is changed to non-const in this block, thus constVal is removed */
-                VIR_LOG(pDumper, "\ttemp[%d].%s(changed to non-const)",
-                        regNo,
-                        _VSC_CPF_GetChannelName(channel));
+                gcmASSERT(gcvFALSE);
             }
+
+        }
+        else
+        {
+            /* the const is changed to non-const in this block, thus constVal is removed */
+            VIR_LOG(pDumper, "\ttemp[%d].%s(changed to non-const)",
+                    regNo,
+                    _VSC_CPF_GetChannelName(channel));
         }
 
         i = constIdx + 1;
@@ -805,11 +766,10 @@ _VSC_CPF_CFG_DataFlow_Dump(
 /*   dstFlow = srcFlow: only copy the lattice state */
 static void
 _VSC_CPF_CopyFlowLattice(
-    VSC_CPF_DF_VECTOR *dstFlow,
-    VSC_CPF_DF_VECTOR *srcFlow)
+    VSC_STATE_VECTOR *dstFlow,
+    VSC_STATE_VECTOR *srcFlow)
 {
-    vscBV_Copy(&dstFlow->hi, &srcFlow->hi);
-    vscBV_Copy(&dstFlow->low, &srcFlow->low);
+    vscSV_Copy(dstFlow, srcFlow);
 }
 
 /*   dstFlow = srcFlow */
@@ -817,33 +777,30 @@ static void
 _VSC_CPF_CopyFlow(
     VSC_CPF           *pCPF,
     gctUINT           dstBBId,
-    VSC_CPF_DF_VECTOR *dstFlow,
+    VSC_STATE_VECTOR  *dstFlow,
     gctUINT            srcBBId,
-    VSC_CPF_DF_VECTOR *srcFlow)
+    VSC_STATE_VECTOR  *srcFlow)
 {
     gctUINT i = 0, constIdx;
 
     _VSC_CPF_CopyFlowLattice(dstFlow, srcFlow);
 
     /* copy the const hash table */
-    while ((constIdx = vscBV_FindSetBitForward(&srcFlow->low, i)) != (gctUINT)INVALID_BIT_LOC)
+    while ((constIdx = vscSV_FindStateForward(srcFlow, i, VSC_CPF_CONSTANT)) != (gctUINT)INVALID_STATE_LOC)
     {
-        /* VSC_CPF_CONSTANT */
-        if (!vscBV_TestBit(&srcFlow->hi, constIdx))
-        {
-            VSC_CPF_Const   *constVal = _VSC_CPF_GetConstVal(pCPF, srcBBId, constIdx, gcvFALSE);
+        VSC_CPF_Const   *constVal = _VSC_CPF_GetConstVal(pCPF, srcBBId, constIdx, gcvFALSE);
 
-            if (constVal != gcvNULL)
-            {
-                /* we have two const key to the hash table,
-                   one is to save the IN const value,
-                   the other is to be changed inside the block.
-                   when merging the data flow, we only need to change IN const key,
-                   the other one is copy from IN const key at the beginning of BB
-                   analysis and changed inside the block. */
-                _VSC_CPF_SetConstVal(pCPF, dstBBId, constIdx, gcvTRUE, constVal->value, constVal->type);
-            }
+        if (constVal != gcvNULL)
+        {
+            /* we have two const key to the hash table,
+                one is to save the IN const value,
+                the other is to be changed inside the block.
+                when merging the data flow, we only need to change IN const key,
+                the other one is copy from IN const key at the beginning of BB
+                analysis and changed inside the block. */
+            _VSC_CPF_SetConstVal(pCPF, dstBBId, constIdx, gcvTRUE, constVal->value, constVal->type);
         }
+
         i = constIdx + 1;
     }
 }
@@ -854,15 +811,15 @@ static gctBOOL
 _VSC_CPF_AndFlow(
     VSC_CPF           *pCPF,
     gctUINT           dstBBId,
-    VSC_CPF_DF_VECTOR *dstFlow,
+    VSC_STATE_VECTOR  *dstFlow,
     gctUINT            srcBBId,
-    VSC_CPF_DF_VECTOR *srcFlow)
+    VSC_STATE_VECTOR  *srcFlow)
 {
     gctUINT i;
     gctBOOL changed = gcvFALSE;
 
     /* to-do optimize this case */
-    for (i = 0; i < vscCPF_DV_BitCount(srcFlow); i ++)
+    for (i = 0; i < pCPF->flowSize; i ++)
     {
         if (_VSC_CPF_DF_GetLattice(dstFlow, i) == VSC_CPF_NOT_CONSTANT)
         {
@@ -911,15 +868,10 @@ _VSC_CPF_AndFlow(
 
 static gctBOOL
 _VSC_CPF_EqualFlowLattice(
-    VSC_CPF_DF_VECTOR *src1Flow,
-    VSC_CPF_DF_VECTOR *src2Flow)
+    VSC_STATE_VECTOR *src1Flow,
+    VSC_STATE_VECTOR *src2Flow)
 {
-    if (!vscBV_Equal(&src1Flow->hi, &src2Flow->hi))
-    {
-        return gcvFALSE;
-    }
-
-    if (!vscBV_Equal(&src1Flow->low, &src2Flow->low))
+    if (!vscSV_Equal(src1Flow, src2Flow))
     {
         return gcvFALSE;
     }
@@ -965,7 +917,7 @@ _VSC_CPF_isScalarConst(
     VIR_Instruction     *pInst,
     VIR_Operand         *pOpnd,
     gctUINT8            opndChannel,
-    VSC_CPF_DF_VECTOR   *tmpFlow,
+    VSC_STATE_VECTOR    *tmpFlow,
     VSC_CPF_Const       *constVal,
     VSC_CPF_LATTICE     *srcLattic
     )
@@ -983,7 +935,7 @@ _VSC_CPF_isScalarConst(
     if(VIR_Operand_GetOpKind(pOpnd) == VIR_OPND_IMMEDIATE)
     {
         /* immediate case */
-        constVal->value = pOpnd->u1.uConst;
+        constVal->value = VIR_Operand_GetImmediateUint(pOpnd);
         constVal->type = type;
         lattic = VSC_CPF_CONSTANT;
     }
@@ -991,12 +943,13 @@ _VSC_CPF_isScalarConst(
     {
         /* constant vec case */
         VIR_Shader* pShader = VIR_Inst_GetShader(pInst);
-        VIR_Const* cur_const = VIR_Shader_GetConstFromId(pShader, pOpnd->u1.constId);
+        VIR_Const* cur_const = VIR_Shader_GetConstFromId(pShader, VIR_Operand_GetConstId(pOpnd));
         constVal->value = cur_const->value.vecVal.u32Value[symChannel];
         constVal->type = type;
         lattic = VSC_CPF_CONSTANT;
     }
-    else if (VIR_Operand_GetOpKind(pOpnd) == VIR_OPND_SYMBOL && VIR_Symbol_isUniform(VIR_Operand_GetSymbol(pOpnd)))
+    else if (VIR_Operand_GetOpKind(pOpnd) == VIR_OPND_SYMBOL &&
+             VIR_Symbol_isUniform(VIR_Operand_GetSymbol(pOpnd)))
     {
         VIR_Shader* pShader = VIR_Inst_GetShader(pInst);
         VIR_Symbol* uniformSym = VIR_Operand_GetSymbol(pOpnd);
@@ -1062,7 +1015,7 @@ _VSC_CPF_SetDestConst(
     gctUINT                 srcBBId,
     VIR_Instruction         *pInst,
     gctUINT8                channel,
-    VSC_CPF_DF_VECTOR       *tmpFlow,
+    VSC_STATE_VECTOR        *tmpFlow,
     VSC_CPF_Const           *constVal
     )
 {
@@ -1094,7 +1047,7 @@ _VSC_CPF_SetDestNotConst(
     gctUINT                 srcBBId,
     VIR_Instruction         *pInst,
     gctUINT8                channel,
-    VSC_CPF_DF_VECTOR       *tmpFlow
+    VSC_STATE_VECTOR        *tmpFlow
     )
 {
     VIR_Operand         *dstOpnd = VIR_Inst_GetDest(pInst);
@@ -1186,8 +1139,9 @@ _VSC_CPF_FoldConst(
         gcmASSERT(dstConstVal != gcvNULL);
         switch(dstConstVal->type)
         {
+            case VIR_TYPE_FLOAT16:
             case VIR_TYPE_FLOAT32:
-                srcOpnd->u1.fConst = gcoMATH_UIntAsFloat(dstConstVal->value);;
+                VIR_Operand_SetImmFloat(srcOpnd, gcoMATH_UIntAsFloat(dstConstVal->value));
                 break;
             case VIR_TYPE_INT32:
             case VIR_TYPE_INT16:
@@ -1196,7 +1150,7 @@ _VSC_CPF_FoldConst(
             case VIR_TYPE_UINT16:
             case VIR_TYPE_UINT8:
             case VIR_TYPE_BOOLEAN:
-                srcOpnd->u1.uConst = dstConstVal->value;
+                VIR_Operand_SetImmUint(srcOpnd, dstConstVal->value);
                 break;
             default:
                 gcmASSERT(gcvFALSE);
@@ -1210,7 +1164,7 @@ _VSC_CPF_FoldConst(
         VIR_Inst_SetSrcNum(pInst, 1);
         folded = gcvTRUE;
     }
-    else if (ENABLE_FULL_NEW_LINKER)
+    else if (gcUseFullNewLinker(VSC_CPF_GetHwCfg(pCPF)->hwFeatureFlags.hasHalti2))
     {
         /* const vec case */
         VIR_ConstVal    new_const_val;
@@ -1231,6 +1185,7 @@ _VSC_CPF_FoldConst(
 
                 switch(dstConstVal->type)
                 {
+                    case VIR_TYPE_FLOAT16:
                     case VIR_TYPE_FLOAT32:
                         new_const_val.vecVal.f32Value[constChannel] = gcoMATH_UIntAsFloat(dstConstVal->value);
                         break;
@@ -1350,7 +1305,7 @@ _VSC_CPF_PropagateConst(
             }
         }
 
-        if (_VSC_CPF_isTypeFloat(pConst[channel].type))
+        if (VIR_TypeId_isFloat(pConst[channel].type))
         {
             floatValue = gcoMATH_UIntAsFloat(pConst[channel].value);
             intValue = (gctUINT)floatValue;
@@ -1361,21 +1316,21 @@ _VSC_CPF_PropagateConst(
             floatValue = (gctFLOAT) intValue;
         }
 
-        if (_VSC_CPF_isTypeFloat(srcType))
+        if (VIR_TypeId_isFloat(srcType))
         {
-            pOpnd->u1.fConst = floatValue;
+            VIR_Operand_SetImmFloat(pOpnd, floatValue);
         }
         else if (_VSC_CPF_isTypeINT(srcType))
         {
-            pOpnd->u1.iConst = intValue;
+            VIR_Operand_SetImmInt(pOpnd, intValue);
         }
         else if (_VSC_CPF_isTypeUINT(srcType))
         {
-            pOpnd->u1.uConst = intValue;
+            VIR_Operand_SetImmUint(pOpnd, intValue);
         }
         else if (_VSC_CPF_isTypeBOOL(srcType))
         {
-            pOpnd->u1.uConst = intValue;
+            VIR_Operand_SetImmUint(pOpnd, intValue);
         }
         else
         {
@@ -1429,6 +1384,7 @@ _VSC_CPF_GetConditionResult(
 
     switch(constVal0->type)
     {
+        case VIR_TYPE_FLOAT16:
         case VIR_TYPE_FLOAT32:
         case VIR_TYPE_INT32:
         case VIR_TYPE_INT16:
@@ -1453,6 +1409,7 @@ _VSC_CPF_GetConditionResult(
             gcmASSERT(constVal1);
             switch(constVal0->type)
             {
+                case VIR_TYPE_FLOAT16:
                 case VIR_TYPE_FLOAT32:
                 {
                     gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
@@ -1481,6 +1438,7 @@ _VSC_CPF_GetConditionResult(
             gcmASSERT(constVal1);
             switch(constVal0->type)
             {
+                case VIR_TYPE_FLOAT16:
                 case VIR_TYPE_FLOAT32:
                 {
                     gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
@@ -1509,6 +1467,7 @@ _VSC_CPF_GetConditionResult(
             gcmASSERT(constVal1);
             switch(constVal0->type)
             {
+                case VIR_TYPE_FLOAT16:
                 case VIR_TYPE_FLOAT32:
                 {
                     gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
@@ -1537,6 +1496,7 @@ _VSC_CPF_GetConditionResult(
             gcmASSERT(constVal1);
             switch(constVal0->type)
             {
+                case VIR_TYPE_FLOAT16:
                 case VIR_TYPE_FLOAT32:
                 {
                     gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
@@ -1564,7 +1524,14 @@ _VSC_CPF_GetConditionResult(
         {
             switch(constVal0->type)
             {
+                case VIR_TYPE_FLOAT16:
                 case VIR_TYPE_FLOAT32:
+                {
+                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
+                    gctFLOAT f1 = *(gctFLOAT*) &(constVal1->value);
+                    *result = f0 == f1;
+                    return gcvTRUE;
+                }
                 case VIR_TYPE_INT32:
                 case VIR_TYPE_INT16:
                 case VIR_TYPE_INT8:
@@ -1583,7 +1550,14 @@ _VSC_CPF_GetConditionResult(
         {
             switch(constVal0->type)
             {
+                case VIR_TYPE_FLOAT16:
                 case VIR_TYPE_FLOAT32:
+                {
+                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
+                    gctFLOAT f1 = *(gctFLOAT*) &(constVal1->value);
+                    *result = f0 != f1;
+                    return gcvTRUE;
+                }
                 case VIR_TYPE_INT32:
                 case VIR_TYPE_INT16:
                 case VIR_TYPE_INT8:
@@ -1623,7 +1597,13 @@ _VSC_CPF_GetConditionResult(
         {
             switch(constVal0->type)
             {
+                case VIR_TYPE_FLOAT16:
                 case VIR_TYPE_FLOAT32:
+                {
+                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
+                    *result = f0 == 0.0;
+                    return gcvTRUE;
+                }
                 case VIR_TYPE_INT32:
                 case VIR_TYPE_INT16:
                 case VIR_TYPE_INT8:
@@ -1642,7 +1622,13 @@ _VSC_CPF_GetConditionResult(
         {
             switch(constVal0->type)
             {
+                case VIR_TYPE_FLOAT16:
                 case VIR_TYPE_FLOAT32:
+                {
+                    gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
+                    *result = f0 != 0.0;
+                    return gcvTRUE;
+                }
                 case VIR_TYPE_INT32:
                 case VIR_TYPE_INT16:
                 case VIR_TYPE_INT8:
@@ -1661,6 +1647,7 @@ _VSC_CPF_GetConditionResult(
         {
             switch(constVal0->type)
             {
+                case VIR_TYPE_FLOAT16:
                 case VIR_TYPE_FLOAT32:
                 {
                     gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
@@ -1688,6 +1675,7 @@ _VSC_CPF_GetConditionResult(
         {
             switch(constVal0->type)
             {
+                case VIR_TYPE_FLOAT16:
                 case VIR_TYPE_FLOAT32:
                 {
                     gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
@@ -1715,6 +1703,7 @@ _VSC_CPF_GetConditionResult(
         {
             switch(constVal0->type)
             {
+                case VIR_TYPE_FLOAT16:
                 case VIR_TYPE_FLOAT32:
                 {
                     gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
@@ -1742,6 +1731,7 @@ _VSC_CPF_GetConditionResult(
         {
             switch(constVal0->type)
             {
+                case VIR_TYPE_FLOAT16:
                 case VIR_TYPE_FLOAT32:
                 {
                     gctFLOAT f0 = *(gctFLOAT*) &(constVal0->value);
@@ -1817,7 +1807,7 @@ _VSC_CPF_EvaluateConst(
         case VIR_OP_ABS:
         {
             gcmASSERT(srcLattice[0] == VSC_CPF_CONSTANT);       /* otherwise we cannot evaluate */
-            if (_VSC_CPF_isTypeFloat(dstType))
+            if (VIR_TypeId_isFloat(dstType))
             {
                 gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
                 resultVal->value = gcoMATH_FloatAsUInt(f0 >= 0.0 ? f0 : -f0);
@@ -1830,7 +1820,7 @@ _VSC_CPF_EvaluateConst(
         }
         case VIR_OP_ADD:
         {
-            if (_VSC_CPF_isTypeFloat(dstType))
+            if (VIR_TypeId_isFloat(dstType))
             {
                 gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
                 gctFLOAT f1 = *(gctFLOAT*) &(constVal[1].value);
@@ -1858,9 +1848,19 @@ _VSC_CPF_EvaluateConst(
             resultVal->value = constVal[0].value ^ constVal[1].value;
             break;
         }
+        case VIR_OP_NOT_BITWISE:
+        {
+            resultVal->value = ~constVal[0].value;
+            break;
+        }
+        case VIR_OP_LOGICAL_NOT:
+        {
+            resultVal->value = !(constVal[0].value);
+            break;
+        }
         case VIR_OP_MOD:
         {
-            if (_VSC_CPF_isTypeFloat(dstType))
+            if (VIR_TypeId_isFloat(dstType))
             {
                 gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
                 gctFLOAT f1 = *(gctFLOAT*) &(constVal[1].value);
@@ -1873,12 +1873,34 @@ _VSC_CPF_EvaluateConst(
             }
             break;
         }
+        case VIR_OP_REM:
+        {
+            if (VIR_TypeId_isFloat(dstType))
+            {
+                gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
+                gctFLOAT f1 = *(gctFLOAT*) &(constVal[1].value);
+
+                if (f0 / f1 < 0.0)
+                {
+                    resultVal->value = gcoMATH_FloatAsUInt(f0 - f1 * gcoMATH_Ceiling(f0 / f1));
+                }
+                else
+                {
+                    resultVal->value = gcoMATH_FloatAsUInt(f0 - f1 * gcoMATH_Floor(f0 / f1));
+                }
+            }
+            else
+            {
+                resultVal->value = constVal[0].value % constVal[1].value;
+            }
+            break;
+        }
         case VIR_OP_SUB:
         {
             if(srcLattice[0] == VSC_CPF_CONSTANT)
             {
                 gcmASSERT(srcLattice[1] == VSC_CPF_CONSTANT);   /* otherwise we cannot evaluate */
-                if(_VSC_CPF_isTypeFloat(dstType))
+                if(VIR_TypeId_isFloat(dstType))
                 {
                     gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
                     gctFLOAT f1 = *(gctFLOAT*) &(constVal[1].value);
@@ -1905,7 +1927,7 @@ _VSC_CPF_EvaluateConst(
             }
             else
             {
-                if(_VSC_CPF_isTypeFloat(dstType))
+                if(VIR_TypeId_isFloat(dstType))
                 {
                     gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
                     gctFLOAT f1 = *(gctFLOAT*) &(constVal[1].value);
@@ -1959,7 +1981,7 @@ _VSC_CPF_EvaluateConst(
         case VIR_OP_NEG:
         {
             gcmASSERT(srcLattice[0] == VSC_CPF_CONSTANT);       /* otherwise we cannot evaluate */
-            if(_VSC_CPF_isTypeFloat(dstType))
+            if(VIR_TypeId_isFloat(dstType))
             {
                 gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
 
@@ -1979,7 +2001,7 @@ _VSC_CPF_EvaluateConst(
             {
                 gcmASSERT(0);
             }
-            if(_VSC_CPF_isTypeFloat(dstType))
+            if(VIR_TypeId_isFloat(dstType))
             {
                 resultVal->value = gcoMATH_FloatAsUInt(cmpResult ? 1.0f : 0.0f);
             }
@@ -2017,7 +2039,7 @@ _VSC_CPF_EvaluateConst(
         }
         case VIR_OP_CONV:
         {
-            if(!_VSC_CPF_isTypeFloat(dstType))
+            if(!VIR_TypeId_isFloat(dstType))
             {
                 switch(constVal[0].type)
                 {
@@ -2044,8 +2066,28 @@ _VSC_CPF_EvaluateConst(
                     case VIR_TYPE_BOOLEAN:
                         resultVal->value = gcoMATH_FloatAsUInt((gctFLOAT)constVal[0].value);
                         break;
+                    case VIR_TYPE_FLOAT16:
+                        if (dstType == VIR_TYPE_FLOAT32)
+                        {
+                            resultVal->value = vscCvtS10E5FloatToS23E8Float(constVal[0].value);
+                        }
+                        else
+                        {
+                            gcmASSERT(dstType == VIR_TYPE_FLOAT16);
+                            resultVal->value = gcoMATH_FloatAsUInt((gctFLOAT)(gctINT32)*(gctFLOAT*)&constVal[0].value);
+                        }
+                        break;
                     case VIR_TYPE_FLOAT32:
-                        resultVal->value = gcoMATH_FloatAsUInt((gctFLOAT)(gctINT32)*(gctFLOAT*)&constVal[0].value);
+                        if (dstType == VIR_TYPE_FLOAT32)
+                        {
+                            resultVal->value = gcoMATH_FloatAsUInt((gctFLOAT)(gctINT32)*(gctFLOAT*)&constVal[0].value);
+                        }
+                        else
+                        {
+                            gcmASSERT(dstType == VIR_TYPE_FLOAT16);
+                            resultVal->value = vscCvtS23E8FloatToS10E5Float(constVal[0].value);
+                        }
+
                         break;
                     default:
                         gcmASSERT(0);
@@ -2105,23 +2147,26 @@ _VSC_CPF_isAssignmentOpcode(
     VIR_OpCode      opcode
     )
 {
-    if (opcode == VIR_OP_MOV ||
-        opcode == VIR_OP_ABS ||
-        opcode == VIR_OP_ADD ||
-        opcode == VIR_OP_AND_BITWISE ||
-        opcode == VIR_OP_OR_BITWISE ||
-        opcode == VIR_OP_XOR_BITWISE ||
-        opcode == VIR_OP_MOD ||
-        opcode == VIR_OP_SUB ||
-        opcode == VIR_OP_MUL ||
-        opcode == VIR_OP_MULHI ||
-        opcode == VIR_OP_NEG ||
-        opcode == VIR_OP_CMP ||
-        opcode == VIR_OP_SELECT ||
-        opcode == VIR_OP_AQ_SELECT ||
-        opcode == VIR_OP_CONV ||
-        opcode == VIR_OP_RCP ||
-        opcode == VIR_OP_LSHIFT ||
+    if (opcode == VIR_OP_MOV            ||
+        opcode == VIR_OP_ABS            ||
+        opcode == VIR_OP_ADD            ||
+        opcode == VIR_OP_AND_BITWISE    ||
+        opcode == VIR_OP_OR_BITWISE     ||
+        opcode == VIR_OP_XOR_BITWISE    ||
+        opcode == VIR_OP_NOT_BITWISE    ||
+        opcode == VIR_OP_LOGICAL_NOT    ||
+        opcode == VIR_OP_MOD            ||
+        opcode == VIR_OP_REM            ||
+        opcode == VIR_OP_SUB            ||
+        opcode == VIR_OP_MUL            ||
+        opcode == VIR_OP_MULHI          ||
+        opcode == VIR_OP_NEG            ||
+        opcode == VIR_OP_CMP            ||
+        opcode == VIR_OP_SELECT         ||
+        opcode == VIR_OP_AQ_SELECT      ||
+        opcode == VIR_OP_CONV           ||
+        opcode == VIR_OP_RCP            ||
+        opcode == VIR_OP_LSHIFT         ||
         opcode == VIR_OP_RSHIFT)
     {
         return gcvTRUE;
@@ -2151,7 +2196,7 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
     VIR_Instruction     *pInst,
     gctUINT             srcID,
     gctUINT8            channel,
-    VSC_CPF_DF_VECTOR   *tmpFlow
+    VSC_STATE_VECTOR    *tmpFlow
     )
 {
     VIR_OpCode opcode = VIR_Inst_GetOpcode(pInst);
@@ -2180,7 +2225,6 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
         }
         case VIR_OP_SELECT:
         {
-            gcmASSERT(VIR_ConditionOp_SingleOperand(VIR_Inst_GetConditionOp(pInst)));
             switch(srcID)
             {
                 case 0:
@@ -2196,7 +2240,7 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
                     }
                     if(_VSC_CPF_GetConditionResult(VIR_Inst_GetConditionOp(pInst), &constVal0, gcvNULL, &cmpResult))
                     {
-                        return (srcID == 1) ^ cmpResult;
+                        return ((srcID == 1) ? gcvTRUE : gcvFALSE) ^ cmpResult;
                     }
                     else
                     {
@@ -2278,6 +2322,9 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
                         }
                     }
                 }
+
+                default:
+                    break;
             }
             break;
         }
@@ -2304,12 +2351,13 @@ _VSC_CPF_PerformOnInst(
     VSC_CPF             *pCPF,
     gctUINT             srcBBId,
     VIR_Instruction     *pInst,
-    VSC_CPF_DF_VECTOR   *tmpFlow,
+    VSC_STATE_VECTOR    *tmpFlow,
     gctBOOL             analysisOnly
     )
 {
     VSC_ErrCode errCode    = VSC_ERR_NONE;
     VIR_OpCode  opcode = VIR_Inst_GetOpcode(pInst);
+    VIR_ConditionOp conditionOp = VIR_Inst_GetConditionOp(pInst);
 
     if (opcode == VIR_OP_CALL)
     {
@@ -2328,7 +2376,7 @@ _VSC_CPF_PerformOnInst(
         }
 
     }
-    if (_VSC_CPF_isAssignmentOpcode(opcode))
+    if (_VSC_CPF_isAssignmentOpcode(opcode) && conditionOp != VIR_COP_ALLMSB && conditionOp != VIR_COP_ANYMSB)
     {
         gctUINT i;
         VIR_Operand *srcOpnd = gcvNULL;
@@ -2418,8 +2466,8 @@ _VSC_CPF_PerformOnInst(
             }
         }
     }
-    else
-    {
+            else
+            {
         /* not assignment case or assignment that we don't current handle.
            we need to
            1) set dst to be VSC_CPF_NOT_CONSTANT
@@ -2471,12 +2519,12 @@ _VSC_CPF_PerformOnInst(
                     VIR_Operand_GetOpKind(srcOpnd) == VIR_OPND_TEXLDPARM &&
                     i == 2)
                 {
-                    VIR_Operand_TexldModifier * texldModifier = (VIR_Operand_TexldModifier *)srcOpnd;
+                    VIR_Operand * texldModifier = (VIR_Operand *)srcOpnd;
                     VIR_Operand * texldParm;
 
                     for (j = 0; j < VIR_TEXLDMODIFIER_COUNT; j++)
                     {
-                        texldParm = texldModifier->tmodifier[j];
+                        texldParm = VIR_Operand_GetTexldModifier(texldModifier, j);
 
                         if (texldParm == gcvNULL) continue;
 
@@ -2484,7 +2532,7 @@ _VSC_CPF_PerformOnInst(
 
                         if (dstOpnd == gcvNULL ||
                             _VSC_CPF_GetVRegNo(pInst, dstOpnd) == VIR_INVALID_ID ||
-                            !VIR_OPCODE_isComponentwise(opcode))
+                            !VIR_Inst_isComponentwise(pInst))
                         {
                             dstEnable = VIR_Swizzle_2_Enable(srcSwizzle);
                         }
@@ -2524,7 +2572,7 @@ _VSC_CPF_PerformOnInst(
 
                 if (dstOpnd == gcvNULL ||
                     _VSC_CPF_GetVRegNo(pInst, dstOpnd) == VIR_INVALID_ID ||
-                    !VIR_OPCODE_isComponentwise(opcode))
+                    !VIR_Inst_isComponentwise(pInst))
                 {
                     dstEnable = VIR_Swizzle_2_Enable(srcSwizzle);
                 }
@@ -2568,9 +2616,9 @@ _VSC_CPF_AnalysisOnBlock(
     VSC_ErrCode errCode    = VSC_ERR_NONE;
     VSC_OPTN_CPFOptions *pOptions  = VSC_CPF_GetOptions(pCPF);
 
-    VSC_CPF_DF_VECTOR  tmpFlow;
-    VSC_CPF_DF_VECTOR  *inFlow = gcvNULL;
-    VSC_CPF_DF_VECTOR  *outFlow = gcvNULL;
+    VSC_STATE_VECTOR  tmpFlow;
+    VSC_STATE_VECTOR  *inFlow = gcvNULL;
+    VSC_STATE_VECTOR  *outFlow = gcvNULL;
 
     VSC_CPF_BLOCK_FLOW  *pBlkFlow = (VSC_CPF_BLOCK_FLOW*)
             vscSRARR_GetElement(VSC_CPF_GetBlkFlowArray(pCPF),
@@ -2596,7 +2644,7 @@ _VSC_CPF_AnalysisOnBlock(
         gctBOOL                     firstPred = gcvTRUE;
         gctBOOL                     inChanged = gcvFALSE;
 
-        vscCPF_DV_Initialize(&tmpFlow, VSC_CPF_GetMM(pCPF), vscCPF_DV_BitCount(inFlow));
+        vscSV_Initialize(&tmpFlow, VSC_CPF_GetMM(pCPF), pCPF->flowSize, 4);
 
         VSC_ADJACENT_LIST_ITERATOR_INIT(&predEdgeIter, &pBB->dgNode.predList);
         pPredEdge = (VIR_CFG_EDGE *)VSC_ADJACENT_LIST_ITERATOR_FIRST(&predEdgeIter);
@@ -2717,9 +2765,11 @@ _VSC_CPF_AnalysisOnBlock(
                 if (psuccBasicBlk->flowType != VIR_FLOW_TYPE_EXIT &&
                     BB_GET_END_INST(psuccBasicBlk) != gcvNULL)
                 {
+                    /* JMPC's branch target is VIR_CFG_EDGE_TYPE_FALSE
+                       JMPC's next basic block is VIR_CFG_EDGE_TYPE_TRUE */
                     if (!constCondition ||
-                        (checkingResult && pSuccEdge->type == VIR_CFG_EDGE_TYPE_TRUE) ||
-                        (!checkingResult && pSuccEdge->type == VIR_CFG_EDGE_TYPE_FALSE)
+                        (checkingResult && pSuccEdge->type == VIR_CFG_EDGE_TYPE_FALSE) ||
+                        (!checkingResult && pSuccEdge->type == VIR_CFG_EDGE_TYPE_TRUE)
                        )
                     {
                         if (!_VSC_CPF_InWorkList(pCPF, psuccBasicBlk))
@@ -2741,7 +2791,7 @@ _VSC_CPF_AnalysisOnBlock(
         VIR_LOG_FLUSH(pDumper);
     }
 
-    vscCPF_DV_Finalize(&tmpFlow);
+    vscSV_Finalize(&tmpFlow);
 
     return errCode;
 }
@@ -2754,8 +2804,8 @@ _VSC_CPF_TransformOnBlock(
 {
     VSC_ErrCode errCode    = VSC_ERR_NONE;
 
-    VSC_CPF_DF_VECTOR  tmpFlow;
-    VSC_CPF_DF_VECTOR  *inFlow = gcvNULL;
+    VSC_STATE_VECTOR  tmpFlow;
+    VSC_STATE_VECTOR  *inFlow = gcvNULL;
 
     VIR_Instruction *inst = gcvNULL;
 
@@ -2765,7 +2815,7 @@ _VSC_CPF_TransformOnBlock(
 
     inFlow = &pBlkFlow->inFlow;
 
-    vscCPF_DV_Initialize(&tmpFlow, VSC_CPF_GetMM(pCPF), vscCPF_DV_BitCount(inFlow));
+    vscSV_Initialize(&tmpFlow, VSC_CPF_GetMM(pCPF), pCPF->flowSize, 4);
     _VSC_CPF_CopyFlowLattice(&tmpFlow, inFlow);
 
     _VSC_CPF_CopyConstKey(pCPF, pBB->dgNode.id);
@@ -2784,7 +2834,7 @@ _VSC_CPF_TransformOnBlock(
         inst = VIR_Inst_GetNext(inst);
     }
 
-    vscCPF_DV_Finalize(&tmpFlow);
+    vscSV_Finalize(&tmpFlow);
 
     return errCode;
 }
@@ -2877,7 +2927,7 @@ _VSC_CPF_PerformOnShader(
 
     if(VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
         VSC_OPTN_CPFOptions_TRACE_OUTPUT) ||
-        gcSHADER_DumpCodeGenVerbose(pShader))
+       VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
         VIR_Shader_Dump(gcvNULL, "Shader after Constant Propagation and Folding", pShader, gcvTRUE);
     }
@@ -2885,15 +2935,26 @@ _VSC_CPF_PerformOnShader(
     return errcode;
 }
 
+DEF_QUERY_PASS_PROP(VSC_CPF_PerformOnShader)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_LL;
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_CPF;
+    pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
+
+    pPassProp->passFlag.resCreationReq.s.bNeedCfg = gcvTRUE;
+}
+
 /* Interface function to be called by drvi */
 VSC_ErrCode
 VSC_CPF_PerformOnShader(
-    IN VIR_Shader           *shader,
-    IN VSC_OPTN_CPFOptions  *options,
-    IN VIR_Dumper           *dumper
+    IN VSC_SH_PASS_WORKER* pPassWorker
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_Shader           *shader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VSC_OPTN_CPFOptions  *options = (VSC_OPTN_CPFOptions*)pPassWorker->basePassWorker.pBaseOption;
+    VIR_Dumper           *dumper = pPassWorker->basePassWorker.pDumper;
+
     VSC_CPF cpf;
 
     if (!VSC_OPTN_InRange(VIR_Shader_GetId(shader), VSC_OPTN_CPFOptions_GetBeforeShader(options),
@@ -2920,7 +2981,7 @@ VSC_CPF_PerformOnShader(
         return errCode;
     }
 
-    _VSC_CPF_Init(&cpf, shader, options, dumper);
+    _VSC_CPF_Init(&cpf, pPassWorker, shader, options, dumper, pPassWorker->basePassWorker.pMM);
     errCode = _VSC_CPF_PerformOnShader(&cpf);
     _VSC_CPF_Final(&cpf);
 

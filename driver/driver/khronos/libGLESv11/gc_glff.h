@@ -68,6 +68,8 @@ typedef struct _glsCONTEXT
     gco3D                       hw;
     gcoOS                       os;
 
+    gcePATCH_ID                 patchId;
+
     struct _glsCONTEXT          *shared;
 
     gceCHIPMODEL                chipModel;
@@ -283,15 +285,42 @@ typedef struct _glsCONTEXT
     gctBOOL                     programDirty;
 
     gctBOOL                     hashAlphaTest;
+
+    /* GLSL Compiler. */
+    gctHANDLE                   dll;
+    gctGLSLInitCompiler         pfInitCompiler;
+    gctGLSLFinalizeCompiler     pfFinalizeCompiler;
+
+    gcoPROFILER                 profilerObj;
 }
 glsCONTEXT;
+
+typedef struct _glsINSTANT_DRAW_REC
+{
+    /* baseVertex(startVertex) we could program to hardware
+    ** if hardware DP command support startVertex
+    */
+    gctINT           first;
+    gctINT           count;
+
+    /* indexLoops > 0 means it's an index draw */
+    gceINDEX_TYPE    indexType;
+    gctPOINTER       indexMemory;
+    gcoINDEX         indexBuffer;
+
+    gctINT           primCount;
+    gcePRIMITIVE     primMode;
+
+    GLuint           attribMask;
+    gcsVERTEXARRAY * attributes;
+} glsINSTANT_DRAW,
+*glsINSTANT_DRAW_PTR;
 
 gctUINT glfSetContext(
     void       * Thread,
     void       * Context,
     VEGLDrawable Drawable,
     VEGLDrawable Readable);
-
 
 gceSTATUS glfTranslateRotationRect(
     gcsSIZE_PTR rtSize,
@@ -306,8 +335,18 @@ GetCurrentContext(
 
 void
 SetCurrentContext(
-   void *context
-   );
+    void *context
+    );
+
+gceSTATUS
+glfLoadCompiler(
+    glsCONTEXT_PTR      Context
+    );
+
+gceSTATUS
+glfReleaseCompiler(
+    glsCONTEXT_PTR      Context
+    );
 
 #if gcdENABLE_BLIT_BUFFER_PRESERVE
 /* Update preserve status. */

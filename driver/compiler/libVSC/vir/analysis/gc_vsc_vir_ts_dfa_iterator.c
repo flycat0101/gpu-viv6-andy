@@ -18,7 +18,7 @@ void vscVIR_InitializeBaseDFA(VIR_BASE_DFA* pBaseDFA, VIR_CALL_GRAPH* pCg, VIR_D
 {
     pBaseDFA->dfaType = dfaType;
     pBaseDFA->flowSize = flowSize;
-    pBaseDFA->cmnDfaFlags.bValid = gcvFALSE;
+    pBaseDFA->cmnDfaFlags.bFlowBuilt = gcvFALSE;
     pBaseDFA->cmnDfaFlags.bFlowInvalidated = gcvFALSE;
     pBaseDFA->pOwnerCG = pCg;
     pBaseDFA->pMM = pMM;
@@ -26,8 +26,8 @@ void vscVIR_InitializeBaseDFA(VIR_BASE_DFA* pBaseDFA, VIR_CALL_GRAPH* pCg, VIR_D
 
 void vscVIR_FinalizeBaseDFA(VIR_BASE_DFA* pBaseDFA)
 {
-    /* Finalization must mean the dfa becomes invalid now */
-    pBaseDFA->cmnDfaFlags.bValid = gcvFALSE;
+    /* Finalization must mean the dfa flow becomes invalid now */
+    pBaseDFA->cmnDfaFlags.bFlowBuilt = gcvFALSE;
 
     pBaseDFA->cmnDfaFlags.bFlowInvalidated = gcvFALSE;
 }
@@ -37,14 +37,14 @@ void vscVIR_UpdateBaseDFAFlowSize(VIR_BASE_DFA* pBaseDFA, gctINT newFlowSize)
     pBaseDFA->flowSize = newFlowSize;
 }
 
-void vscVIR_SetDFAValidity(VIR_BASE_DFA* pBaseDFA, gctBOOL bValid)
+void vscVIR_SetDFAFlowBuilt(VIR_BASE_DFA* pBaseDFA, gctBOOL bFlowBuilt)
 {
-    pBaseDFA->cmnDfaFlags.bValid = bValid;
+    pBaseDFA->cmnDfaFlags.bFlowBuilt = bFlowBuilt;
 }
 
-gctBOOL vscVIR_GetDFAValidity(VIR_BASE_DFA* pBaseDFA)
+gctBOOL vscVIR_CheckDFAFlowBuilt(VIR_BASE_DFA* pBaseDFA)
 {
-    return pBaseDFA->cmnDfaFlags.bValid;
+    return pBaseDFA->cmnDfaFlags.bFlowBuilt;
 }
 
 void vscVIR_InitializeTsBlockFlow(VIR_TS_BLOCK_FLOW* pTsBlkFlow, VIR_BASIC_BLOCK* pOwnerBB, VSC_MM* pMM, gctINT flowSize)
@@ -424,7 +424,7 @@ static VSC_ErrCode _DoForwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
 
             if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_EXIT)
             {
-                vscBV_Copy(&pThisBasicBlk->pTsWorkDataFlow->outFlow, &pThisBasicBlk->pTsWorkDataFlow->inFlow);
+                pTsDFA->tsDfaResolvers.ts_iterateBlockFlow_resolver(pTsDFA, pThisBasicBlk->pTsWorkDataFlow);
                 vscBV_Copy(&pFuncFlow->outFlow, &pThisBasicBlk->pTsWorkDataFlow->outFlow);
 
                 if (bIPA)
@@ -680,7 +680,7 @@ static VSC_ErrCode _DoBackwardIterativeTsDFAPerFunc(VIR_FUNC_BLOCK* pFuncBlk,
 
             if (pThisBasicBlk->flowType == VIR_FLOW_TYPE_ENTRY)
             {
-                vscBV_Copy(&pThisBasicBlk->pTsWorkDataFlow->inFlow, &pThisBasicBlk->pTsWorkDataFlow->outFlow);
+                pTsDFA->tsDfaResolvers.ts_iterateBlockFlow_resolver(pTsDFA, pThisBasicBlk->pTsWorkDataFlow);
                 vscBV_Copy(&pFuncFlow->inFlow, &pThisBasicBlk->pTsWorkDataFlow->inFlow);
 
                 if (bIPA)

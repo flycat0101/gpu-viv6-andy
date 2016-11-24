@@ -114,11 +114,7 @@ static gceSTATUS _CreateRenderBuffer(
         glsCONTEXT_PTR shared;
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (Context->shared != gcvNULL) ? Context->shared : Context;
-#else
         shared = Context;
-#endif
 
         /* Attempt to allocate a new buffer. */
         gcmERR_BREAK(glfCreateNamedObject(
@@ -594,11 +590,7 @@ GL_API void GL_APIENTRY glDeleteRenderbuffersOES(
         glsCONTEXT_PTR shared;
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (context->shared != gcvNULL) ? context->shared : context;
-#else
         shared = context;
-#endif
 
         /* Validate count. */
         if (Count < 0)
@@ -852,11 +844,7 @@ GL_API void GL_APIENTRY glBindRenderbufferOES(
                     Target, RenderBuffer);
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (context->shared != gcvNULL) ? context->shared : context;
-#else
         shared = context;
-#endif
 
         /* Verify the target. */
         if (Target != GL_RENDERBUFFER_OES)
@@ -1394,11 +1382,7 @@ glfCreateImageRenderBuffer(
         }
 
         /* Map shared context. */
-#if gcdRENDER_THREADS
-        shared = (context->shared != gcvNULL) ? context->shared : context;
-#else
         shared = context;
-#endif
 
         /* Verify the render buffer name. */
         if (RenderBuffer == 0)

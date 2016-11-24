@@ -33,6 +33,7 @@ vx_status _gcfVX_BitwiseOpration(vx_node node, gceVX_KERNEL kernel, vx_image in0
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     /*index = 0*/
@@ -46,6 +47,8 @@ vx_status _gcfVX_BitwiseOpration(vx_node node, gceVX_KERNEL kernel, vx_image in0
 
     kernelContext->params.kernel = kernel;
     kernelContext->params.xstep = 16;
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -93,6 +96,7 @@ vx_status vxNot(vx_node node, vx_image input, vx_image output)
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
+        kernelContext->uniform_num = 0;
     }
 
     /*index = 0*/
@@ -103,6 +107,8 @@ vx_status vxNot(vx_node node, vx_image input, vx_image output)
 
     kernelContext->params.kernel = gcvVX_KERNEL_NOT;
     kernelContext->params.xstep = 16;
+
+    kernelContext->node = node;
 
     status = gcfVX_Kernel(kernelContext);
 
@@ -115,3 +121,4 @@ vx_status vxNot(vx_node node, vx_image input, vx_image output)
 
     return status;
 }
+
