@@ -1461,6 +1461,9 @@ gcoTEXTURE_GetMipMap(
     gcmVERIFY_OBJECT(Texture, gcvOBJ_TEXTURE);
     gcmDEBUG_VERIFY_ARGUMENT(Surface != gcvNULL);
 
+    if (Texture == gcvNULL)
+        return gcvSTATUS_INVALID_ARGUMENT;
+
     /* Get the pointer to the first gcsMIPMAP. */
     map = Texture->maps;
 
