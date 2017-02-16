@@ -340,7 +340,11 @@ static gceSTATUS _CheckSurface(
 
         case gcvSURF_YV12:
         case gcvSURF_I420:
+#if defined(ANDROID)
+            if (((Address[0] & 63) || (Address[1] | Address[2]) & 15)
+#else
             if (((Address[0] | Address[1] | Address[2]) & 63)
+#endif
                 || (Stride[0] & 7) || ((Stride[1] | Stride[2]) & 3))
             {
                 return gcvSTATUS_NOT_ALIGNED;
@@ -520,7 +524,11 @@ static gceSTATUS _CheckSurface(
 
         case gcvSURF_YV12:
         case gcvSURF_I420:
+#if defined(ANDROID)
+            if (((Address[0] & 63) || (Address[1] | Address[2]) & 15)
+#else
             if (((Address[0] | Address[1] | Address[2]) & 63)
+#endif
                 || (Stride[0] & 7) || ((Stride[1] | Stride[2]) & 3))
             {
                 return gcvSTATUS_NOT_ALIGNED;
