@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -4152,6 +4152,175 @@ GLvoid GLAPIENTRY __GLES_APINAME(WindowPos3sv)(const GLshort *v)
     __GL_GET_CONTEXT;
     gc->currentImmediateTable->WindowPos3sv(gc, v);
 }
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib1d)(GLuint indx, GLdouble x)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib1d(gc, indx, x);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib1dv)(GLuint indx, const GLdouble* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib1dv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib1s)(GLuint indx, GLshort x)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib1s(gc, indx, x);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib1sv)(GLuint indx, const GLshort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib1sv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib2d)(GLuint indx, GLdouble x, GLdouble y)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib2d(gc, indx, x, y);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib2dv)(GLuint indx, const GLdouble* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib2dv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib2s)(GLuint indx, GLshort x, GLshort y)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib2s(gc, indx, x, y);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib2sv)(GLuint indx, const GLshort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib2sv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib3d)(GLuint indx, GLdouble x, GLdouble y, GLdouble z)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib3d(gc, indx, x, y, z);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib3dv)(GLuint indx, const GLdouble* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib3dv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib3s)(GLuint indx, GLshort x, GLshort y, GLshort z)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib3s(gc, indx, x, y, z);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib3sv)(GLuint indx, const GLshort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib3sv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Nbv)(GLuint indx, const GLbyte* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Nbv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Niv)(GLuint indx, const GLint* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Niv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Nsv)(GLuint indx, const GLshort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Nsv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Nub)(GLuint indx, GLubyte x, GLubyte y, GLubyte z, GLubyte w)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Nub(gc, indx, x, y, z, w);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Nubv)(GLuint indx, const GLubyte* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Nubv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Nuiv)(GLuint indx, const GLuint* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Nuiv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Nusv)(GLuint indx, const GLushort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Nusv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4bv)(GLuint indx, const GLbyte* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4bv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4d)(GLuint indx, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4d(gc, indx, x, y, z, w);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4dv)(GLuint indx, const GLdouble* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4dv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4iv)(GLuint indx, const GLint* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4iv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4s)(GLuint indx, GLshort x, GLshort y, GLshort z, GLshort w)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4s(gc, indx, x, y, z, w);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4sv)(GLuint indx, const GLshort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4sv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4ubv)(GLuint indx, const GLubyte* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4ubv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4uiv)(GLuint indx, const GLuint* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4uiv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4usv)(GLuint indx, const GLushort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4usv(gc, indx, values);
+}
+
 GLvoid GLAPIENTRY __GLES_APINAME(DrawPixels)( GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *pixels )
 {
     __GL_GET_CONTEXT;
@@ -4172,7 +4341,11 @@ GLvoid GLAPIENTRY __GLES_APINAME(Indexubv)( const GLubyte *c )
     __GL_GET_CONTEXT;
     gc->currentImmediateTable->Indexubv(gc, c);
 }
-GLvoid GLAPIENTRY __GLES_APINAME(GetVertexAttribdv) (GLuint index, GLenum pname, GLdouble* params){}
+GLvoid GLAPIENTRY __GLES_APINAME(GetVertexAttribdv) (GLuint index, GLenum pname, GLdouble* params)
+{
+     __GL_GET_CONTEXT;
+    gc->currentImmediateTable->GetVertexAttribdv(gc, index, pname, params);
+}
 GLvoid GLAPIENTRY __GLES_APINAME(GetQueryObjectiv) (GLuint id, GLenum pname, GLint* params){}
 GLvoid GLAPIENTRY __GLES_APINAME(GetBufferSubData) (GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid* data){}
 GLvoid GLAPIENTRY __GLES_APINAME(DeleteObjectARB) (UINT obj){}
@@ -8502,6 +8675,174 @@ GLvoid GLAPIENTRY __GLES_APINAME(WindowPos3sv)(const GLshort *v)
 {
     __GL_GET_CONTEXT;
     gc->currentImmediateTable->WindowPos3sv(gc, v);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib1d)(GLuint indx, GLdouble x)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib1d(gc, indx, x);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib1dv)(GLuint indx, const GLdouble* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib1dv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib1s)(GLuint indx, GLshort x)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib1s(gc, indx, x);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib1sv)(GLuint indx, const GLshort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib1sv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib2d)(GLuint indx, GLdouble x, GLdouble y)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib2d(gc, indx, x, y);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib2dv)(GLuint indx, const GLdouble* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib2dv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib2s)(GLuint indx, GLshort x, GLshort y)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib2s(gc, indx, x, y);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib2sv)(GLuint indx, const GLshort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib2sv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib3d)(GLuint indx, GLdouble x, GLdouble y, GLdouble z)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib3d(gc, indx, x, y, z);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib3dv)(GLuint indx, const GLdouble* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib3dv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib3s)(GLuint indx, GLshort x, GLshort y, GLshort z)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib3s(gc, indx, x, y, z);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib3sv)(GLuint indx, const GLshort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib3sv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Nbv)(GLuint indx, const GLbyte* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Nbv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Niv)(GLuint indx, const GLint* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Niv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Nsv)(GLuint indx, const GLshort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Nsv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Nub)(GLuint indx, GLubyte x, GLubyte y, GLubyte z, GLubyte w)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Nub(gc, indx, x, y, z, w);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Nubv)(GLuint indx, const GLubyte* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Nubv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Nuiv)(GLuint indx, const GLuint* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Nuiv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4Nusv)(GLuint indx, const GLushort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4Nusv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4bv)(GLuint indx, const GLbyte* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4bv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4d)(GLuint indx, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4d(gc, indx, x, y, z, w);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4dv)(GLuint indx, const GLdouble* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4dv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4iv)(GLuint indx, const GLint* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4iv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4s)(GLuint indx, GLshort x, GLshort y, GLshort z, GLshort w)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4s(gc, indx, x, y, z, w);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4sv)(GLuint indx, const GLshort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4sv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4ubv)(GLuint indx, const GLubyte* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4ubv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4uiv)(GLuint indx, const GLuint* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4uiv(gc, indx, values);
+}
+
+GLvoid GLAPIENTRY __GLES_APINAME(VertexAttrib4usv)(GLuint indx, const GLushort* values)
+{
+    __GL_GET_CONTEXT;
+    gc->currentImmediateTable->VertexAttrib4usv(gc, indx, values);
 }
 GLvoid GLAPIENTRY __GLES_APINAME(DrawPixels)( GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *pixels )
 {

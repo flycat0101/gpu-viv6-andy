@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -464,21 +464,21 @@ typedef union __GLchipProgramStateKeyMaskRec
 {
     struct __GLchipProgramStateMaskRec
     {
-        GLuint                          hasNP2AddrMode          : 1; /* Set when NP2 texture is set */
-        GLuint                          hasShadowMapCmp         : 1; /* Set when shadow map compare parameters are set */
-        GLuint                          hasTexPatchFmt          : 1; /* Set when texture format needs shader patch */
-        GLuint                          hasRtPatchFmt           : 1; /* Set when rt format needs shader patch */
-        GLuint                          hasConstTexcrd          : 1; /* Set when sampler is filtered by constant texcoord */
-        GLuint                          hasShaderBlend          : 1; /* Set when using ETC2 RGBA8 texture with src blend  */
-        GLuint                          hasRemoveAlpha          : 1; /* Set when we have opt to remove alpha assignment */
-        GLuint                          hasYinverted            : 1; /* Set when we have yInverted-awared code in ps */
-        GLuint                          hasSampleMask           : 1; /* Set when we have sample mask code in ps */
-        GLuint                          hasSampleCov            : 1; /* Set when we have sample coverage code in ps */
-        GLuint                          hasAlpha2Cov            : 1; /* Set when we have alpha to coverage code in ps */
-        GLuint                          hasTcsPatchInVertices   : 1; /* Set when we have mismatched tcs patchIn vertices with predicted value */
-        GLuint                          hasColorKill            : 1; /* Set when we found color.xyzw = 0 and blend function (1, 1-srcAlpha) to discard color */
-        GLuint                          hasAlphaBlend           : 1; /* Set when we need do shader blend */
-        GLuint                          hasPolygonOffset        : 1; /* Set when we do shader polygone offset */
+        GLuint                          hasNP2AddrMode          : 1;
+        GLuint                          hasShadowMapCmp         : 1;
+        GLuint                          hasTexPatchFmt          : 1;
+        GLuint                          hasRtPatchFmt           : 1;
+        GLuint                          hasConstTexcrd          : 1;
+        GLuint                          hasShaderBlend          : 1;
+        GLuint                          hasRemoveAlpha          : 1;
+        GLuint                          hasYinverted            : 1;
+        GLuint                          hasSampleMask           : 1;
+        GLuint                          hasSampleCov            : 1;
+        GLuint                          hasAlpha2Cov            : 1;
+        GLuint                          hasTcsPatchInVertices   : 1;
+        GLuint                          hasColorKill            : 1;
+        GLuint                          hasAlphaBlend           : 1;
+        GLuint                          hasPolygonOffset        : 1;
         GLuint                          hasPSOutHighpConversion : 1; /*  */
         GLuint                          reserved                : 16;
     } s;
@@ -627,7 +627,6 @@ typedef struct __GLchipSLProgramInstanceRec
     /* advanced blend state uniform */
     __GLchipSLUniform                  *advBlendState;
 
-    /* TODO: We need to redesign it with recompilePatchInfo to let driver more safely and efficiently use */
     __GLchipProgramStateKeyMask         pgStateKeyMask;
 
     GLboolean                           master;

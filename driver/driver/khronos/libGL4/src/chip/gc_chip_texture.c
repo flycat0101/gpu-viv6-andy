@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -841,7 +841,17 @@ gcChipUtilGetImageFormat(
             break;
         }
         break;
-
+#ifdef OPENGL40
+    case GL_BGR_EXT:
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE:
+            bpp = 24;
+            imageFormat = gcvSURF_R8G8B8;
+            break;
+        }
+        break;
+#endif
     case GL_RED:
         switch (type)
         {
@@ -1232,6 +1242,7 @@ gcChipResidentTextureLevel(
     GLboolean astc;
     GLboolean needClean = GL_FALSE;
     const GLvoid *pixels = gcvNULL;
+
     gceTEXTURE_FACE halFace = (__GL_TEXTURE_CUBEMAP_INDEX == texObj->targetIndex)
                             ? gcvFACE_POSITIVE_X + face : gcvFACE_NONE;
     __GLbufferObject *unpackBufObj = gc->bufferObject.generalBindingPoint[__GL_PIXEL_UNPACK_BUFFER_INDEX].boundBufObj;
@@ -1267,8 +1278,6 @@ gcChipResidentTextureLevel(
         gcmONERROR(gcoTEXTURE_ConstructEx(chipCtx->hal, __glChipTexTargetToHAL[texObj->targetIndex], &texInfo->object));
     }
 
-    /* TODO: this two operations should be put on completion check.
-    ** the format and type could be change here, RGBA to DEPTH*/
     gcmONERROR(gcoTEXTURE_SetEndianHint(texInfo->object,
         gcChipUtilGetEndianHint(mipmap->requestedFormat, mipmap->type)));
 
@@ -1482,7 +1491,6 @@ gcChipResidentTextureLevel(
                 {
                     /* Go through all attach points, not only the ones selected by drawBuffers.
                     ** Because we do not resize indirect RT surfaces when change drawBuffers.
-                    ** (todo) handle array texture shadow rendering not correctly.
                     */
                     for (attachIdx = 0; attachIdx < __GL_MAX_ATTACHMENTS; ++attachIdx)
                     {
@@ -1611,7 +1619,6 @@ gcChipResidentTextureLevel(
              case GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC:
                 if (needDecompress)
                 {
-                    /* TODO: decompress function */
                     GL_ASSERT(GL_FALSE);
                 }
                 else
@@ -1759,6 +1766,8 @@ gcChipResidentTextureLevel(
                 texInfo->mipLevels[level].shadow[face + i].masterDirty = GL_TRUE;
                 texInfo->mipLevels[level].shadow[face + i].shadowDirty = GL_FALSE;
             }
+
+
 
             if (needClean)
             {
@@ -2280,6 +2289,9 @@ gcChipCopyTexImage(
     gcmHEADER_ARG("gc=0x%x texObj=0x%x face=%d level=%d x=%d y=%d",
                    gc, texObj, face, level, x, y);
 
+#ifdef OPENGL40
+    gcmONERROR(setTextureWrapperFormat(gc, texObj, mipmap->baseFormat));
+#endif
     gcmONERROR(gcChipResetTextureWrapper(gc, texObj));
 
     /* Construct the gcoTEXTURE object. */
@@ -3177,7 +3189,6 @@ gcChipGetTextureSurface(
                                              gcvNULL));
         break;
     default:
-        /* TODO: HAL do not support yet */
         GL_ASSERT(0);
     }
 
@@ -3485,7 +3496,6 @@ gcChipCompressedTexSubImage(
          case GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC:
             if (needDecompress)
             {
-                /* TODO: decompress function */
                 GL_ASSERT(GL_FALSE);
             }
             break;
@@ -3782,6 +3792,76 @@ OnError:
     gcmFOOTER_ARG("return=%d", GL_FALSE);
     return GL_FALSE;
 }
+
+GLboolean
+__glChipGetCompressedTexImage(
+    __GLcontext *gc,
+    __GLtextureObject *texObj,
+    __GLmipMapLevel *mipmap,
+    GLint level,
+    GLvoid *img
+)
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gctSIZE_T sliceoffset = 0;
+    gcoSURF mipSurf = gcvNULL;
+    __GLchipFmtMapInfo *formatMapInfo = gcvNULL;
+    GLboolean needDecompress = GL_FALSE;
+    gctUINT32 address[3] = {0};
+    gctPOINTER memory[3] = {gcvNULL};
+    gceSTATUS status = gcvSTATUS_FALSE;
+
+    __GLchipTextureInfo *texInfo = (__GLchipTextureInfo*)texObj->privateData;
+    __GLchipMipmapInfo *chipMipLevel = &texInfo->mipLevels[level];
+    GLint numSlices = mipmap->arrays > 1 ? mipmap->arrays : mipmap->depth;
+
+    gcmHEADER_ARG("gc=0x%x texObj=0x%x mipmap=0x%x level=%d img=0x%x",
+                   gc, texObj, mipmap, level, img);
+
+    formatMapInfo = chipMipLevel->formatMapInfo;
+
+    /*
+    ** If core format indicate it's compressed AND there is mismatch within core->requestHAL->readHAL,
+    ** which mean we have to do conversion.
+    */
+    if ((formatMapInfo->flags & (__GL_CHIP_FMTFLAGS_FMT_DIFF_CORE_REQ |
+    __GL_CHIP_FMTFLAGS_FMT_DIFF_REQ_READ)) &&
+    mipmap->compressed)
+    {
+        needDecompress = GL_TRUE;
+    }
+
+    if ( needDecompress )
+    {
+        GL_ASSERT(0);
+    } else {
+        if ( mipmap->compressed && mipmap->compressedSize )
+        {
+            /* For tiled issue, perhaps it can be done by resolving to non-tiled surface and copy data to the user, Fix me ? */
+            if ( numSlices == 1 )
+            {
+                gcmONERROR(gcoTEXTURE_GetMipMapSlice(texInfo->object, level, 0, &mipSurf, &sliceoffset));
+                /* Lock the surface. */
+                gcmONERROR(gcoSURF_Lock(mipSurf, address, memory));
+                if ( memory[0] != gcvNULL )
+                    memcpy((GLchar *)img, (GLchar *)memory[0], mipmap->compressedSize);
+                gcmONERROR(gcoSURF_Unlock(mipSurf, memory[0]));
+            }
+            else {
+                GL_ASSERT(0);
+            }
+        }
+    }
+
+    gcmFOOTER_ARG("return=%d", GL_TRUE);
+    return GL_TRUE;
+
+OnError:
+    gcChipSetError(chipCtx, status);
+    gcmFOOTER_ARG("return=%d", GL_FALSE);
+    return GL_FALSE;
+}
+
 #endif
 
 GLboolean
@@ -4168,9 +4248,6 @@ __glChipGenerateMipMap(
                                                                     baseMipmap->type)));
     }
 
-    /* TODO: If the base level was not specified yet, mipmaps in fact cannot be generated.
-    ** We should just remove add base level mipmap code.
-    */
     chipMipLevel = &texInfo->mipLevels[baseLevel];
 
     if (CHIP_TEX_IMAGE_IS_UPTODATE(texInfo, baseLevel) == 0)
@@ -5006,7 +5083,6 @@ GLboolean __glChipCopyImageSubData(
                 gcmONERROR(gcoSURF_ResolveRect(&srcView, &dstView, &rlvArgs));
             }
 
-            /* TODO, base on format/size do 3D copy and CPUBLIT */
         }
     }
 
@@ -5886,7 +5962,6 @@ __glChipEglImageTargetTexture2DOES(
     /* Save closest supported destination. */
     texInfo->eglImage.textureFormat = dstFormat;
 
-    /* TODO: ??? */
     if (image->type == KHR_IMAGE_TEXTURE_CUBE && image->u.texture.face > 0)
     {
         if ((image->u.texture.shadowSurface != gcvNULL) && (image->u.texture.masterDirty))
@@ -6198,7 +6273,6 @@ __glChipEglImageTargetTexture2DOES(
             {
                 /* Go through all attach points, not only the ones selected by drawBuffers.
                 ** Because we do not resize indirect RT surfaces when change drawBuffers.
-                ** (todo) handle array texture shadow rendering not correctly.
                 */
                 for (attachIdx = 0; attachIdx < __GL_MAX_ATTACHMENTS; ++attachIdx)
                 {

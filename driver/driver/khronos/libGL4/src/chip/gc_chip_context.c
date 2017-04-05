@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -245,6 +245,7 @@ gcChipInitDevicePipeline(
     gc->dp.compressedTexSubImage3D = __glChipCompressedTexSubImage3D;
     gc->dp.generateMipmaps = __glChipGenerateMipMap;
 
+
 #ifdef OPENGL40
     gc->dp.texImage1D = __glChipTexImage1D;
     gc->dp.texSubImage1D = __glChipTexSubImage1D;
@@ -257,6 +258,7 @@ gcChipInitDevicePipeline(
     gc->dp.bitmaps = __glChipBitmaps;
     gc->dp.drawPixels = __glChipDrawPixels;
     gc->dp.copyPixels = __glChipCopyPixels;
+    gc->dp.getCompressedTexImage = __glChipGetCompressedTexImage;
 #endif
 
     gc->dp.copyTexBegin = __glChipCopyTexBegin;
@@ -1480,10 +1482,6 @@ __glChipGetDeviceConstants(
                                             gcvNULL,
                                             gcvNULL));
 
-        /* maxVertOut and maxFragIn count gl_position in, while maxVarying does not.
-        ** TODO: gl_position used 2 varyings on some chips, need to change interface of gcoHAL_QueryShaderCaps()
-        **       for accurate maxVertOut and maxFragIn.
-        */
         shaderCaps->maxVertOutVectors = shaderCaps->maxFragInVectors = shaderCaps->maxVaryingVectors + 1;
 
         if (tsAvailable)
@@ -1608,6 +1606,11 @@ __glChipGetDeviceConstants(
     constants->minFragmentInterpolationOffset = -0.5f;
     constants->maxFragmentInterpolationOffset = 0.5f;
     constants->fragmentInterpolationOffsetBits = 4;
+
+#ifdef OPENGL40
+    constants->maxGeometryVaryingComponents = __GL_MAX_GEOMETRY_VARYING_COMPONENTS;
+    constants->maxVertexVaryingComponents = __GL_MAX_VERTEX_VARYING_COMPONENTS;
+#endif
 
     if (gcmIS_SUCCESS(status))
     {
@@ -1919,6 +1922,7 @@ __glChipCreateContext(
     gcmONERROR(gcChipInitializeSampler(gc));
     gcmONERROR(gcChipLoadCompiler(gc));
 #ifdef OPENGL40
+    memset((char *)chipCtx->builtinAttributeIndex, 0xFF, sizeof(chipCtx->builtinAttributeIndex));
     gcmONERROR(initializeHashTable(chipCtx));
     initPolygonStipplePatch(gc, chipCtx);
     initLineStipplePatch(gc, chipCtx);

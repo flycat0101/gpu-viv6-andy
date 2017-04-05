@@ -35,6 +35,7 @@ EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user
 
 # from libCL (trunk/driver/khronos/libCL/makefile.linux)
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_log.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_command.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_context.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libCL/gc_cl_device.o
@@ -73,12 +74,7 @@ CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS
 CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_1_APIS
 CCFLAGS += -DBUILD_OPENCL_12=1
 
-ifneq ($(filter v7, $(VARIANT_LIST)), v7)
-	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp
-	LIBS += m-vfp
-else
-	LIBS += m
-endif
+include $(qnx_build_dir)/math.mk
 
 LDFLAGS += -Wl,--version-script=$(driver_root)/driver/khronos/libCL/libOpenCL12.map
 

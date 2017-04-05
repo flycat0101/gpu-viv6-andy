@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -52,7 +52,7 @@ vx_status Convolve(vx_node node, vx_image src, vx_image dst, vx_int16* matrix, v
     kernelContext->params.col = (vx_uint32)conv_width;
     kernelContext->params.row = (vx_uint32)conv_height;
     kernelContext->params.matrix = matrix;
-    kernelContext->params.scale = gcoMATH_Log2((vx_float32)scale);
+    kernelContext->params.scale = gcoMATH_Ceiling(gcoMATH_Log2((vx_float32)scale));
 #if gcdVX_OPTIMIZER
     kernelContext->borders = bordermode->mode;
 #else

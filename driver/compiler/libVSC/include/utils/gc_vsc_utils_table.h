@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -52,7 +52,7 @@ BEGIN_EXTERN_C()
 #define BT_ENTRY_ID_SCOPE_MASK  0xC0000000
 #define BT_ENTRY_VALID_BITS     30
 
-#define BT_MAKE_ENTRY_ID(pBT, blockId, offset) (blockId)*(pBT)->entryCountPerBlock + (offset)/(pBT)->entrySize
+#define BT_MAKE_ENTRY_ID(pBT, blockId, offset) ((blockId)*(pBT)->entryCountPerBlock + (offset)/(pBT)->entrySize)
 #define BT_GET_BLOCK_INDEX(pBT, entryId)       ((entryId)/(pBT)->entryCountPerBlock)
 #define BT_GET_BLOCK_OFFSET(pBT, entryId)      (((entryId)%(pBT)->entryCountPerBlock)*(pBT)->entrySize)
 #define BT_GET_ENTRY_DATA(pBT, entryId)        ((pBT)->ppBlockArray[BT_GET_BLOCK_INDEX((pBT), (entryId))] + \

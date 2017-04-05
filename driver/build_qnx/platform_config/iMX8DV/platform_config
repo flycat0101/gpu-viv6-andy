@@ -16,6 +16,7 @@ EGL_API_FB      ?= 0
 USE_VDK         ?= 1
 USE_SW_FB       ?= 0
 USE_OPENCL      ?= 1
+USE_OPENVX      ?= 1
 VIVANTE_ENABLE_VG ?= 0
 VIVANTE_ENABLE_2D ?= 0
 VIVANTE_ENABLE_3D ?= 1

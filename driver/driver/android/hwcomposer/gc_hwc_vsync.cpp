@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -29,7 +29,7 @@ extern "C" int clock_nanosleep(clockid_t clock_id, int flags,
                            struct timespec *remain);
 
 /*
- * NOTICE & TODO:
+ * NOTICE & TODO (Soc-vendor):
  * This is only reference implementation for hwc vsync.
  * And it is a fake vsync, which does not wait for real framebuffer vsync.
  *
@@ -107,7 +107,7 @@ hwcVsyncPeriod(
     IN hwcContext * Context
     )
 {
-    /* TODO: vsync period in nano seconds. */
+    /* TODO (Soc-vendor): vsync period in nano seconds. */
     return (1000000000 / 60);
 }
 
@@ -171,7 +171,7 @@ vsyncThread(
 
     const nsecs_t period = (1000000000 / 60);
 
-    /* TODO: Implement real vsync. */
+    /* TODO (Soc-vendor): Implement real vsync. */
     nsecs_t nextFakeVsync = 0;
 
     for (;;)
@@ -194,7 +194,7 @@ vsyncThread(
             break;
         }
 
-        /*--------------- TODO: Implement real vsync. ---------------*/
+        /*--------------- TODO (Soc-vendor): Implement real vsync. ---------------*/
         nsecs_t now       = systemTime(CLOCK_MONOTONIC);
         nsecs_t nextVsync = nextFakeVsync;
         nsecs_t sleep     = nextVsync - now;

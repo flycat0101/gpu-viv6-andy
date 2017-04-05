@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -3376,9 +3376,9 @@ gcGetComparisonFunctionName(
     )
 {
     gceSTATUS       status   = gcvSTATUS_OK;
-    gctBOOL         isHalti0 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI0);
-    gctBOOL         isHalti1 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1);
-    gctBOOL         isHalti2 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2);
+    gctBOOL         isHalti0 = gcHWCaps.hwFeatureFlags.hasHalti0;
+    gctBOOL         isHalti1 = gcHWCaps.hwFeatureFlags.hasHalti1;
+    gctBOOL         isHalti2 = gcHWCaps.hwFeatureFlags.hasHalti2;
     gctCHAR         name[128] = "_txpcfcvt";
 
     if (isHalti2)
@@ -3994,7 +3994,7 @@ _createBlendStubFunction(
     gctUINT          argNo;
     gcSL_INSTRUCTION tempCode = gcvNULL;
     gctPOINTER       pointer = gcvNULL;
-    gctBOOL          advBlendHwPart0 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_ADVANCED_BLEND_MODE_PART0);
+    gctBOOL          advBlendHwPart0 = gcHWCaps.hwFeatureFlags.supportAdvBlendPart0;
 
     gcSL_SWIZZLE     srcSwizzle;
     gcsValue         val0;
@@ -4211,19 +4211,19 @@ _getRecompilerShaderSource(void)
     };
 
     /* Get library source based on hardware capability. */
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2))
+    if (gcHWCaps.hwFeatureFlags.hasHalti2)
     {
         sourceArray = Halti2FormatConvertLib;
     }
-    else if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SINGLE_PIPE_HALTI1))
+    else if (gcHWCaps.hwFeatureFlags.singlePipeHalti1)
     {
         sourceArray = Halti1SinglePipeFormatConvertLib;
     }
-    else if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1))
+    else if (gcHWCaps.hwFeatureFlags.hasHalti1)
     {
         sourceArray = Halti1FormatConvertLib;
     }
-    else if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI0))
+    else if (gcHWCaps.hwFeatureFlags.hasHalti0)
     {
         sourceArray = Halti0FormatConvertLib;
     }
@@ -4305,15 +4305,15 @@ gcLoadESTexFormatConvertLibrary(
         gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_FRAGMENT, &library));
 
         /* Load library based on hardware capability. */
-        if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2))
+        if (gcHWCaps.hwFeatureFlags.hasHalti2)
         {
             gcoOS_StrCopySafe(libName, gcmSIZEOF(libName), "libtxcvt2.pgcSL");
         }
-        else if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1))
+        else if (gcHWCaps.hwFeatureFlags.hasHalti1)
         {
             gcoOS_StrCopySafe(libName, gcmSIZEOF(libName), "libtxcvt1.pgcSL");
         }
-        else if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI0))
+        else if (gcHWCaps.hwFeatureFlags.hasHalti0)
         {
             gcoOS_StrCopySafe(libName, gcmSIZEOF(libName), "libtxcvt0.pgcSL");
         }
@@ -4441,7 +4441,7 @@ _getDXRecompilerShaderBinary(
     }
     else
     */
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI0))
+    if (gcHWCaps.hwFeatureFlags.hasHalti0)
     {
         gcoOS_PrintStrSafe(libName, gcmSIZEOF(libName), &libNameOffset,
             "%s\\system32\\libtxcvt0.pgcSL", winDir);
@@ -4600,6 +4600,7 @@ gcLoadCLPatchLibrary(
 {
     gceSTATUS   status          = gcvSTATUS_OK;
     gctSTRING   gcCLPatchSource[CL_LIB_COUNT] = {gcvNULL};
+    gctSTRING   log = gcvNULL;
     gctINT      i, j;
 
     _gcmLockLoadLibrary(status);
@@ -4719,7 +4720,6 @@ gcLoadCLPatchLibrary(
         };
         gctSIZE_T   sourceSize, length;
         gctPOINTER  pointer = gcvNULL;
-        gctSTRING   log       = gcvNULL;
         gctINT      stringNum;
         gctINT      patchLen;
 
@@ -4761,29 +4761,11 @@ gcLoadCLPatchLibrary(
             if (status != gcvSTATUS_OK)
             {
                 /* report error */
-                gctSIZE_T strLen = gcoOS_StrLen(log, gcvNULL);
-                gctSIZE_T outLen = 1024;
-                char orig = '\0';
-                char* start = log;
-                gcoOS_Print("Compiler Error:\n");
-                do {
-                    if (strLen > outLen)
-                    {
-                        orig = start[outLen];
-                        start[outLen] = '\0';
-                    }
-                    gcoOS_Print("%s\n", start);
-                    if (strLen > outLen)
-                    {
-                        start[outLen] = orig;
-                        start+=outLen;
-                    }
-                    else
-                    {
-                        break;
-                    }
-                    strLen = gcoOS_StrLen(start, gcvNULL);
-                }while(strLen > 0);
+                gcoOS_Print("Compiler Error:");
+                if (log)
+                {
+                    gcoOS_Print("%s\n", log);
+                }
                 goto OnError;
             }
 
@@ -4814,8 +4796,6 @@ gcLoadCLPatchLibrary(
         gcmONERROR(gcSHADER_Load(library, buffer, bufferSize));
 #endif
     }
-    _gcmUnlockLoadLibrary(status);
-    gcmONERROR(status);
 
 OnError:
     for (i = 0; i < CL_LIB_COUNT; i++)
@@ -4825,6 +4805,13 @@ OnError:
             gcmOS_SAFE_FREE(gcvNULL, gcCLPatchSource[i]);
         }
     }
+
+    if (log)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, log);
+    }
+
+    _gcmUnlockLoadLibrary(status);
     /* Return the status. */
     return status;
 }
@@ -4835,17 +4822,24 @@ gcFreeCLPatchLibrary(
     )
 {
     gctINT i;
+    gceSTATUS status = gcvSTATUS_OK;
+
+    _gcmLockLoadLibrary(status);
+    gcmONERROR(status);
+
     for (i = 0; i < CL_LIB_COUNT; i++)
     {
         if (gcCLPatchLibrary[i])
         {
             /* Free library. */
-            gcSHADER_Destroy(gcCLPatchLibrary[i]);
+            gcmONERROR(gcSHADER_Destroy(gcCLPatchLibrary[i]));
             gcCLPatchLibrary[i] = gcvNULL;
         }
     }
 
-    return gcvSTATUS_OK;
+OnError:
+    _gcmUnlockLoadLibrary(status);
+    return status;
 }
 
 static gceSTATUS
@@ -7962,7 +7956,7 @@ _patchLongULong(
             gcFUNCTION          stubFunction_jmp = gcvNULL;
             gctUINT16 jmpIndex = 0;
 
-#if gcdDEBUG
+#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
             gcSL_INSTRUCTION code     = &Shader->code[Patch->instructionIndex+Shader->InsertCount];
             gcSL_FORMAT src0Format  = gcmSL_SOURCE_GET(GetInstSource0(code), Format);
             gcSL_FORMAT src1Format  = gcmSL_SOURCE_GET(GetInstSource1(code), Format);
@@ -8036,7 +8030,7 @@ _patchLongULong(
                     Shader->instrIndex = instrIndex;
                     gcSHADER_AddLabel(Shader, tmpLabel1);
                     Shader->lastInstruction = lastInstruction + 1;
-                    gcoOS_MemCopy(Shader->code+i+4, tempCode+i+3, gcmSIZEOF(struct _gcSL_INSTRUCTION) * (lastInstruction - i - 2));
+                    gcoOS_MemCopy(Shader->code+i+4, tempCode+i+3, gcmSIZEOF(struct _gcSL_INSTRUCTION) * (lastInstruction - i - 3));
                     Shader->InsertCount++;
                 }
                 else if(condition == gcSL_EQUAL)
@@ -8048,7 +8042,7 @@ _patchLongULong(
                                      gcmSIZEOF(struct _gcSL_INSTRUCTION));
 
                      gcoOS_MemCopy(Shader->code+i+3, tempCode+i+3,
-                                     gcmSIZEOF(struct _gcSL_INSTRUCTION) * (lastInstruction - i - 1));
+                                     gcmSIZEOF(struct _gcSL_INSTRUCTION) * (lastInstruction - i - 3));
 
                      Shader->lastInstruction -= 1;
                     isLogicOR = gcvTRUE;
@@ -8072,7 +8066,7 @@ _patchLongULong(
                 gcSHADER_AddLabel(Shader, tmpLabel2);
                 Shader->lastInstruction = lastInstruction + 1;
                 gcoOS_MemCopy(Shader->code+i+4, tempCode+i+3,
-                    gcmSIZEOF(struct _gcSL_INSTRUCTION) * (lastInstruction - i - 2));
+                    gcmSIZEOF(struct _gcSL_INSTRUCTION) * (lastInstruction - i - 3));
 
                 Shader->InsertCount++;
                 Shader->InstNum++;
@@ -8226,7 +8220,7 @@ _patchLongULong(
             Shader->lastInstruction = lastInstruction + 1;
             Shader->instrIndex = instrIndex;
             gcoOS_MemCopy(Shader->code+patchInstrIndex+2, tempCode+patchInstrIndex+1,
-                        gcmSIZEOF(struct _gcSL_INSTRUCTION) * (lastInstruction - patchInstrIndex));
+                        gcmSIZEOF(struct _gcSL_INSTRUCTION) * (lastInstruction - patchInstrIndex - 1));
 
             gcmOS_SAFE_FREE(gcvNULL, tempCode);
             Shader->codeCount = Shader->lastInstruction;
@@ -8317,7 +8311,7 @@ _patchLongULong(
             gcFUNCTION          stubFunction = gcvNULL;
             gcSL_INSTRUCTION code     = &Shader->code[Patch->instructionIndex];
 
-#if gcdDEBUG
+#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
             gcSL_FORMAT src0Format  = gcmSL_SOURCE_GET(GetInstSource0(code), Format);
             gcSL_FORMAT src1Format  = gcmSL_SOURCE_GET(GetInstSource1(code), Format);
             gcSL_FORMAT dstFormat   = gcmSL_TARGET_GET(GetInstTemp(code), Format);
@@ -9350,7 +9344,7 @@ gcSHADER_CompileBuiltinLibrary(
         GetWindowsDirectoryA(winDir, 260);
 
         /* Load library based on hardware capability. */
-        if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI0))
+        if (gcHWCaps.hwFeatureFlags.hasHalti0)
         {
             gcoOS_PrintStrSafe(libName, gcmSIZEOF(libName), &libNameOffset,
                 "%s\\system32\\libbuiltin0.pgcSL", winDir);
@@ -9411,24 +9405,24 @@ gcSHADER_CompileBuiltinLibrary(
 {
     gceSTATUS   status          = gcvSTATUS_OK;
     gctSTRING   sloBuiltinSource = gcvNULL;
-    gcePATCH_ID patchId = gcvPATCH_INVALID;
+    gcePATCH_ID patchId = gcPatchId;
 
     gctSIZE_T   length;
     gctPOINTER  pointer = gcvNULL;
     gctINT      i, stringNum = 0;
     gctSTRING   log    = gcvNULL;
 
-    gctBOOL     fmaSupported = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_ADVANCED_SH_INST);
-    gctBOOL     isHalti5 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI5);
-    gctBOOL     isHalti4 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI4);
-    gctBOOL     isHalti2 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2);
-    gctBOOL     isHalti0 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI0);
-    gctBOOL     isSupportTextureGather = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TEXTURE_GATHER);
-    gctBOOL     isSupportImgAddr = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION);
-    gctBOOL     isSupportImgInst = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI5) ?
-                                    gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_USC_GOS_ADDR_FIX) :
+    gctBOOL     fmaSupported = gcHWCaps.hwFeatureFlags.supportAdvancedInsts;
+    gctBOOL     isHalti5 = gcHWCaps.hwFeatureFlags.hasHalti5;
+    gctBOOL     isHalti4 = gcHWCaps.hwFeatureFlags.hasHalti4;
+    gctBOOL     isHalti2 = gcHWCaps.hwFeatureFlags.hasHalti2;
+    gctBOOL     isHalti0 = gcHWCaps.hwFeatureFlags.hasHalti0;
+    gctBOOL     isSupportTextureGather = gcHWCaps.hwFeatureFlags.supportTxGather;
+    gctBOOL     isSupportImgAddr = gcHWCaps.hwFeatureFlags.supportImgAddr;
+    gctBOOL     isSupportImgInst = gcHWCaps.hwFeatureFlags.hasHalti5 ?
+                                    gcHWCaps.hwFeatureFlags.hasUscGosAddrFix :
                                     isSupportImgAddr;
-    gctBOOL     isSupportTexelFetchForMSAA = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_MSAA_TEXTURE);
+    gctBOOL     isSupportTexelFetchForMSAA = gcHWCaps.hwFeatureFlags.supportMSAATexture;
     /* Use extension string to check extension feature. */
     gctBOOL     isSupportTexMSAA2DArray = gcoOS_StrStr(GetGLExtensionString(), "GL_OES_texture_storage_multisample_2d_array", gcvNULL);
     gctBOOL     isSupportCubeMapArray = gcoOS_StrStr(GetGLExtensionString(), "GL_EXT_texture_cube_map_array", gcvNULL);
@@ -10227,8 +10221,6 @@ gcSHADER_CompileBuiltinLibrary(
         }
     }
 
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
-
     gcmONERROR(gcoOS_Allocate(gcvNULL, __BUILTIN_SHADER_LENGTH__, &pointer));
     sloBuiltinSource = pointer;
 
@@ -10551,7 +10543,7 @@ gcSHADER_CompileBuiltinLibrary(
         /* add the header source */
         gcoOS_StrCatSafe(sloBuiltinSource, __BUILTIN_SHADER_LENGTH__, gcLibFunc_BlendEquationHeader);
 
-        if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_ADVANCED_BLEND_MODE_PART0))
+        if (gcHWCaps.hwFeatureFlags.supportAdvBlendPart0)
         {
             /* add the blend equation source that are not supported by HW in gc7000 */
             stringNum = sizeof(BlendEquationLib_part0) / sizeof(gctSTRING);
@@ -10659,10 +10651,11 @@ gcSHADER_CompileCLBuiltinLibrary(
 
     if (gcCLCompiler == gcvNULL)
     {
+        _gcmUnlockLoadLibrary(status);
         return gcvSTATUS_LINK_LIB_ERROR;
     }
 
-    useImgInst = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION) &&
+    useImgInst = gcHWCaps.hwFeatureFlags.supportImgAddr&&
                  !gcdHasOptimization(gcGetOptimizerOptionVariable()->optFlags, gcvOPTIMIZATION_IMAGE_PATCHING) &&
                  gcSHADER_GoVIRPass(Shader);
 
@@ -10673,6 +10666,7 @@ gcSHADER_CompileCLBuiltinLibrary(
             if (gcCLBuiltinLibrary1 != gcvNULL)
             {
                 *Binary = gcCLBuiltinLibrary1;
+                _gcmUnlockLoadLibrary(status);
                 return gcvSTATUS_OK;
             }
         }
@@ -10681,6 +10675,7 @@ gcSHADER_CompileCLBuiltinLibrary(
             if (gcCLBuiltinLibrary0 != gcvNULL)
             {
                 *Binary = gcCLBuiltinLibrary0;
+                _gcmUnlockLoadLibrary(status);
                 return gcvSTATUS_OK;
             }
         }
@@ -10822,11 +10817,11 @@ _fixTempIndexByMappingTable(
 {
     gctINT libFunctionTempIndexStart = (gctINT)MI->Function->tempIndexStart - MI->TempOffset;
 
-    gcmASSERT(*TempIndexPtr < MI->LibList->mappingTableEntries);
-    if (MI->LibList->mappingTable[*TempIndexPtr] != -1)
+    gcmASSERT(*TempIndexPtr < MI->LibList->tempMappingTableEntries);
+    if (MI->LibList->tempMappingTable[*TempIndexPtr] != (gctUINT16)-1)
     {
         /* already mapped, use the mapped temp index */
-        *TempIndexPtr = (gctUINT16) MI->LibList->mappingTable[*TempIndexPtr];
+        *TempIndexPtr = (gctUINT16) MI->LibList->tempMappingTable[*TempIndexPtr];
         gcmASSERT(*TempIndexPtr < MI->Shader->_tempRegCount);
         return;
     }
@@ -10838,14 +10833,99 @@ _fixTempIndexByMappingTable(
         gctINT newTempIndex = (gctINT)*TempIndexPtr + MI->TempOffset;
         gcmASSERT(newTempIndex > 0 && newTempIndex < (gctINT)MI->Shader->_tempRegCount);
         /* enter the mapping */
-        MI->LibList->mappingTable[*TempIndexPtr] = newTempIndex;
+        gcmASSERT(newTempIndex < 0xFFFF);
+        MI->LibList->tempMappingTable[*TempIndexPtr] = (gctUINT16)newTempIndex;
         *TempIndexPtr = (gctUINT16)newTempIndex;
     }
     else
     {
         /* TODO: handling global variables */
+        if (gcSHADER_DumpCodeGenVerbose(MI->LibList->lib))
+        {
+            gcDump_Shader(gcvNULL, "Library shader ", gcvNULL, MI->LibList->lib, gcvTRUE);
+        }
+
         gcmASSERT(gcvFALSE);
     }
+    return;
+}
+
+/* check Library's uniform mapping table if *UniformIndexPtr is
+ * already mapped, if it is, change the temp index to mapped value,
+ * otherwise if the temp index is in Function's temp register range,
+ * then adjust the temp index by TempOffset and enter the mapping
+ * to the table; otherwise, it must use some unseen variable (most
+ * likely the global variable), mapping the global variable.
+ */
+static void
+_fixUniformIndexByMappingTable(
+    IN     _MappingInfo *   MI,
+    IN OUT gctUINT16 *      UniformIndexPtr
+    )
+{
+    gcUNIFORM libUniform, newUniform;
+    gctINT16  newUniformIndex;
+    gcmASSERT(*UniformIndexPtr < MI->LibList->uniformMappingTableEntries);
+    if (MI->LibList->uniformMappingTable[*UniformIndexPtr] != (gctUINT16)-1)
+    {
+        /* already mapped, use the mapped temp index */
+        *UniformIndexPtr = (gctUINT16) MI->LibList->uniformMappingTable[*UniformIndexPtr];
+        gcmASSERT(*UniformIndexPtr < MI->Shader->uniformCount + MI->Shader->maxKernelFunctionArgs);
+        return;
+    }
+
+    /* add the uniform in the lib to the shader be linked to */
+    libUniform = MI->LibList->lib->uniforms[*UniformIndexPtr];
+    gcmASSERT(libUniform != gcvNULL);
+    if (isUniformCompiletimeInitialized(libUniform) && isUniformCompilerGen(libUniform))
+    {
+        gcSHADER_CreateConstantUniform(MI->Shader,
+                                        libUniform->u.type,
+                                        &libUniform->initializer,
+                                        &newUniform);
+        gcmASSERT(newUniform != gcvNULL && newUniform->index < 0xFFFF);
+        newUniformIndex = newUniform->index;
+    }
+    else
+    {
+        gctINT16    parentUniformIndex = -1,
+                    prevSiblingUniformIndex = -1;
+        if (libUniform->parent != -1)
+        {
+            /* first link in parent */
+            gctUINT16    uniformIndex = (gctUINT16)libUniform->parent;
+            _fixUniformIndexByMappingTable(MI, &uniformIndex);
+            parentUniformIndex = uniformIndex;
+        }
+        if (libUniform->prevSibling != -1)
+        {
+            /* then link in prevSibling */
+            gctUINT16    uniformIndex = (gctUINT16)libUniform->prevSibling;
+            _fixUniformIndexByMappingTable(MI, &uniformIndex);
+            prevSiblingUniformIndex = uniformIndex;
+        }
+        gcSHADER_AddUniformEx1(MI->Shader,
+                libUniform->name,
+                libUniform->u.type,
+                libUniform->precision,
+                libUniform->location,
+                libUniform->binding,
+                libUniform->offset,
+                libUniform->arrayLengthCount,
+                libUniform->arrayLengthList,
+                libUniform->_varCategory,
+                (gctUINT16)libUniform->u.numStructureElement,
+                parentUniformIndex,
+                prevSiblingUniformIndex,
+                (gctUINT16)libUniform->imageFormat,
+                &newUniformIndex,
+                &newUniform);
+    }
+    /* enter the mapping */
+    gcmASSERT(newUniformIndex < 0xFFFF);
+    MI->LibList->uniformMappingTable[*UniformIndexPtr] = (gctUINT16)newUniformIndex;
+    *UniformIndexPtr = (gctUINT16)newUniformIndex;
+
     return;
 }
 
@@ -10857,8 +10937,8 @@ _MapTempRegister(
     )
 {
     gcmASSERT(TempIndex >= 0 &&
-              TempIndex < (gctINT)LibList->mappingTableEntries);
-    LibList->mappingTable[TempIndex] = MappedTempRegIndex;
+              TempIndex < (gctINT)LibList->tempMappingTableEntries);
+    LibList->tempMappingTable[TempIndex] = (gctUINT16)MappedTempRegIndex;
     return;
 }
 
@@ -10881,22 +10961,45 @@ _addToLibraryList(
 
         /* create a new node if LibraryShader is not in the list */
         gcmVERIFY_OK(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcLibraryList), &pointer));
-        if (pointer == gcvNULL) return pointer;
+        if (pointer == gcvNULL) return gcvNULL;
+
         libList = (gcLibraryList *)pointer;
 
         libList->lib   = LibraryShader;
         libList->next  = Shader->libraryList;
         Shader->libraryList = libList;
 
+        /* make sure the max temp count can fit into 16bit */
+        gcmASSERT(LibraryShader->_tempRegCount < 0xFFFF);
         gcmVERIFY_OK(gcoOS_Allocate(gcvNULL,
-                                  gcmSIZEOF(gctINT) * LibraryShader->_tempRegCount,
+                                  gcmSIZEOF(gctUINT16) * LibraryShader->_tempRegCount,
                                   &pointer));
-        libList->mappingTableEntries = LibraryShader->_tempRegCount;
-        libList->mappingTable = (gctINT *) pointer;
+        libList->tempMappingTableEntries = LibraryShader->_tempRegCount;
+        libList->tempMappingTable = (gctUINT16 *) pointer;
 
-        for (i=0; i < (gctINT)libList->mappingTableEntries; i++)
+        for (i=0; i < (gctINT)libList->tempMappingTableEntries; i++)
         {
-            libList->mappingTable[i] = -1;
+            libList->tempMappingTable[i] = (gctUINT16)-1;
+        }
+        /* make sure the max uniform count can fit into 16bit */
+        libList->uniformMappingTableEntries =
+            LibraryShader->maxKernelFunctionArgs + LibraryShader->uniformCount;
+        gcmASSERT(libList->uniformMappingTableEntries < 0xFFFF);
+        if (libList->uniformMappingTableEntries > 0)
+        {
+            gcmVERIFY_OK(gcoOS_Allocate(gcvNULL,
+                                      gcmSIZEOF(gctUINT16) * libList->uniformMappingTableEntries,
+                                      &pointer));
+            libList->uniformMappingTable = (gctUINT16 *) pointer;
+
+            for (i=0; i < (gctINT)libList->uniformMappingTableEntries; i++)
+            {
+                libList->uniformMappingTable[i] = (gctUINT16)-1;
+            }
+        }
+        else
+        {
+            libList->uniformMappingTable = gcvNULL;
         }
     }
 
@@ -10929,9 +11032,13 @@ gcSHADER_ResetLibraryMappingTable(
     {
         gcLibraryList * next = libList->next;
 
-        if(libList->mappingTable)
+        if(libList->tempMappingTable)
         {
-            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, libList->mappingTable));
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, libList->tempMappingTable));
+        }
+        if(libList->uniformMappingTable)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, libList->uniformMappingTable));
         }
         /* free the libList node */
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, libList));
@@ -12680,12 +12787,11 @@ gcSHADER_FindLibFunction(
     gctBOOL *    checkVariable = gcvNULL;
     gceINTRINSICS_KIND intrinsicsKind;
     gctINT  paraMapping[gcMAX_BUILT_IN_PARAMETER_COUNT];
-    gctBOOL     isSupportTextureGather = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TEXTURE_GATHER);
-    gctBOOL     isSupportTexelFetchForMSAA = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_MSAA_TEXTURE);
-    gctBOOL     isSupportImgAddr = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION);
-    gctBOOL     isSupportImgInst = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI5) ?
-                                    gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_USC_GOS_ADDR_FIX) :
-                                    isSupportImgAddr;
+    gctBOOL     isSupportTextureGather = gcHWCaps.hwFeatureFlags.supportTxGather;
+    gctBOOL     isSupportTexelFetchForMSAA = gcHWCaps.hwFeatureFlags.supportMSAATexture;
+    gctBOOL     isSupportImgAddr = gcHWCaps.hwFeatureFlags.supportImgAddr;
+    gctBOOL     isSupportImgInst = gcHWCaps.hwFeatureFlags.hasHalti5 ?
+                                    gcHWCaps.hwFeatureFlags.hasUscGosAddrFix : isSupportImgAddr;
     gctSTRING   functionName = (gctSTRING)FunctionName;
 
     if (isSupportImgAddr && !isSupportImgInst &&
@@ -12965,6 +13071,7 @@ gcSHADER_FindLibFunction(
                         gcmASSERT(paraMapping[argIndex] != -1);
                         code->source0Index = (gctUINT16) paraMapping[argIndex];
                     }
+
                     if ((gcmSL_SOURCE_GET(code->source1, Type) == gcSL_TEMP) &&
                         _inputOutputArgument(function, code->source1Index, gcvFALSE, &argIndex))
                     {
@@ -13085,8 +13192,13 @@ gcSHADER_FindLibFunction(
 
             if (gcmSL_SOURCE_GET(code->source0, Type) == gcSL_TEMP)
             {
-                /* Adjust temporary register count. */
+                /* Adjust temporary register index. */
                 _fixTempIndexByMappingTable(&mi, &code->source0Index);
+            }
+            if (gcmSL_SOURCE_GET(code->source0, Type) == gcSL_UNIFORM)
+            {
+                /* Adjust uniform index . */
+                _fixUniformIndexByMappingTable(&mi, &code->source0Index);
             }
             if (gcmSL_SOURCE_GET(code->source0, Indexed) != gcSL_NOT_INDEXED)
             {
@@ -13123,6 +13235,11 @@ gcSHADER_FindLibFunction(
             {
                 /* Adjust temporary register count. */
                 _fixTempIndexByMappingTable(&mi, &code->source1Index);
+            }
+            if (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_UNIFORM)
+            {
+                /* Adjust uniform index . */
+                _fixUniformIndexByMappingTable(&mi, &code->source1Index);
             }
             if (gcmSL_SOURCE_GET(code->source1, Indexed) != gcSL_NOT_INDEXED)
             {
@@ -13295,7 +13412,7 @@ _checkTexGradBuiltinFunc(
     IN gctINT       Index
 )
 {
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2))
+    if (gcHWCaps.hwFeatureFlags.hasHalti2)
     {
         return gcvFALSE;
     }
@@ -13522,7 +13639,7 @@ gcSHADER_LinkBuiltinLibrary(
         "_blend_equation_advanced_all",
     };
 
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_ADVANCED_BLEND_MODE_PART0))
+    if (gcHWCaps.hwFeatureFlags.supportAdvBlendPart0)
     {
         unSupportedBlendNum = gcmCOUNTOF(hwUnSupportedBlendEquatioins_part0);
         unSupportedBlendModes = hwUnSupportedBlendEquatioins_part0;

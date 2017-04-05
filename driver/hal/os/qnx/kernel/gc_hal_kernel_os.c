@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -26,7 +26,6 @@
 /* for ARM_PTE_... */
 #include <arm/mmu.h>
 
-/* TODO: Redefined. Put in common header. */
 #define GC_HAL_QNX_PULSEVAL_SIGNAL  (_PULSE_CODE_MINAVAIL+1)
 
 #define USE_VMALLOC 0
@@ -316,7 +315,7 @@ _MapPages(
     gcmkVERIFY_ARGUMENT(PageCount > 0);
     gcmkVERIFY_ARGUMENT(PageTable != gcvNULL);
 
-    addr  = (gctUINT32)Logical;
+    addr  = gcmPTR2INT32(Logical);
     table = (gctUINT32 *)PageTable;
     bytes = PageCount * __PAGESIZE;
 
@@ -510,8 +509,8 @@ gckOS_Construct(
                   "Physical base address set to 0x%08X.\n",
                   os->baseAddress);
 
-    os->mempoolBaseAddress = (gctPOINTER) drv_mempool_get_baseAddress();
-    os->mempoolBasePAddress = (gctPOINTER) drv_mempool_get_basePAddress();
+    os->mempoolBaseAddress = gcmINT2PTR( drv_mempool_get_baseAddress());
+    os->mempoolBasePAddress = gcmINT2PTR( drv_mempool_get_basePAddress());
     os->mempoolPageSize = drv_mempool_get_page_size();
 
     /* Return pointer to the gckOS object. */
@@ -2082,7 +2081,7 @@ gckOS_AtomicExchangePtr(
 
     atom = (gcskATOM_PTR)Target;
 
-    oldValue = _smp_xchg((volatile unsigned *)&atom->counter, (unsigned)NewValue);
+    oldValue = _smp_xchg((volatile unsigned *)&atom->counter, gcmPTR2INT(NewValue));
 
     if (OldValue != gcvNULL)
     {
@@ -4464,9 +4463,8 @@ gckOS_CacheInvalidate(
     IN gctSIZE_T Bytes
     )
 {
-    __asm__ __volatile__ ("dsb");
-
-    return gcvSTATUS_OK;
+     __asm__ __volatile__ ("dsb");
+     return gcvSTATUS_OK;
 }
 
 /*******************************************************************************
@@ -5049,8 +5047,6 @@ gckOS_ResetGPU(
     )
 {
     gcmkHEADER_ARG("Os=0x%X Core=%d", Os, Core);
-
-    /* TODO: Put your code here. */
 
     gcmkFOOTER_NO();
     return gcvSTATUS_NOT_SUPPORTED;
@@ -5949,7 +5945,7 @@ gckOS_StartThread(
 
     pthread_setname_np(tid, "Vivante Kernel Thread");
 
-    *Thread = (gctTHREAD)tid;
+    *Thread = (gctTHREAD)gcmINT2PTR(tid);
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
@@ -5971,7 +5967,7 @@ gckOS_StopThread(
     gcmkVERIFY_ARGUMENT(Thread != gcvNULL);
 
     /* Thread should have already been enabled to terminate. */
-    pthread_join((pthread_t)Thread, gcvNULL);
+    pthread_join((pthread_t)gcmPTR2INT(Thread), gcvNULL);
 
     gcmkFOOTER_NO();
     /* Success. */
@@ -6075,8 +6071,6 @@ gckOS_DumpCallStack(
     gcmkHEADER_ARG("Os=0x%X", Os);
 
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-
-    /* TODO */
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;

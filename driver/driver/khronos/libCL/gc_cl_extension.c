@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -43,6 +43,9 @@ static clsLOOKUP clgLookup[] =
     clmMAKE_LOOKUP(clCreateFromGLBuffer),
     clmMAKE_LOOKUP(clCreateFromGLTexture2D),
     clmMAKE_LOOKUP(clCreateFromGLTexture3D),
+#if BUILD_OPENCL_12
+    clmMAKE_LOOKUP(clCreateFromGLTexture),
+#endif
     clmMAKE_LOOKUP(clCreateFromGLRenderbuffer),
     clmMAKE_LOOKUP(clGetGLObjectInfo),
     clmMAKE_LOOKUP(clGetGLTextureInfo),
@@ -107,6 +110,8 @@ clGetExtensionFunctionAddress(
     function;
 
     gcmHEADER_ARG("FuncName=%s", FuncName);
+    gcmDUMP_API("${OCL clGetExtensionFunctionAddress %s}", FuncName);
+    VCL_TRACE_API(getExtensionFunctionAddress_Pre)(FuncName);
 
     if ((FuncName == gcvNULL)
     ||  (FuncName[0] == '\0')
@@ -118,6 +123,7 @@ clGetExtensionFunctionAddress(
 
     function.function = clfLookup(clgLookup, FuncName);
 
+    VCL_TRACE_API(getExtensionFunctionAddress_Post)(FuncName, function.ptr);
     gcmFOOTER_ARG("0x%x", function.ptr);
     return function.ptr;
 }
@@ -137,6 +143,8 @@ clGetExtensionFunctionAddressForPlatform(
     function;
 
     gcmHEADER_ARG("FuncName=%s", FuncName);
+    gcmDUMP_API("${OCL clGetExtensionFunctionAddressForPlatform 0x%x, %s}", Platform, FuncName);
+    VCL_TRACE_API(GetExtensionFunctionAddressForPlatform_Pre)(Platform, FuncName);
 
      if ((Platform == gcvNULL)
      || (Platform->objectType != clvOBJECT_PLATFORM))
@@ -155,12 +163,13 @@ clGetExtensionFunctionAddressForPlatform(
 
     function.function = clfLookup(clgLookup, FuncName);
 
+    VCL_TRACE_API(GetExtensionFunctionAddressForPlatform_Post)(Platform, FuncName, function.ptr);
     gcmFOOTER_ARG("0x%x", function.ptr);
     return function.ptr;
 }
 #endif
 
-
+extern void clfSetTraceMode(void);
 /*****************************************************************************\
 |*                      OpenCL Extension cl_khr_icd API                      *|
 \*****************************************************************************/
@@ -173,6 +182,7 @@ clIcdGetPlatformIDsKHR(cl_uint              NumEntries,
     gceSTATUS                   status          = CL_SUCCESS;
 
     gcmHEADER_ARG("NumEntries=%u", NumEntries);
+    gcmDUMP_API("${OCL clIcdGetPlatformIDsKHR %d}", NumEntries);
 
     if (Platforms && NumEntries == 0)
     {
@@ -186,6 +196,8 @@ clIcdGetPlatformIDsKHR(cl_uint              NumEntries,
         clfONERROR(cliIcdDispatchTableCreate(&dispatchTable));
     }
 
+    clfSetTraceMode();
+
     clfGetDefaultPlatformID(Platforms);
 
     if (Platforms)
@@ -198,6 +210,7 @@ clIcdGetPlatformIDsKHR(cl_uint              NumEntries,
         *NumPlatforms = 1;
     }
 
+    VCL_TRACE_API(IcdGetPlatformIDsKHR)(NumEntries, Platforms, NumPlatforms);
     gcmFOOTER_ARG("%d *Platforms=0x%x *NumPlatforms=%u",
                   CL_SUCCESS, gcmOPT_POINTER(Platforms),
                   gcmOPT_VALUE(NumPlatforms));
@@ -232,6 +245,7 @@ clGetGLContextInfoKHR(
 
     gcmHEADER_ARG("Properties=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   Properties, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetGLContextInfoKHR 0x%x, 0x%x}", Properties, ParamName);
 
     if (Properties)
     {
@@ -312,6 +326,7 @@ clGetGLContextInfoKHR(
         *ParamValueSizeRet = retParamSize;
     }
 
+    VCL_TRACE_API(GetGLContextInfoKHR)(Properties, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;

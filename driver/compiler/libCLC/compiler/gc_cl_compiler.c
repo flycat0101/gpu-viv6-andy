@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -152,8 +152,8 @@ cloCOMPILER_Unload(void)
        clmLockCompiler(status);
        if(gcmIS_ERROR(status)) return status;
 
-       status = clCleanupBuiltins();
-       if(gcmIS_ERROR(status)) return status;
+     status = clCleanupBuiltins();
+     if(gcmIS_ERROR(status)) return status;
 
        clmUnlockCompiler(status);
        if(gcmIS_ERROR(status)) return status;
@@ -168,7 +168,7 @@ cloCOMPILER_Unload(void)
 OnError:
        CompilerLockRef = gcvNULL;
        CompilerLockRefCount = 0;
-     }
+   }
      else gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, CompilerLockRef, gcvNULL));
    }
    return status;
@@ -242,7 +242,7 @@ cloCOMPILER_Construct(
         compiler->context.fpConfig = cldFpFAST_RELAXED_MATH;
         compiler->context.allowExternSymbols = gcvFALSE;
 
-        gcoHAL_GetPatchID(gcvNULL, &patchId);
+        patchId = *gcGetPatchId();
 
 #if gcdCOMPILER_DEBUGOUTPUT
         if (gcmIS_ERROR(vscDIConstructContext(gcvNULL,gcvNULL, &compiler->context.debugInfo)))
@@ -651,7 +651,7 @@ cloCOMPILER_VOutputLog(
 
     buffer[MAX_SINGLE_LOG_LENGTH] = '\0';
 #if gcdCOMPILER_DEBUGOUTPUT
-    gcmPRINT("%s", buffer);
+        gcmPRINT("%s", buffer);
 #endif
     return cloCOMPILER_AddLog(Compiler, buffer);
 }
@@ -978,6 +978,11 @@ gctCHAR *Buffer
             *(bufPtr.floatPtr)++ = constant->values[i].floatValue;
             break;
 
+         case clvTYPE_HALF:
+         case clvTYPE_HALF_PACKED:
+            *(bufPtr.ushortPtr)++ = (unsigned short)clmF2H(constant->values[i].floatValue);
+            break;
+
          case clvTYPE_LONG:
             *(bufPtr.longPtr)++ = constant->values[i].longValue;
             break;
@@ -1042,16 +1047,6 @@ cloCOMPILER_Compile(
         gcmONERROR(cloCOMPILER_Lock(Compiler));
 
         cloCOMPILER_SetCollectDIE(Compiler, gcvTRUE);
-
-        /* Load the built-ins */
-        status = cloCOMPILER_LoadBuiltins(Compiler);
-        if(gcmIS_ERROR(status)) {
-            cloCOMPILER_Unlock(Compiler);
-            break;
-        }
-
-        /* Set the global scope as current */
-        Compiler->context.currentSpace = Compiler->context.globalSpace;
 
         if (gcSHADER_DumpSource(0)) {
             gctCHAR buffer[512];
@@ -2107,18 +2102,23 @@ cloCOMPILER_MakeCurrent(
                                            (gctCONST_STRING **) &CurrentCompiler->context.strings,
                                            &CurrentCompiler->context.stringCount);
       if (gcmIS_ERROR(status)) return status;
-      /* Disable the Empty if statement*/
-      gcmVERIFY_OK(cloCOMPILER_SetCurrentLineNo(CurrentCompiler, 1));
-      gcmVERIFY_OK(cloCOMPILER_SetCurrentStringNo(CurrentCompiler, 0));
-      CurrentCompiler->context.currentCharNo    = 0;
     }
 #else
     CurrentCompiler->context.stringCount    = StringCount;
     CurrentCompiler->context.strings    = Strings;
+#endif
     gcmVERIFY_OK(cloCOMPILER_SetCurrentLineNo(CurrentCompiler, 1));
     gcmVERIFY_OK(cloCOMPILER_SetCurrentStringNo(CurrentCompiler, 0));
     CurrentCompiler->context.currentCharNo    = 0;
-#endif
+
+    Compiler->context.basicTypePacked = cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX);
+
+    /* Load the built-ins */
+    status = cloCOMPILER_LoadBuiltins(Compiler);
+    if (gcmIS_ERROR(status)) return status;
+
+    /* Set the global scope as current */
+    Compiler->context.currentSpace = Compiler->context.globalSpace;
     return _InitFpCapsFromVcOption(Compiler);
 }
 

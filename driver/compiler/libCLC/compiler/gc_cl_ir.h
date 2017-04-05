@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,6 +23,7 @@
 #define cldBASIC_VECTOR_BYTE_SIZE (cldBASIC_VECTOR_SIZE * cldMachineBytesPerWord)
 #define cldMAX_ARRAY_DIMENSION  4      /*maximum number of dimension for array allowed */
 
+#define _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES 0
 
 /* Compute aligned value in bytes */
 #define clmALIGN(N, Alignment, Packed) \
@@ -34,8 +35,7 @@
 #define clmF2L(f)        ((gctINT64)(f))
 #define clmF2UL(f)       ((gctUINT64)(f))
 #define clmF2C(f)        ((gctCHAR)(f))
-/*float to half: to be implemented later. For now, it is just float itself */
-#define clmF2H(f)        (f)
+#define clmF2H(f)        ((gctUINT)clConvFloatToHalf((f)))
 
 #define clmI2F(i)        ((gctFLOAT)(i))
 #define clmI2U(i)        ((gctUINT32)(i))
@@ -453,6 +453,11 @@ typedef struct _clsDECL
     gctBOOL ptrDominant;       /* This is to indicate the declaration is a pointer
                                   when it is an array and ptrDscr is not null */
 } clsDECL;
+
+gctUINT
+clConvFloatToHalf(
+IN gctFLOAT F
+);
 
 gctUINT
 clPermissibleAlignment(
@@ -892,6 +897,7 @@ typedef enum _cleATTR_FLAGS
     clvATTR_REQD_WORK_GROUP_SIZE = 0x10,
     clvATTR_WORK_GROUP_SIZE_HINT = 0x20,
     clvATTR_ALWAYS_INLINE = 0x40,
+    clvATTR_KERNEL_SCALE_HINT = 0x80,
 }
 cleATTR_FLAGS;
 
@@ -907,6 +913,7 @@ typedef struct _clsATTRIBUTE
     gctINT vecTypeHint; /*default is int*/
     gctSIZE_T reqdWorkGroupSize[3]; /*default {0,0,0} */
     gctSIZE_T workGroupSizeHint[3]; /*default {0,0,0} */
+    gctSIZE_T kernelScaleHint[3];   /*default {1,1,1} */
 } clsATTRIBUTE;
 
 struct _cloIR_EXPR;
@@ -965,6 +972,7 @@ typedef struct _clsNAME
         gctINT vecTypeHint;
         gctSIZE_T reqdWorkGroupSize[3];
         gctSIZE_T workGroupSizeHint[3];
+        gctSIZE_T kernelScaleHint[3];
         gctSIZE_T localMemorySize;
         gctUINT  refCount;
         gctBOOL  needLocalMemory;
@@ -1712,7 +1720,12 @@ struct _cloIR_CONSTANT
     cluCONSTANT_VALUE * values;
     gctSTRING buffer;
     clsNAME * variable;
+    gctUINT uniformCount;
+#if _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
+    gcUNIFORM *uniform;
+#else
     gcUNIFORM uniform;
+#endif
     gctBOOL allValuesEqual;
 };
 

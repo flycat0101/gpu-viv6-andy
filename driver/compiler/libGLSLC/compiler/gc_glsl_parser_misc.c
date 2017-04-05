@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -3758,6 +3758,8 @@ slParseFieldSelectionExpr(
         status = slsNAME_SPACE_Search(Compiler,
                                       Operand->dataType->fieldSpace,
                                       FieldSelection->u.fieldSelection,
+                                      gcvNULL,
+                                      gcvNULL,
                                       gcvFALSE,
                                       gcvFALSE,
                                       &fieldName);
@@ -4132,6 +4134,7 @@ slParseFuncDefinitionBegin(
     {
         status = sloCOMPILER_CreateNameSpace(Compiler,
                                              FuncName->symbol,
+                                             slvNAME_SPACE_FUNCTION,
                                              &nameSpace);
 
         if (gcmIS_ERROR(status))
@@ -8988,7 +8991,7 @@ gceSTATUS _CreateTempIdentifier(
     tempSymbol = pointer;
 
     gcoOS_GetTime(&curTime);
-    gcoOS_PrintStrSafe(tempSymbol, 256, &offset, "%u_scalarArray", curTime);
+    gcoOS_PrintStrSafe(tempSymbol, 256, &offset, "%llu_scalarArray", curTime);
 
     status = sloCOMPILER_AllocatePoolString(
         Compiler,
@@ -9018,6 +9021,7 @@ _ParseFuncCallExprAsExpr(
     status = sloCOMPILER_CreateNameSpace(
                                    Compiler,
                                    gcvNULL,
+                                   slvNAME_SPACE_FUNCTION,
                                    &nameSpace);
 
     if(gcmIS_ERROR(status)) {
@@ -9379,6 +9383,7 @@ slParseFuncHeader(
 
     status = sloCOMPILER_CreateNameSpace(Compiler,
                                          Identifier->u.identifier,
+                                         slvNAME_SPACE_FUNCTION,
                                          &name->u.funcInfo.localSpace);
 
     if (gcmIS_ERROR(status))
@@ -9617,6 +9622,7 @@ slParseCompoundStatementBegin(
     status = sloCOMPILER_CreateNameSpace(
                                         Compiler,
                                         gcvNULL,
+                                        slvNAME_SPACE_STATE_SET,
                                         &nameSpace);
 
     if (gcmIS_ERROR(status))
@@ -10882,6 +10888,7 @@ slParseWhileStatementBegin(
     status = sloCOMPILER_CreateNameSpace(
                                         Compiler,
                                         gcvNULL,
+                                        slvNAME_SPACE_STATE_SET,
                                         &nameSpace);
 
     if (gcmIS_ERROR(status))
@@ -11051,6 +11058,7 @@ slParseForStatementBegin(
     status = sloCOMPILER_CreateNameSpace(
                                         Compiler,
                                         gcvNULL,
+                                        slvNAME_SPACE_STATE_SET,
                                         &nameSpace);
 
     if (gcmIS_ERROR(status))
@@ -11546,6 +11554,8 @@ slParseInvariantOrPreciseDecl(
     status = slsNAME_SPACE_Search(Compiler,
                                   sloCOMPILER_GetGlobalSpace(Compiler),
                                   Identifier->u.identifier,
+                                  gcvNULL,
+                                  gcvNULL,
                                   gcvFALSE,
                                   gcvFALSE,
                                   &Name);
@@ -11555,6 +11565,8 @@ slParseInvariantOrPreciseDecl(
         status = slsNAME_SPACE_Search(Compiler,
                                       sloCOMPILER_GetBuiltInSpace(Compiler),
                                       Identifier->u.identifier,
+                                      gcvNULL,
+                                      gcvNULL,
                                       gcvTRUE,
                                       gcvFALSE,
                                       &Name);
@@ -11848,6 +11860,15 @@ slParseFullySpecifiedType(
     {
         gcmFOOTER_ARG("<return>=%s", "<nil>");
         return gcvNULL;
+    }
+
+    /* Copy flags. */
+    if (TypeQualifier)
+    {
+        if (slsQUALIFIERS_HAS_FLAG(&TypeQualifier->u.qualifiers, slvQUALIFIERS_FLAG_INVARIANT))
+        {
+            slsQUALIFIERS_SET_FLAG(&DataType->qualifiers, slvQUALIFIERS_FLAG_INVARIANT);
+        }
     }
 
     shaderType = Compiler->shaderType;
@@ -13495,7 +13516,8 @@ slParseNamedType(
 
 void
 slParseStructDeclBegin(
-    IN sloCOMPILER Compiler
+    IN sloCOMPILER Compiler,
+    IN slsLexToken * Identifier
     )
 {
     gceSTATUS       status;
@@ -13504,10 +13526,10 @@ slParseStructDeclBegin(
     gcmHEADER_ARG("Compiler=0x%x",
                   Compiler);
 
-    status = sloCOMPILER_CreateNameSpace(
-                                        Compiler,
-                                        gcvNULL,
-                                        &nameSpace);
+    status = sloCOMPILER_CreateNameSpace(Compiler,
+                                         Identifier ? Identifier->u.identifier : gcvNULL,
+                                         slvNAME_SPACE_STRUCT,
+                                         &nameSpace);
 
     if (gcmIS_ERROR(status))
     {
@@ -13525,7 +13547,6 @@ slParseStructDeclBegin(
 slsDATA_TYPE *
 slParseStructDeclEnd(
     IN sloCOMPILER Compiler,
-    IN slsLexToken * StartToken,
     IN slsLexToken * Identifier
     )
 {
@@ -13534,10 +13555,7 @@ slParseStructDeclEnd(
     slsNAME *       field;
     slsNAME_SPACE * prevNameSpace = gcvNULL;
 
-    gcmHEADER_ARG("Compiler=0x%x StartToken=0x%x Identifier=0x%x",
-                  Compiler, StartToken, Identifier);
-
-    gcmASSERT(StartToken);
+    gcmHEADER_ARG("Compiler=0x%x Identifier=0x%x", Compiler, Identifier);
 
     status = sloCOMPILER_PopCurrentNameSpace(Compiler, &prevNameSpace);
     if (gcmIS_ERROR(status)) {
@@ -13590,6 +13608,122 @@ slParseStructDeclEnd(
             gcmFOOTER_ARG("<return>=%s", "<nil>");
             return gcvNULL;
         }
+    }
+
+    gcmVERIFY_OK(sloCOMPILER_Dump(
+                                Compiler,
+                                slvDUMP_PARSER,
+                                "</STRUCT_DECL>"));
+
+    gcmFOOTER_ARG("<return>=0x%x", dataType);
+    return dataType;
+}
+
+void
+slParseStructReDeclBegin(
+    IN sloCOMPILER Compiler,
+    IN slsLexToken * TypeName
+    )
+{
+    gceSTATUS       status;
+    slsNAME_SPACE * nameSpace;
+
+    gcmHEADER_ARG("Compiler=0x%x TypeName=0x%x", Compiler, TypeName);
+
+    if (TypeName->u.typeName->mySpace == sloCOMPILER_GetCurrentSpace(Compiler))
+    {
+        gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                        sloCOMPILER_GetCurrentLineNo(Compiler),
+                                        sloCOMPILER_GetCurrentStringNo(Compiler),
+                                        slvREPORT_ERROR,
+                                        " Struct \"%s\" is redeclared.",
+                                        TypeName->u.typeName->symbol));
+        return;
+    }
+
+    status = sloCOMPILER_CreateNameSpace(
+                                        Compiler,
+                                        gcvNULL,
+                                        slvNAME_SPACE_STRUCT,
+                                        &nameSpace);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER_NO();
+        return;
+    }
+
+    gcmVERIFY_OK(sloCOMPILER_Dump(
+                                Compiler,
+                                slvDUMP_PARSER,
+                                "<STRUCT_DECL>"));
+    gcmFOOTER_NO();
+}
+
+slsDATA_TYPE *
+slParseStructReDeclEnd(
+    IN sloCOMPILER Compiler,
+    IN slsLexToken * TypeName
+    )
+{
+    gceSTATUS       status;
+    slsDATA_TYPE *  dataType;
+    slsNAME *       field;
+    slsNAME_SPACE * prevNameSpace = gcvNULL;
+    sltPOOL_STRING  typeName = TypeName->u.typeName->symbol;
+
+    gcmHEADER_ARG("Compiler=0x%x TypeName=0x%x", Compiler, TypeName);
+
+    status = sloCOMPILER_PopCurrentNameSpace(Compiler, &prevNameSpace);
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return gcvNULL;
+    }
+
+    /*
+    ** check it there is a embedded structure definition
+    */
+    FOR_EACH_DLINK_NODE(&(prevNameSpace->names), slsNAME, field)
+    {
+        if (field->type == slvSTRUCT_NAME)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(
+                                            Compiler,
+                                            field->lineNo,
+                                            field->stringNo,
+                                            slvREPORT_ERROR,
+                                            "Embedded structure definitions are not supported"));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return gcvNULL;
+        }
+    }
+
+    status = sloCOMPILER_CreateDataType(Compiler,
+                                        T_STRUCT,
+                                        prevNameSpace,
+                                        &dataType);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return gcvNULL;
+    }
+
+    status = sloCOMPILER_CreateName(Compiler,
+                                    sloCOMPILER_GetCurrentLineNo(Compiler),
+                                    sloCOMPILER_GetCurrentStringNo(Compiler),
+                                    slvSTRUCT_NAME,
+                                    dataType,
+                                    typeName,
+                                    slvEXTENSION_NONE,
+                                    gcvTRUE,
+                                    gcvNULL);
+
+    if (gcmIS_ERROR(status))
+    {
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return gcvNULL;
     }
 
     gcmVERIFY_OK(sloCOMPILER_Dump(
@@ -13767,8 +13901,88 @@ slParseInterfaceBlock(
     }
 
     shaderType = Compiler->shaderType;
-
     addMember = slsDLINK_LIST_IsEmpty(&Block->u.interfaceBlockContent.members);
+
+    if (slsDATA_TYPE_IsUnderlyingUniformBlock(Block->dataType))
+    {
+        qualifier = slvSTORAGE_QUALIFIER_UNIFORM_BLOCK_MEMBER;
+    }
+    else if (slsDATA_TYPE_IsUnderlyingStorageBlock(Block->dataType))
+    {
+        qualifier = slvSTORAGE_QUALIFIER_STORAGE_BLOCK_MEMBER;
+    }
+    else if (slsDATA_TYPE_IsUnderlyingIOBlock(Block->dataType))
+    {
+        if (Block->dataType->qualifiers.storage == slvSTORAGE_QUALIFIER_IN_IO_BLOCK)
+        {
+            if (shaderType == slvSHADER_TYPE_VERTEX)
+            {
+                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                Block->lineNo,
+                                                Block->stringNo,
+                                                slvREPORT_ERROR,
+                                                "It is a compile-time error to have an input block \"%s\" in a vertex shader",
+                                                Block->symbol));
+                gcmFOOTER_ARG("<return>=%s", "<nil>");
+                return gcvNULL;
+            }
+            qualifier = slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER;
+        }
+        else
+        {
+            if (shaderType == slvSHADER_TYPE_FRAGMENT)
+            {
+                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                Block->lineNo,
+                                                Block->stringNo,
+                                                slvREPORT_ERROR,
+                                                "It is a compile-time error to have an input block \"%s\" in a fragment shader",
+                                                Block->symbol));
+                gcmFOOTER_ARG("<return>=%s", "<nil>");
+                return gcvNULL;
+            }
+            qualifier = slvSTORAGE_QUALIFIER_OUT_IO_BLOCK_MEMBER;
+        }
+    }
+    else
+    {
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return gcvNULL;
+    }
+
+    /* If this is a redeclaration for a built-in block, check instance name first, then just return NULL. */
+    if (Compiler->context.redeclareBuiltInVar)
+    {
+        Compiler->context.redeclareBuiltInVar = gcvFALSE;
+        if (BlockInstance)
+        {
+            slsNAME *instanceName = gcvNULL;
+
+            status = slsNAME_SPACE_Search(Compiler,
+                                          sloCOMPILER_GetBuiltInSpace(Compiler),
+                                          BlockInstance->u.identifier,
+                                          gcvNULL,
+                                          gcvNULL,
+                                          gcvFALSE,
+                                          gcvFALSE,
+                                          &instanceName);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return gcvNULL; }
+
+            if (instanceName->u.variableInfo.interfaceBlock != Block)
+            {
+                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                Block->lineNo,
+                                                Block->stringNo,
+                                                slvREPORT_ERROR,
+                                                "It is a compile-time error to re-declare \"%s\"",
+                                                BlockInstance->u.identifier));
+                gcmFOOTER_ARG("<return>=%s", "<nil>");
+                return gcvNULL;
+            }
+        }
+        gcmFOOTER_ARG("<return>=%s", "<nil>");
+        return gcvNULL;
+    }
 
     if (BlockInstance)
     {
@@ -13817,53 +14031,6 @@ slParseInterfaceBlock(
             }
         }
         instance->u.variableInfo.interfaceBlock = Block;
-    }
-
-    if (slsDATA_TYPE_IsUnderlyingUniformBlock(Block->dataType))
-    {
-        qualifier = slvSTORAGE_QUALIFIER_UNIFORM_BLOCK_MEMBER;
-    }
-    else if (slsDATA_TYPE_IsUnderlyingStorageBlock(Block->dataType))
-    {
-        qualifier = slvSTORAGE_QUALIFIER_STORAGE_BLOCK_MEMBER;
-    }
-    else if (slsDATA_TYPE_IsUnderlyingIOBlock(Block->dataType))
-    {
-        if (Block->dataType->qualifiers.storage == slvSTORAGE_QUALIFIER_IN_IO_BLOCK)
-        {
-            if (shaderType == slvSHADER_TYPE_VERTEX)
-            {
-                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                                Block->lineNo,
-                                                Block->stringNo,
-                                                slvREPORT_ERROR,
-                                                "It is a compile-time error to have an input block \"%s\" in a vertex shader",
-                                                Block->symbol));
-                gcmFOOTER_ARG("<return>=%s", "<nil>");
-                return gcvNULL;
-            }
-            qualifier = slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER;
-        }
-        else
-        {
-            if (shaderType == slvSHADER_TYPE_FRAGMENT)
-            {
-                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                                Block->lineNo,
-                                                Block->stringNo,
-                                                slvREPORT_ERROR,
-                                                "It is a compile-time error to have an input block \"%s\" in a fragment shader",
-                                                Block->symbol));
-                gcmFOOTER_ARG("<return>=%s", "<nil>");
-                return gcvNULL;
-            }
-            qualifier = slvSTORAGE_QUALIFIER_OUT_IO_BLOCK_MEMBER;
-        }
-    }
-    else
-    {
-        gcmFOOTER_ARG("<return>=%s", "<nil>");
-        return gcvNULL;
     }
 
     /*
@@ -14063,12 +14230,12 @@ slParseInterfaceBlockMember(
     return DataType;
 }
 
-
 void
 slParseInterfaceBlockDeclBegin(
     IN sloCOMPILER Compiler,
-    IN slsLexToken * BlockType
-)
+    IN slsLexToken * BlockType,
+    IN slsLexToken * BlockName
+    )
 {
     gceSTATUS       status;
     slsNAME_SPACE * nameSpace = gcvNULL;
@@ -14126,11 +14293,15 @@ slParseInterfaceBlockDeclBegin(
     }
 
     status = sloCOMPILER_CreateAuxGlobalNameSpace(Compiler,
+                                                  BlockName->u.identifier,
+                                                  slvNAME_SPACE_IO_BLOCK,
                                                   &nameSpace);
+    if (gcmIS_ERROR(status))  { gcmFOOTER_NO(); return; }
 
-    if (gcmIS_ERROR(status)) {
-        gcmFOOTER_NO();
-        return;
+    /* Check if it is the redeclaration of gl_PerVertex. */
+    if (gcoOS_StrNCmp(BlockName->u.identifier, "gl_PerVertex", 12) == gcvSTATUS_OK)
+    {
+        Compiler->context.redeclareBuiltInVar = gcvTRUE;
     }
 
     gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
@@ -14170,7 +14341,8 @@ slParseInterfaceBlockDeclEnd(
         return gcvNULL;
     }
 
-    if (sloCOMPILER_CheckErrorLog(Compiler, BlockName->lineNo, BlockName->stringNo))
+    if (BlockName &&
+        sloCOMPILER_CheckErrorLog(Compiler, BlockName->lineNo, BlockName->stringNo))
     {
         gcmFOOTER_ARG("<return>=%s", "<nil>");
         return gcvNULL;
@@ -14300,71 +14472,13 @@ slParseInterfaceBlockDeclEnd(
         return gcvNULL;
     }
 
-    /* IO block can be re-used, check if it is defined before. */
-    if (BlockType->type == T_IO_BLOCK)
-    {
-        status = slsNAME_SPACE_Search(Compiler,
-                                      sloCOMPILER_GetCurrentSpace(Compiler),
-                                      BlockName->u.identifier,
-                                      gcvFALSE,
-                                      gcvFALSE,
-                                      &name);
-
-        if (status == gcvSTATUS_OK)
-        {
-            slsNAME *fieldName1, *fieldName2;
-            gctBOOL matched = gcvTRUE;
-
-            for (fieldName1 = (slsNAME *)(&name->dataType->fieldSpace->names)->next,
-                 fieldName2 = (slsNAME *)(&dataType->fieldSpace->names)->next;
-                 (slsDLINK_NODE *)(fieldName1) != (&name->dataType->fieldSpace->names) &&
-                 (slsDLINK_NODE *)(fieldName2) != (&dataType->fieldSpace->names);
-                 fieldName1 = (slsNAME *)(((slsDLINK_NODE *)fieldName1)->next),
-                 fieldName2 = (slsNAME *)(((slsDLINK_NODE *)fieldName2)->next))
-            {
-                if (fieldName1->symbol != fieldName2->symbol ||
-                    !slsDATA_TYPE_IsEqual(fieldName1->dataType, fieldName2->dataType))
-                {
-                    matched = gcvFALSE;
-                    break;
-                }
-            }
-            if ((slsDLINK_NODE *)(fieldName1) != (&name->dataType->fieldSpace->names) ||
-                (slsDLINK_NODE *)(fieldName2) != (&dataType->fieldSpace->names))
-
-            {
-                matched = gcvFALSE;
-            }
-
-            if (!matched)
-            {
-                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
-                                                BlockType->lineNo,
-                                                BlockType->stringNo,
-                                                slvREPORT_ERROR,
-                                                "Redefine IO block \"%s\"",
-                                                BlockName->u.identifier));
-                gcmFOOTER_ARG("<return>=%s", "<nil>");
-                return gcvNULL;
-            }
-
-            name->dataType = dataType;
-
-            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
-                                          slvDUMP_PARSER,
-                                          "</INTERFACE_BLOCK_DECL>"));
-
-            gcmFOOTER_ARG("<return>=0x%x", name);
-            return name;
-        }
-    }
-
     if (BlockName != gcvNULL)
     {
         gctBOOL atGlobalNameSpace;
 
         gcmVERIFY_OK(sloCOMPILER_AtGlobalNameSpace(Compiler, &atGlobalNameSpace));
-        if(!atGlobalNameSpace) {
+        if (!atGlobalNameSpace)
+        {
             gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
                                             BlockName->lineNo,
                                             BlockName->stringNo,
@@ -14376,6 +14490,98 @@ slParseInterfaceBlockDeclEnd(
             return gcvNULL;
         }
 
+        /*
+        ** It is a compile-time error to use the same block name for more than one block
+        ** declaration in the same shader interface within one shader.
+        ** But a block name is allowed to have different definitions in different shader interfaces within the same shader.
+        */
+        status = slsNAME_SPACE_Search(Compiler,
+                                      sloCOMPILER_GetCurrentSpace(Compiler),
+                                      BlockName->u.identifier,
+                                      slsNAME_SPACE_CheckBlockNameForTheSameInterface,
+                                      dataType,
+                                      gcvFALSE,
+                                      gcvFALSE,
+                                      &name);
+        if (status == gcvSTATUS_OK)
+        {
+            gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                            BlockType->lineNo,
+                                            BlockType->stringNo,
+                                            slvREPORT_ERROR,
+                                            "Redeclare block \"%s\"",
+                                            BlockName->u.identifier));
+            gcmFOOTER_ARG("<return>=%s", "<nil>");
+            return gcvNULL;
+        }
+
+        /*
+        ** If redeclare built in block, check the block members, it is allowed to delete block member only.
+        */
+        if (Compiler->context.redeclareBuiltInVar)
+        {
+            slsNAME *fieldName1, *fieldName2;
+            gctBOOL blockMatched = gcvTRUE;
+
+            status = slsNAME_SPACE_Search(Compiler,
+                                          sloCOMPILER_GetBuiltInSpace(Compiler),
+                                          BlockName->u.identifier,
+                                          slsNAME_SPACE_CheckBlockNameForTheSameInterface,
+                                          dataType,
+                                          gcvFALSE,
+                                          gcvFALSE,
+                                          &name);
+            if (gcmIS_ERROR(status))
+            {
+                gcmFOOTER_ARG("<return>=%s", "<nil>");
+                return gcvNULL;
+            }
+
+            for (fieldName1 = (slsNAME *)(&dataType->fieldSpace->names)->next;
+                 (slsDLINK_NODE *)(fieldName1) != (&dataType->fieldSpace->names);
+                 fieldName1 = (slsNAME *)(((slsDLINK_NODE *)fieldName1)->next))
+            {
+                gctBOOL fieldMatched = gcvFALSE;
+
+                for (fieldName2 = (slsNAME *)(&dataType->fieldSpace->names)->next;
+                     (slsDLINK_NODE *)(fieldName2) != (&dataType->fieldSpace->names);
+                     fieldName2 = (slsNAME *)(((slsDLINK_NODE *)fieldName2)->next))
+                {
+                    if ((fieldName1->symbol == fieldName2->symbol) &&
+                        slsDATA_TYPE_IsEqual(fieldName1->dataType, fieldName2->dataType))
+                    {
+                        fieldMatched = gcvTRUE;
+                    }
+                }
+
+                blockMatched &= fieldMatched;
+
+                if (!blockMatched)
+                {
+                    break;
+                }
+            }
+
+            if (!blockMatched)
+            {
+                gcmVERIFY_OK(sloCOMPILER_Report(Compiler,
+                                                BlockType->lineNo,
+                                                BlockType->stringNo,
+                                                slvREPORT_ERROR,
+                                                "only \"%s\" members allowed",
+                                                BlockName->u.identifier));
+                gcmFOOTER_ARG("<return>=%s", "<nil>");
+                return gcvNULL;
+            }
+
+            gcmVERIFY_OK(sloCOMPILER_Dump(Compiler,
+                                          slvDUMP_PARSER,
+                                          "</INTERFACE_BLOCK_DECL>"));
+
+            gcmFOOTER_ARG("<return>=0x%x", name);
+            return name;
+        }
+
         status = sloCOMPILER_CreateName(Compiler,
                                         BlockName->lineNo,
                                         BlockName->stringNo,
@@ -14383,7 +14589,7 @@ slParseInterfaceBlockDeclEnd(
                                         dataType,
                                         BlockName->u.identifier,
                                         slvEXTENSION_NONE,
-                                        gcvTRUE,
+                                        gcvFALSE,
                                         &name);
 
         if (gcmIS_ERROR(status)) {
@@ -15171,7 +15377,7 @@ slParseFieldListDecl(
     IN sloCOMPILER Compiler,
     IN slsLexToken * Identifier,
     IN slsDLINK_LIST * LengthList,
-    IN gctBOOL isSSBOMember
+    IN gctBOOL IsBlockMember
     )
 {
     gceSTATUS       status;
@@ -15213,7 +15419,7 @@ slParseFieldListDecl(
         gcmONERROR(status);
     }
 
-    if (gcmIS_ERROR(_CheckErrorForArraysOfArraysLengthValue(Compiler, LengthList, isSSBOMember)))
+    if (gcmIS_ERROR(_CheckErrorForArraysOfArraysLengthValue(Compiler, LengthList, IsBlockMember)))
     {
         gcmVERIFY_OK(sloCOMPILER_Report(
                                         Compiler,
@@ -15279,7 +15485,7 @@ slParseFieldListDecl(
         _EvaluateExprToArrayLength(Compiler,
                                    operand,
                                    gcvFALSE,
-                                   isSSBOMember ? gcvFALSE : gcvTRUE,
+                                   IsBlockMember ? gcvFALSE : gcvTRUE,
                                    &arrayLengthList[i]);
         i++;
     }

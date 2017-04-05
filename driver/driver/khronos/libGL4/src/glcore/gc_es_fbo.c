@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -548,6 +548,96 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
 
     switch(internalformat)
     {
+#ifdef OPENGL40
+    /* color-renderable format */
+    case GL_RGB:
+    case GL_RGBA:
+    case GL_FLOAT_R_NV:
+    case GL_FLOAT_RG_NV:
+    case GL_FLOAT_RGB_NV:
+    case GL_FLOAT_RGBA_NV:
+    case GL_R3_G3_B2:
+    case GL_RGB4:
+    case GL_RGB5:
+    case GL_RGB8:
+    case GL_RGB10:
+    case GL_RGB12:
+    case GL_RGB16:
+    case GL_RGBA2:
+    case GL_RGBA4:
+    case GL_RGB5_A1:
+    case GL_RGBA8:
+    case GL_RGB10_A2:
+    case GL_RGBA12:
+    case GL_RGBA16:
+        /* depth-renderable */
+    case GL_DEPTH_COMPONENT:
+    case GL_DEPTH_COMPONENT16:
+    case GL_DEPTH_COMPONENT24:
+    case GL_DEPTH_COMPONENT32:
+        /* stencil-renderable */
+    case GL_STENCIL_INDEX:
+    case GL_STENCIL_INDEX1_EXT:
+    case GL_STENCIL_INDEX4_EXT:
+    case GL_STENCIL_INDEX8_EXT:
+    case GL_STENCIL_INDEX16_EXT:
+        break;
+        /*GL_EXT_texture_integer*/
+    case GL_RGBA32UI_EXT:
+    case GL_RGB32UI_EXT:
+    case GL_RGBA16UI_EXT:
+    case GL_RGB16UI_EXT:
+    case GL_RGBA8UI_EXT:
+    case GL_RGB8UI_EXT:
+    case GL_RGBA32I_EXT:
+    case GL_RGB32I_EXT:
+    case GL_RGBA16I_EXT:
+    case GL_RGB16I_EXT:
+    case GL_RGBA8I_EXT:
+    case GL_RGB8I_EXT:
+        if (!__glExtension[__GL_EXTID_texture_integer].bEnabled)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
+        break;
+    case GL_RGB9_E5_EXT:
+        if(!__glExtension[__GL_EXTID_texture_shared_exponent].bEnabled)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
+        break;
+    case GL_R11F_G11F_B10F_EXT:
+        if(!__glExtension[__GL_EXTID_packed_float].bEnabled)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
+        break;
+
+    case GL_RGBA32F_ARB:
+    case GL_RGBA16F_ARB:
+    case GL_RGB32F_ARB:
+        /*cann't support downsampling for D2, but support on D3
+        **only RGBA16F support Fog on D3, others not
+        */
+        if(!__glExtension[__GL_EXTID_ARB_texture_float].bEnabled)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
+        }
+        break;
+    case GL_RGB16F_ARB:
+    case GL_ALPHA32F_ARB:
+    case GL_ALPHA16F_ARB:
+    case GL_LUMINANCE32F_ARB:
+    case GL_LUMINANCE16F_ARB:
+    case GL_LUMINANCE_ALPHA32F_ARB:
+    case GL_LUMINANCE_ALPHA16F_ARB:
+    case GL_INTENSITY32F_ARB:
+    case GL_INTENSITY16F_ARB:
+        /*cann't be RT format for D2/D3*/
+
+    default:
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
+#else
     case GL_RGBA8:
     case GL_RGBA4:
     case GL_RGB8:
@@ -630,6 +720,7 @@ GLvoid __glRenderbufferStorage(__GLcontext* gc,
 
     default:
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
+#endif
     }
 
     formatInfo = __glGetFormatInfo(internalformat);
@@ -1682,7 +1773,6 @@ GLvoid GL_APIENTRY __gles_GetFramebufferAttachmentParameteriv(__GLcontext *gc, G
             __GL_EXIT();
 
         case GL_FRAMEBUFFER_ATTACHMENT_OBJECT_NAME:
-            /* TODO: change the condition to (objType == FRAMEBUFFER_DEFAULT) */
             if (framebufferObj->name == 0)
             {
                 __GL_ERROR_EXIT(GL_INVALID_ENUM);

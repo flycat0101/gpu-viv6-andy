@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2016 Vivante Corporation
+*    Copyright (c) 2014 - 2017 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2016 Vivante Corporation
+*    Copyright (C) 2014 - 2017 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -60,7 +60,7 @@
 
 #define _GC_OBJ_ZONE    gcvZONE_OS
 
-gcTA globalTA = gcvNULL;
+gcTA globalTA[16] = { gcvNULL, gcvNULL, gcvNULL, gcvNULL,gcvNULL, gcvNULL, gcvNULL, gcvNULL };
 gctaOS globalTAos;
 
 struct _gctaOS {
@@ -71,12 +71,13 @@ struct _gctaOS {
 
 gceSTATUS HALDECL
 TAEmulator(
+    gceCORE Core,
     void * Interface
     )
 {
     gckOS_AcquireMutex(globalTAos->os, globalTAos->dispatchMutex, gcvINFINITE);
 
-    gcTA_Dispatch(globalTA, Interface);
+    gcTA_Dispatch(globalTA[Core], Interface);
 
     gckOS_ReleaseMutex(globalTAos->os, globalTAos->dispatchMutex);
     return gcvSTATUS_OK;
@@ -100,15 +101,15 @@ gctaOS_ConstructOS(
 
     gcmkONERROR(gckOS_CreateMutex(Os, &os->dispatchMutex));
 
-    gckOS_SetGPUPower(Os, gcvCORE_MAJOR, gcvTRUE, gcvTRUE);
-
     *TAos = globalTAos = os;
 
     return gcvSTATUS_OK;
 
 OnError:
-    if(pointer != gcvNULL)
-        gcmkVERIFY_OK(gckOS_FreeMemory(pointer, Os));
+    if (pointer != gcvNULL)
+    {
+        gcmkVERIFY_OK(gckOS_FreeMemory(Os, pointer));
+    }
     return status;
 }
 
@@ -222,24 +223,22 @@ OnError:
     return status;
 }
 
-gceSTATUS
-gctaOS_WriteRegister(
-    IN gctaOS Os,
+gceSTATUS gctaOS_WriteRegister(
+    IN gctaOS Os, IN gceCORE Core,
     IN gctUINT32 Address,
     IN gctUINT32 Data
     )
 {
-    return gckOS_WriteRegister(Os->os, Address, Data);
+    return gckOS_WriteRegisterEx(Os->os, Core, Address, Data);
 }
 
-gceSTATUS
-gctaOS_ReadRegister(
-    IN gctaOS Os,
+gceSTATUS gctaOS_ReadRegister(
+    IN gctaOS Os, IN gceCORE Core,
     IN gctUINT32 Address,
     IN gctUINT32 *Data
     )
 {
-    return gckOS_ReadRegister(Os->os, Address, Data);
+    return gckOS_ReadRegisterEx(Os->os, Core, Address, Data);
 }
 
 gceSTATUS
@@ -307,6 +306,17 @@ gctaOS_Delay(
     )
 {
     return gckOS_Delay(Os->os, Delay);
+}
+
+gceSTATUS
+gctaOS_SetGPUPower(
+    IN gctaOS Os,
+    IN gctUINT32 Core,
+    IN gctBOOL Clock,
+    IN gctBOOL Power
+    )
+{
+    return gckOS_SetGPUPower(Os->os, Core, Power, Clock);
 }
 
 

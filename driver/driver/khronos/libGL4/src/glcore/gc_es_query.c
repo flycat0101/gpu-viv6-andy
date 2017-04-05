@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -51,6 +51,7 @@ GLvoid __glConvertResult(__GLcontext *gc, GLint fromType, const GLvoid *rawdata,
                          GLint toType, GLvoid *result, GLint size)
 {
     GLint i;
+
 
     switch (fromType)
     {
@@ -297,6 +298,10 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
     GLint     itemp[100],   *ip   = itemp;      /* NOTE: for ints */
     GLint64   i64temp[100], *i64p = i64temp;    /* NOTE: for int64 */
     GLboolean btemp[100],   *bp   = btemp;      /* NOTE: for boolean */
+#ifdef OPENGL40
+//    GLfloat sctemp[100], *scp = sctemp;       /* NOTE: for scaled colors */
+    GLfloat *mp;
+#endif
 
     switch (sq)
     {
@@ -309,6 +314,96 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
     case GL_MINOR_VERSION:
         *ip++ = gc->constants.minorVersion;
         break;
+#ifdef OPENGL40
+    case GL_ALPHA_TEST:
+    case GL_COLOR_MATERIAL:
+    case GL_FOG:
+    case GL_LIGHTING:
+    case GL_LINE_SMOOTH:
+    case GL_LINE_STIPPLE:
+    case GL_INDEX_LOGIC_OP:
+    case GL_COLOR_LOGIC_OP:
+    case GL_NORMALIZE:
+    case GL_POINT_SMOOTH:
+    case GL_POLYGON_SMOOTH:
+    case GL_POLYGON_STIPPLE:
+    case GL_TEXTURE_1D:
+    case GL_TEXTURE_2D:
+    case GL_TEXTURE_3D:
+    case GL_TEXTURE_CUBE_MAP:
+#if GL_ARB_texture_rectangle
+    case GL_TEXTURE_RECTANGLE_ARB:
+#endif
+    case GL_AUTO_NORMAL:
+    case GL_TEXTURE_GEN_S:
+    case GL_TEXTURE_GEN_T:
+    case GL_TEXTURE_GEN_R:
+    case GL_TEXTURE_GEN_Q:
+    case GL_CLIP_PLANE0:
+    case GL_CLIP_PLANE1:
+    case GL_CLIP_PLANE2:
+    case GL_CLIP_PLANE3:
+    case GL_CLIP_PLANE4:
+    case GL_CLIP_PLANE5:
+    case GL_LIGHT0:
+    case GL_LIGHT1:
+    case GL_LIGHT2:
+    case GL_LIGHT3:
+    case GL_LIGHT4:
+    case GL_LIGHT5:
+    case GL_LIGHT6:
+    case GL_LIGHT7:
+    case GL_MAP1_COLOR_4:
+    case GL_MAP1_NORMAL:
+    case GL_MAP1_INDEX:
+    case GL_MAP1_TEXTURE_COORD_1:
+    case GL_MAP1_TEXTURE_COORD_2:
+    case GL_MAP1_TEXTURE_COORD_3:
+    case GL_MAP1_TEXTURE_COORD_4:
+    case GL_MAP1_VERTEX_3:
+    case GL_MAP1_VERTEX_4:
+    case GL_MAP2_COLOR_4:
+    case GL_MAP2_NORMAL:
+    case GL_MAP2_INDEX:
+    case GL_MAP2_TEXTURE_COORD_1:
+    case GL_MAP2_TEXTURE_COORD_2:
+    case GL_MAP2_TEXTURE_COORD_3:
+    case GL_MAP2_TEXTURE_COORD_4:
+    case GL_MAP2_VERTEX_3:
+    case GL_MAP2_VERTEX_4:
+    case GL_POLYGON_OFFSET_POINT:
+    case GL_POLYGON_OFFSET_LINE:
+    case GL_VERTEX_ARRAY:
+    case GL_NORMAL_ARRAY:
+    case GL_COLOR_ARRAY:
+    case GL_INDEX_ARRAY:
+    case GL_TEXTURE_COORD_ARRAY:
+    case GL_EDGE_FLAG_ARRAY:
+    case GL_SECONDARY_COLOR_ARRAY:
+    case GL_COLOR_SUM:
+    case GL_FOG_COORDINATE_ARRAY:
+    case GL_COLOR_TABLE:
+    case GL_POST_CONVOLUTION_COLOR_TABLE:
+    case GL_POST_COLOR_MATRIX_COLOR_TABLE:
+    case GL_CONVOLUTION_1D:
+    case GL_CONVOLUTION_2D:
+    case GL_SEPARABLE_2D:
+    case GL_HISTOGRAM:
+    case GL_MINMAX:
+#if GL_ARB_vertex_program
+    case GL_VERTEX_PROGRAM_ARB:
+    case GL_VERTEX_PROGRAM_POINT_SIZE_ARB:
+    case GL_VERTEX_PROGRAM_TWO_SIDE_ARB:
+#endif
+#if GL_ARB_fragment_program
+    case GL_FRAGMENT_PROGRAM_ARB:
+#endif
+#if GL_EXT_depth_bounds_test
+    case GL_DEPTH_BOUNDS_TEST_EXT:
+#endif
+    case GL_POINT_SPRITE:
+    case GL_RESCALE_NORMAL:
+#endif
     case GL_BLEND:
     case GL_CULL_FACE:
     case GL_DEPTH_TEST:
@@ -329,6 +424,152 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
     case GL_SUBPIXEL_BITS:
         *ip++ = gc->constants.subpixelBits;
         break;
+#ifdef OPENGL40
+    case GL_MAX_LIST_NESTING:
+        *ip++ = gc->constants.maxListNesting;
+        break;
+    case GL_CURRENT_COLOR:
+        *cp++ = gc->state.current.color.r;
+        *cp++ = gc->state.current.color.g;
+        *cp++ = gc->state.current.color.b;
+        *cp++ = gc->state.current.color.a;
+        break;
+    case GL_CURRENT_INDEX:
+        *fp++ = gc->state.current.colorIndex;
+        break;
+    case GL_CURRENT_NORMAL:
+        *cp++ = gc->state.current.normal.f.x;
+        *cp++ = gc->state.current.normal.f.y;
+        *cp++ = gc->state.current.normal.f.z;
+        break;
+    case GL_CURRENT_TEXTURE_COORDS:
+        index = gc->state.texture.activeTexIndex;
+        *fp++ = gc->state.current.texture[index].f.x;
+        *fp++ = gc->state.current.texture[index].f.y;
+        *fp++ = gc->state.current.texture[index].f.z;
+        *fp++ = gc->state.current.texture[index].f.w;
+        break;
+    case GL_CURRENT_RASTER_INDEX:
+        /* Always return 1 */
+        *fp++ = 1.0;
+        break;
+    case GL_CURRENT_RASTER_COLOR:
+        *cp++ = gc->state.rasterPos.rPos.colors[__GL_FRONTFACE].r;
+        *cp++ = gc->state.rasterPos.rPos.colors[__GL_FRONTFACE].g;
+        *cp++ = gc->state.rasterPos.rPos.colors[__GL_FRONTFACE].b;
+        *cp++ = gc->state.rasterPos.rPos.colors[__GL_FRONTFACE].a;
+        break;
+    case GL_CURRENT_RASTER_TEXTURE_COORDS:
+        index = gc->state.texture.activeTexIndex;
+        *fp++ = gc->state.rasterPos.rPos.texture[index].f.x;
+        *fp++ = gc->state.rasterPos.rPos.texture[index].f.y;
+        *fp++ = gc->state.rasterPos.rPos.texture[index].f.z;
+        *fp++ = gc->state.rasterPos.rPos.texture[index].f.w;
+        break;
+    case GL_CURRENT_RASTER_POSITION:
+        if(DRAW_FRAMEBUFFER_BINDING_NAME == 0 && gc->drawablePrivate->yInverted)
+        {
+            *fp++ = gc->state.rasterPos.rPos.winPos.f.x;
+            *fp++ = ((GLfloat)gc->drawablePrivate->height - gc->state.rasterPos.rPos.winPos.f.y);
+            *fp++ = gc->state.rasterPos.rPos.winPos.f.z;
+            *fp++ = gc->state.rasterPos.rPos.clipW;
+        }else
+        {
+            *fp++ = gc->state.rasterPos.rPos.winPos.f.x;
+            *fp++ = gc->state.rasterPos.rPos.winPos.f.y;
+            *fp++ = gc->state.rasterPos.rPos.winPos.f.z;
+            *fp++ = gc->state.rasterPos.rPos.clipW;
+        }
+        break;
+    case GL_CURRENT_RASTER_POSITION_VALID:
+        *bp++ = gc->state.rasterPos.validRasterPos;
+        break;
+    case GL_CURRENT_RASTER_DISTANCE:
+        *fp++ = gc->state.rasterPos.rPos.eyeDistance;
+        break;
+    case GL_POINT_SIZE:
+        *fp++ = gc->state.point.requestedSize;
+        break;
+    case GL_POINT_SIZE_RANGE:
+        *fp++ = gc->constants.pointSizeMin;
+        *fp++ = gc->constants.pointSizeMax;
+        break;
+    case GL_POINT_SIZE_MIN:
+        *fp++ = gc->constants.pointSizeMin;
+        break;
+    case GL_POINT_SIZE_MAX:
+        *fp++ = gc->constants.pointSizeMax;
+        break;
+    case GL_POINT_SIZE_GRANULARITY:
+        *fp++ = gc->constants.pointSizeGranularity;
+        break;
+    case GL_LINE_WIDTH_RANGE:
+        *fp++ = gc->constants.lineWidthMin;
+        *fp++ = gc->constants.lineWidthMax;
+        break;
+    case GL_LINE_WIDTH_GRANULARITY:
+        *fp++ = gc->constants.lineWidthGranularity;
+        break;
+    case GL_LINE_STIPPLE_PATTERN:
+        *ip++ = gc->state.line.stipple;
+        break;
+    case GL_LINE_STIPPLE_REPEAT:
+        *ip++ = gc->state.line.stippleRepeat;
+        break;
+    case GL_POLYGON_MODE:
+        *ip++ = gc->state.polygon.frontMode;
+        *ip++ = gc->state.polygon.backMode;
+        break;
+    case GL_EDGE_FLAG:
+        *bp++ = gc->state.current.edgeflag;
+        break;
+    case GL_LIGHT_MODEL_LOCAL_VIEWER:
+        *bp++ = (GLboolean) gc->state.light.model.localViewer;
+        break;
+    case GL_LIGHT_MODEL_TWO_SIDE:
+        *bp++ = (GLboolean) gc->state.light.model.twoSided;
+        break;
+    case GL_LIGHT_MODEL_AMBIENT:
+        *cp++ = gc->state.light.model.ambient.r;
+        *cp++ = gc->state.light.model.ambient.g;
+        *cp++ = gc->state.light.model.ambient.b;
+        *cp++ = gc->state.light.model.ambient.a;
+        break;
+    case GL_COLOR_MATERIAL_FACE:
+        *ip++ = gc->state.light.colorMaterialFace;
+        break;
+    case GL_COLOR_MATERIAL_PARAMETER:
+        *ip++ = gc->state.light.colorMaterialParam;
+        break;
+    case GL_SHADE_MODEL:
+        *ip++ = gc->state.light.shadingModel;
+        break;
+    case GL_FOG_INDEX:
+        *fp++ = gc->state.fog.index;
+        break;
+    case GL_FOG_DENSITY:
+        *fp++ = gc->state.fog.density;
+        break;
+    case GL_FOG_START:
+        *fp++ = gc->state.fog.start;
+        break;
+    case GL_FOG_END:
+        *fp++ = gc->state.fog.end;
+        break;
+    case GL_FOG_MODE:
+        *ip++ = gc->state.fog.mode;
+        break;
+    case GL_FOG_COLOR:
+        {
+            __GLcolor fogColor;
+            __CHECK_GET_COLOR_CLAMP(&fogColor, &gc->state.fog.color);
+            *cp++ = fogColor.r;
+            *cp++ = fogColor.g;
+            *cp++ = fogColor.b;
+            *cp++ = fogColor.a;
+        }
+        break;
+#endif
     case GL_LINE_WIDTH:
         *fp++ = gc->state.line.requestedWidth;
         break;
@@ -425,6 +666,125 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->state.viewport.width;
         *ip++ = gc->state.viewport.height;
         break;
+#ifdef OPENGL40
+    case GL_MATRIX_MODE:
+        *ip++ = gc->state.transform.matrixMode;
+        break;
+    case GL_ATTRIB_STACK_DEPTH:
+        *ip++ = (GLint)(gc->attribute.stackPointer - gc->attribute.stack);
+        break;
+    case GL_MODELVIEW_STACK_DEPTH:
+        *ip++ = 1 + (GLint)(gc->transform.modelView - gc->transform.modelViewStack);
+        break;
+    case GL_PROJECTION_STACK_DEPTH:
+        *ip++ = 1 + (GLint)(gc->transform.projection - gc->transform.projectionStack);
+        break;
+    case GL_TEXTURE_STACK_DEPTH:
+        index = gc->state.texture.activeTexIndex;
+        *ip++ = 1 + (GLint)(gc->transform.texture[index] - gc->transform.textureStack[index]);
+        break;
+    case GL_MODELVIEW_MATRIX:
+        mp = &gc->transform.modelView->matrix.matrix[0][0];
+        *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++;
+        *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++;
+        *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++;
+        *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++;
+        break;
+    case GL_TRANSPOSE_MODELVIEW_MATRIX:
+        mp = &gc->transform.modelView->matrix.matrix[0][0];
+        *fp++ = *mp;        *fp++ = *(mp+4);    *fp++ = *(mp+8);    *fp++ = *(mp+12);
+        *fp++ = *(mp+1);    *fp++ = *(mp+5);    *fp++ = *(mp+9);    *fp++ = *(mp+13);
+        *fp++ = *(mp+2);    *fp++ = *(mp+6);    *fp++ = *(mp+10);   *fp++ = *(mp+14);
+        *fp++ = *(mp+3);    *fp++ = *(mp+7);    *fp++ = *(mp+11);   *fp++ = *(mp+15);
+        break;
+    case GL_PROJECTION_MATRIX:
+        mp = &gc->transform.projection->matrix.matrix[0][0];
+        *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++;
+        *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++;
+        *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++;
+        *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++;
+        break;
+    case GL_TRANSPOSE_PROJECTION_MATRIX:
+        mp = &gc->transform.projection->matrix.matrix[0][0];
+        *fp++ = *mp;        *fp++ = *(mp+4);    *fp++ = *(mp+8);    *fp++ = *(mp+12);
+        *fp++ = *(mp+1);    *fp++ = *(mp+5);    *fp++ = *(mp+9);    *fp++ = *(mp+13);
+        *fp++ = *(mp+2);    *fp++ = *(mp+6);    *fp++ = *(mp+10);   *fp++ = *(mp+14);
+        *fp++ = *(mp+3);    *fp++ = *(mp+7);    *fp++ = *(mp+11);   *fp++ = *(mp+15);
+        break;
+    case GL_TEXTURE_MATRIX:
+        index = gc->state.texture.activeTexIndex;
+        mp = &(gc->transform.texture[index]->matrix.matrix[0][0]);
+        *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++;
+        *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++;
+        *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++;
+        *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++; *fp++ = *mp++;
+        break;
+    case GL_TRANSPOSE_TEXTURE_MATRIX_ARB:
+        index = gc->state.texture.activeTexIndex;
+        mp = &(gc->transform.texture[index]->matrix.matrix[0][0]);
+        *fp++ = *mp;        *fp++ = *(mp+4);    *fp++ = *(mp+8);    *fp++ = *(mp+12);
+        *fp++ = *(mp+1);    *fp++ = *(mp+5);    *fp++ = *(mp+9);    *fp++ = *(mp+13);
+        *fp++ = *(mp+2);    *fp++ = *(mp+6);    *fp++ = *(mp+10);   *fp++ = *(mp+14);
+        *fp++ = *(mp+3);    *fp++ = *(mp+7);    *fp++ = *(mp+11);   *fp++ = *(mp+15);
+        break;
+    case GL_ALPHA_TEST_FUNC:
+        *ip++ = (GLint)gc->state.raster.alphaFunction;
+        break;
+    case GL_ALPHA_TEST_REF:
+        *fp++ = gc->state.raster.alphaReference;
+        break;
+    case GL_BLEND_DST:
+        *ip++ = gc->state.raster.blendDstRGB[0];
+        break;
+    case GL_BLEND_SRC:
+        *ip++ = gc->state.raster.blendSrcRGB[0];
+        break;
+    case GL_LOGIC_OP_MODE:
+        *ip++ = gc->state.raster.logicOp;
+        break;
+//    case GL_DRAW_BUFFER:
+//        *ip++ = gc->state.raster.drawBufferReturn;
+//        break;
+    case GL_INDEX_CLEAR_VALUE:
+        *fp++ = gc->state.raster.clearIndex;
+        break;
+    case GL_INDEX_MODE:
+        *bp++ = GL_FALSE;
+        break;
+    case GL_INDEX_WRITEMASK:
+        *ip++ = gc->state.raster.writeMask;
+        break;
+    case GL_RGBA_MODE:
+        *bp++ = GL_TRUE;
+        break;
+    case GL_RENDER_MODE:
+        *ip++ = gc->renderMode;
+        break;
+    case GL_PERSPECTIVE_CORRECTION_HINT:
+        *ip++ = gc->state.hints.perspectiveCorrection;
+        break;
+    case GL_POINT_SMOOTH_HINT:
+        *ip++ = gc->state.hints.pointSmooth;
+        break;
+    case GL_LINE_SMOOTH_HINT:
+        *ip++ = gc->state.hints.lineSmooth;
+        break;
+    case GL_POLYGON_SMOOTH_HINT:
+        *ip++ = gc->state.hints.polygonSmooth;
+        break;
+    case GL_FOG_HINT:
+        *ip++ = gc->state.hints.fog;
+        break;
+    case GL_LIST_BASE:
+        *ip++ = gc->state.list.listBase;
+        break;
+    case GL_LIST_INDEX:
+        *ip++ = gc->dlist.currentList;
+        break;
+    case GL_LIST_MODE:
+        *ip++ = gc->dlist.mode;
+        break;
+#endif
     case GL_BLEND_DST_RGB:
         *ip++ = gc->state.raster.blendDstRGB[0];
         break;
@@ -517,6 +877,382 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *bp++ = gc->state.raster.colorMask[0].blueMask;
         *bp++ = gc->state.raster.colorMask[0].alphaMask;
         break;
+#ifdef OPENGL40
+    case GL_PACK_SWAP_BYTES:
+        *bp++ = (GLboolean)gc->clientState.pixel.packModes.swapEndian;
+        break;
+    case GL_PACK_LSB_FIRST:
+        *bp++ = (GLboolean)gc->clientState.pixel.packModes.lsbFirst;
+        break;
+    case GL_PACK_SKIP_IMAGES:
+        *ip++ = gc->clientState.pixel.packModes.skipImages;
+        break;
+    case GL_PACK_IMAGE_HEIGHT:
+        *ip++ = gc->clientState.pixel.packModes.imageHeight;
+        break;
+    case GL_UNPACK_SWAP_BYTES:
+        *bp++ = (GLboolean)gc->clientState.pixel.unpackModes.swapEndian;
+        break;
+    case GL_UNPACK_LSB_FIRST:
+        *bp++ = (GLboolean)gc->clientState.pixel.unpackModes.lsbFirst;
+        break;
+    case GL_MAP_COLOR:
+        *bp++ = (GLboolean)gc->state.pixel.transferMode.mapColor;
+        break;
+    case GL_MAP_STENCIL:
+        *bp++ = (GLboolean)gc->state.pixel.transferMode.mapStencil;
+        break;
+    case GL_INDEX_SHIFT:
+        *ip++ = gc->state.pixel.transferMode.indexShift;
+        break;
+    case GL_INDEX_OFFSET:
+        *ip++ = gc->state.pixel.transferMode.indexOffset;
+        break;
+    case GL_RED_SCALE:
+        *fp++ = gc->state.pixel.transferMode.r_scale;
+        break;
+    case GL_GREEN_SCALE:
+        *fp++ = gc->state.pixel.transferMode.g_scale;
+        break;
+    case GL_BLUE_SCALE:
+        *fp++ = gc->state.pixel.transferMode.b_scale;
+        break;
+    case GL_ALPHA_SCALE:
+        *fp++ = gc->state.pixel.transferMode.a_scale;
+        break;
+    case GL_DEPTH_SCALE:
+        *fp++ = gc->state.pixel.transferMode.d_scale;
+        break;
+    case GL_RED_BIAS:
+        *fp++ = gc->state.pixel.transferMode.r_bias;
+        break;
+    case GL_GREEN_BIAS:
+        *fp++ = gc->state.pixel.transferMode.g_bias;
+        break;
+    case GL_BLUE_BIAS:
+        *fp++ = gc->state.pixel.transferMode.b_bias;
+        break;
+    case GL_ALPHA_BIAS:
+        *fp++ = gc->state.pixel.transferMode.a_bias;
+        break;
+    case GL_DEPTH_BIAS:
+        *fp++ = gc->state.pixel.transferMode.d_bias;
+        break;
+    case GL_POST_CONVOLUTION_RED_SCALE:
+        *fp++ = gc->state.pixel.transferMode.postConvolutionScale.r;
+        break;
+    case GL_POST_CONVOLUTION_GREEN_SCALE:
+        *fp++ = gc->state.pixel.transferMode.postConvolutionScale.g;
+        break;
+    case GL_POST_CONVOLUTION_BLUE_SCALE:
+        *fp++ = gc->state.pixel.transferMode.postConvolutionScale.b;
+        break;
+    case GL_POST_CONVOLUTION_ALPHA_SCALE:
+        *fp++ = gc->state.pixel.transferMode.postConvolutionScale.a;
+        break;
+    case GL_POST_CONVOLUTION_RED_BIAS:
+        *fp++ = gc->state.pixel.transferMode.postConvolutionBias.r;
+        break;
+    case GL_POST_CONVOLUTION_GREEN_BIAS:
+        *fp++ = gc->state.pixel.transferMode.postConvolutionBias.g;
+        break;
+    case GL_POST_CONVOLUTION_BLUE_BIAS:
+        *fp++ = gc->state.pixel.transferMode.postConvolutionBias.b;
+        break;
+    case GL_POST_CONVOLUTION_ALPHA_BIAS:
+        *fp++ = gc->state.pixel.transferMode.postConvolutionBias.a;
+        break;
+    case GL_ZOOM_X:
+        *fp++ = gc->state.pixel.transferMode.zoomX;
+        break;
+    case GL_ZOOM_Y:
+        *fp++ = gc->state.pixel.transferMode.zoomY;
+        break;
+    case GL_PIXEL_MAP_I_TO_I_SIZE:
+    case GL_PIXEL_MAP_S_TO_S_SIZE:
+    case GL_PIXEL_MAP_I_TO_R_SIZE:
+    case GL_PIXEL_MAP_I_TO_G_SIZE:
+    case GL_PIXEL_MAP_I_TO_B_SIZE:
+    case GL_PIXEL_MAP_I_TO_A_SIZE:
+    case GL_PIXEL_MAP_R_TO_R_SIZE:
+    case GL_PIXEL_MAP_G_TO_G_SIZE:
+    case GL_PIXEL_MAP_B_TO_B_SIZE:
+    case GL_PIXEL_MAP_A_TO_A_SIZE:
+        index = sq - GL_PIXEL_MAP_I_TO_I_SIZE;
+        *ip++ = gc->state.pixel.pixelMap[index].size;
+        break;
+    case GL_MAX_EVAL_ORDER:
+        *ip++ = gc->constants.maxEvalOrder;
+        break;
+    case GL_MAX_LIGHTS:
+        *ip++ = gc->constants.numberOfLights;
+        break;
+    case GL_MAX_CLIP_PLANES:
+        *ip++ = gc->constants.numberOfClipPlanes;
+        break;
+    case GL_MAX_PIXEL_MAP_TABLE:
+        *ip++ = gc->constants.maxPixelMapTable;
+        break;
+    case GL_MAX_ATTRIB_STACK_DEPTH:
+        *ip++ = gc->constants.maxAttribStackDepth;
+        break;
+    case GL_MAX_CLIENT_ATTRIB_STACK_DEPTH:
+        *ip++ = gc->constants.maxClientAttribStackDepth;
+        break;
+    case GL_MAX_MODELVIEW_STACK_DEPTH:
+        *ip++ = gc->constants.maxModelViewStackDepth;
+        break;
+    case GL_MAX_NAME_STACK_DEPTH:
+        *ip++ = gc->constants.maxNameStackDepth;
+        break;
+    case GL_MAX_PROJECTION_STACK_DEPTH:
+        *ip++ = gc->constants.maxProjectionStackDepth;
+        break;
+    case GL_MAX_TEXTURE_STACK_DEPTH:
+        *ip++ = gc->constants.maxTextureStackDepth;
+        break;
+    case GL_INDEX_BITS:
+        *ip++ = gc->modes.rgbaBits;
+        break;
+    case GL_ACCUM_RED_BITS:
+        *ip++ = gc->modes.accumRedBits;
+        break;
+    case GL_ACCUM_GREEN_BITS:
+        *ip++ = gc->modes.accumGreenBits;
+        break;
+    case GL_ACCUM_BLUE_BITS:
+        *ip++ = gc->modes.accumBlueBits;
+        break;
+    case GL_ACCUM_ALPHA_BITS:
+        *ip++ = gc->modes.accumAlphaBits;
+        break;
+    case GL_MAP1_GRID_DOMAIN:
+        *fp++ = gc->state.evaluator.u1.start;
+        *fp++ = gc->state.evaluator.u1.finish;
+        break;
+    case GL_MAP1_GRID_SEGMENTS:
+        *ip++ = gc->state.evaluator.u1.n;
+        break;
+    case GL_MAP2_GRID_DOMAIN:
+        *fp++ = gc->state.evaluator.u2.start;
+        *fp++ = gc->state.evaluator.u2.finish;
+        *fp++ = gc->state.evaluator.v2.start;
+        *fp++ = gc->state.evaluator.v2.finish;
+        break;
+    case GL_MAP2_GRID_SEGMENTS:
+        *ip++ = gc->state.evaluator.u2.n;
+        *ip++ = gc->state.evaluator.v2.n;
+        break;
+    case GL_NAME_STACK_DEPTH:
+        *ip++ = (GLint)(gc->select.sp - gc->select.stack);
+        break;
+    case GL_DOUBLEBUFFER:
+        *bp++ = gc->modes.doubleBufferMode ? GL_TRUE : GL_FALSE;
+        break;
+    case GL_AUX_BUFFERS:
+        *ip++ = gc->modes.numAuxBuffers;
+        break;
+    case GL_STEREO:
+        *bp++ = GL_FALSE;
+        break;
+    case GL_TEXTURE_BINDING_1D:
+        index = gc->state.texture.activeTexIndex;
+        *ip++ = gc->texture.units[index].boundTextures[__GL_TEXTURE_1D_INDEX]->name;
+        break;
+    case GL_TEXTURE_BINDING_1D_ARRAY_EXT:
+        index = gc->state.texture.activeTexIndex;
+        *ip++ = gc->texture.units[index].boundTextures[__GL_TEXTURE_1D_ARRAY_INDEX]->name;
+        break;
+    case GL_TEXTURE_BUFFER_FORMAT_EXT:
+        index = gc->state.texture.activeTexIndex;
+        *ip++ = gc->texture.units[index].boundTextures[__GL_TEXTURE_BUFFER_INDEX]->faceMipmap[0][0].requestedFormat;
+        break;
+    case GL_TEXTURE_BUFFER_DATA_STORE_BINDING_EXT:
+        index = gc->state.texture.activeTexIndex;
+        if(gc->texture.units[index].boundTextures[__GL_TEXTURE_BUFFER_INDEX]->bufObj)
+            *ip++ = gc->texture.units[index].boundTextures[__GL_TEXTURE_BUFFER_INDEX]->bufObj->name;
+        else
+            *ip++ = 0;
+        break;
+    case GL_VERTEX_ARRAY_SIZE:
+ //       *ip++ = gc->clientState.vertexArray.vertex.size;
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_VERTEX_INDEX].size;
+        break;
+    case GL_VERTEX_ARRAY_TYPE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_VERTEX_INDEX].type;
+        break;
+    case GL_VERTEX_ARRAY_STRIDE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_VERTEX_INDEX].usr_stride;
+        break;
+    case GL_NORMAL_ARRAY_TYPE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_NORMAL_INDEX].type;
+        break;
+    case GL_NORMAL_ARRAY_STRIDE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_NORMAL_INDEX].usr_stride;
+        break;
+    case GL_COLOR_ARRAY_SIZE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_DIFFUSE_INDEX].size;
+        break;
+    case GL_COLOR_ARRAY_TYPE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_DIFFUSE_INDEX].type;
+        break;
+    case GL_COLOR_ARRAY_STRIDE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_DIFFUSE_INDEX].usr_stride;
+        break;
+    case GL_INDEX_ARRAY_TYPE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_COLORINDEX_INDEX].type;
+        break;
+    case GL_INDEX_ARRAY_STRIDE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_COLORINDEX_INDEX].type;
+        break;
+    case GL_TEXTURE_COORD_ARRAY_SIZE:
+        index = gc->state.texture.activeTexIndex;
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_TEX0_INDEX + index].size;
+        break;
+    case GL_TEXTURE_COORD_ARRAY_TYPE:
+        index = gc->state.texture.activeTexIndex;
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_TEX0_INDEX + index].type;
+        break;
+    case GL_TEXTURE_COORD_ARRAY_STRIDE:
+        index = gc->state.texture.activeTexIndex;
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_TEX0_INDEX + index].usr_stride;
+        break;
+    case GL_EDGE_FLAG_ARRAY_STRIDE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_EDGEFLAG + index].usr_stride;
+        break;
+    case GL_FEEDBACK_BUFFER_SIZE:
+        *ip++ = gc->feedback.resultLength;
+        break;
+    case GL_FEEDBACK_BUFFER_TYPE:
+        *ip++ = gc->feedback.type;
+        break;
+    case GL_SELECTION_BUFFER_SIZE:
+        *ip++ = gc->select.bufferMaxCount;
+        break;
+    case GL_CLIENT_ACTIVE_TEXTURE:
+        *ip++ = GL_TEXTURE0 + gc->state.texture.activeTexIndex;
+        break;
+    case GL_MAX_TEXTURE_UNITS:
+        *ip++ = (gc->constants.shaderCaps.maxTextureSamplers < 8) ? gc->constants.shaderCaps.maxTextureSamplers : 8;
+        break;
+    case GL_LIGHT_MODEL_COLOR_CONTROL:
+        *ip++ = gc->state.light.model.colorControl;
+        break;
+    case GL_CURRENT_SECONDARY_COLOR:
+        *cp++ = gc->state.current.color2.r;
+        *cp++ = gc->state.current.color2.g;
+        *cp++ = gc->state.current.color2.b;
+        *cp++ = 0;
+        break;
+    case GL_SECONDARY_COLOR_ARRAY_SIZE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_SPECULAR_INDEX].size;
+        break;
+    case GL_SECONDARY_COLOR_ARRAY_TYPE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_SPECULAR_INDEX].type;
+        break;
+    case GL_SECONDARY_COLOR_ARRAY_STRIDE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_SPECULAR_INDEX].usr_stride;
+        break;
+    case GL_FOG_COORDINATE_SOURCE:
+        *ip++ = gc->state.fog.coordSource;
+        break;
+    case GL_CURRENT_FOG_COORDINATE:
+        *fp++ = gc->state.current.fog;
+        break;
+    case GL_FOG_COORDINATE_ARRAY_TYPE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_FOGCOORD_INDEX].type;
+        break;
+    case GL_FOG_COORDINATE_ARRAY_STRIDE:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attribute[__GL_VARRAY_FOGCOORD_INDEX].usr_stride;
+        break;
+#if GL_EXT_depth_bounds_test
+    case GL_DEPTH_BOUNDS_EXT:
+        *fp++ = gc->state.depthBoundTest.zMin;
+        *fp++ = gc->state.depthBoundTest.zMax;
+        break;
+#endif
+
+#if GL_ARB_fragment_program
+    case GL_MAX_TEXTURE_COORDS_ARB:
+        *ip++ =  (gc->constants.shaderCaps.maxTextureSamplers < 8) ? gc->constants.shaderCaps.maxTextureSamplers : 8;
+        break;
+#endif
+
+    case GL_VERTEX_ARRAY_BUFFER_BINDING:
+//        *ip++ = gc->clientState.vertexArray.vertex.bufBinding;
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attributeBinding[__GL_VARRAY_VERTEX_INDEX].boundArrayName;
+        break;
+    case GL_NORMAL_ARRAY_BUFFER_BINDING:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attributeBinding[__GL_VARRAY_NORMAL_INDEX].boundArrayName;
+        break;
+    case GL_COLOR_ARRAY_BUFFER_BINDING:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attributeBinding[__GL_VARRAY_DIFFUSE_INDEX].boundArrayName;
+        break;
+    case GL_INDEX_ARRAY_BUFFER_BINDING:
+        *ip++ = 0;
+        break;
+    case GL_TEXTURE_COORD_ARRAY_BUFFER_BINDING:
+        index = gc->state.texture.activeTexIndex;;
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attributeBinding[__GL_VARRAY_TEX0_INDEX + index ].boundArrayName;
+        break;
+    case GL_EDGE_FLAG_ARRAY_BUFFER_BINDING:
+        *ip++ = 0;
+        break;
+    case GL_SECONDARY_COLOR_ARRAY_BUFFER_BINDING:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attributeBinding[__GL_VARRAY_SPECULAR_INDEX].boundArrayName;
+        break;
+    case GL_FOG_COORDINATE_ARRAY_BUFFER_BINDING:
+        *ip++ = gc->vertexArray.boundVAO->vertexArray.attributeBinding[__GL_VARRAY_FOGCOORD_INDEX].boundArrayName;
+        break;
+/* lan : disable it */
+/*
+#if GL_ATI_element_array
+    case GL_ELEMENT_ARRAY_TYPE_ATI:
+        *ip++ = gc->clientState.vertexArray.elementType;
+        break;
+#endif
+*/
+#if GL_ARB_texture_rectangle
+    case GL_TEXTURE_BINDING_RECTANGLE_ARB:
+        index = gc->state.texture.activeTexIndex;
+        *ip++ = gc->texture.units[index].boundTextures[__GL_TEXTURE_RECTANGLE_INDEX]->name;
+        break;
+    case GL_MAX_RECTANGLE_TEXTURE_SIZE_ARB:
+        *ip++ = gc->constants.maxTextureSize;
+        break;
+#endif
+
+#if GL_EXT_texture_integer
+//    case GL_RGBA_INTEGER_MODE_EXT:
+//        *bp++ = gc->frameBuffer.drawFramebufObj->fbInteger; /*maybe not evaluate*/
+//        break;
+#endif
+
+#if GL_EXT_geometry_shader4
+    case GL_MAX_GEOMETRY_VARYING_COMPONENTS_EXT:
+        *ip++ = gc->constants.maxGeometryVaryingComponents;
+        break;
+
+    case GL_MAX_VERTEX_VARYING_COMPONENTS_EXT:
+        *ip++ = gc->constants.maxVertexVaryingComponents;
+        break;
+#endif
+
+#if GL_ARB_color_buffer_float
+    case GL_RGBA_FLOAT_MODE_ARB:
+        *ip++ = gc->modes.rgbFloatMode;
+        break;
+    case GL_CLAMP_VERTEX_COLOR_ARB:
+        *ip++ = gc->state.light.clampVertexColor;
+        break;
+    case GL_CLAMP_FRAGMENT_COLOR_ARB:
+        *ip++ = gc->state.raster.clampFragColor;
+        break;
+    case GL_CLAMP_READ_COLOR_ARB:
+        *ip++ = gc->state.raster.clampReadColor;
+        break;
+#endif
+#endif
     case GL_PACK_ROW_LENGTH:
         *ip++ = gc->clientState.pixel.packModes.lineLength;
         break;
@@ -547,30 +1283,6 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
     case GL_UNPACK_IMAGE_HEIGHT:
         *ip++ = gc->clientState.pixel.unpackModes.imageHeight;
         break;
- #ifdef OPENGL40
-    case GL_PACK_LSB_FIRST:
-        *ip++ = gc->clientState.pixel.packModes.lsbFirst;
-        break;
-    case GL_PACK_SWAP_BYTES:
-        *ip++ = gc->clientState.pixel.packModes.swapEndian;
-        break;
-    case GL_UNPACK_LSB_FIRST:
-        *ip++ = gc->clientState.pixel.unpackModes.lsbFirst;
-        break;
-    case GL_UNPACK_SWAP_BYTES:
-        *ip++ = gc->clientState.pixel.unpackModes.swapEndian;
-        break;
-    case GL_FOG_COLOR:
-        {
-            __GLcolor fogColor;
-            __CHECK_GET_COLOR_CLAMP(&fogColor, &gc->state.fog.color);
-            *ip++ = fogColor.r;
-            *ip++ = fogColor.g;
-            *ip++ = fogColor.b;
-            *ip++ = fogColor.a;
-        }
-        break;
- #endif
     case GL_RED_BITS:
         *ip++ = DRAW_FRAMEBUFFER_BINDING_NAME ? __glGetFboColorBits(gc, GL_RED_BITS) : gc->modes.redBits;
         break;
@@ -1390,6 +2102,7 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
     {
         __glConvertResult(gc, __GL_COLOR, ctemp, type, result, (GLint)(cp - ctemp));
     }
+
 }
 
 GLvoid GL_APIENTRY __gles_GetFloatv(__GLcontext *gc, GLenum pname, GLfloat* params)

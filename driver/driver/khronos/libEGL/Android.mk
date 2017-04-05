@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -30,7 +30,8 @@ LOCAL_SRC_FILES := \
 	source/gc_egl_surface.c \
 	source/gc_egl_swap.c \
 	source/gc_egl_sync.c \
-	api/gc_egl_android.c
+	api/gc_egl_android.c \
+	api/gc_egl_nullws.c
 
 LOCAL_CFLAGS := \
 	$(CFLAGS) \

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -21,6 +21,9 @@ void vscInitializeOptions(VSC_OPTN_Options* pOptions,
                           gctUINT cFlags,
                           gctUINT64 optFlags)
 {
+    /* set default optimization level to 2 */
+    gctUINT optLevel = 2;
+
     gcmASSERT(pOptions);
 
     /* Initialize options. */
@@ -34,8 +37,11 @@ void vscInitializeOptions(VSC_OPTN_Options* pOptions,
     ** 5) Get the ENV options.
     */
 
+    /* if optimization level is set in options, get it here */
+    VSC_OPTN_Options_GetOptLevelFromEnv(&optLevel);
+
     /* Set the default options. */
-    VSC_OPTN_Options_SetDefault(pOptions);
+    VSC_OPTN_Options_SetDefault(pOptions, optLevel);
 
     /* Set the options by compile flags. */
     VSC_OPTN_Options_SetOptionsByCompileFlags(pOptions, cFlags);
@@ -490,6 +496,7 @@ static VSC_ErrCode _FinalizeMemPool(VSC_PASS_PROPERTY* pPassProp,
 
 static VSC_ErrCode _BeginShaderPass(VSC_SHADER_PASS_MANAGER* pShPassMnger,
                                     VSC_PASS_PROPERTY* pPassProp,
+                                    gctUINT passId,
                                     void* pPrvData,
                                     VSC_SH_PASS_WORKER* pPassWorker)
 {
@@ -498,7 +505,7 @@ static VSC_ErrCode _BeginShaderPass(VSC_SHADER_PASS_MANAGER* pShPassMnger,
     VSC_SHADER_PASS_RES* pPassRes = &pShPassMnger->passRes;
 
     /* Firstly check gate */
-    pPassWorker->basePassWorker.pBaseOption = VSC_OPTN_Options_GetOption(pShPassMnger->basePM.pOptions, pPassProp->passOptionType);
+    pPassWorker->basePassWorker.pBaseOption = VSC_OPTN_Options_GetOption(pShPassMnger->basePM.pOptions, pPassProp->passOptionType, passId);
     if (!_Gate(&pPassWorker->basePassWorker))
     {
         return errCode;
@@ -561,6 +568,7 @@ OnError:
 
 static VSC_ErrCode _BeginGpgPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
                                  VSC_PASS_PROPERTY* pPassProp,
+                                 gctUINT passId,
                                  void* pPrvData,
                                  VSC_GPG_PASS_WORKER* pPassWorker)
 {
@@ -569,7 +577,7 @@ static VSC_ErrCode _BeginGpgPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
 
     /* Firstly check gate */
     pPassWorker->basePassWorker.pBaseOption = VSC_OPTN_Options_GetOption(pPgPassMnger->basePgmPM.basePM.pOptions,
-                                                                         pPassProp->passOptionType);
+                                                                         pPassProp->passOptionType, passId);
     if (!_Gate(&pPassWorker->basePassWorker))
     {
         return errCode;
@@ -683,6 +691,7 @@ OnError:
 VSC_ErrCode vscSPM_CallPass(VSC_SHADER_PASS_MANAGER* pShPassMnger,
                             PFN_SH_PASS_ROUTINE pfnPassRoutine,
                             PFN_QUERY_PASS_PROP pfnQueryPassProp,
+                            gctUINT passId,
                             void* pPrvData)
 {
     VSC_ErrCode        errCode = VSC_ERR_NONE;
@@ -703,7 +712,7 @@ VSC_ErrCode vscSPM_CallPass(VSC_SHADER_PASS_MANAGER* pShPassMnger,
 
     /* Begin a pass to prepare resources to generate a pass-worker for the run of this pass */
     memset(&passWorker, 0, sizeof(VSC_SH_PASS_WORKER));
-    errCode = _BeginShaderPass(pShPassMnger, &passProp, pPrvData, &passWorker);
+    errCode = _BeginShaderPass(pShPassMnger, &passProp, passId, pPrvData, &passWorker);
     ON_ERROR(errCode, "Begin shader pass");
 
     /* Now run this pass if pass is gated */
@@ -724,6 +733,7 @@ OnError:
 VSC_ErrCode vscGPPM_CallPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
                              PFN_GPG_PASS_ROUTINE pfnPassRoutine,
                              PFN_QUERY_PASS_PROP pfnQueryPassProp,
+                             gctUINT passId,
                              void* pPrvData)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
@@ -744,7 +754,7 @@ VSC_ErrCode vscGPPM_CallPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
 
     /* Begin a pass to prepare resources to generate a pass-worker for the run of this pass */
     memset(&passWorker, 0, sizeof(VSC_GPG_PASS_WORKER));
-    errCode = _BeginGpgPass(pPgPassMnger, &passProp, pPrvData, &passWorker);
+    errCode = _BeginGpgPass(pPgPassMnger, &passProp, passId, pPrvData, &passWorker);
     ON_ERROR(errCode, "Begin GPG pass");
 
     /* Now run this pass if pass is gated */

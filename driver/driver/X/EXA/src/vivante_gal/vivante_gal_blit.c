@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -1152,6 +1152,8 @@ static Bool BlendMaskedArbitraryPatternRect(GALINFOPTR galInfo, VivBoxPtr opbox)
     _rectPrint(pBlt, "Msk to tempSrc",tempXNum,tempYNum,pSrcClip,pDstClip);
     status = gco2D_SetPorterDuffBlending(gpuctx->mDriver->m2DEngine, gcvPD_DST_IN);
     if (status != gcvSTATUS_OK) {
+        free(pSrcClip);
+        free(pDstClip);
         TRACE_ERROR("gco2D_SetPorterDuffBlending failed\n");
         TRACE_EXIT(FALSE);
     }
@@ -1350,8 +1352,8 @@ static Bool BlendArbitraryPatternRect(GALINFOPTR galInfo, VivBoxPtr opbox) {
     xclipCount = pBlt->mSrcTempSurfInfo.mWidth / pBlt->mSrcSurfInfo.mWidth;
     yclipCount = pBlt->mSrcTempSurfInfo.mHeight/ pBlt->mSrcSurfInfo.mHeight;
 
-    pSrcClip = malloc(sizeof(gcsRECT) * xclipCount * yclipCount);
-    pDstClip = malloc(sizeof(gcsRECT) * xclipCount * yclipCount);
+    pSrcClip = (gcsRECT_PTR)malloc(sizeof(gcsRECT) * xclipCount * yclipCount);
+    pDstClip = (gcsRECT_PTR)malloc(sizeof(gcsRECT) * xclipCount * yclipCount);
 
     pOSrcClip = pSrcClip;
     pODstClip = pDstClip;
@@ -1396,25 +1398,25 @@ static Bool BlendArbitraryPatternRect(GALINFOPTR galInfo, VivBoxPtr opbox) {
     /*setting the source surface*/
     if (!SetSourceSurface(galInfo)) {
         TRACE_ERROR("ERROR SETTING SOURCE SURFACE\n");
-        TRACE_EXIT(FALSE);
+        goto FREESOURCE;
     }
 
     /*Setting the dest surface*/
     if (!SetDestinationSurface(galInfo)) {
         TRACE_ERROR("ERROR SETTING DST SURFACE\n");
-        TRACE_EXIT(FALSE);
+        goto FREESOURCE;
     }
 
     /*setting the clipping for dest*/
     if (!SetClipping(galInfo)) {
         TRACE_ERROR("ERROR SETTING DST CLIPPING\n");
-        TRACE_EXIT(FALSE);
+        goto FREESOURCE;
     }
 
     /*Enabling the alpha blending*/
     if (!EnableAlphaBlending(galInfo)) {
         TRACE_ERROR("Alpha Blending Factor\n");
-        TRACE_EXIT(FALSE);
+        goto FREESOURCE;
     }
 
     status = gco2D_BatchBlit(
@@ -1429,12 +1431,12 @@ static Bool BlendArbitraryPatternRect(GALINFOPTR galInfo, VivBoxPtr opbox) {
 
     if (status != gcvSTATUS_OK) {
         TRACE_ERROR("Copy Blit Failed");
-        TRACE_EXIT(FALSE);
+        goto FREESOURCE;
     }
 
     if (!DisableAlphaBlending(galInfo)) {
         TRACE_ERROR("Disabling Alpha Blend Failed\n");
-        TRACE_EXIT(FALSE);
+        goto FREESOURCE;
     }
 
 
@@ -1442,6 +1444,12 @@ static Bool BlendArbitraryPatternRect(GALINFOPTR galInfo, VivBoxPtr opbox) {
     free((void *)pDstClip);
 
     TRACE_EXIT(TRUE);
+
+FREESOURCE:
+    free((void *)pSrcClip);
+    free((void *)pDstClip);
+
+    TRACE_EXIT(FALSE);
 }
 
 
@@ -1571,7 +1579,7 @@ static void SetTempSurfForRM(GALINFOPTR galInfo, VivBoxPtr opbox)
                 return ;
         }
 
-        if ( retvsurf == FALSE ) return ;
+        if ( retvsurf == FALSE ) goto FREESOURCE;
 
         status = gco2D_SetGenericSource
         (
@@ -1589,7 +1597,7 @@ static void SetTempSurfForRM(GALINFOPTR galInfo, VivBoxPtr opbox)
 
         if ( status != gcvSTATUS_OK ) {
             TRACE_ERROR("ERROR SETTING SOURCE SURFACE\n");
-            TRACE_EXIT();
+            goto FREESOURCE;
         }
 
 
@@ -1609,7 +1617,7 @@ static void SetTempSurfForRM(GALINFOPTR galInfo, VivBoxPtr opbox)
 
         if ( status != gcvSTATUS_OK ) {
             TRACE_ERROR("ERROR SETTING SOURCE SURFACE\n");
-            TRACE_EXIT();
+            goto FREESOURCE;
         }
 
         dstRect.right = maxsize;
@@ -1618,7 +1626,7 @@ static void SetTempSurfForRM(GALINFOPTR galInfo, VivBoxPtr opbox)
         status = gco2D_SetClipping(gpuctx->mDriver->m2DEngine, &dstRect);
         if (status != gcvSTATUS_OK) {
             TRACE_ERROR("gco2D_SetClipping failed\n");
-            TRACE_EXIT();
+            goto FREESOURCE;
         }
 
         if (galInfo->mBlitInfo.mOperationCode == VIVCOMPOSITE_MASKED_SRC_REPEAT_PIXEL_ONLY_PATTERN )
@@ -1658,8 +1666,8 @@ static void SetTempSurfForRM(GALINFOPTR galInfo, VivBoxPtr opbox)
             xclipCount = pBlt->mSrcTempSurfInfo.mWidth / pBlt->mSrcSurfInfo.mWidth;
             yclipCount = pBlt->mSrcTempSurfInfo.mHeight/ pBlt->mSrcSurfInfo.mHeight;
 
-            pSrcClip = malloc(sizeof(gcsRECT) * xclipCount * yclipCount);
-            pDstClip = malloc(sizeof(gcsRECT) * xclipCount * yclipCount);
+            pSrcClip = (gcsRECT_PTR)malloc(sizeof(gcsRECT) * xclipCount * yclipCount);
+            pDstClip = (gcsRECT_PTR)malloc(sizeof(gcsRECT) * xclipCount * yclipCount);
 
             pOSrcClip = pSrcClip;
             pODstClip = pDstClip;
@@ -1707,13 +1715,20 @@ static void SetTempSurfForRM(GALINFOPTR galInfo, VivBoxPtr opbox)
 
         pinfo->mAlignedWidth = aligned_width;
         pinfo->mAlignedHeight = aligned_height;
-        pinfo->mLogicalAddr = (gctPOINTER)linearaddr;
+        pinfo->mLogicalAddr = gcmINT2PTR(linearaddr);
         pinfo->mStride = aligned_pitch;
         pinfo->mVideoNode.mPhysicalAddr = physicaladdr;
         pinfo->mRotation = gcvSURF_0_DEGREE;
         pinfo->mTiling = srcsurf->mTiling;
     }
 
+FREESOURCE:
+
+    if (pBlt->mSrcTempSurfInfo.mPriv->mVidMemInfo);
+    free(pBlt->mSrcTempSurfInfo.mPriv->mVidMemInfo);
+
+    if (pBlt->mSrcTempSurfInfo.mPriv);
+    free(pBlt->mSrcTempSurfInfo.mPriv);
 }
 
 static void ReleaseTempSurfForRM(GALINFOPTR galInfo, VivBoxPtr opbox)

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -5213,8 +5213,6 @@ gckOS_SetGPUPower(
 {
     gcmkHEADER_ARG("Os=0x%X Core=%d Clock=%d Power=%d", Os, Core, Clock, Power);
 
-    /* TODO: Put your code here. */
-
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;
 }
@@ -5245,8 +5243,6 @@ gckOS_ResetGPU(
 {
     gcmkHEADER_ARG("Os=0x%X Core=%d", Os, Core);
 
-    /* TODO: Put your code here. */
-
     gcmkFOOTER_NO();
     return gcvSTATUS_NOT_SUPPORTED;
 }
@@ -5259,8 +5255,6 @@ gckOS_DumpCallStack(
     gcmkHEADER_ARG("Os=0x%X", Os);
 
     gcmkVERIFY_OBJECT(Os, gcvOBJ_OS);
-
-    /* TODO */
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;

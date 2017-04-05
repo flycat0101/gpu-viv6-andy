@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -171,11 +171,14 @@ typedef struct _cl_mem
             /* GL sharing. */
             cl_GLenum               textureTarget;
             cl_GLint                mipLevel;
+            cl_GLenum               glType;
+            cl_GLenum               glFormat;
             gctUINT                 textureSlicePitch;  /* Texture data. */
-#if BUILD_OPENCL_12
             clsMem_PTR              buffer;
             size_t                  arraySize;
-#endif
+            gctBOOL                 vxcnormalizedCoords;
+            cl_addressing_mode      vxcaddressingMode;
+            cl_filter_mode          vxcfilterMode;
         } image;
     } u;
 }
@@ -314,41 +317,15 @@ clfPackImagePixelf(
     void *outData );
 #endif
 
-cl_int clfCLGLShareBufferData(
-    cl_context   Context,
-    cl_mem_flags Flags,
-    size_t       Size,
-    void *       HostPtr,
-    cl_int *     ErrcodeRet,
-    cl_mem       buffer);
-cl_mem clfCLGLShareBufferWrapper(
-    cl_context   Context,
-    cl_mem_flags Flags,
-    size_t       Size,
-    void *       HostPtr,
-    cl_int *     ErrcodeRet);
-#if BUILD_OPENCL_12
-cl_int clfCLGLShareCreateImageData(
-    cl_context               context ,
-    cl_mem                   image,
-    void *                   hostPtr
-    );
-cl_mem clfCLGLShareCreateImageWrapper(
-    cl_context               Context ,
-    cl_mem_flags             Flags ,
-    const cl_image_format *  ImageFormat ,
-    const cl_image_desc *    ImageDesc ,
-    void *                   HostPtr ,
-    cl_int *                 ErrcodeRet
-    );
-#endif
-cl_int clfCLGLShareReleaseMemObjectData(
-    cl_mem MemObj
-    );
-cl_int clfCLGLShareReleaseMemObjectWrapper(
+gctINT
+clfRetainMemObject(
     cl_mem MemObj
     );
 
+gctINT
+clfReleaseMemObject(
+    cl_mem MemObj
+    );
 #ifdef __cplusplus
 }
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,7 +18,7 @@
 */
 #define VX_IMPLEMENTATION_NAME          "Vivante"
 
-gceSTATUS gcLoadKernelCompiler(IN gcsHWCaps *HWCaps);
+gceSTATUS gcLoadKernelCompiler(IN gcsHWCaps *HWCaps, IN gcePATCH_ID PatchId);
 gceSTATUS gcUnloadKernelCompiler(void);
 
 VX_INTERNAL_API vx_bool vxIsValidImportType(vx_enum type)
@@ -298,6 +298,7 @@ VX_PRIVATE_API vx_context vxoContext_Create()
 {
     vx_context context = VX_NULL;
     VSC_HW_CONFIG hwCfg;
+    gcePATCH_ID patchId;
 
     if (vxSingletonContext == VX_NULL)
     {
@@ -305,6 +306,8 @@ VX_PRIVATE_API vx_context vxoContext_Create()
     }
 
     vxAcquireMutex(vxContextGlobalLock);
+
+    gcoVX_ZeroMemorySize();
 
     if (vxSingletonContext == VX_NULL)
     {
@@ -350,6 +353,12 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         context->processor.running = vx_true_e;
         context->processor.thread = vxCreateThread((vx_thread_routine_f)&vxGraphThreadRoutine, &context->processor);
 
+        context->cnnAvailableEventID = 1;
+
+        gcoOS_GetEnv(gcvNULL, "CNN_PERF", &oldEnv);
+        if (oldEnv)
+            context->perfEnable = (atoi(oldEnv) == 1)?vx_true_e:vx_false_e;
+
 
         context->deviceCount = 1;
         if (gcmIS_ERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg)))
@@ -357,7 +366,9 @@ VX_PRIVATE_API vx_context vxoContext_Create()
             goto ErrorExit;
         }
 
-        if (gcmIS_ERROR(gcLoadKernelCompiler(&hwCfg)))
+        gcoHAL_GetPatchID(gcvNULL, &patchId);
+
+        if (gcmIS_ERROR(gcLoadKernelCompiler(&hwCfg, patchId)))
         {
             goto ErrorExit;
         }
@@ -399,7 +410,14 @@ VX_PRIVATE_API vx_context vxoContext_Create()
 ErrorExit:
     vxReleaseMutex(vxContextGlobalLock);
 
-    if (context != VX_NULL) vxFree(context);
+    if (context != VX_NULL)
+    {
+        if ((&context->base)->lock != VX_NULL)
+        {
+            vxDestroyMutex((&context->base)->lock);
+        }
+        vxFree(context);
+    }
 
     return VX_NULL;
 }
@@ -448,7 +466,7 @@ VX_PRIVATE_API void vxoContext_ForceReleaseAllObjects(vx_context context)
             if (ref == VX_NULL) continue;
         }
 
-        while (externalCount > 1)
+        while (vxoReference_GetExternalCount(ref) > 1)
         {
             vxoReference_Decrement(ref, VX_REF_EXTERNAL);
         }
@@ -464,6 +482,14 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 {
     vx_context context;
     vx_uint32 i;
+    vx_char* flag;
+    gcoOS_GetEnv(gcvNULL, "ENABLE_TRACE_MEMORY", &flag);
+    if (flag)
+    {
+        vx_uint32 size = 0;
+        gcoVX_GetMemorySize(&size);
+        printf("Memory size (Mbyte) = %d\n", size/(1000*1000));
+    }
 
     if (contextPtr == VX_NULL) return VX_ERROR_INVALID_REFERENCE;
 
@@ -930,13 +956,13 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryContext(vx_context context, vx_enum at
     switch (attribute)
     {
         case VX_CONTEXT_ATTRIBUTE_VENDOR_ID:
-             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint16, 0x3);
+             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint16, 0x1);
 
             *(vx_uint16 *)ptr = VX_ID_VIVANTE;
             break;
 
         case VX_CONTEXT_ATTRIBUTE_VERSION:
-            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint16, 0x3);
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint16, 0x1);
 
             *(vx_uint16 *)ptr = (vx_uint16)VX_VERSION;
             break;

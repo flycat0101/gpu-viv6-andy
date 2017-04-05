@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -239,7 +239,7 @@ vdkInitialize(
     }
 
 
-    vdk->display = (EGLNativeDisplayType) NULL;
+    vdk->display = (EGLNativeDisplayType) 0;
 
     _vdk = vdk;
     return vdk;
@@ -287,10 +287,10 @@ vdkGetDisplayByIndex(
 {
     if (!Private)
     {
-        return NULL;
+        return 0;
     }
 
-    if (Private->display != (EGLNativeDisplayType) NULL)
+    if (Private->display != (EGLNativeDisplayType) 0)
     {
         return Private->display;
     }
@@ -327,7 +327,7 @@ vdkDestroyDisplay(
 {
     if (_vdk->display == Display)
     {
-        _vdk->display = NULL;
+        _vdk->display = 0;
     }
 }
 
@@ -372,7 +372,7 @@ vdkCreateWindow(
 {
     int pos[2];
     int size[2];
-    screen_window_t window = (NativeDisplayType) NULL;
+    screen_window_t window = (NativeDisplayType) 0;
     int screen_format = SCREEN_FORMAT_RGBX8888;
     int screen_transparency = SCREEN_TRANSPARENCY_NONE;
     int screen_usage = SCREEN_USAGE_OPENGL_ES1
@@ -601,7 +601,6 @@ vdkGetWindowInfo(
 
     if (Offset != NULL)
     {
-        /* TODO: Check if offset means anything in qnx. */
         *Offset = 0;
     }
 
@@ -694,10 +693,6 @@ vdkGetEvent(
             {
                 Event->type = VDK_BUTTON;
                 Event->data.button.left   = (buttons & 0x0001);
-                /* TODO
-                Event->data.button.middle = (buttons & 0x????);
-                Event->data.button.right  = (buttons & 0x????);
-                */
                 Event->data.button.x = pointer[0];
                 Event->data.button.y = pointer[1];
 
@@ -718,9 +713,11 @@ vdkGetEvent(
             int buffer;
             int scancode;
             static int prefix;
-
+#ifdef gcdQNX_SDP700
+            screen_get_event_property_iv(screen_evt, SCREEN_PROPERTY_SCAN, &buffer);
+#else
             screen_get_event_property_iv(screen_evt, SCREEN_PROPERTY_KEY_SCAN, &buffer);
-
+#endif
             if ((buffer == 0xE0) || (buffer == 0xE1))
             {
                 prefix = buffer;

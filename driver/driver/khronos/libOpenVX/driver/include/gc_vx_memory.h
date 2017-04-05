@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -27,6 +27,10 @@ VX_INTERNAL_API vx_bool vxoMemory_FreeWrappedMemory(vx_context context, vx_memor
 VX_INTERNAL_API void vxoMemory_Dump(vx_memory memory);
 
 VX_INTERNAL_API vx_size vxoMemory_ComputeSize(vx_memory memory, vx_uint32 planeIndex);
+
+VX_INTERNAL_API vx_status vxoMemory_CAllocate(vx_context context, void** memory, vx_uint32 size);
+
+VX_INTERNAL_API vx_status vxoMemory_CFree(vx_context context, void** memory);
 
 EXTERN_C_END
 

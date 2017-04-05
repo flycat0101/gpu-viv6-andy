@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -747,7 +747,7 @@ gcSHADER_GoVIRPass(gcSHADER Shader)
         ** 1) OpenCL has no int64 in the shader.
         ** 2) This chip can support HALTI2.
         */
-        if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2) &&
+        if (gcHWCaps.hwFeatureFlags.hasHalti2 &&
             gcmOPT_CLUseVIRCodeGen() &&
             !gcShaderHasInt64(Shader))
         {
@@ -758,7 +758,7 @@ gcSHADER_GoVIRPass(gcSHADER Shader)
     }
     else
     {
-        if (gcGetVIRCGKind(gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2))) != VIRCG_None)
+        if (gcGetVIRCGKind(gcHWCaps.hwFeatureFlags.hasHalti2) != VIRCG_None)
         {
             gctINT   startId = gcmOPT_VIRCGStart();
             gctINT   endId   = gcmOPT_VIRCGEnd();
@@ -868,7 +868,7 @@ gcSHADER_DumpFinalIR(gcSHADER Shader)
 {
     gcOPTIMIZER_OPTION * option = gcmGetOptimizerOption();
 
-    if (option->dumpBEFinalIR)
+    if (gcmOPT_DUMP_FINAL_IR())
     {
         gctINT   startId = option->_dumpStart;
         gctINT   endId   = option->_dumpEnd;
@@ -2760,6 +2760,12 @@ _BuildCodeList(
     codePrev->next = gcvNULL;
     Optimizer->codeTail = codePrev;
 
+    /* set the prev code of newly added RET to NOP if it is already RET */
+    if (GetShaderType(Optimizer->shader) != gcSHADER_TYPE_CL &&
+        codePrev->prev && codePrev->prev->instruction.opcode == gcSL_RET)
+    {
+        codePrev->prev->instruction.opcode = gcSL_NOP;
+    }
     /* Initialize caller and callee. */
     Optimizer->jmpCount = 0;
     for (code = Optimizer->codeHead; code; code = code->next)
@@ -3690,10 +3696,9 @@ gcOpt_DeleteFunction(
 {
     gceSTATUS           status = gcvSTATUS_OK;
     gcOPT_CODE          code;
-    gcOPT_TEMP          tempArray = Optimizer->tempArray;
     gcOPT_FUNCTION      functionArray = Optimizer->functionArray;
     gctUINT             fIndex = (gctINT) (Function - functionArray);
-    gctUINT             i, j;
+    gctUINT             i;
     gcsFUNCTION_ARGUMENT_PTR argument;
 
     gcmHEADER_ARG("Optimizer=%p Function=%p", Optimizer, Function);
@@ -3703,14 +3708,9 @@ gcOpt_DeleteFunction(
 
     /* Update temps' function for function arguments. */
     argument = Function->arguments;
-    for (j = 0; j < Function->argumentCount; j++, argument++)
+    for (i = 0; i < Function->argumentCount; i++, argument++)
     {
-        gctUINT index = argument->index;
         gcVARIABLE variable = gcvNULL;
-
-        gcmASSERT(tempArray[index].function == Function);
-        tempArray[index].function = gcvNULL;
-        tempArray[index].argument = gcvNULL;
 
         if (argument->variableIndex != 0xffff)
         {
@@ -3734,40 +3734,21 @@ gcOpt_DeleteFunction(
         gcOpt_RemoveCodeList(Optimizer, Function->codeHead, Function->codeTail);
     }
 
-    for (j = fIndex; j < Optimizer->functionCount - 1; j++)
+    for (i = fIndex; i < Optimizer->functionCount - 1; i++)
     {
-        gcsFUNCTION_ARGUMENT_PTR argument;
-
-        functionArray[j] = functionArray[j + 1];
-
-        /* Update temps' function for function arguments. */
-        argument = functionArray[j].arguments;
-        for (i = 0; i < functionArray[j].argumentCount; i++, argument++)
-        {
-            gctUINT index = argument->index;
-
-            gcmASSERT(tempArray[index].function == functionArray + j + 1);
-            tempArray[index].function = functionArray + j;
-            tempArray[index].argument = argument;
-
-            if (argument->variableIndex != 0xffff)
-            {
-                gcmASSERT(argument->variableIndex < Optimizer->shader->variableCount);
-                tempArray[index].arrayVariable = Optimizer->shader->variables[argument->variableIndex];
-            }
-        }
+        functionArray[i] = functionArray[i + 1];
 
         /* Update code's and callee's function */
         for (code = Optimizer->codeHead; code; code = code->next)
         {
             if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) == gcSL_CALL)
             {
-                if (code->callee->function == &functionArray[j + 1])
-                    code->callee->function = &functionArray[j];
+                if (code->callee->function == &functionArray[i + 1])
+                    code->callee->function = &functionArray[i];
             }
 
-            if (code->function == &functionArray[j + 1])
-                code->function = &functionArray[j];
+            if (code->function == &functionArray[i + 1])
+                code->function = &functionArray[i];
         }
     }
     Optimizer->functionArray[Optimizer->functionCount - 1].shaderFunction = gcvNULL;
@@ -3778,6 +3759,8 @@ gcOpt_DeleteFunction(
         gcmVERIFY_OK(_FreeFunctionArray(Optimizer->functionArrayMemPool, functionArray));
         Optimizer->functionArray = gcvNULL;
     }
+
+    gcmVERIFY_OK(gcOpt_RebuildTempArray(Optimizer));
 
     if (RebuildDF)
     {
@@ -4588,8 +4571,6 @@ _PackMainProgram(
             {
                 /* Function is not used at all or is a recursive function. */
                 /* Remove the function. */
-                gcOPT_TEMP tempArray = Optimizer->tempArray;
-                gcsFUNCTION_ARGUMENT_PTR argument;
                 gctUINT j;
 
                 /* Free the code list in the function. */
@@ -4666,39 +4647,11 @@ _PackMainProgram(
                     }
                 }
 #endif
-
-                /* Update temps' function for function arguments. */
-                argument = function->arguments;
-                for (j = 0; j < function->argumentCount; j++, argument++)
-                {
-                    gctUINT index = argument->index;
-
-                    gcmASSERT(tempArray[index].function == function);
-                    tempArray[index].function = gcvNULL;
-                    tempArray[index].argument = gcvNULL;
-                }
-
                 for (j = k; j < Optimizer->functionCount - 1; j++)
                 {
                     functionArray[j] = functionArray[j + 1];
-
-                    /* Update temps' function for function arguments. */
-                    argument = functionArray[j].arguments;
-                    for (i = 0; i < functionArray[j].argumentCount; i++, argument++)
-                    {
-                        gctUINT index = argument->index;
-
-                        gcmASSERT(tempArray[index].function == functionArray + j + 1);
-                        tempArray[index].function = functionArray + j;
-                        tempArray[index].argument = argument;
-
-                        if (argument->variableIndex != 0xffff)
-                        {
-                            gcmASSERT(argument->variableIndex < Optimizer->shader->variableCount);
-                            tempArray[index].arrayVariable = Optimizer->shader->variables[argument->variableIndex];
-                        }
-                    }
                 }
+
                 Optimizer->functionCount--;
                 if (Optimizer->functionCount == 0)
                 {
@@ -7027,6 +6980,7 @@ gcOpt_ConstructOptimizer(
     gceSTATUS           status;
     gcOPTIMIZER         optimizer = gcvNULL;
     gctPOINTER          pointer = gcvNULL;
+    gctUINT             vsUniform, psUniform;
 
     gcmHEADER_ARG("Shader=0x%x", Shader);
 
@@ -7042,7 +6996,7 @@ gcOpt_ConstructOptimizer(
 
     gcoOS_ZeroMemory(optimizer, gcmSIZEOF(struct _gcOPTIMIZER));
 
-    gcoHAL_GetPatchID(gcvNULL, &optimizer->patchID);
+    optimizer->patchID = gcPatchId;
 
     optimizer->globalOptions = &theOptimizerOption;
     optimizer->option = Shader->optimizationOption;
@@ -7052,29 +7006,31 @@ gcOpt_ConstructOptimizer(
     gcmONERROR(gcOpt_CopyInShader(optimizer, Shader));
 
     /* Query the hardware. */
-    gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &optimizer->hwCfg));
+    optimizer->hwCfg = gcHWCaps;
 
-    optimizer->isHalti2 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2);
+    optimizer->isHalti2 = gcHWCaps.hwFeatureFlags.hasHalti2;
     optimizer->supportImmediate = (optimizer->hwCfg.chipRevision >= 0x5310);
 
-    gcmVERIFY_OK(gcoHAL_QueryShaderCaps(
-                   gcvNULL,
-                   gcvNULL,
-                   &optimizer->maxVertexUniforms,
-                   &optimizer->maxFragmentUniforms,
-                   &optimizer->maxVaryings,
-                   &optimizer->maxShaderCoreCount,
-                   &optimizer->maxThreadCount,
-                   &optimizer->maxVertexInstructionCount,
-                   &optimizer->maxFragmentInstructionCount));
+    vsUniform = gcHWCaps.maxVSConstRegCount;
+    psUniform = gcHWCaps.maxPSConstRegCount;
+
+    _MASSAGE_MAX_UNIFORM_FOR_OES30(vsUniform, psUniform);
+
+    optimizer->maxVertexUniforms = vsUniform;
+    optimizer->maxFragmentUniforms = psUniform;
+    optimizer->maxVaryings = gcHWCaps.maxVaryingCount;
+    optimizer->maxShaderCoreCount = gcHWCaps.maxCoreCount;
+    optimizer->maxThreadCount = gcHWCaps.maxThreadCountPerCore * gcHWCaps.maxCoreCount;
+    optimizer->maxVertexInstructionCount = gcHWCaps.maxVSInstCount;
+    optimizer->maxFragmentInstructionCount = gcHWCaps.maxPSInstCount;
 
     optimizer->isCTSInline = gcvFALSE;
 
-    /* Build temp register array. */
-    gcmONERROR(gcOpt_BuildTempArray(optimizer));
-
     /* Pack main program if necessary. */
     gcmONERROR(_PackMainProgram(optimizer));
+
+    /* Build temp register array. */
+    gcmONERROR(gcOpt_BuildTempArray(optimizer));
 
     /* Build flow graph. */
     gcmONERROR(gcOpt_BuildFlowGraph(optimizer));

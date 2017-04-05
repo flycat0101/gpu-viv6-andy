@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -67,6 +67,7 @@ static vx_status vxVivWarpGeneric(vx_node node, vx_image src_image, vx_matrix ma
 
     kernelContext->params.xmax             = dst_width;
     kernelContext->params.ymax             = dst_height;
+    kernelContext->params.evisNoInst       = node->base.context->evisNoInst;
 
     if(borders->mode == VX_BORDER_MODE_CONSTANT || borders->mode == VX_BORDER_MODE_UNDEFINED)
     {
@@ -96,7 +97,7 @@ static vx_status vxVivWarpGeneric(vx_node node, vx_image src_image, vx_matrix ma
     kernelContext->uniforms[index++].index       = 8;
     uniformNum++;
 
-    if (node->base.context->evisNoInst.noBilinear)
+    if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noBilinear)
     {
         vx_uint32 constantData[8] = {0, 8, 16, 24, 0, 0, 0, 0};
         gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, constantData, sizeof(constantData));

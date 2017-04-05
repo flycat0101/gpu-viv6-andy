@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -107,7 +107,7 @@ static int ion_gralloc_alloc_buffer(alloc_device_t* dev,
         return err;
     }
 
-    /* TODO: Get physical address. */
+    /* TODO (Soc-vendor): Get physical address. */
     /*
     err = ion_phys(ionfd, ion_hnd, &phys);
     if (err) {
@@ -201,7 +201,7 @@ int ion_gralloc_alloc(alloc_device_t* dev,
      */
     {
         private_handle_t* hnd = (private_handle_t*) *pHandle;
-        /* TODO: physical address. */
+        /* TODO (Soc-vendor): physical address. */
         unsigned long phys = ~0U;
         void* vaddr = (void*)hnd->base;
 
@@ -266,7 +266,7 @@ int ion_gralloc_register_buffer(gralloc_module_t const* module,
      */
     {
         private_handle_t* hnd = (private_handle_t*)handle;
-        /* TODO: physical address. */
+        /* TODO (Soc-vendor): physical address. */
         unsigned long phys = ~0U;
         void* vaddr = (void*)hnd->base;
 
@@ -320,7 +320,7 @@ int ion_gralloc_unlock(gralloc_module_t const* module, buffer_handle_t handle)
         return -EINVAL;
     }
 
-    /* TODO: Flush cache if allocated for SW read/write. */
+    /* TODO (Soc-vendor): Flush cache if allocated for SW read/write. */
     /*
     private_handle_t* hnd = (private_handle_t*) handle;
 

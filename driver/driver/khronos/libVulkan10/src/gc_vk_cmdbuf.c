@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -970,8 +970,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSubmit(
     VkResult result = VK_SUCCESS;
 
     __VK_SET_ALLOCATIONCB(&devQueue->pDevContext->memCb);
-
-    /* TODO: Add semaphore support */
 
     pCommits = (__vk_CommitInfo *)__VK_ALLOC(
         (__VK_MAX_COMMITS * sizeof(__vk_CommitInfo)), 8, VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
@@ -2204,7 +2202,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBlitImage(
             scale = VK_TRUE;
         }
 
-        if (!scale && !reverse.x && !reverse.y && !reverse.z)   /* TODO: Include unsupported format check */
+        if (!scale && !reverse.x && !reverse.y && !reverse.z)
         {
             uint32_t srcLayers;
             __VK_DEBUG_ONLY(uint32_t dstLayers);
@@ -2749,7 +2747,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdWriteTimestamp(
     uint32_t entry
     )
 {
-    /* TODO */
 }
 
 VKAPI_ATTR void VKAPI_CALL __vk_CmdCopyQueryPoolResults(

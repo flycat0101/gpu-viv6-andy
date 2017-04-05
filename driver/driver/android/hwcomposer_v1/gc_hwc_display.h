@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,7 +18,7 @@
  * 3. vsync control (gc_hwc_vsync.cpp)
  * 4. hardware cursor (gc_hwc_cursor.cpp)
  *
- * TODO (VENDOR): Implement all of this.
+ * TODO (Soc-vendor): Implement all of this.
  */
 #include "gc_hwc.h"
 #include <EGL/egl.h>
@@ -49,7 +49,7 @@
  * 2D blitters need get back buffer for write and post after. That's why the
  * following two functions are needed.
  *
- * TODO (VENDOR): Implement the functions if non-Vivante EGL.
+ * TODO (Soc-vendor): Implement the functions if non-Vivante EGL.
  */
 typedef EGLClientBuffer (EGLAPIENTRYP PFNEGLGETRENDERBUFFERVIVPROC) (EGLClientBuffer Handle);
 typedef EGLBoolean (EGLAPIENTRYP PFNEGLPOSTBUFFERVIVPROC) (EGLClientBuffer Buffer);
@@ -95,7 +95,7 @@ hwcDetectVirtualDisplays(
 
 /*
  * This function is called every frame.
- * TODO (VENDOR): should complete works in it:
+ * TODO (Soc-vendor): should complete works in it:
  * 1. display discovery (hotplug)
  * 2. overlay control
  * 3. hardware cursor control

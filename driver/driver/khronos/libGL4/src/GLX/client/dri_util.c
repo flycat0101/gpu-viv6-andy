@@ -1277,19 +1277,9 @@ static GLvoid *driCreateNewDrawable(Display *dpy,
 #if defined(DRI_PIXMAPRENDER_GL)
     if (pdp)
     {
-        pdp->wrapPixData = (GLvoid *)Xmalloc(sizeof(wPixData));
-        pPixdata = (wPixData *)pdp->wrapPixData;
+        pdp->wrapPixData = NULL;
         pdp->doCPYToSCR = _CopyToDrawable;
-        pPixdata->surftype = gcvSURF_BITMAP;
-        pPixdata->directPix = 0;
-        pDevInfo = (vvtDeviceInfo*)psp->pDevPriv;
-        if (pDevInfo->bufBpp == 2 )
-            hwFormat = gcvSURF_R5G6B5;
-        else
-            hwFormat = gcvSURF_A8R8G8B8;
-        pPixdata->surfformat = hwFormat;
-        _createPixmapInfo(pdp, pdp->draw, &pPixdata->backPixmap, 0, &pPixdata->xgc, &pPixdata->pixWrapSurf, &pPixdata->backPixmapNode, pPixdata->surftype, pPixdata->surfformat);
-        pdp->wrapSurface = (GLvoid *)pPixdata->pixWrapSurf;
+        pdp->wrapSurface = NULL;
     }
 #endif
 

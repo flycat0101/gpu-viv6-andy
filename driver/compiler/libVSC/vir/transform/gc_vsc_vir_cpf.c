@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -113,6 +113,8 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_FLOAT_X2:
     case VIR_TYPE_FLOAT_X3:
     case VIR_TYPE_FLOAT_X4:
+    case VIR_TYPE_FLOAT_X8:
+    case VIR_TYPE_FLOAT_X16:
     case VIR_TYPE_FLOAT_2X2:
     case VIR_TYPE_FLOAT_3X3:
     case VIR_TYPE_FLOAT_4X4:
@@ -122,8 +124,6 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_FLOAT_3X4:
     case VIR_TYPE_FLOAT_4X2:
     case VIR_TYPE_FLOAT_4X3:
-    case VIR_TYPE_FLOAT_X8:
-    case VIR_TYPE_FLOAT_X16:
         *toType = VIR_TYPE_FLOAT32;
         break;
     case VIR_TYPE_INT32:
@@ -148,6 +148,13 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_INT16_X4:
     case VIR_TYPE_INT16_X8:
     case VIR_TYPE_INT16_X16:
+    case VIR_TYPE_INT16_X32:
+    case VIR_TYPE_INT16_P2:
+    case VIR_TYPE_INT16_P3:
+    case VIR_TYPE_INT16_P4:
+    case VIR_TYPE_INT16_P8:
+    case VIR_TYPE_INT16_P16:
+    case VIR_TYPE_INT16_P32:
         *toType = VIR_TYPE_INT16;
         break;
     case VIR_TYPE_UINT16:
@@ -156,6 +163,13 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_UINT16_X4:
     case VIR_TYPE_UINT16_X8:
     case VIR_TYPE_UINT16_X16:
+    case VIR_TYPE_UINT16_X32:
+    case VIR_TYPE_UINT16_P2:
+    case VIR_TYPE_UINT16_P3:
+    case VIR_TYPE_UINT16_P4:
+    case VIR_TYPE_UINT16_P8:
+    case VIR_TYPE_UINT16_P16:
+    case VIR_TYPE_UINT16_P32:
         *toType = VIR_TYPE_UINT16;
         break;
     case VIR_TYPE_INT8:
@@ -164,6 +178,13 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_INT8_X4:
     case VIR_TYPE_INT8_X8:
     case VIR_TYPE_INT8_X16:
+    case VIR_TYPE_INT8_X32:
+    case VIR_TYPE_INT8_P2:
+    case VIR_TYPE_INT8_P3:
+    case VIR_TYPE_INT8_P4:
+    case VIR_TYPE_INT8_P8:
+    case VIR_TYPE_INT8_P16:
+    case VIR_TYPE_INT8_P32:
         *toType = VIR_TYPE_INT8;
         break;
     case VIR_TYPE_UINT8:
@@ -172,12 +193,25 @@ _VSC_CPF_typeToChannelType(
     case VIR_TYPE_UINT8_X4:
     case VIR_TYPE_UINT8_X8:
     case VIR_TYPE_UINT8_X16:
+    case VIR_TYPE_UINT8_X32:
+    case VIR_TYPE_UINT8_P2:
+    case VIR_TYPE_UINT8_P3:
+    case VIR_TYPE_UINT8_P4:
+    case VIR_TYPE_UINT8_P8:
+    case VIR_TYPE_UINT8_P16:
+    case VIR_TYPE_UINT8_P32:
         *toType = VIR_TYPE_UINT8;
         break;
     case VIR_TYPE_BOOLEAN:
     case VIR_TYPE_BOOLEAN_X2:
     case VIR_TYPE_BOOLEAN_X3:
     case VIR_TYPE_BOOLEAN_X4:
+    case VIR_TYPE_BOOLEAN_P2:
+    case VIR_TYPE_BOOLEAN_P3:
+    case VIR_TYPE_BOOLEAN_P4:
+    case VIR_TYPE_BOOLEAN_P8:
+    case VIR_TYPE_BOOLEAN_P16:
+    case VIR_TYPE_BOOLEAN_P32:
         *toType = VIR_TYPE_BOOLEAN;
         break;
     case VIR_TYPE_FLOAT16:
@@ -418,8 +452,11 @@ _VSC_CPF_InitFunction(
     VIR_CFG         *pCfg       = VIR_Function_GetCFG(pFunc);
     gctUINT         tempCount   = VIR_Shader_GetVirRegCount(pShader);
 
-    gcmASSERT(tempCount > 256);
-    tempCount = tempCount - 256;
+    if (VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK)
+    {
+        gcmASSERT(tempCount > 256);
+        tempCount = tempCount - 256;
+    }
 
     /* init the constant data flow*/
     errCode = _VSC_CPF_InitializeBlkFlow(
@@ -886,6 +923,7 @@ _VSC_CPF_GetVRegNo(
     )
 {
     VIR_OperandInfo opndInfo;
+    VIR_Shader*     pShader = VIR_Inst_GetShader(pInst);
     gctUINT         orgTempCount = VIR_Shader_GetOrgRegCount(VIR_Inst_GetShader(pInst));
 
     VIR_Operand_GetOperandInfo(pInst, pOpnd, &opndInfo);
@@ -900,7 +938,8 @@ _VSC_CPF_GetVRegNo(
     {
         return VIR_INVALID_ID;
     }
-    else if (opndInfo.u1.virRegInfo.virReg >= (256 + orgTempCount))
+    else if (VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK &&
+        opndInfo.u1.virRegInfo.virReg >= (256 + orgTempCount))
     {
         return (opndInfo.u1.virRegInfo.virReg - 256);
     }
@@ -917,6 +956,7 @@ _VSC_CPF_isScalarConst(
     VIR_Instruction     *pInst,
     VIR_Operand         *pOpnd,
     gctUINT8            opndChannel,
+    gctUINT             opndOffset,
     VSC_STATE_VECTOR    *tmpFlow,
     VSC_CPF_Const       *constVal,
     VSC_CPF_LATTICE     *srcLattic
@@ -978,9 +1018,10 @@ _VSC_CPF_isScalarConst(
             gctUINT regNo = _VSC_CPF_GetVRegNo(pInst, pOpnd);
             if (regNo != VIR_INVALID_ID)
             {
-                if (_VSC_CPF_DF_GetLattice(tmpFlow, regNo * 4 + symChannel) == VSC_CPF_CONSTANT)
+                /* consider the index */
+                if (_VSC_CPF_DF_GetLattice(tmpFlow, (regNo + opndOffset) * 4 + symChannel) == VSC_CPF_CONSTANT)
                 {
-                    VSC_CPF_Const   *srcConstVal = _VSC_CPF_GetConstVal(pCPF, srcBBId, regNo * 4 + symChannel, gcvFALSE);
+                    VSC_CPF_Const   *srcConstVal = _VSC_CPF_GetConstVal(pCPF, srcBBId, (regNo + opndOffset) * 4 + symChannel, gcvFALSE);
 
                     gcmASSERT(srcConstVal != gcvNULL);
 
@@ -1015,6 +1056,7 @@ _VSC_CPF_SetDestConst(
     gctUINT                 srcBBId,
     VIR_Instruction         *pInst,
     gctUINT8                channel,
+    gctUINT                 opndOffset,
     VSC_STATE_VECTOR        *tmpFlow,
     VSC_CPF_Const           *constVal
     )
@@ -1036,7 +1078,7 @@ _VSC_CPF_SetDestConst(
         }
 
         /* we change the const value key for non isIN one */
-        _VSC_CPF_SetConst(pCPF, tmpFlow, srcBBId, regNo * 4 + channel, gcvFALSE,
+        _VSC_CPF_SetConst(pCPF, tmpFlow, srcBBId, (regNo + opndOffset) * 4 + channel, gcvFALSE,
                           constVal->value, constVal->type);
     }
 }
@@ -1259,6 +1301,218 @@ _VSC_CPF_FoldConst(
 
     return gcvTRUE;
 }
+
+static gctBOOL
+_VSC_CPF_FoldConst_LDARR(
+    VSC_CPF                 *pCPF,
+    gctUINT                 src1Const,
+    VIR_Instruction         *pInst
+    )
+{
+    VSC_OPTN_CPFOptions *pOptions = VSC_CPF_GetOptions(pCPF);
+    VIR_Operand         *src0Opnd = VIR_Inst_GetSource(pInst, 0);
+    VIR_Symbol          *src0Sym = VIR_Operand_GetSymbol(src0Opnd);
+    VIR_Type            *symType = gcvNULL;
+
+    if (VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+    {
+        VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
+        VIR_LOG(pDumper, "[CPF] Fold Const LDARR\n");
+        VIR_Inst_Dump(pDumper, pInst);
+        VIR_LOG_FLUSH(pDumper);
+    }
+
+    switch (VIR_Symbol_GetKind(src0Sym))
+    {
+    case VIR_SYM_VIRREG:
+    {
+        VIR_Symbol *varSym = VIR_Symbol_GetVregVariable(src0Sym);
+        VIR_Symbol *newSym = gcvNULL;
+        gctUINT    varOffset = VIR_Symbol_GetVregIndex(src0Sym) - VIR_Symbol_GetVregIndex(varSym);
+        symType = VIR_Symbol_GetType(varSym);
+        if (VIR_Type_GetKind(symType) != VIR_TY_ARRAY &&
+            VIR_Type_GetKind(symType) != VIR_TY_MATRIX)
+        {
+        }
+
+        if (src1Const + varOffset < VIR_Symbol_GetIndexRange(varSym) - VIR_Symbol_GetVregIndex(varSym))
+        {
+            newSym = VIR_Shader_FindSymbolByTempIndex(pCPF->pShader, VIR_Symbol_GetVregIndex(varSym) + src1Const + varOffset);
+            VIR_Operand_SetSymbol(src0Opnd, VIR_Inst_GetFunction(pInst), newSym->index);
+        }
+        else
+        {
+            gcmASSERT(gcvFALSE);
+        }
+        break;
+    }
+    case VIR_SYM_VARIABLE:
+    {
+        symType = VIR_Symbol_GetType(src0Sym);
+        if (VIR_Type_GetKind(symType) != VIR_TY_ARRAY &&
+            VIR_Type_GetKind(symType) != VIR_TY_MATRIX)
+        {
+            gcmASSERT(gcvFALSE);
+        }
+
+        if (src1Const < VIR_Symbol_GetIndexRange(src0Sym) - VIR_Symbol_GetVariableVregIndex(src0Sym))
+        {
+            VIR_Operand_SetIsConstIndexing(src0Opnd, gcvTRUE);
+            VIR_Operand_SetRelIndex(src0Opnd, src1Const);
+        }
+        else
+        {
+            gcmASSERT(gcvFALSE);
+        }
+        break;
+    }
+    case VIR_SYM_UNIFORM:
+    case VIR_SYM_SAMPLER:
+    case VIR_SYM_IMAGE:
+      {
+        symType = VIR_Symbol_GetType(src0Sym);
+        if (VIR_Type_GetKind(symType) != VIR_TY_ARRAY &&
+            VIR_Type_GetKind(symType) != VIR_TY_MATRIX)
+        {
+            gcmASSERT(gcvFALSE);
+            break;
+        }
+
+        if ((VIR_Type_GetKind(symType) == VIR_TY_ARRAY && src1Const < VIR_Type_GetArrayLength(symType))
+            ||
+            (VIR_Type_GetKind(symType) == VIR_TY_MATRIX && src1Const < VIR_GetTypeRows(VIR_Type_GetIndex(symType)))
+            )
+        {
+            VIR_Operand_SetIsConstIndexing(src0Opnd, gcvTRUE);
+            VIR_Operand_SetRelIndex(src0Opnd, src1Const);
+        }
+        else
+        {
+            gcmASSERT(gcvFALSE);
+        }
+        break;
+    }
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
+
+    VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
+    VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
+    VIR_Inst_SetSrcNum(pInst, 1);
+    VIR_Inst_FreeSource(pInst, 1);
+
+    if (VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+    {
+        VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
+        VIR_LOG(pDumper, "[CPF] to instruction\n");
+        VIR_Inst_Dump(pDumper, pInst);
+        VIR_LOG_FLUSH(pDumper);
+        VIR_LOG(pDumper, "\n");
+        VIR_LOG_FLUSH(pDumper);
+    }
+
+    return gcvTRUE;
+}
+
+static gctBOOL
+_VSC_CPF_FoldConst_STARR(
+VSC_CPF                 *pCPF,
+gctUINT                 dstConst,
+VIR_Instruction         *pInst,
+gctBOOL                 allConst
+)
+{
+    VSC_OPTN_CPFOptions *pOptions = VSC_CPF_GetOptions(pCPF);
+    VIR_Operand         *dstOpnd = VIR_Inst_GetDest(pInst);
+    VIR_Symbol          *dstSym = VIR_Operand_GetSymbol(dstOpnd);
+    VIR_Type            *symType = gcvNULL;
+
+    if (VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+    {
+        VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
+        VIR_LOG(pDumper, "[CPF] Fold Const LDARR\n");
+        VIR_Inst_Dump(pDumper, pInst);
+        VIR_LOG_FLUSH(pDumper);
+    }
+
+    switch (VIR_Symbol_GetKind(dstSym))
+    {
+    case VIR_SYM_VIRREG:
+    {
+        VIR_Symbol *varSym = VIR_Symbol_GetVregVariable(dstSym);
+        VIR_Symbol *newSym = gcvNULL;
+        gctUINT    varOffset = VIR_Symbol_GetVregIndex(dstSym) - VIR_Symbol_GetVregIndex(varSym);
+        symType = VIR_Symbol_GetType(varSym);
+        if (VIR_Type_GetKind(symType) != VIR_TY_ARRAY &&
+            VIR_Type_GetKind(symType) != VIR_TY_MATRIX)
+        {
+            gcmASSERT(gcvFALSE);
+        }
+        if (dstConst + varOffset < VIR_Symbol_GetIndexRange(varSym) - VIR_Symbol_GetVregIndex(varSym))
+        {
+            newSym = VIR_Shader_FindSymbolByTempIndex(pCPF->pShader, VIR_Symbol_GetVregIndex(varSym) + dstConst + varOffset);
+            VIR_Operand_SetSymbol(dstOpnd, VIR_Inst_GetFunction(pInst), newSym->index);
+        }
+        else
+        {
+            gcmASSERT(gcvFALSE);
+        }
+        break;
+    }
+    case VIR_SYM_VARIABLE:
+    {
+        VIR_Symbol *newSym = gcvNULL;
+        symType = VIR_Symbol_GetType(dstSym);
+        if (VIR_Type_GetKind(symType) != VIR_TY_ARRAY &&
+            VIR_Type_GetKind(symType) != VIR_TY_MATRIX)
+        {
+            gcmASSERT(gcvFALSE);
+        }
+        if (dstConst < VIR_Symbol_GetIndexRange(dstSym) - VIR_Symbol_GetVariableVregIndex(dstSym))
+        {
+            newSym = VIR_Shader_FindSymbolByTempIndex(pCPF->pShader, VIR_Symbol_GetVariableVregIndex(dstSym) + dstConst);
+            VIR_Operand_SetSymbol(dstOpnd, VIR_Inst_GetFunction(pInst), newSym->index);
+        }
+        else
+        {
+            gcmASSERT(gcvFALSE);
+        }
+        break;
+    }
+    case VIR_SYM_UNIFORM:
+    case VIR_SYM_SAMPLER:
+    case VIR_SYM_IMAGE:
+        /* to-do */
+        gcmASSERT(gcvFALSE);
+        break;
+    default:
+        break;
+    }
+
+    VIR_Inst_SetSource(pInst, 0, VIR_Inst_GetSource(pInst, 1));
+    VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
+    VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
+    VIR_Inst_SetSrcNum(pInst, 1);
+    VIR_Inst_FreeSource(pInst, 1);
+
+    if (VSC_UTILS_MASK(VSC_OPTN_CPFOptions_GetTrace(pOptions),
+        VSC_OPTN_CPFOptions_TRACE_ALGORITHM))
+    {
+        VIR_Dumper *pDumper = VSC_CPF_GetDumper(pCPF);
+        VIR_LOG(pDumper, "[CPF] to instruction\n");
+        VIR_Inst_Dump(pDumper, pInst);
+        VIR_LOG_FLUSH(pDumper);
+        VIR_LOG(pDumper, "\n");
+        VIR_LOG_FLUSH(pDumper);
+    }
+
+    return gcvTRUE;
+}
+
 
 /* when all the channels in the inst's src are constant,
    we propagate the const to its src */
@@ -1993,7 +2247,7 @@ _VSC_CPF_EvaluateConst(
             }
             break;
         }
-        case VIR_OP_CMP:
+        case VIR_OP_COMPARE:
         {
             gctBOOL cmpResult = gcvFALSE;
 
@@ -2019,8 +2273,8 @@ _VSC_CPF_EvaluateConst(
             }
             break;
         }
+        case VIR_OP_CSELECT:
         case VIR_OP_SELECT:
-        case VIR_OP_AQ_SELECT:
         {
             gctBOOL cmpResult = gcvFALSE;
             if(!_VSC_CPF_GetConditionResult(VIR_Inst_GetConditionOp(pInst), &constVal[0], &constVal[1], &cmpResult))
@@ -2037,7 +2291,7 @@ _VSC_CPF_EvaluateConst(
             }
             break;
         }
-        case VIR_OP_CONV:
+        case VIR_OP_CONVERT:
         {
             if(!VIR_TypeId_isFloat(dstType))
             {
@@ -2135,6 +2389,47 @@ _VSC_CPF_EvaluateConst(
             resultVal->value = gcoMATH_FloatAsUInt(1.0f / f0);
             break;
         }
+        case VIR_OP_SQRT:
+        {
+            gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
+
+            resultVal->value = gcoMATH_FloatAsUInt(gcoMATH_SquareRoot(f0));
+            break;
+        }
+        case VIR_OP_RSQ:
+        {
+            gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
+
+            resultVal->value = gcoMATH_FloatAsUInt(gcoMATH_ReciprocalSquareRoot(f0));
+            break;
+        }
+        case VIR_OP_LOG2:
+        {
+            gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
+
+            resultVal->value = gcoMATH_FloatAsUInt(gcoMATH_Log2(f0));
+            break;
+        }
+        case VIR_OP_CEIL:
+        {
+            gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
+
+            resultVal->value = gcoMATH_FloatAsUInt(gcoMATH_Ceiling(f0));
+            break;
+        }
+        case VIR_OP_FLOOR:
+        {
+            gctFLOAT f0 = *(gctFLOAT*) &(constVal[0].value);
+
+            resultVal->value = gcoMATH_FloatAsUInt(gcoMATH_Floor(f0));
+            break;
+        }
+        case VIR_OP_MOVA:
+        {
+            gcmASSERT(srcLattice[0] == VSC_CPF_CONSTANT);
+            resultVal->value = constVal[0].value;
+            break;
+        }
         default:
             gcmASSERT(gcvFALSE);
             break;
@@ -2161,32 +2456,24 @@ _VSC_CPF_isAssignmentOpcode(
         opcode == VIR_OP_MUL            ||
         opcode == VIR_OP_MULHI          ||
         opcode == VIR_OP_NEG            ||
-        opcode == VIR_OP_CMP            ||
-        opcode == VIR_OP_SELECT         ||
-        opcode == VIR_OP_AQ_SELECT      ||
-        opcode == VIR_OP_CONV           ||
+        opcode == VIR_OP_COMPARE            ||
+        opcode == VIR_OP_CSELECT         ||
+        opcode == VIR_OP_SELECT      ||
+        opcode == VIR_OP_CONVERT           ||
         opcode == VIR_OP_RCP            ||
+        opcode == VIR_OP_SQRT           ||
+        opcode == VIR_OP_RSQ            ||
+        opcode == VIR_OP_LOG2           ||
+        opcode == VIR_OP_CEIL           ||
+        opcode == VIR_OP_FLOOR          ||
         opcode == VIR_OP_LSHIFT         ||
-        opcode == VIR_OP_RSHIFT)
+        opcode == VIR_OP_RSHIFT         ||
+        opcode == VIR_OP_MOVA
+        )
     {
         return gcvTRUE;
     }
-
     return gcvFALSE;
-}
-
-
-static gctBOOL
-_VSC_CPF_Propagatable(
-    VIR_OpCode      opcode
-    )
-{
-    if (opcode == VIR_OP_LDARR)
-    {
-        return gcvFALSE;
-    }
-
-    return gcvTRUE;
 }
 
 static gctBOOL
@@ -2215,15 +2502,15 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
             switch(srcID)
             {
                 case 0:
-                    isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 1), channel, tmpFlow, &constVal1, gcvNULL);
+                    isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 1), channel, 0, tmpFlow, &constVal1, gcvNULL);
                     return isConst && constVal1.value == 0;
                 case 1:
-                    isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, tmpFlow, &constVal0, gcvNULL);
+                    isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, 0, tmpFlow, &constVal0, gcvNULL);
                     return isConst && constVal0.value == 0;
             }
             break;
         }
-        case VIR_OP_SELECT:
+        case VIR_OP_CSELECT:
         {
             switch(srcID)
             {
@@ -2232,7 +2519,7 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
                 case 1:
                 case 2:
                 {
-                    gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, tmpFlow, &constVal0, gcvNULL);
+                    gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, 0, tmpFlow, &constVal0, gcvNULL);
                     gctBOOL cmpResult = gcvFALSE;
                     if(!isConst)
                     {
@@ -2250,7 +2537,7 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
             }
             break;
         }
-        case VIR_OP_AQ_SELECT:
+        case VIR_OP_SELECT:
         {
             switch(srcID)
             {
@@ -2260,7 +2547,7 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
                 {
                     if(VIR_ConditionOp_SingleOperand(VIR_Inst_GetConditionOp(pInst)))
                     {
-                        gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, tmpFlow, &constVal0, gcvNULL);
+                        gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, 0, tmpFlow, &constVal0, gcvNULL);
                         gctBOOL cmpResult = gcvFALSE;
                         if(!isConst)
                         {
@@ -2284,7 +2571,7 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
                 {
                     if(VIR_ConditionOp_SingleOperand(VIR_Inst_GetConditionOp(pInst)))
                     {
-                        gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, tmpFlow, &constVal0, gcvNULL);
+                        gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, 0, tmpFlow, &constVal0, gcvNULL);
                         gctBOOL cmpResult = gcvFALSE;
                         if(!isConst)
                         {
@@ -2301,13 +2588,13 @@ _VSC_CPF_SourceChannelCouldBeNonConst(
                     }
                     else if(VIR_ConditionOp_DoubleOperand(VIR_Inst_GetConditionOp(pInst)))
                     {
-                        gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, tmpFlow, &constVal0, gcvNULL);
+                        gctBOOL isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 0), channel, 0, tmpFlow, &constVal0, gcvNULL);
                         gctBOOL cmpResult = gcvFALSE;
                         if(!isConst)
                         {
                             gcmASSERT(0);
                         }
-                        isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 1), channel, tmpFlow, &constVal1, gcvNULL);
+                        isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, VIR_Inst_GetSource(pInst, 1), channel, 0, tmpFlow, &constVal1, gcvNULL);
                         if(!isConst)
                         {
                             gcmASSERT(0);
@@ -2397,7 +2684,7 @@ _VSC_CPF_PerformOnInst(
             {
                 VSC_CPF_Const vecVal[VIR_MAX_SRC_NUM];
                 VSC_CPF_LATTICE srcLattic[VIR_MAX_SRC_NUM] =
-                    {VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE};
+                {VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE, VSC_CPF_UNDEFINE};
 
                 if (!(dstEnable & (1 << channel)))
                 {
@@ -2414,7 +2701,7 @@ _VSC_CPF_PerformOnInst(
                         VIR_Operand_GetOpKind(srcOpnd) == VIR_OPND_CONST)
                     {
                         gctBOOL isConst;
-                        isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, srcOpnd, channel, tmpFlow, &vecVal[i], &srcLattic[i]);
+                        isConst = _VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, srcOpnd, channel, 0, tmpFlow, &vecVal[i], &srcLattic[i]);
                         if(!isConst)
                         {
                             gcmASSERT(_VSC_CPF_GetVRegNo(pInst, srcOpnd) != VIR_INVALID_ID);
@@ -2451,7 +2738,7 @@ _VSC_CPF_PerformOnInst(
                 }
                 if (evaluable[channel])
                 {
-                    _VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, tmpFlow, &resultVal[channel]);
+                    _VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, 0, tmpFlow, &resultVal[channel]);
                 }
                 else
                 {
@@ -2466,8 +2753,188 @@ _VSC_CPF_PerformOnInst(
             }
         }
     }
+    /*
+        For LDARR/STARR, the index may be negative, so we need to skip this.
+        e.g.
+        for (int i = 0; i < 10; i++)
+        {
+            float temp;
+
+            if (i < 4)
+            {
+                temp = arrayA[i];
+            }
             else
             {
+                temp = arrayA[i - 4];   //[i - 4] here may be negative.
+            }
+        }
+    */
+    else if (opcode == VIR_OP_LDARR)
+    {
+        VIR_Operand *src0Opnd = VIR_Inst_GetSource(pInst, 0);
+        VIR_Operand *src1Opnd = VIR_Inst_GetSource(pInst, 1);
+        VIR_Operand *dstOpnd = VIR_Inst_GetDest(pInst);
+        VIR_Enable  dstEnable = VIR_Operand_GetEnable(dstOpnd);
+
+        gctUINT8    channel = 0;
+        gctBOOL     allChannelConst = gcvTRUE;
+        VSC_CPF_Const vecVal[2];
+        VSC_CPF_LATTICE srcLattic[2];
+        gctBOOL validIndex = gcvFALSE;
+        gctUINT opndOffset = 0;
+
+        if (_VSC_CPF_GetVRegNo(pInst, dstOpnd) != VIR_INVALID_ID)
+        {
+            VIR_Swizzle src1Swizzle = VIR_Operand_GetSwizzle(src1Opnd);
+            gcmASSERT(VIR_Swizzle_Channel_Count(src1Swizzle) == 1);
+            channel = VIR_Swizzle_GetChannel(src1Swizzle, 0);
+
+            /* constant src1 */
+            if (_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, src1Opnd, channel, 0, tmpFlow, &vecVal[1], &srcLattic[1]))
+            {
+                validIndex = gcvTRUE;
+                if (_VSC_CPF_isTypeINT(vecVal[1].type) && ((gctINT)(vecVal[1].value) < 0))
+                {
+                    validIndex = gcvFALSE;
+                }
+            }
+
+            if (validIndex)
+            {
+                for (channel = 0; channel < VIR_CHANNEL_NUM; channel++)
+                {
+                    if (!(dstEnable & (1 << channel)))
+                    {
+                        continue;
+                    }
+
+                    /* constant could be float32 type */
+                    if (vecVal[1].type == VIR_TYPE_FLOAT32)
+                    {
+                        opndOffset = (gctUINT) *(gctFLOAT*) &(vecVal[1].value);
+                    }
+                    else
+                    {
+                        opndOffset = vecVal[1].value;
+                    }
+
+                    if (_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, src0Opnd, channel, opndOffset, tmpFlow, &vecVal[0], &srcLattic[0]))
+                    {
+                        _VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, 0, tmpFlow, &vecVal[0]);
+                    }
+                    else
+                    {
+                        _VSC_CPF_SetDestNotConst(pCPF, srcBBId, pInst, channel, tmpFlow);
+                        allChannelConst = gcvFALSE;
+                    }
+                }
+
+                if (!analysisOnly)
+                {
+                    if (allChannelConst)
+                    {
+                        /* all constant folding */
+                        _VSC_CPF_FoldConst(pCPF, srcBBId, pInst);
+                    }
+                    else
+                    {
+                        /* change to MOV */
+                        _VSC_CPF_FoldConst_LDARR(pCPF, vecVal[1].value, pInst);
+                    }
+                }
+            }
+            else
+            {
+                for (channel = 0; channel < VIR_CHANNEL_NUM; channel++)
+                {
+                    if (dstEnable & (1 << channel))
+                    {
+                        _VSC_CPF_SetDestNotConst(pCPF, srcBBId, pInst, channel, tmpFlow);
+                    }
+                }
+            }
+        }
+    }
+    else if (opcode == VIR_OP_STARR)
+    {
+        VIR_Operand *src0Opnd = VIR_Inst_GetSource(pInst, 0);   /* index */
+        VIR_Operand *src1Opnd = VIR_Inst_GetSource(pInst, 1);   /* value */
+        VIR_Operand *dstOpnd = VIR_Inst_GetDest(pInst);
+        VIR_Enable  dstEnable = VIR_Operand_GetEnable(dstOpnd);
+
+        gctUINT8    channel = 0;
+        gctBOOL     allChannelConst = gcvTRUE;
+        VSC_CPF_Const vecVal[2];
+        VSC_CPF_LATTICE srcLattic[2];
+        gctBOOL validIndex = gcvFALSE;
+        gctUINT opndOffset = 0;
+
+        if (_VSC_CPF_GetVRegNo(pInst, dstOpnd) != VIR_INVALID_ID)
+        {
+            VIR_Swizzle src0Swizzle = VIR_Operand_GetSwizzle(src0Opnd);
+            gcmASSERT(VIR_Swizzle_Channel_Count(src0Swizzle) == 1);
+            channel = VIR_Swizzle_GetChannel(src0Swizzle, 0);
+            /* constant src0 */
+            if (_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, src0Opnd, channel, 0, tmpFlow, &vecVal[0], &srcLattic[0]))
+            {
+                validIndex = gcvTRUE;
+                if (_VSC_CPF_isTypeINT(vecVal[0].type) && ((gctINT)(vecVal[0].value) < 0))
+                {
+                    validIndex = gcvFALSE;
+                }
+            }
+
+            if (validIndex)
+            {
+                for (channel = 0; channel < VIR_CHANNEL_NUM; channel++)
+                {
+                    if (!(dstEnable & (1 << channel)))
+                    {
+                        continue;
+                    }
+
+                    /* constant could be float32 type */
+                    if (vecVal[0].type == VIR_TYPE_FLOAT32)
+                    {
+                        opndOffset = (gctUINT) *(gctFLOAT*) &(vecVal[0].value);
+                    }
+                    else
+                    {
+                        opndOffset = vecVal[0].value;
+                    }
+
+                    if (_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, src1Opnd, channel, 0, tmpFlow, &vecVal[1], &srcLattic[1]))
+                    {
+                        _VSC_CPF_SetDestConst(pCPF, srcBBId, pInst, channel, opndOffset, tmpFlow, &vecVal[1]);
+                    }
+                    else
+                    {
+                        _VSC_CPF_SetDestNotConst(pCPF, srcBBId, pInst, channel, tmpFlow);
+                        allChannelConst = gcvFALSE;
+                    }
+                }
+
+                if (!analysisOnly)
+                {
+                    /* change to MOV */
+                    _VSC_CPF_FoldConst_STARR(pCPF, vecVal[0].value, pInst, allChannelConst);
+                }
+            }
+            else
+            {
+                for (channel = 0; channel < VIR_CHANNEL_NUM; channel++)
+                {
+                    if (dstEnable & (1 << channel))
+                    {
+                        _VSC_CPF_SetDestNotConst(pCPF, srcBBId, pInst, channel, tmpFlow);
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
         /* not assignment case or assignment that we don't current handle.
            we need to
            1) set dst to be VSC_CPF_NOT_CONSTANT
@@ -2494,8 +2961,7 @@ _VSC_CPF_PerformOnInst(
             }
         }
 
-        if (!analysisOnly &&
-            _VSC_CPF_Propagatable(opcode))
+        if (!analysisOnly)
         {
             /* For each src, check wether all its channels are constant.
                If yes, we need to propagate the const to its src */
@@ -2545,7 +3011,7 @@ _VSC_CPF_PerformOnInst(
                             {
                                 if (dstEnable & (1 << channel))
                                 {
-                                    if (!_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, texldParm, channel, tmpFlow,
+                                    if (!_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, texldParm, channel, 0, tmpFlow,
                                             &vecVal[channel], &srcLattic))
                                     {
                                         allChannelConst = gcvFALSE;
@@ -2585,7 +3051,7 @@ _VSC_CPF_PerformOnInst(
                     {
                         if (dstEnable & (1 << channel))
                         {
-                            if (!_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, srcOpnd, channel, tmpFlow,
+                            if (!_VSC_CPF_isScalarConst(pCPF, srcBBId, pInst, srcOpnd, channel, 0, tmpFlow,
                                     &vecVal[channel], &srcLattic))
                             {
                                 allChannelConst = gcvFALSE;
@@ -2922,6 +3388,12 @@ _VSC_CPF_PerformOnShader(
         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
     {
         VIR_Function    *func = func_node->function;
+
+        if (VIR_Function_GetInstCount(func) > VSC_CPF_MAX_INST_COUNT)
+        {
+            continue;
+        }
+
         _VSC_CPF_PerformOnFunction(pCPF, func);
     }
 

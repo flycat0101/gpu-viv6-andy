@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,90 +16,7 @@
 #include <gc_vx_common.h>
 #include <gc_vx_interface.h>
 #include <gc_vx_internal_node_api.h>
-
-typedef struct _vx_object_data
-{
-    vx_enum                                 objType;
-
-    union
-    {
-        struct
-        {
-            vx_uint32                       width;
-            vx_uint32                       height;
-            vx_df_image                     format;
-        }
-        imageInfo;
-
-        struct
-        {
-            vx_enum                         dataType;
-            void *                          scalarValuePtr;
-        }
-        scalarInfo;
-
-        struct
-        {
-            vx_enum                         dataType;
-        }
-        lutArrayInfo;
-
-        struct
-        {
-            vx_size                         numBins;
-        }
-        distributionInfo;
-
-        struct
-        {
-            vx_enum                         dataType;
-        }
-        thresholdInfo;
-
-        struct
-        {
-            vx_size                         rows;
-            vx_size                         columns;
-        }
-        convolutionInfo;
-
-        struct
-        {
-            vx_enum                         dataType;
-            vx_size                         rows;
-            vx_size                         columns;
-        }
-        matrixInfo;
-
-        struct
-        {
-            vx_uint32                       srcWidth;
-            vx_uint32                       srcHeight;
-            vx_uint32                       dstWidth;
-            vx_uint32                       dstHeight;
-        }
-        remapInfo;
-
-        struct
-        {
-            vx_size                         numLevels;
-            vx_float32                      scale;
-            vx_uint32                       width;
-            vx_uint32                       height;
-            vx_df_image                     format;
-        }
-        pyramidInfo;
-
-        struct
-        {
-            vx_enum                         dataType;
-            vx_size                         capacity;
-        }
-        arrayInfo;
-    }
-    u;
-}
-vx_object_data_s;
+#include "gc_hal_types.h"
 
 const vx_size gaussian5x5scale = 256;
 const vx_int16 gaussian5x5[5][5] =
@@ -6288,11 +6205,33 @@ vx_kernel_description_s *target_kernels[] = {
     &internalkernel_sgm_path0,
     &internalkernel_sgm_disp,
     &internalKernel_Laplacian3x3,
-    &internalKernel_census3x3
-
+    &internalKernel_census3x3,
 };
 
 vx_uint32 num_target_kernels = vxmLENGTH_OF(target_kernels);
+
+VX_INTERNAL_API vx_bool isBuildInKernel(vx_context context, vx_enum enumeration)
+{
+    vx_bool build_in_kernel = vx_false_e;
+    vx_kernel kernel = vxGetKernelByEnum(context, enumeration);
+    if (kernel != gcvNULL)
+    {
+        vx_uint32 i = 0;
+
+        for (i = 0; i < num_target_kernels; i++)
+        {
+            if ((target_kernels[i]->enumeration == enumeration) && (strcmp(target_kernels[i]->name, kernel->name) == 0))
+            {
+                build_in_kernel = vx_true_e;
+                break;
+            }
+        }
+
+        vxoKernel_ExternalRelease(&kernel);
+
+    }
+    return build_in_kernel;
+}
 
 
 

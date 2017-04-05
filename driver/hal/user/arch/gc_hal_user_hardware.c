@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -87,6 +87,16 @@ gceSTATUS _DestroyBlitDraw(
     gcoHARDWARE Hardware
     );
 #endif
+
+const gcsSTATEMIRROR mirroredStates[] =
+{
+    {0x5800, 0x300, 0x5B00},
+    {0x5600, 0x100, 0x5700},
+    {0xD800, 0x140, 0xD000},
+};
+
+gctUINT mirroredStatesCount = 0;
+
 
 #if (gcdENABLE_3D || gcdENABLE_2D)
 static gceSTATUS _ResetDelta(
@@ -1576,7 +1586,8 @@ _FillInFeatureTableByDatabase(
               || (chipRevision == 0x5208)))
 
        ||((chipModel == gcv880 )
-           && (chipRevision == 0x5106) && (Hardware->patchID == gcvPATCH_DEQP))
+           && (chipRevision == 0x5106)
+           && (Hardware->patchID == gcvPATCH_DEQP || Hardware->patchID == gcvPATCH_GTFES30))
        )
     {
         Features[gcvFEATURE_DEPTH_BIAS_FIX] = gcvFALSE;
@@ -1743,8 +1754,6 @@ _FillInFeatureTableByDatabase(
 
     Features[gcvFEATURE_TX_HOR_ALIGN_SEL] = database->REG_TextureHorizontalAlignmentSelect;
 
-    /* TODO: replace RTT check with surface check later rather than feature bit.
-    */
     if (Hardware->config->resolvePipes == 1)
     {
         if (Features[gcvFEATURE_TX_HOR_ALIGN_SEL])
@@ -2235,6 +2244,7 @@ _FillInFeatureTableByDatabase(
     Features[gcvFEATURE_EVIS_NO_SELECTADD] = database->EVIS_NO_SELECTADD;
     Features[gcvFEATURE_EVIS_LERP_7OUTPUT] = database->EVIS_LERP_7OUTPUT;
     Features[gcvFEATURE_EVIS_ACCSQ_8OUTPUT] = database->EVIS_ACCSQ_8OUTPUT;
+    Features[gcvFEATURE_EVIS_VX2] = database->EVIS_VX2;
 
     Features[gcvFEATURE_TX_YUV_ASSEMBLER_10BIT] = database->TX_YUV_ASSEMBLER_10BIT;
     Features[gcvFEATURE_USC_GOS_ADDR_FIX] = database->USC_GOS_ADDR_FIX;
@@ -2275,6 +2285,14 @@ _FillInFeatureTableByDatabase(
     Features[gcvFEATURE_FE_PATCHLIST_FETCH_FIX] = database->FE_PATCHLIST_FETCH_FIX;
     Features[gcvFEATURE_LS_SUPPORT_PER_COMP_DEPENDENCY] = database->LS_SUPPORT_PERCOMP_DEPENDENCY;
     Features[gcvFEATURE_SH_HALF_DEPENDENCY_FIX] = database->SH_HALFDEPENDENCY_FIX;
+    Features[gcvFEATURE_TP_ENGINE] = database->TP_ENGINE;
+    Features[gcvFEATURE_TX_BORDER_CLAMP_FIX] = gcvFALSE;
+    Features[gcvFEATURE_SH_IMAGE_LD_LAST_PIXEL_FIX] = gcvFALSE;
+    Features[gcvFEATURE_MULTI_CORE_BLOCK_SET_CONFIG2] = database->MULTI_CORE_BLOCK_SET_CONFIG2;
+    Features[gcvFEATURE_MULTIGPU_SYNC_V3] = database->MULTICORE_SEMAPHORESTALL_V3;
+    Features[gcvFEATURE_PE_VMSAA_COVERAGE_CACHE_FIX] = database->PE_VMSAA_COVERAGE_CACHE_FIX;
+    Features[gcvFEATURE_SECURITY_AHB] = database->SECURITY_AHB;
+    Features[gcvFEATURE_TX_LERP_LESS_BIT] = database->TX_LERP_LESS_BIT;
 
 #if gcdENABLE_2D
     Fill2DFeaturesByDatabase(Hardware, Features);
@@ -2504,8 +2522,6 @@ if (halti5){    Config->vsConstBase  = 0xD000;
 }};
 
 
-    /* Determine instruction parameters. */
-    /* TODO - need to add code for iCache. */
     if (Config->instructionCount > 1024)
     {
         Config->unifiedInst   = gcvTRUE;
@@ -2534,6 +2550,13 @@ if (halti5){    Config->vsConstBase  = 0xD000;
         Config->psInstMax     = 256;
         Config->instMax       = 256 + 256;
     }
+#endif
+
+#if gcdENABLE_3D && gcdUSE_VX
+    Config->nnConfig.nnMadPerCoure       = featureDatabase->NNMadPerCore;
+    Config->nnConfig.nnCoreCount         = featureDatabase->NNCoreCount;
+    Config->nnConfig.nnInputBufferDepth  = featureDatabase->NNInputBufferDepth;
+    Config->nnConfig.nnAccumBufferDepth  = featureDatabase->NNAccumBufferDepth;
 #endif
 
     gcmFOOTER_NO();
@@ -2777,6 +2800,11 @@ gcoHARDWARE_DetectProcess(
         {
             gcvPATCH_GPUBENCH,
             "\x98\x8f\x8a\xbd\x9a\x91\x9c\x97",
+            gcvFALSE
+        },
+        {
+            gcvPATCH_ANTUTU3DBench,
+            "\x9c\x90\x92\xd1\x9e\x91\x8b\x8a\x8b\x8a\xd1\x9d\x9a\x91\x9c\x97\x92\x9e\x8d\x94\xd1\x99\x8a\x93\x93",
             gcvFALSE
         },
 #if defined(ANDROID)
@@ -3527,6 +3555,18 @@ gcoHARDWARE_DetectProcess(
             gcvFALSE
         },
 
+        {
+            gcvPATCH_OES20SFT,
+#if defined(ANDROID)
+ "\x9c\x90\x92\xd1\x9e\x91\x9b\x8d\x90\x96\x9b\xd1\x8e\x9e\xd1\x90\x9a\x8c\xcd\xcf\x8c\x99\x8b",
+#elif defined(UNDER_CE)
+          "\xac\xb9\xab\xa0\xcd\xd1\xcf\xa0\xbc\xba\xd1\x9a\x87\x9a",
+#else /* #elif defined(__QNXNTO__) */
+                  "\xac\xb9\xab\xcd\xd1\xcf",
+#endif
+            gcvFALSE
+        },
+
 #if defined(ANDROID)
         {
             gcvPATCH_A8HP,
@@ -3637,17 +3677,6 @@ gcoHARDWARE_DetectProcess(
             /* "com.sega.afterburner" */
             "\x9c\x90\x92\xd1\x8c\x9a\x98\x9e\xd1\x9e\x99\x8b\x9a\x8d\x9d\x8a"
             "\x8d\x91\x9a\x8d",
-            gcvFALSE
-        },
-        {
-            gcvPATCH_OES20SFT,
-#if defined(ANDROID)
- "\x9c\x90\x92\xd1\x9e\x91\x9b\x8d\x90\x96\x9b\xd1\x8e\x9e\xd1\x90\x9a\x8c\xcd\xcf\x8c\x99\x8b",
-#elif defined(UNDER_CE)
-          "\xac\xb9\xab\xa0\xcd\xd1\xcf\xa0\xbc\xba\xd1\x9a\x87\x9a",
-#else /* #elif defined(__QNXNTO__) */
-                  "\xac\xb9\xab\xcd\xd1\xcf",
-#endif
             gcvFALSE
         },
         {
@@ -3778,7 +3807,20 @@ gcoHARDWARE_DetectProcess(
             "\x9c\x90\x92\xd1\x9e\x91\x9b\x8d\x90\x96\x9b\xd1\x9c\x8b\x8c\xd1\x93\x9a\x9e\x91\x9d\x9e\x9c\x94\xd1\x93\x9a\x9e\x91\x9d\x9e\x9c\x94\x8c\x9c\x8d\x90\x93\x93\x96\x91\x98",
             gcvFALSE
         },
-
+#ifdef ANDROID
+        {
+            gcvPATCH_COMPUTBENCH_CL,
+            /*net.kishonti.compubench.cl*/
+            "\x91\x9a\x8b\xd1\x94\x96\x8c\x97\x90\x91\x8b\x96\xd1\x9c\x90\x92\x8f\x8a\x9d\x9a\x91\x9c\x97\xd1\x9c\x93",
+            gcvFALSE
+        },
+#else
+        {
+            gcvPATCH_MIRADA,
+ "\xb2\x96\x8d\x9e\x9b\x9e",
+            gcvFALSE
+        },
+#endif
 
     };
 
@@ -4434,9 +4476,9 @@ _InitializeFlatMappingRange(
     if (Hardware->features[gcvFEATURE_MMU])
     {
         gcsHAL_INTERFACE iface;
-        iface.command = gcvHAL_GET_BASE_ADDRESS;
+    iface.command = gcvHAL_GET_BASE_ADDRESS;
 
-        gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+    gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
 
         Hardware->flatMappingStart = iface.u.GetBaseAddress.flatMappingStart;
         Hardware->flatMappingEnd   = iface.u.GetBaseAddress.flatMappingEnd;
@@ -5127,12 +5169,6 @@ gcoHARDWARE_Construct(
         hardware->gpuMode          = gcvMULTI_GPU_MODE_COMBINED;
         /* In the combined mode, the core ID is ignored. */
         hardware->chipEnable       = gcvCORE_3D_ALL_MASK;
-        /* This is the semaphore ID
-           TODO: We need to move this out of hardware layer. Because all processes
-                 need to share this id. It may be proper to move this counter to
-                 kernel layer and add an ioctl to fetch the next available id instead of
-                 gcoHARDWARE_MultiGPUSemaphoreId.
-         */
         hardware->interGpuSemaphoreId   = 0;
         hardware->prevSingleCore = -1;
     }
@@ -5418,7 +5454,16 @@ gcoHARDWARE_Construct(
     gcmONERROR(_InitializeFlatMappingRange(hardware));
 
 #if gcdENABLE_3D
-    gcmVERIFY_OK(gcoHAL_QueryMultiGPUAffinityConfig(hardware->constructType, &mode, gcvNULL));
+    gcmVERIFY_OK(gcoHAL_QueryMultiGPUAffinityConfig(hardware->constructType, &mode, &currentCoreIndex));
+
+    if (mode == gcvMULTI_GPU_MODE_INDEPENDENT &&
+        currentCoreIndex > hardware->config->gpuCoreCount - 1)
+    {
+        /* reset default value.*/
+        gcoHAL_SetCoreIndex(gcvNULL, 0);
+        /* current used GPU Core exceed the max gpu Core Count.*/
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
 
     if (mode == gcvMULTI_GPU_MODE_INDEPENDENT)
     {
@@ -5498,6 +5543,11 @@ gcoHARDWARE_Construct(
         "%s(%d): stall created signal 0x%08X\n",
         __FUNCTION__, __LINE__,
         hardware->stallSignal);
+
+    if (hardware->features[gcvFEATURE_HALTI5])
+    {
+        mirroredStatesCount = sizeof(mirroredStates) / sizeof(mirroredStates[0]);
+    }
 
     /* Return pointer to the gcoHARDWARE object. */
     *Hardware = hardware;
@@ -5694,23 +5744,70 @@ gceSTATUS gcoHARDWARE_Destroy(
 
 #if gcdENABLE_3D
     /* Free the state and dirty module in hardware object. */
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->FEStates));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->PAAndSEStates));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->MsaaStates));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->SHStates));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->PEStates));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->TXStates));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->MCStates));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->QUERYStates));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->PROBEStates));
-
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->FEDirty));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->PAAndSEDirty));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->MsaaDirty));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->SHDirty));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->PEDirty));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->TXDirty));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->MCDirty));
+    if (Hardware->FEStates)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->FEStates));
+    }
+    if (Hardware->PAAndSEStates)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->PAAndSEStates));
+    }
+    if (Hardware->MsaaStates)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->MsaaStates));
+    }
+    if (Hardware->SHStates)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->SHStates));
+    }
+    if (Hardware->PEStates)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->PEStates));
+    }
+    if (Hardware->TXStates)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->TXStates));
+    }
+    if (Hardware->MCStates)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->MCStates));
+    }
+    if (Hardware->QUERYStates)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->QUERYStates));
+    }
+    if (Hardware->PROBEStates)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->PROBEStates));
+    }
+    if (Hardware->FEDirty)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->FEDirty));
+    }
+    if (Hardware->PAAndSEDirty)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->PAAndSEDirty));
+    }
+    if (Hardware->MsaaDirty)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->MsaaDirty));
+    }
+    if (Hardware->SHDirty)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->SHDirty));
+    }
+    if (Hardware->PEDirty)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->PEDirty));
+    }
+    if (Hardware->TXDirty)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->TXDirty));
+    }
+    if (Hardware->MCDirty)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->MCDirty));
+    }
 #endif
 
     if (Hardware->XFBStates->internalXFBNode)
@@ -5724,9 +5821,14 @@ gceSTATUS gcoHARDWARE_Destroy(
         gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Hardware->XFBStates->internalXFBNode));
         Hardware->XFBStates->internalXFBNode = gcvNULL;
     }
-
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->XFBDirty));
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->XFBStates));
+    if (Hardware->XFBDirty)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->XFBDirty));
+    }
+    if (Hardware->XFBStates)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->XFBStates));
+    }
 #endif
 
 #if (gcdENABLE_3D || gcdENABLE_2D)
@@ -5757,7 +5859,10 @@ gceSTATUS gcoHARDWARE_Destroy(
 #endif
 
 #if gcdENABLE_3D
-    gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->hwSlot));
+    if (Hardware->hwSlot)
+    {
+        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Hardware->hwSlot));
+    }
 #endif
 
     for (i = 0; i < Hardware->deltasCount; i++)
@@ -5814,11 +5919,9 @@ gceSTATUS gcoHARDWARE_Destroy(
 #if gcdENABLE_3D
     if (Hardware->contexts)
     {
-        gctUINT chipIDs[32];
-        gctUINT coreCount;
         gcoHAL_GetCurrentCoreIndex(gcvNULL, &coreIndex);
-        gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D, &coreCount, chipIDs);
-        for (i = 0; i < coreCount; i++)
+        _QueryCoreCount(Hardware, Hardware->config);
+        for (i = 0; i < Hardware->config->gpuCoreCount; i++)
         {
             /* Detach the process. */
             if (Hardware->contexts[i] != 0)
@@ -6732,7 +6835,7 @@ _ConstructFence(
     fence->fromCommit   = gcvFALSE;
     fence->fenceEnable  = gcvTRUE;
 
-    if (hardware->patchID == gcvPATCH_BASEMARK2V2)
+    if (hardware->patchID == gcvPATCH_BASEMARK2V2 || hardware->patchID == gcvPATCH_MIRADA)
     {
         if ((hardware->config->chipModel == gcv2000) &&
             (hardware->config->chipRevision == 0x5108))
@@ -9917,10 +10020,10 @@ _StripeResolve(
             for (module = 0; module < gcvCOUNTER_COUNT; module++)
             {
                 gcoHARDWARE_ProbeCounter(Hardware, probeAddress, (gceCOUNTER)module, gcvFALSE, Memory);
-            }
+        }
             Hardware->probeBuffer->curBufId++;
 #endif
-        }
+    }
     }
 
 #ifndef __clang__
@@ -10088,7 +10191,7 @@ static gceSTATUS _ResolveRect(
 
     if (srcSurf->formatInfo.format == gcvSURF_UNKNOWN)
     {
-        gcmONERROR(gcoSURF_QueryFormat(srcSurf->format, &vars.srcFormatInfo));
+        gcmONERROR(gcoHARDWARE_QueryFormat(srcSurf->format, &vars.srcFormatInfo));
     }
     else
     {
@@ -10097,7 +10200,7 @@ static gceSTATUS _ResolveRect(
 
     if (dstSurf->formatInfo.format == gcvSURF_UNKNOWN)
     {
-        gcmONERROR(gcoSURF_QueryFormat(dstSurf->format, &vars.dstFormatInfo));
+        gcmONERROR(gcoHARDWARE_QueryFormat(dstSurf->format, &vars.dstFormatInfo));
     }
     else
     {
@@ -11896,7 +11999,6 @@ gcoHARDWARE_ResolveRect(
                  !(alignedDstOriginExpand.x & (dstAlignmentX - 1)) &&
                  !(alignedDstOriginExpand.y & 3))
         {
-            /* TODO: log print for debug. */
             gcmPRINT("libGAL: disabled expanding resolve rect!");
             gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         }
@@ -12577,12 +12679,10 @@ gcoHARDWARE_LockEx(
 
             if (physical != gcvINVALID_ADDRESS)
             {
-                if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_MC20) == gcvSTATUS_FALSE)
-                {
-                    gctUINT32 baseAddress;
-                    gcmONERROR(gcoOS_GetBaseAddress(gcvNULL, &baseAddress));
-                    physical -= baseAddress;
-                }
+                gctUINT32 baseAddress;
+                gcmVERIFY_OK(gcoOS_GetBaseAddress(gcvNULL, &baseAddress));
+
+                physical -= baseAddress;
 
                 gcoOS_CPUPhysicalToGPUPhysical(physical, &physical);
             }
@@ -12596,7 +12696,6 @@ gcoHARDWARE_LockEx(
                 /*
                 ** Some software access only surface has no kernel video node.
                 ** Since 'physical' is only for one hardware, it can't be used by other hardware type.
-                ** TODO: Remove usage of gcoSURF_WrapSurface to avoid this path.
                 */
                 gcmASSERT(Node->logical != gcvNULL);
                 gcsSURF_NODE_SetHardwareAddress(Node, physical + (gctUINT32) Node->bufferOffset);
@@ -12612,7 +12711,6 @@ gcoHARDWARE_LockEx(
 
                 handle = 0;
 
-                /* TODO: Use reference count of each type as valid flag. */
                 Node->valid = gcvTRUE;
             }
 
@@ -13235,7 +13333,7 @@ gcoHARDWARE_Alloc2DSurface(
         Hardware, gcvSURF_BITMAP, 0, Format, &alignedWidth, &alignedHeight, 1, gcvNULL, gcvNULL, gcvNULL
         ));
 
-    gcmONERROR(gcoSURF_QueryFormat(Format, formatInfo));
+    gcmONERROR(gcoHARDWARE_QueryFormat(Format, formatInfo));
 
     size = alignedWidth * formatInfo[0]->bitsPerPixel  / 8 * alignedHeight;
 
@@ -13446,7 +13544,7 @@ gcoHARDWARE_Get2DTempSurface(
         Hardware, gcvSURF_BITMAP, 0, Format, &alignedWidth, &alignedHeight, 1, gcvNULL, gcvNULL, gcvNULL
         ));
 
-    gcmONERROR(gcoSURF_QueryFormat(Format, &formatInfo));
+    gcmONERROR(gcoHARDWARE_QueryFormat(Format, &formatInfo));
 
     size = alignedWidth * formatInfo->bitsPerPixel  / 8 * alignedHeight;
 
@@ -14330,7 +14428,7 @@ gcoHARDWARE_CopyPixels(
         (srcSurf->alignedW / srcSurf->sampleInfo.x >= Hardware->resolveAlignmentX) &&
         (srcSurf->alignedH / srcSurf->sampleInfo.y >= Hardware->resolveAlignmentY) &&
         /* Check whether this is a multi-pixel render target or depth buffer. */
-        (srcSurf->type == gcvSURF_RENDER_TARGET || srcSurf->type == gcvSURF_DEPTH) &&
+        (srcSurf->type == gcvSURF_RENDER_TARGET || srcSurf->type == gcvSURF_DEPTH || srcSurf->type == gcvSURF_TEXTURE) &&
         gcmIS_SUCCESS(_ConvertResolveFormat(Hardware, srcSurf->format, dstSurf->format, gcvNULL, gcvNULL, gcvNULL, gcvNULL))
         )
     {
@@ -17849,7 +17947,6 @@ _FlushTileStatusCache(
 };
 
 
-    /* TODO: for singleBuffer+MultiPipe case, no need to program the 2nd address */
     if (Hardware->config->resolvePipes == 2)
     {
         gctUINT32 physical2 = physical[0] + Hardware->tempSurface->bottomBufferOffset;
@@ -19775,6 +19872,36 @@ _MultiGPUSync2(
 
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
 
+    if (Hardware->features[gcvFEATURE_BLT_ENGINE] &&
+        Hardware->features[gcvFEATURE_VMSAA] &&
+        !Hardware->features[gcvFEATURE_PE_VMSAA_COVERAGE_CACHE_FIX])
+    {
+        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E03) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E03, 0 );
+    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+    }
+
     gcoHARDWARE_Semaphore(Hardware,
                           (Hardware->features[gcvFEATURE_COMMAND_PREFETCH] ?
                             gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND),
@@ -19998,13 +20125,17 @@ gcoHARDWARE_MultiGPUSync(
         return status;
     }
 
-    if (!Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V2])
+    if (Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V3])
     {
-        gcmONERROR(_MultiGPUSync2(Hardware, Memory));
+        gcmONERROR(gcoHARDWARE_MultiGPUSyncV3(Hardware, Hardware->config->gpuCoreCount, Hardware->chipIDs, Memory));
+    }
+    else if (Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V2])
+    {
+        gcmONERROR(gcoHARDWARE_MultiGPUSyncV2(Hardware, Hardware->config->gpuCoreCount, Hardware->chipIDs, Memory));
     }
     else
     {
-        gcmONERROR(gcoHARDWARE_MultiGPUSyncV2(Hardware, Hardware->config->gpuCoreCount, Hardware->chipIDs, Memory));
+        gcmONERROR(_MultiGPUSync2(Hardware, Memory));
     }
 
 OnError:
@@ -20034,13 +20165,17 @@ gcoHARDWARE_MultiGPUSyncEx(
         return status;
     }
 
-    if (!Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V2])
+    if (Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V3])
     {
-        gcmONERROR(_MultiGPUSync2(Hardware, Memory));
+        gcmONERROR(gcoHARDWARE_MultiGPUSyncV3(Hardware, Hardware->config->gpuCoreCount, Hardware->chipIDs, Memory));
+    }
+    else if (Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V2])
+    {
+        gcmONERROR(gcoHARDWARE_MultiGPUSyncV2(Hardware, Hardware->config->gpuCoreCount, Hardware->chipIDs, Memory));
     }
     else
     {
-        gcmONERROR(gcoHARDWARE_MultiGPUSyncV2(Hardware, Hardware->config->gpuCoreCount, Hardware->chipIDs, Memory));
+        gcmONERROR(_MultiGPUSync2(Hardware, Memory));
     }
 
 OnError:
@@ -20099,12 +20234,41 @@ gcoHARDWARE_MultiGPUSyncV2(
 
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
 
+    if (Hardware->features[gcvFEATURE_BLT_ENGINE] &&
+        Hardware->features[gcvFEATURE_VMSAA] &&
+        !Hardware->features[gcvFEATURE_PE_VMSAA_COVERAGE_CACHE_FIX])
+    {
+        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E03) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E03, 0 );
+    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+    }
     /* Drain the whole pipe for each GPUs */
     gcoHARDWARE_Semaphore(Hardware,
                           (Hardware->features[gcvFEATURE_COMMAND_PREFETCH] ?
-                            gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND),
+                              gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND),
                           (Hardware->features[gcvFEATURE_BLT_ENGINE] ?
-                            gcvWHERE_BLT : gcvWHERE_PIXEL),
+                              gcvWHERE_BLT : gcvWHERE_PIXEL),
                           gcvHOW_SEMAPHORE_STALL,
                           (gctPOINTER *)&memory);
 
@@ -20166,7 +20330,7 @@ gcoHARDWARE_MultiGPUSyncV2(
 };
 
 
-             gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[coreID + 1]);
+            gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[coreID + 1]);
 
             /* Await a semaphore token from next core 3D. */
             *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -20179,21 +20343,21 @@ gcoHARDWARE_MultiGPUSyncV2(
  4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
  4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
  23:20) + 1))))))) << (0 ? 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[coreID + 1]) & ((gctUINT32) ((((1 ?
  23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
  23:20) + 1))))))) << (0 ? 23:20)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
  19:16) + 1))))))) << (0 ? 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
  19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
  19:16) + 1))))))) << (0 ? 19:16)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
  12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
  27:24) + 1))))))) << (0 ? 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[coreID]) & ((gctUINT32) ((((1 ?
  27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
@@ -20215,21 +20379,21 @@ gcoHARDWARE_MultiGPUSyncV2(
  4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
  4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
  23:20) + 1))))))) << (0 ? 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[coreID - 1]) & ((gctUINT32) ((((1 ?
  23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
  23:20) + 1))))))) << (0 ? 23:20)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
  19:16) + 1))))))) << (0 ? 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
  19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
  19:16) + 1))))))) << (0 ? 19:16)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
  12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
  27:24) + 1))))))) << (0 ? 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[coreID]) & ((gctUINT32) ((((1 ?
  27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
@@ -20280,7 +20444,7 @@ gcoHARDWARE_MultiGPUSyncV2(
 };
 
 
-             gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[coreID - 1]);
+            gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[coreID - 1]);
         }
         /* For all other Core 3D sitting in the middle */
         else
@@ -20296,21 +20460,21 @@ gcoHARDWARE_MultiGPUSyncV2(
  4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
  4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
  23:20) + 1))))))) << (0 ? 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[coreID - 1]) & ((gctUINT32) ((((1 ?
  23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
  23:20) + 1))))))) << (0 ? 23:20)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
  19:16) + 1))))))) << (0 ? 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
  19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
  19:16) + 1))))))) << (0 ? 19:16)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
  12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
  27:24) + 1))))))) << (0 ? 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[coreID]) & ((gctUINT32) ((((1 ?
  27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
@@ -20361,7 +20525,7 @@ gcoHARDWARE_MultiGPUSyncV2(
 };
 
 
-             gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[coreID + 1]);
+            gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[coreID + 1]);
 
             /* Await a semaphore token from next core 3D. */
             *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -20374,21 +20538,21 @@ gcoHARDWARE_MultiGPUSyncV2(
  4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
  4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
  23:20) + 1))))))) << (0 ? 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[coreID + 1]) & ((gctUINT32) ((((1 ?
  23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
  23:20) + 1))))))) << (0 ? 23:20)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
  19:16) + 1))))))) << (0 ? 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
  19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
  19:16) + 1))))))) << (0 ? 19:16)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
  12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
-                      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
  27:24) + 1))))))) << (0 ? 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[coreID]) & ((gctUINT32) ((((1 ?
  27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
@@ -20439,7 +20603,7 @@ gcoHARDWARE_MultiGPUSyncV2(
 };
 
 
-             gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[coreID - 1]);
+            gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[coreID - 1]);
         }
     }
 
@@ -20449,7 +20613,7 @@ gcoHARDWARE_MultiGPUSyncV2(
  31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
  31:27) + 1))))))) << (0 ? 31:27)))
-              | gcvCORE_3D_ALL_MASK;
+        | gcvCORE_3D_ALL_MASK;
 
     memory++;
 
@@ -20466,7 +20630,572 @@ OnError:
     return status;
 }
 
+/****************************************************************************
+*
+* gcoHARDWARE_MultiGPUSyncV3
+*
+* gcoHARDWAER_MultiGPUSyncV2 only could be used by CL extension directly.
+* This extension tries to sync with GPUs which are not attached to current
+* gcoHARDWARE object.
+*
+* Other clients should use gcoHARDWARE_MultiGPUSync().
+*
+* gcoHARDWARE_MultiGPUSyncV3 generates multi-GPUs sync code according to
+* parameters, not according to Hardware->config. So caller must be responsible
+* for passing correct parameters because this function can't check whether
+* parameters are reasonable.
+*
+* INPUT:
+*
+*   IN gctUINT32 GPUCount
+*       Number of GPUs need to sync
+*
+*   IN gctUINT_PTR ChipIDs
+*       Array of chipID of GPUs need to sync
+*       For example, suppose chipID of GPU[n] is n, a client is using
+*       GPU1, GPU2, GPU3, chipIDs should be [1, 2, 3]
+*/
+gceSTATUS
+gcoHARDWARE_MultiGPUSyncV3(
+    IN gcoHARDWARE Hardware,
+    IN gctUINT32 GPUCount,
+    IN gctUINT_PTR ChipIDs,
+    OUT gctUINT32_PTR *Memory
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
 
+    gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
+
+    gcmHEADER_ARG("Hardware=0x%08x", Hardware);
+
+    gcmGETHARDWARE(Hardware);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+    gcmVERIFY_ARGUMENT(Hardware->constructType != gcvHARDWARE_2D);
+
+    gcmVERIFY_ARGUMENT(Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V3]);
+    gcmVERIFY_ARGUMENT(GPUCount == 4);
+
+    gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
+
+    if (Hardware->features[gcvFEATURE_BLT_ENGINE] &&
+        Hardware->features[gcvFEATURE_VMSAA] &&
+        !Hardware->features[gcvFEATURE_PE_VMSAA_COVERAGE_CACHE_FIX])
+    {
+        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E03) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E03, 0 );
+    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+    }
+    /* Drain the whole pipe for each GPUs */
+    gcoHARDWARE_Semaphore(Hardware,
+                          (Hardware->features[gcvFEATURE_COMMAND_PREFETCH] ?
+                            gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND),
+                          (Hardware->features[gcvFEATURE_BLT_ENGINE] ?
+                            gcvWHERE_BLT : gcvWHERE_PIXEL),
+                          gcvHOW_SEMAPHORE_STALL,
+                          (gctPOINTER *)&memory);
+
+    /* Send a semaphore token from core0 to core1. */
+    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E02) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E02, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[0]) & ((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[1]) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+    gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[1]);
+
+    /* Stall core1 at a semaphore token from core0 */
+    *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)));
+
+    *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 23:20) - (0 ?
+ 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ? 23:20) + 1))))))) << (0 ?
+ 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[0]) & ((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:16) - (0 ?
+ 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 19:16) - (0 ?
+ 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 12:8) - (0 ?
+ 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 27:24) - (0 ?
+ 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ?
+ 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[1]) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24)));
+
+    gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", ChipIDs[1]);
+
+    /* Send a semaphore token from core1 to core2. */
+    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E02) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E02, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[1]) & ((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[2]) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+    gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[2]);
+
+    /* Stall core2 at a semaphore token from core1 */
+    *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)));
+
+    *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 23:20) - (0 ?
+ 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ? 23:20) + 1))))))) << (0 ?
+ 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[1]) & ((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:16) - (0 ?
+ 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 19:16) - (0 ?
+ 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 12:8) - (0 ?
+ 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 27:24) - (0 ?
+ 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ?
+ 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[2]) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24)));
+
+    gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", ChipIDs[2]);
+
+    /* Send a semaphore token from core2 to core3. */
+    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E02) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E02, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[2]) & ((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[3]) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+    gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[3]);
+
+    /* Stall core3 at a semaphore token from core2 */
+    *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)));
+
+    *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 23:20) - (0 ?
+ 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ? 23:20) + 1))))))) << (0 ?
+ 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[2]) & ((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:16) - (0 ?
+ 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 19:16) - (0 ?
+ 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 12:8) - (0 ?
+ 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 27:24) - (0 ?
+ 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ?
+ 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[3]) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24)));
+
+    gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", ChipIDs[3]);
+
+    /* Send a semaphore token from core3 to core2. */
+    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E02) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E02, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[3]) & ((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[2]) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+    gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[2]);
+
+    /* Stall core2 at a semaphore token from core3 */
+    *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)));
+
+    *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 23:20) - (0 ?
+ 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ? 23:20) + 1))))))) << (0 ?
+ 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[3]) & ((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:16) - (0 ?
+ 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 19:16) - (0 ?
+ 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 12:8) - (0 ?
+ 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 27:24) - (0 ?
+ 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ?
+ 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[2]) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24)));
+
+    gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", ChipIDs[2]);
+
+    /* Send a semaphore token from core2 to core1. */
+    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E02) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E02, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[2]) & ((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[1]) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+    gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[1]);
+
+    /* Stall core1 at a semaphore token from core2 */
+    *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)));
+
+    *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 23:20) - (0 ?
+ 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ? 23:20) + 1))))))) << (0 ?
+ 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[2]) & ((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:16) - (0 ?
+ 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 19:16) - (0 ?
+ 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 12:8) - (0 ?
+ 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 27:24) - (0 ?
+ 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ?
+ 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[1]) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24)));
+
+    gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", ChipIDs[1]);
+
+    /* Send a semaphore token from core1 to core0. */
+    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E02) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E02, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[1]) & ((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:8) - (0 ? 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[0]) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+    gcmDUMP(gcvNULL, "#[chip.semaphore 0x%04X]", ChipIDs[0]);
+
+    /* Stall core0 at a semaphore token from core1 */
+    *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x09 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)));
+
+    *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:0) - (0 ? 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ? 4:0) - (0 ? 4:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ? 4:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 23:20) - (0 ?
+ 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ? 23:20) + 1))))))) << (0 ?
+ 23:20))) | (((gctUINT32) ((gctUINT32) (ChipIDs[1]) & ((gctUINT32) ((((1 ?
+ 23:20) - (0 ? 23:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:20) - (0 ?
+ 23:20) + 1))))))) << (0 ? 23:20)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 19:16) - (0 ?
+ 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 19:16) - (0 ?
+ 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ? 19:16) + 1))))))) << (0 ?
+ 19:16)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 12:8) - (0 ?
+ 12:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ?
+ 12:8))) | (((gctUINT32) (0x0F & ((gctUINT32) ((((1 ? 12:8) - (0 ? 12:8) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 12:8) - (0 ? 12:8) + 1))))))) << (0 ? 12:8)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 27:24) - (0 ?
+ 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ? 27:24) + 1))))))) << (0 ?
+ 27:24))) | (((gctUINT32) ((gctUINT32) (ChipIDs[0]) & ((gctUINT32) ((((1 ?
+ 27:24) - (0 ? 27:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:24) - (0 ?
+ 27:24) + 1))))))) << (0 ? 27:24)));
+
+    gcmDUMP(gcvNULL, "#[chip.stall 0x%04X]", ChipIDs[0]);
+
+#ifndef __clang__
+    stateDelta = stateDelta;
+#endif
+
+    gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, Memory);
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
 
 /*
 ** For multiGPU combine mode, we need flush more GPU cache for every commit as
@@ -22240,7 +22969,6 @@ OnError:
      return status;
 }
 
-
 /**********************************************************************
 *********
 **
@@ -23332,6 +24060,8 @@ static gceSTATUS _InitBlitDraw(
                                   gcmSIZEOF(gcsHARDWARE_BLITDRAW),
                                   (gctPOINTER*)&blitDraw));
 
+        Hardware->blitDraw = blitDraw;
+
         gcoOS_ZeroMemory(blitDraw, gcmSIZEOF(gcsHARDWARE_BLITDRAW));
 
         gcmONERROR(_InitCompilerAPIs(blitDraw));
@@ -23343,8 +24073,6 @@ static gceSTATUS _InitBlitDraw(
         {
             blitDraw->descCurIndex = -1;
         }
-
-        Hardware->blitDraw = blitDraw;
     }
 
 OnError:
@@ -23352,6 +24080,7 @@ OnError:
     {
         gcmVERIFY_OK(_DestroyBlitDraw(Hardware));
     }
+
     return status;
 }
 
@@ -23663,7 +24392,6 @@ _PickBlitDrawShader(
             if (i >= gcmMAX_VARIATION_NUM)
             {
                 gcmASSERT(temp);
-                /* TODO: add LRU support, now just free the last one */
                 if (temp->programState.hints)
                 {
                     gcmONERROR(g_vscAPIs->gcHINTS_Destroy(temp->programState.hints));
@@ -24322,8 +25050,6 @@ gcoHARDWARE_DrawClear(
         hardware->XFBDirty->xfbDirty = 0xFFFFFFFF;
     }
 
-    /* TODO: for clear, Reset rt is not need if no context switch,
-       then, the following code can skip.*/
     if ((args->flags & gcvCLEAR_COLOR)                               &&
          hardware->PEStates->colorStates.target[0].surface != gcvNULL)
     {
@@ -24710,7 +25436,7 @@ gcoHARDWARE_DrawBlit(
                 gcoOS_ZeroMemory((gctPOINTER)pDescNode->descNode[i], gcmSIZEOF(gcsSURF_NODE));
                 gcmONERROR(gcsSURF_NODE_Construct(pDescNode->descNode[i],
                                                   256,
-                                                  256,
+                                                  64,
                                                   gcvSURF_TXDESC,
                                                   0,
                                                   gcvPOOL_DEFAULT

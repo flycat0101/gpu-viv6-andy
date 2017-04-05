@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -120,7 +120,11 @@ typedef struct __GLprogramInfoRec
     GLchar  * infoLog;
 
     __GLshaderObject *attachedShader[__GLSL_STAGE_LAST];
-
+#ifdef OPENGL40
+    GLboolean vertShaderEnable;     /* current enable */
+    GLboolean geomShaderEnable;
+    GLboolean fragShaderEnable;
+#endif
     GLboolean retrievable;
     GLboolean separable;
 
@@ -144,6 +148,7 @@ typedef struct __GLbindingInfoRec
     GLuint vsInputArrayMask;
 #ifdef OPENGL40
     GLuint psInputMask;
+    GLuint vsInputMask;
 #endif
     /* Output */
     GLuint numActiveOutput;

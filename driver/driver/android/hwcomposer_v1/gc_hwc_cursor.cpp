@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,7 +19,7 @@ hwcInitCursor(
     IN hwcDisplay * Display
     )
 {
-    /* TODO (VENDOR): */
+    /* TODO (Soc-vendor): */
     return 0;
 }
 
@@ -29,7 +29,7 @@ hwcFinishCursor(
     IN hwcDisplay * Display
     )
 {
-    /* TODO (VENDOR): */
+    /* TODO (Soc-vendor): */
     return 0;
 }
 
@@ -40,7 +40,7 @@ hwcCursorFrame(
     IN hwc_display_contents_1_t * HwDisplay
     )
 {
-    /* TODO (VENDOR): */
+    /* TODO (Soc-vendor): */
     return 0;
 }
 

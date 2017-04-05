@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2267,7 +2267,7 @@ vgSL_FlattenEllipse(
     else
     {
         /* Due to overflow problem, set n to 256 directly. */
-        /* TODO - can be improve to use float and increase the cosine table. */
+        /* VIV: [todo] can be improve to use float and increase the cosine table. */
         n = 256;
     }
     if (n > 16)
@@ -5620,7 +5620,6 @@ vgSL_CopyStrokePath(
     if (pointCount == 0) return gcvSTATUS_OK;
 
 #if gcdUSE_VG
-    /* TODO - Free old segments and data of Outputpath. */
 #else
     /* Free old segments and data of Outputpath. */
     if (ARRAY_SIZE(VGSL_GETPATHSEGMENTS(OutputPath)) > 0)
@@ -5802,8 +5801,6 @@ vgSL_sortXCoords(
 #if SCAN_LINE_HAS_3D_SUPPORT
     vgCOORD                y = YScanLine->y;
 #endif
-
-    /* TODO - Can be improved by checking if most of them in ascending or descending order. */
 
     gcmASSERT(count > 1);
 
@@ -6279,7 +6276,6 @@ vgSL_BuildScanLineArray(
 
             if (point == subPath->pointList)
             {
-                /* TODO - The subPath is too small.  Remove it all. */
                 gcmASSERT(point != subPath->pointList);
             }
         }
@@ -6549,7 +6545,6 @@ vgSL_CreateScanLines(
 
 #if !USE_SCAN_LINE_ON_RI
 #if USE_NEW_SCAN_LINE_FORMAT
-    /* TODO - May need to adjust the values for the new VG core. */
     ScanLineBuffer->size = 1;
     ScanLineBuffer->type = gcvVERTEX_FIXED;
     ScanLineBuffer->stride = sizeof(_VGScanLine);
@@ -6881,7 +6876,7 @@ vgSL_SetRegionBottom(
         vgSL_REGIONPOINT rPoint;
         vgCOORD deltaY = Point2->y - Point1->y;
 
-        /* TODO - Check to make sure no extra lines between point1 and point2. */
+        /* VIV: [todo] Check to make sure no extra lines between point1 and point2. */
         //gcmASSERT(Point1 == Point2->next || Point2 == Point1->next);
 
         if (COORD_ABS(deltaY) < COORD_EPSILON)
@@ -6997,7 +6992,6 @@ vgSL_AddARegion(
         region->isRightNext = (line1->orientation == vgvSL_UP);
     }
 
-    /* TODO - Check if there is a cross point here. */
     /* gcmASSERT(point1->x <= point2->x);  or no cross point */
 
     /* Set region bottom. */
@@ -7146,7 +7140,6 @@ vgSL_AddAPointToRegionLeftBranch(
 
         rPoint = Region->leftPointList;
         point2 = rPoint->point;
-        /* TODO - may need to handle deltaX == rPoint->deltaX. */
         while (rPoint && deltaX > rPoint->deltaX)
         {
             nextRPoint = rPoint->next;
@@ -7385,8 +7378,6 @@ vgSL_AddAPointToRegionRightBranch(
 
         rPoint = Region->rightPointList;
         point2 = rPoint->point;
-
-        /* TODO - may need to handle deltaX == rPoint->deltaX. */
 
         while (rPoint && deltaX < rPoint->deltaX)
         {
@@ -7950,7 +7941,6 @@ vgSL_HandleSimpleCrossForUpDownRegions(
 
         /* Get the cross point. */
         vgSL_GetIntersectionW2Y(x1, x2, x3, x4, y1, y2, &x, &y);
-        /* TODO - Create virtual scan line(s) to get cross point. */
         gcmASSERT(0);
     }
     else if (pxc2)
@@ -8002,7 +7992,6 @@ vgSL_HandleSimpleCrossForUpDownRegions(
     }
     else
     {
-        /* TODO - Complicate case. */
         gcmASSERT(0);
     }
 
@@ -8283,9 +8272,9 @@ vgSL_CreateTriangles(
                     /* Check if xCoord2 is the end of previous line - a flat line. */
                     if (xCoord2->line == region->leftLine)
                     {
-                        /* TODO - Find a flat line. */
+                        /* VIV: [todo] Find a flat line. */
                         /* Create a new region without rightLine, ready to be merged with next region. */
-                        /* TODO - Need to merge this into vgSL_AddARegion as a special case. */
+                        /* VIV: [todo] Need to merge this into vgSL_AddARegion as a special case. */
                         gcmASSERT(0);
 
                         gcmASSERT(xCoord2->endLineStatus);
@@ -8299,7 +8288,7 @@ vgSL_CreateTriangles(
                     }
                     else
                     {
-                        /* TODO - Check xCoord2->x is smaller than leftLine crossing point. */
+                        /* VIV: [todo] Check xCoord2->x is smaller than leftLine crossing point. */
 
                         /* Find a new region. */
                         /* Add the new region before the current region. */
@@ -8314,7 +8303,6 @@ vgSL_CreateTriangles(
                 }
                 else
                 {
-                    /* TODO - Complicate case. */
                     gcmASSERT(xCoord1->line == region->rightLine && xCoord2->line == region->leftLine);
                 }
             }
@@ -8344,9 +8332,9 @@ vgSL_CreateTriangles(
                     /* Check if xCoord2 is the end of previous line - a flat line. */
                     if (xCoord2->line == region->leftLine)
                     {
-                        /* TODO - Find a flat line. */
+                        /* VIV: [todo] Find a flat line. */
                         /* Create a new region without rightLine, ready to be merged with next region. */
-                        /* TODO - Need to merge this into vgSL_AddARegion as a special case. */
+                        /* VIV: [todo] Need to merge this into vgSL_AddARegion as a special case. */
                         gcmASSERT(0);
 
                         gcmASSERT(xCoord2->endLineStatus);
@@ -8360,7 +8348,7 @@ vgSL_CreateTriangles(
                     }
                     else
                     {
-                        /* TODO - Check xCoord2->x is smaller than leftLine crossing point. */
+                        /* VIV: [todo] Check xCoord2->x is smaller than leftLine crossing point. */
 
                         /* Find a new region. */
                         /* Add the new region before the current region. */
@@ -8416,7 +8404,7 @@ vgSL_CreateTriangles(
                         /* Create a new region with xCoord2 and xCoord3. */
                         gcmERR_RETURN(vgSL_AddARegion(ScanLineTess, yScanLine, xCoord2, xCoord3, region->next));
 
-                        /* TODO - Handle Left/right fill regions. */
+                        /* VIV: [todo] Handle Left/right fill regions. */
                         /*gcmERR_RETURN(vgSL_HandleCrossRegionAtRightBranch(ScanLineTess,
                                         xCoord2, yScanLine, region));*/
                     }
@@ -8519,7 +8507,7 @@ vgSL_CreateTriangles(
                             }
                             else
                             {
-                                /* TODO - Check if point2 is on the yScanLine. */
+                                /* VIV: [todo] Check if point2 is on the yScanLine. */
                                 gcmASSERT(xCoord2->endLineStatus == 0);
                             }
 
@@ -8653,7 +8641,7 @@ vgSL_CreateTriangles(
                                 }
                                 else
                                 {
-                                    /* TODO - Check if point2 is on the yScanLine. */
+                                    /* VIV: [todo] Check if point2 is on the yScanLine. */
                                     gcmASSERT(xCoord1->endLineStatus == 0);
                                 }
 
@@ -8725,7 +8713,7 @@ vgSL_CreateTriangles(
                     }
                     else
                     {
-                        /* TODO - Complicate case. */
+                        /* VIV: [todo] Complicate case. */
                         gcmASSERT(xCoord2->line == nextRegion->leftLine &&
                                   xCoord2->next && xCoord2->next->line == region->rightLine);
                     }
@@ -9167,7 +9155,7 @@ CreateFillPathForStrokePath(
     {
         /* The stroke path would be empty. */
 #if gcdUSE_VG
-        /* TODO - Cleanup/destroy OutputPath's data. */
+        /* VIV: [todo] Cleanup/destroy OutputPath's data. */
 #else
         ARRAY_DTOR(VGSL_GETPATHSEGMENTS(OutputPath));
         ARRAY_DTOR(VGSL_GETPATHDATA(OutputPath));

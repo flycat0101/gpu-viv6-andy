@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -176,7 +176,7 @@ int gralloc_alloc(struct alloc_device_t* dev,
 {
     int rel;
 
-    /* TODO: Redirect to specific allocator according to usage. */
+    /* TODO (Soc-vendor): Redirect to specific allocator according to usage. */
     if (usage & GRALLOC_USAGE_HW_FB) {
         /* Dispatch to framebuffer allocator. */
         rel = gralloc_alloc_framebuffer(dev,
@@ -196,7 +196,7 @@ int gralloc_free(struct alloc_device_t* dev,
     private_handle_t const* hnd =
         reinterpret_cast<private_handle_t const*>(handle);
 
-    /* TODO: Redirect to specific allocator. */
+    /* TODO (Soc-vendor): Redirect to specific allocator. */
     if (hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
         rel = gralloc_free_framebuffer(dev, handle);
     } else {
@@ -218,7 +218,7 @@ int gralloc_register_buffer(gralloc_module_t const* module,
         return -EINVAL;
     }
 
-    /* TODO: Redirect to specific allocator. */
+    /* TODO (Soc-vendor): Redirect to specific allocator. */
     rel = gc_gralloc_register_buffer(module, handle);
 
     return rel;
@@ -236,7 +236,7 @@ int gralloc_unregister_buffer(gralloc_module_t const* module,
         return -EINVAL;
     }
 
-    /* TODO: Redirect to specific allocator. */
+    /* TODO (Soc-vendor): Redirect to specific allocator. */
     rel = gc_gralloc_unregister_buffer(module, handle);
 
     return rel;
@@ -251,7 +251,7 @@ int gralloc_lock(gralloc_module_t const* module,
     private_handle_t const* hnd =
         reinterpret_cast<private_handle_t const*>(handle);
 
-    /* TODO: Redirect to specific allocator. */
+    /* TODO (Soc-vendor): Redirect to specific allocator. */
     if (hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
         if (vaddr) {
             *vaddr = (void*) hnd->base;
@@ -273,7 +273,7 @@ int gralloc_lock_ycbcr(struct gralloc_module_t const* module,
 {
     int rel;
 
-    /* TODO: Redirect to specific allocator. */
+    /* TODO (Soc-vendor): Redirect to specific allocator. */
     {
         rel = gc_gralloc_lock_ycbcr(module, handle, usage, l, t, w, h, ycbcr);
     }
@@ -289,7 +289,7 @@ int gralloc_unlock(gralloc_module_t const* module,
     private_handle_t const* hnd =
         reinterpret_cast<private_handle_t const*>(handle);
 
-    /* TODO: Redirect to specific allocator. */
+    /* TODO (Soc-vendor): Redirect to specific allocator. */
     if (hnd->flags & private_handle_t::PRIV_FLAGS_FRAMEBUFFER) {
         /* Do not need to unregister for framebuffer. */
         rel = 0;
@@ -303,7 +303,7 @@ int gralloc_unlock(gralloc_module_t const* module,
 int gralloc_perform(struct gralloc_module_t const* module,
         int operation, ... )
 {
-    /* TODO: Redirect to specific allocator. */
+    /* TODO (Soc-vendor): Redirect to specific allocator. */
     return 0;
 }
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -302,6 +302,7 @@ typedef struct {
     clsArgument_PTR     args;
     gctUINT             workDim;
     size_t              globalWorkOffset[3];
+    size_t              globalScale[3];
     size_t              globalWorkSize[3];
     size_t              localWorkSize[3];
 } clsCommandNDRangeKernel,
@@ -331,23 +332,15 @@ typedef struct {
 
 typedef struct {
     gctUINT             numObjects;
-    const clsMem_PTR *  memObjects;
+    clsMem_PTR *  memObjects;
     void**              objectsDatas;
-    /*size_t              *x,*y,*z;*/
-    size_t              *w,*h,*d;
-    cl_image_format     *imFormats;
-    /*cl_int              *elementSize;*/
 } clsCommandAcquireGLObjects,
 * clsCommandAcquireGLObjects_PTR;
 
 typedef struct {
     gctUINT             numObjects;
-    const clsMem_PTR *  memObjects;
+    clsMem_PTR *  memObjects;
     void**              objectsDatas;
-    /*size_t              *x,*y,*z;*/
-    size_t              *w,*h,*d;
-    cl_image_format     *imFormats;
-    cl_int              *elementSize;
 } clsCommandReleaseGLObjects,
 * clsCommandReleaseGLObjects_PTR;
 
@@ -565,6 +558,16 @@ clfExecuteCommandWaitForEvents(
 void
 clfWakeUpAllCommandQueueWorkers(
     clsContext_PTR      Context
+    );
+
+gceSTATUS
+clfReleaseCommandQueue(
+    cl_command_queue    CommandQueue
+    );
+
+gceSTATUS
+clfRetainCommandQueue(
+    cl_command_queue CommandQueue
     );
 
 #ifdef __cplusplus

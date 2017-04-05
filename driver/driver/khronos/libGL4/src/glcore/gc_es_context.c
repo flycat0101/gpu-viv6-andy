@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -219,6 +219,7 @@ GLvoid __glInitConstantDefault(__GLdeviceConstants *constants)
     constants->maxListNesting = 64;
     constants->maxDrawBuffers = 1;
     constants->maxEvalOrder = 30;
+    constants->pointSizeGranularity = 0.125;
 #endif
 }
 
@@ -1745,6 +1746,9 @@ GLvoid *__glCreateContext(GLint clientVersion,
 #endif
     gc->magic = ES3X_MAGIC;
 
+
+    /* Do not destructor. */
+    gc->base.destructor = gcvNULL;
 
     __GL_FOOTER();
     return (gc);

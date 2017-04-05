@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,9 +16,9 @@
 #define Transcendental      VIR_OPFLAG_Transcendental
 #define IntegerOnly         VIR_OPFLAG_IntegerOnly
 #define ControlFlow         VIR_OPFLAG_ControlFlow
-#define OCLOnly             VIR_OPFLAG_OCLOnly
-#define OGLOnly             VIR_OPFLAG_OGLOnly
-#define VXOnly              VIR_OPFLAG_VXOnly
+#define VX1                 VIR_OPFLAG_VX1
+#define VX2                 VIR_OPFLAG_VX2
+#define VX1_2               VIR_OPFLAG_VX1_2
 #define UseCondCode         VIR_OPFLAG_UseCondCode
 #define Componentwise       VIR_OPFLAG_Componentwise
 #define Src0Componentwise   VIR_OPFLAG_Src0Componentwise
@@ -36,7 +36,8 @@
 #define EPHP                VIR_OPFLAG_ExpdPrecHP
 #define EPMP                VIR_OPFLAG_ExpdPrecMP
 #define Use512BitUniform    VIR_OPFLAG_Use512Unifrom
-#define VXUse512BitUniform(SrcNo)  (VXOnly|VIR_SrcNo2U512(SrcNo))
+#define VXUse512BitUniform(SrcNo)  (VX1_2|VIR_SrcNo2U512(SrcNo))
+#define VX1Use512BitUniform(SrcNo) (VX1|VIR_SrcNo2U512(SrcNo))
 #define EVISModifier(SrcNo)  VIR_SrcNo2EVISModifier(SrcNo)
 
 #define NU  VIR_OPLEVEL_NotUsed
@@ -68,6 +69,12 @@
     VIR_OPINFO(CMOV, 3, HasDest|Componentwise|Expr|EPFromS2|UseCondCode, 1, AL),
     /* @ MOVAR, MOVAF, MOVAI, mov dynamic indexing value to a0 */
     VIR_OPINFO(MOVA, 1, HasDest|Componentwise|VIR_OPFLAG_ExpdPrecHP, 1, LM),
+    /* Mov address to b0 with address calculation, b0 is used for uniform dynamic indexing
+     *  addr[9:0]= base + (index<<shift) *(mul3?3:1)
+     *  write the addr[9:0] to B0, where B0 is similar to A0, but one per shader group.
+     *  B0 is one component S10 and use X writemask to write. There is no data conversion.
+     */
+    VIR_OPINFO(MOVBIX, 2, HasDest|Componentwise|VIR_OPFLAG_ExpdPrecHP, 1, LM),
     /* @ swizzle vector 8/16 components in src0 by the swizzle defined in src1, 16 bit enable mask in src2
      *   SWIZZLE dest, src0, src1, src2
      *   Vector 8 swizzling:
@@ -86,11 +93,11 @@
     /* compare each component
         dest = is_float(dest.type) ? ((cond_op(src0, src1) ? 1.0 : 0.0)
                                    : ((cond_op(src0, src1) ? 0xFFFFFFFF: 0) ;*/
-    VIR_OPINFO(CMP, 2, HasDest|Componentwise|Expr|EPMP|UseCondCode, 1, NM),
+    VIR_OPINFO(COMPARE, 2, HasDest|Componentwise|Expr|EPMP|UseCondCode, 1, NM),
     /* machine instruction: Result = CMP(compFunc, source_0, source_1) ? source_2 : 0; */
-    VIR_OPINFO(AQ_CMP, 3, HasDest|Componentwise|Expr|EPFromS2|UseCondCode, 1, MC),
+    VIR_OPINFO(CMP, 3, HasDest|Componentwise|Expr|EPFromS2|UseCondCode, 1, MC),
     /* machine instruction: Result = CMP(compFunc, source_0, source_1) ? 1.0 : 0.0; */
-    VIR_OPINFO(AQ_SET, 2, HasDest|Componentwise|Expr|UseCondCode, 1, MC),
+    VIR_OPINFO(SET, 2, HasDest|Componentwise|Expr|UseCondCode, 1, MC),
     /* @ pack a vector from SRC0, SRC1, SRC2, */
     VIR_OPINFO(PACK, 3, HasDest|Expr|EPFromHighest, 1, LM),
     /* move long/ulong data */
@@ -102,26 +109,26 @@
      ** type conversion
      **/
     /* convert source to dest type   */
-    VIR_OPINFO(CONV, 1, HasDest|Componentwise|Expr|EPHP, 1, NM),
+    VIR_OPINFO(CONVERT, 1, HasDest|Componentwise|Expr|EPHP, 1, NM),
     /* convert source to dest type, only used in converter to match gcSL_CONV */
     VIR_OPINFO(CONV0, 2, HasDest|Componentwise|Expr|EPHP, 1, HM),
     /* Machine instruction: convert source to dest type, source type is encoded in src1   */
-    VIR_OPINFO(AQ_CONV, 2, HasDest|Componentwise|Expr|EPHP, 1, MC),
+    VIR_OPINFO(CONV, 2, HasDest|Componentwise|Expr|EPHP, 1, MC),
     /* Machine instruciton: convert source to dest type,
        Destination data type is determined by source_1.x[7:4].
        With dual-16 mode the Destination data type for I2I instructions
        (provided as source_1.x[6:4]) must be an immediate.*/
-    VIR_OPINFO(AQ_I2I, 2, HasDest|Componentwise|Expr|EPFromS0, 1, MC),
+    VIR_OPINFO(I2I, 2, HasDest|Componentwise|Expr|EPFromS0, 1, MC),
     /* Machine instruction: Integer to float convert, */
-    VIR_OPINFO(AQ_I2F, 1, HasDest|Componentwise|Expr|EPFromS0, 1, MC),
+    VIR_OPINFO(I2F, 1, HasDest|Componentwise|Expr|EPFromS0, 1, MC),
     /* Machine instruction: Float to integer convert,
        RTNE supported, FP16 valid
        RTNE not implemented (as of 5.4.4) for dual-16 mode.  */
-    VIR_OPINFO(AQ_F2I, 1, HasDest|Componentwise|Expr|EPFromS0, 1, MC),
+    VIR_OPINFO(F2I, 1, HasDest|Componentwise|Expr|EPFromS0, 1, MC),
     /* Machine instruction: Float to integer convert with rounding,
        RTNE supported, FP16 valid.
        RTNE not implemented (as of 5.4.4) for dual-16 mode. */
-    VIR_OPINFO(AQ_F2IRND, 1, HasDest|Componentwise|Expr|EPFromS0, 1, MC),
+    VIR_OPINFO(F2IRND, 1, HasDest|Componentwise|Expr|EPFromS0, 1, MC),
 
     /* treat bit as casted to type, bits unchanged */
     VIR_OPINFO(BITCAST, 1, HasDest|Componentwise|Expr|EPFromS0, 1, NM),
@@ -291,6 +298,15 @@
     /* compute cosine pi or half pi value cos(PI[*1/2] * src)
         pi or pi/2 depents on feature bit _hasNEW_SIN_COS_LOG_DIV */
     VIR_OPINFO(COSPI, 1, HasDest|Transcendental|Componentwise|Expr|EPFromS0, 1, LM),
+    /* The instruction to speed up aSin/aCos/aTan/aTan2, enabled by gcvFEATURE_HALTI5 (v60)
+     *  opcode directly from src2,
+     *         src2[7] for CORNER_FLAG (implied, Indicate the corner cases handling)
+     *         src2[2:0] = 0 ----  ACOS(opcode 8)
+     *                   = 1 ----  ASIN(opcode 9)
+     *                   = 2 ----  ATAN(opcode 10)
+     *                   = 3 ----  ATAN2(opcode 11)
+     * See P4:\\DOC\ARCH\ProposalOfACos.docx for detail
+     */
     VIR_OPINFO(ARCTRIG, 3, HasDest|Expr, 1, LM),
 
     /**
@@ -334,7 +350,7 @@
     */
     VIR_OPINFO(REM, 2, HasDest|Componentwise|Expr|EPFromHighest, 1, NM),
     /* modulus: IMOD dest, src0, src1 */
-    VIR_OPINFO(AQ_IMOD, 2, HasDest|Transcendental|Componentwise|Expr|EPFromHighest, 1, MC),
+    VIR_OPINFO(IMOD, 2, HasDest|Transcendental|Componentwise|Expr|EPFromHighest, 1, MC),
     /* maximum: MAX dest, src0, src1 */
     VIR_OPINFO(MAX, 2, HasDest|Componentwise|Expr|EPFromHighest, 1, AL),
     /* minimum: MIN dest, src0, src1 */
@@ -421,26 +437,26 @@
 
     /* integer satuarated multiply and add: dest = src0*src1 + src2
             MADSAT dest, src0, src1, src2 */
-    VIR_OPINFO(MADSAT, 3, HasDest|Componentwise|EPFromHighest, 1, AL),
+    VIR_OPINFO(MADSAT, 3, HasDest|Componentwise|Expr|EPFromHighest, 1, AL),
 
     /* Fused multiply and add: dest = src0*src1 + src2
             FMA dest, src0, src1, src2 */
     VIR_OPINFO(FMA, 3, HasDest|Componentwise|Expr|EPFromHighest, 1, AL),
 
-    VIR_OPINFO(AQ_IMADLO0, 3, HasDest|Componentwise|Expr|EPFromHighest, 1, MC),
-    VIR_OPINFO(AQ_IMADLO1, 3, HasDest|Componentwise|Expr|EPFromHighest, 1, MC),
+    VIR_OPINFO(IMADLO0, 3, HasDest|Componentwise|Expr|EPFromHighest, 1, MC),
+    VIR_OPINFO(IMADLO1, 3, HasDest|Componentwise|Expr|EPFromHighest, 1, MC),
 
-    VIR_OPINFO(AQ_IMADHI0, 3, HasDest|Componentwise|Expr|EPFromHighest, 1, MC),
-    VIR_OPINFO(AQ_IMADHI1, 3, HasDest|Componentwise|Expr|EPFromHighest, 1, MC),
+    VIR_OPINFO(IMADHI0, 3, HasDest|Componentwise|Expr|EPFromHighest, 1, MC),
+    VIR_OPINFO(IMADHI1, 3, HasDest|Componentwise|Expr|EPFromHighest, 1, MC),
 
     /* @ result = cond_op(src0) ? src1 : src2;
          cond_op := [Z, NZ, GEZ, GZ, LEZ, LZ, FINITE, INFIITE, ANYMSB, ALLMSB]
-            SELECT dest, src0, src1, src2 */
-    VIR_OPINFO(SELECT, 3, HasDest|Componentwise|Expr|EPFromS12|UseCondCode, 1, NM),
+            CSELECT dest, src0, src1, src2 */
+    VIR_OPINFO(CSELECT, 3, HasDest|Componentwise|Expr|EPFromS12|UseCondCode, 1, NM),
     /* Machine instruction: select.cond dst, src0, src1, src2
            dst = cond(src0, src1) ? src1 : src2
      */
-    VIR_OPINFO(AQ_SELECT, 3, HasDest|Componentwise|Expr|EPFromS12|UseCondCode, 1, MC),
+    VIR_OPINFO(SELECT, 3, HasDest|Componentwise|Expr|EPFromS12|UseCondCode, 1, MC),
     /* sum of absolute differences: dst = (s0 - s1) + s2;
             SAD dest, src0, src1, src2 */
     VIR_OPINFO(SAD, 3, HasDest|Componentwise|Expr|EPFromHighest, 1, NU),
@@ -462,6 +478,9 @@
        src0 <- edge0, src1 <- edge1, src2 <- x
            SMOOTH dest, src0, src1, src2 */
     VIR_OPINFO(SMOOTH, 3, HasDest|Componentwise|Expr|EPFromHighest, 1, NU),
+    /* half of mix: dst = src0 * (1.0 - src1)
+            halfmix dest, src0, src1, */
+    VIR_OPINFO(HALFMIX, 3, HasDest|Componentwise|Expr|EPFromHighest, 1, AL),
 
     /**
      ** load store
@@ -741,9 +760,9 @@
      */
 
     /* implicit cast for vx_inst parameter */
-    VIR_OPINFO(VX_ICASTP, 1, HasDest|EPFromS0|VXOnly, 1, NM),
+    VIR_OPINFO(VX_ICASTP, 1, HasDest|EPFromS0|VX1, 1, NM),
     /* implicit cast for vx_inst dest */
-    VIR_OPINFO(VX_ICASTD, 1, HasDest|EPFromS0|VXOnly, 1, NM),
+    VIR_OPINFO(VX_ICASTD, 1, HasDest|EPFromS0|VX1, 1, NM),
 
     /* VX_IMG_LOAD instructions.
     ** The source0 holds the vector 4 image descriptor:
@@ -757,7 +776,7 @@
     **      src2.x[ 9: 5] S05 relative y offset
     ** The source3 holds EVIS_modifer
     */
-    VIR_OPINFO(VX_IMG_LOAD, 4, HasDest|EPFromS0|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_IMG_LOAD, 4, HasDest|EPFromS0|VX1_2|EVISModifier(3), 1, AL),
 
     /* VX_IMG_LOAD_3D instructions.
     ** The source0 holds the vector 4 image descriptor:
@@ -774,7 +793,7 @@
     **      src2.x[14:10] S05 relative z offset
     ** The source3 holds EVIS_modifer
     */
-    VIR_OPINFO(VX_IMG_LOAD_3D, 4, HasDest|EPFromS0|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_IMG_LOAD_3D, 4, HasDest|EPFromS0|VX1_2|EVISModifier(3), 1, AL),
 
     /* IMG_STORE instructions.
     ** The source0 holds the vector 4 image descriptor (same as IMG_LOAD):
@@ -784,7 +803,7 @@
     ** The source2 holds the color value
     ** The source3 holds EVIS_modifer
     */
-    VIR_OPINFO(VX_IMG_STORE, 4, HasDest|Stores|EPFromS0|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_IMG_STORE, 4, HasDest|Stores|EPFromS0|VX1_2|EVISModifier(3), 1, AL),
 
     /* VX_IMG_STORE_3D instructions.
     ** The source0 holds the vector 4 image descriptor (same as IMG_LOAD):
@@ -794,13 +813,13 @@
     ** The source2 holds the color value
     ** The source3 holds EVIS_modifer
     */
-    VIR_OPINFO(VX_IMG_STORE_3D, 4, HasDest|Stores|EPFromS0|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_IMG_STORE_3D, 4, HasDest|Stores|EPFromS0|VX1_2|EVISModifier(3), 1, AL),
 
     /* The AbsDiff instruction computes the absolute difference between two values.
      * It works on packed data, so it can compute 16x 8-bit values or 8x 16-bit values.
      *      dest[i] = |src0[j] - src1[j] |
      */
-    VIR_OPINFO(VX_ABSDIFF, 3, HasDest|Componentwise|Expr|VXOnly|EVISModifier(2), 1, AL),
+    VIR_OPINFO(VX_ABSDIFF, 3, HasDest|Componentwise|Expr|VX1_2|EVISModifier(2), 1, AL),
 
     /* The IAdd instruction adds two or three integer values. It works on packed data,
      * so it can compute 16x 8-bit values or 8x 16-bit values. Valid instruction formats
@@ -808,21 +827,21 @@
      *  dest[i] =  src0[j] + src1[j], if src2 is not valid;
      *             src0[j] + src1[j] + src2[j], if src2 is valid.
      */
-    VIR_OPINFO(VX_IADD, 4, HasDest|Componentwise|Expr|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_IADD, 4, HasDest|Componentwise|Expr|VX1|EVISModifier(3), 1, AL),
 
     /* The IAccSq instruction squares a value and adds it to an accumulator. It works
      * on 8- and 16-bit packed data, so it can compute 16x 8-bit values or 8x 16-bit
      * values. Valid instruction formats are U8, S8, U16, and S16.
      *  dest[i] = src0[i] + (src1[j]^2 >> src2).
      */
-    VIR_OPINFO(VX_IACCSQ, 4, HasDest|Componentwise|Expr|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_IACCSQ, 4, HasDest|Componentwise|Expr|VX1_2|EVISModifier(3), 1, AL),
 
     /* The Lerp instruction does a linear interpolation between two values. It works
      * on 8- and 16-bit packed data, so it can compute 16x 8-bit values or 8x 16-bit
      * values. Valid instruction formats are U8, S8, U16, and S16.
      *  dest[i] = (1 - src2) * src0[j] + src2 * src1[j]
      */
-    VIR_OPINFO(VX_LERP, 4, HasDest|Componentwise|Expr|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_LERP, 4, HasDest|Componentwise|Expr|VX1_2|EVISModifier(3), 1, AL),
 
     /* The Filter instruction performs a specific filter on a 3x3 pixel block. It works
      * on 8- and 16-bit packed data, so it can compute 16x 8-bit values or 8x 16-bit
@@ -830,7 +849,7 @@
      *
      * Note that the box filter only can produce up to 8 values per cycles.
      */
-    VIR_OPINFO(VX_FILTER, 4, HasDest|Componentwise|Expr|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_FILTER, 4, HasDest|Componentwise|Expr|VX1|EVISModifier(3), 1, AL),
 
     /* The MagPhase instruction computes the magnitude and phase of two incoming
      * values. It works on 8- and 16-bit packed data, but it can only 4x 8-bit values
@@ -838,7 +857,7 @@
      * The destination value always gets clamped (signed or unsigned, depending
      * on the IType field).
      */
-    VIR_OPINFO(VX_MAGPHASE, 3, HasDest|Componentwise|Expr|VXOnly|EVISModifier(2), 1, AL),
+    VIR_OPINFO(VX_MAGPHASE, 3, HasDest|Componentwise|Expr|VX1|EVISModifier(2), 1, AL),
 
     /* The MulShift instruction multiplies two 8- or 16-bit integer values together and
      * shifts the result by a specified number of bits. It works on 8- and 16-bit packed
@@ -850,7 +869,7 @@
      *
      *  dest[i] = (src0[j] * src1[j]) >> src2
      */
-    VIR_OPINFO(VX_MULSHIFT, 4, HasDest|Componentwise|Expr|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_MULSHIFT, 4, HasDest|Expr|VX1_2|EVISModifier(3), 1, AL),
 
     /* The DP16x1 instruction performs a dot-product of two 16-component values. It
      * will produce only one output value. Valid instruction formats are U8, S8, U16,
@@ -907,7 +926,7 @@
     /* The DP2x16 instruction performs a dot-product of two 2-component values. It
      * will produce up to sixteen output values. Valid instruction formats are U8, and
      * S8.*/
-    VIR_OPINFO(VX_DP2X16, 4, HasDest|Expr|VXUse512BitUniform(3)|EVISModifier(2), 1, AL),
+    VIR_OPINFO(VX_DP2X16, 4, HasDest|Expr|VX1Use512BitUniform(3)|EVISModifier(2), 1, AL),
 
     /* The DP32x1 instruction performs a dot-product of two 32-component values. It
      * will produce only one output value. Valid instruction formats are U8, S8, U16,
@@ -936,7 +955,7 @@
     /* The DP2x16 instruction performs a dot-product of two 2-component values. It
      * will produce up to sixteen output values. Valid instruction formats are U8, and
      * S8.*/
-    VIR_OPINFO(VX_DP2X16_B, 5, HasDest|Expr|VXUse512BitUniform(4)|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_DP2X16_B, 5, HasDest|Expr|VX1Use512BitUniform(4)|EVISModifier(3), 1, AL),
 
     /* The Clamp instruction clamps up to 16 values to a min and.or max value. In
      * boolean mode it will write a 0 in the result if the value is inside the specified
@@ -944,13 +963,13 @@
      * and 16-bit packed data, so it can produce 16x 8-bit and 8x 16-bit values. Valid
      * instruction formats are U8, S8, U16, and S16.
      */
-    VIR_OPINFO(VX_CLAMP, 4, HasDest|Componentwise|Expr|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_CLAMP, 4, HasDest|Componentwise|Expr|VX1_2|EVISModifier(3), 1, AL),
 
     /* The BiLinear instruction computes a bi-linear interpolation of 4 pixel values. It
      * works on 8- and 16-bit packed data, but it can only produce 8x 8-bit or 16-bit
      * values. Valid instruction formats are U8, S8, U16, and S16.
      */
-    VIR_OPINFO(VX_BILINEAR, 4, HasDest|Expr|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_BILINEAR, 4, HasDest|Expr|VX1|EVISModifier(3), 1, AL),
 
     /* The SelectAdd instruction either adds the pixel value or increments a counter
      * inside a number of distribution (histogram) bins. Based on the destination
@@ -963,7 +982,7 @@
      * bin. Src2 holds a 512-bit uniform that contains the min value for the entire
      * instruction as well as the range for each bin.
      */
-    VIR_OPINFO(VX_SELECTADD, 4, HasDest|Componentwise|Expr|VXUse512BitUniform(2)|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_SELECTADD, 4, HasDest|Componentwise|Expr|VX1Use512BitUniform(2)|EVISModifier(3), 1, AL),
 
     /* The AtomicAdd instruction adds a valid atomically to a given address. It is in
      * fact a read/modify/write instruction that executes atomically. It works on 8-
@@ -972,19 +991,85 @@
      * Src0 holds the base address and src1 holds the offset. Src2 holds the values
      * that need to be added to the memory locations pointed to by src0 and src1.
      */
-    VIR_OPINFO(VX_ATOMICADD, 4, HasDest|Expr|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_ATOMICADD, 4, HasDest|Expr|VX1_2|EVISModifier(3), 1, AL),
 
     /* The BitExtract instruction extracts up to 8 bitfields from a packed data stream.
      * The input is is a 256-bit blob of data. Valid output formats are U8, U16, and
      * U32.
      */
-    VIR_OPINFO(VX_BITEXTRACT, 4, HasDest|Componentwise|Expr|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_BITEXTRACT, 4, HasDest|Componentwise|Expr|VX1_2|EVISModifier(3), 1, AL),
 
     /* The BitReplace instruction replaces up to 8 bitfields inside a packed data stream.
      * Valid output formats are U8, U16, and U32. This instruction doesn’t use the
      * SourceBin field.
      */
-    VIR_OPINFO(VX_BITREPLACE, 4, HasDest|Componentwise|Expr|VXOnly|EVISModifier(3), 1, AL),
+    VIR_OPINFO(VX_BITREPLACE, 4, HasDest|Componentwise|Expr|VX1|EVISModifier(3), 1, AL),
+
+    /* VX2
+     *  The IndexAdd instruction either adds the pixel value or increments a counter inside
+     *  a number of distribution (histogram) bins.  Based on the destination format the
+     *  IndexAdd instruction can modify up to 4 bins.  If more bins are required, multiple
+     *  IndexAdd instructions can be used.  Note that the SelectAdd instruction can only
+     *  produce up to 4 outputs per cycle.
+     *
+     *      IndexAdd Dest, Src0, Src1, Src2
+     *
+     *       Dest = histogram result
+     *       Src0 = BinIndexes : used to select which bin to add to
+     *       Src1 = BinIncs: determines how much to increment
+     *       Src2.x = BinStart: (immediate value) specifies the starting bin index
+     */
+    VIR_OPINFO(VX_INDEXADD, 4, HasDest|Componentwise|Expr|VX2|EVISModifier(3), 1, AL),
+
+    /* VX2
+     *  These six instructions are added to specifically target Median3x3 filter operation.
+     *  The instruction support U8, S8, U16, S16 formats.  VertMin3, VertMax3 and VertMedian3
+     *  perform comparison operations among three sources on all 16 8-bit (or 8 16-bit)
+     *  components in parallel.  HorzMin3, HorzMax3 and HorzMedian3 perform comparison among
+     *  three adjacent components on all 14 8-bit (or 6 16-bit) component groups.
+     */
+    /* VertMin3 dest, src0, src1, src2
+     *  The following equation defines the execution of the VertMin3 instruction.
+     *    dest_(StartBin:StartBin+15) = min (src_(0, bin_0,15 ),
+     *                                       src_(1, bin_0,15 ),
+     *                                       src_(2, bin_0,15 )  )
+     */
+    VIR_OPINFO(VX_VERTMIN3, 4, HasDest|Componentwise|Expr|VX2|EVISModifier(3), 1, AL),
+    /* VertMax3 dest, src0, src1, src2
+     *  The following equation defines the execution of the VertMax3 instruction.
+     *    dest_(StartBin:StartBin+15) = max (src_(0, bin_0,15 ),
+     *                                       src_(1, bin_0,15 ),
+     *                                       src_(2, bin_0,15 )  )
+     */
+    VIR_OPINFO(VX_VERTMAX3, 4, HasDest|Componentwise|Expr|VX2|EVISModifier(3), 1, AL),
+    /* VertMedian3 dest, src0, src1, src2
+     *  The following equation defines the execution of the VertMedian3 instruction.
+     *    dest_(StartBin:StartBin+15) = median (src_(0, bin_0,15 ),
+     *                                          src_(1, bin_0,15 ),
+     *                                          src_(2, bin_0,15 )  )
+     */
+    VIR_OPINFO(VX_VERTMED3, 4, HasDest|Componentwise|Expr|VX2|EVISModifier(3), 1, AL),
+    /* HorzMin3 dest, src0
+     *  The following equation defines the execution of the HorzMin3 instruction.
+     *    dest_(StartBin:StartBin+15) = min (src_(0, bin_0,13 ),
+     *                                       src_(0, bin_1,14 ),
+     *                                       src_(0, bin_2,15 )  )
+     */
+    VIR_OPINFO(VX_HORZMIN3, 2, HasDest|Expr|VX2|EVISModifier(1), 1, AL),
+    /* HorzMax3 dest, src0
+     *  The following equation defines the execution of the HorzMax3 instruction.
+     *    dest_(StartBin:StartBin+15) = max (src_(0, bin_0,13 ),
+     *                                       src_(0, bin_1,14 ),
+     *                                       src_(0, bin_2,15 )  )
+     */
+    VIR_OPINFO(VX_HORZMAX3, 2, HasDest|Expr|VX2|EVISModifier(1), 1, AL),
+    /* HorzMedian3 dest, src0
+     *  The following equation defines the execution of the HorzMaedian3 instruction.
+     *    dest_(StartBin:StartBin+15) = median (src_(0, bin_0,13 ),
+     *                                          src_(0, bin_1,14 ),
+     *                                         src_(0, bin_2,15 )  )
+     */
+    VIR_OPINFO(VX_HORZMED3, 2, HasDest|Expr|VX2|EVISModifier(1), 1, AL),
 
     /* float point number attributes */
     VIR_OPINFO(COPYSIGN, 1, HasDest|Componentwise|Expr|EPFromS0, 1, LM), /* Very Low Level */
@@ -997,6 +1082,10 @@
     VIR_OPINFO(GETMANT, 1, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* get mantissa part of the float point value  */
     VIR_OPINFO(SETEXP, 1, HasDest|Componentwise|Expr|EPFromS0, 1, NU), /* set exponent part of the float point value  */
     VIR_OPINFO(SETMANT, 1, HasDest|Componentwise|Expr|EPFromS0, 1, NU), /* set mantissa part of the float point value  */
+    /* Build float from significand and exponent:
+     *  Result = source_0 * (2 ^ source_1);
+     */
+    VIR_OPINFO(LDEXP, 2, HasDest|Componentwise|Expr|EPFromS0, 1, AL),
 
     /* control flow */
     VIR_OPINFO(JMP, 0, HasDest|ControlFlow, 0, AL), /* unconditional direct branch */
@@ -1028,6 +1117,7 @@
     VIR_OPINFO(BREAK, 0, NoDest, 0, NU), /* break point, suspend the shader and wait for system to resume or terminate */
     VIR_OPINFO(COMMENT, 0, NoDest, 0, HM), /* informational comments */
     VIR_OPINFO(UNREACHABLE, 0, NoDest, 0, HM), /* the instruciton is unrechable */
+    VIR_OPINFO(ERROR, 1, NoDest, 0, HM), /* error report  */
 
     /* Reversal instructions. */
 
@@ -1041,10 +1131,10 @@
     VIR_OPINFO(ATTR_LD, 3, HasDest|Src0Componentwise|Loads|Expr, 1, HM), /* ATTR_LD  dest, Attribute, InvocationIndex, offset */
 
     VIR_OPINFO(SELECT_MAP, 4, HasDest, 1, LM), /* SELECT_MAP dest, RangeSourceComponent, src1, src2, samperSwizzle */
-    VIR_OPINFO(EMIT, 0, NoDest, 0, AL),
-    VIR_OPINFO(RESTART, 0, NoDest, 0, AL), /* cut */
-    VIR_OPINFO(AQ_EMIT, 3,HasDest, 0, LM),
-    VIR_OPINFO(AQ_RESTART, 2,HasDest, 0, LM), /* cut */
+    VIR_OPINFO(EMIT0, 0, NoDest, 0, AL),
+    VIR_OPINFO(RESTART0, 0, NoDest, 0, AL), /* cut */
+    VIR_OPINFO(EMIT, 3,HasDest, 0, LM),
+    VIR_OPINFO(RESTART, 2,HasDest, 0, LM), /* cut */
 
     VIR_OPINFO(ALLOCA, 1, HasDest, 1, NU), /* allocate memory in stack */
 
@@ -1067,8 +1157,6 @@
 #undef Transcendental
 #undef IntegerOnly
 #undef ControlFlow
-#undef OCLOnly
-#undef OGLOnly
 #undef UseCondCode
 #undef Componentwise
 #undef Componentwise

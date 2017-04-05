@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -158,7 +158,7 @@ void vscDG_Destroy(VSC_DIRECTED_GRAPH* pDG)
     }
 }
 
-static void _UpdateRootTailArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
+static void _UpdateRootArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
 {
     gcmASSERT(pNode->id != INVALID_GNODE_ID);
 
@@ -175,6 +175,11 @@ static void _UpdateRootTailArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
     {
         vscSRARR_RemoveElementByContent(&pDG->rootNodeArray, (void*)&pNode);
     }
+}
+
+static void _UpdateTailArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
+{
+    gcmASSERT(pNode->id != INVALID_GNODE_ID);
 
     /* Tail array */
     if (DGND_GET_OUT_DEGREE(pNode) == 0)
@@ -189,6 +194,12 @@ static void _UpdateRootTailArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
     {
         vscSRARR_RemoveElementByContent(&pDG->tailNodeArray, (void*)&pNode);
     }
+}
+
+static void _UpdateRootTailArray(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
+{
+    _UpdateRootArray(pDG, pNode);
+    _UpdateTailArray(pDG, pNode);
 }
 
 void vscDG_AddNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)
@@ -296,10 +307,100 @@ VSC_DG_EDGE* vscDG_AddEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_
     AJLST_ADD_EDGE(&pToNode->predList, pPredEdge);
 
     /* Lastly, update root and tail array */
-    _UpdateRootTailArray(pDG, pFromNode);
-    _UpdateRootTailArray(pDG, pToNode);
+    _UpdateTailArray(pDG, pFromNode);
+    _UpdateRootArray(pDG, pToNode);
 
     return pEdges;
+}
+
+VSC_DG_EDGE* vscDG_ReplaceEdgeFromNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode, VSC_DG_NODE* pNewFromNode)
+{
+    VSC_DG_EDGE* pSuccEdge = gcvNULL;
+    VSC_DG_EDGE* pPredEdge = gcvNULL;
+
+    gcmASSERT(pFromNode->id != INVALID_GNODE_ID);
+    gcmASSERT(pToNode->id != INVALID_GNODE_ID);
+
+    /* Find successor edge and then remove */
+    for (pSuccEdge = AJLST_GET_FIRST_EDGE(&pFromNode->succList);
+         pSuccEdge != NULL;
+         pSuccEdge = DGEG_GET_NEXT_EDGE(pSuccEdge))
+    {
+        if (pSuccEdge->pFromNode == pFromNode && pSuccEdge->pToNode == pToNode)
+        {
+            AJLST_REMOVE_EDGE(&pFromNode->succList, pSuccEdge);
+            break;
+        }
+    }
+    gcmASSERT(pSuccEdge);
+
+    /* Find predecessor edge and remove */
+    for (pPredEdge = AJLST_GET_FIRST_EDGE(&pToNode->predList);
+         pPredEdge != NULL;
+         pPredEdge = DGEG_GET_NEXT_EDGE(pPredEdge))
+    {
+        if (pPredEdge->pToNode == pFromNode && pPredEdge->pFromNode == pToNode)
+        {
+            break;
+        }
+    }
+    gcmASSERT(pPredEdge);
+
+    /* Free edges, note that pSuccEdge and pPredEdge are successive and pSuccEdge points whole entity */
+    pSuccEdge->pFromNode = pNewFromNode;
+    pPredEdge->pToNode = pNewFromNode;
+    AJLST_ADD_EDGE(&pNewFromNode->succList, pSuccEdge);
+
+    /* Lastly, update root and tail array */
+    _UpdateTailArray(pDG, pFromNode);
+    _UpdateTailArray(pDG, pNewFromNode);
+
+    return pSuccEdge;
+}
+
+VSC_DG_EDGE* vscDG_ReplaceEdgeToNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode, VSC_DG_NODE* pNewToNode)
+{
+    VSC_DG_EDGE* pSuccEdge = gcvNULL;
+    VSC_DG_EDGE* pPredEdge = gcvNULL;
+
+    gcmASSERT(pFromNode->id != INVALID_GNODE_ID);
+    gcmASSERT(pToNode->id != INVALID_GNODE_ID);
+
+    /* Find successor edge and then remove */
+    for (pSuccEdge = AJLST_GET_FIRST_EDGE(&pFromNode->succList);
+         pSuccEdge != NULL;
+         pSuccEdge = DGEG_GET_NEXT_EDGE(pSuccEdge))
+    {
+        if (pSuccEdge->pFromNode == pFromNode && pSuccEdge->pToNode == pToNode)
+        {
+            break;
+        }
+    }
+    gcmASSERT(pSuccEdge);
+
+    /* Find predecessor edge and remove */
+    for (pPredEdge = AJLST_GET_FIRST_EDGE(&pToNode->predList);
+         pPredEdge != NULL;
+         pPredEdge = DGEG_GET_NEXT_EDGE(pPredEdge))
+    {
+        if (pPredEdge->pToNode == pFromNode && pPredEdge->pFromNode == pToNode)
+        {
+            AJLST_REMOVE_EDGE(&pToNode->predList, pPredEdge);
+            break;
+        }
+    }
+    gcmASSERT(pPredEdge);
+
+    /* Free edges, note that pSuccEdge and pPredEdge are successive and pSuccEdge points whole entity */
+    pSuccEdge->pToNode = pNewToNode;
+    pPredEdge->pFromNode = pNewToNode;
+    AJLST_ADD_EDGE(&pNewToNode->predList, pPredEdge);
+
+    /* Lastly, update root and tail array */
+    _UpdateRootArray(pDG, pToNode);
+    _UpdateRootArray(pDG, pNewToNode);
+
+    return pSuccEdge;
 }
 
 void vscDG_RemoveEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NODE* pToNode)
@@ -343,8 +444,8 @@ void vscDG_RemoveEdge(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pFromNode, VSC_DG_NO
     vscMM_Free(pDG->pMM, pSuccEdge);
 
     /* Lastly, update root and tail array */
-    _UpdateRootTailArray(pDG, pFromNode);
-    _UpdateRootTailArray(pDG, pToNode);
+    _UpdateTailArray(pDG, pFromNode);
+    _UpdateRootArray(pDG, pToNode);
 }
 
 void vscDG_RemoveNode(VSC_DIRECTED_GRAPH* pDG, VSC_DG_NODE* pNode)

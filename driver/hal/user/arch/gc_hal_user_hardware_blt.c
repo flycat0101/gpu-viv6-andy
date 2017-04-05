@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1365,6 +1365,7 @@ gcoHARDWARE_3DBlitBlt(
     gceSURF_FORMAT srcSurfFmt = srcSurf->format;
     gctUINT32 gpuCount = 0;
     gctBOOL forceSGPU = gcvFALSE;
+    gcsSURF_FORMAT_INFO_PTR fmtInfo = &srcSurf->formatInfo;
     gctUINT srcWidth  = srcSurf->allocedW / srcSurf->sampleInfo.x;
     gctUINT srcHeight = srcSurf->allocedH / srcSurf->sampleInfo.y;
     gctUINT dstWidth  = dstSurf->allocedW / dstSurf->sampleInfo.x;
@@ -1518,7 +1519,7 @@ gcoHARDWARE_3DBlitBlt(
 
     flipY = Args->uArgs.v2.yInverted;
 
-    color64 = srcSurf->clearValue[0] != srcSurf->clearValue[1];
+    color64 = (fmtInfo->bitsPerPixel / fmtInfo->layers == 64);
 
     srcConfig
             = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -2725,6 +2726,7 @@ gcoHARDWARE_3DBlitClear(
     gcoSURF         DstSurf = DstView->surf;
     gctUINT         gpuCount = 0;
     gctBOOL         forceSGPU = gcvFALSE;
+    gcsSURF_FORMAT_INFO_PTR fmtInfo = &DstSurf->formatInfo;
 
      /* Define state buffer variables. */
     gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
@@ -2825,7 +2827,7 @@ gcoHARDWARE_3DBlitClear(
         destCompression = DstSurf->compressed;
     }
 
-    color64 = Info->clearValue[0] != Info->clearValue[1];
+    color64 = (fmtInfo->bitsPerPixel / fmtInfo->layers == 64);
 
     destConfigEx
         = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?

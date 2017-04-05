@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,13 +14,80 @@
 #include "gc_cl_precomp.h"
 
 #define __NEXT_MSG_ID__     006030
-/* varible to record the status of VXC instruction using in OCL */
-static gctBOOL useVXC = gcvFALSE;
 
 /*****************************************************************************\
 |*                         Supporting functions                              *|
 \*****************************************************************************/
+gctINT
+    clfRetainProgram(
+    cl_program Program
+    )
+{
+    gctINT status = CL_SUCCESS;
 
+    gcmHEADER_ARG("Program=0x%x", Program);
+
+    if (Program == gcvNULL ||
+        Program->objectType != clvOBJECT_PROGRAM)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-006009: (clfRetainProgram) invalid Program.\n");
+        clmRETURN_ERROR(CL_INVALID_PROGRAM);
+    }
+
+    gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, Program->referenceCount, gcvNULL));
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+gctINT
+    clfReleaseProgram(
+    cl_program Program
+    )
+{
+    gctINT              status;
+    gctINT32            oldReference;
+
+    gcmHEADER_ARG("Program=0x%x", Program);
+
+    if (Program == gcvNULL ||
+        Program->objectType != clvOBJECT_PROGRAM)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-006010: (clfReleaseProgram) invalid Program.\n");
+        clmRETURN_ERROR(CL_INVALID_PROGRAM);
+    }
+
+    gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, Program->referenceCount, &oldReference));
+
+    if (oldReference == 1)
+    {
+        Program->objectType = clvOBJECT_UNKNOWN;
+
+        if (Program->buildOptions) gcoOS_Free(gcvNULL, Program->buildOptions);
+        if (Program->linkOptions) gcoOS_Free(gcvNULL, Program->linkOptions);
+        if (Program->compileOptions) gcoOS_Free(gcvNULL, Program->compileOptions);
+        if (Program->buildLog) gcoOS_Free(gcvNULL, Program->buildLog);
+        if (Program->source) gcoOS_Free(gcvNULL, Program->source);
+        if (Program->devices) gcoOS_Free(gcvNULL, Program->devices);
+        if (Program->binary) gcSHADER_Destroy((gcSHADER)Program->binary);
+
+        /* Destroy the reference count object */
+        gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, Program->referenceCount));
+        Program->referenceCount = gcvNULL;
+
+        gcoOS_Free(gcvNULL, Program);
+    }
+
+    gcmFOOTER_ARG("%d", CL_SUCCESS);
+    return CL_SUCCESS;
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
 /*****************************************************************************\
 |*                       OpenCL Program Object API                           *|
 \*****************************************************************************/
@@ -33,17 +100,19 @@ clCreateProgramWithSource(
     cl_int *        ErrcodeRet
     )
 {
-    clsProgram_PTR  program = gcvNULL;
-    gctUINT         size = 0;
-    gctUINT         length;
-    gctUINT *       sizes = gcvNULL;
-    gctUINT         i;
-    gctSTRING       source = gcvNULL;
-    gctPOINTER      pointer = gcvNULL;
-    gctINT          status;
+    clsProgram_PTR      program = gcvNULL;
+    gctUINT             size = 0;
+    gctUINT             length;
+    gctUINT *           sizes = gcvNULL;
+    gctUINT             i;
+    gctSTRING           source = gcvNULL;
+    gctPOINTER          pointer = gcvNULL;
+    gctINT              status;
 
     gcmHEADER_ARG("Context=0x%x Count=%u Strings=0x%x Lengths=0x%x",
                   Context, Count, Strings, Lengths);
+    gcmDUMP_API("${OCL clCreateProgramWithSource 0x%x}", Context);
+    VCL_TRACE_API(CreateProgramWithSource_Pre)(Context, Count, Strings, Lengths, ErrcodeRet);
 
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
@@ -86,10 +155,6 @@ clCreateProgramWithSource(
         }
     }
 
-    /* Allocate source. */
-    clmONERROR(gcoOS_Allocate(gcvNULL, size + 1, &pointer), CL_OUT_OF_HOST_MEMORY);
-    source = (gctSTRING) pointer;
-
     /* Allocate program. */
     clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsProgram), &pointer), CL_OUT_OF_HOST_MEMORY);
     gcoOS_ZeroMemory(pointer, sizeof(clsProgram));
@@ -99,12 +164,17 @@ clCreateProgramWithSource(
     program->objectType      = clvOBJECT_PROGRAM;
     program->context         = Context;
     program->kernels         = gcvNULL;
-    program->source          = source;
     program->binarySize      = 0;
     program->binary          = gcvNULL;
     program->buildOptions    = gcvNULL;
     program->buildLog        = gcvNULL;
     program->buildStatus     = CL_BUILD_NONE;
+
+    /* Allocate source. */
+    clmONERROR(gcoOS_Allocate(gcvNULL, size + 1, &pointer), CL_OUT_OF_HOST_MEMORY);
+    source = (gctSTRING) pointer;
+
+    program->source          = source;
 
     /* Create a reference count object and set it to 1. */
     clmONERROR(gcoOS_AtomConstruct(gcvNULL, &program->referenceCount),
@@ -145,6 +215,7 @@ clCreateProgramWithSource(
 
     gcmOS_SAFE_FREE(gcvNULL, sizes);
 
+    VCL_TRACE_API(CreateProgramWithSource_Post)(Context, Count, Strings, Lengths, ErrcodeRet, program);
     gcmFOOTER_ARG("%d program=0x%x", CL_SUCCESS, program);
     return program;
 
@@ -155,9 +226,25 @@ OnError:
             "OCL-006003: (clCreateProgramWithSource) cannot create program.  Maybe run out of memory.\n");
     }
 
-    if (sizes) gcmOS_SAFE_FREE(gcvNULL, sizes);
-    if(program != gcvNULL && program->devices != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, program->devices);
-    if(program != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, program);
+    if (sizes)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, sizes);
+    }
+
+    if(program != gcvNULL && program->devices != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, program->devices);
+    }
+
+    if(program != gcvNULL)
+    {
+        if (program->source)
+        {
+            gcmOS_SAFE_FREE(gcvNULL, program->source);
+        }
+
+        gcmOS_SAFE_FREE(gcvNULL, program);
+    }
 
     if (ErrcodeRet)
     {
@@ -183,9 +270,12 @@ clCreateProgramWithBinary(
     gctINT          status;
     gctUINT         i;
     gcSHADER        binary;
+    gctUINT32_PTR   comVersion;
 
     gcmHEADER_ARG("Context=0x%x NumDevices=%u Binaries=0x%x Lengths=0x%x",
                   Context, NumDevices, Binaries, Lengths);
+    gcmDUMP_API("${OCL clCreateProgramWithBinary 0x%x}", Context);
+    VCL_TRACE_API(CreateProgramWithBinary_Pre)(Context, NumDevices, DeviceList, Lengths, Binaries, BinaryStatus, ErrcodeRet);
 
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
@@ -256,6 +346,10 @@ clCreateProgramWithBinary(
     clmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &binary),
                CL_OUT_OF_HOST_MEMORY);
 
+    gcmONERROR(gcSHADER_GetCompilerVersion((gcSHADER)(Binaries[0]), &comVersion));
+
+    gcmONERROR(gcSHADER_SetCompilerVersion(binary, comVersion));
+
     /* Load binary */
     status = gcSHADER_LoadEx(binary, (gctPOINTER)Binaries[0], Lengths[0]);
     if (gcmIS_ERROR(status))
@@ -277,6 +371,7 @@ clCreateProgramWithBinary(
         BinaryStatus[0] = CL_SUCCESS;
     }
 
+    VCL_TRACE_API(CreateProgramWithBinary_Post)(Context, NumDevices, DeviceList, Lengths, Binaries, BinaryStatus, ErrcodeRet, program);
     gcmFOOTER_ARG("%d program=0x%x", CL_SUCCESS, program);
     return program;
 
@@ -318,6 +413,8 @@ clCreateProgramWithBuiltInKernels(
     cl_int *               ErrcodeRet
     )
 {
+    gcmDUMP_API("${OCL clCreateProgramWithBuiltInKernels 0x%x}", Context);
+    VCL_TRACE_API(CreateProgramWithBuiltInKernels_Pre)(Context, NumDevices, DeviceList, KernelNames, ErrcodeRet);
     return gcvNULL;
 }
 #endif
@@ -330,6 +427,7 @@ clRetainProgram(
     gctINT              status;
 
     gcmHEADER_ARG("Program=0x%x", Program);
+    gcmDUMP_API("${OCL clRetainProgram 0x%x}", Program);
 
     if (Program == gcvNULL ||
         Program->objectType != clvOBJECT_PROGRAM)
@@ -339,8 +437,9 @@ clRetainProgram(
         clmRETURN_ERROR(CL_INVALID_PROGRAM);
     }
 
-    gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, Program->referenceCount, gcvNULL));
+    clfONERROR(clfRetainProgram(Program));
 
+    VCL_TRACE_API(RetainProgram)(Program);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -355,9 +454,9 @@ clReleaseProgram(
     )
 {
     gctINT              status;
-    gctINT32            oldReference;
 
     gcmHEADER_ARG("Program=0x%x", Program);
+    gcmDUMP_API("${OCL clReleaseProgram 0x%x}", Program);
 
     if (Program == gcvNULL ||
         Program->objectType != clvOBJECT_PROGRAM)
@@ -367,27 +466,9 @@ clReleaseProgram(
         clmRETURN_ERROR(CL_INVALID_PROGRAM);
     }
 
-    gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, Program->referenceCount, &oldReference));
+    clfONERROR(clfReleaseProgram(Program));
 
-    if (oldReference == 1)
-    {
-        Program->objectType = clvOBJECT_UNKNOWN;
-
-        if (Program->buildOptions) gcoOS_Free(gcvNULL, Program->buildOptions);
-        if (Program->linkOptions) gcoOS_Free(gcvNULL, Program->linkOptions);
-        if (Program->compileOptions) gcoOS_Free(gcvNULL, Program->compileOptions);
-        if (Program->buildLog) gcoOS_Free(gcvNULL, Program->buildLog);
-        if (Program->source) gcoOS_Free(gcvNULL, Program->source);
-        if (Program->devices) gcoOS_Free(gcvNULL, Program->devices);
-        if (Program->binary) gcSHADER_Destroy((gcSHADER)Program->binary);
-
-        /* Destroy the reference count object */
-        gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, Program->referenceCount));
-        Program->referenceCount = gcvNULL;
-
-        gcoOS_Free(gcvNULL, Program);
-    }
-
+    VCL_TRACE_API(ReleaseProgram)(Program);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -396,15 +477,12 @@ OnError:
     return status;
 }
 
-
-
 gceSTATUS
 clfLoadCompiler(
     cl_platform_id platform
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    VSC_HW_CONFIG hwCfg;
 
     gcmHEADER();
     {
@@ -447,8 +525,7 @@ clfLoadCompiler(
                                           "gcUnloadKernelCompiler",
                                           (gctPOINTER*)&platform->unloadCompiler));
 
-            gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg));
-            gcmVERIFY_OK((*platform->loadCompiler)(&hwCfg));
+            gcmVERIFY_OK((*platform->loadCompiler)(&platform->hwCfg, platform->patchId));
         }
     }
 
@@ -459,42 +536,6 @@ OnError:
     return status;
 }
 
-static void clfGetCLEnvOption(gctBOOL * useVXC)
-{
-    static gctINT envChecked    = 0;
-    if (!envChecked)
-    {
-        char* p = gcvNULL;
-        gctSTRING pos = gcvNULL;
-
-        gcoOS_GetEnv(gcvNULL, "OCL_OPTION", &p);
-        if (p)
-        {
-            gcoOS_StrStr(p, "-USEVXC:", &pos);
-            if (pos)
-            {
-                pos += sizeof("-USEVXC") -1;
-
-                while (pos[0] == ':')
-                {
-                    ++pos;
-
-                    if (*pos == '0')
-                    {
-                        *useVXC = gcvFALSE;
-                        ++pos;
-                    }
-                    else if (*pos == '1')
-                    {
-                        *useVXC = gcvTRUE;
-                        ++pos;
-                    }
-                }
-            }
-            envChecked = 1;
-        }
-    }
-}
 
 CL_API_ENTRY cl_int CL_API_CALL
 clBuildProgram(
@@ -515,8 +556,7 @@ clBuildProgram(
 
     gcmHEADER_ARG("Program=0x%x NumDevices=%u DeviceList=0x%x Options=%s",
                   Program, NumDevices, DeviceList, Options);
-
-    clfGetCLEnvOption(&useVXC);
+    gcmDUMP_API("${OCL clBuildProgram 0x%x}", Program);
 
     if (Program == gcvNULL || Program->objectType != clvOBJECT_PROGRAM)
     {
@@ -556,10 +596,6 @@ clBuildProgram(
     if (Options)
     {
         length = gcoOS_StrLen(Options, gcvNULL) + 1;
-        if(useVXC == gcvTRUE)
-        {
-            length += 21;
-        }
         status = gcoOS_Allocate(gcvNULL, length, &pointer);
         if (gcmIS_ERROR(status))
         {
@@ -567,35 +603,12 @@ clBuildProgram(
                 "OCL-006013: (clBuildProgram) Run out of memory.\n");
             clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
         }
-        if(useVXC == gcvFALSE)
-        {
-            gcoOS_StrCopySafe(pointer, length, Options);
-        }
-        else
-        {
-            gcoOS_StrCopySafe(pointer, 21, "-cl-viv-vx-extension ");
-            gcoOS_StrCatSafe(pointer, length, Options);
-        }
+        gcoOS_StrCopySafe(pointer, length, Options);
         Program->buildOptions = (gctSTRING) pointer;
     }
     else
     {
-        if(useVXC == gcvTRUE)
-        {
-            status = gcoOS_Allocate(gcvNULL, 20, &pointer);
-            if (gcmIS_ERROR(status))
-            {
-                gcmUSER_DEBUG_ERROR_MSG(
-                    "OCL-006013: (clBuildProgram) Run out of memory.\n");
-                clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
-            }
-            gcoOS_StrCopySafe(pointer, 20, "-cl-viv-vx-extension");
-            Program->buildOptions = (gctSTRING) pointer;
-        }
-        else
-        {
-            Program->buildOptions = gcvNULL;
-        }
+        Program->buildOptions = gcvNULL;
     }
 
     Program->buildStatus = CL_BUILD_IN_PROGRESS;
@@ -643,6 +656,7 @@ OnError:
         PfnNotify(Program, UserData);
     }
 
+    VCL_TRACE_API(BuildProgram)(Program, NumDevices, DeviceList, Options, PfnNotify, UserData);
     gcmFOOTER_ARG("%d Program=0x%x", status, Program);
     return status;
 }
@@ -657,6 +671,7 @@ clUnloadCompiler(
     gctBOOL             acquired = gcvFALSE;
 
     gcmHEADER();
+    gcmDUMP_API("${OCL clUnloadCompiler}");
 
     clfGetDefaultPlatformID(&platform);
 
@@ -684,6 +699,7 @@ clUnloadCompiler(
         acquired = gcvFALSE;
     }
 
+    VCL_TRACE_API(UnloadCompiler)();
     gcmFOOTER_NO();
     return CL_SUCCESS;
 
@@ -721,6 +737,7 @@ clCompileProgram(
 
     gcmHEADER_ARG("Program=0x%x NumDevices=%u DeviceList=0x%x Options=%s",
                   Program, NumDevices, DeviceList, Options);
+    gcmDUMP_API("${OCL clCompileProgram 0x%x}", Context);
 
     if (Program == gcvNULL || Program->objectType != clvOBJECT_PROGRAM)
     {
@@ -838,6 +855,7 @@ clCompileProgram(
         PfnNotify(Program, UserData);
     }
 
+    VCL_TRACE_API(CompileProgram)(Program, NumDevices, DeviceList, Options, NumInputHeaders, InputHeaders, HeaderIncludeNames, PfnNotify, UserData);
     gcmFOOTER_NO();
     return CL_SUCCESS;
 
@@ -889,6 +907,8 @@ clLinkProgram(
 
     gcmHEADER_ARG("Context=0x%x NumDevices=%u DeviceList=0x%x Options=%s",
                   Context, NumDevices, DeviceList, Options);
+    gcmDUMP_API("${OCL clLinkProgram 0x%x}", Context);
+    VCL_TRACE_API(LinkProgram_Pre)(Context, NumDevices, DeviceList, Options, NumInputPrograms, InputPrograms, PfnNotify, UserData, ErrcodeRet);
 
     if ((NumInputPrograms != 0 && !InputPrograms) ||
         (NumInputPrograms == 0 && InputPrograms))
@@ -1002,7 +1022,7 @@ clLinkProgram(
         *ErrcodeRet = CL_SUCCESS;
     }
 
-
+    VCL_TRACE_API(LinkProgram_Post)(Context, NumDevices, DeviceList, Options, NumInputPrograms, InputPrograms, PfnNotify, UserData, ErrcodeRet, program);
     gcmFOOTER_NO();
 
     return program;
@@ -1049,6 +1069,7 @@ clUnloadPlatformCompiler(
     gctBOOL             acquired = gcvFALSE;
 
     gcmHEADER();
+    gcmDUMP_API("${OCL clUnloadPlatformCompiler 0x%x}", Platform);
 
     if (Platform == gcvNULL)
     {
@@ -1081,6 +1102,7 @@ clUnloadPlatformCompiler(
         acquired = gcvFALSE;
     }
 
+    VCL_TRACE_API(UnloadPlatformCompiler)(Platform);
     gcmFOOTER_NO();
     return CL_SUCCESS;
 
@@ -1114,6 +1136,7 @@ clGetProgramInfo(
 
     gcmHEADER_ARG("Program=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   Program, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetProgramInfo 0x%x, 0x%x}", Program, ParamName);
 
     if (Program == gcvNULL || Program->objectType != clvOBJECT_PROGRAM)
     {
@@ -1279,6 +1302,7 @@ clGetProgramInfo(
         *ParamValueSizeRet = retParamSize;
     }
 
+    VCL_TRACE_API(GetProgramInfo)(Program, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;
@@ -1308,6 +1332,7 @@ clGetProgramBuildInfo(
 
     gcmHEADER_ARG("Program=0x%x Device=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   Program, Device, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetProgramBuildInfo 0x%x}", Program);
 
     if (Program == gcvNULL || Program->objectType != clvOBJECT_PROGRAM)
     {
@@ -1388,6 +1413,7 @@ clGetProgramBuildInfo(
         *ParamValueSizeRet = retParamSize;
     }
 
+    VCL_TRACE_API(GetProgramBuildInfo)(Program, Device, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;

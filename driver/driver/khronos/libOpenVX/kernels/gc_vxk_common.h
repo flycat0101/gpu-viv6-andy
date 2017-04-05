@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -142,6 +142,13 @@ vx_status gcfVX_Flush(
     IN gctBOOL      Stall
     );
 
+vx_status gcfVX_Accel(
+    IN gctUINT32                CmdAddress,
+    IN gceVX_ACCELERATOR_TYPE   Type,
+    IN gctUINT32                EventId,
+    IN gctBOOL                  waitEvent
+    );
+
 #if gcdVX_OPTIMIZER
 gceSTATUS gcfVX_BindObjects(
     IN gcoVX_Kernel_Context *Context
@@ -158,7 +165,7 @@ gcoVX_AddObject(
 
 gceSTATUS
 gcfVX_GetImageInfo(
-    IN gcoVX_Kernel_Context Context,
+    IN gcoVX_Kernel_Context* Context,
     IN vx_image Image,
     IN gcsVX_IMAGE_INFO_PTR Info,
     IN vx_uint32 Multiply
@@ -286,6 +293,25 @@ vx_status vxLaplacian3x3(vx_node node, vx_image src, vx_image dst, vx_border_mod
 vx_status vxCensus3x3(vx_node node, vx_image src, vx_image dst);
 
 vx_status vxCopyImage(vx_node node, vx_image src, vx_image dst);
+
+vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelIndex, vx_array nnCmdBuffer, vx_array inputKernelBuffer,
+                     vx_array inputBuffer, vx_uint32 inputOffset,
+                     vx_array outputBuffer, vx_uint32 outputOffset,
+                     vx_scalar batchSize, vx_uint8 dataType, vx_uint32 netFlag);
+
+vx_status vxLRN(vx_node node, vx_array src, vx_scalar width, vx_scalar height, vx_scalar depth, vx_scalar batch, vx_scalar type,
+                     vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_scalar sf, vx_scalar ap, vx_scalar bt, vx_array dst);
+
+vx_status vxMaxPool3x3(vx_node node, vx_array src, vx_scalar format, vx_scalar width, vx_scalar height, vx_scalar depth, vx_scalar batch, vx_scalar _width_o, vx_scalar _height_o,
+                     vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_array dst);
+
+
+vx_status vxROIPool(vx_node node, vx_array input1, vx_array input2, vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_array dst);
+
+vx_status vxRPN(vx_node node, vx_array src, vx_array dst0, vx_array dst1);
+
+vx_status vxRCNNSoftEnd(vx_node node, vx_array src, vx_array src_bbox, vx_array prob, vx_array ddbox, vx_scalar batch, vx_scalar networkType);
+
 #ifdef __cplusplus
 }
 #endif

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -38,8 +38,6 @@ typedef struct _slsPOOL_STRING_NODE
     sltPOOL_STRING      string;
 }
 slsPOOL_STRING_NODE;
-
-extern gctPOINTER   CompilerLock;
 
 extern gctINT
 _convertShaderType(
@@ -98,6 +96,7 @@ sloCOMPILER_Construct_General(
         slsSLINK_LIST_Initialize(&compiler->context.switchScope);
         slsSLINK_LIST_Initialize(&compiler->context.layoutOffset);
         slsSLINK_LIST_Initialize(&compiler->context.sharedVariables);
+        slsDLINK_LIST_Initialize(&compiler->context.dataTypeNameList);
 
         for (i = 0; i < sldMAX_VECTOR_COMPONENT; i++)
         {
@@ -116,6 +115,7 @@ sloCOMPILER_Construct_General(
         status = slsNAME_SPACE_Construct(compiler,
                                          str,
                                          gcvNULL,
+                                         slvNAME_SPACE_BUILTIN,
                                          &compiler->context.generalBuiltinSpace);
         if (gcmIS_ERROR(status)) break;
         compiler->context.currentSpace = compiler->context.generalBuiltinSpace;
@@ -225,6 +225,7 @@ sloCOMPILER_Construct(
         slsSLINK_LIST_Initialize(&compiler->context.switchScope);
         slsSLINK_LIST_Initialize(&compiler->context.layoutOffset);
         slsSLINK_LIST_Initialize(&compiler->context.sharedVariables);
+        slsDLINK_LIST_Initialize(&compiler->context.dataTypeNameList);
 
         for(i = 0; i < sldMAX_VECTOR_COMPONENT; i++)
         {
@@ -243,6 +244,7 @@ sloCOMPILER_Construct(
         status = slsNAME_SPACE_Construct(compiler,
                                          str,
                                          gcvNULL,
+                                         slvNAME_SPACE_STATE_SET,
                                          &compiler->context.unnamedSpace);
         if (gcmIS_ERROR(status)) break;
 
@@ -255,6 +257,7 @@ sloCOMPILER_Construct(
         status = slsNAME_SPACE_Construct(compiler,
                                          str,
                                          compiler->context.generalBuiltinSpace,
+                                         slvNAME_SPACE_BUILTIN,
                                          &compiler->context.builtinSpace);
         if (gcmIS_ERROR(status)) break;
 
@@ -269,6 +272,7 @@ sloCOMPILER_Construct(
         status = slsNAME_SPACE_Construct(compiler,
                                          str,
                                          compiler->context.builtinSpace,
+                                         slvNAME_SPACE_DECL_SET,
                                          &compiler->context.globalSpace);
         if (gcmIS_ERROR(status)) break;
 
@@ -2777,6 +2781,7 @@ sloCOMPILER_DuplicateFieldSpaceForDataType(
     /* Create a new name space. */
     gcmONERROR(sloCOMPILER_CreateNameSpace(Compiler,
                                            DataType->fieldSpace ? DataType->fieldSpace->spaceName : gcvNULL,
+                                           slvNAME_SPACE_STRUCT,
                                            &currentNameSpace));
     /* Duplicate field list. */
     FOR_EACH_DLINK_NODE(&DataType->fieldSpace->names, slsNAME, orgFieldName)
@@ -2880,7 +2885,8 @@ sloCOMPILER_CreateName(
     /* Verify the arguments. */
     slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
 
-    if (!Compiler->context.loadingBuiltIns)
+    if (!Compiler->context.loadingBuiltIns &&
+        !Compiler->context.redeclareBuiltInVar)
     {
         length = gcoOS_StrLen(Symbol, gcvNULL);
         if (length >= 3 &&
@@ -2985,6 +2991,8 @@ sloCOMPILER_CreateAuxiliaryName(
         gcmONERROR(slsNAME_SPACE_Search(Compiler,
                                         refName->mySpace,
                                         auxiArraySymbol,
+                                        gcvNULL,
+                                        gcvNULL,
                                         gcvFALSE,
                                         gcvFALSE,
                                         &name));
@@ -3019,7 +3027,7 @@ sloCOMPILER_CreateAuxiliaryName(
         tempSymbol = pointer;
 
         gcoOS_GetTime(&curTime);
-        gcoOS_PrintStrSafe(tempSymbol, 256, &offset, "%u_scalarArray", curTime);
+        gcoOS_PrintStrSafe(tempSymbol, 256, &offset, "%llu_scalarArray", curTime);
 
         gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler,
                                                   tempSymbol,
@@ -3028,6 +3036,8 @@ sloCOMPILER_CreateAuxiliaryName(
         gcmONERROR(slsNAME_SPACE_Search(Compiler,
                                         Compiler->context.currentSpace,
                                         auxiArraySymbol,
+                                        gcvNULL,
+                                        gcvNULL,
                                         gcvFALSE,
                                         gcvFALSE,
                                         &name));
@@ -3093,6 +3103,8 @@ sloCOMPILER_SearchName(
                                   isBuiltInSpace?
                                   Compiler->context.builtinSpace : Compiler->context.currentSpace,
                                   Symbol,
+                                  gcvNULL,
+                                  gcvNULL,
                                   Recursive,
                                   gcvFALSE,
                                   Name);
@@ -3129,6 +3141,8 @@ sloCOMPILER_SearchBuiltinName(
     status = slsNAME_SPACE_Search(Compiler,
                                   Compiler->context.builtinSpace,
                                   symbolInPool,
+                                  gcvNULL,
+                                  gcvNULL,
                                   gcvTRUE,
                                   gcvFALSE,
                                   Name);
@@ -3165,6 +3179,8 @@ sloCOMPILER_SearchIntrinsicBuiltinName(
     status = slsNAME_SPACE_Search(Compiler,
                                   Compiler->context.builtinSpace,
                                   symbolInPool,
+                                  gcvNULL,
+                                  gcvNULL,
                                   gcvTRUE,
                                   gcvTRUE,
                                   Name);
@@ -3261,6 +3277,7 @@ gceSTATUS
 sloCOMPILER_CreateNameSpace(
     IN sloCOMPILER Compiler,
     IN sltPOOL_STRING SpaceName,
+    IN sleNAME_SPACE_TYPE NameSpaceType,
     OUT slsNAME_SPACE ** NameSpace
     )
 {
@@ -3277,6 +3294,7 @@ sloCOMPILER_CreateNameSpace(
     status = slsNAME_SPACE_Construct(Compiler,
                                      SpaceName,
                                      Compiler->context.currentSpace,
+                                     NameSpaceType,
                                      &nameSpace);
 
     if (gcmIS_ERROR(status))
@@ -3296,6 +3314,8 @@ sloCOMPILER_CreateNameSpace(
 gceSTATUS
 sloCOMPILER_CreateAuxGlobalNameSpace(
     IN sloCOMPILER Compiler,
+    IN sltPOOL_STRING SpaceName,
+    IN sleNAME_SPACE_TYPE NameSpaceType,
     OUT slsNAME_SPACE ** NameSpace
     )
 {
@@ -3305,7 +3325,8 @@ sloCOMPILER_CreateAuxGlobalNameSpace(
                   Compiler, NameSpace);
 
     status = sloCOMPILER_CreateNameSpace(Compiler,
-                                         gcvNULL,
+                                         SpaceName,
+                                         NameSpaceType,
                                          NameSpace);
     if (gcmIS_ERROR(status))
     {
@@ -3770,6 +3791,13 @@ sloCOMPILER_SetLanguageVersion(
       Compiler->clientApiVersion = gcvAPI_OPENGL_ES20;
       break;
 
+   case 110:
+   case 120:
+      Compiler->langVersion = _SHADER_ES11_VERSION;
+      Compiler->context.extensions &= ~slvEXTENSION_ES_30_AND_ABOVE;
+      Compiler->context.extensions |= slvEXTENSION_NON_HALTI;
+       break;
+
    default:
       gcmASSERT(0);
       Compiler->langVersion = _SHADER_ES11_VERSION;
@@ -4169,6 +4197,41 @@ sloCOMPILER_GetDefaultPrecision(
 
     gcmFOOTER();
     return status;
+}
+
+gceSTATUS
+sloCOMPILER_PushDataTypeName(
+    IN sloCOMPILER Compiler,
+    IN slsDATA_TYPE_NAME *    DataTypeName
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x DataTypeName=0x%x", Compiler, DataTypeName);
+
+    slsDLINK_LIST_InsertFirst(&Compiler->context.dataTypeNameList, &DataTypeName->node);
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+sloCOMPILER_PopDataTypeName(
+    IN sloCOMPILER Compiler,
+    OUT slsDATA_TYPE_NAME **    DataTypeName
+    )
+{
+    slsDATA_TYPE_NAME *dataTypeName;
+
+    gcmHEADER_ARG("Compiler=0x%x DataTypeName=0x%x", Compiler, DataTypeName);
+
+    slsDLINK_LIST_DetachFirst(&Compiler->context.dataTypeNameList, slsDATA_TYPE_NAME, &dataTypeName);
+
+    if (DataTypeName)
+    {
+        *DataTypeName = dataTypeName;
+    }
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
 }
 
 gctBOOL

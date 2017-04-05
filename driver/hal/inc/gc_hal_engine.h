@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1608,7 +1608,7 @@ typedef struct _gcsTHREAD_WALKER_INFO
 }
 gcsTHREAD_WALKER_INFO;
 
-#if gcdUSE_VX
+#if gcdENABLE_3D && gcdUSE_VX
 /* VX thread walker parameters. */
 typedef struct _gcsVX_THREAD_WALKER_PARAMETERS * gcsVX_THREAD_WALKER_PARAMETERS_PTR;
 
@@ -1655,7 +1655,7 @@ typedef struct _gcsVX_IMAGE_INFO
 
     gctUINT32       stride[3];
 
-    gctUINT32       logicals[3];
+    gctPOINTER      logicals[3];
     gctUINT32       physicals[3];
     gctUINT32       bytes;
 
@@ -2705,7 +2705,6 @@ gcoVERTEXARRAY_StreamBind(
     IN gcsVERTEXARRAY_INDEX_INFO_CONST_PTR IndexInfo
     );
 
-/* TODO: will be merge with indexbind in es30 driver later.*/
 gceSTATUS
 gcoVERTEXARRAY_IndexBind_Ex(
     IN gcoVERTEXARRAY Vertex,
@@ -2722,58 +2721,6 @@ gcoVERTEXARRAY_StreamBind_Ex(
 #endif
     IN OUT gcsVERTEXARRAY_STREAM_INFO_PTR StreamInfo,
     IN gcsVERTEXARRAY_INDEX_INFO_PTR IndexInfo
-    );
-
-gceSTATUS
-gcoVERTEXARRAY_Bind_Ex(
-    IN gcoVERTEXARRAY Vertex,
-    IN gctUINT32 EnableBits,
-    IN gcsVERTEXARRAY_PTR VertexArray,
-    IN gctUINT First,
-    IN gctSIZE_T * Count,
-    IN gctBOOL DrawArraysInstanced,
-    IN gctSIZE_T InstanceCount,
-    IN gceINDEX_TYPE IndexType,
-    IN gcoINDEX IndexObject,
-    IN gctPOINTER IndexMemory,
-    IN OUT gcePRIMITIVE * PrimitiveType,
-    IN OUT gctBOOL * SpilitDraw,
-    IN OUT gctSIZE_T * SpilitCount,
-    IN OUT gcePRIMITIVE * SpilitPrimitiveType,
-#if gcdUSE_WCLIP_PATCH
-    IN OUT gctUINT * PrimitiveCount,
-    IN OUT gctFLOAT * wLimitRms,
-    IN OUT gctBOOL * wLimitDirty
-#else
-    IN OUT gctUINT * PrimitiveCount
-#endif
-    );
-
-gceSTATUS
-gcoVERTEXARRAY_Bind_Ex2(
-    IN gcoVERTEXARRAY Vertex,
-    IN gctUINT32 EnableBits,
-    IN gcsATTRIBUTE_PTR VertexArray,
-    IN gctINT First,
-    IN gctSIZE_T * Count,
-    IN gctBOOL DrawInstanced,
-    IN gctSIZE_T InstanceCount,
-    IN gceINDEX_TYPE IndexType,
-    IN gcoBUFOBJ IndexObject,
-    IN gctPOINTER IndexMemory,
-    IN gctBOOL PrimtiveRestart,
-    IN OUT gcePRIMITIVE * PrimitiveType,
-    IN OUT gctBOOL * SpilitDraw,
-    IN OUT gctSIZE_T * SpilitCount,
-    IN OUT gcePRIMITIVE * SpilitPrimitiveType,
-#if gcdUSE_WCLIP_PATCH
-    IN OUT gctSIZE_T * PrimitiveCount,
-    IN OUT gctFLOAT * WLimitRms,
-    IN OUT gctBOOL * WLimitRmsDirty,
-#else
-    IN OUT gctUINT * PrimitiveCount,
-#endif
-    IN gctINT VertexInstanceIdLinkage
     );
 
 gceSTATUS

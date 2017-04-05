@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -105,12 +105,14 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeSystemMemoryWrapper(
 static const VkExtensionProperties g_InstanceExtensions[] =
 {
     {VK_EXT_DEBUG_REPORT_EXTENSION_NAME, VK_EXT_DEBUG_REPORT_SPEC_VERSION},
+#if !defined(VK_USE_PLATFORM_ANDROID_KHR) || (ANDROID_SDK_VERSION < 24)
     {VK_KHR_SURFACE_EXTENSION_NAME, VK_KHR_SURFACE_SPEC_VERSION},
+#endif
     {VK_KHR_DISPLAY_EXTENSION_NAME, VK_KHR_DISPLAY_SPEC_VERSION},
 #ifdef VK_USE_PLATFORM_WIN32_KHR
     {VK_KHR_WIN32_SURFACE_EXTENSION_NAME, VK_KHR_WIN32_SURFACE_SPEC_VERSION},
 #endif
-#ifdef VK_USE_PLATFORM_ANDROID_KHR
+#if defined(VK_USE_PLATFORM_ANDROID_KHR) && (ANDROID_SDK_VERSION < 24)
     {VK_KHR_ANDROID_SURFACE_EXTENSION_NAME, VK_KHR_ANDROID_SURFACE_SPEC_VERSION},
 #endif
 #ifdef VK_USE_PLATFORM_MIR_KHR

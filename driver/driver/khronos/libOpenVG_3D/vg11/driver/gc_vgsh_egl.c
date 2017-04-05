@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -844,6 +844,11 @@ FindAllImageDescents(
                                         sizeof(VGImage) * (count + currCount),
                                         (gctPOINTER) &temp)))
             {
+                gcmOS_SAFE_FREE(context->os, children);
+                if (currentSet != gcvNULL)
+                {
+                    gcmOS_SAFE_FREE(context->os, currentSet);
+                }
                 gcmFATAL("%s(%d): gcoOS_Allocate failed", __FUNCTION__, __LINE__);
                 gcmFOOTER_ARG("return=%d", count);
                 return count;
@@ -866,6 +871,11 @@ FindAllImageDescents(
                                        sizeof(VGImage) * count,
                                        (gctPOINTER*) descents)))
         {
+            if (currentSet != gcvNULL)
+            {
+                gcmOS_SAFE_FREE(context->os, currentSet);
+            }
+            gcmOS_SAFE_FREE(context->os, children);
             gcmFATAL("%s(%d): gcoOS_Allocate failed", __FUNCTION__, __LINE__);
             gcmFOOTER_ARG("return=%d", count);
             return count;
@@ -877,6 +887,10 @@ FindAllImageDescents(
         }
     }
     gcmOS_SAFE_FREE(context->os, children);
+    if (currentSet != gcvNULL)
+    {
+        gcmOS_SAFE_FREE(context->os, currentSet);
+    }
 
     gcmFOOTER_ARG("return=%d", count);
     return count;
@@ -928,6 +942,10 @@ veglCreateImageParentImage(
     *Count = childCount + 1;
     if (gcmIS_ERROR(gcoOS_Allocate(context->os, sizeof(khrEGL_IMAGE) * (*Count), (gctPOINTER)Images)))
     {
+        if (vgimages != gcvNULL)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(context->os, vgimages));
+        }
         gcmFOOTER_ARG("return=0x%x", EGL_BAD_ALLOC);
         return EGL_BAD_ALLOC;
     }

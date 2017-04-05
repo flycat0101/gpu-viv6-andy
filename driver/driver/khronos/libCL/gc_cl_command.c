@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -139,13 +139,19 @@ clfReleaseCommand(
 
         if (Command->event)
         {
-            clReleaseEvent(Command->event);
+            clfReleaseEvent(Command->event);
             Command->event = gcvNULL;
+        }
+
+        if (Command->eventWaitList)
+        {
+            gcmASSERT(Command->numEventsInWaitList);
+            gcoOS_Free(gcvNULL, (gctPOINTER)Command->eventWaitList);
         }
 
         for(i = 0; i < Command->internalNumEventsInWaitList; i++)
         {
-            clReleaseEvent(Command->internalEventWaitList[i]);
+            clfReleaseEvent(Command->internalEventWaitList[i]);
         }
 
         /* Free kernel arguments for NDRangeKernel and Task commands. */
@@ -153,13 +159,13 @@ clfReleaseCommand(
         {
             clsCommandNDRangeKernel_PTR NDRangeKernel = &Command->u.NDRangeKernel;
             clfFreeKernelArgs(NDRangeKernel->numArgs, NDRangeKernel->args, gcvFALSE);
-            clReleaseKernel(NDRangeKernel->kernel);
+            clfReleaseKernel(NDRangeKernel->kernel);
         }
         else if (Command->type == clvCOMMAND_TASK)
         {
             clsCommandTask_PTR task = &Command->u.task;
             clfFreeKernelArgs(task->numArgs, task->args, gcvFALSE);
-            clReleaseKernel(task->kernel);
+            clfReleaseKernel(task->kernel);
         }
 
         if (Command->releaseSignal)
@@ -1245,8 +1251,8 @@ clfPrintData(
             **Data = (gctUINT16*)(**Data) + 1;
             break;
         case cleARGTYPE_LONG:
-#ifdef ANDROID
-            /*Special handle, Under Android, print 64bit integer, %ld will print pointer value, %lld can print correct value*/
+#if (defined(ANDROID) || gcdFPGA_BUILD || defined(__QNXNTO__))
+            /*Special handle, Under the platforms above, print 64bit integer, %ld will print pointer value, %lld can print correct value*/
             if (!gcoOS_StrCmp(Format,"%ld"))
             {
                 char* NewFormat = "%lld";
@@ -1744,6 +1750,7 @@ clfFinishCommand(
     {
         gcmASSERT(Command->numEventsInWaitList);
         gcoOS_Free(gcvNULL, (gctPOINTER)Command->eventWaitList);
+        Command->eventWaitList = gcvNULL;
     }
 
     if (Command->releaseSignal == gcvNULL)
@@ -2218,7 +2225,7 @@ clfAddCommandDependency(
 
                         memObj->waitEvent.commandQueueID = CommandQueue;
                         memObj->waitEvent.event = Command->event;
-                        if (memObj->waitEvent.event) clRetainEvent(memObj->waitEvent.event);
+                        if (memObj->waitEvent.event) clfRetainEvent(memObj->waitEvent.event);
                     }
                     else
                     {
@@ -2228,9 +2235,9 @@ clfAddCommandDependency(
                             /* find the slot */
                             if (tempWaitEvent->commandQueueID == CommandQueue)
                             {
-                                if (tempWaitEvent->event) clReleaseEvent(tempWaitEvent->event);
+                                if (tempWaitEvent->event) clfReleaseEvent(tempWaitEvent->event);
                                 tempWaitEvent->event = Command->event;
-                                if (tempWaitEvent->event) clRetainEvent(tempWaitEvent->event);
+                                if (tempWaitEvent->event) clfRetainEvent(tempWaitEvent->event);
                                 break;
                             }
                         }
@@ -2246,7 +2253,7 @@ clfAddCommandDependency(
 
                             pointer->commandQueueID = CommandQueue;
                             pointer->event = Command->event;
-                            if (pointer->event) clRetainEvent(pointer->event);
+                            if (pointer->event) clfRetainEvent(pointer->event);
                         }
                     }
                 }
@@ -2332,7 +2339,7 @@ clfAddCommandDependency(
                 if (tempWaitEvent->commandQueueID == CommandQueue)
                 {
                     Command->internalEventWaitList[Command->internalNumEventsInWaitList] = tempWaitEvent->event;
-                    if(tempWaitEvent->event) clRetainEvent(tempWaitEvent->event);
+                    if(tempWaitEvent->event) clfRetainEvent(tempWaitEvent->event);
                     Command->internalNumEventsInWaitList++;
                     break;
                 }
@@ -2391,10 +2398,10 @@ clfSubmitCommand(
         commandEvent->queue = CommandQueue;
 
 #if cldSYNC_MEMORY
-        clRetainCommandQueue(CommandQueue);
+        clfRetainCommandQueue(CommandQueue);
 #endif
 
-        if (Blocking) clRetainEvent(commandEvent);
+        if (Blocking) clfRetainEvent(commandEvent);
 
         clfSetEventExecutionStatus(commandEvent, CL_QUEUED);
 
@@ -2404,7 +2411,7 @@ clfSubmitCommand(
     if (Command->outEvent)
     {
         /* The host must release this event once */
-        clRetainEvent(commandEvent);
+        clfRetainEvent(commandEvent);
 
         *Command->outEvent = Command->event;
     }
@@ -2419,7 +2426,7 @@ clfSubmitCommand(
         /* Wait for the command to finish. */
         clmASSERT(commandEvent, CL_INVALID_VALUE);
         clfWaitForEvent(commandEvent);
-        clReleaseEvent(commandEvent);
+        clfReleaseEvent(commandEvent);
     }
 
     gcmFOOTER_ARG("%d", CL_SUCCESS);
@@ -2559,214 +2566,27 @@ OnError:
     return status;
 }
 
-/*****************************************************************************\
-|*                       OpenCL Command Queue API                            *|
-\*****************************************************************************/
-CL_API_ENTRY cl_command_queue CL_API_CALL
-clCreateCommandQueue(
-    cl_context                     Context,
-    cl_device_id                   Device,
-    cl_command_queue_properties    Properties,
-    cl_int *                       ErrcodeRet
-    )
-{
-    clsCommandQueue_PTR            queue=gcvNULL;
-    gctPOINTER                     pointer=gcvNULL;
-    gctUINT                        i;
-    gctINT                         status;
-
-    gcmHEADER_ARG("Context=0x%x Device=0x%x",
-                  Context, Device);
-
-    if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-003000: (clCreateCommandQueue) invalid Context.\n");
-        clmRETURN_ERROR(CL_INVALID_CONTEXT);
-    }
-
-    if (Device == gcvNULL || Device->objectType != clvOBJECT_DEVICE)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-003001: (clCreateCommandQueue) invalid Device.\n");
-        clmRETURN_ERROR(CL_INVALID_DEVICE);
-    }
-
-    for (i = 0; i < Context->numDevices; i++)
-    {
-        if (Context->devices[i] == Device)
-        {
-            break;
-        }
-    }
-
-    if (i == Context->numDevices)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-003001: (clCreateCommandQueue) invalid Device.\n");
-        clmRETURN_ERROR(CL_INVALID_DEVICE);
-    }
-    /* Allocate command queue. */
-    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsCommandQueue), &pointer), CL_OUT_OF_HOST_MEMORY);
-
-    queue                       = (clsCommandQueue_PTR) pointer;
-    queue->dispatch             = Context->dispatch;
-    queue->objectType           = clvOBJECT_COMMAND_QUEUE;
-    queue->context              = Context;
-    queue->device               = Device;
-    queue->properties           = Properties;
-    queue->numCommands          = 0;
-    queue->syncPointList        = gcvNULL;
-    queue->commandHead          = gcvNULL;
-    queue->commandTail          = gcvNULL;
-    queue->deferredReleaseCommandHead   = gcvNULL;
-    queue->deferredReleaseCommandTail   = gcvNULL;
-    queue->next                 = gcvNULL;
-    queue->previous             = gcvNULL;
-    queue->nextEnqueueNo        = 0;
-    queue->commitRequestList    = gcvNULL;
-    queue->privateBufList       = gcvNULL;
-
-    /* Create a reference count object and set it to 1. */
-    clmONERROR(gcoOS_AtomConstruct(gcvNULL, &queue->referenceCount),
-               CL_OUT_OF_HOST_MEMORY);
-
-    gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, queue->referenceCount, gcvNULL));
-
-    /* Create the mutex for the command list. */
-    clmONERROR(gcoOS_CreateMutex(gcvNULL,
-                                 &queue->commandListMutex),
-               CL_OUT_OF_HOST_MEMORY);
-
-    clmONERROR(gcoOS_AtomIncrement(gcvNULL, clgGlobalId, (gctINT*)&queue->id), CL_INVALID_VALUE);
-
-    clRetainContext(Context);
-
-    /* Create the mutex for the sync point list. */
-    clmONERROR(gcoOS_CreateMutex(gcvNULL,
-                                 &queue->syncPointListMutex),
-               CL_OUT_OF_HOST_MEMORY);
-
-#if cldSEQUENTIAL_EXECUTION
-    queue->workerStartSignal  = gcvNULL;
-    queue->workerStopSignal   = gcvNULL;
-    queue->workerThread = gcvNULL;
-#else
-    /* Create worker thread. */
-
-    /* Create thread start signal. */
-    clmONERROR(gcoCL_CreateSignal(gcvFALSE,
-                                  &queue->workerStartSignal),
-               CL_OUT_OF_HOST_MEMORY);
-
-    /* Create thread stop signal. */
-    clmONERROR(gcoCL_CreateSignal(gcvTRUE,
-                                  &queue->workerStopSignal),
-               CL_OUT_OF_HOST_MEMORY);
-
-    /* Start the worker thread. */
-    clmONERROR(gcoOS_CreateThread(gcvNULL,
-                                  clfCommandQueueWorker,
-                                  queue,
-                                  &queue->workerThread),
-               CL_OUT_OF_HOST_MEMORY);
-#endif
-
-    /* Lock the command queue list in the context. */
-    clfLockCommandQueueList(Context);
-
-    /* Insert to context's queue list. */
-    queue->next            = Context->queueList;
-    Context->queueList     = queue;
-
-    if (queue->next)
-    {
-        queue->next->previous = queue;
-    }
-
-    /* Unlock the command queue list in the context. */
-    clfUnlockCommandQueueList(Context);
-
-    if (ErrcodeRet)
-    {
-        *ErrcodeRet = CL_SUCCESS;
-    }
-
-    gcmFOOTER_ARG("%d queue=0x%x",
-                  CL_SUCCESS, queue);
-
-    return queue;
-
-OnError:
-    if (status == CL_OUT_OF_HOST_MEMORY)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-003002: (clCreateCommandQueue) cannot create command queue.  Maybe run out of memory.\n");
-    }
-
-    if (queue != gcvNULL)
-    {
-        if (queue->commandListMutex != gcvNULL)
-        {
-            gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, queue->commandListMutex));
-            queue->commandListMutex = gcvNULL;
-        }
-
-        gcoOS_Free(gcvNULL, queue);
-    }
-
-    gcmFOOTER_ARG("%d", status);
-
-    if (ErrcodeRet)
-    {
-        *ErrcodeRet = status;
-    }
-
-    return gcvNULL;
-}
-
-CL_API_ENTRY cl_int CL_API_CALL
-clRetainCommandQueue(
+gceSTATUS clfRetainCommandQueue(
     cl_command_queue CommandQueue
     )
 {
-    gctINT              status;
-
+    gceSTATUS status = gcvSTATUS_OK;
     gcmHEADER_ARG("CommandQueue=0x%x", CommandQueue);
-
-    if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-003003: (clRetainCommandQueue) invalid CommandQueue.\n");
-        clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
-    }
 
     gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, CommandQueue->referenceCount, gcvNULL));
 
-    gcmFOOTER_ARG("%d", CL_SUCCESS);
-    return CL_SUCCESS;
-
-OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
 
-CL_API_ENTRY cl_int CL_API_CALL
-clReleaseCommandQueue(
+gceSTATUS clfReleaseCommandQueue(
     cl_command_queue    CommandQueue
     )
 {
-    gctINT              status;
+    gceSTATUS              status;
     gctINT32            oldReference;
 
     gcmHEADER_ARG("CommandQueue=0x%x", CommandQueue);
-
-    if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-003004: (clReleaseCommandQueue) invalid CommandQueue.\n");
-        clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
-    }
 
     gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, CommandQueue->referenceCount, &oldReference));
 
@@ -2853,12 +2673,243 @@ clReleaseCommandQueue(
         CommandQueue->referenceCount = gcvNULL;
 
         /* Release context. */
-        clReleaseContext(CommandQueue->context);
+        clfReleaseContext(CommandQueue->context);
 
         /* Free context. */
         gcoOS_Free(gcvNULL, CommandQueue);
     }
 
+    gcmFOOTER_ARG("%d", CL_SUCCESS);
+    return gcvSTATUS_OK;
+
+OnError:
+    if (status != CL_INVALID_COMMAND_QUEUE)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-003005: (clReleaseCommandQueue) internal error.\n");
+    }
+
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+/*****************************************************************************\
+|*                       OpenCL Command Queue API                            *|
+\*****************************************************************************/
+CL_API_ENTRY cl_command_queue CL_API_CALL
+clCreateCommandQueue(
+    cl_context                     Context,
+    cl_device_id                   Device,
+    cl_command_queue_properties    Properties,
+    cl_int *                       ErrcodeRet
+    )
+{
+    clsCommandQueue_PTR            queue=gcvNULL;
+    gctPOINTER                     pointer=gcvNULL;
+    gctUINT                        i;
+    gctINT                         status;
+
+    gcmHEADER_ARG("Context=0x%x Device=0x%x",
+                  Context, Device);
+    gcmDUMP_API("${OCL clCreateCommandQueue 0x%x, 0x%x}", Context, Device);
+    VCL_TRACE_API(CreateCommandQueue_Pre)(Context, Device, Properties, ErrcodeRet);
+
+    if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-003000: (clCreateCommandQueue) invalid Context.\n");
+        clmRETURN_ERROR(CL_INVALID_CONTEXT);
+    }
+
+    if (Device == gcvNULL || Device->objectType != clvOBJECT_DEVICE)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-003001: (clCreateCommandQueue) invalid Device.\n");
+        clmRETURN_ERROR(CL_INVALID_DEVICE);
+    }
+
+    for (i = 0; i < Context->numDevices; i++)
+    {
+        if (Context->devices[i] == Device)
+        {
+            break;
+        }
+    }
+
+    if (i == Context->numDevices)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-003001: (clCreateCommandQueue) invalid Device.\n");
+        clmRETURN_ERROR(CL_INVALID_DEVICE);
+    }
+    /* Allocate command queue. */
+    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsCommandQueue), &pointer), CL_OUT_OF_HOST_MEMORY);
+
+    queue                       = (clsCommandQueue_PTR) pointer;
+    queue->dispatch             = Context->dispatch;
+    queue->objectType           = clvOBJECT_COMMAND_QUEUE;
+    queue->context              = Context;
+    queue->device               = Device;
+    queue->properties           = Properties;
+    queue->numCommands          = 0;
+    queue->syncPointList        = gcvNULL;
+    queue->commandHead          = gcvNULL;
+    queue->commandTail          = gcvNULL;
+    queue->deferredReleaseCommandHead   = gcvNULL;
+    queue->deferredReleaseCommandTail   = gcvNULL;
+    queue->next                 = gcvNULL;
+    queue->previous             = gcvNULL;
+    queue->nextEnqueueNo        = 0;
+    queue->commitRequestList    = gcvNULL;
+    queue->privateBufList       = gcvNULL;
+
+    /* Create a reference count object and set it to 1. */
+    clmONERROR(gcoOS_AtomConstruct(gcvNULL, &queue->referenceCount),
+               CL_OUT_OF_HOST_MEMORY);
+
+    gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, queue->referenceCount, gcvNULL));
+
+    /* Create the mutex for the command list. */
+    clmONERROR(gcoOS_CreateMutex(gcvNULL,
+                                 &queue->commandListMutex),
+               CL_OUT_OF_HOST_MEMORY);
+
+    clmONERROR(gcoOS_AtomIncrement(gcvNULL, clgGlobalId, (gctINT*)&queue->id), CL_INVALID_VALUE);
+
+    clfRetainContext(Context);
+
+    /* Create the mutex for the sync point list. */
+    clmONERROR(gcoOS_CreateMutex(gcvNULL,
+                                 &queue->syncPointListMutex),
+               CL_OUT_OF_HOST_MEMORY);
+
+#if cldSEQUENTIAL_EXECUTION
+    queue->workerStartSignal  = gcvNULL;
+    queue->workerStopSignal   = gcvNULL;
+    queue->workerThread = gcvNULL;
+#else
+    /* Create worker thread. */
+
+    /* Create thread start signal. */
+    clmONERROR(gcoCL_CreateSignal(gcvFALSE,
+                                  &queue->workerStartSignal),
+               CL_OUT_OF_HOST_MEMORY);
+
+    /* Create thread stop signal. */
+    clmONERROR(gcoCL_CreateSignal(gcvTRUE,
+                                  &queue->workerStopSignal),
+               CL_OUT_OF_HOST_MEMORY);
+
+    /* Start the worker thread. */
+    clmONERROR(gcoOS_CreateThread(gcvNULL,
+                                  clfCommandQueueWorker,
+                                  queue,
+                                  &queue->workerThread),
+               CL_OUT_OF_HOST_MEMORY);
+#endif
+
+    /* Lock the command queue list in the context. */
+    clfLockCommandQueueList(Context);
+
+    /* Insert to context's queue list. */
+    queue->next            = Context->queueList;
+    Context->queueList     = queue;
+
+    if (queue->next)
+    {
+        queue->next->previous = queue;
+    }
+
+    /* Unlock the command queue list in the context. */
+    clfUnlockCommandQueueList(Context);
+
+    if (ErrcodeRet)
+    {
+        *ErrcodeRet = CL_SUCCESS;
+    }
+
+    VCL_TRACE_API(CreateCommandQueue_Post)(Context, Device, Properties, ErrcodeRet, queue);
+    gcmFOOTER_ARG("%d queue=0x%x",
+                  CL_SUCCESS, queue);
+
+    return queue;
+
+OnError:
+    if (status == CL_OUT_OF_HOST_MEMORY)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-003002: (clCreateCommandQueue) cannot create command queue.  Maybe run out of memory.\n");
+    }
+
+    if (queue != gcvNULL)
+    {
+        if (queue->commandListMutex != gcvNULL)
+        {
+            gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, queue->commandListMutex));
+            queue->commandListMutex = gcvNULL;
+        }
+
+        gcoOS_Free(gcvNULL, queue);
+    }
+
+    gcmFOOTER_ARG("%d", status);
+
+    if (ErrcodeRet)
+    {
+        *ErrcodeRet = status;
+    }
+
+    return gcvNULL;
+}
+
+CL_API_ENTRY cl_int CL_API_CALL
+clRetainCommandQueue(
+    cl_command_queue CommandQueue
+    )
+{
+    gctINT              status;
+
+    gcmHEADER_ARG("CommandQueue=0x%x", CommandQueue);
+    gcmDUMP_API("${OCL clRetainCommandQueue 0x%x}", CommandQueue);
+
+    if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-003003: (clRetainCommandQueue) invalid CommandQueue.\n");
+        clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
+    }
+
+    gcmVERIFY_OK(clfRetainCommandQueue(CommandQueue));
+
+    VCL_TRACE_API(RetainCommandQueue)(CommandQueue);
+    gcmFOOTER_ARG("%d", CL_SUCCESS);
+    return CL_SUCCESS;
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+CL_API_ENTRY cl_int CL_API_CALL
+clReleaseCommandQueue(
+    cl_command_queue    CommandQueue
+    )
+{
+    gctINT              status;
+
+    gcmHEADER_ARG("CommandQueue=0x%x", CommandQueue);
+    gcmDUMP_API("${OCL clReleaseCommandQueue 0x%x}", CommandQueue);
+
+    if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-003004: (clReleaseCommandQueue) invalid CommandQueue.\n");
+        clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
+    }
+
+    gcmVERIFY_OK(clfReleaseCommandQueue(CommandQueue));
+
+    VCL_TRACE_API(ReleaseCommandQueue)(CommandQueue);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -2889,6 +2940,7 @@ clGetCommandQueueInfo(
 
     gcmHEADER_ARG("CommandQueue=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   CommandQueue, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetCommandQueueInfo 0x%x, 0x%x}", CommandQueue, ParamName);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -2947,6 +2999,7 @@ clGetCommandQueueInfo(
         *ParamValueSizeRet = retParamSize;
     }
 
+    VCL_TRACE_API(GetCommandQueueInfo)(CommandQueue, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;
@@ -2990,6 +3043,7 @@ clFlush(
     gctINT          status;
 
     gcmHEADER_ARG("CommandQueue=0x%x", CommandQueue);
+    gcmDUMP_API("${OCL clFlush 0x%x}", CommandQueue);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -3006,6 +3060,7 @@ clFlush(
         clmRETURN_ERROR(CL_OUT_OF_RESOURCES);
     }
 
+    VCL_TRACE_API(Flush)(CommandQueue);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -3022,6 +3077,7 @@ clFinish(
     gctINT          status;
 
     gcmHEADER_ARG("CommandQueue=0x%x", CommandQueue);
+    gcmDUMP_API("${OCL clFinish 0x%x}", CommandQueue);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -3038,6 +3094,7 @@ clFinish(
         clmRETURN_ERROR(CL_OUT_OF_RESOURCES);
     }
 
+    VCL_TRACE_API(Finish)(CommandQueue);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 

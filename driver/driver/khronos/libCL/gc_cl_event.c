@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,6 +18,99 @@
 /*****************************************************************************\
 |*                         Supporting functions                              *|
 \*****************************************************************************/
+gctINT
+clfRetainEvent(
+    cl_event Event
+    )
+{
+    gctINT status = CL_SUCCESS;
+
+    gcmHEADER_ARG("Event=0x%x", Event);
+
+    if (Event == gcvNULL || Event->objectType != clvOBJECT_EVENT)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-008002: (clfRetainEvent) invalid Event.\n");
+        clmRETURN_ERROR(CL_INVALID_EVENT);
+    }
+
+    gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, Event->referenceCount, gcvNULL));
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+gctINT
+clfReleaseEvent(
+    cl_event Event
+    )
+{
+    gctINT                  status;
+    clsEventCallback_PTR    eventCallback, nextEventCallback;
+    gctINT32                oldReference;
+
+    gcmHEADER_ARG("Event=0x%x", Event);
+
+    if (Event == gcvNULL || Event->objectType != clvOBJECT_EVENT)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-008003: (clfReleaseEvent) invalid Event.\n");
+        clmRETURN_ERROR(CL_INVALID_EVENT);
+    }
+
+    gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, Event->referenceCount, &oldReference));
+
+    gcmASSERT(oldReference > 0);
+
+    if (oldReference == 1)
+    {
+#if cldSYNC_MEMORY
+        if (Event->queue != gcvNULL)
+        {
+            clfReleaseCommandQueue(Event->queue);
+            Event->queue = gcvNULL;
+        }
+#endif
+
+        gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, Event->callbackMutex, gcvINFINITE));
+        /* Free signals. */
+        gcmVERIFY_OK(gcoCL_DestroySignal(Event->finishSignal));
+        Event->finishSignal = gcvNULL;
+
+        gcmVERIFY_OK(gcoCL_DestroySignal(Event->runSignal));
+        Event->runSignal = gcvNULL;
+
+        gcmVERIFY_OK(gcoCL_DestroySignal(Event->completeSignal));
+        Event->completeSignal = gcvNULL;
+
+        /* Destroy the reference count object */
+        gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, Event->referenceCount));
+        Event->referenceCount = gcvNULL;
+
+        gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, Event->callbackMutex));
+        gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, Event->callbackMutex));
+        Event->callbackMutex = gcvNULL;
+
+        /* Free callbacks */
+        eventCallback = Event->callback;
+        while (eventCallback != gcvNULL)
+        {
+            nextEventCallback = eventCallback->next;
+            gcoOS_Free(gcvNULL, eventCallback);
+            eventCallback = nextEventCallback;
+        }
+
+        gcmOS_SAFE_FREE(gcvNULL, Event);
+    }
+
+    gcmFOOTER_ARG("%d", CL_SUCCESS);
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
 
 gctINT
 clfAllocateEvent(
@@ -173,7 +266,7 @@ clfAddEventToEventList(
     clmASSERT(Event, CL_INVALID_VALUE);
     clmASSERT(!clfIsEventInEventList(Event), CL_INVALID_OPERATION);
 
-    clRetainEvent(Event);
+    clfRetainEvent(Event);
 
     context = Event->context;
 
@@ -238,7 +331,7 @@ clfRemoveEventFromEventList(
     gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL,
                                     context->eventListMutex));
 
-    clReleaseEvent(Event);
+    clfReleaseEvent(Event);
 
     status = CL_SUCCESS;
 
@@ -260,7 +353,7 @@ clfAddEventCallback(
 
     clmASSERT(EventCallback, CL_INVALID_VALUE);
 
-    clRetainEvent(EventCallback->event);
+    clfRetainEvent(EventCallback->event);
 
     context = EventCallback->event->context;
 
@@ -351,10 +444,10 @@ OnError:
 gctINT
 clfSetEventExecutionStatus(
     cl_event        Event,
-    gctINT          Status
+    gctINT          EventStatus
     )
 {
-    gcmHEADER_ARG("Event=0x%x Status=%d", Event, Status);
+    gcmHEADER_ARG("Event=0x%x EventStatus=%d", Event, EventStatus);
 
     if (Event->queue != gcvNULL &&
         (Event->queue->properties & CL_QUEUE_PROFILING_ENABLE) != 0)
@@ -365,7 +458,7 @@ clfSetEventExecutionStatus(
         gcoOS_GetTime(&time);  /* in microseconds */
         time *= 1000;          /* in nanoseconds  */
 
-        switch (Status)
+        switch (EventStatus)
         {
         case CL_SUBMITTED:
             Event->profileInfo.submit = time;
@@ -386,7 +479,7 @@ clfSetEventExecutionStatus(
 
     if (gcmNO_ERROR(Event->executionStatus))
     {
-        Event->executionStatus = Status;
+        Event->executionStatus = EventStatus;
     }
 
     if (Event->userEvent == gcvTRUE)
@@ -432,16 +525,16 @@ clfGetEventExecutionStatus(
 gctINT
 clfFinishEvent(
     cl_event        Event,
-    gctINT          Status
+    gctINT          EventStatus
     )
 {
     gctINT                  status;
 
-    gcmHEADER_ARG("Event=0x%x Status=%d", Event, Status);
+    gcmHEADER_ARG("Event=0x%x EventStatus=%d", Event, EventStatus);
 
     clmASSERT(Event, CL_INVALID_VALUE);
 
-    clfSetEventExecutionStatus(Event, Status);
+    clfSetEventExecutionStatus(Event, EventStatus);
 
     /* Wake up all waiters */
     gcmONERROR(gcoCL_SetSignal(Event->completeSignal));
@@ -450,7 +543,7 @@ clfFinishEvent(
     clfWakeUpAllCommandQueueWorkers(Event->context);
 
     /* Invoke the event callbacks. */
-    status = clfScheduleEventCallback(Event, Status);
+    status = clfScheduleEventCallback(Event, EventStatus);
 
 OnError:
     gcmFOOTER_ARG("%d", status);
@@ -607,12 +700,12 @@ clfWaitForEvent(
 
     clmASSERT(Event, CL_INVALID_VALUE);
 
-    clRetainEvent(Event);
+    clfRetainEvent(Event);
 
     /* wait until the event complete */
     gcmVERIFY_OK(gcoCL_WaitSignal(Event->completeSignal, gcvINFINITE));
 
-    clReleaseEvent(Event);
+    clfReleaseEvent(Event);
 
     status = Event->executionStatus;
 
@@ -849,7 +942,7 @@ clfEventCallbackWorker(
                     eventCallback->type,
                     eventCallback->userData);
 
-                clReleaseEvent(eventCallback->event);
+                clfReleaseEvent(eventCallback->event);
 
                 gcoOS_Free(gcvNULL, eventCallback);
             }
@@ -877,6 +970,8 @@ clCreateUserEvent(
     gctINT                  status;
 
     gcmHEADER_ARG("Context=0x%x", Context);
+    gcmDUMP_API("${OCL clCreateUserEvent 0x%x}", Context);
+    VCL_TRACE_API(CreateUserEvent_Pre)(Context, ErrcodeRet);
 
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
@@ -901,6 +996,8 @@ clCreateUserEvent(
     {
         *ErrcodeRet = CL_SUCCESS;
     }
+
+    VCL_TRACE_API(CreateUserEvent_Post)(Context, ErrcodeRet, event);
     gcmFOOTER_ARG("%d event=%lu",
                   CL_SUCCESS, event);
     return event;
@@ -922,6 +1019,7 @@ clRetainEvent(
     gctINT          status;
 
     gcmHEADER_ARG("Event=0x%x", Event);
+    gcmDUMP_API("${OCL clRetainEvent 0x%x}", Event);
 
     if (Event == gcvNULL || Event->objectType != clvOBJECT_EVENT)
     {
@@ -930,8 +1028,9 @@ clRetainEvent(
         clmRETURN_ERROR(CL_INVALID_EVENT);
     }
 
-    gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, Event->referenceCount, gcvNULL));
+    clfONERROR(clfRetainEvent(Event));
 
+    VCL_TRACE_API(RetainEvent)(Event);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -946,10 +1045,9 @@ clReleaseEvent(
     )
 {
     gctINT                  status;
-    clsEventCallback_PTR    eventCallback, nextEventCallback;
-    gctINT32                oldReference;
 
     gcmHEADER_ARG("Event=0x%x", Event);
+    gcmDUMP_API("${OCL clReleaseEvent 0x%x}", Event);
 
     if (Event == gcvNULL || Event->objectType != clvOBJECT_EVENT)
     {
@@ -958,49 +1056,9 @@ clReleaseEvent(
         clmRETURN_ERROR(CL_INVALID_EVENT);
     }
 
-    gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, Event->referenceCount, &oldReference));
+    clfONERROR(clfReleaseEvent(Event));
 
-    gcmASSERT(oldReference > 0);
-
-    if (oldReference == 1)
-    {
-#if cldSYNC_MEMORY
-        if (Event->queue != gcvNULL)
-        {
-            clReleaseCommandQueue(Event->queue);
-            Event->queue = gcvNULL;
-        }
-#endif
-
-        /* Free signals. */
-        gcmVERIFY_OK(gcoCL_DestroySignal(Event->finishSignal));
-        Event->finishSignal = gcvNULL;
-
-        gcmVERIFY_OK(gcoCL_DestroySignal(Event->runSignal));
-        Event->runSignal = gcvNULL;
-
-        gcmVERIFY_OK(gcoCL_DestroySignal(Event->completeSignal));
-        Event->completeSignal = gcvNULL;
-
-        /* Destroy the reference count object */
-        gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, Event->referenceCount));
-        Event->referenceCount = gcvNULL;
-
-        gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, Event->callbackMutex));
-        Event->callbackMutex = gcvNULL;
-
-        /* Free callbacks */
-        eventCallback = Event->callback;
-        while (eventCallback != gcvNULL)
-        {
-            nextEventCallback = eventCallback->next;
-            gcoOS_Free(gcvNULL, eventCallback);
-            eventCallback = nextEventCallback;
-        }
-
-        gcoOS_Free(gcvNULL, Event);
-    }
-
+    VCL_TRACE_API(ReleaseEvent)(Event);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -1018,6 +1076,7 @@ clSetUserEventStatus(
     gctINT           status;
 
     gcmHEADER_ARG("Event=0x%x ExecutionStatus=%d", Event, ExecutionStatus);
+    gcmDUMP_API("${OCL clSetUserEventStatus 0x%x, 0x%x}", Event, ExecutionStatus);
 
     if (Event == gcvNULL || Event->objectType != clvOBJECT_EVENT)
     {
@@ -1042,6 +1101,7 @@ clSetUserEventStatus(
 
     clfFinishEvent(Event, ExecutionStatus);
 
+    VCL_TRACE_API(SetUserEventStatus)(Event, ExecutionStatus);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -1060,6 +1120,8 @@ clWaitForEvents(
     gctUINT         i;
 
     gcmHEADER_ARG("EventList=0x%x NumEvents=%u", EventList, NumEvents);
+    gcmDUMP_API("${OCL clWaitForEvents 0x%x}", NumEvents);
+    VCL_TRACE_API(WaitForEvents)(NumEvents, EventList);
 
     if (EventList == gcvNULL || NumEvents == 0)
     {
@@ -1119,6 +1181,7 @@ clGetEventInfo(
 
     gcmHEADER_ARG("Event=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   Event, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetEventInfo 0x%x, 0x%x}", Event, ParamName);
 
     if (Event == gcvNULL || Event->objectType != clvOBJECT_EVENT)
     {
@@ -1184,6 +1247,7 @@ clGetEventInfo(
         *ParamValueSizeRet = retParamSize;
     }
 
+    VCL_TRACE_API(GetEventInfo)(Event, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;
@@ -1207,6 +1271,7 @@ clSetEventCallback(
 
     gcmHEADER_ARG("Event=0x%x CallBackType=%d PfnNotify=0x%x UserData=0x%x",
                   Event, CommandExecCallbackType, PfnNotify, UserData);
+    gcmDUMP_API("${OCL clSetEventCallback 0x%x, 0x%x}", Event, CommandExecCallbackType);
 
     if (Event == gcvNULL || Event->objectType != clvOBJECT_EVENT)
     {
@@ -1236,6 +1301,7 @@ clSetEventCallback(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
+    clfRetainEvent(Event);
     status = gcoOS_Allocate(gcvNULL, sizeof(clsEventCallback), &pointer);
     if (gcmIS_ERROR(status))
     {
@@ -1268,7 +1334,9 @@ clSetEventCallback(
     }
 
     gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, Event->callbackMutex));
+    clfReleaseEvent(Event);
 
+    VCL_TRACE_API(SetEventCallback)(Event, CommandExecCallbackType, PfnNotify, UserData);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 

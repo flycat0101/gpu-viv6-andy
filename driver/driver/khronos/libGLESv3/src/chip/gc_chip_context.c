@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -808,6 +808,8 @@ gcChipInitChipFeature(
 
     chipFeature->hasRobustness = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_ROBUSTNESS);
 
+    chipFeature->txLerpLessBit = gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_LERP_LESS_BIT);
+
     /* Get Halti support level */
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI5))
     {
@@ -1047,6 +1049,9 @@ __glChipGetDeviceConstants(
     gceCHIPMODEL chipModel;
     gctUINT32 chipRevision;
     gctBOOL isEs31;
+#if defined(ANDROID)
+    gctSTRING esVersion = gcvNULL;
+#endif
 
     gcmHEADER_ARG("gc=0x%x constants=0x%x", gc, constants);
 
@@ -1089,6 +1094,15 @@ __glChipGetDeviceConstants(
 #else
         if ((patchId == gcvPATCH_OESCTS) && !gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI2))
 #endif
+        {
+            gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION20);
+            constants->GLSLVersion = __GL_GLSL_VERSION20;
+            constants->majorVersion = 2;
+        }
+        else
+        if (((patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
+            && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
+            esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072"))))
         {
             gcoOS_StrCopySafe(constants->version, __GL_MAX_VERSION_LEN, __GL_VERSION20);
             constants->GLSLVersion = __GL_GLSL_VERSION20;
@@ -1429,10 +1443,6 @@ __glChipGetDeviceConstants(
                                             gcvNULL,
                                             gcvNULL));
 
-        /* maxVertOut and maxFragIn count gl_position in, while maxVarying does not.
-        ** TODO: gl_position used 2 varyings on some chips, need to change interface of gcoHAL_QueryShaderCaps()
-        **       for accurate maxVertOut and maxFragIn.
-        */
         shaderCaps->maxVertOutVectors = shaderCaps->maxFragInVectors = shaderCaps->maxVaryingVectors + 1;
 
         if (tsAvailable)

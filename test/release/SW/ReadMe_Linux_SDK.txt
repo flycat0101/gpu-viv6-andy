@@ -70,7 +70,7 @@ Running applications on the target machine
 1. Copy the libraries to the target
 	On the target machine:
 	cp galcore.ko /
-	cp libEGL.so libGLESv1_CM.so libGAL.so libGLSLC.so libGLESv2.so /lib
+	cp libEGL.so libGLESv1_CM.so libGAL.so libVSC.so libGLSLC.so libGLESv2.so /lib
 
 2. Install the kernel driver
 	insmod /galcore.ko registerMemBase=<REG_MEM_BASE> irqLine=<IRQ> contiguousSize=<CONTIGUOUS_MEM_SIZE>

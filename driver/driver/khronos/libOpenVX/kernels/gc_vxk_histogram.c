@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -40,7 +40,6 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
-        kernelContext->uniform_num = 0;
     }
 
     status = vxQueryDistribution(dist, VX_DISTRIBUTION_ATTRIBUTE_BINS, &numBins, sizeof(numBins));
@@ -54,7 +53,77 @@ vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_refer
     status |= vxAccessDistribution(dist, (void **)&dist_ptr, VX_WRITE_ONLY);
     gcoOS_ZeroMemory(dist_ptr, size);
 
-    if (node->base.context->evisNoInst.noSelectAdd)
+    if (node->base.context->evisNoInst.isVX2)
+    {
+        vx_uint32 height = 0;
+        vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+        count = (vx_uint32)numBins;
+
+        /*index = 0*/
+        gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
+
+        /*index = 1*/
+        gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_DISTRIBUTION, dist, GC_VX_INDEX_AUTO);
+
+        kernelContext->uniform_num = 0;
+        {
+            vx_float32 bin[4];
+
+            bin[0] = (vx_float32)offset;
+            bin[1] = (vx_float32)(offset + rang);
+            bin[2] = 1.0f/window_size;
+            bin[3] = 0;
+
+            gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, bin, sizeof(bin));
+            kernelContext->uniforms[kernelContext->uniform_num].num = 4 * 4;
+            kernelContext->uniforms[kernelContext->uniform_num++].index = 2;
+        }
+        {
+            vx_uint8 constantData[16] = {0, 32, 64, 96, 0, 0, 0, 0, 16, 16, 16, 16, 0, 0, 0, 0};
+
+            gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, constantData, sizeof(constantData));
+            kernelContext->uniforms[kernelContext->uniform_num].num = sizeof(constantData) / sizeof(vx_uint8);
+            kernelContext->uniforms[kernelContext->uniform_num++].index = 3;
+        }
+        {
+
+            vx_int32 bin[4];
+
+            bin[0] =
+            bin[1] =
+            bin[2] =
+            bin[3] = FV(offset);
+
+            gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, bin, sizeof(bin));
+            kernelContext->uniforms[kernelContext->uniform_num].num = 4 * 4;
+            kernelContext->uniforms[kernelContext->uniform_num++].index = 4;
+        }
+
+        {
+
+
+            vx_int32 bin[4];
+            bin[0] =
+            bin[1] =
+            bin[2] =
+            bin[3] = 0x00010001;
+
+            gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, bin, sizeof(bin));
+            kernelContext->uniforms[kernelContext->uniform_num].index = 5;
+            kernelContext->uniforms[kernelContext->uniform_num++].num = 4 * 4;
+
+        }
+
+        kernelContext->params.kernel        = gcvVX_KERNEL_HISTOGRAM;
+        kernelContext->params.xstep         = 8;
+        kernelContext->params.ystep         = height;
+        kernelContext->params.volume        = count;
+        kernelContext->params.col           = height;
+        kernelContext->params.scale         = 1.0f/window_size;
+
+        kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+    }
+    else if (node->base.context->evisNoInst.noSelectAdd)
     {
         /*index = 0*/
         gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);

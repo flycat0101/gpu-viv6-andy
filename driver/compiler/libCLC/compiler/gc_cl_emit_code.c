@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -341,6 +341,7 @@ IN gcSL_OPCODE Opcode
     case gcSL_PARAM_CHAIN:   return "gcSL_PARAM_CHAIN";
     case gcSL_INTRINSIC:     return "gcSL_INTRINSIC";
     case gcSL_INTRINSIC_ST:  return "gcSL_INTRINSIC_ST";
+    case gcSL_CLAMP0MAX:     return "gcSL_CLAMP0MAX";
     case gcSL_FMA_MUL:       return "gcSL_FMA_MUL";
     case gcSL_FMA_ADD:       return "gcSL_FMA_ADD";
     default:
@@ -605,8 +606,6 @@ clsGEN_CODE_DATA_TYPE DataType
         break;
 
     case clvTYPE_INT:
-    case clvTYPE_SHORT:
-    case clvTYPE_CHAR:
         switch (clmGEN_CODE_vectorSize_GET(DataType))
         {
         case 0:
@@ -641,6 +640,94 @@ clsGEN_CODE_DATA_TYPE DataType
                    }
                    else {
                        typeSize .type = gcSHADER_INTEGER_X4;
+                       typeSize.length = 4;
+                   }
+                   break;
+
+        default:
+           gcmASSERT(0);
+        }
+        break;
+
+    case clvTYPE_SHORT:
+        switch (clmGEN_CODE_vectorSize_GET(DataType))
+        {
+        case 0:
+                   typeSize.type = gcSHADER_INT16_X1;
+                   break;
+
+        case 2:
+                   typeSize.type = gcSHADER_INT16_X2;
+                   break;
+
+        case 3:
+                   typeSize.type = gcSHADER_INT16_X3;
+                   break;
+
+        case 4:
+                   typeSize.type = gcSHADER_INT16_X4;
+                   break;
+
+        case 8:
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_INT16_X8;
+                   }
+                   else {
+                       typeSize.type = gcSHADER_INT16_X4;
+                       typeSize.length = 2;
+                   }
+                   break;
+
+        case 16:
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_INT16_X16;
+                   }
+                   else {
+                       typeSize .type = gcSHADER_INT16_X4;
+                       typeSize.length = 4;
+                   }
+                   break;
+
+        default:
+           gcmASSERT(0);
+        }
+        break;
+
+    case clvTYPE_CHAR:
+        switch (clmGEN_CODE_vectorSize_GET(DataType))
+        {
+        case 0:
+                   typeSize.type = gcSHADER_INT8_X1;
+                   break;
+
+        case 2:
+                   typeSize.type = gcSHADER_INT8_X2;
+                   break;
+
+        case 3:
+                   typeSize.type = gcSHADER_INT8_X3;
+                   break;
+
+        case 4:
+                   typeSize.type = gcSHADER_INT8_X4;
+                   break;
+
+        case 8:
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_INT8_X8;
+                   }
+                   else {
+                       typeSize.type = gcSHADER_INT8_X4;
+                       typeSize.length = 2;
+                   }
+                   break;
+
+        case 16:
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_INT8_X16;
+                   }
+                   else {
+                       typeSize .type = gcSHADER_INT8_X4;
                        typeSize.length = 4;
                    }
                    break;
@@ -865,8 +952,6 @@ clsGEN_CODE_DATA_TYPE DataType
         break;
 
     case clvTYPE_UINT:
-    case clvTYPE_USHORT:
-    case clvTYPE_UCHAR:
         switch (clmGEN_CODE_vectorSize_GET(DataType))
         {
         case 0:
@@ -910,10 +995,181 @@ clsGEN_CODE_DATA_TYPE DataType
         }
         break;
 
+    case clvTYPE_USHORT:
+        switch (clmGEN_CODE_vectorSize_GET(DataType))
+        {
+        case 0:
+                   typeSize.type = gcSHADER_UINT16_X1;
+                   break;
+
+        case 2:
+                   typeSize.type = gcSHADER_UINT16_X2;
+                   break;
+
+        case 3:
+                   typeSize.type = gcSHADER_UINT16_X3;
+                   break;
+
+        case 4:
+                   typeSize.type = gcSHADER_UINT16_X4;
+                   break;
+
+        case 8:
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_UINT16_X8;
+                   }
+                   else {
+                       typeSize.type = gcSHADER_UINT16_X4;
+                       typeSize.length = 2;
+                   }
+                   break;
+
+        case 16:
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_UINT16_X16;
+                   }
+                   else {
+                       typeSize .type = gcSHADER_UINT16_X4;
+                       typeSize.length = 4;
+                   }
+                   break;
+
+        default:
+           gcmASSERT(0);
+        }
+        break;
+
+    case clvTYPE_UCHAR:
+        switch (clmGEN_CODE_vectorSize_GET(DataType))
+        {
+        case 0:
+                   typeSize.type = gcSHADER_UINT8_X1;
+                   break;
+
+        case 2:
+                   typeSize.type = gcSHADER_UINT8_X2;
+                   break;
+
+        case 3:
+                   typeSize.type = gcSHADER_UINT8_X3;
+                   break;
+
+        case 4:
+                   typeSize.type = gcSHADER_UINT8_X4;
+                   break;
+
+        case 8:
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_UINT8_X8;
+                   }
+                   else {
+                       typeSize.type = gcSHADER_UINT8_X4;
+                       typeSize.length = 2;
+                   }
+                   break;
+
+        case 16:
+                   if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                       typeSize.type = gcSHADER_UINT8_X16;
+                   }
+                   else {
+                       typeSize .type = gcSHADER_UINT8_X4;
+                       typeSize.length = 4;
+                   }
+                   break;
+
+        default:
+           gcmASSERT(0);
+        }
+        break;
+
+    case clvTYPE_HALF:
+        switch (clmGEN_CODE_vectorSize_GET(DataType)) {
+        case 0:
+            typeSize.type = gcSHADER_FLOAT16_X1;
+            break;
+
+        case 2:
+            typeSize.type = gcSHADER_FLOAT16_X2;
+            break;
+
+        case 3:
+            typeSize.type = gcSHADER_FLOAT16_X3;
+            break;
+
+        case 4:
+            typeSize.type = gcSHADER_FLOAT16_X4;
+            break;
+
+        case 8:
+            if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                typeSize.type = gcSHADER_FLOAT16_X8;
+            }
+            else {
+                typeSize.type = gcSHADER_FLOAT16_X4;
+                typeSize.length = 2;
+            }
+            break;
+
+        case 16:
+            if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                typeSize.type = gcSHADER_FLOAT16_X16;
+            }
+            else {
+                typeSize.type = gcSHADER_FLOAT16_X4;
+                typeSize.length = 4;
+            }
+            break;
+
+        default:
+            gcmASSERT(0);
+        }
+        break;
+
+    case clvTYPE_DOUBLE:
+        switch (clmGEN_CODE_vectorSize_GET(DataType)) {
+        case 0:
+            typeSize.type = gcSHADER_FLOAT_X1;
+            break;
+
+        case 2:
+            typeSize.type = gcSHADER_FLOAT_X2;
+            break;
+
+        case 3:
+            typeSize.type = gcSHADER_FLOAT_X3;
+            break;
+
+        case 4:
+            typeSize.type = gcSHADER_FLOAT_X4;
+            break;
+
+        case 8:
+            if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                typeSize.type = gcSHADER_FLOAT_X8;
+            }
+            else {
+                typeSize.type = gcSHADER_FLOAT_X4;
+                typeSize.length = 2;
+            }
+            break;
+
+        case 16:
+            if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+                typeSize.type = gcSHADER_FLOAT_X16;
+            }
+            else {
+                typeSize.type = gcSHADER_FLOAT_X4;
+                typeSize.length = 4;
+            }
+            break;
+
+        default:
+            gcmASSERT(0);
+        }
+        break;
 
     case clvTYPE_FLOAT:
-    case clvTYPE_HALF:
-    case clvTYPE_DOUBLE:
         switch (clmGEN_CODE_matrixColumnCount_GET(DataType)) {
         case 0:
            switch (clmGEN_CODE_vectorSize_GET(DataType)) {
@@ -1219,6 +1475,12 @@ IN gcSHADER_TYPE Type
     case gcSHADER_FLOAT_X4:            return "gcSHADER_FLOAT_X4";
     case gcSHADER_FLOAT_X8:            return "gcSHADER_FLOAT_X8";
     case gcSHADER_FLOAT_X16:           return "gcSHADER_FLOAT_X16";
+    case gcSHADER_FLOAT16_X1:          return "gcSHADER_FLOAT16_X1";
+    case gcSHADER_FLOAT16_X2:          return "gcSHADER_FLOAT16_X2";
+    case gcSHADER_FLOAT16_X3:          return "gcSHADER_FLOAT16_X3";
+    case gcSHADER_FLOAT16_X4:          return "gcSHADER_FLOAT16_X4";
+    case gcSHADER_FLOAT16_X8:          return "gcSHADER_FLOAT16_X8";
+    case gcSHADER_FLOAT16_X16:         return "gcSHADER_FLOAT16_X16";
     case gcSHADER_FLOAT_2X2:           return "gcSHADER_FLOAT_2X2";
     case gcSHADER_FLOAT_3X3:           return "gcSHADER_FLOAT_3X3";
     case gcSHADER_FLOAT_4X4:           return "gcSHADER_FLOAT_4X4";
@@ -1234,6 +1496,18 @@ IN gcSHADER_TYPE Type
     case gcSHADER_INTEGER_X4:          return "gcSHADER_INTEGER_X4";
     case gcSHADER_INTEGER_X8:          return "gcSHADER_INTEGER_X8";
     case gcSHADER_INTEGER_X16:         return "gcSHADER_INTEGER_X16";
+    case gcSHADER_INT8_X1:             return "gcSHADER_INT8_X1";
+    case gcSHADER_INT8_X2:             return "gcSHADER_INT8_X2";
+    case gcSHADER_INT8_X3:             return "gcSHADER_INT8_X3";
+    case gcSHADER_INT8_X4:             return "gcSHADER_INT8_X4";
+    case gcSHADER_INT8_X8:             return "gcSHADER_INT8_X8";
+    case gcSHADER_INT8_X16:            return "gcSHADER_INT8_X16";
+    case gcSHADER_INT16_X1:            return "gcSHADER_INT16_X1";
+    case gcSHADER_INT16_X2:            return "gcSHADER_INT16_X2";
+    case gcSHADER_INT16_X3:            return "gcSHADER_INT16_X3";
+    case gcSHADER_INT16_X4:            return "gcSHADER_INT16_X4";
+    case gcSHADER_INT16_X8:            return "gcSHADER_INT16_X8";
+    case gcSHADER_INT16_X16:           return "gcSHADER_INT16_X16";
     case gcSHADER_SAMPLER:             return "gcSHADER_SAMPLER";
     case gcSHADER_IMAGE_2D:            return "gcSHADER_IMAGE_2D";
     case gcSHADER_IMAGE_3D:            return "gcSHADER_IMAGE_3D";
@@ -1254,7 +1528,21 @@ IN gcSHADER_TYPE Type
     case gcSHADER_UINT_X3:             return "gcSHADER_UINT_X3";
     case gcSHADER_UINT_X4:             return "gcSHADER_UINT_X4";
     case gcSHADER_UINT_X8:             return "gcSHADER_UINT_X8";
-    case gcSHADER_UINT_X16:             return "gcSHADER_UINT_X16";
+    case gcSHADER_UINT_X16:            return "gcSHADER_UINT_X16";
+    case gcSHADER_UINT8_X1:            return "gcSHADER_UINT8_X1";
+    case gcSHADER_UINT8_X2:            return "gcSHADER_UINT8_X2";
+    case gcSHADER_UINT8_X3:            return "gcSHADER_UINT8_X3";
+    case gcSHADER_UINT8_X4:            return "gcSHADER_UINT8_X4";
+    case gcSHADER_UINT8_X8:            return "gcSHADER_UINT8_X8";
+    case gcSHADER_UINT8_X16:           return "gcSHADER_UINT8_X16";
+
+    case gcSHADER_UINT16_X1:           return "gcSHADER_UINT16_X1";
+    case gcSHADER_UINT16_X2:           return "gcSHADER_UINT16_X2";
+    case gcSHADER_UINT16_X3:           return "gcSHADER_UINT16_X3";
+    case gcSHADER_UINT16_X4:           return "gcSHADER_UINT16_X4";
+    case gcSHADER_UINT16_X8:           return "gcSHADER_UINT16_X8";
+    case gcSHADER_UINT16_X16:          return "gcSHADER_UINT16_X16";
+
     case gcSHADER_INT64_X1:            return "gcSHADER_INT64_X1";
     case gcSHADER_INT64_X2:            return "gcSHADER_INT64_X2";
     case gcSHADER_INT64_X3:            return "gcSHADER_INT64_X3";
@@ -3449,6 +3737,33 @@ IN gctLABEL Label
 }
 
 gctUINT8
+clConvPackedTypeToSwizzle(
+    IN cloCOMPILER Compiler,
+    IN clsGEN_CODE_DATA_TYPE PackedType
+    )
+{
+    gcmASSERT(clmIsElementTypePacked(PackedType.elementType));
+    switch(clGEN_CODE_DataTypeByteSize(Compiler, PackedType)) {
+    case 1:
+    case 2:
+    case 3:
+    case 4:
+        return gcSL_SWIZZLE_XXXX;
+
+    case 8:
+        return gcSL_SWIZZLE_XYYY;
+
+    case 16:
+    case 32:
+        return gcSL_SWIZZLE_XYZW;
+
+    default:
+        gcmASSERT(0);
+        return gcSL_SWIZZLE_XYZW;
+    }
+}
+
+gctUINT8
 clConvPackedTypeToEnable(
     IN cloCOMPILER Compiler,
     IN clsGEN_CODE_DATA_TYPE PackedType
@@ -3561,9 +3876,15 @@ gcGetVectorComponentEnable(
 
 gctUINT8
 gcGetDefaultSwizzle(
+    IN cloCOMPILER Compiler,
     IN clsGEN_CODE_DATA_TYPE DataType
     )
 {
+    if(clmIsElementTypePacked(DataType.elementType)) {
+        return clConvPackedTypeToSwizzle(Compiler,
+                                         DataType);
+    }
+
     switch(clmGEN_CODE_vectorSize_NOCHECK_GET(DataType)) {
     case 0:
       return gcSL_SWIZZLE_XXXX;
@@ -3662,7 +3983,7 @@ _MakeNewSource(
                                 NewSource,
                                 Source->dataType,
                                 tempTarget.tempRegIndex,
-                                gcGetDefaultSwizzle(Source->dataType),
+                                gcGetDefaultSwizzle(Compiler, Source->dataType),
                                 gcSL_NOT_INDEXED,
                                 0);
 
@@ -3749,6 +4070,18 @@ _PrepareAnotherSource(
                 || (Source1->type == gcvSOURCE_TEMP
                     && Target->tempRegIndex == Source1->u.sourceReg.regIndex));
         }
+        {
+            gctBOOL     useFullNewLinker = gcvFALSE;
+            gctBOOL     hasHalti2 = gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2));
+
+            useFullNewLinker = gcUseFullNewLinker(hasHalti2);
+
+            if (useFullNewLinker && insertAssign)
+            {
+                insertAssign = gcvFALSE;
+            }
+        }
+
     }
 
     if (insertAssign)
@@ -3823,6 +4156,7 @@ _ConvOpcode(
     case clvOPCODE_IMAGE_READ:       return gcSL_IMAGE_RD;
     case clvOPCODE_IMAGE_READ_3D:    return gcSL_IMAGE_RD_3D;
     case clvOPCODE_IMAGE_SAMPLER:    return gcSL_IMAGE_SAMPLER;
+    case clvOPCODE_CLAMP0MAX:        return gcSL_CLAMP0MAX;
 
     case clvOPCODE_FLOAT_TO_INT:     return gcSL_F2I;
     case clvOPCODE_FLOAT_TO_UINT:    return gcSL_F2I;
@@ -4200,7 +4534,7 @@ _EmitBranchCode(
                                 clvDUMP_CODE_EMITTER,
                                 ">"));
 
-    if (Source0)
+    if (Source0 && !codeGenerator->fulllySupportIntegerBranch)
     {
         sourceType = Source0->dataType.elementType;
 
@@ -4212,8 +4546,9 @@ _EmitBranchCode(
         {
             Source0->dataType.elementType = clvTYPE_UINT;
         }
+
     }
-    if (Source1)
+    if (Source1 && !codeGenerator->fulllySupportIntegerBranch)
     {
         sourceType = Source1->dataType.elementType;
 
@@ -4402,17 +4737,34 @@ clEmitConvCode(
     IN clsGEN_CODE_DATA_TYPE DataType
     )
 {
-
+    gceSTATUS status = gcvSTATUS_OK;
     gcsSOURCE source1[1];
+    gcSHADER binary;
 
     gcsSOURCE_InitializeTargetFormat(source1, DataType);
-    return clEmitCode2(Compiler,
-                       LineNo,
-                       StringNo,
-                       Opcode,
-                       Target,
-                       Source,
-                       source1);
+    status =  clEmitCode2(Compiler,
+                          LineNo,
+                          StringNo,
+                          Opcode,
+                          Target,
+                          Source,
+                          source1);
+    if (gcmIS_ERROR(status)) return status;
+
+    if(clmIsElementTypePacked(Target->dataType.elementType) &&
+       !clmIsElementTypePacked(Source->dataType.elementType)) {
+        gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+        return gcSHADER_UpdateSourcePacked(binary,
+                                           gcSHADER_SOURCE0,
+                                           clmGEN_CODE_vectorSize_GET(Source->dataType));
+    }
+    else if(clmIsElementTypePacked(Source->dataType.elementType) &&
+            !clmIsElementTypePacked(Target->dataType.elementType)) {
+        gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
+        return gcSHADER_UpdateTargetPacked(binary,
+                                           clmGEN_CODE_vectorSize_GET(Target->dataType));
+    }
+    return status;
 }
 
 gceSTATUS
@@ -4522,11 +4874,11 @@ _EmitIntToFloatCode(
     gcsSOURCE_InitializeUintConstant(oneSource, (gctUINT32) 1);
 
     gcsTARGET_InitializeUsingIOperand(Compiler, tempTarget, &tempIOperand[0]);
-    gcsSOURCE_InitializeUsingIOperand(tempSource, &tempIOperand[0]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, tempSource, &tempIOperand[0]);
 
     /* r0 */
     gcsTARGET_InitializeUsingIOperand(Compiler, refTarget, &intermIOperands[0]);
-    gcsSOURCE_InitializeUsingIOperand(refSource, &intermIOperands[0]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, refSource, &intermIOperands[0]);
     status = _EmitCode(Compiler,
                        LineNo,
                        StringNo,
@@ -4549,7 +4901,7 @@ _EmitIntToFloatCode(
 
     /* r2 = int(r1) */
     gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[2]);
-    gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[1]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[1]);
     status = _EmitCode(Compiler,
                        LineNo,
                        StringNo,
@@ -4566,7 +4918,7 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* r0 == r2 ? */
-    gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[2]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[2]);
     status = clEmitCompareBranchCode(Compiler,
                                      LineNo,
                                      StringNo,
@@ -4584,7 +4936,7 @@ _EmitIntToFloatCode(
 
     /* r5 = (uint) r1 */
     gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[5]);
-    gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[1]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[1]);
 
     gcsSOURCE_InitializeTargetFormat(convSource, intermTarget->dataType);
     status = _EmitCode(Compiler,
@@ -4597,10 +4949,10 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* r5 = ((uint)r1) + 0x1 */
-    gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[5]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[5]);
 
     clsIOPERAND_New(Compiler, &tempIOperand[1], clmGenCodeDataType(T_UINT));
-    gcsSOURCE_InitializeUsingIOperand(convSource, &tempIOperand[1]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, convSource, &tempIOperand[1]);
     gcsTARGET_InitializeUsingIOperand(Compiler, convTarget, &tempIOperand[1]);
 
     status = _EmitCode(Compiler,
@@ -4634,7 +4986,7 @@ _EmitIntToFloatCode(
 
     /* r3 = int(r4) */
     gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[3]);
-    gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[4]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[4]);
     status = _EmitCode(Compiler,
                        LineNo,
                        StringNo,
@@ -4645,7 +4997,7 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* r3 = r3 - r0 */
-    gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[3]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[3]);
     status = _EmitCode(Compiler,
                        LineNo,
                        StringNo,
@@ -4665,7 +5017,7 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* r0 = r0 - r2 */
-    gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[2]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[2]);
     status = _EmitCode(Compiler,
                        LineNo,
                        StringNo,
@@ -4691,7 +5043,7 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* r3 != r0 ? */
-    gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[3]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[3]);
     status = clEmitCompareBranchCode(Compiler,
                                      LineNo,
                                      StringNo,
@@ -4708,7 +5060,7 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     /* r0 = r4 & 0x1 */
-    gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[4]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[4]);
     status = _EmitCode(Compiler,
                        LineNo,
                        StringNo,
@@ -4742,7 +5094,7 @@ _EmitIntToFloatCode(
 
     /* r4 is even, pick r4 */
     gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[1]);
-    gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[4]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[4]);
     status = _EmitCode(Compiler,
                        LineNo,
                        StringNo,
@@ -4809,7 +5161,7 @@ _EmitIntToFloatCode(
                           gcvNULL);
        if (gcmIS_ERROR(status)) return status;
 
-       gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[3]);
+       gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[3]);
        gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[3]);
        status = _EmitCode(Compiler,
                           LineNo,
@@ -4831,7 +5183,7 @@ _EmitIntToFloatCode(
     }
 
     /* r3 >= r0 ? */
-    gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[3]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[3]);
 
     status = clEmitCompareBranchCode(Compiler,
                                      LineNo,
@@ -4850,7 +5202,7 @@ _EmitIntToFloatCode(
 
     /* r4 is nearer, pick r4 */
     gcsTARGET_InitializeUsingIOperand(Compiler, intermTarget, &intermIOperands[1]);
-    gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[4]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[4]);
     status = _EmitCode(Compiler,
                        LineNo,
                        StringNo,
@@ -4912,7 +5264,7 @@ _EmitIntToFloatCode(
                                   &selectionContextIntConv);
     if (gcmIS_ERROR(status)) return status;
 
-    gcsSOURCE_InitializeUsingIOperand(intermSource, &intermIOperands[1]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, &intermIOperands[1]);
     return  _EmitCode(Compiler,
                       LineNo,
                       StringNo,
@@ -4996,7 +5348,7 @@ _EmitFloatToIntCode(
                               gcvNULL);
            if (gcmIS_ERROR(status)) return status;
 
-           gcsSOURCE_InitializeUsingIOperand(intermSource, intermIOperand);
+           gcsSOURCE_InitializeUsingIOperand(Compiler, intermSource, intermIOperand);
            gcsSOURCE_InitializeTargetFormat(format, Target->dataType);
            status = _EmitCode(Compiler,
                               LineNo,
@@ -5516,7 +5868,7 @@ _EmitNORM2Code(
     /* rsq t1, t0 */
     clsIOPERAND_New(Compiler, &intermIOperands[1], clmGenCodeDataType(T_FLOAT));
     gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[1], &intermIOperands[1]);
-    gcsSOURCE_InitializeUsingIOperand(&intermSources[0], &intermIOperands[0]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[0], &intermIOperands[0]);
 
     status = _EmitCode(Compiler,
                LineNo,
@@ -5529,7 +5881,7 @@ _EmitNORM2Code(
     if (gcmIS_ERROR(status)) return status;
 
     /* mul target, source, t1 */
-    gcsSOURCE_InitializeUsingIOperand(&intermSources[1], &intermIOperands[1]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[1], &intermIOperands[1]);
 
     status = _EmitCode(
                     Compiler,
@@ -5580,7 +5932,7 @@ _EmitNORM4Code(
     /* rsq t1, t0 */
     clsIOPERAND_New(Compiler, &intermIOperands[1], clmGenCodeDataType(T_FLOAT));
     gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[1], &intermIOperands[1]);
-    gcsSOURCE_InitializeUsingIOperand(&intermSources[0], &intermIOperands[0]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[0], &intermIOperands[0]);
 
     status = _EmitCode(
                     Compiler,
@@ -5594,7 +5946,7 @@ _EmitNORM4Code(
     if (gcmIS_ERROR(status)) return status;
 
     /* mul target, source, t1 */
-    gcsSOURCE_InitializeUsingIOperand(&intermSources[1], &intermIOperands[1]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[1], &intermIOperands[1]);
 
     status = _EmitCode(
                     Compiler,
@@ -6048,7 +6400,7 @@ _EmitMulForDivCode(
         if (gcmIS_ERROR(status)) return status;
 
         /* floor target, t0 */
-        gcsSOURCE_InitializeUsingIOperand(&intermSource, &intermIOperand);
+        gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSource, &intermIOperand);
 
         status = _EmitCode(Compiler,
                    LineNo,
@@ -6147,7 +6499,7 @@ _EmitDivCode(
         if (gcmIS_ERROR(status)) return status;
 
         /* mul target, source0, t0 */
-        gcsSOURCE_InitializeUsingIOperand(&intermSource, &intermIOperand);
+        gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSource, &intermIOperand);
 
         status = _EmitMulForDivCode(
                                     Compiler,
@@ -6220,7 +6572,7 @@ _EmitScalarAtan2Code(
     if (gcmIS_ERROR(status)) return status;
 
     /* mul target, t0, _HALF_PI */
-    gcsSOURCE_InitializeUsingIOperand(&intermSources[0], &intermIOperands[0]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[0], &intermIOperands[0]);
     gcsSOURCE_InitializeFloatConstant(&constSource, _HALF_PI);
 
     status = _EmitCode(
@@ -6266,7 +6618,7 @@ _EmitScalarAtan2Code(
     /* abs t2, t1 */
     clsIOPERAND_New(Compiler, &intermIOperands[2], Source0->dataType);
     gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[2], &intermIOperands[2]);
-    gcsSOURCE_InitializeUsingIOperand(&intermSources[1], &intermIOperands[1]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[1], &intermIOperands[1]);
 
     status = _EmitCode(
                         Compiler,
@@ -6282,7 +6634,7 @@ _EmitScalarAtan2Code(
     /* atan t3, t2 */
     clsIOPERAND_New(Compiler, &intermIOperands[3], Source0->dataType);
     gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[3], &intermIOperands[3]);
-    gcsSOURCE_InitializeUsingIOperand(&intermSources[2], &intermIOperands[2]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[2], &intermIOperands[2]);
 
     status = _EmitCode(
                         Compiler,
@@ -6358,7 +6710,7 @@ _EmitScalarAtan2Code(
     clsIOPERAND_New(Compiler, &intermIOperands[4], Source0->dataType);
     gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[4], &intermIOperands[4]);
     gcsSOURCE_InitializeFloatConstant(&constSource, _PI);
-    gcsSOURCE_InitializeUsingIOperand(&intermSources[3], &intermIOperands[3]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[3], &intermIOperands[3]);
 
     status = _EmitCode(
                         Compiler,
@@ -6372,8 +6724,8 @@ _EmitScalarAtan2Code(
     if (gcmIS_ERROR(status)) return status;
 
     /* mul target, t0, t4 */
-    gcsSOURCE_InitializeUsingIOperand(&intermSources[0], &intermIOperands[0]);
-    gcsSOURCE_InitializeUsingIOperand(&intermSources[4], &intermIOperands[4]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[0], &intermIOperands[0]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[4], &intermIOperands[4]);
 
     status = _EmitCode(
                         Compiler,
@@ -6451,8 +6803,8 @@ _EmitScalarAtan2Code(
     if (gcmIS_ERROR(status)) return status;
 
     /* mul target, t0, t3 */
-    gcsSOURCE_InitializeUsingIOperand(&intermSources[0], &intermIOperands[0]);
-    gcsSOURCE_InitializeUsingIOperand(&intermSources[3], &intermIOperands[3]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[0], &intermIOperands[0]);
+    gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[3], &intermIOperands[3]);
 
     status = _EmitCode(
                         Compiler,
@@ -6754,7 +7106,7 @@ _EmitAtan2Code(
         /* abs t2, t1 */
         clsIOPERAND_New(Compiler, &intermIOperands[2], Source0->dataType);
         gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[2], &intermIOperands[2]);
-        gcsSOURCE_InitializeUsingIOperand(&intermSources[1], &intermIOperands[1]);
+        gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[1], &intermIOperands[1]);
 
         status = _EmitCode(Compiler,
                    LineNo,
@@ -6768,7 +7120,7 @@ _EmitAtan2Code(
         /* atan t3, t2 */
         clsIOPERAND_New(Compiler, &intermIOperands[3], Source0->dataType);
         gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[3], &intermIOperands[3]);
-        gcsSOURCE_InitializeUsingIOperand(&intermSources[2], &intermIOperands[2]);
+        gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[2], &intermIOperands[2]);
 
         status = _EmitCode(Compiler,
                    LineNo,
@@ -6783,7 +7135,7 @@ _EmitAtan2Code(
         clsIOPERAND_New(Compiler, &intermIOperands[4], Source0->dataType);
         gcsTARGET_InitializeUsingIOperand(Compiler, &intermTargets[4], &intermIOperands[4]);
         gcsSOURCE_InitializeFloatConstant(&constSource, _PI);
-        gcsSOURCE_InitializeUsingIOperand(&intermSources[3], &intermIOperands[3]);
+        gcsSOURCE_InitializeUsingIOperand(Compiler, &intermSources[3], &intermIOperands[3]);
 
         status = _EmitCode(Compiler,
                    LineNo,
@@ -7006,6 +7358,7 @@ _EmitVectorCompareCode(
                            Target);
     if (gcmIS_ERROR(status)) return status;
 
+    /* CMP does not support int8 nor int16 */
     if (Source0)
     {
         sourceType = Source0->dataType.elementType;
@@ -8568,7 +8921,7 @@ IN clsNAME *FuncName
    /* Add required work group size */
    status = gcKERNEL_FUNCTION_AddKernelFunctionProperties(FuncName->context.u.variable.u.kernelFunction,
                                                             gcvPROPERTY_REQD_WORK_GRP_SIZE,
-                                                            sizeof(FuncName->u.funcInfo.reqdWorkGroupSize)/sizeof(gctINT),
+                                                            (sizeof(FuncName->u.funcInfo.reqdWorkGroupSize) + sizeof(gctINT) - 1)/sizeof(gctINT),
                                                             (gctINT *)FuncName->u.funcInfo.reqdWorkGroupSize
                                                             );
    if(gcmIS_ERROR(status)) return status;
@@ -8576,9 +8929,17 @@ IN clsNAME *FuncName
    /* Add work group size hint */
    status = gcKERNEL_FUNCTION_AddKernelFunctionProperties(FuncName->context.u.variable.u.kernelFunction,
                                                             gcvPROPERTY_WORK_GRP_SIZE_HINT,
-                                                            sizeof(FuncName->u.funcInfo.workGroupSizeHint)/sizeof(gctINT),
+                                                            (sizeof(FuncName->u.funcInfo.workGroupSizeHint) + sizeof(gctINT) - 1)/sizeof(gctINT),
                                                             (gctINT *)FuncName->u.funcInfo.workGroupSizeHint
                                                             );
+   if(gcmIS_ERROR(status)) return status;
+
+   /* Add kernel scale hint */
+   status = gcKERNEL_FUNCTION_AddKernelFunctionProperties(FuncName->context.u.variable.u.kernelFunction,
+                                                          gcvPROPERTY_KERNEL_SCALE_HINT,
+                                                          (sizeof(FuncName->u.funcInfo.kernelScaleHint) + sizeof(gctINT) - 1)/sizeof(gctINT),
+                                                          (gctINT *)FuncName->u.funcInfo.kernelScaleHint
+                                                          );
    if(gcmIS_ERROR(status)) return status;
 
    return status;

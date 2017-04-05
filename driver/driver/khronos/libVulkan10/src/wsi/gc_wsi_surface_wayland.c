@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -253,7 +253,6 @@ static VkResult waylandGetPhysicalDeviceSurfaceSupport(
 
     *pSupported = VK_FALSE;
 
-    /* TODO: Add present surface tests for present support */
     if (queueFamilyIndex <= phyDev->queueFamilyCount)
     {
         *pSupported = phyDev->queuePresentSupported[queueFamilyIndex];
@@ -509,7 +508,6 @@ static VkResult __CreateImageBuffer(
         image = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->resolveTarget);
         surfNode = &image->memory->node;
 
-        /* TODO: Caluculate stride. */
         alignedWidth  = (sc->imageExtent.width + 15) & ~15;
 
         switch (sc->imageFormat)
@@ -568,7 +566,10 @@ static VkResult __CreateImageBuffer(
             gcvSURF_BITMAP,
             node,
             surfNode->pool,
-            surfNode->size);
+            surfNode->size,
+            0,
+            0,
+            0);
 
         wl_buffer_add_listener(imageBuffer->wl_buf, &buffer_listener, imageBuffer);
 
@@ -786,14 +787,12 @@ static VkResult __AcquireNextImage(
 
     if (semaphore)
     {
-        /* TODO: semaphore. */
         /* Set to signaled by CPU. */
         __vk_SetSemaphore(device, semaphore, VK_TRUE);
     }
 
     if (fence)
     {
-        /* TODO: fence. */
         /* Set to signaled by CPU. */
         __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
         gcoOS_Signal(gcvNULL, fce->signal, VK_TRUE);
@@ -874,8 +873,6 @@ static VkResult __CommitPresentCommand(
 
     __VK_ONERROR(__vk_CommitStateBuffers(queue, &commitInfo, 1));
 
-    /* Create fence sync. */
-    /* TODO: Better to use a thread. */
 #if __VK_NEW_DEVICE_QUEUE
     __vk_QueueWaitIdle(queue);
 #else
@@ -1148,7 +1145,6 @@ VkResult VKAPI_CALL __vk_CreateWaylandSurfaceKHR(
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&inst->memCb);
 
-    /* TODO: VkSurfaceKHR should be object type. */
     surf = (VkIcdSurfaceWayland *)__VK_ALLOC(sizeof(VkIcdSurfaceWayland), 8, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
 
     if (!surf)

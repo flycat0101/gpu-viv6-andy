@@ -171,12 +171,7 @@ $(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
 
 LIBS += GAL $(STATIC_LIBS)
 
-ifneq ($(filter v7, $(VARIANT_LIST)), v7)
-	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp
-	LIBS += m-vfp
-else
-	LIBS += m
-endif
+include $(qnx_build_dir)/math.mk
 
 LDFLAGS += -Wl,--version-script=$(driver_root)/compiler/libVSC/libVSC.map
 

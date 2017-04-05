@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -224,9 +224,21 @@ typedef struct __vkPipelineRec
     uint32_t blendAttachmentCount;
     VkPipelineColorBlendAttachmentState *blendAttachments;
 
+    uint32_t patchControlPoints;
+
     void *chipPriv;
 
 } __vkPipeline;
+
+typedef VkResult (*VK_DRAW_INDEXED_FUNC)(VkCommandBuffer commandBuffer, uint32_t indexCount, uint32_t instanceCount, uint32_t firstIndex, int32_t vertexOffset, uint32_t firstInstance);
+typedef struct __vkSplitPatchListParamsRec
+{
+    uint32_t indexSize;
+    uint32_t indexBufferSize;
+    uint32_t bytesPerPatch;
+    uint32_t splitBytesPerPatch;
+    uint32_t alignBytes;
+}__vkSplitPathListParams;
 
 
 #endif /* __gc_vk_pipeline_h__ */

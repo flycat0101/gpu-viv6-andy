@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -108,11 +108,11 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
     primBegin->primType = mode;
     primBegin->vertexCount = count;
     primBegin->primCount = 1;
-    primBegin->primInputMask = pV->arrayEnabled;
+    primBegin->primInputMask = pV->attribEnabled;
 
     /* Allocate edgeflagBuffer if it is needed */
     if ((mode == GL_TRIANGLES || mode == GL_QUADS || mode == GL_POLYGON || mode == GL_TRIANGLES_ADJACENCY_EXT) &&
-        (pV->arrayEnabled & __GL_VARRAY_EDGEFLAG))
+        (pV->attribEnabled & __GL_VARRAY_EDGEFLAG))
     {
         primBegin->edgeflagBuffer = (GLubyte *)(*gc->imports.malloc)(gc, count * sizeof(GLubyte) );
         if (primBegin->edgeflagBuffer == NULL) {
@@ -149,7 +149,7 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
     ** for ArrayElement so that elemOffsetDW[] match the copied element data in buffer.
     */
 
-    if (pV->arrayEnabled & __GL_VARRAY_NORMAL) {
+    if (pV->attribEnabled & __GL_VARRAY_NORMAL) {
         size = 3;
         primBegin->primitiveFormat |= __GL_N3F_BIT;
         __GL_PRIM_ELEMENT(primBegin->primElemSequence, __GL_N3F_TAG);
@@ -159,7 +159,7 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
         offset += size;
     }
 
-    if (pV->arrayEnabled & __GL_VARRAY_DIFFUSE) {
+    if (pV->attribEnabled & __GL_VARRAY_DIFFUSE) {
         switch (pV->color.size) {
         case 3:
             if (pV->color.type == GL_BYTE || pV->color.type == GL_UNSIGNED_BYTE) {
@@ -194,7 +194,7 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
         offset += size;
     }
 
-    if (pV->arrayEnabled & __GL_VARRAY_SPECULAR) {
+    if (pV->attribEnabled & __GL_VARRAY_SPECULAR) {
         size = 3;
         primBegin->primitiveFormat |= __GL_SC3F_BIT;
         __GL_PRIM_ELEMENT(primBegin->primElemSequence, __GL_SC3F_TAG);
@@ -204,7 +204,7 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
         offset += size;
     }
 
-    if (pV->arrayEnabled & __GL_VARRAY_FOGCOORD) {
+    if (pV->attribEnabled & __GL_VARRAY_FOGCOORD) {
         size = 1;
         primBegin->primitiveFormat |= __GL_FOG1F_BIT;
         __GL_PRIM_ELEMENT(primBegin->primElemSequence, __GL_FOG1F_TAG);
@@ -214,8 +214,8 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
         offset += size;
     }
 
-    if (pV->arrayEnabled & __GL_VARRAY_TEXTURES) {
-        mask = (pV->arrayEnabled & __GL_VARRAY_TEXTURES) >> __GL_VARRAY_TEX0_INDEX;
+    if (pV->attribEnabled & __GL_VARRAY_TEXTURES) {
+        mask = (pV->attribEnabled & __GL_VARRAY_TEXTURES) >> __GL_VARRAY_TEX0_INDEX;
         i = 0;
         while (mask) {
             if (mask & 0x1) {
@@ -252,13 +252,13 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
     }
 
 
-    if (primBegin->edgeflagBuffer && (pV->arrayEnabled & __GL_VARRAY_EDGEFLAG)) {
+    if (primBegin->edgeflagBuffer && (pV->attribEnabled & __GL_VARRAY_EDGEFLAG)) {
         primBegin->primitiveFormat |= __GL_EDGEFLAG_BIT;
         __GL_PRIM_ELEMENT(primBegin->primElemSequence, __GL_EDGEFLAG_TAG);
     }
 
-    if (pV->arrayEnabled & __GL_VARRAY_ATTRIBUTES) {
-        mask = (pV->arrayEnabled & __GL_VARRAY_ATTRIBUTES) >> __GL_VARRAY_ATT0_INDEX;
+    if (pV->attribEnabled & __GL_VARRAY_ATTRIBUTES) {
+        mask = (pV->attribEnabled & __GL_VARRAY_ATTRIBUTES) >> __GL_VARRAY_ATT0_INDEX;
         i = 0;
         while (mask) {
             if (mask & 0x1) {
@@ -275,7 +275,7 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
         }
     }
 
-    if (pV->arrayEnabled & __GL_VARRAY_ATT0) {
+    if (pV->attribEnabled & __GL_VARRAY_ATT0) {
         switch (pV->attribute[0].size) {
         case 1:
         case 2:
@@ -301,7 +301,7 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
         primBegin->elemOffsetDW[__GL_VARRAY_VERTEX_INDEX] = offset;
         offset += size;
     }
-    else if (pV->arrayEnabled & __GL_VARRAY_VERTEX)
+    else if (pV->attribEnabled & __GL_VARRAY_VERTEX)
     {
         switch (pV->vertex.size) {
         case 2:
@@ -331,7 +331,7 @@ GLvoid __glComputeArrayPrimBegin(__GLcontext *gc, GLenum mode, GLsizei count, __
     /* Skip optimized arrayElement function if there are varrays in bufferObject */
 
     gc->vertexArray.optdlArrayElement = NULL;
-    if ((pV->arrayInBufObj & pV->arrayEnabled) == 0)
+    if ((pV->arrayInBufObj & pV->attribEnabled) == 0)
     {
         switch (primBegin->primElemSequence)
         {
@@ -426,7 +426,7 @@ GLvoid APIENTRY __gllc_DrawElements(__GLcontext *gc, GLenum mode, GLsizei count,
     ** Just return if vertex array is not enabled since
     ** vertex state is undefined after DrawElements.
     */
-    if (!(pV->arrayEnabled & __GL_VARRAY_VERTEX)) {
+    if (!(pV->attribEnabled & __GL_VARRAY_VERTEX)) {
         return;
     }
 
@@ -640,7 +640,7 @@ GLvoid APIENTRY __gllc_DrawArrays(__GLcontext *gc, GLenum mode, GLint first, GLs
     ** Just return if vertex array is not enabled since
     ** vertex state is undefined after DrawElements.
     */
-    if (!(pV->arrayEnabled & __GL_VARRAY_VERTEX)) {
+    if (!(pV->attribEnabled & __GL_VARRAY_VERTEX)) {
         return;
     }
 

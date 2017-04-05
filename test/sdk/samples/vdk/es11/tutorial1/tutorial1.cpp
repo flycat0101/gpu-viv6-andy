@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -201,9 +201,9 @@ bool InitGLES()
     // origin with 100 units of edge.
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    glOrthox(FixedFromInt(-50), FixedFromInt(50),
-             FixedFromInt(-50), FixedFromInt(50),
-             FixedFromInt(-50), FixedFromInt(50));
+    glOrthox(FixedFromInt(-50u), FixedFromInt(50),
+             FixedFromInt(-50u), FixedFromInt(50),
+             FixedFromInt(-50u), FixedFromInt(50));
 
     // Select modelview matrix.
     glMatrixMode(GL_MODELVIEW);
@@ -224,7 +224,7 @@ void Render()
 
     // Translate and rotate the triangle.
     glLoadIdentity();
-    glTranslatex(ZERO, ZERO, FixedFromInt(-10));
+    glTranslatex(ZERO, ZERO, FixedFromInt(-10u));
     glRotatex(FixedFromInt(rotation++), ZERO, ONE, ZERO);
 
     // Enable the vertex array.

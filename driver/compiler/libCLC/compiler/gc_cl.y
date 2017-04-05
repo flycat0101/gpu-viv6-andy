@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -27,12 +27,6 @@
 
 #define yylex cloCOMPILER_Lex
 int yylex(YYSTYPE * pyylval, cloCOMPILER Compiler);
-
-#define YYFPRINTF  clfprintf
-static int clfprintf(FILE *file, const char * msg, ...) {
-    /* Do nothing */
-    return 0;
-}
 
 %}
 
@@ -127,6 +121,7 @@ static int clfprintf(FILE *file, const char * msg, ...) {
 			T_ATTRIBUTE__
 			T_REQD_WORK_GROUP_SIZE
 			T_WORK_GROUP_SIZE_HINT
+			T_KERNEL_SCALE_HINT
 			T_ALWAYS_INLINE
 			T_UNSIGNED
 
@@ -134,6 +129,7 @@ static int clfprintf(FILE *file, const char * msg, ...) {
 			T_TYPEDEF T_ENUM T_INLINE
 			T_SIZEOF T_TYPE_CAST
 			T_VEC_STEP
+			T_TYPEOF
 
 %token<token>           T_VERY_LAST_TERMINAL
 /* types */
@@ -165,7 +161,7 @@ static int clfprintf(FILE *file, const char * msg, ...) {
 
 %type<dataType>		struct_union_specifier enum_specifier tags
 
-%type<decl>		fully_specified_type type_specifier type_cast
+%type<decl>		fully_specified_type type_specifier type_cast typeof_type_specifier
 
 %type<fieldDeclList>	struct_declarator_list
 
@@ -281,7 +277,7 @@ type_cast :
 	'(' fully_specified_type ')'
 		{ $$ = $2; }
 	| '(' fully_specified_type pointer ')'
-		{ $$ = clParseCreateDecl(Compiler, &$2, $3); }
+		{ $$ = clParseCreateDecl(Compiler, &$2, $3, gcvNULL); }
 	;
 
 function_call_header :
@@ -785,6 +781,8 @@ attribute :
 		{ $$ = clParseAttributeReqdWorkGroupSize(Compiler, $<attr>0, $3, $5, $7); }
 	| T_WORK_GROUP_SIZE_HINT '(' constant_expression ',' constant_expression ',' constant_expression ')'
 		{ $$ = clParseAttributeWorkGroupSizeHint(Compiler, $<attr>0, $3, $5, $7); }
+	| T_KERNEL_SCALE_HINT '(' constant_expression ',' constant_expression ',' constant_expression ')'
+		{ $$ = clParseAttributeKernelScaleHint(Compiler, $<attr>0, $3, $5, $7); }
 	| T_ALIGNED
 		{ $$ = clParseAttributeAligned(Compiler, $<attr>0, gcvNULL); }
 	| T_ALIGNED '(' constant_expression ')'
@@ -793,11 +791,28 @@ attribute :
 		{ $$ = clParseSimpleAttribute(Compiler, &$1, clvATTR_ALWAYS_INLINE, $<attr>0); }
 	;
 
+typeof_type_specifier :
+	fully_specified_type
+		{ $$ = clParseCreateDecl(Compiler, &$1, gcvNULL, gcvNULL); }
+	| fully_specified_type '[' constant_expression ']'
+		{ $$ = clParseCreateDecl(Compiler, &$1, gcvNULL, $3); }
+	| fully_specified_type pointer
+		{ $$ = clParseCreateDecl(Compiler, &$1, $2, gcvNULL); }
+	| fully_specified_type pointer '[' constant_expression ']'
+		{ $$ = clParseCreateDecl(Compiler, &$1, $2, $4); }
+	| '(' fully_specified_type pointer ')' '[' constant_expression ']'
+		{ $$ = clParseCreateDecl(Compiler, &$2, $3, $6); }
+        |  expression
+		{ $$ = clParseCreateDeclFromExpression(Compiler, $1); }
+	;
+
 fully_specified_type :
 	type_specifier
                 { $$ = clParseQualifiedType(Compiler, gcvNULL, gcvFALSE, &$1); }
 	| type_qualifier_list type_specifier
                 { $$ = clParseQualifiedType(Compiler, $1, gcvFALSE, &$2); }
+	| T_TYPEOF '(' typeof_type_specifier ')'
+                { $$ = $3; }
 	;
 
 type_qualifier :

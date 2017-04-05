@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -30,6 +30,7 @@
 #include "vir/transform/gc_vsc_vir_inline.h"
 #include "vir/transform/gc_vsc_vir_fcp.h"
 #include "vir/transform/gc_vsc_vir_loop.h"
+#include "vir/transform/gc_vsc_vir_cfo.h"
 #include "vir/transform/gc_vsc_vir_uniform.h"
 #include "vir/transform/gc_vsc_vir_static_patch.h"
 #include "vir/transform/gc_vsc_vir_vectorization.h"
@@ -608,8 +609,8 @@ static VSC_ErrCode _PreprocessShader(VSC_SHADER_PASS_MANAGER* pShPassMnger)
     /* Set PM level firstly */
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_PRE);
 
-    CALL_SH_PASS(vscVIR_VX_ReplaceDest, gcvNULL);
-    CALL_SH_PASS(vscVIR_RemoveNop, gcvNULL);
+    CALL_SH_PASS(vscVIR_VX_ReplaceDest, 0, gcvNULL);
+    CALL_SH_PASS(vscVIR_RemoveNop, 0, gcvNULL);
 
 OnError:
     return errCode;
@@ -623,7 +624,7 @@ static VSC_ErrCode _PostprocessShader(VSC_SHADER_PASS_MANAGER*   pShPassMnger,
     /* Set PM level firstly */
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_PST);
 
-    CALL_SH_PASS(vscVIR_PerformSEPBackPatch, pOutSEP);
+    CALL_SH_PASS(vscVIR_PerformSEPBackPatch, 0, pOutSEP);
 
 OnError:
     return VSC_ERR_NONE;
@@ -640,7 +641,7 @@ static VSC_ErrCode _CompileShaderAtHighLevel(VSC_SHADER_PASS_MANAGER* pShPassMng
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_HL);
 
     /* Call (schedule) passes of HL by ourselves */
-    CALL_SH_PASS(VIR_Lower_HighLevel_To_HighLevel_Expand, gcvNULL);
+    CALL_SH_PASS(VIR_Lower_HighLevel_To_HighLevel_Expand, 0, gcvNULL);
 
     /* We are at end of HL of VIR, so set this correct level */
     VIR_Shader_SetLevel(pShader, VIR_SHLEVEL_Post_High);
@@ -653,20 +654,22 @@ static VSC_ErrCode _CompileShaderAtMedLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_Shader*         pShader = (VIR_Shader*)pShPassMnger->pCompilerParam->hShader;
-    VIR_CHECK_VAR_USAGE checkVarUsage = { gcvTRUE, gcvTRUE, gcvTRUE, gcvTRUE, gcvFALSE};
+    VIR_CHECK_VAR_USAGE checkVarUsage = { gcvTRUE, gcvTRUE, gcvFALSE, gcvFALSE, gcvFALSE};
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_Medium ||
               VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Post_High);
 
     /* Lower HL to ML firstly */
-    CALL_SH_PASS(VIR_Lower_HighLevel_To_MiddleLevel, gcvNULL);
+    CALL_SH_PASS(VIR_Lower_HighLevel_To_MiddleLevel, 0, gcvNULL);
 
     /* It must be called after lower */
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_ML);
 
     /* Call (schedule) passes of ML by ourselves */
-    CALL_SH_PASS(VSC_SCPP_PerformOnShader, gcvNULL);
-    CALL_SH_PASS(vscVIR_CheckVariableUsage, &checkVarUsage);
+    CALL_SH_PASS(vscVIR_CheckVariableUsage, 0, &checkVarUsage);
+
+    /* Fix the texld offset */
+    CALL_SH_PASS(vscVIR_FixTexldOffset, 0, gcvNULL);
 
     /* We are at end of ML of VIR, so set this correct level */
     VIR_Shader_SetLevel(pShader, VIR_SHLEVEL_Post_Medium);
@@ -679,37 +682,39 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
     VIR_Shader*         pShader = (VIR_Shader*)pShPassMnger->pCompilerParam->hShader;
-    gctBOOL             bRAEnabled = VSC_OPTN_RAOptions_GetSwitchOn(VSC_OPTN_Options_GetRAOptions(pShPassMnger->basePM.pOptions));
+    gctBOOL             bRAEnabled = VSC_OPTN_RAOptions_GetSwitchOn(VSC_OPTN_Options_GetRAOptions(pShPassMnger->basePM.pOptions, 0));
     gctBOOL             bGlobalCPP = gcvTRUE;
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_Low ||
               VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Post_Medium);
 
     /* Link intrinsic functions. */
-    CALL_SH_PASS(VIR_LinkInternalLibFunc, gcvNULL);
+    CALL_SH_PASS(VIR_LinkInternalLibFunc, 0, gcvNULL);
 
     /* Lower ML to LL firstly */
-    CALL_SH_PASS(VIR_Lower_MiddleLevel_To_LowLevel, &bRAEnabled);
+    CALL_SH_PASS(VIR_Lower_MiddleLevel_To_LowLevel, 0, &bRAEnabled);
 
     /* It must be called after lower */
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_LL);
 
     /* Call (schedule) passes of LL by ourselves */
-    CALL_SH_PASS(vscVIR_PreprocessLLShader, gcvNULL);
-    CALL_SH_PASS(VIR_LoopOpts_PerformOnShader, gcvNULL);
-    CALL_SH_PASS(VSC_IL_PerformOnShader, gcvNULL);
-    CALL_SH_PASS(vscVIR_ConvertVirtualInstructions, gcvNULL);
-    CALL_SH_PASS(VSC_CPF_PerformOnShader, gcvNULL);
-    CALL_SH_PASS(VSC_SIMP_Simplification_PerformOnShader, gcvNULL);
-    CALL_SH_PASS(vscVIR_InitializeVariables, gcvNULL);
-    CALL_SH_PASS(VSC_CPP_PerformOnShader, &bGlobalCPP);
-    CALL_SH_PASS(VSC_SCL_Scalarization_PerformOnShader, gcvNULL);
-    CALL_SH_PASS(VSC_PH_Peephole_PerformOnShader, gcvNULL);
-    CALL_SH_PASS(VSC_LCSE_PerformOnShader, gcvNULL);
-    CALL_SH_PASS(VSC_DCE_Perform, gcvNULL);
-    CALL_SH_PASS(vscVIR_AdjustPrecision, gcvNULL);
-    CALL_SH_PASS(vscVIR_DoLocalVectorization, gcvNULL);
-    CALL_SH_PASS(vscVIR_AddOutOfBoundCheckSupport, gcvNULL);
+    CALL_SH_PASS(vscVIR_PreprocessLLShader, 0, gcvNULL);
+    CALL_SH_PASS(VSC_SCPP_PerformOnShader, 0, gcvNULL);
+    CALL_SH_PASS(VIR_LoopOpts_PerformOnShader, 0, gcvNULL);
+    CALL_SH_PASS(VIR_CFO_PerformOnShader, 0, gcvNULL);
+    CALL_SH_PASS(VSC_IL_PerformOnShader, 0, gcvNULL);
+    CALL_SH_PASS(vscVIR_ConvertVirtualInstructions, 0, gcvNULL);
+    CALL_SH_PASS(VSC_CPF_PerformOnShader, 0, gcvNULL);
+    CALL_SH_PASS(VSC_SIMP_Simplification_PerformOnShader, 0, gcvNULL);
+    CALL_SH_PASS(vscVIR_InitializeVariables, 0, gcvNULL);
+    CALL_SH_PASS(VSC_CPP_PerformOnShader, 0, &bGlobalCPP);
+    CALL_SH_PASS(VSC_SCL_Scalarization_PerformOnShader, 0, gcvNULL);
+    CALL_SH_PASS(VSC_PH_Peephole_PerformOnShader, 0, gcvNULL);
+    CALL_SH_PASS(VSC_LCSE_PerformOnShader, 0, gcvNULL);
+    CALL_SH_PASS(VSC_DCE_Perform, 0, gcvNULL);
+    CALL_SH_PASS(vscVIR_AdjustPrecision, 0, gcvNULL);
+    CALL_SH_PASS(vscVIR_DoLocalVectorization, 0, gcvNULL);
+    CALL_SH_PASS(vscVIR_AddOutOfBoundCheckSupport, 0, gcvNULL);
 
     /* We are at the end of LL of VIR, so set this correct level */
     VIR_Shader_SetLevel(pShader, VIR_SHLEVEL_Post_Low);
@@ -728,7 +733,7 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_SHADER_PASS_MANAGER* pShPassMnger
               VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Post_Low);
 
     /* Lower LL to MC firstly */
-    CALL_SH_PASS(VIR_Lower_LowLevel_To_MachineCodeLevel, gcvNULL);
+    CALL_SH_PASS(VIR_Lower_LowLevel_To_MachineCodeLevel, 0, gcvNULL);
 
     /* It must be called after lower */
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_MC);
@@ -736,13 +741,13 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_SHADER_PASS_MANAGER* pShPassMnger
     /* Call (schedule) passes of MC by ourselves. Note we can only call these passes when new-CG is on */
     if (gcUseFullNewLinker(pShPassMnger->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2))
     {
-        CALL_SH_PASS(vscVIR_PerformSpecialHwPatches, gcvNULL);
-        CALL_SH_PASS(VIR_Shader_CheckDual16able, gcvNULL);
-        CALL_SH_PASS(vscVIR_PutScalarConstToImm, gcvNULL);
-        CALL_SH_PASS(vscVIR_PutImmValueToUniform, gcvNULL);
-        CALL_SH_PASS(vscVIR_CheckPosAndDepthConflict, gcvNULL);
-        CALL_SH_PASS(VSC_CPP_PerformOnShader, &bGlobalCPP);
-        CALL_SH_PASS(VSC_DCE_Perform, gcvNULL);
+        CALL_SH_PASS(vscVIR_PerformSpecialHwPatches, 0, gcvNULL);
+        CALL_SH_PASS(VIR_Shader_CheckDual16able, 0, gcvNULL);
+        CALL_SH_PASS(vscVIR_PutScalarConstToImm, 0, gcvNULL);
+        CALL_SH_PASS(vscVIR_PutImmValueToUniform, 0, gcvNULL);
+        CALL_SH_PASS(vscVIR_CheckPosAndDepthConflict, 0, gcvNULL);
+        CALL_SH_PASS(VSC_CPP_PerformOnShader, 1, &bGlobalCPP);
+        CALL_SH_PASS(VSC_DCE_Perform, 1, gcvNULL);
     }
 
     /* We are at end of MC level of VIR, so set this correct level */
@@ -756,32 +761,30 @@ static VSC_ErrCode _PerformCodegen(VSC_SHADER_PASS_MANAGER*   pShPassMnger,
                                    SHADER_EXECUTABLE_PROFILE* pOutSEP)
 {
     VSC_ErrCode         errCode = VSC_ERR_NONE;
-    gctUINT             isMode;
-    gctBOOL             bRAEnabled = VSC_OPTN_RAOptions_GetSwitchOn(VSC_OPTN_Options_GetRAOptions(pShPassMnger->basePM.pOptions));
+    gctBOOL             bRAEnabled = VSC_OPTN_RAOptions_GetSwitchOn(VSC_OPTN_Options_GetRAOptions(pShPassMnger->basePM.pOptions, 0));
 
     /* Set PM level firstly */
     vscPM_SetCurPassLevel(&pShPassMnger->basePM, VSC_PASS_LEVEL_CG);
 
     /* Call (schedule) passes of CG by ourselves */
-    CALL_SH_PASS(vscVIR_PreCleanup, &bRAEnabled);
-    CALL_SH_PASS(VIR_RA_PerformUniformAlloc, gcvNULL);
-    CALL_SH_PASS(vscVIR_CheckCstRegFileReadPortLimitation, gcvNULL);
+    CALL_SH_PASS(vscVIR_PreCleanup, 0, &bRAEnabled);
+    CALL_SH_PASS(vscVIR_CheckEvisInstSwizzleRestriction, 0, gcvNULL);
+    CALL_SH_PASS(VIR_RA_PerformUniformAlloc, 0, gcvNULL);
+    CALL_SH_PASS(vscVIR_CheckCstRegFileReadPortLimitation, 0, gcvNULL);
 
-    isMode = PRE_PASS_IS;
-    CALL_SH_PASS(VSC_IS_InstSched_PerformOnShader, &isMode);
+    CALL_SH_PASS(VSC_IS_InstSched_PerformOnShader, 0, gcvNULL);
 
-    CALL_SH_PASS(VIR_RA_LS_PerformTempRegAlloc, gcvNULL);
+    CALL_SH_PASS(VIR_RA_LS_PerformTempRegAlloc, 0, gcvNULL);
 
-    isMode = PST_PASS_IS;
-    CALL_SH_PASS(VSC_IS_InstSched_PerformOnShader, &isMode);
+    CALL_SH_PASS(VSC_IS_InstSched_PerformOnShader, 1, gcvNULL);
 
-    CALL_SH_PASS(vscVIR_PostCleanup, gcvNULL);
-    CALL_SH_PASS(VSC_MC_GEN_MachineCodeGen, gcvNULL);
+    CALL_SH_PASS(vscVIR_PostCleanup, 0, gcvNULL);
+    CALL_SH_PASS(VSC_MC_GEN_MachineCodeGen, 0, gcvNULL);
 
     if (pOutSEP)
     {
-        if (!(VSC_OPTN_MCGenOptions_GetSwitchOn(VSC_OPTN_Options_GetMCGenOptions(pShPassMnger->basePM.pOptions)) &&
-              VSC_OPTN_RAOptions_GetSwitchOn(VSC_OPTN_Options_GetRAOptions(pShPassMnger->basePM.pOptions))))
+        if (!(VSC_OPTN_MCGenOptions_GetSwitchOn(VSC_OPTN_Options_GetMCGenOptions(pShPassMnger->basePM.pOptions, 0)) &&
+              VSC_OPTN_RAOptions_GetSwitchOn(VSC_OPTN_Options_GetRAOptions(pShPassMnger->basePM.pOptions, 0))))
         {
             /* Oops, why you ask me to generate SEP but you did not set mc-gen and RA?? */
             gcmASSERT(gcvFALSE);
@@ -789,7 +792,7 @@ static VSC_ErrCode _PerformCodegen(VSC_SHADER_PASS_MANAGER*   pShPassMnger,
             ON_ERROR(errCode, "SEP specified, but RA or mc-gen is disabled");
         }
 
-        CALL_SH_PASS(vscVIR_GenerateSEP, pOutSEP);
+        CALL_SH_PASS(vscVIR_GenerateSEP, 0, pOutSEP);
     }
 
 OnError:
@@ -810,7 +813,7 @@ static VSC_ErrCode _DoHLPreCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
         if (libShLevel == VIR_SHLEVEL_Pre_High)
         {
-            CALL_SH_PASS(VIR_LinkExternalLibFunc, gcvNULL);
+            CALL_SH_PASS(VIR_LinkExternalLibFunc, 0, gcvNULL);
             ON_ERROR(errCode, "Lib link");
         }
     }
@@ -833,7 +836,7 @@ static VSC_ErrCode _DoMLPreCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
         if (libShLevel == VIR_SHLEVEL_Pre_Medium)
         {
-            CALL_SH_PASS(VIR_LinkExternalLibFunc, gcvNULL);
+            CALL_SH_PASS(VIR_LinkExternalLibFunc, 2, gcvNULL);
             ON_ERROR(errCode, "Lib link");
         }
     }
@@ -856,7 +859,7 @@ static VSC_ErrCode _DoLLPreCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
         if (libShLevel == VIR_SHLEVEL_Pre_Low)
         {
-            CALL_SH_PASS(VIR_LinkExternalLibFunc, gcvNULL);
+            CALL_SH_PASS(VIR_LinkExternalLibFunc, 4, gcvNULL);
             ON_ERROR(errCode, "Lib link");
         }
     }
@@ -879,7 +882,7 @@ static VSC_ErrCode _DoMCPreCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
         if (libShLevel == VIR_SHLEVEL_Pre_Machine)
         {
-            CALL_SH_PASS(VIR_LinkExternalLibFunc, gcvNULL);
+            CALL_SH_PASS(VIR_LinkExternalLibFunc, 6, gcvNULL);
             ON_ERROR(errCode, "Lib link");
         }
     }
@@ -902,7 +905,7 @@ static VSC_ErrCode _DoHLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
         if (libShLevel == VIR_SHLEVEL_Post_High)
         {
-            CALL_SH_PASS(VIR_LinkExternalLibFunc, gcvNULL);
+            CALL_SH_PASS(VIR_LinkExternalLibFunc, 1, gcvNULL);
             ON_ERROR(errCode, "Lib link");
         }
     }
@@ -925,7 +928,7 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
         if (libShLevel == VIR_SHLEVEL_Post_Medium)
         {
-            CALL_SH_PASS(VIR_LinkExternalLibFunc, gcvNULL);
+            CALL_SH_PASS(VIR_LinkExternalLibFunc, 3, gcvNULL);
             ON_ERROR(errCode, "Lib link");
         }
     }
@@ -948,7 +951,7 @@ static VSC_ErrCode _DoLLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
         if (libShLevel == VIR_SHLEVEL_Post_Low)
         {
-            CALL_SH_PASS(VIR_LinkExternalLibFunc, gcvNULL);
+            CALL_SH_PASS(VIR_LinkExternalLibFunc, 5, gcvNULL);
             ON_ERROR(errCode, "Lib link");
         }
     }
@@ -971,7 +974,7 @@ static VSC_ErrCode _DoMCPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
 
         if (libShLevel == VIR_SHLEVEL_Post_Machine)
         {
-            CALL_SH_PASS(VIR_LinkExternalLibFunc, gcvNULL);
+            CALL_SH_PASS(VIR_LinkExternalLibFunc, 7, gcvNULL);
             ON_ERROR(errCode, "Lib link");
         }
     }

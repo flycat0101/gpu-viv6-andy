@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -15,7 +15,7 @@
 #include "vir/linker/gc_vsc_vir_linker.h"
 #include "vir/lower/gc_vsc_vir_hl_2_hl.h"
 
-#define __LL_LIB_LENGTH__       (65535 * 2)
+#define __LL_LIB_LENGTH__       (65535 * 3)
 #define __LIB_NAME_LENGTH__     256
 #define __LIB_SHADER_PMP     512
 
@@ -102,7 +102,7 @@ VIR_intrinsic_LibSource(
         gcmONERROR((*gcCLCompiler)(gcvNULL,
                                    gcoOS_StrLen(source, gcvNULL),
                                    source,
-                                   "",
+                                   gcmOPT_oclPackedBasicType() ? "-cl-viv-vx-extension" : "",
                                    &binary,
                                    &log));
     }
@@ -792,7 +792,7 @@ _CreateCLIntrinsicLib(
     gcmONERROR((*gcCLCompiler)(gcvNULL,
                                 gcoOS_StrLen(builtinSource, gcvNULL),
                                 builtinSource,
-                                "",
+                                gcmOPT_oclPackedBasicType() ? "-cl-viv-vx-extension" : "",
                                 &Binary,
                                 &log));
 
@@ -1694,6 +1694,25 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
     }
     else if (opndKind == VIR_OPND_CONST)
     {
+        VIR_ConstVal    new_const_val;
+        VIR_ConstId     new_const_id, lib_const_id;
+        VIR_Const       *libConst;
+
+        lib_const_id = VIR_Operand_GetConstId(libOpnd);
+        libConst = VIR_Shader_GetConstFromId(pLibShader, lib_const_id);
+
+        new_const_val.vecVal.u32Value[0] = libConst->value.vecVal.u32Value[0];
+        new_const_val.vecVal.u32Value[1] = libConst->value.vecVal.u32Value[1];
+        new_const_val.vecVal.u32Value[2] = libConst->value.vecVal.u32Value[2];
+        new_const_val.vecVal.u32Value[3] = libConst->value.vecVal.u32Value[3];
+
+        VIR_Shader_AddConstant(pShader,
+            libConst->type, &new_const_val, &new_const_id);
+
+        VIR_Operand_SetConstId(pOpnd, new_const_id);
+        VIR_Operand_SetOpKind(pOpnd, VIR_OPND_CONST);
+        VIR_Operand_SetType(pOpnd, libConst->type);
+        VIR_Operand_SetSwizzle(pOpnd, VIR_Operand_GetSwizzle(libOpnd));
     }
     else if (opndKind == VIR_OPND_TEXLDPARM)
     {
@@ -1786,31 +1805,37 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
         /* Check gather. */
         if (VIR_Operand_hasGatherFlag(libTexldOperand))
         {
-            VIR_Function_NewOperand(pFunc, &newOperand);
-            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
-                                                     pLibShader,
-                                                     pFunc,
-                                                     libFunc,
-                                                     libInst,
-                                                     VIR_Operand_GetTexldGather_comp(libTexldOperand),
-                                                     pInst,
-                                                     newOperand,
-                                                     pTempSet,
-                                                     tempIndexStart);
-            VIR_Operand_SetTexldGatherComp(pOpnd, newOperand);
+            if (VIR_Operand_GetTexldGather_comp(libTexldOperand))
+            {
+                VIR_Function_NewOperand(pFunc, &newOperand);
+                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+                    pLibShader,
+                    pFunc,
+                    libFunc,
+                    libInst,
+                    VIR_Operand_GetTexldGather_comp(libTexldOperand),
+                    pInst,
+                    newOperand,
+                    pTempSet,
+                    tempIndexStart);
+                VIR_Operand_SetTexldGatherComp(pOpnd, newOperand);
+            }
 
-            VIR_Function_NewOperand(pFunc, &newOperand);
-            errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
-                                                     pLibShader,
-                                                     pFunc,
-                                                     libFunc,
-                                                     libInst,
-                                                     VIR_Operand_GetTexldGather_refz(libTexldOperand),
-                                                     pInst,
-                                                     newOperand,
-                                                     pTempSet,
-                                                     tempIndexStart);
-            VIR_Operand_SetTexldGatherRefZ(pOpnd, newOperand);
+            if (VIR_Operand_GetTexldGather_refz(libTexldOperand))
+            {
+                VIR_Function_NewOperand(pFunc, &newOperand);
+                errCode = _VIR_LinkIntrinsicLib_CopyOpnd(pShader,
+                    pLibShader,
+                    pFunc,
+                    libFunc,
+                    libInst,
+                    VIR_Operand_GetTexldGather_refz(libTexldOperand),
+                    pInst,
+                    newOperand,
+                    pTempSet,
+                    tempIndexStart);
+                VIR_Operand_SetTexldGatherRefZ(pOpnd, newOperand);
+            }
         }
         /* Check fetch ms. */
         if (VIR_Operand_hasFetchMSFlag(libTexldOperand))
@@ -1866,54 +1891,57 @@ _VIR_LinkIntrinsicLib_CopyOpnd(
         /* We may hit VIR_OPND_UNDEF for some opcodes, e.g, IMG_LOAD. */
     }
 
-    /* Copy the index from orig operand to new operand. */
-    VIR_Operand_SetIsConstIndexing(pOpnd, VIR_Operand_GetIsConstIndexing(libOpnd));
-    VIR_Operand_SetRelAddrMode(pOpnd, VIR_Operand_GetRelAddrMode(libOpnd));
-    VIR_Operand_SetMatrixConstIndex(pOpnd, VIR_Operand_GetMatrixConstIndex(libOpnd));
-    VIR_Operand_SetRelAddrLevel(pOpnd, VIR_Operand_GetRelAddrLevel(libOpnd));
-    VIR_Operand_SetRoundMode(pOpnd, VIR_Operand_GetRoundMode(libOpnd));
-
-    /* If it is constant index, just copy; if it is reg indexed, need to map to the new reg. */
-    if (VIR_Operand_GetIsConstIndexing(libOpnd))
+    if (opndKind != VIR_OPND_TEXLDPARM)
     {
-        VIR_Operand_SetRelIndex(pOpnd, VIR_Operand_GetRelIndexing(libOpnd));
-    }
-    else if (VIR_Operand_GetRelAddrMode(libOpnd) != VIR_INDEXED_NONE)
-    {
-        libSym = VIR_Function_GetSymFromId(libFunc, VIR_Operand_GetRelIndexing(libOpnd));
-        /* This must be a vreg symbol. */
-        gcmASSERT(VIR_Symbol_isVreg(libSym));
+        /* Copy the index from orig operand to new operand. */
+        VIR_Operand_SetIsConstIndexing(pOpnd, VIR_Operand_GetIsConstIndexing(libOpnd));
+        VIR_Operand_SetRelAddrMode(pOpnd, VIR_Operand_GetRelAddrMode(libOpnd));
+        VIR_Operand_SetMatrixConstIndex(pOpnd, VIR_Operand_GetMatrixConstIndex(libOpnd));
+        VIR_Operand_SetRelAddrLevel(pOpnd, VIR_Operand_GetRelAddrLevel(libOpnd));
+        VIR_Operand_SetRoundMode(pOpnd, VIR_Operand_GetRoundMode(libOpnd));
 
-        if (vscHTBL_DirectTestAndGet(pTempSet, (void*) libSym, (void **)&newVirRegSym))
+        /* If it is constant index, just copy; if it is reg indexed, need to map to the new reg. */
+        if (VIR_Operand_GetIsConstIndexing(libOpnd))
         {
-            newVirRegId = VIR_Symbol_GetIndex(newVirRegSym);
+            VIR_Operand_SetRelIndex(pOpnd, VIR_Operand_GetRelIndexing(libOpnd));
         }
-        else
+        else if (VIR_Operand_GetRelAddrMode(libOpnd) != VIR_INDEXED_NONE)
         {
-            if (VIR_TypeId_isSampler(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(libSym))))
+            libSym = VIR_Function_GetSymFromId(libFunc, VIR_Operand_GetRelIndexing(libOpnd));
+            /* This must be a vreg symbol. */
+            gcmASSERT(VIR_Symbol_isVreg(libSym));
+
+            if (vscHTBL_DirectTestAndGet(pTempSet, (void*)libSym, (void **)&newVirRegSym))
             {
-                pTyId = VIR_TYPE_UINT_X4;
+                newVirRegId = VIR_Symbol_GetIndex(newVirRegSym);
             }
             else
             {
-                pTyId = VIR_Type_GetIndex(VIR_Symbol_GetType(libSym));
+                if (VIR_TypeId_isSampler(VIR_Type_GetBaseTypeId(VIR_Symbol_GetType(libSym))))
+                {
+                    pTyId = VIR_TYPE_UINT_X4;
+                }
+                else
+                {
+                    pTyId = VIR_Type_GetIndex(VIR_Symbol_GetType(libSym));
+                }
+
+                VIR_Shader_AddSymbol(pShader,
+                    VIR_SYM_VIRREG,
+                    *tempIndexStart,
+                    VIR_Shader_GetTypeFromId(pShader, pTyId),
+                    VIR_STORAGE_UNKNOWN,
+                    &newVirRegId);
+
+                newVirRegSym = VIR_Function_GetSymFromId(pFunc, newVirRegId);
+
+                *tempIndexStart = *tempIndexStart +
+                    VIR_Type_GetRegCount(pShader, VIR_Symbol_GetType(newVirRegSym), gcvFALSE);
+
+                vscHTBL_DirectSet(pTempSet, (void*)libSym, (void*)newVirRegSym);
             }
-
-            VIR_Shader_AddSymbol(pShader,
-                                 VIR_SYM_VIRREG,
-                                 *tempIndexStart,
-                                 VIR_Shader_GetTypeFromId(pShader, pTyId),
-                                 VIR_STORAGE_UNKNOWN,
-                                 &newVirRegId);
-
-            newVirRegSym = VIR_Function_GetSymFromId(pFunc, newVirRegId);
-
-            *tempIndexStart = *tempIndexStart +
-                VIR_Type_GetRegCount(pShader, VIR_Symbol_GetType(newVirRegSym), gcvFALSE);
-
-            vscHTBL_DirectSet(pTempSet, (void*) libSym, (void*) newVirRegSym);
+            VIR_Operand_SetRelIndex(pOpnd, newVirRegId);
         }
-        VIR_Operand_SetRelIndex(pOpnd, newVirRegId);
     }
 
     return errCode;
@@ -3561,7 +3589,37 @@ static gctSTRING _GetLibFuncParam(IN VIR_Function             *pCalleeFunc,
     }
 }
 
+/* change texldInst to the call instruction */
+static void _ChangeTexldToCall(
+    VIR_Instruction     *texldInst,
+    VIR_Function        *libFunc )
+{
+    gctUINT i;
+
+    VIR_Inst_SetOpcode(texldInst, VIR_OP_CALL);
+    VIR_Inst_SetConditionOp(texldInst, VIR_COP_ALWAYS);
+    VIR_Operand_SetFunction(texldInst->dest, libFunc);
+
+    for (i = 0; i < VIR_Inst_GetSrcNum(texldInst); i++)
+    {
+        if (VIR_Inst_GetSource(texldInst, i) != gcvNULL)
+        {
+            VIR_Inst_FreeSource(texldInst, i);
+        }
+    }
+
+    VIR_Inst_SetSrcNum(texldInst, 0);
+}
+
 /* insert the argument passing and call to the libfunc, and mov back the return value */
+/* _inputcvt_R32G32B32A32SINT_2_R32G32SINT(isampler3D origSampler,
+                                           vec4 coord,
+                                           int mod,
+                                           float lod_bias,
+                                           int type,
+                                           isampler3D extraSampler,
+                                           ivec4 swizzles)
+*/
 static VSC_ErrCode
 _InsertCallTexld(
     IN VIR_LinkLibContext     *Context,
@@ -3581,16 +3639,9 @@ _InsertCallTexld(
     gctUINT                          instMod = _texldInstMod(texldInst);
     Vir_TexldModifier_Name           texldMod = instMod2TexldMod(instMod);
     gctSTRING                        paramName;
+    gctBOOL                          paraFound = gcvFALSE;
 
     gcmASSERT(VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(texldInst)));
-
-    /* _inputcvt_R32G32B32A32SINT_2_R32G32SINT(isampler3D origSampler,
-                                               vec4 coord,
-                                               int mod,
-                                               float lod_bias,
-                                               int type,
-                                               isampler3D extraSampler,
-                                               ivec4 swizzles) */
 
     /* insert the MOV to pass arguement
        MOV arg1, sampler
@@ -3606,12 +3657,12 @@ _InsertCallTexld(
     }
 
     /* mod */
-    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, 2, texldInst, &newInst);
+    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
     ON_ERROR(errCode, "_InsertCallTexld");
     VIR_Operand_SetImmediateInt(newInst->src[0], instMod);
 
     /* lod_bias */
-    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, 3, texldInst, &newInst);
+    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
     ON_ERROR(errCode, "_InsertCallTexld");
     if (texldMod < VIR_TEXLDMODIFIER_COUNT)
     {
@@ -3624,21 +3675,27 @@ _InsertCallTexld(
     }
 
     /* type */
-    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, 4, texldInst, &newInst);
+    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
     ON_ERROR(errCode, "_InsertCallTexld");
     VIR_Operand_SetImmediateInt(newInst->src[0], _texldInstType(texldInst));
 
     /* create extra sampler */
-    errCode = _AddExtraSampler(pShader, pFunc, VIR_Inst_GetSource(texldInst, 0),
-                               Context->linkPoint->u.resource.arrayIndex, &newOpnd);
-    ON_ERROR(errCode, "_InsertCallTexld");
-
-    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, 5, texldInst, &newInst);
-    ON_ERROR(errCode, "_InsertCallTexld");
-    newInst->src[0] = newOpnd;
+    if (Context->linkPoint->u.resource.actBits & VSC_RES_ACT_BIT_EXTRA_SAMPLER)
+    {
+        errCode = _AddExtraSampler(pShader, pFunc, VIR_Inst_GetSource(texldInst, 0),
+            Context->linkPoint->u.resource.arrayIndex, &newOpnd);
+        ON_ERROR(errCode, "_InsertCallTexld");
+        errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+        ON_ERROR(errCode, "_InsertCallTexld");
+        newInst->src[0] = newOpnd;
+    }
+    else
+    {
+        argIdx++;
+    }
 
     /* swizzle */
-    paramName = _GetLibFuncParam(LibFunc, 6);
+    paramName = _GetLibFuncParam(LibFunc, argIdx);
     for (i = 0; i < Context->libSpecializationConstantCount; i ++)
     {
         specializationConst = &Context->libSpecializationConsts[i];
@@ -3650,7 +3707,7 @@ _InsertCallTexld(
             VIR_ConstId     new_const_id;
             VIR_Const       *new_const;
 
-            errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, 6, texldInst, &newInst);
+            errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
             ON_ERROR(errCode, "_InsertCallTexld");
 
             new_const_val.vecVal.u32Value[0] = specializationConst->value.iValue[0];
@@ -3667,34 +3724,33 @@ _InsertCallTexld(
             VIR_Operand_SetType(newInst->src[0], VIR_TYPE_UINT_X4);
             VIR_Operand_SetSwizzle(newInst->src[0], VIR_SWIZZLE_XYZW);
 
+            paraFound = gcvTRUE;
             break;
         }
     }
+    if (!paraFound)
+    {
+        gcmASSERT(gcvFALSE);
+    }
 
     /* insert the MOV to get the return value
-       MOV destination, arg[6] */
-    errCode = _InsertMovFromArgs(pShader, pFunc, LibFunc, 7, texldInst, &newInst);
+       MOV destination, arg[7] */
+    errCode = _InsertMovFromArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
     VIR_Operand_Copy(VIR_Inst_GetDest(newInst), texldInst->dest);
 
     /* change texldInst to the call instruction */
-    VIR_Inst_SetOpcode(texldInst, VIR_OP_CALL);
-    VIR_Inst_SetConditionOp(texldInst, VIR_COP_ALWAYS);
-    VIR_Operand_SetFunction(texldInst->dest, LibFunc);
-
-    for (i = 0; i < VIR_Inst_GetSrcNum(texldInst); i++)
-    {
-        if (VIR_Inst_GetSource(texldInst, i) != gcvNULL)
-        {
-            VIR_Function_FreeOperand(pFunc, VIR_Inst_GetSource(texldInst, i));
-            VIR_Inst_SetSource(texldInst, i, gcvNULL);
-        }
-    }
-    VIR_Inst_SetSrcNum(texldInst, 0);
+    _ChangeTexldToCall(texldInst, LibFunc);
 
 OnError:
     return errCode;
 };
 
+/* vec4 _inputgather_R32SINT(isamplerCubeArray origSampler,
+                             vec4 coord,
+                             int mod,
+                             isamplerCubeArray extraSampler
+                             ivec4 swizzles)
+*/
 static VSC_ErrCode
 _InsertCallTexldGather(
     IN VIR_LinkLibContext     *Context,
@@ -3708,113 +3764,342 @@ _InsertCallTexldGather(
     VIR_Function            *pFunc = VIR_Inst_GetFunction(texldInst);
     VIR_Instruction         *newInst = gcvNULL;
 
-    VIR_SymId               parmSymId, parmVregId;
-    VIR_Symbol              *parmSym, *parmVregSym;
-    VIR_TypeId              symTy;
     VIR_Operand             *texldSrc = gcvNULL;
-    VIR_Enable              movEnable = VIR_ENABLE_NONE;
-    gctUINT                 i;
-
-    /* _inputgather_R32SINT(isampler2DArray origSampler, vec3 coord, int mod, int type, isampler2DArray extraSampler) */
-    /* insert the MOV to pass arguement
-       MOV arg1, sampler */
-    errCode = VIR_Function_AddInstructionBefore(pFunc,
-        VIR_OP_MOV,
-        VIR_TYPE_UNKNOWN,
-        texldInst,
-        gcvTRUE,
-        &newInst);
-    ON_ERROR(errCode, "_InsertCallTexldFmt");
-
-    parmSymId = VIR_IdList_GetId(&LibFunc->paramters, 0);
-    parmSym = VIR_Function_GetSymFromId(LibFunc, parmSymId);
-    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INPARM ||
-              VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
-    parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
-    parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
-    symTy = VIR_Symbol_GetTypeId(parmSym);
-
-    texldSrc = VIR_Inst_GetSource(texldInst, 0);
-    VIR_Operand_SetTempRegister(newInst->dest,
-                                pFunc,
-                                VIR_Symbol_GetIndex(parmVregSym),
-                                symTy);
-    movEnable = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(texldSrc));
-    VIR_Operand_SetEnable(newInst->dest, movEnable);
-    newInst->src[0] = texldSrc;
+    gctUINT                 argIdx, i;
+    gctSTRING               paramName;
+    VSC_LIB_SPECIALIZATION_CONSTANT  *specializationConst;
+    gctBOOL                 paraFound = gcvFALSE;
 
     /* insert the MOV to pass arguement
-       MOV arg2, coord */
-    errCode = VIR_Function_AddInstructionBefore(pFunc,
-        VIR_OP_MOV,
-        VIR_TYPE_UNKNOWN,
-        texldInst,
-        gcvTRUE,
-        &newInst);
-    ON_ERROR(errCode, "_InsertCallTexldFmt");
+    MOV arg1, sampler
+    MOV arg2, coord */
+    for (argIdx = 0; argIdx < 2; argIdx++)
+    {
+        errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx, texldInst, &newInst);
+        ON_ERROR(errCode, "_InsertCallTexldGather");
 
-    parmSymId = VIR_IdList_GetId(&LibFunc->paramters, 1);
-    parmSym = VIR_Function_GetSymFromId(LibFunc, parmSymId);
-    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INPARM ||
-              VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
-    parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
-    parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
-    symTy = VIR_Symbol_GetTypeId(parmSym);
+        texldSrc = VIR_Inst_GetSource(texldInst, argIdx);
 
-    texldSrc = VIR_Inst_GetSource(texldInst, 1);
-    VIR_Operand_SetTempRegister(newInst->dest,
-                                pFunc,
-                                VIR_Symbol_GetIndex(parmVregSym),
-                                symTy);
-    movEnable = VIR_Swizzle_2_Enable(VIR_Operand_GetSwizzle(texldSrc));
-    VIR_Operand_SetEnable(newInst->dest, movEnable);
-    newInst->src[0] = texldSrc;
+        VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), texldSrc);
+    }
+
+    /* mod */
+    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+    ON_ERROR(errCode, "_InsertCallTexldGather");
+    texldSrc = VIR_Inst_GetSource(texldInst, 2);
+    gcmASSERT(VIR_Operand_GetTexldGather_comp(texldSrc));
+    VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), VIR_Operand_GetTexldGather_comp(texldSrc));
+
+    /* extraSampler (may not be needed)*/
+    if (Context->linkPoint->u.resource.actBits & VSC_RES_ACT_BIT_EXTRA_SAMPLER)
+    {
+        /* create extra sampler */
+        errCode = _AddExtraSampler(pShader, pFunc, VIR_Inst_GetSource(texldInst, 0),
+            Context->linkPoint->u.resource.arrayIndex, &texldSrc);
+        ON_ERROR(errCode, "_InsertCallTexldGather");
+        errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+        ON_ERROR(errCode, "_InsertCallTexldGather");
+        newInst->src[0] = texldSrc;
+    }
+    else
+    {
+        argIdx++;
+    }
+
+    /* swizzle */
+    paramName = _GetLibFuncParam(LibFunc, argIdx);
+    for (i = 0; i < Context->libSpecializationConstantCount; i++)
+    {
+        specializationConst = &Context->libSpecializationConsts[i];
+
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(specializationConst->varName, paramName)) &&
+            specializationConst->type == VSC_SHADER_DATA_TYPE_IVEC4)
+        {
+            VIR_ConstVal    new_const_val;
+            VIR_ConstId     new_const_id;
+            VIR_Const       *new_const;
+
+            errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+            ON_ERROR(errCode, "_InsertCallTexldGather");
+
+            new_const_val.vecVal.u32Value[0] = specializationConst->value.iValue[0];
+            new_const_val.vecVal.u32Value[1] = specializationConst->value.iValue[1];
+            new_const_val.vecVal.u32Value[2] = specializationConst->value.iValue[2];
+            new_const_val.vecVal.u32Value[3] = specializationConst->value.iValue[3];
+
+            VIR_Shader_AddConstant(pShader,
+                VIR_TYPE_UINT_X4, &new_const_val, &new_const_id);
+            new_const = VIR_Shader_GetConstFromId(pShader, new_const_id);
+            new_const->type = VIR_TYPE_UINT_X4;
+            VIR_Operand_SetConstId(newInst->src[0], new_const_id);
+            VIR_Operand_SetOpKind(newInst->src[0], VIR_OPND_CONST);
+            VIR_Operand_SetType(newInst->src[0], VIR_TYPE_UINT_X4);
+            VIR_Operand_SetSwizzle(newInst->src[0], VIR_SWIZZLE_XYZW);
+
+            paraFound = gcvTRUE;
+
+            break;
+        }
+    }
+
+    if (!paraFound)
+    {
+        gcmASSERT(gcvFALSE);
+    }
 
     /* insert the MOV to get the return value
        MOV destination, arg[5] */
-    errCode = VIR_Function_AddInstructionAfter(pFunc,
-                VIR_OP_MOV,
-                VIR_TYPE_UNKNOWN,
-                texldInst,
-                gcvTRUE,
-                &newInst);
-
-    parmSymId = VIR_IdList_GetId(&LibFunc->paramters, 5);
-    parmSym = VIR_Function_GetSymFromId(LibFunc, parmSymId);
-    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_OUTPARM ||
-            VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
-    parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
-    parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
-    symTy = VIR_Symbol_GetTypeId(parmVregSym);
-    movEnable = VIR_Inst_GetEnable(texldInst);
-
-    gcmASSERT(parmVregSym != gcvNULL);
-
-    VIR_Operand_SetTempRegister(newInst->src[0],
-                                pFunc,
-                                VIR_Symbol_GetIndex(parmVregSym),
-                                symTy);
-
-    VIR_Operand_SetSwizzle(newInst->src[0], VIR_Enable_2_Swizzle(movEnable));
+    errCode = _InsertMovFromArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
     VIR_Operand_Copy(VIR_Inst_GetDest(newInst), texldInst->dest);
 
      /* change texldInst to the call instruction */
-    VIR_Inst_SetOpcode(texldInst, VIR_OP_CALL);
-    VIR_Inst_SetConditionOp(texldInst, VIR_COP_ALWAYS);
-    VIR_Operand_SetFunction(texldInst->dest, LibFunc);
-    for (i = 0; i < VIR_Inst_GetSrcNum(texldInst); i++)
-    {
-        if (VIR_Inst_GetSource(texldInst, i) != gcvNULL)
-        {
-            VIR_Function_FreeOperand(pFunc, VIR_Inst_GetSource(texldInst, i));
-            VIR_Inst_SetSource(texldInst, i, gcvNULL);
-        }
-    }
-    VIR_Inst_SetSrcNum(texldInst, 0);
+    _ChangeTexldToCall(texldInst, LibFunc);
 
 OnError:
     return errCode;
 };
+
+/* insert the argument passing and call to the libfunc, and mov back the return value */
+static VSC_ErrCode
+_InsertCallTexldGatherPCF(
+IN VIR_LinkLibContext     *Context,
+IN void                   *Transpoint,
+IN VIR_Function           *LibFunc
+)
+{
+    VSC_ErrCode                      errCode = VSC_ERR_NONE;
+    VIR_Shader                       *pShader = Context->shader;
+    VIR_Instruction                  *texldInst = (VIR_Instruction *)Transpoint;
+    VIR_Function                     *pFunc = VIR_Inst_GetFunction(texldInst);
+    VIR_Instruction                  *newInst = gcvNULL;
+    VSC_LIB_SPECIALIZATION_CONSTANT  *specializationConst;
+
+    VIR_Operand                      *texldSrc = gcvNULL;
+    gctUINT                          argIdx = 0, i;
+    gctSTRING                        paramName;
+    gctBOOL                          paraFound = gcvFALSE;
+
+    gcmASSERT(VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(texldInst)));
+
+    /* vec4 _inputgather_pcf_D32SFLOAT(samplerCubeArray origSampler,
+                                  vec4 coord,
+                                  int mod,
+                                  int comparemode,
+                                  float refZ,
+                                  ivec4 swizzles) */
+
+    /* insert the MOV to pass arguement
+    MOV arg1, sampler
+    MOV arg2, coord */
+    for (argIdx = 0; argIdx < 2; argIdx++)
+    {
+        errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx, texldInst, &newInst);
+        ON_ERROR(errCode, "_InsertCallTexld");
+
+        texldSrc = VIR_Inst_GetSource(texldInst, argIdx);
+
+        VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), texldSrc);
+    }
+
+    /* mod */
+    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+    ON_ERROR(errCode, "_InsertCallTexld");
+    texldSrc = VIR_Inst_GetSource(texldInst, 2);
+    gcmASSERT(VIR_Operand_GetTexldGather_comp(texldSrc));
+    VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), VIR_Operand_GetTexldGather_comp(texldSrc));
+
+    /* comparemode */
+    paramName = _GetLibFuncParam(LibFunc, argIdx);
+    for (i = 0; i < Context->libSpecializationConstantCount; i++)
+    {
+        specializationConst = &Context->libSpecializationConsts[i];
+
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(specializationConst->varName, paramName)) &&
+            specializationConst->type == VSC_SHADER_DATA_TYPE_IVEC4)
+        {
+            VIR_ConstVal    new_const_val;
+            VIR_ConstId     new_const_id;
+            VIR_Const       *new_const;
+
+            errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+            ON_ERROR(errCode, "_InsertCallTexld");
+
+            new_const_val.vecVal.u32Value[0] = specializationConst->value.iValue[0];
+
+            VIR_Shader_AddConstant(pShader,
+                VIR_TYPE_INT32, &new_const_val, &new_const_id);
+            new_const = VIR_Shader_GetConstFromId(pShader, new_const_id);
+            new_const->type = VIR_TYPE_INT32;
+            VIR_Operand_SetConstId(newInst->src[0], new_const_id);
+            VIR_Operand_SetOpKind(newInst->src[0], VIR_OPND_CONST);
+            VIR_Operand_SetType(newInst->src[0], VIR_TYPE_INT32);
+            VIR_Operand_SetSwizzle(newInst->src[0], VIR_SWIZZLE_X);
+
+            paraFound = gcvTRUE;
+            break;
+        }
+    }
+    if (!paraFound)
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    /* refZ */
+    errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+    ON_ERROR(errCode, "_InsertCallTexld");
+    texldSrc = VIR_Inst_GetSource(texldInst, 2);
+    gcmASSERT(VIR_Operand_GetTexldGather_refz(texldSrc));
+    VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), VIR_Operand_GetTexldGather_refz(texldSrc));
+
+    /* swizzle */
+    paraFound = gcvFALSE;
+    paramName = _GetLibFuncParam(LibFunc, argIdx);
+    for (i = 0; i < Context->libSpecializationConstantCount; i++)
+    {
+        specializationConst = &Context->libSpecializationConsts[i];
+
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(specializationConst->varName, paramName)) &&
+            specializationConst->type == VSC_SHADER_DATA_TYPE_IVEC4)
+        {
+            VIR_ConstVal    new_const_val;
+            VIR_ConstId     new_const_id;
+            VIR_Const       *new_const;
+
+            errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+            ON_ERROR(errCode, "_InsertCallTexld");
+
+            new_const_val.vecVal.u32Value[0] = specializationConst->value.iValue[0];
+            new_const_val.vecVal.u32Value[1] = specializationConst->value.iValue[1];
+            new_const_val.vecVal.u32Value[2] = specializationConst->value.iValue[2];
+            new_const_val.vecVal.u32Value[3] = specializationConst->value.iValue[3];
+
+            VIR_Shader_AddConstant(pShader,
+                VIR_TYPE_UINT_X4, &new_const_val, &new_const_id);
+            new_const = VIR_Shader_GetConstFromId(pShader, new_const_id);
+            new_const->type = VIR_TYPE_UINT_X4;
+            VIR_Operand_SetConstId(newInst->src[0], new_const_id);
+            VIR_Operand_SetOpKind(newInst->src[0], VIR_OPND_CONST);
+            VIR_Operand_SetType(newInst->src[0], VIR_TYPE_UINT_X4);
+            VIR_Operand_SetSwizzle(newInst->src[0], VIR_SWIZZLE_XYZW);
+
+            paraFound = gcvTRUE;
+            break;
+        }
+    }
+    if (!paraFound)
+    {
+        gcmASSERT(gcvFALSE);
+    }
+
+    /* insert the MOV to get the return value
+    MOV destination, arg[6] */
+    errCode = _InsertMovFromArgs(pShader, pFunc, LibFunc, argIdx++, texldInst, &newInst);
+    VIR_Operand_Copy(VIR_Inst_GetDest(newInst), texldInst->dest);
+
+    /* change texldInst to the call instruction */
+    _ChangeTexldToCall(texldInst, LibFunc);
+
+OnError:
+    return errCode;
+};
+
+/* vec3 _unormalizeCoord(sampler3D origSampler, vec3 coord) */
+static VSC_ErrCode
+_InsertCallUnnormalizeCoord(
+IN VIR_LinkLibContext     *Context,
+IN void                   *Transpoint,
+IN VIR_Function           *LibFunc
+)
+{
+    VSC_ErrCode                      errCode = VSC_ERR_NONE;
+    VIR_Shader                       *pShader = Context->shader;
+    VIR_Instruction                  *texldInst = (VIR_Instruction *)Transpoint;
+    VIR_Function                     *pFunc = VIR_Inst_GetFunction(texldInst);
+    VIR_Instruction                  *newInst = gcvNULL, *callInst = gcvNULL;
+
+    VIR_Operand                      *texldSrc = gcvNULL;
+    gctUINT                          argIdx = 0;
+
+    VIR_SymId               parmSymId, parmVregId;
+    VIR_Symbol              *parmSym, *parmVregSym;
+    VIR_TypeId              symTy;
+
+    gcmASSERT(VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(texldInst)));
+
+    /* insert the MOV to pass arguement
+    MOV arg1, sampler
+    MOV arg2, coord */
+    for (argIdx = 0; argIdx < 2; argIdx++)
+    {
+        errCode = _InsertMovToArgs(pShader, pFunc, LibFunc, argIdx, texldInst, &newInst);
+        ON_ERROR(errCode, "_InsertCallUnnormalizeCoord");
+
+        texldSrc = VIR_Inst_GetSource(texldInst, argIdx);
+
+        VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), texldSrc);
+    }
+
+    /* insert a call instruction */
+    errCode = VIR_Function_AddInstructionBefore(pFunc,
+        VIR_OP_CALL,
+        VIR_TYPE_UNKNOWN,
+        texldInst,
+        gcvTRUE,
+        &callInst);
+    ON_ERROR(errCode, "_InsertCallUnnormalizeCoord");
+    VIR_Operand_SetFunction(callInst->dest, LibFunc);
+
+    /* insert the MOV to get the return value to set texld coordinate
+    MOV coordinate, arg[2] */
+    errCode = VIR_Function_AddInstructionAfter(pFunc,
+        VIR_OP_MOV,
+        VIR_TYPE_UNKNOWN,
+        callInst,
+        gcvTRUE,
+        &newInst);
+    ON_ERROR(errCode, "_InsertCallUnnormalizeCoord");
+
+    parmSymId = VIR_IdList_GetId(&LibFunc->paramters, argIdx);
+    parmSym = VIR_Function_GetSymFromId(LibFunc, parmSymId);
+    gcmASSERT(VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_OUTPARM ||
+        VIR_Symbol_GetStorageClass(parmSym) == VIR_STORAGE_INOUTPARM);
+    parmVregId = VIR_Symbol_GetVariableVregIndex(parmSym);
+    parmVregSym = VIR_Shader_FindSymbolByTempIndex(pShader, parmVregId);
+    symTy = VIR_Symbol_GetTypeId(parmSym);
+
+    VIR_Operand_SetTempRegister(newInst->src[0],
+        pFunc,
+        VIR_Symbol_GetIndex(parmVregSym),
+        symTy);
+
+    VIR_Operand_SetSwizzle(newInst->src[0],
+        VIR_Enable_2_Swizzle_WShift(VIR_TypeId_Conv2Enable(symTy)));
+
+    VIR_Operand_Copy(VIR_Inst_GetDest(newInst), (VIR_Inst_GetSource(texldInst, 1)));
+
+    VIR_Operand_Change2Dest(VIR_Inst_GetDest(newInst));
+
+
+OnError:
+    return errCode;
+};
+
+/* vec4 _texld_with_imgld_R32G32B32A32SFLOAT(int coord, samplerBuffer sampledTexelBuffer) */
+static VSC_ErrCode
+_InsertCallTexldImg(
+IN VIR_LinkLibContext     *Context,
+IN void                   *Transpoint,
+IN VIR_Function           *LibFunc
+)
+{
+    VSC_ErrCode                      errCode = VSC_ERR_NONE;
+
+    /* to-do */
+    gcmASSERT(gcvFALSE);
+
+    return errCode;
+};
+
 
 static VSC_ErrCode
 _InsertCallTexldFmt(
@@ -3829,16 +4114,26 @@ _InsertCallTexldFmt(
 
     if (VIR_OPCODE_isTexLd(texldOp))
     {
-        switch (texldOp)
+        switch (Context->linkPoint->u.resource.subType)
         {
-        case VIR_OP_TEXLD:
-        case VIR_OP_TEXLDPROJ:
+        case VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER:
+        case VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGRAD_EXTRA_LATYER:
             errCode = _InsertCallTexld(Context, Transpoint, LibFunc);
             break;
-        case VIR_OP_TEXLD_GATHER:
+        case VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER:
             errCode = _InsertCallTexldGather(Context, Transpoint, LibFunc);
             break;
+        case VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHERPCF_D32F:
+            errCode = _InsertCallTexldGatherPCF(Context, Transpoint, LibFunc);
+            break;
+        case VSC_LINK_POINT_RESOURCE_SUBTYPE_NORMALIZE_TEXCOORD:
+            errCode = _InsertCallUnnormalizeCoord(Context, Transpoint, LibFunc);
+            break;
+        case VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXFETCH_REPLACE_WITH_IMGLD:
+            errCode = _InsertCallTexldImg(Context, Transpoint, LibFunc);
+            break;
         default:
+            gcmASSERT(gcvFALSE);
             break;
         }
     }
@@ -4060,7 +4355,7 @@ VIR_Shader_ReverseFacingValue(
                         VIR_VirRegId        select_regid;
                         VIR_SymId           select_symid;
                         VIR_Symbol          *select_sym;
-                        errCode = VIR_Function_AddInstructionBefore(func, VIR_OP_AQ_SELECT, VIR_TYPE_BOOLEAN, inst, gcvTRUE, &select_inst);
+                        errCode = VIR_Function_AddInstructionBefore(func, VIR_OP_SELECT, VIR_TYPE_BOOLEAN, inst, gcvTRUE, &select_inst);
 
                         VIR_Inst_SetConditionOp(select_inst, VIR_COP_NOT_ZERO);
 

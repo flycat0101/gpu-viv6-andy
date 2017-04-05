@@ -492,10 +492,11 @@ powerOf5(integerPart *dst, unsigned int power)
 
     /* Calculate pow(5,pow(2,n+3)) if we haven't yet.  */
     if (pc == 0) {
-      pc = partsCount[n - 1];
+      if (n != 0)
+        pc = partsCount[n - 1];
       APInt::tcFullMultiply(pow5, pow5 - pc, pow5 - pc, pc, pc);
       pc *= 2;
-      if (pow5[pc - 1] == 0)
+      if (pc != 0 && pow5[pc - 1] == 0)
         pc--;
       partsCount[n] = pc;
     }
@@ -505,7 +506,7 @@ powerOf5(integerPart *dst, unsigned int power)
 
       APInt::tcFullMultiply(p2, p1, pow5, result, pc);
       result += pc;
-      if (p2[result - 1] == 0)
+      if (result != 0 && p2[result - 1] == 0)
         result--;
 
       /* Now result is in p1 with partsCount parts and p2 is scratch

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -224,7 +224,7 @@ _VSC_MC_GEN_GenOpcode(
         gcmASSERT(_VSC_MC_GEN_IsTypeEqualTo(Inst->dest, VIR_TYFLAG_ISINTEGER));
         *BaseOpcode = 0x3B;
         break;
-    case VIR_OP_AQ_IMADHI0:
+    case VIR_OP_IMADHI0:
         if (_VSC_MC_GEN_IsTypeEqualTo(Inst->dest, VIR_TYFLAG_ISINTEGER) &&
             VIR_Operand_GetModifier(Inst->dest) == VIR_MOD_SAT_TO_MAX_UINT)
         {
@@ -235,7 +235,7 @@ _VSC_MC_GEN_GenOpcode(
             *BaseOpcode = 0x50;
         }
         break;
-    case VIR_OP_AQ_IMADHI1:
+    case VIR_OP_IMADHI1:
         if (_VSC_MC_GEN_IsTypeEqualTo(Inst->dest, VIR_TYFLAG_ISINTEGER) &&
             VIR_Operand_GetModifier(Inst->dest) == VIR_MOD_SAT_TO_MAX_UINT)
         {
@@ -246,7 +246,7 @@ _VSC_MC_GEN_GenOpcode(
             *BaseOpcode = 0x51;
         }
         break;
-    case VIR_OP_AQ_IMADLO0:
+    case VIR_OP_IMADLO0:
         if (_VSC_MC_GEN_IsTypeEqualTo(Inst->dest, VIR_TYFLAG_ISINTEGER) &&
             VIR_Operand_GetModifier(Inst->dest) == VIR_MOD_SAT_TO_MAX_UINT)
         {
@@ -257,7 +257,7 @@ _VSC_MC_GEN_GenOpcode(
             *BaseOpcode = 0x4C;
         }
         break;
-    case VIR_OP_AQ_IMADLO1:
+    case VIR_OP_IMADLO1:
         if (_VSC_MC_GEN_IsTypeEqualTo(Inst->dest, VIR_TYFLAG_ISINTEGER) &&
             VIR_Operand_GetModifier(Inst->dest) == VIR_MOD_SAT_TO_MAX_UINT)
         {
@@ -318,7 +318,7 @@ _VSC_MC_GEN_GenOpcode(
             *BaseOpcode = 0x64;
         }
         break;
-    case VIR_OP_AQ_IMOD:
+    case VIR_OP_IMOD:
         *BaseOpcode = 0x48;
         break;
     case VIR_OP_ADDLO:
@@ -506,28 +506,28 @@ _VSC_MC_GEN_GenOpcode(
     case VIR_OP_RET:
         *BaseOpcode = 0x15;
         break;
-    case VIR_OP_AQ_CONV:
+    case VIR_OP_CONV:
         *BaseOpcode = 0x72;
         break;
-    case VIR_OP_AQ_F2I:
+    case VIR_OP_F2I:
         *BaseOpcode = 0x2E;
         break;
-    case VIR_OP_AQ_I2I:
+    case VIR_OP_I2I:
         *BaseOpcode = 0x2C;
         break;
-    case VIR_OP_AQ_I2F:
+    case VIR_OP_I2F:
         *BaseOpcode = 0x2D;
         break;
-    case VIR_OP_AQ_CMP:
+    case VIR_OP_CMP:
         *BaseOpcode = 0x31;
         break;
-    case VIR_OP_AQ_F2IRND:
+    case VIR_OP_F2IRND:
         *BaseOpcode = 0x2F;
         break;
-    case VIR_OP_AQ_SELECT:
+    case VIR_OP_SELECT:
         *BaseOpcode = 0x0F;
         break;
-    case VIR_OP_AQ_SET:
+    case VIR_OP_SET:
         *BaseOpcode = 0x10;
         break;
     case VIR_OP_MOVA:
@@ -686,13 +686,13 @@ _VSC_MC_GEN_GenOpcode(
         break;
 
     /* Below for extended opcodes */
+    case VIR_OP_EMIT0:
     case VIR_OP_EMIT:
-    case VIR_OP_AQ_EMIT:
         *BaseOpcode = 0x7F;
         *ExternOpcode = 0x01;
         break;
+    case VIR_OP_RESTART0:
     case VIR_OP_RESTART:
-    case VIR_OP_AQ_RESTART:
         *BaseOpcode = 0x7F;
         *ExternOpcode = 0x02;
         break;
@@ -819,6 +819,34 @@ _VSC_MC_GEN_GenOpcode(
     case VIR_OP_VX_BITREPLACE:
         *BaseOpcode   = 0x45;
         *ExternOpcode = 0x11;
+        break;
+    case VIR_OP_VX_INDEXADD:
+        *BaseOpcode   = 0x45;
+        *ExternOpcode = 0x17;
+        break;
+    case VIR_OP_VX_VERTMIN3:
+        *BaseOpcode   = 0x45;
+        *ExternOpcode = 0x18;
+        break;
+    case VIR_OP_VX_VERTMAX3:
+        *BaseOpcode   = 0x45;
+        *ExternOpcode = 0x19;
+        break;
+    case VIR_OP_VX_VERTMED3:
+        *BaseOpcode   = 0x45;
+        *ExternOpcode = 0x1A;
+        break;
+    case VIR_OP_VX_HORZMIN3:
+        *BaseOpcode   = 0x45;
+        *ExternOpcode = 0x1B;
+        break;
+    case VIR_OP_VX_HORZMAX3:
+        *BaseOpcode   = 0x45;
+        *ExternOpcode = 0x1C;
+        break;
+    case VIR_OP_VX_HORZMED3:
+        *BaseOpcode   = 0x45;
+        *ExternOpcode = 0x1D;
         break;
     default:
         gcmASSERT(0);
@@ -1122,10 +1150,10 @@ _VSC_MC_GEN_GenInstType(
     /*case VIR_OP_MOVA:, let mova be determined by dst because old gcsl has no type info for indexing reg */
     case VIR_OP_ABS:
     case VIR_OP_NEG:
-    case VIR_OP_AQ_CMP:
-    case VIR_OP_AQ_SET:
-    case VIR_OP_AQ_I2I:
-    case VIR_OP_AQ_I2F:
+    case VIR_OP_CMP:
+    case VIR_OP_SET:
+    case VIR_OP_I2I:
+    case VIR_OP_I2F:
     case VIR_OP_RCP:
     case VIR_OP_IMG_LOAD:
     case VIR_OP_IMG_LOAD_3D:
@@ -1134,7 +1162,7 @@ _VSC_MC_GEN_GenInstType(
     case VIR_OP_MOV:
         return _VSC_MC_GEN_GetInstType(Gen, Inst, VIR_Inst_GetSource(Inst, 0));
     case VIR_OP_CMOV:
-    case VIR_OP_AQ_SELECT:
+    case VIR_OP_SELECT:
         if (VIR_Inst_GetConditionOp(Inst) == VIR_COP_ALLMSB ||
             VIR_Inst_GetConditionOp(Inst) == VIR_COP_ANYMSB ||
             VIR_Inst_GetConditionOp(Inst) == VIR_COP_SELMSB)
@@ -1163,6 +1191,8 @@ _VSC_MC_GEN_GenInstType(
     case VIR_OP_IMG_STORE:
     case VIR_OP_VX_IMG_STORE:
     case VIR_OP_IMG_STORE_3D:
+    case VIR_OP_VX_IMG_STORE_3D:
+        gcmASSERT(VIR_OPCODE_useSrc2AsInstType(opcode));
         return _VSC_MC_GEN_GetInstType(Gen, Inst, VIR_Inst_GetSource(Inst, 2));
         /* No dest. */
     case VIR_OP_NOP:
@@ -1265,8 +1295,8 @@ _VSC_MC_GEN_GenDenormFlag(
         if (VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(Inst)) ||
             VIR_OPCODE_isMemSt(VIR_Inst_GetOpcode(Inst)) ||
             VIR_OPCODE_isAttrLd(VIR_Inst_GetOpcode(Inst)) ||
-            VIR_Inst_GetOpcode(Inst) == VIR_OP_AQ_CMP ||
-            VIR_Inst_GetOpcode(Inst) == VIR_OP_AQ_SELECT)
+            VIR_Inst_GetOpcode(Inst) == VIR_OP_CMP ||
+            VIR_Inst_GetOpcode(Inst) == VIR_OP_SELECT)
         {
             return gcvTRUE;
         }
@@ -1580,7 +1610,8 @@ _VSC_MC_GEN_GenOpndEnable(
                           VIR_Inst_GetOpcode(Inst) == VIR_OP_STORE_ATTR     ||
                           VIR_Inst_GetOpcode(Inst) == VIR_OP_IMG_STORE      ||
                           VIR_Inst_GetOpcode(Inst) == VIR_OP_VX_IMG_STORE   ||
-                          VIR_Inst_GetOpcode(Inst) == VIR_OP_IMG_STORE_3D);
+                          VIR_Inst_GetOpcode(Inst) == VIR_OP_IMG_STORE_3D   ||
+                          VIR_Inst_GetOpcode(Inst) == VIR_OP_VX_IMG_STORE_3D);
             }
         }
     }
@@ -1784,6 +1815,15 @@ _VSC_MC_GEN_GenImmTypeAndValue(
             if (ImmVal)
             {
                 ImmVal->ui = (VIR_Operand_GetImmediateUint(Opnd) & 0xFFFF);
+            }
+            return 0x3;
+        case VIR_TYPE_FLOAT16_P2:
+        case VIR_TYPE_FLOAT16_P3:
+        case VIR_TYPE_FLOAT16_P4:
+        case VIR_TYPE_FLOAT16_P8:
+            if (ImmVal)
+            {
+                ImmVal->ui = VIR_ConvertF32ToFP16(VIR_Operand_GetImmediateFloat(Opnd));
             }
             return 0x3;
         default:
@@ -2407,28 +2447,93 @@ _VSC_MC_GEN_GenGeneralInst(
     return VSC_ERR_NONE;
 }
 
-static void _NegMcSrc(VSC_MC_CODEC_SRC *McSrc)
+static void _NegMcSrc(VSC_MC_CODEC_SRC *McSrc, VIR_Operand * Opnd)
 {
+    VIR_TypeId ty           = VIR_Operand_GetType(Opnd);
+
     if (McSrc->regType == 0x7)
     {
-        switch (McSrc->u.imm.immType)
+        if (VIR_TypeId_isPacked(ty))
         {
-        case 0x0:
-            McSrc->u.imm.immData.f  = -McSrc->u.imm.immData.f;
-            break;
-        case 0x1:
-            McSrc->u.imm.immData.si = -McSrc->u.imm.immData.si;
-            break;
-        case 0x2:
-            McSrc->u.imm.immData.si = -(gctINT)(McSrc->u.imm.immData.ui & 0x7ffff);
-            McSrc->u.imm.immType    = 0x1;
-            break;
-        case 0x3:
-            McSrc->u.imm.immData.si = -McSrc->u.imm.immData.si;
-            break;
-        default:
-            gcmASSERT(0);
-            break;
+            gctUINT     ui;
+            gctINT      si;
+            switch (McSrc->u.imm.immType)
+            {
+            case 0x2:
+                switch (ty)
+                {
+                case VIR_TYPE_INT8_P2:
+                case VIR_TYPE_UINT8_P2:
+                case VIR_TYPE_BOOLEAN_P2:
+                    si = -(gctCHAR)(McSrc->u.imm.immData.si) & 0xFF;
+                    McSrc->u.imm.immData.ui = (gctUINT)((si & 0xFF) | ((si & 0xFF)<< 8) );
+                    break;
+                default:
+                    gcmASSERT(gcvFALSE);
+                    break;
+                }
+                break;
+            case 0x3:
+                switch (ty)
+                {
+                case VIR_TYPE_INT8_P3:
+                case VIR_TYPE_INT8_P4:
+                case VIR_TYPE_INT8_P8:
+                case VIR_TYPE_INT8_P16:
+                case VIR_TYPE_UINT8_P3:
+                case VIR_TYPE_UINT8_P4:
+                case VIR_TYPE_UINT8_P8:
+                case VIR_TYPE_UINT8_P16:
+                case VIR_TYPE_BOOLEAN_P3:
+                case VIR_TYPE_BOOLEAN_P4:
+                case VIR_TYPE_BOOLEAN_P8:
+                case VIR_TYPE_BOOLEAN_P16:
+                    si = -(gctCHAR)((McSrc->u.imm.immData.si) & 0xFF);
+                    ui = (gctUINT)((si & 0xFF) | ((si & 0xFF)<< 8) );
+                    McSrc->u.imm.immData.ui = ui;
+                    break;
+                case VIR_TYPE_INT16_P2:
+                case VIR_TYPE_UINT16_P2:
+                case VIR_TYPE_INT16_P3:
+                case VIR_TYPE_INT16_P4:
+                case VIR_TYPE_INT16_P8:
+                case VIR_TYPE_UINT16_P3:
+                case VIR_TYPE_UINT16_P4:
+                case VIR_TYPE_UINT16_P8:
+                    si = -(gctINT16)((McSrc->u.imm.immData.si) & 0xFFFF);
+                    McSrc->u.imm.immData.ui =  (McSrc->u.imm.immData.si & 0xFFFF);
+                    break;
+                default:
+                    gcmASSERT(gcvFALSE);
+                    break;
+                }
+                break;
+            default:
+                gcmASSERT(gcvFALSE);
+                break;
+            }
+        }
+        else
+        {
+            switch (McSrc->u.imm.immType)
+            {
+            case 0x0:
+                McSrc->u.imm.immData.f  = -McSrc->u.imm.immData.f;
+                break;
+            case 0x1:
+                McSrc->u.imm.immData.si = -McSrc->u.imm.immData.si;
+                break;
+            case 0x2:
+                McSrc->u.imm.immData.si = -(gctINT)(McSrc->u.imm.immData.ui & 0x7ffff);
+                McSrc->u.imm.immType    = 0x1;
+                break;
+            case 0x3:
+                McSrc->u.imm.immData.si = -McSrc->u.imm.immData.si;
+                break;
+            default:
+                gcmASSERT(0);
+                break;
+            }
         }
     }
     else
@@ -2534,7 +2639,6 @@ _VSC_MC_GEN_GenInst(
     memset(mcSrc, 0, sizeof(mcSrc));
 
     _CheckNeedToBeFixed(Inst, GenCount);
-    VIR_Inst_CheckAndSetPakedMode(Inst);
 
     switch(virOpcode)
     {
@@ -2640,7 +2744,7 @@ _VSC_MC_GEN_GenInst(
                 mcSrc,
                 &srcNum);
 
-            _NegMcSrc(&mcSrc[0]);
+            _NegMcSrc(&mcSrc[0], VIR_Inst_GetSource(Inst, 0));
 
             if (mcInstCtrl.instType !=  0x0 &&
                 mcInstCtrl.instType !=  0x1)
@@ -2682,7 +2786,7 @@ _VSC_MC_GEN_GenInst(
                 mcSrc,
                 &srcNum);
 
-            _NegMcSrc(&mcSrc[2]);
+            _NegMcSrc(&mcSrc[2], VIR_Inst_GetSource(Inst, 2));
 
             break;
         }
@@ -2699,7 +2803,7 @@ _VSC_MC_GEN_GenInst(
                 mcSrc,
                 &srcNum);
 
-            _NegMcSrc(&mcSrc[1]);
+            _NegMcSrc(&mcSrc[1], VIR_Inst_GetSource(Inst, 1));
 
             break;
         }
@@ -2746,7 +2850,7 @@ _VSC_MC_GEN_GenInst(
 
             break;
         }
-    case VIR_OP_AQ_EMIT:
+    case VIR_OP_EMIT:
         {
             _VSC_MC_GEN_GenGeneralInst(Gen,
                 Inst,

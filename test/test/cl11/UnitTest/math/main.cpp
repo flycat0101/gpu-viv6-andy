@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -1452,7 +1452,7 @@ case 38:
         break;
 case 32:
 case 33:
-        fsrc[0] = testCase == 32? -4294967296.f*4294967296.f/2.0f:4294967296.f*4294967296.f/2.0f;
+        fsrc[0] = testCase == 32? 9223372036854775800.000000f/655431.f: -9223372036854775800.000000f/655431.f;
         fsrcBuf = clCreateBuffer(context,
                                  CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                  sizeof(fsrc),

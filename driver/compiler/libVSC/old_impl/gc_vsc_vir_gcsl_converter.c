@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -151,7 +151,7 @@ _CalculateInstCount(
     case VIR_OP_VX_IMG_LOAD_3D: case VIR_OP_VX_IMG_STORE_3D:
     case VIR_OP_IMG_ADDR:   case VIR_OP_CLAMP0MAX:
     case VIR_OP_NOP:        case VIR_OP_MOV:
-    case VIR_OP_CMP:        case VIR_OP_SAT:
+    case VIR_OP_COMPARE:        case VIR_OP_SAT:
     case VIR_OP_ABS:
     case VIR_OP_FLOOR:      case VIR_OP_CEIL:
     case VIR_OP_POW:        case VIR_OP_LOG2:
@@ -186,12 +186,12 @@ _CalculateInstCount(
     case VIR_OP_BITSEL:     case VIR_OP_LEADZERO:
     case VIR_OP_GETEXP:     case VIR_OP_GETMANT:
     case VIR_OP_JMP:        case VIR_OP_CALL:
-    case VIR_OP_RET:        case VIR_OP_CONV:
+    case VIR_OP_RET:        case VIR_OP_CONVERT:
     case VIR_OP_JMPC:
     case VIR_OP_JMP_ANY:
     case VIR_OP_NEG:
     case VIR_OP_MOVA:       case VIR_OP_PRE_DIV:
-    case VIR_OP_PRE_LOG2:   case VIR_OP_AQ_SET:
+    case VIR_OP_PRE_LOG2:   case VIR_OP_SET:
     case VIR_OP_POPCOUNT:
     case VIR_OP_BITFIND_MSB:
     case VIR_OP_BITFIND_LSB:
@@ -202,8 +202,8 @@ _CalculateInstCount(
     case VIR_OP_GET_SAMPLER_IDX:
     case VIR_OP_GET_SAMPLER_LMM:
     case VIR_OP_GET_SAMPLER_LBS:
-    case VIR_OP_AQ_F2I:
-    case VIR_OP_AQ_I2F:
+    case VIR_OP_F2I:
+    case VIR_OP_I2F:
         return 1;
     case VIR_OP_BITEXTRACT:
     case VIR_OP_BITINSERT1:
@@ -267,9 +267,9 @@ _CalculateInstCount(
 
             return count + 1;
         }
-    case VIR_OP_AQ_SELECT:
-        return 3;
     case VIR_OP_SELECT:
+        return 3;
+    case VIR_OP_CSELECT:
         if(_ExpandSelectNeedMove(Converter, VirInst))
         {
             return 3;
@@ -343,8 +343,8 @@ _CalculateInstCount(
     case VIR_OP_LOAD_ATTR:
     case VIR_OP_LOAD_ATTR_O:
     case VIR_OP_SELECT_MAP:
-    case VIR_OP_EMIT:
-    case VIR_OP_RESTART:
+    case VIR_OP_EMIT0:
+    case VIR_OP_RESTART0:
 
     case VIR_OP_PARM:       case VIR_OP_UNREACHABLE:
     case VIR_OP_INTRINSIC:  case VIR_OP_THREADEXIT:
@@ -1303,8 +1303,8 @@ _ConvVirOpcode2Opcode(
     case VIR_OP_CLAMP0MAX:      return gcSL_CLAMP0MAX;
     case VIR_OP_NOP:            return gcSL_NOP;
     case VIR_OP_MOV:            return gcSL_MOV;
-    case VIR_OP_AQ_SET:         return gcSL_SET;
-    case VIR_OP_CMP:            return gcSL_CMP;
+    case VIR_OP_SET:         return gcSL_SET;
+    case VIR_OP_COMPARE:            return gcSL_CMP;
     case VIR_OP_SAT:            return gcSL_SAT;
     case VIR_OP_ABS:            return gcSL_ABS;
     case VIR_OP_FLOOR:          return gcSL_FLOOR;
@@ -1384,7 +1384,7 @@ _ConvVirOpcode2Opcode(
     case VIR_OP_JMP_ANY:        return gcSL_JMP_ANY;
     case VIR_OP_CALL:           return gcSL_CALL;
     case VIR_OP_RET:            return gcSL_RET;
-    case VIR_OP_CONV:           return gcSL_CONV;
+    case VIR_OP_CONVERT:           return gcSL_CONV;
     case VIR_OP_TEXLD:          return gcSL_TEXLD;
     case VIR_OP_TEXLD_U:        return gcSL_TEXLD_U;
     case VIR_OP_TEXLDPCF:       return gcSL_TEXLDPCF;
@@ -1406,8 +1406,8 @@ _ConvVirOpcode2Opcode(
     case VIR_OP_TEXLD_U_LOD:    return gcSL_TEXU_LOD;
     case VIR_OP_BITRANGE:       return gcSL_BITRANGE;
     case VIR_OP_BITRANGE1:      return gcSL_BITRANGE1;
-    case VIR_OP_AQ_F2I:         return gcSL_F2I;
-    case VIR_OP_AQ_I2F:         return gcSL_I2F;
+    case VIR_OP_F2I:         return gcSL_F2I;
+    case VIR_OP_I2F:         return gcSL_I2F;
     case VIR_OP_MEM_BARRIER:
         {
             /* Currently HW can't support memory barrier. */
@@ -1905,7 +1905,7 @@ _ConvVirInst2Inst(
     case VIR_OP_IMG_LOAD_3D:
     case VIR_OP_CLAMP0MAX:
     case VIR_OP_NOP:        case VIR_OP_MOV:
-    case VIR_OP_CMP:        case VIR_OP_SAT:
+    case VIR_OP_COMPARE:        case VIR_OP_SAT:
     case VIR_OP_ABS:
     case VIR_OP_FLOOR:      case VIR_OP_CEIL:
     case VIR_OP_POW:        case VIR_OP_LOG2:
@@ -1944,7 +1944,7 @@ _ConvVirInst2Inst(
     case VIR_OP_JMP:        case VIR_OP_CALL:
     case VIR_OP_JMPC:       case VIR_OP_JMP_ANY:
     case VIR_OP_RET:        case VIR_OP_PRE_DIV:
-    case VIR_OP_PRE_LOG2:   case VIR_OP_AQ_SET:
+    case VIR_OP_PRE_LOG2:   case VIR_OP_SET:
     case VIR_OP_UCARRY:
     case VIR_OP_POPCOUNT:
     case VIR_OP_BITFIND_LSB:
@@ -1953,8 +1953,8 @@ _ConvVirInst2Inst(
     case VIR_OP_GET_SAMPLER_IDX:
     case VIR_OP_GET_SAMPLER_LMM:
     case VIR_OP_GET_SAMPLER_LBS:
-    case VIR_OP_AQ_F2I:
-    case VIR_OP_AQ_I2F:
+    case VIR_OP_F2I:
+    case VIR_OP_I2F:
         {
             gctSIZE_T i = 0;
 
@@ -2153,7 +2153,7 @@ _ConvVirInst2Inst(
         }
         break;
         /* select.condition dest, src0, src1, src2 */
-    case VIR_OP_AQ_SELECT:
+    case VIR_OP_SELECT:
         {
             gctUINT16       dest0;
             gcSL_FORMAT     format;
@@ -2169,18 +2169,18 @@ _ConvVirInst2Inst(
             _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
 
             /* CMP.z dest, dest0, src2 */
-            _ConvVirOperand2Target(Converter, VIR_OP_CMP, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ZERO, srcLoc);
+            _ConvVirOperand2Target(Converter, VIR_OP_COMPARE, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ZERO, srcLoc);
             gcSHADER_AddSource(Converter->Shader, _ConvVirSymbol2Type(sym), dest0, gcSL_SWIZZLE_XYZW, format, precision);
             _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
 
             /* CMP.nz dest, dest0, src1 */
-            _ConvVirOperand2Target(Converter, VIR_OP_CMP, VIR_Inst_GetDest(VirInst), VirInst, gcSL_NOT_ZERO, srcLoc);
+            _ConvVirOperand2Target(Converter, VIR_OP_COMPARE, VIR_Inst_GetDest(VirInst), VirInst, gcSL_NOT_ZERO, srcLoc);
             gcSHADER_AddSource(Converter->Shader, _ConvVirSymbol2Type(sym), dest0, gcSL_SWIZZLE_XYZW, format, precision);
             _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
         }
         break;
         /* select.condition dest, src0, src1, src2 */
-    case VIR_OP_SELECT:
+    case VIR_OP_CSELECT:
         {
             gctUINT16       tmpReg = 0;
             VIR_Enable      enable = VIR_ENABLE_NONE;
@@ -2229,12 +2229,12 @@ _ConvVirInst2Inst(
             else
             {
                 /* CMP.z dest, src0, src1 */
-                _ConvVirOperand2Target(Converter, VIR_OP_CMP, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
+                _ConvVirOperand2Target(Converter, VIR_OP_COMPARE, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
                 _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
                 _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
 
                 /* CMP.nz dest, src0, src2 */
-                _ConvVirOperand2Target(Converter, VIR_OP_CMP, VIR_Inst_GetDest(VirInst), VirInst, canReverse ? reversed : condition, srcLoc);
+                _ConvVirOperand2Target(Converter, VIR_OP_COMPARE, VIR_Inst_GetDest(VirInst), VirInst, canReverse ? reversed : condition, srcLoc);
                 _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 0), VirInst, 0);
                 _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
             }
@@ -2265,12 +2265,12 @@ _ConvVirInst2Inst(
             _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 1), VirInst, 1);
 
             /* cmp.z     dst, dst0, dst  */
-            _ConvVirOperand2Target(Converter, VIR_OP_CMP, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ZERO, srcLoc);
+            _ConvVirOperand2Target(Converter, VIR_OP_COMPARE, VIR_Inst_GetDest(VirInst), VirInst, gcSL_ZERO, srcLoc);
             gcSHADER_AddSource(Converter->Shader, _ConvVirSymbol2Type(sym), tmpReg, swizzle, format, precision);
             _ConvVirOperand2Source(Converter, VIR_Inst_GetDest(VirInst), VirInst, 1);
 
             /* cmp.nz    dst, dst0, src2 */
-            _ConvVirOperand2Target(Converter, VIR_OP_CMP, VIR_Inst_GetDest(VirInst), VirInst, gcSL_NOT_ZERO, srcLoc);
+            _ConvVirOperand2Target(Converter, VIR_OP_COMPARE, VIR_Inst_GetDest(VirInst), VirInst, gcSL_NOT_ZERO, srcLoc);
             gcSHADER_AddSource(Converter->Shader, _ConvVirSymbol2Type(sym), tmpReg, swizzle, format, precision);
             _ConvVirOperand2Source(Converter, VIR_Inst_GetSource(VirInst, 2), VirInst, 1);
 
@@ -2466,7 +2466,7 @@ _ConvVirInst2Inst(
             }
         }
         break;
-    case VIR_OP_CONV:
+    case VIR_OP_CONVERT:
         {
             VIR_Type   *type = VIR_Shader_GetTypeFromId(Converter->VirShader,
                 VIR_Operand_GetType(VIR_Inst_GetSource(VirInst, 0)));
@@ -2873,7 +2873,7 @@ gcSHADER_ConvFromVIR(
     gctUINT    i, duboMemberIndex;
     gctBOOL seperatedShader = Flags & gcvSHADER_SEPERATED_PROGRAM;
     gcsUNIFORM_BLOCK dubo = gcvNULL, cubo = gcvNULL;
-    gctBOOL useFullNewLinker = gcUseFullNewLinker(gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2)));
+    gctBOOL useFullNewLinker = gcUseFullNewLinker(gcHWCaps.hwFeatureFlags.hasHalti2);
     gcKERNEL_FUNCTION  *kernelFunctions = gcvNULL;
 
     gcmHEADER_ARG("Shader=0x%x VirShader=0x%x", Shader, VirShader);

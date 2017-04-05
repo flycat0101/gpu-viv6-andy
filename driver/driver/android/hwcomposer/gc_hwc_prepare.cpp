@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -62,7 +62,7 @@ _IsOverlay(
         return gcvFALSE;
     }
 
-    /* TODO: Check OVERLAY layer correctly.
+    /* TODO (Soc-vendor): Check OVERLAY layer correctly.
      * Here we set overlay only when no surfaces in handle. This may be
      * because 'private_handle_t' is customized. */
     return (handle->surface == 0);

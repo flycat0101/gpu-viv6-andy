@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -50,6 +50,12 @@
 /* 8 bpp RGB */
 #define DRM_FORMAT_RGB332   fourcc_code('R', 'G', 'B', '8') /* [7:0] R:G:B 3:3:2 */
 #define DRM_FORMAT_BGR233   fourcc_code('B', 'G', 'R', '8') /* [7:0] B:G:R 2:3:3 */
+
+/* 8 bpp R */
+#define DRM_FORMAT_R8       fourcc_code('R', '8', ' ', ' ') /* [7:0] R     8 */
+
+/* 16 bpp RG */
+#define DRM_FORMAT_GR88     fourcc_code('G', 'R', '8', '8') /* [15:0] R:G     8:8     little endian */
 
 /* 16 bpp RGB */
 #define DRM_FORMAT_XRGB4444 fourcc_code('X', 'R', '1', '2') /* [15:0] x:R:G:B 4:4:4:4 little endian */

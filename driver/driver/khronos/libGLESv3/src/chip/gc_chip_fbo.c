@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -681,9 +681,6 @@ __glChipFramebufferTexture(
 
         samples = gcmMAX((GLsizei)texObj->samplesUsed, samples);
 
-        /*
-        ** TODO: remove cubemap check
-        */
         if (gcChipTexNeedShadow(gc, texObj, texInfo, formatMapInfo, samples, &attachPoint->samplesUsed))
         {
             __GLimageUser *fboList = texObj->fboList;
@@ -727,8 +724,6 @@ __glChipFramebufferTexture(
             gcmONERROR(gcoTEXTURE_RenderIntoMipMap2(texInfo->object,
                                                     level,
                                                     chipMipLevel->shadow[slice].masterDirty));
-            /* TODO: do we need to set orientation of new create RT surface? */
-
             /* TO_DO, put at render real happens */
             CHIP_TEX_IMAGE_UPTODATE(texInfo, level);
         }
@@ -754,7 +749,6 @@ OnError:
 **  Return Value:    Describe the returning sequence
 **
 ********************************************************************/
-/* TODO: better to move it to GLcore layer */
 GLboolean
 __glChipIsFramebufferComplete(
     __GLcontext *gc,
@@ -762,60 +756,35 @@ __glChipIsFramebufferComplete(
     )
 {
     GLuint i;
-    __GLrenderbufferObject *rbo = NULL;
-    __GLtextureObject *tex = NULL;
-    __GLmipMapLevel *mipmap = NULL;
-    __GLfboAttachPoint *attachPoint = NULL;
-
-    GLboolean noImageAttached = GL_TRUE;
-    GLuint width = 0, height = 0, samples = 0;
     GLuint fbwidth = 0, fbheight = 0, fbsamples = 0;
-    GLboolean fixedSampleLoc = GL_TRUE;
-    __GLformatInfo *formatInfo = NULL;
-    GLboolean renderable = GL_TRUE;
-
-    GLenum error = GL_FRAMEBUFFER_COMPLETE;
-    GLuint fbIntMask = 0;
-    GLuint fbFloatMask = 0;
-    GLuint fbUIntMask = 0;
-    GLuint fbUNormalizedMask = 0;
     GLboolean fbFixedSampleLoc = GL_TRUE;
     GLboolean fbLayered = GL_FALSE;
     GLenum fbLayeredTarget = __GL_TEXTURE_2D_INDEX;
-
     GLenum depthObjType = GL_NONE;
     GLenum stencilObjType = GL_NONE;
     GLuint depthObjName = 0;
     GLuint stencilObjName = 0;
     GLboolean depthObjSet = GL_FALSE;
     GLboolean stencilObjSet = GL_FALSE;
+    GLboolean noImageAttached = GL_TRUE;
     GLboolean shadowRender = GL_FALSE;
-    __GLchipRenderbufferObject *chipRBO;
-    __GLchipTextureInfo *texInfo;
-    __GLchipMipmapInfo *chipMipLevel;
-    GLboolean ret = GL_FALSE;
     GLboolean hasDefaultDimesion = GL_FALSE;
     GLboolean useDefault = GL_FALSE;
     GLbitfield attribFlag = 0;
-    GLboolean layered = GL_FALSE;
-    GLenum layeredTarget = __GL_TEXTURE_2D_INDEX;
     GLuint maxLayers = ~(GLuint)0;
+    GLboolean ret = GL_TRUE;
+    GLenum error = GL_FRAMEBUFFER_COMPLETE;
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
     gcmHEADER_ARG("gc=0x%x framebufferObj=0x%x", gc, framebufferObj);
 
-    /* Default FBO is always complete */
-    if (framebufferObj->name == 0)
-    {
-        gcmFOOTER_ARG("return=%d", GL_TRUE);
-        return GL_TRUE;
-    }
+    /* Default FBO must already be checked when make current. */
+    GL_ASSERT(framebufferObj->name || (framebufferObj->flag & __GL_FRAMEBUFFER_IS_CHECKED));
 
     if (framebufferObj->flag & __GL_FRAMEBUFFER_IS_CHECKED)
     {
         ret = (framebufferObj->flag & __GL_FRAMEBUFFER_IS_COMPLETE) ? GL_TRUE : GL_FALSE;
-        gcmFOOTER_ARG("return=%d", ret);
-        return ret;
+        goto OnExit;
     }
 
     /* Zero flag and masks before starting evaluation */
@@ -823,18 +792,31 @@ __glChipIsFramebufferComplete(
     framebufferObj->fbIntMask = 0;
     framebufferObj->fbFloatMask = 0;
     framebufferObj->fbUIntMask = 0;
-    framebufferObj->fbUNormalizedMask = 0;
+    framebufferObj->fbUnormMask = 0;
 
-    for (i = 0; i < __GL_MAX_ATTACHMENTS; i++)
+    for (i = 0; i < __GL_MAX_ATTACHMENTS; ++i)
     {
-        /* All framebuffer attachment points are "framebuffer attachment complete". */
+        GLuint width = 0, height = 0, samples = 0;
+        GLenum layeredTarget = __GL_TEXTURE_2D_INDEX;
+        GLboolean fixedSampleLoc = GL_TRUE;
+        GLboolean layered = GL_FALSE;
+        GLboolean renderable = GL_TRUE;
 
-        fbIntMask = 0;
-        fbFloatMask = 0;
-        fbUIntMask = 0;
-        fbUNormalizedMask = 0;
+        GLuint maskInt = 0;
+        GLuint maskFloat = 0;
+        GLuint maskUint = 0;
+        GLuint maskUnorm = 0;
 
-        attachPoint = &framebufferObj->attachPoint[i];
+        __GLformatInfo *formatInfo = NULL;
+        __GLrenderbufferObject *rbo = gcvNULL;
+        __GLtextureObject *tex = gcvNULL;
+        __GLmipMapLevel *mipmap = gcvNULL;
+        __GLchipRenderbufferObject *chipRBO = gcvNULL;
+        __GLchipTextureInfo *texInfo = gcvNULL;
+        __GLchipMipmapInfo *chipMipLevel = gcvNULL;
+
+        __GLfboAttachPoint *attachPoint = &framebufferObj->attachPoint[i];
+
         if (attachPoint->objType == GL_NONE)
         {
             hasDefaultDimesion = (framebufferObj->defaultWidth > 0) &&
@@ -851,14 +833,14 @@ __glChipIsFramebufferComplete(
             if (!rbo)
             {
                 error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                goto return_not_complete;
+                goto OnExit;
             }
 
             /* Image dimension not zero */
             if ((rbo->width == 0) || (rbo->height == 0) || (rbo->formatInfo == gcvNULL))
             {
                 error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                goto return_not_complete;
+                goto OnExit;
             }
 
             chipRBO = (__GLchipRenderbufferObject *)rbo->privateData;
@@ -870,13 +852,13 @@ __glChipIsFramebufferComplete(
                 shadowRender = GL_TRUE;
             }
 
-            width     = rbo->width;
-            height    = rbo->height;
+            width = rbo->width;
+            height = rbo->height;
             formatInfo = rbo->formatInfo;
-            samples   = rbo->samplesUsed;
+            samples = rbo->samplesUsed;
             fixedSampleLoc = GL_TRUE;
             attribFlag |= __GL_FRAMEBUFFER_ATTACH_RBO;
-            layered  = attachPoint->layered;
+            layered = attachPoint->layered;
             maxLayers = 1;
             GL_ASSERT(!layered);
             break;
@@ -886,14 +868,14 @@ __glChipIsFramebufferComplete(
             if (!tex)
             {
                 error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                goto return_not_complete;
+                goto OnExit;
             }
             mipmap = &tex->faceMipmap[attachPoint->face][attachPoint->level];
 
             if (mipmap->width == 0 || mipmap->height == 0 || mipmap->formatInfo == gcvNULL)
             {
                 error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                goto return_not_complete;
+                goto OnExit;
             }
 
             fixedSampleLoc = GL_TRUE;
@@ -908,7 +890,7 @@ __glChipIsFramebufferComplete(
                     (layered && (mipmap->depth >= (GLint)gc->constants.maxTextureDepthSize)))
                 {
                     error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                    goto return_not_complete;
+                    goto OnExit;
                 }
                 if ((GLuint)mipmap->depth < maxLayers)
                 {
@@ -921,7 +903,7 @@ __glChipIsFramebufferComplete(
                     (layered && (mipmap->arrays >= (GLint)gc->constants.maxTextureDepthSize)))
                 {
                     error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                    goto return_not_complete;
+                    goto OnExit;
                 }
                 if ((GLuint)mipmap->arrays < maxLayers)
                 {
@@ -934,7 +916,7 @@ __glChipIsFramebufferComplete(
                     (layered && (mipmap->arrays >= (GLint)gc->constants.maxTextureDepthSize)))
                 {
                     error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                    goto return_not_complete;
+                    goto OnExit;
                 }
                 /* fall through */
             case __GL_TEXTURE_2D_MS_INDEX:
@@ -951,7 +933,7 @@ __glChipIsFramebufferComplete(
                     (layered && (mipmap->arrays >= (GLint)gc->constants.maxTextureDepthSize)))
                 {
                     error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-                    goto return_not_complete;
+                    goto OnExit;
                 }
                 if ((GLuint)mipmap->arrays < maxLayers)
                 {
@@ -995,29 +977,29 @@ __glChipIsFramebufferComplete(
             break;
         }
 
-        fbUIntMask = ((GL_UNSIGNED_INT == formatInfo->category)? 0x1: 0x0) << i;
-        fbIntMask = ((fbUIntMask || (GL_INT == formatInfo->category))? 0x1: 0x0) << i;
-        fbFloatMask = ((GL_FLOAT == formatInfo->category)? 0x1: 0x0) << i;
-        fbUNormalizedMask = ((GL_UNSIGNED_NORMALIZED == formatInfo->category)? 0x1: 0x0) << i;
+        maskUint = ((GL_UNSIGNED_INT == formatInfo->category)? 0x1: 0x0) << i;
+        maskInt = ((maskUint || (GL_INT == formatInfo->category))? 0x1: 0x0) << i;
+        maskUnorm = ((GL_UNSIGNED_NORMALIZED == formatInfo->category)? 0x1: 0x0) << i;
+        maskFloat = ((GL_FLOAT == formatInfo->category)? 0x1: 0x0) << i;
 
         if (i < __GL_MAX_COLOR_ATTACHMENTS)
         {
             renderable = renderable && (formatInfo->renderable && (formatInfo->baseFormat != GL_DEPTH_COMPONENT &&
-                                                    formatInfo->baseFormat != GL_DEPTH_STENCIL &&
-                                                    formatInfo->baseFormat != GL_STENCIL));
+                                                                   formatInfo->baseFormat != GL_DEPTH_STENCIL &&
+                                                                   formatInfo->baseFormat != GL_STENCIL));
         }
         else if (__GL_DEPTH_ATTACHMENT_POINT_INDEX == i)
         {
             renderable = renderable && (formatInfo->renderable && (formatInfo->baseFormat == GL_DEPTH_COMPONENT ||
-                                                    formatInfo->baseFormat == GL_DEPTH_STENCIL));
+                                                                   formatInfo->baseFormat == GL_DEPTH_STENCIL));
             depthObjType = attachPoint->objType;
             depthObjName = attachPoint->objName;
             depthObjSet = GL_TRUE;
         }
         else if (__GL_STENCIL_ATTACHMENT_POINT_INDEX == i)
         {
-            renderable =renderable && (formatInfo->renderable && (formatInfo->baseFormat == GL_DEPTH_STENCIL ||
-                                                    formatInfo->baseFormat == GL_STENCIL));
+            renderable = renderable && (formatInfo->renderable && (formatInfo->baseFormat == GL_DEPTH_STENCIL ||
+                                                                   formatInfo->baseFormat == GL_STENCIL));
             stencilObjType = attachPoint->objType;
             stencilObjName = attachPoint->objName;
             stencilObjSet = GL_TRUE;
@@ -1026,7 +1008,7 @@ __glChipIsFramebufferComplete(
         if (!renderable)
         {
             error = GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT;
-            goto return_not_complete;
+            goto OnExit;
         }
 
         /*
@@ -1045,19 +1027,20 @@ __glChipIsFramebufferComplete(
         {
             /* ES30 will not generate the error */
             error = GL_FRAMEBUFFER_INCOMPLETE_DIMENSIONS;
-            goto return_not_complete;
+            goto OnExit;
         }
         else if ((fbsamples != samples) || (fbFixedSampleLoc != fixedSampleLoc))
         {
             error = GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE;
-            goto return_not_complete;
+            goto OnExit;
         }
         else if ((fbLayered != layered) ||
                  (fbLayered && (fbLayeredTarget != layeredTarget)))
         {
             error = GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS_EXT;
-            goto return_not_complete;
+            goto OnExit;
         }
+
         /*
         ** As ES30 SPEC required, both depth and stencil attach point must refer to same image.
         ** For ES20, SPEC implicitly indicates implementation cannot support the combination,
@@ -1070,14 +1053,14 @@ __glChipIsFramebufferComplete(
                 (depthObjName != stencilObjName))
             {
                 error = GL_FRAMEBUFFER_UNSUPPORTED;
-                goto return_not_complete;
+                goto OnExit;
             }
         }
 
-        framebufferObj->fbIntMask |= fbIntMask;
-        framebufferObj->fbFloatMask |= fbFloatMask;
-        framebufferObj->fbUIntMask |= fbUIntMask;
-        framebufferObj->fbUNormalizedMask |= fbUNormalizedMask;
+        framebufferObj->fbIntMask |= maskInt;
+        framebufferObj->fbUIntMask |= maskUint;
+        framebufferObj->fbUnormMask |= maskUnorm;
+        framebufferObj->fbFloatMask |= maskFloat;
 
         noImageAttached = GL_FALSE;
     }
@@ -1117,7 +1100,7 @@ __glChipIsFramebufferComplete(
         else
         {
             error = GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT;
-            goto return_not_complete;
+            goto OnExit;
         }
     }
 
@@ -1132,21 +1115,21 @@ __glChipIsFramebufferComplete(
     framebufferObj->fbLayered = fbLayered;
     framebufferObj->fbMaxLayers = maxLayers;
 
-    ret = GL_TRUE;
-    gcmFOOTER_ARG("return=%d", ret);
-    return ret;
+OnExit:
+    if (error != GL_FRAMEBUFFER_COMPLETE)
+    {
+        framebufferObj->flag |=  __GL_FRAMEBUFFER_IS_CHECKED;
+        framebufferObj->checkCode = error;
+        framebufferObj->fbWidth = framebufferObj->fbHeight = 0;
+        framebufferObj->fbSamples = 0;
+        framebufferObj->fbIntMask = 0;
+        framebufferObj->fbFloatMask = 0;
+        framebufferObj->fbLayered = 0;
+        framebufferObj->fbMaxLayers = 0;
 
-return_not_complete:
+        ret = GL_FALSE;
+    }
 
-    framebufferObj->flag |=  __GL_FRAMEBUFFER_IS_CHECKED;
-    framebufferObj->checkCode = error;
-    framebufferObj->fbWidth = framebufferObj->fbHeight = 0;
-    framebufferObj->fbSamples = 0;
-    framebufferObj->fbIntMask = 0;
-    framebufferObj->fbFloatMask = 0;
-    framebufferObj->fbLayered = 0;
-    framebufferObj->fbMaxLayers = 0;
-    ret = GL_FALSE;
     gcmFOOTER_ARG("return=%d", ret);
     return ret;
 }
@@ -1388,7 +1371,6 @@ gcChipBlitFramebuffer3Dblit(
     blitArgs.scissor.top    = gc->state.scissor.scissorY;
     blitArgs.scissor.bottom = gc->state.scissor.scissorY + gc->state.scissor.scissorHeight;
 
-    /* TODO: merge it back to caller when chip3Dblit get removed */
     if (chipCtx->drawYInverted)
     {
         GLint temp = blitArgs.scissor.top;
@@ -2074,7 +2056,7 @@ __glChipRenderbufferStorage(
     }
 
     if (drvFormat == __GL_FMT_RGBA4 &&
-        chipCtx->patchId == gcvPATCH_DEQP &&
+        (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) &&
         gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_DITHER_FIX2) == gcvFALSE)
     {
         drvFormat = __GL_FMT_RGBA8;
@@ -2752,7 +2734,6 @@ gcChipFBOMarkShadowRendered(
     {
         __GLfboAttachPoint *attachPoint = &fbo->attachPoint[__GL_DEPTH_ATTACHMENT_POINT_INDEX];
 
-        /* TODO: depth test and function can be detect to check whether depth buffer was really written */
         if (attachPoint->objType == GL_TEXTURE && chipCtx->drawDepthView.surf && gc->state.depth.writeEnable)
         {
             __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
@@ -2805,7 +2786,6 @@ gcChipFBOMarkShadowRendered(
     {
         __GLfboAttachPoint *attachPoint = &fbo->attachPoint[__GL_STENCIL_ATTACHMENT_POINT_INDEX];
 
-        /* TODO: stencil/depth test and function can be detect to check whether depth buffer was really written */
         if (attachPoint->objType == GL_TEXTURE && chipCtx->drawStencilView.surf &&
             (gc->state.stencil.front.writeMask || gc->state.stencil.back.writeMask))
         {
@@ -2888,7 +2868,6 @@ gcChipTexMipSliceSyncFromShadow(
             {
                 gcsSURF_VIEW shadowView = {shadow->surface, 0 ,1};
 
-                /* TODO: in fact, there should be mechanism to make sure draw to RT was finished here */
                 gcmONERROR(gcoSURF_ResolveRect(&shadowView, &texView, gcvNULL));
                 gcmONERROR(gcChipSetImageSrc(texInfo->eglImage.image, texView.surf));
                 shadow->shadowDirty = GL_FALSE;
@@ -3020,7 +2999,6 @@ gcChipTexSyncFromShadow(
                     {
                         gcsSURF_VIEW shadowView = {shadow->surface, 0, 1};
 
-                        /* TODO: in fact, there should be mechanism to make sure draw to RT was finished here */
                         gcmONERROR(gcoSURF_ResolveRect(&shadowView, &texView, gcvNULL));
 
                         gcmONERROR(gcChipSetImageSrc(texInfo->eglImage.image, texView.surf));
@@ -3389,7 +3367,6 @@ gcChipFBOSyncEGLImageNativeBuffer(
         }
     }
 
-    /* TODO: Sync for RBO EGLImage Native buffer. */
     /*
     else if (GL_RENDERBUFFER == attachPoint->objType)
     {

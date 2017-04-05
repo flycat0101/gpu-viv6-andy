@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,6 +23,102 @@ extern gctBOOL gcSHADER_GoVIRPass(gcSHADER Shader);
 /*****************************************************************************\
 |*                         Supporting functions                              *|
 \*****************************************************************************/
+gctINT
+clfRetainKernel(
+    cl_kernel    Kernel
+    )
+{
+    gctINT status = CL_SUCCESS;
+
+    gcmHEADER_ARG("Kernel=0x%x", Kernel);
+
+    if (Kernel == gcvNULL || Kernel->objectType != clvOBJECT_KERNEL)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-007011: (clfRetainKernel) invalid Kernel.\n");
+        clmRETURN_ERROR(CL_INVALID_KERNEL);
+    }
+
+    gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, Kernel->referenceCount, gcvNULL));
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+gctINT
+clfReleaseKernel(
+    cl_kernel   Kernel
+    )
+{
+    gctINT status = CL_SUCCESS;
+    gctINT32  oldReference;
+
+    gcmHEADER_ARG("Kernel=0x%x", Kernel);
+
+    if (Kernel == gcvNULL || Kernel->objectType != clvOBJECT_KERNEL)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-007011: (clfReleaseKernel) invalid Kernel.\n");
+        clmRETURN_ERROR(CL_INVALID_KERNEL);
+    }
+
+    gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, Kernel->referenceCount, &oldReference));
+
+    if (oldReference == 1)
+    {
+        /* Release arguments */
+        gcmVERIFY_OK(clfFreeKernelArgs(Kernel->numArgs, Kernel->args, gcvTRUE));
+
+        /* Release mutex. */
+        gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, Kernel->argMutex));
+        Kernel->argMutex = gcvNULL;
+
+        Kernel->objectType = clvOBJECT_UNKNOWN;
+        clfReleaseProgram(Kernel->program);
+
+        while (Kernel->patchedStates)
+        {
+            clsKernelStates_PTR states = Kernel->patchedStates;
+
+            /* Release states */
+            Kernel->patchedStates = states->next;
+            if (states->stateBuffer) gcmOS_SAFE_FREE(gcvNULL, states->stateBuffer);
+            if (states->hints) gcHINTS_Destroy(states->hints);
+            if (states->hints)
+            {
+                if(states->hints == Kernel->states.hints)
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, states->hints);
+                    Kernel->states.hints = gcvNULL;
+                }
+                else
+                {
+                    gcmOS_SAFE_FREE(gcvNULL, states->hints);
+                }
+            }
+            if (states->binary) gcSHADER_Destroy((gcSHADER)states->binary);
+            if (states->patchDirective) clfDestroyPatchDirective(&states->patchDirective);
+            gcmOS_SAFE_FREE(gcvNULL, states);
+        }
+
+        if (Kernel->states.stateBuffer) gcmOS_SAFE_FREE(gcvNULL, Kernel->states.stateBuffer);
+        if (Kernel->states.hints) gcHINTS_Destroy(Kernel->states.hints);
+        if (Kernel->states.hints) gcmOS_SAFE_FREE(gcvNULL, Kernel->states.hints);
+        if (Kernel->states.binary) gcSHADER_Destroy((gcSHADER)Kernel->states.binary);
+        if (Kernel->name) gcmOS_SAFE_FREE(gcvNULL, Kernel->name);
+
+        /* Destroy the reference count object */
+        gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, Kernel->referenceCount));
+        Kernel->referenceCount = gcvNULL;
+
+        gcmOS_SAFE_FREE(gcvNULL, Kernel);
+    }
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
 
 gctINT
 clfSetupImageSampler(
@@ -86,7 +182,7 @@ OnError:
 static gctUINT
 clfGetUniformArrayInfo(
     gcUNIFORM uniform,
-    gctUINT *maxNameLen,    /* max possible name len of this entry, exclude bottom-level "[0]" */
+    gctUINT *maxNameLen, /* max possible name len of this entry, exclude bottom-level "[0]" */
     gctBOOL *isArray,
     gctUINT *arraySize
 )
@@ -186,8 +282,12 @@ clfLoadKernelArgValues(
     clmONERROR(gcUNIFORM_GetFlags(Arg->uniform, &flags),
               CL_INVALID_VALUE);
 
-    if (isUniformKernelArg(Arg->uniform) ||
-        isUniformKernelArgConstant(Arg->uniform))
+    if (isUniformCompiletimeInitialized(Arg->uniform))
+    {
+       ;
+    }
+    else if (isUniformKernelArg(Arg->uniform) ||
+             isUniformKernelArgConstant(Arg->uniform))
     {
         if (isPointer)
         {
@@ -222,7 +322,9 @@ clfLoadKernelArgValues(
                 data = (gctINT *) &memObj->u.image.physical;
 
 #if cldTUNING
-                if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION) && (Kernel->patchNeeded == gcvFALSE) && gcSHADER_GoVIRPass(Shader))
+                if(Kernel->context->devices[0]->deviceInfo.supportIMGInstr &&
+                  (Kernel->patchNeeded == gcvFALSE) &&
+                  gcSHADER_GoVIRPass(Shader))
                 {
                     gctUINT addressMode = 0, format, tiling, type=0, componentCount=0,
                             swizzleR=0, swizzleG=0, swizzleB=0, swizzleA=0, i=0;
@@ -255,6 +357,7 @@ clfLoadKernelArgValues(
                         depth = memObj->u.image.depth;
                         type = 1;
                         break;
+#if BUILD_OPENCL_12
                     case CL_MEM_OBJECT_IMAGE1D_ARRAY:
                         tmpData[2] = (memObj->u.image.width) | (memObj->u.image.width<<16);
                         sliceSize = memObj->u.image.width;
@@ -267,6 +370,7 @@ clfLoadKernelArgValues(
                         depth = memObj->u.image.arraySize;
                         type = 1;
                         break;
+#endif
                     default:
                         break;
                     }
@@ -484,6 +588,13 @@ clfLoadKernelArgValues(
                             }
                         }
                     }
+                    else if(Kernel->program->buildOptions != gcvNULL && strstr(Kernel->program->buildOptions, "-cl-viv-vx-extension") != gcvNULL)
+                    {
+                        if(memObj->u.image.vxcaddressingMode == CL_ADDRESS_CLAMP_TO_EDGE)
+                            addressMode = 3;
+                        if(memObj->u.image.vxcaddressingMode == CL_ADDRESS_CLAMP)
+                            addressMode = 1;
+                    }
 
                     tmpData[3] = shift | (addressMode<<4) | (format<<6) | (tiling<<10) | (type<<12)
                         | (componentCount<<14) | (swizzleR<<16) | (swizzleG<<20) | (swizzleB<<24) | (swizzleA<<28);
@@ -556,6 +667,10 @@ clfLoadKernelArgValues(
             case gcSHADER_FLOAT_X2:
             case gcSHADER_FLOAT_X3:
             case gcSHADER_FLOAT_X4:
+            case gcSHADER_FLOAT16_X1:
+            case gcSHADER_FLOAT16_X2:
+            case gcSHADER_FLOAT16_X3:
+            case gcSHADER_FLOAT16_X4:
             case gcSHADER_FLOAT_2X2:
             case gcSHADER_FLOAT_3X3:
             case gcSHADER_FLOAT_4X4:
@@ -573,10 +688,26 @@ clfLoadKernelArgValues(
             case gcSHADER_INTEGER_X2:
             case gcSHADER_INTEGER_X3:
             case gcSHADER_INTEGER_X4:
+            case gcSHADER_INT8_X1:
+            case gcSHADER_INT8_X2:
+            case gcSHADER_INT8_X3:
+            case gcSHADER_INT8_X4:
+            case gcSHADER_INT16_X1:
+            case gcSHADER_INT16_X2:
+            case gcSHADER_INT16_X3:
+            case gcSHADER_INT16_X4:
             case gcSHADER_UINT_X1:
             case gcSHADER_UINT_X2:
             case gcSHADER_UINT_X3:
             case gcSHADER_UINT_X4:
+            case gcSHADER_UINT8_X1:
+            case gcSHADER_UINT8_X2:
+            case gcSHADER_UINT8_X3:
+            case gcSHADER_UINT8_X4:
+            case gcSHADER_UINT16_X1:
+            case gcSHADER_UINT16_X2:
+            case gcSHADER_UINT16_X3:
+            case gcSHADER_UINT16_X4:
 
                 switch (format)
                 {
@@ -882,7 +1013,7 @@ clfLoadKernelArgValues(
                     clmONERROR(status, CL_INVALID_VALUE);
                 }
 
-                gcoOS_MemCopy(privateBuf, memAllocInfo,  sizeof(clsMemAllocInfo));
+                gcoOS_MemCopy(privateBuf, memAllocInfo, sizeof(clsMemAllocInfo));
                 (*privateBufList)->buffer = privateBuf;
                 (*privateBufList)->next = gcvNULL;
                 (*privateBufList)->kernel = Kernel;
@@ -966,7 +1097,7 @@ clfLoadKernelArgValues(
                                                         &memAllocInfo->logical,
                                                         &memAllocInfo->node),
                                    CL_INVALID_VALUE);
-                        gcoOS_MemCopy(privateBuf, memAllocInfo,  sizeof(clsMemAllocInfo));
+                        gcoOS_MemCopy(privateBuf, memAllocInfo, sizeof(clsMemAllocInfo));
 
                         node->buffer = privateBuf;
                     }
@@ -994,7 +1125,7 @@ clfLoadKernelArgValues(
                         clmONERROR(status, CL_INVALID_VALUE);
                     }
 
-                    gcoOS_MemCopy(privateBuf, memAllocInfo,  sizeof(clsMemAllocInfo));
+                    gcoOS_MemCopy(privateBuf, memAllocInfo, sizeof(clsMemAllocInfo));
 
                     tempNode->buffer = privateBuf;
                     tempNode->next = gcvNULL;
@@ -1055,7 +1186,7 @@ clfLoadKernelArgValues(
 
         gcmDUMP_BUFFER(gcvNULL,
                        "memory",
-                       gcmPTR2INT( memAllocInfo->physical),
+                       gcmPTR2INT(memAllocInfo->physical),
                        memAllocInfo->logical,
                        0,
                        Kernel->constantMemSize);
@@ -1152,6 +1283,10 @@ clfLoadKernelArgValues(
         case gcSHADER_FLOAT_X2:
         case gcSHADER_FLOAT_X3:
         case gcSHADER_FLOAT_X4:
+        case gcSHADER_FLOAT16_X1:
+        case gcSHADER_FLOAT16_X2:
+        case gcSHADER_FLOAT16_X3:
+        case gcSHADER_FLOAT16_X4:
         case gcSHADER_FLOAT_2X2:
         case gcSHADER_FLOAT_3X3:
         case gcSHADER_FLOAT_4X4:
@@ -1169,10 +1304,26 @@ clfLoadKernelArgValues(
         case gcSHADER_INTEGER_X2:
         case gcSHADER_INTEGER_X3:
         case gcSHADER_INTEGER_X4:
+        case gcSHADER_INT8_X1:
+        case gcSHADER_INT8_X2:
+        case gcSHADER_INT8_X3:
+        case gcSHADER_INT8_X4:
+        case gcSHADER_INT16_X1:
+        case gcSHADER_INT16_X2:
+        case gcSHADER_INT16_X3:
+        case gcSHADER_INT16_X4:
         case gcSHADER_UINT_X1:
         case gcSHADER_UINT_X2:
         case gcSHADER_UINT_X3:
         case gcSHADER_UINT_X4:
+        case gcSHADER_UINT8_X1:
+        case gcSHADER_UINT8_X2:
+        case gcSHADER_UINT8_X3:
+        case gcSHADER_UINT8_X4:
+        case gcSHADER_UINT16_X1:
+        case gcSHADER_UINT16_X2:
+        case gcSHADER_UINT16_X3:
+        case gcSHADER_UINT16_X4:
 
             switch (format)
             {
@@ -1282,7 +1433,7 @@ clfLoadKernelArgValues(
                 {
                     gctCONST_STRING name;
                     gctSTRING special;
-                    if (   gcmIS_SUCCESS(gcUNIFORM_GetName(Arg->uniform, gcvNULL, &name))
+                    if (gcmIS_SUCCESS(gcUNIFORM_GetName(Arg->uniform, gcvNULL, &name))
                         && gcmIS_SUCCESS(gcoOS_StrFindReverse(name, '#', &special))
                         )
                     {
@@ -1547,7 +1698,7 @@ clfCalcLocalWorkSize(
 
             preferredWorkGroupSize = Kernel->preferredWorkGroupSizeMultiple;
             /* Assume GPU Core Count is 2^N */
-            gcmASSERT( preferredWorkGroupSize == (size_t)(1 << count));
+            gcmASSERT(preferredWorkGroupSize == (size_t)(1 << count));
 
             gcoOS_Allocate(gcvNULL, count*sizeof(size_t), (gctPOINTER*)&WidthLeave);
             gcoOS_Allocate(gcvNULL, count*sizeof(size_t), (gctPOINTER*)&HeightLeave);
@@ -1800,6 +1951,7 @@ clfExecuteKernel(
     clsArgument_PTR     Args,
     gctUINT             WorkDim,
     size_t              GlobalWorkOffset[3],
+    size_t              GlobalScale[3],
     size_t              GlobalWorkSize[3],
     size_t              LocalWorkSize[3],
     clsPrivateBuffer_PTR *privateBufList
@@ -1939,6 +2091,7 @@ clfExecuteKernel(
     gcmONERROR(gcoCL_InvokeKernel((gcSHADER) Kernel->states.binary,
                                   WorkDim,
                                   GlobalWorkOffset,
+                                  GlobalScale,
                                   GlobalWorkSize,
                                   LocalWorkSize,
                                   Kernel->states.hints->valueOrder,
@@ -1989,7 +2142,7 @@ clfExecuteCommandNDRangeKernel(
         gctBOOL localWorkGroupSet = gcvFALSE;
         gctBOOL globalWorkSizeAlign = gcvFALSE;
         /* check Hardware feature */
-        globalWorkSizeWorkaroundNeed = (gcvSTATUS_FALSE == gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SH_MULTI_WG_PACK)?gcvTRUE:gcvFALSE);
+        globalWorkSizeWorkaroundNeed = !NDRangeKernel->kernel->context->devices[0]->deviceInfo.multiWGPack;
         if (!globalWorkSizeWorkaroundNeed) break;
 
         /* Check work Dimension, only support 1D and 2D. 3D calculate complex, skip it so far */
@@ -2028,7 +2181,7 @@ clfExecuteCommandNDRangeKernel(
 
         /* check Kernel use group size relate build-in function */
         i = 0;
-        while( i < GetShaderUniformCount((gcSHADER)NDRangeKernel->kernel->states.binary))
+        while(i < GetShaderUniformCount((gcSHADER)NDRangeKernel->kernel->states.binary))
         {
             gcUNIFORM uniform = GetShaderUniform((gcSHADER)NDRangeKernel->kernel->states.binary, i);
             gctCONST_STRING tmpName=gcvNULL;
@@ -2129,6 +2282,7 @@ clfExecuteCommandNDRangeKernel(
                                         NDRangeKernel->args,
                                         NDRangeKernel->workDim,
                                         globalWorkOffset1+i,
+                                        NDRangeKernel->globalScale,
                                         globalWorkSize1+i,
                                         localWorkSize1+i,
                                         &(Command->commandQueue->privateBufList)),
@@ -2153,6 +2307,7 @@ clfExecuteCommandNDRangeKernel(
                                             NDRangeKernel->args,
                                             NDRangeKernel->workDim,
                                             globalWorkOffset+i,
+                                            NDRangeKernel->globalScale,
                                             globalWorkSize+i,
                                             localWorkSize+i,
                                             &(Command->commandQueue->privateBufList)),
@@ -2167,6 +2322,7 @@ clfExecuteCommandNDRangeKernel(
                                         NDRangeKernel->args,
                                         NDRangeKernel->workDim,
                                         NDRangeKernel->globalWorkOffset,
+                                        NDRangeKernel->globalScale,
                                         NDRangeKernel->globalWorkSize,
                                         NDRangeKernel->localWorkSize,
                                         &(Command->commandQueue->privateBufList)),
@@ -2204,6 +2360,7 @@ clfExecuteCommandTask(
 {
     clsCommandTask_PTR      task;
     size_t                  globalWorkOffset[3] = {0, 0, 0};
+    size_t                  globalScale[3] = {1, 1, 1};
     size_t                  globalWorkSize[3] = {1, 0, 0};
     size_t                  localWorkSize[3]  = {1, 0, 0};
     gctINT                  status;
@@ -2222,6 +2379,7 @@ clfExecuteCommandTask(
                                 task->args,
                                 1,
                                 globalWorkOffset,
+                                globalScale,
                                 globalWorkSize,
                                 localWorkSize,
                                 &(Command->commandQueue->privateBufList)),
@@ -2276,6 +2434,8 @@ clfAllocateKernelArgs(
         clmONERROR(gcSHADER_GetUniform((gcSHADER) Kernel->states.binary, i, &uniform), CL_INVALID_VALUE);
 
         if (!uniform) continue;
+        if (isUniformCompiletimeInitialized(uniform)) continue;
+
         clmONERROR(gcUNIFORM_GetType(uniform, &type, &length), CL_INVALID_VALUE);
         clmONERROR(gcUNIFORM_GetFormat(uniform, &format, &isPointer), CL_INVALID_VALUE);
 
@@ -2340,30 +2500,50 @@ clfAllocateKernelArgs(
                 switch (type)
                 {
                 case gcSHADER_FLOAT_X1:
+                case gcSHADER_FLOAT16_X1:
                 case gcSHADER_BOOLEAN_X1:
                 case gcSHADER_INTEGER_X1:
+                case gcSHADER_INT8_X1:
+                case gcSHADER_INT16_X1:
                 case gcSHADER_UINT_X1:
+                case gcSHADER_UINT8_X1:
+                case gcSHADER_UINT16_X1:
                     bytes = 1 * gcmSIZEOF(cl_float) * length;
                     break;
 
                 case gcSHADER_FLOAT_X2:
+                case gcSHADER_FLOAT16_X2:
                 case gcSHADER_BOOLEAN_X2:
                 case gcSHADER_INTEGER_X2:
+                case gcSHADER_INT8_X2:
+                case gcSHADER_INT16_X2:
                 case gcSHADER_UINT_X2:
+                case gcSHADER_UINT8_X2:
+                case gcSHADER_UINT16_X2:
                     bytes = 2 * gcmSIZEOF(cl_float) * length;
                     break;
 
                 case gcSHADER_FLOAT_X3:
+                case gcSHADER_FLOAT16_X3:
                 case gcSHADER_BOOLEAN_X3:
                 case gcSHADER_INTEGER_X3:
+                case gcSHADER_INT8_X3:
+                case gcSHADER_INT16_X3:
                 case gcSHADER_UINT_X3:
+                case gcSHADER_UINT8_X3:
+                case gcSHADER_UINT16_X3:
                     bytes = 3 * gcmSIZEOF(cl_float) * length;
                     break;
 
                 case gcSHADER_FLOAT_X4:
+                case gcSHADER_FLOAT16_X4:
                 case gcSHADER_BOOLEAN_X4:
                 case gcSHADER_INTEGER_X4:
+                case gcSHADER_INT8_X4:
+                case gcSHADER_INT16_X4:
                 case gcSHADER_UINT_X4:
+                case gcSHADER_UINT8_X4:
+                case gcSHADER_UINT16_X4:
                     bytes = 4 * gcmSIZEOF(cl_float) * length;
                     break;
 
@@ -2460,7 +2640,7 @@ clfDuplicateKernelArgs(
     gctPOINTER      pointer;
     gctSIZE_T       bytes;
     clsArgument_PTR orgArgument, newArgument;
-    gctUINT         i;
+    gctUINT         i = 0;
     gctBOOL         acquired = gcvFALSE;
 
     if (Kernel->args == gcvNULL)
@@ -2513,7 +2693,7 @@ clfDuplicateKernelArgs(
                     gcmASSERT(memObj->objectType == clvOBJECT_MEM);
                 }
                 newArgument->isMemObj = gcvTRUE;
-                clRetainMemObject(memObj);
+                clfRetainMemObject(memObj);
             }
         }
     }
@@ -2526,6 +2706,12 @@ clfDuplicateKernelArgs(
     return gcvSTATUS_OK;
 
 OnError:
+    if (pointer)
+    {
+        gcoOS_Free(gcvNULL, pointer);
+        *Arguments = gcvNULL;
+    }
+
     if (acquired)
     {
         gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, Kernel->argMutex));
@@ -2685,30 +2871,50 @@ clfReallocateKernelUinformArgs(
                 switch (type)
                 {
                 case gcSHADER_FLOAT_X1:
+                case gcSHADER_FLOAT16_X1:
                 case gcSHADER_BOOLEAN_X1:
                 case gcSHADER_INTEGER_X1:
+                case gcSHADER_INT8_X1:
+                case gcSHADER_INT16_X1:
                 case gcSHADER_UINT_X1:
+                case gcSHADER_UINT8_X1:
+                case gcSHADER_UINT16_X1:
                     bytes = 1 * gcmSIZEOF(cl_float) * length;
                     break;
 
                 case gcSHADER_FLOAT_X2:
+                case gcSHADER_FLOAT16_X2:
                 case gcSHADER_BOOLEAN_X2:
                 case gcSHADER_INTEGER_X2:
+                case gcSHADER_INT8_X2:
+                case gcSHADER_INT16_X2:
                 case gcSHADER_UINT_X2:
+                case gcSHADER_UINT8_X2:
+                case gcSHADER_UINT16_X2:
                     bytes = 2 * gcmSIZEOF(cl_float) * length;
                     break;
 
                 case gcSHADER_FLOAT_X3:
+                case gcSHADER_FLOAT16_X3:
                 case gcSHADER_BOOLEAN_X3:
                 case gcSHADER_INTEGER_X3:
+                case gcSHADER_INT8_X3:
+                case gcSHADER_INT16_X3:
                 case gcSHADER_UINT_X3:
+                case gcSHADER_UINT8_X3:
+                case gcSHADER_UINT16_X3:
                     bytes = 3 * gcmSIZEOF(cl_float) * length;
                     break;
 
                 case gcSHADER_FLOAT_X4:
+                case gcSHADER_FLOAT16_X4:
                 case gcSHADER_BOOLEAN_X4:
                 case gcSHADER_INTEGER_X4:
+                case gcSHADER_INT8_X4:
+                case gcSHADER_INT16_X4:
                 case gcSHADER_UINT_X4:
+                case gcSHADER_UINT8_X4:
+                case gcSHADER_UINT16_X4:
                     bytes = 4 * gcmSIZEOF(cl_float) * length;
                     break;
 
@@ -2795,6 +3001,11 @@ clfReallocateKernelUinformArgs(
     return gcvSTATUS_OK;
 
 OnError:
+    if (pointer)
+    {
+        gcoOS_Free(gcvNULL, pointer);
+    }
+
     return status;
 }
 
@@ -2840,7 +3051,7 @@ clfFreeKernelArgs(
                 {
                     gcmASSERT(memObj->objectType == clvOBJECT_MEM);
                 }
-                clReleaseMemObject(memObj);
+                clfReleaseMemObject(memObj);
             }
             gcmOS_SAFE_FREE(gcvNULL, Args[i].data);
         }
@@ -2930,13 +3141,16 @@ clCreateKernel(
     gcKERNEL_FUNCTION kernelFunction;
     gceCHIPMODEL    chipModel;
     gctUINT32       chipRevision;
-    gcePATCH_ID patchId = gcvPATCH_INVALID;
-    gctBOOL hasBarrier = gcvFALSE, hasImageWrite = gcvFALSE, supportImageInst = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION);
-    gctUINT32 maxRegCount = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_GEOMETRY_SHADER)? 109 : 113;
+    gcePATCH_ID     patchId = gcvPATCH_INVALID;
+    gctBOOL         hasBarrier = gcvFALSE, hasImageWrite = gcvFALSE;
+    gctBOOL         supportImageInst = Program->context->devices[0]->deviceInfo.supportIMGInstr;
+    gctUINT32       maxRegCount = Program->context->devices[0]->deviceInfo.maxRegisterCount;
+    gctUINT32_PTR   comVersion;
 
     gcmHEADER_ARG("Program=0x%x KernelName=%s",
                   Program, KernelName);
-
+    gcmDUMP_API("${OCL clCreateKernel 0x%x, %s}", Program, KernelName);
+    VCL_TRACE_API(CreateKernel_Pre)(Program, KernelName, ErrcodeRet);
 
 
     if (Program == gcvNULL || Program->objectType != clvOBJECT_PROGRAM)
@@ -2991,7 +3205,7 @@ clCreateKernel(
 
     clmONERROR(gcoOS_AtomIncrement(gcvNULL, clgGlobalId, (gctINT*)&kernel->id), CL_INVALID_VALUE);
 
-    clRetainProgram(Program);
+    clfRetainProgram(Program);
 
     /* Copy kernel name */
     length = gcoOS_StrLen(KernelName, gcvNULL) + 1;
@@ -3006,6 +3220,12 @@ clCreateKernel(
 
     /* Construct kernel binary. */
     clmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &kernelBinary), CL_OUT_OF_HOST_MEMORY);
+
+    gcmONERROR(gcSHADER_GetCompilerVersion(pgmBinary,
+                                           &comVersion));
+
+    gcmONERROR(gcSHADER_SetCompilerVersion(kernelBinary,
+                                           comVersion));
 
     /* Load kernel binary from program binary */
     status = gcSHADER_LoadEx(kernelBinary, pointer, binarySize);
@@ -3083,7 +3303,7 @@ clCreateKernel(
         }
         gcmASSERT(kernelFunction);
 
-        gcoHAL_GetPatchID(gcvNULL, &patchId);
+        patchId = Program->context->platform->patchId;
         if(patchId == gcvPATCH_OCLCTS)
         {
             if (GetKFunctionISamplerCount(kernelFunction))
@@ -3195,10 +3415,13 @@ clCreateKernel(
 
     gcmASSERT(kernel->context->platform->compiler11);
     gcSetCLCompiler(kernel->context->platform->compiler11);
-    gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+    chipModel = kernel->context->devices[0]->deviceInfo.chipModel;
+    chipRevision = kernel->context->devices[0]->deviceInfo.chipRevision;
 
 #if BUILD_OPENCL_FP
-    if((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (supportImageInst == gcvTRUE))
+    if((chipModel == gcv2500 && chipRevision == 0x5422) ||
+       (chipModel == gcv3000 && chipRevision == 0x5435) ||
+       (supportImageInst == gcvTRUE))
     {
         clmONERROR(gcSHADER_SaveEx(pgmBinary, gcvNULL, &tmpBinarySize), CL_INVALID_VALUE);
         clmONERROR(gcoOS_Allocate(gcvNULL, tmpBinarySize, &savedTmpBinary), CL_OUT_OF_HOST_MEMORY);
@@ -3213,7 +3436,9 @@ clCreateKernel(
                           &hints);
 
 #if BUILD_OPENCL_FP
-    if((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (supportImageInst == gcvTRUE))
+    if((chipModel == gcv2500 && chipRevision == 0x5422) ||
+       (chipModel == gcv3000 && chipRevision == 0x5435) ||
+       (supportImageInst == gcvTRUE))
     {
         if((status == gcvSTATUS_NOT_FOUND || status == gcvSTATUS_OUT_OF_RESOURCES) &&  gcmOPT_INLINELEVEL() != 4)
         {
@@ -3368,6 +3593,8 @@ OnSkipOutOfSampler:
     {
         *ErrcodeRet = CL_SUCCESS;
     }
+
+    VCL_TRACE_API(CreateKernel_Post)(Program, KernelName, ErrcodeRet, kernel);
     gcmFOOTER_ARG("%d kernel=%lu",
                   CL_SUCCESS, kernel);
     return kernel;
@@ -3425,13 +3652,14 @@ clCreateKernelsInProgram(
 {
     gceSTATUS       status;
     gctUINT         i;
-    gctUINT         numKernels;
+    gctUINT         numKernels, kernelCount=0;
     gcSHADER        binary;
     gcKERNEL_FUNCTION kernelFunction;
     gctCONST_STRING kernelName;
 
     gcmHEADER_ARG("Program=0x%x NumKernels=%d Kernels=0x%x",
                   Program, NumKernels, Kernels);
+    gcmDUMP_API("${OCL clCreateKernelsInProgram 0x%x, %d}", Program, NumKernels);
 
     if (Program == gcvNULL || Program->objectType != clvOBJECT_PROGRAM)
     {
@@ -3472,7 +3700,9 @@ clCreateKernelsInProgram(
         *NumKernelsRet = numKernels;
     }
 
-    for (i = 0; i < NumKernels; i++)
+    kernelCount = Kernels ? numKernels : NumKernels;
+
+    for (i = 0; i < kernelCount; i++)
     {
         gcmVERIFY_OK(gcSHADER_GetKernelFunction(binary, i, &kernelFunction));
         gcmVERIFY_OK(gcKERNEL_FUNCTION_GetName(kernelFunction, gcvNULL, &kernelName));
@@ -3490,6 +3720,7 @@ clCreateKernelsInProgram(
 #endif
     }
 
+    VCL_TRACE_API(CreateKernelsInProgram)(Program, NumKernels, Kernels, NumKernelsRet);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -3506,6 +3737,7 @@ clRetainKernel(
     gctINT  status;
 
     gcmHEADER_ARG("Kernel=0x%x", Kernel);
+    gcmDUMP_API("${OCL clRetainKernel 0x%x}", Kernel);
 
     if (Kernel == gcvNULL || Kernel->objectType != clvOBJECT_KERNEL)
     {
@@ -3514,8 +3746,9 @@ clRetainKernel(
         clmRETURN_ERROR(CL_INVALID_KERNEL);
     }
 
-    gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, Kernel->referenceCount, gcvNULL));
+    clfONERROR(clfRetainKernel(Kernel));
 
+    VCL_TRACE_API(RetainKernel)(Kernel);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -3530,9 +3763,9 @@ clReleaseKernel(
     )
 {
     gctINT          status;
-    gctINT32        oldReference;
 
     gcmHEADER_ARG("Kernel=0x%x", Kernel);
+    gcmDUMP_API("${OCL clReleaseKernel 0x%x}", Kernel);
 
     if (Kernel == gcvNULL || Kernel->objectType != clvOBJECT_KERNEL)
     {
@@ -3541,58 +3774,9 @@ clReleaseKernel(
         clmRETURN_ERROR(CL_INVALID_KERNEL);
     }
 
-    gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, Kernel->referenceCount, &oldReference));
+    clfONERROR(clfReleaseKernel(Kernel));
 
-    if (oldReference == 1)
-    {
-        /* Release arguments */
-        gcmVERIFY_OK(clfFreeKernelArgs(Kernel->numArgs, Kernel->args, gcvTRUE));
-
-        /* Release mutex. */
-        gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, Kernel->argMutex));
-        Kernel->argMutex = gcvNULL;
-
-        Kernel->objectType = clvOBJECT_UNKNOWN;
-        clReleaseProgram(Kernel->program);
-
-        while (Kernel->patchedStates)
-        {
-            clsKernelStates_PTR states = Kernel->patchedStates;
-
-            /* Release states */
-            Kernel->patchedStates = states->next;
-            if (states->stateBuffer) gcmOS_SAFE_FREE(gcvNULL, states->stateBuffer);
-            if (states->hints) gcHINTS_Destroy(states->hints);
-            if (states->hints)
-            {
-                if(states->hints == Kernel->states.hints)
-                {
-                    gcmOS_SAFE_FREE(gcvNULL, states->hints);
-                    Kernel->states.hints = gcvNULL;
-                }
-                else
-                {
-                    gcmOS_SAFE_FREE(gcvNULL, states->hints);
-                }
-            }
-            if (states->binary) gcSHADER_Destroy((gcSHADER)states->binary);
-            if (states->patchDirective) clfDestroyPatchDirective(&states->patchDirective);
-            gcmOS_SAFE_FREE(gcvNULL, states);
-        }
-
-        if (Kernel->states.stateBuffer) gcmOS_SAFE_FREE(gcvNULL, Kernel->states.stateBuffer);
-        if (Kernel->states.hints) gcHINTS_Destroy(Kernel->states.hints);
-        if (Kernel->states.hints) gcmOS_SAFE_FREE(gcvNULL, Kernel->states.hints);
-        if (Kernel->states.binary) gcSHADER_Destroy((gcSHADER)Kernel->states.binary);
-        if (Kernel->name) gcmOS_SAFE_FREE(gcvNULL, Kernel->name);
-
-        /* Destroy the reference count object */
-        gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, Kernel->referenceCount));
-        Kernel->referenceCount = gcvNULL;
-
-        gcmOS_SAFE_FREE(gcvNULL, Kernel);
-    }
-
+    VCL_TRACE_API(ReleaseKernel)(Kernel);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -3616,6 +3800,8 @@ clSetKernelArg(
 
     gcmHEADER_ARG("Kernel=0x%x ArgIndex=%u ArgSize=%u ArgValue=0x%x",
                   Kernel, ArgIndex, ArgSize, ArgValue);
+    gcmDUMP_API("${OCL clSetKernelArg 0x%x, %d}", Kernel, ArgIndex);
+    VCL_TRACE_API(SetKernelArg)(Kernel, ArgIndex, ArgSize, ArgValue);
 
     if (Kernel == gcvNULL || Kernel->objectType != clvOBJECT_KERNEL)
     {
@@ -3694,9 +3880,26 @@ clSetKernelArg(
         clsSampler_PTR sampler = *(clsSampler_PTR *) ArgValue;
         gctINT * data = (gctINT *) &sampler->samplerValue;
 
-        if(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_IMG_INSTRUCTION) && (Kernel->patchNeeded == gcvFALSE))
+        if(Kernel->context->devices[0]->deviceInfo.supportIMGInstr &&
+          (Kernel->patchNeeded == gcvFALSE))
         {
             gcKERNEL_FUNCTION   kernelFunction = gcvNULL;
+            unsigned int i = 0;
+            if(Kernel->program->buildOptions != gcvNULL && strstr(Kernel->program->buildOptions, "-cl-viv-vx-extension") != gcvNULL)
+            {
+                for(i = 0; i<Kernel->numArgs; i++)
+                {
+                    if(Kernel->args[i].uniform != gcvNULL && isUniformImage2D(Kernel->args[i].uniform))
+                    {
+                        clsMem_PTR memObj = *(clsMem_PTR *)Kernel->args[i].data;
+                        memObj->u.image.vxcaddressingMode = sampler->addressingMode;
+                        memObj->u.image.vxcfilterMode = sampler->filterMode;
+                        memObj->u.image.vxcnormalizedCoords = sampler->normalizedCoords;
+                        break;
+                    }
+                }
+            }
+            else
             {
                 gctUINT32           orgArgNum = 0, binarySize = 0;
                 gctPOINTER          pointer;
@@ -3704,6 +3907,7 @@ clSetKernelArg(
                 gctUINT32           bufferSize  = 0, i;
                 gcsHINT_PTR         hints       = gcvNULL;
                 gcSHADER            pgmBinary, kernelBinary;
+                gctUINT32_PTR       comVersion;
 
                 Kernel->patchNeeded = gcvTRUE;
                 /* Save program binary into buffer */
@@ -3714,6 +3918,8 @@ clSetKernelArg(
 
                 /* Construct kernel binary. */
                 clmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &kernelBinary), CL_OUT_OF_HOST_MEMORY);
+                gcmONERROR(gcSHADER_GetCompilerVersion(pgmBinary, &comVersion));
+                gcmONERROR(gcSHADER_SetCompilerVersion(kernelBinary, comVersion));
 
                 /* Load kernel binary from program binary */
                 status = gcSHADER_LoadEx(kernelBinary, pointer, binarySize);
@@ -3836,6 +4042,7 @@ clGetKernelInfo(
 
     gcmHEADER_ARG("Kernel=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   Kernel, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetKernelInfo 0x%x, 0x%x}", Kernel, ParamName);
 
     if (Kernel == gcvNULL || Kernel->objectType != clvOBJECT_KERNEL)
     {
@@ -3908,6 +4115,7 @@ clGetKernelInfo(
         *ParamValueSizeRet = retParamSize;
     }
 
+    VCL_TRACE_API(GetKernelInfo)(Kernel, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;
@@ -3920,11 +4128,11 @@ OnError:
 #if BUILD_OPENCL_12
 CL_API_ENTRY cl_int CL_API_CALL
 clGetKernelArgInfo(
-    cl_kernel        Kernel ,
-    cl_uint          ArgIndx ,
-    cl_kernel_arg_info   ParamName ,
-    size_t           ParamValueSize ,
-    void *           ParamValue ,
+    cl_kernel        Kernel,
+    cl_uint          ArgIndx,
+    cl_kernel_arg_info   ParamName,
+    size_t           ParamValueSize,
+    void *           ParamValue,
     size_t *         ParamValueSizeRet
     )
 {
@@ -3938,6 +4146,7 @@ clGetKernelArgInfo(
 
     gcmHEADER_ARG("Kernel=0x%x ArgIndx=%u ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   Kernel, ArgIndx, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetKernelInfo 0x%x, %d, 0x%x}", Kernel, ArgIndx, ParamName);
 
     if (Kernel == gcvNULL || Kernel->objectType != clvOBJECT_KERNEL)
     {
@@ -4120,6 +4329,7 @@ clGetKernelArgInfo(
                             }
                             break;
                         case gcSHADER_FLOAT_X1:
+                        case gcSHADER_FLOAT16_X1:
                             switch (format)
                             {
                             CASE(gcSL_FLOAT,float);
@@ -4129,22 +4339,27 @@ clGetKernelArgInfo(
                             }
                             break;
                         case gcSHADER_FLOAT_X2:
+                        case gcSHADER_FLOAT16_X2:
                             switch (format)
                             {
                             CASE(gcSL_FLOAT,float2);
+                            CASE(gcSL_FLOAT16,half2);
                             CASE(gcSL_FLOAT64,double2);
                             DEFAULT;
                             }
                             break;
                         case gcSHADER_FLOAT_X3:
+                        case gcSHADER_FLOAT16_X3:
                             switch (format)
                             {
                             CASE(gcSL_FLOAT,float3);
+                            CASE(gcSL_FLOAT16,half3);
                             CASE(gcSL_FLOAT64,double3);
                             DEFAULT;
                             }
                             break;
                         case gcSHADER_FLOAT_X4:
+                        case gcSHADER_FLOAT16_X4:
                             switch (format)
                             {
                             case gcSL_FLOAT:
@@ -4153,6 +4368,14 @@ clGetKernelArgInfo(
                                 CASE(1,float4);
                                 CASE(2,float8);
                                 CASE(4,float16);
+                                }
+                                break;
+                            case gcSL_FLOAT16:
+                                switch (length)
+                                {
+                                CASE(1,half4);
+                                CASE(2,half8);
+                                CASE(4,half16);
                                 }
                                 break;
                             case gcSL_FLOAT64:
@@ -4167,7 +4390,11 @@ clGetKernelArgInfo(
                             }
                             break;
                         case gcSHADER_INTEGER_X1:
+                        case gcSHADER_INT8_X1:
+                        case gcSHADER_INT16_X1:
                         case gcSHADER_UINT_X1:
+                        case gcSHADER_UINT8_X1:
+                        case gcSHADER_UINT16_X1:
                         case gcSHADER_INT64_X1:
                         case gcSHADER_UINT64_X1:
                             switch (format)
@@ -4184,7 +4411,11 @@ clGetKernelArgInfo(
                             }
                             break;
                         case gcSHADER_INTEGER_X2:
+                        case gcSHADER_INT8_X2:
+                        case gcSHADER_INT16_X2:
                         case gcSHADER_UINT_X2:
+                        case gcSHADER_UINT8_X2:
+                        case gcSHADER_UINT16_X2:
                         case gcSHADER_INT64_X2:
                         case gcSHADER_UINT64_X2:
                             switch (format)
@@ -4201,7 +4432,11 @@ clGetKernelArgInfo(
                             }
                             break;
                         case gcSHADER_INTEGER_X3:
+                        case gcSHADER_INT8_X3:
+                        case gcSHADER_INT16_X3:
                         case gcSHADER_UINT_X3:
+                        case gcSHADER_UINT8_X3:
+                        case gcSHADER_UINT16_X3:
                         case gcSHADER_INT64_X3:
                         case gcSHADER_UINT64_X3:
                             switch (format)
@@ -4218,7 +4453,11 @@ clGetKernelArgInfo(
                             }
                             break;
                         case gcSHADER_INTEGER_X4:
+                        case gcSHADER_INT8_X4:
+                        case gcSHADER_INT16_X4:
                         case gcSHADER_UINT_X4:
+                        case gcSHADER_UINT8_X4:
+                        case gcSHADER_UINT16_X4:
                         case gcSHADER_INT64_X4:
                         case gcSHADER_UINT64_X4:
                             switch (format)
@@ -4377,6 +4616,7 @@ clGetKernelArgInfo(
         *ParamValueSizeRet = retParamSize;
     }
 
+    VCL_TRACE_API(GetKernelArgInfo)(Kernel, ArgIndx, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;
@@ -4403,6 +4643,7 @@ clGetKernelWorkGroupInfo(
 
     gcmHEADER_ARG("Kernel=0x%x Device=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   Kernel, Device, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetKernelWorkGroupInfo 0x%x, 0x%x, 0x%x}", Kernel, Device, ParamName);
 
     if (Kernel == gcvNULL || Kernel->objectType != clvOBJECT_KERNEL)
     {
@@ -4472,6 +4713,7 @@ clGetKernelWorkGroupInfo(
         *ParamValueSizeRet = retParamSize;
     }
 
+    VCL_TRACE_API(GetKernelWorkGroupInfo)(Kernel, Device, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;
@@ -4480,3 +4722,4 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
+

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -48,6 +48,8 @@ HAL_TEST        := $(HAL_TEST_DIR)
 HAL_UNIT_TEST   := $(AQROOT)/test/hal/common/UnitTest
 GFX_TEST        := $(GFX_TEST_DIR)
 VVLAUNCHER      := $(VVLAUNCHER_DIR)
+SHARECONEXTES20 := $(AQROOT)/test/es20/shareContext
+OVX_TEST         := $(AQROOT)/test/ovx
 ifneq ($(VIVANTE_NO_VG),1)
 TIGER           := $(AQROOT)/test/vg11/tiger
 endif
@@ -75,8 +77,13 @@ APP_OVG11_LIST  := $(TIGER)
 endif
 endif
 
+ifeq ($(USE_OPENCL),1)
 APP_OCL11_LIST  := $(CL11_TEST)
-APP_VDK_LIST    += $(VDK_TEST) $(TIGER) $(VVLAUNCHER)
+else
+APP_OCL11_LIST  :=
+endif
+APP_VDK_LIST    += $(VDK_TEST) $(TIGER) $(VVLAUNCHER) $(SHARECONEXTES20)
+APP_OVX_LIST    := $(OVX_TEST)
 
 APP_LIST        :=
 
@@ -97,6 +104,12 @@ endif
 endif
 ifeq ($(USE_OPENCL),1)
 APP_LIST        += $(APP_OCL11_LIST)
+endif
+ifeq ($(USE_OPENVX),1)
+APP_LIST        += $(APP_OVX_LIST)
+endif
+ifeq ($(USE_OPENVX),1)
+APP_LIST        += $(APP_OVX_LIST)
 endif
 endif
 
@@ -144,25 +157,31 @@ endif
 # Supported targets.
 
 
+ifeq ($(VIVANTE_ENABLE_2D),1)
 gfx_test:   $(GFX_TEST)
 hal_test:   $(HAL_TEST)
 hal_unit:   $(HAL_UNIT_TEST)
 hal_test_all:   $(HAL_TEST) $(HAL_UNIT_TEST)
 chipinfo:   $(CHIPINFO)
-
+endif
 
 ifeq ($(USE_VDK), 0)
 tutorial:   $(TUTORIAL)
 else
 vdktest:    $(VDK_TEST)
 vv_launcher: $(VVLAUNCHER)
+shareContext: $(SHARECONEXTES20)
 endif
-
 
 ifeq ($(USE_OPENCL), 1)
 cl11_test:  $(CL11_TEST)
 cl11_unit:  $(CL11_UNIT)
 endif
+
+ifeq ($(USE_OPENVX), 1)
+ovx_test:  $(OVX_TEST)
+endif
+
 ifneq ($(VIVANTE_NO_VG), 1)
 ovg11_tst:  $(APP_OVG11_LIST)
 

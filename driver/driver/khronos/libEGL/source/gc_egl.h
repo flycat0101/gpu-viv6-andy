@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -107,6 +107,11 @@ typedef struct eglPixmapInfo      * VEGLPixmapInfo;
 #define MAJOR_API_VER(x)            ((x) >> 4)
 #define MINOR_API_VER(x)            ((x) & 0xF)
 
+/* Some internal platform types exist on linux. */
+#define EGL_PLATFORM_FBDEV_VIV      0x31DA
+#define EGL_PLATFORM_NULLWS_VIV     0x31DB
+#define EGL_PLATFORM_DFB_VIV        0x31DC
+
 
 struct eglResObj
 {
@@ -171,6 +176,9 @@ veglAPIINDEX;
 
 struct eglThreadData
 {
+    /* Extends from gcsDRIVER_TLS structure, must be first field. */
+    gcsDRIVER_TLS               base;
+
     /* gcoDUMP object. */
     gcoDUMP                     dump;
 
@@ -179,29 +187,6 @@ struct eglThreadData
 
     /* Current API. */
     EGLenum                     api;
-
-    /* Hardware capabilities. */
-    gceCHIPMODEL                chipModel;
-    EGLint                      maxWidth;
-    EGLint                      maxHeight;
-    EGLint                      maxSamples;
-    gctBOOL                     openVGpipe;
-
-    /* fastMSAA and small MSAA only support 4x mode */
-    gctBOOL                     fastMSAA;
-
-    /* Security feature. */
-    gctBOOL                     security;
-
-    /* Extension strings. */
-    char *                      extString;
-    char *                      clientExtString;
-
-    /* Dispatch tables of client APIs, non-null means client API available. */
-    veglDISPATCH *              dispatchTables[vegl_API_LAST];
-
-    /* Client handles, better to close when exit. */
-    gctHANDLE                   clientHandles[vegl_API_LAST];
 
     /* Current context of current rendering API
     ** Shortcut to below three sorts of current contexts.
@@ -218,38 +203,39 @@ struct eglThreadData
     gctPOINTER                  esPrivate;
     VEGL_ESPrivDestructor       destroyESPrivate;
 
-    /* GL_OES_EGL_image */
-    EGL_PROC                    imageTargetTex2DFunc[3];
-    EGL_PROC                    imageTargetRBStorageFunc[3];
-    /* GL_EXT_multi_draw_arrays */
-    EGL_PROC                    multiDrawArraysFunc[3];
-    EGL_PROC                    multiDrawElementsFunc[3];
-    /* GL_OES_mapbuffer */
-    EGL_PROC                    getBufferPointervFunc[3];
-    EGL_PROC                    mapBufferFunc[3];
-    EGL_PROC                    unmapBufferFunc[3];
-    /* GL_EXT_discard_framebuffer */
-    EGL_PROC                    discardFramebuffer[3];
-    /* GL_EXT_multisampled_render_to_texture */
-    EGL_PROC                    renderbufferStorageMultisampleFunc[3];
-    EGL_PROC                    framebufferTexture2DMultisampleFunc[3];
-    /* GL_OES_get_program_binary */
-    EGL_PROC                    getProgramBinaryFunc[3];
-    EGL_PROC                    programBinaryFunc[3];
-    /* GL_VIV_direct_texture */
-    EGL_PROC                    texDirectFunc[3];
-    EGL_PROC                    texDirectInvalidateFunc[3];
-    EGL_PROC                    texDirectMapFunc[3];
-    EGL_PROC                    texDirectTiledMapFunc[3];
-
-    gctINT32                    chipCount;
-    gcsHAL_LIMITS               chipLimits[gcdCHIP_COUNT];
-
     struct eglWorkerInfo      * worker;
 
 #if gcdGC355_MEM_PRINT
     gctINT                      fbMemSize;
 #endif
+
+    /* Client extension string. */
+    char *                      clientExtString;
+
+    /* Dispatch tables of client APIs, non-null means client API available. */
+    veglDISPATCH *              dispatchTables[vegl_API_LAST];
+
+    /* Client handles, better to close when exit. */
+    gctHANDLE                   clientHandles[vegl_API_LAST];
+
+    /**************************************************************************/
+    /* Fields below are hardware relevant. */
+
+    gctINT32                    chipCount;
+    gcsHAL_LIMITS               chipLimits[gcdCHIP_COUNT];
+
+    /* Hardware capabilities. */
+    gceCHIPMODEL                chipModel;
+    EGLint                      maxWidth;
+    EGLint                      maxHeight;
+    EGLint                      maxSamples;
+    gctBOOL                     openVGpipe;
+
+    /* Hardware specific: fastMSAA and small MSAA only support 4x mode */
+    gctBOOL                     fastMSAA;
+
+    /* Hardware specific: Security feature. */
+    gctBOOL                     security;
 };
 
 struct eglImageRef
@@ -311,6 +297,9 @@ struct eglDisplay
 
     /* Initialize flag. */
     gctBOOL                     initialized;
+
+    /* Hardware specific: Extension string. */
+    char *                      extString;
 
     /* Worker thread for copying data. */
     gctHANDLE                   workerThread;
@@ -702,6 +691,15 @@ typedef struct EGL_CONFIG_DEPTH
 VEGLThreadData
 veglGetThreadData(
     void
+    );
+
+/*
+ * GetThreadData will not initialize hardware relevant data.
+ * Use this function after GetThreadData if hardware initialization required.
+ */
+EGLBoolean
+veglInitDeviceThreadData(
+    VEGLThreadData Thread
     );
 
 /*******************************************************************************
@@ -1109,7 +1107,7 @@ typedef struct
     EGLBoolean (* WaitNative)(EGLint engine);
     EGLBoolean (* SwapBuffers)(EGLDisplay dpy, EGLSurface surface);
     EGLBoolean (* CopyBuffers)(EGLDisplay dpy, EGLSurface surface, EGLNativePixmapType target);
-    __eglMustCastToProperFunctionPointerType (* GetProcAddress_pre)(const char *procname);
+    void (* GetProcAddress_pre)(const char *procname);
 
     /* EGL 1.5 */
     EGLSync    (* CreateSync_post)(EGLDisplay dpy, EGLenum type, const EGLAttrib *attrib_list, EGLSync ret_sync);
@@ -1160,7 +1158,7 @@ typedef struct
     EGLContext (* GetCurrentContext_pre)();
     EGLSurface (* GetCurrentSurface_pre)(EGLint readdraw);
     EGLDisplay (* GetCurrentDisplay_pre)();
-    __eglMustCastToProperFunctionPointerType (* GetProcAddress_post)(const char *procname, EGLint *func);
+    void (* GetProcAddress_post)(const char *procname, __eglMustCastToProperFunctionPointerType func);
 
     EGLint     (* GetError_post)(EGLint err);
     const char * (* QueryString_post)(EGLDisplay dpy, EGLint name, const char* str);

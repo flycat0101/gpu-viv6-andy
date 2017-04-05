@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -35,6 +35,7 @@ include makefile.linux.def
 # Components of the project.
 
 SAMPLES	:= tutorial1 tutorial2 tutorial3 tutorial4 tutorial5 tutorial6 tutorial7 samples
+SAMPLES += pixels cube
 
 ######################################################
 # Define the macros used in the common file.

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -616,6 +616,7 @@ _LoadBuiltinConstants(IN cloCOMPILER Compiler)
         __BUILD_BUILT_IN(LOG2)
         __BUILD_BUILT_IN(SQRT)
         __BUILD_BUILT_IN(INVERSE_SQRT)
+        {"RSQ", clvOPCODE_INVERSE_SQRT},
 
         __BUILD_BUILT_IN(MULLO)
         __BUILD_BUILT_IN(ADDLO)
@@ -690,6 +691,7 @@ _LoadBuiltinConstants(IN cloCOMPILER Compiler)
         __BUILD_BUILT_IN(PARAM_CHAIN)
         __BUILD_BUILT_IN(INTRINSIC)
         __BUILD_BUILT_IN(INTRINSIC_ST)
+        __BUILD_BUILT_IN(CLAMP0MAX)
 
     };
 
@@ -972,10 +974,12 @@ clsINTRINSIC_BUILTIN_FUNCTION;
 
 static gctINT
 _ConvVectorBasicTypeToPacked(
+cloCOMPILER Compiler,
 gctINT TypeToken
 )
 {
-    if(gcmOPT_oclPackedBasicType()) {
+    if(cloCOMPILER_IsBasicTypePacked(Compiler) ||
+       cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
         clsBUILTIN_DATATYPE_INFO *typeInfo;
 
         typeInfo = clGetBuiltinDataTypeInfo(TypeToken);
@@ -1022,7 +1026,8 @@ IN clsBUILTIN_FUNCTION * BuiltinFunctions
         if (gcmIS_ERROR(status)) break;
 
         /* convert basic vector type to packed if necessary */
-        tok = _ConvVectorBasicTypeToPacked(BuiltinFunctions[i].returnType);
+        tok = _ConvVectorBasicTypeToPacked(Compiler,
+                                           BuiltinFunctions[i].returnType);
 
         status = cloCOMPILER_CreateDataType(Compiler,
                                             tok,
@@ -1054,7 +1059,8 @@ IN clsBUILTIN_FUNCTION * BuiltinFunctions
 
         for (j = 0; j < BuiltinFunctions[i].paramCount; j++) {
             /* convert basic vector type to packed if necessary */
-            tok = _ConvVectorBasicTypeToPacked(BuiltinFunctions[i].paramTypes[j]);
+            tok = _ConvVectorBasicTypeToPacked(Compiler,
+                                               BuiltinFunctions[i].paramTypes[j]);
 
             /* Create parameter name */
             status = cloCOMPILER_CreateDataType(Compiler,
@@ -4797,7 +4803,7 @@ _GenBuiltinVectorCode(
     gctUINT8 vectorSize = clmGEN_CODE_vectorSize_GET(OperandsParameters[0].dataTypes[0].def);
     gctUINT8 i;
     gctUINT opCnt;
-    clsROPERAND    tempROperand[16*4], copyROperand[16], cntROperands[2], inputROperands[16];
+    clsROPERAND    tempROperand[16*4], copyROperand[16], cntROperands[2], inputROperands[16], destInitROperand;
     clsIOPERAND tempIOperand, cntIOperands[2], inputIOperands[16];
     clsLOPERAND tempLOperand, destLOperands[16];
     clsROPERAND    vSizeROperand, zero123ROperands[16], zero123X4ROperands[16], negOneROperand;
@@ -4841,6 +4847,9 @@ _GenBuiltinVectorCode(
         clsROPERAND_InitializeUsingIOperand(&cntROperands[i], &cntIOperands[i]);
     }
 
+    clsROPERAND_InitializeIntOrIVecConstant(&destInitROperand,
+                                            tempIOperand.dataType,
+                                            (gctUINT) 0);
     for(i = 0; i<vectorSize; i++){
         for(opCnt = 0; opCnt<OperandCount; opCnt++){
             if(clmGEN_CODE_IsScalarDataType(copyROperand[opCnt].dataType) == 0 ){
@@ -4851,6 +4860,11 @@ _GenBuiltinVectorCode(
             }
         }
         clmLOPERAND_vectorComponent_GET(&destLOperands[i], &tempLOperand, i);
+        status = clGenAssignCode(Compiler,
+                                 PolynaryExpr->exprBase.base.lineNo,
+                                 PolynaryExpr->exprBase.base.stringNo,
+                                 &destLOperands[i],
+                                 &destInitROperand);
     }
 
 

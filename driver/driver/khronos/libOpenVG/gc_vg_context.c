@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -465,9 +465,17 @@ veglCreateContext(
             gctUINT length = 0;
             gctSIZE_T read = 0;
             gctCHAR buf[20];
-            gctCHAR *strArg[4];
+            gctCHAR *strArg[5];
             gctUINT32   argCount;
             gctBOOL     argValid;
+
+            /* Default config. */
+            context->tsWidth = 256;
+            context->tsHeight = 256;
+            context->pCache  = 1;
+            context->sCache  = 1;
+            context->pLimit  = 512;
+
             gcoOS_ZeroMemory(buf, 10);
             status = gcoOS_Open(gcvNULL, "ts.cfg", gcvFILE_READTEXT, &tf);
             if (tf != gcvNULL)
@@ -499,37 +507,26 @@ veglCreateContext(
                         }
                     }
                 }
-                if (argValid && (j == 3))
+                if (argValid && (j >= 3))
                 {
                     gcoOS_StrToInt(strArg[0], (gctINT*)&context->tsWidth);
                     gcoOS_StrToInt(strArg[1], (gctINT*)&context->tsHeight);
                     gcoOS_StrToInt(strArg[2], (gctINT*)&context->pCache);
                     gcoOS_StrToInt(strArg[3], (gctINT*)&context->sCache);
                 }
-                else
+                if (argValid && (j >= 4))
                 {
-                    /* Invalid config file read. */
-                    context->tsWidth = 256;
-                    context->tsHeight = 256;
-                    context->pCache  = 1;
-                    context->sCache  = 1;
+                    gcoOS_StrToInt(strArg[4], (gctINT*)&context->pLimit);
                 }
 
                 gcoOS_Close(gcvNULL, tf);
-            }
-            else
-            {
-                context->tsWidth = 256;
-                context->tsHeight = 256;
-                context->pCache  = 1;
-                context->sCache  = 1;
             }
         }
         /* Construct the path storage manager. */
         gcmERR_BREAK(vgsPATHSTORAGE_Construct(
             context,
             gcmKB2BYTES(context->pCache),
-            0,
+            gcmKB2BYTES(context->pLimit),
             &context->pathStorage
             ));
 

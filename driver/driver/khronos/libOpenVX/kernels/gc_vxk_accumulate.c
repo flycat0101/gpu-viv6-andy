@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -108,7 +108,7 @@ vx_status vxAccumulateWeighted(vx_node node, vx_image input, vx_scalar scalar, v
 
     kernelContext->params.kernel = gcvVX_KERNEL_ACCUMULATE_WEIGHTED;
 
-    if (node->base.context->evisNoInst.lerp7Output)
+    if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.lerp7Output)
     {
         kernelContext->params.xstep = 7;
     }

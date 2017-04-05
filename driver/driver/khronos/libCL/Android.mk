@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -17,7 +17,8 @@ include $(LOCAL_PATH)/../../../Android.mk.def
 include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := \
-	gc_cl.c \
+	gc_cl.c  \
+    gc_cl_log.c  \
 	gc_cl_command.c \
 	gc_cl_context.c \
 	gc_cl_device.c \
@@ -64,7 +65,8 @@ LOCAL_SHARED_LIBRARIES := \
 
 ifeq ($(ENABLE_CL_GL), 1)
 LOCAL_SHARED_LIBRARIES += \
-                       libGLESv2
+	libGLESv2 \
+	libEGL
 endif
 
 ifeq ($(BUILD_OPENCL_ICD),1)

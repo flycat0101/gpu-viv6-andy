@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -571,6 +571,14 @@ __glChipCompressedTexSubImage1D(
     GLsizei size,
     const GLvoid *buf
     );
+extern GLboolean
+__glChipGetCompressedTexImage(
+    __GLcontext *gc,
+    __GLtextureObject *texObj,
+    __GLmipMapLevel *mipmap,
+    GLint level,
+    GLvoid *img
+);
 #endif
 
 

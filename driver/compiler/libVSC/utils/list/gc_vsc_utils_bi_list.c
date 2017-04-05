@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -245,7 +245,11 @@ gctBOOL vscBILST_IsEmpty(VSC_BI_LIST* pList)
 
 void vscBILST_Finalize(VSC_BI_LIST* pList)
 {
-    /* Nothing to do */
+    pList->pHead = gcvNULL;
+    pList->pTail = gcvNULL;
+
+    pList->info.bCircle = 0;
+    pList->info.count = 0;
 }
 
 VSC_BI_LIST_NODE* vscBILST_GetHead(VSC_BI_LIST* pList)

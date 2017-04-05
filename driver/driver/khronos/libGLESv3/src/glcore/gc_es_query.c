@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -603,37 +603,23 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         *ip++ = gc->constants.numProgramBinaryFormats;
         break;
     case GL_SAMPLE_BUFFERS:
-        if (DRAW_FRAMEBUFFER_BINDING_NAME)
+        if (gc->dp.isFramebufferComplete(gc, gc->frameBuffer.drawFramebufObj))
         {
-            if (gc->dp.isFramebufferComplete(gc, gc->frameBuffer.drawFramebufObj))
-            {
-                *ip++ = gc->frameBuffer.drawFramebufObj->fbSamples ? 1 : 0;
-            }
-            else
-            {
-                __GL_ERROR_RET(GL_INVALID_FRAMEBUFFER_OPERATION);
-            }
+            *ip++ = gc->frameBuffer.drawFramebufObj->fbSamples ? 1 : 0;
         }
         else
         {
-            *ip++ = gc->modes.sampleBuffers;
+            __GL_ERROR_RET(GL_INVALID_FRAMEBUFFER_OPERATION);
         }
         break;
     case GL_SAMPLES:
-        if (DRAW_FRAMEBUFFER_BINDING_NAME)
+        if (gc->dp.isFramebufferComplete(gc, gc->frameBuffer.drawFramebufObj))
         {
-            if (gc->dp.isFramebufferComplete(gc, gc->frameBuffer.drawFramebufObj))
-            {
-                *ip++ = gc->frameBuffer.drawFramebufObj->fbSamples;
-            }
-            else
-            {
-                __GL_ERROR_RET(GL_INVALID_FRAMEBUFFER_OPERATION);
-            }
+            *ip++ = gc->frameBuffer.drawFramebufObj->fbSamples;
         }
         else
         {
-            *ip++ = gc->modes.samples;
+            __GL_ERROR_RET(GL_INVALID_FRAMEBUFFER_OPERATION);
         }
         break;
     case GL_SAMPLE_COVERAGE_VALUE:
@@ -677,8 +663,9 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
         break;
     case GL_IMPLEMENTATION_COLOR_READ_TYPE:
         {
+            __GLformatInfo *formatInfo = gcvNULL;
             __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
-            __GLformatInfo * formatInfo = gcvNULL;
+
             if (!gc->dp.isFramebufferComplete(gc, readFBO))
             {
                 __GL_ERROR_RET(GL_INVALID_FRAMEBUFFER_OPERATION);
@@ -705,8 +692,9 @@ __GL_INLINE GLvoid __glDoGet(__GLcontext *gc, GLenum sq, GLvoid *result, GLint t
 
     case GL_IMPLEMENTATION_COLOR_READ_FORMAT:
         {
+            __GLformatInfo *formatInfo = gcvNULL;
             __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
-            __GLformatInfo * formatInfo = gcvNULL;
+
             if (!gc->dp.isFramebufferComplete(gc, readFBO))
             {
                 __GL_ERROR_RET(GL_INVALID_FRAMEBUFFER_OPERATION);

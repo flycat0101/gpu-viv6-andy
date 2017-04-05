@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -33,7 +33,6 @@ _UploadStates(
         /* rotationDeg. */
         if (Context->dirty.s.rotationDegKey)
         {
-            /* TODO: rotationDeg. */
             Context->dirty.s.rotationDegKey = 0;
         }
 
@@ -70,8 +69,6 @@ _UploadStates(
         /* Dither. */
         if (Context->dirty.s.ditherKey)
         {
-            /* TODO: Dither. */
-
             Context->dirty.s.ditherKey = 0;
         }
 
@@ -122,8 +119,6 @@ _UploadStates(
         /* Blur. */
         if (Context->dirty.s.blurKey)
         {
-            /* TODO: Blur. */
-
             Context->dirty.s.blurKey = 0;
         }
     }
@@ -555,7 +550,6 @@ _StretchBlitPE1x(
 
             if (yuvFormat)
             {
-                /* TODO: FilterBlit does not support rotation before PE20. */
                 /* Video filter blit */
                 /* 1. SetClipping() has no effect for FilterBlit()
                  *    so we use dstSubRect to realize clipping effect
@@ -604,7 +598,6 @@ _StretchBlitPE1x(
             }
             else if (Context->blur)
             {
-                /* TODO: FilterBlit does not support rotation before PE20. */
                 gcsRECT dstSubRect;
                 dstSubRect.left  = 0;
                 dstSubRect.top   = 0;
@@ -655,7 +648,6 @@ _StretchBlitPE1x(
                                      &dstRect,
                                      &dstSubRect));
 
-                /* TODO: surfaceflinger set blur issue. */
                 Context->blur = COPYBIT_DISABLE;
             }
             else if (stretch == gcvFALSE)

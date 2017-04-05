@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -373,6 +373,12 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
                                  GLenum format, GLenum type)
 {
     __GLformatInfo * formatInfo = gcvNULL;
+    __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
+
+    if (!gc->dp.isFramebufferComplete(gc, readFBO))
+    {
+        __GL_ERROR_RET_VAL(GL_INVALID_FRAMEBUFFER_OPERATION, GL_FALSE);
+    }
 
     /* Check if framebuffer is complete */
     if (READ_FRAMEBUFFER_BINDING_NAME == 0)
@@ -387,13 +393,7 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
     else
     {
         __GLfboAttachPoint *attachPoint;
-        __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
         GLint attachIndex;
-
-        if (!gc->dp.isFramebufferComplete(gc, readFBO))
-        {
-            __GL_ERROR_RET_VAL(GL_INVALID_FRAMEBUFFER_OPERATION, GL_FALSE);
-        }
 
         if (readFBO->readBuffer == GL_NONE)
         {
@@ -428,7 +428,9 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
 
     /* Implementation-chosen format information */
     if ((formatInfo->dataType == type) && (formatInfo->dataFormat == format))
+    {
         return GL_TRUE;
+    }
 
     switch (formatInfo->category)
     {
@@ -494,6 +496,11 @@ GLboolean __glCheckReadPixelArgs(__GLcontext *gc, GLsizei width, GLsizei height,
 __GL_INLINE GLboolean __glReadPixelsBegin(__GLcontext *gc, GLint x, GLint y, GLsizei width, GLsizei height,
                                           GLenum format, GLenum type, GLvoid* pixels)
 {
+    if (width == 0 || height == 0)
+    {
+        return GL_FALSE;
+    }
+
     if (gc->flags & __GL_CONTEXT_SKIP_DRAW_INVALID_RENDERBUFFER)
     {
         return GL_FALSE;

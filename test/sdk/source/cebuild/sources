@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -32,8 +32,8 @@ SYNCHRONIZE_DRAIN = 1
 TARGETNAME = VivanteDK
 TARGETTYPE = LIBRARY
 
-INCLUDES = $(INCLUDES);$(AQROOT)\sdk\inc;$(VIVANTE_SDK_INC)\HAL
-INCLUDES = $(INCLUDES);$(AQROOT)\sdk\source
+INCLUDES = $(INCLUDES);$(VIVANTE_SDK_INC);$(VIVANTE_SDK_INC)\HAL
+INCLUDES = $(INCLUDES);$(AQROOT)\sdk\source;$(AQROOT)\sdk\inc
 
 USE_STL = 1
 USE_LIBCMT = 1

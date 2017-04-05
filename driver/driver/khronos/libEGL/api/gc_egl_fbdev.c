@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -79,6 +79,7 @@ struct _FBDisplay
     gceSURF_FORMAT          format;
     gceTILING               tiling;
     gctINT                  swapInterval;
+    gctINT                  refCount;
 
     struct _FBDisplay *     next;
 };
@@ -208,6 +209,8 @@ onceInit(
 
     /* Set display mutex as recursive. */
     pthread_mutex_init(&displayMutex, &mta);
+    /* Destroy mta.*/
+    pthread_mutexattr_destroy(&mta);
 }
 
 /*******************************************************************************
@@ -247,6 +250,7 @@ fbdev_GetDisplayByIndex(
             if (display->index == DisplayIndex)
             {
                 /* Find display.*/
+                display->refCount++;
                 break;
             }
         }
@@ -454,6 +458,8 @@ fbdev_GetDisplayByIndex(
         /* initialize swap interval, default value is 1 */
         display->swapInterval = 1;
 
+        display->refCount = 0;
+
         display->memory = mmap(0,
                                display->size,
                                PROT_READ | PROT_WRITE,
@@ -473,6 +479,7 @@ fbdev_GetDisplayByIndex(
         /* Add display into stack. */
         display->next = displayStack;
         displayStack = display;
+        display->refCount++;
         pthread_mutex_unlock(&displayMutex);
 
         gcmFOOTER_ARG("*Display=0x%x", *Display);
@@ -1044,6 +1051,13 @@ fbdev_DestroyDisplay(
 
     if (display != NULL)
     {
+        display->refCount--;
+
+        if (display->refCount > 0)
+        {
+            pthread_mutex_unlock(&displayMutex);
+            return gcvSTATUS_OK;
+        }
         /* Unlink form display stack. */
         if (display == displayStack)
         {
@@ -2008,9 +2022,6 @@ fbdev_ResizeWindow(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-/******************************************************************************/
-/* TODO: merge functions. */
-
 #include <gc_egl_precomp.h>
 
 
@@ -2026,9 +2037,6 @@ fbdev_ResizeWindow(
  * are synchronized.
  * The idea is to wait until buffer is displayed before next time return back
  * to GPU rendering.
- *
- * TODO: But this will break frame skipping because skipped back buffer post
- * will cause infinite wait in getWindowBackBuffer.
  */
 #define SYNC_TEMPORARY_RESOLVE_SURFACES     0
 
@@ -2176,6 +2184,8 @@ struct eglNativeBuffer
     gcsPOINT            origin;
     gcoSURF             surface;
 
+    EGLint              age;
+
     /* Buffer lock. */
     gctSIGNAL           lock;
 
@@ -2262,12 +2272,6 @@ _CreateWindowBuffers(
 
             for (i = 0; i < Info->multiBuffer; i++)
             {
-                /*
-                 * TODO: Check wrapper limitations.
-                 * Allocate temporary surface objects if can not wrap.
-                 *
-                 * Current logic follows former code without changes.
-                 */
                 gctUINT    offset;
                 gctPOINTER logical;
                 gctUINT    physical;
@@ -2327,9 +2331,6 @@ _CreateWindowBuffers(
                 gcmONERROR(gcoSURF_SetWindow(buffer->surface,
                                              0, 0,
                                              Info->width, Info->height));
-
-                /* Initial lock for user-pool surface. */
-                gcmONERROR(gcoSURF_Lock(buffer->surface, gcvNULL, gcvNULL));
 
                 (void) baseType;
 
@@ -3501,7 +3502,31 @@ _UpdateBufferAge(
     IN struct eglBackBuffer * BackBuffer
     )
 {
-    /* TODO */
+    VEGLWindowInfo info  = Surface->winInfo;
+    VEGLNativeBuffer buffer = info->bufferList;
+
+    gcoOS_AcquireMutex(gcvNULL, info->bufferListMutex, gcvINFINITE);
+
+    do
+    {
+        if ((buffer->context  == BackBuffer->context)  &&
+            (buffer->origin.x == BackBuffer->origin.x) &&
+            (buffer->origin.y == BackBuffer->origin.y))
+        {
+            /* Current buffer. */
+            buffer->age = 1;
+        }
+        else if (buffer->age)
+        {
+            buffer->age++;
+        }
+
+        buffer = buffer->next;
+    }
+    while (buffer != info->bufferList);
+
+    gcoOS_ReleaseMutex(gcvNULL, info->bufferListMutex);
+
     return EGL_TRUE;
 }
 
@@ -3513,7 +3538,62 @@ _QueryBufferAge(
     OUT EGLint *BufferAge
     )
 {
-    /* TODO */
+    VEGLWindowInfo info  = Surface->winInfo;
+
+    if (BackBuffer)
+    {
+        VEGLNativeBuffer buffer = info->bufferList;
+
+        gcoOS_AcquireMutex(gcvNULL, info->bufferListMutex, gcvINFINITE);
+
+        do
+        {
+            if ((buffer->context  == BackBuffer->context)  &&
+                (buffer->origin.x == BackBuffer->origin.x) &&
+                (buffer->origin.y == BackBuffer->origin.y))
+            {
+                /* Found buffer, return its age. */
+                *BufferAge = buffer->age;
+                break;
+            }
+
+            buffer = buffer->next;
+        }
+        while (buffer != info->bufferList);
+
+        gcoOS_ReleaseMutex(gcvNULL, info->bufferListMutex);
+
+        return EGL_TRUE;
+    }
+    else if (!Surface->newSwapModel)
+    {
+        EGLint age = info->multiBuffer;
+        VEGLNativeBuffer buffer = info->bufferList;
+
+        gcoOS_AcquireMutex(gcvNULL, info->bufferListMutex, gcvINFINITE);
+
+        /*
+         * In fbdev, back buffers are returned in order. It's safe to return
+         * buffer-count as buffer age --- except that there're 0 aged buffers.
+         */
+        do
+        {
+            if (buffer->age == 0)
+            {
+                age = 0;
+                break;
+            }
+
+            buffer = buffer->next;
+        }
+        while (buffer != info->bufferList);
+
+        gcoOS_ReleaseMutex(gcvNULL, info->bufferListMutex);
+
+        *BufferAge = age;
+        return EGL_TRUE;
+    }
+
     return EGL_FALSE;
 }
 
@@ -3877,15 +3957,6 @@ _ConnectPixmap(
                                    0, 0,
                                    pixmapWidth,
                                    pixmapHeight);
-
-        if (gcmIS_ERROR(status))
-        {
-            /* Failed to wrap. */
-            break;
-        }
-
-        /* Initial lock for user-pool surface. */
-        status = gcoSURF_Lock(wrapper, gcvNULL, gcvNULL);
     }
     while (gcvFALSE);
 
@@ -4081,7 +4152,7 @@ _SyncToPixmap(
 
 static struct eglPlatform fbdevPlatform =
 {
-    0,
+    EGL_PLATFORM_FBDEV_VIV,
 
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,

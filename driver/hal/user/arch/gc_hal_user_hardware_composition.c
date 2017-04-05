@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2836,7 +2836,7 @@ _AllocateTemporarySurface(
         tempBuffer->alignedH   = Height;
 
         /* Locate format record. */
-        gcmONERROR(gcoSURF_QueryFormat(Format, format));
+        gcmONERROR(gcoHARDWARE_QueryFormat(Format, format));
 
         /* Align the width and height. */
         gcmONERROR(gcoHARDWARE_AlignToTile(

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -41,13 +41,8 @@ static gctCONST_STRING s_CaseDescription = \
 typedef struct Test2D {
     GalTest     base;
     GalRuntime  *runtime;
-
-    gctUINT8        srcAlpha;
-    gctUINT8        dstAlpha;
     //source surface
     T2D_SURF_PTR    surf[10];
-
-    gctUINT     alphaValue;
 
     gctBOOL     compressed;
 } Test2D;
@@ -91,6 +86,8 @@ static Comb sCombUnCom[] =
 
     { gcvSURF_P010,              gcvTILED_32X4,           gcv2D_TSC_DISABLE },
 
+    { gcvSURF_NV12,              gcvTILED_64X4,           gcv2D_TSC_DISABLE },
+
     { gcvSURF_A1R5G5B5,    gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_A4R4G4B4,    gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_X1R5G5B5,    gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
@@ -101,7 +98,6 @@ static Comb sCombUnCom[] =
     { gcvSURF_A2R10G10B10, gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_YUY2,        gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_UYVY,        gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
-    { gcvSURF_NV12,        gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
 
     { gcvSURF_NV12,        gcvTILED_8X8_YMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_P010,        gcvTILED_8X8_YMAJOR,           gcv2D_TSC_DISABLE },
@@ -109,16 +105,16 @@ static Comb sCombUnCom[] =
 
 static Comb sCombCom[] =
 {
-    { gcvSURF_A1R5G5B5,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_A4R4G4B4,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_X1R5G5B5,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_X4R4G4B4,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_R5G6B5,            gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_X8R8G8B8,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_A8R8G8B8,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_A2R10G10B10,       gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_YUY2,              gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_UYVY,              gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_A1R5G5B5,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_A4R4G4B4,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_X1R5G5B5,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_X4R4G4B4,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_R5G6B5,            gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_X8R8G8B8,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_A8R8G8B8,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_A2R10G10B10,       gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_YUY2,              gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_UYVY,              gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
 
     { gcvSURF_X8R8G8B8,          gcvTILED_4X8,     gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_A8R8G8B8,          gcvTILED_4X8,     gcv2D_TSC_DEC_COMPRESSED },
@@ -130,6 +126,8 @@ static Comb sCombCom[] =
 
     { gcvSURF_P010,              gcvTILED_32X4,    gcv2D_TSC_DEC_COMPRESSED },
 
+    { gcvSURF_NV12,              gcvTILED_64X4,    gcv2D_TSC_DEC_COMPRESSED },
+
     { gcvSURF_A1R5G5B5,    gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_A4R4G4B4,    gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_X1R5G5B5,    gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
@@ -140,22 +138,26 @@ static Comb sCombCom[] =
     { gcvSURF_A2R10G10B10, gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_YUY2,        gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_UYVY,        gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_NV12,        gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
+
+    { gcvSURF_NV12,        gcvTILED_8X8_YMAJOR,           gcv2D_TSC_DISABLE },
+    { gcvSURF_P010,        gcvTILED_8X8_YMAJOR,           gcv2D_TSC_DISABLE },
 };
+
+#define RECT_SIZE 384
 
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
     gceSTATUS status;
     gcsRECT Rect;
     gco2D egn2D = t2d->runtime->engine2d;
-    gctINT i;
+    gctINT i, k;
 
     gcmONERROR(GalCreateTSurf(
         t2d->runtime->hal,
         t2d->runtime->format,
         gcvLINEAR,
         gcv2D_TSC_DISABLE,
-        480, 480,
+        RECT_SIZE, RECT_SIZE,
         &t2d->surf[8]));
 
     gcmONERROR(GalCreateTSurf(
@@ -169,7 +171,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         t2d->compressed ?
         sCombCom[frameNo % gcmCOUNTOF(sCombCom)].tsc :
         sCombUnCom[frameNo % gcmCOUNTOF(sCombUnCom)].tsc,
-        480, 480,
+        RECT_SIZE, RECT_SIZE,
         &t2d->surf[9]));
 
     gcmONERROR(gco2D_SetGenericTarget(
@@ -181,8 +183,8 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
          t2d->surf[9]->tiling,
          t2d->surf[9]->format,
          t2d->surf[9]->rotation,
-         t2d->surf[9]->width,
-         t2d->surf[9]->height));
+         t2d->surf[9]->aWidth,
+         t2d->surf[9]->aHeight));
 
     gcmONERROR(gco2D_SetTargetTileStatus(
          egn2D,
@@ -192,25 +194,43 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
          t2d->surf[9]->tileStatusAddress
          ));
 
+    if (t2d->surf[9]->tileStatusNodeEx[0].address != 0)
+    {
+        gcmONERROR(gco2D_SetStateArrayU32(
+            egn2D,
+            gcv2D_STATE_ARRAY_YUV_DST_TILE_STATUS_ADDR,
+            &t2d->surf[9]->tileStatusNodeEx[0].address,
+            1
+            ));
+    }
+
     Rect.left = 0;
     Rect.top  = 0;
     Rect.right  = t2d->surf[9]->width;
     Rect.bottom = t2d->surf[9]->height;
 
-    for (i = 0; i < 8; i++)
+    for (k = 0; k < 8; k++)
     {
         gcsRECT srect;
         gceSURF_ROTATION rot;
         gctBOOL horMirror, verMirror;
 
         srect.left = srect.top = 0;
-        srect.right = srect.bottom = 480;
+        srect.right = srect.bottom = RECT_SIZE;
+
+        i = (frameNo + k) % 8;
 
         gcmONERROR(gco2D_SetCurrentSourceIndex(egn2D, i));
 
-        rot = sRots[(frameNo + i) % gcmCOUNTOF(sRots)];
-        horMirror = INT2BOOL((frameNo + i), 2);
-        verMirror = INT2BOOL((frameNo + i), 4);
+        rot = sRots[(frameNo + k) % gcmCOUNTOF(sRots)];
+        horMirror = INT2BOOL((frameNo + k), 2);
+        verMirror = INT2BOOL((frameNo + k), 4);
+
+        if (t2d->surf[9]->format == gcvSURF_YUY2 ||
+            t2d->surf[9]->format == gcvSURF_UYVY)
+        {
+            rot = horMirror = verMirror = gcvFALSE;
+        }
 
         gcmONERROR(gco2D_SetGenericSource(
             egn2D,
@@ -218,7 +238,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
             t2d->surf[i]->stride, t2d->surf[i]->validStrideNum,
             t2d->surf[i]->tiling, t2d->surf[i]->format,
             rot,
-            t2d->surf[i]->width, t2d->surf[i]->height));
+            t2d->surf[i]->aWidth, t2d->surf[i]->aHeight));
 
         gcmONERROR(gco2D_SetSourceTileStatus(
             egn2D,
@@ -227,6 +247,16 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
             t2d->surf[i]->tileStatusClear,
             t2d->surf[i]->tileStatusAddress
             ));
+
+        if (t2d->surf[i]->tileStatusNodeEx[0].address != 0)
+        {
+            gcmONERROR(gco2D_SetStateArrayU32(
+                egn2D,
+                gcv2D_STATE_ARRAY_YUV_SRC_TILE_STATUS_ADDR,
+                &t2d->surf[i]->tileStatusNodeEx[0].address,
+                1
+                ));
+        }
 
         gcmONERROR(gco2D_SetSource(egn2D, &srect));
 
@@ -254,9 +284,9 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
                 case gcvSURF_YUY2:
                 case gcvSURF_UYVY:
                 default:
-                    gcmONERROR(gco2D_SetSourceGlobalColorAdvanced(t2d->runtime->engine2d, 0x80 << 24));
+                    gcmONERROR(gco2D_SetSourceGlobalColorAdvanced(t2d->runtime->engine2d, 0x40 << 24));
 
-                    gcmONERROR(gco2D_SetTargetGlobalColorAdvanced(t2d->runtime->engine2d, 0x80 << 24));
+                    gcmONERROR(gco2D_SetTargetGlobalColorAdvanced(t2d->runtime->engine2d, 0x40 << 24));
 
                     gcmONERROR(gco2D_EnableAlphaBlendAdvanced(egn2D,
                         gcvSURF_PIXEL_ALPHA_STRAIGHT, gcvSURF_PIXEL_ALPHA_STRAIGHT,
@@ -290,8 +320,8 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
          t2d->surf[9]->tiling,
          t2d->surf[9]->format,
          t2d->surf[9]->rotation,
-         t2d->surf[9]->width,
-         t2d->surf[9]->height));
+         t2d->surf[9]->aWidth,
+         t2d->surf[9]->aHeight));
 
     gcmONERROR(gco2D_SetSourceTileStatus(
          egn2D,
@@ -300,6 +330,16 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
          t2d->surf[9]->tileStatusClear,
          t2d->surf[9]->tileStatusAddress
          ));
+
+    if (t2d->surf[9]->tileStatusNodeEx[0].address != 0)
+    {
+        gcmONERROR(gco2D_SetStateArrayU32(
+            egn2D,
+            gcv2D_STATE_ARRAY_YUV_SRC_TILE_STATUS_ADDR,
+            &t2d->surf[9]->tileStatusNodeEx[0].address,
+            1
+            ));
+    }
 
     gcmONERROR(gco2D_SetGenericTarget(
          egn2D,
@@ -377,18 +417,20 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctINT i;
-    gctSTRING sourceARGBfile[] =
+    gctSTRING sourcefile[] =
     {
-         "resource/zero2_A2R10G10B10.bmp",
-         "resource/zero2_YUY2_640X480_Linear.vimg",
-         "resource/VV_Background.bmp",
-         "resource/GoneFishing2.bmp",
-         "resource/zero2_UYVY_640X480_Linear.vimg",
-         "resource/android_720x1280_icons.bmp",
-         "resource/background.bmp",
-         "resource/Crew_NV21_1280x720_Linear.vimg",
+        "resource/VV_Background.bmp",
+        "resource/Crew_NV12_1280x720_Linear.vimg",
+        "resource/zero2_A2R10G10B10.bmp",
+        "resource/zero2_YUY2_640X480_Linear.vimg",
+        "resource/relative.bmp",
+        "resource/android_720x1280_icons.bmp",
+        "resource/smooth_720p.bmp",
+        "resource/zero2_UYVY_640X480_Linear.vimg",
     };
 
+    gctUINT32 argc = runtime->argc;
+    gctSTRING *argv = runtime->argv;
     gctUINT32 k, listLen = sizeof(FeatureList)/sizeof(gctINT);
     gctBOOL featureStatus;
     char featureName[FEATURE_NAME_LEN], featureMsg[FEATURE_MSG_LEN];
@@ -416,10 +458,18 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     if (runtime->notSupport)
         return gcvFALSE;
 
+    t2d->compressed = gcvTRUE;
+    for (k = 0; k < argc; ++k)
+    {
+        if (!strcmp(argv[k], "-compressed"))
+        {
+            t2d->compressed = gcvTRUE;
+        }
+    }
+
     t2d->runtime = runtime;
     runtime->saveTarget = gcvFALSE;
     runtime->cleanTarget = gcvFALSE;
-    t2d->alphaValue = 0x80;
 
     gcmONERROR(GalCreateTSurf(
          t2d->runtime->hal,
@@ -436,10 +486,13 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     {
         T2D_SURF_PTR srcImage;
         gcsRECT srect, rect;
-        gce2D_TILE_STATUS_CONFIG tileStatus = gcv2D_TSC_DEC_COMPRESSED;
+        gce2D_TILE_STATUS_CONFIG tileStatus =
+            t2d->compressed ? gcv2D_TSC_DEC_COMPRESSED : gcv2D_TSC_DISABLE;
+
+        gceTILING tiling = t2d->compressed ? gcvSUPERTILED_128B : gcvLINEAR;
 
         gcmONERROR(GalLoadFileToTSurf(
-            sourceARGBfile[i], &srcImage));
+            sourcefile[i], &srcImage));
 
          gcmONERROR(gco2D_SetGenericSource(
              t2d->runtime->engine2d,
@@ -510,26 +563,10 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
         }
         else
         {
-            GalFillAlphaBySW(
-                    t2d->surf[8]->logical[0],
-                    t2d->surf[8]->aWidth,
-                    t2d->surf[8]->aHeight,
-                    t2d->surf[8]->stride[0],
-                    gcvSURF_0_DEGREE,
-                    &rect,
-                    &rect,
-                    t2d->alphaValue,
-                    0x0);
-
-             rect.left = 240 - (8 - i) * 30;
-             rect.top  = 240 - (8 - i) * 30;
-             rect.right  = 240 + (8 - i) * 30;
-             rect.bottom = 240 + (8 - i) * 30;
-
              gcmONERROR(GalCreateTSurf(
                      t2d->runtime->hal,
                      srcImage->format,
-                     gcvLINEAR,
+                     tiling,
                      tileStatus,
                      t2d->surf[8]->width, t2d->surf[8]->height, &t2d->surf[i]));
 
@@ -558,8 +595,8 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
                      t2d->surf[i]->tiling,
                      t2d->surf[i]->format,
                      t2d->surf[i]->rotation,
-                     t2d->surf[i]->width,
-                     t2d->surf[i]->height));
+                     t2d->surf[i]->aWidth,
+                     t2d->surf[i]->aHeight));
 
              gcmONERROR(gco2D_SetTargetTileStatus(
                      t2d->runtime->engine2d,
@@ -578,14 +615,11 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 
             gcmONERROR(gco2D_SetSource(t2d->runtime->engine2d, &srect));
 
-             gcmONERROR(gco2D_Blit(t2d->runtime->engine2d, 1, &rect, 0xCC, 0xCC, t2d->surf[i]->format));
-
+            gcmONERROR(gco2D_Blit(t2d->runtime->engine2d, 1, &srect, 0xCC, 0xCC, t2d->surf[i]->format));
 
             gcmONERROR(gcoHAL_Commit(gcvNULL, gcvTRUE));
 
             gcmONERROR(GalDeleteTSurf(t2d->runtime->hal, srcImage));
-
-            t2d->alphaValue =  (t2d->alphaValue + 0x30)% 0xFF;
         }
     }
 

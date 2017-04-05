@@ -1,0 +1,419 @@
+#include "cl_viv_vx_ext.h"
+
+_viv_uniform VXC_512Bits UinTestData;
+
+__kernel void vxcVertpool
+    (
+	       __read_only image2d_t   src,
+		   global int        *depth,
+		   global int        *width,
+		   global int        *height,
+		   __write_only image2d_t    dst)
+
+{
+#if 1
+	int depth_s = (*depth);
+	int height_s =(*height);
+	int width_s = (*width);
+	int x =  get_global_id(0);
+	int c =  get_global_id(1);
+	vxc_short8 line0;
+	vxc_short8 line1;
+	vxc_short8 line2;
+	vxc_short8 line3;
+	vxc_short8 line4;
+	vxc_short8 line5;
+	vxc_short8 line6;
+	vxc_short8 maxline;
+ 	float4 dprslt;
+	int2 pos_dst0;
+	int2 pos_dst1;
+	int2 pos_dst2;
+	int2 pos_dst3;
+	int2 pos_dst4;
+	int2 pos_dst5;
+	int2 pos_dst6;
+	int lastfalg = 0;
+	if((x+8) > *width )
+		lastfalg = 1;
+	{
+		{
+  			int loop_height = height_s-6;
+			int y = c*height_s ;
+			int2 pos = (int2)(x,y);
+
+			VXC_OP4(img_load, line0, src, pos, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+			VXC_OP4(img_load, line1, src, pos, VXC_5BITOFFSET_XY(0,1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+ 			VXC_OP4(img_load, line2, src, pos, VXC_5BITOFFSET_XY(0,2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+  			VXC_OP4(img_load, line3, src, pos, VXC_5BITOFFSET_XY(0,3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+			VXC_OP4(img_load, line4, src, pos, VXC_5BITOFFSET_XY(0,4), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+  			VXC_OP4(img_load, line5, src, pos, VXC_5BITOFFSET_XY(0,5), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+
+			pos.y += 6;
+			int c8 = c*8;
+			pos_dst0 = (int2)(x,c8 + 1);
+			pos_dst1 = (int2)(x,c8 + 2);
+			pos_dst2 = (int2)(x,c8 + 3);
+			pos_dst3 = (int2)(x,c8 + 4);
+			pos_dst4 = (int2)(x,c8 + 5);
+			pos_dst5 = (int2)(x,c8 + 6);
+			pos_dst6 = (int2)(x,c8 + 7);
+
+			do
+		    {
+				VXC_OP4(img_load, line6, src, pos, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				pos.y += 1;
+											           //1
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+
+				pos_dst0.x += (*width);
+
+
+				maxline = line0>line1?line0:line1;		 //2
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst1.x += (*width);
+
+				maxline =  maxline>line2?maxline:line2;	 //3
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst2.x += (*width);
+
+				maxline =  maxline>line3?maxline:line3;	 //4
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+
+				pos_dst3.x += (*width);
+
+				maxline =  maxline>line4?maxline:line4;	 //5
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst4.x += (*width);
+
+				maxline =  maxline>line5?maxline:line5;	 //6
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+
+				pos_dst5.x += (*width);
+
+				maxline =  maxline>line6?maxline:line6;	 //7
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst6, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst6, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+
+				pos_dst6.x += (*width);
+
+				line0 = line1;
+				line1 = line2;
+				line2 = line3;
+				line3 = line4;
+				line4 = line5;
+				line5 = line6;
+
+			//	if(loop_height==1)
+			//		VXC_OP4(dp16x1, dprslt, line0,line1, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0), UinTestData);
+
+				y++;
+				loop_height--;
+		   }while(loop_height>0);
+		   //remain
+		  loop_height = 6;
+#if 0
+		  do {
+
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst0.x += (*width);
+
+				if(loop_height > 1) {
+					maxline = line0>line1?line0:line1;		 //2
+					if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+  					else            VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+
+					pos_dst1.x += (*width);
+				}	//2 lines
+				if(loop_height > 2) {
+					maxline = maxline>line2?maxline:line2;	 //3
+					if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+					else            VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+					pos_dst2.x += (*width);
+				}	//3 lines
+				if(loop_height > 3) {
+					maxline = maxline>line3?maxline:line3;	 //4
+					if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+					else            VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+					pos_dst3.x += (*width);
+				}	//4 lines
+				if(loop_height > 4) {
+					maxline = maxline>line4?maxline:line4;	 //6
+					if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+					else            VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+					pos_dst4.x += (*width);
+				}	//5 lines
+				if(loop_height > 5) {
+					maxline = maxline>line5?maxline:line5;	 //6
+					if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+					else            VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+					pos_dst5.x += (*width);
+				}	//6 lines
+
+				line0 = line1;
+				line1 = line2;
+				line2 = line3;
+				line3 = line4;
+				line4 = line5;
+				loop_height--;
+		   }while(loop_height>0);
+#else
+			if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+			else            VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+			pos_dst0.x += (*width);
+
+			if(loop_height > 1) {
+				maxline = line0>line1?line0:line1;		 //2
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+  				else            VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+
+				pos_dst1.x += (*width);
+			}	//2 lines
+			if(loop_height > 2) {
+				maxline = maxline>line2?maxline:line2;	 //3
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst2.x += (*width);
+			}	//3 lines
+			if(loop_height > 3) {
+				maxline = maxline>line3?maxline:line3;	 //4
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst3.x += (*width);
+			}	//4 lines
+			if(loop_height > 4) {
+				maxline = maxline>line4?maxline:line4;	 //6
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst4.x += (*width);
+			}	//5 lines
+			if(loop_height > 5) {
+				maxline = maxline>line5?maxline:line5;	 //6
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst5.x += (*width);
+			}	//6 lines
+
+			line0 = line1;
+			line1 = line2;
+			line2 = line3;
+			line3 = line4;
+			line4 = line5;
+			loop_height--;
+		if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+			else            VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+			pos_dst0.x += (*width);
+
+			if(loop_height > 1) {
+				maxline = line0>line1?line0:line1;		 //2
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+  				else            VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+
+				pos_dst1.x += (*width);
+			}	//2 lines
+			if(loop_height > 2) {
+				maxline = maxline>line2?maxline:line2;	 //3
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst2.x += (*width);
+			}	//3 lines
+			if(loop_height > 3) {
+				maxline = maxline>line3?maxline:line3;	 //4
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst3.x += (*width);
+			}	//4 lines
+			if(loop_height > 4) {
+				maxline = maxline>line4?maxline:line4;	 //6
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst4.x += (*width);
+			}	//5 lines
+			if(loop_height > 5) {
+				maxline = maxline>line5?maxline:line5;	 //6
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst5.x += (*width);
+			}	//6 lines
+
+			line0 = line1;
+			line1 = line2;
+			line2 = line3;
+			line3 = line4;
+			line4 = line5;
+			loop_height--;
+		if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+			else            VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+			pos_dst0.x += (*width);
+
+			if(loop_height > 1) {
+				maxline = line0>line1?line0:line1;		 //2
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+  				else            VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+
+				pos_dst1.x += (*width);
+			}	//2 lines
+			if(loop_height > 2) {
+				maxline = maxline>line2?maxline:line2;	 //3
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst2.x += (*width);
+			}	//3 lines
+			if(loop_height > 3) {
+				maxline = maxline>line3?maxline:line3;	 //4
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst3.x += (*width);
+			}	//4 lines
+			if(loop_height > 4) {
+				maxline = maxline>line4?maxline:line4;	 //6
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst4.x += (*width);
+			}	//5 lines
+			if(loop_height > 5) {
+				maxline = maxline>line5?maxline:line5;	 //6
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst5.x += (*width);
+			}	//6 lines
+
+			line0 = line1;
+			line1 = line2;
+			line2 = line3;
+			line3 = line4;
+			line4 = line5;
+			loop_height--;
+		if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+			else            VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+			pos_dst0.x += (*width);
+
+			if(loop_height > 1) {
+				maxline = line0>line1?line0:line1;		 //2
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+  				else            VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+
+				pos_dst1.x += (*width);
+			}	//2 lines
+			if(loop_height > 2) {
+				maxline = maxline>line2?maxline:line2;	 //3
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst2.x += (*width);
+			}	//3 lines
+			if(loop_height > 3) {
+				maxline = maxline>line3?maxline:line3;	 //4
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst3.x += (*width);
+			}	//4 lines
+			if(loop_height > 4) {
+				maxline = maxline>line4?maxline:line4;	 //6
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst4.x += (*width);
+			}	//5 lines
+			if(loop_height > 5) {
+				maxline = maxline>line5?maxline:line5;	 //6
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst5.x += (*width);
+			}	//6 lines
+
+			line0 = line1;
+			line1 = line2;
+			line2 = line3;
+			line3 = line4;
+			line4 = line5;
+			loop_height--;
+		if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+			else            VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+			pos_dst0.x += (*width);
+
+			if(loop_height > 1) {
+				maxline = line0>line1?line0:line1;		 //2
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+  				else            VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+
+				pos_dst1.x += (*width);
+			}	//2 lines
+			if(loop_height > 2) {
+				maxline = maxline>line2?maxline:line2;	 //3
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst2.x += (*width);
+			}	//3 lines
+			if(loop_height > 3) {
+				maxline = maxline>line3?maxline:line3;	 //4
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst3.x += (*width);
+			}	//4 lines
+			if(loop_height > 4) {
+				maxline = maxline>line4?maxline:line4;	 //6
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst4.x += (*width);
+			}	//5 lines
+			if(loop_height > 5) {
+				maxline = maxline>line5?maxline:line5;	 //6
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst5.x += (*width);
+			}	//6 lines
+
+			line0 = line1;
+			line1 = line2;
+			line2 = line3;
+			line3 = line4;
+			line4 = line5;
+			loop_height--;
+		if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+			else            VXC_OP4_NoDest(img_store, dst, pos_dst0, line0, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+			pos_dst0.x += (*width);
+
+			if(loop_height > 1) {
+				maxline = line0>line1?line0:line1;		 //2
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+  				else            VXC_OP4_NoDest(img_store, dst, pos_dst1, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+
+				pos_dst1.x += (*width);
+			}	//2 lines
+			if(loop_height > 2) {
+				maxline = maxline>line2?maxline:line2;	 //3
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst2, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst2.x += (*width);
+			}	//3 lines
+			if(loop_height > 3) {
+				maxline = maxline>line3?maxline:line3;	 //4
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst3, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst3.x += (*width);
+			}	//4 lines
+			if(loop_height > 4) {
+				maxline = maxline>line4?maxline:line4;	 //6
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst4, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst4.x += (*width);
+			}	//5 lines
+			if(loop_height > 5) {
+				maxline = maxline>line5?maxline:line5;	 //6
+				if(lastfalg==0) VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+				else            VXC_OP4_NoDest(img_store, dst, pos_dst5, maxline, VXC_MODIFIER(0, 2, 0, VXC_RM_TowardZero, 0));
+				pos_dst5.x += (*width);
+			}	//6 lines
+#endif
+		}
+	}
+#endif
+
+}
+

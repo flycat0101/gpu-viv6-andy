@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -512,7 +512,6 @@ pointer_handle_axis(void *data, struct wl_pointer *wl_pointer,
         return;
     }
 
-    /* TODO: axis events? */
 }
 
 static const struct wl_pointer_listener pointer_listener = {
@@ -720,7 +719,6 @@ keyboard_handle_key(void *data, struct wl_keyboard *keyboard,
     pthread_mutex_lock(&win->event_mutex);
     evt  = &win->event_queue[win->event_wpos];
 
-    /* TODO: Fix keyboard. */
     scancode = keys[key & 0x7F].normal;
 
     evt->type = VDK_KEYBOARD;
@@ -752,7 +750,6 @@ keyboard_handle_modifiers(void *data, struct wl_keyboard *keyboard,
         return;
     }
 
-    /* TODO: mofifiers. */
 }
 
 static const struct wl_keyboard_listener keyboard_listener = {

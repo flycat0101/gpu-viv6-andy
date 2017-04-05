@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -157,7 +157,6 @@ GLvoid __glInitPacker(__GLcontext *gc, __GLpixelSpanInfo *spanInfo)
 
     if( type >= __GL_MIN_TC_TYPE && type <= __GL_MAX_TC_TYPE)
     {
-        /* TODO: dstSkipPixels & dstSkipLines are not __GL_TCBLOCK_DIM aligned */
         GL_ASSERT(!(spanInfo->dstSkipPixels % __GL_TCBLOCK_DIM));
         GL_ASSERT(!(spanInfo->dstSkipLines % __GL_TCBLOCK_DIM));
 

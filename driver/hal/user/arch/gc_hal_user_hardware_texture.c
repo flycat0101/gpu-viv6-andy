@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -832,7 +832,7 @@ gcoHARDWARE_DisableTextureSampler(
                 gcoOS_ZeroMemory((gctPOINTER)Hardware->TXStates->nullTxDescNode[index], gcmSIZEOF(gcsSURF_NODE));
                 gcmONERROR(gcsSURF_NODE_Construct(Hardware->TXStates->nullTxDescNode[index],
                                                   256,
-                                                  256,
+                                                  64,
                                                   gcvSURF_TXDESC,
                                                   0,
                                                   gcvPOOL_DEFAULT
@@ -1783,6 +1783,7 @@ gcoHARDWARE_BindTexture(
     gctUINT32 samplerWidth, samplerHeight;
     gctUINT32 samplerDepth;
     gctUINT32 level0Width, level0Height, level0Depth;
+    gceTEXTURE_ADDRESSING addrS, addrT, addrR;
     gceTEXTURE_FILTER minFilter;
     gceTEXTURE_FILTER mipFilter;
     gceTEXTURE_FILTER magFilter;
@@ -1931,6 +1932,9 @@ gcoHARDWARE_BindTexture(
     gcmDEBUG_VERIFY_ARGUMENT(SamplerInfo != gcvNULL);
 
     samplerDepth  = SamplerInfo->depth;
+    addrS         = SamplerInfo->textureInfo->s;
+    addrT         = SamplerInfo->textureInfo->t;
+    addrR         = SamplerInfo->textureInfo->r;
     minFilter     = SamplerInfo->textureInfo->minFilter;
     mipFilter     = SamplerInfo->textureInfo->mipFilter;
     magFilter     = SamplerInfo->textureInfo->magFilter;
@@ -1938,6 +1942,25 @@ gcoHARDWARE_BindTexture(
     samplerWidth  = SamplerInfo->width  * SamplerInfo->baseLevelSurf->sampleInfo.x;
     samplerHeight = SamplerInfo->height * SamplerInfo->baseLevelSurf->sampleInfo.y;
 
+    if (Hardware->features[gcvFEATURE_TEX_SEAMLESS_CUBE] &&
+        Hardware->patchID == gcvPATCH_GFXBENCH &&
+        (SamplerInfo->texType == gcvTEXTURE_CUBEMAP || SamplerInfo->texType == gcvTEXTURE_CUBEMAP_ARRAY))
+    {
+        if (addrS != gcvTEXTURE_WRAP || addrT != gcvTEXTURE_WRAP)
+        {
+            if (minFilter != magFilter)
+            {
+                minFilter = gcvTEXTURE_POINT;
+                magFilter = gcvTEXTURE_POINT;
+            }
+            else if (minFilter == gcvTEXTURE_LINEAR)
+            {
+                /* According to spec, cube sampling uses special addressing. */
+                addrS = gcvTEXTURE_WRAP;
+                addrT = gcvTEXTURE_WRAP;
+            }
+        }
+    }
 
     if (!SamplerInfo->filterable)
     {
@@ -2089,16 +2112,16 @@ gcoHARDWARE_BindTexture(
 
     if ((samplerWidth  & (samplerWidth  - 1)) ||
         (samplerHeight & (samplerHeight - 1)) ||
-        (samplerDepth & (samplerDepth  - 1)))
+        (samplerDepth  & (samplerDepth  - 1)))
     {
         /* HW sampling non-power of two textures only work correct
            under clamp to edge mode if HW didn't support NPOT feature */
 #if !gcdUSE_NPOT_PATCH
         if(Hardware->features[gcvFEATURE_NON_POWER_OF_TWO] != gcvSTATUS_TRUE)
         {
-            SamplerInfo->textureInfo->s = gcvTEXTURE_CLAMP;
-            SamplerInfo->textureInfo->t = gcvTEXTURE_CLAMP;
-            SamplerInfo->textureInfo->r = gcvTEXTURE_CLAMP;
+            addrS = gcvTEXTURE_CLAMP;
+            addrT = gcvTEXTURE_CLAMP;
+            addrR = gcvTEXTURE_CLAMP;
         }
 #endif
     }
@@ -2139,12 +2162,12 @@ gcoHARDWARE_BindTexture(
  17:13)))
         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:3) - (0 ?
  4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
- 4:3))) | (((gctUINT32) ((gctUINT32) (addressXlate[SamplerInfo->textureInfo->s]) & ((gctUINT32) ((((1 ?
+ 4:3))) | (((gctUINT32) ((gctUINT32) (addressXlate[addrS]) & ((gctUINT32) ((((1 ?
  4:3) - (0 ? 4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
  4:3)))
         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 6:5) - (0 ?
  6:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:5) - (0 ? 6:5) + 1))))))) << (0 ?
- 6:5))) | (((gctUINT32) ((gctUINT32) (addressXlate[SamplerInfo->textureInfo->t]) & ((gctUINT32) ((((1 ?
+ 6:5))) | (((gctUINT32) ((gctUINT32) (addressXlate[addrT]) & ((gctUINT32) ((((1 ?
  6:5) - (0 ? 6:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:5) - (0 ? 6:5) + 1))))))) << (0 ?
  6:5)))
         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 8:7) - (0 ?
@@ -2335,7 +2358,7 @@ gcoHARDWARE_BindTexture(
  25:16) + 1))))))) << (0 ? 25:16)))
              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  29:28) - (0 ? 29:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:28) - (0 ?
- 29:28) + 1))))))) << (0 ? 29:28))) | (((gctUINT32) ((gctUINT32) (addressXlate[SamplerInfo->textureInfo->r]) & ((gctUINT32) ((((1 ?
+ 29:28) + 1))))))) << (0 ? 29:28))) | (((gctUINT32) ((gctUINT32) (addressXlate[addrR]) & ((gctUINT32) ((((1 ?
  29:28) - (0 ? 29:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:28) - (0 ?
  29:28) + 1))))))) << (0 ? 29:28)));
 
@@ -2408,7 +2431,6 @@ gcoHARDWARE_BindTexture(
  0:0)));
     }
 
-    /* TODO: program for msaa texture*/
     if (msaaTextureAvail)
     {
         if (samples > 1)
@@ -5832,6 +5854,7 @@ gcoHARDWARE_BindTextureDesc(
     gctUINT32 samplerCtrl0, samplerCtrl1, samplerLODMinMax, samplerLODBias, samplerAnisCtrl;
     gctBOOL sRGB;
     gcsTEXTURE_PTR textureInfo = SamplerInfo->textureInfo;
+    gceTEXTURE_ADDRESSING addrS, addrT, addrR;
     gctUINT32 baseLevelWidth, baseLevelHeight;
     gctUINT32 txDescAddress;
     gcsBITMASK_PTR maskArray[10] = {gcvNULL};
@@ -5927,8 +5950,31 @@ gcoHARDWARE_BindTextureDesc(
     mipFilter     = textureInfo->mipFilter;
     magFilter     = textureInfo->magFilter;
 
+    addrS = textureInfo->s;
+    addrT = textureInfo->t;
+    addrR = textureInfo->r;
+
     baseLevelWidth  = SamplerInfo->baseLevelSurf->allocedW;
     baseLevelHeight = SamplerInfo->baseLevelSurf->allocedH;
+
+    if (Hardware->patchID == gcvPATCH_GFXBENCH &&
+        (SamplerInfo->texType == gcvTEXTURE_CUBEMAP || SamplerInfo->texType == gcvTEXTURE_CUBEMAP_ARRAY))
+    {
+        if (addrS != gcvTEXTURE_WRAP || addrT != gcvTEXTURE_WRAP)
+        {
+            if (minFilter != magFilter)
+            {
+                minFilter = gcvTEXTURE_POINT;
+                magFilter = gcvTEXTURE_POINT;
+            }
+            else if (minFilter == gcvTEXTURE_LINEAR)
+            {
+                /* According to spec, cube sampling uses special addressing. */
+                addrS = gcvTEXTURE_WRAP;
+                addrT = gcvTEXTURE_WRAP;
+            }
+        }
+    }
 
     if (!SamplerInfo->filterable)
     {
@@ -5947,6 +5993,7 @@ gcoHARDWARE_BindTextureDesc(
             mipFilter = gcvTEXTURE_POINT;
         }
     }
+
     if (mipFilter == gcvTEXTURE_LINEAR &&
         SamplerInfo->formatInfo->fmtClass == gcvFORMAT_CLASS_DEPTH)
     {
@@ -6057,17 +6104,17 @@ gcoHARDWARE_BindTextureDesc(
     samplerCtrl0 =
         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 2:0) - (0 ?
  2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
- 2:0))) | (((gctUINT32) ((gctUINT32) (addressXlate[textureInfo->s]) & ((gctUINT32) ((((1 ?
+ 2:0))) | (((gctUINT32) ((gctUINT32) (addressXlate[addrS]) & ((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0)))
       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 5:3) - (0 ?
  5:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:3) - (0 ? 5:3) + 1))))))) << (0 ?
- 5:3))) | (((gctUINT32) ((gctUINT32) (addressXlate[textureInfo->t]) & ((gctUINT32) ((((1 ?
+ 5:3))) | (((gctUINT32) ((gctUINT32) (addressXlate[addrT]) & ((gctUINT32) ((((1 ?
  5:3) - (0 ? 5:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:3) - (0 ? 5:3) + 1))))))) << (0 ?
  5:3)))
       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 8:6) - (0 ?
  8:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:6) - (0 ? 8:6) + 1))))))) << (0 ?
- 8:6))) | (((gctUINT32) ((gctUINT32) (addressXlate[textureInfo->r]) & ((gctUINT32) ((((1 ?
+ 8:6))) | (((gctUINT32) ((gctUINT32) (addressXlate[addrR]) & ((gctUINT32) ((((1 ?
  8:6) - (0 ? 8:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:6) - (0 ? 8:6) + 1))))))) << (0 ?
  8:6)))
       | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 10:9) - (0 ?

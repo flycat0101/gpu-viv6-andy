@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -379,8 +379,7 @@ __glXCreateDrawablePrivate(DrawablePtr pDraw, XID drawId,
     /* initialize the core's private buffer information */
 /*    (*pGlxScreen->createBuffer)(glxPriv);*/
 
-    GL_ASSERT(0);/* TODO: call the device specific createBuffer function*/
-
+    GL_ASSERT(0);
     return glxPriv;
 }
 

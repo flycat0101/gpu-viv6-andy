@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -388,7 +388,7 @@ _hasHalti1(
     IN OUT gctUINT32_PTR States
     )
 {
-    return gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1);
+    return gcHWCaps.hwFeatureFlags.hasHalti1;
 }
 
 static gctBOOL
@@ -399,7 +399,7 @@ _hasHalti2(
     IN OUT gctUINT32_PTR States
     )
 {
-    return gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI2);
+    return gcHWCaps.hwFeatureFlags.hasHalti2;
 }
 
 static gctBOOL
@@ -5295,7 +5295,7 @@ canUseSelectCmpSetInst(
     {
         if (CodeGen->clShader)
         {
-            if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_PARTLY_SUPPORT_INTEGER_BRANCH))
+            if (!gcHWCaps.hwFeatureFlags.supportPartIntBranch)
             {
                 return gcvTRUE;
             }
@@ -11595,7 +11595,7 @@ _UseDestInNextOnly_hasMULLO_ICLimit(
     /* A temp WAR for HW inst limitation */
     if (Tree->shader->codeCount >= 200 &&
         !CodeGen->useICache &&
-        CodeGen->hardware->config->instructionCount < 1024)
+        gcHWCaps.maxHwNativeTotalInstCount < 1024)
     {
         return gcvFALSE;
     }
@@ -12573,6 +12573,27 @@ _IntOpcodeAndHasIABS(
 {
     if (!CodeGen->hasCL ||
         gcmSL_TARGET_GET(Instruction->temp, Format) == gcSL_FLOAT)
+    {
+        return gcvFALSE;
+    }
+    else
+    {
+        return gcvTRUE;
+    }
+}
+
+static gctBOOL
+_IntOpcodeAndSrc0Unsigned(
+    IN gcLINKTREE Tree,
+    IN gcsCODE_GENERATOR_PTR CodeGen,
+    IN gcSL_INSTRUCTION Instruction,
+    IN OUT gctUINT32 * States
+    )
+{
+    if ((gcmSL_TARGET_GET(Instruction->temp, Format) == gcSL_FLOAT) ||
+        (gcmSL_SOURCE_GET(Instruction->source0, Format) != gcSL_UINT32 &&
+         gcmSL_SOURCE_GET(Instruction->source0, Format) != gcSL_UINT16 &&
+         gcmSL_SOURCE_GET(Instruction->source0, Format) != gcSL_UINT8))
     {
         return gcvFALSE;
     }
@@ -14255,6 +14276,13 @@ const gcsSL_PATTERN patterns_ABS[] =
     { 2, gcSL_MUL, 3, 1, 4, 0, 0, _UseDestInNextOnly },
     { 1, gcSL_SAT, 5, 3 },
         { -1, 0x03, 5, 4, 2, 0, 0, _SatAbs0 },
+
+    /*
+        ABS 1, 2
+            mov 1, 2
+    */
+    { 1, gcSL_ABS, 1, 2, 0, 0, 0, _IntOpcodeAndSrc0Unsigned },
+        { -1, 0x09, 1, 0, 0, 2, 0, 0 },
 
     /*
         ABS 1, 2

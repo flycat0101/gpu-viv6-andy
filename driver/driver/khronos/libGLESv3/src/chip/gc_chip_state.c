@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1063,7 +1063,8 @@ gcChipValidateAlphaBlend(
 
     if (localMask & (__GL_BLEND_ENDISABLE_BIT | __GL_BLENDEQUATION_BIT | __GL_BLENDFUNC_BIT))
     {
-        __GLchipSLProgramInstance *fsInstance = chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance;
+        __GLchipSLProgramInstance *fsInstance = chipCtx->activePrograms[__GLSL_STAGE_FS] ?
+            chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance : gcvNULL;
         GLboolean advBlendInShader;
         gceLAYOUT_QUALIFIER layoutBit = gcChipUtilConvertLayoutQualifier(gc->state.raster.blendEquationRGB[0], &advBlendInShader);
 
@@ -1072,7 +1073,7 @@ gcChipValidateAlphaBlend(
             chipCtx->advBlendMode = layoutBit;
             chipCtx->advBlendInShader = (advBlendInShader && gc->state.enables.colorBuffer.blend[0]);
 
-            if (fsInstance->advBlendState)
+            if (fsInstance && fsInstance->advBlendState)
             {
                 fsInstance->advBlendState->dirty = gcvTRUE;
             }
@@ -1396,7 +1397,7 @@ gcChipValidateAttribGroup1(
 
         if (localMask & (__GL_POLYGONOFFSET_FILL_ENDISABLE_BIT | __GL_POLYGONOFFSET_BIT))
         {
-            gcmONERROR(gcChipSetPolygonOffset(gc));
+            chipCtx->chipDirty.uDefer.sDefer.polygonOffset = 1;
         }
 
         if (localMask & __GL_RASTERIZER_DISCARD_ENDISABLE_BIT)
@@ -2249,7 +2250,6 @@ OnError:
 }
 
 
-/* TODO: some misc states which are not covered by dirty bits, we can add it later*/
 __GL_INLINE gceSTATUS
 gcChipValidateMiscState(
     __GLcontext *gc,
@@ -2275,7 +2275,7 @@ gcChipValidateMiscState(
     {
         gctBOOL enable = (GL_POINTS == chipCtx->primitveType) ? gcvTRUE : gcvFALSE;
         gcsHINT_PTR prePAhints = chipCtx->prePAProgram->curPgInstance->programState.hints;
-        gcsHINT_PTR psHints = chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance->programState.hints;
+        gcsHINT_PTR psHints = chipCtx->activePrograms[__GLSL_STAGE_FS] ? chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance->programState.hints : gcvNULL;
 
         enable = enable && prePAhints->prePaShaderHasPointSize;
 
@@ -2283,10 +2283,10 @@ gcChipValidateMiscState(
         gcmONERROR(gco3D_SetPointSizeEnable(chipCtx->engine, enable));
 
         /* Enable point sprites for points. */
-        gcmONERROR(gco3D_SetPointSprite(chipCtx->engine, enable && (psHints->usePointCoord[0] || psHints->usePointCoord[1])));
+        gcmONERROR(gco3D_SetPointSprite(chipCtx->engine, enable && (psHints && (psHints->usePointCoord[0] || psHints->usePointCoord[1]))));
 
         /* Enable primtive-id. */
-        gcmONERROR(gco3D_SetPrimitiveIdEnable(chipCtx->engine, ((psHints->primIdComponent != -1) && !prePAhints->prePaShaderHasPrimitiveId)));
+        gcmONERROR(gco3D_SetPrimitiveIdEnable(chipCtx->engine, (psHints && (psHints->primIdComponent != -1) && !prePAhints->prePaShaderHasPrimitiveId)));
     }
 
     /* Save current primitive type. */
@@ -2365,8 +2365,10 @@ gcChipSetAlphaBlend(
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gceSTATUS status = gcvSTATUS_OK;
-    __GLchipSLProgramInstance *fsInstance = chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance;
-    GLboolean shaderBlendPatch = (fsInstance->pgStateKeyMask.s.hasShaderBlend == 1)  ? GL_TRUE: GL_FALSE;
+    __GLchipSLProgramInstance *fsInstance = chipCtx->activePrograms[__GLSL_STAGE_FS] ?
+        chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance : gcvNULL;
+    GLboolean shaderBlendPatch = (fsInstance && (fsInstance->pgStateKeyMask.s.hasShaderBlend == 1)) ? GL_TRUE : GL_FALSE;
+    GLboolean alphaBlend = (fsInstance && (fsInstance->pgStateKeyMask.s.hasAlphaBlend == 1)) ? GL_TRUE : GL_FALSE;
     gctUINT i, j;
 
     gcmHEADER_ARG("gc=0x%x", gc);
@@ -2379,8 +2381,8 @@ gcChipSetAlphaBlend(
 
             GLboolean hwBlend = (!shaderBlendPatch &&
                                  !chipCtx->advBlendInShader &&
-                                 gc->state.enables.colorBuffer.blend[i]) &&
-                                 (!fsInstance->pgStateKeyMask.s.hasAlphaBlend);
+                                 !alphaBlend &&
+                                 gc->state.enables.colorBuffer.blend[i]);
 
             gcmONERROR(gco3D_EnableBlendingIndexed(chipCtx->engine, halRTIndex, hwBlend));
 
@@ -2604,12 +2606,12 @@ gcChipSetDrawBuffers(
             gcsSURF_FORMAT_INFO_PTR formatInfo;
             gcmONERROR(gcoSURF_GetSize(rtViews[i].surf, &tmpWidth, &tmpHeight, gcvNULL));
 
-            if(tmpWidth < rtWidth)
+            if (tmpWidth < rtWidth)
             {
                 rtWidth = tmpWidth;
             }
 
-            if(tmpHeight < rtHeight)
+            if (tmpHeight < rtHeight)
             {
                 rtHeight = tmpHeight;
             }
@@ -2648,6 +2650,7 @@ gcChipSetDrawBuffers(
     {
         chipCtx->drawDepthView.surf = dView->surf;
         chipDirty->uBuffer.sBuffer.zSurfDirty = GL_TRUE;
+        chipDirty->uDefer.sDefer.polygonOffset = GL_TRUE;
     }
 
     if (chipCtx->drawStencilView.surf != sView->surf)
@@ -3191,7 +3194,6 @@ gcChipNeedRecompile(
 
 /* Key states collection must be as fast as possible since if no dirty exist, such
 ** collection is CPU-time wasted
-** TODO: we need find a way to clear in-stale state
 */
 static gceSTATUS
 gcChipRecompileEvaluateKeyStates(
@@ -3557,7 +3559,6 @@ gcChipRecompileEvaluateKeyStates(
     {
         __GLchipDirty *chipDirty = &chipCtx->chipDirty;
 
-        /* TODO: Refine later. Detect blend process. */
         if ((chipCtx->patchId == gcvPATCH_GTFES30) &&
             (chipCtx->chipFeature.haltiLevel < __GL_CHIP_HALTI_LEVEL_3) &&
             (gcvSTATUS_FALSE == gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SINGLE_PIPE_HALTI1))
@@ -3875,7 +3876,7 @@ gcChipRecompileEvaluateKeyStates(
         }
     }
 
-    if ((chipCtx->patchId == gcvPATCH_DEQP) &&
+    if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) &&
         (gc->apiVersion == __GL_API_VERSION_ES20) &&
         (gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_ALPHABLEND_ATTR_BITS) &&
         (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_HALF_FLOAT_PIPE) == gcvFALSE)
@@ -3902,7 +3903,7 @@ gcChipRecompileEvaluateKeyStates(
         }
     }
 
-    if ((chipCtx->patchId == gcvPATCH_DEQP) && (gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_POLYGONOFFSET_FILL_ENDISABLE_BIT) &&
+    if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) && (gc->globalDirtyState[__GL_DIRTY_ATTRS_1] & __GL_POLYGONOFFSET_FILL_ENDISABLE_BIT) &&
         (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_DEPTH_BIAS_FIX) == gcvFALSE))
     {
         if (gc->state.enables.polygon.polygonOffsetFill)
@@ -3984,10 +3985,18 @@ gcChipValidateRecompileStateCB(
 
             if (newPgInstance != oldPgInstance)
             {
+                /* Pre-compile failed.*/
+                if ((newPgInstance->programState.stateBuffer == gcvNULL || newPgInstance->programState.stateBufferSize == 0) &&
+                    newPgInstance->pgStateKeyMask.value != 0)
+                {
+                    gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+                }
+
                 program->curPgInstance = newPgInstance;
 
                 /* Increase non-master instance's ref and historyRef */
                 gcChipUtilsObjectAddRef(pgInstanceObj);
+                pgInstanceChanged = GL_TRUE;
 
                 if ((newPgInstance->programState.stateBuffer == gcvNULL || newPgInstance->programState.stateBufferSize == 0) &&
                     newPgInstance->pgStateKeyMask.value == 0)
@@ -3997,20 +4006,29 @@ gcChipValidateRecompileStateCB(
                     newPgInstance->pgStateKeyMask.value = pgStateKeyMask.value;
 
                     /* Recompile to generate new instance */
-                    gcmONERROR(gcChipRecompileShader(gc, chipCtx, progObj, program));
+                    status = gcChipRecompileShader(gc, chipCtx, progObj, program);
+
+                    if (gcmIS_ERROR(status))
+                    {
+                        /* recompile failed, need roll back newPgInstance.*/
+                        program->curPgInstance = oldPgInstance;
+                        pgInstanceChanged = GL_FALSE;
+
+                        gcChipUtilsObjectReleaseRef(pgInstanceObj);
+                        /* Do not delete the newPginstanceObj from hash Table, delay it when destory program obj.*/
+                        gcmONERROR(status);
+                    }
                 }
 
                 /* If program change, the sampler dirty is full, but when only instance change
-                recompile could have more sampler, which we need dirty the
-                mapDirty to trigger the validate texture.
-                In __glBuildTexEnableDim, we don't get new pgInstance yet.
+                    recompile could have more sampler, which we need dirty the
+                    mapDirty to trigger the validate texture.
+                    In __glBuildTexEnableDim, we don't get new pgInstance yet.
                 */
                 if (newPgInstance->pgStateKey->staticKey->alphaBlend)
                 {
                     __glBitmaskSet(&gc->shaderProgram.samplerMapDirty, newPgInstance->rtSampler);
                 }
-
-                pgInstanceChanged = GL_TRUE;
             }
         }
         else
@@ -4096,6 +4114,12 @@ gcChipValidateRecompileStateCB(
                 chipCtx->chipDirty.uBuffer.sBuffer.rtSurfDirty = 1;
             }
 
+            if ((program->curPgInstance->pgStateKeyMask.s.hasShaderBlend) ||
+                (program->curPgInstance->pgStateKeyMask.s.hasAlphaBlend))
+            {
+                chipCtx->chipDirty.uDefer.sDefer.blend = 1;
+            }
+
             /* If any of the const base was changed due to recompile, need to reflush all active uniforms. */
             if (__GL_MEMCMP(newPgInstance->programState.hints->hwConstRegBases,
                             oldPgInstance->programState.hints->hwConstRegBases,
@@ -4167,8 +4191,9 @@ gcChipValidateRecompileStateCB(
         gcmONERROR(gcvSTATUS_INVALID_OBJECT);
     }
 
-    if ((gc->globalDirtyState[__GL_PROGRAM_ATTRS] & __GL_DIRTY_GLSL_FS_SWITCH)
-        && chipCtx->activePrograms[__GLSL_STAGE_FS] && chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance->pLastFragData)
+    if ((gc->globalDirtyState[__GL_PROGRAM_ATTRS] & __GL_DIRTY_GLSL_FS_SWITCH) &&
+         chipCtx->activePrograms[__GLSL_STAGE_FS] &&
+         chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance->pLastFragData)
     {
         /* if ps shader have gl_LastFragData we need disable pe*/
         chipCtx->chipDirty.uBuffer.sBuffer.rtSurfDirty = 1;
@@ -4363,7 +4388,6 @@ gcChipValidateProgramImagesCB(
                     texView.numSlices = 1;
                 }
 
-                /* (todo) check if image is written inside shader.*/
                 if (1)
                 {
                     CHIP_TEX_IMAGE_UPTODATE(texInfo, imageUnit->level);

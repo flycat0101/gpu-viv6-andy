@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -25,7 +25,6 @@
 /* The enum of max supported color attachment point */
 #define __GL_COLOR_ATTACHMENTn              (GL_COLOR_ATTACHMENT0 + __GL_MAX_COLOR_ATTACHMENTS - 1)
 
-/* (todo) replace it with GL_COLOR_ATTACHMENT31 when it's ready in new header file */
 #define __GL_COLOR_ATTACHMENT31             (GL_COLOR_ATTACHMENT0 + 31)
 
 #define __GL_DEPTH_ATTACHMENT_POINT_INDEX   (__GL_MAX_COLOR_ATTACHMENTS)
@@ -153,11 +152,6 @@ typedef struct __GLframebufferObjectRec
     **    -              -                  -                  +            float
     */
 
-    /*
-    ** each bit of the mask corresponds to one of its attachpoint.
-    ** TODO: EXT_framebuffer_object require all color attachments have same internal format
-    ** The bit is marked when the corresponding attachpoint is integer internal format.
-        */
     GLuint fbIntMask;
 
     /*

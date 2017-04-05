@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -75,14 +75,14 @@ typedef struct Test2D {
     gctBOOL           compressed;
 } Test2D;
 
-static gceSURF_ROTATION sRots[] =
+static gce2D_NATURE_ROTATION sRots[] =
 {
-    gcvSURF_0_DEGREE,
-    gcvSURF_90_DEGREE,
-    gcvSURF_180_DEGREE,
-    gcvSURF_270_DEGREE,
-    gcvSURF_FLIP_X,
-    gcvSURF_FLIP_Y,
+    gcvNR_0_DEGREE,
+    gcvNR_LEFT_90_DEGREE,
+    gcvNR_RIGHT_90_DEGREE,
+    gcvNR_180_DEGREE,
+    gcvNR_FLIP_X,
+    gcvNR_FLIP_Y,
 };
 
 typedef struct _Comb {
@@ -114,6 +114,8 @@ static Comb sCombUnCom[] =
 
     { gcvSURF_P010,              gcvTILED_32X4,           gcv2D_TSC_DISABLE },
 
+    { gcvSURF_NV12,              gcvTILED_64X4,           gcv2D_TSC_DISABLE },
+
     { gcvSURF_A1R5G5B5,    gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_A4R4G4B4,    gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_X1R5G5B5,    gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
@@ -124,7 +126,6 @@ static Comb sCombUnCom[] =
     { gcvSURF_A2R10G10B10, gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_YUY2,        gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_UYVY,        gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
-    { gcvSURF_NV12,        gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
 
     { gcvSURF_NV12,        gcvTILED_8X8_YMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_P010,        gcvTILED_8X8_YMAJOR,           gcv2D_TSC_DISABLE },
@@ -132,16 +133,16 @@ static Comb sCombUnCom[] =
 
 static Comb sCombCom[] =
 {
-    { gcvSURF_A1R5G5B5,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_A4R4G4B4,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_X1R5G5B5,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_X4R4G4B4,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_R5G6B5,            gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_X8R8G8B8,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_A8R8G8B8,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_A2R10G10B10,       gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_YUY2,              gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_UYVY,              gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_A1R5G5B5,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_A4R4G4B4,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_X1R5G5B5,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_X4R4G4B4,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_R5G6B5,            gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_X8R8G8B8,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_A8R8G8B8,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_A2R10G10B10,       gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_YUY2,              gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_UYVY,              gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
 
     { gcvSURF_X8R8G8B8,          gcvTILED_4X8,     gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_A8R8G8B8,          gcvTILED_4X8,     gcv2D_TSC_DEC_COMPRESSED },
@@ -153,6 +154,8 @@ static Comb sCombCom[] =
 
     { gcvSURF_P010,              gcvTILED_32X4,    gcv2D_TSC_DEC_COMPRESSED },
 
+    { gcvSURF_NV12,              gcvTILED_64X4,    gcv2D_TSC_DEC_COMPRESSED },
+
     { gcvSURF_A1R5G5B5,    gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_A4R4G4B4,    gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_X1R5G5B5,    gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
@@ -163,7 +166,9 @@ static Comb sCombCom[] =
     { gcvSURF_A2R10G10B10, gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_YUY2,        gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_UYVY,        gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_NV12,        gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
+
+    { gcvSURF_NV12,        gcvTILED_8X8_YMAJOR,           gcv2D_TSC_DISABLE },
+    { gcvSURF_P010,        gcvTILED_8X8_YMAJOR,           gcv2D_TSC_DISABLE },
 };
 
 static gceSTATUS ReloadSourceSurface(Test2D *t2d, const char * sourcefile)
@@ -263,7 +268,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     gco2D egn2D = t2d->runtime->engine2d;
     T2D_SURF_PTR surf = gcvNULL;
     T2D_SURF_PTR result = gcvNULL, result2 = gcvNULL;
-    gctINT32 len, n;
+    gctINT32 len, n, index;
     gctUINT32 horFactor, verFactor;
     gcsRECT srect, rect, drect;
 
@@ -273,6 +278,25 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     len = (gcmMIN(t2d->srcWidth, t2d->srcHeight)) >> 1;
     if (len > 320) len = 320;
+
+    index = frameNo % gcmCOUNTOF(sCombCom);
+
+    if (t2d->compressed)
+    {
+        if ((sCombCom[index].format == gcvSURF_P010 && sCombCom[index].tiling == gcvTILED_32X4) ||
+            (sCombCom[index].format == gcvSURF_NV12 && sCombCom[index].tiling == gcvTILED_64X4))
+        {
+            len = 256;
+        }
+    }
+    else
+    {
+        if ((sCombUnCom[index].format == gcvSURF_P010 && sCombUnCom[index].tiling == gcvTILED_32X4) ||
+            (sCombUnCom[index].format == gcvSURF_NV12 && sCombUnCom[index].tiling == gcvTILED_64X4))
+        {
+            len = 256;
+        }
+    }
 
     srect.left = 160;
     srect.right = srect.left + len;
@@ -285,14 +309,14 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
     gcmONERROR(GalCreateTSurf(
         t2d->runtime->hal,
         t2d->compressed ?
-        sCombCom[frameNo % gcmCOUNTOF(sCombCom)].format :
-        sCombUnCom[frameNo % gcmCOUNTOF(sCombUnCom)].format,
+        sCombCom[index].format :
+        sCombUnCom[index].format,
         t2d->compressed ?
-        sCombCom[frameNo % gcmCOUNTOF(sCombCom)].tiling :
-        sCombUnCom[frameNo % gcmCOUNTOF(sCombUnCom)].tiling,
+        sCombCom[index].tiling :
+        sCombUnCom[index].tiling,
         t2d->compressed ?
-        sCombCom[frameNo % gcmCOUNTOF(sCombCom)].tsc :
-        sCombUnCom[frameNo % gcmCOUNTOF(sCombUnCom)].tsc,
+        sCombCom[index].tsc :
+        sCombUnCom[index].tsc,
         len * 6,
         len * 4,
         &surf));
@@ -330,6 +354,16 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         surf->tileStatusAddress
         ));
 
+    if (surf->tileStatusNodeEx[0].address != 0)
+    {
+        gcmONERROR(gco2D_SetStateArrayU32(
+            egn2D,
+            gcv2D_STATE_ARRAY_YUV_DST_TILE_STATUS_ADDR,
+            &surf->tileStatusNodeEx[0].address,
+            1
+            ));
+    }
+
     gcmONERROR(gco2D_SetSourceTileStatus(
         egn2D,
         gcv2D_TSC_DISABLE,
@@ -342,7 +376,8 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
     for (n = 0; n < 24; ++n)
     {
-        gceSURF_ROTATION rot;
+        gce2D_NATURE_ROTATION rot;
+        gceSURF_ROTATION srot, drot;
         gctBOOL horMirror, verMirror;
         gctINT xx = n % 6;
         gctINT yy = n / 6;
@@ -350,6 +385,15 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         rot = sRots[xx];
         horMirror = yy & 1 ? gcvTRUE : gcvFALSE;
         verMirror = yy & 2 ? gcvTRUE : gcvFALSE;
+
+        if (surf->format == gcvSURF_P010 ||
+            surf->format == gcvSURF_NV12 ||
+            surf->format == gcvSURF_YUY2 ||
+            surf->format == gcvSURF_UYVY)
+        {
+            rot = gcvNR_0_DEGREE;
+            horMirror = verMirror = gcvFALSE;
+        }
 
         gcmONERROR(gco2D_SetBitBlitMirror(
             egn2D,
@@ -362,15 +406,25 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         rect.top = yy * len;
         rect.bottom = rect.top + len;
 
+        gcmONERROR(gco2D_NatureRotateTranslation(
+            gcvFALSE,
+            rot,
+            0, 0,
+            surf->aWidth,
+            surf->aHeight,
+            &srect, &rect,
+            &srot, &drot));
+
         gcmONERROR(gco2D_SetClipping(egn2D, &rect));
 
         gcmONERROR(gco2D_FilterBlitEx2(egn2D,
             t2d->srcPhyAddr, t2d->srcAddressNum,
             t2d->srcStride, t2d->srcStrideNum,
-            gcvLINEAR, t2d->srcFormat, gcvSURF_0_DEGREE, t2d->srcWidth, t2d->srcHeight, &srect,
+            gcvLINEAR, t2d->srcFormat, gcvSURF_0_DEGREE,
+            t2d->srcWidth, t2d->srcHeight, &srect,
             surf->address, surf->validAddressNum,
             surf->stride, surf->validStrideNum,
-            surf->tiling, surf->format, rot,
+            surf->tiling, surf->format, drot,
             surf->aWidth, surf->aHeight,
             &rect, gcvNULL));
     }
@@ -392,6 +446,16 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         0,
         surf->tileStatusAddress
         ));
+
+    if (surf->tileStatusNodeEx[0].address != 0)
+    {
+        gcmONERROR(gco2D_SetStateArrayU32(
+            egn2D,
+            gcv2D_STATE_ARRAY_YUV_SRC_TILE_STATUS_ADDR,
+            &surf->tileStatusNodeEx[0].address,
+            1
+            ));
+    }
 
     gcmONERROR(gco2D_SetTargetTileStatus(
         egn2D,
@@ -596,7 +660,7 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     if (runtime->notSupport)
         return gcvFALSE;
 
-    t2d->compressed = gcvFALSE;
+    t2d->compressed = gcvTRUE;
     for (k = 0; k < argc; ++k)
     {
         if (!strcmp(argv[k], "-compressed"))
@@ -612,7 +676,7 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 
     t2d->base.render     = (PGalRender)Render;
     t2d->base.destroy    = (PGalDestroy)Destroy;
-    t2d->base.frameCount = t2d->compressed ? gcmCOUNTOF(sCombCom) : gcmCOUNTOF(sCombUnCom);
+    t2d->base.frameCount = gcmCOUNTOF(sCombCom);
     t2d->base.description = s_CaseDescription;
 
     return gcvTRUE;

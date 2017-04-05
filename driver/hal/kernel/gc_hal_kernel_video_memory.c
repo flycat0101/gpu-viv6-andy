@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2016 Vivante Corporation
+*    Copyright (c) 2014 - 2017 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2016 Vivante Corporation
+*    Copyright (C) 2014 - 2017 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -280,7 +280,6 @@ gckVIDMEM_ConstructVirtual(
 
     if (node->Virtual.onFault == gcvTRUE)
     {
-        /* TODO Lock. */
         gcsLIST_Add(&node->Virtual.head, &Kernel->db->onFaultVidmemList);
     }
 
@@ -341,7 +340,6 @@ gckVIDMEM_DestroyVirtual(
 
     if (Node->Virtual.onFault == gcvTRUE)
     {
-        /* TODO Lock. */
         gcsLIST_Del(&Node->Virtual.head);
     }
 
@@ -2758,13 +2756,17 @@ gckVIDMEM_NODE_Name(
         gcmkONERROR(gckKERNEL_AllocateIntegerId(database, node, &name));
         node->name = name;
     }
+    else
+    {
+        name = node->name;
+    }
 
     gcmkVERIFY_OK(gckOS_ReleaseMutex(Kernel->os, mutex));
     acquired = gcvFALSE;
 
     gcmkVERIFY_OK(gckVIDMEM_NODE_Dereference(Kernel, node));
 
-    *Name = node->name;
+    *Name = name;
 
     gcmkFOOTER_ARG("*Name=%d", *Name);
     return gcvSTATUS_OK;

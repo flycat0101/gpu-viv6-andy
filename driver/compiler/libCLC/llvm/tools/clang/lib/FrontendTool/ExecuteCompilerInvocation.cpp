@@ -507,6 +507,8 @@ unsigned *pped_count)
             }
             else if (options.compare(lastPos, 19, "cl-viv-vx-extension") == 0) {
                 gceSTATUS status;
+                char* env = gcvNULL;
+
                 pos = lastPos + 19;
 
                 status = cloCOMPILER_EnableExtension(Compiler,
@@ -514,6 +516,31 @@ unsigned *pped_count)
                                                      gcvTRUE);
                 if(gcmIS_ERROR(status)) return status;
                 Preprocessoropts.addMacroDef("_VIV_VX_EXTENSION");
+                gcoOS_GetEnv(gcvNULL, "VIVANTE_SDK_DIR", &env);
+                if(env) {
+                    gctUINT len;
+                    char path[_cldFILENAME_MAX];
+
+                    static const char subfix[] = "/include/CL/";
+                    len = gcoOS_StrLen(env, gcvNULL);
+
+                    gcoOS_StrCopySafe(path, len + 1, env);
+                    gcoOS_StrCatSafe(path, _cldFILENAME_MAX, subfix);
+
+                    std::string normalizedPath(path);
+                    std::replace(normalizedPath.begin(), normalizedPath.end(), '\\', '/');
+                    Headersearchopts.AddPath(normalizedPath, frontend::Angled, true, false, true);
+
+                    static const char subfix1[] = "/inc/CL/";
+                    len = gcoOS_StrLen(env, gcvNULL);
+
+                    gcoOS_StrCopySafe(path, len + 1, env);
+                    gcoOS_StrCatSafe(path, _cldFILENAME_MAX, subfix1);
+
+                    std::string normalizedPath1(path);
+                    std::replace(normalizedPath1.begin(), normalizedPath1.end(), '\\', '/');
+                    Headersearchopts.AddPath(normalizedPath1, frontend::Angled, true, false, true);
+                }
             }
             else if (options.compare(lastPos, 24, "cl-viv-packed-basic-type") == 0) {
                 gceSTATUS status;

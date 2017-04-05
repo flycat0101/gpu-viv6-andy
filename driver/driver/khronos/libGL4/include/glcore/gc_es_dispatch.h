@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -961,14 +961,42 @@ typedef  GLvoid  (GLAPIENTRY *__T_UniformMatrix3fv)(__GLcontext *gc, GLint locat
 typedef  GLvoid  (GLAPIENTRY *__T_UniformMatrix4fv)(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
 typedef  GLvoid  (GLAPIENTRY *__T_UseProgram)(__GLcontext *gc, GLuint program);
 typedef  GLvoid  (GLAPIENTRY *__T_ValidateProgram)(__GLcontext *gc, GLuint program);
-typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib1f)(__GLcontext *gc, GLuint indx, GLfloat x);
-typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib1fv)(__GLcontext *gc, GLuint indx, const GLfloat* values);
-typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib2f)(__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y);
-typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib2fv)(__GLcontext *gc, GLuint indx, const GLfloat* values);
-typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib3f)(__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y, GLfloat z);
-typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib3fv)(__GLcontext *gc, GLuint indx, const GLfloat* values);
-typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4f)(__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y, GLfloat z, GLfloat w);
-typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4fv)(__GLcontext *gc, GLuint indx, const GLfloat* values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib1d) (__GLcontext *gc, GLuint indx, GLdouble x);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib1dv) (__GLcontext *gc, GLuint indx, const GLdouble *values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib1f) (__GLcontext *gc, GLuint indx, GLfloat x);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib1fv) (__GLcontext *gc, GLuint indx, const GLfloat * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib1s) (__GLcontext *gc, GLuint indx, GLshort x);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib1sv) (__GLcontext *gc, GLuint indx, const GLshort * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib2d) (__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib2dv) (__GLcontext *gc, GLuint indx, const GLdouble * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib2f) (__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib2fv) (__GLcontext *gc, GLuint indx, const GLfloat * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib2s) (__GLcontext *gc, GLuint indx, GLshort x, GLshort y);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib2sv) (__GLcontext *gc, GLuint indx, const GLshort * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib3d) (__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y, GLdouble z);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib3dv) (__GLcontext *gc, GLuint indx, const GLdouble * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib3f) (__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y, GLfloat z);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib3fv) (__GLcontext *gc, GLuint indx, const GLfloat * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib3s) (__GLcontext *gc, GLuint indx, GLshort x, GLshort y, GLshort z);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib3sv) (__GLcontext *gc, GLuint indx, const GLshort * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4Nbv) (__GLcontext *gc, GLuint indx, const GLbyte * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4Niv) (__GLcontext *gc, GLuint indx, const GLint * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4Nsv) (__GLcontext *gc, GLuint indx, const GLshort * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4Nub) (__GLcontext *gc, GLuint indx, GLubyte x, GLubyte y, GLubyte z, GLubyte w);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4Nubv) (__GLcontext *gc, GLuint indx, const GLubyte * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4Nuiv) (__GLcontext *gc, GLuint indx, const GLuint * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4Nusv) (__GLcontext *gc, GLuint indx, const GLushort * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4bv) (__GLcontext *gc, GLuint indx, const GLbyte * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4d) (__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y, GLdouble z, GLdouble w);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4dv) (__GLcontext *gc, GLuint indx, const GLdouble * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4f) (__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y, GLfloat z, GLfloat w);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4fv) (__GLcontext *gc, GLuint indx, const GLfloat * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4iv) (__GLcontext *gc, GLuint indx, const GLint * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4s) (__GLcontext *gc, GLuint indx, GLshort x, GLshort y, GLshort z, GLshort w);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4sv) (__GLcontext *gc, GLuint indx, const GLshort * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4ubv) (__GLcontext *gc, GLuint indx, const GLubyte * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4uiv) (__GLcontext *gc, GLuint indx, const GLuint * values);
+typedef  GLvoid  (GLAPIENTRY *__T_VertexAttrib4usv) (__GLcontext *gc, GLuint indx, const GLushort * values);
 typedef  GLvoid  (GLAPIENTRY *__T_VertexAttribPointer)(__GLcontext *gc, GLuint indx, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid* ptr);
 typedef  GLvoid  (GLAPIENTRY *__T_Viewport)(__GLcontext *gc, GLint x, GLint y, GLsizei width, GLsizei height);
 
@@ -1815,14 +1843,42 @@ typedef void (GLAPIENTRY  *GLDEBUGPROCKHR)(GLenum source,GLenum type,GLuint id,G
     esApiMacro(UniformMatrix3fv), \
     esApiMacro(UniformMatrix4fv), \
     esApiMacro(ValidateProgram), \
+    esApiMacro(VertexAttrib1d), \
+    esApiMacro(VertexAttrib1dv), \
     esApiMacro(VertexAttrib1f), \
     esApiMacro(VertexAttrib1fv), \
+    esApiMacro(VertexAttrib1s), \
+    esApiMacro(VertexAttrib1sv), \
+    esApiMacro(VertexAttrib2d), \
+    esApiMacro(VertexAttrib2dv), \
     esApiMacro(VertexAttrib2f), \
     esApiMacro(VertexAttrib2fv), \
+    esApiMacro(VertexAttrib2s), \
+    esApiMacro(VertexAttrib2sv), \
+    esApiMacro(VertexAttrib3d), \
+    esApiMacro(VertexAttrib3dv), \
     esApiMacro(VertexAttrib3f), \
     esApiMacro(VertexAttrib3fv), \
+    esApiMacro(VertexAttrib3s), \
+    esApiMacro(VertexAttrib3sv), \
+    esApiMacro(VertexAttrib4Nbv), \
+    esApiMacro(VertexAttrib4Niv), \
+    esApiMacro(VertexAttrib4Nsv), \
+    esApiMacro(VertexAttrib4Nub), \
+    esApiMacro(VertexAttrib4Nubv), \
+    esApiMacro(VertexAttrib4Nuiv), \
+    esApiMacro(VertexAttrib4Nusv), \
+    esApiMacro(VertexAttrib4bv), \
+    esApiMacro(VertexAttrib4d), \
+    esApiMacro(VertexAttrib4dv), \
     esApiMacro(VertexAttrib4f), \
     esApiMacro(VertexAttrib4fv), \
+    esApiMacro(VertexAttrib4iv), \
+    esApiMacro(VertexAttrib4s), \
+    esApiMacro(VertexAttrib4sv), \
+    esApiMacro(VertexAttrib4ubv), \
+    esApiMacro(VertexAttrib4uiv), \
+    esApiMacro(VertexAttrib4usv), \
     esApiMacro(VertexAttribPointer), \
     esApiMacro(BindFramebuffer), \
     esApiMacro(BindRenderbuffer), \
@@ -2639,14 +2695,42 @@ typedef void (GLAPIENTRY  *GLDEBUGPROCKHR)(GLenum source,GLenum type,GLuint id,G
     esApiMacro(UniformMatrix3fv), \
     esApiMacro(UniformMatrix4fv), \
     esApiMacro(ValidateProgram), \
+    esApiMacro(VertexAttrib1d), \
+    esApiMacro(VertexAttrib1dv), \
     esApiMacro(VertexAttrib1f), \
     esApiMacro(VertexAttrib1fv), \
+    esApiMacro(VertexAttrib1s), \
+    esApiMacro(VertexAttrib1sv), \
+    esApiMacro(VertexAttrib2d), \
+    esApiMacro(VertexAttrib2dv), \
     esApiMacro(VertexAttrib2f), \
     esApiMacro(VertexAttrib2fv), \
+    esApiMacro(VertexAttrib2s), \
+    esApiMacro(VertexAttrib2sv), \
+    esApiMacro(VertexAttrib3d), \
+    esApiMacro(VertexAttrib3dv), \
     esApiMacro(VertexAttrib3f), \
     esApiMacro(VertexAttrib3fv), \
+    esApiMacro(VertexAttrib3s), \
+    esApiMacro(VertexAttrib3sv), \
+    esApiMacro(VertexAttrib4Nbv), \
+    esApiMacro(VertexAttrib4Niv), \
+    esApiMacro(VertexAttrib4Nsv), \
+    esApiMacro(VertexAttrib4Nub), \
+    esApiMacro(VertexAttrib4Nubv), \
+    esApiMacro(VertexAttrib4Nuiv), \
+    esApiMacro(VertexAttrib4Nusv), \
+    esApiMacro(VertexAttrib4bv), \
+    esApiMacro(VertexAttrib4d), \
+    esApiMacro(VertexAttrib4dv), \
     esApiMacro(VertexAttrib4f), \
     esApiMacro(VertexAttrib4fv), \
+    esApiMacro(VertexAttrib4iv), \
+    esApiMacro(VertexAttrib4s), \
+    esApiMacro(VertexAttrib4sv), \
+    esApiMacro(VertexAttrib4ubv), \
+    esApiMacro(VertexAttrib4uiv), \
+    esApiMacro(VertexAttrib4usv), \
     esApiMacro(VertexAttribPointer), \
     esApiMacro(BindFramebuffer), \
     esApiMacro(BindRenderbuffer), \
@@ -3465,14 +3549,42 @@ enum {
     GLvoid         (GLAPIENTRY *UniformMatrix3fv) (_gcArgComma_ GLint location, GLsizei count, GLboolean transpose, const GLfloat* value); \
     GLvoid         (GLAPIENTRY *UniformMatrix4fv) (_gcArgComma_ GLint location, GLsizei count, GLboolean transpose, const GLfloat* value); \
     GLvoid         (GLAPIENTRY *ValidateProgram) (_gcArgComma_ GLuint program); \
+    GLvoid         (GLAPIENTRY *VertexAttrib1d) (_gcArgComma_ GLuint indx, GLdouble x); \
+    GLvoid         (GLAPIENTRY *VertexAttrib1dv) (_gcArgComma_ GLuint indx, const GLdouble *values); \
     GLvoid         (GLAPIENTRY *VertexAttrib1f) (_gcArgComma_ GLuint indx, GLfloat x); \
-    GLvoid         (GLAPIENTRY *VertexAttrib1fv) (_gcArgComma_ GLuint indx, const GLfloat* values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib1fv) (_gcArgComma_ GLuint indx, const GLfloat * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib1s) (_gcArgComma_ GLuint indx, GLshort x); \
+    GLvoid         (GLAPIENTRY *VertexAttrib1sv) (_gcArgComma_ GLuint indx, const GLshort * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib2d) (_gcArgComma_ GLuint indx, GLdouble x, GLdouble y); \
+    GLvoid         (GLAPIENTRY *VertexAttrib2dv) (_gcArgComma_ GLuint indx, const GLdouble * values); \
     GLvoid         (GLAPIENTRY *VertexAttrib2f) (_gcArgComma_ GLuint indx, GLfloat x, GLfloat y); \
-    GLvoid         (GLAPIENTRY *VertexAttrib2fv) (_gcArgComma_ GLuint indx, const GLfloat* values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib2fv) (_gcArgComma_ GLuint indx, const GLfloat * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib2s) (_gcArgComma_ GLuint indx, GLshort x, GLshort y); \
+    GLvoid         (GLAPIENTRY *VertexAttrib2sv) (_gcArgComma_ GLuint indx, const GLshort * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib3d) (_gcArgComma_ GLuint indx, GLdouble x, GLdouble y, GLdouble z); \
+    GLvoid         (GLAPIENTRY *VertexAttrib3dv) (_gcArgComma_ GLuint indx, const GLdouble * values); \
     GLvoid         (GLAPIENTRY *VertexAttrib3f) (_gcArgComma_ GLuint indx, GLfloat x, GLfloat y, GLfloat z); \
-    GLvoid         (GLAPIENTRY *VertexAttrib3fv) (_gcArgComma_ GLuint indx, const GLfloat* values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib3fv) (_gcArgComma_ GLuint indx, const GLfloat * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib3s) (_gcArgComma_ GLuint indx, GLshort x, GLshort y, GLshort z); \
+    GLvoid         (GLAPIENTRY *VertexAttrib3sv) (_gcArgComma_ GLuint indx, const GLshort * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4Nbv) (_gcArgComma_ GLuint indx, const GLbyte * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4Niv) (_gcArgComma_ GLuint indx, const GLint * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4Nsv) (_gcArgComma_ GLuint indx, const GLshort * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4Nub) (_gcArgComma_ GLuint indx, GLubyte x, GLubyte y, GLubyte z, GLubyte w); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4Nubv) (_gcArgComma_ GLuint indx, const GLubyte * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4Nuiv) (_gcArgComma_ GLuint indx, const GLuint * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4Nusv) (_gcArgComma_ GLuint indx, const GLushort * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4bv) (_gcArgComma_ GLuint indx, const GLbyte * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4d) (_gcArgComma_ GLuint indx, GLdouble x, GLdouble y, GLdouble z, GLdouble w); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4dv) (_gcArgComma_ GLuint indx, const GLdouble * values); \
     GLvoid         (GLAPIENTRY *VertexAttrib4f) (_gcArgComma_ GLuint indx, GLfloat x, GLfloat y, GLfloat z, GLfloat w); \
-    GLvoid         (GLAPIENTRY *VertexAttrib4fv) (_gcArgComma_ GLuint indx, const GLfloat* values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4fv) (_gcArgComma_ GLuint indx, const GLfloat * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4iv) (_gcArgComma_ GLuint indx, const GLint * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4s) (_gcArgComma_ GLuint indx, GLshort x, GLshort y, GLshort z, GLshort w); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4sv) (_gcArgComma_ GLuint indx, const GLshort * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4ubv) (_gcArgComma_ GLuint indx, const GLubyte * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4uiv) (_gcArgComma_ GLuint indx, const GLuint * values); \
+    GLvoid         (GLAPIENTRY *VertexAttrib4usv) (_gcArgComma_ GLuint indx, const GLushort * values);\
     GLvoid         (GLAPIENTRY *VertexAttribPointer) (_gcArgComma_ GLuint indx, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid* ptr); \
     GLvoid         (GLAPIENTRY *BindFramebuffer) (_gcArgComma_ GLenum target, GLuint framebuffer); \
     GLvoid         (GLAPIENTRY *BindRenderbuffer) (_gcArgComma_ GLenum target, GLuint renderbuffer); \

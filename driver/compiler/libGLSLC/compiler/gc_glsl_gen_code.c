@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1301,6 +1301,98 @@ _ConvOutputBlendSupport(
     return blendSupport;
 }
 
+static gceSTATUS _AllocTypeNameSymbol(
+    IN sloCOMPILER Compiler,
+    OUT gctINT16 *VarIndex
+    )
+{
+    gceSTATUS       status = gcvSTATUS_OK;
+    gcSHADER        binary = gcvNULL;
+    gctSIZE_T       symbolLength = 0;
+    gctSTRING       symbol = gcvNULL;
+    gctUINT         offset = 0;
+    gctPOINTER      pointer = gcvNULL;
+    slsDATA_TYPE_NAME * dataTypeName = gcvNULL;
+    gcVARIABLE      variable = gcvNULL;
+    gctINT16        varIndex = -1;
+
+    if (slsDLINK_LIST_IsEmpty(&Compiler->context.dataTypeNameList))
+    {
+        return status;
+    }
+
+    FOR_EACH_DLINK_NODE_REVERSELY(&Compiler->context.dataTypeNameList, slsDATA_TYPE_NAME, dataTypeName)
+    {
+        gcmASSERT(dataTypeName->name);
+
+        symbolLength += (gcoOS_StrLen(dataTypeName->name, gcvNULL) + 1);
+    }
+    symbolLength++;
+
+    gcmONERROR(sloCOMPILER_Allocate(Compiler,
+                                    symbolLength,
+                                    &pointer));
+
+    symbol = (gctSTRING)pointer;
+
+    FOR_EACH_DLINK_NODE_REVERSELY(&Compiler->context.dataTypeNameList, slsDATA_TYPE_NAME, dataTypeName)
+    {
+        gcmASSERT(dataTypeName->name);
+
+        gcmVERIFY_OK(gcoOS_PrintStrSafe(symbol,
+                                        symbolLength,
+                                        &offset,
+                                        "%s.",
+                                        dataTypeName->name));
+    }
+
+    gcmVERIFY_OK(sloCOMPILER_GetBinary(Compiler, &binary));
+
+    gcmONERROR(gcSHADER_GetVariableByName(binary,
+                                          symbol,
+                                          (gctUINT16)(symbolLength - 1),
+                                          &variable));
+
+    if (variable != gcvNULL)
+    {
+        varIndex = GetVariableIndex(variable);
+    }
+    else
+    {
+        slmNewVariable(Compiler,
+                       0,
+                       0,
+                       symbol,
+                       gcSHADER_FLOAT_X1,
+                       gcSHADER_PRECISION_HIGH,
+                       0,
+                       gcvNULL,
+                       gcvFALSE,
+                       gcvFALSE,
+                       gcvFALSE,
+                       gcvFALSE,
+                       0,
+                       gcSHADER_VAR_CATEGORY_TYPE_NAME,
+                       0,
+                       -1,
+                       -1,
+                       &varIndex,
+                       status);
+    }
+
+    if (VarIndex)
+    {
+        *VarIndex = varIndex;
+    }
+
+OnError:
+    if (symbol != gcvNULL)
+    {
+        gcmVERIFY_OK(sloCOMPILER_Free(Compiler, symbol));
+    }
+    return status;
+}
+
 static gceSTATUS
 _AllocLogicalRegOrArray(
     IN sloCOMPILER Compiler,
@@ -1324,6 +1416,7 @@ _AllocLogicalRegOrArray(
     gctUINT32               binaryDataTypeSize;
     gctUINT                 logicalRegCount, i;
     gctINT16                varIndex = 0;
+    gctINT16                typeNameVarIndex = -1;
     gctREG_INDEX            tempRegIndex = 0;
     gcUNIFORM               uniform = gcvNULL;
     gcATTRIBUTE             attribute = gcvNULL;
@@ -1348,6 +1441,8 @@ _AllocLogicalRegOrArray(
     gcmASSERT(!slsDATA_TYPE_IsStruct(DataType));
     gcmASSERT(LogicalRegs);
     gcmASSERT(Start);
+
+    gcmVERIFY_OK(_AllocTypeNameSymbol(Compiler, &typeNameVarIndex));
 
     storageQualifier           = Name->dataType->qualifiers.storage;
 
@@ -1763,6 +1858,9 @@ _AllocLogicalRegOrArray(
                                                    isInvariant,
                                                    isPrecise,
                                                    &attribute);
+               if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+               SetATTRTypeNameVarIndex(attribute, typeNameVarIndex);
 
                if (slsQUALIFIERS_GET_AUXILIARY(&DataType->qualifiers) == slvAUXILIARY_QUALIFIER_CENTROID)
                {
@@ -1818,6 +1916,7 @@ _AllocLogicalRegOrArray(
                                                     (gctSTRING)Symbol,
                                                     (gctUINT32)gcoOS_StrLen(Symbol, gcvNULL),
                                                     &attribute);
+               if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
            }
         }
         else
@@ -1837,12 +1936,7 @@ _AllocLogicalRegOrArray(
                                                  isInvariant,
                                                  isPrecise,
                                                  &attribute);
-        }
-
-        if (gcmIS_ERROR(status))
-        {
-            gcmFOOTER();
-            return status;
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
         }
 
         if (ThisVarIndex)
@@ -1917,6 +2011,7 @@ _AllocLogicalRegOrArray(
                                                 shaderMode,
                                                 _ConvOutputBlendSupport(slmDATA_TYPE_layoutId_GET(Name->dataType)),
                                                 &output);
+               if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
                gcSHADER_GetOutputIndexByOutput(binary, output, &varIndex);
                {
@@ -1926,6 +2021,8 @@ _AllocLogicalRegOrArray(
                    for (i = 0; i < arraySize; i++)
                    {
                        gcSHADER_GetOutput(binary, (gctUINT)(varIndex + i ), &output);
+
+                       SetOutputTypeNameVarIndex(output, typeNameVarIndex);
 
                        if ((shaderType == slvSHADER_TYPE_TCS || shaderType == slvSHADER_TYPE_TES) &&
                            (slsQUALIFIERS_HAS_FLAG(&DataType->qualifiers, slvQUALIFIERS_FLAG_PATCH) ||
@@ -1970,6 +2067,8 @@ _AllocLogicalRegOrArray(
                                                  (gctSTRING)Symbol,
                                                  (gctUINT32)gcoOS_StrLen(Symbol, gcvNULL),
                                                  &output);
+               if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
                gcSHADER_GetOutputIndexByOutput(binary, output, &varIndex);
            }
 
@@ -2021,6 +2120,7 @@ _AllocLogicalRegOrArray(
                                              shaderMode,
                                              _ConvOutputBlendSupport(slmDATA_TYPE_layoutId_GET(Name->dataType)),
                                              &output);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
             for (i = 0; i < logicalRegCount; i++)
             {
@@ -2031,12 +2131,6 @@ _AllocLogicalRegOrArray(
                                                 output,
                                                 tempRegIndex + (gctREG_INDEX)(i * binaryDataTypeSize));
             }
-        }
-
-        if (gcmIS_ERROR(status))
-        {
-            gcmFOOTER();
-            return status;
         }
 
         if (storageQualifier == slvSTORAGE_QUALIFIER_VARYING_OUT)
@@ -2715,6 +2809,19 @@ _AllocLogicalRegsForStruct1(
 
     gcmASSERT(Name->dataType->fieldSpace);
 
+    if (DataType->orgFieldSpace->spaceName)
+    {
+        slsDATA_TYPE_NAME * dataTypeName;
+
+        status = slsDATA_TYPE_NAME_Construct(Compiler,
+                                             DataType->orgFieldSpace->spaceName,
+                                             &dataTypeName);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        status = sloCOMPILER_PushDataTypeName(Compiler, dataTypeName);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    }
+
     count = slsDATA_TYPE_GetLogicalCountForAnArray(DataType);
     slsDLINK_NODE_COUNT(&DataType->fieldSpace->names, structEleCount);
 
@@ -2816,6 +2923,8 @@ _AllocLogicalRegsForStruct1(
                                            LogicalRegs,
                                            Start,
                                            FieldIndex);
+                if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
             }
             else
             {
@@ -2833,15 +2942,10 @@ _AllocLogicalRegsForStruct1(
                                            LogicalRegs,
                                            Start,
                                            FieldIndex);
+                if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
             }
 
             (*FieldIndex)++;
-
-            if (gcmIS_ERROR(status))
-            {
-                gcmFOOTER();
-                return status;
-            }
 
             gcmVERIFY_OK(_FreeStructElementAggregatedSymbol(Compiler, CodeGenerator, symbol));
 
@@ -2887,6 +2991,17 @@ _AllocLogicalRegsForStruct1(
         }
     }
 #endif
+
+    if (DataType->orgFieldSpace->spaceName)
+    {
+        slsDATA_TYPE_NAME * dataTypeName = gcvNULL;
+
+        status = sloCOMPILER_PopDataTypeName(Compiler, &dataTypeName);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+        status = slsDATA_TYPE_NAME_Destory(Compiler, dataTypeName);
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+    }
 
     if (ThisVarIndex)
         *ThisVarIndex = mainIdx;
@@ -3103,12 +3218,7 @@ _AllocLogicalRegs(
                                             LogicalRegs,
                                             Start,
                                             &fieldIndex);
-
-        if (gcmIS_ERROR(status))
-        {
-            gcmFOOTER();
-            return status;
-        }
+        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
     }
     else
     {
@@ -4758,7 +4868,7 @@ _AllocLogicalRegForNormalIOBlockMember(
                                  BlockMemberName->dataType,
                                  -1,/* Assume it is not structure */
                                  -1,/* Assume it is not structure */
-                                 &variableIndex,/* Do not need var index on the most top level */
+                                 gcvNULL,/* Do not need var index on the most top level */
                                  gcvNULL,
                                  logicalRegs,
                                  &start));
@@ -4774,11 +4884,11 @@ _AllocLogicalRegForNormalIOBlockMember(
 
     if (BlockMemberName->dataType->qualifiers.storage == slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER)
     {
-        gcATTRIBUTE attribute = gcvNULL;
+        gcATTRIBUTE attribute = logicalRegs[0].u.attribute;
         gcATTRIBUTE prevAttribute = gcvNULL;
         gctINT16 prevElement = GetIBIFirstChild(GetSBInterfaceBlockInfo(BlockName->u.interfaceBlockContent.u.ioBlock));
 
-        gcmONERROR(gcSHADER_GetAttribute(binary, (gctUINT)variableIndex, &attribute));
+        variableIndex = GetATTRIndex(attribute);
 
         SetATTRIOBlockIndex(attribute, GetSBBlockIndex(BlockName->u.interfaceBlockContent.u.ioBlock));
         SetATTRIOBlockArrayIndex(attribute, IOBlockArrayIndex);
@@ -4811,10 +4921,12 @@ _AllocLogicalRegForNormalIOBlockMember(
     }
     else
     {
-        gcOUTPUT output = gcvNULL;
+        gcOUTPUT output = logicalRegs[0].u.output;
         gcOUTPUT prevOutput = gcvNULL;
         gctINT length = slsDATA_TYPE_GetLogicalCountForAnArray(BlockMemberName->dataType), i;
         gctINT16 prevElement = GetIBIFirstChild(GetSBInterfaceBlockInfo(BlockName->u.interfaceBlockContent.u.ioBlock));
+
+        variableIndex = GetOutputIndex(output);
 
         for (i = 0; i < length; i++)
         {
@@ -4904,6 +5016,19 @@ _AllocLogicalRegForIOBlockMember(
 
     if (BlockMemberName->dataType->elementType == slvTYPE_STRUCT)
     {
+        if (BlockMemberName->dataType->orgFieldSpace->spaceName)
+        {
+            slsDATA_TYPE_NAME * dataTypeName;
+
+            status = slsDATA_TYPE_NAME_Construct(Compiler,
+                                                 BlockMemberName->dataType->orgFieldSpace->spaceName,
+                                                 &dataTypeName);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            status = sloCOMPILER_PushDataTypeName(Compiler, dataTypeName);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        }
+
         logicalRegCount = slsDATA_TYPE_GetLogicalOperandCount(BlockMemberName->dataType, gcvFALSE);
 
         /* Allocate register for member. */
@@ -5025,6 +5150,17 @@ _AllocLogicalRegForIOBlockMember(
         if (IsInstance)
         {
             gcmVERIFY_OK(_FreeStructElementAggregatedSymbol(Compiler, CodeGenerator, structNameSymbol));
+        }
+
+        if (BlockMemberName->dataType->orgFieldSpace->spaceName)
+        {
+            slsDATA_TYPE_NAME * dataTypeName = gcvNULL;
+
+            status = sloCOMPILER_PopDataTypeName(Compiler, &dataTypeName);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+
+            status = slsDATA_TYPE_NAME_Destory(Compiler, dataTypeName);
+            if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
         }
     }
     else
@@ -5995,14 +6131,7 @@ _AllocateFuncResources(
 
         origParamPrecision = paramName->dataType->qualifiers.precision;
 
-        if (intrinsicCall)
-        {
-            if (origParamPrecision == slvPRECISION_QUALIFIER_ANY ||
-                origParamPrecision == slvPRECISION_QUALIFIER_DEFAULT)
-            {
-                sloCOMPILER_GetDefaultPrecision(Compiler, paramName->dataType->elementType, &paramName->dataType->qualifiers.precision);
-            }
-        }
+        gcmASSERT(!intrinsicCall || paramName->dataType->qualifiers.precision != slvPRECISION_QUALIFIER_DEFAULT);
 
         status = slsNAME_AllocLogicalRegs(Compiler,
                                           CodeGenerator,
@@ -6015,28 +6144,13 @@ _AllocateFuncResources(
     /* Allocate registers for return value */
     if (!slsDATA_TYPE_IsVoid(FuncName->dataType))
     {
-        sltPRECISION_QUALIFIER origPrecision = slvPRECISION_QUALIFIER_ANY;
-
         /* Return registers are output */
         FuncName->dataType->qualifiers.storage = slvSTORAGE_QUALIFIER_OUT;
-
-        if (intrinsicCall)
-        {
-            gcmASSERT(PolynaryExpr);
-
-            origPrecision = FuncName->dataType->qualifiers.precision;
-            FuncName->dataType->qualifiers.precision = PolynaryExpr->exprBase.dataType->qualifiers.precision;
-        }
 
         status = slsNAME_AllocLogicalRegs(Compiler,
                                           CodeGenerator,
                                           FuncName);
         if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-        if (intrinsicCall)
-        {
-            FuncName->dataType->qualifiers.precision = origPrecision;
-        }
     }
 
     gcmFOOTER_NO();
@@ -6205,8 +6319,10 @@ slsLOGICAL_REG_Dump(
     IN slsLOGICAL_REG * LogicalReg
     )
 {
+    gceSTATUS           status = gcvSTATUS_OK;
     gctCONST_STRING     name;
-    gctUINT8            i, component;
+    gctSTRING           pointer = gcvNULL;
+    gctUINT8            i, component = 0;
     const gctCHAR       componentNames[4] = {'x', 'y', 'z', 'w'};
     gcSHADER            binary = gcvNULL;
     gctCHAR             selecttNames[sldMAX_VECTOR_COMPONENT + 1] = {'\0'};
@@ -6230,7 +6346,8 @@ slsLOGICAL_REG_Dump(
         break;
 
     case slvSTORAGE_QUALIFIER_VARYING_OUT:
-        gcOUTPUT_GetNameEx(binary, LogicalReg->u.output, gcvNULL, (gctSTRING *)&name);
+        gcOUTPUT_GetNameEx(binary, LogicalReg->u.output, gcvNULL, (gctSTRING *)&pointer);
+        name = pointer;
         break;
 
     default:
@@ -6248,8 +6365,8 @@ slsLOGICAL_REG_Dump(
 
         default:
             gcmASSERT(0);
-            gcmFOOTER_ARG("status=%d", gcvSTATUS_COMPILER_FE_PARSER_ERROR);
-            return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            status = gcvSTATUS_COMPILER_FE_PARSER_ERROR;
+            gcmONERROR(status);
         }
 
         selecttNames[i] = componentNames[component];
@@ -6268,6 +6385,11 @@ slsLOGICAL_REG_Dump(
                                     LogicalReg->regIndex,
                                     selecttNames));
     }
+
+OnError:
+    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, pointer));
+    /* Return the status. */
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -19103,7 +19225,10 @@ _CheckIterationCount(
     prevContext = CodeGenerator->currentIterationContext;
     while (prevContext != gcvNULL)
     {
-        totalIter *= prevContext->u.unrolledInfo.loopCount;
+        if (prevContext->isUnrolled)
+        {
+            totalIter *= prevContext->u.unrolledInfo.loopCount;
+        }
         prevContext = prevContext->prevContext;
     }
 
@@ -19132,7 +19257,7 @@ sloIR_ITERATION_GenUnrolledCode(
     IN OUT slsGEN_CODE_PARAMETERS * Parameters
     )
 {
-    gceSTATUS               status;
+    gceSTATUS               status = gcvSTATUS_OK;
     gctUINT                 i;
     slsGEN_CODE_PARAMETERS  loopBodyParameters;
     slsITERATION_CONTEXT    iterationContext;
@@ -19162,12 +19287,10 @@ sloIR_ITERATION_GenUnrolledCode(
 
     for (i = 0; i < IterationUnrollInfo->loopCount; i++)
     {
-        status = _DefineUnrolledIterationBodyBegin(
+        gcmONERROR(_DefineUnrolledIterationBodyBegin(
                                                 Compiler,
                                                 CodeGenerator,
-                                                unrolledLoopIndexValue);
-
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+                                                unrolledLoopIndexValue));
 
         /* Generate the code of the loop body */
         slsGEN_CODE_PARAMETERS_Initialize(&loopBodyParameters, gcvFALSE, gcvFALSE);
@@ -19180,13 +19303,11 @@ sloIR_ITERATION_GenUnrolledCode(
 
         slsGEN_CODE_PARAMETERS_Finalize(&loopBodyParameters);
 
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+        gcmONERROR (status);
 
-        status = _DefineUnrolledIterationBodyEnd(
+        gcmONERROR(_DefineUnrolledIterationBodyEnd(
                                                 Compiler,
-                                                CodeGenerator);
-
-        if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
+                                                CodeGenerator));
 
         /* Use the increment */
         if (slsDATA_TYPE_IsInt(IterationUnrollInfo->loopIndexName->dataType))
@@ -19203,14 +19324,13 @@ sloIR_ITERATION_GenUnrolledCode(
         }
     }
 
-    status = slGenDefineUnrolledIterationEnd(Compiler,
-                                             CodeGenerator,
-                                             gcvFALSE);
+OnError:
+    slGenDefineUnrolledIterationEnd(Compiler,
+                                    CodeGenerator,
+                                    gcvFALSE);
 
-    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
-
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
+    gcmFOOTER();
+    return status;
 }
 
 static gctBOOL
@@ -25685,7 +25805,7 @@ sloIR_SWITCH_GenCode(
     IN OUT slsGEN_CODE_PARAMETERS * Parameters
     )
 {
-    gceSTATUS  status;
+    gceSTATUS  status = gcvSTATUS_OK;
     sloIR_LABEL cases;
     slsITERATION_CONTEXT switchContext[1];
     slsGEN_CODE_PARAMETERS  condParameters, switchBodyParameters;
@@ -25781,9 +25901,9 @@ sloIR_SWITCH_GenCode(
                                    &CodeGenerator->visitor,
                                    &switchBodyParameters));
 
-    gcmONERROR(_DefineSwitchEnd(Compiler, CodeGenerator));
 
 OnError:
+    _DefineSwitchEnd(Compiler, CodeGenerator);
     slsGEN_CODE_PARAMETERS_Finalize(&switchBodyParameters);
     slsGEN_CODE_PARAMETERS_Finalize(&condParameters);
 

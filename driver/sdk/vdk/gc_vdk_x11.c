@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -1042,7 +1042,6 @@ _LockPixmap(
         return;
     }
 
-    /* TODO: Should use cacheable by default. */
     status = _LockVideoMemory(node, 0, &address, &memory);
 
     if (status != 0)

@@ -1,0 +1,196 @@
+#include "cl_viv_vx_ext.h"
+_viv_uniform VXC_512Bits dp_fp16_1;
+_viv_uniform VXC_512Bits dp_fp16tofp32;
+_viv_uniform VXC_512Bits dp_u32tofp16;
+_viv_uniform VXC_512Bits UniPackLow16bits;
+
+
+__kernel void vxcLrn
+    (
+           __read_only image2d_t  src,
+		   global int     *width,
+		   global int     *height,
+		   global int     *depth,
+		   global int     *batch,
+		   global int     *type,
+		   global int     *ksize,
+		   global int     *stride,
+		   global int     *pad,
+		   global float   *shift,
+		   global float   *alpha,
+		   global float   *beta,
+		   __write_only image2d_t dst)
+
+{
+
+		int2 pos = (int2)(get_global_id(0), get_global_id(1));
+		vxc_short8 val0;
+		vxc_short8 val1;
+		vxc_short8 val2;
+		vxc_float4 sum0;
+		vxc_float4 sum1;
+		vxc_float4 sum2;
+		vxc_float4 sum;
+		float4 alphadiv9;
+		float4 shift4 = *shift;
+		float4 val1_f32;
+
+		vxc_half8  val0_h;
+		vxc_half8  val1_h;
+		vxc_half8  val2_h;
+
+		int loop_times  = *height-2;
+		int loop_height = 0;
+		int loop_depth  = *depth;
+
+		alphadiv9 = *alpha/9;
+#if 1
+		do
+		{
+			//init
+			loop_height = loop_times;
+			// first
+		 	VXC_OP4(img_load, val1, src, pos, VXC_5BITOFFSET_XY(-1,0), VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
+			VXC_OP4(img_load, val2, src, pos, VXC_5BITOFFSET_XY(-1,1), VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
+		   	_viv_asm(COPY, val1_h, val1, 16);
+			_viv_asm(COPY, val2_h, val2, 16);
+			VXC_OP4(dp4x4, sum1, val1_h, val1_h, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), dp_fp16_1);
+			VXC_OP4(dp4x4, sum2, val2_h, val2_h, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), dp_fp16_1);
+
+			sum = sum1 + sum2;
+			sum = mad(sum,alphadiv9,shift4);
+			sum = sum * sum * sum;
+			sum = sqrt(sqrt(sum));
+			VXC_OP4(dp4x4, val1_f32, val1_h, val1_h, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), dp_fp16tofp32);
+
+			val1_f32 = val1_f32 / sum;
+
+	//fp32 -> fp16   val1_f32 -> val_s16
+			vxc_int4 val_u32;
+			vxc_int4 sign;
+			vxc_int4 exp;
+			vxc_int4 man;
+			vxc_int4  val_u16;
+			vxc_short8 val_s16;
+			vxc_short8 val_fp16;
+#if 1
+		   	_viv_asm(COPY, val_u32, val1_f32, 16);
+			sign = (val_u32 >> 16) & 0x8000 ;
+			man =  (val_u32 >> 13) & 0x3ff;
+			exp =  ((val_u32 >> 23) & 0xff ) - 127 + 15;
+			val_u16 = sign | (exp<<10) | man;
+		    val_u16 = (val_u32 == (int4)(0,0,0,0)) ? (int4)(0,0,0,0) : val_u16;
+
+
+			_viv_asm(COPY, val_s16, val_u16, 16);
+			VXC_OP4(dp4x8, val_fp16, val_s16, val_s16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), UniPackLow16bits);
+			VXC_OP4_NoDest(img_store, dst, pos, val_fp16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+#else
+
+			vxc_half s0,s1,s2,s3;
+			_viv_asm(CONV,s0,val1_f32.x);
+			_viv_asm(CONV,s1,val1_f32.y);
+			_viv_asm(CONV,s2,val1_f32.z);
+			_viv_asm(CONV,s3,val1_f32.w);
+		//	vxc_half8 s8 = (vxc_half8){s0,s1,s2,s3,0,0,0,0};
+			VXC_OP4_NoDest(img_store, dst, pos                  , s0, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+			VXC_OP4_NoDest(img_store, dst, (int2)(pos.x+1,pos.y), s1, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+			VXC_OP4_NoDest(img_store, dst, (int2)(pos.x+2,pos.y), s2, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+			VXC_OP4_NoDest(img_store, dst, (int2)(pos.x+3,pos.y), s3, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+
+#endif
+
+
+			//write_imagef(dst,pos,val1_f32);
+			pos.y = pos.y + 1;
+			// do middle lines
+			do
+			{
+				sum0 = sum1;
+				sum1 = sum2;
+				_viv_asm(COPY, val1_h, val2, 16);
+				VXC_OP4(img_load, val2, src, pos, VXC_5BITOFFSET_XY(-1,1), VXC_MODIFIER(0, 5, 0, VXC_RM_TowardZero, 0));
+				_viv_asm(COPY, val2_h, val2, 16);
+		  		VXC_OP4(dp4x4, sum2, val2_h, val2_h, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), dp_fp16_1);
+				sum = sum0 + sum1 + sum2;
+		   		sum = mad(sum,alphadiv9,shift4);
+				sum = sum * sum * sum;
+				sum = sqrt(sqrt(sum));
+				VXC_OP4(dp4x4, val1_f32, val1_h, val1_h, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), dp_fp16tofp32);
+				val1_f32 = val1_f32 / sum;
+  		//fp32 -> fp16
+#if 1
+		   		_viv_asm(COPY, val_u32, val1_f32, 16);
+				sign = (val_u32 >> 16) & 0x8000 ;
+				man =  (val_u32 >> 13) & 0x3ff;
+				exp =  ((val_u32 >> 23) & 0xff ) - 127 + 15;
+				val_u16 = sign | (exp<<10) | man;
+		        val_u16 = (val_u32 == (int4)(0,0,0,0)) ? (int4)(0,0,0,0) : val_u16;
+
+
+				_viv_asm(COPY, val_s16, val_u16, 16);
+				VXC_OP4(dp4x8, val_fp16, val_s16, val_s16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), UniPackLow16bits);
+				VXC_OP4_NoDest(img_store, dst, pos, val_fp16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+#else
+			_viv_asm(CONV,s0,val1_f32.x);
+			_viv_asm(CONV,s1,val1_f32.y);
+			_viv_asm(CONV,s2,val1_f32.z);
+			_viv_asm(CONV,s3,val1_f32.w);
+
+			VXC_OP4_NoDest(img_store, dst, pos                  , s0, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+			VXC_OP4_NoDest(img_store, dst, (int2)(pos.x+1,pos.y), s1, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+			VXC_OP4_NoDest(img_store, dst, (int2)(pos.x+2,pos.y), s2, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+			VXC_OP4_NoDest(img_store, dst, (int2)(pos.x+3,pos.y), s3, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+
+#endif
+		   	//	write_imagef(dst,pos,val1_f32);
+
+ 				pos.y = pos.y + 1;
+				loop_height--;
+			}while(loop_height > 0);
+
+			// do last line
+//
+	//		_viv_asm(COPY, val1_h, val2, 16);
+
+			sum = sum1 + sum2;
+			sum = mad(sum,alphadiv9,shift4);
+			sum = sum * sum * sum;
+			sum = sqrt(sqrt(sum));
+
+			VXC_OP4(dp4x4, val1_f32, val2_h, val2_h, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), dp_fp16tofp32);
+			val1_f32 = val1_f32 / sum;
+		//fp32 -> fp16
+#if 1
+			_viv_asm(COPY, val_u32, val1_f32, 16);
+			sign = (val_u32 >> 16) & 0x8000 ;
+			man =  (val_u32 >> 13) & 0x3ff;
+			exp =  ((val_u32 >> 23) & 0xff ) - 127 + 15;
+			val_u16 = sign | (exp<<10) | man;
+		    val_u16 = (val_u32 == (int4)(0,0,0,0)) ? (int4)(0,0,0,0) : val_u16;
+
+			_viv_asm(COPY, val_s16, val_u16, 16);
+			VXC_OP4(dp4x8, val_fp16, val_s16, val_s16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0), UniPackLow16bits);
+			VXC_OP4_NoDest(img_store, dst, pos, val_fp16, VXC_MODIFIER(0, 3, 0, VXC_RM_TowardZero, 0));
+#else
+			_viv_asm(CONV,s0,val1_f32.x);
+			_viv_asm(CONV,s1,val1_f32.y);
+			_viv_asm(CONV,s2,val1_f32.z);
+			_viv_asm(CONV,s3,val1_f32.w);
+
+			VXC_OP4_NoDest(img_store, dst, pos                  , s0, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+			VXC_OP4_NoDest(img_store, dst, (int2)(pos.x+1,pos.y), s1, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+			VXC_OP4_NoDest(img_store, dst, (int2)(pos.x+2,pos.y), s2, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+			VXC_OP4_NoDest(img_store, dst, (int2)(pos.x+3,pos.y), s3, VXC_MODIFIER(0, 0, 0, VXC_RM_TowardZero, 0));
+
+#endif
+			//write_imagef(dst,pos,val1_f32);
+			pos.y = pos.y + 1;
+
+			loop_depth--;
+		}while(loop_depth>0);
+
+#endif
+
+
+}

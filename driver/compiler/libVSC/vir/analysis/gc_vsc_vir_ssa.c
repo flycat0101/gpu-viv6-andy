@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -210,7 +210,7 @@ VSC_ErrCode vscVIR_TransformFromSpvSSA(VIR_Shader* pShader)
                             {
                                 VIR_Instruction* jmpc = VIR_Inst_GetNext(labelEnd);
 
-                                if(VIR_Inst_GetOpcode(labelEnd) == VIR_OP_AQ_SET &&
+                                if(VIR_Inst_GetOpcode(labelEnd) == VIR_OP_SET &&
                                    (VIR_Operand_Identical(VIR_Inst_GetDest(inst), VIR_Inst_GetSource(labelEnd, 0), pShader) ||
                                     VIR_Operand_Identical(VIR_Inst_GetDest(inst), VIR_Inst_GetSource(labelEnd, 1), pShader)) &&
                                    (VIR_Operand_Identical(VIR_Inst_GetDest(labelEnd), VIR_Inst_GetSource(jmpc, 0), pShader) ||
@@ -219,14 +219,14 @@ VSC_ErrCode vscVIR_TransformFromSpvSSA(VIR_Shader* pShader)
                                 {
                                     prevMovToDupInst = VIR_Inst_GetPrev(labelEnd);
                                 }
-                                else if(VIR_Inst_GetOpcode(labelEnd) == VIR_OP_SELECT &&
+                                else if(VIR_Inst_GetOpcode(labelEnd) == VIR_OP_CSELECT &&
                                    (VIR_Operand_Identical(VIR_Inst_GetDest(labelEnd), VIR_Inst_GetSource(jmpc, 0), pShader) ||
                                     VIR_Operand_Identical(VIR_Inst_GetDest(labelEnd), VIR_Inst_GetSource(jmpc, 1), pShader))
                                   )
                                 {
                                     VIR_Instruction* preLabelEnd = VIR_Inst_GetPrev(labelEnd);
 
-                                    if(VIR_Inst_GetOpcode(preLabelEnd) == VIR_OP_CMP &&
+                                    if(VIR_Inst_GetOpcode(preLabelEnd) == VIR_OP_COMPARE &&
                                        (VIR_Operand_Identical(VIR_Inst_GetDest(inst), VIR_Inst_GetSource(preLabelEnd, 0), pShader) ||
                                         VIR_Operand_Identical(VIR_Inst_GetDest(inst), VIR_Inst_GetSource(preLabelEnd, 1), pShader)) &&
                                         VIR_Operand_Identical(VIR_Inst_GetDest(preLabelEnd), VIR_Inst_GetSource(labelEnd, 0), pShader))

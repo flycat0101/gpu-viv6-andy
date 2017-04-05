@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -257,7 +257,6 @@ vx_status vxChannelExtract(vx_node node, vx_image src, vx_scalar channel, vx_ima
         }
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
-        kernelContext->uniform_num = 0;
     }
 
     vxReadScalarValue(channel, &chan);

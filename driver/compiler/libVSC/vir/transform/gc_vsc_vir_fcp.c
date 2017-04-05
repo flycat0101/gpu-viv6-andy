@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -618,7 +618,7 @@ _InsertCMPInst(
     VIR_GENERAL_UD_ITERATOR udIter;
     VIR_OperandInfo         operandInfo;
     VIR_DEF     *pDef = gcvNULL;
-    gctUINT     swizzle;
+    VIR_Swizzle swizzle;
     VIR_TypeId  dstTy;
     VIR_Instruction *newInst = gcvNULL;
 
@@ -630,7 +630,7 @@ _InsertCMPInst(
 
             /* add a COMP instruction */
         errCode = VIR_Function_AddInstructionBefore(pFunc,
-                VIR_OP_AQ_CMP,
+                VIR_OP_CMP,
                 dstTy,
                 pInst,
                 gcvTRUE,
@@ -679,13 +679,21 @@ _InsertCMPInst(
 
         if (VIR_GetTypeFlag(dstTy) & VIR_TYFLAG_ISFLOAT)
         {
-            VIR_ScalarConstVal imm0;
+            VIR_Const   virConst;
+            VIR_Uniform *pImmUniform = gcvNULL;
+            VIR_Symbol  *sym = gcvNULL;
 
-            imm0.fValue = 1.0f;
-
-            VIR_Operand_SetImmediate(VIR_Inst_GetSource(newInst, 2),
-            VIR_TYPE_FLOAT32,
-            imm0);
+            /* float should be putting into uniform */
+            virConst.index = VIR_INVALID_ID;
+            virConst.type = VIR_TYPE_FLOAT32;
+            virConst.value.scalarVal.fValue = 1.0f;
+            VIR_Shader_AddInitializedUniform(pShader, &virConst, &pImmUniform, &swizzle);
+            /* Set this uniform as operand and set correct swizzle */
+            sym = VIR_Shader_GetSymFromId(pShader, pImmUniform->sym);
+            VIR_Operand_SetType(VIR_Inst_GetSource(newInst, 2), VIR_TYPE_FLOAT32);
+            VIR_Operand_SetOpKind(VIR_Inst_GetSource(newInst, 2), VIR_OPND_SYMBOL);
+            VIR_Operand_SetSym(VIR_Inst_GetSource(newInst, 2), sym);
+            VIR_Operand_SetSwizzle(VIR_Inst_GetSource(newInst, 2), swizzle);
         }
         else
         {
@@ -1063,84 +1071,6 @@ static VSC_ErrCode _VIR_MergeICASTD(
     return errCode;
 }
 
-VSC_ErrCode
-_ConvEvisInst(
-    VIR_Shader          *pShader,
-    VIR_Function        *pFunc,
-    VIR_Instruction     *pInst)
-{
-    VSC_ErrCode         errCode = VSC_ERR_NONE;
-    VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
-    VIR_Operand        *pSrc2Opnd = VIR_Inst_GetSource(pInst, 2);
-    /*
-    ** For some EVIS instructions, HW doesn't decode src2's swizzle if src2 it is not a IMMEDIATE,
-    ** so we insert a MOV instruction whose enable is XYZW to replace the src2.
-    */
-    if (pSrc2Opnd                       &&
-        VIR_OPCODE_isVXOnly(opCode)     &&
-        opCode != VIR_OP_VX_IACCSQ      &&
-        opCode != VIR_OP_VX_LERP        &&
-        opCode != VIR_OP_VX_MULSHIFT    &&
-        opCode != VIR_OP_VX_BILINEAR    &&
-        opCode != VIR_OP_VX_ATOMICADD
-        )
-    {
-        VIR_TypeId       src2TypeId = VIR_Operand_GetType(pSrc2Opnd);
-        VIR_Swizzle      src2Swizzle = VIR_Operand_GetSwizzle(pSrc2Opnd);
-
-        if ((VIR_Operand_isVirReg(pSrc2Opnd) || VIR_Operand_isSymbol(pSrc2Opnd) || VIR_Operand_isConst(pSrc2Opnd))
-            &&
-            src2Swizzle != VIR_SWIZZLE_XYZW)
-        {
-            VIR_VirRegId    regId;
-            VIR_SymId       regSymId;
-            VIR_TypeId      regTypeId;
-            VIR_Instruction*pMovInst = gcvNULL;
-            VIR_Operand    *pOpnd = gcvNULL;
-
-            /* Create a temp with 4 components to hold the src2. */
-            regTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(src2TypeId), 4, 1);
-            regId = VIR_Shader_NewVirRegId(pShader, 1);
-            errCode = VIR_Shader_AddSymbol(pShader,
-                                           VIR_SYM_VIRREG,
-                                           regId,
-                                           VIR_Shader_GetTypeFromId(pShader, regTypeId),
-                                           VIR_STORAGE_UNKNOWN,
-                                           &regSymId);
-            ON_ERROR(errCode, "Add symbol failed");
-
-            /* Insert a MOV. */
-            errCode = VIR_Function_AddInstructionBefore(pFunc,
-                                                        VIR_OP_MOV,
-                                                        regTypeId,
-                                                        pInst,
-                                                        gcvTRUE,
-                                                        &pMovInst);
-            ON_ERROR(errCode, "Insert instruction failed");
-
-            /* Set DEST. */
-            pOpnd = VIR_Inst_GetDest(pMovInst);
-            VIR_Operand_SetTempRegister(pOpnd,
-                                        pFunc,
-                                        regSymId,
-                                        regTypeId);
-            VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_XYZW);
-
-            /* Set SRC0. */
-            pOpnd = VIR_Inst_GetSource(pMovInst, 0);
-            VIR_Operand_Copy(pOpnd, pSrc2Opnd);
-
-            /* Update the SRC2 of EVIS instruction. */
-            VIR_Operand_Copy(pSrc2Opnd, VIR_Inst_GetDest(pMovInst));
-            VIR_Operand_SetLvalue(pSrc2Opnd, gcvFALSE);
-            VIR_Operand_SetSwizzle(pSrc2Opnd, VIR_SWIZZLE_XYZW);
-        }
-    }
-
-OnError:
-    return errCode;
-}
-
 DEF_QUERY_PASS_PROP(vscVIR_PreCleanup)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
@@ -1220,8 +1150,6 @@ VSC_ErrCode vscVIR_PreCleanup(
                 ON_ERROR(errCode, "Insert precision conversion inst");
             }
 
-            errCode = _ConvEvisInst(pShader, func, inst);
-            ON_ERROR(errCode, "Convert evis instruction");
         }
     }
 
@@ -1325,7 +1253,7 @@ _changeConvSrc1(IN VIR_Instruction    *Inst)
     VIR_TypeId          ty, componentTy;
     gctBOOL            needChangeSrc1 = gcvFALSE;
 
-    if (VIR_Inst_GetOpcode(Inst) == VIR_OP_AQ_I2I)
+    if (VIR_Inst_GetOpcode(Inst) == VIR_OP_I2I)
     {
         opnd = VIR_Inst_GetDest(Inst);
     }
@@ -1362,7 +1290,7 @@ _changeConvSrc1(IN VIR_Instruction    *Inst)
             break;
         }
 
-        if (VIR_Inst_GetOpcode(Inst) == VIR_OP_AQ_I2I)
+        if (VIR_Inst_GetOpcode(Inst) == VIR_OP_I2I)
         {
             imm0.iValue <<= 4;
         }
@@ -1470,8 +1398,8 @@ VSC_ErrCode vscVIR_PostCleanup(
                 }
 
                 /* correctly setting src1 for conv/i2i instruction  */
-                if (VIR_Inst_GetOpcode(inst) == VIR_OP_AQ_CONV ||
-                    VIR_Inst_GetOpcode(inst) == VIR_OP_AQ_I2I)
+                if (VIR_Inst_GetOpcode(inst) == VIR_OP_CONV ||
+                    VIR_Inst_GetOpcode(inst) == VIR_OP_I2I)
                 {
                     _changeConvSrc1(inst);
                 }

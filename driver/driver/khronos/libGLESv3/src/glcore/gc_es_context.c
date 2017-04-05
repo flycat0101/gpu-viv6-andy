@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -937,25 +937,23 @@ GLvoid __glInitGlobals(__GLApiVersion apiVersion)
 
 GLboolean __glLoseCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable)
 {
-    GLboolean retVal;
-
     __glSetDrawable(gc, drawable, readable);
 
     /* Notify DP the context is not current anymore */
-    retVal = (*gc->dp.loseCurrent)(gc, GL_FALSE);
-
-    return retVal;
+    return (*gc->dp.loseCurrent)(gc, GL_FALSE);
 }
 
 GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdrawablePrivate* readable, GLboolean flushDrawableChange)
 {
-    GLboolean retVal;
-    GLsizei width, height;
+    __GLframebufferObject *defaultDrawFBO = &gc->frameBuffer.defaultDrawFBO;
+    __GLframebufferObject *defaultReadFBO = &gc->frameBuffer.defaultReadFBO;
 
     __glSetDrawable(gc, drawable, readable);
 
     if (gc->flags & __GL_CONTEXT_UNINITIALIZED)
     {
+        GLsizei width, height;
+
         if (gc->drawablePrivate)
         {
             width = gc->drawablePrivate->width;
@@ -975,6 +973,32 @@ GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
         gc->flags &= ~(__GL_CONTEXT_UNINITIALIZED);
     }
 
+    if (drawable)
+    {
+        defaultDrawFBO->flag = (__GL_FRAMEBUFFER_IS_CHECKED | __GL_FRAMEBUFFER_IS_COMPLETE);
+        defaultDrawFBO->checkCode = GL_FRAMEBUFFER_COMPLETE;
+        defaultDrawFBO->fbSamples = drawable->modes.samples;
+    }
+    else
+    {
+        defaultDrawFBO->flag = __GL_FRAMEBUFFER_IS_CHECKED;
+        defaultDrawFBO->checkCode = GL_FRAMEBUFFER_UNDEFINED;
+        defaultDrawFBO->fbSamples = 0;
+    }
+
+    if (readable)
+    {
+        defaultReadFBO->flag = (__GL_FRAMEBUFFER_IS_CHECKED | __GL_FRAMEBUFFER_IS_COMPLETE);
+        defaultReadFBO->checkCode = GL_FRAMEBUFFER_COMPLETE;
+        defaultReadFBO->fbSamples = readable->modes.samples;
+    }
+    else
+    {
+        defaultReadFBO->flag = __GL_FRAMEBUFFER_IS_CHECKED;
+        defaultReadFBO->checkCode = GL_FRAMEBUFFER_UNDEFINED;
+        defaultReadFBO->fbSamples = 0;
+    }
+
     /*
     ** Some internal switch need flush drawable immediately to restore the chip layer drawbuffer.
     ** Especially for 3Dblit switch, otherwise the only chance to evaluate drawable change is at
@@ -986,9 +1010,7 @@ GLboolean __glMakeCurrent(__GLcontext *gc, __GLdrawablePrivate* drawable, __GLdr
     }
 
     /* Notify the DP of the new context drawable pair */
-    retVal = (*gc->dp.makeCurrent)(gc);
-
-    return retVal;
+    return (*gc->dp.makeCurrent)(gc);
 }
 
 GLboolean __glDestroyContext(GLvoid *context)
@@ -1172,6 +1194,10 @@ GLvoid *__glCreateContext(GLint clientVersion, VEGLimports *imports, GLvoid* sha
 #endif
 
     gc->magic = ES3X_MAGIC;
+
+
+    /* Do not need destructor. */
+    gc->base.destructor = gcvNULL;
 
 
     __GL_FOOTER();

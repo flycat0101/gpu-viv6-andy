@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -70,10 +70,6 @@ GLint __glReadPixels_size(GLenum format, GLenum type, GLint w, GLint h)
 /**
  * Determine the number of data elements that go with the specified \c pname
  * to a \c glGetTexEnvfv or \c glGetTexEnviv call.
- *
- * \todo
- * Replace this function with a call to \c __glTexEnvfv_size.  Make that there
- * aren't any values of \c pname that are valid for one but not the other.
  */
 GLint __glGetTexEnvfv_size(GLenum pname)
 {

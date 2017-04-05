@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -499,6 +499,7 @@ extern GLvoid GL_APIENTRY __glim_GetUniformiv(__GLcontext *gc, GLuint program, G
 extern GLint  GL_APIENTRY __glim_GetUniformLocation(__GLcontext *gc, GLuint program, const GLchar* name);
 extern GLvoid GL_APIENTRY __glim_GetVertexAttribfv(__GLcontext *gc, GLuint index, GLenum pname, GLfloat* params);
 extern GLvoid GL_APIENTRY __glim_GetVertexAttribiv(__GLcontext *gc, GLuint index, GLenum pname, GLint* params);
+extern GLvoid GL_APIENTRY __glim_GetVertexAttribdv(__GLcontext *gc, GLuint index, GLenum pname, GLdouble* params);
 extern GLvoid GL_APIENTRY __glim_GetVertexAttribPointerv(__GLcontext *gc, GLuint index, GLenum pname, GLvoid** pointer);
 extern GLvoid GL_APIENTRY __glim_Hint(__GLcontext *gc, GLenum target, GLenum mode);
 extern GLboolean GL_APIENTRY __glim_IsBuffer(__GLcontext *gc, GLuint buffer);
@@ -552,14 +553,42 @@ extern GLvoid GL_APIENTRY __glim_UniformMatrix3fv(__GLcontext *gc, GLint locatio
 extern GLvoid GL_APIENTRY __glim_UniformMatrix4fv(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLfloat* value);
 extern GLvoid GL_APIENTRY __glim_UseProgram(__GLcontext *gc, GLuint program);
 extern GLvoid GL_APIENTRY __glim_ValidateProgram(__GLcontext *gc, GLuint program);
-extern GLvoid GL_APIENTRY __glim_VertexAttrib1f(__GLcontext *gc, GLuint indx, GLfloat x);
-extern GLvoid GL_APIENTRY __glim_VertexAttrib1fv(__GLcontext *gc, GLuint indx, const GLfloat* values);
-extern GLvoid GL_APIENTRY __glim_VertexAttrib2f(__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y);
-extern GLvoid GL_APIENTRY __glim_VertexAttrib2fv(__GLcontext *gc, GLuint indx, const GLfloat* values);
-extern GLvoid GL_APIENTRY __glim_VertexAttrib3f(__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y, GLfloat z);
-extern GLvoid GL_APIENTRY __glim_VertexAttrib3fv(__GLcontext *gc, GLuint indx, const GLfloat* values);
-extern GLvoid GL_APIENTRY __glim_VertexAttrib4f(__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y, GLfloat z, GLfloat w);
-extern GLvoid GL_APIENTRY __glim_VertexAttrib4fv(__GLcontext *gc, GLuint indx, const GLfloat* values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib1d(__GLcontext *gc, GLuint indx, GLdouble x);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib1dv(__GLcontext *gc, GLuint indx, const GLdouble *values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib1f(__GLcontext *gc, GLuint indx, GLfloat x);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib1fv(__GLcontext *gc, GLuint indx, const GLfloat * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib1s(__GLcontext *gc, GLuint indx, GLshort x);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib1sv(__GLcontext *gc, GLuint indx, const GLshort * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib2d(__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib2dv(__GLcontext *gc, GLuint indx, const GLdouble * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib2f(__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib2fv(__GLcontext *gc, GLuint indx, const GLfloat * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib2s(__GLcontext *gc, GLuint indx, GLshort x, GLshort y);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib2sv(__GLcontext *gc, GLuint indx, const GLshort * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib3d(__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y, GLdouble z);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib3dv(__GLcontext *gc, GLuint indx, const GLdouble * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib3f(__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y, GLfloat z);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib3fv(__GLcontext *gc, GLuint indx, const GLfloat * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib3s(__GLcontext *gc, GLuint indx, GLshort x, GLshort y, GLshort z);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib3sv(__GLcontext *gc, GLuint indx, const GLshort * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4Nbv(__GLcontext *gc, GLuint indx, const GLbyte * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4Niv(__GLcontext *gc, GLuint indx, const GLint * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4Nsv(__GLcontext *gc, GLuint indx, const GLshort * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4Nub(__GLcontext *gc, GLuint indx, GLubyte x, GLubyte y, GLubyte z, GLubyte w);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4Nubv(__GLcontext *gc, GLuint indx, const GLubyte * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4Nuiv(__GLcontext *gc, GLuint indx, const GLuint * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4Nusv(__GLcontext *gc, GLuint indx, const GLushort * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4bv(__GLcontext *gc, GLuint indx, const GLbyte * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4d(__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y, GLdouble z, GLdouble w);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4dv(__GLcontext *gc, GLuint indx, const GLdouble * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4f(__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y, GLfloat z, GLfloat w);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4fv(__GLcontext *gc, GLuint indx, const GLfloat * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4iv(__GLcontext *gc, GLuint indx, const GLint * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4s(__GLcontext *gc, GLuint indx, GLshort x, GLshort y, GLshort z, GLshort w);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4sv(__GLcontext *gc, GLuint indx, const GLshort * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4ubv(__GLcontext *gc, GLuint indx, const GLubyte * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4uiv(__GLcontext *gc, GLuint indx, const GLuint * values);
+extern  GLvoid  GLAPIENTRY __glim_VertexAttrib4usv(__GLcontext *gc, GLuint indx, const GLushort * values);
 extern GLvoid GL_APIENTRY __glim_VertexAttribPointer(__GLcontext *gc, GLuint indx, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid* ptr);
 extern GLvoid GL_APIENTRY __glim_Viewport(__GLcontext *gc, GLint x, GLint y, GLsizei width, GLsizei height);
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -694,6 +694,9 @@ GLboolean __glCheckTexImgFmtArg(__GLcontext *gc,
         case GL_VIV_YUY2:
         case GL_VIV_UYVY:
         case GL_BGRA_EXT:
+#ifdef OPENGL40
+        case GL_BGR_EXT:
+#endif
             break;
 
         default:
@@ -745,6 +748,7 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         case GL_R3_G3_B2:
         case GL_RGB4:
         case GL_RGB5:
+        case GL_RGB565:
         case GL_RGB8:
         case GL_RGB10:
         case GL_RGB12:
@@ -905,7 +909,7 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
             case GL_LUMINANCE_INTEGER_EXT:
             case GL_LUMINANCE_ALPHA_INTEGER_EXT:
                 break;
-            default:
+        default:
                 goto bad_operation;
             }
             break;
@@ -992,7 +996,7 @@ GLboolean __glCheckTexImgFmtGL4(__GLcontext *gc,
         case GL_LUMINANCE_INTEGER_EXT:
         case GL_LUMINANCE_ALPHA_INTEGER_EXT:
             switch(internalFormat)
-            {
+    {
                 case GL_RGBA32UI_EXT:
                 case GL_RGBA32I_EXT:
                 case GL_RGBA16UI_EXT:
@@ -2401,8 +2405,8 @@ GLint __glTextureBaseFormat(GLint internalFormat)
 #endif
 
 GLboolean __glSetMipmapLevelInfo(__GLcontext *gc, __GLtextureObject *tex, GLint face,
-                                 GLint lod, GLint internalFormat, GLenum format,
-                                 GLenum type, GLsizei width, GLsizei height, GLsizei depth)
+                              GLint lod, GLint internalFormat, GLenum format,
+                              GLenum type, GLsizei width, GLsizei height, GLsizei depth)
 {
     GLint arrays = 1;
     __GLmipMapLevel *mipmap;
@@ -2686,7 +2690,7 @@ EGLenum __glCheckEglImageTexArg(__GLcontext *gc,
                                GLint *face)
 {
     /* Test target parameter. */
-    switch(target)
+    switch (target)
     {
     case EGL_GL_TEXTURE_2D_KHR:
         *face = 0;
@@ -2728,7 +2732,7 @@ EGLenum __glCreateEglImageTexture(__GLcontext* gc,
     EGLenum result;
     __GLtextureObject *texObj = gcvNULL;
 
-    if(gc->texture.shared == gcvNULL)
+    if (gc->texture.shared == gcvNULL)
     {
         return EGL_BAD_PARAMETER;
     }
@@ -3264,7 +3268,6 @@ GLvoid APIENTRY __glim_CopyTexImage1D(__GLcontext *gc,
     }
     if (!__glCheckTexImgArgs(gc, tex, lod, width, 1, 1, border))
     {
-        /* TODO: the width/height cannot exceed read buffer size; */
         __GL_EXIT();
     }
     __glSetMipmapBorder(gc, tex, face, lod, border);
@@ -3323,7 +3326,6 @@ GLvoid GL_APIENTRY __glim_CopyTexSubImage1D(__GLcontext *gc,
     /* Check arguments */
     if (!__glCheckTexSubImgArgs(gc, tex, face, lod, xoffset, 0, 0, width, 1, 1))
     {
-        /* TODO: the width/height cannot exceed read buffer size; */
         __GL_EXIT();
     }
     if (!__glCheckTexCopyImgFmt(gc, tex, tex->faceMipmap[face][lod].requestedFormat, GL_FALSE))
@@ -3566,6 +3568,105 @@ GLvoid GLAPIENTRY __glim_GenerateMipmapEXT(__GLcontext *gc,  GLenum target)
     __gles_GenerateMipmap(gc, target);
 }
 
+GLvoid GLAPIENTRY __glim_GetCompressedTexImage(__GLcontext *gc, GLenum target, GLint level, GLvoid *img)
+{
+    __GLtextureObject *tex;
+    GLuint activeUnit;
+    GLuint face;
+    __GLmipMapLevel *mipmap;
+
+    __GL_HEADER();
+
+    /* Get the texture object and face. */
+
+    activeUnit = gc->state.texture.activeTexIndex;
+    switch (target)
+    {
+    case GL_TEXTURE_1D:
+        face = 0;
+        tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_1D_INDEX];
+        break;
+    case GL_TEXTURE_2D:
+        face = 0;
+        tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_INDEX];
+        break;
+    case GL_TEXTURE_1D_ARRAY_EXT:
+        face = 0;
+        tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_1D_ARRAY_INDEX];
+        break;
+    case GL_TEXTURE_RECTANGLE_ARB:
+        if (level != 0)
+        {
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
+            return;
+        }
+        face = 0;
+        tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_RECTANGLE_INDEX];
+        break;
+    case GL_TEXTURE_CUBE_MAP:
+        face = 0;
+        tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_INDEX];
+        /* Check if this cubemap is cube complete */
+        if (!__glIsCubeBaselevelConsistent(gc, tex))
+        {
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
+        break;
+    case GL_TEXTURE_3D:
+        face = 0;
+        tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_3D_INDEX];
+        break;
+    case GL_TEXTURE_2D_ARRAY:
+        tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_2D_ARRAY_INDEX];
+        face = 0;
+        break;
+    case GL_TEXTURE_CUBE_MAP_ARRAY_EXT:
+        if (__glExtension[__GL_EXTID_EXT_texture_cube_map_array].bEnabled)
+        {
+            tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_ARRAY_INDEX];
+            face = 0;
+            break;
+        }
+    case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
+    case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
+    case GL_TEXTURE_CUBE_MAP_POSITIVE_Y:
+    case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
+    case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
+    case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
+        face = target - GL_TEXTURE_CUBE_MAP_POSITIVE_X;
+        tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_INDEX];
+        break;
+    default:
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
+    }
+
+    if (level < 0 || level >= (GLint)gc->constants.maxNumTextureLevels )
+    {
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
+        return;
+    }
+
+    mipmap = &tex->faceMipmap[face][level];
+
+    /* Invalid to get a non-compressed image. */
+    if (!mipmap->compressed)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+
+    if( (mipmap->width * mipmap->height ) == 0)
+    {
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+    }
+
+    if (img)
+    {
+        gc->dp.getCompressedTexImage(gc, tex, mipmap, level, img);
+    }
+OnError:
+    __GL_FOOTER();
+}
+
 #endif
 
 /*****************************************************************************
@@ -3770,7 +3871,6 @@ GLvoid GL_APIENTRY __gles_CopyTexImage2D(__GLcontext *gc,
     }
     if (!__glCheckTexImgArgs(gc, tex, lod, width, height, 1, border))
     {
-        /* TODO: the width/height cannot exceed read buffer size; */
         __GL_EXIT();
     }
 
@@ -3847,7 +3947,6 @@ GLvoid GL_APIENTRY __gles_CopyTexSubImage3D(__GLcontext *gc,
     /* Check arguments */
     if (!__glCheckTexSubImgArgs(gc, tex, 0, lod, xoffset, yoffset, zoffset, width, height, 1))
     {
-        /* TODO: the width/height cannot exceed read buffer size; */
         __GL_EXIT();
     }
     if (!__glCheckTexCopyImgFmt(gc, tex, tex->faceMipmap[0][lod].requestedFormat, GL_FALSE))
@@ -3904,7 +4003,6 @@ GLvoid GL_APIENTRY __gles_CopyTexSubImage2D(__GLcontext *gc,
     /* Check arguments */
     if (!__glCheckTexSubImgArgs(gc, tex, face, lod, xoffset, yoffset, 0, width, height, 1))
     {
-        /* TODO: the width/height cannot exceed read buffer size; */
         __GL_EXIT();
     }
     if (!__glCheckTexCopyImgFmt(gc, tex, tex->faceMipmap[face][lod].requestedFormat, GL_FALSE))
@@ -3999,8 +4097,8 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage3D(__GLcontext *gc,
     /* Now internalFormat is valid, only allows 2D_ARRAY target currently. */
     if (target != GL_TEXTURE_2D_ARRAY && target != GL_TEXTURE_CUBE_MAP_ARRAY_EXT)
     {
-        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
-    }
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
+        }
 
     if (!__glCheckTexImgArgs(gc, tex, lod, width, height, depth, border))
     {
@@ -5376,7 +5474,7 @@ OnError:
 }
 
 GLvoid GL_APIENTRY __glTexDirectVIVMap(__GLcontext *gc, GLenum target, GLsizei width, GLsizei height,
-                                       GLenum format, GLvoid ** logical, const GLuint * physical, GLboolean tiled)
+                              GLenum format, GLvoid ** logical, const GLuint * physical, GLboolean tiled)
 {
     __GLtextureObject *tex;
     GLint face;
@@ -5970,9 +6068,9 @@ GLboolean __glCheckCopyImageSubDataArg(__GLcontext *gc, GLuint name, GLenum targ
             mipmap->requestedFormat <= GL_COMPRESSED_SRGB8_ALPHA8_ETC2_EAC)
         {
             if ((width  % 4) || (x % 4) || (height % 4) || (y % 4))
-            {
-                __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
-            }
+        {
+            __GL_ERROR_RET_VAL(GL_INVALID_VALUE, GL_FALSE);
+        }
         }
 
         *formatInfo = mipmap->formatInfo;
@@ -6018,9 +6116,8 @@ GLboolean __glIsCopyImageSubDataCompatible(__GLcontext *gc, __GLformatInfo * src
         return GL_TRUE;
     }
 
-    if (srcFormatInfo->compressed && dstFormatInfo->compressed)
+    if (srcFormatInfo->compressed && dstFormatInfo->compressed )
     {
-        /* TODO, add view class for compress format */
     }
 
     /*3. one format is compressed and the other is uncompressed and

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -24,6 +24,8 @@
 *    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 *
 *****************************************************************************/
+
+
 
 
 #if !defined(_WIN32)
@@ -404,17 +406,26 @@ int main(int argc, const char *argv[])
 
     //START THE TESTS
     printf("TESTS STARTED...\n");
-    test_int64(device, context, queue, 1024, totalTests, passed, failed);
-    test_fp64(device, context, queue, 1024, totalTests, passed, failed);
-    test_fp64_func_math_1arg(device, context, queue, 1024, totalTests, passed, failed);
-    test_fp64_func_math_2arg(device, context, queue, 1024, totalTests, passed, failed);
-    test_fp64_func_math_3arg(device, context, queue, 1024, totalTests, passed, failed);
-    test_fp64_func_math4(device, context, queue, 1024, totalTests, passed, failed);
-    test_fp16(device, context, queue, 1024, totalTests, passed, failed);
-    test_fp16_func_math_1arg(device, context, queue, 1024, totalTests, passed, failed);
-    test_fp16_func_math_2arg(device, context, queue, 1024, totalTests, passed, failed);
-    test_fp16_func_math_3arg(device, context, queue, 1024, totalTests, passed, failed);
-    test_fp16_func_math4(device, context, queue, 1024, totalTests, passed, failed);
+    if(is_extension_available(device, "cles_khr_int64"))
+    {
+        test_int64(device, context, queue, 1024, totalTests, passed, failed);
+    }
+    if(is_extension_available(device, "cl_khr_fp64"))
+    {
+        test_fp64(device, context, queue, 1024, totalTests, passed, failed);
+        test_fp64_func_math_1arg(device, context, queue, 1024, totalTests, passed, failed);
+        test_fp64_func_math_2arg(device, context, queue, 1024, totalTests, passed, failed);
+        test_fp64_func_math_3arg(device, context, queue, 1024, totalTests, passed, failed);
+        test_fp64_func_math4(device, context, queue, 1024, totalTests, passed, failed);
+    }
+    if(is_extension_available(device, "cl_khr_fp16"))
+    {
+        test_fp16(device, context, queue, 1024, totalTests, passed, failed);
+        test_fp16_func_math_1arg(device, context, queue, 1024, totalTests, passed, failed);
+        test_fp16_func_math_2arg(device, context, queue, 1024, totalTests, passed, failed);
+        test_fp16_func_math_3arg(device, context, queue, 1024, totalTests, passed, failed);
+        test_fp16_func_math4(device, context, queue, 1024, totalTests, passed, failed);
+    }
     test_write_image3d(device, context, queue, 1024, totalTests, passed, failed);
     test_gl_sharing(device, context, queue, 1024, totalTests, passed, failed);
     test_d3d10(device, context, queue, 1024, totalTests, passed, failed);

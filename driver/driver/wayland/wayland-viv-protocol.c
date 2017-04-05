@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -29,15 +29,25 @@ static const struct wl_interface *types[] = {
     NULL,
     NULL,
     NULL,
+    NULL,
+    NULL,
+    NULL,
+    &wl_buffer_interface,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
 };
 
 static const struct wl_message wl_viv_requests[] = {
-    { "create_buffer", "nuuuiiuiu", types + 0 },
+    { "create_buffer", "nuuuiiuiuuiu", types + 0 },
+    { "enable_tile_status", "ouuuuu", types + 12 },
 };
 
 WL_EXPORT const struct wl_interface wl_viv_interface = {
     "wl_viv", 1,
-    1, wl_viv_requests,
+    2, wl_viv_requests,
     0, NULL,
 };
 

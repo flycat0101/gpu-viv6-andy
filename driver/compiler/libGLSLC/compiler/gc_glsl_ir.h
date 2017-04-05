@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -666,6 +666,28 @@ gctUINT
 slsDATA_TYPE_GetLogicalOperandCount(
     IN slsDATA_TYPE * DataType,
     IN gctBOOL bCalcTypeSize
+    );
+
+/* The name of a type, so far it is only enable for a structure. */
+typedef struct _slsDATA_TYPE_NAME
+{
+    slsDLINK_NODE     node;
+
+    gctCONST_STRING   name;
+}
+slsDATA_TYPE_NAME;
+
+gceSTATUS
+slsDATA_TYPE_NAME_Construct(
+    IN sloCOMPILER Compiler,
+    IN gctCONST_STRING Name,
+    OUT slsDATA_TYPE_NAME **    DataTypeName
+    );
+
+gceSTATUS
+slsDATA_TYPE_NAME_Destory(
+    IN sloCOMPILER Compiler,
+    IN slsDATA_TYPE_NAME * DataTypeName
     );
 
 #define slmPromoteIntToVector(IntValue, Vz, Res)  \
@@ -1335,24 +1357,31 @@ slsNAME_Dump(
     IN slsNAME * Name
     );
 
+typedef enum _sleNAME_SPACE_TYPE
+{
+    slvNAME_SPACE_NONE          = 0,
+    slvNAME_SPACE_BUILTIN       = 1,
+    slvNAME_SPACE_DECL_SET      = 2,
+    slvNAME_SPACE_STATE_SET     = 3,
+    slvNAME_SPACE_FUNCTION      = 4,
+    slvNAME_SPACE_IO_BLOCK      = 5,
+    slvNAME_SPACE_STRUCT        = 6
+}
+sleNAME_SPACE_TYPE;
+
 typedef struct _slsNAME_SPACE
 {
     slsDLINK_NODE            node;
-
     struct _slsNAME_SPACE *  parent;
-
+    sleNAME_SPACE_TYPE       nameSpaceType;
     slsDLINK_LIST            names;
-
     slsDLINK_LIST            subSpaces;
-
     /* Precision has same scope rule as variables, so put it */
     /* in namespace to better management. Only used for parsing */
     /* time, codegen does not use it */
     /* Now, precision is used in Low power shader FP16 medium feature */
     sltPRECISION_QUALIFIER   defaultPrecision[slvTYPE_TOTAL_COUNT];
-
     sltPOOL_STRING           spaceName;
-
     VSC_DIE                  die;
 }
 slsNAME_SPACE;
@@ -1374,6 +1403,7 @@ slsNAME_SPACE_Construct(
     IN sloCOMPILER Compiler,
     IN sltPOOL_STRING SpaceName,
     IN slsNAME_SPACE * Parent,
+    IN sleNAME_SPACE_TYPE NameSpaceType,
     OUT slsNAME_SPACE ** NameSpace
     );
 
@@ -1389,11 +1419,21 @@ slsNAME_SPACE_Dump(
     IN slsNAME_SPACE * NameSpace
     );
 
+typedef gctBOOL (*slsNAME_SEARCH_COMPARE_FUNC_PTR)(void* Data1, void* Data2);
+
+gctBOOL
+slsNAME_SPACE_CheckBlockNameForTheSameInterface(
+    IN void* Data1,
+    IN void* Data2
+    );
+
 gceSTATUS
 slsNAME_SPACE_Search(
     IN sloCOMPILER Compiler,
     IN slsNAME_SPACE * NameSpace,
     IN sltPOOL_STRING Symbol,
+    IN slsNAME_SEARCH_COMPARE_FUNC_PTR NameCompareFunc,
+    IN void * CompareData,
     IN gctBOOL Recursive,
     IN gctBOOL MangleNameMatch,
     OUT slsNAME ** Name
@@ -1508,12 +1548,15 @@ gceSTATUS
 sloCOMPILER_CreateNameSpace(
     IN sloCOMPILER Compiler,
     IN sltPOOL_STRING SpaceName,
+    IN sleNAME_SPACE_TYPE NameSpaceType,
     OUT slsNAME_SPACE ** NameSpace
     );
 
 gceSTATUS
 sloCOMPILER_CreateAuxGlobalNameSpace(
     IN sloCOMPILER Compiler,
+    IN sltPOOL_STRING SpaceName,
+    IN sleNAME_SPACE_TYPE NameSpaceType,
     OUT slsNAME_SPACE ** NameSpace
     );
 
@@ -1622,6 +1665,18 @@ sleLAYOUT_ID
 sloCOMPILER_SearchLayoutId(
     IN sloCOMPILER Compiler,
     IN struct _slsLexToken *LayoutId
+    );
+
+gceSTATUS
+sloCOMPILER_PushDataTypeName(
+    IN sloCOMPILER Compiler,
+    IN slsDATA_TYPE_NAME *    DataTypeName
+    );
+
+gceSTATUS
+sloCOMPILER_PopDataTypeName(
+    IN sloCOMPILER Compiler,
+    OUT slsDATA_TYPE_NAME **    DataTypeName
     );
 
 /* Type of IR objects. */

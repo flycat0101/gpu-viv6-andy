@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -702,6 +702,7 @@ _LoadBuiltInUniformState(
         /* Create the struct field: near, far, diff */
         status = sloCOMPILER_CreateNameSpace(Compiler,
                                              gcvNULL,
+                                             slvNAME_SPACE_STRUCT,
                                              &fieldNameSpace);
 
         if (gcmIS_ERROR(status)) break;
@@ -864,7 +865,7 @@ _LoadBuiltInVariablesForIOBlock(
     gctUINT                         i;
     slsNAME *                       field, *blockName, *instanceName, *memberName;
     slsBUILT_IN_VARIABLE *          fieldVar = Variable.fieldVariables;
-    sltPOOL_STRING                  fieldSymbol;
+    sltPOOL_STRING                  symbol;
     gctPOINTER                      pointer = gcvNULL;
     slsFieldDecl *                  fieldDecl;
     slsDATA_TYPE *                  blockDataType, *instanceDataType, *fieldDataType;
@@ -874,6 +875,8 @@ _LoadBuiltInVariablesForIOBlock(
     slsINTERFACE_BLOCK_MEMBER *     blockMember;
 
     gcmONERROR(sloCOMPILER_CreateAuxGlobalNameSpace(Compiler,
+                                                    gcvNULL,
+                                                    slvNAME_SPACE_IO_BLOCK,
                                                     &blockNameSpace));
 
     /* Create the filed name. */
@@ -881,7 +884,7 @@ _LoadBuiltInVariablesForIOBlock(
     {
         gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler,
                                                   fieldVar[i].symbol,
-                                                  &fieldSymbol));
+                                                  &symbol));
 
         gcmONERROR(sloCOMPILER_CreateDataType(Compiler,
                                               fieldVar[i].type,
@@ -893,7 +896,7 @@ _LoadBuiltInVariablesForIOBlock(
                                           0,
                                           slvFIELD_NAME,
                                           fieldDataType,
-                                          fieldSymbol,
+                                          symbol,
                                           slvEXTENSION_NONE,
                                           gcvFALSE,
                                           &field));
@@ -915,6 +918,7 @@ _LoadBuiltInVariablesForIOBlock(
                                           T_IO_BLOCK,
                                           blockNameSpace,
                                           &blockDataType));
+    blockDataType->qualifiers.storage = Variable.qualifier;
 
     gcmONERROR(sloCOMPILER_GetDefaultLayout(Compiler,
                                             defaultLayout,
@@ -927,33 +931,32 @@ _LoadBuiltInVariablesForIOBlock(
 
     gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler,
                                               Variable.blockSymbol,
-                                              &fieldSymbol));
+                                              &symbol));
 
     status = slsNAME_SPACE_Search(Compiler,
                                   sloCOMPILER_GetCurrentSpace(Compiler),
-                                  fieldSymbol,
+                                  symbol,
+                                  slsNAME_SPACE_CheckBlockNameForTheSameInterface,
+                                  blockDataType,
                                   gcvFALSE,
                                   gcvFALSE,
                                   &blockName);
 
+    /* There can be two blocks with the same name for a shader interface. */
     if (status == gcvSTATUS_OK)
     {
-        blockName->dataType = blockDataType;
-    }
-    else
-    {
-        gcmONERROR(sloCOMPILER_CreateName(Compiler,
-                                          0,
-                                          0,
-                                          slvINTERFACE_BLOCK_NAME,
-                                          blockDataType,
-                                          fieldSymbol,
-                                          slvEXTENSION_NONE,
-                                          gcvFALSE,
-                                          &blockName));
+        gcmASSERT(gcvFALSE);
     }
 
-    addMember = slsDLINK_LIST_IsEmpty(&blockName->u.interfaceBlockContent.members);
+    gcmONERROR(sloCOMPILER_CreateName(Compiler,
+                                      0,
+                                      0,
+                                      slvINTERFACE_BLOCK_NAME,
+                                      blockDataType,
+                                      symbol,
+                                      slvEXTENSION_NONE,
+                                      gcvFALSE,
+                                      &blockName));
 
     /* Create the instance name if needed. */
     if (Variable.symbol != gcvNULL)
@@ -971,14 +974,14 @@ _LoadBuiltInVariablesForIOBlock(
 
         gcmONERROR(sloCOMPILER_AllocatePoolString(Compiler,
                                                   Variable.symbol,
-                                                  &fieldSymbol));
+                                                  &symbol));
 
         gcmONERROR(sloCOMPILER_CreateName(Compiler,
                                           0,
                                           0,
                                           slvVARIABLE_NAME,
                                           instanceDataType,
-                                          fieldSymbol,
+                                          symbol,
                                           slvEXTENSION_NONE,
                                           gcvFALSE,
                                           &instanceName));
@@ -996,29 +999,10 @@ _LoadBuiltInVariablesForIOBlock(
     }
 
     /* Create ALL IO block members. */
+    addMember = slsDLINK_LIST_IsEmpty(&blockName->u.interfaceBlockContent.members);
     FOR_EACH_DLINK_NODE(&(blockName->dataType->fieldSpace->names), slsNAME, field)
     {
-        if (Variable.symbol == gcvNULL)
-        {
-           /* make field global scope */
-           gcmONERROR(slsNAME_SPACE_CreateName(Compiler,
-                                               blockName->mySpace,
-                                               0,
-                                               0,
-                                               slvVARIABLE_NAME,
-                                                 field->dataType,
-                                               field->symbol,
-                                               field->isBuiltIn,
-                                               field->extension,
-                                               gcvTRUE,
-                                               &memberName));
-            memberName->u.variableInfo.interfaceBlock = blockName;
-        }
-        else
-        {
-            memberName = field;
-        }
-
+        memberName = field;
         memberName->dataType->qualifiers.storage = qualifier;
 
         if (addMember)
@@ -1418,6 +1402,7 @@ _LoadBuiltInFunctions(
         status = sloCOMPILER_CreateNameSpace(
                                             Compiler,
                                             symbolInPool,
+                                            slvNAME_SPACE_FUNCTION,
                                             &funcName->u.funcInfo.localSpace);
 
         if (gcmIS_ERROR(status)) break;
@@ -1585,6 +1570,7 @@ _LoadIntrinsicBuiltInFunctions(
 
         status = sloCOMPILER_CreateNameSpace(Compiler,
                                              symbolInPool,
+                                             slvNAME_SPACE_FUNCTION,
                                              &funcName->u.funcInfo.localSpace);
 
         if (gcmIS_ERROR(status)) break;
@@ -1963,7 +1949,8 @@ slGetBuiltInVariableImplSymbol(
     {
         for (i = 0; i < VSBuiltInVariableCount; i++)
         {
-            if (gcmIS_SUCCESS(gcoOS_StrCmp(VSBuiltInVariables[i].symbol, Symbol)))
+            if (VSBuiltInVariables[i].symbol &&
+                gcmIS_SUCCESS(gcoOS_StrCmp(VSBuiltInVariables[i].symbol, Symbol)))
             {
                 *ImplSymbol     = VSBuiltInVariables[i].implSymbol;
                 *ImplQualifier  = VSBuiltInVariables[i].implQualifier;
@@ -1985,7 +1972,8 @@ slGetBuiltInVariableImplSymbol(
     {
         for (i = 0; i < FSBuiltInVariableCount; i++)
         {
-            if (gcmIS_SUCCESS(gcoOS_StrCmp(FSBuiltInVariables[i].symbol, Symbol)))
+            if (FSBuiltInVariables[i].symbol &&
+                gcmIS_SUCCESS(gcoOS_StrCmp(FSBuiltInVariables[i].symbol, Symbol)))
             {
                 *ImplSymbol     = FSBuiltInVariables[i].implSymbol;
                 *ImplQualifier  = FSBuiltInVariables[i].implQualifier;
@@ -2007,7 +1995,8 @@ slGetBuiltInVariableImplSymbol(
     {
         for (i = 0; i < CSBuiltInVariableCount; i++)
         {
-            if (gcmIS_SUCCESS(gcoOS_StrCmp(CSBuiltInVariables[i].symbol, Symbol)))
+            if (CSBuiltInVariables[i].symbol &&
+                gcmIS_SUCCESS(gcoOS_StrCmp(CSBuiltInVariables[i].symbol, Symbol)))
             {
                 *ImplSymbol     = CSBuiltInVariables[i].implSymbol;
                 *ImplQualifier  = CSBuiltInVariables[i].implQualifier;
@@ -2029,7 +2018,8 @@ slGetBuiltInVariableImplSymbol(
     {
         for (i = 0; i < TCSBuiltInVariableCount; i++)
         {
-            if (gcmIS_SUCCESS(gcoOS_StrCmp(TCSBuiltInVariables[i].symbol, Symbol)))
+            if (TCSBuiltInVariables[i].symbol &&
+                gcmIS_SUCCESS(gcoOS_StrCmp(TCSBuiltInVariables[i].symbol, Symbol)))
             {
                 *ImplSymbol     = TCSBuiltInVariables[i].implSymbol;
                 *ImplQualifier  = TCSBuiltInVariables[i].implQualifier;
@@ -2051,7 +2041,8 @@ slGetBuiltInVariableImplSymbol(
     {
         for (i = 0; i < TESBuiltInVariableCount; i++)
         {
-            if (gcmIS_SUCCESS(gcoOS_StrCmp(TESBuiltInVariables[i].symbol, Symbol)))
+            if (TESBuiltInVariables[i].symbol &&
+                gcmIS_SUCCESS(gcoOS_StrCmp(TESBuiltInVariables[i].symbol, Symbol)))
             {
                 *ImplSymbol     = TESBuiltInVariables[i].implSymbol;
                 *ImplQualifier  = TESBuiltInVariables[i].implQualifier;
@@ -2073,7 +2064,8 @@ slGetBuiltInVariableImplSymbol(
     {
         for (i = 0; i < GSBuiltInVariableCount; i++)
         {
-            if (gcmIS_SUCCESS(gcoOS_StrCmp(GSBuiltInVariables[i].symbol, Symbol)))
+            if (GSBuiltInVariables[i].symbol &&
+                gcmIS_SUCCESS(gcoOS_StrCmp(GSBuiltInVariables[i].symbol, Symbol)))
             {
                 *ImplSymbol     = GSBuiltInVariables[i].implSymbol;
                 *ImplQualifier  = GSBuiltInVariables[i].implQualifier;
@@ -8957,8 +8949,8 @@ _GenPow8Code(
     )
 {
     gceSTATUS       status;
-    slsIOPERAND *   intermIOperands;
-    slsROPERAND *   intermROperands;
+    slsIOPERAND *   intermIOperands = gcvNULL;
+    slsROPERAND *   intermROperands = gcvNULL;
 
     gcmHEADER();
 
@@ -8978,14 +8970,9 @@ _GenPow8Code(
         return status;
     }
 
-    status = gcoOS_Allocate(gcvNULL,
-                                    2 * sizeof(slsROPERAND),
-                                    (gctPOINTER *)&intermROperands);
-    if (gcmIS_ERROR(status))
-    {
-        gcmFOOTER();
-        return status;
-    }
+    gcmONERROR(gcoOS_Allocate(gcvNULL,
+                              2 * sizeof(slsROPERAND),
+                              (gctPOINTER *)&intermROperands));
 
     /* mul t0, x, x */
     slsIOPERAND_New(Compiler,
@@ -9030,21 +9017,15 @@ _GenPow8Code(
                                     intermROperands + 1,
                                     intermROperands + 1));
 
+OnError:
     gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, intermIOperands));
     gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, intermROperands));
 
+    /* Return the status. */
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
-
-OnError:
-    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, intermIOperands));
-    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, intermROperands));
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-
 }
 
 typedef gceSTATUS
@@ -15026,7 +15007,7 @@ _EvaluateDeterminant(
 {
     gceSTATUS  status = gcvSTATUS_OK;
     gctUINT8 columnCount;
-#if gcdDEBUG
+#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
     gctUINT8 rowCount;
 #endif
     sluCONSTANT_VALUE det;
@@ -15038,7 +15019,7 @@ _EvaluateDeterminant(
     gcmASSERT(OperandConstants);
 
     columnCount = (gctUINT8)slmDATA_TYPE_matrixColumnCount_GET(OperandConstants[0]->exprBase.dataType);
-#if gcdDEBUG
+#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
     rowCount = (gctUINT8)slmDATA_TYPE_matrixRowCount_GET(OperandConstants[0]->exprBase.dataType);
 #endif
     gcmASSERT(columnCount == rowCount);
@@ -15090,7 +15071,7 @@ _GenDeterminantCode(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT8 columnCount;
-#if gcdDEBUG
+#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
     gctUINT8 rowCount;
 #endif
 
@@ -15104,7 +15085,7 @@ _GenDeterminantCode(
     gcmASSERT(IOperand);
 
     columnCount = (gctUINT8)gcGetMatrixDataTypeColumnCount(OperandsParameters->rOperands[0].dataType);
-#if gcdDEBUG
+#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
     rowCount = (gctUINT8)gcGetMatrixDataTypeRowCount(OperandsParameters->rOperands[0].dataType);
 #endif
     gcmASSERT(columnCount == rowCount);
@@ -16621,6 +16602,8 @@ _GenFtransformCode(
                                 Compiler,
                                 sloCOMPILER_GetBuiltInSpace(Compiler),
                                 position_pool,
+                                gcvNULL,
+                                gcvNULL,
                                 gcvTRUE,
                                 gcvFALSE,
                                 &position));
@@ -16629,6 +16612,8 @@ _GenFtransformCode(
                                 Compiler,
                                 sloCOMPILER_GetBuiltInSpace(Compiler),
                                 matrix_pool,
+                                gcvNULL,
+                                gcvNULL,
                                 gcvTRUE,
                                 gcvFALSE,
                                 &matrix));

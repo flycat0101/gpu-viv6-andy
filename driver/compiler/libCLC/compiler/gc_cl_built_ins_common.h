@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -3713,14 +3713,16 @@ _GenSignBitCode(
                               31);
        {
           cltELEMENT_TYPE copyTypeI = IOperand->dataType.elementType;
+          cltELEMENT_TYPE copyType2 = OperandsParameters[0].rOperands[0].dataType.elementType;
           /*For vector, signbit(-2.0, 1.0) = {-1, 0}, for scalar, signbit(-2.0) = 1 */
           if(clmGEN_CODE_IsVectorDataType(OperandsParameters[0].dataTypes[0].def)){
-                IOperand->dataType.elementType = clvTYPE_INT;
+              IOperand->dataType.elementType = clvTYPE_INT;
           }
           else{
               IOperand->dataType.elementType = clvTYPE_UINT;
           }
-           status = clGenShiftExprCode(Compiler,
+          OperandsParameters[0].rOperands[0].dataType.elementType = clvTYPE_UINT;
+          status = clGenShiftExprCode(Compiler,
                                     PolynaryExpr->exprBase.base.lineNo,
                                     PolynaryExpr->exprBase.base.stringNo,
                                     clvOPCODE_RSHIFT,
@@ -3728,6 +3730,7 @@ _GenSignBitCode(
                                     &OperandsParameters[0].rOperands[0],
                                     &rshftROperand);
           IOperand->dataType.elementType = copyTypeI;
+          OperandsParameters[0].rOperands[0].dataType.elementType = copyType2;
       }
     return gcvSTATUS_OK;
 }
@@ -4635,34 +4638,26 @@ _GenShufflePtrCode(
 
         src[0] = OperandsParameters[0].rOperands[0];
         mask[0] = OperandsParameters[1].rOperands[0];
-        if(OperandsParameters[0].dataTypes[0].byteOffset) {
-            clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                    clmGenCodeDataType(T_UINT),
-                                                    (gctUINT)OperandsParameters[0].dataTypes[0].byteOffset);
-
+        if(!clIsIntegerZero(&OperandsParameters[0].dataTypes[0].byteOffset)) {
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
                                              clvOPCODE_ADD,
                                              srcIOperand,
                                              src,
-                                             addressOffset);
+                                             &OperandsParameters[0].dataTypes[0].byteOffset);
             if (gcmIS_ERROR(status)) return status;
             clsROPERAND_InitializeUsingIOperand(src, srcIOperand);
         }
 
-        if(OperandsParameters[1].dataTypes[0].byteOffset) {
-            clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                    clmGenCodeDataType(T_UINT),
-                                                    (gctUINT)OperandsParameters[1].dataTypes[0].byteOffset);
-
+        if(!clIsIntegerZero(&OperandsParameters[1].dataTypes[0].byteOffset)) {
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
                                              clvOPCODE_ADD,
                                              maskIOperand,
                                              mask,
-                                             addressOffset);
+                                             &OperandsParameters[1].dataTypes[0].byteOffset);
             if (gcmIS_ERROR(status)) return status;
             clsROPERAND_InitializeUsingIOperand(mask, maskIOperand);
         }
@@ -4746,29 +4741,22 @@ _GenShufflePtrCode(
         clsGEN_CODE_DATA_TYPE componentDataType;
         clsLOPERAND tempLOperand, destLOperands[16];
 
-        clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                clmGenCodeDataType(T_UINT),
-                                                OperandsParameters[0].dataTypes[0].byteOffset);
-
         status = clGenGenericCode2(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
                                    PolynaryExpr->exprBase.base.stringNo,
                                    clvOPCODE_LOAD,
                                    srcIOperand,
                                    &OperandsParameters[0].rOperands[0],
-                                   addressOffset);
+                                   &OperandsParameters[0].dataTypes[0].byteOffset);
         if (gcmIS_ERROR(status)) return status;
 
-        clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                clmGenCodeDataType(T_UINT),
-                                                OperandsParameters[1].dataTypes[0].byteOffset);
         status = clGenGenericCode2(Compiler,
                                        PolynaryExpr->exprBase.base.lineNo,
                                        PolynaryExpr->exprBase.base.stringNo,
                                        clvOPCODE_LOAD,
                                        maskIOperand,
                                        &OperandsParameters[1].rOperands[0],
-                                       addressOffset);
+                                       &OperandsParameters[1].dataTypes[0].byteOffset);
         if (gcmIS_ERROR(status)) return status;
 
         clsROPERAND_InitializeUsingIOperand(src, srcIOperand);
@@ -4974,18 +4962,14 @@ _GenShufflePtr1Code(
         gctSIZE_T byteSize;
 
         src[0] = OperandsParameters[0].rOperands[0];
-        if(OperandsParameters[0].dataTypes[0].byteOffset) {
-            clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                    clmGenCodeDataType(T_UINT),
-                                                    (gctUINT)OperandsParameters[0].dataTypes[0].byteOffset);
-
+        if(!clIsIntegerZero(&OperandsParameters[0].dataTypes[0].byteOffset)) {
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
                                              clvOPCODE_ADD,
                                              srcIOperand,
                                              src,
-                                             addressOffset);
+                                             &OperandsParameters[0].dataTypes[0].byteOffset);
             if (gcmIS_ERROR(status)) return status;
             clsROPERAND_InitializeUsingIOperand(src, srcIOperand);
         }
@@ -5048,16 +5032,13 @@ _GenShufflePtr1Code(
         clsLOPERAND tempLOperand, destLOperands[16];
         clsGEN_CODE_DATA_TYPE operandType;
 
-        clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                clmGenCodeDataType(T_UINT),
-                                                OperandsParameters[0].dataTypes[0].byteOffset);
         status = clGenGenericCode2(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
                                    PolynaryExpr->exprBase.base.stringNo,
                                    clvOPCODE_LOAD,
                                    srcIOperand,
                                    &OperandsParameters[0].rOperands[0],
-                                   addressOffset);
+                                   &OperandsParameters[0].dataTypes[0].byteOffset);
         if (gcmIS_ERROR(status)) return status;
 
         clsROPERAND_InitializeUsingIOperand(src, srcIOperand);
@@ -5431,50 +5412,38 @@ _GenShuffle2PtrCode(
         src1[0] = OperandsParameters[0].rOperands[0];
         src2[0] = OperandsParameters[1].rOperands[0];
         mask[0] = OperandsParameters[2].rOperands[0];
-        if(OperandsParameters[0].dataTypes[0].byteOffset) {
-            clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                    clmGenCodeDataType(T_UINT),
-                                                    (gctUINT)OperandsParameters[0].dataTypes[0].byteOffset);
-
+        if(!clIsIntegerZero(&OperandsParameters[0].dataTypes[0].byteOffset)) {
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
                                              clvOPCODE_ADD,
                                              src1IOperand,
                                              src1,
-                                             addressOffset);
+                                             &OperandsParameters[0].dataTypes[0].byteOffset);
             if (gcmIS_ERROR(status)) return status;
             clsROPERAND_InitializeUsingIOperand(src1, src1IOperand);
         }
 
-        if(OperandsParameters[1].dataTypes[0].byteOffset) {
-            clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                    clmGenCodeDataType(T_UINT),
-                                                    (gctUINT)OperandsParameters[1].dataTypes[0].byteOffset);
-
+        if(!clIsIntegerZero(&OperandsParameters[1].dataTypes[0].byteOffset)) {
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
                                              clvOPCODE_ADD,
                                              src2IOperand,
                                              src2,
-                                             addressOffset);
+                                             &OperandsParameters[1].dataTypes[0].byteOffset);
             if (gcmIS_ERROR(status)) return status;
             clsROPERAND_InitializeUsingIOperand(src2, src2IOperand);
         }
 
-        if(OperandsParameters[2].dataTypes[0].byteOffset) {
-            clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                    clmGenCodeDataType(T_UINT),
-                                                    (gctUINT)OperandsParameters[2].dataTypes[0].byteOffset);
-
+        if(!clIsIntegerZero(&OperandsParameters[2].dataTypes[0].byteOffset)) {
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
                                              clvOPCODE_ADD,
                                              maskIOperand,
                                              mask,
-                                             addressOffset);
+                                             &OperandsParameters[2].dataTypes[0].byteOffset);
             if (gcmIS_ERROR(status)) return status;
             clsROPERAND_InitializeUsingIOperand(mask, maskIOperand);
         }
@@ -5597,40 +5566,31 @@ _GenShuffle2PtrCode(
         clsGEN_CODE_DATA_TYPE componentDataType;
         clsLOPERAND tempLOperand, destLOperands[16];
 
-        clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                clmGenCodeDataType(T_UINT),
-                                                OperandsParameters[0].dataTypes[0].byteOffset);
         status = clGenGenericCode2(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
                                    PolynaryExpr->exprBase.base.stringNo,
                                    clvOPCODE_LOAD,
                                    src1IOperand,
                                    &OperandsParameters[0].rOperands[0],
-                                   addressOffset);
+                                   &OperandsParameters[0].dataTypes[0].byteOffset);
         if (gcmIS_ERROR(status)) return status;
 
-        clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                    clmGenCodeDataType(T_UINT),
-                                                    OperandsParameters[1].dataTypes[0].byteOffset);
         status = clGenGenericCode2(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
                                    PolynaryExpr->exprBase.base.stringNo,
                                    clvOPCODE_LOAD,
                                    src2IOperand,
                                    &OperandsParameters[1].rOperands[0],
-                                   addressOffset);
+                                   &OperandsParameters[1].dataTypes[0].byteOffset);
         if (gcmIS_ERROR(status)) return status;
 
-        clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                clmGenCodeDataType(T_UINT),
-                                                OperandsParameters[2].dataTypes[0].byteOffset);
         status = clGenGenericCode2(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
                                    PolynaryExpr->exprBase.base.stringNo,
                                    clvOPCODE_LOAD,
                                    maskIOperand,
                                    &OperandsParameters[2].rOperands[0],
-                                   addressOffset);
+                                   &OperandsParameters[2].dataTypes[0].byteOffset);
         if (gcmIS_ERROR(status)) return status;
 
         clsROPERAND_InitializeUsingIOperand(src1, src1IOperand);
@@ -5843,34 +5803,26 @@ _GenShuffle2Ptr1Code(
 
         src1[0] = OperandsParameters[0].rOperands[0];
         src2[0] = OperandsParameters[1].rOperands[0];
-        if(OperandsParameters[0].dataTypes[0].byteOffset) {
-            clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                    clmGenCodeDataType(T_UINT),
-                                                    (gctUINT)OperandsParameters[0].dataTypes[0].byteOffset);
-
+        if(!clIsIntegerZero(&OperandsParameters[0].dataTypes[0].byteOffset)) {
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
                                              clvOPCODE_ADD,
                                              src1IOperand,
                                              src1,
-                                             addressOffset);
+                                             &OperandsParameters[0].dataTypes[0].byteOffset);
             if (gcmIS_ERROR(status)) return status;
             clsROPERAND_InitializeUsingIOperand(src1, src1IOperand);
         }
 
-        if(OperandsParameters[1].dataTypes[0].byteOffset) {
-            clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                    clmGenCodeDataType(T_UINT),
-                                                    (gctUINT)OperandsParameters[1].dataTypes[0].byteOffset);
-
+        if(!clIsIntegerZero(&OperandsParameters[1].dataTypes[0].byteOffset)) {
             status = clGenArithmeticExprCode(Compiler,
                                              PolynaryExpr->exprBase.base.lineNo,
                                              PolynaryExpr->exprBase.base.stringNo,
                                              clvOPCODE_ADD,
                                              src2IOperand,
                                              src2,
-                                             addressOffset);
+                                             &OperandsParameters[1].dataTypes[0].byteOffset);
             if (gcmIS_ERROR(status)) return status;
             clsROPERAND_InitializeUsingIOperand(src2, src2IOperand);
         }
@@ -5976,28 +5928,22 @@ _GenShuffle2Ptr1Code(
         clsGEN_CODE_DATA_TYPE componentDataType;
         clsLOPERAND tempLOperand, destLOperands[16];
 
-        clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                clmGenCodeDataType(T_UINT),
-                                                OperandsParameters[0].dataTypes[0].byteOffset);
         status = clGenGenericCode2(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
                                    PolynaryExpr->exprBase.base.stringNo,
                                    clvOPCODE_LOAD,
                                    src1IOperand,
                                    &OperandsParameters[0].rOperands[0],
-                                   addressOffset);
+                                   &OperandsParameters[0].dataTypes[0].byteOffset);
         if (gcmIS_ERROR(status)) return status;
 
-        clsROPERAND_InitializeIntOrIVecConstant(addressOffset,
-                                                clmGenCodeDataType(T_UINT),
-                                                OperandsParameters[1].dataTypes[0].byteOffset);
         status = clGenGenericCode2(Compiler,
                                    PolynaryExpr->exprBase.base.lineNo,
                                    PolynaryExpr->exprBase.base.stringNo,
                                    clvOPCODE_LOAD,
                                    src2IOperand,
                                    &OperandsParameters[1].rOperands[0],
-                                   addressOffset);
+                                   &OperandsParameters[1].dataTypes[0].byteOffset);
         if (gcmIS_ERROR(status)) return status;
 
         clsROPERAND_InitializeUsingIOperand(src1, src1IOperand);

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -580,14 +580,42 @@ GLvoid GL_APIENTRY __glnop_UniformMatrix3fv(__GLcontext *gc, GLint location, GLs
 GLvoid GL_APIENTRY __glnop_UniformMatrix4fv(__GLcontext *gc, GLint location, GLsizei count, GLboolean transpose, const GLfloat* value){}
 GLvoid GL_APIENTRY __glnop_UseProgram(__GLcontext *gc, GLuint program){}
 GLvoid GL_APIENTRY __glnop_ValidateProgram(__GLcontext *gc, GLuint program){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib1d(__GLcontext *gc, GLuint indx, GLdouble x){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib1dv(__GLcontext *gc, GLuint indx, const GLdouble *values){}
 GLvoid GL_APIENTRY __glnop_VertexAttrib1f(__GLcontext *gc, GLuint indx, GLfloat x){}
 GLvoid GL_APIENTRY __glnop_VertexAttrib1fv(__GLcontext *gc, GLuint indx, const GLfloat* values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib1s(__GLcontext *gc, GLuint indx, GLshort x){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib1sv(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib2d(__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib2dv(__GLcontext *gc, GLuint indx, const GLdouble *values){}
 GLvoid GL_APIENTRY __glnop_VertexAttrib2f(__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y){}
 GLvoid GL_APIENTRY __glnop_VertexAttrib2fv(__GLcontext *gc, GLuint indx, const GLfloat* values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib2s(__GLcontext *gc, GLuint indx, GLshort x, GLshort y){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib2sv(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib3d(__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y, GLdouble z){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib3dv(__GLcontext *gc, GLuint indx, const GLdouble *values){}
 GLvoid GL_APIENTRY __glnop_VertexAttrib3f(__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y, GLfloat z){}
 GLvoid GL_APIENTRY __glnop_VertexAttrib3fv(__GLcontext *gc, GLuint indx, const GLfloat* values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib3s(__GLcontext *gc, GLuint indx, GLshort x, GLshort y, GLshort z){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib3sv(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4Nbv(__GLcontext *gc, GLuint indx, const GLbyte * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4Niv(__GLcontext *gc, GLuint indx, const GLint * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4Nsv(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4Nub(__GLcontext *gc, GLuint indx, GLubyte x, GLubyte y, GLubyte z, GLubyte w){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4Nubv(__GLcontext *gc, GLuint indx, const GLubyte * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4Nuiv(__GLcontext *gc, GLuint indx, const GLuint * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4Nusv(__GLcontext *gc, GLuint indx, const GLushort * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4bv(__GLcontext *gc, GLuint indx, const GLbyte * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4d(__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y, GLdouble z, GLdouble w){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4dv(__GLcontext *gc, GLuint indx, const GLdouble *values){}
 GLvoid GL_APIENTRY __glnop_VertexAttrib4f(__GLcontext *gc, GLuint indx, GLfloat x, GLfloat y, GLfloat z, GLfloat w){}
 GLvoid GL_APIENTRY __glnop_VertexAttrib4fv(__GLcontext *gc, GLuint indx, const GLfloat* values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4iv(__GLcontext *gc, GLuint indx, const GLint * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4s(__GLcontext *gc, GLuint indx, GLshort x, GLshort y, GLshort z, GLshort w){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4sv(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4ubv(__GLcontext *gc, GLuint indx, const GLubyte * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4uiv(__GLcontext *gc, GLuint indx, const GLuint * values){}
+GLvoid GLAPIENTRY __glnop_VertexAttrib4usv(__GLcontext *gc, GLuint indx, const GLushort * values){}
 GLvoid GL_APIENTRY __glnop_VertexAttribPointer(__GLcontext *gc, GLuint indx, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const GLvoid* ptr){}
 GLvoid GL_APIENTRY __glnop_Viewport(__GLcontext *gc, GLint x, GLint y, GLsizei width, GLsizei height){}
 
@@ -1300,6 +1328,34 @@ GLvoid GLAPIENTRY __gles(WindowPos3i)(__GLcontext *gc,  GLint x, GLint y, GLint 
 GLvoid GLAPIENTRY __gles(WindowPos3iv)(__GLcontext *gc,  const GLint *v){}
 GLvoid GLAPIENTRY __gles(WindowPos3s)(__GLcontext *gc,  GLshort x, GLshort y, GLshort z){}
 GLvoid GLAPIENTRY __gles(WindowPos3sv)(__GLcontext *gc,  const GLshort *v){}
+GLvoid GLAPIENTRY __gles(VertexAttrib1d)(__GLcontext *gc, GLuint indx, GLdouble x){}
+GLvoid GLAPIENTRY __gles(VertexAttrib1dv)(__GLcontext *gc, GLuint indx, const GLdouble *values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib1s)(__GLcontext *gc, GLuint indx, GLshort x){}
+GLvoid GLAPIENTRY __gles(VertexAttrib1sv)(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib2d)(__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y){}
+GLvoid GLAPIENTRY __gles(VertexAttrib2dv)(__GLcontext *gc, GLuint indx, const GLdouble * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib2s)(__GLcontext *gc, GLuint indx, GLshort x, GLshort y){}
+GLvoid GLAPIENTRY __gles(VertexAttrib2sv)(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib3d)(__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y, GLdouble z){}
+GLvoid GLAPIENTRY __gles(VertexAttrib3dv)(__GLcontext *gc, GLuint indx, const GLdouble * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib3s)(__GLcontext *gc, GLuint indx, GLshort x, GLshort y, GLshort z){}
+GLvoid GLAPIENTRY __gles(VertexAttrib3sv)(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4Nbv)(__GLcontext *gc, GLuint indx, const GLbyte * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4Niv)(__GLcontext *gc, GLuint indx, const GLint * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4Nsv)(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4Nub)(__GLcontext *gc, GLuint indx, GLubyte x, GLubyte y, GLubyte z, GLubyte w){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4Nubv)(__GLcontext *gc, GLuint indx, const GLubyte * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4Nuiv)(__GLcontext *gc, GLuint indx, const GLuint * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4Nusv)(__GLcontext *gc, GLuint indx, const GLushort * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4bv)(__GLcontext *gc, GLuint indx, const GLbyte * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4d)(__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y, GLdouble z, GLdouble w){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4dv)(__GLcontext *gc, GLuint indx, const GLdouble * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4iv)(__GLcontext *gc, GLuint indx, const GLint * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4s)(__GLcontext *gc, GLuint indx, GLshort x, GLshort y, GLshort z, GLshort w){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4sv)(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4ubv)(__GLcontext *gc, GLuint indx, const GLubyte * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4uiv)(__GLcontext *gc, GLuint indx, const GLuint * values){}
+GLvoid GLAPIENTRY __gles(VertexAttrib4usv)(__GLcontext *gc, GLuint indx, const GLushort * values){}
 GLvoid GLAPIENTRY __gles(DrawPixels)(__GLcontext *gc,   GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *pixels ){}
 GLvoid GLAPIENTRY __gles(CopyPixels)(__GLcontext *gc,   GLint x, GLint y,  GLsizei width, GLsizei height, GLenum type ){}
 GLvoid GLAPIENTRY __gles(Indexub)(__GLcontext *gc,   GLubyte c ){}
@@ -1689,7 +1745,7 @@ GLvoid GL_APIENTRY __glim_GetMinmaxParameteriv(__GLcontext *gc,  GLenum target, 
 //GLvoid GL_APIENTRY __glim_MultTransposeMatrixf(__GLcontext *gc,  const GLfloat m[16] ){}
 //GLvoid GL_APIENTRY __glim_CompressedTexImage1D(__GLcontext *gc,  GLenum target, GLint level, GLenum internalformat, GLsizei width, GLint border, GLsizei imageSize, const GLvoid *data ){}
 //GLvoid GL_APIENTRY __glim_CompressedTexSubImage1D(__GLcontext *gc,  GLenum target, GLint level, GLint xoffset, GLsizei width, GLenum format, GLsizei imageSize, const GLvoid *data ){}
-GLvoid GL_APIENTRY __glim_GetCompressedTexImage(__GLcontext *gc,  GLenum target, GLint lod, GLvoid *img ){}
+//GLvoid GL_APIENTRY __glim_GetCompressedTexImage(__GLcontext *gc,  GLenum target, GLint lod, GLvoid *img ){}
 //GLvoid GL_APIENTRY __glim_FogCoordf(__GLcontext *gc, GLfloat coord){}
 //GLvoid GL_APIENTRY __glim_FogCoordfv(__GLcontext *gc, const GLfloat *coord){}
 //GLvoid GL_APIENTRY __glim_FogCoordd(__GLcontext *gc, GLdouble coord){}
@@ -2183,7 +2239,7 @@ GLvoid GL_APIENTRY __glim_MultiDrawElementsIndirectEXT(__GLcontext *gc, GLenum m
 
 GLvoid GL_APIENTRY __glim_GetObjectParameterivARB (__GLcontext *gc, UINT obj, GLenum pname, GLint *params){}
 /* To do */
-GLvoid GLAPIENTRY __glim_GetVertexAttribdv(__GLcontext *gc, GLuint index, GLenum pname, GLdouble* params){}
+//GLvoid GLAPIENTRY __glim_GetVertexAttribdv(__GLcontext *gc, GLuint index, GLenum pname, GLdouble* params){}
 GLvoid GLAPIENTRY __glim_GetQueryObjectiv(__GLcontext *gc, GLuint id, GLenum pname, GLint* params){}
 GLvoid GLAPIENTRY __glim_GetBufferSubData (__GLcontext *gc, GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid* data){}
 GLvoid GLAPIENTRY __glim_DeleteObjectARB (__GLcontext *gc, UINT obj){}
@@ -2404,13 +2460,42 @@ GLvoid GLAPIENTRY __glim_ClampColorARB (__GLcontext *gc, GLenum target, GLenum c
 #define __glle_WindowPos3sv                                           ((__T_WindowPos3sv                                      )__glapi_Nop)
 #define __glle_MapBufferOES                                           ((__T_MapBufferOES                                     )__glapi_Nop)
 #define __glle_UnmapBufferOES                                         ((__T_UnmapBufferOES                                    )__glapi_Nop)
+#define __glle_VertexAttrib1d                                         ((__T_VertexAttrib1d                                    )__glapi_Nop)
+#define __glle_VertexAttrib1dv                                         ((__T_VertexAttrib1dv                                    )__glapi_Nop)
 #define __glle_VertexAttrib1f                                         ((__T_VertexAttrib1f                                    )__glapi_Nop)
 #define __glle_VertexAttrib1fv                                        ((__T_VertexAttrib1fv                                    )__glapi_Nop)
+#define __glle_VertexAttrib1s                                         ((__T_VertexAttrib1s                                    )__glapi_Nop)
+#define __glle_VertexAttrib1sv                                         ((__T_VertexAttrib1sv                                    )__glapi_Nop)
+#define __glle_VertexAttrib2d                                         ((__T_VertexAttrib2d                                    )__glapi_Nop)
+#define __glle_VertexAttrib2dv                                        ((__T_VertexAttrib2dv                                    )__glapi_Nop)
 #define __glle_VertexAttrib2f                                         ((__T_VertexAttrib2f                                    )__glapi_Nop)
 #define __glle_VertexAttrib2fv                                        ((__T_VertexAttrib2fv                                    )__glapi_Nop)
+#define __glle_VertexAttrib2s                                         ((__T_VertexAttrib2s                                    )__glapi_Nop)
+#define __glle_VertexAttrib2sv                                         ((__T_VertexAttrib2sv                                    )__glapi_Nop)
+#define __glle_VertexAttrib3d                                         ((__T_VertexAttrib3d                                    )__glapi_Nop)
+#define __glle_VertexAttrib3dv                                        ((__T_VertexAttrib3dv                                    )__glapi_Nop)
 #define __glle_VertexAttrib3f                                         ((__T_VertexAttrib3f                                    )__glapi_Nop)
 #define __glle_VertexAttrib3fv                                        ((__T_VertexAttrib3fv                                    )__glapi_Nop)
+#define __glle_VertexAttrib3s                                         ((__T_VertexAttrib3s                                    )__glapi_Nop)
+#define __glle_VertexAttrib3sv                                         ((__T_VertexAttrib3sv                                    )__glapi_Nop)
+#define __glle_VertexAttrib4Nbv                                         ((__T_VertexAttrib4Nbv                                   )__glapi_Nop)
+#define __glle_VertexAttrib4Niv                                         ((__T_VertexAttrib4Niv                                   )__glapi_Nop)
+#define __glle_VertexAttrib4Nsv                                         ((__T_VertexAttrib4Nsv                                   )__glapi_Nop)
+#define __glle_VertexAttrib4Nub                                         ((__T_VertexAttrib4Nub                                   )__glapi_Nop)
+#define __glle_VertexAttrib4Nubv                                         ((__T_VertexAttrib4Nubv                                   )__glapi_Nop)
+#define __glle_VertexAttrib4Nuiv                                         ((__T_VertexAttrib4Nuiv                                   )__glapi_Nop)
+#define __glle_VertexAttrib4Nusv                                         ((__T_VertexAttrib4Nusv                                   )__glapi_Nop)
+#define __glle_VertexAttrib4bv                                         ((__T_VertexAttrib4bv                                    )__glapi_Nop)
+#define __glle_VertexAttrib4d                                         ((__T_VertexAttrib4d                                    )__glapi_Nop)
+#define __glle_VertexAttrib4dv                                        ((__T_VertexAttrib4dv                                    )__glapi_Nop)
 #define __glle_VertexAttrib4f                                         ((__T_VertexAttrib4f                                   )__glapi_Nop)
+#define __glle_VertexAttrib4fv                                         ((__T_VertexAttrib4fv                                   )__glapi_Nop)
+#define __glle_VertexAttrib4iv                                         ((__T_VertexAttrib4iv                                   )__glapi_Nop)
+#define __glle_VertexAttrib4s                                         ((__T_VertexAttrib4s                                   )__glapi_Nop)
+#define __glle_VertexAttrib4sv                                         ((__T_VertexAttrib4sv                                   )__glapi_Nop)
+#define __glle_VertexAttrib4ubv                                         ((__T_VertexAttrib4ubv                                   )__glapi_Nop)
+#define __glle_VertexAttrib4uiv                                         ((__T_VertexAttrib4uiv                                   )__glapi_Nop)
+#define __glle_VertexAttrib4usv                                         ((__T_VertexAttrib4usv                                   )__glapi_Nop)
 #define __glle_BindFramebuffer                                        ((__T_BindFramebuffer                                   )__glapi_Nop)
 #define __glle_BindRenderbuffer                                       ((__T_BindRenderbuffer                                 )__glapi_Nop)
 #define __glle_CheckFramebufferStatus                                 ((__T_CheckFramebufferStatus                            )__glapi_Nop)
@@ -3246,9 +3331,9 @@ GLvoid __glOverWriteListCompileTable(__GLcontext *gc)
     __gllc_Table->GetVertexAttribiv = __glim_GetVertexAttribiv;
     __gllc_Table->GetVertexAttribfv = __glim_GetVertexAttribfv;
     /* To do */
-    /*
+
     __gllc_Table->GetVertexAttribdv = __glim_GetVertexAttribdv;
-    */
+
     __gllc_Table->GetUniformiv = __glim_GetUniformiv;
     __gllc_Table->GetUniformfv = __glim_GetUniformfv;
     __gllc_Table->GetUniformLocation = __glim_GetUniformLocation;
@@ -4039,14 +4124,42 @@ GLvoid __gDLDispatch(__GLcontext *gc)
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,UniformMatrix4fv);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,UseProgram);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,ValidateProgram);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib1d);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib1dv);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib1f);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib1fv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib1s);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib1sv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib2d);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib2dv);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib2f);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib2fv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib2s);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib2sv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib3d);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib3dv);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib3f);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib3fv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib3s);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib3sv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4Nbv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4Niv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4Nsv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4Nub);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4Nubv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4Nuiv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4Nusv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4bv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4d);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4dv);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4f);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4fv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4iv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4s);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4sv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4ubv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4uiv);
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttrib4usv);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,VertexAttribPointer);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,Viewport);
 
@@ -4327,8 +4440,9 @@ GLvoid __gDLDispatch(__GLcontext *gc)
 
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,GetObjectParameterivARB);
 /* To do */
+
+    SetDLTABLE((&(gc->listCompileDispatchTable)),(gc->currentImmediateTable) ,GetVertexAttribdv);
 /*
-    SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,GetVertexAttribdv);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,GetQueryObjectiv);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,GetBufferSubData);
     SetDLTABLE((&(gc->listCompileDispatchTable)),(&(gc->apiDispatchTable)) ,DeleteObjectARB);

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1455,6 +1455,7 @@ _CreateDummyUniformInfo(
     gctCHAR                   name[64];
     gcSHADER_TYPE             type;
     gctUINT                   offset;
+    gctINT16                  dummyUniformIndex = (gctINT16)Optimizer->shader->_dummyUniformCount;
 
     gcmHEADER();
 
@@ -1467,14 +1468,18 @@ _CreateDummyUniformInfo(
                            "#sh%d__ltc_uniform_%d", /* private (internal)
                                                        * uniform starts with '#' */
                            Optimizer->shader->_id,
-                           Optimizer->shader->_dummyUniformCount++));
+                           dummyUniformIndex));
     /* add uniform */
     type = _MapTargetFormatToShaderType(Code, ComponentMap);
     gcmONERROR(gcSHADER_AddUniformEx(Optimizer->shader, name,
                                    type, Precision, 1 /* Length */, &uniform));
     SetUniformFlag(uniform, gcvUNIFORM_FLAG_LOADTIME_CONSTANT);
     SetUniformFlag(uniform, gcvUNIFORM_FLAG_COMPILER_GEN);
+    setUniformDummyUniformIndex(uniform, dummyUniformIndex);
     *DummyUniformPtr = uniform;
+
+    Optimizer->shader->_dummyUniformCount++;
+
     gcmFOOTER();
     return status;
 
@@ -1845,7 +1850,7 @@ _CloneLTCExpressionToShader(
                 /* check the source index register */
                 if (!isSourceProcessed(processedSourceMap, i, j) )
                 {
-                        gcmASSERT(gcvFALSE);
+                        /* gcmASSERT(gcvFALSE); */
                         status = gcvSTATUS_INVALID_DATA;
                         break;
                 }
@@ -1854,7 +1859,7 @@ _CloneLTCExpressionToShader(
                 {
                     if (!isSourceIndexProcessed(processedSourceMap, i, j))
                     {
-                        gcmASSERT(gcvFALSE);
+                        /* gcmASSERT(gcvFALSE); */
                         status = gcvSTATUS_INVALID_DATA;
                         break;
                     }
@@ -1867,7 +1872,7 @@ _CloneLTCExpressionToShader(
                 {
                     if (!isSourceIndexProcessed(processedSourceMap, i, j))
                     {
-                        gcmASSERT(gcvFALSE);
+                        /* gcmASSERT(gcvFALSE); */
                         status = gcvSTATUS_INVALID_DATA;
                         break;
                     }

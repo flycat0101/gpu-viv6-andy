@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2626,7 +2626,6 @@ void ConvertImage(_VGContext *context, _VGImage *image, _VGColorFormat format)
     gcmHEADER_ARG("context=0x%x image=0x%x format=%d",
                    context, image, format);
 
-    /*TODO:now only for the filter function*/
     if (context->filterChannelMask == (VG_ALPHA  |VG_RED | VG_GREEN | VG_BLUE))
     {
         gcmFOOTER_NO();
@@ -3073,7 +3072,6 @@ void  vgGaussianBlur(VGImage dst, VGImage src, VGfloat stdDeviationX, VGfloat st
         expScaleY = -1.0f / (2.0f * sy * sy);
 
 
-        /*TODO:do better*/
         if (context->targetImage.height > 64 || context->targetImage.width > 64)
         {
             if (sx < 6.0f && sx > 2.0f)
@@ -3760,8 +3758,6 @@ vgCreateEGLImageTargetKHR(VGeglImageKHR inImage)
         gcmFOOTER_ARG("return=%d", VG_INVALID_HANDLE);
         return VG_INVALID_HANDLE;
     }
-    /*TODO: Check the format.*/
-
     /*Create the vgimage object.*/
     NEWOBJ(_VGImage, context->os, image);
 

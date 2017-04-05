@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -30,7 +30,6 @@ static struct EGL_CONFIG_COLOR eglConfigColor[] =
     { 16, 12, 4, 4, 4, 0, VEGL_444  },  /* X4R4G4B4 */
     { 16, 16, 4, 4, 4, 4, VEGL_4444 },  /* A4R4G4B4 */
     { 16, 15, 5, 5, 5, 0, VEGL_555  },  /* X1R5G5B5 */
-    { 16, 16, 5, 5, 5, 1, VEGL_5551 },  /* A1R5G5B5 */
 #endif
     { 16, 16, 5, 6, 5, 0, VEGL_565  },  /* R5G6B5   */
     { 32, 24, 8, 8, 8, 0, VEGL_888  },  /* X8R8G8B8 */
@@ -81,7 +80,8 @@ static struct eglExtension extensions[] =
 
 static void
 _GenExtension(
-    VEGLThreadData Thread
+    VEGLThreadData Thread,
+    VEGLDisplay Display
     )
 {
     char * str;
@@ -91,6 +91,12 @@ _GenExtension(
 #if defined(__linux__)
     extensions[VEGL_EXTID_EXT_image_dma_buf_import].enabled = EGL_TRUE;
     extensions[VEGL_EXTID_EXT_client_extensions].enabled    = EGL_TRUE;
+
+    if (Display->platform->platform == EGL_PLATFORM_FBDEV_VIV ||
+        Display->platform->platform == EGL_PLATFORM_WAYLAND_KHR)
+    {
+        extensions[VEGL_EXTID_EXT_buffer_age].enabled          = EGL_TRUE;
+    }
 #endif
 
 #if defined(ANDROID)
@@ -145,7 +151,7 @@ _GenExtension(
 
     /* Remove the tail space. */
     str[len - 2] = '\0';
-    Thread->extString = str;
+    Display->extString = str;
 }
 
 static const char clientExtension[] =
@@ -206,14 +212,6 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID reserved)
     {
     case DLL_PROCESS_DETACH:
     case DLL_THREAD_DETACH:
-        {
-            gcsTLS_PTR tls = gcvNULL;
-            gcoOS_QueryTLS(&tls);
-            if (tls)
-            {
-                tls->destructor = gcvNULL;
-            }
-        }
         break;
 
     default:
@@ -320,6 +318,10 @@ _FillIn(
 {
     VEGLConfig config;
     VEGLThreadData thread = veglGetThreadData();
+#if defined(ANDROID)
+    gctSTRING esVersion = gcvNULL;
+    gcePATCH_ID patchId   = gcvPATCH_INVALID;
+#endif
 
     if (thread == gcvNULL)
     {
@@ -412,7 +414,7 @@ _FillIn(
         if (patchId == gcvPATCH_GTFES30)
         {
             gctSTRING env;
-            gctINT enableAllConfig = 1;
+            gctINT enableAllConfig = 0;
             static gctBOOL printed = gcvFALSE;
             gcoOS_GetEnv(gcvNULL, "VIV_EGL_ALL_CONFIG", &env);
             if (env)
@@ -426,12 +428,10 @@ _FillIn(
                     gcmPRINT("EGL: enable default configs for conformance test");
                     printed = gcvTRUE;
                 }
-                /* Only enable RGBA8888/RGB565 + D24S8 for ES2/ES3 context to reduce ES CTS running time */
-                if (!((Color->formatFlags & VEGL_8888) == VEGL_8888 ||
-                      (Color->formatFlags & VEGL_565) == VEGL_565
-                     ) ||
-                 !(config->depthSize == 24 && config->stencilSize == 8)
-                )
+
+                /* Only enable RGBA8888/D24S8 and RGB565/D0S0 for ES2/ES3 context to reduce ES CTS running time */
+                if (!((Color->formatFlags & VEGL_8888) == VEGL_8888 && config->depthSize == 24 && config->stencilSize == 8) &&
+                    !((Color->formatFlags & VEGL_565) == VEGL_565 && config->depthSize == 0 && config->stencilSize == 0))
                 {
                     config->renderableType &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR);
                     config->conformant     &= ~(EGL_OPENGL_ES2_BIT | EGL_OPENGL_ES3_BIT_KHR);
@@ -448,6 +448,17 @@ _FillIn(
 
 #if gcdENABLE_3D
     if (!(gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI0)))
+    {
+        config->renderableType &= ~EGL_OPENGL_ES3_BIT_KHR;
+        config->conformant     &= ~EGL_OPENGL_ES3_BIT_KHR;
+    }
+#endif
+
+#if defined(ANDROID)
+    gcoHAL_GetPatchID(gcvNULL, &patchId);
+    if (((patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
+        && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
+        esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072"))))
     {
         config->renderableType &= ~EGL_OPENGL_ES3_BIT_KHR;
         config->conformant     &= ~EGL_OPENGL_ES3_BIT_KHR;
@@ -503,7 +514,6 @@ _FillIn(
     {
         /* Determing the number of samples required for OpenVG. */
 
-        /* TODO: Need to get rid of depth for OpenVG. */
         if (
 #if NO_STENCIL_VG
             (Depth->stencilSize == 0 && Depth->depthSize == 16) &&
@@ -514,11 +524,18 @@ _FillIn(
             ((Color->formatFlags & VEGL_8888) == VEGL_8888) ||
             ((Color->formatFlags & VEGL_888) == VEGL_888)))
         {
-            config->renderableType |= EGL_OPENVG_BIT;
+            if (!gcoOS_DetectProcessByName("\x98\x9a\x91\x9a\x8d\x9e\x8b\x90\x8d"))
+            {
+                config->renderableType |= EGL_OPENVG_BIT;
+            }
 
             /* Why? 3D OpenVG does not support color format with alpha channel. */
             if (((Color->formatFlags & VEGL_ALPHA) == 0) && (Samples >= thread->maxSamples))
             {
+                if (gcoOS_DetectProcessByName("\x98\x9a\x91\x9a\x8d\x9e\x8b\x90\x8d"))
+                {
+                    config->renderableType |= EGL_OPENVG_BIT;
+                }
                 config->conformant  |= EGL_OPENVG_BIT;
                 config->surfaceType |= EGL_VG_ALPHA_FORMAT_PRE_BIT
                                     |  EGL_VG_COLORSPACE_LINEAR_BIT;
@@ -652,6 +669,40 @@ _AttribValue(
                      : attribList[index];
 }
 
+static const struct
+{
+    gctSTRING name;
+    VEGLPlatform (* platformGetFunc)(void *native_display);
+}
+_SupportedPlatforms[] =
+{
+#if defined(WIN32) || defined(UNDER_CE)
+    {"win32",   veglGetWin32Platform},
+#endif
+#if defined(ANDROID)
+    {"android", veglGetAndroidPlatform},
+#endif
+#if defined(X11)
+    {"x11",     veglGetX11Platform},
+#endif
+#if defined(WL_EGL_PLATFORM)
+    {"wayland", veglGetWaylandPlatform},
+#endif
+#if defined(__GBM__)
+    {"gbm",     veglGetGbmPlatform},
+#endif
+#if defined(__QNXNTO__)
+    {"qnx",     veglGetQnxPlatform},
+#endif
+#if defined(EGL_API_DFB)
+    {"dfb",     veglGetDfbPlatform},
+#endif
+#if defined(EGL_API_FB)
+    {"fbdev",   veglGetFbdevPlatform},
+#endif
+    {"nullws",  veglGetNullwsPlatform},
+};
+
 static EGLDisplay
 veglGetPlatformDisplay(
     EGLenum platform,
@@ -665,6 +716,9 @@ veglGetPlatformDisplay(
     gctBOOL releaseDpy = gcvFALSE;
     void * nativeScreen = gcvNULL;
     VEGLPlatform eglPlatform = gcvNULL;
+    gctSTRING platEnv = gcvNULL;
+
+    gcoOS_GetEnv(gcvNULL, "VIV_EGL_PLATFORM", &platEnv);
 
     gcoOS_LockPLS();
     _SetTraceMode();
@@ -761,25 +815,40 @@ veglGetPlatformDisplay(
         /*
          * Default platform called by eglGetDisplay.
          */
-#if defined(WIN32) || defined(UNDER_CE)
-        eglPlatform = veglGetWin32Platform(native_display);
-#elif defined(ANDROID)
-        eglPlatform = veglGetAndroidPlatform(native_display);
-#elif defined(X11)
-        eglPlatform = veglGetX11Platform(native_display);
-#elif defined(WL_EGL_PLATFORM)
-        eglPlatform = veglGetWaylandPlatform(native_display);
-#elif defined(__GBM__)
-        eglPlatform = veglGetGbmPlatform(native_display);
-#elif defined(__QNXNTO__)
-        eglPlatform = veglGetQnxPlatform(native_display);
-#elif defined(EGL_API_DFB)
-        eglPlatform = veglGetDfbPlatform(native_display);
-#elif defined(EGL_API_FB)
-        eglPlatform = veglGetFbdevPlatform(native_display);
-#else
-        eglPlatform = veglGetNullwsPlatform(native_display);
-#endif
+        if (platEnv != gcvNULL)
+        {
+            gctSIZE_T i;
+
+            for (i = 0; i < gcmCOUNTOF(_SupportedPlatforms); i++)
+            {
+                if (!gcoOS_StrCmp(_SupportedPlatforms[i].name, platEnv))
+                {
+                    eglPlatform =
+                        _SupportedPlatforms[i].platformGetFunc(native_display);
+                    break;
+                }
+            }
+
+            if (!eglPlatform)
+            {
+                gcmPRINT("eglGetDisplay: platform '%s' not supported", platEnv);
+                gcmPRINT("Available platforms are:");
+                for (i = 0; i < gcmCOUNTOF(_SupportedPlatforms); i++)
+                {
+                    gcmPRINT("  %s", _SupportedPlatforms[i].name);
+                }
+
+                veglSetEGLerror(thread, EGL_BAD_PARAMETER);
+                gcoOS_UnLockPLS();
+                return EGL_NO_DISPLAY;
+            }
+        }
+        else
+        {
+            /* Use the first supported platform. */
+            eglPlatform =
+                _SupportedPlatforms[0].platformGetFunc(native_display);
+        }
         break;
 
 
@@ -996,7 +1065,7 @@ eglGetDisplay(
     VEGL_TRACE_API_PRE(GetDisplay)(display_id);
 
     /* Call GetPlatformDisplay with default platform. */
-    dpy = veglGetPlatformDisplay(0, (void *) display_id, gcvNULL, EGL_TRUE);
+    dpy = veglGetPlatformDisplay(0, gcmINT2PTR(display_id), gcvNULL, EGL_TRUE);
 
     VEGL_TRACE_API_POST(GetDisplay)(display_id, dpy);
     gcmDUMP_API("${EGL eglGetDisplay 0x%08X := 0x%08X}", display_id, dpy);
@@ -1209,7 +1278,9 @@ veglInitilizeDisplay(
     gctBOOL enableMSAAx2 = gcvFALSE;
 
     if (Display->initialized)
+    {
         return EGL_TRUE;
+    }
 
     do
     {
@@ -1632,6 +1703,12 @@ veglTerminateDisplay(
         Display->configCount = 0;
     }
 
+    if (Display->extString)
+    {
+        gcoOS_Free(gcvNULL, Display->extString);
+        Display->extString = gcvNULL;
+    }
+
     Display->platform->deinitLocalDisplayInfo(Display);
 
     Display->initialized = gcvFALSE;
@@ -1676,6 +1753,9 @@ eglInitialize(
         gcmFOOTER_ARG("%d", EGL_FALSE);
         return EGL_FALSE;
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     VEGL_LOCK_DISPLAY(dpy);
 
@@ -1762,6 +1842,9 @@ eglTerminate(
         gcmFOOTER_ARG("%d", EGL_FALSE);
         return EGL_FALSE;
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     VEGL_LOCK_DISPLAY(dpy);
 
@@ -1885,6 +1968,9 @@ eglQueryString(
             gcmONERROR(gcvSTATUS_INVALID_DATA);
         }
 
+        /* Hardware relevant thread data initialization. */
+        veglInitDeviceThreadData(thread);
+
         switch (name)
         {
         case EGL_CLIENT_APIS:
@@ -1907,12 +1993,12 @@ eglQueryString(
             break;
 
         case EGL_EXTENSIONS:
-            if (!thread->extString)
+            if (!dpy->extString)
             {
-                _GenExtension(thread);
+                _GenExtension(thread, dpy);
             }
 
-            ptr = thread->extString;
+            ptr = dpy->extString;
             break;
 
         case EGL_VENDOR:

@@ -75,7 +75,6 @@ typedef struct _XF86DRISAREAFrame {
 typedef struct _XF86DRISAREA {
     /** first thing is always the DRM locking structure */
     drmLock            lock;
-    /** \todo Use readers/writer lock for drawable_lock */
     drmLock            drawable_lock;
     XF86DRISAREADrawableRec     drawableTable[SAREA_MAX_DRAWABLES];
     XF86DRISAREAFrameRec        frame;

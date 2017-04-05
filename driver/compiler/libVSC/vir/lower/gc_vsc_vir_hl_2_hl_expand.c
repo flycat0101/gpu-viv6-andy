@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -211,14 +211,18 @@ _AddGeneralVariable(
 
         if (Location)
         {
-            location = _EvaluateLocation(Shader,
-                                         Symbol,
-                                         Type,
-                                         VariableKind,
-                                         StorageClass,
-                                         Location);
+            location = *Location;
         }
         VIR_Symbol_SetLocation(sym, location);
+        if (Location)
+        {
+            _EvaluateLocation(Shader,
+                Symbol,
+                Type,
+                VariableKind,
+                StorageClass,
+                Location);
+        }
         VIR_Symbol_SetPrecision(sym, VIR_Symbol_GetPrecision(Symbol));
 
         switch (VariableKind)
@@ -242,13 +246,14 @@ _AddGeneralVariable(
                     VIR_FieldInfo *fInfo = VIR_Symbol_GetFieldInfo(Symbol);
                     VIR_Symbol_SetUniformKind(sym, VIR_UNIFORM_PUSH_CONSTANT);
                     VIR_Symbol_SetLayoutOffset(sym, VIR_FieldInfo_GetOffset(fInfo));
-                    VIR_Symbol_SetFlag(sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
+                    flags = flags | VIR_SYMUNIFORMFLAG_USED_IN_SHADER;
                 }
                 else
                 {
                     VIR_Symbol_SetUniformKind(sym, VIR_UNIFORM_NORMAL);
                 }
                 VIR_Symbol_SetFlag(sym, flags | SymFlag);
+                VIR_Symbol_ClrFlag(sym, VIR_SYMFLAG_WITHOUT_REG);
 
                 /* Set the uniform sym info.*/
                 virUniform = sym->u2.uniform;
@@ -282,6 +287,7 @@ _AddGeneralVariable(
         case VIR_SYM_VARIABLE:
             {
                 VIR_Symbol_SetFlag(sym, flags | SymFlag);
+                VIR_Symbol_ClrFlag(sym, VIR_SYMFLAG_WITHOUT_REG);
                 if (BlockIndex != VIR_INVALID_ID)
                 {
                     sym->ioBlockIndex = BlockIndex;
@@ -1391,7 +1397,7 @@ _SplitVariables(
                                           StorageClass,
                                           name,
                                           VIR_INVALID_ID,
-                                          VIR_SYMFLAG_NONE,
+                                          VIR_Symbol_GetFlag(VariableSym),
                                           gcvFALSE,
                                           gcvTRUE,
                                           gcvTRUE,
@@ -1413,7 +1419,7 @@ _SplitVariables(
                                            name,
                                            type,
                                            VIR_INVALID_ID,
-                                           VIR_SYMFLAG_NONE,
+                                           VIR_Symbol_GetFlag(VariableSym),
                                            gcvFALSE,
                                            gcvTRUE,
                                            gcvTRUE,
@@ -1485,7 +1491,7 @@ _SplitOutputs(
                                           StorageClass,
                                           name,
                                           VIR_INVALID_ID,
-                                          VIR_SYMFLAG_NONE,
+                                          VIR_Symbol_GetFlag(OutputSym),
                                           splitArray,
                                           gcvTRUE,
                                           gcvTRUE,
@@ -1507,7 +1513,7 @@ _SplitOutputs(
                                            name,
                                            type,
                                            VIR_INVALID_ID,
-                                           VIR_SYMFLAG_NONE,
+                                           VIR_Symbol_GetFlag(OutputSym),
                                            splitArray,
                                            gcvTRUE,
                                            gcvTRUE,
@@ -1853,6 +1859,11 @@ _AllocateInterfaceBlock(
             gcmASSERT(symId != VIR_INVALID_ID);
             symbol = VIR_Shader_GetSymFromId(Shader, symId);
 
+            if (isSymSkipNameCheck(IBSymbol))
+            {
+                VIR_Symbol_SetFlag(symbol, VIR_SYMFLAG_SKIP_NAME_CHECK);
+            }
+
             /* Set general info. */
             VIR_Symbol_SetPrecision(symbol, VIR_Symbol_GetPrecision(IBSymbol));
             if (symbolKind == VIR_SYM_UBO)
@@ -1916,16 +1927,27 @@ _AllocateInterfaceBlock(
         else
         {
             offset = 0;
-            gcoOS_PrintStrSafe(mixName,
-                               __MAX_SYM_NAME_LENGTH__,
-                               &offset,
-                               "%s",
-                               blockName);
+            if (i == 0)
+            {
+                gcoOS_PrintStrSafe(mixName,
+                    __MAX_SYM_NAME_LENGTH__,
+                    &offset,
+                    "%s",
+                    blockName);
+            }
+            else
+            {
+                gcoOS_PrintStrSafe(mixName,
+                    __MAX_SYM_NAME_LENGTH__,
+                    &offset,
+                    "%s[%d]",
+                    blockName,
+                    i);
+            }
         }
 
         /* Generate block member if needed. */
-        if (GenerateBlockMember &&
-            ((!SplitArray && i == 0) || (SplitArray)))
+        if (GenerateBlockMember)
         {
             errCode = _SplitStructVariable(Shader,
                                            symbol,

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -567,7 +567,6 @@ veglSubmitWorker(
             gcsTASK_SIGNAL_PTR startSignal;
 
 #ifdef __QNXNTO__
-            /* TODO: QNX Can not support 2 signals in one batch currently. */
             /* Allocate a cluster event. */
             if (gcmIS_ERROR(gcoHAL_ReserveTask(gcvNULL,
 #if gcdGC355_PROFILER
@@ -2022,6 +2021,9 @@ _SwapBuffersRegion(
             break;
         }
 
+        /* Update buffer age. */
+        platform->updateBufferAge(dpy, draw, &backBuffer);
+
 #if gcdENABLE_3D
         if (!draw->openVG)
         {
@@ -2640,9 +2642,6 @@ eglSwapBuffersRegionEXT(
         NumRects = 0;
     }
 
-    /* TODO: Resolve regions can result in bad image.
-     * Falling to fullscreen resolve until fixed.
-    */
     result = _eglSwapBuffersRegion(Dpy, Draw, 0, gcvNULL);
 
     gcmFOOTER_ARG("%d", result);
@@ -3026,7 +3025,7 @@ eglGetRenderBufferv0VIV(
         if (draw->backBuffer.context == gcvNULL)
         {
             /*
-             * TODO: Get window back buffer without bound.
+             *VIV: [TODO] Get window back buffer without bound.
              * This case is when 'draw' is not made current.
              */
             EGLBoolean result;
@@ -3055,7 +3054,6 @@ eglGetRenderBufferv0VIV(
             android_native_buffer_t * nativeBuffer =
                 (android_native_buffer_t *) buffer;
 
-            /* TODO: Save to a more proper place. */
             *((gctINT_PTR) &nativeBuffer->common.reserved[0]) =
                 (draw->swapRect.x << 16) | draw->swapRect.y;
 
@@ -3093,7 +3091,6 @@ eglGetRenderBufferVIV(
 
     do
     {
-        /* TODO: need refine about get display stack. */
         dpy = (VEGLDisplay) gcoOS_GetPLSValue(gcePLS_VALUE_EGL_DISPLAY_INFO);
 
         if (dpy == gcvNULL)
@@ -3152,7 +3149,7 @@ eglGetRenderBufferVIV(
         if (draw->backBuffer.context == gcvNULL)
         {
             /*
-             * TODO: Get window back buffer without bound.
+             *VIV: [TODO] Get window back buffer without bound.
              * This case is when 'draw' is not made current.
              */
             EGLBoolean result;
@@ -3178,7 +3175,6 @@ eglGetRenderBufferVIV(
             android_native_buffer_t * nativeBuffer =
                 (android_native_buffer_t *) buffer;
 
-            /* TODO: Save to a more proper place. */
             *((gctINT_PTR) &nativeBuffer->common.reserved[0]) =
                 (draw->swapRect.x << 16) | draw->swapRect.y;
 
@@ -3216,7 +3212,6 @@ eglPostBufferVIV(
     {
         gctBOOL flip;
 
-        /* TODO: need refine about get display stack. */
         dpy = (VEGLDisplay) gcoOS_GetPLSValue(gcePLS_VALUE_EGL_DISPLAY_INFO);
 
         if (dpy == gcvNULL)

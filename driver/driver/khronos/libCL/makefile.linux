@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -47,6 +47,7 @@ endif
 # Objects.
 
 OBJECTS			=	$(OBJ_DIR)/gc_cl.o \
+                    $(OBJ_DIR)/gc_cl_log.o \
 					$(OBJ_DIR)/gc_cl_command.o \
 					$(OBJ_DIR)/gc_cl_context.o \
 					$(OBJ_DIR)/gc_cl_device.o \
@@ -98,7 +99,7 @@ LIBS += -L $(AQROOT)/driver/khronos/libGLESv3/$(OBJ_DIR)
 endif
 LIBS += -L $(AQROOT)/compiler/libVSC/$(OBJ_DIR)
 ifeq ($(ENABLE_CL_GL),1)
-LIBS += -l GAL -lVSC -l GLESv2 -lm
+LIBS += -l GAL -lVSC -l GLESv2 -lm -lEGL
 else
 LIBS += -l GAL -lVSC -lm
 endif

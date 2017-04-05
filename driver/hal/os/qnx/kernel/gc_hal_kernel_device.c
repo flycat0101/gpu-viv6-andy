@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -112,7 +112,6 @@ _FreeMemory(
 ******************************* Interrupt Handler ******************************
 \******************************************************************************/
 
-/* TODO: Make part of device. */
 struct sigevent gIntrEvents[gcdMAX_GPU_COUNT];
 int gIntrChids[gcdMAX_GPU_COUNT];
 int gIntrCoids[gcdMAX_GPU_COUNT];
@@ -317,7 +316,7 @@ static void* threadRoutine3D1(void *ctxt)
                     "irqId:%d\n",
                     device->irqIds[gcvCORE_3D1]);
 
-    gcmkPRINT("[Interrupt] int rutine Attached irqLine %d with id %d.\n",
+    gcmkPRINT("[Interrupt] Attached irqLine %d with id %d.\n",
         device->irqLines[gcvCORE_3D1], device->irqIds[gcvCORE_3D1]);
 
     device->isrInitializeds[gcvCORE_3D1] = gcvTRUE;
@@ -935,7 +934,7 @@ gckGALDEVICE_Construct(
         else
         {
             /* map internal memory */
-            device->internalPhysical  = (gctPHYS_ADDR)physical;
+            device->internalPhysical  = gcmUINT64_TO_PTR(physical);
             device->internalLogical = (gctPOINTER)mmap_device_io(device->internalSize, physical);
 
             gcmkASSERT(device->internalLogical != NULL);
@@ -962,7 +961,7 @@ gckGALDEVICE_Construct(
         else
         {
             /* map internal memory */
-            device->externalPhysical = (gctPHYS_ADDR)physical;
+            device->externalPhysical = gcmUINT64_TO_PTR(physical);
             device->externalLogical = (gctPOINTER)mmap_device_io(device->externalSize, physical);
 
             gcmkASSERT(device->externalLogical != NULL);
@@ -1068,7 +1067,7 @@ gckGALDEVICE_Construct(
         else
         {
             /* Map the contiguous memory. */
-            device->contiguousPhysical = (gctPHYS_ADDR) ContiguousBase;
+            device->contiguousPhysical = gcmUINT64_TO_PTR(ContiguousBase);
             device->contiguousSize     = ContiguousSize;
             device->contiguousBase     = (gctPOINTER) mmap_device_io(ContiguousSize, ContiguousBase);
             device->contiguousMapped   = gcvTRUE;

@@ -105,12 +105,7 @@ LIBS += VSC GAL EGL_viv $(STATIC_LIBS)
 
 CCFLAGS += -DGL_GLEXT_PROTOTYPES -fms-extensions
 
-ifneq ($(filter v7, $(VARIANT_LIST)), v7)
-	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp
-	LIBS += m-vfp
-else
-	LIBS += m
-endif
+include $(qnx_build_dir)/math.mk
 
 LDFLAGS += -Wl,--version-script=$(driver_root)/driver/khronos/libGLESv3/libGLESv3.map
 

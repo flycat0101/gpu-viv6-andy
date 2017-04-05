@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1518,7 +1518,9 @@ GLvoid GL_APIENTRY __gles_GetProgramiv(__GLcontext *gc, GLuint program, GLenum p
     case GL_PROGRAM_BINARY_LENGTH:
         if (programObject->programInfo.linkedStatus)
         {
-            gc->dp.getProgramBinary(gc, programObject, (GLsizei)(0x7ffffff), params, gcvNULL, gcvNULL);
+            GLsizei bplen = 0;
+            gc->dp.getProgramBinary(gc, programObject, (GLsizei)(0x7ffffff), &bplen, gcvNULL, gcvNULL);
+            *params = *((GLint *)&bplen);
         }
         else
         {
@@ -2939,7 +2941,6 @@ OnError:
 
 GLvoid GL_APIENTRY __gles_ReleaseShaderCompiler(__GLcontext *gc)
 {
-    /* TODO ES20 */
 }
 
 GLvoid GL_APIENTRY __gles_ProgramBinary(__GLcontext *gc, GLuint program, GLenum binaryFormat,

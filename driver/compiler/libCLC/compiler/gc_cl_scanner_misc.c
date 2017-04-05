@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -146,6 +146,7 @@ static clsKEYWORD KeywordTable[] =
     {"struct",               T_STRUCT,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"switch",               T_SWITCH,               0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"typedef",              T_TYPEDEF,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
+    {"typeof",               T_TYPEOF,               0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"uchar",                T_UCHAR,                0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"uchar16",              T_UCHAR16,              0,    clvCL_11|clvCL_12, clvEXTENSION_NONE},
     {"uchar32",              T_UCHAR32,              0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
@@ -236,8 +237,9 @@ static clsKEYWORD KeywordTable[] =
     {"_viv_half32_packed",   T_HALF32_PACKED,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"_viv_gentype_packed",  T_GENTYPE_PACKED,      0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"_viv_image2d_ptr_t",   T_IMAGE2D_PTR_T,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
-    {"_viv_image2d_array_t", T_IMAGE2D_DYNAMIC_ARRAY_T,       0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"_viv_image2d_array_t", T_IMAGE2D_DYNAMIC_ARRAY_T,   0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
     {"_viv_uniform",         T_UNIFORM,             0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
+    {"kernel_scale_hint",    T_KERNEL_SCALE_HINT,   0,    clvCL_11|clvCL_12, clvEXTENSION_VIV_VX},
 };
 
 #define _cldMaxRepetitiveError   5
@@ -355,7 +357,10 @@ IN gctCONST_STRING Symbol
                 return KeywordTable[mid].token;
             }
             else {
-                return T_RESERVED_KEYWORD;
+                if(KeywordTable[mid].extension & clvEXTENSION_VIV_VX) {
+                    return T_NOT_KEYWORD;
+                }
+                else return T_RESERVED_KEYWORD;
             }
         }
     }
@@ -508,28 +513,28 @@ OUT clsLexToken *Token
     }
 
     status = cloCOMPILER_AllocatePoolString(Compiler,
-                        Symbol,
-                        &symbolInPool);
+                                            Symbol,
+                                            &symbolInPool);
     if (gcmIS_ERROR(status)) return T_EOF;
 
     if (cloCOMPILER_GetScannerState(Compiler) == clvSCANNER_NORMAL) {
-       /* Check as a type name */
-      status = cloCOMPILER_SearchName(Compiler,
-                      symbolInPool,
-                      gcvTRUE,
-                      &typeName);
-      if (status == gcvSTATUS_OK && typeName->type == clvTYPE_NAME) {
-        Token->type    = T_TYPE_NAME;
-        Token->u.typeName = typeName;
+         /* Check as a type name */
+        status = cloCOMPILER_SearchName(Compiler,
+                                        symbolInPool,
+                                        gcvTRUE,
+                                        &typeName);
+        if (status == gcvSTATUS_OK && typeName->type == clvTYPE_NAME) {
+            Token->type    = T_TYPE_NAME;
+            Token->u.typeName = typeName;
 
-        gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
-                          clvDUMP_SCANNER,
-                          "<TOKEN line=\"%d\" string=\"%d\" type=\"typeName\" symbol=\"%s\" />",
-                          LineNo,
-                          StringNo,
-                          Symbol));
-        return T_TYPE_NAME;
-      }
+            gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
+                                          clvDUMP_SCANNER,
+                                          "<TOKEN line=\"%d\" string=\"%d\" type=\"typeName\" symbol=\"%s\" />",
+                                          LineNo,
+                                          StringNo,
+                                          Symbol));
+            return T_TYPE_NAME;
+        }
     }
 
     /* Treat as an identifier */
@@ -537,11 +542,11 @@ OUT clsLexToken *Token
     Token->u.identifier.name = symbolInPool;
     Token->u.identifier.ptrDscr = gcvNULL;
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
-                      clvDUMP_SCANNER,
-                      "<TOKEN line=\"%d\" string=\"%d\" type=\"identifier\" symbol=\"%s\" />",
-                      LineNo,
-                      StringNo,
-                      Token->u.identifier.name));
+                                  clvDUMP_SCANNER,
+                                  "<TOKEN line=\"%d\" string=\"%d\" type=\"identifier\" symbol=\"%s\" />",
+                                  LineNo,
+                                  StringNo,
+                                  Token->u.identifier.name));
     return T_IDENTIFIER;
 }
 

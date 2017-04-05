@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -147,7 +147,6 @@ _GetNativeVisualId(
     gcePATCH_ID patchId = gcvPATCH_INVALID;
     gcmASSERT(Config != gcvNULL);
 
-    /*!VIV: TODO: Do NOT fake visual id here. */
     gcoHAL_GetPatchID(gcvNULL, &patchId);
 
     switch (patchId)
@@ -1019,7 +1018,6 @@ _QueryRenderMode(
 
         if (Surface->openVG)
         {
-            /* TODO: Hardware OpenVG. */
             renderMode = VEGL_INDIRECT_RENDERING;
             break;
         }
@@ -1270,14 +1268,7 @@ _QueryRenderMode(
          * output. 3D composition should be rare.
          * If there's no 2D, and 3D TX has decompress support, we can also use
          * compressed output.
-         *
-         * TODO: 'has 2D core' may not mean 'has 2D hwcomposer'
-         *
-         * TODO: Trade Off:
-         * 1. Indirect rendering  w/  Color-Compression?
-         * 2. Direction rendering w/o Color-Compression?
          */
-
         if (((mode2D == VEGL_DIRECT_RENDERING) &&
                 (compressNOAA || config->samples == 4)) ||
             ((mode2D == -1) && (mode3D == VEGL_DIRECT_RENDERING)))
@@ -1307,11 +1298,6 @@ _QueryRenderMode(
         if ((renderMode < VEGL_DIRECT_RENDERING) &&
             (config->samples  > 1))
         {
-            /*
-             * TODO: 2 choices:
-             *  * MSAA w/o color compress, Enable No Resolve
-             *  * MSAA w color compress, Disable No Resolve
-             */
             /* Disable No Resolve for MSAA case. */
             renderMode = VEGL_INDIRECT_RENDERING;
         }
@@ -1705,7 +1691,10 @@ _UpdateBufferAge(
 
     for (i = 0; i < winInfo->bufferCacheCount; i++)
     {
-        winInfo->bufferCache[i].age += 1;
+        if (winInfo->bufferCache[i].age > 0)
+        {
+            winInfo->bufferCache[i].age += 1;
+        }
 
         if (winInfo->bufferCache[i].handle == buffer->handle)
         {
@@ -1974,7 +1963,6 @@ _SynchronousPost(
             break;
         }
 
-        /* TODO: not required when fence sync enabled. */
 
         /*
          * Found hang on ics and later in query 'QUEUES_TO_WINDOW_COMPOSER',

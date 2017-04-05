@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -380,15 +380,6 @@ drv_mempool_init()
         return gcvSTATUS_GENERIC_IO;
     }
 
-    /**
-     * TODO: Re-enable write-combine.
-     * Should it be 0x9 for ARM??
-     *
-     * The 0x41 is intended for normal memory that does not have side effects so
-     * the restrictions are different to Shared Device.
-     *
-     * TODO: Special values should be ifdef ARM, or otherwise abstracted.
-     */
     if (shm_ctl_special(memPool.fd, SHMCTL_ANON | SHMCTL_PHYS, 0, memPool.poolSize, ARM_PTE_RW) == -1) {
         fprintf(stderr, "galcore:%s[%d]: shm_ctl_special failed: %s\n", __FUNCTION__, __LINE__, strerror(errno));
         close(memPool.fd);
@@ -404,7 +395,7 @@ drv_mempool_init()
         memPool.fd = -1;
         return gcvSTATUS_GENERIC_IO;
     }
-    memPool.addr = (gctUINT32)addr;
+    memPool.addr = gcmPTR2INT32(addr) ;
 
     while (1) {
         if (mem_offset64(addr, NOFD, memPool.poolSize, &paddr, &pcontig) == -1) {
@@ -413,7 +404,7 @@ drv_mempool_init()
                 munmap(addr, memPool.poolSize);
                 close(memPool.fd);
                 memPool.fd = -1;
-                memPool.addr = NULL;
+                memPool.addr = 0;
                 return gcvSTATUS_GENERIC_IO;
             }
         } else {
@@ -428,7 +419,6 @@ drv_mempool_init()
         fprintf(stderr, "galcore:%s[%d]: mprotect failed, errno=%d (%s)\n", __FUNCTION__, __LINE__, err, strerror(err));
     }
 
-    /* TODO. Truncating 64bit value. */
     memPool.paddr = (gctUINT32)paddr;
 
     fprintf(stderr, "Mempool Map addr range[%x-%x]\n", memPool.addr, memPool.addr +  memPool.poolSize);
@@ -445,7 +435,7 @@ drv_mempool_init()
         munmap(addr, memPool.poolSize);
         close(memPool.fd);
         memPool.fd = -1;
-        memPool.addr = NULL;
+        memPool.addr = 0;
         memPool.paddr = 0;
         return gcvSTATUS_GENERIC_IO;
     }
@@ -454,13 +444,13 @@ drv_mempool_init()
     memPool.freePage = 0;
 
     /* Initialize the semaphore. */
-    if (pthread_mutex_init(&memPool.mutex, NULL) != EOK)
+    if (pthread_mutex_init(&memPool.mutex, gcvNULL) != EOK)
     {
         free(memPool.pageUsage);
         munmap(addr, memPool.poolSize);
         close(memPool.fd);
         memPool.fd = -1;
-        memPool.addr = NULL;
+        memPool.addr = 0;
         memPool.paddr = 0;
         return gcvSTATUS_GENERIC_IO;
     }
@@ -473,11 +463,11 @@ drv_mempool_destroy()
 {
     pthread_mutex_destroy(&memPool.mutex);
     free(memPool.pageUsage);
-    memPool.pageUsage = NULL;
-    munmap((void*)memPool.addr, memPool.poolSize);
+    memPool.pageUsage = gcvNULL;
+    munmap(gcmINT2PTR(memPool.addr), memPool.poolSize);
     close(memPool.fd);
     memPool.fd = -1;
-    memPool.addr = NULL;
+    memPool.addr = 0;
     memPool.paddr = 0;
 }
 
@@ -510,7 +500,7 @@ drv_mempool_mem_offset(
     IN gctPOINTER Logical,
     OUT gctUINT32 * Address)
 {
-    gctUINT32 logical = (gctUINT32)Logical;
+    gctUINT32 logical = gcmPTR2INT32(Logical);
 
     if (Address == gcvNULL)
     {
@@ -666,7 +656,7 @@ int drv_mempool_free(gctPOINTER Logical)
 
     pthread_mutex_lock(&memPool.mutex);
 
-    pageIndex = ((gctUINT32)Logical - (gctUINT32)memPool.addr) / memPool.pageSize;
+    pageIndex = (gcmPTR2INT32(Logical) - gcmPTR2INT32(memPool.addr)) / memPool.pageSize;
 
     /* Verify the memory is valid and unlocked. */
     if ( (pageIndex < 0) || (pageIndex >= memPool.pageCount) )
@@ -828,8 +818,8 @@ drv_shm_acquire_pool_by_user_logical(
         while (shmPoolPid != gcvNULL)
         {
             /* Check if this address is in range of this shmPool. */
-            if ((shmPoolPid->UserLogical <= (gctUINT32)Logical) &&
-                ((shmPoolPid->UserLogical + shmPoolPid->poolSize) > (gctUINT32)Logical)
+            if ((shmPoolPid->UserLogical <= gcmPTR2INT32(Logical)) &&
+                ((shmPoolPid->UserLogical + shmPoolPid->poolSize) > gcmPTR2INT32(Logical))
                )
             {
                 return shmPoolPid;
@@ -879,8 +869,8 @@ drv_shm_acquire_pool_by_kernel_logical(
         while (shmPoolPid != gcvNULL)
         {
             /* Check if this address is in range of this shmPool. */
-            if ((shmPoolPid->KernelLogical <= (gctUINT32)Logical) &&
-                ((shmPoolPid->KernelLogical + shmPoolPid->poolSize) > (gctUINT32)Logical)
+            if ((shmPoolPid->KernelLogical <= gcmPTR2INT32(Logical)) &&
+                ((shmPoolPid->KernelLogical + shmPoolPid->poolSize) > gcmPTR2INT32(Logical))
                )
             {
                 return shmPoolPid;
@@ -946,7 +936,7 @@ drv_shmpool_mem_offset(
     IN gctPOINTER Logical,
     OUT gctUINT32 * Address)
 {
-    gctUINT32 logical = (gctUINT32)Logical;
+    gctUINT32 logical = gcmPTR2INT32(Logical);
     gckSHM_POOL shmPool;
 
     if (Address == gcvNULL)
@@ -978,7 +968,7 @@ drv_shmpool_mem_offset_by_user_logical(
     IN gctPOINTER Logical,
     OUT gctUINT32 * Address)
 {
-    gctUINT32 logical = (gctUINT32)Logical;
+    gctUINT32 logical = gcmPTR2INT32(Logical);
     gckSHM_POOL shmPool;
 
     if (Address == gcvNULL)
@@ -1110,7 +1100,6 @@ gckSHM_POOL drv_shmpool_create(
 
     shm->cacheFlag = CacheFlag;
 
-    /* TODO: Don't close fd if need to truncate shm later. */
     rc = close(fd);
     if (rc == -1) {
         fprintf(stderr, "%s: close failed: %s\n", __FUNCTION__, strerror( errno ) );
@@ -1119,32 +1108,31 @@ gckSHM_POOL drv_shmpool_create(
         return gcvNULL;
     }
 
-    shm->UserLogical   = (gctUINT32) caddr;
-    shm->KernelLogical = (gctUINT32) saddr;
+    shm->UserLogical   = gcmPTR2INT32(caddr);
+    shm->KernelLogical = gcmPTR2INT32(saddr);
 
     /* fd should be NOFD here, to get physical address. */
     rc = mem_offset64(saddr, NOFD, 1, (off64_t *)&paddr, NULL);
     if (rc == -1) {
-        fprintf(stderr, "%s: mem_offset failed (saddr:%x): %s\n", __FUNCTION__, (gctUINT32)saddr, strerror( errno ) );
+        fprintf(stderr, "%s: mem_offset failed (saddr:%x): %s\n", __FUNCTION__, gcmPTR2INT32(saddr), strerror( errno ) );
         pthread_mutex_destroy(&shm->mutex);
         free(shm);
         return gcvNULL;
     }
 
-    shm->Physical = (gctUINT32)paddr;
+    shm->Physical = gcmPTR2INT32(paddr);
 
-    /* TODO: MLOCK may or may not be needed!. */
-    mlock((void*)shm->KernelLogical, shm->poolSize);
+    mlock(gcmINT2PTR(shm->KernelLogical), shm->poolSize);
 
     /* Allocate the page usage array and Initialize all pages to free. */
     shm->pageUsage = (gckPAGE_USAGE)calloc(shm->pageCount, sizeof(struct _gckPAGE_USAGE));
     if (shm->pageUsage == gcvNULL)
     {
         fprintf( stderr, "%s: malloc failed: %s\n", __FUNCTION__, strerror(errno) );
-        munmap((void*)shm->KernelLogical, shm->poolSize);
+        munmap(gcmINT2PTR(shm->KernelLogical), shm->poolSize);
         if (getpid() != Pid)
         {
-            munmap_peer(Pid, (void*)shm->UserLogical, shm->poolSize);
+            munmap_peer(Pid, gcmINT2PTR(shm->UserLogical), shm->poolSize);
         }
         pthread_mutex_destroy(&shm->mutex);
         free(shm);
@@ -1177,10 +1165,10 @@ drv_shmpool_destroy(
 
         if (ShmPool->UserLogical)
         {
-            munmap((void*)ShmPool->KernelLogical, ShmPool->poolSize);
+            munmap(gcmINT2PTR(ShmPool->KernelLogical), ShmPool->poolSize);
             if (getpid() != ShmPool->pid)
             {
-                munmap_peer(ShmPool->pid, (void*)ShmPool->UserLogical, ShmPool->poolSize);
+                munmap_peer(ShmPool->pid, gcmINT2PTR(ShmPool->UserLogical), ShmPool->poolSize);
             }
         }
 
@@ -1341,7 +1329,7 @@ drv_shmpool_get_kernel_logical(
     )
 {
     gckSHM_POOL shmPool;
-    gctUINT32 logical = (gctUINT32)Logical;
+    gctUINT32 logical = gcmPTR2INT32(Logical);
     gctPOINTER svaddr = gcvNULL;
 
     pthread_mutex_lock(&shmPoolListMutex);
@@ -1387,7 +1375,7 @@ drv_shmpool_free(
         return 0;
     }
 
-    pageIndex = ((gctUINT32)Logical - shmPool->UserLogical) / shmPool->pageSize;
+    pageIndex = (gcmPTR2INT32(Logical) - shmPool->UserLogical) / shmPool->pageSize;
 
     gcmkTRACE(gcvLEVEL_INFO, "Freeing pages @ %d\n", pageIndex);
 
@@ -2010,7 +1998,6 @@ static int drv_init(void)
     args.registerSizes[gcvCORE_VG] = registerMemSizeVG;
     args.chipIDs[gcvCORE_VG] = gcvCORE_VG;
 
-    /* TODO: Enable clock by driver support? */
     gcmkTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_DRIVER,
                   "[galcore] Entering drv_init\n");
 
@@ -2468,8 +2455,6 @@ int gpu_init()
     {
         goto fail_007;
     }
-
-    /* TODO: gpu_suspend, gpu_resume */
 
     return EXIT_SUCCESS;
 

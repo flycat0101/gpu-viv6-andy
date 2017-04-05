@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -126,7 +126,6 @@ typedef struct {
     /* Atoms for output properties */
     Atom atomEdid;
 
-    /* TODO - maybe don't need to store these? */
     xf86CrtcPtr    crtcPtr;
     xf86OutputPtr outputPtr;
 
@@ -213,6 +212,8 @@ Bool imxSetShadowBuffer(ScreenPtr pScreen)
     if (!imxDisplayStartScreenInit(scrnIndex, pScreen)) {
         return FALSE;
     }
+
+    return TRUE;
 }
 
 /* -------------------------------------------------------------------- */
@@ -425,7 +426,7 @@ imxDisplaySetMode(ScrnInfoPtr pScrn, const char* fbDeviceName,
 
         /* Write the desired mode name */
         if (-1 == write(fd, validModeName, strlen(validModeName))) {
-
+            close(fd);
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
             "unable to write '%s' to sysnode '%s': %s\n",
             validModeName, sysnodeName, strerror(errno));
@@ -743,7 +744,7 @@ imxDisplayGetCurrentMode(ScrnInfoPtr pScrn, int fd, const char* modeName)
     }
 
     /* Allocate a new mode structure. */
-    DisplayModePtr mode = malloc(sizeof(DisplayModeRec));
+    DisplayModePtr mode = (DisplayModePtr)malloc(sizeof(DisplayModeRec));
 
     /* Transfer info from fbdev var screen info */
     /* into the X DisplayModeRec. */
@@ -840,6 +841,13 @@ imxDisplayGetModes(ScrnInfoPtr pScrn, const char* fbDeviceName)
 
         /* Check whether meet XRandR requirement (SL/SX: some modes are not supported) */
         if (!imxDisplayCheckModeXRandR(pScrn)) {
+            if ( NULL != mode )
+            {
+                if (NULL != mode->name) {
+                    free((void *)((char*)mode->name));
+                }
+                free((void *)mode);
+            }
             xf86DrvMsg(pScrn->scrnIndex, X_ERROR,
                 "Mode '%s' is eliminated from XRandR support\n",
                 modeName);
@@ -855,6 +863,14 @@ imxDisplayGetModes(ScrnInfoPtr pScrn, const char* fbDeviceName)
 
             xf86PrintModeline(pScrn->scrnIndex, mode);
             modesList = xf86ModesAdd(modesList, mode);
+        } else {
+            if ( NULL != mode )
+            {
+                if (NULL != mode->name) {
+                    free((void *)((char*)mode->name));
+                }
+                free((void *)mode);
+            }
         }
     }
 
@@ -1147,7 +1163,6 @@ imxCrtcCommit(xf86CrtcPtr crtc)
      * Commit mode changes to a CRTC
      */
 
-    /* TODO - unblank display after changing modes? */
 }
 
 static void*
@@ -1262,7 +1277,6 @@ imxCrtcShadowDestroy(xf86CrtcPtr crtc, PixmapPtr pPixmap, void* data)
 static void
 imxCrtcDestroy(xf86CrtcPtr crtc)
 {
-    /* TODO */
 }
 
 /* -------------------------------------------------------------------- */
@@ -1293,13 +1307,11 @@ imxOutputDPMS(xf86OutputPtr output, int mode)
 static void
 imxOutputSave(xf86OutputPtr output)
 {
-    /* TODO */
 }
 
 static void
 imxOutputRestore(xf86OutputPtr output)
 {
-    /* TODO */
 }
 
 static int
@@ -1389,7 +1401,6 @@ imxOutputGetModes(xf86OutputPtr output)
 static void
 imxOutputDestroy(xf86OutputPtr output)
 {
-    /* TODO */
 }
 
 static Bool
@@ -2076,6 +2087,14 @@ imxRefreshModes(ScrnInfoPtr pScrn, int fbIndex, char *suggestMode)
 
             xf86PrintModeline(pScrn->scrnIndex, mode);
             modesList = xf86ModesAdd(modesList, mode);
+        } else {
+            if ( NULL != mode )
+            {
+                if (NULL != mode->name) {
+                    free((void *)((char*)mode->name));
+                }
+                free((void *)mode);
+            }
         }
     }
 

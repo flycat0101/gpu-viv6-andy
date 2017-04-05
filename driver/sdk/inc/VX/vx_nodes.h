@@ -584,7 +584,9 @@ VX_API_ENTRY vx_node VX_API_CALL vxRemapNode(vx_graph graph,
  * \retval vx_node A node reference. Any possible errors preventing a successful creation should be checked using <tt>\ref vxGetStatus</tt>
  */
 VX_API_ENTRY vx_node VX_API_CALL vxHalfScaleGaussianNode(vx_graph graph, vx_image input, vx_image output, vx_int32 kernel_size);
+VX_API_ENTRY vx_node VX_API_CALL vxCNNNode(vx_graph graph, vx_image inputImage, vx_array percentArray);
 
+VX_API_ENTRY vx_node VX_API_CALL vxFasterRCNNode(vx_graph graph, vx_image inputImage, vx_array percentArray, vx_array coordArray);
 #ifdef __cplusplus
 }
 #endif

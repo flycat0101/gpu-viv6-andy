@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1282,8 +1282,8 @@ static VIR_PatternMatchInst _intrinFaceForwardPatInst0[] = {
 
 static VIR_PatternReplaceInst _intrinFaceForwardRepInst0[] = {
     { VIR_OP_DOT, 0, 0, { -1, 3, 3, 0}, { 0, _dup3rdParm, _dup2ndParm } },
-    { VIR_OP_SELECT, VIR_COP_LESS, 0, { -1, -1, 0, 0 }, { 0, 0, _constf_zero, _constf_one } },
-    { VIR_OP_SELECT, VIR_COP_NOT_ZERO, 0, { 1, -1, 3, 3 }, {0, 0, _dup1stParmAsNeg, _dup1stParm } },
+    { VIR_OP_CSELECT, VIR_COP_LESS, 0, { -1, -1, 0, 0 }, { 0, 0, _constf_zero, _constf_one } },
+    { VIR_OP_CSELECT, VIR_COP_NOT_ZERO, 0, { 1, -1, 3, 3 }, {0, 0, _dup1stParmAsNeg, _dup1stParm } },
 };
 
 static VIR_Pattern _intrinFaceForwardPattern[] = {
@@ -1336,7 +1336,7 @@ static VIR_PatternMatchInst _intrinSelectPatInst0[] = {
 };
 
 static VIR_PatternReplaceInst _intrinSelectRepInst0[] = {
-    { VIR_OP_SELECT, VIR_COP_NOT_ZERO, 0, { 1, 3, 3, 3 }, { 0, _dup1stParm, _dup2ndParm, _dup3rdParm } },
+    { VIR_OP_CSELECT, VIR_COP_NOT_ZERO, 0, { 1, 3, 3, 3 }, { 0, _dup1stParm, _dup2ndParm, _dup3rdParm } },
 };
 
 static VIR_Pattern _intrinSelectPattern[] = {
@@ -1409,7 +1409,7 @@ static VIR_PatternMatchInst _intrinQueryLodPatInst0[] = {
 
 static VIR_PatternReplaceInst _intrinQueryLodRepInst0[] = {
     { VIR_OP_LODQ, 0, 0, { 1, 3, 3, 0 }, { 0, _dup1stParm, _dup2ndParm, VIR_Lower_SetZero } },
-    { VIR_OP_CONV, 0, 0, { 1, 1, 0, 0 }, { _setEnableXFloat, _setSwizzleXInt } },
+    { VIR_OP_CONVERT, 0, 0, { 1, 1, 0, 0 }, { _setEnableXFloat, _setSwizzleXInt } },
 
 };
 
@@ -1653,6 +1653,14 @@ static VIR_Pattern* _intrisicPatterns[] = {
     gcvNULL, /* evis_vstore4 */
     gcvNULL, /* evis_vstore8 */
     gcvNULL, /* evis_vstore16 */
+    gcvNULL, /* evis_index_add */
+    gcvNULL, /* evis_vert_min3 */
+    gcvNULL, /* evis_vert_max3 */
+    gcvNULL, /* evis_vert_med3 */
+    gcvNULL, /* evis_horz_min3 */
+    gcvNULL, /* evis_horz_max3 */
+    gcvNULL, /* evis_horz_med3 */
+    gcvNULL, /* evis_error */
     gcvNULL, /* evis_end */
 
     /* common functions */
@@ -1835,6 +1843,9 @@ static VIR_Pattern* _intrisicPatterns[] = {
     /* three operand instructions */
     gcvNULL, /* swizzle */
     _intrinMadsatPattern, /* madsat */
+    gcvNULL, /* swizzle_full_def */
+    gcvNULL, /* imadhi0 */
+    gcvNULL, /* imadlo0 */
 };
 
 char _checkIntrisicPatternsSize[(sizeof(_intrisicPatterns) / sizeof(VIR_Pattern*)) == VIR_IK_LAST];
@@ -1896,7 +1907,7 @@ static VIR_PatternMatchInst _loadPatInst0[] = {
 
 static VIR_PatternReplaceInst _loadRepInst0[] = {
     { VIR_OP_LOAD, 0, 0, { 1, 2, 3, 0 }, { 0 } },
-    { VIR_OP_SELECT, VIR_COP_NOT_ZERO, 0, { 1, 1, 0, 0 }, { 0, 0, _constb_true, _constb_false } },
+    { VIR_OP_CSELECT, VIR_COP_NOT_ZERO, 0, { 1, 1, 0, 0 }, { 0, 0, _constb_true, _constb_false } },
 };
 
 static VIR_Pattern _loadPattern[] = {
@@ -2092,14 +2103,22 @@ _processEvisIntrinsic(
     VIR_Operand  *    src0 = VIR_Inst_GetSource(pInst, 0);
     VIR_Operand  *    src1 = VIR_Inst_GetSource(pInst, 1);
     VIR_OpCode        opCode = VIR_OP_NOP;
+    gctBOOL           isVX2 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_EVIS_VX2);
     gctUINT           i;
     VIR_ParmPassing * argList;
+    gctINT            evisSrcNo;
+    VIR_Operand *     modifier;
+    gctUINT           val;
+    gctUINT           startBin;
+    gctUINT           endBin;
+    gctINT            storeElements = 0;
 
     gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_INTRINSIC);
     if (VIR_Operand_GetOpKind(src1) != VIR_OPND_PARAMETERS)
     {
         return errCode;
     }
+
     switch (Ik) {
     case VIR_IK_evis_abs_diff:
         opCode = VIR_OP_VX_ABSDIFF;
@@ -2202,11 +2221,48 @@ _processEvisIntrinsic(
         opCode = VIR_OP_LOAD;
         break;
     case VIR_IK_evis_vstore2:
-    case VIR_IK_evis_vstore3:
-    case VIR_IK_evis_vstore4:
-    case VIR_IK_evis_vstore8:
-    case VIR_IK_evis_vstore16:
+        storeElements = 2;
         opCode = VIR_OP_STORE;
+        break;
+    case VIR_IK_evis_vstore3:
+        storeElements = 3;
+        opCode = VIR_OP_STORE;
+        break;
+    case VIR_IK_evis_vstore4:
+        storeElements = 4;
+        opCode = VIR_OP_STORE;
+        break;
+    case VIR_IK_evis_vstore8:
+        storeElements = 8;
+        opCode = VIR_OP_STORE;
+        break;
+    case VIR_IK_evis_vstore16:
+        storeElements = 16;
+        opCode = VIR_OP_STORE;
+        break;
+    case VIR_IK_evis_index_add:
+        opCode = VIR_OP_VX_INDEXADD;
+        break;
+    case VIR_IK_evis_vert_min3:
+        opCode = VIR_OP_VX_VERTMIN3;
+        break;
+    case VIR_IK_evis_vert_max3:
+        opCode = VIR_OP_VX_VERTMAX3;
+        break;
+    case VIR_IK_evis_vert_med3:
+        opCode = VIR_OP_VX_VERTMED3;
+        break;
+    case VIR_IK_evis_horz_min3:
+        opCode = VIR_OP_VX_HORZMIN3;
+        break;
+    case VIR_IK_evis_horz_max3:
+        opCode = VIR_OP_VX_HORZMAX3;
+        break;
+    case VIR_IK_evis_horz_med3:
+        opCode = VIR_OP_VX_HORZMED3;
+        break;
+    case VIR_IK_evis_error:
+        opCode = VIR_OP_ERROR;
         break;
     default:
         gcmASSERT(gcvFALSE);
@@ -2266,6 +2322,143 @@ _processEvisIntrinsic(
             ON_ERROR0(VIR_Function_NewOperand(func, &pInst->src[i]));
         }
     }
+
+    /* change enable based on store width */
+    if (storeElements > 0)
+    {
+        VIR_Operand  *  data = VIR_Inst_GetSource(pInst, 2);
+        VIR_TypeId      tyId = VIR_Operand_GetType(data);
+        VIR_TypeId      componentTyId, newTyId;
+        VIR_Enable      enable;
+        VIR_Operand  *  dest = VIR_Inst_GetDest(pInst);
+        gcmASSERT(VIR_TypeId_isPrimitive(tyId) && dest);
+        componentTyId = VIR_GetTypeComponentType(tyId);
+        newTyId = VIR_TypeId_ComposePackedNonOpaqueType(componentTyId, storeElements);
+        enable = VIR_TypeId_Conv2Enable(newTyId);
+        VIR_Operand_SetEnable(dest, enable);
+    }
+    evisSrcNo = VIR_OPCODE_EVISModifier_SrcNo(opCode);
+    switch (opCode) {
+    case VIR_OP_ERROR:
+        {
+            modifier = VIR_Inst_GetSource(pInst, 0);
+            gcmASSERT(VIR_Operand_isImm(modifier));
+            val = VIR_Operand_GetImmediateUint(modifier);
+            switch (val) {
+            case ERROR_DP2x16_NOT_SUPPORTED:
+                gcoOS_Print("Error: VXC_DP2x16() is not supported");
+                break;
+            case ERROR_IADD_NOT_SUPPORTED:
+                gcoOS_Print("Error: VXC_IAdd() is not supported");
+                break;
+            case ERROR_SELECTADD_NOT_SUPPORTED:
+                gcoOS_Print("Error: VXC_SelectAdd() is not supported");
+                break;
+            case ERROR_BITREPLACE_NOT_SUPPORTED:
+                gcoOS_Print("Error: VXC_BitReplace() is not supported");
+                break;
+            default:
+                gcoOS_Print("Error: unknown VXC operator is not supported");
+                break;
+            }
+        }
+        return VSC_ERR_NOT_SUPPORTED;
+    case VIR_OP_VX_BILINEAR:
+        /* BiLinear only support up to 7 outputs*/
+        modifier = VIR_Inst_GetSource(pInst, evisSrcNo);
+        val = VIR_Operand_GetImmediateUint(modifier);
+        startBin =  VXC_GET_START_BIN(val);
+        endBin   =  VXC_GET_END_BIN(val);
+        if (endBin - startBin >= 7)
+        {
+            gcoOS_Print("Error: %s [StartBin:%d, EndBin:%d] using more than 7 bins is not supported",
+                            VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
+            return VSC_ERR_NOT_SUPPORTED;
+        }
+        break;
+   case VIR_OP_VX_MULSHIFT:
+        /* NulShift only support up to 8 outputs*/
+        modifier = VIR_Inst_GetSource(pInst, evisSrcNo);
+        val = VIR_Operand_GetImmediateUint(modifier);
+        startBin =  VXC_GET_START_BIN(val);
+        endBin   =  VXC_GET_END_BIN(val);
+        if (endBin - startBin >= 8)
+        {
+            gcoOS_Print("Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported",
+                            VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
+            return VSC_ERR_NOT_SUPPORTED;
+        }
+        break;
+    default:
+        break;
+    }
+    if (isVX2)
+    {
+        switch (opCode) {
+        case VIR_OP_VX_SELECTADD:
+        case VIR_OP_VX_DP2X16:
+            gcoOS_Print("Error: opcode %s is not supported in VX2", VIR_OPCODE_GetName(opCode));
+            return VSC_ERR_NOT_SUPPORTED;
+        case VIR_OP_VX_IACCSQ:
+            /* IAccSQ will only support up to 8 outputs*/
+            modifier = VIR_Inst_GetSource(pInst, evisSrcNo);
+            val = VIR_Operand_GetImmediateUint(modifier);
+            startBin =  VXC_GET_START_BIN(val);
+            endBin   =  VXC_GET_END_BIN(val);
+            if (endBin - startBin >= 8)
+            {
+                gcoOS_Print("Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported in VX2",
+                                VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
+                return VSC_ERR_NOT_SUPPORTED;
+            }
+            break;
+        case VIR_OP_VX_LERP:
+            /* LERP will only support up to 7 outputs */
+            modifier = VIR_Inst_GetSource(pInst, evisSrcNo);
+            val = VIR_Operand_GetImmediateUint(modifier);
+            startBin =  VXC_GET_START_BIN(val);
+            endBin   =  VXC_GET_END_BIN(val);
+            if (endBin - startBin >= 7)
+            {
+                gcoOS_Print("Error: %s [StartBin:%d, EndBin:%d] using more than 7 bins is not supported in VX2",
+                                VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
+                return VSC_ERR_NOT_SUPPORTED;
+            }
+            break;
+        default:
+            break;
+        }
+    }
+    else /* VX1 */
+    {
+        switch (opCode) {
+        case VIR_OP_VX_SELECTADD:
+            /* SelectAdd only support up to 8 outputs*/
+            modifier = VIR_Inst_GetSource(pInst, evisSrcNo);
+            val = VIR_Operand_GetImmediateUint(modifier);
+            startBin =  VXC_GET_START_BIN(val);
+            endBin   =  VXC_GET_END_BIN(val);
+            if (endBin - startBin >= 8)
+            {
+                gcoOS_Print("Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported",
+                                VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
+                return VSC_ERR_NOT_SUPPORTED;
+            }
+            break;
+        case VIR_OP_VX_INDEXADD:
+        case VIR_OP_VX_VERTMIN3:
+        case VIR_OP_VX_VERTMAX3:
+        case VIR_OP_VX_VERTMED3:
+        case VIR_OP_VX_HORZMIN3:
+        case VIR_OP_VX_HORZMAX3:
+        case VIR_OP_VX_HORZMED3:
+            gcoOS_Print("Error: VX2 opcode %s is not supported in non-VX2 chip", VIR_OPCODE_GetName(opCode));
+            return VSC_ERR_NOT_SUPPORTED;
+        default:
+            break;
+        }
+    }
+
 OnError:
     return errCode;
 }
@@ -2358,7 +2551,7 @@ VIR_Lower_MiddleLevel_Process_Intrinsics(
                 if (ik > VIR_IK_evis_begin && ik < VIR_IK_evis_end)
                 {
                     /* process EVIS instructions */
-                    _processEvisIntrinsic(Shader, inst, ik);
+                    ON_ERROR0(_processEvisIntrinsic(Shader, inst, ik));
                     continue;
                 }
                 else
@@ -2370,6 +2563,11 @@ VIR_Lower_MiddleLevel_Process_Intrinsics(
                         opCode = VIR_OP_SWIZZLE;
                         break;
 
+                    case VIR_IK_swizzle_full_def:
+                        opCode = VIR_OP_SWIZZLE;
+                        VIR_Inst_SetFlag(inst, VIR_INSTFLAG_FULL_DEF);
+                        break;
+
                     case VIR_IK_any:
                         opCode = VIR_OP_ANY;
                         break;
@@ -2378,19 +2576,32 @@ VIR_Lower_MiddleLevel_Process_Intrinsics(
                         opCode = VIR_OP_ALL;
                         break;
 
+                    case VIR_IK_madsat:
+                        opCode = VIR_OP_MADSAT;
+                        break;
+
+                    case VIR_IK_imadhi0:
+                        opCode = VIR_OP_IMADHI0;
+                        break;
+
+                    case VIR_IK_imadlo0:
+                        opCode = VIR_OP_IMADLO0;
+                        break;
+
                     default:
                         break;
                     }
 
                     if (opCode != VIR_OP_NOP)
                     {
-                        _processIntrinsic(Shader, inst, opCode);
+                        ON_ERROR0(_processIntrinsic(Shader, inst, opCode));
                         continue;
                     }
                 }
             }
         }
     }
+OnError:
     return errCode;
 }
 

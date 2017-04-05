@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2016 Vivante Corporation
+*    Copyright (c) 2014 - 2017 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2016 Vivante Corporation
+*    Copyright (C) 2014 - 2017 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -143,8 +143,8 @@ typedef va_list gctARGUMENTS;
 #define gcmkVSPRINTF(Destination, Size, Message, Arguments) \
     vsnprintf(Destination, Size, Message, *((va_list*)Arguments))
 
-#define gcmkSTRCAT(Destination, Size, String) \
-    strncat(Destination, String, Size)
+#define gcmkSTRCATSAFE(Destination, Size, String) \
+    strncat(Destination, String, (Size) - 1)
 
 #define gcmkMEMCPY(Destination, Source, Size) \
     memcpy(Destination, Source, Size)

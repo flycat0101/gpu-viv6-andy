@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -70,7 +70,7 @@ vx_status vxSobel3x3(vx_node node, vx_image input, vx_image grad_x, vx_image gra
     kernelContext->params.borders = bordermode->mode;
 #endif
 
-    if (node->base.context->evisNoInst.noFilter)
+    if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noFilter)
     {
         kernelContext->params.xstep = 4;
         kernelContext->params.clamp = vx_false_e;
@@ -177,7 +177,7 @@ vx_status vxScharr3x3(vx_node node, vx_image input, vx_image grad_x, vx_image gr
 #endif
 
     /* RTL limit. Output bin# <= 6 */
-    if (node->base.context->evisNoInst.noIAdd || node->base.context->evisNoInst.noFilter)
+    if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noIAdd || node->base.context->evisNoInst.noFilter)
     {
         kernelContext->params.xstep = 4;
         kernelContext->params.clamp = vx_false_e;

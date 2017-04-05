@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -8762,7 +8762,34 @@ GLvoid GLAPIENTRY __glesProfile(FramebufferRenderbufferEXT)(__GLcontext *gc,  GL
 GLvoid GLAPIENTRY __glesProfile(GetFramebufferAttachmentParameterivEXT)(__GLcontext *gc,  GLenum target, GLenum attachment, GLenum pname, GLint *params){}
 GLvoid GLAPIENTRY __glesProfile(GenerateMipmapEXT)(__GLcontext *gc,  GLenum target){}
 GLvoid GLAPIENTRY __glesProfile(BlitFramebufferEXT)(__GLcontext *gc,  GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1,GLbitfield mask, GLenum filter){}
-
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib1d)(__GLcontext *gc, GLuint indx, GLdouble x){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib1dv)(__GLcontext *gc, GLuint indx, const GLdouble *values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib1s)(__GLcontext *gc, GLuint indx, GLshort x){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib1sv)(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib2d)(__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib2dv)(__GLcontext *gc, GLuint indx, const GLdouble * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib2s)(__GLcontext *gc, GLuint indx, GLshort x, GLshort y){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib2sv)(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib3d)(__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y, GLdouble z){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib3dv)(__GLcontext *gc, GLuint indx, const GLdouble * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib3s)(__GLcontext *gc, GLuint indx, GLshort x, GLshort y, GLshort z){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib3sv)(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4Nbv)(__GLcontext *gc, GLuint indx, const GLbyte * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4Niv)(__GLcontext *gc, GLuint indx, const GLint * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4Nsv)(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4Nub)(__GLcontext *gc, GLuint indx, GLubyte x, GLubyte y, GLubyte z, GLubyte w){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4Nubv)(__GLcontext *gc, GLuint indx, const GLubyte * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4Nuiv)(__GLcontext *gc, GLuint indx, const GLuint * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4Nusv)(__GLcontext *gc, GLuint indx, const GLushort * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4bv)(__GLcontext *gc, GLuint indx, const GLbyte * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4d)(__GLcontext *gc, GLuint indx, GLdouble x, GLdouble y, GLdouble z, GLdouble w){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4dv)(__GLcontext *gc, GLuint indx, const GLdouble * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4iv)(__GLcontext *gc, GLuint indx, const GLint * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4s)(__GLcontext *gc, GLuint indx, GLshort x, GLshort y, GLshort z, GLshort w){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4sv)(__GLcontext *gc, GLuint indx, const GLshort * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4ubv)(__GLcontext *gc, GLuint indx, const GLubyte * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4uiv)(__GLcontext *gc, GLuint indx, const GLuint * values){}
+GLvoid  GLAPIENTRY __glesProfile(VertexAttrib4usv)(__GLcontext *gc, GLuint indx, const GLushort * values){}
 
 __GLesDispatchTable __glesApiProfileDispatchTable =
 {

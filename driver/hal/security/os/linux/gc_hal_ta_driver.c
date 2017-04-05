@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -93,7 +93,6 @@ static TEE_Result TA_EXPORT TA_OpenSessionEntryPoint(
 OnError:
     if (context)
     {
-        /* TODO . */
     }
 
     return TEE_ERROR_STORAGE_NO_SPACE;

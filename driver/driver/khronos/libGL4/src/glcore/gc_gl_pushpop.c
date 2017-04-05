@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -949,11 +949,11 @@ GLvoid APIENTRY __glim_PopClientAttrib(__GLcontext *gc)
             /* Restore the ELEMENT_ARRAY_BUFFER binding point according to the saved
             ** gc->clientState.vertexArray.elementBufBinding.
             */
-            if (gc->clientState.vertexArray.elementBufBinding !=
+            if (vertexArrayState->boundIdxName !=
                 gc->bufferObject.generalBindingPoint[__GL_ELEMENT_ARRAY_BUFFER_INDEX].boundBufName)
             {
                 __glBindBufferToGeneralPoint(gc, __GL_ELEMENT_ARRAY_BUFFER_INDEX,
-                    gc->clientState.vertexArray.elementBufBinding);
+                    vertexArrayState->boundIdxName);
             }
 
             /* Notify the new clientActiveUnit to DP.

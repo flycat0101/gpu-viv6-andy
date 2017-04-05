@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -532,7 +532,6 @@ gcChipProfiler_NEW_Write(
                         totalDrawCalls += gc->profiler.apiCalls[i];
                         break;
 
-                        /* TODO: deal with es3.0 APIs */
                     case GLES3_ATTACHSHADER:
                     case GLES3_BLENDCOLOR:
                     case GLES3_BLENDEQUATION:

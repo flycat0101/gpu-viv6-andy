@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,6 +14,30 @@
 #include <gc_vx_common.h>
 #include <gc_hal_user_precomp.h>
 #include <gc_hal_vx.h>
+
+VX_INTERNAL_API vx_status vxoMemory_CAllocate(vx_context context, void** memory, vx_uint32 size)
+{
+    gcoOS_AllocateMemory(gcvNULL, size, memory);
+
+    context->memoryCount ++;
+
+    return VX_SUCCESS;
+}
+
+VX_INTERNAL_API vx_status vxoMemory_CFree(vx_context context, void** memory)
+{
+    vxAcquireMutex(context->base.lock);
+
+    gcoOS_FreeMemory(gcvNULL, *memory);
+
+    *memory = NULL;
+
+    context->memoryCount --;
+
+    vxReleaseMutex(context->base.lock);
+
+    return VX_SUCCESS;
+}
 
 VX_INTERNAL_API vx_bool vxoMemory_Allocate(vx_context context, vx_memory memory)
 {

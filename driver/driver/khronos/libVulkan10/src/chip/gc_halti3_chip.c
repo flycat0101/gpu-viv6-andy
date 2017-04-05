@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -91,15 +91,15 @@ VkResult halti3_helper_convertHwTxDesc(
     {
 #define __VK_FAKED_TEX_MAX_WIDTH 8192
 
-        __vkImageLevel fakedImageLevel = {0};
-        __vkBuffer *buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, bufv->createInfo.buffer);
-        uint32_t sizeInByte, texelSize;
-        VkImageSubresourceRange fakedSubResourceRange;
+        static __vkImageLevel fakedImageLevel = {0};
+        static VkImageSubresourceRange fakedSubResourceRange;
         static const VkComponentMapping identityComponentMapping =
         {
             VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,
             VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A
         };
+        __vkBuffer *buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, bufv->createInfo.buffer);
+        uint32_t sizeInByte, texelSize;
 
         __VK_ASSERT(!imgv);
         residentFormatInfo = &bufv->formatInfo;
@@ -571,7 +571,7 @@ void halti3_helper_convertHwSampler(
     hwSamplerDesc->halti3.anisoLog = anisoLog;
 
     hwSamplerDesc->halti3.hwSamplerMode_p0 =
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:3) - (0 ?
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:3) - (0 ?
  4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
  4:3))) | (((gctUINT32) ((gctUINT32) (s_addressXlate[createInfo->addressModeU]) & ((gctUINT32) ((((1 ?
  4:3) - (0 ? 4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
@@ -608,7 +608,7 @@ void halti3_helper_convertHwSampler(
  19:19)));
 
     hwSamplerDesc->halti3.hwSamplerLOD  =
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 12:0) - (0 ?
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 12:0) - (0 ?
  12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
  12:0))) | (((gctUINT32) ((gctUINT32) (maxlod) & ((gctUINT32) ((((1 ? 12:0) - (0 ?
  12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
@@ -620,7 +620,7 @@ void halti3_helper_convertHwSampler(
  28:16)));
 
     hwSamplerDesc->halti3.hwSamplerLODBias  =
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 16:16) - (0 ?
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 16:16) - (0 ?
  16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ?
  16:16))) | (((gctUINT32) ((gctUINT32) ((lodbias == 0 ? 0 : 1)) & ((gctUINT32) ((((1 ?
  16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
@@ -632,7 +632,7 @@ void halti3_helper_convertHwSampler(
  15:0)));
 
     hwSamplerDesc->halti3.hwBaseLOD_p0 =
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 16:16) - (0 ?
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 16:16) - (0 ?
  16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ?
  16:16))) | (((gctUINT32) ((gctUINT32) (createInfo->compareEnable ? 1 : 0) & ((gctUINT32) ((((1 ?
  16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
@@ -669,6 +669,8 @@ void halti3_helper_setSamplerStates(
     uint32_t shaderConfigData
     )
 {
+    uint32_t hwSamplerMode_p0 = samplerDesc->halti3.hwSamplerMode_p0;
+
     if (!txHwRegisterIdx)
     {
         __vkCmdLoadSingleHWState(commandBuffer, 0x022D, VK_FALSE,
@@ -688,8 +690,9 @@ void halti3_helper_setSamplerStates(
  16:16) + 1))))))) << (0 ? 16:16))));
     }
 
+
     __vkCmdLoadSingleHWState(commandBuffer, 0x4000 + hwSamplerNo, VK_FALSE,
-        txDesc->halti2.hwSamplerMode_p1 | samplerDesc->halti3.hwSamplerMode_p0);
+        hwSamplerMode_p0 | txDesc->halti2.hwSamplerMode_p1);
 
     __vkCmdLoadSingleHWState(commandBuffer, 0x40E0 + hwSamplerNo, VK_FALSE,
         txDesc->halti2.hwSamplerModeEx);

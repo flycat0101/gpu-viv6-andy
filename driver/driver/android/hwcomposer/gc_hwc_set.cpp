@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -499,8 +499,7 @@ hwcSet(
                     /* Alpha blending is needed. */
                     layer->opaque = gcvFALSE;
 
-                    /* Alpha blending parameters.
-                     * TODO: this may be incorrect. */
+                    /* Alpha blending parameters. */
                     layer->srcAlphaMode         = gcvSURF_PIXEL_ALPHA_STRAIGHT;
                     layer->dstAlphaMode         = gcvSURF_PIXEL_ALPHA_STRAIGHT;
                     layer->srcGlobalAlphaMode   = gcvSURF_GLOBAL_ALPHA_ON;

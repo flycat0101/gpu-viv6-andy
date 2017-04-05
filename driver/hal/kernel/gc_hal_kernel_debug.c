@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2016 Vivante Corporation
+*    Copyright (c) 2014 - 2017 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2016 Vivante Corporation
+*    Copyright (C) 2014 - 2017 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -762,7 +762,7 @@ _PrintBuffer(
         if ((column % COLUMN_COUNT) == 0)
         {
             /* Append EOL. */
-            gcmkSTRCAT(buffer + len, gcmSIZEOF(buffer) - len, "\n");
+            gcmkSTRCATSAFE(buffer, gcmSIZEOF(buffer), "\n");
 
             /* Print the string. */
             gcmkOUTPUT_STRING(buffer);
@@ -777,7 +777,7 @@ _PrintBuffer(
     if (column != 0)
     {
         /* Append EOL. */
-        gcmkSTRCAT(buffer + len, gcmSIZEOF(buffer) - len, "\n");
+        gcmkSTRCATSAFE(buffer, gcmSIZEOF(buffer), "\n");
 
         /* Print the string. */
         gcmkOUTPUT_STRING(buffer);
@@ -787,7 +787,7 @@ _PrintBuffer(
     if (command)
     {
         buffer[indent] = '\0';
-        gcmkSTRCAT(buffer, gcmSIZEOF(buffer), "] -- command\n");
+        gcmkSTRCATSAFE(buffer, gcmSIZEOF(buffer), "] -- command\n");
         gcmkOUTPUT_STRING(buffer);
     }
 }

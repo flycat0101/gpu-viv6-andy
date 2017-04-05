@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -124,6 +124,23 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          supportUnOrdBranch     : 1;
         gctUINT          supportPatchVerticesIn : 1;
         gctUINT          hasHalfDepFix          : 1;
+        gctUINT          supportUSC             : 1;
+        gctUINT          supportPartIntBranch   : 1;
+        gctUINT          supportIntAttrib       : 1;
+        gctUINT          hasTxBiasLodFix        : 1;
+        gctUINT          supportmovai           : 1;
+        gctUINT          useGLZ                 : 1;
+        gctUINT          supportHelperInv       : 1;
+        gctUINT          supportAdvBlendPart0   : 1;
+        gctUINT          supportStartVertexFE   : 1;
+        gctUINT          supportTxGather        : 1;
+        gctUINT          singlePipeHalti1       : 1;
+        gctUINT          supportEVISVX2         : 1;
+        gctUINT          computeOnly            : 1;
+        gctUINT          hasBugFix7             : 1;
+        gctUINT          hasExtraInst2          : 1;
+        gctUINT          hasAtomic              : 1;
+        gctUINT          supportFullIntBranch   : 1;
 
         /* Followings will be removed after shader programming is removed out of VSC */
         gctUINT          hasSHEnhance3          : 1;
@@ -139,7 +156,8 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          robustAtomic           : 1;
         gctUINT          newGPIPE               : 1;
 
-        gctUINT          reserved               : 23;
+        gctUINT          reserved               : 6;
+
     } hwFeatureFlags;
 
     gctUINT              chipModel;
@@ -157,6 +175,7 @@ typedef struct _VSC_HW_CONFIG
     gctUINT              maxPSInstCount;
     gctUINT              maxHwNativeTotalConstRegCount;
     gctUINT              maxTotalConstRegCount;
+    gctUINT              unifiedConst;
     gctUINT              maxVSConstRegCount;
     gctUINT              maxTCSConstRegCount;  /* HS */
     gctUINT              maxTESConstRegCount;  /* DS */
@@ -179,6 +198,8 @@ typedef struct _VSC_HW_CONFIG
     gctUINT              maxUSCSizeInKbyte;
     gctUINT              maxLocalMemSizeInByte;
     gctUINT              maxResultCacheWinSize;
+    gctUINT              vsSamplerNoBaseInInstruction;
+    gctUINT              psSamplerNoBaseInInstruction;
 
     /* Followings will be removed after shader programming is removed out of VSC */
     gctUINT              vsInstBufferAddrBase;
@@ -196,25 +217,47 @@ typedef struct _VSC_HW_CONFIG
 typedef gcsGLSLCaps VSC_GL_API_CONFIG, *PVSC_GL_API_CONFIG;
 
 /* VSC supported optional opts */
-#define VSC_COMPILER_OPT_ALGE_SIMP                     0x0000000000000001ULL
-#define VSC_COMPILER_OPT_GCP                           0x0000000000000002ULL
-#define VSC_COMPILER_OPT_LCP                           0x0000000000000004ULL
-#define VSC_COMPILER_OPT_LCSE                          0x0000000000000008ULL
-#define VSC_COMPILER_OPT_DCE                           0x0000000000000010ULL
-#define VSC_COMPILER_OPT_PRE                           0x0000000000000020ULL
-#define VSC_COMPILER_OPT_PEEPHOLE                      0x0000000000000040ULL
-#define VSC_COMPILER_OPT_CONSTANT_PROPOGATION          0x0000000000000080ULL
-#define VSC_COMPILER_OPT_CONSTANT_FOLDING              0x0000000000000100ULL
-#define VSC_COMPILER_OPT_FUNC_INLINE                   0x0000000000000200ULL
-#define VSC_COMPILER_OPT_INST_SKED                     0x0000000000000400ULL
-#define VSC_COMPILER_OPT_GPR_SPILLABLE                 0x0000000000000800ULL
-#define VSC_COMPILER_OPT_CONSTANT_REG_SPILLABLE        0x0000000000001000ULL
-#define VSC_COMPILER_OPT_VEC                           0x0000000000002000ULL /* Including logic io packing */
-#define VSC_COMPILER_OPT_IO_PACKING                    0x0000000000004000ULL /* Physical io packing */
-#define VSC_COMPILER_OPT_FULL_ACTIVE_IO                0x0000000000008000ULL
-#define VSC_COMPILER_OPT_DUAL16                        0x0000000000010000ULL
+#define VSC_COMPILER_OPT_NONE                           0x0000000000000000ULL
 
-#define VSC_COMPILER_OPT_FULL                          0x0000000000013FFFULL
+#define VSC_COMPILER_OPT_ALGE_SIMP                      0x0000000000000001ULL
+#define VSC_COMPILER_OPT_GCP                            0x0000000000000002ULL
+#define VSC_COMPILER_OPT_LCP                            0x0000000000000004ULL
+#define VSC_COMPILER_OPT_LCSE                           0x0000000000000008ULL
+#define VSC_COMPILER_OPT_DCE                            0x0000000000000010ULL
+#define VSC_COMPILER_OPT_PRE                            0x0000000000000020ULL
+#define VSC_COMPILER_OPT_PEEPHOLE                       0x0000000000000040ULL
+#define VSC_COMPILER_OPT_CONSTANT_PROPOGATION           0x0000000000000080ULL
+#define VSC_COMPILER_OPT_CONSTANT_FOLDING               0x0000000000000100ULL
+#define VSC_COMPILER_OPT_FUNC_INLINE                    0x0000000000000200ULL
+#define VSC_COMPILER_OPT_INST_SKED                      0x0000000000000400ULL
+#define VSC_COMPILER_OPT_GPR_SPILLABLE                  0x0000000000000800ULL
+#define VSC_COMPILER_OPT_CONSTANT_REG_SPILLABLE         0x0000000000001000ULL
+#define VSC_COMPILER_OPT_VEC                            0x0000000000002000ULL /* Including logic io packing */
+#define VSC_COMPILER_OPT_IO_PACKING                     0x0000000000004000ULL /* Physical io packing */
+#define VSC_COMPILER_OPT_FULL_ACTIVE_IO                 0x0000000000008000ULL
+#define VSC_COMPILER_OPT_DUAL16                         0x0000000000010000ULL
+
+#define VSC_COMPILER_OPT_FULL                           0x000000000001FFFFULL
+
+#define VSC_COMPILER_OPT_NO_ALGE_SIMP                   0x0000000100000000ULL
+#define VSC_COMPILER_OPT_NO_GCP                         0x0000000200000000ULL
+#define VSC_COMPILER_OPT_NO_LCP                         0x0000000400000000ULL
+#define VSC_COMPILER_OPT_NO_LCSE                        0x0000000800000000ULL
+#define VSC_COMPILER_OPT_NO_DCE                         0x0000001000000000ULL
+#define VSC_COMPILER_OPT_NO_PRE                         0x0000002000000000ULL
+#define VSC_COMPILER_OPT_NO_PEEPHOLE                    0x0000004000000000ULL
+#define VSC_COMPILER_OPT_NO_CONSTANT_PROPOGATION        0x0000008000000000ULL
+#define VSC_COMPILER_OPT_NO_CONSTANT_FOLDING            0x0000010000000000ULL
+#define VSC_COMPILER_OPT_NO_FUNC_INLINE                 0x0000020000000000ULL
+#define VSC_COMPILER_OPT_NO_INST_SKED                   0x0000040000000000ULL
+#define VSC_COMPILER_OPT_NO_GPR_SPILLABLE               0x0000080000000000ULL
+#define VSC_COMPILER_OPT_NO_CONSTANT_REG_SPILLABLE      0x0000100000000000ULL
+#define VSC_COMPILER_OPT_NO_VEC                         0x0000200000000000ULL /* Including logic io packing */
+#define VSC_COMPILER_OPT_NO_IO_PACKING                  0x0000400000000000ULL /* Physical io packing */
+#define VSC_COMPILER_OPT_NO_FULL_ACTIVE_IO              0x0000800000000000ULL
+#define VSC_COMPILER_OPT_NO_DUAL16                      0x0001000000000000ULL
+
+#define VSC_COMPILER_OPT_NO_OPT                         0x0001FFFF00000000ULL
 
 /* Compiler flag for special purpose */
 #define VSC_COMPILER_FLAG_COMPILE_TO_HL                0x00000001   /* Compile IR to HL, including doing all opts in HL */

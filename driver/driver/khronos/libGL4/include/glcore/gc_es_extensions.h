@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -127,6 +127,8 @@ typedef enum
     __GL_EXTID_texture_sRGB,
     __GL_EXTID_ARB_texture_float,
     __GL_EXTID_ARB_texture_array,
+    __GL_EXTID_EXT_framebuffer_object,
+    __GL_EXTID_ARB_framebuffer_object,
 #endif
     __GL_EXTID_EXT_LAST,
 

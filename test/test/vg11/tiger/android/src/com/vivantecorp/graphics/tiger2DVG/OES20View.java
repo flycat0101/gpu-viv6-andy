@@ -101,7 +101,7 @@ public class OES20View extends SurfaceView implements SurfaceHolder.Callback{
 		}
 
 	}
-	private boolean mHasSurface;
-	private boolean mDone;
+	private volatile boolean mHasSurface;
+	private volatile boolean mDone;
 	private RenderThread mthread;
 }

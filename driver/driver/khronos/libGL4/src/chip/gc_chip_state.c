@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1527,6 +1527,17 @@ GLvoid loadLineStippleImage(__GLcontext *gc, __GLchipContext *chipCtx)
     }
 
     if (textureInfo->object) {
+        gcoSURF mipsurf;
+        gctUINT mipW;
+        gctUINT mipH;
+        gctINT mipStride;
+
+        gcoTEXTURE_GetMipMap(textureInfo->object,
+                          0,
+                          &mipsurf);
+
+        gcoSURF_GetAlignedSize(mipsurf, &mipW, &mipH, &mipStride);
+
         gcoTEXTURE_Upload(textureInfo->object,
                           0,
                           0,
@@ -1534,7 +1545,7 @@ GLvoid loadLineStippleImage(__GLcontext *gc, __GLchipContext *chipCtx)
                           1,
                           0,
                           pTexImage,
-                          0, /* stride */
+                          mipStride,
                           textureInfo->imageFormat,
                           gcvSURF_COLOR_SPACE_LINEAR);
     }
@@ -1693,6 +1704,18 @@ GLvoid loadPolygonStippleImage(__GLcontext *gc, __GLchipContext *chipCtx)
     }
 
     if (textureInfo->object) {
+        gcoSURF mipsurf;
+        gctUINT mipW;
+        gctUINT mipH;
+        gctINT mipStride;
+
+        gcoTEXTURE_GetMipMap(textureInfo->object,
+                          0,
+                          &mipsurf);
+
+        gcoSURF_GetAlignedSize(mipsurf, &mipW, &mipH, &mipStride);
+
+
         gcoTEXTURE_Upload(textureInfo->object,
                           0,
                           0,
@@ -1700,7 +1723,7 @@ GLvoid loadPolygonStippleImage(__GLcontext *gc, __GLchipContext *chipCtx)
                           32,
                           0,
                           &texImage[0][0],
-                          0, /* stride */
+                          mipStride,
                           textureInfo->imageFormat,
                           gcvSURF_COLOR_SPACE_LINEAR);
     }
@@ -4100,7 +4123,6 @@ OnError:
 }
 
 
-/* TODO: some misc states which are not covered by dirty bits, we can add it later*/
 __GL_INLINE gceSTATUS
 gcChipValidateMiscState(
     __GLcontext *gc,
@@ -4994,7 +5016,6 @@ gcChipNeedRecompile(
 
 /* Key states collection must be as fast as possible since if no dirty exist, such
 ** collection is CPU-time wasted
-** TODO: we need find a way to clear in-stale state
 */
 static gceSTATUS
 gcChipRecompileEvaluateKeyStates(
@@ -5349,7 +5370,6 @@ gcChipRecompileEvaluateKeyStates(
     {
         __GLchipDirty *chipDirty = &chipCtx->chipDirty;
 
-        /* TODO: Refine later. Detect blend process. */
         if ((chipCtx->patchId == gcvPATCH_GTFES30) &&
             (chipCtx->chipFeature.haltiLevel < __GL_CHIP_HALTI_LEVEL_3) &&
             (gcvSTATUS_FALSE == gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_SINGLE_PIPE_HALTI1))
@@ -5985,7 +6005,6 @@ gcChipValidateProgramImagesCB(
                     texView.firstSlice = 0;
                 }
 
-                /* (todo) check if image is written inside shader.*/
                 if (1)
                 {
                     CHIP_TEX_IMAGE_UPTODATE(texInfo, imageUnit->level);

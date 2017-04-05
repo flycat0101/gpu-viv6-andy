@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -97,7 +97,7 @@ static vx_status vxVivScale(vx_node node, vx_image src_image, vx_image dst_image
     kernelContext->uniforms[index++].index       = 8;
     uniformNum++;
 
-    if (node->base.context->evisNoInst.noBilinear)
+    if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noBilinear)
     {
         vx_uint8 constantData0[16] = {0, 0, 8, 8, 64, 64, 72, 72, 0, 8, 0, 8, 0, 8, 0, 8};
         vx_uint8 constantData1[16] = {0, 0, 16, 0, 0, 0, 0, 0, 16, 0, 16, 0, 0, 0, 0, 0};

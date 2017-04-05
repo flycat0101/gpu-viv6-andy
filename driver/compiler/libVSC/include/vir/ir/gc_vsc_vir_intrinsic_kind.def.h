@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -57,6 +57,14 @@
     VIR_INTRINSIC_INFO(evis_vstore4),
     VIR_INTRINSIC_INFO(evis_vstore8),
     VIR_INTRINSIC_INFO(evis_vstore16),
+    VIR_INTRINSIC_INFO(evis_index_add),
+    VIR_INTRINSIC_INFO(evis_vert_min3),
+    VIR_INTRINSIC_INFO(evis_vert_max3),
+    VIR_INTRINSIC_INFO(evis_vert_med3),
+    VIR_INTRINSIC_INFO(evis_horz_min3),
+    VIR_INTRINSIC_INFO(evis_horz_max3),
+    VIR_INTRINSIC_INFO(evis_horz_med3),
+    VIR_INTRINSIC_INFO(evis_error),
     VIR_INTRINSIC_INFO(evis_end), /* end of evis instrinsic */
     /* DO NOT add or change order of any Intrinsic before */
 
@@ -244,6 +252,10 @@
     /* three operand instructions */
     VIR_INTRINSIC_INFO(swizzle),
     VIR_INTRINSIC_INFO(madsat),
+    VIR_INTRINSIC_INFO(swizzle_full_def), /* fully defined swizzle */
+
+    VIR_INTRINSIC_INFO(imadhi0),
+    VIR_INTRINSIC_INFO(imadlo0),
 
     VIR_INTRINSIC_INFO(LAST),
 

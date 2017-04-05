@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -496,7 +496,6 @@ typedef struct _gcsHAL_INTERFACE
             IN gctUINT32                node;
 
 #ifdef __QNXNTO__
-/* TODO: This is part of the unlock - why is it here? */
             /* Mapped logical address to unmap in user space. */
             OUT gctUINT64               memory;
 

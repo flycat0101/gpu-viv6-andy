@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -474,7 +474,6 @@ VGPath  vgCreatePath(VGint pathFormat, VGPathDatatype datatype, VGfloat scale, V
         _VGint32 pathDataSize = gcmMIN(coordCapacityHint, 65536) * getBytesPerCoordinate(datatype);
         ARRAY_ALLOCATE(path->data,  pathDataSize);
     }
-
 Error:
     vgmGetApiEndTime(context);
     gcmFOOTER_ARG("return=%d", (path ? path->object.name : VG_INVALID_HANDLE));
@@ -1991,6 +1990,8 @@ VGboolean  vgInterpolatePath(VGPath dstPath, VGPath startPath, VGPath endPath, V
     ARRAY_RESIZE(newSegments, oldSegmentSize + start.segments.size);
     if (newSegments.items == gcvNULL)
     {
+        _VGPathDtor(context->os, &start);
+        _VGPathDtor(context->os, &end);
         vgmGetApiEndTime(context);
         gcmFOOTER_ARG("return=%s", "VG_FALSE");
         return VG_FALSE;
@@ -2001,6 +2002,8 @@ VGboolean  vgInterpolatePath(VGPath dstPath, VGPath startPath, VGPath endPath, V
     ARRAY_RESIZE(newData, temp);
     if (newData.items == gcvNULL)
     {
+        _VGPathDtor(context->os, &start);
+        _VGPathDtor(context->os, &end);
         ARRAY_DTOR(newSegments);
         vgmGetApiEndTime(context);
         gcmFOOTER_ARG("return=%s", "VG_FALSE");
@@ -2023,6 +2026,8 @@ VGboolean  vgInterpolatePath(VGPath dstPath, VGPath startPath, VGPath endPath, V
         {
             if(e != VG_SCCWARC_TO && e != VG_SCWARC_TO && e != VG_LCCWARC_TO && e != VG_LCWARC_TO)
             {
+                _VGPathDtor(context->os, &start);
+                _VGPathDtor(context->os, &end);
                 ARRAY_DTOR(newSegments);
                 ARRAY_DTOR(newData);
                 OVG_RETURN(VG_FALSE);
@@ -2036,6 +2041,8 @@ VGboolean  vgInterpolatePath(VGPath dstPath, VGPath startPath, VGPath endPath, V
         {
             if(s != e)
             {
+                _VGPathDtor(context->os, &start);
+                _VGPathDtor(context->os, &end);
                 ARRAY_DTOR(newSegments);
                 ARRAY_DTOR(newData);
                 OVG_RETURN(VG_FALSE);

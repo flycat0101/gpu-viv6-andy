@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -109,7 +109,7 @@
                                     (Lhs), \
                                     (LOffset), \
                                     (RightParameters)->rOperands, \
-                                    (RightParameters)->dataTypes[0].byteOffset, \
+                                    &((RightParameters)->dataTypes[0].byteOffset), \
                                     (ElementSize)); \
      } \
      else { \
@@ -149,7 +149,10 @@
         isPointer = clmDECL_IsPointerType(Decl); \
     } \
     else { \
-        binaryDataType = _ConvElementDataTypeForRegAlloc(Name); \
+        if(clmIsElementTypeImage((Name)->decl.dataType->elementType)) { \
+            binaryDataType = _ConvElementDataType(&((Name)->decl)); \
+        } \
+        else binaryDataType = _ConvElementDataTypeForRegAlloc(Compiler, (Name)); \
         isPointer = clmDECL_IsPointerType(Decl) || clmGEN_CODE_checkVariableForMemory(Name); \
     } \
     (Status) = clNewUniform((Compiler), \
@@ -223,7 +226,7 @@ static gctBOOL _IsOpcodeComponentWise[] =
     /* clvOPCODE_IMAGE_READ_3D */ gcvFALSE,
     /* clvOPCODE_IMAGE_WRITE */ gcvFALSE,
     /* clvOPCODE_IMAGE_WRITE_3D */ gcvFALSE,
-
+    /* clvOPCODE_CLAMP0MAX */ gcvFALSE,
 
     /* Conversion Operations */
     /* clvOPCODE_FLOAT_TO_INT */ gcvTRUE,
@@ -401,9 +404,9 @@ IN cloCOMPILER Compiler,
 IN gctINT LineNo,
 IN gctINT StringNo,
 IN clsLOPERAND *LOperand,
-IN gctINT LOffset,
+IN clsROPERAND *LOffset,
 IN clsROPERAND *ROperand,
-IN gctINT ROffset,
+IN clsROPERAND *ROffset,
 IN gctSIZE_T NumBytes
 );
 
@@ -1438,9 +1441,10 @@ clGetOpcodeName(
     case clvOPCODE_TEXTURE_LOAD:     return "texture_load";
     case clvOPCODE_IMAGE_SAMPLER:    return "image_sampler";
     case clvOPCODE_IMAGE_READ:       return "image_read";
-    case clvOPCODE_IMAGE_READ_3D:       return "image_read_3d";
+    case clvOPCODE_IMAGE_READ_3D:    return "image_read_3d";
     case clvOPCODE_IMAGE_WRITE:      return "image_write";
-    case clvOPCODE_IMAGE_WRITE_3D:      return "image_write_3d";
+    case clvOPCODE_IMAGE_WRITE_3D:   return "image_write_3d";
+    case clvOPCODE_CLAMP0MAX:        return "clamp0max";
 
     case clvOPCODE_FLOAT_TO_INT:     return "float_to_int";
     case clvOPCODE_FLOAT_TO_UINT:    return "float_to_uint";
@@ -2113,18 +2117,19 @@ _AssignStructOrUnionInMemory(
     IN gctINT StringNo,
     IN clsDECL * StructDecl,
     IN clsLOPERAND *LOperand,
-    IN gctINT LOffset,
+    IN clsROPERAND * LOffset,
     IN clsGEN_CODE_PARAMETERS *Rhs,
     IN OUT gctINT *CurOperand,
     IN gctBOOL DoAssign
     )
 {
    gctINT size = 0;
+   gctINT totalSize = 0;
    gctUINT i;
    gctUINT elementCount = 1;
    gctUINT structAlignment = 0;
    gctBOOL packed = gcvFALSE;
-   gctINT lOffset;
+   clsROPERAND *lOffset;
    clsROPERAND offset[1];
    gceSTATUS status;
 
@@ -2189,18 +2194,25 @@ _AssignStructOrUnionInMemory(
                     fieldName->u.variableInfo.padding = newLocalSize - localSize;
                  }
                  localSize += fieldName->u.variableInfo.padding;
+                 status = clUpdateAddressOffset(Compiler,
+                                                LineNo,
+                                                StringNo,
+                                                localSize,
+                                                lOffset,
+                                                offset);
+                 if (gcmIS_ERROR(status)) return -1;
                  curSize = _AssignStructOrUnionInMemory(Compiler,
                                                         LineNo,
                                                         StringNo,
                                                         &fieldName->decl,
                                                         LOperand,
-                                                        localSize + lOffset,
+                                                        offset,
                                                         Rhs,
                                                         CurOperand,
                                                         doAssign);
 
                  if(StructDecl->dataType->elementType == clvTYPE_UNION) {
-                if(curSize > localSize) localSize = curSize;
+                    if(curSize > localSize) localSize = curSize;
                     curCount = *CurOperand - curOperandIndex;
                     if(curCount > localCount) localCount = curCount;
                     doAssign = gcvFALSE;
@@ -2216,7 +2228,15 @@ _AssignStructOrUnionInMemory(
               }
 
               newLocalSize = clmALIGN(localSize, structAlignment, packed);
-              lOffset += newLocalSize - localSize;
+              size = newLocalSize - localSize;
+              totalSize += size;
+              status = clUpdateAddressOffset(Compiler,
+                                             LineNo,
+                                             StringNo,
+                                             size,
+                                             lOffset,
+                                             gcvNULL);
+              if (gcmIS_ERROR(status)) return -1;
               continue;
             }
             break;
@@ -2305,7 +2325,6 @@ _AssignStructOrUnionInMemory(
             size *= clmDATA_TYPE_matrixRowCount_GET(StructDecl->dataType) * clmDATA_TYPE_matrixColumnCount_GET(StructDecl->dataType);
          }
       }
-      _InitializeROperandConstant(offset, clmGenCodeDataType(T_UINT), lOffset);
       (*CurOperand)++;
       if(DoAssign) {
          status = clGenStoreCode(Compiler,
@@ -2314,13 +2333,20 @@ _AssignStructOrUnionInMemory(
                                  Rhs->rOperands + *CurOperand,
                                  LOperand,
                                  Rhs->dataTypes[*CurOperand].def,
-                                 offset);
+                                 lOffset);
          if (gcmIS_ERROR(status)) return -1;
       }
-      lOffset += size;
+      status = clUpdateAddressOffset(Compiler,
+                                     LineNo,
+                                     StringNo,
+                                     size,
+                                     lOffset,
+                                     gcvNULL);
+      if (gcmIS_ERROR(status)) return -1;
+      totalSize += size;
    }
 
-   return lOffset - LOffset;
+   return totalSize;
 }
 
 static clsGEN_CODE_DATA_TYPE
@@ -2396,6 +2422,8 @@ _FillMemoryOffsetsForStruct(
     structElemCount = *ParamDataTypes - fromDataTypes;
     toDataTypes = *ParamDataTypes;
     if(--count > 0) {
+        gceSTATUS status;
+
         if(bufSize < (gctINT)(structElemCount * count)) return -1;
         offset = gcmALIGN(offset, alignment);
         for (i = 0, arrayStride = offset - *Offset ; i < count; i++, offset += arrayStride)
@@ -2403,7 +2431,13 @@ _FillMemoryOffsetsForStruct(
             for(j = 0; j < structElemCount; j++, toDataTypes++)
             {
                 toDataTypes->def = fromDataTypes[j].def;
-                toDataTypes->byteOffset = fromDataTypes[j].byteOffset + offset;
+                status = clUpdateAddressOffset(Compiler,
+                                               0,
+                                               0,
+                                               offset,
+                                               &fromDataTypes[j].byteOffset,
+                                               &toDataTypes->byteOffset);
+                if (gcmIS_ERROR(status)) return -1;
             }
         }
         bufSize -= (gctINT)(structElemCount * count);
@@ -2454,7 +2488,10 @@ _FillMemoryOffsetOrArray(
         i < operandCount;
         i++, dataTypes++, offset += arrayStride) {
         dataTypes->def = binaryDataType;
-        dataTypes->byteOffset = offset;
+        clsROPERAND_InitializeScalarConstant(&dataTypes->byteOffset,
+                                             clmGenCodeDataType(T_INT),
+                                             long,
+                                             offset);
     }
 
     *Offset = offset;
@@ -2574,6 +2611,7 @@ _FillDefaultComponentSelection(
 
 static clsGEN_CODE_DATA_TYPE
 _ConvElementDataTypeForRegAlloc(
+IN cloCOMPILER Compiler,
 IN clsNAME * Name
 )
 {
@@ -2585,6 +2623,10 @@ IN clsNAME * Name
       clmDECL_IsArrayOfPointers(decl) ||
       clmGEN_CODE_checkVariableForMemory(Name)) {
       return clmGenCodeDataType(T_UINT);
+   }
+   else if (clmIsElementTypeImage(decl->dataType->elementType)  &&
+            cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+      return clmGenCodeDataType(T_UINT8);
    }
    else {
       clsGEN_CODE_DATA_TYPE resultType;
@@ -2625,21 +2667,32 @@ IN OUT gctUINT * Start
    gceSTATUS status;
    gctUINT count, i, curStart, prevStart;
    clsNAME *fieldName;
+   clsGEN_CODE_DATA_TYPE dataType;
 
    gcmASSERT(Decl);
    gcmASSERT(TargetDataTypes);
    gcmASSERT(Start);
 
    if(clmDECL_IsArray(Decl) && Decl->dataType->addrSpaceQualifier == clvQUALIFIER_LOCAL) {
-    TargetDataTypes[*Start].def = _ConvElementDataType(Decl);
-    (*Start)++;
-    return gcvSTATUS_OK;
+       TargetDataTypes[*Start].def = _ConvElementDataType(Decl);
+       dataType = clmGenCodeDataType(T_INT);
+       clsROPERAND_InitializeScalarConstant(&TargetDataTypes[*Start].byteOffset,
+                                            dataType,
+                                            long,
+                                            0);
+       (*Start)++;
+       return gcvSTATUS_OK;
    }
 
    if(clmDECL_IsPointerType(Decl)) {
-    TargetDataTypes[*Start].def = _ConvElementDataType(Decl);
-    (*Start)++;
-    return gcvSTATUS_OK;
+       TargetDataTypes[*Start].def = _ConvElementDataType(Decl);
+       dataType = clmGenCodeDataType(T_INT);
+       clsROPERAND_InitializeScalarConstant(&TargetDataTypes[*Start].byteOffset,
+                                            dataType,
+                                            long,
+                                            0);
+       (*Start)++;
+       return gcvSTATUS_OK;
    }
 
    if (clmDECL_IsArray(Decl)) {
@@ -2650,27 +2703,32 @@ IN OUT gctUINT * Start
    for (i = 0; i < count; i++) {
       if (Decl->dataType->elementType == clvTYPE_STRUCT ||
           Decl->dataType->elementType == clvTYPE_UNION) {
-        gcmASSERT(Decl->dataType->u.fieldSpace);
+          gcmASSERT(Decl->dataType->u.fieldSpace);
 
-        prevStart = curStart = *Start;
-        FOR_EACH_DLINK_NODE(&Decl->dataType->u.fieldSpace->names, clsNAME, fieldName) {
-           gcmASSERT(fieldName->decl.dataType);
+          prevStart = curStart = *Start;
+          FOR_EACH_DLINK_NODE(&Decl->dataType->u.fieldSpace->names, clsNAME, fieldName) {
+             gcmASSERT(fieldName->decl.dataType);
 
-           status = _ConvDataType(&fieldName->decl,
-                                  TargetDataTypes,
-                                  Start);
-           if(Decl->dataType->elementType == clvTYPE_UNION) {
-          if(*Start > curStart) curStart = *Start;
-          *Start = prevStart;
-       }
-       else curStart = *Start;
-           if (gcmIS_ERROR(status)) return status;
-    }
-    *Start = curStart;
+             status = _ConvDataType(&fieldName->decl,
+                                    TargetDataTypes,
+                                    Start);
+             if(Decl->dataType->elementType == clvTYPE_UNION) {
+                 if(*Start > curStart) curStart = *Start;
+                 *Start = prevStart;
+             }
+             else curStart = *Start;
+             if (gcmIS_ERROR(status)) return status;
+          }
+          *Start = curStart;
       }
       else {
-    TargetDataTypes[*Start].def = _ConvElementDataType(Decl);
-    (*Start)++;
+          TargetDataTypes[*Start].def = _ConvElementDataType(Decl);
+          dataType = clmGenCodeDataType(T_INT);
+          clsROPERAND_InitializeScalarConstant(&TargetDataTypes[*Start].byteOffset,
+                                               dataType,
+                                               long,
+                                               0);
+          (*Start)++;
       }
   }
 
@@ -2688,6 +2746,7 @@ IN OUT gctUINT * Start
    gctUINT count, i, curStart, prevStart;
    clsNAME *fieldName;
    clsDECL * decl;
+   clsGEN_CODE_DATA_TYPE dataType;
    gcmASSERT(Name && Name->decl.dataType);
 
    gcmASSERT(TargetDataTypes);
@@ -2695,6 +2754,11 @@ IN OUT gctUINT * Start
    decl = &Name->decl;
    if(clmDECL_IsPointerType(decl) || clmGEN_CODE_checkVariableForMemory(Name)) {
        TargetDataTypes[*Start].def = clmGenCodeDataType(T_UINT);
+       dataType = clmGenCodeDataType(T_INT);
+       clsROPERAND_InitializeScalarConstant(&TargetDataTypes[*Start].byteOffset,
+                                            dataType,
+                                            long,
+                                            0);
        (*Start)++;
        return gcvSTATUS_OK;
    }
@@ -2727,6 +2791,11 @@ IN OUT gctUINT * Start
       }
       else {
           TargetDataTypes[*Start].def = _ConvElementDataType(decl);
+          dataType = clmGenCodeDataType(T_INT);
+          clsROPERAND_InitializeScalarConstant(&TargetDataTypes[*Start].byteOffset,
+                                               dataType,
+                                               long,
+                                               0);
           (*Start)++;
       }
   }
@@ -3723,7 +3792,7 @@ OUT gctUINT *NumRegNeeded
         gcmVERIFY_OK(clGetBuiltinVariableImplSymbol(Compiler, Name, Symbol, &Symbol));
     }
 
-    binaryDataType        = _ConvElementDataTypeForRegAlloc(Name);
+    binaryDataType        = _ConvElementDataTypeForRegAlloc(Compiler, Name);
     binaryDataTypeRegSize    = gcGetDataTypeRegSize(binaryDataType);
     regOffset = _clmGetTempRegIndexOffset(binaryDataTypeRegSize,
                                           binaryDataType.elementType);
@@ -3749,7 +3818,7 @@ OUT gctUINT *NumRegNeeded
     if(isUniformForAddressSpace ||
        (cloCOMPILER_IsExternSymbolsAllowed(Compiler) &&
         !clmDECL_IsPointerType(&Name->decl) &&
-        (Name->type == clvVARIABLE_NAME || Name->type == clvPARAMETER_NAME) &&
+        Name->type == clvPARAMETER_NAME &&
         Name->decl.dataType->addrSpaceQualifier == clvQUALIFIER_CONSTANT)) {
 
         status = cloCOMPILER_AllocateVariableMemory(Compiler,
@@ -3978,6 +4047,17 @@ OUT gctUINT *NumRegNeeded
                                               &variable);
                        if (gcmIS_ERROR(status)) return status;
                    }
+                   if(storageQualifier & clvSTORAGE_QUALIFIER_EXTERN) {
+                       gcSHADER shader;
+
+                       /* set shader to have extern variables */
+                       gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &shader));
+                       SetShaderHasExternVariable(shader, gcvTRUE);
+                       SetVariableIsExtern(variable);
+                   }
+                   else if(storageQualifier & clvSTORAGE_QUALIFIER_STATIC) {
+                       SetVariableIsStatic(variable);
+                   }
                }
                else variable = gcvNULL;
                status = clNewFunctionArgument(Compiler,
@@ -4146,13 +4226,19 @@ OUT gctUINT *NumRegNeeded
         }
         else {
             clsGEN_CODE_DATA_TYPE format;
+            clsGEN_CODE_DATA_TYPE uniformKind;
 
             clmGEN_CODE_ConvDirectElementDataType(Decl->dataType, format);
+            uniformKind = binaryDataType;
+            if(clmIsElementTypeImage(Name->decl.dataType->elementType)) {
+                uniformKind = _ConvElementDataType(&Name->decl);
+            }
+
             status = clNewUniform(Compiler,
                                   Name->lineNo,
                                   Name->stringNo,
                                   Symbol,
-                                  binaryDataType,
+                                  uniformKind,
                                   format,
                                   Name->u.variableInfo.variableType,
                                   clmDECL_IsPointerType(Decl) || clmGEN_CODE_checkVariableForMemory(Name),
@@ -4257,7 +4343,7 @@ OUT gctUINT *NumRegNeeded
         gcmVERIFY_OK(clGetBuiltinVariableImplSymbol(Compiler, Name, Symbol, &Symbol));
     }
 
-    binaryDataType        = _ConvElementDataTypeForRegAlloc(Name);
+    binaryDataType        = _ConvElementDataTypeForRegAlloc(Compiler, Name);
     binaryDataTypeRegSize    = gcGetDataTypeRegSize(binaryDataType);
 
     addrSpaceQualifier = Name->decl.dataType->addrSpaceQualifier;
@@ -4366,13 +4452,19 @@ OUT gctUINT *NumRegNeeded
     case clvQUALIFIER_UNIFORM:
         {
             clsGEN_CODE_DATA_TYPE format;
+            clsGEN_CODE_DATA_TYPE uniformKind;
 
             clmGEN_CODE_ConvDirectElementDataType(Decl->dataType, format);
+            uniformKind = binaryDataType;
+            if(clmIsElementTypeImage(Name->decl.dataType->elementType)) {
+                uniformKind = _ConvElementDataType(&Name->decl);
+            }
+
             status = clNewUniform(Compiler,
                                   Name->lineNo,
                                   Name->stringNo,
                                   Symbol,
-                                  binaryDataType,
+                                  uniformKind,
                                   format,
                                   Name->u.variableInfo.variableType,
                                   clmDECL_IsPointerType(Decl) || clmGEN_CODE_checkVariableForMemory(Name),
@@ -4679,7 +4771,7 @@ IN clsNAME * Name
     }
 
     if(!clmDECL_IsPointerType(&Name->decl) &&
-       (Name->type == clvVARIABLE_NAME || Name->type == clvPARAMETER_NAME) &&
+       Name->type == clvPARAMETER_NAME &&
        Name->decl.dataType->addrSpaceQualifier == clvQUALIFIER_CONSTANT &&
        Name->decl.storageQualifier & clvSTORAGE_QUALIFIER_EXTERN) {
         status = clsNAME_SetVariableAddressed(Compiler,
@@ -5554,6 +5646,23 @@ OUT gctUINT8 *SuperEnable
     return enable ? (numSections + 1) : 0;
 }
 
+
+
+gctUINT8
+_findLastEnabledComponent(
+IN clsCOMPONENT_SELECTION *ComponentSelection
+)
+{
+   gctUINT8 enabledComponent = 0;
+   gctUINT8 i;
+
+   for(i = 0; i < ComponentSelection->components; i++) {
+      if(ComponentSelection->selection[i] > enabledComponent) {
+          enabledComponent = ComponentSelection->selection[i];
+      }
+   }
+   return enabledComponent + 1;
+}
 
 static gctUINT32
 _ConvComponentSelectionToSwizzleEnable(
@@ -6765,33 +6874,6 @@ _ConvComponentSelectionToSwizzle(
 }
 
 static gctUINT8
-_ConvPackedTypeToSwizzle(
-    IN cloCOMPILER Compiler,
-    IN clsGEN_CODE_DATA_TYPE PackedType
-    )
-{
-    gcmASSERT(clmIsElementTypePacked(PackedType.elementType));
-    switch(clGEN_CODE_DataTypeByteSize(Compiler, PackedType)) {
-    case 1:
-    case 2:
-    case 3:
-    case 4:
-        return gcSL_SWIZZLE_XXXX;
-
-    case 8:
-        return gcSL_SWIZZLE_XYYY;
-
-    case 16:
-    case 32:
-        return gcSL_SWIZZLE_XYZW;
-
-    default:
-        gcmASSERT(0);
-        return gcSL_SWIZZLE_XYZW;
-    }
-}
-
-static gctUINT8
 _CompleteSwizzle(
 IN gctUINT8 Swizzle,
 IN gctUINT8 Components
@@ -7010,13 +7092,55 @@ _makeShortPackedEnable(
 #endif
 
 static gceSTATUS
+_GenSignExtendCode(
+    IN cloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
+    IN clsLOPERAND * LOperand
+    )
+{
+    gceSTATUS status;
+    clsIOPERAND iOperand[1];
+    clsROPERAND rOperand[1];
+    gcsSOURCE source[1];
+    gcsTARGET target[1];
+    clsGEN_CODE_DATA_TYPE dataType;
+
+    clsROPERAND_InitializeUsingLOperand(rOperand, LOperand);
+
+    status = _ConvNormalROperandToSource(Compiler,
+                                         LineNo,
+                                         StringNo,
+                                         rOperand,
+                                         source);
+    if(gcmIS_ERROR(status)) return status;
+
+    if(clmIsElementTypeUnsigned(rOperand->dataType.elementType)) {
+        dataType = clmGenCodeDataType(T_UINT);
+    }
+    else {
+        dataType = clmGenCodeDataType(T_INT);
+    }
+    clsIOPERAND_Initialize(Compiler, iOperand, dataType, rOperand->u.reg.regIndex);
+    gcsTARGET_InitializeUsingIOperand(Compiler, target, iOperand);
+    return clEmitConvCode(Compiler,
+                          LineNo,
+                          StringNo,
+                          clvOPCODE_CONV,
+                          target,
+                          source,
+                          rOperand->dataType);
+}
+
+static gceSTATUS
 _GenSwizzleCode(
     IN cloCOMPILER Compiler,
     IN gctUINT LineNo,
     IN gctUINT StringNo,
     IN clsLOPERAND * LOperand,
     IN clsROPERAND * ROperand,
-    IN clsCOMPONENT_SELECTION *ComponentSelection
+    IN clsCOMPONENT_SELECTION *ComponentSelection,
+    IN gctBOOL NotAssign
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -7133,6 +7257,7 @@ _GenSwizzleCode(
 #else
     {
 #endif
+        clvVIR_IK intrinsicKind = NotAssign ? CL_VIR_IK_swizzle_full_def : CL_VIR_IK_swizzle;
         gctUINT32 enable;
         gctUINT8 lastEnabledComponent;
 
@@ -7143,7 +7268,7 @@ _GenSwizzleCode(
             rOperands[0].u.reg.componentSelection = clGetDefaultComponentSelection(Compiler, ROperand->u.reg.dataType);
         }
 
-        lastEnabledComponent = LOperand->reg.componentSelection.selection[LOperand->reg.componentSelection.components - 1] + 1;
+        lastEnabledComponent = _findLastEnabledComponent(&LOperand->reg.componentSelection);
         status = _ConvComponentSelectionToPackedSwizzle(Compiler,
                                                         lastEnabledComponent,
                                                         ComponentSelection,
@@ -7154,15 +7279,20 @@ _GenSwizzleCode(
                                                         LOperand->dataType.elementType);
         _InitializeROperandConstant(&rOperands[2], clmGenCodeDataType(T_UINT), enable);
         status = clGenIntrinsicAsmCode(Compiler,
-                                       0,
-                                       0,
-                                       CL_VIR_IK_swizzle,
+                                       LineNo,
+                                       StringNo,
+                                       intrinsicKind,
                                        lOperand,
                                        3,
                                        rOperands);
         if(gcmIS_ERROR(status)) return status;
-
-
+        if(NotAssign && clmGEN_CODE_IsScalarDataType(lOperand->dataType)) {
+            status = _GenSignExtendCode(Compiler,
+                                        LineNo,
+                                        StringNo,
+                                        lOperand);
+            if(gcmIS_ERROR(status)) return status;
+        }
     }
     return status;
 }
@@ -7180,7 +7310,8 @@ _SetSourceRegSwizzle(
     if(clmIsElementTypePacked(ROperand->dataType.elementType)) {
         clsGEN_CODE_DATA_TYPE targetDataType;
 
-        if(clIsDefaultComponentSelection(ComponentSelection)) {
+        if(ROperand->isReg && _IsDefaultComponentSelectionByComponents(gcGetDataTypeComponentCount(ROperand->u.reg.dataType),
+                                                                       ComponentSelection)) {
             targetDataType = ROperand->dataType;
         }
         else {
@@ -7196,14 +7327,15 @@ _SetSourceRegSwizzle(
                                      0,
                                      lOperand,
                                      ROperand,
-                                     ComponentSelection);
+                                     ComponentSelection,
+                                     gcvTRUE);
             if(gcmIS_ERROR(status)) return status;
 
             SourceReg->indexMode = gcSL_NOT_INDEXED;
             SourceReg->indexRegIndex    = 0;
             SourceReg->regIndex = iOperand->tempRegIndex;
         }
-        SourceReg->swizzle = _ConvPackedTypeToSwizzle(Compiler, targetDataType);
+        SourceReg->swizzle = clConvPackedTypeToSwizzle(Compiler, targetDataType);
     }
     else SourceReg->swizzle = _ConvComponentSelectionToSwizzle(ComponentSelection);
     return status;
@@ -8388,7 +8520,8 @@ _SpecialGenAssignCode(
                                             StringNo,
                                             LOperand,
                                             ROperand,
-                                            &componentSelection);
+                                            &componentSelection,
+                                            gcvFALSE);
                 }
                 else if(ROperand->isReg && gcIsScalarDataType(ROperand->dataType)) {
                     clsLOPERAND lOperand;
@@ -8402,7 +8535,7 @@ _SpecialGenAssignCode(
 
                     lOperand = *LOperand;
                     lOperand.dataType = LOperand->reg.dataType;
-                    lOperand.reg.componentSelection = ComponentSelection_XYZW;
+                    lOperand.reg.componentSelection = clGetDefaultComponentSelection(Compiler, LOperand->reg.dataType);
 
 #if _SPLIT_PACKED_TYPE_GT_16_BYTES
                     if(clGEN_CODE_DataTypeByteSize(Compiler, LOperand->dataType) > 16) {
@@ -8432,7 +8565,7 @@ _SpecialGenAssignCode(
                         return  clGenIntrinsicAsmCode(Compiler,
                                                       LineNo,
                                                       StringNo,
-                                                      CL_VIR_IK_swizzle,
+                                                      CL_VIR_IK_swizzle_full_def,
                                                       &lOperand,
                                                       3,
                                                       rOperands);
@@ -9313,7 +9446,7 @@ _EmitGenericCode2(
                    gcmASSERT(source0.type != gcvSOURCE_CONSTANT);
                    source0.dataType = gcGetVectorComponentSelectionDataType(source0.dataType,
                                                                             8);
-                   source0.u.sourceReg.swizzle =_ConvPackedTypeToSwizzle(Compiler,
+                   source0.u.sourceReg.swizzle = clConvPackedTypeToSwizzle(Compiler,
                                                                          source0.dataType);
                    regOffset0 = 1;
                }
@@ -9322,7 +9455,7 @@ _EmitGenericCode2(
 
                    source1.dataType = gcGetVectorComponentSelectionDataType(source1.dataType,
                                                                             8);
-                   source1.u.sourceReg.swizzle =_ConvPackedTypeToSwizzle(Compiler,
+                   source1.u.sourceReg.swizzle = clConvPackedTypeToSwizzle(Compiler,
                                                                          source1.dataType);
                    regOffset1 = 1;
                }
@@ -11128,7 +11261,7 @@ IN gctINT Incr
       case clvTYPE_INT:
       case clvTYPE_CHAR:
       case clvTYPE_SHORT:
-           Offset->u.constant.values[0].intValue += Incr;
+           Offset->u.constant.values[0].longValue += Incr;
        return gcvSTATUS_OK;
 
       default:
@@ -11138,8 +11271,8 @@ IN gctINT Incr
    return gcvSTATUS_INVALID_ARGUMENT;
 }
 
-static gceSTATUS
-_UpdateAddressOffset(
+gceSTATUS
+clUpdateAddressOffset(
 IN cloCOMPILER Compiler,
 IN gctUINT LineNo,
 IN gctUINT StringNo,
@@ -11197,17 +11330,18 @@ clGenScaledIndexOperandWithOffset(
     IN gctUINT StringNo,
     IN clsROPERAND *IndexOperand,
     IN gctINT32 ElementDataTypeSize,
-    IN gctINT ByteOffset,
+    IN clsROPERAND *ByteOffset,
     OUT clsROPERAND *ScaledOperand
     )
 {
    gceSTATUS status = gcvSTATUS_OK;
+   clsIOPERAND result[1];
 
    gcmASSERT(IndexOperand);
    gcmASSERT(gcIsScalarDataType(IndexOperand->dataType) &&
        clmIsElementTypeInteger(clmGEN_CODE_elementType_GET(IndexOperand->dataType)));
 
-   if(ElementDataTypeSize == 1 && ByteOffset == 0) {
+   if(ElementDataTypeSize == 1 && clIsIntegerZero(ByteOffset)) {
       *ScaledOperand = *IndexOperand;
       return gcvSTATUS_OK;
    }
@@ -11216,14 +11350,17 @@ clGenScaledIndexOperandWithOffset(
      gctUINT index;
 
      index = IndexOperand->u.constant.values[0].intValue;
-     if(index == 0 && ByteOffset == 0) {
+     if(index == 0 && clIsIntegerZero(ByteOffset)) {
         *ScaledOperand = *IndexOperand;
      }
      else {
-        clsROPERAND_InitializeScalarConstant(ScaledOperand,
-                                             clmGenCodeDataType(T_INT),
-                                             long,
-                                             index * ElementDataTypeSize + ByteOffset);
+        status = clUpdateAddressOffset(Compiler,
+                                       LineNo,
+                                       StringNo,
+                                       index * ElementDataTypeSize,
+                                       ByteOffset,
+                                       ScaledOperand);
+        if (gcmIS_ERROR(status)) return status;
      }
      return gcvSTATUS_OK;
    }
@@ -11236,7 +11373,6 @@ clGenScaledIndexOperandWithOffset(
      }
      else {
         clsROPERAND scale[1];
-        clsIOPERAND result[1];
         cltELEMENT_TYPE elementType = IndexOperand->dataType.elementType;
 
         if(elementType < clvTYPE_INT) {
@@ -11281,14 +11417,17 @@ clGenScaledIndexOperandWithOffset(
         IndexOperand->dataType.elementType = elementType; /* restore element type to original */
      }
 
-     if(ByteOffset) {
-        status = _UpdateAddressOffset(Compiler,
-                                      LineNo,
-                                      StringNo,
-                                      ByteOffset,
-                                      ScaledOperand,
-                                      gcvNULL);
+     if(!clIsIntegerZero(ByteOffset)) {
+        clsIOPERAND_New(Compiler, result, ScaledOperand->dataType);
+        status = clGenArithmeticExprCode(Compiler,
+                                         LineNo,
+                                         StringNo,
+                                         clvOPCODE_ADD,
+                                         result,
+                                         ByteOffset,
+                                         ScaledOperand);
         if (gcmIS_ERROR(status)) return status;
+        clsROPERAND_InitializeUsingIOperand(ScaledOperand, result);
      }
    }
    return status;
@@ -11322,7 +11461,7 @@ IN gctINT Value
 }
 
 gctBOOL
-_IsIntegerZero(
+clIsIntegerZero(
 IN clsROPERAND *Operand
 )
 {
@@ -11350,7 +11489,7 @@ IN clsROPERAND *Operand
 }
 
 gctINT
-_GetIntegerValue(
+clGetIntegerValue(
 IN clsROPERAND *Operand
 )
 {
@@ -11391,17 +11530,17 @@ IN clsROPERAND *Offset,
 IN OUT clsROPERAND *Res
 )
 {
-    if(_IsIntegerZero(Offset)) {
+    if(clIsIntegerZero(Offset)) {
        *Res = *ROperand;
     }
-    else if(_IsIntegerZero(ROperand)) {
+    else if(clIsIntegerZero(ROperand)) {
        *Res = *Offset;
     }
     else if(!ROperand->isReg && !Offset->isReg) {
        clsROPERAND_InitializeScalarConstant(Res,
                                             clmGenCodeDataType(T_INT),
                                             int,
-                                           _GetIntegerValue(ROperand) + _GetIntegerValue(Offset));
+                                            clGetIntegerValue(ROperand) + clGetIntegerValue(Offset));
     }
     else {
        gceSTATUS status;
@@ -11431,7 +11570,7 @@ IN clsROPERAND *Offset,
 IN OUT clsLOPERAND *Res
 )
 {
-    if(_IsIntegerZero(Offset)) {
+    if(clIsIntegerZero(Offset)) {
        *Res = *LOperand;
     }
     else {
@@ -11541,7 +11680,7 @@ IN clsCOMPONENT_SELECTION *ComponentSelection
      addressOperand = ROperand;
      _InitializeROperandConstant(offsetBuffer,
                                  Offset->dataType,
-                                 _GetIntegerValue(Offset));
+                                 clGetIntegerValue(Offset));
      offset = offsetBuffer;
   }
 
@@ -11702,7 +11841,7 @@ IN clsCOMPONENT_SELECTION *ComponentSelection
      addressOperand = ROperand;
      _InitializeROperandConstant(offsetBuffer,
                                  Offset->dataType,
-                                 _GetIntegerValue(Offset));
+                                 clGetIntegerValue(Offset));
      offset = offsetBuffer;
   }
 
@@ -11815,7 +11954,7 @@ IN clsIOPERAND *IOperand
        return gcvTRUE;
     }
     else {
-       offset = _GetIntegerValue(ScaledIndex);
+       offset = clGetIntegerValue(ScaledIndex);
     }
 
     variable = clParseFindPointerVariable(Compiler,
@@ -11905,21 +12044,22 @@ clGenDerefPointerCode(
   }
 
   if (Parameters->needROperand || Parameters->needLOperand) {
+    clsROPERAND rOperand[1];
     clsIOPERAND iOperand[1];
     clsROPERAND scaledIndex[1];
     gctUINT elementDataTypeSize = 0;
 
     elementDataTypeSize = clsDECL_GetByteSize(Compiler, &Expr->decl);
-    status = clGenScaledIndexOperandWithOffset(Compiler,
-                                               Expr->base.lineNo,
-                                               Expr->base.stringNo,
-                                               &RightParameters->rOperands[0],
-                                               elementDataTypeSize,
-                                               LeftParameters->dataTypes[0].byteOffset,
-                                               scaledIndex);
-    if (gcmIS_ERROR(status)) return status;
 
     if(Parameters->hint & clvGEN_FIELD_SELECT_CODE) {
+       status = clGenScaledIndexOperandWithOffset(Compiler,
+                                                  Expr->base.lineNo,
+                                                  Expr->base.stringNo,
+                                                  &RightParameters->rOperands[0],
+                                                  elementDataTypeSize,
+                                                  &LeftParameters->dataTypes[0].byteOffset,
+                                                  scaledIndex);
+       if (gcmIS_ERROR(status)) return status;
        if (_clmIsROperandConstantZero(scaledIndex)) {
           if(Parameters->needLOperand) {
              Parameters->lOperands[0] = LeftParameters->lOperands[0];
@@ -11930,8 +12070,6 @@ clGenDerefPointerCode(
        }
        else {
           if(Parameters->needLOperand) {
-            clsROPERAND rOperand[1];
-
             clsIOPERAND_New(Compiler, iOperand, LeftParameters->lOperands[0].dataType);
             clsROPERAND_InitializeUsingLOperand(rOperand, &LeftParameters->lOperands[0]);
             status = clGenGenericCode2(Compiler,
@@ -11965,9 +12103,16 @@ clGenDerefPointerCode(
         if(clmDECL_IsUnderlyingStructOrUnion(&Expr->decl)) {
             gctINT32 offset = 0;
             gctINT operandsRemain;
-            clsROPERAND rOperand[1];
             clsGEN_CODE_PARAMETER_DATA_TYPE *dataTypes;
 
+            status = clGenScaledIndexOperandWithOffset(Compiler,
+                                                       Expr->base.lineNo,
+                                                       Expr->base.stringNo,
+                                                       &RightParameters->rOperands[0],
+                                                       elementDataTypeSize,
+                                                       &LeftParameters->dataTypes[0].byteOffset,
+                                                       scaledIndex);
+            if (gcmIS_ERROR(status)) return status;
             clsROPERAND_InitializeUsingLOperand(rOperand, &LeftParameters->lOperands[0]);
             if(scaledIndex->isReg) {
                 clsIOPERAND_New(Compiler, iOperand, LeftParameters->rOperands[0].dataType);
@@ -11982,7 +12127,7 @@ clGenDerefPointerCode(
                 clsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
             }
             else {
-                offset = _GetIntegerValue(scaledIndex);
+                offset = clGetIntegerValue(scaledIndex);
             }
 
             dataTypes = Parameters->dataTypes;
@@ -11996,24 +12141,32 @@ clGenDerefPointerCode(
 
             for (i = 0; i < Parameters->operandCount; i++) {
                 clsIOPERAND_New(Compiler, iOperand, Parameters->dataTypes[i].def);
-                _InitializeROperandConstant(scaledIndex,
-                                            clmGenCodeDataType(T_UINT),
-                                            Parameters->dataTypes[i].byteOffset);
                 status = clGenGenericCode2(Compiler,
                                            Expr->base.lineNo,
                                            Expr->base.stringNo,
                                            clvOPCODE_LOAD,
                                            iOperand,
                                            rOperand,
-                                           scaledIndex);
-               if (gcmIS_ERROR(status)) return status;
-               clsLOPERAND_InitializeUsingIOperand(&Parameters->lOperands[i], iOperand);
-               Parameters->dataTypes[i].byteOffset = 0;
+                                           &Parameters->dataTypes[i].byteOffset);
+                if (gcmIS_ERROR(status)) return status;
+                clsLOPERAND_InitializeUsingIOperand(&Parameters->lOperands[i], iOperand);
+                clsROPERAND_InitializeScalarConstant(&Parameters->dataTypes[i].byteOffset,
+                                                     clmGenCodeDataType(T_INT),
+                                                     long,
+                                                     0);
             }
         }
         else {
-          clsROPERAND rOperand[1];
+          clsIOPERAND intermIOperand[1];
 
+          status = clGenScaledIndexOperand(Compiler,
+                                           Expr->base.lineNo,
+                                           Expr->base.stringNo,
+                                           &RightParameters->rOperands[0],
+                                           elementDataTypeSize,
+                                           gcvTRUE,
+                                           scaledIndex);
+          if (gcmIS_ERROR(status)) return status;
           for (i = 0; i < Parameters->operandCount; i++) {
             cloIR_UNARY_EXPR unaryExpr = gcvNULL;
 
@@ -12038,7 +12191,20 @@ clGenDerefPointerCode(
               clmGEN_CODE_GetParametersIOperand(Compiler, iOperand, Parameters, Parameters->dataTypes[i].def);
             }
 
-            clsROPERAND_InitializeUsingLOperand(rOperand, LeftParameters->lOperands);
+            clsROPERAND_InitializeUsingLOperand(rOperand, LeftParameters->lOperands + i);
+
+            if(!clIsIntegerZero(&LeftParameters->dataTypes[i].byteOffset)) {
+                clsIOPERAND_New(Compiler, intermIOperand, LeftParameters->dataTypes[i].byteOffset.dataType);
+                status = clGenGenericCode2(Compiler,
+                                           Expr->base.lineNo,
+                                           Expr->base.stringNo,
+                                           clvOPCODE_ADD,
+                                           intermIOperand,
+                                           rOperand,
+                                           &LeftParameters->dataTypes[i].byteOffset);
+                if (gcmIS_ERROR(status)) return status;
+                clsROPERAND_InitializeUsingIOperand(rOperand, intermIOperand);
+            }
 
             if(Parameters->hint & clvGEN_COMPONENT_SELECT_CODE) {
                status = _GenSelectiveLoadCode(Compiler,
@@ -12078,11 +12244,17 @@ clGenDerefPointerCode(
         if(clmDECL_IsUnderlyingStructOrUnion(&Expr->decl)) {
             gctINT32 offset = 0;
             gctINT operandsRemain;
-            clsROPERAND *rOperand;
-            clsROPERAND operandBuf[1];
             clsGEN_CODE_PARAMETER_DATA_TYPE *dataTypes;
 
-            rOperand = &LeftParameters->rOperands[0];
+            status = clGenScaledIndexOperandWithOffset(Compiler,
+                                                       Expr->base.lineNo,
+                                                       Expr->base.stringNo,
+                                                       &RightParameters->rOperands[0],
+                                                       elementDataTypeSize,
+                                                       &LeftParameters->dataTypes[0].byteOffset,
+                                                       scaledIndex);
+            if (gcmIS_ERROR(status)) return status;
+            rOperand[0] = LeftParameters->rOperands[0];
             if(scaledIndex->isReg) {
                 clsIOPERAND_New(Compiler, iOperand, LeftParameters->rOperands[0].dataType);
                 status = clGenGenericCode2(Compiler,
@@ -12093,11 +12265,10 @@ clGenDerefPointerCode(
                                            rOperand,
                                            scaledIndex);
                 if (gcmIS_ERROR(status)) return status;
-                clsROPERAND_InitializeUsingIOperand(operandBuf, iOperand);
-                rOperand = operandBuf;
+                clsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
             }
             else {
-                offset = _GetIntegerValue(scaledIndex);
+                offset = clGetIntegerValue(scaledIndex);
             }
 
             dataTypes = Parameters->dataTypes;
@@ -12111,26 +12282,49 @@ clGenDerefPointerCode(
 
             for (i = 0; i < Parameters->operandCount; i++) {
                 clsIOPERAND_New(Compiler, iOperand, Parameters->dataTypes[i].def);
-                _InitializeROperandConstant(scaledIndex,
-                                            clmGenCodeDataType(T_UINT),
-                                            Parameters->dataTypes[i].byteOffset);
                 status = clGenGenericCode2(Compiler,
                                            Expr->base.lineNo,
                                            Expr->base.stringNo,
                                            clvOPCODE_LOAD,
                                            iOperand,
                                            rOperand,
-                                           scaledIndex);
-               if (gcmIS_ERROR(status)) return status;
-               clsROPERAND_InitializeUsingIOperand(&Parameters->rOperands[i], iOperand);
-               Parameters->dataTypes[i].byteOffset = 0;
+                                           &Parameters->dataTypes[i].byteOffset);
+                if (gcmIS_ERROR(status)) return status;
+                clsROPERAND_InitializeUsingIOperand(&Parameters->rOperands[i], iOperand);
+                clsROPERAND_InitializeScalarConstant(&Parameters->dataTypes[i].byteOffset,
+                                                     clmGenCodeDataType(T_INT),
+                                                     long,
+                                                     0);
             }
         }
         else {
-          for (i = 0; i < Parameters->operandCount; i++) {
-               cloIR_UNARY_EXPR unaryExpr = gcvNULL;
+          clsIOPERAND intermIOperand[1];
 
-               if(Parameters->hint & clvGEN_COMPONENT_SELECT_CODE) {
+          status = clGenScaledIndexOperand(Compiler,
+                                           Expr->base.lineNo,
+                                           Expr->base.stringNo,
+                                           &RightParameters->rOperands[0],
+                                           elementDataTypeSize,
+                                           gcvTRUE,
+                                           scaledIndex);
+          if (gcmIS_ERROR(status)) return status;
+          for (i = 0; i < Parameters->operandCount; i++) {
+              cloIR_UNARY_EXPR unaryExpr = gcvNULL;
+
+              rOperand[0] = LeftParameters->rOperands[i];
+              if(!clIsIntegerZero(&LeftParameters->dataTypes[i].byteOffset)) {
+                  clsIOPERAND_New(Compiler, intermIOperand, LeftParameters->dataTypes[i].byteOffset.dataType);
+                  status = clGenGenericCode2(Compiler,
+                                             Expr->base.lineNo,
+                                             Expr->base.stringNo,
+                                             clvOPCODE_ADD,
+                                             intermIOperand,
+                                             rOperand,
+                                             &LeftParameters->dataTypes[i].byteOffset);
+                  if (gcmIS_ERROR(status)) return status;
+                  clsROPERAND_InitializeUsingIOperand(rOperand, intermIOperand);
+              }
+              if(Parameters->hint & clvGEN_COMPONENT_SELECT_CODE) {
                   clsGEN_CODE_DATA_TYPE selectionDataType;
 
                   unaryExpr = (cloIR_UNARY_EXPR) &Parameters->expr->base;
@@ -12152,6 +12346,7 @@ clGenDerefPointerCode(
 #else
                   clmGEN_CODE_GetParametersIOperand(Compiler, iOperand, Parameters, Parameters->dataTypes[i].def);
 #endif
+
                   if(Parameters->operandCount == 1) {
                      gctBOOL loadNeeded;
                      cloCODE_GENERATOR codeGenerator;
@@ -12168,7 +12363,6 @@ clGenDerefPointerCode(
                   if(Parameters->hasIOperand &&
                      gcIsVectorDataType(selectionDataType) &&
                      !clIsDefaultComponentSelection(&unaryExpr->u.componentSelection)) {
-                     clsIOPERAND intermIOperand[1];
                      clsROPERAND intermROperand[1];
                      clsLOPERAND intermLOperand[1];
 
@@ -12177,7 +12371,7 @@ clGenDerefPointerCode(
                                                     Expr->base.lineNo,
                                                     Expr->base.stringNo,
                                                     intermIOperand,
-                                                    LeftParameters->rOperands,
+                                                    rOperand,
                                                     scaledIndex,
                                                     Parameters->dataTypes[i].def,
                                                     &unaryExpr->u.componentSelection);
@@ -12203,7 +12397,7 @@ clGenDerefPointerCode(
                                                     Expr->base.lineNo,
                                                     Expr->base.stringNo,
                                                     iOperand,
-                                                    LeftParameters->rOperands,
+                                                    rOperand,
                                                     scaledIndex,
                                                     Parameters->dataTypes[i].def,
                                                     &unaryExpr->u.componentSelection);
@@ -12236,7 +12430,7 @@ clGenDerefPointerCode(
                                              Expr->base.stringNo,
                                              clvOPCODE_LOAD,
                                              iOperand,
-                                             LeftParameters->rOperands,
+                                             rOperand,
                                              scaledIndex);
                   if (gcmIS_ERROR(status)) return status;
                }
@@ -12374,6 +12568,8 @@ clGenGenericCode1(
     }
 
     if(iSize > 1) {
+       cleOPCODE opcode;
+
        rSize = gcGetDataTypeRegSize(ROperand->dataType);
 
        gcmASSERT((iSize == rSize || rSize == 1));
@@ -12401,16 +12597,17 @@ clGenGenericCode1(
            _SplitSources(&superSource, superTarget.numTargets);
            gcmASSERT(superTarget.numTargets == superSource.numSources);
 
-           if(Opcode == clvOPCODE_ASTYPE) {
-               Opcode = _AdjustAstypeOpcode(Opcode,
+           opcode = Opcode;
+           if(opcode == clvOPCODE_ASTYPE) {
+               opcode = _AdjustAstypeOpcode(opcode,
                                             IOperand->dataType.elementType);
            }
 
-           if(clmIsOpcodeConv(Opcode)) {
+           if(clmIsOpcodeConv(opcode)) {
                clsGEN_CODE_DATA_TYPE srcType = ROperand->dataType;
 
                if(Opcode == clvOPCODE_ASTYPE) {
-                   Opcode = clvOPCODE_CONV;
+                   opcode = clvOPCODE_CONV;
                    srcType = IOperand->dataType;
                }
 
@@ -12418,7 +12615,7 @@ clGenGenericCode1(
                    status = clEmitConvCode(Compiler,
                                            LineNo,
                                            StringNo,
-                                           Opcode,
+                                           opcode,
                                            superTarget.targets + j,
                                            superSource.sources + j,
                                            srcType);
@@ -12430,7 +12627,7 @@ clGenGenericCode1(
                    status = clEmitCode1(Compiler,
                                         LineNo,
                                         StringNo,
-                                        Opcode,
+                                        opcode,
                                         superTarget.targets + j,
                                         superSource.sources + j);
                    if (gcmIS_ERROR(status)) return status;
@@ -12505,8 +12702,8 @@ clGenGenericCode1(
                    if(ROperand->isReg && clGEN_CODE_DataTypeByteSize(Compiler, ROperand->u.reg.dataType) > 16) {
                        superSource.sources->dataType = gcGetVectorComponentSelectionDataType(ROperand->u.reg.dataType,
                                                                                              8);
-                       superSource.sources->u.sourceReg. swizzle =_ConvPackedTypeToSwizzle(Compiler,
-                                                                                           superSource.sources->dataType);
+                       superSource.sources->u.sourceReg.swizzle = clConvPackedTypeToSwizzle(Compiler,
+                                                                                            superSource.sources->dataType);
                        regOffset = 1;
                    }
                    status = clEmitCode1(Compiler,
@@ -12940,7 +13137,7 @@ IN clsROPERAND *Offset
      addressOperand = ROperand;
      _InitializeROperandConstant(offsetBuffer,
                                  Offset->dataType,
-                                 _GetIntegerValue(Offset));
+                                 clGetIntegerValue(Offset));
      offset = offsetBuffer;
   }
 
@@ -13256,11 +13453,7 @@ clGenGenericCode2(
                             ROperand1);
 
     case clvOPCODE_TEXTURE_LOAD:
-    case clvOPCODE_IMAGE_SAMPLER:
-    case clvOPCODE_IMAGE_READ:
-    case clvOPCODE_IMAGE_READ_3D:
-    case clvOPCODE_IMAGE_WRITE:
-    case clvOPCODE_IMAGE_WRITE_3D:
+    case clvOPCODE_CLAMP0MAX:
     case clvOPCODE_ATAN2:
 
     case clvOPCODE_POW:
@@ -13313,8 +13506,22 @@ clGenGenericCode2(
     case clvOPCODE_ATOMXOR:
 
     case clvOPCODE_MOV_LONG:
-    case clvOPCODE_COPY:
     case clvOPCODE_UNPACK:
+        break;
+
+    case clvOPCODE_IMAGE_SAMPLER:
+    case clvOPCODE_IMAGE_READ:
+    case clvOPCODE_IMAGE_READ_3D:
+    case clvOPCODE_IMAGE_WRITE:
+    case clvOPCODE_IMAGE_WRITE_3D:
+        keepSrcTargetAsOne = gcvTRUE;
+        break;
+
+    case clvOPCODE_COPY:
+        if(clmIsElementTypeImage(ROperand0->dataType.elementType) ||
+           cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)) {
+            keepSrcTargetAsOne = gcvTRUE;
+        }
         break;
 
     case clvOPCODE_PARAM_CHAIN:
@@ -13533,6 +13740,7 @@ clGenGenericCode2(
     case clvOPCODE_IMAGE_READ_3D:
     case clvOPCODE_IMAGE_WRITE:
     case clvOPCODE_IMAGE_WRITE_3D:
+    case clvOPCODE_CLAMP0MAX:
     case clvOPCODE_LOAD:
 
     case clvOPCODE_ATAN2:
@@ -14060,7 +14268,7 @@ IN OUT clsGEN_CODE_PARAMETERS *RightParameters
    case clvIR_SELECTION:
       selectionExpr = (cloIR_SELECTION) &Expr->base;
       operand1 = (cloIR_EXPR)selectionExpr->trueOperand;
-      operand2 = (cloIR_EXPR)&selectionExpr->falseOperand;
+      operand2 = (cloIR_EXPR)selectionExpr->falseOperand;
       break;
 
    default:
@@ -16892,7 +17100,7 @@ _CreateKernelArgumentOrArray(
 {
     gceSTATUS  status = gcvSTATUS_OK;
     gctINT     i, logicalRegCount;
-    clsGEN_CODE_DATA_TYPE binaryDataType;
+    clsGEN_CODE_DATA_TYPE binaryDataType, uniformKind;
     gctUINT binaryDataTypeRegSize;
     clsGEN_CODE_DATA_TYPE format;
     gctSIZE_T    regOffset;
@@ -16916,17 +17124,22 @@ _CreateKernelArgumentOrArray(
        return gcvSTATUS_COMPILER_FE_PARSER_ERROR;
     }
 
-    binaryDataType = _ConvElementDataTypeForRegAlloc(ParamName);
+    binaryDataType = _ConvElementDataTypeForRegAlloc(Compiler, ParamName);
     binaryDataTypeRegSize = gcGetDataTypeRegSize(binaryDataType);
     clmGEN_CODE_ConvDirectElementDataType(ParamName->decl.dataType, format);
     regOffset = _clmGetTempRegIndexOffset(binaryDataTypeRegSize,
                                           binaryDataType.elementType);
 
+    uniformKind = binaryDataType;
+    if(clmIsElementTypeImage(ParamName->decl.dataType->elementType)) {
+        uniformKind = _ConvElementDataType(&ParamName->decl);
+    }
+
 #if cldSupportMultiKernelFunction
     status = clNewKernelUniformArgument(Compiler,
                                         KernelFuncName,
                                         Symbol,
-                                        binaryDataType,
+                                        uniformKind,
                                         format,
                                         ParamName,
                                         logicalRegCount,
@@ -16936,7 +17149,7 @@ _CreateKernelArgumentOrArray(
                           KernelFuncName->lineNo,
                           KernelFuncName->stringNo,
                           Symbol,
-                          binaryDataType,
+                          uniformKind,
                           format,
                           clvBUILTIN_KERNEL_ARG,
                           clmDECL_IsPointerType(&paramName->decl) ||
@@ -17080,7 +17293,7 @@ OUT clsGEN_CODE_PARAMETERS * * OperandsParameters
                                                                     operandsParameters + i,
                                                                     paramName);
              if (gcmIS_ERROR(status)) return status;
-             binaryDataType = _ConvElementDataTypeForRegAlloc(paramName);
+             binaryDataType = _ConvElementDataTypeForRegAlloc(Compiler, paramName);
              if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) ||
                 gcmOPT_oclPassKernelStructArgByValue()) {
                  logicalRegCount = 0;
@@ -17109,6 +17322,7 @@ OUT clsGEN_CODE_PARAMETERS * * OperandsParameters
                  gctUINT binaryDataTypeRegSize;
                  gctSIZE_T    regOffset;
                  clsGEN_CODE_DATA_TYPE format;
+                 clsGEN_CODE_DATA_TYPE uniformKind;
                  gcUNIFORM uniform;
 
                  binaryDataTypeRegSize = gcGetDataTypeRegSize(binaryDataType);
@@ -17117,11 +17331,16 @@ OUT clsGEN_CODE_PARAMETERS * * OperandsParameters
                  clmGEN_CODE_ConvDirectElementDataType(paramName->decl.dataType, format);
                  logicalRegCount = 1;
 
+                 uniformKind = binaryDataType;
+                 if(clmIsElementTypeImage(paramName->decl.dataType->elementType)) {
+                     uniformKind = _ConvElementDataType(&paramName->decl);
+                 }
+
 #if cldSupportMultiKernelFunction
                  status = clNewKernelUniformArgument(Compiler,
                                                      KernelFuncName,
                                                      paramName->symbol,
-                                                     binaryDataType,
+                                                     uniformKind,
                                                      format,
                                                      paramName,
                                                      logicalRegCount,
@@ -17131,7 +17350,7 @@ OUT clsGEN_CODE_PARAMETERS * * OperandsParameters
                                        KernelFuncName->lineNo,
                                        KernelFuncName->stringNo,
                                        paramName->symbol,
-                                       binaryDataType,
+                                       uniformKind,
                                        format,
                                        clvBUILTIN_KERNEL_ARG,
                                        clmDECL_IsPointerType(&paramName->decl) ||
@@ -18905,7 +19124,10 @@ _CheckIterationCount(
     prevContext = CodeGenerator->currentIterationContext;
     while (prevContext != gcvNULL)
     {
-        totalIter *= prevContext->u.unrolledInfo.loopCount;
+        if (prevContext->isUnrolled)
+        {
+            totalIter *= prevContext->u.unrolledInfo.loopCount;
+        }
         prevContext = prevContext->prevContext;
     }
 
@@ -18933,7 +19155,7 @@ cloIR_ITERATION_GenUnrolledCode(
     IN OUT clsGEN_CODE_PARAMETERS * Parameters
     )
 {
-    gceSTATUS                status;
+    gceSTATUS                status = gcvSTATUS_OK;
     gctUINT                    i;
     clsGEN_CODE_PARAMETERS    loopBodyParameters;
     clsITERATION_CONTEXT    iterationContext;
@@ -18961,12 +19183,10 @@ cloIR_ITERATION_GenUnrolledCode(
 
     for (i = 0; i < IterationUnrollInfo->loopCount; i++)
     {
-        status = _DefineUnrolledIterationBodyBegin(
+        gcmONERROR(_DefineUnrolledIterationBodyBegin(
                                                 Compiler,
                                                 CodeGenerator,
-                                                unrolledLoopIndexValue);
-
-        if (gcmIS_ERROR(status)) return status;
+                                                unrolledLoopIndexValue));
 
         /* Generate the code of the loop body */
         clsGEN_CODE_PARAMETERS_Initialize(&loopBodyParameters, gcvFALSE, gcvFALSE);
@@ -18979,12 +19199,10 @@ cloIR_ITERATION_GenUnrolledCode(
 
         clsGEN_CODE_PARAMETERS_Finalize(&loopBodyParameters);
 
-        if (gcmIS_ERROR(status)) return status;
+        gcmONERROR(status);
 
-        status = _DefineUnrolledIterationBodyEnd(Compiler,
-                            CodeGenerator);
-
-        if (gcmIS_ERROR(status)) return status;
+        gcmONERROR(_DefineUnrolledIterationBodyEnd(Compiler,
+                            CodeGenerator));
 
         /* Use the increment */
         if (clmDECL_IsInt(&IterationUnrollInfo->loopIndexName->decl))
@@ -19001,13 +19219,11 @@ cloIR_ITERATION_GenUnrolledCode(
         }
     }
 
-    status = _DefineUnrolledIterationEnd(
-                                        Compiler,
-                                        CodeGenerator);
+OnError:
+     _DefineUnrolledIterationEnd(Compiler,
+                                 CodeGenerator);
 
-    if (gcmIS_ERROR(status)) return status;
-
-    return gcvSTATUS_OK;
+    return status;
 }
 
 gceSTATUS
@@ -19857,16 +20073,21 @@ IN OUT clsGEN_CODE_PARAMETERS * Parameters
             if(clmDECL_IsUnderlyingStructOrUnion(&funcName->decl) &&
                clmNAME_VariableHasMemoryOffset(funcName)) {
                gctUINT elementDataTypeSize;
+               clsROPERAND offset[1];
 
                gcmASSERT(clmDECL_IsUnderlyingStructOrUnion(&Jump->u.returnExpr->decl));
                gcmASSERT(funcName->context.u.variable.logicalRegCount == 1);
                elementDataTypeSize = clsDECL_GetByteSize(Compiler, &funcName->decl);
                clsLOPERAND_Initialize(&lOperand,
                                       funcName->context.u.variable.logicalRegs);
+               clsROPERAND_InitializeScalarConstant(offset,
+                                                    clmGenCodeDataType(T_INT),
+                                                    long,
+                                                    clmNAME_VariableMemoryOffset_NOCHECK_GET(funcName));
                _clmGenStructAssign(Compiler,
                                    Jump->u.returnExpr,
                                    &lOperand,
-                                   clmNAME_VariableMemoryOffset_NOCHECK_GET(funcName),
+                                   offset,
                                    &returnExprParameters,
                                    elementDataTypeSize,
                                    status);
@@ -20155,7 +20376,6 @@ IN OUT clsGEN_CODE_PARAMETERS *Parameters
   gceSTATUS status = gcvSTATUS_OK;
   clsIOPERAND iOperand[1];
   clsROPERAND offset[1];
-  cluCONSTANT_VALUE constantValue[1];
 
   if(!Parameters->needLOperand && !Parameters->needROperand) return status;
 
@@ -20165,17 +20385,30 @@ IN OUT clsGEN_CODE_PARAMETERS *Parameters
 
   if(Parameters->hint & clvGEN_ADDRESS_OFFSET) {
      if(Offset == 0) return status;
-     Parameters->dataTypes[0].byteOffset += Offset;
+
+     status = clUpdateAddressOffset(Compiler,
+                                    Expr->base.lineNo,
+                                    Expr->base.stringNo,
+                                    Offset,
+                                    &Parameters->dataTypes[0].byteOffset,
+                                    gcvNULL);
+     if (gcmIS_ERROR(status)) return status;
      return gcvSTATUS_OK;
   }
 
-  constantValue->longValue = Parameters->dataTypes[0].byteOffset + Offset;
-  Parameters->dataTypes[0].byteOffset = 0;
-  if(constantValue->longValue == 0) return gcvSTATUS_OK;
-  clsROPERAND_InitializeConstant(offset,
-                                 clmGenCodeDataType(T_INT),
-                                 1,
-                                 constantValue);
+  status = clUpdateAddressOffset(Compiler,
+                                 Expr->base.lineNo,
+                                 Expr->base.stringNo,
+                                 Offset,
+                                 &Parameters->dataTypes[0].byteOffset,
+                                 offset);
+  if (gcmIS_ERROR(status)) return status;
+
+  clsROPERAND_InitializeScalarConstant(&Parameters->dataTypes[0].byteOffset,
+                                       clmGenCodeDataType(T_INT),
+                                       long,
+                                       0);
+  if(clIsIntegerZero(offset)) return gcvSTATUS_OK;
 
   if(Parameters->needLOperand) {
      clsROPERAND rOperand[1];
@@ -20936,6 +21169,461 @@ cluCONSTANT_VALUE *ValueEnd
     return gcvSTATUS_OK;
 }
 
+#if _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
+static gceSTATUS
+_ConvFieldConstantToGcsValue(
+gcsValue *Value,
+clsDECL *Decl,
+gctSTRING Buffer
+)
+{
+    gctUINT8 vectorSize, i;
+    gctSTRING ptr;
+
+    gcoOS_ZeroMemory(Value, gcmSIZEOF(gcsValue));
+
+    ptr = Buffer;
+    vectorSize = clmDATA_TYPE_vectorSize_GET(Decl->dataType);
+    switch(Decl->dataType->elementType) {
+    case clvTYPE_CHAR:
+    case clvTYPE_CHAR_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr++) {
+            Value->i32_v16[i] = *((gctINT8 *) ptr);
+        }
+        break;
+
+    case clvTYPE_UCHAR:
+    case clvTYPE_UCHAR_PACKED:
+    case clvTYPE_BOOL_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr++) {
+            Value->u32_v16[i] = *((gctUINT8 *) ptr);
+        }
+        break;
+
+    case clvTYPE_SHORT:
+    case clvTYPE_SHORT_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr += 2) {
+            Value->i32_v16[i] = *((gctINT16 *) ptr);
+        }
+        break;
+
+    case clvTYPE_USHORT:
+    case clvTYPE_USHORT_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr += 2) {
+            Value->u32_v16[i] = *((gctUINT16 *) ptr);
+        }
+        break;
+
+    case clvTYPE_INT:
+        for(i = 0; i < vectorSize; i++, ptr += 4) {
+            Value->i32_v16[i] = *((gctINT32 *) ptr);
+        }
+        break;
+
+    case clvTYPE_UINT:
+    case clvTYPE_BOOL:
+        for(i = 0; i < vectorSize; i++, ptr += 4) {
+            Value->u32_v16[i] = *((gctUINT32 *) ptr);
+        }
+        break;
+
+    case clvTYPE_FLOAT:
+        for(i = 0; i < vectorSize; i++, ptr += 4) {
+            Value->f32_v16[i] = *((gctFLOAT *) ptr);
+        }
+        break;
+
+    default:
+        gcmASSERT(0);
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_ConvFieldConstantToConstantValues(
+cluCONSTANT_VALUE *Values,
+clsDECL *Decl,
+gctSTRING Buffer
+)
+{
+    gctUINT8 vectorSize, i;
+    gctSTRING ptr;
+
+    gcoOS_ZeroMemory(Values, gcmSIZEOF(gcsValue) * cldMAX_VECTOR_COMPONENT);
+
+    ptr = Buffer;
+    vectorSize = clmDATA_TYPE_vectorSize_GET(Decl->dataType);
+    switch(Decl->dataType->elementType) {
+    case clvTYPE_CHAR:
+    case clvTYPE_CHAR_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr++) {
+            Values[i].intValue = *((gctINT8 *) ptr);
+        }
+        break;
+
+    case clvTYPE_UCHAR:
+    case clvTYPE_UCHAR_PACKED:
+    case clvTYPE_BOOL_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr++) {
+            Values[i].uintValue = *((gctUINT8 *) ptr);
+        }
+        break;
+
+    case clvTYPE_SHORT:
+    case clvTYPE_SHORT_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr += 2) {
+            Values[i].intValue = *((gctINT16 *) ptr);
+        }
+        break;
+
+    case clvTYPE_USHORT:
+    case clvTYPE_USHORT_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr += 2) {
+            Values[i].uintValue = *((gctUINT16 *) ptr);
+        }
+        break;
+
+    case clvTYPE_INT:
+        for(i = 0; i < vectorSize; i++, ptr += 4) {
+            Values[i].intValue = *((gctINT32 *) ptr);
+        }
+        break;
+
+    case clvTYPE_UINT:
+    case clvTYPE_BOOL:
+        for(i = 0; i < vectorSize; i++, ptr += 4) {
+            Values[i].uintValue = *((gctUINT32 *) ptr);
+        }
+        break;
+
+    case clvTYPE_FLOAT:
+        for(i = 0; i < vectorSize; i++, ptr += 4) {
+            Values[i].floatValue = *((gctFLOAT *) ptr);
+        }
+        break;
+
+    default:
+        gcmASSERT(0);
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_InitializeConstantsUniforms(
+IN cloCOMPILER Compiler,
+IN clsDECL * Decl,
+IN cloIR_CONSTANT Constant,
+IN gctSTRING Symbol,
+IN gctSIZE_T NameBufLen,
+IN gctUINT  ByteOffset,
+IN OUT gctUINT * UniformOffset
+)
+{
+    gceSTATUS status;
+    gcSHADER shader;
+    gctUINT    count, i;
+    clsNAME *fieldName;
+    gcUNIFORM uniform;
+
+    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &shader));
+    if (clmDECL_IsArray(Decl)) {
+        clmGetArrayElementCount(Decl->array, 0, count);
+    }
+    else count = 1;
+
+    if(clmDECL_IsUnderlyingStructOrUnion(Decl)) {
+        gctSIZE_T fieldOffset;
+        gctSIZE_T offset;
+        gctSIZE_T symLen;
+        gcmASSERT(Decl->dataType->u.fieldSpace);
+
+        symLen = gcoOS_StrLen(Symbol, gcvNULL);
+        for (i = 0; i < count; i++) {
+            if(count > 1) {
+                offset = symLen;
+                gcmVERIFY_OK(gcoOS_PrintStrSafe(Symbol,
+                                                NameBufLen,
+                                                &offset,
+                                                "[%d]",
+                                                i));
+            }
+            FOR_EACH_DLINK_NODE(&Decl->dataType->u.fieldSpace->names, clsNAME, fieldName) {
+                gctSIZE_T curOffset = offset;
+
+                gcmASSERT(fieldName->decl.dataType);
+                fieldOffset = _GetFieldByteOffset(Compiler,
+                                                  Decl,
+                                                  fieldName,
+                                                  gcvNULL);
+
+                fieldOffset += ByteOffset;
+                gcmVERIFY_OK(gcoOS_PrintStrSafe(Symbol,
+                                                NameBufLen,
+                                                &curOffset,
+                                                ".%s",
+                                                fieldName->symbol));
+                status = _InitializeConstantsUniforms(Compiler,
+                                                      &fieldName->decl,
+                                                      Constant,
+                                                      Symbol,
+                                                      NameBufLen,
+                                                      fieldOffset,
+                                                      UniformOffset);
+                if (gcmIS_ERROR(status)) return status;
+            }
+        }
+    }
+    else {
+        clsGEN_CODE_DATA_TYPE binaryDataType = _ConvElementDataType(Decl);
+        gcSHADER_TYPE type = _GetShaderDataType(binaryDataType);
+
+        if(clmDECL_IsArray(Decl) || clmDATA_TYPE_IsHighPrecision(Decl->dataType)) {
+            gctUINT j, k;
+            status = gcSHADER_AddUniform(shader,
+                                         Symbol,
+                                         type,
+                                         count,
+                                         gcSHADER_PRECISION_DEFAULT,
+                                         &uniform);
+            if(gcmIS_ERROR(status)) return status;
+            SetUniformOffset(uniform, ByteOffset);
+            for(j = 0, k = *UniformOffset; j < count; j++, k++) {
+                Constant->uniform[k] = uniform;
+            }
+            *UniformOffset += count;
+        }
+        else if(!clmDECL_IsScalar(Decl)) {
+            gcsValue value[1];
+
+            status = _ConvFieldConstantToGcsValue(value,
+                                                  Decl,
+                                                  Constant->buffer + ByteOffset);
+            if(gcmIS_ERROR(status)) return status;
+
+            status = gcSHADER_AddUniformWithInitializer(shader,
+                                                        Symbol,
+                                                        type,
+                                                        1,
+                                                        gcSHADER_PRECISION_DEFAULT,
+                                                        value,
+                                                        &Constant->uniform[*UniformOffset]);
+            if(gcmIS_ERROR(status)) return status;
+            Constant->uniform[*UniformOffset++] = uniform;
+        }
+        else { /* is scalar */
+            *UniformOffset++;
+        }
+    }
+    return gcvSTATUS_OK;
+}
+
+gctSIZE_T
+_EstimateNameBufferSize(
+IN cloCOMPILER Compiler,
+IN clsNAME *Variable
+)
+{
+    gctSIZE_T nameLength;
+
+    nameLength = gcoOS_StrLen(Variable->symbol, gcvNULL) + 1;
+    if (clmDECL_IsArray(&Variable->decl)) {
+        gctSIZE_T count;
+        gctSIZE_T numDigit = 0;
+
+        clmGetArrayElementCount(Variable->decl.array, 0, count);
+        do {
+           numDigit++;
+           count /= 10;
+        } while(count);
+        nameLength += numDigit + Variable->decl.array.numDim * 2;
+    }
+    if (clmDECL_IsUnderlyingStructOrUnion(&Variable->decl)) {
+        clsNAME *fieldName;
+        gctSIZE_T maxLength = 0;
+        gctSIZE_T fieldLength = 0;
+
+        FOR_EACH_DLINK_NODE(&Variable->decl.dataType->u.fieldSpace->names, clsNAME, fieldName)
+        {
+            fieldLength = _EstimateNameBufferSize(Compiler,
+                                                  fieldName) + 1;
+            if(fieldLength > maxLength) maxLength = fieldLength;
+        }
+        nameLength += maxLength;
+    }
+    return nameLength;
+}
+
+static gceSTATUS
+_SetOperandConstants(
+IN cloCOMPILER Compiler,
+IN clsDECL * Decl,
+IN cloIR_CONSTANT Constant,
+IN OUT clsGEN_CODE_PARAMETERS * Parameters,
+IN OUT gctUINT * ByteOffset,
+IN OUT gctUINT * UniformOffset,
+IN OUT gctUINT * ValueStart,
+IN OUT gctUINT * Start
+)
+{
+    gceSTATUS status;
+    gctUINT   count, i;
+    gctUINT   operandCount;
+    clsNAME *fieldName;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    gcmASSERT(Decl  && Decl->dataType);
+    gcmASSERT(Constant);
+    gcmASSERT(Parameters);
+    gcmASSERT(ByteOffset);
+    gcmASSERT(ValueStart);
+    gcmASSERT(Start);
+
+    if (clmDECL_IsArray(Decl)) {
+       clmGetArrayElementCount(Decl->array, 0, count);
+    }
+    else count = 1;
+
+    operandCount = _GetLogicalOperandCount(&Constant->exprBase.decl);
+    if(Constant->variable &&
+       !(clmDECL_IsScalar(&Constant->exprBase.decl) ||
+         clmDATA_TYPE_IsHighPrecision(Constant->exprBase.decl.dataType)) &&
+       Constant->uniform == gcvNULL) {
+        gctPOINTER pointer;
+        gctSTRING nameBuffer = gcvNULL;
+        gctSTRING namePtr;
+        gctUINT uniformOffset = 0;
+        gctUINT byteOffset = 0;
+        gctSIZE_T symLen;
+
+        status = cloCOMPILER_ZeroMemoryAllocate(Compiler,
+                                                sizeof(gcUNIFORM) * operandCount,
+                                                (gctPOINTER *) &pointer);
+        if (gcmIS_ERROR(status)) return status;
+        Constant->uniformCount = operandCount;
+        Constant->uniform = pointer;
+
+        if (clmDECL_IsUnderlyingStructOrUnion(&Constant->exprBase.decl)) {
+            symLen = _EstimateNameBufferSize(Compiler,
+                                             Constant->variable);
+            status = cloCOMPILER_Allocate(Compiler,
+                                          sizeof(char) * symLen,
+                                          (gctPOINTER *) &pointer);
+            if (gcmIS_ERROR(status)) return status;
+            nameBuffer = pointer;
+            gcmVERIFY_OK(gcoOS_StrCopySafe(nameBuffer,
+                                           symLen,
+                                           Constant->variable->symbol));
+            namePtr = nameBuffer;
+        }
+        else {
+            namePtr = Constant->variable->symbol;
+            symLen = gcoOS_StrLen(Constant->variable->symbol, gcvNULL);
+        }
+        status = _InitializeConstantsUniforms(Compiler,
+                                              Decl,
+                                              Constant,
+                                              namePtr,
+                                              symLen,
+                                              byteOffset,
+                                              &uniformOffset);
+        if (gcmIS_ERROR(status)) return status;
+        if (nameBuffer) {
+            gcmVERIFY_OK(cloCOMPILER_Free(Compiler, Parameters->rOperands));
+        }
+    }
+
+    if(clmDECL_IsUnderlyingStructOrUnion(Decl)) {
+        for (i = 0; i < count; i++) {
+            gcmASSERT(Decl->dataType->u.fieldSpace);
+
+            FOR_EACH_DLINK_NODE(&Decl->dataType->u.fieldSpace->names, clsNAME, fieldName)
+            {
+                gctSIZE_T fieldOffset = _GetFieldByteOffset(Compiler, Decl, fieldName, gcvNULL);
+
+                gcmASSERT(fieldName->decl.dataType);
+
+                (*ByteOffset) += fieldOffset;
+
+                status = _SetOperandConstants(Compiler,
+                                  &fieldName->decl,
+                                  Constant,
+                                  Parameters,
+                                  ByteOffset,
+                                  UniformOffset,
+                                  ValueStart,
+                                  Start);
+                if (gcmIS_ERROR(status)) return status;
+                (*UniformOffset) += _GetLogicalOperandCount(&fieldName->decl);
+            }
+        }
+    }
+    else {
+        clsGEN_CODE_DATA_TYPE binaryDataType;
+        gctUINT    componentCount;
+        clsLOGICAL_REG reg[1];
+        clsROPERAND * operand;
+
+        binaryDataType    = _ConvElementDataType(Decl);
+        componentCount    = gcGetDataTypeComponentCount(binaryDataType);
+
+        operand = Parameters->rOperands + *Start;
+        if(!clmDECL_IsScalar(Decl)) {
+            clsGEN_CODE_DATA_TYPE binaryDataType = _ConvElementDataType(Decl);
+
+            if(!clmDECL_IsScalar(Decl) || clmDATA_TYPE_IsHighPrecision(Decl->dataType)) {
+                for(i = 0; i < operandCount; i++) {
+                    clsLOGICAL_REG_InitializeUniform(Compiler,
+                                                     reg,
+                                                     clvQUALIFIER_UNIFORM,
+                                                     binaryDataType,
+                                                     Constant->uniform[*UniformOffset],
+                                                     i,
+                                                     gcvFALSE);
+                    clsROPERAND_InitializeReg(operand + i, reg);
+                }
+            }
+        }
+        else if (clmDECL_IsUnderlyingStructOrUnion(&Constant->exprBase.decl)) {
+            cluCONSTANT_VALUE values[cldMAX_VECTOR_COMPONENT];
+
+            status = _ConvFieldConstantToConstantValues(values,
+                                                        Decl,
+                                                        Constant->buffer + *ByteOffset);
+            if(gcmIS_ERROR(status)) return status;
+            clsROPERAND_InitializeConstant(operand,
+                                           binaryDataType,
+                                           componentCount,
+                                           values);
+        }
+        else {
+            clsROPERAND_InitializeConstant(operand,
+                                           binaryDataType,
+                                           componentCount,
+                                           Constant->values + *ValueStart);
+        }
+        *Start = *Start + operandCount;
+
+        if(Parameters->hasIOperand) {
+           gceSTATUS status;
+
+           gcmASSERT(Parameters->operandCount == 1 && *Start == 0);
+           _clmAssignROperandToPreallocatedTempReg(Compiler,
+                                                   Parameters,
+                                                   &Parameters->rOperands[0],
+                                                   status,
+                                                   Constant->exprBase.base.lineNo,
+                                                   Constant->exprBase.base.stringNo
+                                                   );
+           if(gcmIS_ERROR(status)) return status;
+        }
+    }
+
+    return gcvSTATUS_OK;
+}
+#else
 /*KLC : need work here */
 static gceSTATUS
 _SetOperandConstants(
@@ -20944,6 +21632,7 @@ IN clsDECL * Decl,
 IN cloIR_CONSTANT Constant,
 IN OUT clsGEN_CODE_PARAMETERS * Parameters,
 IN OUT gctUINT * ByteOffset,
+IN OUT gctUINT * UniformOffset,
 IN OUT gctUINT * ValueStart,
 IN OUT gctUINT * Start
 )
@@ -20990,6 +21679,7 @@ IN OUT gctUINT * Start
                                   Constant,
                                   Parameters,
                                   ByteOffset,
+                                  UniformOffset,
                                   ValueStart,
                                   Start);
                 if (gcmIS_ERROR(status)) return status;
@@ -21015,7 +21705,10 @@ IN OUT gctUINT * Start
                                               iOperand);
                 if(gcmIS_ERROR(status)) return status;
                 Parameters->dataTypes[*Start].def = binaryDataType;
-                Parameters->dataTypes[*Start].byteOffset = 0;
+                clsROPERAND_InitializeScalarConstant(&Parameters->dataTypes[*Start].byteOffset,
+                                                     clmGenCodeDataType(T_INT),
+                                                     long,
+                                                     0);
             }
             else {
                 if(cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX) &&
@@ -21085,6 +21778,7 @@ IN OUT gctUINT * Start
 
     return gcvSTATUS_OK;
 }
+#endif
 
 gceSTATUS
 cloIR_CONSTANT_GenCode(
@@ -21096,7 +21790,7 @@ cloIR_CONSTANT_GenCode(
 {
     gceSTATUS status;
     gctUINT    valueStart = 0, start = 0;
-    gctUINT byteOffset = 0;
+    gctUINT byteOffset = 0, uniformOffset = 0;
     gctINT isMemoryRef = 0 ;
     gctBOOL allocRegs = gcvFALSE;
 
@@ -21125,6 +21819,20 @@ cloIR_CONSTANT_GenCode(
                      Constant->variable->u.variableInfo.indirectlyAddressed);
     }
 
+#if _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
+    if(allocRegs) {
+       if(Constant->variable->context.u.variable.logicalRegs == gcvNULL) {
+          status = clsNAME_AllocLogicalRegs(Compiler,
+                                            CodeGenerator,
+                                            Constant->variable);
+          if(gcmIS_ERROR(status)) return status;
+       }
+    }
+    status = clsGEN_CODE_PARAMETERS_AllocateOperands(Compiler,
+                                      Parameters,
+                                      &Constant->exprBase.decl);
+    if (gcmIS_ERROR(status)) return status;
+#else
     if(allocRegs) {
        if(Constant->variable->context.u.variable.logicalRegs == gcvNULL) {
           status = clsNAME_AllocLogicalRegs(Compiler,
@@ -21143,6 +21851,7 @@ cloIR_CONSTANT_GenCode(
                                 &Constant->exprBase.decl);
        if (gcmIS_ERROR(status)) return status;
     }
+#endif
 
     if(Parameters->hint & clvGEN_SUBSCRIPT_CODE) {
        gctUINT i;
@@ -21152,7 +21861,11 @@ cloIR_CONSTANT_GenCode(
           for (i = 0; i < Parameters->operandCount; i++) {
               clsROPERAND_InitializeReg(Parameters->rOperands + i,
                                         Constant->variable->context.u.variable.logicalRegs + isMemoryRef * i);
-              Parameters->dataTypes[i].byteOffset = clmNAME_VariableMemoryOffset_GET(Constant->variable);
+              byteOffset = clmNAME_VariableMemoryOffset_GET(Constant->variable);
+              clsROPERAND_InitializeScalarConstant(&Parameters->dataTypes[i].byteOffset,
+                                                   clmGenCodeDataType(T_INT),
+                                                   long,
+                                                   byteOffset);
           }
        }
        else {
@@ -21163,6 +21876,7 @@ cloIR_CONSTANT_GenCode(
                                         Constant,
                                         Parameters,
                                         &byteOffset,
+                                        &uniformOffset,
                                         &valueStart,
                                         &start);
           if (gcmIS_ERROR(status)) return status;
@@ -21207,11 +21921,11 @@ cloIR_CONSTANT_GenCode(
                                      Constant,
                                      Parameters,
                                      &byteOffset,
+                                     &uniformOffset,
                                      &valueStart,
                                      &start);
        if (gcmIS_ERROR(status)) return status;
 
-       gcmASSERT(valueStart == Constant->valueCount);
        gcmASSERT(start == Parameters->operandCount);
     }
 
@@ -21262,12 +21976,19 @@ clGenDerefStructPointerCode(
         Parameters->elementIndex = pointer;
      }
 
-     clsROPERAND_InitializeScalarConstant(Parameters->elementIndex,
+     status = clUpdateAddressOffset(Compiler,
+                                    UnaryExpr->exprBase.base.lineNo,
+                                    UnaryExpr->exprBase.base.stringNo,
+                                    fieldByteOffset,
+                                    &LeftParameters->dataTypes[0].byteOffset,
+                                    Parameters->elementIndex);
+     if (gcmIS_ERROR(status)) return status;
+
+     clsROPERAND_InitializeScalarConstant(&Parameters->dataTypes[0].byteOffset,
                                           clmGenCodeDataType(T_INT),
                                           long,
-                                          fieldByteOffset + LeftParameters->dataTypes[0].byteOffset);
+                                          0);
 
-     Parameters->dataTypes[0].byteOffset = 0;
      for (i = 0; i < Parameters->operandCount; i++) {
          Parameters->lOperands[i] = LeftParameters->lOperands[0];
      }
@@ -21297,7 +22018,13 @@ clGenDerefStructPointerCode(
      if(Parameters->needROperand) {
         /*klc: defer loading the struct to subsequent operation */
         if(clmDECL_IsUnderlyingStructOrUnion(&UnaryExpr->exprBase.decl)) {
-           Parameters->dataTypes[0].byteOffset = fieldByteOffset + LeftParameters->dataTypes[0].byteOffset;
+           status = clUpdateAddressOffset(Compiler,
+                                          UnaryExpr->exprBase.base.lineNo,
+                                          UnaryExpr->exprBase.base.stringNo,
+                                          fieldByteOffset,
+                                          &LeftParameters->dataTypes[0].byteOffset,
+                                          &Parameters->dataTypes[0].byteOffset);
+           if (gcmIS_ERROR(status)) return status;
            Parameters->rOperands[0] = LeftParameters->rOperands[0];
            Parameters->hint = clvGEN_DEREF_CODE;
         }
@@ -21308,10 +22035,13 @@ clGenDerefStructPointerCode(
 
            gcmASSERT(Parameters->operandCount == 1);
 
-           clsROPERAND_InitializeScalarConstant(offset,
-                                                clmGenCodeDataType(T_INT),
-                                                long,
-                                                fieldByteOffset + LeftParameters->dataTypes[0].byteOffset);
+           status = clUpdateAddressOffset(Compiler,
+                                          UnaryExpr->exprBase.base.lineNo,
+                                          UnaryExpr->exprBase.base.stringNo,
+                                          fieldByteOffset,
+                                          &LeftParameters->dataTypes[0].byteOffset,
+                                          offset);
+           if (gcmIS_ERROR(status)) return status;
            clmGEN_CODE_ConvDirectElementDataType(UnaryExpr->u.fieldName->decl.dataType, dataType);
 
            clmGEN_CODE_GetParametersIOperand(Compiler, iOperand, Parameters, dataType);
@@ -21329,6 +22059,43 @@ clGenDerefStructPointerCode(
   }
 
   return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_ReviseOperandRegToFieldType(
+    IN cloCOMPILER Compiler,
+    gctSIZE_T  OperandOffset,
+    IN clsNAME *FieldName,
+    IN OUT clsGEN_CODE_PARAMETERS * Parameters
+    )
+{
+     clsCOMPONENT_SELECTION componentSelection;
+     clsGEN_CODE_DATA_TYPE dataType;
+     if(clmDECL_IsUnderlyingStructOrUnion(&FieldName->decl)) return gcvSTATUS_OK;
+
+     clmGEN_CODE_ConvDirectElementDataType(FieldName->decl.dataType, dataType);
+     componentSelection = clGetDefaultComponentSelection(Compiler, dataType);
+     gcmASSERT(OperandOffset < Parameters->operandCount);
+
+     Parameters->dataTypes[OperandOffset].def = dataType;
+     if (Parameters->needLOperand) {
+         clsLOPERAND *lOperand;
+         lOperand = Parameters->lOperands + OperandOffset;
+         lOperand->dataType = dataType;
+         lOperand->reg.dataType = dataType;
+         lOperand->reg.componentSelection = componentSelection;
+     }
+
+     if (Parameters->needROperand) {
+         clsROPERAND *rOperand;
+         rOperand = Parameters->rOperands + OperandOffset;
+         rOperand->dataType = dataType;
+         if(rOperand->isReg) {
+             rOperand->u.reg.dataType = dataType;
+             rOperand->u.reg.componentSelection = componentSelection;
+         }
+     }
+     return gcvSTATUS_OK;
 }
 
 gceSTATUS
@@ -21420,6 +22187,11 @@ cloIR_UNARY_EXPR_GenFieldSelectionCode(
 
            operandFieldOffset = _GetLogicalOperandFieldOffset(&UnaryExpr->operand->decl,
                                                               UnaryExpr->u.fieldName);
+           status = _ReviseOperandRegToFieldType(Compiler,
+                                                 operandFieldOffset,
+                                                 UnaryExpr->u.fieldName,
+                                                 operandParameters);
+           if (gcmIS_ERROR(status)) return status;
        }
 
        if (Parameters->needLOperand) {
@@ -21560,7 +22332,8 @@ cloIR_UNARY_EXPR_GenComponentSelectionCode(
 /*KLC */
 #if _cldIncludeComponentOffset
     if(Parameters->hasIOperand  &&
-       !clmDECL_IsPackedType(&UnaryExpr->exprBase.decl) &&
+       !(clmDECL_IsPackedType(&UnaryExpr->exprBase.decl) ||
+         clmDECL_IsPackedType(&UnaryExpr->operand->decl)) &&
        (Parameters->hint & clvGEN_SELECTIVE_LOAD_TO ||
            _IsExprDeref(Compiler, UnaryExpr->operand))) { /* transfer ioperand to here */
         clsIOPERAND *iOperand;
@@ -21656,7 +22429,12 @@ cloIR_UNARY_EXPR_GenComponentSelectionCode(
                 Parameters->rOperands[0].vectorIndex.mode = clvINDEX_CONSTANT;
                 Parameters->rOperands[0].vectorIndex.u.constant =
                 _ConvComponentToVectorIndex(UnaryExpr->u.componentSelection.selection[clvCOMPONENT_X]);
-                Parameters->rOperands[0].u.reg.componentSelection = UnaryExpr->u.componentSelection;
+                Parameters->rOperands[0].u.reg.componentSelection =
+                   _SwizzleComponentSelection(_CheckHighPrecisionComponentSelection(Parameters->rOperands[0].dataType,
+                                                                                    &UnaryExpr->u.componentSelection,
+                                                                                    componentSelection),
+                                              &operandParameters.rOperands[0].u.reg.componentSelection);
+
                 _CompleteComponentSelection(&Parameters->rOperands[0].u.reg.componentSelection, 1);
              }
              else
@@ -21778,62 +22556,64 @@ clGenPointerArithmeticCode(
        return gcvSTATUS_OK;
     }
     else {
-       if(_IsIntegerZero(RightOperand)) {
-         if(LeftParameters->dataTypes[0].byteOffset) {
-           _InitializeROperandConstant(scaledIndex,
-                                       clmGenCodeDataType(T_INT),
-                                       LeftParameters->dataTypes[0].byteOffset);
-         }
-         else {
-           *Res = LeftParameters->rOperands[0];
-           return gcvSTATUS_OK;
-         }
-      }
-      else {
-         elementDataTypeSize = clsDECL_GetPointedToByteSize(Compiler, &Expr->decl);
-         status = clGenScaledIndexOperandWithOffset(Compiler,
-                                                    Expr->base.lineNo,
-                                                    Expr->base.stringNo,
-                                                    RightOperand,
-                                                    elementDataTypeSize,
-                                                    LeftParameters->dataTypes[0].byteOffset,
-                                                    scaledIndex);
-         if (gcmIS_ERROR(status)) return status;
-      }
+       if(clIsIntegerZero(RightOperand)) {
+          if(clIsIntegerZero(&LeftParameters->dataTypes[0].byteOffset)) {
+              *Res = LeftParameters->rOperands[0];
+              return gcvSTATUS_OK;
+          }
+          scaledIndex[0] = LeftParameters->dataTypes[0].byteOffset;
+       }
+       else {
+          elementDataTypeSize = clsDECL_GetPointedToByteSize(Compiler, &Expr->decl);
+          status = clGenScaledIndexOperandWithOffset(Compiler,
+                                                     Expr->base.lineNo,
+                                                     Expr->base.stringNo,
+                                                     RightOperand,
+                                                     elementDataTypeSize,
+                                                     &LeftParameters->dataTypes[0].byteOffset,
+                                                     scaledIndex);
+          if (gcmIS_ERROR(status)) return status;
+       }
 
-      if(!scaledIndex->isReg &&
-         Hint & clvGEN_ADDRESS_OFFSET) {
-         gctINT offset;
+       if(!scaledIndex->isReg &&
+          Hint & clvGEN_ADDRESS_OFFSET) {
+          gctINT offset;
 
-         *Res = LeftParameters->rOperands[0];
-         offset = _GetIntegerValue(scaledIndex);
-         if(Opcode == clvOPCODE_SUB) {
-            LeftParameters->dataTypes[0].byteOffset = -offset;
-            if(Hint & clvGEN_SAVE_ADDRESS_OFFSET) {
-                LeftParameters->dataTypes[0].savedByteOffset = -offset;
-            }
-         }
-         else {
-            LeftParameters->dataTypes[0].byteOffset = offset;
-            if(Hint & clvGEN_SAVE_ADDRESS_OFFSET) {
-                LeftParameters->dataTypes[0].savedByteOffset = offset;
-            }
-         }
-      }
-      else {
-         clsIOPERAND_New(Compiler, iOperand, Res->dataType);
-         status = clGenGenericCode2(Compiler,
-                                    Expr->base.lineNo,
-                                    Expr->base.stringNo,
-                                    Opcode,
-                                    iOperand,
-                                    &LeftParameters->rOperands[0],
-                                    scaledIndex);
-         if (gcmIS_ERROR(status)) return status;
+          *Res = LeftParameters->rOperands[0];
+          offset = clGetIntegerValue(scaledIndex);
+          if(Opcode == clvOPCODE_SUB) {
+             clsROPERAND_InitializeScalarConstant(&LeftParameters->dataTypes[0].byteOffset,
+                                                  clmGenCodeDataType(T_INT),
+                                                  long,
+                                                  -offset);
+             if(Hint & clvGEN_SAVE_ADDRESS_OFFSET) {
+                 LeftParameters->dataTypes[0].savedByteOffset = -offset;
+             }
+          }
+          else {
+             clsROPERAND_InitializeScalarConstant(&LeftParameters->dataTypes[0].byteOffset,
+                                                  clmGenCodeDataType(T_INT),
+                                                  long,
+                                                  offset);
+             if(Hint & clvGEN_SAVE_ADDRESS_OFFSET) {
+                 LeftParameters->dataTypes[0].savedByteOffset = offset;
+             }
+          }
+       }
+       else {
+          clsIOPERAND_New(Compiler, iOperand, Res->dataType);
+          status = clGenGenericCode2(Compiler,
+                                     Expr->base.lineNo,
+                                     Expr->base.stringNo,
+                                     Opcode,
+                                     iOperand,
+                                     &LeftParameters->rOperands[0],
+                                     scaledIndex);
+          if (gcmIS_ERROR(status)) return status;
 
-         clsROPERAND_InitializeUsingIOperand(Res, iOperand);
-      }
-      return gcvSTATUS_OK;
+          clsROPERAND_InitializeUsingIOperand(Res, iOperand);
+       }
+       return gcvSTATUS_OK;
    }
 }
 
@@ -21886,7 +22666,7 @@ cloIR_UNARY_EXPR_GenIncOrDecCode(
                                                     UnaryExpr->exprBase.base.stringNo,
                                                     operandParameters->elementIndex,
                                                     elementDataTypeSize,
-                                                    operandParameters->dataTypes[0].byteOffset,
+                                                    &operandParameters->dataTypes[0].byteOffset,
                                                     scaledIndex));
 
        if (operandParameters->needROperand) {
@@ -22398,7 +23178,7 @@ cloIR_UNARY_EXPR_GenAddrCode(
         clmGEN_CODE_GetParametersIOperand(Compiler, iOperand, Parameters, Parameters->dataTypes[0].def);
         clsLOPERAND_InitializeUsingIOperand(lOperand, iOperand);
 
-        if(operandParameters.dataTypes[0].byteOffset) {
+        if(!clIsIntegerZero(&operandParameters.dataTypes[0].byteOffset)) {
             operandParameters.hint &= ~clvGEN_ADDRESS_OFFSET;
             status = _GenAddressOffsetCode(Compiler,
                                            &UnaryExpr->exprBase,
@@ -24292,7 +25072,7 @@ cloIR_BINARY_EXPR_GenSubscriptCode(
                                                      BinaryExpr->exprBase.base.stringNo,
                                                      &rightParameters.rOperands[0],
                                                      elementDataTypeSize,
-                                                     leftParameters.dataTypes[0].byteOffset,
+                                                     &leftParameters.dataTypes[0].byteOffset,
                                                      scaledIndex));
 
         if ((Parameters->hint & clvGEN_SAVE_ADDRESS_OFFSET) && !scaledIndex->isReg) { /* Save address offset && is a constant */
@@ -25966,12 +26746,12 @@ IN clsROPERAND *Offset
      _SplitSources(&superSource1, superTarget.numTargets);
      for(j=0; j < superTarget.numTargets; j++) {
          if(incr) {
-             status = _UpdateAddressOffset(Compiler,
-                                           LineNo,
-                                           StringNo,
-                                           incr,
-                                           offset,
-                                           newOffset ? gcvNULL: rOperand);
+             status = clUpdateAddressOffset(Compiler,
+                                            LineNo,
+                                            StringNo,
+                                            incr,
+                                            offset,
+                                            newOffset ? gcvNULL: rOperand);
              if (gcmIS_ERROR(status)) return status;
              newOffset = rOperand;
              offset = rOperand;
@@ -25986,7 +26766,7 @@ IN clsROPERAND *Offset
 
          clsIOPERAND_New(Compiler, iOperand, LOperand->dataType);
          gcsTARGET_InitializeUsingIOperand(Compiler, addressTarget, iOperand);
-         gcsSOURCE_InitializeUsingIOperand(addressSource, iOperand);
+         gcsSOURCE_InitializeUsingIOperand(Compiler, addressSource, iOperand);
          status = clEmitCode2(Compiler,
                               LineNo,
                               StringNo,
@@ -26026,12 +26806,12 @@ IN clsROPERAND *Offset
               zeroConstant.uintValue = 0;
               gcsSOURCE_InitializeConstant(zeroSource, dataType, zeroConstant);
 
-              status = _UpdateAddressOffset(Compiler,
-                                            LineNo,
-                                            StringNo,
-                                            4,
-                                            offset,
-                                            upperHalfOffset);
+              status = clUpdateAddressOffset(Compiler,
+                                             LineNo,
+                                             StringNo,
+                                             4,
+                                             offset,
+                                             upperHalfOffset);
               if (gcmIS_ERROR(status)) return status;
 
               status = _ConvNormalROperandToSource(Compiler,
@@ -26043,7 +26823,7 @@ IN clsROPERAND *Offset
 
               clsIOPERAND_New(Compiler, iOperand, LOperand->dataType);
               gcsTARGET_InitializeUsingIOperand(Compiler, addressTarget, iOperand);
-              gcsSOURCE_InitializeUsingIOperand(addressSource, iOperand);
+              gcsSOURCE_InitializeUsingIOperand(Compiler, addressSource, iOperand);
               status = clEmitCode2(Compiler,
                                    LineNo,
                                    StringNo,
@@ -26181,12 +26961,12 @@ IN clsROPERAND *Offset
 
      for(j=0; j < superTarget.numTargets; j++) {
            if(incr) {
-              status = _UpdateAddressOffset(Compiler,
-                                            LineNo,
-                                            StringNo,
-                                            incr,
-                                            offset,
-                                            newOffset ? gcvNULL: rOperand);
+              status = clUpdateAddressOffset(Compiler,
+                                             LineNo,
+                                             StringNo,
+                                             incr,
+                                             offset,
+                                             newOffset ? gcvNULL: rOperand);
               if (gcmIS_ERROR(status)) return status;
               newOffset = rOperand;
           offset = rOperand;
@@ -26664,9 +27444,9 @@ IN cloCOMPILER Compiler,
 IN gctINT LineNo,
 IN gctINT StringNo,
 IN clsLOPERAND *LOperand,
-IN gctINT LOffset,
+IN clsROPERAND * LOffset,
 IN clsROPERAND *ROperand,
-IN gctINT ROffset,
+IN clsROPERAND * ROffset,
 IN gctSIZE_T NumBytes
 )
 {
@@ -26679,7 +27459,7 @@ IN gctSIZE_T NumBytes
    gcsSOURCE leftAddress[1], rightAddress[1];
    gcsSOURCE offset[1];
    gcsTARGET target[1];
-   gcsSOURCE_CONSTANT lOffsetVal, rOffsetVal;
+   clsROPERAND lOffsetVal, rOffsetVal;
    clsGEN_CODE_DATA_TYPE offsetType;
    clsGEN_CODE_DATA_TYPE argType;
 
@@ -26688,8 +27468,8 @@ IN gctSIZE_T NumBytes
    wordsRemaining = numWords & 0x3;
    numQuads = numWords >> 2;
 
-   lOffsetVal.intValue = LOffset;
-   rOffsetVal.intValue = ROffset;
+   lOffsetVal= *LOffset;
+   rOffsetVal= *ROffset;
    offsetType = clmGenCodeDataType(T_INT);
    status = _ConvNormalROperandToSource(Compiler,
                                         LineNo,
@@ -26715,10 +27495,13 @@ IN gctSIZE_T NumBytes
                                      target);
       if (gcmIS_ERROR(status)) return status;
 
-      for(i = 0; i < numQuads; i++,
-                               lOffsetVal.intValue += 16,
-                               rOffsetVal.intValue += 16) {
-        gcsSOURCE_InitializeConstant(offset, offsetType, rOffsetVal);
+      for(i = 0; i < numQuads; i++) {
+        status = _ConvNormalROperandToSource(Compiler,
+                                             LineNo,
+                                             StringNo,
+                                             &rOffsetVal,
+                                             offset);
+        if (gcmIS_ERROR(status)) return status;
         status = clEmitCode2(Compiler,
                              LineNo,
                              StringNo,
@@ -26728,7 +27511,12 @@ IN gctSIZE_T NumBytes
                              offset);
         if (gcmIS_ERROR(status)) return status;
 
-        gcsSOURCE_InitializeConstant(offset, offsetType, lOffsetVal);
+        status = _ConvNormalROperandToSource(Compiler,
+                                             LineNo,
+                                             StringNo,
+                                             &lOffsetVal,
+                                             offset);
+        if (gcmIS_ERROR(status)) return status;
         status = clEmitCode2(Compiler,
                              LineNo,
                              StringNo,
@@ -26736,6 +27524,20 @@ IN gctSIZE_T NumBytes
                              target,
                              leftAddress,
                              offset);
+        if (gcmIS_ERROR(status)) return status;
+        status = clUpdateAddressOffset(Compiler,
+                                       LineNo,
+                                       StringNo,
+                                       16,
+                                       &lOffsetVal,
+                                       gcvNULL);
+        if (gcmIS_ERROR(status)) return status;
+        status = clUpdateAddressOffset(Compiler,
+                                       LineNo,
+                                       StringNo,
+                                       16,
+                                       &rOffsetVal,
+                                       gcvNULL);
         if (gcmIS_ERROR(status)) return status;
       }
    }
@@ -26765,7 +27567,12 @@ IN gctSIZE_T NumBytes
          break;
       }
       clsIOPERAND_New(Compiler, iOperand, argType);
-      gcsSOURCE_InitializeConstant(offset, offsetType, rOffsetVal);
+      status = _ConvNormalROperandToSource(Compiler,
+                                           LineNo,
+                                           StringNo,
+                                           &rOffsetVal,
+                                           offset);
+      if (gcmIS_ERROR(status)) return status;
       status = _ConvIOperandToTarget(Compiler,
                                      iOperand,
                                      target);
@@ -26779,7 +27586,12 @@ IN gctSIZE_T NumBytes
                            offset);
       if (gcmIS_ERROR(status)) return status;
 
-      gcsSOURCE_InitializeConstant(offset, offsetType, lOffsetVal);
+      status = _ConvNormalROperandToSource(Compiler,
+                                           LineNo,
+                                           StringNo,
+                                           &lOffsetVal,
+                                           offset);
+      if (gcmIS_ERROR(status)) return status;
       status = clEmitCode2(Compiler,
                            LineNo,
                            StringNo,
@@ -26788,8 +27600,20 @@ IN gctSIZE_T NumBytes
                            leftAddress,
                            offset);
       if (gcmIS_ERROR(status)) return status;
-      lOffsetVal.intValue += dataOffset;
-      rOffsetVal.intValue += dataOffset;
+      status = clUpdateAddressOffset(Compiler,
+                                     LineNo,
+                                     StringNo,
+                                     dataOffset,
+                                     &lOffsetVal,
+                                     gcvNULL);
+      if (gcmIS_ERROR(status)) return status;
+      status = clUpdateAddressOffset(Compiler,
+                                     LineNo,
+                                     StringNo,
+                                     dataOffset,
+                                     &rOffsetVal,
+                                     gcvNULL);
+      if (gcmIS_ERROR(status)) return status;
    }
 
    if (bytesRemaining) {
@@ -26811,7 +27635,13 @@ IN gctSIZE_T NumBytes
          break;
       }
       clsIOPERAND_New(Compiler, iOperand, argType);
-      gcsSOURCE_InitializeConstant(offset, offsetType, rOffsetVal);
+
+      status = _ConvNormalROperandToSource(Compiler,
+                                           LineNo,
+                                           StringNo,
+                                           &rOffsetVal,
+                                           offset);
+      if (gcmIS_ERROR(status)) return status;
       status = _ConvIOperandToTarget(Compiler,
                                      iOperand,
                                      target);
@@ -26825,7 +27655,13 @@ IN gctSIZE_T NumBytes
                            offset);
       if (gcmIS_ERROR(status)) return status;
 
-      gcsSOURCE_InitializeConstant(offset, offsetType, lOffsetVal);
+
+      status = _ConvNormalROperandToSource(Compiler,
+                                           LineNo,
+                                           StringNo,
+                                           &lOffsetVal,
+                                           offset);
+      if (gcmIS_ERROR(status)) return status;
       status = clEmitCode2(Compiler,
                            LineNo,
                            StringNo,
@@ -26929,8 +27765,7 @@ cloIR_BINARY_EXPR_GenAssignCode(
            variable->decl.dataType->accessQualifier == clvQUALIFIER_CONST &&
            variable->u.variableInfo.u.constant &&
            (variable->u.variableInfo.isAddressed ||
-            clmGEN_CODE_checkVariableForMemory(variable) ||
-            !variable->u.variableInfo.indirectlyAddressed)) return status;
+            clmGEN_CODE_checkVariableForMemory(variable))) return status;
     }
 
     if(clmDECL_IsPackedType(&BinaryExpr->exprBase.decl) &&
@@ -27069,7 +27904,7 @@ errorHandling:
                                                                BinaryExpr->exprBase.base.stringNo,
                                                                leftParameters.elementIndex,
                                                                elementDataTypeSize,
-                                                               leftParameters.dataTypes[0].byteOffset,
+                                                               &leftParameters.dataTypes[0].byteOffset,
                                                                scaledIndex));
 
                   gcmONERROR(_GenImplicitConvParametersToType(Compiler,
@@ -27096,21 +27931,26 @@ errorHandling:
                   gctUINT elementDataTypeSize;
 
                   elementDataTypeSize = clsDECL_GetByteSize(Compiler, &BinaryExpr->leftOperand->decl);
-                  gcmONERROR(clGenScaledIndexOperandWithOffset(Compiler,
-                                                               BinaryExpr->exprBase.base.lineNo,
-                                                               BinaryExpr->exprBase.base.stringNo,
-                                                               leftParameters.elementIndex,
-                                                               elementDataTypeSize,
-                                                               leftParameters.dataTypes[0].byteOffset,
-                                                               scaledIndex));
 
                   if(clmDECL_IsUnderlyingStructOrUnion(&BinaryExpr->leftOperand->decl)) {
-                      gctINT byteOffset = 0;
+                      clsROPERAND byteOffset[1];
                       clsLOPERAND lOperand[1];
                       clsLOPERAND *lhs;
 
+                      gcmONERROR(clGenScaledIndexOperandWithOffset(Compiler,
+                                                                   BinaryExpr->exprBase.base.lineNo,
+                                                                   BinaryExpr->exprBase.base.stringNo,
+                                                                   leftParameters.elementIndex,
+                                                                   elementDataTypeSize,
+                                                                   &leftParameters.dataTypes[0].byteOffset,
+                                                                   scaledIndex));
+
                       gcmASSERT(clmDECL_IsUnderlyingStructOrUnion(&BinaryExpr->rightOperand->decl));
 
+                      clsROPERAND_InitializeScalarConstant(byteOffset,
+                                                           clmGenCodeDataType(T_INT),
+                                                           long,
+                                                           0);
                       if(scaledIndex->isReg) {
                          clsROPERAND rOperand[1];
                          clsIOPERAND iOperand[1];
@@ -27129,7 +27969,7 @@ errorHandling:
                           lhs = lOperand;
                       }
                       else {
-                          byteOffset = _GetIntegerValue(scaledIndex);
+                          byteOffset[0] = scaledIndex[0];
                           lhs = leftParameters.lOperands;
                       }
                       _clmGenStructAssign(Compiler,
@@ -27142,6 +27982,17 @@ errorHandling:
                       gcmONERROR(status);
                   }
                   else {
+                      clsLOPERAND *lOperand;
+                      clsLOPERAND lOperandBuf[1];
+
+                      gcmONERROR(clGenScaledIndexOperand(Compiler,
+                                                         BinaryExpr->exprBase.base.lineNo,
+                                                         BinaryExpr->exprBase.base.stringNo,
+                                                         leftParameters.elementIndex,
+                                                         elementDataTypeSize,
+                                                         gcvTRUE,
+                                                         scaledIndex));
+
                       gcmONERROR(_GenImplicitConvParametersToType(Compiler,
                                                                   BinaryExpr->rightOperand,
                                                                   BinaryExpr->leftOperand,
@@ -27149,11 +28000,29 @@ errorHandling:
                                                                   &leftParameters));
 
                       for (i = 0; i < leftParameters.operandCount; i++) {
+                          lOperand = leftParameters.lOperands + i;
+                          if(!clIsIntegerZero(&leftParameters.dataTypes[i].byteOffset)) {
+                              clsIOPERAND intermIOperand[1];
+                              clsROPERAND intermROperand[1];
+
+                              clsIOPERAND_New(Compiler, intermIOperand, lOperand->dataType);
+                              clsROPERAND_InitializeUsingLOperand(intermROperand, lOperand);
+
+                              gcmONERROR(clGenGenericCode2(Compiler,
+                                                           BinaryExpr->exprBase.base.lineNo,
+                                                           BinaryExpr->exprBase.base.stringNo,
+                                                           clvOPCODE_ADD,
+                                                           intermIOperand,
+                                                           intermROperand,
+                                                           &leftParameters.dataTypes[i].byteOffset));
+                              clsLOPERAND_InitializeUsingIOperand(lOperandBuf, intermIOperand);
+                              lOperand = lOperandBuf;
+                          }
                           gcmONERROR(clGenStoreCode(Compiler,
                                                     BinaryExpr->exprBase.base.lineNo,
                                                     BinaryExpr->exprBase.base.stringNo,
                                                     rightParameters.rOperands + i,
-                                                    leftParameters.lOperands + i,
+                                                    lOperand,
                                                     leftParameters.dataTypes[i].def,
                                                     scaledIndex));
                       }
@@ -27169,7 +28038,7 @@ errorHandling:
                   _clmGenStructAssign(Compiler,
                                       &BinaryExpr->exprBase,
                                       leftParameters.lOperands,
-                                      _GetIntegerValue(leftParameters.elementIndex),
+                                      leftParameters.elementIndex,
                                       &rightParameters,
                                       elementDataTypeSize,
                                       status);
@@ -27259,7 +28128,7 @@ errorHandling:
                                                                   BinaryExpr->exprBase.base.stringNo,
                                                                   leftParameters.elementIndex,
                                                                   elementDataTypeSize,
-                                                                  leftParameters.dataTypes[0].byteOffset,
+                                                                  &leftParameters.dataTypes[0].byteOffset,
                                                                   scaledIndex));
 
                      gcmONERROR(_AddLOperandOffset(Compiler,
@@ -27308,7 +28177,7 @@ errorHandling:
                       _clmGenStructAssign(Compiler,
                                           &BinaryExpr->exprBase,
                                           leftParameters.lOperands,
-                                          leftParameters.dataTypes[0].byteOffset,
+                                          &leftParameters.dataTypes[0].byteOffset,
                                           &rightParameters,
                                           elementDataTypeSize,
                                           status);
@@ -27408,7 +28277,7 @@ cloIR_BINARY_EXPR_GenArithmeticAssignCode(
                                                     BinaryExpr->exprBase.base.stringNo,
                                                     leftParameters.elementIndex,
                                                     elementDataTypeSize,
-                                                    leftParameters.dataTypes[0].byteOffset,
+                                                    &leftParameters.dataTypes[0].byteOffset,
                                                     scaledIndex));
 
        if (leftParameters.needROperand) {
@@ -27695,7 +28564,7 @@ cloIR_BINARY_EXPR_GenShiftAssignCode(
                                                      BinaryExpr->exprBase.base.stringNo,
                                                      leftParameters.elementIndex,
                                                      elementDataTypeSize,
-                                                     leftParameters.dataTypes[0].byteOffset,
+                                                     &leftParameters.dataTypes[0].byteOffset,
                                                      scaledIndex));
 
         if (leftParameters.needROperand) {
@@ -27885,7 +28754,7 @@ cloIR_BINARY_EXPR_GenBitwiseAssignCode(
                                                      BinaryExpr->exprBase.base.stringNo,
                                                      leftParameters.elementIndex,
                                                      elementDataTypeSize,
-                                                     leftParameters.dataTypes[0].byteOffset,
+                                                     &leftParameters.dataTypes[0].byteOffset,
                                                      scaledIndex));
 
         if (leftParameters.needROperand) {
@@ -28458,7 +29327,7 @@ cloIR_SELECTION_GenCode(
         gcmASSERT(!Parameters->needROperand);
 
         /* Only generate the code of the condition expression */
-        clsGEN_CODE_PARAMETERS_Initialize(&condParameters, gcvFALSE, gcvFALSE);
+        clsGEN_CODE_PARAMETERS_Initialize(&condParameters, gcvFALSE, gcvTRUE);
 
         status = cloIR_OBJECT_Accept(Compiler,
                          &Selection->condExpr->base,
@@ -28763,9 +29632,9 @@ cloIR_SWITCH_GenCode(
                        &switchBodyParameters));
 
 
-    gcmONERROR(_DefineSwitchEnd(Compiler, CodeGenerator));
-
 OnError:
+    _DefineSwitchEnd(Compiler, CodeGenerator);
+
     clsGEN_CODE_PARAMETERS_Finalize(&switchBodyParameters);
     clsGEN_CODE_PARAMETERS_Finalize(&condParameters);
     return status;
@@ -30449,6 +31318,7 @@ clGenBuiltInAsmCode(
     case clvOPCODE_IMAGE_READ_3D:
     case clvOPCODE_IMAGE_WRITE:
     case clvOPCODE_IMAGE_WRITE_3D:
+    case clvOPCODE_CLAMP0MAX:
     case clvOPCODE_ATAN2:
 
     case clvOPCODE_POW:
@@ -31118,18 +31988,12 @@ OUT cloCODE_GENERATOR * CodeGenerator
         /* Initialize other data members */
         codeGenerator->currentIterationContext    = gcvNULL;
 
-        gcmONERROR(gcoHAL_QueryChipIdentity(gcvNULL,
-                            &codeGenerator->chipModel,
-                            &codeGenerator->chipRevision,
-                            gcvNULL,
-                            gcvNULL));
+        codeGenerator->chipModel = gcGetHWCaps()->chipModel;
+        codeGenerator->chipRevision = gcGetHWCaps()->chipRevision;
 
-        codeGenerator->hasNEW_SIN_COS_LOG_DIV =
-            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_EXTRA_INSTRUCTIONS2);
-        codeGenerator->supportRTNE =
-            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE);
-        codeGenerator->supportAtomic =
-            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC);
+        codeGenerator->hasNEW_SIN_COS_LOG_DIV = gcGetHWCaps()->hwFeatureFlags.hasExtraInst2;
+        codeGenerator->supportRTNE = gcGetHWCaps()->hwFeatureFlags.rtneRoundingEnabled;
+        codeGenerator->supportAtomic = gcGetHWCaps()->hwFeatureFlags.hasAtomic;
         /* Disable atomic support for gcv3000-v5450. */
         if (codeGenerator->chipModel == gcv3000 && codeGenerator->chipRevision == 0x5450)
         {
@@ -31144,9 +32008,7 @@ OUT cloCODE_GENERATOR * CodeGenerator
 
             gcmOS_SAFE_FREE(gcvNULL, productName);
         }
-        codeGenerator->fulllySupportIntegerBranch =
-            gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_FULLLY_SUPPORT_INTEGER_BRANCH);
-
+        codeGenerator->fulllySupportIntegerBranch = gcGetHWCaps()->hwFeatureFlags.supportFullIntBranch;
         codeGenerator->fpConfig = cldFpCapsDefault;
         codeGenerator->fpConfig |= cloCOMPILER_GetFpConfig(Compiler);
 

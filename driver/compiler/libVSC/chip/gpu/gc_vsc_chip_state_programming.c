@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1727,19 +1727,20 @@ extern gctUINT _GetHsRemapMode(SHADER_EXECUTABLE_PROFILE* pHsSEP,
 }
 
 extern gctUINT _GetHsValidMaxPatchesPerHwTG(SHADER_EXECUTABLE_PROFILE* pHsSEP,
+                                            gctUINT maxHwTGThreadCount,
                                             gctBOOL bIsInputRemap,
                                             gctUINT maxParallelFactor)
 {
     gctUINT maxPatchesPerHwTG;
 
-    maxPatchesPerHwTG = vscMIN(32/pHsSEP->exeHints.nativeHints.prvStates.ts.outputCtrlPointCount,
-                               256/(bIsInputRemap ?
+    maxPatchesPerHwTG = vscMIN(maxHwTGThreadCount / pHsSEP->exeHints.nativeHints.prvStates.ts.outputCtrlPointCount,
+                               (maxHwTGThreadCount * 8)/(bIsInputRemap ?
                                pHsSEP->exeHints.nativeHints.prvStates.ts.inputCtrlPointCount :
                                (pHsSEP->exeHints.nativeHints.prvStates.ts.inputCtrlPointCount +
                                 pHsSEP->exeHints.nativeHints.prvStates.ts.outputCtrlPointCount)));
     maxPatchesPerHwTG = vscMIN(maxPatchesPerHwTG, maxParallelFactor);
 
-    return maxPatchesPerHwTG;
+    return (maxPatchesPerHwTG == 0) ? 1 : maxPatchesPerHwTG;
 }
 
 static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
@@ -1852,7 +1853,8 @@ static VSC_ErrCode _ProgramHS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
 
     remapMode = _GetHsRemapMode(pHsSEP, hsPerCPInputCount, hsPerCPOutputCount, gcvNULL);
 
-    maxPatchesPerHwTG = _GetHsValidMaxPatchesPerHwTG(pHsSEP, (remapMode == 0x0),
+    maxPatchesPerHwTG = _GetHsValidMaxPatchesPerHwTG(pHsSEP, pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.maxCoreCount * 4,
+                                                     (remapMode == 0x0),
                                                      pShHwInfo->hwProgrammingHints.maxParallelFactor);
     totalCPOutputCount = hsPerCPOutputCount * pHsSEP->exeHints.nativeHints.prvStates.ts.outputCtrlPointCount;
     totalOutputCountPerhwTG = (totalCPOutputCount + hsPerPatchOutputCount) * maxPatchesPerHwTG;
@@ -2591,9 +2593,9 @@ static gctUINT _GetGSRemapInputStartHwReg(SHADER_EXECUTABLE_PROFILE* pGsSEP)
     return retValue;
 }
 
-extern gctUINT _GetGsValidMaxThreadsPerHwTG(SHADER_EXECUTABLE_PROFILE* pGsSEP, gctUINT maxThreadsPerHwTG)
+extern gctUINT _GetGsValidMaxThreadsPerHwTG(SHADER_EXECUTABLE_PROFILE* pGsSEP, gctUINT maxThreadsPerHwTG, gctUINT maxHwTGThreadCount)
 {
-    return vscMIN(192/pGsSEP->exeHints.nativeHints.prvStates.gs.inputVtxCount, maxThreadsPerHwTG);
+    return vscMIN((maxHwTGThreadCount * 6)/pGsSEP->exeHints.nativeHints.prvStates.gs.inputVtxCount, maxThreadsPerHwTG);
 }
 
 static VSC_ErrCode _ProgramGS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAMMER* pStatesPgmer)
@@ -2749,7 +2751,8 @@ static VSC_ErrCode _ProgramGS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRAM
     gsOutputSizePerThread = (gsOutputCount << 4) * pGsSEP->exeHints.nativeHints.prvStates.gs.maxOutputVtxCount;
 #endif
 
-    maxThreadsPerHwTG = _GetGsValidMaxThreadsPerHwTG(pGsSEP, pShHwInfo->hwProgrammingHints.maxThreadsPerHwTG);
+    maxThreadsPerHwTG = _GetGsValidMaxThreadsPerHwTG(pGsSEP, pShHwInfo->hwProgrammingHints.maxThreadsPerHwTG,
+                                                     pStatesPgmer->pSysCtx->pCoreSysCtx->hwCfg.maxCoreCount * 4);
     hwTGSize = maxThreadsPerHwTG * gsOutputSizePerThread + pShHwInfo->hwProgrammingHints.gsMetaDataSizePerHwTGInBtye;
     hwTGSize = VSC_UTILS_ALIGN(hwTGSize, 16);
 
@@ -5073,9 +5076,7 @@ static VSC_ErrCode _AllocVidMemForSharedMemory(VSC_CHIP_STATES_PROGRAMMER* pStat
         }
     }
 
-    /* TODO: use co-current group number */
-#define HACKED_WORK_GROUP_NUMBER 100
-    totalSharedMemVidMemSize = HACKED_WORK_GROUP_NUMBER * sharedMemVidMemSizePerGrp;
+    totalSharedMemVidMemSize = pGpsSEP->exeHints.nativeHints.prvStates.gps.currWorkGrpNum * sharedMemVidMemSizePerGrp;
 
     gcmASSERT(totalSharedMemVidMemSize);
 

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,10 +18,10 @@
 
 #define gcvVERSION_MINOR        2
 
-#define gcvVERSION_PATCH        0
+#define gcvVERSION_PATCH        2
 
-#define gcvVERSION_BUILD     79565
+#define gcvVERSION_BUILD     93313
 
-#define gcvVERSION_STRING    "6.2.0.p2.79565"
+#define gcvVERSION_STRING    "6.2.2.93313"
 
 #endif /* __gc_hal_version_h_ */

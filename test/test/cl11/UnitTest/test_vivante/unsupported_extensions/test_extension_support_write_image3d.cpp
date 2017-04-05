@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -70,7 +70,7 @@ int test_write_image3d(cl_device_id device, cl_context context, cl_command_queue
     int err;
     int img_width = 512;
     int img_height = 512;
-    int img_depth = 512;
+    int img_depth = 32;
 
     size_t origin[3] = {0, 0, 0};
     size_t region[3] = {img_width, img_height, 1};

@@ -324,6 +324,7 @@ static void ParseDirective(const char *CommentStart, unsigned CommentLen,
       PP.Diag(Pos.getFileLocWithOffset(ContentBegin-PH.Begin),
               diag::err_verify_invalid_content)
         << KindStr << Error;
+      delete D;
     }
   }
 }

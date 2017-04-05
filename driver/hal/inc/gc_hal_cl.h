@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -81,7 +81,18 @@ typedef struct _gcoCL_DEVICE_INFO
     gctBOOL             atomicSupport;
     gctSIZE_T           imageMaxBufferSize;
 
-    gctBOOL             computeOnlyGpu;         /* without graphih, only compute core GPU flag */
+    gctBOOL             computeOnlyGpu;           /* without graphih, only compute core GPU flag */
+    gctBOOL             supportIMGInstr;          /* support image instruction */
+    gctBOOL             psThreadWalker;           /* TW in PS */
+    gctBOOL             supportSamplerBaseOffset; /* HW has samplerBaseOffset */
+    gctUINT             maxRegisterCount;         /* max temp register count */
+    gctBOOL             TxIntegerSupport;
+    gctBOOL             halti2;                   /* Halit2 support */
+    gctBOOL             multiWGPack;
+
+    gceCHIPMODEL        chipModel;
+    gctUINT32           chipRevision;
+
 } gcoCL_DEVICE_INFO;
 
 typedef gcoCL_DEVICE_INFO *  gcoCL_DEVICE_INFO_PTR;
@@ -659,6 +670,7 @@ gcoCL_InvokeKernel(
     IN gcSHADER     Kernel,
     IN gctUINT      WorkDim,
     IN size_t       GlobalWorkOffset[3],
+    IN size_t       GlobalScale[3],
     IN size_t       GlobalWorkSize[3],
     IN size_t       LocalWorkSize[3],
     IN gctUINT      ValueOrder,

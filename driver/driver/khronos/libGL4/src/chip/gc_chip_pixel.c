@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1693,7 +1693,14 @@ GLboolean simulatePixelOperation(__GLcontext *gc, GLint x, GLint y, GLsizei widt
         }
         else
         {
-            internalFormat = GL_RGBA;
+            if(gc->modes.alphaBits == 0)
+            {
+                internalFormat = GL_RGB;
+            }
+            else
+            {
+                internalFormat = GL_RGBA;
+            }
         }
         break;
     }

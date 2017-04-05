@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -434,12 +434,13 @@ G2dPrepareSolid(PixmapPtr pPixmap, int alu, Pixel planemask, Pixel fg) {
  *
  * This call is required if PrepareSolid() ever succeeds.
  */
-static int _last_hw_solid = 0;
+
 void
 G2dSolid(PixmapPtr pPixmap, int x1, int y1, int x2, int y2) {
     VivPtr pViv = VIVPTR_FROM_PIXMAP(pPixmap);
     VIVGPUPtr pGpuCtx = (VIVGPUPtr)(pViv->mGrCtx.mGpu);
     G2DBLITINFOPTR pBlt = &pViv->mGrCtx.mG2dBlitInfo;
+    static int _last_hw_solid = 0;
 
     Viv2DPixmapPtr pVivPixDst = NULL;
 
@@ -640,13 +641,14 @@ G2dPrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap,
  * This call is required if PrepareCopy ever succeeds.
  *
 **/
-static int  _last_hw_cpy = 0;
 void
 G2dCopy(PixmapPtr pDstPixmap, int srcX, int srcY,
     int dstX, int dstY, int width, int height) {
     VivPtr pViv = VIVPTR_FROM_PIXMAP(pDstPixmap);
     VIVGPUPtr pGpuCtx = (VIVGPUPtr)(pViv->mGrCtx.mGpu);
     G2DBLITINFOPTR pBlt = &pViv->mGrCtx.mG2dBlitInfo;
+    static int  _support_pixman_blit = 1;
+    static int  _last_hw_cpy = 0;
 
     Viv2DPixmapPtr pVivPixSrc = NULL;
     Viv2DPixmapPtr pVivPixDst = NULL;
@@ -702,7 +704,8 @@ G2dCopy(PixmapPtr pDstPixmap, int srcX, int srcY,
          (0 == (pViv->mGrCtx.mG2dBlitInfo.mSrcSurfInfo.mStride%4)))
     {
         /* when surface > IMX_EXA_NONCACHESURF_SIZE but actual copy size < IMX_EXA_NONCACHESURF_SIZE, go sw path */
-        if ( ( width * height ) < IMX_EXA_NONCACHESURF_SIZE )
+        if ( ( width * height ) < IMX_EXA_NONCACHESURF_SIZE
+            && _support_pixman_blit )
         {
             if ( MapViv2DPixmap(pVivPixSrc) != MapViv2DPixmap(pVivPixDst) )
             {
@@ -715,7 +718,7 @@ G2dCopy(PixmapPtr pDstPixmap, int srcX, int srcY,
                 }
                 _last_hw_cpy = 0;
 
-                pixman_blt((uint32_t *) MapViv2DPixmap(pVivPixSrc),
+                if ( pixman_blt((uint32_t *) MapViv2DPixmap(pVivPixSrc),
                     (uint32_t *) MapViv2DPixmap(pVivPixDst),
                     pViv->mGrCtx.mG2dBlitInfo.mSrcSurfInfo.mStride/4,
                     pViv->mGrCtx.mG2dBlitInfo.mDstSurfInfo.mStride/4,
@@ -726,10 +729,13 @@ G2dCopy(PixmapPtr pDstPixmap, int srcX, int srcY,
                     dstX,
                     dstY,
                     width,
-                    height);
-
-                pBlt->mSwcpy = TRUE;
-                return;
+                    height) )
+                {
+                    pBlt->mSwcpy = TRUE;
+                    return;
+                } else {
+                    _support_pixman_blit = 0;
+                }
             }
         }
     }
@@ -961,13 +967,14 @@ G2dPrepareComposite(int op, PicturePtr pSrc, PicturePtr pMsk,
  *
  * This call is required if PrepareComposite() ever succeeds.
  */
-static int  _last_hw_composite = 0;
+
 void
 G2dComposite(PixmapPtr pxDst, int srcX, int srcY, int maskX, int maskY,
     int dstX, int dstY, int width, int height) {
     VivPtr pViv = VIVPTR_FROM_PIXMAP(pxDst);
     VIVGPUPtr pGpuCtx = (VIVGPUPtr)(pViv->mGrCtx.mGpu);
     G2DBLITINFOPTR pBlt = &pViv->mGrCtx.mG2dBlitInfo;
+    static int  _last_hw_composite = 0;
 
     Viv2DPixmapPtr pVivPixSrc = NULL;
     Viv2DPixmapPtr pVivPixDst = NULL;

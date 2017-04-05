@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -603,7 +603,7 @@ gceSTATUS vgfReferenceImage(
 
         /* Success. */
         status = gcvSTATUS_OK;
-        goto ErrorHandler;
+        goto OnSuccess;
     }
     while (gcvFALSE);
 
@@ -612,7 +612,7 @@ gceSTATUS vgfReferenceImage(
     {
         gcmCHECK_STATUS(gcoOS_Free(Context->os, image));
     }
-ErrorHandler:
+OnSuccess:
     break;
 
     vgmLEAVESUBAPI(vgfReferenceImage);
@@ -1214,11 +1214,29 @@ gceSTATUS vgfCreateImage(
         if (UserMemory != gcvNULL)
         {
             status = gcoSURF_ConstructWrapper(Context->hal, &surface);
+            if (gcmIS_ERROR(status))
+            {
+                vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+                break;
+            }
+
             status = gcoSURF_SetBuffer(surface,
                         gcvSURF_BITMAP,
                         surfaceFormat->internalFormat,
                         ~0U, UserMemory, gcvINVALID_ADDRESS);
+            if (gcmIS_ERROR(status))
+            {
+                vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+                break;
+            }
+
             status = gcoSURF_SetWindow(surface, 0, 0, Width, Height);
+            if (gcmIS_ERROR(status))
+            {
+                vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+                break;
+            }
+
             status = gcoSURF_CPUCacheOperation(surface, gcvCACHE_FLUSH);
         }
         else
@@ -1316,7 +1334,7 @@ gceSTATUS vgfCreateImage(
         image->surfArgValid     = gcvTRUE;
         /* Success. */
         status = gcvSTATUS_OK;
-        goto ErrorHandler;
+        goto OnSuccess;
     }
     while (gcvFALSE);
 
@@ -1336,7 +1354,7 @@ gceSTATUS vgfCreateImage(
         gcmVERIFY_OK(vgfDereferenceObject(Context, (vgsOBJECT_PTR *) &image));
     }
 
-ErrorHandler:
+OnSuccess:
     break;
     vgmLEAVESUBAPI(vgfCreateImage);
     /* Return status. */
@@ -4644,6 +4662,7 @@ VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageVIV(
 {
     vgmENTERAPI(vgDrawWarpedImageVIV)
     {
+        VGImage PaddedImage;
         vgsIMAGE_PTR image;
         VGuint i;
         gceSTATUS status;
@@ -4668,7 +4687,9 @@ VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageVIV(
             break;
         }
 
-        image = (vgsIMAGE_PTR) Image;
+        PaddedImage = vgCreateImage((VGImageFormat)vgGetParameteri(Image, VG_IMAGE_FORMAT), vgGetParameteri(Image, VG_IMAGE_WIDTH) + 10, vgGetParameteri(Image, VG_IMAGE_HEIGHT) + 10, vgGeti(VG_IMAGE_QUALITY));
+        vgCopyImage(PaddedImage, 1, 1, Image, 0, 0, vgGetParameteri(Image, VG_IMAGE_WIDTH), vgGetParameteri(Image, VG_IMAGE_HEIGHT), VG_FALSE);
+        image = (vgsIMAGE_PTR) PaddedImage;
 
         if (vgfIsImageRenderTarget(Context, image))
         {
@@ -4777,6 +4798,7 @@ VG_API_CALL void VG_API_ENTRY vgDrawWarpedImageVIV(
         *image->imageDirtyPtr = vgvIMAGE_NOT_FINISHED;
         *Context->targetImage.imageDirtyPtr = vgvIMAGE_NOT_READY;
         Context->imageDirty = vgvIMAGE_NOT_READY;
+        vgDestroyImage(PaddedImage);
     }
     vgmLEAVEAPI(vgDrawWarpedImageVIV);
 }

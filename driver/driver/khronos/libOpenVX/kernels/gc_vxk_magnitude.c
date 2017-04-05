@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -48,7 +48,7 @@ vx_status vxMagnitude(vx_node node, vx_image grad_x, vx_image grad_y, vx_image o
 
     /*index = 2*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
-    if (node->base.context->evisNoInst.noMagPhase)
+    if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noMagPhase)
     {
         vx_uint8 bin[16] = {0, 32, 64, 96, 0, 0, 0, 0, 16, 16, 16, 16, 0, 0, 0, 0};
         gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));

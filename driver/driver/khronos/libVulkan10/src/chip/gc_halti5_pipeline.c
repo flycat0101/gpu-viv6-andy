@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -609,7 +609,6 @@ static VkResult halti5_pip_emit_viewport(
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x02A3, VK_FALSE, *(uint32_t*)&wSmall);
 
-    /* TODO: move below programming to other place */
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x02A1, VK_TRUE, 8192 << 16);
 
     if ((!(pip->dynamicStates & __VK_DYNAMIC_STATE_VIEWPORT_BIT))
@@ -1725,10 +1724,8 @@ static VkResult halti5_pip_emit_rt(
     VkBool32 hasDsSurface = (subPass->dsAttachIndex != VK_ATTACHMENT_UNUSED) ? VK_TRUE : VK_FALSE;
     uint32_t i;
 
-    /* step 1: depthOnly check */
-        /* no color attachment. (TODO): if all colorWrite is off and depth pipe is on */
     depthOnly = (subPass->colorCount == 0);
-        /* ps shader is not necessary to be excuted */
+    /* ps shader is not necessary to be excuted */
     depthOnly &= !(hints->hasKill
         || hints->psHasFragDepthOut
         || psHasMemoryAccess
@@ -1864,7 +1861,7 @@ static VkResult halti5_pip_emit_rt(
 
         if ((dsInfo->depthCompareOp == VK_COMPARE_OP_NOT_EQUAL) ||
             (dsInfo->stencilTestEnable &&
-             ((dsInfo->front.passOp != VK_STENCIL_OP_KEEP) ||  /* TODO: should we check back face operation ? */
+             ((dsInfo->front.passOp != VK_STENCIL_OP_KEEP) ||
               (dsInfo->front.failOp != VK_STENCIL_OP_KEEP) ||
               (dsInfo->front.depthFailOp != VK_STENCIL_OP_KEEP))) ||
               (psEarlyFragmentTest ? VK_FALSE :((hints->psHasFragDepthOut)||psHasMemoryAccess)))
@@ -3158,7 +3155,7 @@ static VkResult halti5_helper_createVscResLayout(
                 VkPushConstantRange *pVkPushConstant = &pipLayout->pushConstantRanges[i];
                 pVscPushConstant->shPushConstRange.offset = pVkPushConstant->offset;
                 pVscPushConstant->shPushConstRange.size = pVkPushConstant->size;
-                pVscPushConstant->stageBits = (VSC_SHADER_STAGE_BIT)pVkPushConstant->stageFlags; /* TODO, the definition is unknown */
+                pVscPushConstant->stageBits = (VSC_SHADER_STAGE_BIT)pVkPushConstant->stageFlags;
             }
         }
 
@@ -3193,7 +3190,7 @@ static VkResult halti5_helper_createVscResLayout(
                         pVscResourceBinding->shResBinding.arraySize = pVkDescSetLayout->binding[j].std.descriptorCount;
                         pVscResourceBinding->shResBinding.type = (VSC_SHADER_RESOURCE_TYPE)pVkDescSetLayout->binding[j].std.descriptorType;
                         pVscResourceBinding->shResBinding.set = i;
-                        pVscResourceBinding->stageBits = (VSC_SHADER_STAGE_BIT)pVkDescSetLayout->binding[j].std.stageFlags; /* TODO, the definition is unknown */
+                        pVscResourceBinding->stageBits = (VSC_SHADER_STAGE_BIT)pVkDescSetLayout->binding[j].std.stageFlags;
                     }
                 }
             }
@@ -3343,61 +3340,6 @@ void halti5_free_vscprogram_instance(
     return;
 }
 
-#include "gc_halti5_patchlib.frag.h"
-
-__VK_INLINE SHADER_HANDLE halti5_get_patchlib(
-    __vkDevContext *devCtx
-    )
-{
-    VkResult result =  VK_SUCCESS;
-    halti5_module *chipModule = (halti5_module*)devCtx->chipPriv;
-
-    if (!chipModule->patchLib)
-    {
-        SpvDecodeInfo decodeInfo;
-        VSC_SHADER_COMPILER_PARAM vscCompileParams;
-
-        __VK_MEMZERO(&decodeInfo, sizeof(decodeInfo));
-        decodeInfo.binary = (gctUINT *)gc_halti5_patchlib_frag;
-        decodeInfo.sizeInByte = (gctUINT)sizeof(gc_halti5_patchlib_frag);
-        decodeInfo.stageInfo = gcvNULL;
-        decodeInfo.specFlag = SPV_SPECFLAG_NONE;
-        decodeInfo.localSize[0] = decodeInfo.localSize[1] = decodeInfo.localSize[2] = 0;
-        decodeInfo.tcsInputVertices = 0;
-        decodeInfo.funcCtx = gcvNULL;
-        decodeInfo.renderpassInfo = gcvNULL;
-        decodeInfo.subPass = ~0U;
-
-        __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &chipModule->patchLib))
-                                    ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
-
-        __VK_MEMZERO(&vscCompileParams, sizeof(VSC_SHADER_COMPILER_PARAM));
-        vscCompileParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
-        vscCompileParams.cfg.ctx.appNameId = gcvPATCH_INVALID;
-        vscCompileParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
-        vscCompileParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_TO_ML
-                                    | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
-                                    | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
-        vscCompileParams.cfg.optFlags = VSC_COMPILER_OPT_FULL;
-        vscCompileParams.hShader = chipModule->patchLib;
-
-        __VK_ONERROR((gcvSTATUS_OK == vscCompileShader(&vscCompileParams, gcvNULL))
-                                    ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
-
-#if __VK_SAVE_THEN_LOAD_SHADER_BIN
-        __VK_ONERROR(__vkSaveThenLoadShaderBin(&devCtx->memCb, &chipModule->patchLib));
-#endif
-    }
-
-OnError:
-    if (result !=  VK_SUCCESS && chipModule->patchLib)
-    {
-        vscDestroyShader(chipModule->patchLib);
-        chipModule->patchLib = gcvNULL;
-    }
-    return chipModule->patchLib;
-}
-
 static void halti5_pip_build_patchKeyMask(
     __vkPipeline *pip
     )
@@ -3463,6 +3405,10 @@ static void halti5_pip_build_patchKeyMask(
                             {
                                 patchKey |= HALTI5_PATCH_TX_GATHER_BIT;
                             }
+                            if (*pResOp & VSC_RES_OP_BIT_GATHER_PCF)
+                            {
+                                patchKey |= HALTI5_PATCH_TX_GATHER_PCF_BIT;
+                            }
                             if (*pResOp & (VSC_RES_OP_BIT_TEXLD
                                 | VSC_RES_OP_BIT_TEXLD_BIAS
                                 | VSC_RES_OP_BIT_TEXLD_LOD
@@ -3503,6 +3449,10 @@ static void halti5_pip_build_patchKeyMask(
                             if (*pResOp & VSC_RES_OP_BIT_GATHER)
                             {
                                 patchKey |= HALTI5_PATCH_TX_GATHER_BIT;
+                            }
+                            if (*pResOp & VSC_RES_OP_BIT_GATHER_PCF)
+                            {
+                                patchKey |= HALTI5_PATCH_TX_GATHER_PCF_BIT;
                             }
                             if (*pResOp & (VSC_RES_OP_BIT_TEXLD
                                 | VSC_RES_OP_BIT_TEXLD_BIAS
@@ -3547,6 +3497,10 @@ static void halti5_pip_build_patchKeyMask(
                             if (*pResOp & VSC_RES_OP_BIT_GATHER)
                             {
                                 patchKey |= HALTI5_PATCH_TX_GATHER_BIT;
+                            }
+                            if (*pResOp & VSC_RES_OP_BIT_GATHER_PCF)
+                            {
+                                patchKey |= HALTI5_PATCH_TX_GATHER_PCF_BIT;
                             }
                             if (*pResOp & (VSC_RES_OP_BIT_TEXLD
                                 | VSC_RES_OP_BIT_TEXLD_BIAS
@@ -3703,10 +3657,9 @@ static VkResult halti5_pip_build_gfxshaders(
             break;
         default:
             __VK_ASSERT(!"Unknown shader type");
+            __VK_ONERROR(VK_ERROR_INCOMPATIBLE_DRIVER);
             break;
         }
-
-        __VK_ASSERT(shaderType < VSC_MAX_GFX_SHADER_STAGE_COUNT);
 
         shaderModule = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkShaderModule*, info->pStages[i].module);
 
@@ -3812,12 +3765,7 @@ static VkResult halti5_pip_build_gfxshaders(
         uint32_t linkEntryIdx = 0;
         uint32_t j = 0;
         uint32_t patchMask = chipGfxPipeline->patchOutput.mask;
-        SHADER_HANDLE patchLib = halti5_get_patchlib(devCtx);
-
-        if (!patchLib)
-        {
-            __VK_ONERROR(VK_ERROR_INCOMPATIBLE_DRIVER);
-        }
+        halti5_module *chipModule = (halti5_module*)devCtx->chipPriv;
 
         __VK_MEMZERO(&vscLibLinkTable, sizeof(vscLibLinkTable));
         vscLinkParams.pProgLibLinkTable = &vscLibLinkTable;
@@ -3833,19 +3781,19 @@ static VkResult halti5_pip_build_gfxshaders(
 
         if (patchMask)
         {
-
             while (patchMask)
             {
                 if (patchMask & (1 << j))
                 {
                     vsclinkEntries[linkEntryIdx].mainShaderStageBits = VSC_SHADER_STAGE_BIT_PS;
-                    vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = patchLib;
+                    vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPointCount = 1;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_COLOR_OUTPUT;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].u.clrOutput.location = chipGfxPipeline->patchOutput.outputs[j].locations[0];
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].u.clrOutput.layers = chipGfxPipeline->patchOutput.outputs[j].partCount;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].strFunc =
-                        halti5_helper_patchFuc(chipGfxPipeline->patchOutput.outputs[j].format, HALTI5_PATCH_PE_EXTRA_OUTPUT, 0, VK_NULL_HANDLE);
+                        halti5_helper_patchFuc(chipGfxPipeline->patchOutput.outputs[j].format,
+                                               HALTI5_PATCH_PE_EXTRA_OUTPUT, 0, VK_NULL_HANDLE, VK_NULL_HANDLE, VK_NULL_HANDLE);
                     linkEntryIdx++;
                     patchMask &= ~(1 << j);
                 }
@@ -3857,7 +3805,7 @@ static VkResult halti5_pip_build_gfxshaders(
         {
             vsclinkEntries[linkEntryIdx].mainShaderStageBits = VSC_SHADER_STAGE_BIT_PS;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPointCount = 1;
-            vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = patchLib;
+            vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_FRONTFACING_CCW;
             linkEntryIdx++;
         }
@@ -4404,7 +4352,7 @@ static VkResult halti5_pip_emit_computeShaderInstance(
 {
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
-    struct _gcsHINT *hints = &chipPipeline->masterInstance->hwStates.hints;
+    struct _gcsHINT *hints = &chipPipeline->curInstance->hwStates.hints;
 
     chipPipeline->curInstance->curInstanceCmdIndex = 0;
 
@@ -4498,7 +4446,6 @@ static VkResult halti5_pip_emit_computeProgram(
  20:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:20) - (0 ? 20:20) + 1))))))) << (0 ?
  20:20))));
 
-    /* TODO: do we need to program throttle? */
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0228, VK_FALSE, reservedPages);
 
     if (database->REG_TessellationShaders)
@@ -4533,7 +4480,6 @@ static VkResult halti5_pip_emit_computeProgram(
  5:0))));
     }
 
-    /* TODO compiler is not enabling prefetch for compute shader */
     for (i = 0; i < GC_ICACHE_PREFETCH_TABLE_SIZE; i++)
     {
         if (-1 != hints->fsICachePrefetch[i])
@@ -4713,13 +4659,8 @@ VkResult halti5_patch_pipeline(
             uint32_t entryIdx = 0;
             VSC_PROGRAM_LINKER_PARAM vscLinkParams;
             VSC_PROG_LIB_LINK_TABLE vscLibLinkTable;
-            SHADER_HANDLE patchLib = halti5_get_patchlib(devCtx);
+            halti5_module *chipModule = (halti5_module*)devCtx->chipPriv;
             struct _gcsHINT *hints = VK_NULL_HANDLE;
-
-            if (!patchLib)
-            {
-                __VK_ONERROR(VK_ERROR_INCOMPATIBLE_DRIVER);
-            }
 
             for (i = 0; i < VSC_MAX_SHADER_STAGE_COUNT; i++)
             {
@@ -4815,14 +4756,27 @@ VkResult halti5_patch_pipeline(
                             if (validPatchKey & (1 << k))
                             {
                                 VSC_RES_OP_BIT opTypeBits = 0;
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.hShaderLib = patchLib;
+                                VSC_RES_ACT_BIT actBits = 0;
+                                uint32_t subType;
+                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib;
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_RESOURCE;
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].strFunc = halti5_helper_patchFuc(patchInfo->patchFormat, k, patchInfo->viewType, &opTypeBits);
+                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].strFunc =
+                                    halti5_helper_patchFuc(patchInfo->patchFormat, k, patchInfo->viewType, &opTypeBits, &actBits, &subType);
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.set = i;
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.binding = patchInfo->binding;
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.arrayIndex = patchInfo->arrayIndex;
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.opTypeBits = opTypeBits;
-                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount = 1;
+                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.actBits = actBits;
+                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].u.resource.subType = subType;
+                                switch (k)
+                                {
+                                case HALTI5_PATCH_TX_GATHER_PCF:
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount = 2;
+                                    break;
+                                default:
+                                    vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount = 1;
+                                    break;
+                                }
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts =
                                               (VSC_LIB_SPECIALIZATION_CONSTANT *)__VK_ALLOC(sizeof(VSC_LIB_SPECIALIZATION_CONSTANT) *
                                                                                             vscLinkEntriesCur[entryIdx].shLibLinkEntry.libSpecializationConstantCount,
@@ -4832,6 +4786,13 @@ VkResult halti5_patch_pipeline(
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].varName = "swizzles";
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].type = VSC_SHADER_DATA_TYPE_IVEC4;
                                 __VK_MEMCOPY(&vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[0].value, patchInfo->swizzles, sizeof(patchInfo->swizzles));
+                               if (k == HALTI5_PATCH_TX_GATHER_PCF)
+                               {
+                                   vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].varName = "comparemode";
+                                   vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].type = VSC_SHADER_DATA_TYPE_IVEC4;
+                                   vscLinkEntriesCur[entryIdx].shLibLinkEntry.pLibSpecializationConsts[1].value.uValue[0] = patchInfo->compareOp;
+                               }
+
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPointCount = 1;
                                 vscLinkEntriesCur[entryIdx].mainShaderStageBits = (VSC_SHADER_STAGE_BIT)chipDescSet->patchInfos[j].patchStages;
                                 entryIdx++;

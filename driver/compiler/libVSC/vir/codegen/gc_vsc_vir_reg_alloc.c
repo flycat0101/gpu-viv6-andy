@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2132,56 +2132,76 @@ void _VIR_RS_LS_MarkLRDead(
     2: ldarr dst, src0, t2.x    [2, 4] */
     if (pLR->hwType == VIR_RA_HWREG_A0)
     {
+        gctUINT8    channel;
+        gctUINT     movaDefIdx;
+        VIR_DEF     *movaDef;
+
         pLR->origEndPoint = pLR->endPoint;
 
         pDef = GET_DEF_BY_IDX(&pLvInfo->pDuInfo->defTable, defIdx);
 
-        /* go through all the uses, find the longest live range */
-        VSC_DU_ITERATOR_INIT(&duIter, &pDef->duChain);
-        pUsageNode = VSC_DU_ITERATOR_FIRST(&duIter);
-        for (; pUsageNode != gcvNULL; )
+        /* go through MOVA's all def */
+        for (channel = VIR_CHANNEL_X; channel < VIR_CHANNEL_NUM; channel ++)
         {
-            pUsage = GET_USAGE_BY_IDX(&pLvInfo->pDuInfo->usageTable, pUsageNode->usageIdx);
-            defIdx = _VIR_RA_LS_InstFirstDefIdx(pRA, pUsage->usageKey.pUsageInst);
-
-            /* we only need to extend LDARR's live range, not STARR's */
-            if ((VIR_INVALID_DEF_INDEX != defIdx) &&
-                (VIR_Inst_GetOpcode(pUsage->usageKey.pUsageInst) == VIR_OP_LDARR))
+            if (!VSC_UTILS_TST_BIT(VIR_Inst_GetEnable(pDef->defKey.pDefInst), channel))
             {
-                VIR_Operand_GetOperandInfo(pUsage->usageKey.pUsageInst,
-                                           pUsage->usageKey.pUsageInst->dest,
-                                           &operandInfo);
+                continue;
+            }
 
-                defKey.pDefInst = pUsage->usageKey.pUsageInst;
-                defKey.regNo = operandInfo.u1.virRegInfo.virReg;
-                defKey.channel = VIR_CHANNEL_ANY;
-                tempDefIdx = vscBT_HashSearch(&pLvInfo->pDuInfo->defTable, &defKey);
-                gcmASSERT(VIR_INVALID_DEF_INDEX != tempDefIdx);
-                pTempDef = GET_DEF_BY_IDX(&pLvInfo->pDuInfo->defTable, tempDefIdx);
-                /* du chain could be empty
-                */
-                if (!DU_CHAIN_CHECK_EMPTY(&pTempDef->duChain))
+            defKey.pDefInst = pDef->defKey.pDefInst;
+            defKey.regNo = pDef->defKey.regNo;
+            defKey.channel = channel;
+            movaDefIdx = vscBT_HashSearch(&pLvInfo->pDuInfo->defTable, &defKey);
+            gcmASSERT(VIR_INVALID_DEF_INDEX != movaDefIdx);
+            movaDef = GET_DEF_BY_IDX(&pLvInfo->pDuInfo->defTable, movaDefIdx);
+
+            /* go through all the uses, find the longest live range */
+            VSC_DU_ITERATOR_INIT(&duIter, &movaDef->duChain);
+            pUsageNode = VSC_DU_ITERATOR_FIRST(&duIter);
+            for (; pUsageNode != gcvNULL; )
+            {
+                pUsage = GET_USAGE_BY_IDX(&pLvInfo->pDuInfo->usageTable, pUsageNode->usageIdx);
+                defIdx = _VIR_RA_LS_InstFirstDefIdx(pRA, pUsage->usageKey.pUsageInst);
+
+                /* we only need to extend LDARR's live range, not STARR's */
+                if ((VIR_INVALID_DEF_INDEX != defIdx) &&
+                    (VIR_Inst_GetOpcode(pUsage->usageKey.pUsageInst) == VIR_OP_LDARR))
                 {
-                    pTempUsageNode = DU_CHAIN_GET_FIRST_USAGE(&pTempDef->duChain);
-                    pTempUsage = GET_USAGE_BY_IDX(&pLvInfo->pDuInfo->usageTable, pTempUsageNode->usageIdx);
+                    VIR_Operand_GetOperandInfo(pUsage->usageKey.pUsageInst,
+                                               pUsage->usageKey.pUsageInst->dest,
+                                               &operandInfo);
 
-                    if (!VIR_IS_OUTPUT_USAGE_INST(pTempUsage->usageKey.pUsageInst))
+                    defKey.pDefInst = pUsage->usageKey.pUsageInst;
+                    defKey.regNo = operandInfo.u1.virRegInfo.virReg;
+                    defKey.channel = VIR_CHANNEL_ANY;
+                    tempDefIdx = vscBT_HashSearch(&pLvInfo->pDuInfo->defTable, &defKey);
+                    gcmASSERT(VIR_INVALID_DEF_INDEX != tempDefIdx);
+                    pTempDef = GET_DEF_BY_IDX(&pLvInfo->pDuInfo->defTable, tempDefIdx);
+                    /* du chain could be empty
+                    */
+                    if (!DU_CHAIN_CHECK_EMPTY(&pTempDef->duChain))
                     {
-                        if (vscVIR_IsUniqueDefInstOfUsageInst(pLvInfo->pDuInfo, pTempUsage->usageKey.pUsageInst,
-                                                              pTempUsage->usageKey.pOperand, pTempUsage->usageKey.bIsIndexingRegUsage,
-                                                              pUsage->usageKey.pUsageInst, gcvNULL))
+                        pTempUsageNode = DU_CHAIN_GET_FIRST_USAGE(&pTempDef->duChain);
+                        pTempUsage = GET_USAGE_BY_IDX(&pLvInfo->pDuInfo->usageTable, pTempUsageNode->usageIdx);
+
+                        if (!VIR_IS_OUTPUT_USAGE_INST(pTempUsage->usageKey.pUsageInst))
                         {
-                            pUseLR = _VIR_RA_LS_Def2LR(pRA, defIdx);
-                            if (pUseLR->endPoint > pLR->endPoint)
+                            if (vscVIR_IsUniqueDefInstOfUsageInst(pLvInfo->pDuInfo, pTempUsage->usageKey.pUsageInst,
+                                                                  pTempUsage->usageKey.pOperand, pTempUsage->usageKey.bIsIndexingRegUsage,
+                                                                  pUsage->usageKey.pUsageInst, gcvNULL))
                             {
-                                pLR->endPoint = pUseLR->endPoint;
+                                pUseLR = _VIR_RA_LS_Def2LR(pRA, defIdx);
+                                if (pUseLR->endPoint > pLR->endPoint)
+                                {
+                                    pLR->endPoint = pUseLR->endPoint;
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            pUsageNode = VSC_DU_ITERATOR_NEXT(&duIter);
+                pUsageNode = VSC_DU_ITERATOR_NEXT(&duIter);
+            }
         }
     }
 }
@@ -2238,6 +2258,46 @@ void _VIR_RS_LS_UnsetOtherLiveLRVec(
         _VIR_RS_LS_UnsetLiveLRVec(pRA, thisIdx);
 
         thisIdx = pDef->nextDefInWebIdx;
+    }
+}
+
+void _VIR_RA_LS_ChangeMovaType(
+    VIR_RA_LS           *pRA,
+    VIR_Instruction     *pInst)
+{
+
+    VIR_LIVENESS_INFO   *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
+
+    VIR_DEF             *pDef;
+    VIR_USAGE_KEY       usageKey;
+    VIR_USAGE           *pUsage;
+    gctUINT             usageIdx, defIdx, i;
+
+    usageKey.pUsageInst = pInst;
+    usageKey.pOperand = pInst->src[0];
+    usageKey.bIsIndexingRegUsage = gcvFALSE;
+    usageIdx = vscBT_HashSearch(&pLvInfo->pDuInfo->usageTable, &usageKey);
+    if (VIR_INVALID_USAGE_INDEX != usageIdx)
+    {
+        pUsage = GET_USAGE_BY_IDX(&pLvInfo->pDuInfo->usageTable, usageIdx);
+        gcmASSERT(pUsage);
+
+        for (i = 0; i < UD_CHAIN_GET_DEF_COUNT(&pUsage->udChain); i ++)
+        {
+            defIdx = UD_CHAIN_GET_DEF(&pUsage->udChain, i);
+            if (VIR_INVALID_USAGE_INDEX != defIdx)
+            {
+                pDef = GET_DEF_BY_IDX(&pLvInfo->pDuInfo->defTable, defIdx);
+                if (VIR_IS_IMPLICIT_DEF_INST(pDef->defKey.pDefInst) ||
+                    pDef->defKey.pDefInst == VIR_UNDEF_INST)
+                {
+                    continue;
+                }
+                gcmASSERT(pDef->defKey.pDefInst->dest);
+                VIR_Operand_SetType(pInst->dest, VIR_Operand_GetType(pDef->defKey.pDefInst->dest));
+                break;
+            }
+        }
     }
 }
 
@@ -2298,6 +2358,8 @@ void _VIR_RA_LS_MarkDef(
 
                         if (instOpcode == VIR_OP_MOVA)
                         {
+                            _VIR_RA_LS_ChangeMovaType(pRA, pInst);
+
                             _VIR_RA_LS_SetHwRegType(pRA, defIdx, VIR_RA_HWREG_A0);
 
                             if (pRA->pHwCfg->hwFeatureFlags.hasUniformB0 &&
@@ -2762,7 +2824,7 @@ void _VIR_RA_LS_Mark_Outputs(
     gctUINT             i, j, defIdx;
     VIR_Enable          outEnable;
 
-    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT);
+    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0);
 
     for (outputIdx = 0;
         outputIdx < VIR_IdList_Count(VIR_Shader_GetOutputs(pShader));
@@ -5409,8 +5471,8 @@ VSC_ErrCode _VIR_RA_LS_BuildLRTableBB(
         }
 
         /* Emit has implicit usage for all outputs, so we also gen these */
-        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_AQ_EMIT)
+        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
+            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT)
         {
             _VIR_RA_LS_Mark_Outputs(pRA, pInst);
         }
@@ -6473,46 +6535,6 @@ void _VIR_RA_LS_SetSymbolHwRegInfo(
     }
 }
 
-void _VIR_RA_LS_ChangeMovaType(
-    VIR_RA_LS           *pRA,
-    VIR_Instruction     *pInst)
-{
-
-    VIR_LIVENESS_INFO   *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
-
-    VIR_DEF             *pDef;
-    VIR_USAGE_KEY       usageKey;
-    VIR_USAGE           *pUsage;
-    gctUINT             usageIdx, defIdx, i;
-
-    usageKey.pUsageInst = pInst;
-    usageKey.pOperand = pInst->src[0];
-    usageKey.bIsIndexingRegUsage = gcvFALSE;
-    usageIdx = vscBT_HashSearch(&pLvInfo->pDuInfo->usageTable, &usageKey);
-    if (VIR_INVALID_USAGE_INDEX != usageIdx)
-    {
-        pUsage = GET_USAGE_BY_IDX(&pLvInfo->pDuInfo->usageTable, usageIdx);
-        gcmASSERT(pUsage);
-
-        for (i = 0; i < UD_CHAIN_GET_DEF_COUNT(&pUsage->udChain); i ++)
-        {
-            defIdx = UD_CHAIN_GET_DEF(&pUsage->udChain, i);
-            if (VIR_INVALID_USAGE_INDEX != defIdx)
-            {
-                pDef = GET_DEF_BY_IDX(&pLvInfo->pDuInfo->defTable, defIdx);
-                if (VIR_IS_IMPLICIT_DEF_INST(pDef->defKey.pDefInst) ||
-                    pDef->defKey.pDefInst == VIR_UNDEF_INST)
-                {
-                    continue;
-                }
-                gcmASSERT(pDef->defKey.pDefInst->dest);
-                VIR_Operand_SetType(pInst->dest, VIR_Operand_GetType(pDef->defKey.pDefInst->dest));
-                break;
-            }
-        }
-    }
-}
-
 void    _VIR_RA_LS_ComputeAttrIndexEnable(
     VIR_Instruction *pInst,
     VIR_Operand     *pOpnd,
@@ -7490,7 +7512,7 @@ _VIR_RA_LS_SpillAddrComputation(
     /* TODO: HW can't support 32 bit mod/div, use 16 bit mod right now, need to refine. */
     /* index = mod(index, groupSize) */
     retErrCode = VIR_Function_AddInstructionAfter(pFunc,
-                                                  VIR_OP_AQ_IMOD,
+                                                  VIR_OP_IMOD,
                                                   VIR_TYPE_UINT16,
                                                   atomicAddInst,
                                                   gcvTRUE,
@@ -8104,7 +8126,7 @@ VSC_ErrCode _VIR_RA_LS_InsertMOD(
 
     /* MOD index, index, vertexCount */
     retValue = VIR_Function_AddInstructionBefore(pFunc,
-                VIR_OP_AQ_IMOD,
+                VIR_OP_IMOD,
                 VIR_TYPE_INT16,
                 pInst,
                 gcvTRUE,
@@ -8122,11 +8144,19 @@ VSC_ErrCode _VIR_RA_LS_InsertMOD(
     /* src 0 index*/
     newOpnd = VIR_Inst_GetSource((*newInst), VIR_Operand_Src0);
     VIR_Operand_Copy(newOpnd, srcOpnd);
-    _VIR_RA_MakeColor(
-        VIR_Operand_GetHwRegId(srcOpnd),
-        VIR_Operand_GetHwShift(srcOpnd),
-        &curColor);
-    _VIR_RA_LS_SetOperandHwRegInfo(pRA, (*newInst)->src[VIR_Operand_Src0], curColor);
+    if (VIR_Operand_GetOpKind(newOpnd) == VIR_OPND_SYMBOL)
+    {
+        VIR_Symbol * srcSym = VIR_Operand_GetSymbol(newOpnd);
+
+        if (!VIR_Symbol_isUniform(srcSym))
+        {
+            _VIR_RA_MakeColor(
+                VIR_Operand_GetHwRegId(srcOpnd),
+                VIR_Operand_GetHwShift(srcOpnd),
+                &curColor);
+            _VIR_RA_LS_SetOperandHwRegInfo(pRA, (*newInst)->src[VIR_Operand_Src0], curColor);
+        }
+    }
 
     VIR_Operand_SetImmediateInt((*newInst)->src[VIR_Operand_Src1], vertexCount);
 
@@ -8470,12 +8500,25 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
 
     if (VIR_Operand_GetOpKind(src1Opnd) == VIR_OPND_IMMEDIATE)
     {
+        gctUINT indexValue = 0;
+
         /* const index access */
         firstSelectMap = gcvFALSE;
         secondSelectMap = gcvFALSE;
 
         /* write this way to be clear */
-        switch(VIR_Operand_GetImmediateUint(src1Opnd) / 8)
+        switch (VIR_GetTypeComponentType(VIR_Operand_GetType(src1Opnd)))
+        {
+        case VIR_TYPE_UINT32:
+        case VIR_TYPE_INT32:
+            indexValue = VIR_Operand_GetImmediateUint(src1Opnd);
+            break;
+        default:
+            gcmASSERT(gcvFALSE);
+            break;
+        }
+
+        switch (indexValue / 8)
         {
             case 0:
                 destReg = (inputVertex ? pShader->remapRegStart : outputRemapStart);
@@ -8497,7 +8540,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
                 break;
         }
 
-        regmapIndex = VIR_Operand_GetImmediateUint(src1Opnd) % 8;
+        regmapIndex = indexValue % 8;
 
         if ((inputVertex && (regmapIndex >= vertexCount)) ||
             (!inputVertex && (regmapIndex >= outputCount)))
@@ -8658,7 +8701,20 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
     /* offset is in src2 */
     if (VIR_Operand_GetOpKind(src2Opnd) == VIR_OPND_IMMEDIATE)
     {
-        attrIndex = attrIndex + VIR_Operand_GetImmediateInt(src2Opnd);
+        gctUINT indexValue = 0;
+
+        switch (VIR_GetTypeComponentType(VIR_Operand_GetType(src2Opnd)))
+        {
+        case VIR_TYPE_UINT32:
+        case VIR_TYPE_INT32:
+            indexValue = VIR_Operand_GetImmediateUint(src2Opnd);
+            break;
+        default:
+            gcmASSERT(gcvFALSE);
+            break;
+        }
+
+        attrIndex = attrIndex + indexValue;
     }
     else if (attrIndex != 0)
     {
@@ -8982,7 +9038,7 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr_Output(
 
     curColor = InvalidColor;
 
-    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT);
+    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0);
 
     /* set VIR_SYMFLAG_LOAD_STORE_ATTR flag */
     VIR_Symbol_SetFlag(pSym, VIR_SYMFLAG_LOAD_STORE_ATTR);
@@ -9373,8 +9429,8 @@ VSC_ErrCode _VIR_RA_LS_GenEmitRestart(
 
     curColor = InvalidColor;
 
-    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT ||
-              VIR_Inst_GetOpcode(pInst) == VIR_OP_RESTART);
+    gcmASSERT(VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
+              VIR_Inst_GetOpcode(pInst) == VIR_OP_RESTART0);
 
     if (isEmit)
     {
@@ -9416,7 +9472,7 @@ VSC_ErrCode _VIR_RA_LS_GenEmitRestart(
 
     /* generate aq_emit */
     retValue = VIR_Function_AddInstructionBefore(pFunc,
-                isEmit ? VIR_OP_AQ_EMIT : VIR_OP_AQ_RESTART,
+                isEmit ? VIR_OP_EMIT : VIR_OP_RESTART,
                 VIR_TYPE_UINT16,
                 pInst,
                 gcvTRUE,
@@ -9483,7 +9539,6 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
     {
     case VIR_OP_MOVA:
         {
-            _VIR_RA_LS_ChangeMovaType(pRA, pInst);
             _VIR_RA_LS_RewriteColor_Src(pRA, pInst, pInst->src[0], pInst->src[0]);
         }
         break;
@@ -9652,10 +9707,10 @@ VSC_ErrCode _VIR_RA_LS_RewriteColorInst(
     case VIR_OP_STORE_S:
         /* nothing to do, already colored when generating */
         break;
-    case VIR_OP_EMIT:
+    case VIR_OP_EMIT0:
         _VIR_RA_LS_GenEmitRestart(pRA, pInst, gcvTRUE);
         break;
-    case VIR_OP_RESTART:
+    case VIR_OP_RESTART0:
         /* we don't need to generate restart for the case where
            output primitive type is point */
         if (VIR_Shader_GS_HasRestartOp(pShader))
@@ -10001,6 +10056,8 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
             pOpnd = VIR_Inst_GetSource(pInst, 0);
         }
         webIdx = _VIR_RA_LS_SrcOpnd2WebIdx(pRA, pInst, pOpnd);
+        /* assume LDARR/STARR dst, base, immediate is already simplified*/
+        gcmASSERT(webIdx != VIR_INVALID_WEB_INDEX);
         pMovaLR = _VIR_RA_LS_Web2ColorLR(pRA, webIdx);
         if (_VIR_RA_LS_IsInvalidColor(_VIR_RA_GetLRColor(pMovaLR)))
         {
@@ -10492,7 +10549,7 @@ void _VIR_RA_LS_UpdateWorkgroupId(
          inst != gcvNULL;
          inst = (VIR_Instruction *)VIR_InstIterator_Next(&inst_iter))
     {
-        if (VIR_Inst_GetOpcode(inst) == VIR_OP_AQ_IMADLO0)
+        if (VIR_Inst_GetOpcode(inst) == VIR_OP_IMADLO0)
         {
             VIR_Symbol  *sym = VIR_Operand_GetSymbol(VIR_Inst_GetSource(inst, VIR_Operand_Src2));
             if (sym &&
@@ -10503,12 +10560,21 @@ void _VIR_RA_LS_UpdateWorkgroupId(
                 VIR_Operand         *newOpnd = gcvNULL;
                 VIR_RA_HWReg_Color  curColor;
 
-                srcOpnd = VIR_Inst_GetSource(inst, VIR_Operand_Src0);
+                if (VIR_Operand_isImm(VIR_Inst_GetSource(inst, VIR_Operand_Src1)))
+                {
+                    srcOpnd = VIR_Inst_GetSource(inst, VIR_Operand_Src0);
+                }
+                else
+                {
+                    srcOpnd = VIR_Inst_GetSource(inst, VIR_Operand_Src1);
+                }
                 curColor = InvalidColor;
+
+                gcmASSERT(!VIR_Operand_isImm(srcOpnd));
 
                 /* MOD index, index, numWorkgroup */
                 VIR_Function_AddInstructionBefore(mainFunc,
-                            VIR_OP_AQ_IMOD,
+                            VIR_OP_IMOD,
                             VIR_TYPE_INT16,
                             inst,
                             gcvTRUE,
@@ -10547,6 +10613,43 @@ void _VIR_RA_LS_UpdateWorkgroupId(
     {
         /* we could not find the instruction to compute the local base address */
         gcmASSERT(gcvFALSE);
+    }
+}
+
+void _VIR_RA_LS_UpdateWorkgroupNum(
+    VIR_RA_LS   *pRA,
+    VIR_Shader  *pShader,
+    gctUINT     numWorkGroup)
+{
+    VIR_Function    *mainFunc = VIR_Shader_GetMainFunction(pShader);
+    VIR_InstIterator inst_iter;
+    VIR_Instruction *inst;
+    gctBOOL         imodAdd = gcvFALSE;
+
+    VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(mainFunc));
+    for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+        inst != gcvNULL;
+        inst = (VIR_Instruction *)VIR_InstIterator_Next(&inst_iter))
+    {
+        if (VIR_Inst_GetOpcode(inst) == VIR_OP_IMOD)
+        {
+            VIR_Symbol  *sym = VIR_Operand_GetUnderlyingSymbol(VIR_Inst_GetDest(inst));
+            if (sym &&
+                strcmp(VIR_Shader_GetSymNameString(pShader, sym), "#sh_workgroupId") == 0)
+            {
+                VIR_Operand_SetImmediateInt(VIR_Inst_GetSource(inst, 1), numWorkGroup);
+
+                imodAdd = gcvTRUE;
+
+                break;
+            }
+        }
+    }
+
+    if (!imodAdd)
+    {
+        /* If the shared variable is not used in the shader, we could not find the
+        mod instruction to change */
     }
 }
 
@@ -10651,6 +10754,8 @@ void _VIR_RA_LS_SetRegWatermark(
         hwRegCount = VSC_OPTN_RAOptions_GetRegWaterMark(pOption);
     }
 
+    VIR_Shader_SetRegWatermark(pShader, hwRegCount);
+
     /* in opencl, enable local storage only when temp register meets local storage requirement
     */
     if (VIR_Shader_IsCL(pShader) && VIR_Shader_UseLocalMem(pShader))
@@ -10685,7 +10790,15 @@ void _VIR_RA_LS_SetRegWatermark(
         }
     }
 
-    VIR_Shader_SetRegWatermark(pShader, hwRegCount);
+    if (VIR_Shader_GetKind(pShader) == VIR_SHADER_COMPUTE &&
+        VIR_Shader_GetLocalMemorySize(pShader) > 0)
+    {
+        gctUINT numWorkGroup = VIR_Shader_ComputeWorkGroupNum(pShader, pHwCfg);
+
+        _VIR_RA_LS_UpdateWorkgroupNum(pRA, pShader, numWorkGroup);
+
+        VIR_Shader_SetCurrWorkGrpNum(pShader, numWorkGroup);
+    }
 
     if (VSC_UTILS_MASK(VSC_OPTN_RAOptions_GetTrace(pOption),
         VSC_OPTN_RAOptions_TRACE_WATERMARK))

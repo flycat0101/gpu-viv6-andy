@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -741,12 +741,12 @@ _SetSourceCompression(
         {
             gcmDUMP_2D_SURFACE(gcvTRUE, Surface->tileStatusGpuAddress);
 
-            if (Surface->tileStatusConfig & gcv2D_TSC_DEC_TPC_COMPRESSED
-                && Surface->tileStatusGpuAddressEx[0])
+            if (Surface->tileStatusGpuAddressEx[0])
             {
                 gcmDUMP_2D_SURFACE(gcvTRUE, Surface->tileStatusGpuAddressEx[0]);
 
-                if (Surface->tileStatusGpuAddressEx[1])
+                if (Surface->tileStatusConfig & gcv2D_TSC_DEC_TPC_COMPRESSED
+                    && Surface->tileStatusGpuAddressEx[1])
                 {
                     gcmDUMP_2D_SURFACE(gcvTRUE, Surface->tileStatusGpuAddressEx[1]);
                 }
@@ -802,7 +802,7 @@ gcoHARDWARE_CheckConstraint(
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
 
     dstSurface = &State->dstSurface;
-    gcmONERROR(gcoSURF_QueryFormat(dstSurface->format, &formatInfo));
+    gcmONERROR(gcoHARDWARE_QueryFormat(dstSurface->format, &formatInfo));
 
     if (Hardware->features[gcvFEATURE_TPCV11_COMPRESSION])
     {
@@ -1033,6 +1033,11 @@ gcoHARDWARE_GetCompressionCmdSize(
             State,
             Command,
             &size));
+
+        if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
+        {
+            size += 2 * gcdMULTI_SOURCE_NUM;
+        }
     }
 
     if (CmdSize != gcvNULL)

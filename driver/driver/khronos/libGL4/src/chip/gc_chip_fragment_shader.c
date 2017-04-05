@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -385,6 +385,28 @@ static gceSTATUS set_uAccum(
     return status;
 }
 
+/*******************************************************************************
+** Constant setting callbacks.
+*/
+
+static gceSTATUS set_uYmajor(
+    __GLcontext * gc,
+    gcUNIFORM Uniform
+    )
+{
+    __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
+
+    gceSTATUS status;
+    gcmHEADER_ARG("gc=0x%x Uniform=0x%x", gc, Uniform);
+
+
+    status = gcUNIFORM_SetValueF_Ex(Uniform, 1, chipCtx->currProgram->hints, &chipCtx->yMajor);
+
+    gcmFOOTER();
+
+    return status;
+}
+
 
 static gceSTATUS set_uColor(
     __GLcontext * gc,
@@ -676,6 +698,34 @@ static gceSTATUS using_uAccum(
 
     return status;
 }
+
+
+/*******************************************************************************
+** Uniform access helpers.
+*/
+
+static gceSTATUS using_uYmajor(
+    __GLcontext * gc,
+    glsFSCONTROL_PTR ShaderControl
+    )
+{
+    gceSTATUS status;
+    gcmHEADER_ARG("gc=0x%x ShaderControl=0x%x", gc, ShaderControl);
+
+    status = glfUsingUniform(
+        ShaderControl->i,
+        "uYmajor",
+        gcSHADER_FRAC_X1,
+        1,
+        set_uYmajor,
+        &glmUNIFORM_WRAP(FS, uYmajor)
+        );
+
+    gcmFOOTER();
+
+    return status;
+}
+
 
 static gceSTATUS using_uColor(
     __GLcontext * gc,
@@ -4211,7 +4261,7 @@ static gceSTATUS processLineStipple(
     __GLchipContext     *chipCtx = CHIP_CTXINFO(gc);
     gcmHEADER_ARG("gc=0x%x ShaderControl=0x%x", gc, ShaderControl);
 
-    step = 1.0 / (gctFLOAT)(16 * gc->state.line.stippleRepeat);
+    step = 1.0f / (gctFLOAT)(16 * gc->state.line.stippleRepeat);
     do
     {
         gctUINT samplerNumber;
@@ -4219,14 +4269,29 @@ static gceSTATUS processLineStipple(
         /* Allocate temporaries. */
         glmALLOCATE_LOCAL_TEMP(temp1);
         glmALLOCATE_LOCAL_TEMP(temp2);
+        glmALLOCATE_LOCAL_LABEL(label0);
+        glmALLOCATE_LOCAL_LABEL(label1);
+        glmUSING_UNIFORM(uYmajor);
         /* Allocate resources. */
         glmUSING_VARYING(vPosition);
         samplerNumber = chipCtx->lineStippleTextureStage;
         /* Allocate sampler. */
         glmUSING_INDEXED_VARYING(uTexSampler, samplerNumber);
 
+        glmOPCODE_BRANCH(JMP, GREATER, label0);
+        glmUNIFORM(FS, uYmajor, XXXX);
+        glmCONST(0.0);
+
         glmOPCODE(MOV, temp1, X);
-            glmVARYING(FS, vPosition, XXXX);
+        glmVARYING(FS, vPosition, XXXX);
+        glmOPCODE_BRANCH(JMP, ALWAYS, label1);
+
+        glmLABEL(label0);
+        glmOPCODE(MOV, temp1, X);
+        glmVARYING(FS, vPosition, YYYY);
+
+
+        glmLABEL(label1);
 
         glmOPCODE(MUL, temp2, X);
             glmTEMP(temp1, XXXX);

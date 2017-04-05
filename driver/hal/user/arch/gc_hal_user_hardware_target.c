@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -224,6 +224,16 @@ static gceSTATUS _SetTargetCompression(
             !(Surface->tileStatusConfig & gcv2D_TSC_DEC_TPC))
         {
             gcmDUMP_2D_SURFACE(gcvFALSE, Surface->tileStatusGpuAddress);
+
+            if (Surface->tileStatusGpuAddressEx[0])
+            {
+                gcmDUMP_2D_SURFACE(gcvFALSE, Surface->tileStatusGpuAddressEx[0]);
+
+                if (Surface->tileStatusGpuAddressEx[1])
+                {
+                    gcmDUMP_2D_SURFACE(gcvFALSE, Surface->tileStatusGpuAddressEx[1]);
+                }
+            }
         }
     }
 
@@ -483,7 +493,7 @@ _SetTargetTileStatus(
         Target->tileStatusGpuAddress
         ));
 
-    gcmDUMP_2D_SURFACE(gcvTRUE, Target->tileStatusGpuAddress);
+    gcmDUMP_2D_SURFACE(gcvFALSE, Target->tileStatusGpuAddress);
 
     gcmONERROR(gcoHARDWARE_Load2DState32(
         Hardware,
@@ -908,7 +918,7 @@ gceSTATUS gcoHARDWARE_SetTarget(
                 case gcvSURF_I420:
                 case gcvSURF_YV12:
                     /* Dump the memory. */
-                    gcmDUMP_2D_SURFACE(gcvTRUE, Surface->node.physical3);
+                    gcmDUMP_2D_SURFACE(gcvFALSE, Surface->node.physical3);
 
                     if (Hardware->features[gcvFEATURE_2D_YUV420_OUTPUT_LINEAR])
                     {
@@ -947,7 +957,7 @@ gceSTATUS gcoHARDWARE_SetTarget(
                 case gcvSURF_NV61_10BIT:
                 case gcvSURF_P010:
                     /* Dump the memory. */
-                    gcmDUMP_2D_SURFACE(gcvTRUE, Surface->node.physical2);
+                    gcmDUMP_2D_SURFACE(gcvFALSE, Surface->node.physical2);
 
                     {
                         gcmONERROR(gcoHARDWARE_Load2DState32(

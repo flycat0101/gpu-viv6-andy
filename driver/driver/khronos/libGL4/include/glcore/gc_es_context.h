@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1063,6 +1063,20 @@ typedef struct __GLexportsRec
 
 } __GLexports;
 
+#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
+/*
+** This must be the first member of a __GLcontext structure.  This is the
+** only part of a context that is exposed to the outside world; everything
+** else is opaque.
+*/
+typedef struct __GLcontextInterfaceRec {
+    /* The first Int of __GLcontext stores a unique context ID */
+    GLuint magic;
+    VEGLEXimports imports;
+    __GLexports exports;
+} __GLcontextInterface;
+#endif
+
 typedef enum __GLApiVersionRec
 {
     __GL_API_VERSION_INVALID = 0,
@@ -1130,8 +1144,10 @@ typedef enum
 
 struct __GLcontextRec
 {
-    /* The first Int of __GLcontext stores a unique context ID */
+    gcsDRIVER_TLS base;
+
     GLuint magic;
+
 #ifdef OPENGL40
     /* EGL imported functions which might be OS specific */
     VEGLEXimports imports;
@@ -1316,25 +1332,19 @@ extern GLvoid __glSetError(__GLcontext *gc, GLenum code);
 
 __GL_INLINE __GLcontext * __glGetGLcontext(GLvoid)
 {
-    gcsTLS_PTR tls;
-    gcoOS_GetTLS(&tls);
-    if (tls == gcvNULL)
-        return gcvNULL;
-    else
-        return tls->esClientCtx;
+    gcsDRIVER_TLS_PTR tls;
+    gcoOS_GetDriverTLS(gcvTLS_KEY_OPENGL, &tls);
+    return (__GLcontext *) tls;
 }
 
 __GL_INLINE GLvoid __glSetGLcontext(GLvoid *context)
 {
-    gcsTLS_PTR tls;
-    gcoOS_GetTLS(&tls);
-    if (tls != gcvNULL)
-        tls->esClientCtx = context;
+    gcoOS_SetDriverTLS(gcvTLS_KEY_OPENGL, (gcsDRIVER_TLS_PTR) context);
 }
 
 extern GLvoid __glEvaluateFramebufferChange(__GLcontext *gc, GLbitfield flags);
 extern GLvoid __glEvaluateSystemDrawableChange(__GLcontext *gc, GLbitfield flags);
-#if OPENGL40
+#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
 extern GLvoid __glDispatchDrawableChange(__GLcontext *gc);
 #endif
 __GL_INLINE GLvoid __glEvaluateDrawableChange(__GLcontext *gc, GLbitfield flags)
@@ -1368,7 +1378,7 @@ __GL_INLINE GLvoid __glEvaluateDrawableChange(__GLcontext *gc, GLbitfield flags)
         gc->drawableDirtyMask &= ~__GL_BUFFER_READ_BIT;
     }
 
-#if OPENGL40
+#if defined(OPENGL40) && defined(DRI_PIXMAPRENDER_GL)
     /* Get the latest drawable information */
     LINUX_LOCK_FRAMEBUFFER(gc);
     __glDispatchDrawableChange(gc);

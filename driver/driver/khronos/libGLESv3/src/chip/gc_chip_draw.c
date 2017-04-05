@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -330,7 +330,7 @@ gcChipComputeWlimitArg(
     {
         gcmONERROR(gco3D_SetWPlaneLimitF(chipCtx->engine, 0.0f));
         gcmONERROR(gco3D_SetWClipEnable(chipCtx->engine, gcvFALSE));
-        if(chipCtx->patchId == gcvPATCH_DEQP)
+        if(chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
         {
             gcmONERROR(gco3D_SetWPlaneLimitF(chipCtx->engine, 0.1f));
             gcmONERROR(gco3D_SetWClipEnable(chipCtx->engine, gcvTRUE));
@@ -357,7 +357,6 @@ gcChipComputeWlimitArg(
                         /* Get the column-major matrix from the uniform. */
                         gcoOS_MemCopy(matrix, vsProgram->uniforms[i].data, 16 * gcmSIZEOF(gctFLOAT));
                     }
-                    /* TODO: Handle UBO cases properly. */
                     else
                     {
                         /* Set default value, if shader uses UBOs. */
@@ -377,7 +376,6 @@ gcChipComputeWlimitArg(
                         /* Get the column-major matrix from the uniform. */
                         gcoOS_MemCopy(tempMatrix, vsProgram->uniforms[i].data, 16 * gcmSIZEOF(gctFLOAT));
                     }
-                    /* TODO: Handle UBO cases properly. */
                     else
                     {
                         /* Set default value, if shader uses UBOs. */
@@ -2786,7 +2784,7 @@ gcChipPatchConvertVertAttrib(
     /* Check if this attribute is an array */
     if (AttrPtr->enable)
     {
-        __GLvertexAttrib *pAttrib = &gc->vertexArray.boundVAO->vertexArray.attribute[AttrPtr->arrayIdx];
+        GLuint binding = gc->vertexArray.boundVAO->vertexArray.attribute[AttrPtr->arrayIdx].attribBinding;
         const GLint defaultAtrrib[4] =
         {
             0x00000000,
@@ -2796,7 +2794,7 @@ gcChipPatchConvertVertAttrib(
         };
 
         /* Get stream is this is a server side buffer */
-        bufObj =  gc->vertexArray.boundVAO->vertexArray.attributeBinding[pAttrib->attribBinding].boundArrayObj;
+        bufObj = __glGetCurrentVertexArrayBufObj(gc, binding);
         if (bufObj && bufObj->size > 0)
         {
             bufInfo = (__GLchipVertexBufferInfo *)(bufObj->privateData);
@@ -3773,7 +3771,7 @@ gcChipValidateDrawPath(
                     }
                     else if (chipCtx->indexLoops &&
                              chipCtx->chipFeature.patchTriangleStrip &&
-                             chipCtx->patchId == gcvPATCH_DEQP)
+                             (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30))
                     {
                         gcmONERROR(gcChipPatchTriangleFanIndexed(gc, chipCtx, defaultInstant, gcvFALSE));
                     }
@@ -4248,7 +4246,7 @@ gcChipValidateStream(
                 }
 #endif
 
-                bufObj = attribBinding->boundArrayObj;
+                bufObj = __glGetCurrentVertexArrayBufObj(gc, attribute->attribBinding);
                 if (bufObj)
                 {
                     if (bufObj->size > 0)
@@ -4322,7 +4320,7 @@ gcChipValidateRenderTargetState(
         GLint *psOutputMapping = chipCtx->psOutputMapping;
         __GLchipDirty *chipDirty = &chipCtx->chipDirty;
         __GLchipSLProgram *fsProgram = chipCtx->activePrograms[__GLSL_STAGE_FS];
-        __GLchipSLProgramInstance* pgInstance = fsProgram->curPgInstance;
+        __GLchipSLProgramInstance* pgInstance = fsProgram ? fsProgram->curPgInstance : gcvNULL;
         __GLchipHalRtSlotInfo rtHalMapping[__GL_MAX_DRAW_BUFFERS];
         GLuint halRTIndex = 0;
         GLuint i, j;
@@ -4354,7 +4352,8 @@ gcChipValidateRenderTargetState(
             */
             __GL_MEMZERO(tempRTView, sizeof(gcsSURF_VIEW) * gcdMAX_DRAW_BUFFERS);
 
-            if ((pgInstance->recompilePatchInfo.recompilePatchDirectivePtr) &&
+            if (pgInstance &&
+                (pgInstance->recompilePatchInfo.recompilePatchDirectivePtr) &&
                 (pgInstance->pgStateKeyMask.s.hasRtPatchFmt))
             {
                 gctUINT outputLoc[gcdMAX_SURF_LAYERS];
@@ -4429,7 +4428,7 @@ gcChipValidateRenderTargetState(
                 chipCtx->drawRTnum = halRTIndex;
             }
 
-            if (pgInstance->pLastFragData)
+            if (pgInstance && pgInstance->pLastFragData)
             {
                 chipDirty->uBuffer.sBuffer.rtNumberDirty = 1;
                 chipCtx->drawRTnum = 0;
@@ -4593,9 +4592,9 @@ OnError:
 
 __GL_INLINE gceSTATUS
 gcChipValidateLastFragDataUniform(
-__GLcontext *gc,
-__GLchipSLUniform *uniform
-)
+    __GLcontext *gc,
+    __GLchipSLUniform *uniform
+    )
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     gceSTATUS status = gcvSTATUS_OK;
@@ -4861,6 +4860,11 @@ gcChipValidateChipDirty(
             gcmONERROR(gcChipSetAlphaBlend(gc));
         }
 
+        if(chipCtx->chipDirty.uDefer.sDefer.polygonOffset)
+        {
+            gcmONERROR(gcChipSetPolygonOffset(gc));
+        }
+
         if (chipCtx->chipDirty.uDefer.sDefer.vsReload  ||
             chipCtx->chipDirty.uDefer.sDefer.fsReload  ||
             chipCtx->chipDirty.uDefer.sDefer.tcsReload ||
@@ -4968,8 +4972,9 @@ gcChipValidateChipDirty(
         /* Validate RT info into the lastFragData image uniform*/
         if (chipCtx->chipDirty.uDefer.sDefer.lastFragData)
         {
-            __GLchipSLProgramInstance* pgInstance = chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance;
-            if (pgInstance->pLastFragData)
+            __GLchipSLProgramInstance* pgInstance = chipCtx->activePrograms[__GLSL_STAGE_FS] ?
+                chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance : gcvNULL;
+            if (pgInstance && pgInstance->pLastFragData)
             {
                 gcChipValidateLastFragDataUniform(gc, pgInstance->pLastFragData);
             }
@@ -5757,7 +5762,7 @@ gcChipCollectSplitDrawArraysInfo(
         return gcvSTATUS_OK;
     }
 
-    if (chipCtx->patchId == gcvPATCH_DEQP
+    if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
     &&  gc->vertexArray.instanceCount == 1
     &&  (!gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_PE_B2B_PIXEL_FIX) ||
          !gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_V2_MSAA_COHERENCY_FIX))
@@ -6073,7 +6078,7 @@ gcChipCollectSplitDrawElementInfo(
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
     /* Collect split draw info.*/
-    if (chipCtx->patchId == gcvPATCH_DEQP
+    if ((chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
     &&  gc->vertexArray.instanceCount == 1
     &&  instantDraw->primMode == gcvPRIMITIVE_LINE_STRIP
     &&  instantDraw->count == 0x81
@@ -6085,7 +6090,7 @@ gcChipCollectSplitDrawElementInfo(
     }
 
     if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PE_ENHANCEMENTS2)
-    &&  (chipCtx->patchId == gcvPATCH_DEQP)
+    &&  (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
     &&  (gc->vertexArray.instanceCount == 1 && instantDraw->primMode == gcvPRIMITIVE_TRIANGLE_LIST &&
          gc->state.enables.stencilTest &&
          (
@@ -7308,7 +7313,6 @@ __glChipDrawBegin(
                 /* If SW can determine the stencil test must fail for all fragments, we can skip the draw. */
                 if (gcChipPatchStencilOptTest(gc, stencilOpt))
                 {
-                    /* TODO: can add more check here. E.g. when depth test is disabled. */
                     if (gc->state.stencil.front.fail      != GL_KEEP ||
                         gc->state.stencil.back.fail       != GL_KEEP ||
                         gc->state.stencil.front.depthFail != GL_KEEP ||
@@ -7452,6 +7456,11 @@ __glChipDrawEnd(
         }
     }
 
+    if (gc->profiler.enable)
+    {
+        __glChipProfiler_NEW_Set(gc, GL3_PROFILER_DRAW_END, 0);
+    }
+
 #if gcdFRAMEINFO_STATISTIC
     {
         gcoHAL_FrameInfoOps(chipCtx->hal,
@@ -7479,11 +7488,6 @@ __glChipDrawEnd(
                 frameCount, drawCount,
                 gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
                 gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name);
-    }
-
-    if (gc->profiler.enable)
-    {
-        __glChipProfiler_NEW_Set(gc, GL3_PROFILER_DRAW_END, 0);
     }
 
     if (g_dbgPerDrawKickOff)
@@ -7818,7 +7822,7 @@ __glChipDrawPattern(
                 /* For GLES_PATTERN_GFX0 or GLES_PATTERN_GFX1, there is no aliasing attribute. */
                 gcmASSERT(!attribLinkage->next);
 
-                bufObj = pAttribBinding->boundArrayObj;
+                bufObj = __glGetCurrentVertexArrayBufObj(gc, pAttrib->attribBinding);
 
                 if (!(bufObj && bufObj->size > 0))
                 {

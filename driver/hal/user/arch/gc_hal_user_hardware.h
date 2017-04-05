@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -407,6 +407,11 @@ typedef struct _gcsHARDWARE_CONFIG
     gctUINT32                   productID;
 
     gceCHIP_FLAG                chipFlags;
+
+#if gcdENABLE_3D && gcdUSE_VX
+    /* Info of NN */
+    vx_nn_config                nnConfig;
+#endif
 }
 gcsHARDWARE_CONFIG;
 
@@ -2009,6 +2014,16 @@ gcoHARDWARE_SetCompression(
     IN gctBOOL DstCompress
     );
 
+typedef struct {
+    gctUINT inputBase;
+    gctUINT count;
+    gctUINT outputBase;
+}
+gcsSTATEMIRROR;
+
+extern const gcsSTATEMIRROR mirroredStates[];
+extern gctUINT mirroredStatesCount;
+
 /* Update the state delta. */
 static gcmINLINE void gcoHARDWARE_UpdateDelta(
     IN gcsSTATE_DELTA_PTR StateDelta,
@@ -2022,6 +2037,7 @@ static gcmINLINE void gcoHARDWARE_UpdateDelta(
     gctUINT32_PTR mapEntryID;
     gctUINT32_PTR mapEntryIndex;
     gctUINT deltaID;
+    gctUINT32 i;
 
     /* Get the current record array. */
     recordArray = (gcsSTATE_DELTA_RECORD_PTR)(gcmUINT64_TO_PTR(StateDelta->recordArray));
@@ -2032,6 +2048,16 @@ static gcmINLINE void gcoHARDWARE_UpdateDelta(
     mapEntryIndex = (gctUINT32_PTR)(gcmUINT64_TO_PTR(StateDelta->mapEntryIndex));
 
     gcmASSERT(Address < (StateDelta->mapEntryIDSize / gcmSIZEOF(gctUINT)));
+
+    for (i = 0; i < mirroredStatesCount; i++)
+    {
+        if ((Address >= mirroredStates[i].inputBase) &&
+            (Address < (mirroredStates[i].inputBase + mirroredStates[i].count)))
+        {
+            Address = mirroredStates[i].outputBase + (Address - mirroredStates[i].inputBase);
+            break;
+        }
+    }
 
     /* Has the entry been initialized? */
     if (mapEntryID[Address] != deltaID)

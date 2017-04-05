@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -819,7 +819,6 @@ hwcComposeG2D(
                         break;
                     }
 
-                    /* FIXME: yuv is already disabled. */
                     if (hasYuv && layer->yuv)
                     {
                         /* Multi-source blit can only support ONE yuv layer. */

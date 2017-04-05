@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -5926,7 +5926,7 @@ _UploadTextureTiled(
 
     /* Query format specifics. */
     trgFormatInfo = &TexSurf->formatInfo;
-    gcmONERROR(gcoSURF_QueryFormat(SourceFormat, &srcFormatInfo));
+    gcmONERROR(gcoHARDWARE_QueryFormat(SourceFormat, &srcFormatInfo));
 
     /* Determine bit step. */
     srcBitStep = srcFormatInfo->interleaved
@@ -11211,7 +11211,7 @@ _UploadTextureSuperTiled(
     }
 
     /* Query format specifics. */
-    gcmONERROR(gcoSURF_QueryFormat(SourceFormat, &srcFormatInfo));
+    gcmONERROR(gcoHARDWARE_QueryFormat(SourceFormat, &srcFormatInfo));
 
     if (TexSurf->formatInfo.layers > 1)
     {
@@ -11243,7 +11243,6 @@ _UploadTextureSuperTiled(
         }
         else
         {
-            /* TODO. */
             gcmASSERT(0);
         }
     }
@@ -12636,7 +12635,7 @@ _UploadTextureLinear(
     }
 
     /* Query format specifics. */
-    gcmONERROR(gcoSURF_QueryFormat(SourceFormat, &srcFormatInfo));
+    gcmONERROR(gcoHARDWARE_QueryFormat(SourceFormat, &srcFormatInfo));
 
     gcmASSERT(TexSurf->formatInfo.layers == 1);
 

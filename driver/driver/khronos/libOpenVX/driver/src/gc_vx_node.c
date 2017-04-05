@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -68,6 +68,10 @@ VX_PRIVATE_API vx_node vxoNode_CreateGeneric(vx_graph graph, vx_kernel kernel)
 
     graph->nodeTable[i]     = node;
     node->graph             = graph;
+
+    node->cnnTriggerEventID = 0;
+    node->cnnWaitEventID0    = 0xffffffff;
+    node->cnnWaitEventID1    = 0xffffffff;
 
     /* Add the node ref from the graph */
     vxoReference_Increment(&node->base, VX_REF_INTERNAL);
@@ -210,6 +214,15 @@ VX_INTERNAL_CALLBACK_API void vxoNode_Destructor(vx_reference ref)
         node->kernelContext = gcvNULL;
     }
 #endif
+
+    if (node->cmdBuffer)
+    {
+#if VX_C_MEMORY_MANAGE
+        vxoMemory_CFree(node->base.context, (void**)&(node->cmdBuffer));
+#else
+        free(node->cmdBuffer);
+#endif
+    }
 
     /* Remove the ref count of the kernel from the node */
     vxoReference_Release((vx_reference *)&node->kernel, VX_TYPE_KERNEL, VX_REF_INTERNAL);
@@ -534,14 +547,22 @@ VX_INTERNAL_API vx_status vxoNode_Record(vx_node node)
     {
         if (node->cmdBuffer && (node->cmdSizeBytes < CmdSizeBytes))
         {
+#if VX_C_MEMORY_MANAGE
+            vxoMemory_CFree(node->base.context, (void**)&node->cmdBuffer);
+#else
             free(node->cmdBuffer);
+#endif
             node->cmdBuffer = NULL;
         }
 
         if (node->cmdBuffer == NULL)
         {
             node->cmdSizeBytes = (size_t) CmdSizeBytes;
+#if VX_C_MEMORY_MANAGE
+            vxoMemory_CAllocate(node->base.context, (void**)&node->cmdBuffer, (vx_uint32)node->cmdSizeBytes);
+#else
             node->cmdBuffer = malloc(node->cmdSizeBytes);
+#endif
         }
 
         memcpy(node->cmdBuffer, CmdBuffer, node->cmdSizeBytes);
@@ -598,10 +619,6 @@ VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
 
 VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr)
 {
-    if ((*nodePtr)->cmdBuffer)
-    {
-        free((*nodePtr)->cmdBuffer);
-    }
 
 #if gcdVX_OPTIMIZER
     if ((*nodePtr)->kernelContext)
@@ -634,6 +651,34 @@ VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr)
 #endif
 
     return vxoReference_Release((vx_reference_ptr)nodePtr, VX_TYPE_NODE, VX_REF_EXTERNAL);
+}
+
+
+VX_INTERNAL_API vx_status vxoNode_GetTriggerCNNEventID(vx_node node, vx_uint32 * eventID)
+{
+    /*TODO: need to manage the eventID  */
+    if (node->base.context->cnnAvailableEventID == 32)
+    {
+        node->base.context->cnnAvailableEventID = 1;
+    }
+
+    *eventID = node->base.context->cnnAvailableEventID++;
+
+    node->cnnTriggerEventID = *eventID;
+
+    return VX_SUCCESS;
+}
+
+VX_INTERNAL_API vx_status vxoNode_SetWaitCNNEventID0(vx_node node, vx_uint32 eventID)
+{
+    node->cnnWaitEventID0 = eventID;
+    return VX_SUCCESS;
+}
+
+VX_INTERNAL_API vx_status vxoNode_SetWaitCNNEventID1(vx_node node, vx_uint32 eventID)
+{
+    node->cnnWaitEventID1 = eventID;
+    return VX_SUCCESS;
 }
 
 VX_API_ENTRY vx_node VX_API_CALL vxCreateGenericNode(vx_graph graph, vx_kernel kernel)

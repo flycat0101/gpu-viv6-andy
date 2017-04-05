@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,7 +13,7 @@
 
 #include "gc_vsc.h"
 
-#define DEF_USAGE_HASH_TABLE_SIZE   32
+#define DEF_USAGE_HASH_TABLE_SIZE   2048
 
 #define ARE_INSTS_IN_SAME_BASIC_BLOCK(pInst1, pInst2)                    \
     (((pInst1) < VIR_OUTPUT_USAGE_INST) && ((pInst1) != gcvNULL) &&      \
@@ -775,6 +775,20 @@ static void _AddHwSpecificDefs(VIR_Shader* pShader, VIR_DEF_USAGE_INFO* pDuInfo,
     }
 }
 
+static gctINT estimateDUHashTableSize(VIR_Shader*            pShader)
+{
+    gctINT instCount = BT_GET_MAX_VALID_ID(&pShader->instTable);
+    if (instCount/2 < 32)
+    {
+        return 32;
+    }
+    if (instCount > 4000)
+    {
+        return 2048;
+    }
+    return instCount/2;
+}
+
 static VSC_ErrCode _BuildDefTable(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuInfo)
 {
     VSC_ErrCode            errCode = VSC_ERR_NONE;
@@ -795,7 +809,7 @@ static VSC_ErrCode _BuildDefTable(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuIn
                      gcvNULL,
                      _HFUNC_DefPassThroughRegNo,
                      _HKCMP_DefKeyEqual,
-                     DEF_USAGE_HASH_TABLE_SIZE);
+                     estimateDUHashTableSize(pShader));
 
     pDuInfo->maxVirRegNo = 0;
 
@@ -1024,8 +1038,8 @@ static void _ReachDef_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
         }
 
         /* Emit will implicitly kill all output's defs */
-        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_AQ_EMIT)
+        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
+            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT)
         {
             _Update_ReachDef_Local_Kill_All_Output_Defs((VIR_DEF_USAGE_INFO*)pBaseTsDFA,
                                                         pDefTable,
@@ -1595,7 +1609,8 @@ static gctBOOL _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
                         {
                             VIR_Operand_GetOperandInfo(pUsageInst, pOperand, &operandInfo);
 
-                            if (VIR_OPCODE_isVXOnly(VIR_Inst_GetOpcode(pUsageInst)) ||
+                            if ((VIR_OPCODE_isVXOnly(VIR_Inst_GetOpcode(pUsageInst)) &&
+                                 VIR_Inst_GetSourceIndex(pUsageInst, pOperand) == 0) ||
                                 VIR_Inst_GetOpcode(pUsageInst) == VIR_OP_SWIZZLE)
                             {
                                 pDef->flags.deducedDefFlags.bHasUsageOnNoSwizzleInst = gcvTRUE;
@@ -1903,8 +1918,8 @@ static gctBOOL _CanAddUsageToOutputDef(VIR_DEF_USAGE_INFO* pDuInfo,
     {
         /* Calling here is because we need determine implicits output usages for EMIT */
 
-        gcmASSERT(VIR_Inst_GetOpcode(pOutputUsageInst) == VIR_OP_EMIT ||
-                  VIR_Inst_GetOpcode(pOutputUsageInst) == VIR_OP_AQ_EMIT);
+        gcmASSERT(VIR_Inst_GetOpcode(pOutputUsageInst) == VIR_OP_EMIT0 ||
+                  VIR_Inst_GetOpcode(pOutputUsageInst) == VIR_OP_EMIT);
 
         if (vscBV_TestBit(pWorkingDefFlow, outputDefIdx))
         {
@@ -2161,8 +2176,8 @@ static void _AddUsages(VIR_Shader* pShader,
     }
 
     /* Emit will implicitly use all outputs */
-    if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT ||
-        VIR_Inst_GetOpcode(pInst) == VIR_OP_AQ_EMIT)
+    if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
+        VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT)
     {
         _AddOutputUsages(pDuInfo, pWorkingDefFlow, pInst);
     }
@@ -2229,8 +2244,8 @@ static void _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAGE_INFO*
         }
 
         /* Emit will implicitly kill all output's defs */
-        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_AQ_EMIT)
+        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
+            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT)
         {
             _Update_ReachDef_Local_Kill_All_Output_Defs(pDuInfo,
                                                         pDefTable,
@@ -2280,7 +2295,7 @@ static VSC_ErrCode _BuildDUUDChain(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuI
                      gcvNULL,
                      _HFUNC_UsageInstLSB8,
                      _HKCMP_UsageKeyEqual,
-                     DEF_USAGE_HASH_TABLE_SIZE);
+                     estimateDUHashTableSize(pCg->pOwnerShader));
 
     /* Go through whole shader func by func */
     CG_ITERATOR_INIT(&funcBlkIter, pCg);

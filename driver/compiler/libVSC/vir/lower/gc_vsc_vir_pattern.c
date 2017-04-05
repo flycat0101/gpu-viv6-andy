@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -858,6 +858,23 @@ _Pattern_ReplaceNormal(
             if (replacedPtnInst->function[j] != gcvNULL)
             {
                 replacedPtnInst->function[j](Context, insertedInst, _Pattern_GetOperand(insertedInst, j));
+            }
+        }
+
+        if(VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(insertedInst)))
+        {
+            VIR_Label* label = VIR_Operand_GetLabel(VIR_Inst_GetDest(insertedInst));
+            if(label)   /* label may be filled later because it may not be generated yet here */
+            {
+                VIR_Link* link;
+
+                errCode = VIR_Function_NewLink(Function, &link);
+                if(errCode)
+                {
+                    return errCode;
+                }
+                VIR_Link_SetReference(link, (gctUINTPTR_T)insertedInst);
+                VIR_Link_AddLink(VIR_Label_GetReferenceAddr(label), link);
             }
         }
     }

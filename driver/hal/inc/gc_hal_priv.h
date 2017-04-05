@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -135,8 +135,11 @@ typedef enum _gcePATCH_ID
     gcvPATCH_SILICONSTUDIOGPUMARK,
     gcvPATCH_LEANBACKSCROLLING,
     gcvPATCH_ANTUTU6X,      /* Antutu 6.x */
+    gcvPATCH_ANTUTU3DBench,
     gcvPATCH_CAR_CHASE,
     gcvPATCH_ANDROID_BROWSER,
+    gcvPATCH_COMPUTBENCH_CL,  /* ComputBench 1.5 */
+    gcvPATCH_MIRADA,          /* Mirada */
 
     gcvPATCH_COUNT
 } gcePATCH_ID;
@@ -205,12 +208,21 @@ typedef struct _gcsPLS
     */
     gctPOINTER                  accessLock;
 
+    /* Mutex to gurad gl FE compiler access. */
+    gctPOINTER                  glFECompilerAccessLock;
+
     /* Global patchID to overwrite the detection */
     gcePATCH_ID                 patchID;
 }
 gcsPLS;
 
 extern gcsPLS gcPLS;
+
+gceSTATUS
+gcoHAL_GetBaseAddr(
+    IN  gcoHAL Hal,
+    OUT gctUINT32 *BaseAddr
+    );
 
 gceSTATUS
 gcoHAL_SetPatchID(

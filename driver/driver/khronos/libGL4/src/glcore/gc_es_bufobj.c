@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -728,7 +728,6 @@ GLvoid GL_APIENTRY __gles_BindBufferRange(__GLcontext *gc, GLenum target, GLuint
 
     __GL_HEADER();
 
-    /* TODO: Spec does not require offset to be non-negative */
     if ((buffer != 0) && (size <= 0))
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);

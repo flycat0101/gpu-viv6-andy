@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,12 +23,15 @@
 
 static void _IntializeCallGraph(VIR_CALL_GRAPH* pCg, VIR_Shader* pShader)
 {
+    gctINT instCount = BT_GET_MAX_VALID_ID(&pShader->instTable);
+    gctINT hashTblSize;
     vscPMP_Intialize(&pCg->pmp, gcvNULL, 20*(sizeof(VIR_FUNC_BLOCK)+4*sizeof(VIR_CG_EDGE)), sizeof(void*), gcvTRUE);
     vscDG_Initialize(&pCg->dgGraph, &pCg->pmp.mmWrapper, 2, 4, sizeof(VIR_CG_EDGE));
     pCg->pOwnerShader = pShader;
     pCg->nextGlobalBbId = 0;
+    hashTblSize = (instCount/5 > GLOBAL_BB_HASH_TABLE_SIZE) ? instCount/5 : GLOBAL_BB_HASH_TABLE_SIZE;
     vscHTBL_Initialize(&pCg->globalBbHashTable, &pCg->pmp.mmWrapper, _HFUNC_PassThroughGlobalBbId,
-                       gcvNULL, GLOBAL_BB_HASH_TABLE_SIZE);
+                       gcvNULL, hashTblSize);
 }
 
 static void _FinalizeCallGraph(VIR_CALL_GRAPH* pCg)
@@ -458,6 +461,7 @@ static void _AssociateAnInstToBasicBlock(VIR_BASIC_BLOCK* pBasicBlock, VIR_Instr
 
     if (VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(pInst)) ||
         VIR_OPCODE_isMemLd(VIR_Inst_GetOpcode(pInst)) ||
+        VIR_OPCODE_isImgLd(VIR_Inst_GetOpcode(pInst)) ||
         VIR_OPCODE_isAttrLd(VIR_Inst_GetOpcode(pInst)))
     {
         BB_FLAGS_SET_LLI(pBasicBlock);
@@ -533,7 +537,9 @@ static VIR_CFG_EDGE* _AddEdgeForCFG(VIR_CONTROL_FLOW_GRAPH* pCfg, VIR_BASIC_BLOC
     /* We only consider successor edge */
     pEdge = (VIR_CFG_EDGE*)vscDG_AddEdge(&pCfg->dgGraph, &pFromBB->dgNode, &pToBB->dgNode, gcvNULL);
     pEdge->type = edgeType;
+    (pEdge + 1)->type = edgeType;
     pEdge->dfsType = VIR_CFG_DFS_EDGE_TYPE_NORMAL;
+    (pEdge + 1)->dfsType = VIR_CFG_DFS_EDGE_TYPE_NORMAL;
 
     return pEdge;
 }
@@ -944,48 +950,78 @@ VIR_CFG_EDGE* vscVIR_GetCfgEdge(VIR_CONTROL_FLOW_GRAPH* pCFG,
     return (VIR_CFG_EDGE*)vscDG_GetEdge(&pCFG->dgGraph, &pFromBasicBlk->dgNode, &pToBasicBlk->dgNode);
 }
 
-VIR_BASIC_BLOCK* VIR_BB_GetFollowingBB(VIR_BASIC_BLOCK* bb)
+VIR_BASIC_BLOCK* VIR_BB_GetFirstSuccBB(VIR_BASIC_BLOCK* bb)
 {
-    VIR_Instruction* bbEnd = BB_GET_END_INST(bb);
+    gcmASSERT(BB_GET_OUT_DEGREE(bb) <= 2);
 
-    if(bbEnd == gcvNULL)
+    if(BB_GET_OUT_DEGREE(bb))
     {
-        return gcvNULL;
+        return CFG_EDGE_GET_TO_BB((VIR_CFG_EDGE*)bb->dgNode.succList.pHead);
     }
-    else
-    {
-        VIR_Instruction* bbEndNext = VIR_Inst_GetNext(bbEnd);
 
-        if(bbEndNext == gcvNULL)
-        {
-            return gcvNULL;
-        }
-        else
-        {
-            return VIR_Inst_GetBasicBlock(bbEndNext);
-        }
+    return gcvNULL;
+}
+
+VIR_BASIC_BLOCK* VIR_BB_GetSecondSuccBB(VIR_BASIC_BLOCK* bb)
+{
+    gcmASSERT(BB_GET_OUT_DEGREE(bb) <= 2);
+
+    if(BB_GET_OUT_DEGREE(bb) == 2)
+    {
+        return CFG_EDGE_GET_TO_BB((VIR_CFG_EDGE*)bb->dgNode.succList.pTail);
     }
+
+    return gcvNULL;
 }
 
 VIR_BASIC_BLOCK* VIR_BB_GetLeadingBB(VIR_BASIC_BLOCK* bb)
 {
-    VIR_Instruction* bbStart = BB_GET_START_INST(bb);
-
-    if(bbStart == gcvNULL)
+    if(BB_GET_FLOWTYPE(bb) == VIR_FLOW_TYPE_EXIT)
     {
-        return gcvNULL;
+        return VIR_Inst_GetBasicBlock(VIR_Function_GetInstEnd(BB_GET_FUNC(bb)));
     }
     else
     {
-        VIR_Instruction* bbStartPrev = VIR_Inst_GetPrev(bbStart);
+        VIR_Instruction* bbStart = BB_GET_START_INST(bb);
+        VIR_Instruction* bbStartPrev;
+
+        gcmASSERT(bbStart);
+
+        bbStartPrev = VIR_Inst_GetPrev(bbStart);
 
         if(bbStartPrev == gcvNULL)
         {
-            return gcvNULL;
+            return CFG_GET_ENTRY_BB(BB_GET_CFG(bb));
         }
         else
         {
             return VIR_Inst_GetBasicBlock(bbStartPrev);
+        }
+    }
+}
+
+VIR_BASIC_BLOCK* VIR_BB_GetFollowingBB(VIR_BASIC_BLOCK* bb)
+{
+    if(BB_GET_FLOWTYPE(bb) == VIR_FLOW_TYPE_ENTRY)
+    {
+        return VIR_Inst_GetBasicBlock(VIR_Function_GetInstStart(BB_GET_FUNC(bb)));
+    }
+    else
+    {
+        VIR_Instruction* bbEnd = BB_GET_END_INST(bb);
+        VIR_Instruction* bbEndNext;
+
+        gcmASSERT(bbEnd);
+
+        bbEndNext = VIR_Inst_GetNext(bbEnd);
+
+        if(bbEndNext == gcvNULL)
+        {
+            return CFG_GET_EXIT_BB(BB_GET_CFG(bb));
+        }
+        else
+        {
+            return VIR_Inst_GetBasicBlock(bbEndNext);
         }
     }
 }
@@ -1019,8 +1055,6 @@ VIR_BB_ChangeSuccBBs(
 
     VSC_ADJACENT_LIST_ITERATOR succEdgeIter;
     VIR_CFG_EDGE* succEdge;
-
-    gcmASSERT(VIR_OPCODE_isBranch(VIR_Inst_GetOpcode(bbEnd)));
 
     /* update bb's succ bb */
     VSC_ADJACENT_LIST_ITERATOR_INIT(&succEdgeIter, &bb->dgNode.succList);
@@ -1090,9 +1124,7 @@ VIR_BB_ChangeSuccBBs(
 
         if(bbEndOp == VIR_OP_JMP && newJmpTo == VIR_BB_GetFollowingBB(bb))
         {
-            VIR_Function_FreeOperand(func, VIR_Inst_GetDest(bbEnd));
-            VIR_Inst_SetDest(bbEnd, gcvNULL);
-            VIR_Inst_SetOpcode(bbEnd, VIR_OP_NOP);  /*it's better to keep the instruction here, because removing it may empty the bb */
+            VIR_Function_ChangeInstToNop(func, bbEnd);  /*it's better to keep the instruction here, because removing it may empty the bb */
             BB_SET_FLOWTYPE(bb, VIR_FLOW_TYPE_NONE);
         }
         else
@@ -1218,51 +1250,58 @@ VIR_BB_CopyBBBefore(
     VIR_BASIC_BLOCK** copy
     )
 {
-    VSC_ErrCode errCode = VSC_ERR_NONE;
-    VIR_Function* func = BB_GET_FUNC(source);
-    VIR_Instruction* newBBStart = gcvNULL;
-    VIR_Instruction* newBBEnd = gcvNULL;
-    VIR_Instruction* bbInst = BB_GET_START_INST(source);
-    VIR_Instruction* beforeHead = BB_GET_START_INST(before);
-    VIR_BB* newBB;
-
-    gcmASSERT(func == BB_GET_FUNC(before));
-    gcmASSERT(BB_GET_LENGTH(source));
-
-    while(gcvTRUE)
+    if(BB_GET_FLOWTYPE(before) == VIR_FLOW_TYPE_EXIT)
     {
-        VIR_Instruction* newBBInst;
-
-        errCode = VIR_Function_AddCopiedInstructionBefore(func, bbInst, beforeHead, gcvFALSE, &newBBInst);
-        if(errCode)
-        {
-            return errCode;
-        }
-
-        if(newBBStart == gcvNULL)
-        {
-            newBBStart = newBBInst;
-        }
-
-        if(bbInst == BB_GET_END_INST(source))
-        {
-            newBBEnd = newBBInst;
-            break;
-        }
-        else
-        {
-            bbInst = VIR_Inst_GetNext(bbInst);
-        }
+        return VIR_BB_CopyBBAfter(source, VIR_BB_GetLeadingBB(before), copy);
     }
-
-    newBB = vscVIR_AddBasicBlockToCFG(BB_GET_CFG(source), newBBStart, newBBEnd, BB_GET_FLOWTYPE(source));
-
-    if(copy)
+    else
     {
-        *copy = newBB;
-    }
+        VSC_ErrCode errCode = VSC_ERR_NONE;
+        VIR_Function* func = BB_GET_FUNC(source);
+        VIR_Instruction* newBBStart = gcvNULL;
+        VIR_Instruction* newBBEnd = gcvNULL;
+        VIR_Instruction* bbInst = BB_GET_START_INST(source);
+        VIR_Instruction* beforeHead = BB_GET_START_INST(before);
+        VIR_BB* newBB;
 
-    return errCode;
+        gcmASSERT(func == BB_GET_FUNC(before));
+        gcmASSERT(BB_GET_LENGTH(source));
+
+        while(gcvTRUE)
+        {
+            VIR_Instruction* newBBInst;
+
+            errCode = VIR_Function_AddCopiedInstructionBefore(func, bbInst, beforeHead, gcvFALSE, &newBBInst);
+            if(errCode)
+            {
+                return errCode;
+            }
+
+            if(newBBStart == gcvNULL)
+            {
+                newBBStart = newBBInst;
+            }
+
+            if(bbInst == BB_GET_END_INST(source))
+            {
+                newBBEnd = newBBInst;
+                break;
+            }
+            else
+            {
+                bbInst = VIR_Inst_GetNext(bbInst);
+            }
+        }
+
+        newBB = vscVIR_AddBasicBlockToCFG(BB_GET_CFG(source), newBBStart, newBBEnd, BB_GET_FLOWTYPE(source));
+
+        if(copy)
+        {
+            *copy = newBB;
+        }
+
+        return errCode;
+    }
 }
 
 VSC_ErrCode
@@ -1272,47 +1311,116 @@ VIR_BB_CopyBBAfter(
     VIR_BASIC_BLOCK** copy
     )
 {
-    VSC_ErrCode errCode = VSC_ERR_NONE;
-    VIR_Function* func = BB_GET_FUNC(source);
-    VIR_Instruction* newBBStart = gcvNULL;
-    VIR_Instruction* newBBEnd = gcvNULL;
-    VIR_Instruction* bbInst = BB_GET_END_INST(source);
-    VIR_Instruction* afterEnd = BB_GET_END_INST(after);
-    VIR_BB* newBB;
-
-    gcmASSERT(func == BB_GET_FUNC(after));
-
-    while(gcvTRUE)
+    if(BB_GET_FLOWTYPE(after) == VIR_FLOW_TYPE_ENTRY)
     {
-        VIR_Instruction* newBBInst;
+        return VIR_BB_CopyBBBefore(source, VIR_BB_GetFollowingBB(after), copy);
+    }
+    else
+    {
+        VSC_ErrCode errCode = VSC_ERR_NONE;
+        VIR_Function* func = BB_GET_FUNC(source);
+        VIR_Instruction* newBBStart = gcvNULL;
+        VIR_Instruction* newBBEnd = gcvNULL;
+        VIR_Instruction* bbInst = BB_GET_END_INST(source);
+        VIR_Instruction* afterEnd = BB_GET_END_INST(after);
+        VIR_BB* newBB;
 
-        errCode = VIR_Function_AddCopiedInstructionAfter(func, bbInst, afterEnd, gcvFALSE, &newBBInst);
-        if(errCode)
+        gcmASSERT(func == BB_GET_FUNC(after));
+
+        while(gcvTRUE)
         {
-            return errCode;
+            VIR_Instruction* newBBInst;
+
+            errCode = VIR_Function_AddCopiedInstructionAfter(func, bbInst, afterEnd, gcvFALSE, &newBBInst);
+            if(errCode)
+            {
+                return errCode;
+            }
+
+            if(newBBEnd == gcvNULL)
+            {
+                newBBEnd = newBBInst;
+            }
+
+            if(bbInst == BB_GET_START_INST(source))
+            {
+                newBBStart = newBBInst;
+                break;
+            }
+            else
+            {
+                bbInst = VIR_Inst_GetPrev(bbInst);
+            }
         }
 
-        if(newBBEnd == gcvNULL)
+        newBB = vscVIR_AddBasicBlockToCFG(BB_GET_CFG(source), newBBStart, newBBEnd, BB_GET_FLOWTYPE(source));
+
+        if(copy)
         {
-            newBBEnd = newBBInst;
+            *copy = newBB;
         }
 
-        if(bbInst == BB_GET_START_INST(source))
-        {
-            newBBStart = newBBInst;
-            break;
-        }
-        else
-        {
-            bbInst = VIR_Inst_GetPrev(bbInst);
-        }
+        return errCode;
+    }
+}
+
+VSC_ErrCode
+VIR_BB_InsertBBBefore(
+    VIR_BB* before,
+    VIR_OpCode opcode,
+    VIR_BB** newBB
+    )
+{
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    VIR_Function* func = BB_GET_FUNC(before);
+    VIR_Instruction* newInst;
+    VIR_BB* bb;
+    VIR_FLOW_TYPE flowType;
+
+    gcmASSERT(opcode == VIR_OP_NOP ||
+              opcode == VIR_OP_LABEL ||
+              opcode == VIR_OP_JMP ||
+              opcode == VIR_OP_JMPC);
+
+    errCode = VIR_Function_AddInstructionBefore(func, opcode, VIR_TYPE_UNKNOWN, BB_GET_START_INST(before), gcvFALSE, &newInst);
+    if(errCode)
+    {
+        return errCode;
     }
 
-    newBB = vscVIR_AddBasicBlockToCFG(BB_GET_CFG(source), newBBStart, newBBEnd, BB_GET_FLOWTYPE(source));
-
-    if(copy)
+    switch(opcode)
     {
-        *copy = newBB;
+        case VIR_OP_JMP:
+            flowType = VIR_FLOW_TYPE_JMP;
+            break;
+        case VIR_OP_JMPC:
+            flowType = VIR_FLOW_TYPE_JMPC;
+            break;
+        case VIR_OP_LABEL:
+        {
+            VIR_LabelId newLabelId;
+            VIR_Label* newLabel;
+
+            VIR_Function_AddLabel(func, gcvNULL, &newLabelId);
+            newLabel = VIR_Function_GetLabelFromId(func, newLabelId);
+            VIR_Operand_SetLabel(VIR_Inst_GetDest(newInst), newLabel);
+            VIR_Label_SetDefInst(newLabel, newInst);
+        }
+        default:
+            flowType = VIR_FLOW_TYPE_NONE;
+    }
+    bb = vscVIR_AddBasicBlockToCFG(BB_GET_CFG(before), newInst, newInst, flowType);
+
+    if(bb)
+    {
+        if(newBB)
+        {
+            *newBB = bb;
+        }
+    }
+    else
+    {
+        errCode = VSC_ERR_OUT_OF_MEMORY;
     }
 
     return errCode;
@@ -1694,13 +1802,24 @@ VSC_ErrCode vscVIR_DestroyDOMTreePerCFG(VIR_CONTROL_FLOW_GRAPH* pCFG)
     VSC_TNODE_LIST_ITERATOR treeNodeIter;
     VIR_DOM_TREE*           pDomTree = &pCFG->domTree;
     VIR_DOM_TREE_NODE*      pDomTreeNode;
+    VIR_DOM_TREE_NODE*      pLastDomTreeNode = gcvNULL;
 
     VSC_TNODE_LIST_ITERATOR_INIT(&treeNodeIter, &pDomTree->tree);
     pDomTreeNode = (VIR_DOM_TREE_NODE *)VSC_TNODE_LIST_ITERATOR_FIRST(&treeNodeIter);
     for (; pDomTreeNode != gcvNULL; pDomTreeNode = (VIR_DOM_TREE_NODE *)VSC_TNODE_LIST_ITERATOR_NEXT(&treeNodeIter))
     {
-        _RemoveDomNodeFromDomTree(pDomTree, pDomTreeNode, gcvFALSE);
+        if(pLastDomTreeNode)
+        {
+            _RemoveDomNodeFromDomTree(pDomTree, pLastDomTreeNode, gcvFALSE);
+        }
+
+        pLastDomTreeNode = pDomTreeNode;
     }
+    if(pLastDomTreeNode)
+    {
+        _RemoveDomNodeFromDomTree(pDomTree, pLastDomTreeNode, gcvFALSE);
+    }
+    vscTREE_Finalize(&pDomTree->tree);
 
     return errCode;
 }

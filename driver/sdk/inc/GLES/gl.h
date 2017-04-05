@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 /*
-** Copyright (c) 2013 The Khronos Group Inc.
+** Copyright (c) 2013-2017 The Khronos Group Inc.
 **
 ** Permission is hereby granted, free of charge, to any person obtaining a
 ** copy of this software and/or associated documentation files (the
@@ -31,12 +31,12 @@ extern "C" {
 ** This header is generated from the Khronos OpenGL / OpenGL ES XML
 ** API Registry. The current version of the Registry, generator scripts
 ** used to make the header, and the header can be found at
-**   http://www.opengl.org/registry/
-**
-** Khronos $Revision: 23728 $ on $Date: 2013-10-28 14:53:57 -0700 (Mon, 28 Oct 2013) $
+**   https://github.com/KhronosGroup/OpenGL-Registry
 */
 
 #include <GLES/glplatform.h>
+
+/* Generated on date 20170305 */
 
 /* Generated C header for:
  * API: gles1
@@ -64,7 +64,7 @@ typedef khronos_uint8_t GLubyte;
 typedef unsigned char GLboolean;
 typedef int GLsizei;
 typedef khronos_int32_t GLclampx;
-typedef unsigned short   GLushort;
+typedef unsigned short GLushort;
 #define GL_VERSION_ES_CL_1_0              1
 #define GL_VERSION_ES_CM_1_1              1
 #define GL_VERSION_ES_CL_1_1              1

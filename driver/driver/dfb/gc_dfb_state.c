@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -802,9 +802,6 @@ gal_validate_source( GalDriverData          *vdrv,
 
                     gcmERR_BREAK( gcoSURF_Unlock( alloc->surf, gcvNULL ));
                 }
-                /* else if ( alloc->prealloc_addr ) */
-                    /* TODO: Flush CPU cache here */
-
 #if GAL_SURFACE_COMPRESSED
                 if (vdrv->vdev->hw_2d_compression)
                 {

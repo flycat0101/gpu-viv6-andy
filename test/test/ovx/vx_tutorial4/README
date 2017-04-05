@@ -1,0 +1,15 @@
+The parameter set of vx_tutorial4 is as the following:
+-f  data_file_list.txt    Input data list. Please put your test data names here (data at per row, ).
+-w  1920           	Width of input data
+-h  1080            Height of input data
+-c  10              GPU clock on FPGA
+
+
+Say "vx_tutorial4" is the name of the executive file. For example:
+
+If you want to display the result on screen, using:
+vx_tutorial4 -f bmp_list.txt -w 1920 -h 1080 -c 10
+
+If you want to generate outputs as files, using:
+vx_tutorial4 -f bmp_list.txt -w 1920 -h 1080
+

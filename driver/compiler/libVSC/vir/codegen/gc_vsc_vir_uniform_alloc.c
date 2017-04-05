@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1401,9 +1401,11 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
 
         /*
         ** When allocate constant register for #num_group, we should always allocate XYZ for it
-        ** because HW always use XYZ for this uniform.
+        ** because HW always use XYZ for this uniform, so is base instance.
         */
-        if (VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_NUM_GROUPS)
+        if (VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_NUM_GROUPS    ||
+            VIR_Symbol_GetUniformKind(sym) == VIR_UNIFORM_BASE_INSTANCE ||
+            VIR_Symbol_GetCannotShift(sym))
             restricted = gcvTRUE;
 
         /* skip samplers */
@@ -1482,7 +1484,7 @@ VSC_ErrCode _VIR_CG_MapNonSamplerUniforms(
                 retValue = VIR_CG_FindUniformUse(uniformColorMap,
                                         type,
                                         arraySize,
-                                        gcvFALSE,
+                                        restricted,
                                         &physical,
                                         &swizzle,
                                         &shift);

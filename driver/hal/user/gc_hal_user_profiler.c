@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -309,6 +309,50 @@ static void glhal_map_delete(gcoHAL Hal){}
 
 #endif
 
+#define gcmGET_COUNTER(counter, counterId) \
+    do \
+    { \
+        if ((gctUINT32)*(memory + counterId + offset) == 0xdeaddead) \
+        { \
+            counter = 0xdeaddead; \
+        } \
+        else \
+        { \
+            gctUINT32 i; \
+            gctUINT64_PTR Memory = memory; \
+            counter = 0; \
+            for (i = 0; i < coreCount; i++) \
+            { \
+                Memory += TOTAL_PROBE_NUMBER * i; \
+                counter += (gctUINT32)*(Memory + counterId + offset); \
+            } \
+        } \
+    } \
+    while (gcvFALSE)
+
+#define gcmGET_LATENCY_COUNTER(minLatency, maxLatency, counterId) \
+    do \
+    { \
+        if ((gctUINT32)*(memory + counterId + offset) == 0xdeaddead) \
+        { \
+            minLatency = maxLatency = 0xdeaddead; \
+        } \
+        else \
+        { \
+            gctUINT32 i; \
+            gctUINT64_PTR Memory = memory; \
+            maxLatency = minLatency = 0; \
+            for (i = 0; i < coreCount; i++) \
+            { \
+                Memory += TOTAL_PROBE_NUMBER * i; \
+                maxLatency += (((gctUINT32)*(Memory + counterId + offset) & 0xfff000) >> 12); \
+                minLatency += ((gctUINT32)*(Memory + counterId + offset) & 0x000fff); \
+                if (minLatency == 4095) \
+                    minLatency = 0; \
+            } \
+        } \
+    } \
+    while (gcvFALSE)
 
 gceSTATUS
 gcoPROFILER_NEW_Construct(
@@ -338,6 +382,7 @@ gcoPROFILER_NEW_Construct(
     profiler->file = gcvNULL;
     profiler->perDrawMode = gcvFALSE;
     profiler->needDump = gcvFALSE;
+    profiler->counterEnable = gcvFALSE;
     profiler->fileName = DEFAULT_PROFILE_NEW_FILE_NAME;
 
     for (; bufId < NumOfDrawBuf; bufId++)
@@ -364,6 +409,7 @@ gcoPROFILER_NEW_Destroy(
 )
 {
     gceSTATUS status = gcvSTATUS_OK;
+    gcsHAL_INTERFACE iface;
     gctUINT32 i = 0;
 
     gcmHEADER_ARG("Profiler=0x%x", Profiler);
@@ -378,6 +424,17 @@ gcoPROFILER_NEW_Destroy(
         if (Profiler->counterBuf[i].couterBufobj)
             gcoBUFOBJ_Destroy(Profiler->counterBuf[i].couterBufobj);
     }
+
+    /* disable profiler in kernel. */
+    iface.ignoreTLS = gcvFALSE;
+    iface.command = gcvHAL_SET_PROFILE_SETTING;
+    iface.u.SetProfileSetting.enable = gcvFALSE;
+
+    /* Call the kernel. */
+    gcoOS_DeviceControl(gcvNULL,
+        IOCTL_GCHAL_INTERFACE,
+        &iface, gcmSIZEOF(iface),
+        &iface, gcmSIZEOF(iface));
 
     /* Free the gcoPROFILER structure. */
     gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Profiler));
@@ -419,6 +476,8 @@ gcoPROFILER_NEW_Enable(
     {
         gctINT32 bufId = 0;
         gctUINT32 address;
+        gctUINT32 size;
+        gctUINT32 coreCount = 1;
         gcoBUFOBJ counterBuf;
 
         gcoHAL_ConfigPowerManagement(gcvTRUE);
@@ -434,17 +493,18 @@ gcoPROFILER_NEW_Enable(
             &iface, gcmSIZEOF(iface),
             &iface, gcmSIZEOF(iface)));
 
+        gcmONERROR(gcoHARDWARE_Query3DCoreCount(gcvNULL, &coreCount));
+
+        size = gcmSIZEOF(gctUINT64) * TOTAL_PROBE_NUMBER * coreCount;
         for (; bufId < NumOfDrawBuf; bufId++)
         {
             gcmONERROR(gcoBUFOBJ_Construct(gcvNULL, gcvBUFOBJ_TYPE_GENERIC_BUFFER, &counterBuf));
-            gcmONERROR(gcoBUFOBJ_Upload(counterBuf, gcvNULL, 0, gcmSIZEOF(gcsPROFILER_NEW_COUNTERS), gcvBUFOBJ_USAGE_STATIC_DRAW));
+            gcmONERROR(gcoBUFOBJ_Upload(counterBuf, gcvNULL, 0, size, gcvBUFOBJ_USAGE_STATIC_DRAW));
             gcoBUFOBJ_Lock(counterBuf, &address, gcvNULL);
             Profiler->counterBuf[bufId].probeAddress = address;
             Profiler->counterBuf[bufId].couterBufobj = (gctHANDLE)counterBuf;
             Profiler->counterBuf[bufId].opType = gcvCOUNTER_OP_NONE;
         }
-
-        gcmONERROR(gcoHARDWARE_EnableCounters(gcvNULL));
 
         Profiler->curBufId = 0;
     }
@@ -556,6 +616,13 @@ gcoPROFILER_NEW_Begin(
 
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PROBE))
     {
+        if (Profiler->counterEnable == gcvFALSE)
+        {
+            gcmONERROR(gcoHARDWARE_EnableCounters(gcvNULL));
+
+            Profiler->counterEnable = gcvTRUE;
+        }
+
         /* reset probe counter */
         if (Profiler->curBufId == 0)
         {
@@ -568,6 +635,8 @@ gcoPROFILER_NEW_Begin(
         if (Profiler->curBufId >= NumOfDrawBuf)
         {
             gctINT32 i;
+            gctUINT32 size;
+            gctUINT32 coreCount = 1;
             gctPOINTER memory;
 
             gcmONERROR(gcoBUFOBJ_WaitFence(Profiler->counterBuf[NumOfDrawBuf-1].couterBufobj, gcvFENCE_TYPE_READ));
@@ -582,9 +651,14 @@ gcoPROFILER_NEW_Begin(
             }
 
             Profiler->curBufId = 0;
+
+            gcmONERROR(gcoHARDWARE_Query3DCoreCount(gcvNULL, &coreCount));
+
+            size = gcmSIZEOF(gctUINT64) * TOTAL_PROBE_NUMBER * coreCount;
+
             for (i = 0; i < NumOfDrawBuf; i++)
             {
-                gcmONERROR(gcoBUFOBJ_Upload(Profiler->counterBuf[i].couterBufobj, gcvNULL, 0, gcmSIZEOF(gcsPROFILER_NEW_COUNTERS), gcvBUFOBJ_USAGE_STATIC_DRAW));
+                gcmONERROR(gcoBUFOBJ_Upload(Profiler->counterBuf[i].couterBufobj, gcvNULL, 0, size, gcvBUFOBJ_USAGE_STATIC_DRAW));
                 Profiler->counterBuf[i].opType = gcvCOUNTER_OP_NONE;
             }
         }
@@ -954,190 +1028,185 @@ gcoPROFILER_NEW_RecordCounters(
 )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gctUINT32_PTR memory = gcvNULL;
-    gctUINT32 min_latency = 0;
-    gctUINT32 max_latency = 0;
+    gctUINT64_PTR memory = gcvNULL;
     gctUINT32 offset = 0;
+    gctUINT32 coreCount = 1;
 
     gcmHEADER_ARG("Logical=0x%x, Counters=0x%x", Logical, Counters);
 
     gcmASSERT(gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PROBE));
 
-    memory = (gctUINT32_PTR)Logical;
+    gcmONERROR(gcoHARDWARE_Query3DCoreCount(gcvNULL, &coreCount));
 
+    memory = (gctUINT64_PTR)Logical;
+
+    gcoOS_ZeroMemory(Counters, gcmSIZEOF(&Counters));
     /* module FE */
-    Counters->counters_part1.fe_out_vertex_count = *(memory + 0 + offset);
-    Counters->counters_part1.fe_cache_miss_count = *(memory + 1 + offset);
-    Counters->counters_part1.fe_cache_lk_count = *(memory + 2 + offset);
-    Counters->counters_part1.fe_stall_count = *(memory + 3 + offset);
-    Counters->counters_part1.fe_process_count = *(memory + 4 + offset);
+    gcmGET_COUNTER(Counters->counters_part1.fe_out_vertex_count, 0);
+    gcmGET_COUNTER(Counters->counters_part1.fe_cache_miss_count, 1);
+    gcmGET_COUNTER(Counters->counters_part1.fe_cache_lk_count, 2);
+    gcmGET_COUNTER(Counters->counters_part1.fe_stall_count, 3);
+    gcmGET_COUNTER(Counters->counters_part1.fe_process_count, 4);
     Counters->counters_part1.fe_starve_count = 0xDEADDEAD;
     offset += MODULE_FRONT_END_COUNTER_NUM;
 
     /* module VS */
     /*todo*/
-    Counters->counters_part1.vs_shader_cycle_count = *(memory + 0 + offset);
-    Counters->counters_part1.vs_inst_counter = *(memory + 3 + offset);
-    Counters->counters_part1.vs_rendered_vertice_counter = *(memory + 4 + offset);
-    Counters->counters_part1.vs_branch_inst_counter = *(memory + 5 + offset);
-    Counters->counters_part1.vs_texld_inst_counter = *(memory + 6 + offset);
+    gcmGET_COUNTER(Counters->counters_part1.vs_shader_cycle_count, 0);
+    gcmGET_COUNTER(Counters->counters_part1.vs_inst_counter, 3);
+    gcmGET_COUNTER(Counters->counters_part1.vs_rendered_vertice_counter, 4);
+    gcmGET_COUNTER(Counters->counters_part1.vs_branch_inst_counter, 5);
+    gcmGET_COUNTER(Counters->counters_part1.vs_texld_inst_counter, 6);
     offset += MODULE_VERTEX_SHADER_COUNTER_NUM;
 
     /* module PA */
-    Counters->counters_part1.pa_input_vtx_counter = *(memory + 0 + offset);
-    Counters->counters_part1.pa_input_prim_counter = *(memory + 1 + offset);
-    Counters->counters_part1.pa_output_prim_counter = *(memory + 2 + offset);
-    Counters->counters_part1.pa_trivial_rejected_counter = *(memory + 3 + offset);
-    Counters->counters_part1.pa_culled_prim_counter = *(memory + 4 + offset);
-    Counters->counters_part1.pa_droped_prim_counter = *(memory + 5 + offset);
-    Counters->counters_part1.pa_frustum_clipped_prim_counter = *(memory + 6 + offset);
-    Counters->counters_part1.pa_frustum_clipdroped_prim_counter = *(memory + 7 + offset);
-    Counters->counters_part1.pa_non_idle_starve_count = *(memory + 8 + offset);
-    Counters->counters_part1.pa_starve_count = *(memory + 9 + offset);
-    Counters->counters_part1.pa_stall_count = *(memory + 10 + offset);
-    Counters->counters_part1.pa_process_count = *(memory + 11 + offset);
+    gcmGET_COUNTER(Counters->counters_part1.pa_input_vtx_counter, 0);
+    gcmGET_COUNTER(Counters->counters_part1.pa_input_prim_counter, 1);
+    gcmGET_COUNTER(Counters->counters_part1.pa_output_prim_counter, 2);
+    gcmGET_COUNTER(Counters->counters_part1.pa_trivial_rejected_counter, 3);
+    gcmGET_COUNTER(Counters->counters_part1.pa_culled_prim_counter, 4);
+    gcmGET_COUNTER(Counters->counters_part1.pa_droped_prim_counter, 5);
+    gcmGET_COUNTER(Counters->counters_part1.pa_frustum_clipped_prim_counter, 6);
+    gcmGET_COUNTER(Counters->counters_part1.pa_frustum_clipdroped_prim_counter, 7);
+    gcmGET_COUNTER(Counters->counters_part1.pa_non_idle_starve_count, 8);
+    gcmGET_COUNTER(Counters->counters_part1.pa_starve_count, 9);
+    gcmGET_COUNTER(Counters->counters_part1.pa_stall_count, 10);
+    gcmGET_COUNTER(Counters->counters_part1.pa_process_count, 11);
     offset += MODULE_PRIMITIVE_ASSEMBLY_COUNTER_NUM;
 
     /* module SE */
-    Counters->counters_part1.se_starve_count = *(memory + 0 + offset);
-    Counters->counters_part1.se_stall_count = *(memory + 1 + offset);
-    Counters->counters_part1.se_receive_triangle_count = *(memory + 2 + offset);
-    Counters->counters_part1.se_send_triangle_count = *(memory + 3 + offset);
-    Counters->counters_part1.se_receive_lines_count = *(memory + 4 + offset);
-    Counters->counters_part1.se_send_lines_count = *(memory + 5 + offset);
-    Counters->counters_part1.se_process_count = *(memory + 6 + offset);
-    Counters->counters_part1.se_clipped_triangle_count = *(memory + 7 + offset);
-    Counters->counters_part1.se_clipped_line_count = *(memory + 8 + offset);
-    Counters->counters_part1.se_culled_lines_count = *(memory + 9 + offset);
-    Counters->counters_part1.se_culled_triangle_count = *(memory + 10 + offset);
-    Counters->counters_part1.se_trivial_rejected_line_count = *(memory + 11 + offset);
-    Counters->counters_part1.se_non_idle_starve_count = *(memory + 12 + offset);
+    gcmGET_COUNTER(Counters->counters_part1.se_starve_count, 0);
+    gcmGET_COUNTER(Counters->counters_part1.se_stall_count, 1);
+    gcmGET_COUNTER(Counters->counters_part1.se_receive_triangle_count, 2);
+    gcmGET_COUNTER(Counters->counters_part1.se_send_triangle_count, 3);
+    gcmGET_COUNTER(Counters->counters_part1.se_receive_lines_count, 4);
+    gcmGET_COUNTER(Counters->counters_part1.se_send_lines_count, 5);
+    gcmGET_COUNTER(Counters->counters_part1.se_process_count, 6);
+    gcmGET_COUNTER(Counters->counters_part1.se_clipped_triangle_count, 7);
+    gcmGET_COUNTER(Counters->counters_part1.se_clipped_line_count, 8);
+    gcmGET_COUNTER(Counters->counters_part1.se_culled_lines_count, 9);
+    gcmGET_COUNTER(Counters->counters_part1.se_culled_triangle_count, 10);
+    gcmGET_COUNTER(Counters->counters_part1.se_trivial_rejected_line_count, 11);
+    gcmGET_COUNTER(Counters->counters_part1.se_non_idle_starve_count, 12);
     offset += MODULE_SETUP_COUNTER_NUM;
 
     /* module RA */
-    Counters->counters_part1.ra_input_prim_count = *(memory + 0 + offset);
-    Counters->counters_part1.ra_total_quad_count = *(memory + 1 + offset);
-    Counters->counters_part1.ra_prefetch_cache_miss_counter = *(memory + 2 + offset);
-    Counters->counters_part1.ra_prefetch_hz_cache_miss_counter = *(memory + 3 + offset);
-    Counters->counters_part1.ra_valid_quad_count_after_early_z = *(memory + 4 + offset);
-    Counters->counters_part1.ra_valid_pixel_count_to_render = *(memory + 5 + offset);
-    Counters->counters_part1.ra_output_valid_quad_count = *(memory + 6 + offset);
-    Counters->counters_part1.ra_output_valid_pixel_count = *(memory + 7 + offset);
-    /*need confirm with hw*/
-    Counters->counters_part1.ra_pipe_cache_miss_counter = *(memory + 8 + offset);
-    Counters->counters_part1.ra_pipe_hz_cache_miss_counter = *(memory + 9 + offset);
-    Counters->counters_part1.ra_non_idle_starve_count = *(memory + 10 + offset);
-    Counters->counters_part1.ra_starve_count = *(memory + 11 + offset);
-    Counters->counters_part1.ra_stall_count = *(memory + 12 + offset);
-    Counters->counters_part1.ra_process_count = *(memory + 12 + offset);
+    gcmGET_COUNTER(Counters->counters_part1.ra_input_prim_count, 0);
+    gcmGET_COUNTER(Counters->counters_part1.ra_total_quad_count, 1);
+    gcmGET_COUNTER(Counters->counters_part1.ra_prefetch_cache_miss_counter, 2);
+    gcmGET_COUNTER(Counters->counters_part1.ra_prefetch_hz_cache_miss_counter, 3);
+    gcmGET_COUNTER(Counters->counters_part1.ra_valid_quad_count_after_early_z, 4);
+    gcmGET_COUNTER(Counters->counters_part1.ra_valid_pixel_count_to_render, 5);
+    gcmGET_COUNTER(Counters->counters_part1.ra_output_valid_quad_count, 6);
+    gcmGET_COUNTER(Counters->counters_part1.ra_output_valid_pixel_count, 7);
+    Counters->counters_part1.ra_eez_culled_counter = 0xDEADDEAD;
+    gcmGET_COUNTER(Counters->counters_part1.ra_pipe_cache_miss_counter, 8);
+    gcmGET_COUNTER(Counters->counters_part1.ra_pipe_hz_cache_miss_counter, 9);
+    gcmGET_COUNTER(Counters->counters_part1.ra_non_idle_starve_count, 10);
+    gcmGET_COUNTER(Counters->counters_part1.ra_starve_count, 11);
+    gcmGET_COUNTER(Counters->counters_part1.ra_stall_count, 12);
+    gcmGET_COUNTER(Counters->counters_part1.ra_process_count, 13);
     offset += MODULE_RASTERIZER_COUNTER_NUM;
 
     /* module PS */
-    Counters->counters_part1.ps_shader_cycle_count = *(memory + 0 + offset);
-    Counters->counters_part1.ps_inst_counter = *(memory + 1 + offset);
-    Counters->counters_part1.ps_rendered_pixel_counter = *(memory + 2 + offset);
-    Counters->counters_part1.ps_branch_inst_counter = *(memory + 7 + offset);
-    Counters->counters_part1.ps_texld_inst_counter = *(memory + 8 + offset);
+    gcmGET_COUNTER(Counters->counters_part1.ps_shader_cycle_count, 0);
+    gcmGET_COUNTER(Counters->counters_part1.ps_inst_counter, 1);
+    gcmGET_COUNTER(Counters->counters_part1.ps_rendered_pixel_counter, 2);
+    gcmGET_COUNTER(Counters->counters_part1.ps_branch_inst_counter, 7);
+    gcmGET_COUNTER(Counters->counters_part1.ps_texld_inst_counter, 8);
     offset += MODULE_PIXEL_SHADER_COUNTER_NUM;
 
     /* module TX */
-    Counters->counters_part1.tx_total_bilinear_requests = *(memory + 0 + offset);
-    Counters->counters_part1.tx_total_trilinear_requests = *(memory + 1 + offset);
-    Counters->counters_part1.tx_total_discarded_texture_requests = *(memory + 2 + offset);
-    Counters->counters_part1.tx_total_texture_requests = *(memory + 3 + offset);
-    Counters->counters_part1.tx_mc0_miss_count = *(memory + 4 + offset);
-    Counters->counters_part1.tx_mc0_request_byte_count = *(memory + 5 + offset);
-    Counters->counters_part1.tx_mc1_miss_count = *(memory + 6 + offset);
-    Counters->counters_part1.tx_mc1_request_byte_count = *(memory + 7 + offset);
+    gcmGET_COUNTER(Counters->counters_part1.tx_total_bilinear_requests, 0);
+    gcmGET_COUNTER(Counters->counters_part1.tx_total_trilinear_requests, 1);
+    gcmGET_COUNTER(Counters->counters_part1.tx_total_discarded_texture_requests, 2);
+    gcmGET_COUNTER(Counters->counters_part1.tx_total_texture_requests, 3);
+    gcmGET_COUNTER(Counters->counters_part1.tx_mc0_miss_count, 4);
+    gcmGET_COUNTER(Counters->counters_part1.tx_mc0_request_byte_count, 5);
+    gcmGET_COUNTER(Counters->counters_part1.tx_mc1_miss_count, 6);
+    gcmGET_COUNTER(Counters->counters_part1.tx_mc1_request_byte_count, 7);
     offset += MODULE_TEXTURE_COUNTER_NUM;
 
     /* module PE */
-    Counters->counters_part1.pe0_pixel_count_killed_by_color_pipe = *(memory + 0 + offset);
-    Counters->counters_part1.pe0_pixel_count_killed_by_depth_pipe = *(memory + 1 + offset);
-    Counters->counters_part1.pe0_pixel_count_drawn_by_color_pipe = *(memory + 2 + offset);
-    Counters->counters_part1.pe0_pixel_count_drawn_by_depth_pipe = *(memory + 3 + offset);
-    Counters->counters_part1.pe1_pixel_count_killed_by_color_pipe = *(memory + 4 + offset);
-    Counters->counters_part1.pe1_pixel_count_killed_by_depth_pipe = *(memory + 5 + offset);
-    Counters->counters_part1.pe1_pixel_count_drawn_by_color_pipe = *(memory + 6 + offset);
-    Counters->counters_part1.pe1_pixel_count_drawn_by_depth_pipe = *(memory + 7 + offset);
+    gcmGET_COUNTER(Counters->counters_part1.pe0_pixel_count_killed_by_color_pipe, 0);
+    gcmGET_COUNTER(Counters->counters_part1.pe0_pixel_count_killed_by_depth_pipe, 1);
+    gcmGET_COUNTER(Counters->counters_part1.pe0_pixel_count_drawn_by_color_pipe, 2);
+    gcmGET_COUNTER(Counters->counters_part1.pe0_pixel_count_drawn_by_depth_pipe, 3);
+    gcmGET_COUNTER(Counters->counters_part1.pe1_pixel_count_killed_by_color_pipe, 4);
+    gcmGET_COUNTER(Counters->counters_part1.pe1_pixel_count_killed_by_depth_pipe, 5);
+    gcmGET_COUNTER(Counters->counters_part1.pe1_pixel_count_drawn_by_color_pipe, 6);
+    gcmGET_COUNTER(Counters->counters_part1.pe1_pixel_count_drawn_by_depth_pipe, 7);
     offset += MODULE_PIXEL_ENGINE_COUNTER_NUM;
 
     /* module MCC */
-    max_latency = ((*(memory + 0 + offset) & 0x0fff0000) >> 16);
-    min_latency = (*(memory + 0 + offset) & 0x00000fff);
-    if (min_latency == 4095)
-        min_latency = 0;
-    Counters->counters_part2.mc_axi_max_latency = max_latency;
-    Counters->counters_part2.mc_axi_max_latency = min_latency;
-    Counters->counters_part2.mc_axi_total_latency = *(memory + 1 + offset);
-    Counters->counters_part2.mc_axi_sample_count = *(memory + 2 + offset);
-    Counters->counters_part2.mc_total_read_req_8B_from_colorpipe = *(memory + 3 + offset);
-    Counters->counters_part2.mc_total_read_req_8B_sentout_from_colorpipe = *(memory + 4 + offset);
-    Counters->counters_part2.mc_total_write_req_8B_from_colorpipe = *(memory + 5 + offset);
-    Counters->counters_part2.mc_total_read_req_sentout_from_colorpipe = *(memory + 6 + offset);
-    Counters->counters_part2.mc_total_write_req_from_colorpipe = *(memory + 7 + offset);
-    Counters->counters_part2.mc_total_read_req_8B_from_others = *(memory + 8 + offset);
-    Counters->counters_part2.mc_total_write_req_8B_from_others = *(memory + 9 + offset);
-    Counters->counters_part2.mc_total_read_req_from_others = *(memory + 10 + offset);
-    Counters->counters_part2.mc_total_write_req_from_others = *(memory + 11 + offset);
+    gcmGET_LATENCY_COUNTER(Counters->counters_part2.mcc_axi_min_latency, Counters->counters_part2.mcc_axi_max_latency, 0);
+    gcmGET_COUNTER(Counters->counters_part2.mcc_axi_total_latency, 1);
+    gcmGET_COUNTER(Counters->counters_part2.mcc_axi_sample_count, 2);
+    gcmGET_COUNTER(Counters->counters_part2.mcc_total_read_req_8B_from_colorpipe, 3);
+    gcmGET_COUNTER(Counters->counters_part2.mcc_total_read_req_8B_sentout_from_colorpipe, 4);
+    gcmGET_COUNTER(Counters->counters_part2.mcc_total_write_req_8B_from_colorpipe, 5);
+    gcmGET_COUNTER(Counters->counters_part2.mcc_total_read_req_sentout_from_colorpipe, 6);
+    gcmGET_COUNTER(Counters->counters_part2.mcc_total_write_req_from_colorpipe, 7);
+    gcmGET_COUNTER(Counters->counters_part2.mcc_total_read_req_8B_from_others, 8);
+    gcmGET_COUNTER(Counters->counters_part2.mcc_total_write_req_8B_from_others, 9);
+    gcmGET_COUNTER(Counters->counters_part2.mcc_total_read_req_from_others, 10);
+    gcmGET_COUNTER(Counters->counters_part2.mcc_total_write_req_from_others, 11);
     offset += MODULE_MEMORY_CONTROLLER_COLOR_COUNTER_NUM;
 
     /* module MCZ */
-    Counters->counters_part2.mc_total_read_req_8B_from_depthpipe = *(memory + 3 + offset);
-    Counters->counters_part2.mc_total_read_req_8B_sentout_from_depthpipe = *(memory + 4 + offset);
-    Counters->counters_part2.mc_total_write_req_8B_from_depthpipe = *(memory + 5 + offset);
-    Counters->counters_part2.mc_total_read_req_sentout_from_depthpipe = *(memory + 6 + offset);
-    Counters->counters_part2.mc_total_write_req_from_depthpipe = *(memory + 7 + offset);
+    gcmGET_LATENCY_COUNTER(Counters->counters_part2.mcz_axi_min_latency, Counters->counters_part2.mcz_axi_max_latency, 0);
+    gcmGET_COUNTER(Counters->counters_part2.mcz_axi_total_latency, 1);
+    gcmGET_COUNTER(Counters->counters_part2.mcz_axi_sample_count, 2);
+    gcmGET_COUNTER(Counters->counters_part2.mcz_total_read_req_8B_from_colorpipe, 3);
+    gcmGET_COUNTER(Counters->counters_part2.mcz_total_read_req_8B_sentout_from_colorpipe, 4);
+    gcmGET_COUNTER(Counters->counters_part2.mcz_total_write_req_8B_from_colorpipe, 5);
+    gcmGET_COUNTER(Counters->counters_part2.mcz_total_read_req_sentout_from_colorpipe, 6);
+    gcmGET_COUNTER(Counters->counters_part2.mcz_total_write_req_from_colorpipe, 7);
+    gcmGET_COUNTER(Counters->counters_part2.mcz_total_read_req_8B_from_others, 8);
+    gcmGET_COUNTER(Counters->counters_part2.mcz_total_write_req_8B_from_others, 9);
+    gcmGET_COUNTER(Counters->counters_part2.mcz_total_read_req_from_others, 10);
+    gcmGET_COUNTER(Counters->counters_part2.mcz_total_write_req_from_others, 11);
     offset += MODULE_MEMORY_CONTROLLER_DEPTH_COUNTER_NUM;
 
     /* module HI0 */
-    Counters->counters_part2.hi0_total_read_8B_count = *(memory + 0 + offset);
-    Counters->counters_part2.hi0_total_write_8B_count = *(memory + 1 + offset);
-    Counters->counters_part2.hi0_total_write_request_count = *(memory + 2 + offset);
-    Counters->counters_part2.hi0_total_read_request_count = *(memory + 3 + offset);
-    Counters->counters_part2.hi0_axi_cycles_read_request_stalled = *(memory + 4 + offset);
-    Counters->counters_part2.hi0_axi_cycles_write_request_stalled = *(memory + 5 + offset);
-    Counters->counters_part2.hi0_axi_cycles_write_data_stalled = *(memory + 6 + offset);
-    Counters->counters_part2.hi_total_cycle_count = *(memory + 7 + offset);
-    Counters->counters_part2.hi_total_idle_cycle_count = *(memory + 8 + offset);
+    gcmGET_COUNTER(Counters->counters_part2.hi0_total_read_8B_count, 0);
+    gcmGET_COUNTER(Counters->counters_part2.hi0_total_write_8B_count, 1);
+    gcmGET_COUNTER(Counters->counters_part2.hi0_total_write_request_count, 2);
+    gcmGET_COUNTER(Counters->counters_part2.hi0_total_read_request_count, 3);
+    gcmGET_COUNTER(Counters->counters_part2.hi0_axi_cycles_read_request_stalled, 4);
+    gcmGET_COUNTER(Counters->counters_part2.hi0_axi_cycles_write_request_stalled, 5);
+    gcmGET_COUNTER(Counters->counters_part2.hi0_axi_cycles_write_data_stalled, 6);
+    gcmGET_COUNTER(Counters->counters_part2.hi_total_cycle_count, 7);
+    gcmGET_COUNTER(Counters->counters_part2.hi_total_idle_cycle_count, 8);
     offset += MODULE_HOST_INTERFACE0_COUNTER_NUM;
 
     /* module HI1 */
-    Counters->counters_part2.hi1_total_read_8B_count = *(memory + 0 + offset);
-    Counters->counters_part2.hi1_total_write_8B_count = *(memory + 1 + offset);
-    Counters->counters_part2.hi1_total_write_request_count = *(memory + 2 + offset);
-    Counters->counters_part2.hi1_total_read_request_count = *(memory + 3 + offset);
-    Counters->counters_part2.hi1_axi_cycles_read_request_stalled = *(memory + 4 + offset);
-    Counters->counters_part2.hi1_axi_cycles_write_request_stalled = *(memory + 5 + offset);
-    Counters->counters_part2.hi1_axi_cycles_write_data_stalled = *(memory + 6 + offset);
+    gcmGET_COUNTER(Counters->counters_part2.hi1_total_read_8B_count, 0);
+    gcmGET_COUNTER(Counters->counters_part2.hi1_total_write_8B_count, 1);
+    gcmGET_COUNTER(Counters->counters_part2.hi1_total_write_request_count, 2);
+    gcmGET_COUNTER(Counters->counters_part2.hi1_total_read_request_count, 3);
+    gcmGET_COUNTER(Counters->counters_part2.hi1_axi_cycles_read_request_stalled, 4);
+    gcmGET_COUNTER(Counters->counters_part2.hi1_axi_cycles_write_request_stalled, 5);
+    gcmGET_COUNTER(Counters->counters_part2.hi1_axi_cycles_write_data_stalled, 6);
     offset += MODULE_HOST_INTERFACE1_COUNTER_NUM;
 
     /* module L2 */
-    Counters->counters_part2.l2_total_axi0_read_request_count = *(memory + 0 + offset);
-    Counters->counters_part2.l2_total_axi1_read_request_count = *(memory + 1 + offset);
-    Counters->counters_part2.l2_total_axi0_write_request_count = *(memory + 2 + offset);
-    Counters->counters_part2.l2_total_axi1_write_request_count = *(memory + 3 + offset);
-    Counters->counters_part2.l2_total_read_transactions_request_by_axi0 = *(memory + 4 + offset);
-    Counters->counters_part2.l2_total_read_transactions_request_by_axi1 = *(memory + 5 + offset);
-    Counters->counters_part2.l2_total_write_transactions_request_by_axi0 = *(memory + 6 + offset);
-    Counters->counters_part2.l2_total_write_transactions_request_by_axi1 = *(memory + 7 + offset);
-    max_latency = ((*(memory + 8 + offset) & 0xffff0000) >> 16);
-    min_latency = (*(memory + 8 + offset) & 0x0000ffff);
-    if (min_latency == 4095)
-        min_latency = 0;
-    Counters->counters_part2.l2_axi0_min_latency = max_latency;
-    Counters->counters_part2.l2_axi0_max_latency = min_latency;
-    Counters->counters_part2.l2_axi0_total_latency = *(memory + 9 + offset);
-    Counters->counters_part2.l2_axi0_total_request_count = *(memory + 10 + offset);
-    max_latency = ((*(memory + 11 + offset) & 0xffff0000) >> 16);
-    min_latency = (*(memory + 11 + offset) & 0x0000ffff);
-    if (min_latency == 4095)
-        min_latency = 0;
-    Counters->counters_part2.l2_axi1_min_latency = max_latency;
-    Counters->counters_part2.l2_axi1_max_latency = min_latency;
-    Counters->counters_part2.l2_axi1_total_latency = *(memory + 12 + offset);
-    Counters->counters_part2.l2_axi1_total_request_count = *(memory + 13 + offset);
+    gcmGET_COUNTER(Counters->counters_part2.l2_total_axi0_read_request_count, 0);
+    gcmGET_COUNTER(Counters->counters_part2.l2_total_axi1_read_request_count, 1);
+    gcmGET_COUNTER(Counters->counters_part2.l2_total_axi0_write_request_count, 2);
+    gcmGET_COUNTER(Counters->counters_part2.l2_total_axi1_write_request_count, 3);
+    gcmGET_COUNTER(Counters->counters_part2.l2_total_read_transactions_request_by_axi0, 4);
+    gcmGET_COUNTER(Counters->counters_part2.l2_total_read_transactions_request_by_axi1, 5);
+    gcmGET_COUNTER(Counters->counters_part2.l2_total_write_transactions_request_by_axi0, 6);
+    gcmGET_COUNTER(Counters->counters_part2.l2_total_write_transactions_request_by_axi1, 7);
+    gcmGET_LATENCY_COUNTER(Counters->counters_part2.l2_axi0_min_latency, Counters->counters_part2.l2_axi0_max_latency, 8);
+    gcmGET_COUNTER(Counters->counters_part2.l2_axi0_total_latency, 9);
+    gcmGET_COUNTER(Counters->counters_part2.l2_axi0_total_request_count, 10);
+    gcmGET_LATENCY_COUNTER(Counters->counters_part2.l2_axi1_min_latency, Counters->counters_part2.l2_axi1_max_latency, 11);
+    gcmGET_COUNTER(Counters->counters_part2.l2_axi1_total_latency, 12);
+    gcmGET_COUNTER(Counters->counters_part2.l2_axi1_total_request_count, 13);
 
+OnError:
     gcmFOOTER_NO();
     return status;
 }
@@ -1148,6 +1217,10 @@ IN gctUINT32 new,
 IN gctUINT32 old
 )
 {
+    if (new == 0xdeaddead || new == 0xdead)
+    {
+        return new;
+    }
     if (new >= old)
     {
         return new - old;
@@ -1168,7 +1241,11 @@ gcoPROFILER_NEW_WriteCounters(
 {
     gceSTATUS status = gcvSTATUS_OK;
     static gcsPROFILER_NEW_COUNTERS precounters;
+    gctUINT shaderCoreCount = 0;
     gctBOOL bSupportProbe = (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PROBE) == gcvSTATUS_TRUE);
+    gctBOOL bHalti4 = (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI4) == gcvSTATUS_TRUE);
+    gceCHIPMODEL chipModel;
+    gctUINT32 chipRevision;
 
     gcmHEADER_ARG("Profiler=0x%x Counters=0x%x", Profiler, Counters);
 
@@ -1180,12 +1257,24 @@ gcoPROFILER_NEW_WriteCounters(
 
     gcmASSERT(Profiler->enable);
 
-#define gcmGETCOUNTER(name) Profiler->perDrawMode && !IsFrameEnd? CalcDelta((Counters.name), (precounters.name)) : (Counters.name)
+#define gcmGETCOUNTER(name) Profiler->perDrawMode && !IsFrameEnd ? CalcDelta((Counters.name), (precounters.name)) : (Counters.name)
 
-    if (Profiler->curBufId == 0 && Profiler->perDrawMode)
+    if (Counters.drawID == 0 && Profiler->perDrawMode && !IsFrameEnd)
     {
         gcoOS_ZeroMemory(&precounters, gcmSIZEOF(precounters));
     }
+
+    gcoHAL_QueryShaderCaps(gcvNULL,
+                           gcvNULL,
+                           gcvNULL,
+                           gcvNULL,
+                           gcvNULL,
+                           &shaderCoreCount,
+                           gcvNULL,
+                           gcvNULL,
+                           gcvNULL);
+
+    gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
 
     if (Profiler->needDump)
     {
@@ -1282,10 +1371,23 @@ gcoPROFILER_NEW_WriteCounters(
         gcmWRITE_CONST_NEW(VPG_END);
 
         gcmWRITE_CONST_NEW(VPNG_PS);
-        gcmWRITE_COUNTER_NEW(VPNC_PSINSTCOUNT, gcmGETCOUNTER(counters_part1.ps_inst_counter));
+        if (!bSupportProbe && !bHalti4)
+        {
+            /*this counter only recode on the first shader core, so just multi shaderCoreCount here*/
+            gcmWRITE_COUNTER_NEW(VPNC_PSINSTCOUNT, gcmGETCOUNTER(counters_part1.ps_inst_counter) * shaderCoreCount);
+            if (chipModel == gcv2000 && chipRevision == 0x5108)
+            {
+                /* this counter is not correct on gc2000 510_rc8, so set the value invalid here*/
+                gcmWRITE_COUNTER_NEW(VPNC_PSRENDEREDPIXCOUNT, 0xdeaddead);
+            }
+            else
+            {
+                /*this counter will caculate twice on each shader core, so need divide by 2 for each shader core*/
+                gcmWRITE_COUNTER_NEW(VPNC_PSRENDEREDPIXCOUNT, gcmGETCOUNTER(counters_part1.ps_rendered_pixel_counter) * (shaderCoreCount / 2));
+            }
+        }
         gcmWRITE_COUNTER_NEW(VPNC_PSBRANCHINSTCOUNT, gcmGETCOUNTER(counters_part1.ps_branch_inst_counter));
         gcmWRITE_COUNTER_NEW(VPNC_PSTEXLDINSTCOUNT, gcmGETCOUNTER(counters_part1.ps_texld_inst_counter));
-        gcmWRITE_COUNTER_NEW(VPNC_PSRENDEREDPIXCOUNT, gcmGETCOUNTER(counters_part1.ps_rendered_pixel_counter));
         gcmWRITE_COUNTER_NEW(VPNC_PSNONIDLESTARVECOUNT, gcmGETCOUNTER(counters_part1.ps_non_idle_starve_count));
         gcmWRITE_COUNTER_NEW(VPNC_PSSTARVELCOUNT, gcmGETCOUNTER(counters_part1.ps_starve_count));
         gcmWRITE_COUNTER_NEW(VPNC_PSSTALLCOUNT, gcmGETCOUNTER(counters_part1.ps_stall_count));
@@ -1304,25 +1406,46 @@ gcoPROFILER_NEW_WriteCounters(
         gcmWRITE_COUNTER_NEW(VPNC_PE1DRAWNBYDEPTH, gcmGETCOUNTER(counters_part1.pe1_pixel_count_drawn_by_depth_pipe));
         gcmWRITE_CONST_NEW(VPG_END);
 
-        gcmWRITE_CONST_NEW(VPNG_MC);
-        gcmWRITE_COUNTER_NEW(VPNC_MCREADREQ8BCOLORPIPE, gcmGETCOUNTER(counters_part2.mc_total_read_req_8B_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCREADREQ8BSOCOLORPIPE, gcmGETCOUNTER(counters_part2.mc_total_read_req_8B_sentout_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCWRITEREQ8BCOLORPIPE, gcmGETCOUNTER(counters_part2.mc_total_write_req_8B_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCREADREQSOCOLORPIPE, gcmGETCOUNTER(counters_part2.mc_total_read_req_8B_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCWRITEREQCOLORPIPE, gcmGETCOUNTER(counters_part2.mc_total_read_req_8B_sentout_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCREADREQ8BDEPTHPIPE, gcmGETCOUNTER(counters_part2.mc_total_read_req_8B_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCREADREQ8BSFDEPTHPIPE, gcmGETCOUNTER(counters_part2.mc_total_read_req_8B_sentout_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCWRITEREQ8BDEPTHPIPE, gcmGETCOUNTER(counters_part2.mc_total_write_req_8B_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCREADREQSFDEPTHPIPE, gcmGETCOUNTER(counters_part2.mc_total_read_req_8B_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCWRITEREQDEPTHPIPE, gcmGETCOUNTER(counters_part2.mc_total_read_req_8B_sentout_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCREADREQ8BOTHERPIPE, gcmGETCOUNTER(counters_part2.mc_total_read_req_8B_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCREADREQ8BSFOTHERPIPE, gcmGETCOUNTER(counters_part2.mc_total_read_req_8B_sentout_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCWRITEREQ8BOTHERPIPE, gcmGETCOUNTER(counters_part2.mc_total_write_req_8B_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCREADREQSFOTHERPIPE, gcmGETCOUNTER(counters_part2.mc_total_read_req_8B_from_colorpipe));
-        gcmWRITE_COUNTER_NEW(VPNC_MCAXIMINLATENCY, gcmGETCOUNTER(counters_part2.mc_axi_min_latency));
-        gcmWRITE_COUNTER_NEW(VPNC_MCAXIMAXLATENCY, gcmGETCOUNTER(counters_part2.mc_axi_max_latency));
-        gcmWRITE_COUNTER_NEW(VPNC_MCAXIMAXLATENCY, gcmGETCOUNTER(counters_part2.mc_axi_total_latency));
-        gcmWRITE_COUNTER_NEW(VPNC_MCAXISAMPLECOUNT, gcmGETCOUNTER(counters_part2.mc_axi_sample_count));
+        gcmWRITE_CONST_NEW(VPNG_MCC);
+        gcmWRITE_COUNTER_NEW(VPNC_MCCREADREQ8BCOLORPIPE, gcmGETCOUNTER(counters_part2.mcc_total_read_req_8B_from_colorpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCREADREQ8BSOCOLORPIPE, gcmGETCOUNTER(counters_part2.mcc_total_read_req_8B_sentout_from_colorpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCWRITEREQ8BCOLORPIPE, gcmGETCOUNTER(counters_part2.mcc_total_write_req_8B_from_colorpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCREADREQSOCOLORPIPE, gcmGETCOUNTER(counters_part2.mcc_total_read_req_sentout_from_colorpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCWRITEREQCOLORPIPE, gcmGETCOUNTER(counters_part2.mcc_total_write_req_from_colorpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCREADREQ8BDEPTHPIPE, gcmGETCOUNTER(counters_part2.mcc_total_read_req_8B_from_depthpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCREADREQ8BSFDEPTHPIPE, gcmGETCOUNTER(counters_part2.mcc_total_read_req_8B_sentout_from_depthpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCWRITEREQ8BDEPTHPIPE, gcmGETCOUNTER(counters_part2.mcc_total_write_req_8B_from_depthpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCREADREQSFDEPTHPIPE, gcmGETCOUNTER(counters_part2.mcc_total_read_req_sentout_from_depthpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCWRITEREQDEPTHPIPE, gcmGETCOUNTER(counters_part2.mcc_total_write_req_from_depthpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCREADREQ8BOTHERPIPE, gcmGETCOUNTER(counters_part2.mcc_total_read_req_8B_from_others));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCWRITEREQ8BOTHERPIPE, gcmGETCOUNTER(counters_part2.mcc_total_write_req_8B_from_others));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCREADREQOTHERPIPE, gcmGETCOUNTER(counters_part2.mcc_total_read_req_from_others));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCWRITEREQOTHERPIPE, gcmGETCOUNTER(counters_part2.mcc_total_write_req_from_others));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCAXIMINLATENCY, Counters.counters_part2.mcc_axi_min_latency);
+        gcmWRITE_COUNTER_NEW(VPNC_MCCAXIMAXLATENCY, Counters.counters_part2.mcc_axi_max_latency);
+        gcmWRITE_COUNTER_NEW(VPNC_MCCAXITOTALLATENCY, gcmGETCOUNTER(counters_part2.mcc_axi_total_latency));
+        gcmWRITE_COUNTER_NEW(VPNC_MCCAXISAMPLECOUNT, gcmGETCOUNTER(counters_part2.mcc_axi_sample_count));
+        gcmWRITE_CONST_NEW(VPG_END);
+
+        gcmWRITE_CONST_NEW(VPNG_MCZ);
+        gcmWRITE_COUNTER_NEW(VPNC_MCZREADREQ8BCOLORPIPE, gcmGETCOUNTER(counters_part2.mcz_total_read_req_8B_from_colorpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZREADREQ8BSOCOLORPIPE, gcmGETCOUNTER(counters_part2.mcz_total_read_req_8B_sentout_from_colorpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZWRITEREQ8BCOLORPIPE, gcmGETCOUNTER(counters_part2.mcz_total_write_req_8B_from_colorpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZREADREQSOCOLORPIPE, gcmGETCOUNTER(counters_part2.mcz_total_read_req_sentout_from_colorpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZWRITEREQCOLORPIPE, gcmGETCOUNTER(counters_part2.mcz_total_write_req_from_colorpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZREADREQ8BDEPTHPIPE, gcmGETCOUNTER(counters_part2.mcz_total_read_req_8B_from_depthpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZREADREQ8BSFDEPTHPIPE, gcmGETCOUNTER(counters_part2.mcz_total_read_req_8B_sentout_from_depthpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZWRITEREQ8BDEPTHPIPE, gcmGETCOUNTER(counters_part2.mcz_total_write_req_8B_from_depthpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZREADREQSFDEPTHPIPE, gcmGETCOUNTER(counters_part2.mcz_total_read_req_sentout_from_depthpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZWRITEREQDEPTHPIPE, gcmGETCOUNTER(counters_part2.mcz_total_write_req_from_depthpipe));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZREADREQ8BOTHERPIPE, gcmGETCOUNTER(counters_part2.mcz_total_read_req_8B_from_others));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZWRITEREQ8BOTHERPIPE, gcmGETCOUNTER(counters_part2.mcz_total_write_req_8B_from_others));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZREADREQOTHERPIPE, gcmGETCOUNTER(counters_part2.mcz_total_read_req_from_others));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZWRITEREQOTHERPIPE, gcmGETCOUNTER(counters_part2.mcz_total_write_req_from_others));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZAXIMINLATENCY, Counters.counters_part2.mcz_axi_min_latency);
+        gcmWRITE_COUNTER_NEW(VPNC_MCZAXIMAXLATENCY, Counters.counters_part2.mcz_axi_max_latency);
+        gcmWRITE_COUNTER_NEW(VPNC_MCZAXITOTALLATENCY, gcmGETCOUNTER(counters_part2.mcz_axi_total_latency));
+        gcmWRITE_COUNTER_NEW(VPNC_MCZAXISAMPLECOUNT, gcmGETCOUNTER(counters_part2.mcz_axi_sample_count));
         gcmWRITE_CONST_NEW(VPG_END);
 
         gcmWRITE_CONST_NEW(VPNG_HI);
@@ -1363,12 +1486,12 @@ gcoPROFILER_NEW_WriteCounters(
         gcmWRITE_COUNTER_NEW(VPNC_L2READTRANSREQBYAXI1, gcmGETCOUNTER(counters_part2.l2_total_read_transactions_request_by_axi1));
         gcmWRITE_COUNTER_NEW(VPNC_L2WRITETRANSREQBYAXI0, gcmGETCOUNTER(counters_part2.l2_total_write_transactions_request_by_axi0));
         gcmWRITE_COUNTER_NEW(VPNC_L2WRITETRANSREQBYAXI1, gcmGETCOUNTER(counters_part2.l2_total_write_transactions_request_by_axi1));
-        gcmWRITE_COUNTER_NEW(VPNC_L2AXI0MINLATENCY, gcmGETCOUNTER(counters_part2.l2_axi0_min_latency));
-        gcmWRITE_COUNTER_NEW(VPNC_L2AXI0MAXLATENCY, gcmGETCOUNTER(counters_part2.l2_axi0_max_latency));
+        gcmWRITE_COUNTER_NEW(VPNC_L2AXI0MINLATENCY, Counters.counters_part2.l2_axi0_min_latency);
+        gcmWRITE_COUNTER_NEW(VPNC_L2AXI0MAXLATENCY, Counters.counters_part2.l2_axi0_max_latency);
         gcmWRITE_COUNTER_NEW(VPNC_L2AXI0TOTLATENCY, gcmGETCOUNTER(counters_part2.l2_axi0_total_latency));
         gcmWRITE_COUNTER_NEW(VPNC_L2AXI0TOTREQCOUNT, gcmGETCOUNTER(counters_part2.l2_axi0_total_request_count));
-        gcmWRITE_COUNTER_NEW(VPNC_L2AXI1MINLATENCY, gcmGETCOUNTER(counters_part2.l2_axi1_min_latency));
-        gcmWRITE_COUNTER_NEW(VPNC_L2AXI1MAXLATENCY, gcmGETCOUNTER(counters_part2.l2_axi1_max_latency));
+        gcmWRITE_COUNTER_NEW(VPNC_L2AXI1MINLATENCY, Counters.counters_part2.l2_axi1_min_latency);
+        gcmWRITE_COUNTER_NEW(VPNC_L2AXI1MAXLATENCY, Counters.counters_part2.l2_axi1_max_latency);
         gcmWRITE_COUNTER_NEW(VPNC_L2AXI1TOTLATENCY, gcmGETCOUNTER(counters_part2.l2_axi1_total_latency));
         gcmWRITE_COUNTER_NEW(VPNC_L2AXI1TOTREQCOUNT, gcmGETCOUNTER(counters_part2.l2_axi1_total_request_count));
         gcmWRITE_CONST_NEW(VPG_END);
@@ -2436,8 +2559,7 @@ gcoPROFILER_EndFrame(
 #if VIVANTE_PROFILER_PROBE
         gctUINT32 mc_axi_min_latency, mc_axi_max_latency, total_reads, total_writes;
 
-        gcoHAL_Commit(_HAL, gcvTRUE); /* TODO: Calling this function on multi-GPU board will cause GPU hang. */
-
+        gcoHAL_Commit(_HAL, gcvTRUE);
         /* write per draw counter */
         for (j = 0; j < _HAL->profiler.probeBuffer.curBufId; j++)
         {
@@ -3048,7 +3170,6 @@ gcoPROFILER_Begin(
         return gcvSTATUS_NOT_SUPPORTED;
     }
 
-    /* TODO */
     if (_HAL->profiler.probeBuffer.curBufId >= NumOfDrawBuf)
     {
         int bufId = 0;
@@ -3148,7 +3269,6 @@ gcoPROFILER_End(
         return gcvSTATUS_NOT_SUPPORTED;
     }
 
-    /* TODO */
     if (_HAL->profiler.probeBuffer.curBufId >= NumOfDrawBuf)
         return gcvSTATUS_NOT_SUPPORTED;
 

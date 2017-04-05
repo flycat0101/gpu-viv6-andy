@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -16,7 +16,7 @@
 
 #include "gc_glsl_built_ins.h"
 
-#define MIX_AS_INTRINCIS 1
+#define MIX_AS_INTRINCIS 0
 
 /* how many kinds of param datatype constructor could be there for the param set.
    currently define it to 3, mapping to T_TYPE_MATCH_CALLBACK0, T_TYPE_MATCH_CALLBACK1
@@ -2929,137 +2929,137 @@ static slsINTRINSIC_BUILTIN_FUNCTION CommonIntrinsicBuiltInFunctions[] =
 
     /* Image atomic functions. */
     /* imageAtomicAddXXX */
-    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_buffer_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicAdd", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_add_buffer_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
     /* imageAtomicMinXXX */
-    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMin", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicMin", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicMin", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicMin", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicMin", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_min_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
     /* imageAtomicMaxXXX */
-    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicMax", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicMax", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicMax", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicMax", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicMax", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_max_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
     /* imageAtomicAnd */
-    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicAnd", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_and_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
     /* imageAtomicOrXXX */
-    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_INT,   _DP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_UINT,  _DP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_INT,   _HP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_UINT,  _HP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_INT,   _DP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_UINT,  _DP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_INT,   _HP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_UINT,  _HP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_INT,   _DP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_UINT,  _DP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_INT,   _HP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_UINT,  _HP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_INT,   _DP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_UINT,  _DP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_INT,   _HP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicOr", gcvNULL, gcvNULL,          T_UINT,  _HP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicOr", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicOr", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicOr", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicOr", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_or_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
     /* imageAtomicXorXXX */
-    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicXor", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicXor", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicXor", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicXor", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicXor", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xor_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
     /* imageAtomicExchangeXXX */
-    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_INT,   _DP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_UINT,  _DP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_FLOAT, _DP,   3, {T_IMAGE2D, T_IVEC2, T_FLOAT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_2D_float", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_INT,   _HP,   3, {T_IIMAGE2D, T_IVEC2, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_UINT,  _HP,   3, {T_UIMAGE2D, T_IVEC2, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_FLOAT, _HP,   3, {T_IMAGE2D, T_IVEC2, T_FLOAT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_2D_float", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_INT,   _DP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_UINT,  _DP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_FLOAT, _DP,   3, {T_IMAGE3D, T_IVEC3, T_FLOAT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_3D_float", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_INT,   _HP,   3, {T_IIMAGE3D, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_UINT,  _HP,   3, {T_UIMAGE3D, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_FLOAT, _HP,   3, {T_IMAGE3D, T_IVEC3, T_FLOAT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_3D_float", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_INT,   _DP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_UINT,  _DP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_FLOAT, _DP,   3, {T_IMAGECUBE, T_IVEC3, T_FLOAT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_CUBE_float", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_INT,   _HP,   3, {T_IIMAGECUBE, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_UINT,  _HP,   3, {T_UIMAGECUBE, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_FLOAT, _HP,   3, {T_IMAGECUBE, T_IVEC3, T_FLOAT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_CUBE_float", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_INT,   _DP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_UINT,  _DP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_FLOAT, _DP,   3, {T_IMAGE2DARRAY, T_IVEC3, T_FLOAT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_2DARRAY_float", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_INT,   _HP,   3, {T_IIMAGE2DARRAY, T_IVEC3, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_UINT,  _HP,   3, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicExchange", gcvNULL, gcvNULL,    T_FLOAT, _HP,   3, {T_IMAGE2DARRAY, T_IVEC3, T_FLOAT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_2DARRAY_float", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicExchange", gcvNULL, gcvNULL,         T_INT,   _DP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicExchange", gcvNULL, gcvNULL,         T_UINT,  _DP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicExchange", gcvNULL, gcvNULL,         T_FLOAT, _DP,   3, {T_IMAGEBUFFER, T_INT, T_FLOAT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_buffer_float", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicExchange", gcvNULL, gcvNULL,         T_INT,   _HP,   3, {T_IIMAGEBUFFER, T_INT, T_INT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicExchange", gcvNULL, gcvNULL,         T_UINT,  _HP,   3, {T_UIMAGEBUFFER, T_INT, T_UINT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicExchange", gcvNULL, gcvNULL,         T_FLOAT, _HP,   3, {T_IMAGEBUFFER, T_INT, T_FLOAT}, {_IN, _IN, _IN}, {_HP, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_xchg_buffer_float", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
     /* imageAtomicCompSwapXXX */
-    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_INT,   _DP,   4, {T_IIMAGE2D, T_IVEC2, T_INT, T_INT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_UINT,  _DP,   4, {T_UIMAGE2D, T_IVEC2, T_UINT, T_UINT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_INT,   _HP,   4, {T_IIMAGE2D, T_IVEC2, T_INT, T_INT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_2D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_UINT,  _HP,   4, {T_UIMAGE2D, T_IVEC2, T_UINT, T_UINT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_2D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_INT,   _DP,   4, {T_IIMAGE3D, T_IVEC3, T_INT, T_INT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_UINT,  _DP,   4, {T_UIMAGE3D, T_IVEC3, T_UINT, T_UINT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_INT,   _HP,   4, {T_IIMAGE3D, T_IVEC3, T_INT, T_INT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_3D_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_UINT,  _HP,   4, {T_UIMAGE3D, T_IVEC3, T_UINT, T_UINT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_3D_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_INT,   _DP,   4, {T_IIMAGECUBE, T_IVEC3, T_INT, T_INT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_UINT,  _DP,   4, {T_UIMAGECUBE, T_IVEC3, T_UINT, T_UINT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_INT,   _HP,   4, {T_IIMAGECUBE, T_IVEC3, T_INT, T_INT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_CUBE_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_UINT,  _HP,   4, {T_UIMAGECUBE, T_IVEC3, T_UINT, T_UINT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_CUBE_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_INT,   _DP,   4, {T_IIMAGE2DARRAY, T_IVEC3, T_INT, T_INT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_UINT,  _DP,   4, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT, T_UINT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_INT,   _HP,   4, {T_IIMAGE2DARRAY, T_IVEC3, T_INT, T_INT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_2DARRAY_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_ES_31,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_UINT,  _HP,   4, {T_UIMAGE2DARRAY, T_IVEC3, T_UINT, T_UINT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_2DARRAY_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_INT,   _DP,   4, {T_IIMAGEBUFFER, T_INT, T_INT, T_INT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
-    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_UINT,  _DP,   4, {T_UIMAGEBUFFER, T_INT, T_UINT, T_UINT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_buffer_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_INT,   _HP,   4, {T_IIMAGEBUFFER, T_INT, T_INT, T_INT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_buffer_int", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
+    {slvEXTENSION_EXT_TEXTURE_BUFFER,    "imageAtomicCompSwap", gcvNULL, gcvNULL,    T_UINT,  _HP,   4, {T_UIMAGEBUFFER, T_INT, T_UINT, T_UINT}, {_IN, _IN, _IN, _IN}, {_HP, ANY, ANY, ANY},gceINTRIN_image_atomic, "_viv_image_atomic_cmpxchg_buffer_uint", {slvMEMORY_ACCESS_QUALIFIER_COHERENT, 0, 0, 0}, {0}, gcvNULL, MEM_ACCESS},
 };
 
 static gctUINT CommonIntrinsicBuiltInFunctionCount =
@@ -3147,8 +3147,15 @@ updateForSampleMask(
     OUT slsDATA_TYPE**
     );
 
+static slsBUILT_IN_VARIABLE PerVertexVariables[] =
+{
+    {slvEXTENSION_NONE,  "gl_Position",              "#In.Position",      slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,   T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {slvEXTENSION_NONE,  "gl_PointSize",             "#In.PointSize",     slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,   T_FLOAT,    0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
+};
+
 static slsBUILT_IN_VARIABLE VSBuiltInVariables[] =
 {
+    {slvEXTENSION_NONE,  gcvNULL,                    "#Out",              slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_OUT_IO_BLOCK,   T_IO_BLOCK,   0,   slvSTORAGE_QUALIFIER_OUT_IO_BLOCK, PerVertexVariables, "gl_PerVertex", 2, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_Position",              "#Position",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_PointSize",             "#PointSize",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_HALTI, "gl_VertexID",              "#VertexID",         slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VERTEX_ID,    T_INT,      0,    slvSTORAGE_QUALIFIER_VERTEX_ID, gcvNULL, gcvNULL, 0, gcvFALSE},
@@ -3193,7 +3200,7 @@ static slsBUILT_IN_VARIABLE FSBuiltInVariables[] =
     {slvEXTENSION_NON_HALTI, "gl_FragData",         "#Color",       slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_VEC4,     1,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE, updateForFragData},
     {slvEXTENSION_SHADER_FRAMEBUFFER_FETCH, "gl_LastFragData",     "#LastFragData",       slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_VARYING_IN,  T_VEC4,     1,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE, updateForFragData},
     {slvEXTENSION_NONE,      "gl_PointCoord",       "#PointCoord",  slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_VARYING_IN,    T_VEC2,     0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {slvEXTENSION_FRAG_DEPTH,"gl_FragDepthEXT",     "#Depth",       slvPRECISION_QUALIFIER_MEDIUM,   slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
+    {slvEXTENSION_FRAG_DEPTH,"gl_FragDepthEXT",     "#Depth",       slvPRECISION_QUALIFIER_HIGH,     slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_HALTI,     "gl_FragDepth",        "#Depth",       slvPRECISION_QUALIFIER_HIGH,     slvSTORAGE_QUALIFIER_FRAGMENT_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_FRAGMENT_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
 
     {slvEXTENSION_NONE,      "gl_DepthRange.near",  "#DepthRange.near",slvPRECISION_QUALIFIER_HIGH,  slvSTORAGE_QUALIFIER_UNIFORM,       T_FLOAT,    0,    slvSTORAGE_QUALIFIER_UNIFORM, gcvNULL, gcvNULL, 0, gcvFALSE},
@@ -3238,12 +3245,6 @@ static slsBUILT_IN_VARIABLE CSBuiltInVariables[] =
 static gctUINT CSBuiltInVariableCount =
                     sizeof(CSBuiltInVariables) / sizeof(slsBUILT_IN_VARIABLE);
 
-static slsBUILT_IN_VARIABLE PerVertexVariables[] =
-{
-    {slvEXTENSION_NONE,  "gl_Position",              "#In.Position",      slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,   T_VEC4,     0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
-    {slvEXTENSION_NONE,  "gl_PointSize",             "#In.PointSize",     slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER,   T_FLOAT,    0,    slvSTORAGE_QUALIFIER_IN_IO_BLOCK_MEMBER, gcvNULL, gcvNULL, 0, gcvFALSE},
-};
-
 static slsBUILT_IN_VARIABLE TCSBuiltInVariables[] =
 {
     /* input. */
@@ -3279,6 +3280,7 @@ static slsBUILT_IN_VARIABLE TESBuiltInVariables[] =
     {slvEXTENSION_NONE,  "gl_TessLevelOuter",        "#TessLevelOuter",     slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_PATCH_IN,   T_FLOAT,    4,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_TessLevelInner",        "#TessLevelInner",     slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_PATCH_IN,   T_FLOAT,    2,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     /* output. */
+    {slvEXTENSION_NONE,  gcvNULL,                    "#Out",                slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_OUT_IO_BLOCK,   T_IO_BLOCK,   0,   slvSTORAGE_QUALIFIER_OUT_IO_BLOCK, PerVertexVariables, "gl_PerVertex", 2, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_Position",              "#Position",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_PointSize",             "#PointSize",          slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
 };
@@ -3295,6 +3297,7 @@ static slsBUILT_IN_VARIABLE GSBuiltInVariables[] =
     {slvEXTENSION_NONE,  "gl_PrimitiveIDIn",         "#PrimitiveIDIn",      slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_IN,   T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_InvocationID",          "#InvocationID",       slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_IN,   T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_IN, gcvNULL, gcvNULL, 0, gcvFALSE},
     /* output. */
+    {slvEXTENSION_NONE,  gcvNULL,                    "#Out",                slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_OUT_IO_BLOCK,   T_IO_BLOCK,   0,   slvSTORAGE_QUALIFIER_OUT_IO_BLOCK, PerVertexVariables, "gl_PerVertex", 2, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_Position",              "#Position",           slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_VEC4,     0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_PointSize",             "#PointSize",          slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_FLOAT,    0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},
     {slvEXTENSION_NONE,  "gl_PrimitiveID",           "#PrimitiveID",        slvPRECISION_QUALIFIER_HIGH,    slvSTORAGE_QUALIFIER_VARYING_OUT,  T_INT,      0,    slvSTORAGE_QUALIFIER_VARYING_OUT, gcvNULL, gcvNULL, 0, gcvFALSE},

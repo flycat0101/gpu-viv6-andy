@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -696,7 +696,32 @@ static void _VSC_IL_Init(
         }
     }
 
-    /* If HW has iCache, maybe we can assume more budget. */
+    /* adjust the inline budget based on inline level */
+    switch (VSC_OPTN_ILOptions_GetInlineLevel(pOptions))
+    {
+    case VSC_OPTN_ILOptions_LEVEL0:
+        maxInstCount = 0;
+        break;
+    case VSC_OPTN_ILOptions_LEVEL1:
+        break;
+    case VSC_OPTN_ILOptions_LEVEL2:
+        /* If HW has iCache, maybe we can assume more budget. */
+        if (pHwCfg->hwFeatureFlags.hasInstCache)
+        {
+            maxInstCount = 2 * maxInstCount;
+        }
+        break;
+    case VSC_OPTN_ILOptions_LEVEL3:
+        /* If HW has iCache, maybe we can assume more budget. */
+        if (pHwCfg->hwFeatureFlags.hasInstCache)
+        {
+            maxInstCount = 0x7fffffff;
+        }
+        break;
+    default:
+        gcmASSERT(gcvFALSE);
+        break;
+    }
 
     VSC_IL_SetInlineBudget(pInliner, maxInstCount);
 }
@@ -772,8 +797,12 @@ VSC_ErrCode VSC_IL_PerformOnShader(
         VSC_OPTN_ILOptions_TRACE) ||
         VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
     {
+        /* Inliner invalids CFG, thus dumping IR with CFG may have issue */
+        gctBOOL oldCFGFlag = pShader->dumper->invalidCFG;
+        pShader->dumper->invalidCFG = gcvTRUE;
         VIR_Shader_Dump(gcvNULL, "Shader after Inliner", pShader, gcvTRUE);
         VIR_LOG_FLUSH(pDumper);
+        pShader->dumper->invalidCFG = oldCFGFlag;
     }
 
     _VSC_IL_Final(&inliner);

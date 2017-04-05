@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -117,12 +117,11 @@ __GLextension __glExtension[] =
 
     {__GL_EXTID_VIV_tex_direct, "GL_VIV_direct_texture", GL_FALSE, GL_FALSE},
 
-    {__GL_EXTID_ARB_vertex_program, "GL_ARB_vertex_program", GL_TRUE, GL_FALSE},
+#ifdef OPENGL40
+    {__GL_EXTID_ARB_vertex_program, "GL_ARB_vertex_program", GL_FALSE, GL_FALSE},
     {__GL_EXTID_ARB_vertex_buffer_object, "GL_ARB_vertex_buffer_object", GL_TRUE, GL_FALSE},
     {__GL_EXTID_ARB_shading_language_100, "GL_ARB_shading_language_100", GL_TRUE, GL_FALSE},
     {__GL_EXTID_ARB_shader_objects, "GL_ARB_shader_objects", GL_TRUE, GL_FALSE},
-
-#ifdef OPENGL40
     {__GL_EXTID_texture_compression_s3tc, "GL_EXT_texture_compression_s3tc", GL_FALSE, GL_FALSE},
     {__GL_EXTID_ARB_depth_texture, "GL_ARB_depth_texture", GL_FALSE, GL_FALSE},
     {__GL_EXTID_texture_shared_exponent, "GL_EXT_texture_shared_exponent", GL_FALSE, GL_FALSE},
@@ -134,6 +133,8 @@ __GLextension __glExtension[] =
     {__GL_EXTID_texture_sRGB, "GL_EXT_texture_sRGB", GL_FALSE, GL_FALSE},
     {__GL_EXTID_ARB_texture_float, "GL_ARB_texture_float", GL_FALSE, GL_FALSE},
     {__GL_EXTID_ARB_texture_array, "GL_EXT_texture_array", GL_FALSE, GL_FALSE},
+    {__GL_EXTID_EXT_framebuffer_object, "GL_EXT_framebuffer_object", GL_TRUE, GL_FALSE},
+    {__GL_EXTID_ARB_framebuffer_object, "GL_ARB_framebuffer_object", GL_TRUE, GL_FALSE},
 #endif
     {__GL_EXTID_EXT_LAST, gcvNULL, GL_FALSE, GL_FALSE}
 };

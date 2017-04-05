@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -41,7 +41,6 @@
 #include <dirent.h>
 
 #include <signal.h>
-#include <asm/sigcontext.h>       /* for sigcontext */
 #ifdef ANDROID
 #include <elf.h>
 #include <cutils/properties.h>
@@ -111,10 +110,6 @@ struct _gcoOS
     /* Base address. */
     gctUINT32               baseAddress;
 
-
-    /* Handle to the device. */
-    int                     device;
-
 #if VIVANTE_PROFILER
     gctUINT64               startTick;
     gctUINT32               allocCount;
@@ -131,6 +126,9 @@ struct _gcoOS
 #endif
 
     gcsPLATFORM             platform;
+
+    /* Handle to the device. */
+    int                     device;
 };
 
 /******************************************************************************\
@@ -388,8 +386,6 @@ _ConstructOs(
 {
     gcoOS os = gcPLS.os;
     gceSTATUS status;
-    gctUINT i;
-    gctUINT tryCount = 0;
 
     gcmPROFILE_DECLARE_ONLY(gctUINT64 freq);
 
@@ -420,53 +416,6 @@ _ConstructOs(
         gcmASSERT(gcPLS.os == gcvNULL);
         gcPLS.os = os;
 
-retry:
-        /* Attempt to open the device. */
-        for (i = 0; i < gcmCOUNTOF(GALDeviceName); i += 1)
-        {
-            gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_OS,
-                "%s(%d): Attempting to open device %s.",
-                __FUNCTION__, __LINE__, GALDeviceName[i]
-                );
-
-            os->device = open(GALDeviceName[i], O_RDWR);
-
-            if (os->device != -1)
-            {
-                gcmTRACE_ZONE(
-                    gcvLEVEL_VERBOSE, gcvZONE_OS,
-                    "%s(%d): Opened device %s.",
-                    __FUNCTION__, __LINE__, GALDeviceName[i]
-                    );
-
-                break;
-            }
-
-            gcmTRACE_ZONE(
-                gcvLEVEL_VERBOSE, gcvZONE_OS,
-                "%s(%d): Failed to open device %s, errno=%s.",
-                __FUNCTION__, __LINE__, GALDeviceName[i], strerror(errno)
-                );
-        }
-
-        if (i == gcmCOUNTOF(GALDeviceName) && tryCount < 5)
-        {
-            tryCount++;
-            usleep(1000000);
-            gcmPRINT("Failed to open device: %s, Try again...", strerror(errno));
-            goto retry;
-        }
-
-        if (i == gcmCOUNTOF(GALDeviceName))
-        {
-            gcmPRINT(
-                "%s(%d): FATAL: Failed to open device, errno=%s.",
-                __FUNCTION__, __LINE__, strerror(errno)
-                );
-
-            exit(1);
-        }
 
         /* Construct heap. */
         status = gcoHEAP_Construct(gcvNULL, gcdHEAP_SIZE, &os->heap);
@@ -792,6 +741,9 @@ _PLSDestructor(
     gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.accessLock));
     gcPLS.accessLock = gcvNULL;
 
+    gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.glFECompilerAccessLock));
+    gcPLS.glFECompilerAccessLock = gcvNULL;
+
     gcmVERIFY_OK(gcoOS_AtomDestroy(gcPLS.os, gcPLS.reference));
     gcPLS.reference = gcvNULL;
 
@@ -815,6 +767,7 @@ _TLSDestructor(
 {
     gcsTLS_PTR tls;
     gctINT reference = 0;
+    gctINT i;
 
     gcmHEADER_ARG("TLS=0x%x", TLS);
 
@@ -829,10 +782,16 @@ _TLSDestructor(
         gcoOS_ZeroMemory(tls, gcmSIZEOF(gcsTLS));
     }
 
-    if (tls->destructor != gcvNULL)
+    for (i = 0; i < gcvTLS_KEY_COUNT; i++)
     {
-        tls->destructor(tls);
-        tls->destructor = gcvNULL;
+        gcsDRIVER_TLS_PTR drvTLS = tls->driverTLS[i];
+
+        if (drvTLS && drvTLS->destructor != gcvNULL)
+        {
+            drvTLS->destructor(drvTLS);
+        }
+
+        tls->driverTLS[i] = gcvNULL;
     }
 
 #if gcdENABLE_3D
@@ -942,15 +901,9 @@ _TLSDestructor(
 }
 
 static void
-_InitializeProcess(
+_AtForkChild(
     void
     )
-{
-    /* Install thread destructor. */
-    pthread_key_create(&gcProcessKey, _TLSDestructor);
-}
-
-void _ResetPLS(void)
 {
     gcPLS.os = gcvNULL;
     gcPLS.hal = gcvNULL;
@@ -958,19 +911,23 @@ void _ResetPLS(void)
     gcPLS.processID = 0;
     gcPLS.reference = 0;
     gcPLS.patchID   = gcvPATCH_NOTINIT;
+
+    pthread_key_delete(gcProcessKey);
 }
 
-void _AtForkChild(
+static void
+_OnceInit(
     void
     )
 {
-    _ResetPLS();
-
-    pthread_key_delete(gcProcessKey);
-    pthread_key_create(&gcProcessKey, _TLSDestructor);
+#if (defined(ANDROID) && (ANDROID_SDK_VERSION > 16)) || !defined(ANDROID)
+    /* Use once control to avoid registering the handler multiple times. */
+    pthread_atfork(gcvNULL, gcvNULL, _AtForkChild);
+#endif
 }
 
-static gceSTATUS _ModuleConstructor(
+static gceSTATUS
+_ModuleConstructor(
     void
     )
 {
@@ -988,30 +945,16 @@ static gceSTATUS _ModuleConstructor(
     gcmASSERT(gcPLS.externalLogical   == gcvNULL);
     gcmASSERT(gcPLS.contiguousLogical == gcvNULL);
 
-#if (defined(ANDROID) && (ANDROID_SDK_VERSION > 16)) || !defined(ANDROID)
-    result = pthread_atfork(gcvNULL, gcvNULL, _AtForkChild);
+    pthread_once(&onceControl, _OnceInit);
+
+    /* Create tls key. */
+    result = pthread_key_create(&gcProcessKey, _TLSDestructor);
 
     if (result != 0)
     {
         gcmTRACE(
             gcvLEVEL_ERROR,
-            "%s(%d): pthread_atfork returned %d",
-            __FUNCTION__, __LINE__, result
-            );
-
-        gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
-    }
-#endif
-
-
-    /* Call _InitializeProcess function only one time for the process. */
-    result = pthread_once(&onceControl, _InitializeProcess);
-
-    if (result != 0)
-    {
-        gcmTRACE(
-            gcvLEVEL_ERROR,
-            "%s(%d): pthread_once returned %d",
+            "%s(%d): pthread_key_create returned %d",
             __FUNCTION__, __LINE__, result
             );
 
@@ -1026,6 +969,119 @@ static gceSTATUS _ModuleConstructor(
 
     /* Increment PLS reference for main thread. */
     gcmONERROR(gcoOS_AtomIncrement(gcPLS.os, gcPLS.reference, gcvNULL));
+
+    /* Record the process and thread that calling this constructor function */
+    gcPLS.processID = gcmGETPROCESSID();
+    gcPLS.threadID = gcmGETTHREADID();
+
+    /* Construct access lock */
+    gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.accessLock));
+
+    /* Construct gl FE compiler access lock */
+    gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.glFECompilerAccessLock));
+
+#if gcdDUMP_2D
+    gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &dumpMemInfoListMutex));
+#endif
+
+    gcmFOOTER_ARG(
+        "gcPLS.os=0x%08X, gcPLS.hal=0x%08X"
+        " internal=0x%08X external=0x%08X contiguous=0x%08X",
+        gcPLS.os, gcPLS.hal,
+        gcPLS.internalLogical, gcPLS.externalLogical, gcPLS.contiguousLogical
+        );
+
+    return status;
+
+OnError:
+    if (gcPLS.accessLock != gcvNULL)
+    {
+        /* Destroy access lock */
+        gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.accessLock));
+    }
+
+    if (gcPLS.glFECompilerAccessLock != gcvNULL)
+    {
+        /* Destroy access lock */
+        gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.glFECompilerAccessLock));
+    }
+
+    if (gcPLS.reference != gcvNULL)
+    {
+        /* Destroy the reference. */
+        gcmVERIFY_OK(gcoOS_AtomDestroy(gcPLS.os, gcPLS.reference));
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS
+_OpenDevice(
+    IN gcoOS Os
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT tryCount;
+
+    gcmHEADER();
+
+    if (Os->device > 0)
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+
+    for (tryCount = 0; tryCount < 5; tryCount++)
+    {
+        gctUINT i;
+
+        if (tryCount > 0)
+        {
+            /* Sleep for a while when second and later tries. */
+            usleep(1000000);
+            gcmPRINT("Failed to open device: %s, Try again...", strerror(errno));
+        }
+
+        /* Attempt to open the device. */
+        for (i = 0; i < gcmCOUNTOF(GALDeviceName); i += 1)
+        {
+            gcmTRACE_ZONE(
+                gcvLEVEL_VERBOSE, gcvZONE_OS,
+                "%s(%d): Attempting to open device %s.",
+                __FUNCTION__, __LINE__, GALDeviceName[i]
+                );
+
+            Os->device = open(GALDeviceName[i], O_RDWR);
+
+            if (Os->device >= 0)
+            {
+                gcmTRACE_ZONE(
+                    gcvLEVEL_VERBOSE, gcvZONE_OS,
+                    "%s(%d): Opened device %s.",
+                    __FUNCTION__, __LINE__, GALDeviceName[i]
+                    );
+
+                break;
+            }
+        }
+
+        if (Os->device >= 0)
+        {
+            /* Device opened. */
+            break;
+        }
+    }
+
+    if (Os->device < 0)
+    {
+        gcmPRINT(
+            "%s(%d): FATAL: Failed to open device, errno=%s.",
+            __FUNCTION__, __LINE__, strerror(errno)
+            );
+
+        exit(1);
+    }
 
     /* Construct gcoHAL object. */
     gcmONERROR(gcoHAL_ConstructEx(gcvNULL, gcvNULL, &gcPLS.hal));
@@ -1071,40 +1127,7 @@ static gceSTATUS _ModuleConstructor(
             ));
     }
 
-    /* Record the process and thread that calling this constructor function */
-    gcPLS.processID = gcmGETPROCESSID();
-    gcPLS.threadID = gcmGETTHREADID();
-
-    /* Construct access lock */
-    gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.accessLock));
-
-#if gcdDUMP_2D
-    gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &dumpMemInfoListMutex));
-#endif
-
-    gcmFOOTER_ARG(
-        "gcPLS.os=0x%08X, gcPLS.hal=0x%08X"
-        " internal=0x%08X external=0x%08X contiguous=0x%08X",
-        gcPLS.os, gcPLS.hal,
-        gcPLS.internalLogical, gcPLS.externalLogical, gcPLS.contiguousLogical
-        );
-
-    return status;
-
 OnError:
-
-    if (gcPLS.accessLock != gcvNULL)
-    {
-        /* Destroy access lock */
-        gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.accessLock));
-    }
-
-    if (gcPLS.reference != gcvNULL)
-    {
-        /* Destroy the reference. */
-        gcmVERIFY_OK(gcoOS_AtomDestroy(gcPLS.os, gcPLS.reference));
-    }
-
     gcmFOOTER();
     return status;
 }
@@ -1225,45 +1248,30 @@ gcoOS_SetPLSValue(
     }
 }
 
-/*******************************************************************************
- **
- ** gcoOS_GetTLS
- **
- ** Get access to the thread local storage.
- **
- ** INPUT:
- **
- **     Nothing.
- **
- ** OUTPUT:
- **
- **     gcsTLS_PTR * TLS
- **         Pointer to a variable that will hold the pointer to the TLS.
- */
 static pthread_mutex_t plsMutex = PTHREAD_MUTEX_INITIALIZER;
 
-gceSTATUS
-gcoOS_GetTLS(
+static gceSTATUS
+_GetTLS(
+    IN gctBOOL NeedOpenDevice,
     OUT gcsTLS_PTR * TLS
     )
 {
     gceSTATUS status;
-    gcsTLS_PTR tls;
+    gcsTLS_PTR tls = gcvNULL;
     int res;
 
     gcmHEADER_ARG("TLS=%p", TLS);
-
-    tls = (gcsTLS_PTR) pthread_getspecific(gcProcessKey);
 
     if (!gcPLS.processID)
     {
         pthread_mutex_lock(&plsMutex);
         status = _ModuleConstructor();
-        tls = NULL;
         pthread_mutex_unlock(&plsMutex);
 
         gcmONERROR(status);
     }
+
+    tls = (gcsTLS_PTR) pthread_getspecific(gcProcessKey);
 
     if (tls == NULL)
     {
@@ -1275,8 +1283,8 @@ gcoOS_GetTLS(
             tls, gcmSIZEOF(gcsTLS)
             );
 
-        /* The default hardware type is 2D */
-        tls->currentType = gcvHARDWARE_2D;
+        /* Determine default hardware type later. */
+        tls->currentType = gcvHARDWARE_INVALID;
 
         res = pthread_setspecific(gcProcessKey, tls);
 
@@ -1305,6 +1313,34 @@ gcoOS_GetTLS(
 #endif
     }
 
+    if (NeedOpenDevice)
+    {
+        gcmONERROR(_OpenDevice(gcPLS.os));
+    }
+
+    /* Assign default hardware type. */
+    if ((tls->currentType == gcvHARDWARE_INVALID) && gcPLS.hal)
+    {
+        gcoHAL hal = gcPLS.hal;
+
+        if (hal->separated2D)
+        {
+            tls->currentType = gcvHARDWARE_2D;
+        }
+        else if (hal->hybrid2D)
+        {
+            tls->currentType = gcvHARDWARE_3D2D;
+        }
+        else if (hal->is3DAvailable)
+        {
+            tls->currentType = gcvHARDWARE_3D;
+        }
+        else
+        {
+            tls->currentType = gcvHARDWARE_VG;
+        }
+    }
+
     * TLS = tls;
 
     gcmFOOTER_NO();
@@ -1320,6 +1356,29 @@ OnError:
 
     gcmFOOTER();
     return status;
+}
+
+/*******************************************************************************
+ **
+ ** gcoOS_GetTLS
+ **
+ ** Get access to the thread local storage.
+ **
+ ** INPUT:
+ **
+ **     Nothing.
+ **
+ ** OUTPUT:
+ **
+ **     gcsTLS_PTR * TLS
+ **         Pointer to a variable that will hold the pointer to the TLS.
+ */
+gceSTATUS
+gcoOS_GetTLS(
+    OUT gcsTLS_PTR * TLS
+    )
+{
+    return _GetTLS(gcvTRUE, TLS);
 }
 
 /*
@@ -1372,7 +1431,6 @@ gceSTATUS gcoOS_CopyTLS(IN gcsTLS_PTR Source)
     tls->copied = gcvTRUE;
 
     tls->currentHardware = gcvNULL;
-    tls->destructor     = gcvNULL;
 
 #if gcdDUMP || gcdDUMP_API || gcdDUMP_2D
     _SetDumpFileInfo();
@@ -1408,6 +1466,66 @@ gcoOS_QueryTLS(
     /* Return pointer to user. */
     *TLS = tls;
 
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+/* Get access to driver tls. */
+gceSTATUS
+gcoOS_GetDriverTLS(
+    IN gceTLS_KEY Key,
+    OUT gcsDRIVER_TLS_PTR * TLS
+    )
+{
+    gceSTATUS status;
+    gcsTLS_PTR tls;
+
+    gcmHEADER_ARG("Key=%d", Key);
+
+    if (Key >= gcvTLS_KEY_COUNT)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Get generic tls. */
+    gcmONERROR(_GetTLS(gcvFALSE, &tls));
+
+    *TLS = tls->driverTLS[Key];
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+/* Set driver tls. */
+gceSTATUS
+gcoOS_SetDriverTLS(
+    IN gceTLS_KEY Key,
+    IN gcsDRIVER_TLS * TLS
+    )
+{
+    gceSTATUS status;
+    gcsTLS_PTR tls;
+
+    gcmHEADER_ARG("Key=%d", Key);
+
+    if (Key >= gcvTLS_KEY_COUNT)
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Get generic tls. */
+    gcmONERROR(_GetTLS(gcvFALSE, &tls));
+
+    tls->driverTLS[Key] = TLS;
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -1476,6 +1594,65 @@ gcoOS_UnLockPLS(
     return status;
 }
 
+/*******************************************************************************
+**
+**  gcoOS_LockGLFECompiler
+**
+**  Lock mutext before access GL FE compiler if needed
+**
+**  INPUT:
+**
+**      Nothing.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcoOS_LockGLFECompiler(
+    void
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
+    if (gcPLS.glFECompilerAccessLock)
+    {
+        status = gcoOS_AcquireMutex(gcPLS.os, gcPLS.glFECompilerAccessLock, gcvINFINITE);
+    }
+    gcmFOOTER_ARG("Lock GL FE compiler ret=%d", status);
+
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoOS_UnLockGLFECompiler
+**
+**  Release mutext after access GL FE compiler if needed
+**
+**  INPUT:
+**
+**      Nothing.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcoOS_UnLockGLFECompiler(
+    void
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
+    if (gcPLS.glFECompilerAccessLock)
+    {
+        status = gcoOS_ReleaseMutex(gcPLS.os, gcPLS.glFECompilerAccessLock);
+    }
+    gcmFOOTER_ARG("Release GL FE compiler ret=%d", status);
+
+    return status;
+}
 
 /*******************************************************************************
 **
@@ -3829,6 +4006,9 @@ gcoOS_CreateMutex(
     /* Initialize the mutex. */
     pthread_mutex_init(mutex, &mta);
 
+    /* Destroy mta.*/
+    pthread_mutexattr_destroy(&mta);
+
     /* Return mutex to caller. */
     *Mutex = (gctPOINTER) mutex;
 
@@ -4344,7 +4524,7 @@ gceSTATUS gcoOS_HexStrToInt(IN gctCONST_STRING String,
     gcmDEBUG_VERIFY_ARGUMENT(String != gcvNULL);
     gcmDEBUG_VERIFY_ARGUMENT(Int != gcvNULL);
 
-    sscanf(String, "%x", Int);
+    sscanf(String, "%x", ((gctUINT*)Int));
 
     gcmFOOTER_ARG("*Int=%d", *Int);
     return gcvSTATUS_OK;

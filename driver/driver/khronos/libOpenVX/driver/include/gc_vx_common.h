@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -55,6 +55,7 @@
 #endif
 
 #include <VX/vx_ext_program.h>
+#include <VX/vx_viv_cnn.h>
 
 #include "gc_vxk_common.h"
 
@@ -92,6 +93,33 @@
 #endif
 
 #endif /* __cplusplus */
+
+/*#define USE_REF_INPUT*/
+#define NUM_ROI             256
+
+#define NN_MULTI_THREAD     1
+#define NN_MULTI_THREAD2    1
+#define NN_PERF_ZRL         1
+#define NN_WSZIE_REG        0   /* to match old register. 05/18 FPGA result is not stable without this */
+#define NN_LAYER_FLUSH      1
+#define NN_POOLING          1
+#define USE_GPU_RESHUFFLE   0
+#define ALL_LAYERS          1
+#define CURR_LAYER          1
+#define NUM_LAYERS          9
+#define ENABLE_COMPRESSION  1
+#define ENABLE_LRN_LAYER    0
+#define ENABLE_COV_BATCH    1
+#define VX_C_MEMORY_MANAGE  1
+
+#define NN_TP_ENGINE        0
+#define NN_TP_NEW_ROI       1
+
+#define VX_SHADER_TP        1
+
+#define VX_NN_SH_PARALLEL   0
+
+#define NN_Z_POSITION_OFFSET_BITS           24
 
 #define VX_PRIVATE_API                      static
 #define VX_INTERNAL_API
@@ -276,7 +304,33 @@ enum vx_kernel_internal_e
 
     VX_KERNEL_INTERNAL_LAPLACIAN3x3                = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x20,
 
-    VX_KERNEL_INTERNAL_CENSUS3x3                = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x21,
+    VX_KERNEL_INTERNAL_CENSUS3x3                   = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x21,
+
+    VX_KERNEL_INTERNAL_CNN_SOFTMAX                 = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x22,
+
+    VX_KERNEL_INTERNAL_CNN_INTERLEAVE_BUFFERS      = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x23,
+
+    VX_KERNEL_INTERNAL_CNN_LAYER                   = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x24,
+
+    VX_KERNEL_INTERNAL_CNN_DATACONVERT             = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x25,
+
+    VX_KERNEL_INTERNAL_CNN_RESHUFFLE_IMAGE         = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x26,
+
+    VX_KERNEL_INTERNAL_FASTERRCNN_SOFTMAX          = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x27,
+
+    VX_KERNEL_INTERNAL_MAX_POOL3x3                 = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x28,
+    VX_KERNEL_INTERNAL_LRN                         = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x29,
+    VX_KERNEL_INTERNAL_ROI_POOLING                 = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x2A,
+
+    VX_KERNEL_INTERNAL_POOLING                     = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x2B,
+
+    VX_KERNEL_INTERNAL_FASTERRCNN_RESHUFFLE_DATA   = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x2C,
+
+    VX_KERNEL_INTERNAL_RPN                         = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x2D,
+
+    VX_KERNEL_INTERNAL_CONVERT                     = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x2E,
+
+    VX_KERNEL_INTERNAL_FASTERRCNN_WAIT             = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x2F,
 };
 
 
@@ -437,6 +491,8 @@ typedef struct _vx_reference
     vx_int32                                delayIndex;
 
     vx_ptr                                  reserved;
+
+    vx_bool                                 isStage;/*if enable, skip write dependency checking*/
 }
 vx_reference_s;
 
@@ -561,6 +617,8 @@ typedef struct _vx_kernel_attribute_s
 #endif
     vx_reference                            stagings[10];
 
+    void *                                  stageMemory[10];
+
     vx_kernel_execution_parameters_t        shaderParameter;
 
 #if gcdVX_OPTIMIZER
@@ -569,6 +627,207 @@ typedef struct _vx_kernel_attribute_s
 #endif
 }
 vx_kernel_attribute_s;
+
+typedef enum _vx_cnn_net_name_e
+{
+    CNN_INVALID_NET,
+    CNN_ALEX_NET,
+    CNN_DAHUA_NET,
+    CNN_FASTCNN_NET,
+    CNN_VGG_NET,
+    CNN_NIN_NET,
+    CNN_TOTAL_NETS,
+}
+vx_cnn_net_name_e;
+
+typedef struct _vx_cnn_kernelStreamInfo
+{
+    /* parameters from input */
+    vx_float32 *orgWeightData;
+    vx_float32 *orgBiasData;
+    vx_uint32 orgWeightWidth;
+    vx_uint32 orgWeightHeight;
+    vx_uint32 orgWeightDepth;
+    vx_uint32 alignedWeightWidth;
+    vx_uint32 alignedWeightHeight;
+    vx_uint32 orgInImageXSize;
+    vx_uint32 orgInImageYSize;
+    vx_uint32 orgInImageZSize;
+    vx_uint32 alignedInImageXSize;
+    vx_uint32 alignedInImageYSize;
+
+    /* parameters for kernel stream */
+    void *weightData;
+    void *biasData;
+    vx_uint32 repeats;
+    vx_uint32 filterTotalCount;
+    vx_uint32 filtersPerCore;      /* filter count every group */
+    vx_uint32 sliceCount;       /* slice count every filter */
+    vx_uint32 weightWidth;
+    vx_uint32 weightHeight;
+    vx_uint32 inImageXSize;
+    vx_uint32 inImageYSize;
+    vx_int32  inImageXOffset;
+    vx_int32  inImageYOffset;
+    vx_uint32 outImageXSize;
+    vx_uint32 outImageYSize;
+    vx_uint32 outImageZSize;
+    vx_uint32 outImageTileXSize;
+    vx_uint32 outImageTileYSize;
+    vx_uint32 outFinalImageXSize; /*if no pooling, outImageXSize = outFinalImageXSize*/
+    vx_uint32 outFinalImageYSize;
+    vx_uint32 strideX;
+    vx_uint32 strideY;
+    vx_uint32 outItemCount;
+    viv_nn_non_linear_func_e nonlinearFunc;
+    viv_nn_pooling_type_e    poolingType;
+    unsigned int             poolingSize;
+    unsigned int             poolingStride;
+    vx_uint8 zeroRunLen;
+    vx_uint8 zeroRunLen2;
+    unsigned int layerType;
+}
+vx_cnn_kernelStreamInfo_s;
+
+typedef struct _vx_cnn_networkDataInfo
+{
+    vx_uint8 networkTypeValue;
+    vx_type_e weightType;
+    vx_size  weightItemSize;
+    vx_uint32 weightBitSize;
+    vx_type_e biasType;
+    vx_size biasItemSize;
+    vx_size  biasBitSize;
+}
+vx_cnn_networkDataInfo_s;
+
+typedef struct _vx_cnn_attributes_s
+{
+    vx_array                                kernelBuffer[20][2];
+    vx_array                                cmmdBuffer[20];
+    vx_cnn_kernelStreamInfo_s               cnnkernelStreamInfo[20];
+    vx_uint32                               layerCount;
+    vx_uint32                               batchSizeValue;
+    vx_cnn_networkDataInfo_s                networkDataInfo;
+    vx_uint32                               batchLevelIndex;
+    vx_cnn_net_name_e                       netFlag;
+}
+vx_cnn_attributes_s;
+
+typedef struct _vx_tp_coomandInfo_s
+{
+    vx_uint32 inImageXSize;
+    vx_uint32 inImageYSize;
+    vx_uint32 inImageZSize;
+    vx_uint32 inImageStride;
+    vx_uint32 inImageSlice;
+    vx_int32  inWindowXStart;
+    vx_int32  inWindowYStart;
+    vx_uint32 inWindowXEnd;
+    vx_uint32 inWindowYEnd;
+    vx_uint32 inTileSequence;
+    vx_uint32 inTileListGlobalMem;
+    vx_uint32 inImageGlobalMem;
+    vx_uint32 aluI2FEnable;
+    vx_uint32 aluSquareEnable;
+    vx_uint32 aluHorzProcessing;
+    vx_uint32 aluHorzProcCount;
+    vx_uint32 aluHorzProcStride;
+    vx_uint32 aluVertProcessing;
+    vx_uint32 aluVertProcCount;
+    vx_uint32 aluVertProcStride;
+    vx_uint32 aluNmsEnable;
+    vx_uint32 aluPwlEnable;
+    vx_uint32 aluMultEnable;
+    vx_uint32 aluF2IEnable;
+    vx_uint32 aluLoadPwlLUT;
+    vx_uint32 aluLoadPwlLUTGlobalMem;
+    vx_uint32 inImageBaseAddress;
+    vx_uint32 inTileListAddress;
+    vx_uint32 inTileXSize;
+    vx_uint32 inTileYSize;
+    vx_uint32 inTileXInc;
+    vx_uint32 inTileYInc;
+    vx_uint32 aluLoadPwlLUTAddress;
+    vx_uint32 outTileSkipAtborder;
+    vx_uint32 outGlobalMem;
+    vx_uint32 outLoop1Reset;
+    vx_uint32 outLoop2Reset;
+    vx_uint32 outLoop3Reset;
+    vx_uint32 outBrickMode;
+    vx_uint32 aluZFilterMode;
+    vx_uint32 aluZFilterStartOverfetch;
+    vx_uint32 aluZFilterEndOverfetch;
+    vx_uint32 aluSquarePreshift;
+    vx_uint32 last;
+    vx_uint32 outBaseAddress;
+    vx_uint32 outLoop0Inc;
+    vx_uint32 outLoop1Inc;
+    vx_uint32 outLoop2Inc;
+    vx_uint32 outLoop3Inc;
+    vx_uint32 outLoop4Inc;
+    vx_uint32 outLoop5Inc;
+    vx_uint32 outLoop6Inc;
+    vx_uint32 outLoop0Count;
+    vx_uint32 outLoop1Count;
+    vx_uint32 outLoop2Count;
+    vx_uint32 outLoop3Count;
+    vx_uint32 outLoop4Count;
+    vx_uint32 outLoop5Count;
+}
+vx_tp_coomandInfo_s;
+
+typedef struct _vx_tp_roi_coomandInfo_s
+{
+    vx_uint32 poolingHsize;
+    vx_uint32 hstride;
+    vx_uint32 poolingVsize;
+    vx_uint32 vstride;
+    vx_uint32 last;
+    vx_uint32 xcoord;
+    vx_uint32 ycoord;
+}
+vx_tp_roi_coomandInfo_s;
+
+typedef struct _vx_tp_convLayerDesc_s
+{
+    vx_uint32 outImageZsize;
+    vx_uint32 kernelXsize;
+    vx_uint32 kernelYsize;
+    vx_uint32 kernelZsize;
+    vx_uint32 xStride;
+    vx_uint32 yStride;
+}
+vx_tp_convLayerDesc_s;
+
+typedef struct _vx_tp_poolLayerDesc_s
+{
+    vx_uint32 poolXsize;
+    vx_uint32 poolYsize;
+    vx_uint32 xStride;
+    vx_uint32 yStride;
+}
+vx_tp_poolLayerDesc_s;
+
+typedef struct _vx_tp_imageDesc_s
+{
+    vx_uint32 baseAddr;
+    vx_uint32 xsize;
+    vx_uint32 ysize;
+    vx_uint32 zsize;
+    vx_uint32 stride;
+    vx_uint32 slice;
+}
+vx_tp_imageDesc_s;
+
+typedef struct _vx_tp_packedImageDesc_s
+{
+    vx_uint32 baseAddr;
+    vx_uint32 xsize;
+    vx_uint32 ysize;
+    vx_uint32 zsize;
+}
+vx_tp_packedImageDesc_s;
 
 typedef struct _vx_program
 {
@@ -658,8 +917,11 @@ typedef struct _vx_kernel_shader
 {
     gctSTRING               name;
     size_t                  maxWorkGroupSize;
+    size_t                  maxWorkItemSizes[3];
     size_t                  compileWorkGroupSize[3];
+    size_t                  preferredWorkGroupSizeMultiple;
 
+    gctUINT64               maxGlobalWorkSize;
     vx_uint64               localMemSize;
     vx_uint64               privateMemSize;
     gctSIZE_T               constantMemSize;
@@ -707,6 +969,8 @@ typedef struct _vx_kernel
     vx_kernel_deinitialize_f                deinitializeFunction;
 
     vx_kernel_attribute_s                   attributes;
+
+    vx_cnn_attributes_s                     cnnAttributes;
 
     vx_uint32                               targetIndex;
 
@@ -842,6 +1106,12 @@ typedef struct _vx_context
 
     vx_user_struct_s                        userStructTable[VX_MAX_USER_STRUCT_COUNT];
 
+#if (NN_MULTI_THREAD || NN_MULTI_THREAD2)
+    vx_event                                cnnEvent;
+    vx_event                                cnnEvent2;
+    vx_thread                               cnnThread;
+#endif
+
 #if VX_USE_THREADPOOL
     vx_threadpool                           threadPool;
 #endif
@@ -850,6 +1120,7 @@ typedef struct _vx_context
 
     vx_evis_no_inst_s                       evisNoInst;
 
+    vx_bool                                 perfEnable;
     /* Profiler */
 #if VIVANTE_PROFILER
     vx_profiler_s                           profiler;
@@ -858,6 +1129,13 @@ typedef struct _vx_context
 
     gctPOINTER                              devices[VX_MAX_DEVICES];
     vx_uint32                               deviceCount;
+
+    vx_uint32                               memoryCount;
+
+    vx_nn_config                            nnConfig;
+
+    vx_uint32                               cnnAvailableEventID;
+
 }
 vx_context_s;
 
@@ -914,6 +1192,10 @@ typedef struct _vx_node
 
     vx_graph                                childGraph;
 
+#if (NN_MULTI_THREAD || NN_MULTI_THREAD2)
+    vx_graph                                workGraph;
+#endif
+
     vx_cost_factors_s                       costFactors;
 
     void *                                  cmdBuffer;
@@ -931,6 +1213,12 @@ typedef struct _vx_node
 #else
     void *                                  kernelContext;
 #endif
+
+    vx_bool                                 forceWaitForEvent;
+
+    vx_uint32                               cnnTriggerEventID;
+    vx_uint32                               cnnWaitEventID0;
+    vx_uint32                               cnnWaitEventID1;
 }
 vx_node_s;
 
@@ -993,6 +1281,17 @@ typedef struct _vx_graph
     vx_value_set_s                          data;
 
     vx_bool                                 isChildGraph;
+
+    /* only for AlexNet node*/
+    vx_bool                                 isNNKernelBufReady;
+    vx_array                                nnInputKernelBuffer[8][2];
+    vx_array                                nnCmds;
+
+    /* Pre-allocated staging buffers for CPU nodes. Used by RCNN*/
+    vx_array                                wStageA[2];
+    vx_array                                wStageB[2];
+    vx_array                                wStageC[2];
+    vx_array                                wStageD[2];
 
 #if gcdVX_OPTIMIZER
     vx_bool                                 isSubGraph;
@@ -1325,6 +1624,97 @@ typedef struct _vx_kernel_description_s
     }extension;
 }
 vx_kernel_description_s;
+
+typedef struct _vx_object_data
+{
+    vx_enum                                 objType;
+
+    union
+    {
+        struct
+        {
+            vx_uint32                       width;
+            vx_uint32                       height;
+            vx_df_image                     format;
+        }
+        imageInfo;
+
+        struct
+        {
+            vx_enum                         dataType;
+            void *                          scalarValuePtr;
+        }
+        scalarInfo;
+
+        struct
+        {
+            vx_enum                         dataType;
+        }
+        lutArrayInfo;
+
+        struct
+        {
+            vx_size                         numBins;
+        }
+        distributionInfo;
+
+        struct
+        {
+            vx_enum                         dataType;
+        }
+        thresholdInfo;
+
+        struct
+        {
+            vx_size                         rows;
+            vx_size                         columns;
+        }
+        convolutionInfo;
+
+        struct
+        {
+            vx_enum                         dataType;
+            vx_size                         rows;
+            vx_size                         columns;
+        }
+        matrixInfo;
+
+        struct
+        {
+            vx_uint32                       srcWidth;
+            vx_uint32                       srcHeight;
+            vx_uint32                       dstWidth;
+            vx_uint32                       dstHeight;
+        }
+        remapInfo;
+
+        struct
+        {
+            vx_size                         numLevels;
+            vx_float32                      scale;
+            vx_uint32                       width;
+            vx_uint32                       height;
+            vx_df_image                     format;
+        }
+        pyramidInfo;
+
+        struct
+        {
+            vx_enum                         dataType;
+            vx_size                         capacity;
+        }
+        arrayInfo;
+    }
+    u;
+}
+vx_object_data_s;
+
+#if defined(__linux__)
+
+VX_INTERNAL_API struct timeval gcfVX_PerfStart(vx_reference ref);
+VX_INTERNAL_API vx_uint32 gcfVX_PerfEnd(vx_reference ref, struct timeval start);
+
+#endif
 
 #include <gc_vx_context.h>
 #include <gc_vx_delay.h>

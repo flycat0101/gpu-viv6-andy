@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -272,6 +272,14 @@ _FillInOptions(
         }
     }
 
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_FBO_PREFER_TILED", &fboScheme)) && fboScheme)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(fboScheme, "1")))
+        {
+            gcOptions[gcvOPTION_PREFER_TILED_DISPLAY_BUFFER] = gcvTRUE;
+        }
+    }
+
     return gcvSTATUS_OK;
 }
 
@@ -493,6 +501,7 @@ gcoHAL_ConstructEx(
 
             case gcvHARDWARE_3D2D:
                 hal->is3DAvailable = gcvTRUE;
+                hal->hybrid2D = gcvTRUE;
                 break;
 
             default:
@@ -940,10 +949,7 @@ gcoHAL_MapUserMemory(
 
     gcmSAFECASTSIZET(size, Size);
 
-    if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_MC20) == gcvSTATUS_FALSE)
-    {
-        gcmONERROR(gcoOS_GetBaseAddress(gcvNULL, &baseAddress));
-    }
+    gcmONERROR(gcoOS_GetBaseAddress(gcvNULL, &baseAddress));
 
     /* Only valid physical address can be converted to GPU's view */
     if (Physical != gcvINVALID_ADDRESS)

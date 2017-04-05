@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -975,7 +975,7 @@ gcoDECHARDWARE_SetTilingConfig(
             case gcvSUPERTILED_128B:
                 {
                     gcsSURF_FORMAT_INFO_PTR formatInfo;
-                    gcmONERROR(gcoSURF_QueryFormat(Format, &formatInfo));
+                    gcmONERROR(gcoHARDWARE_QueryFormat(Format, &formatInfo));
 
                     if (formatInfo->bitsPerPixel == 32)
                     {
@@ -1337,12 +1337,6 @@ gcoDECHARDWARE_EnableDECCompression(
     }
 
 
-    config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 24:24) - (0 ? 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:24) - (0 ?
- 24:24) + 1))))))) << (0 ? 24:24))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 24:24) - (0 ? 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:24) - (0 ?
- 24:24) + 1))))))) << (0 ? 24:24)));
-
     gcmONERROR(gcoDECHARDWARE_UploadData(
         Hardware,
         0x18180,
@@ -1431,6 +1425,16 @@ gcoDECHARDWARE_SetSrcDECCompression(
                 0x18000 + regOffset[0],
                 config
                 ));
+
+            if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION] ||
+                (Hardware->features[gcvFEATURE_DEC400_COMPRESSION] && ReadId < 4))
+            {
+                gcmONERROR(gcoDECHARDWARE_UploadData(
+                    Hardware,
+                    0x18000 + regOffset[1],
+                    config
+                    ));
+            }
 
             /* Disable DEC TPC compression. */
             if (Hardware->features[gcvFEATURE_DEC300_COMPRESSION] && ReadId < 4)
@@ -2347,6 +2351,14 @@ gcoDECHARDWARE_SetDstDECCompression(
                 ));
         }
     }
+    else if (!enable)
+    {
+        gcmONERROR(gcoDECHARDWARE_UploadData(
+            Hardware,
+            0x18040 + regOffsetW[1],
+            configW
+            ));
+    }
 #else
     gcsHAL_INTERFACE iface;
 
@@ -2439,17 +2451,26 @@ gcoDECHARDWARE_FlushDECCompression(
 #else
     if (Flush)
     {
+        gctUINT32 config;
+
+        config = ((((gctUINT32) (0x0000EE0A)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:22) - (0 ? 22:22) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:22) - (0 ?
+ 22:22) + 1))))))) << (0 ? 22:22))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 22:22) - (0 ? 22:22) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:22) - (0 ?
+ 22:22) + 1))))))) << (0 ? 22:22)));
+        config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
+ 1:1))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)));
+        config = ((((gctUINT32) (config)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)));
+
         gcmONERROR(gcoDECHARDWARE_UploadData(
             Hardware,
             0x18180,
-            ((((gctUINT32) (0x0000EE0A)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))) |
-            ((((gctUINT32) (0x0000EE0A)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
- 1:1))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)))
+            config
         ));
     }
 

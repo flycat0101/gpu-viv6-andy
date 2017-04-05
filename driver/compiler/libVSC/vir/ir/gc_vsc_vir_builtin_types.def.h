@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1727,7 +1727,7 @@
         16/* size */,
         0,
         VIR_TYFLAG_SIZED | VIR_TYFLAG_ISFLOAT,
-        4,
+        8,
         VIR_TY_MATRIX
     },
     {
@@ -1741,7 +1741,7 @@
         36/* size */,
         0,
         VIR_TYFLAG_SIZED | VIR_TYFLAG_ISFLOAT,
-        4,
+        16,
         VIR_TY_MATRIX
     },
     {
@@ -1755,7 +1755,7 @@
         64/* size */,
         0,
         VIR_TYFLAG_SIZED | VIR_TYFLAG_ISFLOAT,
-        4,
+        16,
         VIR_TY_MATRIX
     },
     {
@@ -1769,7 +1769,7 @@
         24/* size */,
         0,
         VIR_TYFLAG_SIZED | VIR_TYFLAG_ISFLOAT,
-        4,
+        16,
         VIR_TY_MATRIX
     },
     {
@@ -1783,7 +1783,7 @@
         32/* size */,
         0,
         VIR_TYFLAG_SIZED | VIR_TYFLAG_ISFLOAT,
-        4,
+        16,
         VIR_TY_MATRIX
     },
     {
@@ -1797,7 +1797,7 @@
         24/* size */,
         0,
         VIR_TYFLAG_SIZED | VIR_TYFLAG_ISFLOAT,
-        4,
+        8,
         VIR_TY_MATRIX
     },
     {
@@ -1811,7 +1811,7 @@
         48/* size */,
         0,
         VIR_TYFLAG_SIZED | VIR_TYFLAG_ISFLOAT,
-        4,
+        16,
         VIR_TY_MATRIX
     },
     {
@@ -1825,7 +1825,7 @@
         32/* size */,
         0,
         VIR_TYFLAG_SIZED | VIR_TYFLAG_ISFLOAT,
-        4,
+        8,
         VIR_TY_MATRIX
     },
     {
@@ -1839,7 +1839,7 @@
         48/* size */,
         0,
         VIR_TYFLAG_SIZED | VIR_TYFLAG_ISFLOAT,
-        4,
+        16,
         VIR_TY_MATRIX
     },
     {

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1205,22 +1205,17 @@ static GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex
 {
     __GLformatInfo* texFormatInfo;
     __GLformatInfo* rtFormatInfo;
+    __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
 
-    if (GL_RGB9_E5 == internalFormat)
+    if (!gc->dp.isFramebufferComplete(gc, readFBO))
     {
-        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+        __GL_ERROR_RET_VAL(GL_INVALID_FRAMEBUFFER_OPERATION, GL_FALSE);
     }
 
     if (READ_FRAMEBUFFER_BINDING_NAME)
     {
         __GLfboAttachPoint *attachPoint;
-        __GLframebufferObject *readFBO = gc->frameBuffer.readFramebufObj;
         GLint attachIndex;
-
-        if (!gc->dp.isFramebufferComplete(gc, readFBO))
-        {
-            __GL_ERROR_RET_VAL(GL_INVALID_FRAMEBUFFER_OPERATION, GL_FALSE);
-        }
 
         if (readFBO->readBuffer == GL_NONE)
         {
@@ -1344,6 +1339,9 @@ static GLboolean __glCheckTexCopyImgFmt(__GLcontext *gc, __GLtextureObject * tex
             }
             break;
         }
+        break;
+    case GL_RGB9_E5:
+        __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
         break;
     default:
         texFormatInfo = __glGetFormatInfo(internalFormat);
@@ -2578,7 +2576,6 @@ GLvoid GL_APIENTRY __gles_CopyTexImage2D(__GLcontext *gc,
     }
     if (!__glCheckTexImgArgs(gc, tex, lod, width, height, 1, border))
     {
-        /* TODO: the width/height cannot exceed read buffer size; */
         __GL_EXIT();
     }
 
@@ -2650,7 +2647,6 @@ GLvoid GL_APIENTRY __gles_CopyTexSubImage3D(__GLcontext *gc,
     /* Check arguments */
     if (!__glCheckTexSubImgArgs(gc, tex, 0, lod, xoffset, yoffset, zoffset, width, height, 1))
     {
-        /* TODO: the width/height cannot exceed read buffer size; */
         __GL_EXIT();
     }
     if (!__glCheckTexCopyImgFmt(gc, tex, tex->faceMipmap[0][lod].requestedFormat, GL_FALSE))
@@ -2707,7 +2703,6 @@ GLvoid GL_APIENTRY __gles_CopyTexSubImage2D(__GLcontext *gc,
     /* Check arguments */
     if (!__glCheckTexSubImgArgs(gc, tex, face, lod, xoffset, yoffset, 0, width, height, 1))
     {
-        /* TODO: the width/height cannot exceed read buffer size; */
         __GL_EXIT();
     }
     if (!__glCheckTexCopyImgFmt(gc, tex, tex->faceMipmap[face][lod].requestedFormat, GL_FALSE))

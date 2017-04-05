@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -308,7 +308,13 @@ VSC_ErrCode vscVIR_PutScalarConstToImm(VSC_SH_PASS_WORKER* pPassWorker)
                 gctUINT             immedValue = 0;
                 gctBOOL             hasSameValue = gcvTRUE;
 
-                if (!_IsConstScalar(pShader, inst, srcOpnd, &constValue))
+                if (!_IsConstScalar(pShader, inst, srcOpnd, &constValue) ||
+                    VIR_TypeId_isPacked(srcType))
+                {
+                    continue;
+                }
+                if (VIR_Inst_GetOpcode(inst) == VIR_OP_SUBSAT &&
+                    srcInx == 1)
                 {
                     continue;
                 }
@@ -497,7 +503,9 @@ VSC_ErrCode vscVIR_PutImmValueToUniform(VSC_SH_PASS_WORKER* pPassWorker)
                 }
             }
             /* to improve performance, we put the (same type) immediate into one uniform (const vector) */
-            if (gcUseFullNewLinker(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2) && numChange > 1)
+            if (gcUseFullNewLinker(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2) &&
+                numChange > 1 &&
+                !VIR_OPCODE_isVXOnly(VIR_Inst_GetOpcode(inst)))
             {
                 /* generate a const vector */
                 VIR_ConstVal    new_const_val;
@@ -834,6 +842,75 @@ OnError:
     return errCode;
 }
 
+DEF_QUERY_PASS_PROP(vscVIR_CheckEvisInstSwizzleRestriction)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
+
+    /* Only constant allocation is enable, we can check constant reg file read port limitation */
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_RA;
+
+    pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvFALSE;
+
+    /* Temp invaliate rd flow here (before IS/RA) as dubo pass does not update du */
+    pPassProp->passFlag.resDestroyReq.s.bInvalidateRdFlow = gcvTRUE;
+}
+
+VSC_ErrCode vscVIR_CheckEvisInstSwizzleRestriction(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode                errCode = VSC_ERR_NONE;
+    VIR_Shader*                pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VIR_FuncIterator           func_iter;
+    VIR_FunctionNode*          func_node;
+    VIR_Operand*               opnd;
+    gctUINT                    j;
+    VIR_Symbol*                pSym = gcvNULL;
+
+
+    /* If it is not OCL, just bail out */
+    if (!VIR_Shader_IsCL(pShader))
+    {
+        return errCode;
+    }
+
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+         func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function*    func = func_node->function;
+        VIR_InstIterator inst_iter;
+        VIR_Instruction* inst;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            if (!VIR_OPCODE_isVX(VIR_Inst_GetOpcode(inst)))
+            {
+                continue;
+            }
+
+            for (j = 0; j < VIR_Inst_GetSrcNum(inst); ++j)
+            {
+                opnd = VIR_Inst_GetSource(inst, j);
+
+                if (VIR_Operand_GetOpKind(opnd) == VIR_OPND_SYMBOL)
+                {
+                    pSym = VIR_Operand_GetSymbol(opnd);
+
+                    if (VIR_Symbol_GetKind(pSym) == VIR_SYM_UNIFORM)
+                    {
+                        /* set the symbol as cannotShift if the symbol is used in EVIS source,
+                         * since the swizzle bits are used for EVIS states */
+                        VIR_Symbol_SetCannotShift(pSym, gcvTRUE);
+                    }
+                }
+            }
+        }
+    }
+
+    return errCode;
+}
+
 static gctBOOL _IsPosAndDepthConflicted(VIR_Shader* pShader,
                                         VIR_Symbol* pPosSym,
                                         VIR_Symbol* pDepthSym,
@@ -1089,8 +1166,7 @@ VSC_ErrCode vscVIR_CheckPosAndDepthConflict(VSC_SH_PASS_WORKER* pPassWorker)
 
        mov depth, temp
     */
-    errCode = VIR_Function_AddInstruction(pShader->mainFunction,
-                                          VIR_OP_MOV,
+    errCode = VIR_Function_AddInstruction(pShader->mainFunction, VIR_OP_MOV,
                                           VIR_TYPE_FLOAT32,
                                           &pNewInsertedInst);
     ON_ERROR(errCode, "add instruction");
@@ -1660,7 +1736,7 @@ _Inst_RequireHPDest(
             return gcvTRUE;
         }
 
-        if (opcode == VIR_OP_SELECT &&
+        if (opcode == VIR_OP_CSELECT &&
             forceChange &&
             VIR_Inst_GetConditionOp(pInst) != VIR_COP_SELMSB &&
             VIR_Inst_GetConditionOp(pInst) != VIR_COP_ALLMSB &&
@@ -1723,7 +1799,7 @@ _Inst_RequireHPSrc(
             }
         }
 
-        if (opcode == VIR_OP_SELECT)
+        if (opcode == VIR_OP_CSELECT)
         {
             if (VIR_Inst_GetConditionOp(pInst) == VIR_COP_SELMSB ||
                 VIR_Inst_GetConditionOp(pInst) == VIR_COP_ALLMSB ||
@@ -1804,7 +1880,7 @@ _Inst_RequireHPSrc(
             }
         }
 
-        if (opcode == VIR_OP_CONV)
+        if (opcode == VIR_OP_CONVERT)
         {
             if (srcSym && VIR_Symbol_isInput(srcSym) &&
                 VIR_Symbol_GetName(srcSym) != VIR_NAME_FRONT_FACING)
@@ -1980,7 +2056,7 @@ VSC_ErrCode vscVIR_AdjustPrecision(VSC_SH_PASS_WORKER* pPassWorker)
                    we need to set it instruction type to int32, thus it will use integer conversion
                    to convert fp16 to fp32, which is wrong. Thus, we make dest and all src to be highp if
                    there is one highp source or dest */
-                if (VIR_Inst_GetOpcode(inst) == VIR_OP_SELECT)
+                if (VIR_Inst_GetOpcode(inst) == VIR_OP_CSELECT)
                 {
                     /* cmp.uint16 t1, t2, t3
                        select.selmsb.fp32, t1.uint16, fp16, fp16 has problem
@@ -2960,7 +3036,7 @@ static gctBOOL _vscVIR_ConvertIntegerSymbolToFloat(
                             {
                                 gctUINT32 symBaseTypeIdComponentCount = VIR_GetTypeComponents(symBaseTypeId);
                                 gctUINT32 symBaseTypeIdRowCount = VIR_GetTypeRows(symBaseTypeId);
-                                VIR_TypeId newBaseTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_FLOAT32, symBaseTypeIdComponentCount, symBaseTypeIdRowCount);
+                                VIR_TypeId newBaseTypeId = VIR_TypeId_ComposeNonOpaqueArrayedType(pShader, VIR_TYPE_FLOAT32, symBaseTypeIdComponentCount, symBaseTypeIdRowCount, VIR_Type_GetArrayLength(symType));
                                 VIR_Type* newBaseType = VIR_Shader_GetTypeFromId(pShader, newBaseTypeId);
 
                                 VIR_Symbol_SetType(symbol, newBaseType);
@@ -3097,7 +3173,7 @@ static void _vscVIR_ConvertIntegerInstructionToFloat(
     switch(opcode)
     {
         case VIR_OP_CMOV:
-        case VIR_OP_SELECT:
+        case VIR_OP_CSELECT:
         {
             VIR_ConditionOp conditionOp = VIR_Inst_GetConditionOp(inst);
             if(conditionOp == VIR_COP_EQUAL)
@@ -3107,7 +3183,7 @@ static void _vscVIR_ConvertIntegerInstructionToFloat(
             }
             break;
         }
-        case VIR_OP_CMP:
+        case VIR_OP_COMPARE:
         {
             VIR_Instruction* nextInst = VIR_Inst_GetNext(inst);
 
@@ -3144,7 +3220,7 @@ static void _vscVIR_ConvertIntegerInstructionToFloat(
 
     switch(opcode)
     {
-        case VIR_OP_CONV:
+        case VIR_OP_CONVERT:
         {
             VIR_Operand* dest = VIR_Inst_GetDest(inst);
             VIR_Operand* src = VIR_Inst_GetSource(inst, 0);
@@ -3179,12 +3255,12 @@ static void _vscVIR_ConvertIntegerInstructionToFloat(
                         newSym = VIR_Shader_GetSymFromId(pShader, newSymId);
                         VIR_Symbol_SetPrecision(newSym, VIR_Operand_GetPrecision(VIR_Inst_GetDest(inst)));
 
-                        VIR_Function_AddInstructionBefore(func, VIR_OP_AQ_F2I, destTypeId, inst, gcvTRUE, &newInst);
+                        VIR_Function_AddInstructionBefore(func, VIR_OP_F2I, destTypeId, inst, gcvTRUE, &newInst);
                         VIR_Operand_SetSymbol(VIR_Inst_GetDest(newInst), func, newSymId);
                         VIR_Operand_SetEnable(VIR_Inst_GetDest(newInst), newEnable);
                         VIR_Operand_Copy(VIR_Inst_GetSource(newInst, 0), VIR_Inst_GetSource(inst, 0));
 
-                        VIR_Inst_SetOpcode(inst, VIR_OP_AQ_I2F);
+                        VIR_Inst_SetOpcode(inst, VIR_OP_I2F);
                         VIR_Operand_SetSymbol(VIR_Inst_GetSource(inst, 0), func, newSymId);
                         VIR_Operand_SetSwizzle(VIR_Inst_GetSource(inst, 0), newSwizzle);
                     }
@@ -3545,8 +3621,7 @@ VSC_ErrCode _ConvertRetToJmpForFunction(
     pInst = VIR_Function_GetInstEnd(pFunc);
     if (VIR_Inst_GetOpcode(pInst) != VIR_OP_RET)
     {
-        errCode = VIR_Function_AddInstructionAfter(pFunc,
-                                                   VIR_OP_RET,
+        errCode = VIR_Function_AddInstructionAfter(pFunc, VIR_OP_RET,
                                                    VIR_TYPE_VOID,
                                                    pInst,
                                                    gcvTRUE,
@@ -3577,8 +3652,7 @@ VSC_ErrCode _ConvertRetToJmpForFunction(
                 {
                     VIR_Function_AddLabel(pFunc, "#sh_FuncEnd", &labelId);
 
-                    errCode = VIR_Function_AddInstructionBefore(pFunc,
-                                                                VIR_OP_LABEL,
+                    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_LABEL,
                                                                 VIR_TYPE_UNKNOWN,
                                                                 pFunc->instList.pTail,
                                                                 gcvTRUE,
@@ -3590,8 +3664,7 @@ VSC_ErrCode _ConvertRetToJmpForFunction(
                 }
 
                 /* Insert a JMP to the tail instruction label. */
-                errCode = VIR_Function_AddInstructionAfter(pFunc,
-                                                           VIR_OP_JMP,
+                errCode = VIR_Function_AddInstructionAfter(pFunc, VIR_OP_JMP,
                                                            VIR_TYPE_VOID,
                                                            pInst,
                                                            gcvTRUE,
@@ -3944,6 +4017,10 @@ VSC_ErrCode _ConvertScalarVectorConstToImm(
             gctUINT         i;
             VIR_Operand*    pSrcOpnd;
 
+            /* set pack mode if the instruction uses packed type.
+             * adjust immediate date type for componentwise instruction */
+            VIR_Inst_CheckAndSetPakedMode(pInst);
+
             for (i = 0; i < VIR_Inst_GetSrcNum(pInst); i++)
             {
                 pSrcOpnd = VIR_Inst_GetSource(pInst, i);
@@ -4288,7 +4365,8 @@ VSC_ErrCode VIR_Shader_CheckDual16able(VSC_SH_PASS_WORKER* pPassWorker)
                     break;
                 }
 
-                VIR_Inst_Check4Dual16(pInst, &needRunSingleT, &dual16NotSupported, options, dumper);
+                VIR_Inst_Check4Dual16(pInst, &needRunSingleT, &dual16NotSupported, options, dumper,
+                    gcdPROC_IS_WEBGL(compCfg->ctx.appNameId));
                 if(dual16NotSupported && VSC_UTILS_MASK(VSC_OPTN_DUAL16Options_GetTrace(options), VSC_OPTN_DUAL16Options_TRACE_DETAIL))
                 {
                     VIR_LOG(dumper, "inst not supported by dual16.\n", i);
@@ -4422,7 +4500,8 @@ _InitUsageFlag(
     IN  VIR_Shader              *pShader,
     IN  VIR_IdList              *IdList,
     IN  VIR_SymFlag              Flag,
-    IN  gctBOOL                  SetFlag
+    IN  gctBOOL                  SetFlag,
+    IN  gctBOOL                  CheckPerVertex
     )
 {
     VIR_Symbol                  *sym;
@@ -4431,6 +4510,11 @@ _InitUsageFlag(
     for (i = 0; i < VIR_IdList_Count(IdList); i++)
     {
         sym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(IdList, i));
+
+        if (isSymArrayedPerVertex(sym) && !CheckPerVertex)
+        {
+            continue;
+        }
 
         if (SetFlag)
         {
@@ -4457,25 +4541,37 @@ VSC_ErrCode vscVIR_CheckVariableUsage(VSC_SH_PASS_WORKER* pPassWorker)
     VIR_FunctionNode           *func_node;
 
     /* Clean up the flag first. */
+    /* to-do: we have issue with IO block with struct. Since all the accesses
+       is based on first symbol, after this phase, all other fields will be marked as unused.
+       thus disable the check for some phase. */
     if (checkVarUsage->checkInput)
     {
-        _InitUsageFlag(pShader, VIR_Shader_GetAttributes(pShader), VIR_SYMFLAG_UNUSED, gcvTRUE);
+        /* we check per-vertex attribute for TCS, since VS shader output is always checked */
+        if (VIR_Shader_GetKind(pShader) == VIR_SHADER_TESSELLATION_CONTROL ||
+            VIR_Shader_GetKind(pShader) == VIR_SHADER_GEOMETRY)
+        {
+            _InitUsageFlag(pShader, VIR_Shader_GetAttributes(pShader), VIR_SYMFLAG_UNUSED, gcvTRUE, gcvTRUE);
+        }
+        else
+        {
+            _InitUsageFlag(pShader, VIR_Shader_GetAttributes(pShader), VIR_SYMFLAG_UNUSED, gcvTRUE, gcvFALSE);
+        }
     }
     if (checkVarUsage->checkOutput)
     {
-        _InitUsageFlag(pShader, VIR_Shader_GetOutputs(pShader), VIR_SYMFLAG_UNUSED, gcvTRUE);
+        _InitUsageFlag(pShader, VIR_Shader_GetOutputs(pShader), VIR_SYMFLAG_UNUSED, gcvTRUE, gcvFALSE);
     }
     if (checkVarUsage->checkPrePatchInput)
     {
-        _InitUsageFlag(pShader, VIR_Shader_GetPerpatchAttributes(pShader), VIR_SYMFLAG_UNUSED, gcvTRUE);
+        _InitUsageFlag(pShader, VIR_Shader_GetPerpatchAttributes(pShader), VIR_SYMFLAG_UNUSED, gcvTRUE, gcvFALSE);
     }
     if (checkVarUsage->checkPrePatchOutput)
     {
-        _InitUsageFlag(pShader, VIR_Shader_GetPerpatchOutputs(pShader), VIR_SYMFLAG_UNUSED, gcvTRUE);
+        _InitUsageFlag(pShader, VIR_Shader_GetPerpatchOutputs(pShader), VIR_SYMFLAG_UNUSED, gcvTRUE, gcvFALSE);
     }
     if (checkVarUsage->checkUniform)
     {
-        _InitUsageFlag(pShader, VIR_Shader_GetUniforms(pShader), VIR_SYMUNIFORMFLAG_USED_IN_SHADER | VIR_SYMUNIFORMFLAG_USED_IN_LTC, gcvFALSE);
+        _InitUsageFlag(pShader, VIR_Shader_GetUniforms(pShader), VIR_SYMUNIFORMFLAG_USED_IN_SHADER | VIR_SYMUNIFORMFLAG_USED_IN_LTC, gcvFALSE, gcvFALSE);
     }
 
     /* Process all instructions. */
@@ -4690,6 +4786,7 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
                 VIR_Operand_SetSymbol(opnd, VIR_Inst_GetFunction(pUsage->usageKey.pUsageInst), pSym->index);
                 VIR_Operand_SetEnable(opnd, defEnableMask);
                 VIR_Operand_SetPrecision(opnd, VIR_Symbol_GetPrecision(pSym));
+                VIR_Operand_SetType(opnd, VIR_Operand_GetType(pUsage->usageKey.pOperand));
 
                 /* Src */
                 opnd = VIR_Inst_GetSource(pNewMovInst, VIR_Operand_Src0);
@@ -4725,5 +4822,1635 @@ VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker)
 
     return errCode;
 }
+
+static gctBOOL
+_NeedToCalculateOffset(
+    IN      VIR_Shader       *pShader,
+    IN      VIR_Function     *pFunc,
+    IN      VIR_Operand      *pOffsetOpnd
+    )
+{
+    gctBOOL needToCalculate = gcvTRUE;
+
+    switch (VIR_Operand_GetOpKind(pOffsetOpnd))
+    {
+    case VIR_OPND_IMMEDIATE:
+        if (VIR_Operand_GetImmediateInt(pOffsetOpnd) == 0)
+        {
+            needToCalculate = gcvFALSE;
+        }
+        break;
+
+    case VIR_OPND_CONST:
+    {
+        VIR_Const   *vConst = gcvNULL;
+        gctINT      i;
+
+        vConst = VIR_Shader_GetConstFromId(pShader,
+            VIR_Operand_GetConstId(pOffsetOpnd));
+        for (i = 0; i < 16; i++)
+        {
+            if (vConst->value.vecVal.i32Value[i] != 0)
+            {
+                break;
+            }
+        }
+        if (i == 16)
+        {
+            needToCalculate = gcvFALSE;
+        }
+    }
+    break;
+
+    default:
+        break;
+    }
+
+    return needToCalculate;
+}
+
+static VSC_ErrCode
+_GetSamplerInfo(
+    IN      VIR_Shader       *pShader,
+    IN      VIR_Function     *pFunc,
+    IN      VIR_Instruction  *pInst,
+    INOUT   VIR_SymId        *LevelBaseSizeSymId,
+    INOUT   VIR_SymId        *LodMinMaxSymId
+    )
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_Operand                *pSamplerOpnd = VIR_Inst_GetSource(pInst, 0);
+    VIR_SymId                   levelBaseSizeSymId = VIR_INVALID_ID, lodMinMaxSymId = VIR_INVALID_ID;
+    VIR_VirRegId                regId = VIR_INVALID_ID;
+    VIR_Instruction            *inst = gcvNULL;
+    VIR_Operand                *operand = gcvNULL;
+
+    /* Create a symbol to save levelBaseSizeSymId. */
+    regId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+        VIR_SYM_VIRREG,
+        regId,
+        VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_INTEGER_X4),
+        VIR_STORAGE_UNKNOWN,
+        &levelBaseSizeSymId);
+    CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
+
+    /* Get the levelBaseSize. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_GET_SAMPLER_LBS,
+        VIR_TYPE_INTEGER_X4,
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction.");
+
+    operand = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        levelBaseSizeSymId,
+        VIR_TYPE_INTEGER_X4);
+    VIR_Operand_SetEnable(operand, VIR_ENABLE_XYZW);
+
+    operand = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_Copy(operand, pSamplerOpnd);
+
+    operand = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand_SetImmediateUint(operand, 0);
+
+    /* Create a symbol to save lodMinMaxSymId. */
+    regId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+        VIR_SYM_VIRREG,
+        regId,
+        VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_INTEGER_X4),
+        VIR_STORAGE_UNKNOWN,
+        &lodMinMaxSymId);
+    CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
+
+    /* Get the lodMinMax. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_GET_SAMPLER_LMM,
+        VIR_TYPE_INTEGER_X4,
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction.");
+
+    operand = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        lodMinMaxSymId,
+        VIR_TYPE_INTEGER_X4);
+    VIR_Operand_SetEnable(operand, VIR_ENABLE_XYZW);
+
+    operand = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_Copy(operand, pSamplerOpnd);
+
+    operand = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand_SetImmediateUint(operand, 0);
+
+    /* Save the result. */
+    if (LevelBaseSizeSymId)
+    {
+        *LevelBaseSizeSymId = levelBaseSizeSymId;
+    }
+    if (LodMinMaxSymId)
+    {
+        *LodMinMaxSymId = lodMinMaxSymId;
+    }
+
+OnError:
+    return errCode;
+}
+
+/* lod = floor(clamp(lod, min, max) + 0.5). */
+static VSC_ErrCode
+_ClampFloatLod(
+    IN      VIR_Shader       *pShader,
+    IN      VIR_Function     *pFunc,
+    IN      VIR_Instruction  *pInst,
+    IN      VIR_SymId         LodMinMaxSymId,
+    IN      VIR_Operand      *pLodOpnd,
+    INOUT   VIR_SymId        *pFloatLodSymId
+    )
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_SymId                   floatLodSymId = VIR_INVALID_ID;
+    VIR_SymId                   floatLodMinMaxSymId = VIR_INVALID_ID;
+    VIR_VirRegId                regId = VIR_INVALID_ID;
+    VIR_Instruction            *inst = gcvNULL;
+    VIR_Operand                *operand = gcvNULL;
+
+    if (pFloatLodSymId)
+    {
+        floatLodSymId = *pFloatLodSymId;
+    }
+
+    if (floatLodSymId == VIR_INVALID_ID)
+    {
+        /* Create a reg to clamp the LOD. */
+        regId = VIR_Shader_NewVirRegId(pShader, 1);
+        errCode = VIR_Shader_AddSymbol(pShader,
+            VIR_SYM_VIRREG,
+            regId,
+            VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_FLOAT32),
+            VIR_STORAGE_UNKNOWN,
+            &floatLodSymId);
+        ON_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
+    }
+
+    /* Convert the lodMinMax to float. */
+    regId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+        VIR_SYM_VIRREG,
+        regId,
+        VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_FLOAT_X2),
+        VIR_STORAGE_UNKNOWN,
+        &floatLodMinMaxSymId);
+    ON_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
+
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_CONVERT,
+        VIR_TYPE_FLOAT_X2,
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction.");
+
+    operand = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        floatLodMinMaxSymId,
+        VIR_TYPE_FLOAT_X2);
+    VIR_Operand_SetEnable(operand, VIR_ENABLE_XY);
+
+    operand = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        LodMinMaxSymId,
+        VIR_TYPE_INTEGER_X2);
+    VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XYYY);
+
+    /* Clamp the float lod.*/
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MAX,
+        VIR_TYPE_FLOAT32,
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction.");
+
+    operand = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        floatLodSymId,
+        VIR_TYPE_FLOAT32);
+    VIR_Operand_SetEnable(operand, VIR_ENABLE_X);
+
+    operand = VIR_Inst_GetSource(inst, 0);
+    if (pLodOpnd)
+    {
+        VIR_Operand_Copy(operand, pLodOpnd);
+    }
+    else
+    {
+        gcmASSERT(floatLodSymId != VIR_INVALID_ID);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            floatLodSymId,
+            VIR_TYPE_FLOAT32);
+    }
+    VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
+
+    operand = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        floatLodMinMaxSymId,
+        VIR_TYPE_FLOAT32);
+    VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
+
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MIN,
+        VIR_TYPE_FLOAT32,
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction.");
+
+    operand = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        floatLodSymId,
+        VIR_TYPE_FLOAT32);
+    VIR_Operand_SetEnable(operand, VIR_ENABLE_X);
+
+    operand = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        floatLodSymId,
+        VIR_TYPE_FLOAT32);
+    VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
+
+    operand = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        floatLodMinMaxSymId,
+        VIR_TYPE_FLOAT32);
+    VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_YYYY);
+
+    /* ADD: floatLod, floatLod, 0.5. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_ADD,
+        VIR_TYPE_FLOAT32,
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction.");
+
+    operand = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        floatLodSymId,
+        VIR_TYPE_FLOAT32);
+    VIR_Operand_SetEnable(operand, VIR_ENABLE_X);
+
+    operand = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        floatLodSymId,
+        VIR_TYPE_FLOAT32);
+    VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
+
+    operand = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand_SetImmediateFloat(operand, 0.5);
+
+    /* FLOOR: floatLod, floatLod. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_FLOOR,
+        VIR_TYPE_FLOAT32,
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction.");
+
+    operand = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        floatLodSymId,
+        VIR_TYPE_FLOAT32);
+    VIR_Operand_SetEnable(operand, VIR_ENABLE_X);
+
+    operand = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        floatLodSymId,
+        VIR_TYPE_FLOAT32);
+    VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
+
+    if (pFloatLodSymId)
+    {
+        *pFloatLodSymId = floatLodSymId;
+    }
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_CalculateFloatLodByGrad(
+    IN      VIR_Shader       *pShader,
+    IN      VIR_Function     *pFunc,
+    IN      VIR_Instruction  *pInst,
+    IN      VIR_SymId         LevelBaseSizeSymId,
+    IN      VIR_SymId         LodMinMaxSymId,
+    INOUT   VIR_SymId        *pFloatLodSymId
+    )
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_VirRegId        regId = VIR_INVALID_ID;
+    VIR_Operand * texldModifier = (VIR_Operand *)VIR_Inst_GetSource(pInst, 2);
+    gctUINT             coordCompCount;
+    VIR_SymId           dpdxSymId = VIR_INVALID_ID, dpdySymId = VIR_INVALID_ID;
+    VIR_TypeId          gradTypeId = VIR_INVALID_ID;
+    VIR_Instruction*    inst = gcvNULL;
+    VIR_Operand*        pOpnd = gcvNULL;
+    VIR_SymId           floatLevelBaseSizeSymId = VIR_INVALID_ID;
+
+    coordCompCount = VIR_TypeId_GetSamplerCoordComponentCount(VIR_Operand_GetType(VIR_Inst_GetSource(pInst, 0)));
+    gradTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_FLOAT32, coordCompCount, 1);
+
+    /* Create two regs to hold dpdx/dpdy. */
+    regId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+        VIR_SYM_VIRREG,
+        regId,
+        VIR_Shader_GetTypeFromId(pShader, gradTypeId),
+        VIR_STORAGE_UNKNOWN,
+        &dpdxSymId);
+    ON_ERROR(errCode, "Add symbol failed.");
+
+    regId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+        VIR_SYM_VIRREG,
+        regId,
+        VIR_Shader_GetTypeFromId(pShader, gradTypeId),
+        VIR_STORAGE_UNKNOWN,
+        &dpdySymId);
+    ON_ERROR(errCode, "Add symbol failed.");
+
+    /* Get the dpdx and dpdy. */
+    if (VIR_Operand_hasGradFlag(texldModifier))
+    {
+        VIR_Operand*    pDpdxOpnd = gcvNULL;
+        VIR_Operand*    pDpdyOpnd = gcvNULL;
+
+        pDpdxOpnd = VIR_Operand_GetTexldModifier(texldModifier, VIR_TEXLDMODIFIER_DPDX);
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MOV,
+            gradTypeId,
+            pInst,
+            gcvTRUE,
+            &inst);
+        ON_ERROR(errCode, "Add instruction failed.");
+
+        pOpnd = VIR_Inst_GetDest(inst);
+        VIR_Operand_SetTempRegister(pOpnd,
+            pFunc,
+            dpdxSymId,
+            gradTypeId);
+        VIR_Operand_SetEnable(pOpnd, VIR_TypeId_Conv2Enable(gradTypeId));
+
+        pOpnd = VIR_Inst_GetSource(inst, 0);
+        VIR_Operand_Copy(pOpnd, pDpdxOpnd);
+        VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(gradTypeId));
+
+        pDpdyOpnd = VIR_Operand_GetTexldModifier(texldModifier, VIR_TEXLDMODIFIER_DPDY);
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MOV,
+            gradTypeId,
+            pInst,
+            gcvTRUE,
+            &inst);
+        ON_ERROR(errCode, "Add instruction failed.");
+
+        pOpnd = VIR_Inst_GetDest(inst);
+        VIR_Operand_SetTempRegister(pOpnd,
+            pFunc,
+            dpdySymId,
+            gradTypeId);
+        VIR_Operand_SetEnable(pOpnd, VIR_TypeId_Conv2Enable(gradTypeId));
+
+        pOpnd = VIR_Inst_GetSource(inst, 0);
+        VIR_Operand_Copy(pOpnd, pDpdyOpnd);
+        VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(gradTypeId));
+    }
+    else
+    {
+        VIR_Operand*    pCoordOpnd = VIR_Inst_GetSource(pInst, 1);
+
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_DSX,
+            gradTypeId,
+            pInst,
+            gcvTRUE,
+            &inst);
+        ON_ERROR(errCode, "Add instruction failed.");
+
+        pOpnd = VIR_Inst_GetDest(inst);
+        VIR_Operand_SetTempRegister(pOpnd,
+            pFunc,
+            dpdxSymId,
+            gradTypeId);
+        VIR_Operand_SetEnable(pOpnd, VIR_TypeId_Conv2Enable(gradTypeId));
+
+        pOpnd = VIR_Inst_GetSource(inst, 0);
+        VIR_Operand_Copy(pOpnd, pCoordOpnd);
+        VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(gradTypeId));
+
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_DSY,
+            gradTypeId,
+            pInst,
+            gcvTRUE,
+            &inst);
+        ON_ERROR(errCode, "Add instruction failed.");
+
+        pOpnd = VIR_Inst_GetDest(inst);
+        VIR_Operand_SetTempRegister(pOpnd,
+            pFunc,
+            dpdySymId,
+            gradTypeId);
+        VIR_Operand_SetEnable(pOpnd, VIR_TypeId_Conv2Enable(gradTypeId));
+
+        pOpnd = VIR_Inst_GetSource(inst, 0);
+        VIR_Operand_Copy(pOpnd, pCoordOpnd);
+        VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(gradTypeId));
+    }
+
+    /* Convert the levelBaseSize to float. */
+    regId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+        VIR_SYM_VIRREG,
+        regId,
+        VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_FLOAT_X3),
+        VIR_STORAGE_UNKNOWN,
+        &floatLevelBaseSizeSymId);
+    ON_ERROR(errCode, "Add symbol failed.");
+
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_CONVERT,
+        VIR_TYPE_FLOAT_X3,
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction failed.");
+
+    pOpnd = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        floatLevelBaseSizeSymId,
+        VIR_TYPE_FLOAT_X3);
+    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_XYZ);
+
+    pOpnd = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        LevelBaseSizeSymId,
+        VIR_TYPE_INTEGER_X3);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XYZZ);
+
+    /* MUL, dpdx, dpdx, size. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MUL,
+        gradTypeId,
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction failed.");
+
+    pOpnd = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdxSymId,
+        gradTypeId);
+    VIR_Operand_SetEnable(pOpnd, VIR_TypeId_Conv2Enable(gradTypeId));
+
+    pOpnd = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdxSymId,
+        gradTypeId);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(gradTypeId));
+
+    pOpnd = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        floatLevelBaseSizeSymId,
+        gradTypeId);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(gradTypeId));
+
+    /* MUL, dpdy, dpdy, size. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MUL,
+        gradTypeId,
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction failed.");
+
+    pOpnd = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdySymId,
+        gradTypeId);
+    VIR_Operand_SetEnable(pOpnd, VIR_TypeId_Conv2Enable(gradTypeId));
+
+    pOpnd = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdySymId,
+        gradTypeId);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(gradTypeId));
+
+    pOpnd = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        floatLevelBaseSizeSymId,
+        gradTypeId);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(gradTypeId));
+
+    /* DOT, dpdx.x, dpdx, dpdx. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_DOT,
+        VIR_GetTypeComponentType(gradTypeId),
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction failed.");
+
+    pOpnd = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdxSymId,
+        VIR_GetTypeComponentType(gradTypeId));
+    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+    pOpnd = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdxSymId,
+        gradTypeId);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(gradTypeId));
+
+    pOpnd = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdxSymId,
+        gradTypeId);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(gradTypeId));
+
+    /* SQRT dpdx.x, dpdx.x. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_SQRT,
+        VIR_GetTypeComponentType(gradTypeId),
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction failed.");
+
+    pOpnd = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdxSymId,
+        VIR_GetTypeComponentType(gradTypeId));
+    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+    pOpnd = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdxSymId,
+        VIR_GetTypeComponentType(gradTypeId));
+    VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+
+    /* DOT, dpdy.x, dpdy, dpdy. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_DOT,
+        VIR_GetTypeComponentType(gradTypeId),
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction failed.");
+
+    pOpnd = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdySymId,
+        VIR_GetTypeComponentType(gradTypeId));
+    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+    pOpnd = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdySymId,
+        gradTypeId);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(gradTypeId));
+
+    pOpnd = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdySymId,
+        gradTypeId);
+    VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(gradTypeId));
+
+    /* SQRT, dpdy.x, dpdy.x. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_SQRT,
+        VIR_GetTypeComponentType(gradTypeId),
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction failed.");
+
+    pOpnd = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdySymId,
+        VIR_GetTypeComponentType(gradTypeId));
+    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+    pOpnd = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdySymId,
+        VIR_GetTypeComponentType(gradTypeId));
+    VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+
+    /* LOG2, dpdx.x, dpdx.x. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_LOG2,
+        VIR_GetTypeComponentType(gradTypeId),
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction failed.");
+
+    pOpnd = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdxSymId,
+        VIR_GetTypeComponentType(gradTypeId));
+    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+    pOpnd = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdxSymId,
+        VIR_GetTypeComponentType(gradTypeId));
+    VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+
+    /* LOG2, dpdy.x, dpdy.x. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_LOG2,
+        VIR_GetTypeComponentType(gradTypeId),
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction failed.");
+
+    pOpnd = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdySymId,
+        VIR_GetTypeComponentType(gradTypeId));
+    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+    pOpnd = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdySymId,
+        VIR_GetTypeComponentType(gradTypeId));
+    VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+
+    /* MAX, dpdx.x, dpdx.x, dpdy.x. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MAX,
+        VIR_GetTypeComponentType(gradTypeId),
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction failed.");
+
+    pOpnd = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdxSymId,
+        VIR_GetTypeComponentType(gradTypeId));
+    VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+    pOpnd = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdxSymId,
+        VIR_GetTypeComponentType(gradTypeId));
+    VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+
+    pOpnd = VIR_Inst_GetSource(inst, 1);
+    VIR_Operand_SetTempRegister(pOpnd,
+        pFunc,
+        dpdySymId,
+        VIR_GetTypeComponentType(gradTypeId));
+    VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+
+    /* Clamp the lod. */
+    errCode = _ClampFloatLod(pShader,
+        pFunc,
+        pInst,
+        LodMinMaxSymId,
+        gcvNULL,
+        &dpdxSymId);
+    ON_ERROR(errCode, "Clamp float lod");
+
+    if (pFloatLodSymId)
+    {
+        *pFloatLodSymId = dpdxSymId;
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_CalculateIntegerLod(
+IN      VIR_Shader       *pShader,
+IN      VIR_Function     *pFunc,
+IN      VIR_Instruction  *pInst,
+IN      VIR_SymId         LevelBaseSizeSymId,
+IN      VIR_SymId         LodMinMaxSymId,
+INOUT   VIR_SymId        *pIntLodSymId
+)
+{
+    VSC_ErrCode         errCode = VSC_ERR_NONE;
+    VIR_Instruction*    pCalcLodInst = gcvNULL;
+    VIR_Operand*        pParamSrc;
+    VIR_Operand*        pSamplerOpnd = gcvNULL;
+    VIR_Operand*        pCoordOpnd = gcvNULL;
+    VIR_Operand*        pOpnd = gcvNULL;
+    VIR_VirRegId        lodRegId = VIR_INVALID_ID;
+    VIR_SymId           intLodSymId = VIR_INVALID_ID;
+    VIR_SymId           newCoordSymId = VIR_INVALID_ID;
+    VIR_TypeId          coordTypeId;
+    VIR_OpCode          opCode = VIR_Inst_GetOpcode(pInst);
+    gctBOOL             isTexldProj;
+
+    isTexldProj = (opCode == VIR_OP_TEXLDPROJ || opCode == VIR_OP_TEXLDPCFPROJ);
+
+    pParamSrc = VIR_Inst_GetSource(pInst, 2);
+
+    /* Get the sampler and coord operand. */
+    pSamplerOpnd = VIR_Inst_GetSource(pInst, 0);
+    pCoordOpnd = VIR_Inst_GetSource(pInst, 1);
+
+    /* Get coord type. */
+    coordTypeId = VIR_Operand_GetType(pCoordOpnd);
+
+    /* Create a reg to hold the LOD. */
+    lodRegId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+        VIR_SYM_VIRREG,
+        lodRegId,
+        VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_INT32),
+        VIR_STORAGE_UNKNOWN,
+        &intLodSymId);
+    ON_ERROR(errCode, "Add symbol failed.");
+
+    /*
+    ** 1) With explicit gradients, then we need to calculate lod with these gradients.
+    ** 2) Without explicit gradients and in FS, use LODQ to get the lod.
+    ** 3) Otherwise, use 0 as LOD.
+    */
+    if (VIR_Operand_hasGradFlag(pParamSrc))
+    {
+        VIR_SymId   floatLodSymId = VIR_INVALID_ID;
+        VIR_Instruction* convInst = gcvNULL;
+
+        errCode = _CalculateFloatLodByGrad(pShader,
+            pFunc,
+            pInst,
+            LevelBaseSizeSymId,
+            LodMinMaxSymId,
+            &floatLodSymId);
+        ON_ERROR(errCode, "Calculate lod by grad failed.");
+
+        /* Conv the float LOD. */
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_CONVERT,
+            VIR_TYPE_INT32,
+            pInst,
+            gcvTRUE,
+            &convInst);
+        ON_ERROR(errCode, "Add instruction failed.");
+
+        pOpnd = VIR_Inst_GetDest(convInst);
+        VIR_Operand_SetTempRegister(pOpnd,
+            pFunc,
+            intLodSymId,
+            VIR_TYPE_INT32);
+        VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+        pOpnd = VIR_Inst_GetSource(convInst, 0);
+        VIR_Operand_SetTempRegister(pOpnd,
+            pFunc,
+            floatLodSymId,
+            VIR_TYPE_FLOAT32);
+        VIR_Operand_SetSwizzle(pOpnd, VIR_SWIZZLE_XXXX);
+    }
+    else if (VIR_Shader_IsFS(pShader))
+    {
+        /* If this is a texldproj, we need to div the q component. */
+        if (isTexldProj)
+        {
+            VIR_Swizzle     swizzle;
+            VIR_Instruction*pCoordInst = gcvNULL;
+            VIR_VirRegId    coordRegId = VIR_INVALID_ID;
+            VIR_TypeId      newCoordTypeId;
+
+            /* Create a reg to save the coord. */
+            coordRegId = VIR_Shader_NewVirRegId(pShader, 1);
+            errCode = VIR_Shader_AddSymbol(pShader,
+                VIR_SYM_VIRREG,
+                coordRegId,
+                VIR_Shader_GetTypeFromId(pShader, coordTypeId),
+                VIR_STORAGE_UNKNOWN,
+                &newCoordSymId);
+            ON_ERROR(errCode, "Add symbol failed.");
+
+            errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MOV,
+                coordTypeId,
+                pInst,
+                gcvTRUE,
+                &pCoordInst);
+            ON_ERROR(errCode, "Add instruction failed.");
+
+            /* Set Dest. */
+            pOpnd = VIR_Inst_GetDest(pCoordInst);
+            VIR_Operand_SetTempRegister(pOpnd,
+                pFunc,
+                newCoordSymId,
+                coordTypeId);
+            VIR_Operand_SetEnable(pOpnd, VIR_TypeId_Conv2Enable(coordTypeId));
+
+            /* Set Source0. */
+            pOpnd = VIR_Inst_GetSource(pCoordInst, 0);
+            VIR_Operand_Copy(pOpnd, pCoordOpnd);
+
+            /* Div the q component. */
+            newCoordTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(coordTypeId),
+                VIR_GetTypeComponents(coordTypeId) - 1,
+                1);
+
+            errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_DIV,
+                newCoordTypeId,
+                pInst,
+                gcvTRUE,
+                &pCoordInst);
+            ON_ERROR(errCode, "Add instruction failed.");
+
+            /* Set Dest. */
+            pOpnd = VIR_Inst_GetDest(pCoordInst);
+            VIR_Operand_SetTempRegister(pOpnd,
+                pFunc,
+                newCoordSymId,
+                newCoordTypeId);
+            VIR_Operand_SetEnable(pOpnd, VIR_TypeId_Conv2Enable(newCoordTypeId));
+
+            /* Set Source0. */
+            pOpnd = VIR_Inst_GetSource(pCoordInst, 0);
+            VIR_Operand_SetTempRegister(pOpnd,
+                pFunc,
+                newCoordSymId,
+                newCoordTypeId);
+            VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(newCoordTypeId));
+
+            /* Set Source1. */
+            pOpnd = VIR_Inst_GetSource(pCoordInst, 1);
+            VIR_Operand_Copy(pOpnd, pCoordOpnd);
+            swizzle = VIR_Operand_GetSwizzle(pCoordOpnd);
+            swizzle = VIR_Swizzle_GetChannel(swizzle, 3);
+            VIR_Operand_SetSwizzle(pOpnd, VIR_Enable_2_Swizzle_WShift((VIR_Enable)(VIR_ENABLE_X << swizzle)));
+            VIR_Operand_SetType(pOpnd, VIR_GetTypeComponentType(coordTypeId));
+        }
+
+        /* Insert a intrinsic call to get LOD. */
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_LODQ,
+            VIR_TYPE_INT32,
+            pInst,
+            gcvTRUE,
+            &pCalcLodInst);
+        ON_ERROR(errCode, "Add instruction failed.");
+
+        VIR_Inst_SetResOpType(pCalcLodInst, VIR_RES_OP_TYPE_LODQ);
+
+        pOpnd = VIR_Inst_GetDest(pCalcLodInst);
+        VIR_Operand_SetTempRegister(pOpnd,
+            pFunc,
+            intLodSymId,
+            VIR_TYPE_INT32);
+        VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+        pOpnd = VIR_Inst_GetSource(pCalcLodInst, 0);
+        VIR_Operand_Copy(pOpnd, pSamplerOpnd);
+
+        pOpnd = VIR_Inst_GetSource(pCalcLodInst, 1);
+        if (isTexldProj)
+        {
+            VIR_Operand_SetTempRegister(pOpnd,
+                pFunc,
+                newCoordSymId,
+                coordTypeId);
+            VIR_Operand_SetSwizzle(pOpnd, VIR_TypeId_Conv2Swizzle(coordTypeId));
+        }
+        else
+        {
+            VIR_Operand_Copy(pOpnd, pCoordOpnd);
+        }
+
+        pOpnd = VIR_Inst_GetSource(pCalcLodInst, 2);
+        if (VIR_Operand_hasBiasFlag(pParamSrc))
+        {
+            VIR_Operand * texldModifier = (VIR_Operand *)pParamSrc;
+
+            VIR_Operand_Copy(pOpnd, VIR_Operand_GetTexldBias(pParamSrc));
+            /* Remove the bias. */
+            VIR_Operand_ClrTexModifierFlag(pParamSrc, VIR_TMFLAG_BIAS);
+            VIR_Operand_SetTexldModifier(texldModifier, VIR_TEXLDMODIFIER_BIAS, gcvNULL);
+        }
+        else
+        {
+            VIR_Operand_SetImmediateFloat(pOpnd, 0.0);
+        }
+    }
+    else
+    {
+        /* Use 0 as LOD. */
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MOV,
+            VIR_TYPE_INT32,
+            pInst,
+            gcvTRUE,
+            &pCalcLodInst);
+        ON_ERROR(errCode, "Add instruction failed.");
+
+        pOpnd = VIR_Inst_GetDest(pCalcLodInst);
+        VIR_Operand_SetTempRegister(pOpnd,
+            pFunc,
+            intLodSymId,
+            VIR_TYPE_INT32);
+        VIR_Operand_SetEnable(pOpnd, VIR_ENABLE_X);
+
+        pOpnd = VIR_Inst_GetSource(pCalcLodInst, 0);
+        VIR_Operand_SetImmediateInt(pOpnd, 0);
+    }
+
+    if (pIntLodSymId)
+    {
+        *pIntLodSymId = intLodSymId;
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_GetIntegerLod(
+IN      VIR_Shader       *pShader,
+IN      VIR_Function     *pFunc,
+IN      VIR_Instruction  *pInst,
+IN      VIR_SymId         LevelBaseSizeSymId,
+IN      VIR_SymId         LodMinMaxSymId,
+INOUT   VIR_SymId        *IntgerLodSymId
+)
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_Operand  *pTexldModifier = (VIR_Operand *)VIR_Inst_GetSource(pInst, 2);
+    VIR_Operand                *pLodOpnd = VIR_Operand_GetTexldLod(pTexldModifier);
+    VIR_SymId                   intLodSymId = VIR_INVALID_ID, floatLodSymId = VIR_INVALID_ID;
+    VIR_VirRegId                regId = VIR_INVALID_ID;
+    VIR_Instruction            *inst = gcvNULL;
+    VIR_Operand                *operand = gcvNULL;
+    gctBOOL                     isFloatLod;
+
+    /* If there is not lod modifier, then we need to calculate it. */
+    if (pLodOpnd == gcvNULL)
+    {
+        errCode = _CalculateIntegerLod(pShader,
+            pFunc,
+            pInst,
+            LevelBaseSizeSymId,
+            LodMinMaxSymId,
+            IntgerLodSymId);
+        ON_ERROR(errCode, "Calculate lod failed.");
+
+        return errCode;
+    }
+
+    isFloatLod = VIR_TypeId_isFloat(VIR_Operand_GetType(pLodOpnd));
+
+    /* Create a temp to hold the integer LOD. */
+    regId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+        VIR_SYM_VIRREG,
+        regId,
+        VIR_Shader_GetTypeFromId(pShader, VIR_TYPE_INT32),
+        VIR_STORAGE_UNKNOWN,
+        &intLodSymId);
+    ON_ERROR(errCode, "Add symbol failed.");
+
+    if (isFloatLod)
+    {
+        /* If the LOD is floating variable from shader source, we need to clamp it. */
+        errCode = _ClampFloatLod(pShader,
+            pFunc,
+            pInst,
+            LodMinMaxSymId,
+            pLodOpnd,
+            &floatLodSymId);
+        ON_ERROR(errCode, "Clamp float lod failed.");
+    }
+
+    /* Move the integer LOD. */
+    errCode = VIR_Function_AddInstructionBefore(pFunc, isFloatLod ? VIR_OP_CONVERT : VIR_OP_MOV,
+        VIR_TYPE_INT32,
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction failed.");
+
+    operand = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        intLodSymId,
+        VIR_TYPE_INT32);
+    VIR_Operand_SetEnable(operand, VIR_ENABLE_X);
+
+    operand = VIR_Inst_GetSource(inst, 0);
+    if (!isFloatLod)
+    {
+        VIR_Operand_Copy(operand, pLodOpnd);
+    }
+    else
+    {
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            floatLodSymId,
+            VIR_TYPE_FLOAT32);
+        VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
+    }
+
+    /* Return the LOD symbol ID. */
+    if (IntgerLodSymId)
+    {
+        *IntgerLodSymId = intLodSymId;
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_CalculateOffsetCoord(
+IN      VIR_Shader       *pShader,
+IN      VSC_HW_CONFIG    *HwCfg,
+IN      VIR_Function     *pFunc,
+IN      VIR_Instruction  *pInst
+)
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_OpCode                  opCode = VIR_Inst_GetOpcode(pInst);
+    VIR_Operand                *pCoordOpnd = VIR_Inst_GetSource(pInst, 1);
+    VIR_TypeId                  coordTypeId = VIR_Operand_GetType(pCoordOpnd);
+    VIR_TypeId                  newCoordTypeId = VIR_INVALID_ID;
+    VIR_Type                   *pCoordType = VIR_Shader_GetTypeFromId(pShader, coordTypeId);
+    VIR_Operand                *pParamOpnd = VIR_Inst_GetSource(pInst, 2);
+    VIR_Operand                *pOffsetOpnd = VIR_Operand_GetTexldOffset(pParamOpnd);
+    VIR_TypeId                  offsetTypeId = VIR_Operand_GetType(pOffsetOpnd);
+    VIR_Type                   *pOffsetType = VIR_Shader_GetTypeFromId(pShader, offsetTypeId);
+    VIR_SymId                   intLodSymId = VIR_INVALID_ID;
+    VIR_SymId                   levelBaseSizeSymId = VIR_INVALID_ID, lodMinMaxSymId = VIR_INVALID_ID;
+    VIR_SymId                   newCoordSymId = VIR_INVALID_ID, sizeSymId, newOffsetSymId = VIR_INVALID_ID;
+    VIR_VirRegId                tempRegId = VIR_INVALID_ID;
+    VIR_Instruction            *inst = gcvNULL;
+    VIR_Operand                *operand = gcvNULL;
+    gctUINT                     offsetCompCount = VIR_GetTypeComponents(offsetTypeId);
+    gctBOOL                     addOffsetOnly = gcvFALSE;
+    gctBOOL                     isTexldProj = gcvFALSE;
+    gctBOOL                     isTexGather = gcvFALSE;
+
+    if (VIR_Type_isInteger(pCoordType) && VIR_Type_isInteger(pOffsetType))
+    {
+        gcmASSERT(opCode == VIR_OP_TEXLD_U);
+
+        if (HwCfg->hwFeatureFlags.hasUniversalTexldV2 &&
+            HwCfg->hwFeatureFlags.hasTexldUFix)
+        {
+            addOffsetOnly = gcvTRUE;
+        }
+    }
+
+    if (opCode == VIR_OP_TEXLDPROJ || opCode == VIR_OP_TEXLDPCFPROJ)
+    {
+        isTexldProj = gcvTRUE;
+        newCoordTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(coordTypeId),
+            VIR_GetTypeComponents(coordTypeId) - 1,
+            1);
+    }
+
+    if (VIR_Operand_hasGatherFlag(pParamOpnd))
+    {
+        isTexGather = gcvTRUE;
+    }
+
+    if (!addOffsetOnly)
+    {
+        /* Get sampler info. */
+        errCode = _GetSamplerInfo(pShader,
+            pFunc,
+            pInst,
+            &levelBaseSizeSymId,
+            &lodMinMaxSymId);
+        ON_ERROR(errCode, "Get sampler info.");
+
+        /* Get the LOD. */
+        errCode = _GetIntegerLod(pShader,
+            pFunc,
+            pInst,
+            levelBaseSizeSymId,
+            lodMinMaxSymId,
+            &intLodSymId);
+        ON_ERROR(errCode, "get integer lod failed.");
+        gcmASSERT(intLodSymId != VIR_INVALID_ID);
+    }
+
+    /* Move the coord into a new reg. */
+    tempRegId = VIR_Shader_NewVirRegId(pShader, 1);
+    errCode = VIR_Shader_AddSymbol(pShader,
+        VIR_SYM_VIRREG,
+        tempRegId,
+        VIR_Shader_GetTypeFromId(pShader, coordTypeId),
+        VIR_STORAGE_UNKNOWN,
+        &newCoordSymId);
+    CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
+
+    errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MOV,
+        coordTypeId,
+        pInst,
+        gcvTRUE,
+        &inst);
+    ON_ERROR(errCode, "Add instruction.");
+
+    /* Set Dest. */
+    operand = VIR_Inst_GetDest(inst);
+    VIR_Operand_SetTempRegister(operand,
+        pFunc,
+        newCoordSymId,
+        coordTypeId);
+    VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(coordTypeId));
+
+    /* Set Source0. */
+    operand = VIR_Inst_GetSource(inst, 0);
+    VIR_Operand_Copy(operand, pCoordOpnd);
+
+    /* If it is a projective texld, we need to div the coordinate with the q component of the coordinate. */
+    if (isTexldProj)
+    {
+        VIR_Swizzle                 swizzle;
+        VIR_Operand  *pTexldModifier = (VIR_Operand *)VIR_Inst_GetSource(pInst, 2);
+
+        if (VIR_Operand_GetTexldGather_refz(pTexldModifier))
+        {
+            errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MOV,
+                VIR_GetTypeComponentType(coordTypeId),
+                pInst,
+                gcvTRUE,
+                &inst);
+            ON_ERROR(errCode, "Add instruction.");
+
+            /* Set Dest. */
+            operand = VIR_Inst_GetDest(inst);
+            VIR_Operand_SetTempRegister(operand,
+                pFunc,
+                newCoordSymId,
+                VIR_GetTypeComponentType(coordTypeId));
+            VIR_Operand_SetEnable(operand, (VIR_Enable)(VIR_ENABLE_X << (VIR_GetTypeComponents(newCoordTypeId) - 1)));
+
+            /* Set Source0. */
+            operand = VIR_Inst_GetSource(inst, 0);
+            VIR_Operand_Copy(operand, VIR_Operand_GetTexldGather_refz(pTexldModifier));
+
+            /* Clean the drefZ. */
+            VIR_Operand_SetTexldModifier(pTexldModifier, VIR_TEXLDMODIFIER_GATHERREFZ, gcvNULL);
+            if (VIR_Operand_GetTexldModifier(pTexldModifier, VIR_TEXLDMODIFIER_GATHERCOMP) == gcvNULL)
+            {
+                VIR_Operand_ClrTexModifierFlag(pTexldModifier, VIR_TMFLAG_GATHER);
+            }
+        }
+
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_DIV,
+            newCoordTypeId,
+            pInst,
+            gcvTRUE,
+            &inst);
+        ON_ERROR(errCode, "Add instruction.");
+
+        /* Set Dest. */
+        operand = VIR_Inst_GetDest(inst);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            newCoordSymId,
+            newCoordTypeId);
+        VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(newCoordTypeId));
+
+        /* Set Source0. */
+        operand = VIR_Inst_GetSource(inst, 0);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            newCoordSymId,
+            newCoordTypeId);
+        VIR_Operand_SetSwizzle(operand, VIR_TypeId_Conv2Swizzle(newCoordTypeId));
+
+        /* Set Source1. */
+        operand = VIR_Inst_GetSource(inst, 1);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            newCoordSymId,
+            VIR_GetTypeComponentType(coordTypeId));
+        swizzle = VIR_Operand_GetSwizzle(pCoordOpnd);
+        swizzle = VIR_Swizzle_GetChannel(swizzle, 3);
+        VIR_Operand_SetSwizzle(operand, VIR_Enable_2_Swizzle_WShift((VIR_Enable)(VIR_ENABLE_X << swizzle)));
+        VIR_Operand_SetType(operand, VIR_GetTypeComponentType(coordTypeId));
+    }
+
+    /* Calculate the new coordinate value with offset. */
+    if (addOffsetOnly)
+    {
+        /* ADD: newCoord, coord, offset */
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_ADD,
+            offsetTypeId,
+            pInst,
+            gcvTRUE,
+            &inst);
+        ON_ERROR(errCode, "Add instruction.");
+
+        operand = VIR_Inst_GetDest(inst);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            newCoordSymId,
+            offsetTypeId);
+        VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(offsetTypeId));
+
+        operand = VIR_Inst_GetSource(inst, 0);
+        VIR_Operand_Copy(operand, pCoordOpnd);
+
+        operand = VIR_Inst_GetSource(inst, 1);
+        VIR_Operand_Copy(operand, pOffsetOpnd);
+    }
+    else
+    {
+        VIR_TypeId tempTypeId;
+
+        /* RSHIFT: size, levelBaseSize, LOD. */
+        tempTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_INT32, offsetCompCount, 1);
+        tempRegId = VIR_Shader_NewVirRegId(pShader, 1);
+        errCode = VIR_Shader_AddSymbol(pShader,
+            VIR_SYM_VIRREG,
+            tempRegId,
+            VIR_Shader_GetTypeFromId(pShader, tempTypeId),
+            VIR_STORAGE_UNKNOWN,
+            &sizeSymId);
+        CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
+
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_RSHIFT,
+            tempTypeId,
+            pInst,
+            gcvTRUE,
+            &inst);
+        ON_ERROR(errCode, "Add instruction.");
+
+        /* Set Dest. */
+        operand = VIR_Inst_GetDest(inst);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            sizeSymId,
+            tempTypeId);
+        VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(tempTypeId));
+
+        /* Set Source0. */
+        operand = VIR_Inst_GetSource(inst, 0);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            levelBaseSizeSymId,
+            VIR_TYPE_INTEGER_X4);
+        VIR_Operand_SetSwizzle(operand, VIR_TypeId_Conv2Swizzle(tempTypeId));
+
+        /* Set Source1. */
+        operand = VIR_Inst_GetSource(inst, 1);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            intLodSymId,
+            VIR_TYPE_INT32);
+        VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
+
+        /* MAX: size, size, 1. */
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MAX,
+            tempTypeId,
+            pInst,
+            gcvTRUE,
+            &inst);
+        ON_ERROR(errCode, "Add instruction.");
+
+        /* Set Dest. */
+        operand = VIR_Inst_GetDest(inst);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            sizeSymId,
+            tempTypeId);
+        VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(tempTypeId));
+
+        /* Set Source0. */
+        operand = VIR_Inst_GetSource(inst, 0);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            sizeSymId,
+            tempTypeId);
+        VIR_Operand_SetSwizzle(operand, VIR_TypeId_Conv2Swizzle(tempTypeId));
+
+        /* Set Source1. */
+        operand = VIR_Inst_GetSource(inst, 1);
+        VIR_Operand_SetImmediateInt(operand, 1);
+
+        /* I2F: size, size. */
+        tempTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_FLOAT32, offsetCompCount, 1);
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_CONVERT,
+            tempTypeId,
+            pInst,
+            gcvTRUE,
+            &inst);
+        ON_ERROR(errCode, "Add instruction.");
+
+        /* Set Dest. */
+        operand = VIR_Inst_GetDest(inst);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            sizeSymId,
+            tempTypeId);
+        VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(tempTypeId));
+
+        /* Set Source0. */
+        tempTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_INT32, offsetCompCount, 1);
+        operand = VIR_Inst_GetSource(inst, 0);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            sizeSymId,
+            tempTypeId);
+        VIR_Operand_SetSwizzle(operand, VIR_TypeId_Conv2Swizzle(tempTypeId));
+
+        /* I2F: newOffset, offset*/
+        tempTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_FLOAT32, offsetCompCount, 1);
+        tempRegId = VIR_Shader_NewVirRegId(pShader, 1);
+        errCode = VIR_Shader_AddSymbol(pShader,
+            VIR_SYM_VIRREG,
+            tempRegId,
+            VIR_Shader_GetTypeFromId(pShader, tempTypeId),
+            VIR_STORAGE_UNKNOWN,
+            &newOffsetSymId);
+        CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
+
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_CONVERT,
+            tempTypeId,
+            pInst,
+            gcvTRUE,
+            &inst);
+        ON_ERROR(errCode, "Add instruction.");
+
+        /* Set Dest. */
+        operand = VIR_Inst_GetDest(inst);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            newOffsetSymId,
+            tempTypeId);
+        VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(tempTypeId));
+
+        /* Set Source0. */
+        operand = VIR_Inst_GetSource(inst, 0);
+        VIR_Operand_Copy(operand, pOffsetOpnd);
+
+        /* If this offset is for textureGather, we need to clamp the offset. */
+        if (isTexGather)
+        {
+            gctFLOAT minOffset = -8.0, maxOffset = 7.0;
+
+            errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MAX,
+                tempTypeId,
+                pInst,
+                gcvTRUE,
+                &inst);
+            ON_ERROR(errCode, "Add instruction.");
+
+            /* Set Dest. */
+            operand = VIR_Inst_GetDest(inst);
+            VIR_Operand_SetTempRegister(operand,
+                pFunc,
+                newOffsetSymId,
+                tempTypeId);
+            VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(tempTypeId));
+
+            /* Set Source0. */
+            operand = VIR_Inst_GetSource(inst, 0);
+            VIR_Operand_SetImmediateFloat(operand, minOffset);
+
+            /* Set Source1. */
+            operand = VIR_Inst_GetSource(inst, 1);
+            VIR_Operand_SetTempRegister(operand,
+                pFunc,
+                newOffsetSymId,
+                tempTypeId);
+            VIR_Operand_SetSwizzle(operand, VIR_TypeId_Conv2Swizzle(tempTypeId));
+
+            errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_MIN,
+                tempTypeId,
+                pInst,
+                gcvTRUE,
+                &inst);
+            ON_ERROR(errCode, "Add instruction.");
+
+            /* Set Dest. */
+            operand = VIR_Inst_GetDest(inst);
+            VIR_Operand_SetTempRegister(operand,
+                pFunc,
+                newOffsetSymId,
+                tempTypeId);
+            VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(tempTypeId));
+
+            /* Set Source0. */
+            operand = VIR_Inst_GetSource(inst, 0);
+            VIR_Operand_SetImmediateFloat(operand, maxOffset);
+
+            /* Set Source1. */
+            operand = VIR_Inst_GetSource(inst, 1);
+            VIR_Operand_SetTempRegister(operand,
+                pFunc,
+                newOffsetSymId,
+                tempTypeId);
+            VIR_Operand_SetSwizzle(operand, VIR_TypeId_Conv2Swizzle(tempTypeId));
+        }
+
+        /* DIV: newOffset, newOffset, size. */
+        tempTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_FLOAT32, offsetCompCount, 1);
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_DIV,
+            tempTypeId,
+            pInst,
+            gcvTRUE,
+            &inst);
+        ON_ERROR(errCode, "Add instruction.");
+
+        /* Set Dest. */
+        operand = VIR_Inst_GetDest(inst);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            newOffsetSymId,
+            tempTypeId);
+        VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(tempTypeId));
+
+        /* Set Source0. */
+        operand = VIR_Inst_GetSource(inst, 0);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            newOffsetSymId,
+            tempTypeId);
+        VIR_Operand_SetSwizzle(operand, VIR_TypeId_Conv2Swizzle(tempTypeId));
+
+        /* Set Source1. */
+        operand = VIR_Inst_GetSource(inst, 1);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            sizeSymId,
+            tempTypeId);
+        VIR_Operand_SetSwizzle(operand, VIR_TypeId_Conv2Swizzle(tempTypeId));
+
+        /* ADD: newCoord, newCoord, newOffset. */
+        tempTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_TYPE_FLOAT32, offsetCompCount, 1);
+        errCode = VIR_Function_AddInstructionBefore(pFunc, VIR_OP_ADD,
+            tempTypeId,
+            pInst,
+            gcvTRUE,
+            &inst);
+        ON_ERROR(errCode, "Add instruction.");
+
+        /* Set Dest. */
+        operand = VIR_Inst_GetDest(inst);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            newCoordSymId,
+            tempTypeId);
+        VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(tempTypeId));
+
+        /* Set Source0. */
+        operand = VIR_Inst_GetSource(inst, 0);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            newCoordSymId,
+            tempTypeId);
+        VIR_Operand_SetSwizzle(operand, VIR_TypeId_Conv2Swizzle(tempTypeId));
+
+        /* Set Source1. */
+        operand = VIR_Inst_GetSource(inst, 1);
+        VIR_Operand_SetTempRegister(operand,
+            pFunc,
+            newOffsetSymId,
+            tempTypeId);
+        VIR_Operand_SetSwizzle(operand, VIR_TypeId_Conv2Swizzle(tempTypeId));
+    }
+
+    /* Update the coord operand. */
+    VIR_Operand_SetSymbol(pCoordOpnd, pFunc, newCoordSymId);
+    if (isTexldProj)
+    {
+        /* We don't need the proj after this process. */
+        VIR_Operand_SetType(pCoordOpnd, newCoordTypeId);
+        VIR_Operand_SetSwizzle(pCoordOpnd, VIR_TypeId_Conv2Swizzle(newCoordTypeId));
+        VIR_Inst_SetOpcode(pInst, (opCode == VIR_OP_TEXLDPROJ) ? VIR_OP_TEXLD : VIR_OP_TEXLDPCF);
+    }
+    else
+    {
+        VIR_Operand_SetSwizzle(pCoordOpnd, VIR_TypeId_Conv2Swizzle(coordTypeId));
+    }
+
+OnError:
+    return errCode;
+}
+
+static VSC_ErrCode
+_CalculateCoordWithOffset(
+IN      VIR_Shader       *pShader,
+IN      VSC_HW_CONFIG    *HwCfg,
+IN      VIR_Function     *pFunc,
+IN      VIR_Instruction  *pInst
+)
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_Operand                *pParamSrc = VIR_Inst_GetSource(pInst, 2);
+    VIR_Operand                *pOffsetOpnd = gcvNULL;
+    VIR_Operand  *pTexldModifier = (VIR_Operand *)pParamSrc;
+
+    /* Skip non-param operand. */
+    if (pParamSrc == gcvNULL || VIR_Operand_GetOpKind(pParamSrc) != VIR_OPND_TEXLDPARM)
+    {
+        return errCode;
+    }
+
+    /* Skip non-offset param. */
+    if (!VIR_Operand_hasOffsetFlag(pTexldModifier))
+    {
+        return errCode;
+    }
+
+    /* Get the offset operand. */
+    pOffsetOpnd = VIR_Operand_GetTexldOffset(pTexldModifier);
+
+    /* Check if we need to calculate the offset. */
+    if (_NeedToCalculateOffset(pShader, pFunc, pOffsetOpnd))
+    {
+        errCode = _CalculateOffsetCoord(pShader,
+            HwCfg,
+            pFunc,
+            pInst);
+        ON_ERROR(errCode, "Calculate offset coord");
+    }
+
+    /* Clean up the offset param. */
+    VIR_Operand_ClrTexModifierFlag(pTexldModifier, VIR_TMFLAG_OFFSET);
+    VIR_Operand_SetTexldModifier(pTexldModifier, VIR_TEXLDMODIFIER_OFFSET, gcvNULL);
+
+OnError:
+    return errCode;
+}
+
+DEF_QUERY_PASS_PROP(vscVIR_FixTexldOffset)
+{
+    pPassProp->supportedLevels = VSC_PASS_LEVEL_ML;
+}
+
+VSC_ErrCode vscVIR_FixTexldOffset(VSC_SH_PASS_WORKER* pPassWorker)
+{
+    VSC_ErrCode                 errCode = VSC_ERR_NONE;
+    VIR_Shader                 *pShader = (VIR_Shader*)pPassWorker->pCompilerParam->hShader;
+    VSC_HW_CONFIG              *pHwCfg = &pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg;
+    VIR_FuncIterator            func_iter;
+    VIR_FunctionNode           *func_node;
+
+    /* Calcuate the new coordinate with offset, if hardware doesn't support it directly. */
+    if (pHwCfg->hwFeatureFlags.supportTexldOffset)
+    {
+        return errCode;
+    }
+
+    /* Process all instructions. */
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+        func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_Function           *func = func_node->function;
+        VIR_InstIterator        inst_iter;
+        VIR_Instruction        *inst;
+
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(func));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+            inst != gcvNULL; inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
+        {
+            if (VIR_OPCODE_isTexLd(VIR_Inst_GetOpcode(inst)))
+            {
+                _CalculateCoordWithOffset(pShader, pHwCfg, func, inst);
+            }
+        }
+    }
+
+    return errCode;
+}
+
 
 

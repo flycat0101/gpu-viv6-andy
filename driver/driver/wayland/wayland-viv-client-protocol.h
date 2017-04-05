@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -43,11 +43,16 @@ struct wl_viv;
 extern const struct wl_interface wl_viv_interface;
 
 #define WL_VIV_CREATE_BUFFER    0
+#define WL_VIV_ENABLE_TILE_STATUS    1
 
 /**
  * @ingroup iface_wl_viv
  */
 #define WL_VIV_CREATE_BUFFER_SINCE_VERSION    1
+/**
+ * @ingroup iface_wl_viv
+ */
+#define WL_VIV_ENABLE_TILE_STATUS_SINCE_VERSION    1
 
 /** @ingroup iface_wl_viv */
 static inline void
@@ -74,14 +79,24 @@ wl_viv_destroy(struct wl_viv *wl_viv)
  * @ingroup iface_wl_viv
  */
 static inline struct wl_buffer *
-wl_viv_create_buffer(struct wl_viv *wl_viv, uint32_t width, uint32_t height, uint32_t stride, int32_t format, int32_t type, uint32_t node, int32_t pool, uint32_t size)
+wl_viv_create_buffer(struct wl_viv *wl_viv, uint32_t width, uint32_t height, uint32_t stride, int32_t format, int32_t type, uint32_t node, int32_t pool, uint32_t size, uint32_t tsNode, int32_t tsPool, uint32_t tsSize)
 {
     struct wl_proxy *id;
 
     id = wl_proxy_marshal_constructor((struct wl_proxy *) wl_viv,
-             WL_VIV_CREATE_BUFFER, &wl_buffer_interface, NULL, width, height, stride, format, type, node, pool, size);
+             WL_VIV_CREATE_BUFFER, &wl_buffer_interface, NULL, width, height, stride, format, type, node, pool, size, tsNode, tsPool, tsSize);
 
     return (struct wl_buffer *) id;
+}
+
+/**
+ * @ingroup iface_wl_viv
+ */
+static inline void
+wl_viv_enable_tile_status(struct wl_viv *wl_viv, struct wl_buffer *id, uint32_t enabled, uint32_t compressed, uint32_t dirty, uint32_t fc_value, uint32_t fc_value_upper)
+{
+    wl_proxy_marshal((struct wl_proxy *) wl_viv,
+             WL_VIV_ENABLE_TILE_STATUS, id, enabled, compressed, dirty, fc_value, fc_value_upper);
 }
 
 #ifdef __cplusplus

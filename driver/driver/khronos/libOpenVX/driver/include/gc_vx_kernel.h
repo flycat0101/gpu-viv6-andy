@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -47,6 +47,13 @@ VX_INTERNAL_API vx_kernel vxoKernel_GetByEnum(vx_context context, vx_enum kernel
 VX_INTERNAL_API vx_status vxoKernel_ExternalRelease(vx_kernel_ptr kernelPtr);
 
 VX_INTERNAL_CALLBACK_API void vxoKernel_Destructor(vx_reference ref);
+
+VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernelInProgramEx(
+        vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration, vx_kernel_f func_ptr,
+        vx_uint32 num_params, vx_kernel_input_validate_f input,
+        vx_kernel_output_validate_f output, vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize);
+
+VX_API_ENTRY vx_status VX_CALLBACK vxProgramKernel_Function(vx_node node, const vx_reference parameters[], vx_uint32 paramCount);
 
 EXTERN_C_END
 

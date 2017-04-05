@@ -51,6 +51,8 @@
 #define VX_RESTRICT     __restrict
 #elif defined LINUX
 #define VX_RESTRICT
+#elif defined __QNXNTO__
+#define VX_RESTRICT
 #else
 #define VX_RESTRICT     restrict
 #endif

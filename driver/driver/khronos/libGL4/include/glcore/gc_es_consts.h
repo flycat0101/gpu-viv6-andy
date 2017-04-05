@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -297,6 +297,7 @@ typedef struct __GLdeviceConstantsRec
 
     GLint maxTextureBufferSize;
     GLint textureBufferOffsetAlignment;
+
 #ifdef OPENGL40
     GLuint numberOfClipPlanes;
     GLuint maxEvalOrder;
@@ -310,6 +311,10 @@ typedef struct __GLdeviceConstantsRec
     GLuint maxClientAttribStackDepth;
     GLuint maxNameStackDepth;
     GLuint maxDrawBuffers;
+    GLuint maxGeometryVaryingComponents;
+    GLuint maxVertexVaryingComponents;
+    GLfloat pointSizeGranularity;
+    GLuint maxPixelMapTable;
 #endif
 } __GLdeviceConstants;
 

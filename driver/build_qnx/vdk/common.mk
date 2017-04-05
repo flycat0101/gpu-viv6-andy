@@ -58,15 +58,10 @@ $(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
 
 LIBS += screen $(STATIC_LIBS) GAL EGL_viv
 
-ifneq ($(filter v7, $(VARIANT_LIST)), v7)
-	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp
-	LIBS += m-vfp
-else
-	LIBS += m
-endif
+include $(qnx_build_dir)/math.mk
 
 LDFLAGS += -Wl,--version-script=$(driver_root)/sdk/vdk/libVDK.map
 
-INSTALLDIR=$(firstword $(INSTALLDIR_$(OS)) usr/lib)
+INSTALLDIR=$(firstword $(INSTALLDIR_$(OS)) usr/lib/graphics/$(PLATFORM))
 
 include $(MKFILES_ROOT)/qtargets.mk

@@ -5,6 +5,10 @@
 
 #pragma OPENCL EXTENSION  CL_VIV_asm : enable
 
+#ifndef VX_VERSION
+#define VX_VERSION 1   /* change to 2 if VX 2 APIs are implemented below */
+#endif
+
 typedef enum _VXC_FilterMode
 {
     VXC_FM_BOX      = 0,
@@ -20,7 +24,8 @@ typedef enum _VXC_FilterMode
 
 typedef enum _VXC_RoundMode
 {
-    VXC_RM_TowardZero    = 0,
+    VXC_RM_Truncate      = 0,    /* for integer truncation */
+    VXC_RM_TowardZero    = 0,    /* for floats round to zero */
     VXC_RM_TowardInf     = 1,
     VXC_RM_ToNearestEven = 2
 } vxc_round_mode;
@@ -174,153 +179,6 @@ typedef struct _vxc_half16
 
 typedef uint16 vxc_512bits;
 
-typedef struct
-{
-    size_t size;
-    global char* item;
-} vx_array_char;
-
-typedef struct
-{
-    size_t size;
-    global unsigned char* item;
-} vx_array_uchar;
-
-typedef struct
-{
-    size_t size;
-    global short* item;
-} vx_array_short;
-
-typedef struct
-{
-    size_t size;
-    global unsigned short* item;
-} vx_array_ushort;
-
-typedef struct
-{
-    size_t size;
-    global int* item;
-} vx_array_int;
-
-typedef struct
-{
-    size_t size;
-    global unsigned int* item;
-} vx_array_uint;
-
-
-typedef struct
-{
-    size_t size;
-    global float * item;
-} vx_array_float;
-
-typedef struct
-{
-    size_t size;
-    global unsigned char* item;
-} vx_lut_uchar;
-
-typedef struct
-{
-    size_t size;
-    global unsigned short* item;
-} vx_lut_ushort;
-
-typedef struct
-{
-    size_t columns;
-    size_t rows;
-    global short* matrix;
-    uint scale;
-} vx_convolution;
-
-typedef struct
-{
-    size_t columns;
-    size_t rows;
-    global char* matrix;
-} vx_matrix_char;
-
-typedef struct
-{
-    size_t columns;
-    size_t rows;
-    global unsigned char* matrix;
-} vx_matrix_uchar;
-
-typedef struct
-{
-    size_t columns;
-    size_t rows;
-    global short* matrix;
-} vx_matrix_short;
-
-typedef struct
-{
-    size_t columns;
-    size_t rows;
-    global unsigned short* matrix;
-} vx_matrix_ushort;
-
-typedef struct
-{
-    size_t columns;
-    size_t rows;
-    global int* matrix;
-} vx_matrix_int;
-
-typedef struct
-{
-    size_t columns;
-    size_t rows;
-    global unsigned int* matrix;
-} vx_matrix_uint;
-
-typedef struct
-{
-    size_t columns;
-    size_t rows;
-    global float* matrix;
-} vx_matrix_float;
-
-typedef struct
-{
-    int type;
-    uint value;
-    uint lower;
-    uint upper;
-    uint trueValue;
-    uint falseValue;
-} vx_threshold;
-
-typedef struct  {
-    int dst_width;
-    int dst_height;
-    global float* ptr;
-} vx_remap;
-
-typedef struct
-{
-    int bins;
-    int rang;
-    int offset;
-    float window_r;
-    global int* ptr;
-} vx_distribution;
-
-typedef struct _vxc_pyramid
-{
-    float scale;
-    uint width;
-    uint height;
-    uint format;
-    uint levelCount;
-    _viv_image2d_array_t  imageArray;
-} vxc_pyramid;
-
 typedef vxc_512bits VXC_512Bits;
 typedef vxc_modifier VXC_Modifier_t ;
 typedef vxc_round_mode VXC_RoundMode;
@@ -375,10 +233,20 @@ enum VXC_OP {
     VXC_OP_index_add,
     VXC_OP_vert_min3,
     VXC_OP_vert_max3,
-    VXC_OP_vert_median3,
-    VXC_OP_hori_min3,
-    VXC_OP_hori_max3,
-    VXC_OP_hori_median3,
+    VXC_OP_vert_med3,
+    VXC_OP_horz_min3,
+    VXC_OP_horz_max3,
+    VXC_OP_horz_med3,
+    VXC_OP_error,
+    OP_bit_extract,
+};
+
+enum eVXC_ERROR
+{
+    ERROR_DP2x16_NOT_SUPPORTED,
+    ERROR_IADD_NOT_SUPPORTED,
+    ERROR_SELECTADD_NOT_SUPPORTED,
+    ERROR_BITREPLACE_NOT_SUPPORTED
 };
 
 #define VXC_OP1(Op, Dest, Src0)   _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, Src0)
@@ -447,14 +315,20 @@ enum VXC_OP {
 /* make sure the immediate value offsetX and offsetY are in range of [-16, 15] */
 #define VXC_5BITOFFSET_XY(offsetX, offsetY)  ((((offsetY) & 0x1F) << 5) | ((offsetX) & 0x1F))
 
-#if !VX_USE_INTRINSIC
+/* Non-packed type image support in VX extension:
+ *   For VX1, following image types are supported :
+ *       image1d_t, image1d_array_t, image2d_t
+ *   For VX2 all image types are supported
+ *
+ * OCL image builtins can be used in VX kernel:
+ *  all samplerless image read/write builtins for supported image types
+ *  all image query functions for supported image types
+ */
 
+#if !VX_USE_INTRINSIC
 #define VXC_AbsDiff(Dest, Src0, Src1, Info)         VXC_OP3(abs_diff, Dest, Src0, Src1, Info)
-#define VXC_IAdd(Dest, Src0, Src1, Src2, Info)      VXC_OP4(iadd, Dest, Src0, Src1, Src2, Info)
 #define VXC_IAccSq(Dest, Src0, Src1, Imm, Info)     VXC_OP4(iacc_sq, Dest, Src0, Src1, Imm, Info)
 #define VXC_Lerp(Dest, Src0, Src1, Src2, Info)      VXC_OP4(lerp, Dest, Src0, Src1, Src2, Info)
-#define VXC_Filter(Dest, Src0, Src1, Src2, Info)    VXC_OP4(filter, Dest, Src0, Src1, Src2, Info)
-#define VXC_MagPhase(Dest, Src0, Src1, Info)        VXC_OP3(mag_phase, Dest, Src0, Src1, Info)
 /* MulShift: Multiples two 8- or 16-bit integers and shifts
  *
  * Syntax:
@@ -463,7 +337,10 @@ enum VXC_OP {
  * Semantics:
  *      r[i] = (a[i] * b[i]) >> Imm ;  i E [0, elem(r) )
  */
-#define VXC_MulShift(Dest, Src0, Src1, Imm, Info)   VXC_OP4(mul_shift, Dest, Src0, Src1, Imm, Info)
+#define VXC_MulShift(Dest, Src0, Src1, Imm, Info)      VXC_OP4(mul_shift, Dest, Src0, Src1, Imm, Info)
+#define VXC_Clamp(Dest, Src0, Src1, Src2, Info)        VXC_OP4(clamp, Dest, Src0, Src1, Src2, Info)
+#define VXC_AtomicAdd(Dest, Base, Offset, Data, Info)  VXC_OP4_ST(atomic_add, Dest, Base, Offset, Data, Info)
+#define VXC_BitExtract(Dest, Src0, Src1, Src2, Info)   VXC_OP4(bit_extract, Dest, Src0, Src1, Src2, Info)
 
 #define VXC_DP16x1(Dest, Src0, Src1, Info, U512)    VXC_OP4(dp16x1, Dest, Src0, Src1, Info, U512)
 #define VXC_DP8x2(Dest, Src0, Src1, Info, U512)     VXC_OP4(dp8x2, Dest, Src0, Src1, Info, U512)
@@ -474,7 +351,11 @@ enum VXC_OP {
 #define VXC_DP16x2(Dest, Src0, Src1, Info, U512)    VXC_OP4(dp16x2, Dest, Src0, Src1, Info, U512)
 #define VXC_DP8x4(Dest, Src0, Src1, Info, U512)     VXC_OP4(dp8x4,  Dest, Src0, Src1, Info, U512)
 #define VXC_DP4x8(Dest, Src0, Src1, Info, U512)     VXC_OP4(dp4x8,  Dest, Src0, Src1, Info, U512)
+#if (VX_VERSION >= 2)
+#define VXC_DP2x16(Dest, Src0, Src1, Info, U512)    VXC_OP1(error, ERROR_DP2x16_NOT_SUPPORTED)
+#else
 #define VXC_DP2x16(Dest, Src0, Src1, Info, U512)    VXC_OP4(dp2x16, Dest, Src0, Src1, Info, U512)
+#endif
 
 /* DP32 <a, b> dot c
  *  vxc_char32 a;
@@ -491,16 +372,44 @@ enum VXC_OP {
 #define VXC_DP4x8_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp4x8_b,  Dest, Src0, Src1, Src2, Info, U512)
 #define VXC_DP2x16_b(Dest, Src0, Src1, Src2, Info, U512)    VXC_OP5(dp2x16_b, Dest, Src0, Src1, Src2, Info, U512)
 
-#define VXC_Clamp(Dest, Src0, Src1, Src2, Info)        VXC_OP4(clamp, Dest, Src0, Src1, Src2, Info)
-#define VXC_BiLinear(Dest, Src0, Src1, Src2, Info)     VXC_OP4(bi_linear, Dest, Src0, Src1, Src2, Info)
-#define VXC_SelectAdd(Dest, Src0, Src1, U512, Info)    VXC_OP4(select_add, Dest, Src0, Src1, U512, Info)
-#define VXC_AtomicAdd(Dest, Base, Offset, Data, Info)  VXC_OP4_ST(atomic_add, Dest, Base, Offset, Data, Info)
-#define VXC_BitExtract(Dest, Src0, Src1, Src2, Info)   VXC_OP4(bit_extract, Dest, Src0, Src1, Src2, Info)
-#define VXC_BitReplace(Dest, Src0, Src1, Src2, Info)   VXC_OP4(bit_replace, Dest, Src0, Src1, Src2, Info)
-
-/* offset should be composed by using VXC_5BITOFFSET_XY(x, y) */
+/* packed type image data read/write: supported types are packed 8-bit/16bit integer, 16bit float */
+/* image read/write for image1d_t/image1d_array/image2d_t,
+ * offset should be composed by using VXC_5BITOFFSET_XY(x, y) */
 #define VXC_ReadImage(Dest, Image, Coord, Offset, Info)   VXC_OP4(img_load, Dest, Image, Coord, Offset, Info)
 #define VXC_WriteImage(Image, Coord, Color, Info)         VXC_OP4_NoDest(img_store, Image, Coord, Color, Info)
+
+/* image load/store for image2d_array_t,
+ * Image is a vec8 image descriptor
+ * Offset should be composed by using VXC_5BITOFFSET_XY(x, y)
+ * Coord must be type of int4 or float4
+ */
+#define VXC_ReadImage2DArray(Dest, Image, Coord, Offset, Info)       \
+    do {                                                             \
+       int8 desc;                                                    \
+       int arraySize = get_image_array_size(Image);                  \
+       _viv_asm(COPY, desc, Image, sizeof(desc));                    \
+       _viv_asm(CLAMP0MAX, Coord.w, Coord.z, desc.s4);               \
+       int baseAddr =  (int)Coord.w *desc.s5 + desc.s0;              \
+       _viv_asm(MOV, Coord.w, baseAddr);                             \
+       VXC_OP4(img_load_3d, Dest, Image, Coord.xyww, Offset, Info);  \
+    } while (0)
+#define VXC_WriteImage2DArray(Image, Coord, Color, Info)             \
+    do {                                                             \
+       int8 desc;                                                    \
+       int arraySize = get_image_array_size(Image);                  \
+       _viv_asm(COPY, desc, Image, sizeof(desc));                    \
+       _viv_asm(CLAMP0MAX, Coord.w, Coord.z, desc.s4);               \
+       int baseAddr =  (int)Coord.w *desc.s5 + desc.s0;              \
+       _viv_asm(MOV, Coord.w, baseAddr);                             \
+       VXC_OP4_NoDest(img_store_3d, Image, Coord.xyww, Color, Info); \
+    } while (0)
+
+/* image load/store for image3d_t,
+ * offset should be composed by using VXC_5BITOFFSET_XY(x, y)
+ * Coord must be type of int4 or float4
+ */
+#define VXC_ReadImage3D(Dest, Image, Coord, Offset, Info)       VXC_OP4(img_load_3d, Dest, Image, Coord, Offset, Info)
+#define VXC_WriteImage3D(Image, Coord, Color, Info)             VXC_OP4_NoDest(img_store_3d, Image, Coord, Color, Info)
 
 #define VXC_Vload2(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload2, Dest, Pointer, byteOffset); } while(0)
 #define VXC_Vload4(Dest, Pointer, Offset)    do { int byteOffset = ((int)sizeof((Dest)))*Offset; VXC_OP2(vload4, Dest, Pointer,  byteOffset); } while(0)
@@ -513,13 +422,68 @@ enum VXC_OP {
 #define VXC_Vstore16(Pointer, Offset, Data)  do { int byteOffset = ((int)sizeof((Data)))*Offset; VXC_OP3_NoDest(vstore16, Pointer, byteOffset, Data); } while(0)
 
 /* VX2 only instructions*/
-#define VXC_IndexAdd(Dest, Src0, Src1, Src2)        VXC_OP3(index_add, Dest, Src0, Src1, Src2)
-#define VXC_VertMin3(Dest, Src0, Src1, Src2)        VXC_OP3(vert_min3, Dest, Src0, Src1, Src2)
-#define VXC_VertMax3(Dest, Src0, Src1, Src2)        VXC_OP3(vert_max3, Dest, Src0, Src1, Src2)
-#define VXC_VertMed3(Dest, Src0, Src1, Src2)        VXC_OP3(vert_med3, Dest, Src0, Src1, Src2)
-#define VXC_HorzMin3(Dest, Src0)                    VXC_OP1(horz_min3, Dest, Src0)
-#define VXC_HorzMax3(Dest, Src0)                    VXC_OP1(horz_max3, Dest, Src0)
-#define VXC_HorzMed3(Dest, Src0)                    VXC_OP1(horz_med3, Dest, Src0)
+#define VXC_IndexAdd(Dest, Src0, Src1, Src2, Info)        VXC_OP4(index_add, Dest, Src0, Src1, Src2, Info)
+#define VXC_VertMin3(Dest, Src0, Src1, Src2, Info)        VXC_OP4(vert_min3, Dest, Src0, Src1, Src2, Info)
+#define VXC_VertMax3(Dest, Src0, Src1, Src2, Info)        VXC_OP4(vert_max3, Dest, Src0, Src1, Src2, Info)
+#define VXC_VertMed3(Dest, Src0, Src1, Src2, Info)        VXC_OP4(vert_med3, Dest, Src0, Src1, Src2, Info)
+#define VXC_HorzMin3(Dest, Src0, Info)                    VXC_OP2(horz_min3, Dest, Src0, Info)
+#define VXC_HorzMax3(Dest, Src0, Info)                    VXC_OP2(horz_max3, Dest, Src0, Info)
+#define VXC_HorzMed3(Dest, Src0, Info)                    VXC_OP2(horz_med3, Dest, Src0, Info)
+
+#if (VX_VERSION == 2)
+#define VXC_BiLinear(Dest, Src0, Src1, Src2, Info)                                      \
+    do {                                                                                \
+        int endBin = (Info & VXC_END_BIN_BITMASK) >> 8;                                 \
+        int roundMode = (Info & VXC_ROUNDING_MODE_BITMASK) >> 2;                        \
+        int clamp = (Info & VXC_CLAMP_BITMASK) >> 22;                                   \
+        int mod1 = VXC_MODIFIER(0, endBin + 1, 0, roundMode, clamp);                    \
+        int4 bitMask = { 0x00000000, 0x00000008, 0x00000010, 0x00000018};               \
+        vxc_uchar16 bi1;                                                                \
+        uint4 bi2;                                                                      \
+        int bi3, bi4;                                                                   \
+        VXC_Lerp(bi1, Src0, Src1, Src2.y, mod1);                                        \
+        _viv_asm(PARAM_CHAIN, bi3, bi1.x!<f:UINT>, bitMask);                            \
+        _viv_asm(PARAM_CHAIN, bi4, bi3, 8);                                             \
+        _viv_asm(INTRINSIC, bi2, OP_bit_extract, bi4);                                  \
+        VXC_Lerp(Dest, bi2!<f:UCHAR>, bi2.y!<f:UCHAR>, Src2.x, Info);                   \
+    }   while (0)
+
+#define VXC_BitReplace(Dest, Src0, Src1, Src2, Info)   /* BitReplace definition here */
+#define VXC_IAdd(Dest, Src0, Src1, Src2, Info)         /* IAdd definition here */
+#define VXC_MagPhase(Dest, Src0, Src1, Info)           /* MagPhase definition here */
+#define VXC_SelectAdd(Dest, Src0, Src1, U512, Info)    VXC_OP1(error, ERROR_SELECTADD_NOT_SUPPORTED)
+
+#define VXC_Filter_Box(Dest, Src0, Src1, Src2, Info)        /* box filter definition here */
+#define VXC_Filter_Guassian(Dest, Src0, Src1, Src2, Info)   /* Guassian filter definition here */
+#define VXC_Filter_SobelX(Dest, Src0, Src1, Src2, Info)     /* SobelX filter definition here */
+#define VXC_Filter_SobelY(Dest, Src0, Src1, Src2, Info)     /* SobelY filter definition here */
+#define VXC_Filter_ScharrX(Dest, Src0, Src1, Src2, Info)    /* ScharrX filter definition here */
+#define VXC_Filter_ScharrY(Dest, Src0, Src1, Src2, Info)    /* ScharrY filter definition here */
+#define VXC_Filter_Max(Dest, Src0, Src1, Src2, Info)        /* Max filter definition here */
+#define VXC_Filter_Min(Dest, Src0, Src1, Src2, Info)        /* Min filter definition here */
+#define VXC_Filter_Median(Dest, Src0, Src1, Src2, Info)     /* Median filter definition here */
+#define VXC_Filter(Dest, Src0, Src1, Src2, Info)       do {                                    \
+        int filter = (((Info) >> 16)&0x0F);                                                    \
+        if (filter == VXC_FM_BOX)       { VXC_Filter_Box(Dest, Src0, Src1, Src2, Info); }      \
+        if (filter == VXC_FM_Guassian)  { VXC_Filter_Guassian(Dest, Src0, Src1, Src2, Info); } \
+        if (filter == VXC_FM_SobelX)    { VXC_Filter_SobelX(Dest, Src0, Src1, Src2, Info); }   \
+        if (filter == VXC_FM_SobelY)    { VXC_Filter_SobelY(Dest, Src0, Src1, Src2, Info); }   \
+        if (filter == VXC_FM_ScharrX)   { VXC_Filter_ScharrX(Dest, Src0, Src1, Src2, Info); }  \
+        if (filter == VXC_FM_ScharrY)   { VXC_Filter_ScharrY(Dest, Src0, Src1, Src2, Info); }  \
+        if (filter == VXC_FM_Max)       { VXC_Filter_Max(Dest, Src0, Src1, Src2, Info); }      \
+        if (filter == VXC_FM_Min)       { VXC_Filter_Min(Dest, Src0, Src1, Src2, Info); }      \
+        if (filter == VXC_FM_Median)    { VXC_Filter_Median(Dest, Src0, Src1, Src2, Info); }   \
+    } while (0)
+
+#else   /* VX1 */
+
+#define VXC_BiLinear(Dest, Src0, Src1, Src2, Info)     VXC_OP4(bi_linear, Dest, Src0, Src1, Src2, Info)
+#define VXC_BitReplace(Dest, Src0, Src1, Src2, Info)   VXC_OP4(bit_replace, Dest, Src0, Src1, Src2, Info)
+#define VXC_IAdd(Dest, Src0, Src1, Src2, Info)         VXC_OP4(iadd, Dest, Src0, Src1, Src2, Info)
+#define VXC_MagPhase(Dest, Src0, Src1, Info)           VXC_OP3(mag_phase, Dest, Src0, Src1, Info)
+#define VXC_SelectAdd(Dest, Src0, Src1, U512, Info)    VXC_OP4(select_add, Dest, Src0, Src1, U512, Info)
+#define VXC_Filter(Dest, Src0, Src1, Src2, Info)       VXC_OP4(filter, Dest, Src0, Src1, Src2, Info)
+#endif
 
 #else
 
@@ -775,8 +739,6 @@ _EXT_ vxc_float2  viv_intrinsic_vx_icastD_f(vxc_int2 a)  _RET0_
         (uint)((S0) << 0  | (S1) << 4  | (S2) << 8  | (S3) << 12 |  \
                (S4) << 16 | (S5) << 20 | (S6) << 24 | (S7) << 28  )
 
-
-/* samplerless image read */
 
 _EXT_ vxc_char16  viv_intrinsic_vx_read_imagec   (image2d_t image, int2 coord) _RET0_
 _EXT_ vxc_uchar16 viv_intrinsic_vx_read_imageuc  (image2d_t image, int2 coord) _RET0_
@@ -1444,6 +1406,152 @@ void viv_intrinsic_vx_vstore16(vxc_half16 Data, size_t Offset, half * Pointer)  
 #endif
 
 #endif
+typedef struct
+{
+    size_t size;
+    global char* item;
+} vx_array_char;
+
+typedef struct
+{
+    size_t size;
+    global unsigned char* item;
+} vx_array_uchar;
+
+typedef struct
+{
+    size_t size;
+    global short* item;
+} vx_array_short;
+
+typedef struct
+{
+    size_t size;
+    global unsigned short* item;
+} vx_array_ushort;
+
+typedef struct
+{
+    size_t size;
+    global int* item;
+} vx_array_int;
+
+typedef struct
+{
+    size_t size;
+    global unsigned int* item;
+} vx_array_uint;
+
+
+typedef struct
+{
+    size_t size;
+    global float * item;
+} vx_array_float;
+
+typedef struct
+{
+    size_t size;
+    global unsigned char* item;
+} vx_lut_uchar;
+
+typedef struct
+{
+    size_t size;
+    global unsigned short* item;
+} vx_lut_ushort;
+
+typedef struct
+{
+    size_t columns;
+    size_t rows;
+    global short* matrix;
+    uint scale;
+} vx_convolution;
+
+typedef struct
+{
+    size_t columns;
+    size_t rows;
+    global char* matrix;
+} vx_matrix_char;
+
+typedef struct
+{
+    size_t columns;
+    size_t rows;
+    global unsigned char* matrix;
+} vx_matrix_uchar;
+
+typedef struct
+{
+    size_t columns;
+    size_t rows;
+    global short* matrix;
+} vx_matrix_short;
+
+typedef struct
+{
+    size_t columns;
+    size_t rows;
+    global unsigned short* matrix;
+} vx_matrix_ushort;
+
+typedef struct
+{
+    size_t columns;
+    size_t rows;
+    global int* matrix;
+} vx_matrix_int;
+
+typedef struct
+{
+    size_t columns;
+    size_t rows;
+    global unsigned int* matrix;
+} vx_matrix_uint;
+
+typedef struct
+{
+    size_t columns;
+    size_t rows;
+    global float* matrix;
+} vx_matrix_float;
+
+typedef struct
+{
+    int type;
+    uint value;
+    uint lower;
+    uint upper;
+    uint trueValue;
+    uint falseValue;
+} vx_threshold;
+
+typedef struct  {
+    int dst_width;
+    int dst_height;
+    global float* ptr;
+} vx_remap;
+
+typedef struct
+{
+    int bins;
+    int rang;
+    int offset;
+    float window_r;
+    global int* ptr;
+} vx_distribution;
+
+typedef struct _vxc_pyramid
+{
+    float scale;
+    uint width;
+    uint height;
+    uint format;
+    uint levelCount;
+    _viv_image2d_array_t  imageArray;
+} vxc_pyramid;
 
 #endif /* _VIV_VX_EXTENSION */
 

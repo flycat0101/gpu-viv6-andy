@@ -1,0 +1,76 @@
+#include "cl_viv_vx_ext.h"
+
+_viv_uniform VXC_512Bits UniPackData2x8_even;
+_viv_uniform VXC_512Bits UniPackData2x8_odd;
+_viv_uniform unsigned int src_inxSize;
+_viv_uniform unsigned int src_inySize;
+_viv_uniform unsigned int src_inzSize;
+_viv_uniform unsigned int dst_xSize;
+_viv_uniform unsigned int dst_ySize;
+_viv_uniform unsigned int dst_zSize;
+__kernel void fasterrcnnreshuffledataVXC
+    (
+    __read_only image2d_t 	in_image,
+    global int              *levelScalar,
+    global int              *strideX,
+    global int              *strideY,
+    global int              *batchSize,
+    global int              *networkType,
+    __write_only image2d_t 	out_image
+    )
+{
+    int2 coord_in = (int2)(get_global_id(0), get_global_id(1));
+    int2 posin = (int2)(coord_in.x, (coord_in.y * src_inySize));
+    int offset_y = coord_in.y * dst_ySize * 4;
+    int loop_count = (src_inySize  >> 1);
+    int count = 0;
+
+    int2 posout0 = (int2)((coord_in.x >> 1) + 1, offset_y + 1);
+    int2 posout1 = (int2)(posout0.x, posout0.y + dst_ySize);
+    int2 posout2 = (int2)(posout0.x, posout1.y + dst_ySize);
+    int2 posout3 = (int2)(posout0.x, posout2.y + dst_ySize);
+
+    vxc_short8 img_inL10;//src image fp16
+    vxc_short8 img_inL11;
+    vxc_short8 img_inL20;
+    vxc_short8 img_inL21;
+    vxc_short8 dst_ValS16;
+
+#if 1
+    for (count = 0; count < loop_count; count++)
+    {
+        //read image fp16
+        VXC_ReadImage(img_inL10, in_image, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(img_inL11, in_image, posin, VXC_5BITOFFSET_XY(8,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(img_inL20, in_image, posin, VXC_5BITOFFSET_XY(0,1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(img_inL21, in_image, posin, VXC_5BITOFFSET_XY(8,1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        posin.y +=2;
+        //pack pos0 data and output to posout0
+        VXC_DP2x8(dst_ValS16, img_inL10, img_inL11, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniPackData2x8_even);
+        VXC_WriteImage(out_image, posout0, dst_ValS16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        //pack pos1 data and output to posout1
+        VXC_DP2x8(dst_ValS16, img_inL10, img_inL11, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniPackData2x8_odd);
+        VXC_WriteImage(out_image, posout1, dst_ValS16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        //pack pos2 data and output to posout2
+        VXC_DP2x8(dst_ValS16, img_inL20, img_inL21, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniPackData2x8_even);
+        VXC_WriteImage(out_image, posout2, dst_ValS16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        //pack pos3 data and output to posout3
+        VXC_DP2x8(dst_ValS16, img_inL20, img_inL21, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniPackData2x8_odd);
+        VXC_WriteImage(out_image, posout3, dst_ValS16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        posout0.y +=1;
+        posout1.y +=1;
+        posout2.y +=1;
+        posout3.y +=1;
+    }
+    //src_inySize is odd
+    if ((count == loop_count) && ((src_inySize % 2) ==1))
+    {
+        VXC_ReadImage(img_inL10, in_image, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_ReadImage(img_inL11, in_image, posin, VXC_5BITOFFSET_XY(8,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_DP2x8(dst_ValS16, img_inL10, img_inL11, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniPackData2x8_even);
+        VXC_WriteImage(out_image, posout0, dst_ValS16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+        VXC_DP2x8(dst_ValS16, img_inL10, img_inL11, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), UniPackData2x8_odd);
+        VXC_WriteImage(out_image, posout1, dst_ValS16, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    }
+#endif
+}

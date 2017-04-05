@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -3955,7 +3955,7 @@ _EmitSourceWithModifiers(
     }
 
     /* Unsupported currently. */
-    if(SourceModifiers->modifiers[sleASM_MODIFIER_OPND_NEG].value != -1)
+    if (SourceModifiers && SourceModifiers->modifiers[sleASM_MODIFIER_OPND_NEG].value != -1)
     {
         /*
         *source = gcmSL_SOURCE_SET(*source, Neg, 1);
@@ -3963,7 +3963,7 @@ _EmitSourceWithModifiers(
     }
 
     /* Unsupported currently. */
-    if(SourceModifiers->modifiers[sleASM_MODIFIER_OPND_ABS].value != -1)
+    if (SourceModifiers && SourceModifiers->modifiers[sleASM_MODIFIER_OPND_ABS].value != -1)
     {
         /*
         *source = gcmSL_SOURCE_SET(*source, Abs, 1);
@@ -4993,7 +4993,17 @@ _PrepareAnotherSource(
                 || (Source1->type == gcvSOURCE_TEMP
                     && Target->tempRegIndex == Source1->u.sourceReg.regIndex));
         }
+        {
+            gctBOOL     useFullNewLinker = gcvFALSE;
+            gctBOOL     hasHalti2 = gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2));
 
+            useFullNewLinker = gcUseFullNewLinker(hasHalti2);
+
+            if (useFullNewLinker && insertAssign)
+            {
+                insertAssign = gcvFALSE;
+            }
+        }
         if (insertAssign)
         {
             status = _MakeNewSource(Compiler,
@@ -6086,23 +6096,46 @@ _EmitScalarFloatOrIntToBoolCode(
     IN gcsSOURCE * Source
     )
 {
-    gceSTATUS    status;
-    gctLABEL    endLabel;
-    gcsSOURCE    constSource;
+    gceSTATUS       status;
+    gctLABEL        endLabel;
+    gcsSOURCE       constSource;
+    gcsSOURCE       newSource;
+    gcsSOURCE       falseSource;
 
     gcmHEADER();
 
-    endLabel    = slNewLabel(Compiler);
+    endLabel = slNewLabel(Compiler);
 
-    /* jump end if !(source) */
-    status = slEmitTestBranchCode(Compiler,
-                      LineNo,
-                      StringNo,
-                      slvOPCODE_JUMP,
-                      endLabel,
-                      gcvFALSE,
-                      Source);
+    status = _PrepareSource(Compiler,
+                            LineNo,
+                            StringNo,
+                            gcvNULL,
+                            Source,
+                            &newSource);
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
+    /* Make sure that source0 and source1 have the same data type. */
+    if (Source->dataType == gcSHADER_FLOAT_X1)
+    {
+        gcsSOURCE_InitializeFloatConstant(&falseSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvFALSE));
+    }
+    else
+    {
+        gcsSOURCE_InitializeIntConstant(&falseSource, gcSHADER_PRECISION_MEDIUM, 0);
+#if TREAT_ES20_INTEGER_AS_FLOAT
+        gcsSOURCE_InitializeFloatConstant(&falseSource, gcSHADER_PRECISION_MEDIUM, slmB2F(gcvFALSE));
+#endif
+    }
+
+    status = _EmitBranchCode(
+                        Compiler,
+                        LineNo,
+                        StringNo,
+                        _ConvOpcode(slvOPCODE_JUMP),
+                        gcSL_EQUAL,
+                        endLabel,
+                        &newSource,
+                        &falseSource);
     if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     /* mov target, true */

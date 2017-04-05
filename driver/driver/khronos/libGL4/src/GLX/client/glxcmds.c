@@ -67,11 +67,7 @@ static const char *__glXGLXClientExtensions = __glXGLXDefaultClientExtensions;
  *              to be retrieved.
  * \returns A pointer to the GLX per-screen data if \c dpy and \c scrn
  *          specify a valid GLX screen, or NULL otherwise.
- *
- * \todo Should this function validate that \c scrn is within the screen
- *       number range for \c dpy?
  */
-
 static __GLXscreenConfigs *
 GetGLXScreenConfigs(Display *dpy, int scrn)
 {
@@ -144,16 +140,6 @@ ValidateGLXFBConfig( Display * dpy, GLXFBConfig config )
     return NULL;
 }
 
-/**
- * \todo It should be possible to move the allocate of \c client_state_private
- * later in the function for direct-rendering contexts.  Direct-rendering
- * contexts don't need to track client state, so they don't need that memory
- * at all.
- *
- * \todo Eliminate \c __glXInitVertexArrayState.  Replace it with a new
- * function called \c __glXAllocateClientState that allocates the memory and
- * does all the initialization (including the pixel pack / unpack).
- */
 static
 GLXContext AllocateGLXContext( Display *dpy )
 {
@@ -2422,6 +2408,11 @@ int GLX_PREFIX(glXChannelRectSyncSGIX)(Display *dpy, int screen, int channel, GL
    return 0;
 }
 
+int GLX_PREFIX(glXSwapInterval)(int interval)
+{
+   return 1;
+}
+
 /* strdup() is actually not a standard ANSI C or POSIX routine.
  * Irix will not define it if ANSI mode is in effect.
  */
@@ -2526,6 +2517,8 @@ static struct name_address_pair GLX_functions[] = {
     GLX_FUNCTION( glXQueryChannelRectSGIX ),
     GLX_FUNCTION( glXQueryChannelDeltasSGIX ),
     GLX_FUNCTION( glXChannelRectSyncSGIX ),
+    GLX_FUNCTION2( glXSwapIntervalSGI, glXSwapInterval ),
+    GLX_FUNCTION2( glXSwapIntervalMESA, glXSwapInterval ),
 
     { NULL, NULL }   /* end of list */
 };

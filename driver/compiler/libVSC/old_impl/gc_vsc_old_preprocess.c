@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -386,7 +386,7 @@ _gcPreprocessHeplerInvocation(
 
         tempIdx = gcSHADER_NewTempRegs(FragmentShader, 1, gcSHADER_FLOAT_X1);
 
-        if (gcoHAL_IsFeatureAvailable1(NULL, gcvFEATURE_HELPER_INVOCATION))
+        if (gcHWCaps.hwFeatureFlags.supportHelperInv)
         {
             setCode->opcode = gcSL_SET;
             setCode->temp = gcmSL_TARGET_SET(0, Format, gcSL_BOOLEAN)  |
@@ -1325,7 +1325,7 @@ _UpdateLastFragData(
     Shader->useLastFragData = gcvTRUE;
 
     /* Update gl_LastFragData by using a image if hardware can't support it. */
-    if (!gcoHAL_IsFeatureAvailable1(NULL, gcvFEATURE_PSIO_INTERLOCK))
+    if (!gcHWCaps.hwFeatureFlags.hasPSIOInterlock)
     {
         return status;
     }
@@ -1731,8 +1731,12 @@ _gcLinkBuiltinLibs(
 
     for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i ++)
     {
+        if (!Shaders[i])
+        {
+            continue;
+        }
 #if DX_SHADER
-        if (Shaders[i] && GetShaderHasIntrinsicBuiltin(Shaders[i]))
+        if (GetShaderHasIntrinsicBuiltin(Shaders[i]))
         {
             gcSHADER libBinary = gcvNULL;
 
@@ -1752,12 +1756,9 @@ _gcLinkBuiltinLibs(
         }
 #else
         /* Do some works which use built-in functions. */
-        if (Shaders[i])
-        {
-            gcmONERROR(_PreprocessLinkBuiltinLibs(Shaders[i]));
-        }
+        gcmONERROR(_PreprocessLinkBuiltinLibs(Shaders[i]));
 
-        if (Shaders[i] && GetShaderNeedPatchForCentroid(Shaders[i]))
+        if (GetShaderNeedPatchForCentroid(Shaders[i]))
         {
             status = gcSHADER_PatchCentroidVaryingAsCenter(Shaders[i]);
 
@@ -1770,7 +1771,7 @@ _gcLinkBuiltinLibs(
             SetShaderNeedPatchForCentroid(Shaders[i], gcvFALSE);
         }
 
-        if (Shaders[i] && GetShaderHasIntrinsicBuiltin(Shaders[i]))
+        if (GetShaderHasIntrinsicBuiltin(Shaders[i]))
         {
             gcSHADER libBinary = gcvNULL;
             gcLibType libType = gcLIB_BUILTIN;
@@ -1812,7 +1813,7 @@ _gcLinkBuiltinLibs(
         }
 #endif
 
-        if (Shaders[i] && gceLAYOUT_QUALIFIER_HasHWNotSupportingBlendMode(GetShaderOutputBlends(Shaders[i])))
+        if (gceLAYOUT_QUALIFIER_HasHWNotSupportingBlendMode(GetShaderOutputBlends(Shaders[i])))
         {
             gcSHADER libBinary = gcvNULL;
 
@@ -1842,10 +1843,7 @@ _gcLinkBuiltinLibs(
         }
 
         /* After link all built-in functions, analyze them. */
-        if (Shaders[i])
-        {
-            gcSHADER_AnalyzeFunctions(Shaders[i], gcvFALSE);
-        }
+        gcSHADER_AnalyzeFunctions(Shaders[i], gcvFALSE);
     }
 
 OnError:
@@ -1857,7 +1855,7 @@ gceLAYOUT_QUALIFIER_HasHWNotSupportingBlendMode(
     IN gceLAYOUT_QUALIFIER Qualifier
     )
 {
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_ADVANCED_BLEND_MODE_PART0))
+    if (gcHWCaps.hwFeatureFlags.supportAdvBlendPart0)
     {
         return Qualifier & gcvLAYOUT_QUALIFIER_BLEND_HW_UNSUPPORT_EQUATIONS_PART0;
     }
@@ -2532,10 +2530,8 @@ _findVexterInstIDTemp(
         gctINT vertexInstIDTemp = _getUnusedTempIndex(Shader, 1);
         gctINT16 varIndex = -1;
         gctINT size = 1;
-        gcSHADER_TYPE  vertexInstIDType =
-            gcoHAL_IsFeatureAvailable1(gcvNULL,
-                                       gcvFEATURE_VERTEX_INST_ID_AS_INTEGER) == gcvSTATUS_TRUE ?
-                                       gcSHADER_INTEGER_X1 : gcSHADER_FLOAT_X1;
+        gcSHADER_TYPE  vertexInstIDType = gcHWCaps.hwFeatureFlags.vtxInstanceIdAsInteger?
+                                            gcSHADER_INTEGER_X1 : gcSHADER_FLOAT_X1;
 
         gcSHADER_AddVariableEx(Shader,
                                (vtxOrInstIdName == gcSL_VERTEX_ID) ? "#VertexID" : "#InstanceID",
@@ -2608,7 +2604,7 @@ _getVertexIDTemp(
     ** If FE don't reset vertexID when a new instance start,
     ** then we don't need to evaluate the vertexID.
     */
-    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_FE_START_VERTEX_SUPPORT))
+    if (!gcHWCaps.hwFeatureFlags.supportStartVertexFE)
     {
         return vertexIDTemp1;
     }
@@ -3028,7 +3024,7 @@ _gcAddVertexAndInstanceIdPatch(
     }
 
     /* 2. Convert vertexID/instanceID if needed. */
-    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VERTEX_INST_ID_AS_ATTRIBUTE))
+    if (!gcHWCaps.hwFeatureFlags.vtxInstanceIdAsAttr)
     {
         addCodeCount = 0;
         if (needXFB)
@@ -3108,8 +3104,8 @@ _gcAddVertexAndInstanceIdPatch(
     }
 
     /* 3. Add patch at the entry of shader */
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI0) &&
-        !gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_FE_START_VERTEX_SUPPORT) &&
+    if (gcHWCaps.hwFeatureFlags.hasHalti0 &&
+        !gcHWCaps.hwFeatureFlags.supportStartVertexFE &&
         bVertexIdUsed && vtxIdVariable)
     {
         gcmONERROR(gcSHADER_InsertNOP2BeforeCode(VertexShader, mainEnter, 2, gcvTRUE, gcvTRUE));
@@ -3182,14 +3178,12 @@ gcDoPreprocess(
     )
 {
     gceSTATUS               status = gcvSTATUS_OK;
-    gcePATCH_ID             patchId = gcvPATCH_INVALID;
+    gcePATCH_ID             patchId = gcPatchId;
     gcSHADER                shader;
     gcSHADER_KIND           shaderType;
     gctBOOL                 isRecompiler = Flags & gcvSHADER_RECOMPILER;
     gctBOOL                 packMainFunction;
     gctUINT                 i;
-
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
 
     /* if there is intrinsic builtin functions,
        compile the builtin libary and
@@ -3209,11 +3203,11 @@ gcDoPreprocess(
         if (shaderType == gcSHADER_TYPE_VERTEX)
         {
             gctBOOL needVertexIDReversePatch
-                = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_FE_START_VERTEX_SUPPORT)
+                = gcHWCaps.hwFeatureFlags.supportStartVertexFE
                 ? gcvTRUE
                 : gcvFALSE;
 
-            gctBOOL hwTFBsupport = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HW_TFB);
+            gctBOOL hwTFBsupport = gcHWCaps.hwFeatureFlags.supportStreamOut;
 
             /* Do vertexId patch */
             if (!isRecompiler)

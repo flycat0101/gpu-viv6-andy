@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2016 Vivante Corporation
+*    Copyright (c) 2014 - 2017 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2016 Vivante Corporation
+*    Copyright (C) 2014 - 2017 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -91,6 +91,7 @@ gckKERNEL_NewDatabase(
 {
     gceSTATUS status;
     gcsDATABASE_PTR database;
+    gctPOINTER pointer = gcvNULL;
     gctBOOL acquired = gcvFALSE;
     gctSIZE_T slot;
     gcsDATABASE_PTR existingDatabase;
@@ -124,8 +125,6 @@ gckKERNEL_NewDatabase(
     }
     else
     {
-        gctPOINTER pointer = gcvNULL;
-
         /* Allocate a new database from the heap. */
         gcmkONERROR(gckOS_Allocate(Kernel->os,
                                    gcmSIZEOF(gcsDATABASE),
@@ -156,6 +155,11 @@ gckKERNEL_NewDatabase(
     return gcvSTATUS_OK;
 
 OnError:
+    if (pointer)
+    {
+        gcmkOS_SAFE_FREE(Kernel->os, pointer);
+    }
+
     if (acquired)
     {
         /* Release the database mutex. */
@@ -1410,7 +1414,6 @@ gckKERNEL_DestroyProcessDB(
             {
                 if (gcmIS_SUCCESS(status) && (gcvTRUE == asynchronous))
                 {
-                    /* TODO: we maybe need to schedule a event here */
                     status = gckVIDMEM_Unlock(record->kernel,
                                               nodeObject,
                                               nodeObject->type,
@@ -1451,7 +1454,6 @@ gckKERNEL_DestroyProcessDB(
             break;
 
         case gcvDB_CONTEXT:
-            /* TODO: Free the context */
             status = gckCOMMAND_Detach(record->kernel->command, gcmNAME_TO_PTR(record->data));
             gcmRELEASE_NAME(record->data);
 
@@ -1473,7 +1475,6 @@ gckKERNEL_DestroyProcessDB(
             break;
 
         case gcvDB_MAP_USER_MEMORY:
-            /* TODO: Unmap user memory. */
             status = gckOS_UnmapUserMemory(Kernel->os,
                                            Kernel->core,
                                            record->physical,

@@ -287,6 +287,10 @@ enum vx_kernel_e {
     VX_KERNEL_HALFSCALE_GAUSSIAN = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x29,
 
     /* insert new kernels here */
+    VX_KERNEL_CNN = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x2A,
+
+    VX_KERNEL_FASTER_RCNN = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x2B,
+
     VX_KERNEL_MAX_1_0, /*!< \internal Used for bounds checking in the conformance test. */
 };
 

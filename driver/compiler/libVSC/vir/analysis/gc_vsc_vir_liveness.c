@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -510,8 +510,8 @@ static void _Liveness_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
                                     pInst);
 
          /* Emit has implicit usage for all outputs, so we also gen these */
-        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT ||
-            VIR_Inst_GetOpcode(pInst) == VIR_OP_AQ_EMIT)
+        if (VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT0 ||
+            VIR_Inst_GetOpcode(pInst) == VIR_OP_EMIT)
         {
             _Update_Liveness_Local_Gen_All_Outputs(pDuInfo,
                                                    pGenFlow,

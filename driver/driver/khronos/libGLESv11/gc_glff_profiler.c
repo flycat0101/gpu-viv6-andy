@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -744,9 +744,8 @@ _glffProfiler_NEW_Set(
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Context=0x%x, Enum=%d, Value=0x%x", Context, Enum, Value);
-    gcmASSERT(Context);
 
-    if (!profiler->enable)
+    if (Context == gcvNULL || !profiler->enable)
     {
         gcmFOOTER_ARG("return=%d", GL_FALSE);
         return GL_FALSE;

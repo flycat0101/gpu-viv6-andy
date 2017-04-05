@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -848,7 +848,7 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
         }
         else if (Surface->format == gcvSURF_S8)
         {
-            gcmPRINT("TODO:partial fast clear for S8");
+            gcmPRINT("TODO: partial fast clear for S8");
         }
 
         if (bailOut)
@@ -860,7 +860,6 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
 
     if (!Surface->superTiled)
     {
-        /* TODO: only support supertiled surface for now. */
         status = gcvSTATUS_NOT_SUPPORTED;
         goto OnError;
     }
@@ -971,11 +970,6 @@ gcoHARDWARE_ClearTileStatusWindowAligned(
 
         if (gcmIS_ERROR(status))
         {
-            /*
-             * TODO: refine this check.
-             * The unaligned areas will be cleared with 3D draw. If surface is
-             * not renderable, return not supported.
-             */
             status = gcvSTATUS_NOT_SUPPORTED;
             goto OnError;
         }

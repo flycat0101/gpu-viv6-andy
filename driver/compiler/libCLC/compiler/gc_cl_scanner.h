@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -317,6 +317,20 @@ char *msg
 #endif
 #ifndef YY_MAIN
 #define YY_MAIN 0
+#endif
+
+#ifndef NULL
+#define NULL ((void *)0)
+#endif
+#ifndef EOF
+#define EOF     (-1)
+#endif
+#if !defined(UNDER_CE) || UNDER_CE >=800
+#define FILE    void
+#define stdin   NULL
+#define stdout  NULL
+#else
+typedef void FILE;
 #endif
 
 #endif /* __gc_cl_scanner_h_ */

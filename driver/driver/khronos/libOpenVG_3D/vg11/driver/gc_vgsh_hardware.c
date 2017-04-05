@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -590,7 +590,6 @@ gceSTATUS _LoadIndices(_vgHARDWARE *hardware, _VGIndexBuffer *indexBuffer)
                 gcoINDEX_Construct(hardware->core.hal,
                                    &indexBuffer->index));
 
-            /*TODO: since hal API can not support the video memory allocation alignemnt, so use the lock memory to substitute*/
             /* for the vgmark11 flash performance */
 #if gcdDUMP || defined _DUMP_FILE
             gcmERR_BREAK(
@@ -656,7 +655,6 @@ gceSTATUS _LoadVertexs(_vgHARDWARE *hardware, _VGVertexBuffer *vertexBuffer)
                 gcoSTREAM_Construct(hardware->core.hal,
                                     &vertexBuffer->stream));
 
-            /*TODO: since hal API can not support the video memory allocation alignemnt, so use the lock memory to substitute*/
             /* for the vgmark11 flash performance */
 #if gcdDUMP || defined _DUMP_FILE
             gcmERR_BREAK(gcoSTREAM_Upload(
@@ -1610,7 +1608,7 @@ gceSTATUS SetUniform_ProjectionMatrix(_vgHARDWARE *hardware, gcUNIFORM uniform)
 
 gceSTATUS SetUniform_GradientMatrix(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
-    /* TODO: need to optimize */
+    /* VIV: [todo] need to optimize */
     gctINT32 width, height;
     gctFLOAT galMatrix[16];
     _VGMatrix3x3 matrix;
@@ -2970,7 +2968,7 @@ static gceSTATUS _GenColorConvertCodeEx(_VGShader *Shader, gctUINT16 color, gctU
             /* no need to process the pre/unpre*/
             break;
         }
-        /* TODO: need to optimize */
+        /* VIV: [todo] need to optimize */
         gcmERR_BREAK(_GenUnPreMultiColorCode(Shader, color, alphaConvert));
 
         /*
@@ -3922,7 +3920,7 @@ static gceSTATUS _GenPathImageFragmentCode(_vgHARDWARE *hardware)
             else
             {
 
-                /* TODO:  do more opitimize */
+                /* VIV: [todo] do more opitimize */
                 vgmDEFINE_ALLOCATE_VARYING(a2, X4, 1);
                 vgmDEFINE_ALLOCATE_UNIFORM(TexBound, X4, 3);
                 vgmDEFINE_ALLOCATE_SAMPLER(PatternSampler, SAMPLER_2D, 1);
@@ -4607,7 +4605,7 @@ static gceSTATUS _GenColorRampVertexCode(_vgHARDWARE *hardware)
 
         if ((hardware->drawPipe == vgvDRAWPIPE_CLEAR)  && hardware->scissoring)
         {
-            /* TODO:can use uniform to pass in, map to 0.0f - 1.0f */
+            /* VIV: [todo] can use uniform to pass in, map to 0.0f - 1.0f */
             vgmDEFINE_ALLOCATE_OUTPUT_VARYING(texCoord, "texCoord", X2, 1);
             vgmDEFINE_ALLOCATE_TEMP(temp1);
 
@@ -4998,7 +4996,7 @@ static gceSTATUS _GenFilterVertexCode(_vgHARDWARE *hardware)
         if (hardware->scissoring && (hardware->filterType == vgvFILTER_COPY))
         {
 
-            /* TODO:can use uniform to pass in, map to 0.0f - 1.0f */
+            /* VIV: [todo] can use uniform to pass in, map to 0.0f - 1.0f */
             vgmDEFINE_ALLOCATE_OUTPUT_VARYING(texCoord, "texCoord", X2, 1);
             vgmDEFINE_ALLOCATE_TEMP(temp0);
 
@@ -6756,7 +6754,7 @@ static gceSTATUS _EnableAttributes(_vgHARDWARE *hardware)
             y1 = y1 / (gctFLOAT)ancHeight   * 2.0f - 1.0f;
 
 
-            /* TODO: opitimize */
+            /* VIV: [todo] opitimize */
             if (hardware->rectStream != gcvNULL)
             {
                 gcmVERIFY_OK(gcoSTREAM_Destroy(hardware->rectStream));

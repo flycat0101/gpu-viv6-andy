@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -194,6 +194,7 @@ typedef enum _gleFS_UNIFORMS
     glmUNIFORM_INDEX(FS, uPixelTransferScale),
     glmUNIFORM_INDEX(FS, uPixelTransferBias),
     glmUNIFORM_INDEX(FS, uTextureBorderColor),
+    glmUNIFORM_INDEX(FS, uYmajor),
     glvUNIFORM_FS_COUNT
 }
 gleFS_UNIFORMS;

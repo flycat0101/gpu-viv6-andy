@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -71,7 +71,24 @@ typedef enum _VSC_RES_OP_BIT
     VSC_RES_OP_BIT_FETCH_MS    = 0x0200,
     VSC_RES_OP_BIT_GATHER      = 0x0400,
     VSC_RES_OP_BIT_GATHER_PCF  = 0x0800,
+    VSC_RES_OP_LODQ            = 0x1000,
 }VSC_RES_OP_BIT;
+
+typedef enum _VSC_RES_ACT_BIT
+{
+    VSC_RES_ACT_BIT_EXTRA_SAMPLER                      = 0x0001,
+    VSC_RES_ACT_BIT_REPLACE_SAMPLER_WITH_IMAGE_UNIFORM = 0x0002,
+}VSC_RES_ACT_BIT;
+
+typedef enum _VSC_LINK_POINT_RESOURCE_SUBTYPE
+{
+    VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER              = 1,
+    VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGRAD_EXTRA_LATYER            = 2,
+    VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXFETCH_REPLACE_WITH_IMGLD     = 3,
+    VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER          = 4,
+    VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHERPCF_D32F               = 5,
+    VSC_LINK_POINT_RESOURCE_SUBTYPE_NORMALIZE_TEXCOORD              = 6,
+} VSC_LINK_POINT_RESOURCE_SUBTYPE;
 
 typedef struct _VSC_LIB_LINK_POINT_FUNC_NAME
 {
@@ -90,6 +107,8 @@ typedef struct _VSC_LIB_LINK_POINT_RESOURCE
     gctUINT                           binding;
     gctUINT                           arrayIndex;
     VSC_RES_OP_BIT                    opTypeBits;
+    VSC_RES_ACT_BIT                   actBits;
+    VSC_LINK_POINT_RESOURCE_SUBTYPE   subType;
 } VSC_LIB_LINK_POINT_RESOURCE;
 
 typedef struct _VSC_LIB_LINK_POINT

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -251,6 +251,36 @@ OnError:
     return status;
 }
 
+gceSTATUS
+gcoCL_SaveContext(
+    OUT gcoHARDWARE *Hardware
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
+    gcmVERIFY_ARGUMENT(Hardware != gcvNULL);
+    gcmONERROR(gcoHARDWARE_Get3DHardware(Hardware));
+    gcmONERROR(gcoHARDWARE_Set3DHardware(gcvNULL));
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoCL_RestoreContext(
+    IN gcoHARDWARE Hardware
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
+
+    gcmONERROR(gcoHARDWARE_Set3DHardware(Hardware));
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
 /**********************************************************************
 **
 **  gcoCL_SetHardware
@@ -295,7 +325,19 @@ OnError:
     gcmFOOTER();
     return status;
 #else
-    return gcoCL_InitializeHardware();
+    gceSTATUS   status;
+    gcoHARDWARE savedHardware = gcvNULL;
+
+    gcmHEADER();
+
+    gcmONERROR(gcoCL_SaveContext(&savedHardware));
+    gcmONERROR(gcoCL_InitializeHardware());
+
+OnError:
+    gcmONERROR(gcoCL_RestoreContext(savedHardware));
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
 #endif
 }
 
@@ -1170,8 +1212,6 @@ gcoCL_SetupTexture(
 
     info.s = info.t = info.r = AddressMode;
     info.magFilter = info.minFilter = FilterMode;
-    /* Mipmap is not supported. */
-    /* TODO - need to enhance when suppporting mipmap. */
     info.mipFilter = gcvTEXTURE_NONE;
     info.anisoFilter = 1;
 
@@ -1190,7 +1230,6 @@ gcoCL_SetupTexture(
     info.border[gcvTEXTURE_COMPONENT_R] = 0;
     info.border[gcvTEXTURE_COMPONENT_G] = 0;
     info.border[gcvTEXTURE_COMPONENT_B] = 0;
-    /* TODO - need to check format to determine border color. */
     info.border[gcvTEXTURE_COMPONENT_A] = 0 /*255*/;
 
     /* PCF is not allowed. */
@@ -1206,7 +1245,6 @@ gcoCL_SetupTexture(
         gcoTEXTURE_BindTextureEx(Texture, 0, SamplerNum, &info, 0);
     }
 
-    /* TODO - need to check thread walker in PS. */
     gcoTEXTURE_Flush(Texture);
     gcoTEXTURE_FlushVS(Texture);
 
@@ -1256,9 +1294,9 @@ gcoCL_QueryDeviceInfo(
     gctSIZE_T contiguousSize;
     gctPHYS_ADDR contiguousAddress;
     gctSIZE_T physicalSystemMemSize;
-#if BUILD_OPENCL_FP
     gceCHIPMODEL  chipModel;
     gctUINT32 chipRevision;
+#if BUILD_OPENCL_FP
     gctBOOL chipEnableFP = gcvFALSE;
 #endif
 
@@ -1366,7 +1404,6 @@ gcoCL_QueryDeviceInfo(
     /* Size (in bytes) of the largest OpenCL builtin data type (long16) */
     DeviceInfo->minDataTypeAlignSize  = 128;
 
-    /* TODO - Need to check if hardware has GL components. */
     DeviceInfo->imageSupport          = gcvTRUE;
 
     /* Hardware capabilities.  14-bits per dimension */
@@ -1445,12 +1482,16 @@ gcoCL_QueryDeviceInfo(
     {
         DeviceInfo->singleFpConfig   |= 0x4;    /* CL_FP_ROUND_TO_NEAREST */
     }
-
+    gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
+    DeviceInfo->chipModel = chipModel;
+    DeviceInfo->chipRevision = chipRevision;
 #if BUILD_OPENCL_FP
-    gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
-    chipEnableFP = ((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008));
-    if(gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) && gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE)
-        && (chipEnableFP == gcvTRUE))
+    chipEnableFP = ((chipModel == gcv2500 && chipRevision == 0x5422) ||
+                    (chipModel == gcv3000 && chipRevision == 0x5435) ||
+                    (chipModel == gcv7000));
+    if(gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) &&
+       gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) &&
+       (chipEnableFP == gcvTRUE))
     {
         DeviceInfo->singleFpConfig |= 0x2; /* CL_FP_INF_NAN */
         DeviceInfo->localMemSize    = 32*1024;
@@ -1481,6 +1522,21 @@ gcoCL_QueryDeviceInfo(
     /* VIP core: without graphich core, only compute core */
     DeviceInfo->computeOnlyGpu        = gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_COMPUTE_ONLY);
 
+    DeviceInfo->supportIMGInstr = gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_IMG_INSTRUCTION);
+
+    DeviceInfo->psThreadWalker  = gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_CL_PS_WALKER);
+
+    DeviceInfo->supportSamplerBaseOffset = gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SAMPLER_BASE_OFFSET);
+
+    DeviceInfo->maxRegisterCount = (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_GEOMETRY_SHADER) == gcvSTATUS_TRUE) ?
+                                    109 : 113;
+
+    DeviceInfo->TxIntegerSupport = gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE) ||
+                                   gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE_V2);
+
+    DeviceInfo->halti2 = gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI2);
+
+    DeviceInfo->multiWGPack  = gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SH_MULTI_WG_PACK);
 
     status = gcvSTATUS_OK;
 
@@ -1690,7 +1746,7 @@ gcoCL_SubmitSignal(
 #if COMMAND_PROCESSOR_VERSION > 1
 #if gcdGC355_PROFILER
     /* Allocate a cluster event. */
-    gcmONERROR(gcoHAL_ReserveTask(_gCL->hal,
+    gcmONERROR(gcoHAL_ReserveTask(gcvNULL,
                                   gcvNULL,
                                   0,0,0,
                                   gcvBLOCK_PIXEL,
@@ -1698,7 +1754,7 @@ gcoCL_SubmitSignal(
                                   gcmSIZEOF(gcsTASK_SIGNAL),
                                   (gctPOINTER *) &signal));
 #else
-    gcmONERROR(gcoHAL_ReserveTask(_gCL->hal,
+    gcmONERROR(gcoHAL_ReserveTask(gcvNULL,
                                   gcvBLOCK_PIXEL,
                                   1,
                                   gcmSIZEOF(gcsTASK_SIGNAL),
@@ -1760,7 +1816,7 @@ gcoCL_WaitSignal(
 
     /*gcmSWITCHHARDWARE();*/
 
-    status = gcoOS_WaitSignal(_gCL->os, Signal, Wait);
+    status = gcoOS_WaitSignal(gcvNULL, Signal, Wait);
 
     /*gcmRESTOREHARDWARE();*/
 
@@ -1793,7 +1849,7 @@ gcoCL_SetSignal(
 
     gcmHEADER_ARG("Signal=0x%x", Signal);
 
-    status = gcoOS_Signal(_gCL->os, Signal, gcvTRUE);
+    status = gcoOS_Signal(gcvNULL, Signal, gcvTRUE);
 
     gcmFOOTER();
     return status;
@@ -1902,6 +1958,7 @@ gcoCL_InvokeKernel(
     IN gcSHADER            Kernel,
     IN gctUINT             WorkDim,
     IN size_t              GlobalWorkOffset[3],
+    IN size_t              GlobalScale[3],
     IN size_t              GlobalWorkSize[3],
     IN size_t              LocalWorkSize[3],
     IN gctUINT             ValueOrder,
@@ -1915,31 +1972,32 @@ gcoCL_InvokeKernel(
 
     gcoOS_ZeroMemory(&info, gcmSIZEOF(gcsTHREAD_WALKER_INFO));
 
-    info.dimensions      = WorkDim;
-    info.globalSizeX     = (gctUINT32)GlobalWorkSize[0];
-    info.globalOffsetX   = (gctUINT32)GlobalWorkOffset[0];
-    info.workGroupSizeX  = LocalWorkSize[0] ? (gctUINT32)LocalWorkSize[0] : 1;
-    info.workGroupCountX = info.globalSizeX / info.workGroupSizeX;
-    if (WorkDim > 1)
+    switch(WorkDim)
     {
-        info.globalSizeY     = (gctUINT32)GlobalWorkSize[1];
-        info.globalOffsetY   = (gctUINT32)GlobalWorkOffset[1];
-        info.workGroupSizeY  = LocalWorkSize[1] ? (gctUINT32)LocalWorkSize[1] : 1;
-        info.workGroupCountY = info.globalSizeY / info.workGroupSizeY;
-    }
-    if (WorkDim > 2)
-    {
+    case 3:
         info.globalSizeZ     = (gctUINT32)GlobalWorkSize[2];
         info.globalOffsetZ   = (gctUINT32)GlobalWorkOffset[2];
         info.workGroupSizeZ  = LocalWorkSize[2] ? (gctUINT32)LocalWorkSize[2] : 1;
         info.workGroupCountZ = info.globalSizeZ / info.workGroupSizeZ;
+
+    case 2:
+        info.globalSizeY     = (gctUINT32)GlobalWorkSize[1];
+        info.globalOffsetY   = (gctUINT32)GlobalWorkOffset[1];
+        info.workGroupSizeY  = LocalWorkSize[1] ? (gctUINT32)LocalWorkSize[1] : 1;
+        info.workGroupCountY = info.globalSizeY / info.workGroupSizeY;
+    case 1:
+    default:
+        info.dimensions      = WorkDim;
+        info.globalSizeX     = (gctUINT32)GlobalWorkSize[0];
+        info.globalOffsetX   = (gctUINT32)GlobalWorkOffset[0];
+        info.workGroupSizeX  = LocalWorkSize[0] ? (gctUINT32)LocalWorkSize[0] : 1;
+        info.workGroupCountX = info.globalSizeX / info.workGroupSizeX;
+        info.globalScaleZ     = (gctUINT32)GlobalScale[2];
+        info.globalScaleY     = (gctUINT32)GlobalScale[1];
+        info.globalScaleX     = (gctUINT32)GlobalScale[0];
+        break;
     }
 
-    info.globalScaleX     = 1;
-    info.globalScaleY     = 1;
-    info.globalScaleZ     = 1;
-
-    /* TODO - Handle GLW order and in-use. */
     info.traverseOrder    = 0;  /* XYZ */
     info.enableSwathX     = 0;
     info.enableSwathY     = 0;
@@ -1963,6 +2021,7 @@ gcoCL_MultiGPUSync(
     IN gctUINT_PTR ChipIDs
     )
 {
+    /* TODO: need refine later */
     return gcoHARDWARE_MultiGPUSyncV2(gcvNULL, GPUCount, ChipIDs, gcvNULL);
 }
 

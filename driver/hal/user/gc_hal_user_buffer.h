@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -33,13 +33,13 @@ extern "C" {
 #define gcdRESERVED_PAUSE_PRIMGEN_QUERY_LENGTH      (4 * gcmSIZEOF(gctUINT32))
 #define gcdRESERVED_PAUSE_XFB_LENGTH                (2 * gcmSIZEOF(gctUINT32))
 #define gcdRESERVED_HW_FENCE                        (4 * gcmSIZEOF(gctUINT32))
-#define gcdRESERVED_PAUSE_PROBE_LENGTH              (TOTAL_PROBE_NUMBER *4 * gcmSIZEOF(gctUINT32))
+#define gcdRESERVED_PAUSE_PROBE_LENGTH              (TOTAL_PROBE_NUMBER * 2 * gcmSIZEOF(gctUINT32))
 
 #define gcdRESUME_OQ_LENGTH                         (2 * gcmSIZEOF(gctUINT32))
 #define gcdRESUME_XFBWRITTEN_QUERY_LENGTH           (4 * gcmSIZEOF(gctUINT32))
 #define gcdRESUME_PRIMGEN_QUERY_LENGTH              (4 * gcmSIZEOF(gctUINT32))
 #define gcdRESUME_XFB_LENGH                         (2 * gcmSIZEOF(gctUINT32))
-#define gcdRESUME_PROBE_LENGH                       (TOTAL_PROBE_NUMBER *4 * gcmSIZEOF(gctUINT32))
+#define gcdRESUME_PROBE_LENGH                       (TOTAL_PROBE_NUMBER * 2 * gcmSIZEOF(gctUINT32))
 
 
 /* State delta record. */

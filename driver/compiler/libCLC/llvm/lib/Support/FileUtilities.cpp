@@ -25,6 +25,7 @@
 
 #ifdef __QNXNTO__
 #include <ctype.h>
+using namespace std;
 #endif
 
 using namespace llvm;
@@ -142,20 +143,20 @@ static bool CompareNumbers(const char *&F1P, const char *&F2P,
   }
 
   // Check to see if these are inside the absolute tolerance
-  if (AbsTolerance < abs(V1-V2)) {
+  if (AbsTolerance < fabs(V1-V2)) {
     // Nope, check the relative tolerance...
     double Diff;
     if (V2)
-      Diff = abs(V1/V2 - 1.0);
+      Diff = fabs(V1/V2 - 1.0);
     else if (V1)
-      Diff = abs(V2/V1 - 1.0);
+      Diff = fabs(V2/V1 - 1.0);
     else
       Diff = 0;  // Both zero.
     if (Diff > RelTolerance) {
       if (ErrorMsg) {
         raw_string_ostream(*ErrorMsg)
           << "Compared: " << V1 << " and " << V2 << '\n'
-          << "abs. diff = " << abs(V1-V2) << " rel.diff = " << Diff << '\n'
+          << "abs. diff = " << fabs(V1-V2) << " rel.diff = " << Diff << '\n'
           << "Out of tolerance: rel/abs: " << RelTolerance << '/'
           << AbsTolerance;
       }

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -220,6 +220,12 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
             runtime->notSupport = gcvTRUE;
         }
         strncat(runtime->wholeDescription, featureName, k==listLen-1 ? strlen(featureName)+1:strlen(featureName));
+    }
+
+    if (gcoHAL_IsFeatureAvailable(runtime->hal, gcvFEATURE_DEC400_COMPRESSION) == gcvTRUE)
+    {
+        GalOutput(GalOutputType_Result | GalOutputType_Console, "SuperTile version is not supported.\n");
+        runtime->notSupport = gcvTRUE;
     }
 
     if (runtime->ChipModel >= gcv600 ||

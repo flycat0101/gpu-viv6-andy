@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -505,15 +505,14 @@ VkResult __vk_utils_readBinary(
     {
         *pSize = bytes;
     }
-    __VK_ONERROR(gcoOS_Close(gcvNULL, pFile));
-
-    return VK_SUCCESS;
 
 OnError:
-    if (pData)
+    if (!__VK_IS_SUCCESS(result) && pData)
     {
         __VK_FREE(pData);
     }
+    gcoOS_Close(gcvNULL, pFile);
+
     return result;
 }
 
@@ -805,203 +804,202 @@ void __vk_utils_insertDescSetRes(
     char tag[gcdMAX_PATH];
 
     for (setIdx = 0; setIdx < __VK_MAX_DESCRIPTOR_SETS; ++setIdx)
-    {
-        __vkDescriptorSet *descSet = descSetInfo->descSets[setIdx];
-        uint32_t *dynamicOffsets = descSetInfo->dynamicOffsets[setIdx];
-        uint32_t dynamicOffsetIdx = 0;
-
-        if (descSet)
         {
-            uint32_t bindIdx, arrayIdx;
-            __vkDescriptorSetLayout *descSetLayout = descSet->descSetLayout;
+            __vkDescriptorSet *descSet = descSetInfo->descSets[setIdx];
+            uint32_t *dynamicOffsets = descSetInfo->dynamicOffsets[setIdx];
+            uint32_t dynamicOffsetIdx = 0;
 
-            for (bindIdx = 0; bindIdx < descSetLayout->bindingCount; ++bindIdx)
+            if (descSet)
             {
-                __vkDescriptorResourceInfo *resInfo;
-                __vkDescriptorResourceRegion curDescRegion;
-                __vkDescriptorSetLayoutBinding *binding = &descSetLayout->binding[bindIdx];
+                uint32_t bindIdx, arrayIdx;
+                __vkDescriptorSetLayout *descSetLayout = descSet->descSetLayout;
 
-                switch (binding->std.descriptorType)
+                for (bindIdx = 0; bindIdx < descSetLayout->bindingCount; ++bindIdx)
                 {
-                case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-                    __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                    cmdRes.pTag = tag;
-                    for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
+                    __vkDescriptorResourceInfo *resInfo;
+                    __vkDescriptorResourceRegion curDescRegion;
+                    __vkDescriptorSetLayoutBinding *binding = &descSetLayout->binding[bindIdx];
+
+                    switch (binding->std.descriptorType)
                     {
-                        __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
-                        resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
-
-                        if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
+                        __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
+                        cmdRes.pTag = tag;
+                        for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
-                            cmdRes.isImage = VK_FALSE;
-                            cmdRes.u.buf.pBuffer = resInfo->u.bufferInfo.buffer;
-                            cmdRes.u.buf.offset  = resInfo->u.bufferInfo.offset;
-                            cmdRes.u.buf.range   = resInfo->u.bufferInfo.range;
+                            __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
+                            resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
 
-                            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_uniformBuf=%d",
-                                               cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
-                            __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
+                            if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                            {
+                                cmdRes.isImage = VK_FALSE;
+                                cmdRes.u.buf.pBuffer = resInfo->u.bufferInfo.buffer;
+                                cmdRes.u.buf.offset  = resInfo->u.bufferInfo.offset;
+                                cmdRes.u.buf.range   = resInfo->u.bufferInfo.range;
+
+                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_uniformBuf=%d",
+                                                   cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
+                                __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
+                            }
                         }
-                    }
-                    break;
+                        break;
 
-                case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
-                    __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                    cmdRes.pTag = tag;
-                    for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
-                    {
-                        __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
-                        resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
-
-                        if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                    case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC:
+                        __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
+                        cmdRes.pTag = tag;
+                        for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
-                            cmdRes.isImage = VK_FALSE;
-                            cmdRes.u.buf.pBuffer = resInfo->u.bufferInfo.buffer;
-                            cmdRes.u.buf.offset  = resInfo->u.bufferInfo.offset + dynamicOffsets[dynamicOffsetIdx++];
-                            cmdRes.u.buf.range   = resInfo->u.bufferInfo.range;
+                            __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
+                            resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
 
-                            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_uniformBufDynamic=%d",
-                                               cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
-                            __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
+                            if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                            {
+                                cmdRes.isImage = VK_FALSE;
+                                cmdRes.u.buf.pBuffer = resInfo->u.bufferInfo.buffer;
+                                cmdRes.u.buf.offset  = resInfo->u.bufferInfo.offset + dynamicOffsets[dynamicOffsetIdx++];
+                                cmdRes.u.buf.range   = resInfo->u.bufferInfo.range;
+
+                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_uniformBufDynamic=%d",
+                                                   cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
+                                __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
+                            }
                         }
-                    }
-                    break;
+                        break;
 
-                case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-                    __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                    cmdRes.pTag = tag;
-                    for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
-                    {
-                        __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
-                        resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
-
-                        if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
+                        __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
+                        cmdRes.pTag = tag;
+                        for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
-                            cmdRes.isImage = VK_FALSE;
-                            cmdRes.u.buf.pBuffer = resInfo->u.bufferInfo.buffer;
-                            cmdRes.u.buf.offset  = resInfo->u.bufferInfo.offset;
-                            cmdRes.u.buf.range   = resInfo->u.bufferInfo.range;
+                            __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
+                            resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
 
-                            /* Storage buffer can used as either input or output */
-                            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_storageBuf=%d",
-                                               cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
-                            __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
-                            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageBuf=%d",
-                                               cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
-                            __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
+                            if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                            {
+                                cmdRes.isImage = VK_FALSE;
+                                cmdRes.u.buf.pBuffer = resInfo->u.bufferInfo.buffer;
+                                cmdRes.u.buf.offset  = resInfo->u.bufferInfo.offset;
+                                cmdRes.u.buf.range   = resInfo->u.bufferInfo.range;
+
+                                /* Storage buffer can used as either input or output */
+                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_storageBuf=%d",
+                                                   cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
+                                __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
+                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageBuf=%d",
+                                                   cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
+                                __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
+                            }
                         }
-                    }
-                    break;
+                        break;
 
-                case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
-                    __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                    cmdRes.pTag = tag;
-                    for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
-                    {
-                        __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
-                        resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
-
-                        if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                    case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC:
+                        __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
+                        cmdRes.pTag = tag;
+                        for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
-                            cmdRes.isImage = VK_FALSE;
-                            cmdRes.u.buf.pBuffer = resInfo->u.bufferInfo.buffer;
-                            cmdRes.u.buf.offset  = resInfo->u.bufferInfo.offset + dynamicOffsets[dynamicOffsetIdx++];
-                            cmdRes.u.buf.range   = resInfo->u.bufferInfo.range;
+                            __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
+                            resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
 
-                            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageBufDynamic=%d",
-                                               cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
-                            __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
+                            if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                            {
+                                cmdRes.isImage = VK_FALSE;
+                                cmdRes.u.buf.pBuffer = resInfo->u.bufferInfo.buffer;
+                                cmdRes.u.buf.offset  = resInfo->u.bufferInfo.offset + dynamicOffsets[dynamicOffsetIdx++];
+                                cmdRes.u.buf.range   = resInfo->u.bufferInfo.range;
+
+                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageBufDynamic=%d",
+                                                   cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
+                                __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
+                            }
                         }
-                    }
-                    break;
+                        break;
 
-                case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
-                    __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                    cmdRes.pTag = tag;
-                    for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
-                    {
-                        __vkBufferView *bufView;
-                        __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
-                        resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
-                        bufView = resInfo->u.bufferView;
-
-                        if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                    case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
+                        __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
+                        cmdRes.pTag = tag;
+                        for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
-                            cmdRes.isImage = VK_FALSE;
-                            cmdRes.u.buf.pBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, bufView->createInfo.buffer);
-                            cmdRes.u.buf.offset  = bufView->createInfo.offset;
-                            cmdRes.u.buf.range   = bufView->createInfo.range;
+                            __vkBufferView *bufView;
+                            __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
+                            resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
+                            bufView = resInfo->u.bufferView;
 
-                            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_uniformTexBuf=%d",
-                                               cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
-                            __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
+                            if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                            {
+                                cmdRes.isImage = VK_FALSE;
+                                cmdRes.u.buf.pBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, bufView->createInfo.buffer);
+                                cmdRes.u.buf.offset  = bufView->createInfo.offset;
+                                cmdRes.u.buf.range   = bufView->createInfo.range;
+
+                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_uniformTexBuf=%d",
+                                                   cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
+                                __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
+                            }
                         }
-                    }
-                    break;
+                        break;
 
-                case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
-                    __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                    cmdRes.pTag = tag;
-                    for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
-                    {
-                        __vkBufferView *bufView;
-                        __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
-                        resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
-                        bufView = resInfo->u.bufferView;
-
-                        if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                    case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
+                        __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
+                        cmdRes.pTag = tag;
+                        for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
-                            cmdRes.isImage = VK_FALSE;
-                            cmdRes.u.buf.pBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, bufView->createInfo.buffer);
-                            cmdRes.u.buf.offset  = bufView->createInfo.offset;
-                            cmdRes.u.buf.range   = bufView->createInfo.range;
+                            __vkBufferView *bufView;
+                            __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
+                            resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
+                            bufView = resInfo->u.bufferView;
 
-                            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageTexBuf=%d",
-                                               cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
-                            __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
+                            if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                            {
+                                cmdRes.isImage = VK_FALSE;
+                                cmdRes.u.buf.pBuffer = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, bufView->createInfo.buffer);
+                                cmdRes.u.buf.offset  = bufView->createInfo.offset;
+                                cmdRes.u.buf.range   = bufView->createInfo.range;
+
+                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageTexBuf=%d",
+                                                   cmdBuf->obj.id, op, cmdRes.u.buf.pBuffer->obj.id);
+                                __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
+                            }
                         }
-                    }
-                    break;
+                        break;
 
-                case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
-                    __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
-                    cmdRes.pTag = tag;
-                    for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
-                    {
-                        __vkImageView *imgView;
-                        __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
-                        resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
-                        imgView = resInfo->u.imageInfo.imageView;
-
-                        if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                    case VK_DESCRIPTOR_TYPE_STORAGE_IMAGE:
+                        __VK_MEMZERO(&cmdRes, sizeof(__vkCmdResource));
+                        cmdRes.pTag = tag;
+                        for (arrayIdx = 0; arrayIdx < binding->std.descriptorCount; ++arrayIdx)
                         {
-                            cmdRes.isImage = VK_TRUE;
-                            cmdRes.u.img.pImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, imgView->createInfo.image);
-                            cmdRes.u.img.subResRange = imgView->createInfo.subresourceRange;
-                            cmdRes.u.img.subResRange.aspectMask = 0;
+                            __vkImageView *imgView;
+                            __vk_utils_region_mad(&curDescRegion, &binding->perElementSize, arrayIdx, &binding->offset);
+                            resInfo = (__vkDescriptorResourceInfo*)((uint8_t*)descSet->resInfos + curDescRegion.resource);
+                            imgView = resInfo->u.imageInfo.imageView;
 
-                            /* Storage image can used as either input or output */
-                            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_storageImg=%d",
-                                               cmdBuf->obj.id, op, cmdRes.u.img.pImage->obj.id);
-                            __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
-                            gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageImg=%d",
-                                               cmdBuf->obj.id, op, cmdRes.u.img.pImage->obj.id);
-                            __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
+                            if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
+                            {
+                                cmdRes.isImage = VK_TRUE;
+                                cmdRes.u.img.pImage = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, imgView->createInfo.image);
+                                cmdRes.u.img.subResRange = imgView->createInfo.subresourceRange;
+                                cmdRes.u.img.subResRange.aspectMask = 0;
+
+                                /* Storage image can used as either input or output */
+                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_input_storageImg=%d",
+                                                   cmdBuf->obj.id, op, cmdRes.u.img.pImage->obj.id);
+                                __vk_utils_insertCmdRes(&cmdBuf->inputs, &cmdRes, &cdp->memCb);
+                                gcoOS_PrintStrSafe(tag, gcdMAX_PATH, gcvNULL, "cmdBuf=%d_%s_output_storageImg=%d",
+                                                   cmdBuf->obj.id, op, cmdRes.u.img.pImage->obj.id);
+                                __vk_utils_insertCmdRes(&cmdBuf->outputs, &cmdRes, &cdp->memCb);
+                            }
                         }
+                        break;
+
+                    case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
+                    case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
+                    case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
+                        break;
+
+                    default:
+                        break;
                     }
-                    break;
-
-                case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
-                case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
-                case VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT:
-                    /* TODO: add them to input list */
-                    break;
-
-                default:
-                    break;
                 }
             }
-        }
     }
 }
 

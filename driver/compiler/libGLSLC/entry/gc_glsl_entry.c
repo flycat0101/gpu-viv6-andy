@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -318,7 +318,6 @@ static gctUINT _convertShaderTypeToGcCompilerIndex(
 }
 
 struct gcsATOM CompilerLockRef = gcmATOM_INITIALIZER;
-gctPOINTER CompilerLock = gcvNULL;
 
 static gceSTATUS
 _LockCompiler(void)
@@ -327,14 +326,7 @@ _LockCompiler(void)
 
     gcmHEADER();
 
-    if (CompilerLock == gcvNULL)
-    {
-        status = gcvSTATUS_INVALID_OBJECT;
-        gcmFOOTER();
-        return status;
-    }
-
-    status = gcoOS_AcquireMutex(gcvNULL, CompilerLock, gcvINFINITE);
+    status = gcoOS_LockGLFECompiler();
 
     gcmFOOTER();
     return status;
@@ -347,14 +339,7 @@ _UnLockCompiler(void)
 
     gcmHEADER();
 
-    if (CompilerLock == gcvNULL)
-    {
-        status = gcvSTATUS_INVALID_OBJECT;
-        gcmFOOTER();
-        return status;
-    }
-
-    status = gcoOS_ReleaseMutex(gcvNULL, CompilerLock);
+    status = gcoOS_UnLockGLFECompiler();
 
     gcmFOOTER();
     return status;
@@ -599,17 +584,6 @@ gcInitializeCompiler(
     /* Increment the reference counter */
     gcmONERROR(gcoOS_AtomIncrement(gcvNULL, &CompilerLockRef, &reference));
 
-    if (reference == 0)
-    {
-        /* Create a global lock. */
-        status = gcoOS_CreateMutex(gcvNULL, &CompilerLock);
-
-        if (gcmIS_ERROR(status))
-        {
-            CompilerLock = gcvNULL;
-        }
-    }
-
     *gcGetPatchId() = PatchId;
 
     if (HWCaps)
@@ -661,9 +635,6 @@ gcFinalizeCompiler(void)
 
     if (reference == 1)
     {
-        /* Delete the global lock */
-        gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, CompilerLock));
-
         for (i = 0; i < __GC_COMPILER_NUMBER__; i++)
         {
             if (*gcGetCompiler(i) != gcvNULL)

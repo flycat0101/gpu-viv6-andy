@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -31,6 +31,7 @@ struct wl_viv_buffer
     gcoSURF  surface;
     gctINT32 width;
     gctINT32 height;
+    gceHARDWARE_TYPE hwType;
 };
 
 static void
@@ -44,8 +45,18 @@ destroy_buffer(struct wl_resource *resource)
 
         if (surface)
         {
-            gcoSURF_Unlock(surface, gcvNULL);
+            gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;
+
+            /* Switch to hardware type when allocation. */
+            gcoHAL_GetHardwareType(gcvNULL, &hwType);
+            gcoHAL_SetHardwareType(gcvNULL, buffer->hwType);
+
             gcoSURF_Destroy(surface);
+
+            gcoHAL_Commit(gcvNULL, gcvFALSE);
+
+            /* Restore hardware type. */
+            gcoHAL_SetHardwareType(gcvNULL, hwType);
         }
 
         free(buffer);
@@ -73,12 +84,15 @@ viv_handle_create_buffer(struct wl_client *client,
                   int32_t type,
                   uint32_t node,
                   int32_t pool,
-                  uint32_t size)
+                  uint32_t size,
+                  uint32_t tsNode,
+                  int32_t tsPool,
+                  uint32_t tsSize)
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcoSURF surface = gcvNULL;
     struct wl_viv_buffer * buffer = NULL;
-    gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
+    gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;
 
     buffer = malloc(sizeof(*buffer));
 
@@ -89,8 +103,13 @@ viv_handle_create_buffer(struct wl_client *client,
 
     memset(buffer, 0, sizeof(*buffer));
 
-    gcoHAL_GetHardwareType(gcvNULL, &currentType);
-    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+    gcoHAL_GetHardwareType(gcvNULL, &hwType);
+
+    /* Switch to an available hardware type. */
+    buffer->hwType = !gcoHAL_Is3DAvailable(gcvNULL) ? gcvHARDWARE_VG
+                   : gcoHAL_QueryHybrid2D(gcvNULL) ? gcvHARDWARE_3D2D : gcvHARDWARE_3D;
+
+    gcoHAL_SetHardwareType(gcvNULL, buffer->hwType);
 
     gcmONERROR(
         gcoSURF_Construct(gcvNULL,
@@ -107,11 +126,25 @@ viv_handle_create_buffer(struct wl_client *client,
     surface->node.pool          = (gcePOOL) pool;
     surface->node.size          = (gctSIZE_T) size;
 
-    /*
-    gcmONERROR(
-        gcoSURF_SetOrientation(surface,
-                               gcvORIENTATION_BOTTOM_TOP));
-     */
+#if gcdENABLE_3D
+    /* Import tile status video memory node. */
+    if (tsNode != 0)
+    {
+        gcmVERIFY_OK(gcoHAL_ImportVideoMemory(tsNode, &tsNode));
+    }
+
+    surface->tileStatusNode.u.normal.node = tsNode;
+    surface->tileStatusNode.pool          = (gcePOOL  ) tsPool;
+    surface->tileStatusNode.size          = (gctSIZE_T) tsSize;
+
+    /* Set tile status disabled by default for compositor. */
+    surface->tileStatusDisabled[0] = gcvTRUE;
+#endif
+
+    if ((type & 0xFF) != gcvSURF_BITMAP)
+    {
+        gcmONERROR(gcoSURF_SetFlags(surface, gcvSURF_FLAG_CONTENT_YINVERTED, gcvTRUE));
+    }
 
     gcmONERROR(gcoHAL_ImportVideoMemory(
         (gctUINT32)node, (gctUINT32 *)&surface->node.u.normal.node));
@@ -136,7 +169,8 @@ viv_handle_create_buffer(struct wl_client *client,
                        (void (**)(void)) &wl_viv_buffer_implementation,
                        buffer, destroy_buffer);
 
-    gcoHAL_SetHardwareType(gcvNULL, currentType);
+    /* Restore hardware type. */
+    gcoHAL_SetHardwareType(gcvNULL, hwType);
     return;
 
 OnError:
@@ -144,7 +178,6 @@ OnError:
 
     if (surface)
     {
-        gcoSURF_Unlock(surface, gcvNULL);
         gcoSURF_Destroy(surface);
         surface = gcvNULL;
     }
@@ -154,11 +187,13 @@ OnError:
         free(buffer);
     }
 
+    /* Restore hardware type. */
+    gcoHAL_SetHardwareType(gcvNULL, hwType);
     return;
 }
 
 struct wl_viv_interface wl_viv_implementation = {
-    viv_handle_create_buffer
+    viv_handle_create_buffer,
 };
 
 static void

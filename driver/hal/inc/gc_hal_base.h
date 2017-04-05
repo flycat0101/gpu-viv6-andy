@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -121,9 +121,10 @@ gcsSystemInfo;
     0,               /* threadID           */ \
     gcvFALSE,        /* exiting            */ \
     gcvFALSE,        /* Special flag for NP2 texture. */ \
-    gcvNULL,         /* destructor        */ \
-    gcvNULL,         /* accessLock        */ \
-    gcvPATCH_NOTINIT,/* global patchID    */ \
+    gcvNULL,         /* destructor         */ \
+    gcvNULL,         /* accessLock         */ \
+    gcvNULL,         /* GL FE compiler lock*/ \
+    gcvPATCH_NOTINIT,/* global patchID     */ \
 }
 #else
 #define gcPLS_INITIALIZER \
@@ -156,11 +157,28 @@ gcsSystemInfo;
 ******************************* Thread local storage *************************
 \******************************************************************************/
 
-typedef struct _gcsTLS * gcsTLS_PTR;
+typedef struct _gcsDRIVER_TLS * gcsDRIVER_TLS_PTR;
 
-typedef void (* gctTLS_DESTRUCTOR) (
-    gcsTLS_PTR
-    );
+typedef struct _gcsDRIVER_TLS
+{
+    void (* destructor)(gcsDRIVER_TLS_PTR Tls);
+}
+gcsDRIVER_TLS;
+
+typedef enum _gceTLS_KEY
+{
+    gcvTLS_KEY_EGL,
+    gcvTLS_KEY_OPENGL_ES,
+    gcvTLS_KEY_OPENVG,
+    gcvTLS_KEY_OPENGL,
+    gcvTLS_KEY_OPENCL,
+    gcvTLS_KEY_OPENVX,
+
+    gcvTLS_KEY_COUNT
+}
+gceTLS_KEY;
+
+typedef struct _gcsTLS * gcsTLS_PTR;
 
 typedef struct _gcsTLS
 {
@@ -193,12 +211,6 @@ typedef struct _gcsTLS
 #endif
 #endif
 
-    /*thread data */
-    gctPOINTER                  context;
-    /* ES(including es1 and es2) client driver context which is current state */
-    gctPOINTER                  esClientCtx;
-    gctTLS_DESTRUCTOR           destructor;
-
     gctBOOL                     copied;
 
     /* libGAL.so handle */
@@ -206,6 +218,9 @@ typedef struct _gcsTLS
 
     /* If true, do not releas 2d engine and hardware in hal layer */
     gctBOOL                     release2DUpper;
+
+    /* Driver tls. */
+    gcsDRIVER_TLS_PTR           driverTLS[gcvTLS_KEY_COUNT];
 }
 gcsTLS;
 
@@ -860,6 +875,11 @@ gcoHAL_QuerySeparated2D(
     );
 
 gceSTATUS
+gcoHAL_QueryHybrid2D(
+    IN gcoHAL Hal
+    );
+
+gceSTATUS
 gcoHAL_Is3DAvailable(
     IN gcoHAL Hal
     );
@@ -1059,7 +1079,18 @@ gcoOS_SetPLSValue(
     OUT gctPOINTER value
     );
 
-/* Get access to the thread local storage. */
+/* Lock GL FE compiler access */
+gceSTATUS
+gcoOS_LockGLFECompiler(
+    void
+    );
+
+/* Unlock GL FE compiler access */
+gceSTATUS
+gcoOS_UnLockGLFECompiler(
+    void
+    );
+
 gceSTATUS
 gcoOS_GetTLS(
     OUT gcsTLS_PTR * TLS
@@ -1075,6 +1106,23 @@ gcoOS_CopyTLS(
 gceSTATUS
 gcoOS_QueryTLS(
     OUT gcsTLS_PTR * TLS
+    );
+
+/* Get access to driver tls. */
+gceSTATUS
+gcoOS_GetDriverTLS(
+    IN gceTLS_KEY Key,
+    OUT gcsDRIVER_TLS_PTR * TLS
+    );
+
+/*
+ * Set driver tls.
+ * May cause memory leak if 'destructor' not set.
+ */
+gceSTATUS
+gcoOS_SetDriverTLS(
+    IN gceTLS_KEY Key,
+    IN gcsDRIVER_TLS * TLS
     );
 
 /* Destroy the objects associated with the current thread. */

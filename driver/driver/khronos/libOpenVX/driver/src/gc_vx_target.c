@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -55,9 +55,9 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
 
         if (status != VX_SUCCESS) return status;
 
+        if (vxoKernel_IsUnique(&target->kernelTable[index])) target->base.context->uniqueKernelCount++;
         target->kernelCount++;
         target->base.context->kernelCount++;
-        if (vxoKernel_IsUnique(&target->kernelTable[index])) target->base.context->uniqueKernelCount++;
     }
 
     /* ToDo : Add more specific return status check */
@@ -126,7 +126,7 @@ VX_PRIVATE_API vx_status vxoTarget_IsKernelSupported(
 
     for (index = 0; index < target->kernelCount; index++)
     {
-        vx_char         kernelFullName[VX_MAX_KERNEL_NAME];
+        vx_char         kernelFullName[VX_MAX_KERNEL_NAME+1] = {'\0'};
         vx_char_ptr     kernelNamePtr;
 
 #if defined(OPENVX_USE_VARIANTS)

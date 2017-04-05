@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -174,7 +174,7 @@ cl_int cliIcdDispatchTableCreate(CLIicdDispatchTable **outDispatchTable)
     ICD_DISPATCH_TABLE_ENTRY ( /*clRetainDeviceEXT*/ NULL);
     ICD_DISPATCH_TABLE_ENTRY ( /*clReleaseDevice*/NULL);
 
-#if CL_VERSION_1_2
+#if BUILD_OPENCL_12
 #if gcdENABLE_CL_GL
     ICD_DISPATCH_TABLE_ENTRY ( clCreateEventFromGLsyncKHR);
 #else
@@ -196,7 +196,11 @@ cl_int cliIcdDispatchTableCreate(CLIicdDispatchTable **outDispatchTable)
     ICD_DISPATCH_TABLE_ENTRY ( clEnqueueMarkerWithWaitList);
     ICD_DISPATCH_TABLE_ENTRY ( clEnqueueBarrierWithWaitList);
     ICD_DISPATCH_TABLE_ENTRY ( clGetExtensionFunctionAddressForPlatform);
-    ICD_DISPATCH_TABLE_ENTRY ( /*clCreateFromGLTexture*/NULL);
+#if gcdENABLE_CL_GL
+    ICD_DISPATCH_TABLE_ENTRY ( clCreateFromGLTexture);
+#else
+    ICD_DISPATCH_TABLE_ENTRY( NULL );
+#endif
 #endif
 
     /* return success */

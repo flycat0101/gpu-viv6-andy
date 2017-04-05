@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2161,6 +2161,9 @@ __glUtilComputeColor(
     GLushort color1r, color1g, color1b, color1a;
     GLushort r, g, b, a;
 
+    color0r = color0g = color0b = color0a = 0;
+    color1r = color1g = color1b = color1a = 0;
+
     switch (Plane2comp)
     {
     case 0:
@@ -2607,6 +2610,12 @@ gcChipDecompressASTC(
 
     if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, blockWidth * blockHeight * 4, (gctPOINTER*)&line)))
     {
+        /* free memory.*/
+        if (pixels)
+        {
+            gcoOS_Free(gcvNULL, (gctPOINTER)pixels);
+            pixels = gcvNULL;
+        }
         gcmFOOTER_ARG("return=0x%x", gcvNULL);
         return gcvNULL;
     }

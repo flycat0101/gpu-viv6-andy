@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -531,6 +531,7 @@ clfDynamicPatchKernel(
     gctUINT                 oldNumArgs, numToUpdate = *NumArgs, i;
     gctUINT                 isScalar = 0;
     gceSHADER_FLAGS         flags = gcvSHADER_RESOURCE_USAGE | gcvSHADER_OPTIMIZER | gcvSHADER_REMOVE_UNUSED_UNIFORMS;
+    gctUINT32_PTR           comVersion;
 #if BUILD_OPENCL_FP
     gctBOOL                 reLinkNeed = gcvFALSE;
     gctPOINTER              orgArgs = gcvNULL;
@@ -656,7 +657,8 @@ clfDynamicPatchKernel(
     }
 
 #if BUILD_OPENCL_FP
-    gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+    chipModel = Kernel->context->devices[0]->deviceInfo.chipModel;
+    chipRevision = Kernel->context->devices[0]->deviceInfo.chipRevision;
 DoReLink:
 #endif
     /* Save program binary into buffer */
@@ -670,6 +672,10 @@ DoReLink:
     /* Construct kernel binary. */
     clmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &kernelBinary),
                CL_OUT_OF_HOST_MEMORY);
+
+    gcmONERROR(gcSHADER_GetCompilerVersion((gcSHADER)Kernel->states.binary, &comVersion));
+
+    gcmONERROR(gcSHADER_SetCompilerVersion(kernelBinary, comVersion));
 
     /* Load kernel binary from program binary */
     clmONERROR(gcSHADER_LoadEx(kernelBinary, pointer, binarySize),
@@ -1055,7 +1061,9 @@ DoReLink:
     }
 
 #if BUILD_OPENCL_FP
-    if(((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008)) && (reLinkNeed == gcvFALSE))
+    if(((chipModel == gcv2500 && chipRevision == 0x5422) ||
+        (chipModel == gcv3000 && chipRevision == 0x5435) ||
+        (chipModel == gcv7000)) && (reLinkNeed == gcvFALSE))
     {
         gcoOS_Allocate(gcvNULL,  numToUpdate * gcmSIZEOF(clsArgument), &orgArgs);
         gcoOS_MemCopy(orgArgs, *Args, numToUpdate * gcmSIZEOF(clsArgument));
@@ -1071,6 +1079,7 @@ DoReLink:
                                      isScalar),
                                      CL_OUT_OF_HOST_MEMORY);
 
+    /*gcPatchDirective will reset to NULL after this*/
     gcDestroyPatchDirective(&gcPatchDirective);
 
     /* No need to recalculate binarySize. */
@@ -1087,7 +1096,7 @@ DoReLink:
                           &hints);
 
 #if BUILD_OPENCL_FP
-    if((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008))
+    if((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000))
     {
         if((status == gcvSTATUS_NOT_FOUND || status == gcvSTATUS_OUT_OF_RESOURCES) && gcmOPT_INLINELEVEL() != 4)
         {
@@ -1100,6 +1109,7 @@ DoReLink:
             reLinkNeed = gcvTRUE;
             goto DoReLink;
         }
+
         if(reLinkNeed == gcvTRUE)
         {
             reLinkNeed = gcvFALSE;
@@ -1145,11 +1155,17 @@ DoReLink:
     return status;
 
 OnError:
+    if (gcPatchDirective)
+    {
+        gcDestroyPatchDirective(&gcPatchDirective);
+    }
+
     /* In case a operation before free memory has error. pointer should free properly. */
     if (pointer)
     {
         gcmOS_SAFE_FREE(gcvNULL, pointer);
     }
+
 #if BUILD_OPENCL_FP
     if(orgArgs)
     {
@@ -1182,6 +1198,7 @@ clEnqueueReadBuffer(
 
     gcmHEADER_ARG("CommandQueue=0x%x Buffer=0x%x BlockingRead=%u Offset=%lu Ptr=0x%x",
                   CommandQueue, Buffer, BlockingRead, Offset, Ptr);
+    gcmDUMP_API("${OCL clEnqueueReadBuffer 0x%x, 0x%x}", CommandQueue, Buffer);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -1288,6 +1305,7 @@ clEnqueueReadBuffer(
                CL_OUT_OF_HOST_MEMORY);
 #endif
 
+    VCL_TRACE_API(EnqueueReadBuffer)(CommandQueue, Buffer, BlockingRead, Offset, Cb, Ptr, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -1334,6 +1352,7 @@ clEnqueueReadBufferRect(
                   "HostOrigin=0x%x Region=0x%x Ptr=0x%x",
                   CommandQueue, Buffer, BlockingRead, BufferOrigin,
                   HostOrigin, Region, Ptr);
+    gcmDUMP_API("${OCL clEnqueueReadBufferRect 0x%x, 0x%x}", CommandQueue, Buffer);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -1504,6 +1523,7 @@ clEnqueueReadBufferRect(
     clmONERROR(clfSubmitCommand(CommandQueue, command, BlockingRead),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueReadBufferRect)(CommandQueue, Buffer, BlockingRead, BufferOrigin, HostOrigin, Region, BufferRowPitch, BufferSlicePitch, HostRowPitch, HostSlicePitch, Ptr, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -1543,6 +1563,7 @@ clEnqueueWriteBuffer(
 
     gcmHEADER_ARG("CommandQueue=0x%x Buffer=0x%x BlockingWrite=%u Offset=%lu Ptr=0x%x",
                   CommandQueue, Buffer, BlockingWrite, Offset, Ptr);
+    gcmDUMP_API("${OCL clEnqueueWriteBuffer 0x%x, 0x%x, %d}", CommandQueue, Buffer, BlockingWrite);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -1642,6 +1663,7 @@ clEnqueueWriteBuffer(
     clmONERROR(clfSubmitCommand(CommandQueue, command, BlockingWrite),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueWriteBuffer)(CommandQueue, Buffer, BlockingWrite, Offset, Cb, Ptr, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -1688,6 +1710,7 @@ clEnqueueWriteBufferRect(
                   "HostOrigin=0x%x Region=0x%x Ptr=0x%x",
                   CommandQueue, Buffer, BlockingWrite, BufferOrigin,
                   HostOrigin, Region, Ptr);
+    gcmDUMP_API("${OCL clEnqueueWriteBufferRect 0x%x, 0x%x}", CommandQueue, Buffer);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -1857,6 +1880,7 @@ clEnqueueWriteBufferRect(
     clmONERROR(clfSubmitCommand(CommandQueue, command, BlockingWrite),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueWriteBufferRect)(CommandQueue, Buffer, BlockingWrite, BufferOrigin, HostOrigin, Region, BufferRowPitch, BufferSlicePitch, HostRowPitch, HostSlicePitch, Ptr, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -1897,6 +1921,7 @@ clEnqueueCopyBuffer(
     gcmHEADER_ARG("CommandQueue=0x%x SrcBuffer=0x%x DstBuffer=0x%x "
                   "SrcOffset=%u DstOffset=%u",
                   CommandQueue, SrcBuffer, DstBuffer, SrcOffset, DstOffset);
+    gcmDUMP_API("${OCL clEnqueueCopyBuffer 0x%x, 0x%x, 0x%x}", CommandQueue, SrcBuffer, DstBuffer);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -1980,6 +2005,10 @@ clEnqueueCopyBuffer(
         clmRETURN_ERROR(CL_MEM_COPY_OVERLAP);
     }
 
+    /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
+    clRetainMemObject(SrcBuffer);
+    clRetainMemObject(DstBuffer);
+
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -2002,6 +2031,8 @@ clEnqueueCopyBuffer(
 
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
+
+    VCL_TRACE_API(EnqueueCopyBuffer)(CommandQueue, SrcBuffer, DstBuffer, SrcOffset, DstOffset, Cb, NumEventsInWaitList, EventWaitList, Event);
 
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
@@ -2047,6 +2078,7 @@ clEnqueueCopyBufferRect(
     gcmHEADER_ARG("CommandQueue=0x%x SrcBuffer=0x%x DstBuffer=0x%x "
                   "SrcOrigin=0x%x DstOrigin=0x%x Region=0x%x",
                   CommandQueue, SrcBuffer, DstBuffer, SrcOrigin, DstOrigin, Region);
+    gcmDUMP_API("${OCL clEnqueueCopyBufferRect 0x%x, 0x%x, 0x%x}", CommandQueue, SrcBuffer, DstBuffer);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -2203,6 +2235,11 @@ clEnqueueCopyBufferRect(
             clmRETURN_ERROR(CL_MEM_COPY_OVERLAP);
         }
     }
+
+    /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
+    clRetainMemObject(SrcBuffer);
+    clRetainMemObject(DstBuffer);
+
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -2236,6 +2273,7 @@ clEnqueueCopyBufferRect(
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueCopyBufferRect)(CommandQueue, SrcBuffer, DstBuffer, SrcOrigin, DstOrigin, Region, SrcRowPitch, SrcSlicePitch, DstRowPitch, DstSlicePitch, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -2282,6 +2320,7 @@ clEnqueueReadImage(
     gcmHEADER_ARG("CommandQueue=0x%x Image=0x%x BlockingRead=%u Origin=0x%x Region=0x%x "
                   "RowPitch=%u SlicePitch=%u Ptr=0x%x",
                   CommandQueue, Image, BlockingRead, Origin, Region, RowPitch, SlicePitch, Ptr);
+    gcmDUMP_API("${OCL clEnqueueReadImage 0x%x, 0x%x}", CommandQueue, Image);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -2531,6 +2570,7 @@ clEnqueueReadImage(
     clmONERROR(clfSubmitCommand(CommandQueue, command, BlockingRead),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueReadImage)(CommandQueue, Image, BlockingRead, Origin, Region, RowPitch, SlicePitch, Ptr, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -2578,6 +2618,8 @@ clEnqueueWriteImage(
                   "InputRowPitch=%u InputSlicePitch=%u Ptr=0x%x",
                   CommandQueue, Image, BlockingWrite, Origin, Region,
                   InputRowPitch, InputSlicePitch, Ptr);
+
+    gcmDUMP_API("${OCL clEnqueueWriteImage 0x%x, 0x%x, %d}", CommandQueue, Image, BlockingWrite);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -2828,6 +2870,7 @@ clEnqueueWriteImage(
     clmONERROR(clfSubmitCommand(CommandQueue, command, BlockingWrite),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueWriteImage)(CommandQueue, Image, BlockingWrite, Origin, Region, InputRowPitch, InputSlicePitch, Ptr, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -2869,6 +2912,7 @@ clEnqueueFillImage(
     gcmHEADER_ARG("CommandQueue=0x%x Image=0x%x FillColor=0x%x "
                   "Origin=0x%x Region=0x%x Region=0x%x",
                   CommandQueue, Image, FillColor, Origin, Region);
+    gcmDUMP_API("${OCL clEnqueueFillImage 0x%x, 0x%x}", CommandQueue, Image);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -3042,6 +3086,7 @@ clEnqueueFillImage(
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueFillImage)(CommandQueue, Image, FillColor, Origin, Region, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -3051,6 +3096,12 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010253: (clEnqueueFillImage) Run out of memory.\n");
+    }
+
+    if (fillPtr)
+    {
+        gcoOS_Free(gcvNULL, fillPtr);
+        command->u.fillImage.fillColorPtr = gcvNULL;
     }
 
     if(command != gcvNULL)
@@ -3084,6 +3135,7 @@ clEnqueueCopyImage(
     gcmHEADER_ARG("CommandQueue=0x%x SrcImage=0x%x DstImage=0x%x "
                   "SrcOrigin=0x%x DstOrigin=0x%x Region=0x%x",
                   CommandQueue, SrcImage, DstImage, SrcOrigin, DstOrigin, Region);
+    gcmDUMP_API("${OCL clEnqueueCopyImage 0x%x, 0x%x, 0x%x}", CommandQueue, SrcImage, DstImage);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -3435,6 +3487,7 @@ clEnqueueCopyImage(
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueCopyImage)(CommandQueue, SrcImage, DstImage, SrcOrigin, DstOrigin, Region, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -3474,6 +3527,7 @@ clEnqueueCopyImageToBuffer(
     gcmHEADER_ARG("CommandQueue=0x%x SrcImage=0x%x DstBuffer=0x%x "
                   "SrcOrigin=0x%x DstOffset=%u Region=0x%x",
                   CommandQueue, SrcImage, DstBuffer, SrcOrigin, DstOffset, Region);
+    gcmDUMP_API("${OCL clEnqueueCopyImageToBuffer 0x%x, 0x%x, 0x%x}", CommandQueue, SrcImage, DstBuffer);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -3692,6 +3746,7 @@ clEnqueueCopyImageToBuffer(
 
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
+    VCL_TRACE_API(EnqueueCopyImageToBuffer)(CommandQueue, SrcImage, DstBuffer, SrcOrigin, Region, DstOffset, NumEventsInWaitList, EventWaitList, Event);
 
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
@@ -3732,6 +3787,7 @@ clEnqueueCopyBufferToImage(
     gcmHEADER_ARG("CommandQueue=0x%x SrcBuffer=0x%x DstImage=0x%x "
                   "DstOrigin=0x%x SrcOffset=%u Region=0x%x",
                   CommandQueue, SrcBuffer, DstImage, DstOrigin, SrcOffset, Region);
+    gcmDUMP_API("${OCL clEnqueueCopyBufferToImage 0x%x, 0x%x, 0x%x}", CommandQueue, SrcBuffer, DstImage);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -3950,6 +4006,7 @@ clEnqueueCopyBufferToImage(
 
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
+    VCL_TRACE_API(EnqueueCopyBufferToImage)(CommandQueue, SrcBuffer, DstImage, SrcOffset, DstOrigin, Region, NumEventsInWaitList, EventWaitList, Event);
 
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
@@ -3992,6 +4049,8 @@ clEnqueueMapBuffer(
     gcmHEADER_ARG("CommandQueue=0x%x Buffer=0x%x BlockingMap=%u "
                   "MapFlags=0x%x Offset=%u Cb=%u",
                   CommandQueue, Buffer, BlockingMap, MapFlags, Offset, Cb);
+    gcmDUMP_API("${OCL clEnqueueMapBuffer 0x%x, 0x%x}", CommandQueue, Buffer);
+    VCL_TRACE_API(EnqueueMapBuffer_Pre)(CommandQueue, Buffer, BlockingMap, MapFlags, Offset, Cb, NumEventsInWaitList, EventWaitList, Event, ErrCodeRet);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -4108,6 +4167,7 @@ clEnqueueMapBuffer(
         *ErrCodeRet = CL_SUCCESS;
     }
 
+    VCL_TRACE_API(EnqueueMapBuffer_Post)(CommandQueue, Buffer, BlockingMap, MapFlags, Offset, Cb, NumEventsInWaitList, EventWaitList, Event, ErrCodeRet, mappedPtr);
     gcmFOOTER_ARG("%d Command=0x%x mappedPtr=0x%x",
                   CL_SUCCESS, command, mappedPtr);
 #if BUILD_OPENCL_12
@@ -4170,6 +4230,8 @@ clEnqueueMapImage(
     gcmHEADER_ARG("CommandQueue=0x%x Image=0x%x BlockingMap=%u "
                   "MapFlags=0x%x Origin=%u Region=0x%x",
                   CommandQueue, Image, BlockingMap, MapFlags, Origin, Region);
+    gcmDUMP_API("${OCL clEnqueueMapImage 0x%x, 0x%x}", CommandQueue, Image);
+    VCL_TRACE_API(EnqueueMapImage_Pre)(CommandQueue, Image, BlockingMap, MapFlags, Origin, Region, ImageRowPitch, ImageSlicePitch, NumEventsInWaitList, EventWaitList, Event, ErrCodeRet);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -4457,6 +4519,7 @@ clEnqueueMapImage(
         *ErrCodeRet = CL_SUCCESS;
     }
 
+    VCL_TRACE_API(EnqueueMapImage_Post)(CommandQueue, Image, BlockingMap, MapFlags, Origin, Region, ImageRowPitch, ImageSlicePitch, NumEventsInWaitList, EventWaitList, Event, ErrCodeRet, mappedPtr);
     gcmFOOTER_ARG("%d Command=0x%x mappedPtr=0x%x",
                   CL_SUCCESS, command,mappedPtr);
     return mappedPtr;
@@ -4497,6 +4560,7 @@ clEnqueueUnmapMemObject(
 
     gcmHEADER_ARG("CommandQueue=0x%x MemObj=0x%x MappedPtr=0x%x",
                   CommandQueue, MemObj, MappedPtr);
+    gcmDUMP_API("${OCL clEnqueueUnmapMemObject 0x%x, 0x%x}", CommandQueue, MemObj);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -4562,6 +4626,7 @@ clEnqueueUnmapMemObject(
 
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
+    VCL_TRACE_API(EnqueueUnmapMemObject)(CommandQueue, MemObj, MappedPtr, NumEventsInWaitList, EventWaitList, Event);
 
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
@@ -4601,6 +4666,7 @@ clEnqueueMigrateMemObjects(
 
     gcmHEADER_ARG("CommandQueue=0x%x MemObjects=0x%x Flags=%u",
                   CommandQueue, MemObjects, Flags);
+    gcmDUMP_API("${OCL clEnqueueMigrateMemObjects 0x%x}", CommandQueue);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -4666,6 +4732,7 @@ clEnqueueMigrateMemObjects(
     command->eventWaitList          = (clsEvent_PTR *)pointer;
 
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE), CL_OUT_OF_HOST_MEMORY);
+    VCL_TRACE_API(EnqueueMigrateMemObjects)(CommandQueue, NumMemObjects, MemObjects, Flags, NumEventsInWaitList, EventWaitList, Event);
 
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
@@ -4765,7 +4832,8 @@ clEnqueueNDRangeKernel(
 
     gcmHEADER_ARG("CommandQueue=0x%x Kernel=0x%x "
                   "GlobalWorkOffset=0x%x GlobalWorkSize=0x%x GlobalWorkSize=0x%x",
-                  CommandQueue, Kernel, GlobalWorkOffset, GlobalWorkSize, GlobalWorkSize);
+                  CommandQueue, Kernel, GlobalWorkOffset, GlobalWorkSize, LocalWorkSize);
+    gcmDUMP_API("${OCL clEnqueueNDRangeKernel 0x%x, 0x%x, %d}", CommandQueue, Kernel, WorkDim);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -5060,6 +5128,30 @@ clEnqueueNDRangeKernel(
     }
 
     NDRangeKernel                       = &command->u.NDRangeKernel;
+
+    {
+        gcKERNEL_FUNCTION kernelFunction;
+        gctUINT         count, propertySize = 0;
+        gctINT          propertyType = 0;
+        gctSIZE_T       propertyValues[3] = {0};
+
+        /* Set the required work group size. */
+        gcSHADER_GetKernelFunctionByName((gcSHADER) Kernel->states.binary, Kernel->name, &kernelFunction);
+        gcKERNEL_FUNCTION_GetPropertyCount(kernelFunction, &count);
+
+        for (i = 0; i < count; i++)
+        {
+            gcKERNEL_FUNCTION_GetProperty(kernelFunction, i, &propertySize, &propertyType, (gctINT *)propertyValues);
+
+            if (propertyType == gcvPROPERTY_KERNEL_SCALE_HINT)
+            {
+                gcoOS_MemCopy(NDRangeKernel->globalScale,
+                    propertyValues,
+                    gcmSIZEOF(gctINT) * propertySize);
+            }
+        }
+    }
+
     NDRangeKernel->kernel               = Kernel;
     NDRangeKernel->workDim              = WorkDim;
     NDRangeKernel->globalWorkSize[0]    = GlobalWorkSize[0];
@@ -5270,18 +5362,14 @@ clEnqueueNDRangeKernel(
 
             if (CommandQueue->device->deviceInfo.computeOnlyGpu != gcvTRUE)  /*use texld*/
             {
-                gcmONERROR(
-                    gcoHAL_QuerySamplerBase(gcvNULL,
-                                            &vsSamplers,
-                                            gcvNULL,
-                                            &psSamplers,
-                                            gcvNULL));
+                vsSamplers = CommandQueue->context->platform->hwCfg.maxVSSamplerCount;
+                psSamplers = CommandQueue->context->platform->hwCfg.maxPSSamplerCount;
 
                 /* Determine starting sampler index. */
-                shadeType = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_CL_PS_WALKER)
+                shadeType = CommandQueue->device->deviceInfo.psThreadWalker
                     ? GetShaderType(kernelBinary) : gcSHADER_TYPE_VERTEX;
 
-                if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SAMPLER_BASE_OFFSET))
+                if (CommandQueue->device->deviceInfo.supportSamplerBaseOffset)
                 {
                     sampler = 0;
                 }
@@ -5360,7 +5448,7 @@ clEnqueueNDRangeKernel(
                         filterMode  = samplerValue & 0xF00;
 
 #if gcdOCL_READ_IMAGE_OPTIMIZATION
-                        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_HALTI2))
+                        if (CommandQueue->device->deviceInfo.halti2)
                         {
                             /* Check imgae type and channel data type. */
                             if (( Kernel->patchNeeded == gcvFALSE) &&
@@ -5375,8 +5463,7 @@ clEnqueueNDRangeKernel(
                                 (channelDataType != CL_SIGNED_INT32) &&
                                 (channelDataType != CL_UNORM_INT16))
                             {
-                                if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE) ||  /* v55 */
-                                    gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE_V2)) /* v60 and above */
+                                if (CommandQueue->device->deviceInfo.TxIntegerSupport)
                                 {
                                     if (isConstantSamplerType)
                                     {
@@ -5497,6 +5584,9 @@ clEnqueueNDRangeKernel(
                                          patchDirective),
                    status);
 
+        /* patch already insert to kernel, set to NULL */
+        patchDirective = gcvNULL;
+
         NDRangeKernel->states = Kernel->patchedStates;
         Kernel->isPatched = gcvTRUE;
         if((Kernel->states.hints == gcvNULL) && (Kernel->patchedStates->hints != gcvNULL))
@@ -5536,7 +5626,7 @@ clEnqueueNDRangeKernel(
     }
 
     /* Retain kernel. */
-    clRetainKernel(Kernel);
+    clfRetainKernel(Kernel);
 
 #if cldSEQUENTIAL_EXECUTION
     clmONERROR(clfExecuteCommandNDRangeKernel(command),
@@ -5546,6 +5636,8 @@ clEnqueueNDRangeKernel(
                CL_OUT_OF_HOST_MEMORY);
 #endif
 
+    VCL_TRACE_API(EnqueueNDRangeKernel)(CommandQueue, Kernel, WorkDim, GlobalWorkOffset, GlobalWorkSize, LocalWorkSize, NumEventsInWaitList, EventWaitList, Event);
+
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -5554,6 +5646,11 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010182: (clEnqueueNDRangeKernel) Run out of memory.\n");
+    }
+
+    if(patchDirective)
+    {
+        clfDestroyPatchDirective(&patchDirective);
     }
 
     if(command != gcvNULL)
@@ -5582,6 +5679,7 @@ clEnqueueTask(
     gcmHEADER_ARG("CommandQueue=0x%x Kernel=0x%x "
                   "NumEventsInWaitList=%u EventWaitList=0x%x Event=0x%x",
                   CommandQueue, Kernel, NumEventsInWaitList, EventWaitList, Event);
+    gcmDUMP_API("${OCL clEnqueueTask 0x%x, 0x%x}", CommandQueue, Kernel);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -5681,11 +5779,12 @@ clEnqueueTask(
     }
 
     /* Retain kernel. */
-    clRetainKernel(Kernel);
+    clfRetainKernel(Kernel);
 
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueTask)(CommandQueue, Kernel, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -5726,6 +5825,7 @@ clEnqueueNativeKernel(
 
     gcmHEADER_ARG("CommandQueue=0x%x UserFunc=0x%x Args=0x%x",
                   CommandQueue, UserFunc, Args);
+    gcmDUMP_API("${OCL clEnqueueNativeKernel 0x%x}", CommandQueue);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -5840,6 +5940,7 @@ clEnqueueNativeKernel(
 
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
+    VCL_TRACE_API(EnqueueNativeKernel)(CommandQueue, UserFunc, Args, CbArgs, NumMemObjects, MemList, ArgsMemLoc, NumEventsInWaitList, EventWaitList, Event);
 
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
@@ -6024,6 +6125,7 @@ clEnqueueMarker(
     gctINT              status;
 
     gcmHEADER_ARG("CommandQueue=0x%x Event=0x%x", CommandQueue, Event);
+    gcmDUMP_API("${OCL clEnqueueMarker 0x%x, 0x%x}", CommandQueue, Event);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -6048,6 +6150,7 @@ clEnqueueMarker(
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueMarker)(CommandQueue, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -6081,6 +6184,7 @@ clEnqueueMarkerWithWaitList(
 
     gcmHEADER_ARG("CommandQueue=0x%x NumEventsInWaitList=%u EventWaitList=0x%x Event=0x%x",
                   CommandQueue, NumEventsInWaitList, EventWaitList, Event);
+    gcmDUMP_API("${OCL clEnqueueMarkerWithWaitList 0x%x}", CommandQueue);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -6112,6 +6216,7 @@ clEnqueueMarkerWithWaitList(
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueMarkerWithWaitList)(CommandQueue, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -6144,6 +6249,7 @@ clEnqueueBarrierWithWaitList(
 
     gcmHEADER_ARG("CommandQueue=0x%x NumEventsInWaitList=%u EventWaitList=0x%x Event=0x%x",
                   CommandQueue, NumEventsInWaitList, EventWaitList, Event);
+    gcmDUMP_API("${OCL clEnqueueBarrierWithWaitList 0x%x}", CommandQueue);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -6175,6 +6281,7 @@ clEnqueueBarrierWithWaitList(
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueBarrierWithWaitList)(CommandQueue, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -6207,6 +6314,7 @@ clEnqueueWaitForEvents(
 
     gcmHEADER_ARG("CommandQueue=0x%x NumEvents=%u EventList=0x%x",
                   CommandQueue, NumEvents, EventList);
+    gcmDUMP_API("${OCL clEnqueueWaitForEvents 0x%x}", CommandQueue);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -6254,6 +6362,7 @@ clEnqueueWaitForEvents(
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueWaitForEvents)(CommandQueue, NumEvents, EventList);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -6281,6 +6390,7 @@ clEnqueueBarrier(
     gctINT              status;
 
     gcmHEADER_ARG("CommandQueue=0x%x", CommandQueue);
+    gcmDUMP_API("${OCL clEnqueueBarrier 0x%x}", CommandQueue);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -6298,6 +6408,7 @@ clEnqueueBarrier(
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueBarrier)(CommandQueue);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -6337,6 +6448,7 @@ clEnqueueFillBuffer(
 
     gcmHEADER_ARG("CommandQueue=0x%x Buffer=0x%x Pattern=0x%x Offset=%lu Size=%lu",
                   CommandQueue, Buffer, Pattern, Offset, Size);
+    gcmDUMP_API("${OCL clEnqueueFillBuffer 0x%x, 0x%x}", CommandQueue, Buffer);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -6421,6 +6533,7 @@ clEnqueueFillBuffer(
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
 
+    VCL_TRACE_API(EnqueueFillBuffer)(CommandQueue, Buffer, Pattern, PatternSize, Offset, Size, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 

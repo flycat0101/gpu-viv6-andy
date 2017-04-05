@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1931,6 +1931,9 @@ veglCreatePlatformWindowSurface(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     /* Test for valid config. */
     if (((EGLint)(intptr_t)config <= __EGL_INVALID_CONFIG__)
     ||  ((EGLint)(intptr_t)config > dpy->configCount)
@@ -2197,6 +2200,9 @@ veglDestroySurface(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     /* Test for valid EGLSurface structure */
     surface = (VEGLSurface)veglGetResObj(
         dpy,
@@ -2316,6 +2322,9 @@ eglCreatePbufferSurface(
         veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     /* Test for valid config. */
     if (((EGLint)(intptr_t)Config <= __EGL_INVALID_CONFIG__)
@@ -2567,6 +2576,9 @@ eglCreatePbufferFromClientBuffer(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     /* Test for valid config. */
     if (((EGLint)(intptr_t)Config <= __EGL_INVALID_CONFIG__)
     ||  ((EGLint)(intptr_t)Config > dpy->configCount)
@@ -2817,6 +2829,9 @@ eglSurfaceAttrib(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     /* Test for valid EGLSurface structure */
     surface = (VEGLSurface)veglGetResObj(dpy, (VEGLResObj*)&dpy->surfaceStack, (EGLResObj)Surface, EGL_SURFACE_SIGNATURE);
     if (surface == gcvNULL)
@@ -2918,8 +2933,6 @@ eglSurfaceAttrib(
 
         if (surface->newSwapModel)
         {
-            /* Get window back buffer for new swap model. */
-            /* TODO: handle get back buffer failure? */
             platform->getWindowBackBuffer(dpy, surface, &surface->backBuffer);
         }
 
@@ -3070,6 +3083,9 @@ eglQuerySurface(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     /* Test for valid EGLSurface structure */
     surface = (VEGLSurface)veglGetResObj(
         dpy,
@@ -3216,28 +3232,24 @@ eglQuerySurface(
         *value = _GetLockedBufferPixelChannelOffset(Surface, attribute);
         break;
 
-#ifdef ANDROID
+#if defined(__linux__) || defined(ANDROID)
     case EGL_BUFFER_AGE_EXT:
         if (thread->context && thread->context->draw == surface)
         {
-            if (surface->initialFrame)
-            {
-                *value = 0;
-                break;
-            }
-
             if ((surface->swapBehavior == EGL_BUFFER_PRESERVED) ||
+                /*
+                 * Currently we will resolve the whole internal render target
+                 * to window back buffer, hence age is 1, if not zero.
+                 */
                 (surface->renderMode == VEGL_INDIRECT_RENDERING))
             {
-                *value = 1;
+                *value = surface->initialFrame ? 0 : 1;
                 break;
             }
 
             if (dpy->platform &&
-                dpy->platform->queryBufferAge(dpy,
-                                               surface,
-                                               &surface->backBuffer,
-                                               value))
+                dpy->platform->queryBufferAge(dpy, surface,
+                                              &surface->backBuffer, value))
             {
                 break;
             }
@@ -3324,6 +3336,9 @@ veglCreatePlatformPixmapSurface(
         veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     /* Get shortcut. */
     platform = dpy->platform;
@@ -3589,6 +3604,9 @@ eglBindTexImage(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     /* Test for valid surface. */
     surface = (VEGLSurface)veglGetResObj(dpy, (VEGLResObj*)&dpy->surfaceStack, (EGLResObj)Surface, EGL_SURFACE_SIGNATURE);
     if ((surface == gcvNULL)
@@ -3641,10 +3659,8 @@ eglBindTexImage(
     }
     else
     {
-        /* TODO: Call glFinish on the context the Surface is bound to. */
     }
 
-    /* TODO: This is incorrect for window surface. */
     /* Call the GL to bind the texture. */
     thread->error = _BindTexImage(thread,
                                   surface->renderTarget,
@@ -3713,6 +3729,9 @@ eglReleaseTexImage(
         veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     /* Test for valid EGLSurface structure */
     surface = (VEGLSurface)veglGetResObj(dpy, (VEGLResObj*)&dpy->surfaceStack, (EGLResObj)Surface, EGL_SURFACE_SIGNATURE);
@@ -3827,6 +3846,9 @@ eglLockSurfaceKHR(
         gcmFOOTER_ARG("return=%d", EGL_FALSE);
         return EGL_FALSE;
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     /* Test for valid EGLSurface structure */
     surface = (VEGLSurface)veglGetResObj(dpy, (VEGLResObj*)&dpy->surfaceStack, (EGLResObj)Surface, EGL_SURFACE_SIGNATURE);
@@ -3955,6 +3977,9 @@ eglUnlockSurfaceKHR(
         veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     /* Test for valid EGLSurface structure */
     surface = (VEGLSurface)veglGetResObj(dpy, (VEGLResObj*)&dpy->surfaceStack, (EGLResObj)Surface, EGL_SURFACE_SIGNATURE);

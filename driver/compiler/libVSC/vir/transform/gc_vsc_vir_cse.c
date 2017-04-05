@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -477,8 +477,8 @@ static void _VSC_LCSE_ExpMap_MultiKill(
     gcmASSERT(VIR_OPCODE_hasDest(killOpcode) ||
               VIR_OPCODE_isMemSt(killOpcode) ||
               VIR_OPCODE_isAttrSt(killOpcode) ||
-              killOpcode == VIR_OP_EMIT ||
-              killOpcode == VIR_OP_AQ_EMIT);
+              killOpcode == VIR_OP_EMIT0 ||
+              killOpcode == VIR_OP_EMIT);
 
     vscULIterator_Init(&iter, keyList);
     for(key = (VSC_LCSE_Key*)vscULIterator_First(&iter);
@@ -489,8 +489,8 @@ static void _VSC_LCSE_ExpMap_MultiKill(
         gctUINT i;
         gctBOOL kills = gcvFALSE;
 
-        if (killOpcode == VIR_OP_EMIT ||
-            killOpcode == VIR_OP_AQ_EMIT)
+        if (killOpcode == VIR_OP_EMIT0 ||
+            killOpcode == VIR_OP_EMIT)
         {
             /* output destination is killed */
             if (VIR_Inst_GetOpcode(keyInst) == VIR_OP_ATTR_LD ||
@@ -713,8 +713,8 @@ static VSC_ErrCode _VSC_LCSE_PerformOnBB(
         if(VIR_OPCODE_hasDest(instOpcode) ||
            VIR_OPCODE_isMemSt(instOpcode) ||
            VIR_OPCODE_isAttrSt(instOpcode) ||
-           instOpcode == VIR_OP_EMIT ||
-           instOpcode == VIR_OP_AQ_EMIT)
+           instOpcode == VIR_OP_EMIT0 ||
+           instOpcode == VIR_OP_EMIT)
         {
             _VSC_LCSE_ExpMap_MultiKill(&expMap, instIter);
         }

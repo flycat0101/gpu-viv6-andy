@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -301,6 +301,7 @@ void vscKPPM_Finalize(VSC_KPG_PASS_MANAGER* pPgPassMnger);
 VSC_ErrCode vscSPM_CallPass(VSC_SHADER_PASS_MANAGER* pShPassMnger,
                             PFN_SH_PASS_ROUTINE pfnPassRoutine,
                             PFN_QUERY_PASS_PROP pfnQueryPassProp,
+                            gctUINT passId,
                             void* pPrvData);
 
 /* Full-auto mode of SPM */
@@ -314,10 +315,11 @@ VSC_ErrCode vscSPM_RunPasses(VSC_SHADER_PASS_MANAGER* pShPassMnger);
 VSC_ErrCode vscGPPM_CallPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
                              PFN_GPG_PASS_ROUTINE pfnPassRoutine,
                              PFN_QUERY_PASS_PROP pfnQueryPassProp,
+                             gctUINT passId,
                              void* pPrvData);
 
-#define CALL_SH_PASS(pfnPassRoutine, pPrvData) \
-          errCode = vscSPM_CallPass(pShPassMnger, (pfnPassRoutine), QUERY_PASS_PROP_NAME(pfnPassRoutine), (pPrvData)); \
+#define CALL_SH_PASS(pfnPassRoutine, passId, pPrvData) \
+          errCode = vscSPM_CallPass(pShPassMnger, (pfnPassRoutine), QUERY_PASS_PROP_NAME(pfnPassRoutine), (passId), (pPrvData)); \
           ON_ERROR(errCode, #pfnPassRoutine);
 
 #define REGISTER_SH_PASS(pfnPassRoutine, pPrvData) \
@@ -325,8 +327,8 @@ VSC_ErrCode vscGPPM_CallPass(VSC_GPG_PASS_MANAGER* pPgPassMnger,
 
 #define RUN_SH_PASSES() errCode = vscSPM_RunPasses(pShPassMnger); ON_ERROR(errCode, "run shader passes");
 
-#define CALL_GPG_PASS(pfnPassRoutine, pPrvData) \
-          errCode = vscGPPM_CallPass(pPgPassMnger, (pfnPassRoutine), QUERY_PASS_PROP_NAME(pfnPassRoutine), (pPrvData)); \
+#define CALL_GPG_PASS(pfnPassRoutine, passId, pPrvData) \
+          errCode = vscGPPM_CallPass(pPgPassMnger, (pfnPassRoutine), QUERY_PASS_PROP_NAME(pfnPassRoutine), (passId), (pPrvData)); \
           ON_ERROR(errCode, #pfnPassRoutine);
 
 END_EXTERN_C()

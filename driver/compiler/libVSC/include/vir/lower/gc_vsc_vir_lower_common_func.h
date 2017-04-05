@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -227,7 +227,25 @@ VIR_Lower_IsDstFloat(
     );
 
 gctBOOL
+VIR_Lower_IsDstInt(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
 VIR_Lower_IsDstInt32(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_IsDstIntPacked(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_IsDstNotIntPacked(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
     );
@@ -252,6 +270,12 @@ VIR_Lower_IsDstInt16(
 
 gctBOOL
 VIR_Lower_IsFloatOpcode(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_IsSrc0Unsigned(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
     );
@@ -284,6 +308,14 @@ gctBOOL
 VIR_Lower_HasTexldModifier(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
+    );
+
+gctBOOL
+VIR_Lower_label_set_jmp_n(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd,
+    IN gctINT32           n
     );
 
 gctBOOL

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -450,6 +450,9 @@ _PLSDestructor(
     gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.accessLock));
     gcPLS.accessLock = gcvNULL;
 
+    gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.glFECompilerAccessLock));
+    gcPLS.glFECompilerAccessLock = gcvNULL;
+
     gcmVERIFY_OK(gcoOS_AtomDestroy(gcPLS.os, gcPLS.reference));
     gcPLS.reference = gcvNULL;
 
@@ -477,6 +480,7 @@ _TLSDestructor(
 {
     gcsTLS_PTR tls;
     gctINT reference = 0;
+    gctINT i;
 
     gcmHEADER_ARG("TLS=0x%x", TLS);
 
@@ -489,10 +493,16 @@ _TLSDestructor(
         gcoOS_ZeroMemory(tls, gcmSIZEOF(gcsTLS));
     }
 
-    if (tls->destructor != gcvNULL)
+    for (i = 0; i < gcvTLS_KEY_COUNT; i++)
     {
-        tls->destructor(tls);
-        tls->destructor = gcvNULL;
+        gcsDRIVER_TLS_PTR drvTLS = tls->driverTLS[i];
+
+        if (drvTLS && drvTLS->destructor != gcvNULL)
+        {
+            drvTLS->destructor(drvTLS);
+        }
+
+        tls->driverTLS[i] = gcvNULL;
     }
 
     if (tls->defaultHardware != gcvNULL)
@@ -634,6 +644,9 @@ static void _ModuleConstructor(
     /* Construct access lock */
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.accessLock));
 
+    /* Construct gl FE compiler access lock */
+    gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.glFECompilerAccessLock));
+
 #if gcdDUMP_2D
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &dumpMemInfoListMutex));
 #endif
@@ -652,6 +665,12 @@ OnError:
     {
         /* Destroy access lock */
         gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.accessLock));
+    }
+
+    if (gcPLS.glFECompilerAccessLock != gcvNULL)
+    {
+        /* Destroy access lock */
+        gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.glFECompilerAccessLock));
     }
 
     if (gcPLS.reference != gcvNULL)
@@ -988,7 +1007,6 @@ gceSTATUS gcoOS_CopyTLS(IN gcsTLS_PTR Source)
     tls->copied = gcvTRUE;
 
     tls->currentHardware = gcvNULL;
-    tls->destructor     = gcvNULL;
 
 #if gcdDUMP || gcdDUMP_API || gcdDUMP_2D
     _SetDumpFileInfo();
@@ -1003,6 +1021,67 @@ OnError:
     gcmFOOTER();
     return status;
 }
+
+/* Get access to driver tls. */
+gceSTATUS
+gcoOS_GetDriverTLS(
+    IN gceTLS_KEY Key,
+    OUT gcsDRIVER_TLS_PTR * TLS
+    )
+{
+    gceSTATUS status;
+    gcsTLS_PTR tls;
+
+    gcmHEADER_ARG("Key=%d", Key);
+
+    if ((Key < (gceTLS_KEY)0) || (Key >= gcvTLS_KEY_COUNT))
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Get generic tls. */
+    gcmONERROR(gcoOS_GetTLS(&tls));
+
+    *TLS = tls->driverTLS[Key];
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+/* Set driver tls. */
+gceSTATUS
+gcoOS_SetDriverTLS(
+    IN gceTLS_KEY Key,
+    IN gcsDRIVER_TLS * TLS
+    )
+{
+    gceSTATUS status;
+    gcsTLS_PTR tls;
+
+    gcmHEADER_ARG("Key=%d", Key);
+
+    if ((Key < (gceTLS_KEY)0) || (Key >= gcvTLS_KEY_COUNT))
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Get generic tls. */
+    gcmONERROR(gcoOS_GetTLS(&tls));
+
+    tls->driverTLS[Key] = TLS;
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
 
 /*******************************************************************************
 **
@@ -1062,6 +1141,66 @@ gcoOS_UnLockPLS(
 
     }
     gcmFOOTER_ARG("Release PLS ret=%d", status);
+
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoOS_LockGLFECompiler
+**
+**  Lock mutext before access GL FE compiler if needed
+**
+**  INPUT:
+**
+**      Nothing.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcoOS_LockGLFECompiler(
+    void
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
+    if (gcPLS.glFECompilerAccessLock)
+    {
+        status = gcoOS_AcquireMutex(gcPLS.os, gcPLS.glFECompilerAccessLock, gcvINFINITE);
+    }
+    gcmFOOTER_ARG("Lock GL FE compiler ret=%d", status);
+
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoOS_UnLockGLFECompiler
+**
+**  Release mutext after access GL FE compiler if needed
+**
+**  INPUT:
+**
+**      Nothing.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcoOS_UnLockGLFECompiler(
+    void
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
+    if (gcPLS.glFECompilerAccessLock)
+    {
+        status = gcoOS_ReleaseMutex(gcPLS.os, gcPLS.glFECompilerAccessLock);
+    }
+    gcmFOOTER_ARG("Release GL FE compiler ret=%d", status);
 
     return status;
 }
@@ -2680,7 +2819,6 @@ gceSTATUS gcoOS_SetEnv(
     IN gctSTRING Value
     )
 {
-     /* TODO: currently, no need to implement on ce*/
     return gcvSTATUS_OK;
 }
 

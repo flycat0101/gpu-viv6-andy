@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -46,9 +46,9 @@ extern "C" {
 #define __GL_VERSION32      "OpenGL ES 3.2 V"
 
 /* Fix me for the next defines */
-#define __OGL_VERSION21      "OpenGL 2.1 V"
-#define __OGL_VERSION30      "OpenGL 3.0 V"
-#define __OGL_VERSION40      "OpenGL 4.0 V"
+#define __OGL_VERSION21      "2.1 V"
+#define __OGL_VERSION30      "3.0 V"
+#define __OGL_VERSION40      "4.0 V"
 
 #define __GL_GLSL_VERSION20 "OpenGL ES GLSL ES 1.0.0"
 #define __GL_GLSL_VERSION30 "OpenGL ES GLSL ES 3.00"
@@ -56,12 +56,28 @@ extern "C" {
 #define __GL_GLSL_VERSION32 "OpenGL ES GLSL ES 3.20"
 
 /* Fix me for the next defines */
-#define __OGL_GLSL_VERSION21 "OpenGL GLSL 2.1"
-#define __OGL_GLSL_VERSION30 "OpenGL GLSL 3.0"
-#define __OGL_GLSL_VERSION40 "OpenGL GLSL 4.0"
+#define __OGL_GLSL_VERSION21 "2.1.0 "
+#define __OGL_GLSL_VERSION30 "3.00 "
+#define __OGL_GLSL_VERSION40 "4.00 "
 
 #ifdef OPENGL40
 #define __GL_MAX_HW_LIGHTS            8
+#define __GL_MAX_GEOMETRY_VARYING_COMPONENTS        (1024-4)   /* exclude gl_Position */
+#define __GL_MAX_VERTEX_VARYING_COMPONENTS          (16*6*4)
+typedef enum {
+_GL_VERTEX_INDEX = 0,
+_GL_COLOR_INDEX,
+_GL_MULTITEX0_INDEX,
+_GL_MULTITEX1_INDEX,
+_GL_MULTITEX2_INDEX,
+_GL_MULTITEX3_INDEX,
+_GL_MULTITEX4_INDEX,
+_GL_MULTITEX5_INDEX,
+_GL_MULTITEX6_INDEX,
+_GL_MULTITEX7_INDEX,
+_GL_BT_INDEX_MAX
+} BUILT_IN_ATTR_INDEX;
+
 #endif
 
 #define __GL_MAX_VS_CONSTANT          256
@@ -464,12 +480,15 @@ struct __GLchipContextRec
     GLboolean                   programDirty;
 
 
-    GLint       errorNo;
-    GLboolean   multiSampleOn;
-    GLboolean   drawToAccumBuf;
-    GLfloat     accumValue;
+    GLint                       errorNo;
+    GLboolean                   multiSampleOn;
+    GLboolean                   drawToAccumBuf;
+    GLfloat                     accumValue;
+    GLfloat                     yMajor;
+
     gctBOOL                     hwLogicOp;
     glsLOGICOP                  logicOp;
+    GLint                       builtinAttributeIndex[_GL_BT_INDEX_MAX];
 #endif
 };
 

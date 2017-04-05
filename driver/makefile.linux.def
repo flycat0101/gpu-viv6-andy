@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -12,7 +12,7 @@
 
 
 #
-# Common inlude file for Linux build.
+#  Common inlude file for Linux build.
 #
 
 ################################################################
@@ -76,7 +76,7 @@ SOC_PLATFORM        ?= default
 
 ifeq ($(VIVANTE_ENABLE_3D),1)
   ifeq ($(USE_OPENCL),1)
-    ENABLE_CL_GL    ?= 0
+    ENABLE_CL_GL    ?= 1
     BUILD_OPENCL_ICD:= 1
     BUILD_OPENCL_FP := 1
   else

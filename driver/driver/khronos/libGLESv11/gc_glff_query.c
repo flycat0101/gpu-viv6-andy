@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -205,7 +205,6 @@ GL_API void GL_APIENTRY glGetBooleanv(
             break;
         }
 
-        /* TODO, Size unknown; */
         gcmDUMP_API("${ES11 glGetBooleanv 0x%08X (0x%08X)}", Value, Data);
     }
     glmLEAVE();
@@ -225,7 +224,6 @@ GL_API void GL_APIENTRY glGetIntegerv(
             break;
         }
 
-        /* TODO, Size unknown; */
         gcmDUMP_API("${ES11 glGetIntegerv 0x%08X (0x%08X)", Value, Data);
         gcmDUMP_API_ARRAY(Data, 1);
         gcmDUMP_API("$}");
@@ -247,7 +245,6 @@ GL_API void GL_APIENTRY glGetFixedv(
             break;
         }
 
-        /* TODO, Size unknown; */
         gcmDUMP_API("${ES11 glGetFixedv 0x%08X (0x%08X)}", Value, Data);
         gcmDUMP_API_ARRAY(Data, 1);
         gcmDUMP_API("$}");
@@ -268,7 +265,6 @@ GL_API void GL_APIENTRY glGetFixedvOES(
             break;
         }
 
-        /* TODO, Size unknown; */
         gcmDUMP_API("${ES11 glGetFixedvOES 0x%08X (0x%08X)}", Value, Data);
     }
     glmLEAVE();
@@ -288,7 +284,6 @@ GL_API void GL_APIENTRY glGetFloatv(
             break;
         }
 
-        /* TODO, Size unknown; */
         gcmDUMP_API("${ES11 glGetFloatv 0x%08X (0x%08X)}", Value, Data);
     }
     glmLEAVE();
@@ -357,7 +352,6 @@ GL_API void GL_APIENTRY glGetPointerv(
             glmERROR(GL_INVALID_ENUM);
         }
 
-        /* TODO, Size unknown; */
         gcmDUMP_API("${ES11 glGetPointerv 0x%08X (0x%08X)}", Name, Params);
     }
     glmLEAVE();
@@ -414,7 +408,6 @@ GL_API const GLubyte * GL_APIENTRY glGetString(
             /* For QNX, it's mandatory to return gcvNULL. */
         }
 
-        /* TODO, Size unknown; */
 #if gcdDUMP
         {
             gcmDUMP_API("${ES11 glGetString 0x%08X :=", Name);

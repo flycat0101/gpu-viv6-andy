@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -33,6 +33,9 @@ DECLARE_QUERY_PASS_PROP(vscVIR_PutImmValueToUniform);
 VSC_ErrCode vscVIR_CheckCstRegFileReadPortLimitation(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_CheckCstRegFileReadPortLimitation);
 
+VSC_ErrCode vscVIR_CheckEvisInstSwizzleRestriction(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_CheckEvisInstSwizzleRestriction);
+
 VSC_ErrCode vscVIR_CheckPosAndDepthConflict(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_CheckPosAndDepthConflict);
 
@@ -53,6 +56,9 @@ DECLARE_QUERY_PASS_PROP(vscVIR_PreprocessLLShader);
 
 VSC_ErrCode vscVIR_CheckVariableUsage(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_CheckVariableUsage);
+
+VSC_ErrCode vscVIR_FixTexldOffset(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_FixTexldOffset);
 
 VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_InitializeVariables);

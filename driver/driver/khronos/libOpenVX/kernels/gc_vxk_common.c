@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,6 +12,33 @@
 
 
 #include <gc_vxk_common.h>
+
+#if defined(__linux__)
+VX_INTERNAL_API struct timeval gcfVX_PerfStart(vx_reference ref)
+{
+    struct timeval start = {0};
+    if(ref->context->perfEnable)
+    {
+        gettimeofday(&start, 0);
+    }
+
+    return start;
+}
+
+VX_INTERNAL_API vx_uint32 gcfVX_PerfEnd(vx_reference ref, struct timeval start)
+{
+    vx_uint32 interval = 0;
+
+    if(ref->context->perfEnable)
+    {
+        struct timeval end = {0};
+        gettimeofday(&end, 0);
+        interval = 1000000 * (end.tv_sec - start.tv_sec) + (end.tv_usec - start.tv_usec);
+    }
+
+    return interval;
+}
+#endif
 
 gceSTATUS gcfVX_Kernel_ConvertFormat(
     IN vx_df_image Format,
@@ -254,7 +281,7 @@ gcfVX_BindInstructions(
             {
                 gcoVX_Hardware_Context hardwareContext = *C->hwContext[i];
 
-                 gctUINT32 borders = gcvVX_BORDER_MODE_UNDEFINED;
+                gctUINT32 borders = gcvVX_BORDER_MODE_UNDEFINED;
 
                 _SetBorderMode(Context->borders, &borders);
 
@@ -417,7 +444,7 @@ gcoVX_AddObject(
 
 gceSTATUS
 gcfVX_GetImageInfo(
-    IN gcoVX_Kernel_Context Context,
+    IN gcoVX_Kernel_Context* Context,
     IN vx_image Image,
     IN gcsVX_IMAGE_INFO_PTR Info,
     IN vx_uint32 Multiply
@@ -428,12 +455,12 @@ gcfVX_GetImageInfo(
     vx_df_image format;
     gcsSURF_NODE_PTR node = gcvNULL;
 
-    gcmHEADER_ARG("Context=%d", Context);
+    gcmHEADER_ARG("Context=%d", *Context);
 
 #if gcdVX_OPTIMIZER
-    _SetBorderMode(Context.borders, &Info->border);
+    _SetBorderMode(Context->borders, &Info->border);
 #else
-    _SetBorderMode(Context.params.borders, &Info->border);
+    _SetBorderMode(Context->params.borders, &Info->border);
 #endif
 
     vxQueryImage(Image, VX_IMAGE_ATTRIBUTE_WIDTH, &Info->width, sizeof(vx_uint32));
@@ -478,7 +505,7 @@ gcfVX_GetImageInfo(
             vxQuerySurfaceNode((vx_reference)Image, plane, (void**)&node);
 
             Info->physicals[plane] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
-            Info->logicals[plane] = (gctUINT32)(gctUINTPTR_T)node->logical;
+            Info->logicals[plane] = node->logical;
         }
     }
 
@@ -517,7 +544,7 @@ gceSTATUS gcfVX_GetInfo(
         {
         case GC_VX_CONTEXT_OBJECT_IMAGE_INPUT:
 
-            gcfVX_GetImageInfo(*Context, (vx_image)object->obj, info, Context->params.inputMultipleWidth);
+            gcfVX_GetImageInfo(Context, (vx_image)object->obj, info, Context->params.inputMultipleWidth);
 
             Context->params.input_type[Context->params.input_count++] = info->format;
 
@@ -530,7 +557,7 @@ gceSTATUS gcfVX_GetInfo(
 
         case GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT:
 
-            gcfVX_GetImageInfo(*Context, (vx_image)object->obj, info, Context->params.outputMultipleWidth);
+            gcfVX_GetImageInfo(Context, (vx_image)object->obj, info, Context->params.outputMultipleWidth);
 
             Context->params.output_type[Context->params.output_count++] = info->format;
 
@@ -553,7 +580,7 @@ gceSTATUS gcfVX_GetInfo(
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
             info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
-            info->logicals[0] = (gctUINT32)(gctUINTPTR_T)node->logical;
+            info->logicals[0] = node->logical;
 
             gcmONERROR(gcoVX_BindImage(object->index, info));
 
@@ -565,7 +592,7 @@ gceSTATUS gcfVX_GetInfo(
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
             info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
-            info->logicals[0] = (gctUINT32)(gctUINTPTR_T)node->logical;
+            info->logicals[0] = node->logical;
 
 #if !gcdVX_OPTIMIZER
             gcmONERROR(gcoVX_BindUniform(GC_VX_UNIFORM_PIXEL, object->index, &info->physicals[0], 1));
@@ -583,7 +610,7 @@ gceSTATUS gcfVX_GetInfo(
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
             info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
-            info->logicals[0] = (gctUINT32)(gctUINTPTR_T)node->logical;
+            info->logicals[0] = node->logical;
 
             gcmONERROR(gcoVX_BindImage(object->index, info));
 
@@ -600,7 +627,7 @@ gceSTATUS gcfVX_GetInfo(
             vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
             info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
-            info->logicals[0] = (gctUINT32)(gctUINTPTR_T)node->logical;
+            info->logicals[0] = node->logical;
 
             gcmONERROR(gcoVX_BindImage(object->index, info));
 
@@ -622,7 +649,7 @@ gceSTATUS gcfVX_GetInfo(
                 vxQuerySurfaceNode((vx_reference)object->obj, 0, (void**)&node);
 
                 info->physicals[0] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
-                info->logicals[0] = (gctUINT32)(gctUINTPTR_T)node->logical;
+                info->logicals[0] = node->logical;
 
                 gcmONERROR(gcoVX_BindImage(object->index, info));
             }
@@ -743,12 +770,33 @@ gcfVX_RunKernel(
 
     gcmONERROR(gcfVX_BindInstructions(Context));
 
+#if VX_NN_SH_PARALLEL
+    /* sync CNN layer */
+    if (Context->node->cnnWaitEventID0 != 0xffffffff)
+    {
+        if ((Context->node->cnnWaitEventID0 > 0) && (Context->node->cnnWaitEventID0 < 32))
+            gcoVX_WaitNNEvent(Context->node->cnnWaitEventID0);
+        else
+            gcmPRINT("cnnWaitEventID0 = %d\n", Context->node->cnnWaitEventID0);
+    }
+#endif
+
 #if gcdVX_OPTIMIZER
     if (!Context->codeGenOnly)
 #endif
     {
         gcmONERROR(gcoVX_InvokeKernel(&Context->params));
     }
+
+#if VX_NN_SH_PARALLEL
+    if (Context->node->cnnWaitEventID1 != 0xffffffff)
+    {
+        if ((Context->node->cnnWaitEventID1 > 0) && (Context->node->cnnWaitEventID1 < 32))
+           gcoVX_WaitNNEvent(Context->node->cnnWaitEventID1);
+        else
+           gcmPRINT("Error cnnWaitEventID1 = %d\n", Context->node->cnnWaitEventID1);
+    }
+#endif
 
 #if gcdDUMP
     /* Need dump output of every node while gcdDUMP is set                              */
@@ -842,6 +890,23 @@ gcfVX_Flush(
 OnError:
     gcmVERIFY_OK(gcoVX_RestoreContext(savedHardware));
     gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+vx_status gcfVX_Accel(
+    IN gctUINT32                CmdAddress,
+    IN gceVX_ACCELERATOR_TYPE   Type,
+    IN gctUINT32                EventId,
+    IN gctBOOL                  waitEvent
+    )
+{
+    vx_status status = VX_SUCCESS;
+
+    status = gcoVX_TriggerAccelerator(CmdAddress, Type, EventId, waitEvent);
+
+#if NN_LAYER_FLUSH
+    status = gcoVX_Flush(gcvTRUE);
+#endif
     return status;
 }
 

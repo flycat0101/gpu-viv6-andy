@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -26,6 +26,12 @@ LOCAL_SRC_FILES := \
 	icd_dispatch.c \
 	icd_linux.c
 
+ifeq ($(ENABLE_CL_GL), 1)
+CFLAGS += -DgcdENABLE_CL_GL=1
+else
+CFLAGS += -DgcdENABLE_CL_GL=0
+endif
+
 LOCAL_CFLAGS := \
 	$(CFLAGS)
 
@@ -33,19 +39,19 @@ LOCAL_C_INCLUDES := \
 	$(AQROOT)/sdk/inc \
 	$(LOCAL_PATH)
 
+ifeq ($(ENABLE_CL_GL), 1)
+LOCAL_LDFLAGS := \
+	-Wl,-z,defs \
+	-Wl,--version-script=$(LOCAL_PATH)/icd_exports_GL.map
+else
 LOCAL_LDFLAGS := \
 	-Wl,-z,defs \
 	-Wl,--version-script=$(LOCAL_PATH)/icd_exports.map
+endif
 
 LOCAL_SHARED_LIBRARIES := \
 	liblog \
 	libdl
-
-ifeq ($(ENABLE_CL_GL), 1)
-CFLAGS += -DgcdENABLE_CL_GL=1
-else
-CFLAGS += -DgcdENABLE_CL_GL=0
-endif
 
 LOCAL_MODULE         := libOpenCL
 LOCAL_MODULE_TAGS    := optional

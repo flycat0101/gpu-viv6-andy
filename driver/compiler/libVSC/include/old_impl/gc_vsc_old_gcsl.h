@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -76,13 +76,19 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.14 for ES31 uniform base binding index support on 04/07/2015 */
 #define gcdSL_SHADER_BINARY_BEFORE_UNIFORM_BASE_BINDING_VERSION gcmCC(0, 0, 1, 14)
 
-/* bump up version to 1.15 for ES31 uniform base binding index support on 04/07/2015 */
+/* bump up version to 1.15 for enlarge type size from 8 bit to 16 bit on 06/25/2015 */
 #define gcdSL_SHADER_BINARY_BEFORE_16BIT_TYPE_VERSION gcmCC(0, 0, 1, 15)
 
-/* bump up version to 1.16 for enlarge type size from 8 bit to 16 bit on 06/25/2015 */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(0, 0, 1, 16)
+/* bump up version to 1.16 for ltc dummy uniform index on 09/23/2016 */
+#define gcdSL_SHADER_BINARY_BEFORE_DUMMY_UNIFORM_INDEX_VERSION gcmCC(0, 0, 1, 16)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC('\0','\0','\16','\0')
+/* bump up version to 1.17 for type name var index on 03/16/2017 */
+#define gcdSL_SHADER_BINARY_BEFORE_SAVEING_TYPE_NAME_VAR_INDEX gcmCC(0, 0, 1, 17)
+
+/* current version */
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(0, 0, 1, 18)
+
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(0, 0, 1, 18)
 
 typedef union _gcsValue
 {
@@ -906,6 +912,7 @@ typedef enum _gcSHADER_VAR_CATEGORY
     gcSHADER_VAR_CATEGORY_TOP_LEVEL_STRUCT, /* top level struct, only use for ssbo. */
     gcSHADER_VAR_CATEGORY_SAMPLE_LOCATION, /* sample location. */
     gcSHADER_VAR_CATEGORY_ENABLE_MULTISAMPLE_BUFFERS, /* multisample buffers. */
+    gcSHADER_VAR_CATEGORY_TYPE_NAME, /* the name of a type, e.g, a structure type name. */
 }
 gcSHADER_VAR_CATEGORY;
 
@@ -1016,7 +1023,8 @@ gcSHADER_SHADERMODE;
 typedef enum _gcePROPERTY_FLAGS
 {
     gcvPROPERTY_REQD_WORK_GRP_SIZE    = 0x01,
-    gcvPROPERTY_WORK_GRP_SIZE_HINT    = 0x02
+    gcvPROPERTY_WORK_GRP_SIZE_HINT    = 0x02,
+    gcvPROPERTY_KERNEL_SCALE_HINT     = 0x03
 }
 gceKERNEL_FUNCTION_PROPERTY_FLAGS;
 
@@ -1745,6 +1753,9 @@ struct _gcATTRIBUTE
     /* Only used for a IO block member, point to the previous element in block. */
     gctINT16                     prevSibling;
 
+    /* The variable index of the type name, it is only enabled for a structure member only. */
+    gctINT16                     typeNameVarIndex;
+
     /* Length of the attribute name. */
     gctINT                       nameLength;
 
@@ -1775,6 +1786,8 @@ struct _gcATTRIBUTE
 #define SetATTRNextSibling(a, i)            (GetATTRNextSibling(a) = (i))
 #define GetATTRPrevSibling(a)               ((a)->prevSibling)
 #define SetATTRPrevSibling(a, i)            (GetATTRPrevSibling(a) = (i))
+#define GetATTRTypeNameVarIndex(a)          ((a)->typeNameVarIndex)
+#define SetATTRTypeNameVarIndex(a, i)       (GetATTRTypeNameVarIndex(a) = (i))
 
 /* Sampel structure, but inside a binary. */
 typedef struct _gcBINARY_ATTRIBUTE
@@ -1813,6 +1826,9 @@ typedef struct _gcBINARY_ATTRIBUTE
 
     /* Only used for a IO block member, point to the previous element in block. */
     gctINT16                      prevSibling;
+
+    /* The variable index of the type name, it is only enabled for a structure member only. */
+    gctINT16                      typeNameVarIndex;
 
     /* The attribute name. */
     char                          name[1];
@@ -2420,6 +2436,9 @@ struct _gcUNIFORM
     /* Compile-time constant value, */
     gcsValue                        initializer;
 
+    /* Dummy-uniform index for LTC uniform, -1 for non-ltc uniforms. */
+    gctINT16                        dummyUniformIndex;
+
     /* Only used for structure or blocks;
        When used for structure, point to either first array element for
        arrayed struct or first struct element if struct is not arrayed
@@ -2501,6 +2520,8 @@ struct _gcUNIFORM
 #define SetUniformSwizzle(u, s)                 (GetUniformSwizzle(u) = (s))
 #define GetUniformAddress(u)                    ((u)->address)
 #define GetUniformInitializer(u)                ((u)->initializer)
+#define GetUniformDummyUniformIndex(u)          ((u)->dummyUniformIndex)
+#define setUniformDummyUniformIndex(u, i)       ((u)->dummyUniformIndex = (i))
 #define GetUniformMatchIndex(u)                 ((u)->matchIndex)
 #define GetUniformFirstChild(u)                 ((u)->firstChild)
 #define GetUniformNextSibling(u)                ((u)->nextSibling)
@@ -2599,6 +2620,9 @@ typedef struct _gcBINARY_UNIFORM
     /* compile-time constant value */
     char                            initializer[sizeof(gcsValue)];
 
+    /* Dummy-uniform index for LTC uniform, -1 for non-ltc uniforms. */
+    gctINT16                        dummyUniformIndex;
+
     /* 3.1 explicit binding for opaque uniforms, -1 if not specify. */
     char                            binding[sizeof(gctINT32)];
 
@@ -2660,6 +2684,9 @@ typedef struct _gcBINARY_UNIFORM_EX
 
     /* compile-time constant value */
     char                            initializer[sizeof(gcsValue)];
+
+    /* Dummy-uniform index for LTC uniform, -1 for non-ltc uniforms. */
+    gctINT16                        dummyUniformIndex;
 
     /* type qualifier is currently 16bit long.
        If it ever changes to more than 16bits, the alignment has to be adjusted
@@ -2870,6 +2897,9 @@ struct _gcOUTPUT
     /* Only used for a IO block member, point to the previous element in block. */
     gctINT16                        prevSibling;
 
+    /* The variable index of the type name, it is only enabled for a structure member only. */
+    gctINT16                        typeNameVarIndex;
+
     /* layout qualifier */
     gceLAYOUT_QUALIFIER             layoutQualifier;
 
@@ -2902,6 +2932,8 @@ struct _gcOUTPUT
 #define SetOutputNextSibling(o, i)          (GetOutputNextSibling(o) = (i))
 #define GetOutputPrevSibling(o)             ((o)->prevSibling)
 #define SetOutputPrevSibling(o, i)          (GetOutputPrevSibling(o) = (i))
+#define GetOutputTypeNameVarIndex(o)        ((o)->typeNameVarIndex)
+#define SetOutputTypeNameVarIndex(o, i)     (GetOutputTypeNameVarIndex(o) = (i))
 
 /* Same structure, but inside a binary. */
 typedef struct _gcBINARY_OUTPUT
@@ -2942,6 +2974,9 @@ typedef struct _gcBINARY_OUTPUT
 
     /* Only used for a IO block member, point to the previous element in block. */
     gctINT16                        prevSibling;
+
+    /* The variable index of the type name, it is only enabled for a structure member only. */
+    gctINT16                        typeNameVarIndex;
 
     /* layout qualifier */
     char                            layoutQualifier[sizeof(gceLAYOUT_QUALIFIER)];
@@ -3111,6 +3146,7 @@ struct _gcVARIABLE
 #define isVariableInactive(v)                   (gcvFALSE)
 #define isVariableSimple(v)                     (isVariableNormal(v) || isVariableBlockMember(v) )
 #define isVariableStructMember(v)               (GetVariableParent(v) != -1)
+#define isVariableTypeName(v)                   (GetVariableCategory(v) == gcSHADER_VAR_CATEGORY_TYPE_NAME)
 
 #define SetVariableFlag(v, f)                   do { (v)->flags |= f; } while(0)
 #define SetVariableFlags(v, f)                  do { (v)->flags = f; } while(0)
@@ -3923,8 +3959,13 @@ typedef struct _gcLibraryList gcLibraryList;
 struct _gcLibraryList
 {
     gcSHADER        lib;
-    gctUINT32       mappingTableEntries;
-    gctINT *        mappingTable;
+    /* temp register mapping table */
+    gctUINT32       tempMappingTableEntries;
+    gctUINT16 *     tempMappingTable;
+    /* uniform mapping table */
+    gctUINT32       uniformMappingTableEntries;
+    gctUINT16 *     uniformMappingTable;
+
     gcLibraryList * next;
 };
 
@@ -4178,7 +4219,7 @@ struct _gcSHADER
     gctUINT                     ltcInstructionCount;  /* the total instruction count of the LTC expressions */
     gcSL_INSTRUCTION            ltcExpressions;       /* the expression array for ltc uniforms, which is a list of instructions */
 
-    PLTCValue                   ltcValues;  /* Save the LTC values that can be evaluated within link time. */
+    PLTCValue                   ltcUniformValues;  /* Save the LTC uniform values that can be evaluated within link time. */
 
 #if gcdUSE_WCLIP_PATCH
     gctBOOL                     vsPositionZDependsOnW;    /* for wClip */

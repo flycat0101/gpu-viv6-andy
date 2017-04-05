@@ -1,6 +1,6 @@
 ;#############################################################################
 ;#
-;#   Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+;#   Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 ;#
 ;#   The material in this file is confidential and contains trade secrets
 ;#   of Vivante Corporation. This is proprietary information owned by
@@ -135,6 +135,7 @@ EXPORTS
     gcSHADER_GetIoBlockVariable
     gcSHADER_GetIoBlockVariableCount
     gcSHADER_GetVariable
+	gcSHADER_GetVariableByName
     gcSHADER_GetVariableCount
     gcSHADER_GetTempCount
     gcSHADER_GetVariableIndexingRange
@@ -254,6 +255,7 @@ EXPORTS
 	gcGetHWCaps
     gcGetGLSLCaps
     gcInitGLSLCaps
+    gcUseFullNewLinker
     gcOPT_DoConstantFoldingLTC
     gcOPT_GetUniformSrcLTC
     gcBLOCKTABLE_Init
@@ -276,6 +278,7 @@ EXPORTS
     gcSHADER_FreeRecompilerLibrary
     gcSHADER_FreeBlendLibrary
     gcLoadCLPatchLibrary
+	gcFreeCLPatchLibrary
     gcSHADER_DumpSource
     gcSHADER_DoPatch
     gcSHADER_GoVIRPass

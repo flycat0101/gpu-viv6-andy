@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -21,9 +21,10 @@
 
 const VkExtensionProperties g_DeviceExtensions[] =
 {
-    {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_SWAPCHAIN_SPEC_VERSION},
-#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 24)
+#if defined(VK_USE_PLATFORM_ANDROID_KHR) && (ANDROID_SDK_VERSION >= 24)
     {VK_ANDROID_NATIVE_BUFFER_EXTENSION_NAME, VK_ANDROID_NATIVE_BUFFER_SPEC_VERSION},
+#else
+    {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_SWAPCHAIN_SPEC_VERSION},
 #endif
 };
 
@@ -461,7 +462,6 @@ static void __vki_InitializeShaderCaps(
     shaderCaps->provokingVertex = gcvPROVOKING_VERTEX_UNDEFINE;
     shaderCaps->maxGsInvocationCount = phyDevProp->limits.maxGeometryShaderInvocations;
 
-    /* (TODO) need to remove it later */
     gcInitializeCompiler(gcvPATCH_INVALID, &phyDev->vscCoreSysCtx.hwCfg, &phyDev->shaderCaps);
 
 #if __VK_NEW_DEVICE_QUEUE
@@ -786,7 +786,6 @@ static void __vki_InitializePhysicalDevicePorperties(
     phyDev->phyDevProp.pipelineCacheUUID[14] = 0x3c;
     phyDev->phyDevProp.pipelineCacheUUID[15] = 0x85;
 
-    /* Sparse properties.  TODO. */
     phyDev->phyDevProp.sparseProperties.residencyAlignedMipSize                  = VK_FALSE;
     phyDev->phyDevProp.sparseProperties.residencyNonResidentStrict               = VK_FALSE;
     phyDev->phyDevProp.sparseProperties.residencyStandard2DBlockShape            = VK_FALSE;
@@ -895,7 +894,6 @@ static void __vki_InitializePhysicalDevicePorperties(
     phyDev->phyDevProp.limits.maxComputeWorkGroupSize[1]                      = 128;
     phyDev->phyDevProp.limits.maxComputeWorkGroupSize[2]                      = 64;
 
-    /* Precision bits. (TODO: refine based on HW) */
     phyDev->phyDevProp.limits.subPixelPrecisionBits                           = 4;
     phyDev->phyDevProp.limits.subTexelPrecisionBits                           =
         database->TX_8bit_UVFrac ? 8 : (database->REG_TX6bitFrac ? 6 : 5);
@@ -1270,7 +1268,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceImageFormatProperties(
             }
         }
 
-        /* TODO: This is simple first pass implementation and needs to be refined to reflect true HW. */
         pImageFormatProperties->maxExtent.width       = maxDim;
         pImageFormatProperties->maxExtent.height      = 1;
         pImageFormatProperties->maxExtent.depth       = 1;

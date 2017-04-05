@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -13,6 +13,8 @@
 
 #Enable Hardware Kernels
 VX_KENRELS_HW     := 1
+
+CAFFE_MODEL       := 1
 
 CFLAGS  += -D_LITTLE_ENDIAN_ \
            -DOPENVX_USE_LIST \

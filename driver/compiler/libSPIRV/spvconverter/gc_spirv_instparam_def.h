@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1138,7 +1138,7 @@
         { OperandId, },
         { "'Float Value'", },
         { gcvNULL },
-        VIR_OP_CONV, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_CONVERT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpConvertFToS = 110 */
@@ -1149,7 +1149,7 @@
         { OperandId, },
         { "'Float Value'", },
         { gcvNULL },
-        VIR_OP_CONV, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_CONVERT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpConvertSToF = 111 */
@@ -1160,7 +1160,7 @@
         { OperandId, },
         { "'Signed Value'", },
         { gcvNULL },
-        VIR_OP_CONV, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_CONVERT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpConvertUToF = 112 */
@@ -1171,7 +1171,7 @@
         { OperandId, },
         { "'Unsigned Value'", },
         { gcvNULL },
-        VIR_OP_CONV, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_CONVERT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpUConvert = 113 */
@@ -1782,7 +1782,7 @@
         { OperandId, OperandId, OperandId, },
         { "'Condition'", "'Object 1'", "'Object 2'", },
         { gcvNULL },
-        VIR_OP_SELECT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_CSELECT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpIEqual = 170 */
@@ -2281,7 +2281,7 @@
         { OperandNone },
         { gcvNULL },
         { gcvNULL },
-        VIR_OP_EMIT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_EMIT0, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpEndPrimitive = 219 */
@@ -2292,7 +2292,7 @@
         { OperandNone },
         { gcvNULL },
         { gcvNULL },
-        VIR_OP_RESTART, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_RESTART0, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpEmitStreamVertex = 220 */
@@ -2303,7 +2303,7 @@
         { OperandId, },
         { "'Stream'", },
         { gcvNULL },
-        VIR_OP_EMIT, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_EMIT0, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* SpvOpEndStreamPrimitive = 221 */
@@ -2314,7 +2314,7 @@
         { OperandId, },
         { "'Stream'", },
         { gcvNULL },
-        VIR_OP_RESTART, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
+        VIR_OP_RESTART0, VIR_TYPE_UNKNOWN, VIR_MOD_NONE
     },
 
     /* Unknown = 222 */

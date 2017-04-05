@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,6 +23,8 @@
 /******************************************************************************\
 |********************************* Structures *********************************|
 \******************************************************************************/
+
+#define gcdTEXTURE_PATCH_STATUS_APPENDMEM       0x1
 
 typedef struct _gcsMIPMAP *     gcsMIPMAP_PTR;
 
@@ -58,7 +60,7 @@ struct _gcsMIPMAP
     gcoSURF                     surface;
     gctPOINTER                  locked;
     gctUINT32                   address;
-
+    gctUINT32                   patchStatus;
     /* Next mipmap level. */
     gcsMIPMAP_PTR               next;
 };
@@ -107,7 +109,6 @@ struct _gcoTEXTURE
 
     gctINT                      descCurIndex;
     gcsTXDescNode               descArray[gcdMAX_TXDESC_ARRAY_SIZE];
-
 };
 
 
@@ -196,9 +197,6 @@ static gceSTATUS _uploadBlitBlt(
     srcLocked = gcvFALSE;
     dstLocked = gcvFALSE;
 
-    /* TODO: All format should be supported by blt engine.
-    ** check failed format.
-    */
     status = gcoHARDWARE_CanDo3DBlitBlt(args->format, args->dstSurf->format);
     if(gcmIS_ERROR(status))
     {
@@ -279,10 +277,6 @@ static gceSTATUS _uploadBlitBlt(
         srcSurf->alignedW = args->dstSurf->alignedW;
         srcSurf->alignedH = args->dstSurf->alignedH;
 
-        /* update size.*/
-        width  *= srcSurf->sampleInfo.x;
-        height *= srcSurf->sampleInfo.y;
-
         gcmERR_BREAK(gcoSURF_QueryFormat(args->format, &formatInfo));
         srcSurf->formatInfo = *formatInfo;
         /* Set dimensions of surface. */
@@ -295,7 +289,7 @@ static gceSTATUS _uploadBlitBlt(
         */
         srcSurf->stride = args->stride;
 
-        srcSurf->sliceSize = args->rectSize.y * srcSurf->stride;
+        srcSurf->sliceSize = height * srcSurf->stride;
 
         srcSurf->size = srcSurf->layerSize = srcSurf->sliceSize;
 
@@ -328,7 +322,7 @@ static gceSTATUS _uploadBlitBlt(
         srcLocked = gcvTRUE;
 
         /* Full copy.*/
-        gcoOS_MemCopy(srcMemory, args->buf, srcSurf->size);
+        gcoOS_MemCopy(srcMemory, args->buf, srcSurf->size - (srcSurf->stride - width * (formatInfo->bitsPerPixel >> 3)));
 
         /* Flush the CPU cache. */
         gcmERR_BREAK(gcoSURF_NODE_Cache(&srcSurf->node,
@@ -581,6 +575,7 @@ gcoTEXTURE_ConstructSized(
     gcsMIPMAP_PTR map = gcvNULL;
     gctUINT level;
     gctPOINTER pointer = gcvNULL;
+    gceSURF_TYPE surfType;
 
     gcmHEADER_ARG("Format=%d Width=%d Height=%d Depth=%d "
                     "Faces=%d MipMapCount=%d Pool=%d",
@@ -633,6 +628,8 @@ gcoTEXTURE_ConstructSized(
     /* Client driver may sent depth = 0 */
     Depth = Depth > 0 ? Depth : 1;
 
+    surfType = (texture->type == gcvTEXTURE_3D) ? gcvSURF_TEXTURE_3D : gcvSURF_TEXTURE;
+
     /* Loop through all mip map. */
     for (level = 0; MipMapCount-- > 0; ++level)
     {
@@ -684,7 +681,7 @@ gcoTEXTURE_ConstructSized(
                                       gcmALIGN_NP2(Width, texture->blockWidth),
                                       gcmALIGN_NP2(Height, texture->blockHeight),
                                       gcmMAX(gcmMAX(Depth, Faces), 1),
-                                      gcvSURF_TEXTURE,
+                                      surfType,
                                       Format,
                                       Pool,
                                       &map->surface);
@@ -1844,6 +1841,7 @@ gcoTEXTURE_AddMipMapEx(
     gceSTATUS status;
     gceSURF_FORMAT format;
     gctUINT width, height, depth, faces;
+    gceSURF_TYPE surfType;
 
     gcmHEADER_ARG("Texture=0x%x Level=%d Format=%d Width=%zu Height=%zu "
                     "Depth=%zu Faces=0x%x Pool=%d",
@@ -1872,6 +1870,8 @@ gcoTEXTURE_AddMipMapEx(
     map  = gcvNULL;
     next = Texture->maps;
     /* Find the correct mip level. */
+    surfType = Protected ? gcvSURF_TEXTURE | gcvSURF_PROTECTED_CONTENT : gcvSURF_TEXTURE;
+    surfType |= (Texture->type == gcvTEXTURE_3D) ? gcvSURF_3D : 0;
     for (level = 0; level <= Level; level += 1)
     {
         /* Create gcsMIPMAP structure if doesn't yet exist. */
@@ -1900,6 +1900,7 @@ gcoTEXTURE_AddMipMapEx(
             next->pool       = gcvPOOL_UNKNOWN;
             next->surface    = gcvNULL;
             next->locked     = gcvNULL;
+            next->patchStatus = 0;
             next->next       = gcvNULL;
 
             /* Append the gcsMIPMAP structure to the end of the chain. */
@@ -2008,6 +2009,7 @@ gcoTEXTURE_AddMipMapEx(
 
             /* Reset the surface pointer. */
             map->surface = gcvNULL;
+            map->patchStatus = 0;
 
             /* A surface has been removed. */
             gcmASSERT(Texture->completeLevels > 0);
@@ -2022,7 +2024,7 @@ gcoTEXTURE_AddMipMapEx(
                                   gcmALIGN_NP2(width, Texture->blockWidth),
                                   gcmALIGN_NP2(height, Texture->blockHeight),
                                   gcmMAX(gcmMAX(depth, faces), 1),
-                                  Protected ? gcvSURF_TEXTURE | gcvSURF_PROTECTED_CONTENT : gcvSURF_TEXTURE,
+                                  surfType,
                                   Format,
                                   Pool,
                                   &map->surface));
@@ -2256,6 +2258,7 @@ gcoTEXTURE_AddMipMapFromSurface(
     map->surface    = Surface;
     map->locked     = gcvNULL;
     map->next       = gcvNULL;
+    map->patchStatus = 0;
     map->format     = format;
 
     /* Append the gcsMIPMAP structure to the end of the chain. */
@@ -3388,7 +3391,6 @@ gcoTEXTURE_RenderIntoMipMap(
     case gcvSURF_D24X8:
         /* fall through */
     case gcvSURF_D32:
-        /* TODO: just because tile filler cannot work for depth now. */
         type = gcvSURF_DEPTH_NO_TILE_STATUS;
         break;
 
@@ -4044,7 +4046,7 @@ _UpdateTextureDesc(
                gcoOS_ZeroMemory((gctPOINTER)pDescNode->descNode[layerIndex], gcmSIZEOF(gcsSURF_NODE));
                gcmONERROR(gcsSURF_NODE_Construct(pDescNode->descNode[layerIndex],
                                                  256,
-                                                 256,
+                                                 64,
                                                  gcvSURF_TXDESC,
                                                  0,
                                                  gcvPOOL_DEFAULT
@@ -4133,7 +4135,98 @@ gcoTEXTURE_SetDescDirty(
     return gcvSTATUS_OK;
 }
 
+static gceSTATUS
+_ReplaceSurfaceForBorderPatch(
+    gcoTEXTURE Texture,
+    gcsMIPMAP_PTR Map
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcoSURF surface;
+    gcoSURF curSurf = Map->surface;
+    gctUINT32 srcAddress = 0, dstAddress = 0;
+    gcsSURF_NODE_PTR lockedSrcNode = gcvNULL, lockedDstNode = gcvNULL;
 
+    gcmHEADER_ARG("Map=%p", Map);
+    gcmVERIFY_ARGUMENT(Texture != gcvNULL);
+    gcmVERIFY_ARGUMENT(Map != gcvNULL);
+
+    gcmASSERT(curSurf);
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_BORDER_CLAMP_FIX))
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
+    gcmASSERT(curSurf->node.pool != gcvPOOL_USER);
+    /* Construct the surface. */
+    gcmONERROR(
+        gcoSURF_Construct(gcvNULL,
+                          gcmALIGN_NP2(curSurf->requestW, Texture->blockWidth),
+                          gcmALIGN_NP2(curSurf->requestH, Texture->blockHeight),
+                          curSurf->requestD,
+                          curSurf->type | curSurf->hints,
+                          curSurf->format | gcvSURF_FORMAT_PATCH_BORDER,
+                          gcvPOOL_DEFAULT,
+                          &surface));
+
+    gcmONERROR(gcoSURF_SetSamples(surface, (curSurf->sampleInfo.x * curSurf->sampleInfo.y)));
+
+    gcmASSERT(curSurf->node.pool != gcvPOOL_UNKNOWN);
+    gcmASSERT(surface->node.pool != gcvPOOL_UNKNOWN);
+
+    gcmONERROR(gcoHARDWARE_LockEx(&curSurf->node, gcvENGINE_RENDER, &srcAddress, gcvNULL));
+    lockedSrcNode = &curSurf->node;
+    gcmONERROR(gcoHARDWARE_LockEx(&surface->node, gcvENGINE_RENDER, &dstAddress, gcvNULL));
+    lockedDstNode = &surface->node;
+    gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, gcvENGINE_RENDER, srcAddress, dstAddress, (gctUINT32)curSurf->size));
+    gcmONERROR(gcoHARDWARE_UnlockEx(lockedSrcNode, gcvENGINE_RENDER, curSurf->type));
+    lockedSrcNode = gcvNULL;
+    gcmONERROR(gcoHARDWARE_UnlockEx(lockedDstNode, gcvENGINE_RENDER, surface->type));
+    lockedDstNode = gcvNULL;
+
+    if (curSurf->tileStatusNode.pool != gcvPOOL_UNKNOWN)
+    {
+        gcmASSERT(surface->tileStatusNode.pool != gcvPOOL_UNKNOWN);
+        gcmONERROR(gcoHARDWARE_LockEx(&curSurf->tileStatusNode, gcvENGINE_RENDER, &srcAddress, gcvNULL));
+        lockedSrcNode = &curSurf->tileStatusNode;
+        gcmONERROR(gcoHARDWARE_LockEx(&surface->tileStatusNode, gcvENGINE_RENDER, &dstAddress, gcvNULL));
+        lockedDstNode = &surface->tileStatusNode;
+        gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, gcvENGINE_RENDER, srcAddress, dstAddress, (gctUINT32)curSurf->tileStatusNode.size));
+        gcmONERROR(gcoHARDWARE_UnlockEx(lockedSrcNode, gcvENGINE_RENDER, gcvSURF_TILE_STATUS));
+        lockedSrcNode = gcvNULL;
+        gcmONERROR(gcoHARDWARE_UnlockEx(lockedDstNode, gcvENGINE_RENDER, gcvSURF_TILE_STATUS));
+        lockedDstNode = gcvNULL;
+    }
+
+    gcmASSERT(curSurf->hzNode.pool == gcvPOOL_UNKNOWN);
+    gcmASSERT(surface->hzNode.pool == gcvPOOL_UNKNOWN);
+
+    Map->surface = surface;
+    Map->patchStatus |= gcdTEXTURE_PATCH_STATUS_APPENDMEM;
+    gcoSURF_Destroy(curSurf);
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    if (lockedSrcNode)
+    {
+        gcmONERROR(gcoHARDWARE_UnlockEx(lockedSrcNode, gcvENGINE_RENDER, surface->type));
+    }
+
+    if (lockedDstNode)
+    {
+        gcmONERROR(gcoHARDWARE_UnlockEx(lockedDstNode, gcvENGINE_RENDER, surface->type));
+    }
+
+    if (surface)
+    {
+        gcoSURF_Destroy(surface);
+    }
+
+    gcmFOOTER();
+    return status;
+}
 
 gceSTATUS
 gcoTEXTURE_BindTextureDesc(
@@ -4205,6 +4298,14 @@ gcoTEXTURE_BindTextureDesc(
         /* Normal textures(include linear RGB) can have up to 14 lods. */
         for (map = baseMipMap, lod = baseLevel; map && (lod <= (gctINT)maxLevel); map = map->next, lod++)
         {
+            if (((map->patchStatus & gcdTEXTURE_PATCH_STATUS_APPENDMEM) == 0) &&
+                 ((pTexParams->s == gcvTEXTURE_BORDER) ||
+                  (pTexParams->t == gcvTEXTURE_BORDER) ||
+                  (pTexParams->r == gcvTEXTURE_BORDER)))
+            {
+                gcmVERIFY_OK(_ReplaceSurfaceForBorderPatch(Texture, map));
+            }
+
             texSurf = map->surface;
             if (map->locked == gcvNULL)
             {
@@ -4507,6 +4608,8 @@ gcoTEXTURE_BindTextureEx(
     {
         pTexParams->lodMax = gcmMIN(maxLevel, Info->lodMax);
     }
+
+    gcmASSERT(gcvSTATUS_FALSE == gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_BORDER_CLAMP));
 
     pTexParams->lodMin = gcmMAX(pTexParams->lodMin, 0.0f);
     gcmASSERT(baseLevel <= (gctINT)maxLevel);

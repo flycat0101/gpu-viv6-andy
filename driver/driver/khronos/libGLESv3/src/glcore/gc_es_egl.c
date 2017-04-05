@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -102,11 +102,11 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID reserved)
 
       case DLL_PROCESS_DETACH:
           {
-              gcsTLS_PTR tls = gcvNULL;
-              gcoOS_QueryTLS(&tls);
-              if (tls && tls->context)
+              gcsDRIVER_TLS_PTR tls = gcvNULL;
+              gcoOS_GetDriverTLS(gcvTLS_KEY_EGL, &tls);
+              if (tls)
               {
-                  VEGLThreadData thread = (VEGLThreadData)tls->context;
+                  VEGLThreadData thread = (VEGLThreadData)tls;
                   thread->destroyESPrivate = gcvNULL;
               }
           }
@@ -114,11 +114,11 @@ BOOL WINAPI DllMain(HINSTANCE hInst, DWORD reason, LPVOID reserved)
 
       case DLL_THREAD_DETACH:
           {
-              gcsTLS_PTR tls = gcvNULL;
-              gcoOS_QueryTLS(&tls);
-              if (tls && tls->context)
+              gcsDRIVER_TLS_PTR tls = gcvNULL;
+              gcoOS_GetDriverTLS(gcvTLS_KEY_EGL, &tls);
+              if (tls)
               {
-                  VEGLThreadData thread = (VEGLThreadData)tls->context;
+                  VEGLThreadData thread = (VEGLThreadData)tls;
                   thread->destroyESPrivate = gcvNULL;
               }
           }

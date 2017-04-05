@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -66,7 +66,6 @@ gbm_viv_bo_write(struct gbm_bo *_bo, const void *buf, size_t count)
 static int
 gbm_viv_bo_get_fd(struct gbm_bo *_bo)
 {
-    /* TODO */
     return 0;
 }
 
@@ -74,7 +73,6 @@ static struct gbm_bo *
 gbm_viv_bo_import(struct gbm_device *gbm,
                   uint32_t type, void *buffer, uint32_t usage)
 {
-    /* TODO */
     return NULL;
 }
 

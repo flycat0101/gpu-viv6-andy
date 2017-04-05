@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -53,7 +53,7 @@ hwc_blank(
     }
 
     /*
-     * TODO (VENDOR): Turn on or turn off screen!.
+     * TODO (Soc-vendor): Turn on or turn off screen!.
      * Currently not supported.
      */
 
@@ -116,7 +116,7 @@ hwc_setPowerMode(
     }
 
     /*
-     * TODO (VENDOR): Power control!
+     * TODO (Soc-vendor): Power control!
      * Currently not supported.
      */
 
@@ -186,7 +186,7 @@ hwc_getDisplayConfigs(
     if (dpy != NULL && dpy->device.connected)
     {
         /*
-         * TODO (VENDOR): Support multiple configs.
+         * TODO (Soc-vendor): Support multiple configs.
          * Current only one config is supported.
          */
         configs[0]  = 0;
@@ -251,7 +251,7 @@ hwc_getDisplayAttributes(
     }
 
     /*
-     * TODO (VENDOR): Support mutiple configs.
+     * TODO (Soc-vendor): Support mutiple configs.
      * Currently only one config is supported.
      */
     if (config != 0)
@@ -414,7 +414,7 @@ hwc_getActiveConfig(
     int disp
     )
 {
-    /* TODO(VENDOR): display config management. */
+    /* TODO (Soc-vendor): display config management. */
     return 0;
 }
 #endif
@@ -446,7 +446,7 @@ hwc_setActiveConfig(
     int index
     )
 {
-    /* TODO(VENDOR): display config management. */
+    /* TODO (Soc-vendor): display config management. */
     return 0;
 }
 #endif
@@ -485,7 +485,7 @@ hwc_setCursorPositionAsync(
     int y_pos
     )
 {
-    /* TODO(VENDOR): hw cursor. */
+    /* TODO (Soc-vendor): hw cursor. */
     return 0;
 }
 #endif
@@ -600,7 +600,7 @@ hwcInitDisplays(
 
         dpy->device.framebuffer = dev;
 
-        ALOGW("TODO: HWC integration: display!");
+        ALOGW("TODO (Soc-vendor): HWC integration: display!");
 
         ALOGI("Default primary display\n"
               "xres         = %d px\n"
@@ -645,7 +645,7 @@ hwcFinishDisplays(
         if (dpy == NULL) continue;
 
         /*
-         * TODO (VENDOR): Close display.
+         * TODO (Soc-vendor): Close display.
          */
         if (dpy->device.framebuffer)
         {
@@ -720,7 +720,7 @@ hwcDisplayFrame(
 
     /*
      * Wait framebuffer-target until it can be read.
-     * TODO: some DC may receive the fd and wait it automatically.
+     * TODO (Soc-vendor): some DC may receive the fd and wait it automatically.
      */
     if (fbTarget->acquireFenceFd > 0)
     {
@@ -731,7 +731,7 @@ hwcDisplayFrame(
 
     /*
      * Wait 2D blitter until it can be read.
-     * TODO: some DC may receive the fd and wait it automatically.
+     * TODO (Soc-vendor): some DC may receive the fd and wait it automatically.
      */
     if (Display->fenceFd2D > 0)
     {
@@ -756,7 +756,7 @@ hwcDisplayFrame(
         {
             framebuffer_device_t * dev = Display->device.framebuffer;
 
-            /* TODO: Tell framebuffer wheter the buffer is compressed. */
+            /* TODO (Soc-vendor): Tell framebuffer wheter the buffer is compressed. */
 
             /* Display framebuffer target. */
             dev->post(dev, fbTarget->handle);
@@ -764,7 +764,7 @@ hwcDisplayFrame(
     }
 
     /*
-     * TODO: If DC (Overlay, Cursor, etc) is used for composition, please
+     * TODO (Soc-vendor): If DC (Overlay, Cursor, etc) is used for composition, please
      * correct these fenceFds.
      */
     HwDisplay->retireFenceFd = -1;

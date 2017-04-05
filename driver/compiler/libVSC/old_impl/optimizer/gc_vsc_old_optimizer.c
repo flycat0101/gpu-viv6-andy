@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -173,6 +173,20 @@ gcOpt_RemoveDeadCode(
     gcSL_CONDITION firstCondition = gcSL_ALWAYS, secondCondition = gcSL_ALWAYS;
 
     gcmHEADER_ARG("Optimizer=0x%x", Optimizer);
+
+    {
+        gctBOOL     useFullNewLinker = gcvFALSE;
+        gctBOOL     hasHalti2 = gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2));
+
+        useFullNewLinker = gcUseFullNewLinker(hasHalti2);
+
+        /* onlu disable old DCE for vx shader for now. */
+        if (useFullNewLinker && gcSHADER_GoVIRPass(Optimizer->shader) && gcShaderHasVivVxExtension(Optimizer->shader))
+        {
+            gcmFOOTER();
+            return status;
+        }
+    }
 
     gcmONERROR(gcOpt_RemoveNOP(Optimizer));
 
@@ -2126,7 +2140,19 @@ gcOpt_OptimizeConstantAssignment(
         gcmFOOTER();
         return status;
     }
+    {
+        gctBOOL     useFullNewLinker = gcvFALSE;
+        gctBOOL     hasHalti2 = gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2));
 
+        useFullNewLinker = gcUseFullNewLinker(hasHalti2);
+
+        /* only disable it for vx shader for now. */
+        if (useFullNewLinker && gcSHADER_GoVIRPass(Optimizer->shader) && gcShaderHasVivVxExtension(Optimizer->shader))
+        {
+            gcmFOOTER();
+            return status;
+        }
+    }
     if (Optimizer->shader->codeCount > SHADER_TOO_MANY_CODE &&
         Optimizer->jmpCount > SHADER_TOO_MANY_JMP)
     {
@@ -4034,8 +4060,7 @@ _ExpandOneFunctionCall(
     IN gcOPT_FUNCTION Function,
     IN gcOPT_CODE Caller,
     IN gctUINT RealCallerCount,
-    IN gctBOOL *RenameArgument,
-    IN gctBOOL *UpdateTempArray
+    IN gctBOOL *RenameArgument
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -4191,11 +4216,6 @@ _ExpandOneFunctionCall(
             callerFunction->kernelFunction->tempIndexEnd = tempEnd;
             callerFunction->kernelFunction->tempIndexCount = tempCount;
         }
-
-        if (UpdateTempArray)
-        {
-            *UpdateTempArray = gcvTRUE;
-        }
     }
 
     gcmFOOTER();
@@ -4212,14 +4232,13 @@ _GetInlineBudget(
     IN gcOPTIMIZER Optimizer
     )
 {
-    gceSTATUS status = gcvSTATUS_OK;
-    gctUINT vsInstMax = 0, psInstMax = 0, instMax = 0;
+    gctUINT instMax = 0;
     gctINT  budget=0;
     gcSHADER shader = Optimizer->shader;
     gctSIZE_T codeCount = Optimizer->codeTail->id + 1;
     gcePATCH_ID patchID = Optimizer->patchID;
 
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SHADER_HAS_INSTRUCTION_CACHE) &&
+    if (gcHWCaps.hwFeatureFlags.hasInstCache &&
         /* WAR for some APPs. */
         (patchID != gcvPATCH_YOUILABS_SHADERTEST && !gcdPROC_IS_WEBGL(patchID)))
     {
@@ -4235,23 +4254,13 @@ _GetInlineBudget(
     else
     {
         /* Determine the maximum number of instructions. */
-        gcmONERROR(
-            gcoHAL_QueryShaderCaps(gcvNULL,
-                                   gcvNULL,
-                                   gcvNULL,
-                                   gcvNULL,
-                                   gcvNULL,
-                                   gcvNULL,
-                                   gcvNULL,
-                                   &vsInstMax,
-                                   &psInstMax));
         if (shader->type == gcSHADER_TYPE_VERTEX)
         {
-            instMax = vsInstMax;
+            instMax = gcHWCaps.maxVSInstCount;
         }
         else
         {
-            instMax = psInstMax;
+            instMax = gcHWCaps.maxPSInstCount;
         }
     }
     /* get budget based on current shader code count */
@@ -4259,7 +4268,7 @@ _GetInlineBudget(
     {
         budget = (gctINT)(instMax - (gctUINT)(codeCount * 1.2));
     }
-OnError:
+
     return budget;
 }
 
@@ -4430,7 +4439,6 @@ _InlineSinglelFunction(
     enum ForceInlineKind forceInline;
     gcePATCH_ID patchID = Optimizer->patchID;
     gctBOOL inlineAllFunctionForCTS = gcvFALSE;
-    gctBOOL updateTempArray = gcvFALSE;
 
     if (function->shaderFunction &&
         gcoOS_StrNCmp(function->shaderFunction->name, "compare_", 8) == 0 &&
@@ -4557,8 +4565,7 @@ _InlineSinglelFunction(
                         function,
                         codeCaller,
                         realCallerCount,
-                        (realCallerCount == 0) ? &renameArgument : gcvNULL,
-                        &updateTempArray));
+                        (realCallerCount == 0) ? &renameArgument : gcvNULL));
     }
     while (realCallerCount > 0);
 
@@ -4573,11 +4580,6 @@ _InlineSinglelFunction(
     (*functionRemoved)++;
 
     status = gcvSTATUS_TRUE;
-
-    if (updateTempArray)
-    {
-        gcOpt_RebuildTempArray(Optimizer);
-    }
 
 OnError:
     /* Return the status. */
@@ -6833,8 +6835,11 @@ gcOpt_PropagateConstants(
                 }
                 else if (type == gcSL_TEMP)
                 {
+                    gcSL_FORMAT src0format = (gcSL_FORMAT) gcmSL_SOURCE_GET(codeUser->instruction.source0, Format);
                     /* Change temp usage to constant. */
                     codeUser->instruction.source0 = sourceUint;
+                    /* keep the src0format */
+                    codeUser->instruction.source0 = gcmSL_SOURCE_SET(codeUser->instruction.source0, Format, src0format);
                     codeUser->instruction.source0Index = sourceIndex;
                     codeUser->instruction.source0Indexed = sourceIndexed;
 
@@ -7039,7 +7044,9 @@ gcOpt_PropagateConstants(
                 if (type == gcSL_TEMP )
                 {
                     /* Change temp usage to constant. */
+                    gcSL_FORMAT src1format = (gcSL_FORMAT) gcmSL_SOURCE_GET(codeUser->instruction.source1, Format);
                     codeUser->instruction.source1 = sourceUint;
+                    codeUser->instruction.source1 = gcmSL_SOURCE_SET(codeUser->instruction.source1, Format, src1format);
                     codeUser->instruction.source1Index = sourceIndex;
                     codeUser->instruction.source1Indexed = sourceIndexed;
 
@@ -7277,13 +7284,13 @@ _GetLTCValue(
     gcSL_TYPE type = gcmSL_SOURCE_GET(source, Type);
     gcSL_SWIZZLE swizzle[4];
     LTCValue tempValue;
-    gctINT i, j;
+    gctINT i;
 
-    if (shader->ltcValues == gcvNULL)
+    if (shader->ltcUniformValues == gcvNULL)
     {
         gcSHADER_EvaluateLTCValueWithinLinkTime(shader);
 
-        if (shader->ltcValues == gcvNULL)
+        if (shader->ltcUniformValues == gcvNULL)
             return gcvFALSE;
     }
 
@@ -7301,34 +7308,13 @@ _GetLTCValue(
     if (type == gcSL_UNIFORM)
     {
         gctINT uniformIndex = gcmSL_INDEX_GET(sourceIndex, Index);
-        gctINT LTCCodeIndex = -1;
         gcUNIFORM uniform = shader->uniforms[uniformIndex];
 
-        if (isUniformLoadtimeConstant(uniform))
+        if (isUniformLoadtimeConstant(uniform) &&
+            GetUniformDummyUniformIndex(uniform) != -1)
         {
-            for (i = 0; i < (gctINT)GetShaderLtcInstructionCount(shader); i++)
-            {
-                if (shader->ltcCodeUniformIndex[i] == uniformIndex)
-                {
-                    LTCCodeIndex = i;
-                    break;
-                }
-            }
-
-            gcmASSERT(LTCCodeIndex >= 0 && LTCCodeIndex < (gctINT)GetShaderLtcInstructionCount(shader));
-
-            if (shader->ltcValues[LTCCodeIndex].instructionIndex != -1)
-            {
-                tempValue.elementType = shader->ltcValues[LTCCodeIndex].elementType;
-                tempValue.enable = shader->ltcValues[LTCCodeIndex].enable;
-                tempValue.instructionIndex = shader->ltcValues[LTCCodeIndex].enable;
-                tempValue.sourceInfo = shader->ltcValues[LTCCodeIndex].sourceInfo;
-                for (j = 0; j < MAX_LTC_COMPONENTS; j++)
-                {
-                    tempValue.v[j] = shader->ltcValues[LTCCodeIndex].v[j];
-                }
-            }
-            else
+            tempValue = shader->ltcUniformValues[GetUniformDummyUniformIndex(uniform)];
+            if (tempValue.enable == gcSL_ENABLE_NONE)
             {
                 match = gcvFALSE;
             }
@@ -7537,6 +7523,7 @@ _EvaluateChecking(
     OUT gctBOOL * CheckingResult
     )
 {
+    gctBOOL validCase = gcvTRUE;
     gcSL_INSTRUCTION inst = &Code->instruction;
     gcSL_FORMAT format0, format1;
     gcSL_TYPE type0, type1;
@@ -7606,12 +7593,17 @@ _EvaluateChecking(
     {
         if ((value0.enable & (1 << i)) && (value1.enable & (1 << i)))
         {
-            _EvaluateSingleChannelChecking(value0.v[i].u32,
-                                           value1.v[i].u32,
-                                           format0,
-                                           format1,
-                                           condition,
-                                           &results[i]);
+            validCase = _EvaluateSingleChannelChecking(value0.v[i].u32,
+                                                       value1.v[i].u32,
+                                                       format0,
+                                                       format1,
+                                                       condition,
+                                                       &results[i]);
+
+            if (!validCase)
+            {
+                break;
+            }
 
             if (i == 0)
                 *CheckingResult = results[i];
@@ -7620,7 +7612,7 @@ _EvaluateChecking(
         }
     }
 
-    return gcvTRUE;
+    return validCase;
 }
 
 /*******************************************************************************
@@ -7641,7 +7633,6 @@ gcOpt_RemoveRedundantCheckings(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcOPT_CODE code;
-    gctBOOL checkingResult = gcvFALSE;
     gctUINT changeCount = 0;
     gctUINT i;
 
@@ -7660,6 +7651,8 @@ gcOpt_RemoveRedundantCheckings(
         {
             if (gcmSL_TARGET_GET(code->instruction.temp, Condition) != gcSL_ALWAYS)
             {
+                gctBOOL checkingResult = gcvFALSE;
+
                 if (_EvaluateChecking(Optimizer, code, &checkingResult))
                 {
                     changeCount++;
@@ -8651,7 +8644,10 @@ gcOpt_AnalysisCode(
 #if !DX_SHADER
     /* Sometimes, bad applications may introduce undefined temp register, if so we
        need firstly change it to zero before doing any opts */
-    gcmERR_RETURN(_analyzeUndefinedRegisters(Optimizer, &modifiedCode));
+    if (!gcUseFullNewLinker(Optimizer->hwCfg.hwFeatureFlags.hasHalti2))
+    {
+        gcmERR_RETURN(_analyzeUndefinedRegisters(Optimizer, &modifiedCode));
+    }
 #endif
 
     if (modifiedCode)

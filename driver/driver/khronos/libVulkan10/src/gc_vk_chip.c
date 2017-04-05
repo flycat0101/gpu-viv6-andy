@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -27,6 +27,12 @@ VkResult __vkInitilizeChipModule(
         halti5_chip.FillBuffer = halti3_fillBuffer;
         halti5_chip.CopyBuffer = halti3_copyBuffer;
         halti5_chip.UpdateBuffer = halti3_updateBuffer;
+    }
+
+    /* Split draw path.*/
+    if (!phyDev->phyDevConfig.database->FE_PATCHLIST_FETCH_FIX)
+    {
+        halti5_chip.DrawIndexed = halti5_splitDrawIndexed;
     }
     devCtx->chipFuncs = &halti5_chip;
     return ((*devCtx->chipFuncs->InitializeChipModule)((VkDevice)devCtx));

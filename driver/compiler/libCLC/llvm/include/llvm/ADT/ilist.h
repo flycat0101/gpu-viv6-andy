@@ -615,7 +615,7 @@ public:
       }
     if (first2 != last2) transfer(last1, right, first2, last2);
   }
-  void merge(iplist &right) { return merge(right, op_less); }
+  void merge(iplist &right) { merge(right, op_less); }
 
   template<class Pr3> void sort(Pr3 pred);
   void sort() { sort(op_less); }

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -332,7 +332,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateSemaphore(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkSemaphore *sph;
+    __vkSemaphore *sph = gcvNULL;
     VkResult result = VK_SUCCESS;
 
     result = __vk_CreateObject(devCtx, __VK_OBJECT_SEMAPHORE,
@@ -347,6 +347,10 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateSemaphore(
     if (result == VK_SUCCESS)
     {
         *pSemaphore = (VkSemaphore)(uintptr_t)sph;
+    }
+    else
+    {
+        __vk_DestroyObject(devCtx, __VK_OBJECT_SEMAPHORE, (__vkObject*)sph);
     }
 
     return result;
@@ -388,6 +392,10 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateEvent(
     if (result == VK_SUCCESS)
     {
         *pEvent = (VkEvent)(uintptr_t)evt;
+    }
+    else
+    {
+        __vk_DestroyObject(devCtx, __VK_OBJECT_EVENT, (__vkObject*)evt);
     }
 
     return result;

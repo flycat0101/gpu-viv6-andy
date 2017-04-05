@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -748,7 +748,6 @@ gbm_GetDisplayVirtual(
     OUT gctINT * Height
     )
 {
-    /* TODO */
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
@@ -848,7 +847,6 @@ gbm_GetSwapInterval(
     IN gctINT_PTR Max
     )
 {
-    /* TODO */
     gcmHEADER_ARG("Display=0x%x Min=0x%x Max=0x%x", Display, Min, Max);
 
     if( Min != gcvNULL)
@@ -1331,7 +1329,6 @@ gbm_DrawImageEx(
     IN gceSURF_FORMAT Format
     )
 {
-    /* TODO */
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
@@ -1407,9 +1404,6 @@ gbm_DestroyDrawable(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-/******************************************************************************/
-/* TODO: merge functions. */
-
 #include <gc_egl_precomp.h>
 
 
@@ -1425,9 +1419,6 @@ gbm_DestroyDrawable(
  * are synchronized.
  * The idea is to wait until buffer is displayed before next time return back
  * to GPU rendering.
- *
- * TODO: But this will break frame skipping because skipped back buffer post
- * will cause infinite wait in getWindowBackBuffer.
  */
 #define SYNC_TEMPORARY_RESOLVE_SURFACES     0
 
@@ -1665,12 +1656,6 @@ _CreateWindowBuffers(
 
             for (i = 0; i < Info->multiBuffer; i++)
             {
-                /*
-                 * TODO: Check wrapper limitations.
-                 * Allocate temporary surface objects if can not wrap.
-                 *
-                 * Current logic follows former code without changes.
-                 */
                 gctUINT    offset;
                 gctPOINTER logical;
                 gctUINT    physical;
@@ -1714,9 +1699,6 @@ _CreateWindowBuffers(
                                              0, 0,
                                              Info->width, Info->height));
 
-                /* Initial lock for user-pool surface. */
-                gcmONERROR(gcoSURF_Lock(buffer->surface, gcvNULL, gcvNULL));
-
                 (void) baseType;
 
 #if gcdENABLE_3D
@@ -1757,8 +1739,6 @@ _CreateWindowBuffers(
                     Info->bufferList = buffer;
                 }
 
-                buffer = gcvNULL;
-
                 gcmTRACE(gcvLEVEL_INFO,
                          "%s(%d): buffer[%d]: yoffset=%-4d physical=%x",
                          __FUNCTION__, __LINE__,
@@ -1769,7 +1749,6 @@ _CreateWindowBuffers(
         }
         else
         {
-            gcmPRINT("%s(%d): Invalid integration!", __FUNCTION__, __LINE__);
             return gcvSTATUS_OK;
         }
     }
@@ -2899,7 +2878,6 @@ _UpdateBufferAge(
     IN struct eglBackBuffer * BackBuffer
     )
 {
-    /* TODO */
     return EGL_TRUE;
 }
 
@@ -2911,7 +2889,6 @@ _QueryBufferAge(
     OUT EGLint *BufferAge
     )
 {
-    /* TODO */
     return EGL_FALSE;
 }
 
@@ -3275,15 +3252,6 @@ _ConnectPixmap(
                                    0, 0,
                                    pixmapWidth,
                                    pixmapHeight);
-
-        if (gcmIS_ERROR(status))
-        {
-            /* Failed to wrap. */
-            break;
-        }
-
-        /* Initial lock for user-pool surface. */
-        status = gcoSURF_Lock(wrapper, gcvNULL, gcvNULL);
     }
     while (gcvFALSE);
 

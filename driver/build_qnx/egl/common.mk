@@ -54,6 +54,7 @@ SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/source/gc_egl_surface.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/source/gc_egl_swap.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/source/gc_egl_sync.o
 SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/source/gc_egl.o
+SOURCE_OBJECTS += $(driver_root)/driver/khronos/libEGL/api/gc_egl_nullws.o
 
 EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libEGL/os
 EXTRA_SRCVPATH += $(driver_root)/driver/khronos/libEGL/api
@@ -74,12 +75,7 @@ include $(MKFILES_ROOT)/qmacros.mk
 
 LIBS += screen GAL
 
-ifneq ($(filter v7, $(VARIANT_LIST)), v7)
-	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp
-	LIBS += m-vfp
-else
-	LIBS += m
-endif
+include $(qnx_build_dir)/math.mk
 
 LDFLAGS += -Wl,--version-script=$(driver_root)/driver/khronos/libEGL/source/libEGL.map
 

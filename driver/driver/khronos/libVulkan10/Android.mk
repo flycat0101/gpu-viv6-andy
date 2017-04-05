@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -55,6 +55,9 @@ LOCAL_SRC_FILES := \
 
 LOCAL_SRC_FILES += \
 	src/wsi/gc_wsi_display_fbdev.c
+
+LOCAL_GENERATED_SOURCES := \
+    $(AQREG)
 
 ifndef FIXED_ARCH_TYPE
 

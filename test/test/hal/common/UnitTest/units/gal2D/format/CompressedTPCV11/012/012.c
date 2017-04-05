@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -246,11 +246,11 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
             gcv2D_GLOBAL_COLOR_MULTIPLY_DISABLE,
             gcv2D_COLOR_MULTIPLY_DISABLE));
 
-        if (surfaceIndex == 0)
+        if (i == 0)
         {
             gcmONERROR(gco2D_DisableAlphaBlend(egn2D));
         }
-        else if (surfaceIndex < 4)
+        else if (i < 4)
         {
             gcmONERROR(gco2D_EnableAlphaBlend(egn2D,
                         128, 128,
@@ -340,6 +340,8 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
 
     /* compressed => non compressed */
+    gcmONERROR(gco2D_SetCurrentSourceIndex(egn2D, 0));
+
     gcmONERROR(gco2D_SetGenericSource(
         egn2D,
         compressedTarget->address,

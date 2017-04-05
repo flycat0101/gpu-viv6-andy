@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -11,7 +11,7 @@
 *****************************************************************************/
 
 
-/*Auto created on 2016-11-23 14:18:12*/
+/*Auto created on 2017-03-31 08:28:15*/
 static uint8_t gc_halti5_blit_comp[] = {
   0x03, 0x02, 0x23, 0x07, 0x00, 0x00, 0x01, 0x00,
   0x01, 0x00, 0x08, 0x00, 0x43, 0x04, 0x00, 0x00,

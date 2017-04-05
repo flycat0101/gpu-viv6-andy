@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -740,7 +740,6 @@ __GL_INLINE GLboolean __glDrawValidateState(__GLcontext *gc)
     ** for those cases.
     */
 
-    /* TODO: When we cover all logic of this function with dirty bits, we can check dirty before call into it*/
     return gc->dp.drawValidateState(gc);
 }
 
@@ -952,7 +951,7 @@ static GLboolean __glCheckVBOSize(__GLcontext *gc)
                     GLuint remain;
                     __GLvertexAttrib *pAttrib = &curVertexArray->attribute[index];
                     __GLvertexAttribBinding *pAttribBinding = &curVertexArray->attributeBinding[pAttrib->attribBinding];
-                    __GLbufferObject *boundVBObj = pAttribBinding->boundArrayObj;
+                    __GLbufferObject *boundVBObj = __glGetCurrentVertexArrayBufObj(gc, pAttrib->attribBinding);
 
                     if (boundVBObj)
                     {
@@ -1110,7 +1109,6 @@ __GL_INLINE GLboolean __glComputeValidateState(__GLcontext *gc)
     ** for those cases.
     */
 
-    /* TODO: When we cover all logic of this function with dirty bits, we can check dirty before call into it*/
     return gc->dp.computeValidateState(gc);
 }
 

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -37,9 +37,9 @@ include $(AQROOT)/makefile.linux.def
 
 #############################################################################
 DYNAMIC = 1
-TARGET_NAME = libdebayer_kernel.so
+TARGET_NAME = libtutorial4_kernel.so
 
-OBJECTS		= $(OBJ_DIR)/debayer_kernel.o \
+OBJECTS		= $(OBJ_DIR)/tutorial4_kernel.o \
 
 ################################################################################
 # Add extra flags for object files.
@@ -47,11 +47,11 @@ OBJECTS		= $(OBJ_DIR)/debayer_kernel.o \
 INCLUDE += -I $(VIVANTE_SDK_DIR)/include
 CFLAGS += $(INCLUDE)
 CFLAGS += -fPIC -shared
-#LFLAGS += -Wl,--version-script=laneDetection_kernels.def
+#LFLAGS += -Wl
 ################################################################################
 # Add extra library path.
 
-LIBS += -L $(VIVANTE_SDK_DIR)/drivers
+LIBS += -L $(VIVANTE_SDK_DIR)//drivers
 LIBS += -l dl -l pthread -l m -l stdc++
 LIBS += -l OpenVX
 
@@ -70,6 +70,6 @@ include $(AQROOT)/common.target
 
 ################################################################################
 ################################################################################
-# Extra installation.
+
 
 

@@ -132,7 +132,7 @@ extern _glthread_Mutex __glDrmMutex;
 
 #define LINUX_LOCK_FRAMEBUFFER_DUMMY( sPriv ) \
     do { \
-        if (sPriv->dummyContextPriv.hHWContext) { \
+        if ( sPriv->dummyContextPriv.driScreenPriv && sPriv->dummyContextPriv.hHWContext) { \
             DRMGL_LOCK(sPriv->fd, &sPriv->pSAREA->lock, sPriv->dummyContextPriv.hHWContext, 0); \
             DEBUG_LOCK(); \
         } \
@@ -140,7 +140,7 @@ extern _glthread_Mutex __glDrmMutex;
 
 #define LINUX_UNLOCK_FRAMEBUFFER_DUMMY( sPriv ) \
     do { \
-        if (sPriv->dummyContextPriv.hHWContext) { \
+        if ( sPriv->dummyContextPriv.driScreenPriv && sPriv->dummyContextPriv.hHWContext) { \
             DRMGL_UNLOCK(sPriv->fd, &sPriv->pSAREA->lock, sPriv->dummyContextPriv.hHWContext); \
             DEBUG_RESET(); \
         } \

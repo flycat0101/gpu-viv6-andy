@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -286,6 +286,9 @@ eglQueryContext(
         return EGL_FALSE;
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     /* Test for a valid context. */
     context = (VEGLContext)veglGetResObj(display,
                                          (VEGLResObj*)&display->contextStack,
@@ -415,646 +418,624 @@ eglPatchID(
 }
 
 /*
- * The following GL API functions are used for eglGetProcAddress() which is independent of the currently bound client API.
- * As different GLES client APIs have the same API entry functions, eglGetProcAddress() should always return the function
- * pointers here. And the following API functions will dispatch the API call to the currently bound client API
+ * XXX: Following typedefs and definitions are copied from GLES header file.
+ * Maybe include GLES header file directly is better.
+ *
+ * Define data types here because 'gc_egl.h' is incorrectly included by GLES
+ * driver. Duplicated typedefs may cause problems on some compilers.
  */
+typedef void GLvoid;
+typedef unsigned int GLenum;
+typedef khronos_float_t GLfloat;
+typedef khronos_int32_t GLfixed;
+typedef unsigned int GLuint;
+typedef khronos_ssize_t GLsizeiptr;
+typedef khronos_intptr_t GLintptr;
+typedef unsigned int GLbitfield;
+typedef int GLint;
+typedef khronos_uint8_t GLubyte;
+typedef unsigned char GLboolean;
+typedef int GLsizei;
+typedef khronos_int32_t GLclampx;
+typedef unsigned short   GLushort;
+
+typedef void *GLeglImageOES;
+
+#ifndef GL_API
+#define GL_API      KHRONOS_APICALL
+#endif
+
 #ifndef GL_APIENTRY
 #define GL_APIENTRY KHRONOS_APIENTRY
 #endif
 
-/* GL_OES_EGL_image */
+/*
+ * OpenGL/OpenGL ES Client API entries for eglGetProcAddress.
+ * This table only includes APIs with same name in es11 and es3x.
+ */
+#define GL_API_ENTRIES(GL_ENTRY) \
+    GL_ENTRY(void, glActiveTexture, GLenum texture) \
+    GL_ENTRY(void, glBindBuffer, GLenum target, GLuint buffer) \
+    GL_ENTRY(void, glBindTexture, GLenum target, GLuint texture) \
+    GL_ENTRY(void, glBlendFunc, GLenum sfactor, GLenum dfactor) \
+    GL_ENTRY(void, glBufferData, GLenum target, GLsizeiptr size, const void * data, GLenum usage) \
+    GL_ENTRY(void, glBufferSubData, GLenum target, GLintptr offset, GLsizeiptr size, const void * data) \
+    GL_ENTRY(void, glClear, GLbitfield mask) \
+    GL_ENTRY(void, glClearColor, GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha) \
+    GL_ENTRY(void, glClearDepthf, GLfloat d) \
+    GL_ENTRY(void, glClearStencil, GLint s) \
+    GL_ENTRY(void, glColorMask, GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha) \
+    GL_ENTRY(void, glCompressedTexImage2D, GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const void * data) \
+    GL_ENTRY(void, glCompressedTexSubImage2D, GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLsizei imageSize, const void * data) \
+    GL_ENTRY(void, glCopyTexImage2D, GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border) \
+    GL_ENTRY(void, glCopyTexSubImage2D, GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height) \
+    GL_ENTRY(void, glCullFace, GLenum mode) \
+    GL_ENTRY(void, glDeleteBuffers, GLsizei n, const GLuint * buffers) \
+    GL_ENTRY(void, glDeleteTextures, GLsizei n, const GLuint * textures) \
+    GL_ENTRY(void, glDepthFunc, GLenum func) \
+    GL_ENTRY(void, glDepthMask, GLboolean flag) \
+    GL_ENTRY(void, glDepthRangef, GLfloat n, GLfloat f) \
+    GL_ENTRY(void, glDisable, GLenum cap) \
+    GL_ENTRY(void, glDrawArrays, GLenum mode, GLint first, GLsizei count) \
+    GL_ENTRY(void, glDrawElements, GLenum mode, GLsizei count, GLenum type, const void * indices) \
+    GL_ENTRY(void, glEnable, GLenum cap) \
+    GL_ENTRY(void, glFinish, void) \
+    GL_ENTRY(void, glFlush, void) \
+    GL_ENTRY(void, glFrontFace, GLenum mode) \
+    GL_ENTRY(void, glGenBuffers, GLsizei n, GLuint * buffers) \
+    GL_ENTRY(void, glGenTextures, GLsizei n, GLuint * textures) \
+    GL_ENTRY(void, glGetBooleanv, GLenum pname, GLboolean * data) \
+    GL_ENTRY(void, glGetBufferParameteriv, GLenum target, GLenum pname, GLint * params) \
+    GL_ENTRY(GLenum, glGetError, void) \
+    GL_ENTRY(void, glGetFloatv, GLenum pname, GLfloat * data) \
+    GL_ENTRY(void, glGetIntegerv, GLenum pname, GLint * data) \
+    GL_ENTRY(void, glGetPointerv, GLenum pname, void ** params) \
+    GL_ENTRY(const GLubyte *, glGetString, GLenum name) \
+    GL_ENTRY(void, glGetTexParameterfv, GLenum target, GLenum pname, GLfloat * params) \
+    GL_ENTRY(void, glGetTexParameteriv, GLenum target, GLenum pname, GLint * params) \
+    GL_ENTRY(void, glHint, GLenum target, GLenum mode) \
+    GL_ENTRY(GLboolean, glIsBuffer, GLuint buffer) \
+    GL_ENTRY(GLboolean, glIsEnabled, GLenum cap) \
+    GL_ENTRY(GLboolean, glIsTexture, GLuint texture) \
+    GL_ENTRY(void, glLineWidth, GLfloat width) \
+    GL_ENTRY(void, glPixelStorei, GLenum pname, GLint param) \
+    GL_ENTRY(void, glPolygonOffset, GLfloat factor, GLfloat units) \
+    GL_ENTRY(void, glReadPixels, GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void * pixels) \
+    GL_ENTRY(void, glSampleCoverage, GLfloat value, GLboolean invert) \
+    GL_ENTRY(void, glScissor, GLint x, GLint y, GLsizei width, GLsizei height) \
+    GL_ENTRY(void, glStencilFunc, GLenum func, GLint ref, GLuint mask) \
+    GL_ENTRY(void, glStencilMask, GLuint mask) \
+    GL_ENTRY(void, glStencilOp, GLenum fail, GLenum zfail, GLenum zpass) \
+    GL_ENTRY(void, glTexImage2D, GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void * pixels) \
+    GL_ENTRY(void, glTexParameterf, GLenum target, GLenum pname, GLfloat param) \
+    GL_ENTRY(void, glTexParameterfv, GLenum target, GLenum pname, const GLfloat * params) \
+    GL_ENTRY(void, glTexParameteri, GLenum target, GLenum pname, GLint param) \
+    GL_ENTRY(void, glTexParameteriv, GLenum target, GLenum pname, const GLint * params) \
+    GL_ENTRY(void, glTexSubImage2D, GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void * pixels) \
+    GL_ENTRY(void, glViewport, GLint x, GLint y, GLsizei width, GLsizei height) \
+    GL_ENTRY(void, glEGLImageTargetRenderbufferStorageOES, GLenum target, GLeglImageOES image) \
+    GL_ENTRY(void, glEGLImageTargetTexture2DOES, GLenum target, GLeglImageOES image) \
+    GL_ENTRY(void, glGetBufferPointervOES, GLenum target, GLenum pname, void ** params) \
+    GL_ENTRY(void *, glMapBufferOES, GLenum target, GLenum access) \
+    GL_ENTRY(GLboolean, glUnmapBufferOES, GLenum target) \
+    GL_ENTRY(void, glMultiDrawArraysEXT, GLenum mode, const GLint * first, const GLsizei * count, GLsizei primcount) \
+    GL_ENTRY(void, glMultiDrawElementsEXT, GLenum mode, const GLsizei * count, GLenum type, const void *const* indices, GLsizei primcount) \
+    GL_ENTRY(void, glDiscardFramebufferEXT, GLenum target, GLsizei numAttachments, const GLenum *attachments) \
+    GL_ENTRY(void, glRenderbufferStorageMultisampleEXT, GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height) \
+    GL_ENTRY(void, glFramebufferTexture2DMultisampleEXT, GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLsizei samples) \
+    GL_ENTRY(void, glGetProgramBinaryOES, GLuint program, GLsizei bufSize, GLsizei *length, GLenum *binaryFormat, void *binary) \
+    GL_ENTRY(void, glProgramBinaryOES, GLuint program, GLenum binaryFormat, const void *binary, GLint length) \
+    GL_ENTRY(void, glTexDirectVIV, GLenum Target, GLsizei Width, GLsizei Height, GLenum Format, GLvoid ** Pixels) \
+    GL_ENTRY(void, glTexDirectVIVMap, GLenum Target, GLsizei Width, GLsizei Height, GLenum Format, GLvoid ** Logical, const GLuint * Physical) \
+    GL_ENTRY(void, glTexDirectMapVIV, GLenum Target, GLsizei Width, GLsizei Height, GLenum Format, GLvoid ** Logical, const GLuint * Physical) \
+    GL_ENTRY(void, glTexDirectTiledMapVIV, GLenum Target, GLsizei Width, GLsizei Height, GLenum Format, GLvoid ** Logical, const GLuint * Physical) \
+    GL_ENTRY(void, glTexDirectInvalidateVIV, GLenum Target)
 
-typedef void (GL_APIENTRY *ImageTargetTexture2DFunc)(EGLenum, void*);
-typedef void (GL_APIENTRY *ImageTargetRenderbufferStorageFunc)(EGLenum, void*);
 
-void GL_APIENTRY glEGLImageTargetTexture2DOES_Entry(EGLenum target, void* image)
+#define apiNameEntry(__ret, __api, ...) #__api,
+
+const char * glApiNames[] =
 {
-    ImageTargetTexture2DFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
+    GL_API_ENTRIES(apiNameEntry)
+};
 
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return;
-    }
+#define apiHookEntry(__ret, __api, ...) __ret (GL_APIENTRY * __api)(__VA_ARGS__);
 
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->imageTargetTex2DFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->imageTargetTex2DFunc[index] =
-                    dispatch->getProcAddr("glEGLImageTargetTexture2DOES");
-            }
-        }
-
-        extfunc = (ImageTargetTexture2DFunc)thread->imageTargetTex2DFunc[index];
-        if (extfunc)
-        {
-            (*extfunc)(target, image);
-        }
-    }
+typedef struct _veglGLAPIHook
+{
+    GL_API_ENTRIES(apiHookEntry)
 }
+veglGLAPIHook;
 
-void GL_APIENTRY glEGLImageTargetRenderbufferStorageOES_Entry(EGLenum target, void* image)
+/* Global gl hooks. Do not need to be thread specific. */
+static veglGLAPIHook glHooks[3];
+static EGLBoolean    glHoolInitialized[3];
+
+veglGLAPIHook *
+_GetGLAPIHook(
+    void
+    )
 {
-    ImageTargetRenderbufferStorageFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
+    gctSIZE_T i;
+    EGLint index = 0;
+    gctHANDLE library;
+    veglDISPATCH *dispatch = gcvNULL;
+    __eglMustCastToProperFunctionPointerType *api;
 
-    thread = veglGetThreadData();
+    VEGLThreadData thread = veglGetThreadData();
+
     if (thread == gcvNULL)
     {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-
-        return;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->imageTargetRBStorageFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->imageTargetRBStorageFunc[index] =
-                    dispatch->getProcAddr("glEGLImageTargetRenderbufferStorageOES");
-            }
-        }
-
-        extfunc = (ImageTargetRenderbufferStorageFunc)thread->imageTargetRBStorageFunc[index];
-        if (extfunc)
-        {
-            (*extfunc)(target, image);
-        }
-    }
-}
-
-/* GL_EXT_multi_draw_arrays */
-
-typedef void (GL_APIENTRY *MultiDrawArraysFunc)(EGLenum mode, EGLint *first, EGLint *count, EGLint primcount);
-typedef void (GL_APIENTRY *MultiDrawElementsFunc)(EGLenum mode, const EGLint *count, EGLenum type, const void* *indices, EGLint primcount);
-
-void GL_APIENTRY glMultiDrawArraysEXT_Entry(EGLenum mode, EGLint *first, EGLint *count, EGLint primcount)
-{
-    MultiDrawArraysFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->multiDrawArraysFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->multiDrawArraysFunc[index] =
-                    dispatch->getProcAddr("glMultiDrawArraysEXT");
-            }
-        }
-
-        extfunc = (MultiDrawArraysFunc)thread->multiDrawArraysFunc[index];
-        if (extfunc)
-        {
-            (*extfunc)(mode, first, count, primcount);
-        }
-    }
-}
-
-void GL_APIENTRY glMultiDrawElementsEXT_Entry(EGLenum mode, const EGLint *count, EGLenum type, const void* *indices, EGLint primcount)
-{
-    MultiDrawElementsFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->multiDrawElementsFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->multiDrawElementsFunc[index] =
-                    dispatch->getProcAddr("glMultiDrawElementsEXT");
-            }
-        }
-
-        extfunc = (MultiDrawElementsFunc)thread->multiDrawElementsFunc[index];
-        if (extfunc)
-        {
-            (*extfunc)(mode, count, type, indices, primcount);
-        }
-    }
-}
-
-/* GL_OES_mapbuffer */
-
-typedef void (GL_APIENTRY *GetBufferPointervFunc)(EGLenum target, EGLenum pname, void** params);
-typedef void* (GL_APIENTRY *MapBufferFunc)(EGLenum target, EGLenum access);
-typedef EGLBoolean (GL_APIENTRY *UnmapBufferFunc)(EGLenum target);
-
-void GL_APIENTRY glGetBufferPointervOES_Entry(EGLenum target, EGLenum pname, void** params)
-{
-    GetBufferPointervFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->getBufferPointervFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->getBufferPointervFunc[index] =
-                    dispatch->getProcAddr("glGetBufferPointervOES");
-            }
-        }
-
-        extfunc = (GetBufferPointervFunc)thread->getBufferPointervFunc[index];
-        if (extfunc)
-        {
-            (*extfunc)(target, pname, params);
-        }
-    }
-}
-
-void* GL_APIENTRY glMapBufferOES_Entry(EGLenum target, EGLenum access)
-{
-    MapBufferFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
         return gcvNULL;
     }
 
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
+    if (thread->esContext)
     {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->mapBufferFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->mapBufferFunc[index] =
-                    dispatch->getProcAddr("glMapBufferOES");
-            }
-        }
-
-        extfunc = (MapBufferFunc)thread->mapBufferFunc[index];
-        if (extfunc)
-        {
-            return (*extfunc)(target, access);
-        }
+        index = MAJOR_API_VER(thread->esContext->client) - 1;
     }
 
-    return gcvNULL;
+    if (glHoolInitialized[index])
+    {
+        return &glHooks[index];
+    }
+
+    /* To avoid multiple initializations. */
+    gcoOS_LockPLS();
+
+    /* Check again. */
+    if (glHoolInitialized[index])
+    {
+        gcoOS_UnLockPLS();
+        return &glHooks[index];
+    }
+
+    /* Get client driver. */
+    library  = thread->clientHandles[vegl_OPENGL_ES11 + index];
+    dispatch = thread->dispatchTables[vegl_OPENGL_ES11 + index];
+
+    if (dispatch == gcvNULL && index == 0)
+    {
+        /* Try commit-line profile. */
+        library  = thread->clientHandles[vegl_OPENGL_ES11_CL];
+        dispatch = thread->dispatchTables[vegl_OPENGL_ES11_CL];
+    }
+
+    /* Dispatch should not be null. */
+    gcmASSERT(dispatch != gcvNULL);
+
+    /* Set as initialized. */
+    glHoolInitialized[index] = EGL_TRUE;
+
+    /* Cast glHook as function pointer array. */
+    api = (__eglMustCastToProperFunctionPointerType *) &glHooks[index];
+
+    /* Now load the symbols. */
+    for (i = 0; i < gcmCOUNTOF(glApiNames); i++)
+    {
+        __eglMustCastToProperFunctionPointerType func = gcvNULL;
+
+        if (dispatch->getProcAddr)
+        {
+            func = dispatch->getProcAddr(glApiNames[i]);
+        }
+
+        if (!func && library)
+        {
+            gcoOS_GetProcAddress(gcvNULL, library, glApiNames[i], (gctPOINTER *) &func);
+        }
+
+        *api++ = func;
+    }
+
+    gcoOS_UnLockPLS();
+    return &glHooks[index];
 }
 
-EGLBoolean GL_APIENTRY glUnmapBufferOES_Entry(EGLenum target)
+
+/*
+ * define forward functions, like
+ * GLvoid forward_##glXXX(...)
+ */
+#define API_ENTRY(__api) forward_##__api
+
+#define CALL_GL_API(__api, ...) \
+    veglGLAPIHook *hook = _GetGLAPIHook(); \
+    if (hook && hook->__api) \
+    { \
+        hook->__api(__VA_ARGS__); \
+    }
+
+#define CALL_GL_API_RETURN(__api, ...) \
+    veglGLAPIHook *hook = _GetGLAPIHook(); \
+    if (hook && hook->__api) \
+    { \
+        return hook->__api(__VA_ARGS__); \
+    } \
+    return 0;
+
+static void GL_APIENTRY API_ENTRY(glActiveTexture)(GLenum texture)
 {
-    UnmapBufferFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return gcvFALSE;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->unmapBufferFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->unmapBufferFunc[index] =
-                    dispatch->getProcAddr("glUnmapBufferOES");
-            }
-        }
-
-        extfunc = (UnmapBufferFunc)thread->unmapBufferFunc[index];
-        if (extfunc)
-        {
-            return (*extfunc)(target);
-        }
-    }
-
-    return gcvFALSE;
+    CALL_GL_API(glActiveTexture, texture);
 }
 
-/* GL_EXT_discard_framebuffer */
-
-typedef void (GL_APIENTRY *DiscardFramebufferFunc)(EGLenum target, EGLint numAttachments, const EGLenum *attachments);
-
-void GL_APIENTRY glDiscardFramebufferEXT_Entry(EGLenum target, EGLint numAttachments, const EGLenum *attachments)
+static void GL_APIENTRY API_ENTRY(glBindBuffer)(GLenum target, GLuint buffer)
 {
-    DiscardFramebufferFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->discardFramebuffer[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->discardFramebuffer[index] =
-                    dispatch->getProcAddr("glDiscardFramebufferEXT");
-            }
-        }
-
-        extfunc = (DiscardFramebufferFunc)thread->discardFramebuffer[index];
-        if (extfunc)
-        {
-            (*extfunc)(target, numAttachments, attachments);
-        }
-    }
+    CALL_GL_API(glBindBuffer, target, buffer);
 }
 
-/* GL_EXT_multisampled_render_to_texture */
-typedef void (GL_APIENTRY *RenderbufferStorageMultisampleFunc)(EGLenum target, EGLint samples, EGLenum internalformat, EGLint width, EGLint height);
-typedef void (GL_APIENTRY *FramebufferTexture2DMultisampleFunc)(EGLenum target, EGLenum attachment, EGLenum textarget, EGLint texture, EGLint level, EGLint samples);
-
-void GL_APIENTRY glRenderbufferStorageMultisampleEXT_Entry(EGLenum target, EGLint samples, EGLenum internalformat, EGLint width, EGLint height)
+static void GL_APIENTRY API_ENTRY(glBindTexture)(GLenum target, GLuint texture)
 {
-    RenderbufferStorageMultisampleFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->renderbufferStorageMultisampleFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->renderbufferStorageMultisampleFunc[index] =
-                    dispatch->getProcAddr("glRenderbufferStorageMultisampleEXT");
-            }
-        }
-
-        extfunc = (RenderbufferStorageMultisampleFunc)thread->renderbufferStorageMultisampleFunc[index];
-        if (extfunc)
-        {
-            (*extfunc)(target, samples, internalformat, width, height);
-        }
-    }
+    CALL_GL_API(glBindTexture, target, texture);
 }
 
-void GL_APIENTRY glFramebufferTexture2DMultisampleEXT_Entry(EGLenum target, EGLenum attachment, EGLenum textarget, EGLint texture, EGLint level, EGLint samples)
+static void GL_APIENTRY API_ENTRY(glBlendFunc)(GLenum sfactor, GLenum dfactor)
 {
-    FramebufferTexture2DMultisampleFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->framebufferTexture2DMultisampleFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->framebufferTexture2DMultisampleFunc[index] =
-                    dispatch->getProcAddr("glFramebufferTexture2DMultisampleEXT");
-            }
-        }
-
-        extfunc = (FramebufferTexture2DMultisampleFunc)thread->framebufferTexture2DMultisampleFunc[index];
-        if (extfunc)
-        {
-            (*extfunc)(target, attachment, textarget, texture, level, samples);
-        }
-    }
+    CALL_GL_API(glBlendFunc, sfactor, dfactor);
 }
 
-/* GL_OES_get_program_binary */
-
-typedef void (GL_APIENTRY *GetProgramBinaryFunc)(EGLint program, EGLint bufSize, EGLint* length, EGLenum* binaryFormat, void* binary);
-typedef void (GL_APIENTRY *ProgramBinaryFunc)(EGLint program, EGLenum binaryFormat, const void* binary, EGLint length);
-
-void GL_APIENTRY glGetProgramBinaryOES_Entry(EGLint program, EGLint bufSize, EGLint* length, EGLenum* binaryFormat, void* binary)
+static void GL_APIENTRY API_ENTRY(glBufferData)(GLenum target, GLsizeiptr size, const void * data, GLenum usage)
 {
-    GetProgramBinaryFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->getProgramBinaryFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->getProgramBinaryFunc[index] =
-                    dispatch->getProcAddr("glGetProgramBinaryOES");
-            }
-        }
-
-        extfunc = (GetProgramBinaryFunc)thread->getProgramBinaryFunc[index];
-        if (extfunc)
-        {
-            (*extfunc)(program, bufSize, length, binaryFormat, binary);
-        }
-    }
+    CALL_GL_API(glBufferData, target, size, data, usage);
 }
 
-void GL_APIENTRY glProgramBinaryOES_Entry(EGLint program, EGLenum binaryFormat, const void* binary, EGLint length)
+static void GL_APIENTRY API_ENTRY(glBufferSubData)(GLenum target, GLintptr offset, GLsizeiptr size, const void * data)
 {
-    ProgramBinaryFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->programBinaryFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->programBinaryFunc[index] =
-                    dispatch->getProcAddr("glProgramBinaryOES");
-            }
-        }
-
-        extfunc = (ProgramBinaryFunc)thread->programBinaryFunc[index];
-        if (extfunc)
-        {
-            (*extfunc)(program, binaryFormat, binary, length);
-        }
-    }
+    CALL_GL_API(glBufferSubData, target, offset, size, data);
 }
 
-/* GL_VIV_direct_texture */
-
-typedef void (GL_APIENTRY *TexDirectFunc)(EGLenum target, EGLint width, EGLint height, EGLenum format, void ** pixels);
-typedef void (GL_APIENTRY *TexDirectInvalidateFunc)(EGLenum target);
-typedef void (GL_APIENTRY *TexDirectVIVMapFunc)(EGLenum target, EGLint width, EGLint height, EGLenum format, void ** logical, const EGLint * physical);
-typedef void (GL_APIENTRY *TexDirectTiledMapFunc)(EGLenum target, EGLint width, EGLint height, EGLenum format, void ** logical, const EGLint * physical);
-
-void GL_APIENTRY glTexDirectVIV_Entry(EGLenum target, EGLint width, EGLint height, EGLenum format, void ** pixels)
+static void GL_APIENTRY API_ENTRY(glClear)(GLbitfield mask)
 {
-    TexDirectFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->texDirectFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->texDirectFunc[index] =
-                    dispatch->getProcAddr("glTexDirectVIV");
-            }
-        }
-
-        extfunc = (TexDirectFunc)thread->texDirectFunc[index];
-        if (extfunc)
-        {
-            (*extfunc)(target, width, height, format, pixels);
-        }
-    }
+    CALL_GL_API(glClear, mask);
 }
 
-void GL_APIENTRY glTexDirectInvalidateVIV_Entry(EGLenum target)
+static void GL_APIENTRY API_ENTRY(glClearColor)(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha)
 {
-    TexDirectInvalidateFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->texDirectInvalidateFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->texDirectInvalidateFunc[index] =
-                    dispatch->getProcAddr("glTexDirectInvalidateVIV");
-            }
-        }
-
-        extfunc = (TexDirectInvalidateFunc)thread->texDirectInvalidateFunc[index];
-        if (extfunc)
-        {
-            (*extfunc)(target);
-        }
-    }
+    CALL_GL_API(glClearColor, red, green, blue, alpha);
 }
 
-void GL_APIENTRY glTexDirectVIVMap_Entry(EGLenum target, EGLint width, EGLint height, EGLenum format, void ** logical, const EGLint * physical)
+static void GL_APIENTRY API_ENTRY(glClearDepthf)(GLfloat d)
 {
-    TexDirectVIVMapFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->texDirectMapFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->texDirectMapFunc[index] =
-                    dispatch->getProcAddr("glTexDirectVIVMap");
-            }
-        }
-
-        extfunc = (TexDirectVIVMapFunc)thread->texDirectMapFunc[index];
-        if (extfunc)
-        {
-            (*extfunc)(target, width, height, format, logical, physical);
-        }
-    }
+    CALL_GL_API(glClearDepthf, d);
 }
 
-void GL_APIENTRY glTexDirectTiledMapVIV_Entry(EGLenum target, EGLint width, EGLint height, EGLenum format, void ** logical, const EGLint * physical)
+static void GL_APIENTRY API_ENTRY(glClearStencil)(GLint s)
 {
-    TexDirectTiledMapFunc extfunc;
-    VEGLThreadData thread;
-    veglDISPATCH *dispatch;
-    EGLint index;
-
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.", __FUNCTION__, __LINE__);
-        return;
-    }
-
-    if (thread->api == EGL_OPENGL_ES_API && thread->context)
-    {
-        index = MAJOR_API_VER(thread->context->client) - 1;
-
-        if (thread->texDirectTiledMapFunc[index] == gcvNULL)
-        {
-            dispatch = _GetDispatch(thread, gcvNULL);
-
-            if (dispatch && dispatch->getProcAddr)
-            {
-                thread->texDirectTiledMapFunc[index] =
-                    dispatch->getProcAddr("glTexDirectTiledMapVIV");
-            }
-        }
-
-        extfunc = (TexDirectTiledMapFunc)thread->texDirectTiledMapFunc[index];
-        if (extfunc)
-        {
-            (*extfunc)(target, width, height, format, logical, physical);
-        }
-    }
+    CALL_GL_API(glClearStencil, s);
 }
+
+static void GL_APIENTRY API_ENTRY(glColorMask)(GLboolean red, GLboolean green, GLboolean blue, GLboolean alpha)
+{
+    CALL_GL_API(glColorMask, red, green, blue, alpha);
+}
+
+static void GL_APIENTRY API_ENTRY(glCompressedTexImage2D)(GLenum target, GLint level, GLenum internalformat, GLsizei width, GLsizei height, GLint border, GLsizei imageSize, const void * data)
+{
+    CALL_GL_API(glCompressedTexImage2D, target, level, internalformat, width, height, border, imageSize, data);
+}
+
+static void GL_APIENTRY API_ENTRY(glCompressedTexSubImage2D)(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLsizei imageSize, const void * data)
+{
+    CALL_GL_API(glCompressedTexSubImage2D, target, level, xoffset, yoffset, width, height, format, imageSize, data);
+}
+
+static void GL_APIENTRY API_ENTRY(glCopyTexImage2D)(GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border)
+{
+    CALL_GL_API(glCopyTexImage2D, target, level, internalformat, x, y, width, height, border);
+}
+
+static void GL_APIENTRY API_ENTRY(glCopyTexSubImage2D)(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height)
+{
+    CALL_GL_API(glCopyTexSubImage2D, target, level, xoffset, yoffset, x, y, width, height);
+}
+
+static void GL_APIENTRY API_ENTRY(glCullFace)(GLenum mode)
+{
+    CALL_GL_API(glCullFace, mode);
+}
+
+static void GL_APIENTRY API_ENTRY(glDeleteBuffers)(GLsizei n, const GLuint * buffers)
+{
+    CALL_GL_API(glDeleteBuffers, n, buffers);
+}
+
+static void GL_APIENTRY API_ENTRY(glDeleteTextures)(GLsizei n, const GLuint * textures)
+{
+    CALL_GL_API(glDeleteTextures, n, textures);
+}
+
+static void GL_APIENTRY API_ENTRY(glDepthFunc)(GLenum func)
+{
+    CALL_GL_API(glDepthFunc, func);
+}
+
+static void GL_APIENTRY API_ENTRY(glDepthMask)(GLboolean flag)
+{
+    CALL_GL_API(glDepthMask, flag);
+}
+
+static void GL_APIENTRY API_ENTRY(glDepthRangef)(GLfloat n, GLfloat f)
+{
+    CALL_GL_API(glDepthRangef, n, f);
+}
+
+static void GL_APIENTRY API_ENTRY(glDisable)(GLenum cap)
+{
+    CALL_GL_API(glDisable, cap);
+}
+
+static void GL_APIENTRY API_ENTRY(glDrawArrays)(GLenum mode, GLint first, GLsizei count)
+{
+    CALL_GL_API(glDrawArrays, mode, first, count);
+}
+
+static void GL_APIENTRY API_ENTRY(glDrawElements)(GLenum mode, GLsizei count, GLenum type, const void * indices)
+{
+    CALL_GL_API(glDrawElements, mode, count, type, indices);
+}
+
+static void GL_APIENTRY API_ENTRY(glEnable)(GLenum cap)
+{
+    CALL_GL_API(glEnable, cap);
+}
+
+static void GL_APIENTRY API_ENTRY(glFinish)(void)
+{
+    CALL_GL_API(glFinish);
+}
+
+static void GL_APIENTRY API_ENTRY(glFlush)(void)
+{
+    CALL_GL_API(glFlush);
+}
+
+static void GL_APIENTRY API_ENTRY(glFrontFace)(GLenum mode)
+{
+    CALL_GL_API(glFrontFace, mode);
+}
+
+static void GL_APIENTRY API_ENTRY(glGenBuffers)(GLsizei n, GLuint * buffers)
+{
+    CALL_GL_API(glGenBuffers, n, buffers);
+}
+
+static void GL_APIENTRY API_ENTRY(glGenTextures)(GLsizei n, GLuint * textures)
+{
+    CALL_GL_API(glGenTextures, n, textures);
+}
+
+static void GL_APIENTRY API_ENTRY(glGetBooleanv)(GLenum pname, GLboolean * data)
+{
+    CALL_GL_API(glGetBooleanv, pname, data);
+}
+
+static void GL_APIENTRY API_ENTRY(glGetBufferParameteriv)(GLenum target, GLenum pname, GLint * params)
+{
+    CALL_GL_API(glGetBufferParameteriv, target, pname, params);
+}
+
+static GLenum GL_APIENTRY API_ENTRY(glGetError)(void)
+{
+    CALL_GL_API_RETURN(glGetError);
+}
+
+static void GL_APIENTRY API_ENTRY(glGetFloatv)(GLenum pname, GLfloat * data)
+{
+    CALL_GL_API(glGetFloatv, pname, data);
+}
+
+static void GL_APIENTRY API_ENTRY(glGetIntegerv)(GLenum pname, GLint * data)
+{
+    CALL_GL_API(glGetIntegerv, pname, data);
+}
+
+static void GL_APIENTRY API_ENTRY(glGetPointerv)(GLenum pname, void ** params)
+{
+    CALL_GL_API(glGetPointerv, pname, params);
+}
+
+const GLubyte * GL_APIENTRY API_ENTRY(glGetString)(GLenum name)
+{
+    CALL_GL_API_RETURN(glGetString, name);
+}
+
+static void GL_APIENTRY API_ENTRY(glGetTexParameterfv)(GLenum target, GLenum pname, GLfloat * params)
+{
+    CALL_GL_API(glGetTexParameterfv, target, pname, params);
+}
+
+static void GL_APIENTRY API_ENTRY(glGetTexParameteriv)(GLenum target, GLenum pname, GLint * params)
+{
+    CALL_GL_API(glGetTexParameteriv, target, pname, params);
+}
+
+static void GL_APIENTRY API_ENTRY(glHint)(GLenum target, GLenum mode)
+{
+    CALL_GL_API(glHint, target, mode);
+}
+
+static GLboolean GL_APIENTRY API_ENTRY(glIsBuffer)(GLuint buffer)
+{
+    CALL_GL_API_RETURN(glIsBuffer, buffer);
+}
+
+static GLboolean GL_APIENTRY API_ENTRY(glIsEnabled)(GLenum cap)
+{
+    CALL_GL_API_RETURN(glIsEnabled, cap);
+}
+
+static GLboolean GL_APIENTRY API_ENTRY(glIsTexture)(GLuint texture)
+{
+    CALL_GL_API_RETURN(glIsTexture, texture);
+}
+
+static void GL_APIENTRY API_ENTRY(glLineWidth)(GLfloat width)
+{
+    CALL_GL_API(glLineWidth, width);
+}
+
+static void GL_APIENTRY API_ENTRY(glPixelStorei)(GLenum pname, GLint param)
+{
+    CALL_GL_API(glPixelStorei, pname, param);
+}
+
+static void GL_APIENTRY API_ENTRY(glPolygonOffset)(GLfloat factor, GLfloat units)
+{
+    CALL_GL_API(glPolygonOffset, factor, units);
+}
+
+static void GL_APIENTRY API_ENTRY(glReadPixels)(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void * pixels)
+{
+    CALL_GL_API(glReadPixels, x, y, width, height, format, type, pixels);
+}
+
+static void GL_APIENTRY API_ENTRY(glSampleCoverage)(GLfloat value, GLboolean invert)
+{
+    CALL_GL_API(glSampleCoverage, value, invert);
+}
+
+static void GL_APIENTRY API_ENTRY(glScissor)(GLint x, GLint y, GLsizei width, GLsizei height)
+{
+    CALL_GL_API(glScissor, x, y, width, height);
+}
+
+static void GL_APIENTRY API_ENTRY(glStencilFunc)(GLenum func, GLint ref, GLuint mask)
+{
+    CALL_GL_API(glStencilFunc, func, ref, mask);
+}
+
+static void GL_APIENTRY API_ENTRY(glStencilMask)(GLuint mask)
+{
+    CALL_GL_API(glStencilMask, mask);
+}
+
+static void GL_APIENTRY API_ENTRY(glStencilOp)(GLenum fail, GLenum zfail, GLenum zpass)
+{
+    CALL_GL_API(glStencilOp, fail, zfail, zpass);
+}
+
+static void GL_APIENTRY API_ENTRY(glTexImage2D)(GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLint border, GLenum format, GLenum type, const void * pixels)
+{
+    CALL_GL_API(glTexImage2D, target, level, internalformat, width, height, border, format, type, pixels);
+}
+
+static void GL_APIENTRY API_ENTRY(glTexParameterf)(GLenum target, GLenum pname, GLfloat param)
+{
+    CALL_GL_API(glTexParameterf, target, pname, param);
+}
+
+static void GL_APIENTRY API_ENTRY(glTexParameterfv)(GLenum target, GLenum pname, const GLfloat * params)
+{
+    CALL_GL_API(glTexParameterfv, target, pname, params);
+}
+
+static void GL_APIENTRY API_ENTRY(glTexParameteri)(GLenum target, GLenum pname, GLint param)
+{
+    CALL_GL_API(glTexParameteri, target, pname, param);
+}
+
+static void GL_APIENTRY API_ENTRY(glTexParameteriv)(GLenum target, GLenum pname, const GLint * params)
+{
+    CALL_GL_API(glTexParameteriv, target, pname, params);
+}
+
+static void GL_APIENTRY API_ENTRY(glTexSubImage2D)(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const void * pixels)
+{
+    CALL_GL_API(glTexSubImage2D, target, level, xoffset, yoffset, width, height, format, type, pixels);
+}
+
+static void GL_APIENTRY API_ENTRY(glViewport)(GLint x, GLint y, GLsizei width, GLsizei height)
+{
+    CALL_GL_API(glViewport, x, y, width, height);
+}
+
+static void GL_APIENTRY API_ENTRY(glEGLImageTargetRenderbufferStorageOES)(GLenum target, GLeglImageOES image)
+{
+    CALL_GL_API(glEGLImageTargetRenderbufferStorageOES, target, image);
+}
+
+static void GL_APIENTRY API_ENTRY(glEGLImageTargetTexture2DOES)(GLenum target, GLeglImageOES image)
+{
+    CALL_GL_API(glEGLImageTargetTexture2DOES, target, image);
+}
+
+static void GL_APIENTRY API_ENTRY(glGetBufferPointervOES)(GLenum target, GLenum pname, void ** params)
+{
+    CALL_GL_API(glGetBufferPointervOES, target, pname, params);
+}
+
+static void * GL_APIENTRY API_ENTRY(glMapBufferOES)(GLenum target, GLenum access)
+{
+    CALL_GL_API_RETURN(glMapBufferOES, target, access);
+}
+
+static GLboolean GL_APIENTRY API_ENTRY(glUnmapBufferOES)(GLenum target)
+{
+    CALL_GL_API_RETURN(glUnmapBufferOES, target);
+}
+
+static void GL_APIENTRY API_ENTRY(glMultiDrawArraysEXT)(GLenum mode, const GLint * first, const GLsizei * count, GLsizei primcount)
+{
+    CALL_GL_API(glMultiDrawArraysEXT, mode, first, count, primcount);
+}
+
+static void GL_APIENTRY API_ENTRY(glMultiDrawElementsEXT)(GLenum mode, const GLsizei * count, GLenum type, const void *const* indices, GLsizei primcount)
+{
+    CALL_GL_API(glMultiDrawElementsEXT, mode, count, type, indices, primcount);
+}
+
+static void GL_APIENTRY API_ENTRY(glDiscardFramebufferEXT)(GLenum target, GLsizei numAttachments, const GLenum *attachments)
+{
+    CALL_GL_API(glDiscardFramebufferEXT, target, numAttachments, attachments);
+}
+
+static void GL_APIENTRY API_ENTRY(glRenderbufferStorageMultisampleEXT)(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height)
+{
+    CALL_GL_API(glRenderbufferStorageMultisampleEXT, target, samples, internalformat, width, height);
+}
+
+static void GL_APIENTRY API_ENTRY(glFramebufferTexture2DMultisampleEXT)(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLsizei samples)
+{
+    CALL_GL_API(glFramebufferTexture2DMultisampleEXT, target, attachment, textarget, texture, level, samples);
+}
+
+static void GL_APIENTRY API_ENTRY(glGetProgramBinaryOES)(GLuint program, GLsizei bufSize, GLsizei *length, GLenum *binaryFormat, void *binary)
+{
+    CALL_GL_API(glGetProgramBinaryOES, program, bufSize, length, binaryFormat, binary);
+}
+
+static void GL_APIENTRY API_ENTRY(glProgramBinaryOES)(GLuint program, GLenum binaryFormat, const void *binary, GLint length)
+{
+    CALL_GL_API(glProgramBinaryOES, program, binaryFormat, binary, length);
+}
+
+static void GL_APIENTRY API_ENTRY(glTexDirectVIV)(GLenum Target, GLsizei Width, GLsizei Height, GLenum Format, GLvoid ** Pixels)
+{
+    CALL_GL_API(glTexDirectVIV, Target, Width, Height, Format, Pixels);
+}
+
+static void GL_APIENTRY API_ENTRY(glTexDirectVIVMap)(GLenum Target, GLsizei Width, GLsizei Height, GLenum Format, GLvoid ** Logical, const GLuint * Physical)
+{
+    CALL_GL_API(glTexDirectVIVMap, Target, Width, Height, Format, Logical, Physical);
+}
+
+static void GL_APIENTRY API_ENTRY(glTexDirectMapVIV)(GLenum Target, GLsizei Width, GLsizei Height, GLenum Format, GLvoid ** Logical, const GLuint * Physical)
+{
+    CALL_GL_API(glTexDirectMapVIV, Target, Width, Height, Format, Logical, Physical);
+}
+
+static void GL_APIENTRY API_ENTRY(glTexDirectTiledMapVIV)(GLenum Target, GLsizei Width, GLsizei Height, GLenum Format, GLvoid ** Logical, const GLuint * Physical)
+{
+    CALL_GL_API(glTexDirectTiledMapVIV, Target, Width, Height, Format, Logical, Physical);
+}
+
+static void GL_APIENTRY API_ENTRY(glTexDirectInvalidateVIV)(GLenum Target)
+{
+    CALL_GL_API(glTexDirectInvalidateVIV, Target);
+}
+
+#undef API_ENTRY
+#undef CALL_GL_API
+#undef CALL_GL_API_RETURN
 
 #if defined(WL_EGL_PLATFORM)
 EGLAPI EGLBoolean EGLAPIENTRY eglBindWaylandDisplayWL(EGLDisplay dpy, struct wl_display *display)
@@ -1104,8 +1085,8 @@ veglLOOKUP;
 #define eglMAKE_LOOKUP(function) \
     { #function, (__eglMustCastToProperFunctionPointerType) function }
 
-#define eglMAKE_EXT_ENTRY(function) \
-    { #function, (__eglMustCastToProperFunctionPointerType) function##_Entry }
+#define forwardGLFunction(__ret, __api, ...)   \
+    {#__api, (__eglMustCastToProperFunctionPointerType) forward_##__api},
 
 static veglLOOKUP _veglLookup[] =
 {
@@ -1184,29 +1165,8 @@ static veglLOOKUP _veglLookup[] =
     eglMAKE_LOOKUP(eglDupNativeFenceFDANDROID),
 #endif
     eglMAKE_LOOKUP(eglPatchID),
-    /* GL_OES_EGL_image */
-    eglMAKE_EXT_ENTRY(glEGLImageTargetTexture2DOES),
-    eglMAKE_EXT_ENTRY(glEGLImageTargetRenderbufferStorageOES),
-    /* GL_EXT_multi_draw_arrays */
-    eglMAKE_EXT_ENTRY(glMultiDrawArraysEXT),
-    eglMAKE_EXT_ENTRY(glMultiDrawElementsEXT),
-    /* GL_OES_mapbuffer */
-    eglMAKE_EXT_ENTRY(glGetBufferPointervOES),
-    eglMAKE_EXT_ENTRY(glMapBufferOES),
-    eglMAKE_EXT_ENTRY(glUnmapBufferOES),
-    /* GL_EXT_discard_framebuffer */
-    eglMAKE_EXT_ENTRY(glDiscardFramebufferEXT),
-    /* GL_EXT_multisampled_render_to_texture */
-    eglMAKE_EXT_ENTRY(glRenderbufferStorageMultisampleEXT),
-    eglMAKE_EXT_ENTRY(glFramebufferTexture2DMultisampleEXT),
-    /* GL_OES_get_program_binary */
-    eglMAKE_EXT_ENTRY(glGetProgramBinaryOES),
-    eglMAKE_EXT_ENTRY(glProgramBinaryOES),
-    /* GL_VIV_direct_texture */
-    eglMAKE_EXT_ENTRY(glTexDirectVIV),
-    eglMAKE_EXT_ENTRY(glTexDirectInvalidateVIV),
-    eglMAKE_EXT_ENTRY(glTexDirectVIVMap),
-    eglMAKE_EXT_ENTRY(glTexDirectTiledMapVIV),
+
+    GL_API_ENTRIES(forwardGLFunction)
 
     { gcvNULL, gcvNULL }
 };
@@ -1265,286 +1225,124 @@ _Lookup(
 
 #define gcmDEF2STRING(def) #def
 
-EGLAPI EGL_PROC EGLAPIENTRY
+EGLAPI __eglMustCastToProperFunctionPointerType EGLAPIENTRY
 eglGetProcAddress(const char *procname)
 {
-    union gcuVARIANT
-    {
-        EGL_PROC   func;
-        gctPOINTER ptr;
-    } proc;
+    __eglMustCastToProperFunctionPointerType func = gcvNULL;
     VEGLThreadData thread;
-    const char * appendix = gcvNULL;
-    veglDISPATCH * dispatch;
-#if !gcdSTATIC_LINK
-    gctHANDLE library;
-    veglAPIINDEX index;
+
+    static const char * appendix[] =
+    {
+#ifdef _EGL_APPENDIX
+        gcmDEF2STRING(_EGL_APPENDIX),
+#else
+        gcvNULL,
 #endif
-    char * name;
-    gctSIZE_T nameLen = 0, appendixLen = 0;
-    gctSIZE_T len = 0;
-    gctPOINTER pointer = gcvNULL;
+
+        /* ES11_CL and ES11. */
+#ifdef _GL_11_APPENDIX
+        gcmDEF2STRING(_GL_11_APPENDIX),
+        gcmDEF2STRING(_GL_11_APPENDIX),
+#else
+        gcvNULL,
+        gcvNULL,
+#endif
+
+#ifdef _GL_2_APPENDIX
+        gcmDEF2STRING(_GL_2_APPENDIX),
+#else
+        gcvNULL,
+#endif
+
+#ifdef _GL_3_APPENDIX
+        gcmDEF2STRING(_GL_3_APPENDIX),
+#else
+        gcvNULL,
+#endif
+
+#ifdef _VG_APPENDIX
+        gcmDEF2STRING(_VG_APPENDIX),
+#else
+        gcvNULL,
+#endif
+    };
 
     gcmHEADER_ARG("procname=%s", procname);
-
     VEGL_TRACE_API_PRE(GetProcAddress)(procname);
 
-    if ((procname == gcvNULL) || (procname[0] == '\0'))
+    do
     {
-        gcmFOOTER_ARG("0x%x", gcvNULL);
-        return gcvNULL;
-    }
+        veglAPIINDEX index;
+        gctHANDLE library;
+        veglDISPATCH * dispatch;
 
-    /* Lookup in EGL API. */
-#if defined _EGL_APPENDIX
-    proc.func = _Lookup(_veglLookup, procname, gcmDEF2STRING(_EGL_APPENDIX));
-#else
-    proc.func = _Lookup(_veglLookup, procname, gcvNULL);
-#endif
-    if (proc.func != gcvNULL)
-    {
-        goto Exit;
-    }
+        /* Lookup in EGL API. */
+        func = _Lookup(_veglLookup, procname, appendix[vegl_EGL]);
 
-    thread = veglGetThreadData();
-    if (thread == gcvNULL)
-    {
-        gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.",
-                 __FUNCTION__, __LINE__);
-
-        gcmFOOTER_ARG("0x%x", gcvNULL);
-        return gcvNULL;
-    }
-
-    dispatch = _GetDispatch(thread, gcvNULL);
-
-    switch (thread->api)
-    {
-    case EGL_OPENGL_ES_API:
-#if gcdENABLE_3D
-        if ((thread->context == gcvNULL)
-        ||  (MAJOR_API_VER(thread->context->client) == 1)
-        )
+        if (func != gcvNULL)
         {
-            /* OpenGL ES 1.1 API. */
-#if defined _GL_11_APPENDIX
-            appendix = gcmDEF2STRING(_GL_11_APPENDIX);
-#else
-            appendix = gcvNULL;
-#endif
+            break;
         }
-        else if (MAJOR_API_VER(thread->context->client) == 2)
+
+        thread = veglGetThreadData();
+        if (thread == gcvNULL)
         {
-            /* OpenGL ES 2.0 API. */
-#if defined _GL_2_APPENDIX
-            appendix = gcmDEF2STRING(_GL_2_APPENDIX);
-#else
-            appendix = gcvNULL;
-#endif
+            gcmTRACE(gcvLEVEL_ERROR, "%s(%d): veglGetThreadData failed.",
+                    __FUNCTION__, __LINE__);
+
+            break;
         }
-        else
-#endif
+
+        /* Go through drivers. */
+        for (index = vegl_EGL; index < vegl_API_LAST; index++)
         {
-            appendix = gcvNULL;
-        }
-        break;
+            char rename[128];
+            const char *name;
 
-    case EGL_OPENVG_API:
-#if defined(VIVANTE_NO_VG)
-        /* VG driver is not available. */
-        veglSetEGLerror(thread,  EGL_BAD_PARAMETER);
-        gcmTRACE_ZONE(gcvLEVEL_WARNING, gcdZONE_EGL_API,
-                      "%s(%d): %s",
-                      __FUNCTION__, __LINE__,
-                      "VG driver is not available.");
-        gcmFOOTER_ARG("0x%x", gcvNULL);
-        return gcvNULL;
-#else
-#if defined _VG_APPENDIX
-        appendix = gcmDEF2STRING(_VG_APPENDIX);
-#else
-        appendix = gcvNULL;
-#endif
-#endif
-        break;
-
-    default:
-        appendix = gcvNULL;
-        break;
-    }
-
-    if (dispatch && dispatch->getProcAddr)
-    {
-        if (appendix)
-        {
-            nameLen = gcoOS_StrLen(procname, gcvNULL);
-            appendixLen = gcoOS_StrLen(appendix, gcvNULL);
-            len = nameLen + appendixLen + 1;
-            if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
-                                           len,
-                                           &pointer)))
+            if (appendix[index])
             {
-                veglSetEGLerror(thread,  EGL_BAD_ALLOC);
-                gcmFOOTER_ARG("0x%x", gcvNULL);
-                return gcvNULL;
+                gcoOS_StrCopySafe(rename, 128, procname);
+                gcoOS_StrCatSafe(rename, 128, appendix[index]);
+                name = rename;
+            }
+            else
+            {
+                name = procname;
             }
 
-            name = pointer;
-
-            gcmVERIFY_OK(gcoOS_StrCopySafe(name, len, procname));
-            gcmVERIFY_OK(gcoOS_StrCatSafe(name, len, appendix));
-
-            proc.func = dispatch->getProcAddr(name);
-
-            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, name));
-        }
-        else
-        {
-            proc.func = dispatch->getProcAddr(procname);
-        }
-    }
-
-    if (proc.func != gcvNULL)
-    {
-        goto Exit;
-    }
-
-#if !gcdSTATIC_LINK
-    nameLen = gcoOS_StrLen(procname, gcvNULL);
-
-#if defined _EGL_APPENDIX
-    len = nameLen + gcmSIZEOF(gcmDEF2STRING(_EGL_APPENDIX)) + 1;
-
-    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
-                                   len,
-                                   (gctPOINTER *) &name)))
-    {
-        gcmFOOTER_ARG("0x%x", gcvNULL);
-        return gcvNULL;
-    }
-
-    gcmVERIFY_OK(gcoOS_StrCopySafe(name, len, procname));
-    gcmVERIFY_OK(gcoOS_StrCatSafe(name, len, gcmDEF2STRING(_EGL_APPENDIX)));
-#else
-    name = gcvNULL;
-#endif
-
-    /* Try loading from libEGL. */
-    library = thread->clientHandles[vegl_EGL];
-
-    if (library != gcvNULL)
-    {
-        if (gcmIS_SUCCESS(gcoOS_GetProcAddress(gcvNULL,
-                                               library,
-                                               procname,
-                                               &proc.ptr)))
-        {
-            goto Done;
-        }
-
-        if ((name != gcvNULL)
-        &&  gcmIS_SUCCESS(gcoOS_GetProcAddress(gcvNULL,
-                                               library,
-                                               name,
-                                               &proc.ptr))
-        )
-        {
-            goto Done;
-        }
-    }
-
-    if (name != gcvNULL)
-    {
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, name));
-    }
-
-    if (appendix == gcvNULL)
-    {
-        name = gcvNULL;
-    }
-    else
-    {
-        appendixLen = gcoOS_StrLen(appendix, gcvNULL);
-        len = nameLen + appendixLen + 1;
-        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
-                                       len,
-                                       &pointer)))
-        {
-            veglSetEGLerror(thread,  EGL_BAD_ALLOC);
-            gcmFOOTER_ARG("0x%x", gcvNULL);
-            return gcvNULL;
-        }
-
-        name = pointer;
-
-        gcmVERIFY_OK(gcoOS_StrCopySafe(name, len, procname));
-        gcmVERIFY_OK(gcoOS_StrCatSafe(name, len, appendix));
-    }
-
-    /* Try iterate all client library. */
-    for (index = 0; index < vegl_API_LAST; ++index)
-    {
-        library  = thread->clientHandles[index];
-        dispatch = thread->dispatchTables[index];
-
-        if (library != gcvNULL)
-        {
-            if (gcmIS_SUCCESS(gcoOS_GetProcAddress(gcvNULL,
-                                                   library,
-                                                   procname,
-                                                   &proc.ptr)))
-            {
-                goto Done;
-            }
+            library  = thread->clientHandles[index];
+            dispatch = thread->dispatchTables[index];
 
             if (dispatch && dispatch->getProcAddr)
             {
-                proc.func = dispatch->getProcAddr(procname);
-                if (proc.func)
+                func = dispatch->getProcAddr(name);
+
+                if (func != gcvNULL)
                 {
-                    goto Done;
+                    break;
                 }
             }
 
-            if (name)
+            if (library)
             {
                 if (gcmIS_SUCCESS(gcoOS_GetProcAddress(gcvNULL,
                                                        library,
                                                        name,
-                                                       &proc.ptr)))
+                                                       (gctPOINTER *) &func)))
                 {
-                    goto Done;
-                }
-
-                if (dispatch && dispatch->getProcAddr)
-                {
-                    proc.func = dispatch->getProcAddr(name);
-                    if (proc.func)
-                    {
-                        goto Done;
-                    }
+                    break;
                 }
             }
         }
     }
+    while (gcvFALSE);
 
-    proc.func = gcvNULL;
-
-Done:
-    veglSetEGLerror(thread,  EGL_SUCCESS);
-
-    if (name != gcvNULL)
-    {
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, name));
-    }
-#endif /* gcdSTATIC_LINK */
-
-Exit:
-    VEGL_TRACE_API_POST(GetProcAddress)(procname, proc.ptr);
+    VEGL_TRACE_API_POST(GetProcAddress)(procname, func);
     gcmDUMP_API("${EGL eglGetProcAddress (0x%08X) := 0x%08X",
-                procname, proc.func);
+                procname, func);
     gcmDUMP_API_DATA(procname, 0);
     gcmDUMP_API("$}");
-    gcmFOOTER_ARG("0x%x", proc.func);
-    return proc.func;
+    gcmFOOTER_ARG("0x%x", func);
+    return func;
 }
+

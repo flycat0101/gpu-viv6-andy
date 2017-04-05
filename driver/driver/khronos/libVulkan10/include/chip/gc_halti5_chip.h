@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -268,8 +268,8 @@ typedef struct
 
 typedef struct
 {
-    HwImgDesc imgDesc;
-    HwTxDesc txDesc;
+    HwImgDesc imgDesc[__VK_MAX_PARTS];
+    HwTxDesc txDesc[__VK_MAX_PARTS];
     HwSamplerDesc samplerDesc;
     uint32_t  patchFormat;
     halti5_patch_key patchKey;
@@ -527,6 +527,7 @@ enum halti_patch_type
     HALTI5_PATCH_UNORMALIZED_SAMPLER     = 3,
     HALTI5_PATCH_TX_GATHER               = 4,
     HALTI5_PATCH_TX_EXTRA_INPUT_GRAD     = 5,
+    HALTI5_PATCH_TX_GATHER_PCF           = 6,
 };
 
 enum
@@ -537,6 +538,7 @@ enum
     HALTI5_PATCH_UNORMALIZED_SAMPLER_BIT      = 1 << HALTI5_PATCH_UNORMALIZED_SAMPLER,
     HALTI5_PATCH_TX_GATHER_BIT                = 1 << HALTI5_PATCH_TX_GATHER,
     HALTI5_PATCH_TX_EXTRA_INPUT_GRAD_BIT      = 1 << HALTI5_PATCH_TX_EXTRA_INPUT_GRAD,
+    HALTI5_PATCH_TX_GATHER_PCF_BIT            = 1 << HALTI5_PATCH_TX_GATHER_PCF,
 
     HALTI5_PATCHKEY_ALL_BITS                = 0xFFFF,
 };
@@ -550,6 +552,7 @@ typedef struct
     uint32_t arrayIndex;
     SwizzleComponent swizzles[4];
     VkImageViewType viewType;
+    VkCompareOp   compareOp;
 } halti5_patch_info;
 
 typedef struct
@@ -764,8 +767,17 @@ VkResult halti5_draw(
     uint32_t firstInstance
     );
 
-VkResult halti5_drawIndexed
-    (VkCommandBuffer commandBuffer,
+VkResult halti5_drawIndexed(
+    VkCommandBuffer commandBuffer,
+    uint32_t indexCount,
+    uint32_t instanceCount,
+    uint32_t firstIndex,
+    int32_t vertexOffset,
+    uint32_t firstInstance
+    );
+
+VkResult halti5_splitDrawIndexed(
+    VkCommandBuffer commandBuffer,
     uint32_t indexCount,
     uint32_t instanceCount,
     uint32_t firstIndex,
@@ -990,7 +1002,9 @@ const char * halti5_helper_patchFuc(
     uint32_t patchFormat,
     uint32_t patchType,
     VkImageViewType viewType,
-    VSC_RES_OP_BIT *pOpTypeBits
+    VSC_RES_OP_BIT *pOpTypeBits,
+    VSC_RES_ACT_BIT *pActBits,
+    uint32_t *pSubType
     );
 
 VkResult halti5_bindDescriptors(

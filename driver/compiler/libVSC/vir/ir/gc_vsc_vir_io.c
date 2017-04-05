@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -476,6 +476,28 @@ VIR_IO_writeSymTable(VIR_Shader_IOBuffer *Buf, VIR_SymTable* pSymTbl)
          IS_VALID_DIRECT_HNODE_PAIR(&pair); pair = vscHTBLIterator_DirectNext(&iter))
     {
         VIR_SymId symId = (VIR_SymId)(size_t) VSC_DIRECT_HNODE_PAIR_SECOND(&pair);
+        VIR_IO_writeUint(Buf, symId);
+    }
+    /* write invalidId as last item */
+    VIR_IO_writeUint(Buf, VIR_INVALID_ID);
+
+    return errCode;
+}
+
+VSC_ErrCode
+VIR_IO_writeVirRegTable(VIR_Shader_IOBuffer *Buf, VIR_VirRegTable* pVirRegTable)
+{
+    VSC_ErrCode errCode =  VSC_ERR_NONE;
+    VSC_HASH_ITERATOR     iter;
+    VSC_DIRECT_HNODE_PAIR pair;
+
+    vscHTBLIterator_Init(&iter, pVirRegTable);
+    for (pair = vscHTBLIterator_DirectFirst(&iter);
+         IS_VALID_DIRECT_HNODE_PAIR(&pair); pair = vscHTBLIterator_DirectNext(&iter))
+    {
+        VIR_SymId virRegId = (VIR_VirRegId)(size_t) VSC_DIRECT_HNODE_PAIR_FIRST(&pair);
+        VIR_SymId symId = (VIR_SymId)(size_t) VSC_DIRECT_HNODE_PAIR_SECOND(&pair);
+        VIR_IO_writeUint(Buf, virRegId);
         VIR_IO_writeUint(Buf, symId);
     }
     /* write invalidId as last item */
@@ -1353,9 +1375,6 @@ VIR_IO_writeShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
     errCode = VIR_IO_writeIdList(buf, &pShader->perpatchOutputVregs);
     ON_ERROR(errCode, "Fail to write perpatchOutputVregs id list.");
 
-    errCode = VIR_IO_writeIdList(buf, &pShader->virRegs);
-    ON_ERROR(errCode, "Fail to write virRegs id list.");
-
     errCode = VIR_IO_writeIdList(buf, &pShader->buffers);
     ON_ERROR(errCode, "Fail to write buffers id list.");
 
@@ -1910,7 +1929,26 @@ OnError:
     return errCode;
 }
 
+VSC_ErrCode
+VIR_IO_readVirRegTable(VIR_Shader_IOBuffer *Buf, VIR_VirRegTable* pVirRegTbl)
+{
+    VSC_ErrCode errCode =  VSC_ERR_NONE;
 
+    do {
+        VIR_Id       symId;
+        VIR_Id       virRegId;
+        ON_ERROR0(VIR_IO_readUint(Buf, &virRegId));
+
+        if (virRegId == VIR_INVALID_ID)
+            break;
+
+        ON_ERROR0(VIR_IO_readUint(Buf, &symId));
+        vscHTBL_DirectSet(pVirRegTbl, (void*)(gctUINTPTR_T)virRegId, (void*)(gctUINTPTR_T)symId);
+    } while (1);
+
+OnError:
+    return errCode;
+}
 VSC_ErrCode
 VIR_IO_readNewIdList(VIR_Shader_IOBuffer *Buf, VIR_IdList** pIdList, gctBOOL Create)
 {
@@ -2818,14 +2856,17 @@ VIR_IO_readSymbol(VIR_Shader_IOBuffer *Buf, VIR_Symbol* pSymbol)
             VIR_Symbol_SetFieldInfo(pSymbol, gcvNULL);
         }
         break;
+    case VIR_SYM_VIRREG:
+        ON_ERROR0(VIR_IO_readUint(Buf, &pSymbol->u2.varSymId));
+        VIR_Shader_AddSymbolContents(Buf->shader, pSymbol, VIR_Symbol_GetVregIndex(pSymbol), gcvFALSE);
+        break;
     case VIR_SYM_TYPE:
     case VIR_SYM_LABEL:
-    case VIR_SYM_VIRREG:
     case VIR_SYM_CONST:
     case VIR_SYM_UNKNOWN:
     default:
         ON_ERROR0(VIR_IO_readUint(Buf, &pSymbol->u2.varSymId));
-        break;
+       break;
     }
     /* u3 */
     switch(symKind)
@@ -2972,9 +3013,6 @@ VIR_IO_readShader(VIR_Shader_IOBuffer *buf, VIR_Shader* pShader)
 
     errCode = VIR_IO_readIdList(buf, &pShader->perpatchOutputVregs);
     ON_ERROR(errCode, "Fail to read perpatchOutputVregs id list.");
-
-    errCode = VIR_IO_readIdList(buf, &pShader->virRegs);
-    ON_ERROR(errCode, "Fail to read virRegs id list.");
 
     errCode = VIR_IO_readIdList(buf, &pShader->buffers);
     ON_ERROR(errCode, "Fail to read buffers id list.");
@@ -4262,6 +4300,14 @@ VIR_Copy_FixSymbol(VIR_CopyContext * Ctx, VIR_Symbol* pSymbol)
         }
         break;
     case VIR_SYM_VIRREG:
+        {
+            VIR_VirRegId virRegId = VIR_Symbol_GetVregIndex(pSymbol);
+            /* add <virregId, symId> to shader virreg hash table */
+            vscHTBL_DirectSet(VIR_Shader_GetVirRegTable(Ctx->toShader),
+                             (void *)(gctUINTPTR_T)virRegId,
+                             (void *)(gctUINTPTR_T)VIR_Symbol_GetIndex(pSymbol));
+            break;
+        }
     case VIR_SYM_TYPE:
     case VIR_SYM_LABEL:
     case VIR_SYM_CONST:
@@ -4484,9 +4530,6 @@ VIR_Shader_Copy(
 
     errCode = VIR_CopyIdList(&context, &Shader->perpatchOutputVregs, &Source->perpatchOutputVregs);
     ON_ERROR(errCode, "Fail to copy perpatchOutputVregs id list.");
-
-    errCode = VIR_CopyIdList(&context, &Shader->virRegs, &Source->virRegs);
-    ON_ERROR(errCode, "Fail to copy virRegs id list.");
 
     errCode = VIR_CopyIdList(&context, &Shader->buffers, &Source->buffers);
     ON_ERROR(errCode, "Fail to copy buffers id list.");

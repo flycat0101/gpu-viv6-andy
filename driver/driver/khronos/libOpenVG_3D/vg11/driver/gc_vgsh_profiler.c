@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -504,7 +504,7 @@ endFrame(
 
                     totalVGCalls += Context->profiler.apiCalls[i];
 
-                    /* TODO: Correctly place function calls into bins. */
+                    /* VIV: [todo] Correctly place function calls into bins. */
                     switch(i + APICALLBASE)
                     {
                     case VGDRAWPATH:

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1458,128 +1458,160 @@ ppoPREPROCESSOR_ControlLine(
 
 /******************************************************************************\
 Version
+OpenGL version------GLSL Version
+2.0                 110
+2.1                 120
+3.0                 130
+3.1                 140
+3.2                 150
+3.3                 330
+4.0                 400
+4.1                 410
+4.2                 420
+4.3                 430
+
+OpenGLES version----GLSL Version
+2.0                 100
+3.0                 300
+3.1                 310
+3.2                 320
 \******************************************************************************/
 gceSTATUS ppoPREPROCESSOR_Version(ppoPREPROCESSOR PP)
 {
-    gctBOOL doWeInValidArea = PP->doWeInValidArea;
+    gctBOOL     doWeInValidArea = PP->doWeInValidArea;
     gceSTATUS   status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+    gctBOOL     isGLVersion = (sloCOMPILER_GetClientApiVersion(PP->compiler) == gcvAPI_OPENGL);
+    gctUINT32   langVersion = 0;
 
-    if(doWeInValidArea == gcvTRUE)
+    if (doWeInValidArea == gcvTRUE)
     {
-        /*Now we just support 100*/
         ppoTOKEN    ntoken = gcvNULL;
+        ppoTOKEN    nextToken = gcvNULL;
 
-        gcmONERROR(
-            PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace)
-            );
+        gcmONERROR(PP->inputStream->GetToken(PP, &(PP->inputStream), &ntoken, !ppvICareWhiteSpace));
 
-        if(ntoken->type != ppvTokenType_INT)
+        if (ntoken->type != ppvTokenType_INT)
         {
             ppoPREPROCESSOR_Report(PP,
                 slvREPORT_ERROR,
                 "Expect a number afer the #version.");
 
-            gcmONERROR(
-                ppoTOKEN_Destroy(PP, ntoken)
-                );
+            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
 
             status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
             return status;
         }
-        if(ntoken->poolString != PP->keyword->version_100)
+
+        /* Get the version integer number first. */
+        gcmONERROR(gcoOS_StrToInt(ntoken->poolString, (gctINT *)&langVersion));
+
+        /* So far we can only support OpenGL2.0/2.1 */
+        if (isGLVersion)
         {
-            gctUINT32 langVersion = 0;
-
-            if(_slHaltiSupport)
+            switch (langVersion)
             {
-                if(gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "300")))
-                {
-                    langVersion = 300;
-                }
-                else if(gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "310")))
-                {
-                    langVersion = 310;
-                }
-                else if(gcmIS_SUCCESS(gcoOS_StrCmp(ntoken->poolString, "320")))
-                {
-                    langVersion = 320;
-                }
-            }
+            case 110:
+            case 120:
+                break;
 
-            if(langVersion) {
-                ppoTOKEN nextToken = gcvNULL;
-
-
-                gcmONERROR(PP->inputStream->GetToken(PP,
-                                                     &(PP->inputStream),
-                                                     &nextToken,
-                                                     !ppvICareWhiteSpace));
-                if(gcmIS_SUCCESS(gcoOS_StrCmp(nextToken->poolString, "es")))
-                {
-                    PP->version = langVersion;
-                    sloCOMPILER_SetLanguageVersion(PP->compiler, langVersion);
-                    gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
-                }
-                else
-                {
-                    gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
-                    ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
-                                           "Expect es afer the #version directive.",
-                                           PP->currentSourceFileStringNumber,
-                                           PP->currentSourceFileLineNumber);
-
-                    gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
-
-                    status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
-                    return status;
-                }
-
-                gcmONERROR(PP->inputStream->GetToken(PP,
-                                                     &(PP->inputStream),
-                                                     &nextToken,
-                                                     !ppvICareWhiteSpace));
-
-                if (nextToken && nextToken->poolString != PP->keyword->newline)
-                {
-                    ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
-                                           "The #version directive must be followed by a newline",
-                                           PP->currentSourceFileStringNumber,
-                                           PP->currentSourceFileLineNumber);
-
-                    gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
-                    gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
-                    status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
-                    return status;
-                }
-
-                gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
-            }
-            else {
-                ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
-                                       "Expect 100 afer the #version.",
+            default:
+                ppoPREPROCESSOR_Report(PP,
+                                       slvREPORT_ERROR,
+                                       "Can not support version %d.",
                                        PP->currentSourceFileStringNumber,
-                                       PP->currentSourceFileLineNumber);
+                                       PP->currentSourceFileLineNumber,
+                                       langVersion);
 
                 gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
-
-               status = gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
-               return status;
+                return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
             }
         }
         else
         {
-            PP->version = 100;
-            sloCOMPILER_SetLanguageVersion(PP->compiler, 100);
+            switch (langVersion)
+            {
+            case 100:
+                break;
+
+            case 300:
+            case 310:
+            case 320:
+                if (!_slHaltiSupport)
+                {
+                    ppoPREPROCESSOR_Report(PP,
+                                           slvREPORT_ERROR,
+                                           "Can not support version %d.",
+                                           PP->currentSourceFileStringNumber,
+                                           PP->currentSourceFileLineNumber,
+                                           langVersion);
+
+                    gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+                    return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+                }
+                break;
+
+            default:
+                ppoPREPROCESSOR_Report(PP,
+                                       slvREPORT_ERROR,
+                                       "Can not support version %d.",
+                                       PP->currentSourceFileStringNumber,
+                                       PP->currentSourceFileLineNumber,
+                                       langVersion);
+
+                gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+                return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+            }
         }
 
-        gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+        /* For GLES 30 and above, we need to check if there is a 'es' after the version number. */
+        if (!isGLVersion && langVersion > 100)
+        {
+            gcmONERROR(PP->inputStream->GetToken(PP,
+                                                 &(PP->inputStream),
+                                                 &nextToken,
+                                                 !ppvICareWhiteSpace));
 
-        status = gcvSTATUS_OK;
+            if (!gcmIS_SUCCESS(gcoOS_StrCmp(nextToken->poolString, "es")))
+            {
+                ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
+                                       "Expect 'es' afer the #version directive.",
+                                       PP->currentSourceFileStringNumber,
+                                       PP->currentSourceFileLineNumber);
+
+                gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+                gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
+                return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+            }
+        }
+
+        gcmONERROR(PP->inputStream->GetToken(PP,
+                                             &(PP->inputStream),
+                                             &nextToken,
+                                             !ppvICareWhiteSpace));
+
+        if (nextToken && nextToken->poolString != PP->keyword->newline)
+        {
+            ppoPREPROCESSOR_Report(PP,slvREPORT_ERROR,
+                                   "The #version directive must be followed by a newline",
+                                   PP->currentSourceFileStringNumber,
+                                   PP->currentSourceFileLineNumber);
+
+            gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
+            gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
+            return gcvSTATUS_COMPILER_FE_PREPROCESSOR_ERROR;
+        }
+
+        /* Set the version. */
+        PP->version = langVersion;
+        sloCOMPILER_SetLanguageVersion(PP->compiler, langVersion);
+
+        gcmONERROR(ppoTOKEN_Destroy(PP, nextToken));
+        gcmONERROR(ppoTOKEN_Destroy(PP, ntoken));
         return status;
     }
     else
     {
-            status = ppoPREPROCESSOR_ToEOL(PP);
+        status = ppoPREPROCESSOR_ToEOL(PP);
         return status;
     }
 

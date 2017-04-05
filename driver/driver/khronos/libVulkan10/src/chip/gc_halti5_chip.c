@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -204,6 +204,8 @@ static void halti5_helper_computeCentroids(
     return;
 }
 
+#include "gc_halti5_patchlib.frag.h"
+
 static VkResult halti5_finalizeComputeBlit(
     __vkDevContext *devCtx
     )
@@ -233,6 +235,8 @@ VkResult halti5_initializeChipModule(
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
     halti5_module *chipModule;
+    SpvDecodeInfo decodeInfo;
+    VSC_SHADER_COMPILER_PARAM vscCompileParams;
     float limit;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     VkResult result = VK_SUCCESS;
@@ -547,6 +551,32 @@ VkResult halti5_initializeChipModule(
         chipModule->minorTable.pip_emit_vsinput = halti2_pip_emit_vsinput;
     }
 
+    __VK_MEMZERO(&decodeInfo, sizeof(decodeInfo));
+    decodeInfo.binary = (gctUINT *)gc_halti5_patchlib_frag;
+    decodeInfo.sizeInByte = (gctUINT)sizeof(gc_halti5_patchlib_frag);
+    decodeInfo.stageInfo = gcvNULL;
+    decodeInfo.specFlag = SPV_SPECFLAG_NONE;
+    decodeInfo.tcsInputVertices = 0;
+
+    __VK_ONERROR((gcvSTATUS_OK == gcSPV_Decode(&decodeInfo, &chipModule->patchLib)) ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+
+    __VK_MEMZERO(&vscCompileParams, sizeof(VSC_SHADER_COMPILER_PARAM));
+    vscCompileParams.cfg.ctx.clientAPI = gcvAPI_OPENVK;
+    vscCompileParams.cfg.ctx.appNameId = gcvPATCH_INVALID;
+    vscCompileParams.cfg.ctx.pSysCtx = &devCtx->vscSysCtx;
+    vscCompileParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_TO_ML
+                                | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
+                                | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
+    vscCompileParams.cfg.optFlags = VSC_COMPILER_OPT_FULL;
+    vscCompileParams.hShader = chipModule->patchLib;
+
+    __VK_ONERROR((gcvSTATUS_OK == vscCompileShader(&vscCompileParams, gcvNULL))
+                                ? VK_SUCCESS : VK_ERROR_INCOMPATIBLE_DRIVER);
+
+#if __VK_SAVE_THEN_LOAD_SHADER_BIN
+    __VK_ONERROR(__vkSaveThenLoadShaderBin(&devCtx->memCb, &chipModule->patchLib));
+#endif
+
     devCtx->chipPriv = chipModule;
 
     __VK_ONERROR(halti5_tweak_detect(devCtx));
@@ -554,6 +584,12 @@ VkResult halti5_initializeChipModule(
     return VK_SUCCESS;
 
 OnError:
+    if (chipModule->patchLib)
+    {
+        vscDestroyShader(chipModule->patchLib);
+        chipModule->patchLib = VK_NULL_HANDLE;
+    }
+
     if (chipModule)
     {
         __VK_FREE(chipModule);

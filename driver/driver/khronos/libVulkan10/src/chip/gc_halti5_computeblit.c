@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -530,13 +530,13 @@ static VkResult halti5_program_blit_dst_img(
     __vkImageView  *imgView = gcvNULL;
     __vkBufferView *bufView = gcvNULL;
     SHADER_UAV_SLOT_MAPPING *hwMapping = gcvNULL;
-    HwImgDesc hwImgDesc;
+    HwImgDesc hwImgDesc[__VK_MAX_PARTS];
     uint32_t hwConstRegAddr;
     VkExtent3D *pUserSize = gcvNULL;
     gcsHINT_PTR pHints = &blitProg->hwStates.hints;
     VkResult result = VK_SUCCESS;
 
-    __VK_MEMZERO(&hwImgDesc, sizeof(hwImgDesc));
+    __VK_MEMZERO(hwImgDesc, sizeof(hwImgDesc));
 
     if (dstRes->isImage)
     {
@@ -666,7 +666,7 @@ static VkResult halti5_program_blit_dst_img(
 
         pUserSize = &dstSize;
     }
-    __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, imgView, bufView, pUserSize, &hwImgDesc));
+    __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, imgView, bufView, pUserSize, hwImgDesc));
 
     if (imgView && imgView->formatInfo->compressed)
     {
@@ -680,7 +680,7 @@ static VkResult halti5_program_blit_dst_img(
         {
             width *= 2;
         }
-        hwImgDesc.imageInfo[2] = width | (height << 16);
+        hwImgDesc[0].imageInfo[2] = width | (height << 16);
     }
 
     hwMapping = &blitProg->dstImgEntry[0]->hwMappings[VSC_SHADER_STAGE_CS];
@@ -689,7 +689,7 @@ static VkResult halti5_program_blit_dst_img(
     hwConstRegAddr = (pHints->hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2)
                    + (hwMapping->hwLoc.pHwDirectAddrBase->hwLoc.hwRegNo * 4)
                    + hwMapping->hwLoc.pHwDirectAddrBase->firstValidHwChannel;
-    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc.imageInfo);
+    __vkCmdLoadBatchHWStates(states, hwConstRegAddr, VK_FALSE, 4, hwImgDesc[0].imageInfo);
 
 OnError:
     return result;
@@ -714,7 +714,7 @@ VkResult halti5_program_clear_dst_img(
     gcsHINT_PTR pHints = &blitProg->hwStates.hints;
     VkResult result = VK_SUCCESS;
 
-    __VK_MEMZERO(&hwImgDesc, sizeof(hwImgDesc));
+    __VK_MEMZERO(hwImgDesc, sizeof(hwImgDesc));
 
     if (dstRes->isImage)
     {

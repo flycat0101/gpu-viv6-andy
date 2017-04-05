@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -691,7 +691,6 @@ struct _gcsSL_CONSTANT_TABLE
 /* Generate hardware states. */
 gceSTATUS
 gcLINKTREE_GenerateStates(
-    IN gcoHARDWARE                      Hardware,
     IN OUT gcLINKTREE                  *pTree,
     IN gceSHADER_FLAGS                  Flags,
     IN gcsSL_USAGE_PTR                  UniformUsage,
@@ -947,9 +946,6 @@ struct _gcsCODE_GENERATOR
     gctBOOL                         subsampleDepthRegIncluded; /* no need to add implicit reg if true */
     gctINT                          subsampleDepthIndex;
     gctUINT                         subsampleDepthPhysical;
-
-    /* Hardware feature */
-    gcoHARDWARE                     hardware;
 
     /* Number of Shader cores */
     gctUINT32                       shaderCoreCount;
@@ -1334,6 +1330,16 @@ gctUINT
 gcGetDualFP16Mode(
     IN gctBOOL              HasHalti2
     );
+
+#define _MASSAGE_MAX_UNIFORM_FOR_OES30(vsUniform, psUniform)   \
+    do {                                                       \
+        if (gcPatchId == gcvPATCH_GTFES30)                     \
+        {                                                      \
+            vsUniform = gcmMAX(vsUniform, 256);                \
+            psUniform = gcmMAX(psUniform, 224);                \
+        }                                                      \
+    }                                                          \
+    while(0)                                                   \
 
 END_EXTERN_C()
 

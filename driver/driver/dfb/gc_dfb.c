@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1108,8 +1108,6 @@ gal_setup_driver( GalDriverData *drv,
             vdrv->per_process_compression = gcvFALSE;
 #endif
 
-            /* Initialize pending primitives. */
-            /* TODO: Overrided with the value from config file. */
             vdev->max_pending_num  = MAX_PENDING_NUM;
             vdev->gard_pending_num = GARD_PENDING_NUM;
         }

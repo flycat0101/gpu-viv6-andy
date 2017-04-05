@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -159,6 +159,12 @@ gcGetUniformName(
     );
 
 gctUINT8
+clConvPackedTypeToSwizzle(
+    IN cloCOMPILER Compiler,
+    IN clsGEN_CODE_DATA_TYPE PackedType
+    );
+
+gctUINT8
 clConvPackedTypeToEnable(
     IN cloCOMPILER Compiler,
     IN clsGEN_CODE_DATA_TYPE PackedType
@@ -178,6 +184,7 @@ gcGetVectorComponentEnable(
 
 gctUINT8
 gcGetDefaultSwizzle(
+    IN cloCOMPILER compiler,
     IN clsGEN_CODE_DATA_TYPE DataType
     );
 
@@ -381,12 +388,12 @@ gcsSUPER_SOURCE;
     } \
     while (gcvFALSE)
 
-#define gcsSOURCE_InitializeUsingIOperand(source, iOperand) \
+#define gcsSOURCE_InitializeUsingIOperand(compiler, source, iOperand) \
     gcsSOURCE_InitializeTempReg( \
                 (source), \
                 (iOperand)->dataType, \
                 (iOperand)->tempRegIndex, \
-                gcGetDefaultSwizzle((iOperand)->dataType), \
+                gcGetDefaultSwizzle((compiler), (iOperand)->dataType), \
                 gcSL_NOT_INDEXED, \
                 0)
 

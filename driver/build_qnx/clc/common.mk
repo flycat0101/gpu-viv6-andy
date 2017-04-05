@@ -89,19 +89,21 @@ LIBS += VSC GAL LLVM_viv
 
 CCFLAGS += -Wno-error=unused-value
 
+ifeq ($(QNX_SDP700), 1)
+# LIBS += cpp
+# TODO FIXME HACK
+LIBS += c++
+else
 LIBS += cpp
+endif
+
 EXTRA_LIBVPATH += $(QNX_TARGET)/$(CPUVARDIR)/lib/gcc/4.7.3
 
 CCFLAGS += -D_LIB -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS
 
 CCFLAGS += -DBUILD_OPENCL_12=1
 
-ifneq ($(filter v7, $(VARIANT_LIST)), v7)
-	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp
-	LIBS += m-vfp
-else
-	LIBS += m
-endif
+include $(qnx_build_dir)/math.mk
 
 LDFLAGS += -Wl,--version-script=$(driver_root)/compiler/libCLC/entry/libCLC.map
 

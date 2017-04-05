@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -411,9 +411,6 @@
 #define GLES31_COPYIMAGESUBDATA 490
 #define GLES3_GETNUNIFORMUIV    491
 
-/* Must be >= last define value + 1 - 100
-** TODO: reuse __GLES_API_ENTRIES() for all the define to share code
-*/
 #define GLES3_NUM_API_CALLS     (GLES3_GETNUNIFORMUIV + 1 - 100)
 
 #define GL3_PROFILER_FRAME_END 10

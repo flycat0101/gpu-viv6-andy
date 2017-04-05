@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -283,6 +283,8 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 
 
     /* render the result to uncompressed dst surface. */
+    gcmONERROR(gco2D_SetCurrentSourceIndex(egn2D, 0));
+
     gcmONERROR(gco2D_SetGenericSource(
          egn2D,
          t2d->surf[9]->address,

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -173,17 +173,17 @@ static gceSTATUS _RenderRectangle(
         gcmERR_BREAK(gcoHARDWARE_Stall(Hardware));
 
         /* Get format specifics. */
-        gcmERR_BREAK(gcoSURF_QueryFormat(
+        gcmERR_BREAK(gcoHARDWARE_QueryFormat(
             srcSurface->format, &srcFormatInfo
             ));
         srcSurface->formatInfo = *srcFormatInfo;
 
-        gcmERR_BREAK(gcoSURF_QueryFormat(
+        gcmERR_BREAK(gcoHARDWARE_QueryFormat(
             State->dstSurface.format, &trgFormatInfo
             ));
         State->dstSurface.formatInfo = *trgFormatInfo;
 
-        gcmERR_BREAK(gcoSURF_QueryFormat(
+        gcmERR_BREAK(gcoHARDWARE_QueryFormat(
             gcvSURF_A8R8G8B8, &intFormatInfo
             ));
 
@@ -463,7 +463,7 @@ static gctUINT _ReserveBufferSize(
         /* pattern. */
         + (usePattern ? 54 : 0)
         /* source. */
-        + ((srcCurrent > 0) ? (srcCurrent * (Hardware->features[gcvFEATURE_2D_MULTI_SOURCE_BLT_EX2] ? 72 : 68)) : 24)
+        + ((srcCurrent > 0) ? (srcCurrent * (Hardware->features[gcvFEATURE_2D_MULTI_SOURCE_BLT_EX2] ? 76 : 68)) : 24)
         /* pallete. */
         + (usePallete ? 258 : 0)
         /* input CSC. */
@@ -593,7 +593,7 @@ static gceSTATUS gcoHARDWARE_Set2DState(
         Hardware,
         State));
 
-    gcmONERROR(gcoSURF_QueryFormat(State->dstSurface.format, &dstFormatInfo));
+    gcmONERROR(gcoHARDWARE_QueryFormat(State->dstSurface.format, &dstFormatInfo));
 
     if (Hardware->features[gcvFEATURE_2D_YUV420_OUTPUT_LINEAR])
     {
@@ -870,7 +870,7 @@ static gceSTATUS gcoHARDWARE_Set2DState(
             Command != gcv2D_LINE  &&
             useSource)
         {
-            gcmONERROR(gcoSURF_QueryFormat(src->srcSurface.format, &srcFormatInfo));
+            gcmONERROR(gcoHARDWARE_QueryFormat(src->srcSurface.format, &srcFormatInfo));
 
             srcYUV420 = (srcFormatInfo->fmtClass == gcvFORMAT_CLASS_YUV &&
                          srcFormatInfo->txFormat == gcvINVALID_TEXTURE_FORMAT);
@@ -2259,88 +2259,10 @@ static gceSTATUS gcoHARDWARE_Set2DState(
     }
     else if (Hardware->features[gcvFEATURE_DEC400_COMPRESSION])
     {
-        gctUINT32 bpp, tile;
-        gcoSURF DstSurface = &State->dstSurface;
-
-        /* Set Dst */
-        dstYUV420 = (dstFormatInfo->fmtClass == gcvFORMAT_CLASS_YUV &&
-                     dstFormatInfo->txFormat == gcvINVALID_TEXTURE_FORMAT);
-
-        gcmONERROR(gcoHARDWARE_ConvertFormat(DstSurface->format, &bpp, gcvNULL));
-
-        switch (DstSurface->tiling)
-        {
-            case gcvTILED:
-                tile = 16;
-                break;
-
-            case gcvTILED_4X8:
-            case gcvTILED_8X4:
-                tile = 32;
-                break;
-
-            case gcvSUPERTILED:
-            case gcvTILED_8X8_XMAJOR:
-            case gcvTILED_8X8_YMAJOR:
-                tile = 64;
-                break;
-
-            case gcvTILED_32X4:
-                tile = 128;
-                break;
-
-            case gcvTILED_64X4:
-                tile = 256;
-                break;
-
-            default:
-                tile = 1;
-                break;
-        }
-
-        tile *= bpp / 8;
-
-        if (dstYUV420 || srcCacheType == 1 ||
-            ((gcmHASCOMPRESSION(DstSurface) && tile == 256) &&
-             (DstSurface->format == gcvSURF_NV12 ||
-              DstSurface->format == gcvSURF_NV12_10BIT)))
-        {
-            gcmONERROR(gcoHARDWARE_Load2DState32(
-                Hardware,
-                0x01328,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 20:18) - (0 ? 20:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:18) - (0 ?
- 20:18) + 1))))))) << (0 ? 20:18))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
- 20:18) - (0 ? 20:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:18) - (0 ?
- 20:18) + 1))))))) << (0 ? 20:18))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
- 17:17) + 1))))))) << (0 ? 17:17))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
- 17:17) + 1))))))) << (0 ? 17:17))))
-                ));
-        }
-        else if (gcmHASCOMPRESSION(DstSurface) && tile == 128)
-        {
-            gcmONERROR(gcoHARDWARE_Load2DState32(
-                Hardware,
-                0x01328,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 20:18) - (0 ? 20:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:18) - (0 ?
- 20:18) + 1))))))) << (0 ? 20:18))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
- 20:18) - (0 ? 20:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:18) - (0 ?
- 20:18) + 1))))))) << (0 ? 20:18))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
- 17:17) + 1))))))) << (0 ? 17:17))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
- 17:17) + 1))))))) << (0 ? 17:17))))
-                ));
-        }
-        else if (gcmHASCOMPRESSION(DstSurface))
-        {
-            gcmONERROR(gcoHARDWARE_Load2DState32(
-                Hardware,
-                0x01328,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        gcmONERROR(gcoHARDWARE_Load2DState32(
+            Hardware,
+            0x01328,
+            (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  20:18) - (0 ? 20:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:18) - (0 ?
  20:18) + 1))))))) << (0 ? 20:18))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
  20:18) - (0 ? 20:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:18) - (0 ?
@@ -2349,69 +2271,12 @@ static gceSTATUS gcoHARDWARE_Set2DState(
  17:17) + 1))))))) << (0 ? 17:17))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
  17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
  17:17) + 1))))))) << (0 ? 17:17))))
-                ));
-        }
-        else if (!Hardware->hw2DQuad ||
-                 DstSurface->tiling != gcvLINEAR ||
-                 (dstAddress & 0x3F) ||
-                 (DstSurface->stride & 0x3F))
-        {
-            gcmONERROR(gcoHARDWARE_Load2DState32(
-                Hardware,
-                0x01328,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 20:18) - (0 ? 20:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:18) - (0 ?
- 20:18) + 1))))))) << (0 ? 20:18))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 20:18) - (0 ? 20:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:18) - (0 ?
- 20:18) + 1))))))) << (0 ? 20:18))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
- 17:17) + 1))))))) << (0 ? 17:17))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
- 17:17) + 1))))))) << (0 ? 17:17))))
-                ));
-        }
-        else
-        {
-            gcmONERROR(gcoHARDWARE_Load2DState32(
-                Hardware,
-                0x01328,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 20:18) - (0 ? 20:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:18) - (0 ?
- 20:18) + 1))))))) << (0 ? 20:18))) | (((gctUINT32) (0x4 & ((gctUINT32) ((((1 ?
- 20:18) - (0 ? 20:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:18) - (0 ?
- 20:18) + 1))))))) << (0 ? 20:18))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
- 17:17) + 1))))))) << (0 ? 17:17))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
- 17:17) + 1))))))) << (0 ? 17:17))))
-                ));
-        }
+            ));
 
-        /* Set Src */
-        if (srcCacheType == 1 || dstYUV420)
-        {
-            gcmONERROR(gcoHARDWARE_Load2DState32(
-                Hardware,
-                0x01328,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
- 26:24) + 1))))))) << (0 ? 26:24))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
- 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
- 26:24) + 1))))))) << (0 ? 26:24))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ? 23:23))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ? 23:23))))
-                ));
-        }
-        else if (srcCacheType == 2 ||
-                 gcmHASCOMPRESSION(DstSurface) ||
-                 State->dstSurface.tiling != gcvLINEAR)
-        {
-            gcmONERROR(gcoHARDWARE_Load2DState32(
-                Hardware,
-                0x01328,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+        gcmONERROR(gcoHARDWARE_Load2DState32(
+            Hardware,
+            0x01328,
+            (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
  26:24) + 1))))))) << (0 ? 26:24))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
  26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
@@ -2420,40 +2285,7 @@ static gceSTATUS gcoHARDWARE_Set2DState(
  23:23) + 1))))))) << (0 ? 23:23))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
  23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
  23:23) + 1))))))) << (0 ? 23:23))))
-                ));
-        }
-        else if (srcCacheType == 3)
-        {
-            gcmONERROR(gcoHARDWARE_Load2DState32(
-                Hardware,
-                0x01328,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
- 26:24) + 1))))))) << (0 ? 26:24))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
- 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
- 26:24) + 1))))))) << (0 ? 26:24))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ? 23:23))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ? 23:23))))
-                ));
-        }
-        else
-        {
-            gcmONERROR(gcoHARDWARE_Load2DState32(
-                Hardware,
-                0x01328,
-                (((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
- 26:24) + 1))))))) << (0 ? 26:24))) | (((gctUINT32) (0x4 & ((gctUINT32) ((((1 ?
- 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
- 26:24) + 1))))))) << (0 ? 26:24))) &  ((((gctUINT32) (~0U)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ? 23:23))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
- 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
- 23:23) + 1))))))) << (0 ? 23:23))))
-                ));
-        }
+            ));
     }
 
     if (Hardware->features[gcvFEATURE_2D_COLOR_SPACE_CONVERSION] && (uploadCSC
@@ -2909,7 +2741,7 @@ gceSTATUS gco2D_GetPixelAlignment(
     {
         /* Get format's specifics. */
         gcsSURF_FORMAT_INFO_PTR formatInfo;
-        gcmERR_BREAK(gcoSURF_QueryFormat(Format, &formatInfo));
+        gcmERR_BREAK(gcoHARDWARE_QueryFormat(Format, &formatInfo));
 
         /* Determine horizontal alignment. */
         Alignment->x = BITS_PER_CACHELINE / formatInfo->bitsPerPixel;
@@ -7738,7 +7570,7 @@ gcoHARDWARE_Blit(
             gctUINT32 i, srcPos, dstPos;
             gcsSURF_FORMAT_INFO_PTR tempFormat[2];
 
-            gcmONERROR(gcoSURF_QueryFormat(srcSurf->format, tempFormat));
+            gcmONERROR(gcoHARDWARE_QueryFormat(srcSurf->format, tempFormat));
             bpp = tempFormat[0]->bitsPerPixel < 8 ? 1 : tempFormat[0]->bitsPerPixel / 8;
 
             if (SrcRectCount)

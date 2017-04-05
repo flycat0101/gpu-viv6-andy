@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -222,6 +222,13 @@ static void _DumpOpcode(gctUINT baseOpcode, gctUINT extOpcode, VSC_DUMPER* pDump
         "vx_dp8x4",
         "vx_dp4x8",
         "vx_dp2x16",
+        "vx_index_add",
+        "vx_vert_min3",
+        "vx_vert_max3",
+        "vx_vert_med3",
+        "vx_horz_min3",
+        "vx_horz_max3",
+        "vx_horz_med3",
     };
 
     static const char * _strAuxOpcode[] =

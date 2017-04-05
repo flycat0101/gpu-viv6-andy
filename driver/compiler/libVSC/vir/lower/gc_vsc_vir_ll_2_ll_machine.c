@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -73,10 +73,10 @@ static VIR_PatternReplaceInst _divRepInst1[] = {
     { VIR_OP_ABS, 0, 0, { -3, 2, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_ABS, 0, 0, { -4, 3, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_JMPC, VIR_COP_LESS_OR_EQUAL, 0, { 0, -4, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne } },
-    { VIR_OP_AQ_I2F, 0, 0, { -5, -4, 0, 0 }, { VIR_Lower_SetOpndFloat } },
+    { VIR_OP_I2F, 0, 0, { -5, -4, 0, 0 }, { VIR_Lower_SetOpndFloat } },
     { VIR_OP_ADD, 0, 0, { -6, -5, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, _SetUIntFloatFour } },
     { VIR_OP_RCP, 0, 0, { -7, -6, 0, 0 }, { VIR_Lower_SetOpndFloat, VIR_Lower_SetOpndFloat } },
-    { VIR_OP_AQ_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_SUB, 0, 0, { -9, 0, -4, 0 }, { VIR_Lower_SetOpndUINT32, VIR_Lower_SetIntZero} },
     { VIR_OP_MUL, 0, 0, { -10, -9, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_MULHI, 0, 0, { -11, -10, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
@@ -106,10 +106,10 @@ static VIR_PatternMatchInst _divPatInst2[] = {
 
 static VIR_PatternReplaceInst _divRepInst2[] = {
     { VIR_OP_JMPC, VIR_COP_LESS_OR_EQUAL, 0, { 0, 3, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne } },
-    { VIR_OP_AQ_I2F, 0, 0, { -5, 3, 0, 0 }, { VIR_Lower_SetOpndFloat } },
+    { VIR_OP_I2F, 0, 0, { -5, 3, 0, 0 }, { VIR_Lower_SetOpndFloat } },
     { VIR_OP_ADD, 0, 0, { -6, -5, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, _SetUIntFloatFour } },
     { VIR_OP_RCP, 0, 0, { -7, -6, 0, 0 }, { VIR_Lower_SetOpndFloat, VIR_Lower_SetOpndFloat } },
-    { VIR_OP_AQ_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_SUB, 0, 0, { -9, 0, 3, 0 }, { VIR_Lower_SetOpndUINT32, VIR_Lower_SetIntZero} },
     { VIR_OP_MUL, 0, 0, { -10, -9, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_MULHI, 0, 0, { -11, -10, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
@@ -167,10 +167,10 @@ static VIR_PatternReplaceInst _modRepInst1[] = {
     { VIR_OP_ABS, 0, 0, { -3, 2, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_ABS, 0, 0, { -4, 3, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_JMPC, VIR_COP_LESS_OR_EQUAL, 0, { 0, -4, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne } },
-    { VIR_OP_AQ_I2F, 0, 0, { -5, -4, 0, 0 }, { VIR_Lower_SetOpndFloat } },
+    { VIR_OP_I2F, 0, 0, { -5, -4, 0, 0 }, { VIR_Lower_SetOpndFloat } },
     { VIR_OP_ADD, 0, 0, { -6, -5, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, _SetUIntFloatFour } },
     { VIR_OP_RCP, 0, 0, { -7, -6, 0, 0 }, { VIR_Lower_SetOpndFloat, VIR_Lower_SetOpndFloat } },
-    { VIR_OP_AQ_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_SUB, 0, 0, { -9, 0, -4, 0 }, { VIR_Lower_SetOpndUINT32, VIR_Lower_SetIntZero} },
     { VIR_OP_MUL, 0, 0, { -10, -9, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_MULHI, 0, 0, { -11, -10, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
@@ -202,10 +202,10 @@ static VIR_PatternMatchInst _modPatInst2[] = {
 
 static VIR_PatternReplaceInst _modRepInst2[] = {
     { VIR_OP_JMPC, VIR_COP_LESS_OR_EQUAL, 0, { 0, 3, 0, 0 }, { 0, 0, VIR_Lower_SetUIntOne } },
-    { VIR_OP_AQ_I2F, 0, 0, { -5, 3, 0, 0 }, { VIR_Lower_SetOpndFloat } },
+    { VIR_OP_I2F, 0, 0, { -5, 3, 0, 0 }, { VIR_Lower_SetOpndFloat } },
     { VIR_OP_ADD, 0, 0, { -6, -5, 0, 0 }, { VIR_Lower_SetOpndUINT32, 0, _SetUIntFloatFour } },
     { VIR_OP_RCP, 0, 0, { -7, -6, 0, 0 }, { VIR_Lower_SetOpndFloat, VIR_Lower_SetOpndFloat } },
-    { VIR_OP_AQ_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
+    { VIR_OP_F2I, 0, 0, { -8, -7, 0, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_SUB, 0, 0, { -9, 0, 3, 0 }, { VIR_Lower_SetOpndUINT32, VIR_Lower_SetIntZero} },
     { VIR_OP_MUL, 0, 0, { -10, -9, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
     { VIR_OP_MULHI, 0, 0, { -11, -10, -8, 0 }, { VIR_Lower_SetOpndUINT32 } },
@@ -235,7 +235,7 @@ static VIR_PatternMatchInst _modPatInst3[] = {
 };
 
 static VIR_PatternReplaceInst _modRepInst3[] = {
-    { VIR_OP_AQ_IMOD, 0, 0, { 1, 2, 3, 0 }, { 0 } },
+    { VIR_OP_IMOD, 0, 0, { 1, 2, 3, 0 }, { 0 } },
 };
 
 static VIR_Pattern _modPattern[] = {
@@ -328,7 +328,7 @@ static VIR_PatternMatchInst _maxPatInst0[] = {
 };
 
 static VIR_PatternReplaceInst _maxRepInst0[] = {
-    { VIR_OP_AQ_SELECT, VIR_COP_LESS, 0, {  1, 2, 3, 2 }, { 0 } },
+    { VIR_OP_SELECT, VIR_COP_LESS, 0, {  1, 2, 3, 2 }, { 0 } },
 };
 
 /*
@@ -343,7 +343,7 @@ static VIR_PatternMatchInst _maxPatInst1[] = {
 };
 
 static VIR_PatternReplaceInst _maxRepInst1[] = {
-    { VIR_OP_AQ_SELECT, VIR_COP_LESS, 0, {  -1, 2, 3, 2 }, { 0 } },
+    { VIR_OP_SELECT, VIR_COP_LESS, 0, {  -1, 2, 3, 2 }, { 0 } },
     { VIR_OP_ADD, 0, 0, {  1, -1, 0, 0 }, { 0, 0, VIR_Lower_SetZero } },
 };
 
@@ -363,7 +363,7 @@ static VIR_PatternMatchInst _minPatInst0[] = {
 };
 
 static VIR_PatternReplaceInst _minRepInst0[] = {
-    { VIR_OP_AQ_SELECT, VIR_COP_GREATER, 0, {  1, 2, 3, 2 }, { 0 } },
+    { VIR_OP_SELECT, VIR_COP_GREATER, 0, {  1, 2, 3, 2 }, { 0 } },
 };
 
 /*
@@ -378,7 +378,7 @@ static VIR_PatternMatchInst _minPatInst1[] = {
 };
 
 static VIR_PatternReplaceInst _minRepInst1[] = {
-    { VIR_OP_AQ_SELECT, VIR_COP_GREATER, 0, { -1, 2, 3, 2 }, { 0 } },
+    { VIR_OP_SELECT, VIR_COP_GREATER, 0, { -1, 2, 3, 2 }, { 0 } },
     { VIR_OP_ADD, 0, 0, {  1, -1, 0, 0 }, { 0, 0, VIR_Lower_SetZero } },
 };
 

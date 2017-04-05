@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -59,82 +59,45 @@ typedef struct __DRIcontextRec  __DRIcontextPriv;
 typedef struct __DRIdrawableRec __DRIdrawablePriv;
 typedef struct __DRIDisplayRec  __DRIDisplay;
 
-void _VivGetLock(__DRIdrawablePriv * drawable);
-void _UpdateDrawableInfo(__DRIdrawablePriv * drawable);
-void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable);
 
-static __DRIDisplay *pCurrentDRIDisplay = (__DRIDisplay *)gcvNULL;
+void _VivGetLock(__DRIdrawablePriv * drawable);
+void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable);
 
 static pthread_mutex_t drmMutex = PTHREAD_MUTEX_INITIALIZER;
 
+
 #define LINUX_LOCK_FRAMEBUFFER( context )                       \
     do {                                                        \
-        gctUINT8 __ret = 0;                                     \
         pthread_mutex_lock(&drmMutex);                          \
         if (!context->initialized) {                            \
             _VivGetLock( context->drawablePriv);                \
             context->initialized = 1;                           \
         } else {                                                \
-            DRMGL_CAS( context->hwLock, context->hHWContext,      \
-               (DRM_LOCK_HELD | context->hHWContext), __ret );  \
-            if ( __ret)                                         \
                _VivGetLock( context->drawablePriv );            \
         }                                                       \
     } while (0)
 
 #define LINUX_UNLOCK_FRAMEBUFFER( context )                     \
     do {                                                        \
-        DRMGL_UNLOCK( context->fd,                                \
-          context->hwLock,                                      \
-          context->hHWContext );                                \
         pthread_mutex_unlock(&drmMutex);                        \
-    } while (0)
-
-
-#define DRI_VALIDATE_DRAWABLE_INFO_ONCE(pDrawPriv)              \
-    do {                                                        \
-        if (*(pDrawPriv->pStamp) != pDrawPriv->lastStamp) {     \
-            _UpdateDrawableInfo(pDrawPriv);                     \
-        }                                                       \
     } while (0)
 
 
 #define DRI_VALIDATE_EXTRADRAWABLE_INFO_ONCE(pDrawPriv)              \
     do {                                                        \
-        if ((*(pDrawPriv->pStamp) != pDrawPriv->lastStamp)) {     \
             _UpdateDrawableInfoDrawableInfo(pDrawPriv);             \
-        }                                                       \
     } while (0)
 
 
 #define DRI_VALIDATE_DRAWABLE_INFO(pdp)                                 \
  do {                                                                   \
-    while ((*(pdp->pStamp) != pdp->lastStamp)) {                          \
-        DRMGL_UNLOCK(pdp->fd, &pdp->display->pSAREA->lock,                \
-               pdp->contextPriv->hHWContext);                           \
-                                                                        \
-        DRMGL_SPINLOCK(&pdp->display->pSAREA->drawable_lock, pdp->drawLockID);\
-        DRI_VALIDATE_EXTRADRAWABLE_INFO_ONCE(pdp);                           \
-        DRMGL_SPINUNLOCK(&pdp->display->pSAREA->drawable_lock, pdp->drawLockID);   \
-                                                                        \
-        DRMGL_LIGHT_LOCK(pdp->fd, &pdp->display->pSAREA->lock,            \
-              pdp->contextPriv->hHWContext);                            \
-              break;                            \
-    }                                                                   \
-} while (0)
+        DRI_VALIDATE_EXTRADRAWABLE_INFO_ONCE(pdp);        \
+    } while (0)
 
 
-#define DRI_FULLSCREENCOVERED(pdp)                                 \
+#define DRI_FULLSCREENCOVERED(pdp)            \
  do {                                                                   \
-        DRMGL_UNLOCK(pdp->fd, &pdp->display->pSAREA->lock,                \
-               pdp->contextPriv->hHWContext);                           \
-                                                                        \
-        DRMGL_SPINLOCK(&pdp->display->pSAREA->drawable_lock, pdp->drawLockID);\
-        _FullScreenCovered(pdp);                           \
-        DRMGL_SPINUNLOCK(&pdp->display->pSAREA->drawable_lock, pdp->drawLockID);   \
-                                                                        \
-        DRMGL_LIGHT_LOCK(pdp->fd, &pdp->display->pSAREA->lock,            \
-              pdp->contextPriv->hHWContext);                            \
+        _FullScreenCovered(pdp);                        \
 } while (0)
 
 
@@ -601,46 +564,6 @@ static Bool VIVEXTFULLScreenInfo(Display* dpy, int screen, Drawable drawable)
 
 #endif
 
-/* UINX signal handling utility function  */
-static void setSigFunc(int sig, void (*func)())
-{
-    __sighandler_t handler = signal(sig, SIG_IGN);
-
-    if (handler == SIG_ERR) {
-        fprintf(stderr, "libEGL DRI BackEnd error: UNIX signal setting error!\n");
-        return;
-    }
-    else if (handler == SIG_IGN) {
-        return;
-    }
-
-#if DEBUG
-    if (handler != SIG_DFL) {
-        fprintf(stderr, "libEGL DRI BackEnd error: UNIX signal already caught!");
-    }
-#endif
-
-    if (signal(sig, func) == SIG_ERR) {
-        fprintf(stderr, "libEGL DRI BackEnd error: UNIX signal setting error!\n");
-    }
-
-}
-
-static void setSignalHandlingFunc(void (*func)())
-{
-    setSigFunc(SIGTERM, func);
-    setSigFunc(SIGQUIT, func);
-    setSigFunc(SIGINT, func);
-    setSigFunc(SIGHUP, func);
-}
-
-
-void __eglInteruptHandler(void)
-{
-    pCurrentDRIDisplay = gcvNULL;
-    exit(1);
-}
-
 static gceSTATUS _CreateOnScreenSurfaceWrapper(
     __DRIdrawablePriv * drawable,
       gceSURF_FORMAT Format
@@ -887,7 +810,9 @@ OnError:
     *backPixmap = (Pixmap)0;
     *xgc =(GC)0;
     *pixWrapSurf = (gcoSURF)0;
+#if (defined(DEBUG) || defined(_DEBUG))
     fprintf(stderr, "Warning::Backpixmap can't be created for the current Drawable\n");
+#endif
 }
 
 static void _destroyPixmapInfo(
@@ -965,8 +890,11 @@ static void renderThread(void* refData)
 /*
                     LINUX_LOCK_FRAMEBUFFER(context);
 */
-                    XCopyArea(dpy, drawable->ascframe[i].backPixmap, drawable->ascframe[i].Drawable, drawable->ascframe[i].xgc, 0, 0, drawable->ascframe[i].w, drawable->ascframe[i].h, 0, 0);
-                    XFlush(dpy);
+                    if ( drawable->ascframe[i].backPixmap )
+                    {
+                        XCopyArea(dpy, drawable->ascframe[i].backPixmap, drawable->ascframe[i].Drawable, drawable->ascframe[i].xgc, 0, 0, drawable->ascframe[i].w, drawable->ascframe[i].h, 0, 0);
+                        XFlush(dpy);
+                    }
 /*
                     LINUX_UNLOCK_FRAMEBUFFER(context);
 */
@@ -1186,8 +1114,6 @@ static void asyncRenderBegin(__DRIdrawablePriv * drawable, PlatformWindowType Dr
             drawable->ascframe[i].Drawable = Drawable;
             drawable->ascframe[i].backNode = 0;
             _createPixmapInfo(drawable, Drawable, &(drawable->ascframe[i].backPixmap), &(drawable->ascframe[i].xgc), &(drawable->ascframe[i].pixWrapSurf), &drawable->ascframe[i].backNode, drawable->surftype, drawable->surfformat);
-            if ( drawable->ascframe[i].pixWrapSurf == gcvNULL)
-                break;
         }
 
        if ( i < NUM_ASYNCFRAME )
@@ -1457,35 +1383,6 @@ gceSTATUS _getPixmapDrawableInfo(Display *dpy, Drawable pixmap, gctUINT* videoNo
     return gcvSTATUS_OK;
 }
 
-void _UpdateDrawableInfo(__DRIdrawablePriv * drawable)
-{
-    __DRIDisplay * display;
-
-    display = drawable->display;
-
-    DRMGL_SPINUNLOCK(&display->pSAREA->drawable_lock, drawable->drawLockID);
-
-    if(!XF86DRIGetDrawableInfo(display->dpy, drawable->screen, drawable->drawable,
-                    &drawable->index, &drawable->lastStamp,
-                    &drawable->x, &drawable->y, &drawable->w, &drawable->h,
-                    &drawable->numClipRects, &drawable->pClipRects,
-                    &drawable->backX,
-                    &drawable->backY,
-                    &drawable->numBackClipRects,
-                    &drawable->pBackClipRects)) {
-        /* Error -- eg the window may have been destroyed.  Keep going
-         * with no cliprects.
-         */
-        drawable->pStamp = &drawable->lastStamp; /* prevent endless loop */
-        drawable->numClipRects = 0;
-        drawable->pClipRects = NULL;
-        drawable->numBackClipRects = 0;
-        drawable->pBackClipRects = NULL;
-    }
-
-    DRMGL_SPINLOCK(&display->pSAREA->drawable_lock, drawable->drawLockID);
-}
-
 void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
 {
 
@@ -1503,7 +1400,6 @@ void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
 
     display = drawable->display;
 
-    DRMGL_SPINUNLOCK(&display->pSAREA->drawable_lock, drawable->drawLockID);
 
     /* Assign __DRIdrawablePrivate first */
     if (!XF86DRIGetDrawableInfo(display->dpy, pdp->screen, pdp->drawable,
@@ -1557,7 +1453,8 @@ void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
     pdp->backNode = 0;
 
 ENDFLAG:
-    DRMGL_SPINLOCK(&display->pSAREA->drawable_lock, drawable->drawLockID);
+/* make compiler happy */
+;
 }
 
 void _FullScreenCovered(__DRIdrawablePriv * drawable)
@@ -1567,10 +1464,8 @@ void _FullScreenCovered(__DRIdrawablePriv * drawable)
 
     display = drawable->display;
     drawable->fullscreenCovered = 0;
-    DRMGL_SPINUNLOCK(&display->pSAREA->drawable_lock, drawable->drawLockID);
     ret = VIVEXTFULLScreenInfo(display->dpy, drawable->screen, drawable->drawable);
     drawable->fullscreenCovered = (int)ret;
-    DRMGL_SPINLOCK(&display->pSAREA->drawable_lock, drawable->drawLockID);
 }
 
 /* Lock the hardware and validate drawable state.
@@ -1584,8 +1479,6 @@ void _VivGetLock(__DRIdrawablePriv * drawable)
         __DRIDisplay *display = drawable->display;
         gctINT width = drawable->w;
         gctINT height = drawable->h;
-
-        drmGetLock(drawable->fd, drawable->contextPriv->hHWContext, 0);
 
         DRI_VALIDATE_DRAWABLE_INFO(drawable);
         DRI_FULLSCREENCOVERED(drawable);
@@ -2155,7 +2048,7 @@ dri_CreateContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
     __DRIcontextPriv *context;
     __DRIDisplay* display;
     gceSTATUS status = gcvSTATUS_OK;
-    static int setSig = 0;
+
 
     gcmHEADER_ARG("localDisplay=0x%x, Context=0x%x\n", localDisplay, Context);
 
@@ -2193,11 +2086,6 @@ dri_CreateContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
     }
 #endif
 
-    if ( setSig == 0 )
-    {
-        setSignalHandlingFunc(__eglInteruptHandler);
-        setSig = 1;
-    }
 
 OnError:
     /* Success. */
@@ -2233,20 +2121,6 @@ dri_DestroyContext(IN gctPOINTER localDisplay, IN gctPOINTER Context)
         }
     }
     if (found) {
-
-#ifdef DRI_PIXMAPRENDER
-    if ( cur->drawablePriv )
-    {
-            _DestroyBackPixmapForDrawable(cur->drawablePriv);
-            _CreateBackPixmapForDrawable(cur->drawablePriv);
-    }
-#endif
-
-#if defined(DRI_PIXMAPRENDER_ASYNC)
-    asyncRenderKill(cur->drawablePriv);
-    asyncRenderDestroy(cur->drawablePriv);
-#endif
-
         XF86DRIDestroyContext(display->dpy, display->screen, cur->contextID);
         if (display->contextStack == cur) {
             display->contextStack = cur->next;
@@ -2294,16 +2168,14 @@ dri_MakeCurrent(IN gctPOINTER localDisplay,
     }
 
     if (!drawable->pStamp) {
-       DRMGL_SPINLOCK(&display->pSAREA->drawable_lock, drawable->drawLockID);
+
        _UpdateDrawableInfoDrawableInfo(drawable);
-       DRMGL_SPINUNLOCK(&display->pSAREA->drawable_lock, drawable->drawLockID);
+
        drawable->pStamp = &(display->pSAREA->drawableTable[drawable->index].stamp);
     } else {
-        if (*drawable->pStamp != drawable->lastStamp) {
-            DRMGL_SPINLOCK(&display->pSAREA->drawable_lock, drawable->drawLockID);
+
             _UpdateDrawableInfoDrawableInfo(drawable);
-            DRMGL_SPINUNLOCK(&display->pSAREA->drawable_lock, drawable->drawLockID);
-        }
+
     }
 
     gcoSURF_GetFormat(ResolveTarget, gcvNULL,&format );
@@ -2663,7 +2535,7 @@ dri_SwapBuffersXwinAsync(
 
     asyncRenderSurf(drawable, index, &ResolveTarget);
 
-    if (drawable) {
+    if (drawable && ResolveTarget) {
 
         if ( drawable->rsFunc == (RSFUNC)gcvNULL )
         {
@@ -3970,7 +3842,6 @@ dri_InitLocalDisplayInfo(
         _GetDisplayInfo(display, screen);
 
         *localDisplay = (gctPOINTER)display;
-        pCurrentDRIDisplay = display;
         gcmFOOTER_ARG("*localDisplay=0x%x", *localDisplay);
         return status;
     }
@@ -3997,7 +3868,6 @@ dri_DeinitLocalDisplayInfo(
         free(display);
         *localDisplay = gcvNULL;
     }
-    pCurrentDRIDisplay = (__DRIDisplay *)gcvNULL;
     return gcvSTATUS_OK;
 }
 
@@ -4668,9 +4538,6 @@ _CreateWindowBuffers(
                 gcmONERROR(gcoSURF_SetWindow(buffer->surface,
                                              0, 0,
                                              Info->width, Info->height));
-
-                /* Initial lock for user-pool surface. */
-                gcmONERROR(gcoSURF_Lock(buffer->surface, gcvNULL, gcvNULL));
 
                 (void) baseType;
 
@@ -6232,15 +6099,6 @@ _ConnectPixmap(
                                    0, 0,
                                    pixmapWidth,
                                    pixmapHeight);
-
-        if (gcmIS_ERROR(status))
-        {
-            /* Failed to wrap. */
-            break;
-        }
-
-        /* Initial lock for user-pool surface. */
-        status = gcoSURF_Lock(wrapper, gcvNULL, gcvNULL);
     }
     while (gcvFALSE);
 

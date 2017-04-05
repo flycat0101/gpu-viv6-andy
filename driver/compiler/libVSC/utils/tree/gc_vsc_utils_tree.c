@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -81,7 +81,10 @@ void vscTREE_Initialize(VSC_TREE* pTree, VSC_MM* pMM, gctUINT leafInitAllocCount
 void vscTREE_Finalize(VSC_TREE* pTree)
 {
     TNLST_FINALIZE(&pTree->nodeList);
+    pTree->nextNodeId = 0;
+    pTree->pRootNode = gcvNULL;
     vscSRARR_Finalize(&pTree->leafNodeArray);
+    pTree->pMM = gcvNULL;
 }
 
 void vscTree_Destroy(VSC_TREE* pTree)

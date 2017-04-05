@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 /*
-** Copyright (c) 2013 The Khronos Group Inc.
+** Copyright (c) 2013-2017 The Khronos Group Inc.
 **
 ** Permission is hereby granted, free of charge, to any person obtaining a
 ** copy of this software and/or associated documentation files (the
@@ -31,14 +31,14 @@ extern "C" {
 ** This header is generated from the Khronos OpenGL / OpenGL ES XML
 ** API Registry. The current version of the Registry, generator scripts
 ** used to make the header, and the header can be found at
-**   http://www.opengl.org/registry/
-**
-** Khronos $Revision: 23422 $ on $Date: 2013-10-08 15:40:45 -0700 (Tue, 08 Oct 2013) $
+**   https://github.com/KhronosGroup/OpenGL-Registry
 */
 
 #ifndef GL_APIENTRYP
 #define GL_APIENTRYP GL_APIENTRY*
 #endif
+
+/* Generated on date 20170305 */
 
 /* Generated C header for:
  * API: gles1
@@ -105,53 +105,11 @@ GL_API void GL_APIENTRY glBlendEquationOES (GLenum mode);
 #ifndef GL_OES_byte_coordinates
 #define GL_OES_byte_coordinates 1
 typedef khronos_int8_t GLbyte;
-typedef void (GL_APIENTRYP PFNGLMULTITEXCOORD1BOESPROC) (GLenum texture, GLbyte s);
-typedef void (GL_APIENTRYP PFNGLMULTITEXCOORD1BVOESPROC) (GLenum texture, const GLbyte *coords);
-typedef void (GL_APIENTRYP PFNGLMULTITEXCOORD2BOESPROC) (GLenum texture, GLbyte s, GLbyte t);
-typedef void (GL_APIENTRYP PFNGLMULTITEXCOORD2BVOESPROC) (GLenum texture, const GLbyte *coords);
-typedef void (GL_APIENTRYP PFNGLMULTITEXCOORD3BOESPROC) (GLenum texture, GLbyte s, GLbyte t, GLbyte r);
-typedef void (GL_APIENTRYP PFNGLMULTITEXCOORD3BVOESPROC) (GLenum texture, const GLbyte *coords);
-typedef void (GL_APIENTRYP PFNGLMULTITEXCOORD4BOESPROC) (GLenum texture, GLbyte s, GLbyte t, GLbyte r, GLbyte q);
-typedef void (GL_APIENTRYP PFNGLMULTITEXCOORD4BVOESPROC) (GLenum texture, const GLbyte *coords);
-typedef void (GL_APIENTRYP PFNGLTEXCOORD1BOESPROC) (GLbyte s);
-typedef void (GL_APIENTRYP PFNGLTEXCOORD1BVOESPROC) (const GLbyte *coords);
-typedef void (GL_APIENTRYP PFNGLTEXCOORD2BOESPROC) (GLbyte s, GLbyte t);
-typedef void (GL_APIENTRYP PFNGLTEXCOORD2BVOESPROC) (const GLbyte *coords);
-typedef void (GL_APIENTRYP PFNGLTEXCOORD3BOESPROC) (GLbyte s, GLbyte t, GLbyte r);
-typedef void (GL_APIENTRYP PFNGLTEXCOORD3BVOESPROC) (const GLbyte *coords);
-typedef void (GL_APIENTRYP PFNGLTEXCOORD4BOESPROC) (GLbyte s, GLbyte t, GLbyte r, GLbyte q);
-typedef void (GL_APIENTRYP PFNGLTEXCOORD4BVOESPROC) (const GLbyte *coords);
-typedef void (GL_APIENTRYP PFNGLVERTEX2BOESPROC) (GLbyte x);
-typedef void (GL_APIENTRYP PFNGLVERTEX2BVOESPROC) (const GLbyte *coords);
-typedef void (GL_APIENTRYP PFNGLVERTEX3BOESPROC) (GLbyte x, GLbyte y);
-typedef void (GL_APIENTRYP PFNGLVERTEX3BVOESPROC) (const GLbyte *coords);
-typedef void (GL_APIENTRYP PFNGLVERTEX4BOESPROC) (GLbyte x, GLbyte y, GLbyte z);
-typedef void (GL_APIENTRYP PFNGLVERTEX4BVOESPROC) (const GLbyte *coords);
-#ifdef GL_GLEXT_PROTOTYPES
-GL_API void GL_APIENTRY glMultiTexCoord1bOES (GLenum texture, GLbyte s);
-GL_API void GL_APIENTRY glMultiTexCoord1bvOES (GLenum texture, const GLbyte *coords);
-GL_API void GL_APIENTRY glMultiTexCoord2bOES (GLenum texture, GLbyte s, GLbyte t);
-GL_API void GL_APIENTRY glMultiTexCoord2bvOES (GLenum texture, const GLbyte *coords);
-GL_API void GL_APIENTRY glMultiTexCoord3bOES (GLenum texture, GLbyte s, GLbyte t, GLbyte r);
-GL_API void GL_APIENTRY glMultiTexCoord3bvOES (GLenum texture, const GLbyte *coords);
-GL_API void GL_APIENTRY glMultiTexCoord4bOES (GLenum texture, GLbyte s, GLbyte t, GLbyte r, GLbyte q);
-GL_API void GL_APIENTRY glMultiTexCoord4bvOES (GLenum texture, const GLbyte *coords);
-GL_API void GL_APIENTRY glTexCoord1bOES (GLbyte s);
-GL_API void GL_APIENTRY glTexCoord1bvOES (const GLbyte *coords);
-GL_API void GL_APIENTRY glTexCoord2bOES (GLbyte s, GLbyte t);
-GL_API void GL_APIENTRY glTexCoord2bvOES (const GLbyte *coords);
-GL_API void GL_APIENTRY glTexCoord3bOES (GLbyte s, GLbyte t, GLbyte r);
-GL_API void GL_APIENTRY glTexCoord3bvOES (const GLbyte *coords);
-GL_API void GL_APIENTRY glTexCoord4bOES (GLbyte s, GLbyte t, GLbyte r, GLbyte q);
-GL_API void GL_APIENTRY glTexCoord4bvOES (const GLbyte *coords);
-GL_API void GL_APIENTRY glVertex2bOES (GLbyte x);
-GL_API void GL_APIENTRY glVertex2bvOES (const GLbyte *coords);
-GL_API void GL_APIENTRY glVertex3bOES (GLbyte x, GLbyte y);
-GL_API void GL_APIENTRY glVertex3bvOES (const GLbyte *coords);
-GL_API void GL_APIENTRY glVertex4bOES (GLbyte x, GLbyte y, GLbyte z);
-GL_API void GL_APIENTRY glVertex4bvOES (const GLbyte *coords);
-#endif
 #endif /* GL_OES_byte_coordinates */
+
+#ifndef GL_OES_compressed_ETC1_RGB8_sub_texture
+#define GL_OES_compressed_ETC1_RGB8_sub_texture 1
+#endif /* GL_OES_compressed_ETC1_RGB8_sub_texture */
 
 #ifndef GL_OES_compressed_ETC1_RGB8_texture
 #define GL_OES_compressed_ETC1_RGB8_texture 1
@@ -237,7 +195,6 @@ typedef void (GL_APIENTRYP PFNGLPOINTPARAMETERXVOESPROC) (GLenum pname, const GL
 typedef void (GL_APIENTRYP PFNGLPOINTSIZEXOESPROC) (GLfixed size);
 typedef void (GL_APIENTRYP PFNGLPOLYGONOFFSETXOESPROC) (GLfixed factor, GLfixed units);
 typedef void (GL_APIENTRYP PFNGLROTATEXOESPROC) (GLfixed angle, GLfixed x, GLfixed y, GLfixed z);
-typedef void (GL_APIENTRYP PFNGLSAMPLECOVERAGEOESPROC) (GLfixed value, GLboolean invert);
 typedef void (GL_APIENTRYP PFNGLSCALEXOESPROC) (GLfixed x, GLfixed y, GLfixed z);
 typedef void (GL_APIENTRYP PFNGLTEXENVXOESPROC) (GLenum target, GLenum pname, GLfixed param);
 typedef void (GL_APIENTRYP PFNGLTEXENVXVOESPROC) (GLenum target, GLenum pname, const GLfixed *params);
@@ -281,7 +238,6 @@ GL_API void GL_APIENTRY glPointParameterxvOES (GLenum pname, const GLfixed *para
 GL_API void GL_APIENTRY glPointSizexOES (GLfixed size);
 GL_API void GL_APIENTRY glPolygonOffsetxOES (GLfixed factor, GLfixed units);
 GL_API void GL_APIENTRY glRotatexOES (GLfixed angle, GLfixed x, GLfixed y, GLfixed z);
-GL_API void GL_APIENTRY glSampleCoverageOES (GLfixed value, GLboolean invert);
 GL_API void GL_APIENTRY glScalexOES (GLfixed x, GLfixed y, GLfixed z);
 GL_API void GL_APIENTRY glTexEnvxOES (GLenum target, GLenum pname, GLfixed param);
 GL_API void GL_APIENTRY glTexEnvxvOES (GLenum target, GLenum pname, const GLfixed *params);
@@ -522,11 +478,6 @@ GL_API void GL_APIENTRY glGetTexGenivOES (GLenum coord, GLenum pname, GLint *par
 #endif
 #endif /* GL_OES_texture_cube_map */
 
-/* GL_OES_vertex_half_float */
-#ifndef GL_OES_vertex_half_float
-#define GL_HALF_FLOAT_OES                                       0x8D61
-#endif
-
 #ifndef GL_OES_texture_env_crossbar
 #define GL_OES_texture_env_crossbar 1
 #endif /* GL_OES_texture_env_crossbar */
@@ -746,6 +697,7 @@ GL_API void GL_APIENTRY glGetnUniformivEXT (GLuint program, GLint location, GLsi
 #endif /* GL_EXT_texture_compression_dxt1 */
 
 #ifndef GL_EXT_texture_compression_s3tc
+#define GL_EXT_texture_compression_s3tc 1
 #define GL_COMPRESSED_RGBA_S3TC_DXT3_EXT  0x83F2
 #define GL_COMPRESSED_RGBA_S3TC_DXT5_EXT  0x83F3
 #endif /* GL_EXT_texture_compression_s3tc */
@@ -998,6 +950,11 @@ GL_API void GL_APIENTRY glEndTilingQCOM (GLbitfield preserveMask);
 #define GL_WRITEONLY_RENDERING_QCOM       0x8823
 #endif /* GL_QCOM_writeonly_rendering */
 
+/* GL_OES_vertex_half_float */
+#ifndef GL_OES_vertex_half_float
+#define GL_HALF_FLOAT_OES                                          0x8D61
+#endif
+
 /*------------------------------------------------------------------------*
  * VIV extension functions
  *------------------------------------------------------------------------*/
@@ -1038,7 +995,6 @@ GL_API void GL_APIENTRY glBufferSubDataARB (GLenum target, GLintptr offset, GLsi
 GL_API void GL_APIENTRY glDeleteBuffersARB (GLsizei n, const GLuint *buffers);
 GL_API void GL_APIENTRY glGenBuffersARB (GLsizei n, GLuint *buffers);
 GL_API void GL_APIENTRY glGetBufferParameterivARB (GLenum target, GLenum pname, GLint *params);
-
 
 #ifdef __cplusplus
 }

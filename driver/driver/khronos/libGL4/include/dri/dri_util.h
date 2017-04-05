@@ -359,7 +359,6 @@ struct __DRIscreenPrivateRec {
     /**
      * \name DDX version
      * DDX / 2D driver version information.
-     * \todo Replace these fields with a \c __DRIversionRec.
      */
     /*@{*/
     int ddxMajor;
@@ -370,7 +369,6 @@ struct __DRIscreenPrivateRec {
     /**
      * \name DRI version
      * DRI X extension version information.
-     * \todo Replace these fields with a \c __DRIversionRec.
      */
     /*@{*/
     int driMajor;
@@ -381,8 +379,7 @@ struct __DRIscreenPrivateRec {
     /**
      * \name DRM version
      * DRM (kernel module) version information.
-     * \todo Replace these fields with a \c __DRIversionRec.
-     */
+    */
     /*@{*/
     int drmMajor;
     int drmMinor;

@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2016 Vivante Corporation
+*    Copyright (c) 2014 - 2017 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2016 Vivante Corporation
+*    Copyright (C) 2014 - 2017 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -66,7 +66,7 @@
 #define _GC_OBJ_ZONE    gcvZONE_DRIVER
 
 MODULE_DESCRIPTION("Vivante Graphics Driver");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("Dual MIT/GPL");
 
 static struct class* gpuClass;
 
@@ -282,7 +282,7 @@ gckOS_DumpParam(
     printk("  registerMemSizeDEC300 = 0x%08lX\n", registerMemSizeDEC300);
 #endif
 
-    printk("  contiguousSize    = %ld\n",     contiguousSize);
+    printk("  contiguousSize    = 0x%08lX\n", contiguousSize);
     printk("  contiguousBase    = 0x%08lX\n", contiguousBase);
     printk("  bankSize          = 0x%08lX\n", bankSize);
     printk("  fastClear         = %d\n",      fastClear);

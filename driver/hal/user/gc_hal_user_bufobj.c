@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -20,7 +20,7 @@
 #define _GC_OBJ_ZONE            gcvZONE_BUFOBJ
 #define BUFFER_OBJECT_ALIGNMENT 8 /* max alignmet for all buffer object types */
 #define BUFFER_INDEX_ALIGNMENT  16 /* max alignmet for index buffer object types */
-#define BUFFER_OBJECT_SURFTYPE  gcvSURF_VERTEX /* TODO add surf type for buffer object */
+#define BUFFER_OBJECT_SURFTYPE  gcvSURF_VERTEX
 #define DYNAMIC_BUFFER_MAX_COUNT    0x1000 /* max dynamic buffer size.*/
 
 /******************************************************************************\
@@ -889,6 +889,14 @@ gcoBUFOBJ_Upload (
                 0,
                 BufObj->memory.logical,
                 BufObj->bytes));
+
+            /* Dump buffer.*/
+            gcmDUMP_BUFFER(gcvNULL,
+                BufObj->dumpDescriptor,
+                gcsSURF_NODE_GetHWAddress(&memory),
+                memory.logical,
+                0,
+                BufObj->bytes);
         }
 
         /* Free any allocated video memory. */

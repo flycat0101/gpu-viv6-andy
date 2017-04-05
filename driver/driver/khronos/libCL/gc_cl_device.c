@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -52,17 +52,68 @@ static struct _cl_device_id _device =
 
     {0,0,{0,0,0},0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
      gcvFALSE,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-     gcvFALSE,gcvFALSE,0,0,0,gcvFALSE,gcvFALSE,gcvFALSE,0},
+     gcvFALSE,gcvFALSE,0,0,0,gcvFALSE,gcvFALSE,gcvFALSE,0, 0, 0},
                                 /* Device Info      */
 };
 
-static char *extension_w_atomic = "cl_khr_byte_addressable_store "
-                                  "cl_khr_global_int32_base_atomics "
-                                  "cl_khr_global_int32_extended_atomics "
-                                  "cl_khr_local_int32_base_atomics "
-                                  "cl_khr_local_int32_extended_atomics ";
+#if defined (__QNXNTO__)
+        static char *extension_w_atomic = "cl_khr_byte_addressable_store "
+                                          "cl_khr_global_int32_base_atomics "
+                                          "cl_khr_global_int32_extended_atomics "
+                                          "cl_khr_local_int32_base_atomics "
+                                          "cl_khr_local_int32_extended_atomics ";
 
-static char *extension_without_atomic = "cl_khr_byte_addressable_store ";
+        static char *extension_without_atomic = "cl_khr_byte_addressable_store ";
+#else
+    #if gcvVERSION_MAJOR >= 5
+        #if defined(ANDROID)
+            #if ANDROID_SDK_VERSION >= 20
+                static char *extension_w_atomic = "cl_khr_byte_addressable_store "
+                                                  "cl_khr_global_int32_base_atomics "
+                                                  "cl_khr_global_int32_extended_atomics "
+                                                  "cl_khr_local_int32_base_atomics "
+                                                  "cl_khr_local_int32_extended_atomics "
+                                                  "cl_khr_gl_sharing ";
+
+                static char *extension_without_atomic = "cl_khr_byte_addressable_store "
+                                                        "cl_khr_gl_sharing ";
+                static char *extension_w_atomic_wo_glsharing = "cl_khr_byte_addressable_store "
+                                                  "cl_khr_global_int32_base_atomics "
+                                                  "cl_khr_global_int32_extended_atomics "
+                                                  "cl_khr_local_int32_base_atomics "
+                                                  "cl_khr_local_int32_extended_atomics ";
+
+                static char *extension_without_atomic_wo_glsharing = "cl_khr_byte_addressable_store ";
+            #else
+                static char *extension_w_atomic = "cl_khr_byte_addressable_store "
+                                                  "cl_khr_global_int32_base_atomics "
+                                                  "cl_khr_global_int32_extended_atomics "
+                                                  "cl_khr_local_int32_base_atomics "
+                                                  "cl_khr_local_int32_extended_atomics ";
+
+                static char *extension_without_atomic = "cl_khr_byte_addressable_store ";
+            #endif
+        #else
+            static char *extension_w_atomic = "cl_khr_byte_addressable_store "
+                                              "cl_khr_global_int32_base_atomics "
+                                              "cl_khr_global_int32_extended_atomics "
+                                              "cl_khr_local_int32_base_atomics "
+                                              "cl_khr_local_int32_extended_atomics "
+                                              "cl_khr_gl_sharing ";
+
+            static char *extension_without_atomic = "cl_khr_byte_addressable_store "
+                                                    "cl_khr_gl_sharing ";
+        #endif
+    #else
+        static char *extension_w_atomic = "cl_khr_byte_addressable_store "
+                                          "cl_khr_global_int32_base_atomics "
+                                          "cl_khr_global_int32_extended_atomics "
+                                          "cl_khr_local_int32_base_atomics "
+                                          "cl_khr_local_int32_extended_atomics ";
+
+        static char *extension_without_atomic = "cl_khr_byte_addressable_store ";
+    #endif
+#endif
 
 cl_device_id clgDefaultDevice = gcvNULL;
 
@@ -106,6 +157,7 @@ clGetDeviceIDs(
     gctINT              status;
 
     gcmHEADER_ARG("NumEntries=%u", NumEntries);
+    gcmDUMP_API("${OCL clGetDeviceIDs %d}", NumEntries);
 
     if (Devices && NumEntries == 0)
     {
@@ -176,18 +228,24 @@ clGetDeviceIDs(
         {
             gceCHIPMODEL  chipModel;
             gctUINT32 chipRevision;
-            gcePATCH_ID patchId = gcvPATCH_INVALID;
+            gcePATCH_ID patchId = platform->patchId;
             gctUINT offset;
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
+            gctBOOL skipCLGLSharingExtension = gcvFALSE;
+#endif
 #if BUILD_OPENCL_FP
             gctSTRING epProfile = "EMBEDDED_PROFILE";
             gctBOOL chipEnableFP = gcvFALSE;
 #endif
-
-            gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
+            chipModel = clgDefaultDevice->deviceInfo.chipModel;
+            chipRevision = clgDefaultDevice->deviceInfo.chipRevision;
 #if BUILD_OPENCL_FP
-            chipEnableFP = ((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008));
-            if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) || (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE)
-                || (chipEnableFP == gcvFALSE))
+            chipEnableFP = ((chipModel == gcv2500 && chipRevision == 0x5422) ||
+                            (chipModel == gcv3000 && chipRevision == 0x5435) ||
+                            (chipModel == gcv7000));
+            if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) ||
+               (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE) ||
+               (chipEnableFP == gcvFALSE))
             {
                 /*if the features on the device are not availble, still report embedded profile even if BUILD_OPENCL_FP is 1*/
                 clgDefaultDevice->profile = epProfile;
@@ -197,10 +255,25 @@ clGetDeviceIDs(
             gcoOS_MemCopy(&device[i], clgDefaultDevice, sizeof(clsDeviceId));
             clmONERROR(gcoOS_AtomIncrement(gcvNULL, clgGlobalId, (gctINT*)&device[i].id), CL_INVALID_VALUE);
 
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
+            if(patchId == gcvPATCH_COMPUTBENCH_CL)
+            {
+                skipCLGLSharingExtension = gcvTRUE;
+            }
+#endif
+
             device[i].gpuId = i;
             if (clgDefaultDevice->deviceInfo.atomicSupport)
             {
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
+                device[i].extensions = skipCLGLSharingExtension ? extension_w_atomic_wo_glsharing : extension_w_atomic;
+#else
                 device[i].extensions = extension_w_atomic;
+#endif
+            }
+            else
+            {
+                device[i].extensions = extension_without_atomic;
             }
 
             if(chipModel == gcv3000 && chipRevision == 0x5450)
@@ -211,14 +284,16 @@ clGetDeviceIDs(
 
                 if (gcmIS_SUCCESS(gcoOS_StrCmp(productName, "GC2000+")))
                 {
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
+                    device[i].extensions = skipCLGLSharingExtension ? extension_without_atomic_wo_glsharing : extension_without_atomic;
+#else
                     device[i].extensions = extension_without_atomic;
+#endif
                 }
 
                 gcmOS_SAFE_FREE(gcvNULL, productName);
 
             }
-
-            gcoHAL_GetPatchID(gcvNULL, &patchId);
 
             offset = 0;
             gcmVERIFY_OK(gcoOS_PrintStrSafe(device[i].name,
@@ -277,6 +352,7 @@ clGetDeviceIDs(
         clmRETURN_ERROR(CL_INVALID_DEVICE_TYPE);
     }
 
+    VCL_TRACE_API(GetDeviceIDs)(Platform, DeviceType, NumEntries, Devices, NumDevices);
     gcmFOOTER_ARG("%d *Devices=0x%x *NumDevices=%u",
                   CL_SUCCESS, gcmOPT_POINTER(Devices),
                   gcmOPT_VALUE(NumDevices));
@@ -308,6 +384,7 @@ clCreateSubDevices(
 
     gcmHEADER_ARG("InDevice=0x%x Properties=0x%x NumDevices=%lu",
                   InDevice, Properties, NumDevices);
+    gcmDUMP_API("${OCL clCreateSubDevices 0x%x, 0x%x, 0x%x}", InDevice, Properties, NumDevices);
 
     clmCHECK_ERROR(InDevice == gcvNULL, CL_INVALID_DEVICE);
 
@@ -388,6 +465,7 @@ clCreateSubDevices(
         *NumDevicesRet = numSubDevices;
     }
 
+    VCL_TRACE_API(CreateSubDevices)(InDevice, Properties, NumDevices, OutDevices, NumDevicesRet);
     gcmFOOTER_ARG("%d *OutDevices=0x%x *NumDevicesRet=%u",
                   CL_DEVICE_PARTITION_FAILED, gcmOPT_POINTER(OutDevices),
                   gcmOPT_VALUE(NumDevicesRet));
@@ -405,6 +483,7 @@ clRetainDevice(cl_device_id  device )
      gctINT              status;
 
     gcmHEADER_ARG("Program=0x%x", device);
+    gcmDUMP_API("${OCL clRetainDevice 0x%x}", device);
 
     if (device == gcvNULL ||
         device->objectType != clvOBJECT_DEVICE)
@@ -414,6 +493,7 @@ clRetainDevice(cl_device_id  device )
         clmRETURN_ERROR(CL_INVALID_DEVICE);
     }
 
+    VCL_TRACE_API(RetainDevice)(device);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -429,6 +509,7 @@ clReleaseDevice(cl_device_id  device )
     gctINT              status;
 
     gcmHEADER_ARG("Device=0x%x", device);
+    gcmDUMP_API("${OCL clReleaseDevice 0x%x}", device);
 
     if (device == gcvNULL ||
         device->objectType != clvOBJECT_DEVICE)
@@ -438,6 +519,7 @@ clReleaseDevice(cl_device_id  device )
         clmRETURN_ERROR(CL_INVALID_DEVICE);
     }
 
+    VCL_TRACE_API(ReleaseDevice)(device);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -471,6 +553,7 @@ clGetDeviceInfo(
 
     gcmHEADER_ARG("Device=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   Device, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetDeviceInfo 0x%x, 0x%x}", Device, ParamName);
 
     clmCHECK_ERROR(Device == gcvNULL, CL_INVALID_DEVICE);
 
@@ -890,6 +973,7 @@ clGetDeviceInfo(
         *ParamValueSizeRet = retParamSize;
     }
 
+    VCL_TRACE_API(GetDeviceInfo)(Device, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;

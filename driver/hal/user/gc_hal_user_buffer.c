@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -769,18 +769,19 @@ gcoBUFFER_Construct(
         {
             buffer->queryResumeBytes[gcvQUERY_OCCLUSION] = gpuCount * (2 * gcmSIZEOF(gctUINT32) + gcdRESUME_OQ_LENGTH)
                                                          + 2 * gcmSIZEOF(gctUINT32);
+            buffer->probeResumeBytes = gpuCount * (2 * gcmSIZEOF(gctUINT32) + gcdRESUME_PROBE_LENGH)
+                                     + 2 * gcmSIZEOF(gctUINT32);
         }
         else
         {
             buffer->queryResumeBytes[gcvQUERY_OCCLUSION] = gcdRESUME_OQ_LENGTH;
+            buffer->probeResumeBytes = gcdRESUME_PROBE_LENGH;
         }
     }
 
     buffer->tfbResumeBytes                            = mGpuModeSwitchBytes + gcdRESUME_XFB_LENGH;
     buffer->queryResumeBytes[gcvQUERY_XFB_WRITTEN]    = mGpuModeSwitchBytes + gcdRESUME_XFBWRITTEN_QUERY_LENGTH;
     buffer->queryResumeBytes[gcvQUERY_PRIM_GENERATED] = mGpuModeSwitchBytes + gcdRESUME_PRIMGEN_QUERY_LENGTH;
-    /*caculate the resume bytes when probe enable*/
-    buffer->probeResumeBytes = gcdRESUME_PROBE_LENGH;
 #endif
 
     buffer->totalReserved
@@ -801,7 +802,6 @@ gcoBUFFER_Construct(
     ** Initialize the command buffers.
     */
 
-    /* TODO: enable this feature for all platforms. */
 #if defined(ANDROID)
     /* No buffer when initialization. */
     buffer->count = gcdCMD_BUFFERS;
@@ -1593,7 +1593,7 @@ gcoBUFFER_Commit(
         /* Make sure the tail got aligned properly. */
         commandBuffer->offset = gcmALIGN(commandBuffer->offset, Buffer->info.alignment);
 
-#if ( gcdDUMP || gcdUSE_VX)
+#if (gcdDUMP || (gcdUSE_VX && gcdENABLE_3D))
         *DumpLogical = (gctUINT8_PTR) gcmUINT64_TO_PTR(commandBuffer->logical)
                      + commandBuffer->startOffset
                      + Buffer->info.reservedHead;

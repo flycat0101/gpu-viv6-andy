@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -49,8 +49,12 @@ cloCOMPILER_Lex(YYSTYPE * pyylval, cloCOMPILER Compiler)
 
     tokenType = cloCOMPILER_Scan(Compiler, &(pyylval->token));
     if(clIsBuiltinDataType(tokenType) ||
-       (tokenType == T_TYPE_NAME)) {
+       (tokenType == T_TYPE_NAME) ||
+       (tokenType == T_IDENTIFIER && cloCOMPILER_GetScannerState(Compiler) == clvSCANNER_IN_TYPEOF)) {
        gcmVERIFY_OK(cloCOMPILER_SetScannerState(Compiler, clvSCANNER_AFTER_TYPE));
+    }
+    else if(tokenType == T_TYPEOF) {
+       gcmVERIFY_OK(cloCOMPILER_SetScannerState(Compiler, clvSCANNER_IN_TYPEOF));
     }
     else {
        gcmVERIFY_OK(cloCOMPILER_SetScannerState(Compiler, clvSCANNER_NORMAL));
@@ -1061,6 +1065,56 @@ IN cloIR_EXPR Z
 }
 
 clsATTRIBUTE *
+clParseAttributeKernelScaleHint(
+IN cloCOMPILER Compiler,
+IN clsATTRIBUTE *Attr,
+IN cloIR_EXPR X,
+IN cloIR_EXPR Y,
+IN cloIR_EXPR Z
+)
+{
+   gceSTATUS status;
+   clsATTRIBUTE *attr;
+   gctINT x, y, z;
+
+   status = _EvaluateExprToInteger(Compiler, X, &x);
+   if (gcmIS_ERROR(status)) return Attr;
+
+   status = _EvaluateExprToInteger(Compiler, Y, &y);
+   if (gcmIS_ERROR(status)) return Attr;
+
+   status = _EvaluateExprToInteger(Compiler, Z, &z);
+   if (gcmIS_ERROR(status)) return Attr;
+
+   if(Attr == gcvNULL) {
+     gctPOINTER pointer;
+
+     status = cloCOMPILER_Allocate(Compiler,
+                                   (gctSIZE_T)sizeof(clsATTRIBUTE),
+                                   (gctPOINTER *) &pointer);
+     if (gcmIS_ERROR(status)) return Attr;
+     attr = pointer;
+     (void)gcoOS_ZeroMemory((gctPOINTER)attr, sizeof(clsATTRIBUTE));
+   }
+   else {
+     if(Attr->specifiedAttr & clvATTR_KERNEL_SCALE_HINT) {
+       gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                       X->base.lineNo,
+                                       X->base.stringNo,
+                                       clvREPORT_ERROR,
+                                       "kernel_scale_hint attribute already defined"));
+       return Attr;
+     }
+     attr = Attr;
+   }
+   attr->kernelScaleHint[0] = x;
+   attr->kernelScaleHint[1] = y;
+   attr->kernelScaleHint[2] = z;
+   attr->specifiedAttr |= clvATTR_KERNEL_SCALE_HINT;
+   return attr;
+}
+
+clsATTRIBUTE *
 clParseAttributeVecTypeHint(
 IN cloCOMPILER Compiler,
 IN clsATTRIBUTE *Attr,
@@ -1878,218 +1932,218 @@ OUT clsCOMPONENT_SELECTION * ComponentSelection
    gcmASSERT(ComponentSelection);
 
    if (gcmIS_SUCCESS(gcoOS_StrCmp(FieldSelection->u.fieldSelection, "hi"))) {
-    gctUINT8 start;
-    start = (VectorSize + 1) >> 1;
-    for(i = 0; i < start; i++) {
-       ComponentSelection->selection[i] = start + i;
-    }
-    ComponentSelection->components = i;
+       gctUINT8 start;
+       start = (VectorSize + 1) >> 1;
+       for(i = 0; i < start; i++) {
+          ComponentSelection->selection[i] = start + i;
+       }
+       ComponentSelection->components = i;
    }
    else if (gcmIS_SUCCESS(gcoOS_StrCmp(FieldSelection->u.fieldSelection, "lo"))) {
-    for(i = 0; i < ((VectorSize + 1) >> 1); i++) {
-       ComponentSelection->selection[i] = i;
-    }
-    ComponentSelection->components = i;
+       for(i = 0; i < ((VectorSize + 1) >> 1); i++) {
+          ComponentSelection->selection[i] = i;
+       }
+       ComponentSelection->components = i;
    }
    else if (gcmIS_SUCCESS(gcoOS_StrCmp(FieldSelection->u.fieldSelection, "even"))) {
-    for(i = 0; i < ((VectorSize + 1) >> 1); i++) {
-       ComponentSelection->selection[i] = i << 1;
-    }
-    ComponentSelection->components = i;
+       for(i = 0; i < ((VectorSize + 1) >> 1); i++) {
+          ComponentSelection->selection[i] = i << 1;
+       }
+       ComponentSelection->components = i;
    }
    else if (gcmIS_SUCCESS(gcoOS_StrCmp(FieldSelection->u.fieldSelection, "odd"))) {
-    for(i = 0; i < ((VectorSize + 1) >> 1); i++) {
-       ComponentSelection->selection[i] = (i << 1) + 1;
-    }
+       for(i = 0; i < ((VectorSize + 1) >> 1); i++) {
+          ComponentSelection->selection[i] = (i << 1) + 1;
+       }
        ComponentSelection->components = i;
    }
    else {
-     gctINT isNumericIndex = 0;
+       gctINT isNumericIndex = 0;
 
-     do {
-    if ((FieldSelection->u.fieldSelection[0] == 's' ||
-         FieldSelection->u.fieldSelection[0] == 'S') &&
-        FieldSelection->u.fieldSelection[1] != '\0') {
-        gctUINT selectLen;
-        selectLen= clScanStrspn(FieldSelection->u.fieldSelection + 1, _cldHexadecimalDigits);
-        if(selectLen) {
-        for (i=0, selectLen= 1; FieldSelection->u.fieldSelection[selectLen] != '\0'; i++, selectLen++) {
+       do {
+          if ((FieldSelection->u.fieldSelection[0] == 's' ||
+               FieldSelection->u.fieldSelection[0] == 'S') &&
+               FieldSelection->u.fieldSelection[1] != '\0') {
+              gctUINT selectLen;
+              selectLen= clScanStrspn(FieldSelection->u.fieldSelection + 1, _cldHexadecimalDigits);
+              if(selectLen) {
+                 for (i=0, selectLen= 1; FieldSelection->u.fieldSelection[selectLen] != '\0'; i++, selectLen++) {
 
-                   if(i >= cldMaxComponentCount) {
-                      gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                                      FieldSelection->lineNo,
-                                                      FieldSelection->stringNo,
-                                                      clvREPORT_ERROR,
-                                                      "more than %d components are selected : \"%s\"",
-                                                      cldMaxComponentCount,
-                                                      FieldSelection->u.fieldSelection));
-                      return gcvSTATUS_INVALID_ARGUMENT;
-                   }
+                     if(i >= cldMaxComponentCount) {
+                        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                        FieldSelection->lineNo,
+                                                        FieldSelection->stringNo,
+                                                        clvREPORT_ERROR,
+                                                        "more than %d components are selected : \"%s\"",
+                                                        cldMaxComponentCount,
+                                                        FieldSelection->u.fieldSelection));
+                        return gcvSTATUS_INVALID_ARGUMENT;
+                     }
 
-           switch(FieldSelection->u.fieldSelection[selectLen]) {
-           case '0':
-             components[i] = 0;
-             break;
+                     switch(FieldSelection->u.fieldSelection[selectLen]) {
+                     case '0':
+                       components[i] = 0;
+                       break;
 
-           case '1':
-             components[i] = 1;
-             break;
+                     case '1':
+                       components[i] = 1;
+                       break;
 
-           case '2':
-             components[i] = 2;
-             break;
+                     case '2':
+                           components[i] = 2;
+                           break;
 
-           case '3':
-             components[i] = 3;
-             break;
+                     case '3':
+                       components[i] = 3;
+                       break;
 
-           case '4':
-             components[i] = 4;
-             break;
+                     case '4':
+                       components[i] = 4;
+                       break;
 
-           case '5':
-             components[i] = 5;
-             break;
+                     case '5':
+                       components[i] = 5;
+                       break;
 
-           case '6':
-             components[i] = 6;
-             break;
+                     case '6':
+                       components[i] = 6;
+                       break;
 
-           case '7':
-             components[i] = 7;
-             break;
+                     case '7':
+                       components[i] = 7;
+                       break;
 
-           case '8':
-             components[i] = 8;
-             break;
+                     case '8':
+                       components[i] = 8;
+                       break;
 
-           case '9':
-             components[i] = 9;
-             break;
+                     case '9':
+                       components[i] = 9;
+                       break;
 
-           case 'a':
-           case 'A':
-             components[i] = 10;
-             break;
+                     case 'a':
+                     case 'A':
+                       components[i] = 10;
+                       break;
 
-           case 'b':
-           case 'B':
-             components[i] = 11;
-             break;
+                     case 'b':
+                     case 'B':
+                       components[i] = 11;
+                       break;
 
-           case 'c':
-           case 'C':
-             components[i] = 12;
-             break;
+                     case 'c':
+                     case 'C':
+                       components[i] = 12;
+                       break;
 
-           case 'd':
-           case 'D':
-             components[i] = 13;
-             break;
+                     case 'd':
+                     case 'D':
+                       components[i] = 13;
+                       break;
 
-           case 'e':
-           case 'E':
-             components[i] = 14;
-             break;
+                     case 'e':
+                     case 'E':
+                       components[i] = 14;
+                       break;
 
-           case 'f':
-           case 'F':
-             components[i] = 15;
-             break;
+                     case 'f':
+                     case 'F':
+                       components[i] = 15;
+                       break;
 
-           default:
-            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                            FieldSelection->lineNo,
-                            FieldSelection->stringNo,
-                            clvREPORT_ERROR,
-                            "invalid component selection: '%c'",
-                                                        FieldSelection->u.fieldSelection[selectLen]));
-            return gcvSTATUS_INVALID_ARGUMENT;
-           }
-        }
-           ComponentSelection->components = i;
-                isNumericIndex = 1;
-        break;
-        }
-    }
-        for (i = 0; FieldSelection->u.fieldSelection[i] != '\0'; i++) {
-                if(i >= cldMaxComponentCount) {
+                     default:
+                       gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                       FieldSelection->lineNo,
+                                       FieldSelection->stringNo,
+                                       clvREPORT_ERROR,
+                                       "invalid component selection: '%c'",
+                                       FieldSelection->u.fieldSelection[selectLen]));
+                       return gcvSTATUS_INVALID_ARGUMENT;
+                     }
+                  }
+                  ComponentSelection->components = i;
+                  isNumericIndex = 1;
+                  break;
+              }
+          }
+          for (i = 0; FieldSelection->u.fieldSelection[i] != '\0'; i++) {
+              if(i >= cldMaxComponentCount) {
+                    gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                    FieldSelection->lineNo,
+                                                    FieldSelection->stringNo,
+                                                    clvREPORT_ERROR,
+                                                    "more than %d components are selected : \"%s\"",
+                                                    cldMaxComponentCount,
+                                                    FieldSelection->u.fieldSelection));
+                    return gcvSTATUS_INVALID_ARGUMENT;
+              }
+              switch (FieldSelection->u.fieldSelection[i]) {
+              case 'x': nameSets[i] = 0; components[i] = clvCOMPONENT_X; break;
+              case 'y': nameSets[i] = 0; components[i] = clvCOMPONENT_Y; break;
+              case 'z': nameSets[i] = 0; components[i] = clvCOMPONENT_Z; break;
+              case 'w': nameSets[i] = 0; components[i] = clvCOMPONENT_W; break;
+
+              case 'r': nameSets[i] = 1; components[i] = clvCOMPONENT_X; break;
+              case 'g': nameSets[i] = 1; components[i] = clvCOMPONENT_Y; break;
+              case 'b': nameSets[i] = 1; components[i] = clvCOMPONENT_Z; break;
+              case 'a': nameSets[i] = 1; components[i] = clvCOMPONENT_W; break;
+
+              case 's': nameSets[i] = 2; components[i] = clvCOMPONENT_X; break;
+              case 't': nameSets[i] = 2; components[i] = clvCOMPONENT_Y; break;
+              case 'p': nameSets[i] = 2; components[i] = clvCOMPONENT_Z; break;
+              case 'q': nameSets[i] = 2; components[i] = clvCOMPONENT_W; break;
+
+              default:
                   gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                                                  FieldSelection->lineNo,
-                                                  FieldSelection->stringNo,
-                                                  clvREPORT_ERROR,
-                                                  "more than %d components are selected : \"%s\"",
-                                                  cldMaxComponentCount,
-                                                  FieldSelection->u.fieldSelection));
+                                  FieldSelection->lineNo,
+                                  FieldSelection->stringNo,
+                                  clvREPORT_ERROR,
+                                  "invalid component name: '%c'",
+                                  FieldSelection->u.fieldSelection[i]));
                   return gcvSTATUS_INVALID_ARGUMENT;
-                }
-        switch (FieldSelection->u.fieldSelection[i]) {
-        case 'x': nameSets[i] = 0; components[i] = clvCOMPONENT_X; break;
-        case 'y': nameSets[i] = 0; components[i] = clvCOMPONENT_Y; break;
-        case 'z': nameSets[i] = 0; components[i] = clvCOMPONENT_Z; break;
-        case 'w': nameSets[i] = 0; components[i] = clvCOMPONENT_W; break;
+              }
+         }
 
-        case 'r': nameSets[i] = 1; components[i] = clvCOMPONENT_X; break;
-        case 'g': nameSets[i] = 1; components[i] = clvCOMPONENT_Y; break;
-        case 'b': nameSets[i] = 1; components[i] = clvCOMPONENT_Z; break;
-        case 'a': nameSets[i] = 1; components[i] = clvCOMPONENT_W; break;
+         ComponentSelection->components = i;
 
-        case 's': nameSets[i] = 2; components[i] = clvCOMPONENT_X; break;
-        case 't': nameSets[i] = 2; components[i] = clvCOMPONENT_Y; break;
-        case 'p': nameSets[i] = 2; components[i] = clvCOMPONENT_Z; break;
-        case 'q': nameSets[i] = 2; components[i] = clvCOMPONENT_W; break;
+         for (i = 1; i < ComponentSelection->components; i++) {
+             if (nameSets[i] != nameSets[0]) {
+                 gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                 FieldSelection->lineNo,
+                                 FieldSelection->stringNo,
+                                 clvREPORT_ERROR,
+                                 "the component name: '%c'"
+                                 " do not come from the same set",
+                                 FieldSelection->u.fieldSelection[i]));
+                 return gcvSTATUS_INVALID_ARGUMENT;
+             }
+         }
+       } while (gcvFALSE);
 
-        default:
-            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                            FieldSelection->lineNo,
-                            FieldSelection->stringNo,
-                            clvREPORT_ERROR,
-                            "invalid component name: '%c'",
-                            FieldSelection->u.fieldSelection[i]));
-            return gcvSTATUS_INVALID_ARGUMENT;
-        }
+       if(_clmIsValidVectorType(ComponentSelection->components)) {
+           for (i = 0; i < ComponentSelection->components; i++) {
+               if ((gctUINT8)components[i] >= VectorSize) {
+                   gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                   FieldSelection->lineNo,
+                                   FieldSelection->stringNo,
+                                   clvREPORT_ERROR,
+                                   "the component: '%c' beyond the specified vector type",
+                                   FieldSelection->u.fieldSelection[i + isNumericIndex]));
+                   return gcvSTATUS_INVALID_ARGUMENT;
+               }
+
+               ComponentSelection->selection[i] = components[i];
+           }
        }
-
-       ComponentSelection->components = i;
-
-       for (i = 1; i < ComponentSelection->components; i++) {
-      if (nameSets[i] != nameSets[0]) {
-        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                        FieldSelection->lineNo,
-                        FieldSelection->stringNo,
-                        clvREPORT_ERROR,
-                        "the component name: '%c'"
-                        " do not come from the same set",
-                        FieldSelection->u.fieldSelection[i]));
-        return gcvSTATUS_INVALID_ARGUMENT;
-      }
-    }
-     } while (gcvFALSE);
-
-     if(_clmIsValidVectorType(ComponentSelection->components)) {
-    for (i = 0; i < ComponentSelection->components; i++) {
-        if ((gctUINT8)components[i] >= VectorSize) {
-            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                            FieldSelection->lineNo,
-                            FieldSelection->stringNo,
-                            clvREPORT_ERROR,
-                            "the component: '%c' beyond the specified vector type",
-                            FieldSelection->u.fieldSelection[i + isNumericIndex]));
-            return gcvSTATUS_INVALID_ARGUMENT;
-        }
-
-        ComponentSelection->selection[i] = components[i];
-    }
-     }
-     else {
-    gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                    FieldSelection->lineNo,
-                    FieldSelection->stringNo,
-                    clvREPORT_ERROR,
-                    "vector type of component selection \"%s\" is invalid",
-                    FieldSelection->u.fieldSelection));
-    return gcvSTATUS_INVALID_ARGUMENT;
-     }
+       else {
+           gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                           FieldSelection->lineNo,
+                           FieldSelection->stringNo,
+                           clvREPORT_ERROR,
+                           "vector type of component selection \"%s\" is invalid",
+                           FieldSelection->u.fieldSelection));
+           return gcvSTATUS_INVALID_ARGUMENT;
+       }
    }
    return gcvSTATUS_OK;
 }
@@ -3221,7 +3275,60 @@ IN clsDATA_TYPE *DataType
 }
 
 clsDECL
+clParseCreateDeclFromExpression(
+IN cloCOMPILER Compiler,
+IN cloIR_EXPR Expr
+)
+{
+   return Expr->decl;
+}
+
+clsDECL
 clParseCreateDecl(
+IN cloCOMPILER Compiler,
+IN clsDECL *Decl,
+IN slsSLINK_LIST *PtrDscr,
+IN cloIR_EXPR ArrayLengthExpr
+)
+{
+    clsDECL decl;
+    gceSTATUS status;
+
+    decl = *Decl;
+    if (Decl->dataType == gcvNULL) return decl;
+
+    if(clmDATA_TYPE_IsImage(decl.dataType)) {
+        gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                        cloCOMPILER_GetCurrentLineNo(Compiler),
+                                        cloCOMPILER_GetCurrentStringNo(Compiler),
+                                        clvREPORT_ERROR,
+                                        "image cannot have pointer type"));
+    }
+    else {
+        clsARRAY array[1];
+
+        clMergePtrDscrToDecl(Compiler, PtrDscr, &decl, PtrDscr != gcvNULL);
+        if(ArrayLengthExpr) {
+            clmEvaluateExprToArrayLength(Compiler,
+                                         ArrayLengthExpr,
+                                         array,
+                                         gcvFALSE,
+                                         status);
+            if (gcmIS_ERROR(status)) return decl;
+            status = cloCOMPILER_CreateArrayDecl(Compiler,
+                                                 decl.dataType,
+                                                 array,
+                                                 decl.ptrDscr,
+                                                 &decl);
+            if (gcmIS_ERROR(status)) return decl;
+            decl.ptrDominant = gcvFALSE;
+        }
+    }
+    return decl;
+}
+
+clsDECL
+clParseTypeofArguments(
 IN cloCOMPILER Compiler,
 IN clsDECL *Decl,
 IN slsSLINK_LIST *PtrDscr
@@ -7102,18 +7209,17 @@ IN cloIR_EXPR RightOperand
 static void
 cltest(void)
 {
-
-        enum  hue {red, blue, green, yellow, brown};
+    enum  hue {red, blue, green, yellow, brown};
     enum { one, two, three, seven, eight, nine} number;
-        enum { four, five, six } number_big;
-        enum not_yet_defined;
+    enum { four, five, six } number_big;
+    enum not_yet_defined;
     const char a[] = "";
     char b[5] = "abcd";
     char c[] = "abcdefg";
     char d[5] = "dfgh";
     char chr;
     const char *ptr;
-        struct yet_to_define;
+    struct yet_to_define;
     struct s {
         int i;
         int a[2];
@@ -7121,7 +7227,7 @@ cltest(void)
     } s1, s2;
     typedef int arrayeight[8];
     int size;
-        arrayeight intarray = {1, 2, 3, 4, 5, 6, 7, 8};
+    arrayeight intarray = {1, 2, 3, 4, 5, 6, 7, 8};
     arrayeight *intarrayptr;
     int outValues[3][8] = { 17, 01, 11, 12, 1955, 11, 5, 1985, 113, 1, 24, 1984, 7, 23, 1979, 97,
                                 100, 101, 102, 103, 104, 105, 106, 107 };
@@ -9067,8 +9173,13 @@ IN cloIR_EXPR InitExpr
                                          &constant);
         if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
 
+#if _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
+        if (clmDECL_IsUnderlyingStructOrUnion(&name->decl)) {
+#else
         if (clmDECL_IsUnderlyingStructOrUnion(&name->decl) &&
-            (clGetOperandCountForRegAlloc(&name->decl) > _cldMaxOperandCountToUseMemory)) {
+            ((clGetOperandCountForRegAlloc(&name->decl) > _cldMaxOperandCountToUseMemory) ||
+             name->u.variableInfo.isAddressed)) {
+#endif
            gctSIZE_T written;
            clsVARIABLE_NESTING *nesting = gcvNULL;
 
@@ -9834,6 +9945,12 @@ IN clsLexToken *Identifier
         name->u.funcInfo.workGroupSizeHint[0] = Attr->workGroupSizeHint[0];
         name->u.funcInfo.workGroupSizeHint[1] = Attr->workGroupSizeHint[1];
         name->u.funcInfo.workGroupSizeHint[2] = Attr->workGroupSizeHint[2];
+     }
+
+     if(Attr->specifiedAttr & clvATTR_KERNEL_SCALE_HINT)  {
+        name->u.funcInfo.kernelScaleHint[0] = Attr->kernelScaleHint[0];
+        name->u.funcInfo.kernelScaleHint[1] = Attr->kernelScaleHint[1];
+        name->u.funcInfo.kernelScaleHint[2] = Attr->kernelScaleHint[2];
      }
 
      if(Attr->specifiedAttr & clvATTR_VEC_TYPE_HINT)  {
@@ -11515,7 +11632,7 @@ IN cloIR_EXPR ArrayLengthExpr
     clmEvaluateExprToArrayLength(Compiler,
                      ArrayLengthExpr,
                      array,
-                                     gcvFALSE,
+                     gcvFALSE,
                      status);
     if (gcmIS_ERROR(status)) return gcvNULL;
 

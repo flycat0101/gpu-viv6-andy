@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1364,9 +1364,6 @@ dfb_CopyPixmapBits(
     return gcvSTATUS_NOT_SUPPORTED;
 }
 
-/******************************************************************************/
-/* TODO: merge functions. */
-
 #include <gc_egl_precomp.h>
 
 
@@ -1382,9 +1379,6 @@ dfb_CopyPixmapBits(
  * are synchronized.
  * The idea is to wait until buffer is displayed before next time return back
  * to GPU rendering.
- *
- * TODO: But this will break frame skipping because skipped back buffer post
- * will cause infinite wait in getWindowBackBuffer.
  */
 #define SYNC_TEMPORARY_RESOLVE_SURFACES     0
 
@@ -2181,7 +2175,6 @@ _UpdateBufferAge(
     IN struct eglBackBuffer * BackBuffer
     )
 {
-    /* TODO */
     return EGL_TRUE;
 }
 
@@ -2193,7 +2186,6 @@ _QueryBufferAge(
     OUT EGLint *BufferAge
     )
 {
-    /* TODO */
     return EGL_FALSE;
 }
 
@@ -2557,15 +2549,6 @@ _ConnectPixmap(
                                    0, 0,
                                    pixmapWidth,
                                    pixmapHeight);
-
-        if (gcmIS_ERROR(status))
-        {
-            /* Failed to wrap. */
-            break;
-        }
-
-        /* Initial lock for user-pool surface. */
-        status = gcoSURF_Lock(wrapper, gcvNULL, gcvNULL);
     }
     while (gcvFALSE);
 
@@ -2761,7 +2744,7 @@ _SyncToPixmap(
 
 static struct eglPlatform dfbPlatform =
 {
-    EGL_PLATFORM_X11_KHR,
+    EGL_PLATFORM_DFB_VIV,
 
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,

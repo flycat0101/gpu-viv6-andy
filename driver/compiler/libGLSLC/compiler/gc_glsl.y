@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -953,13 +953,17 @@ memory_access_qualifier :
 
 struct_specifier :
 	T_STRUCT T_IDENTIFIER '{'
-			{ slParseStructDeclBegin(Compiler); }
+			{ slParseStructDeclBegin(Compiler, &$2); }
 		struct_declaration_list '}'
-		{ $$ = slParseStructDeclEnd(Compiler, &$1, &$2); }
+		{ $$ = slParseStructDeclEnd(Compiler, &$2); }
 	| T_STRUCT '{'
-			{ slParseStructDeclBegin(Compiler); }
+			{ slParseStructDeclBegin(Compiler, gcvNULL); }
 		struct_declaration_list '}'
-		{ $$ = slParseStructDeclEnd(Compiler, &$1, gcvNULL); }
+		{ $$ = slParseStructDeclEnd(Compiler, gcvNULL); }
+	| T_STRUCT T_TYPE_NAME '{'
+			{ slParseStructReDeclBegin(Compiler, &$2); }
+		struct_declaration_list '}'
+		{ $$ = slParseStructReDeclEnd(Compiler, &$2); }
 	;
 
 struct_declaration_list :
@@ -1007,11 +1011,11 @@ interface_block :
 
 interface_block_decl :
 	type_qualifiers T_IDENTIFIER '{'
-		{ slParseInterfaceBlockDeclBegin(Compiler, &$1); }
+		{ slParseInterfaceBlockDeclBegin(Compiler, &$1, &$2); }
 		interface_block_member_list '}'
 		{ $$ = slParseInterfaceBlockDeclEnd(Compiler, &$1, &$2); }
 	| type_qualifiers T_IDENTIFIER '{'
-        { slParseInterfaceBlockDeclBegin(Compiler, &$1); }
+        { slParseInterfaceBlockDeclBegin(Compiler, &$1, &$2); }
         error '}'
         {
             yyclearin;

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1004,13 +1004,23 @@ gcoHARDWARE_SetLastPixelEnable(
     )
 {
     gceSTATUS status;
+    gctUINT last;
 
     gcmHEADER_ARG("Hardware=0x%x Enable=%d", Hardware, Enable);
 
+    last = (gctUINT)Enable;
+
+    if (!Hardware->features[gcvFEATURE_WIDELINE_HELPER_FIX])
+    {
+        last = ((((gctUINT32) (last)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:5) - (0 ? 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ?
+ 5:5))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 5:5) - (0 ? 5:5) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ? 5:5)));
+    }
 
     gcmONERROR(gcoHARDWARE_SelectPipe(gcvNULL, gcvPIPE_3D, gcvNULL));
     gcmONERROR(gcoHARDWARE_LoadState32(
-        Hardware, 0x00C18, Enable
+        Hardware, 0x00C18, last
         ));
 
 OnError:
@@ -2422,6 +2432,7 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
     gceMULTI_GPU_RENDERING_MODE mode;
     gcsHINT_PTR hints;
     gctBOOL singleCore = gcvFALSE;
+    gctUINT32 setMappingGPU4to7 = 0;
 
     gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
 
@@ -2667,6 +2678,57 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
  23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
  23:23) + 1))))))) << (0 ? 23:23)))
                      ;
+        }
+        else if (gpuCoreCount == 8)
+        {
+            gcmASSERT(Hardware->features[gcvFEATURE_MULTI_CORE_BLOCK_SET_CONFIG2]);
+            /* Flat map set[i] to core[i]. */
+            control |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:4) - (0 ? 6:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:4) - (0 ? 6:4) + 1))))))) << (0 ?
+ 6:4))) | (((gctUINT32) (0x7 & ((gctUINT32) ((((1 ? 6:4) - (0 ? 6:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 6:4) - (0 ? 6:4) + 1))))))) << (0 ? 6:4)))
+                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 8:8) - (0 ? 8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
+ 8:8))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ? 8:8) - (0 ?
+ 8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
+ 8:8)))
+                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:13) - (0 ? 13:13) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:13) - (0 ?
+ 13:13) + 1))))))) << (0 ? 13:13))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 13:13) - (0 ? 13:13) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:13) - (0 ?
+ 13:13) + 1))))))) << (0 ? 13:13)))
+                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:18) - (0 ? 18:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:18) - (0 ?
+ 18:18) + 1))))))) << (0 ? 18:18))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 18:18) - (0 ? 18:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:18) - (0 ?
+ 18:18) + 1))))))) << (0 ? 18:18)))
+                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
+ 23:23) + 1))))))) << (0 ? 23:23))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 23:23) - (0 ? 23:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:23) - (0 ?
+ 23:23) + 1))))))) << (0 ? 23:23)))
+                     ;
+            setMappingGPU4to7 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:0) - (0 ? 7:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ?
+ 7:0))) | (((gctUINT32) ((gctUINT32) (1 << 4) & ((gctUINT32) ((((1 ? 7:0) - (0 ?
+ 7:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:0) - (0 ? 7:0) + 1))))))) << (0 ?
+ 7:0)))
+                              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:8) - (0 ? 15:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:8) - (0 ? 15:8) + 1))))))) << (0 ?
+ 15:8))) | (((gctUINT32) ((gctUINT32) (1 << 5) & ((gctUINT32) ((((1 ? 15:8) - (0 ?
+ 15:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:8) - (0 ? 15:8) + 1))))))) << (0 ?
+ 15:8)))
+                              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:16) - (0 ? 23:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:16) - (0 ?
+ 23:16) + 1))))))) << (0 ? 23:16))) | (((gctUINT32) ((gctUINT32) (1 << 6) & ((gctUINT32) ((((1 ?
+ 23:16) - (0 ? 23:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:16) - (0 ?
+ 23:16) + 1))))))) << (0 ? 23:16)))
+                              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:24) - (0 ? 31:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:24) - (0 ?
+ 31:24) + 1))))))) << (0 ? 31:24))) | (((gctUINT32) ((gctUINT32) (1 << 7) & ((gctUINT32) ((((1 ?
+ 31:24) - (0 ? 31:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:24) - (0 ?
+ 31:24) + 1))))))) << (0 ? 31:24)));
+
         }
         else if (gpuCoreCount == 2)
         {
@@ -2940,6 +3002,35 @@ gcoHARDWARE_FlushMultiGPURenderingMode(
 };
 
 
+    if (setMappingGPU4to7)
+    {
+        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E84) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E84, setMappingGPU4to7);
+    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+    }
+
     gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, Memory);
 
     if (renderWindow != gcvNULL)
@@ -3132,8 +3223,7 @@ gcoHARDWARE_Initialize3D(
         gcoHAL_GetOption(gcvNULL, gcvOPTION_PREFER_GUARDBAND))
     {
         Hardware->TXStates->hwTxLODGuardbandEnable = gcvTRUE;
-        Hardware->TXStates->hwTxLODGuardbandIndex = 0; /* TODO: can choice a better mode later */
-
+        Hardware->TXStates->hwTxLODGuardbandIndex = 0;
         /* Program the guardband table. */
         gcmONERROR(gcoHARDWARE_LoadState(Hardware,
                                          0x14C00, 4*4, _GuardbandTable));
@@ -3185,12 +3275,12 @@ gcoHARDWARE_Initialize3D(
     if (Hardware->features[gcvFEATURE_SECURITY])
     {
         gcmONERROR(gcoHARDWARE_LoadState32(Hardware,
-                                           0x03900,
-                                           Hardware->context));
+            0x03900,
+            Hardware->context));
 
         gcmONERROR(gcoHARDWARE_LoadState32(Hardware,
-                                           0x03904,
-                                           0));
+            0x03904,
+            0));
     }
 #endif
 
@@ -3377,7 +3467,7 @@ gcoHARDWARE_QuerySurfaceRenderable(
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
     gcmDEBUG_VERIFY_ARGUMENT(Surface != gcvNULL);
 
-    gcmONERROR(gcoSURF_QueryFormat(Surface->format, info));
+    gcmONERROR(gcoHARDWARE_QueryFormat(Surface->format, info));
 
     do
     {
@@ -8235,7 +8325,6 @@ gcoHARDWARE_FlushDepth(
                         surfaceBase + depthInfo->sliceIndex * surface->sliceSize
                         );
 
-                    /* TODO: for singleBuffer+MultiPipe case, no need to program the 2nd address */
                     gcmSETSTATEDATA_NEW(
                         stateDelta, reserve, memory, gcvFALSE, 0x0520 + 1,
                         surfaceBottom + depthInfo->sliceIndex * surface->sliceSize
@@ -10264,8 +10353,6 @@ gcoHARDWARE_FlushShaders(
     }
 
 #if gcdALPHA_KILL_IN_SHADER
-    /* Determine alpka kill. */
-    /*TODO: need review the code to make sure MRT is correctly considered */
     alphaKill = (Hardware->PEStates->alphaStates.blend[0]
                  &&
                  (hints->killStateAddress != 0)
@@ -15425,11 +15512,11 @@ gcoHARDWARE_SetProbeCmd(
     gceSTATUS status = gcvSTATUS_OK;
     gceProbeStatus probeStatus;
     gctUINT32 address;
-    gctINT32 module;
+    gctUINT32 module;
     gctUINT32 offset = 0;
-    gctINT32 i;
+    gctUINT32 i,j;
 
-    static const gctINT32 moduleXlate[] =
+    static const gctUINT32 moduleXlate[] =
     {
         /* FE MODULE */
         0x0,
@@ -15459,7 +15546,7 @@ gcoHARDWARE_SetProbeCmd(
         0xC,
     };
 
-    static const gctINT32 numXlate[] =
+    static const gctUINT32 numXlate[] =
     {
         /* FE MODULE */
         MODULE_FRONT_END_COUNTER_NUM,
@@ -15532,47 +15619,36 @@ gcoHARDWARE_SetProbeCmd(
         break;
     }
 
-    for (module = 0; module < gcvCOUNTER_COUNT; module++)
+    for (i = 0; i < Hardware->config->gpuCoreCount; ++i)
     {
-        offset = 0;
-        for (i = 0; i < (gctINT32)module; i++)
+        if (Hardware->config->gpuCoreCount > 1)
         {
-            offset += numXlate[i];
+            { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | gcvCORE_3D_0_MASK << gcmTO_CHIP_ID(i); memory++;
+  gcmDUMP(gcvNULL, "#[chip.enable 0x%04X]", gcvCORE_3D_0_MASK << gcmTO_CHIP_ID(i));
+ } };
+
+            address = Hardware->PROBEStates->probeAddress + TOTAL_PROBE_NUMBER * gcmSIZEOF(gctUINT64) * i;
         }
-
-        for (i = 0; i < numXlate[module]; i++)
+        for (module = 0; module < gcvCOUNTER_COUNT; module++)
         {
-            /* pass address to store counter */
-            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
-    gcmASSERT((gctUINT32)1 <= 1024);
-    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
- 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
- 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
- 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
- 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
- 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
- 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
- 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
- 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
- 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E1C) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
- 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0)));    gcmSKIPSECUREUSER();
-};
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E1C, address + (i + offset) * sizeof(gctUINT32));
-    gcmENDSTATEBATCH_NEW(reserve, memory);
-};
-
-
-            switch (Cmd)
+            offset = 0;
+            for (j = 0; j < module; j++)
             {
-            case gcvPROBECMD_BEGIN:
-                /* reset and resume counter */
-                {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+                offset += numXlate[j];
+            }
+
+            for (j = 0; j < numXlate[module]; j++)
+            {
+                gctUINT32 tempAddrs;
+                switch (Cmd)
+                {
+                case gcvPROBECMD_BEGIN:
+                    /* reset and resume counter */
+                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
@@ -15602,14 +15678,14 @@ gcoHARDWARE_SetProbeCmd(
  19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
  19:16) + 1))))))) << (0 ? 19:16))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (i) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (j) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0))); );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
 
-                {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
@@ -15639,16 +15715,16 @@ gcoHARDWARE_SetProbeCmd(
  19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
  19:16) + 1))))))) << (0 ? 19:16))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (i) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (j) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0))); );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
-                break;
-            case gcvPROBECMD_PAUSE:
-                /* pause the counter */
-                {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+                    break;
+                case gcvPROBECMD_PAUSE:
+                    /* pause the counter */
+                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
@@ -15678,16 +15754,16 @@ gcoHARDWARE_SetProbeCmd(
  19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
  19:16) + 1))))))) << (0 ? 19:16))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (i) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (j) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0))); );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
-                break;
-            case gcvPROBECMD_RESUME:
-                /* resume the counter */
-                {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+                    break;
+                case gcvPROBECMD_RESUME:
+                    /* resume the counter */
+                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
@@ -15717,16 +15793,44 @@ gcoHARDWARE_SetProbeCmd(
  19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
  19:16) + 1))))))) << (0 ? 19:16))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (i) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (j) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0))); );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
-                break;
-            case gcvPROBECMD_END:
-                /* probe and pass the counter */
-                {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+                    break;
+                case gcvPROBECMD_END:
+                    /* pass address to store counter */
+                    tempAddrs = address + (j + offset) * gcmSIZEOF(gctUINT64);
+
+                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0E1C) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E1C, tempAddrs);
+    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+                    /* probe and pass the counter */
+                    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
@@ -15756,19 +15860,32 @@ gcoHARDWARE_SetProbeCmd(
  19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
  19:16) + 1))))))) << (0 ? 19:16))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
- 15:0))) | (((gctUINT32) ((gctUINT32) (i) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (j) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0))); );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
-                break;
-            default:
-                gcmASSERT(0);
-                gcmPRINT("Invalid PROBE command");
-                break;
+                    break;
+                default:
+                    gcmASSERT(0);
+                    gcmPRINT("Invalid PROBE command");
+                    break;
+                }
             }
         }
+    }
+
+    if (Hardware->config->gpuCoreCount > 1)
+    {
+        { if (Hardware->config->gpuCoreCount > 1) { *memory++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | gcvCORE_3D_ALL_MASK; memory++;
+  gcmDUMP(gcvNULL, "#[chip.enable 0x%04X]", gcvCORE_3D_ALL_MASK);
+ } };
+
     }
 
 #ifndef __clang__

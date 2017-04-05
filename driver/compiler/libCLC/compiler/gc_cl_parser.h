@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -74,6 +74,15 @@ clParseAttributeReqdWorkGroupSize(
 
 clsATTRIBUTE *
 clParseAttributeWorkGroupSizeHint(
+    IN cloCOMPILER Compiler,
+    IN clsATTRIBUTE *Attr,
+    IN cloIR_EXPR X,
+    IN cloIR_EXPR Y,
+    IN cloIR_EXPR Z
+    );
+
+clsATTRIBUTE *
+clParseAttributeKernelScaleHint(
     IN cloCOMPILER Compiler,
     IN clsATTRIBUTE *Attr,
     IN cloIR_EXPR X,
@@ -215,10 +224,17 @@ clParseCreateDeclFromDataType(
     );
 
 clsDECL
+clParseCreateDeclFromExpression(
+    IN cloCOMPILER Compiler,
+    IN cloIR_EXPR Expr
+    );
+
+clsDECL
 clParseCreateDecl(
 IN cloCOMPILER Compiler,
 IN clsDECL *Decl,
-IN slsSLINK_LIST *ptrDscr
+IN slsSLINK_LIST *ptrDscr,
+IN cloIR_EXPR ArrayLengthExpr
 );
 
 gceSTATUS

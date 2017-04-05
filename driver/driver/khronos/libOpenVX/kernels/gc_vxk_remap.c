@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -80,7 +80,7 @@ gcvVX_INTERPOLATION_TYPE_BILINEAR:gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR);
         uniformNum++;
     }
 
-    if (node->base.context->evisNoInst.noBilinear)
+    if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noBilinear)
     {
         vx_uint32 constantData[8] = {0, 8, 16, 24, 0, 0, 0, 0};
         gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData, sizeof(constantData));

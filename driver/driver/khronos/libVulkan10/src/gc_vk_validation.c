@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -14,8 +14,6 @@
 #include "gc_vk_precomp.h"
 
 #define __VK_PTRVALUE(ptr)  ((ptr) ? *(ptr) : 0)
-
-#define __VK_PRTRESULT(result)  (result < 0 ? retStr[VK_RESULT_END_RANGE - result] : retStr[result])
 
 /* Vivante Implementation Defined Validation Errors */
 #define __VK_ERROR_DEVICE_ALREADY_CREATED               ((VkResult)(VK_RESULT_RANGE_SIZE + 0))
@@ -35,7 +33,13 @@
 #define __VK_ERROR_DEVICE_MISMATCH                      ((VkResult)(VK_RESULT_RANGE_SIZE + 14))
 #define __VK_ERROR_NOT_ALIGNED                          ((VkResult)(VK_RESULT_RANGE_SIZE + 15))
 
-static const char *retStr[] = {
+extern __vkInstance *__vkInstanceRoot;
+extern gctPOINTER  __vkRootMutex;
+
+static const char* __vkiGetResultString(VkResult result)
+{
+    static const char *sRetStr[] =
+    {
         "VK_SUCCESS",
         "VK_NOT_READY",
         "VK_TIMEOUT",
@@ -53,6 +57,7 @@ static const char *retStr[] = {
         "VK_ERROR_INCOMPATIBLE_DRIVER",
         "VK_ERROR_TOO_MANY_OBJECTS",
         "VK_ERROR_FORMAT_NOT_SUPPORTED",
+        "VK_ERROR_FRAGMENTED_POOL",
         "__VK_ERROR_DEVICE_ALREADY_CREATED",
         "__VK_ERROR_INVALID_POINTER",
         "__VK_ERROR_INVALID_VALUE",
@@ -69,13 +74,46 @@ static const char *retStr[] = {
         "__VK_ERROR_BUILDING_COMMAND_BUFFER",
         "__VK_ERROR_DEVICE_MISMATCH",
         "__VK_ERROR_NOT_ALIGNED"
-};
+    };
+
+    if (result >= VK_RESULT_BEGIN_RANGE && result < 0)
+    {
+        return sRetStr[VK_RESULT_END_RANGE - result];
+    }
+    else if ((result >= 0 && result <= VK_RESULT_END_RANGE) ||
+             (result >= VK_RESULT_RANGE_SIZE && result <= __VK_ERROR_NOT_ALIGNED))
+    {
+        return sRetStr[result];
+    }
+    else
+    {
+        switch (result)
+        {
+        case VK_ERROR_SURFACE_LOST_KHR:
+            return "VK_ERROR_SURFACE_LOST_KHR";
+        case VK_ERROR_NATIVE_WINDOW_IN_USE_KHR:
+            return "VK_ERROR_NATIVE_WINDOW_IN_USE_KHR";
+        case VK_SUBOPTIMAL_KHR:
+            return "VK_SUBOPTIMAL_KHR";
+        case VK_ERROR_OUT_OF_DATE_KHR:
+            return "VK_ERROR_OUT_OF_DATE_KHR";
+        case VK_ERROR_INCOMPATIBLE_DISPLAY_KHR:
+            return "VK_ERROR_INCOMPATIBLE_DISPLAY_KHR";
+        case VK_ERROR_VALIDATION_FAILED_EXT:
+            return "VK_ERROR_VALIDATION_FAILED_EXT";
+        case VK_ERROR_INVALID_SHADER_NV:
+            return "VK_ERROR_INVALID_SHADER_NV";
+        default:
+            break;
+        }
+    }
+
+    return "ERROR_UNKNOWN_RESULT";
+}
 
 /*
 ** Vulkan API Validation Layer that is enabled for App development and can be skipped at runtime.
 */
-extern __vkInstance *__vkInstanceRoot;
-extern gctPOINTER  __vkRootMutex;
 VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkInstance* pInstance)
 {
     VkResult result = VK_SUCCESS;
@@ -111,8 +149,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateInstance(const VkInstanceCreateInfo
     result = __vk_CreateInstance(pCreateInfo, pAllocator, pInstance);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (instance=%p) %s\n", *pInstance, __VK_PRTRESULT(result));
-
+    __VK_LOG_API(" ==> (instance=%p) %s\n", __VK_PTRVALUE(pInstance), __vkiGetResultString(result));
     return result;
 }
 
@@ -152,7 +189,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyInstance(VkInstance instance, const Vk
     __vk_DestroyInstance(instance, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumeratePhysicalDevices(VkInstance instance, uint32_t* pPhysicalDeviceCount, VkPhysicalDevice* pPhysicalDevices)
@@ -187,8 +224,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumeratePhysicalDevices(VkInstance insta
     result = __vk_EnumeratePhysicalDevices(instance, pPhysicalDeviceCount, pPhysicalDevices);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pPhysicalDeviceCount), __VK_PRTRESULT(result));
-
+    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pPhysicalDeviceCount), __vkiGetResultString(result));
     return result;
 }
 
@@ -214,8 +250,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceFeatures(VkPhysicalDevice ph
     __vk_GetPhysicalDeviceFeatures(physicalDevice, pFeatures);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
-
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 }
 
 VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceFormatProperties(VkPhysicalDevice physicalDevice, VkFormat format, VkFormatProperties* pFormatProperties)
@@ -245,8 +280,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceFormatProperties(VkPhysicalD
     __vk_GetPhysicalDeviceFormatProperties(physicalDevice, format, pFormatProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
-
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceImageFormatProperties(VkPhysicalDevice physicalDevice,
@@ -288,8 +322,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceImageFormatProperties(Vk
     result = __vk_GetPhysicalDeviceImageFormatProperties(physicalDevice, format, type, tiling, usage, flags, pImageFormatProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
-
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     return result;
 }
 
@@ -315,7 +348,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceProperties(VkPhysicalDevice 
     __vk_GetPhysicalDeviceProperties(physicalDevice, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 }
 
 VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceQueueFamilyProperties(VkPhysicalDevice physicalDevice, uint32_t* pQueueFamilyPropertyCount, VkQueueFamilyProperties* pQueueFamilyProperties)
@@ -340,7 +373,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceQueueFamilyProperties(VkPhys
     __vk_GetPhysicalDeviceQueueFamilyProperties(physicalDevice, pQueueFamilyPropertyCount, pQueueFamilyProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 }
 
 VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceMemoryProperties(VkPhysicalDevice physicalDevice, VkPhysicalDeviceMemoryProperties* pMemoryProperties)
@@ -365,7 +398,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceMemoryProperties(VkPhysicalD
     __vk_GetPhysicalDeviceMemoryProperties(physicalDevice, pMemoryProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 }
 
 VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __valid_GetInstanceProcAddr(VkInstance instance, const char* pName)
@@ -397,7 +430,7 @@ vk_Exit:
     }
     else
     {
-        __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+        __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     }
 
     return pFunc;
@@ -465,7 +498,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDevice(VkPhysicalDevice physicalDev
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (device=%p) %s\n", *pDevice, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (device=%p) %s\n", __VK_PTRVALUE(pDevice), __vkiGetResultString(result));
 
     return result;
 }
@@ -489,7 +522,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyDevice(VkDevice device, const VkAlloca
     __vk_DestroyDevice(device, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumerateInstanceExtensionProperties(const char* pLayerName, uint32_t* pCount, VkExtensionProperties* pProperties)
@@ -507,7 +540,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumerateInstanceExtensionProperties(cons
     result = __vk_EnumerateInstanceExtensionProperties(pLayerName, pCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n",__VK_PTRVALUE(pCount), __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %d %s\n",__VK_PTRVALUE(pCount), __vkiGetResultString(result));
 
     return result;
 }
@@ -534,7 +567,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumerateDeviceExtensionProperties(VkPhys
     result = __vk_EnumerateDeviceExtensionProperties(physicalDevice, pLayerName, pCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pCount), __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pCount), __vkiGetResultString(result));
 
     return result;
 }
@@ -554,7 +587,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumerateInstanceLayerProperties(uint32_t
     result = __vk_EnumerateInstanceLayerProperties(pCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pCount), __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pCount), __vkiGetResultString(result));
 
     return result;
 }
@@ -581,7 +614,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EnumerateDeviceLayerProperties(VkPhysical
     result = __vk_EnumerateDeviceLayerProperties(physicalDevice, pCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pCount), __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pCount), __vkiGetResultString(result));
 
     return result;
 }
@@ -614,7 +647,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetDeviceQueue(VkDevice device, uint32_t queu
     __vk_GetDeviceQueue(device, queueFamilyIndex, queueIndex, pQueue);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (queue=%p) %s\n", *pQueue, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (queue=%p) %s\n", __VK_PTRVALUE(pQueue), __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -667,7 +700,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_QueueSubmit(VkQueue queue, uint32_t submi
     result = __vk_QueueSubmit(queue, submitCount, pSubmits, fence);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     pqe->pDevContext->currentResult = result;
 
     return result;
@@ -690,7 +723,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_QueueWaitIdle(VkQueue queue)
     result = __vk_QueueWaitIdle(queue);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     pqe->pDevContext->currentResult = result;
 
     return result;
@@ -713,7 +746,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_DeviceWaitIdle(VkDevice device)
     result = __vk_DeviceWaitIdle(device);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -756,7 +789,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AllocateMemory(VkDevice device, const VkM
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (memory=0x%llx) %s\n", *pMemory, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (memory=0x%llx) %s\n", __VK_PTRVALUE(pMemory), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -795,7 +828,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_FreeMemory(VkDevice device, VkDeviceMemory me
     __vk_FreeMemory(device, memory, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -847,7 +880,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_MapMemory(VkDevice device, VkDeviceMemory
     result = __vk_MapMemory(device, mem, offset, size, flags, ppData);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (addr=%p) %s\n", *ppData, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (addr=%p) %s\n", __VK_PTRVALUE(ppData), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -886,7 +919,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_UnmapMemory(VkDevice device, VkDeviceMemory m
     __vk_UnmapMemory(device, mem);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -944,7 +977,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_FlushMappedMemoryRanges(VkDevice device, 
     result = __vk_FlushMappedMemoryRanges(device, memRangeCount, pMemRanges);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1004,7 +1037,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_InvalidateMappedMemoryRanges(VkDevice dev
     result = __vk_InvalidateMappedMemoryRanges(device, memRangeCount, pMemRanges);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1051,7 +1084,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetDeviceMemoryCommitment(VkDevice device, Vk
     __vk_GetDeviceMemoryCommitment(device, memory, pCommittedMemoryInBytes);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %lld %s\n", __VK_PTRVALUE(pCommittedMemoryInBytes), __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %lld %s\n", __VK_PTRVALUE(pCommittedMemoryInBytes), __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -1129,12 +1162,10 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_BindBufferMemory(VkDevice device, VkBuffe
         result = __VK_ERROR_INVALID_VALUE;
         goto vk_Exit;
     }
-    /*TODO: overlap range and Buffer-Image Granularity check */
-
     result = __vk_BindBufferMemory(device, buffer, mem, memOffset);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1169,7 +1200,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_BindImageMemory(VkDevice device, VkImage 
     result = __vk_BindImageMemory(device, image, mem, memOffset);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1208,7 +1239,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetBufferMemoryRequirements(VkDevice device, 
     __vk_GetBufferMemoryRequirements(device, buffer, pMemoryRequirements);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -1240,7 +1271,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetImageMemoryRequirements(VkDevice device, V
     __vk_GetImageMemoryRequirements(device, image, pMemoryRequirements);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -1272,7 +1303,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetImageSparseMemoryRequirements(VkDevice dev
     __vk_GetImageSparseMemoryRequirements(device, image, pNumRequirements, pSparseMemoryRequirements);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pNumRequirements), __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pNumRequirements), __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -1315,7 +1346,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetPhysicalDeviceSparseImageFormatProperties(
     __vk_GetPhysicalDeviceSparseImageFormatProperties(physicalDevice, format, type, samples, usage, tiling, pPropertyCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pPropertyCount), __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pPropertyCount), __vkiGetResultString(result));
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __valid_QueueBindSparse(VkQueue queue, uint32_t bindInfoCount, const VkBindSparseInfo* pBindInfo, VkFence fence)
@@ -1340,7 +1371,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_QueueBindSparse(VkQueue queue, uint32_t b
     result = __vk_QueueBindSparse(queue, bindInfoCount, pBindInfo, fence);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     pqe->pDevContext->currentResult = result;
 
     return result;
@@ -1378,7 +1409,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateFence(VkDevice device, const VkFenc
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (fence=0x%llx) %s\n", *pFence, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (fence=0x%llx) %s\n", __VK_PTRVALUE(pFence), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1409,7 +1440,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyFence(VkDevice device, VkFence fence, 
     __vk_DestroyFence(device, fence, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -1446,7 +1477,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_ResetFences(VkDevice device, uint32_t fen
     result = __vk_ResetFences(device, fenceCount, pFences);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1475,7 +1506,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetFenceStatus(VkDevice device, VkFence f
     result = __vk_GetFenceStatus(device, fence);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1514,7 +1545,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_WaitForFences(VkDevice device, uint32_t f
     result = __vk_WaitForFences(device, fenceCount, pFences, waitAll, timeout);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1552,7 +1583,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateSemaphore(VkDevice device, const Vk
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (semaphore=0x%llx) %s\n", *pSemaphore, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (semaphore=0x%llx) %s\n", __VK_PTRVALUE(pSemaphore), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1583,7 +1614,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroySemaphore(VkDevice device, VkSemaphore
     __vk_DestroySemaphore(device, semaphore, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -1619,7 +1650,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateEvent(VkDevice device, const VkEven
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (event=0x%llx) %s\n", pEvent, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (event=0x%llx) %s\n", __VK_PTRVALUE(pEvent), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1650,7 +1681,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyEvent(VkDevice device, VkEvent event, 
     __vk_DestroyEvent(device, event, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -1677,7 +1708,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetEventStatus(VkDevice device, VkEvent e
     result = __vk_GetEventStatus(device, event);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1706,7 +1737,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_SetEvent(VkDevice device, VkEvent event)
     result = __vk_SetEvent(device, event);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1735,7 +1766,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_ResetEvent(VkDevice device, VkEvent event
     result = __vk_ResetEvent(device, event);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1773,7 +1804,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateQueryPool(VkDevice device, const Vk
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (queryPool=0x%llx) %s\n", *pQueryPool, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (queryPool=0x%llx) %s\n", __VK_PTRVALUE(pQueryPool), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1804,7 +1835,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyQueryPool(VkDevice device, VkQueryPool
     __vk_DestroyQueryPool(device, queryPool, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -1836,7 +1867,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetQueryPoolResults(VkDevice device, VkQu
     result = __vk_GetQueryPoolResults(device, queryPool, firstQuery, queryCount, dataSize, pData, stride, flags);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1908,7 +1939,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateBuffer(VkDevice device, const VkBuf
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (buffer=0x%llx) %s\n", *pBuffer, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (buffer=0x%llx) %s\n", __VK_PTRVALUE(pBuffer), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -1947,7 +1978,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyBuffer(VkDevice device, VkBuffer buffe
     __vk_DestroyBuffer(device, buffer, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -1999,10 +2030,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateBufferView(VkDevice device, const V
             result = __VK_ERROR_INVALID_VALUE;
             goto vk_Exit;
         }
-        /* TODO: 1). range must be a multiple of the element size of format
-        **       2). The value of range, divided by the size of an element of format, must be less
-        **           than or equal to the value of VkPhysicalDeviceLimits::maxTexelBufferElements
-        */
     }
     if (!pView)
     {
@@ -2018,7 +2045,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateBufferView(VkDevice device, const V
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (view=0x%llx) %s\n", *pView, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (view=0x%llx) %s\n", __VK_PTRVALUE(pView), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2049,7 +2076,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyBufferView(VkDevice device, VkBufferVi
     __vk_DestroyBufferView(device, bufferView, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -2085,7 +2112,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateImage(VkDevice device, const VkImag
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (image=0x%llx) %s\n", *pImage, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (image=0x%llx) %s\n", __VK_PTRVALUE(pImage), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2116,7 +2143,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyImage(VkDevice device, VkImage image, 
     __vk_DestroyImage(device, image, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -2148,7 +2175,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetImageSubresourceLayout(VkDevice device, Vk
     __vk_GetImageSubresourceLayout(device, image, pSubresource, pLayout);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -2184,7 +2211,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateImageView(VkDevice device, const Vk
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (view=0x%llx) %s\n", *pView, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (view=0x%llx) %s\n", __VK_PTRVALUE(pView), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2215,7 +2242,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyImageView(VkDevice device, VkImageView
     __vk_DestroyImageView(device, imageView, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -2251,7 +2278,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateShaderModule(VkDevice device, const
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (shaderModule=0x%llx) %s\n", *pShaderModule, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (shaderModule=0x%llx) %s\n", __VK_PTRVALUE(pShaderModule), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2282,7 +2309,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyShaderModule(VkDevice device, VkShader
     __vk_DestroyShaderModule(device, shaderModule, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -2318,7 +2345,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreatePipelineCache(VkDevice device, cons
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (pipelineCache=0x%llx) %s\n", *pPipelineCache, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (pipelineCache=0x%llx) %s\n", __VK_PTRVALUE(pPipelineCache), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2349,7 +2376,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyPipelineCache(VkDevice device, VkPipel
     __vk_DestroyPipelineCache(device, pipelineCache, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -2376,7 +2403,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPipelineCacheData(VkDevice device, VkP
     result = __vk_GetPipelineCacheData(device, pipelineCache, pDataSize, pData);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2421,7 +2448,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_MergePipelineCaches(VkDevice device, VkPi
     result = __vk_MergePipelineCaches(device, destCache, srcCacheCount, pSrcCaches);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2459,7 +2486,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateGraphicsPipelines(VkDevice device, 
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (pipeline=0x%llx) %s\n", *pPipelines, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (pipeline=0x%llx) %s\n", __VK_PTRVALUE(pPipelines), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2497,7 +2524,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateComputePipelines(VkDevice device, V
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (pipeline=0x%llx) %s\n", *pPipelines, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (pipeline=0x%llx) %s\n", __VK_PTRVALUE(pPipelines), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2528,7 +2555,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyPipeline(VkDevice device, VkPipeline p
     __vk_DestroyPipeline(device, pipeline, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -2564,7 +2591,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreatePipelineLayout(VkDevice device, con
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (pipelineLayout=0x%llx) %s\n", *pPipelineLayout, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (pipelineLayout=0x%llx) %s\n", __VK_PTRVALUE(pPipelineLayout), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2595,7 +2622,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyPipelineLayout(VkDevice device, VkPipe
     __vk_DestroyPipelineLayout(device, pipelineLayout, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -2631,7 +2658,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateSampler(VkDevice device, const VkSa
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (sampler=0x%llx) %s\n", *pSampler, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (sampler=0x%llx) %s\n", __VK_PTRVALUE(pSampler), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2662,7 +2689,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroySampler(VkDevice device, VkSampler sam
     __vk_DestroySampler(device, sampler, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -2698,7 +2725,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDescriptorSetLayout(VkDevice device
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (layout=0x%llx) %s\n", *pSetLayout, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (layout=0x%llx) %s\n", __VK_PTRVALUE(pSetLayout), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2729,7 +2756,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyDescriptorSetLayout(VkDevice device, V
     __vk_DestroyDescriptorSetLayout(device, descriptorSetLayout, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -2765,7 +2792,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDescriptorPool(VkDevice device, con
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (descPool=0x%llx) %s\n", *pDescriptorPool, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (descPool=0x%llx) %s\n", __VK_PTRVALUE(pDescriptorPool), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2796,7 +2823,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyDescriptorPool(VkDevice device, VkDesc
     __vk_DestroyDescriptorPool(device, descriptorPool, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -2823,7 +2850,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_ResetDescriptorPool(VkDevice device, VkDe
     result = __vk_ResetDescriptorPool(device, descriptorPool, flags);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2862,7 +2889,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AllocateDescriptorSets(VkDevice device, c
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (descSet=0x%llx) %s\n", *pDescriptorSets, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (descSet=0x%llx) %s\n", __VK_PTRVALUE(pDescriptorSets), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2909,7 +2936,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_FreeDescriptorSets(VkDevice device, VkDes
     result = __vk_FreeDescriptorSets(device, descriptorPool, count, pDescriptorSets);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -2959,7 +2986,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_UpdateDescriptorSets(VkDevice device, uint32_
     __vk_UpdateDescriptorSets(device, writeCount, pDescriptorWrites, copyCount, pDescriptorCopies);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -2995,7 +3022,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateFramebuffer(VkDevice device, const 
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (framebuffer=0x%llx) %s\n", *pFramebuffer, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (framebuffer=0x%llx) %s\n", __VK_PTRVALUE(pFramebuffer), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -3026,7 +3053,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyFramebuffer(VkDevice device, VkFramebu
     __vk_DestroyFramebuffer(device, framebuffer, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -3062,7 +3089,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateRenderPass(VkDevice device, const V
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (renderPass=0x%llx) %s\n", *pRenderPass, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (renderPass=0x%llx) %s\n", __VK_PTRVALUE(pRenderPass), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -3093,7 +3120,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyRenderPass(VkDevice device, VkRenderPa
     __vk_DestroyRenderPass(device, renderPass, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -3125,7 +3152,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_GetRenderAreaGranularity(VkDevice device, VkR
     __vk_GetRenderAreaGranularity(device, renderPass, pGranularity);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -3161,7 +3188,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateCommandPool(VkDevice device, const 
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (commandPool=0x%llx) %s\n", *pCommandPool, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (commandPool=0x%llx) %s\n", __VK_PTRVALUE(pCommandPool), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -3192,7 +3219,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyCommandPool(VkDevice device, VkCommand
     __vk_DestroyCommandPool(device, commandPool, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -3219,7 +3246,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_ResetCommandPool(VkDevice device, VkComma
     result = __vk_ResetCommandPool(device, commandPool, flags);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -3270,7 +3297,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AllocateCommandBuffers(VkDevice device, c
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (commandBuffer=%p) %s\n", *pCommandBuffers, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (commandBuffer=%p) %s\n", __VK_PTRVALUE(pCommandBuffers), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -3307,7 +3334,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_FreeCommandBuffers(VkDevice device, VkCommand
     __vk_FreeCommandBuffers(device, commandPool, commandBufferCount, pCommandBuffers);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -3333,7 +3360,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_BeginCommandBuffer(VkCommandBuffer comman
     result = __vk_BeginCommandBuffer(commandBuffer, pBeginInfo);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3358,7 +3385,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_EndCommandBuffer(VkCommandBuffer commandB
     result = __vk_EndCommandBuffer(commandBuffer);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3383,7 +3410,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_ResetCommandBuffer(VkCommandBuffer comman
     result = __vk_ResetCommandBuffer(commandBuffer, flags);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3419,7 +3446,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBindPipeline(VkCommandBuffer commandBuffer
     __vk_CmdBindPipeline(commandBuffer, pipelineBindPoint, pipeline);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3442,7 +3469,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetViewport(VkCommandBuffer commandBuffer,
     __vk_CmdSetViewport(commandBuffer, firstViewPort, viewportCount, pViewports);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3465,7 +3492,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetScissor(VkCommandBuffer commandBuffer, 
     __vk_CmdSetScissor(commandBuffer, firstScissor, scissorCount, pScissors);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3488,7 +3515,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetLineWidth(VkCommandBuffer commandBuffer
     __vk_CmdSetLineWidth(commandBuffer, lineWidth);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3511,7 +3538,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetDepthBias(VkCommandBuffer commandBuffer
     __vk_CmdSetDepthBias(commandBuffer, depthBiasConstantFactor, depthBiasClamp, depthBiasSlopeFactor);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3535,7 +3562,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetBlendConstants(VkCommandBuffer commandB
     __vk_CmdSetBlendConstants(commandBuffer, blendConstants);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3558,7 +3585,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetDepthBounds(VkCommandBuffer commandBuff
     __vk_CmdSetDepthBounds(commandBuffer, minDepthBounds, maxDepthBounds);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3581,7 +3608,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetStencilCompareMask(VkCommandBuffer comm
     __vk_CmdSetStencilCompareMask(commandBuffer, faceMask, compareMask);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3604,7 +3631,7 @@ vk_Exit:
     __vk_CmdSetStencilWriteMask(commandBuffer, faceMask, writeMask);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3627,7 +3654,7 @@ vk_Exit:
     __vk_CmdSetStencilReference(commandBuffer, faceMask, reference);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3680,7 +3707,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBindDescriptorSets(VkCommandBuffer command
     __vk_CmdBindDescriptorSets(commandBuffer, pipelineBindPoint, layout, firstSet, setCount, pDescriptorSets, dynamicOffsetCount, pDynamicOffsets);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3714,7 +3741,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBindIndexBuffer(VkCommandBuffer commandBuf
     __vk_CmdBindIndexBuffer(commandBuffer, buffer, offset, indexType);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3753,7 +3780,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBindVertexBuffers(VkCommandBuffer commandB
     __vk_CmdBindVertexBuffers(commandBuffer, startBinding, bindingCount, pBuffers, pOffsets);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3776,7 +3803,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdDraw(VkCommandBuffer commandBuffer, uint32
     __vk_CmdDraw(commandBuffer, vertexCount, instanceCount, firstVertex, firstInstance);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3799,7 +3826,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdDrawIndexed(VkCommandBuffer commandBuffer,
     __vk_CmdDrawIndexed(commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3828,7 +3855,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdDrawIndirect(VkCommandBuffer commandBuffer
     __vk_CmdDrawIndirect(commandBuffer, buffer, offset, count, stride);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3857,7 +3884,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdDrawIndexedIndirect(VkCommandBuffer comman
     __vk_CmdDrawIndexedIndirect(commandBuffer, buffer, offset, count, stride);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3880,7 +3907,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdDispatch(VkCommandBuffer commandBuffer, ui
     __vk_CmdDispatch(commandBuffer, x, y, z);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3909,7 +3936,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdDispatchIndirect(VkCommandBuffer commandBu
     __vk_CmdDispatchIndirect(commandBuffer, buffer, offset);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3949,7 +3976,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdCopyBuffer(VkCommandBuffer commandBuffer, 
     __vk_CmdCopyBuffer(commandBuffer, srcBuffer, destBuffer, regionCount, pRegions);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -3994,7 +4021,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdCopyImage(VkCommandBuffer commandBuffer, V
     __vk_CmdCopyImage(commandBuffer, srcImage, srcImageLayout, destImage, destImageLayout, regionCount, pRegions);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4044,7 +4071,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBlitImage(VkCommandBuffer commandBuffer, V
     __vk_CmdBlitImage(commandBuffer, srcImage, srcImageLayout, destImage, destImageLayout, regionCount, pRegions, filter);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4089,7 +4116,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdCopyBufferToImage(VkCommandBuffer commandB
     __vk_CmdCopyBufferToImage(commandBuffer, srcBuffer, destImage, destImageLayout, regionCount, pRegions);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4134,7 +4161,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdCopyImageToBuffer(VkCommandBuffer commandB
     __vk_CmdCopyImageToBuffer(commandBuffer, srcImage, srcImageLayout, destBuffer, regionCount, pRegions);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4168,7 +4195,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdUpdateBuffer(VkCommandBuffer commandBuffer
     __vk_CmdUpdateBuffer(commandBuffer, destBuffer, destOffset, dataSize, pData);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4197,7 +4224,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdFillBuffer(VkCommandBuffer commandBuffer, 
     __vk_CmdFillBuffer(commandBuffer, destBuffer, destOffset, fillSize, data);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4236,7 +4263,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdClearColorImage(VkCommandBuffer commandBuf
     __vk_CmdClearColorImage(commandBuffer, image, imageLayout, pColor, rangeCount, pRanges);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4275,7 +4302,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdClearDepthStencilImage(VkCommandBuffer com
     __vk_CmdClearDepthStencilImage(commandBuffer, image, imageLayout, pDepthStencil, rangeCount, pRanges);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4308,7 +4335,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdClearAttachments(VkCommandBuffer commandBu
     __vk_CmdClearAttachments(commandBuffer, attachmentCount, pAttachments, rectCount, pRects);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4353,7 +4380,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdResolveImage(VkCommandBuffer commandBuffer
     __vk_CmdResolveImage(commandBuffer, srcImage, srcImageLayout, destImage, destImageLayout, regionCount, pRegions);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4382,7 +4409,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdSetEvent(VkCommandBuffer commandBuffer, Vk
     __vk_CmdSetEvent(commandBuffer, event, stageMask);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4411,7 +4438,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdResetEvent(VkCommandBuffer commandBuffer, 
     __vk_CmdResetEvent(commandBuffer, event, stageMask);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4466,7 +4493,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdWaitEvents(VkCommandBuffer commandBuffer,
     __vk_CmdWaitEvents(commandBuffer, eventCount, pEvents, srcStageMask, destStageMask, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4510,7 +4537,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdPipelineBarrier(VkCommandBuffer commandBuf
     __vk_CmdPipelineBarrier(commandBuffer, srcStageMask, destStageMask, dependencyFlags, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4539,7 +4566,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBeginQuery(VkCommandBuffer commandBuffer, 
     __vk_CmdBeginQuery(commandBuffer, queryPool, slot, flags);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4568,7 +4595,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdEndQuery(VkCommandBuffer commandBuffer, Vk
     __vk_CmdEndQuery(commandBuffer, queryPool, slot);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4597,7 +4624,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdResetQueryPool(VkCommandBuffer commandBuff
     __vk_CmdResetQueryPool(commandBuffer, queryPool, firstQuery, queryCount);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4631,7 +4658,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdWriteTimestamp(VkCommandBuffer commandBuff
     __vk_CmdWriteTimestamp(commandBuffer, pipelineStage, queryPool, entry);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4666,7 +4693,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdCopyQueryPoolResults(VkCommandBuffer comma
     __vk_CmdCopyQueryPoolResults(commandBuffer, queryPool, firstQuery, queryCount, destBuffer, destOffset, destStride, flags);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4700,7 +4727,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdPushConstants(VkCommandBuffer commandBuffe
     __vk_CmdPushConstants(commandBuffer, layout, stageFlags, start, length, values);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4728,7 +4755,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdBeginRenderPass(VkCommandBuffer commandBuf
     __vk_CmdBeginRenderPass(commandBuffer, pRenderPassBegin, contents);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4756,7 +4783,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdNextSubpass(VkCommandBuffer commandBuffer,
     __vk_CmdNextSubpass(commandBuffer, contents);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4779,7 +4806,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdEndRenderPass(VkCommandBuffer commandBuffe
     __vk_CmdEndRenderPass(commandBuffer);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
     cmb->result = result;
     cmb->obj.pDevContext->currentResult = result;
@@ -4812,7 +4839,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_CmdExecuteCommands(VkCommandBuffer commandBuf
     __vk_CmdExecuteCommands(commandBuffer, commandBuffersCount, pCmdBuffers);
 
 vk_Exit:
-    __VK_LOG_API(" --> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" --> %s\n", __vkiGetResultString(result));
 
 //    cmd->result = result;
 //    cmd->obj.pDevContext->currentResult = result;
@@ -4842,7 +4869,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroySurfaceKHR(VkInstance instance, VkSurf
      __vk_DestroySurfaceKHR(instance, surface, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex, VkSurfaceKHR surface, VkBool32* pSupported)
@@ -4877,7 +4904,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceSurfaceSupportKHR(VkPhys
     __vk_GetPhysicalDeviceSurfaceSupportKHR(physicalDevice, queueFamilyIndex, surface, pSupported);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d  %s\n", *pSupported, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %d  %s\n", __VK_PTRVALUE(pSupported), __vkiGetResultString(result));
 
     return result;
 }
@@ -4909,7 +4936,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceSurfaceCapabilitiesKHR(V
     __vk_GetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice, surface, pSurfaceCapabilities);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 
     return result;
 }
@@ -4941,7 +4968,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceSurfaceFormatsKHR(VkPhys
     __vk_GetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, pSurfaceFormatCount, pSurfaceFormats);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 
     return result;
 }
@@ -4973,7 +5000,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceSurfacePresentModesKHR(V
     __vk_GetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, pPresentModeCount, pPresentModes);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 
     return result;
 }
@@ -5010,7 +5037,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateSwapchainKHR(VkDevice  device, cons
     }
 
 vk_Exit:
-    __VK_LOG_API(" ==> (swapChain=0x%llx) %s\n", *pSwapchain, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (swapChain=0x%llx) %s\n", __VK_PTRVALUE(pSwapchain), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -5041,7 +5068,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroySwapchainKHR(VkDevice  device, VkSwapc
     __vk_DestroySwapchainKHR(device, swapchain, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 }
 
@@ -5073,7 +5100,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetSwapchainImagesKHR(VkDevice device, Vk
     result = __vk_GetSwapchainImagesKHR(device, swapchain, pSwapchainImageCount, pSwapchainImages);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", *pSwapchainImageCount, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pSwapchainImageCount), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -5114,7 +5141,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AcquireNextImageKHR(VkDevice device, VkSw
     result = __vk_AcquireNextImageKHR(device, swapchain, timeout, semaphore, fence, pImageIndex);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %d %s\n", *pImageIndex, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %d %s\n", __VK_PTRVALUE(pImageIndex), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -5142,7 +5169,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_QueuePresentKHR(VkQueue  queue, const VkP
     result = __vk_QueuePresentKHR(queue, pPresentInfo);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     pqe->pDevContext->currentResult = result;
 
     return result;
@@ -5170,7 +5197,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceDisplayPropertiesKHR(VkP
     __vk_GetPhysicalDeviceDisplayPropertiesKHR(physicalDevice, pPropertyCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 
     return result;
 }
@@ -5197,7 +5224,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetPhysicalDeviceDisplayPlanePropertiesKH
     __vk_GetPhysicalDeviceDisplayPlanePropertiesKHR(physicalDevice, pPropertyCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 
     return result;
 }
@@ -5224,7 +5251,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetDisplayPlaneSupportedDisplaysKHR(VkPhy
     __vk_GetDisplayPlaneSupportedDisplaysKHR(physicalDevice, planeIndex, pDisplayCount, pDisplays);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 
     return result;
 }
@@ -5257,7 +5284,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetDisplayModePropertiesKHR(VkPhysicalDev
     __vk_GetDisplayModePropertiesKHR(physicalDevice, display, pPropertyCount, pProperties);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 
     return result;
 }
@@ -5290,7 +5317,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDisplayModeKHR(VkPhysicalDevice phy
     __vk_CreateDisplayModeKHR(physicalDevice, display, pCreateInfo, pAllocator, pMode);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (displayMode=0x%llx) %s\n", *pMode, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (displayMode=0x%llx) %s\n", __VK_PTRVALUE(pMode), __vkiGetResultString(result));
 
     return result;
 }
@@ -5323,7 +5350,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetDisplayPlaneCapabilitiesKHR(VkPhysical
     __vk_GetDisplayPlaneCapabilitiesKHR(physicalDevice, mode, planeIndex, pCapabilities);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 
     return result;
 }
@@ -5355,7 +5382,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDisplayPlaneSurfaceKHR(VkInstance i
      result = __vk_CreateDisplayPlaneSurfaceKHR(instance, pCreateInfo, pAllocator, pSurface);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (surface=0x%llx) %s\n", *pSurface, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (surface=0x%llx) %s\n", __VK_PTRVALUE(pSurface), __vkiGetResultString(result));
 
     return result;
 }
@@ -5377,7 +5404,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateSharedSwapchainsKHR(VkDevice device
      result = __vk_CreateSharedSwapchainsKHR(device, swapchainCount, pCreateInfos, pAllocator, pSwapchains);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (swapChain=0x%llx) %s\n", *pSwapchains, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (swapChain=0x%llx) %s\n", __VK_PTRVALUE(pSwapchains), __vkiGetResultString(result));
 
     return result;
 }
@@ -5409,7 +5436,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateDebugReportCallbackEXT(VkInstance i
      result = __vk_CreateDebugReportCallbackEXT(instance, pCreateInfo, pAllocator, pCallback);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (Callback=0x%llx) %s\n", *pCallback, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (Callback=0x%llx) %s\n", __VK_PTRVALUE(pCallback), __vkiGetResultString(result));
 
     return result;
 }
@@ -5437,7 +5464,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DestroyDebugReportCallbackEXT(VkInstance inst
     __vk_DestroyDebugReportCallbackEXT(instance, callback, pAllocator);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 }
 
 VKAPI_ATTR void VKAPI_CALL __valid_DebugReportMessageEXT(VkInstance instance, VkDebugReportFlagsEXT flags, VkDebugReportObjectTypeEXT objectType, uint64_t object, size_t location, int32_t messageCode, const char* pLayerPrefix, const char* pMessage)
@@ -5457,7 +5484,7 @@ VKAPI_ATTR void VKAPI_CALL __valid_DebugReportMessageEXT(VkInstance instance, Vk
     __vk_DebugReportMessageEXT(instance, flags, objectType, object, location, messageCode, pLayerPrefix, pMessage);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
 }
 
 #ifdef VK_USE_PLATFORM_XLIB_KHR
@@ -5527,7 +5554,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateAndroidSurfaceKHR(VkInstance instan
      result = __vk_CreateAndroidSurfaceKHR(instance, pCreateInfo, pAllocator, pSurface);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (surface=0x%llx) %s\n", *pSurface, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (surface=0x%llx) %s\n", __VK_PTRVALUE(pSurface), __vkiGetResultString(result));
 
     return result;
 }
@@ -5549,7 +5576,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetSwapchainGrallocUsageANDROID(VkDevice 
     result = __vk_GetSwapchainGrallocUsageANDROID(device, format, imageUsage, grallocUsage);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (grallocUsage=0x%08X) %s\n", *grallocUsage, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (grallocUsage=0x%08X) %s\n", __VK_PTRVALUE(grallocUsage), __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -5590,7 +5617,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_AcquireImageANDROID(VkDevice device, VkIm
     result = __vk_AcquireImageANDROID(device, image, nativeFenceFd, semaphore, fence);
 
 vk_Exit:
-    __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     devCtx->currentResult = result;
 
     return result;
@@ -5612,7 +5639,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_QueueSignalReleaseImageANDROID(VkQueue qu
     result = __vk_QueueSignalReleaseImageANDROID(queue, waitSemaphoreCount, pWaitSemaphores, image, pNativeFenceFd);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (nativeFenceFd=%d) %s\n", *pNativeFenceFd, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (nativeFenceFd=%d) %s\n", __VK_PTRVALUE(pNativeFenceFd), __vkiGetResultString(result));
     pqe->pDevContext->currentResult = result;
 
     return result;
@@ -5642,7 +5669,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_CreateWin32SurfaceKHR(VkInstance instance
      result = __vk_CreateWin32SurfaceKHR(instance, pCreateInfo, pAllocator, pSurface);
 
 vk_Exit:
-    __VK_LOG_API(" ==> (surface=0x%llx) %s\n", *pSurface, __VK_PRTRESULT(result));
+    __VK_LOG_API(" ==> (surface=0x%llx) %s\n", __VK_PTRVALUE(pSurface), __vkiGetResultString(result));
 
     return result;
 }
@@ -5698,7 +5725,7 @@ vk_Exit:
     }
     else
     {
-        __VK_LOG_API(" ==> %s\n", __VK_PRTRESULT(result));
+        __VK_LOG_API(" ==> %s\n", __vkiGetResultString(result));
     }
 
     return pFunc;
@@ -5725,7 +5752,7 @@ vk_Exit:
     }
     else
     {
-        __VK_LOG_API(" ==> %s", __VK_PRTRESULT(result));
+        __VK_LOG_API(" ==> %s", __vkiGetResultString(result));
         result = VK_ERROR_INCOMPATIBLE_DRIVER;
     }
 

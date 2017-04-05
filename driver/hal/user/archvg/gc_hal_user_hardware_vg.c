@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -17,7 +17,6 @@
 
 #include "gc_hal_user_vg.h"
 
-/* TODO: Remove these includes! Not allowed in the HAL! */
 #include <math.h>
 
 #define _GC_OBJ_ZONE            gcvZONE_VG
@@ -2340,6 +2339,8 @@ gcoVGHARDWARE_DrawSurfaceToImage(
     )
 {
     gceSTATUS status;
+    gcsVG_RECT tmpRect;
+    gcsVG_RECT_PTR pRect = &tmpRect;
 
     gcmHEADER_ARG("Hardware=0x%x", Hardware);
 
@@ -2347,6 +2348,19 @@ gcoVGHARDWARE_DrawSurfaceToImage(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+
+    tmpRect = *SrcRectangle;
+
+    pRect->width++;
+    pRect->height++;
+    if (pRect->x < 0) {
+        pRect->width += pRect->x;
+        pRect->x = 0;
+    }
+    if (pRect->y < 0) {
+        pRect->height += pRect->y;
+        pRect->y = 0;
+    }
 
     do
     {
@@ -2359,17 +2373,17 @@ gcoVGHARDWARE_DrawSurfaceToImage(
         ** Transform image parameters.
         */
 
-        imageStepX[0] = SurfaceToImage[0] / SrcRectangle->width;
-        imageStepX[1] = SurfaceToImage[1] / SrcRectangle->height;
+        imageStepX[0] = SurfaceToImage[0] / pRect->width;
+        imageStepX[1] = SurfaceToImage[1] / pRect->height;
         imageStepX[2] = SurfaceToImage[2];
 
-        imageStepY[0] = SurfaceToImage[3] / SrcRectangle->width;
-        imageStepY[1] = SurfaceToImage[4] / SrcRectangle->height;
+        imageStepY[0] = SurfaceToImage[3] / pRect->width;
+        imageStepY[1] = SurfaceToImage[4] / pRect->height;
         imageStepY[2] = SurfaceToImage[5];
 
-        imageConst[0] = ((0.5f * SurfaceToImage[0] + SurfaceToImage[3]) + SurfaceToImage[6]) / SrcRectangle->width;
-        imageConst[1] = ((0.5f * SurfaceToImage[1] + SurfaceToImage[4]) + SurfaceToImage[7]) / SrcRectangle->height;
-        imageConst[2] = (0.5f * SurfaceToImage[2] + SurfaceToImage[5]) + SurfaceToImage[8];
+        imageConst[0] = (0.5f * (SurfaceToImage[0] + SurfaceToImage[3]) + SurfaceToImage[6]) / pRect->width;
+        imageConst[1] = (0.5f * (SurfaceToImage[1] + SurfaceToImage[4]) + SurfaceToImage[7]) / pRect->height;
+        imageConst[2] =  0.5f * (SurfaceToImage[2] + SurfaceToImage[5]) + SurfaceToImage[8];
 
         /***********************************************************************
         ** Set image parameters.
@@ -2422,10 +2436,10 @@ gcoVGHARDWARE_DrawSurfaceToImage(
                 Mask, /* Mask vs. image selection. */
                 Filter, /* Image quailty filter mode. */
                 gcvFALSE, /* Not in image filter mode. */
-                SrcRectangle->x, /* Image origin. */
-                SrcRectangle->y,
-                SrcRectangle->width,/* Image size. */
-                SrcRectangle->height,
+                pRect->x, /* Image origin. */
+                pRect->y,
+                pRect->width,/* Image size. */
+                pRect->height,
                 gcvTRUE
                 ));
         }
@@ -2434,24 +2448,24 @@ gcoVGHARDWARE_DrawSurfaceToImage(
             gctUINT origin
                 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:0) - (0 ? 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
- 12:0))) | (((gctUINT32) ((gctUINT32) (SrcRectangle->x) & ((gctUINT32) ((((1 ?
+ 12:0))) | (((gctUINT32) ((gctUINT32) (pRect->x) & ((gctUINT32) ((((1 ?
  12:0) - (0 ? 12:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:0) - (0 ? 12:0) + 1))))))) << (0 ?
  12:0)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
- 28:16) + 1))))))) << (0 ? 28:16))) | (((gctUINT32) ((gctUINT32) (SrcRectangle->y) & ((gctUINT32) ((((1 ?
+ 28:16) + 1))))))) << (0 ? 28:16))) | (((gctUINT32) ((gctUINT32) (pRect->y) & ((gctUINT32) ((((1 ?
  28:16) - (0 ? 28:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:16) - (0 ?
  28:16) + 1))))))) << (0 ? 28:16)));
 
             gctUINT size
                 = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
- 13:0))) | (((gctUINT32) ((gctUINT32) (SrcRectangle->width) & ((gctUINT32) ((((1 ?
+ 13:0))) | (((gctUINT32) ((gctUINT32) (pRect->width) & ((gctUINT32) ((((1 ?
  13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
  13:0)))
                 | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  29:16) - (0 ? 29:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:16) - (0 ?
- 29:16) + 1))))))) << (0 ? 29:16))) | (((gctUINT32) ((gctUINT32) (SrcRectangle->height) & ((gctUINT32) ((((1 ?
+ 29:16) + 1))))))) << (0 ? 29:16))) | (((gctUINT32) ((gctUINT32) (pRect->height) & ((gctUINT32) ((((1 ?
  29:16) - (0 ? 29:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:16) - (0 ?
  29:16) + 1))))))) << (0 ? 29:16)));
 
@@ -2592,7 +2606,7 @@ gcoVGHARDWARE_VgBlit(
             gcsSURF_FORMAT_INFO_PTR tempFormat[2];
 
             /* Get the format descriptor. */
-            gcmERR_BREAK(gcoSURF_QueryFormat(
+            gcmERR_BREAK(gcoHARDWARE_QueryFormat(
                 Source->format, tempFormat
                 ));
 
@@ -5352,7 +5366,7 @@ gcoVGHARDWARE_ColorMatrix(
             gcsSURF_FORMAT_INFO_PTR tempFormat[2];
 
             /* Get the format descriptor. */
-            gcmERR_BREAK(gcoSURF_QueryFormat(
+            gcmERR_BREAK(gcoHARDWARE_QueryFormat(
                 gcvSURF_A8R8G8B8, tempFormat
                 ));
 
@@ -5496,7 +5510,7 @@ _SeparableConvolve(
         */
 
         /* Get the format descriptor. */
-        gcmERR_BREAK(gcoSURF_QueryFormat(
+        gcmERR_BREAK(gcoHARDWARE_QueryFormat(
             gcvSURF_A8R8G8B8, tempFormat
             ));
 
@@ -7606,13 +7620,10 @@ gcoVGHARDWARE_Lock(
 
             if (physical != gcvINVALID_ADDRESS)
             {
-                if (gcoVGHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_MC20) == gcvSTATUS_FALSE)
-                {
-                    gctUINT32 baseAddress;
-                    gcmONERROR(gcoOS_GetBaseAddress(gcvNULL, &baseAddress));
-                    physical -= baseAddress;
-                }
+                gctUINT32 baseAddress;
 
+                gcmVERIFY_OK(gcoOS_GetBaseAddress(gcvNULL, &baseAddress));
+                physical -= baseAddress;
                 gcoOS_CPUPhysicalToGPUPhysical(physical, &physical);
             }
 
@@ -7625,7 +7636,6 @@ gcoVGHARDWARE_Lock(
                 /*
                 ** Some software access only surface has no kernel video node.
                 */
-                /* TODO: Remove this risky usage, physical may be not flat mapped. */
                 gcmASSERT(Node->logical != gcvNULL);
                 gcsSURF_NODE_SetHardwareAddress(Node, physical);
             }
@@ -7640,7 +7650,6 @@ gcoVGHARDWARE_Lock(
 
                 handle = 0;
 
-                /* TODO: Use reference count of each type as valid flag. */
                 Node->valid = gcvTRUE;
             }
 
@@ -12185,7 +12194,6 @@ gcoVGHARDWARE_ResolveRect(
     /* Determine the format value. */
     if (Source->format == gcvSURF_YUY2)
     {
-        /* TODO: UV swizzle not handled. */
         src_format = 0x0;
     }
     else
@@ -12277,8 +12285,6 @@ gcoVGHARDWARE_ResolveRect(
 
     dst_xy = (DX & 0x0000ffff) | ((DX & 0x0000ffff) << 16);
 
-    /*TODO: Actually the following is not correct for YUV with alpha.
-      Need to refine in many other places to support alpha output. */
     dst_address[0] = Target->node.hardwareAddresses[gcvHARDWARE_VG];
     dst_address[1] = dst_address[0] + Target->uOffset;
     dst_address[2] = dst_address[0] + Target->aOffset;

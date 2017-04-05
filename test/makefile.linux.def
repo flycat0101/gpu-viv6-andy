@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -252,11 +252,11 @@ ifneq ($(FLOAT_ABI),)
   PFLAGS            += -mfloat-abi=$(FLOAT_ABI)
 endif
 
-ifeq ($(LINUX_OABI), 1)
+ifeq ($(LINUX_OABI),1)
   CFLAGS            += -DLINUX_OABI
 endif
 
-ifeq ($(DEBUG), 1)
+ifeq ($(DEBUG),1)
 # CFLAGS            += -g3 -ggdb3 -O0 -DDEBUG -D_DEBUG -DgcdDEBUG=1
   CFLAGS            += -g -O0 -DDEBUG -D_DEBUG -DgcdDEBUG=1
 else
@@ -314,15 +314,15 @@ ifeq ($(EGL_API_GBM),1)
   CFLAGS            += -DEGL_API_GBM -D__GBM__=1
 endif
 
-ifeq ($(EGL_API_NULLWS), 1)
+ifeq ($(EGL_API_NULLWS),1)
   CFLAGS            += -DEGL_API_NULLWS
 endif
 
-ifeq ($(EGL_API_FB), 1)
+ifeq ($(EGL_API_FB),1)
   CFLAGS            += -DEGL_API_FB
 endif
 
-ifeq ($(EGL_API_WL), 1)
+ifeq ($(EGL_API_WL),1)
   CFLAGS            += -DEGL_API_WL -DWL_EGL_PLATFORM -Wno-deprecated-declarations
   LFLAGS             += -L$(VIVANTE_SDK_LIB) -L$(ROOTFS_USR)/lib
 endif
@@ -338,17 +338,17 @@ ifeq ($(EGL_API_DRI),1)
   CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
 endif
 
-ifeq ($(EGL_API_DFB), 1)
+ifeq ($(EGL_API_DFB),1)
   CFLAGS            += -DEGL_API_DFB
 endif
 
-ifeq ($(EGL_API_X), 1)
+ifeq ($(EGL_API_X),1)
   CFLAGS            += -DEGL_API_X
   CFLAGS            += -I$(X11_ARM_DIR)/include
   CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
 endif
 
-ifeq ($(STATIC_LINK), 1)
+ifeq ($(STATIC_LINK),1)
   CFLAGS            += -DSTATIC_LINK
 endif
 
@@ -365,7 +365,7 @@ ifneq (,$(EGL_APPENDIX))
   CFLAGS            += -D_EGL_APPENDIX=$(EGL_APPENDIX)
 endif
 
-ifeq ($(gcdSTATIC_LINK), 1)
+ifeq ($(gcdSTATIC_LINK),1)
   CFLAGS            += -DgcdSTATIC_LINK=1
 else
   CFLAGS            += -DgcdSTATIC_LINK=0

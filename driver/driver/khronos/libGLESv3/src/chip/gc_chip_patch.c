@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13718,7 +13718,6 @@ gcChipPatchGTF_IntVarying(
     gctINT* index
     )
 {
-
     static char vertShader[] =
         "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
         "\xe0\x8e\xae\xd8\xbd\xde\xea\xca\xbc\xd9\xab\xdf\xba\xc2\x9d\xf2"
@@ -13751,12 +13750,10 @@ gcChipPatchGTF_IntVarying(
         "\xc1\xf1\xdd\xfd\xcc\xe2\xd2\xfb\xc0\xca\xb7\xbd"
     ;
 
-
     gcChipUtilsDecrypt(vertShader);
     patchedSrcs[__GLSL_STAGE_VS] = vertShader;
     gcChipUtilsDecrypt(fragShader);
     patchedSrcs[__GLSL_STAGE_FS] = fragShader;
-
 }
 
 static void
@@ -13767,13 +13764,11 @@ gcChipPatchGTF_DiscardDraw(
     gctINT* index
     )
 {
-
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
 
     chipCtx->patchInfo.patchCleanupProgram = program;
     chipCtx->patchInfo.patchFlags.discardDraw = 1;
-
 }
 
 static void
@@ -13784,10 +13779,15 @@ gcChipPatch2v2(
     gctINT* index
     )
 {
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+
     gcmHEADER_ARG("gc=0x%x progObj=0x%x index=%d", gc, progObj, index);
 
-    gcoHAL_SetPatchID(gcvNULL, gcvPATCH_BASEMARK2V2);
-    gcoHAL_SetGlobalPatchID(gcvNULL, gcvPATCH_BASEMARK2V2);
+    if (chipCtx->patchId <= gcvPATCH_INVALID)
+    {
+        chipCtx->patchId = gcvPATCH_BASEMARK2V2;
+        gcoHAL_SetPatchID(gcvNULL, gcvPATCH_BASEMARK2V2);
+    }
 
     gcmFOOTER_NO();
 }
@@ -13800,6 +13800,8 @@ gcChipPatchGFX31_Precision(
     gctINT* index
     )
 {
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+
     static char fragShader[] =
 "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
 "\xaa\xce\xab\xcd\xa4\xca\xaf\x8f\xda\x89\xcc\x93\xc6\x84\xcb\xb8"
@@ -14193,7 +14195,9 @@ gcChipPatchGFX31_Precision(
 
     gcChipUtilsDecrypt(fragShader);
     patchedSrcs[__GLSL_STAGE_FS] = fragShader;
-    gcoHAL_SetPatchID(gcvNULL,gcvPATCH_GFXBENCH);
+
+    chipCtx->patchId = gcvPATCH_GFXBENCH;
+    gcoHAL_SetPatchID(gcvNULL, gcvPATCH_GFXBENCH);
 }
 
 static void
@@ -15557,10 +15561,10 @@ gcChipPatchDEQP_CarChase(
     gctINT* index
     )
 {
-    __GLchipContext *chipCtx         = CHIP_CTXINFO(gc);
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
-    gcoHAL_SetPatchID(gcvNULL,gcvPATCH_CAR_CHASE);
     chipCtx->patchId = gcvPATCH_CAR_CHASE;
+    gcoHAL_SetPatchID(gcvNULL, gcvPATCH_CAR_CHASE);
 }
 
 static void
@@ -15763,9 +15767,12 @@ gcChipPatch_Trex(
     gctINT* index
     )
 {
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+
     gcmHEADER_ARG("gc=0x%x progObj=0x%x patchedSrcs=0x%x index=%d",
                    gc, progObj, patchedSrcs, index);
 
+    chipCtx->patchId = gcvPATCH_GLBM27;
     gcoHAL_SetPatchID(gcvNULL, gcvPATCH_GLBM27);
 
     gcmFOOTER_NO();
@@ -15779,9 +15786,12 @@ gcChipPatch_Manhattan(
     gctINT* index
     )
 {
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+
     gcmHEADER_ARG("gc=0x%x progObj=0x%x patchedSrcs=0x%x index=%d",
                    gc, progObj, patchedSrcs, index);
 
+    chipCtx->patchId = gcvPATCH_GFXBENCH;
     gcoHAL_SetPatchID(gcvNULL, gcvPATCH_GFXBENCH);
 
     gcmFOOTER_NO();
@@ -15825,7 +15835,7 @@ gctINT* index
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
 
-    if (chipCtx->patchId == gcvPATCH_DEQP)
+    if (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30)
     {
         __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
         program->progFlags.alphaBlend = 1;
@@ -15951,6 +15961,50 @@ gctINT* index
     {
         __GLchipSLProgram *program = (__GLchipSLProgram *)progObj->privateData;
         program->progFlags.enableHP_TEXLD_COORD = 1;
+    }
+}
+
+static void
+gcChipPatch_Cube_tweak(
+    __GLcontext *gc,
+    __GLprogramObject *progObj,
+    const gctCHAR **patchedSrcs,
+    gctINT* index
+    )
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+
+    static gldREPLACE_SHADERS fragment20Shaders[] =
+    {
+        {
+            gcvTRUE,
+            "\x98\xf4\xab\xed\x9f\xfe\x99\xda\xb5\xd9\xb6\xc4\xf9\x8d\xe8\x90"
+            "\xe4\x91\xe3\x86\xc5\xb0\xd2\xb7\x9f\xea\xb5\xc6\xa7\xca\xba\xd6"
+            "\xb3\xc1\xed\x9b\xc4\xb0\xd5\xad\xee\x81\xee\x9c\xf8\xd1\xfb\x8e"
+            "\xd1\xb2\xdd\xb1\xde\xac\xff\x9c\xfd\x91\xf4\xdf\xaa\xf5\x96\xf9"
+            "\x95\xfa\x88\xca\xa3\xc2\xb1\x8a"
+            ,
+            "\x98\xf4\xab\xed\x9f\xfe\x99\xda\xb5\xd9\xb6\xc4\xe4\xd9\xf9\x8d"
+            "\xe8\x90\xe4\x91\xe3\x86\xc5\xb0\xd2\xb7\x9f\xea\xb5\xc6\xa7\xca"
+            "\xba\xd6\xb3\xc1\xed\xcd\xbb\xe4\x90\xf5\x8d\xce\xa1\xce\xbc\xd8"
+            "\xf1\xd1\xfb\xdb\xae\xf1\x92\xfd\x91\xfe\x8c\xdf\xbc\xdd\xb1\xd4"
+            "\xf4\xdf\xff\x8a\xd5\xb6\xd9\xb5\xda\xa8\xea\x83\xe2\x91\xaa\xa0"
+            "\xc9\xaf\x87\xeb\x8e\xe0\x87\xf3\x9b\xb3\xd4\xb8\xe7\xa1\xd3\xb2"
+            "\xd5\x96\xf9\x95\xfa\x88\xa6\xde\xa7\x8e\xae\x90\xb0\x80\xae\x9e"
+            "\xb7\x97\xb7\xd0\xbc\xe3\xa5\xd7\xb6\xd1\x92\xfd\x91\xfe\x8c\xac"
+            "\x87\xba\x9a\xaa\x84\xb4\x84\xb7\x82\xb9\xb3"
+        },
+        {gcvFALSE, gcvNULL, gcvNULL}
+    };
+
+    gctCONST_STRING fragSource = patchedSrcs[__GLSL_STAGE_FS]
+                               ? patchedSrcs[__GLSL_STAGE_FS]
+                               : progObj->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.source;
+
+    if ((chipCtx->patchId == gcvPATCH_GTFES30) &&
+         chipCtx->chipFeature.txLerpLessBit)
+    {
+        patchedSrcs[__GLSL_STAGE_FS] = gcChipPatchShaderReplace(SHADER_TYPE_FRAG, fragSource, fragment20Shaders);
     }
 }
 
@@ -27406,8 +27460,102 @@ static __GLchipPatch gcChipPatches[] =
         gcChipPatch_Trex,
     },
     {
-        GC_CHIP_PATCH_MANHATTAN,
-        "GC_CHIP_PATCH_MANHATTAN, MANHATTAN, fragment shader replacement.",
+        GC_CHIP_PATCH_MANHATTAN30,
+        "GC_CHIP_PATCH_MANHATTAN30, vertex shader detection for GFX30 Manhattan.",
+
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+
+        /* vertex shader */
+        "\xdc\xaa\xcf\xbd\xce\xa7\xc8\xa6\x86\xb5\x85\xb5\x95\xf0\x83\x89"
+        "\xaa\xc3\xa5\xc1\xa4\xc2\xe2\xa5\xe9\xb6\xf3\xa0\xaa\xda\xa8\xcd"
+        "\xae\xc7\xb4\xdd\xb2\xdc\xfc\x94\xfd\x9a\xf2\x82\xa2\xc4\xa8\xc7"
+        "\xa6\xd2\xe9\xe3\xc0\xa5\xcb\xaf\xc6\xa0\xaa\x89\xe0\x86\xe8\x8c"
+        "\xe9\x8f\xaf\xe8\xa4\xfb\xbe\xed\xe7\xc4\xa0\xc5\xa3\xca\xa4\xc1"
+        "\xe1\x89\xe0\x87\xef\x9f\x95\xb6\xd2\xb7\xd1\xb8\xd6\xb3\x93\xfe"
+        "\x9b\xff\x96\xe3\x8e\xfe\xf4\xd7\xb3\xd6\xb0\xd9\xb7\xd2\xf2\x9e"
+        "\xf1\x86\xf6\xfc\xdf\xba\xd4\xb0\xd9\xbf\xb5\x96\xf2\x97\xf1\x98"
+        "\xf6\x93\xb3\xe0\xa8\xe9\xad\xe2\xb5\xea\xa7\xe6\xb6\xbc\x9f\xfb"
+        "\x9e\xf8\x91\xff\x9a\xba\xe9\xa6\xe0\xb4\xeb\xb8\xf0\xb1\xf5\xba"
+        "\xed\xe7\x92\xfc\x95\xf3\x9c\xee\x83\xa3\xcb\xa2\xc5\xad\xdd\xfd"
+        "\x90\xf1\x85\xb1\x91\xfc\x8a\xfa\xc1\xcb\xbe\xd0\xb9\xdf\xb0\xc2"
+        "\xaf\x8f\xe7\x8e\xe9\x81\xf1\xd1\xbc\xdd\xa9\x9d\xbd\xd0\xa6\x9d"
+        "\x97\xe2\x8c\xe5\x83\xec\x9e\xf3\xd3\xbb\xd2\xb5\xdd\xad\x8d\xe0"
+        "\x81\xf5\xc1\xe1\x8c\xe3\x87\xe2\x8e\xb5\xbf\xca\xa4\xcd\xab\xc4"
+        "\xb6\xdb\xfb\x93\xfa\x9d\xf5\x85\xa5\xd3\xb6\xd5\xe6\xc6\xb0\xd9"
+        "\xbc\xcb\x94\xe4\x8b\xf8\xc3\xc9\xa0\xce\xee\x98\xfd\x9e\xad\x8d"
+        "\xe4\x8a\xd5\xa5\xca\xb9\xd0\xa4\xcd\xa2\xcc\xf7\xfd\x94\xfa\xda"
+        "\xac\xc9\xaa\x98\xb8\xd1\xbf\xe0\x94\xf1\x89\xea\x85\xea\x98\xfc"
+        "\xcc\xf7\xfd\xde\xb7\xd1\xb5\xd0\xb6\x96\xdf\x91\xc2\x96\xd7\x99"
+        "\xda\x93\xdd\x9a\x90\xbf\x90\xf9\x97\xb7\xda\xbb\xcf\xfb\xdb\xb2"
+        "\xdc\x83\xea\x84\xf7\x83\xe2\x8c\xef\x8a\xd5\xb8\xce\xf5\xff\x96"
+        "\xf8\xd8\xae\xcb\xa8\x9c\xbc\xd5\xbb\xe4\x8d\xe3\x90\xe4\x85\xeb"
+        "\x88\xed\xb2\xdf\xa9\x99\xa2\xa8\xc1\xaf\x8f\xf9\x9c\xff\xcb\xeb"
+        "\x82\xec\xb3\xda\xb4\xc7\xb3\xd2\xbc\xdf\xba\xe5\x88\xfe\xcf\xf4"
+        "\xfe\x97\xf9\xd9\xaf\xca\xa9\x9d\xbd\xd4\xba\xe5\x8c\xe2\x91\xe5"
+        "\x84\xea\x89\xec\xb3\xde\xa8\x9a\xa1\xab\xc2\xac\x8c\xfa\x9f\xfc"
+        "\xc8\xe8\x81\xef\xb0\xd9\xb7\xc4\xb0\xd1\xbf\xdc\xb9\xe6\x8b\xfd"
+        "\xce\xf5\xff\x96\xf8\xd8\xb5\xd4\xa0\x94\xb4\xdd\xb3\xec\x85\xeb"
+        "\x98\xec\x8d\xe3\x80\xe5\xba\xd3\xbd\xcb\x94\xf9\x8f\xb4\xbe\x9d"
+        "\xf8\x96\xf2\x9b\xfd\xf7\xfe\xf4\x9b\xee\x9a\xba\xcc\xa9\xca\xf8"
+        "\xd8\xb7\xc2\xb6\xe9\x9d\xf8\x80\xe3\x8c\xe3\x91\xf5\xc5\xfe\xf4"
+        "\x82\xed\x84\xe0\xc0\xad\xcc\xa5\xcb\xe3\xca\xc0\xbb\x9b\xbb\x9b"
+        "\xbb\xb1\xb8\xce\xab\xc8\xfb\xdb\xae\xde\xe5\xc5\xcf\xc6\xb0\xd5"
+        "\xb6\x85\xa5\xd7\xbe\xd9\xb1\xc5\xfe\xf4\xfd\x8b\xee\x8d\xbe\x9e"
+        "\xf8\x8f\xeb\xd0\xda\xf9\x90\xf6\x92\xf7\x91\xb1\xf8\xb6\xe5\xb1"
+        "\xf0\xbe\xfd\xb4\xfa\xbd\xb7\xbe\xd3\xb2\xc6\xf2\xd2\xbb\xd5\x8a"
+        "\xe3\x8d\xfe\x8a\xeb\x85\xe6\x83\xdc\xb1\xc7\xe7\xda\xfa\x97\xf6"
+        "\x82\xb6\x9e\xf7\x99\xc6\xaf\xc1\xb2\xc6\xa7\xc9\xaa\xcf\x90\xfd"
+        "\x8b\xbb\x97\xb7\xde\xb0\xef\x86\xe8\x9b\xef\x8e\xe0\x83\xe6\xb9"
+        "\xd4\xa2\x93\xbf\x9f\xf6\x98\xc7\xae\xc0\xb3\xc7\xa6\xc8\xab\xce"
+        "\x91\xfc\x8a\xb8\x94\xb4\xdd\xb3\xec\x85\xeb\x98\xec\x8d\xe3\x80"
+        "\xe5\xba\xd7\xa1\x92\xbb\x80\x8a\xa9\xcc\xa2\xc6\xaf\xc9\xc3\xca"
+        "\xc0\xe3\x8a\xec\x88\xed\x8b\xab\xea\xab\xe7\xae\xe9\xa7\xe2\xa6"
+        "\xaf\xa5\xac\xd9\xa9\x89\xb4\x94\xe2\x87\xe4\xd7\xff\xdf\xef\xc1"
+        "\xf1\xdd\xfd\xcc\xe2\xd2\xfe\xde\xee\xc0\xf0\xd9\xe2\xe8\xcb\xae"
+        "\xc2\xb1\xd4\xde\xd7\xa2\xd2\xf2\xcf\xef\x99\xfc\x9f\xac\x84\xa4"
+        "\xc9\xbf\xe4\xd4\x89\xd2\xe3\xbe\x92\xb2\xdf\xa9\xf2\xc3\x9e\xc5"
+        "\xf4\xa9\x85\xa5\xc8\xbe\xe5\xd7\x8a\xd1\xe0\xbd\x94\xaf\xa5\x86"
+        "\xe3\x8d\xe9\x80\xe6\xec\xe5\x97\xfe\x99\xf1\x85\xa5\x98\xb8\xce"
+        "\xab\xc8\xfb\xd3\xf3\x9e\xe8\xb3\x83\xde\x85\xb5\xe8\xc4\xe4\x89"
+        "\xff\xa4\x95\xc8\x93\xa3\xfe\xd2\xf2\x9f\xe9\xb2\x80\xdd\x86\xb6"
+        "\xeb\xc2\xf9\xf3\xfa\xf0\xf9\x8f\xea\x89\xba\x9a\xfe\x9b\xf7\x83"
+        "\xe2\xc2\xff\xdf\xa9\xcc\xaf\x9c\xb4\x94\xf9\x96\xf2\x97\xfb\xa0"
+        "\x93\xce\x95\xa5\xf8\xd4\xf4\x99\xf6\x92\xf7\x9b\xc0\xf3\xae\xf5"
+        "\xc4\x99\xb5\x95\xf8\x97\xf3\x96\xfa\xa1\x92\xcf\x94\xa6\xfb\xd2"
+        "\xf2\xdf\xff\x89\xe0\x85\xf2\xad\xdd\xb2\xc1\xfa\xf0\xf9\x9d\xf8"
+        "\x94\xe0\x81\xa1\x9c\xbc\xd2\xbd\xcf\xa2\xc3\xaf\xc6\xbc\xd9\xf1"
+        "\xd1\xb5\xd0\xbc\xc8\xa9\x80\xbb\xb1\xb8\xce\xab\xc8\xfb\xdb\xab"
+        "\xc4\xb7\xde\xaa\xc3\xac\xc2\xe2\xdf\xff\x96\xf8\xa7\xd7\xb8\xcb"
+        "\xa2\xd6\xbf\xd0\xbe\x90\xe8\xc8\xe2\xc2\xb0\xd9\xbe\xd6\xa2\x82"
+        "\xa9\x89\xe0\x8e\xd1\xa1\xce\xbd\xd4\xa0\xc9\xa6\xc8\xe6\x9f\xbf"
+        "\x95\xb5\xc0\xb0\x90\xbb\x9b\xf2\x9c\xc3\xb3\xdc\xaf\xc6\xb2\xdb"
+        "\xb4\xda\xf4\x8e\xae\x84\xa4\xc0\xa5\xc9\xbd\xdc\xe7\xed\xce\xa7"
+        "\xc1\xa5\xc0\xa6\x86\xcf\x81\xd2\x86\xc7\x89\xca\x83\xcd\x8a\x80"
+        "\xa0\x80\xa0\x80\xed\x8c\xf8\xcc\xec\x81\xf7\x87\xb5\x95\xa8\x88"
+        "\xe5\x93\xe3\xc3\xe9\xc9\xa0\xce\x91\xf8\x96\xe5\x91\xf0\x9e\xfd"
+        "\x98\xc7\xaa\xdc\xe7\xed\xe4\x83\xef\xb0\xe0\x8f\xfc\x95\xe1\x88"
+        "\xe7\x89\xa9\x94\xb4\xd9\xaf\xdf\xed\xcd\xe7\xc7\xb1\xd4\xb7\x83"
+        "\xab\x8b\xfb\x94\xe7\x8e\xfa\x93\xfc\x92\xbe\x9e\xaf\x81\xb1\x98"
+        "\xa3\xa9\x8a\xef\x83\xf0\x95\x9f\x96\xf1\x9d\xc2\x92\xfd\x8e\xe7"
+        "\x93\xfa\x95\xfb\xdb\xe6\xc6\xab\xdd\xad\x8d\xa7\x87\xf1\x94\xf7"
+        "\xc3\xeb\xcb\xbb\xd4\xa7\xce\xba\xd3\xbc\xd2\xfe\xde\xef\xc1\xf1"
+        "\xd8\xe3\xe9\xca\xaf\xc1\xa5\xcc\xaa\xa0\xa9\xc6\xb3\xc7\x98\xec"
+        "\x89\xf1\x92\xfd\x92\xe0\x84\xb4\x94\xa9\x89\xe0\x8e\xd1\xa5\xc0"
+        "\xb8\xdb\xb4\xdb\xa9\xcd\xfd\xc6\xcc\xb1",
+        /* fragment shader */
+        gcvNULL,    /* TCS */
+        gcvNULL,    /* TES */
+        gcvNULL,    /* GS  */
+        gcvNULL,    /* FS  */
+        gcvNULL,    /* CS  */
+        },
+        gcChipPatch_Manhattan,
+    },
+    {
+        GC_CHIP_PATCH_MANHATTAN40,
+        "GC_CHIP_PATCH_MANHATTAN40, vertex shader detection for GFX40 Manhattan.",
 
         GLchipPatch_Shader,
         gcvTRUE,
@@ -28324,7 +28472,7 @@ static __GLchipPatch gcChipPatches[] =
             gcvNULL,    /* CS  */
         },
 
-        gcChipPatchDEQP_CompileTime_S_4,
+        gcChipPatchDEQP_CompileTime_S_2,
     },
 
     {
@@ -28447,6 +28595,104 @@ static __GLchipPatch gcChipPatches[] =
 
         gcChipPatchGFX4_Fill2,
     },
+
+    {
+        GC_CHIP_PATCH_ES20_CONF_CUBE,
+        "",
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+            gcvNULL,
+            gcvNULL,
+            gcvNULL,
+            gcvNULL,
+        "\x98\xdb\xb4\xd8\xb7\xc5\xf8\x8c\xe9\x91\xe5\x90\xe2\x87\xc4\xb1"
+        "\xd3\xb6\x9e\xeb\xb4\xc7\xa6\xcb\xbb\xd7\xb2\xc0\xec\x9a\xc5\xb1"
+        "\xd4\xac\xef\x80\xef\x9d\xf9\xd0\xfa\x8f\xd0\xb3\xdc\xb0\xdf\xad"
+        "\xfe\x9d\xfc\x90\xf5\xde\xab\xf4\x97\xf8\x94\xfb\x89\xcb\xa2\xc3"
+        "\xb0\x8b"
+        ,
+            gcvNULL,
+        },
+
+        gcChipPatch_Cube_tweak,
+    },
+
+    {
+        GC_CHIP_PATCH_GLMARK2_ES2,
+        "",
+        GLchipPatch_Shader,
+        gcvTRUE,
+        {
+            gcvNULL,
+            gcvNULL,
+            gcvNULL,
+            gcvNULL,
+        "\xd0\xff\xbe\xda\xb0\xc5\xb6\xc2\xb6\xde\xbb\xd5\xba\xc8\xa5\xc4"
+        "\xa8\xca\xab\xd8\xbd\xd9\xb6\xd8\xac\xc4\xa1\xc9\xac\xc5\xa2\xca"
+        "\xbe\xd3\xb2\xc2\xa6\xc7\xb3\xd2\xa4\xc1\xa2\x91\xdf\xe2\xac\xc3"
+        "\xb1\xdc\xbd\xd1\x94\xed\x88\xa5\xcd\xa8\xc1\xa6\xce\xba\xe5\x83"
+        "\xe2\x81\xf5\x9a\xe8\xc2\xa6\xce\xe0\x98\xb2\xe6\x87\xe9\x8e\xeb"
+        "\x85\xf1\xb4\xcd\xa8\x85\xed\x88\xe1\x86\xee\x9a\xc5\xa3\xc2\xa1"
+        "\xd5\xba\xc8\xe2\x86\xee\xc0\xb9\x93\xd1\xb8\xcc\xad\xc3\xa4\xc1"
+        "\xaf\xdb\x9e\xe7\x82\xb9\xf7\xca\xa4\xcb\xb9\xd4\xb5\xd9\xb0\xca"
+        "\xaf\x87\xc9\xe0\xdb\xf4\xdb\x92\xfc\x88\xe0\x85\xe9\x80\xe7\x8f"
+        "\xfb\x92\xfc\x9b\xf6\x99\xfd\x98\xf4\x83\xe6\x87\xf5\x90\xe5\x96"
+        "\xff\x91\xf6\x9e\xfb\x89\xec\xc4\x86\xea\x83\xed\x83\xae\xfe\x96"
+        "\xf9\x97\xf0\x87\xee\x9a\xf2\x9e\xf7\x90\xf8\x8c\xed\x99\xb6\x99"
+        "\xf0\x9e\xf8\x91\xff\x96\xe2\x9b\xb7\xc1\xa8\xcd\xba\xdf\xad\xcc"
+        "\xb8\xd1\xbf\xd9\xb0\xde\xb7\xc3\xba\x93\xbf\xcb\xa3\xc6\xaa\xc3"
+        "\xa4\xcc\xb8\xc8\xa7\xd4\xbd\xc9\xa0\xcf\xa1\x8e\xea\x83\xf1\x94"
+        "\xf7\x83\xea\x85\xeb\x8a\xe4\x80\xf4\x9c\xf9\xd6\xf9\x91\xf0\x9c"
+        "\xfa\x8c\xe9\x8a\xfe\x91\xe3\x8a\xf9\x9a\xf5\x9b\xe8\x9c\xfd\x93"
+        "\xe7\x81\xee\x9c\xe8\x80\xe5\x84\xe8\x84\xf0\x98\xfd\x9b\xe9\x88"
+        "\xef\x82\xe7\x89\xfd\x8e\xa0\xd6\xb3\xd0\xe3\xaf\x92\xfc\x93\xe1"
+        "\x8c\xed\x81\xe8\x92\xf7\xdf\x93\xfa\x9d\xf5\x81\xd2\xbd\xc8\xba"
+        "\xd9\xbc\xec\x83\xf0\x99\xed\x84\xeb\x85\xab\xd3\xaa\xd0\xf9\xc2"
+        "\xb4\xd1\xb2\x81\xc9\xf4\x9a\xf5\x87\xea\x8b\xe7\x8e\xf4\x91\xb9"
+        "\xf5\x9c\xfb\x93\xe7\xb4\xdb\xae\xdc\xbf\xda\x92\xf3\x9f\xf9\xaf"
+        "\xca\xa9\xdd\xb2\xc0\xe9\xd2\xfd\xd2\x91\xf0\x9c\xff\x8a\xe6\x87"
+        "\xf3\x96\xe2\x8a\xef\x8b\xe2\x84\xe2\x97\xe4\x81\xe2\x8d\xe1\x8e"
+        "\xfc\x9d\xfe\x9d\xf2\x80\xe4\x8d\xe3\x84\xf0\x9f\xd3\xb2\xdf\xbd"
+        "\xd8\xaa\xde\xb7\xd6\xb8\xca\xaf\xc9\xa5\xc0\xa3\xd7\xb6\xd8\xbb"
+        "\xde\xa8\xcd\xae\x9a\xfe\x97\xf1\x97\xe2\x91\xf4\xc9\x84\xe5\x91"
+        "\xf4\x86\xef\x8e\xe2\xa6\xcf\xa9\xcf\xba\xc9\xac\x86\xca\xa3\xc4"
+        "\xac\xd8\x8b\xe4\x91\xe3\x80\xe5\xa1\xc8\xae\xc8\xbd\xce\xab\x81"
+        "\xec\x8d\xf5\xdd\xb9\xd6\xa2\x8a\xc4\xe8\xa4\x8d\xa1\x91\xbf\x8f"
+        "\xa6\x9d\xb2\x9d\xde\xbf\xd3\xb0\xc5\xa9\xc8\xbc\xd9\xad\xc5\xa0"
+        "\xc1\xac\xce\xa7\xc2\xac\xd8\xbb\xd4\xb8\xd7\xa5\xd3\xb6\xd5\xe1"
+        "\x80\xed\x8f\xe6\x83\xed\x99\xa4\xe9\x88\xfc\x99\xeb\x82\xe3\x8f"
+        "\xce\xa3\xc1\xa8\xcd\xa3\xd7\xfd\xb1\xd8\xbf\xd7\xa3\xf0\x9f\xea"
+        "\x98\xfb\x9e\xdf\xb2\xd0\xb9\xdc\xb2\xc6\xfd\xd2\xfd\xbe\xdf\xb3"
+        "\xd0\xa5\xc9\xa8\xdc\xb9\xcd\xa5\xc0\xb3\xc3\xa6\xc5\xb0\xdc\xbd"
+        "\xcf\xac\xc3\xaf\xc0\xb2\xd3\xb0\xd3\xbc\xce\xaa\xc3\xad\xca\xbe"
+        "\xd1\xa5\xcd\xa8\xea\x86\xef\x81\xef\xc2\x92\xfa\x95\xfb\x9c\xf1"
+        "\x9e\xfa\x9f\xf3\x85\xe0\x83\xb7\xc4\xb4\xd1\xb2\xc7\xab\xca\xb8"
+        "\x85\xc8\xa9\xdd\xb8\xca\xa3\xc2\xae\xfd\x8d\xe8\x8b\xfe\x92\xf3"
+        "\x81\xab\xe7\x8e\xe9\x81\xf5\xa6\xc9\xbc\xce\xad\xc8\x9b\xeb\x8e"
+        "\xed\x98\xf4\x95\xe7\xcd\xbd\xd2\xa5\x8d\xe0\x81\xf9\xd1\xb5\xda"
+        "\xae\x86\xc8\xe4\xac\x85\xa9\x99\xb7\x87\xae\x82\xcf\xae\xda\xbf"
+        "\xcd\xa4\xc5\xa9\xfa\x92\xfb\x95\xfc\x92\xf7\x84\xf7\xde\xe5\xca"
+        "\xe5\xa6\xc7\xab\xc8\xbd\xd1\xb0\xc4\xa1\xd5\xbd\xd8\xbe\xd7\xb9"
+        "\xd8\xb4\xd7\xb8\xd4\xbb\xc9\xae\xc2\x9d\xdb\xa9\xc8\xaf\xec\x83"
+        "\xef\x80\xf2\xcf\xae\xc3\xa1\xc8\xad\xc3\xb7\x9c\xef\x9f\xfa\x99"
+        "\xec\x80\xe1\x93\xb8\xdc\xb5\xd3\xb5\xc0\xb3\xd6\xed\xc2\xed\x8a"
+        "\xe6\xb9\xff\x8d\xec\x8b\xc8\xa7\xcb\xa4\xd6\xeb\x9d\xf8\x9b\xaf"
+        "\x87\xef\x8a\xe3\x84\xec\x98\xc7\xa3\xca\xac\xca\x95\xe7\x86\xf1"
+        "\xdf\xa7\xde\xf2\xc2\xec\xdc\xf0\xc1\xef\xdf\xf6\xcd\xe2\xcd\xaa"
+        "\xc6\x99\xdf\xad\xcc\xab\xe8\x87\xeb\x84\xf6\xcb\xbd\xd8\xbb\x8f"
+        "\xa7\xcf\xaa\xc3\xa4\xcc\xb8\xe7\x83\xea\x8c\xea\xb5\xc6\xa5\xc4"
+        "\xa8\xcd\xa9\x87\xff\x86\xaa\x9a\xb4\x84\xa8\x99\xb7\x87\xae\x95"
+        "\xba\x95\xf2\x9e\xc1\x87\xf5\x94\xf3\xb0\xdf\xb3\xdc\xae\x93\xe5"
+        "\x80\xe3\xd7\xff\xab\xca\xa4\xc3\xa6\xc8\xbc\x90\xa1\x8f\xbf\x96"
+        "\xad"
+        ,
+            gcvNULL,
+        },
+
+        gcChipPatch_DisableDual16,
+    },
+
     {GC_CHIP_PATCH_LAST, gcvNULL, 0, gcvFALSE, {gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL, gcvNULL}, gcvNULL}
 };
 
@@ -28569,7 +28815,7 @@ gcChipPatchUI(
     {
         gcoSURF_GetSamples((gcoSURF)gc->drawablePrivate->rtHandle, &samples);
         if ((chipCtx->patchInfo.uiDepth == gcvNULL) &&
-            (gc->frameBuffer.drawFramebufObj == &gc->frameBuffer.defaultFBO) &&        /* No FBO is bound. */
+            (gc->frameBuffer.drawFramebufObj == &gc->frameBuffer.defaultDrawFBO) &&        /* No FBO is bound. */
             (samples > 1) &&          /* MultiSampled. */
             (gc->bufferObject.generalBindingPoint[__GL_ARRAY_BUFFER_INDEX].boundBufObj != gcvNULL) && /* A VBO is bound. */
             (gc->bufferObject.generalBindingPoint[__GL_ARRAY_BUFFER_INDEX].boundBufObj->usage == GL_DYNAMIC_DRAW)   /* And the VBO usage is GL_DYNAMIC_DRAW. */
@@ -28783,95 +29029,101 @@ gcChipPatchLink(
 {
 #if !gcdRENDER_QUALITY_CHECK
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    __GLchipSLProgram *program = (__GLchipSLProgram*)programObject->privateData;
     __GLshaderObject **ppShaders = programObject->programInfo.attachedShader;
     gctCONST_STRING searchSrc[__GLSL_STAGE_LAST] = {gcvNULL};
     gctINT searchIndex = 0;
     __GLSLStage stage;
     gctUINT i;
-    gcePATCH_ID         patchId;
 
     gcmHEADER_ARG("gc=0x%x programObject=0x%x patchedSrcs=0x%x replaceIndices=0x%x",
                   gc, programObject, patchedSrcs, replaceIndices);
 
-    /* Disable patches compiler option says so */
-    if (gcSHADER_DoPatch(gcvNULL) == 0)
+    do
     {
-        gcmFOOTER_NO();
-        return;
-    }
-    /* Loop all entries of the patch table. */
-    for (i = 0; i < gcmCOUNTOF(gcChipPatches); ++i)
-    {
-        if (chipCtx->doPatchCondition[i])
+        /* Disable patches compiler option says so */
+        if (gcSHADER_DoPatch(gcvNULL) == 0)
         {
-            __GLchipPatch *patch = &gcChipPatches[i];
+            break;
+        }
 
-            for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
-            {
-                if (ppShaders[stage] &&
-                    ppShaders[stage]->shaderInfo.source &&
-                    patch->fromStages[stage] &&
-                    gcSHADER_DoPatch((gcSHADER)ppShaders[stage]->shaderInfo.hBinary))
-                {
-                    searchSrc[stage] = gcChipUtilFindString(patch->encrypted,
-                                                            ppShaders[stage]->shaderInfo.source,
-                                                            patch->fromStages[stage],
-                                                            &searchIndex);
-                }
-            }
+        if (chipCtx->patchId == gcvPATCH_MIRADA)
+        {
+            program->progFlags.alphaKill = 1;
+            break;
+        }
 
-            /* Check if we need a VS+PS combined patch. */
-            if (patch->fromStages[__GLSL_STAGE_VS] && patch->fromStages[__GLSL_STAGE_FS])
+        /* Loop all entries of the patch table. */
+        for (i = 0; i < gcmCOUNTOF(gcChipPatches); ++i)
+        {
+            if (chipCtx->doPatchCondition[i])
             {
-                if (searchSrc[__GLSL_STAGE_VS] && searchSrc[__GLSL_STAGE_FS] && patch->handler)
-                {
-                    patch->handler(gc, programObject, patchedSrcs, gcvNULL);
+                __GLchipPatch *patch = &gcChipPatches[i];
 
-                    gcmDUMP(gcvNULL, "#[info: patchInfo 0x%04x %s]", chipCtx->patchId, patch->description);
-                }
-            }
-            else
-            {
-                /* Check for per stage patch */
                 for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
                 {
-                    if (patch->fromStages[stage] && searchSrc[stage] && patch->handler)
+                    if (ppShaders[stage] &&
+                        ppShaders[stage]->shaderInfo.source &&
+                        patch->fromStages[stage] &&
+                        gcSHADER_DoPatch((gcSHADER)ppShaders[stage]->shaderInfo.hBinary))
                     {
-                        patch->handler(gc, programObject, patchedSrcs, &replaceIndices[stage]);
+                        searchSrc[stage] = gcChipUtilFindString(patch->encrypted,
+                                                                ppShaders[stage]->shaderInfo.source,
+                                                                patch->fromStages[stage],
+                                                                &searchIndex);
+                    }
+                }
+
+                /* Check if we need a VS+PS combined patch. */
+                if (patch->fromStages[__GLSL_STAGE_VS] && patch->fromStages[__GLSL_STAGE_FS])
+                {
+                    if (searchSrc[__GLSL_STAGE_VS] && searchSrc[__GLSL_STAGE_FS] && patch->handler)
+                    {
+                        patch->handler(gc, programObject, patchedSrcs, gcvNULL);
 
                         gcmDUMP(gcvNULL, "#[info: patchInfo 0x%04x %s]", chipCtx->patchId, patch->description);
-                        break;
+                    }
+                }
+                else
+                {
+                    /* Check for per stage patch */
+                    for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
+                    {
+                        if (patch->fromStages[stage] && searchSrc[stage] && patch->handler)
+                        {
+                            patch->handler(gc, programObject, patchedSrcs, &replaceIndices[stage]);
+
+                            gcmDUMP(gcvNULL, "#[info: patchInfo 0x%04x %s]", chipCtx->patchId, patch->description);
+                            break;
+                        }
                     }
                 }
             }
         }
-    }
 
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
-    if (patchId == gcvPATCH_BASEMARK2V2)
-    {
-        __GLchipSLProgram *program = (__GLchipSLProgram *)programObject->privateData;
-        program->progFlags.alphaKill = 1;
-    }
-
-    if (chipCtx->patchInfo.patchFlags.rgbEncoding)
-    {
-        for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
+        if (chipCtx->patchId == gcvPATCH_BASEMARK2V2)
         {
-            gctCONST_STRING searched = gcChipUtilFindString(gcvTRUE,
-                                                            ppShaders[stage]->shaderInfo.source,
-                                                            chipCtx->patchInfo.rgbSearch,
-                                                            &searchIndex);
+            program->progFlags.alphaKill = 1;
+        }
 
-            if (searched)
+        if (chipCtx->patchInfo.patchFlags.rgbEncoding)
+        {
+            for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
             {
-                /* TODO: it's illegal to overwrite app specified shader sources */
-                ((GLchar*)searched)[0] = '/';
-                ((GLchar*)searched)[1] = '/';
-                patchedSrcs[stage] = ppShaders[stage]->shaderInfo.source;
+                gctCONST_STRING searched = gcChipUtilFindString(gcvTRUE,
+                                                                ppShaders[stage]->shaderInfo.source,
+                                                                chipCtx->patchInfo.rgbSearch,
+                                                                &searchIndex);
+
+                if (searched)
+                {
+                    ((GLchar*)searched)[0] = '/';
+                    ((GLchar*)searched)[1] = '/';
+                    patchedSrcs[stage] = ppShaders[stage]->shaderInfo.source;
+                }
             }
         }
-    }
+    } while (GL_FALSE);
 
     gcmFOOTER_NO();
     return;
@@ -31205,8 +31457,8 @@ gcChipPatchVertexPacking(
             {
                 if (attribMask & 1)
                 {
-                    __GLvertexAttrib *pAttrib = &vaState->attribute[chipCtx->attributeArray[i].arrayIdx];
-                    __GLbufferObject *vbo = vaState->attributeBinding[pAttrib->attribBinding].boundArrayObj;
+                    GLuint binding = vaState->attribute[chipCtx->attributeArray[i].arrayIdx].attribBinding;
+                    __GLbufferObject *vbo = __glGetCurrentVertexArrayBufObj(gc, binding);
                     if (vbo && vbo->size > 0)
                     {
                         __GLchipVertexBufferInfo *bufInfo = (__GLchipVertexBufferInfo*)(vbo->privateData);
@@ -32135,7 +32387,6 @@ gcChipPatchStencilOptWrite(
         }
         else
         {
-            /* TODO: if sw knows the dst stencil, we can calc the final value after written */
             value = GL_INVALID_INDEX;
         }
     }

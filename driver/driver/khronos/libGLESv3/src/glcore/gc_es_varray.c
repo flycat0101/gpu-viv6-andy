@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -220,18 +220,18 @@ static GLboolean __glCheckVAOState(__GLcontext *gc, GLboolean attribMustFromVBO,
     {
         if (attribEnabled & 0x1)
         {
-            __GLvertexAttrib *pAttrib = &curVertexArray->attribute[index];
-            __GLvertexAttribBinding *pAttribBinding = &curVertexArray->attributeBinding[pAttrib->attribBinding];
+            GLuint binding = curVertexArray->attribute[index].attribBinding;
+            __GLbufferObject *boundVBObj = __glGetCurrentVertexArrayBufObj(gc, binding);
+
             if (attribMustFromVBO)
             {
-                if (pAttribBinding->boundArrayName == 0)
+                if (!boundVBObj)
                 {
                     __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
                 }
             }
 
-            if (pAttribBinding->boundArrayObj && pAttribBinding->boundArrayObj->name != 0 &&
-                pAttribBinding->boundArrayObj->bufferMapped)
+            if (boundVBObj && boundVBObj->bufferMapped)
             {
                 __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
             }
@@ -262,7 +262,7 @@ static GLvoid  __glUpdateVertexArray(__GLcontext *gc,
     __GLvertexAttrib *pAttrib = &vertexArrayState->attribute[attribIdx];
     __GLvertexAttribBinding *pAttribBinding = &vertexArrayState->attributeBinding[bindingIdx];
     __GLbufferObject *newBufObj = gc->bufferObject.generalBindingPoint[__GL_ARRAY_BUFFER_INDEX].boundBufObj;
-    __GLbufferObject *oldBufObj = pAttribBinding->boundArrayObj;
+    __GLbufferObject *oldBufObj = __glGetCurrentVertexArrayBufObj(gc, bindingIdx);
     GLsizei actualStride = stride ? stride : __glUtilCalculateStride(size, type);
 
     /* if (oldBufObj != newBufObj) */
@@ -294,10 +294,11 @@ static GLvoid  __glUpdateVertexArray(__GLcontext *gc,
             {
                 __glAddImageUser(gc, &newBufObj->vaoList, gc->vertexArray.boundVAO);
             }
+
+            pAttribBinding->boundArrayObj = newBufObj;
         }
 
         pAttribBinding->boundArrayName = gc->bufferObject.generalBindingPoint[__GL_ARRAY_BUFFER_INDEX].boundBufName;
-        pAttribBinding->boundArrayObj = newBufObj;
 
         __GL_SET_VARRAY_BINDING_BIT(gc);
     }
@@ -1740,6 +1741,8 @@ GLboolean __glDeleteVertexArrayObject(__GLcontext *gc, __GLvertexArrayObject *ve
 
     __GL_HEADER();
 
+    GL_ASSERT(vertexArrayObj->name);
+
     for (i = 0; i < __GL_MAX_VERTEX_ATTRIBUTE_BINDINGS; i++)
     {
         bufObj = vertexArrayObj->vertexArray.attributeBinding[i].boundArrayObj;
@@ -1833,6 +1836,30 @@ void __glFreeVertexArrayState(__GLcontext *gc)
     __glFreeSharedObjectState(gc, gc->vertexArray.noShare);
 
     __GL_FOOTER();
+}
+
+__GLbufferObject* __glGetCurrentVertexArrayBufObj(__GLcontext *gc, GLuint binding)
+{
+    __GLbufferObject *bufObj = gcvNULL;
+    __GLvertexAttribBinding *pAttribBinding = gcvNULL;
+
+    GL_ASSERT(binding < __GL_MAX_VERTEX_ATTRIBUTE_BINDINGS);
+
+    pAttribBinding = &gc->vertexArray.boundVAO->vertexArray.attributeBinding[binding];
+    if (gc->vertexArray.boundVertexArray)
+    {
+        /* For named vao, get the bound bufobj of binding time. */
+        bufObj = pAttribBinding->boundArrayObj;
+    }
+    else if (pAttribBinding->boundArrayName)
+    {
+        /* For default vao, since bufobj will not be kept when it was bound to default vao,
+        ** need to retrieve bufobj from its name.
+        */
+        bufObj = (__GLbufferObject*)__glGetObject(gc, gc->bufferObject.shared, pAttribBinding->boundArrayName);
+    }
+
+    return bufObj;
 }
 
 GLvoid GL_APIENTRY __gles_BindVertexArray(__GLcontext *gc, GLuint array)

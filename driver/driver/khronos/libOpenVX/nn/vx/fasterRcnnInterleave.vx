@@ -1,0 +1,78 @@
+#include "cl_viv_vx_ext.h"
+
+_viv_uniform VXC_512Bits InterleaveStep1PackHead4;
+_viv_uniform VXC_512Bits InterleaveStep1PackLast4;
+_viv_uniform VXC_512Bits InterleaveStep2PackHead4;
+_viv_uniform VXC_512Bits InterleaveStep2PackLast4;
+_viv_uniform VXC_512Bits InterleaveStep3PackHead4;
+_viv_uniform VXC_512Bits InterleaveStep3PackLast4;
+__kernel void fasterrcnninterleaveVXC
+    (
+    __read_only image2d_t 	in_image,
+    global int              *in_Width,
+    global int              *in_Height,
+    global int              *type,
+    global int              *set_event,
+    __write_only image2d_t 	out_image
+    )
+{
+    int2 coord_in = (int2)(get_global_id(0), get_global_id(1));
+    int2 posin = (int2)(coord_in.x, coord_in.y);
+    int2 posout = (int2)(coord_in.y, coord_in.x);
+#if 1
+    vxc_short8 s16reg0, s16reg1, s16reg2, s16reg3;
+    vxc_short8 s16reg4, s16reg5, s16reg6, s16reg7;
+    vxc_short8 s16reg8, s16reg9;
+    //read image s16 s16reg0,1,2,3,4,5,6,7
+    VXC_ReadImage(s16reg0, in_image, posin, VXC_5BITOFFSET_XY(0,0), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(s16reg1, in_image, posin, VXC_5BITOFFSET_XY(0,1), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(s16reg2, in_image, posin, VXC_5BITOFFSET_XY(0,2), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(s16reg3, in_image, posin, VXC_5BITOFFSET_XY(0,3), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(s16reg4, in_image, posin, VXC_5BITOFFSET_XY(0,4), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(s16reg5, in_image, posin, VXC_5BITOFFSET_XY(0,5), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(s16reg6, in_image, posin, VXC_5BITOFFSET_XY(0,6), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    VXC_ReadImage(s16reg7, in_image, posin, VXC_5BITOFFSET_XY(0,7), VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    //pack step1 s16reg8,9,0,1,2,3,4,5
+    VXC_DP2x8(s16reg8, s16reg0, s16reg1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep1PackHead4);
+    VXC_DP2x8(s16reg9, s16reg0, s16reg1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep1PackLast4);
+    VXC_DP2x8(s16reg0, s16reg2, s16reg3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep1PackHead4);
+    VXC_DP2x8(s16reg1, s16reg2, s16reg3, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep1PackLast4);
+    VXC_DP2x8(s16reg2, s16reg4, s16reg5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep1PackHead4);
+    VXC_DP2x8(s16reg3, s16reg4, s16reg5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep1PackLast4);
+    VXC_DP2x8(s16reg4, s16reg6, s16reg7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep1PackHead4);
+    VXC_DP2x8(s16reg5, s16reg6, s16reg7, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep1PackLast4);
+    //pack step2 s16reg6,7,8,0,2,4,9,1
+    VXC_DP2x8(s16reg6, s16reg8, s16reg0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep2PackHead4);
+    VXC_DP2x8(s16reg7, s16reg8, s16reg0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep2PackLast4);
+    VXC_DP2x8(s16reg8, s16reg2, s16reg4, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep2PackHead4);
+    VXC_DP2x8(s16reg0, s16reg2, s16reg4, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep2PackLast4);
+    VXC_DP2x8(s16reg2, s16reg9, s16reg1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep2PackHead4);
+    VXC_DP2x8(s16reg4, s16reg9, s16reg1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep2PackLast4);
+    VXC_DP2x8(s16reg9, s16reg3, s16reg5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep2PackHead4);
+    VXC_DP2x8(s16reg1, s16reg3, s16reg5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep2PackLast4);
+    //pack step3 and store
+    VXC_DP2x8(s16reg5, s16reg6, s16reg8, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep3PackHead4);
+    VXC_WriteImage(out_image, posout, s16reg5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    posout.y += 1;
+    VXC_DP2x8(s16reg5, s16reg6, s16reg8, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep3PackLast4);
+    VXC_WriteImage(out_image, posout, s16reg5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    posout.y += 1;
+    VXC_DP2x8(s16reg5, s16reg7, s16reg0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep3PackHead4);
+    VXC_WriteImage(out_image, posout, s16reg5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    posout.y += 1;
+    VXC_DP2x8(s16reg5, s16reg7, s16reg0, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep3PackLast4);
+    VXC_WriteImage(out_image, posout, s16reg5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    posout.y += 1;
+    VXC_DP2x8(s16reg5, s16reg2, s16reg9, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep3PackHead4);
+    VXC_WriteImage(out_image, posout, s16reg5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    posout.y += 1;
+    VXC_DP2x8(s16reg5, s16reg2, s16reg9, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep3PackLast4);
+    VXC_WriteImage(out_image, posout, s16reg5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    posout.y += 1;
+    VXC_DP2x8(s16reg5, s16reg4, s16reg1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep3PackHead4);
+    VXC_WriteImage(out_image, posout, s16reg5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+    posout.y += 1;
+    VXC_DP2x8(s16reg5, s16reg4, s16reg1, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0), InterleaveStep3PackLast4);
+    VXC_WriteImage(out_image, posout, s16reg5, VXC_MODIFIER(0, 7, 0, VXC_RM_TowardZero, 0));
+#endif
+}

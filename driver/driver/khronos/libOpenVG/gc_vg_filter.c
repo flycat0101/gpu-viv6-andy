@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -47,10 +47,17 @@
 **    Tiling mode in gceTILE_MODE format.
 */
 
+#if defined(__QNXNTO__)
+gceTILE_MODE _GetTileMode(
+    vgsCONTEXT_PTR Context,
+    VGTilingMode TilingMode
+    )
+#else
 vgmINLINE gceTILE_MODE _GetTileMode(
     vgsCONTEXT_PTR Context,
     VGTilingMode TilingMode
     )
+#endif
 {
     gceTILE_MODE result;
     vgmENTERSUBAPI(_GetTileMode);

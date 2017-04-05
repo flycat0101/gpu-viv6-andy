@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -25,76 +25,43 @@
 
 #if gcvVERSION_MAJOR >= 5
 /* GLES3 */
+#include <EGL/egl.h>
 #include <GLES3/gl32.h>
-#include <GLES3/gl3ext.h>
 #include <GLES2/gl2ext.h>
+#if defined(ANDROID)
+    #if ANDROID_SDK_VERSION >= 20
+        #define  GL_VERSION_SUPPORT_CL CL_TRUE
+    #else
+        #define  GL_VERSION_SUPPORT_CL CL_FALSE
+    #endif
+#elif defined(__QNXNTO__)
+    #define  GL_VERSION_SUPPORT_CL CL_FALSE
+#else
+    #define  GL_VERSION_SUPPORT_CL CL_TRUE
+#endif
+
 #else
 /* GLES2 */
+#include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
+#define  GL_VERSION_SUPPORT_CL CL_FALSE
 #endif
+
+
+#if GL_VERSION_SUPPORT_CL
+typedef void (GL_APIENTRY PFNGLGETTEXIMAGEVIVPROC)(GLenum target, GLint level, GLenum format, GLenum type, GLvoid *pixels);
 
 /*****************************************************************************\
 |*                         Supporting functions                              *|
 \*****************************************************************************/
-
-size_t
-clfGetGLTypeSize(GLenum type)
-{
-    switch( type )
-    {
-    case GL_FLOAT:
-        return sizeof(GLfloat);
-    case GL_INT:
-        return sizeof(GLint);
-    case GL_UNSIGNED_INT:
-        return sizeof(GLuint);
-    case GL_SHORT:
-        return sizeof(GLshort);
-    case GL_UNSIGNED_SHORT:
-        return sizeof(GLushort);
-    case GL_BYTE:
-        return sizeof(GLbyte);
-    case GL_UNSIGNED_BYTE:
-        return sizeof(GLubyte);
-    case GL_HALF_FLOAT:
-        return sizeof(GLhalf);
-    default:
-        gcmASSERT(-1);/*unsupport data type */
-        return sizeof(GLfloat);
-    };
-}
-
-size_t
-clfGetCLTypeSize(GLenum type)
-{
-    switch( type )
-    {
-    case CL_FLOAT:
-        return sizeof(cl_float);
-    case CL_UNSIGNED_INT32:
-    case CL_SIGNED_INT32:
-        return sizeof(cl_int);
-    case CL_UNSIGNED_INT16:
-    case CL_SIGNED_INT16:
-        return sizeof(cl_short);
-    case CL_UNSIGNED_INT8:
-    case CL_SIGNED_INT8:
-        return sizeof(cl_char);
-    case CL_HALF_FLOAT:
-        return sizeof(cl_half);
-    default:
-        gcmASSERT(-1);/*unsupport data type */
-        return sizeof(GLfloat);
-    };
-}
 
 gctINT
 clfExecuteCommandAcquireGLObjects(
     clsCommand_PTR  Command
     )
 {
-    clsCommandAcquireGLObjects_PTR  acquireGLObjects;
+    clsCommandAcquireGLObjects_PTR  aqGLObj;
     gctUINT                         i;
     gctINT                          status = gcvSTATUS_OK;
 
@@ -104,55 +71,73 @@ clfExecuteCommandAcquireGLObjects(
 
     clmASSERT(Command->type == clvCOMMAND_ACQUIRE_GL_OBJECTS, CL_INVALID_VALUE);
 
-    acquireGLObjects = &Command->u.acquireGLObjects;
+    aqGLObj = &Command->u.acquireGLObjects;
 
-    for (i = 0; i < acquireGLObjects->numObjects; i++)
+    for (i = 0; i < aqGLObj->numObjects; i++)
     {
-        switch (acquireGLObjects->memObjects[i]->glObjType)
+        if (aqGLObj->memObjects[i]->flags != CL_MEM_WRITE_ONLY)
         {
-        case CL_GL_OBJECT_BUFFER:
+            switch (aqGLObj->memObjects[i]->glObjType)
             {
-                /* do nothing */
+            case CL_GL_OBJECT_BUFFER:
+                {
+                    /* data already process in main thread */
+                }
+                break;
+            case CL_GL_OBJECT_TEXTURE2D:
+            case CL_GL_OBJECT_TEXTURE3D:
+            case CL_GL_OBJECT_RENDERBUFFER:
+                {
+                    size_t origin[3] = { 0, 0, 0};
+                    size_t region[3] = {aqGLObj->memObjects[i]->u.image.width, aqGLObj->memObjects[i]->u.image.height, aqGLObj->memObjects[i]->u.image.depth};
+                    clsCommand      command;
+                    clsCommandWriteImage_PTR writeImage;
+                    command.objectType             = clvOBJECT_COMMAND;
+                    command.type                   = clvCOMMAND_WRITE_IMAGE;
+                    command.handler                = gcvNULL;
+                    command.outEvent               = gcvNULL;
+                    command.numEventsInWaitList    = 0;
+                    command.eventWaitList          = gcvNULL;
+
+                    writeImage                       = &command.u.writeImage;
+                    writeImage->image                = aqGLObj->memObjects[i];
+                    writeImage->blockingWrite         = CL_TRUE;
+                    writeImage->origin[0]            = origin[0];
+                    writeImage->origin[1]            = origin[1];
+                    writeImage->origin[2]            = origin[2];
+                    writeImage->region[0]            = region[0];
+                    writeImage->region[1]            = region[1];
+                    writeImage->region[2]            = region[2];
+                    writeImage->inputRowPitch        = aqGLObj->memObjects[i]->u.image.rowPitch;
+                    writeImage->inputSlicePitch      = aqGLObj->memObjects[i]->u.image.slicePitch;
+                    writeImage->ptr                  = aqGLObj->objectsDatas[i];
+                    clfExecuteCommandWriteImage(&command);
+                }
+                break;
+            case CL_GL_OBJECT_TEXTURE2D_ARRAY:
+                break;
+            case CL_GL_OBJECT_TEXTURE1D:
+                break;
+            case CL_GL_OBJECT_TEXTURE1D_ARRAY:
+                break;
+            case CL_GL_OBJECT_TEXTURE_BUFFER:
+                break;
+            default:
+                break;
             }
-            break;
-        case CL_GL_OBJECT_TEXTURE2D:
-            {
-                clfCLGLShareCreateImageData(Command->commandQueue->context, acquireGLObjects->memObjects[i], acquireGLObjects->objectsDatas[i]);
-            }
-            break;
-        case CL_GL_OBJECT_TEXTURE3D:
-            {
-                clfCLGLShareCreateImageData(Command->commandQueue->context, acquireGLObjects->memObjects[i], acquireGLObjects->objectsDatas[i]);
-            }
-            break;
-        case CL_GL_OBJECT_RENDERBUFFER:
-            {
-                clfCLGLShareCreateImageData(Command->commandQueue->context, acquireGLObjects->memObjects[i], acquireGLObjects->objectsDatas[i]);
-            }
-            break;
-        case CL_GL_OBJECT_TEXTURE2D_ARRAY:
-            break;
-        case CL_GL_OBJECT_TEXTURE1D:
-            break;
-        case CL_GL_OBJECT_TEXTURE1D_ARRAY:
-            break;
-        case CL_GL_OBJECT_TEXTURE_BUFFER:
-            break;
-        default:
-            break;
+        }
+        if (aqGLObj->objectsDatas[i] != gcvNULL)
+        {
+            gcoOS_Free(gcvNULL, aqGLObj->objectsDatas[i]);
         }
     }
 
-    for (i = 0; i < acquireGLObjects->numObjects; i++)
+    for (i = 0; i < aqGLObj->numObjects; i++)
     {
-        clRetainMemObject(acquireGLObjects->memObjects[i]);
+        clfRetainMemObject(aqGLObj->memObjects[i]);
     }
 
-    gcoOS_Free(gcvNULL, acquireGLObjects->w);
-    gcoOS_Free(gcvNULL, acquireGLObjects->h);
-    gcoOS_Free(gcvNULL, acquireGLObjects->d);
-    gcoOS_Free(gcvNULL, acquireGLObjects->imFormats);
-    gcoOS_Free(gcvNULL, acquireGLObjects->objectsDatas);
+    gcoOS_Free(gcvNULL, aqGLObj->memObjects);
 
 OnError:
     gcmFOOTER_ARG("%d", status);
@@ -166,7 +151,7 @@ clfExecuteCommandReleaseGLObjects(
     clsCommand_PTR  Command
     )
 {
-    clsCommandReleaseGLObjects_PTR  releaseGLObjects;
+    clsCommandReleaseGLObjects_PTR  rlsGLObj;
     gctUINT                         i;
     gctINT                          status = gcvSTATUS_OK;
 
@@ -176,74 +161,22 @@ clfExecuteCommandReleaseGLObjects(
 
     clmASSERT(Command->type == clvCOMMAND_RELEASE_GL_OBJECTS, CL_INVALID_VALUE);
 
-    releaseGLObjects = &Command->u.releaseGLObjects;
+    rlsGLObj = &Command->u.releaseGLObjects;
 
-    for (i = 0; i < releaseGLObjects->numObjects; i++)
+    for (i = 0; i < rlsGLObj->numObjects; i++)
     {
-        switch (releaseGLObjects->memObjects[i]->glObjType)
+        switch (rlsGLObj->memObjects[i]->glObjType)
         {
         case CL_GL_OBJECT_BUFFER:
             break;
         case CL_GL_OBJECT_TEXTURE2D:
-            {
-                size_t origin[3] = { 0, 0, 0/*releaseGLObjects->x[i], releaseGLObjects->y[i], releaseGLObjects->z[i]*/};
-                size_t region[3] = {releaseGLObjects->w[i], releaseGLObjects->h[i], releaseGLObjects->d[i]};
-                clsCommand      command;
-                clsCommandReadImage_PTR readImage;
-                command.objectType             = clvOBJECT_COMMAND;
-                command.type                   = clvCOMMAND_READ_IMAGE;
-                command.handler                = gcvNULL;
-                command.outEvent               = gcvNULL;
-                command.numEventsInWaitList    = 0;
-                command.eventWaitList          = gcvNULL;
-
-                readImage                       = &command.u.readImage;
-                readImage->image                = releaseGLObjects->memObjects[i];
-                readImage->blockingRead         = CL_TRUE;
-                readImage->origin[0]            = origin[0];
-                readImage->origin[1]            = origin[1];
-                readImage->origin[2]            = origin[2];
-                readImage->region[0]            = region[0];
-                readImage->region[1]            = region[1];
-                readImage->region[2]            = region[2];
-                readImage->rowPitch             = region[0]*releaseGLObjects->elementSize[i];
-                readImage->slicePitch           = 0;
-                readImage->ptr                  = releaseGLObjects->objectsDatas[i];
-                clfExecuteCommandReadImage(&command);
-            }
-            break;
         case CL_GL_OBJECT_TEXTURE3D:
-            {
-                size_t origin[3] = { 0, 0, 0/*releaseGLObjects->x[i], releaseGLObjects->y[i], releaseGLObjects->z[i]*/};
-                size_t region[3] = {releaseGLObjects->w[i], releaseGLObjects->h[i], releaseGLObjects->d[i]};
-                clsCommand      command;
-                clsCommandReadImage_PTR readImage;
-                command.objectType             = clvOBJECT_COMMAND;
-                command.type                   = clvCOMMAND_READ_IMAGE;
-                command.handler                = gcvNULL;
-                command.outEvent               = gcvNULL;
-                command.numEventsInWaitList    = 0;
-                command.eventWaitList          = gcvNULL;
-
-                readImage                       = &command.u.readImage;
-                readImage->image                = releaseGLObjects->memObjects[i];
-                readImage->blockingRead         = CL_TRUE;
-                readImage->origin[0]            = origin[0];
-                readImage->origin[1]            = origin[1];
-                readImage->origin[2]            = origin[2];
-                readImage->region[0]            = region[0];
-                readImage->region[1]            = region[1];
-                readImage->region[2]            = region[2];
-                readImage->rowPitch             = region[0]*releaseGLObjects->elementSize[i];
-                readImage->slicePitch           = readImage->rowPitch*region[1];
-                readImage->ptr                  = releaseGLObjects->objectsDatas[i];
-                clfExecuteCommandReadImage(&command);
-            }
-            break;
         case CL_GL_OBJECT_RENDERBUFFER:
+            if ((rlsGLObj->memObjects[i]->flags != CL_MEM_READ_ONLY)
+                && (rlsGLObj->objectsDatas[i] != gcvNULL))
             {
-                size_t origin[3] = { 0, 0, 0/*releaseGLObjects->x[i], releaseGLObjects->y[i], releaseGLObjects->z[i]*/};
-                size_t region[3] = {releaseGLObjects->w[i], releaseGLObjects->h[i], releaseGLObjects->d[i]};
+                size_t origin[3] = { 0, 0, 0};
+                size_t region[3] = {rlsGLObj->memObjects[i]->u.image.width, rlsGLObj->memObjects[i]->u.image.height, rlsGLObj->memObjects[i]->u.image.depth};
                 clsCommand      command;
                 clsCommandReadImage_PTR readImage;
                 command.objectType             = clvOBJECT_COMMAND;
@@ -254,7 +187,7 @@ clfExecuteCommandReleaseGLObjects(
                 command.eventWaitList          = gcvNULL;
 
                 readImage                       = &command.u.readImage;
-                readImage->image                = releaseGLObjects->memObjects[i];
+                readImage->image                = rlsGLObj->memObjects[i];
                 readImage->blockingRead         = CL_TRUE;
                 readImage->origin[0]            = origin[0];
                 readImage->origin[1]            = origin[1];
@@ -262,9 +195,9 @@ clfExecuteCommandReleaseGLObjects(
                 readImage->region[0]            = region[0];
                 readImage->region[1]            = region[1];
                 readImage->region[2]            = region[2];
-                readImage->rowPitch             = region[0]*releaseGLObjects->elementSize[i];
-                readImage->slicePitch           = 0;
-                readImage->ptr                  = releaseGLObjects->objectsDatas[i];
+                readImage->rowPitch             = rlsGLObj->memObjects[i]->u.image.rowPitch;
+                readImage->slicePitch           = rlsGLObj->memObjects[i]->u.image.slicePitch;
+                readImage->ptr                  = rlsGLObj->objectsDatas[i];
                 clfExecuteCommandReadImage(&command);
             }
             break;
@@ -281,17 +214,12 @@ clfExecuteCommandReleaseGLObjects(
         }
     }
 
-    for (i = 0; i < releaseGLObjects->numObjects; i++)
+    for (i = 0; i < rlsGLObj->numObjects; i++)
     {
-        clReleaseMemObject(releaseGLObjects->memObjects[i]);
+        clfReleaseMemObject(rlsGLObj->memObjects[i]);
     }
 
-    gcoOS_Free(gcvNULL, releaseGLObjects->w);
-    gcoOS_Free(gcvNULL, releaseGLObjects->h);
-    gcoOS_Free(gcvNULL, releaseGLObjects->d);
-    gcoOS_Free(gcvNULL, releaseGLObjects->imFormats);
-    gcoOS_Free(gcvNULL, releaseGLObjects->elementSize);
-    gcoOS_Free(gcvNULL, releaseGLObjects->objectsDatas);
+    gcoOS_Free(gcvNULL, rlsGLObj->memObjects);
 
 OnError:
     gcmFOOTER_ARG("%d", status);
@@ -311,308 +239,324 @@ static void clfQueryGLEnum2Enum(GLint internalFormat, GLint textureType, cl_chan
     GLenum glFormat = 0;
     /* Translate format information. */
     if ( internalFormat != 0)
-    switch (internalFormat)
     {
-    case GL_R8:
-    case GL_R8UI:
-        dataFormat = CL_R;
-        dataType = CL_UNSIGNED_INT8;
-        channelCount = 1;
-        glFormat = GL_RED;
-        glType = GL_UNSIGNED_BYTE;
-        break;
-    case GL_R8_SNORM:
-    case GL_R8I:
-        dataFormat = CL_R;
-        dataType = CL_SIGNED_INT8;
-        channelCount = 1;
-        glFormat = GL_RED;
-        glType = GL_BYTE;
-        break;
-    case GL_R16F:
-        dataFormat = CL_R;
-        dataType = CL_HALF_FLOAT;
-        channelCount = 1;
-        glFormat = GL_RED;
-        glType = GL_SHORT;
-        break;
-    case GL_R32F:
-        dataFormat = CL_R;
-        dataType = CL_FLOAT;
-        channelCount = 1;
-        glFormat = GL_RED;
-        glType = GL_FLOAT;
-        break;
-    case GL_R16UI:
-        dataFormat = CL_R;
-        dataType = CL_UNSIGNED_INT16;
-        channelCount = 1;
-        glFormat = GL_RED;
-        glType = GL_UNSIGNED_SHORT;
-        break;
-    case GL_R16I:
-        dataFormat = CL_R;
-        dataType = CL_SIGNED_INT16;
-        channelCount = 1;
-        glFormat = GL_RED;
-        glType = GL_SHORT;
-        break;
-    case GL_R32UI:
-        dataFormat = CL_R;
-        dataType = CL_UNSIGNED_INT32;
-        channelCount = 1;
-        glFormat = GL_RED;
-        glType = GL_UNSIGNED_INT;
-        break;
-    case GL_R32I:
-        dataFormat = CL_R;
-        dataType = CL_SIGNED_INT32;
-        channelCount = 1;
-        glFormat = GL_RED;
-        glType = GL_INT;
-        break;
-    case GL_RG8:
-    case GL_RG8UI:
-        dataFormat = CL_RG;
-        dataType = CL_UNSIGNED_INT8;
-        channelCount = 2;
-        glFormat = GL_RG;
-        glType = GL_UNSIGNED_BYTE;
-        break;
-    case GL_RG8_SNORM:
-    case GL_RG8I:
-        dataFormat = CL_RG;
-        dataType = CL_SIGNED_INT8;
-        channelCount = 2;
-        glFormat = GL_RG;
-        glType = GL_BYTE;
-        break;
-    case GL_RG16F:
-        dataFormat = CL_RG;
-        dataType = CL_HALF_FLOAT;
-        channelCount = 2;
-        glFormat = GL_RG;
-        glType = GL_HALF_FLOAT;
-        break;
-    case GL_RG32F:
-        dataFormat = CL_RG;
-        dataType = CL_FLOAT;
-        channelCount = 2;
-        glFormat = GL_RG;
-        glType = GL_FLOAT;
-        break;
-    case GL_RG16UI:
-        dataFormat = CL_RG;
-        dataType = CL_UNSIGNED_INT16;
-        channelCount = 2;
-        glFormat = GL_RG;
-        glType = GL_UNSIGNED_SHORT;
-        break;
-    case GL_RG16I:
-        dataFormat = CL_RG;
-        dataType = CL_SIGNED_INT16;
-        channelCount = 2;
-        glFormat = GL_RG;
-        glType = GL_SHORT;
-        break;
-    case GL_RG32UI:
-        dataFormat = CL_RG;
-        dataType = CL_UNSIGNED_INT32;
-        channelCount = 2;
-        glFormat = GL_RG;
-        glType = GL_UNSIGNED_INT;
-        break;
-    case GL_RG32I:
-        dataFormat = CL_RG;
-        dataType = CL_SIGNED_INT32;
-        channelCount = 2;
-        glFormat = GL_RG;
-        glType = GL_INT;
-        break;
-    case GL_RGB8:
-    case GL_RGB8UI:
-        dataFormat = CL_RGB;
-        dataType = CL_UNSIGNED_INT8;
-        channelCount = 3;
-        glFormat = GL_RGB;
-        glType = GL_UNSIGNED_BYTE;
-        break;
-    case GL_SRGB8:
-    case GL_RGB8I:
-        dataFormat = CL_RGB;
-        dataType = CL_SIGNED_INT8;
-        channelCount = 3;
-        glFormat = GL_RGB;
-        glType = GL_BYTE;
-        break;
-    case GL_RGB565:
-        dataFormat = CL_RGBx;
-        dataType = CL_UNORM_SHORT_565;
-        channelCount = 1;
-        glFormat = GL_RGB;
-        glType = GL_UNSIGNED_SHORT_5_6_5;
-        break;
-    case GL_RGB8_SNORM:
-        dataFormat = CL_RGB;
-        dataType = CL_SIGNED_INT8;
-        channelCount = 3;
-        glFormat = GL_RGB;
-        glType = GL_BYTE;
-        break;
-    case GL_RGB16F:
-        dataFormat = CL_RGB;
-        dataType = CL_HALF_FLOAT;
-        channelCount = 3;
-        glFormat = GL_RGB;
-        glType = GL_HALF_FLOAT;
-        break;
-    case GL_RGB32F:
-        dataFormat = CL_RGB;
-        dataType = CL_FLOAT;
-        channelCount = 3;
-        glFormat = GL_RGB;
-        glType = GL_FLOAT;
-        break;
-    case GL_RGB16UI:
-        dataFormat = CL_RGB;
-        dataType = CL_UNSIGNED_INT16;
-        channelCount = 3;
-        glFormat = GL_RGB;
-        glType = GL_UNSIGNED_SHORT;
-        break;
-    case GL_RGB16I:
-        dataFormat = CL_RGB;
-        dataType = CL_SIGNED_INT16;
-        glFormat = GL_RGB;
-        glType = GL_SHORT;
-        channelCount = 3;
-        break;
-    case GL_RGB32UI:
-        dataFormat = CL_RGB;
-        dataType = CL_UNSIGNED_INT32;
-        channelCount = 3;
-        break;
-    case GL_RGB32I:
-        dataFormat = CL_RGB;
-        dataType = CL_SIGNED_INT32;
-        channelCount = 3;
-        glFormat = GL_RGB;
-        glType = GL_INT;
-        break;
-    case GL_RGBA8:
-    case GL_SRGB8_ALPHA8:
-    case GL_RGBA8UI:
-        dataFormat = CL_RGBA;
-        dataType = CL_UNSIGNED_INT8;
-        channelCount = 4;
-        glFormat = GL_RGBA;
-        glType = GL_UNSIGNED_BYTE;
-        break;
-    case GL_RGBA8_SNORM:
-    case GL_RGBA8I:
-        dataFormat = CL_RGBA;
-        dataType = CL_SIGNED_INT8;
-        channelCount = 4;
-        glFormat = GL_RGBA;
-        glType = GL_BYTE;
-        break;
-    case GL_RGBA16F:
-        dataFormat = CL_RGBA;
-        dataType = CL_HALF_FLOAT;
-        channelCount = 4;
-        glFormat = GL_RGBA;
-        glType = GL_HALF_FLOAT;
-        break;
-    case GL_RGBA32F:
-        dataFormat = CL_RGBA;
-        dataType = CL_FLOAT;
-        channelCount = 4;
-        glFormat = GL_RGBA;
-        glType = GL_FLOAT;
-        break;
-    case GL_RGBA16UI:
-        dataFormat = CL_RGBA;
-        dataType = CL_UNSIGNED_INT16;
-        channelCount = 4;
-        glFormat = GL_RGBA;
-        glType = GL_UNSIGNED_SHORT;
-        break;
-    case GL_RGBA16I:
-        dataFormat = CL_RGBA;
-        dataType = CL_SIGNED_INT16;
-        channelCount = 4;
-        glFormat = GL_RGBA;
-        glType = GL_SHORT;
-        break;
-    case GL_RGBA32UI:
-        dataFormat = CL_RGBA;
-        dataType = CL_UNSIGNED_INT32;
-        channelCount = 4;
-        glFormat = GL_RGBA;
-        glType = GL_UNSIGNED_INT;
-        break;
-    case GL_RGBA32I:
-        dataFormat = CL_RGBA;
-        dataType = CL_SIGNED_INT32;
-        channelCount = 4;
-        glFormat = GL_RGBA;
-        glType = GL_INT;
-        break;
-    case GL_RGB10_A2UI:
-    case GL_RGB10_A2:
-    case GL_RGBA4:
-    case GL_RGB5_A1:
-    case GL_R11F_G11F_B10F:
-    case GL_RGB9_E5:
-    default:
-        gcmASSERT(internalFormat); /*unsupport format in CL*/
-        break;
+        switch (internalFormat)
+        {
+        case GL_R8:
+        case GL_R8UI:
+            dataFormat = CL_R;
+            dataType = CL_UNSIGNED_INT8;
+            channelCount = 1;
+            glFormat = GL_RED;
+            glType = GL_UNSIGNED_BYTE;
+            break;
+        case GL_R8_SNORM:
+        case GL_R8I:
+            dataFormat = CL_R;
+            dataType = CL_SIGNED_INT8;
+            channelCount = 1;
+            glFormat = GL_RED;
+            glType = GL_BYTE;
+            break;
+        case GL_R16F:
+            dataFormat = CL_R;
+            dataType = CL_HALF_FLOAT;
+            channelCount = 1;
+            glFormat = GL_RED;
+            glType = GL_SHORT;
+            break;
+        case GL_R32F:
+            dataFormat = CL_R;
+            dataType = CL_FLOAT;
+            channelCount = 1;
+            glFormat = GL_RED;
+            glType = GL_FLOAT;
+            break;
+        case GL_R16UI:
+            dataFormat = CL_R;
+            dataType = CL_UNSIGNED_INT16;
+            channelCount = 1;
+            glFormat = GL_RED;
+            glType = GL_UNSIGNED_SHORT;
+            break;
+        case GL_R16I:
+            dataFormat = CL_R;
+            dataType = CL_SIGNED_INT16;
+            channelCount = 1;
+            glFormat = GL_RED;
+            glType = GL_SHORT;
+            break;
+        case GL_R32UI:
+            dataFormat = CL_R;
+            dataType = CL_UNSIGNED_INT32;
+            channelCount = 1;
+            glFormat = GL_RED;
+            glType = GL_UNSIGNED_INT;
+            break;
+        case GL_R32I:
+            dataFormat = CL_R;
+            dataType = CL_SIGNED_INT32;
+            channelCount = 1;
+            glFormat = GL_RED;
+            glType = GL_INT;
+            break;
+        case GL_RG8:
+        case GL_RG8UI:
+            dataFormat = CL_RG;
+            dataType = CL_UNSIGNED_INT8;
+            channelCount = 2;
+            glFormat = GL_RG;
+            glType = GL_UNSIGNED_BYTE;
+            break;
+        case GL_RG8_SNORM:
+        case GL_RG8I:
+            dataFormat = CL_RG;
+            dataType = CL_SIGNED_INT8;
+            channelCount = 2;
+            glFormat = GL_RG;
+            glType = GL_BYTE;
+            break;
+        case GL_RG16F:
+            dataFormat = CL_RG;
+            dataType = CL_HALF_FLOAT;
+            channelCount = 2;
+            glFormat = GL_RG;
+            glType = GL_HALF_FLOAT;
+            break;
+        case GL_RG32F:
+            dataFormat = CL_RG;
+            dataType = CL_FLOAT;
+            channelCount = 2;
+            glFormat = GL_RG;
+            glType = GL_FLOAT;
+            break;
+        case GL_RG16UI:
+            dataFormat = CL_RG;
+            dataType = CL_UNSIGNED_INT16;
+            channelCount = 2;
+            glFormat = GL_RG;
+            glType = GL_UNSIGNED_SHORT;
+            break;
+        case GL_RG16I:
+            dataFormat = CL_RG;
+            dataType = CL_SIGNED_INT16;
+            channelCount = 2;
+            glFormat = GL_RG;
+            glType = GL_SHORT;
+            break;
+        case GL_RG32UI:
+            dataFormat = CL_RG;
+            dataType = CL_UNSIGNED_INT32;
+            channelCount = 2;
+            glFormat = GL_RG;
+            glType = GL_UNSIGNED_INT;
+            break;
+        case GL_RG32I:
+            dataFormat = CL_RG;
+            dataType = CL_SIGNED_INT32;
+            channelCount = 2;
+            glFormat = GL_RG;
+            glType = GL_INT;
+            break;
+        case GL_RGB8:
+        case GL_RGB8UI:
+            dataFormat = CL_RGB;
+            dataType = CL_UNSIGNED_INT8;
+            channelCount = 3;
+            glFormat = GL_RGB;
+            glType = GL_UNSIGNED_BYTE;
+            break;
+        case GL_SRGB8:
+        case GL_RGB8I:
+            dataFormat = CL_RGB;
+            dataType = CL_SIGNED_INT8;
+            channelCount = 3;
+            glFormat = GL_RGB;
+            glType = GL_BYTE;
+            break;
+        case GL_RGB565:
+            dataFormat = CL_RGBx;
+            dataType = CL_UNORM_SHORT_565;
+            channelCount = 1;
+            glFormat = GL_RGB;
+            glType = GL_UNSIGNED_SHORT_5_6_5;
+            break;
+        case GL_RGB8_SNORM:
+            dataFormat = CL_RGB;
+            dataType = CL_SIGNED_INT8;
+            channelCount = 3;
+            glFormat = GL_RGB;
+            glType = GL_BYTE;
+            break;
+        case GL_RGB16F:
+            dataFormat = CL_RGB;
+            dataType = CL_HALF_FLOAT;
+            channelCount = 3;
+            glFormat = GL_RGB;
+            glType = GL_HALF_FLOAT;
+            break;
+        case GL_RGB32F:
+            dataFormat = CL_RGB;
+            dataType = CL_FLOAT;
+            channelCount = 3;
+            glFormat = GL_RGB;
+            glType = GL_FLOAT;
+            break;
+        case GL_RGB16UI:
+            dataFormat = CL_RGB;
+            dataType = CL_UNSIGNED_INT16;
+            channelCount = 3;
+            glFormat = GL_RGB;
+            glType = GL_UNSIGNED_SHORT;
+            break;
+        case GL_RGB16I:
+            dataFormat = CL_RGB;
+            dataType = CL_SIGNED_INT16;
+            glFormat = GL_RGB;
+            glType = GL_SHORT;
+            channelCount = 3;
+            break;
+        case GL_RGB32UI:
+            dataFormat = CL_RGB;
+            dataType = CL_UNSIGNED_INT32;
+            channelCount = 3;
+            break;
+        case GL_RGB32I:
+            dataFormat = CL_RGB;
+            dataType = CL_SIGNED_INT32;
+            channelCount = 3;
+            glFormat = GL_RGB;
+            glType = GL_INT;
+            break;
+        case GL_RGBA8:
+        case GL_SRGB8_ALPHA8:
+        case GL_RGBA8UI:
+            dataFormat = CL_RGBA;
+            dataType = CL_UNSIGNED_INT8;
+            channelCount = 4;
+            glFormat = GL_RGBA;
+            glType = GL_UNSIGNED_BYTE;
+            break;
+        case GL_RGBA8_SNORM:
+        case GL_RGBA8I:
+            dataFormat = CL_RGBA;
+            dataType = CL_SIGNED_INT8;
+            channelCount = 4;
+            glFormat = GL_RGBA;
+            glType = GL_BYTE;
+            break;
+        case GL_RGBA16F:
+            dataFormat = CL_RGBA;
+            dataType = CL_HALF_FLOAT;
+            channelCount = 4;
+            glFormat = GL_RGBA;
+            glType = GL_HALF_FLOAT;
+            break;
+        case GL_RGBA32F:
+            dataFormat = CL_RGBA;
+            dataType = CL_FLOAT;
+            channelCount = 4;
+            glFormat = GL_RGBA;
+            glType = GL_FLOAT;
+            break;
+        case GL_RGBA16UI:
+            dataFormat = CL_RGBA;
+            dataType = CL_UNSIGNED_INT16;
+            channelCount = 4;
+            glFormat = GL_RGBA;
+            glType = GL_UNSIGNED_SHORT;
+            break;
+        case GL_RGBA16I:
+            dataFormat = CL_RGBA;
+            dataType = CL_SIGNED_INT16;
+            channelCount = 4;
+            glFormat = GL_RGBA;
+            glType = GL_SHORT;
+            break;
+        case GL_RGBA32UI:
+            dataFormat = CL_RGBA;
+            dataType = CL_UNSIGNED_INT32;
+            channelCount = 4;
+            glFormat = GL_RGBA;
+            glType = GL_UNSIGNED_INT;
+            break;
+        case GL_RGBA32I:
+            dataFormat = CL_RGBA;
+            dataType = CL_SIGNED_INT32;
+            channelCount = 4;
+            glFormat = GL_RGBA;
+            glType = GL_INT;
+            break;
+        case GL_RGB10_A2UI:
+        case GL_RGB10_A2:
+        case GL_RGBA4:
+        case GL_RGB5_A1:
+        case GL_R11F_G11F_B10F:
+        case GL_RGB9_E5:
+        default:
+            gcmASSERT(internalFormat); /*unsupport format in CL*/
+            break;
+        }
     }
 #define GL_TEXTURE_1D               0x0DE0
 #define GL_TEXTURE_1D_ARRAY               0x8C18
     if ( textureType != 0 )
-    switch (textureType)
     {
-    case GL_TEXTURE_1D:
-        imType = CL_MEM_OBJECT_IMAGE1D;
-        break;
-    case GL_TEXTURE_1D_ARRAY:
-        imType = CL_MEM_OBJECT_IMAGE1D_ARRAY;
-        break;
-    case GL_TEXTURE_2D:
-    case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
-    case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
-    case GL_TEXTURE_CUBE_MAP_POSITIVE_Y:
-    case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
-    case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
-    case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
-        imType = CL_MEM_OBJECT_IMAGE2D;
-        break;
-    case GL_TEXTURE_2D_ARRAY:
-        imType = CL_MEM_OBJECT_IMAGE2D_ARRAY;
-        break;
-    case GL_TEXTURE_3D:
-        imType = CL_MEM_OBJECT_IMAGE3D;
-        break;
-    default:
-        gcmASSERT(textureType); /*unsupport textureType in CL*/
-        break;
+        switch (textureType)
+        {
+        case GL_TEXTURE_1D:
+            imType = CL_MEM_OBJECT_IMAGE1D;
+            break;
+        case GL_TEXTURE_1D_ARRAY:
+            imType = CL_MEM_OBJECT_IMAGE1D_ARRAY;
+            break;
+        case GL_TEXTURE_2D:
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_Y:
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
+        case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
+        case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
+            imType = CL_MEM_OBJECT_IMAGE2D;
+            break;
+        case GL_TEXTURE_2D_ARRAY:
+            imType = CL_MEM_OBJECT_IMAGE2D_ARRAY;
+            break;
+        case GL_TEXTURE_3D:
+            imType = CL_MEM_OBJECT_IMAGE3D;
+            break;
+        default:
+            gcmASSERT(textureType); /*unsupport textureType in CL*/
+            break;
+        }
     }
 
     if(textureType != 0 && retImType != gcvNULL)
+    {
         *retImType = imType;
+    }
     if(internalFormat != 0)
     {
         if ( retCLdataType != gcvNULL)
+        {
             *retCLdataType = dataType;
+        }
         if ( retCLdataFormat != gcvNULL)
+        {
             *retCLdataFormat = dataFormat;
+        }
         if ( retChannelCount != gcvNULL)
+        {
             *retChannelCount = channelCount;
+        }
         if ( retGLType != gcvNULL)
+        {
             *retGLType = glType;
+        }
         if ( retGLFormat != gcvNULL)
+        {
             *retGLFormat = glFormat;
+        }
     }
 
 }
@@ -623,6 +567,8 @@ CL_API_ENTRY cl_event CL_API_CALL clCreateEventFromGLsyncKHR(cl_context context,
     cl_GLsync sync,
     cl_int * errcode_ret)
 {
+    gcmDUMP_API("${OCL clCreateEventFromGLsyncKHR}");
+    VCL_TRACE_API(CreateEventFromGLsyncKHR_Pre)(context, sync, errcode_ret);
     /* note: empty now just to pass build */
     return gcvNULL;
 }
@@ -644,6 +590,8 @@ clCreateFromGLBuffer(
 
     gcmHEADER_ARG("Context=0x%x Flags=0x%x BufObj=%u ",
                    Context, Flags, BufObj);
+    gcmDUMP_API("${OCL clCreateFromGLBuffer %s, 0x%x}", Context, Flags);
+    VCL_TRACE_API(CreateFromGLBuffer_Pre)(Context, Flags, BufObj, ErrcodeRet);
 
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
@@ -672,6 +620,8 @@ clCreateFromGLBuffer(
     {
         *ErrcodeRet = CL_SUCCESS;
     }
+
+    VCL_TRACE_API(CreateFromGLBuffer_Post)(Context, Flags, BufObj, ErrcodeRet, buffer);
     gcmFOOTER_ARG("%d buffer=0x%x",
                   CL_SUCCESS, buffer);
     return buffer;
@@ -685,13 +635,14 @@ OnError:
 
     if(buffer != gcvNULL)
     {
-        clReleaseMemObject(buffer);
+        clfReleaseMemObject(buffer);
     }
 
     gcmFOOTER_ARG("%d", status);
     return gcvNULL;
 }
 
+#if BUILD_OPENCL_12
 CL_API_ENTRY cl_mem CL_API_CALL
 clCreateFromGLTexture(
     cl_context      Context,
@@ -709,6 +660,8 @@ clCreateFromGLTexture(
     GLint           textureFormat      = 0;
     cl_channel_order  realCLFormat;
     cl_channel_type   realCLType;
+    GLenum          realGLFormat;
+    GLenum          realGLType;
     clsMem_PTR      image = gcvNULL;
     cl_image_format imageFormat;
     cl_image_desc   imageDesc;
@@ -718,6 +671,8 @@ clCreateFromGLTexture(
 
     gcmHEADER_ARG("Context=0x%x Flags=%u Target=%u MipLevel=%u Texture=%u",
                    Context, Flags, Target, MipLevel, Texture);
+    gcmDUMP_API("${OCL clCreateFromGLTexture %s, 0x%x}", Context, Flags);
+    VCL_TRACE_API(CreateFromGLTexture_Pre)(Context, Flags, Target, MipLevel, Texture, ErrcodeRet);
 
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
@@ -805,7 +760,7 @@ clCreateFromGLTexture(
     }
     glGetTexLevelParameteriv(Target, MipLevel, GL_TEXTURE_INTERNAL_FORMAT, &textureFormat );
 
-    clfQueryGLEnum2Enum(textureFormat, Target, &realCLType, &realCLFormat, gcvNULL,gcvNULL, gcvNULL, &clImageType);
+    clfQueryGLEnum2Enum(textureFormat, Target, &realCLType, &realCLFormat, gcvNULL,&realGLType, &realGLFormat, &clImageType);
 
 
     imageFormat.image_channel_order = realCLFormat;
@@ -822,12 +777,14 @@ clCreateFromGLTexture(
     imageDesc.image_row_pitch = 0;
     imageDesc.image_slice_pitch = 0;
 
-    image = clfCLGLShareCreateImageWrapper(Context, Flags, &imageFormat, &imageDesc, gcvNULL, ErrcodeRet);
+    image = clCreateImage(Context, Flags, &imageFormat, &imageDesc, gcvNULL, ErrcodeRet);
 
-    image->fromGL               = gcvTRUE;
-    image->glObj                = Texture;
-    image->glObjType            = glObjType;
-    image->glTexTarget          = Target;
+    image->fromGL                = gcvTRUE;
+    image->glObj                 = Texture;
+    image->glObjType             = glObjType;
+    image->u.image.textureTarget = Target;
+    image->u.image.glFormat      = realGLFormat;
+    image->u.image.glType        = realGLType;
 
     if (  Target == GL_TEXTURE_CUBE_MAP_POSITIVE_X
         ||Target == GL_TEXTURE_CUBE_MAP_POSITIVE_Y
@@ -842,6 +799,8 @@ clCreateFromGLTexture(
     {
         glBindTexture(Target, origTex);
     }
+
+    VCL_TRACE_API(CreateFromGLTexture_Post)(Context, Flags, Target, MipLevel, Texture, ErrcodeRet, image);
     gcmFOOTER_ARG("%d image=0x%x",
                   CL_SUCCESS, image);
     return image;
@@ -854,6 +813,7 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return gcvNULL;
 }
+#endif
 
 CL_API_ENTRY cl_mem CL_API_CALL
 clCreateFromGLTexture2D(
@@ -871,14 +831,20 @@ clCreateFromGLTexture2D(
     GLint           textureFormat      = 0;
     cl_channel_order  realCLFormat;
     cl_channel_type   realCLType;
+    GLenum          realGLFormat;
+    GLenum          realGLType;
     clsMem_PTR      image = gcvNULL;
     cl_image_format imageFormat;
+#if BUILD_OPENCL_12
     cl_image_desc   imageDesc;
+#endif
     cl_gl_object_type  glObjType;
     GLint          origTex = 0;
 
     gcmHEADER_ARG("Context=0x%x Flags=%u Target=%u MipLevel=%u Texture=%u",
                    Context, Flags, Target, MipLevel, Texture);
+    gcmDUMP_API("${OCL clCreateFromGLTexture2D %s, 0x%x}", Context, Flags);
+    VCL_TRACE_API(CreateFromGLTexture2D_Pre)(Context, Flags, Target, MipLevel, Texture, ErrcodeRet);
 
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
@@ -957,11 +923,11 @@ clCreateFromGLTexture2D(
     glGetTexLevelParameteriv(Target, MipLevel, GL_TEXTURE_HEIGHT, &realHeight );
     glGetTexLevelParameteriv(Target, MipLevel, GL_TEXTURE_INTERNAL_FORMAT, &textureFormat );
 
-    clfQueryGLEnum2Enum(textureFormat, 0, &realCLType, &realCLFormat, gcvNULL, gcvNULL, gcvNULL,gcvNULL);
+    clfQueryGLEnum2Enum(textureFormat, Target, &realCLType, &realCLFormat, gcvNULL,&realGLType, &realGLFormat, gcvNULL);
 
     imageFormat.image_channel_order = realCLFormat;
     imageFormat.image_channel_data_type = realCLType;
-
+#if BUILD_OPENCL_12
     imageDesc.image_width = realWidth;
     imageDesc.image_height = realHeight;
     imageDesc.image_depth = 1;
@@ -972,13 +938,18 @@ clCreateFromGLTexture2D(
     imageDesc.image_type = CL_MEM_OBJECT_IMAGE2D;
     imageDesc.image_row_pitch = 0;
     imageDesc.image_slice_pitch = 0;
-
-    image = clfCLGLShareCreateImageWrapper(Context, Flags, &imageFormat, &imageDesc, gcvNULL, ErrcodeRet);
+    image = clCreateImage(Context, Flags, &imageFormat, &imageDesc, gcvNULL, ErrcodeRet);
+#else
+    image = clCreateImage2D(Context, Flags, &imageFormat, realWidth, realHeight, 0, gcvNULL, ErrcodeRet);
+#endif
 
     image->fromGL               = gcvTRUE;
     image->glObj                = Texture;
     image->glObjType            = glObjType;
-    image->glTexTarget          = Target;
+    image->u.image.textureTarget = Target;
+    image->u.image.glFormat      = realGLFormat;
+    image->u.image.glType        = realGLType;
+
     if (  Target == GL_TEXTURE_CUBE_MAP_POSITIVE_X
         ||Target == GL_TEXTURE_CUBE_MAP_POSITIVE_Y
         ||Target == GL_TEXTURE_CUBE_MAP_POSITIVE_Z
@@ -993,6 +964,7 @@ clCreateFromGLTexture2D(
         glBindTexture(Target, origTex);
     }
 
+    VCL_TRACE_API(CreateFromGLTexture2D_Post)(Context, Flags, Target, MipLevel, Texture, ErrcodeRet, image);
     gcmFOOTER_ARG("%d image=0x%x",
                   CL_SUCCESS, image);
     return image;
@@ -1023,13 +995,19 @@ clCreateFromGLTexture3D(
     GLint           textureFormat      = 0;
     cl_channel_order  realCLFormat;
     cl_channel_type   realCLType;
+    GLenum          realGLFormat;
+    GLenum          realGLType;
     clsMem_PTR      image = gcvNULL;
     cl_image_format imageFormat;
+#if BUILD_OPENCL_12
     cl_image_desc   imageDesc;
+#endif
     GLint          origTex = 0;
 
     gcmHEADER_ARG("Context=0x%x Flags=%u Target=%u MipLevel=%u Texture=%u",
                    Context, Flags, Target, MipLevel, Texture);
+    gcmDUMP_API("${OCL clCreateFromGLTexture3D %s, 0x%x}", Context, Flags);
+    VCL_TRACE_API(CreateFromGLTexture3D_Pre)(Context, Flags, Target, MipLevel, Texture, ErrcodeRet);
 
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
@@ -1077,11 +1055,12 @@ clCreateFromGLTexture3D(
     glGetTexLevelParameteriv(Target, MipLevel, GL_TEXTURE_DEPTH, &realDepth );
     glGetTexLevelParameteriv(Target, MipLevel, GL_TEXTURE_INTERNAL_FORMAT, &textureFormat );
 
-    clfQueryGLEnum2Enum(textureFormat, 0, &realCLType, &realCLFormat, gcvNULL, gcvNULL, gcvNULL,gcvNULL);
+    clfQueryGLEnum2Enum(textureFormat, Target, &realCLType, &realCLFormat, gcvNULL,&realGLType, &realGLFormat, gcvNULL);
 
     imageFormat.image_channel_order = realCLFormat;
     imageFormat.image_channel_data_type = realCLType;
 
+#if BUILD_OPENCL_12
     imageDesc.image_width = realWidth;
     imageDesc.image_height = realHeight;
     imageDesc.image_depth = realDepth;
@@ -1092,16 +1071,21 @@ clCreateFromGLTexture3D(
     imageDesc.image_type = CL_MEM_OBJECT_IMAGE3D;
     imageDesc.image_row_pitch = 0;
     imageDesc.image_slice_pitch = 0;
-
-    image = clfCLGLShareCreateImageWrapper(Context, Flags, &imageFormat, &imageDesc, gcvNULL, ErrcodeRet);
+    image = clCreateImage(Context, Flags, &imageFormat, &imageDesc, gcvNULL, ErrcodeRet);
+#else
+    image = clCreateImage3D(Context, Flags, &imageFormat, realWidth, realHeight, realDepth, 0, 0, gcvNULL, ErrcodeRet);
+#endif
 
     image->fromGL               = gcvTRUE;
     image->glObj                = Texture;
     image->glObjType            = CL_GL_OBJECT_TEXTURE3D;
-    image->glTexTarget          = Target;
+    image->u.image.textureTarget = Target;
+    image->u.image.glFormat      = realGLFormat;
+    image->u.image.glType        = realGLType;
 
     glBindTexture(Target, origTex);
 
+    VCL_TRACE_API(CreateFromGLTexture3D_Post)(Context, Flags, Target, MipLevel, Texture, ErrcodeRet, image);
     gcmFOOTER_ARG("%d image=0x%x",
                   CL_SUCCESS, image);
     return image;
@@ -1134,10 +1118,14 @@ clCreateFromGLRenderbuffer(
     GLenum          glType        = 0;
     clsMem_PTR      image               = gcvNULL;
     cl_image_format imageFormat;
+#if BUILD_OPENCL_12
     cl_image_desc   imageDesc;
+#endif
 
     gcmHEADER_ARG("Context=0x%x Flags=%u Renderbuffer=%u",
                    Context, Flags, Renderbuffer);
+    gcmDUMP_API("${OCL clCreateFromGLRenderbuffer %s, 0x%x}", Context, Flags);
+    VCL_TRACE_API(CreateFromGLRenderbuffer_Pre)(Context, Flags, Renderbuffer, ErrcodeRet);
 
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
@@ -1162,7 +1150,7 @@ clCreateFromGLRenderbuffer(
     imageFormat.image_channel_order = clFormat;
     imageFormat.image_channel_data_type = clType;
 
-
+#if BUILD_OPENCL_12
     imageDesc.image_width = outWidth;
     imageDesc.image_height = outHeight;
     imageDesc.image_depth = 1;
@@ -1175,7 +1163,10 @@ clCreateFromGLRenderbuffer(
     imageDesc.image_row_pitch = 0;
     imageDesc.image_row_pitch = 0;
     /* don't copy host data, it may dirty when use, so update it at enqueueAquire */
-    image = clfCLGLShareCreateImageWrapper(Context, Flags, &imageFormat, &imageDesc, gcvNULL, ErrcodeRet);
+    image = clCreateImage(Context, Flags, &imageFormat, &imageDesc, gcvNULL, ErrcodeRet);
+#else
+    image = clCreateImage2D(Context, Flags, &imageFormat, outWidth, outHeight, 0, gcvNULL, ErrcodeRet);
+#endif
 
     image->fromGL               = gcvTRUE;
     image->glObj                = Renderbuffer;
@@ -1186,6 +1177,7 @@ clCreateFromGLRenderbuffer(
         *ErrcodeRet = CL_SUCCESS;
     }
 
+    VCL_TRACE_API(CreateFromGLRenderbuffer_Post)(Context, Flags, Renderbuffer, ErrcodeRet, image);
     gcmFOOTER_ARG("%d image=0x%x",
                   CL_SUCCESS, image);
     return image;
@@ -1211,6 +1203,7 @@ clGetGLObjectInfo(
 
     gcmHEADER_ARG("MemObj=0x%x GLObjectType=%u GLObjectName=0x%x",
                   MemObj, GLObjectType, GLObjectName);
+    gcmDUMP_API("${OCL clGetGLObjectInfo %s}", MemObj);
 
     if (MemObj == gcvNULL || MemObj->objectType != clvOBJECT_MEM)
     {
@@ -1234,6 +1227,7 @@ clGetGLObjectInfo(
         *GLObjectName = MemObj->glObj;
     }
 
+    VCL_TRACE_API(GetGLObjectInfo)(MemObj, GLObjectType, GLObjectName);
     gcmFOOTER_ARG("%d *GLObjectType=%lu *GLObjectName=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(GLObjectType), gcmOPT_VALUE(GLObjectName));
     return CL_SUCCESS;
@@ -1259,6 +1253,7 @@ clGetGLTextureInfo(
 
     gcmHEADER_ARG("MemObj=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   MemObj, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetGLTextureInfo %s}", MemObj);
 
     if (MemObj == gcvNULL || MemObj->objectType != clvOBJECT_MEM)
     {
@@ -1316,6 +1311,7 @@ clGetGLTextureInfo(
         *ParamValueSizeRet = retParamSize;
     }
 
+    VCL_TRACE_API(GetGLTextureInfo)(MemObj, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;
@@ -1337,7 +1333,7 @@ clEnqueueAcquireGLObjects(
     )
 {
     clsCommand_PTR                  command = gcvNULL;
-    clsCommandAcquireGLObjects_PTR  acquireGLObjects;
+    clsCommandAcquireGLObjects_PTR  aqGLObj = gcvNULL;
     gctUINT                         i;
     gctPOINTER                      pointer = gcvNULL;
     gctPOINTER*                     pointers = gcvNULL;
@@ -1346,6 +1342,7 @@ clEnqueueAcquireGLObjects(
     gcmHEADER_ARG("CommandQueue=0x%x NumObjects=%d MemObjects=0x%x "
                   "NumEventsInWaitList=%u EventWaitList=0x%x Event=0x%x",
                   CommandQueue, NumObjects, MemObjects, NumEventsInWaitList, EventWaitList, Event);
+    gcmDUMP_API("${OCL clEnqueueAcquireGLObjects 0x%x}", CommandQueue);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -1435,14 +1432,19 @@ clEnqueueAcquireGLObjects(
     command->numEventsInWaitList    = NumEventsInWaitList;
     command->eventWaitList          = (clsEvent_PTR *)pointer;
 
-    acquireGLObjects                = &command->u.acquireGLObjects;
-    acquireGLObjects->numObjects    = NumObjects;
-    acquireGLObjects->memObjects    = MemObjects;
-    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gctPOINTER)*NumObjects, (gctPOINTER*)&acquireGLObjects->objectsDatas), CL_OUT_OF_HOST_MEMORY);
-    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(size_t)*NumObjects, (gctPOINTER*)&acquireGLObjects->w), CL_OUT_OF_HOST_MEMORY);
-    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(size_t)*NumObjects, (gctPOINTER*)&acquireGLObjects->h), CL_OUT_OF_HOST_MEMORY);
-    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(size_t)*NumObjects, (gctPOINTER*)&acquireGLObjects->d), CL_OUT_OF_HOST_MEMORY);
-    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(cl_image_format)*NumObjects, (gctPOINTER*)&acquireGLObjects->imFormats), CL_OUT_OF_HOST_MEMORY);
+    pointer = gcvNULL;
+
+    aqGLObj                = &command->u.acquireGLObjects;
+    if ((NumObjects > 0)&&(MemObjects!=gcvNULL))
+    {
+        aqGLObj->numObjects    = NumObjects;
+        clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsMem_PTR *)*NumObjects, (gctPOINTER*)&pointer), CL_OUT_OF_HOST_MEMORY);
+        gcoOS_MemCopy(pointer, MemObjects, sizeof(clsMem_PTR *)*NumObjects);
+        aqGLObj->memObjects    = (clsMem_PTR*)pointer;
+        pointer = gcvNULL;
+    }
+    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gctPOINTER)*NumObjects, (gctPOINTER*)&aqGLObj->objectsDatas), CL_OUT_OF_HOST_MEMORY);
+    gcoOS_MemFill(aqGLObj->objectsDatas, 0, sizeof(gctPOINTER)*NumObjects);
     clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gctPOINTER)*NumObjects, (gctPOINTER*)&pointers), CL_OUT_OF_HOST_MEMORY);
     gcoOS_MemFill(pointers, 0, sizeof(gctPOINTER)*NumObjects);
 
@@ -1487,7 +1489,7 @@ clEnqueueAcquireGLObjects(
                     clmRETURN_ERROR(CL_INVALID_GL_OBJECT);
                 }
 
-                acquireGLObjects->objectsDatas[i] = data;
+                aqGLObj->objectsDatas[i] = pointers[i];
                 /* use block mode to update data in current implement */
 
                 /* Share with GL buffer. */
@@ -1523,15 +1525,13 @@ clEnqueueAcquireGLObjects(
                 GLint           realWidth  = MemObjects[i]->u.image.width;
                 GLint           realHeight = MemObjects[i]->u.image.height;
                 GLint           realDepth = 1;
-                size_t          outBytes   = 0;
-                GLint           origTex = 0;
                 GLenum          target;
-                if (  MemObjects[i]->glTexTarget == GL_TEXTURE_CUBE_MAP_POSITIVE_X
-                    ||MemObjects[i]->glTexTarget == GL_TEXTURE_CUBE_MAP_POSITIVE_Y
-                    ||MemObjects[i]->glTexTarget == GL_TEXTURE_CUBE_MAP_POSITIVE_Z
-                    ||MemObjects[i]->glTexTarget == GL_TEXTURE_CUBE_MAP_NEGATIVE_X
-                    ||MemObjects[i]->glTexTarget == GL_TEXTURE_CUBE_MAP_NEGATIVE_Y
-                    ||MemObjects[i]->glTexTarget == GL_TEXTURE_CUBE_MAP_NEGATIVE_Z)
+                if (  MemObjects[i]->u.image.textureTarget == GL_TEXTURE_CUBE_MAP_POSITIVE_X
+                    ||MemObjects[i]->u.image.textureTarget == GL_TEXTURE_CUBE_MAP_POSITIVE_Y
+                    ||MemObjects[i]->u.image.textureTarget == GL_TEXTURE_CUBE_MAP_POSITIVE_Z
+                    ||MemObjects[i]->u.image.textureTarget == GL_TEXTURE_CUBE_MAP_NEGATIVE_X
+                    ||MemObjects[i]->u.image.textureTarget == GL_TEXTURE_CUBE_MAP_NEGATIVE_Y
+                    ||MemObjects[i]->u.image.textureTarget == GL_TEXTURE_CUBE_MAP_NEGATIVE_Z)
                 {
                     target = GL_TEXTURE_CUBE_MAP;
                 }
@@ -1540,28 +1540,35 @@ clEnqueueAcquireGLObjects(
                     target = GL_TEXTURE_2D;
                 }
 
-                glGetIntegerv(target == GL_TEXTURE_2D ? GL_TEXTURE_BINDING_2D : GL_TEXTURE_BINDING_CUBE_MAP, &origTex);
-                glBindTexture(target, acquireGLObjects->memObjects[i]->glObj);
-
-                outBytes = realWidth * realHeight * realDepth * acquireGLObjects->memObjects[i]->u.image.elementSize;
-
-                status = gcoOS_Allocate(gcvNULL, outBytes, &pointers[i]);
-                if (gcmIS_ERROR(status))
+                if (MemObjects[i]->flags != CL_MEM_WRITE_ONLY)
                 {
-                    gcmUSER_DEBUG_ERROR_MSG(
-                        "OCL-011070: (clEnqueueAcquireGLObjects) Cannot allocate memory.\n");
-                    clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+                    size_t          outBytes   = 0;
+                    GLint           origTex = 0;
+                    PFNGLGETTEXIMAGEVIVPROC* pFungetTexImage = gcvNULL;
+                    glGetIntegerv(target == GL_TEXTURE_2D ? GL_TEXTURE_BINDING_2D : GL_TEXTURE_BINDING_CUBE_MAP, &origTex);
+                    glBindTexture(target, aqGLObj->memObjects[i]->glObj);
+                    outBytes = realWidth * realHeight * realDepth * aqGLObj->memObjects[i]->u.image.elementSize;
+
+                    status = gcoOS_Allocate(gcvNULL, outBytes, &pointers[i]);
+                    if (gcmIS_ERROR(status))
+                    {
+                        gcmUSER_DEBUG_ERROR_MSG(
+                            "OCL-011070: (clEnqueueAcquireGLObjects) Cannot allocate memory.\n");
+                        clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+                    }
+                    /*fill texture data into buffer */
+                    pFungetTexImage = (PFNGLGETTEXIMAGEVIVPROC*)eglGetProcAddress("glGetTexImage");
+                    if (pFungetTexImage)
+                        (*pFungetTexImage)(
+                                        MemObjects[i]->u.image.textureTarget,
+                                        MemObjects[i]->u.image.mipLevel,
+                                        MemObjects[i]->u.image.glFormat,
+                                        MemObjects[i]->u.image.glType,
+                                        pointers[i]);
+                    glBindTexture(target, origTex);
                 }
 
-                /*fill texture data into buffer */
-                glGetTexLevelParameteriv(MemObjects[i]->glTexTarget, MemObjects[i]->u.image.mipLevel, GL_TEXTURE_INTERNAL_FORMAT, &internalFormat );
-
-                clfQueryGLEnum2Enum(internalFormat, 0, gcvNULL, gcvNULL, gcvNULL,&glType, &glFormat, gcvNULL);
-                glGetTexImage(MemObjects[i]->glTexTarget, MemObjects[i]->u.image.mipLevel, glFormat, glType, pointers[i]);
-
-                acquireGLObjects->objectsDatas[i] = (cl_char *) pointers[i];
-
-                glBindTexture(target, origTex);
+                aqGLObj->objectsDatas[i] = (cl_char *) pointers[i];
 
             }
             break;
@@ -1571,51 +1578,50 @@ clEnqueueAcquireGLObjects(
                 GLint           realWidth  = MemObjects[i]->u.image.width;
                 GLint           realHeight = MemObjects[i]->u.image.height;
                 GLint           realDepth = MemObjects[i]->u.image.depth;
-                size_t          outBytes   = 0;
-                GLint           origTex = 0;
 
-                glGetIntegerv(GL_TEXTURE_BINDING_3D, &origTex);
-                glBindTexture(GL_TEXTURE_3D, acquireGLObjects->memObjects[i]->glObj);
-
-                outBytes = realWidth * realHeight * realDepth * acquireGLObjects->memObjects[i]->u.image.elementSize;
-                status = gcoOS_Allocate(gcvNULL, outBytes, &pointers[i]);
-                if (gcmIS_ERROR(status))
+                if (MemObjects[i]->flags != CL_MEM_WRITE_ONLY)
                 {
-                    gcmUSER_DEBUG_ERROR_MSG(
-                        "OCL-011071: (clEnqueueAcquireGLObjects) Cannot allocate memory.\n");
-                    clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+                    size_t          outBytes   = 0;
+                    GLint           origTex = 0;
+                    PFNGLGETTEXIMAGEVIVPROC* pFungetTexImage = gcvNULL;
+
+                    glGetIntegerv(GL_TEXTURE_BINDING_3D, &origTex);
+                    glBindTexture(GL_TEXTURE_3D, aqGLObj->memObjects[i]->glObj);
+                    outBytes = realWidth * realHeight * realDepth * aqGLObj->memObjects[i]->u.image.elementSize;
+                    status = gcoOS_Allocate(gcvNULL, outBytes, &pointers[i]);
+                    if (gcmIS_ERROR(status))
+                    {
+                        gcmUSER_DEBUG_ERROR_MSG(
+                            "OCL-011071: (clEnqueueAcquireGLObjects) Cannot allocate memory.\n");
+                        clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+                    }
+                    /*fill texture data into buffer */
+                    pFungetTexImage = (PFNGLGETTEXIMAGEVIVPROC*)eglGetProcAddress("glGetTexImage");
+                    if (pFungetTexImage)
+                        (*pFungetTexImage)(
+                                        MemObjects[i]->u.image.textureTarget,
+                                        MemObjects[i]->u.image.mipLevel,
+                                        MemObjects[i]->u.image.glFormat,
+                                        MemObjects[i]->u.image.glType,
+                                        pointers[i]);
+                    glBindTexture(GL_TEXTURE_3D, origTex);
                 }
 
-                /*fill texture data into buffer */
-                glGetTexLevelParameteriv(GL_TEXTURE_3D, MemObjects[i]->u.image.mipLevel, GL_TEXTURE_INTERNAL_FORMAT, &internalFormat );
-
-                clfQueryGLEnum2Enum(internalFormat, 0, gcvNULL, gcvNULL, gcvNULL,&glType, &glFormat, gcvNULL);
-                glGetTexImage(GL_TEXTURE_3D, MemObjects[i]->u.image.mipLevel, glFormat, glType, pointers[i]);
-
-                acquireGLObjects->objectsDatas[i] = (cl_char *) pointers[i];
-
-                glBindTexture(GL_TEXTURE_3D, origTex);
+                aqGLObj->objectsDatas[i] = (cl_char *) pointers[i];
 
             }
             break;
         case CL_GL_OBJECT_RENDERBUFFER:
             {
-                GLint           realWidth  = MemObjects[i]->u.image.width;
-                GLint           realHeight = MemObjects[i]->u.image.height;
-                GLint           realDepth = MemObjects[i]->u.image.depth;
                 GLint           elemenSize = MemObjects[i]->u.image.elementSize;
                 size_t          outBytes   = 0;
                 glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_INTERNAL_FORMAT, &internalFormat );
 
                 clfQueryGLEnum2Enum(internalFormat, 0, gcvNULL, gcvNULL, gcvNULL, &glType, &glFormat, gcvNULL);
-                outBytes = realWidth * realHeight * elemenSize;
 
-                acquireGLObjects->w[i] = realWidth;
-                acquireGLObjects->h[i] = realHeight;
-                acquireGLObjects->d[i] = realDepth;
-                acquireGLObjects->imFormats[i] = MemObjects[i]->u.image.format;
-
+                if (MemObjects[i]->flags != CL_MEM_WRITE_ONLY)
                 {
+                    outBytes = MemObjects[i]->u.image.width * MemObjects[i]->u.image.height * elemenSize;
                     status = gcoOS_Allocate(gcvNULL, outBytes, &pointers[i]);
                     if (gcmIS_ERROR(status))
                     {
@@ -1623,12 +1629,12 @@ clEnqueueAcquireGLObjects(
                             "OCL-011072: (clEnqueueAcquireGLObjects) Cannot allocate memory.\n");
                         clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
                     }
-                    acquireGLObjects->objectsDatas[i] = (cl_char *) pointers[i];
 
                     /* TODO - Use resolve to speed up the conversion. */
                     glFinish();
-                    glReadPixels(0, 0, (GLsizei)realWidth, (GLsizei)realHeight, glFormat, glType, acquireGLObjects->objectsDatas[i]);
+                    glReadPixels(0, 0, (GLsizei)MemObjects[i]->u.image.width, (GLsizei)MemObjects[i]->u.image.height, glFormat, glType, pointers[i]);
                 }
+                aqGLObj->objectsDatas[i] = (cl_char *) pointers[i];
             }
             break;
         case CL_GL_OBJECT_TEXTURE2D_ARRAY:
@@ -1647,13 +1653,9 @@ clEnqueueAcquireGLObjects(
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvTRUE),
                CL_OUT_OF_HOST_MEMORY);
 
-    for (i = 0; i < NumObjects; i++)
-    {
-        if(pointers[i])
-            gcoOS_Free(gcvNULL, pointers[i]);
-    }
     gcoOS_Free(gcvNULL, pointers);
 
+    VCL_TRACE_API(EnqueueAcquireGLObjects)(CommandQueue, NumObjects, MemObjects, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
     return CL_SUCCESS;
 
@@ -1662,6 +1664,31 @@ OnError:
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-011046: (clEnqueueAcquireGLObjects) Run out of memory.\n");
+    }
+
+    if (pointers)
+    {
+        gcoOS_Free(gcvNULL, pointers);
+    }
+
+    if (aqGLObj)
+    {
+        if (aqGLObj->objectsDatas)
+        {
+            gcoOS_Free(gcvNULL, aqGLObj->objectsDatas);
+            aqGLObj->objectsDatas = gcvNULL;
+        }
+
+        if (aqGLObj->memObjects)
+        {
+            gcoOS_Free(gcvNULL, aqGLObj->memObjects);
+            aqGLObj->memObjects = gcvNULL;
+        }
+    }
+
+    if (command)
+    {
+        clfReleaseCommand(command);
     }
 
     /* Return the status. */
@@ -1680,7 +1707,8 @@ clEnqueueReleaseGLObjects(
     )
 {
     clsCommand_PTR                  command = gcvNULL;
-    clsCommandReleaseGLObjects_PTR  releaseGLObjects;
+    clsCommand_PTR                  retCommand = gcvNULL;
+    clsCommandReleaseGLObjects_PTR  rlsGLObj = gcvNULL;
     gctUINT                         i;
     gctPOINTER                      pointer = gcvNULL;
     gctPOINTER*                     pointers = gcvNULL;
@@ -1689,6 +1717,7 @@ clEnqueueReleaseGLObjects(
     gcmHEADER_ARG("CommandQueue=0x%x NumObjects=%d MemObjects=0x%x "
                   "NumEventsInWaitList=%u EventWaitList=0x%x Event=0x%x",
                   CommandQueue, NumObjects, MemObjects, NumEventsInWaitList, EventWaitList, Event);
+    gcmDUMP_API("${OCL clEnqueueReleaseGLObjects 0x%x}", CommandQueue);
 
     if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
     {
@@ -1778,15 +1807,18 @@ clEnqueueReleaseGLObjects(
     command->numEventsInWaitList    = NumEventsInWaitList;
     command->eventWaitList          = (clsEvent_PTR *)pointer;
 
-    releaseGLObjects                = &command->u.releaseGLObjects;
-    releaseGLObjects->numObjects    = NumObjects;
-    releaseGLObjects->memObjects    = MemObjects;
-    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gctPOINTER)*NumObjects, (gctPOINTER*)&releaseGLObjects->objectsDatas), CL_OUT_OF_HOST_MEMORY);
-    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(size_t)*NumObjects, (gctPOINTER*)&releaseGLObjects->w), CL_OUT_OF_HOST_MEMORY);
-    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(size_t)*NumObjects, (gctPOINTER*)&releaseGLObjects->h), CL_OUT_OF_HOST_MEMORY);
-    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(size_t)*NumObjects, (gctPOINTER*)&releaseGLObjects->d), CL_OUT_OF_HOST_MEMORY);
-    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(cl_image_format)*NumObjects, (gctPOINTER*)&releaseGLObjects->imFormats), CL_OUT_OF_HOST_MEMORY);
-    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(cl_int)*NumObjects, (gctPOINTER*)&releaseGLObjects->elementSize), CL_OUT_OF_HOST_MEMORY);
+    pointer = gcvNULL;
+
+    rlsGLObj                = &command->u.releaseGLObjects;
+    if ((NumObjects > 0)&&(MemObjects!=gcvNULL))
+    {
+        rlsGLObj->numObjects    = NumObjects;
+        clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsMem_PTR *)*NumObjects, (gctPOINTER*)&pointer), CL_OUT_OF_HOST_MEMORY);
+        gcoOS_MemCopy(pointer, MemObjects, sizeof(clsMem_PTR *)*NumObjects);
+        rlsGLObj->memObjects    = (clsMem_PTR*)pointer;
+        pointer = gcvNULL;
+    }
+    clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gctPOINTER)*NumObjects, (gctPOINTER*)&rlsGLObj->objectsDatas), CL_OUT_OF_HOST_MEMORY);
     clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gctPOINTER)*NumObjects, (gctPOINTER*)&pointers), CL_OUT_OF_HOST_MEMORY);
     gcoOS_MemFill(pointers, 0, sizeof(gctPOINTER)*NumObjects);
 
@@ -1797,82 +1829,32 @@ clEnqueueReleaseGLObjects(
         case CL_GL_OBJECT_BUFFER:
             {
                 gcmVERIFY_OK(gcoCL_UnshareMemory(MemObjects[i]->u.buffer.node));
+                rlsGLObj->objectsDatas[i] = (cl_char *) pointers[i];
             }
             break;
         case CL_GL_OBJECT_TEXTURE2D:
-            {
-                size_t          outBytes            = 0;
-
-                releaseGLObjects->w[i] = releaseGLObjects->memObjects[i]->u.image.width;
-                releaseGLObjects->h[i] = releaseGLObjects->memObjects[i]->u.image.height;
-                releaseGLObjects->d[i] = 1;
-
-                releaseGLObjects->imFormats[i] = releaseGLObjects->memObjects[i]->u.image.format;
-                releaseGLObjects->elementSize[i] = releaseGLObjects->memObjects[i]->u.image.elementSize;
-
-                outBytes = releaseGLObjects->w[i]
-                           * releaseGLObjects->h[i]
-                           * releaseGLObjects->d[i]
-                           * releaseGLObjects->elementSize[i];
-                status = gcoOS_Allocate(gcvNULL, outBytes, &pointers[i]);
-                if (gcmIS_ERROR(status))
-                {
-                    gcmUSER_DEBUG_ERROR_MSG(
-                        "OCL-011073: (clEnqueueReleaseGLObjects) Cannot allocate memory.\n");
-                    clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
-                }
-                releaseGLObjects->objectsDatas[i] = (cl_char *) pointers[i];
-            }
-            break;
         case CL_GL_OBJECT_TEXTURE3D:
-            {
-                size_t          outBytes            = 0;
-
-                releaseGLObjects->w[i] = releaseGLObjects->memObjects[i]->u.image.width;
-                releaseGLObjects->h[i] = releaseGLObjects->memObjects[i]->u.image.height;
-                releaseGLObjects->d[i] = releaseGLObjects->memObjects[i]->u.image.depth;
-
-                releaseGLObjects->imFormats[i] = releaseGLObjects->memObjects[i]->u.image.format;
-                releaseGLObjects->elementSize[i] = releaseGLObjects->memObjects[i]->u.image.elementSize;
-
-                outBytes = releaseGLObjects->w[i]
-                           * releaseGLObjects->h[i]
-                           * releaseGLObjects->d[i]
-                           * releaseGLObjects->elementSize[i];
-                status = gcoOS_Allocate(gcvNULL, outBytes, &pointers[i]);
-                if (gcmIS_ERROR(status))
-                {
-                    gcmUSER_DEBUG_ERROR_MSG(
-                        "OCL-011074: (clEnqueueReleaseGLObjects) Cannot allocate memory.\n");
-                    clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
-                }
-                releaseGLObjects->objectsDatas[i] = (cl_char *) pointers[i];
-            }
-            break;
         case CL_GL_OBJECT_RENDERBUFFER:
             {
                 size_t          outBytes            = 0;
-
-                releaseGLObjects->w[i] = releaseGLObjects->memObjects[i]->u.image.width;
-                releaseGLObjects->h[i] = releaseGLObjects->memObjects[i]->u.image.height;
-                releaseGLObjects->d[i] = 1;
-
-                releaseGLObjects->imFormats[i] = MemObjects[i]->u.image.format;
-                releaseGLObjects->elementSize[i] = MemObjects[i]->u.image.elementSize;
-
-                outBytes = releaseGLObjects->memObjects[i]->u.image.width
-                         * releaseGLObjects->memObjects[i]->u.image.height
-                         * releaseGLObjects->elementSize[i];
-                status = gcoOS_Allocate(gcvNULL, outBytes, &pointers[i]);
-                if (gcmIS_ERROR(status))
+                if (MemObjects[i]->flags != CL_MEM_READ_ONLY)
                 {
-                    gcmUSER_DEBUG_ERROR_MSG(
-                        "OCL-011075: (clEnqueueReleaseGLObjects) Cannot allocate memory.\n");
-                    clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+                    outBytes = MemObjects[i]->u.image.width
+                               * MemObjects[i]->u.image.height
+                               * MemObjects[i]->u.image.depth
+                               * MemObjects[i]->u.image.elementSize;
+                    status = gcoOS_Allocate(gcvNULL, outBytes, &pointers[i]);
+                    if (gcmIS_ERROR(status))
+                    {
+                        gcmUSER_DEBUG_ERROR_MSG(
+                            "OCL-011073: (clEnqueueReleaseGLObjects) Cannot allocate memory.\n");
+                        clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+                    }
                 }
-                releaseGLObjects->objectsDatas[i] = (cl_char *) pointers[i];
+                rlsGLObj->objectsDatas[i] = (cl_char *) pointers[i];
             }
             break;
+
         case CL_GL_OBJECT_TEXTURE2D_ARRAY:
             break;
         case CL_GL_OBJECT_TEXTURE1D:
@@ -1890,6 +1872,11 @@ clEnqueueReleaseGLObjects(
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvTRUE),
                CL_OUT_OF_HOST_MEMORY);
 
+    retCommand = command;
+    command = gcvNULL;
+
+    retCommand = retCommand;
+
     /* Update */
     for (i = 0; i < NumObjects; i++)
     {
@@ -1902,17 +1889,16 @@ clEnqueueReleaseGLObjects(
         case CL_GL_OBJECT_BUFFER:
             break;
         case CL_GL_OBJECT_TEXTURE2D:
+            if (MemObjects[i]->flags != CL_MEM_READ_ONLY)
             {
-                GLint textureFormat;
-                GLenum format,type;
                 GLint origTex;
                 GLenum target;
-                if (  MemObjects[i]->glTexTarget == GL_TEXTURE_CUBE_MAP_POSITIVE_X
-                    ||MemObjects[i]->glTexTarget == GL_TEXTURE_CUBE_MAP_POSITIVE_Y
-                    ||MemObjects[i]->glTexTarget == GL_TEXTURE_CUBE_MAP_POSITIVE_Z
-                    ||MemObjects[i]->glTexTarget == GL_TEXTURE_CUBE_MAP_NEGATIVE_X
-                    ||MemObjects[i]->glTexTarget == GL_TEXTURE_CUBE_MAP_NEGATIVE_Y
-                    ||MemObjects[i]->glTexTarget == GL_TEXTURE_CUBE_MAP_NEGATIVE_Z)
+                if (  MemObjects[i]->u.image.textureTarget == GL_TEXTURE_CUBE_MAP_POSITIVE_X
+                    ||MemObjects[i]->u.image.textureTarget == GL_TEXTURE_CUBE_MAP_POSITIVE_Y
+                    ||MemObjects[i]->u.image.textureTarget == GL_TEXTURE_CUBE_MAP_POSITIVE_Z
+                    ||MemObjects[i]->u.image.textureTarget == GL_TEXTURE_CUBE_MAP_NEGATIVE_X
+                    ||MemObjects[i]->u.image.textureTarget == GL_TEXTURE_CUBE_MAP_NEGATIVE_Y
+                    ||MemObjects[i]->u.image.textureTarget == GL_TEXTURE_CUBE_MAP_NEGATIVE_Z)
                 {
                     target = GL_TEXTURE_CUBE_MAP;
                 }
@@ -1920,48 +1906,43 @@ clEnqueueReleaseGLObjects(
                 {
                     target = GL_TEXTURE_2D;
                 }
-                clfCLGLShareReleaseMemObjectData(MemObjects[i]);
 
                 glGetIntegerv(target == GL_TEXTURE_2D ? GL_TEXTURE_BINDING_2D : GL_TEXTURE_BINDING_CUBE_MAP, &origTex);
                 glBindTexture(target, MemObjects[i]->glObj);
-                glGetTexLevelParameteriv(MemObjects[i]->glTexTarget, MemObjects[i]->u.image.mipLevel, GL_TEXTURE_INTERNAL_FORMAT, &textureFormat );
-                clfQueryGLEnum2Enum(textureFormat, 0, gcvNULL, gcvNULL, gcvNULL, &type, &format, gcvNULL);
-                glTexImage2D(MemObjects[i]->glTexTarget,
-                             MemObjects[i]->u.image.mipLevel,
-                             textureFormat,
-                             MemObjects[i]->u.image.width,
-                             MemObjects[i]->u.image.height,
-                             0,
-                             format,
-                             type,
-                             pointers[i]);
+                glTexSubImage2D(MemObjects[i]->u.image.textureTarget,
+                                MemObjects[i]->u.image.mipLevel,
+                                0,
+                                0,
+                                MemObjects[i]->u.image.width,
+                                MemObjects[i]->u.image.height,
+                                MemObjects[i]->u.image.glFormat,
+                                MemObjects[i]->u.image.glType,
+                                pointers[i]);
                 glBindTexture(target, origTex);
             }
             break;
         case CL_GL_OBJECT_TEXTURE3D:
+            if (MemObjects[i]->flags != CL_MEM_READ_ONLY)
             {
-                GLint textureFormat;
-                GLenum format,type;
                 GLint origTex;
-                clfCLGLShareReleaseMemObjectData(MemObjects[i]);
                 glGetIntegerv(GL_TEXTURE_BINDING_3D, &origTex);
                 glBindTexture(GL_TEXTURE_3D, MemObjects[i]->glObj);
-                glGetTexLevelParameteriv(GL_TEXTURE_3D, MemObjects[i]->u.image.mipLevel, GL_TEXTURE_INTERNAL_FORMAT, &textureFormat );
-                clfQueryGLEnum2Enum(textureFormat, 0, gcvNULL, gcvNULL, gcvNULL, &type, &format, gcvNULL);
-                glTexImage3D(GL_TEXTURE_3D,
+                glTexSubImage3D(GL_TEXTURE_3D,
                              MemObjects[i]->u.image.mipLevel,
-                             textureFormat,
+                             0,
+                             0,
+                             0,
                              MemObjects[i]->u.image.width,
                              MemObjects[i]->u.image.height,
                              MemObjects[i]->u.image.depth,
-                             0,
-                             format,
-                             type,
+                             MemObjects[i]->u.image.glFormat,
+                             MemObjects[i]->u.image.glType,
                              pointers[i]);
                 glBindTexture(GL_TEXTURE_3D, origTex);
             }
             break;
         case CL_GL_OBJECT_RENDERBUFFER:
+            if (MemObjects[i]->flags != CL_MEM_READ_ONLY)
             {
                 const char *vssrc =
                     "varying   mediump vec2 texCoord;\n"
@@ -2053,7 +2034,8 @@ clEnqueueReleaseGLObjects(
     }
     gcoOS_Free(gcvNULL, pointers);
 
-    gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
+    VCL_TRACE_API(EnqueueReleaseGLObjects)(CommandQueue, NumObjects, MemObjects, NumEventsInWaitList, EventWaitList, Event);
+    gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, retCommand);
     return CL_SUCCESS;
 
 OnError:
@@ -2063,7 +2045,167 @@ OnError:
             "OCL-011055: (clEnqueueReleaseGLObjects) Run out of memory.\n");
     }
 
+    if (pointers)
+    {
+        gcoOS_Free(gcvNULL, pointers);
+    }
+
+    if (rlsGLObj)
+    {
+        if (rlsGLObj->objectsDatas)
+        {
+            gcoOS_Free(gcvNULL, rlsGLObj->objectsDatas);
+            rlsGLObj->objectsDatas = gcvNULL;
+        }
+
+        if (rlsGLObj->memObjects)
+        {
+            gcoOS_Free(gcvNULL, rlsGLObj->memObjects);
+            rlsGLObj->memObjects = gcvNULL;
+        }
+    }
+
+    if (command)
+    {
+        clfReleaseCommand(command);
+    }
+
     /* Return the status. */
     gcmFOOTER_ARG("%d", status);
     return status;
 }
+
+#else
+/*****************************************************************************\
+|*                      OCL11 extension API                                  *|
+\*****************************************************************************/
+CL_API_ENTRY cl_event CL_API_CALL clCreateEventFromGLsyncKHR(cl_context context,
+    cl_GLsync sync,
+    cl_int * errcode_ret)
+{
+    /* note: empty now just to pass build */
+    return gcvNULL;
+}
+
+
+/*****************************************************************************\
+|*                      OpenCL GL_Sharing Extension API                      *|
+\*****************************************************************************/
+CL_API_ENTRY cl_mem CL_API_CALL
+clCreateFromGLBuffer(
+    cl_context      Context,
+    cl_mem_flags    Flags,
+    cl_GLuint       BufObj,
+    int *           ErrcodeRet
+    )
+{
+    /* note: empty now just to pass build */
+    return gcvNULL;
+}
+
+CL_API_ENTRY cl_mem CL_API_CALL
+clCreateFromGLTexture(
+    cl_context      Context,
+    cl_mem_flags    Flags,
+    cl_GLenum       Target,
+    cl_GLint        MipLevel,
+    cl_GLuint       Texture,
+    cl_int *        ErrcodeRet
+    )
+{
+    /* note: empty now just to pass build */
+    return gcvNULL;
+}
+
+CL_API_ENTRY cl_mem CL_API_CALL
+clCreateFromGLTexture2D(
+    cl_context      Context,
+    cl_mem_flags    Flags,
+    cl_GLenum       Target,
+    cl_GLint        MipLevel,
+    cl_GLuint       Texture,
+    cl_int *        ErrcodeRet
+    )
+{
+    /* note: empty now just to pass build */
+    return gcvNULL;
+}
+
+CL_API_ENTRY cl_mem CL_API_CALL
+clCreateFromGLTexture3D(
+    cl_context      Context,
+    cl_mem_flags    Flags,
+    cl_GLenum       Target,
+    cl_GLint        MipLevel,
+    cl_GLuint       Texture,
+    cl_int *        ErrcodeRet
+    )
+{
+    /* note: empty now just to pass build */
+    return gcvNULL;
+}
+
+CL_API_ENTRY cl_mem CL_API_CALL
+clCreateFromGLRenderbuffer(
+    cl_context      Context,
+    cl_mem_flags    Flags,
+    cl_GLuint       Renderbuffer,
+    cl_int *        ErrcodeRet
+    )
+{
+    /* note: empty now just to pass build */
+    return gcvNULL;
+}
+
+CL_API_ENTRY cl_int CL_API_CALL
+clGetGLObjectInfo(
+    cl_mem                MemObj,
+    cl_gl_object_type *   GLObjectType,
+    cl_GLuint *           GLObjectName
+    )
+{
+    /* note: empty now just to pass build */
+    return CL_SUCCESS;
+}
+
+CL_API_ENTRY cl_int CL_API_CALL
+clGetGLTextureInfo(
+    cl_mem               MemObj,
+    cl_gl_texture_info   ParamName,
+    size_t               ParamValueSize,
+    void *               ParamValue,
+    size_t *             ParamValueSizeRet
+    )
+{
+    /* note: empty now just to pass build */
+    return CL_SUCCESS;
+}
+
+extern CL_API_ENTRY cl_int CL_API_CALL
+clEnqueueAcquireGLObjects(
+    cl_command_queue      CommandQueue,
+    cl_uint               NumObjects,
+    const cl_mem *        MemObjects,
+    cl_uint               NumEventsInWaitList,
+    const cl_event *      EventWaitList,
+    cl_event *            Event
+    )
+{
+    /* note: empty now just to pass build */
+    return CL_SUCCESS;
+}
+
+extern CL_API_ENTRY cl_int CL_API_CALL
+clEnqueueReleaseGLObjects(
+    cl_command_queue      CommandQueue,
+    cl_uint               NumObjects,
+    const cl_mem *        MemObjects,
+    cl_uint               NumEventsInWaitList,
+    const cl_event *      EventWaitList,
+    cl_event *            Event
+    )
+{
+    /* note: empty now just to pass build */
+    return CL_SUCCESS;
+}
+#endif

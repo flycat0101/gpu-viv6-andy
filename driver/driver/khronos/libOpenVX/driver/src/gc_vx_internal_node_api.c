@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -411,5 +411,197 @@ VX_INTERNAL_API vx_node vxCensus3x3Node(vx_graph graph, vx_image src, vx_image d
     };
 
     return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_CENSUS3x3, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxCnnSoftMaxNode(vx_graph graph, vx_array src, vx_scalar batchSize, vx_scalar networkType, vx_scalar hasInterleave, vx_array dst)
+{
+     vx_reference parameters[] = {
+        (vx_reference)src,
+        (vx_reference)batchSize,
+        (vx_reference)networkType,
+        (vx_reference)hasInterleave,
+        (vx_reference)dst,
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_CNN_SOFTMAX, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxCnnInterleaveBuffersNode(vx_graph graph, vx_array src, vx_scalar itemSize, vx_scalar batchSize, vx_scalar networkType, vx_scalar setEvent, vx_array dst)
+{
+     vx_reference parameters[] = {
+        (vx_reference)src,
+        (vx_reference)itemSize,
+        (vx_reference)batchSize,
+        (vx_reference)networkType,
+        (vx_reference)setEvent,
+        (vx_reference)dst,
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_CNN_INTERLEAVE_BUFFERS, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxCnnLayerNode(vx_graph graph, vx_array src, vx_scalar levelScalar,vx_array kernelBuffer, vx_array nnCmdBuffer, vx_scalar repeatScalar, vx_scalar batchSize, vx_scalar networkType, vx_array dst)
+{
+     vx_reference parameters[] = {
+        (vx_reference)src,
+        (vx_reference)levelScalar,
+        (vx_reference)kernelBuffer,
+        (vx_reference)nnCmdBuffer,
+        (vx_reference)repeatScalar,
+        (vx_reference)batchSize,
+        (vx_reference)networkType,
+        (vx_reference)dst,
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_CNN_LAYER, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxCnnDataConvertNode(vx_graph graph, vx_image src, vx_scalar batchSize, vx_scalar networkType, vx_array dst)
+{
+     vx_reference parameters[] = {
+        (vx_reference)src,
+        (vx_reference)batchSize,
+        (vx_reference)networkType,
+        (vx_reference)dst,
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_CNN_DATACONVERT, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxCnnReshuffleImageNode(vx_graph graph, vx_image src, vx_array mean, vx_scalar levelScalar, vx_scalar padScalar, vx_scalar strideX, vx_scalar strideY, vx_scalar batchSize, vx_scalar networkType, vx_array dst)
+{
+     vx_reference parameters[] = {
+        (vx_reference)src,
+        (vx_reference)mean,
+        (vx_reference)levelScalar,
+        (vx_reference)padScalar,
+        (vx_reference)strideX,
+        (vx_reference)strideY,
+        (vx_reference)batchSize,
+        (vx_reference)networkType,
+        (vx_reference)dst,
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_CNN_RESHUFFLE_IMAGE, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxFasterRCNNSoftMaxNode(vx_graph graph, vx_array src, vx_array src_bbox, vx_scalar batchSize, vx_scalar networkType, vx_array percentArray, vx_array coordArray)
+{
+     vx_reference parameters[] = {
+        (vx_reference)src,
+        (vx_reference)src_bbox,
+        (vx_reference)batchSize,
+        (vx_reference)networkType,
+        (vx_reference)percentArray,
+        (vx_reference)coordArray
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_FASTERRCNN_SOFTMAX, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxFasterRCNNReshuffleDataNode(vx_graph graph, vx_array src, vx_scalar levelScalar, vx_scalar strideX, vx_scalar strideY, vx_scalar batchSize, vx_scalar networkType, vx_array dst)
+{
+     vx_reference parameters[] = {
+        (vx_reference)src,
+        (vx_reference)levelScalar,
+        (vx_reference)strideX,
+        (vx_reference)strideY,
+        (vx_reference)batchSize,
+        (vx_reference)networkType,
+        (vx_reference)dst,
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_FASTERRCNN_RESHUFFLE_DATA, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxFasterRCNNConvertNode(vx_graph graph, vx_array src, vx_scalar src_format, vx_scalar dst_format, vx_scalar set_event, vx_array dst)
+{
+     vx_reference parameters[] = {
+        (vx_reference)src,
+        (vx_reference)src_format,
+        (vx_reference)dst_format,
+        (vx_reference)set_event,
+        (vx_reference)dst
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_CONVERT, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxLRNNode(vx_graph graph, vx_array src, vx_scalar w, vx_scalar h, vx_scalar d, vx_scalar batch, vx_scalar type, vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_scalar shift, vx_scalar alpha, vx_scalar beta, vx_array dst)
+{
+     vx_reference parameters[] = {
+        (vx_reference)src,
+        (vx_reference)w,
+        (vx_reference)h,
+        (vx_reference)d,
+        (vx_reference)batch,
+        (vx_reference)type,
+        (vx_reference)kernel,
+        (vx_reference)stride,
+        (vx_reference)pad,
+        (vx_reference)shift,
+        (vx_reference)alpha,
+        (vx_reference)beta,
+        (vx_reference)dst,
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_LRN, parameters, vxmLENGTH_OF(parameters));
+}
+
+
+VX_INTERNAL_API vx_node vxMaxPoolNode(vx_graph graph, vx_array src, vx_scalar format, vx_scalar w, vx_scalar h, vx_scalar d, vx_scalar batch, vx_scalar w2, vx_scalar h2, vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_array dst)
+{
+     vx_reference parameters[] = {
+        (vx_reference)src,
+        (vx_reference)format,
+        (vx_reference)w,
+        (vx_reference)h,
+        (vx_reference)d,
+        (vx_reference)batch,
+        (vx_reference)w2,
+        (vx_reference)h2,
+        (vx_reference)kernel,
+        (vx_reference)stride,
+        (vx_reference)pad,
+        (vx_reference)dst,
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_MAX_POOL3x3, parameters, vxmLENGTH_OF(parameters));
+}
+
+
+VX_INTERNAL_API vx_node vxROIPoolNode(vx_graph graph, vx_array input1, vx_array input2, vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_array dst)
+{
+     vx_reference parameters[] = {
+        (vx_reference)input1,
+        (vx_reference)input2,
+        (vx_reference)kernel,
+        (vx_reference)stride,
+        (vx_reference)pad,
+        (vx_reference)dst,
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_ROI_POOLING, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxRCNNWaitNode(vx_graph graph, vx_graph graph_id, vx_scalar event_id)
+{
+     vx_reference parameters[] = {
+        (vx_reference)graph_id,
+        (vx_reference)event_id
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_FASTERRCNN_WAIT, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_INTERNAL_API vx_node vxRPNNode(vx_graph graph, vx_array input, vx_array dst0, vx_array dst1)
+{
+     vx_reference parameters[] = {
+        (vx_reference)input,
+        (vx_reference)dst0,
+        (vx_reference)dst1,
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_RPN, parameters, vxmLENGTH_OF(parameters));
 }
 

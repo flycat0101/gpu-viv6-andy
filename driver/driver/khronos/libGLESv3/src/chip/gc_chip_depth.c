@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -94,7 +94,6 @@ gcChipGetStencilBits(
 
     gcmHEADER_ARG("chipCtx=0x%x", chipCtx);
 
-    /* TODO: consider dirty and FBO cases */
     if (chipCtx->drawDepthView.surf)
     {
         gcmVERIFY_OK(gcoSURF_GetFormat(chipCtx->drawDepthView.surf, gcvNULL, &format));
@@ -514,7 +513,7 @@ gcChipSetDepthMode(
                            : gcvDEPTH_NONE;
 
         if (!gc->frameBuffer.drawFramebufObj->name &&
-            (chipCtx->patchId == gcvPATCH_DEQP) &&
+            (chipCtx->patchId == gcvPATCH_DEQP || chipCtx->patchId == gcvPATCH_GTFES30) &&
             chipCtx->drawDepthView.surf &&
             (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_BUG_FIXES7) == gcvFALSE))
         {

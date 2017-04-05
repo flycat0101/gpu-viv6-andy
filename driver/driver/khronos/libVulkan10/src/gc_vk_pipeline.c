@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -476,6 +476,16 @@ static VkResult __vki_CreateGraphicsPipeline(
     {
         __VK_MEMCOPY(&pip->dsInfo, info->pDepthStencilState, sizeof(VkPipelineDepthStencilStateCreateInfo));
     }
+
+    if (info->pTessellationState)
+    {
+        pip->patchControlPoints = info->pTessellationState->patchControlPoints;
+    }
+    else
+    {
+        pip->patchControlPoints = 0;
+    }
+
     /* Color blend attachment states */
     if (info->pColorBlendState)
     {

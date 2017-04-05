@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -25,7 +25,8 @@
    make sure change this accordingly*/
 #define SPV_MAX_OPCODE_NUM                          321
 
-#define SPV_MAX_OPERAND_NUM                         16
+/* switch could have a lot of cases. TODO: change this to dynamic */
+#define SPV_MAX_OPERAND_NUM                         20
 
 #define SPV_INVALID_ID                              0
 

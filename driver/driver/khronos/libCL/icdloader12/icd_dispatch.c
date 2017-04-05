@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1382,7 +1382,7 @@ clGetExtensionFunctionAddressForPlatform(cl_platform_id platform,
     /* Are these core or ext?  This is unclear, but they appear to be*/
     /* independent from cl_khr_gl_sharing.*/
     CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLBuffer);
-    /*CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLTexture);*/
+    CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLTexture);
     CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLTexture2D);
     CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLTexture3D);
     CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLRenderbuffer);
@@ -1577,7 +1577,7 @@ clGetExtensionFunctionAddress(const char *function_name) CL_EXT_SUFFIX__VERSION_
     /* Are these core or ext?  This is unclear, but they appear to be*/
     /* independent from cl_khr_gl_sharing.*/
     CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLBuffer);
-    /*CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLTexture);*/
+    CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLTexture);
     CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLTexture2D);
     CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLTexture3D);
     CL_COMMON_EXTENSION_ENTRYPOINT_ADD(clCreateFromGLRenderbuffer);
@@ -1649,7 +1649,7 @@ CL_API_ENTRY cl_mem CL_API_CALL clCreateFromGLBuffer(
         bufobj,
         errcode_ret);
 }
-/*
+
 CL_API_ENTRY cl_mem CL_API_CALL clCreateFromGLTexture(
     cl_context      context,
     cl_mem_flags    flags,
@@ -1666,7 +1666,7 @@ CL_API_ENTRY cl_mem CL_API_CALL clCreateFromGLTexture(
         miplevel,
         texture,
         errcode_ret);
-}*/
+}
 
 CL_API_ENTRY cl_mem CL_API_CALL clCreateFromGLTexture2D(
     cl_context      context,

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -950,6 +950,22 @@ GLvoid GL_APIENTRY __gles_LinkProgram(__GLcontext *gc,  GLuint program)
             programObject->programInfo.linkedStatus = GL_FALSE;
             __GL_EXIT();
         }
+
+ #ifdef OPENGL40
+        if (programObject->programInfo.attachedShader[__GLSL_STAGE_VS])
+        {
+                programObject->programInfo.vertShaderEnable = GL_TRUE;
+        }
+        if (programObject->programInfo.attachedShader[__GLSL_STAGE_FS])
+        {
+                programObject->programInfo.fragShaderEnable = GL_TRUE;
+        }
+        if (programObject->programInfo.attachedShader[__GLSL_STAGE_GS])
+        {
+                programObject->programInfo.geomShaderEnable = GL_TRUE;
+        }
+  #endif
+
     }
 
     programObject->programInfo.codeSeq++;
@@ -973,6 +989,15 @@ GLvoid GL_APIENTRY __gles_LinkProgram(__GLcontext *gc,  GLuint program)
         if (gc->shaderProgram.currentProgram == programObject)
         {
             (*gc->dp.useProgram)(gc, programObject, gcvNULL);
+#ifdef OPENGL40
+    if(programObject)
+    {
+        gc->shaderProgram.vertShaderEnable = programObject->programInfo.vertShaderEnable;
+        gc->shaderProgram.geomShaderEnable = programObject->programInfo.geomShaderEnable;
+        gc->shaderProgram.fragShaderEnable = programObject->programInfo.fragShaderEnable;
+//        gc->shaderProgram.geomOutputType   = programObject->programInfo.geomRealOutputType;
+    }
+#endif
             __GL_SET_ATTR_DIRTY_BIT(gc, __GL_PROGRAM_ATTRS, __GL_DIRTY_GLSL_PROGRAM_SWITCH);
         }
         else if (!gc->shaderProgram.currentProgram && gc->shaderProgram.boundPPO)
@@ -1098,6 +1123,22 @@ GLvoid GL_APIENTRY __gles_UseProgram(__GLcontext *gc, GLuint program)
 
     (*gc->dp.useProgram)(gc, programObject, gcvNULL);
 
+#ifdef OPENGL40
+    if(programObject)
+    {
+        gc->shaderProgram.vertShaderEnable = programObject->programInfo.vertShaderEnable;
+        gc->shaderProgram.geomShaderEnable = programObject->programInfo.geomShaderEnable;
+        gc->shaderProgram.fragShaderEnable = programObject->programInfo.fragShaderEnable;
+//        gc->shaderProgram.geomOutputType   = programObject->programInfo.geomRealOutputType;
+    }
+    else
+    {
+        gc->shaderProgram.vertShaderEnable = GL_FALSE;
+        gc->shaderProgram.geomShaderEnable = GL_FALSE;
+        gc->shaderProgram.fragShaderEnable = GL_FALSE;
+//        gc->shaderProgram.geomOutputType   = GL_TRIANGLE_STRIP;
+    }
+#endif
 OnError:
     __GL_FOOTER();
 }
@@ -1508,7 +1549,9 @@ GLvoid GL_APIENTRY __gles_GetProgramiv(__GLcontext *gc, GLuint program, GLenum p
     case GL_PROGRAM_BINARY_LENGTH:
         if (programObject->programInfo.linkedStatus)
         {
-            gc->dp.getProgramBinary(gc, programObject, (GLsizei)(0x7ffffff), params, gcvNULL, gcvNULL);
+            GLsizei bplen = 0;
+            gc->dp.getProgramBinary(gc, programObject, (GLsizei)(0x7ffffff), &bplen, gcvNULL, gcvNULL);
+            *params = *((GLint *)&bplen);
         }
         else
         {
@@ -2923,7 +2966,6 @@ OnError:
 
 GLvoid GL_APIENTRY __gles_ReleaseShaderCompiler(__GLcontext *gc)
 {
-    /* TODO ES20 */
 }
 
 GLvoid GL_APIENTRY __gles_ProgramBinary(__GLcontext *gc, GLuint program, GLenum binaryFormat,
@@ -4943,7 +4985,7 @@ GLvoid APIENTRY __glim_BindFragDataLocation(__GLcontext *gc, GLuint program, GLu
         return;
     }
 
-   (*gc->dp.bindFragDataLocation)(gc, programObject, colorNumber, name);
+    (*gc->dp.bindFragDataLocation)(gc, programObject, colorNumber, (GLchar *)name);
 
 
 }

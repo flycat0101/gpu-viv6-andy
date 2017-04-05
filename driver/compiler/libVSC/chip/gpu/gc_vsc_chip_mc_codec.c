@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1507,6 +1507,16 @@ static VSC_MC_CODEC_TYPE _GetExtendedOpcodeCodecType(VSC_MC_CODEC* pMcCodec,
         case 0x13:
         case 0x12:
             return VSC_MC_CODEC_TYPE_3_SRCS_ALU;
+        case 0x17:
+            return VSC_MC_CODEC_TYPE_3_SRCS_ALU;
+        case 0x18:
+        case 0x19:
+        case 0x1A:
+            return VSC_MC_CODEC_TYPE_3_SRCS_ALU;
+        case 0x1B:
+        case 0x1C:
+        case 0x1D:
+            return VSC_MC_CODEC_TYPE_1_SRC_SRC0_ALU;
         }
     }
 
@@ -1552,14 +1562,19 @@ static VSC_MC_CODEC_TYPE _GetMcCodecType(VSC_MC_CODEC* pMcCodec,
     case 0x6A:
     case 0x6B:
     case 0x6C:
-    case 0x36:
     case 0x60:
     case 0x54:
     case 0x55:
     case 0x78:
     case 0x63:
         return VSC_MC_CODEC_TYPE_3_SRCS_ALU;
-
+    case 0x36:
+        {
+            /* src2 of CLAMP0_MAX is optional */
+            VSC_MC_CODEC_INST* pInstHelper = (VSC_MC_CODEC_INST *)pRefInInst;
+            return pInstHelper->srcCount == 3 ? VSC_MC_CODEC_TYPE_3_SRCS_ALU
+                                              : VSC_MC_CODEC_TYPE_2_SRCS_SRC0_SRC1_ALU;
+        }
     case 0x10:
     case 0x17:  /* A special one that has no dst valid bit */
     case 0x72:
@@ -4275,16 +4290,64 @@ static void _dbgStopHere(void)
 
 #define GotoError()  do { _dbgStopHere(); goto OnError; } while (0)
 
+static gctUINT _getSrcType(VSC_MC_CODEC_INST* pCodecHelperInst)
+{
+    gctUINT srcType = pCodecHelperInst->instCtrl.instType;
+
+    switch (pCodecHelperInst->baseOpcode)
+    {
+    case 0x72:
+        srcType = pCodecHelperInst->src[1].u.imm.immData.ui;
+        if (srcType == 0xB ||
+            srcType == 0xC ||
+            srcType == 0xE ||
+            srcType == 0xF)
+        {
+            if (pCodecHelperInst->instCtrl.threadType == 0x0)
+            {
+                srcType = 0x1;
+            }
+            else
+            {
+                srcType = 0x0;
+            }
+        }
+        break;
+    case 0x2E:
+    case 0x2F:
+        if (pCodecHelperInst->instCtrl.threadType == 0x0)
+        {
+            srcType = 0x1;
+        }
+        else
+        {
+            srcType = 0x0;
+        }
+        break;
+    case 0x2C:
+    case 0x2D:
+        /* to be clear: I2I/I2F instruction type is src0 type */
+        srcType = pCodecHelperInst->instCtrl.instType;
+        break;
+    default:
+        break;
+    }
+
+    return srcType;
+}
+
 static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCodecHelperInst)
 {
     gctUINT  srcIdx, i, firstCstRegNo;
     gctBOOL  bFirstCstRegIndexing;
     gctUINT8 src2Format;
+    gctBOOL  isVX2 = gcHWCaps.hwFeatureFlags.supportEVISVX2;
 
     if (pCodecHelperInst->instCtrl.instType == 0x1)
     {
         if (pCodecHelperInst->baseOpcode != 0x72 &&
             pCodecHelperInst->baseOpcode != 0x09 &&
+            pCodecHelperInst->baseOpcode != 0x2B &&
             pCodecHelperInst->baseOpcode != 0x32 &&
             pCodecHelperInst->baseOpcode != 0x39 &&
             pCodecHelperInst->baseOpcode != MC_AUXILIARY_OP_CODE_USC_STORE &&
@@ -4309,7 +4372,8 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
               pCodecHelperInst->extOpcode != 0x12 &&
               pCodecHelperInst->extOpcode != 0x13 &&
               pCodecHelperInst->extOpcode != 0x14 &&
-              pCodecHelperInst->extOpcode != 0x15)))
+              pCodecHelperInst->extOpcode != 0x15 &&
+              !(pCodecHelperInst->extOpcode == 0x0C && isVX2))))
         {
             GotoError();
         }
@@ -4436,8 +4500,9 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
         if (pCodecHelperInst->src[srcIdx].u.reg.bAbs &&
             pCodecHelperInst->src[srcIdx].regType != 0x7)
         {
-            if (pCodecHelperInst->instCtrl.instType != 0x0 &&
-                pCodecHelperInst->instCtrl.instType != 0x1)
+            gctUINT srcType = _getSrcType(pCodecHelperInst);
+            if (srcType != 0x0 &&
+                srcType != 0x1)
             {
                 GotoError();
             }
@@ -4542,6 +4607,17 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
         {
             GotoError();
         }
+        else if (pCodecHelperInst->src[0].u.reg.swizzle != VIR_SWIZZLE_XXXX &&
+                 pCodecHelperInst->src[0].u.reg.swizzle != VIR_SWIZZLE_XYYY &&
+                 pCodecHelperInst->src[0].u.reg.swizzle != VIR_SWIZZLE_XYZZ &&
+                 pCodecHelperInst->src[0].u.reg.swizzle != VIR_SWIZZLE_XYZW
+                 )
+        {
+            /* the EVIS inst src0's swizzle bits are used for EVIS info like startBin,
+             * make sure the src0 operand does NOT use them
+             */
+            GotoError();
+        }
 
         /* When src0 is temp256, src1’s swizzle has to be XYZW */
         if (pCodecHelperInst->src[0].regType == 0x1)
@@ -4579,6 +4655,26 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
             if (pCodecHelperInst->instCtrl.instType != 0x7 &&
                 pCodecHelperInst->instCtrl.instType != 0x6 &&
                 pCodecHelperInst->instCtrl.instType != 0x5)
+            {
+                GotoError();
+            }
+        }
+
+        /* MUL_SHIFT/SELECT_ADD cannot output more than 8 bin */
+        if (pCodecHelperInst->extOpcode == 0x07 ||
+            pCodecHelperInst->extOpcode == 0x0E)
+        {
+            if (!pCodecHelperInst->bDstValid ||
+                pCodecHelperInst->dst.u.evisDst.compIdxRange > 8)
+            {
+                GotoError();
+            }
+        }
+        /* BI_LINEAR cannot output more than 7 bin */
+        if (pCodecHelperInst->extOpcode == 0x0D)
+        {
+            if (!pCodecHelperInst->bDstValid ||
+                pCodecHelperInst->dst.u.evisDst.compIdxRange > 7)
             {
                 GotoError();
             }

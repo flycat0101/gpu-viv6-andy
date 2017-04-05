@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1069,8 +1069,8 @@ gcLINKTREE_Construct(
     tree->WChannelEqualToZ = gcvFALSE;
 #endif
 
-    gcQueryShaderCompilerHwCfg(gcvNULL, &tree->hwCfg);
-    gcoHAL_GetPatchID(gcvNULL, &tree->patchID);
+    tree->hwCfg = gcHWCaps;
+    tree->patchID = gcPatchId;
 
     /* Return the gcLINKTREE structure pointer. */
     *Tree = tree;
@@ -2988,13 +2988,6 @@ gcLINKTREE_Build(
                 if (format == gcSL_FLOAT16 &&
                     gcmSL_OPCODE_GET(code->opcode, Opcode) != gcSL_CONV)
                 {
-                    gcmASSERT(gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_LOAD ||
-                              gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_STORE ||
-                              gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_STORE1 ||
-                              gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_CMP ||
-                              gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_COPY ||
-                              gcmSL_OPCODE_GET(code->opcode, Opcode) == gcSL_MOV);
-
                     format = gcSL_FLOAT;
                 }
 
@@ -6598,16 +6591,22 @@ gcLINKTREE_Link(
 
     if (!useFullNewLinker)
     {
-        status = _CheckIoAliasedLocation(VertexTree);
-        if (status != gcvSTATUS_OK)
+        if (VertexTree != gcvNULL)
         {
-            return status;
+            status = _CheckIoAliasedLocation(VertexTree);
+            if (status != gcvSTATUS_OK)
+            {
+                return status;
+            }
         }
 
-        status = _CheckIoAliasedLocation(FragmentTree);
-        if (status != gcvSTATUS_OK)
+        if (FragmentTree != gcvNULL)
         {
-            return status;
+            status = _CheckIoAliasedLocation(FragmentTree);
+            if (status != gcvSTATUS_OK)
+            {
+                return status;
+            }
         }
     }
 
@@ -6687,6 +6686,36 @@ gcLINKTREE_Link(
                         gcmOUTPUT_isInvariant(output) != gcmATTRIBUTE_isInvariant(attribute))
                     {
                         return gcvSTATUS_VARYING_TYPE_MISMATCH;
+                    }
+
+                    /* Check the type name if needed. */
+                    if ((GetOutputTypeNameVarIndex(output) != -1 && GetATTRTypeNameVarIndex(attribute) == -1)
+                        ||
+                        (GetOutputTypeNameVarIndex(output) == -1 && GetATTRTypeNameVarIndex(attribute) != -1))
+
+                    {
+                        return gcvSTATUS_VARYING_TYPE_MISMATCH;
+                    }
+
+                    if (GetOutputTypeNameVarIndex(output) != -1 && GetATTRTypeNameVarIndex(attribute) != -1)
+                    {
+                        gcVARIABLE outputVar = gcvNULL, inputVar = gcvNULL;
+
+                        gcSHADER_GetVariable(VertexTree->shader,
+                                             (gctUINT)GetOutputTypeNameVarIndex(output),
+                                             &outputVar);
+                        gcSHADER_GetVariable(FragmentTree->shader,
+                                             (gctUINT)GetATTRTypeNameVarIndex(attribute),
+                                             &inputVar);
+
+                        gcmASSERT(isVariableTypeName(outputVar) && isVariableTypeName(inputVar));
+
+                        if (outputVar->nameLength != inputVar->nameLength
+                            ||
+                            !gcmIS_SUCCESS(gcoOS_StrCmp(outputVar->name, inputVar->name)))
+                        {
+                            return gcvSTATUS_VARYING_TYPE_MISMATCH;
+                        }
                     }
 
                     /* Determine rows and components. */
@@ -9114,16 +9143,8 @@ _InitializeSamplerAddress(
     gctINT vsBase, psBase;
     gctBOOL remapSamplerAddress = gcvFALSE;
 
-    gcoHAL_QuerySamplerBase(gcvNULL,
-                            gcvNULL,
-                            &vsBase,
-                            gcvNULL,
-                            &psBase);
-
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SAMPLER_BASE_OFFSET))
-    {
-        vsBase = 0;
-    }
+    vsBase = gcHWCaps.vsSamplerNoBaseInInstruction;
+    psBase = gcHWCaps.psSamplerNoBaseInInstruction;
 
     /* Determine starting sampler index. */
     samplerBase = (Shader->type == gcSHADER_TYPE_VERTEX)
@@ -10116,7 +10137,7 @@ _gcCheckShadersVersion(
     fragLangVersion = FragmentShader->compilerVersion[0] & 0xFF;
 
     if(vertexLangVersion != fragLangVersion) {
-#if gcdDEBUG
+#if gcmIS_DEBUG(gcdDEBUG_FATAL)
         gctUINT8 *verVersionPtr = (gctUINT8 *)&vertexLangVersion;
         gctUINT8 *fragVersionPtr = (gctUINT8 *)&fragLangVersion;
 
@@ -10170,7 +10191,8 @@ PatchShaders(
                 }
             }
         }
-        else if (!gcUseFullNewLinker(gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2))) && FragmentShader->attributes[i]->nameLength == gcSL_POINT_COORD)
+        else if (!gcUseFullNewLinker(gcHWCaps.hwFeatureFlags.hasHalti2) &&
+                  FragmentShader->attributes[i]->nameLength == gcSL_POINT_COORD)
         {
             gctSIZE_T j;
 
@@ -10203,10 +10225,7 @@ PatchShaders(
     if (position != -1)
     {
         if (!hasPositionW
-        &&  (gcoHAL_IsFeatureAvailable1(gcvNULL,
-                                        gcvFEATURE_SHADER_HAS_W)
-             == gcvSTATUS_FALSE)
-        )
+        &&  !gcHWCaps.hwFeatureFlags.raPushPosW)
         {
             gctINT temp = -1;
 
@@ -10277,7 +10296,7 @@ _FindTexLodAndTexBias(
     IN gcSHADER FragmentShader
     )
 {
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TEXTURE_BIAS_LOD_FIX) == gcvSTATUS_FALSE)
+    if (!gcHWCaps.hwFeatureFlags.hasTxBiasLodFix)
     {
         gcShaderCodeInfo  vertexCodeInfo, fragCodeInfo;
 
@@ -10800,9 +10819,13 @@ gcLINKTREE_FindModelViewProjection(
     gctINT matchCount = 0;
     gcOUTPUT positionOutput = gcvNULL;
     gctINT positionTempHolding = 0;
-    gcePATCH_ID patchId = gcvPATCH_INVALID;
+    gcePATCH_ID patchId = gcPatchId;
 
-    gcoHAL_GetPatchID(gcvNULL, &patchId);
+    /* Skip this for recompile. */
+    if (VertexTree->flags & gcvSHADER_RECOMPILER)
+    {
+        return;
+    }
 
     /* Find the output position. */
     for (i = 0; i < VertexTree->outputCount; ++i)
@@ -10822,7 +10845,7 @@ gcLINKTREE_FindModelViewProjection(
     }
 
 #if gcdUSE_WCLIP_PATCH
-    if (patchId == gcvPATCH_DEQP)
+    if (patchId == gcvPATCH_DEQP || patchId == gcvPATCH_GTFES30)
     {
         /* Check that direct position first. */
         for (i = 0; i < VertexTree->shader->codeCount; i++)
@@ -11187,7 +11210,7 @@ _ConvertCONV(
     gcSL_SWIZZLE swizzle;
     gcSL_PRECISION precision;
     gctUINT16 newTempIndex, origTempIndex;
-    gctBOOL hasInteger = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SUPPORT_INTEGER);
+    gctBOOL hasInteger = gcHWCaps.hwFeatureFlags.supportInteger;
 
     if (ConvertToF2IOnly && Tree->patchID == gcvPATCH_GLBM25)
     {
@@ -11332,7 +11355,7 @@ _ConvertCONVForOneShader(
     ** CONV.RTZ float, float, float ==> F2I int, float.
     */
 
-    supportMOVAI = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SUPPORT_MOVAI);
+    supportMOVAI = gcHWCaps.hwFeatureFlags.supportmovai;
 
     for (i = 0; i < origCodeCount; i++)
     {
@@ -12008,16 +12031,10 @@ gcLINKTREE_AllocateConstantUniform(
 
     gcSHADER_GetUniformVectorCount(Tree->shader, &curUsedUniform);
 
-    gcmVERIFY_OK(gcoHAL_QueryShaderCaps(
-                   gcvNULL,
-                   gcvNULL,
-                   &vsUniform,
-                   &psUniform,
-                   gcvNULL,
-                   gcvNULL,
-                   gcvNULL,
-                   gcvNULL,
-                   gcvNULL));
+    vsUniform = gcHWCaps.maxVSConstRegCount;
+    psUniform = gcHWCaps.maxPSConstRegCount;
+
+    _MASSAGE_MAX_UNIFORM_FOR_OES30(vsUniform, psUniform);
 
     maxShaderUniforms = (Tree->shader->type == gcSHADER_TYPE_VERTEX)
                         ? vsUniform
@@ -12507,7 +12524,7 @@ _convertImageReadToTexld(
     )
 {
     gceSTATUS           status = gcvSTATUS_OK;
-    gctBOOL             computeOnlyGpu = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_COMPUTE_ONLY);
+    gctBOOL             computeOnlyGpu = gcHWCaps.hwFeatureFlags.computeOnly;
     gcKERNEL_FUNCTION   kernelFunction = gcvNULL;
     gctSIZE_T           origUniformCount;
     gctSIZE_T           imageSamplerCount = 0;
@@ -12774,8 +12791,8 @@ _convertImageReadToTexld(
         }
         else
         {
-            if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE) ||  /* v55 */
-                gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE_V2)) /* v60 and above */
+            if (gcHWCaps.hwFeatureFlags.hasUniversalTexld || /* v55 */
+                gcHWCaps.hwFeatureFlags.hasUniversalTexldV2) /* v60 and above */
             {
                 /* Set HW sampler value. */
                 if (isConstantSamplerType)
@@ -12814,8 +12831,8 @@ _convertImageReadToTexld(
         }
 #else
         if ((computeOnlyGpu ||
-             gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE) ||
-             gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_INTEGER_COORDINATE_V2)) &&
+             gcHWCaps.hwFeatureFlags.hasUniversalTexld ||
+             gcHWCaps.hwFeatureFlags.hasUniversalTexldV2) &&
              isConstantSamplerType &&
              (coordFormat != gcSL_FLOAT) &&
              ((Flags & gcvSHADER_IMAGE_PATCHING) != gcvSHADER_IMAGE_PATCHING))
@@ -12869,19 +12886,14 @@ _ToUploadUBO(
 
     if(gcmOPT_UploadUBO() &&
        VertexShader && FragmentShader) {
-        gctUINT maxVertexUniforms;
-        gctUINT maxFragmentUniforms;
+        gctUINT vsUniform;
+        gctUINT psUniform;
         gctUINT uniformCount, uboUniformCount;
 
-        gcmVERIFY_OK(gcoHAL_QueryShaderCaps(gcvNULL,
-                                            gcvNULL,
-                                            &maxVertexUniforms,
-                                            &maxFragmentUniforms,
-                                            gcvNULL,
-                                            gcvNULL,
-                                            gcvNULL,
-                                            gcvNULL,
-                                            gcvNULL));
+        vsUniform = gcHWCaps.maxVSConstRegCount;
+        psUniform = gcHWCaps.maxPSConstRegCount;
+
+        _MASSAGE_MAX_UNIFORM_FOR_OES30(vsUniform, psUniform);
 
         do {
             gcSHADER_GetUniformVectorCount(VertexShader,
@@ -12890,7 +12902,7 @@ _ToUploadUBO(
             gcSHADER_GetUniformVectorCountByCategory(VertexShader,
                                                      gcSHADER_VAR_CATEGORY_BLOCK_MEMBER,
                                                      &uboUniformCount);
-            if(maxVertexUniforms < (uniformCount + uboUniformCount)) break;
+            if(vsUniform < (uniformCount + uboUniformCount)) break;
 
             gcSHADER_GetUniformVectorCount(FragmentShader,
                                            &uniformCount);
@@ -12898,7 +12910,7 @@ _ToUploadUBO(
             gcSHADER_GetUniformVectorCountByCategory(FragmentShader,
                                                      gcSHADER_VAR_CATEGORY_BLOCK_MEMBER,
                                                      &uboUniformCount);
-            if(maxFragmentUniforms < (uniformCount + uboUniformCount)) break;
+            if(psUniform < (uniformCount + uboUniformCount)) break;
 
             uploadUBO = gcvTRUE;
         } while (gcvFALSE);
@@ -13348,7 +13360,7 @@ gcLinkTreeThruVirShaders(
         gctBOOL                        dumpCGV = gcvFALSE;
         gceAPI                         clientAPI = gcvAPI_OPENGL_ES30;
 
-        gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &coreSysCtx.hwCfg));
+        coreSysCtx.hwCfg = gcHWCaps;
         coreSysCtx.hPrivData = gcvNULL;
         sysCtx.pCoreSysCtx = &coreSysCtx;
         sysCtx.drvCBs.pfnAllocVidMemCb = (PFN_ALLOC_VIDMEM_CB)gcoSHADER_AllocateVidMem;
@@ -13422,10 +13434,9 @@ gcLinkTreeThruVirShaders(
             scParam.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_FULL_LEVELS|
                                  VSC_COMPILER_FLAG_COMPILE_CODE_GEN;
             scParam.cfg.ctx.clientAPI = clientAPI;
-            scParam.cfg.optFlags = VSC_COMPILER_OPT_FULL;
+            scParam.cfg.optFlags = VSC_COMPILER_OPT_NONE;
             scParam.cfg.ctx.pSysCtx = &sysCtx;
-            gcoHAL_GetPatchID(gcvNULL, &scParam.cfg.ctx.appNameId);
-
+            scParam.cfg.ctx.appNameId = gcPatchId;
             if (Flags & gcvSHADER_FLUSH_DENORM_TO_ZERO)
             {
                 scParam.cfg.cFlags |= VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO;
@@ -13473,39 +13484,37 @@ gcLinkTreeThruVirShaders(
 
             pgComParam.cfg.ctx.clientAPI = clientAPI;
 
-            pgComParam.cfg.optFlags = VSC_COMPILER_OPT_FULL;
+            pgComParam.cfg.optFlags = VSC_COMPILER_OPT_NONE;
             if (Flags & gcvSHADER_DISABLE_DEFAULT_UBO)
             {
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_CONSTANT_REG_SPILLABLE;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_CONSTANT_REG_SPILLABLE;
             }
             if (Flags & gcvSHADER_DISABLE_DUAL16)
             {
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_DUAL16;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_DUAL16;
             }
             if (Flags & gcvSHADER_MIN_COMP_TIME)
             {
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_LCSE;
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_DCE;
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_PEEPHOLE;
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_CONSTANT_PROPOGATION;
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_CONSTANT_FOLDING;
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_INST_SKED;
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_CONSTANT_REG_SPILLABLE;
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_VEC;
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_IO_PACKING;
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_FULL_ACTIVE_IO;
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_DUAL16;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_LCSE;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_DCE;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_PEEPHOLE;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_CONSTANT_PROPOGATION;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_CONSTANT_FOLDING;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_INST_SKED;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_VEC;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_IO_PACKING;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_FULL_ACTIVE_IO;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_DUAL16;
             }
             if (Flags & gcvSHADER_SET_INLINE_LEVEL_0)
             {
-                pgComParam.cfg.optFlags &= ~VSC_COMPILER_OPT_FUNC_INLINE;
+                pgComParam.cfg.optFlags |= VSC_COMPILER_OPT_NO_FUNC_INLINE;
             }
 
             pgComParam.cfg.ctx.pSysCtx = &sysCtx;
 
             pgComParam.pGlApiCfg = gcGetGLSLCaps();
-
-            gcoHAL_GetPatchID(gcvNULL, &pgComParam.cfg.ctx.appNameId);
+            pgComParam.cfg.ctx.appNameId = gcPatchId;
 
             if (pgComParam.cfg.ctx.appNameId == gcvPATCH_AXX_SAMPLE)
             {
@@ -14604,16 +14613,10 @@ _gcCreateConstantUBO(
 
     gcSHADER_GetUniformVectorCount(Shader, &curUsedUniform);
 
-    gcmONERROR(gcoHAL_QueryShaderCaps(
-                   gcvNULL,
-                   gcvNULL,
-                   &vsUniform,
-                   &psUniform,
-                   gcvNULL,
-                   gcvNULL,
-                   gcvNULL,
-                   gcvNULL,
-                   gcvNULL));
+    vsUniform = gcHWCaps.maxVSConstRegCount;
+    psUniform = gcHWCaps.maxPSConstRegCount;
+
+    _MASSAGE_MAX_UNIFORM_FOR_OES30(vsUniform, psUniform);
 
     maxShaderUniforms = (Shader->type == gcSHADER_TYPE_VERTEX)
                         ? vsUniform
@@ -15843,7 +15846,7 @@ _gcConvert32BitModulus(
     gctUINT lastInst = Shader->lastInstruction;
     gctBOOL changed = gcvFALSE;
 
-    if(!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI0))
+    if(!gcHWCaps.hwFeatureFlags.hasHalti0)
     {
         return status;
     }
@@ -16714,7 +16717,7 @@ gcLinkShaders(
                   VertexShader, FragmentShader, Flags);
 
     gcSetOptimizerOption(Flags);
-    hasHalti2 = gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2));
+    hasHalti2 = gcHWCaps.hwFeatureFlags.hasHalti2;
     useFullNewLinker = gcUseFullNewLinker(hasHalti2);
 
     /* Verify the arguments. */
@@ -16841,28 +16844,19 @@ gcLinkShaders(
     }
 
     if (enableDefaultUBO &&
-        gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1))
+        gcHWCaps.hwFeatureFlags.hasHalti1)
     {
-        gctUINT maxVertexUniforms;
-        gctUINT maxFragmentUniforms;
+        gctUINT vsUniform;
+        gctUINT psUniform;
         gctUINT uniformsUsed = 0;
         gcSHADER shader;
         gctINT i;
-        gcoHARDWARE hardware;
         gctBOOL IsUsedLoadInstruction[2] = {gcvFALSE, gcvFALSE};
 
-        gcoHAL_GetHardware(gcvNULL, &hardware);
-        gcmASSERT(hardware);
+        vsUniform = gcHWCaps.maxVSConstRegCount;
+        psUniform = gcHWCaps.maxPSConstRegCount;
 
-        gcmVERIFY_OK(gcoHAL_QueryShaderCaps(gcvNULL,
-                                            gcvNULL,
-                                            &maxVertexUniforms,
-                                            &maxFragmentUniforms,
-                                            gcvNULL,
-                                            gcvNULL,
-                                            gcvNULL,
-                                            gcvNULL,
-                                            gcvNULL));
+        _MASSAGE_MAX_UNIFORM_FOR_OES30(vsUniform, psUniform);
 
         if (VertexShader && VertexShader->uniformCount > 0)
         {
@@ -16892,7 +16886,7 @@ gcLinkShaders(
             }
 
             status = _ManageUniformMembersInUBO(VertexShader,
-                                                maxVertexUniforms,
+                                                vsUniform,
                                                 &uniformsUsed,
                                                 &IsUsedLoadInstruction[0]);
             if (gcmIS_ERROR(status))
@@ -16913,7 +16907,7 @@ gcLinkShaders(
             }
 
             status = _ManageUniformMembersInUBO(FragmentShader,
-                                                maxFragmentUniforms,
+                                                psUniform,
                                                 gcvNULL,
                                                 &IsUsedLoadInstruction[1]);
             if (gcmIS_ERROR(status))
@@ -16937,7 +16931,7 @@ gcLinkShaders(
 
     do
     {
-        if(!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1) ||
+        if(!gcHWCaps.hwFeatureFlags.hasHalti1 ||
            _ToUploadUBO(VertexShader, FragmentShader, &uploadUBO))
         {
             /* TODO -
@@ -16956,7 +16950,7 @@ gcLinkShaders(
         /*
         ** we need to do some conversion for integer branch.
         */
-        if ((!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_PARTLY_SUPPORT_INTEGER_BRANCH)) &&
+        if ((!gcHWCaps.hwFeatureFlags.supportPartIntBranch) &&
             (!isRecompiler))
         {
             if (VertexShader)
@@ -16975,8 +16969,8 @@ gcLinkShaders(
         */
         if (!useFullNewLinker)
         {
-            if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1) &&
-                gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SHADER_ENHANCEMENTS2) &&
+            if (gcHWCaps.hwFeatureFlags.hasHalti1 &&
+                gcHWCaps.hwFeatureFlags.hasSHEnhance2 &&
                 !gcmOPT_NOIMMEDIATE())
             {
                 if (VertexShader && VertexShader->replaceIndex == gcvMACHINECODE_COUNT)
@@ -17022,7 +17016,7 @@ gcLinkShaders(
 
         /* Remove some flags depending on the IP. */
         if ((Flags & gcvSHADER_USE_GL_Z) &&
-            gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_USE_GL_Z) == gcvSTATUS_FALSE)
+            !gcHWCaps.hwFeatureFlags.useGLZ)
         {
             Flags &= ~gcvSHADER_USE_GL_Z;
         }
@@ -17237,7 +17231,7 @@ gcLinkShaders(
                 {
                     VSC_PRIMARY_MEM_POOL allShadersPmp;
                     VSC_AllShaders all_shaders;
-                    VSC_OPTN_UF_AUBO_Options* aubo_options;
+                    VSC_OPTN_UF_AUBOOptions* aubo_options;
                     char buffer[4096];
                     VIR_Dumper dumper;
 
@@ -17252,7 +17246,7 @@ gcLinkShaders(
 
                     /* Create Default UBO*/
                     aubo_options = VSC_OPTN_Options_GetAUBOOptions(VSC_OPTN_Get_Options());
-                    if (VSC_OPTN_UF_AUBO_Options_GetSwitchOn(aubo_options) && !(Flags & gcvSHADER_DISABLE_DEFAULT_UBO))
+                    if (VSC_OPTN_UF_AUBOOptions_GetSwitchOn(aubo_options) && !(Flags & gcvSHADER_DISABLE_DEFAULT_UBO))
                     {
                         VSC_UF_UtilizeAuxUBO(&all_shaders, gcvNULL, aubo_options);
                     }
@@ -17313,9 +17307,9 @@ gcLinkShaders(
             }
 
             /* Check if we need to enable icache. */
-            if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SH_INSTRUCTION_PREFETCH))
+            if (gcHWCaps.hwFeatureFlags.hasInstCachePrefetch)
             {
-                gcmASSERT(gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SHADER_HAS_INSTRUCTION_CACHE));
+                gcmASSERT(gcHWCaps.hwFeatureFlags.hasInstCache);
                 if (vertexTree)
                     vertexTree->useICache = gcvTRUE;
                 if (fragmentTree)
@@ -17323,14 +17317,9 @@ gcLinkShaders(
             }
             else if (VertexShader && FragmentShader)
             {
-                if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SHADER_HAS_INSTRUCTION_CACHE))
+                if (gcHWCaps.hwFeatureFlags.hasInstCache)
                 {
-                    gcoHARDWARE hardware;
-
-                    gcoHAL_GetHardware(gcvNULL, &hardware);
-                    gcmASSERT(hardware);
-
-                    if ((VertexShader->codeCount + FragmentShader->codeCount) >= (gctSIZE_T)hardware->config->instructionCount)
+                    if ((VertexShader->codeCount + FragmentShader->codeCount) >= (gctSIZE_T)gcHWCaps.maxHwNativeTotalInstCount)
                     {
                         if (vertexTree)
                             vertexTree->useICache = gcvTRUE;
@@ -17364,7 +17353,7 @@ gcLinkShaders(
                     gcmERR_BREAK(gcSHADER_Copy(vsTemp, (gcSHADER)VertexShader));
                 }
 
-                if (gcSHADER_DumpFinalIR(VertexShader))
+                if (gcSHADER_DumpFinalIR(VertexShader) && !useFullNewLinker)
                 {
                     gcDump_Shader(gcvNULL, "Final vertex shader IR.", gcvNULL, VertexShader, gcvTRUE);
                 }
@@ -17372,8 +17361,7 @@ gcLinkShaders(
                 if(vertexTree->hints)
                     vertexTree->hints->uploadedUBO = uploadUBO;
 
-                gcmERR_BREAK(gcLINKTREE_GenerateStates(gcvNULL,
-                                                       &vertexTree,
+                gcmERR_BREAK(gcLINKTREE_GenerateStates(&vertexTree,
                                                        Flags,
                                                        gcvNULL,
                                                        gcvNULL,
@@ -17412,7 +17400,7 @@ gcLinkShaders(
                     gcmERR_BREAK(gcSHADER_Copy(fsTemp, (gcSHADER)FragmentShader));
                 }
 
-                if (gcSHADER_DumpFinalIR(FragmentShader))
+                if (gcSHADER_DumpFinalIR(FragmentShader) && !useFullNewLinker)
                 {
                     gcDump_Shader(gcvNULL, "Final fragment shader IR.", gcvNULL, FragmentShader, gcvTRUE);
                 }
@@ -17420,8 +17408,7 @@ gcLinkShaders(
                 if(fragmentTree->hints)
                     fragmentTree->hints->uploadedUBO = uploadUBO;
 
-                gcmERR_BREAK(gcLINKTREE_GenerateStates(gcvNULL,
-                                                       &fragmentTree,
+                gcmERR_BREAK(gcLINKTREE_GenerateStates(&fragmentTree,
                                                        Flags,
                                                        gcvNULL,
                                                        gcvNULL,
@@ -17568,7 +17555,7 @@ _gcLinkFullGraphicsShaders(
     gcmHEADER_ARG("Shaders=0x%x Flags=%x", Shaders, Flags);
 
     gcSetOptimizerOption(Flags);
-    useFullNewLinker = gcUseFullNewLinker(gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2)));
+    useFullNewLinker = gcUseFullNewLinker(gcHWCaps.hwFeatureFlags.hasHalti2);
 
     firstShot = gcvFALSE;
     for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i ++)
@@ -17659,7 +17646,7 @@ _gcLinkFullGraphicsShaders(
     /*
     ** we need to do some conversion for integer branch.
     */
-    if ((!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_PARTLY_SUPPORT_INTEGER_BRANCH)) &&
+    if ((!gcHWCaps.hwFeatureFlags.supportPartIntBranch) &&
         (!isRecompiler))
     {
         for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i ++)
@@ -17685,7 +17672,7 @@ _gcLinkFullGraphicsShaders(
 
     /* Remove some flags depending on the IP. */
     if ((Flags & gcvSHADER_USE_GL_Z) &&
-        gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_USE_GL_Z) == gcvSTATUS_FALSE)
+        !gcHWCaps.hwFeatureFlags.useGLZ)
     {
         Flags &= ~gcvSHADER_USE_GL_Z;
     }
@@ -17990,32 +17977,22 @@ gcLinkKernel(
 
     if (gcmOPT_CreateDefaultUBO() &&
         Kernel->uniformBlockCount &&
-        gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1))
+        gcHWCaps.hwFeatureFlags.hasHalti1)
     {
-        gctUINT maxVertexUniforms;
-        gctUINT maxFragmentUniforms;
+        gctUINT vsUniform;
+        gctUINT psUniform;
         gctUINT uniformsUsed = 0;
-        gcoHARDWARE hardware;
         gctBOOL isUsedLoadInstruction = Kernel->uniformCount ? gcvTRUE : gcvFALSE;
-
-        gcoHAL_GetHardware(gcvNULL, &hardware);
-        gcmASSERT(hardware);
 
         Kernel->enableDefaultUBO = gcvTRUE;
 
-        gcmVERIFY_OK(gcoHAL_QueryShaderCaps(gcvNULL,
-                                            gcvNULL,
-                                            &maxVertexUniforms,
-                                            &maxFragmentUniforms,
-                                            gcvNULL,
-                                            gcvNULL,
-                                            gcvNULL,
-                                            gcvNULL,
-                                            gcvNULL));
+        vsUniform = gcHWCaps.maxVSConstRegCount;
+        psUniform = gcHWCaps.maxPSConstRegCount;
 
+        _MASSAGE_MAX_UNIFORM_FOR_OES30(vsUniform, psUniform);
 
         status = _ManageUniformMembersInUBO(Kernel,
-                                            maxVertexUniforms + maxFragmentUniforms,
+                                            vsUniform + psUniform,
                                             &uniformsUsed,
                                             &isUsedLoadInstruction);
         if (gcmIS_ERROR(status))
@@ -18124,7 +18101,7 @@ gcLinkKernel(
 
             trees[gceSGSK_CL_SHADER] = &kernelTree;
 
-            if (gcUseFullNewLinker(gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2))))
+            if (gcUseFullNewLinker(gcHWCaps.hwFeatureFlags.hasHalti2))
             {
                 gcmONERROR(gcLinkTreeThruVirShaders(trees, gcvTRUE, Flags,
                                                     gcvFALSE, StateBufferSize, StateBuffer, Hints));
@@ -18154,8 +18131,7 @@ gcLinkKernel(
             }
 
             /* Generate kernel shader states. */
-            gcmONERROR(gcLINKTREE_GenerateStates(gcvNULL,
-                                                 &kernelTree,
+            gcmONERROR(gcLINKTREE_GenerateStates(&kernelTree,
                                                  Flags,
                                                  gcvNULL,
                                                  gcvNULL,
@@ -18228,9 +18204,10 @@ _gcConvertSharedMemoryBaseAddr(
     gcUNIFORM               uniform, blockAddrUniform, numGroupsUniform = gcvNULL;
     gcATTRIBUTE             attr, groupIdAttr = gcvNULL;
     gcSL_INSTRUCTION        code = gcvNULL;
-    gctUINT16               addCodeCount = 6;
+    gctUINT16               addCodeCount = 7;
     gctUINT16               blockAddrTempIndex;
-    gctUINT16               tempIndex1, tempIndex2, tempIndex3, tempIndex4, tempIndex5, tempIndex6;
+    gctINT16                workgroupIdIndex;
+    gctUINT16               tempIndex1, tempIndex2, tempIndex3, tempIndex4, tempIndex5, tempIndex6, tempIndex7;
     gctUINT32               uintConstant[1];
     void*                   constantPtr;
 
@@ -18367,12 +18344,34 @@ _gcConvertSharedMemoryBaseAddr(
     gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex3, gcSL_SWIZZLE_XXXX, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
     gcmONERROR(gcSHADER_AddSourceAttribute(Shader, groupIdAttr, gcSL_SWIZZLE_XXXX, 0));
 
-    /* MUL temp5.x, temp4.x, shared_memory_size */
+    /* MOD temp7.x, temp4.x, #current_num_workgroup
+       we use 100 for #current_num_workgroup here. After register allocation, we change it to
+       the real value. */
+    tempIndex7 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
+    gcSHADER_AddVariableEx(Shader,
+        "#sh_workgroupId",
+        gcSHADER_FLOAT_X3,
+        0,
+        gcvNULL,
+        (gctUINT16)tempIndex7,
+        gcSHADER_VAR_CATEGORY_NORMAL,
+        gcSHADER_PRECISION_MEDIUM,
+        0,
+        -1,
+        -1,
+        &workgroupIdIndex);
+    uintConstant[0] = 100;
+    constantPtr = (void *)uintConstant;
+    gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MOD, tempIndex7, gcSL_ENABLE_X, gcSL_UINT16, gcSHADER_PRECISION_MEDIUM, 0));
+    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex4, gcSL_SWIZZLE_XXXX, gcSL_UINT16, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSourceConstantFormattedWithPrecision(Shader, constantPtr, gcSL_UINT16, gcSHADER_PRECISION_MEDIUM));
+
+    /* MUL temp5.x, temp7.x, shared_memory_size */
     tempIndex5 = (gctUINT16)gcSHADER_NewTempRegs(Shader, 1, gcSHADER_UINT_X1);
     uintConstant[0] = GetSBBlockSize(ssbo);
     constantPtr = (void *)uintConstant;
     gcmONERROR(gcSHADER_AddOpcode(Shader, gcSL_MUL, tempIndex5, gcSL_ENABLE_X, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM, 0));
-    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex4, gcSL_SWIZZLE_XXXX, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
+    gcmONERROR(gcSHADER_AddSource(Shader, gcSL_TEMP, tempIndex7, gcSL_SWIZZLE_XXXX, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
     gcmONERROR(gcSHADER_AddSourceConstantFormattedWithPrecision(Shader, constantPtr, gcSL_UINT32, gcSHADER_PRECISION_MEDIUM));
 
     /* ADD temp6.x, base_addr, temp5.x*/
@@ -18474,7 +18473,7 @@ _gcLinkComputeShader(
     gctBOOL                 isRecompiler = Flags & gcvSHADER_RECOMPILER;
     gcSHADER                Shaders[gcMAX_SHADERS_IN_LINK_GOURP] = {0, 0, 0, 0, 0, 0};
     gcLINKTREE              *trees[gcMAX_SHADERS_IN_LINK_GOURP] = {0, 0, 0, 0, 0, 0};
-    gctBOOL                 hasHalti2 = gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2));
+    gctBOOL                 hasHalti2 = gcHWCaps.hwFeatureFlags.hasHalti2;
     gctBOOL                 useFullNewLinker = gcvFALSE;
 
     gcmHEADER_ARG("ComputeShader=0x%x Flags=%x",
@@ -18532,8 +18531,8 @@ _gcLinkComputeShader(
 
     if (!useFullNewLinker)
     {
-        if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1) &&
-            gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SHADER_ENHANCEMENTS2) &&
+        if (gcHWCaps.hwFeatureFlags.hasHalti1 &&
+            gcHWCaps.hwFeatureFlags.hasSHEnhance2 &&
             !gcmOPT_NOIMMEDIATE())
         {
             if (ComputeShader && ComputeShader->replaceIndex == gcvMACHINECODE_COUNT)
@@ -18639,7 +18638,7 @@ _gcLinkComputeShader(
             {
                 VSC_PRIMARY_MEM_POOL allShadersPmp;
                 VSC_AllShaders all_shaders;
-                VSC_OPTN_UF_AUBO_Options* aubo_options;
+                VSC_OPTN_UF_AUBOOptions* aubo_options;
                 char buffer[4096];
                 VIR_Dumper dumper;
 
@@ -18654,7 +18653,7 @@ _gcLinkComputeShader(
 
                 /* Create Default UBO*/
                 aubo_options = VSC_OPTN_Options_GetAUBOOptions(VSC_OPTN_Get_Options());
-                if (VSC_OPTN_UF_AUBO_Options_GetSwitchOn(aubo_options))
+                if (VSC_OPTN_UF_AUBOOptions_GetSwitchOn(aubo_options))
                 {
                     VSC_UF_UtilizeAuxUBO(&all_shaders, gcvNULL, aubo_options);
                 }
@@ -18692,18 +18691,13 @@ _gcLinkComputeShader(
                 gcDump_Shader(gcvNULL, "Final compute shader IR.", gcvNULL, ComputeShader, gcvTRUE);
             }
 
-            if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SH_INSTRUCTION_PREFETCH))
+            if (gcHWCaps.hwFeatureFlags.hasInstCachePrefetch)
             {
                 computeTree->useICache = gcvTRUE;
             }
-            else if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SHADER_HAS_INSTRUCTION_CACHE))
+            else if (gcHWCaps.hwFeatureFlags.hasInstCache)
             {
-                gcoHARDWARE hardware;
-
-                gcoHAL_GetHardware(gcvNULL, &hardware);
-                gcmASSERT(hardware);
-
-                if (ComputeShader->codeCount >= (gctSIZE_T)hardware->config->instructionCount)
+                if (ComputeShader->codeCount >= (gctSIZE_T)gcHWCaps.maxHwNativeTotalInstCount)
                 {
                     computeTree->useICache = gcvTRUE;
                 }
@@ -18713,8 +18707,7 @@ _gcLinkComputeShader(
                 }
             }
             /* Generate kernel shader states. */
-            gcmONERROR(gcLINKTREE_GenerateStates(gcvNULL,
-                                                 &computeTree,
+            gcmONERROR(gcLINKTREE_GenerateStates(&computeTree,
                                                  Flags,
                                                  gcvNULL,
                                                  gcvNULL,
@@ -19059,6 +19052,62 @@ gcLinkProgram(
 }
 
 gceSTATUS
+_LinkProgramCopyTFB(
+    IN gcSHADER inShader,
+    OUT gcSHADER outShader
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT   j, k;
+
+    if (inShader && inShader->transformFeedback.varyingCount > 0)
+    {
+        gcmASSERT(inShader->transformFeedback.varyings);
+
+        outShader->transformFeedback.varyingCount = inShader->transformFeedback.varyingCount;
+        outShader->transformFeedback.bufferMode = inShader->transformFeedback.bufferMode;
+        outShader->transformFeedback.stateUniform = gcvNULL;
+        outShader->transformFeedback.feedbackBuffer.interleavedBufUniform = gcvNULL;
+        outShader->transformFeedback.varRegInfos = gcvNULL;
+        outShader->transformFeedback.shaderTempCount = inShader->transformFeedback.shaderTempCount;
+        outShader->transformFeedback.totalSize = inShader->transformFeedback.totalSize;
+
+        gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                  gcmSIZEOF(gcsTFBVarying) * inShader->transformFeedback.varyingCount,
+                                  (gctPOINTER*)&outShader->transformFeedback.varyings));
+
+        for (j = 0; j < inShader->transformFeedback.varyingCount; ++j)
+        {
+            if (inShader->transformFeedback.varyings[j].name)
+            {
+                gctUINT nameLength = gcoOS_StrLen(inShader->transformFeedback.varyings[j].name, gcvNULL) + 1;
+                gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                            nameLength,
+                                            (gctPOINTER*)&outShader->transformFeedback.varyings[j].name));
+                gcoOS_MemCopy(outShader->transformFeedback.varyings[j].name,
+                                inShader->transformFeedback.varyings[j].name,
+                                nameLength);
+
+                outShader->transformFeedback.varyings[j].arraySize = inShader->transformFeedback.varyings[j].arraySize;
+                outShader->transformFeedback.varyings[j].isWholeTFBed = inShader->transformFeedback.varyings[j].isWholeTFBed;
+                outShader->transformFeedback.varyings[j].isArray = inShader->transformFeedback.varyings[j].isArray;
+
+                for (k = 0; k < inShader->outputCount; k++)
+                {
+                    if (inShader->outputs[k] == inShader->transformFeedback.varyings[j].output)
+                    {
+                        outShader->transformFeedback.varyings[j].output = outShader->outputs[k];
+                        break;
+                    }
+                }
+            }
+        }
+    }
+OnError:
+    return status;
+}
+
+gceSTATUS
 _LinkProgramPipeline(
     IN gcSHADER VertexShader,
     IN gcSHADER FragmentShader,
@@ -19081,21 +19130,27 @@ _LinkProgramPipeline(
 
     gcmHEADER_ARG("VertexShader=0x%x FragmentShader=0x%x",
                   VertexShader, FragmentShader);
-
-    gcmASSERT(VertexShader && FragmentShader);
-
     do
     {
         gcmERR_BREAK(gcSHADER_Construct(gcSHADER_TYPE_VERTEX, &vsTemp));
         gcmERR_BREAK(gcSHADER_Copy(vsTemp, (gcSHADER)VertexShader));
 
-        gcmERR_BREAK(gcSHADER_Construct(gcSHADER_TYPE_FRAGMENT, &fsTemp));
-        gcmERR_BREAK(gcSHADER_Copy(fsTemp, (gcSHADER)FragmentShader));
+        if (FragmentShader)
+        {
+            gcmERR_BREAK(gcSHADER_Construct(gcSHADER_TYPE_FRAGMENT, &fsTemp));
+            gcmERR_BREAK(gcSHADER_Copy(fsTemp, (gcSHADER)FragmentShader));
 
-        gcmERR_BREAK(_gcCheckShadersVersion(vsTemp, fsTemp));
+            gcmERR_BREAK(_gcCheckShadersVersion(vsTemp, fsTemp));
 
-        /* Special case for Fragment Shader using PointCoord. */
-        gcmERR_BREAK(PatchShaders(vsTemp, fsTemp));
+            /* Special case for Fragment Shader using PointCoord. */
+            gcmERR_BREAK(PatchShaders(vsTemp, fsTemp));
+        }
+
+        /* If pre-RA shader has transform-feedback, then bound it */
+        {
+            _LinkProgramCopyTFB((gcSHADER)FragmentShader, fsTemp);
+            _LinkProgramCopyTFB((gcSHADER)VertexShader, vsTemp);
+        }
 
         gcmERR_BREAK(gcLINKTREE_Construct(gcvNULL, &vertexTree));
         gcmERR_BREAK(gcLINKTREE_Build(vertexTree, vsTemp, Flags));
@@ -19109,15 +19164,18 @@ _LinkProgramPipeline(
             gcmERR_BREAK(gcLINKTREE_MarkAllAsUsed(vertexTree));
         }
 
-        gcmERR_BREAK(gcLINKTREE_Construct(gcvNULL, &fragmentTree));
-        gcmERR_BREAK(gcLINKTREE_Build(fragmentTree, fsTemp, Flags));
-        if (gcShaderHwRegAllocated(fsTemp))
+        if (FragmentShader)
         {
-            gcmERR_BREAK(gcLINKTREE_MarkAllAsUsedwithRA(fragmentTree));
-        }
-        else
-        {
-            gcmERR_BREAK(gcLINKTREE_MarkAllAsUsed(fragmentTree));
+            gcmERR_BREAK(gcLINKTREE_Construct(gcvNULL, &fragmentTree));
+            gcmERR_BREAK(gcLINKTREE_Build(fragmentTree, fsTemp, Flags));
+            if (gcShaderHwRegAllocated(fsTemp))
+            {
+                gcmERR_BREAK(gcLINKTREE_MarkAllAsUsedwithRA(fragmentTree));
+            }
+            else
+            {
+                gcmERR_BREAK(gcLINKTREE_MarkAllAsUsed(fragmentTree));
+            }
         }
 
         /* Fill tree pointers. */
@@ -19129,7 +19187,7 @@ _LinkProgramPipeline(
         /* Convert CONV. */
         gcmERR_BREAK(gcLINKTREE_ConvertCONV(trees, gcvTRUE, gcvFALSE, gcvFALSE));
 
-        if (gcUseFullNewLinker(gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2))))
+        if (gcUseFullNewLinker(gcHWCaps.hwFeatureFlags.hasHalti2))
         {
             gcmERR_BREAK(gcLinkTreeThruVirShaders(trees, gcvFALSE, Flags,
                                                     gcvFALSE, StateBufferSize, StateBuffer, Hints));
@@ -19138,15 +19196,17 @@ _LinkProgramPipeline(
         {
             gcmERR_BREAK(gcLINKTREE_Link(linkTrees, gcvTRUE));
 
-            if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SHADER_HAS_INSTRUCTION_CACHE))
+            if (gcHWCaps.hwFeatureFlags.hasInstCache)
             {
-                gcoHARDWARE hardware;
+                gctINT fsCodeCount = 0;
 
-                gcoHAL_GetHardware(gcvNULL, &hardware);
-                gcmASSERT(hardware);
+                if (fsTemp)
+                {
+                    fsCodeCount = fsTemp->codeCount;
+                }
 
-                if (((vsTemp->codeCount + fsTemp->codeCount) >= (gctSIZE_T)hardware->config->instructionCount) ||
-                    (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SH_INSTRUCTION_PREFETCH))
+                if (((vsTemp->codeCount + fsCodeCount) >= (gctSIZE_T)gcHWCaps.maxHwNativeTotalInstCount) ||
+                    (gcHWCaps.hwFeatureFlags.hasInstCachePrefetch)
                     )
                 {
                     if (vertexTree)
@@ -19170,8 +19230,7 @@ _LinkProgramPipeline(
                     fragmentTree->useICache = gcvFALSE;
             }
 
-            gcmERR_BREAK(gcLINKTREE_GenerateStates(gcvNULL,
-                                                   &vertexTree,
+            gcmERR_BREAK(gcLINKTREE_GenerateStates(&vertexTree,
                                                    Flags,
                                                    gcvNULL,
                                                    gcvNULL,
@@ -19181,16 +19240,18 @@ _LinkProgramPipeline(
 
             gcmERR_BREAK(gcSetUniformShaderKind(VertexShader));
 
-            gcmERR_BREAK(gcLINKTREE_GenerateStates(gcvNULL,
-                                                   &fragmentTree,
-                                                   Flags,
-                                                   gcvNULL,
-                                                   gcvNULL,
-                                                   StateBufferSize,
-                                                   StateBuffer,
-                                                   Hints));
+            if (FragmentShader)
+            {
+                gcmERR_BREAK(gcLINKTREE_GenerateStates(&fragmentTree,
+                                                       Flags,
+                                                       gcvNULL,
+                                                       gcvNULL,
+                                                       StateBufferSize,
+                                                       StateBuffer,
+                                                       Hints));
 
-            gcmERR_BREAK(gcSetUniformShaderKind(FragmentShader));
+                gcmERR_BREAK(gcSetUniformShaderKind(FragmentShader));
+            }
         }
     }
     while (gcvFALSE);
@@ -19560,6 +19621,37 @@ _ValidateIOVariables(
         {
             return gcvSTATUS_VARYING_TYPE_MISMATCH;
         }
+
+        /* Check the type name if needed. */
+        if ((GetOutputTypeNameVarIndex(Output) != -1 && GetATTRTypeNameVarIndex(Input) == -1)
+            ||
+            (GetOutputTypeNameVarIndex(Output) == -1 && GetATTRTypeNameVarIndex(Input) != -1))
+
+        {
+            return gcvSTATUS_VARYING_TYPE_MISMATCH;
+        }
+
+        if (GetOutputTypeNameVarIndex(Output) != -1 && GetATTRTypeNameVarIndex(Input) != -1)
+        {
+            gcVARIABLE outputVar = gcvNULL, inputVar = gcvNULL;
+
+            gcSHADER_GetVariable(UpperShader,
+                                 (gctUINT)GetOutputTypeNameVarIndex(Output),
+                                 &outputVar);
+            gcSHADER_GetVariable(LowerShader,
+                                 (gctUINT)GetATTRTypeNameVarIndex(Input),
+                                 &inputVar);
+
+            gcmASSERT(isVariableTypeName(outputVar) && isVariableTypeName(inputVar));
+
+            if (outputVar->nameLength != inputVar->nameLength
+                ||
+                !gcmIS_SUCCESS(gcoOS_StrCmp(outputVar->name, inputVar->name)))
+            {
+                return gcvSTATUS_VARYING_TYPE_MISMATCH;
+            }
+        }
+
         return gcvSTATUS_TRUE;
     }
     /* Declared with same location */
@@ -19849,7 +19941,7 @@ _gcLoadProgramHeader(
     /* Word 2: program binary file version # */
     version = (gctUINT32 *) (signature + 1);
     if(*version > gcdSL_PROGRAM_BINARY_FILE_VERSION) {
-#if gcdDEBUG
+#if gcmIS_DEBUG(gcdDEBUG_FATAL)
         gctUINT8 *inputVerPtr, *curVerPtr;
         gctUINT32 curVer[1] = {gcdSL_PROGRAM_BINARY_FILE_VERSION};
 

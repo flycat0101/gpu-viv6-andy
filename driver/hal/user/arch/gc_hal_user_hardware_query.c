@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -3457,8 +3457,6 @@ gcoHARDWARE_InitializeFormatArrayTable(
         info->txIntFilter         = gcvTRUE;
     }
 
-    /* Float texture formats. */
-    /* TODO: Add else case for the float textures. */
     if (Hardware->features[gcvFEATURE_HALF_FLOAT_PIPE])
     {
         info = gcmGET_SURF_FORMAT_INFO(gcvSURF_R16F);
@@ -4727,6 +4725,10 @@ gcoHARDWARE_QueryBPP(
 
             case gcvSURF_NV12:
             case gcvSURF_NV21:
+                bpps[0] = 1.0;
+                bpps[1] = 1.0;
+                break;
+
             case gcvSURF_NV16:
             case gcvSURF_NV61:
                 bpps[0] = 1.0;
@@ -5012,7 +5014,7 @@ gcoHARDWARE_QueryCommandBuffer(
             gctSTRING profilemode = gcvNULL;
             gcmONERROR(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &profilemode));
             if (profilemode != gcvNULL &&
-                gcoOS_StrCmp(profilemode, "1") == gcvSTATUS_OK)
+                gcoOS_StrCmp(profilemode, "0") == gcvSTATUS_LARGER)
             {
                 *ReservedUser += gcdRESERVED_PAUSE_PROBE_LENGTH;
             }
@@ -5021,7 +5023,6 @@ gcoHARDWARE_QueryCommandBuffer(
 
     if (Source != gcvNULL)
     {
-        /* TODO: Remove platform limitation after porting. */
 #if ((defined(LINUX) || defined(__QNXNTO__)) && !defined(gcdFPGA)) && !defined(EMULATOR)
         *Source = gcvCMDBUF_VIRTUAL;
 #else
@@ -5127,7 +5128,7 @@ gcoHARDWARE_AlignToTile(
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
 
-    format = (gceSURF_FORMAT) (Format & ~gcvSURF_FORMAT_OCL);
+    format = (gceSURF_FORMAT) (Format & ~(gcvSURF_FORMAT_OCL | gcvSURF_FORMAT_PATCH_BORDER));
 
     gcmONERROR(gcoHARDWARE_QueryFormat(format, &formatInfo));
 
@@ -5171,14 +5172,14 @@ gcoHARDWARE_AlignToTile(
             }
             else
             {
-                /*
-                 * TODO: Is this always the render into texture case?
-                 * Tile alignment for render into texture. If supertiled texture and
-                 * supertiled render target are both supported, use super tile
-                 * alignment. Otherwise tile alignment is taken.
-                 */
                 superTiled = Hardware->features[gcvFEATURE_SUPER_TILED] &&
                              Hardware->features[gcvFEATURE_SUPERTILED_TEXTURE];
+            }
+
+            if ((Hint & gcvSURF_CREATE_AS_DISPLAYBUFFER) &&
+                 (gcoHAL_GetOption(gcvNULL, gcvOPTION_PREFER_TILED_DISPLAY_BUFFER)))
+            {
+                superTiled = gcvFALSE;
             }
 
             tiling = superTiled ? gcvSUPERTILED : gcvTILED;
@@ -5445,14 +5446,12 @@ gcoHARDWARE_AlignToTile(
 
     if (Width != gcvNULL)
     {
-        *Width = (*Width == 0) ? 1 : *Width;
         /* Align the width. */
         *Width = gcmALIGN_NP2(*Width, xAlignment);
     }
 
     if (Height != gcvNULL)
     {
-        *Height = (*Height == 0) ? 1 : *Height;
         /* Align the height. */
         *Height = gcmALIGN_NP2(*Height, yAlignment);
     }
@@ -5551,7 +5550,7 @@ gcoHARDWARE_AlignToTileCompatible(
 
     gcmONERROR(gcoOS_GetTLS(&tls));
 
-    /* Set to 3D hardwawre. */
+    /* Set to 3D hardware. */
     prevType = tls->currentType;
     tls->currentType = gcvHARDWARE_3D;
 
@@ -6505,8 +6504,6 @@ gcoHARDWARE_QueryShaderCapsEx(
 
     if (ClockFrequency != gcvNULL)
     {
-        /* Return the shader core clock in Mhz. */
-        /* TODO. */
         *ClockFrequency = 500;
     }
 
@@ -7089,8 +7086,13 @@ gcoHARDWARE_QueryMultiGPUSyncLength(
     gcmGETHARDWARE(Hardware);
 
     coreCount = Hardware->config->gpuCoreCount;
-
-    if (Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V2])
+    if (Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V3])
+    {
+        /* make compiler happy */
+        coreCount = coreCount + 1;
+        *Bytes = (24 + 4) * gcmSIZEOF(gctUINT32);
+    }
+    else if (Hardware->features[gcvFEATURE_MULTIGPU_SYNC_V2])
     {
         *Bytes = (18 + (coreCount - 2) * 10) * gcmSIZEOF(gctUINT32);
     }
@@ -7104,6 +7106,11 @@ gcoHARDWARE_QueryMultiGPUSyncLength(
     {
         /* Lock/Unlock command for blt engine.*/
         *Bytes += 4 * gcmSIZEOF(gctUINT32);
+
+        if (Hardware->features[gcvFEATURE_VMSAA] && !Hardware->features[gcvFEATURE_PE_VMSAA_COVERAGE_CACHE_FIX])
+        {
+            *Bytes += 2 * gcmSIZEOF(gctUINT32);
+        }
     }
 
 OnError:
@@ -7150,4 +7157,33 @@ OnError:
     gcmFOOTER();
     return status;
 }
+
+#if gcdENABLE_3D && gcdUSE_VX
+gceSTATUS
+gcoHARDWARE_QueryNNConfig(
+    IN gcoHARDWARE Hardware,
+    OUT gctPOINTER Config
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    vx_nn_config* NNConfig = (vx_nn_config*) Config;
+
+    gcmHEADER_ARG("Hardware=0x%x Count=%p", Hardware, NNConfig);
+
+    gcmGETHARDWARE(Hardware);
+
+    if (NNConfig != gcvNULL)
+    {
+        NNConfig->nnMadPerCoure = Hardware->config->nnConfig.nnMadPerCoure;
+        NNConfig->nnCoreCount   = Hardware->config->nnConfig.nnCoreCount;
+        NNConfig->nnInputBufferDepth = Hardware->config->nnConfig.nnInputBufferDepth;
+        NNConfig->nnAccumBufferDepth = Hardware->config->nnConfig.nnAccumBufferDepth;
+        NNConfig->isSet = gcvTRUE;
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+#endif
 

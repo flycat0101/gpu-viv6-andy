@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -291,10 +291,9 @@ hwc_device_open(
     /* Check GPU PE 2.0 feature. */
     status = gcoHAL_IsFeatureAvailable(context->hal, gcvFEATURE_2DPE20);
 
-    /* TODO: PE1.x path. */
     if (status != gcvSTATUS_TRUE)
     {
-        LOGE("%s(%d): PE20 not supported", __FUNCTION__, __LINE__);
+        LOGE("%s(%d): Requires PE20, but not supported ", __FUNCTION__, __LINE__);
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 

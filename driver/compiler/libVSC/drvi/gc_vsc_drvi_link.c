@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -3387,14 +3387,17 @@ static VSC_ErrCode _CalcIoHwCompIndexBetweenTwoShaderStagesPerExeObj(VSC_BASE_LI
     {
         pOutputSym = VIR_Shader_GetSymFromId(pUpperShader, VIR_IdList_GetId(pOutputIdLstsOfUpperShader, outputIdx));
 
+        if (isSymUnused(pOutputSym) || isSymVectorizedOut(pOutputSym))
+        {
+            continue;
+        }
+
         /* Only consider SIVs */
         if (!(VIR_Shader_IsNameBuiltIn(pUpperShader, VIR_Symbol_GetName(pOutputSym)) &&
               !_IsFakeSIV(pUpperShader, pLowerShader, VIR_Symbol_GetName(pOutputSym), gcvTRUE)))
         {
             continue;
         }
-
-        gcmASSERT(!isSymUnused(pOutputSym) && !isSymVectorizedOut(pOutputSym));
 
         _SetHwCompIndexForSVs(pUpperShader->shaderKind, pOutputSym, bNeedIoMemPacked,
                               hwChannelIdxForPos, hwChannelIdxForPtSz, hwChannelIdxForPrimId,
@@ -3889,10 +3892,82 @@ OnError:
     return errCode;
 }
 
+/* API level check for shaders:
+   Geometry shader:
+   It is a link-time error if not all provided sizes (sized input arrays and layout size) match in the geometry
+   shader of a program.
+*/
+static VSC_ErrCode _APICheckShader(VSC_BASE_LINKER_HELPER* pBaseLinkHelper,
+                                   VIR_Shader* pShader)
+{
+    VSC_ErrCode  errCode = VSC_ERR_NONE;
+
+    if (pShader->shaderKind == VIR_SHADER_GEOMETRY)
+    {
+        gctINT inputVtxCount = 0;
+        if (pShader->shaderLayout.geo.geoInPrimitive == VIR_GEO_POINTS)
+        {
+            inputVtxCount = 1;
+        }
+        else if (pShader->shaderLayout.geo.geoInPrimitive == VIR_GEO_LINES)
+        {
+            inputVtxCount = 2;
+        }
+        else if (pShader->shaderLayout.geo.geoInPrimitive == VIR_GEO_LINES_ADJACENCY)
+        {
+            inputVtxCount = 4;
+        }
+        else if (pShader->shaderLayout.geo.geoInPrimitive == VIR_GEO_TRIANGLES)
+        {
+            inputVtxCount = 3;
+        }
+        else if (pShader->shaderLayout.geo.geoInPrimitive == VIR_GEO_TRIANGLES_ADJACENCY)
+        {
+            inputVtxCount = 6;
+        }
+        else
+        {
+            gcmASSERT(gcvFALSE);
+        }
+
+        if (pShader->geoMaxAccessVertices > inputVtxCount)
+        {
+            errCode = VSC_ERR_INVALID_INDEX;
+        }
+    }
+
+    return errCode;
+}
+
+static VSC_ErrCode _APICheckShaders(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper)
+{
+    VSC_ErrCode  errCode = VSC_ERR_NONE;
+    VIR_Shader*  pCurStage;
+    gctUINT      stageIdx;
+
+    for (stageIdx = 0; stageIdx < VSC_MAX_GFX_SHADER_STAGE_COUNT; stageIdx ++)
+    {
+        pCurStage= (VIR_Shader*)pPgLinkHelper->pgPassMnger.pPgmLinkerParam->hShaderArray[stageIdx];
+
+        if (pCurStage)
+        {
+            errCode = _APICheckShader(&pPgLinkHelper->baseHelper, pCurStage);
+            ON_ERROR(errCode, "API check fail");
+        }
+    }
+
+OnError:
+    return errCode;
+}
+
 static VSC_ErrCode _DoSecondStageOfLinkage(VSC_PROGRAM_LINKER_HELPER* pPgLinkHelper)
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VSC_GPG_PASS_MANAGER*      pPgPassMnger = &pPgLinkHelper->pgPassMnger;
+
+    /* 0. individual shader API level check */
+    errCode = _APICheckShaders(pPgLinkHelper);
+    ON_ERROR(errCode, "Error in API check");
 
     /* 1. Calc IO hw component index among stages. Note that this is actually doing hw
           shader linkage, so the real HW shader linkage called before state-programming
@@ -3902,7 +3977,7 @@ static VSC_ErrCode _DoSecondStageOfLinkage(VSC_PROGRAM_LINKER_HELPER* pPgLinkHel
 
     /* 2. Program-level constant reg spillage needs full program info, so entry of this
           kind of reg spillage is put in link time */
-    CALL_GPG_PASS(VSC_UF_CreateAUBO, gcvNULL);
+    CALL_GPG_PASS(VSC_UF_CreateAUBO, 0, gcvNULL);
 
     /* 3. Calc the sampler base offset for unified sampler mode. */
     errCode = _CalcSamplerBaseOffset(pPgLinkHelper);
@@ -3936,7 +4011,7 @@ static VSC_ErrCode _GeneratePepHLMappingTables(VSC_PROGRAM_LINKER_HELPER* pPgLin
         pepGenPrvData.client = PEP_CLIENT_GL;
     }
 
-    CALL_GPG_PASS(vscVIR_GeneratePEP, &pepGenPrvData);
+    CALL_GPG_PASS(vscVIR_GeneratePEP, 0, &pepGenPrvData);
 
 OnError:
     return errCode;
@@ -4291,7 +4366,6 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
     gctBOOL                       bComputeOnlyProgram, bGfxOnlyProgram;
     gctUINT                       stageIdx, processedStageCount, firstValidStage = VSC_MAX_SHADER_STAGE_COUNT;
     gctINT                        sStageIdx;
-    gctUINT64                     realOptFlags;
     gctBOOL                       bSeperatedShaders = (pPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_SEPERATED_SHADERS);
     gctBOOL                       bHasTsOrGs = gcvFALSE, bNeedActiveIo = gcvFALSE;
     VSC_OPTN_Options              options;
@@ -4422,8 +4496,7 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
     /* Pass-resources of graphics-program pass manager are pointed to counterpart of each shader pass manager */
     vscGPPM_SetPassRes(&pgLinkHelper.pgPassMnger, pShPassResArray);
 
-    realOptFlags = pPgLinkParam->cfg.optFlags;
-    bNeedActiveIo = ((realOptFlags & VSC_COMPILER_OPT_FULL_ACTIVE_IO) || bHasTsOrGs);
+    bNeedActiveIo = (VSC_OPTN_FAIOOptions_GetSwitchOn(VSC_OPTN_Options_GetFAIOOptions(&options, 0)) || bHasTsOrGs);
 
     /* 1. At first fork link process, only do HL level compiling */
 
@@ -4486,7 +4559,7 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
         */
         bNeedSSL = (pPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_UNI_UNIFORM_UNIFIED_ALLOC ||
                     pPgLinkParam->cfg.cFlags & VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC ||
-                    realOptFlags & VSC_COMPILER_OPT_CONSTANT_REG_SPILLABLE || bNeedActiveIo);
+                    VSC_OPTN_UF_AUBOOptions_GetSwitchOn(VSC_OPTN_Options_GetAUBOOptions(&options, 0)) || bNeedActiveIo);
     }
     else
     {
@@ -4520,7 +4593,7 @@ gceSTATUS vscLinkProgram(VSC_PROGRAM_LINKER_PARAM* pPgLinkParam,
                Conditions to need us do 2nd level shaders linkage
                a. Constant register can be spillable to memory.
             */
-            bNeedSSL = ((realOptFlags & VSC_COMPILER_OPT_CONSTANT_REG_SPILLABLE) != 0);
+            bNeedSSL = VSC_OPTN_UF_AUBOOptions_GetSwitchOn(VSC_OPTN_Options_GetAUBOOptions(&options, 0));
         }
     }
 
@@ -6893,12 +6966,13 @@ static VSC_ErrCode _AnalyzeHwSamplerRFProgrammingHints(VSC_HW_PIPELINE_SHADERS_P
 
 /* Defined in chip_state_programming.c */
 extern gctUINT _GetValidHwRegChannelCount(SHADER_IO_REG_MAPPING* pIoRegMapping, SHADER_IO_MEM_ALIGN ioMemAlign);
-extern gctUINT _GetGsValidMaxThreadsPerHwTG(SHADER_EXECUTABLE_PROFILE* pGsSEP, gctUINT maxThreadsPerHwTG);
+extern gctUINT _GetGsValidMaxThreadsPerHwTG(SHADER_EXECUTABLE_PROFILE* pGsSEP, gctUINT maxThreadsPerHwTG, gctUINT maxHwTGThreadCount);
 extern gctUINT _GetHsRemapMode(SHADER_EXECUTABLE_PROFILE* pHsSEP,
                                gctUINT hsPerCPInputCount,
                                gctUINT hsPerCPOutputCount,
                                gctBOOL* pIsInputRemapMode);
 extern gctUINT _GetHsValidMaxPatchesPerHwTG(SHADER_EXECUTABLE_PROFILE* pHsSEP,
+                                            gctUINT maxHwTGThreadCount,
                                             gctBOOL bIsInputRemap,
                                             gctUINT maxParallelFactor);
 
@@ -7274,6 +7348,7 @@ static gctUINT _AnalyzeHwUSCSizeForGs(gctUINT baseMaxThreadCount,
 }
 
 static gctUINT _GetInputVerticesCountPerHwTGForHs(SHADER_EXECUTABLE_PROFILE* pHsSEP,
+                                                  gctUINT maxHwTGThreadCount,
                                                   SHADER_IO_LINKAGE_INFO* pLinkInfo,
                                                   gctUINT parallelFactor)
 {
@@ -7289,14 +7364,14 @@ static gctUINT _GetInputVerticesCountPerHwTGForHs(SHADER_EXECUTABLE_PROFILE* pHs
 
     _GetHsRemapMode(pHsSEP, hsPerCPInputCount, hsPerCPOutputCount, &bIsInputRemap);
 
-    maxPatchesPerHwTG = _GetHsValidMaxPatchesPerHwTG(pHsSEP, bIsInputRemap, parallelFactor);
+    maxPatchesPerHwTG = _GetHsValidMaxPatchesPerHwTG(pHsSEP, maxHwTGThreadCount, bIsInputRemap, parallelFactor);
 
     return (maxPatchesPerHwTG * pHsSEP->exeHints.nativeHints.prvStates.ts.inputCtrlPointCount);
 }
 
-static gctUINT _GetInputVerticesCountPerHwTGForGs(SHADER_EXECUTABLE_PROFILE* pGsSEP, gctUINT expectedMaxThreadsPerHwTG)
+static gctUINT _GetInputVerticesCountPerHwTGForGs(SHADER_EXECUTABLE_PROFILE* pGsSEP, gctUINT expectedMaxThreadsPerHwTG, gctUINT maxHwTGThreadCount)
 {
-    return (_GetGsValidMaxThreadsPerHwTG(pGsSEP, expectedMaxThreadsPerHwTG) *
+    return (_GetGsValidMaxThreadsPerHwTG(pGsSEP, expectedMaxThreadsPerHwTG, maxHwTGThreadCount) *
             pGsSEP->exeHints.nativeHints.prvStates.gs.inputVtxCount);
 }
 
@@ -7465,7 +7540,8 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
         pLinkInfo = &pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_VS].outputLinkageInfo;
 
         if ((pLinkInfo->linkedShaderStage == SHADER_TYPE_PIXEL) ||
-            (pLinkInfo->linkedShaderStage == SHADER_TYPE_FFU && pLinkInfo->vtxPxlLinkage.totalLinkNoCount > 0))
+            (pLinkInfo->linkedShaderStage == SHADER_TYPE_FFU && pLinkInfo->vtxPxlLinkage.totalLinkNoCount > 0) ||
+            (pLinkInfo->linkedShaderStage == SHADER_TYPE_UNKNOWN && pLinkInfo->vtxPxlLinkage.totalLinkNoCount == 0)) /* VS only */
         {
             realMaxHwUSCSizeInKbyte --;
             realUSCThreshold[VSC_GFX_SHADER_STAGE_VS] = vscMIN(realUSCThreshold[VSC_GFX_SHADER_STAGE_VS],
@@ -7673,7 +7749,7 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
                 vsDownStreamVerticesCountPerHwTG =
                 dsDownStreamVerticesCountPerHwTG =
                          _GetInputVerticesCountPerHwTGForGs(pSEP,
-                                                            expectedMaxThreadsPerHwTG[VSC_GFX_SHADER_STAGE_GS]);
+                                                            expectedMaxThreadsPerHwTG[VSC_GFX_SHADER_STAGE_GS], maxHwTGThreadCount);
             }
 
             if (pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_DS].pSEP)
@@ -7719,7 +7795,7 @@ static VSC_ErrCode _AnalyzeHwUSCProgrammingHints(VSC_HW_PIPELINE_SHADERS_PARAM* 
                 totalExpectedUSCSize += expectedUSCSize[VSC_GFX_SHADER_STAGE_HS];
 
                 vsDownStreamVerticesCountPerHwTG =
-                            _GetInputVerticesCountPerHwTGForHs(pSEP,
+                            _GetInputVerticesCountPerHwTGForHs(pSEP, maxHwTGThreadCount,
                                          &pOutHwShdsLinkInfo->shHwInfoArray[VSC_GFX_SHADER_STAGE_HS].outputLinkageInfo, i);
             }
 

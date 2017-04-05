@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -67,7 +67,8 @@ static void __clChipUtilsDecrypt( IN OUT gctSTRING Source)
 */
 gceSTATUS
 gcLoadKernelCompiler(
-    IN gcsHWCaps *HWCaps
+    IN gcsHWCaps *HWCaps,
+    IN gcePATCH_ID PatchId
     )
 {
     gceSTATUS status;
@@ -86,6 +87,8 @@ gcLoadKernelCompiler(
     {
         *gcGetHWCaps() = *HWCaps;
     }
+
+    *gcGetPatchId() = PatchId;
 
     gcmONERROR(cloCOMPILER_Load());
 

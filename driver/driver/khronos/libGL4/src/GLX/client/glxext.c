@@ -411,7 +411,6 @@ __glContextModesDestroy( __GLcontextModes * modes )
  *          Basically this means that fields have to be added in libGL and
  *          then propagated to drivers.  Drivers should \b never arbitrarilly
  *          extend the \c __GLcontextModes data-structure.
- *  TODO: possible need remove comments about parament "minimum_size"
  */
 __GLcontextModes *
 __glContextModesCreate( unsigned count )
@@ -882,10 +881,6 @@ FilterGlContextModes( __GLcontextModes ** server_modes,
  *               \c __driCreateNewScreen function.
  * \returns A pointer to the \c __DRIscreenPrivate structure returned by
  *          the client-side driver on success, or \c NULL on failure.
- *
- * \todo This function needs to be modified to remove context-modes from the
- *       list stored in the \c __GLXscreenConfigsRec to match the list
- *       returned by the client-side driver.
  */
 static GLvoid *
 CallCreateNewScreen(Display *dpy, int scrn, __DRIscreen *psc,
@@ -1319,8 +1314,6 @@ GLvoid __glXInteruptHandler(GLvoid)
     __GLXdisplayPrivate *priv;
     __GLXscreenConfigs *psc;
     __DRIscreenPrivate *psp;
-    vvtDeviceInfo *pDevInfo;
-    drm_vvt_sarea_t *vvtSarea;
     int i, screens;
 
     priv = (__GLXdisplayPrivate*)__glXExtensionPrivate->private_data;
@@ -1329,23 +1322,10 @@ GLvoid __glXInteruptHandler(GLvoid)
     for (i = 0; i < screens; i++, psc++) {
         if (psc->driScreen.private) {
             psp = (__DRIscreenPrivate *)(psc->driScreen.private);
-            pDevInfo = (vvtDeviceInfo *)psp->pDevPriv;
-            vvtSarea = (drm_vvt_sarea_t *)((GLubyte *)psp->pSAREA + pDevInfo->sareaPrivOffset);
-
-            /* Make sure the previous DRM_LOCK is unlocked here */
-            DRM_UNLOCK(psp->fd, &psp->pSAREA->lock, vvtSarea->ctx_owner);
-
-            if (psp->dummyContextPriv.hHWContext) {
-                DRM_LOCK(psp->fd, &psp->pSAREA->lock, psp->dummyContextPriv.hHWContext, 0);
-            }
-
-            if (psp->dummyContextPriv.hHWContext) {
-                DRM_UNLOCK(psp->fd, &psp->pSAREA->lock, psp->dummyContextPriv.hHWContext);
-            }
 #if USE_DRM_MAP
             (GLvoid)drmUnmap(psp->pLogicalAddr, psp->fbSize);
 #else
-            munmap(psp->pLogicalAddr, pspfbSize);
+            munmap(psp->pLogicalAddr, psp->fbSize);
 #endif
 
             (GLvoid)drmUnmap((drmAddress)psp->pSAREA, SAREA_MAX);

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -431,7 +431,7 @@ __GL_INLINE GLvoid __glWindowPos3fv(__GLcontext* gc, GLfloat *v)
     /*Window coordinate*/
     rp = &gc->state.rasterPos;
     rp->rPos.winPos.f.x = v[0];
-    rp->rPos.winPos.f.y = gc->drawablePrivate->height - v[1];
+    rp->rPos.winPos.f.y = v[1];
 
     if(v[2] <= 0)
         rp->rPos.winPos.f.z = gc->state.viewport.zNear;

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -15,6 +15,57 @@
 #include "gc_chip_context.h"
 
 #define _GC_OBJ_ZONE __GLES3_ZONE_SHADER
+
+#ifdef OPENGL40
+typedef struct _bt_attribute
+{
+gctINT index;
+char name[128];
+}BT_ATTRIBUTE;
+static const BT_ATTRIBUTE builtInAttributesInfo[]={
+    {_GL_VERTEX_INDEX,"#Vertex"},
+    {_GL_COLOR_INDEX,"#AttrColor"},
+    {_GL_MULTITEX0_INDEX,"#MultiTexCoord0"},
+    {_GL_MULTITEX1_INDEX,"#MultiTexCoord1"},
+    {_GL_MULTITEX2_INDEX,"#MultiTexCoord2"},
+    {_GL_MULTITEX3_INDEX,"#MultiTexCoord3"},
+    {_GL_MULTITEX4_INDEX,"#MultiTexCoord4"},
+    {_GL_MULTITEX5_INDEX,"#MultiTexCoord5"},
+    {_GL_MULTITEX6_INDEX,"#MultiTexCoord6"},
+    {_GL_MULTITEX7_INDEX,"#MultiTexCoord7"}
+};
+
+static void  tagBuiltInAttribute(IN __GLcontext * gc, IN gctINT index, IN gctCONST_STRING attrname)
+{
+    __GLchipContext* chipCtx = CHIP_CTXINFO(gc);
+    gctINT i = 0;
+    for ( i = 0; i < sizeof(builtInAttributesInfo)/sizeof(builtInAttributesInfo[0]); i++ )
+    {
+        if ( gcmIS_SUCCESS(gcoOS_StrCmp(attrname, builtInAttributesInfo[i].name)) )
+        {
+            chipCtx->builtinAttributeIndex[builtInAttributesInfo[i].index] = index;
+        }
+    }
+}
+
+static void vsInputMaskForBuiltIns(IN __GLcontext * gc, GLuint *vsInputMask)
+{
+    gctUINT i = 0;
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+
+    if ( chipCtx->builtinAttributeIndex[_GL_VERTEX_INDEX] >=0 )
+        (*vsInputMask) |= __GL_INPUT_VERTEX;
+
+    if ( chipCtx->builtinAttributeIndex[_GL_COLOR_INDEX] >=0 )
+        (*vsInputMask) |= __GL_INPUT_DIFFUSE;
+
+    for( i = _GL_MULTITEX0_INDEX; i < _GL_BT_INDEX_MAX; i++ )
+    {
+        if ( chipCtx->builtinAttributeIndex[i] >=0 )
+            (*vsInputMask) |= (__GL_ONE_32 << (__GL_INPUT_TEX0_INDEX + i - _GL_MULTITEX0_INDEX));
+    }
+}
+#endif
 
 gcePROGRAM_STAGE __glChipGLShaderStageToHAL[] =
 {
@@ -336,6 +387,206 @@ const __GLchipNonUserDefUniformInfo nonUserDefUniformInfo[] =
     {"#NumSamples",    __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_SAMPLE_NUM,     gcvNULL},
     {"#TcsPatchVerticesIn",    __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_TCS_PATCH_VERTICES_IN,     gcvNULL},
     {"#TesPatchVerticesIn",    __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED, __GL_CHIP_UNIFORM_SUB_USAGE_TES_PATCH_VERTICES_IN,     gcvNULL},
+#ifdef OPENGL40
+    { "#ModelViewMatrix",  __GL_CHIP_UNIFORM_USAGE_MODELVIEW,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ModelViewMatrix"},
+    { "#ProjectionMatrix",  __GL_CHIP_UNIFORM_USAGE_PROJECTION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ProjectionMatrix"},
+    { "#ModelViewProjectionMatrix",  __GL_CHIP_UNIFORM_USAGE_MVP,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ModelViewProjectionMatrix"},
+    { "#ff_MVP_Matrix",  __GL_CHIP_UNIFORM_USAGE_MVP,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_MVP_Matrix"},
+    { "#TextureMatrix",  __GL_CHIP_UNIFORM_USAGE_TEXTURE_MATRIX,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_TextureMatrix"},
+    { "#NormalMatrix",  __GL_CHIP_UNIFORM_USAGE_NORMAL_MATRIX,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_NormalMatrix"},
+    { "#ModelViewMatrixInverse",  __GL_CHIP_UNIFORM_USAGE_MODELVIEW_INV,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ModelViewMatrixInverse"},
+    { "#ProjectionMatrixInverse",  __GL_CHIP_UNIFORM_USAGE_PROJECTION_INV,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ProjectionMatrixInverse"},
+    { "#ModelViewProjectionMatrixInverse",  __GL_CHIP_UNIFORM_USAGE_MVP_INV,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ModelViewProjectionMatrixInverse"},
+    { "#TextureMatrixInverse",  __GL_CHIP_UNIFORM_USAGE_TEXTURE_MATRIX_INV,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_TextureMatrixInverse"},
+    { "#ModelViewMatrixTranspose",  __GL_CHIP_UNIFORM_USAGE_MODELVIEW_TRANS,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ModelViewMatrixTranspose"},
+    { "#ProjectionMatrixTranspose",  __GL_CHIP_UNIFORM_USAGE_PROJECTION_TRANS,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ProjectionMatrixTranspose"},
+    { "#ModelViewProjectionMatrixTranspose",  __GL_CHIP_UNIFORM_USAGE_MVP_TRANS,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ModelViewProjectionMatrixTranspose"},
+    { "#TextureMatrixTranspose",  __GL_CHIP_UNIFORM_USAGE_TEXTURE_MATRIX_TRANS,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_TextureMatrixTranspose"},
+    { "#ModelViewMatrixInverseTranspose",  __GL_CHIP_UNIFORM_USAGE_MODELVIEW_INVTRANS,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ModelViewMatrixInverseTranspose"},
+    { "#ProjectionMatrixInverseTranspose",  __GL_CHIP_UNIFORM_USAGE_PROJECTION_INVTRANS,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ProjectionMatrixInverseTranspose"},
+    { "#ModelViewProjectionMatrixInverseTranspose",  __GL_CHIP_UNIFORM_USAGE_MVP_INVTRANS,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ModelViewProjectionMatrixInverseTranspose"},
+    { "#TextureMatrixInverseTranspose",  __GL_CHIP_UNIFORM_USAGE_TEXTURE_MATRIX_INVTRANS,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_TextureMatrixInverseTranspose"},
+    { "#NormalScale",  __GL_CHIP_UNIFORM_USAGE_NORMAL_SCALE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_NormalScale"},
+    { "#ClipPlane",  __GL_CHIP_UNIFORM_USAGE_ClIP_PLANE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ClipPlane"},
+    { "#Point.size",  __GL_CHIP_UNIFORM_USAGE_POINT_SIZE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Point.size"},
+    { "#Point.sizeMin",  __GL_CHIP_UNIFORM_USAGE_POINT_SIZE_MIN,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Point.sizeMin"},
+    { "#Point.sizeMax",  __GL_CHIP_UNIFORM_USAGE_POINT_SIZE_MAX,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Point.sizeMax"},
+    { "#Point.fadeThresholdSize",  __GL_CHIP_UNIFORM_USAGE_POINT_FADE_THRESHOLD_SIZE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Point.fadeThresholdSize"},
+    { "#Point.distanceConstantAttenuation",  __GL_CHIP_UNIFORM_USAGE_POINT_DISTANCE_CONST_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Point.distanceConstantAttenuation"},
+    { "#Point.distanceLinearAttenuation",  __GL_CHIP_UNIFORM_USAGE_POINT_DISTANCE_LINEAR_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Point.distanceLinearAttenuation"},
+    { "#Point.distanceQuadraticAttenuation",  __GL_CHIP_UNIFORM_USAGE_POINT_DISTANCE_QUADRATIC_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Point.distanceQuadraticAttenuation"},
+    { "#FrontMaterial.emission",  __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_EMISSION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontMaterial.emission"},
+    { "#FrontMaterial.ambient",  __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontMaterial.ambient"},
+    { "#FrontMaterial.diffuse",  __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontMaterial.diffuse"},
+    { "#FrontMaterial.specular",  __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontMaterial.specular"},
+    { "#FrontMaterial.shininess",  __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_SHININESS,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontMaterial.shininess"},
+    { "#BackMaterial.emission",  __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_EMISSION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackMaterial.emission"},
+    { "#BackMaterial.ambient",  __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackMaterial.ambient"},
+    { "#BackMaterial.diffuse",  __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackMaterial.diffuse"},
+    { "#BackMaterial.specular",  __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackMaterial.specular"},
+    { "#BackMaterial.shininess",  __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_SHININESS,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackMaterial.shininess"},
+    { "#LightSource[0].ambient",  __GL_CHIP_UNIFORM_USAGE_LIGHT0_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[0].ambient"},
+    { "#LightSource[0].diffuse",  __GL_CHIP_UNIFORM_USAGE_LIGHT0_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[0].diffuse"},
+    { "#LightSource[0].specular",  __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[0].specular"},
+    { "#LightSource[0].position",  __GL_CHIP_UNIFORM_USAGE_LIGHT0_POSITION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[0].position"},
+    { "#LightSource[0].halfVector",  __GL_CHIP_UNIFORM_USAGE_LIGHT0_HALF_VECTOR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[0].halfVector"},
+    { "#LightSource[0].spotDirection",  __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_DIRECTION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[0].spotDirection"},
+    { "#LightSource[0].spotExponent",  __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_EXPONENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[0].spotExponent"},
+    { "#LightSource[0].spotCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[0].spotCutoff"},
+    { "#LightSource[0].spotCosCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_COS_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[0].spotCosCutoff"},
+    { "#LightSource[0].constantAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT0_CONST_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[0].constantAttenuation"},
+    { "#LightSource[0].linearAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT0_LINEAR_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[0].linearAttenuation"},
+    { "#LightSource[0].quadraticAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT0_QUADRATIC_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[0].quadraticAttenuation"},
+    { "#LightSource[1].ambient",  __GL_CHIP_UNIFORM_USAGE_LIGHT1_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[1].ambient"},
+    { "#LightSource[1].diffuse",  __GL_CHIP_UNIFORM_USAGE_LIGHT1_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[1].diffuse"},
+    { "#LightSource[1].specular",  __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[1].specular"},
+    { "#LightSource[1].position",  __GL_CHIP_UNIFORM_USAGE_LIGHT1_POSITION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[1].position"},
+    { "#LightSource[1].halfVector",  __GL_CHIP_UNIFORM_USAGE_LIGHT1_HALF_VECTOR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[1].halfVector"},
+    { "#LightSource[1].spotDirection",  __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPOT_DIRECTION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[1].spotDirection"},
+    { "#LightSource[1].spotExponent",  __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPOT_EXPONENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[1].spotExponent"},
+    { "#LightSource[1].spotCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPOT_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[1].spotCutoff"},
+    { "#LightSource[1].spotCosCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPOT_COS_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[1].spotCosCutoff"},
+    { "#LightSource[1].constantAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT1_CONST_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[1].constantAttenuation"},
+    { "#LightSource[1].linearAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT1_LINEAR_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[1].linearAttenuation"},
+    { "#LightSource[1].quadraticAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT1_QUADRATIC_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[1].quadraticAttenuation"},
+    { "#LightSource[2].ambient",  __GL_CHIP_UNIFORM_USAGE_LIGHT2_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[2].ambient"},
+    { "#LightSource[2].diffuse",  __GL_CHIP_UNIFORM_USAGE_LIGHT2_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[2].diffuse"},
+    { "#LightSource[2].specular",  __GL_CHIP_UNIFORM_USAGE_LIGHT2_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[2].specular"},
+    { "#LightSource[2].position",  __GL_CHIP_UNIFORM_USAGE_LIGHT2_POSITION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[2].position"},
+    { "#LightSource[2].halfVector",  __GL_CHIP_UNIFORM_USAGE_LIGHT2_HALF_VECTOR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[2].halfVector"},
+    { "#LightSource[2].spotDirection",  __GL_CHIP_UNIFORM_USAGE_LIGHT2_SPOT_DIRECTION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[2].spotDirection"},
+    { "#LightSource[2].spotExponent",  __GL_CHIP_UNIFORM_USAGE_LIGHT2_SPOT_EXPONENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[2].spotExponent"},
+    { "#LightSource[2].spotCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT2_SPOT_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[2].spotCutoff"},
+    { "#LightSource[2].spotCosCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT2_SPOT_COS_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[2].spotCosCutoff"},
+    { "#LightSource[2].constantAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT2_CONST_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[2].constantAttenuation"},
+    { "#LightSource[2].linearAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT2_LINEAR_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[2].linearAttenuation"},
+    { "#LightSource[2].quadraticAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT2_QUADRATIC_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[2].quadraticAttenuation"},
+    { "#LightSource[3].ambient",  __GL_CHIP_UNIFORM_USAGE_LIGHT3_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[3].ambient"},
+    { "#LightSource[3].diffuse",  __GL_CHIP_UNIFORM_USAGE_LIGHT3_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[3].diffuse"},
+    { "#LightSource[3].specular",  __GL_CHIP_UNIFORM_USAGE_LIGHT3_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[3].specular"},
+    { "#LightSource[3].position",  __GL_CHIP_UNIFORM_USAGE_LIGHT3_POSITION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[3].position"},
+    { "#LightSource[3].halfVector",  __GL_CHIP_UNIFORM_USAGE_LIGHT3_HALF_VECTOR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[3].halfVector"},
+    { "#LightSource[3].spotDirection",  __GL_CHIP_UNIFORM_USAGE_LIGHT3_SPOT_DIRECTION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[3].spotDirection"},
+    { "#LightSource[3].spotExponent",  __GL_CHIP_UNIFORM_USAGE_LIGHT3_SPOT_EXPONENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[3].spotExponent"},
+    { "#LightSource[3].spotCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT3_SPOT_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[3].spotCutoff"},
+    { "#LightSource[3].spotCosCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT3_SPOT_COS_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[3].spotCosCutoff"},
+    { "#LightSource[3].constantAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT3_CONST_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[3].constantAttenuation"},
+    { "#LightSource[3].linearAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT3_LINEAR_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[3].linearAttenuation"},
+    { "#LightSource[3].quadraticAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT3_QUADRATIC_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[3].quadraticAttenuation"},
+    { "#LightSource[4].ambient",  __GL_CHIP_UNIFORM_USAGE_LIGHT4_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[4].ambient"},
+    { "#LightSource[4].diffuse",  __GL_CHIP_UNIFORM_USAGE_LIGHT4_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[4].diffuse"},
+    { "#LightSource[4].specular",  __GL_CHIP_UNIFORM_USAGE_LIGHT4_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[4].specular"},
+    { "#LightSource[4].position",  __GL_CHIP_UNIFORM_USAGE_LIGHT4_POSITION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[4].position"},
+    { "#LightSource[4].halfVector",  __GL_CHIP_UNIFORM_USAGE_LIGHT4_HALF_VECTOR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[4].halfVector"},
+    { "#LightSource[4].spotDirection",  __GL_CHIP_UNIFORM_USAGE_LIGHT4_SPOT_DIRECTION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[4].spotDirection"},
+    { "#LightSource[4].spotExponent",  __GL_CHIP_UNIFORM_USAGE_LIGHT4_SPOT_EXPONENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[4].spotExponent"},
+    { "#LightSource[4].spotCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT4_SPOT_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[4].spotCutoff"},
+    { "#LightSource[4].spotCosCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT4_SPOT_COS_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[4].spotCosCutoff"},
+    { "#LightSource[4].constantAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT4_CONST_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[4].constantAttenuation"},
+    { "#LightSource[4].linearAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT4_LINEAR_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[4].linearAttenuation"},
+    { "#LightSource[4].quadraticAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT4_QUADRATIC_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[4].quadraticAttenuation"},
+    { "#LightSource[5].ambient",  __GL_CHIP_UNIFORM_USAGE_LIGHT5_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[5].ambient"},
+    { "#LightSource[5].diffuse",  __GL_CHIP_UNIFORM_USAGE_LIGHT5_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[5].diffuse"},
+    { "#LightSource[5].specular",  __GL_CHIP_UNIFORM_USAGE_LIGHT5_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[5].specular"},
+    { "#LightSource[5].position",  __GL_CHIP_UNIFORM_USAGE_LIGHT5_POSITION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[5].position"},
+    { "#LightSource[5].halfVector",  __GL_CHIP_UNIFORM_USAGE_LIGHT5_HALF_VECTOR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[5].halfVector"},
+    { "#LightSource[5].spotDirection",  __GL_CHIP_UNIFORM_USAGE_LIGHT5_SPOT_DIRECTION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[5].spotDirection"},
+    { "#LightSource[5].spotExponent",  __GL_CHIP_UNIFORM_USAGE_LIGHT5_SPOT_EXPONENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[5].spotExponent"},
+    { "#LightSource[5].spotCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT5_SPOT_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[5].spotCutoff"},
+    { "#LightSource[5].spotCosCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT5_SPOT_COS_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[5].spotCosCutoff"},
+    { "#LightSource[5].constantAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT5_CONST_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[5].constantAttenuation"},
+    { "#LightSource[5].linearAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT5_LINEAR_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[5].linearAttenuation"},
+    { "#LightSource[5].quadraticAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT5_QUADRATIC_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[5].quadraticAttenuation"},
+    { "#LightSource[6].ambient",  __GL_CHIP_UNIFORM_USAGE_LIGHT6_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[6].ambient"},
+    { "#LightSource[6].diffuse",  __GL_CHIP_UNIFORM_USAGE_LIGHT6_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[6].diffuse"},
+    { "#LightSource[6].specular",  __GL_CHIP_UNIFORM_USAGE_LIGHT6_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[6].specular"},
+    { "#LightSource[6].position",  __GL_CHIP_UNIFORM_USAGE_LIGHT6_POSITION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[6].position"},
+    { "#LightSource[6].halfVector",  __GL_CHIP_UNIFORM_USAGE_LIGHT6_HALF_VECTOR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[6].halfVector"},
+    { "#LightSource[6].spotDirection",  __GL_CHIP_UNIFORM_USAGE_LIGHT6_SPOT_DIRECTION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[6].spotDirection"},
+    { "#LightSource[6].spotExponent",  __GL_CHIP_UNIFORM_USAGE_LIGHT6_SPOT_EXPONENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[6].spotExponent"},
+    { "#LightSource[6].spotCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT6_SPOT_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[6].spotCutoff"},
+    { "#LightSource[6].spotCosCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT6_SPOT_COS_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[6].spotCosCutoff"},
+    { "#LightSource[6].constantAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT6_CONST_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[6].constantAttenuation"},
+    { "#LightSource[6].linearAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT6_LINEAR_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[6].linearAttenuation"},
+    { "#LightSource[6].quadraticAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT6_QUADRATIC_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[6].quadraticAttenuation"},
+    { "#LightSource[7].ambient",  __GL_CHIP_UNIFORM_USAGE_LIGHT7_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[7].ambient"},
+    { "#LightSource[7].diffuse",  __GL_CHIP_UNIFORM_USAGE_LIGHT7_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[7].diffuse"},
+    { "#LightSource[7].specular",  __GL_CHIP_UNIFORM_USAGE_LIGHT7_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[7].specular"},
+    { "#LightSource[7].position",  __GL_CHIP_UNIFORM_USAGE_LIGHT7_POSITION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[7].position"},
+    { "#LightSource[7].halfVector",  __GL_CHIP_UNIFORM_USAGE_LIGHT7_HALF_VECTOR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[7].halfVector"},
+    { "#LightSource[7].spotDirection",  __GL_CHIP_UNIFORM_USAGE_LIGHT7_SPOT_DIRECTION,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[7].spotDirection"},
+    { "#LightSource[7].spotExponent",  __GL_CHIP_UNIFORM_USAGE_LIGHT7_SPOT_EXPONENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[7].spotExponent"},
+    { "#LightSource[7].spotCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT7_SPOT_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[7].spotCutoff"},
+    { "#LightSource[7].spotCosCutoff",  __GL_CHIP_UNIFORM_USAGE_LIGHT7_SPOT_COS_CUTOFF,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[7].spotCosCutoff"},
+    { "#LightSource[7].constantAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT7_CONST_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[7].constantAttenuation"},
+    { "#LightSource[7].linearAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT7_LINEAR_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[7].linearAttenuation"},
+    { "#LightSource[7].quadraticAttenuation",  __GL_CHIP_UNIFORM_USAGE_LIGHT7_QUADRATIC_ATTENU,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_LightSource[7].quadraticAttenuation"},
+    { "#LightModel.ambient",  __GL_CHIP_UNIFORM_USAGE_LIGHTMODEL_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "LightModel.ambient"},
+    { "#FrontLightModelProduct.sceneColor",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHTMODEL_PRODUCT_SCENECOLOR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightModelProduct.sceneColor"},
+    { "#BackLightModelProduct.sceneColor",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHTMODEL_PRODUCT_SCENECOLOR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightModelProduct.sceneColor"},
+    { "#FrontLightProduct[0].ambient",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[0].ambient"},
+    { "#FrontLightProduct[0].diffuse",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[0].diffuse"},
+    { "#FrontLightProduct[0].specular",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[0].specular"},
+    { "#BackLightProduct[0].ambient",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[0].ambient"},
+    { "#BackLightProduct[0].diffuse",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[0].diffuse"},
+    { "#BackLightProduct[0].specular",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[0].specular"},
+    { "#FrontLightProduct[1].ambient",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT1_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[1].ambient"},
+    { "#FrontLightProduct[1].diffuse",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT1_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[1].diffuse"},
+    { "#FrontLightProduct[1].specular",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT1_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[1].specular"},
+    { "#BackLightProduct[1].ambient",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT1_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[1].ambient"},
+    { "#BackLightProduct[1].diffuse",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT1_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[1].diffuse"},
+    { "#BackLightProduct[1].specular",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT1_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[1].specular"},
+    { "#FrontLightProduct[2].ambient",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT2_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[2].ambient"},
+    { "#FrontLightProduct[2].diffuse",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT2_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[2].diffuse"},
+    { "#FrontLightProduct[2].specular",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT2_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[2].specular"},
+    { "#BackLightProduct[2].ambient",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT2_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[2].ambient"},
+    { "#BackLightProduct[2].diffuse",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT2_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[2].diffuse"},
+    { "#BackLightProduct[2].specular",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT2_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[2].specular"},
+    { "#FrontLightProduct[3].ambient",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT3_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[3].ambient"},
+    { "#FrontLightProduct[3].diffuse",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT3_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[3].diffuse"},
+    { "#FrontLightProduct[3].specular",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT3_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[3].specular"},
+    { "#BackLightProduct[3].ambient",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT3_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[3].ambient"},
+    { "#BackLightProduct[3].diffuse",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT3_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[3].diffuse"},
+    { "#BackLightProduct[3].specular",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT3_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[3].specular"},
+    { "#FrontLightProduct[4].ambient",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT4_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[4].ambient"},
+    { "#FrontLightProduct[4].diffuse",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT4_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[4].diffuse"},
+    { "#FrontLightProduct[4].specular",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT4_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[4].specular"},
+    { "#BackLightProduct[4].ambient",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT4_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[4].ambient"},
+    { "#BackLightProduct[4].diffuse",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT4_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[4].diffuse"},
+    { "#BackLightProduct[4].specular",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT4_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[4].specular"},
+    { "#FrontLightProduct[5].ambient",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT5_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[5].ambient"},
+    { "#FrontLightProduct[5].diffuse",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT5_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[5].diffuse"},
+    { "#FrontLightProduct[5].specular",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT5_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[5].specular"},
+    { "#BackLightProduct[5].ambient",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT5_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[5].ambient"},
+    { "#BackLightProduct[5].diffuse",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT5_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[5].diffuse"},
+    { "#BackLightProduct[5].specular",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT5_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[5].specular"},
+    { "#FrontLightProduct[6].ambient",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT6_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[6].ambient"},
+    { "#FrontLightProduct[6].diffuse",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT6_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[6].diffuse"},
+    { "#FrontLightProduct[6].specular",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT6_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[6].specular"},
+    { "#BackLightProduct[6].ambient",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT6_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[6].ambient"},
+    { "#BackLightProduct[6].diffuse",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT6_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[6].diffuse"},
+    { "#BackLightProduct[6].specular",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT6_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[6].specular"},
+    { "#FrontLightProduct[7].ambient",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT7_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[7].ambient"},
+    { "#FrontLightProduct[7].diffuse",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT7_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[7].diffuse"},
+    { "#FrontLightProduct[7].specular",  __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT7_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_FrontLightProduct[7].specular"},
+    { "#BackLightProduct[7].ambient",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT7_PRODUCT_AMBIENT,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[7].ambient"},
+    { "#BackLightProduct[7].diffuse",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT7_PRODUCT_DIFFUSE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[7].diffuse"},
+    { "#BackLightProduct[7].specular",  __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT7_PRODUCT_SPECULAR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_BackLightProduct[7].specular"},
+    { "#TextureEnvColor",  __GL_CHIP_UNIFORM_USAGE_TEXENV_COLOR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_TextureEnvColor"},
+    { "#EyePlaneS",  __GL_CHIP_UNIFORM_USAGE_TEXGEN_EYE_PLANE_S,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_EyePlaneS"},
+    { "#EyePlaneT",  __GL_CHIP_UNIFORM_USAGE_TEXGEN_EYE_PLANE_T,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_EyePlaneT"},
+    { "#EyePlaneR",  __GL_CHIP_UNIFORM_USAGE_TEXGEN_EYE_PLANE_R,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_EyePlaneR"},
+    { "#EyePlaneQ",  __GL_CHIP_UNIFORM_USAGE_TEXGEN_EYE_PLANE_Q,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_EyePlaneQ"},
+    { "#ObjectPlaneS",  __GL_CHIP_UNIFORM_USAGE_TEXGEN_OBJECT_PLANE_S,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ObjectPlaneS"},
+    { "#ObjectPlaneT",  __GL_CHIP_UNIFORM_USAGE_TEXGEN_OBJECT_PLANE_T,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ObjectPlaneT"},
+    { "#ObjectPlaneR",  __GL_CHIP_UNIFORM_USAGE_TEXGEN_OBJECT_PLANE_R,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ObjectPlaneR"},
+    { "#ObjectPlaneQ",  __GL_CHIP_UNIFORM_USAGE_TEXGEN_OBJECT_PLANE_Q,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_ObjectPlaneQ"},
+    { "#Fog.color",  __GL_CHIP_UNIFORM_USAGE_FOG_COLOR,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Fog.color"},
+    { "#Fog.density",  __GL_CHIP_UNIFORM_USAGE_FOG_DENSITY,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Fog.density"},
+    { "#Fog.start",  __GL_CHIP_UNIFORM_USAGE_FOG_START,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Fog.start"},
+    { "#Fog.end",  __GL_CHIP_UNIFORM_USAGE_FOG_END,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Fog.end"},
+    { "#Fog.scale",  __GL_CHIP_UNIFORM_USAGE_FOG_SCALE,    __GL_CHIP_UNIFORM_SUB_USAGE_NOT_CARE,     "gl_Fog.scale"},
+#endif
 
 };
 
@@ -1331,7 +1582,6 @@ gcChipProcessUniforms(
         matrixStride = (gctINT)GetUniformMatrixStride(uniform);
         binding      = GetUniformBinding(uniform);
 
-        /* TODO: Get explicit location/binding from compiler */
         location     = uniform->location;
         GL_ASSERT(location == -1 || location >= 0);
 
@@ -1921,7 +2171,6 @@ gcChipProcessUniformBlocks(
             mapFlags |= gcdUB_MAPPED_TO_MEM;
         }
 
-        /* TODO: Get explicit binding */
         ubUsage = gcChipUtilFindUbUsage(GetUniformName(ubUniform));
         binding = GetUBBinding(uniformBlock);
         switch (ubUsage)
@@ -3322,7 +3571,9 @@ gcChipProgramCleanBindingInfo(
     programObject->bindingInfo.maxInputNameLen = 0;
     programObject->bindingInfo.numActiveInput = 0;
     programObject->bindingInfo.vsInputArrayMask = 0;
-
+#ifdef OPENGL40
+    programObject->bindingInfo.vsInputMask = 0;
+#endif
     __glBitmaskSetAll(&program->shadowSamplerMask, GL_FALSE);
 
     /* Free uniforms */
@@ -3925,7 +4176,9 @@ gcChipProgramBuildBindingInfo(
     /* Get the number of shader inputs. */
     gcmONERROR(gcSHADER_GetAttributeAndBuiltinInputCount(pBinaries[firstStage], &resCount));
     gcmONERROR(gcSHADER_GetAttributeCount(pBinaries[firstStage], &userInputCount));
-
+#ifdef OPENGL40
+    memset((char *)chipCtx->builtinAttributeIndex, 0xFF, sizeof(chipCtx->builtinAttributeIndex));
+#endif
     /* Query how many active inputs */
     for (i = 0; i < resCount; ++i)
     {
@@ -4049,6 +4302,9 @@ gcChipProgramBuildBindingInfo(
                 program->attribLocation[index].pInput = input;
                 program->attribLocation[index].index  = (GLint)j;
             }
+#ifdef OPENGL40
+            tagBuiltInAttribute(gc, i, input->name);
+#endif
         }
 
         /* Step1: Walk all attribute locations to set all binding defined in shader text by APP*/
@@ -4523,7 +4779,6 @@ gcChipProgramBuildBindingInfo(
         {
             if (uBlock->halUB[stage])
             {
-                /* TODO: compiler please move the data to per UB */
                 data = GetShaderConstUBOData(pBinaries[stage]);
                 break;
             }
@@ -4673,9 +4928,6 @@ gcChipProgramBuildBindingInfo(
             gcOUTPUT halOut;
             gcmONERROR(gcSHADER_GetOutput(pBinaries[lastStage], i, &halOut));
 
-            /* TODO: need to push compiler to report one entry for an array.
-            ** driver will build mapping table to expand the location
-            */
             if (halOut)
             {
                 gctSTRING name = gcvNULL;
@@ -7279,6 +7531,9 @@ __glChipLinkProgram(
     const gctCHAR *patchedSrcs[__GLSL_STAGE_LAST] = {gcvNULL};
 #endif
 
+#ifdef OPENGL40
+    GLuint i;
+#endif
     gcmHEADER_ARG("gc=0x%x programObject=0x%x", gc, programObject);
 
 #if __GL_CHIP_PATCH_ENABLED
@@ -7499,6 +7754,22 @@ __glChipLinkProgram(
     gcChipProgramCleanBindingInfo(gc, programObject);
 
     gcmONERROR(gcChipProgramBuildBindingInfo(gc, programObject));
+
+#ifdef OPENGL40
+    programObject->bindingInfo.vsInputMask = 0;
+    vsInputMaskForBuiltIns( gc, &(programObject->bindingInfo.vsInputMask));
+    for (i = 0; i < gc->constants.shaderCaps.maxUserVertAttributes; ++i)
+    {
+        __GLchipSLLinkage* attribLinkage = gcvNULL;
+        /* currently the compiler does not support build in input, so we only can */
+        /* use generic attributes, immediate mode and conventional inputs won't work */
+        attribLinkage =  ((__GLchipSLProgram *)programObject->privateData)->attribLinkage[i];
+        if (attribLinkage)
+        {
+            programObject->bindingInfo.vsInputMask |= 1 << (i + __GL_VARRAY_ATT0_INDEX);
+        }
+    }
+#endif
 
     if (pgStateKey)
     {
@@ -7763,7 +8034,6 @@ gcChipProgramBinary_V0(
        to increase historic ref count since it has been set to be perpetual */
     gcChipUtilsObjectAddRef(pgInstanceObj);
 
-    /*(todo) support other stages */
     for (stage = __GLSL_STAGE_VS; stage <= __GLSL_STAGE_FS; ++stage)
     {
         if (stage != __GLSL_STAGE_VS && stage != __GLSL_STAGE_FS)
@@ -7780,7 +8050,6 @@ gcChipProgramBinary_V0(
         }
     }
 
-    /* (todo) to suport ts/gs) */
     gcmONERROR(gcLoadProgram((gctPOINTER)binary,
                              (gctUINT32)length,
                              masterPgInstance->binaries[__GLSL_STAGE_VS],
@@ -7855,8 +8124,6 @@ gcChipProgramBinary_V0(
     {
         __GLSLStage stage;
 
-        /* Record link time info. */
-        /* TODO: need to retrieve the flags from binary */
         programObject->bindingInfo.isSeparable = GL_FALSE;
         programObject->bindingInfo.isRetrievable = GL_FALSE;
 
@@ -9092,11 +9359,6 @@ __glChipGetUniformData(
     GL_ASSERT(g_typeInfos[uniform->dataType].halType == uniform->dataType);
     bytes = g_typeInfos[uniform->dataType].size;
 
-    /*
-    ** Image uniform data record image info and its data type is not consistent with spec.
-    ** Normally we should have private imageInfo uniform, but keep imageUniform as an opaque
-    ** handle, and record binding information. (todo)
-    */
     if ((uniform->dataType >= gcSHADER_IMAGE_2D && uniform->dataType <= gcSHADER_IMAGE_3D) ||
         (uniform->dataType >= gcSHADER_IIMAGE_2D && uniform->dataType <= gcSHADER_UIMAGE_2D_ARRAY))
     {
@@ -9220,7 +9482,6 @@ __glChipBuildTexEnableDim(
 
         for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
         {
-            /* TODO: SSO assumes different stages cannot share same sampler index */
             if (programs[stage] && programs[stage]->samplerMap[sampler].stage == stage)
             {
                 unit = programs[stage]->samplerMap[sampler].unit;
@@ -9612,7 +9873,6 @@ gcChipFlushUniformBlock(
     }
 
 OnError:
-    /* TODO: should unlock the surface after the draw */
     if (bufObj && physical)
     {
         gcoBUFOBJ_Unlock(bufObj);
@@ -10077,7 +10337,7 @@ gcChipFlushBuiltinUniforms(
     __GLchipSLProgram *program
     )
 {
-    GLint i;
+    GLint i,x,y;
     gceSTATUS status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x progObj=0x%x program=0x%x", gc, chipCtx, progObj, program);
@@ -10119,6 +10379,427 @@ gcChipFlushBuiltinUniforms(
                 *(GLfloat*)uniform->data = gc->state.depth.zFar - gc->state.depth.zNear;
             }
             break;
+#ifdef OPENGL40
+        case __GL_CHIP_UNIFORM_USAGE_MODELVIEW:
+            for (y = 0; y < 4; y++) {
+                for (x = 0; x < 4; x++) {
+                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->matrix.matrix[x][y];
+                }
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_PROJECTION:
+            for (y = 0; y < 4; y++) {
+                for (x = 0; x < 4; x++) {
+                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.projection->matrix.matrix[x][y];
+                }
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_MVP:
+            for (y = 0; y < 4; y++) {
+                for (x = 0; x < 4; x++) {
+                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->mvp.matrix[x][y];
+                }
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_MODELVIEW_INV:
+            for (y = 0; y < 4; y++) {
+                for (x = 0; x < 4; x++) {
+                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->inverse.matrix[x][y];
+                }
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_MODELVIEW_INVTRANS:
+            for (y = 0; y < 4; y++) {
+                for (x = 0; x < 4; x++) {
+                    ((GLfloat*)uniform->data)[4*y+x] = gc->transform.modelView->inverseTranspose.matrix[x][y];
+                }
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_NORMAL_SCALE:
+            {
+                GLfloat  scale = 0;
+                __GLtransform *tr = NULL;
+                tr = gc->transform.modelView;
+                scale = tr->matrix.matrix[1][3] * tr->matrix.matrix[1][3] +
+                    tr->matrix.matrix[2][3] * tr->matrix.matrix[2][3] +
+                    tr->matrix.matrix[3][3] * tr->matrix.matrix[3][3];
+                scale = (GLfloat)(1.0 / sqrt(scale));
+                *(GLfloat*)uniform->data = scale;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_POINT_SIZE:
+            *(GLfloat*)uniform->data = gc->state.point.requestedSize;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_POINT_SIZE_MIN:
+            *(GLfloat*)uniform->data = gc->state.point.sizeMin;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_POINT_SIZE_MAX:
+            *(GLfloat*)uniform->data = gc->state.point.sizeMax;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_POINT_FADE_THRESHOLD_SIZE:
+            *(GLfloat*)uniform->data = gc->state.point.fadeThresholdSize;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_POINT_DISTANCE_CONST_ATTENU:
+            *(GLfloat*)uniform->data = gc->state.point.distanceAttenuation[0];
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_POINT_DISTANCE_LINEAR_ATTENU:
+            *(GLfloat*)uniform->data = gc->state.point.distanceAttenuation[1];
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_POINT_DISTANCE_QUADRATIC_ATTENU:
+            *(GLfloat*)uniform->data = gc->state.point.distanceAttenuation[2];
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_EMISSION:
+            ((GLfloat*)uniform->data)[0] = gc->state.light.front.emissive.r;
+            ((GLfloat*)uniform->data)[1] = gc->state.light.front.emissive.g;
+            ((GLfloat*)uniform->data)[2] = gc->state.light.front.emissive.b;
+            ((GLfloat*)uniform->data)[3] = gc->state.light.front.emissive.a;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_DIFFUSE:
+            ((GLfloat*)uniform->data)[0] = gc->state.light.front.diffuse.r;
+            ((GLfloat*)uniform->data)[1] = gc->state.light.front.diffuse.g;
+            ((GLfloat*)uniform->data)[2] = gc->state.light.front.diffuse.b;
+            ((GLfloat*)uniform->data)[3] = gc->state.light.front.diffuse.a;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_AMBIENT:
+            ((GLfloat*)uniform->data)[0] = gc->state.light.front.ambient.r;
+            ((GLfloat*)uniform->data)[1] = gc->state.light.front.ambient.g;
+            ((GLfloat*)uniform->data)[2] = gc->state.light.front.ambient.b;
+            ((GLfloat*)uniform->data)[3] = gc->state.light.front.ambient.a;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_SPECULAR:
+            ((GLfloat*)uniform->data)[0] = gc->state.light.front.specular.r;
+            ((GLfloat*)uniform->data)[1] = gc->state.light.front.specular.g;
+            ((GLfloat*)uniform->data)[2] = gc->state.light.front.specular.b;
+            ((GLfloat*)uniform->data)[3] = gc->state.light.front.specular.a;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_MATERIAL_SHININESS:
+            ((GLfloat*)uniform->data)[0] = gc->state.light.front.specularExponent;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_EMISSION:
+            ((GLfloat*)uniform->data)[0] = gc->state.light.back.emissive.r;
+            ((GLfloat*)uniform->data)[1] = gc->state.light.back.emissive.g;
+            ((GLfloat*)uniform->data)[2] = gc->state.light.back.emissive.b;
+            ((GLfloat*)uniform->data)[3] = gc->state.light.back.emissive.a;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_DIFFUSE:
+            ((GLfloat*)uniform->data)[0] = gc->state.light.back.diffuse.r;
+            ((GLfloat*)uniform->data)[1] = gc->state.light.back.diffuse.g;
+            ((GLfloat*)uniform->data)[2] = gc->state.light.back.diffuse.b;
+            ((GLfloat*)uniform->data)[3] = gc->state.light.back.diffuse.a;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_AMBIENT:
+            ((GLfloat*)uniform->data)[0] = gc->state.light.back.ambient.r;
+            ((GLfloat*)uniform->data)[1] = gc->state.light.back.ambient.g;
+            ((GLfloat*)uniform->data)[2] = gc->state.light.back.ambient.b;
+            ((GLfloat*)uniform->data)[3] = gc->state.light.back.ambient.a;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_SPECULAR:
+            ((GLfloat*)uniform->data)[0] = gc->state.light.back.specular.r;
+            ((GLfloat*)uniform->data)[1] = gc->state.light.back.specular.g;
+            ((GLfloat*)uniform->data)[2] = gc->state.light.back.specular.b;
+            ((GLfloat*)uniform->data)[3] = gc->state.light.back.specular.a;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_BACK_MATERIAL_SHININESS:
+            ((GLfloat*)uniform->data)[0] = gc->state.light.back.specularExponent;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT0_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT1_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT2_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT3_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT4_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT5_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT6_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT7_AMBIENT:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_AMBIENT;
+                ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].ambient.r;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].ambient.g;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].ambient.b;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].ambient.a;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT0_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT1_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT2_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT3_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT4_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT5_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT6_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT7_DIFFUSE:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_DIFFUSE;
+                ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].diffuse.r;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].diffuse.g;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].diffuse.b;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].diffuse.a;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT2_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT3_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT4_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT5_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT6_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT7_SPECULAR:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPECULAR;
+                ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].specular.r;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].specular.g;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].specular.b;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].specular.a;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT0_POSITION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT1_POSITION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT2_POSITION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT3_POSITION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT4_POSITION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT5_POSITION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT6_POSITION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT7_POSITION:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_POSITION;
+                ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].position.f.x;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].position.f.y;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].position.f.z;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].position.f.w;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_DIRECTION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPOT_DIRECTION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT2_SPOT_DIRECTION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT3_SPOT_DIRECTION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT4_SPOT_DIRECTION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT5_SPOT_DIRECTION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT6_SPOT_DIRECTION:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT7_SPOT_DIRECTION:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_DIRECTION;
+                ((GLfloat*)uniform->data)[0] = gc->state.light.source[index].direction.f.x;
+                ((GLfloat*)uniform->data)[1] = gc->state.light.source[index].direction.f.y;
+                ((GLfloat*)uniform->data)[2] = gc->state.light.source[index].direction.f.z;
+                ((GLfloat*)uniform->data)[3] = gc->state.light.source[index].direction.f.w;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_EXPONENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPOT_EXPONENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT2_SPOT_EXPONENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT3_SPOT_EXPONENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT4_SPOT_EXPONENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT5_SPOT_EXPONENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT6_SPOT_EXPONENT:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT7_SPOT_EXPONENT:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_EXPONENT;
+                *(GLfloat*)uniform->data = gc->state.light.source[index].spotLightExponent;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_CUTOFF:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT1_SPOT_CUTOFF:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT2_SPOT_CUTOFF:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT3_SPOT_CUTOFF:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT4_SPOT_CUTOFF:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT5_SPOT_CUTOFF:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT6_SPOT_CUTOFF:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT7_SPOT_CUTOFF:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_SPOT_CUTOFF;
+                *(GLfloat*)uniform->data = gc->state.light.source[index].spotLightCutOffAngle;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT0_CONST_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT1_CONST_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT2_CONST_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT3_CONST_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT4_CONST_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT5_CONST_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT6_CONST_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT7_CONST_ATTENU:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_CONST_ATTENU;
+                *(GLfloat*)uniform->data = gc->state.light.source[index].constantAttenuation;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT0_LINEAR_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT1_LINEAR_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT2_LINEAR_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT3_LINEAR_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT4_LINEAR_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT5_LINEAR_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT6_LINEAR_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT7_LINEAR_ATTENU:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_LINEAR_ATTENU;
+                *(GLfloat*)uniform->data = gc->state.light.source[index].linearAttenuation;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT0_QUADRATIC_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT1_QUADRATIC_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT2_QUADRATIC_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT3_QUADRATIC_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT4_QUADRATIC_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT5_QUADRATIC_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT6_QUADRATIC_ATTENU:
+        case __GL_CHIP_UNIFORM_USAGE_LIGHT7_QUADRATIC_ATTENU:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_LIGHT0_QUADRATIC_ATTENU;
+                *(GLfloat*)uniform->data = gc->state.light.source[index].quadraticAttenuation;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_LIGHTMODEL_AMBIENT:
+            ((GLfloat*)uniform->data)[0] = gc->state.light.model.ambient.r;
+            ((GLfloat*)uniform->data)[1] = gc->state.light.model.ambient.g;
+            ((GLfloat*)uniform->data)[2] = gc->state.light.model.ambient.b;
+            ((GLfloat*)uniform->data)[3] = gc->state.light.model.ambient.a;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHTMODEL_PRODUCT_SCENECOLOR:
+            {
+                __GLmaterialState *m = &gc->state.light.front;
+                __GLcolor* ma = &(gc->state.light.model.ambient);
+                ((GLfloat*)uniform->data)[0] = m->emissive.r + m->ambient.r * ma->r;
+                ((GLfloat*)uniform->data)[1] = m->emissive.g + m->ambient.g * ma->g;
+                ((GLfloat*)uniform->data)[2] = m->emissive.b + m->ambient.b * ma->b;
+                ((GLfloat*)uniform->data)[3] = m->emissive.a + m->ambient.a * ma->a;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHTMODEL_PRODUCT_SCENECOLOR:
+            {
+                __GLmaterialState *m = &gc->state.light.back;
+                __GLcolor* ma = &(gc->state.light.model.ambient);
+                ((GLfloat*)uniform->data)[0] = m->emissive.r + m->ambient.r * ma->r;
+                ((GLfloat*)uniform->data)[1] = m->emissive.g + m->ambient.g * ma->g;
+                ((GLfloat*)uniform->data)[2] = m->emissive.b + m->ambient.b * ma->b;
+                ((GLfloat*)uniform->data)[3] = m->emissive.a + m->ambient.a * ma->a;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT1_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT2_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT3_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT4_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT5_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT6_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT7_PRODUCT_AMBIENT:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_AMBIENT;
+                __GLcolor* acm  = &(gc->state.light.front.ambient);
+                __GLcolor* acli = &gc->state.light.source[index].ambient;
+                ((GLfloat*)uniform->data)[0] = acm->r * acli->r;
+                ((GLfloat*)uniform->data)[1] = acm->g * acli->g;
+                ((GLfloat*)uniform->data)[2] = acm->b * acli->b;
+                ((GLfloat*)uniform->data)[3] = acm->a * acli->a;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT1_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT2_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT3_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT4_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT5_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT6_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT7_PRODUCT_DIFFUSE:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_DIFFUSE;
+                __GLcolor* dcm  = &(gc->state.light.front.diffuse);
+                __GLcolor* dcli = &gc->state.light.source[index].diffuse;
+                ((GLfloat*)uniform->data)[0] = dcm->r * dcli->r;
+                ((GLfloat*)uniform->data)[1] = dcm->g * dcli->g;
+                ((GLfloat*)uniform->data)[2] = dcm->b * dcli->b;
+                ((GLfloat*)uniform->data)[3] = dcm->a * dcli->a;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT1_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT2_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT3_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT4_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT5_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT6_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT7_PRODUCT_SPECULAR:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_FRONT_LIGHT0_PRODUCT_SPECULAR;
+                __GLcolor* scm  = &(gc->state.light.front.specular);
+                __GLcolor* scli = &gc->state.light.source[index].specular;
+                ((GLfloat*)uniform->data)[0] = scm->r * scli->r;
+                ((GLfloat*)uniform->data)[1] = scm->g * scli->g;
+                ((GLfloat*)uniform->data)[2] = scm->b * scli->b;
+                ((GLfloat*)uniform->data)[3] = scm->a * scli->a;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT1_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT2_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT3_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT4_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT5_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT6_PRODUCT_AMBIENT:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT7_PRODUCT_AMBIENT:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_AMBIENT;
+                __GLcolor* acm  = &(gc->state.light.back.ambient);
+                __GLcolor* acli = &gc->state.light.source[index].ambient;
+                ((GLfloat*)uniform->data)[0] = acm->r * acli->r;
+                ((GLfloat*)uniform->data)[1] = acm->g * acli->g;
+                ((GLfloat*)uniform->data)[2] = acm->b * acli->b;
+                ((GLfloat*)uniform->data)[3] = acm->a * acli->a;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT1_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT2_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT3_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT4_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT5_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT6_PRODUCT_DIFFUSE:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT7_PRODUCT_DIFFUSE:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_DIFFUSE;
+                __GLcolor* dcm  = &(gc->state.light.back.diffuse);
+                __GLcolor* dcli = &gc->state.light.source[index].diffuse;
+                ((GLfloat*)uniform->data)[0] = dcm->r * dcli->r;
+                ((GLfloat*)uniform->data)[1] = dcm->g * dcli->g;
+                ((GLfloat*)uniform->data)[2] = dcm->b * dcli->b;
+                ((GLfloat*)uniform->data)[3] = dcm->a * dcli->a;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT1_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT2_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT3_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT4_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT5_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT6_PRODUCT_SPECULAR:
+        case __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT7_PRODUCT_SPECULAR:
+            {
+                GLint index = uniform->usage - __GL_CHIP_UNIFORM_USAGE_BACK_LIGHT0_PRODUCT_SPECULAR;
+                __GLcolor* scm  = &(gc->state.light.back.specular);
+                __GLcolor* scli = &gc->state.light.source[index].specular;
+                ((GLfloat*)uniform->data)[0] = scm->r * scli->r;
+                ((GLfloat*)uniform->data)[1] = scm->g * scli->g;
+                ((GLfloat*)uniform->data)[2] = scm->b * scli->b;
+                ((GLfloat*)uniform->data)[3] = scm->a * scli->a;
+            }
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FOG_COLOR:
+            ((GLfloat*)uniform->data)[0] = gc->state.fog.color.r;
+            ((GLfloat*)uniform->data)[1] = gc->state.fog.color.g;
+            ((GLfloat*)uniform->data)[2] = gc->state.fog.color.b;
+            ((GLfloat*)uniform->data)[3] = gc->state.fog.color.a;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FOG_DENSITY:
+            *(GLfloat*)uniform->data = gc->state.fog.density;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FOG_START:
+            *(GLfloat*)uniform->data = gc->state.fog.start;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FOG_END:
+            *(GLfloat*)uniform->data = gc->state.fog.end;
+            break;
+        case __GL_CHIP_UNIFORM_USAGE_FOG_SCALE:
+            *(GLfloat*)uniform->data = 1.0f / (gc->state.fog.end - gc->state.fog.start);
+            break;
+#endif
         default:
             GL_ASSERT(0);
             break;
@@ -10219,7 +10900,6 @@ gcChipFlushUserDefUBs(
         __GLchipVertexBufferInfo *bufInfo = gcvNULL;
         __GLchipSLUniformBlock *ub = &program->uniformBlocks[i];
 
-        /* TODO: consider buffer object and program dirty */
         GL_ASSERT(ub->binding < gc->constants.shaderCaps.maxUniformBufferBindings);
 
         pBindingPoint = &gc->bufferObject.bindingPoints[__GL_UNIFORM_BUFFER_INDEX][ub->binding];
@@ -10672,7 +11352,6 @@ gcChipFlushPrivateSSBs(
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x progObj=0x%x program=0x%x pgInstance=0x%x",
                    gc, chipCtx, progObj, program, pgInstance);
 
-    /* TODO: consider dirty later */
     for (i = program->userDefSsbCount; i < program->totalSsbCount; ++i)
     {
         GLuint groups;

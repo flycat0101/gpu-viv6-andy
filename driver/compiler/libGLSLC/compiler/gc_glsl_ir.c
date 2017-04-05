@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -752,6 +752,8 @@ slsDATA_TYPE_ConstructElement(
 
         dataType->isInheritFromUnsizedDataType = CompoundDataType->isInheritFromUnsizedDataType;
         dataType->isPerVertexArray             = gcvFALSE;
+        dataType->orgFieldSpace                = CompoundDataType->orgFieldSpace;
+        dataType->fieldSpace                   = CompoundDataType->fieldSpace;
 
         *DataType = dataType;
 
@@ -1744,6 +1746,66 @@ slsDATA_TYPE_GetLogicalOperandCount(
 }
 
 gceSTATUS
+slsDATA_TYPE_NAME_Construct(
+    IN sloCOMPILER Compiler,
+    IN gctCONST_STRING Name,
+    OUT slsDATA_TYPE_NAME **    DataTypeName
+    )
+{
+    gceSTATUS       status;
+    slsDATA_TYPE_NAME *  dataTypeName;
+
+    gcmHEADER_ARG("Compiler=0x%x Name=0x%x", Compiler, Name);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmVERIFY_ARGUMENT(DataTypeName);
+
+    do
+    {
+        gctPOINTER pointer = gcvNULL;
+
+        status = sloCOMPILER_Allocate(Compiler,
+                                      (gctSIZE_T)sizeof(slsDATA_TYPE_NAME),
+                                      &pointer);
+        if (gcmIS_ERROR(status)) break;
+
+        gcoOS_ZeroMemory(pointer, gcmSIZEOF(slsDATA_TYPE_NAME));
+        dataTypeName = (slsDATA_TYPE_NAME *)pointer;
+        dataTypeName->name = Name;
+
+        *DataTypeName = dataTypeName;
+
+        gcmFOOTER_ARG("*DataTypeName=0x%x", *DataTypeName);
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+
+    *DataTypeName = gcvNULL;
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+slsDATA_TYPE_NAME_Destory(
+    IN sloCOMPILER Compiler,
+    IN slsDATA_TYPE_NAME * DataTypeName
+    )
+{
+    gcmHEADER_ARG("Compiler=0x%x DataTypeName=0x%x", Compiler, DataTypeName);
+
+    /* Verify the arguments. */
+    slmVERIFY_OBJECT(Compiler, slvOBJ_COMPILER);
+    gcmVERIFY_ARGUMENT(DataTypeName);
+
+    gcmVERIFY_OK(sloCOMPILER_Free(Compiler, DataTypeName));
+
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
 slsNAME_Initialize(
     IN sloCOMPILER Compiler,
     IN slsNAME * Name,
@@ -2206,6 +2268,7 @@ slsNAME_SPACE_Construct(
     IN sloCOMPILER Compiler,
     IN sltPOOL_STRING SpaceName,
     IN slsNAME_SPACE * Parent,
+    IN sleNAME_SPACE_TYPE NameSpaceType,
     OUT slsNAME_SPACE ** NameSpace
     )
 {
@@ -2224,19 +2287,16 @@ slsNAME_SPACE_Construct(
         gctPOINTER pointer = gcvNULL;
 
         status = sloCOMPILER_Allocate(Compiler,
-                                      (gctSIZE_T)sizeof(slsNAME_SPACE),
+                                      gcmSIZEOF(slsNAME_SPACE),
                                       &pointer);
-
         if (gcmIS_ERROR(status)) break;
+        gcoOS_ZeroMemory(pointer, gcmSIZEOF(slsNAME_SPACE));
 
-        nameSpace = pointer;
-
-        nameSpace->parent = Parent;
-
-        nameSpace->spaceName = SpaceName;
-
+        nameSpace = (slsNAME_SPACE *)pointer;
+        nameSpace->parent           = Parent;
+        nameSpace->nameSpaceType    = NameSpaceType;
+        nameSpace->spaceName        = SpaceName;
         slsDLINK_LIST_Initialize(&nameSpace->names);
-
         slsDLINK_LIST_Initialize(&nameSpace->subSpaces);
 
         if (Parent != gcvNULL)
@@ -2368,11 +2428,30 @@ slsNAME_SPACE_Dump(
     return gcvSTATUS_OK;
 }
 
+gctBOOL
+slsNAME_SPACE_CheckBlockNameForTheSameInterface(
+    void* Data1, void* Data2
+    )
+{
+    gctBOOL match = gcvFALSE;
+    slsNAME * name = (slsNAME *)Data1;
+    slsDATA_TYPE * dataType = (slsDATA_TYPE *)Data2;
+
+    if (name->dataType->qualifiers.storage == dataType->qualifiers.storage)
+    {
+        match = gcvTRUE;
+    }
+
+    return match;
+}
+
 gceSTATUS
 slsNAME_SPACE_Search(
     IN sloCOMPILER Compiler,
     IN slsNAME_SPACE * NameSpace,
     IN sltPOOL_STRING Symbol,
+    IN slsNAME_SEARCH_COMPARE_FUNC_PTR NameCompareFunc,
+    IN void * CompareData,
     IN gctBOOL Recursive,
     IN gctBOOL MangleNameMatch,
     OUT slsNAME ** Name
@@ -2413,9 +2492,17 @@ slsNAME_SPACE_Search(
             if (name->symbol == Symbol)
             {
                 if (!sloCOMPILER_ExtensionEnabled(Compiler,
-                                                    name->extension))
+                                                  name->extension))
                 {
                     continue;
+                }
+
+                if (NameCompareFunc)
+                {
+                    if (!(*NameCompareFunc)(name, CompareData))
+                    {
+                        continue;
+                    }
                 }
 
                 *Name = name;
@@ -2431,6 +2518,8 @@ slsNAME_SPACE_Search(
         status = slsNAME_SPACE_Search(Compiler,
                                       NameSpace->parent,
                                       Symbol,
+                                      NameCompareFunc,
+                                      CompareData,
                                       Recursive,
                                       gcvFALSE,
                                       Name);
@@ -3081,6 +3170,8 @@ slsNAME_SPACE_CreateName(
             status = slsNAME_SPACE_Search(Compiler,
                                           NameSpace,
                                           Symbol,
+                                          gcvNULL,
+                                          gcvNULL,
                                           gcvFALSE,
                                           gcvFALSE,
                                           &name);
@@ -3132,6 +3223,8 @@ slsNAME_SPACE_CreateName(
                 status = slsNAME_SPACE_Search(Compiler,
                                               NameSpace,
                                               Symbol,
+                                              gcvNULL,
+                                              gcvNULL,
                                               gcvFALSE,
                                               gcvFALSE,
                                               &name);
@@ -4399,7 +4492,7 @@ sloIR_CONSTANT_Initialize(
     IN OUT sloIR_CONSTANT Constant
     )
 {
-#if gcdDEBUG
+#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
     gctUINT componentCount;
 #endif
 
@@ -4412,7 +4505,7 @@ sloIR_CONSTANT_Initialize(
     gcmASSERT(Constant);
     gcmASSERT(Values);
 
-#if gcdDEBUG
+#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
     componentCount = slsDATA_TYPE_GetSize(DataType);
 #endif
     gcmASSERT(componentCount == ValueCount);
@@ -5039,7 +5132,8 @@ _sloIR_CONSTANT_Mat_Mul_Mat(
     /* Save the result back */
     LeftConstant->exprBase.dataType->matrixSize.columnCount = matrixColumnCount;
     LeftConstant->exprBase.dataType->matrixSize.rowCount = matrixRowCount;
-    sloIR_CONSTANT_SetValues(Compiler, LeftConstant, matrixColumnCount * matrixRowCount, resultMatrix);
+    status = sloIR_CONSTANT_SetValues(Compiler, LeftConstant, matrixColumnCount * matrixRowCount, resultMatrix);
+    if (gcmIS_ERROR(status)) { gcmFOOTER(); return status; }
 
     gcmVERIFY_OK(sloIR_OBJECT_Destroy(Compiler, &RightConstant->exprBase.base));
 

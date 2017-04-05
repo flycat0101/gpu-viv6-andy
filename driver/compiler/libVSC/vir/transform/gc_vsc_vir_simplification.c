@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -103,7 +103,7 @@ gctBOOL _DestSrc0Identical(
         VIR_Enable enable = VIR_Operand_GetEnable(dest);
         VIR_Swizzle swizzle = VIR_Operand_GetSwizzle(src0);
         if(swizzle != VIR_Enable_2_Swizzle(enable))
-        {
+            {
             return gcvFALSE;
         }
         return memcmp(VIR_Operand_GetSymbol(dest), VIR_Operand_GetSymbol(src0), sizeof(VIR_Symbol)) == 0;
@@ -156,8 +156,8 @@ gctBOOL _ConstOrImmZero(
     }
     else
     {
-        return gcvFALSE;
-    }
+                    return gcvFALSE;
+                }
 }
 
 gctBOOL _ConstOrImmOne(
@@ -176,11 +176,11 @@ gctBOOL _ConstOrImmOne(
         VIR_PrimitiveTypeId type = VIR_Operand_GetType(opnd);
         VIR_Const* cur_const = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(opnd));
         return VIR_VecConstVal_AllOne(type, &cur_const->value.vecVal);
-    }
+                    }
     else
-    {
-        return gcvFALSE;
-    }
+                    {
+                        return gcvFALSE;
+                    }
 }
 
 gctBOOL _ConstOrImm4294967295(
@@ -201,13 +201,13 @@ gctBOOL _ConstOrImm4294967295(
         for(i = 0; i < VIR_CHANNEL_COUNT; i++)
         {
             if(cur_const->value.vecVal.u32Value[VIR_Swizzle_GetChannel(swizzle, i)] != 0xFFFFFFFF)
-            return gcvFALSE;
-        }
+                        return gcvFALSE;
+                    }
         return gcvTRUE;
     }
     else
     {
-        return gcvFALSE;
+                    return gcvFALSE;
     }
 }
 
@@ -342,12 +342,12 @@ void _MOVDestSumSrc0Src1(
         memset(&new_const, 0, sizeof(VIR_ConstVal));
 
         if((VIR_Operand_GetOpKind(src0) == VIR_OPND_IMMEDIATE && VIR_Operand_GetOpKind(src1) == VIR_OPND_CONST))
-        {
+    {
             VIR_Inst_SetSource(inst, 0, src1);
             VIR_Inst_SetSource(inst, 1, src0);
             src0 = src1;
             src1 = VIR_Inst_GetSource(inst, 0);
-        }
+    }
         cur_const = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(src0));
 
         VIR_VecConstVal_AddScalarConstVal(type, &cur_const->value.vecVal, (VIR_ScalarConstVal*)&(src1->u.n.u1), &new_const.vecVal);
@@ -527,7 +527,7 @@ _VSC_SIMP_Steps RSHIFT_Steps[] = {
     {_VSC_SIMP_STEPS_END, {0}},
 };
 
-_VSC_SIMP_Steps SELECT_Steps[] = {
+_VSC_SIMP_Steps CSELECT_Steps[] = {
     {_VSC_SIMP_STEPS_COUNT, {5}},
     {_VSC_SIMP_STEPS_INST_CHECK, {(gctUINTPTR_T)_NZCond}},
     {_VSC_SIMP_STEPS_SRC0_CHECK, {(gctUINTPTR_T)_ABSModifier}},
@@ -562,99 +562,99 @@ VSC_ErrCode VSC_SIMP_Simplification_PerformOnInst(
     OUT gctBOOL* changed
     )
 {
-    VSC_ErrCode            errCode  = VSC_ERR_NONE;
+    VSC_ErrCode errCode  = VSC_ERR_NONE;
     VIR_OpCode opc = VIR_Inst_GetOpcode(inst);
     _VSC_SIMP_Steps* steps = _VSC_SIMP_GetSteps(opc);
     gctBOOL chg = gcvFALSE;
 
-    if(steps == gcvNULL)
-    {
-        return errCode;
-    }
-
-    while(VSC_SIMP_Steps_GetType(steps) != _VSC_SIMP_STEPS_END)
-    {
-        gctUINT count;
-        gctBOOL check = gcvTRUE;
-        gcmASSERT(VSC_SIMP_Steps_GetType(steps) == _VSC_SIMP_STEPS_COUNT);
-        count = (gctUINT)VSC_SIMP_Steps_GetCount(steps);
-        ++steps;
-        while(count > 0)
+        if(steps == gcvNULL)
         {
-            switch(VSC_SIMP_Steps_GetType(steps))
+            return errCode;
+        }
+
+        while(VSC_SIMP_Steps_GetType(steps) != _VSC_SIMP_STEPS_END)
+        {
+            gctUINT count;
+            gctBOOL check = gcvTRUE;
+            gcmASSERT(VSC_SIMP_Steps_GetType(steps) == _VSC_SIMP_STEPS_COUNT);
+            count = (gctUINT)VSC_SIMP_Steps_GetCount(steps);
+            ++steps;
+            while(count > 0)
             {
-                case _VSC_SIMP_STEPS_INST_CHECK:
+                switch(VSC_SIMP_Steps_GetType(steps))
                 {
-                    _VSC_SIMP_InstValidate inst_vali = VSC_SIMP_Steps_GetInstVali(steps);
-                    check = (*inst_vali)(inst);
-                    break;
-                }
-                case _VSC_SIMP_STEPS_DEST_CHECK:
-                {
-                    _VSC_SIMP_OpndValidate dest_vali = VSC_SIMP_Steps_GetOpndVali(steps);
-                    check = (*dest_vali)(inst, VIR_Inst_GetDest(inst));
-                    break;
-                }
-                case _VSC_SIMP_STEPS_SRC0_CHECK:
-                {
-                    _VSC_SIMP_OpndValidate src0_vali = VSC_SIMP_Steps_GetOpndVali(steps);
-                    check = (*src0_vali)(inst, VIR_Inst_GetSource(inst, 0));
-                    break;
-                }
-                case _VSC_SIMP_STEPS_SRC1_CHECK:
-                {
-                    _VSC_SIMP_OpndValidate src1_vali = VSC_SIMP_Steps_GetOpndVali(steps);
-                    check = (*src1_vali)(inst, VIR_Inst_GetSource(inst, 1));
-                    break;
-                }
-                case _VSC_SIMP_STEPS_SRC2_CHECK:
-                {
-                    _VSC_SIMP_OpndValidate src2_vali = VSC_SIMP_Steps_GetOpndVali(steps);
-                    check = (*src2_vali)(inst, VIR_Inst_GetSource(inst, 2));
-                    break;
-                }
-                case _VSC_SIMP_STEPS_TRANS:
-                {
-                    _VSC_SIMP_Transform trans = VSC_SIMP_Steps_GetTrans(steps);
+                    case _VSC_SIMP_STEPS_INST_CHECK:
+                    {
+                        _VSC_SIMP_InstValidate inst_vali = VSC_SIMP_Steps_GetInstVali(steps);
+                        check = (*inst_vali)(inst);
+                        break;
+                    }
+                    case _VSC_SIMP_STEPS_DEST_CHECK:
+                    {
+                        _VSC_SIMP_OpndValidate dest_vali = VSC_SIMP_Steps_GetOpndVali(steps);
+                        check = (*dest_vali)(inst, VIR_Inst_GetDest(inst));
+                        break;
+                    }
+                    case _VSC_SIMP_STEPS_SRC0_CHECK:
+                    {
+                        _VSC_SIMP_OpndValidate src0_vali = VSC_SIMP_Steps_GetOpndVali(steps);
+                        check = (*src0_vali)(inst, VIR_Inst_GetSource(inst, 0));
+                        break;
+                    }
+                    case _VSC_SIMP_STEPS_SRC1_CHECK:
+                    {
+                        _VSC_SIMP_OpndValidate src1_vali = VSC_SIMP_Steps_GetOpndVali(steps);
+                        check = (*src1_vali)(inst, VIR_Inst_GetSource(inst, 1));
+                        break;
+                    }
+                    case _VSC_SIMP_STEPS_SRC2_CHECK:
+                    {
+                        _VSC_SIMP_OpndValidate src2_vali = VSC_SIMP_Steps_GetOpndVali(steps);
+                        check = (*src2_vali)(inst, VIR_Inst_GetSource(inst, 2));
+                        break;
+                    }
+                    case _VSC_SIMP_STEPS_TRANS:
+                    {
+                        _VSC_SIMP_Transform trans = VSC_SIMP_Steps_GetTrans(steps);
                     VSC_OPTN_SIMPOptions* options = gcvNULL;
                     if(simp)
                     {
                         options = VSC_SIMP_Simplification_GetOptions(simp);
                     }
-                    if(options && VSC_UTILS_MASK(VSC_OPTN_SIMPOptions_GetTrace(options), VSC_OPTN_SIMPOptions_TRACE_TRANSFORMATION))
-                    {
-                        VIR_Dumper* dumper = VSC_SIMP_Simplification_GetDumper(simp);
-                        VIR_LOG(dumper, "before SIMP:\n");
-                        VIR_Inst_Dump(dumper, inst);
+                        if(options && VSC_UTILS_MASK(VSC_OPTN_SIMPOptions_GetTrace(options), VSC_OPTN_SIMPOptions_TRACE_TRANSFORMATION))
+                        {
+                            VIR_Dumper* dumper = VSC_SIMP_Simplification_GetDumper(simp);
+                            VIR_LOG(dumper, "before SIMP:\n");
+                            VIR_Inst_Dump(dumper, inst);
+                        }
+                        (*trans)(inst);
+                        chg = gcvTRUE;
+                        if(options && VSC_UTILS_MASK(VSC_OPTN_SIMPOptions_GetTrace(options), VSC_OPTN_SIMPOptions_TRACE_TRANSFORMATION))
+                        {
+                            VIR_Dumper* dumper = VSC_SIMP_Simplification_GetDumper(simp);
+                            VIR_LOG(dumper, "after SIMP:\n");
+                            VIR_Inst_Dump(dumper, inst);
+                        }
+                        /* recursively simplify */
+                        return VSC_SIMP_Simplification_PerformOnInst(simp, inst, gcvNULL);
                     }
-                    (*trans)(inst);
-                    chg = gcvTRUE;
-                    if(options && VSC_UTILS_MASK(VSC_OPTN_SIMPOptions_GetTrace(options), VSC_OPTN_SIMPOptions_TRACE_TRANSFORMATION))
+                    default:
                     {
-                        VIR_Dumper* dumper = VSC_SIMP_Simplification_GetDumper(simp);
-                        VIR_LOG(dumper, "after SIMP:\n");
-                        VIR_Inst_Dump(dumper, inst);
+                        gcmASSERT(0);
                     }
-                    /* recursively simplify */
-                    return VSC_SIMP_Simplification_PerformOnInst(simp, inst, gcvNULL);
                 }
-                default:
+                if(check)
                 {
-                    gcmASSERT(0);
+                    ++steps;
+                    --count;
                 }
-            }
-            if(check)
-            {
-                ++steps;
-                --count;
-            }
-            else
-            {
-                steps += count;
-                break;
+                else
+                {
+                    steps += count;
+                    break;
+                }
             }
         }
-    }
 
     if(changed)
     {

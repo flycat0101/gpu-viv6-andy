@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -358,7 +358,7 @@ vx_status _gcfVX_Filter(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_imag
 
 vx_status vxMedian3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *borders)
 {
-    if (node->base.context->evisNoInst.noFilter)
+    if (!node->base.context->evisNoInst.isVX2 && node->base.context->evisNoInst.noFilter)
     {
         return _gcfVX_Median3x3_Cpu(src, dst, borders);
     }
@@ -370,7 +370,7 @@ vx_status vxMedian3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t
 
 vx_status vxBox3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *bordermode)
 {
-    if (node->base.context->evisNoInst.noBoxFilter)
+    if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noBoxFilter)
     {
         return _gcfVX_Filter_Halfevis(node, gcvVX_KERNEL_BOX_3x3, src, dst, bordermode);
     }
@@ -382,7 +382,7 @@ vx_status vxBox3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *b
 
 vx_status vxGaussian3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *bordermode)
 {
-    if (node->base.context->evisNoInst.noFilter)
+    if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noFilter)
     {
         return _gcfVX_Filter_Halfevis(node, gcvVX_KERNEL_GAUSSIAN_3x3, src, dst, bordermode);
     }

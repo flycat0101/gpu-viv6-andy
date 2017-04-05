@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -630,7 +630,6 @@ static VkResult win32GetPhysicalDeviceSurfaceSupport(
 
     *pSupported = VK_FALSE;
 
-    /* TODO: Add present surface tests for present support */
     if (queueFamilyIndex <= phyDev->queueFamilyCount)
     {
         *pSupported = phyDev->queuePresentSupported[queueFamilyIndex];
@@ -1229,7 +1228,6 @@ static VkResult win32CreateSwapchain(
 
 OnError:
 
-    /* TODO: Handle cases where swap chain images are not free */
     if (pCreateInfo->oldSwapchain)
     {
         __vkWin32SwapchainKHR *old_sc = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkWin32SwapchainKHR *, pCreateInfo->oldSwapchain);

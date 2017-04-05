@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -125,7 +125,7 @@ vdkSetupEGL(
         }
     }
 
-    if (Egl->display == NULL)
+    if (Egl->display == 0)
     {
         /* Get the VDK display. */
         Egl->display = vdkGetDisplay(Egl->vdk);
@@ -448,11 +448,11 @@ vdkFinishEGL(
             Egl->window = 0;
         }
 
-        if (Egl->display != NULL)
+        if (Egl->display != 0)
         {
             /* Destroy the display. */
             vdkDestroyDisplay(Egl->display);
-            Egl->display = NULL;
+            Egl->display = 0;
         }
 
         if (Egl->vdk != NULL)

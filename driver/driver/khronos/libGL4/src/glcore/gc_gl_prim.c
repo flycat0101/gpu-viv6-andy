@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -445,7 +445,7 @@ GLvoid __glComputeRequiredInputMask(__GLcontext *gc)
     {
         if(gc->shaderProgram.currentProgram)
         {
-            vsInputMask = gc->shaderProgram.currentProgram->bindingInfo.vsInputArrayMask;
+            vsInputMask = gc->shaderProgram.currentProgram->bindingInfo.vsInputMask;
         }
         else
         {
@@ -1505,7 +1505,6 @@ GLvoid __glImmediateFlushBuffer(__GLcontext *gc)
         }
         break;
 
-    /* TODO: Connecting following primitive hasn't been done */
     case GL_LINES_ADJACENCY_EXT:
     case GL_LINE_STRIP_ADJACENCY_EXT:
     case GL_TRIANGLES_ADJACENCY_EXT:

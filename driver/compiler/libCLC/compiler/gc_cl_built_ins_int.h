@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -219,28 +219,28 @@ _GenShiftCode(
 
     if( clmGEN_CODE_IsScalarDataType(OperandsParameters[0].dataTypes[0].def) &&
         (IOperand->dataType.elementType == clvTYPE_CHAR ||
+        IOperand->dataType.elementType == clvTYPE_CHAR_PACKED ||
         IOperand->dataType.elementType == clvTYPE_UCHAR ||
+        IOperand->dataType.elementType == clvTYPE_UCHAR_PACKED ||
         IOperand->dataType.elementType == clvTYPE_SHORT ||
-        IOperand->dataType.elementType == clvTYPE_USHORT)){ /*Need to promote the data type to integer/unsigned integer */
+        IOperand->dataType.elementType == clvTYPE_SHORT_PACKED ||
+        IOperand->dataType.elementType == clvTYPE_USHORT ||
+        IOperand->dataType.elementType == clvTYPE_USHORT_PACKED)){ /*Need to promote the data type to integer/unsigned integer */
 
-        if(IOperand->dataType.elementType == clvTYPE_UCHAR ||
-            IOperand->dataType.elementType == clvTYPE_USHORT){
-                IOperand->dataType.elementType = clvTYPE_UINT;
+        if(clmIsElementTypeUnsigned(IOperand->dataType.elementType)) {
+            IOperand->dataType.elementType = clvTYPE_UINT;
         }
         else
             IOperand->dataType.elementType = clvTYPE_INT;
 
         status = clGenShiftExprCode(Compiler,
-            PolynaryExpr->exprBase.base.lineNo,
-            PolynaryExpr->exprBase.base.stringNo,
-            shiftCode,
-            IOperand,
-            &OperandsParameters[0].rOperands[0],
-            &OperandsParameters[1].rOperands[0]);
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
+                                    shiftCode,
+                                    IOperand,
+                                    &OperandsParameters[0].rOperands[0],
+                                    &OperandsParameters[1].rOperands[0]);
         if (gcmIS_ERROR(status)) return status;
-
-        IOperand->dataType.elementType = OperandsParameters[0].rOperands[0].dataType.elementType ;
-
     }
     else{
         status = clGenShiftExprCode(Compiler,
@@ -1281,77 +1281,95 @@ _GenMadSatCode(
     IN clsIOPERAND * IOperand
     )
 {
+    if(clmIsElementTypePacked(IOperand->dataType.elementType)) {
+        clsLOPERAND lOperand[1];
+        clsROPERAND rOperands[3];
 
-    gceSTATUS    status = gcvSTATUS_OK;
-    clsROPERAND sliceROperand0, sliceROperand1, sliceROperand2, cpyROperand[3];
-    clsLOPERAND tempLOperand, destLOperand;
-    clsIOPERAND tempIOperand;
-    clsROPERAND tempROperand;
-    clsGEN_CODE_DATA_TYPE dataType;
-    gctUINT8 i, vectorComponentCount = gcGetDataTypeComponentCount(OperandsParameters[0].rOperands[0].dataType);
-    if(vectorComponentCount != 8 && vectorComponentCount != 16)
-        return _GenMadSatVec4Code(
-                Compiler,
-                CodeGenerator,
-                PolynaryExpr,
-                OperandCount,
-                OperandsParameters,
-                IOperand
-                );
-    for(i = 0; i<3; i++)
-        cpyROperand[i] = OperandsParameters[i].rOperands[0];
+        clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+        rOperands[0] = OperandsParameters[0].rOperands[0];
+        rOperands[1] = OperandsParameters[1].rOperands[0];
+        rOperands[2] = OperandsParameters[2].rOperands[0];
+        return  clGenIntrinsicAsmCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      CL_VIR_IK_madsat,
+                                      lOperand,
+                                      OperandCount,
+                                      rOperands);
+    }
+    else {
+        gceSTATUS    status = gcvSTATUS_OK;
 
-    clsLOPERAND_InitializeUsingIOperand(&tempLOperand, IOperand);
-    dataType = clGetSubsetDataType(IOperand->dataType, 4);
-    clsIOPERAND_New(Compiler, &tempIOperand, dataType);
-    clsROPERAND_InitializeUsingIOperand(&tempROperand, &tempIOperand);
+        clsROPERAND sliceROperand0, sliceROperand1, sliceROperand2, cpyROperand[3];
+        clsLOPERAND tempLOperand, destLOperand;
+        clsIOPERAND tempIOperand;
+        clsROPERAND tempROperand;
+        clsGEN_CODE_DATA_TYPE dataType;
+        gctUINT8 i, vectorComponentCount = gcGetDataTypeComponentCount(OperandsParameters[0].rOperands[0].dataType);
 
-    for(i = 0; i<vectorComponentCount; i += 4){
-        clGetVectorROperandSlice(&cpyROperand[0],
-                i,
-                4,
-                &sliceROperand0);
-        clGetVectorROperandSlice(&cpyROperand[1],
-                i,
-                4,
-                &sliceROperand1);
-        clGetVectorROperandSlice(&cpyROperand[2],
-                i,
-                4,
-                &sliceROperand2);
+        if(vectorComponentCount != 8 && vectorComponentCount != 16)
+            return _GenMadSatVec4Code(
+                    Compiler,
+                    CodeGenerator,
+                    PolynaryExpr,
+                    OperandCount,
+                    OperandsParameters,
+                    IOperand
+                    );
+        for(i = 0; i<3; i++)
+            cpyROperand[i] = OperandsParameters[i].rOperands[0];
 
-        clGetVectorLOperandSlice(&tempLOperand,
+        clsLOPERAND_InitializeUsingIOperand(&tempLOperand, IOperand);
+        dataType = clGetSubsetDataType(IOperand->dataType, 4);
+        clsIOPERAND_New(Compiler, &tempIOperand, dataType);
+        clsROPERAND_InitializeUsingIOperand(&tempROperand, &tempIOperand);
+
+        for(i = 0; i<vectorComponentCount; i += 4){
+            clGetVectorROperandSlice(&cpyROperand[0],
                     i,
                     4,
-                    &destLOperand);
+                    &sliceROperand0);
+            clGetVectorROperandSlice(&cpyROperand[1],
+                    i,
+                    4,
+                    &sliceROperand1);
+            clGetVectorROperandSlice(&cpyROperand[2],
+                    i,
+                    4,
+                    &sliceROperand2);
 
-        OperandsParameters[0].rOperands[0] = sliceROperand0;
-        OperandsParameters[1].rOperands[0] = sliceROperand1;
-        OperandsParameters[2].rOperands[0] = sliceROperand2;
-        status = _GenMadSatVec4Code(
-                Compiler,
-                CodeGenerator,
-                PolynaryExpr,
-                OperandCount,
-                OperandsParameters,
-                &tempIOperand
-                );
+            clGetVectorLOperandSlice(&tempLOperand,
+                        i,
+                        4,
+                        &destLOperand);
 
-        status = clGenAssignCode(
-                Compiler,
-                PolynaryExpr->exprBase.base.lineNo,
-                PolynaryExpr->exprBase.base.stringNo,
-                &destLOperand,
-                &tempROperand);
-        if (gcmIS_ERROR(status)) return status;
+            OperandsParameters[0].rOperands[0] = sliceROperand0;
+            OperandsParameters[1].rOperands[0] = sliceROperand1;
+            OperandsParameters[2].rOperands[0] = sliceROperand2;
+            status = _GenMadSatVec4Code(
+                    Compiler,
+                    CodeGenerator,
+                    PolynaryExpr,
+                    OperandCount,
+                    OperandsParameters,
+                    &tempIOperand
+                    );
+
+            status = clGenAssignCode(
+                    Compiler,
+                    PolynaryExpr->exprBase.base.lineNo,
+                    PolynaryExpr->exprBase.base.stringNo,
+                    &destLOperand,
+                    &tempROperand);
+            if (gcmIS_ERROR(status)) return status;
+        }
+
+        OperandsParameters[0].rOperands[0] = cpyROperand[0];
+        OperandsParameters[1].rOperands[0] = cpyROperand[1];
+        OperandsParameters[2].rOperands[0] = cpyROperand[2];
+        return status;
     }
-    OperandsParameters[0].rOperands[0] = cpyROperand[0];
-    OperandsParameters[1].rOperands[0] = cpyROperand[1];
-    OperandsParameters[2].rOperands[0] = cpyROperand[2];
-
-    return status;
 }
-
 
 
 static gceSTATUS
@@ -1364,9 +1382,6 @@ _GenMadHiLoCode(
     IN clsIOPERAND * IOperand
     )
 {
-    gceSTATUS    status = gcvSTATUS_OK;
-    clsIOPERAND intermIOperands[1];
-    clsROPERAND intermROperands[1];
     int madHiFlag = strstr(PolynaryExpr->funcName->symbol, "hi")? 1:0;
 
     /* Verify the arguments. */
@@ -1376,32 +1391,54 @@ _GenMadHiLoCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    clsIOPERAND_New(Compiler, &intermIOperands[0], OperandsParameters[0].dataTypes[0].def);
-    clsROPERAND_InitializeUsingIOperand(&intermROperands[0], &intermIOperands[0]);
+    if(clmIsElementTypePacked(IOperand->dataType.elementType)) {
+        clvVIR_IK intrinsicKind = madHiFlag ? CL_VIR_IK_imadhi0 : CL_VIR_IK_imadlo0;
+        clsLOPERAND lOperand[1];
+        clsROPERAND rOperands[3];
 
-    {
-        status = clGenArithmeticExprCode(Compiler,
-                            PolynaryExpr->exprBase.base.lineNo,
-                            PolynaryExpr->exprBase.base.stringNo,
-                            madHiFlag ? clvOPCODE_MULHI : clvOPCODE_MUL,
-                            &intermIOperands[0],
-                            &OperandsParameters[0].rOperands[0],
-                            &OperandsParameters[1].rOperands[0]);
-
-        status = clGenArithmeticExprCode(Compiler,
-                            PolynaryExpr->exprBase.base.lineNo,
-                            PolynaryExpr->exprBase.base.stringNo,
-                            clvOPCODE_ADD,
-                            IOperand,
-                            &intermROperands[0],
-                            &OperandsParameters[2].rOperands[0]);
-
+        clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+        rOperands[0] = OperandsParameters[0].rOperands[0];
+        rOperands[1] = OperandsParameters[1].rOperands[0];
+        rOperands[2] = OperandsParameters[2].rOperands[0];
+        return  clGenIntrinsicAsmCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      intrinsicKind,
+                                      lOperand,
+                                      OperandCount,
+                                      rOperands);
     }
+    else {
+        gceSTATUS    status = gcvSTATUS_OK;
+        clsIOPERAND intermIOperands[1];
+        clsROPERAND intermROperands[1];
 
+        clsIOPERAND_New(Compiler, &intermIOperands[0], OperandsParameters[0].dataTypes[0].def);
+        clsROPERAND_InitializeUsingIOperand(&intermROperands[0], &intermIOperands[0]);
 
-    if (gcmIS_ERROR(status)) return status;
+        {
+            status = clGenArithmeticExprCode(Compiler,
+                                PolynaryExpr->exprBase.base.lineNo,
+                                PolynaryExpr->exprBase.base.stringNo,
+                                madHiFlag ? clvOPCODE_MULHI : clvOPCODE_MUL,
+                                &intermIOperands[0],
+                                &OperandsParameters[0].rOperands[0],
+                                &OperandsParameters[1].rOperands[0]);
 
-    return gcvSTATUS_OK;
+            status = clGenArithmeticExprCode(Compiler,
+                                PolynaryExpr->exprBase.base.lineNo,
+                                PolynaryExpr->exprBase.base.stringNo,
+                                clvOPCODE_ADD,
+                                IOperand,
+                                &intermROperands[0],
+                                &OperandsParameters[2].rOperands[0]);
+
+        }
+
+        if (gcmIS_ERROR(status)) return status;
+
+        return gcvSTATUS_OK;
+    }
 }
 
 static gceSTATUS
@@ -1541,10 +1578,6 @@ _GenAbsCode(
     IN clsIOPERAND * IOperand
     )
 {
-    gceSTATUS    status;
-
-    gctBOOL        isUnsigned;
-
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
     clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
@@ -1552,25 +1585,25 @@ _GenAbsCode(
     gcmASSERT(OperandsParameters);
     gcmASSERT(IOperand);
 
-    isUnsigned = clmIsElementTypeUnsigned(OperandsParameters[0].dataTypes[0].def.elementType);
-    if(isUnsigned){
-     status = clGenGenericCode1(Compiler,
-                PolynaryExpr->exprBase.base.lineNo,
-                PolynaryExpr->exprBase.base.stringNo,
-                clvOPCODE_ASSIGN,
-                IOperand,
-                &OperandsParameters[0].rOperands[0]);
+    if(clmIsElementTypeHighPrecision(OperandsParameters[0].dataTypes[0].def.elementType) &&
+       clmIsElementTypeUnsigned(OperandsParameters[0].dataTypes[0].def.elementType))
+    {
+        return clGenGenericCode1(Compiler,
+                                 PolynaryExpr->exprBase.base.lineNo,
+                                 PolynaryExpr->exprBase.base.stringNo,
+                                 clvOPCODE_ASSIGN,
+                                 IOperand,
+                                 &OperandsParameters[0].rOperands[0]);
     }
-    else{
-        status = clGenGenericCode1(
-                            Compiler,
-                            PolynaryExpr->exprBase.base.lineNo,
-                            PolynaryExpr->exprBase.base.stringNo,
-                            clvOPCODE_ABS,
-                            IOperand,
-                            &OperandsParameters[0].rOperands[0]);
+    else
+    {
+        return clGenGenericCode1(Compiler,
+                                 PolynaryExpr->exprBase.base.lineNo,
+                                 PolynaryExpr->exprBase.base.stringNo,
+                                 clvOPCODE_ABS,
+                                 IOperand,
+                                 &OperandsParameters[0].rOperands[0]);
     }
-    return status;
 }
 
 static gceSTATUS

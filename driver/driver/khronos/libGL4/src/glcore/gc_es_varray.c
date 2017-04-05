@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -32,10 +32,15 @@ __GL_INLINE GLvoid __glVertexAttrib4f(__GLcontext *gc, GLuint index, GLfloat x, 
         __GL_ERROR_RET(GL_INVALID_VALUE);
     }
 
+#ifdef OPENGL40
+    index = index + __GL_VARRAY_ATT0_INDEX;
+#endif
+
     gc->state.current.attribute[index].f.x = x;
     gc->state.current.attribute[index].f.y = y;
     gc->state.current.attribute[index].f.z = z;
     gc->state.current.attribute[index].f.w = w;
+
 }
 
 __GL_INLINE GLvoid __glVertexAttribI4ui(__GLcontext *gc, GLuint index, GLuint ix, GLuint iy, GLuint iz, GLuint iw)
@@ -45,10 +50,15 @@ __GL_INLINE GLvoid __glVertexAttribI4ui(__GLcontext *gc, GLuint index, GLuint ix
         __GL_ERROR_RET(GL_INVALID_VALUE);
     }
 
+#ifdef OPENGL40
+    index = index + __GL_VARRAY_ATT0_INDEX;
+#endif
+
     gc->state.current.attribute[index].i.ix = ix;
     gc->state.current.attribute[index].i.iy = iy;
     gc->state.current.attribute[index].i.iz = iz;
     gc->state.current.attribute[index].i.iw = iw;
+
 }
 
 GLvoid GL_APIENTRY __gles_VertexAttrib1f(__GLcontext *gc, GLuint index, GLfloat x)
@@ -159,6 +169,230 @@ GLvoid GL_APIENTRY __gles_VertexAttribI4uiv(__GLcontext *gc, GLuint index, const
     __GL_FOOTER();
 }
 
+#ifdef OPENGL40
+GLvoid APIENTRY __glim_VertexAttrib1s(__GLcontext *gc, GLuint index, GLshort x)
+{
+    __glVertexAttrib4f(gc, index, x, 0.0f, 0.0f, 1.0f);
+}
+
+
+GLvoid APIENTRY __glim_VertexAttrib1d(__GLcontext *gc, GLuint index, GLdouble x)
+{
+    __glVertexAttrib4f(gc, index, x, 0.0f, 0.0f, 1.0f);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2s(__GLcontext *gc, GLuint index, GLshort x, GLshort y)
+{
+    __glVertexAttrib4f(gc, index, x, y, 0.0f, 1.0f);
+}
+
+
+GLvoid APIENTRY __glim_VertexAttrib2d(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y)
+{
+    __glVertexAttrib4f(gc, index, x, y, 0.0f, 1.0f);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3s(__GLcontext *gc, GLuint index, GLshort x, GLshort y, GLshort z)
+{
+    __glVertexAttrib4f(gc, index, x, y, z, 1.0f);
+}
+
+
+GLvoid APIENTRY __glim_VertexAttrib3d(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y, GLdouble z)
+{
+    __glVertexAttrib4f(gc, index, x, y, z, 1.0f);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4s(__GLcontext *gc, GLuint index, GLshort x, GLshort y, GLshort z, GLshort w)
+{
+    __glVertexAttrib4f(gc, index, x, y, z, w);
+}
+
+
+GLvoid APIENTRY __glim_VertexAttrib4d(__GLcontext *gc, GLuint index, GLdouble x, GLdouble y, GLdouble z, GLdouble w)
+{
+    __glVertexAttrib4f(gc, index, x, y, z, w);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib1sv(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    __glVertexAttrib4f(gc, index, v[0], 0.0f, 0.0f, 1.0f);
+}
+
+
+GLvoid APIENTRY __glim_VertexAttrib1dv(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    __glVertexAttrib4f(gc, index, v[0], 0.0f, 0.0f, 1.0f);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib2sv(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    __glVertexAttrib4f(gc, index, v[0], v[1], 0.0f, 1.0f);
+}
+
+
+GLvoid APIENTRY __glim_VertexAttrib2dv(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    __glVertexAttrib4f(gc,index, v[0], v[1], 0.0f, 1.0f);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3sv(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    __glVertexAttrib4f(gc,index, v[0], v[1], v[2], 1.0f);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib3dv(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], 1.0f);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4bv(__GLcontext *gc, GLuint index, const GLbyte *v)
+{
+    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4sv(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4iv(__GLcontext *gc, GLuint index, const GLint *v)
+{
+    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4ubv(__GLcontext *gc, GLuint index, const GLubyte *v)
+{
+    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4usv(__GLcontext *gc, GLuint index, const GLushort *v)
+{
+    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4uiv(__GLcontext *gc, GLuint index, const GLuint *v)
+{
+    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+}
+
+
+GLvoid APIENTRY __glim_VertexAttrib4dv(__GLcontext *gc, GLuint index, const GLdouble *v)
+{
+    __glVertexAttrib4f(gc, index, v[0], v[1], v[2], v[3]);
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nub(__GLcontext *gc, GLuint index, GLubyte x, GLubyte y, GLubyte z, GLubyte w)
+{
+    __glVertexAttrib4f(gc, index, __GL_UB_TO_FLOAT(x), __GL_UB_TO_FLOAT(y),
+        __GL_UB_TO_FLOAT(z), __GL_UB_TO_FLOAT(w));
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nbv(__GLcontext *gc, GLuint index, const GLbyte *v)
+{
+    __glVertexAttrib4f(gc, index, __GL_B_TO_FLOAT(v[0]), __GL_B_TO_FLOAT(v[1]),
+        __GL_B_TO_FLOAT(v[2]), __GL_B_TO_FLOAT(v[3]));
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nsv(__GLcontext *gc, GLuint index, const GLshort *v)
+{
+    __glVertexAttrib4f(gc, index, __GL_S_TO_FLOAT(v[0]), __GL_S_TO_FLOAT(v[1]),
+        __GL_S_TO_FLOAT(v[2]), __GL_S_TO_FLOAT(v[3]));
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Niv(__GLcontext *gc, GLuint index, const GLint *v)
+{
+    __glVertexAttrib4f(gc, index, __GL_I_TO_FLOAT(v[0]), __GL_I_TO_FLOAT(v[1]),
+        __GL_I_TO_FLOAT(v[2]), __GL_I_TO_FLOAT(v[3]));
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nubv(__GLcontext *gc, GLuint index, const GLubyte *v)
+{
+    __glVertexAttrib4f(gc, index, __GL_UB_TO_FLOAT(v[0]), __GL_UB_TO_FLOAT(v[1]),
+        __GL_UB_TO_FLOAT(v[2]), __GL_UB_TO_FLOAT(v[3]));
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nusv(__GLcontext *gc, GLuint index, const GLushort *v)
+{
+    __glVertexAttrib4f(gc, index, __GL_US_TO_FLOAT(v[0]), __GL_US_TO_FLOAT(v[1]),
+        __GL_US_TO_FLOAT(v[2]), __GL_US_TO_FLOAT(v[3]));
+}
+
+GLvoid APIENTRY __glim_VertexAttrib4Nuiv(__GLcontext *gc, GLuint index, const GLuint *v)
+{
+    __glVertexAttrib4f(gc, index, __GL_UI_TO_FLOAT(v[0]), __GL_UI_TO_FLOAT(v[1]),
+        __GL_UI_TO_FLOAT(v[2]), __GL_UI_TO_FLOAT(v[3]));
+}
+
+GLvoid APIENTRY __glim_GetVertexAttribdv(__GLcontext *gc,  GLuint index, GLenum pname, GLdouble *params)
+{
+    __GLvertexAttrib *pAttrib;
+    __GLvertexArrayState * pVertexArrayState = &gc->vertexArray.boundVAO->vertexArray;
+    GLuint bit;
+
+
+    __GL_SETUP_NOT_IN_BEGIN(gc);
+
+
+    if((index >= __GL_MAX_PROGRAM_VERTEX_ATTRIBUTES) || (params == NULL))
+    {
+        __glSetError(gc, GL_INVALID_VALUE);
+        return;
+    }
+
+#ifdef OPENGL40
+    index = index + __GL_VARRAY_ATT0_INDEX;
+#endif
+
+    pVertexArrayState = &gc->clientState.vertexArray;
+    pAttrib = &pVertexArrayState->attribute[index];
+
+    switch(pname)
+    {
+    case GL_VERTEX_ATTRIB_ARRAY_ENABLED:
+        bit = __GL_VARRAY_ATT0 << index;
+        *params = (pVertexArrayState->attribEnabled & bit) ? 1 : 0;
+        break;
+
+    case GL_VERTEX_ATTRIB_ARRAY_SIZE:
+        *params = pAttrib->size;
+        break;
+
+    case GL_VERTEX_ATTRIB_ARRAY_STRIDE:
+        *params = pAttrib->stride;
+        break;
+
+    case GL_VERTEX_ATTRIB_ARRAY_TYPE:
+        *params = pAttrib->type;
+        break;
+
+    case GL_VERTEX_ATTRIB_ARRAY_NORMALIZED:
+        *params = pAttrib->normalized;
+        break;
+
+    case GL_VERTEX_ATTRIB_ARRAY_INTEGER_EXT:
+        *params = pAttrib->integer;
+        break;
+
+    case GL_CURRENT_VERTEX_ATTRIB:
+        if(index > 0)
+        {
+            *params++ = gc->state.current.attribute[index].f.x;
+            *params++ = gc->state.current.attribute[index].f.y;
+            *params++ = gc->state.current.attribute[index].f.z;
+            *params++ = gc->state.current.attribute[index].f.w;
+        }
+        else
+            __glSetError(gc, GL_INVALID_OPERATION);
+        break;
+
+    default:
+        __glSetError(gc, GL_INVALID_VALUE);
+        break;
+    }
+}
+
+#endif
 
 /*
 ** Minimum vertex numbers for each primitive type.
@@ -447,6 +681,11 @@ GLvoid GL_APIENTRY __gles_VertexAttribPointer(__GLcontext *gc, GLuint index, GLi
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
+
+#ifdef OPENGL40
+    index = index + __GL_VARRAY_ATT0_INDEX;
+#endif
+
     if ((stride < 0) || (stride > (GLsizei)gc->constants.maxVertexAttribStride)|| (size < 1) || (size > 4))
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
@@ -496,7 +735,7 @@ GLvoid GL_APIENTRY __gles_VertexAttribPointer(__GLcontext *gc, GLuint index, GLi
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
 
-    __glUpdateVertexArray(gc, index, index, size, type, normalized, GL_FALSE, stride, pointer);
+     __glUpdateVertexArray(gc, index, index, size, type, normalized, GL_FALSE, stride, pointer);
 
 OnError:
     __GL_FOOTER();
@@ -511,6 +750,10 @@ GLvoid GL_APIENTRY __gles_VertexAttribIPointer(__GLcontext *gc, GLuint index, GL
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
+
+#ifdef OPENGL40
+    index = index + __GL_VARRAY_ATT0_INDEX;
+#endif
 
     if ((stride < 0) || (stride > (GLsizei)gc->constants.maxVertexAttribStride) || (size <= 0) || (size > 4))
     {
@@ -554,6 +797,10 @@ GLvoid GL_APIENTRY __gles_EnableVertexAttribArray(__GLcontext *gc, GLuint index)
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
+#ifdef OPENGL40
+    index = index + __GL_VARRAY_ATT0_INDEX;
+#endif
+
     if ((pVertexArrayState->attribEnabled & (__GL_ONE_32 << index)) == 0)
     {
         pVertexArrayState->attribEnabled |= (__GL_ONE_32 << index);
@@ -574,6 +821,10 @@ GLvoid GL_APIENTRY __gles_DisableVertexAttribArray(__GLcontext *gc, GLuint index
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
+
+#ifdef OPENGL40
+    index = index + __GL_VARRAY_ATT0_INDEX;
+#endif
 
     if (pVertexArrayState->attribEnabled & (__GL_ONE_32 << index))
     {
@@ -649,8 +900,8 @@ OnError:
 GLvoid GL_APIENTRY __gles_VertexAttribDivisor(__GLcontext *gc, GLuint index, GLuint divisor)
 {
     __GLvertexArrayState *vertexArrayState = &gc->vertexArray.boundVAO->vertexArray;
-    __GLvertexAttrib *pAttrib = &vertexArrayState->attribute[index];
-    __GLvertexAttribBinding *pAttribBinding = &vertexArrayState->attributeBinding[index];
+    __GLvertexAttrib *pAttrib;
+    __GLvertexAttribBinding *pAttribBinding;
 
     __GL_HEADER();
 
@@ -659,6 +910,12 @@ GLvoid GL_APIENTRY __gles_VertexAttribDivisor(__GLcontext *gc, GLuint index, GLu
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
+#ifdef OPENGL40
+    index = index + __GL_VARRAY_ATT0_INDEX;
+#endif
+
+    pAttrib = &vertexArrayState->attribute[index];
+    pAttribBinding = &vertexArrayState->attributeBinding[index];
     pAttrib->attribBinding = index;
 
     if(pAttribBinding->divisor != divisor)
@@ -1366,6 +1623,10 @@ GLvoid GL_APIENTRY __gles_GetVertexAttribfv(__GLcontext *gc,  GLuint index, GLen
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
+#ifdef OPENGL40
+    index = index + __GL_VARRAY_ATT0_INDEX;
+#endif
+
     pAttrib = &pVertexArrayState->attribute[index];
     pAttribBinding = &pVertexArrayState->attributeBinding[pAttrib->attribBinding];
 
@@ -1439,6 +1700,10 @@ GLvoid GL_APIENTRY __gles_GetVertexAttribiv(__GLcontext *gc,  GLuint index, GLen
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
+#ifdef OPENGL40
+    index = index + __GL_VARRAY_ATT0_INDEX;
+#endif
+
     pAttrib = &pVertexArrayState->attribute[index];
     pAttribBinding = &pVertexArrayState->attributeBinding[pAttrib->attribBinding];
 
@@ -1510,6 +1775,10 @@ GLvoid GL_APIENTRY __gles_GetVertexAttribPointerv(__GLcontext *gc, GLuint index,
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
+#ifdef OPENGL40
+    index = index + __GL_VARRAY_ATT0_INDEX;
+#endif
+
     pAttrib = &gc->vertexArray.boundVAO->vertexArray.attribute[index];
     switch (pname)
     {
@@ -1538,6 +1807,10 @@ GLvoid GL_APIENTRY __gles_GetVertexAttribIiv(__GLcontext *gc, GLuint index, GLen
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
+
+#ifdef OPENGL40
+    index = index + __GL_VARRAY_ATT0_INDEX;
+#endif
 
     pAttrib = &pVertexArrayState->attribute[index];
     pAttribBinding = &pVertexArrayState->attributeBinding[pAttrib->attribBinding];
@@ -1612,6 +1885,10 @@ GLvoid GL_APIENTRY __gles_GetVertexAttribIuiv(__GLcontext *gc, GLuint index, GLe
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
+
+#ifdef OPENGL40
+    index = index + __GL_VARRAY_ATT0_INDEX;
+#endif
 
     pAttrib = &pVertexArrayState->attribute[index];
     pAttribBinding = &pVertexArrayState->attributeBinding[pAttrib->attribBinding];
@@ -1711,6 +1988,9 @@ GLvoid __glInitVertexArrayObject(__GLcontext *gc, __GLvertexArrayObject *vertexA
 
     pArrayState->attribEnabled = 0;
 
+#ifdef OPENGL40
+    pArrayState->clientActiveUnit = 0;
+#endif
     __GL_FOOTER();
 }
 
@@ -2092,6 +2372,10 @@ GLvoid GL_APIENTRY __gles_VertexAttribFormat(__GLcontext *gc, GLuint attribindex
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
+#ifdef OPENGL40
+    attribindex = attribindex + __GL_VARRAY_ATT0_INDEX;
+#endif
+
     if ((size < 1) || (size > 4))
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
@@ -2162,6 +2446,9 @@ GLvoid GL_APIENTRY __gles_VertexAttribIFormat(__GLcontext *gc, GLuint attribinde
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
+#ifdef OPENGL40
+    attribindex = attribindex + __GL_VARRAY_ATT0_INDEX;
+#endif
     if ((size < 1) || (size > 4))
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
@@ -2217,6 +2504,10 @@ GLvoid GL_APIENTRY __gles_VertexAttribBinding(__GLcontext *gc, GLuint attribinde
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
+#ifdef OPENGL40
+    attribindex = attribindex + __GL_VARRAY_ATT0_INDEX;
+#endif
+
     if (gc->vertexArray.boundVertexArray == 0)
     {
         __GL_ERROR_EXIT(GL_INVALID_OPERATION);
@@ -2241,6 +2532,10 @@ GLvoid GL_APIENTRY __gles_VertexBindingDivisor(__GLcontext *gc, GLuint bindingin
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
+
+#ifdef OPENGL40
+    bindingindex = bindingindex + __GL_VARRAY_ATT0_INDEX;
+#endif
 
     if (gc->vertexArray.boundVertexArray == 0)
     {

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -39,7 +39,6 @@
 #include <assert.h>
 #include <gc_hal.h>
 #include <gc_hal_raster.h>
-#include <gc_hal_engine.h>
 
 #define MAX_BUFFER_SIZE         4096
 #define MAX_ARG_COUNT           20
@@ -375,6 +374,8 @@ typedef struct
     gctUINT32 compressedFormat;
     gctUINT32 clearValue;
     gctUINT32 tileStatusOffset;
+    gctUINT32 tileStatusOffsetEx[2];
+    gctUINT32 tileStatusSizeEx[2];
 } VIMG_V2;
 
 #pragma pack()
@@ -400,6 +401,15 @@ typedef struct
 #define G2D_TILING_SUPERTILE             2
 #define G2D_TILING_MINORTILE             3
 #define G2D_TILING_YMAJORSUPERTILE       4
+#define G2D_TILING_XMAJOR8X8             5
+#define G2D_TILING_XMAJORSUPERTILE       6
+#define G2D_TILING_8X4                   7
+#define G2D_TILING_4X8                   8
+#define G2D_TILING_32X4                  9
+#define G2D_TILING_64X4                  10
+#define G2D_TILING_Y                     11
+#define G2D_TILING_SUPERTILE128B         12
+#define G2D_TILING_SUPERTILE256B         13
 
 /********************************* Area Split ******************************/
 

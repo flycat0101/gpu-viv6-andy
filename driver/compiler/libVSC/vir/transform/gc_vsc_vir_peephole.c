@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2063,7 +2063,7 @@ static VSC_ErrCode _VSC_PH_PerformOnInst(
                             while(gcvTRUE)
                             {
                                 VSC_PH_Oper* oper = VSC_PH_Step_GetOper(currentStep);
-#if gcdDEBUG
+#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
                                 gctBOOL result = VSC_PH_Oper_PerformTransformations(oper, ph, &tree, VSC_PH_ResultInstsGetNthInst(&resultInsts, channel));
                                 gcmASSERT(result);
 #else
@@ -5048,6 +5048,75 @@ static VSC_ErrCode _VSC_PH_LocalInst(
     return errCode;
 }
 
+void _VSC_PH_Inst_DeleteUses(
+    IN OUT VSC_PH_Peephole  *ph,
+    IN VIR_Instruction      *pInst,
+    IN gctUINT              delSrcNum
+    )
+{
+    VIR_DEF_USAGE_INFO  *pDuInfo = ph->du_info;
+    gctUINT         i;
+    VIR_Operand     *srcOpnd = gcvNULL;
+    VIR_OperandInfo         operandInfo;
+    gctUINT     swizzle;
+
+    gcmASSERT(delSrcNum <= VIR_Inst_GetSrcNum(pInst));
+
+    for (i = 0; i < delSrcNum; i++)
+    {
+        srcOpnd = VIR_Inst_GetSource(pInst, i);
+        if (srcOpnd == gcvNULL || VIR_Operand_isUndef(srcOpnd))
+        {
+            continue;
+        }
+
+        swizzle = VIR_Operand_GetSwizzle(srcOpnd);
+
+        VIR_Operand_GetOperandInfo(pInst,
+            srcOpnd,
+            &operandInfo);
+
+        vscVIR_DeleteUsage(pDuInfo,
+            VIR_ANY_DEF_INST,
+            pInst,
+            srcOpnd,
+            gcvFALSE,
+            operandInfo.u1.virRegInfo.virReg,
+            1,
+            VIR_Swizzle_2_Enable(swizzle),
+            VIR_HALF_CHANNEL_MASK_FULL,
+            gcvNULL);
+    }
+}
+
+void _VSC_PH_Inst_DeleteDef(
+    IN OUT VSC_PH_Peephole  *ph,
+    IN VIR_Instruction      *pInst
+    )
+{
+    VIR_DEF_USAGE_INFO  *pDuInfo = ph->du_info;
+    VIR_Operand     *dstOpnd = gcvNULL;
+    VIR_OperandInfo  operandInfo;
+    VIR_Enable      instEnable;
+
+    dstOpnd = VIR_Inst_GetDest(pInst);
+    gcmASSERT(dstOpnd);
+    instEnable = VIR_Operand_GetEnable(dstOpnd);
+
+    VIR_Operand_GetOperandInfo(pInst,
+        dstOpnd,
+        &operandInfo);
+
+    vscVIR_DeleteDef(
+        pDuInfo,
+        pInst,
+        operandInfo.u1.virRegInfo.virReg,
+        1,
+        instEnable,
+        VIR_HALF_CHANNEL_MASK_FULL,
+        gcvNULL);
+}
+
 static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
     IN OUT VSC_PH_Peephole* ph
     )
@@ -5247,6 +5316,7 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
         {
             VIR_OpCode opc;
             gctBOOL checkingResult;
+            gctUINT i;
 
             opc = VIR_Inst_GetOpcode(inst);
             if (opc == VIR_OP_JMPC || opc == VIR_OP_JMP_ANY || opc == VIR_OP_CMOV)
@@ -5266,10 +5336,17 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                     {
                         if (checkingResult)
                         {
-                                /* change instruction to jmp*/
+                            /* change instruction to jmp*/
                             VIR_Inst_SetOpcode(inst, VIR_OP_JMP);
                             VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+                            /* update du information */
+                            _VSC_PH_Inst_DeleteUses(ph, inst, VIR_Inst_GetSrcNum(inst));
+                            for (i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
+                            {
+                                VIR_Inst_FreeSource(inst, i);
+                            }
                             VIR_Inst_SetSrcNum(inst, 0);
+
                         }
                         else
                         {
@@ -5277,6 +5354,12 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                             VIR_Inst_SetOpcode(inst, VIR_OP_NOP);
                             VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
                             VIR_Inst_SetSrcNum(inst, 0);
+                            /* update du information */
+                            _VSC_PH_Inst_DeleteUses(ph, inst, VIR_Inst_GetSrcNum(inst));
+                            for (i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
+                            {
+                                VIR_Inst_FreeSource(inst, i);
+                            }
                             VIR_Inst_SetDest(inst, gcvNULL);
                         }
                     }
@@ -5287,6 +5370,8 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                                 /* change instruction to MOV*/
                             VIR_Inst_SetOpcode(inst, VIR_OP_MOV);
                             VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+                            /* update du information - only delete src0, src1 */
+                            _VSC_PH_Inst_DeleteUses(ph, inst, 2);
                             VIR_Inst_SetSource(inst, 0, VIR_Inst_GetSource(inst, 2));
                             VIR_Inst_SetSrcNum(inst, 1);
                         }
@@ -5295,7 +5380,14 @@ static VSC_ErrCode _VSC_PH_DoPeepholeForBB(
                             /*change instruction to nop*/
                             VIR_Inst_SetOpcode(inst, VIR_OP_NOP);
                             VIR_Inst_SetConditionOp(inst, VIR_COP_ALWAYS);
+                            _VSC_PH_Inst_DeleteUses(ph, inst, VIR_Inst_GetSrcNum(inst));
+                            for (i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
+                            {
+                                VIR_Inst_FreeSource(inst, i);
+                            }
+                            _VSC_PH_Inst_DeleteDef(ph, inst);
                             VIR_Inst_SetSrcNum(inst, 0);
+                            VIR_Inst_FreeDest(inst);
                             VIR_Inst_SetDest(inst, gcvNULL);
                         }
                     }

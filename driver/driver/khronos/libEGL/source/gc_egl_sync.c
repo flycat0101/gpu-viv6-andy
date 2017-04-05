@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -77,6 +77,9 @@ veglCreateSync(
         thread->error = EGL_NOT_INITIALIZED;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     /* Test type is a supported type of sync object. */
     if (type != EGL_SYNC_REUSABLE_KHR
@@ -317,6 +320,9 @@ veglDestroySync(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     /* Create a shortcut to the sync. */
     sync = (VEGLSync)veglGetResObj(dpy, (VEGLResObj*)&dpy->syncStack, (EGLResObj)Sync, EGL_SYNC_SIGNATURE);
 
@@ -330,14 +336,17 @@ veglDestroySync(
 
     if (sync->signal)
     {
-        /* Signal before destroying. */
-        status = gcoOS_Signal(gcvNULL, sync->signal, gcvTRUE);
-
-        if (gcmIS_ERROR(status))
+        if (sync->type == EGL_SYNC_REUSABLE_KHR)
         {
-            /* Error. */
-            thread->error = EGL_BAD_ACCESS;
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            /* Signal before destroying. */
+            status = gcoOS_Signal(gcvNULL, sync->signal, gcvTRUE);
+
+            if (gcmIS_ERROR(status))
+            {
+                /* Error. */
+                thread->error = EGL_BAD_ACCESS;
+                gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+            }
         }
 
         /* Destroy the signal. */
@@ -354,16 +363,6 @@ veglDestroySync(
 #if gcdANDROID_NATIVE_FENCE_SYNC
     if (sync->fenceFD != EGL_NO_NATIVE_FENCE_FD_ANDROID)
     {
-        /* GPU wait. */
-        status = gcoOS_WaitNativeFence(gcvNULL, sync->fenceFD, 0);
-
-        if (gcmIS_ERROR(status))
-        {
-            /* Error. */
-            thread->error = EGL_BAD_ACCESS;
-            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
-        }
-
         /* Close file descriptor. */
         status = gcoOS_CloseFD(gcvNULL, sync->fenceFD);
 
@@ -433,6 +432,9 @@ veglClientWaitSync(
         thread->error = EGL_NOT_INITIALIZED;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     /* Create a shortcut to the sync. */
     sync = (VEGLSync)veglGetResObj(dpy, (VEGLResObj*)&dpy->syncStack, (EGLResObj)Sync, EGL_SYNC_SIGNATURE);
@@ -573,6 +575,9 @@ veglGetSyncAttrib(
         thread->error = EGL_NOT_INITIALIZED;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     /* Create a shortcut to the sync. */
     sync = (VEGLSync)veglGetResObj(dpy, (VEGLResObj*)&dpy->syncStack, (EGLResObj)Sync, EGL_SYNC_SIGNATURE);
@@ -716,6 +721,9 @@ veglWaitSync(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     /* Create a shortcut to the sync. */
     sync = (VEGLSync)veglGetResObj(dpy, (VEGLResObj*)&dpy->syncStack, (EGLResObj)Sync, EGL_SYNC_SIGNATURE);
 
@@ -736,13 +744,6 @@ veglWaitSync(
 
     /* Commit accumulated commands. */
     gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
-
-    /*
-     * TODO:
-     * We don't have server wait.
-     * Can not support server wait on EGL_KHR_reusable_sync and
-     * EGL_ANDROID_native_fence_sync (external fd).
-     */
 
     /* Success. */
     thread->error = EGL_SUCCESS;
@@ -1045,6 +1046,9 @@ eglSignalSyncKHR(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     /* Create a shortcut to the sync. */
     sync = (VEGLSync)veglGetResObj(dpy, (VEGLResObj*)&dpy->syncStack, (EGLResObj)Sync, EGL_SYNC_SIGNATURE);
 
@@ -1145,6 +1149,9 @@ eglDupNativeFenceFDANDROID(
         thread->error = EGL_NOT_INITIALIZED;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     /* Create a shortcut to the sync. */
     sync = (VEGLSync)veglGetResObj(dpy, (VEGLResObj*)&dpy->syncStack, (EGLResObj)Sync, EGL_SYNC_SIGNATURE);

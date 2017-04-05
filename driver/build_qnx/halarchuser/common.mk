@@ -62,6 +62,9 @@ SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_texture.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_texture_upload.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_stream.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_shader.o
+ifeq ($(USE_OPENVX),1)
+  SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_vx.o
+endif
 endif
 
 ifeq ($(VIVANTE_ENABLE_2D), 1)
@@ -88,12 +91,7 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-ifneq ($(filter v7, $(VARIANT_LIST)), v7)
-	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp
-	LIBS += m-vfp
-else
-	LIBS += m
-endif
+include $(qnx_build_dir)/math.mk
 
 ifneq ($(filter so, $(VARIANT_LIST)), so)
 INSTALLDIR=/dev/null

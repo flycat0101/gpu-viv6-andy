@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -227,6 +227,14 @@ vscVIR_PerformSEPBackPatch(
     errCode = _AddAlphaKillPatch(pShader, pHwCfg, pOutSEP);
     ON_ERROR(errCode, "Add alphakill patch to SEP");
 #endif
+
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader),
+                                           VSC_OPTN_DumpOptions_DUMP_FINALIR))
+    {
+        VIR_Dumper *pDumper = pPassWorker->basePassWorker.pDumper;
+        VIR_Shader_Dump(gcvNULL, "Shader IR", pShader, gcvTRUE);
+        VIR_LOG_FLUSH(pDumper);
+    }
 
     if (VSC_OPTN_SEPGenOptions_GetTrace(sepgen_options) ||
         VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_CG))

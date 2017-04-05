@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1101,17 +1101,9 @@ GLvoid GL_APIENTRY __gles_GetMultisamplefv(__GLcontext *gc, GLenum pname, GLuint
         __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
-
-    if (DRAW_FRAMEBUFFER_BINDING_NAME)
+    if (gc->dp.isFramebufferComplete(gc, gc->frameBuffer.drawFramebufObj))
     {
-        if (gc->dp.isFramebufferComplete(gc, gc->frameBuffer.drawFramebufObj))
-        {
-            currentSamples = gc->frameBuffer.drawFramebufObj->fbSamples;
-        }
-    }
-    else
-    {
-        currentSamples = gc->modes.samples;
+        currentSamples = gc->frameBuffer.drawFramebufObj->fbSamples;
     }
 
     if (index >= currentSamples)

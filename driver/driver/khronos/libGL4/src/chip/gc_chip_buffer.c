@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -246,9 +246,6 @@ gcChipSetFmtMapAttribs(
         fmtMapInfo->flags |= __GL_CHIP_FMTFLAGS_FMT_DIFF_READ_WRITE;
     }
 
-    /*
-    ** TODO:remove indirectRTT check
-    */
     if (chipCtx->chipFeature.indirectRTT)
     {
         fmtMapInfo->flags |= __GL_CHIP_FMTFLAGS_LAYOUT_DIFF_READ_WRITE;
@@ -826,7 +823,6 @@ __glChipMapBufferRange(
 
         if ((access & GL_MAP_UNSYNCHRONIZED_BIT) == 0)
         {
-            /* (todo) after fence tracking refinement, we can remove this flush */
             __glChipFlush(gc);
 
             if (gcvSTATUS_FALSE == gcoBUFOBJ_IsFenceEnabled(bufInfo->bufObj))
@@ -965,7 +961,6 @@ __glChipUnMapBufferObject(
                     bufInfo->patchDirty = gcvTRUE;
                 }
 
-                /* TODO: only flush range not flush by FlushMappedBufferRange */
                 gcmONERROR(gcoBUFOBJ_CPUCacheOperation_Range(bufInfo->bufObj,
                                                              (gctSIZE_T)bufObj->mapOffset,
                                                              (gctSIZE_T)bufObj->mapLength,

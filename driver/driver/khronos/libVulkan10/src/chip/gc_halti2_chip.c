@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1112,7 +1112,7 @@ void halti2_helper_convertHwSampler(
     hwSamplerDesc->halti2.anisoLog = anisoLog;
 
     hwSamplerDesc->halti2.hwSamplerMode_p0 =
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:3) - (0 ?
+          ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:3) - (0 ?
  4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
  4:3))) | (((gctUINT32) ((gctUINT32) (s_addressXlate[createInfo->addressModeU]) & ((gctUINT32) ((((1 ?
  4:3) - (0 ? 4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
@@ -1273,20 +1273,22 @@ VkResult halti2_helper_convertHwTxDesc(
     else if (bufv)
     {
 #define FAKED_TEXTURE_MAX_WIDTH 8192
-        __vkImageLevel fakedImageLevel = {0};
-         __vkBuffer *buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, bufv->createInfo.buffer);
-         uint32_t sizeInByte, texelSize;
-         static const VkComponentMapping identityComponentMapping =
-         {
-             VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,
-             VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A
-         };
-         VkImageSubresourceRange fakedSubResourceRange;
-         __VK_ASSERT(!imgv);
-         residentFormatInfo = &bufv->formatInfo;
-         sizeInByte = (bufv->createInfo.range == VK_WHOLE_SIZE) ?
-             (uint32_t)(buf->createInfo.size - bufv->createInfo.offset) :
-         (uint32_t)bufv->createInfo.range;
+        static __vkImageLevel fakedImageLevel = {0};
+        static VkImageSubresourceRange fakedSubResourceRange;
+        static const VkComponentMapping identityComponentMapping =
+        {
+            VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,
+            VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A
+        };
+
+        __vkBuffer *buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, bufv->createInfo.buffer);
+        uint32_t sizeInByte, texelSize;
+
+        __VK_ASSERT(!imgv);
+        residentFormatInfo = &bufv->formatInfo;
+        sizeInByte = (bufv->createInfo.range == VK_WHOLE_SIZE)
+                   ? (uint32_t)(buf->createInfo.size - bufv->createInfo.offset)
+                   : (uint32_t)bufv->createInfo.range;
 
         texelSize = sizeInByte / (residentFormatInfo->bitsPerBlock >> 3);
         tiling = gcvLINEAR;
@@ -1678,6 +1680,8 @@ void halti2_helper_setSamplerStates(
     uint32_t shaderConfigData
     )
 {
+    uint32_t hwSamplerMode_p0 = samplerDesc->halti2.hwSamplerMode_p0;
+
     if (!txHwRegisterIdx)
     {
         __vkCmdLoadSingleHWState(commandBuffer, 0x022D, VK_FALSE,
@@ -1697,8 +1701,9 @@ void halti2_helper_setSamplerStates(
  16:16) + 1))))))) << (0 ? 16:16))));
     }
 
+
     __vkCmdLoadSingleHWState(commandBuffer, 0x4000 + hwSamplerNo, VK_FALSE,
-        txDesc->halti2.hwSamplerMode_p1 | samplerDesc->halti2.hwSamplerMode_p0);
+        hwSamplerMode_p0 | txDesc->halti2.hwSamplerMode_p1);
 
     __vkCmdLoadSingleHWState(commandBuffer, 0x40E0 + hwSamplerNo, VK_FALSE,
         txDesc->halti2.hwSamplerModeEx);

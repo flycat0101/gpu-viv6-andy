@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,7 +12,7 @@
 
 
 #include "gc_hal_user_precomp.h"
-#if gcdUSE_VX
+#if gcdUSE_VX && gcdENABLE_3D
 #include "gc_hal_vx.h"
 
 #define _GC_OBJ_ZONE            gcvZONE_VX
@@ -89,6 +89,11 @@ gcoVX_SetFeatueCap(vx_evis_no_inst_s *evisNoInst)
     if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_EVIS_ACCSQ_8OUTPUT))
     {
         evisNoInst->accsq8Output = gcvTRUE;
+    }
+
+    if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_EVIS_VX2))
+    {
+        evisNoInst->isVX2 = gcvTRUE;
     }
 
     evisNoInst->isSet = gcvTRUE;
@@ -547,11 +552,11 @@ gcoVX_InvokeKernel(
     else
 #endif
     {
-    twParameters.globalOffsetX      = Parameters->xmin;
-    twParameters.globalScaleX       = Parameters->xstep;
+        twParameters.globalOffsetX  = Parameters->xmin;
+        twParameters.globalScaleX   = Parameters->xstep;
 
-    twParameters.globalOffsetY      = Parameters->ymin;
-    twParameters.globalScaleY       = Parameters->ystep;
+        twParameters.globalOffsetY  = Parameters->ymin;
+        twParameters.globalScaleY   = Parameters->ystep;
     }
 
     gcoOS_ZeroMemory(&info, gcmSIZEOF(gcsTHREAD_WALKER_INFO));
@@ -603,7 +608,6 @@ gcoVX_Upload(
      gctPOINTER         logical = gcvNULL;
 
      gcmHEADER_ARG("Point=%p Physical=%p", Point, Physical);
-
 
     gcmONERROR(gcoOS_Allocate(gcvNULL,
                               gcmSIZEOF(gcsSURF_NODE),
@@ -731,6 +735,21 @@ OnError:
     return status;
 }
 
+static gctUINT32 memory_size = 0;
+
+gceSTATUS gcoVX_GetMemorySize(OUT gctUINT32_PTR Size)
+{
+    *Size = memory_size;
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS gcoVX_ZeroMemorySize()
+{
+    memory_size = 0;
+
+    return gcvSTATUS_OK;
+}
+
 gceSTATUS
 gcoVX_AllocateMemory(
     IN gctUINT32        Size,
@@ -747,6 +766,12 @@ gcoVX_AllocateMemory(
     gcmHEADER_ARG("Size=%d Logical=%p", Size, Logical);
 
     gcoVX_Initialize(gcvNULL);
+
+    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SH_IMAGE_LD_LAST_PIXEL_FIX))
+    {
+        /* Allocate extra 15 bytes to avoid cache overflow */
+        Size += 15;
+    }
 
     gcmONERROR(gcoOS_Allocate(gcvNULL,
                              gcmSIZEOF(gcsSURF_NODE),
@@ -772,6 +797,8 @@ gcoVX_AllocateMemory(
         *Physical   = (gctPHYS_ADDR*)(gctSIZE_T)physical;
         *Node       = node;
     }
+
+    memory_size += Size;
 
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -875,44 +902,27 @@ gcoVX_InvokeKernelShader(
 {
     gcsTHREAD_WALKER_INFO   info;
     gceSTATUS               status = gcvSTATUS_OK;
-    gctUINT32               maxGroupSize;
-    gctUINT                 maxComputeUnits;
 
     gcmHEADER_ARG("Kernel=0x%x WorkDim=%d", Kernel, WorkDim);
 
     gcoOS_ZeroMemory(&info, gcmSIZEOF(gcsTHREAD_WALKER_INFO));
 
-    /* Number of shader cores */
-    gcmONERROR(
-        gcoHARDWARE_QueryShaderCaps(gcvNULL,
-                                    gcvNULL,
-                                    gcvNULL,
-                                    gcvNULL,
-                                    gcvNULL,
-                                    &maxComputeUnits,
-                                    gcvNULL,
-                                    gcvNULL,
-                                    gcvNULL));
-
-    maxGroupSize = 4 * maxComputeUnits;
-
     info.dimensions      = WorkDim;
     info.globalSizeX     = (gctUINT32)GlobalWorkSize[0];
     info.globalOffsetX   = (gctUINT32)GlobalWorkOffset[0];
     info.globalScaleX    = (gctUINT32)GlobalWorkScale[0];
-    info.workGroupSizeX  = LocalWorkSize[0] ? (gctUINT32)LocalWorkSize[0] : maxGroupSize;
-    gcmASSERT(info.workGroupSizeX <= maxGroupSize);
+    info.workGroupSizeX  = LocalWorkSize[0] ? (gctUINT32)LocalWorkSize[0] : 1;
 
-    info.workGroupCountX = gcmALIGN(info.globalSizeX, info.workGroupSizeX) / info.workGroupSizeX;
+    info.workGroupCountX = info.globalSizeX / info.workGroupSizeX;
 
     if (WorkDim > 1)
     {
         info.globalSizeY     = (gctUINT32)GlobalWorkSize[1];
         info.globalOffsetY   = (gctUINT32)GlobalWorkOffset[1];
         info.globalScaleY    = (gctUINT32)GlobalWorkScale[1];
-        info.workGroupSizeY  = LocalWorkSize[1] ? (gctUINT32)LocalWorkSize[1] : maxGroupSize;
-        gcmASSERT(info.workGroupSizeY <= maxGroupSize);
-        info.workGroupCountY = gcmALIGN(info.globalSizeY, info.workGroupSizeY) / info.workGroupSizeY;
+        info.workGroupSizeY  = LocalWorkSize[1] ? (gctUINT32)LocalWorkSize[1] : 1;
+
+        info.workGroupCountY = info.globalSizeY / info.workGroupSizeY;
 
     }
     if (WorkDim > 2)
@@ -920,9 +930,8 @@ gcoVX_InvokeKernelShader(
         info.globalSizeZ     = (gctUINT32)GlobalWorkSize[2];
         info.globalOffsetZ   = (gctUINT32)GlobalWorkOffset[2];
         info.globalScaleZ    = (gctUINT32)GlobalWorkScale[2];
-        info.workGroupSizeZ  = LocalWorkSize[2] ? (gctUINT32)LocalWorkSize[2] : maxGroupSize;
-        gcmASSERT(info.workGroupSizeZ <= maxGroupSize);
-        info.workGroupCountZ = gcmALIGN(info.globalSizeZ, info.workGroupSizeZ) / info.workGroupSizeZ;
+        info.workGroupSizeZ  = LocalWorkSize[2] ? (gctUINT32)LocalWorkSize[2] : 1;
+        info.workGroupCountZ = info.globalSizeZ / info.workGroupSizeZ;
     }
 
     /* TODO - Handle GLW order and in-use. */
@@ -970,6 +979,103 @@ OnError:
 }
 
 gceSTATUS
+gcoVX_TriggerAccelerator(
+    IN gctUINT32              CmdAddress,
+    IN gceVX_ACCELERATOR_TYPE Type,
+    IN gctUINT32              EventId,
+    IN gctBOOL                waitEvent
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER_ARG("Cmd Address=%d", CmdAddress);
+
+    gcmONERROR(gcoHARDWAREVX_TriggerAccelerator(gcvNULL, CmdAddress, Type, EventId, waitEvent));
+
+OnError:
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoVX_ProgrammCrossEngine(
+    IN gctPOINTER             Data,
+    IN gceVX_ACCELERATOR_TYPE Type,
+    IN OUT gctUINT32_PTR      *Instruction
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Data=%p Type=%d Instruction=%p", Data, Type, Instruction);
+
+    switch (Type)
+    {
+    case gcvVX_ACCELERATOR_TP:
+        gcmONERROR(gcoHARDWAREVX_ProgrammeTPEngine(gcvNULL, Data, Instruction));
+        break;
+    case gcvVX_ACCELERATOR_NN:
+        gcmONERROR(gcoHARDWAREVX_ProgrammeNNEngine(gcvNULL, Data, Instruction));
+        break;
+    default:
+        gcmASSERT(0);
+        break;
+    }
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoVX_SetNNImage(
+    IN gctPOINTER Data,
+    IN OUT gctUINT32_PTR *Instruction
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER_ARG("Data=%p Instruction=%p", Data, Instruction);
+
+    gcmONERROR(gcoHARDWAREVX_SetNNImage(gcvNULL, Data, Instruction));
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoVX_GetNNConfig(
+    IN OUT gctPOINTER Config
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER_ARG("Config=%p", Config);
+
+    gcmONERROR(gcoHARDWARE_QueryNNConfig(gcvNULL, Config));
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoVX_WaitNNEvent(
+    gctUINT32 EventId
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER_ARG("id=%d", EventId);
+
+    gcmONERROR(gcoHARDWAREVX_WaitNNEvent(gcvNULL, EventId));
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcoVX_AllocateMemoryEx(
     IN OUT gctUINT *        Bytes,
     OUT gctPHYS_ADDR *      Physical,
@@ -977,16 +1083,21 @@ gcoVX_AllocateMemoryEx(
     OUT gcsSURF_NODE_PTR *  Node
     )
 {
-
     gceSTATUS status;
     gctUINT bytes;
     gcsSURF_NODE_PTR node = gcvNULL;
 
     gcmHEADER_ARG("*Bytes=%lu", *Bytes);
 
-
-    /* Allocate extra 64 bytes to avoid cache overflow */
-    bytes = gcmALIGN(*Bytes, 64);
+    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SH_IMAGE_LD_LAST_PIXEL_FIX))
+    {
+        /* Allocate extra 15 bytes to avoid cache overflow */
+        bytes = gcmALIGN(*Bytes + 15, 64);
+    }
+    else
+    {
+        bytes = gcmALIGN(*Bytes, 64);
+    }
 
     {
     gctPOINTER pointer = gcvNULL;

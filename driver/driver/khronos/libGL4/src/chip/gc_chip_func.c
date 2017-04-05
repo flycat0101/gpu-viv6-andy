@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -441,7 +441,7 @@ gceSTATUS glfUsing_uTexGenEyePlane(
 **      Nothing.
 */
 
-static gceSTATUS loadUniforms(
+gceSTATUS loadUniforms(
     IN __GLcontext * gc,
     IN glsSHADERCONTROL_PTR ShaderControl
     )

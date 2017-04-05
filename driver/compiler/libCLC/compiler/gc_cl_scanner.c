@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,19 +23,6 @@
 #define YY_FLEX_MINOR_VERSION 5
 
 #include "gc_cl_scanner.h"
-#ifndef NULL
-#define NULL ((void *)0)
-#endif
-#ifndef EOF
-#define EOF     (-1)
-#endif
-#if !defined(UNDER_CE) || UNDER_CE >=800
-#define FILE    void
-#define stdin   NULL
-#define stdout  NULL
-#else
-typedef void FILE;
-#endif
 
 
 
@@ -48,6 +35,7 @@ typedef void FILE;
 
 
 #ifdef __cplusplus
+
 
 
 /* Use prototypes in function declarations. */
@@ -70,6 +58,7 @@ typedef void FILE;
  #pragma warn -rch
  #pragma warn -use
 #include <io.h>
+
 #define YY_USE_CONST
 #define YY_USE_PROTOS
 #endif
@@ -880,6 +869,7 @@ YY_MALLOC_DECL
 #else
 #if __STDC__
 #ifndef __cplusplus
+
 #endif
 #else
 /* Just try to get by without declaring the routines.  This will fail
@@ -2299,6 +2289,7 @@ static void yy_fatal_error( msg )
 char msg[];
 #endif
     {
+
     clReport(0, 0, clvREPORT_FATAL_ERROR, (char *)msg);
     }
 

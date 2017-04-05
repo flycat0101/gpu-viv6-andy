@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,10 +13,10 @@
 
 #ifndef __gc_cl_token_def_h_
 #define __gc_cl_token_def_h_
-/* A Bison parser, made by GNU Bison 1.875c.  */
+/* A Bison parser, made by GNU Bison 1.875.  */
 
 /* Skeleton parser for Yacc-like parsing with Bison,
-   Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002, 2003 Free Software Foundation, Inc.
+   Copyright (C) 1984, 1989, 1990, 2000, 2001, 2002 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -267,17 +267,19 @@
      T_ATTRIBUTE__ = 478,
      T_REQD_WORK_GROUP_SIZE = 479,
      T_WORK_GROUP_SIZE_HINT = 480,
-     T_ALWAYS_INLINE = 481,
-     T_UNSIGNED = 482,
-     T_STRUCT = 483,
-     T_UNION = 484,
-     T_TYPEDEF = 485,
-     T_ENUM = 486,
-     T_INLINE = 487,
-     T_SIZEOF = 488,
-     T_TYPE_CAST = 489,
-     T_VEC_STEP = 490,
-     T_VERY_LAST_TERMINAL = 491
+     T_KERNEL_SCALE_HINT = 481,
+     T_ALWAYS_INLINE = 482,
+     T_UNSIGNED = 483,
+     T_STRUCT = 484,
+     T_UNION = 485,
+     T_TYPEDEF = 486,
+     T_ENUM = 487,
+     T_INLINE = 488,
+     T_SIZEOF = 489,
+     T_TYPE_CAST = 490,
+     T_VEC_STEP = 491,
+     T_TYPEOF = 492,
+     T_VERY_LAST_TERMINAL = 493
    };
 #endif
 #define T_VERY_FIRST_TERMINAL 258
@@ -503,46 +505,48 @@
 #define T_ATTRIBUTE__ 478
 #define T_REQD_WORK_GROUP_SIZE 479
 #define T_WORK_GROUP_SIZE_HINT 480
-#define T_ALWAYS_INLINE 481
-#define T_UNSIGNED 482
-#define T_STRUCT 483
-#define T_UNION 484
-#define T_TYPEDEF 485
-#define T_ENUM 486
-#define T_INLINE 487
-#define T_SIZEOF 488
-#define T_TYPE_CAST 489
-#define T_VEC_STEP 490
-#define T_VERY_LAST_TERMINAL 491
+#define T_KERNEL_SCALE_HINT 481
+#define T_ALWAYS_INLINE 482
+#define T_UNSIGNED 483
+#define T_STRUCT 484
+#define T_UNION 485
+#define T_TYPEDEF 486
+#define T_ENUM 487
+#define T_INLINE 488
+#define T_SIZEOF 489
+#define T_TYPE_CAST 490
+#define T_VEC_STEP 491
+#define T_TYPEOF 492
+#define T_VERY_LAST_TERMINAL 493
 
 
 
 
 #if !defined (YYSTYPE) && ! defined (YYSTYPE_IS_DECLARED)
-#line 29 "gc_cl.y"
+#line 23 "gc_cl.y"
 typedef union YYSTYPE {
-    clsLexToken     token;
-    slsSLINK_LIST *     typeQualifierList;
-    clsDeclOrDeclList   *declOrDeclList;
-    slsDLINK_LIST *     fieldDeclList;
-    clsFieldDecl *      fieldDecl;
-    clsDATA_TYPE *      dataType;
-    clsDECL         decl;
-    cloIR_EXPR      expr;
-    clsNAME *       funcName;
-    clsNAME *       paramName;
-    clsATTRIBUTE *      attr;
-    slsSLINK_LIST *     enumeratorList;
-    clsNAME *       enumeratorName;
-    cloIR_SET       statements;
-    cloIR_BASE      statement;
-    clsIfStatementPair  ifStatementPair;
-    clsForExprPair      forExprPair;
-    cloIR_POLYNARY_EXPR funcCall;
-    gceSTATUS       status;
+    clsLexToken        token;
+    slsSLINK_LIST *        typeQualifierList;
+    clsDeclOrDeclList    *declOrDeclList;
+    slsDLINK_LIST *        fieldDeclList;
+    clsFieldDecl *        fieldDecl;
+    clsDATA_TYPE *        dataType;
+    clsDECL            decl;
+    cloIR_EXPR        expr;
+    clsNAME    *        funcName;
+    clsNAME    *        paramName;
+    clsATTRIBUTE *        attr;
+    slsSLINK_LIST *        enumeratorList;
+    clsNAME    *        enumeratorName;
+    cloIR_SET        statements;
+    cloIR_BASE        statement;
+    clsIfStatementPair    ifStatementPair;
+    clsForExprPair        forExprPair;
+    cloIR_POLYNARY_EXPR    funcCall;
+    gceSTATUS        status;
 } YYSTYPE;
-/* Line 1268 of yacc.c.  */
-#line 531 "gc_cl.tab.h"
+/* Line 1250 of yacc.c.  */
+#line 534 "gc_cl.tab.h"
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
 # define YYSTYPE_IS_TRIVIAL 1

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -146,10 +146,10 @@ static __GLextProcAlias __glExtProcAlias[] =
     {__GL_EXTID_OES_get_program_binary, "ProgramBinaryOES", (__GLprocAddr)glProgramBinary},
 
     /* Extension API alias for GL_OES_vertex_array_object */
-    {__GL_EXTID_OES_vertex_array_object, "BindVertexArrayOES", (__GLprocAddr)glBindVertexArray},
-    {__GL_EXTID_OES_vertex_array_object, "DeleteVertexArraysOES", (__GLprocAddr)glDeleteVertexArrays},
-    {__GL_EXTID_OES_vertex_array_object, "GenVertexArraysOES", (__GLprocAddr)glGenVertexArrays},
-    {__GL_EXTID_OES_vertex_array_object, "IsVertexArrayOES", (__GLprocAddr)glIsVertexArray},
+    {__GL_EXTID_OES_vertex_array_object, "BindVertexArrayOES", (__GLprocAddr)glBindVertexArrayOES},
+    {__GL_EXTID_OES_vertex_array_object, "DeleteVertexArraysOES", (__GLprocAddr)glDeleteVertexArraysOES},
+    {__GL_EXTID_OES_vertex_array_object, "GenVertexArraysOES", (__GLprocAddr)glGenVertexArraysOES},
+    {__GL_EXTID_OES_vertex_array_object, "IsVertexArrayOES", (__GLprocAddr)glIsVertexArrayOES},
 
      /* Extension API alias for GL_EXT_blend_minmax */
      {__GL_EXTID_EXT_blend_minmax, "BlendEquationEXT", (__GLprocAddr)glBlendEquation},
@@ -258,7 +258,7 @@ static __GLextProcAlias __glExtProcAlias[] =
     {__GL_EXTID_KHR_debug, "GetObjectPtrLabelKHR", (__GLprocAddr)glGetObjectPtrLabel},
 
     /* Extension API alias for GL_KHR_blend_equation_advanced */
-    {__GL_EXTID_KHR_blend_equation_advanced, "BlendBarrierKHR", (__GLprocAddr)glBlendBarrier},
+    {__GL_EXTID_KHR_blend_equation_advanced, "BlendBarrierKHR", (__GLprocAddr)glBlendBarrierKHR},
 
     /* Extension API alias for GL_KHR_robustness */
     {__GL_EXTID_KHR_robustness, "GetGraphicsResetStatusKHR", (__GLprocAddr)glGetGraphicsResetStatus},
@@ -268,10 +268,10 @@ static __GLextProcAlias __glExtProcAlias[] =
     {__GL_EXTID_KHR_robustness, "GetnUniformuivKHR", (__GLprocAddr)glGetnUniformuiv},
 
     /* Extension API alias for GL_EXT_robustness */
-    {__GL_EXTID_KHR_robustness, "GetGraphicsResetStatusEXT", (__GLprocAddr)glGetGraphicsResetStatus},
-    {__GL_EXTID_KHR_robustness, "ReadnPixelsEXT", (__GLprocAddr)glReadnPixels},
-    {__GL_EXTID_KHR_robustness, "GetnUniformfvEXT", (__GLprocAddr)glGetnUniformfv},
-    {__GL_EXTID_KHR_robustness, "GetnUniformivEXT", (__GLprocAddr)glGetnUniformiv},
+    {__GL_EXTID_KHR_robustness, "GetGraphicsResetStatusEXT", (__GLprocAddr)glGetGraphicsResetStatusEXT},
+    {__GL_EXTID_KHR_robustness, "ReadnPixelsEXT", (__GLprocAddr)glReadnPixelsEXT},
+    {__GL_EXTID_KHR_robustness, "GetnUniformfvEXT", (__GLprocAddr)glGetnUniformfvEXT},
+    {__GL_EXTID_KHR_robustness, "GetnUniformivEXT", (__GLprocAddr)glGetnUniformivEXT},
 
     {__GL_EXTID_EXT_LAST, gcvNULL, gcvNULL}
 };

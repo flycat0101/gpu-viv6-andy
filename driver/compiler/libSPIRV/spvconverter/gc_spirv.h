@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -51,6 +51,8 @@
 
 /* TODO: so far, we use a constant for a struct field number, we need to make it dynamically. */
 #define SPV_STRUCT_FIELD_NUM        16
+
+#define SPV_SKIP_NAME_CHECK         1
 
 typedef struct
 {

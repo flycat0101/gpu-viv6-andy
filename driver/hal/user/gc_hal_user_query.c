@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1159,6 +1159,21 @@ gcoHAL_QuerySeparated2D(
         gcmFOOTER();
         return status;
     }
+}
+
+gceSTATUS
+gcoHAL_QueryHybrid2D(
+    IN gcoHAL Hal
+    )
+{
+    gceSTATUS status;
+    gcmHEADER();
+
+    status = gcPLS.hal->hybrid2D ? gcvSTATUS_TRUE
+           : gcvSTATUS_FALSE;
+
+    gcmFOOTER();
+    return status;
 }
 
 gceSTATUS

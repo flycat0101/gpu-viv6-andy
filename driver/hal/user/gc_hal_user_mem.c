@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -355,15 +355,23 @@ gcfMEM_FSMemPoolFreeAList(
     IN gctPOINTER           LastNode
     )
 {
+    gceSTATUS status = gcvSTATUS_OK;
 #if USE_LOCAL_MEMORY_POOL
     gcsMEM_FS_MEM_NODE      firstNode = (gcsMEM_FS_MEM_NODE) FirstNode;
     gcsMEM_FS_MEM_NODE      lastNode  = (gcsMEM_FS_MEM_NODE) LastNode;
 
-    lastNode->next = MemPool->freeList;
-    MemPool->freeList = firstNode;
+    if ((FirstNode != gcvNULL) && (LastNode != gcvNULL))
+    {
+        lastNode->next = MemPool->freeList;
+        MemPool->freeList = firstNode;
+    }
+    else
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+    }
 #endif
 
-    return gcvSTATUS_OK;
+    return status;
 }
 
 gceSTATUS
@@ -570,8 +578,6 @@ gcfMEM_VSMemPoolGetANode(
 
             if (MemPool->recycleFreeNode)
             {
-                /* Move the remaining part in current block to free list. */
-                /* TODO - Can be improved. */
                 if (MemPool->freeSize >= VS_MEM_NODE_DATA_OFFSET + _WORD_SIZE)
                 {
                     list = (gcsMEM_VS_MEM_NODE) MemPool->freeData;
@@ -812,8 +818,6 @@ gcfMEM_AFSMemPoolGetANode(
         {
             gctPOINTER pointer = gcvNULL;
 
-            /* Move the remaining part in current block to free list. */
-            /* TODO - Can be improved. */
             if (MemPool->freeSize >= AFS_MEM_NODE_DATA_OFFSET + MemPool->nodeSize)
             {
                 list = (gcsMEM_AFS_MEM_NODE) MemPool->freeData;

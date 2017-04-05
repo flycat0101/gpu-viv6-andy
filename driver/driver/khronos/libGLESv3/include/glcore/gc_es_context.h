@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -450,7 +450,8 @@ typedef enum
 
 struct __GLcontextRec
 {
-    /* The first Int of __GLcontext stores a unique context ID */
+    gcsDRIVER_TLS base;
+
     GLuint magic;
 
     /* EGL imported functions which might be OS specific */
@@ -579,37 +580,22 @@ extern GLvoid __glSetError(__GLcontext *gc, GLenum code);
 
 __GL_INLINE __GLcontext * __glGetGLcontext(GLvoid)
 {
-    gcsTLS_PTR tls = gcvNULL;
-    gcoOS_GetTLS(&tls);
-    if (tls == gcvNULL)
-        return gcvNULL;
-    else
-        return tls->esClientCtx;
+    gcsDRIVER_TLS_PTR tls;
+    gcoOS_GetDriverTLS(gcvTLS_KEY_OPENGL_ES, &tls);
+    return (__GLcontext *) tls;
 }
 
 __GL_INLINE GLvoid __glSetGLcontext(GLvoid *context)
 {
-    gcsTLS_PTR tls = gcvNULL;
-    gcoOS_GetTLS(&tls);
-    if (tls != gcvNULL)
-        tls->esClientCtx = context;
+    gcoOS_SetDriverTLS(gcvTLS_KEY_OPENGL_ES, (gcsDRIVER_TLS_PTR) context);
 }
 
 extern GLvoid __glEvaluateFramebufferChange(__GLcontext *gc, GLbitfield flags);
-extern GLvoid __glEvaluateSystemDrawableChange(__GLcontext *gc, GLbitfield flags);
 
 __GL_INLINE GLvoid __glEvaluateDrawableChange(__GLcontext *gc, GLbitfield flags)
 {
-    if (DRAW_FRAMEBUFFER_BINDING_NAME == 0)
-    {
-        /* Dispatch window system render buffer changes*/
-        __glEvaluateSystemDrawableChange(gc, flags);
-    }
-    else
-    {
-       /* Evaluate context frame buffer object status*/
-        __glEvaluateFramebufferChange(gc, flags);
-    }
+    /* Evaluate context frame buffer object status, include default ones. */
+    __glEvaluateFramebufferChange(gc, flags);
 
     if ((gc->drawableDirtyMask & __GL_BUFFER_DRAW_BIT)&& (flags & __GL_BUFFER_DRAW_BIT))
     {

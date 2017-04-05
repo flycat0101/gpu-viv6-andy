@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1622,6 +1622,9 @@ OUT clsNAME **Name
             name->u.funcInfo.workGroupSizeHint[0] =
             name->u.funcInfo.workGroupSizeHint[1] =
             name->u.funcInfo.workGroupSizeHint[2] = 0;
+            name->u.funcInfo.kernelScaleHint[0] =
+            name->u.funcInfo.kernelScaleHint[1] =
+            name->u.funcInfo.kernelScaleHint[2] = 1;
             break;
 
         case clvLABEL_NAME:
@@ -1963,7 +1966,7 @@ OUT clsNAME_SPACE ** NameSpace
     gcmASSERT(NameSpace);
 
     do {
-        status = cloCOMPILER_Allocate(Compiler,
+        status = cloCOMPILER_ZeroMemoryAllocate(Compiler,
                         (gctSIZE_T)sizeof(clsNAME_SPACE),
                         (gctPOINTER *) &nameSpace);
         if (gcmIS_ERROR(status)) break;
@@ -2338,7 +2341,35 @@ IN gctINT8 NumComponents
 {
    clsVecCompSelType *vectorSel;
 
-   if(clmIsElementTypePacked(ElementType)) {
+   if(clmIsElementTypePackedGenType(ElementType)) {
+       return T_GENTYPE_PACKED;
+   }
+   else if(clmIsElementTypeGenType(ElementType)) {
+       switch(ElementType) {
+       case clvTYPE_SIU_GEN:
+           return T_SIU_GENTYPE;
+
+       case clvTYPE_I_GEN:
+           return T_I_GENTYPE;
+
+       case clvTYPE_U_GEN:
+           return T_U_GENTYPE;
+
+       case clvTYPE_IU_GEN:
+           return T_IU_GENTYPE;
+
+       case clvTYPE_F_GEN:
+           return T_F_GENTYPE;
+
+       case clvTYPE_GEN:
+           return T_GENTYPE;
+
+       default:
+           gcmASSERT(0);
+           return T_GENTYPE;
+       }
+   }
+   if(clmIsElementTypePacked(ElementType) && !clmIsElementTypePackedGenType(ElementType)) {
        gctINT index;
        index = ElementType - _BuiltinPackedVectorTypes[0].elementType;
 
@@ -2379,10 +2410,10 @@ IN clsDATA_TYPE **VecDataType
                    dataType);
 
    return cloCOMPILER_CreateDataType(Compiler,
-                     dataType->type,
-                     DataType->u.generic,
-                     DataType->accessQualifier,
-                     DataType->addrSpaceQualifier,
+                                     dataType->type,
+                                     DataType->u.generic,
+                                     DataType->accessQualifier,
+                                     DataType->addrSpaceQualifier,
                                      VecDataType);
 }
 
@@ -5062,6 +5093,9 @@ IN cloIR_BASE This
            gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant->buffer));
         }
     }
+    if (constant->uniformCount > 0) {
+        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant->uniform));
+    }
 
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant));
     return gcvSTATUS_OK;
@@ -5185,14 +5219,12 @@ OUT cloIR_CONSTANT *Constant
      cloIR_EXPR_Initialize(&constant->exprBase, &s_constantVTab, LineNo, StringNo,
                            decl);
 
-     constant->variable = gcvNULL;
-     constant->values = gcvNULL;
-     constant->buffer = gcvNULL;
-     constant->uniform = gcvNULL;
-     constant->allValuesEqual = gcvFALSE;
-
+#if _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
+     if (clmDECL_IsUnderlyingStructOrUnion(&decl)) {
+#else
      if (clmDECL_IsUnderlyingStructOrUnion(&decl) &&
          (clGetOperandCountForRegAlloc(&decl) > _cldMaxOperandCountToUseMemory)) {
+#endif
          constant->valueCount = clsDECL_GetByteSize(Compiler, &decl);
          size = (gctSIZE_T)(sizeof(gctCHAR) * constant->valueCount);
          status = cloCOMPILER_ZeroMemoryAllocate(Compiler,
@@ -5224,6 +5256,9 @@ OUT cloIR_CONSTANT *Constant
     }
     if (constant->buffer != gcvNULL) {
         gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant->buffer));
+    }
+    if (constant->uniformCount > 0) {
+        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant->uniform));
     }
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant));
   }
@@ -5261,13 +5296,6 @@ OUT cloIR_CONSTANT * Constant
         clmDECL_Initialize(&decl, Decl->dataType, &Decl->array, gcvNULL, gcvFALSE, clvSTORAGE_QUALIFIER_NONE);
         cloIR_EXPR_Initialize(&constant->exprBase, &s_constantVTab, LineNo, StringNo,
                       decl);
-
-        constant->valueCount = 0;
-        constant->values = gcvNULL;
-        constant->variable = gcvNULL;
-        constant->buffer = gcvNULL;
-        constant->uniform = gcvNULL;
-        constant->allValuesEqual = gcvFALSE;
 
         *Constant = constant;
         return gcvSTATUS_OK;
@@ -5321,11 +5349,24 @@ OUT cloIR_CONSTANT * Constant
                           (gctSIZE_T)sizeof(gctCHAR) * Source->valueCount);
             }
         }
-        status = cloCOMPILER_Allocate(Compiler,
-                          (gctSIZE_T)sizeof(struct _cloIR_CONSTANT),
-                          (gctPOINTER *) &pointer);
+
+        status = cloCOMPILER_ZeroMemoryAllocate(Compiler,
+                                                (gctSIZE_T)sizeof(struct _cloIR_CONSTANT),
+                                                (gctPOINTER *) &pointer);
         if (gcmIS_ERROR(status)) break;
         constant = pointer;
+
+        if (Source->uniformCount > 0) {
+            status = cloCOMPILER_Allocate(Compiler,
+                                          (gctSIZE_T)sizeof(gcUNIFORM) * Source->uniformCount,
+                                          (gctPOINTER *) &pointer);
+            if (gcmIS_ERROR(status)) break;
+            constant->uniform = pointer;
+            gcoOS_MemCopy(constant->uniform,
+                          Source->uniform,
+                          (gctSIZE_T)sizeof(gcUNIFORM) * Source->uniformCount);
+            constant->uniformCount = Source->uniformCount;
+        }
 
         clmDECL_Initialize(&decl,
                            Source->exprBase.decl.dataType,
@@ -5343,7 +5384,6 @@ OUT cloIR_CONSTANT * Constant
         constant->values = values;
         constant->buffer = buffer;
         constant->variable = Source->variable;
-        constant->uniform = Source->uniform;
         constant->allValuesEqual = Source->allValuesEqual;
         *Constant = constant;
         return gcvSTATUS_OK;
@@ -8611,6 +8651,26 @@ static clsVTAB s_unaryExprVTab =
     cloIR_UNARY_EXPR_Accept
 };
 
+#define _GetFloatSign(f)      (((f) >> 31) & 0x01)
+#define _GetFloatExp(f)       (((f) >> 23) & 0xFF)
+#define _GetFloatMantissa(f)  (((f) & 0x7FFFFF) | 0x800000)
+
+gctUINT
+clConvFloatToHalf(
+IN gctFLOAT F
+)
+{
+    union {
+       gctFLOAT f;
+       gctUINT  u;
+    } value;
+
+    value.f = F;
+    return ((_GetFloatSign(value.u) << 15 |
+            (_GetFloatExp(value.u) & 0x1F) << 10) |
+            ((_GetFloatMantissa(value.u) >> 13) & 0x3FF));
+}
+
 static gctINT
 _ConvUnsignedToSigned(
 IN gctINT intType
@@ -9764,12 +9824,40 @@ _GetBinaryExprDecl(
 
     case clvBINARY_LSHIFT:
     case clvBINARY_RSHIFT:
-    status = cloCOMPILER_CloneDecl(Compiler,
-                                   clvQUALIFIER_CONST,
-                                   LeftOperand->decl.dataType->addrSpaceQualifier,
-                                   &LeftOperand->decl,
-                                   Decl);
-        if (gcmIS_ERROR(status)) return status;
+        if (clmDECL_IsScalar(&LeftOperand->decl) &&
+            !clmIsElementTypeHighPrecision(LeftOperand->decl.dataType->elementType)) {
+            clsDATA_TYPE *dataType;
+            gctINT typeToken;
+
+            if(clmIsElementTypeUnsigned(LeftOperand->decl.dataType->elementType)) {
+                typeToken = T_UINT;
+            }
+            else {
+                typeToken = T_INT;
+            }
+            status = cloCOMPILER_CreateDataType(Compiler,
+                                                typeToken,
+                                                gcvNULL,
+                                                clvQUALIFIER_CONST,
+                                                LeftOperand->decl.dataType->addrSpaceQualifier,
+                                                &dataType);
+            if (gcmIS_ERROR(status)) return status;
+
+            clmDECL_Initialize(Decl,
+                               dataType,
+                               &LeftOperand->decl.array,
+                               LeftOperand->decl.ptrDscr,
+                               LeftOperand->decl.ptrDominant,
+                               LeftOperand->decl.storageQualifier);
+        }
+        else {
+            status = cloCOMPILER_CloneDecl(Compiler,
+                                           clvQUALIFIER_CONST,
+                                           LeftOperand->decl.dataType->addrSpaceQualifier,
+                                           &LeftOperand->decl,
+                                           Decl);
+            if (gcmIS_ERROR(status)) return status;
+        }
         break;
 
     case clvBINARY_SEQUENCE:

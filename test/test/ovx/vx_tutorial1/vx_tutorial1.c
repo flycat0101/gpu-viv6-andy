@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -80,7 +80,7 @@ int freeRes(FILE** srcFile, FILE** destFile, u08** tmpBuf, u08** tmpBuf2, u08** 
 
 int main(int argc, char* argv[])
 {
-    vx_context ContextVX;
+    vx_context ContextVX = NULL;
 
     vx_image imgObj[3]  = { NULL, NULL, NULL };
     void* imgAddr[3] = { NULL, NULL, NULL };
@@ -99,6 +99,7 @@ int main(int argc, char* argv[])
     u32 fileOffset = 0;
     u32 x = 0, y = 0;
     u16 desPixel;
+    int status = -1;
 
     /* read image data */
     srcFile = fopen("lena_gray.bmp", "rb");
@@ -106,8 +107,8 @@ int main(int argc, char* argv[])
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "file error.");
 
-        freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-        exit(-1);
+        status = -1;
+        goto exit;
     }
 
     fileSize = sizeof(FileHeader) + sizeof(InfoHeader);
@@ -117,8 +118,8 @@ int main(int argc, char* argv[])
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "memory error.");
 
-        freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-        exit(-1);
+        status = -1;
+        goto exit;
     }
     fread((u08*)tmpBuf, fileSize, 1, srcFile);
 
@@ -132,8 +133,8 @@ int main(int argc, char* argv[])
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "memory error.");
 
-        freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-        exit(-1);
+        status = -1;
+        goto exit;
     }
     fread((u08*)tmpBuf2, (fileOffset-fileSize), 1, srcFile);
 
@@ -142,8 +143,8 @@ int main(int argc, char* argv[])
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "memory error.");
 
-        freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-        exit(-1);
+        status = -1;
+        goto exit;
     }
     fread((u08*)imgBuf, imgHei*imgWid*sizeof(u08), 1, srcFile);
 
@@ -165,16 +166,16 @@ int main(int argc, char* argv[])
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
-            freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-            exit(-1);
+            status = -1;
+            goto exit;
         }
 
         if((1!=imgInfo[0].step_y)||(1!=imgInfo[0].step_x)||(imgHei!=imgInfo[0].dim_y)||(imgWid!=imgInfo[0].dim_x))
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
-            freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-            exit(-1);
+            status = -1;
+            goto exit;
         }
 
         for(y=0; y<imgHei; y++)
@@ -190,8 +191,8 @@ int main(int argc, char* argv[])
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
-            freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-            exit(-1);
+            status = -1;
+            goto exit;
         }
         imgAddr[0] = NULL;
 
@@ -200,8 +201,8 @@ int main(int argc, char* argv[])
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
-            freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-            exit(-1);
+            status = -1;
+            goto exit;
         }
 
         /* transfer image from gpu to cpu */
@@ -209,16 +210,16 @@ int main(int argc, char* argv[])
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
-            freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-            exit(-1);
+            status = -1;
+            goto exit;
         }
 
         if(VX_SUCCESS!=vxAccessImagePatch(imgObj[2], &imgRect, 0, &(imgInfo[2]), &imgAddr[2], VX_READ_ONLY))
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
-            freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-            exit(-1);
+            status = -1;
+            goto exit;
         }
 
         if((imgInfo[2].dim_y!=imgInfo[1].dim_y)||(imgInfo[2].dim_x!=imgInfo[1].dim_x)||
@@ -228,8 +229,8 @@ int main(int argc, char* argv[])
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
-            freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-            exit(-1);
+            status = -1;
+            goto exit;
         }
 
         for(y=0; y<imgHei; y++)
@@ -251,8 +252,8 @@ int main(int argc, char* argv[])
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
-            freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-            exit(-1);
+            status = -1;
+            goto exit;
         }
         imgAddr[1] = NULL;
 
@@ -260,8 +261,8 @@ int main(int argc, char* argv[])
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
-            freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-            exit(-1);
+            status = -1;
+            goto exit;
         }
         imgAddr[2] = NULL;
 
@@ -271,27 +272,29 @@ int main(int argc, char* argv[])
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "file error.");
 
-            freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-            return -1;
+            status = -1;
+            goto exit;
         }
 
         fwrite(tmpBuf, fileSize, 1, destFile);
         fwrite(tmpBuf2, (fileOffset-fileSize), 1, destFile);
         fwrite(imgBuf, imgHei*imgWid*sizeof(u08), 1, destFile);
 
-        freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
+        status = 0;
     }
     else
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
-        freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
-        exit(-1);
+        status = -1;
+        goto exit;
     }
 
     printf("vx process success.\n");
 
-    return 0;
+exit:
+    freeRes(&srcFile, &destFile, &tmpBuf, &tmpBuf2, &imgBuf, imgObj, &ContextVX);
+    return status;
 }
 
 int freeRes(FILE** srcFile, FILE** destFile, u08** tmpBuf, u08** tmpBuf2, u08** imgBuf, vx_image imgObj[], vx_context* ContextVX)

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -13,6 +13,8 @@
 
 #ifndef __gc_cl_h_
 #define __gc_cl_h_
+
+#include <CL/cl_egl.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -203,6 +205,12 @@ extern gcsATOM_PTR clgGlobalId;
 
 /* Helper string for query functions to return empty null-terminated string */
 extern const gctSTRING clgEmptyStr;
+
+#if defined(_WINDOWS)
+#define __CL_INLINE static __forceinline
+#else
+#define __CL_INLINE static __inline
+#endif
 
 
 /******************************************************************************\

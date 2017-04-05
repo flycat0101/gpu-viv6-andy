@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -579,7 +579,7 @@ __glChipFramebufferTexture(
         samples = gcmMAX((GLsizei)texObj->samplesUsed, samples);
 
         /*
-        ** TODO: remove cubemap check
+        **VIV: [todo] remove cubemap check
         */
         if (gcChipTexNeedShadow(gc, texObj, texInfo, formatMapInfo, samples, &attachPoint->samplesUsed))
         {
@@ -624,8 +624,6 @@ __glChipFramebufferTexture(
             gcmONERROR(gcoTEXTURE_RenderIntoMipMap2(texInfo->object,
                                                     level,
                                                     chipMipLevel->shadow[slice].masterDirty));
-            /* TODO: do we need to set orientation of new create RT surface? */
-
             /* TO_DO, put at render real happens */
             CHIP_TEX_IMAGE_UPTODATE(texInfo, level);
         }
@@ -651,7 +649,6 @@ OnError:
 **  Return Value:    Describe the returning sequence
 **
 ********************************************************************/
-/* TODO: better to move it to GLcore layer */
 GLboolean
 __glChipIsFramebufferComplete(
     __GLcontext *gc,
@@ -1259,7 +1256,6 @@ gcChipBlitFramebuffer3Dblit(
     blitArgs.scissor.top    = gc->state.scissor.scissorY;
     blitArgs.scissor.bottom = gc->state.scissor.scissorY + gc->state.scissor.scissorHeight;
 
-    /* TODO: merge it back to caller when chip3Dblit get removed */
     if (chipCtx->drawYInverted)
     {
         GLint temp = blitArgs.scissor.top;
@@ -2574,7 +2570,6 @@ gcChipFBOMarkShadowRendered(
     {
         __GLfboAttachPoint *attachPoint = &fbo->attachPoint[__GL_DEPTH_ATTACHMENT_POINT_INDEX];
 
-        /* TODO: depth test and function can be detect to check whether depth buffer was really written */
         if (attachPoint->objType == GL_TEXTURE && chipCtx->drawDepthView.surf && gc->state.depth.writeEnable)
         {
             __GLtextureObject *texObj = (__GLtextureObject*)attachPoint->object;
@@ -2627,7 +2622,6 @@ gcChipFBOMarkShadowRendered(
     {
         __GLfboAttachPoint *attachPoint = &fbo->attachPoint[__GL_STENCIL_ATTACHMENT_POINT_INDEX];
 
-        /* TODO: stencil/depth test and function can be detect to check whether depth buffer was really written */
         if (attachPoint->objType == GL_TEXTURE && chipCtx->drawStencilView.surf &&
             (gc->state.stencil.front.writeMask || gc->state.stencil.back.writeMask))
         {
@@ -2710,7 +2704,6 @@ gcChipTexMipSliceSyncFromShadow(
             {
                 gcsSURF_VIEW shadowView = {shadow->surface, 0 ,1};
 
-                /* TODO: in fact, there should be mechanism to make sure draw to RT was finished here */
                 gcmONERROR(gcoSURF_ResolveRect(&shadowView, &texView, gcvNULL));
                 gcmONERROR(gcChipSetImageSrc(texInfo->eglImage.image, texView.surf));
                 shadow->shadowDirty = GL_FALSE;
@@ -2808,7 +2801,6 @@ gcChipTexSyncFromShadow(
                     {
                         gcsSURF_VIEW shadowView = {shadow->surface, 0, 1};
 
-                        /* TODO: in fact, there should be mechanism to make sure draw to RT was finished here */
                         gcmONERROR(gcoSURF_ResolveRect(&shadowView, &texView, gcvNULL));
 
                         gcmONERROR(gcChipSetImageSrc(texInfo->eglImage.image, texView.surf));
@@ -3177,7 +3169,6 @@ gcChipFBOSyncEGLImageNativeBuffer(
         }
     }
 
-    /* TODO: Sync for RBO EGLImage Native buffer. */
     /*
     else if (GL_RENDERBUFFER == attachPoint->objType)
     {

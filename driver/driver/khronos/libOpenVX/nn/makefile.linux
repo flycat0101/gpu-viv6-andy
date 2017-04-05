@@ -1,0 +1,83 @@
+##############################################################################
+#
+#    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
+#
+#    The material in this file is confidential and contains trade secrets
+#    of Vivante Corporation. This is proprietary information owned by
+#    Vivante Corporation. No part of this work may be disclosed,
+#    reproduced, copied, transmitted, or used in any way for any purpose,
+#    without the express written permission of Vivante Corporation.
+#
+##############################################################################
+
+
+#
+# Driver part of OpenVX.
+#
+
+#############################################################################
+# Include common definitions.
+
+include $(AQROOT)/makefile.linux.def
+include ../makefile.linux.def
+INCLUDE += -I$(AQROOT)/hal/inc
+INCLUDE += -I$(AQROOT)/hal/user
+INCLUDE += -I$(AQROOT)/hal/os/linux/user
+INCLUDE += -I$(AQROOT)/sdk/inc
+INCLUDE += -I$(AQROOT)/compiler/libVSC/include
+
+INCLUDE += -I../driver/include
+
+INCLUDE += -I./
+
+ifeq ($(gcdSTATIC_LINK), 1)
+STATIC=1
+TARGET_NAME = libnn.a
+else
+DYNAMIC = 1
+TARGET_NAME = libnn.so
+endif
+
+#############################################################################
+# Objects.
+
+# Core
+OBJECTS = $(OBJ_DIR)/gc_nn_interface.o
+
+LIBS += -l OpenVX -l CLC -l VSC -l GAL
+
+INCLUDE += -I../kernels
+
+VPATH = ../driver/include
+
+CFLAGS += $(INCLUDE)
+
+################################################################################
+# Add extra library path.
+LIBS += -L $(AQROOT)/build/sdk/drivers
+LIBS += -L $(AQROOT)/hal/user/$(OBJ_DIR)
+
+LIBS += -l dl -l pthread -lm
+
+################################################################################
+# Add extra include path.
+
+################################################################################
+# Define the macros used in common makefile.
+
+# installation directory
+INSTALL_DIR := $(SDK_DIR)/drivers
+
+################################################################################
+# Include the common makefile.
+
+include $(AQROOT)/common.target
+
+################################################################################
+# Extra installation.
+install: $(TARGET_OUTPUT) extra_install
+
+.PHONY: extra_install
+extra_install: $(TARGET_OUTPUT)
+	@mkdir -p $(SDK_DIR)/include
+	@-cp -rf $(AQROOT)/sdk/inc/VX $(SDK_DIR)/include

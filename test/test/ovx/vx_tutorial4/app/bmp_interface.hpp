@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -141,7 +141,7 @@ void BmpInterface::help(void)
     printf("\n");
     printf("----------------help---------------------\n");
     printf("\n");
-    printf("version:08302016\n");
+    printf("version:12142016\n");
     printf("vx_tutorial4 [-f ] [-c ] [-w] [-h]\n");
     printf("-f: input data filelist, a necessary parameter.\n");
     printf("-c: FPGA clk MHz, default is off to generate bmp, set it >0 to change app to perf mode.\n");
@@ -524,6 +524,7 @@ int BmpInterface::showFPGA(u08* inputBuf, u32 xSize, u32 ySize)
     u32 yEnd = 0;
     u32 desIndex=0;
     u32 srcIndex=0;
+	u32 xWidthInPixel;
 
     // read frame buffer info
     hFB = open("/dev/fb0", O_RDWR);
@@ -549,9 +550,11 @@ int BmpInterface::showFPGA(u08* inputBuf, u32 xSize, u32 ySize)
         return -1;
     }
 
-    screenSize = vInfo.xres * vInfo.yres * CHANNELNUM;
+    xWidthInPixel = (fInfo.line_length/(vInfo.bits_per_pixel >> 3));
 
-    // mmap frame buffer data 
+    screenSize = xWidthInPixel * vInfo.yres * CHANNELNUM;
+
+    // mmap frame buffer data
     pFB = (u32*)mmap(0, screenSize, PROT_READ|PROT_WRITE, MAP_SHARED, hFB, 0);
     if (MAP_FAILED==pFB)
     {
@@ -588,16 +591,16 @@ int BmpInterface::showFPGA(u08* inputBuf, u32 xSize, u32 ySize)
     {
         for(u32 x=0; x<vInfo.xres; x++)
         {
-            desIndex = y * vInfo.xres + x;
+            desIndex = y * xWidthInPixel + x;
             srcIndex = (y - yStart) * xSize + (x - xStart);
 
             if((y>=yStart)&&(y<yEnd)&&(x>=xStart)&&(x<xEnd))
             {
-                *(pFB + desIndex) = *((u32*)inputBuf + srcIndex); 
+                *(pFB + desIndex) = *((u32*)inputBuf + srcIndex);
             }
             else
             {
-                *(pFB + desIndex) = 0; 
+                *(pFB + desIndex) = 0;
             }
         }
     }

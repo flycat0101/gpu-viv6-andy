@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -155,19 +155,6 @@ _DestroyImage(
                 previous = ref;
             }
 
-            /*
-             * TODO: Code and Comments are incorrect:
-             *
-             * It is impossible to depend on the reference count.
-             *
-             * If there's no other reference to the surface, the reference
-             * count should be '2'. One is when gcoSURF object creation
-             * (accurately, wrap), the second is the EGLImage itself (see
-             * eglCreateImage function).
-             *
-             * What's more, it is very possible that the EGLImage targets a
-             * texture but EGLImage is to be destroyed before the texture.
-             */
             /* If we have a valid reference and the reference count has
             ** reached 1, we can remove the surface from the reference
             ** stack. */
@@ -1190,6 +1177,12 @@ static struct
 }
 _FormatTable[] =
 {
+    /* 8 bpp R */
+    {DRM_FORMAT_R8,       gcvSURF_R8},
+
+    /* 16 bpp RG */
+    {DRM_FORMAT_GR88,     gcvSURF_G8R8},
+
     /* 16 bpp RGB */
     {DRM_FORMAT_XRGB4444, gcvSURF_X4R4G4B4},
     {DRM_FORMAT_XBGR4444, gcvSURF_X4B4G4R4},
@@ -1643,6 +1636,9 @@ veglCreateImage (
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     /* Get context, context may be NULL. */
     if (Ctx == EGL_NO_CONTEXT)
     {
@@ -1832,6 +1828,9 @@ veglDestroyImageImpl(
         veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     /* Get shortcut of the eglImage. */
     image = VEGL_IMAGE(Image);
@@ -2023,6 +2022,9 @@ struct wl_buffer *eglCreateWaylandBufferFromImageWL(EGLDisplay Dpy, EGLImageKHR 
         veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     /* Get shortcut of the eglImage. */
     image = VEGL_IMAGE(Image);

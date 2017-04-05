@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -55,6 +55,7 @@ struct wl_egl_window
 
     struct wl_egl_buffer * buffers;
     int nr_buffers;
+    int next;
 
     int32_t dx;
     int32_t dy;
@@ -90,14 +91,17 @@ struct wl_egl_buffer
         gctUINT32 node;
         gcePOOL pool;
         gctSIZE_T size;
+        gctUINT32 tsNode;
+        gcePOOL tsPool;
+        gctSIZE_T tsSize;
         gcoSURF surface;
         gceHARDWARE_TYPE hwType;
     } info;
 
+    EGLint age;
     volatile int state;
     struct wl_callback * frame_callback;
     struct wl_buffer * wl_buf;
-    struct wl_list link;
 };
 
 static struct wl_list egl_window_list;
@@ -473,6 +477,7 @@ wl_egl_buffer_create(struct wl_egl_window *window,
         int width, int height, int type, int format)
 {
     gceSTATUS status;
+    gcoSURF surface = gcvNULL;
 
     /*
      * Current hardware type should be correctly set already.
@@ -488,25 +493,27 @@ wl_egl_buffer_create(struct wl_egl_window *window,
                           type,
                           format,
                           gcvPOOL_DEFAULT,
-                          &buffer->info.surface));
+                          &surface));
 
-    if (type != gcvSURF_BITMAP)
+    buffer->info.surface = surface;
+
+    if ((type & 0xFF) != gcvSURF_BITMAP)
     {
-        gcoSURF_SetFlags(buffer->info.surface,
+        gcoSURF_SetFlags(surface,
                          gcvSURF_FLAG_CONTENT_YINVERTED,
                          gcvTRUE);
     }
 
-    gcmONERROR(gcoSURF_Lock(buffer->info.surface, gcvNULL, gcvNULL));
+    gcmONERROR(gcoSURF_Lock(surface, gcvNULL, gcvNULL));
 
     gcmONERROR(
-        gcoSURF_GetAlignedSize(buffer->info.surface,
+        gcoSURF_GetAlignedSize(surface,
                                gcvNULL,
                                gcvNULL,
                                &buffer->info.stride));
 
     gcmONERROR(
-        gcoSURF_QueryVidMemNode(buffer->info.surface,
+        gcoSURF_QueryVidMemNode(surface,
                                 &buffer->info.node,
                                 &buffer->info.pool,
                                 &buffer->info.size));
@@ -514,6 +521,23 @@ wl_egl_buffer_create(struct wl_egl_window *window,
     gcmONERROR(
         gcoHAL_NameVideoMemory(buffer->info.node,
                                &buffer->info.node));
+
+#if gcdENABLE_3D
+    buffer->info.tsNode = surface->tileStatusNode.u.normal.node;
+    buffer->info.tsPool = surface->tileStatusNode.pool;
+    buffer->info.tsSize = surface->tileStatusNode.size;
+
+    if (buffer->info.tsNode)
+    {
+        gcmONERROR(
+            gcoHAL_NameVideoMemory(buffer->info.tsNode,
+                                   &buffer->info.tsNode));
+    }
+#else
+    buffer->info.tsNode = 0;
+    buffer->info.tsPool = gcvPOOL_UNKNOWN;
+    buffer->info.tsSize = 0;
+#endif
 
     buffer->info.width      = width;
     buffer->info.height     = height;
@@ -531,7 +555,10 @@ wl_egl_buffer_create(struct wl_egl_window *window,
                 buffer->info.type,
                 buffer->info.node,
                 buffer->info.pool,
-                buffer->info.size);
+                buffer->info.size,
+                buffer->info.tsNode,
+                buffer->info.tsPool,
+                buffer->info.tsSize);
 
     wl_buffer_add_listener(buffer->wl_buf, &buffer_listener, buffer);
 
@@ -606,6 +633,8 @@ wl_egl_buffer_destroy(struct wl_egl_window *window,
         wl_buffer_destroy(buffer->wl_buf);
         buffer->wl_buf = NULL;
     }
+
+    buffer->age = 0;
 }
 
 /* returns errno. */
@@ -619,11 +648,19 @@ static int wl_egl_window_set_format(struct wl_egl_window *window,
      *   gcvSURF_RENDER_TARGET_NO_COMPRESSION
      *   gcvSURF_RENDER_TARGET_NO_TILE_STATUS
      */
-    if (Type != gcvSURF_BITMAP)
+    switch (Type)
     {
+    case gcvSURF_BITMAP:
+    case gcvSURF_RENDER_TARGET:
+    case gcvSURF_RENDER_TARGET_NO_COMPRESSION:
+    case gcvSURF_RENDER_TARGET_NO_TILE_STATUS:
+        break;
+
+    default:
         return -EINVAL;
     }
 
+    window->type   = Type;
     window->format = Format;
     return 0;
 }
@@ -649,26 +686,17 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
     {
         for (;;)
         {
-            int i;
+            int current = window->next;
 
-            for (i = 0; i < window->nr_buffers; i++)
-            {
-                /*
-                 * Need check 'state', but not 'frame_callback' here. Our driver
-                 * may use another thread for 'queue_buffer' where
-                 * 'frame_callback' pointer is assigned. That means, null-
-                 * 'frame_callback' does not mean the buffer is avaiable for
-                 * rendering.
-                 */
-                if (window->buffers[i].state == BUFFER_STATE_FREE)
-                {
-                    buffer = &window->buffers[i];
-                    break;
-                }
-            }
+            buffer = &window->buffers[current];
 
-            if (buffer)
+            if (buffer->state == BUFFER_STATE_FREE)
             {
+                window->next = current + 1;
+
+                if (window->next >= window->nr_buffers)
+                    window->next -= window->nr_buffers;
+
                 break;
             }
 
@@ -788,6 +816,10 @@ wl_egl_window_cancel_buffer(struct wl_egl_window *window,
     struct wl_egl_display *display = window->display;
 
     buffer->state = BUFFER_STATE_FREE;
+
+    /* Roll back to make back buffers returned in order. */
+    window->next = (window->next == 0) ? window->nr_buffers - 1
+                 : window->next - 1;
 
     /* flush events. */
     wl_display_flush(display->wl_dpy);
@@ -1116,6 +1148,7 @@ _BindWindow(
         do
         {
             /* Check if direct rendering is available. */
+            VEGLThreadData thread;
             EGLBoolean fcFill = EGL_FALSE;
             EGLBoolean formatSupported;
             EGLint texMode = 0;
@@ -1123,9 +1156,6 @@ _BindWindow(
             EGLint i;
             gcePATCH_ID patchId = gcvPATCH_INVALID;
             EGLBoolean indirect = EGL_FALSE;
-
-            /* TODO: direct rendering is not ready yet. */
-            break;
 
             /* Get patch id. */
             gcoHAL_GetPatchID(gcvNULL, &patchId);
@@ -1142,6 +1172,20 @@ _BindWindow(
             if (indirect)
             {
                 /* Forced indirect rendering. */
+                break;
+            }
+
+            if (Surface->config.samples > 1)
+            {
+                /* Can not support MSAA, stop. */
+                break;
+            }
+
+            thread = veglGetThreadData();
+
+            if (thread && thread->api == EGL_OPENVG_API)
+            {
+                /* 3D VG, stop. */
                 break;
             }
 
@@ -1414,7 +1458,22 @@ _UpdateBufferAge(
     IN struct eglBackBuffer * BackBuffer
     )
 {
-    /* TODO */
+    int i;
+    struct wl_egl_window *window = Surface->hwnd;
+    struct wl_egl_buffer *buffer = BackBuffer->context;
+
+    for (i = 0; i < window->nr_buffers; i++)
+    {
+        struct wl_egl_buffer *b = &window->buffers[i];
+
+        if (b->age)
+        {
+            b->age++;
+        }
+    }
+
+    buffer->age = 1;
+
     return EGL_TRUE;
 }
 
@@ -1426,7 +1485,39 @@ _QueryBufferAge(
     OUT EGLint *BufferAge
     )
 {
-    /* TODO */
+    if (BackBuffer && BackBuffer->context)
+    {
+        struct wl_egl_buffer *buffer = BackBuffer->context;
+        *BufferAge = buffer->age;
+        return EGL_TRUE;
+    }
+    else if (!Surface->newSwapModel)
+    {
+        /*
+         * In current wayland implementation, back buffers are returned in order.
+         * It's safe to return age of buffer to dequeue next time --- except that
+         * there're 0 aged buffers.
+         */
+        int i;
+        struct wl_egl_window *window = Surface->hwnd;
+        struct wl_egl_buffer *buffer = &window->buffers[window->next];
+
+        *BufferAge = buffer->age;
+
+        for (i = 0; i < window->nr_buffers; i++)
+        {
+            buffer = &window->buffers[i];
+
+            if (buffer->age == 0)
+            {
+                *BufferAge = 0;
+                break;
+            }
+        }
+
+        return EGL_TRUE;
+    }
+
     return EGL_FALSE;
 }
 
@@ -1826,6 +1917,9 @@ void wl_egl_window_resize(struct wl_egl_window *window,
     if (window->width != width || window->height != height)
     {
         struct wl_egl_display *display = window->display;
+        VEGLDisplay dpy = NULL;
+        VEGLSurface sur = NULL;
+        int i;
 
         if (display)
         {
@@ -1834,6 +1928,37 @@ void wl_egl_window_resize(struct wl_egl_window *window,
 
         window->width  = width;
         window->height = height;
+
+        /* Reset age. */
+        for (i = 0; i < window->nr_buffers; i++)
+        {
+            struct wl_egl_buffer *buffer = &window->buffers[i];
+            buffer->age = 0;
+        }
+
+        /* Go through dpy list to find EGLSurface for window. */
+        gcoOS_LockPLS();
+        dpy = (VEGLDisplay) gcoOS_GetPLSValue(gcePLS_VALUE_EGL_DISPLAY_INFO);
+
+        for (; dpy != NULL; dpy = dpy->next)
+        {
+            sur = (VEGLSurface) dpy->surfaceStack;
+
+            for (; sur != NULL; sur = (VEGLSurface) sur->resObj.next)
+            {
+                if (sur->hwnd == window)
+                    break;
+            }
+
+            if (sur != NULL)
+                break;
+        }
+        gcoOS_UnLockPLS();
+
+        if (dpy != NULL && sur != NULL)
+        {
+            veglResizeSurface(dpy, sur, width, height);
+        }
     }
 }
 
@@ -1928,7 +2053,7 @@ static int create_pixmap_content(struct wl_egl_pixmap *pixmap)
 
     /* Switch to an available hardware type. */
     pixmap->hwType = !gcoHAL_Is3DAvailable(gcvNULL) ? gcvHARDWARE_VG
-                   : gcoHAL_QuerySeparated2D(gcvNULL) ? gcvHARDWARE_3D : gcvHARDWARE_3D2D;
+                   : gcoHAL_QueryHybrid2D(gcvNULL) ? gcvHARDWARE_3D2D : gcvHARDWARE_3D;
 
     gcoHAL_SetHardwareType(gcvNULL, pixmap->hwType);
 
@@ -2094,12 +2219,11 @@ veglCreateWaylandBufferFromImage(
         wl_viv_create_buffer(display->wl_viv,
                 buffer->info.width, buffer->info.height, buffer->info.stride,
                 buffer->info.format, buffer->info.type,
-                buffer->info.node, buffer->info.pool,
-                buffer->info.size);
+                buffer->info.node, buffer->info.pool, buffer->info.size,
+                buffer->info.tsNode, buffer->info.tsPool, buffer->info.tsSize);
 
     wl_proxy_set_queue((struct wl_proxy *)buffer->wl_buf, NULL);
 
-    /* TODO: what does this mean??? */
     /*buffer is no longer required. wl_buffer will be destoryed by application, look weston nested.c*/
 
     free(buffer);

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -65,10 +65,10 @@
 #define OPCODE_STORE_L (VIR_OP_STARR)
 #define EXTERN_STORE_L (5)
 
-#define OPCODE_I2F     (VIR_OP_CONV)
+#define OPCODE_I2F     (VIR_OP_CONVERT)
 #define EXTERN_I2F     (1)
 
-#define OPCODE_F2I     (VIR_OP_CONV)
+#define OPCODE_F2I     (VIR_OP_CONVERT)
 #define EXTERN_F2I     (2)
 
 #define OPCODE_FMA_MUL (VIR_OP_MUL)
@@ -180,7 +180,7 @@ conv2VirsVirOpcodeMap _virOpcodeMap[] =
     {VIR_OP_ACOS, /* gcSL_ACOS, 0x24 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_ASIN, /* gcSL_ASIN, 0x25 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_ATAN, /* gcSL_ATAN, 0x26 */ VIR_MOD_NONE, 0, 0},
-    {VIR_OP_AQ_SET,/* gcSL_SET, 0x27 */ VIR_MOD_NONE, 0, 0},
+    {VIR_OP_SET,/* gcSL_SET, 0x27 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_DSX, /* gcSL_DSX, 0x28 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_DSY, /* gcSL_DSY, 0x29 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_FWIDTH, /* gcSL_FWIDTH, 0x2A */ VIR_MOD_NONE, 0, 0},
@@ -230,7 +230,7 @@ conv2VirsVirOpcodeMap _virOpcodeMap[] =
     {VIR_OP_GETEXP, /* gcSL_GETEXP, 0x56 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_GETMANT, /* gcSL_GETMANT, 0x57 */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_MULHI, /* gcSL_MULHI, 0x58 */ VIR_MOD_NONE, 0, 0},
-    {VIR_OP_CMP, /* gcSL_CMP, 0x59 */ VIR_MOD_NONE, 0, 0},
+    {VIR_OP_COMPARE, /* gcSL_CMP, 0x59 */ VIR_MOD_NONE, 0, 0},
     {OPCODE_I2F, /* gcSL_I2F, 0x5A */ VIR_MOD_NONE, EXTERN_I2F, 0},
     {OPCODE_F2I, /* gcSL_F2I, 0x5B */ VIR_MOD_NONE, EXTERN_F2I, 0},
     {VIR_OP_ADDSAT, /* gcSL_ADDSAT, 0x5C */ VIR_MOD_NONE, 0, 0},
@@ -268,8 +268,8 @@ conv2VirsVirOpcodeMap _virOpcodeMap[] =
     {VIR_OP_ADD, /* gcSL_FMA_ADD, 0x7C */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_ATTR_ST, /* gcSL_ATTR_ST, 0x7D */ VIR_MOD_NONE, 0, 0},
     {VIR_OP_ATTR_LD, /* gcSL_ATTR_LD, 0x7E */ VIR_MOD_NONE, 0, 0},
-    {VIR_OP_EMIT, /* gcSL_EMIT_VERTEX, 0x7F */ VIR_MOD_NONE, 0, 0},
-    {VIR_OP_RESTART, /* gcSL_END_PRIMITIVE, 0x80 */ VIR_MOD_NONE, 0, 0},
+    {VIR_OP_EMIT0, /* gcSL_EMIT_VERTEX, 0x7F */ VIR_MOD_NONE, 0, 0},
+    {VIR_OP_RESTART0, /* gcSL_END_PRIMITIVE, 0x80 */ VIR_MOD_NONE, 0, 0},
     {OPCODE_ARCTRIG0, /* gcSL_ARCTRIG0, 0x81 */ VIR_MOD_NONE, EXTERN_ARCTRIG0, 0},
     {OPCODE_ARCTRIG1, /* gcSL_ARCTRIG1, 0x82 */ VIR_MOD_NONE, EXTERN_ARCTRIG1, 0},
     {VIR_OP_MUL_Z, /* gcSL_MUL_Z, 0x83 */ VIR_MOD_NONE, 0, 0},
@@ -481,6 +481,8 @@ _ConvScalarFormatToVirVectorTypeId(
         case 2: return VIR_TYPE_FLOAT_X2;
         case 3: return VIR_TYPE_FLOAT_X3;
         case 4: return VIR_TYPE_FLOAT_X4;
+        case 8: return VIR_TYPE_FLOAT_X8;
+        case 16: return VIR_TYPE_FLOAT_X16;
 
         default:
             return VIR_TYPE_FLOAT_X4;
@@ -554,6 +556,8 @@ _ConvScalarFormatToVirVectorTypeId(
         case 2: return VIR_TYPE_INTEGER_X2;
         case 3: return VIR_TYPE_INTEGER_X3;
         case 4: return VIR_TYPE_INTEGER_X4;
+        case 8: return VIR_TYPE_INTEGER_X8;
+        case 16: return VIR_TYPE_INTEGER_X16;
 
         default:
             return VIR_TYPE_INTEGER_X4;
@@ -627,6 +631,8 @@ _ConvScalarFormatToVirVectorTypeId(
         case 2: return VIR_TYPE_UINT_X2;
         case 3: return VIR_TYPE_UINT_X3;
         case 4: return VIR_TYPE_UINT_X4;
+        case 8: return VIR_TYPE_UINT_X8;
+        case 16: return VIR_TYPE_UINT_X16;
 
         default:
             return VIR_TYPE_UINT_X4;
@@ -2219,6 +2225,10 @@ _ConvShaderVariable2Vir(
         if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
         sym = VIR_Shader_GetSymFromId(VirShader, symId);
+        if(StructVariable)
+        {
+            VIR_Symbol_SetParentId(sym, VIR_Symbol_GetIndex(StructVariable));
+        }
 
         if (symbolKind == VIR_SYM_VARIABLE)
         {
@@ -2276,7 +2286,7 @@ _ConvShaderVariable2Vir(
                                                     StartRegIndex,
                                                     VirShader,
                                                     VIR_Shader_GetTypeFromId(VirShader, structTypeId),
-                                                    StructVariable ? StructVariable : sym,
+                                                    sym,
                                                     &currStartRegIndex,
                                                     &currEndRegIndex);
                 if(virErrCode != VSC_ERR_NONE) return virErrCode;
@@ -3520,7 +3530,7 @@ _ConvShaderOutput2Vir(
     if (gcmOUTPUT_isArray(Output) &&
         VIR_Symbol_GetPrecision(sym) == VIR_PRECISION_HIGH)
     {
-        VIR_Shader_SetFlags(VirShader, VIR_SHFLAG_HAS_OUTPUT_ARRAY_HIGHP);
+        VIR_Shader_SetFlag(VirShader, VIR_SHFLAG_HAS_OUTPUT_ARRAY_HIGHP);
     }
 
     sym->u2.tempIndex = Output->tempIndex;
@@ -4310,7 +4320,6 @@ _GetVirRegId(
         }
         gcmASSERT(precision == VIR_PRECISION_ANY || VIR_Symbol_GetPrecision(sym) == precision
                   || !VIR_Shader_IsFS(VirShader) );
-
         /* need to update type of function arguments */
         if(_gcdVirIsUnknownBasicTypeId(VIR_Symbol_GetTypeId(sym)) && VIR_Symbol_GetVregVariable(sym)) {
             VIR_Symbol *variable;
@@ -4633,6 +4642,11 @@ _ConvSource2VirOperand(
         gcmASSERT(effectiveIndex < Shader->uniformCount);
         symId = VirUniformIdArr[effectiveIndex];
         sym = VIR_Shader_GetSymFromId(VirShader, symId);
+        if (srcPrecision != VIR_Symbol_GetPrecision(sym) &&
+            srcPrecision == VIR_PRECISION_DEFAULT)
+        {
+            srcPrecision = VIR_Symbol_GetPrecision(sym);
+        }
         gcmASSERT(srcPrecision == VIR_Symbol_GetPrecision(sym));
         if(VIR_Symbol_GetKind(sym) == VIR_SYM_SAMPLER) {
             typeId = VIR_Symbol_GetTypeId(sym);
@@ -5918,7 +5932,8 @@ gcSHADER_Conv2VIR(
     gcmDEBUG_VERIFY_ARGUMENT(VirShader);
 
      /* OCL uses uvec8 for image descriptors if gcShaderHasImageQuery, otherwise uses uvec4 */
-    VIR_Adjust_Imagetypesize(GetShaderType(Shader) == gcSHADER_TYPE_CL && gcShaderHasImageQuery(Shader));
+    VIR_Adjust_Imagetypesize(GetShaderType(Shader) == gcSHADER_TYPE_CL &&
+                             (gcShaderHasImageQuery(Shader) || gcShaderHasVivVxExtension(Shader)));
 
     if(!VirShader) {
        gcmFATAL("gcSHADER_Conv2VIR: null VIR shader handle passed");
@@ -6123,7 +6138,12 @@ gcSHADER_Conv2VIR(
     if (gcShaderHasInt64(Shader))
         VIR_Shader_SetFlag(VirShader, VIR_SHFLAG_HAS_INT64);
 
-    size = (Shader->codeCount + 1) * gcmSIZEOF(conv2VirsInstMap);
+    if (gcShaderHasVivVxExtension(Shader))
+    {
+        VIR_Shader_SetFlag(VirShader, VIR_SHFLAG_HAS_VIV_VX_EXTENSION);
+    }
+
+     size = (Shader->codeCount + 1) * gcmSIZEOF(conv2VirsInstMap);
      gcmONERROR(gcoOS_Allocate(gcvNULL,
                             size,
                             &pointer));
@@ -7081,13 +7101,13 @@ _SetTexFetchMS(
             select 4, 2, 5, 3, 0
 
 static VIR_PatternInst _cmpPatInst0[] = {
-    { VIR_OP_CMP, VIR_PATTERN_ANYCOND, { 1, 2, 3, 0 }, 0 },
-    { VIR_OP_CMP, VIR_COP_NOT, { 1, 1, 4, 0 }, 0 },
-    { VIR_OP_CMP, VIR_COP_NOT_ZERO, { 1, 1, 3, 0 }, 0 },
+    { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, { 1, 2, 3, 0 }, 0 },
+    { VIR_OP_COMPARE, VIR_COP_NOT, { 1, 1, 4, 0 }, 0 },
+    { VIR_OP_COMPARE, VIR_COP_NOT_ZERO, { 1, 1, 3, 0 }, 0 },
 };
 
 static VIR_PatternInst _cmpRepInst0[] = {
-    { VIR_OP_SELECT, -1, { 1, 2, 3, 4 }, 0 },
+    { VIR_OP_CSELECT, -1, { 1, 2, 3, 4 }, 0 },
 };
 */
 
@@ -7098,13 +7118,13 @@ static VIR_PatternInst _cmpRepInst0[] = {
             select 4, 2, 3, 4
     */
 static VIR_PatternMatchInst _setPatInst0[] = {
-    { VIR_OP_AQ_SET, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_CMP, VIR_COP_NOT, 0, { 4, 1, 4, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_CMP, VIR_COP_NOT_ZERO, 0, { 4, 1, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_SET, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_COP_NOT, 0, { 4, 1, 4, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_COP_NOT_ZERO, 0, { 4, 1, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _setRepInst0[] = {
-    { VIR_OP_AQ_SELECT, -1, 0, { 4, 2, 3, 4 }, { 0 } },
+    { VIR_OP_SELECT, -1, 0, { 4, 2, 3, 4 }, { 0 } },
 };
 
      /*
@@ -7114,13 +7134,13 @@ static VIR_PatternReplaceInst _setRepInst0[] = {
             select 4, 2, 3, 2
     */
 static VIR_PatternMatchInst _setPatInst1[] = {
-    { VIR_OP_AQ_SET, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_CMP, VIR_COP_NOT, 0, { 4, 1, 2, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_CMP, VIR_COP_NOT_ZERO, 0, { 4, 1, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_SET, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_COP_NOT, 0, { 4, 1, 2, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_COP_NOT_ZERO, 0, { 4, 1, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _setRepInst1[] = {
-    { VIR_OP_AQ_SELECT, -1, 0, { 4, 2, 3, 2 }, { 0 } },
+    { VIR_OP_SELECT, -1, 0, { 4, 2, 3, 2 }, { 0 } },
 };
 
      /*
@@ -7130,13 +7150,13 @@ static VIR_PatternReplaceInst _setRepInst1[] = {
             select 4, 2, 3, 5
     */
 static VIR_PatternMatchInst _setPatInst2[] = {
-    { VIR_OP_AQ_SET, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_CMP, VIR_COP_NOT, 0, { 4, 1, 5, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_CMP, VIR_COP_NOT_ZERO, 0, { 4, 1, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_SET, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_COP_NOT, 0, { 4, 1, 5, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_COP_NOT_ZERO, 0, { 4, 1, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _setRepInst2[] = {
-    { VIR_OP_AQ_SELECT, -1, 0, { 4, 2, 3, 5 }, { 0 } },
+    { VIR_OP_SELECT, -1, 0, { 4, 2, 3, 5 }, { 0 } },
 };
 
      /*
@@ -7147,15 +7167,15 @@ static VIR_PatternReplaceInst _setRepInst2[] = {
             select 5, 2, 3, 5
     */
 static VIR_PatternMatchInst _setPatInst3[] = {
-    { VIR_OP_AQ_SET, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_SET, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 4, 5, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_CMP, VIR_COP_NOT, 0, { 5, 1, 4, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_CMP, VIR_COP_NOT_ZERO, 0, { 5, 1, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_COP_NOT, 0, { 5, 1, 4, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_COP_NOT_ZERO, 0, { 5, 1, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _setRepInst3[] = {
     { VIR_OP_MOV, 0, 0, { 4, 5, 0, 0 }, { 0 } },
-    { VIR_OP_AQ_SELECT, -1, 0, { 5, 2, 3, 5 }, { 0 } },
+    { VIR_OP_SELECT, -1, 0, { 5, 2, 3, 5 }, { 0 } },
 };
 
      /*
@@ -7166,15 +7186,15 @@ static VIR_PatternReplaceInst _setRepInst3[] = {
             select 4, 2, 3, 5
     */
 static VIR_PatternMatchInst _setPatInst4[] = {
-    { VIR_OP_AQ_SET, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_CMP, VIR_COP_NOT, 0, { 4, 1, 5, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_SET, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_COP_NOT, 0, { 4, 1, 5, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_MOV, VIR_PATTERN_ANYCOND, 0, { 6, 4, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_CMP, VIR_COP_NOT_ZERO, 0, { 4, 1, 6, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_COP_NOT_ZERO, 0, { 4, 1, 6, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _setRepInst4[] = {
     { VIR_OP_MOV, 0, 0, { 6, 4, 0, 0 }, { 0 } },
-    { VIR_OP_AQ_SELECT, -1, 0, { 4, 2, 3, 5 }, { 0 } },
+    { VIR_OP_SELECT, -1, 0, { 4, 2, 3, 5 }, { 0 } },
 };
 
 /*
@@ -7183,12 +7203,12 @@ set.nz 1, 2, 4
     select.nz 1, 2, 3, 4, 0
 */
 static VIR_PatternMatchInst _setPatInst5[] = {
-    { VIR_OP_AQ_SET, VIR_COP_NOT, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_AQ_SET, VIR_COP_NOT_ZERO, 0, { 1, 2, 4, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_SET, VIR_COP_NOT, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_SET, VIR_COP_NOT_ZERO, 0, { 1, 2, 4, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _setRepInst5[] = {
-    { VIR_OP_SELECT, VIR_COP_NOT_ZERO, 0, { 1, 2, 4, 3 }, { 0 } },
+    { VIR_OP_CSELECT, VIR_COP_NOT_ZERO, 0, { 1, 2, 4, 3 }, { 0 } },
 };
 
 static VIR_Pattern _setPattern[] = {
@@ -7224,12 +7244,12 @@ cmp.nz 1, 2, 4
     select.nz 1, 2, 3, 4, 0
 */
 static VIR_PatternMatchInst _cmpPatInst0[] = {
-    { VIR_OP_CMP, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _ConditionWithZero }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_CMP, VIR_PATTERN_ANYCOND, 0, { 1, 2, 4, 0 }, { _ConditionReversedWithPrev }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _ConditionWithZero }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 4, 0 }, { _ConditionReversedWithPrev }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _cmpRepInst0[] = {
-    { VIR_OP_SELECT, -1, 0, { 1, 2, 3, 4 }, { 0 } },
+    { VIR_OP_CSELECT, -1, 0, { 1, 2, 3, 4 }, { 0 } },
 };
 
 static gctBOOL
@@ -7263,14 +7283,14 @@ cmp.nz 1, 2, 4
     select.nz 1, 2, 3, 4, 0
 */
 static VIR_PatternMatchInst _cmpPatInst1[] = {
-    { VIR_OP_CMP, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_RSHIFT, VIR_PATTERN_ANYCOND, 0, { 4, 1, 5, 0 }, { 0, 0, _isSrc1ConstInteger31 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_AQ_SET, VIR_COP_NOT, 0, { 6, 4, 7, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_AQ_SET, VIR_COP_NOT_ZERO, 0, { 6, 4, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_SET, VIR_COP_NOT, 0, { 6, 4, 7, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_SET, VIR_COP_NOT_ZERO, 0, { 6, 4, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _cmpRepInst1[] = {
-    { VIR_OP_AQ_SELECT, -1, 0, { 6, 2, 3, 7 }, { 0 } },
+    { VIR_OP_SELECT, -1, 0, { 6, 2, 3, 7 }, { 0 } },
 };
 
 static gctBOOL
@@ -7286,14 +7306,14 @@ reverseCondOp(
 }
 
 static VIR_PatternMatchInst _cmpPatInst2[] = {
-    { VIR_OP_CMP, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
     { VIR_OP_RSHIFT, VIR_PATTERN_ANYCOND, 0, { 4, 1, 5, 0 }, { 0, 0, _isSrc1ConstInteger31 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_AQ_SET, VIR_COP_NOT, 0, { 6, 4, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
-    { VIR_OP_AQ_SET, VIR_COP_NOT_ZERO, 0, { 6, 4, 2, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_SET, VIR_COP_NOT, 0, { 6, 4, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_SET, VIR_COP_NOT_ZERO, 0, { 6, 4, 2, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _cmpRepInst2[] = {
-    { VIR_OP_AQ_SELECT, -1, 0, { 6, 3, 2, 3 }, { reverseCondOp } },
+    { VIR_OP_SELECT, -1, 0, { 6, 3, 2, 3 }, { reverseCondOp } },
 };
 
 static VIR_Pattern _cmpPattern[] = {
@@ -7615,11 +7635,11 @@ i2f   1, 2
     conv 1, 2
 */
 static VIR_PatternMatchInst _convPatInst0[] = {
-    { MERGE_OPCODE(VIR_OP_CONV, EXTERN_I2F), VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { MERGE_OPCODE(VIR_OP_CONVERT, EXTERN_I2F), VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _convRepInst0[] = {
-    { VIR_OP_CONV, -1, 0, { 1, 2 }, { _SetI2F } },
+    { VIR_OP_CONVERT, -1, 0, { 1, 2 }, { _SetI2F } },
 };
 
 static gctBOOL
@@ -7639,11 +7659,11 @@ f2i   1, 2
     conv 1, 2
 */
 static VIR_PatternMatchInst _convPatInst1[] = {
-    { MERGE_OPCODE(VIR_OP_CONV, EXTERN_F2I), VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { MERGE_OPCODE(VIR_OP_CONVERT, EXTERN_F2I), VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _convRepInst1[] = {
-    { VIR_OP_CONV, -1, 0, { 1, 2 }, { _SetF2I } },
+    { VIR_OP_CONVERT, -1, 0, { 1, 2 }, { _SetF2I } },
 };
 
 static VIR_Pattern _convPattern[] = {
@@ -7683,7 +7703,7 @@ static VIR_PatternMatchInst _conv0PatInst0[] = {
 };
 
 static VIR_PatternReplaceInst _conv0RepInst0[] = {
-    { VIR_OP_CONV, -1, 0, { 1, 2 }, { 0, _SetConvType } },
+    { VIR_OP_CONVERT, -1, 0, { 1, 2 }, { 0, _SetConvType } },
 };
 
 static VIR_Pattern _conv0Pattern[] = {
@@ -7940,13 +7960,38 @@ _SetImmOffset(
     return VIR_IMG_LOAD_SetImmOffset(Context->shader, Inst, Opnd, gcvFALSE);
 }
 
+/* mul/add pattern can be changed to mad, but this pattern makes mad not happening
+   mul t1, t2, t3
+   add t4, t1, base
+   store t0, t1, base, data (t1 is used here) */
+static gctBOOL
+_isPrevInstNotMul(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Instruction *prevInst = VIR_Inst_GetPrev(Inst);
+
+    if (prevInst != gcvNULL &&
+        VIR_Inst_GetOpcode(prevInst) == VIR_OP_MUL)
+    {
+        if (VIR_Operand_SameLocation(prevInst, VIR_Inst_GetDest(prevInst), Inst, VIR_Inst_GetSource(Inst, 0)) ||
+            VIR_Operand_SameLocation(prevInst, VIR_Inst_GetDest(prevInst), Inst, VIR_Inst_GetSource(Inst, 1)))
+        {
+            return gcvFALSE;
+        }
+    }
+
+    return gcvTRUE;
+}
+
 /*
 add      1, 2, 3
 store1   4, 1, 5
     store 4, 2, 3, 5
 */
 static VIR_PatternMatchInst _addPatInst0[] = {
-    { VIR_OP_ADD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_ADD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { _isPrevInstNotMul }, VIR_PATN_MATCH_FLAG_OR },
     { MERGE_OPCODE(VIR_OP_STARR, EXTERN_STORE1), VIR_PATTERN_ANYCOND, 0, { 4, 1, 5, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
@@ -8820,11 +8865,11 @@ _GetgcSL2VirPatterns(
         return _arctrigPattern;
     case VIR_OP_MUL:
         return _mulPattern;
-    case VIR_OP_CMP:
+    case VIR_OP_COMPARE:
         return _cmpPattern;
-    case VIR_OP_AQ_SET:
+    case VIR_OP_SET:
         return _setPattern;
-    case VIR_OP_CONV:
+    case VIR_OP_CONVERT:
         return _convPattern;
     case VIR_OP_CONV0:
         return _conv0Pattern;

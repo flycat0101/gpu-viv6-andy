@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -335,7 +335,7 @@ typedef struct __GLvertexArrayStateRec
     */
     GLuint elementBufBinding;
 
-    GLuint arrayEnabled;    /*bitvector of the enabled arrays*/
+//    GLuint arrayEnabled;    /*bitvector of the enabled arrays*/
 //    GLuint currentEnabled;  /*bitvector of the really needed enabled arrays*/
     GLuint arrayInBufObj;   /*bitvector of the arrays that are in buffer objects */
 

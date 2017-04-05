@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -50,6 +50,15 @@ typedef struct _cl_program
 }
 clsProgram;
 
+gctINT
+clfRetainProgram(
+    cl_program Program
+    );
+
+gctINT
+clfReleaseProgram(
+    cl_program Program
+    );
 
 #ifdef __cplusplus
 }

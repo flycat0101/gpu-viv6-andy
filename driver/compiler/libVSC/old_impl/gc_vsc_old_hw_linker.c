@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -51,7 +51,7 @@ typedef struct _gcsSourceConstandInfo
     ((CodeGen)->isDual16Shader ? _SetDestWithPrecision((Tree), (CodeGen), (States), (Index), (Relative), (Enable), (Precision), (Shift)) \
                     : _SetDest((Tree), (CodeGen), (States), (Index), (Relative), (Enable), (Shift)))
 
-#define _gcmHasDual16(Shader)   (GC_ENABLE_DUAL_FP16 > 0 && gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_DUAL_16))
+#define _gcmHasDual16(Shader)   (GC_ENABLE_DUAL_FP16 > 0 && gcHWCaps.hwFeatureFlags.supportDual16)
 
 gceSTATUS
 gcLINKTREE_Destroy(
@@ -807,13 +807,10 @@ _DumpShader(
 {
     gctUINTPTR_T lastState;
     gctUINT32 address, count, nextAddress;
-    VSC_HW_CONFIG hwCfg;
     gctUINT       dumpBufferSize = 1024;
     gctCHAR*      pDumpBuffer;
     VSC_DUMPER    vscDumper;
     VSC_MC_CODEC  mcCodec;
-
-    gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg);
 
     gcoOS_Allocate(gcvNULL, dumpBufferSize, (gctPOINTER*)&pDumpBuffer);
 
@@ -823,7 +820,7 @@ _DumpShader(
                          pDumpBuffer,
                          dumpBufferSize);
 
-    vscMC_BeginCodec(&mcCodec, &hwCfg, IsDual16Shader, gcvFALSE);
+    vscMC_BeginCodec(&mcCodec, &gcHWCaps, IsDual16Shader, gcvFALSE);
 
     lastState = (gctUINTPTR_T)((gctUINT8_PTR) States + StateBufferOffset);
     nextAddress = 0;
@@ -1511,7 +1508,7 @@ _AllocateConst(
 
             if (status != gcvSTATUS_OK)
             {
-                if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1) &&
+                if (gcHWCaps.hwFeatureFlags.hasHalti1 &&
                     !(CodeGen->clShader))
                 {
                     /* If we move this constant to the UBO, we need to emit a extra load instruction,
@@ -3108,11 +3105,11 @@ _MapNonSamplerUniforms(
     if (Tree->shader->uniformBlockCount)
     {
         if(Tree->shader->enableDefaultUBO  &&
-           gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1))
+           gcHWCaps.hwFeatureFlags.hasHalti1)
         {
             handleDefaultUBO = gcvTRUE;
         }
-        else if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1) ||
+        else if (!gcHWCaps.hwFeatureFlags.hasHalti1 ||
                (Tree->hints && Tree->hints->uploadedUBO))
         {
             unblockUniformBlock = gcvTRUE;
@@ -3446,12 +3443,8 @@ _MapUniforms(
     }
 
     /* Get the sampler size. */
-    gcmONERROR(
-        gcoHAL_QuerySamplerBase(gcvNULL,
-                                &vsSamplers,
-                                gcvNULL,
-                                &psSamplers,
-                                gcvNULL));
+    vsSamplers = gcHWCaps.maxVSSamplerCount;
+    psSamplers = gcHWCaps.maxPSSamplerCount;
 
     /* Determine starting sampler index. */
     sampler = (Tree->shader->type == gcSHADER_TYPE_VERTEX)
@@ -3470,7 +3463,7 @@ _MapUniforms(
         {
             handleDefaultUBO = gcvTRUE;
         }
-        else if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1) ||
+        else if (!gcHWCaps.hwFeatureFlags.hasHalti1 ||
                (Tree->hints && Tree->hints->uploadedUBO))
         {
             unblockUniformBlock = gcvTRUE;
@@ -3836,7 +3829,7 @@ _needAddDummyAttribute(
     )
 {
     if (CodeGen->shaderType == gcSHADER_TYPE_VERTEX &&
-        !gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_ZERO_ATTRIB_SUPPORT) &&
+        !gcHWCaps.hwFeatureFlags.supportZeroAttrsInFE &&
         Tree->shader->attributeCount == 0)
     {
         return gcvTRUE;
@@ -5569,7 +5562,7 @@ _GetTEMPSource(
 
     gcLINKTREE_TEMP temp = &Tree->tempArray[Index];
 
-    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VERTEX_INST_ID_AS_ATTRIBUTE))
+    if (!gcHWCaps.hwFeatureFlags.vtxInstanceIdAsAttr)
     {
 
         if (Index == VIR_SR_VERTEXID)
@@ -5627,8 +5620,7 @@ _GetTEMPSourceWithPrecision(
         *type = 0x0;
     }
 
-
-    if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VERTEX_INST_ID_AS_ATTRIBUTE))
+    if (!gcHWCaps.hwFeatureFlags.vtxInstanceIdAsAttr)
     {
         if (Index == VIR_SR_VERTEXID)
         {
@@ -5777,7 +5769,7 @@ _SetSource(
                        (variable->nameLength == gcSL_VERTEX_ID ||
                         variable->nameLength == gcSL_INSTANCE_ID)) { /* check for instanceID and vertexID */
                        gcmASSERT((gctINT32)variable->tempIndex == Index);
-                       if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VERTEX_INST_ID_AS_ATTRIBUTE)) {
+                       if (gcHWCaps.hwFeatureFlags.vtxInstanceIdAsAttr) {
 #if !DX_SHADER
                            gcmASSERT (Tree->tempArray[Index].assigned != -1);
                            if (Tree->tempArray[Index].assigned == -1) {
@@ -6061,7 +6053,7 @@ _SetSourceWithPrecision(
                        (variable->nameLength == gcSL_VERTEX_ID ||
                         variable->nameLength == gcSL_INSTANCE_ID)) { /* check for instanceID and vertexID */
                        gcmASSERT((gctINT32)variable->tempIndex == Index);
-                       if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VERTEX_INST_ID_AS_ATTRIBUTE)) {
+                       if (gcHWCaps.hwFeatureFlags.vtxInstanceIdAsAttr) {
                            gcmASSERT (Tree->tempArray[Index].assigned != -1);
                            if (Tree->tempArray[Index].assigned == -1) {
                                gcmFATAL("Register for instance or vertex id should have been assigned already");
@@ -12739,7 +12731,7 @@ _SetTarget(
         {
             gctUINT32 *states     = &code->states[ip * 4];
             /* Patch the code. */
-            if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_BRANCH_ON_IMMEDIATE_REG))
+            if (!gcHWCaps.hwFeatureFlags.canBranchOnImm)
             {
                 states[3] = ((((gctUINT32) (states[3])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:7) - (0 ? 26:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:7) - (0 ? 26:7) + 1))))))) << (0 ?
@@ -14761,20 +14753,11 @@ _GenerateCode(
     {
         gctSIZE_T i;
         gctUINT base = 0, max = 0;
-        gctUINT vsInstMax = 0, psInstMax = 0;
+        gctUINT vsInstMax = gcHWCaps.maxVSInstCount;
+        gctUINT psInstMax = gcHWCaps.maxPSInstCount;
         gcSHADER shader = Tree->shader;
 
         /* Determine the maximum number of instructions. */
-        gcmERR_BREAK(
-            gcoHAL_QueryShaderCaps(gcvNULL,
-                                   gcvNULL,
-                                   gcvNULL,
-                                   gcvNULL,
-                                   gcvNULL,
-                                   gcvNULL,
-                                   gcvNULL,
-                                   &vsInstMax,
-                                   &psInstMax));
 
         /* check if FB_UNLIMITED_INSTRUCTION is set */
         if (gcmOPT_hasFeature(FB_UNLIMITED_INSTRUCTION))
@@ -15338,7 +15321,7 @@ static gceSTATUS _PatchShaderByReplaceWholeShaderCode(
     gctBOOL                 isMatch = gcvFALSE;
     gctBOOL                 isSupportDual16;
 
-    isSupportDual16 = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_DUAL_16);
+    isSupportDual16 = gcHWCaps.hwFeatureFlags.supportDual16;
 
     /* Assume we are not in patching */
     if (Hints)
@@ -15391,6 +15374,11 @@ static gceSTATUS _PatchShaderByReplaceWholeShaderCode(
 
     if (shaderSizeInDW == INVALID_SHADER_SIZE)
     {
+        if (pPatchedShaderCode && pPatchedShaderCode != *ppPatchedShaderCode)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, pPatchedShaderCode));
+        }
+
         return gcvSTATUS_OUT_OF_MEMORY;
     }
 
@@ -15410,7 +15398,6 @@ static gceSTATUS _PatchShaderByReplaceWholeShaderCode(
 
 static gceSTATUS
 _GenerateStates(
-    IN gcoHARDWARE Hardware,
     IN gcLINKTREE Tree,
     IN gcsCODE_GENERATOR_PTR CodeGen,
     IN gctPOINTER StateBuffer,
@@ -15444,8 +15431,6 @@ _GenerateStates(
     gctUINT32 shaderConfigData = 0;
     gctPOINTER instPtr = gcvNULL;
 
-    gcoHAL_GetHardware(gcvNULL, &Hardware);
-    gcmASSERT(Hardware);
 #if TEMP_SHADER_PATCH
     gcmONERROR(_PatchShaderByReplaceWholeShaderCode(Tree, CodeGen, &BinaryShaderCode,
                                                     &shaderSizeInDW, Hints));
@@ -15485,7 +15470,7 @@ _GenerateStates(
     }
 
     if (CodeGen->useICache &&
-        gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SH_ICACHE_ALLOC_COUNT_FIX) == gcvSTATUS_FALSE)
+        !gcHWCaps.hwFeatureFlags.hasICacheAllocCountFix)
     {
         _UpdateMaxRegister(CodeGen, 3, Tree);
     }
@@ -15952,7 +15937,7 @@ _GenerateStates(
         }
         if(CodeGen->shaderType == gcSHADER_TYPE_VERTEX &&
            CodeGen->vsHasVertexInstId &&
-           gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VERTEX_INST_ID_AS_ATTRIBUTE))
+           gcHWCaps.hwFeatureFlags.vtxInstanceIdAsAttr)
         {
            if (attributeCount < CodeGen->maxAttributes )
            {
@@ -16050,7 +16035,7 @@ _GenerateStates(
         }
 
 
-        if (Hardware->features[gcvFEATURE_NEW_GPIPE])
+        if (gcHWCaps.hwFeatureFlags.newGPIPE)
         {
             gctUINT groupSize;
             gctUINT maxThreads;
@@ -16076,7 +16061,7 @@ _GenerateStates(
 
             numberVertecis = (vsPages * 1024) / (outputCount * 16);
 
-            maxThreads = (Hardware->config->shaderCoreCount * 4);
+            maxThreads = (gcHWCaps.maxCoreCount * 4);
 
             groupSize = maxThreads * outputCount;
 
@@ -16152,7 +16137,7 @@ _GenerateStates(
                    instruction and output components */
                 gctSIZE_T prePackingOutputCount = outputCount +
                                                Tree->packedAwayOutputCount;
-                gctBOOL hasOutputCountFix = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HAS_OUTPUT_COUNT_FIX);
+                gctBOOL hasOutputCountFix = gcHWCaps.hwFeatureFlags.outputCountFix;
 
                 effectiveOutputCount = !hasOutputCountFix ?
                     gcmALIGN(prePackingOutputCount, 2)
@@ -16162,11 +16147,11 @@ _GenerateStates(
 
                 Hints->balanceMin = ((256 * 10
                                       * 8 /* Pipe line depth. */
-                                      / (Hardware->config->vertexOutputBufferSize -
-                                          effectiveOutputCount * Hardware->config->vertexCacheSize )
+                                      / (gcHWCaps.vertexOutputBufferSize-
+                                          effectiveOutputCount * gcHWCaps.vertexCacheSize)
                                       ) + 9
                                     ) / 10;
-                Hints->balanceMax = gcmMIN(255, 512 / (Hardware->config->shaderCoreCount * effectiveOutputCount));
+                Hints->balanceMax = gcmMIN(255, 512 / (gcHWCaps.maxCoreCount * effectiveOutputCount));
 
                 min = Hints->balanceMin;
                 max = Hints->balanceMax;
@@ -16183,11 +16168,11 @@ _GenerateStates(
                 /* XFB case. Set balanceMin/Max per effectiveOutputCount as 1. */
                 Hints->balanceMin = ((256 * 10
                                       * 8 /* Pipe line depth. */
-                                      / (Hardware->config->vertexOutputBufferSize -
-                                          1 * Hardware->config->vertexCacheSize )
+                                      / (gcHWCaps.vertexOutputBufferSize -
+                                          1 * gcHWCaps.vertexCacheSize)
                                       ) + 9
                                     ) / 10;
-                Hints->balanceMax = gcmMIN(255, 512 / (Hardware->config->shaderCoreCount));
+                Hints->balanceMax = gcmMIN(255, 512 / (gcHWCaps.maxCoreCount));
             }
             if (dumpCodeGen)
             {
@@ -16253,7 +16238,7 @@ _GenerateStates(
             shaderConfigData =
                       ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
- 1:1))) | (((gctUINT32) ((gctUINT32) ((Hardware->SHStates->rtneRounding ?
+ 1:1))) | (((gctUINT32) ((gctUINT32) ((gcHWCaps.hwFeatureFlags.rtneRoundingEnabled ?
  0x1 : 0x0)) & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
  1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)));
             gcmONERROR(
@@ -16284,7 +16269,7 @@ _GenerateStates(
                     /* Need to keep existing RTNE setting. */
                     | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ?
- 12:12) + 1))))))) << (0 ? 12:12))) | (((gctUINT32) ((gctUINT32) ((Hardware->SHStates->rtneRounding ?
+ 12:12) + 1))))))) << (0 ? 12:12))) | (((gctUINT32) ((gctUINT32) ((gcHWCaps.hwFeatureFlags.rtneRoundingEnabled ?
  0x1 : 0x0)) & ((gctUINT32) ((((1 ? 12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
  12:12) - (0 ? 12:12) + 1))))))) << (0 ? 12:12)));
             gcmONERROR(
@@ -16302,7 +16287,7 @@ _GenerateStates(
         if (Hints != gcvNULL)
         {
             if ((Hints->memoryAccessFlags[VSC_SHADER_STAGE_VS] & gceMA_FLAG_ATOMIC) &&
-                Hardware->features[gcvFEATURE_ROBUST_ATOMIC])
+                gcHWCaps.hwFeatureFlags.robustAtomic)
             {
                 shaderConfigData |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
@@ -16319,7 +16304,7 @@ _GenerateStates(
         {
             /* Set code address. */
             instrBase         = (gctUINT32)(gctUINTPTR_T) StateBuffer;
-            maxNumInstrStates = Hardware->config->instructionCount << 2;
+            maxNumInstrStates = gcHWCaps.maxHwNativeTotalInstCount << 2;
         }
         else
         {
@@ -16338,7 +16323,7 @@ _GenerateStates(
             }
             else
             {
-                if (Hardware->config->instructionCount <= 256)
+                if (gcHWCaps.maxHwNativeTotalInstCount <= 256)
                 {
                     /* AQVertexShaderStartPC */
                     gcmONERROR(_SetState(CodeGen,
@@ -16382,16 +16367,16 @@ _GenerateStates(
             }
 
             /* Set code address. */
-            if (Hardware->config->instructionCount > 1024)
+            if (gcHWCaps.maxHwNativeTotalInstCount > 1024)
             {
                 instrBase         = 0x8000;
-                maxNumInstrStates = Hardware->config->instructionCount << 2;
+                maxNumInstrStates = gcHWCaps.maxHwNativeTotalInstCount << 2;
 
             }
-            else if (Hardware->config->instructionCount > 256)
+            else if (gcHWCaps.maxHwNativeTotalInstCount > 256)
             {
                 instrBase         = 0x3000;
-                maxNumInstrStates = Hardware->config->instructionCount << 2;
+                maxNumInstrStates = gcHWCaps.maxHwNativeTotalInstCount << 2;
 
             }
             else
@@ -16463,7 +16448,7 @@ _GenerateStates(
 
                 Hints->unifiedStatus.constant = gcvTRUE;
                 Hints->unifiedStatus.constGPipeEnd = count;
-                Hints->maxConstCount = Hardware->config->constMax;
+                Hints->maxConstCount = gcHWCaps.maxTotalConstRegCount;
                 Hints->vsConstCount = count;
             }
         }
@@ -16632,7 +16617,7 @@ _GenerateStates(
 
           gctINT curLocation;
           gctUINT curIndex = 0;
-          for (curLocation = -1; curLocation < (gctINT)Hardware->config->renderTargets; ++curLocation)
+          for (curLocation = -1; curLocation < (gctINT)gcHWCaps.maxRenderTargetCount; ++curLocation)
           {
               gctINT temp, reg;
               /* get the output whose location is curLocation. if not found,
@@ -16643,7 +16628,7 @@ _GenerateStates(
                   gctBOOL isRecompileOut = Tree->shader->outputs[i]->nameLength > 0
                                         && Tree->shader->outputs[i]->name[0] == '#';
                   /* use driver passed caps to get the user visible RTs */
-                  gctINT maxLoc = isRecompileOut ? (gctINT)Hardware->config->renderTargets : GetGLMaxDrawBuffers();
+                  gctINT maxLoc = isRecompileOut ? (gctINT)gcHWCaps.maxRenderTargetCount : GetGLMaxDrawBuffers();
 
                   if (Tree->shader->outputs[i] == gcvNULL)
                   {
@@ -16656,7 +16641,7 @@ _GenerateStates(
                   {
                      gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_COMPILER,
                                    "Fragment output %d mapped to location greater than %d, location = %d",
-                                   Hardware->config->renderTargets, i,
+                                   gcHWCaps.maxRenderTargetCount, i,
                                    Tree->shader->outputLocations[i]);
 
                      status = gcvSTATUS_TOO_MANY_OUTPUT;
@@ -16882,7 +16867,7 @@ _GenerateStates(
                         reg = 1;
                     }
 #endif
-                    gcmASSERT(Tree->shader->outputs[i]->location < (gctINT)Hardware->config->renderTargets);
+                    gcmASSERT(Tree->shader->outputs[i]->location < (gctINT)gcHWCaps.maxRenderTargetCount);
 
                     if (Hints)
                     {
@@ -17068,7 +17053,7 @@ _GenerateStates(
         }
 
 
-        if (!Hardware->features[gcvFEATURE_NEW_GPIPE])
+        if (!gcHWCaps.hwFeatureFlags.newGPIPE)
         {
             /* Generate element type. */
             address = 0x0290;
@@ -17135,7 +17120,7 @@ _GenerateStates(
                     continue;
                 }
 
-                if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SUPPORT_INTEGER_ATTRIBUTE))
+                if (gcHWCaps.hwFeatureFlags.supportIntAttrib)
                 {
                     type = Tree->shader->attributes[i]->type;
                 }
@@ -17358,7 +17343,7 @@ _GenerateStates(
                     0x0;
             }
 
-            if (Hardware->features[gcvFEATURE_NEW_GPIPE])
+            if (gcHWCaps.hwFeatureFlags.newGPIPE)
             {
                 for (i = 0; i < 4; i++)
                 {
@@ -17660,7 +17645,7 @@ _GenerateStates(
                 }
             }
 
-            if (Hardware->features[gcvFEATURE_NEW_GPIPE])
+            if (gcHWCaps.hwFeatureFlags.newGPIPE)
             {
                 for (i = 0; i < 16; i++)
                 {
@@ -18093,7 +18078,7 @@ _GenerateStates(
                 }
             }
         }
-        else if (Hardware->threadWalkerInPS)
+        else if (gcHWCaps.hwFeatureFlags.hasThreadWalkerInPS)
         {
             gctUINT32 varyingPacking[2] = {0, 0};
 
@@ -18111,7 +18096,7 @@ _GenerateStates(
                 Hints->componentCount = gcmALIGN(varyingPacking[0] + varyingPacking[1], 2);
             }
 
-            if (Hardware->features[gcvFEATURE_NEW_GPIPE])
+            if (gcHWCaps.hwFeatureFlags.newGPIPE)
             {
                 gcmONERROR(
                     _SetState(CodeGen,
@@ -18195,7 +18180,7 @@ _GenerateStates(
                           /* Need to keep existing RTNE setting. */
                           | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
- 1:1))) | (((gctUINT32) ((gctUINT32) ((Hardware->SHStates->rtneRounding ?
+ 1:1))) | (((gctUINT32) ((gctUINT32) ((gcHWCaps.hwFeatureFlags.rtneRoundingEnabled ?
  0x1 : 0x0)) & ((gctUINT32) ((((1 ? 1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
  1:1) - (0 ? 1:1) + 1))))))) << (0 ? 1:1)));
 
@@ -18221,7 +18206,7 @@ _GenerateStates(
                           /* Need to keep existing RTNE setting. */
                           | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ?
- 12:12) + 1))))))) << (0 ? 12:12))) | (((gctUINT32) ((gctUINT32) ((Hardware->SHStates->rtneRounding ?
+ 12:12) + 1))))))) << (0 ? 12:12))) | (((gctUINT32) ((gctUINT32) ((gcHWCaps.hwFeatureFlags.rtneRoundingEnabled ?
  0x1 : 0x0)) & ((gctUINT32) ((((1 ? 12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
  12:12) - (0 ? 12:12) + 1))))))) << (0 ? 12:12)));
 
@@ -18230,7 +18215,7 @@ _GenerateStates(
         if (Hints != gcvNULL)
         {
             if ((Hints->memoryAccessFlags[VSC_SHADER_STAGE_PS] & gceMA_FLAG_ATOMIC) &&
-                Hardware->features[gcvFEATURE_ROBUST_ATOMIC])
+                gcHWCaps.hwFeatureFlags.robustAtomic)
             {
                 shaderConfigData |= ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
@@ -18263,7 +18248,7 @@ _GenerateStates(
         {
             /* Set code address. */
             instrBase         = (gctUINT32)(gctUINTPTR_T) StateBuffer;
-            maxNumInstrStates = Hardware->config->instructionCount << 2;
+            maxNumInstrStates = gcHWCaps.maxHwNativeTotalInstCount << 2;
 
             if (Hints != gcvNULL)
             {
@@ -18279,11 +18264,11 @@ _GenerateStates(
                  /* Use bottom part of instruction memory for PS. */
                 if (CodeGen->instCount > 0)
                 {
-                    psOffset = Hardware->config->instructionCount - CodeGen->instCount;
+                    psOffset = gcHWCaps.maxHwNativeTotalInstCount - CodeGen->instCount;
                 }
                 else
                 {
-                    psOffset = Hardware->config->instructionCount - 1;
+                    psOffset = gcHWCaps.maxHwNativeTotalInstCount - 1;
                 }
             }
             /* initialize unified instruction status */
@@ -18306,7 +18291,7 @@ _GenerateStates(
                 {
                     Hints->unifiedStatus.instruction = gcvTRUE;
                     Hints->unifiedStatus.instPSStart = psOffset;
-                    Hints->maxInstCount = Hardware->config->instructionCount;
+                    Hints->maxInstCount = gcHWCaps.maxHwNativeTotalInstCount;
 #if gcdALPHA_KILL_IN_SHADER
                     if (CodeGen->endPCAlphaKill == 0)
                     {
@@ -18323,7 +18308,7 @@ _GenerateStates(
             }
             else
             {
-                if (Hardware->config->instructionCount <= 256)
+                if (gcHWCaps.maxHwNativeTotalInstCount <= 256)
                 {
                      /* AQPixelShaderStartPC */
                      gcmONERROR(_SetState(CodeGen,
@@ -18386,7 +18371,7 @@ _GenerateStates(
                     {
                         Hints->unifiedStatus.instruction = gcvTRUE;
                         Hints->unifiedStatus.instPSStart = psOffset;
-                        Hints->maxInstCount = Hardware->config->instructionCount;
+                        Hints->maxInstCount = gcHWCaps.maxHwNativeTotalInstCount;
 
 #if gcdALPHA_KILL_IN_SHADER
                         if (CodeGen->endPCAlphaKill == 0)
@@ -18428,18 +18413,18 @@ _GenerateStates(
             }
 
             /* Set code address. */
-            if (Hardware->config->instructionCount > 1024)
+            if (gcHWCaps.maxHwNativeTotalInstCount > 1024)
             {
                 instrBase         = 0x8000 + (psOffset << 2);
-                maxNumInstrStates = Hardware->config->instructionCount << 2;
+                maxNumInstrStates = gcHWCaps.maxHwNativeTotalInstCount << 2;
 
             }
-            else if (Hardware->config->instructionCount > 256)
+            else if (gcHWCaps.maxHwNativeTotalInstCount > 256)
             {
 
                 instrBase         = (!CodeGen->hasBugFixes7 ? 0x3000 : 0x2000)
                                     + (psOffset << 2);
-                maxNumInstrStates = Hardware->config->instructionCount << 2;
+                maxNumInstrStates = gcHWCaps.maxHwNativeTotalInstCount << 2;
             }
             else
             {
@@ -18518,7 +18503,7 @@ _GenerateStates(
                 }
 
                 /* Adjust uniform address. */
-                offset = Hardware->config->numConstants - count;
+                offset = gcHWCaps.maxHwNativeTotalConstRegCount - count;
                 uniformBase += offset * 4;
 
                 /* Set offset. */
@@ -18536,7 +18521,7 @@ _GenerateStates(
                 {
                     Hints->unifiedStatus.constant = gcvTRUE;
                     Hints->unifiedStatus.constPSStart = offset;
-                    Hints->maxConstCount = Hardware->config->constMax;
+                    Hints->maxConstCount = gcHWCaps.maxTotalConstRegCount;
                     Hints->fsConstCount = count;
 
                     /* Update the ps const base address. */
@@ -18548,11 +18533,11 @@ _GenerateStates(
 
                     if (Tree->shader->uniformBlockCount) {
                         if(Tree->shader->enableDefaultUBO  &&
-                           gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1))
+                           gcHWCaps.hwFeatureFlags.hasHalti1)
                         {
                             handleDefaultUBO = gcvTRUE;
                         }
-                        else if (!gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_HALTI1) ||
+                        else if (!gcHWCaps.hwFeatureFlags.hasHalti1 ||
                                (Tree->hints && Tree->hints->uploadedUBO))
                         {
                             unblockUniformBlock = gcvTRUE;
@@ -18746,7 +18731,7 @@ _GenerateStates(
             }
         }
 #endif
-        gcmASSERT(codeAddress <= Hardware->maxState);
+        gcmASSERT(codeAddress <= gcHWCaps.ctxStateCount);
     }
     else
     {
@@ -18830,13 +18815,10 @@ _GenerateStates(
             {
                 gctUINT32     address, count;
                 gctUINT32_PTR states;
-                VSC_HW_CONFIG hwCfg;
                 gctUINT       dumpBufferSize = 1024;
                 gctCHAR*      pDumpBuffer;
                 VSC_DUMPER    vscDumper;
                 VSC_MC_CODEC  mcCodec;
-
-                gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg);
 
                 gcmONERROR(gcoOS_Allocate(gcvNULL, dumpBufferSize, (gctPOINTER*)&pDumpBuffer));
 
@@ -18846,7 +18828,7 @@ _GenerateStates(
                                      pDumpBuffer,
                                      dumpBufferSize);
 
-                vscMC_BeginCodec(&mcCodec, &hwCfg, CodeGen->isDual16Shader, gcvFALSE);
+                vscMC_BeginCodec(&mcCodec, &gcHWCaps, CodeGen->isDual16Shader, gcvFALSE);
 
                 _DumpUniforms(CodeGen, StateBuffer, CodeGen->stateBufferOffset);
 
@@ -18932,7 +18914,7 @@ _GenerateStates(
                                  ));
 
 
-            if (Hardware->features[gcvFEATURE_SH_INSTRUCTION_PREFETCH])
+            if (gcHWCaps.hwFeatureFlags.hasInstCachePrefetch)
             {
                 if (CodeGen->hasHalti5)
                 {
@@ -19022,7 +19004,7 @@ _GenerateStates(
                                  ));
 
 
-            if (Hardware->features[gcvFEATURE_SH_INSTRUCTION_PREFETCH])
+            if (gcHWCaps.hwFeatureFlags.hasInstCachePrefetch)
             {
                 if (CodeGen->hasHalti5)
                 {
@@ -19150,46 +19132,41 @@ _GetDefaultSamplerBaseOffset(
     IN gcSHADER_KIND               ShaderKind
     )
 {
-    gceSTATUS status = gcvSTATUS_OK;
-    VSC_HW_CONFIG hwCfg;
     gctUINT samplerBaseOffset = 0;
-
-    gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg));
 
     switch (ShaderKind)
     {
     case gcSHADER_TYPE_VERTEX:
     case gcSHADER_TYPE_VERTEX_DEFAULT_UBO:
-        samplerBaseOffset = hwCfg.vsSamplerRegNoBase;
+        samplerBaseOffset = gcHWCaps.vsSamplerRegNoBase;
         break;
 
     case gcSHADER_TYPE_FRAGMENT:
     case gcSHADER_TYPE_FRAGMENT_DEFAULT_UBO:
-        samplerBaseOffset = hwCfg.psSamplerRegNoBase;
+        samplerBaseOffset = gcHWCaps.psSamplerRegNoBase;
         break;
 
     case gcSHADER_TYPE_TCS:
-        samplerBaseOffset = hwCfg.tcsSamplerRegNoBase;
+        samplerBaseOffset = gcHWCaps.tcsSamplerRegNoBase;
         break;
 
     case gcSHADER_TYPE_TES:
-        samplerBaseOffset = hwCfg.tesSamplerRegNoBase;
+        samplerBaseOffset = gcHWCaps.tesSamplerRegNoBase;
         break;
 
     case gcSHADER_TYPE_GEOMETRY:
-        samplerBaseOffset = hwCfg.gsSamplerRegNoBase;
+        samplerBaseOffset = gcHWCaps.gsSamplerRegNoBase;
         break;
 
     case gcSHADER_TYPE_CL:
     case gcSHADER_TYPE_COMPUTE:
-        samplerBaseOffset = hwCfg.csSamplerRegNoBase;
+        samplerBaseOffset = gcHWCaps.csSamplerRegNoBase;
         break;
 
     default:
         break;
     }
 
-OnError:
     return samplerBaseOffset;
 }
 
@@ -19200,9 +19177,6 @@ OnError:
 **  Generate hardware states from the shader.
 **
 **  INPUT:
-**
-**      gcoHARDWARE Hardware
-**          Pointer to an gcoHARDWARE object.
 **
 **      gcLINKTREE pTree
 **          Pointer to a gcLINKTREE object.
@@ -19231,7 +19205,6 @@ OnError:
 */
 gceSTATUS
 gcLINKTREE_GenerateStates(
-    IN gcoHARDWARE                      Hardware,
     IN OUT gcLINKTREE                  *pTree,
     IN gceSHADER_FLAGS                  Flags,
     IN gcsSL_USAGE_PTR                  UniformUsage,
@@ -19246,7 +19219,6 @@ gcLINKTREE_GenerateStates(
     gctUINT8 *          stateBuffer = gcvNULL;
     gctPOINTER          pointer = gcvNULL;
     gctUINT32           i;
-    gctUINT32           vsUniformCount, psUniformCount, varyings;
     gctUINT32           vsSamplers, psSamplers;
     gctINT              vsSamplersBase, psSamplersBase;
     gcShaderCodeInfo    codeInfo;
@@ -19257,20 +19229,15 @@ gcLINKTREE_GenerateStates(
     /* The common code generator structure. */
     gcsCODE_GENERATOR   codeGen = { (gceSHADER_FLAGS) 0 };
 
-    gcmHEADER_ARG("Hardware=0x%x pTree=0x%x Flags=%d StateBufferSize=0x%x "
+    gcmHEADER_ARG("pTree=0x%x Flags=%d StateBufferSize=0x%x "
                     "StateBuffer=0x%x Hints=0x%x",
-                    Hardware, pTree, Flags, StateBufferSize,
+                    pTree, Flags, StateBufferSize,
                     StateBuffer, Hints);
-
-    gcoHAL_GetHardware(gcvNULL, &Hardware);
-    gcmASSERT(Hardware);
 
     /* Verify the arguments. */
     gcmDEBUG_VERIFY_ARGUMENT(StateBufferSize != gcvNULL);
     gcmDEBUG_VERIFY_ARGUMENT(StateBuffer != gcvNULL);
     gcmDEBUG_VERIFY_ARGUMENT(Hints != gcvNULL);
-
-    codeGen.hardware      = Hardware;
 
     /* count the code in the shader */
     gcoOS_ZeroMemory(&codeInfo, gcmSIZEOF(codeInfo));
@@ -19285,7 +19252,7 @@ gcLINKTREE_GenerateStates(
     if (codeGen.clShader)
     {
         /* Treat as vertex shader for linking purposes from this point on */
-        if (! Hardware->threadWalkerInPS)
+        if (!gcHWCaps.hwFeatureFlags.hasThreadWalkerInPS)
         {
             codeGen.shaderType = gcSHADER_TYPE_VERTEX;
         }
@@ -19295,10 +19262,10 @@ gcLINKTREE_GenerateStates(
     codeGen.haltiShader = gcSHADER_IsHaltiCompiler(shader);
 
     /* Cache hardware flags. */
-    codeGen.isCL_X  = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_NEED_FIX_FOR_CL_X);
-    codeGen.isCL_XE = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_NEED_FIX_FOR_CL_XE);
+    codeGen.isCL_X  = gcHWCaps.hwFeatureFlags.needCLXFixes;
+    codeGen.isCL_XE = gcHWCaps.hwFeatureFlags.needCLXEFixes;
     codeGen.hasCL   = codeGen.isCL_X || codeGen.isCL_XE;
-    codeGen.hasInteger = gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_SUPPORT_INTEGER);
+    codeGen.hasInteger = gcHWCaps.hwFeatureFlags.supportInteger;
 
     /* Determine if HW has dual-16 support. */
     codeGen.hasDual16 = _gcmHasDual16(shader);
@@ -19309,7 +19276,7 @@ gcLINKTREE_GenerateStates(
         codeGen.isDual16Shader = gcSHADER_IsDual16Shader(shader, &codeInfo);
     }
 
-    codeGen.shaderCoreCount  = Hardware->config->shaderCoreCount;
+    codeGen.shaderCoreCount  = gcHWCaps.maxCoreCount;
 
     if (codeGen.clShader && ! codeGen.hasCL)
     {
@@ -19323,7 +19290,7 @@ gcLINKTREE_GenerateStates(
         gcmONERROR(gcvSTATUS_NOT_SUPPORT_INTEGER);
     }
 
-    if (Hardware->features[gcvFEATURE_SHADER_HAS_INSTRUCTION_CACHE])
+    if (gcHWCaps.hwFeatureFlags.hasInstCache)
     {
         codeGen.hasICache = gcvTRUE;
         if (codeGen.clShader || (tree && tree->useICache))
@@ -19341,7 +19308,7 @@ gcLINKTREE_GenerateStates(
         codeGen.useICache = gcvFALSE;
     }
 
-    if (Hardware->features[gcvFEATURE_SHADER_ENHANCEMENTS2])
+    if (gcHWCaps.hwFeatureFlags.hasSHEnhance2)
     {
         codeGen.hasSHEnhancements2 = gcvTRUE;
         if (gcmOPT_NOIMMEDIATE())
@@ -19355,7 +19322,7 @@ gcLINKTREE_GenerateStates(
         codeGen.generateImmediate  = gcvFALSE;
     }
 
-    if (Hardware->features[gcvFEATURE_SHADER_ENHANCEMENTS3])
+    if (gcHWCaps.hwFeatureFlags.hasSHEnhance3)
     {
         codeGen.hasSHEnhancements3 = gcvTRUE;
     }
@@ -19367,7 +19334,7 @@ gcLINKTREE_GenerateStates(
     if (gcmOPT_FORCEIMMEDIATE())
             codeGen.forceGenImmediate  = gcvTRUE;
 
-    if (Hardware->features[gcvFEATURE_BUG_FIXES10])
+    if (gcHWCaps.hwFeatureFlags.hasBugFix10)
     {
         codeGen.hasBugFixes10 = gcvTRUE;
     }
@@ -19376,7 +19343,7 @@ gcLINKTREE_GenerateStates(
         codeGen.hasBugFixes10 = gcvFALSE;
 
         if (codeGen.clShader && !codeGen.useICache &&
-            codeGen.hardware->config->instructionCount < 1024)
+            gcHWCaps.maxHwNativeTotalInstCount < 1024)
         {
             if (tree->shader->codeCount > 422 && tree->shader->codeCount < 434 &&
                 tree->shader->attributeCount == 1 && tree->shader->uniformCount == 2)
@@ -19433,105 +19400,97 @@ gcLINKTREE_GenerateStates(
         }
     }
 
-    codeGen.hasBugFixes11 = Hardware->features[gcvFEATURE_BUG_FIXES11];
+    codeGen.hasBugFixes11 = gcHWCaps.hwFeatureFlags.hasBugFix11;
 
-    codeGen.hasBugFixes7 = Hardware->features[gcvFEATURE_BUG_FIXES7];
+    codeGen.hasBugFixes7 = gcHWCaps.hwFeatureFlags.hasBugFix7;
 
     /* Determine if hardware is bigEndian */
-    codeGen.isBigEndian = Hardware->bigEndian;
-
-    /* Determine the maximum number of uniforms. */
-    gcmONERROR(
-        gcoHAL_QueryShaderCaps(gcvNULL,
-                               gcvNULL,
-                               &vsUniformCount,
-                               &psUniformCount,
-                               &varyings,
-                               gcvNULL,
-                               gcvNULL,
-                               gcvNULL,
-                               gcvNULL));
+    codeGen.isBigEndian = gcHWCaps.hwFeatureFlags.bigEndianMI;
 
     if (codeGen.shaderType == gcSHADER_TYPE_VERTEX)
     {
-        codeGen.uniformBase    = Hardware->config->vsConstBase;
-        codeGen.maxUniform     = Hardware->config->vsConstMax;
-        codeGen.unifiedUniform = Hardware->config->unifiedConst;
+        codeGen.uniformBase    = gcHWCaps.vsConstRegAddrBase;
+        codeGen.maxUniform     = gcHWCaps.maxVSConstRegCount;
+        codeGen.unifiedUniform = gcHWCaps.unifiedConst;
+
+        if (codeGen.unifiedUniform)
+        {
+            codeGen.maxUniform = gcmMIN(512, gcHWCaps.maxTotalConstRegCount);
+        }
     }
     else if (codeGen.clShader || codeGen.computeShader)
     {
         /* If unified constant registers, CL/CS shaders can use all of them. */
-        if (Hardware->config->unifiedConst)
+        if (gcHWCaps.hwFeatureFlags.constRegFileUnified)
         {
-            codeGen.uniformBase    = Hardware->config->psConstBase;
-            codeGen.maxUniform     = gcmMIN(512, Hardware->config->constMax);
-            codeGen.unifiedUniform = Hardware->config->unifiedConst;
+            codeGen.uniformBase    = gcHWCaps.psConstRegAddrBase;
+            codeGen.maxUniform     = gcmMIN(512, gcHWCaps.maxTotalConstRegCount);
+            codeGen.unifiedUniform = gcHWCaps.unifiedConst;
         }
 #if !gcdENABLE_UNIFIED_CONSTANT
         /* TODO - Need to enhance unified constant checking. */
-        else if ((Hardware->config->constMax == 320 &&
-                  Hardware->config->psConstMax == 64 &&
-                  Hardware->config->vsConstMax == 256) &&
+        else if ((gcHWCaps.maxTotalConstRegCount== 320 &&
+                  gcHWCaps.maxPSConstRegCount == 64 &&
+                  gcHWCaps.maxVSConstRegCount == 256) &&
                   !codeGen.computeShader)
         {
             /* TODO - Need to enhance for unified constant. */
             codeGen.uniformBase    = 0xC000;
-            codeGen.maxUniform     = Hardware->config->constMax;
+            codeGen.maxUniform     = gcHWCaps.maxTotalConstRegCount;
             codeGen.unifiedUniform = gcvTRUE;
         }
 #endif
         else
         {
-            codeGen.uniformBase    = Hardware->config->psConstBase;
-            codeGen.maxUniform     = Hardware->config->psConstMax;
-            codeGen.unifiedUniform = Hardware->config->unifiedConst;
+            codeGen.uniformBase    = gcHWCaps.psConstRegAddrBase;
+            codeGen.maxUniform     = gcHWCaps.maxPSConstRegCount;
+            codeGen.unifiedUniform = gcHWCaps.unifiedConst;
         }
     }
     else
     {
-        codeGen.uniformBase    = Hardware->config->psConstBase;
-        codeGen.maxUniform     = Hardware->config->psConstMax;
-        codeGen.unifiedUniform = Hardware->config->unifiedConst;
+        codeGen.uniformBase    = gcHWCaps.psConstRegAddrBase;
+        codeGen.maxUniform     = gcHWCaps.maxPSConstRegCount;
+        codeGen.unifiedUniform = gcHWCaps.unifiedConst;
+
+        if (codeGen.unifiedUniform)
+        {
+            codeGen.maxUniform = gcmMIN(512, gcHWCaps.maxTotalConstRegCount);
+        }
     }
 
-    gcmONERROR(
-        gcoHAL_QuerySamplerBase(gcvNULL,
-                                &vsSamplers,
-                                &vsSamplersBase,
-                                &psSamplers,
-                                &psSamplersBase));
+    vsSamplers = gcHWCaps.maxVSSamplerCount;
+    psSamplers = gcHWCaps.maxPSSamplerCount;
+    vsSamplersBase = gcHWCaps.vsSamplerNoBaseInInstruction;
+    psSamplersBase = gcHWCaps.psSamplerNoBaseInInstruction;
+
     codeGen.dummySamplerId = (codeGen.shaderType == gcSHADER_TYPE_VERTEX)
         ? vsSamplersBase + vsSamplers - 1
         : psSamplersBase + psSamplers - 1;
 
-    codeGen.maxVaryingVectors = varyings;
+    codeGen.maxVaryingVectors = gcHWCaps.maxVaryingCount;
 
     codeGen.maxExtraVaryingVectors = 3;
 
-    gcmONERROR(gcoHAL_QueryStreamCaps(gcvNULL,
-                                      &codeGen.maxAttributes,
-                                      gcvNULL,
-                                      gcvNULL,
-                                      gcvNULL,
-                                      gcvNULL));
+    codeGen.maxAttributes = gcHWCaps.maxAttributeCount;
 
     /* Get the maximum number of registers. */
-    codeGen.registerCount = Hardware->config->registerMax;
+    codeGen.registerCount = gcHWCaps.maxGPRCountPerThread;
     codeGen.flags = Flags;
 
-    codeGen.hasSIGN_FLOOR_CEIL = Hardware->features[gcvFEATURE_EXTRA_SHADER_INSTRUCTIONS0];
+    codeGen.hasSIGN_FLOOR_CEIL = gcHWCaps.hwFeatureFlags.hasSignFloorCeil;
 
-    codeGen.hasSQRT_TRIG = Hardware->features[gcvFEATURE_EXTRA_SHADER_INSTRUCTIONS1];
+    codeGen.hasSQRT_TRIG = gcHWCaps.hwFeatureFlags.hasSqrtTrig;
 
-    codeGen.hasNEW_SIN_COS_LOG_DIV = Hardware->features[gcvFEATURE_EXTRA_SHADER_INSTRUCTIONS2];
+    codeGen.hasNEW_SIN_COS_LOG_DIV = gcHWCaps.hwFeatureFlags.hasNewSinCosLogDiv;
 
-    codeGen.hasMediumPrecision = Hardware->features[gcvFEATURE_MEDIUM_PRECISION];
+    codeGen.hasMediumPrecision = gcHWCaps.hwFeatureFlags.hasMediumPrecision;
 
-    codeGen.hasNEW_TEXLD = Hardware->features[gcvFEATURE_HALTI2];
-    codeGen.hasHalti3    = Hardware->features[gcvFEATURE_HALTI3];
-    codeGen.hasHalti4    = Hardware->features[gcvFEATURE_HALTI4];
-    codeGen.hasHalti5    = Hardware->features[gcvFEATURE_HALTI5];
-    codeGen.hasUSC       = Hardware->features[gcvFEATURE_USC];
+    codeGen.hasNEW_TEXLD = gcHWCaps.hwFeatureFlags.hasHalti2;
+    codeGen.hasHalti3    = gcHWCaps.hwFeatureFlags.hasHalti3;
+    codeGen.hasHalti4    = gcHWCaps.hwFeatureFlags.hasHalti4;
+    codeGen.hasHalti5    = gcHWCaps.hwFeatureFlags.hasHalti5;
+    codeGen.hasUSC       = gcHWCaps.hwFeatureFlags.supportUSC;
 
     if (UniformUsage == gcvNULL)
     {
@@ -19658,7 +19617,7 @@ gcLINKTREE_GenerateStates(
         codeGen.vertexIdIndex = -1;
         codeGen.instanceIdIndex = -1;
         if(codeGen.shaderType == gcSHADER_TYPE_VERTEX &&
-           gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VERTEX_INST_ID_AS_ATTRIBUTE))
+           gcHWCaps.hwFeatureFlags.vtxInstanceIdAsAttr)
         {
             gctUINT i;
             gcVARIABLE variable;
@@ -19714,7 +19673,7 @@ gcLINKTREE_GenerateStates(
             if (!_isHWRegisterAllocated(tree->shader))
             {
             if(codeGen.vsHasVertexInstId && /* assign instance/vertex id registers */
-               gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_VERTEX_INST_ID_AS_ATTRIBUTE))
+               gcHWCaps.hwFeatureFlags.vtxInstanceIdAsAttr)
             {
                 _SetRegisterUsage(codeGen.registerUsage + attributeCount,
                                   1,
@@ -19847,7 +19806,7 @@ gcLINKTREE_GenerateStates(
     gcmONERROR(_GenerateCode(tree, &codeGen));
 
     /* Compute the size of the state buffer. */
-    gcmONERROR(_GenerateStates(Hardware, tree, &codeGen, gcvNULL, &size, gcvNULL));
+    gcmONERROR(_GenerateStates(tree, &codeGen, gcvNULL, &size, gcvNULL));
 
     /* Allocate a new state buffer. */
     gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -19954,7 +19913,8 @@ gcLINKTREE_GenerateStates(
         if (threadGroupSync)
         {
             gcmASSERT(stageIndex == gcvPROGRAM_STAGE_OPENCL ||
-                      stageIndex == gcvPROGRAM_STAGE_COMPUTE);
+                      stageIndex == gcvPROGRAM_STAGE_COMPUTE ||
+                      codeGen.clShader || codeGen.computeShader);
         }
 
         /* Set sample base offset. */
@@ -19991,8 +19951,7 @@ gcLINKTREE_GenerateStates(
     }
 
     /* Fill the state buffer. */
-    gcmONERROR(_GenerateStates(Hardware,
-                               tree,
+    gcmONERROR(_GenerateStates(tree,
                                &codeGen,
                                stateBuffer + *StateBufferSize,
                                &size,
@@ -20089,7 +20048,7 @@ gcSHADER_CheckBugFixes10(
 
     gcmHEADER();
 
-    if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_BUG_FIXES10))
+    if (gcHWCaps.hwFeatureFlags.hasBugFix10)
     {
         hasBugFixes10 = gcvTRUE;
     }

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -27,5 +27,5 @@
 
 
 LIST=test
-EARLY_DIRS=hal_unit es11 es20 vg cl11
+EARLY_DIRS=hal_unit es11 es20 vg cl11 vx
 include recurse.mk

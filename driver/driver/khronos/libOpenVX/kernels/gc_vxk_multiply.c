@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -22,6 +22,8 @@ vx_status vxMultiply(vx_node node, vx_image in0, vx_image in1, vx_scalar scale_p
     vx_float32    logs = 0.0f, logr = 0.0f;
     vx_enum overflow_policy         = -1;
     vx_enum rounding_policy         = -1;
+    vx_float32 frac_part            = 0.0f;
+    vx_uint32 int_part              = 0;
     gcoVX_Kernel_Context * kernelContext = gcvNULL;
     vx_df_image format = 0;
 
@@ -86,16 +88,29 @@ vx_status vxMultiply(vx_node node, vx_image in0, vx_image in1, vx_scalar scale_p
     }
     else
     {
+        int_part = (vx_uint32)floor(scale);
+        frac_part = scale - (vx_float32)floor(scale);
+        logs = -gcoMATH_Log2(frac_part);
+        logr = (vx_float32)ROUNDF(logs);
         kernelContext->params.volume           = 2;
-        kernelContext->params.scale            = scale;
-        kernelContext->params.xstep            = 8;
+        kernelContext->params.clamp            = int_part;
+        kernelContext->params.xstep            = 4;
+
+        /* check if the fractor is the integer power of 2 */
+        if (frac_part == 0)
+            kernelContext->params.scale            = frac_part;
+        else if(logs - logr < THRESHOLD)
+            kernelContext->params.scale            = logr;
+        else
+            kernelContext->params.scale            = frac_part;
+
         {
             vx_float32 bin[4];
 
             bin[0] =
             bin[1] =
             bin[2] =
-            bin[3] = scale;
+            bin[3] = frac_part;
 
             gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, bin, sizeof(bin));
             kernelContext->uniforms[kernelContext->uniform_num].num = 4;

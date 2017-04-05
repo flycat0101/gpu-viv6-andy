@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -131,6 +131,7 @@ typedef struct __GLchipFeatureRec
     GLboolean                   supportMSAA2X;
     GLboolean                   hasSecurity;
     GLboolean                   hasRobustness;
+    GLboolean                   txLerpLessBit;
 } __GLchipFeature;
 
 
@@ -178,7 +179,8 @@ typedef struct __GLchipDirtyRec
             unsigned int activeUniform   : 1;
             unsigned int lastFragData    : 1;
             unsigned int pgInsChanged    : 1;
-            unsigned int reserved        : 12;
+            unsigned int polygonOffset   : 1;  /* depthBias depend on polygonOffset state and depth surface */
+            unsigned int reserved        : 11;
         } sDefer;
         unsigned int deferDirty;
     } uDefer;

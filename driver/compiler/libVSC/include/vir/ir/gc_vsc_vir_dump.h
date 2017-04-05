@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -23,6 +23,7 @@ struct _VIR_DUMPER
     VSC_DUMPER      baseDumper;
     VIR_Shader *    Shader;
     gctBOOL         dumpOperandId;
+    gctBOOL         invalidCFG;
 };
 
 #define VIR_LOG(pVirDumper, ...)    vscDumper_PrintStrSafe(&(pVirDumper)->baseDumper, __VA_ARGS__)

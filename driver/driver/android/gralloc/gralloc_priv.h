@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -124,6 +124,13 @@ struct private_handle_t {
     ~private_handle_t()
     {
         magic = 0;
+#ifdef __GNUC__
+        /*
+         * Found clang will optimize out above code.
+         * Use barrier to disable compiler optimization.
+         */
+        asm volatile("":::"memory");
+#endif
     }
 
     static int validate(const native_handle* h)

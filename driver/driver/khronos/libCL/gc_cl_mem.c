@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -157,6 +157,203 @@ clfSyncHostMemory(
 /*****************************************************************************\
 |*                         Supporting functions                              *|
 \*****************************************************************************/
+gctINT
+clfRetainMemObject(
+    cl_mem MemObj
+    )
+{
+    gctINT status = CL_SUCCESS;
+
+    gcmHEADER_ARG("MemObj=0x%x", MemObj);
+
+    if (MemObj == gcvNULL ||
+        MemObj->objectType != clvOBJECT_MEM)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-004025: (clfRetainMemObject) invalid MemObj.\n");
+        clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
+    }
+
+    gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, MemObj->referenceCount, gcvNULL));
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+gctINT
+clfReleaseMemObject(
+    cl_mem MemObj
+    )
+{
+    clsMemObjCallback_PTR   memObjCallback, nextMemObjCallback;
+    gctINT                  status;
+    gctINT32                oldReference;
+
+    gcmHEADER_ARG("MemObj=0x%x", MemObj);
+
+    if (MemObj == gcvNULL ||
+        MemObj->objectType != clvOBJECT_MEM)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-004026: (clfReleaseMemObject) invalid MemObj.\n");
+        clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
+    }
+
+    gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, MemObj->referenceCount, &oldReference));
+
+    if (oldReference == 1)
+    {
+        gcmASSERT(MemObj->mapCount == 0);
+
+        if (MemObj->waitEvent.event)
+        {
+            clsBufferWaitEvent_PTR  tempWaitEvent        = &MemObj->waitEvent;
+            clsBufferWaitEvent_PTR  tempNextWaitEvent    = gcvNULL;
+            /* header node */
+            clReleaseEvent(tempWaitEvent->event);
+            tempWaitEvent = tempWaitEvent->next;
+
+            while(tempWaitEvent)
+            {
+                tempNextWaitEvent = tempWaitEvent->next;
+                clReleaseEvent(tempWaitEvent->event);
+                gcoOS_Free(gcvNULL, tempWaitEvent);
+                tempWaitEvent = tempNextWaitEvent;
+            }
+        }
+
+        if (MemObj->type == CL_MEM_OBJECT_BUFFER)
+        {
+            if (MemObj->u.buffer.createType == CL_BUFFER_CREATE_TYPE_REGION) {
+                clsMem_PTR parentBuffer = MemObj->u.buffer.parentBuffer;
+
+                /* Release parent buffer. */
+                clfReleaseMemObject(parentBuffer);
+            }
+            if (MemObj->mapCount == 0)
+            {
+                if (MemObj->fromGL)
+                {
+                    /* do nothing, it already release in releaseGLObject */
+                    /* gcmVERIFY_OK(gcoCL_UnshareMemory(MemObj->u.buffer.node)); */
+                }
+                else if (MemObj->u.buffer.createType != CL_BUFFER_CREATE_TYPE_REGION)
+                {
+                    if (MemObj->u.buffer.wrapped)
+                    {
+                        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(
+                            MemObj->u.buffer.wrappedNode,
+                            gcvSURF_BITMAP));
+
+                        gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(
+                            MemObj->u.buffer.wrappedNode));
+                    }
+                    else
+                    {
+                        gcoCL_FreeMemory(MemObj->u.buffer.physical,
+                                         MemObj->u.buffer.logical,
+                                         MemObj->u.buffer.allocatedSize,
+                                         MemObj->u.buffer.node);
+                    }
+                }
+
+#if cldSYNC_MEMORY
+                gcmVERIFY_OK(gcoCL_Commit(gcvTRUE));
+#endif
+
+                /* Invoke and free callbacks */
+                memObjCallback = MemObj->memObjCallback;
+                while (memObjCallback != gcvNULL)
+                {
+                    nextMemObjCallback = memObjCallback->next;
+                    memObjCallback->pfnNotify(MemObj, memObjCallback->userData);
+                    gcoOS_Free(gcvNULL, memObjCallback);
+                    memObjCallback = nextMemObjCallback;
+                }
+
+                gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, MemObj->mutex));
+                MemObj->mutex = gcvNULL;
+
+                /* Destroy the reference count object */
+                gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, MemObj->referenceCount));
+                MemObj->referenceCount = gcvNULL;
+
+                gcoOS_Free(gcvNULL, MemObj);
+
+                gcmFOOTER_NO();
+                return CL_SUCCESS;
+            }
+        }
+#if BUILD_OPENCL_12
+        else if (MemObj->type == CL_MEM_OBJECT_IMAGE2D ||
+                 MemObj->type == CL_MEM_OBJECT_IMAGE3D ||
+                 MemObj->type == CL_MEM_OBJECT_IMAGE2D_ARRAY ||
+                 MemObj->type == CL_MEM_OBJECT_IMAGE1D ||
+                 MemObj->type == CL_MEM_OBJECT_IMAGE1D_ARRAY ||
+                 MemObj->type == CL_MEM_OBJECT_IMAGE1D_BUFFER)
+#else
+        else if (MemObj->type == CL_MEM_OBJECT_IMAGE2D ||
+                 MemObj->type == CL_MEM_OBJECT_IMAGE3D )
+#endif
+        {
+            if (MemObj->mapCount == 0)
+            {
+                /* Release image object */
+                gcoCL_FreeMemory(MemObj->u.image.physical,
+                                 MemObj->u.image.logical,
+                                 MemObj->u.image.allocatedSize,
+                                 MemObj->u.image.node);
+
+                gcoCL_DestroyTexture(MemObj->u.image.texture,
+                                     MemObj->u.image.surface);
+
+#if cldSYNC_MEMORY
+                gcmVERIFY_OK(gcoCL_Commit(gcvTRUE));
+#endif
+
+                MemObj->u.image.texture = gcvNULL;
+                MemObj->u.image.surface = gcvNULL;
+                MemObj->u.image.surfaceMapped = gcvFALSE;
+
+                /* Invoke and free callbacks */
+                memObjCallback = MemObj->memObjCallback;
+                while (memObjCallback != gcvNULL)
+                {
+                    nextMemObjCallback = memObjCallback->next;
+                    memObjCallback->pfnNotify(MemObj, memObjCallback->userData);
+                    gcoOS_Free(gcvNULL, memObjCallback);
+                    memObjCallback = nextMemObjCallback;
+                }
+
+                gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, MemObj->mutex));
+                MemObj->mutex = gcvNULL;
+
+                /* Destroy the reference count object */
+                gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, MemObj->referenceCount));
+                MemObj->referenceCount = gcvNULL;
+
+                gcoOS_Free(gcvNULL, MemObj);
+
+                gcmFOOTER_NO();
+                return CL_SUCCESS;
+            }
+        }
+    }
+
+    gcmFOOTER_NO();
+    return CL_SUCCESS;
+
+OnError:
+    if (status != CL_INVALID_MEM_OBJECT)
+    {
+        gcmUSER_DEBUG_ERROR_MSG(
+            "OCL-004027: (clfReleaseMemObject) internal error.\n");
+    }
+
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
 
 gctINT
 clfExecuteCommandReadBuffer(
@@ -509,6 +706,9 @@ clfExecuteCommandCopyBuffer(
 
     status = CL_SUCCESS;
 
+    clfReleaseMemObject(srcBuffer);
+    clfReleaseMemObject(dstBuffer);
+
 OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
@@ -586,6 +786,9 @@ clfExecuteCommandCopyBufferRect(
     gcoCL_FlushMemory(dstBuffer->u.buffer.node, dstBuffer->u.buffer.logical, dstBuffer->u.buffer.allocatedSize);
 
     status = CL_SUCCESS;
+
+    clfReleaseMemObject(srcBuffer);
+    clfReleaseMemObject(dstBuffer);
 
 OnError:
     gcmFOOTER_ARG("%d", status);
@@ -1342,7 +1545,7 @@ clfExecuteCommandMapBuffer(
     buffer->mapFlag  = mapFlags;
 #endif
 
-    clRetainMemObject(buffer);
+    clfRetainMemObject(buffer);
 
     gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, buffer->mutex, gcvINFINITE));
     buffer->mapCount++;
@@ -1437,7 +1640,7 @@ clfExecuteCommandMapImage(
 #if BUILD_OPENCL_12
     image->mapFlag = mapFlags;
 #endif
-    clRetainMemObject(image);
+    clfRetainMemObject(image);
 
     gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, image->mutex, gcvINFINITE));
 
@@ -1642,7 +1845,7 @@ clfExecuteCommandUnmapMemObject(
     gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, memObj->mutex));
     acquired = gcvFALSE;
 
-    clReleaseMemObject(memObj);
+    clfReleaseMemObject(memObj);
 
     status = CL_SUCCESS;
 
@@ -2609,226 +2812,6 @@ OnError:
     return status;
 }
 
-cl_mem clfCLGLShareBufferWrapper(
-    cl_context   Context,
-    cl_mem_flags Flags,
-    size_t       Size,
-    void *       HostPtr,
-    cl_int *     ErrcodeRet)
-{
-    clsMem_PTR   buffer = gcvNULL;
-    gctINT       status;
-
-    gcmHEADER_ARG("Context=0x%x Size=%u HostPtr=0x%x Flags=0x%x ",
-                   Context, Size, HostPtr, Flags);
-
-    if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
-    {
-        clmRETURN_ERROR(CL_INVALID_CONTEXT);
-    }
-
-    if (Size == 0)
-    {
-        clmRETURN_ERROR(CL_INVALID_BUFFER_SIZE);
-    }
-
-    if ((Flags & CL_MEM_USE_HOST_PTR) &&
-        (Flags & (CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR)))
-    {
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    if ((HostPtr == gcvNULL && (Flags & (CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR))) ||
-        (HostPtr && (Flags & (CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR)) == 0))
-    {
-        clmRETURN_ERROR(CL_INVALID_HOST_PTR);
-    }
-
-    gcoCL_SetHardware();
-    /* New buffer object. */
-    clmONERROR(clfNewBuffer(Context, &buffer),
-               CL_OUT_OF_HOST_MEMORY);
-
-    /* Mem info. */
-    buffer->host            = HostPtr;
-    buffer->flags           = Flags ? Flags : CL_MEM_READ_WRITE /* default */;
-#if BUILD_OPENCL_12
-    buffer->mapFlag         = 0;
-#endif
-    /* Buffer specific info. */
-    buffer->u.buffer.size   = Size;
-
-    if (ErrcodeRet) {
-        *ErrcodeRet = CL_SUCCESS;
-    }
-
-    gcmFOOTER_ARG("%d buffer=0x%x",
-                  CL_SUCCESS, buffer);
-    return buffer;
-
-OnError:
-
-    if(buffer != gcvNULL) gcoOS_Free(gcvNULL,buffer);
-
-    if (ErrcodeRet) {
-        *ErrcodeRet = status;
-    }
-
-    gcmFOOTER_ARG("%d", status);
-    return gcvNULL;
-}
-
-cl_int clfCLGLShareBufferData(
-    cl_context   Context,
-    cl_mem_flags Flags,
-    size_t       Size,
-    void *       HostPtr,
-    cl_int *     ErrcodeRet,
-    cl_mem       buffer)
-{
-    gctINT       status;
-#if MAP_TO_DEVICE
-    gceCHIPMODEL  chipModel;
-#endif
-    gcmHEADER_ARG("Context=0x%x Size=%u HostPtr=0x%x Flags=0x%x ",
-                   Context, Size, HostPtr, Flags);
-
-    if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
-    {
-        clmRETURN_ERROR(CL_INVALID_CONTEXT);
-    }
-
-    if (Size == 0)
-    {
-        clmRETURN_ERROR(CL_INVALID_BUFFER_SIZE);
-    }
-
-    if ((Flags & CL_MEM_USE_HOST_PTR) &&
-        (Flags & (CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR)))
-    {
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    if ((HostPtr == gcvNULL && (Flags & (CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR))) ||
-        (HostPtr && (Flags & (CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR)) == 0))
-    {
-        clmRETURN_ERROR(CL_INVALID_HOST_PTR);
-    }
-
-    /* Mem info. */
-    buffer->host            = HostPtr;
-    buffer->flags           = Flags ? Flags : CL_MEM_READ_WRITE /* default */;
-#if BUILD_OPENCL_12
-    buffer->mapFlag         = 0;
-#endif
-    /* Buffer specific info. */
-    buffer->u.buffer.size   = Size;
-
-#if MAP_TO_DEVICE
-    /*
-     * Map host ptr to physical if flag has CL_MEM_USE_HOST_PTR
-     * and host ptr is aligned.
-
-     * This is not required for CL_MEM_ALLOC_HOST_PTR
-     * We always allocate from host-accessible memory
-     */
-    gcoHAL_QueryChipIdentity(gcvNULL,
-                             &chipModel,
-                             gcvNULL,
-                             gcvNULL,
-                             gcvNULL);
-
-    if ((Flags & CL_MEM_USE_HOST_PTR)
-         && !(gcmPTR2INT(HostPtr) & 0x3F)
-         && !(chipModel == gcv3000 || chipModel == gcv5000))
-    {
-        gcsUSER_MEMORY_DESC desc;
-        gctUINT32 node, physical;
-
-        gcoOS_ZeroMemory(&desc, gcmSIZEOF(desc));
-
-        desc.flag     = gcvALLOC_FLAG_USERMEMORY;
-        desc.logical  = gcmPTR_TO_UINT64(HostPtr);
-        desc.physical = gcvINVALID_ADDRESS;
-        desc.size     = Size;
-
-        /* Map the host ptr to a vidmem node. */
-        clmONERROR(gcoHAL_WrapUserMemory(&desc,
-                                         &node
-                                         ),
-                   CL_MEM_OBJECT_ALLOCATION_FAILURE);
-
-        /* Get the physical address. */
-        clmONERROR(gcoHAL_LockVideoMemory(node,
-                                          gcvFALSE,
-                                          &physical,
-                                          gcvNULL
-                                          ),
-                   CL_MEM_OBJECT_ALLOCATION_FAILURE);
-
-        buffer->u.buffer.allocatedSize  = Size;
-        buffer->u.buffer.physical       = (gctPHYS_ADDR)gcmINT2PTR(physical);
-        buffer->u.buffer.logical        = HostPtr;
-        buffer->u.buffer.wrapped        = gcvTRUE;
-        buffer->u.buffer.wrappedNode    = node;
-    }
-    else
-#endif
-    {
-        /* Allocate physical buffer from device. */
-        buffer->u.buffer.allocatedSize = Size;
-        clmONERROR(gcoCL_AllocateMemory(&buffer->u.buffer.allocatedSize,
-                                        &buffer->u.buffer.physical,
-                                        &buffer->u.buffer.logical,
-                                        &buffer->u.buffer.node),
-                   CL_MEM_OBJECT_ALLOCATION_FAILURE);
-
-        if ((Flags & CL_MEM_COPY_HOST_PTR) ||
-            (Flags & CL_MEM_USE_HOST_PTR))
-        {
-#if cldTUNING
-            if ((Flags & CL_MEM_READ_ONLY) && Context->sortRects && (Size == 7731040))
-            {
-                clfSortHaarRects(buffer->u.buffer.logical, HostPtr, Size);
-                Context->sortRects = gcvFALSE;
-            }
-            else
-#endif
-            {
-                gcoOS_MemCopy(buffer->u.buffer.logical, HostPtr, Size);
-            }
-
-            gcoCL_FlushMemory(buffer->u.buffer.node, buffer->u.buffer.logical, buffer->u.buffer.allocatedSize);
-
-            gcmDUMP_BUFFER(gcvNULL,
-                           "memory",
-                           gcmPTR2INT(buffer->u.buffer.physical),
-                           buffer->u.buffer.logical,
-                           0,
-                           buffer->u.buffer.size);
-        }
-    }
-
-    if (ErrcodeRet) {
-        *ErrcodeRet = CL_SUCCESS;
-    }
-
-    gcmFOOTER_ARG("%d buffer=0x%x",
-                  CL_SUCCESS, buffer);
-    return CL_SUCCESS;
-
-OnError:
-
-    if(buffer != gcvNULL) gcoOS_Free(gcvNULL,buffer);
-
-    if (ErrcodeRet) {
-        *ErrcodeRet = status;
-    }
-
-    gcmFOOTER_ARG("%d", status);
-    return status;
-}
-
 /*****************************************************************************\
 |*                       OpenCL Memory Object API                            *|
 \*****************************************************************************/
@@ -2847,6 +2830,8 @@ clCreateBuffer(
 #endif
     gcmHEADER_ARG("Context=0x%x Size=%u HostPtr=0x%x Flags=0x%x ",
                    Context, Size, HostPtr, Flags);
+    gcmDUMP_API("${OCL clCreateBuffer 0x%x, 0x%x}", Context, Flags);
+    VCL_TRACE_API(CreateBuffer_Pre)(Context, Flags, Size, HostPtr, ErrcodeRet);
 
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
@@ -2878,7 +2863,7 @@ clCreateBuffer(
         clmRETURN_ERROR(CL_INVALID_HOST_PTR);
     }
 
-    gcoCL_SetHardware();
+    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
     /* New buffer object. */
     clmONERROR(clfNewBuffer(Context, &buffer),
                CL_OUT_OF_HOST_MEMORY);
@@ -2900,12 +2885,7 @@ clCreateBuffer(
      * This is not required for CL_MEM_ALLOC_HOST_PTR
      * We always allocate from host-accessible memory
      */
-    gcoHAL_QueryChipIdentity(gcvNULL,
-                             &chipModel,
-                             gcvNULL,
-                             gcvNULL,
-                             gcvNULL);
-
+    chipModel = Context->devices[0]->deviceInfo.chipModel;
     if ((Flags & CL_MEM_USE_HOST_PTR)
          && !(gcmPTR2INT(HostPtr) & 0x3F)
          && !(chipModel == gcv3000 || chipModel == gcv5000))
@@ -2981,6 +2961,7 @@ clCreateBuffer(
         *ErrcodeRet = CL_SUCCESS;
     }
 
+    VCL_TRACE_API(CreateBuffer_Post)(Context, Flags, Size, HostPtr, ErrcodeRet, buffer);
     gcmFOOTER_ARG("%d buffer=0x%x",
                   CL_SUCCESS, buffer);
     return buffer;
@@ -3017,6 +2998,8 @@ clCreateSubBuffer(
 
     gcmHEADER_ARG("Buffer=0x%x Flags=0x%x BufferCreateType=%u BufferCreateInfo=0x%x",
                    Buffer, Flags, BufferCreateType, BufferCreateInfo);
+    gcmDUMP_API("${OCL clCreateSubBuffer 0x%x, 0x%x}", Buffer, Flags);
+    VCL_TRACE_API(CreateSubBuffer_Pre)(Buffer, Flags, BufferCreateType, BufferCreateInfo, ErrcodeRet);
 
     if (Buffer == gcvNULL ||
         Buffer->objectType != clvOBJECT_MEM ||
@@ -3091,7 +3074,7 @@ clCreateSubBuffer(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-    gcoCL_SetHardware();
+    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
     /* New buffer object. */
     clmONERROR(clfNewBuffer(Buffer->context, &buffer),
                CL_OUT_OF_HOST_MEMORY);
@@ -3115,12 +3098,13 @@ clCreateSubBuffer(
     buffer->u.buffer.node = Buffer->u.buffer.node;
 
     /* Retain Parent buffer. */
-    clRetainMemObject(Buffer);
+    clfRetainMemObject(Buffer);
 
     if (ErrcodeRet) {
         *ErrcodeRet = CL_SUCCESS;
     }
 
+    VCL_TRACE_API(CreateSubBuffer_Post)(Buffer, Flags, BufferCreateType, BufferCreateInfo, ErrcodeRet, buffer);
     gcmFOOTER_ARG("%d buffer=0x%x",
                   CL_SUCCESS, buffer);
     return buffer;
@@ -3140,423 +3124,6 @@ OnError:
 }
 
 #if BUILD_OPENCL_12
-cl_mem clfCLGLShareCreateImageWrapper(
-    cl_context               Context ,
-    cl_mem_flags             Flags ,
-    const cl_image_format *  ImageFormat ,
-    const cl_image_desc *    ImageDesc ,
-    void *                   HostPtr ,
-    cl_int *                 ErrcodeRet
-    )
-{
-    clsMem_PTR              image = gcvNULL;
-    gctINT                  status;
-    gctSIZE_T               rowPitch;
-    gctSIZE_T               slicePitch = 0;
-    gctSIZE_T               elementSize;
-    gceSURF_FORMAT          internalFormat;
-    gctSIZE_T               size;
-    gctSIZE_T               ImageWidth, ImageHeight, ImageDepth, ImageRowPitch, ImageSlicePitch, ImageArraySize;
-
-
-    gcmHEADER_ARG("Context=0x%x Flags=%u ImageFormat=0x%x ImageDesc=%u HostPtr=0x%x",
-                   Context, Flags, ImageFormat, ImageDesc, HostPtr);
-
-    if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
-    {
-        clmRETURN_ERROR(CL_INVALID_CONTEXT);
-    }
-
-    if (ImageFormat == gcvNULL)
-    {
-        clmRETURN_ERROR(CL_INVALID_IMAGE_FORMAT_DESCRIPTOR);
-    }
-
-    if (ImageDesc == gcvNULL)
-    {
-        clmRETURN_ERROR(CL_INVALID_IMAGE_DESCRIPTOR);
-    }
-
-    ImageWidth = ImageDesc->image_width;
-    ImageHeight = ImageDesc->image_height;
-    ImageDepth = ImageDesc->image_depth;
-    ImageRowPitch = ImageDesc->image_row_pitch;
-    ImageSlicePitch = ImageDesc->image_slice_pitch;
-    ImageArraySize = ImageDesc->image_array_size;
-
-    if (clfImageFormat2GcFormat(ImageFormat, &elementSize, &internalFormat, gcvNULL))
-    {
-        clmRETURN_ERROR(CL_INVALID_IMAGE_FORMAT_DESCRIPTOR);
-    }
-
-     if (ImageDesc->num_mip_levels != 0)
-     {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-     }
-
-     if (ImageDesc->num_samples != 0)
-     {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-     }
-
-     if (ImageRowPitch != 0 && HostPtr == gcvNULL)
-     {
-         clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-     }
-
-    /* Get row pitch. */
-    rowPitch = (ImageRowPitch ? ImageRowPitch
-                              : ImageWidth * elementSize);
-    switch (ImageDesc->image_type) {
-    case CL_MEM_OBJECT_IMAGE2D:
-        if (ImageWidth == 0 || ImageWidth > Context->devices[0]->deviceInfo.image2DMaxWidth)
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-        if (ImageHeight == 0 || ImageHeight > Context->devices[0]->deviceInfo.image2DMaxHeight)
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-
-        if (ImageRowPitch != 0 &&
-               (ImageRowPitch < ImageWidth * elementSize ||
-                ImageRowPitch % elementSize != 0 ))
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-        ImageDepth = 1;
-        /* Calculate the size of the image. */
-        size = rowPitch * ImageHeight;
-        break;
-
-    case CL_MEM_OBJECT_IMAGE1D:
-        if (ImageWidth == 0 || ImageWidth > Context->devices[0]->deviceInfo.image2DMaxWidth)
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-        ImageHeight = 1;
-        ImageDepth = 1;
-        /* Calculate the size of the image. */
-        size = rowPitch * ImageHeight;
-        break;
-
-    case CL_MEM_OBJECT_IMAGE2D_ARRAY:
-        if (ImageWidth == 0 || ImageWidth > Context->devices[0]->deviceInfo.image2DMaxWidth)
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-        if (ImageHeight == 0 || ImageHeight > Context->devices[0]->deviceInfo.image2DMaxHeight)
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-
-        if (ImageRowPitch != 0 &&
-               (ImageRowPitch < ImageWidth * elementSize ||
-                ImageRowPitch % elementSize != 0 ))
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-
-        if (ImageSlicePitch != 0 && HostPtr != gcvNULL &&
-            (ImageSlicePitch < rowPitch * ImageHeight))
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-        /* Get slice pitch. */
-        slicePitch = (ImageSlicePitch ? ImageSlicePitch
-                                      : rowPitch * ImageHeight);
-        ImageDepth = 1;
-        /* Calculate the size of the image. */
-        size = slicePitch * ImageArraySize;
-        break;
-    case CL_MEM_OBJECT_IMAGE1D_ARRAY:
-        if (ImageWidth == 0 || ImageWidth > Context->devices[0]->deviceInfo.image2DMaxWidth)
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-        ImageHeight = 1;
-        if (ImageSlicePitch != 0 && HostPtr != gcvNULL &&
-            (ImageSlicePitch < rowPitch * ImageHeight))
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-        /* Get slice pitch. */
-        slicePitch = (ImageSlicePitch ? ImageSlicePitch
-                                      : rowPitch * ImageHeight);
-        ImageDepth = 1;
-        /* Calculate the size of the image. */
-        size = slicePitch * ImageArraySize;
-        break;
-    case CL_MEM_OBJECT_IMAGE1D_BUFFER:
-        if (ImageWidth == 0 || ImageWidth > Context->devices[0]->deviceInfo.imageMaxBufferSize)
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-        ImageHeight = 1;
-        ImageDepth = 1;
-        /* Calculate the size of the image. */
-        size = rowPitch * ImageHeight;
-        break;
-    case CL_MEM_OBJECT_IMAGE3D:
-        if (ImageWidth == 0 || ImageWidth > Context->devices[0]->deviceInfo.image2DMaxWidth)
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-        if (ImageHeight == 0 || ImageHeight > Context->devices[0]->deviceInfo.image2DMaxHeight)
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-        if (ImageDepth == 0 || ImageDepth > Context->devices[0]->deviceInfo.image3DMaxDepth)
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-
-        if (ImageRowPitch != 0 &&
-               (ImageRowPitch < ImageWidth * elementSize ||
-                ImageRowPitch % elementSize != 0 ))
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-
-        if (ImageSlicePitch != 0 && HostPtr != gcvNULL &&
-            (ImageSlicePitch < slicePitch * ImageDepth))
-        {
-            clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
-        }
-        /* Get slice pitch. */
-        slicePitch = (ImageSlicePitch ? ImageSlicePitch
-                                      : rowPitch * ImageHeight);
-        /* Calculate the size of the image. */
-        size = slicePitch * ImageDepth;
-        break;
-
-    default:
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-
-    if ((Flags & CL_MEM_USE_HOST_PTR) &&
-        (Flags & (CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR)))
-    {
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    if ((HostPtr == gcvNULL && (Flags & (CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR))) ||
-        (HostPtr && (Flags & (CL_MEM_USE_HOST_PTR | CL_MEM_COPY_HOST_PTR)) == 0))
-    {
-        clmRETURN_ERROR(CL_INVALID_HOST_PTR);
-    }
-    gcoCL_SetHardware();
-
-    /* TODO - Set endian hint. */
-
-
-    /* New image object. */
-    clmONERROR(clfNewImage(Context, &image),
-               CL_OUT_OF_HOST_MEMORY);
-
-    image->type = ImageDesc->image_type; /* Update image type */
-
-    /* Mem info. */
-    image->host            = HostPtr;
-
-    /* default image type*/
-    if (!Flags && ImageDesc->image_type != CL_MEM_OBJECT_IMAGE1D)
-    {
-        image->flags = CL_MEM_READ_WRITE;
-    }
-    else if (ImageDesc->image_type == CL_MEM_OBJECT_IMAGE1D && ImageDesc->buffer)
-    {
-        image->flags = Flags;
-        /* if not set CL_MEM_READ_WRITE CL_MEM_READ_ONLY CL_MEM_WRITE_ONLY inherite from parent */
-        if (!(Flags & (CL_MEM_READ_WRITE | CL_MEM_READ_ONLY | CL_MEM_WRITE_ONLY)))
-        {
-            image->flags |= (ImageDesc->buffer->flags & (CL_MEM_READ_WRITE | CL_MEM_READ_ONLY | CL_MEM_WRITE_ONLY));
-        }
-        image->flags |= (ImageDesc->buffer->flags & (CL_MEM_USE_HOST_PTR | CL_MEM_ALLOC_HOST_PTR | CL_MEM_COPY_HOST_PTR));
-
-        /* if not set CL_MEM_HOST_WRITE_ONLY CL_MEM_HOST_READ_ONLY CL_MEM_HOST_NO_ACCESS inherite from parent */
-        if (!(Flags & (CL_MEM_HOST_WRITE_ONLY | CL_MEM_HOST_READ_ONLY | CL_MEM_HOST_NO_ACCESS)))
-        {
-            image->flags |= (ImageDesc->buffer->flags & (CL_MEM_HOST_WRITE_ONLY | CL_MEM_HOST_READ_ONLY | CL_MEM_HOST_NO_ACCESS));
-        }
-    }
-    else
-    {
-        image->flags = Flags;
-    }
-
-    /* Image specific info. */
-    image->u.image.format           = *ImageFormat;
-    image->u.image.width            = ImageWidth;
-    image->u.image.height           = ImageHeight;
-    image->u.image.depth            = ImageDepth;
-    image->u.image.rowPitch         = rowPitch;
-    image->u.image.slicePitch       = slicePitch;
-    image->u.image.elementSize      = elementSize;
-    image->u.image.size             = size;
-    image->u.image.arraySize        = ImageArraySize;
-    image->u.image.texture          = gcvNULL;
-    image->u.image.node             = gcvNULL;
-    image->u.image.internalFormat   = internalFormat;
-    image->u.image.texturePhysical  = 0;
-    image->u.image.textureLogical   = 0;
-    image->u.image.surfaceMapped    = gcvFALSE;
-    image->u.image.tiling           = gcvLINEAR;
-    /* TODO: need to handle 1d buffer */
-    image->u.image.buffer           = ImageDesc->buffer;
-#if BUILD_OPENCL_12
-    image->mapFlag                  = 0;
-#endif
-
-
-    if (ErrcodeRet)
-    {
-        *ErrcodeRet = CL_SUCCESS;
-    }
-
-    gcmFOOTER_ARG("%d image=0x%x",
-                  CL_SUCCESS, image);
-    return image;
-
-OnError:
-
-    if(image != gcvNULL) gcoOS_Free(gcvNULL,image);
-    if (ErrcodeRet)
-    {
-        *ErrcodeRet = status;
-    }
-
-    gcmFOOTER_ARG("%d", status);
-    return gcvNULL;
-}
-
-cl_int clfCLGLShareCreateImageData(
-    cl_context               context ,
-    cl_mem                   image,
-    void *                   hostPtr
-    )
-{
-    /*clsMem_PTR              image = gcvNULL;*/
-    clsImageHeader_PTR      imageHeader;
-    gctINT                  status;
-    /*gctSIZE_T               rowPitch;
-    gctSIZE_T               slicePitch = 0;*/
-    gctSIZE_T               elementSize;
-    gceSURF_FORMAT          internalFormat;
-    gctSIZE_T               size = 0;
-    gctSIZE_T               dim1Size, dim2Size, dim3Size;
-
-
-    gcmHEADER_ARG("context=0x%x image=0x%x hostPtr=0x%x",
-                   context, image, hostPtr);
-
-    if (clfImageFormat2GcFormat(&image->u.image.format, &elementSize, &internalFormat, gcvNULL))
-    {
-        clmRETURN_ERROR(CL_INVALID_IMAGE_FORMAT_DESCRIPTOR);
-    }
-
-    dim1Size = image->u.image.width;
-    dim2Size = image->u.image.height;
-    dim3Size = image->u.image.depth;
-    switch (image->type) {
-    case CL_MEM_OBJECT_IMAGE2D_ARRAY:
-        dim3Size = image->u.image.arraySize;
-        break;
-    case CL_MEM_OBJECT_IMAGE1D_ARRAY:
-        dim2Size = image->u.image.arraySize;
-        break;
-    case CL_MEM_OBJECT_IMAGE1D_BUFFER:
-        size = elementSize * image->u.image.width;
-    default:
-        break;
-
-    }
-
-    /* Mem info. */
-    image->host            = hostPtr;
-
-
-
-    /* Allocate physical buffer for image header. */
-    image->u.image.allocatedSize = sizeof(clsImageHeader);
-    clmONERROR(gcoCL_AllocateMemory(&image->u.image.allocatedSize,
-                                    &image->u.image.physical,
-                                    &image->u.image.logical,
-                                    &image->u.image.node),
-               CL_MEM_OBJECT_ALLOCATION_FAILURE);
-
-    imageHeader = (clsImageHeader_PTR) image->u.image.logical;
-
-    /* Get endian hint */
-    /*endianHint = clfEndianHint(internalformat, type);*/
-
-#if MAP_TO_DEVICE
-    image->u.image.surfaceMapped = (image->flags & CL_MEM_USE_HOST_PTR) && !(gcmPTR2INT(hostPtr) & 0x3F);
-#endif
-
-    clmONERROR(gcoCL_CreateTexture(&image->u.image.surfaceMapped,
-                                   dim1Size,
-                                   dim2Size,
-                                   dim3Size,
-                                   hostPtr,
-                                   image->u.image.rowPitch,
-                                   image->u.image.slicePitch,
-                                   internalFormat,
-                                   gcvENDIAN_NO_SWAP,
-                                   &image->u.image.texture,
-                                   &image->u.image.surface,
-                                   &image->u.image.texturePhysical,
-                                   &image->u.image.textureLogical,
-                                   &image->u.image.textureStride,
-                                   &image->u.image.textureSlicePitch),
-               CL_MEM_OBJECT_ALLOCATION_FAILURE);
-
-    switch (image->type) {
-    case CL_MEM_OBJECT_IMAGE1D:
-    case CL_MEM_OBJECT_IMAGE1D_BUFFER:
-    case CL_MEM_OBJECT_IMAGE2D:
-        image->u.image.textureSlicePitch = 0;
-        break;
-    case CL_MEM_OBJECT_IMAGE1D_ARRAY:
-        image->u.image.textureSlicePitch = image->u.image.textureStride;
-        break;
-    }
-
-    /* For 1D buffer, associate the buffer with the image and sync the data. */
-    if (image->type == CL_MEM_OBJECT_IMAGE1D_BUFFER)
-    {
-        gcmASSERT((image->u.image.buffer != gcvNULL)
-                    && (image->u.image.buffer->u.buffer.logical != gcvNULL));
-        image->u.image.buffer->u.buffer.image = image;
-        gcoOS_MemCopy(image->u.image.textureLogical, image->u.image.buffer->u.buffer.logical, size);
-    }
-
-    gcoCL_FlushSurface(image->u.image.surface);
-
-    imageHeader->width              = image->u.image.width;
-    imageHeader->height             = image->u.image.height;
-    imageHeader->depth              = image->u.image.depth;
-    imageHeader->arraySize          = image->u.image.arraySize;
-    imageHeader->rowPitch           = image->u.image.textureStride;
-    imageHeader->slicePitch         = image->u.image.textureSlicePitch;
-    imageHeader->channelDataType    = image->u.image.format.image_channel_data_type;
-    imageHeader->channelOrder       = image->u.image.format.image_channel_order;
-    imageHeader->samplerValue       = -1;
-    imageHeader->tiling             = image->u.image.tiling;
-    imageHeader->physical           = gcmPTR2INT32(image->u.image.texturePhysical);
-    imageHeader->imageType          = image->type;
-
-    gcmFOOTER_ARG("%d image=0x%x",
-                  CL_SUCCESS, image);
-    return status;
-
-OnError:
-
-    gcmFOOTER_ARG("%d", status);
-    return status;
-}
-
 CL_API_ENTRY cl_mem CL_API_CALL
 clCreateImage(
     cl_context               Context ,
@@ -3581,6 +3148,8 @@ clCreateImage(
 
     gcmHEADER_ARG("Context=0x%x Flags=%u ImageFormat=0x%x ImageDesc=%u HostPtr=0x%x",
                    Context, Flags, ImageFormat, ImageDesc, HostPtr);
+    gcmDUMP_API("${OCL clCreateImage 0x%x, 0x%x}", Context, Flags);
+    VCL_TRACE_API(CreateImage_Pre)(Context, Flags, ImageFormat, ImageDesc, HostPtr, ErrcodeRet);
 
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
@@ -3844,7 +3413,7 @@ clCreateImage(
             "OCL-004065: (clCreateImage) invalid HostPtr.\n");
         clmRETURN_ERROR(CL_INVALID_HOST_PTR);
     }
-    gcoCL_SetHardware();
+    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
 
     /* TODO - Set endian hint. */
 
@@ -3906,6 +3475,9 @@ clCreateImage(
 #if BUILD_OPENCL_12
     image->mapFlag                  = 0;
 #endif
+    image->u.image.vxcaddressingMode = 0;
+    image->u.image.vxcfilterMode    = 0;
+    image->u.image.vxcnormalizedCoords = 0;
 
     /* Allocate physical buffer for image header. */
     image->u.image.allocatedSize = sizeof(clsImageHeader);
@@ -3980,6 +3552,7 @@ clCreateImage(
         *ErrcodeRet = CL_SUCCESS;
     }
 
+    VCL_TRACE_API(CreateImage_Post)(Context, Flags, ImageFormat, ImageDesc, HostPtr, ErrcodeRet, image);
     gcmFOOTER_ARG("%d image=0x%x",
                   CL_SUCCESS, image);
     return image;
@@ -4027,6 +3600,8 @@ clCreateImage2D(
 
     gcmHEADER_ARG("Context=0x%x Flags=%u ImageFormat=0x%x ImageWidth=%u ImageWidth=%u ImageRowPitch=%u HostPtr=0x%x",
                    Context, Flags, ImageFormat, ImageWidth, ImageHeight, ImageRowPitch, HostPtr);
+    gcmDUMP_API("${OCL clCreateImage2D 0x%x, 0x%x}", Context, Flags);
+    VCL_TRACE_API(CreateImage2D_Pre)(Context, Flags, ImageFormat, ImageWidth, ImageHeight, ImageRowPitch, HostPtr, ErrcodeRet);
 
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
@@ -4099,7 +3674,7 @@ clCreateImage2D(
         clmRETURN_ERROR(CL_INVALID_IMAGE_SIZE);
     }
 
-    gcoCL_SetHardware();
+    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
     /* TODO - Set endian hint. */
 
     /* Get row pitch. */
@@ -4133,6 +3708,9 @@ clCreateImage2D(
     image->u.image.textureLogical   = 0;
     image->u.image.surfaceMapped    = gcvFALSE;
     image->u.image.tiling           = gcvLINEAR;
+    image->u.image.vxcaddressingMode = 0;
+    image->u.image.vxcfilterMode    = 0;
+    image->u.image.vxcnormalizedCoords = 0;
 
     /* Allocate physical buffer for image header. */
     image->u.image.allocatedSize = sizeof(clsImageHeader);
@@ -4148,11 +3726,7 @@ clCreateImage2D(
     /*endianHint = clfEndianHint(internalformat, type);*/
 
 #if MAP_TO_DEVICE
-    gcoHAL_QueryChipIdentity(gcvNULL,
-                             &chipModel,
-                             gcvNULL,
-                             gcvNULL,
-                             gcvNULL);
+    chipModel = Context->devices[0]->deviceInfo.chipModel;
 
     image->u.image.surfaceMapped =
             (Flags & CL_MEM_USE_HOST_PTR)
@@ -4195,6 +3769,7 @@ clCreateImage2D(
         *ErrcodeRet = CL_SUCCESS;
     }
 
+    VCL_TRACE_API(CreateImage2D_Post)(Context, Flags, ImageFormat, ImageWidth, ImageHeight, ImageRowPitch, HostPtr, ErrcodeRet, image);
     gcmFOOTER_ARG("%d image=0x%x",
                   CL_SUCCESS, image);
     return image;
@@ -4216,7 +3791,6 @@ OnError:
     return gcvNULL;
 }
 
-#if BUILD_OPENCL_12
 CL_API_ENTRY cl_mem CL_API_CALL
 clCreateImage3D(
     cl_context              Context,
@@ -4243,6 +3817,8 @@ clCreateImage3D(
 
     gcmHEADER_ARG("Context=0x%x Flags=%u ImageFormat=0x%x ImageWidth=%u ImageHeight=%u ImageDepth=%u ImageRowPitch=%u ImageSlicePitch=%u HostPtr=0x%x",
                    Context, Flags, ImageFormat, ImageWidth, ImageHeight, ImageDepth, ImageRowPitch, ImageSlicePitch, HostPtr);
+    gcmDUMP_API("${OCL clCreateImage3D 0x%x, 0x%x}", Context, Flags);
+    VCL_TRACE_API(CreateImage3D_Pre)(Context, Flags, ImageFormat, ImageWidth, ImageHeight, ImageDepth, ImageRowPitch, ImageSlicePitch, HostPtr, ErrcodeRet);
 
     if (Context->devices[0]->deviceInfo.image3DMaxDepth == 0)
     {
@@ -4319,7 +3895,7 @@ clCreateImage3D(
             "OCL-004020: (clCreateImage3D) invalid format descriptor.\n");
         clmRETURN_ERROR(CL_INVALID_IMAGE_FORMAT_DESCRIPTOR);
     }
-    gcoCL_SetHardware();
+    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
     /* Get row pitch. */
     rowPitch = (ImageRowPitch ? ImageRowPitch
                               : ImageWidth * elementSize);
@@ -4391,6 +3967,9 @@ clCreateImage3D(
     image->u.image.textureLogical   = 0;
     image->u.image.surfaceMapped    = gcvFALSE;
     image->u.image.tiling           = gcvLINEAR;
+    image->u.image.vxcaddressingMode = 0;
+    image->u.image.vxcfilterMode    = 0;
+    image->u.image.vxcnormalizedCoords = 0;
 
     /* Allocate physical buffer for image header. */
     image->u.image.allocatedSize = sizeof(clsImageHeader);
@@ -4441,6 +4020,7 @@ clCreateImage3D(
         *ErrcodeRet = CL_SUCCESS;
     }
 
+    VCL_TRACE_API(CreateImage3D_Post)(Context, Flags, ImageFormat, ImageWidth, ImageHeight, ImageDepth, ImageRowPitch, ImageSlicePitch, HostPtr, ErrcodeRet, image);
     gcmFOOTER_ARG("%d image=0x%x",
                   CL_SUCCESS, image);
     return image;
@@ -4461,47 +4041,6 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return gcvNULL;
 }
-#else
-CL_API_ENTRY cl_mem CL_API_CALL
-clCreateImage3D(
-    cl_context              Context,
-    cl_mem_flags            Flags,
-    const cl_image_format * ImageFormat,
-    size_t                  ImageWidth,
-    size_t                  ImageHeight,
-    size_t                  ImageDepth,
-    size_t                  ImageRowPitch,
-    size_t                  ImageSlicePitch,
-    void *                  HostPtr,
-    cl_int *                ErrcodeRet
-    )
-{
-    gctINT                  status;
-
-    gcmHEADER_ARG("Context=0x%x Flags=%u ImageFormat=0x%x ImageWidth=%u ImageWidth=%u ImageRowPitch=%u HostPtr=0x%x",
-                   Context, Flags, ImageFormat, ImageWidth, ImageHeight, ImageRowPitch, HostPtr);
-
-    if (Context->devices[0]->deviceInfo.image3DMaxDepth == 0)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-004023: (clCreateImage3D) image3D is not supported.\n");
-        clmRETURN_ERROR(CL_INVALID_OPERATION);
-    }
-
-    /* TODO - Need to implement image3D. */
-    gcmUSER_DEBUG_ERROR_MSG(
-        "OCL-004024: (clCreateImage3D) internal error.\n");
-    status = CL_INVALID_OPERATION;
-
-OnError:
-    if (ErrcodeRet) {
-        *ErrcodeRet = status;
-    }
-
-    gcmFOOTER_ARG("%d", status);
-    return gcvNULL;
-}
-#endif
 
 CL_API_ENTRY cl_int CL_API_CALL
 clRetainMemObject(
@@ -4511,6 +4050,7 @@ clRetainMemObject(
     gctINT status;
 
     gcmHEADER_ARG("MemObj=0x%x", MemObj);
+    gcmDUMP_API("${OCL clRetainMemObject 0x%x}", MemObj);
 
     if (MemObj == gcvNULL ||
         MemObj->objectType != clvOBJECT_MEM)
@@ -4520,258 +4060,13 @@ clRetainMemObject(
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
     }
 
-    gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, MemObj->referenceCount, gcvNULL));
+    clfONERROR(clfRetainMemObject(MemObj));
 
+    VCL_TRACE_API(RetainMemObject)(MemObj);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
 OnError:
-    gcmFOOTER_ARG("%d", status);
-    return status;
-}
-
-cl_int clfCLGLShareReleaseMemObjectWrapper(
-    cl_mem MemObj
-    )
-{
-    clsMemObjCallback_PTR   memObjCallback, nextMemObjCallback;
-    gctINT                  status;
-    gctINT32                oldReference;
-
-    gcmHEADER_ARG("MemObj=0x%x", MemObj);
-
-    if (MemObj == gcvNULL ||
-        MemObj->objectType != clvOBJECT_MEM)
-    {
-        clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
-    }
-
-    gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, MemObj->referenceCount, &oldReference));
-
-    if (oldReference == 1)
-    {
-        gcmASSERT(MemObj->mapCount == 0);
-
-        if (MemObj->waitEvent.event)
-        {
-            clsBufferWaitEvent_PTR  tempWaitEvent        = &MemObj->waitEvent;
-            clsBufferWaitEvent_PTR  tempNextWaitEvent    = gcvNULL;
-            /* header node */
-            clReleaseEvent(tempWaitEvent->event);
-            tempWaitEvent = tempWaitEvent->next;
-
-            while(tempWaitEvent)
-            {
-                tempNextWaitEvent = tempWaitEvent->next;
-                clReleaseEvent(tempWaitEvent->event);
-                gcoOS_Free(gcvNULL, tempWaitEvent);
-                tempWaitEvent = tempNextWaitEvent;
-            }
-        }
-
-        if (MemObj->type == CL_MEM_OBJECT_BUFFER)
-        {
-            if (MemObj->u.buffer.createType == CL_BUFFER_CREATE_TYPE_REGION) {
-                clsMem_PTR parentBuffer = MemObj->u.buffer.parentBuffer;
-
-                /* Release parent buffer. */
-                clReleaseMemObject(parentBuffer);
-            }
-            if (MemObj->mapCount == 0)
-            {
-                gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, MemObj->mutex));
-                MemObj->mutex = gcvNULL;
-
-                /* Destroy the reference count object */
-                gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, MemObj->referenceCount));
-                MemObj->referenceCount = gcvNULL;
-
-                gcoOS_Free(gcvNULL, MemObj);
-
-                gcmFOOTER_NO();
-                return CL_SUCCESS;
-            }
-        }
-#if BUILD_OPENCL_12
-        else if (MemObj->type == CL_MEM_OBJECT_IMAGE2D ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE3D ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE2D_ARRAY ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE1D ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE1D_ARRAY ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE1D_BUFFER)
-#else
-        else if (MemObj->type == CL_MEM_OBJECT_IMAGE2D ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE3D )
-#endif
-        {
-            if (MemObj->mapCount == 0)
-            {
-
-                /* Invoke and free callbacks */
-                memObjCallback = MemObj->memObjCallback;
-                while (memObjCallback != gcvNULL)
-                {
-                    nextMemObjCallback = memObjCallback->next;
-                    memObjCallback->pfnNotify(MemObj, memObjCallback->userData);
-                    gcoOS_Free(gcvNULL, memObjCallback);
-                    memObjCallback = nextMemObjCallback;
-                }
-
-                gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, MemObj->mutex));
-                MemObj->mutex = gcvNULL;
-
-                /* Destroy the reference count object */
-                gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, MemObj->referenceCount));
-                MemObj->referenceCount = gcvNULL;
-
-                gcoOS_Free(gcvNULL, MemObj);
-
-                gcmFOOTER_NO();
-                return CL_SUCCESS;
-            }
-        }
-    }
-
-    gcmFOOTER_NO();
-    return CL_SUCCESS;
-
-OnError:
-
-    gcmFOOTER_ARG("%d", status);
-    return status;
-}
-
-cl_int clfCLGLShareReleaseMemObjectData(
-    cl_mem MemObj
-    )
-{
-    clsMemObjCallback_PTR   memObjCallback, nextMemObjCallback;
-    gctINT                  status;
-    /*gctINT32                oldReference;*/
-
-    gcmHEADER_ARG("MemObj=0x%x", MemObj);
-
-    if (MemObj == gcvNULL ||
-        MemObj->objectType != clvOBJECT_MEM)
-    {
-        clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
-    }
-
-    if (CL_TRUE)
-    {
-        gcmASSERT(MemObj->mapCount == 0);
-
-        if (MemObj->waitEvent.event)
-        {
-            clsBufferWaitEvent_PTR  tempWaitEvent        = &MemObj->waitEvent;
-            clsBufferWaitEvent_PTR  tempNextWaitEvent    = gcvNULL;
-            /* header node */
-            clReleaseEvent(tempWaitEvent->event);
-            tempWaitEvent = tempWaitEvent->next;
-
-            while(tempWaitEvent)
-            {
-                tempNextWaitEvent = tempWaitEvent->next;
-                clReleaseEvent(tempWaitEvent->event);
-                gcoOS_Free(gcvNULL, tempWaitEvent);
-                tempWaitEvent = tempNextWaitEvent;
-            }
-        }
-
-        if (MemObj->type == CL_MEM_OBJECT_BUFFER)
-        {
-            if (MemObj->u.buffer.createType == CL_BUFFER_CREATE_TYPE_REGION) {
-                clsMem_PTR parentBuffer = MemObj->u.buffer.parentBuffer;
-
-                /* Release parent buffer. */
-                clReleaseMemObject(parentBuffer);
-            }
-            if (MemObj->mapCount == 0)
-            {
-                if (MemObj->fromGL)
-                {
-                    gcmVERIFY_OK(gcoCL_UnshareMemory(MemObj->u.buffer.node));
-                }
-                else if (MemObj->u.buffer.createType != CL_BUFFER_CREATE_TYPE_REGION)
-                {
-                    if (MemObj->u.buffer.wrapped)
-                    {
-                        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(
-                            MemObj->u.buffer.wrappedNode,
-                            gcvSURF_BITMAP));
-
-                        gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(
-                            MemObj->u.buffer.wrappedNode));
-                    }
-                    else
-                    {
-                        gcoCL_FreeMemory(MemObj->u.buffer.physical,
-                                         MemObj->u.buffer.logical,
-                                         MemObj->u.buffer.allocatedSize,
-                                         MemObj->u.buffer.node);
-                    }
-                }
-
-#if cldSYNC_MEMORY
-                gcmVERIFY_OK(gcoCL_Commit(gcvTRUE));
-#endif
-
-                /* Invoke and free callbacks */
-                memObjCallback = MemObj->memObjCallback;
-                while (memObjCallback != gcvNULL)
-                {
-                    nextMemObjCallback = memObjCallback->next;
-                    memObjCallback->pfnNotify(MemObj, memObjCallback->userData);
-                    gcoOS_Free(gcvNULL, memObjCallback);
-                    memObjCallback = nextMemObjCallback;
-                }
-
-                gcmFOOTER_NO();
-                return CL_SUCCESS;
-            }
-        }
-#if BUILD_OPENCL_12
-        else if (MemObj->type == CL_MEM_OBJECT_IMAGE2D ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE3D ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE2D_ARRAY ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE1D ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE1D_ARRAY ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE1D_BUFFER)
-#else
-        else if (MemObj->type == CL_MEM_OBJECT_IMAGE2D ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE3D )
-#endif
-        {
-            if (MemObj->mapCount == 0)
-            {
-                /* Release image object */
-                gcoCL_FreeMemory(MemObj->u.image.physical,
-                                 MemObj->u.image.logical,
-                                 MemObj->u.image.allocatedSize,
-                                 MemObj->u.image.node);
-
-                gcoCL_DestroyTexture(MemObj->u.image.texture,
-                                     MemObj->u.image.surface);
-
-#if cldSYNC_MEMORY
-                gcmVERIFY_OK(gcoCL_Commit(gcvTRUE));
-#endif
-
-                MemObj->u.image.texture = gcvNULL;
-                MemObj->u.image.surface = gcvNULL;
-                MemObj->u.image.surfaceMapped = gcvFALSE;
-
-                gcmFOOTER_NO();
-                return CL_SUCCESS;
-            }
-        }
-    }
-
-    gcmFOOTER_NO();
-    return CL_SUCCESS;
-
-OnError:
-
     gcmFOOTER_ARG("%d", status);
     return status;
 }
@@ -4781,11 +4076,10 @@ clReleaseMemObject(
     cl_mem MemObj
     )
 {
-    clsMemObjCallback_PTR   memObjCallback, nextMemObjCallback;
     gctINT                  status;
-    gctINT32                oldReference;
 
     gcmHEADER_ARG("MemObj=0x%x", MemObj);
+    gcmDUMP_API("${OCL clReleaseMemObject 0x%x}", MemObj);
 
     if (MemObj == gcvNULL ||
         MemObj->objectType != clvOBJECT_MEM)
@@ -4795,154 +4089,9 @@ clReleaseMemObject(
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
     }
 
-    gcmVERIFY_OK(gcoOS_AtomDecrement(gcvNULL, MemObj->referenceCount, &oldReference));
+    clfONERROR(clfReleaseMemObject(MemObj));
 
-    if (oldReference == 1)
-    {
-        gcmASSERT(MemObj->mapCount == 0);
-
-        if (MemObj->waitEvent.event)
-        {
-            clsBufferWaitEvent_PTR  tempWaitEvent        = &MemObj->waitEvent;
-            clsBufferWaitEvent_PTR  tempNextWaitEvent    = gcvNULL;
-            /* header node */
-            clReleaseEvent(tempWaitEvent->event);
-            tempWaitEvent = tempWaitEvent->next;
-
-            while(tempWaitEvent)
-            {
-                tempNextWaitEvent = tempWaitEvent->next;
-                clReleaseEvent(tempWaitEvent->event);
-                gcoOS_Free(gcvNULL, tempWaitEvent);
-                tempWaitEvent = tempNextWaitEvent;
-            }
-        }
-
-        if (MemObj->type == CL_MEM_OBJECT_BUFFER)
-        {
-            if (MemObj->u.buffer.createType == CL_BUFFER_CREATE_TYPE_REGION) {
-                clsMem_PTR parentBuffer = MemObj->u.buffer.parentBuffer;
-
-                /* Release parent buffer. */
-                clReleaseMemObject(parentBuffer);
-            }
-            if (MemObj->mapCount == 0)
-            {
-                if (MemObj->fromGL)
-                {
-                    /* do nothing, it already release in releaseGLObject */
-                    /* gcmVERIFY_OK(gcoCL_UnshareMemory(MemObj->u.buffer.node)); */
-                }
-                else if (MemObj->u.buffer.createType != CL_BUFFER_CREATE_TYPE_REGION)
-                {
-                    if (MemObj->u.buffer.wrapped)
-                    {
-                        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(
-                            MemObj->u.buffer.wrappedNode,
-                            gcvSURF_BITMAP));
-
-                        gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(
-                            MemObj->u.buffer.wrappedNode));
-                    }
-                    else
-                    {
-                        gcoCL_FreeMemory(MemObj->u.buffer.physical,
-                                         MemObj->u.buffer.logical,
-                                         MemObj->u.buffer.allocatedSize,
-                                         MemObj->u.buffer.node);
-                    }
-                }
-
-#if cldSYNC_MEMORY
-                gcmVERIFY_OK(gcoCL_Commit(gcvTRUE));
-#endif
-
-                /* Invoke and free callbacks */
-                memObjCallback = MemObj->memObjCallback;
-                while (memObjCallback != gcvNULL)
-                {
-                    nextMemObjCallback = memObjCallback->next;
-                    memObjCallback->pfnNotify(MemObj, memObjCallback->userData);
-                    gcoOS_Free(gcvNULL, memObjCallback);
-                    memObjCallback = nextMemObjCallback;
-                }
-
-                gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, MemObj->mutex));
-                MemObj->mutex = gcvNULL;
-
-                /* Destroy the reference count object */
-                gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, MemObj->referenceCount));
-                MemObj->referenceCount = gcvNULL;
-
-                gcoOS_Free(gcvNULL, MemObj);
-
-                gcmFOOTER_NO();
-                return CL_SUCCESS;
-            }
-        }
-#if BUILD_OPENCL_12
-        else if (MemObj->type == CL_MEM_OBJECT_IMAGE2D ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE3D ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE2D_ARRAY ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE1D ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE1D_ARRAY ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE1D_BUFFER)
-#else
-        else if (MemObj->type == CL_MEM_OBJECT_IMAGE2D ||
-                 MemObj->type == CL_MEM_OBJECT_IMAGE3D )
-#endif
-        {
-            if (MemObj->mapCount == 0)
-            {
-                if (MemObj->fromGL)
-                {
-                    /* do nothing, it already release in releaseGLObject */
-                }
-                else
-                {
-                    /* Release image object */
-                    gcoCL_FreeMemory(MemObj->u.image.physical,
-                                     MemObj->u.image.logical,
-                                     MemObj->u.image.allocatedSize,
-                                     MemObj->u.image.node);
-
-                    gcoCL_DestroyTexture(MemObj->u.image.texture,
-                                         MemObj->u.image.surface);
-                }
-
-#if cldSYNC_MEMORY
-                gcmVERIFY_OK(gcoCL_Commit(gcvTRUE));
-#endif
-
-                MemObj->u.image.texture = gcvNULL;
-                MemObj->u.image.surface = gcvNULL;
-                MemObj->u.image.surfaceMapped = gcvFALSE;
-
-                /* Invoke and free callbacks */
-                memObjCallback = MemObj->memObjCallback;
-                while (memObjCallback != gcvNULL)
-                {
-                    nextMemObjCallback = memObjCallback->next;
-                    memObjCallback->pfnNotify(MemObj, memObjCallback->userData);
-                    gcoOS_Free(gcvNULL, memObjCallback);
-                    memObjCallback = nextMemObjCallback;
-                }
-
-                gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, MemObj->mutex));
-                MemObj->mutex = gcvNULL;
-
-                /* Destroy the reference count object */
-                gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, MemObj->referenceCount));
-                MemObj->referenceCount = gcvNULL;
-
-                gcoOS_Free(gcvNULL, MemObj);
-
-                gcmFOOTER_NO();
-                return CL_SUCCESS;
-            }
-        }
-    }
-
+    VCL_TRACE_API(ReleaseMemObject)(MemObj);
     gcmFOOTER_NO();
     return CL_SUCCESS;
 
@@ -4956,6 +4105,7 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
+
 
 CL_API_ENTRY cl_int CL_API_CALL
 clGetSupportedImageFormats(
@@ -5010,6 +4160,7 @@ clGetSupportedImageFormats(
 
     gcmHEADER_ARG("Context=0x%x Flags=%u ImageType=0x%x NumEntries=%u",
                    Context, Flags, ImageType, NumEntries);
+    gcmDUMP_API("${OCL clGetSupportedImageFormats 0x%x, 0x%x}", Context, Flags);
 
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
@@ -5051,6 +4202,7 @@ clGetSupportedImageFormats(
         *NumImageFormats = count;
     }
 
+    VCL_TRACE_API(GetSupportedImageFormats)(Context, Flags, ImageType, NumEntries, ImageFormats, NumImageFormats);
     gcmFOOTER_ARG("%d *NumImageFormats=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(NumImageFormats));
     return CL_SUCCESS;
@@ -5080,6 +4232,7 @@ clGetMemObjectInfo(
 
     gcmHEADER_ARG("MemObj=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   MemObj, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetMemObjectInfo 0x%x, 0x%x}", MemObj, ParamName);
 
     if (MemObj == gcvNULL || MemObj->objectType != clvOBJECT_MEM)
     {
@@ -5201,6 +4354,7 @@ clGetMemObjectInfo(
         *ParamValueSizeRet = retParamSize;
     }
 
+    VCL_TRACE_API(GetMemObjectInfo)(MemObj, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;
@@ -5226,6 +4380,7 @@ clGetImageInfo(
 
     gcmHEADER_ARG("Image=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   Image, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetImageInfo 0x%x, 0x%x}", Image, ParamName);
 
 #if BUILD_OPENCL_12
     if (Image == gcvNULL ||
@@ -5368,6 +4523,7 @@ clGetImageInfo(
         *ParamValueSizeRet = retParamSize;
     }
 
+    VCL_TRACE_API(GetImageInfo)(Image, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;
@@ -5390,6 +4546,7 @@ clSetMemObjectDestructorCallback(
 
     gcmHEADER_ARG("MemObj=0x%x PfnNotify=0x%x UserData=0x%x",
                   MemObj, PfnNotify, UserData);
+    gcmDUMP_API("${OCL clSetMemObjectDestructorCallback 0x%x}", MemObj);
 
     if (MemObj == gcvNULL || MemObj->objectType != clvOBJECT_MEM)
     {
@@ -5419,6 +4576,7 @@ clSetMemObjectDestructorCallback(
     memObjCallback->next        = MemObj->memObjCallback;
     MemObj->memObjCallback      = memObjCallback;
 
+    VCL_TRACE_API(SetMemObjectDestructorCallback)(MemObj, PfnNotify, UserData);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 

@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -67,6 +67,7 @@ EXPORTS
     gcoOS_GetCwd
     gcoOS_GetDebugLevel
     gcoOS_GetDebugZone
+    gcoOS_GetDriverTLS
     gcoOS_GetEnv
     gcoOS_SetEnv
     gcoOS_GetMemoryUsage
@@ -92,6 +93,7 @@ EXPORTS
     gcoOS_QueryProfileTickRate
     gcoOS_QueryVideoMemory
     gcoOS_LockPLS
+	gcoOS_LockGLFECompiler
     gcoOS_Read
     gcoOS_ReadRegister
     gcoOS_ReleaseMutex
@@ -105,6 +107,7 @@ EXPORTS
     gcoOS_SetDebugShaderFiles
     gcoOS_SetDebugZone
     gcoOS_SetDebugZones
+    gcoOS_SetDriverTLS
     gcoOS_SetPLSValue
     gcoOS_SetPos
     gcoOS_Shutdown
@@ -124,6 +127,7 @@ EXPORTS
     gcoOS_StrToFloat
     gcoOS_StrToInt
     gcoOS_UnLockPLS
+	gcoOS_UnLockGLFECompiler
     gcoOS_UnmapUserMemory
     gcoOS_Verify
     gcoOS_WaitSignal
@@ -770,8 +774,6 @@ EXPORTS
     gcoVERTEXARRAY_IndexBind
     gcoVERTEXARRAY_StreamBind
     gcoVERTEXARRAY_Bind
-    gcoVERTEXARRAY_Bind_Ex
-    gcoVERTEXARRAY_Bind_Ex2
     gcoVERTEXARRAY_IndexBind_Ex
     gcoVERTEXARRAY_StreamBind_Ex
 
@@ -1024,8 +1026,14 @@ EXPORTS
     gcoVX_LoadKernelShader
     gcoVX_InvokeKernelShader
     gcoVX_Flush
+    gcoVX_TriggerAccelerator
+    gcoVX_ProgrammCrossEngine
+    gcoVX_SetNNImage
+    gcoVX_GetNNConfig
     gcoVX_AllocateMemoryEx
     gcoVX_FreeMemoryEx
+    gcoVX_GetMemorySize
+    gcoVX_ZeroMemorySize
     gcoVX_CreateDevices
     gcoVX_DestroyDevices
     gcoVX_GetCurrentDevice
@@ -1033,6 +1041,7 @@ EXPORTS
     gcoVX_MultiDeviceSync
     gcoVX_SaveContext
     gcoVX_RestoreContext
+    gcoVX_WaitNNEvent
 
 !IF "$(VSIMULATOR_DEBUG)" == "1"
 	gcoOS_SetSimulatorCallback

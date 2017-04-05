@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -152,7 +152,7 @@ vx_status vxViv_Fast9Corners_Strength(vx_node node, vx_image src, vx_scalar t, v
         kernelContext->uniform_num = 0;
     }
 
-    if (node->base.context->evisNoInst.noIAdd || node->base.context->evisNoInst.noFilter || node->base.context->evisNoInst.noAbsDiff)
+    if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noIAdd || node->base.context->evisNoInst.noFilter || node->base.context->evisNoInst.noAbsDiff)
     {
         indexNum = sizeof(indexs_halfevis)/sizeof(indexs_halfevis[0]);
         indexData = (gcoVX_Index *)vxAllocate(sizeof(gcoVX_Index) * indexNum);
@@ -210,7 +210,7 @@ vx_status vxViv_Fast9Corners_Strength(vx_node node, vx_image src, vx_scalar t, v
         bin[4] = 0xaaaaaaaa;
         bin[5] = 0x76543210;
         bin[6] = 0xfedcba98;
-        if (node->base.context->evisNoInst.noIAdd || node->base.context->evisNoInst.noFilter || node->base.context->evisNoInst.noAbsDiff)
+        if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noIAdd || node->base.context->evisNoInst.noFilter || node->base.context->evisNoInst.noAbsDiff)
         {
             bin[7] = 0x00006300;
         }
@@ -231,7 +231,7 @@ vx_status vxViv_Fast9Corners_Strength(vx_node node, vx_image src, vx_scalar t, v
 
         gcoOS_MemCopy(&kernelContext->uniforms[kernelContext->uniform_num].uniform, bin, sizeof(bin));
         kernelContext->uniforms[kernelContext->uniform_num].num         = 16 * 4;
-        if (node->base.context->evisNoInst.noIAdd || node->base.context->evisNoInst.noFilter || node->base.context->evisNoInst.noAbsDiff)
+        if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noIAdd || node->base.context->evisNoInst.noFilter || node->base.context->evisNoInst.noAbsDiff)
         {
             kernelContext->uniforms[kernelContext->uniform_num].index       = 42;
         }

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -222,6 +222,7 @@ typedef enum _cleOPCODE
     clvOPCODE_IMAGE_READ_3D,
     clvOPCODE_IMAGE_WRITE,
     clvOPCODE_IMAGE_WRITE_3D,
+    clvOPCODE_CLAMP0MAX,
 
 
     /* Conversion Operations */
@@ -791,6 +792,26 @@ typedef struct _clsROPERAND
     clsINDEX   vectorIndex;
 }
 clsROPERAND;
+
+gctINT
+clGetIntegerValue(
+IN clsROPERAND *Operand
+);
+
+gctBOOL
+clIsIntegerZero(
+IN clsROPERAND *Operand
+);
+
+gceSTATUS
+clUpdateAddressOffset(
+IN cloCOMPILER Compiler,
+IN gctUINT LineNo,
+IN gctUINT StringNo,
+IN gctINT Incr,
+IN OUT clsROPERAND *Offset,
+OUT clsROPERAND *NewOffset
+);
 
 void
 clGetVectorROperandSlice(
@@ -1396,7 +1417,7 @@ cleGEN_CODE_HINT;
 typedef struct _clsGEN_CODE_PARAMETER_DATA_TYPE
 {
     clsGEN_CODE_DATA_TYPE def;
-    gctINT byteOffset;
+    clsROPERAND byteOffset;
     gctINT savedByteOffset;
 } clsGEN_CODE_PARAMETER_DATA_TYPE;
 

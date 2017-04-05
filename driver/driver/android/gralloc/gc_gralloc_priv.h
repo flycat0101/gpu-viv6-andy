@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -22,7 +22,7 @@
 
 /*
  * Private gralloc usage(s) for render target allocation.
- * TODO (Vendor): Make sure these do not conflict with other private usage bits.
+ * TODO (Soc-vendor): Make sure these do not conflict with other private usage bits.
  */
 #define GRALLOC_USAGE_PRIVATE_0_VIV         0x100000
 #define GRALLOC_USAGE_PRIVATE_1_VIV         0x200000

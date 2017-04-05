@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -41,7 +41,7 @@
 using namespace android;
 #   define DEBUG_PRINT         LOGE
 #   include <pthread.h>
-#elif defined(LINUX)
+#elif defined(LINUX) || defined(__QNXNTO__)
 #   define DEBUG_PRINT         printf
 #   include <gc_vdk.h>
 #   include <pthread.h>
@@ -67,7 +67,7 @@ using namespace android;
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 
-#if defined(ANDROID_JNI) || defined(LINUX)
+#if defined(ANDROID_JNI) || defined(LINUX) || defined(__QNXNTO__)
 pthread_t   g_thread;
 #else
 HDC         g_hDC   = NULL;
@@ -227,7 +227,7 @@ void initEGL(EGLNativeWindowType nativeWindow, EGLNativeWindowType nativeWindow2
     DEBUG_PRINT("*************************SURF2(%p), CONTEXT(%p)", g_eglSurface2, g_eglContext2);
 
     eglMakeCurrent(g_eglDisplay, g_eglSurface1, g_eglSurface1, g_eglContext1);
-#elif defined(LINUX)
+#elif defined(LINUX) || defined(__QNXNTO__)
     int iConfigs;
     EGLConfig eglConfig = 0;
     EGLint ai32ContextAttribs[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
@@ -543,7 +543,7 @@ void renderThread1()
     LOSE_CURRENT;
 }
 
-#if defined(ANDROID_JNI) || defined(LINUX)
+#if defined(ANDROID_JNI) || defined(LINUX) || defined(__QNXNTO__)
 void* renderThread2(void* param)
 #else
 DWORD WINAPI renderThread2(LPVOID lpParam)
@@ -664,7 +664,7 @@ void RenderInit(EGLNativeWindowType nativeWindow, EGLNativeWindowType nativeWind
     DEBUG_PRINT("Begin GL init");
     initGL();
 
-#if defined(ANDROID_JNI) || defined(LINUX)
+#if defined(ANDROID_JNI) || defined(LINUX) || defined(__QNXNTO__)
     pthread_create(&g_thread, NULL, renderThread2, NULL);
 #endif
 }
@@ -674,7 +674,7 @@ void Render()
 {
     renderThread1();
 }
-#elif defined(LINUX)
+#elif defined(LINUX) || defined(__QNXNTO__)
 int main(int argc, char** argv)
 {
     bool        pause = false;

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -711,5 +711,25 @@ VX_API_ENTRY vx_node VX_API_CALL vxSgmNode(vx_graph graph, vx_image right_img, v
     };
 
     return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_SGM, parameters, vxmLENGTH_OF(parameters));
+}
+VX_API_ENTRY vx_node VX_API_CALL vxCNNNode(vx_graph graph, vx_image inputImage, vx_array percentArray)
+{
+    vx_reference parameters[] = {
+        (vx_reference)inputImage,
+        (vx_reference)percentArray,
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_CNN, parameters, vxmLENGTH_OF(parameters));
+}
+
+VX_API_ENTRY vx_node VX_API_CALL vxFasterRCNNode(vx_graph graph, vx_image inputImage, vx_array percentArray, vx_array coordArray)
+{
+    vx_reference parameters[] = {
+        (vx_reference)inputImage,
+        (vx_reference)percentArray,
+        (vx_reference)coordArray
+    };
+
+    return vxoNode_CreateSpecific(graph, VX_KERNEL_FASTER_RCNN, parameters, vxmLENGTH_OF(parameters));
 }
 

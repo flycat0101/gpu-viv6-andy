@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -83,6 +83,7 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     pVscHwCfg->psInstBufferAddrBase                  = Hardware->config->psInstBase;
     pVscHwCfg->maxHwNativeTotalConstRegCount         = Hardware->config->numConstants;
     pVscHwCfg->maxTotalConstRegCount                 = Hardware->config->constMax;
+    pVscHwCfg->unifiedConst                          = Hardware->config->unifiedConst;
     pVscHwCfg->maxVSConstRegCount                    = Hardware->config->vsConstMax;
     /* use VS count for now */
     pVscHwCfg->maxTCSConstRegCount                   = Hardware->config->vsConstMax;
@@ -115,6 +116,7 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
 
     pVscHwCfg->maxHwNativeTotalSamplerCount          = totalCount;
 
+    /* samplerNoBase for state programming */
     if (IS_HW_SUPPORT(gcvFEATURE_SAMPLER_BASE_OFFSET))
     {
         pVscHwCfg->vsSamplerRegNoBase                = samplerBase[gcvPROGRAM_STAGE_VERTEX];
@@ -123,6 +125,9 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
         pVscHwCfg->tcsSamplerRegNoBase               = samplerBase[gcvPROGRAM_STAGE_TCS];
         pVscHwCfg->tesSamplerRegNoBase               = samplerBase[gcvPROGRAM_STAGE_TES];
         pVscHwCfg->gsSamplerRegNoBase                = samplerBase[gcvPROGRAM_STAGE_GEOMETRY];
+        /* samplerNoBase in instruction words */
+        pVscHwCfg->vsSamplerNoBaseInInstruction      = 0;
+        pVscHwCfg->psSamplerNoBaseInInstruction      = samplerBase[gcvPROGRAM_STAGE_FRAGMENT];
     }
     else
     {
@@ -132,6 +137,9 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
         pVscHwCfg->tcsSamplerRegNoBase               = 0;
         pVscHwCfg->tesSamplerRegNoBase               = 0;
         pVscHwCfg->gsSamplerRegNoBase                = 0;
+        /* samplerNoBase in instruction words */
+        pVscHwCfg->vsSamplerNoBaseInInstruction      = samplerBase[gcvPROGRAM_STAGE_VERTEX];
+        pVscHwCfg->psSamplerNoBaseInInstruction      = samplerBase[gcvPROGRAM_STAGE_FRAGMENT];
     }
     pVscHwCfg->vertexOutputBufferSize                = Hardware->config->vertexOutputBufferSize;
     pVscHwCfg->vertexCacheSize                       = Hardware->config->vertexCacheSize;
@@ -229,6 +237,25 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     pVscHwCfg->hwFeatureFlags.supportUnOrdBranch     = gcvFALSE;
     pVscHwCfg->hwFeatureFlags.supportPatchVerticesIn = gcvFALSE;
     pVscHwCfg->hwFeatureFlags.hasHalfDepFix          = IS_HW_SUPPORT(gcvFEATURE_SH_HALF_DEPENDENCY_FIX);
+    pVscHwCfg->hwFeatureFlags.supportUSC             = IS_HW_SUPPORT(gcvFEATURE_USC);
+    pVscHwCfg->hwFeatureFlags.supportPartIntBranch   = IS_HW_SUPPORT(gcvFEATURE_PARTLY_SUPPORT_INTEGER_BRANCH);
+    pVscHwCfg->hwFeatureFlags.supportIntAttrib       = IS_HW_SUPPORT(gcvFEATURE_SUPPORT_INTEGER_ATTRIBUTE);
+    pVscHwCfg->hwFeatureFlags.hasTxBiasLodFix        = IS_HW_SUPPORT(gcvFEATURE_TEXTURE_BIAS_LOD_FIX);
+    pVscHwCfg->hwFeatureFlags.supportmovai           = IS_HW_SUPPORT(gcvFEATURE_SUPPORT_MOVAI);
+    pVscHwCfg->hwFeatureFlags.useGLZ                 = IS_HW_SUPPORT(gcvFEATURE_USE_GL_Z);
+    pVscHwCfg->hwFeatureFlags.supportHelperInv       = IS_HW_SUPPORT(gcvFEATURE_HELPER_INVOCATION);
+    pVscHwCfg->hwFeatureFlags.supportAdvBlendPart0   = IS_HW_SUPPORT(gcvFEATURE_ADVANCED_BLEND_MODE_PART0);
+    pVscHwCfg->hwFeatureFlags.supportStartVertexFE   = IS_HW_SUPPORT(gcvFEATURE_FE_START_VERTEX_SUPPORT);
+    pVscHwCfg->hwFeatureFlags.supportTxGather        = IS_HW_SUPPORT(gcvFEATURE_TEXTURE_GATHER);
+    pVscHwCfg->hwFeatureFlags.singlePipeHalti1       = IS_HW_SUPPORT(gcvFEATURE_SINGLE_PIPE_HALTI1);
+    pVscHwCfg->hwFeatureFlags.supportEVISVX2         = IS_HW_SUPPORT(gcvFEATURE_EVIS_VX2);
+    pVscHwCfg->hwFeatureFlags.computeOnly            = IS_HW_SUPPORT(gcvFEATURE_COMPUTE_ONLY);
+    pVscHwCfg->hwFeatureFlags.hasBugFix7             = IS_HW_SUPPORT(gcvFEATURE_BUG_FIXES7);
+    pVscHwCfg->hwFeatureFlags.hasExtraInst2          = IS_HW_SUPPORT(gcvFEATURE_SHADER_HAS_EXTRA_INSTRUCTIONS2);
+    pVscHwCfg->hwFeatureFlags.hasAtomic              = IS_HW_SUPPORT(gcvFEATURE_SHADER_HAS_ATOMIC);
+    pVscHwCfg->hwFeatureFlags.supportFullIntBranch   = IS_HW_SUPPORT(gcvFEATURE_FULLLY_SUPPORT_INTEGER_BRANCH);
+
+
 
 OnError:
     gcmFOOTER();

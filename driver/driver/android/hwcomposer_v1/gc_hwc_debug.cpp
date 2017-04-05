@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1090,7 +1090,7 @@ again:
                     uint8_t  *p = (uint8_t *) buff;
 
                     for (j = 0; j < (size_t) width; j++) {
-                        /* TODO: low bits. */
+                        /* low bits are '0' currently. */
                         uint16_t pix = *s++;
                         *p++ = (pix & 0x001F) << 3;
                         *p++ = (pix & 0x07E0) >> 3;
@@ -1107,7 +1107,7 @@ again:
                     uint8_t *p  = (uint8_t *) buff;
 
                     for (j = 0; j < (size_t) width; j++) {
-                        /* TODO: low bits. */
+                        /* low bits are '0' currently. */
                         uint16_t pix = *s++;
                         *p++ = (pix & 0xF800) >> 8;
                         *p++ = (pix & 0x07E0) >> 3;
@@ -1124,7 +1124,7 @@ again:
                     uint32_t *p = (uint32_t *) buff;
 
                     for (j = 0; j < (size_t) width; j++) {
-                        /* TODO: low bits. */
+                        /* low bits are '0' currently. */
                         uint16_t pix = *s++;
                         *p++ = ( pix & 0xF0) |
                                ((pix & 0x0F00) << 4) |
@@ -1142,7 +1142,7 @@ again:
                     uint32_t *p = (uint32_t *) buff;
 
                     for (j = 0; j < (size_t) width; j++) {
-                        /* TODO: low bits. */
+                        /* low bits are '0' currently. */
                         uint16_t pix = *s++;
                         *p++ = ((pix & 0xF000) >> 8) |
                                ((pix & 0x0F00) << 4) |
@@ -1160,7 +1160,7 @@ again:
                     uint8_t *p = (uint8_t *) buff;
 
                     for (j = 0; j < (size_t) width; j++) {
-                        /* TODO: low bits. */
+                        /* low bits are '0' currently. */
                         uint8_t pix = *s++;
                         *p++ = pix;
                         *p++ = pix;
@@ -1182,7 +1182,7 @@ again:
                     uint16_t *p = (uint16_t *) buff;
 
                     for (j = 0; j < (size_t) width; j++) {
-                        /* TODO: low bits. */
+                        /* low bits are '0' currently. */
                         uint16_t pix = *s++;
                         *p++ = ((pix & 0x7FFF) << 1) | ((pix & 0x8000) >> 15);
                     }

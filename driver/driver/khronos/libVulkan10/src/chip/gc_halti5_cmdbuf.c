@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -668,8 +668,8 @@ OnError:
     return result;
 }
 
-VkResult halti5_drawIndexed
-    (VkCommandBuffer commandBuffer,
+VkResult halti5_drawIndexed(
+    VkCommandBuffer commandBuffer,
     uint32_t indexCount,
     uint32_t instanceCount,
     uint32_t firstIndex,
@@ -835,6 +835,525 @@ VkResult halti5_drawIndexed
 OnError:
     __VK_ASSERT(result == VK_SUCCESS);
     cmdBuf->curScrachBufIndex = 0;
+    return result;
+}
+
+__VK_INLINE VkResult halti5_setIndexBufferCmd(
+    __vkCommandBuffer *cmdBuf,
+    uint32_t **pCmdBuffer
+    )
+{
+    __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
+
+    static const uint32_t xlateIndexType[] =
+    {
+        /* VK_INDEX_TYPE_UINT16*/
+        0x1,
+        /* VK_INDEX_TYPE_UINT32 */
+        0x2,
+    };
+
+    static const uint32_t xlatePRindex[] =
+    {
+        /* VK_INDEX_TYPE_UINT16*/
+        0xFFFF,
+         /* VK_INDEX_TYPE_UINT32 */
+        0xFFFFFFFF,
+    };
+
+    uint32_t srcAddr;
+    __vkBuffer *buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, cmdBuf->bindInfo.indexBuffer.buffer);
+
+    if (pip->patchControlPoints != 0 && buf->splitMemory)
+    {
+        srcAddr = buf->splitMemory->devAddr;
+        srcAddr += (uint32_t)buf->splitMemOffset;
+    }
+    else
+    {
+        srcAddr = buf->memory->devAddr;
+        srcAddr += (uint32_t)(buf->memOffset + cmdBuf->bindInfo.indexBuffer.offset);
+    }
+
+    if (cmdBuf->bindInfo.indexBuffer.firstIndex)
+    {
+        srcAddr += cmdBuf->bindInfo.indexBuffer.firstIndex
+            * ((cmdBuf->bindInfo.indexBuffer.indexType == VK_INDEX_TYPE_UINT16) ? 2 : 4);
+    }
+
+    __vkCmdLoadSingleHWState(pCmdBuffer, 0x0191, VK_FALSE, srcAddr);
+    __vkCmdLoadSingleHWState(pCmdBuffer, 0x0192, VK_FALSE,
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 1:0) - (0 ?
+ 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
+ 1:0))) | (((gctUINT32) ((gctUINT32) (xlateIndexType[cmdBuf->bindInfo.indexBuffer.indexType]) & ((gctUINT32) ((((1 ?
+ 1:0) - (0 ? 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
+ 1:0)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 5:4) - (0 ?
+ 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
+ 5:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 5:4) - (0 ?
+ 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
+ 5:4)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 8:8) - (0 ?
+ 8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
+ 8:8))) | (((gctUINT32) ((gctUINT32) (pip->primitiveRestartEnable) & ((gctUINT32) ((((1 ?
+ 8:8) - (0 ? 8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
+ 8:8))));
+
+    if (pip->primitiveRestartEnable)
+    {
+        __vkCmdLoadSingleHWState(pCmdBuffer, 0x019D, VK_FALSE,
+            xlatePRindex[cmdBuf->bindInfo.indexBuffer.indexType]);
+    }
+
+    return VK_SUCCESS;
+}
+
+/*********************************************************
+**              split draw func
+**********************************************************/
+#define __VK_COMPUTE_SPLIT_PARAMTER(cmdBuf, pip, indexCount) \
+    splitParamter.indexSize = ((cmdBuf->bindInfo.indexBuffer.indexType == VK_INDEX_TYPE_UINT16) ? 2 : 4); \
+    splitParamter.indexBufferSize = (indexCount) * splitParamter.indexSize; \
+    splitParamter.bytesPerPatch = pip->patchControlPoints * splitParamter.indexSize; \
+    splitParamter.alignBytes = 64; \
+    splitParamter.splitBytesPerPatch = splitParamter.bytesPerPatch - splitParamter.indexSize
+
+__VK_INLINE VkResult halti5_allocSplitMemory(
+    __vkCommandBuffer *cmdBuf,
+    __vkBuffer * buf,
+    __vkSplitPathListParams* pParameter
+    )
+{
+    VkResult result = VK_SUCCESS;
+    uint32_t copyOffset = 0;
+    uint32_t copyLen = 0;
+    uint32_t splitMemSize = 0;
+    uint32_t i = 0;
+    VkMemoryAllocateInfo mem_alloc;
+    __vkDevContext *devCtx = cmdBuf->devCtx;
+
+    if (buf->splitMemory)
+    {
+        /* already exist, just update offset.*/
+        buf->splitMemOffset = __VK_ALIGN(buf->splitMemory->devAddr, pParameter->alignBytes) - buf->splitMemory->devAddr;
+    }
+    else
+    {
+        /* allocate split memory.*/
+        /* compute split memory size.*/
+        do
+        {
+            VkBool32 doCopy = VK_FALSE;
+
+            if (copyOffset >= pParameter->indexBufferSize)
+            {
+                /* done.*/
+                break;
+            }
+
+            /* compute copyLen.*/
+            for (i = 1; (pParameter->alignBytes * i) < pParameter->indexBufferSize - copyOffset; ++i)
+            {
+                /* only one index beyond 64 bytes.*/
+                if (((pParameter->alignBytes * i) % pParameter->bytesPerPatch) == pParameter->splitBytesPerPatch)
+                {
+                    doCopy = gcvTRUE;
+                    break;
+                }
+            }
+
+            if (doCopy)
+            {
+                copyLen = pParameter->alignBytes * i - pParameter->splitBytesPerPatch;
+            }
+            else
+            {
+                copyLen = pParameter->indexBufferSize - copyOffset;
+            }
+
+            /* No split draw for this time.*/
+            if (copyLen == 0)
+            {
+                continue;
+            }
+
+            /* Compute split Memory size.*/
+            splitMemSize += __VK_ALIGN(copyLen, pParameter->alignBytes);
+
+            /* Update offset.*/
+            copyOffset += copyLen;
+        }
+        while(copyOffset < pParameter->indexBufferSize);
+
+        /* allocate split memory.*/
+        __VK_MEMZERO(&mem_alloc, sizeof(mem_alloc));
+        mem_alloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        mem_alloc.allocationSize = splitMemSize;
+        mem_alloc.memoryTypeIndex = 0;
+        __VK_ONERROR(__vk_AllocateMemory((VkDevice)devCtx, &mem_alloc, gcvNULL, (VkDeviceMemory *)&buf->splitMemory));
+        buf->splitMemOffset = __VK_ALIGN(buf->splitMemory->devAddr, pParameter->alignBytes) - buf->splitMemory->devAddr;
+    }
+
+OnError:
+    __VK_ASSERT(result == VK_SUCCESS);
+    return result;
+}
+
+__VK_INLINE VkResult halti5_setSplitDrawCmd(
+    __vkCommandBuffer *cmdBuf,
+    uint32_t **pCmdBuffer,
+    __vkBuffer * buf,
+    __vkSplitPathListParams* pParameter,
+    uint32_t instanceCount,
+    int32_t vertexOffset
+    )
+{
+    VkResult result = VK_SUCCESS;
+    uint32_t copyOffset = 0;
+    uint32_t copyLen = 0;
+    uint32_t i = 0;
+    __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
+    uint32_t drawCommand, drawCount;
+
+    static const uint32_t s_xlatePrimitiveTopology[] =
+    {
+        /* VK_PRIMITIVE_TOPOLOGY_POINT_LIST */
+        0x1,
+        /* VK_PRIMITIVE_TOPOLOGY_LINE_LIST */
+        0x2,
+        /* VK_PRIMITIVE_TOPOLOGY_LINE_STRIP */
+        0x3,
+        /* VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST */
+        0x4,
+        /* VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP */
+        0x5,
+        /*  VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN */
+        0x6,
+        /* VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY */
+        0x9,
+        /* VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY */
+        0xA,
+        /* VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY */
+        0xB,
+        /* VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY */
+        0xC,
+        /* VK_PRIMITIVE_TOPOLOGY_PATCH_LIST */
+        0xD,
+    };
+
+    do
+    {
+        VkBool32 doCopy = VK_FALSE;
+
+        if (copyOffset >= pParameter->indexBufferSize)
+        {
+            /* done.*/
+            break;
+        }
+
+        /* compute copyLen.*/
+        for (i = 1; (pParameter->alignBytes * i) < pParameter->indexBufferSize - copyOffset; ++i)
+        {
+            /* only one index beyond 64 bytes.*/
+            if (((pParameter->alignBytes * i) % pParameter->bytesPerPatch) == pParameter->splitBytesPerPatch)
+            {
+                doCopy = VK_TRUE;
+                break;
+            }
+        }
+
+        if (doCopy)
+        {
+            copyLen = pParameter->alignBytes * i - pParameter->splitBytesPerPatch;
+        }
+        else
+        {
+            copyLen = pParameter->indexBufferSize - copyOffset;
+        }
+
+        /* No split draw for this time.*/
+        if (copyLen == 0)
+        {
+            continue;
+        }
+
+        __VK_MEMCOPY(__VK_PTR2SIZE(buf->splitMemory->hostAddr) + (gctSIZE_T)buf->splitMemOffset,
+                     __VK_PTR2SIZE(buf->memory->hostAddr) + (gctSIZE_T)(buf->memOffset + cmdBuf->bindInfo.indexBuffer.offset + copyOffset),
+                     copyLen);
+
+        __VK_ONERROR(halti5_setIndexBufferCmd(cmdBuf, pCmdBuffer));
+
+        /* Update offset.*/
+        copyOffset += copyLen;
+        buf->splitMemOffset += __VK_ALIGN(copyLen, pParameter->alignBytes);
+
+        /* draw command.*/
+        /* Determine draw command. */
+        drawCommand = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x0C & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (instanceCount) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16))) | (((gctUINT32) ((gctUINT32) (s_xlatePrimitiveTopology[pip->topology]) & ((gctUINT32) ((((1 ?
+ 19:16) - (0 ? 19:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:16) - (0 ?
+ 19:16) + 1))))))) << (0 ? 19:16)));
+
+        drawCount = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 23:0) - (0 ? 23:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:0) - (0 ? 23:0) + 1))))))) << (0 ?
+ 23:0))) | (((gctUINT32) ((gctUINT32) ((copyLen / pParameter->indexSize)) & ((gctUINT32) ((((1 ?
+ 23:0) - (0 ? 23:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:0) - (0 ? 23:0) + 1))))))) << (0 ?
+ 23:0)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:24) - (0 ? 31:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:24) - (0 ?
+ 31:24) + 1))))))) << (0 ? 31:24))) | (((gctUINT32) ((gctUINT32) ((instanceCount >> 16)) & ((gctUINT32) ((((1 ?
+ 31:24) - (0 ? 31:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:24) - (0 ?
+ 31:24) + 1))))))) << (0 ? 31:24)));
+
+        __VK_DEBUG_ONLY(if (!g_dbgSkipDraw) {)
+        *((*pCmdBuffer)++) = drawCommand;
+        *((*pCmdBuffer)++) = drawCount;
+        *((*pCmdBuffer)++) = vertexOffset;
+        *((*pCmdBuffer)++) = 0;
+        __VK_DEBUG_ONLY(});
+    }
+    while(copyOffset < pParameter->indexBufferSize);
+
+OnError:
+    __VK_ASSERT(result == VK_SUCCESS);
+    return result;
+}
+
+VkResult halti5_splitDrawIndexedPatchList(
+    VkCommandBuffer commandBuffer,
+    uint32_t indexCount,
+    uint32_t instanceCount,
+    uint32_t firstIndex,
+    int32_t vertexOffset,
+    uint32_t firstInstance
+    )
+{
+    __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
+    __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
+    halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
+    uint32_t *states;
+    uint32_t *pCmdBuffer, *pCmdBufferBegin;
+    VkResult result;
+    __vkDrawComputeCmdParams cmdParams;
+    VkBool32 useOneCore = VK_FALSE;
+    __vkDevContext *devCtx = cmdBuf->devCtx;
+
+    /* Split draw variable.*/
+    __vkSplitPathListParams splitParamter;
+    __vkBuffer *buf = VK_NULL_HANDLE;
+
+    __VK_ASSERT(cmdBuf->curScrachBufIndex == 0);
+
+    if (firstIndex != cmdBuf->bindInfo.indexBuffer.firstIndex)
+    {
+        cmdBuf->bindInfo.indexBuffer.firstIndex = firstIndex;
+        cmdBuf->bindInfo.indexBuffer.dirty = VK_TRUE;
+    }
+
+    if (firstInstance != cmdBuf->bindInfo.vertexBuffers.firstInstance)
+    {
+        cmdBuf->bindInfo.vertexBuffers.firstInstance = firstInstance;
+        cmdBuf->bindInfo.vertexBuffers.dirtyBits |= chipGfxPipeline->instancedVertexBindingMask;
+    }
+
+    if (chipGfxPipeline->chipPipeline.tweakHandler)
+    {
+        __VK_MEMZERO(&cmdParams, sizeof(cmdParams));
+        cmdParams.draw.indexDraw = VK_TRUE;
+        cmdParams.draw.indirectDraw = VK_FALSE;
+        cmdParams.draw.firstIndex = firstIndex;
+        cmdParams.draw.indexCount = indexCount;
+        cmdParams.draw.firstInstance = firstInstance;
+        cmdParams.draw.instanceCount = instanceCount;
+        cmdParams.draw.firstVertex = vertexOffset;
+    }
+
+    __VK_ONERROR(halti5_draw_validate(cmdBuf, &cmdParams));
+
+    if (cmdBuf->gpuRenderingMode == gcvMULTI_GPU_RENDERING_MODE_OFF)
+    {
+        useOneCore = VK_TRUE;
+    }
+
+    buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, cmdBuf->bindInfo.indexBuffer.buffer);
+
+    /* split draw command.*/
+    __VK_COMPUTE_SPLIT_PARAMTER(cmdBuf, pip, indexCount);
+    __VK_ONERROR(halti5_allocSplitMemory(cmdBuf, buf, &splitParamter));
+
+    /* prepare cmd buf.*/
+    pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
+
+    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+    {
+        if (useOneCore)
+        {
+            halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+            *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_0_MASK << (0));*(*&pCmdBuffer)++ = 0;
+;
+
+        }
+    }
+
+    if (chipGfxPipeline->baseInstance.bUsed)
+    {
+        __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->baseInstance.hwRegAddress, VK_FALSE, firstInstance);
+    }
+
+    /* set split draw cmd.*/
+    __VK_ONERROR(halti5_setSplitDrawCmd(cmdBuf, &pCmdBuffer, buf, &splitParamter, instanceCount, vertexOffset));
+
+    if (devCtx->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE)
+    {
+        if (useOneCore)
+        {
+            *(*&pCmdBuffer)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x0D & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (gcvCORE_3D_ALL_MASK);*(*&pCmdBuffer)++ = 0;
+;
+
+            halti5_setMultiGpuSync((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE);
+        }
+    }
+
+    cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+
+    __VK_ASSERT(cmdBuf->curScrachBufIndex <= __VK_CMDBUF_SCRATCH_BUFFER_SIZE);
+
+    __vk_CmdAquireBuffer(commandBuffer, cmdBuf->curScrachBufIndex, &states);
+
+    __VK_MEMCOPY(states, cmdBuf->scratchCmdBuffer, cmdBuf->curScrachBufIndex * sizeof(uint32_t));
+
+    __vk_CmdReleaseBuffer(commandBuffer, cmdBuf->curScrachBufIndex);
+
+OnError:
+    __VK_ASSERT(result == VK_SUCCESS);
+    cmdBuf->curScrachBufIndex = 0;
+    return result;
+}
+
+/* Whether has invalid index when the bug exist.*/
+static VkBool32 halti5_needSplitPatchList(
+    VkCommandBuffer commandBuffer,
+    uint32_t indexCount
+    )
+{
+    __vkSplitPathListParams splitParamter;
+    uint32_t i = 0;
+    uint32_t baseOffset = 0;
+
+    uint32_t srcAddr;
+    __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
+    __vkBuffer *buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, cmdBuf->bindInfo.indexBuffer.buffer);
+    __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
+
+    /* Get physical address.*/
+    __VK_COMPUTE_SPLIT_PARAMTER(cmdBuf, pip, indexCount);
+    srcAddr = buf->memory->devAddr;
+    srcAddr += (uint32_t)(buf->memOffset + cmdBuf->bindInfo.indexBuffer.offset);
+
+    baseOffset = __VK_ALIGN(srcAddr, splitParamter.alignBytes) - srcAddr;
+
+    if (splitParamter.splitBytesPerPatch == splitParamter.alignBytes || (baseOffset == 0 && pip->patchControlPoints % 2 == 0))
+    {
+        /* splitBytesPerPatch == alignBytes is corner case, can not handle.*/
+        return VK_FALSE;
+    }
+
+    /* check invalid index.*/
+    for (i = 0; (splitParamter.alignBytes * i + baseOffset) < splitParamter.indexBufferSize; ++i)
+    {
+        /* only one index beyond 64 bytes.*/
+        if (((splitParamter.alignBytes * i + baseOffset) % splitParamter.bytesPerPatch) == splitParamter.splitBytesPerPatch)
+        {
+            return VK_TRUE;
+        }
+    }
+
+    return VK_FALSE;
+}
+
+static VkResult halti5_pickSplitDrawIndexedFunc(
+    VkCommandBuffer commandBuffer,
+    uint32_t indexCount,
+    uint32_t instanceCount,
+    uint32_t firstIndex,
+    int32_t vertexOffset,
+    uint32_t firstInstance,
+    VK_DRAW_INDEXED_FUNC* pFunc
+    )
+{
+    VkResult result = VK_SUCCESS;
+    __vkCommandBuffer *cmdBuf = (__vkCommandBuffer *)commandBuffer;
+    __vkDevContext *devCtx = cmdBuf->devCtx;
+    const gcsFEATURE_DATABASE *database = devCtx->pPhyDevice->phyDevConfig.database;
+    __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
+
+    char tempBuf[__VK_MAX_NAME_LENGTH];
+    char *pos;
+    const char* caseName = "\x9b\x9a\x8e\x8f"; /* "deqp".*/
+
+    __vk_utils_reverseBytes(caseName, tempBuf, __VK_MAX_NAME_LENGTH);
+    gcoOS_StrStr(devCtx->pPhyDevice->pInst->applicationName, tempBuf, &pos);
+
+    /* Default func.*/
+    *pFunc = halti5_drawIndexed;
+
+    /* Pick split draw func.*/
+    if (pip->topology == VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+    &&  pos
+    &&  firstIndex == 0
+    &&  !database->FE_PATCHLIST_FETCH_FIX
+    &&  halti5_needSplitPatchList(commandBuffer, indexCount)
+    )
+    {
+        *pFunc = halti5_splitDrawIndexedPatchList;
+    }
+
+
+    return result;
+}
+
+VkResult halti5_splitDrawIndexed(
+    VkCommandBuffer commandBuffer,
+    uint32_t indexCount,
+    uint32_t instanceCount,
+    uint32_t firstIndex,
+    int32_t vertexOffset,
+    uint32_t firstInstance
+    )
+{
+    VkResult result = VK_SUCCESS;
+    VK_DRAW_INDEXED_FUNC pFunc = VK_NULL_HANDLE;
+
+    /* Pick match split draw.*/
+    __VK_ONERROR(halti5_pickSplitDrawIndexedFunc(commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance, &pFunc));
+    __VK_ONERROR((*pFunc)(commandBuffer, indexCount, instanceCount, firstIndex, vertexOffset, firstInstance));
+
+OnError:
+    __VK_ASSERT(result == VK_SUCCESS);
     return result;
 }
 
@@ -2511,61 +3030,11 @@ VkResult halti5_setIndexBuffer(
     __vkCommandBuffer *cmdBuf
     )
 {
-    __vkPipeline *pip = cmdBuf->bindInfo.pipeline.graphics;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
 
-    static const uint32_t xlateIndexType[] =
-    {
-        /* VK_INDEX_TYPE_UINT16*/
-        0x1,
-        /* VK_INDEX_TYPE_UINT32 */
-        0x2,
-    };
-
-    static const uint32_t xlatePRindex[] =
-    {
-        /* VK_INDEX_TYPE_UINT16*/
-        0xFFFF,
-         /* VK_INDEX_TYPE_UINT32 */
-        0xFFFFFFFF,
-    };
-
-    uint32_t srcAddr;
-    __vkBuffer *buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, cmdBuf->bindInfo.indexBuffer.buffer);
-
-    srcAddr = buf->memory->devAddr;
-    srcAddr += (uint32_t)(buf->memOffset + cmdBuf->bindInfo.indexBuffer.offset);
-
-    if (cmdBuf->bindInfo.indexBuffer.firstIndex)
-    {
-        srcAddr += cmdBuf->bindInfo.indexBuffer.firstIndex
-            * ((cmdBuf->bindInfo.indexBuffer.indexType == VK_INDEX_TYPE_UINT16) ? 2 : 4);
-    }
     pCmdBuffer = pCmdBufferBegin = &cmdBuf->scratchCmdBuffer[cmdBuf->curScrachBufIndex];
 
-    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0191, VK_FALSE, srcAddr);
-    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0192, VK_FALSE,
-        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 1:0) - (0 ?
- 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
- 1:0))) | (((gctUINT32) ((gctUINT32) (xlateIndexType[cmdBuf->bindInfo.indexBuffer.indexType]) & ((gctUINT32) ((((1 ?
- 1:0) - (0 ? 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
- 1:0)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 5:4) - (0 ?
- 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
- 5:4))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 5:4) - (0 ?
- 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
- 5:4)))
-        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 8:8) - (0 ?
- 8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
- 8:8))) | (((gctUINT32) ((gctUINT32) (pip->primitiveRestartEnable) & ((gctUINT32) ((((1 ?
- 8:8) - (0 ? 8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
- 8:8))));
-
-    if (pip->primitiveRestartEnable)
-    {
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x019D, VK_FALSE,
-            xlatePRindex[cmdBuf->bindInfo.indexBuffer.indexType]);
-    }
+    halti5_setIndexBufferCmd(cmdBuf, &pCmdBuffer);
 
     cmdBuf->curScrachBufIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
 
@@ -3144,6 +3613,7 @@ void halti5_helper_setSamplerStates(
     int32_t tsSlotIndex = -1;
     __vkDevContext *devCtx = cmdBuf->devCtx;
     halti5_commandBuffer *chipCommand = (halti5_commandBuffer *)cmdBuf->chipPriv;
+    uint32_t hwSamplerCtrl0 = samplerDesc->halti5.hwSamplerCtrl0;
 
     txDescriptorNode = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDeviceMemory *, txDesc->descriptor);
 
@@ -3151,9 +3621,10 @@ void halti5_helper_setSamplerStates(
 
     physical += TX_HW_DESCRIPTOR_MEM_SIZE * borderColorIdx;
 
+
     __vkCmdLoadSingleHWState(commandBuffer,
         s_TxHwRegisters[txHwRegisterIdx].samplerCtrl0Reg + hwSamplerNo, VK_FALSE,
-        (samplerDesc->halti5.hwSamplerCtrl0
+        (hwSamplerCtrl0
         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 16:16) - (0 ?
  16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ? 16:16) + 1))))))) << (0 ?
  16:16))) | (((gctUINT32) ((gctUINT32) (txDesc->sampleStencil) & ((gctUINT32) ((((1 ?
@@ -3835,7 +4306,7 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
                                                                   commandBuffer,
                                                                   VK_NULL_HANDLE,
                                                                   TxHwRegisterIdx,
-                                                                  &chipBufv->txDesc,
+                                                                  chipBufv->txDesc,
                                                                   &chipBufv->samplerDesc,
                                                                   0,
                                                                   (hwSamplerNo + arrayIdx),
@@ -3854,10 +4325,10 @@ static VkResult halti5_helper_setDescSetUniformTexelBuffer(
 
                         __VK_ASSERT(privEntry->commonPrivm.privmFlag == SHS_PRIV_CONSTANT_FLAG_TEXTURE_SIZE);
 
-                        data[0] = chipBufv->txDesc.baseWidth;
-                        data[1] = chipBufv->txDesc.baseHeight;
-                        data[2] = chipBufv->txDesc.baseDepth;
-                        data[3] = chipBufv->txDesc.baseSlice;
+                        data[0] = chipBufv->txDesc[0].baseWidth;
+                        data[1] = chipBufv->txDesc[0].baseHeight;
+                        data[2] = chipBufv->txDesc[0].baseDepth;
+                        data[3] = chipBufv->txDesc[0].baseSlice;
                         __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4, data);
                     }
                 }
@@ -4066,7 +4537,7 @@ static VkResult halti5_helper_setDescSetStorage(
                         bufv = resInfo->u.bufferView;
                         chipBufv = (halti5_bufferView *)bufv->chipPriv;
                         __vkCmdLoadBatchHWStates(commandBuffer, hwConstRegAddr + (arrayIdx * 4), VK_FALSE, 4,
-                            chipBufv->imgDesc.imageInfo);
+                            chipBufv->imgDesc[0].imageInfo);
 
                         if (storageEntry->pImageSize[stageIdx])
                         {

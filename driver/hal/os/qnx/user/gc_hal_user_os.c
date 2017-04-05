@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -656,7 +656,6 @@ _ConstructOs(
             gcmONERROR(gcvSTATUS_OUT_OF_RESOURCES);
         }
 
-        /* TODO. : Get mempool page size. */
         os->mempoolPageSize = 1 << 12;
 
         /* Construct heap. */
@@ -803,6 +802,9 @@ _PLSDestructor(
     gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.accessLock));
     gcPLS.accessLock = gcvNULL;
 
+    gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.glFECompilerAccessLock));
+    gcPLS.glFECompilerAccessLock = gcvNULL;
+
     gcmVERIFY_OK(gcoOS_AtomDestroy(gcPLS.os, gcPLS.reference));
     gcPLS.reference = gcvNULL;
 
@@ -826,6 +828,7 @@ _TLSDestructor(
 {
     gcsTLS_PTR tls;
     gctINT reference = 0;
+    gctINT i;
 
     gcmHEADER_ARG("TLS=0x%x", TLS);
 
@@ -840,10 +843,16 @@ _TLSDestructor(
         gcoOS_ZeroMemory(tls, gcmSIZEOF(gcsTLS));
     }
 
-    if (tls->destructor != gcvNULL)
+    for (i = 0; i < gcvTLS_KEY_COUNT; i++)
     {
-        tls->destructor(tls);
-        tls->destructor = gcvNULL;
+        gcsDRIVER_TLS_PTR drvTLS = tls->driverTLS[i];
+
+        if (drvTLS && drvTLS->destructor != gcvNULL)
+        {
+            drvTLS->destructor(drvTLS);
+        }
+
+        tls->driverTLS[i] = gcvNULL;
     }
 
 #if gcdENABLE_3D
@@ -986,8 +995,11 @@ static void _ModuleConstructor(
 
     /* The library is loaded from dlopen().
        dlclose is called for the library so we have to use __cxa_atexit here. */
-    __cxa_atexit((void (*)(void*)) _ModuleDestructor, NULL, __dso_handle);
 
+#ifdef gcdQNX_SDP700
+#else
+    __cxa_atexit((void (*)(void*)) _ModuleDestructor, NULL, __dso_handle);
+#endif
     /* Initialize the shared memory list. */
     LIST_INIT(&s_sharedMemoryList);
     LIST_INIT(&s_sharedMemoryFreeList);
@@ -1014,6 +1026,9 @@ static void _ModuleConstructor(
     /* Construct access lock */
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.accessLock));
 
+    /* Construct gl FE compiler access lock */
+    gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.glFECompilerAccessLock));
+
 #if gcdDUMP_2D
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &dumpMemInfoListMutex));
 #endif
@@ -1032,6 +1047,12 @@ OnError:
     {
         /* Destroy access lock */
         gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.accessLock));
+    }
+
+    if (gcPLS.glFECompilerAccessLock != gcvNULL)
+    {
+        /* Destroy access lock */
+        gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.glFECompilerAccessLock));
     }
 
     if (gcPLS.reference != gcvNULL)
@@ -1287,7 +1308,6 @@ gceSTATUS gcoOS_CopyTLS(IN gcsTLS_PTR Source)
     tls->copied = gcvTRUE;
 
     tls->currentHardware = gcvNULL;
-    tls->destructor     = gcvNULL;
 
 #if gcdDUMP || gcdDUMP_API || gcdDUMP_2D
     _SetDumpFileInfo();
@@ -1326,6 +1346,67 @@ gcoOS_QueryTLS(
     gcmFOOTER();
     return status;
 }
+
+/* Get access to driver tls. */
+gceSTATUS
+gcoOS_GetDriverTLS(
+    IN gceTLS_KEY Key,
+    OUT gcsDRIVER_TLS_PTR * TLS
+    )
+{
+    gceSTATUS status;
+    gcsTLS_PTR tls;
+
+    gcmHEADER_ARG("Key=%d", Key);
+
+    if ((Key < (gceTLS_KEY)0) || (Key >= gcvTLS_KEY_COUNT))
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Get generic tls. */
+    gcmONERROR(gcoOS_GetTLS(&tls));
+
+    *TLS = tls->driverTLS[Key];
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+/* Set driver tls. */
+gceSTATUS
+gcoOS_SetDriverTLS(
+    IN gceTLS_KEY Key,
+    IN gcsDRIVER_TLS * TLS
+    )
+{
+    gceSTATUS status;
+    gcsTLS_PTR tls;
+
+    gcmHEADER_ARG("Key=%d", Key);
+
+    if ((Key < (gceTLS_KEY)0) || (Key >= gcvTLS_KEY_COUNT))
+    {
+        gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+    }
+
+    /* Get generic tls. */
+    gcmONERROR(gcoOS_GetTLS(&tls));
+
+    tls->driverTLS[Key] = TLS;
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
 
 /*******************************************************************************
 **
@@ -1383,6 +1464,66 @@ gcoOS_UnLockPLS(
         status = gcoOS_ReleaseMutex(gcPLS.os, gcPLS.accessLock);
     }
     gcmFOOTER_ARG("Release PLS ret=%d", status);
+
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoOS_LockGLFECompiler
+**
+**  Lock mutext before access GL FE compiler if needed
+**
+**  INPUT:
+**
+**      Nothing.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcoOS_LockGLFECompiler(
+    void
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
+    if (gcPLS.glFECompilerAccessLock)
+    {
+        status = gcoOS_AcquireMutex(gcPLS.os, gcPLS.glFECompilerAccessLock, gcvINFINITE);
+    }
+    gcmFOOTER_ARG("Lock GL FE compiler ret=%d", status);
+
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoOS_UnLockGLFECompiler
+**
+**  Release mutext after access GL FE compiler if needed
+**
+**  INPUT:
+**
+**      Nothing.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcoOS_UnLockGLFECompiler(
+    void
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
+    if (gcPLS.glFECompilerAccessLock)
+    {
+        status = gcoOS_ReleaseMutex(gcPLS.os, gcPLS.glFECompilerAccessLock);
+    }
+    gcmFOOTER_ARG("Release GL FE compiler ret=%d", status);
 
     return status;
 }
@@ -2172,7 +2313,6 @@ gcoOS_DeviceControl(
             return gcvSTATUS_NOT_SUPPORTED;
         }
 
-        /* TODO. Check mmap flags. */
         /*iface->u.MapMemory.logical = mmap64(NULL,*/
         logical = mmap(NULL,
                        iface->u.MapMemory.bytes,
@@ -3370,7 +3510,6 @@ gceSTATUS gcoOS_SetEnv(
     IN gctSTRING Value
     )
 {
-     /* TODO: currently, no need to implement on qnx*/
     return gcvSTATUS_OK;
 }
 
@@ -3400,18 +3539,23 @@ gcoOS_CreateThread(
 {
     pthread_t thread;
 
+    pthread_attr_t attr;
+
+    pthread_attr_init(&attr );
+    pthread_attr_setstacksize(&attr, 262144);
+
     gcmHEADER_ARG("Worker=0x%x Argument=0x%x", Worker, Argument);
 
     /* Validate the arguments. */
     gcmDEBUG_VERIFY_ARGUMENT(Thread != gcvNULL);
 
-    if (pthread_create(&thread, gcvNULL, Worker, Argument) != 0)
+    if (pthread_create(&thread, &attr, Worker, Argument) != 0)
     {
         gcmFOOTER_ARG("status=%d", gcvSTATUS_OUT_OF_RESOURCES);
         return gcvSTATUS_OUT_OF_RESOURCES;
     }
 
-    *Thread = (gctPOINTER) thread;
+    *Thread = gcmINT2PTR(thread);
 
     /* Success. */
     gcmFOOTER_ARG("*Thread=0x%x", *Thread);
@@ -3447,7 +3591,7 @@ gcoOS_CloseThread(
     /* Validate the arguments. */
     gcmDEBUG_VERIFY_ARGUMENT(Thread != gcvNULL);
 
-    pthread_join((pthread_t) Thread, gcvNULL);
+    pthread_join((pthread_t)gcmPTR2INT32(Thread), gcvNULL);
 
     /* Success. */
     gcmFOOTER_NO();
@@ -4556,8 +4700,6 @@ gcoOS_LoadLibrary(
 
     if (*Handle == gcvNULL)
     {
-        /* Try loading it through QNX utility function. */
-        /* TODO: mimbrogno: Need to propagate display ID into here. For now just use first. */
         int rc = __khrGetDisplayConfigValue(1, Library, buf, sizeof(buf));
         if (rc == EOK)
         {
@@ -4967,7 +5109,7 @@ gcoOS_GetCurrentProcessID(
     void
     )
 {
-    return (gctHANDLE)getpid();
+    return (gctHANDLE)gcmINT2PTR(getpid());
 }
 
 gctHANDLE
@@ -4975,7 +5117,7 @@ gcoOS_GetCurrentThreadID(
     void
     )
 {
-    return (gctHANDLE) pthread_self();
+    return (gctHANDLE)gcmINT2PTR( pthread_self());
 }
 
 /*----------------------------------------------------------------------------*/
@@ -5050,8 +5192,6 @@ gcoOS_GetCPUTime(
     OUT gctUINT64_PTR CPUTime
     )
 {
-    /* TODO. */
-
     /* Return CPU time in microseconds. */
     return gcvSTATUS_NOT_SUPPORTED;
 }
@@ -5091,8 +5231,6 @@ gcoOS_GetMemoryUsage(
     OUT gctUINT32_PTR IsRSS
     )
 {
-    /* TODO. */
-
     /* Return memory usage. */
     return gcvSTATUS_NOT_SUPPORTED;
 }

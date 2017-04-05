@@ -20,7 +20,7 @@ CUSTOM_PIXMAP?=0
 USE_NEW_LINUX_SIGNAL?=1
 USE_FB_DOUBLE_BUFFER?=0
 BUILD_OPENCL_FP?=1
-ENABLE_CL_GL ?=0
+ENABLE_CL_GL ?=1
 
 # This prevents the platform/board name from getting appended to every build target name.
 # This happens automatically as the build directory structure now includes the board above the
@@ -50,7 +50,9 @@ ifneq ($(ABI), 0)
 endif
 
 CCFLAGS += -Werror
-
+ifeq ($(QNX_SDP700), 1)
+CCFLAGS += -Wno-error=unused-function
+endif
 # We have commented this in order to allow some extensions not contemplated in C89 see: http://reviews.ott.qnx.com/r/118143/
 #CCFLAGS += -ansi
 
@@ -69,6 +71,10 @@ endif
 
 ifeq ($(PLATFORM), iMX8DV)
         CCFLAGS += -DIMX8X
+endif
+
+ifeq ($(PLATFORM), iMX8DV_64bit)
+        CCFLAGS += -DIMX8X_64bit
 endif
 
 ifeq ($(PLATFORM), iMX6X)
@@ -93,6 +99,10 @@ endif
 
 ifeq ($(PLATFORM), iMX6DQP_vProfile)
 	CCFLAGS += -DIMX6X
+endif
+
+ifeq ($(QNX_SDP700), 1)
+        CCFLAGS += -DgcdQNX_SDP700
 endif
 
 ifeq ($(USE_VDK), 1)
@@ -151,6 +161,12 @@ ifeq ($(USE_FAST_MEM_COPY), 1)
 	CCFLAGS += -DgcdUSE_FAST_MEM_COPY=1
 else
 	CCFLAGS += -DgcdUSE_FAST_MEM_COPY=0
+endif
+
+ifeq ($(VIVANTE_ENABLE_3D),1)
+        CCFLAGS += -DgcdUSE_VX=$(USE_OPENVX)
+else
+        CCFLAGS += -DgcdUSE_VX=0
 endif
 
 CCFLAGS += -DgcdDISPLAY_BACK_BUFFERS=3

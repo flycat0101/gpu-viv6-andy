@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -55,7 +55,11 @@ CFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS -DCL_USE_DEPRECATED_OPENCL_1_1_API
 ifneq ($(USE_ARMCC), 1)
 CFLAGS += -fPIC
 ifeq (,$(GL_2_APPENDIX))
+ifeq ($(ENABLE_CL_GL), 1)
+LFLAGS += -Wl,--version-script=icd_exports_GL.map
+else
 LFLAGS += -Wl,--version-script=icd_exports.map
+endif
 endif
 endif
 

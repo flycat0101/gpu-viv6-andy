@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -29,6 +29,14 @@ static gceSTATUS
 _ClearWormHole(
     IN hwcContext * Context,
     IN hwcDisplay * Display
+    );
+
+/* Clear overlay areas. */
+static gceSTATUS
+_ClearOverlay(
+    IN hwcContext * Context,
+    IN hwcDisplay * Display,
+    IN gctUINT32 OverlayMask
     );
 
 /* Clear full screen */
@@ -192,53 +200,11 @@ hwcComposeG2D(
             }
         }
 
+        /* Clear overlay area. */
+        _ClearOverlay(Context, Display, overlayOwners);
+
         /* Save this overlay layer to composed mask. */
         composed |= overlayOwners;
-
-        for (gctUINT i = 0; i < Display->layerCount; i++)
-        {
-            if ((overlayOwners & (1U << i)) == 0U)
-            {
-                continue;
-            }
-
-            /* Go through all areas.. */
-            area = Display->compositionArea;
-
-            while (area != NULL)
-            {
-                if ((area->owners != overlayOwners))
-                {
-                    area = area->next;
-                    continue;
-                }
-
-#if ENABLE_SWAP_RECTANGLE
-                gcsRECT clipRect;
-
-                /* Intersect with swap rectangle. */
-                clipRect.left   = gcmMAX(target->swapRect.left,   area->rect.left);
-                clipRect.top    = gcmMAX(target->swapRect.top,    area->rect.top);
-                clipRect.right  = gcmMIN(target->swapRect.right,  area->rect.right);
-                clipRect.bottom = gcmMIN(target->swapRect.bottom, area->rect.bottom);
-
-                if ((clipRect.left >= clipRect.right)
-                ||  (clipRect.top  >= clipRect.bottom)
-                )
-                {
-                    area = area->next;
-                    continue;
-                }
-
-                gcmONERROR(_Blit(Context, Display, area, i, 0xFF, &clipRect));
-#   else
-                gcmONERROR(_Blit(Context, Display, area, i, 0xFF, &area->rect));
-#   endif
-
-                /* Advance to next area. */
-                area = area->next;
-            }
-        }
     }
 #endif
 
@@ -333,6 +299,7 @@ hwcComposeG2D(
          *   2) If hasDim, we compose by area for performance
          *   3) But if there's any YUV layer, we always compose by layer. */
         gctBOOL composeByArea = gcvFALSE;
+        gctUINT layerStart = 0;
 
         if (Display->hasDim)
         {
@@ -473,17 +440,36 @@ hwcComposeG2D(
                 }
             }
 
-            /* All areas done. */
-            return gcvSTATUS_OK;
+            /* Check if there's any top layers to be composed by layer. */
+            layerStart = Display->layerCount;
+
+            for (gctUINT32 i = Display->layerCount - 1; i < 64; i--)
+            {
+                hwcLayer * layer = &Display->layers[i];
+
+                if (layer->topTiny)
+                {
+                    layerStart = i;
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (layerStart == Display->layerCount)
+            {
+                /* All areas done. */
+                return gcvSTATUS_OK;
+            }
         }
 
-        /* else compose by layer */
-
-        /* Go through all layers.
+        /*
          * BLITTER: blit layer
          * DIM: blit layer
-         * CLEARHOLE & OVERLAY: skip because already composed */
-        for (gctUINT32 i = 0; i < Display->layerCount; i++)
+         * CLEARHOLE & OVERLAY: skip because already composed
+         */
+        for (gctUINT32 i = layerStart; i < Display->layerCount; i++)
         {
             if ((1U << i) & composed)
             {
@@ -636,6 +622,11 @@ hwcComposeG2D(
                         break;
                     }
                 }
+
+                if (layer->topTiny)
+                {
+                    break;
+                }
             }
 
             if ((layer->compositionType == HWC_DIM)
@@ -706,43 +697,46 @@ hwcComposeG2D(
                 }
 
                 /* Get shortcut. */
-                area = Display->compositionArea;
+                layer = &Display->layers[i];
 
-                while (area != NULL)
+                for (gctUINT32 j = 0; j < layer->clipCount; j++)
                 {
                     gcsRECT clipRect;
+                    gcsRECT_PTR dstRect = &layer->dstRect;
 
-                    if ((area->owners & owner) == 0U)
-                    {
-                        area = area->next;
-                        continue;
-                    }
+                    /* Shortcut to dest clip rect. */
+                    gcsRECT_PTR rect = &layer->clipRects[j];
 
 #if ENABLE_SWAP_RECTANGLE
                     /* Intersect with swap rectangle. */
-                    clipRect.left   = gcmMAX(target->swapRect.left,   area->rect.left);
-                    clipRect.top    = gcmMAX(target->swapRect.top,    area->rect.top);
-                    clipRect.right  = gcmMIN(target->swapRect.right,  area->rect.right);
-                    clipRect.bottom = gcmMIN(target->swapRect.bottom, area->rect.bottom);
+                    clipRect.left   = gcmMAX(target->swapRect.left,   rect->left);
+                    clipRect.top    = gcmMAX(target->swapRect.top,    rect->top);
+                    clipRect.right  = gcmMIN(target->swapRect.right,  rect->right);
+                    clipRect.bottom = gcmMIN(target->swapRect.bottom, rect->bottom);
+#else
+                    /* Intersect with display size. */
+                    clipRect.left   = gcmMAX(Display->res.left,   rect->left);
+                    clipRect.top    = gcmMAX(Display->res.top,    rect->top);
+                    clipRect.right  = gcmMIN(Display->res.right,  rect->right);
+                    clipRect.bottom = gcmMIN(Display->res.bottom, rect->bottom);
+#endif
+
+                    /* Intersect with dest rectangle. */
+                    clipRect.left   = gcmMAX(clipRect.left,   dstRect->left);
+                    clipRect.top    = gcmMAX(clipRect.top,    dstRect->top);
+                    clipRect.right  = gcmMIN(clipRect.right,  dstRect->right);
+                    clipRect.bottom = gcmMIN(clipRect.bottom, dstRect->bottom);
 
                     if ((clipRect.left >= clipRect.right)
                     ||  (clipRect.top  >= clipRect.bottom)
                     )
                     {
                         /* Skip clipRect out of swap rectangle. */
-                        area = area->next;
                         continue;
                     }
-#else
-                    clipRect = area->rect;
-#endif
 
                     /* Start single-source blit. */
-                    gcmONERROR(
-                        _Blit(Context, Display, area, i, 0xFF, &clipRect));
-
-                    /* Check next area. */
-                    area = area->next;
+                    gcmONERROR(_Blit(Context, Display, NULL, i, 0xFF, &clipRect));
                 }
             }
 
@@ -1446,44 +1440,47 @@ hwcComposeG2D(
             LOGD(" Single-source for barrier=[%d]", barrier);
         }
 
-        /* Now we need to compose the barrier layer by area. */
-        area = Display->compositionArea;
+        /* Now we need to compose the barrier layer. */
+        layer = &Display->layers[barrier];
 
-        while (area != NULL)
+        for (gctUINT32 j = 0; j < layer->clipCount; j++)
         {
             gcsRECT clipRect;
+            gcsRECT_PTR dstRect = &layer->dstRect;
 
-            if ((area->owners & (1U << barrier)) == 0U)
-            {
-                area = area->next;
-                continue;
-            }
+            /* Shortcut to dest clip rect. */
+            gcsRECT_PTR rect = &layer->clipRects[j];
 
 #if ENABLE_SWAP_RECTANGLE
             /* Intersect with swap rectangle. */
-            clipRect.left   = gcmMAX(target->swapRect.left,   area->rect.left);
-            clipRect.top    = gcmMAX(target->swapRect.top,    area->rect.top);
-            clipRect.right  = gcmMIN(target->swapRect.right,  area->rect.right);
-            clipRect.bottom = gcmMIN(target->swapRect.bottom, area->rect.bottom);
+            clipRect.left   = gcmMAX(target->swapRect.left,   rect->left);
+            clipRect.top    = gcmMAX(target->swapRect.top,    rect->top);
+            clipRect.right  = gcmMIN(target->swapRect.right,  rect->right);
+            clipRect.bottom = gcmMIN(target->swapRect.bottom, rect->bottom);
 #else
-            clipRect = area->rect;
+            /* Intersect with display size. */
+            clipRect.left   = gcmMAX(Display->res.left,   rect->left);
+            clipRect.top    = gcmMAX(Display->res.top,    rect->top);
+            clipRect.right  = gcmMIN(Display->res.right,  rect->right);
+            clipRect.bottom = gcmMIN(Display->res.bottom, rect->bottom);
 #endif
+
+            /* Intersect with dest rectangle. */
+            clipRect.left   = gcmMAX(clipRect.left,   dstRect->left);
+            clipRect.top    = gcmMAX(clipRect.top,    dstRect->top);
+            clipRect.right  = gcmMIN(clipRect.right,  dstRect->right);
+            clipRect.bottom = gcmMIN(clipRect.bottom, dstRect->bottom);
 
             if ((clipRect.left >= clipRect.right)
             ||  (clipRect.top  >= clipRect.bottom)
             )
             {
                 /* Skip clipRect out of swap rectangle. */
-                area = area->next;
                 continue;
             }
 
             /* Start single-source blit. */
-            gcmONERROR(
-                _Blit(Context, Display, area, barrier, 0xFF, &clipRect));
-
-            /* Advance to next area. */
-            area = area->next;
+            gcmONERROR(_Blit(Context, Display, NULL, barrier, 0xFF, &clipRect));
         }
 
         /* We have handled layers till barrier. */
@@ -1828,6 +1825,118 @@ OnError:
     return status;
 }
 
+#if CLEAR_FB_FOR_OVERLAY
+gceSTATUS
+_ClearOverlay(
+    IN hwcContext * Context,
+    IN hwcDisplay * Display,
+    IN gctUINT32 OverlayMask
+    )
+{
+    gceSTATUS status;
+    gcsRECT rects[16];
+    gctUINT rectCount = 0U;
+
+    hwcArea * area     = Display->compositionArea;
+    hwcBuffer * target = Display->target;
+
+    /* Disable alpha blending. */
+    gcmONERROR(gco2D_DisableAlphaBlend(Context->engine));
+
+    /* No premultiply. */
+    gcmONERROR(
+        gco2D_SetPixelMultiplyModeAdvanced(Context->engine,
+                                           gcv2D_COLOR_MULTIPLY_DISABLE,
+                                           gcv2D_COLOR_MULTIPLY_DISABLE,
+                                           gcv2D_GLOBAL_COLOR_MULTIPLY_DISABLE,
+                                           gcv2D_COLOR_MULTIPLY_DISABLE));
+
+    /* Setup Target. */
+    gcmONERROR(
+        gco2D_SetGenericTarget(Context->engine,
+                               &target->physical,
+                               1U,
+                               &Display->stride,
+                               1U,
+                               Display->tiling,
+                               Display->format,
+                               gcvSURF_0_DEGREE,
+                               Display->res.right,
+                               Display->res.bottom));
+
+    /* Target display buffer tile status. */
+    gcmONERROR(
+        gco2D_SetTargetTileStatus(Context->engine,
+                                  target->tsConfig,
+                                  Display->format,
+                                  0,
+                                  target->tsPhysical));
+
+    /* Go through all areas. */
+    while (area != NULL)
+    {
+        if (area->owners & OverlayMask)
+        {
+#if ENABLE_SWAP_RECTANGLE
+            /* Intersect with swap rectangle. */
+            rects[rectCount].left   = gcmMAX(target->swapRect.left,   area->rect.left);
+            rects[rectCount].top    = gcmMAX(target->swapRect.top,    area->rect.top);
+            rects[rectCount].right  = gcmMIN(target->swapRect.right,  area->rect.right);
+            rects[rectCount].bottom = gcmMIN(target->swapRect.bottom, area->rect.bottom);
+
+            if ((rects[rectCount].left < rects[rectCount].right)
+            &&  (rects[rectCount].top  < rects[rectCount].bottom)
+            )
+            {
+                rectCount++;
+            }
+#   else
+            rects[rectCount] = area->rect;
+#   endif
+        }
+
+        /* Advance to next area. */
+        area = area->next;
+
+        if ((rectCount == 16) || ((area == NULL) && (rectCount > 0)))
+        {
+            if (Context->dumpCompose & DUMP_OPERATIONS)
+            {
+                LOGD("  CLEAR-OVERLAY:");
+
+                for (gctUINT i = 0; i < rectCount; i++)
+                {
+                    LOGD("    [%d,%d,%d,%d]",
+                         rects[i].left,
+                         rects[i].top,
+                         rects[i].right,
+                         rects[i].bottom);
+                }
+            }
+
+            /* Perform a Clear. */
+            gcmONERROR(
+                gco2D_Clear(Context->engine,
+                            rectCount,
+                            rects,
+                            0x00000000,
+                            0xCC,
+                            0xCC,
+                            Display->format));
+
+            /* Reset rect count. */
+            rectCount = 0U;
+        }
+    }
+
+    return gcvSTATUS_OK;
+
+OnError:
+    LOGE("Failed in %s: status=%d", __FUNCTION__, status);
+    return status;
+}
+#endif
+
 
 gctBOOL
 _IsForceOpaque(
@@ -1860,8 +1969,6 @@ _IsForceOpaque(
             {
                 /* Force opaque if the layer under current layer is
                  * OVERLAY. */
-                /* TODO: Same optimization can be applied for worm-hole
-                 * and clear-hole. */
                 forceOpaque = gcvTRUE;
             }
         }

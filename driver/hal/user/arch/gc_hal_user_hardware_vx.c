@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,7 +18,7 @@
 #include "gc_hal_user_hardware_precomp.h"
 #include "gc_hal_user.h"
 
-#if gcdUSE_VX
+#if gcdENABLE_3D && gcdUSE_VX
 #include <stdio.h>
 #include <assert.h>
 
@@ -2908,6 +2908,456 @@ static gceSTATUS _SetUniformItemExt(
     return status;
 }
 
+static gceSTATUS _max_pooling(
+    IN OUT gcoVX_Hardware_Context   *Context
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctINT32 size = Context->col;
+    gcoVX_Instructions *Instructions = Context->instructions;
+    gctUINT32 i = 0;
+    gctINT16 off = (gctINT16)(-(gctINT32)(Context->row));
+    RelOffset offset = {{0, 0}};
+    gctUINT32 flag = 0;
+
+    /*           x         y         z         w
+     * r0 : |  srcx   |  srcy   |  srcx/2 |  dst_y  |
+     * r1 : | x-1,y-1 | x-1,y-1 | x-1,y-1 | x-1,y-1 |
+     * r2 : |   x,y   |   x,y   |   x,y   |   x,y   |
+     * r3 : | x+1,y+1 | x+1,y+1 | x+1,y+1 | x+1,y+1 |
+     * r4 : |dst0,dst1|dst2,dst3|dst4,dst5|         |
+     * r5 : | start_y |  end_y  |  height |  all_h  |
+     */
+
+    gcmHEADER_ARG("Instructions=0x%x", Instructions);
+    /*mov r5.xyzw, c2.zwxy */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(2, 2, gcdVX_ENABLE4(2, 3, 0, 1), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    /*rshift.u32 r0.z, r0.x, 1 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x5A, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE1(2), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(0), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 1U, &Instructions->binarys[Instructions->count++]));
+
+    /*add.u32 r5.xy, r5.xy, c3.ww */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x2, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE2(0, 1), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 5, gcdVX_SWIZZLE2(0, 1), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(2, 3, gcdVX_SWIZZLE2(3, 3), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    offset.u.x = off;
+    offset.u.y = off;
+    for (i = 0; i < (gctUINT32)size; i ++)
+    {
+        if (i == (gctUINT32)(size - 2))
+            flag = Instructions->count;
+
+        if(Context->borders == gcvVX_BORDER_MODE_CONSTANT)
+        {
+            /*mov r1/2/3, c3.z */
+            gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetDestination(i + 1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetUniform(2, 3, gcdVX_SWIZZLE1(2), 0, &Instructions->binarys[Instructions->count++]));
+        }
+
+        /*img_load.u8 r1/2/3, c0, r0.xy, -1,-1*/
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x79, 0, 0x3, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(i + 1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 7, 1, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, offset.raw, &Instructions->binarys[Instructions->count++]));
+
+        offset.u.y += 1;
+
+        if (i == 0)
+        {
+            /*mov.le r1 r0.z, r5.x(start_height_o), c3.z(min:0xfc00) */
+            gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0x04, 0x5, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(3), gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 5, gcdVX_SWIZZLE1(0), gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetUniform(2, 3, gcdVX_SWIZZLE4(2, 2, 2, 2), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+        }
+        else
+        {
+            /*mov.ge r2/3 r0.z, r5.y(end_height_o), c3.z(min:0xfc00) */
+            gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0x03, 0x5, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetDestination(i + 1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(3), gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 5, gcdVX_SWIZZLE1(1), gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetUniform(2, 3, gcdVX_SWIZZLE4(2, 2, 2, 2), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+        }
+
+    }
+
+    if (Context->evisNoInst.isVX2)
+    {
+        /*vertMax3.u8, r4, r1, r2, r3 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x19, 0x3, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 7, 0x3, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+        /*horzMax3.u8, r4, r4 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x1C, 0x3, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 5, 0x3, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+    }
+    else if (!Context->evisNoInst.noFilter)
+    {
+        /*filter.box.u8 r4, r1, r2, r3*/
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x05, 0x3, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 5, 0x3 | (0x8 << 3), &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+    }
+    else
+        gcmPRINT("not support filter or vertMax3/horzMax3");
+
+    /*
+    {
+        gctUINT32 p = 0, index = 4;
+        gcVXConfig config = {{0}};
+        gcoVX_Kernel_Context_Uniform Uinform;
+
+        for(p = 0; p < 16; p++)
+              config.termconfig[p] = (p < 12 && (p % 4 == 0))?VX_ADD:VX_DISABLE;
+
+        for(p = 0; p < 16; p++)
+        {
+            config.matrix[p]   = (p < 12 && (p % 4 == 0)) ? 1 : 0;
+            config.aselect[p]  = 0;
+        }
+
+        for(p = 0; p < 8; p++)
+        {
+            config.abin0[p]    =(p % 4 == 0)?p/2:0;
+            config.abin1[p]    = (p % 4 == 0)?(p + 8)/2:0;
+        }
+
+        _SetUniformItem(&index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x3, &Uinform);
+    }
+    */
+    /*dp4.u8 r4[0-2], r4, r4, c4 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, 0x3, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 2, (0x3 | (0x3 << 3)), &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 4, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 4, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_Setuniform(2, 4, &Instructions->binarys[Instructions->count++]));
+
+    /*img_store.u8 c1, r0.zw, r4*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x7A, 0, 0x3, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 2, 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(2, 3), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 4, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r1, r3 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    /*add.u32 r0.yw, r0.yyww, c3.xxyy */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE2(1, 3), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE4(1, 1, 3, 3), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(2, 3, gcdVX_SWIZZLE4(0, 0, 1, 1), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    /*branch.u32 r0.w, r5.y, flag-count */
+    gcmONERROR(gcoHARDWAREVX_Branch(0x04, flag-Instructions->count, 0x5, Instructions->count, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(3), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 5, gcdVX_SWIZZLE1(1), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    /*add.u32 r0.y, r0.y, c3.x(-2) */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE1(1), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(1), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(2, 3, gcdVX_SWIZZLE1(0), gcvTRUE, &Instructions->binarys[Instructions->count++]));
+
+    /*branch.u32 r0.y, c2.y, 0 */
+    gcmONERROR(gcoHARDWAREVX_Branch(0x02, 0, 0x5, 2, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(1), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(1, 2, gcdVX_SWIZZLE1(1), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    Instructions->regs_count = 0x6;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+
+static gceSTATUS _lrn(
+    IN OUT gcoVX_Hardware_Context   *Context
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcoVX_Instructions *Instructions = Context->instructions;
+    RelOffset offset = {{ -1, 0 }};
+    gctUINT32 flag;
+    gctUINT32 i = 0;
+
+    gcmHEADER_ARG("Instructions=0x%x", Instructions);
+
+    /*
+     * r0 : |         |         | height-1|  index  |
+     * r1 : | x-1,y-1 | x-1,y-1 | x-1,y-1 | x-1,y-1 |
+     * r2 : |   x,y   |   x,y   |   x,y   |   x,y   |
+     * r3 : | x+1,y+1 | x+1,y+1 | x+1,y+1 | x+1,y+1 |
+     * r4 : |  shift  |  alpha  | index2  |         |
+     * r5 : |   sum1  |   sum1  |   sum1  |   sum1  |
+     * r6 : |   sum2  |   sum2  |   sum2  |   sum2  |
+     * r7 : |   sum3  |   sum3  |   sum3  |   sum3  |
+     *
+     */
+
+    /*mov r4.xyz, c4.xyw shift, alpha*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE3(0, 1, 2), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(2, 4, gcdVX_SWIZZLE4(0, 1, 3, 3), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r0.zw, c2.xy  (height-1, 0)*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE2(2, 3), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(2, 2, gcdVX_SWIZZLE4(0, 1, 0, 1), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r1, 0*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count++]));
+
+    offset.u.y = (1u << 5) - 1;
+
+    /* img_load.s16 r1,c0,r0.xy, (-1,-1), load val0*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x79, 0, 0x3, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 5, 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, offset.raw, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r1, r0.w, 0, 0, if(r0.w(index) == 0), 0->r1*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0x05, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE4(3, 3, 3, 3), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(1, 2, gcdVX_SWIZZLE4(1, 1, 1, 1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r2, 0*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count++]));
+
+    offset.u.y = (gctUINT16)0;
+    /* img_load.s16 r2,c0,r0.xy, (-1,0), load val1*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x79, 0, 0x3, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 5, 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, offset.raw, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r1, r0.w, r0.z, 0, r0.w(index) > r0.x(height-1), 0->r1*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0x01, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE4(3, 3, 3, 3), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(1, 2, gcdVX_SWIZZLE4(0, 0, 0, 0), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count++]));
+
+    flag = Instructions->count;
+
+    /*mov r3, 0*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count++]));
+
+    offset.u.y = (gctUINT16)1;
+    /* img_load.s16 r3,c0,r0.xy, (-1,1), load val2*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x79, 0, 0x3, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 5, 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, offset.raw, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r1, r0.w, r0.z, 0, r0.w(index) > c2.z(height-2), 0->r1*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0x01, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE4(3, 3, 3, 3), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(1, 2, gcdVX_SWIZZLE4(2, 2, 2, 2), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*dp4x4.evis.fp16 r5, r1, r1, c5    val0->sum0*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, 0x0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (1<<6)|(0x1 << 3) | 0x1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 1, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_Setuniform(2, 5, &Instructions->binarys[Instructions->count++]));
+
+    /*dp4x4.evis.fp16 r6, r2, r2, c5    val2->sum2*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, 0x0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(6, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (1<<6)|(0x1 << 3) | 0x1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_Setuniform(2, 5, &Instructions->binarys[Instructions->count++]));
+
+    /*dp4x4.evis.fp16 r7, r3, r3, c5    val2->sum3*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, 0x0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(7, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (1<<6)|(0x1 << 3) | 0x1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 3, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 3, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_Setuniform(2, 5, &Instructions->binarys[Instructions->count++]));
+
+    /*add.f32 r5, r5, r6  sum1+sum2*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 5, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 6, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*add.f32 r5, r5, r7  sum1 + sum2 + sum3*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 5, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 7, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*mul.f32 r5, r5, 9  sum*sum*sum/9 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x03, 0, 0x0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 5, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValueF(1, 1/9.0f, &Instructions->binarys[Instructions->count++]));
+
+    /*mad.f32 r6, r5, r4.y(alpha) ,r4.x(shift) sum*alpha+shift*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x02, 0, 0x0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(6, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 5, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 4, gcdVX_SWIZZLE1(1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 4, gcdVX_SWIZZLE1(0), 0, &Instructions->binarys[Instructions->count++]));
+
+    /*sum^0.75 = sum^(3/4) = (sum * sum * sum)^1/4 = e^(0.75*log(sum))*/
+    /*mul.f32 r5, r6, r6  sum*sum */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x03, 0, 0x0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 6, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 6, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*mul.f32 r5, r5, r6  sum*sum*sum */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x03, 0, 0x0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 5, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 6, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    for (i = 0; i < 4; i ++)
+    {
+        /*sqrt.f32 r5.x/y/z/w, r5.x/y/z/w  sqrt(sum) */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x21, 0, 0x0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE1(i), gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 5, gcdVX_SWIZZLE1(i), 0, &Instructions->binarys[Instructions->count++]));
+
+        /*sqrt.f32 r5.x/y/z/w, r5.x/y/z/w  sqrt(sqrt(sum)) */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x21, 0, 0x0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE1(i), gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 5, gcdVX_SWIZZLE1(i), 0, &Instructions->binarys[Instructions->count++]));
+    }
+    /*dp4.fp16 r6, r2, r2, c9   val1_32f fp16->fp32*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, 0x0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(6, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (0x1 | 0x0 << 3), &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_Setuniform(2, 9, &Instructions->binarys[Instructions->count++]));
+
+    for (i = 0; i < 4; i ++)
+    {
+        /*rcp.f32 r5.x/y/z/w, r5.x/y/z/w  1/(sum*sum*sum) */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x0C, 0, 0x0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestinationExt(5, gcdVX_ENABLE1(i), gcvFALSE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 5, gcdVX_SWIZZLE1(i), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+    }
+
+    /*mul.f32 r6, r6, r5   */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x03, 0, 0x0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(6, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 6, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 5, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    if (Context->row == 2)
+    {
+    /*conv.s32 r6, r6; f32 -> f16 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x72, 0, 0x1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(6, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 6, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0x0, &Instructions->binarys[Instructions->count++]));
+
+    /*dp4.fp16 r5, r6, r6, c13   val1_32f fp32->fp16*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0A, 0x1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (0x1 | 0x1 << 3), &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 6, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 6, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_Setuniform(2, 13, &Instructions->binarys[Instructions->count++]));
+    }
+
+    /*img_store.evis.s16 c1, r0.xy, r5*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x7A, 0, 0x3, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, (Context->row == 2)?3:7, 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, (Context->row == 2)?5:6, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r1, r2*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 2, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r2, r3*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    /*add.u32 r0.yw, r0.yw, 1*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE2(1, 3), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 1, &Instructions->binarys[Instructions->count++]));
+
+    /*branch.u32 r0.w, r0.z, flag-count y <= (height-1)*/
+    gcmONERROR(gcoHARDWAREVX_Branch(0x04, flag-Instructions->count, 0x5, Instructions->count, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(3), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE1(2), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    /*add.u32 r4.z, r4.z, 1*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE1(2), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 4, gcdVX_SWIZZLE1(2), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 1, &Instructions->binarys[Instructions->count++]));
+
+    /*branch.u32 r4.z, 96, 1; y < depth*/
+    gcmONERROR(gcoHARDWAREVX_Branch(0x02, 1, 0x5, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 4, gcdVX_SWIZZLE1(2), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(1, 3, gcdVX_SWIZZLE1(0), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    Instructions->regs_count = 0x9;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
 static gceSTATUS _filter(
     IN OUT gcoVX_Hardware_Context   *Context
     )
@@ -3281,6 +3731,208 @@ static gceSTATUS _scharr3x3(
     gcmONERROR(gcoHARDWAREVX_SetUniform(1, 3, gcdVX_SWIZZLE1(1), 0, &Instructions->binarys[Instructions->count++]));
 
     Instructions->regs_count = 0x5;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS _histogram_vx2(
+    IN OUT gcoVX_Hardware_Context   *Context
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcoVX_Instructions *Instructions = Context->instructions;
+    gcVXConfig                    subConfig    = {{0}};
+    gctUINT32                    *index        = Context->unifor_num;
+    gcoVX_Kernel_Context_Uniform *Uinform      = Context->uniform;
+    gctUINT32           flag, i, count =  Context->volume;
+    gctUINT32           Height = Context->col;
+
+    gcmHEADER_ARG("Instructions=0x%x", Instructions);
+
+    for (i = 0; i < 16; i++)
+    {
+        subConfig.termconfig[i]   = VX_ADD;
+        if(i < 8)
+        {
+            subConfig.abin0[i]   = (gctUINT)(i/2);
+        }
+        else
+        {
+            subConfig.abin1[i%8]   = (gctUINT)(i/2);
+        }
+
+        subConfig.aselect[i]   = i%2 ? 1 : 0;
+        subConfig.matrix[i]    = i%2 ? -1 : 1;
+    }
+
+    for(i = 0; i < count; i += 8)
+    {
+        /*mov r0.y, 0 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE1(1), gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0U, &Instructions->binarys[Instructions->count++]));
+
+        /*mov r1, 0 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0U, &Instructions->binarys[Instructions->count++]));
+
+        /*mov r4, c5 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetUniform(2, 5, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+        /*mov r5, c4 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetUniform(2, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+        flag = Instructions->count;
+
+        /*img_load.u8 r3, c0, r0.xy */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x79, 0, 0x7, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 15, 1, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count++]));
+
+        _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, subConfig, 0x7, &Uinform[*index]);
+        /*dp2x8.u8 r3, r3, r5, c4_512 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0B, 0x3, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 7, (0x7 | (0x7 << 3)), &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 5, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_Setuniform(2, 4 * (++*index), &Instructions->binarys[Instructions->count++]));
+
+        /*mul_shift.u32, r2, r3.u16, 1, 0 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x07, 0x0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (0x3 | 0x3 << 3), &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 1 | (1 << 16), &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+        /*mad r2, r2, 1.0f/window, 0.00001f;*/
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x02, 0, 0x0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetUniform(1, 2, gcdVX_SWIZZLE1(2), gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValueF(2, 0.00001f, &Instructions->binarys[Instructions->count++]));
+
+        /* floor r2 r2; */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x25, 0, 0x0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 2, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+        /*conv.s32 r2 r2 f32 -> s32*/
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x72, 0, 0x2, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0x0, &Instructions->binarys[Instructions->count++]));
+
+        /*bitextract.u32 r2, r1, 0, c3;  c2 = [0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8] */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x10, 0x6, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (0x5 | (0x5 << 3)), &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0U, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetUniform(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+        /*mul_shift.u32, r2, r3.u16, 1, 0 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x07, 0x0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (0x3 | 0x3 << 3), &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 1 | (1 << 16), &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(4, &Instructions->binarys[Instructions->count++]));
+
+        /*mad r2, r2, 1.0f/window, 0.00001f;*/
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x02, 0, 0x0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetUniform(1, 2, gcdVX_SWIZZLE1(2), gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValueF(2, 0.00001f, &Instructions->binarys[Instructions->count++]));
+
+        /* floor r2 r2; */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x25, 0, 0x0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 2, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+        /*conv.s32 r2 r2 f32 -> s32*/
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x72, 0, 0x2, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0x0, &Instructions->binarys[Instructions->count++]));
+
+        /*bitextract.u32 r3, r2, 0, c3;  c2 = [0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8] */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x10, 0x6, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(4, 7, (0x5 | (0x5 << 3)), &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0U, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetUniform(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+        /*index_add.u16 r1[0-3], r3[0-3], r4, 0 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x17, 0x6, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (0x6 | (0x6 << 3)), &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, i, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+        if (count - i > 4)
+        {
+            /*index_add.u16 r1[4-7], r3[4-7], r4, 4 */
+            gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x17, 0x6, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetEVIS(4, 7, (0x6 | (0x6 << 3)), &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 4 + i, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+        }
+
+
+        /*add.u32 r0.y, r0.y, 1 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x5, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE1(1), gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(1), 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 1U, &Instructions->binarys[Instructions->count++]));
+
+        /*branch.u32 r0.y, height, flag-count */
+        gcmONERROR(gcoHARDWAREVX_Branch(0x02, flag-Instructions->count, 0x5, Instructions->count, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(1), 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, Height, &Instructions->binarys[Instructions->count++]));
+
+        /*atomic_add.u32 c1, 0, r1.u16[0-3] */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0F, 0x5, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, 0x6, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, i * 4, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+        if (count - i > 4)
+        {
+            /*atomic_add.u32 c1, 16, r1.u16[4-7] */
+            gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x0F, 0x5, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, 0x6, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, i * 4 + 16, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 1, gcdVX_SWIZZLE2(2, 3), 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+        }
+
+    }
+
+    Instructions->regs_count = 0x6;
 
 OnError:
     gcmFOOTER();
@@ -4528,6 +5180,173 @@ static gceSTATUS _minmaxloc_filter(
     gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
     gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, (Input | (0 << 4)), &Instructions->binarys[Instructions->count++]));
 
+
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x68, 0, 0x2, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE1(0), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 1, gcdVX_SWIZZLE1(0), 0, &Instructions->binarys[Instructions->count++]));
+
+    /*atom_max c2, 0, r4.y */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x69, 0, 0x2, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 2, gcdVX_SWIZZLE1(0), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 4, gcdVX_SWIZZLE1(1), 0, &Instructions->binarys[Instructions->count++]));
+
+    Instructions->regs_count = 0x5;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS _minmaxloc_filter_vx2(
+    IN OUT gcoVX_Hardware_Context   *Context
+    )
+{
+    gcoVX_Instructions *Instructions = Context->instructions;
+    gceSTATUS                 status = gcvSTATUS_OK;
+    gctUINT32                  Input = Context->input_type[0];
+    gctUINT32                   flag = 0;
+    gctUINT16 j;
+    gcmHEADER_ARG("Context=0x%x", Context);
+
+    /*
+     * r1 : | l1/min | l1/min | l1/min | l1/min |
+     * r2 : |   l2   |   l2   |   l2   |   l2   |
+     * r3 : |   l3   |   l3   |   l3   |   l3   |
+     * r4 : |   max  |   max  |   max  |   max  |
+     * r5 : |   pcx  |   pcy  |    0   |    0   |
+     */
+
+    /*mov r4, 0 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r0.z, r0.y */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE1(2), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 0, gcdVX_SWIZZLE1(1), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+
+    flag = Instructions->count;
+
+    for(j = 0; j < 3; j++)
+    {
+        /*img_load.u8 r2/3, c0, r0.xz */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x79, 0, Input, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(j+1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input), 1, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 2), 0, &Instructions->binarys[Instructions->count++]));
+
+        /* add r0.z, r0.z  1 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x5, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE1(2), gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(2), 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 1, &Instructions->binarys[Instructions->count++]));
+    }
+
+    /*vertMax3.u8, r4, r2, r3, r4 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x19, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input), Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+    /*horzMax3.u8, r4, r4 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x1C, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input) - 2, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+    /*vertMin3.u8, r1, r2, r3, r4 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x18, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input), Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+    /*horzMin3.u8, r1, r1 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x1B, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input) - 2, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+    /*branch r0.z, ystep, (flag - Instructions->count + 2); r0.z < ystep => loop */
+    gcmONERROR(gcoHARDWAREVX_Branch(0x02, (flag - Instructions->count + 2), 0x5, Instructions->count, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(2), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, Context->ystep, &Instructions->binarys[Instructions->count++]));
+
+    /*bitextract.u8, r2, r1, r4, c3;*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x10, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 1, 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 4, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(2, 3, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+    /*bitextract.u8, r3, r1, r4, c4;*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x10, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 1, 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 4, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(2, 4, gcdVX_SWIZZLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+    /*vertMax3.u8, r4, r2, r3, r4 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x19, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input) - 2, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+    /*horzMax3.u8, r4, r4 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x1C, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, (gcoHardwareVX_GetPixel(Input) + 1)/2 - 1, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+    /*vertMin3.u8, r4, r2, r3, r4 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x18, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, (gcoHardwareVX_GetPixel(Input) + 1)/4 -1, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+    /*horzMin3.u8, r1, r1 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x1B, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input) - 2, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+    /*div r0.x, r0.x, xstep */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x44, 0, 0x6, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE1(0), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(0), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, Context->xstep, &Instructions->binarys[Instructions->count++]));
+
+    /*conv.s32 r1, r1; u8/s16 -> u32*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x72, 0, 0x2, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, (Input | (0 << 4)), &Instructions->binarys[Instructions->count++]));
+
+    /*conv.s32 r4, r4; u8/s16 -> u32*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x72, 0, 0x2, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, (Input | (0 << 4)), &Instructions->binarys[Instructions->count++]));
+
     /*atom_min c1, 0, r1.x */
     gcmONERROR(gcoHARDWAREVX_AddOpcode(0x68, 0, 0x2, &Instructions->binarys[Instructions->count]));
     gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE1(0), 0, &Instructions->binarys[Instructions->count]));
@@ -5050,6 +5869,32 @@ static gceSTATUS _minmaxloc(
     gceSTATUS status                    = gcvSTATUS_OK;
     gcoVX_Hardware_Step steps[] = {
         {0, "filter", MML_FILTER, &_minmaxloc_filter},
+        {1, "location", MML_LOC, &_minmaxloc_loc},
+        {1, "pack data", MML_PACK, &_minmaxloc_pack},
+    };
+
+    gcmHEADER_ARG("Context=0x%x", Context);
+    assert(Context->step < 3);
+
+    gcmONERROR(steps[Context->step].func(Context));
+
+OnError:
+    gcmFOOTER();
+
+    return status;
+}
+
+static gceSTATUS _minmaxloc_vx2(
+    IN OUT gcoVX_Hardware_Context   *Context
+    )
+{
+#define MML_FILTER 0
+#define MML_LOC   1
+#define MML_PACK 2
+
+    gceSTATUS status                    = gcvSTATUS_OK;
+    gcoVX_Hardware_Step steps[] = {
+        {0, "filter", MML_FILTER, &_minmaxloc_filter_vx2},
         {1, "location", MML_LOC, &_minmaxloc_loc},
         {1, "pack data", MML_PACK, &_minmaxloc_pack},
     };
@@ -8184,6 +9029,8 @@ static gceSTATUS _multiply(
     gctUINT32 Output = Context->output_type[0];
     gcoVX_Instructions *Instructions = Context->instructions;
     gctFLOAT ShiftR = floorf(Shift);
+    gctUINT32 intPart = Context->clamp;
+    gctUINT32 i = 0;
 
     gcmHEADER_ARG("Instructions=0x%x", Instructions);
 
@@ -8217,79 +9064,111 @@ static gceSTATUS _multiply(
         gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count++]));
 
+        if (Shift == 0)
+        {
+            /*mov r3, 0 */
+            gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0U, &Instructions->binarys[Instructions->count++]));
+        }
+        /* check if the scale is the integer power of 2 */
+        else if((Shift - ShiftR) == 0)
+        {
+            /*mul_shift.u8, r3, r1.u8, r2.u8, shift */
+            gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x07, 0x2, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, Saturate, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (Input1 | (Input2 << 3) | Rounding), &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, (gctINT32)Shift, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+        }
+        else
+        {
+            /*mul_shift.u8, r3, r1.u8, r2.u8, 0 */
+            gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x07, 0x2, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (Input1 | (Input2 << 3)), &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+            /*conv.s32 r3, r3 : S16 -> float32 */
+            gcmONERROR(gcoHARDWAREVX_AddOpcode(0x72, 0, 0x0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, (0x2 | (0 << 4)), &Instructions->binarys[Instructions->count++]));
+            /*mul r3, r3, c3(shift) */
+            gcmONERROR(gcoHARDWAREVX_AddOpcode(0x03, 0, 0x0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetUniform(1, 3, gcdVX_SWIZZLE1(0), gcvFALSE, &Instructions->binarys[Instructions->count++]));
+            /*conv.s32 r3, r3 : float32 -> s32*/
+            gcmONERROR(gcoHARDWAREVX_AddOpcode(0x72, 0, 0x2, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, Saturate, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, (0x0 | (Rounding << 4)), &Instructions->binarys[Instructions->count++]));
+        }
         /*mul_shift.u8, r3, r1.u8, r2.u8, 0 */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x07, 0x2, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (Input1 | (Input2 << 3)), &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, Saturate, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (Input1 | (Input2 << 3) | Rounding), &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+        if (intPart != 1)
+        {
+            for (i = 0; i < 4; i++)
+            {
+                /*mul r1, r1, intPart*/
+                gcmONERROR(gcoHARDWAREVX_AddOpcode(0x3C, 0, 0x2, &Instructions->binarys[Instructions->count]));
+                gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE1(i), gcvFALSE, &Instructions->binarys[Instructions->count]));
+                gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE1(i), 0, &Instructions->binarys[Instructions->count]));
+                gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, intPart, &Instructions->binarys[Instructions->count++]));
+            }
+        }
         /*mul_shift.u8, r1, r1.u8, r2.u8, 0 */
-        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x07, 0x2, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (Input1 | (Input2 << 3)), &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetSourceBin(4, &Instructions->binarys[Instructions->count++]));
-
-        /*conv.s32 r3, r3 : S16 -> float32 */
-        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x72, 0, 0x0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, (0x2 | (0 << 4)), &Instructions->binarys[Instructions->count++]));
-        /*conv.s32 r1, r1 : S16 -> float32 */
-        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x72, 0, 0x0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x2, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, (0x2 | (0 << 4)), &Instructions->binarys[Instructions->count++]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
 
         /*mul r3, r3, c3(shift) */
-        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x03, 0, 0x0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetUniform(1, 3, gcdVX_SWIZZLE1(0), gcvFALSE, &Instructions->binarys[Instructions->count++]));
-        /*mul r1, r1, c3(shift) */
-        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x03, 0, 0x0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetUniform(1, 3, gcdVX_SWIZZLE1(0), gcvFALSE, &Instructions->binarys[Instructions->count++]));
-
-        /*conv.s32 r3, r3 : float32 -> output*/
-        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x72, 0, Output, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, Saturate, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, (0x0 | (Rounding << 4)), &Instructions->binarys[Instructions->count++]));
-        /*conv.s32 r1, r1 : float32 -> output*/
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x72, 0, Output, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, Saturate, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, (0x0 | (Rounding << 4)), &Instructions->binarys[Instructions->count++]));
+        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, (0x2 | (Rounding << 4)), &Instructions->binarys[Instructions->count++]));
 
-        /*bitextract.u32 r1[4-7], r3, 0, c4;  c4 = [0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8] */
-        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x10, Output, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetEVIS(4, 7, (0x5 | (0x5 << 3)), &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0U, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetUniform(2, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
-        /*bitextract.u32 r1[0-3], r3, 0, c4;  c4 = [0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8] */
-        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x10, Output, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (0x5 | (0x5 << 3)), &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0U, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetUniform(2, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+        if (Output == 0x3)
+        {
+            /*bitextract.u32 r1[4-7], r3, 0, c4;  c4 = [0, 32, 64, 96, 0, 0, 0, 0, 16, 16, 16, 16] */
+            gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x10, 0x6, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (0x5 | (0x5 << 3)), &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0U, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetUniform(2, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+        }
+        else
+        {
+            /*bitextract.u32 r1[4-7], r3, 0, c4;  c4 = [0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8] */
+            gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x10, Output, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, (0x5 | (0x5 << 3)), &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0U, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetUniform(2, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+            gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+        }
 
         /*img_store.u8, r1, c2, r0.xy, r1[0-7] */
         gcmONERROR(gcoHARDWAREVX_AddOpcode(0x7A, 0, Output, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, Context->xstep - 1, 1, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 3, 1, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetUniform(0, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
         gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
-        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
 
         Instructions->regs_count = 4;
     }
@@ -14931,6 +15810,199 @@ static gceSTATUS _edge_trace_hysteresis(
     gcmONERROR(gcoHARDWAREVX_Branch(0x01, 2, 0x5, Instructions->count, &Instructions->binarys[Instructions->count]));
     gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(3), 0, &Instructions->binarys[Instructions->count]));
     gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 11, &Instructions->binarys[Instructions->count++]));
+
+    /*branch.u32 c1.x, 0, 0-curr */
+    gcmONERROR(gcoHARDWAREVX_Branch(0x01, 0-Instructions->count, 0x5, Instructions->count, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE1(0), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0, &Instructions->binarys[Instructions->count++]));
+    /*mov r0.w, 0 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE1(3), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count++]));
+
+    Instructions->regs_count = 0x9;
+
+    OnError:
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS _edge_trace_hysteresis_vx2(
+    IN OUT gcoVX_Hardware_Context   *Context
+    )
+{
+    gceSTATUS                    status = gcvSTATUS_OK;
+    gcoVX_Instructions   *Instructions  = Context->instructions;
+    RelOffset minusOne = {{ -1, -1 }};
+    RelOffset zero = {{ -1, 0 }};
+    RelOffset plusOne = {{ -1, 1 }};
+    gctUINT32 flag[2],i;
+    gctUINT32 *index = Context->unifor_num;
+    gcoVX_Kernel_Context_Uniform *Uinform = Context->uniform;
+    gcVXConfig config = {{0}};
+    gcmHEADER_ARG("Instructions=0x%x", Instructions);
+
+    for (i = 0; i < 14; i++)
+    {
+        config.termconfig[i] = VX_ACCUMULATOR;
+        if(i < 8)
+            config.abin0[i] = i + 1;
+        else
+            config.abin1[i%8] = i + 1;
+        config.aselect[i] = 0;
+        config.matrix[i] = 1;
+    }
+
+    _SetUniformItem(index, 0, 0, 0, 0, 0, gcvTRUE, config, 0x7, &Uinform[*index]);
+
+    /*mov r0.yz, 0 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE2(1, 2), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*img_load.u8 r1, c0, r0.xy, -1,-1*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x79, 0, 0x7, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(0x7), 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, minusOne.raw, &Instructions->binarys[Instructions->count++]));
+    /*img_load.u8 r2, c0, r0.xy, -1,0 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x79, 0, 0x7, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(0x7), 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, zero.raw, &Instructions->binarys[Instructions->count++]));
+    flag[0] = Instructions->count;
+
+    /*img_load.u8 r3, c0, r0.xy, -1,1 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x79, 0, 0x7, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(0x7), 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, plusOne.raw, &Instructions->binarys[Instructions->count++]));
+    /*mov r8, r2 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(8, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    flag[1] = Instructions->count;
+
+    /*mov r5, r2 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+    /*vertMax3.u8, r4, r1, r2, r3 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x19, 0x7, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 15, 0x7, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+    /*horzMax3.u8, r4, r4 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x1C, 0x7, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(1, 14, 0x7, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+    /*mul_shift.u8, r2, r2, r4, 0 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x07, 0x7, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvTRUE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(1, 8, (0x7 | (0x7 << 3)), &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(1, &Instructions->binarys[Instructions->count++]));
+    /*mul_shift.u8, r2, r2, r4, 0 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x07, 0x7, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvTRUE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(9, 14, (0x7 | (0x7 << 3)), &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(9, &Instructions->binarys[Instructions->count++]));
+    /*add.u32 r6, r2, -r5 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(6, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 5, gcdVX_SWIZZLE, NEGATE_FLAG, &Instructions->binarys[Instructions->count++]));
+    /*dp16.u8 r7, r6, 1, c4_512 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x08, 0x2, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(7, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 0, (0x7 | (0x7 << 3)), &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 6, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 6, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_Setuniform(2, 4 * (++*index), &Instructions->binarys[Instructions->count++]));
+
+
+    /*branch.u32 r7.x, 0, flag1-curr */
+    gcmONERROR(gcoHARDWAREVX_Branch(0x01, flag[1]-Instructions->count, 0x5, Instructions->count, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 7, gcdVX_SWIZZLE1(0), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*add.u32 r6, r2, -r8 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(6, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 8, gcdVX_SWIZZLE, NEGATE_FLAG, &Instructions->binarys[Instructions->count++]));
+    /*dp16.u8 r7, r6, 1, c4_512 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x08, 0x2, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(7, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, 0, (0x7 | (0x7 << 3)), &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 6, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 6, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_Setuniform(2, 4 * (*index), &Instructions->binarys[Instructions->count++]));
+
+    /*atom_max c1, 0, r7.x */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x69, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE1(0), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 7, gcdVX_SWIZZLE1(0), 0, &Instructions->binarys[Instructions->count++]));
+    /*img_store r2, c0, r0.xy, r2 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x7A, 0, 0x7, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(1, 14, 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r1, r2 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r2, r3 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*add.u32 r0.yz, r0, 1 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE2(1, 2), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 1U, &Instructions->binarys[Instructions->count++]));
+
+    /*branch.u32 r0.z, c2.y, flag0-curr */
+    gcmONERROR(gcoHARDWAREVX_Branch(0x02, flag[0]-Instructions->count, 0x5, Instructions->count, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(2), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(1, 2, gcdVX_SWIZZLE1(1), 0, &Instructions->binarys[Instructions->count++]));
+
+    /*barrier */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x2A, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*add.u32 r0.w, r0.w, 1 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE1(3), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(3), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 1U, &Instructions->binarys[Instructions->count++]));
+    /*branch.u32 r0.w, 12, 2*/
+    gcmONERROR(gcoHARDWAREVX_Branch(0x01, 2, 0x5, Instructions->count, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(3), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 12, &Instructions->binarys[Instructions->count++]));
 
     /*branch.u32 c1.x, 0, 0-curr */
     gcmONERROR(gcoHARDWAREVX_Branch(0x01, 0-Instructions->count, 0x5, Instructions->count, &Instructions->binarys[Instructions->count]));
@@ -22772,8 +23844,8 @@ static gceSTATUS _fast9corners_strength_halfevis(
     gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(1), gcvFALSE, &Instructions->binarys[Instructions->count]));
     gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, Context->volume + 1, &Instructions->binarys[Instructions->count++]));
 
-    /*texkill.eq 1, 0;*/
-    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x17, 0x01, 0x2, &Instructions->binarys[Instructions->count]));
+    /*branch.gt 1, 0, Instructions->count, 30 + 1; exit */
+    gcmONERROR(gcoHARDWAREVX_Branch(0x01, SCORE_CHECKING_COUNT + 1, 0x5, Instructions->count, &Instructions->binarys[Instructions->count]));
     gcmONERROR(gcoHARDWAREVX_SetImmediateValue(0, 1U, &Instructions->binarys[Instructions->count]));
     gcmONERROR(gcoHARDWAREVX_SetImmediateValue(1, 0U, &Instructions->binarys[Instructions->count++]));
 
@@ -23010,6 +24082,181 @@ static gceSTATUS _minmaxloc_halfevis(
 OnError:
     gcmFOOTER();
 
+    return status;
+}
+
+static gceSTATUS _morphology_vx2(
+    IN OUT gcoVX_Hardware_Context   *Context
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT32 Kernel = Context->kernel;
+    gctUINT32 Input = Context->input_type[0];
+    gctUINT32 Border = Context->borders;
+    gcoVX_Instructions *Instructions = Context->instructions;
+    gctUINT32 Opcode[2] = {0};
+    RelOffset minusOne = {{ -1, -1 }};
+    RelOffset zero = {{ -1, 0 }};
+    RelOffset plusOne = {{ -1, 1 }};
+    gctUINT32 flag;
+
+    gcmHEADER_ARG("Instructions=0x%x", Instructions);
+
+    switch(Kernel)
+    {
+    case gcvVX_KERNEL_DILATE_3x3:
+        Opcode[0] = 0x19;
+        Opcode[1] = 0x1C;
+        break;
+    case gcvVX_KERNEL_ERODE_3x3:
+        Opcode[0] = 0x18;
+        Opcode[1] = 0x1B;
+        break;
+    case gcvVX_KERNEL_MEDIAN_3x3:
+        Opcode[0] = 0x1A;
+        Opcode[1] = 0x1D;
+        break;
+    }
+
+    if(Border == gcvVX_BORDER_MODE_CONSTANT)
+    {
+        /*mov r1, c3 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetUniform(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+    }
+
+    /*img_load.u8 r1, c0, r0.xy, -1,-1*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x79, 0, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input), 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, minusOne.raw, &Instructions->binarys[Instructions->count++]));
+
+    if(Border == gcvVX_BORDER_MODE_CONSTANT)
+    {
+        /*mov r2, c3 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetUniform(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+    }
+
+    /*img_load.u8 r2, c0, r0.xy, -1,0 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x79, 0, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input), 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, zero.raw, &Instructions->binarys[Instructions->count++]));
+
+    flag = Instructions->count;
+
+    if(Border == gcvVX_BORDER_MODE_CONSTANT)
+    {
+        /*mov r3, c3 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetUniform(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+    }
+
+    /*img_load.u8 r3, c0, r0.xy, -1,1 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x79, 0, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(3, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input), 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, plusOne.raw, &Instructions->binarys[Instructions->count++]));
+
+    /*vertMax3.u8, r4, r1, r2, r3 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, Opcode[0], Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input), Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+    /*horzMax3.u8, r4, r4 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, Opcode[1], Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input) - 2, Input, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+    if (Kernel == gcvVX_KERNEL_MEDIAN_3x3)
+    {
+        /*vertMax3.u8, r5, r1, r2, r3 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x19, Input, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input), Input, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+        /*vertMin3.u8, r1, r1, r2, r3 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x18, Input, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input), Input, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+        /*horzMax3.u8, r1, r1 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x1C, Input, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input) - 2, Input, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+        /*horzMin3.u8, r5, r5 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x1B, Input, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(5, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input) - 2, Input, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 5, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+
+        /*vertMed3.u8, r4, r1, r4, r5 */
+        gcmONERROR(gcoHARDWAREVX_AddOpcode(0x45, 0x1A, Input, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetDestination(4, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input) - 2, Input, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 5, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+        gcmONERROR(gcoHARDWAREVX_SetSourceBin(0, &Instructions->binarys[Instructions->count++]));
+    }
+
+    /*img_store.u8 c1, r0.xy, r4.xy*/
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x7A, 0, 0x7, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetEVIS(0, gcoHardwareVX_GetPixel(Input) - 2, 1, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(0, 1, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r1, r2 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(1, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 2, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*mov r2, r3 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x09, 0, GCREG_SH_INSTRUCTION_TYPE_INVALID, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(2, gcdVX_ENABLE, gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 3, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
+
+    /*add.u32 r0.yz, r0, 1 */
+    gcmONERROR(gcoHARDWAREVX_AddOpcode(0x01, 0, 0x5, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetDestination(0, gcdVX_ENABLE2(1, 2), gcvFALSE, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetImmediateValue(2, 1U, &Instructions->binarys[Instructions->count++]));
+
+    /*branch.u32 r0.z, c2.x, flag-count */
+    gcmONERROR(gcoHARDWAREVX_Branch(0x02, flag-Instructions->count, 0x5, Instructions->count, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetTempReg(0, 0, gcdVX_SWIZZLE1(2), 0, &Instructions->binarys[Instructions->count]));
+    gcmONERROR(gcoHARDWAREVX_SetUniform(1, 2, gcdVX_SWIZZLE1(0), 0, &Instructions->binarys[Instructions->count++]));
+
+    Instructions->regs_count = (Kernel == gcvVX_KERNEL_MEDIAN_3x3) ? 0x6 : 0x5;
+OnError:
+    gcmFOOTER();
     return status;
 }
 
@@ -24027,6 +25274,32 @@ static gceSTATUS _edge_trace_non_filter_hysteresis(
     return status;
 }
 
+static gceSTATUS _edge_trace_vx2(
+    IN OUT gcoVX_Hardware_Context   *Context
+    )
+{
+#define ET_THRESHOLD 0
+#define ET_HYST   1
+#define ET_CLAMP   2
+
+    gceSTATUS status                    = gcvSTATUS_OK;
+    gcoVX_Hardware_Step steps[] = {
+        {0, "threshold", ET_THRESHOLD, &_edge_trace_threshold},
+        {1, "hysteresis", ET_HYST, &_edge_trace_hysteresis_vx2},
+        {2, "clamp", ET_CLAMP, &_edge_trace_clamp},
+    };
+
+    gcmHEADER_ARG("Context=0x%x", Context);
+    assert(Context->step < 3);
+
+    gcmONERROR(steps[Context->step].func(Context));
+
+OnError:
+    gcmFOOTER();
+
+    return status;
+}
+
 static gceSTATUS _edge_trace_halfevis(
     IN OUT gcoVX_Hardware_Context   *Context
     )
@@ -24832,7 +26105,7 @@ static gceSTATUS _warpaffine_no_bilinear(
     gcmONERROR(gcoHARDWAREVX_SetTempReg(1, 0, gcdVX_SWIZZLE2(0, 1), 0, &Instructions->binarys[Instructions->count]));
     gcmONERROR(gcoHARDWAREVX_SetTempReg(2, 4, gcdVX_SWIZZLE, 0, &Instructions->binarys[Instructions->count++]));
 
-    Instructions->regs_count = 0x10;
+    Instructions->regs_count = 0xa;
 OnError:
     gcmFOOTER();
     return status;
@@ -27894,6 +29167,8 @@ gcoVX_Hardware_Kernel kernelTables[] =
     {49, "laplacian 3x3", gcvVX_KERNEL_LAPLACIAN_3x3, &_laplacian},
     {50, "census 3x3", gcvVX_KERNEL_CENSUS_3x3, &_census3x3},
     {51, "copy image", gcvVX_KERNEL_COPY_IMAGE, &_copy_image},
+    {52, "maxpool", gcvVX_KERNEL_MAXPOOL, &_max_pooling},
+    {53, "lrn", gcvVX_KERNEL_LRN, &_lrn},
 };
 
 gceSTATUS
@@ -27912,19 +29187,19 @@ gcoHARDWAREVX_KenrelConstruct(
     {
     case gcvVX_KERNEL_SOBEL_3x3:
     case gcvVX_KERNEL_SOBEL_MxN:
-        kernel.func = Context->evisNoInst.noFilter ? &_sobel_mxn_halfevis : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noFilter) ? &_sobel_mxn_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_MAGNITUDE:
-        kernel.func = Context->evisNoInst.noMagPhase ? &_mag_halfevis : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noMagPhase) ? &_mag_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_PHASE:
-        kernel.func = Context->evisNoInst.noMagPhase ? &_phase_halfevis : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noMagPhase) ? &_phase_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_HISTOGRAM:
-        kernel.func = Context->evisNoInst.noSelectAdd ? &_histogram_halfevis : kernel.func;
+        kernel.func = Context->evisNoInst.isVX2 ? _histogram_vx2 : Context->evisNoInst.noSelectAdd ? &_histogram_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_ABSDIFF:
@@ -27937,45 +29212,49 @@ gcoHARDWAREVX_KenrelConstruct(
 
     case gcvVX_KERNEL_DILATE_3x3:
     case gcvVX_KERNEL_ERODE_3x3:
-        kernel.func = Context->evisNoInst.noFilter ? &_morphology_halfevis : kernel.func;
+        kernel.func = Context->evisNoInst.isVX2 ? &_morphology_vx2 : Context->evisNoInst.noFilter ? &_morphology_halfevis : kernel.func;
+        break;
+
+    case gcvVX_KERNEL_MEDIAN_3x3:
+        kernel.func = Context->evisNoInst.isVX2 ? &_morphology_vx2 : kernel.func;
         break;
 
     case gcvVX_KERNEL_BOX_3x3:
-        kernel.func = Context->evisNoInst.noBoxFilter ? &_filter_halfevis : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noBoxFilter) ? &_filter_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_GAUSSIAN_3x3:
-        kernel.func = Context->evisNoInst.noFilter ? &_filter_halfevis : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noFilter) ? &_filter_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_ACCUMULATE:
-        kernel.func = Context->evisNoInst.noIAdd ? &_accumulate_halfevis : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noIAdd) ? &_accumulate_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_ACCUMULATE_WEIGHTED:
-        kernel.func = Context->evisNoInst.lerp7Output ? &_accumulateweighted_halfevis : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.lerp7Output) ? &_accumulateweighted_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_MINMAXLOC:
-        kernel.func = Context->evisNoInst.noFilter ? &_minmaxloc_halfevis : kernel.func;
+        kernel.func = Context->evisNoInst.isVX2 ? &_minmaxloc_vx2 : Context->evisNoInst.noFilter ? &_minmaxloc_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_CONVERTDEPTH:
-        kernel.func = Context->evisNoInst.noIAdd ? &_convertdepth_halfevis : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noIAdd) ? &_convertdepth_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_ADD:
     case gcvVX_KERNEL_SUBTRACT:
-        kernel.func = Context->evisNoInst.noIAdd ? _add_sub_halfevis : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noIAdd) ? _add_sub_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_FAST_CORNERS:
-        kernel.func = (Context->evisNoInst.noIAdd || Context->evisNoInst.noFilter ||
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noIAdd || Context->evisNoInst.noFilter ||
                        Context->evisNoInst.noAbsDiff) ? _fast9corners_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_SCHARR_3x3:
-        kernel.func = (Context->evisNoInst.noIAdd || Context->evisNoInst.noFilter) ? &_sobel_mxn_halfevis : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noIAdd || Context->evisNoInst.noFilter) ? &_sobel_mxn_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_ELEMENTWISE_NORM:
@@ -27983,28 +29262,34 @@ gcoHARDWAREVX_KenrelConstruct(
         break;
 
     case gcvVX_KERNEL_EDGE_TRACE:
-        kernel.func = (Context->evisNoInst.clamp8Output || Context->evisNoInst.noFilter ||
+        kernel.func = Context->evisNoInst.isVX2 ? &_edge_trace_vx2 : (Context->evisNoInst.clamp8Output || Context->evisNoInst.noFilter ||
                        Context->evisNoInst.noIAdd) ? &_edge_trace_halfevis : kernel.func;
         break;
 
     case gcvVX_KERNEL_REMAP:
-        kernel.func = Context->evisNoInst.noBilinear ? &_remap_no_bilinear : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noBilinear) ? &_remap_no_bilinear : kernel.func;
         break;
 
     case gcvVX_KERNEL_WARP_PERSPECTIVE:
-        kernel.func = Context->evisNoInst.noBilinear ? &_warpperspective_no_bilinear : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noBilinear) ? &_warpperspective_no_bilinear : kernel.func;
         break;
 
     case gcvVX_KERNEL_WARP_AFFINE:
-        kernel.func = Context->evisNoInst.noBilinear ? &_warpaffine_no_bilinear : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noBilinear) ? &_warpaffine_no_bilinear : kernel.func;
         break;
 
     case gcvVX_KERNEL_OPTICAL_FLOW_PYR_LK:
-        kernel.func = Context->evisNoInst.noBilinear ? &_optLKTracker_no_bilinear : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noBilinear) ? &_optLKTracker_no_bilinear : kernel.func;
         break;
 
     case gcvVX_KERNEL_SCALE_IMAGE:
-        kernel.func = Context->evisNoInst.noBilinear ? &_scaleimage_no_bilinear : kernel.func;
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noBilinear) ? &_scaleimage_no_bilinear : kernel.func;
+        break;
+    case gcvVX_KERNEL_MAXPOOL:
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noBilinear) ? &_max_pooling : kernel.func;
+        break;
+    case gcvVX_KERNEL_LRN:
+        kernel.func = (Context->evisNoInst.isVX2 || Context->evisNoInst.noBilinear) ? &_lrn : kernel.func;
         break;
 
     default:
@@ -28131,7 +29416,7 @@ gcoHARDWARE_LoadKernelVX(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0425, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0425, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  19:0) - (0 ? 19:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ?
  19:0))) | (((gctUINT32) ((gctUINT32) (Size - 1) & ((gctUINT32) ((((1 ?
  19:0) - (0 ? 19:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:0) - (0 ? 19:0) + 1))))))) << (0 ?
@@ -28171,7 +29456,7 @@ gcoHARDWARE_LoadKernelVX(
         );
 
     gcmSETSTATEDATA_NEW(
-        stateDelta, reserve, memory, gcvFALSE, 0x0402,
+        stateDelta, reserve, memory, gcvFALSE, 0x0403,
           ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 6:0) - (0 ?
  6:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:0) - (0 ? 6:0) + 1))))))) << (0 ?
  6:0))) | (((gctUINT32) ((gctUINT32) (TempRegCount) & ((gctUINT32) ((((1 ?
@@ -28180,7 +29465,7 @@ gcoHARDWARE_LoadKernelVX(
         );
 
     gcmSETSTATEDATA_NEW(
-        stateDelta, reserve, memory, gcvFALSE, 0x0402,
+        stateDelta, reserve, memory, gcvFALSE, 0x0404,
           ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
  0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
  0:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 0:0) - (0 ?
@@ -28262,7 +29547,7 @@ gcoHARDWARE_LoadKernelVX(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x040A, (gctUINT32)(Address) );
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x040A, (gctUINT32)(Address) );
     gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
@@ -28288,7 +29573,7 @@ gcoHARDWARE_LoadKernelVX(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0409, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0409, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:0) - (0 ? 9:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:0) - (0 ? 9:0) + 1))))))) << (0 ?
  9:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 9:0) - (0 ?
  9:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:0) - (0 ? 9:0) + 1))))))) << (0 ?
@@ -28316,7 +29601,7 @@ gcoHARDWARE_LoadKernelVX(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x021A, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x021A, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
  0:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
@@ -28393,7 +29678,7 @@ gcoHARDWAREVX_InitVX(
  15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
  15:0)));    gcmSKIPSECUREUSER();
 };
-    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0E21, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0E21, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
  2:0))) | (((gctUINT32) (0x6 & ((gctUINT32) ((((1 ? 2:0) - (0 ? 2:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ? 2:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -28425,6 +29710,647 @@ OnError:
     return status;
 
 }
+
+gceSTATUS
+gcoHARDWAREVX_TriggerAccelerator(
+    IN gcoHARDWARE              Hardware,
+    IN gctUINT32                CmdAddress,
+    IN gceVX_ACCELERATOR_TYPE   Type,
+    IN gctUINT32                EventId,
+    IN gctBOOL                  waitEvent
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctPOINTER *cmdBuffer = gcvNULL;
+    static gctUINT32 triggerRegAddr[] =
+    {
+        0x0428,
+        0x042E,
+        0x042F
+    };
+
+     /* Define state buffer variables. */
+    gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
+
+    gcmHEADER_ARG("Hardware=0x%x CmdAddress=0x%x Type=0x%x EventId=0x%x",
+        Hardware, CmdAddress, Type, EventId);
+
+    gcmGETHARDWARE(Hardware);
+
+    gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, cmdBuffer);
+
+    stateDelta = stateDelta; /* Keep the compiler happy. */
+
+    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (triggerRegAddr[Type]) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, triggerRegAddr[Type], ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:6) - (0 ? 31:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:6) - (0 ? 31:6) + 1))))))) << (0 ?
+ 31:6))) | (((gctUINT32) ((gctUINT32) ((CmdAddress >> 6)) & ((gctUINT32) ((((1 ?
+ 31:6) - (0 ? 31:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:6) - (0 ? 31:6) + 1))))))) << (0 ?
+ 31:6))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:0) - (0 ?
+ 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))) | (((gctUINT32) ((gctUINT32) (EventId) & ((gctUINT32) ((((1 ? 4:0) - (0 ?
+ 4:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:0) - (0 ? 4:0) + 1))))))) << (0 ?
+ 4:0))));    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+    if (EventId == 0 || waitEvent)
+    {
+        {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0429) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0429, EventId);
+    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+    }
+
+    /* Validate the state buffer. */
+    gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, cmdBuffer);
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+
+}
+
+gceSTATUS
+gcoHARDWAREVX_ProgrammeNNEngine(
+    IN gcoHARDWARE Hardware,
+    IN gctPOINTER Info,
+    IN OUT gctUINT32_PTR *Instruction
+    )
+{
+    struct _vx_nn_general_cmd_info *info = (struct _vx_nn_general_cmd_info*) Info;
+
+    *(*Instruction)++ =  ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 0:0) - (0 ?
+ 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:2) - (0 ? 5:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:2) - (0 ? 5:2) + 1))))))) << (0 ?
+ 5:2))) | (((gctUINT32) ((gctUINT32) (info->kernelXYSize) & ((gctUINT32) ((((1 ?
+ 5:2) - (0 ? 5:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:2) - (0 ? 5:2) + 1))))))) << (0 ?
+ 5:2)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 19:6) - (0 ? 19:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:6) - (0 ? 19:6) + 1))))))) << (0 ?
+ 19:6))) | (((gctUINT32) ((gctUINT32) (info->kernelZSize) & ((gctUINT32) ((((1 ?
+ 19:6) - (0 ? 19:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 19:6) - (0 ? 19:6) + 1))))))) << (0 ?
+ 19:6)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:20) - (0 ? 26:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:20) - (0 ?
+ 26:20) + 1))))))) << (0 ? 26:20))) | (((gctUINT32) ((gctUINT32) (info->kernelsPerCore) & ((gctUINT32) ((((1 ?
+ 26:20) - (0 ? 26:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:20) - (0 ?
+ 26:20) + 1))))))) << (0 ? 26:20)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:27) - (0 ? 28:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:27) - (0 ?
+ 28:27) + 1))))))) << (0 ? 28:27))) | (((gctUINT32) ((gctUINT32) (info->pooling) & ((gctUINT32) ((((1 ?
+ 28:27) - (0 ? 28:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:27) - (0 ?
+ 28:27) + 1))))))) << (0 ? 28:27)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ? 29:29))) | (((gctUINT32) ((gctUINT32) (info->poolingXYSize) & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ? 29:29)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ? 31:31))) | (((gctUINT32) ((gctUINT32) (info->nn_layer_flush) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ? 31:31)));
+
+     *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) ((gctUINT32) (info->dataType) & ((gctUINT32) ((((1 ?
+ 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:2) - (0 ? 2:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ?
+ 2:2))) | (((gctUINT32) ((gctUINT32) (info->dataType) & ((gctUINT32) ((((1 ?
+ 2:2) - (0 ? 2:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ?
+ 2:2)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:4) - (0 ? 4:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
+ 4:4))) | (((gctUINT32) ((gctUINT32) (info->dataType) & ((gctUINT32) ((((1 ?
+ 4:4) - (0 ? 4:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
+ 4:4)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:6) - (0 ? 18:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:6) - (0 ? 18:6) + 1))))))) << (0 ?
+ 18:6))) | (((gctUINT32) ((gctUINT32) (info->inImageXSize) & ((gctUINT32) ((((1 ?
+ 18:6) - (0 ? 18:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:6) - (0 ? 18:6) + 1))))))) << (0 ?
+ 18:6)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:19) - (0 ? 31:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:19) - (0 ?
+ 31:19) + 1))))))) << (0 ? 31:19))) | (((gctUINT32) ((gctUINT32) (info->inImageYSize) & ((gctUINT32) ((((1 ?
+ 31:19) - (0 ? 31:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:19) - (0 ?
+ 31:19) + 1))))))) << (0 ? 31:19)));
+
+     *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 24:24) - (0 ? 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:24) - (0 ?
+ 24:24) + 1))))))) << (0 ? 24:24))) | (((gctUINT32) ((gctUINT32) (info->relu) & ((gctUINT32) ((((1 ?
+ 24:24) - (0 ? 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:24) - (0 ?
+ 24:24) + 1))))))) << (0 ? 24:24)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) ((gctUINT32) (info->inImageXOffset) & ((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:3) - (0 ? 5:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:3) - (0 ? 5:3) + 1))))))) << (0 ?
+ 5:3))) | (((gctUINT32) ((gctUINT32) (info->inImageYOffset) & ((gctUINT32) ((((1 ?
+ 5:3) - (0 ? 5:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:3) - (0 ? 5:3) + 1))))))) << (0 ?
+ 5:3)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (info->postMultiplier) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) ((gctUINT32) (info->postShift) & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)));
+
+     *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:6) - (0 ? 18:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:6) - (0 ? 18:6) + 1))))))) << (0 ?
+ 18:6))) | (((gctUINT32) ((gctUINT32) (info->outImageXSize) & ((gctUINT32) ((((1 ?
+ 18:6) - (0 ? 18:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:6) - (0 ? 18:6) + 1))))))) << (0 ?
+ 18:6)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:19) - (0 ? 31:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:19) - (0 ?
+ 31:19) + 1))))))) << (0 ? 31:19))) | (((gctUINT32) ((gctUINT32) (info->outImageYSize) & ((gctUINT32) ((((1 ?
+ 31:19) - (0 ? 31:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:19) - (0 ?
+ 31:19) + 1))))))) << (0 ? 31:19)));
+
+     *(*Instruction)++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
+ 13:0))) | (((gctUINT32) ((gctUINT32) (info->outImageZSize) & ((gctUINT32) ((((1 ?
+ 13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
+ 13:0)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 24:18) - (0 ? 24:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:18) - (0 ?
+ 24:18) + 1))))))) << (0 ? 24:18))) | (((gctUINT32) ((gctUINT32) (info->outImageTileXSize) & ((gctUINT32) ((((1 ?
+ 24:18) - (0 ? 24:18) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:18) - (0 ?
+ 24:18) + 1))))))) << (0 ? 24:18)))
+                         | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:25) - (0 ? 31:25) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:25) - (0 ?
+ 31:25) + 1))))))) << (0 ? 31:25))) | (((gctUINT32) ((gctUINT32) (info->outImageTileYSize) & ((gctUINT32) ((((1 ?
+ 31:25) - (0 ? 31:25) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:25) - (0 ?
+ 31:25) + 1))))))) << (0 ? 31:25)));
+
+     return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoHARDWAREVX_ProgrammeTPEngine(
+    IN gcoHARDWARE Hardware,
+    IN gctPOINTER Info,
+    IN OUT gctUINT32_PTR *Instruction
+    )
+{
+    struct _vx_nn_tp_cmd_info *info = (struct _vx_nn_tp_cmd_info*) Info;
+
+    *(*Instruction)++ =   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (info->inImageXSize) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));
+
+    *(*Instruction)++ =   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (info->inImageYSize) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16))) | (((gctUINT32) ((gctUINT32) (info->inImageZSize) & ((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16)));
+
+    *(*Instruction)++ =   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (info->inImageStride) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));
+
+    *(*Instruction)++ =   info->inImageSlice;
+
+    *(*Instruction)++ =   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (info->inWindowXStart) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16))) | (((gctUINT32) ((gctUINT32) (info->inWindowYStart) & ((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16)));
+
+    *(*Instruction)++ =   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (info->inWindowXEnd) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16))) | (((gctUINT32) ((gctUINT32) (info->inWindowYEnd) & ((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16)));
+
+    *(*Instruction)++ =   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:0) - (0 ? 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
+ 1:0))) | (((gctUINT32) ((gctUINT32) (info->inTileSequence) & ((gctUINT32) ((((1 ?
+ 1:0) - (0 ? 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
+ 1:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:2) - (0 ? 2:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ?
+ 2:2))) | (((gctUINT32) ((gctUINT32) (info->inTileListGlobalMem) & ((gctUINT32) ((((1 ?
+ 2:2) - (0 ? 2:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ?
+ 2:2)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 3:3) - (0 ? 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
+ 3:3))) | (((gctUINT32) ((gctUINT32) (info->inImageGlobalMem) & ((gctUINT32) ((((1 ?
+ 3:3) - (0 ? 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
+ 3:3)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:4) - (0 ? 4:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
+ 4:4))) | (((gctUINT32) ((gctUINT32) (info->aluI2FEnable) & ((gctUINT32) ((((1 ?
+ 4:4) - (0 ? 4:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
+ 4:4)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:5) - (0 ? 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ?
+ 5:5))) | (((gctUINT32) ((gctUINT32) (info->aluSquareEnable) & ((gctUINT32) ((((1 ?
+ 5:5) - (0 ? 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ?
+ 5:5)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 7:6) - (0 ? 7:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:6) - (0 ? 7:6) + 1))))))) << (0 ?
+ 7:6))) | (((gctUINT32) ((gctUINT32) (info->aluHorzProcessing) & ((gctUINT32) ((((1 ?
+ 7:6) - (0 ? 7:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:6) - (0 ? 7:6) + 1))))))) << (0 ?
+ 7:6)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 14:9) - (0 ? 14:9) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:9) - (0 ? 14:9) + 1))))))) << (0 ?
+ 14:9))) | (((gctUINT32) ((gctUINT32) (info->aluHorzProcCount) & ((gctUINT32) ((((1 ?
+ 14:9) - (0 ? 14:9) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:9) - (0 ? 14:9) + 1))))))) << (0 ?
+ 14:9)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:15) - (0 ? 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:15) - (0 ?
+ 15:15) + 1))))))) << (0 ? 15:15))) | (((gctUINT32) ((gctUINT32) (info->aluHorzProcStride) & ((gctUINT32) ((((1 ?
+ 15:15) - (0 ? 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:15) - (0 ?
+ 15:15) + 1))))))) << (0 ? 15:15)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 17:16) - (0 ? 17:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:16) - (0 ?
+ 17:16) + 1))))))) << (0 ? 17:16))) | (((gctUINT32) ((gctUINT32) (info->aluVertProcessing) & ((gctUINT32) ((((1 ?
+ 17:16) - (0 ? 17:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:16) - (0 ?
+ 17:16) + 1))))))) << (0 ? 17:16)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 24:19) - (0 ? 24:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:19) - (0 ?
+ 24:19) + 1))))))) << (0 ? 24:19))) | (((gctUINT32) ((gctUINT32) (info->aluVertProcCount) & ((gctUINT32) ((((1 ?
+ 24:19) - (0 ? 24:19) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:19) - (0 ?
+ 24:19) + 1))))))) << (0 ? 24:19)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:25) - (0 ? 25:25) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:25) - (0 ?
+ 25:25) + 1))))))) << (0 ? 25:25))) | (((gctUINT32) ((gctUINT32) (info->aluVertProcStride) & ((gctUINT32) ((((1 ?
+ 25:25) - (0 ? 25:25) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:25) - (0 ?
+ 25:25) + 1))))))) << (0 ? 25:25)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (info->aluNmsEnable) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 27:27) - (0 ? 27:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:27) - (0 ?
+ 27:27) + 1))))))) << (0 ? 27:27))) | (((gctUINT32) ((gctUINT32) (info->aluPwlEnable) & ((gctUINT32) ((((1 ?
+ 27:27) - (0 ? 27:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:27) - (0 ?
+ 27:27) + 1))))))) << (0 ? 27:27)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 28:28) - (0 ? 28:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ? 28:28))) | (((gctUINT32) ((gctUINT32) (info->aluMultEnable) & ((gctUINT32) ((((1 ?
+ 28:28) - (0 ? 28:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 28:28) - (0 ?
+ 28:28) + 1))))))) << (0 ? 28:28)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ? 29:29))) | (((gctUINT32) ((gctUINT32) (info->aluF2IEnable) & ((gctUINT32) ((((1 ?
+ 29:29) - (0 ? 29:29) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:29) - (0 ?
+ 29:29) + 1))))))) << (0 ? 29:29)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
+ 30:30) + 1))))))) << (0 ? 30:30))) | (((gctUINT32) ((gctUINT32) (info->aluLoadPwlLUT) & ((gctUINT32) ((((1 ?
+ 30:30) - (0 ? 30:30) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:30) - (0 ?
+ 30:30) + 1))))))) << (0 ? 30:30)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ? 31:31))) | (((gctUINT32) ((gctUINT32) (info->aluLoadPwlLUTGlobalMem) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ? 31:31)));
+
+    *(*Instruction)++ =   info->inTileListAddress;
+
+    *(*Instruction)++ =   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (info->inTileXSize) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16))) | (((gctUINT32) ((gctUINT32) (info->inTileYSize) & ((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16)));
+
+    *(*Instruction)++ =   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (info->inTileXInc) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16))) | (((gctUINT32) ((gctUINT32) (info->inTileYInc) & ((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16)));
+
+    *(*Instruction)++ =   info->inImageBaseAddress;
+
+    *(*Instruction)++ =   info->aluLoadPwlLUTAddress;
+
+    *(*Instruction)++ =   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) ((gctUINT32) (info->outTileSkipAtborder) & ((gctUINT32) ((((1 ?
+ 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
+ 1:1))) | (((gctUINT32) ((gctUINT32) (info->outGlobalMem) & ((gctUINT32) ((((1 ?
+ 1:1) - (0 ? 1:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:1) - (0 ? 1:1) + 1))))))) << (0 ?
+ 1:1)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:2) - (0 ? 2:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ?
+ 2:2))) | (((gctUINT32) ((gctUINT32) (info->outLoop1Reset) & ((gctUINT32) ((((1 ?
+ 2:2) - (0 ? 2:2) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:2) - (0 ? 2:2) + 1))))))) << (0 ?
+ 2:2)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 3:3) - (0 ? 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
+ 3:3))) | (((gctUINT32) ((gctUINT32) (info->outLoop2Reset) & ((gctUINT32) ((((1 ?
+ 3:3) - (0 ? 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
+ 3:3)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 4:4) - (0 ? 4:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
+ 4:4))) | (((gctUINT32) ((gctUINT32) (info->outLoop3Reset) & ((gctUINT32) ((((1 ?
+ 4:4) - (0 ? 4:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:4) - (0 ? 4:4) + 1))))))) << (0 ?
+ 4:4)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:5) - (0 ? 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ?
+ 5:5))) | (((gctUINT32) ((gctUINT32) (info->outBrickMode) & ((gctUINT32) ((((1 ?
+ 5:5) - (0 ? 5:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:5) - (0 ? 5:5) + 1))))))) << (0 ?
+ 5:5)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 6:6) - (0 ? 6:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ?
+ 6:6))) | (((gctUINT32) ((gctUINT32) (info->aluZFilterMode) & ((gctUINT32) ((((1 ?
+ 6:6) - (0 ? 6:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:6) - (0 ? 6:6) + 1))))))) << (0 ?
+ 6:6)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 9:8) - (0 ? 9:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:8) - (0 ? 9:8) + 1))))))) << (0 ?
+ 9:8))) | (((gctUINT32) ((gctUINT32) (info->aluZFilterStartOverfetch) & ((gctUINT32) ((((1 ?
+ 9:8) - (0 ? 9:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:8) - (0 ? 9:8) + 1))))))) << (0 ?
+ 9:8)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:11) - (0 ? 12:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:11) - (0 ?
+ 12:11) + 1))))))) << (0 ? 12:11))) | (((gctUINT32) ((gctUINT32) (info->aluZFilterEndOverfetch) & ((gctUINT32) ((((1 ?
+ 12:11) - (0 ? 12:11) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:11) - (0 ?
+ 12:11) + 1))))))) << (0 ? 12:11)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 17:14) - (0 ? 17:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:14) - (0 ?
+ 17:14) + 1))))))) << (0 ? 17:14))) | (((gctUINT32) ((gctUINT32) (info->aluSquarePreshift) & ((gctUINT32) ((((1 ?
+ 17:14) - (0 ? 17:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:14) - (0 ?
+ 17:14) + 1))))))) << (0 ? 17:14)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ? 31:31))) | (((gctUINT32) ((gctUINT32) (info->last) & ((gctUINT32) ((((1 ?
+ 31:31) - (0 ? 31:31) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:31) - (0 ?
+ 31:31) + 1))))))) << (0 ? 31:31)));
+
+    *(*Instruction)++ =   info->outBaseAddress;
+
+    *(*Instruction)++ =   info->outLoop0Inc;
+
+    *(*Instruction)++ =   info->outLoop1Inc;
+
+    *(*Instruction)++ =   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (info->outLoop0Count) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16))) | (((gctUINT32) ((gctUINT32) (info->outLoop1Count) & ((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16)));
+
+    *(*Instruction)++ =   info->outLoop2Inc;
+
+    *(*Instruction)++ =   info->outLoop3Inc;
+
+    *(*Instruction)++ =   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (info->outLoop2Count) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16))) | (((gctUINT32) ((gctUINT32) (info->outLoop3Count) & ((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16)));
+
+    *(*Instruction)++ =   info->outLoop4Inc;
+
+    *(*Instruction)++ =   info->outLoop5Inc;
+
+    *(*Instruction)++ =   ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (info->outLoop4Count) & ((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+                        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16))) | (((gctUINT32) ((gctUINT32) (info->outLoop5Count) & ((gctUINT32) ((((1 ?
+ 31:16) - (0 ? 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ?
+ 31:16) + 1))))))) << (0 ? 31:16)));
+
+    *(*Instruction)++ =   info->outLoop6Inc;
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoHARDWAREVX_SetNNImage(
+    IN gcoHARDWARE Hardware,
+    IN gctPOINTER Info,
+    IN OUT gctUINT32_PTR *Instruction
+)
+{
+    gctUINT32 shImage;
+    struct _vx_nn_image_cmd_info *info = (struct _vx_nn_image_cmd_info*) Info;
+
+    /* 16 bits per pixel.*/
+    shImage = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) ((gctUINT32) (info->shift) & ((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0)))
+              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 3:3) - (0 ? 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
+ 3:3))) | (((gctUINT32) ((gctUINT32) (0x0) & ((gctUINT32) ((((1 ? 3:3) - (0 ?
+ 3:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:3) - (0 ? 3:3) + 1))))))) << (0 ?
+ 3:3)))
+              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:4) - (0 ? 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
+ 5:4))) | (((gctUINT32) ((gctUINT32) (0x0) & ((gctUINT32) ((((1 ? 5:4) - (0 ?
+ 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
+ 5:4)))
+              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 9:6) - (0 ? 9:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ?
+ 9:6))) | (((gctUINT32) ((gctUINT32) ((info->shift == 2)?0x0:0x6) & ((gctUINT32) ((((1 ?
+ 9:6) - (0 ? 9:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ?
+ 9:6)))
+              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 11:10) - (0 ? 11:10) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:10) - (0 ?
+ 11:10) + 1))))))) << (0 ? 11:10))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 11:10) - (0 ? 11:10) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 11:10) - (0 ?
+ 11:10) + 1))))))) << (0 ? 11:10)))
+              | ((info->height <= 1) ? ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ?
+ 12:12) + 1))))))) << (0 ? 12:12))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ?
+ 12:12) + 1))))))) << (0 ? 12:12))) : ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ?
+ 12:12) + 1))))))) << (0 ? 12:12))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ?
+ 12:12) + 1))))))) << (0 ? 12:12))))
+              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:14) - (0 ?
+ 15:14) + 1))))))) << (0 ? 15:14))) | (((gctUINT32) ((gctUINT32) ((info->shift == 2)?
+0x0:0x1) & ((gctUINT32) ((((1 ? 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
+ 15:14) - (0 ? 15:14) + 1))))))) << (0 ? 15:14)))
+              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ? 18:16))) | (((gctUINT32) ((gctUINT32) (0x0) & ((gctUINT32) ((((1 ?
+ 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ? 18:16)))
+              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20))) | (((gctUINT32) ((gctUINT32) (0x4) & ((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20)))
+              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ? 26:24))) | (((gctUINT32) ((gctUINT32) (0x4) & ((gctUINT32) ((((1 ?
+ 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ? 26:24)))
+              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ?
+ 30:28) + 1))))))) << (0 ? 30:28))) | (((gctUINT32) ((gctUINT32) (0x4) & ((gctUINT32) ((((1 ?
+ 30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ?
+ 30:28) + 1))))))) << (0 ? 30:28)));
+
+    *(*Instruction)++ = info->physical;
+    *(*Instruction)++ = info->width * info->shift * 2;
+    *(*Instruction)++ = info->width | (info->height << 16);
+    *(*Instruction)++ = shImage;
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoHARDWAREVX_WaitNNEvent(
+    IN gcoHARDWARE Hardware,
+    IN gctUINT32   EventId
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctPOINTER *cmdBuffer = gcvNULL;
+
+     /* Define state buffer variables. */
+    gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
+
+    gcmHEADER_ARG("Hardware=0x%x  EventId=0x%x",
+        Hardware, EventId);
+
+    gcmGETHARDWARE(Hardware);
+
+    gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, cmdBuffer);
+
+    stateDelta = stateDelta; /* Keep the compiler happy. */
+
+    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0429) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x0429, EventId);
+    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+    /* Validate the state buffer. */
+    gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, cmdBuffer);
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+
+}
+
 #if GC_VX_ASM
 
 typedef struct _gctVX_AsmIndexTable

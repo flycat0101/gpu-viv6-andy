@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -548,14 +548,26 @@ slParseNamedType(
 
 void
 slParseStructDeclBegin(
-    IN sloCOMPILER Compiler
+    IN sloCOMPILER Compiler,
+    IN slsLexToken * Identifier
     );
 
 slsDATA_TYPE *
 slParseStructDeclEnd(
     IN sloCOMPILER Compiler,
-    IN slsLexToken * StartToken,
     IN slsLexToken * Identifier
+    );
+
+void
+slParseStructReDeclBegin(
+    IN sloCOMPILER Compiler,
+    IN slsLexToken * TypeName
+    );
+
+slsDATA_TYPE *
+slParseStructReDeclEnd(
+    IN sloCOMPILER Compiler,
+    IN slsLexToken * TypeName
     );
 
 void
@@ -611,7 +623,7 @@ slParseFieldListDecl(
     IN sloCOMPILER Compiler,
     IN slsLexToken * Identifier,
     IN slsDLINK_LIST * LengthList,
-    IN gctBOOL isSSBOMember
+    IN gctBOOL IsBlockMember
     );
 
 slsDeclOrDeclList
@@ -680,7 +692,8 @@ slParseAddLayoutId(
 void
 slParseInterfaceBlockDeclBegin(
     IN sloCOMPILER Compiler,
-    IN slsLexToken * BlockType
+    IN slsLexToken * BlockType,
+    IN slsLexToken * BlockName
     );
 
 slsNAME *

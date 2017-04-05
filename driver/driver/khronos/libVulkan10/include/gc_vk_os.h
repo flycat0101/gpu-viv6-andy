@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -32,13 +32,13 @@ extern "C" {
 #   include <dlfcn.h>
 #   include <unistd.h>
 #   include "stdarg.h"
-#   define OutputDebugString(szBuff) fprintf(stderr, szBuff)
+#   define OutputDebugString(szBuff) fputs(szBuff, stderr)
 #elif defined(__unix__)
 #   include <dlfcn.h>
 #   include <unistd.h>
 #   include "stdarg.h"
 #   include <stdio.h>
-#   define OutputDebugString(szBuff) fprintf(stderr, szBuff)
+#   define OutputDebugString(szBuff) fputs(szBuff, stderr)
 #elif defined (__QNXNTO__)
 #   include <dlfcn.h>
 #   include <unistd.h>

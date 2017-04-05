@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -83,8 +83,6 @@ static Comb sCombUnCom[] =
     { gcvSURF_A8R8G8B8,          gcvTILED_8X4,            gcv2D_TSC_DISABLE },
     { gcvSURF_A2R10G10B10,       gcvTILED_8X4,            gcv2D_TSC_DISABLE },
 
-    { gcvSURF_P010,              gcvTILED_32X4,           gcv2D_TSC_DISABLE },
-
     { gcvSURF_A1R5G5B5,    gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_A4R4G4B4,    gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_X1R5G5B5,    gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
@@ -95,24 +93,28 @@ static Comb sCombUnCom[] =
     { gcvSURF_A2R10G10B10, gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_YUY2,        gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_UYVY,        gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
-    { gcvSURF_NV12,        gcvTILED_8X8_XMAJOR,           gcv2D_TSC_DISABLE },
+};
 
+static Comb sCombUnComYUV420[] =
+{
+    { gcvSURF_P010,              gcvTILED_32X4,           gcv2D_TSC_DISABLE },
+    { gcvSURF_NV12,              gcvTILED_64X4,           gcv2D_TSC_DISABLE },
     { gcvSURF_NV12,        gcvTILED_8X8_YMAJOR,           gcv2D_TSC_DISABLE },
     { gcvSURF_P010,        gcvTILED_8X8_YMAJOR,           gcv2D_TSC_DISABLE },
 };
 
 static Comb sCombCom[] =
 {
-    { gcvSURF_A1R5G5B5,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_A4R4G4B4,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_X1R5G5B5,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_X4R4G4B4,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_R5G6B5,            gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_X8R8G8B8,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_A8R8G8B8,          gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_A2R10G10B10,       gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_YUY2,              gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_UYVY,              gcvSUPERTILED,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_A1R5G5B5,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_A4R4G4B4,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_X1R5G5B5,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_X4R4G4B4,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_R5G6B5,            gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_X8R8G8B8,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_A8R8G8B8,          gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_A2R10G10B10,       gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_YUY2,              gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_UYVY,              gcvSUPERTILED_128B,    gcv2D_TSC_DEC_COMPRESSED },
 
     { gcvSURF_X8R8G8B8,          gcvTILED_4X8,     gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_A8R8G8B8,          gcvTILED_4X8,     gcv2D_TSC_DEC_COMPRESSED },
@@ -121,8 +123,6 @@ static Comb sCombCom[] =
     { gcvSURF_X8R8G8B8,          gcvTILED_8X4,     gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_A8R8G8B8,          gcvTILED_8X4,     gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_A2R10G10B10,       gcvTILED_8X4,     gcv2D_TSC_DEC_COMPRESSED },
-
-    { gcvSURF_P010,              gcvTILED_32X4,    gcv2D_TSC_DEC_COMPRESSED },
 
     { gcvSURF_A1R5G5B5,    gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_A4R4G4B4,    gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
@@ -134,7 +134,14 @@ static Comb sCombCom[] =
     { gcvSURF_A2R10G10B10, gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_YUY2,        gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
     { gcvSURF_UYVY,        gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
-    { gcvSURF_NV12,        gcvTILED_8X8_XMAJOR,    gcv2D_TSC_DEC_COMPRESSED },
+};
+
+static Comb sCombComYUV420[] =
+{
+    { gcvSURF_P010,              gcvTILED_32X4,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_NV12,              gcvTILED_64X4,    gcv2D_TSC_DEC_COMPRESSED },
+    { gcvSURF_NV12,        gcvTILED_8X8_YMAJOR,           gcv2D_TSC_DISABLE },
+    { gcvSURF_P010,        gcvTILED_8X8_YMAJOR,           gcv2D_TSC_DISABLE },
 };
 
 static gceSTATUS CDECL InitSourceSurface(Test2D *t2d, gctUINT num)
@@ -149,18 +156,36 @@ static gceSTATUS CDECL InitSourceSurface(Test2D *t2d, gctUINT num)
 
     index = num % 8;
 
-    gcmONERROR(GalCreateTSurf(
-        t2d->runtime->hal,
-        t2d->compressed ?
-        sCombCom[num % gcmCOUNTOF(sCombCom)].format :
-        sCombUnCom[num % gcmCOUNTOF(sCombUnCom)].format,
-        t2d->compressed ?
-        sCombCom[num % gcmCOUNTOF(sCombCom)].tiling :
-        sCombUnCom[num % gcmCOUNTOF(sCombUnCom)].tiling,
-        t2d->compressed ?
-        sCombCom[num % gcmCOUNTOF(sCombCom)].tsc :
-        sCombUnCom[num % gcmCOUNTOF(sCombUnCom)].tsc,
-        480, 480, &surf));
+    if (index < 4)
+    {
+        gcmONERROR(GalCreateTSurf(
+            t2d->runtime->hal,
+            t2d->compressed ?
+            sCombCom[num % gcmCOUNTOF(sCombComYUV420)].format :
+            sCombUnCom[num % gcmCOUNTOF(sCombUnComYUV420)].format,
+            t2d->compressed ?
+            sCombCom[num % gcmCOUNTOF(sCombComYUV420)].tiling :
+            sCombUnCom[num % gcmCOUNTOF(sCombUnComYUV420)].tiling,
+            t2d->compressed ?
+            sCombCom[num % gcmCOUNTOF(sCombComYUV420)].tsc :
+            sCombUnCom[num % gcmCOUNTOF(sCombUnComYUV420)].tsc,
+            480, 480, &surf));
+    }
+    else
+    {
+        gcmONERROR(GalCreateTSurf(
+            t2d->runtime->hal,
+            t2d->compressed ?
+            sCombCom[num % gcmCOUNTOF(sCombCom)].format :
+            sCombUnCom[num % gcmCOUNTOF(sCombUnCom)].format,
+            t2d->compressed ?
+            sCombCom[num % gcmCOUNTOF(sCombCom)].tiling :
+            sCombUnCom[num % gcmCOUNTOF(sCombUnCom)].tiling,
+            t2d->compressed ?
+            sCombCom[num % gcmCOUNTOF(sCombCom)].tsc :
+            sCombUnCom[num % gcmCOUNTOF(sCombUnCom)].tsc,
+            480, 480, &surf));
+    }
 
     dstRect.left   = 0;
     dstRect.top    = 0;
@@ -189,8 +214,8 @@ static gceSTATUS CDECL InitSourceSurface(Test2D *t2d, gctUINT num)
         surf->tiling,
         surf->format,
         surf->rotation,
-        surf->width,
-        surf->height));
+        surf->aWidth,
+        surf->aHeight));
 
     gcmONERROR(gco2D_SetTargetTileStatus(
         egn2D,
@@ -199,6 +224,16 @@ static gceSTATUS CDECL InitSourceSurface(Test2D *t2d, gctUINT num)
         surf->tileStatusClear,
         surf->tileStatusAddress
         ));
+
+    if (surf->tileStatusNodeEx[0].address != 0)
+    {
+        gcmONERROR(gco2D_SetStateArrayU32(
+            egn2D,
+            gcv2D_STATE_ARRAY_YUV_DST_TILE_STATUS_ADDR,
+            &surf->tileStatusNodeEx[0].address,
+            1
+            ));
+    }
 
     gcmONERROR(gco2D_SetClipping(egn2D, &dstRect));
 
@@ -290,7 +325,7 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
             t2d->surf[i]->stride, t2d->surf[i]->validStrideNum,
             t2d->surf[i]->tiling, t2d->surf[i]->format,
             sRots[frameNo % gcmCOUNTOF(sRots)],
-            t2d->surf[i]->width, t2d->surf[i]->height));
+            t2d->surf[i]->aWidth, t2d->surf[i]->aHeight));
 
         gcmONERROR(gco2D_SetSourceTileStatus(
             egn2D,
@@ -299,6 +334,16 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
             t2d->surf[i]->tileStatusClear,
             t2d->surf[i]->tileStatusAddress
             ));
+
+        if (t2d->surf[i]->tileStatusNodeEx[0].address != 0)
+        {
+            gcmONERROR(gco2D_SetStateArrayU32(
+                egn2D,
+                gcv2D_STATE_ARRAY_YUV_SRC_TILE_STATUS_ADDR,
+                &t2d->surf[i]->tileStatusNodeEx[0].address,
+                1
+                ));
+        }
 
         gcmONERROR(gco2D_SetSource(egn2D, &srect));
 
@@ -311,6 +356,8 @@ static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
         else if (t2d->surf[i]->format == gcvSURF_NV12 ||
                  t2d->surf[i]->format == gcvSURF_UYVY ||
                  t2d->surf[i]->format == gcvSURF_YUY2 ||
+                 t2d->surf[i]->format == gcvSURF_R5G6B5 ||
+                 t2d->surf[i]->format == gcvSURF_X8R8G8B8 ||
                  t2d->surf[i]->format == gcvSURF_P010)
         {
             gcmONERROR(gco2D_EnableAlphaBlend(egn2D,
@@ -467,7 +514,7 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
     if (runtime->notSupport)
         return gcvFALSE;
 
-    t2d->compressed = gcvFALSE;
+    t2d->compressed = gcvTRUE;
     for (k = 0; k < argc; ++k)
     {
         if (!strcmp(argv[k], "-compressed"))

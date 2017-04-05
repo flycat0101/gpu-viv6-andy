@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -42,6 +42,8 @@ static struct _cl_platform_id _platform =
     "cl_khr_icd",               /* Extensions. */
     "viv",                      /* ICD Extensioin suffix. */
 
+    {{0}},                       /* hwcfg */
+    gcvPATCH_INVALID,           /* patchId */
     gcvNULL,                    /* Compiler mutex. */
     gcvNULL,                    /* Compiler dll. */
     gcvNULL,                    /* Compiler pointer. */
@@ -53,9 +55,69 @@ cl_platform_id clgDefaultPlatform = gcvNULL;
 
 gcsATOM_PTR clgGlobalId = gcvNULL;
 
+gceTRACEMODE vclTraceMode = gcvTRACEMODE_NONE;
+
 /*****************************************************************************\
 |*                         Supporting functions                              *|
 \*****************************************************************************/
+cl_bool clfInitTracerDispatchTable()
+{
+    cl_bool ret = CL_TRUE;
+
+    switch (vclTraceMode)
+    {
+    case gcvTRACEMODE_FULL:
+        {
+            /* Set veglTracerDispatchTable[] to simple log functions */
+            vclTracerDispatchTable = vclLogFunctionTable;
+        }
+        break;
+
+     case gcvTRACEMODE_NONE:
+     default:
+         {
+             /* Clear veglTracerDispatchTable[] */
+             memset(&vclTracerDispatchTable, 0, sizeof(clsTracerDispatchTableStruct));
+             break;
+         }
+    }
+
+    return ret;
+}
+
+void
+clfSetTraceMode(
+    void
+    )
+{
+    static gctBOOL Once = gcvFALSE;
+
+    if (!Once)
+    {
+        gctSTRING tracemode = gcvNULL;
+
+        if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_TRACE", &tracemode)) && tracemode)
+        {
+            if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "0")))
+            {
+                vclTraceMode = gcvTRACEMODE_NONE;
+            }
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "1")))
+            {
+                vclTraceMode = gcvTRACEMODE_FULL;
+            }
+            else
+            {
+                gcmPRINT("OCL: unsupported trace mode");
+            }
+
+            clfInitTracerDispatchTable();
+        }
+
+        Once = gcvTRUE;
+    }
+}
+
 void
 clfGetDefaultPlatformID(
     clsPlatformId_PTR * Platform
@@ -89,17 +151,23 @@ clfGetDefaultPlatformID(
            }
            clmONERROR(gcoOS_AtomDestroy(gcvNULL, delay), CL_INVALID_VALUE);
         }
+
+        gcoCL_SetHardware();
 #if BUILD_OPENCL_FP
-        gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
         gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
-        chipEnableFP = ((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000 && chipRevision == 0x6008));
-        if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) || (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE)
-            || (chipEnableFP == gcvFALSE))
+        chipEnableFP = ((chipModel == gcv2500 && chipRevision == 0x5422) ||
+                        (chipModel == gcv3000 && chipRevision == 0x5435) ||
+                        (chipModel == gcv7000));
+        if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) ||
+           (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE)   ||
+           (chipEnableFP == gcvFALSE))
         {
             /*if the features on the platform are not availble, still report embedded profile even if BUILD_OPENCL_FP is 1*/
             clgDefaultPlatform->profile = epProfile;
         }
 #endif
+        clmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &clgDefaultPlatform->hwCfg), CL_INVALID_VALUE);
+        clmONERROR(gcoHAL_GetPatchID(gcvNULL, &clgDefaultPlatform->patchId), CL_INVALID_VALUE);
     }
 
     if (clgGlobalId == gcvNULL)
@@ -133,6 +201,7 @@ clGetPlatformIDs(
     gctINT           status;
 
     gcmHEADER_ARG("NumEntries=%u", NumEntries);
+    gcmDUMP_API("${OCL clGetPlatformIDs %d}", NumEntries);
 
     if (Platforms && NumEntries == 0)
     {
@@ -141,6 +210,8 @@ clGetPlatformIDs(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
+    clfSetTraceMode();
+
     clfGetDefaultPlatformID(Platforms);
 
     if (NumPlatforms)
@@ -148,6 +219,7 @@ clGetPlatformIDs(
         *NumPlatforms = (clgDefaultPlatform ? 1 : 0);
     }
 
+    VCL_TRACE_API(GetPlatformIDs)(NumEntries, Platforms, NumPlatforms);
     gcmFOOTER_ARG("%d *Platforms=0x%x *NumPlatforms=%u",
                   CL_SUCCESS, gcmOPT_POINTER(Platforms),
                   gcmOPT_VALUE(NumPlatforms));
@@ -173,6 +245,7 @@ clGetPlatformInfo(
 
     gcmHEADER_ARG("Platform=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   Platform, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetPlatformInfo 0x%x, 0x%x}", Platform, ParamName);
 
     if (Platform == gcvNULL)
     {
@@ -240,6 +313,7 @@ clGetPlatformInfo(
         gcmVERIFY_OK(gcoOS_StrCopySafe(ParamValue, retParamSize, retParam));
     }
 
+    VCL_TRACE_API(GetPlatformInfo)(Platform, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;

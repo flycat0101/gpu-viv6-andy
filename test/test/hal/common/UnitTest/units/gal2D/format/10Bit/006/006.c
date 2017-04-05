@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -182,7 +182,8 @@ static gceSTATUS ReloadSourceSurface(Test2D *t2d, const char * sourcefile)
             {
                 gctUINT32 addressT, aligned;
 
-                if (gcoHAL_IsFeatureAvailable(t2d->runtime->hal, gcvFEATURE_TPCV11_COMPRESSION))
+                if (gcoHAL_IsFeatureAvailable(t2d->runtime->hal, gcvFEATURE_TPCV11_COMPRESSION) ||
+                    gcoHAL_IsFeatureAvailable(t2d->runtime->hal, gcvFEATURE_DEC400_COMPRESSION))
                 {
                     aligned = 320;
                 }

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -177,6 +177,13 @@ gcoTPHARDWARE_StartTPCCompression_V11(
         config
         ));
 
+    /* Init surface id mode. */
+    gcmONERROR(gcoHARDWARE_Load2DState32(
+        Hardware,
+        0x14C98,
+        0x010
+        ));
+
 OnError:
     /* Return the status. */
     gcmFOOTER();
@@ -235,12 +242,6 @@ gcoTPHARDWARE_SetSrcTPCCompression_V11(
         switch (SrcFormat)
         {
             case gcvSURF_A8R8G8B8:
-                config = ((((gctUINT32) (0x00000200)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 1:0) - (0 ? 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
- 1:0))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 1:0) - (0 ? 1:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0)));
-                break;
-
             case gcvSURF_X8R8G8B8:
                 config = ((((gctUINT32) (0x00000200)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ? 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
@@ -288,6 +289,21 @@ gcoTPHARDWARE_SetSrcTPCCompression_V11(
             SrcStatusAddr
             ));
     }
+    else
+    {
+        /* Set to default. */
+        gcmONERROR(gcoHARDWARE_Load2DState32(
+            Hardware,
+            0x14CA8,
+            0x1
+            ));
+
+        gcmONERROR(gcoHARDWARE_Load2DState32(
+            Hardware,
+            0x14CA4,
+            0x0
+            ));
+    }
 
 OnError:
     /* Return the status. */
@@ -321,7 +337,7 @@ gcoTPHARDWARE_SetDstTPCCompression_V11(
         switch (DstFormat)
         {
             case gcvSURF_A8R8G8B8:
-                config  = ((((gctUINT32) (0x00000015)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                config  = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  3:0) - (0 ? 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
  3:0))) | (((gctUINT32) (0x5 & ((gctUINT32) ((((1 ? 3:0) - (0 ? 3:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)));
@@ -332,7 +348,7 @@ gcoTPHARDWARE_SetDstTPCCompression_V11(
                 break;
 
             case gcvSURF_X8R8G8B8:
-                config  = ((((gctUINT32) (0x00000015)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                config  = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  3:0) - (0 ? 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
  3:0))) | (((gctUINT32) (0x5 & ((gctUINT32) ((((1 ? 3:0) - (0 ? 3:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)));
@@ -343,7 +359,7 @@ gcoTPHARDWARE_SetDstTPCCompression_V11(
                 break;
 
             case gcvSURF_A2R10G10B10:
-                config  = ((((gctUINT32) (0x00000015)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                config  = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  3:0) - (0 ? 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
  3:0))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ? 3:0) - (0 ? 3:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)));
@@ -354,7 +370,7 @@ gcoTPHARDWARE_SetDstTPCCompression_V11(
                 break;
 
             case gcvSURF_NV12:
-                config  = ((((gctUINT32) (0x00000015)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                config  = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  3:0) - (0 ? 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
  3:0))) | (((gctUINT32) (0x9 & ((gctUINT32) ((((1 ? 3:0) - (0 ? 3:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)));
@@ -366,7 +382,7 @@ gcoTPHARDWARE_SetDstTPCCompression_V11(
 
             case gcvSURF_NV12_10BIT:
             case gcvSURF_P010:
-                config  = ((((gctUINT32) (0x00000015)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                config  = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  3:0) - (0 ? 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
  3:0))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ? 3:0) - (0 ? 3:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ? 3:0)));
@@ -420,11 +436,11 @@ gcoTPHARDWARE_SetDstTPCCompression_V11(
             DstStatusAddr
             ));
 
-        /* TPC destination address once again. */
+        /* TPC destination tile status buffer address once again. */
         gcmONERROR(gcoHARDWARE_Load2DState32(
             Hardware,
             0x14CE4,
-            DstAddr
+            DstStatusAddr
             ));
 
         /* TPC destination format once again. */

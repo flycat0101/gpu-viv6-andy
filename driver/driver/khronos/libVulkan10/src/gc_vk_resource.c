@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -919,7 +919,10 @@ VkResult __vki_LockSurfNode(
 
             if (physical != gcvINVALID_ADDRESS)
             {
-                __VK_ASSERT(devCtx->database->REG_MC20);
+                gctUINT32 baseAddress;
+
+                gcmVERIFY_OK(gcoOS_GetBaseAddress(gcvNULL, &baseAddress));
+                physical -= baseAddress;
                 gcoOS_CPUPhysicalToGPUPhysical(physical, &physical);
             }
 
@@ -932,7 +935,6 @@ VkResult __vki_LockSurfNode(
                 /*
                 ** Some software access only surface has no kernel video node.
                 ** Since 'physical' is only for one hardware, it can't be used by other hardware type.
-                ** TODO: Remove usage of gcoSURF_WrapSurface to avoid this path.
                 */
                 gcmASSERT(node->logical != gcvNULL);
                 node->hardwareAddresses[type] = physical + (gctUINT32)node->bufferOffset;
@@ -948,7 +950,6 @@ VkResult __vki_LockSurfNode(
 
                 handle = 0;
 
-                /* TODO: Use reference count of each type as valid flag. */
                 node->valid = gcvTRUE;
             }
 
@@ -1368,8 +1369,8 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeMemory(
         if (dvm->ts)
         {
             uint32_t i = 0;
-            gcmVERIFY_OK(__vki_UnlockSurfNode(devCtx, &dvm->ts->tsNode));
-            gcmVERIFY_OK(__vki_DestroySurfNode(devCtx, &dvm->ts->tsNode));
+            __VK_VERIFY_OK(__vki_UnlockSurfNode(devCtx, &dvm->ts->tsNode));
+            __VK_VERIFY_OK(__vki_DestroySurfNode(devCtx, &dvm->ts->tsNode));
             for (i = 0; i < dvm->ts->mipLevels; i++)
             {
                 __VK_FREE(dvm->ts->tileStatusDisable[i]);
@@ -1454,7 +1455,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_FlushMappedMemoryRanges(
     const VkMappedMemoryRange* pMemRanges
     )
 {
-    /* TODO */
     return VK_SUCCESS;
 }
 
@@ -1464,7 +1464,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_InvalidateMappedMemoryRanges(
     const VkMappedMemoryRange* pMemRanges
     )
 {
-    /* TODO */
     return VK_SUCCESS;
 }
 
@@ -1610,7 +1609,7 @@ VkResult __vki_AllocateTileStatus(
             /* Tile status supported? */
             if (totalBytes == 0)
             {
-                return VK_SUCCESS;
+                break;
             }
 
 #if __VK_NEW_DEVICE_QUEUE
@@ -1718,11 +1717,15 @@ VkResult __vki_AllocateTileStatus(
 
             tsResource->compressedFormat = compressedFormat;
         }
-    }while(VK_FALSE);
+    } while(VK_FALSE);
 
     img->memory->ts = tsResource;
 
 OnError:
+    if (!__VK_IS_SUCCESS(result) && tsResource)
+    {
+        __VK_FREE(tsResource);
+    }
     return result;
 }
 
@@ -1923,6 +1926,9 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyBuffer(
     {
         __vkDevContext *devCtx = (__vkDevContext *)device;
         __vkBuffer *buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, buffer);
+
+        if (buf->splitMemory)
+            __vk_FreeMemory(device, (VkDeviceMemory)(uintptr_t)buf->splitMemory, gcvNULL);
 
         __vk_DestroyObject(devCtx, __VK_OBJECT_BUFFER, (__vkObject*)buf);
     }
@@ -2321,11 +2327,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateSampler(
     /* Initialize __vkSampler specific data fields here */
     __VK_MEMCOPY(&spl->createInfo, pCreateInfo, sizeof(VkSamplerCreateInfo));
     spl->memCb = __VK_ALLOCATIONCB;
-    /* (TODO) we don't support it with state */
-    if (spl->createInfo.unnormalizedCoordinates)
-    {
-        __VK_DEBUG_PRINT(__VK_DBG_LEVEL_ERROR, "unormalized texture coordinate, patch is not ready");
-    }
 
     __VK_ONERROR((*devCtx->chipFuncs->CreateSampler)(device, (VkSampler)(uintptr_t)spl));
 

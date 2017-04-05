@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,11 +19,14 @@ typedef struct VSC_IS_DEPDAGEDGE VSC_IS_DepDagEdge;
 typedef enum VSC_IS_DEPDAGNODE_FLAG
 {
     VSC_IS_DEPDAGNODE_FLAG_NONE = 0,
-    VSC_IS_DEPDAGNODE_FLAG_HAS_BINDING_PRED     = 0x01,
-    VSC_IS_DEPDAGNODE_FLAG_HAS_BINDING_SUCC     = 0x02,
-    VSC_IS_DEPDAGNODE_FLAG_DEPENDING_MOVA       = 0x04,
-    VSC_IS_DEPDAGNODE_FLAG_DETOURS_MERGED       = 0x08,
-    VSC_IS_DEPDAGNODE_FLAG_FORK_MERGED          = 0x10,
+    VSC_IS_DEPDAGNODE_FLAG_HAS_BINDING_PRED             = 0x01,
+    VSC_IS_DEPDAGNODE_FLAG_HAS_BINDING_SUCC             = 0x02,
+    VSC_IS_DEPDAGNODE_FLAG_DEPENDING_MOVA               = 0x04,
+    VSC_IS_DEPDAGNODE_FLAG_1ST_TIME_DETOURS_TRIED       = 0x08,
+    VSC_IS_DEPDAGNODE_FLAG_1ST_TIME_DETOURS_UNFRIENDLY  = 0x10,
+    VSC_IS_DEPDAGNODE_FLAG_2nd_DETOURS_TRIED            = 0x20,
+    VSC_IS_DEPDAGNODE_FLAG_ALL_DETOURS_DONE             = 0x40,
+    VSC_IS_DEPDAGNODE_FLAG_FORK_MERGED                  = 0x80,
 } VSC_IS_DepDagNode_Flag;
 
 /* data structure of the node in a dependence DAG */
@@ -102,13 +105,6 @@ static gctUINT32 _VSC_IS_DepDagNode_DepandsOnBubbleSet(
     IN VSC_HASH_TABLE* set
     );
 
-static void _VSC_IS_DepDagNode_MarkSubTree(
-    IN VSC_IS_DepDagNode* node,
-    IN gctBOOL succ,
-    IN OUT VSC_BIT_VECTOR* nodes_bv,
-    IN OUT VSC_BIT_VECTOR* edges_bv
-    );
-
 /* enum for instruction conflict types */
 /* TL           texture load instruction */
 /* ML           memory load instruction */
@@ -160,7 +156,8 @@ typedef enum VSC_IS_CONFLICTTYPE
     VSC_IS_ConflictType_ATOMIC              = 0x1000000    /* atomic instruction has dependency with all previous atomic instructions */
 } VSC_IS_ConflictType;
 
-#define VSC_IS_ConflictType_SET(ct_var, ct_value)       ((ct_var) |= (ct_value))
+#define VSC_IS_ConflictType_ExclusivelySet(ct_var, ct_exclude, ct_value)       ((ct_var) |= ((~(ct_exclude)) & (ct_value)))
+#define VSC_IS_ConflictType_Set(ct_var, ct_value)       ((ct_var) |= (ct_value))
 #define VSC_IS_ConflictType_RESET(ct_var, ct_value)     ((ct_var) ^= (ct_var) & (ct_value))
 #define VSC_IS_ConflictType_HasTLRS_RU(ct)              ((ct) & VSC_IS_ConflictType_TLRS_RU)
 #define VSC_IS_ConflictType_HasTLRS_RS(ct)              ((ct) & VSC_IS_ConflictType_TLRS_RS)
@@ -231,9 +228,10 @@ static void _VSC_IS_ConflictType_Dump(
 
 typedef enum VSC_IS_DEPDAGEDGE_FLAG
 {
-    VSC_IS_DepDagEdge_Flag_None         = 0x00,
-    VSC_IS_DepDagEdge_Flag_Deleted      = 0x01,
-    VSC_IS_DepDagEdge_Flag_NewlyAdded   = 0x02
+    VSC_IS_DEPDAGEDGE_FLAG_NONE             = 0x00,
+    VSC_IS_DEPDAGEDGE_FLAG_DELETED          = 0x01,
+    VSC_IS_DEPDAGEDGE_FLAG_NEWLY_ADDED      = 0x02,
+    VSC_IS_DepDagEdge_Flag_4_DETOURS_UNDONE = 0x04,
 } VSC_IS_DepDagEdge_Flag;
 
 /* data structure of the edge in a dependence DAG */
@@ -256,7 +254,7 @@ struct VSC_IS_DEPDAGEDGE
 #define VSC_IS_DepDagEdge_HasConflictType(eg, c)    ((eg)->conflict_type & (c))
 #define VSC_IS_DepDagEdge_GetFlags(eg)              ((eg)->flags)
 #define VSC_IS_DepDagEdge_SetFlags(eg, f)           VSC_IS_DepDagEdge_Verify(eg); (eg)->flags = (f); (eg+1)->flags = (f)
-#define VSC_IS_DepDagEdge_ResetFlags(eg)            VSC_IS_DepDagEdge_Verify(eg); (eg)->flags = VSC_IS_DepDagEdge_Flag_None; (eg+1)->flags = VSC_IS_DepDagEdge_Flag_None
+#define VSC_IS_DepDagEdge_ResetFlags(eg)            VSC_IS_DepDagEdge_Verify(eg); (eg)->flags = VSC_IS_DEPDAGEDGE_FLAG_NONE; (eg+1)->flags = VSC_IS_DEPDAGEDGE_FLAG_NONE
 #define VSC_IS_DepDagEdge_AddFlag(eg, f)            VSC_IS_DepDagEdge_Verify(eg); (eg)->flags |= (f); (eg+1)->flags |= (f)
 #define VSC_IS_DepDagEdge_RemoveFlag(eg, f)         VSC_IS_DepDagEdge_Verify(eg); (eg)->flags &= ~(f); (eg+1)->flags &= ~(f)
 #define VSC_IS_DepDagEdge_HasFlag(eg, f)            ((eg)->flags & (f))
@@ -292,9 +290,12 @@ static void _VSC_IS_DepDag_Dump(
     IN VIR_Dumper* dumper
     );
 
-static void _VSC_IS_DepDagNode_MarkSubTree(
+static gctBOOL _VSC_IS_DepDagNode_MarkSubTree(
     IN VSC_IS_DepDagNode* node,
     IN gctBOOL succ,
+    IN VSC_IS_DepDagNode_Flag exclueNodeflag,
+    IN VSC_IS_DepDagEdge_Flag exclueEdgeflag,
+    IN VSC_BIT_VECTOR* excluded_nodes_bv,
     IN OUT VSC_BIT_VECTOR* nodes_bv,
     IN OUT VSC_BIT_VECTOR* edges_bv
     )
@@ -302,24 +303,46 @@ static void _VSC_IS_DepDagNode_MarkSubTree(
     VSC_ADJACENT_LIST* edge_list = succ ? VSC_IS_DepDagNode_GetSuccEdgeList(node) : VSC_IS_DepDagNode_GetPredEdgeList(node);
     VSC_UL_ITERATOR iter;
     VSC_IS_DepDagEdge* edge;
+    gctBOOL allMarked = gcvTRUE;
 
     gcmASSERT(nodes_bv);
+    if(VSC_IS_DepDagNode_HasFlag(node, exclueNodeflag))
+    {
+        return gcvFALSE;
+    }
+
+    if(excluded_nodes_bv && vscBV_TestBit(nodes_bv, VSC_IS_DepDagNode_GetID(node)))
+    {
+        return gcvFALSE;
+    }
+
     vscBV_SetBit(nodes_bv, VSC_IS_DepDagNode_GetID(node));
     VSC_ADJACENT_LIST_ITERATOR_INIT(&iter, edge_list);
     for(edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&iter);
         edge != gcvNULL; edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&iter))
     {
-        VSC_IS_DepDagNode* edge_to = VSC_IS_DepDagEdge_GetToNode(edge);
+        if(!VSC_IS_DepDagEdge_HasFlag(edge, exclueEdgeflag))
+        {
+            VSC_IS_DepDagNode* edge_to = VSC_IS_DepDagEdge_GetToNode(edge);
 
-        if(edges_bv)
-        {
-            vscBV_SetBit(edges_bv, VSC_IS_DepDagEdge_GetID(edge));
+            if(edges_bv)
+            {
+                vscBV_SetBit(edges_bv, VSC_IS_DepDagEdge_GetID(edge));
+            }
+            if(!vscBV_TestBit(nodes_bv, VSC_IS_DepDagNode_GetID(edge_to)))
+            {
+                gctBOOL result = _VSC_IS_DepDagNode_MarkSubTree(edge_to, succ, exclueNodeflag, exclueEdgeflag, excluded_nodes_bv, nodes_bv, edges_bv);
+
+                allMarked = allMarked && result;
+            }
         }
-        if(!vscBV_TestBit(nodes_bv, VSC_IS_DepDagNode_GetID(edge_to)))
+        else
         {
-            _VSC_IS_DepDagNode_MarkSubTree(edge_to, succ, nodes_bv, edges_bv);
+            allMarked = gcvFALSE;
         }
     }
+
+    return allMarked;
 }
 
 static void VSC_IS_DepDagNode_PropagateKillPriority(
@@ -414,11 +437,26 @@ static VSC_IS_DepDagEdge* _VSC_IS_DepDag_AddEdge(
     gctBOOL is_new_edge = gcvFALSE;
     VSC_IS_DepDagEdge* edge = (VSC_IS_DepDagEdge*)vscDG_AddEdge(VSC_IS_DepDag_GetDGraph(dag),
         VSC_IS_DepDagNode_GetNode(from), VSC_IS_DepDagNode_GetNode(to), &is_new_edge);
+
+    gcmASSERT(VSC_IS_DepDagNode_GetID(from) != VSC_IS_DepDagNode_GetID(to));
     if(is_new_edge)
     {
         _VSC_IS_DepDagEdge_Init(edge);
     }
     return edge;
+}
+
+
+static VSC_IS_DepDagEdge* _VSC_IS_DepDag_ReplaceEdgeToNode(
+    IN VSC_IS_DepDag* dag,
+    IN VSC_IS_DepDagNode* from,
+    IN VSC_IS_DepDagNode* to,
+    IN VSC_IS_DepDagNode* newTo)
+{
+    return (VSC_IS_DepDagEdge*)vscDG_ReplaceEdgeToNode(VSC_IS_DepDag_GetDGraph(dag),
+                                                       VSC_IS_DepDagNode_GetNode(from),
+                                                       VSC_IS_DepDagNode_GetNode(to),
+                                                       VSC_IS_DepDagNode_GetNode(newTo));
 }
 
 static void _VSC_IS_DepDag_RemoveEdge(
@@ -464,10 +502,11 @@ static void _VSC_IS_DepDag_ReturnANodesBV(
     gctUINT i;
 
     vscBV_ClearAll(nodes_bv);
-    for(i = 0; i < VSC_IS_DEPDAG_NODES_BV_COUNT && VSC_IS_DepDag_GetUsingNodesBVs(dag, i); i++)
+    for(i = 0; i < VSC_IS_DEPDAG_NODES_BV_COUNT; i++)
     {
         if(VSC_IS_DepDag_GetNodes_BV(dag, i) == nodes_bv)
         {
+            gcmASSERT(VSC_IS_DepDag_GetUsingNodesBVs(dag, i));
             VSC_IS_DepDag_ResetUsingNodesBVs(dag, i);
             break;
         }
@@ -508,10 +547,11 @@ static void _VSC_IS_DepDag_ReturnAEdgesBV(
     gctUINT i;
 
     vscBV_ClearAll(edges_bv);
-    for(i = 0; i < VSC_IS_DEPDAG_EDGES_BV_COUNT && VSC_IS_DepDag_GetUsingEdgesBVs(dag, i); i++)
+    for(i = 0; i < VSC_IS_DEPDAG_EDGES_BV_COUNT; i++)
     {
         if(VSC_IS_DepDag_GetEdges_BV(dag, i) == edges_bv)
         {
+            gcmASSERT(VSC_IS_DepDag_GetUsingEdgesBVs(dag, i));
             VSC_IS_DepDag_ResetUsingEdgesBVs(dag, i);
             break;
         }
@@ -528,7 +568,7 @@ static gctUINT _VSC_IS_DepDag_GetSubTreeNodesCount(
     gctUINT result;
     VSC_BIT_VECTOR* nodes_bv = _VSC_IS_DepDag_RentANodesBV(dag);
 
-    _VSC_IS_DepDagNode_MarkSubTree(node, succ, nodes_bv, gcvNULL);
+    _VSC_IS_DepDagNode_MarkSubTree(node, succ, VSC_IS_DEPDAGNODE_FLAG_NONE, VSC_IS_DEPDAGEDGE_FLAG_NONE, gcvNULL, nodes_bv, gcvNULL);
     result = vscBV_CountBits(nodes_bv);
     _VSC_IS_DepDag_ReturnANodesBV(dag, nodes_bv);
 
@@ -552,6 +592,7 @@ static void _VSC_IS_DepDag_SetKillPriority(
         _VSC_IS_DepDag_ReturnANodesBV(dag, nodes_bv);
     }
 }
+
 
 static void _VSC_IS_DepDag_Final(
     IN VSC_IS_DepDag* dag
@@ -683,6 +724,10 @@ static void _VSC_IS_InstSched_InitBubble(
     else
     {
         allocatedRegisterCount = VIR_Shader_GetRegWatermark(shader);
+    }
+    if(allocatedRegisterCount > 14)
+    {
+        allocatedRegisterCount = 14;
     }
     VSC_IS_InstSched_SetRegisterCount(is, allocatedRegisterCount);
 
@@ -948,28 +993,50 @@ static gctBOOL _VSC_IS_OperandsOverlapping(
 static gctUINT32 _VSC_IS_InstConflict(
     IN VIR_Shader* shader,
     IN VIR_Instruction* inst0,
-    IN VIR_Instruction* inst1)
+    IN VIR_Instruction* inst1,
+    IN gctUINT32* excludeCTs)
 {
     gctUINT32 conflict_types = 0;
     VIR_OpCode opc0, opc1;
     VIR_Operand *dest0, *dest1;
     gctUINT32 i, j;
 
-    if(VIR_Inst_GetOpcode(inst0) == VIR_OP_BARRIER || VIR_Inst_GetOpcode(inst1) == VIR_OP_BARRIER)
+    if(VIR_Inst_GetOpcode(inst1) == VIR_OP_BARRIER)
     {
-        VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_BARRIER);
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_BARRIER);
+        if(VIR_Inst_GetOpcode(inst0) == VIR_OP_BARRIER)
+        {
+            VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_BARRIER);
+        }
+        return conflict_types;
+    }
+    if(VIR_Inst_GetOpcode(inst0) == VIR_OP_BARRIER)
+    {
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_BARRIER);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_BARRIER);
         return conflict_types;
     }
 
-    if(VIR_Inst_GetOpcode(inst0) == VIR_OP_EMIT || VIR_Inst_GetOpcode(inst1) == VIR_OP_EMIT)
+    if(VIR_Inst_GetOpcode(inst1) == VIR_OP_EMIT0)
     {
-        VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_EMIT);
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_EMIT);
+        if(VIR_Inst_GetOpcode(inst0) == VIR_OP_EMIT0)
+        {
+            VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_EMIT);
+        }
+        return conflict_types;
+    }
+    if(VIR_Inst_GetOpcode(inst0) == VIR_OP_EMIT0)
+    {
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_EMIT);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_EMIT);
         return conflict_types;
     }
 
     if(VIR_OPCODE_isAtom(VIR_Inst_GetOpcode(inst0)) && VIR_OPCODE_isAtom(VIR_Inst_GetOpcode(inst1)))
     {
-        VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_ATOMIC);
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_ATOMIC);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_ATOMIC);
     }
 
     opc0 = VIR_Inst_GetOpcode(inst0);
@@ -977,7 +1044,7 @@ static gctUINT32 _VSC_IS_InstConflict(
     dest0 = VIR_Inst_GetDest(inst0);
     dest1 = VIR_Inst_GetDest(inst1);
 
-    if(dest0)
+    if(dest0 && !VIR_OPCODE_isMemSt(opc0))
     {
         VIR_Operand* src1;
         for(i = 0; i < VIR_Inst_GetSrcNum(inst1); i++)
@@ -996,22 +1063,22 @@ static gctUINT32 _VSC_IS_InstConflict(
                         {
                             if (VIR_OPCODE_isTexLd(opc0))
                             {
-                                VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_TLRS_RU);
+                                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_TLRS_RU);
                             }
-                            else if (VIR_OPCODE_isMemLd(opc0))
+                            else if (VIR_OPCODE_isMemLd(opc0) || VIR_OPCODE_isImgLd(opc0))
                             {
-                                VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_MLRS_RU);
+                                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_MLRS_RU);
                             }
                             else if (VIR_OPCODE_isAttrLd(opc0))
                             {
-                                VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_CLRS_RU);
+                                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_CLRS_RU);
                             }
                             else
                             {
-                                VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_RS_RU);
+                                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_RS_RU);
                                 if(VIR_Inst_GetOpcode(inst0) == VIR_OP_MOVA)
                                 {
-                                    VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_LOOSE_BINDING_MOVA);
+                                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_LOOSE_BINDING_MOVA);
                                 }
                             }
                         }
@@ -1022,22 +1089,22 @@ static gctUINT32 _VSC_IS_InstConflict(
             {
                 if(VIR_OPCODE_isTexLd(opc0))
                 {
-                    VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_TLRS_RU);
+                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_TLRS_RU);
                 }
-                else if(VIR_OPCODE_isMemLd(opc0))
+                else if(VIR_OPCODE_isMemLd(opc0) || VIR_OPCODE_isImgLd(opc0))
                 {
-                    VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_MLRS_RU);
+                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_MLRS_RU);
                 }
                 else if(VIR_OPCODE_isAttrLd(opc0))
                 {
-                    VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_CLRS_RU);
+                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_CLRS_RU);
                 }
                 else
                 {
-                    VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_RS_RU);
+                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_RS_RU);
                     if(VIR_Inst_GetOpcode(inst0) == VIR_OP_MOVA)
                     {
-                        VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_LOOSE_BINDING_MOVA);
+                        VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_LOOSE_BINDING_MOVA);
                     }
                 }
             }
@@ -1046,23 +1113,23 @@ static gctUINT32 _VSC_IS_InstConflict(
         {
             if(VIR_OPCODE_isTexLd(opc0))
             {
-                VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_TLRS_RS);
+                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_TLRS_RS);
             }
-            else if(VIR_OPCODE_isMemLd(opc0))
+            else if(VIR_OPCODE_isMemLd(opc0) || VIR_OPCODE_isImgLd(opc0))
             {
-                VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_MLRS_RS);
+                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_MLRS_RS);
             }
             else if(VIR_OPCODE_isAttrLd(opc0))
             {
-                VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_CLRS_RS);
+                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_CLRS_RS);
             }
             else
             {
-                VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_RS_RS);
+                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_RS_RS);
             }
         }
     }
-    if(dest1)
+    if(dest1 && !VIR_OPCODE_isMemSt(opc1))
     {
         VIR_Operand* src0;
         for(i = 0; i < VIR_Inst_GetSrcNum(inst0); i++)
@@ -1073,7 +1140,7 @@ static gctUINT32 _VSC_IS_InstConflict(
                 VIR_Symbol *sym = VIR_Operand_GetUnderlyingSymbol(src0);
                 if (sym && VIR_Symbol_isOutParam(sym))
                 {
-                    VSC_IS_ConflictType_SET(conflict_types,
+                    VSC_IS_ConflictType_Set(conflict_types,
                                             VSC_IS_ConflictType_USE_RETURNVALUE);
                 }
             }
@@ -1088,42 +1155,90 @@ static gctUINT32 _VSC_IS_InstConflict(
 
                         if (_VSC_IS_OperandsOverlapping(inst0, srcTexMod, inst1, dest1))
                         {
-                            VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_RU_RS);
+                            VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_RU_RS);
                         }
                     }
                 }
             }
             else if(_VSC_IS_OperandsOverlapping(inst0, src0, inst1, dest1))
             {
-                VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_RU_RS);
+                VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_RU_RS);
             }
         }
     }
 
     /* without alias, have to assume memory/cache dependence */
-    if(VIR_OPCODE_isMemLd(opc0) && VIR_OPCODE_isMemSt(opc1))
+    if(VIR_OPCODE_isAtom(opc0) && VIR_OPCODE_isImgSt(opc1))
     {
-        VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_ML_MS);
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_ML_MS);
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_MS_MS);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_MS_MS);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_ML_MS);
     }
-    else if(VIR_OPCODE_isMemSt(opc0) && VIR_OPCODE_isMemLd(opc1))
+    else if(VIR_OPCODE_isAtom(opc0) && VIR_OPCODE_isImgLd(opc1))
     {
-        VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_MS_ML);
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_MS_ML);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_MS_ML);
     }
-    else if(VIR_OPCODE_isMemSt(opc0) && VIR_OPCODE_isMemSt(opc1))
+    else if(VIR_OPCODE_isImgSt(opc0) && VIR_OPCODE_isAtom(opc1))
     {
-        VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_MS_MS);
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_MS_ML);
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_MS_MS);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_MS_ML);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_MS_MS);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_ML_MS);
+    }
+    else if(VIR_OPCODE_isImgLd(opc0) && VIR_OPCODE_isAtom(opc1))
+    {
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_ML_MS);
+    }
+    else if((VIR_OPCODE_isLocalMemLd(opc0) && VIR_OPCODE_isLocalMemSt(opc1)) ||
+       (VIR_OPCODE_isSpecialMemLd(opc0) && VIR_OPCODE_isSpecialMemSt(opc1)) ||
+       (VIR_OPCODE_isGlobalMemLd(opc0) && VIR_OPCODE_isGlobalMemSt(opc1)) ||
+       (opc0 == VIR_OP_IMG_LOAD && opc1 == VIR_OP_IMG_STORE) ||
+       (opc0 == VIR_OP_IMG_LOAD_3D && opc1 == VIR_OP_IMG_STORE_3D) ||
+       (opc0 == VIR_OP_VX_IMG_LOAD && opc1 == VIR_OP_VX_IMG_STORE) ||
+       (opc0 == VIR_OP_VX_IMG_LOAD_3D && opc1 == VIR_OP_VX_IMG_STORE_3D))
+    {
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_ML_MS);
+    }
+    else if((VIR_OPCODE_isLocalMemSt(opc0) && VIR_OPCODE_isLocalMemLd(opc1)) ||
+            (VIR_OPCODE_isSpecialMemSt(opc0) && VIR_OPCODE_isSpecialMemLd(opc1)) ||
+            (VIR_OPCODE_isGlobalMemSt(opc0) && VIR_OPCODE_isGlobalMemLd(opc1)) ||
+            (opc0 == VIR_OP_IMG_STORE && opc1 == VIR_OP_IMG_LOAD) ||
+            (opc0 == VIR_OP_IMG_STORE_3D && opc1 == VIR_OP_IMG_LOAD_3D) ||
+            (opc0 == VIR_OP_VX_IMG_STORE && opc1 == VIR_OP_VX_IMG_LOAD) ||
+            (opc0 == VIR_OP_VX_IMG_STORE_3D && opc1 == VIR_OP_VX_IMG_LOAD_3D))
+    {
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_MS_ML);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_MS_ML);
+    }
+    else if((VIR_OPCODE_isLocalMemSt(opc0) && VIR_OPCODE_isLocalMemSt(opc1)) ||
+            (VIR_OPCODE_isSpecialMemSt(opc0) && VIR_OPCODE_isSpecialMemSt(opc1)) ||
+            (VIR_OPCODE_isGlobalMemSt(opc0) && VIR_OPCODE_isGlobalMemSt(opc1)) ||
+            (opc0 == VIR_OP_IMG_STORE && opc1 == VIR_OP_IMG_STORE) ||
+            (opc0 == VIR_OP_IMG_STORE_3D && opc1 == VIR_OP_IMG_STORE_3D) ||
+            (opc0 == VIR_OP_VX_IMG_STORE && opc1 == VIR_OP_VX_IMG_STORE) ||
+            (opc0 == VIR_OP_VX_IMG_STORE_3D && opc1 == VIR_OP_VX_IMG_STORE_3D))
+    {
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_MS_MS);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_MS_MS);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_ML_MS);
     }
     if(VIR_OPCODE_isAttrLd(opc0) && VIR_OPCODE_isAttrSt(opc1))
     {
-        VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_CL_CS);
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_CL_CS);
     }
     else if(VIR_OPCODE_isAttrSt(opc0) && VIR_OPCODE_isAttrLd(opc1))
     {
-        VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_CS_CL);
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_CS_CL);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_CS_CL);
     }
     else if(VIR_OPCODE_isAttrSt(opc0) && VIR_OPCODE_isAttrSt(opc1))
     {
-        VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_CS_CS);
+        VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_CS_CS);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_CS_CS);
+        VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_CL_CS);
     }
     return conflict_types;
 }
@@ -1329,12 +1444,13 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB_Gross(
         VIR_Instruction* prev;
         gctINT32 j;
         VSC_IS_DepDagNode* node = _VSC_IS_DepDag_NewNode(dag, inst);
+        gctUINT32 excludeCTs = VSC_IS_ConflictType_NONE;
 
         vscHTBL_DirectSet(inst2node, inst, node);
         _VSC_IS_DepDag_AddNode(dag, node);
         for(j = i - 1, prev = VIR_Inst_GetPrev(inst); j >= 0; j--, prev = VIR_Inst_GetPrev(prev))
         {
-            gctUINT32 ct = _VSC_IS_InstConflict(shader, prev, inst);
+            gctUINT32 ct = _VSC_IS_InstConflict(shader, prev, inst, &excludeCTs);
             VSC_IS_DepDagNode* prev_node = gcvNULL;
 
             vscHTBL_DirectTestAndGet(inst2node, prev, (void**)&prev_node);
@@ -1342,7 +1458,7 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB_Gross(
             if(VSC_IS_DepDagNode_HasFlag(prev_node, VSC_IS_DEPDAGNODE_FLAG_DEPENDING_MOVA) &&
                 VIR_Inst_GetOpcode(inst) == VIR_OP_MOVA)
             {
-                VSC_IS_ConflictType_SET(ct, VSC_IS_ConflictType_DODGING);
+                VSC_IS_ConflictType_Set(ct, VSC_IS_ConflictType_DODGING);
             }
 
             /* add dependence edge */
@@ -1448,7 +1564,7 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB_DUPerChannel(
                 if(VSC_IS_DepDagNode_GetID(use_node) < VSC_IS_DepDagNode_GetID(def_node))
                 {
                     edge = _VSC_IS_DepDag_AddEdge(dag, use_node, def_node);
-                    VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_LOOP_CARRIED);
+                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_LOOP_CARRIED);
                 }
                 else
                 {
@@ -1456,19 +1572,19 @@ static VSC_ErrCode _VSC_IS_BuildDAGForBB_DUPerChannel(
                 }
                 if(VIR_OPCODE_isTexLd(def_instopc))
                 {
-                    VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_TLRS_RU);
+                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_TLRS_RU);
                 }
                 else if(VIR_OPCODE_isMemLd(def_instopc))
                 {
-                    VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_MLRS_RU);
+                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_MLRS_RU);
                 }
                 else if(VIR_OPCODE_isAttrLd(def_instopc))
                 {
-                    VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_CLRS_RU);
+                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_CLRS_RU);
                 }
                 else
                 {
-                    VSC_IS_ConflictType_SET(conflict_types, VSC_IS_ConflictType_RS_RU);
+                    VSC_IS_ConflictType_Set(conflict_types, VSC_IS_ConflictType_RS_RU);
                 }
                 VSC_IS_DepDagEdge_SetConflictType(edge, conflict_types);
             }
@@ -3093,16 +3209,19 @@ static VSC_IS_DepDagNode* _VSC_IS_DepDagNode_GetNodeOnList(
     IN VSC_IS_DepDagNode* start,
     IN gctBOOL succ,
     IN VSC_BIT_VECTOR* edges_bv,
-    IN gctUINT32 distance,
+    IN gctUINT32 maxDistance,
     IN gctBOOL no_bubble,
     IN gctUINT32 kill_bubble_bound,
+    IN gctUINT32 maxInDegree,
+    IN gctUINT32 minID,
+    IN gctUINT32 maxID,
     IN VSC_IS_DepDagNode* end,
     OUT gctUINT32* final_distance, /* node distance */
     OUT gctUINT32* bubble_sum, /* bubble sum on the segment */
     OUT VSC_IS_DepDagEdge** last_edge   /* last visited edge on the segment */
     )
 {
-    if(start == end || distance == 0)
+    if(start == end || maxDistance == 0)
     {
         if(final_distance)
         {
@@ -3128,6 +3247,25 @@ static VSC_IS_DepDagNode* _VSC_IS_DepDagNode_GetNodeOnList(
         while(iter != end)
         {
             VSC_IS_DepDagEdge* edge;
+
+            if(VSC_IS_DepDagNode_GetInDegree(iter) > maxInDegree ||
+               VSC_IS_DepDagNode_GetID(iter) < minID ||
+               VSC_IS_DepDagNode_GetID(iter) > maxID)
+            {
+                if(final_distance)
+                {
+                    *final_distance = dist;
+                }
+                if(bubble_sum)
+                {
+                    *bubble_sum = bubble_sum_l;
+                }
+                if(last_edge)
+                {
+                    *last_edge = prev_edge;
+                }
+                return iter;
+            }
             if(_VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(iter, succ, edges_bv, &edge))
             {
                 if(no_bubble && VSC_IS_DepDagEdge_GetBubble(edge))
@@ -3149,7 +3287,7 @@ static VSC_IS_DepDagNode* _VSC_IS_DepDagNode_GetNodeOnList(
                 bubble_sum_l += VSC_IS_DepDagEdge_GetBubble(edge);
                 ++dist;
                 iter = VSC_IS_DepDagEdge_GetToNode(edge);
-                if((dist == distance) ||
+                if(dist == maxDistance ||
                    (succ && VSC_IS_DepDagNode_GetKillPriority(iter) < kill_bubble_bound) ||
                    (!succ && VSC_IS_DepDagNode_GetKillPriority(iter) > kill_bubble_bound))
                 {
@@ -3202,79 +3340,128 @@ static VSC_IS_DepDagNode* _VSC_IS_DepDagNode_GetNodeOnList(
     }
 }
 
-static void _VSC_IS_FindDetourTopNode(
+#define DEBUG_FINDING_DETOUR 0
+static gctBOOL _VSC_IS_FindDetourTopNode(/* if node is excluded, return true, otherwise return false */
     IN VSC_IS_DepDagNode* node,
     IN VSC_BIT_VECTOR* sub_tree_edges_bv,
+    IN gctUINT maxTopOutDegree,
+    IN gctUINT maxByPassOutDegree,
+    IN gctBOOL succExcluded,
     IN OUT VSC_BIT_VECTOR* visited_sub_tree_edges_bv,
     IN OUT VSC_IS_DepDagNode** head,
     IN OUT VSC_IS_DepDagNode** tail
     )
 {
+    gctBOOL selfExcluded = gcvFALSE;
 
-    VSC_ADJACENT_LIST* succ_edge_list = VSC_IS_DepDagNode_GetSuccEdgeList(node);
-    VSC_UL_ITERATOR succ_edge_iter;
-    VSC_IS_DepDagEdge* succ_edge;
-    gctUINT32 succ_edge_count = 0;
-
-    gcmASSERT(head && tail);
-
-    VSC_ADJACENT_LIST_ITERATOR_INIT(&succ_edge_iter, succ_edge_list);
-    for(succ_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succ_edge_iter);
-        succ_edge != gcvNULL;   /*??*/
-        succ_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succ_edge_iter))
+    if(!succExcluded)
     {
-        if(vscBV_TestBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(succ_edge)))
+        VSC_ADJACENT_LIST* succ_edge_list = VSC_IS_DepDagNode_GetSuccEdgeList(node);
+        VSC_UL_ITERATOR succ_edge_iter;
+        VSC_IS_DepDagEdge* succ_edge;
+        gctUINT32 succ_edge_count = 0;
+
+        gcmASSERT(head && tail);
+
+        VSC_ADJACENT_LIST_ITERATOR_INIT(&succ_edge_iter, succ_edge_list);
+        for(succ_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succ_edge_iter);
+            succ_edge != gcvNULL;   /*??*/
+            succ_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succ_edge_iter))
         {
-            if(!vscBV_TestBit(visited_sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(succ_edge)))
+            if(vscBV_TestBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(succ_edge)))
             {
-                /* one succ edge has not been visited, so wait */
-                return;
+                if(!vscBV_TestBit(visited_sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(succ_edge)))
+                {
+                    /* one succ edge has not been visited, so wait */
+                    return gcvFALSE;
+                }
+                succ_edge_count++;
             }
-            succ_edge_count++;
         }
-    }
 
-    /* all succ edge in the sub-tree visited */
-    if(succ_edge_count >= 2)
-    {
-        if(*head)
+        if(succ_edge_count == 0 ||
+           succ_edge_count > maxTopOutDegree)
         {
-            gcmASSERT(*tail);
-
-            VSC_IS_DepDagNode_SetNext(*tail, node);
-            *tail = node;
+            selfExcluded = gcvTRUE;
+#if DEBUG_FINDING_DETOUR
+            gcoOS_Print("as a top node, node %d has succ edge count %d and is excluded .\n", VSC_IS_DepDagNode_GetID(node), succ_edge_count);
+#endif
         }
-        else
+
+        /* all succ edge in the sub-tree visited */
+        if(!selfExcluded && succ_edge_count >= 2)
         {
-            gcmASSERT(!*tail);
+#if DEBUG_FINDING_DETOUR
+            gcoOS_Print("node %d is added as detour head.\n", VSC_IS_DepDagNode_GetID(node));
+#endif
+            if(*head)
+            {
+                gcmASSERT(*tail);
 
-            *head = node;
-            *tail = node;
+                VSC_IS_DepDagNode_SetNext(*tail, node);
+                *tail = node;
+            }
+            else
+            {
+                gcmASSERT(!*tail);
+
+                *head = node;
+                *tail = node;
+            }
+            VSC_IS_DepDagNode_SetNext(node, gcvNULL);
         }
-        VSC_IS_DepDagNode_SetNext(node, gcvNULL);
+
+        if(VSC_IS_DepDagNode_GetOutDegree(node) > maxByPassOutDegree)
+        {
+            selfExcluded = gcvTRUE;
+#if DEBUG_FINDING_DETOUR
+            gcoOS_Print("as a bypass node, node %d has outdegree %d and is excluded.\n", VSC_IS_DepDagNode_GetID(node), VSC_IS_DepDagNode_GetOutDegree(node));
+#endif
+        }
     }
 
     {
         VSC_ADJACENT_LIST* pred_edge_list = VSC_IS_DepDagNode_GetPredEdgeList(node);
         VSC_UL_ITERATOR pred_edge_iter;
         VSC_IS_DepDagEdge* pred_edge;
+        gctBOOL predExcluded = gcvFALSE;
 
         VSC_ADJACENT_LIST_ITERATOR_INIT(&pred_edge_iter, pred_edge_list);
         for(pred_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&pred_edge_iter);
             pred_edge != gcvNULL;   /*??*/
             pred_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&pred_edge_iter))
         {
-            VSC_IS_DepDagNode* pred_edge_to = VSC_IS_DepDagEdge_GetToNode(pred_edge);
-            vscBV_SetBit(visited_sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(pred_edge));
-            _VSC_IS_FindDetourTopNode(pred_edge_to, sub_tree_edges_bv, visited_sub_tree_edges_bv, head, tail);
+            if(vscBV_TestBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(pred_edge)))
+            {
+                VSC_IS_DepDagNode* pred_edge_to = VSC_IS_DepDagEdge_GetToNode(pred_edge);
+                gctBOOL result;
+
+                if(selfExcluded || succExcluded)
+                {
+#if DEBUG_FINDING_DETOUR
+                    gcoOS_Print("remove sub-tree edge from %d to %d.\n", VSC_IS_DepDagNode_GetID(node), VSC_IS_DepDagNode_GetID(pred_edge_to));
+#endif
+                    vscBV_ClearBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(pred_edge));
+                }
+                else
+                {
+                    vscBV_SetBit(visited_sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(pred_edge));
+                }
+                result = _VSC_IS_FindDetourTopNode(pred_edge_to, sub_tree_edges_bv, maxTopOutDegree, maxByPassOutDegree, selfExcluded || succExcluded, visited_sub_tree_edges_bv, head, tail);
+                predExcluded = predExcluded || result;
+            }
         }
+
+        return predExcluded || selfExcluded;
     }
 }
 
-static void _VSC_IS_FindDetourTopNodes(
+static gctBOOL _VSC_IS_FindDetourTopNodes(/* if node is excluded, return true, otherwise return false */
     IN VSC_IS_DepDag* dag,
     IN VSC_IS_DepDagNode* sub_root,
     IN VSC_BIT_VECTOR* sub_tree_edges_bv,
+    IN gctUINT maxDetourInDegree,
+    IN gctUINT maxByPassOutDegree,
     OUT VSC_IS_DepDagNode** head,
     OUT VSC_IS_DepDagNode** tail
     )
@@ -3283,18 +3470,101 @@ static void _VSC_IS_FindDetourTopNodes(
     VSC_ADJACENT_LIST* pred_edge_list = VSC_IS_DepDagNode_GetPredEdgeList(sub_root);
     VSC_UL_ITERATOR pred_edge_iter;
     VSC_IS_DepDagEdge* pred_edge;
+    gctBOOL hasExcluded = gcvFALSE;
+
+#if DEBUG_FINDING_DETOUR
+    gcoOS_Print("sub root: %d\n", VSC_IS_DepDagNode_GetID(sub_root));
+#endif
 
     VSC_ADJACENT_LIST_ITERATOR_INIT(&pred_edge_iter, pred_edge_list);
     for(pred_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&pred_edge_iter);
         pred_edge != gcvNULL;   /*??*/
         pred_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&pred_edge_iter))
     {
-        VSC_IS_DepDagNode* pred_edge_to = VSC_IS_DepDagEdge_GetToNode(pred_edge);
-        vscBV_SetBit(visited_sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(pred_edge));
-        _VSC_IS_FindDetourTopNode(pred_edge_to, sub_tree_edges_bv, visited_sub_tree_edges_bv, head, tail);
+        if(vscBV_TestBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(pred_edge)))
+        {
+            VSC_IS_DepDagNode* pred_edge_to = VSC_IS_DepDagEdge_GetToNode(pred_edge);
+            gctBOOL result;
+
+            vscBV_SetBit(visited_sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(pred_edge));
+            result = _VSC_IS_FindDetourTopNode(pred_edge_to, sub_tree_edges_bv, maxDetourInDegree, maxByPassOutDegree, gcvFALSE, visited_sub_tree_edges_bv, head, tail);
+            hasExcluded = hasExcluded || result;
+        }
     }
 
     _VSC_IS_DepDag_ReturnAEdgesBV(dag, visited_sub_tree_edges_bv);
+    return hasExcluded;
+}
+
+static VSC_IS_DepDagNode* _VSC_IS_MergePredsOrderly(
+    VSC_IS_DepDag* dag,
+    VSC_IS_DepDagNode* rootNode,
+    VSC_IS_DepDagNode* startNode0,
+    VSC_IS_DepDagNode* startNode1,
+    VSC_IS_DepDagNode* endNode0,
+    VSC_IS_DepDagNode* endNode1,
+    VSC_BIT_VECTOR* pathEdges,
+    OUT VSC_IS_DepDagEdge** endNode0PredEdge,
+    OUT VSC_IS_DepDagEdge** endNode1PredEdge
+    )
+{
+    VSC_IS_DepDagEdge* newEdge;
+    VSC_IS_DepDagNode* currNode0 = startNode0;
+    VSC_IS_DepDagNode* currNode1 = startNode1;
+
+    gcmASSERT(rootNode && startNode0 && startNode1 && endNode0 && endNode1);
+    if(VSC_IS_DepDagNode_GetID(startNode0) < VSC_IS_DepDagNode_GetID(startNode1))
+    {
+        VSC_IS_DepDagEdge* currNode1Edge = gcvNULL;
+
+        while(currNode1 != endNode1 && VSC_IS_DepDagNode_GetID(currNode1) > VSC_IS_DepDagNode_GetID(startNode0))
+        {
+            currNode1 = _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(currNode1, gcvFALSE, pathEdges, &currNode1Edge);
+        }
+
+        if(currNode1 == endNode1 && VSC_IS_DepDagNode_GetID(currNode1) > VSC_IS_DepDagNode_GetID(startNode0))
+        {
+            newEdge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, startNode0, rootNode, endNode1);
+            if(endNode1PredEdge)
+            {
+                *endNode1PredEdge = newEdge + 1;
+            }
+            return endNode0;
+        }
+        else
+        {
+            VSC_IS_DepDagNode* newRoot = VSC_IS_DepDagEdge_GetFromNode(currNode1Edge);
+
+            newEdge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, startNode0, rootNode, newRoot);
+            return _VSC_IS_MergePredsOrderly(dag, newRoot, startNode0, currNode1, endNode0, endNode1, pathEdges, endNode0PredEdge, endNode1PredEdge);
+        }
+    }
+    else
+    {
+        VSC_IS_DepDagEdge* currNode0Edge = gcvNULL;
+
+        while(currNode0 != endNode0 && VSC_IS_DepDagNode_GetID(currNode0) > VSC_IS_DepDagNode_GetID(startNode1))
+        {
+            currNode0 = _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(currNode0, gcvFALSE, pathEdges, &currNode0Edge);
+        }
+
+        if(currNode0 == endNode0 && VSC_IS_DepDagNode_GetID(currNode0) > VSC_IS_DepDagNode_GetID(startNode1))
+        {
+            newEdge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, startNode1, rootNode, endNode0);
+            if(endNode0PredEdge)
+            {
+                *endNode0PredEdge = newEdge + 1;
+            }
+            return endNode1;
+        }
+        else
+        {
+            VSC_IS_DepDagNode* newRoot = VSC_IS_DepDagEdge_GetFromNode(currNode0Edge);
+
+            newEdge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, startNode1, rootNode, newRoot);
+            return _VSC_IS_MergePredsOrderly(dag, newRoot, currNode0, startNode1, endNode0, endNode1, pathEdges, endNode0PredEdge, endNode1PredEdge);
+        }
+    }
 }
 
 
@@ -3304,7 +3574,6 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
     IN OUT VSC_IS_DepDagEdge* edge0,
     IN OUT VSC_IS_DepDagEdge* edge1,
     IN OUT VSC_IS_DepDagNode* bottom_node,
-    IN OUT VSC_BIT_VECTOR* sub_tree_edges_bv,
     IN OUT VSC_BIT_VECTOR* detour_edges_bv,
     IN gctBOOL recursive_call
     )
@@ -3342,30 +3611,39 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
 
     if(node0 == top_node)
     {
-        gctUINT32 final_distance = 0;
-        gctUINT32 bubble_sum = 0;
-        gctUINT32 total_len;
-
-        _VSC_IS_DepDagNode_GetNodeOnList(node1, gcvFALSE, detour_edges_bv, gcvMAXUINT32, gcvFALSE, gcvMAXUINT32, top_node, &final_distance, &bubble_sum, gcvNULL);
         _VSC_IS_DepDag_RemoveEdge(dag, top_node, bottom_node);
-        total_len = final_distance + bubble_sum + bubble1;
-        if(bubble0 > total_len)
+        if(bubble0)
         {
-            VSC_IS_DepDagEdge_IncBubble(edge1 - 1, bubble0 - total_len);
+            gctUINT32 final_distance = 0;
+            gctUINT32 bubble_sum = 0;
+            gctUINT32 total_len;
+            _VSC_IS_DepDagNode_GetNodeOnList(node1, gcvFALSE, detour_edges_bv, gcvMAXUINT32, gcvFALSE, gcvMAXUINT32, gcvMAXUINT32, 0, gcvMAXUINT32, top_node, &final_distance, &bubble_sum, gcvNULL);
+            total_len = final_distance + bubble_sum + bubble1;
+            if(bubble0 > total_len)
+            {
+                VSC_IS_DepDagEdge* endEdge1;
+                _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(top_node, gcvTRUE, detour_edges_bv, &endEdge1);
+                VSC_IS_DepDagEdge_IncBubble(edge0 - 1, bubble0 - total_len);
+            }
         }
     }
     else if(node1 == top_node)
     {
-        gctUINT32 final_distance = 0;
-        gctUINT32 bubble_sum = 0;
-        gctUINT32 total_len;
-
-        _VSC_IS_DepDagNode_GetNodeOnList(node0, gcvFALSE, detour_edges_bv, gcvMAXUINT32, gcvFALSE, gcvMAXUINT32, top_node, &final_distance, &bubble_sum, gcvNULL);
         _VSC_IS_DepDag_RemoveEdge(dag, top_node, bottom_node);
-        total_len = final_distance + bubble_sum + bubble0;
-        if(bubble1 > total_len)
+        if(bubble1)
         {
-            VSC_IS_DepDagEdge_IncBubble(edge0 - 1, bubble1 - total_len);
+            gctUINT32 final_distance = 0;
+            gctUINT32 bubble_sum = 0;
+            gctUINT32 total_len;
+
+            _VSC_IS_DepDagNode_GetNodeOnList(node0, gcvFALSE, detour_edges_bv, gcvMAXUINT32, gcvFALSE, gcvMAXUINT32, gcvMAXUINT32, 0, gcvMAXUINT32, top_node, &final_distance, &bubble_sum, gcvNULL);
+            total_len = final_distance + bubble_sum + bubble0;
+            if(bubble1 > total_len)
+            {
+                VSC_IS_DepDagEdge* endEdge0;
+                _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(top_node, gcvTRUE, detour_edges_bv, &endEdge0);
+                VSC_IS_DepDagEdge_IncBubble(endEdge0, bubble1 - total_len);
+            }
         }
     }
     else
@@ -3376,24 +3654,37 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
             VSC_IS_DepDagEdge* node1_prev_edge = gcvNULL;
 
             _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node1, gcvFALSE, detour_edges_bv, &node1_prev_edge);
-            _VSC_IS_DepDag_RemoveEdge(dag, node0, bottom_node);
-            new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, node1);
-            vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-            vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-            VSC_IS_DepDagEdge_SetBubble(new_edge, bubble1 > bubble0 ? bubble1 - bubble0 - 1 : 0);
-            err_code = _VSC_IS_MergeDetour(is, top_node, node1_prev_edge, new_edge + 1, node1, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+            new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node0, bottom_node, node1);
+            VSC_IS_DepDagEdge_SetBubble(new_edge, bubble0 > bubble1 ? bubble0 - bubble1 - 1 : 0);
+            err_code = _VSC_IS_MergeDetour(is, top_node, node1_prev_edge, new_edge + 1, node1, detour_edges_bv, gcvTRUE);
         }
         else if(VSC_IS_DepDagNode_GetKillPriority(node1) > VSC_IS_DepDagNode_GetKillPriority(node0))
         {
             VSC_IS_DepDagEdge* node0_prev_edge = gcvNULL;
 
             _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node0, gcvFALSE, detour_edges_bv, &node0_prev_edge);
-            _VSC_IS_DepDag_RemoveEdge(dag, node1, bottom_node);
-            new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, node0);
-            vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-            vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+            new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node1, bottom_node, node0);
+            VSC_IS_DepDagEdge_SetBubble(new_edge, bubble0 < bubble1 ? bubble1 - bubble0 - 1 : 0);
+            err_code = _VSC_IS_MergeDetour(is, top_node, node0_prev_edge, new_edge + 1, node0, detour_edges_bv, gcvTRUE);
+        }
+        /* kill priorities equal here. handle indegree nodes */
+        else if(VSC_IS_DepDagNode_GetInDegree(node0) < VSC_IS_DepDagNode_GetInDegree(node1) && bubble0 >= bubble1 && VSC_IS_DepDagNode_GetID(node0) < VSC_IS_DepDagNode_GetID(node1))
+        {
+            VSC_IS_DepDagEdge* node1_prev_edge = gcvNULL;
+
+            _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node1, gcvFALSE, detour_edges_bv, &node1_prev_edge);
+            new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node0, bottom_node, node1);
             VSC_IS_DepDagEdge_SetBubble(new_edge, bubble0 > bubble1 ? bubble0 - bubble1 - 1 : 0);
-            err_code = _VSC_IS_MergeDetour(is, top_node, node0_prev_edge, new_edge + 1, node0, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+            err_code = _VSC_IS_MergeDetour(is, top_node, node1_prev_edge, new_edge + 1, node1, detour_edges_bv, gcvTRUE);
+        }
+        else if(VSC_IS_DepDagNode_GetInDegree(node1) < VSC_IS_DepDagNode_GetInDegree(node0) && bubble0 <= bubble1 && VSC_IS_DepDagNode_GetID(node1) < VSC_IS_DepDagNode_GetID(node0))
+        {
+            VSC_IS_DepDagEdge* node0_prev_edge = gcvNULL;
+
+            _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node0, gcvFALSE, detour_edges_bv, &node0_prev_edge);
+            new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node1, bottom_node, node0);
+            VSC_IS_DepDagEdge_SetBubble(new_edge, bubble0 < bubble1 ? bubble1 - bubble0 - 1 : 0);
+            err_code = _VSC_IS_MergeDetour(is, top_node, node0_prev_edge, new_edge + 1, node0, detour_edges_bv, gcvTRUE);
         }
         /* handle others */
         else if(bubble0 && bubble1)
@@ -3402,59 +3693,48 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
             {
                 VSC_IS_DepDagEdge* node1_pred_edge;
 
-                _VSC_IS_DepDag_RemoveEdge(dag, node0, bottom_node);
                 _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node1, gcvFALSE, detour_edges_bv, &node1_pred_edge);
-                new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, node1);
-                vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+                new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node0, bottom_node, node1);
                 VSC_IS_DepDagEdge_SetBubble(new_edge, bubble0 - bubble1 - 1);
                 gcmASSERT(node1_pred_edge);
-                err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, node1_pred_edge, node1, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+                err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, node1_pred_edge, node1, detour_edges_bv, gcvTRUE);
             }
             else if(bubble0 < bubble1)
             {
                 VSC_IS_DepDagEdge* node0_pred_edge;
 
-                _VSC_IS_DepDag_RemoveEdge(dag, node1, bottom_node);
                 _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node0, gcvFALSE, detour_edges_bv, &node0_pred_edge);
-                new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, node0);
-                vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+                new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node1, bottom_node, node0);
                 VSC_IS_DepDagEdge_SetBubble(new_edge, bubble1 - bubble0 - 1);
                 gcmASSERT(node0_pred_edge);
-                err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, node0_pred_edge, node0, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+                err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, node0_pred_edge, node0, detour_edges_bv, gcvTRUE);
             }
             else
             {
-                /* schedule node0 and node1 orderly. we may have better way to schedule them here */
+                /* bubble0 equals to bubble1, schedule node0 and node1 orderly. we may have better way to schedule them here */
                 if(VSC_IS_DepDagNode_GetID(node0) < VSC_IS_DepDagNode_GetID(node1))
                 {
                     VSC_IS_DepDagEdge* node1_pred_edge;
 
-                    _VSC_IS_DepDag_RemoveEdge(dag, node0, bottom_node);
                     _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node1, gcvFALSE, detour_edges_bv, &node1_pred_edge);
-                    new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, node1);
-                    vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                    vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+                    new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node0, bottom_node, node1);
                     gcmASSERT(node1_pred_edge);
-                    err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, node1_pred_edge, node1, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+                    err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, node1_pred_edge, node1, detour_edges_bv, gcvTRUE);
                 }
                 else
                 {
                     VSC_IS_DepDagEdge* node0_pred_edge;
 
-                    _VSC_IS_DepDag_RemoveEdge(dag, node1, bottom_node);
                     _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node0, gcvFALSE, detour_edges_bv, &node0_pred_edge);
-                    new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, node0);
-                    vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                    vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+                    new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node1, bottom_node, node0);
                     gcmASSERT(node0_pred_edge);
-                    err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, node0_pred_edge, node0, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+                    err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, node0_pred_edge, node0, detour_edges_bv, gcvTRUE);
                 }
             }
         }
         else
         {
+            /* not both edges have bubble */
             if(bubble0)
             {
                 VSC_IS_DepDagNode* end_node1;
@@ -3466,20 +3746,20 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
                                                              bubble0 - 1,
                                                              gcvTRUE,
                                                              VSC_IS_DepDagNode_GetKillPriority(node0),
+                                                             gcvMAXUINT32,
+                                                             0,
+                                                             gcvMAXUINT32,
                                                              top_node,
                                                              &final_distance,
                                                              gcvNULL,
                                                              &end_node1_edge);
-                _VSC_IS_DepDag_RemoveEdge(dag, node0, bottom_node);
                 if(end_node1 == top_node)
                 {
                     VSC_IS_DepDagNode* end_node1_edge_from = VSC_IS_DepDagEdge_GetFromNode(end_node1_edge);
 
-                    new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, end_node1_edge_from);
-                    vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                    vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+                    new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node0, bottom_node, end_node1_edge_from);
                     _VSC_IS_DepDag_RemoveEdge(dag, top_node, end_node1_edge_from);
-                    VSC_IS_DepDagEdge_SetBubble(edge1 - 1, bubble0 - final_distance - 1);
+                    VSC_IS_DepDagEdge_SetBubble(new_edge, bubble0 - final_distance - 1);
                 }
                 else
                 {
@@ -3489,29 +3769,22 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
                         VSC_IS_DepDagEdge* node0_prev_edge;
 
                         _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node0, gcvFALSE, detour_edges_bv, &node0_prev_edge);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, end_node1_edge_from);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+                        new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node0, bottom_node, end_node1_edge_from);
                         if(bubble0 > final_distance)
                         {
-                            VSC_IS_DepDagEdge_SetBubble(edge1 - 1, bubble0 - final_distance);
+                            VSC_IS_DepDagEdge_SetBubble(new_edge, bubble0 - final_distance);
                         }
-                        _VSC_IS_DepDag_RemoveEdge(dag, end_node1, end_node1_edge_from);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, end_node1, node0);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, node0_prev_edge, node0, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+                        new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, end_node1, end_node1_edge_from, node0);
+                        err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, node0_prev_edge, node0, detour_edges_bv, gcvTRUE);
                     }
                     else
                     {
                         VSC_IS_DepDagEdge* end_node1_bubble_edge;
 
                         _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node1, gcvFALSE, detour_edges_bv, &end_node1_bubble_edge);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, end_node1);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+                        new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node0, bottom_node, end_node1);
                         VSC_IS_DepDagEdge_SetBubble(new_edge, bubble0 - final_distance - 1);
-                        err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, end_node1_bubble_edge, end_node1, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+                        err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, end_node1_bubble_edge, end_node1, detour_edges_bv, gcvTRUE);
                     }
                 }
             }
@@ -3526,20 +3799,20 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
                                                              bubble1 - 1,
                                                              gcvTRUE,
                                                              VSC_IS_DepDagNode_GetKillPriority(node1),
+                                                             gcvMAXUINT32,
+                                                             0,
+                                                             gcvMAXUINT32,
                                                              top_node,
                                                              &final_distance,
                                                              gcvNULL,
                                                              &end_node0_edge);
-                _VSC_IS_DepDag_RemoveEdge(dag, node1, bottom_node);
                 if(end_node0 == top_node)
                 {
                     VSC_IS_DepDagNode* end_node0_edge_from = VSC_IS_DepDagEdge_GetFromNode(end_node0_edge);
 
-                    new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, end_node0_edge_from);
-                    vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                    vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+                    new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node1, bottom_node, end_node0_edge_from);
                     _VSC_IS_DepDag_RemoveEdge(dag, top_node, end_node0_edge_from);
-                    VSC_IS_DepDagEdge_SetBubble(edge0 - 1, bubble1 - final_distance);
+                    VSC_IS_DepDagEdge_SetBubble(new_edge, bubble1 - final_distance);
                 }
                 else
                 {
@@ -3549,34 +3822,28 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
                         VSC_IS_DepDagEdge* node1_prev_edge;
 
                         _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(node1, gcvFALSE, detour_edges_bv, &node1_prev_edge);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, end_node0_edge_from);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+                        new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node1, bottom_node, end_node0_edge_from);
                         if(bubble1 > final_distance)
                         {
-                            VSC_IS_DepDagEdge_SetBubble(edge0 - 1, bubble1 - final_distance);
+                            VSC_IS_DepDagEdge_SetBubble(new_edge, bubble1 - final_distance);
                         }
-                        _VSC_IS_DepDag_RemoveEdge(dag, end_node0, end_node0_edge_from);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, end_node0, node1);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, node1_prev_edge, node1, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+                        new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, end_node0, end_node0_edge_from, node1);
+                        err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, node1_prev_edge, node1, detour_edges_bv, gcvTRUE);
                     }
                     else
                     {
                         VSC_IS_DepDagEdge* end_node0_bubble_edge;
 
                         _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node0, gcvFALSE, detour_edges_bv, &end_node0_bubble_edge);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, end_node0);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+                        new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node1, bottom_node, end_node0);
                         VSC_IS_DepDagEdge_SetBubble(new_edge, bubble1 - final_distance - 1);
-                        err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, end_node0_bubble_edge, end_node0, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+                        err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, end_node0_bubble_edge, end_node0, detour_edges_bv, gcvTRUE);
                     }
                 }
             }
             else
             {
+                /* bubble0 and bubble1 are both zero */
                 gctUINT32 end_node0_distance = 0;
                 gctUINT32 end_node1_distance = 0;
                 VSC_IS_DepDagNode* end_node0;
@@ -3590,6 +3857,9 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
                                                              gcvMAXUINT32,
                                                              gcvTRUE,
                                                              VSC_IS_DepDagNode_GetKillPriority(node0),
+                                                             1,
+                                                             0,
+                                                             gcvMAXUINT32,
                                                              top_node,
                                                              &end_node0_distance,
                                                              gcvNULL,
@@ -3600,6 +3870,9 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
                                                              gcvMAXUINT32,
                                                              gcvTRUE,
                                                              VSC_IS_DepDagNode_GetKillPriority(node1),
+                                                             1,
+                                                             0,
+                                                             gcvMAXUINT32,
                                                              top_node,
                                                              &end_node1_distance,
                                                              gcvNULL,
@@ -3607,145 +3880,164 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
 
                 if(end_node0 == top_node && end_node1 == top_node)
                 {
-                    if(end_node0_distance >= end_node1_distance)
+                    VSC_IS_DepDagNode* endNode0PredNode = VSC_IS_DepDagEdge_GetFromNode(prev_edge0);
+                    VSC_IS_DepDagNode* endNode1PredNode = VSC_IS_DepDagEdge_GetFromNode(prev_edge1);
+                    VSC_IS_DepDagNode* tailNode = _VSC_IS_MergePredsOrderly(dag, bottom_node, node0, node1, endNode0PredNode, endNode1PredNode, detour_edges_bv, gcvNULL, gcvNULL);
+
+                    if(tailNode == endNode0PredNode)
                     {
-                        VSC_IS_DepDagNode* pred_edge1_from = VSC_IS_DepDagEdge_GetFromNode(prev_edge1);
-                        _VSC_IS_DepDag_RemoveEdge(dag, node0, bottom_node);
-                        _VSC_IS_DepDag_RemoveEdge(dag, top_node, pred_edge1_from);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, pred_edge1_from);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+                        _VSC_IS_DepDag_RemoveEdge(dag, top_node, endNode1PredNode);
                     }
                     else
                     {
-                        VSC_IS_DepDagNode* pred_edge0_from = VSC_IS_DepDagEdge_GetFromNode(prev_edge0);
-                        _VSC_IS_DepDag_RemoveEdge(dag, node1, bottom_node);
-                        _VSC_IS_DepDag_RemoveEdge(dag, top_node, pred_edge0_from);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, pred_edge0_from);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+                        _VSC_IS_DepDag_RemoveEdge(dag, top_node, endNode0PredNode);
                     }
                 }
                 else if(end_node0 == top_node)
                 {
                     if(VSC_IS_DepDagNode_GetKillPriority(end_node1) > VSC_IS_DepDagNode_GetKillPriority(node1))
                     {
+                        /* the second path has higher priority */
                         VSC_IS_DepDagNode* prev_edge0_from = VSC_IS_DepDagEdge_GetFromNode(prev_edge0);
+                        VSC_IS_DepDagNode* prev_edge1_from = VSC_IS_DepDagEdge_GetFromNode(prev_edge1);
+                        VSC_IS_DepDagNode* tailNode = _VSC_IS_MergePredsOrderly(dag, bottom_node, node0, node1, prev_edge0_from, prev_edge1_from, detour_edges_bv, gcvNULL, gcvNULL);
 
-                        _VSC_IS_DepDag_RemoveEdge(dag, node1, bottom_node);
                         _VSC_IS_DepDag_RemoveEdge(dag, top_node, prev_edge0_from);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, prev_edge0_from);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
+                        if(tailNode == prev_edge0_from)
+                        {
+                            new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, end_node1, prev_edge1_from, tailNode);
+                        }
+                    }
+                    else if(VSC_IS_DepDagNode_GetInDegree(end_node1) > 1)
+                    {
+                        /* the second path has a high indegree node */
+                        VSC_IS_DepDagNode* endNode0PrevNode = VSC_IS_DepDagEdge_GetFromNode(prev_edge0);
+                        VSC_IS_DepDagEdge* endNode1PredEdge;
+                        VSC_IS_DepDagNode* tailNode;
+                        VSC_IS_DepDagEdge* newEndNode1PredEdge;
+
+                        _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node1, gcvFALSE, detour_edges_bv, &endNode1PredEdge);
+                        tailNode = _VSC_IS_MergePredsOrderly(dag, bottom_node, node0, node1, endNode0PrevNode, end_node1, detour_edges_bv, gcvNULL, &newEndNode1PredEdge);
+
+                        if(tailNode == endNode0PrevNode)
+                        {
+                            err_code = _VSC_IS_MergeDetour(is, top_node, newEndNode1PredEdge, endNode1PredEdge, end_node1, detour_edges_bv, gcvTRUE);
+                        }
+                        else
+                        {
+                            _VSC_IS_DepDag_RemoveEdge(dag, top_node, endNode0PrevNode);
+                        }
                     }
                     else
                     {
-                        VSC_IS_DepDagEdge* bubble1_edge = gcvNULL;
-                        _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node1, gcvFALSE, detour_edges_bv, &bubble1_edge);
+                        /* the second path has a bubble */
+                        gctUINT32 bubbleSum;
 
-                        gcmASSERT(bubble1_edge && VSC_IS_DepDagEdge_GetBubble(bubble1_edge));
-                        _VSC_IS_DepDag_RemoveEdge(dag, node0, bottom_node);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, end_node1);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, bubble1_edge, end_node1, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+                        _VSC_IS_DepDagNode_GetNodeOnList(end_node1,
+                                                             gcvFALSE,
+                                                             detour_edges_bv,
+                                                             gcvMAXUINT32,
+                                                             gcvFALSE,
+                                                             VSC_IS_DepDagNode_GetKillPriority(node1),
+                                                             1,
+                                                             0,
+                                                             gcvMAXUINT32,
+                                                             top_node,
+                                                             gcvNULL,
+                                                             &bubbleSum,
+                                                             gcvNULL);
+
+                        if(bubbleSum >= end_node0_distance)
+                        {
+                            /* all nodes on the first path need to be used to fill bubbles on the second path */
+                            VSC_IS_DepDagEdge* nextDetourEdge = gcvNULL;
+                            _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node1, gcvFALSE, detour_edges_bv, &nextDetourEdge);
+
+                            gcmASSERT(nextDetourEdge);
+                            new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node0, bottom_node, end_node1);
+                            err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, nextDetourEdge, end_node1, detour_edges_bv, gcvTRUE);
+                        }
+                        else
+                        {
+                            /* use some upper nodes on the first path to fill bubbles on the second path */
+                            VSC_IS_DepDagNode* newNode0;
+                            VSC_IS_DepDagEdge* prevNewNode0Edge;
+                            VSC_IS_DepDagNode* prevNewNode0Node;
+                            VSC_IS_DepDagEdge* nextDetourEdge;
+                            VSC_IS_DepDagNode* tailNode;
+                            VSC_IS_DepDagEdge* newEndNode1SuccEdge;
+
+                            newNode0 = _VSC_IS_DepDagNode_GetNodeOnList(node0,
+                                                             gcvFALSE,
+                                                             detour_edges_bv,
+                                                             end_node0_distance - bubbleSum,
+                                                             gcvFALSE,
+                                                             gcvMAXUINT32,
+                                                             gcvMAXUINT32,
+                                                             0,
+                                                             gcvMAXUINT32,
+                                                             top_node,
+                                                             gcvNULL,
+                                                             gcvNULL,
+                                                             &prevNewNode0Edge);
+
+                            /* Orderly merge the lower part */
+                            prevNewNode0Node = VSC_IS_DepDagEdge_GetFromNode(prevNewNode0Edge);
+                            _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node1, gcvFALSE, detour_edges_bv, &nextDetourEdge);
+                            tailNode = _VSC_IS_MergePredsOrderly(dag, bottom_node, node0, node1, prevNewNode0Node, end_node1, detour_edges_bv, gcvNULL, &newEndNode1SuccEdge);
+
+                            /* recursively merge the upper detour */
+                            if(tailNode == prevNewNode0Node)
+                            {
+                                err_code = _VSC_IS_MergeDetour(is, top_node, newEndNode1SuccEdge, nextDetourEdge, end_node1, detour_edges_bv, gcvTRUE);
+                            }
+                            else
+                            {
+                                new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, newNode0, prevNewNode0Node, end_node1);
+                                err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, nextDetourEdge, end_node1, detour_edges_bv, gcvTRUE);
+                            }
+                        }
                     }
                 }
                 else if(end_node1 == top_node)
                 {
                     if(VSC_IS_DepDagNode_GetKillPriority(end_node0) > VSC_IS_DepDagNode_GetKillPriority(node0))
                     {
-                        VSC_IS_DepDagNode* prev_edge1_from = VSC_IS_DepDagEdge_GetFromNode(prev_edge1);
-
-                        _VSC_IS_DepDag_RemoveEdge(dag, node0, bottom_node);
-                        _VSC_IS_DepDag_RemoveEdge(dag, top_node, prev_edge1_from);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, prev_edge1_from);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                    }
-                    else
-                    {
-                        VSC_IS_DepDagEdge* bubble0_edge = gcvNULL;
-                        _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node0, gcvFALSE, detour_edges_bv, &bubble0_edge);
-
-                        gcmASSERT(bubble0_edge && VSC_IS_DepDagEdge_GetBubble(bubble0_edge));
-                        _VSC_IS_DepDag_RemoveEdge(dag, node1, bottom_node);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, end_node0);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, bubble0_edge, end_node0, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
-                    }
-                }
-                else
-                {
-                    /* both stopped by lower priority node */
-                    if(VSC_IS_DepDagNode_GetKillPriority(end_node0) > VSC_IS_DepDagNode_GetKillPriority(node0) &&
-                       VSC_IS_DepDagNode_GetKillPriority(end_node1) > VSC_IS_DepDagNode_GetKillPriority(node1))
-                    {
+                        /* the first path has higher priority */
                         VSC_IS_DepDagNode* prev_edge0_from = VSC_IS_DepDagEdge_GetFromNode(prev_edge0);
                         VSC_IS_DepDagNode* prev_edge1_from = VSC_IS_DepDagEdge_GetFromNode(prev_edge1);
+                        VSC_IS_DepDagNode* tailNode = _VSC_IS_MergePredsOrderly(dag, bottom_node, node0, node1, prev_edge0_from, prev_edge1_from, detour_edges_bv, gcvNULL, gcvNULL);
 
-                        if(end_node0_distance >= end_node1_distance)
+                        _VSC_IS_DepDag_RemoveEdge(dag, top_node, prev_edge1_from);
+                        if(tailNode == prev_edge1_from)
                         {
-                            _VSC_IS_DepDag_RemoveEdge(dag, node0, bottom_node);
-                            new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, prev_edge1_from);
-                            vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                            vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                            _VSC_IS_DepDag_RemoveEdge(dag, end_node1, prev_edge1_from);
-                            new_edge = _VSC_IS_DepDag_AddEdge(dag, end_node1, prev_edge0_from);
-                            vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                            vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                            err_code = _VSC_IS_MergeDetour(is, top_node, prev_edge0, new_edge + 1, prev_edge0_from, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+                            new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, end_node0, prev_edge0_from, tailNode);
+                        }
+                    }
+                    else if(VSC_IS_DepDagNode_GetInDegree(end_node0) > 1)
+                    {
+                        /* the first path has a high indegree node */
+                        VSC_IS_DepDagNode* endNode1PrevNode = VSC_IS_DepDagEdge_GetFromNode(prev_edge1);
+                        VSC_IS_DepDagEdge* endNode0SuccEdge;
+                        VSC_IS_DepDagNode* tailNode;
+                        VSC_IS_DepDagEdge* newEndNode0PredEdge;
+
+                        _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node0, gcvFALSE, detour_edges_bv, &endNode0SuccEdge);
+                        tailNode = _VSC_IS_MergePredsOrderly(dag, bottom_node, node0, node1, end_node0, endNode1PrevNode, detour_edges_bv, &newEndNode0PredEdge, gcvNULL);
+
+                        if(tailNode == endNode1PrevNode)
+                        {
+                            err_code = _VSC_IS_MergeDetour(is, top_node, newEndNode0PredEdge, endNode0SuccEdge, end_node0, detour_edges_bv, gcvTRUE);
                         }
                         else
                         {
-                            _VSC_IS_DepDag_RemoveEdge(dag, node1, bottom_node);
-                            new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, prev_edge0_from);
-                            vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                            vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                            _VSC_IS_DepDag_RemoveEdge(dag, end_node0, prev_edge0_from);
-                            new_edge = _VSC_IS_DepDag_AddEdge(dag, end_node0, prev_edge1_from);
-                            vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                            vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                            err_code = _VSC_IS_MergeDetour(is, top_node, prev_edge1, new_edge + 1, prev_edge1_from, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+                            _VSC_IS_DepDag_RemoveEdge(dag, top_node, endNode1PrevNode);
                         }
                     }
-                    /* one stopped by lower priority node, the other stopped by bubble */
-                    else if(VSC_IS_DepDagNode_GetKillPriority(end_node0) > VSC_IS_DepDagNode_GetKillPriority(node0))
-                    {
-                        VSC_IS_DepDagEdge* bubble1_edge = gcvNULL;
-
-                        _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node1, gcvFALSE, detour_edges_bv, &bubble1_edge);
-                        gcmASSERT(bubble1_edge && VSC_IS_DepDagEdge_GetBubble(bubble1_edge));
-                        _VSC_IS_DepDag_RemoveEdge(dag, node0, bottom_node);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, end_node1);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        err_code = _VSC_IS_MergeDetour(is, top_node, bubble1_edge, new_edge + 1, end_node1, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
-                    }
-                    else if(VSC_IS_DepDagNode_GetKillPriority(end_node1) > VSC_IS_DepDagNode_GetKillPriority(node1))
-                    {
-                        VSC_IS_DepDagEdge* bubble0_edge = gcvNULL;
-
-                        _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node0, gcvFALSE, detour_edges_bv, &bubble0_edge);
-                        gcmASSERT(bubble0_edge && VSC_IS_DepDagEdge_GetBubble(bubble0_edge));
-                        _VSC_IS_DepDag_RemoveEdge(dag, node1, bottom_node);
-                        new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, end_node0);
-                        vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                        err_code = _VSC_IS_MergeDetour(is, top_node, bubble0_edge, new_edge + 1, end_node0, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
-                    }
-                    /* both stopped by bubble */
                     else
                     {
-                        gctUINT32 following_distance0;
-                        gctUINT32 following_distance1;
-                        gctUINT32 bubble_sum0;
-                        gctUINT32 bubble_sum1;
-                        gctUINT32 total_length0;
-                        gctUINT32 total_length1;
-                        gctUINT32 filled_bubble0;
-                        gctUINT32 filled_bubble1;
+                        /* the first path has a bubble */
+                        gctUINT32 bubbleSum;
 
                         _VSC_IS_DepDagNode_GetNodeOnList(end_node0,
                                                              gcvFALSE,
@@ -3753,47 +4045,126 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
                                                              gcvMAXUINT32,
                                                              gcvFALSE,
                                                              VSC_IS_DepDagNode_GetKillPriority(node0),
-                                                             top_node,
-                                                             &following_distance0,
-                                                             &bubble_sum0,
-                                                             gcvNULL);
-                        _VSC_IS_DepDagNode_GetNodeOnList(end_node1,
-                                                             gcvFALSE,
-                                                             detour_edges_bv,
+                                                             1,
+                                                             0,
                                                              gcvMAXUINT32,
-                                                             gcvFALSE,
-                                                             VSC_IS_DepDagNode_GetKillPriority(node1),
                                                              top_node,
-                                                             &following_distance1,
-                                                             &bubble_sum1,
+                                                             gcvNULL,
+                                                             &bubbleSum,
                                                              gcvNULL);
 
-                        total_length0 = end_node0_distance + 1 + following_distance0 + bubble_sum0;
-                        total_length1 = end_node1_distance + 1 + following_distance1 + bubble_sum1;
-                        filled_bubble0 = bubble_sum0 > total_length0 ? total_length0 : bubble_sum0;
-                        filled_bubble1 = bubble_sum1 > total_length1 ? total_length1 : bubble_sum1;
-
-                        if(filled_bubble0 <= filled_bubble1)
+                        if(bubbleSum >= end_node1_distance)
                         {
-                            VSC_IS_DepDagEdge* end_node1_prev_edge;
+                            /* all nodes on the first path need to be used to fill bubbles on the second path */
+                            VSC_IS_DepDagEdge* nextDetourEdge = gcvNULL;
+                            _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node0, gcvFALSE, detour_edges_bv, &nextDetourEdge);
 
-                            _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node1, gcvFALSE, detour_edges_bv, &end_node1_prev_edge);
-                            _VSC_IS_DepDag_RemoveEdge(dag, node0, bottom_node);
-                            new_edge = _VSC_IS_DepDag_AddEdge(dag, node0, end_node1);
-                            vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                            vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                            err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, end_node1_prev_edge, end_node1, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+                            gcmASSERT(nextDetourEdge);
+                            new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node1, bottom_node, end_node0);
+                            err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, nextDetourEdge, end_node0, detour_edges_bv, gcvTRUE);
                         }
                         else
                         {
-                            VSC_IS_DepDagEdge* end_node0_prev_edge;
+                            /* use some upper nodes on the first path to fill bubbles on the second path */
+                            VSC_IS_DepDagNode* newNode1;
+                            VSC_IS_DepDagEdge* prevNewNode1Edge;
+                            VSC_IS_DepDagNode* prevNewNode1Node;
+                            VSC_IS_DepDagEdge* nextDetourEdge;
+                            VSC_IS_DepDagNode* tailNode;
+                            VSC_IS_DepDagEdge* newEndNode0SuccEdge;
 
-                            _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node0, gcvFALSE, detour_edges_bv, &end_node0_prev_edge);
-                            _VSC_IS_DepDag_RemoveEdge(dag, node1, bottom_node);
-                            new_edge = _VSC_IS_DepDag_AddEdge(dag, node1, end_node0);
-                            vscBV_SetBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                            vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(new_edge));
-                            err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, end_node0_prev_edge, end_node0, sub_tree_edges_bv, detour_edges_bv, gcvTRUE);
+                            newNode1 = _VSC_IS_DepDagNode_GetNodeOnList(node1,
+                                                             gcvFALSE,
+                                                             detour_edges_bv,
+                                                             end_node1_distance - bubbleSum,
+                                                             gcvFALSE,
+                                                             gcvMAXUINT32,
+                                                             gcvMAXUINT32,
+                                                             0,
+                                                             gcvMAXUINT32,
+                                                             top_node,
+                                                             gcvNULL,
+                                                             gcvNULL,
+                                                             &prevNewNode1Edge);
+
+                            /* Orderly merge the lower part */
+                            prevNewNode1Node = VSC_IS_DepDagEdge_GetFromNode(prevNewNode1Edge);
+                            _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node0, gcvFALSE, detour_edges_bv, &nextDetourEdge);
+                            tailNode = _VSC_IS_MergePredsOrderly(dag, bottom_node, node1, node0, prevNewNode1Node, end_node0, detour_edges_bv, gcvNULL, &newEndNode0SuccEdge);
+
+                            /* recursively merge the upper detour */
+                            if(tailNode == prevNewNode1Node)
+                            {
+                                err_code = _VSC_IS_MergeDetour(is, top_node, newEndNode0SuccEdge, nextDetourEdge, end_node0, detour_edges_bv, gcvTRUE);
+                            }
+                            else
+                            {
+                                new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, newNode1, prevNewNode1Node, end_node0);
+                                err_code = _VSC_IS_MergeDetour(is, top_node, new_edge + 1, nextDetourEdge, end_node0, detour_edges_bv, gcvTRUE);
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    /* both stopped by lower_priority/bubble/indegree node */
+                    if(VSC_IS_DepDagNode_GetKillPriority(end_node0) > VSC_IS_DepDagNode_GetKillPriority(node0) &&
+                       VSC_IS_DepDagNode_GetKillPriority(end_node1) > VSC_IS_DepDagNode_GetKillPriority(node1))
+                    {
+                        /* both stopped by lower_priority node */
+                        VSC_IS_DepDagNode* prev_edge0_from = VSC_IS_DepDagEdge_GetFromNode(prev_edge0);
+                        VSC_IS_DepDagNode* prev_edge1_from = VSC_IS_DepDagEdge_GetFromNode(prev_edge1);
+                        VSC_IS_DepDagNode* tailNode = _VSC_IS_MergePredsOrderly(dag, bottom_node, node0, node1, prev_edge0_from, prev_edge1_from, detour_edges_bv, gcvNULL, gcvNULL);
+
+                        if(tailNode == prev_edge0_from)
+                        {
+                            new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, end_node1, prev_edge1_from, prev_edge0_from);
+                            err_code = _VSC_IS_MergeDetour(is, top_node, prev_edge0, new_edge + 1, prev_edge0_from, detour_edges_bv, gcvTRUE);
+                        }
+                        else
+                        {
+                            new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node0, prev_edge0_from, prev_edge1_from);
+                            err_code = _VSC_IS_MergeDetour(is, top_node, prev_edge0, new_edge + 1, prev_edge0_from, detour_edges_bv, gcvTRUE);
+                        }
+                    }
+                    else if(VSC_IS_DepDagNode_GetKillPriority(end_node0) > VSC_IS_DepDagNode_GetKillPriority(node0))
+                    {
+                        /* one stopped by lower priority node, the other stopped by indegree/bubble */
+                        VSC_IS_DepDagEdge* bubble1_edge = gcvNULL;
+
+                        _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node1, gcvFALSE, detour_edges_bv, &bubble1_edge);
+                        gcmASSERT(bubble1_edge);
+                        new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node0, bottom_node, end_node1);
+                        err_code = _VSC_IS_MergeDetour(is, top_node, bubble1_edge, new_edge + 1, end_node1, detour_edges_bv, gcvTRUE);
+                    }
+                    else if(VSC_IS_DepDagNode_GetKillPriority(end_node1) > VSC_IS_DepDagNode_GetKillPriority(node1))
+                    {
+                        /* one stopped by lower priority node, the other stopped by indegree/bubble */
+                        VSC_IS_DepDagEdge* bubble0_edge = gcvNULL;
+
+                        _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node0, gcvFALSE, detour_edges_bv, &bubble0_edge);
+                        gcmASSERT(bubble0_edge);
+                        new_edge = _VSC_IS_DepDag_ReplaceEdgeToNode(dag, node1, bottom_node, end_node0);
+                        err_code = _VSC_IS_MergeDetour(is, top_node, bubble0_edge, new_edge + 1, end_node0, detour_edges_bv, gcvTRUE);
+                    }
+                    else
+                    {
+                        VSC_IS_DepDagEdge* end_node0_prev_edge;
+                        VSC_IS_DepDagEdge* end_node1_prev_edge;
+                        VSC_IS_DepDagNode* tailNode;
+                        VSC_IS_DepDagEdge* endNode0SuccEdge;
+                        VSC_IS_DepDagEdge* endNode1SuccEdge;
+
+                        _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node0, gcvFALSE, detour_edges_bv, &end_node0_prev_edge);
+                        _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(end_node1, gcvFALSE, detour_edges_bv, &end_node1_prev_edge);
+                        tailNode = _VSC_IS_MergePredsOrderly(dag, bottom_node, node0, node1, end_node0, end_node1, detour_edges_bv, &endNode0SuccEdge, &endNode1SuccEdge);
+                        if(tailNode == end_node0)
+                        {
+                            err_code = _VSC_IS_MergeDetour(is, top_node, endNode1SuccEdge, end_node1_prev_edge, end_node1, detour_edges_bv, gcvTRUE);
+                        }
+                        else
+                        {
+                            err_code = _VSC_IS_MergeDetour(is, top_node, endNode0SuccEdge, end_node0_prev_edge, end_node0, detour_edges_bv, gcvTRUE);
                         }
                     }
                 }
@@ -3809,8 +4180,8 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
 
         VIR_LOG(dumper, "after merge detour:\n");
         VIR_LOG(dumper, "list:\n");
-        _VSC_IS_DepDagNode_DumpList(bottom_node, top_node, gcvFALSE, detour_edges_bv, dumper);
-        _VSC_IS_DepDagNode_GetNodeOnList(bottom_node, gcvFALSE, detour_edges_bv, gcvMAXUINT32, gcvFALSE, gcvMAXUINT32, top_node, gcvNULL, &bubble_sum, gcvNULL);
+        _VSC_IS_DepDagNode_DumpList(top_node, bottom_node, gcvTRUE, detour_edges_bv, dumper);
+        _VSC_IS_DepDagNode_GetNodeOnList(bottom_node, gcvFALSE, detour_edges_bv, gcvMAXUINT32, gcvFALSE, gcvMAXUINT32, gcvMAXUINT32, 0, gcvMAXUINT32, top_node, gcvNULL, &bubble_sum, gcvNULL);
         VIR_LOG(dumper, "bubble_sum: %d\n", bubble_sum);
         VIR_LOG_FLUSH(dumper);
     }
@@ -3819,160 +4190,205 @@ static VSC_ErrCode _VSC_IS_MergeDetour(
 }
 
 
-static VSC_IS_DepDagNode* _VSC_IS_FindBottomNode(
+static VSC_IS_DepDagNode* _VSC_IS_FindFromEdges(
     IN VSC_IS_DepDag* dag,
+    IN VSC_IS_DepDagNode* top_node,
     IN VSC_IS_DepDagEdge* first_succ_edge,
     IN VSC_IS_DepDagEdge* second_succ_edge,
+    IN VSC_IS_DepDagNode* sub_root,
     IN VSC_BIT_VECTOR* sub_tree_edges_bv,
-    OUT VSC_BIT_VECTOR* detour_edges_bv
+    OUT VSC_IS_DepDagEdge** first_from_edge,
+    OUT VSC_IS_DepDagEdge** second_from_edge,
+    OUT VSC_BIT_VECTOR* detour_edges_bv/*,
+    OUT VSC_BIT_VECTOR* excluded_edges_bv*/
     )
 {
+    /* the result may be diffenrent from sub_root. For example, A->C, A->D, B->C, B->D, C->E, D->E. After one detour is merged, the other will not have E as root any more */
+    VSC_IS_DepDagNode* result = gcvNULL;
     VSC_BIT_VECTOR* nodes_bv = _VSC_IS_DepDag_RentANodesBV(dag);
-    VSC_IS_DepDagNode* first_node = VSC_IS_DepDagEdge_GetToNode(first_succ_edge);
-    VSC_IS_DepDagNode* second_node = VSC_IS_DepDagEdge_GetToNode(second_succ_edge);
+    VSC_IS_DepDagNode* nodeOnFirstPath = VSC_IS_DepDagEdge_GetToNode(first_succ_edge);
+    VSC_IS_DepDagNode* nodeOnSecondPath = VSC_IS_DepDagEdge_GetToNode(second_succ_edge);
+    VSC_IS_DepDagEdge* from_edge0;
+    VSC_IS_DepDagEdge* from_edge1;
     VSC_IS_DepDagEdge* adj_edge;
 
+    /* first step: reach down to sub_root from the first path. mark those nodes on the path. record the first breaking node if it exists */
     vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(first_succ_edge));
+    from_edge0 = first_succ_edge;
+    while(nodeOnFirstPath != sub_root)
+    {
+        vscBV_SetBit(nodes_bv, VSC_IS_DepDagNode_GetID(nodeOnFirstPath));
+        nodeOnFirstPath = _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(nodeOnFirstPath, gcvTRUE, sub_tree_edges_bv, &adj_edge);
+        gcmASSERT(adj_edge);
+        from_edge0 = adj_edge;
+        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(adj_edge));
+    }
+    vscBV_SetBit(nodes_bv, VSC_IS_DepDagNode_GetID(sub_root));
+
+    /* second step: reach down to sub_root from the second path. If a breaking node is met, record and mark it. it will meet a node on the first path for sure */
     vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(second_succ_edge));
-
-    while(first_node)
+    from_edge1 = second_succ_edge;
+    while(!vscBV_TestBit(nodes_bv, VSC_IS_DepDagNode_GetID(nodeOnSecondPath)))
     {
-        vscBV_SetBit(nodes_bv, VSC_IS_DepDagNode_GetID(first_node));
-        first_node = _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(first_node, gcvTRUE, sub_tree_edges_bv, &adj_edge);
-        if(adj_edge)
-        {
-            vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(adj_edge));
-        }
+        nodeOnSecondPath = _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(nodeOnSecondPath, gcvTRUE, sub_tree_edges_bv, &adj_edge);
+        gcmASSERT(adj_edge);
+        from_edge1 = adj_edge;
+        vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(adj_edge));
     }
+    /* -- now nodeOnSecondPath is the new sub root */
 
-    while(second_node)
+    /* third step: */
+    if(nodeOnSecondPath == sub_root)
     {
-        if(vscBV_TestBit(nodes_bv, VSC_IS_DepDagNode_GetID(second_node)))
-        {
-            _VSC_IS_DepDag_ReturnANodesBV(dag, nodes_bv);
-            return second_node;
-        }
-        second_node = _VSC_IS_DepDagNode_GetAdjacentNodeAndEdge(second_node, gcvTRUE, sub_tree_edges_bv, &adj_edge);
-        if(adj_edge)
-        {
-            vscBV_SetBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(adj_edge));
-        }
+        *first_from_edge = from_edge0 + 1;
     }
+    else
+    {
+        VSC_ADJACENT_LIST* pred_edge_list = VSC_IS_DepDagNode_GetPredEdgeList(nodeOnSecondPath);
+        VSC_UL_ITERATOR pred_edge_iter;
+        VSC_IS_DepDagEdge* pred_edge;
 
-    gcmASSERT(second_node);
-    return gcvNULL;
+        VSC_ADJACENT_LIST_ITERATOR_INIT(&pred_edge_iter, pred_edge_list);
+        for(pred_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&pred_edge_iter);
+            pred_edge != gcvNULL;   /*??*/
+            pred_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&pred_edge_iter))
+        {
+            if(vscBV_TestBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(pred_edge)) &&
+               pred_edge - 1 != from_edge1)
+            {
+                *first_from_edge = pred_edge;
+                break;
+            }
+        }
+        gcmASSERT(pred_edge);
+    }
+    *second_from_edge = from_edge1 + 1;
+    result = nodeOnSecondPath;
+
+    _VSC_IS_DepDag_ReturnANodesBV(dag, nodes_bv);
+
+    return result;
 }
 
 static VSC_ErrCode _VSC_IS_MergeDetours(
     IN VSC_IS_InstSched* is,
-    IN OUT VSC_IS_DepDagNode* sub_root
+    IN OUT VSC_IS_DepDagNode* sub_root,
+    IN gctUINT maxDetourInDegree,
+    IN gctUINT maxByPassOutDegree,
+    OUT gctBOOL* detourLeft
     )
 {
-    VSC_ErrCode err_code  = VSC_ERR_NONE;
+    VSC_ErrCode errCode = VSC_ERR_NONE;
     VSC_IS_DepDag* dag = VSC_IS_InstSched_GetCurrDepDag(is);
     VSC_BIT_VECTOR* nodes_bv;
     VSC_BIT_VECTOR* sub_tree_edges_bv;
-    VSC_ADJACENT_LIST* pred_edge_list = VSC_IS_DepDagNode_GetPredEdgeList(sub_root);
+    gctBOOL hasExcluded;
     VSC_IS_DepDagNode* top_nodes_head = gcvNULL;
     VSC_IS_DepDagNode* top_nodes_tail = gcvNULL;
 
-    if(AJLST_GET_EDGE_COUNT(pred_edge_list) <= 1)
+    gcmASSERT(detourLeft);
+
+    if(VSC_IS_DepDagNode_GetInDegree(sub_root) <= 1)
     {
-        return err_code;
+        *detourLeft = gcvFALSE;
+        return errCode;
     }
 
     nodes_bv = _VSC_IS_DepDag_RentANodesBV(dag);
     sub_tree_edges_bv = _VSC_IS_DepDag_RentAEdgesBV(dag);
-    _VSC_IS_DepDagNode_MarkSubTree(sub_root, gcvFALSE, nodes_bv, sub_tree_edges_bv);
+    _VSC_IS_DepDagNode_MarkSubTree(sub_root, gcvFALSE, VSC_IS_DEPDAGNODE_FLAG_NONE, VSC_IS_DEPDAGEDGE_FLAG_NONE, gcvNULL, nodes_bv, sub_tree_edges_bv);
+    hasExcluded = _VSC_IS_FindDetourTopNodes(dag, sub_root, sub_tree_edges_bv, maxDetourInDegree, maxByPassOutDegree, &top_nodes_head, &top_nodes_tail);
     _VSC_IS_DepDag_ReturnANodesBV(dag, nodes_bv);
-    _VSC_IS_FindDetourTopNodes(dag, sub_root, sub_tree_edges_bv, &top_nodes_head, &top_nodes_tail);
 
-    while(top_nodes_head)
+    if(top_nodes_head)
     {
-        VSC_ADJACENT_LIST* succ_edge_list = VSC_IS_DepDagNode_GetSuccEdgeList(top_nodes_head);
-        VSC_UL_ITERATOR succ_edge_iter;
-        VSC_IS_DepDagEdge* succ_edge;
-        VSC_IS_DepDagEdge* first_succ_edge = gcvNULL;
-        VSC_IS_DepDagEdge* second_succ_edge = gcvNULL;
-
-        VSC_ADJACENT_LIST_ITERATOR_INIT(&succ_edge_iter, succ_edge_list);
-        for(succ_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succ_edge_iter);
-            succ_edge != gcvNULL;   /*??*/
-            succ_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succ_edge_iter))
+        while(top_nodes_head)
         {
-            if(vscBV_TestBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(succ_edge)))
-            {
-                if(!first_succ_edge)
-                {
-                    first_succ_edge = succ_edge;
-                }
-                else
-                {
-                    gcmASSERT(!second_succ_edge);
+            VSC_ADJACENT_LIST* succ_edge_list = VSC_IS_DepDagNode_GetSuccEdgeList(top_nodes_head);
+            VSC_UL_ITERATOR succ_edge_iter;
+            VSC_IS_DepDagEdge* succ_edge;
+            VSC_IS_DepDagEdge* first_succ_edge = gcvNULL;
+            VSC_IS_DepDagEdge* second_succ_edge = gcvNULL;
 
-                    second_succ_edge = succ_edge;
+            VSC_ADJACENT_LIST_ITERATOR_INIT(&succ_edge_iter, succ_edge_list);
+            for(succ_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&succ_edge_iter);
+                succ_edge != gcvNULL;   /*??*/
+                succ_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&succ_edge_iter))
+            {
+                if(vscBV_TestBit(sub_tree_edges_bv, VSC_IS_DepDagEdge_GetID(succ_edge)))
+                {
+                    if(!first_succ_edge)
+                    {
+                        first_succ_edge = succ_edge;
+                    }
+                    else if(!second_succ_edge)
+                    {
+                        second_succ_edge = succ_edge;
+                    }
+                }
+            }
+
+            if(first_succ_edge && second_succ_edge)
+            {
+                VSC_BIT_VECTOR* detour_edges_bv = _VSC_IS_DepDag_RentAEdgesBV(dag);
+
+                VSC_IS_DepDagEdge* first_pred_edge = gcvNULL;
+                VSC_IS_DepDagEdge* second_pred_edge = gcvNULL;
+
+                VSC_IS_DepDagNode* new_sub_root =  _VSC_IS_FindFromEdges(dag,
+                                                                            top_nodes_head,
+                                                                            first_succ_edge,
+                                                                            second_succ_edge,
+                                                                            sub_root,
+                                                                            sub_tree_edges_bv,
+                                                                            &first_pred_edge,
+                                                                            &second_pred_edge,
+                                                                            detour_edges_bv/*,
+                                                                            excluded_edges_bv*/);
+
+                gcmASSERT(new_sub_root && first_pred_edge && second_pred_edge);
+
+                errCode = _VSC_IS_MergeDetour(is, top_nodes_head, first_pred_edge, second_pred_edge, new_sub_root, detour_edges_bv, gcvFALSE);
+                _VSC_IS_DepDag_ReturnAEdgesBV(dag, detour_edges_bv);
+
+                if(errCode != VSC_ERR_NONE)
+                {
                     break;
                 }
             }
-        }
-
-        if(first_succ_edge && second_succ_edge)
-        {
-            VSC_BIT_VECTOR* detour_edges_bv = _VSC_IS_DepDag_RentAEdgesBV(dag);
-            VSC_IS_DepDagNode* bottom_node = _VSC_IS_FindBottomNode(dag, first_succ_edge, second_succ_edge, sub_tree_edges_bv, detour_edges_bv);
-            VSC_ADJACENT_LIST* pred_edge_list = VSC_IS_DepDagNode_GetPredEdgeList(bottom_node);
-            VSC_UL_ITERATOR pred_edge_iter;
-            VSC_IS_DepDagEdge* pred_edge;
-            VSC_IS_DepDagEdge* first_pred_edge = gcvNULL;
-            VSC_IS_DepDagEdge* second_pred_edge = gcvNULL;
-
-            VSC_ADJACENT_LIST_ITERATOR_INIT(&pred_edge_iter, pred_edge_list);
-            for(pred_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_FIRST(&pred_edge_iter);
-                pred_edge != gcvNULL;   /*??*/
-                pred_edge = (VSC_IS_DepDagEdge*)VSC_ADJACENT_LIST_ITERATOR_NEXT(&pred_edge_iter))
+            else
             {
-                if(vscBV_TestBit(detour_edges_bv, VSC_IS_DepDagEdge_GetID(pred_edge)))
-                {
-                    if(!first_pred_edge)
-                    {
-                        first_pred_edge = pred_edge;
-                    }
-                    else
-                    {
-                        gcmASSERT(!second_pred_edge);
-
-                        second_pred_edge = pred_edge;
-                        break;
-                    }
-                }
+                top_nodes_head = VSC_IS_DepDagNode_GetNext(top_nodes_head);
             }
-
-            gcmASSERT(first_pred_edge && second_pred_edge);
-
-            err_code = _VSC_IS_MergeDetour(is, top_nodes_head, first_pred_edge, second_pred_edge, bottom_node, sub_tree_edges_bv, detour_edges_bv, gcvFALSE);
-            _VSC_IS_DepDag_ReturnAEdgesBV(dag, detour_edges_bv);
-            if(err_code != VSC_ERR_NONE)
-            {
-                break;
-            }
-        }
-        else
-        {
-            top_nodes_head = VSC_IS_DepDagNode_GetNext(top_nodes_head);
         }
     }
 
     _VSC_IS_DepDag_ReturnAEdgesBV(dag, sub_tree_edges_bv);
 
-    return err_code;
+    if(hasExcluded)
+    {
+        *detourLeft = gcvTRUE;
+    }
+    else
+    {
+        *detourLeft = gcvFALSE;
+    }
+
+    return errCode;
 }
 
 static VSC_ErrCode _VSC_IS_DepDag_RecursivelyMergeDetours(
     IN VSC_IS_InstSched* is,
-    IN OUT VSC_IS_DepDagNode* sub_root
+    IN OUT VSC_IS_DepDagNode* sub_root,
+    IN gctUINT maxDetourInDegree, /* detour in degree is the path count betwenn A and B in detour A-B */
+    IN gctUINT maxByPassOutDegree, /* Bypass out degree is the out degree of a node on the path between A and B in detour A-B, excluding A & B */
+    IN VSC_IS_DepDagNode_Flag triedFlag,
+    OUT gctBOOL* detourLeft
     )
 {
-    VSC_ErrCode err_code  = VSC_ERR_NONE;
+    VSC_ErrCode errCode = VSC_ERR_NONE;
+    gctBOOL predsDetourLeft = gcvFALSE;
+    gctBOOL selfDetourLeft;
 
     VSC_ADJACENT_LIST* pred_edge_list = VSC_IS_DepDagNode_GetPredEdgeList(sub_root);
     VSC_UL_ITERATOR edge_iter;
@@ -3985,17 +4401,30 @@ static VSC_ErrCode _VSC_IS_DepDag_RecursivelyMergeDetours(
     {
         VSC_IS_DepDagNode* pred = VSC_IS_DepDagEdge_GetToNode(pred_edge);
 
-        if(!VSC_IS_DepDagNode_HasFlag(pred, VSC_IS_DEPDAGNODE_FLAG_DETOURS_MERGED))
+        if(!VSC_IS_DepDagNode_HasFlag(pred, triedFlag)
+          )
         {
-            err_code = _VSC_IS_DepDag_RecursivelyMergeDetours(is, pred);
+            gctBOOL result;
+
+            _VSC_IS_DepDag_RecursivelyMergeDetours(is, pred, maxDetourInDegree, maxByPassOutDegree, triedFlag, &result);
+            predsDetourLeft = predsDetourLeft || result;
         }
     }
 
-    _VSC_IS_MergeDetours(is, sub_root);
+    _VSC_IS_MergeDetours(is, sub_root, maxDetourInDegree, maxByPassOutDegree, &selfDetourLeft);
 
-    VSC_IS_DepDagNode_AddFlag(sub_root, VSC_IS_DEPDAGNODE_FLAG_DETOURS_MERGED);
+    if(predsDetourLeft || selfDetourLeft)
+    {
+        *detourLeft = gcvTRUE;
+    }
+    else
+    {
+        *detourLeft = gcvFALSE;
+    }
 
-    return err_code;
+    VSC_IS_DepDagNode_AddFlag(sub_root, triedFlag);
+
+    return errCode;
 }
 
 static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
@@ -4101,6 +4530,9 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                                                         bubble0 - 1,
                                                         gcvTRUE,
                                                         VSC_IS_DepDagNode_GetKillPriority(node1),
+                                                        gcvMAXUINT32,
+                                                        0,
+                                                        gcvMAXUINT32,
                                                         gcvNULL,
                                                         &final_distance,
                                                         gcvNULL,
@@ -4145,6 +4577,9 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                                                         bubble1 - 1,
                                                         gcvTRUE,
                                                         VSC_IS_DepDagNode_GetKillPriority(node0),
+                                                        gcvMAXUINT32,
+                                                        0,
+                                                        gcvMAXUINT32,
                                                         gcvNULL,
                                                         &final_distance,
                                                         gcvNULL,
@@ -4193,6 +4628,9 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                                                          gcvMAXUINT32,
                                                          gcvTRUE,
                                                          VSC_IS_DepDagNode_GetKillPriority(node0),
+                                                         gcvMAXUINT32,
+                                                         0,
+                                                         gcvMAXUINT32,
                                                          gcvNULL,
                                                          &end_node0_distance,
                                                          gcvNULL,
@@ -4203,6 +4641,9 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                                                          gcvMAXUINT32,
                                                          gcvTRUE,
                                                          VSC_IS_DepDagNode_GetKillPriority(node1),
+                                                         gcvMAXUINT32,
+                                                         0,
+                                                         gcvMAXUINT32,
                                                          gcvNULL,
                                                          &end_node1_distance,
                                                          gcvNULL,
@@ -4328,6 +4769,9 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                                                             gcvMAXUINT32,
                                                             gcvFALSE,
                                                             VSC_IS_DepDagNode_GetKillPriority(node0),
+                                                            gcvMAXUINT32,
+                                                            0,
+                                                            gcvMAXUINT32,
                                                             gcvNULL,
                                                             &following_distance0,
                                                             &bubble_sum0,
@@ -4338,6 +4782,9 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
                                                             gcvMAXUINT32,
                                                             gcvFALSE,
                                                             VSC_IS_DepDagNode_GetKillPriority(node1),
+                                                            gcvMAXUINT32,
+                                                            0,
+                                                            gcvMAXUINT32,
                                                             gcvNULL,
                                                             &following_distance1,
                                                             &bubble_sum1,
@@ -4385,7 +4832,7 @@ static VSC_ErrCode _VSC_IS_DepDagNode_MergeBranch(
             _VSC_IS_DepDagEgde_Dump(edge1, dumper);
             _VSC_IS_DepDagNode_DumpList(node1, gcvNULL, gcvFALSE, gcvNULL, dumper);
         }
-        _VSC_IS_DepDagNode_GetNodeOnList(sub_root, gcvFALSE, gcvNULL, gcvMAXUINT32, gcvFALSE, gcvMAXUINT32, gcvNULL, gcvNULL, &bubble_sum, gcvNULL);
+        _VSC_IS_DepDagNode_GetNodeOnList(sub_root, gcvFALSE, gcvNULL, gcvMAXUINT32, gcvFALSE, gcvMAXUINT32, gcvMAXUINT32, 0, gcvMAXUINT32, gcvNULL, gcvNULL, &bubble_sum, gcvNULL);
         VIR_LOG(dumper, "bubble_sum: %d\n", bubble_sum);
         VIR_LOG_FLUSH(dumper);
     }
@@ -4472,8 +4919,14 @@ static VSC_ErrCode _VSC_IS_MergeOnNode(
     )
 {
     VSC_ErrCode err_code  = VSC_ERR_NONE;
+    gctBOOL detourLeft;
 
-    err_code = _VSC_IS_DepDag_RecursivelyMergeDetours(is, sub_root);
+    err_code = _VSC_IS_DepDag_RecursivelyMergeDetours(is, sub_root, 4, 4, VSC_IS_DEPDAGNODE_FLAG_1ST_TIME_DETOURS_TRIED, &detourLeft);
+    if(detourLeft)
+    {
+        err_code = _VSC_IS_DepDag_RecursivelyMergeDetours(is, sub_root, gcvMAXUINT32, gcvMAXUINT32, VSC_IS_DEPDAGNODE_FLAG_2nd_DETOURS_TRIED, &detourLeft);
+    }
+    gcmASSERT(!detourLeft);
     err_code = _VSC_IS_RecursivelyMergeFork(is, sub_root);
 
     return err_code;
@@ -4514,7 +4967,7 @@ static VSC_ErrCode _VSC_IS_DoBubbleScheduling(
             gctUINT bubble_sum;
             VIR_Dumper* dumper = VSC_IS_InstSched_GetDumper(is);
 
-            _VSC_IS_DepDagNode_GetNodeOnList(tail_node, gcvFALSE, gcvNULL, gcvMAXUINT32, gcvFALSE, gcvMAXUINT32, gcvNULL, gcvNULL, &bubble_sum, gcvNULL);
+            _VSC_IS_DepDagNode_GetNodeOnList(tail_node, gcvFALSE, gcvNULL, gcvMAXUINT32, gcvFALSE, gcvMAXUINT32, gcvMAXUINT32, 0, gcvMAXUINT32, gcvNULL, gcvNULL, &bubble_sum, gcvNULL);
             VIR_LOG(dumper, "BB(%d)'s bubble sum: %d.\n", BB_GET_ID(bb), bubble_sum);
             VIR_LOG_FLUSH(dumper);
         }
@@ -4590,6 +5043,32 @@ static gctBOOL _VSC_IS_IsBandwidthRatioMetForBB(
         len > (memld_count * (VSC_IS_InstSched_GetMemldInterfaceBubble(is) + 1)) + 1;
 }
 
+static gctBOOL _VSC_IS_ContainsVXInBB(
+    IN OUT VSC_IS_InstSched* is
+    )
+{
+    VIR_BASIC_BLOCK* bb = VSC_IS_InstSched_GetCurrBB(is);
+    VIR_Instruction *start_inst, *end_inst;
+    VIR_Instruction* inst;
+    gctUINT32 i, len;
+
+    len = _VSC_IS_GetBBEssence(bb, &start_inst, &end_inst);
+
+    for(i = 0, inst = start_inst; i < len; i++, inst = VIR_Inst_GetNext(inst))
+    {
+        VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
+
+        if(VIR_OPCODE_isVX(opcode) &&
+           opcode != VIR_OP_VX_IMG_LOAD &&
+           opcode != VIR_OP_VX_IMG_LOAD_3D)
+        {
+            return gcvTRUE;
+        }
+    }
+
+    return gcvFALSE;
+}
+
 static VSC_ErrCode _VSC_IS_DoInstructionSchedulingForBB(
     IN OUT VSC_IS_InstSched* is
     )
@@ -4625,6 +5104,18 @@ static VSC_ErrCode _VSC_IS_DoInstructionSchedulingForBB(
             VIR_LOG(dumper, "%s\nInstruction Scheduling End for BB %d\n%s\n",
                 VSC_TRACE_STAR_LINE, VSC_IS_InstSched_GetCurrBB(is)->dgNode.id, VSC_TRACE_STAR_LINE);
             VIR_LOG(dumper, "Not scheduled because the bandwidth ratio is not met.\n");
+        }
+        return err_code;
+    }
+
+    if(!VSC_OPTN_ISOptions_GetVXOn(options) && _VSC_IS_ContainsVXInBB(is))
+    {
+        if(VSC_UTILS_MASK(VSC_OPTN_ISOptions_GetTrace(options), VSC_OPTN_ISOptions_TRACE_OUTPUT_BB))
+        {
+            VIR_Dumper* dumper = VSC_IS_InstSched_GetDumper(is);
+            VIR_LOG(dumper, "%s\nInstruction Scheduling End for BB %d\n%s\n",
+                VSC_TRACE_STAR_LINE, VSC_IS_InstSched_GetCurrBB(is)->dgNode.id, VSC_TRACE_STAR_LINE);
+            VIR_LOG(dumper, "Not scheduled because it contains VX instructions.\n");
         }
         return err_code;
     }
@@ -4758,19 +5249,7 @@ DEF_QUERY_PASS_PROP(VSC_IS_InstSched_PerformOnShader)
 {
     pPassProp->supportedLevels = VSC_PASS_LEVEL_CG;
     pPassProp->memPoolSel = VSC_PASS_MEMPOOL_SEL_PRIVATE_PMP;
-
-    if (*(gctUINT*)pPrvData == PRE_PASS_IS)
-    {
-        pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_PRE_RA_IS;
-    }
-    else if (*(gctUINT*)pPrvData == PST_PASS_IS)
-    {
-        pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_POST_RA_IS;
-    }
-    else
-    {
-        gcmASSERT(gcvFALSE);
-    }
+    pPassProp->passOptionType = VSC_PASS_OPTN_TYPE_IS;
 
     pPassProp->passFlag.resCreationReq.s.bNeedDu = gcvTRUE;
 }
@@ -4873,9 +5352,17 @@ void _VSC_IS_DepDagNode_Dump(
         {
             VIR_LOG(dumper, "Depending_MOVA ");
         }
-        if(VSC_IS_DepDagNode_HasFlag(node, VSC_IS_DEPDAGNODE_FLAG_DETOURS_MERGED))
+        if(VSC_IS_DepDagNode_HasFlag(node, VSC_IS_DEPDAGNODE_FLAG_1ST_TIME_DETOURS_TRIED))
         {
-            VIR_LOG(dumper, "Detours_Merged ");
+            VIR_LOG(dumper, "4_Detours_Tried ");
+        }
+        if(VSC_IS_DepDagNode_HasFlag(node, VSC_IS_DEPDAGNODE_FLAG_2nd_DETOURS_TRIED))
+        {
+            VIR_LOG(dumper, "All_Detours_Tried ");
+        }
+        if(VSC_IS_DepDagNode_HasFlag(node, VSC_IS_DEPDAGNODE_FLAG_ALL_DETOURS_DONE))
+        {
+            VIR_LOG(dumper, "All_Detours_Done ");
         }
         if(VSC_IS_DepDagNode_HasFlag(node, VSC_IS_DEPDAGNODE_FLAG_FORK_MERGED))
         {
@@ -5164,6 +5651,8 @@ static void _VSC_IS_DepDag_Dump(
 {
     VSC_DG_ITERATOR iter;
     VSC_IS_DepDagNode* node;
+
+    VIR_LOG(dumper, "dependence graph:\n");
 
     vscDG_ITERATOR_Initialize(&iter, VSC_IS_DepDag_GetDGraph(dag),
         VSC_GRAPH_SEARCH_MODE_BREADTH_FIRST_WIDE, VSC_GRAPH_TRAVERSAL_ORDER_PREV, gcvFALSE);

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -333,6 +333,7 @@ struct _sloCOMPILER
         gctUINT                 labelCount;
         gctBOOL                 loadingGeneralBuiltIns;
         gctBOOL                 loadingBuiltIns;
+        gctBOOL                 redeclareBuiltInVar;
         gctBOOL                 mainDefined;
         gctBOOL                 debug;
         gctBOOL                 optimize;
@@ -348,6 +349,8 @@ struct _sloCOMPILER
            slsDLINK_LIST        typeBool[sldMAX_VECTOR_COMPONENT];
         } vecConstants;
         slsSLINK_LIST           sharedVariables;
+        /* Use it to save the name of a type. */
+        slsDLINK_LIST           dataTypeNameList;
         gceSTATUS               hasNotStagesRelatedLinkError;
         sleCOMPILER_FLAGS       compilerFlags;
         VSC_DIContext *         debugInfo;

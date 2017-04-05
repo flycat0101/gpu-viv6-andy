@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2016 Vivante Corporation
+*    Copyright (c) 2014 - 2017 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2016 Vivante Corporation
+*    Copyright (C) 2014 - 2017 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -1963,6 +1963,7 @@ gckEVENT_Commit(
     gcsQUEUE_PTR record = gcvNULL, next;
     gctUINT32 processID;
     gctBOOL needCopy = gcvFALSE;
+    gctPOINTER pointer = gcvNULL;
 
     gcmkHEADER_ARG("Event=0x%x Queue=0x%x", Event, Queue);
 
@@ -1993,7 +1994,6 @@ gckEVENT_Commit(
         }
         else
         {
-            gctPOINTER pointer = gcvNULL;
 
             /* Map record into kernel memory. */
             gcmkONERROR(gckOS_MapUserPointer(Event->os,
@@ -2033,13 +2033,13 @@ gckEVENT_Commit(
     return gcvSTATUS_OK;
 
 OnError:
-    if ((record != gcvNULL) && !needCopy)
+    if (pointer)
     {
         /* Roll back. */
         gcmkVERIFY_OK(gckOS_UnmapUserPointer(Event->os,
                                              Queue,
                                              gcmSIZEOF(gcsQUEUE),
-                                             (gctPOINTER *) record));
+                                             (gctPOINTER*)pointer));
     }
 
     /* Return the status. */
@@ -2620,8 +2620,7 @@ gckEVENT_Notify(
                 /* Write data. */
                 gcmkERR_BREAK(
                     gckOS_WriteMemory(Event->os,
-                                      (gctPOINTER)
-                                          record->info.u.WriteData.address,
+                                      gcmUINT64_TO_PTR(record->info.u.WriteData.address),
                                       record->info.u.WriteData.data));
 #endif
                 break;

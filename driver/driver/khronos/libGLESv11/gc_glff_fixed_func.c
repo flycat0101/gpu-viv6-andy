@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -469,7 +469,6 @@ static gceSTATUS _LoadUniforms(
     {
         ubPtr = ShaderControl->logicalAddress;
     }
-    /*todo: now we just only have default ubo uniform*/
     else if (uboCount == 1 && Context->programDirty)
     {
         gcsUNIFORM_BLOCK uniformBlock;

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -396,7 +396,6 @@ _Free(
     gcoOS_Free(gcvNULL, ptr);
 }
 
-/* TODO: For windows only */
 static void
 _CreateUserMutex(
     VEGLLock *mp
@@ -971,6 +970,9 @@ eglCreateContext(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     /* Test for valid config. */
     if (((EGLint)(intptr_t)config <= __EGL_INVALID_CONFIG__)
     ||  ((EGLint)(intptr_t)config > dpy->configCount)
@@ -1134,6 +1136,11 @@ eglCreateContext(
         gceCHIPMODEL chipModel;
         gctUINT32 chipRevision;
         EGLenum renderableType = eglConfig->renderableType;
+#if defined(ANDROID)
+        gctSTRING esVersion = gcvNULL;
+        gcePATCH_ID patchId = gcvPATCH_INVALID;
+        gcmVERIFY_OK(gcoHAL_GetPatchID(gcvNULL, &patchId));
+#endif
 
         switch (major)
         {
@@ -1165,7 +1172,14 @@ eglCreateContext(
                 match = (minor >= 0 && minor <= 1) ? EGL_TRUE : EGL_FALSE;
             }
             /* Halti0 HW support ES30 only */
+#if defined(ANDROID)
+            else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI0) &&
+                    !(((patchId == gcvPATCH_ANTUTU6X) || (patchId == gcvPATCH_ANTUTU3DBench))
+                    && (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "ro.opengles.version", &esVersion)) &&
+                    esVersion && gcmIS_SUCCESS(gcoOS_StrCmp(esVersion, "131072")))))
+#else
             else if (gcoHAL_IsFeatureAvailable(NULL, gcvFEATURE_HALTI0))
+#endif
             {
                 match = (minor == 0) ? EGL_TRUE : EGL_FALSE;
             }
@@ -1575,6 +1589,9 @@ veglDestroyContext(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     /* Find the context object on the stack. */
     ctx = (VEGLContext)veglGetResObj(dpy,
                                      (VEGLResObj*)&dpy->contextStack,
@@ -1672,6 +1689,9 @@ veglMakeCurrent(
         gcmFOOTER_ARG("%d", EGL_FALSE);
         return EGL_FALSE;
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     /* Get shortcut. */
     platform = dpy->platform;
@@ -2843,9 +2863,6 @@ veglSyncNative(
     _SyncSwapWorker(Thread, Dpy);
 }
 
-/*
-** TODO: need refine about looking up current display
-*/
 /* Callback function exported for client. */
 void
 _SyncNative(
@@ -2889,6 +2906,9 @@ EGLBoolean veglWaitClient(
     }
     else
     {
+        /* Hardware relevant thread data initialization. */
+        veglInitDeviceThreadData(thread);
+
         result = _Flush(thread);
 
         if (result)

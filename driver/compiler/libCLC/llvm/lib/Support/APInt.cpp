@@ -1772,13 +1772,16 @@ void APInt::divide(const APInt LHS, unsigned lhsWords,
   unsigned *V = 0;
   unsigned *Q = 0;
   unsigned *R = 0;
+  bool allocatedUVQR;
   if ((Remainder?4:3)*n+2*m+1 <= 128) {
+    allocatedUVQR = false;
     U = &SPACE[0];
     V = &SPACE[m+n+1];
     Q = &SPACE[(m+n+1) + n];
     if (Remainder)
       R = &SPACE[(m+n+1) + n + (m+n)];
   } else {
+    allocatedUVQR = true;
     U = new unsigned[m + n + 1];
     V = new unsigned[n];
     Q = new unsigned[m+n];
@@ -1916,11 +1919,12 @@ void APInt::divide(const APInt LHS, unsigned lhsWords,
   }
 
   // Clean up the memory we allocated.
-  if (U != &SPACE[0]) {
+  if (allocatedUVQR) {
     delete [] U;
     delete [] V;
     delete [] Q;
-    delete [] R;
+    if (R)
+        delete [] R;
   }
 }
 

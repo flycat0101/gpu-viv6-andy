@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -107,6 +107,9 @@ typedef struct __GLdevicePipelineRec
     GLboolean (*compressedTexSubImage2D)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLint, GLint, GLint, GLint, const GLvoid*, GLsizei);
     GLboolean (*compressedTexSubImage3D)(__GLcontext*, __GLtextureObject*, GLint, GLint, GLint, GLint, GLint, GLint, GLint, const GLvoid*, GLsizei);
     GLboolean (*generateMipmaps)(__GLcontext*, __GLtextureObject*, GLint, GLint*);
+#ifdef OPENGL40
+    GLboolean (*getCompressedTexImage)(__GLcontext*, __GLtextureObject*, __GLmipMapLevel *, GLint , GLvoid *);
+#endif
 
     GLboolean (*copyTexBegin)(__GLcontext*);
     GLvoid (*copyTexValidateState)(__GLcontext *);

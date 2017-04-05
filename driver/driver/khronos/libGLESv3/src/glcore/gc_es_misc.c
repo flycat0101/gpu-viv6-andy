@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -278,8 +278,6 @@ __GL_INLINE GLboolean __glClearBegin(__GLcontext *gc, GLbitfield *mask)
 
 __GL_INLINE GLvoid __glClearValidateState(__GLcontext *gc, GLbitfield mask)
 {
-    /* TODO: check dirty bits before calling to dp function */
-
     (*gc->dp.clearValidateState)(gc, mask);
 }
 
@@ -787,11 +785,6 @@ GLenum GL_APIENTRY __gles_ClientWaitSync(__GLcontext *gc, GLsync sync, GLbitfiel
     /* Call dp function to wait sync */
     ret = (*gc->dp.waitSync)(gc, syncObj, timeout);
 
-    /*
-    ** TODO: Spec requires "deletion is deferred until the sync object is signaled
-    ** and all blocked GL clients and servers are unblocked"
-    ** How about if a certain wait fails or timeout?
-    */
     if ((--syncObj->waitCount) == 0 && (syncObj->objFlag & __GL_OBJECT_IS_DELETED))
     {
         __glDeleteSyncObj(gc, syncObj);

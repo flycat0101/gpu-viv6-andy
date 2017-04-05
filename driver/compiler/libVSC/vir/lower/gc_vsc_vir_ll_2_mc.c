@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -443,8 +443,8 @@ static VIR_PatternMatchInst _cmovPatInst0[] = {
    Using SELMSB, we can resolve the issue that select has one instruction type to control
    comparison and implicit converstion */
 static VIR_PatternReplaceInst _cmovRepInst0[] = {
-    { VIR_OP_CMP, -1, 0, { -1, 2, 3, 0 }, { _setIntegerType } },
-    { VIR_OP_SELECT, VIR_COP_SELMSB, 0, {  1, -1, 4, 1 }, { 0 } }
+    { VIR_OP_COMPARE, -1, 0, { -1, 2, 3, 0 }, { _setIntegerType } },
+    { VIR_OP_CSELECT, VIR_COP_SELMSB, 0, {  1, -1, 4, 1 }, { 0 } }
 };
 
 static VIR_Pattern _cmovPattern[] = {
@@ -470,8 +470,8 @@ static VIR_PatternMatchInst _madPatInst0[] = {
 };
 
 static VIR_PatternReplaceInst _madRepInst0[] = {
-    { VIR_OP_AQ_IMADLO0, 0, 0, { 1, 2, 3, 4 }, { 0 } },
-    { VIR_OP_AQ_IMADLO1, 0, 0, { 1, 2, 3, 4 }, { 0 } }
+    { VIR_OP_IMADLO0, 0, 0, { 1, 2, 3, 4 }, { 0 } },
+    { VIR_OP_IMADLO1, 0, 0, { 1, 2, 3, 4 }, { 0 } }
 };
 
 static VIR_PatternMatchInst _madPatInst1[] = {
@@ -479,7 +479,7 @@ static VIR_PatternMatchInst _madPatInst1[] = {
 };
 
 static VIR_PatternReplaceInst _madRepInst1[] = {
-    { VIR_OP_AQ_IMADLO0, 0, 0, { 1, 2, 3, 4 }, { 0 } },
+    { VIR_OP_IMADLO0, 0, 0, { 1, 2, 3, 4 }, { 0 } },
 };
 
 static VIR_Pattern _madPattern[] = {
@@ -489,19 +489,19 @@ static VIR_Pattern _madPattern[] = {
 };
 
 static VIR_PatternMatchInst _cmpPatInst0[] = {
-    { VIR_OP_CMP, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsFloatOpcode }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsFloatOpcode }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _cmpRepInst0[] = {
-    { VIR_OP_AQ_CMP, -1, 0, {  1, 2, 3, 0 }, { 0, 0, 0, VIR_Lower_SetOne } }
+    { VIR_OP_CMP, -1, 0, {  1, 2, 3, 0 }, { 0, 0, 0, VIR_Lower_SetOne } }
 };
 
 static VIR_PatternMatchInst _cmpPatInst1[] = {
-    { VIR_OP_CMP, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_COMPARE, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _cmpRepInst1[] = {
-    { VIR_OP_AQ_CMP, -1, 0, { 1, 2, 3, 0 }, { 0, 0, 0, VIR_Lower_SetIntMinusOne } }
+    { VIR_OP_CMP, -1, 0, { 1, 2, 3, 0 }, { 0, 0, 0, VIR_Lower_SetIntMinusOne } }
 };
 
 static VIR_Pattern _cmpPattern[] = {
@@ -511,11 +511,11 @@ static VIR_Pattern _cmpPattern[] = {
 };
 
 static VIR_PatternMatchInst _selectPatInst0[] = {
-    { VIR_OP_SELECT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 }, VIR_PATN_MATCH_FLAG_OR},
+    { VIR_OP_CSELECT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 }, VIR_PATN_MATCH_FLAG_OR},
 };
 
 static VIR_PatternReplaceInst _selectRepInst0[] = {
-    { VIR_OP_AQ_SELECT, -1, 0, {  1, 2, 3, 4 }, { 0 } }
+    { VIR_OP_SELECT, -1, 0, {  1, 2, 3, 4 }, { 0 } }
 };
 
 static VIR_Pattern _selectPattern[] = {
@@ -524,7 +524,7 @@ static VIR_Pattern _selectPattern[] = {
 };
 
 static VIR_PatternMatchInst _convPatInst0[] = {
-    { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _sameType }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _sameType }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _convRepInst0[] = {
@@ -532,39 +532,39 @@ static VIR_PatternReplaceInst _convRepInst0[] = {
 };
 
 static VIR_PatternMatchInst _convPatInst1[] = {
-    { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isF2I }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isF2I }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _convRepInst1[] = {
-    { VIR_OP_AQ_F2I, -1, 0, { 1, 2, 0, 0 }, { 0 } }
+    { VIR_OP_F2I, -1, 0, { 1, 2, 0, 0 }, { 0 } }
 };
 
 static VIR_PatternMatchInst _convPatInst2[] = {
-    { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isF2IRnd }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isF2IRnd }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _convRepInst2[] = {
-    { VIR_OP_AQ_F2IRND, -1, 0, { 1, 2, 0, 0 }, { 0 } }
+    { VIR_OP_F2IRND, -1, 0, { 1, 2, 0, 0 }, { 0 } }
 };
 
 static VIR_PatternMatchInst _convPatInst3[] = {
-    { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isI2F }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isI2F }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _convRepInst3[] = {
-    { VIR_OP_AQ_I2F, -1, 0, { 1, 2, 0, 0 }, { 0 } }
+    { VIR_OP_I2F, -1, 0, { 1, 2, 0, 0 }, { 0 } }
 };
 
 static VIR_PatternMatchInst _convPatInst4[] = {
-    { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isI2I, _hasSHEnhancements2, _notSameSizeType }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isI2I, _hasSHEnhancements2, _notSameSizeType }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _convRepInst4[] = {
-    { VIR_OP_AQ_I2I, -1, 0, { 1, 2, 0, 0 }, { _setI2I } }
+    { VIR_OP_I2I, -1, 0, { 1, 2, 0, 0 }, { _setI2I } }
 };
 
 static VIR_PatternMatchInst _convPatInst5[] = {
-    { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isI2I }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isI2I }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _convRepInst5[] = {
@@ -572,11 +572,11 @@ static VIR_PatternReplaceInst _convRepInst5[] = {
 };
 
 static VIR_PatternMatchInst _convPatInst6[] = {
-    { VIR_OP_CONV, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_CONVERT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _convRepInst6[] = {
-    { VIR_OP_AQ_CONV, -1, 0, { 1, 2, 0, 0 }, { _setConv } }
+    { VIR_OP_CONV, -1, 0, { 1, 2, 0, 0 }, { _setConv } }
 };
 
 static VIR_Pattern _convPattern[] = {
@@ -592,11 +592,11 @@ static VIR_Pattern _convPattern[] = {
 
 
 static VIR_PatternMatchInst _setPatInst0[] = {
-    { VIR_OP_AQ_SET, VIR_COP_EQUAL, 0, { 1, 2, 3, 0 }, { _shouldSetHelper }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_SET, VIR_COP_EQUAL, 0, { 1, 2, 3, 0 }, { _shouldSetHelper }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _setRepInst0[] = {
-    { VIR_OP_AQ_SET, VIR_COP_HELPER, 0, { 1, 2, 3, 0 }, { 0 } }
+    { VIR_OP_SET, VIR_COP_HELPER, 0, { 1, 2, 3, 0 }, { 0 } }
 };
 
 static VIR_Pattern _setPattern[] = {
@@ -625,13 +625,22 @@ static VIR_PatternReplaceInst _absRepInst0[] = {
     { VIR_OP_ADD, -1, 0, { 1, 0, 2, 0 }, { 0, VIR_Lower_SetZero, _setAbs } }
 };
 
+static VIR_PatternMatchInst _absPatInst1[] = {
+    { VIR_OP_ABS, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { 0, VIR_Lower_IsSrc0Unsigned }, VIR_PATN_MATCH_FLAG_OR },
+};
+
+static VIR_PatternReplaceInst _absRepInst1[] = {
+    { VIR_OP_MOV, -1, 0, { 1, 2, 0, 0 }, { 0 } }
+};
+
 static VIR_Pattern _absPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_abs, 0) },
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_abs, 1) },
     { VIR_PATN_FLAG_NONE }
 };
 
 static VIR_PatternMatchInst _mulhiSclPatInst0[] = {
-    { VIR_OP_MULHI, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_MULHI, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsDstInt32 }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _mulhiSclRepInst0[] = {
@@ -644,7 +653,7 @@ static VIR_Pattern _mulhiSclPattern[] = {
 };
 
 static VIR_PatternMatchInst _mulloSclPatInst0[] = {
-    { VIR_OP_MULLO, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { 0 }, VIR_PATN_MATCH_FLAG_AND },
+    { VIR_OP_MULLO, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsDstInt32 }, VIR_PATN_MATCH_FLAG_AND },
 };
 
 static VIR_PatternReplaceInst _mulloSclRepInst0[] = {
@@ -959,6 +968,120 @@ static VIR_Pattern _addPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
+static gctBOOL
+_isSrc1Imm(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Operand * src1 = VIR_Inst_GetSource(Inst, 1);
+    if (VIR_Operand_GetOpKind(src1) != VIR_OPND_IMMEDIATE)
+    {
+        return gcvFALSE;
+    }
+    return gcvTRUE;
+}
+
+static gctBOOL
+_createUniform(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_TypeId    tyId;
+    gctUINT imm = 0;
+    VIR_Uniform*       pImmUniform;
+    VIR_Symbol*        sym;
+    VIR_Swizzle        swizzle = VIR_SWIZZLE_XXXX;
+    VIR_Const          vConst;
+
+    if (VIR_Operand_GetOpKind(Opnd) == VIR_OPND_IMMEDIATE)
+    {
+        tyId = VIR_Operand_GetType(Opnd);
+        if (VIR_TypeId_isPrimitive(tyId))
+        {
+            if (VIR_TypeId_isSignedInteger(tyId))
+            {
+                imm = (gctUINT)VIR_Operand_GetImmediateInt(Opnd);
+            }
+            else if (VIR_TypeId_isUnSignedInteger(tyId))
+            {
+                imm = VIR_Operand_GetImmediateUint(Opnd);
+            }
+        }
+        else
+        {
+            gcmASSERT(gcvFALSE);
+            return gcvFALSE;
+        }
+
+        vConst.type = VIR_GetTypeComponentType(tyId);
+        /* populate all 32bit with correct bits for packed type data */
+        if (VIR_TypeId_isPacked(tyId))
+        {
+            switch (VIR_GetTypeSize(vConst.type)) {
+            case 1:
+                imm |= imm << 8;
+                imm |= imm << 16;
+                break;
+            case 2:
+                imm |= imm << 16;
+                break;
+            default:
+                break;
+            }
+        }
+        vConst.value.scalarVal.uValue = imm;
+        vConst.index = VIR_INVALID_ID;
+
+        VIR_Shader_AddInitializedUniform(Context->shader, &vConst, &pImmUniform, &swizzle);
+
+        /* Set this uniform as operand and set correct swizzle */
+        sym = VIR_Shader_GetSymFromId(Context->shader, pImmUniform->sym);
+        VIR_Operand_SetOpKind(Opnd, VIR_OPND_SYMBOL);
+        VIR_Operand_SetSym(Opnd, sym);
+        VIR_Operand_SetSwizzle(Opnd, swizzle);
+   }
+    return gcvTRUE;
+}
+
+static VIR_PatternMatchInst _subSatPatInst0[] = {
+    { VIR_OP_SUBSAT, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsDstInt, _isSrc1Imm }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _subSatRepInst0[] = {
+    { VIR_OP_SUBSAT, 0, 0, { 1, 2, 3, 0 }, { 0, 0, _createUniform } },
+};
+
+static VIR_Pattern _subSatPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_subSat, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
+static gctBOOL
+_noFMASupport(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return !gcHWCaps.hwFeatureFlags.supportAdvancedInsts;
+}
+
+static VIR_PatternMatchInst _fmaPatInst0[] = {
+    { VIR_OP_FMA, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { _noFMASupport }, VIR_PATN_MATCH_FLAG_AND },
+};
+
+static VIR_PatternReplaceInst _fmaRepInst0[] = {
+    { VIR_OP_MUL, 0, 0, { 1, 2, 3, 0 }, { 0, 0, 0 } },
+    { VIR_OP_ADD, 0, 0, { 1, 1, 4, 0 }, { 0, 0, 0 } },
+};
+
+static VIR_Pattern _fmaPattern[] = {
+    { VIR_PATN_FLAG_NONE, CODEPATTERN(_fma, 0) },
+    { VIR_PATN_FLAG_NONE }
+};
+
 static VIR_PatternMatchInst _addSclPatInst0[] = {
     { VIR_OP_ADD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 0 }, { VIR_Lower_IsDstInt32, _isCL_X }, VIR_PATN_MATCH_FLAG_AND },
 };
@@ -971,7 +1094,6 @@ static VIR_Pattern _addSclPattern[] = {
     { VIR_PATN_FLAG_EXPAND_COMPONENT_INLINE | VIR_PATN_FLAG_EXPAND_MODE_COMPONENT_O2O, CODEPATTERN(_addScl, 0) },
     { VIR_PATN_FLAG_NONE }
 };
-
 
 static VIR_PatternMatchInst _madSclPatInst0[] = {
     { VIR_OP_MAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsIntOpcode }, VIR_PATN_MATCH_FLAG_OR },
@@ -1001,11 +1123,11 @@ static VIR_Pattern _madsatSclPattern[] = {
 };
 
 static VIR_PatternMatchInst _imadhi0SclPatInst0[] = {
-    { VIR_OP_AQ_IMADHI0, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_IMADHI0, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsDstNotIntPacked }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _imadhi0SclRepInst0[] = {
-    { VIR_OP_AQ_IMADHI0, 0, 0, { 1, 2, 3, 4 }, { 0 } },
+    { VIR_OP_IMADHI0, 0, 0, { 1, 2, 3, 4 }, { 0 } },
 };
 
 static VIR_Pattern _imadhi0SclPattern[] = {
@@ -1015,11 +1137,11 @@ static VIR_Pattern _imadhi0SclPattern[] = {
 
 
 static VIR_PatternMatchInst _imadhi1SclPatInst0[] = {
-    { VIR_OP_AQ_IMADHI1, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { 0 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_IMADHI1, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsDstNotIntPacked }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _imadhi1SclRepInst0[] = {
-    { VIR_OP_AQ_IMADHI1, 0, 0, { 1, 2, 3, 4 }, { 0 } },
+    { VIR_OP_IMADHI1, 0, 0, { 1, 2, 3, 4 }, { 0 } },
 };
 
 static VIR_Pattern _imadhi1SclPattern[] = {
@@ -1028,11 +1150,11 @@ static VIR_Pattern _imadhi1SclPattern[] = {
 };
 
 static VIR_PatternMatchInst _imadlo0SclPatInst0[] = {
-    { VIR_OP_AQ_IMADLO0, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsDstInt32 }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_IMADLO0, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4 }, { VIR_Lower_IsDstInt32 }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _imadlo0SclRepInst0[] = {
-    { VIR_OP_AQ_IMADLO0, 0, 0, { 1, 2, 3, 4 }, { 0 } },
+    { VIR_OP_IMADLO0, 0, 0, { 1, 2, 3, 4 }, { 0 } },
 };
 
 static VIR_Pattern _imadlo0SclPattern[] = {
@@ -1041,11 +1163,11 @@ static VIR_Pattern _imadlo0SclPattern[] = {
 };
 
 static VIR_PatternMatchInst _f2iSclPatInst0[] = {
-    { VIR_OP_AQ_F2I, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isCL_X }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_F2I, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isCL_X }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _f2iSclRepInst0[] = {
-    { VIR_OP_AQ_F2I, 0, 0, { 1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_F2I, 0, 0, { 1, 2, 0, 0 }, { 0 } },
 };
 
 static VIR_Pattern _f2iSclPattern[] = {
@@ -1055,11 +1177,11 @@ static VIR_Pattern _f2iSclPattern[] = {
 
 
 static VIR_PatternMatchInst _f2irndSclPatInst0[] = {
-    { VIR_OP_AQ_F2IRND, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isCL_X }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_F2IRND, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isCL_X }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _f2irndSclRepInst0[] = {
-    { VIR_OP_AQ_F2IRND, 0, 0, { 1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_F2IRND, 0, 0, { 1, 2, 0, 0 }, { 0 } },
 };
 
 static VIR_Pattern _f2irndSclPattern[] = {
@@ -1068,11 +1190,11 @@ static VIR_Pattern _f2irndSclPattern[] = {
 };
 
 static VIR_PatternMatchInst _i2fSclPatInst0[] = {
-    { VIR_OP_AQ_I2F, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isCL_X }, VIR_PATN_MATCH_FLAG_OR },
+    { VIR_OP_I2F, VIR_PATTERN_ANYCOND, 0, { 1, 2, 0, 0 }, { _isCL_X }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _i2fSclRepInst0[] = {
-    { VIR_OP_AQ_I2F, 0, 0, { 1, 2, 0, 0 }, { 0 } },
+    { VIR_OP_I2F, 0, 0, { 1, 2, 0, 0 }, { 0 } },
 };
 
 static VIR_Pattern _i2fSclPattern[] = {
@@ -1145,7 +1267,7 @@ static VIR_PatternMatchInst _logicalNotSclPatInst0[] = {
 };
 
 static VIR_PatternReplaceInst _logicalNotSclRepInst0[] = {
-    { VIR_OP_AQ_SELECT, VIR_COP_NOT_ZERO, 0, { 1, 2, 0, 0 }, { 0, 0, _constb_false, _constb_true } },
+    { VIR_OP_SELECT, VIR_COP_NOT_ZERO, 0, { 1, 2, 0, 0 }, { 0, 0, _constb_false, _constb_true } },
 };
 
 static VIR_Pattern _logicalNotSclPattern[] = {
@@ -1443,78 +1565,17 @@ static VIR_Pattern _normPattern[] = {
     { VIR_PATN_FLAG_NONE }
 };
 
-static
-gctBOOL _needSetConstBorderValue(
-    IN VIR_PatternContext   *Context,
-    IN VIR_Instruction      *Inst
-    )
-{
-    return gcmOPT_hasFeature(FB_ENABLE_CONST_BORDER);
-}
-
-static gctBOOL
-_setConstBorderValue(
-    IN VIR_PatternContext *Context,
-    IN VIR_Instruction    *Inst,
-    IN VIR_Operand        *Opnd
-    )
-{
-    VIR_Shader *  shader = Context->shader;
-    VIR_Uniform * uniform = VIR_Shader_GetConstBorderValueUniform(shader);
-    VIR_TypeId    tyId = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
-    VIR_TypeId    compTyId;
-    VIR_Swizzle   swizzle = VIR_SWIZZLE_XXXX;
-
-    VIR_Operand_SetLvalue(Opnd, 0);
-    VIR_Operand_SetUniform(Opnd, uniform, shader);
-    /* set swizzle by dest's type: U8 => .x, U16 => .y, U32 => .z, F32 => .w */
-    compTyId = VIR_GetTypeComponentType(tyId);
-    switch(compTyId) {
-    case VIR_TYPE_UINT8:
-    case VIR_TYPE_INT8:
-        swizzle = VIR_SWIZZLE_XXXX;
-        break;
-    case VIR_TYPE_UINT16:
-    case VIR_TYPE_INT16:
-        swizzle = VIR_SWIZZLE_YYYY;
-        break;
-    case VIR_TYPE_UINT32:
-    case VIR_TYPE_INT32:
-        swizzle = VIR_SWIZZLE_ZZZZ;
-        break;
-    case VIR_TYPE_FLOAT32:
-        swizzle = VIR_SWIZZLE_WWWW;
-        break;
-    default:
-        break;
-    }
-
-    VIR_Operand_SetSwizzle(Opnd, swizzle);
-
-    return gcvTRUE;
-}
-
 static VIR_PatternMatchInst _vxImgLoadPatInst0[] = {
     { VIR_OP_VX_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, {_isSrc1FloatType }, VIR_PATN_MATCH_FLAG_OR },
 };
 
 static VIR_PatternReplaceInst _vxImgLoadRepInst0[] = {
-    { VIR_OP_CONV, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXY } },
+    { VIR_OP_CONVERT, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXY } },
     { VIR_OP_VX_IMG_LOAD, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
-};
-
-static VIR_PatternMatchInst _vxImgLoadPatInst1[] = {
-    { VIR_OP_VX_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, { _needSetConstBorderValue }, VIR_PATN_MATCH_FLAG_OR },
-};
-
-static VIR_PatternReplaceInst _vxImgLoadRepInst1[] = {
-    { VIR_OP_MOV, 0, 0, {  1, 0, 0 ,0 }, {0, _setConstBorderValue } },
-    { VIR_OP_VX_IMG_LOAD, 0, 0, {  1, 2, 3, 4, 5 }, { 0 } },
 };
 
 static VIR_Pattern _vxImgLoadPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad, 0) },
-    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad, 1) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -1523,22 +1584,12 @@ static VIR_PatternMatchInst _vxImgLoad3DPatInst0[] = {
 };
 
 static VIR_PatternReplaceInst _vxImgLoad3DRepInst0[] = {
-    { VIR_OP_CONV, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXYZ } },
+    { VIR_OP_CONVERT, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXYZ } },
     { VIR_OP_VX_IMG_LOAD_3D, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
-};
-
-static VIR_PatternMatchInst _vxImgLoad3DPatInst1[] = {
-    { VIR_OP_VX_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, {  1, 2, 3, 4, 5}, { _needSetConstBorderValue }, VIR_PATN_MATCH_FLAG_OR },
-};
-
-static VIR_PatternReplaceInst _vxImgLoad3DRepInst1[] = {
-    { VIR_OP_MOV, 0, 0, {  1, 0, 0 ,0 }, {0, _setConstBorderValue } },
-    { VIR_OP_VX_IMG_LOAD_3D, 0, 0, { 1, 2, 3, 4, 5 }, { 0 } },
 };
 
 static VIR_Pattern _vxImgLoad3DPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad3D, 0) },
-    { VIR_PATN_FLAG_NONE, CODEPATTERN(_vxImgLoad3D, 1) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -1547,22 +1598,12 @@ static VIR_PatternMatchInst _imgLoadPatInst0[] = {
 };
 
 static VIR_PatternReplaceInst _imgLoadRepInst0[] = {
-    { VIR_OP_CONV, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXY } },
+    { VIR_OP_CONVERT, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXY } },
     { VIR_OP_IMG_LOAD, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
-};
-
-static VIR_PatternMatchInst _imgLoadPatInst1[] = {
-    { VIR_OP_IMG_LOAD, VIR_PATTERN_ANYCOND, 0, { 1, 2, 3, 4, 5 }, { _needSetConstBorderValue }, VIR_PATN_MATCH_FLAG_OR },
-};
-
-static VIR_PatternReplaceInst _imgLoadRepInst1[] = {
-    { VIR_OP_MOV, 0, 0, {  1, 0, 0 ,0 }, {0, _setConstBorderValue } },
-    { VIR_OP_IMG_LOAD, 0, 0, {  1, 2, 3, 4, 5 }, { 0 } },
 };
 
 static VIR_Pattern _imgLoadPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad, 0) },
-    { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad, 1) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -1571,22 +1612,12 @@ static VIR_PatternMatchInst _imgLoad3DPatInst0[] = {
 };
 
 static VIR_PatternReplaceInst _imgLoad3DRepInst0[] = {
-    { VIR_OP_CONV, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXYZ } },
+    { VIR_OP_CONVERT, 0, 0, {  -1, 3, 0 ,0 }, {_setIntegerType_EnableXYZ } },
     { VIR_OP_IMG_LOAD_3D, 0, 0, {  1, 2, -1, 4, 5 }, { 0 } },
-};
-
-static VIR_PatternMatchInst _imgLoad3DPatInst1[] = {
-    { VIR_OP_IMG_LOAD_3D, VIR_PATTERN_ANYCOND, 0, {  1, 2, 3, 4, 5}, { _needSetConstBorderValue }, VIR_PATN_MATCH_FLAG_OR },
-};
-
-static VIR_PatternReplaceInst _imgLoad3DRepInst1[] = {
-    { VIR_OP_MOV, 0, 0, {  1, 0, 0 ,0 }, {0, _setConstBorderValue } },
-    { VIR_OP_IMG_LOAD_3D, 0, 0, { 1, 2, 3, 4, 5 }, { 0 } },
 };
 
 static VIR_Pattern _imgLoad3DPattern[] = {
     { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad3D, 0) },
-    { VIR_PATN_FLAG_NONE, CODEPATTERN(_imgLoad3D, 1) },
     { VIR_PATN_FLAG_NONE }
 };
 
@@ -1624,15 +1655,19 @@ _GetPattern1(
     {
     case VIR_OP_ADD:
         return _addPattern;
-    case VIR_OP_CMP:
+    case VIR_OP_SUBSAT:
+        return _subSatPattern;
+    case VIR_OP_FMA:
+        return _fmaPattern;
+    case VIR_OP_COMPARE:
         return _cmpPattern;
-    case VIR_OP_SELECT:
+    case VIR_OP_CSELECT:
         return _selectPattern;
-    case VIR_OP_CONV:
+    case VIR_OP_CONVERT:
         {
             return _convPattern;
         }
-    case VIR_OP_AQ_SET:
+    case VIR_OP_SET:
         return _setPattern;
     case VIR_OP_NEG:
         return _negPattern;
@@ -1671,21 +1706,21 @@ _GetPatternScalar(
         return _mulsatSclPattern;
     case VIR_OP_ADD:
         return _addSclPattern;
-    case VIR_OP_AQ_IMADHI0:
+    case VIR_OP_IMADHI0:
         return _imadhi0SclPattern;
-    case VIR_OP_AQ_IMADHI1:
+    case VIR_OP_IMADHI1:
         return _imadhi1SclPattern;
-    case VIR_OP_AQ_IMADLO0:
+    case VIR_OP_IMADLO0:
         return _imadlo0SclPattern;
     case VIR_OP_MAD:
         return _madSclPattern;
     case VIR_OP_MADSAT:
         return _madsatSclPattern;
-    case VIR_OP_AQ_F2I:
+    case VIR_OP_F2I:
         return _f2iSclPattern;
-    case VIR_OP_AQ_F2IRND:
+    case VIR_OP_F2IRND:
         return _f2irndSclPattern;
-    case VIR_OP_AQ_I2F:
+    case VIR_OP_I2F:
         return _i2fSclPattern;
     case VIR_OP_XOR_BITWISE:
         return _xorSclPattern;

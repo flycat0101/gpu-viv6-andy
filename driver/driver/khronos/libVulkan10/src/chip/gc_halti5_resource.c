@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2004,7 +2004,7 @@ VkResult halti5_copyImage(
 
         if (devCtx->database->CACHE128B256BPERLINE)
         {
-            if(dstImg->halTiling == gcvSUPERTILED)
+            if (dstImg->halTiling == gcvSUPERTILED)
             {
                 dstTileConfigEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  27:26) - (0 ? 27:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 27:26) - (0 ?
@@ -2026,12 +2026,14 @@ VkResult halti5_copyImage(
  27:26) + 1))))))) << (0 ? 27:26)));
             }
         }
+
         if (dstAnyTsEnable)
         {
-            __VK_ONERROR(halti5_decompressTileStatus(cmd, &pCmdBuffer, dstImg, imgvRange));
+            result = halti5_decompressTileStatus(cmd, &pCmdBuffer, dstImg, imgvRange);
         }
 
         __VK_FREE(imgvRange);
+        __VK_ONERROR(result);
     }
     else
     {
@@ -5524,7 +5526,6 @@ VkResult halti5_helper_convertHwImgDesc(
  5:4))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 5:4) - (0 ? 5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
         break;
-    /* (TODO) remove below formats as HW can't support them */
     case VK_FORMAT_R5G6B5_UNORM_PACK16:
         imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  9:6) - (0 ? 9:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ?
@@ -5943,7 +5944,10 @@ VkResult halti5_createImageView(
         chipImgv->patchFormat = residentImgFormat;
         chipImgv->patchKey |= HALTI5_PATCH_TX_GATHER_BIT;
         break;
-
+    case VK_FORMAT_D32_SFLOAT:
+        chipImgv->patchFormat = residentImgFormat;
+        chipImgv->patchKey |= HALTI5_PATCH_TX_GATHER_PCF_BIT | HALTI5_PATCH_TX_GATHER_BIT;
+        break;
     default:
         break;
     }
@@ -6011,7 +6015,7 @@ VkResult halti5_createBufferView(
 
     if (buf->createInfo.usage & VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT)
     {
-        __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, VK_NULL_HANDLE, bufv, gcvNULL, &chipBufv->imgDesc));
+        __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, VK_NULL_HANDLE, bufv, gcvNULL, chipBufv->imgDesc));
     }
 
     if (buf->createInfo.usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT)
@@ -6022,7 +6026,7 @@ VkResult halti5_createBufferView(
         case VK_FORMAT_R32G32B32A32_UINT:
         case VK_FORMAT_R32G32B32A32_SINT:
             chipBufv->patchFormat = bufv->createInfo.format;
-            __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, VK_NULL_HANDLE, bufv, gcvNULL, &chipBufv->imgDesc));
+            __VK_ONERROR(halti5_helper_convertHwImgDesc(devCtx, VK_NULL_HANDLE, bufv, gcvNULL, chipBufv->imgDesc));
             chipBufv->patchKey |= HALTI5_PATCH_REPLACE_TXLD_WITH_IMGLD_BIT;
             break;
         default:
@@ -6049,7 +6053,7 @@ VkResult halti5_createBufferView(
                     VK_FALSE
                 };
                 (*chipModule->minorTable.helper_convertHwSampler)(devCtx, &s_SamplerCreateInfo, &chipBufv->samplerDesc);
-                (*chipModule->minorTable.helper_convertHwTxDesc)(devCtx, VK_NULL_HANDLE, bufv, &chipBufv->txDesc);
+                (*chipModule->minorTable.helper_convertHwTxDesc)(devCtx, VK_NULL_HANDLE, bufv, chipBufv->txDesc);
             }
             break;
         }
@@ -6081,9 +6085,9 @@ VkResult halti5_destroyBufferView(
         halti5_bufferView *chipBufv;
         chipBufv = (halti5_bufferView *)bufv->chipPriv;
 
-        if (chipBufv->txDesc.descriptor)
+        if (chipBufv->txDesc[0].descriptor)
         {
-            __vk_FreeMemory(device, chipBufv->txDesc.descriptor, VK_NULL_HANDLE);
+            __vk_FreeMemory(device, chipBufv->txDesc[0].descriptor, VK_NULL_HANDLE);
         }
 
         __VK_FREE(chipBufv);
@@ -6182,7 +6186,9 @@ const char * halti5_helper_patchFuc(
     uint32_t patchFormat,
     uint32_t patchType,
     VkImageViewType viewType,
-    VSC_RES_OP_BIT *pOpTypeBits
+    VSC_RES_OP_BIT *pOpTypeBits,
+    VSC_RES_ACT_BIT *pActBits,
+    uint32_t *pSubType
     )
 {
     static const struct
@@ -6191,7 +6197,9 @@ const char * halti5_helper_patchFuc(
         uint32_t patchType;
         uint32_t viewTypeBits;
         const char *patchFunc;
-        VSC_RES_OP_BIT  opTypeBits;
+        VSC_RES_OP_BIT  opTypeBits; /* What resource operation we need apply this function link */
+        VSC_RES_ACT_BIT actBits;    /* For this link, what extra action we need compiler to prepare before that */
+        uint32_t subType;
     }
     s_patchEntries[] =
     {
@@ -6200,6 +6208,8 @@ const char * halti5_helper_patchFuc(
             HALTI5_PATCH_PE_EXTRA_OUTPUT,
             0,
             "_outputcvt_R32G32B32A32SFLOAT_2_R32G32SFLOAT",
+            0,
+            0,
             0
         },
         {
@@ -6207,6 +6217,8 @@ const char * halti5_helper_patchFuc(
             HALTI5_PATCH_PE_EXTRA_OUTPUT,
             0,
             "_outputcvt_R32G32B32A32SINT_2_R32G32SINT",
+            0,
+            0,
             0
         },
         {
@@ -6214,6 +6226,8 @@ const char * halti5_helper_patchFuc(
             HALTI5_PATCH_PE_EXTRA_OUTPUT,
             0,
             "_outputcvt_R32G32B32A32UINT_2_R32G32UINT",
+            0,
+            0,
             0
         },
 
@@ -6224,7 +6238,10 @@ const char * halti5_helper_patchFuc(
           | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
             "_inputcvt_R32G32B32A32SFLOAT_2_R32G32SFLOAT",
             VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH
+          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH,
+          VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+          VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
+
         },
         {
             __VK_FORMAT_R32G32B32A32_SINT_2_R32G32_SINT,
@@ -6233,7 +6250,9 @@ const char * halti5_helper_patchFuc(
           | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
             "_inputcvt_R32G32B32A32SINT_2_R32G32SINT",
             VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH
+          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH,
+          VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+          VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
         },
         {
             __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT,
@@ -6242,7 +6261,9 @@ const char * halti5_helper_patchFuc(
           | __VK_IMAGE_VIEW_TYPE_1D_ARRAY_BIT | __VK_IMAGE_VIEW_TYPE_2D_ARRAY_BIT,
             "_inputcvt_R32G32B32A32UINT_2_R32G32UINT",
             VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH
+          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD | VSC_RES_OP_BIT_FETCH,
+          VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+          VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
         },
 
         {
@@ -6250,21 +6271,27 @@ const char * halti5_helper_patchFuc(
             HALTI5_PATCH_TX_EXTRA_INPUT,
             __VK_IMAGE_VIEW_TYPE_CUBE_ARRAY_BIT,
             "_inputcvt_R32G32B32A32SFLOAT_2_R32G32SFLOAT_cubeArray",
-            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
+            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD,
+            VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
         },
         {
             __VK_FORMAT_R32G32B32A32_SINT_2_R32G32_SINT,
             HALTI5_PATCH_TX_EXTRA_INPUT,
             __VK_IMAGE_VIEW_TYPE_CUBE_ARRAY_BIT,
             "_inputcvt_R32G32B32A32SINT_2_R32G32SINT_cubeArray",
-            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
+            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD,
+            VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
         },
         {
             __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT,
             HALTI5_PATCH_TX_EXTRA_INPUT,
             __VK_IMAGE_VIEW_TYPE_CUBE_ARRAY_BIT,
             "_inputcvt_R32G32B32A32UINT_2_R32G32UINT_cubeArray",
-            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
+            VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD,
+            VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXLD_EXTRA_LATYER
         },
 
 
@@ -6273,21 +6300,28 @@ const char * halti5_helper_patchFuc(
             HALTI5_PATCH_REPLACE_TXLD_WITH_IMGLD,
             0,
             "_texld_with_imgld_R32G32B32A32SFLOAT",
-            VSC_RES_OP_BIT_FETCH
+            VSC_RES_OP_BIT_FETCH,
+            VSC_RES_ACT_BIT_REPLACE_SAMPLER_WITH_IMAGE_UNIFORM,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXFETCH_REPLACE_WITH_IMGLD
+
         },
         {
             VK_FORMAT_R32G32B32A32_SINT,
             HALTI5_PATCH_REPLACE_TXLD_WITH_IMGLD,
             0,
             "_texld_with_imgld_R32G32B32A32SINT",
-            VSC_RES_OP_BIT_FETCH
+            VSC_RES_OP_BIT_FETCH,
+            VSC_RES_ACT_BIT_REPLACE_SAMPLER_WITH_IMAGE_UNIFORM,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXFETCH_REPLACE_WITH_IMGLD
         },
         {
             VK_FORMAT_R32G32B32A32_UINT,
             HALTI5_PATCH_REPLACE_TXLD_WITH_IMGLD,
             0,
             "_texld_with_imgld_R32G32B32A32UINT",
-            VSC_RES_OP_BIT_FETCH
+            VSC_RES_OP_BIT_FETCH,
+            VSC_RES_ACT_BIT_REPLACE_SAMPLER_WITH_IMAGE_UNIFORM,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXFETCH_REPLACE_WITH_IMGLD
         },
 
         {
@@ -6295,21 +6329,28 @@ const char * halti5_helper_patchFuc(
             HALTI5_PATCH_TX_GATHER,
             0,
             "_inputgather_R32G32B32A32SFLOAT_2_R32G32SFLOAT",
-            VSC_RES_OP_BIT_GATHER
+            VSC_RES_OP_BIT_GATHER,
+            VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER
+
         },
         {
             __VK_FORMAT_R32G32B32A32_SINT_2_R32G32_SINT,
             HALTI5_PATCH_TX_GATHER,
             0,
             "_inputgather_R32G32B32A32SINT_2_R32G32SINT",
-            VSC_RES_OP_BIT_GATHER
+            VSC_RES_OP_BIT_GATHER,
+            VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER
         },
         {
             __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT,
             HALTI5_PATCH_TX_GATHER,
             0,
             "_inputgather_R32G32B32A32UINT_2_R32G32UINT",
-            VSC_RES_OP_BIT_GATHER
+            VSC_RES_OP_BIT_GATHER,
+            VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER
         },
 
         {
@@ -6317,21 +6358,27 @@ const char * halti5_helper_patchFuc(
             HALTI5_PATCH_TX_GATHER,
             0,
             "_inputgather_R32G32SFLOAT",
-            VSC_RES_OP_BIT_GATHER
+            VSC_RES_OP_BIT_GATHER,
+            0,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER
         },
         {
             VK_FORMAT_R32G32_SINT,
             HALTI5_PATCH_TX_GATHER,
             0,
             "_inputgather_R32G32SINT",
-            VSC_RES_OP_BIT_GATHER
+            VSC_RES_OP_BIT_GATHER,
+            0,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER
          },
         {
             VK_FORMAT_R32G32_UINT,
             HALTI5_PATCH_TX_GATHER,
             0,
             "_inputgather_R32G32UINT",
-            VSC_RES_OP_BIT_GATHER
+            VSC_RES_OP_BIT_GATHER,
+            0,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER
         },
 
         {
@@ -6339,21 +6386,45 @@ const char * halti5_helper_patchFuc(
             HALTI5_PATCH_TX_GATHER,
             0,
             "_inputgather_R32SFLOAT",
-            VSC_RES_OP_BIT_GATHER
+            VSC_RES_OP_BIT_GATHER,
+            0,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER
         },
         {
             VK_FORMAT_R32_SINT,
             HALTI5_PATCH_TX_GATHER,
             0,
             "_inputgather_R32SINT",
-            VSC_RES_OP_BIT_GATHER
+            VSC_RES_OP_BIT_GATHER,
+            0,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER
         },
         {
             VK_FORMAT_R32_UINT,
             HALTI5_PATCH_TX_GATHER,
             0,
             "_inputgather_R32UINT",
-            VSC_RES_OP_BIT_GATHER
+            VSC_RES_OP_BIT_GATHER,
+            0,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER
+        },
+        {
+            VK_FORMAT_D32_SFLOAT,
+            HALTI5_PATCH_TX_GATHER,
+            0,
+            "_inputgather_D32SFLOAT",
+            VSC_RES_OP_BIT_GATHER,
+            0,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHER_EXTRA_LAYTER
+        },
+        {
+            VK_FORMAT_D32_SFLOAT,
+            HALTI5_PATCH_TX_GATHER_PCF,
+            0,
+            "_inputgather_pcf_D32SFLOAT",
+            VSC_RES_OP_BIT_GATHER_PCF,
+            0,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGATHERPCF_D32F
         },
 
         {
@@ -6362,7 +6433,9 @@ const char * halti5_helper_patchFuc(
             0,
             "_unormalizeCoord",
             VSC_RES_OP_BIT_TEXLD | VSC_RES_OP_BIT_TEXLD_BIAS | VSC_RES_OP_BIT_TEXLD_LOD
-          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD
+          | VSC_RES_OP_BIT_TEXLDP | VSC_RES_OP_BIT_TEXLDP_BIAS | VSC_RES_OP_BIT_TEXLDP_LOD,
+            0,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_NORMALIZE_TEXCOORD
         },
 
         {
@@ -6370,26 +6443,31 @@ const char * halti5_helper_patchFuc(
             HALTI5_PATCH_TX_EXTRA_INPUT_GRAD,
             0,
             "_inputTexGrad_R32G32B32A32SFLOAT_2_R32G32SFLOAT",
-            VSC_RES_OP_BIT_TEXLD_GRAD | VSC_RES_OP_BIT_TEXLDP_GRAD
+            VSC_RES_OP_BIT_TEXLD_GRAD | VSC_RES_OP_BIT_TEXLDP_GRAD,
+            VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGRAD_EXTRA_LATYER
         },
         {
             __VK_FORMAT_R32G32B32A32_SINT_2_R32G32_SINT,
             HALTI5_PATCH_TX_EXTRA_INPUT_GRAD,
             0,
             "_inputTexGrad_R32G32B32A32SINT_2_R32G32UINT",
-            VSC_RES_OP_BIT_TEXLD_GRAD | VSC_RES_OP_BIT_TEXLDP_GRAD
+            VSC_RES_OP_BIT_TEXLD_GRAD | VSC_RES_OP_BIT_TEXLDP_GRAD,
+            VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGRAD_EXTRA_LATYER
         },
         {
             __VK_FORMAT_R32G32B32A32_UINT_2_R32G32_UINT,
             HALTI5_PATCH_TX_EXTRA_INPUT_GRAD,
             0,
             "_inputTexGrad_R32G32B32A32UINT_2_R32G32UINT",
-            VSC_RES_OP_BIT_TEXLD_GRAD | VSC_RES_OP_BIT_TEXLDP_GRAD
+            VSC_RES_OP_BIT_TEXLD_GRAD | VSC_RES_OP_BIT_TEXLDP_GRAD,
+            VSC_RES_ACT_BIT_EXTRA_SAMPLER,
+            VSC_LINK_POINT_RESOURCE_SUBTYPE_TEXGRAD_EXTRA_LATYER
         },
     };
 
     uint32_t i;
-
 
     for (i = 0; i < __VK_COUNTOF(s_patchEntries); i++)
     {
@@ -6400,6 +6478,14 @@ const char * halti5_helper_patchFuc(
             if (pOpTypeBits)
             {
                 *pOpTypeBits = s_patchEntries[i].opTypeBits;
+            }
+            if (pActBits)
+            {
+                *pActBits = s_patchEntries[i].actBits;
+            }
+            if (pSubType)
+            {
+                *pSubType = s_patchEntries[i].subType;
             }
             return s_patchEntries[i].patchFunc;
         }
@@ -6454,6 +6540,7 @@ VkResult halti5_updateDescriptorSet(
                         patchInfos[entryIdx].binding = i;
                         patchInfos[entryIdx].arrayIndex = j;
                         patchInfos[entryIdx].viewType = VK_IMAGE_VIEW_TYPE_1D;
+                        patchInfos[entryIdx].compareOp = sampler->createInfo.compareOp;
                         patchIdx++;
                     }
                 }
@@ -6469,11 +6556,13 @@ VkResult halti5_updateDescriptorSet(
                                                        SWIZZLE_GREEN,
                                                        SWIZZLE_BLUE,
                                                        SWIZZLE_ALPHA};
+                    VkCompareOp compareOp = VK_COMPARE_OP_MAX_ENUM;
                     if (samplers[0])
                     {
                         __vkSampler *sampler = samplers[0];
                         halti5_sampler *chipSampler = (halti5_sampler *)sampler->chipPriv;
                         patchKey |= chipSampler->patchKey;
+                        compareOp = sampler->createInfo.compareOp;
                     }
 
                     if (resInfo->type != __VK_DESC_RESOURCE_INVALID_INFO)
@@ -6498,6 +6587,8 @@ VkResult halti5_updateDescriptorSet(
                         patchInfos[entryIdx].binding = i;
                         patchInfos[entryIdx].arrayIndex = j;
                         patchInfos[entryIdx].viewType = viewType;
+                        __VK_ASSERT(compareOp != VK_COMPARE_OP_MAX_ENUM);
+                        patchInfos[entryIdx].compareOp = compareOp;
                         __VK_MEMCOPY(patchInfos[entryIdx].swizzles, swizzles, sizeof(swizzles));
                         patchIdx++;
                     }

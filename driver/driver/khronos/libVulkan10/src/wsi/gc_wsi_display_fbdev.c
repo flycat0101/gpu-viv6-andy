@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -213,11 +213,6 @@ static VkFormat __TranslateFbdevFormat(
     return VK_FORMAT_UNDEFINED;
 }
 
-/*
- * TODO:
- * It is platform specific.
- * alignedHeight may be aligned to page size on some platforms.
- */
 static inline uint32_t __CalcAlignedHeight(
     const struct fb_var_screeninfo *varInfo
     )
@@ -225,11 +220,6 @@ static inline uint32_t __CalcAlignedHeight(
     return varInfo->yres_virtual / (varInfo->yres_virtual / varInfo->yres);
 }
 
-/*
- * TODO:
- * One display-plane for one display currently.
- * And can not switch the planes.
- */
 static __vkFbdevDisplayKHR *__CreateFbdevDisplay(
     __vkPhysicalDevice *phyDev,
     __vkFbdevDisplayPlane *graphicPlane
@@ -255,7 +245,6 @@ static __vkFbdevDisplayKHR *__CreateFbdevDisplay(
     display->base.persistentContent         = VK_FALSE;
     display->base.planeStack[0]             = (__vkDisplayPlane *) graphicPlane;
 
-    /* TODO: only current mode for now. */
     displayMode = (__vkDisplayModeKHR *)__VK_ALLOC(sizeof(__vkFbdevDisplayKHR), 8, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
     __VK_MEMZERO(displayMode, sizeof(__vkDisplayModeKHR));
     displayMode->sType = __VK_OBJECT_DISPLAY_MODE_KHR;
@@ -331,7 +320,7 @@ static __vkFbdevDisplayPlane *__CreateFbdevDisplayPlane(
     uint32_t planeIndex
     )
 {
-    int fd;
+    int fd = -1;
     uint32_t i;
     int ret;
     uint32_t alignedHeight;
@@ -343,11 +332,11 @@ static __vkFbdevDisplayPlane *__CreateFbdevDisplayPlane(
 
     fd = open(fbPath, O_RDWR);
     if (fd < 0)
-        return NULL;
+        __VK_ONERROR(VK_INCOMPLETE);
 
     ret = ioctl(fd, FBIOGET_VSCREENINFO, &varInfo);
     if (ret < 0)
-        return NULL;
+        __VK_ONERROR(VK_INCOMPLETE);
 
     plane = (__vkFbdevDisplayPlane *)__VK_ALLOC(sizeof(__vkFbdevDisplayPlane), 8, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
     __VK_MEMZERO(plane, sizeof(__vkFbdevDisplayPlane));
@@ -355,7 +344,7 @@ static __vkFbdevDisplayPlane *__CreateFbdevDisplayPlane(
     plane->base.planeIndex = planeIndex;
     plane->varInfo = varInfo;
 
-    strncpy(plane->fbPath, fbPath, sizeof(plane->fbPath));
+    strncpy(plane->fbPath, fbPath, sizeof(plane->fbPath) - 1);
     plane->fd = fd;
 
     /* check supported formats. */
@@ -433,6 +422,11 @@ OnError:
     if (plane)
     {
         __VK_FREE(plane);
+    }
+
+    if (fd >= 0)
+    {
+        close(fd);
     }
 
     return VK_NULL_HANDLE;
@@ -620,7 +614,6 @@ static VkResult fbdevGetPhysicalDeviceSurfaceSupport(
 
     *pSupported = VK_FALSE;
 
-    /* TODO: Add present surface tests for present support */
     if (queueFamilyIndex <= phyDev->queueFamilyCount)
     {
         *pSupported = phyDev->queuePresentSupported[queueFamilyIndex];
@@ -1022,13 +1015,12 @@ static VkResult __AcquireNextImage(
 
     if (semaphore)
     {
-        /* TODO: hook with fbdev. */
+        /* VIV: [todo] hook with fbdev. */
         __vk_SetSemaphore(device, semaphore, VK_TRUE);
     }
 
     if (fence)
     {
-        /* TODO: hook with fbdev. */
         __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
         gcoOS_Signal(gcvNULL, fce->signal, VK_TRUE);
     }
@@ -1064,7 +1056,6 @@ static VkResult __GenPresentCommand(
     __VK_MEMZERO(&dstRes, sizeof(dstRes));
     dstRes.isImage         = VK_FALSE;
     dstRes.u.buf.pBuffer   = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer*, imageBuffer->resolveTarget);
-    /* TODO: get correct buffer info. */
     dstRes.u.buf.rowLength = imageBuffer->bufferRowLength;
     dstRes.u.buf.imgHeight = imageBuffer->bufferImageHeight;
 
@@ -1107,7 +1098,6 @@ static VkResult __CommitPresentCommand(
 #if __VK_NEW_DEVICE_QUEUE
     __VK_ONERROR(__vk_QueueIdle((__vkDevQueue *)queue));
 #else
-    /* TODO: Better to use a thread. */
     gcoHAL_Commit(gcvNULL, gcvTRUE);
 #endif
     /* Post fb. */
@@ -1466,7 +1456,6 @@ VkResult VKAPI_CALL __vk_CreateDisplayPlaneSurfaceKHR(
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&inst->memCb);
 
-    /* TODO: VkSurfaceKHR should be object type. */
     surf = (VkIcdSurfaceDisplay *)__VK_ALLOC(sizeof(VkIcdSurfaceDisplay), 8, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
 
     if (!surf)

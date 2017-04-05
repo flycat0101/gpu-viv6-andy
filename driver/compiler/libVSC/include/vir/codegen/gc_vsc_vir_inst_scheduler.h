@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -19,7 +19,7 @@
 
 BEGIN_EXTERN_C()
 
-#define VSC_IS_DEPDAG_NODES_BV_COUNT    1
+#define VSC_IS_DEPDAG_NODES_BV_COUNT    2
 #define VSC_IS_DEPDAG_EDGES_BV_COUNT    3
 /* data structure of dependence DAG */
 typedef struct VSC_IS_DEPDAG

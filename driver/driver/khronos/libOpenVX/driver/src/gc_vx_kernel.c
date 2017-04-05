@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,6 +12,8 @@
 
 
 #include <gc_vx_common.h>
+
+gceSTATUS gcfVX_FreeKernelShader(vx_kernel_shader kernel);
 
 gceSTATUS
 gcfVX_AdjustLocalWorkSize(
@@ -36,7 +38,7 @@ gcfVX_AdjustLocalWorkSize(
          */
         for (i = 0; i < WorkDim; i++)
         {
-            preferredWorkGroupSize = 16;//Kernel->preferredWorkGroupSizeMultiple;
+            preferredWorkGroupSize = Kernel->preferredWorkGroupSizeMultiple;
             while (preferredWorkGroupSize % 2 == 0)
             {
                 if ((GlobalWorkSize[i] % preferredWorkGroupSize == 0) &&
@@ -66,15 +68,12 @@ gcfVX_AdjustLocalWorkSize(
             }
         }
 
-        if (workGroupSize == 1)
+        /*not lucky, so just keep localworksize invalid */
+        for (i = 0; i< WorkDim; i++)
         {
-            for (i=0; i<WorkDim; i++)
+            if (LocalWorkSize[i] == 0)
             {
-                if (((GlobalWorkSize[i] % 381) == 0) && (workGroupSize * 381 <= Kernel->maxWorkGroupSize))
-                {
-                    LocalWorkSize[i] = 381;
-                    workGroupSize *= LocalWorkSize[i];
-                }
+                LocalWorkSize[i] = 1;
             }
         }
     }
@@ -288,6 +287,7 @@ gcfVX_LoadKernelArgValues(
     gctBOOL             isPointer;
     gceUNIFORM_FLAGS    flags;
     gceSTATUS           status;
+    gcoVX_Kernel_Context *context = gcvNULL;
 
     if (Arg->uniform == gcvNULL)
     {
@@ -309,16 +309,20 @@ gcfVX_LoadKernelArgValues(
             {
                 vx_image image = *(vx_image*) Arg->data;
 
-                gcoVX_Kernel_Context context = {{0}};
                 gcsVX_IMAGE_INFO     info = {0};
 
+                context = (gcoVX_Kernel_Context *) vxAllocate(sizeof(gcoVX_Kernel_Context));
+
 #if gcdVX_OPTIMIZER
-                context.borders = BorderMode->mode;
+                context->borders = BorderMode->mode;
 #else
-                context.params.borders = BorderMode->mode;
+                context->params.borders = BorderMode->mode;
 #endif
 
                 gcmONERROR(gcfVX_GetImageInfo(context, (vx_image)image, &info, 0));
+
+                vxFree(context);
+                context = gcvNULL;
 
                 gcmONERROR(gcoVX_BindImage(GetUniformPhysical(Arg->uniform), &info));
             }
@@ -440,16 +444,19 @@ gcfVX_LoadKernelArgValues(
                 {
                 vx_image image = *(vx_image*) Arg->data;
 
-                gcoVX_Kernel_Context context = {{0}};
                 gcsVX_IMAGE_INFO     info = {0};
 
+                context = (gcoVX_Kernel_Context *) vxAllocate(sizeof(gcoVX_Kernel_Context));
 #if gcdVX_OPTIMIZER
-                context.borders = VX_BORDER_MODE_UNDEFINED;
+                context->borders = VX_BORDER_MODE_UNDEFINED;
 #else
-                context.params.borders = BorderMode->mode;
+                context->params.borders = BorderMode->mode;
 #endif
 
                 gcmONERROR(gcfVX_GetImageInfo(context, (vx_image)image, &info, 1));
+
+                vxFree(context);
+                context = gcvNULL;
 
                 gcmONERROR(gcoVX_BindImage(0, &info));
 
@@ -912,10 +919,13 @@ gcfVX_LoadKernelArgValues(
     status = gcvSTATUS_OK;
 
 OnError:
+    if (context != gcvNULL) {
+        vxFree(context);
+    }
     return status;
 }
 
-vx_argument
+static vx_argument
 clfGetKernelArg(
     vx_kernel_shader    Kernel,
     gctUINT             Index,
@@ -1321,13 +1331,6 @@ gcfVX_ExecuteKernel(
                                 Kernel->states.stateBuffer,
                                 Kernel->states.hints));
 
-    /* Adjust local work sizes if not specified by the application. */
-    gcmONERROR(gcfVX_AdjustLocalWorkSize(Kernel,
-                                      WorkDim,
-                                      GlobalWorkOffset,
-                                      GlobalWorkSize,
-                                      LocalWorkSize));
-
     /* Load argument values. */
     for (i = 0; i < NumArgs; i++)
     {
@@ -1384,7 +1387,7 @@ gcfVX_CreateKernelShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], g
     gctINT          propertyType = 0;
     gctSIZE_T       propertyValues[3] = {0};
     gceSHADER_FLAGS flags;
-    gctPOINTER      pointer;
+    gctPOINTER      pointer     = gcvNULL;
     gceSTATUS       status;
     gctPOINTER      buffer      = gcvNULL;
     gctUINT         bufferSize  = 0;
@@ -1393,6 +1396,7 @@ gcfVX_CreateKernelShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], g
 
     gcKERNEL_FUNCTION   kernelFunction;
     vx_kernel_shader    kernel;
+    gctUINT             maxComputeUnits, threadCount, maxDeviceWorkGroupSize;
 
     /* Allocate kernel. */
     gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(vx_kernel_shader_s), (gctPOINTER*)&kernel));
@@ -1458,12 +1462,52 @@ gcfVX_CreateKernelShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], g
     gcoOS_StrCopySafe((gctSTRING)pointer, strLen, name);
     kernel->name                   = (gctSTRING) pointer;
 
+    pointer = gcvNULL;
+
     kernel->states.binary          = (gctUINT8_PTR) kernelBinary;
     kernel->states.stateBuffer     = buffer;
     kernel->states.stateBufferSize = bufferSize;
     kernel->states.hints           = hints;
 
 
+    gcmONERROR(
+        gcoHAL_QueryShaderCaps(gcvNULL,
+                                    gcvNULL,
+                                    gcvNULL,
+                                    gcvNULL,
+                                    gcvNULL,
+                                    &maxComputeUnits,
+                                    &threadCount,
+                                    gcvNULL,
+                                    gcvNULL));
+
+    kernel->maxWorkItemSizes[0]   = gcmMIN(threadCount, 1024);
+    kernel->maxWorkItemSizes[1]   = gcmMIN(threadCount, 1024);
+    kernel->maxWorkItemSizes[2]   = gcmMIN(threadCount, 1024);
+
+    kernel->maxGlobalWorkSize     = (gctUINT64) 4*1024*1024*1024;
+
+    maxDeviceWorkGroupSize        = gcmMIN(threadCount, 1024);
+
+
+    kernel->preferredWorkGroupSizeMultiple = 4 * maxComputeUnits;
+
+    if (hints->threadWalkerInPS)
+    {
+        kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->fsMaxTemp)) *
+                                   4 * maxComputeUnits;
+    }
+    else
+    {
+        kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->vsMaxTemp)) *
+                                   4 * maxComputeUnits;
+    }
+
+    /* maxWorkGroupSize should not over the device's maxWorkGroupSize. */
+    if (kernel->maxWorkGroupSize > maxDeviceWorkGroupSize)
+    {
+        kernel->maxWorkGroupSize =  maxDeviceWorkGroupSize;
+    }
 
     gcmVERIFY_OK(gcSHADER_GetAttributeCount(kernelBinary, &kernel->attributeCount));
 
@@ -1474,8 +1518,37 @@ gcfVX_CreateKernelShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], g
 
     status =  gcvSTATUS_OK;
 
-OnError:
     return status;
+
+OnError:
+    if (kernel)
+    {
+        gcfVX_FreeKernelShader(kernel);
+        gcoOS_Free(gcvNULL, kernel);
+    }
+
+    if(pointer != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, pointer);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_string _getShaderName(vx_string orignal, vx_string name)
+{
+    vx_char* pointer = strrchr(orignal, '.');
+
+    if(pointer)
+    {
+        gctSTRING suffix = strchr(pointer, ':');
+        pointer = pointer + 1;
+        if(suffix)
+            gcoOS_StrCopySafe(name, suffix - pointer + 1, pointer);
+        else
+            gcoOS_StrCopySafe(name, strlen(pointer) + 1, pointer);
+    }
+    else
+        gcoOS_StrCopySafe(name, strlen(orignal)+1, orignal);
+
+    return name;
 }
 
 gceSTATUS
@@ -1486,6 +1559,9 @@ gcfVX_CreateKernelShaders(vx_kernel kernel)
     gcKERNEL_FUNCTION kernelFunction;
     gctSTRING kernelName;
     gcSHADER  kernelBinary = (gcSHADER) kernel->program->binary;
+    gctUINT32 kernelCount;
+    gctSIZE_T length;
+    vx_char shader_name[128] = {0}, searchName[128]= {0};
 
     if (kernelBinary == gcvNULL)
     {
@@ -1493,15 +1569,26 @@ gcfVX_CreateKernelShaders(vx_kernel kernel)
         goto OnError;
     }
 
-    gcmONERROR(gcSHADER_GetKernelFunctionCount(kernelBinary, &kernel->kernelShaderCount));
-    gcmONERROR(gcoOS_AllocateMemory(gcvNULL, gcmSIZEOF(gctPOINTER) * kernel->kernelShaderCount * 2, (gctPOINTER*)&kernel->kernelShader));
+    _getShaderName(kernel->name, shader_name);
+    gcoOS_StrLen(shader_name, &length);
 
-    for(i = 0 ; i < kernel->kernelShaderCount; i++)
+    kernel->kernelShaderCount = 0;
+
+    gcmONERROR(gcSHADER_GetKernelFunctionCount(kernelBinary, &kernelCount));
+    gcmONERROR(gcoOS_AllocateMemory(gcvNULL, gcmSIZEOF(gctPOINTER) * kernelCount * 2, (gctPOINTER*)&kernel->kernelShader));
+
+    for (i = 0; i < kernelCount; i++)
     {
         gcmONERROR(gcSHADER_GetKernelFunction(kernelBinary, i, &kernelFunction));
         gcmONERROR(gcKERNEL_FUNCTION_GetName(kernelFunction, gcvNULL, (gctCONST_STRING *)&kernelName));
-        gcmONERROR(gcfVX_CreateKernelShader(kernel->program, kernelName, gcvFALSE, &kernel->kernelShader[i*2]));
-        gcmONERROR(gcfVX_CreateKernelShader(kernel->program, kernelName, gcvTRUE, &kernel->kernelShader[i*2 + 1]));
+        gcoOS_StrCopySafe(searchName, length+1, kernelName);
+
+        if (gcoOS_StrCmp(shader_name, searchName) == 0)
+        {
+            gcmONERROR(gcfVX_CreateKernelShader(kernel->program, kernelName, gcvFALSE, &kernel->kernelShader[kernel->kernelShaderCount*2]));
+            gcmONERROR(gcfVX_CreateKernelShader(kernel->program, kernelName, gcvTRUE, &kernel->kernelShader[kernel->kernelShaderCount*2 + 1]));
+            kernel->kernelShaderCount++;
+        }
     }
 
 
@@ -1520,7 +1607,7 @@ gceSTATUS gcfVX_SplitWork(
 {
     gctINT32 gpuCount        = deviceCount;
     gctINT32 usedGPUCount    = gpuCount;
-    gcsTHREAD_WALKER_INFO eachGPUInfo[VX_MAX_DEVICES] = {0}, info;
+    gcsTHREAD_WALKER_INFO eachGPUInfo[VX_MAX_DEVICES] = {{0}}, info;
     gctINT32 groupCountX, groupCountY, groupCountZ, i;
     gctINT32 restGroupCount = 0;
 
@@ -1653,25 +1740,6 @@ OnError:
     return gcvSTATUS_INVALID_ARGUMENT;
 }
 
-
-VX_PRIVATE_API vx_string _getShaderName(vx_string orignal, vx_string name)
-{
-    vx_char* pointer = strrchr(orignal, '.');
-
-    if(pointer)
-    {
-        gctSTRING suffix = strchr(pointer, ':');
-        pointer = pointer + 1;
-        if(suffix)
-            gcoOS_StrCopySafe(name, suffix - pointer + 1, pointer);
-        else
-            gcoOS_StrCopySafe(name, strlen(pointer) + 1, pointer);
-    }
-    else
-        gcoOS_StrCopySafe(name, strlen(orignal)+1, orignal);
-
-    return name;
-}
 
 VX_INTERNAL_API vx_status vxoKernel_Initialize(
     vx_context context,
@@ -2430,6 +2498,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
     vx_kernel_shader    kernelShader;
     gctCHAR             kernelName[256] = {0};
     vx_char             kernelMainName[128] = {0};
+    vx_size             workGroupSize = 1;
 
     gcoOS_StrCopySafe(kernelName, 256, _getShaderName(node->kernel->name, kernelMainName));
     gcoOS_StrCatSafe(kernelName, 256, node->kernel->subname);
@@ -2447,9 +2516,55 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
     kernelShader = node->kernel->kernelShader[i*2 + shaderID];
 
 
+
+    /* adjust the localworksize while it is unset */
+    gcmONERROR(gcfVX_AdjustLocalWorkSize(kernelShader,
+                              node->kernelAttributes.shaderParameter.workDim,
+                              node->kernelAttributes.shaderParameter.globalWorkOffset,
+                              node->kernelAttributes.shaderParameter.globalWorkSize,
+                              node->kernelAttributes.shaderParameter.localWorkSize));
+
+    /* validate the arguments */
+    for (i = 0; i < node->kernelAttributes.shaderParameter.workDim; i++)
+    {
+        if(node->kernelAttributes.shaderParameter.globalWorkSize[i] == 0)
+        {
+            goto OnError;
+        }
+
+        if (node->kernelAttributes.shaderParameter.globalWorkSize[i] > kernelShader->maxGlobalWorkSize)
+        {
+            goto OnError;
+        }
+
+        if ((node->kernelAttributes.shaderParameter.globalWorkSize[i] + node->kernelAttributes.shaderParameter.globalWorkOffset[i]) > kernelShader->maxGlobalWorkSize)
+        {
+            goto OnError;
+        }
+
+
+        if((node->kernelAttributes.shaderParameter.globalWorkSize[i] % node->kernelAttributes.shaderParameter.localWorkSize[i]) != 0)
+        {
+            goto OnError;
+        }
+
+        if (node->kernelAttributes.shaderParameter.localWorkSize[i] > kernelShader->maxWorkItemSizes[i])
+        {
+            goto OnError;
+        }
+
+        workGroupSize *= node->kernelAttributes.shaderParameter.localWorkSize[i];
+
+    }
+
+    if (workGroupSize > kernelShader->maxWorkGroupSize) goto OnError;
+
+
     for (i = 0; i < paramCount; i++)
     {
-        switch(node->kernel->signature.dataTypeTable[i])
+        vx_type_e type = (vx_type_e)((parameters[i] != gcvNULL) ? parameters[i]->type : node->kernel->signature.dataTypeTable[i]);
+
+        switch(type)
         {
         case VX_TYPE_SCALAR:
         {
@@ -2747,11 +2862,27 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
         }
         case VX_TYPE_IMAGE:
         {
-            gcmONERROR(gcfVX_SetKernelArg(
+
+            vx_image image = (vx_image)parameters[i];
+
+            if (image && image->memory.logicals[0])
+            {
+                gcmONERROR(gcfVX_SetKernelArg(
                         kernelShader,
                         argIndex,
                         sizeof(vx_reference),
                         &parameters[i]));
+            }
+            else
+            {
+                vx_reference nullRef = VX_NULL;
+
+                gcmONERROR(gcfVX_SetKernelArg(
+                        kernelShader,
+                        argIndex,
+                        sizeof(vx_reference),
+                        &nullRef));
+            }
 
             argIndex ++;
 
@@ -2814,7 +2945,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
                     gcmONERROR(gcfVX_SetKernelArg(
                                     kernelShader,
                                     argIndex + j,
-                                    sizeof(gctUINT32),
+                                    sizeof(vx_image),
                                     &pyramid->levels[j]));
 
                 }
@@ -2835,11 +2966,19 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
         }
     }
 
+    /* sync CNN layer */
+    if (node->cnnWaitEventID0 != 0xffffffff)
+    {
+        gcmASSERT((node->cnnWaitEventID0 > 0) && (node->cnnWaitEventID0 < 32));
+
+        gcoVX_WaitNNEvent(node->cnnWaitEventID0);
+    }
+
     if (node->base.context->deviceCount > 1)
     {
         gctINT  i;
         gctUINT usedDeviceCount;
-        vx_kernel_execution_parameters_t shaderParameter[VX_MAX_DEVICES] = {0};
+        vx_kernel_execution_parameters_t shaderParameter[VX_MAX_DEVICES] = {{0}};
 
         gcmONERROR(gcfVX_SplitWork(node->base.context->deviceCount,
                         &node->kernelAttributes.shaderParameter,
@@ -2893,6 +3032,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
                         node->kernelAttributes.shaderParameter.localWorkSize));
     }
 
+    /* sync CNN layer */
+    if (node->cnnWaitEventID1 != 0xffffffff)
+    {
+        gcmASSERT((node->cnnWaitEventID1 > 0) && (node->cnnWaitEventID1 < 32));
+
+        gcoVX_WaitNNEvent(node->cnnWaitEventID1);
+    }
 #if gcdDUMP
     gcfVX_Flush(gcvTRUE);
 
@@ -2903,6 +3049,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
 
 OnError:
     return VX_FAILURE;
+}
+
+VX_API_ENTRY vx_status VX_CALLBACK vxProgramKernel_Function(vx_node node, const vx_reference parameters[], vx_uint32 paramCount)
+{
+    return vxoProgramKernel_Function(node, parameters, paramCount);
 }
 
 /*unused code*/
@@ -2920,8 +3071,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Deinitialize(vx_node node,
     return VX_SUCCESS;
 }
 
-VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernelInProgram(
-        vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration, vx_uint32 num_params, vx_kernel_input_validate_f input,
+VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernelInProgramEx(
+        vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration, vx_kernel_f func_ptr,
+        vx_uint32 num_params, vx_kernel_input_validate_f input,
         vx_kernel_output_validate_f output, vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize)
 {
     vx_context  context;
@@ -2943,7 +3095,9 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernelInProgram(
             vxmASSERT(target->funcs.addkernel);
 
             return target->funcs.addkernel(target, name, enumeration,
-                                            program, vxoProgramKernel_Function, num_params,
+                                            program,
+                                            (func_ptr != VX_NULL) ? func_ptr:vxoProgramKernel_Function,
+                                            num_params,
                                             input, output,
                                             (initialize != VX_NULL)?initialize:vxoProgramKernel_Initialize,
                                             (deinitialize != VX_NULL)?deinitialize:vxoProgramKernel_Deinitialize);
@@ -2954,6 +3108,13 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernelInProgram(
 
 ErrorExit:
     return (vx_kernel)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
+}
+
+VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernelInProgram(
+        vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration, vx_uint32 num_params, vx_kernel_input_validate_f input,
+        vx_kernel_output_validate_f output, vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize)
+{
+    return vxAddKernelInProgramEx(program, name, enumeration, vxoProgramKernel_Function, num_params, input, output, initialize, deinitialize);
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxSelectKernelSubname(vx_node node, const vx_char * subname)

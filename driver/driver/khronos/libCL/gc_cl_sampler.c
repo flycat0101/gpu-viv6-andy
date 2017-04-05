@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -32,11 +32,13 @@ clCreateSampler(
     )
 {
     clsSampler_PTR      sampler;
-    gctPOINTER          pointer;
+    gctPOINTER          pointer = gcvNULL;
     gctINT              status;
 
     gcmHEADER_ARG("Context=0x%x NormalizedCoords=%d AddressingMode=%d FilterMode=%d",
                   Context, NormalizedCoords, AddressingMode, FilterMode);
+    gcmDUMP_API("${OCL clCreateSampler 0x%x}", Context);
+    VCL_TRACE_API(CreateSampler_Pre)(Context, NormalizedCoords, AddressingMode, FilterMode, ErrcodeRet);
 
     if (Context == gcvNULL || Context->objectType != clvOBJECT_CONTEXT)
     {
@@ -80,11 +82,18 @@ clCreateSampler(
     {
         *ErrcodeRet = CL_SUCCESS;
     }
+
+    VCL_TRACE_API(CreateSampler_Post)(Context, NormalizedCoords, AddressingMode, FilterMode, ErrcodeRet, sampler);
     gcmFOOTER_ARG("%d sampler=%lu",
                   CL_SUCCESS, sampler);
     return sampler;
 
 OnError:
+    if (pointer)
+    {
+        gcoOS_Free(gcvNULL, pointer);
+    }
+
     if (ErrcodeRet)
     {
         *ErrcodeRet = status;
@@ -101,6 +110,7 @@ clRetainSampler(
     gctINT              status;
 
     gcmHEADER_ARG("Sampler=0x%x", Sampler);
+    gcmDUMP_API("${OCL clRetainSampler 0x%x}", Sampler);
 
     if (Sampler == gcvNULL ||
         Sampler->objectType != clvOBJECT_SAMPLER)
@@ -112,6 +122,7 @@ clRetainSampler(
 
     gcmVERIFY_OK(gcoOS_AtomIncrement(gcvNULL, Sampler->referenceCount, gcvNULL));
 
+    VCL_TRACE_API(RetainSampler)(Sampler);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -129,6 +140,7 @@ clReleaseSampler(
     gctINT32            oldReference;
 
     gcmHEADER_ARG("Sampler=0x%x", Sampler);
+    gcmDUMP_API("${OCL clReleaseSampler 0x%x}", Sampler);
 
     if (Sampler == gcvNULL ||
         Sampler->objectType != clvOBJECT_SAMPLER)
@@ -149,6 +161,7 @@ clReleaseSampler(
         gcoOS_Free(gcvNULL, Sampler);
     }
 
+    VCL_TRACE_API(ReleaseSampler)(Sampler);
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -173,6 +186,7 @@ clGetSamplerInfo(
 
     gcmHEADER_ARG("Sampler=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
                   Sampler, ParamName, ParamValueSize, ParamValue);
+    gcmDUMP_API("${OCL clGetSamplerInfo 0x%x, 0x%x}", Sampler, ParamName);
 
     if (Sampler == gcvNULL || Sampler->objectType != clvOBJECT_SAMPLER)
     {
@@ -236,6 +250,7 @@ clGetSamplerInfo(
         *ParamValueSizeRet = retParamSize;
     }
 
+    VCL_TRACE_API(GetSamplerInfo)(Sampler, ParamName, ParamValueSize, ParamValue, ParamValueSizeRet);
     gcmFOOTER_ARG("%d *ParamValueSizeRet=%lu",
                   CL_SUCCESS, gcmOPT_VALUE(ParamValueSizeRet));
     return CL_SUCCESS;

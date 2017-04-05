@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -212,16 +212,16 @@ static VSC_ErrCode _VSC_SCL_CollectInformationFromInst(
 {
     VSC_ErrCode errcode  = VSC_ERR_NONE;
     VIR_Operand* dest;
-    VIR_Operand* src;
-    gctUINT32 i = 0;
+    gctUINT32 i;
 
     dest = VIR_Inst_GetDest(inst);
     _VSC_SCL_CollectInformationFromOper(scl, dest);
-    src = VIR_Inst_GetSource(inst, i);
-    while(src)
+
+    for(i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
     {
+        VIR_Operand* src = VIR_Inst_GetSource(inst, i);
+
         _VSC_SCL_CollectInformationFromOper(scl, src);
-        i++;
     }
 
     return errcode;

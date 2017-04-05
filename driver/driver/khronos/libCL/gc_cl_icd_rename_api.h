@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,7 +12,7 @@
 
 
 #ifndef _RENAME_API_H_
-#define _RENAME_API_H_
+#define  _RENAME_API_H_
 
 #define clGetPlatformIDs                         ___clGetPlatformIDs
 #define clGetPlatformInfo                        ___clGetPlatformInfo
@@ -105,7 +105,7 @@
 #define clEnqueueBarrier                         ___clEnqueueBarrier
 
 #define clCreateFromGLBuffer                     ___clCreateFromGLBuffer
-/*#define clCreateFromGLTexture                    ___clCreateFromGLTexture*/
+#define clCreateFromGLTexture                    ___clCreateFromGLTexture
 #define clCreateFromGLTexture2D                  ___clCreateFromGLTexture2D
 #define clCreateFromGLTexture3D                  ___clCreateFromGLTexture3D
 #define clCreateFromGLRenderbuffer               ___clCreateFromGLRenderbuffer

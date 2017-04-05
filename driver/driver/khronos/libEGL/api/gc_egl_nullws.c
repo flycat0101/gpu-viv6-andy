@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -11,6 +11,7 @@
 *****************************************************************************/
 
 
+#include <gc_egl_precomp.h>
 #include "gc_egl_platform.h"
 
 static void *
@@ -18,7 +19,7 @@ _GetDefaultDisplay(
     void
     )
 {
-    return (void *) 1;
+    return (void *)(gctUINTPTR_T)1;
 }
 
 static void
@@ -80,8 +81,29 @@ _SetSwapInterval(
     return EGL_TRUE;
 }
 
+static EGLBoolean
+_UpdateBufferAge(
+    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
+    IN struct eglBackBuffer * BackBuffer
+    )
+{
+    return EGL_TRUE;
+}
+
+static EGLBoolean
+_QueryBufferAge(
+    IN VEGLDisplay Display,
+    IN VEGLSurface Surface,
+    IN struct eglBackBuffer * BackBuffer,
+    OUT EGLint *BufferAge
+    )
+{
+    return EGL_FALSE;
+}
+
 static struct eglPlatform nullwsPlatform = {
-    0,
+    EGL_PLATFORM_NULLWS_VIV,
     _GetDefaultDisplay,
     _ReleaseDefaultDisplay,
     _IsValidDisplay,
@@ -101,8 +123,8 @@ static struct eglPlatform nullwsPlatform = {
     gcvNULL,
     gcvNULL,
     gcvNULL,
-    gcvNULL,
-    gcvNULL,
+    _UpdateBufferAge,
+    _QueryBufferAge,
     gcvNULL,
     gcvNULL,
     gcvNULL,

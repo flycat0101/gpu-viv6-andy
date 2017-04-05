@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -73,7 +73,8 @@ cloCOMPILER_EmptyMemoryPool(
 typedef enum _cleSCANNER_STATE
 {
     clvSCANNER_NORMAL    = 0,
-    clvSCANNER_AFTER_TYPE
+    clvSCANNER_AFTER_TYPE,
+    clvSCANNER_IN_TYPEOF
 }
 cleSCANNER_STATE;
 

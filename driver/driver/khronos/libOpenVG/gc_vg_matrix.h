@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -38,7 +38,17 @@ gctBOOL vgfIsIdentity(
     IN vgsCONTEXT_PTR Context,
     IN OUT vgsMATRIX_PTR Matrix
     );
+#if defined(__QNXNTO__)
+void vgfInvalidateMatrix(
+    IN vgsCONTEXT_PTR Context,
+    IN OUT vgsMATRIX_PTR Matrix
+    );
 
+void vgfInvalidateContainer(
+    IN vgsCONTEXT_PTR Context,
+    IN OUT vgsMATRIXCONTAINER_PTR Container
+    );
+#else
 vgmINLINE void vgfInvalidateMatrix(
     IN vgsCONTEXT_PTR Context,
     IN OUT vgsMATRIX_PTR Matrix
@@ -49,6 +59,7 @@ vgmINLINE void vgfInvalidateContainer(
     IN OUT vgsMATRIXCONTAINER_PTR Container
     );
 
+#endif
 gctFLOAT vgfGetDeterminant(
     IN vgsCONTEXT_PTR Context,
     IN OUT vgsMATRIX_PTR Matrix

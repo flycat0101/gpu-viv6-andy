@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -945,7 +945,6 @@ void _ReadPixelFrom_B8G8R8I(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* out
     outPixel->s = 0;
 }
 
-/* (todo) channel order not following convention */
 void _ReadPixelFrom_B8G8R8I_1_A8R8G8B8(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
 {
     gctINT8* pI = (gctINT8*)inAddr[0];
@@ -970,7 +969,6 @@ void _ReadPixelFrom_B8G8R8UI(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* ou
     outPixel->s = 0;
 }
 
-/* (todo) channel order not following convention */
 void _ReadPixelFrom_B8G8R8UI_1_A8R8G8B8(gctPOINTER inAddr[gcdMAX_SURF_LAYERS], gcsPIXEL* outPixel)
 {
     gctUINT8* pI = (gctUINT8*)inAddr[0];

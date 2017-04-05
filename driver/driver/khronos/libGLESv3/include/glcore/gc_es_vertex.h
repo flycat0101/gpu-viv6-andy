@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -229,5 +229,6 @@ __GL_INLINE GLsizei __glUtilCalculateStride(GLint size, GLenum type)
     return 0;
 }
 
+__GLbufferObject* __glGetCurrentVertexArrayBufObj(__GLcontext *gc, GLuint binding);
 
 #endif /* __gc_es_vertex_h__ */

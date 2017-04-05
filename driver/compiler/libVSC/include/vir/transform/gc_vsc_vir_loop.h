@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -18,29 +18,7 @@
 
 BEGIN_EXTERN_C()
 
-typedef struct VIR_LOOPINFOMGR
-{
-    VIR_Shader*                     shader;
-    VIR_Function*                   func;
-    gctUINT                         nextLoopId;
-    VSC_UNI_LIST                    loopInfos;
-    VIR_Dumper*                     dumper;
-    VSC_MM*                         mm;
-} VIR_LoopInfoMgr;
-
-#define VIR_LoopInfoMgr_GetShader(lim)          ((lim)->shader)
-#define VIR_LoopInfoMgr_SetShader(lim, s)       ((lim)->shader = (s))
-#define VIR_LoopInfoMgr_GetFunc(lim)            ((lim)->func)
-#define VIR_LoopInfoMgr_SetFunc(lim, f)         ((lim)->func = (f))
-#define VIR_LoopInfoMgr_GetNextLoopId(lim)      ((lim)->nextLoopId)
-#define VIR_LoopInfoMgr_SetNextLoopId(lim, n)   ((lim)->nextLoopId = (n))
-#define VIR_LoopInfoMgr_IncNextLoopId(lim)      ((lim)->nextLoopId++)
-#define VIR_LoopInfoMgr_GetLoopInfos(lim)       (&(lim)->loopInfos)
-#define VIR_LoopInfoMgr_GetLoopInfoCount(lim)   (vscUNILST_GetNodeCount(VIR_LoopInfoMgr_GetLoopInfos(lim)))
-#define VIR_LoopInfoMgr_GetMM(lim)              ((lim)->mm)
-#define VIR_LoopInfoMgr_SetMM(lim, m)           ((lim)->mm = (m))
-#define VIR_LoopInfoMgr_GetDumper(lim)          ((lim)->dumper)
-#define VIR_LoopInfoMgr_SetDumper(lim, d)       ((lim)->dumper = (d))
+typedef struct VIR_LOOPINFOMGR VIR_LoopInfoMgr;
 
 typedef struct VIR_LOOPOPTS
 {

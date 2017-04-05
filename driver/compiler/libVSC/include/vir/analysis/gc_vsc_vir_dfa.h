@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -298,8 +298,8 @@ VSC_ErrCode vscVIR_DoBackwardIterativeMsDFA(VIR_CALL_GRAPH* pCg, VIR_BASE_MS_DFA
                                                 (pDefInst) == VIR_INPUT_DEF_INST)
 
 #define VIR_IS_OUTPUT_USAGE_INST(pUsageInst)   ((pUsageInst) == VIR_OUTPUT_USAGE_INST           || \
-                                                VIR_Inst_GetOpcode((pUsageInst)) == VIR_OP_EMIT || \
-                                                VIR_Inst_GetOpcode((pUsageInst)) == VIR_OP_AQ_EMIT)
+                                                VIR_Inst_GetOpcode((pUsageInst)) == VIR_OP_EMIT0 || \
+                                                VIR_Inst_GetOpcode((pUsageInst)) == VIR_OP_EMIT)
 
 #define VIR_IS_IMPLICIT_USAGE_INST(pUsageInst) ((pUsageInst) == VIR_OUTPUT_USAGE_INST)
 
@@ -490,8 +490,8 @@ typedef struct _VIR_USAGE
 
 #define IS_OUTPUT_USAGE(pUsage)                                             \
     ((pUsage)->usageKey.pUsageInst == VIR_OUTPUT_USAGE_INST              || \
-     VIR_Inst_GetOpcode((pUsage)->usageKey.pUsageInst) == VIR_OP_EMIT    || \
-     VIR_Inst_GetOpcode((pUsage)->usageKey.pUsageInst) == VIR_OP_AQ_EMIT)
+     VIR_Inst_GetOpcode((pUsage)->usageKey.pUsageInst) == VIR_OP_EMIT0    || \
+     VIR_Inst_GetOpcode((pUsage)->usageKey.pUsageInst) == VIR_OP_EMIT)
 
 typedef enum _VIR_WEB_TYPE
 {

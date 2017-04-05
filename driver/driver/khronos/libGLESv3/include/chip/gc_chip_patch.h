@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -145,7 +145,8 @@ typedef enum __GCPatchNum_enum
     GC_CHIP_PATCH_COC_1,
     GC_CHIP_PATCH_CTS_DOT,
     GC_CHIP_PATCH_TREX,
-    GC_CHIP_PATCH_MANHATTAN,
+    GC_CHIP_PATCH_MANHATTAN30,
+    GC_CHIP_PATCH_MANHATTAN40,
     GC_CHIP_PATCH_BATCHCOUNT,
     GC_CHIP_PATCH_NETFLIX_1,
     GC_CHIP_PATCH_ES20_CONF_ATAN2,
@@ -168,7 +169,8 @@ typedef enum __GCPatchNum_enum
     GC_CHIP_PATCH_DEQP_COMPILE_TIME_4,   /* dEQP-GLES3.functional.uniform_api.random.13 */
 
     GC_CHIP_PATCH_GFX4_FILL2,
-
+    GC_CHIP_PATCH_ES20_CONF_CUBE,
+    GC_CHIP_PATCH_GLMARK2_ES2,
     GC_CHIP_PATCH_LAST
 } __GCPatchNum;
 

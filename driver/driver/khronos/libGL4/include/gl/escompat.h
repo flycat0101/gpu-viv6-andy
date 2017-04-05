@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -27,7 +27,8 @@ extern "C" {
 #endif
 
 
-#ifdef GL_KHR_debug
+#ifndef GL_KHR_debug
+#define GL_KHR_debug 1
 typedef void (GL_APIENTRY  *GLDEBUGPROCKHR)(GLenum source,GLenum type,GLuint id,GLenum severity,GLsizei length,const GLchar *message,const void *userParam);
 #define GL_SAMPLER                        0x82E6
 #define GL_DEBUG_OUTPUT_SYNCHRONOUS_KHR   0x8242

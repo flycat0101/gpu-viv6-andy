@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -2299,7 +2299,6 @@ galBlit( void         *drv,
                 vdrv->pending_dst_rects[vdrv->pending_num].bottom = dst_rect.bottom;
 
                 if (!vdev->hw_2d_pe20 && vdrv->blit_blend && vdrv->dst_blend_no_alpha) {
-                    /* TODO: need to improve 16-bit blending. */
                     max_pending_num = 1;
                 }
                 else {

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1877,13 +1877,6 @@ gckKERNEL_Recovery(
     IN gckKERNEL Kernel
     );
 
-/* Set the value of timeout on HW operation. */
-void
-gckKERNEL_SetTimeOut(
-    IN gckKERNEL Kernel,
-    IN gctUINT32 timeOut
-    );
-
 /* Get access to the user data. */
 gceSTATUS
 gckKERNEL_OpenUserData(
@@ -2323,6 +2316,11 @@ gckHARDWARE_SetDVFSPeroid(
 
 gceSTATUS
 gckHARDWARE_PrepareFunctions(
+    gckHARDWARE Hardware
+    );
+
+gceSTATUS
+gckHARDWARE_DestroyFunctions(
     gckHARDWARE Hardware
     );
 

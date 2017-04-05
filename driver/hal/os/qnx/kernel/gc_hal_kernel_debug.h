@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -72,8 +72,8 @@ typedef va_list gctARGUMENTS;
 #define gcmkVSPRINTF(Destination, Size, Message, Arguments) \
     vsnprintf(Destination, Size, Message, *((va_list *)Arguments))
 
-#define gcmkSTRCAT(Destination, Size, String) \
-    strncat(Destination, String, Size)
+#define gcmkSTRCATSAFE(Destination, Size, String) \
+    strncat(Destination, String, (Size) - 1)
 
 #if gcdUSE_FAST_MEM_COPY
 #define gcmkMEMCPY(Destination, Source, Size) \

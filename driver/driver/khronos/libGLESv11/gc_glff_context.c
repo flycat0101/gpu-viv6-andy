@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -702,6 +702,9 @@ glfCreateContext(
         /* Store a magic number to indicate it is a ES11 context */
         context->magic = ES11_MAGIC;
 
+        /* Do not need destructor. */
+        context->base.destructor = gcvNULL;
+
         context->isQuadrant = (patchId == gcvPATCH_QUADRANT);
         context->curFrameBufferID = 0;
 
@@ -845,7 +848,7 @@ glfDestroyContext(
     gcmCHECK_STATUS(gco3D_SetDepth(context->hw, gcvNULL));
 
 #if VIVANTE_PROFILER
-    _glffDestroyProfiler(context);
+    _glffProfiler_NEW_Destroy(context);
 #endif
 
     if (context->chipInfo.extensions != gcvNULL)
@@ -1009,7 +1012,7 @@ glfSetContext(
         drawView.surf = draw;
 
         /* Set surfaces into hardware context. */
-        gco3D_SetTarget(context->hw, 0, &drawView, 0);
+        gcmERR_BREAK(gco3D_SetTarget(context->hw, 0, &drawView, 0));
 
         if (depth != gcvNULL)
         {
@@ -1025,7 +1028,7 @@ glfSetContext(
 
         dsView.surf = depth;
 
-        gco3D_SetDepth(context->hw, &dsView);
+        gcmERR_BREAK(gco3D_SetDepth(context->hw, &dsView));
 
         gco3D_SetColorCacheMode(context->hw);
 
@@ -1481,11 +1484,10 @@ GetCurrentContext(void)
     gceSTATUS status;
     glsCONTEXT_PTR context = gcvNULL;
 
-    gcsTLS_PTR tls;
-
     gcmHEADER();
 
-    status = gcoOS_GetTLS(&tls);
+    status = gcoOS_GetDriverTLS(gcvTLS_KEY_OPENGL_ES,
+                                (gcsDRIVER_TLS_PTR *) &context);
 
     if (gcmIS_ERROR(status))
     {
@@ -1493,11 +1495,9 @@ GetCurrentContext(void)
         return gcvNULL;
     }
 
-    context = tls->esClientCtx;
-
     if ((context != gcvNULL) && (context->magic != ES11_MAGIC))
     {
-        gcoOS_Print("!!ERROR: It's not a GLContext for OES11");
+        gcmPRINT("%s: Invalid API call", __FUNCTION__);
         return gcvNULL;
     }
 
@@ -1511,16 +1511,9 @@ SetCurrentContext(
     void *context
     )
 {
-    gcsTLS_PTR tls;
-
     gcmHEADER_ARG("context=0x%x", context);
 
-    gcoOS_GetTLS(&tls);
-
-    if(tls)
-    {
-        tls->esClientCtx = context;
-    }
+    gcoOS_SetDriverTLS(gcvTLS_KEY_OPENGL_ES, (gcsDRIVER_TLS_PTR) context);
 
     gcmFOOTER_NO();
 }

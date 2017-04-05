@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -120,7 +120,7 @@ __glChipBeginQuery(
     {
         gcmASSERT(queryHeader->headerLocked != gcvNULL);
 
-        gcoOS_ZeroMemory(queryHeader->headerLocked, queryHeader->headerSize);
+    gcoOS_ZeroMemory(queryHeader->headerLocked, queryHeader->headerSize);
     }
 
     gcmGETHARDWAREADDRESS(queryHeader->headerNode, physical);
@@ -623,10 +623,10 @@ __glChipEndXFB(
     else
     {
         gcmONERROR(gco3D_FlushSHL1Cache(chipCtx->engine));
-        gcmONERROR(gco3D_Semaphore(chipCtx->engine,
-                                   chipCtx->chipFeature.hasCommandPrefetch ? gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND,
-                                   gcvWHERE_PIXEL,
-                                   gcvHOW_SEMAPHORE));
+    gcmONERROR(gco3D_Semaphore(chipCtx->engine,
+                               chipCtx->chipFeature.hasCommandPrefetch ? gcvWHERE_COMMAND_PREFETCH : gcvWHERE_COMMAND,
+                               gcvWHERE_PIXEL,
+                               gcvHOW_SEMAPHORE));
     }
 
 #if gcdDUMP
@@ -644,7 +644,7 @@ __glChipEndXFB(
         for (i = 0; i < __GL_MAX_TRANSFORM_FEEDBACK_SEPARATE_ATTRIBS; i++)
         {
             if (pXfbBindingPoints[i].boundBufName != 0)
-            {
+        {
                 __GLchipVertexBufferInfo *chipBufInfo;
                 gctPOINTER buffer;
                 gctUINT32 physical;

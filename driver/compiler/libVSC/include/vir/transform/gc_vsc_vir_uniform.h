@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -242,7 +242,7 @@ VSC_UF_UtilizeAuxUBO(
     IN OUT VSC_AllShaders           *all_shaders,
     IN VSC_HW_CONFIG                *hwCfg,
     IN VSC_PROGRAM_RESOURCE_LAYOUT  *pgResourceLayout,
-    IN VSC_OPTN_UF_AUBO_Options     *options
+    IN VSC_OPTN_UF_AUBOOptions      *options
     );
 
 VSC_ErrCode

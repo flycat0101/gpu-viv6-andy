@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -276,7 +276,7 @@ _Set(
             /* Calculate framebuffer tile status address. */
             if (Display->compression)
             {
-                /* TODO: Assume tile status address is next to fb address. */
+                /* TODO (Soc-vendor): Assume tile status address is next to fb address. */
                 target->tsPhysical = target->physical + stride * yres;
             }
             else
@@ -353,7 +353,7 @@ _Set(
                 /* Calculate framebuffer tile status address. */
                 if (Display->compression)
                 {
-                    /* TODO: Assume tile status address is next to fb address. */
+                    /* TODO (Soc-vendor): Assume tile status address is next to fb address. */
                     target->tsPhysical = target->physical
                                        + Display->stride * Display->res.bottom;
                 }
@@ -459,6 +459,7 @@ _Set(
 
             /* Dest rectangle. */
             layer->dstRect         = *(gcsRECT *) &hwLayer->displayFrame;
+            layer->topTiny         = gcvFALSE;
 
             /* Dest clips. */
             layer->clipRects       = (gcsRECT_PTR) region->rects;
@@ -606,8 +607,7 @@ _Set(
                     /* Alpha blending is needed. */
                     layer->opaque = gcvFALSE;
 
-                    /* Alpha blending parameters.
-                     * TODO: this may be incorrect. */
+                    /* Alpha blending parameters. */
                     layer->srcAlphaMode         = gcvSURF_PIXEL_ALPHA_STRAIGHT;
                     layer->dstAlphaMode         = gcvSURF_PIXEL_ALPHA_STRAIGHT;
                     layer->srcGlobalAlphaMode   = gcvSURF_GLOBAL_ALPHA_ON;
@@ -721,6 +721,21 @@ _Set(
             }
         }
 
+        for (gctUINT32 i = Display->layerCount - 1; i <= 64; i--)
+        {
+            hwcLayer * layer = &Display->layers[i];
+
+            if ((layer->dstRect.right  - layer->dstRect.left < 128) &&
+                (layer->dstRect.bottom - layer->dstRect.top  < 128))
+            {
+                layer->topTiny = gcvTRUE;
+            }
+            else
+            {
+                break;
+            }
+        }
+
         /* Reset allocated areas. */
         if (Display->compositionArea != NULL)
         {
@@ -771,6 +786,11 @@ _Set(
                 )
                 {
                     /* Skip rectangle out of display. */
+                    continue;
+                }
+
+                if (Display->layers[i].topTiny)
+                {
                     continue;
                 }
 
@@ -1036,11 +1056,11 @@ _Set(
     if (Display->hasG2D)
     {
 #if ANDROID_SDK_VERSION >= 23
+        gcsRECT boundRect = {65535, 65535, 0, 0};
+
         if (Context->device.common.version >= HWC_DEVICE_API_VERSION_1_5
             && SwapRect != gcvNULL)
         {
-            gcsRECT drect = {65535, 65535, 0, 0};
-
             for (gctUINT32 j = 0; j < Display->layerCount; j++)
             {
                 hwc_layer_1_t * hwLayer = &HwDisplay->hwLayers[j];
@@ -1052,12 +1072,12 @@ _Set(
                      * The layer has full damage region.
                      * Merge this layer target rect directly.
                      */
-                    gcsRECT_PTR dstRect = (gcsRECT *) &hwLayer->displayFrame;
+                    hwc_rect_t * dstRect = &hwLayer->displayFrame;
 
-                    drect.left   = gcmMAX(0, gcmMIN(dstRect->left,   drect.left));
-                    drect.top    = gcmMAX(0, gcmMIN(dstRect->top,    drect.top));
-                    drect.right  = gcmMIN(Display->res.right,  gcmMAX(dstRect->right,  drect.right));
-                    drect.bottom = gcmMIN(Display->res.bottom, gcmMAX(dstRect->bottom, drect.bottom));
+                    boundRect.left   = gcmMIN(dstRect->left,   boundRect.left);
+                    boundRect.top    = gcmMIN(dstRect->top,    boundRect.top);
+                    boundRect.right  = gcmMAX(dstRect->right,  boundRect.right);
+                    boundRect.bottom = gcmMAX(dstRect->bottom, boundRect.bottom);
 
                     if (Context->dumpCompose & DUMP_DAMAGE_LAYERS)
                     {
@@ -1067,59 +1087,67 @@ _Set(
                              gcmMIN(Display->res.right, dstRect->right),
                              gcmMIN(Display->res.bottom, dstRect->bottom));
                     }
-
-                    continue;
                 }
                 else
                 {
-                    gcsRECT srect = {65535, 65535, 0, 0}, dsrect;
+                    gcsRECT srcBound = {65535, 65535, 0, 0};
 
                     for (gctUINT32 k = 0; k < damage->numRects; k++)
                     {
+                        const hwc_rect_t * r = &damage->rects[k];
+
                         if (Context->dumpCompose & DUMP_DAMAGE_LAYERS)
                         {
                             LOGD("  DAMAGE RECT: layer=%d [%d,%d,%d,%d]", j,
-                                 damage->rects[k].left,
-                                 damage->rects[k].top,
-                                 damage->rects[k].right,
-                                 damage->rects[k].bottom);
+                                 r->left,
+                                 r->top,
+                                 r->right,
+                                 r->bottom);
                         }
 
-                        if (_IsValidRect((gcsRECT_PTR)&damage->rects[k]))
+                        if ((r->right > r->left) && (r->bottom > r->top))
                         {
                             /* Merge valid damage region of this layer source first. */
-                            srect.left   = gcmMIN(damage->rects[k].left,   srect.left);
-                            srect.top    = gcmMIN(damage->rects[k].top,    srect.top);
-                            srect.right  = gcmMAX(damage->rects[k].right,  srect.right);
-                            srect.bottom = gcmMAX(damage->rects[k].bottom, srect.bottom);
+                            srcBound.left   = gcmMIN(r->left,   srcBound.left);
+                            srcBound.top    = gcmMIN(r->top,    srcBound.top);
+                            srcBound.right  = gcmMAX(r->right,  srcBound.right);
+                            srcBound.bottom = gcmMAX(r->bottom, srcBound.bottom);
                         }
                     }
 
-                    if (_IsValidRect(&srect))
+                    if (_IsValidRect(&srcBound))
                     {
+                        gcsRECT dstBound;
+
                         /* Map source rect to target. */
-                        _MapSource2Target(&Display->layers[j], &srect, &dsrect);
+                        _MapSource2Target(&Display->layers[j], &srcBound, &dstBound);
 
                         if (Context->dumpCompose & DUMP_DAMAGE_LAYERS)
                         {
                             LOGD("    SWAP MERGE: [%d,%d,%d,%d] => [%d,%d,%d,%d]",
-                                srect.left, srect.top, srect.right, srect.bottom,
-                                dsrect.left, dsrect.top, dsrect.right, dsrect.bottom);
+                                srcBound.left, srcBound.top, srcBound.right, srcBound.bottom,
+                                dstBound.left, dstBound.top, dstBound.right, dstBound.bottom);
                         }
 
-                        if (_IsValidRect(&dsrect))
+                        if (_IsValidRect(&dstBound))
                         {
                             /* Merge valid transformed layer target damage region. */
-                            drect.left   = gcmMIN(dsrect.left,   drect.left);
-                            drect.top    = gcmMIN(dsrect.top,    drect.top);
-                            drect.right  = gcmMAX(dsrect.right,  drect.right);
-                            drect.bottom = gcmMAX(dsrect.bottom, drect.bottom);
+                            boundRect.left   = gcmMIN(dstBound.left,   boundRect.left);
+                            boundRect.top    = gcmMIN(dstBound.top,    boundRect.top);
+                            boundRect.right  = gcmMAX(dstBound.right,  boundRect.right);
+                            boundRect.bottom = gcmMAX(dstBound.bottom, boundRect.bottom);
                         }
                     }
                 }
             }
 
-            SwapRect = &drect;
+            /* Clip to display size. */
+            boundRect.left   = gcmMAX(0, boundRect.left);
+            boundRect.top    = gcmMAX(0, boundRect.top);
+            boundRect.right  = gcmMIN(Display->res.right,  boundRect.right);
+            boundRect.bottom = gcmMIN(Display->res.bottom, boundRect.bottom);
+
+            SwapRect = &boundRect;
         }
 #endif
 
@@ -1168,7 +1196,8 @@ _Set(
             && !_IsValidRect(&buffer->swapRect))
         {
             compose = gcvFALSE;
-        } else
+        }
+        else
 #endif
         /* Optimize: do not need split area for full screen composition. */
         if (
@@ -2682,7 +2711,7 @@ hwc_set(
             iface.command            = gcvHAL_SIGNAL;
             iface.u.Signal.signal    = gcmPTR_TO_UINT64(signal);
             iface.u.Signal.auxSignal = 0;
-            iface.u.Signal.process   = 0; /* TODO */
+            iface.u.Signal.process   = 0;
             iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
 
             /* Send event. */

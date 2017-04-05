@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1067,6 +1067,11 @@ gctINT32 TessellateStroke(
 
     if (numTotalPoints < 1)
     {
+        if (isDashed)
+        {
+            OVG_FREE(context->os, counts);
+            OVG_FREE(context->os, points);
+        }
         gcmFOOTER_ARG("return=%d", 0);
         return 0;
     }
@@ -1258,6 +1263,12 @@ END_PROFILE
         {
             OVG_SAFE_FREE(context->os, streamPipe.indices_16);
         }
+
+        if (isDashed)
+        {
+            OVG_FREE(context->os, counts);
+            OVG_FREE(context->os, points);
+        }
         OVG_SAFE_FREE(context->os, streamPipe.stream);
         gcmFOOTER_ARG("return=%d", 0);
         return 0;
@@ -1421,6 +1432,8 @@ gceSTATUS Tessellate(
         scale = context->tessContext.strokeScale;
         if (scale == 0)
         {
+            OVG_FREE(context->os, points);
+            OVG_FREE(context->os, numPointsInSubPaths);
             gcmFOOTER_ARG("return=%s", "FALSE");
             return gcvSTATUS_SKIP;
         }
@@ -7023,6 +7036,7 @@ gctINT32    _DivideIntoDashLines(
     if (numTotalPoints == 0)
     {
         OVG_FREE(context->os, headNode);
+        OVG_SAFE_FREE(context->os, points);
         *resultPoints = gcvNULL;
         *countArray = gcvNULL;
         *numDashSegs = 0;

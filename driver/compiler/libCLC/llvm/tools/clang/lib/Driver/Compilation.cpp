@@ -139,6 +139,7 @@ int Compilation::ExecuteCommand(const Command &C,
   if (getDriver().CCCEcho || getDriver().CCPrintOptions ||
       getArgs().hasArg(options::OPT_v)) {
     llvm::raw_ostream *OS = &llvm::errs();
+    bool deleteOS = true;
 
     // Follow gcc implementation of CC_PRINT_OPTIONS; we could also cache the
     // output stream.
@@ -155,6 +156,7 @@ int Compilation::ExecuteCommand(const Command &C,
         delete[] Argv;
         return 1;
       }
+      deleteOS = false;
     }
 
     if (getDriver().CCPrintOptions)
@@ -162,7 +164,7 @@ int Compilation::ExecuteCommand(const Command &C,
 
     PrintJob(*OS, C, "\n", /*Quote=*/getDriver().CCPrintOptions);
 
-    if (OS != &llvm::errs())
+    if (deleteOS)
       delete OS;
   }
 

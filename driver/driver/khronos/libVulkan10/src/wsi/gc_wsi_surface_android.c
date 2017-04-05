@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -125,10 +125,10 @@ formatXlateTable[] =
     {HAL_PIXEL_FORMAT_BGRA_8888, VK_FORMAT_B8G8R8A8_UNORM},
     {/* HAL_PIXEL_FORMAT_RGBA_5551 */ 6, VK_FORMAT_R5G5B5A1_UNORM_PACK16},
     {/* HAL_PIXEL_FORMAT_RGBA_4444 */ 7, VK_FORMAT_R4G4B4A4_UNORM_PACK16},
-    /* TODO: A8. */
     {/* HAL_PIXEL_FORMAT_A_8 */ 8, VK_FORMAT_R8_UNORM},
-    /* TODO: L8. */
     {/* HAL_PIXEL_FORMAT_L_8 */ 9, VK_FORMAT_R8_UNORM},
+    {HAL_PIXEL_FORMAT_RGBA_8888, VK_FORMAT_R8G8B8A8_SRGB},
+    {HAL_PIXEL_FORMAT_BGRA_8888, VK_FORMAT_B8G8R8A8_SRGB},
 };
 
 static VkFormat __TranslateAndroidFormat(
@@ -405,7 +405,6 @@ static void __SelectNativeWindowRenderMode(
     ANativeWindow *win
     )
 {
-    /* TODO */
     sc->renderMode = __VK_WSI_INDIRECT_RENDERING;
     ALOGV(" %s: sc=%p win=%p renderMode=%d", __func__, sc, win, sc->renderMode);
 }
@@ -469,9 +468,6 @@ static void __UpdateNativeWindowProducerUsage(
 
 /*
  * Wrap native window buffer to __vkDeviceMemory
- *
- * TODO:
- * Make it more general.
  */
 static VkResult __WrapNativeWindowBufferMemory(
     VkDevice device,
@@ -521,9 +517,11 @@ static inline void __GetNativeWindowBufferSize(
 }
 
 static const VkFormat wsiSupportedPresentFormats[] = {
+    VK_FORMAT_R8G8B8A8_UNORM,
     VK_FORMAT_B8G8R8A8_UNORM,
-    VK_FORMAT_B8G8R8A8_SRGB,
     VK_FORMAT_R5G6B5_UNORM_PACK16,
+    VK_FORMAT_B8G8R8A8_SRGB,
+    VK_FORMAT_R8G8B8A8_SRGB,
 };
 
 
@@ -562,7 +560,6 @@ static VkResult androidGetPhysicalDeviceSurfaceSupport(
 
     *pSupported = VK_FALSE;
 
-    /* TODO: Add present surface tests for present support */
     if (queueFamilyIndex <= phyDev->queueFamilyCount)
     {
         *pSupported = phyDev->queuePresentSupported[queueFamilyIndex];
@@ -638,6 +635,7 @@ static VkResult androidGetPhysicalDeviceSurfacePresentModes(
 {
     static VkPresentModeKHR presentModes[] =
     {
+        VK_PRESENT_MODE_MAILBOX_KHR,
         VK_PRESENT_MODE_FIFO_KHR,
     };
 
@@ -706,7 +704,6 @@ static VkResult __CreateImageBuffer(
     VkImageCreateInfo imgInfo;
     VkBufferCreateInfo bufInfo;
     VkMemoryAllocateInfo memAlloc;
-    VkDeviceMemory memory;
     VkResult result = VK_SUCCESS;
 
     /* Create the swap chain render target images */
@@ -733,10 +730,10 @@ static VkResult __CreateImageBuffer(
     memAlloc.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     memAlloc.allocationSize  = (__VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage *, imageBuffer->renderTarget))->memReq.size;
     memAlloc.memoryTypeIndex = 0;
-    __VK_ONERROR(__vk_AllocateMemory(sc->device, &memAlloc, gcvNULL, &memory));
+    __VK_ONERROR(__vk_AllocateMemory(sc->device, &memAlloc, gcvNULL, &imageBuffer->renderTargetMemory));
 
     /* bind memory to image. */
-    __VK_ONERROR(__vk_BindImageMemory(sc->device, imageBuffer->renderTarget, memory, 0));
+    __VK_ONERROR(__vk_BindImageMemory(sc->device, imageBuffer->renderTarget, imageBuffer->renderTargetMemory, 0));
 
     /* Create the swap chain resolve buffers */
     __VK_MEMZERO(&bufInfo, sizeof(VkBufferCreateInfo));
@@ -916,11 +913,6 @@ static VkResult __AcquireNextImage(
         return VK_ERROR_OUT_OF_DATE_KHR;
     }
 
-    /*
-     * TODO: Link fenceFd to semaphore and fence.
-     * On android, producer can write to window buffer when the fenceFd is signaled.
-     * VkSemaphore and VkFence has similar meanings.
-     */
     if (fenceFd != -1)
     {
         sync_wait(fenceFd, -1);
@@ -929,14 +921,12 @@ static VkResult __AcquireNextImage(
 
     if (semaphore)
     {
-        /* TODO: hook with fenceFd. */
         /* Set to signaled by CPU. */
         __vk_SetSemaphore(device, semaphore, VK_TRUE);
     }
 
     if (fence)
     {
-        /* TODO: hook with fenceFd. */
         /* Set to signaled by CPU. */
         __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
         gcoOS_Signal(gcvNULL, fce->signal, VK_TRUE);
@@ -1113,7 +1103,6 @@ static VkResult __CommitPresentCommand(
     while (VK_FALSE);
 
 #else
-    /* TODO: Better to use a thread. */
 #if __VK_NEW_DEVICE_QUEUE
     __vk_QueueWaitIdle(queue);
 #  else
@@ -1178,6 +1167,8 @@ static VkResult androidCreateSwapchain(
     __vkDevContext *devCtx = (__vkDevContext *)device;
     __vkAndroidSwapchainKHR *sc = NULL;
     uint32_t i;
+    uint32_t imageCount = 0;
+    int swapInterval;
     VkResult result = VK_SUCCESS;
     __vkAndroidSurfaceKHR *surf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkAndroidSurfaceKHR *, pCreateInfo->surface);
     ANativeWindow *win = surf->window;
@@ -1244,16 +1235,24 @@ static VkResult androidCreateSwapchain(
 
     sc->imageCount       = 0;
 
+    /* Require extra 1 image for async mode. */
+    imageCount           = (pCreateInfo->presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+                            ? sc->minImageCount + 1 : sc->minImageCount;
+
     __VK_ONERROR(__CreateSwapchainCommandBuffer(sc));
 
     __SelectNativeWindowRenderMode(sc, surf, win);
     __UpdateNativeWindowProducerUsage(sc, surf, win);
-    __SetNativeWindowBufferCount(surf, win, sc->minImageCount);
+    __SetNativeWindowBufferCount(surf, win, imageCount);
     __SetNativeWindowBufferFormat(surf, win, sc->imageFormat);
+
+    /* 0 for async mode (MAILBOX), 1 for sync mode (FIFO). */
+    swapInterval = sc->presentMode == VK_PRESENT_MODE_MAILBOX_KHR ? 0 : 1;
+    win->setSwapInterval(win, swapInterval);
 
     /* Create swap chain images */
     sc->imageBuffers = (__vkAndroidImageBuffer *)__VK_ALLOC(
-        (sc->minImageCount * sizeof(__vkAndroidImageBuffer)), 8, VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
+        (imageCount * sizeof(__vkAndroidImageBuffer)), 8, VK_SYSTEM_ALLOCATION_SCOPE_COMMAND);
 
     if (!sc->imageBuffers)
     {
@@ -1261,9 +1260,9 @@ static VkResult androidCreateSwapchain(
         goto OnError;
     }
 
-    __VK_MEMZERO(sc->imageBuffers, sc->minImageCount * sizeof(__vkAndroidImageBuffer));
+    __VK_MEMZERO(sc->imageBuffers, imageCount * sizeof(__vkAndroidImageBuffer));
 
-    for (i = 0; i < sc->minImageCount; i++)
+    for (i = 0; i < imageCount; i++)
     {
         __VK_ONERROR(__CreateImageBuffer(sc, &sc->imageBuffers[i]));
         sc->imageCount++;
@@ -1289,7 +1288,7 @@ OnError:
         {
             uint32_t i;
 
-            for (i = 0; i < sc->imageCount; i++)
+            for (i = 0; i < imageCount; i++)
             {
                 __DestroySwapchainImageBuffer(sc, &sc->imageBuffers[i]);
             }
@@ -1315,7 +1314,6 @@ VkResult VKAPI_CALL __vk_CreateAndroidSurfaceKHR(
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&inst->memCb);
 
-    /* TODO: VkSurfaceKHR should be object type. */
     surf = (__vkAndroidSurfaceKHR *)__VK_ALLOC(sizeof(__vkAndroidSurfaceKHR), 8, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
 
     if (!surf)
@@ -1382,11 +1380,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AcquireImageANDROID(
     VkFence fence
     )
 {
-    /*
-     * TODO: Link nativeFenceFd to semaphore and fence.
-     * On android, producer can write to window buffer when the nativeFenceFd is signaled.
-     * VkSemaphore and VkFence has similar meanings.
-     */
     if (nativeFenceFd != -1)
     {
         sync_wait(nativeFenceFd, -1);
@@ -1395,14 +1388,12 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AcquireImageANDROID(
 
     if (semaphore)
     {
-        /* TODO: hook with nativeFenceFd. */
         /* Set to signaled by CPU. */
         __vk_SetSemaphore(device, semaphore, VK_TRUE);
     }
 
     if (fence)
     {
-        /* TODO: hook with nativeFenceFd. */
         /* Set to signaled by CPU. */
         __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
         gcoOS_Signal(gcvNULL, fce->signal, VK_TRUE);

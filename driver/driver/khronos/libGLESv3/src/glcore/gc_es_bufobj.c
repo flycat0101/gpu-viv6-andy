@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -473,15 +473,24 @@ GLboolean __glDeleteBufferObject(__GLcontext *gc, __GLbufferObject *bufObj)
     /* Check all the binding points in vertexArrayState. */
     for (bindingIndex = 0; bindingIndex < __GL_MAX_VERTEX_ATTRIBUTE_BINDINGS; bindingIndex++)
     {
-        if (vertexArrayState->attributeBinding[bindingIndex].boundArrayObj == bufObj)
+        __GLvertexAttribBinding *pAttribBinding = &vertexArrayState->attributeBinding[bindingIndex];
+
+        if (gc->vertexArray.boundVertexArray)
         {
-            if (gc->vertexArray.boundVertexArray)
+            if (pAttribBinding->boundArrayObj == bufObj)
             {
                 __glRemoveImageUser(gc, &bufObj->vaoList, gc->vertexArray.boundVAO);
+                pAttribBinding->boundArrayName = 0;
+                pAttribBinding->boundArrayObj = gcvNULL;
             }
-
-            vertexArrayState->attributeBinding[bindingIndex].boundArrayName = 0;
-            vertexArrayState->attributeBinding[bindingIndex].boundArrayObj = gcvNULL;
+        }
+        else
+        {
+            if (pAttribBinding->boundArrayName == bufObj->name)
+            {
+                pAttribBinding->boundArrayName = 0;
+                pAttribBinding->boundArrayObj = gcvNULL;
+            }
         }
     }
 
@@ -720,7 +729,6 @@ GLvoid GL_APIENTRY __gles_BindBufferRange(__GLcontext *gc, GLenum target, GLuint
 
     __GL_HEADER();
 
-    /* TODO: Spec does not require offset to be non-negative */
     if ((buffer != 0) && (size <= 0))
     {
         __GL_ERROR_EXIT(GL_INVALID_VALUE);

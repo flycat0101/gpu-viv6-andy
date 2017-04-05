@@ -1118,7 +1118,6 @@ struct PragmaOPENCL_EXTENSIONHandler : public PragmaHandler {
     case CL_EXT_KHR_FP16:
     case CL_EXT_KHR_INT64_BASE_ATOMICS:
     case CL_EXT_KHR_INT64_EXTENDED_ATOMICS:
-    case CL_EXT_KHR_GL_SHARING:
     case CL_EXT_KHR_GL_EVENT:
     case CL_EXT_KHR_D3D10_SHARING:
        if(Setting == OPENCL_ENABLE) {
@@ -1153,6 +1152,7 @@ struct PragmaOPENCL_EXTENSIONHandler : public PragmaHandler {
 
     case CL_EXT_KHR_BYTE_ADDRESSABLE_STORE:
     case CL_EXT_KHR_3D_IMAGE_WRITES:
+    case CL_EXT_KHR_GL_SHARING:
        DefineUndefMacro(PP, II, ExtTok.getLocation(), Setting);
        break;
 

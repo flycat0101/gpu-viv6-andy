@@ -857,7 +857,7 @@ class opt : public Option,
     return Parser.getValueExpectedFlagDefault();
   }
   virtual void getExtraOptionNames(SmallVectorImpl<const char*> &OptionNames) {
-    return Parser.getExtraOptionNames(OptionNames);
+    Parser.getExtraOptionNames(OptionNames);
   }
 
   // Forward printing stuff to the parser...
@@ -1010,7 +1010,7 @@ class list : public Option, public list_storage<DataType, Storage> {
     return Parser.getValueExpectedFlagDefault();
   }
   virtual void getExtraOptionNames(SmallVectorImpl<const char*> &OptionNames) {
-    return Parser.getExtraOptionNames(OptionNames);
+    Parser.getExtraOptionNames(OptionNames);
   }
 
   virtual bool handleOccurrence(unsigned pos, StringRef ArgName, StringRef Arg){
@@ -1209,7 +1209,7 @@ class bits : public Option, public bits_storage<DataType, Storage> {
     return Parser.getValueExpectedFlagDefault();
   }
   virtual void getExtraOptionNames(SmallVectorImpl<const char*> &OptionNames) {
-    return Parser.getExtraOptionNames(OptionNames);
+    Parser.getExtraOptionNames(OptionNames);
   }
 
   virtual bool handleOccurrence(unsigned pos, StringRef ArgName, StringRef Arg){

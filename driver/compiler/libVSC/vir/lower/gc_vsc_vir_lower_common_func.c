@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -120,7 +120,7 @@ VIR_Lower_SetOne(
 {
     VIR_ScalarConstVal imm0;
 
-    imm0.fValue = 1.0f,
+    imm0.fValue = 1.0f;
 
     VIR_Operand_SetImmediate(Opnd,
         VIR_TYPE_FLOAT32,
@@ -137,7 +137,7 @@ VIR_Lower_SetMinusOne(
 {
     VIR_ScalarConstVal imm0;
 
-    imm0.fValue = -1.0f,
+    imm0.fValue = -1.0f;
 
     VIR_Operand_SetImmediate(Opnd,
         VIR_TYPE_FLOAT32,
@@ -154,7 +154,7 @@ VIR_Lower_SetIntOne(
 {
     VIR_ScalarConstVal imm0;
 
-    imm0.iValue = 1,
+    imm0.iValue = 1;
 
     VIR_Operand_SetImmediate(Opnd,
         VIR_TYPE_INT32,
@@ -171,7 +171,7 @@ VIR_Lower_SetUIntOne(
 {
     VIR_ScalarConstVal imm0;
 
-    imm0.iValue = 1,
+    imm0.iValue = 1;
 
     VIR_Operand_SetImmediate(Opnd,
         VIR_TYPE_UINT32,
@@ -188,7 +188,7 @@ VIR_Lower_SetIntMinusOne(
 {
     VIR_ScalarConstVal imm0;
 
-    imm0.iValue = -1,
+    imm0.iValue = -1;
 
     VIR_Operand_SetImmediate(Opnd,
         VIR_TYPE_INT32,
@@ -488,6 +488,37 @@ VIR_Lower_IsDstFloat(
 }
 
 gctBOOL
+VIR_Lower_IsSrc0Unsigned(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_Operand  *src0 = VIR_Inst_GetSource(Inst, 0);
+    VIR_TypeId   typeId;
+
+    gcmASSERT(src0);
+    if(src0 == gcvNULL) return gcvFALSE;
+
+    typeId= VIR_Operand_GetType(src0);
+
+    gcmASSERT(typeId < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+    return VIR_TypeId_isUnSignedInteger(typeId);
+}
+
+gctBOOL
+VIR_Lower_IsDstInt(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_TypeId   ty   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
+    gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+    return VIR_TypeId_isInteger(ty);
+}
+
+gctBOOL
 VIR_Lower_IsDstInt32(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst
@@ -511,6 +542,27 @@ VIR_Lower_IsDstInt16(
 
     return VIR_GetTypeComponentType(ty) == VIR_TYPE_INT16
         || VIR_GetTypeComponentType(ty) == VIR_TYPE_UINT16;
+}
+
+gctBOOL
+VIR_Lower_IsDstIntPacked(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    VIR_TypeId   ty   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
+    gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
+
+    return VIR_TypeId_isInteger(ty) && VIR_TypeId_isPacked(ty);
+}
+
+gctBOOL
+VIR_Lower_IsDstNotIntPacked(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst
+    )
+{
+    return !VIR_Lower_IsDstIntPacked(Context, Inst);
 }
 
 gctBOOL
@@ -636,8 +688,8 @@ VIR_Lower_HasTexldModifier(
     return gcvFALSE;
 }
 
-static gctBOOL
-_label_set_jmp_n(
+gctBOOL
+VIR_Lower_label_set_jmp_n(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,
     IN VIR_Operand        *Opnd,
@@ -686,7 +738,7 @@ VIR_Lower_label_set_jmp_neg2(
     IN VIR_Operand        *Opnd
     )
 {
-    return _label_set_jmp_n(Context, Inst, Opnd, -2);
+    return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -2);
 }
 
 gctBOOL
@@ -696,7 +748,7 @@ VIR_Lower_label_set_jmp_neg3(
     IN VIR_Operand        *Opnd
     )
 {
-    return _label_set_jmp_n(Context, Inst, Opnd, -3);
+    return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -3);
 }
 
 gctBOOL
@@ -706,12 +758,12 @@ VIR_Lower_label_set_jmp_neg3_6(
     IN VIR_Operand        *Opnd
     )
 {
-    if (!_label_set_jmp_n(Context, Inst, Opnd, -3))
+    if (!VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -3))
     {
         return gcvFALSE;
     }
 
-    return _label_set_jmp_n(Context, Inst, Opnd, -6);
+    return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -6);
 }
 
 gctBOOL
@@ -721,7 +773,7 @@ VIR_Lower_label_set_jmp_neg10(
     IN VIR_Operand        *Opnd
     )
 {
-    return _label_set_jmp_n(Context, Inst, Opnd, -10);
+    return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -10);
 }
 
 gctBOOL
@@ -731,7 +783,7 @@ VIR_Lower_label_set_jmp_neg22(
     IN VIR_Operand        *Opnd
     )
 {
-    return _label_set_jmp_n(Context, Inst, Opnd, -22);
+    return VIR_Lower_label_set_jmp_n(Context, Inst, Opnd, -22);
 }
 
 static gctBOOL

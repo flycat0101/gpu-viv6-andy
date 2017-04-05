@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1416,6 +1416,50 @@ static gctBOOL _isMovaUniformBase(VIR_DEF_USAGE_INFO* pDuInfo,
     return gcvFALSE;
 }
 
+static gctBOOL _IsDstHasNoSwizzleFlag(
+    VIR_DEF_USAGE_INFO* pDuInfo,
+    VIR_Instruction* pInst)
+{
+    VIR_OperandInfo         operandInfo;
+    VIR_DEF_KEY             defKey;
+    VIR_DEF                 *pDef;
+    gctUINT8                channel;
+    gctUINT                 defIdx;
+
+    VIR_Operand_GetOperandInfo(
+        pInst,
+        VIR_Inst_GetDest(pInst),
+        &operandInfo);
+
+    for (channel = VIR_CHANNEL_X; channel < VIR_CHANNEL_NUM; channel++)
+    {
+        if (!(VIR_Inst_GetEnable(pInst) & (1 << channel)))
+        {
+            continue;
+        }
+
+        defKey.pDefInst = pInst;
+        defKey.regNo = operandInfo.u1.virRegInfo.virReg;
+        defKey.channel = channel;
+        defIdx = vscBT_HashSearch(&pDuInfo->defTable, &defKey);
+
+        if (VIR_INVALID_DEF_INDEX != defIdx)
+        {
+            pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
+
+            gcmASSERT(pDef->defKey.pDefInst == pInst && (pDef->defKey.channel == channel));
+
+            if (pDef->flags.deducedDefFlags.bHasUsageOnNoSwizzleInst)
+            {
+                return gcvTRUE;
+            }
+        }
+    }
+
+    return gcvFALSE;
+}
+
+
 static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
                                            VIR_Shader* pShader,
                                            VIR_DEF_USAGE_INFO* pDuInfo,
@@ -1486,6 +1530,13 @@ static gctBOOL _CanInstVectorizeToSeedInst(VIR_VECTORIZER_INFO* pVectorizerInfo,
         {
             return gcvFALSE;
         }
+    }
+
+    /* could not do vectorization for dst has bHasUsageOnNoSwizzleInst */
+    if (_IsDstHasNoSwizzleFlag(pDuInfo, pSeedInst) ||
+        _IsDstHasNoSwizzleFlag(pDuInfo, pInst))
+    {
+        return gcvFALSE;
     }
 
     /* Check dst */
@@ -3719,7 +3770,10 @@ VSC_ErrCode vscVIR_DoLocalVectorization(VSC_SH_PASS_WORKER* pPassWorker)
         {VIR_OPND_VECTORIZE_TYPE_VIMM_2_VIMM, _Vimm2VimmOpndsVectorizabilityCheck, gcvNULL, _VectorizeVimm2VimmOpnds    },
     };
 
-    if (!gcUseFullNewLinker(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2))
+    /* the local vectoization has not handled packed type yet, turn off it for VX for now. */
+    if (!gcUseFullNewLinker(pPassWorker->pCompilerParam->cfg.ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti2) ||
+        VIR_Shader_HasVivVxExtension(pShader) ||
+        gcmOPT_oclPackedBasicType())
     {
         return errCode;
     }

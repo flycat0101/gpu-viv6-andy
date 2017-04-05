@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1933,6 +1933,11 @@ static void _CollectExeHints(VSC_SEP_GEN_HELPER* pSepGenHelper, SHADER_EXECUTABL
     if (pShader->shaderKind == VIR_SHADER_COMPUTE)
     {
         pOutSEP->exeHints.nativeHints.prvStates.gps.shareMemSizePerThreadGrpInByte = VIR_Shader_GetLocalMemorySize(pShader);
+        pOutSEP->exeHints.nativeHints.prvStates.gps.currWorkGrpNum = VIR_Shader_GetCurrWorkGrpNum(pShader);
+        if (pOutSEP->exeHints.nativeHints.prvStates.gps.shareMemSizePerThreadGrpInByte > 0)
+        {
+            gcmASSERT(pOutSEP->exeHints.nativeHints.prvStates.gps.currWorkGrpNum > 0);
+        }
         pOutSEP->exeHints.nativeHints.prvStates.gps.threadGrpDimX = pShader->shaderLayout.compute.workGroupSize[0];
         pOutSEP->exeHints.nativeHints.prvStates.gps.threadGrpDimY = pShader->shaderLayout.compute.workGroupSize[1];
         pOutSEP->exeHints.nativeHints.prvStates.gps.threadGrpDimZ = pShader->shaderLayout.compute.workGroupSize[2];
@@ -2775,6 +2780,9 @@ VSC_RES_OP_BIT _VirResOpType2DrviResOpBit(gctUINT resOpType)
 
     case VIR_RES_OP_TYPE_GATHER_PCF:
         return VSC_RES_OP_BIT_GATHER_PCF;
+
+    case VIR_RES_OP_TYPE_LODQ:
+        return VSC_RES_OP_LODQ;
 
     default:
         gcmASSERT(gcvFALSE);

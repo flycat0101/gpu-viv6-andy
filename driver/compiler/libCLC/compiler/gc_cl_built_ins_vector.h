@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -602,39 +602,27 @@ _GenVloadCode(
     if (gcmIS_ERROR(status)) return status;
 
     rOperand = &OperandsParameters[1].rOperands[0];
-    if(OperandsParameters[1].dataTypes[0].byteOffset) { /* byte offset is non-zero */
+    if(!clIsIntegerZero(&OperandsParameters[1].dataTypes[0].byteOffset)) { /* byte offset is non-zero */
        if(!scaledIndex->isReg) { /*index is a constant */
-          status = clGenAddToOffset(scaledIndex,
-                                    OperandsParameters[1].dataTypes[0].byteOffset);
+          status = clUpdateAddressOffset(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         clGetIntegerValue(scaledIndex),
+                                         &OperandsParameters[1].dataTypes[0].byteOffset,
+                                         scaledIndex);
           if (gcmIS_ERROR(status)) return status;
        }
        else {
           clsIOPERAND intermIOperand[1];
-          cleOPCODE opcode;
-          gctUINT offset;
-          clsROPERAND constantOffset[1];
-          clsGEN_CODE_DATA_TYPE dataType;
 
-          if(OperandsParameters[1].dataTypes[0].byteOffset < 0) {
-             offset = -OperandsParameters[1].dataTypes[0].byteOffset;
-             opcode = clvOPCODE_SUB;
-          }
-          else {
-             offset = OperandsParameters[1].dataTypes[0].byteOffset;
-             opcode = clvOPCODE_ADD;
-          }
-          dataType = clmGenCodeDataType(T_UINT);
-          clsROPERAND_InitializeScalarConstant(constantOffset,
-                                               dataType,
-                                               uint,
-                                               offset);
+          clsIOPERAND_New(Compiler, intermIOperand, clmGenCodeDataType(T_INT));
           status = clGenGenericCode2(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
                                      PolynaryExpr->exprBase.base.stringNo,
-                                     opcode,
+                                     clvOPCODE_ADD,
                                      intermIOperand,
                                      rOperand,
-                                     constantOffset);
+                                     &OperandsParameters[1].dataTypes[0].byteOffset);
           if (gcmIS_ERROR(status)) return status;
           clsROPERAND_InitializeUsingIOperand(operandBuffer, intermIOperand);
           rOperand = operandBuffer;
@@ -1002,39 +990,27 @@ _GenVstoreCode(
     if (gcmIS_ERROR(status)) return status;
 
     rOperand = &OperandsParameters[2].rOperands[0];
-    if(OperandsParameters[2].dataTypes[0].byteOffset) { /* byte offset is non-zero */
+    if(!clIsIntegerZero(&OperandsParameters[2].dataTypes[0].byteOffset)) { /* byte offset is non-zero */
        if(!scaledIndex->isReg) { /*index is a constant */
-          status = clGenAddToOffset(scaledIndex,
-                                    OperandsParameters[2].dataTypes[0].byteOffset);
+          status = clUpdateAddressOffset(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         clGetIntegerValue(scaledIndex),
+                                         &OperandsParameters[2].dataTypes[0].byteOffset,
+                                         scaledIndex);
           if (gcmIS_ERROR(status)) return status;
        }
        else {
           clsIOPERAND intermIOperand[1];
-          cleOPCODE opcode;
-          gctUINT offset;
-          clsROPERAND constantOffset[1];
-          clsGEN_CODE_DATA_TYPE dataType;
 
-          if(OperandsParameters[2].dataTypes[0].byteOffset < 0) {
-             offset = -OperandsParameters[2].dataTypes[0].byteOffset;
-             opcode = clvOPCODE_SUB;
-          }
-          else {
-             offset = OperandsParameters[2].dataTypes[0].byteOffset;
-             opcode = clvOPCODE_ADD;
-          }
-          dataType = clmGenCodeDataType(T_UINT);
-          clsROPERAND_InitializeScalarConstant(constantOffset,
-                                               dataType,
-                                               uint,
-                                               offset);
+          clsIOPERAND_New(Compiler, intermIOperand, clmGenCodeDataType(T_INT));
           status = clGenGenericCode2(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
                                      PolynaryExpr->exprBase.base.stringNo,
-                                     opcode,
+                                     clvOPCODE_ADD,
                                      intermIOperand,
                                      rOperand,
-                                     constantOffset);
+                                     &OperandsParameters[2].dataTypes[0].byteOffset);
           if (gcmIS_ERROR(status)) return status;
           clsROPERAND_InitializeUsingIOperand(operandBuffer, intermIOperand);
           rOperand = operandBuffer;
@@ -1089,52 +1065,40 @@ _GenVloadHalfCode(
         if (gcmIS_ERROR(status)) return status;
 
     rOperand = &OperandsParameters[1].rOperands[0];
-    if(OperandsParameters[1].dataTypes[0].byteOffset) { /* byte offset is non-zero */
+    if(!clIsIntegerZero(&OperandsParameters[1].dataTypes[0].byteOffset)) { /* byte offset is non-zero */
        if(!scaledIndex->isReg) { /*index is a constant */
-              status = clGenAddToOffset(scaledIndex,
-                                    OperandsParameters[1].dataTypes[0].byteOffset);
-              if (gcmIS_ERROR(status)) return status;
+          status = clUpdateAddressOffset(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         clGetIntegerValue(scaledIndex),
+                                         &OperandsParameters[1].dataTypes[0].byteOffset,
+                                         scaledIndex);
+          if (gcmIS_ERROR(status)) return status;
        }
        else {
           clsIOPERAND intermIOperand[1];
-          cleOPCODE opcode;
-          gctUINT offset;
-          clsROPERAND constantOffset[1];
-          clsGEN_CODE_DATA_TYPE dataType;
 
-          if(OperandsParameters[1].dataTypes[0].byteOffset < 0) {
-             offset = -OperandsParameters[1].dataTypes[0].byteOffset;
-             opcode = clvOPCODE_SUB;
-          }
-          else {
-             offset = OperandsParameters[1].dataTypes[0].byteOffset;
-             opcode = clvOPCODE_ADD;
-          }
-          dataType = clmGenCodeDataType(T_UINT);
-          clsROPERAND_InitializeScalarConstant(constantOffset,
-                                                   dataType,
-                                               uint,
-                                                   offset);
-              status = clGenGenericCode2(Compiler,
-                                         PolynaryExpr->exprBase.base.lineNo,
-                                         PolynaryExpr->exprBase.base.stringNo,
-                                         opcode,
-                                         intermIOperand,
+          clsIOPERAND_New(Compiler, intermIOperand, clmGenCodeDataType(T_INT));
+          status = clGenGenericCode2(Compiler,
+                                     PolynaryExpr->exprBase.base.lineNo,
+                                     PolynaryExpr->exprBase.base.stringNo,
+                                     clvOPCODE_ADD,
+                                     intermIOperand,
                                      rOperand,
-                                         constantOffset);
-              if (gcmIS_ERROR(status)) return status;
-              clsROPERAND_InitializeUsingIOperand(operandBuffer, intermIOperand);
+                                     &OperandsParameters[1].dataTypes[0].byteOffset);
+          if (gcmIS_ERROR(status)) return status;
+          clsROPERAND_InitializeUsingIOperand(operandBuffer, intermIOperand);
           rOperand = operandBuffer;
        }
     }
-        status = clGenGenericCode2(Compiler,
-                                   PolynaryExpr->exprBase.base.lineNo,
-                                   PolynaryExpr->exprBase.base.stringNo,
-                                   clvOPCODE_LOAD,
-                                   iOperand,
+    status = clGenGenericCode2(Compiler,
+                               PolynaryExpr->exprBase.base.lineNo,
+                               PolynaryExpr->exprBase.base.stringNo,
+                               clvOPCODE_LOAD,
+                               iOperand,
                                rOperand,
-                                   scaledIndex);
-        if (gcmIS_ERROR(status)) return status;
+                               scaledIndex);
+    if (gcmIS_ERROR(status)) return status;
 
     return gcvSTATUS_OK;
 }
@@ -1175,39 +1139,27 @@ _GenVstoreHalfCode(
     if (gcmIS_ERROR(status)) return status;
 
     addrOperand = &OperandsParameters[2].rOperands[0];
-    if(OperandsParameters[2].dataTypes[0].byteOffset) { /* byte offset is non-zero */
+    if(!clIsIntegerZero(&OperandsParameters[2].dataTypes[0].byteOffset)) { /* byte offset is non-zero */
        if(!scaledIndex->isReg) { /*index is a constant */
-          status = clGenAddToOffset(scaledIndex,
-                                    OperandsParameters[2].dataTypes[0].byteOffset);
+          status = clUpdateAddressOffset(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         clGetIntegerValue(scaledIndex),
+                                         &OperandsParameters[2].dataTypes[0].byteOffset,
+                                         scaledIndex);
           if (gcmIS_ERROR(status)) return status;
        }
        else {
           clsIOPERAND intermIOperand[1];
-          cleOPCODE opcode;
-          gctUINT offset;
-          clsROPERAND constantOffset[1];
-          clsGEN_CODE_DATA_TYPE dataType;
 
-          if(OperandsParameters[2].dataTypes[0].byteOffset < 0) {
-             offset = -OperandsParameters[2].dataTypes[0].byteOffset;
-             opcode = clvOPCODE_SUB;
-          }
-          else {
-             offset = OperandsParameters[2].dataTypes[0].byteOffset;
-             opcode = clvOPCODE_ADD;
-          }
-          dataType = clmGenCodeDataType(T_UINT);
-          clsROPERAND_InitializeScalarConstant(constantOffset,
-                                               dataType,
-                                               uint,
-                                               offset);
+          clsIOPERAND_New(Compiler, intermIOperand, clmGenCodeDataType(T_INT));
           status = clGenGenericCode2(Compiler,
                                      PolynaryExpr->exprBase.base.lineNo,
                                      PolynaryExpr->exprBase.base.stringNo,
-                                     opcode,
+                                     clvOPCODE_ADD,
                                      intermIOperand,
                                      addrOperand,
-                                     constantOffset);
+                                     &OperandsParameters[2].dataTypes[0].byteOffset);
           if (gcmIS_ERROR(status)) return status;
           clsROPERAND_InitializeUsingIOperand(operandBuffer, intermIOperand);
           addrOperand = operandBuffer;

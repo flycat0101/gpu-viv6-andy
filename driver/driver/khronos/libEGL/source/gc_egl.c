@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -31,24 +31,17 @@ const char * _EGL_VERSION = "\n\0$VERSION$"
 
 static void
 _DestroyThreadData(
-    gcsTLS_PTR TLS
+    gcsDRIVER_TLS_PTR TLS
     )
 {
     gctBOOL releaseThread = gcvFALSE;
+    VEGLThreadData thread;
     gcmHEADER_ARG("TLS=0x%x", TLS);
 
-    if (TLS->context != gcvNULL)
+    thread = (VEGLThreadData) TLS;
+    if (thread != gcvNULL)
     {
-        VEGLThreadData thread;
         VEGLDisplay head;
-
-        thread = (VEGLThreadData) TLS->context;
-
-        if (thread == gcvNULL)
-        {
-            gcmFOOTER_NO();
-            return;
-        }
 
         gcoOS_LockPLS();
 
@@ -83,23 +76,14 @@ _DestroyThreadData(
             }
         }
 
-        if (thread->extString)
-        {
-            gcoOS_Free(gcvNULL, thread->extString);
-            thread->extString = gcvNULL;
-        }
-
         if (thread->clientExtString)
         {
             gcoOS_Free(gcvNULL, thread->clientExtString);
             thread->clientExtString = gcvNULL;
         }
 
-        gcoOS_Free(gcvNULL, TLS->context);
-        TLS->context = gcvNULL;
+        gcoOS_Free(gcvNULL, thread);
     }
-
-    TLS->destructor = gcvNULL;
 
     gcmFOOTER_NO();
 }
@@ -243,17 +227,16 @@ veglGetThreadData(
     void
     )
 {
-    gcsTLS_PTR tls = gcvNULL;
+    VEGLThreadData thread = gcvNULL;
     gceSTATUS status;
-    gctINT32 i;
     gcmHEADER();
 
-    gcmONERROR(gcoOS_GetTLS(&tls));
+    gcmONERROR(
+        gcoOS_GetDriverTLS(gcvTLS_KEY_EGL, (gcsDRIVER_TLS_PTR *) &thread));
 
-    if (tls->context == gcvNULL)
+    if (thread == gcvNULL)
     {
         gctPOINTER pointer = gcvNULL;
-        VEGLThreadData thread;
 
         gcmONERROR(gcoOS_Allocate(
             gcvNULL, gcmSIZEOF(struct eglThreadData), &pointer
@@ -263,117 +246,42 @@ veglGetThreadData(
             pointer, gcmSIZEOF(struct eglThreadData)
             );
 
-        /* Initialize TLS record. */
-        tls->context    = pointer;
-        tls->destructor = _DestroyThreadData;
-
         /* Cast the pointer. */
         thread = (VEGLThreadData) pointer;
+
+        /* Initialize TLS record. */
+        thread->base.destructor   = _DestroyThreadData;
 
         /* Initialize the thread data. */
         thread->error             = EGL_SUCCESS;
         thread->api               = EGL_OPENGL_ES_API;
         thread->worker            = gcvNULL;
-        thread->maxWidth          = 0;
-        thread->maxHeight         = 0;
-        thread->maxSamples        = 0;
-        /* Default feature bits. */
-        thread->fastMSAA          = gcvFALSE;
-        thread->security          = gcvFALSE;
-        thread->openVGpipe        = gcvFALSE;
 
 #if gcdGC355_MEM_PRINT
         thread->fbMemSize         = 0;
 #endif
-
-        gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
 
 #if veglUSE_HAL_DUMP
         /* Get the gcoDUMP object. */
         gcmONERROR(gcoHAL_GetDump(thread->hal, &thread->dump));
 #endif
 
-        gcmONERROR(gcoHAL_QueryChipCount(gcvNULL, &thread->chipCount));
-
         /* Initialize client dispatch tables. */
         _InitDispatchTables(thread);
 
-        for (i = 0; i < thread->chipCount; i++)
-        {
-            if (gcvSTATUS_OK != gcoHAL_QueryChipLimits(gcvNULL, i, &thread->chipLimits[i]))
-            {
-                thread->chipLimits[i].maxWidth = 0;
-                thread->chipLimits[i].maxHeight = 0;
-                thread->chipLimits[i].maxSamples = 0;
-            }
-        }
-
-        for (i = 0; i < thread->chipCount; i++)
-        {
-            thread->maxWidth =
-                gcmMAX(thread->maxWidth, (gctINT32)thread->chipLimits[i].maxWidth);
-
-            thread->maxHeight =
-                gcmMAX(thread->maxHeight, (gctINT32)thread->chipLimits[i].maxHeight);
-
-            thread->maxSamples =
-                gcmMAX(thread->maxSamples, (gctINT32)thread->chipLimits[i].maxSamples);
-        }
-
-#if gcdENABLE_VG
-        for (i = 0; i < thread->chipCount; i++)
-        {
-            if (gcoHAL_QueryChipFeature(gcvNULL, i, gcvFEATURE_PIPE_VG))
-            {
-                veglDISPATCH * dispatch = thread->dispatchTables[vegl_OPENVG];
-
-                if (dispatch && dispatch->queryHWVG)
-                {
-                    thread->openVGpipe = (*dispatch->queryHWVG)();
-                }
-                break;
-            }
-        }
-#endif
-
-        /* Query fastMSAA support. */
-        for (i = 0; i < thread->chipCount; i++)
-        {
-            if ((gcoHAL_QueryChipFeature(gcvNULL, i, gcvFEATURE_FAST_MSAA)) ||
-                (gcoHAL_QueryChipFeature(gcvNULL, i, gcvFEATURE_SMALL_MSAA)))
-            {
-                thread->fastMSAA = gcvTRUE;
-                break;
-            }
-        }
-
-        for (i = 0; i < thread->chipCount; i++)
-        {
-            if (gcoHAL_QueryChipFeature(gcvNULL, i, gcvFEATURE_SECURITY))
-            {
-                thread->security = gcvTRUE;
-                break;
-            }
-        }
-
-        gcmTRACE_ZONE(
-            gcvLEVEL_VERBOSE, gcdZONE_EGL_API,
-            "%s(%d): maxWidth=%d maxHeight=%d maxSamples=%d fastmsaa=%d openVG=%d",
-            __FUNCTION__, __LINE__,
-            thread->maxWidth, thread->maxHeight, thread->maxSamples,
-            thread->fastMSAA, thread->openVGpipe
-            );
+        /* Set driver tls. */
+        gcoOS_SetDriverTLS(gcvTLS_KEY_EGL, &thread->base);
     }
 
     /* Return pointer to thread data. */
-    gcmFOOTER_ARG("0x%x", tls->context);
-    return (VEGLThreadData) tls->context;
+    gcmFOOTER_ARG("0x%x", thread);
+    return thread;
 
 OnError:
     /* Roll back. */
-    if (tls != gcvNULL)
+    if (thread != gcvNULL)
     {
-        _DestroyThreadData(tls);
+        _DestroyThreadData(&thread->base);
     }
 
     /* Return error. */
@@ -381,6 +289,94 @@ OnError:
     return gcvNULL;
 }
 
+EGLBoolean
+veglInitDeviceThreadData(
+    VEGLThreadData Thread
+    )
+{
+    gctINT32 i;
+
+    if (Thread->chipCount > 0)
+    {
+        return EGL_TRUE;
+    }
+
+    /* Set to 3D hardware by default. */
+    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+
+    if (gcmIS_ERROR(gcoHAL_QueryChipCount(gcvNULL, &Thread->chipCount)))
+    {
+        return EGL_FALSE;
+    }
+
+    for (i = 0; i < Thread->chipCount; i++)
+    {
+        if (gcvSTATUS_OK != gcoHAL_QueryChipLimits(gcvNULL, i, &Thread->chipLimits[i]))
+        {
+            Thread->chipLimits[i].maxWidth = 0;
+            Thread->chipLimits[i].maxHeight = 0;
+            Thread->chipLimits[i].maxSamples = 0;
+        }
+    }
+
+    for (i = 0; i < Thread->chipCount; i++)
+    {
+        Thread->maxWidth =
+            gcmMAX(Thread->maxWidth, (gctINT32)Thread->chipLimits[i].maxWidth);
+
+        Thread->maxHeight =
+            gcmMAX(Thread->maxHeight, (gctINT32)Thread->chipLimits[i].maxHeight);
+
+        Thread->maxSamples =
+            gcmMAX(Thread->maxSamples, (gctINT32)Thread->chipLimits[i].maxSamples);
+    }
+
+#if gcdENABLE_VG
+    for (i = 0; i < Thread->chipCount; i++)
+    {
+        if (gcoHAL_QueryChipFeature(gcvNULL, i, gcvFEATURE_PIPE_VG))
+        {
+            veglDISPATCH * dispatch = Thread->dispatchTables[vegl_OPENVG];
+
+            if (dispatch && dispatch->queryHWVG)
+            {
+                Thread->openVGpipe = (*dispatch->queryHWVG)();
+            }
+            break;
+        }
+    }
+#endif
+
+    /* Query fastMSAA support. */
+    for (i = 0; i < Thread->chipCount; i++)
+    {
+        if ((gcoHAL_QueryChipFeature(gcvNULL, i, gcvFEATURE_FAST_MSAA)) ||
+            (gcoHAL_QueryChipFeature(gcvNULL, i, gcvFEATURE_SMALL_MSAA)))
+        {
+            Thread->fastMSAA = gcvTRUE;
+            break;
+        }
+    }
+
+    for (i = 0; i < Thread->chipCount; i++)
+    {
+        if (gcoHAL_QueryChipFeature(gcvNULL, i, gcvFEATURE_SECURITY))
+        {
+            Thread->security = gcvTRUE;
+            break;
+        }
+    }
+
+    gcmTRACE_ZONE(
+        gcvLEVEL_VERBOSE, gcdZONE_EGL_API,
+        "%s(%d): maxWidth=%d maxHeight=%d maxSamples=%d fastmsaa=%d openVG=%d",
+        __FUNCTION__, __LINE__,
+        Thread->maxWidth, Thread->maxHeight, Thread->maxSamples,
+        Thread->fastMSAA, Thread->openVGpipe
+        );
+
+    return EGL_TRUE;
+}
 
 #define EGL_LOG_API(...)  gcmPRINT(__VA_ARGS__)
 
@@ -814,19 +810,15 @@ EGLBoolean LOG_eglCopyBuffers(EGLDisplay dpy, EGLSurface surface, EGLNativePixma
     return EGL_TRUE;
 }
 
-__eglMustCastToProperFunctionPointerType LOG_eglGetProcAddress_pre(const char *procname)
+void LOG_eglGetProcAddress_pre(const char *procname)
 {
     EGL_LOG_API("EGL(tid=0x%x): eglGetProcAddress_pre %s\n", (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), procname);
-
-    return gcvNULL;
 }
 
-__eglMustCastToProperFunctionPointerType LOG_eglGetProcAddress_post(const char *procname, EGLint *func)
+void LOG_eglGetProcAddress_post(const char *procname, __eglMustCastToProperFunctionPointerType func)
 {
     EGL_LOG_API("EGL(tid=0x%x): eglGetProcAddress_post %s\n => (0x%08X)",
                  (EGLint)(gctUINTPTR_T)gcoOS_GetCurrentThreadID(), procname, (EGLint)(gctUINTPTR_T)func);
-
-    return gcvNULL;
 }
 
 /* EGL 1.5. */

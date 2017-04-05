@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+*    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 *    All Rights Reserved.
 *
 *    Permission is hereby granted, free of charge, to any person obtaining
@@ -512,12 +512,20 @@ static gctBOOL VIV2DGPUSurfaceAlloc(VIVGPUPtr gpuctx, gctUINT alignedWidth, gctU
         status = AllocVideoNode(gpuctx->mDriver->mHal, &surf->mVideoNode.mSizeInBytes, &surf->mVideoNode.mPool, cacheable, surftype, (gctUINT32 *)&surf->mVideoNode.mNode);
         if (status != gcvSTATUS_OK) {
 
+            if ( mHandle != gcvNULL )
+                gcoOS_Free(gcvNULL, mHandle);
+
             TRACE_ERROR("Unable to allocate video node\n");
             TRACE_EXIT(FALSE);
         }
 
         status = LockVideoNode(gpuctx->mDriver->mHal, (gctUINT32)surf->mVideoNode.mNode, cacheable, &surf->mVideoNode.mPhysicalAddr, &surf->mVideoNode.mLogicalAddr);
         if (status != gcvSTATUS_OK) {
+
+            FreeVideoNode(gpuctx->mDriver->mHal, surf->mVideoNode.mNode);
+            if ( mHandle != gcvNULL )
+                gcoOS_Free(gcvNULL, mHandle);
+
             TRACE_ERROR("Unable to Lock video node\n");
             TRACE_EXIT(FALSE);
         }

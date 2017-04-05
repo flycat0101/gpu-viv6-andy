@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -202,6 +202,37 @@ gcoVX_Flush(
     );
 
 gceSTATUS
+gcoVX_TriggerAccelerator(
+    IN gctUINT32              CmdAddress,
+    IN gceVX_ACCELERATOR_TYPE Type,
+    IN gctUINT32              EventId,
+    IN gctBOOL                waitEvent
+    );
+
+gceSTATUS
+gcoVX_ProgrammCrossEngine(
+    IN gctPOINTER                Data,
+    IN gceVX_ACCELERATOR_TYPE    Type,
+    IN OUT gctUINT32_PTR        *Instruction
+    );
+
+gceSTATUS
+gcoVX_SetNNImage(
+    IN gctPOINTER Data,
+    IN OUT gctUINT32_PTR *Instruction
+    );
+
+gceSTATUS
+gcoVX_GetNNConfig(
+    IN OUT gctPOINTER Config
+    );
+
+gceSTATUS
+gcoVX_WaitNNEvent(
+    gctUINT32 EventId
+    );
+
+gceSTATUS
 gcoVX_AllocateMemoryEx(
     IN OUT gctUINT *        Bytes,
     OUT gctPHYS_ADDR *      Physical,
@@ -216,6 +247,14 @@ gcoVX_FreeMemoryEx(
     IN gctUINT              Bytes,
     IN gcsSURF_NODE_PTR     Node
     );
+
+gceSTATUS
+gcoVX_GetMemorySize(
+    OUT gctUINT32_PTR Size
+    );
+
+gceSTATUS
+gcoVX_ZeroMemorySize();
 
 
 gceSTATUS

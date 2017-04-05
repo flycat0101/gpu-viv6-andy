@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -20,7 +20,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetImageSparseMemoryRequirements(
     VkSparseImageMemoryRequirements* pSparseMemoryRequirements
     )
 {
-    /* TODO */
 }
 
 VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceSparseImageFormatProperties(
@@ -34,7 +33,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceSparseImageFormatProperties(
     VkSparseImageFormatProperties* pProperties
     )
 {
-    /* TODO */
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueBindSparse(
@@ -44,7 +42,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueBindSparse(
     VkFence fence
     )
 {
-    /* TODO */
     return VK_SUCCESS;
 }
 
@@ -54,7 +51,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetRenderAreaGranularity(
     VkExtent2D* pGranularity
     )
 {
-    /* TODO */
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDebugReportCallbackEXT(
@@ -90,7 +86,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDebugReportCallbackEXT(
     const VkAllocationCallbacks* pAllocator
     )
 {
-    //__vkInstance *inst = (__vkInstance *)instance;
+    /*__vkInstance *inst = (__vkInstance *)instance;*/
     __vkDebugCallbackEXT *dcb = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDebugCallbackEXT *, callback);
 
     __VK_SET_ALLOCATIONCB(pAllocator);
@@ -109,7 +105,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_DebugReportMessageEXT(
     const char* pMessage
     )
 {
-    /* TODO */
 }
 
 

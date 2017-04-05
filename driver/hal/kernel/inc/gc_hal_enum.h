@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2016 Vivante Corporation
+*    Copyright (c) 2014 - 2017 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2016 Vivante Corporation
+*    Copyright (C) 2014 - 2017 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -493,9 +493,18 @@ typedef enum _gceFEATURE
     gcvFEATURE_SH_MULTI_WG_PACK_FIX,
     gcvFEATURE_FE_PATCHLIST_FETCH_FIX,
     gcvFEATURE_RA_CG_FIX,
+    gcvFEATURE_EVIS_VX2,
     gcvFEATURE_SH_HALF_DEPENDENCY_FIX,
     gcvFEATURE_SH_CLOCK_GATE_FIX,
     gcvFEATURE_GPIPE_CLOCK_GATE_FIX,
+    gcvFEATURE_TP_ENGINE,
+    gcvFEATURE_TX_BORDER_CLAMP_FIX,
+    gcvFEATURE_SH_IMAGE_LD_LAST_PIXEL_FIX,
+    gcvFEATURE_MULTI_CORE_BLOCK_SET_CONFIG2,
+    gcvFEATURE_MULTIGPU_SYNC_V3,
+    gcvFEATURE_PE_VMSAA_COVERAGE_CACHE_FIX,
+    gcvFEATURE_SECURITY_AHB,
+    gcvFEATURE_TX_LERP_LESS_BIT,
     /* Insert features above this comment only. */
     gcvFEATURE_COUNT                /* Not a feature. */
 }
@@ -653,6 +662,8 @@ typedef enum _gceSURF_TYPE
 
     gcvSURF_NO_HZ              = 0x100000,
 
+    gcvSURF_3D                  = 0x200000, /* It's 3d surface */
+
     gcvSURF_TEXTURE_LINEAR               = gcvSURF_TEXTURE
                                          | gcvSURF_LINEAR,
 
@@ -665,7 +676,7 @@ typedef enum _gceSURF_TYPE
     gcvSURF_RENDER_TARGET_NO_COMPRESSION = gcvSURF_RENDER_TARGET
                                          | gcvSURF_NO_COMPRESSION,
 
-    gcvSURF_RENDER_TARGET_TS_DIRTY = gcvSURF_RENDER_TARGET
+    gcvSURF_RENDER_TARGET_TS_DIRTY       = gcvSURF_RENDER_TARGET
                                          | gcvSURF_TILE_STATUS_DIRTY,
 
     gcvSURF_DEPTH_NO_TILE_STATUS         = gcvSURF_DEPTH
@@ -687,6 +698,9 @@ typedef enum _gceSURF_TYPE
 
     gcvSURF_CACHEABLE_BITMAP             = gcvSURF_BITMAP
                                          | gcvSURF_CACHEABLE,
+
+    gcvSURF_TEXTURE_3D                  = gcvSURF_TEXTURE
+                                         | gcvSURF_3D
 }
 gceSURF_TYPE;
 
@@ -1192,7 +1206,8 @@ gceSURF_INFO_TYPE;
 /* Format modifiers. */
 typedef enum _gceSURF_FORMAT_MODE
 {
-    gcvSURF_FORMAT_OCL = 0x80000000
+    gcvSURF_FORMAT_OCL          = 0x80000000,
+    gcvSURF_FORMAT_PATCH_BORDER = 0x40000000,
 }
 gceSURF_FORMAT_MODE;
 
@@ -2006,6 +2021,11 @@ typedef enum _gceCORE
     gcvCORE_3D1,
     gcvCORE_3D2,
     gcvCORE_3D3,
+    gcvCORE_3D4,
+    gcvCORE_3D5,
+    gcvCORE_3D6,
+    gcvCORE_3D7,
+    gcvCORE_3D_MAX = gcvCORE_3D7,
     gcvCORE_2D,
     gcvCORE_VG,
 #if gcdDEC_ENABLE_AHB

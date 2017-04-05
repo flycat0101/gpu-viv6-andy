@@ -52,14 +52,9 @@ EXCLUDE_OBJS += $(addsuffix .o, $(notdir $(filter-out $(basename $(SOURCE_OBJECT
 
 include $(MKFILES_ROOT)/qmacros.mk
 
-LIBS += GAL-$(HARDWARENAME) VDK EGL GLESv1_CM
+LDOPTS += -lGAL -lVSC -lVDK -lEGL_viv -lGLES_CM_viv
 
-ifneq ($(filter v7, $(VARIANT_LIST)), v7)
-	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp
-	LIBS += m-vfp
-else
-	LIBS += m
-endif
+include $(qnx_build_dir)/math.mk
 
 INSTALLDIR=$(firstword $(INSTALLDIR_$(OS)) samples/es11/tutorial)
 

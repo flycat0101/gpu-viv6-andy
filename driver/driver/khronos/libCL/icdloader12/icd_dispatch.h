@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -765,6 +765,7 @@ typedef CL_API_ENTRY cl_event (CL_API_CALL *KHRpfn_clCreateEventFromGLsyncKHR)(
     cl_int *errcode_ret);
 #else
 typedef void *KHRpfn_clCreateFromGLBuffer;
+typedef void *KHRpfn_clCreateFromGLTexture;
 typedef void *KHRpfn_clCreateFromGLTexture2D;
 typedef void *KHRpfn_clCreateFromGLTexture3D;
 typedef void *KHRpfn_clCreateFromGLRenderbuffer;
@@ -1241,7 +1242,7 @@ struct KHRicdVendorDispatchRec
     KHRpfn_clEnqueueMarkerWithWaitList              clEnqueueMarkerWithWaitList;
     KHRpfn_clEnqueueBarrierWithWaitList             clEnqueueBarrierWithWaitList;
     KHRpfn_clGetExtensionFunctionAddressForPlatform clGetExtensionFunctionAddressForPlatform;
-    /*KHRpfn_clCreateFromGLTexture                    clCreateFromGLTexture;*/
+    KHRpfn_clCreateFromGLTexture                    clCreateFromGLTexture;
 
     KHRpfn_clGetDeviceIDsFromD3D11KHR               clGetDeviceIDsFromD3D11KHR;
     KHRpfn_clCreateFromD3D11BufferKHR               clCreateFromD3D11BufferKHR;

@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -37,7 +37,7 @@ extern "C" int clock_nanosleep(clockid_t clock_id, int flags,
                            struct timespec *remain);
 
 /*
- * NOTICE & TODO:
+ * NOTICE & TODO (Soc-vendor):
  * This is only reference implementation for hwc vsync.
  * And it is a fake vsync, which does not wait for real framebuffer vsync.
  *
@@ -80,7 +80,7 @@ hwcInitVsync(
     int err;
 
     /*
-     * TODO: Do you need vsync for multiple displays?
+     * TODO (Soc-vendor): Do you need vsync for multiple displays?
      * For fake vsync, we only use one vsync thread.
      */
     if (Display->disp != HWC_DISPLAY_PRIMARY)
@@ -217,7 +217,7 @@ vsyncThread(
 
     const nsecs_t period = 1e9 / display->device.fps;
 
-    /* TODO: Implement real vsync. */
+    /* TODO (Soc-vendor): Implement real vsync. */
     nsecs_t nextFakeVsync = 0;
 
     for (;;)

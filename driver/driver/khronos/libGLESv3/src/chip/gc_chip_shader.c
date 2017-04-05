@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -919,6 +919,7 @@ gcChipSSBGetPrevActiveSibling(
 __GL_INLINE GLuint
 gcChipGetUniformArrayInfo(
     gcUNIFORM uniform,
+    gctCONST_STRING name,
     gctUINT *maxNameLen,    /* max possible name len of this entry, exclude bottom-level "[0]" */
     gctBOOL *isArray,
     gctUINT *arraySize
@@ -928,7 +929,14 @@ gcChipGetUniformArrayInfo(
     gctUINT32 length;
     GLuint entries = 1;
 
-    gcUNIFORM_GetName(uniform, &length, gcvNULL);
+    if (name)
+    {
+        length = (gctUINT32)gcoOS_StrLen(name, gcvNULL);
+    }
+    else
+    {
+        gcUNIFORM_GetName(uniform, &length, gcvNULL);
+    }
 
     /* Multiple entries will be reported for array of arrays.
     ** If a uniform is an array, or array of array, its name length should be added
@@ -1045,9 +1053,9 @@ gcChipCountUniforms(
         }
 
         gcmVERIFY_OK(gcUNIFORM_GetName(uniform, &length, &name));
-        numEntries = gcChipGetUniformArrayInfo(uniform, &length, &isArray, gcvNULL);
-
         usage = gcChipUtilFindUniformUsage(Shader, uniform, &name, gcvNULL);
+        numEntries = gcChipGetUniformArrayInfo(uniform, name, &length, &isArray, gcvNULL);
+
         if (usage != __GL_CHIP_UNIFORM_USAGE_COMPILER_GENERATED)
         {
             /* Active uniforms count separately in VS and PS */
@@ -1343,11 +1351,10 @@ gcChipProcessUniforms(
         matrixStride = (gctINT)GetUniformMatrixStride(uniform);
         binding      = GetUniformBinding(uniform);
 
-        /* TODO: Get explicit location/binding from compiler */
         location     = uniform->location;
         GL_ASSERT(location == -1 || location >= 0);
 
-        numEntries = gcChipGetUniformArrayInfo(uniform, &maxLen, &isArray, &arraySize);
+        numEntries = gcChipGetUniformArrayInfo(uniform, name, &maxLen, &isArray, &arraySize);
         maxLen++; /* count in null-terminator */
 
         tmpName = (gctSTRING)gc->imports.calloc(gc, maxLen, sizeof(gctCHAR));
@@ -1955,7 +1962,6 @@ gcChipProcessUniformBlocks(
             mapFlags |= gcdUB_MAPPED_TO_MEM;
         }
 
-        /* TODO: Get explicit binding */
         ubUsage = gcChipUtilFindUbUsage(GetUniformName(ubUniform));
         binding = GetUBBinding(uniformBlock);
         switch (ubUsage)
@@ -2069,7 +2075,7 @@ gcChipProcessUniformBlocks(
                 continue;
             }
 
-            totalEntries += gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, gcvNULL);
+            totalEntries += gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, gcvNULL, gcvNULL);
         }
 
         /* Resize the index buffer if needed */
@@ -2162,7 +2168,7 @@ gcChipProcessUniformBlocks(
                     continue;
                 }
 
-                entries = gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, gcvNULL);
+                entries = gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, gcvNULL, gcvNULL);
 
                 for (k = 0; k < entries; ++k, ++uSlotIdx)
                 {
@@ -3783,7 +3789,7 @@ gcChipProgramBindingRecompiledInfo(
                 break;
             }
         }
-        gcoBUFOBJ_Upload(uBlock->halBufObj, data, 0, uBlock->dataSize, gcvBUFOBJ_USAGE_STATIC_READ);
+        gcmONERROR(gcoBUFOBJ_Upload(uBlock->halBufObj, data, 0, uBlock->dataSize, gcvBUFOBJ_USAGE_STATIC_READ));
     }
 
     /* The base address uniform of a SSBO may be changed, so we need to update this uniform. */
@@ -4562,7 +4568,6 @@ gcChipProgramBuildBindingInfo(
         {
             if (uBlock->halUB[stage])
             {
-                /* TODO: compiler please move the data to per UB */
                 data[stage] = GetShaderConstUBOData(pBinaries[stage]);
 
                 if (__GLSL_STAGE_LAST == firstStage)
@@ -4724,9 +4729,6 @@ gcChipProgramBuildBindingInfo(
             gcOUTPUT halOut;
             gcmONERROR(gcSHADER_GetOutput(pBinaries[lastStage], i, &halOut));
 
-            /* TODO: need to push compiler to report one entry for an array.
-            ** driver will build mapping table to expand the location
-            */
             if (halOut)
             {
                 gctSTRING name = gcvNULL;
@@ -4983,7 +4985,7 @@ gcChipProgramBuildBindingInfo(
         gcmONERROR(gcSHADER_GetTESVertexSpacing(pBinaries[__GLSL_STAGE_TES], &spacing));
         gcmONERROR(gcSHADER_GetTESPointMode(pBinaries[__GLSL_STAGE_TES], &pointMode));
         GL_ASSERT(primMode < gcmCOUNTOF(xlateTessMode));
-        GL_ASSERT(order < gcmCOUNTOF(xlateOrder));
+        GL_ASSERT((size_t) order < gcmCOUNTOF(xlateOrder));
         GL_ASSERT(spacing < gcmCOUNTOF(xlateSpacing));
         programObject->bindingInfo.tessGenMode = xlateTessMode[primMode];
         programObject->bindingInfo.tessVertexOrder = xlateOrder[order];
@@ -7850,7 +7852,6 @@ gcChipProgramBinary_V0(
        to increase historic ref count since it has been set to be perpetual */
     gcChipUtilsObjectAddRef(pgInstanceObj);
 
-    /*(todo) support other stages */
     for (stage = __GLSL_STAGE_VS; stage <= __GLSL_STAGE_FS; ++stage)
     {
         if (stage != __GLSL_STAGE_VS && stage != __GLSL_STAGE_FS)
@@ -7867,7 +7868,6 @@ gcChipProgramBinary_V0(
         }
     }
 
-    /* (todo) to suport ts/gs) */
     gcmONERROR(gcLoadProgram((gctPOINTER)binary,
                              (gctUINT32)length,
                              masterPgInstance->binaries[__GLSL_STAGE_VS],
@@ -7947,6 +7947,7 @@ gcChipProgramBinary_V0(
         program->progFlags.robustEnabled = gcvTRUE;
     }
 
+    gcSetGLSLCompiler(chipCtx->pfCompile);
     status = gcLinkProgram(__GLSL_STAGE_LAST,
                            masterPgInstance->binaries,
                            flags,
@@ -7963,8 +7964,6 @@ gcChipProgramBinary_V0(
     {
         __GLSLStage stage;
 
-        /* Record link time info. */
-        /* TODO: need to retrieve the flags from binary */
         programObject->bindingInfo.isSeparable = GL_FALSE;
         programObject->bindingInfo.isRetrievable = GL_FALSE;
 
@@ -8305,7 +8304,8 @@ __glChipShaderBinary(
 {
     __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
     GLsizei     i;
-    gcSHADER    vertexShader = gcvNULL;
+    gcSHADER    shader         = gcvNULL;
+    gcSHADER    vertexShader   = gcvNULL;
     gcSHADER    fragmentShader = gcvNULL;
     gceSTATUS   status = gcvSTATUS_OK;
 
@@ -8356,7 +8356,6 @@ __glChipShaderBinary(
     /* Set shader binary according to the format. */
     if (binaryformat == GL_SHADER_BINARY_VIV)
     {
-        gcSHADER        shader          = gcvNULL;
         gcSHADER        found           = gcvNULL;
         gctUINT32_PTR   compilerVersion = gcvNULL;
         gcSHADER_KIND   shaderType      = gcSHADER_TYPE_UNKNOWN;
@@ -8413,6 +8412,11 @@ __glChipShaderBinary(
     return GL_TRUE;
 
 OnError:
+    /* free memory.*/
+    if (shader)
+    {
+        gcmVERIFY_OK(gcSHADER_Destroy(shader));
+    }
     gcChipSetError(chipCtx, status);
     gcmFOOTER_ARG("return=%d", GL_FALSE);
     return GL_FALSE;
@@ -9149,11 +9153,6 @@ __glChipGetUniformData(
     GL_ASSERT(g_typeInfos[uniform->dataType].halType == uniform->dataType);
     bytes = g_typeInfos[uniform->dataType].size;
 
-    /*
-    ** Image uniform data record image info and its data type is not consistent with spec.
-    ** Normally we should have private imageInfo uniform, but keep imageUniform as an opaque
-    ** handle, and record binding information. (todo)
-    */
     if ((uniform->dataType >= gcSHADER_IMAGE_2D && uniform->dataType <= gcSHADER_IMAGE_3D) ||
         (uniform->dataType >= gcSHADER_IIMAGE_2D && uniform->dataType <= gcSHADER_UIMAGE_2D_ARRAY))
     {
@@ -9277,7 +9276,6 @@ __glChipBuildTexEnableDim(
 
         for (stage = __GLSL_STAGE_VS; stage < __GLSL_STAGE_LAST; ++stage)
         {
-            /* TODO: SSO assumes different stages cannot share same sampler index */
             if (programs[stage] && programs[stage]->samplerMap[sampler].stage == stage)
             {
                 unit = programs[stage]->samplerMap[sampler].unit;
@@ -9653,7 +9651,7 @@ gcChipFlushUniformBlock(
 
                     gcTYPE_GetTypeInfo(GetUniformType(uniform), &numCols, &numRows, gcvNULL);
 
-                    entries = gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, &arraySize);
+                    entries = gcChipGetUniformArrayInfo(uniform, gcvNULL, gcvNULL, gcvNULL, &arraySize);
                     arraySize *= entries;   /* Expand array size for array of arrays to one dimension */
 
                     gcmONERROR(gcoSHADER_ProgramUniformEx(gcvNULL, physicalAddress,
@@ -9667,7 +9665,6 @@ gcChipFlushUniformBlock(
     }
 
 OnError:
-    /* TODO: should unlock the surface after the draw */
     if (bufObj && physical)
     {
         gcoBUFOBJ_Unlock(bufObj);
@@ -10334,7 +10331,6 @@ gcChipFlushUserDefUBs(
         __GLchipVertexBufferInfo *bufInfo = gcvNULL;
         __GLchipSLUniformBlock *ub = &program->uniformBlocks[i];
 
-        /* TODO: consider buffer object and program dirty */
         GL_ASSERT(ub->binding < gc->constants.shaderCaps.maxUniformBufferBindings);
 
         pBindingPoint = &gc->bufferObject.bindingPoints[__GL_UNIFORM_BUFFER_INDEX][ub->binding];
@@ -10781,7 +10777,6 @@ gcChipFlushPrivateSSBs(
     gcmHEADER_ARG("gc=0x%x chipCtx=0x%x progObj=0x%x program=0x%x pgInstance=0x%x",
                    gc, chipCtx, progObj, program, pgInstance);
 
-    /* TODO: consider dirty later */
     for (i = program->userDefSsbCount; i < program->totalSsbCount; ++i)
     {
         GLuint groups;

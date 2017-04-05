@@ -79,12 +79,7 @@ include $(MKFILES_ROOT)/qmacros.mk
 
 LIBS += GAL EGL_viv
 
-ifneq ($(filter v7, $(VARIANT_LIST)), v7)
-	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp
-	LIBS += m-vfp
-else
-	LIBS += m
-endif
+include $(qnx_build_dir)/math.mk
 
 LDFLAGS += -Wl,--version-script=$(driver_root)/driver/khronos/libOpenVG/libOpenVG.map
 

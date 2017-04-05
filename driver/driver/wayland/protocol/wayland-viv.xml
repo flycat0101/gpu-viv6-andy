@@ -3,6 +3,10 @@
   <interface name="wl_viv" version="1">
      <!-- Create a wayland buffer for video memory node. -->
      <request name="create_buffer">
+       <description summary="Create server side buffer stub">
+	Map the client buffer to server side.
+	Buffer is a actually surface object.
+       </description>
        <arg name="id" type="new_id" interface="wl_buffer"/>
        <arg name="width" type="uint"/>
        <arg name="height" type="uint"/>
@@ -12,6 +16,25 @@
        <arg name="node" type="uint"/>
        <arg name="pool" type="int"/>
        <arg name="size" type="uint"/>
+       <arg name="tsNode" type="uint"/>
+       <arg name="tsPool" type="int"/>
+       <arg name="tsSize" type="uint"/>
+     </request>
+     <request name="enable_tile_status">
+       <description summary="Sync tile status">
+	Pass tile status information to server side.
+	@enabled:		tile status is now enabled.
+	@compressed:	compressed, tile status must be enabled.
+	@dirty:			some pixels are not resolved, ie, tile status is dirty.
+	@fc_value:		the fast clear value.
+	@fc_value_upper:	upper 32bit fast clear value.
+       </description>
+       <arg name="id" type="object" interface="wl_buffer"/>
+       <arg name="enabled" type="uint"/>
+       <arg name="compressed" type="uint"/>
+       <arg name="dirty" type="uint"/>
+       <arg name="fc_value" type="uint"/>
+       <arg name="fc_value_upper" type="uint"/>
      </request>
   </interface>
 </protocol>

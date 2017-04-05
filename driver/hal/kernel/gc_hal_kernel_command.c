@@ -2,7 +2,7 @@
 *
 *    The MIT License (MIT)
 *
-*    Copyright (c) 2014 - 2016 Vivante Corporation
+*    Copyright (c) 2014 - 2017 Vivante Corporation
 *
 *    Permission is hereby granted, free of charge, to any person obtaining a
 *    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 *
 *    The GPL License (GPL)
 *
-*    Copyright (C) 2014 - 2016 Vivante Corporation
+*    Copyright (C) 2014 - 2017 Vivante Corporation
 *
 *    This program is free software; you can redistribute it and/or
 *    modify it under the terms of the GNU General Public License
@@ -882,6 +882,7 @@ _ProcessUserCommandBufferList(
 
     struct _gcoCMDBUF   _commandBufferObject;
     gcoCMDBUF           currentCMDBUF;
+    struct _gcoCMDBUF   _nextCMDBUF;
     gcoCMDBUF           currentCMDBUFUser = CommandBufferListHead;
 
     gckOS_QueryNeedCopy(Command->os, 0, &needCopy);
@@ -901,10 +902,9 @@ _ProcessUserCommandBufferList(
     {
         gcoCMDBUF           nextCMDBUFUser;
         gcoCMDBUF           nextCMDBUF;
-        struct _gcoCMDBUF   _nextCMDBUF;
         gctUINT8_PTR        fenceLogical = gcvNULL;
         gctUINT8_PTR        linkLogical;
-        gctUINT32           linkBytes;
+        gctUINT32           linkBytes = 8;
         gctUINT32           linkLow;
         gctUINT32           linkHigh;
 
@@ -947,7 +947,7 @@ _ProcessUserCommandBufferList(
             /* Fill NOPs in space reserved for fence. */
             while (i--)
             {
-                gctSIZE_T nopBytes;
+                gctSIZE_T nopBytes = 8;
                 gcmkONERROR(gckHARDWARE_Nop(Command->kernel->hardware, fenceLogical, &nopBytes));
                 fenceLogical += nopBytes;
             }
@@ -1971,13 +1971,6 @@ gckCOMMAND_Commit(
             ));
     }
 
-    /* Get the physical address. */
-    gcmkONERROR(gckOS_UserLogicalToPhysical(
-        Command->os,
-        commandBufferLogical,
-        &commandBufferPhysical
-        ));
-
 #ifdef __QNXNTO__
     userCommandBufferLogical = (gctPOINTER) commandBufferLogical;
 
@@ -1990,6 +1983,19 @@ gckCOMMAND_Commit(
     commandBufferLogical = pointer;
 
     userCommandBufferLogicalMapped = gcvTRUE;
+
+    gcmkONERROR(gckOS_GetPhysicalAddress(
+        Command->os,
+        commandBufferLogical,
+        &commandBufferPhysical
+        ));
+#else
+    /* Get the physical address. */
+    gcmkONERROR(gckOS_UserLogicalToPhysical(
+        Command->os,
+        commandBufferLogical,
+        &commandBufferPhysical
+        ));
 #endif
 
     commandBufferSize

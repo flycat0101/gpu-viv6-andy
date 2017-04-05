@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -51,6 +51,8 @@ clsProfiler;
 ************************* Context Object Definition *************************
 \******************************************************************************/
 
+#define CONTEXT_PROPERTIES_SIZE 15 /* support all properites size */
+
 typedef struct _cl_context
 {
     clsIcdDispatch_PTR      dispatch;
@@ -80,7 +82,7 @@ typedef struct _cl_context
 
     clsSampler_PTR          samplers;
 
-    cl_context_properties   properties[3];
+    cl_context_properties   properties[CONTEXT_PROPERTIES_SIZE];
     void                    (CL_CALLBACK * pfnNotify)(const char *, const void *, size_t, void *);
 
     /* Process handle. */
@@ -93,7 +95,7 @@ typedef struct _cl_context
     /* Profiler */
 #if VIVANTE_PROFILER
     clsProfiler             profiler;
-    gcoHAL                  phal;
+    gcoPROFILER             halProfile;
 #endif
 
 #if cldTUNING
@@ -124,6 +126,16 @@ gctINT
 clfEndProfiler(
     cl_command_queue CommandQueue,
     clsKernel_PTR Kerenl
+    );
+
+gctINT
+clfRetainContext(
+    cl_context Context
+    );
+
+gctINT
+clfReleaseContext(
+    cl_context Context
     );
 
 #ifdef __cplusplus

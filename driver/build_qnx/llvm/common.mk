@@ -246,14 +246,9 @@ CCFLAGS += -DBUILD_OPENCL_12=1
 
 LIBS += VSC GAL
 
-CCFLAGS += -Wno-error=unused-value
+CCFLAGS += -Wno-error=unused-value -Wno-attributes
 
-ifneq ($(filter v7, $(VARIANT_LIST)), v7)
-	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp
-	LIBS += m-vfp
-else
-	LIBS += m
-endif
+include $(qnx_build_dir)/math.mk
 
 LDFLAGS += -Wl,--version-script=$(driver_root)/compiler/libCLC/llvm/libLLVM.map
 

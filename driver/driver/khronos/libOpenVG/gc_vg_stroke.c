@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1056,6 +1056,7 @@ _ResetStrokeConversion(
     IN vgsSTROKECONVERSION_PTR StrokeConversion
     )
 {
+    gceSTATUS status = gcvSTATUS_OK;
     vgmENTERSUBAPI(_ResetStrokeConversion);
 
     if (StrokeConversion->strokeDashPatternCount > 0)
@@ -1085,14 +1086,27 @@ _ResetStrokeConversion(
             _FreeSubPath(StrokeConversion->subPathMemPool, subPath);
 #else
             nextSubPath = subPath->next;
-            _FreePointList(StrokeConversion->pointMemPool,
+
+            status = _FreePointList(StrokeConversion->pointMemPool,
                 subPath->pointList, subPath->lastPoint);
+
+            if (status == gcvSTATUS_INVALID_ARGUMENT)
+            {
+                vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+                goto OnError;
+            }
 #endif
         }
 
 #if gcvUSE_FAST_STROKE
-        _FreeSubPathList(StrokeConversion->subPathMemPool,
+        status = _FreeSubPathList(StrokeConversion->subPathMemPool,
             StrokeConversion->subPathList, StrokeConversion->lastSubPath);
+
+        if (status == gcvSTATUS_INVALID_ARGUMENT)
+        {
+            vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+            goto OnError;
+        }
 #endif
 
         StrokeConversion->subPathList = gcvNULL;
@@ -1124,15 +1138,27 @@ _ResetStrokeConversion(
             _FreeSubPath(StrokeConversion->subPathMemPool, subPath);
 #else
             nextSubPath = subPath->next;
-            _FreePointList(StrokeConversion->pointMemPool,
+            status = _FreePointList(StrokeConversion->pointMemPool,
                 subPath->pointList, subPath->lastPoint);
+
+            if (status == gcvSTATUS_INVALID_ARGUMENT)
+            {
+                vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+                goto OnError;
+            }
 #endif
         }
 
 
 #if gcvUSE_FAST_STROKE
-        _FreeSubPathList(StrokeConversion->subPathMemPool,
+        status = _FreeSubPathList(StrokeConversion->subPathMemPool,
             StrokeConversion->strokeSubPathList, StrokeConversion->lastStrokeSubPath);
+
+        if (status == gcvSTATUS_INVALID_ARGUMENT)
+        {
+            vgmERROR(VG_ILLEGAL_ARGUMENT_ERROR);
+            goto OnError;
+        }
 #endif
 
         StrokeConversion->strokeSubPathList = gcvNULL;
@@ -1143,12 +1169,14 @@ _ResetStrokeConversion(
 
         if (! StrokeConversion->useFastMode)
         {
-            /* TODO - Clear swing related data. */
+            /* VIV: [todo] Clear swing related data. */
         }
     }
 
+OnError:
+    break;
     vgmLEAVESUBAPI(_ResetStrokeConversion);
-    return gcvSTATUS_OK;
+    return status;
 }
 
 #define vgmGETINCREMENT(Pointer, DatatypeSize) \
@@ -3717,7 +3745,7 @@ _ProcessLineJoint(
                 StrokeConversion->swingStrokeDeltaY = Y2 - prevPoint->y;
 
                 /* Add extra center point for swing out pie area. */
-                /* TODO - Should adjust prevPoint, instead of adding new point? */
+                /* VIV: [todo] Should adjust prevPoint, instead of adding new point? */
                 gcmERR_GOTO(_AddAPointToLeftStrokePointListHead(Context, StrokeConversion, Point->x, Point->y));
 
                 /* Add extra start stroke point for swing out pie area. */
@@ -3845,7 +3873,7 @@ _ProcessLineJoint(
                 StrokeConversion->swingStrokeDeltaY = Y1 - prevPoint->y;
 
                 /* Add extra center point for swing out pie area. */
-                /* TODO - Should adjust prevPoint, instead of adding new point? */
+                /* VIV: [todo] Should adjust prevPoint, instead of adding new point? */
                 gcmERR_GOTO(_AddAPointToRightStrokePointListTail(Context, StrokeConversion, Point->x, Point->y));
 
                 /* Add extra start stroke point for swing out pie area. */
@@ -4028,7 +4056,7 @@ _CreateStrokePath(
 
         StrokeConversion->currentSubPath = subPath;
 
-        /* TODO - Need to check/debug closed stroke path. */
+        /* VIV: [todo] Need to check/debug closed stroke path. */
         needToHandleSwing = (StrokeConversion->strokeCapStyle == gcvCAP_BUTT || subPath->closed);
         if (needToHandleSwing)
         {
@@ -6705,7 +6733,7 @@ _FlattenPath_I(
 needToUseFloat:
     StrokeConversion->useFixedPoint = gcvFALSE;
 
-    /* TODO - Use free list. */
+    /* VIV: [todo] Use free list. */
     /* Free subPaths. */
     if (StrokeConversion->subPathList)
     {
@@ -7035,7 +7063,7 @@ needToUseFloat:
 needToUseSlowMode:
     StrokeConversion->useFastMode   = gcvFALSE;
 
-    /* TODO - Use free list. */
+    /* VIV: [todo] Use free list. */
     /* Free subPaths. */
     if (StrokeConversion->subPathList)
     {
@@ -7563,7 +7591,7 @@ _StartANewStrokeSubPath_I(
 #if gcvUSE_FAST_STROKE
             if (StrokeConversion->useFastMode)
             {
-                /* TODO - Add a point. */
+                /* VIV: [todo] Add a point. */
             }
             else
 #endif
@@ -7626,7 +7654,7 @@ _EndAStrokeSubPath_I(
 #if gcvUSE_FAST_STROKE
         if (StrokeConversion->useFastMode)
         {
-            /* TODO - Add a point. */
+            /* VIV: [todo] Add a point. */
         }
         else
 #endif
@@ -8114,7 +8142,7 @@ _ProcessLineJoint_I(
                 StrokeConversion->swingStrokeDeltaY = Y2 - prevPoint->y;
 
                 /* Add extra center point for swing out pie area. */
-                /* TODO - Should adjust prevPoint, instead of adding new point? */
+                /* VIV: [todo] Should adjust prevPoint, instead of adding new point? */
                 gcmERR_GOTO(_AddAPointToLeftStrokePointListHead_I(Context, StrokeConversion, Point->x, Point->y));
 
                 /* Add extra start stroke point for swing out pie area. */
@@ -8242,7 +8270,7 @@ _ProcessLineJoint_I(
                 StrokeConversion->swingStrokeDeltaY = Y1 - prevPoint->y;
 
                 /* Add extra center point for swing out pie area. */
-                /* TODO - Should adjust prevPoint, instead of adding new point? */
+                /* VIV: [todo] Should adjust prevPoint, instead of adding new point? */
                 gcmERR_GOTO(_AddAPointToRightStrokePointListTail_I(Context, StrokeConversion, Point->x, Point->y));
 
                 /* Add extra start stroke point for swing out pie area. */
@@ -8422,7 +8450,7 @@ _CreateStrokePath_I(
 
         StrokeConversion->currentSubPath = subPath;
 
-        /* TODO - Need to check/debug closed stroke path. */
+        /* VIV: [todo] Need to check/debug closed stroke path. */
         needToHandleSwing = (StrokeConversion->strokeCapStyle == gcvCAP_BUTT || subPath->closed);
         if (needToHandleSwing)
         {
@@ -9292,7 +9320,7 @@ _FastProcessLineJoint_I(
 
     if (counterClockwise)
     {
-        /* TODO - Check if the turn is more than 90 degree. */
+        /* VIV: [todo] Check if the turn is more than 90 degree. */
         if (Point->flattenFlag == vgcFLATTEN_NO)
         {
             /* Add the point to avoid incorrect sharp angle. */
@@ -9331,7 +9359,7 @@ _FastProcessLineJoint_I(
     }
     else
     {
-        /* TODO - Check if the turn is more than 90 degree. */
+        /* VIV: [todo] Check if the turn is more than 90 degree. */
         if (Point->flattenFlag == vgcFLATTEN_NO)
         {
             /* Add the point to avoid incorrect sharp angle. */
@@ -10445,22 +10473,27 @@ ErrorHandler:
 
     vgmPROFILESTROKEENTRY(_DestroyStrokeConversion);
 
-    /* Clean up. */
-    gcmVERIFY_OK(_ResetStrokeConversion(
-        Context, strokeConversion
-        ));
+    if (strokeConversion != gcvNULL)
+    {
+        /* Clean up. */
+        gcmVERIFY_OK(_ResetStrokeConversion(
+            Context, strokeConversion
+            ));
 
 #if !gcvSTROKE_KEEP_MEMPOOL
-    gcmVERIFY_OK(vgfDestroyStrokeConversion(
-        Context, strokeConversion
-        ));
+        gcmVERIFY_OK(vgfDestroyStrokeConversion(
+            Context, strokeConversion
+            ));
 #endif
-
-    vgmPROFILESTROKEEXIT(_DestroyStrokeConversion);
-
+        vgmPROFILESTROKEEXIT(_DestroyStrokeConversion);
+    }
+    else
+    {
+        vgmERROR(VG_OUT_OF_MEMORY_ERROR);
+        break;
+    }
     }
     while (gcvFALSE);
-
 
     vgmLEAVESUBAPI(_ConvertStroke);
     return status;

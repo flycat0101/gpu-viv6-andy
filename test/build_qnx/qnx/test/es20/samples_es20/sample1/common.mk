@@ -52,14 +52,9 @@ $(foreach lib, $(STATIC_LIBS), $(eval LIBPREF_$(lib) = -Bstatic))
 $(foreach lib, $(STATIC_LIBS), $(eval LIBPOST_$(lib) = -Bdynamic))
 
 LIBS += $(STATIC_LIBS)
-LIBS += GAL-$(HARDWARENAME) VDK EGL GLESv2
+LDOPTS += -lGAL -lVSC -lVDK -lEGL_viv -lGLESv2_viv
 
-ifneq ($(filter v7, $(VARIANT_LIST)), v7)
-	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp
-	LIBS += m-vfp
-else
-	LIBS += m
-endif
+include $(qnx_build_dir)/math.mk
 
 INSTALLDIR=$(firstword $(INSTALLDIR_$(OS)) samples/vdk/samples_es20)
 

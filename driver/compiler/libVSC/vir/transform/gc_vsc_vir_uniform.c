@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -593,7 +593,7 @@ typedef struct VSC_UF_AUBO
     VSC_HASH_TABLE* aux_addresses;
     gctUINT aux_addr_count;
     VSC_HW_CONFIG* hwCfg;
-    VSC_OPTN_UF_AUBO_Options* options;
+    VSC_OPTN_UF_AUBOOptions* options;
     VSC_MM* mm;
 } VSC_UF_AUBO;
 
@@ -820,7 +820,7 @@ _VSC_UF_AUBO_Initialize(
     IN OUT VSC_UF_AUBO* aubo,
     IN VSC_AllShaders* all_shaders,
     IN VSC_HW_CONFIG* hwCfg,
-    IN VSC_OPTN_UF_AUBO_Options* options
+    IN VSC_OPTN_UF_AUBOOptions* options
     )
 {
     gctUINT i;
@@ -847,7 +847,7 @@ _VSC_UF_AUBO_Initialize(
     VSC_UF_AUBO_SetOptions(aubo, options);
     VSC_UF_AUBO_SetMM(aubo, VSC_AllShaders_GetMM(all_shaders));
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_INITIALIZE))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_INITIALIZE))
     {
         VIR_Dumper* dumper = VSC_UF_AUBO_GetDumper(aubo);
         VIR_LOG(dumper, "DUBO Initialization\n");
@@ -875,12 +875,12 @@ _VSC_UF_AUBO_CollectUniformsInfo(
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     VSC_AllShaders* all_shaders = VSC_UF_AUBO_GetAllShaders(aubo);
     VSC_GlobalUniformTable* global_uniform_table = VSC_AllShaders_GetGlobalUniformTable(all_shaders);
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
     VIR_Dumper* dumper = VSC_UF_AUBO_GetDumper(aubo);
     gctUINT i;
 
     gcmASSERT(has_active);
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_MARKACTIVE))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_MARKACTIVE))
     {
         VIR_LOG(dumper, "Mark active uniforms:\n");
         VIR_LOG_FLUSH(dumper);
@@ -943,7 +943,7 @@ _VSC_UF_AUBO_CollectUniformsInfo(
                                     VSC_GlobalUniformTable_SetHasActiveUniform(global_uniform_table);
                                     *has_active = gcvTRUE;
 
-                                    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_MARKACTIVE))
+                                    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_MARKACTIVE))
                                     {
                                         VSC_GlobalUniformItem_Dump(item);
                                     }
@@ -975,11 +975,11 @@ _VSC_UF_AUBO_CollectIndirectlyAccessedUniforms(
 {
     VSC_AllShaders* all_shaders = VSC_UF_AUBO_GetAllShaders(aubo);
     VSC_GlobalUniformTable* global_uniform_table = VSC_AllShaders_GetGlobalUniformTable(all_shaders);
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
     VIR_Dumper* dumper = VSC_UF_AUBO_GetDumper(aubo);
     gctUINT i;
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_INDIRECT))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_INDIRECT))
     {
         VIR_LOG(dumper, "Collect indirectly accessed uniforms:\n");
         VIR_LOG_FLUSH(dumper);
@@ -1059,7 +1059,7 @@ _VSC_UF_AUBO_CollectIndirectlyAccessedUniforms(
                         {
                             VSC_GlobalUniformItem_SetFlag(item, VIR_SYMUNIFORMFLAG_MOVING_TO_DUBO);
 
-                            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_INDIRECT))
+                            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_INDIRECT))
                             {
                                 VSC_GlobalUniformItem_Dump(item);
                             }
@@ -1079,7 +1079,7 @@ _VSC_UF_AUBO_CalculateDUBRegCount(
     )
 {
     VSC_AllShaders* all_shaders = VSC_UF_AUBO_GetAllShaders(aubo);
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
 
     VSC_GlobalUniformTable* global_uniform_table = VSC_AllShaders_GetGlobalUniformTable(all_shaders);
     VSC_GlobalUniformTable_Iterator iter;
@@ -1100,7 +1100,7 @@ _VSC_UF_AUBO_CalculateDUBRegCount(
         }
     }
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_DUBSIZE))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_DUBSIZE))
     {
         _VSC_UF_AUBO_DumpDUBRegCount(aubo);
     }
@@ -1113,7 +1113,7 @@ _VSC_UF_AUBO_DUBIsAffordable(
     )
 {
     gctUINT i;
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
     gctUINT fattest = 0;
     gctUINT max_gap = 0;
     gctUINT totalRegCount = 0;
@@ -1129,11 +1129,11 @@ _VSC_UF_AUBO_DUBIsAffordable(
         }
 
         if(VSC_UF_AUBO_GetDUBRegCount(aubo, i) > (VSC_UF_AUBO_GetMaxRegCount(aubo, i) -
-                              VSC_OPTN_UF_AUBO_Options_GetConstRegReservation(options) - VSC_UF_AUBO_GetPerShRsvedCount(aubo, i)))
+                              VSC_OPTN_UF_AUBOOptions_GetConstRegReservation(options) - VSC_UF_AUBO_GetPerShRsvedCount(aubo, i)))
         {
             result = gcvFALSE;
             if(VSC_UF_AUBO_GetDUBRegCount(aubo, i) - (VSC_UF_AUBO_GetMaxRegCount(aubo, i) -
-                              VSC_OPTN_UF_AUBO_Options_GetConstRegReservation(options) - VSC_UF_AUBO_GetPerShRsvedCount(aubo, i))> max_gap)
+                              VSC_OPTN_UF_AUBOOptions_GetConstRegReservation(options) - VSC_UF_AUBO_GetPerShRsvedCount(aubo, i))> max_gap)
             {
                 max_gap = VSC_UF_AUBO_GetDUBRegCount(aubo, i) - VSC_UF_AUBO_GetMaxRegCount(aubo, i);
                 fattest = i;
@@ -1217,7 +1217,7 @@ _VSC_UF_AUBO_PickItem(
     IN gctUINT* cubo_byte_size
     )
 {
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
 
     gcmASSERT(dubo_byte_size);
 
@@ -1236,7 +1236,7 @@ _VSC_UF_AUBO_PickItem(
         *dubo_byte_size += VSC_GlobalUniformItem_GetByteSize(item);
         _VSC_UF_AUBO_UpdateDUBOItemCount(aubo, item);
     }
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_PICK))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_PICK))
     {
         VSC_GlobalUniformItem_Dump(item);
     }
@@ -1249,19 +1249,19 @@ _VSC_UF_AUBO_PickUniforms(
     )
 {
     VSC_AllShaders* all_shaders = VSC_UF_AUBO_GetAllShaders(aubo);
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
     VIR_Dumper* dumper = VSC_UF_AUBO_GetDumper(aubo);
     gctUINT dubo_byte_size = 0, cubo_byte_size = 0;
     VSC_GlobalUniformTable* global_uniform_table = VSC_AllShaders_GetGlobalUniformTable(all_shaders);
     VSC_GlobalUniformTable_Iterator iter;
     VSC_GlobalUniformItem* item;
-    gctBOOL skipDUBO = VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_SKIP_DUBO);
-    gctBOOL skipCUBO = VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_SKIP_CUBO);
+    gctBOOL skipDUBO = VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetHeuristics(options), VSC_OPTN_UF_AUBOOptions_HEUR_SKIP_DUBO);
+    gctBOOL skipCUBO = VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetHeuristics(options), VSC_OPTN_UF_AUBOOptions_HEUR_SKIP_CUBO);
 
     VSC_GlobalUniformTable_Iterator_Init(&iter, global_uniform_table);
 
     /* pick those pre-decided uniform items */
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_PICK))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_PICK))
     {
         VIR_LOG(dumper, "Picked pre-decided uniforms:\n");
         VIR_LOG_FLUSH(dumper);
@@ -1275,12 +1275,12 @@ _VSC_UF_AUBO_PickUniforms(
         }
     }
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_PICK))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_PICK))
     {
-        VIR_LOG(dumper, "Pick uniforms with heuristic %x:\n", VSC_OPTN_UF_AUBO_Options_GetHeuristics(options));
+        VIR_LOG(dumper, "Pick uniforms with heuristic %x:\n", VSC_OPTN_UF_AUBOOptions_GetHeuristics(options));
         VIR_LOG_FLUSH(dumper);
     }
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_FORCE_ALL))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetHeuristics(options), VSC_OPTN_UF_AUBOOptions_HEUR_FORCE_ALL))
     {
         VSC_GlobalUniformTable_Iterator_Init(&iter, global_uniform_table);
 
@@ -1298,7 +1298,7 @@ _VSC_UF_AUBO_PickUniforms(
         gctUINT fattest_shader = VSC_MAX_LINKABLE_SHADER_STAGE_COUNT;
         while(!_VSC_UF_AUBO_DUBIsAffordable(aubo, &fattest_shader))
         {
-            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetHeuristics(options), VSC_OPTN_UF_AUBO_Options_HEUR_ORDERLY))
+            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetHeuristics(options), VSC_OPTN_UF_AUBOOptions_HEUR_ORDERLY))
             {
                 VSC_GlobalUniformTable_Iterator_Init(&iter, global_uniform_table);
 
@@ -1323,7 +1323,7 @@ _VSC_UF_AUBO_PickUniforms(
     VSC_UF_AUBO_SetDUBOByteSize(aubo, dubo_byte_size);
     VSC_UF_AUBO_SetCUBOByteSize(aubo, cubo_byte_size);
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_PICK))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_PICK))
     {
         VIR_LOG(dumper, "DUBO byte size: %d\n", VSC_UF_AUBO_GetDUBOByteSize(aubo));
         VIR_LOG(dumper, "CUBO byte size: %d\n", VSC_UF_AUBO_GetCUBOByteSize(aubo));
@@ -1339,10 +1339,10 @@ _VSC_UF_AUBO_ConstructDefaultUBO(
 {
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     VSC_AllShaders* all_shaders = VSC_UF_AUBO_GetAllShaders(aubo);
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
     gctUINT i;
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_CONSTRUCTION))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_CONSTRUCTION))
     {
         VIR_Dumper* dumper = VSC_UF_AUBO_GetDumper(aubo);
         VIR_LOG(dumper, "Construct Default UBOs:\n");
@@ -1369,7 +1369,7 @@ _VSC_UF_AUBO_ConstructDefaultUBO(
         }
     }
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_CONSTRUCTION))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_CONSTRUCTION))
     {
         _VSC_UF_AUBO_DumpDUBOs(aubo);
         _VSC_UF_AUBO_DumpDUBOAddrs(aubo);
@@ -1385,10 +1385,10 @@ _VSC_UF_AUBO_ConstructConstantUBO(
 {
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     VSC_AllShaders* all_shaders = VSC_UF_AUBO_GetAllShaders(aubo);
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
     gctUINT i;
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_CONSTRUCTION))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_CONSTRUCTION))
     {
         VIR_Dumper* dumper = VSC_UF_AUBO_GetDumper(aubo);
         VIR_LOG(dumper, "Construct Constant UBOs:\n");
@@ -1415,7 +1415,7 @@ _VSC_UF_AUBO_ConstructConstantUBO(
         }
     }
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_CONSTRUCTION))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_CONSTRUCTION))
     {
         _VSC_UF_AUBO_DumpCUBOs(aubo);
         _VSC_UF_AUBO_DumpCUBOAddrs(aubo);
@@ -1431,13 +1431,13 @@ _VSC_UF_AUBO_FillAuxiliaryUBOs(
 {
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     VSC_AllShaders* all_shaders = VSC_UF_AUBO_GetAllShaders(aubo);
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
     /*VIR_Dumper* dumper = VSC_UF_AUBO_GetDumper(aubo);*/
     VSC_GlobalUniformTable* global_uniform_table = VSC_AllShaders_GetGlobalUniformTable(all_shaders);
     VSC_GlobalUniformTable_Iterator iter;
     VSC_GlobalUniformItem* item;
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_FILL))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_FILL))
     {
         VIR_Dumper* dumper = VSC_UF_AUBO_GetDumper(aubo);
         VIR_LOG(dumper, "Fill Auxiliary UBOs:\n");
@@ -1490,7 +1490,7 @@ _VSC_UF_AUBO_FillAuxiliaryUBOs(
         }
     }
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_FILL))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_FILL))
     {
         _VSC_UF_AUBO_DumpDUBOs(aubo);
         _VSC_UF_AUBO_DumpCUBOs(aubo);
@@ -1603,7 +1603,7 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
     VIR_SymId mad_symid, load_symid;
     VIR_Symbol* mad_sym;
     gctUINT const_offset = 0;
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
     VIR_Dumper* dumper = VSC_UF_AUBO_GetDumper(aubo);
     VIR_Type* base_type = VIR_Shader_GetTypeFromId(shader, base_typeid);
 
@@ -1643,7 +1643,7 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
             VIR_VirRegId f2i_regid;
             VIR_SymId f2i_symid;
             VIR_Symbol* f2i_sym;
-            virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_AQ_F2I, VIR_TYPE_UINT32, insert_before, gcvTRUE, &f2i_inst);
+            virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_F2I, VIR_TYPE_UINT32, insert_before, gcvTRUE, &f2i_inst);
 
             f2i_regid = VIR_Shader_NewVirRegId(shader, 1);
             virErrCode = VIR_Shader_AddSymbol(shader,
@@ -1747,7 +1747,7 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
     {
         gctBOOL needRunSingleT = gcvFALSE;
         gctBOOL dual16NotSupported = gcvFALSE;
-        VIR_Inst_Check4Dual16(mad_inst, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+        VIR_Inst_Check4Dual16(mad_inst, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL, gcvFALSE);
         if (needRunSingleT)
         {
             VIR_Inst_SetThreadMode(mad_inst, VIR_THREAD_D16_DUAL_32);
@@ -1804,7 +1804,7 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
     {
         gctBOOL needRunSingleT = gcvFALSE;
         gctBOOL dual16NotSupported = gcvFALSE;
-        VIR_Inst_Check4Dual16(load_inst, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+        VIR_Inst_Check4Dual16(load_inst, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL, gcvFALSE);
         if (needRunSingleT)
         {
             VIR_Inst_SetThreadMode(load_inst, VIR_THREAD_D16_DUAL_32);
@@ -1838,7 +1838,7 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
         gcmASSERT(0);
     }
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM))
     {
         VIR_LOG(dumper, "MAD instruction:\n");
         VIR_LOG_FLUSH(dumper);
@@ -1878,7 +1878,7 @@ _VSC_UF_AUBO_TransformNormalInstruction(
     VIR_TypeId src_data_type_id = _VSC_UF_AUBO_GetUniformDataTypeID(shader, src_sym);
     VIR_Type* src_data_type = VIR_Shader_GetTypeFromId(shader, src_data_type_id);
     VIR_Uniform* src_uniform = VIR_Symbol_GetUniform(src_sym);
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
     VIR_Dumper* dumper = VSC_UF_AUBO_GetDumper(aubo);
 
     virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_LOAD, src_data_type_id, insert_before, gcvTRUE, &new_inst);
@@ -1977,7 +1977,7 @@ _VSC_UF_AUBO_TransformNormalInstruction(
     {
         gctBOOL needRunSingleT = gcvFALSE;
         gctBOOL dual16NotSupported = gcvFALSE;
-        VIR_Inst_Check4Dual16(new_inst, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+        VIR_Inst_Check4Dual16(new_inst, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL, gcvFALSE);
         if (needRunSingleT)
         {
             VIR_Inst_SetThreadMode(new_inst, VIR_THREAD_D16_DUAL_32);
@@ -1990,7 +1990,7 @@ _VSC_UF_AUBO_TransformNormalInstruction(
        (VIR_GetTypeFlag(src_data_type_id) & VIR_TYFLAG_ISFLOAT) && (VIR_GetTypeFlag(src_type_id) & VIR_TYFLAG_ISINTEGER))
     {
         VIR_TypeId converted_typeid = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(src_type_id), VIR_GetTypeComponents(src_data_type_id), 1);
-        virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_AQ_F2I, converted_typeid, insert_before, gcvTRUE, &conv_inst);
+        virErrCode = VIR_Function_AddInstructionBefore(func, VIR_OP_F2I, converted_typeid, insert_before, gcvTRUE, &conv_inst);
         if(virErrCode != VSC_ERR_NONE) return virErrCode;
 
         new_dest = VIR_Inst_GetDest(conv_inst);
@@ -2018,7 +2018,7 @@ _VSC_UF_AUBO_TransformNormalInstruction(
         {
             gctBOOL needRunSingleT = gcvFALSE;
             gctBOOL dual16NotSupported = gcvFALSE;
-            VIR_Inst_Check4Dual16(conv_inst, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+            VIR_Inst_Check4Dual16(conv_inst, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL, gcvFALSE);
             if (needRunSingleT)
             {
                 VIR_Inst_SetThreadMode(conv_inst, VIR_THREAD_D16_DUAL_32);
@@ -2031,7 +2031,7 @@ _VSC_UF_AUBO_TransformNormalInstruction(
     VIR_Operand_SetRelIndexing(src, 0);
     /*VIR_Operand_SetSwizzle(src, VIR_Enable_2_Swizzle(new_enable));*/
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM))
     {
         VIR_LOG(dumper, "Load instruction:\n");
         VIR_LOG_FLUSH(dumper);
@@ -2059,7 +2059,7 @@ _VSC_UF_AUBO_TransformInstructions(
 {
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     VSC_AllShaders* all_shaders = VSC_UF_AUBO_GetAllShaders(aubo);
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
     VIR_Dumper* dumper = VSC_UF_AUBO_GetDumper(aubo);
     gctUINT i;
 
@@ -2071,7 +2071,7 @@ _VSC_UF_AUBO_TransformInstructions(
             VIR_FuncIterator func_iter;
             VIR_FunctionNode* func_node;
 
-            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_INPUT))
+            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_INPUT))
             {
                 VIR_Shader_Dump(gcvNULL, "CreateAUBO Input", shader, gcvTRUE);
             }
@@ -2102,19 +2102,19 @@ _VSC_UF_AUBO_TransformInstructions(
                                 VIR_Instruction* insert_before = inst;
 
 
-                                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM))
+                                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM))
                                 {
                                     VIR_LOG(dumper, "To be transformed instruction:\n");
                                     VIR_LOG_FLUSH(dumper);
                                     VIR_Inst_Dump(shader->dumper, inst);
                                 }
 
-                                if((VIR_OPCODE_isAtom(VIR_Inst_GetOpcode(inst)) || VIR_Inst_GetOpcode(inst) == VIR_OP_CMP)
+                                if((VIR_OPCODE_isAtom(VIR_Inst_GetOpcode(inst)) || VIR_Inst_GetOpcode(inst) == VIR_OP_COMPARE)
                                     && VIR_Inst_GetPrev(inst) && VIR_Inst_GetOpcode(VIR_Inst_GetPrev(inst)) == VIR_OP_LOAD)
                                 {
                                     insert_before = VIR_Inst_GetPrev(inst);
                                 }
-                                if(VIR_Inst_GetOpcode(inst) == VIR_OP_ATOMCMPXCHG && VIR_Inst_GetOpcode(VIR_Inst_GetPrev(inst)) == VIR_OP_CMP
+                                if(VIR_Inst_GetOpcode(inst) == VIR_OP_ATOMCMPXCHG && VIR_Inst_GetOpcode(VIR_Inst_GetPrev(inst)) == VIR_OP_COMPARE
                                     && VIR_Inst_GetPrev(inst) && VIR_Inst_GetPrev(VIR_Inst_GetPrev(inst))
                                     && VIR_Inst_GetOpcode(VIR_Inst_GetPrev(VIR_Inst_GetPrev(inst))) == VIR_OP_LOAD)
                                 {
@@ -2145,7 +2145,7 @@ _VSC_UF_AUBO_TransformInstructions(
                                         if(VIR_Symbol_HasFlag(sym, VIR_SYMUNIFORMFLAG_MOVED_TO_DUBO))
                                         {
                                             VIR_Symbol_SetFlag(sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
-                                            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM))
+                                            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM))
                                             {
                                                 VIR_LOG(dumper, "To be transformed instruction:\n");
                                                 VIR_LOG_FLUSH(dumper);
@@ -2162,7 +2162,7 @@ _VSC_UF_AUBO_TransformInstructions(
                 }
             }
 
-            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_OUTPUT))
+            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_OUTPUT))
             {
                 VIR_Shader_Dump(gcvNULL, "CreateDefaultUBO Output", shader, gcvTRUE);
             }
@@ -2291,10 +2291,10 @@ typedef struct VSC_UF_AUBO_UNIFORMINFONODE
     VIR_Swizzle indexSwizzle;
     gctUINT constOffset;
     gctUINT stride;
-    struct VSC_UF_AUBO_UNIFORMINFONODE* sameIndexList;
+    struct VSC_UF_AUBO_UNIFORMINFONODE* sameIndexList;                          /* share f2i instruction */
     struct VSC_UF_AUBO_UNIFORMINFONODE* sameIndexSameSwizzleList;
-    struct VSC_UF_AUBO_UNIFORMINFONODE* sameIndexSameSwizzleSameStrideList;
-    struct VSC_UF_AUBO_UNIFORMINFONODE* identicalList;
+    struct VSC_UF_AUBO_UNIFORMINFONODE* sameIndexSameSwizzleSameStrideList;     /* share mad instruction */
+    struct VSC_UF_AUBO_UNIFORMINFONODE* identicalList;                          /* share load instruction */
     struct VSC_UF_AUBO_UNIFORMINFONODE* identical;
     struct VSC_UF_AUBO_UNIFORMINFONODE* sameIndexSameSwizzleSameStride;
     struct VSC_UF_AUBO_UNIFORMINFONODE* sameIndexSameSwizzle;
@@ -2672,7 +2672,7 @@ _VSC_UF_AUBO_BuildUpInfoList(
 {
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     VIR_Instruction* inst = BB_GET_START_INST(bb);
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
 
     gcmASSERT(inst);
 
@@ -2702,6 +2702,8 @@ _VSC_UF_AUBO_BuildUpInfoList(
                         VIR_Swizzle src1Swizzle = VIR_Operand_GetSwizzle(src1);
                         VIR_Operand* indexingSrc;
 
+                        gcmASSERT(VIR_Type_isArray(uniformType) || VIR_Type_isMatrix(uniformType));
+
                         if(VIR_Shader_isRAEnabled(shader))
                         {
                             VIR_Instruction *movaInst = VIR_Inst_GetPrev(inst);
@@ -2728,14 +2730,24 @@ _VSC_UF_AUBO_BuildUpInfoList(
                         VSC_UF_AUBO_UniformInfoNode_SetIndexOperand(uin, indexingSrc);
                         VSC_UF_AUBO_UniformInfoNode_SetIndexSwizzle(uin, VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(indexingSrc), VIR_Swizzle_GetChannel(src1Swizzle, 0)));
 
-                        if (VIR_Type_isMatrix(uniformBaseType) && VIR_Type_isArray(uniformType))
+                        if(VIR_Type_isArray(uniformType))
                         {
-                            VSC_UF_AUBO_UniformInfoNode_SetStride(uin, _VSC_UF_AUBO_GetArrayStride(uniformType) / VIR_GetTypeRows(uniformBaseTypeId));
-                            VSC_UF_AUBO_UniformInfoNode_SetConstOffset(uin, VIR_Operand_GetMatrixConstIndex(src0) * VIR_GetTypeSize(VIR_GetTypeRowType(VIR_Type_GetIndex(uniformBaseType))));
+                            if(VIR_Type_isMatrix(uniformBaseType))
+                            {
+                                VSC_UF_AUBO_UniformInfoNode_SetStride(uin, _VSC_UF_AUBO_GetArrayStride(uniformType) / VIR_GetTypeRows(uniformBaseTypeId));
+                                VSC_UF_AUBO_UniformInfoNode_SetConstOffset(uin, VIR_Operand_GetMatrixConstIndex(src0) * VIR_GetTypeSize(VIR_GetTypeRowType(VIR_Type_GetIndex(uniformBaseType))));
+                            }
+                            else
+                            {
+                                VSC_UF_AUBO_UniformInfoNode_SetStride(uin, _VSC_UF_AUBO_GetArrayStride(uniformType));
+                                VSC_UF_AUBO_UniformInfoNode_SetConstOffset(uin, VIR_Operand_GetIsConstIndexing(src0) ?
+                                    (VIR_Operand_GetConstIndexingImmed(src0) + VIR_Operand_GetMatrixConstIndex(src0)) * VIR_GetTypeSize(VIR_Type_GetIndex(uniformBaseType)) : 0);
+                            }
                         }
                         else
                         {
-                            VSC_UF_AUBO_UniformInfoNode_SetStride(uin, _VSC_UF_AUBO_GetArrayStride(uniformType));
+                            gcmASSERT(VIR_Type_isMatrix(uniformType));
+                            VSC_UF_AUBO_UniformInfoNode_SetStride(uin, VIR_GetTypeSize(VIR_GetTypeRowType(VIR_Type_GetIndex(uniformBaseType))));
                         }
                     }
                     else if(VIR_Operand_GetRelAddrMode(src))
@@ -2789,7 +2801,7 @@ _VSC_UF_AUBO_BuildUpInfoList(
         BB_FLAGS_SET_LLI(bb);
     }
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_BUILD))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_BUILD))
     {
         VIR_Dumper* dumper = VIR_Shader_GetDumper(shader);
         VIR_LOG(dumper, "after building up info list:\n");
@@ -2812,10 +2824,10 @@ _VSC_UF_AUBO_ReorgUniformInfoList(
     VSC_UL_ITERATOR iter0;
     VSC_UF_AUBO_UniformInfoNode* uin0;
     gctBOOL changed = gcvFALSE;
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
     VIR_Dumper* dumper = VIR_Shader_GetDumper(shader);
 
-    gcmASSERT(VSC_OPTN_UF_AUBO_Options_GetOpt(options));
+    gcmASSERT(VSC_OPTN_UF_AUBOOptions_GetOpt(options));
 
     /* find out identicals */
     vscULIterator_Init(&iter0, VSC_UF_AUBO_UniformInfoList_GetList(uil));
@@ -2842,7 +2854,7 @@ _VSC_UF_AUBO_ReorgUniformInfoList(
             }
         }
     }
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_REORG))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_REORG))
     {
         if(changed)
         {
@@ -2856,14 +2868,16 @@ _VSC_UF_AUBO_ReorgUniformInfoList(
         }
     }
 
-    /* find out same-indexes */
+    /* find out same-indexes, which can share f2i instruction */
     changed = gcvFALSE;
     vscULIterator_Init(&iter0, VSC_UF_AUBO_UniformInfoList_GetList(uil));
     for(uin0 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_First(&iter0);
         uin0 != gcvNULL;
         uin0 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter0))
     {
-        if(VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(uin0) != VIR_INVALID_ID && VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin0) == gcvNULL)
+        if(VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(uin0) != VIR_INVALID_ID &&
+           VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin0) == gcvNULL &&
+           VSC_UF_AUBO_UniformInfoNode_GetIdentical(uin0) == gcvNULL)
         {
             VSC_UL_ITERATOR iter1 = iter0;
             VSC_UF_AUBO_UniformInfoNode* uin1;
@@ -2873,7 +2887,9 @@ _VSC_UF_AUBO_ReorgUniformInfoList(
                 uin1 = (VSC_UF_AUBO_UniformInfoNode*)vscULIterator_Next(&iter1))
             {
                 if(VSC_UF_AUBO_UniformInfoNode_GetIdentical(uin1) == gcvNULL &&
-                   VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(uin1) == VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(uin0))
+                   VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(uin1) == VSC_UF_AUBO_UniformInfoNode_GetIndexSymId(uin0) &&
+                   VSC_UF_AUBO_UniformInfoNode_GetIndexSwizzle(uin1) == VSC_UF_AUBO_UniformInfoNode_GetIndexSwizzle(uin0) &&
+                   VSC_UF_AUBO_UniformInfoNode_GetStride(uin1) == VSC_UF_AUBO_UniformInfoNode_GetStride(uin0))
                 {
                     _VSC_UF_AUBO_UniformInfoNode_AppendSameIndexList(uin0, uin1);
                     changed = gcvTRUE;
@@ -2881,7 +2897,7 @@ _VSC_UF_AUBO_ReorgUniformInfoList(
             }
         }
     }
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_REORG))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_REORG))
     {
         if(changed)
         {
@@ -2895,7 +2911,7 @@ _VSC_UF_AUBO_ReorgUniformInfoList(
         }
     }
 
-    if(VSC_OPTN_UF_AUBO_Options_GetOpt(options) == 2)
+    if(VSC_OPTN_UF_AUBOOptions_GetOpt(options) == 2)
     {
         /* find out same-index-same-swizzles */
         changed = gcvFALSE;
@@ -2943,7 +2959,7 @@ _VSC_UF_AUBO_ReorgUniformInfoList(
                 }
             }
         }
-        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_REORG))
+        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_REORG))
         {
             if(changed)
             {
@@ -2983,7 +2999,7 @@ _VSC_UF_AUBO_ReorgUniformInfoList(
                 }
             }
         }
-        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_REORG))
+        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_REORG))
         {
             if(changed)
             {
@@ -3039,7 +3055,7 @@ _VSC_UF_AUBO_ReorgUniformInfoList(
                 }
             }
         }
-        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_REORG))
+        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_REORG))
         {
             if(changed)
             {
@@ -3099,7 +3115,7 @@ _VSC_UF_AUBO_InsertInstructions(
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     VSC_UL_ITERATOR iter;
     VSC_UF_AUBO_UniformInfoNode* uin;
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
     VIR_Dumper* dumper = VIR_Shader_GetDumper(shader);
 
     vscULIterator_Init(&iter, VSC_UF_AUBO_UniformInfoList_GetList(uil));
@@ -3120,19 +3136,19 @@ _VSC_UF_AUBO_InsertInstructions(
         VIR_Uniform* uniform = VIR_Symbol_GetUniform(uniformSym);
         VIR_Instruction* insertBefore = inst;
 
-        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
         {
             VIR_LOG(dumper, "inst:\n");
             VIR_LOG_FLUSH(dumper);
             VIR_Inst_Dump(dumper, inst);
         }
 
-        if((VIR_OPCODE_isAtom(VIR_Inst_GetOpcode(inst)) || opcode == VIR_OP_CMP)
+        if((VIR_OPCODE_isAtom(VIR_Inst_GetOpcode(inst)) || opcode == VIR_OP_COMPARE)
             && VIR_Inst_GetPrev(inst) && VIR_Inst_GetOpcode(VIR_Inst_GetPrev(inst)) == VIR_OP_LOAD)
         {
             insertBefore = VIR_Inst_GetPrev(inst);
         }
-        if(opcode == VIR_OP_ATOMCMPXCHG && VIR_Inst_GetOpcode(VIR_Inst_GetPrev(inst)) == VIR_OP_CMP
+        if(opcode == VIR_OP_ATOMCMPXCHG && VIR_Inst_GetOpcode(VIR_Inst_GetPrev(inst)) == VIR_OP_COMPARE
             && VIR_Inst_GetPrev(inst) && VIR_Inst_GetPrev(VIR_Inst_GetPrev(inst))
             && VIR_Inst_GetOpcode(VIR_Inst_GetPrev(VIR_Inst_GetPrev(inst))) == VIR_OP_LOAD)
         {
@@ -3146,7 +3162,7 @@ _VSC_UF_AUBO_InsertInstructions(
             VIR_Instruction* load = VSC_UF_AUBO_UniformInfoNode_GetLOADInst(identical);
             VIR_Operand* loadDest = VIR_Inst_GetDest(load);
 
-            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
             {
                 VIR_LOG(dumper, "identical to inst:\n");
                 VIR_LOG_FLUSH(dumper);
@@ -3163,7 +3179,7 @@ _VSC_UF_AUBO_InsertInstructions(
                 VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
                 VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
                 VIR_Operand_SetSwizzle(operand, operandSwizzle);
-                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                 {
                     VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
                     VIR_LOG_FLUSH(dumper);
@@ -3180,7 +3196,7 @@ _VSC_UF_AUBO_InsertInstructions(
                 VIR_Operand_SetRelIndex(operand, 0);
                 VIR_Operand_SetRelAddrMode(operand, 0);
                 VIR_Operand_SetMatrixConstIndex(operand, 0);
-                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                 {
                     VIR_LOG(dumper, "propagate as:\n");
                     VIR_LOG_FLUSH(dumper);
@@ -3189,7 +3205,7 @@ _VSC_UF_AUBO_InsertInstructions(
             }
         }
         else if((VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzle(uin) ||
-                 VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin)) && VSC_OPTN_UF_AUBO_Options_GetOpt(options) == 2)
+                 VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin)) && VSC_OPTN_UF_AUBOOptions_GetOpt(options) == 2)
         {
             /* handle uniform usage having same index */
             VSC_UF_AUBO_UniformInfoNode* sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin);
@@ -3209,7 +3225,7 @@ _VSC_UF_AUBO_InsertInstructions(
                 sameIndexId = VSC_UF_AUBO_UniformInfoNode_GetSameIndexId(sameIndexSameSwizzle);
             }
 
-            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
             {
                 VIR_LOG(dumper, "same index as inst:\n");
                 VIR_LOG_FLUSH(dumper);
@@ -3254,13 +3270,16 @@ _VSC_UF_AUBO_InsertInstructions(
                 VIR_Operand_Change2Src(loadSrc1);
                 VIR_Operand_SetSwizzle(loadSrc1, (VIR_Swizzle)sameIndexId);
                 VIR_Operand_SetLShift(loadSrc1, lshift);
-                VIR_Operand_SetModifier(loadSrc1, VIR_MOD_X3);
+                if(mul3)
+                {
+                    VIR_Operand_SetModifier(loadSrc1, VIR_MOD_X3);
+                }
 
                 if(VIR_Shader_isDual16Mode(shader))
                 {
                     gctBOOL needRunSingleT = gcvFALSE;
                     gctBOOL dual16NotSupported = gcvFALSE;
-                    VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+                    VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL, gcvFALSE);
                     if (needRunSingleT)
                     {
                         VIR_Inst_SetThreadMode(load, VIR_THREAD_D16_DUAL_32);
@@ -3269,7 +3288,7 @@ _VSC_UF_AUBO_InsertInstructions(
 
                 VSC_UF_AUBO_UniformInfoNode_SetLOADInst(uin, load);
 
-                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                 {
                     VIR_LOG(dumper, "insert load:\n");
                     VIR_LOG_FLUSH(dumper);
@@ -3284,7 +3303,7 @@ _VSC_UF_AUBO_InsertInstructions(
                 VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
                 VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
                 VIR_Operand_SetSwizzle(operand, operandSwizzle);
-                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                 {
                     VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
                     VIR_LOG_FLUSH(dumper);
@@ -3293,7 +3312,7 @@ _VSC_UF_AUBO_InsertInstructions(
             }
         }
         else if((VSC_UF_AUBO_UniformInfoNode_GetSameIndexSameSwizzleSameStride(uin) ||
-                 VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin)) && VSC_OPTN_UF_AUBO_Options_GetOpt(options) == 1)
+                 VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin)) && VSC_OPTN_UF_AUBOOptions_GetOpt(options) == 1)
         {
             /* handle uniform usage having same index */
             VSC_UF_AUBO_UniformInfoNode* sameIndex = VSC_UF_AUBO_UniformInfoNode_GetSameIndex(uin);
@@ -3312,7 +3331,7 @@ _VSC_UF_AUBO_InsertInstructions(
             }
 
             gcmASSERT(opcode == VIR_OP_LDARR);
-            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+            if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
             {
                 VIR_LOG(dumper, "same index as inst:\n");
                 VIR_LOG_FLUSH(dumper);
@@ -3355,7 +3374,7 @@ _VSC_UF_AUBO_InsertInstructions(
                 {
                     gctBOOL needRunSingleT = gcvFALSE;
                     gctBOOL dual16NotSupported = gcvFALSE;
-                    VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+                    VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL, gcvFALSE);
                     if (needRunSingleT)
                     {
                         VIR_Inst_SetThreadMode(load, VIR_THREAD_D16_DUAL_32);
@@ -3364,7 +3383,7 @@ _VSC_UF_AUBO_InsertInstructions(
 
                 VSC_UF_AUBO_UniformInfoNode_SetLOADInst(uin, load);
 
-                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                 {
                     VIR_LOG(dumper, "insert load:\n");
                     VIR_LOG_FLUSH(dumper);
@@ -3379,7 +3398,7 @@ _VSC_UF_AUBO_InsertInstructions(
                 VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
                 VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
                 VIR_Operand_SetSwizzle(operand, operandSwizzle);
-                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                 {
                     VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
                     VIR_LOG_FLUSH(dumper);
@@ -3420,12 +3439,15 @@ _VSC_UF_AUBO_InsertInstructions(
                         gctUINT j;
 
                         strides[i] = VSC_UF_AUBO_UniformInfoNode_GetStride(sameIndex);
-                        for(j = 0; j < i; j++)
+                        if(!needConst)
                         {
-                            if(strides[j] != strides[i])
+                            for(j = 0; j < i; j++)
                             {
-                                needConst = gcvTRUE;
-                                break;
+                                if(strides[j] != strides[i])
+                                {
+                                    needConst = gcvTRUE;
+                                    break;
+                                }
                             }
                         }
                         swizzles[i] = VSC_UF_AUBO_UniformInfoNode_GetIndexSwizzle(sameIndex);
@@ -3449,7 +3471,7 @@ _VSC_UF_AUBO_InsertInstructions(
                     VIR_SymId f2iSymId;
                     VIR_Symbol* f2iSym;
 
-                    VIR_Function_AddInstructionBefore(func, VIR_OP_AQ_F2I, f2iDestTypeId, insertBefore, gcvTRUE, &f2i);
+                    VIR_Function_AddInstructionBefore(func, VIR_OP_F2I, f2iDestTypeId, insertBefore, gcvTRUE, &f2i);
                     f2iDest = VIR_Inst_GetDest(f2i);
                     f2iSrc = VIR_Inst_GetSource(f2i, 0);
 
@@ -3473,7 +3495,7 @@ _VSC_UF_AUBO_InsertInstructions(
                     lastSymId = f2iSymId;
                     lastSwizzle = VIR_Enable_2_Swizzle(lastEnable);
 
-                    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                     {
                         VIR_LOG(dumper, "insert f2i:\n");
                         VIR_LOG_FLUSH(dumper);
@@ -3481,7 +3503,7 @@ _VSC_UF_AUBO_InsertInstructions(
                     }
                 }
 
-                if(VSC_OPTN_UF_AUBO_Options_GetOpt(options) == 2)
+                if(VSC_OPTN_UF_AUBOOptions_GetOpt(options) == 2)
                 {
                     /* insert load */
                     {
@@ -3525,7 +3547,7 @@ _VSC_UF_AUBO_InsertInstructions(
                         {
                             gctBOOL needRunSingleT = gcvFALSE;
                             gctBOOL dual16NotSupported = gcvFALSE;
-                            VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+                            VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL, gcvFALSE);
                             if (needRunSingleT)
                             {
                                 VIR_Inst_SetThreadMode(load, VIR_THREAD_D16_DUAL_32);
@@ -3534,7 +3556,7 @@ _VSC_UF_AUBO_InsertInstructions(
 
                         VSC_UF_AUBO_UniformInfoNode_SetLOADInst(uin, load);
 
-                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                         {
                             VIR_LOG(dumper, "insert load:\n");
                             VIR_LOG_FLUSH(dumper);
@@ -3549,7 +3571,7 @@ _VSC_UF_AUBO_InsertInstructions(
                         VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
                         VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
                         VIR_Operand_SetSwizzle(operand, operandSwizzle);
-                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                         {
                             VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
                             VIR_LOG_FLUSH(dumper);
@@ -3603,7 +3625,7 @@ _VSC_UF_AUBO_InsertInstructions(
                             VIR_ConstId constId;
                             gctUINT j;
 
-                            for(j = 0; j < i; j++)
+                            for(j = 0; j <= i; j++)
                             {
                                 constVal.vecVal.u32Value[j] = strides[j];
                             }
@@ -3641,7 +3663,7 @@ _VSC_UF_AUBO_InsertInstructions(
                         {
                             gctBOOL needRunSingleT = gcvFALSE;
                             gctBOOL dual16NotSupported = gcvFALSE;
-                            VIR_Inst_Check4Dual16(mad, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+                            VIR_Inst_Check4Dual16(mad, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL, gcvFALSE);
                             if (needRunSingleT)
                             {
                                 VIR_Inst_SetThreadMode(mad, VIR_THREAD_D16_DUAL_32);
@@ -3652,7 +3674,7 @@ _VSC_UF_AUBO_InsertInstructions(
                         lastSwizzle = VIR_Enable_2_Swizzle(lastEnable);
                         VSC_UF_AUBO_UniformInfoNode_SetMADInst(uin, mad);
 
-                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                         {
                             VIR_LOG(dumper, "insert mad:\n");
                             VIR_LOG_FLUSH(dumper);
@@ -3692,7 +3714,7 @@ _VSC_UF_AUBO_InsertInstructions(
                         {
                             gctBOOL needRunSingleT = gcvFALSE;
                             gctBOOL dual16NotSupported = gcvFALSE;
-                            VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+                            VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL, gcvFALSE);
                             if (needRunSingleT)
                             {
                                 VIR_Inst_SetThreadMode(load, VIR_THREAD_D16_DUAL_32);
@@ -3701,7 +3723,7 @@ _VSC_UF_AUBO_InsertInstructions(
 
                         VSC_UF_AUBO_UniformInfoNode_SetLOADInst(uin, load);
 
-                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                         {
                             VIR_LOG(dumper, "insert load:\n");
                             VIR_LOG_FLUSH(dumper);
@@ -3716,7 +3738,7 @@ _VSC_UF_AUBO_InsertInstructions(
                         VIR_Operand_Copy(VIR_Inst_GetSource(inst, 0), loadDest);
                         VIR_Operand_Change2Src(VIR_Inst_GetSource(inst, 0));
                         VIR_Operand_SetSwizzle(operand, operandSwizzle);
-                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                        if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                         {
                             VIR_LOG(dumper, "propagate load and change ldarr to mov:\n");
                             VIR_LOG_FLUSH(dumper);
@@ -3825,7 +3847,7 @@ _VSC_UF_AUBO_InsertInstructions(
                 {
                     gctBOOL needRunSingleT = gcvFALSE;
                     gctBOOL dual16NotSupported = gcvFALSE;
-                    VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL);
+                    VIR_Inst_Check4Dual16(load, &needRunSingleT, &dual16NotSupported, gcvNULL, gcvNULL, gcvFALSE);
                     if (needRunSingleT)
                     {
                         VIR_Inst_SetThreadMode(load, VIR_THREAD_D16_DUAL_32);
@@ -3840,7 +3862,7 @@ _VSC_UF_AUBO_InsertInstructions(
 
                 VSC_UF_AUBO_UniformInfoNode_SetLOADInst(uin, load);
 
-                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_TRANSFORM_INSERT))
+                if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_TRANSFORM_INSERT))
                 {
                     VIR_LOG(dumper, "insert load:\n");
                     VIR_LOG_FLUSH(dumper);
@@ -3930,9 +3952,9 @@ _VSC_UF_AUBO_TransformInstructionsForShader(
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     VIR_FuncIterator func_iter;
     VIR_FunctionNode* func_node;
-    VSC_OPTN_UF_AUBO_Options* options = VSC_UF_AUBO_GetOptions(aubo);
+    VSC_OPTN_UF_AUBOOptions* options = VSC_UF_AUBO_GetOptions(aubo);
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_INPUT))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_INPUT))
     {
         VIR_Shader_Dump(gcvNULL, "CreateAUBO Input", shader, gcvTRUE);
     }
@@ -3968,7 +3990,7 @@ _VSC_UF_AUBO_TransformInstructionsForShader(
         VSC_UF_AUBO_SetAuxAddresses(aubo, gcvNULL);
     }
 
-    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBO_Options_GetTrace(options), VSC_OPTN_UF_AUBO_Options_TRACE_OUTPUT))
+    if(VSC_UTILS_MASK(VSC_OPTN_UF_AUBOOptions_GetTrace(options), VSC_OPTN_UF_AUBOOptions_TRACE_OUTPUT))
     {
         VIR_Shader_Dump(gcvNULL, "CreateAUBO Output", shader, gcvTRUE);
     }
@@ -4059,7 +4081,7 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
     IN OUT VSC_AllShaders           *all_shaders,
     IN VSC_HW_CONFIG                *hwCfg,
     IN VSC_PROGRAM_RESOURCE_LAYOUT  *pgResourceLayout,
-    IN VSC_OPTN_UF_AUBO_Options     *options
+    IN VSC_OPTN_UF_AUBOOptions     *options
     )
 {
     VSC_ErrCode errCode = VSC_ERR_NONE;
@@ -4070,7 +4092,7 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
     /* verify whether hardware configuration supports default UBO */
     if(!hwCfg->hwFeatureFlags.hasHalti1)
     {
-        if(VSC_OPTN_UF_AUBO_Options_GetTrace(options))
+        if(VSC_OPTN_UF_AUBOOptions_GetTrace(options))
         {
             VIR_LOG(dumper, "DefaultUBO is skipped because HALTI1 is not available:\n");
             VIR_LOG_FLUSH(dumper);
@@ -4084,10 +4106,10 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
         VIR_Shader* shader = VSC_AllShaders_GetShader(all_shaders, i);
         if(shader)
         {
-            if (!VSC_OPTN_InRange(VIR_Shader_GetId(shader), VSC_OPTN_UF_AUBO_Options_GetBeforeShader(options),
-                                  VSC_OPTN_UF_AUBO_Options_GetAfterShader(options)))
+            if (!VSC_OPTN_InRange(VIR_Shader_GetId(shader), VSC_OPTN_UF_AUBOOptions_GetBeforeShader(options),
+                                  VSC_OPTN_UF_AUBOOptions_GetAfterShader(options)))
             {
-                if(VSC_OPTN_UF_AUBO_Options_GetTrace(options))
+                if(VSC_OPTN_UF_AUBOOptions_GetTrace(options))
                 {
                     VIR_LOG(dumper, "Default UBO skips shader(id=%d)\n", VIR_Shader_GetId(shader));
                     VIR_LOG_FLUSH(dumper);
@@ -4096,7 +4118,7 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
             }
             if(VIR_Shader_GetClientApiVersion(shader) < gcvAPI_OPENGL_ES20)
             {
-                if(VSC_OPTN_UF_AUBO_Options_GetTrace(options))
+                if(VSC_OPTN_UF_AUBOOptions_GetTrace(options))
                 {
                     VIR_LOG(dumper, "Default UBO skips shader(id=%d) because it's not an es20 or above shader\n", VIR_Shader_GetId(shader));
                     VIR_LOG_FLUSH(dumper);
@@ -4107,7 +4129,7 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
                /* to be modified */
                (shader->compilerVersion[0] & 0xffff) == _SHADER_VG_TYPE)
             {
-                if(VSC_OPTN_UF_AUBO_Options_GetTrace(options))
+                if(VSC_OPTN_UF_AUBOOptions_GetTrace(options))
                 {
                     VIR_LOG(dumper, "Default UBO skips shader(id=%d) because it's an OpenVG shader\n", VIR_Shader_GetId(shader));
                     VIR_LOG_FLUSH(dumper);
@@ -4117,7 +4139,7 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
         }
     }
 
-    if(VSC_OPTN_UF_AUBO_Options_GetTrace(options))
+    if(VSC_OPTN_UF_AUBOOptions_GetTrace(options))
     {
         VIR_LOG(dumper, "Default UBO starts for program\n");
         VIR_LOG_FLUSH(dumper);
@@ -4135,7 +4157,7 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
         _VSC_UF_AUBO_CollectUniformsInfo(&aubo, &has_active);
         if(!has_active)
         {
-            if(VSC_OPTN_UF_AUBO_Options_GetTrace(options))
+            if(VSC_OPTN_UF_AUBOOptions_GetTrace(options))
             {
                 VIR_LOG(dumper, "Default UBO ends for program because there is no active uniform\n");
                 VIR_LOG_FLUSH(dumper);
@@ -4150,12 +4172,12 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
     /* HW may not support dynamic uniform indexing, so put indirectly accessed uniforms into workset if needed */
     if(hwCfg->hwFeatureFlags.hasUniformB0)
     {
-        VSC_OPTN_UF_AUBO_Options_SetIndirectAccessLevel(options, VSC_IndirectAccessLevel_UNIFORM_DYNAMICALLY);
+        VSC_OPTN_UF_AUBOOptions_SetIndirectAccessLevel(options, VSC_IndirectAccessLevel_UNIFORM_DYNAMICALLY);
     }
 
-    if(VSC_OPTN_UF_AUBO_Options_GetIndirectAccessLevel(options))
+    if(VSC_OPTN_UF_AUBOOptions_GetIndirectAccessLevel(options))
     {
-        _VSC_UF_AUBO_CollectIndirectlyAccessedUniforms(&aubo, (VSC_IndirectAccessLevel)VSC_OPTN_UF_AUBO_Options_GetIndirectAccessLevel(options));
+        _VSC_UF_AUBO_CollectIndirectlyAccessedUniforms(&aubo, (VSC_IndirectAccessLevel)VSC_OPTN_UF_AUBOOptions_GetIndirectAccessLevel(options));
     }
 
     /* pick uniforms to put into default UBO */
@@ -4176,7 +4198,7 @@ VSC_ErrCode VSC_UF_UtilizeAuxUBO(
         /* fill default UBO */
         _VSC_UF_AUBO_FillAuxiliaryUBOs(&aubo);
         /* transform corresponding MOV into LOAD */
-        if(VSC_OPTN_UF_AUBO_Options_GetOpt(options))
+        if(VSC_OPTN_UF_AUBOOptions_GetOpt(options))
         {
             _VSC_UF_AUBO_TransformInstructionsForShaders(&aubo);
         }
@@ -4370,6 +4392,15 @@ VSC_CheckUniformUsage(
     for(i = 0; i < VIR_IdList_Count(VIR_Shader_GetUniforms(pShader)); ++i)
     {
         /* need to fix here */
+        VIR_Id      id  = VIR_IdList_GetId(VIR_Shader_GetUniforms(pShader), i);
+        VIR_Symbol *sym = VIR_Shader_GetSymFromId(pShader, id);
+
+        if (isSymUniformCompiletimeInitialized(sym) &&
+            VIR_Symbol_GetUniformKind(sym) != VIR_UNIFORM_TEMP_REG_SPILL_MEM_ADDRESS)
+        {
+            VIR_Symbol_ClrFlag(sym, VIR_SYMUNIFORMFLAG_USED_IN_SHADER);
+        }
+
     }
 
     VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
@@ -4416,7 +4447,7 @@ VSC_UF_CreateAUBO(
 {
     VSC_ErrCode                errCode = VSC_ERR_NONE;
     VSC_AllShaders             all_shaders;
-    VSC_OPTN_UF_AUBO_Options*  aubo_options = (VSC_OPTN_UF_AUBO_Options*)pPassWorker->basePassWorker.pBaseOption;
+    VSC_OPTN_UF_AUBOOptions*   aubo_options = (VSC_OPTN_UF_AUBOOptions*)pPassWorker->basePassWorker.pBaseOption;
 
     VSC_AllShaders_Initialize(&all_shaders,
                               (VIR_Shader*)pPassWorker->pPgmLinkerParam->hShaderArray[VSC_SHADER_STAGE_VS],

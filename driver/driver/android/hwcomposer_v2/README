@@ -1,0 +1,65 @@
+HWComposer2 Integration Guide
+=============================
+
+Structure
+=========
+          +--------------------------------+
+          |                                |
+          |          Module Entry          |
+          +--------------------------------+
+                          |
+                          V
+          +--------------------------------+
+          |            Basic hwc2          |
+          |         (hwc2_common.h)        |
+          +--------------------------------+
+                              |
+                              V
+                  +------------------------+
+                  |        Blitter         |
+                  |    (hwc2_blitter.h)    |
+                  +------------------------+
+
+hwc2_common.h hwc2_common.cpp
+
+Includes a basic hwc2 implemention, with blitter support but not enabled,
+and without display features.
+Soc-Vendor can use functions exported in hwc2_common.h
+
+
+hwc2_blitter.cpp hwc2_blitter.h
+
+Implements the blitter features, referenced by hwc2_common.cpp.
+Soc-Vendor should not change them, either do not need to include the header
+file.
+
+
+hwc2_fbdev.cpp
+
+Module entry, defines the module and device.
+This is a reference.
+
+
+Required Functions
+==================
+
+NOTICE that some function requires taking effect immediately upon
+function returns. Must override the default function, ie implement practical
+functionalities for such descriptors.
+
+Such functions are listed below, see hwc2_common.h for more information.
+  HWC2_FUNCTION_PRESENT_DISPLAY
+  HWC2_FUNCTION_SET_ACTIVE_CONFIG
+  HWC2_FUNCTION_SET_COLOR_MODE
+  HWC2_FUNCTION_SET_POWER_MODE
+  HWC2_FUNCTION_CREATE_VIRTUAL_DISPLAY
+  HWC2_FUNCTION_DESTROY_VIRTUAL_DISPLAY
+  HWC2_FUNCTION_REGISTER_CALLBACK
+  HWC2_FUNCTION_CREATE_LAYER
+  HWC2_FUNCTION_DESTROY_LAYER
+  HWC2_FUNCTION_GET_CLIENT_TARGET_SUPPORT
+  HWC2_FUNCTION_SET_VSYNC_ENABLED
+  HWC2_FUNCTION_VALIDATE_DISPLAY
+  HWC2_FUNCTION_SET_CURSOR_POSITION
+
+

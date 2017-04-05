@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+#    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 #
 #    The material in this file is confidential and contains trade secrets
 #    of Vivante Corporation. This is proprietary information owned by
@@ -23,6 +23,7 @@ include ../../makefile.linux.def
 INCLUDE += -I$(AQROOT)/hal/inc
 INCLUDE += -I$(AQROOT)/hal/user
 INCLUDE += -I$(AQROOT)/hal/os/linux/user
+INCLUDE += -I$(AQARCH)/cmodel/inc
 INCLUDE += -I$(AQROOT)/sdk/inc
 INCLUDE += -I$(AQROOT)/compiler/libVSC/include
 
@@ -107,6 +108,7 @@ OBJECTS         +=  \
                     $(OBJ_DIR)/gc_vxk_statistics.o \
                     $(OBJ_DIR)/gc_vxk_threshold.o \
                     $(OBJ_DIR)/gc_vxk_warp.o \
+                    $(OBJ_DIR)/gc_vxk_rpn.o \
 
 
 LIBS += -l CLC -l VSC -l GAL

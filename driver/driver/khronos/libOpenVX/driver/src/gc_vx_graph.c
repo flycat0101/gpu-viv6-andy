@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -12,7 +12,6 @@
 
 
 #include <gc_vx_common.h>
-#include "debug/gc_vsc_debug_extern.h"
 
 VX_INTERNAL_API void vxoGraph_Dump(vx_graph graph)
 {
@@ -89,7 +88,7 @@ VX_PRIVATE_API vx_bool vxoReference_HasWriteDependency(vx_reference ref1, vx_ref
 {
     if (ref1 == VX_NULL || ref2 == VX_NULL) return vx_false_e;
 
-    if (ref1 == ref2) return vx_true_e;
+    if (ref1 == ref2) return (((vx_array)ref1)->base.isStage)?vx_false_e:vx_true_e;/*if is staging reference, skip dependency checking*/
 
     if (ref1->type == VX_TYPE_PYRAMID && ref2->type == VX_TYPE_IMAGE)
     {
@@ -617,7 +616,7 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodeParameters(vx_graph graph)
 
             if (paramRef->isVirtual)
             {
-                if (vxoReference_GetType(paramRef->scope) == VX_TYPE_GRAPH && (vx_graph)paramRef->scope != graph)
+                if (vxoReference_GetType(paramRef->scope) == VX_TYPE_GRAPH && (vx_graph)paramRef->scope != graph && !graph->isChildGraph)
                 {
                     vxError("Node %p(\"%s\") in Graph %p: No.%d virtual parameter has an invalid scope, %p",
                             node, node->kernel->name, graph, paramIndex, paramRef->scope);
@@ -1738,9 +1737,9 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
     vx_action action;
-    vx_uint32 lastNodeIndexTable[VX_MAX_NODE_COUNT];
-    vx_uint32 nextNodeIndexTable[VX_MAX_NODE_COUNT];
-    vx_uint32 leftNodeIndexTable[VX_MAX_NODE_COUNT];
+    vx_uint32 lastNodeIndexTable[VX_MAX_NODE_COUNT] = {0};
+    vx_uint32 nextNodeIndexTable[VX_MAX_NODE_COUNT] = {0};
+    vx_uint32 leftNodeIndexTable[VX_MAX_NODE_COUNT] = {0};
     vx_uint32 lastNodeCount, nextNodeCount, leftNodeCount = 0;
     vx_uint32 i;
 

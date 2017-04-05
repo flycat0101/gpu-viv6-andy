@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -441,6 +441,8 @@ VIR_CFG_EDGE* vscVIR_GetCfgEdge(VIR_CONTROL_FLOW_GRAPH* pCFG,
                                 VIR_BASIC_BLOCK* pToBasicBlk);
 
 /* Followings CFG related functions are TO-BE-REFINE!!! */
+VIR_BASIC_BLOCK* VIR_BB_GetFirstSuccBB(VIR_BASIC_BLOCK* bb);
+VIR_BASIC_BLOCK* VIR_BB_GetSecondSuccBB(VIR_BASIC_BLOCK* bb);
 VIR_BASIC_BLOCK* VIR_BB_GetLeadingBB(VIR_BASIC_BLOCK* bb);
 VIR_BASIC_BLOCK* VIR_BB_GetFollowingBB(VIR_BASIC_BLOCK* bb);
 VIR_BASIC_BLOCK* VIR_BB_GetJumpToBB(VIR_BASIC_BLOCK* bb);
@@ -472,6 +474,12 @@ VIR_BB_CopyBBAfter(
     VIR_BASIC_BLOCK* source,
     VIR_BASIC_BLOCK* after,
     VIR_BASIC_BLOCK** copy
+    );
+VSC_ErrCode
+VIR_BB_InsertBBBefore(
+    VIR_BB* before,
+    VIR_OpCode opcode,
+    VIR_BB** newBB
     );
 VSC_ErrCode
 VIR_BB_InsertBBAfter(

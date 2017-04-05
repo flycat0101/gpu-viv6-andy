@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -33,7 +33,6 @@ _UploadStates(
         /* rotationDeg. */
         if (Context->dirty.s.rotationDegKey)
         {
-            /* TODO: rotationDeg. */
             Context->dirty.s.rotationDegKey = 0;
         }
 
@@ -70,8 +69,6 @@ _UploadStates(
         /* Dither. */
         if (Context->dirty.s.ditherKey)
         {
-            /* TODO: Dither. */
-
             Context->dirty.s.ditherKey = 0;
         }
 
@@ -121,8 +118,6 @@ _UploadStates(
         /* Blur. */
         if (Context->dirty.s.blurKey)
         {
-            /* TODO: Blur. */
-
             Context->dirty.s.blurKey = 0;
         }
     }
@@ -250,7 +245,6 @@ _StretchBlit(
 
         case COPYBIT_TRANSFORM_FLIP_H:
         case COPYBIT_TRANSFORM_FLIP_V:
-            /* TODO: Clip rectangles for mirror. */
         case 0:
             srcRect.left   = SourceRect->l;
             srcRect.top    = SourceRect->t;
@@ -456,7 +450,6 @@ _StretchBlit(
                                      &dstRect,
                                      &dstSubRect));
 
-                /* TODO: surfaceflinger set blur issue. */
                 Context->blur = COPYBIT_DISABLE;
             }
             else if (stretch == gcvFALSE)

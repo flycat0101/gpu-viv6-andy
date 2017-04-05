@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -701,6 +701,9 @@ eglGetConfigs(
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
 
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
+
     if (num_config == gcvNULL)
     {
         /* Bad parameter. */
@@ -1319,6 +1322,9 @@ eglGetConfigAttrib(
         veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);;
         gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
     }
+
+    /* Hardware relevant thread data initialization. */
+    veglInitDeviceThreadData(thread);
 
     /* Test for valid config. */
     if (((EGLint)(intptr_t)Config <= __EGL_INVALID_CONFIG__)

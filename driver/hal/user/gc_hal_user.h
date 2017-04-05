@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -39,7 +39,7 @@
 
 #define OPT_VERTEX_ARRAY                  1
 
-#if gcdUSE_VX
+#if gcdENABLE_3D && gcdUSE_VX
 #define GC_VX_ASM                         0
 #endif
 
@@ -645,6 +645,13 @@ gceSTATUS gcoHARDWARE_MultiGPUSyncV2(
     OUT gctUINT32_PTR *Memory
 );
 
+gceSTATUS gcoHARDWARE_MultiGPUSyncV3(
+    IN gcoHARDWARE Hardware,
+    IN gctUINT32 GPUCount,
+    IN gctUINT_PTR ChipIDs,
+    OUT gctUINT32_PTR *Memory
+);
+
 gceSTATUS
 gcoHARDWARE_MultiGPUCacheFlush(
     IN gcoHARDWARE Hardware,
@@ -1080,6 +1087,14 @@ gcoHARDWARE_TranslateDestinationFormat(
     OUT gctUINT32* HwSwizzleValue,
     OUT gctUINT32* HwIsYUVValue
     );
+
+#if gcdENABLE_3D && gcdUSE_VX
+gceSTATUS
+gcoHARDWARE_QueryNNConfig(
+    IN gcoHARDWARE Hardware,
+    OUT gctPOINTER Config
+    );
+#endif
 
 #if gcdENABLE_3D
 gceSTATUS
@@ -2623,7 +2638,7 @@ gcoHARDWARE_3DBlit420Tiler(
     IN gcsPOINT_PTR RectSize
     );
 
-#if gcdUSE_VX
+#if gcdENABLE_3D && gcdUSE_VX
 typedef enum _gceVX_KERNEL
 {
     gcvVX_KERNEL_COLOR_CONVERT,
@@ -2680,6 +2695,9 @@ typedef enum _gceVX_KERNEL
     gcvVX_KERNEL_LAPLACIAN_3x3,
     gcvVX_KERNEL_CENSUS_3x3,
     gcvVX_KERNEL_COPY_IMAGE,
+
+    gcvVX_KERNEL_MAXPOOL,
+    gcvVX_KERNEL_LRN,
 }
 gceVX_KERNEL;
 
@@ -2763,8 +2781,121 @@ typedef struct _vx_evis_no_inst_struct
     gctBOOL lerp7Output;
     gctBOOL accsq8Output;
     gctBOOL noBilinear;
+    gctBOOL isVX2;
 }
 vx_evis_no_inst_s;
+
+typedef struct _vx_nn_config
+{
+    gctBOOL isSet;
+    gctUINT nnMadPerCoure;
+    gctUINT nnCoreCount;
+    gctUINT nnInputBufferDepth;
+    gctUINT nnAccumBufferDepth;
+}
+vx_nn_config;
+
+typedef union _vx_nn_cmd_info_union
+{
+    struct _vx_nn_general_cmd_info
+    {
+        gctUINT32 kernelXYSize;
+        gctUINT32 kernelZSize;
+        gctUINT32 kernelsPerCore;
+        gctUINT32 pooling;
+        gctUINT32 poolingXYSize;
+        gctUINT32 inImageXSize;
+        gctUINT32 inImageYSize;
+        gctINT32  inImageXOffset;
+        gctINT32  inImageYOffset;
+        gctUINT32 outImageXSize;
+        gctUINT32 outImageYSize;
+        gctUINT32 outImageZSize;
+        gctUINT32 outImageTileXSize;
+        gctUINT32 outImageTileYSize;
+
+        gctUINT32  relu;
+        gctINT32   nn_layer_flush;
+        gctUINT32  postMultiplier;
+        gctUINT32  postShift;
+        gctUINT32  wSize;
+        gctUINT8   dataType;
+    }
+    vx_nn_general_cmd_info;
+
+    struct _vx_nn_tp_cmd_info
+    {
+        gctUINT32 inImageXSize;
+        gctUINT32 inImageYSize;
+        gctUINT32 inImageZSize;
+        gctUINT32 inImageStride;
+        gctUINT32 inImageSlice;
+        gctINT32  inWindowXStart;
+        gctINT32  inWindowYStart;
+        gctUINT32 inWindowXEnd;
+        gctUINT32 inWindowYEnd;
+        gctUINT32 inTileSequence;
+        gctUINT32 inTileListGlobalMem;
+        gctUINT32 inImageGlobalMem;
+        gctUINT32 aluI2FEnable;
+        gctUINT32 aluSquareEnable;
+        gctUINT32 aluHorzProcessing;
+        gctUINT32 aluHorzProcCount;
+        gctUINT32 aluHorzProcStride;
+        gctUINT32 aluVertProcessing;
+        gctUINT32 aluVertProcCount;
+        gctUINT32 aluVertProcStride;
+        gctUINT32 aluNmsEnable;
+        gctUINT32 aluPwlEnable;
+        gctUINT32 aluMultEnable;
+        gctUINT32 aluF2IEnable;
+        gctUINT32 aluLoadPwlLUT;
+        gctUINT32 aluLoadPwlLUTGlobalMem;
+        gctUINT32 inImageBaseAddress;
+        gctUINT32 inTileListAddress;
+        gctUINT32 inTileXSize;
+        gctUINT32 inTileYSize;
+        gctUINT32 inTileXInc;
+        gctUINT32 inTileYInc;
+        gctUINT32 aluLoadPwlLUTAddress;
+        gctUINT32 outTileSkipAtborder;
+        gctUINT32 outGlobalMem;
+        gctUINT32 outLoop1Reset;
+        gctUINT32 outLoop2Reset;
+        gctUINT32 outLoop3Reset;
+        gctUINT32 outBrickMode;
+        gctUINT32 aluZFilterMode;
+        gctUINT32 aluZFilterStartOverfetch;
+        gctUINT32 aluZFilterEndOverfetch;
+        gctUINT32 aluSquarePreshift;
+        gctUINT32 last;
+        gctUINT32 outBaseAddress;
+        gctUINT32 outLoop0Inc;
+        gctUINT32 outLoop1Inc;
+        gctUINT32 outLoop2Inc;
+        gctUINT32 outLoop3Inc;
+        gctUINT32 outLoop4Inc;
+        gctUINT32 outLoop5Inc;
+        gctUINT32 outLoop6Inc;
+        gctUINT32 outLoop0Count;
+        gctUINT32 outLoop1Count;
+        gctUINT32 outLoop2Count;
+        gctUINT32 outLoop3Count;
+        gctUINT32 outLoop4Count;
+        gctUINT32 outLoop5Count;
+    }
+    vx_nn_tp_cmd_info;
+
+    struct _vx_nn_image_cmd_info
+    {
+        gctUINT32 width;
+        gctUINT32 height;
+        gctUINT32 shift;
+        gctUINT32 physical;
+    }
+    vx_nn_image_cmd_info;
+}
+vx_nn_cmd_info_u;
 
 typedef struct _gcoVX_Hardware_Context
 {
@@ -2841,7 +2972,6 @@ typedef struct _gcoVX_Hardware_Context
 
     vx_evis_no_inst_s    evisNoInst;
 
-
 }
 gcoVX_Hardware_Context;
 
@@ -2855,6 +2985,14 @@ typedef struct _gcoVX_Hardware_Kernel
 gcoVX_Hardware_Kernel;
 
 typedef gcoVX_Hardware_Kernel gcoVX_Hardware_Step;
+
+typedef enum
+{
+    gcvVX_ACCELERATOR_INVALID = -1,
+    gcvVX_ACCELERATOR_NN      = 0,
+    gcvVX_ACCELERATOR_TP      = 1,
+}
+gceVX_ACCELERATOR_TYPE;
 
 
 gceSTATUS
@@ -2910,6 +3048,42 @@ gcoHARDWAREVX_KenrelConstruct(
 gceSTATUS
 gcoHARDWAREVX_InitVX(
     IN gcoHARDWARE                          Hardware
+);
+
+gceSTATUS
+gcoHARDWAREVX_TriggerAccelerator(
+    IN gcoHARDWARE              Hardware,
+    IN gctUINT32                CmdAddress,
+    IN gceVX_ACCELERATOR_TYPE   Type,
+    IN gctUINT32                EventId,
+    IN gctBOOL                  waitEvent
+);
+
+gceSTATUS
+gcoHARDWAREVX_ProgrammeNNEngine(
+    IN gcoHARDWARE Hardware,
+    IN gctPOINTER Info,
+    IN OUT gctUINT32_PTR *Instruction
+);
+
+gceSTATUS
+gcoHARDWAREVX_ProgrammeTPEngine(
+    IN gcoHARDWARE Hardware,
+    IN gctPOINTER Info,
+    IN OUT gctUINT32_PTR *Instruction
+);
+
+gceSTATUS
+gcoHARDWAREVX_SetNNImage(
+    IN gcoHARDWARE Hardware,
+    IN gctPOINTER Info,
+    IN OUT gctUINT32_PTR *Instruction
+);
+
+gceSTATUS
+gcoHARDWAREVX_WaitNNEvent(
+    IN gcoHARDWARE Hardware,
+    IN gctUINT32   EventId
 );
 
 #if GC_VX_ASM
@@ -3136,6 +3310,7 @@ struct _gcoHAL
     gceHARDWARE_TYPE        chipTypes[gcdCHIP_COUNT];
     gctUINT                 chipIDs[gcvCORE_COUNT];
     gctBOOL                 separated2D;
+    gctBOOL                 hybrid2D;
     gctBOOL                 is3DAvailable;
     gctBOOL                 isGpuBenchSmoothTriangle;
 

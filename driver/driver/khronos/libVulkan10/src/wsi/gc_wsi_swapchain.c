@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -77,7 +77,6 @@ VkResult VKAPI_CALL __vk_QueuePresentKHR(
         if (pPresentInfo->pResults)
             pPresentInfo->pResults[i] = r;
 
-        /* TODO: correct the return value. */
         if (r != VK_SUCCESS)
             result = VK_ERROR_SURFACE_LOST_KHR;
     }

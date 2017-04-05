@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1528,6 +1528,8 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_PatchShaderStart()   (gcmGetOptimizerOption()->_patchShaderStart)
 #define gcmOPT_PatchShaderEnd()     (gcmGetOptimizerOption()->_patchShaderEnd)
 
+#define gcmOPT_SetOclPackedBasicType(val) do { (gcmGetOptimizerOption()->oclPackedBasicType = (val)); } while(0)
+
 #define gcmOPT_FragmentFPPrecision() (gcmGetOptimizerOption()->fragmentFPPrecision)
 
 extern gctBOOL gcSHADER_GoVIRPass(gcSHADER Shader);
@@ -1859,6 +1861,9 @@ gcGetOptimizerOption(void);
 
 gcOPTIMIZER_OPTION *
 gcGetOptimizerOptionVariable(void);
+
+gctBOOL
+gcUseFullNewLinker(gctBOOL HasHalti2);
 
 typedef gceSTATUS (*gctGLSLCompiler)(IN  gctINT ShaderType,
                                      IN  gctUINT SourceSize,
@@ -4324,6 +4329,14 @@ gceSTATUS
 gcSHADER_GetVariable(
     IN gcSHADER Shader,
     IN gctUINT Index,
+    OUT gcVARIABLE * Variable
+    );
+
+gceSTATUS
+gcSHADER_GetVariableByName(
+    IN gcSHADER Shader,
+    IN gctCONST_STRING VariableName,
+    IN gctUINT16 NameLength,
     OUT gcVARIABLE * Variable
     );
 
@@ -6960,7 +6973,8 @@ gcCompileShader(
 */
 gceSTATUS
 gcLoadKernelCompiler(
-    IN gcsHWCaps *HWCaps
+    IN gcsHWCaps *HWCaps,
+    IN gcePATCH_ID PatchId
     );
 
 /*******************************************************************************
@@ -7348,6 +7362,11 @@ gcDestroyPatchDirective(
 
 gceSTATUS
 gcLoadCLPatchLibrary(
+    void
+    );
+
+gceSTATUS
+gcFreeCLPatchLibrary(
     void
     );
 

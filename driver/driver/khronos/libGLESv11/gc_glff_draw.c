@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -1045,7 +1045,10 @@ gctBOOL _computeWlimitByData(
         gctPOINTER memory = gcvNULL;
 
         glsBUFFER_PTR object = (glsBUFFER_PTR)(Context->aPositionInfo.buffer->object);
-        gcoSTREAM_Lock(object->stream, &memory,gcvNULL);
+        if (gcmIS_ERROR(gcoSTREAM_Lock(object->stream, &memory,gcvNULL)))
+        {
+            return gcvFALSE;
+        }
         vertexPtr =  (gctFLOAT_PTR)((gctUINTPTR_T)memory + (gctUINTPTR_T)Context->aPositionInfo.pointer
                                      + wlimitVertexStride * First);
         gcoSTREAM_Unlock(object->stream);
@@ -1307,7 +1310,6 @@ void _fixWlimit(
 
     if (Context->bComputeWlimitByVertex && !Context->drawTexOESEnabled)
     {
-        /* TODO, check vbo or vertex array changed */
         if (_computeWlimitByData(Context, First, Count, matrix, zNear, Type, Indices))
         {
             return;

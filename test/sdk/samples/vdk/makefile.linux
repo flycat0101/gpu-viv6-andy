@@ -1,6 +1,6 @@
 ##############################################################################
 #
-#    Copyright 2012 - 2016 Vivante Corporation, Santa Clara, California.
+#    Copyright 2012 - 2017 Vivante Corporation, Santa Clara, California.
 #    All Rights Reserved.
 #
 #    Permission is hereby granted, free of charge, to any person obtaining
@@ -29,7 +29,7 @@
 ######################################################
 # Include global difinitions.
 
-include makefile.linux.def
+include $(AQROOT)/makefile.linux.def
 
 ######################################################
 # Components of the project.

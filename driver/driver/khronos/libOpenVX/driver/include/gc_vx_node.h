@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -49,6 +49,11 @@ VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node);
 
 VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr);
 
+VX_INTERNAL_API vx_status vxoNode_GetTriggerCNNEventID(vx_node node, vx_uint32 * eventID);
+
+VX_INTERNAL_API vx_status vxoNode_SetWaitCNNEventID0(vx_node node, vx_uint32 eventID);
+
+VX_INTERNAL_API vx_status vxoNode_SetWaitCNNEventID1(vx_node node, vx_uint32 eventID);
 EXTERN_C_END
 
 #endif /* __GC_VX_NODE_H__ */

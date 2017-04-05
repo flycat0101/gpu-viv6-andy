@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -6585,7 +6585,6 @@ GL_API void GL_APIENTRY glGetTexParameterfv(
             break;
         }
 
-        /* TODO: Is the size fixed to 1. */
         gcmDUMP_API("${ES11 glGetTexParameterfv 0x%08X 0x%08X (0x%08X)", Target, Name, Value);
         gcmDUMP_API_ARRAY(Value, 1);
         gcmDUMP_API("$}");
@@ -8829,6 +8828,8 @@ GL_API void GL_APIENTRY glCompressedTexImage2D(
                     Target, Level, rgbFormat, Width, Height,
                     Border, rgbFormat, imageFormat, pixels
                     );
+                gcmVERIFY_OK(gcoOS_Free(gcvNULL, pixels));
+                pixels = gcvNULL;
             }
             else
             {
@@ -8863,6 +8864,8 @@ GL_API void GL_APIENTRY glCompressedTexImage2D(
                     Target, Level, GL_RGB, Width, Height,
                     Border, GL_RGB, imageType, pixels
                     );
+                gcmVERIFY_OK(gcoOS_Free(gcvNULL, pixels));
+                pixels = gcvNULL;
             }
             else
             {
@@ -9702,8 +9705,8 @@ GL_API void GL_APIENTRY glTexDirectVIV(
     {
         gceSTATUS status = gcvSTATUS_OK;
         gctBOOL tilerAvailable;
-        gctBOOL sourceYuv;
-        gctBOOL planarYuv;
+        gctBOOL sourceYuv = gcvFALSE;
+        gctBOOL planarYuv = gcvFALSE;
         gceSURF_FORMAT sourceFormat   = gcvSURF_UNKNOWN;
         gceSURF_FORMAT textureFormat  = gcvSURF_UNKNOWN;
         glsTEXTURESAMPLER_PTR sampler = gcvNULL;

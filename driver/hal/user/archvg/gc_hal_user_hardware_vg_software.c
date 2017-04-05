@@ -1,6 +1,6 @@
 /****************************************************************************
 *
-*    Copyright (c) 2005 - 2016 by Vivante Corp.  All rights reserved.
+*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
 *
 *    The material in this file is confidential and contains trade secrets
 *    of Vivante Corporation. This is proprietary information owned by
@@ -17,7 +17,6 @@
 
 #include "gc_hal_user_vg.h"
 
-/* TODO: Remove these includes! Not allowed in the HAL! */
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <math.h>
