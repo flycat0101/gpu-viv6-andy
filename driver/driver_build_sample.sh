@@ -70,6 +70,21 @@ arm-yocto)
 ;;
 
 
+arm-yocto-sdk)
+    ARCH=arm
+    export ARCH_TYPE=$ARCH
+    export CPU_TYPE=cortex-a9
+    export CPU_ARCH=armv7-a
+    BUILD_YOCTO_DRI_BUILD=1
+    BUILD_OPTION_USE_OPENCL=1
+    BUILD_OPTION_VIVANTE_ENABLE_2D=1
+    export KERNEL_DIR=${KERNEL_DIR:=PLEASE_SET_THIS_VARIABLE}
+    export ROOTFS=$SDKTARGETSYSROOT
+    export ROOTFS_USR=$ROOTFS/usr
+    export X11_ARM_DIR=$SDKTARGETSYSROOT/usr
+    export TOOLCHAIN=$SDKTARGETSYSROOT
+;;
+
 arm64-yocto)
     export ARCH=arm64
     export ARCH_TYPE=$ARCH
