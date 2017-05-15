@@ -14426,6 +14426,7 @@ gcoHARDWARE_Get2DTempSurface(
     }
 
     gcmONERROR(gcoHARDWARE_Lock(&(*Surface)->node, &phys, gcvNULL));
+    gcmONERROR(gcoHARDWARE_Unlock(&(*Surface)->node, gcvSURF_BITMAP));
 
     switch((*Surface)->format)
     {
