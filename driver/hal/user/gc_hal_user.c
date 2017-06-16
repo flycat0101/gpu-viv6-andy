@@ -3141,7 +3141,7 @@ gcoHAL_WrapUserMemory(
     iface.command = gcvHAL_WRAP_USER_MEMORY;
 
 #if defined(__QNXNTO__)
-    mlock(lock_addr, lock_size);
+    gcmONERROR(mlock(lock_addr, lock_size));  /* Lock the user memory, so mem_offset64 can be used */
 #endif
 
     gcoOS_MemCopy(&iface.u.WrapUserMemory.desc, UserMemoryDesc, gcmSIZEOF(gcsUSER_MEMORY_DESC));
