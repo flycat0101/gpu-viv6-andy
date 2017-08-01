@@ -910,4 +910,72 @@ void vscMC_DumpInsts(VSC_MC_RAW_INST* pMcInsts,
     vscMC_EndCodec(&mcCodec);
 }
 
+void vscMC_DisassembleInst(VSC_MC_CODEC* pMcCodec,
+                           VSC_MC_RAW_INST* pMcInst,
+                           gctUINT instIdx,
+                           VSC_DUMPER* pDumper)
+{
+    VSC_MC_CODEC_INST    codecHelperInst;
+    DST_ADDR_REG_TYPE addrRegType = DST_ADDR_REG_TYPE_NONE;
+    gctUINT           srcIdx;
+    gctBOOL           bEvisMode;
+
+    /* Decode firstly */
+    if (!vscMC_DecodeInst(pMcCodec, pMcInst, &codecHelperInst))
+    {
+        gcmASSERT(gcvFALSE);
+        return;
+    }
+
+    bEvisMode = ((codecHelperInst.baseOpcode == 0x45) ||
+                                  (IS_MEM_ACCESS_MC_OPCODE(codecHelperInst.baseOpcode) && codecHelperInst.instCtrl.u.maCtrl.bUnderEvisMode));
+
+    if (codecHelperInst.baseOpcode == 0x0A ||
+        codecHelperInst.baseOpcode == 0x0B ||
+        codecHelperInst.baseOpcode == 0x56)
+    {
+        addrRegType = DST_ADDR_REG_TYPE_A0;
+    }
+    else if (codecHelperInst.baseOpcode == 0x7F &&
+        codecHelperInst.extOpcode == 0x13)
+    {
+        addrRegType = DST_ADDR_REG_TYPE_B0;
+    }
+
+    /* Print inst ordinal */
+    vscDumper_PrintStrSafe(pDumper, "%04u: ", instIdx);
+
+    /* print opcode */
+    _DumpOpcode(codecHelperInst.baseOpcode, codecHelperInst.extOpcode, pDumper);
+
+    /* Print inst control */
+    _DumpInstCtrl(&codecHelperInst.instCtrl, codecHelperInst.baseOpcode,
+                  codecHelperInst.extOpcode, pMcCodec->bDual16ModeEnabled, pDumper);
+
+    /* Print dst */
+    _DumpInstDst(&codecHelperInst.dst,
+                 codecHelperInst.bDstValid,
+                 addrRegType,
+                 bEvisMode,
+                 pMcCodec->bDual16ModeEnabled,
+                 (codecHelperInst.srcCount != 0),
+                 pDumper);
+
+    /* Print srcs */
+    for (srcIdx = 0; srcIdx < codecHelperInst.srcCount; srcIdx ++)
+    {
+        _DumpInstSrc(&codecHelperInst.src[srcIdx],
+                     srcIdx,
+                     bEvisMode,
+                     pMcCodec->bDual16ModeEnabled,
+                     (srcIdx < codecHelperInst.srcCount -1),
+                     pDumper);
+    }
+
+    /* Print raw hex mc inst */
+    APPEND_PADDING_TO_ALIGN(HEX_MC_START_COLUMN);
+    vscDumper_PrintStrSafe(pDumper,
+                           "# 0x%08x 0x%08x 0x%08x 0x%08x",
+                           pMcInst->word[0], pMcInst->word[1], pMcInst->word[2], pMcInst->word[3]);
+}
 

@@ -22,7 +22,14 @@ VX_INTERNAL_CALLBACK_API void vxoProgram_Destructor(vx_reference ref)
     if (program->buildOptions) gcoOS_Free(gcvNULL, program->buildOptions);
     if (program->buildLog) gcoOS_Free(gcvNULL, program->buildLog);
     if (program->source) gcoOS_Free(gcvNULL, program->source);
-    if (program->binary) gcSHADER_Destroy((gcSHADER)program->binary);
+    if (program->linked)
+    {
+        if (program->binary) gcoOS_Free(gcvNULL, program->binary);
+    }
+    else
+    {
+        if (program->binary) gcSHADER_Destroy((gcSHADER)program->binary);
+    }
 }
 
 VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithSource(
@@ -115,6 +122,7 @@ VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithBinary(
     vx_program program;
     gceSTATUS   status;
     gcSHADER    shaderBinary;
+    gctUINT32   *pBinary = (gctUINT32*)binary;
 
     if (!vxoContext_IsValid(context)) return VX_NULL;
 
@@ -122,17 +130,31 @@ VX_API_ENTRY vx_program VX_API_CALL vxCreateProgramWithBinary(
 
     if (vxoReference_GetStatus((vx_reference)program) != VX_SUCCESS) return program;
 
-    /* Construct binary. */
-    gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &shaderBinary));
+    if ((*pBinary == FULL_PROGRAM_BINARY_SIG_1) &&  (*(pBinary+1) == FULL_PROGRAM_BINARY_SIG_2))
+    {
+        program->linked = gcvTRUE;
 
-    /* Load binary */
-    gcmONERROR(gcSHADER_LoadEx(shaderBinary, (gctPOINTER)binary, (gctUINT32)size));
+        gcmONERROR(gcoOS_Allocate(gcvNULL, size, (gctPOINTER*)&program->binary));
+        gcoOS_MemCopy(program->binary, binary, size);
+        program->binarySize = (gctUINT)size;
+    }
+    else
+    {
+        /* Construct binary. */
+        gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &shaderBinary));
 
-    program->binary = (gctUINT8_PTR) shaderBinary;
+        /* Load binary */
+        gcmONERROR(gcSHADER_LoadEx(shaderBinary, (gctPOINTER)binary, (gctUINT32)size));
+
+        program->binary = (gctUINT8_PTR) shaderBinary;
+        program->binarySize = (gctUINT)size;
+    }
 
     return program;
 
 OnError:
+    vxReleaseProgram(&program);
+
     return VX_NULL;
 }
 
@@ -141,6 +163,59 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseProgram(vx_program *program)
     return vxoReference_Release((vx_reference_ptr)program, (vx_type_e)VX_TYPE_PROGRAM, VX_REF_EXTERNAL);
 }
 
+gceSTATUS
+gcfVX_LoadCompiler(
+    vx_context context
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    VSC_HW_CONFIG hwCfg;
+    gcePATCH_ID patchId;
+
+    gcmHEADER();
+    {
+        if (context->compileKernel == gcvNULL)
+        {
+            status = gcoOS_LoadLibrary(gcvNULL,
+#if defined(__APPLE__)
+                                       "libCLC.dylib",
+#else
+                                       "libCLC",
+#endif
+                                       &context->libCLC);
+
+            if (gcmIS_ERROR(status))
+            {
+                goto OnError;
+            }
+
+             gcmONERROR(gcoOS_GetProcAddress(gcvNULL,
+                                          context->libCLC,
+                                          "gcCompileKernel",
+                                          (gctPOINTER*)&context->compileKernel));
+
+            gcmONERROR(gcoOS_GetProcAddress(gcvNULL,
+                                          context->libCLC,
+                                          "gcLoadKernelCompiler",
+                                          (gctPOINTER*)&context->loadCompiler));
+
+            gcmONERROR(gcoOS_GetProcAddress(gcvNULL,
+                                          context->libCLC,
+                                          "gcUnloadKernelCompiler",
+                                          (gctPOINTER*)&context->unloadCompiler));
+
+            gcmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg));
+            gcmONERROR(gcoHAL_GetPatchID(gcvNULL, &patchId));
+
+            gcmONERROR((*context->loadCompiler)(&hwCfg, patchId));
+        }
+    }
+
+OnError:
+
+    gcmFOOTER_NO();
+    return status;
+}
 
 VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_string options)
 {
@@ -185,14 +260,20 @@ VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_s
 
     program->buildStatus = VX_BUILD_IN_PROGRESS;
 
+    if (program->binary == gcvNULL || !program->linked)
+    {
+        gcmONERROR(gcfVX_LoadCompiler(program->base.context));
+    }
+
     if (program->binary == gcvNULL)
     {
-        status = gcCompileKernel(gcvNULL,
-                                       0,
-                                       program->source,
-                                       program->buildOptions,
-                                       &binary,
-                                       &program->buildLog);
+        status = (*program->base.context->compileKernel) (
+                                        gcvNULL,
+                                        0,
+                                        program->source,
+                                        program->buildOptions,
+                                        &binary,
+                                        &program->buildLog);
         if (gcmIS_ERROR(status))
         {
             goto OnError;
@@ -206,17 +287,15 @@ VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, vx_const_s
     vStatus = VX_SUCCESS;
 
 OnError:
-        if (gcmIS_ERROR(status))
+    if (gcmIS_ERROR(status))
+    {
+        if (program->buildLog != gcvNULL)
         {
-            binary = gcvNULL;
-
-            if (program->buildLog != gcvNULL)
-            {
-                fprintf(stderr, "%s\n", program->buildLog);
-            }
-
-            fprintf(stderr, "ERROR: Failed to compile vx shader. (error: %X)\n", status);
+            fprintf(stderr, "%s\n", program->buildLog);
         }
+
+        fprintf(stderr, "ERROR: Failed to compile vx shader. (error: %X)\n", status);
+    }
 
 
     if(program != gcvNULL)

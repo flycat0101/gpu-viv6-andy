@@ -89,19 +89,15 @@ LIBS += VSC GAL LLVM_viv
 
 CCFLAGS += -Wno-error=unused-value
 
-ifeq ($(QNX_SDP700), 1)
-# LIBS += cpp
-# TODO FIXME HACK
+ifeq ($(SDP_VERSION),700)
 LIBS += c++
-else
+else # SDP660
 LIBS += cpp
 endif
 
 EXTRA_LIBVPATH += $(QNX_TARGET)/$(CPUVARDIR)/lib/gcc/4.7.3
 
 CCFLAGS += -D_LIB -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS
-
-CCFLAGS += -DBUILD_OPENCL_12=1
 
 include $(qnx_build_dir)/math.mk
 

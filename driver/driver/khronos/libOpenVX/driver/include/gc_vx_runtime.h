@@ -68,6 +68,8 @@ VX_INTERNAL_API vx_bool vxIsSameString(vx_const_string string1, vx_const_string 
 
 VX_INTERNAL_API vx_string vxStrDup(vx_const_string string);
 
+VX_INTERNAL_API vx_bool vxStrToLower(vx_const_string srcString, vx_string lowerString);
+
 /* Thread APIs */
 VX_INTERNAL_API vx_thread vxCreateThread(vx_thread_routine_f func, void *arg);
 

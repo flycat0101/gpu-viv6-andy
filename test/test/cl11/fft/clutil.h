@@ -82,7 +82,6 @@ extern cl_mem d_outfft; // freq-domain output samples
 
 extern cl_context cxContext;
 extern cl_program cpProgram;
-extern cl_event gpuDone;
 extern cl_kernel kernels[FFT_MAX_LOG2N];
 extern cl_event gpuExecution[FFT_MAX_LOG2N];
 extern cl_command_queue commandQueue;

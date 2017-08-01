@@ -76,36 +76,44 @@ int test_fp64(cl_device_id device, cl_context context, cl_command_queue queue, i
 
         sprintf(kernel_code_int, kernel_test_fp64, types[typeIndex], types[typeIndex], types[typeIndex], types[typeIndex]);
         constkernelint = kernel_code_int;
-        err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_fp64" );
-        if (err)
+
+        if(is_extension_available(device, "cl_khr_fp64"))
         {
-            if(is_extension_available(device, "cl_khr_fp64"))
+            err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_fp64" );
+            if (err)
             {
                 printf("Kernel compilation error using double as a type.\n");
-                clReleaseMemObject(streams);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                printf("\n!!Kernel build not successful.\n");
+                if(streams) clReleaseMemObject(streams);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(output_h) free(output_h);
                 return -1;
             }
-            printf("\n!!Kernel build not successful.\n");
-            printf("cl_khr_fp64 extension is not supported.!!\n");
-            printf("double%s passed\n", types[typeIndex]);
+        }
+        else
+        {
+            if(streams) clReleaseMemObject(streams);
+            if(kernel) clReleaseKernel(kernel);
+            if(program) clReleaseProgram(program);
+            if(output_h) free(output_h);
 
             passCount++;
-            typeIndex++;
-            continue;
+
+            printf("--------------------------------------------------------\n");
+            printf("cl_khr_fp64 extension is not supported.!!\n");
+            printf("double%s passed\n", types[typeIndex]);
+            return 0;
         }
+
         err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
         if (err != CL_SUCCESS)
         {
             printf("clSetKernelArgs failed\n");
-            clReleaseMemObject(streams);
-            if(!kernel)
-                clReleaseKernel(kernel);
-            clReleaseProgram(program);
-            free(output_h);
+            if(streams) clReleaseMemObject(streams);
+            if(kernel) clReleaseKernel(kernel);
+            if(program) clReleaseProgram(program);
+            if(output_h) free(output_h);
             return -1;
         }
         threads[0] = (unsigned int)num_elements;
@@ -113,30 +121,27 @@ int test_fp64(cl_device_id device, cl_context context, cl_command_queue queue, i
         if (err != CL_SUCCESS)
         {
             printf("clEnqueueNDRangeKernel failed\n");
-            clReleaseMemObject(streams);
-            if(!kernel)
-                clReleaseKernel(kernel);
-            clReleaseProgram(program);
-            free(output_h);
+            if(streams) clReleaseMemObject(streams);
+            if(kernel) clReleaseKernel(kernel);
+            if(program) clReleaseProgram(program);
+            if(output_h) free(output_h);
             return -1;
         }
         err = clEnqueueReadBuffer(queue, streams, CL_TRUE, 0, length, output_h, 0, NULL, NULL);
         if (err != CL_SUCCESS)
         {
             printf("clReadArray failed\n");
-            clReleaseMemObject(streams);
-            if(!kernel)
-                clReleaseKernel(kernel);
-            clReleaseProgram(program);
-            free(output_h);
+            if(streams) clReleaseMemObject(streams);
+            if(kernel) clReleaseKernel(kernel);
+            if(program) clReleaseProgram(program);
+            if(output_h) free(output_h);
             return -1;
         }
 
-        clReleaseMemObject(streams);
-        if(!kernel)
-            clReleaseKernel(kernel);
-        clReleaseProgram(program);
-        free(output_h);
+        if(streams) clReleaseMemObject(streams);
+        if(kernel) clReleaseKernel(kernel);
+        if(program) clReleaseProgram(program);
+        if(output_h) free(output_h);
 
         typeIndex++;
 

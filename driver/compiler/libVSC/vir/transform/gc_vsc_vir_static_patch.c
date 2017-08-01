@@ -109,7 +109,7 @@ VSC_ErrCode _DoOutSampleMaskPatch(VIR_Shader* pShader)
                 if (varSym && VIR_Symbol_GetName(varSym) == VIR_NAME_SAMPLE_MASK)
                 {
                     VIR_Operand *opnd;
-                    dstTypeId = VIR_Operand_GetType(dst);
+                    dstTypeId = VIR_Operand_GetTypeId(dst);
 
                     /* Since MSAA count we supported is less than 32, and bits we can write for sample-mask
                        has only be 0~3 for a specific channel, so we temp change starr to mov. For general
@@ -634,10 +634,16 @@ VSC_ErrCode vscVIR_PerformSpecialHwPatches(VSC_SH_PASS_WORKER* pPassWorker)
 
     if (pShader->shaderKind == VIR_SHADER_FRAGMENT)
     {
-        /* For point coord, HW generate Y direction is bottom-up, while spec require it to
-           be up-bottom, so we need revert it */
-        errCode = _DoPointCoordYDirectionPatch(pShader);
-        ON_ERROR(errCode, "Do point coord Y direction patch");
+        /*
+        ** For point coord, HW generate Y direction is bottom-up, while spec require it to
+        ** be up-bottom, so we need revert it.
+        ** And Vulkan has different coordinate system from OES, so this patch is for OES only.
+        */
+        if (VIR_Shader_GetClientApiVersion(pShader) != gcvAPI_OPENVK)
+        {
+            errCode = _DoPointCoordYDirectionPatch(pShader);
+            ON_ERROR(errCode, "Do point coord Y direction patch");
+        }
 
         /* Hw's output-sample-mask is only located in LSB4, and other bits has use for other
            purpose, so we need patch to insure only LSB4 is touched when output-sample-mask
@@ -661,6 +667,11 @@ VSC_ErrCode vscVIR_PerformSpecialHwPatches(VSC_SH_PASS_WORKER* pPassWorker)
             errCode = _DoLocalMemAccessPatch(pShader);
             ON_ERROR(errCode, "Do local-mem access patch");
         }
+    }
+
+    if (VSC_OPTN_DumpOptions_CheckDumpFlag(VIR_Shader_GetDumpOptions(pShader), VIR_Shader_GetId(pShader), VSC_OPTN_DumpOptions_DUMP_OPT_VERBOSE))
+    {
+        VIR_Shader_Dump(gcvNULL, "After perform specila HW patches.", pShader, gcvTRUE);
     }
 
 OnError:

@@ -37,10 +37,11 @@ typedef va_list gctARGUMENTS;
 #define gcmkARGUMENTS_ARG(Arguments, Type) \
     va_arg(Arguments, Type)
 
-#define gcmkDECLARE_LOCK(__lockHandle__) \
-    static HANDLE __lockHandle__;
+#define gcmkDECLARE_MUTEX(__lockHandle__) \
+    HANDLE __lockHandle__;
 
-#define gcmkLOCKSECTION(__lockHandle__) \
+/* Unsafe. */
+#define gcmkMUTEX_LOCK(__lockHandle__) \
     if (__lockHandle__ == gcvNULL) \
     { \
         __lockHandle__ = CreateMutex(gcvNULL, gcvFALSE, gcvNULL); \
@@ -48,7 +49,7 @@ typedef va_list gctARGUMENTS;
     \
     WaitForSingleObject(__lockHandle__, INFINITE)
 
-#define gcmkUNLOCKSECTION(__lockHandle__) \
+#define gcmkMUTEX_UNLOCK(__lockHandle__) \
     ReleaseMutex(__lockHandle__)
 
 #define gcmkGETPROCESSID() \

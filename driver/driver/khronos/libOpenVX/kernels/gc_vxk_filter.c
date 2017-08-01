@@ -26,14 +26,14 @@ static vx_int16 box3x3Matrix[3][3] = {
         {1, 1, 1},
 };
 
-vx_status _gcfVX_Filter_Halfevis(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_image dst, vx_border_mode_t *bordermode)
+vx_status _gcfVX_Filter_Halfevis(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_image dst, vx_border_t *bordermode)
 {
     vx_status status  = VX_SUCCESS;
     gcoVX_Kernel_Context * kernelContext = gcvNULL;
     vx_uint32 height;
     vx_uint8 constantData[16] = {0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0};
 
-    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(src, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
 #if gcdVX_OPTIMIZER
     if (node && node->kernelContext)
@@ -76,14 +76,14 @@ vx_status _gcfVX_Filter_Halfevis(vx_node node, gceVX_KERNEL kernel, vx_image src
     kernelContext->params.borders = bordermode->mode;
 #endif
 
-    if(bordermode->mode == VX_BORDER_MODE_CONSTANT || bordermode->mode == VX_BORDER_MODE_UNDEFINED)
+    if(bordermode->mode == VX_BORDER_CONSTANT || bordermode->mode == VX_BORDER_UNDEFINED)
     {
         vx_uint32 bin[4];
 
         bin[0] =
         bin[1] =
         bin[2] =
-        bin[3] = FORMAT_VALUE((bordermode->mode == VX_BORDER_MODE_UNDEFINED)?0xcd:bordermode->constant_value);
+        bin[3] = FORMAT_VALUE((bordermode->mode == VX_BORDER_UNDEFINED)?0xcd:bordermode->constant_value.U32);
 
         gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, bin, sizeof(bin));
         kernelContext->uniforms[1].num    = 4 * 4;
@@ -135,7 +135,7 @@ vx_status vxAlterRectangle(vx_rectangle_t *rect,
 
 void vxReadRectangle(const void *base,
                      const vx_imagepatch_addressing_t *addr,
-                     const vx_border_mode_t *borders,
+                     const vx_border_t *borders,
                      vx_df_image type,
                      vx_uint32 center_x,
                      vx_uint32 center_y,
@@ -150,7 +150,7 @@ void vxReadRectangle(const void *base,
     vx_int32 ky, kx;
     vx_uint32 dest_index = 0;
     // kx, kx - kernel x and y
-    if(borders->mode == VX_BORDER_MODE_REPLICATE || borders->mode == VX_BORDER_MODE_UNDEFINED )
+    if(borders->mode == VX_BORDER_REPLICATE || borders->mode == VX_BORDER_UNDEFINED )
     {
         for (ky = -(int32_t)radius_y; ky <= (int32_t)radius_y; ++ky)
         {
@@ -181,9 +181,9 @@ void vxReadRectangle(const void *base,
             }
         }
     }
-    else if(borders->mode == VX_BORDER_MODE_CONSTANT )
+    else if(borders->mode == VX_BORDER_CONSTANT )
     {
-        vx_uint32 cval = borders->constant_value;
+        vx_uint32 cval = borders->constant_value.U32;
         for (ky = -(int32_t)radius_y; ky <= (int32_t)radius_y; ++ky)
         {
             vx_int32 y = (vx_int32)(center_y + ky);
@@ -231,7 +231,7 @@ static int vx_uint8_compare(const void * a, const void * b)
     return *(vx_uint8*)a - *(vx_uint8*)b;
 }
 
-vx_status _gcfVX_Median3x3_Cpu(vx_image src, vx_image dst, vx_border_mode_t *borders)
+vx_status _gcfVX_Median3x3_Cpu(vx_image src, vx_image dst, vx_border_t *borders)
 {
     vx_uint32 y, x;
     void *src_base = NULL;
@@ -247,7 +247,7 @@ vx_status _gcfVX_Median3x3_Cpu(vx_image src, vx_image dst, vx_border_mode_t *bor
     high_x = src_addr.dim_x;
     high_y = src_addr.dim_y;
 
-    if (borders->mode == VX_BORDER_MODE_UNDEFINED)
+    if (borders->mode == VX_BORDER_UNDEFINED)
     {
         ++low_x; --high_x;
         ++low_y; --high_y;
@@ -274,7 +274,7 @@ vx_status _gcfVX_Median3x3_Cpu(vx_image src, vx_image dst, vx_border_mode_t *bor
     return status;
 }
 
-vx_status _gcfVX_Filter(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_image dst, vx_border_mode_t borders)
+vx_status _gcfVX_Filter(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_image dst, vx_border_t borders)
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 height;
@@ -299,7 +299,7 @@ vx_status _gcfVX_Filter(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_imag
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(src, VX_IMAGE_HEIGHT, &height, sizeof(height));
     rect[0] = height;
 
     /*index = 0*/
@@ -325,14 +325,14 @@ vx_status _gcfVX_Filter(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_imag
     kernelContext->uniforms[0].num         = 4;
     kernelContext->uniform_num             = 1;
 
-    if(borders.mode == VX_BORDER_MODE_CONSTANT)
+    if(borders.mode == VX_BORDER_CONSTANT)
     {
         vx_uint32 bin[4];
 
         bin[0] =
         bin[1] =
         bin[2] =
-        bin[3] = FORMAT_VALUE(borders.constant_value);
+        bin[3] = FORMAT_VALUE(borders.constant_value.U32);
 
         gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, bin, sizeof(bin));
         kernelContext->uniforms[1].num    = 4 * 4;
@@ -356,7 +356,7 @@ vx_status _gcfVX_Filter(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_imag
     return status;
 }
 
-vx_status vxMedian3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *borders)
+vx_status vxMedian3x3(vx_node node, vx_image src, vx_image dst, vx_border_t *borders)
 {
     if (!node->base.context->evisNoInst.isVX2 && node->base.context->evisNoInst.noFilter)
     {
@@ -368,7 +368,7 @@ vx_status vxMedian3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t
     }
 }
 
-vx_status vxBox3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *bordermode)
+vx_status vxBox3x3(vx_node node, vx_image src, vx_image dst, vx_border_t *bordermode)
 {
     if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noBoxFilter)
     {
@@ -380,7 +380,7 @@ vx_status vxBox3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *b
     }
 }
 
-vx_status vxGaussian3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *bordermode)
+vx_status vxGaussian3x3(vx_node node, vx_image src, vx_image dst, vx_border_t *bordermode)
 {
     if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noFilter)
     {
@@ -955,5 +955,411 @@ vx_status vxCensus3x3(vx_node node, vx_image src, vx_image dst)
 #endif
 
     return status;
+}
+
+static vx_uint32 _gcfVX_ReadMaskedRectangleU8(const void *base,
+    const vx_imagepatch_addressing_t *addr,
+    const vx_border_t *borders,
+    vx_df_image type,
+    vx_uint32 center_x,
+    vx_uint32 center_y,
+    vx_uint32 left,
+    vx_uint32 top,
+    vx_uint32 right,
+    vx_uint32 bottom,
+    vx_uint8 *mask,
+    vx_uint8 *destination)
+{
+    vx_int32 width = (vx_int32)addr->dim_x, height = (vx_int32)addr->dim_y;
+    vx_int32 stride_y = addr->stride_y;
+    vx_int32 stride_x = addr->stride_x;
+    const vx_uint8 *ptr = (const vx_uint8 *)base;
+    vx_int32 ky, kx;
+    vx_uint32 mask_index = 0;
+    vx_uint32 dest_index = 0;
+    /* kx, kx - kernel x and y */
+    if (borders->mode == VX_BORDER_REPLICATE || borders->mode == VX_BORDER_UNDEFINED)
+    {
+        for (ky = -(int32_t)top; ky <= (int32_t)bottom; ++ky)
+        {
+            vx_int32 y = (vx_int32)(center_y + ky);
+            y = y < 0 ? 0 : y >= height ? height - 1 : y;
+
+            for (kx = -(int32_t)left; kx <= (int32_t)right; ++kx, ++mask_index)
+            {
+                vx_int32 x = (int32_t)(center_x + kx);
+                x = x < 0 ? 0 : x >= width ? width - 1 : x;
+                if (mask[mask_index])
+                    ((vx_uint8*)destination)[dest_index++] = *(vx_uint8*)(ptr + y*stride_y + x*stride_x);
+            }
+        }
+    }
+    else if (borders->mode == VX_BORDER_CONSTANT)
+    {
+        vx_pixel_value_t cval = borders->constant_value;
+        for (ky = -(int32_t)top; ky <= (int32_t)bottom; ++ky)
+        {
+            vx_int32 y = (vx_int32)(center_y + ky);
+            int ccase_y = y < 0 || y >= height;
+
+            for (kx = -(int32_t)left; kx <= (int32_t)right; ++kx, ++mask_index)
+            {
+                vx_int32 x = (int32_t)(center_x + kx);
+                int ccase = ccase_y || x < 0 || x >= width;
+                if (mask[mask_index])
+                    ((vx_uint8*)destination)[dest_index++] = ccase ? (vx_uint8)cval.U8 : *(vx_uint8*)(ptr + y*stride_y + x*stride_x);
+            }
+        }
+    }
+
+    return dest_index;
+}
+
+enum
+{
+    gceVX_MEDIAN_CROSS_NOCARE = 0,
+    gceVX_MEDIAN_CROSS_MUL,
+    gceVX_MEDIAN_CROSS_ADD,
+}
+gceVX_MedianMode;
+
+static vx_uint8 _gcfVX_PatternValue(vx_enum f, vx_uint8 v, vx_enum mode)
+{
+    vx_uint8 result = 0;
+
+    switch(f)
+    {
+    case VX_NONLINEAR_FILTER_MAX:
+        result = (v != 0)?1:0;
+        break;
+    case VX_NONLINEAR_FILTER_MIN:
+        result = (v != 0)?0:0xff;
+        break;
+    case VX_NONLINEAR_FILTER_MEDIAN:
+        if (mode == gceVX_MEDIAN_CROSS_MUL)
+            result = (v != 0)?1:0;
+        else
+            result = (v != 0)?0:0xff;
+        break;
+    }
+
+    return result;
+}
+
+#define ENABLE_SOFT_IMPLEMENT_FOR_MEDIAN 1
+
+/* nodeless version of NonLinearFilter kernel*/
+vx_status vxNonLinearFilter(vx_node node, vx_scalar function, vx_image src, vx_matrix mask, vx_image dst, vx_border_t *border)
+{
+    vx_status status = VX_SUCCESS;
+    vx_size mrows, mcols;
+    vx_enum func = 0;
+    vx_enum pattern;
+
+    status |= vxQueryMatrix(mask, VX_MATRIX_PATTERN, &pattern, sizeof(pattern));
+
+    status |= vxQueryMatrix(mask, VX_MATRIX_ROWS, &mrows, sizeof(mrows));
+    status |= vxQueryMatrix(mask, VX_MATRIX_COLUMNS, &mcols, sizeof(mcols));
+
+    status |= vxCopyScalar(function, &func, VX_READ_ONLY, VX_MEMORY_TYPE_HOST);
+
+#if ENABLE_SOFT_IMPLEMENT_FOR_MEDIAN
+
+    if ((mrows == 5 && mcols == 5 && func == VX_NONLINEAR_FILTER_MEDIAN && pattern != VX_PATTERN_CROSS))
+    {
+        vx_uint32 y, x;
+        void *src_base = NULL;
+        void *dst_base = NULL;
+        vx_imagepatch_addressing_t src_addr, dst_addr;
+        vx_rectangle_t rect;
+        vx_size low_x = 0, low_y = 0, high_x, high_y;
+        vx_enum mtype = 0;
+        vx_coordinates2d_t origin;
+
+        vx_uint8 m[VX_INT_MAX_NONLINEAR_DIM * VX_INT_MAX_NONLINEAR_DIM];
+        vx_uint8 v[VX_INT_MAX_NONLINEAR_DIM * VX_INT_MAX_NONLINEAR_DIM];
+
+        vx_status status = vxGetValidRegionImage(src, &rect);
+        status |= vxAccessImagePatch(src, &rect, 0, &src_addr, &src_base, VX_READ_ONLY);
+        status |= vxAccessImagePatch(dst, &rect, 0, &dst_addr, &dst_base, VX_WRITE_ONLY);
+        status |= vxQueryMatrix(mask, VX_MATRIX_TYPE, &mtype, sizeof(mtype));
+        status |= vxQueryMatrix(mask, VX_MATRIX_ORIGIN, &origin, sizeof(origin));
+
+        if ((mtype != VX_TYPE_UINT8) || (sizeof(m) < mrows * mcols))
+            status = VX_ERROR_INVALID_PARAMETERS;
+
+        status |= vxReadMatrix(mask, m);
+
+        if (status == VX_SUCCESS)
+        {
+            vx_size rx0 = origin.x;
+            vx_size ry0 = origin.y;
+            vx_size rx1 = mcols - origin.x - 1;
+            vx_size ry1 = mrows - origin.y - 1;
+
+            high_x = src_addr.dim_x;
+            high_y = src_addr.dim_y;
+
+            if (border->mode == VX_BORDER_UNDEFINED)
+            {
+                low_x += rx0;
+                low_y += ry0;
+                high_x -= rx1;
+                high_y -= ry1;
+                vxAlterRectangle(&rect, (vx_int32)rx0, (vx_int32)ry0, -(vx_int32)rx1, -(vx_int32)ry1);
+            }
+
+            for (y = (vx_uint32)low_y; y < (vx_uint32)high_y; y++)
+            {
+                for (x = (vx_uint32)low_x; x < (vx_uint32)high_x; x++)
+                {
+                    vx_uint8 *dst = (vx_uint8 *)vxFormatImagePatchAddress2d(dst_base, x, y, &dst_addr);
+                    vx_int32 count = _gcfVX_ReadMaskedRectangleU8(src_base, &src_addr, border, VX_DF_IMAGE_U8, x, y, (vx_uint32)rx0, (vx_uint32)ry0, (vx_uint32)rx1, (vx_uint32)ry1, m, v);
+
+                    qsort(v, count, sizeof(vx_uint8), vx_uint8_compare);
+
+                    switch (func)
+                    {
+                    case VX_NONLINEAR_FILTER_MIN: *dst = v[0]; break; /* minimal value */
+                    case VX_NONLINEAR_FILTER_MAX: *dst = v[count - 1]; break; /* maximum value */
+                    case VX_NONLINEAR_FILTER_MEDIAN: *dst = v[count / 2]; break; /* pick the middle value */
+                    }
+                }
+            }
+        }
+
+        status |= vxCommitImagePatch(src, NULL, 0, &src_addr, src_base);
+        status |= vxCommitImagePatch(dst, &rect, 0, &dst_addr, dst_base);
+
+        return status;
+    }
+    else
+#endif
+    {
+        vx_uint32 height;
+        gcoVX_Kernel_Context * kernelContext = gcvNULL;
+        vx_uint8 m[C_MAX_NONLINEAR_DIM * C_MAX_NONLINEAR_DIM];
+
+#if gcdVX_OPTIMIZER
+        if (node && node->kernelContext)
+        {
+            kernelContext = (gcoVX_Kernel_Context *) node->kernelContext;
+        }
+        else
+#endif
+        {
+            if (node->kernelContext == VX_NULL)
+            {
+                /* Allocate a local copy for old flow. */
+                node->kernelContext = (gcoVX_Kernel_Context *) vxAllocate(sizeof(gcoVX_Kernel_Context));
+            }
+            kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
+            kernelContext->objects_num = 0;
+        }
+
+        vxQueryImage(src, VX_IMAGE_HEIGHT, &height, sizeof(height));
+
+        /*index = 0*/
+        gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
+
+        /*index = 1*/
+        gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
+
+        switch (func)
+        {
+        case VX_NONLINEAR_FILTER_MIN: kernelContext->params.kernel = gcvVX_KERNEL_NONLINEAR_FILTER_MIN; break;
+        case VX_NONLINEAR_FILTER_MAX: kernelContext->params.kernel = gcvVX_KERNEL_NONLINEAR_FILTER_MAX; break;
+        case VX_NONLINEAR_FILTER_MEDIAN: kernelContext->params.kernel = gcvVX_KERNEL_NONLINEAR_FILTER_MEDIAN; break;
+        }
+
+        kernelContext->params.col          = (vx_uint32)mcols;
+        kernelContext->params.row          = (vx_uint32)mrows;
+
+        switch (pattern)
+        {
+        case VX_PATTERN_BOX:
+            kernelContext->params.volume   = gcvVX_PARTTERN_MODE_BOX;
+
+            kernelContext->params.xstep    = (mrows == 3 && mcols == 3)?8:6;
+            kernelContext->params.ystep    = (mrows == 3 && mcols == 3)?height:1;
+            break;
+        case VX_PATTERN_CROSS:
+        case VX_PATTERN_DISK:
+            {
+                status |= vxCopyMatrix(mask, m, VX_READ_ONLY, VX_MEMORY_TYPE_HOST);
+
+                if (mrows == 3 && mcols == 3)
+                {
+                    vx_uint32 bin[4];
+                    if (func != VX_NONLINEAR_FILTER_MEDIAN)
+                    {
+                        /*          x        y       z        w
+                         * x max:
+                         * c4 : 00010000 01010100 00010000 00000000
+                         *
+                         * + min:
+                         * c4 : ff00ff00 00ff0000 ff00ff00 00000000
+                         */
+                        bin[0] = _gcfVX_PatternValue(func, m[0], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func, m[1], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[2], gceVX_MEDIAN_CROSS_NOCARE) << 16);
+                        bin[1] = _gcfVX_PatternValue(func, m[3], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func, m[4], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[5], gceVX_MEDIAN_CROSS_NOCARE) << 16);
+                        bin[2] = _gcfVX_PatternValue(func, m[6], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func, m[7], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[8], gceVX_MEDIAN_CROSS_NOCARE) << 16);
+                        bin[3] = 0;
+                    }
+                    else
+                    {
+                        /*          x        y       z        w
+                         * x src0, src1(xy), + src2(z)
+                         * c4 : 00010000 01010100 ff00ff00 00000000
+                         *
+                         */
+                        bin[0] = _gcfVX_PatternValue(func, m[0], gceVX_MEDIAN_CROSS_MUL) | (_gcfVX_PatternValue(func, m[1], gceVX_MEDIAN_CROSS_MUL) << 8)  | (_gcfVX_PatternValue(func, m[2], gceVX_MEDIAN_CROSS_MUL) << 16);
+                        bin[1] = _gcfVX_PatternValue(func, m[3], gceVX_MEDIAN_CROSS_MUL) | (_gcfVX_PatternValue(func, m[4], gceVX_MEDIAN_CROSS_MUL) << 8)  | (_gcfVX_PatternValue(func, m[5], gceVX_MEDIAN_CROSS_MUL) << 16);
+                        bin[2] = _gcfVX_PatternValue(func, m[6], gceVX_MEDIAN_CROSS_ADD) | (_gcfVX_PatternValue(func, m[7], gceVX_MEDIAN_CROSS_ADD) << 8)  | (_gcfVX_PatternValue(func, m[8], gceVX_MEDIAN_CROSS_ADD) << 16);
+                        bin[3] = 0;
+                    }
+
+                    gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, bin, sizeof(bin));
+                    kernelContext->uniforms[2].index       = 4;
+                    kernelContext->uniforms[2].num         = 4 * 4;
+                    kernelContext->uniform_num ++;
+
+
+                }
+                else if (mrows == 5 && mcols == 5)
+                {
+                    /* gcvVX_PARTTERN_MODE_CROSS
+                     *          x        y       z        w
+                     * x max:
+                     * c4 : 00000100 00000000 00000100 00000000
+                     * c5 : 01010101 01000000 00000100 00000000
+                     * c6 : 0000ff00 00000000 00000000 00000000
+                     *
+                     * + min:
+                     * c4 : ffff00ff ff000000 ffff00ff ff000000
+                     * c5 : 00000000 00000000 ffff00ff ff000000
+                     * c6 : ffff00ff ff000000 00000000 00000000
+                     */
+
+                    /* gcvVX_PARTTERN_MODE_DISK
+                     *          x        y       z        w
+                     * x max:
+                     * c4 : 00010101 00000000 01010101 01000000
+                     * c5 : 01010101 01000000 01010101 01000000
+                     * c6 : 00010101 00000000 00000000 00000000
+                     *
+                     * + min:
+                     * c4 : ff000000 ff000000 00000000 00000000
+                     * c5 : 00000000 00000000 00000000 00000000
+                     * c6 : ff000000 ff000000 00000000 00000000
+                     */
+
+                    vx_uint32 bin[12];
+                    /*c4*/
+                    bin[0] = _gcfVX_PatternValue(func, m[0], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func,
+ m[1], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[2],
+ gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[3], gceVX_MEDIAN_CROSS_NOCARE) << 24);
+
+                    bin[1] = _gcfVX_PatternValue(func, m[4], gceVX_MEDIAN_CROSS_NOCARE);
+
+                    bin[2] = _gcfVX_PatternValue(func, m[5], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func,
+ m[6], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[7],
+ gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[8], gceVX_MEDIAN_CROSS_NOCARE) << 24);
+
+                    bin[3] = _gcfVX_PatternValue(func, m[9], gceVX_MEDIAN_CROSS_NOCARE);
+
+                    /*c5*/
+                    bin[4] = _gcfVX_PatternValue(func, m[10], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func,
+ m[11], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[12],
+ gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[13],
+ gceVX_MEDIAN_CROSS_NOCARE) << 24);
+                    bin[5] = _gcfVX_PatternValue(func, m[14], gceVX_MEDIAN_CROSS_NOCARE);
+
+                    bin[6] = _gcfVX_PatternValue(func, m[15], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func,
+ m[16], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[17],
+ gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[18],
+ gceVX_MEDIAN_CROSS_NOCARE) << 24);
+                    bin[7] = _gcfVX_PatternValue(func, m[19], gceVX_MEDIAN_CROSS_NOCARE);
+
+                    /*c6*/
+                    bin[8] = _gcfVX_PatternValue(func, m[20], gceVX_MEDIAN_CROSS_NOCARE) | (_gcfVX_PatternValue(func,
+ m[21], gceVX_MEDIAN_CROSS_NOCARE) << 8)  | (_gcfVX_PatternValue(func, m[22],
+ gceVX_MEDIAN_CROSS_NOCARE) << 16)  | (_gcfVX_PatternValue(func, m[23],
+ gceVX_MEDIAN_CROSS_NOCARE) << 24);
+                    bin[9] = _gcfVX_PatternValue(func, m[24], gceVX_MEDIAN_CROSS_NOCARE);
+
+                    bin[10] =
+                    bin[11] = 0;
+
+
+                    gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, bin, sizeof(bin));
+                    kernelContext->uniforms[2].index       = 4;
+                    kernelContext->uniforms[2].num         = 4 * 4 * 3;
+                    kernelContext->uniform_num += 3;
+                }
+
+                kernelContext->params.xstep        = 1;
+                kernelContext->params.ystep        = 1;
+                kernelContext->params.volume       = (pattern == VX_PATTERN_CROSS) ? gcvVX_PARTTERN_MODE_CROSS: gcvVX_PARTTERN_MODE_DISK;
+            }
+            break;
+        }
+
+#if gcdVX_OPTIMIZER
+        kernelContext->borders             = bordermode->mode;
+#else
+        kernelContext->params.borders      = border->mode;
+#endif
+
+        if (node->base.context->evisNoInst.noFilter)
+        {
+            vx_uint32 rect[2];
+            rect[0] = height;
+            rect[1] = FV(1);
+            gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, rect, sizeof(rect));
+            kernelContext->uniforms[0].index       = 2;
+            kernelContext->uniforms[0].num         = 4 * 2;
+        }
+        else
+        {
+            vx_uint32 rect[2];
+            rect[0] = height;
+            rect[1] = FV(1);
+            gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, rect, sizeof(rect));
+            kernelContext->uniforms[0].index       = 2;
+            kernelContext->uniforms[0].num         = 4 * 2;
+        }
+
+        kernelContext->uniform_num ++;
+
+        if(border->mode == VX_BORDER_CONSTANT)
+        {
+            vx_uint32 bin[4];
+
+            bin[0] =
+            bin[1] =
+            bin[2] =
+            bin[3] = FORMAT_VALUE(border->constant_value.U32);
+
+            gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, bin, sizeof(bin));
+            kernelContext->uniforms[1].num = 4 * 4;
+            kernelContext->uniforms[1].index = 3;
+            kernelContext->uniform_num ++;
+        }
+
+        kernelContext->params.evisNoInst = node->base.context->evisNoInst;
+
+        kernelContext->node = node;
+
+        status = gcfVX_Kernel(kernelContext);
+
+#if gcdVX_OPTIMIZER
+        if (!node || !node->kernelContext)
+        {
+            vxFree(kernelContext);
+        }
+#endif
+
+        return status;
+    }
 }
 

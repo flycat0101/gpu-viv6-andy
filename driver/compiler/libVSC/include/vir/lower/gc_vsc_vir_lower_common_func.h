@@ -181,6 +181,13 @@ VIR_Lower_SetSwizzleXYZW(
     );
 
 gctBOOL
+VIR_Lower_SetSwizzleXY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    );
+
+gctBOOL
 VIR_Lower_SetSwizzleXEx(
     IN VIR_PatternContext *Context,
     IN VIR_Instruction    *Inst,

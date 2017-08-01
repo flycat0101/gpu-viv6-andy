@@ -378,11 +378,11 @@ gc_gralloc_alloc_buffer(
     }
     else if (Usage & GRALLOC_USAGE_HW_TEXTURE)
     {
-        /* 3D tile texture. */
-        type = gcvSURF_TEXTURE;
+        /* No hw-render texture, use bitmap. */
+        type = gcvSURF_BITMAP;
         orientation = gcvORIENTATION_TOP_BOTTOM;
         pool = gcvPOOL_DEFAULT;
-        LOGV(" > Allocate TX (type=%x, halFormat=%d)", type, halFormat);
+        LOGV(" > Allocate BITMAP (type=%x, halFormat=%d)", type, halFormat);
     }
     else
     {

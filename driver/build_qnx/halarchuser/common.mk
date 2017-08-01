@@ -28,6 +28,7 @@ include $(qnx_build_dir)/common.mk
 EXTRA_INCVPATH += $(driver_root)/hal/inc
 EXTRA_INCVPATH += $(driver_root)/hal/user
 EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user
+EXTRA_INCVPATH += $(driver_root)/hal/user/arch
 EXTRA_INCVPATH += $(driver_root)/arch/XAQ2/cmodel/inc
 ifeq ($(VIVANTE_ENABLE_3D), 1)
 EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
@@ -53,7 +54,6 @@ SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_dec.o
 
 ifeq ($(VIVANTE_ENABLE_3D), 1)
-SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_composition.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_clear.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_filter_blt_de.o
 SOURCE_OBJECTS += $(driver_root)/hal/user/arch/gc_hal_user_hardware_engine.o

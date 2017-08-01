@@ -29,11 +29,11 @@
 #include <VX/vx.h>
 #include <VX/vxu.h>
 #include <VX/vx_ext_program.h>
+#include <VX/vx_helper.h>
 #include <stdio.h>
 #include <math.h>
 #include <malloc.h>
 
-#include "defines.hpp"
 #include "tutorial4_vxc.hpp"
 
 #define VX_KERNEL_NAME_TUTORIAL4        "com.vivantecorp.extension.tutorial4VXC"
@@ -54,10 +54,10 @@ vx_status VX_CALLBACK vxTutorial4InputValidator(vx_node node, vx_uint32 index)
         {
             vx_image img = NULL;
             vx_df_image format = 0;
-            status = vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &img, sizeof(img));
+            status = vxQueryParameter(param, VX_PARAMETER_REF, &img, sizeof(img));
             if(status == VX_SUCCESS)
             {
-                status = vxQueryImage(img, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
+                status = vxQueryImage(img, VX_IMAGE_FORMAT, &format, sizeof(format));
                 if (format == VX_DF_IMAGE_U8)
                     status = VX_SUCCESS;
                 else
@@ -83,14 +83,14 @@ vx_status VX_CALLBACK vxTutorial4OutputValidator(vx_node node, vx_uint32 index, 
             vx_image img = NULL;
             vx_uint32 width = 0, height = 0;
             vx_df_image format = VX_DF_IMAGE_U8;
-            status = vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &img, sizeof(img));
+            status = vxQueryParameter(param, VX_PARAMETER_REF, &img, sizeof(img));
             if(status == VX_SUCCESS)
             {
-                status = vxQueryImage(img, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-                status |= vxQueryImage(img, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
-                status |= vxSetMetaFormatAttribute(metaObj, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
-                status |= vxSetMetaFormatAttribute(metaObj, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-                status |= vxSetMetaFormatAttribute(metaObj, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+                status = vxQueryImage(img, VX_IMAGE_WIDTH, &width, sizeof(width));
+                status |= vxQueryImage(img, VX_IMAGE_HEIGHT, &height, sizeof(height));
+                status |= vxSetMetaFormatAttribute(metaObj, VX_IMAGE_FORMAT, &format, sizeof(format));
+                status |= vxSetMetaFormatAttribute(metaObj, VX_IMAGE_WIDTH, &width, sizeof(width));
+                status |= vxSetMetaFormatAttribute(metaObj, VX_IMAGE_HEIGHT, &height, sizeof(height));
                 status |= vxReleaseImage(&img);
             }
             status |= vxReleaseParameter(&param);
@@ -99,7 +99,24 @@ vx_status VX_CALLBACK vxTutorial4OutputValidator(vx_node node, vx_uint32 index, 
 
     return status;
 }
+vx_status VX_CALLBACK vxTutorial4Validator(vx_node node, const vx_reference parameters[], vx_uint32 num, vx_meta_format metas[])
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 index = 0;
+    for(index = 0; index < num; index++)
+    {
+        if(index < 1)
+        {
+            status |= vxTutorial4InputValidator(node,index);
+        }
+        else
+        {
+            status |= vxTutorial4OutputValidator(node,index,metas[index]);
+        }
 
+    }
+    return status;
+}
 
 #ifndef USE_TUTORIAL4_VXC
 
@@ -226,21 +243,21 @@ vx_status VX_CALLBACK vxTutorial4Kernel(vx_node node, const vx_reference* paramO
         vx_rectangle_t imgRect[2] = { { 0, 0, 0, 0 }, { 0, 0, 0, 0 }};
         vx_imagepatch_addressing_t imgInfo[2] = {VX_IMAGEPATCH_ADDR_INIT, VX_IMAGEPATCH_ADDR_INIT};
         vx_uint32 width = 0, height = 0;
-
+        vx_map_id map_id,map_id1;
         imgObj[0]    = (vx_image)paramObj[0];
         imgObj[1]    = (vx_image)paramObj[1];
-        vxQueryImage(imgObj[0], VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-        vxQueryImage(imgObj[0], VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+        vxQueryImage(imgObj[0], VX_IMAGE_WIDTH, &width, sizeof(width));
+        vxQueryImage(imgObj[0], VX_IMAGE_HEIGHT, &height, sizeof(height));
         status |= vxGetValidRegionImage(imgObj[0], &imgRect[0]);
-        status |= vxAccessImagePatch(imgObj[0], &imgRect[0], 0, &imgInfo[0], &imgBaseAddr[0], VX_READ_ONLY);
+        status |= vxMapImagePatch(imgObj[0], &imgRect[0], 0, &map_id,&imgInfo[0], &imgBaseAddr[0], VX_READ_ONLY,VX_MEMORY_TYPE_HOST,0);
         status |= vxGetValidRegionImage(imgObj[1], &imgRect[1]);
-        status |= vxAccessImagePatch(imgObj[1], &imgRect[1], 0, &imgInfo[1], &imgBaseAddr[1], VX_WRITE_ONLY);
+        status |= vxMapImagePatch(imgObj[1], &imgRect[1], 0,&map_id1, &imgInfo[1], &imgBaseAddr[1], VX_WRITE_ONLY,VX_MEMORY_TYPE_HOST,0);
 
         // simulate the execution of GPU
         tutorial4Filter((unsigned char*)imgBaseAddr[0], (unsigned char*)imgBaseAddr[1], width, height);
 
-        status |= vxCommitImagePatch(imgObj[0], &imgRect[0], 0, &imgInfo[0], imgBaseAddr[0]);
-        status |= vxCommitImagePatch(imgObj[1], &imgRect[1], 0, &imgInfo[1], imgBaseAddr[1]);
+        status |= vxUnmapImagePatch(imgObj[0], map_id);
+        status |= vxUnmapImagePatch(imgObj[1], map_id1);
     }
 
     return status;
@@ -260,8 +277,8 @@ vx_status VX_CALLBACK vxTutorial4Initializer(vx_node nodObj, const vx_reference 
     vx_int32 imgWid = 0, imgHei = 0;
     vx_image imgObj = (vx_image)paramObj[0];
 
-    vxQueryImage(imgObj, VX_IMAGE_ATTRIBUTE_WIDTH, &imgWid, sizeof(vx_uint32));
-    vxQueryImage(imgObj, VX_IMAGE_ATTRIBUTE_HEIGHT, &imgHei, sizeof(vx_uint32));
+    vxQueryImage(imgObj, VX_IMAGE_WIDTH, &imgWid, sizeof(vx_uint32));
+    vxQueryImage(imgObj, VX_IMAGE_HEIGHT, &imgHei, sizeof(vx_uint32));
 
     shaderParam.globalWorkOffset[0] = 0;
     shaderParam.globalWorkOffset[1] = 0;
@@ -376,8 +393,9 @@ vx_kernel_description_t vxTutorial4KernelInfo =
 #endif
     vxTutorial4KernelParam,
     (sizeof(vxTutorial4KernelParam)/sizeof(vxTutorial4KernelParam[0])),
-    vxTutorial4InputValidator,
-    vxTutorial4OutputValidator,
+    vxTutorial4Validator,
+    NULL,
+    NULL,
     vxTutorial4Initializer,
     vxTutorial4Deinitializer
 };
@@ -411,10 +429,9 @@ extern "C" vx_status VX_API_CALL vxPublishKernels(vx_context ContextVX)
             kernels[i]->name,
             kernels[i]->enumeration,
             kernels[i]->numParams,
-            kernels[i]->inputValidator,
-            kernels[i]->outputValidator,
-            kernels[i]->initializer,
-            kernels[i]->deinitializer
+            kernels[i]->validate,
+            kernels[i]->initialize,
+            kernels[i]->deinitialize
             );
         status = vxGetStatus((vx_reference)kernelObj);
         if(status == VX_SUCCESS)
@@ -425,7 +442,7 @@ extern "C" vx_status VX_API_CALL vxPublishKernels(vx_context ContextVX)
                 status = vxAddParameterToKernel(kernelObj,
                     j,
                     kernels[i]->parameters[j].direction,
-                    kernels[i]->parameters[j].dataType,
+                    kernels[i]->parameters[j].data_type,
                     kernels[i]->parameters[j].state
                     );
                 if(status != VX_SUCCESS)
@@ -460,15 +477,14 @@ extern "C" vx_status VX_API_CALL vxPublishKernels(vx_context ContextVX)
 #else
     for(int i=0; i < (int)(sizeof(kernels)/sizeof(kernels[0])); i++)
     {
-        kernelObj = vxAddKernel(ContextVX,
+        kernelObj = vxAddUserKernel(ContextVX,
             kernels[i]->name,
             kernels[i]->enumeration,
             kernels[i]->function,
             kernels[i]->numParams,
-            kernels[i]->inputValidator,
-            kernels[i]->outputValidator,
-            kernels[i]->initializer,
-            kernels[i]->deinitializer
+            kernels[i]->validate,
+            kernels[i]->initialize,
+            kernels[i]->deinitialize
             );
         status = vxGetStatus((vx_reference)kernelObj);
         if(status == VX_SUCCESS)
@@ -479,7 +495,7 @@ extern "C" vx_status VX_API_CALL vxPublishKernels(vx_context ContextVX)
                 status = vxAddParameterToKernel(kernelObj,
                     j,
                     kernels[i]->parameters[j].direction,
-                    kernels[i]->parameters[j].dataType,
+                    kernels[i]->parameters[j].data_type,
                     kernels[i]->parameters[j].state
                     );
                 if(status != VX_SUCCESS)

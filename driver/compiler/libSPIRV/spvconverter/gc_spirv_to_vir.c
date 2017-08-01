@@ -595,7 +595,7 @@ static gctCHAR * SpvBuiltInName [] =
     "gl_Position", /* SpvBuiltInFragCoord = 15, */
     "gl_PointCoord", /* SpvBuiltInPointCoord = 16, */
     "gl_FrontFacing", /* SpvBuiltInFrontFacing = 17, */
-    "gl_SampleId", /* SpvBuiltInSampleId = 18, */
+    "gl_SampleID", /* SpvBuiltInSampleId = 18, */
     "gl_SamplePosition", /* SpvBuiltInSamplePosition = 19, */
     "gl_SampleMask", /* SpvBuiltInSampleMask = 20, */
     "gl_FragColor", /* SpvBuiltInFragColor = 21, */
@@ -2628,13 +2628,13 @@ static VSC_ErrCode __SpvIDCopy(gcSPV spv, VIR_Shader * virShader, SpvId from, Sp
     VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
     VIR_Operand_SetEnable(operand, __SpvGenEnable(spv, virType, SPV_ID_SYM_SPV_TYPE(to)));
     VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(operand, virTypeId);
+    VIR_Operand_SetTypeId(operand, virTypeId);
 
     /* Set SOURCE0 */
     operand = VIR_Inst_GetSource(virInst, 0);
     /*VIR_Operand_SetSwizzle(operand, VIR_Swizzle_GenSwizzleByComponentCount(componentCount));*/
     VIR_Operand_SetSwizzle(operand, __SpvID2Swizzle(spv, from));
-    VIR_Operand_SetType(operand, virTypeId);
+    VIR_Operand_SetTypeId(operand, virTypeId);
     VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
     switch (fromIdType)
@@ -2951,7 +2951,7 @@ static VSC_ErrCode __SpvInsertInstruction3(gcSPV spv, VIR_Shader * virShader, VI
     VIR_Operand_SetModifier(VIR_Inst_GetDest(virInst), VIR_MOD_NONE);
     VIR_Operand_SetEnable(VIR_Inst_GetDest(virInst), virEnableMask);
     VIR_Operand_SetOpKind(VIR_Inst_GetDest(virInst), VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(VIR_Inst_GetDest(virInst), dstVirTypeId);
+    VIR_Operand_SetTypeId(VIR_Inst_GetDest(virInst), dstVirTypeId);
     VIR_Operand_SetSym(VIR_Inst_GetDest(virInst), dst);
 
     virSwizzle = __SpvID2Swizzle(spv, src);
@@ -2960,7 +2960,7 @@ static VSC_ErrCode __SpvInsertInstruction3(gcSPV spv, VIR_Shader * virShader, VI
     VIR_Operand_SetImmediate(VIR_Inst_GetSource(virInst, 0), SPV_ID_VIR_TYPE_ID(srcType), constVal);
     VIR_Operand_SetSwizzle(VIR_Inst_GetSource(virInst, 0), virSwizzle);
     VIR_Operand_SetOpKind(VIR_Inst_GetSource(virInst, 0), VIR_OPND_IMMEDIATE);
-    VIR_Operand_SetType(VIR_Inst_GetSource(virInst, 0), SPV_ID_VIR_TYPE_ID(srcType));
+    VIR_Operand_SetTypeId(VIR_Inst_GetSource(virInst, 0), SPV_ID_VIR_TYPE_ID(srcType));
     VIR_Operand_SetPrecision(VIR_Inst_GetSource(virInst, 0), VIR_PRECISION_HIGH);
     VIR_Operand_SetRoundMode(VIR_Inst_GetSource(virInst, 0), VIR_ROUND_DEFAULT);
     VIR_Operand_SetModifier(VIR_Inst_GetSource(virInst, 0), VIR_MOD_NONE);
@@ -3027,7 +3027,7 @@ static VSC_ErrCode __SpvInsertInstruction2(gcSPV spv, VIR_Shader * virShader, VI
     VIR_Operand_SetModifier(VIR_Inst_GetDest(virInst), VIR_MOD_NONE);
     VIR_Operand_SetEnable(VIR_Inst_GetDest(virInst), virEnableMask);
     VIR_Operand_SetOpKind(VIR_Inst_GetDest(virInst), VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(VIR_Inst_GetDest(virInst), dstVirTypeId);
+    VIR_Operand_SetTypeId(VIR_Inst_GetDest(virInst), dstVirTypeId);
     VIR_Operand_SetSym(VIR_Inst_GetDest(virInst), dst);
 
     virSwizzle = __SpvID2Swizzle(spv, srcType);
@@ -3035,7 +3035,7 @@ static VSC_ErrCode __SpvInsertInstruction2(gcSPV spv, VIR_Shader * virShader, VI
     VIR_Operand_SetSwizzle(VIR_Inst_GetSource(virInst, 0), virSwizzle);
     VIR_Operand_SetSym(VIR_Inst_GetSource(virInst, 0), src);
     VIR_Operand_SetOpKind(VIR_Inst_GetSource(virInst, 0), VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(VIR_Inst_GetSource(virInst, 0), SPV_ID_TYPE_VIR_TYPE_ID(srcType));
+    VIR_Operand_SetTypeId(VIR_Inst_GetSource(virInst, 0), SPV_ID_TYPE_VIR_TYPE_ID(srcType));
     VIR_Operand_SetPrecision(VIR_Inst_GetSource(virInst, 0), VIR_PRECISION_HIGH);
     VIR_Operand_SetRoundMode(VIR_Inst_GetSource(virInst, 0), VIR_ROUND_DEFAULT);
     VIR_Operand_SetModifier(VIR_Inst_GetSource(virInst, 0), VIR_MOD_NONE);
@@ -3106,7 +3106,7 @@ static VSC_ErrCode __SpvInsertInstruction(gcSPV spv, VIR_Shader * virShader, VIR
     VIR_Operand_SetModifier(VIR_Inst_GetDest(virInst), VIR_MOD_NONE);
     VIR_Operand_SetEnable(VIR_Inst_GetDest(virInst), virEnableMask);
     VIR_Operand_SetOpKind(VIR_Inst_GetDest(virInst), VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(VIR_Inst_GetDest(virInst), dstVirTypeId);
+    VIR_Operand_SetTypeId(VIR_Inst_GetDest(virInst), dstVirTypeId);
     VIR_Operand_SetSym(VIR_Inst_GetDest(virInst), dstVirSym);
 
     virSwizzle = __SpvID2Swizzle(spv, src);
@@ -3114,7 +3114,7 @@ static VSC_ErrCode __SpvInsertInstruction(gcSPV spv, VIR_Shader * virShader, VIR
     VIR_Operand_SetSwizzle(VIR_Inst_GetSource(virInst, 0), virSwizzle);
     VIR_Operand_SetSym(VIR_Inst_GetSource(virInst, 0), SPV_ID_VIR_SYM(src));
     VIR_Operand_SetOpKind(VIR_Inst_GetSource(virInst, 0), VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(VIR_Inst_GetSource(virInst, 0), SPV_ID_VIR_TYPE_ID(src));
+    VIR_Operand_SetTypeId(VIR_Inst_GetSource(virInst, 0), SPV_ID_VIR_TYPE_ID(src));
     VIR_Operand_SetPrecision(VIR_Inst_GetSource(virInst, 0), VIR_PRECISION_HIGH);
     VIR_Operand_SetRoundMode(VIR_Inst_GetSource(virInst, 0), VIR_ROUND_DEFAULT);
     VIR_Operand_SetModifier(VIR_Inst_GetSource(virInst, 0), VIR_MOD_NONE);
@@ -3225,6 +3225,7 @@ static VIR_TypeId __SpvImage2VirImageType(gcSPV spv, SpvId targetId, VIR_TypeId 
     gctUINT sampled;
     gctUINT type = 0;
     gctUINT magic;
+    gctUINT sampledType;
 
     if (!SPV_ID_TYPE_IS_IMAGE(targetId))
     {
@@ -3238,6 +3239,10 @@ static VIR_TypeId __SpvImage2VirImageType(gcSPV spv, SpvId targetId, VIR_TypeId 
     msaa = SPV_ID_TYPE_IMAGE_MSAA(targetId);
     sampled = SPV_ID_TYPE_IMAGE_SAMPLED(targetId);
 
+    sampledType = SPV_ID_TYPE_IMAGE_SAMPLED_TYPE(targetId);
+
+    if (format != SpvImageFormatUnknown)
+    {
         if (format <= SpvImageFormatR8Snorm)
         {
             type = 0;
@@ -3250,6 +3255,22 @@ static VIR_TypeId __SpvImage2VirImageType(gcSPV spv, SpvId targetId, VIR_TypeId 
         {
             type = 2;
         }
+    }
+    else
+    {
+        if (SPV_ID_TYPE_IS_FLOAT(sampledType))
+        {
+            type = 0;
+        }
+        else if (SPV_ID_TYPE_IS_SIGNEDINTEGER(sampledType))
+        {
+            type = 1;
+        }
+        else if (SPV_ID_TYPE_IS_UNSIGNEDINTEGER(sampledType))
+        {
+            type = 2;
+        }
+    }
 
     /* magic = dimension | (type << 4) | (depth << 6) | (arrayed << 8) | (msaa << 10) | (sampled << 12); */
     magic = SPV_GEN_IMAGE_TYPE_MAGIC(dimension, type, depth, arrayed, msaa, sampled);
@@ -3501,6 +3522,36 @@ static VIR_TypeId __SpvImage2VirImageType(gcSPV spv, SpvId targetId, VIR_TypeId 
     case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDimBuffer, 2, 0, 0, 0, 2):
         virType = VIR_TYPE_UIMAGE_BUFFER;
         sampledImageType = VIR_TYPE_USAMPLER_BUFFER;
+        break;
+
+    case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDimSubpassData, 0, 0, 0, 0, 2):
+        virType = VIR_TYPE_SUBPASSINPUT;
+        sampledImageType = VIR_TYPE_SAMPLER_2D;
+        break;
+
+    case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDimSubpassData, 0, 0, 0, 1, 2):
+        virType = VIR_TYPE_SUBPASSINPUTMS;
+        sampledImageType = VIR_TYPE_SAMPLER_2D_MS;
+        break;
+
+    case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDimSubpassData, 1, 0, 0, 0, 2):
+        virType = VIR_TYPE_ISUBPASSINPUT;
+        sampledImageType = VIR_TYPE_ISAMPLER_2D;
+        break;
+
+    case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDimSubpassData, 1, 0, 0, 1, 2):
+        virType = VIR_TYPE_ISUBPASSINPUTMS;
+        sampledImageType = VIR_TYPE_ISAMPLER_2D_MS;
+        break;
+
+    case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDimSubpassData, 2, 0, 0, 0, 2):
+        virType = VIR_TYPE_USUBPASSINPUT;
+        sampledImageType = VIR_TYPE_USAMPLER_2D;
+        break;
+
+    case SPV_GEN_IMAGE_TYPE_MAGIC(SpvDimSubpassData, 2, 0, 0, 1, 2):
+        virType = VIR_TYPE_USUBPASSINPUTMS;
+        sampledImageType = VIR_TYPE_USAMPLER_2D_MS;
         break;
 
     default:
@@ -3819,6 +3870,9 @@ static VSC_ErrCode __SpvAddType(gcSPV spv, VIR_Shader * virShader)
                     virErrCode = VSC_ERR_INVALID_DATA;
                     ON_ERROR(virErrCode, "Invalid OpTypeImage operand");
                 }
+
+                /* set a default format for subpass data */
+                SPV_ID_TYPE_IMAGE_FORMAT(spv->resultId) = SpvImageFormatRgba8;
             }
 
             break;
@@ -4213,7 +4267,7 @@ static VSC_ErrCode __SpvAddVariable(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetEnable(operand, virEnable);
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, virTypeId);
+        VIR_Operand_SetTypeId(operand, virTypeId);
         VIR_Operand_SetSym(operand, sym);
 
         /* Set SOURCE0. */
@@ -4223,7 +4277,7 @@ static VSC_ErrCode __SpvAddVariable(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetSwizzle(operand, virSwizzle);
             VIR_Operand_SetConstId(operand, constId);
             VIR_Operand_SetOpKind(operand, VIR_OPND_CONST);
-            VIR_Operand_SetType(operand, virTypeId);
+            VIR_Operand_SetTypeId(operand, virTypeId);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -4233,7 +4287,7 @@ static VSC_ErrCode __SpvAddVariable(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetSwizzle(operand, virSwizzle);
             VIR_Operand_SetSym(operand, initSymbol);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, virTypeId);
+            VIR_Operand_SetTypeId(operand, virTypeId);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -4976,7 +5030,7 @@ static VSC_ErrCode __SpvAddFuncCall(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetSwizzle(operand, __SpvID2Swizzle(spv, spvArgs));
         VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spvArgs));
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(spvArgs));
+        VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spvArgs));
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -4989,7 +5043,7 @@ static VSC_ErrCode __SpvAddFuncCall(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetSwizzle(operand, __SpvID2Swizzle(spv, spv->resultId));
         VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spv->resultId));
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(spv->resultId));
+        VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spv->resultId));
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -5281,7 +5335,7 @@ static VSC_ErrCode __SpvAddIntrisicFunction(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetModifier(VIR_Inst_GetDest(virInst), VIR_MOD_NONE);
         VIR_Operand_SetEnable(VIR_Inst_GetDest(virInst), __SpvGenEnable(spv, SPV_ID_TYPE_VIR_TYPE(pointedTy), spv->resultTypeId));
         VIR_Operand_SetOpKind(VIR_Inst_GetDest(virInst), VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(VIR_Inst_GetDest(virInst), SPV_ID_TYPE_VIR_TYPE_ID(pointedTy));
+        VIR_Operand_SetTypeId(VIR_Inst_GetDest(virInst), SPV_ID_TYPE_VIR_TYPE_ID(pointedTy));
         VIR_Operand_SetSym(VIR_Inst_GetDest(virInst), dstVirSym);
     }
 
@@ -5295,7 +5349,7 @@ static VSC_ErrCode __SpvAddIntrisicFunction(gcSPV spv, VIR_Shader * virShader)
     {
         for (i = 2; i < argCount + 2; i++)
         {
-            VIR_Swizzle virSwizzle = __SpvID2Swizzle(spv, spv->operands[i]);
+            VIR_Swizzle virSwizzle;
             VIR_Operand *srcOpnd = parmOpnd->args[i-2];
 
             if (spv->opCode == SpvOpImageFetch && i >= 4)
@@ -5313,7 +5367,21 @@ static VSC_ErrCode __SpvAddIntrisicFunction(gcSPV spv, VIR_Shader * virShader)
                 break;
             }
 
-            if (SPV_ID_TYPE(spv->operands[i]) == SPV_ID_TYPE_SYMBOL)
+            virSwizzle = __SpvID2Swizzle(spv, spv->operands[i]);
+            if ((i == 3) &&
+                (spv->opCode == SpvOpImageRead) &&
+                (VIR_TypeId_isSubPass(SPV_ID_TYPE_VIR_TYPE_ID(spv->operands[2]))))
+            {
+                /* handle subpass */
+                VIR_Operand_SetSwizzle(srcOpnd, virSwizzle);
+                VIR_Operand_SetSym(srcOpnd, spv->internalSym);
+                VIR_Operand_SetOpKind(srcOpnd, VIR_OPND_SYMBOL);
+                VIR_Operand_SetTypeId(srcOpnd, SPV_ID_VIR_TYPE_ID(spv->operands[i]));
+                VIR_Operand_SetPrecision(srcOpnd, VIR_PRECISION_HIGH);
+                VIR_Operand_SetRoundMode(srcOpnd, VIR_ROUND_DEFAULT);
+                VIR_Operand_SetModifier(srcOpnd, VIR_MOD_NONE);
+            }
+            else if (SPV_ID_TYPE(spv->operands[i]) == SPV_ID_TYPE_SYMBOL)
             {
                 gctUINT resultTypeId = spv->operands[i];
 
@@ -5334,7 +5402,7 @@ static VSC_ErrCode __SpvAddIntrisicFunction(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetSwizzle(srcOpnd, virSwizzle);
                 VIR_Operand_SetSym(srcOpnd, SPV_ID_VIR_SYM(resultTypeId));
                 VIR_Operand_SetOpKind(srcOpnd, VIR_OPND_SYMBOL);
-                VIR_Operand_SetType(srcOpnd, SPV_ID_VIR_TYPE_ID(resultTypeId));
+                VIR_Operand_SetTypeId(srcOpnd, SPV_ID_VIR_TYPE_ID(resultTypeId));
                 VIR_Operand_SetPrecision(srcOpnd, VIR_PRECISION_HIGH);
                 VIR_Operand_SetRoundMode(srcOpnd, VIR_ROUND_DEFAULT);
                 VIR_Operand_SetModifier(srcOpnd, VIR_MOD_NONE);
@@ -5349,7 +5417,7 @@ static VSC_ErrCode __SpvAddIntrisicFunction(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetSwizzle(srcOpnd, virSwizzle);
                 VIR_Operand_SetConstId(srcOpnd, SPV_ID_VIR_CONST_ID(spv->operands[i]));
                 VIR_Operand_SetOpKind(srcOpnd, VIR_OPND_CONST);
-                VIR_Operand_SetType(srcOpnd, SPV_ID_VIR_TYPE_ID(spv->operands[i]));
+                VIR_Operand_SetTypeId(srcOpnd, SPV_ID_VIR_TYPE_ID(spv->operands[i]));
                 VIR_Operand_SetPrecision(srcOpnd, VIR_PRECISION_HIGH);
                 VIR_Operand_SetRoundMode(srcOpnd, VIR_ROUND_DEFAULT);
                 VIR_Operand_SetModifier(srcOpnd, VIR_MOD_NONE);
@@ -5384,7 +5452,7 @@ static VSC_ErrCode __SpvCheckUnhandledWorkGroupVar(gcSPV spv, VIR_Shader * virSh
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
         VIR_Operand_SetOpKind(operand, VIR_OPND_IMMEDIATE);
-        VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+        VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
         sym = VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->sharedSboSymId);
@@ -5440,7 +5508,7 @@ static VSC_ErrCode __SpvInsertInstAtFuncBegin(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(VIR_TYPE_UINT16));
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, VIR_TYPE_UINT16);
+        VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT16);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
         operand = VIR_Inst_GetSource(virInst, 0);
@@ -5449,7 +5517,7 @@ static VSC_ErrCode __SpvInsertInstAtFuncBegin(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetSwizzle(operand, VIR_Enable_2_Swizzle_WShift(VIR_TypeId_Conv2Enable(VIR_TYPE_UINT16)));
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, VIR_TYPE_UINT16);
+        VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT16);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
         /* The src1 should be the number of concurrent workgroups, which will be known after register allocation */
@@ -5460,7 +5528,7 @@ static VSC_ErrCode __SpvInsertInstAtFuncBegin(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
         VIR_Operand_SetOpKind(operand, VIR_OPND_IMMEDIATE);
-        VIR_Operand_SetType(operand, VIR_TYPE_UINT16);
+        VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT16);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
         /* add instructions to get the offset of current group */
@@ -5489,7 +5557,7 @@ static VSC_ErrCode __SpvInsertInstAtFuncBegin(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(VIR_TYPE_UINT32));
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+        VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
         operand = VIR_Inst_GetSource(virInst, 0);
@@ -5498,7 +5566,7 @@ static VSC_ErrCode __SpvInsertInstAtFuncBegin(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetSwizzle(operand, VIR_Enable_2_Swizzle_WShift(VIR_TypeId_Conv2Enable(VIR_TYPE_UINT16)));
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, VIR_TYPE_UINT16);
+        VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT16);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
         /* The src1 should be set after the adding of ssbo member */
@@ -6010,7 +6078,7 @@ static VSC_ErrCode __SpvEmitVectorShuffle(gcSPV spv, VIR_Shader * virShader)
             operand = VIR_Inst_GetSource(virInst, 0);
             /* we need to consider the swizzle with shift */
             VIR_Operand_SetSwizzle(operand, srcSwizzle[i]);
-            VIR_Operand_SetType(operand, typeId);
+            VIR_Operand_SetTypeId(operand, typeId);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -6030,7 +6098,7 @@ static VSC_ErrCode __SpvEmitVectorShuffle(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, dstEnable[i]);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, typeId);
+            VIR_Operand_SetTypeId(operand, typeId);
             VIR_Operand_SetSym(operand, dstVirSym);
         }
     }
@@ -6070,7 +6138,7 @@ static VSC_ErrCode __SpvEmitPhi(gcSPV spv, VIR_Shader * virShader)
     VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
     VIR_Operand_SetEnable(operand, virEnableMask);
     VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(operand, dstVirTypeId);
+    VIR_Operand_SetTypeId(operand, dstVirTypeId);
     VIR_Operand_SetSym(operand, dstVirSym);
     __SetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
 
@@ -6078,7 +6146,7 @@ static VSC_ErrCode __SpvEmitPhi(gcSPV spv, VIR_Shader * virShader)
     VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
     VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
     VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
-    VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+    VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
 
     for (i = 0; 2 * i < spv->operandSize; i++)
     {
@@ -6102,7 +6170,7 @@ static VSC_ErrCode __SpvEmitPhi(gcSPV spv, VIR_Shader * virShader)
                 VIR_Symbol* sym = SPV_ID_VIR_SYM(spvOperand);
                 VIR_Operand_SetSym(newOperands, sym);
                 VIR_Operand_SetOpKind(newOperands, VIR_OPND_SYMBOL);
-                VIR_Operand_SetType(newOperands, SPV_ID_VIR_TYPE_ID(resultTypeId));
+                VIR_Operand_SetTypeId(newOperands, SPV_ID_VIR_TYPE_ID(resultTypeId));
                 VIR_Operand_SetPrecision(newOperands, VIR_PRECISION_HIGH);
                 VIR_Operand_SetSwizzle(newOperands, virSwizzle);
                 VIR_Operand_SetRoundMode(newOperands, VIR_ROUND_DEFAULT);
@@ -6113,7 +6181,7 @@ static VSC_ErrCode __SpvEmitPhi(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetSwizzle(newOperands, virSwizzle);
                 VIR_Operand_SetConstId(newOperands, SPV_ID_VIR_CONST_ID(spvOperand));
                 VIR_Operand_SetOpKind(newOperands, VIR_OPND_CONST);
-                VIR_Operand_SetType(newOperands, SPV_ID_VIR_TYPE_ID(resultTypeId));
+                VIR_Operand_SetTypeId(newOperands, SPV_ID_VIR_TYPE_ID(resultTypeId));
                 VIR_Operand_SetPrecision(newOperands, VIR_PRECISION_HIGH);
                 VIR_Operand_SetRoundMode(newOperands, VIR_ROUND_DEFAULT);
                 VIR_Operand_SetModifier(newOperands, VIR_MOD_NONE);
@@ -6194,7 +6262,7 @@ static VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetSwizzle(operand, __SpvConstIndexToVIRSwizzle(spv->operands[1]));
             }
             VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spv->operands[0]));
-            VIR_Operand_SetType(operand, SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_VEC_COMP_TYPE(SPV_ID_SYM_SPV_TYPE(spv->operands[0]))));
+            VIR_Operand_SetTypeId(operand, SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_VEC_COMP_TYPE(SPV_ID_SYM_SPV_TYPE(spv->operands[0]))));
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
@@ -6251,7 +6319,7 @@ static VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetEnable(operand, virEnable);
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, dstVirTypeId);
+        VIR_Operand_SetTypeId(operand, dstVirTypeId);
         VIR_Operand_SetSym(operand, dstVirSym);
     }
     /* If the composite is a matrix, then it must be a variable. */
@@ -6273,7 +6341,7 @@ static VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
             operand = VIR_Inst_GetSource(virInst, 0);
             VIR_Operand_SetSwizzle(operand, __SpvConstIndexToVIRSwizzle(spv->operands[2]));
             VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spv->operands[0]));
-            VIR_Operand_SetType(operand, SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_MAT_COL_TYPE(SPV_ID_SYM_SPV_TYPE(spv->operands[0]))));
+            VIR_Operand_SetTypeId(operand, SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_MAT_COL_TYPE(SPV_ID_SYM_SPV_TYPE(spv->operands[0]))));
             VIR_Operand_SetMatrixConstIndex(operand, spv->operands[1]);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
@@ -6285,7 +6353,7 @@ static VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, virEnable);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, dstVirTypeId);
+            VIR_Operand_SetTypeId(operand, dstVirTypeId);
             VIR_Operand_SetSym(operand, dstVirSym);
         }
         else if (SPV_ID_TYPE_IS_VECTOR(spv->resultTypeId))
@@ -6302,7 +6370,7 @@ static VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
             operand = VIR_Inst_GetSource(virInst, 0);
             VIR_Operand_SetSwizzle(operand, VIR_Enable_2_Swizzle_WShift(virEnable));
             VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spv->operands[0]));
-            VIR_Operand_SetType(operand, SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_MAT_COL_TYPE(SPV_ID_SYM_SPV_TYPE(spv->operands[0]))));
+            VIR_Operand_SetTypeId(operand, SPV_ID_TYPE_VIR_TYPE_ID(SPV_ID_TYPE_MAT_COL_TYPE(SPV_ID_SYM_SPV_TYPE(spv->operands[0]))));
             VIR_Operand_SetMatrixConstIndex(operand, spv->operands[1]);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
@@ -6314,7 +6382,7 @@ static VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, virEnable);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, dstVirTypeId);
+            VIR_Operand_SetTypeId(operand, dstVirTypeId);
             VIR_Operand_SetSym(operand, dstVirSym);
         }
         else
@@ -6467,11 +6535,11 @@ static VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
                 VIR_Operand_SetEnable(operand, VIR_ENABLE_X);
                 VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-                VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+                VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
 
                 operand = VIR_Inst_GetSource(virInst, 0);
                 VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
-                VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+                VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
                 VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
                 if (orgBaseOffsetType == VIR_SYM_VARIABLE)
                 {
@@ -6487,7 +6555,7 @@ static VSC_ErrCode __SpvEmitCompositeExtract(gcSPV spv, VIR_Shader * virShader)
 
                 operand = VIR_Inst_GetSource(virInst, 1);
                 VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
-                VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+                VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
                 VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
                 if (baseOffsetType == VIR_SYM_VARIABLE)
                 {
@@ -6626,12 +6694,12 @@ static VSC_ErrCode __SpvEmitVectorExtractDynamic(gcSPV spv, VIR_Shader * virShad
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetEnable(operand, VIR_ENABLE_X);
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, componentTypeId);
+        VIR_Operand_SetTypeId(operand, componentTypeId);
 
         /* Set SOURCE0 */
         operand = VIR_Inst_GetSource(virInst, 0);
         VIR_Operand_SetSwizzle(operand, __SpvConstIndexToVIRSwizzle(indexValue));
-        VIR_Operand_SetType(operand, componentTypeId);
+        VIR_Operand_SetTypeId(operand, componentTypeId);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
         switch (SPV_ID_TYPE(vectorId))
@@ -6684,7 +6752,7 @@ static VSC_ErrCode __SpvEmitVectorExtractDynamic(gcSPV spv, VIR_Shader * virShad
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, VIR_ENABLE_X);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, componentTypeId);
+            VIR_Operand_SetTypeId(operand, componentTypeId);
             if (i != 0)
             {
                 VIR_Operand_SetIsConstIndexing(operand, gcvTRUE);
@@ -6694,7 +6762,7 @@ static VSC_ErrCode __SpvEmitVectorExtractDynamic(gcSPV spv, VIR_Shader * virShad
             /* Set SOURCE0 */
             operand = VIR_Inst_GetSource(virInst, 0);
             VIR_Operand_SetSwizzle(operand, __SpvConstIndexToVIRSwizzle(i));
-            VIR_Operand_SetType(operand, componentTypeId);
+            VIR_Operand_SetTypeId(operand, componentTypeId);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
             switch (SPV_ID_TYPE(vectorId))
@@ -6729,7 +6797,7 @@ static VSC_ErrCode __SpvEmitVectorExtractDynamic(gcSPV spv, VIR_Shader * virShad
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetEnable(operand, VIR_ENABLE_X);
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, componentTypeId);
+        VIR_Operand_SetTypeId(operand, componentTypeId);
 
         /* Set SOURCE0. */
         operand = VIR_Inst_GetSource(virInst, 0);
@@ -6738,7 +6806,7 @@ static VSC_ErrCode __SpvEmitVectorExtractDynamic(gcSPV spv, VIR_Shader * virShad
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, componentTypeId);
+        VIR_Operand_SetTypeId(operand, componentTypeId);
         VIR_Operand_SetIsConstIndexing(operand, gcvFALSE);
         VIR_Operand_SetRelIndex(operand, VIR_Symbol_GetIndex(indexSym));
         VIR_Operand_SetRelAddrMode(operand, VIR_INDEXED_X);
@@ -6790,12 +6858,12 @@ static VSC_ErrCode __SpvEmitVectorInsertDynamic(gcSPV spv, VIR_Shader * virShade
     VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
     VIR_Operand_SetEnable(operand, VIR_TypeId_Conv2Enable(vectorTypeId));
     VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(operand, vectorTypeId);
+    VIR_Operand_SetTypeId(operand, vectorTypeId);
 
     /* Set SOURCE0 */
     operand = VIR_Inst_GetSource(virInst, 0);
     VIR_Operand_SetSwizzle(operand, VIR_Swizzle_GenSwizzleByComponentCount(componentCount));
-    VIR_Operand_SetType(operand, vectorTypeId);
+    VIR_Operand_SetTypeId(operand, vectorTypeId);
     VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
     switch (SPV_ID_TYPE(vectorId))
@@ -6838,12 +6906,12 @@ static VSC_ErrCode __SpvEmitVectorInsertDynamic(gcSPV spv, VIR_Shader * virShade
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetEnable(operand, virEnable);
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, vectorTypeId);
+        VIR_Operand_SetTypeId(operand, vectorTypeId);
 
         /* Set SOURCE0 */
         operand = VIR_Inst_GetSource(virInst, 0);
         VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
-        VIR_Operand_SetType(operand, componentTypeId);
+        VIR_Operand_SetTypeId(operand, componentTypeId);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
         switch (SPV_ID_TYPE(componentDataId))
@@ -6896,7 +6964,7 @@ static VSC_ErrCode __SpvEmitVectorInsertDynamic(gcSPV spv, VIR_Shader * virShade
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, VIR_ENABLE_X);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, componentTypeId);
+            VIR_Operand_SetTypeId(operand, componentTypeId);
             if (i != 0)
             {
                 VIR_Operand_SetIsConstIndexing(operand, gcvTRUE);
@@ -6910,7 +6978,7 @@ static VSC_ErrCode __SpvEmitVectorInsertDynamic(gcSPV spv, VIR_Shader * virShade
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetSwizzle(operand, __SpvConstIndexToVIRSwizzle(i));
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, componentTypeId);
+            VIR_Operand_SetTypeId(operand, componentTypeId);
         }
 
         /* Write the component data by index. */
@@ -6926,7 +6994,7 @@ static VSC_ErrCode __SpvEmitVectorInsertDynamic(gcSPV spv, VIR_Shader * virShade
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetEnable(operand, VIR_ENABLE_X);
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, componentTypeId);
+        VIR_Operand_SetTypeId(operand, componentTypeId);
         VIR_Operand_SetIsConstIndexing(operand, gcvFALSE);
         VIR_Operand_SetRelIndex(operand, VIR_Symbol_GetIndex(indexSym));
         VIR_Operand_SetRelAddrMode(operand, VIR_INDEXED_X);
@@ -6934,7 +7002,7 @@ static VSC_ErrCode __SpvEmitVectorInsertDynamic(gcSPV spv, VIR_Shader * virShade
         /* Set SOURCE. */
         operand = VIR_Inst_GetSource(virInst, 0);
         VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
-        VIR_Operand_SetType(operand, componentTypeId);
+        VIR_Operand_SetTypeId(operand, componentTypeId);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
         switch (SPV_ID_TYPE(componentDataId))
@@ -6972,7 +7040,7 @@ static VSC_ErrCode __SpvEmitVectorInsertDynamic(gcSPV spv, VIR_Shader * virShade
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, virEnable);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, componentTypeId);
+            VIR_Operand_SetTypeId(operand, componentTypeId);
 
             /* Set SOURCE0 */
             operand = VIR_Inst_GetSource(virInst, 0);
@@ -6981,7 +7049,7 @@ static VSC_ErrCode __SpvEmitVectorInsertDynamic(gcSPV spv, VIR_Shader * virShade
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, componentTypeId);
+            VIR_Operand_SetTypeId(operand, componentTypeId);
             if (i != 0)
             {
                 VIR_Operand_SetIsConstIndexing(operand, gcvTRUE);
@@ -7164,6 +7232,138 @@ static VSC_ErrCode __SpvEmitIntrisicCall(gcSPV spv, VIR_Shader * virShader)
     gctUINT setId = 0;
     gctUINT instId = 0;
 
+    if (spv->opCode == SpvOpImageRead && VIR_TypeId_isSubPass(SPV_ID_TYPE_VIR_TYPE_ID(spv->operands[0])))
+    {
+        /* add current fragment location with coordinate */
+        VIR_Instruction * virInst;
+        VIR_Operand * operand;
+        VIR_Symbol * dstCoordSym = gcvNULL;
+        VIR_Symbol * convCoordSym = gcvNULL;
+        VIR_SymId symId;
+        VIR_Swizzle virSwizzle = __SpvID2Swizzle(spv, spv->operands[1]);
+        VIR_TypeId virTypeId = VIR_Symbol_GetTypeId(SPV_ID_VIR_SYM(spv->operands[1]));
+        VIR_NameId nameId;
+        gctUINT offset = 0;
+
+        gcoOS_MemFill(spv->virName, 0, SPV_VIR_NAME_SIZE * gcmSIZEOF(gctCHAR));
+        gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#sh_spv_conv_int_%d", spv->operands[1]);
+        VIR_Shader_AddString(virShader, spv->virName, &nameId);
+
+        VIR_Shader_AddSymbol(
+            virShader,
+            VIR_SYM_VARIABLE,
+            nameId,
+            VIR_Shader_GetTypeFromId(virShader, virTypeId),
+            VIR_STORAGE_GLOBAL,
+            &symId);
+
+        convCoordSym = VIR_Shader_GetSymFromId(virShader, symId);
+
+        VIR_Symbol_SetPrecision(convCoordSym, VIR_PRECISION_HIGH);
+        VIR_Symbol_SetTyQualifier(convCoordSym, VIR_TYQUAL_NONE);
+        VIR_Symbol_SetLayoutQualifier(convCoordSym, VIR_LAYQUAL_NONE);
+        VIR_Symbol_SetLocation(convCoordSym, -1);
+        VIR_Symbol_SetFlag(convCoordSym, VIR_SYMFLAG_WITHOUT_REG);
+
+        /* transform vec4 to ivec2 */
+        VIR_Function_AddInstruction(
+            spv->virFunction,
+            VIR_OP_CONV,
+            virTypeId,
+            &virInst
+            );
+
+        VIR_Inst_SetConditionOp(virInst, VIR_COP_ALWAYS);
+
+        operand = VIR_Inst_GetDest(virInst);
+        VIR_Operand_SetSym(operand, convCoordSym);
+        VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
+        VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
+        VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
+        VIR_Operand_SetEnable(operand, VIR_Swizzle_2_Enable(virSwizzle));
+        VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
+        VIR_Operand_SetTypeId(operand, virTypeId);
+
+        /* gl_FragCoord */
+        operand = VIR_Inst_GetSource(virInst, 0);
+        VIR_Operand_SetSwizzle(operand, virSwizzle);
+        VIR_Operand_SetTypeId(operand, VIR_TYPE_FLOAT_X4);
+        VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
+        VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
+        VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
+        VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
+        VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, spv->builtinVariable[SPV_FRAGCOORD]));
+
+
+        offset = 0;
+        gcoOS_MemFill(spv->virName, 0, SPV_VIR_NAME_SIZE * gcmSIZEOF(gctCHAR));
+        gcoOS_PrintStrSafe(spv->virName, SPV_VIR_NAME_SIZE, &offset, "#sh_spv_subpass_coord_%d", spv->operands[1]);
+        VIR_Shader_AddString(virShader, spv->virName, &nameId);
+
+        VIR_Shader_AddSymbol(
+            virShader,
+            VIR_SYM_VARIABLE,
+            nameId,
+            VIR_Shader_GetTypeFromId(virShader, virTypeId),
+            VIR_STORAGE_GLOBAL,
+            &symId);
+
+        dstCoordSym = VIR_Shader_GetSymFromId(virShader, symId);
+
+        VIR_Symbol_SetPrecision(dstCoordSym, VIR_PRECISION_HIGH);
+        VIR_Symbol_SetTyQualifier(dstCoordSym, VIR_TYQUAL_NONE);
+        VIR_Symbol_SetLayoutQualifier(dstCoordSym, VIR_LAYQUAL_NONE);
+        VIR_Symbol_SetLocation(dstCoordSym, -1);
+        VIR_Symbol_SetFlag(dstCoordSym, VIR_SYMFLAG_WITHOUT_REG);
+
+        /* add coordinate to gl_FragCoord */
+        VIR_Function_AddInstruction(
+            spv->virFunction,
+            VIR_OP_ADD,
+            virTypeId,
+            &virInst);
+
+        VIR_Inst_SetConditionOp(virInst, VIR_COP_ALWAYS);
+
+        operand = VIR_Inst_GetDest(virInst);
+        VIR_Operand_SetSym(operand, dstCoordSym);
+        VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
+        VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
+        VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
+        VIR_Operand_SetEnable(operand, VIR_Swizzle_2_Enable(virSwizzle));
+        VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
+        VIR_Operand_SetTypeId(operand, virTypeId);
+
+        operand = VIR_Inst_GetSource(virInst, 0);
+        VIR_Operand_SetSwizzle(operand, virSwizzle);
+        VIR_Operand_SetTypeId(operand, virTypeId);
+        VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
+        VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
+        VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
+        VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
+        VIR_Operand_SetSym(operand, convCoordSym);
+
+        /* Coordinate */
+        operand = VIR_Inst_GetSource(virInst, 1);
+        VIR_Operand_SetSwizzle(operand, virSwizzle);
+        VIR_Operand_SetTypeId(operand, virTypeId);
+        VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
+        VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
+        VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
+        if (SPV_ID_TYPE(spv->operands[1]) == SPV_ID_TYPE_SYMBOL)
+        {
+            VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
+            VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spv->operands[1]));
+        }
+        else
+        {
+            VIR_Operand_SetConstId(operand, SPV_ID_VIR_CONST_ID(spv->operands[1]));
+            VIR_Operand_SetOpKind(operand, VIR_OPND_CONST);
+        }
+
+        spv->internalSym = dstCoordSym;
+    }
+
     /* Copy operands to begin at 2 */
     gcoOS_MemCopy(tmpOperand, spv->operands, argCount * gcmSIZEOF(gctUINT));
     gcoOS_MemCopy((gctPOINTER*)&spv->operands[2], tmpOperand, argCount * gcmSIZEOF(gctUINT));
@@ -7246,6 +7446,10 @@ static VSC_ErrCode __SpvSetTexldModifier(
     {
         VIR_Operand_SetTexldGradient(operand, modifier[0], modifier[1]);
     }
+    else if (singleMask & SpvImageOperandsSampleMask)
+    {
+        VIR_Operand_SetTexldFetchMS(operand, modifier[0]);
+    }
     else if ((singleMask & SpvImageOperandsConstOffsetMask) ||
         (singleMask & SpvImageOperandsOffsetMask))
     {
@@ -7271,8 +7475,9 @@ static gctUINT32 __SpvImageFlag2VirFlagIndex(gcSPV spv, SpvImageOperandsMask fla
     case SpvImageOperandsConstOffsetMask:
     case SpvImageOperandsOffsetMask:    index = 4; break;
 
+    case SpvImageOperandsSampleMask:    index = 1; break;
+
     case SpvImageOperandsConstOffsetsMask:
-    case SpvImageOperandsSampleMask:
     case SpvImageOperandsMinLodMask:
         gcmASSERT(gcvFALSE);
         break;
@@ -7322,7 +7527,7 @@ static VSC_ErrCode __SpvDecodeImageOperand(
                 virErrCode = VIR_Function_NewOperand(spv->virFunction, &paramOperand[k]);
                 if (virErrCode != VSC_ERR_NONE) return virErrCode;
 
-                VIR_Operand_SetType(paramOperand[k], SPV_ID_VIR_TYPE_ID(spvOperand));
+                VIR_Operand_SetTypeId(paramOperand[k], SPV_ID_VIR_TYPE_ID(spvOperand));
                 VIR_Operand_SetPrecision(paramOperand[k], VIR_PRECISION_HIGH);
                 VIR_Operand_SetRoundMode(paramOperand[k], VIR_ROUND_DEFAULT);
                 VIR_Operand_SetModifier(paramOperand[k], VIR_MOD_NONE);
@@ -7498,7 +7703,7 @@ static VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
     VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
     VIR_Operand_SetEnable(operand, __SpvGenEnable(spv, dstVirType, resultTypeId));
     VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(operand, dstVirTypeId);
+    VIR_Operand_SetTypeId(operand, dstVirTypeId);
     VIR_Operand_SetSym(operand, dstVirSym);
     VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
     __SetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
@@ -7529,7 +7734,7 @@ static VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
             operand = VIR_Inst_GetSource(virInst, virOpIndex);
         }
         spvOperand = spv->operands[i];
-        VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
+        VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         VIR_Operand_SetSwizzle(operand, __SpvID2Swizzle(spv, spvOperand));
         VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
@@ -7591,7 +7796,7 @@ static VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
         virErrCode = VIR_Function_NewOperand(spv->virFunction, &paramOperand);
         if (virErrCode != VSC_ERR_NONE) return virErrCode;
 
-        VIR_Operand_SetType(paramOperand, SPV_ID_VIR_TYPE_ID(spvOperand));
+        VIR_Operand_SetTypeId(paramOperand, SPV_ID_VIR_TYPE_ID(spvOperand));
         VIR_Operand_SetPrecision(paramOperand, VIR_PRECISION_HIGH);
         VIR_Operand_SetRoundMode(paramOperand, VIR_ROUND_DEFAULT);
         VIR_Operand_SetModifier(paramOperand, VIR_MOD_NONE);
@@ -7636,7 +7841,7 @@ static VSC_ErrCode __SpvEmitImageSample(gcSPV spv, VIR_Shader * virShader)
             VIR_ScalarConstVal constVal;
             SpvId spvOperand = spv->operands[i++];
 
-            VIR_Operand_SetType(paramOperand, SPV_ID_VIR_TYPE_ID(spvOperand));
+            VIR_Operand_SetTypeId(paramOperand, SPV_ID_VIR_TYPE_ID(spvOperand));
             VIR_Operand_SetPrecision(paramOperand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(paramOperand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(paramOperand, VIR_MOD_NONE);
@@ -7740,7 +7945,7 @@ static VSC_ErrCode __SpvInsertWorkGroupOffsetInst(
     VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
     VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
     VIR_Operand_SetEnable(operand, VIR_Swizzle_2_Enable(virSwizzle));
-    VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+    VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
 
     operand = VIR_Inst_GetSource(virInst, 0);
     sym = VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->groupOffsetSymId);
@@ -7750,7 +7955,7 @@ static VSC_ErrCode __SpvInsertWorkGroupOffsetInst(
     VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
     VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
     VIR_Operand_SetSwizzle(operand, virSwizzle);
-    VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+    VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
 
     operand = VIR_Inst_GetSource(virInst, 1);
     if (baseOffsetType == VIR_SYM_VARIABLE)
@@ -7769,7 +7974,7 @@ static VSC_ErrCode __SpvInsertWorkGroupOffsetInst(
     VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
     VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
     VIR_Operand_SetSwizzle(operand, virSwizzle);
-    VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+    VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
 
     return VSC_ERR_NONE;
 }
@@ -8043,7 +8248,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetEnable(operand, virEnableMask);
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, dstVirTypeId);
+        VIR_Operand_SetTypeId(operand, dstVirTypeId);
         VIR_Operand_SetSym(operand, dstVirSym);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         __SetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
@@ -8070,7 +8275,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetSwizzle(operand, virSwizzle);
             VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spvOperand));
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -8084,14 +8289,14 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, blockOffset));
                 VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
                 VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-                VIR_Operand_SetType(operand, VIR_Symbol_GetTypeId(VIR_Shader_GetSymFromId(virShader, blockOffset)));
+                VIR_Operand_SetTypeId(operand, VIR_Symbol_GetTypeId(VIR_Shader_GetSymFromId(virShader, blockOffset)));
             }
             else if (blockIndexType == VIR_SYM_CONST)
             {
                 VIR_ScalarConstVal constVal;
                 constVal.uValue = blockOffset;
                 VIR_Operand_SetImmediate(operand, VIR_TYPE_UINT32, constVal);
-                VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+                VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
                 VIR_Operand_SetSwizzle(operand, virSwizzle);
             }
             else
@@ -8118,7 +8323,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetSym(operand, baseOffsetSym);
                 VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
                 VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-                VIR_Operand_SetType(operand, VIR_Symbol_GetTypeId(baseOffsetSym));
+                VIR_Operand_SetTypeId(operand, VIR_Symbol_GetTypeId(baseOffsetSym));
             }
             else if (baseOffsetType == VIR_SYM_CONST)
             {
@@ -8128,7 +8333,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
                     __SpvInsertWorkGroupOffsetInst(spv, virShader, virInst, baseOffset, baseOffsetType);
                     VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->curOffsetSymId));
                 VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-                    VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+                    VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
             }
                 else
             {
@@ -8136,7 +8341,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
                 constVal.uValue = baseOffset;
                 VIR_Operand_SetImmediate(operand, VIR_TYPE_UINT32, constVal);
                 }
-                VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+                VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
                 VIR_Operand_SetSwizzle(operand, virSwizzle);
             }
             else
@@ -8167,7 +8372,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spvOperand));
             }
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+            VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -8205,7 +8410,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
                     __SpvInsertWorkGroupOffsetInst(spv, virShader, virInst, baseOffset, baseOffsetType);
                     VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->curOffsetSymId));
                     VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-                    VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+                    VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
                 }
                 else
                 {
@@ -8219,7 +8424,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
             {
                 gcmASSERT(gcvFALSE);
             }
-            VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+            VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -8305,7 +8510,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
         {
             VIR_Operand_SetSym(operand, SPV_ID_SYM_MAPPING_ARRAY_SYM(spvOperand) ? SPV_ID_SYM_MAPPING_ARRAY_SYM(spvOperand) : SPV_ID_VIR_SYM(spvOperand));
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
             VIR_Operand_SetSwizzle(operand, virSwizzle);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
@@ -8328,7 +8533,7 @@ static VSC_ErrCode __SpvEmitLoad(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetSwizzle(operand, virSwizzle);
         VIR_Operand_SetConstId(operand, SPV_ID_VIR_CONST_ID(spv->operands[0]));
         VIR_Operand_SetOpKind(operand, VIR_OPND_CONST);
-        VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(spv->operands[0]));
+        VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spv->operands[0]));
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -8471,7 +8676,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, VIR_Swizzle_2_Enable(virSwizzle));
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
 
             /* operand[0].blockIndex->virOperand[0](invocation) */
             operand = VIR_Inst_GetSource(virInst, 0);
@@ -8480,7 +8685,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, blockOffset));
                 VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
                 VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-                VIR_Operand_SetType(operand, VIR_Symbol_GetTypeId(VIR_Shader_GetSymFromId(virShader, blockOffset)));
+                VIR_Operand_SetTypeId(operand, VIR_Symbol_GetTypeId(VIR_Shader_GetSymFromId(virShader, blockOffset)));
             }
             else
             {
@@ -8502,7 +8707,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetSym(operand, baseOffsetSym);
                 VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
                 VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-                VIR_Operand_SetType(operand, VIR_Symbol_GetTypeId(baseOffsetSym));
+                VIR_Operand_SetTypeId(operand, VIR_Symbol_GetTypeId(baseOffsetSym));
             }
             else
             {
@@ -8529,7 +8734,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetOpKind(operand, VIR_OPND_CONST);
             }
             VIR_Operand_SetSwizzle(operand, swizzle);
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -8560,7 +8765,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, VIR_Swizzle_2_Enable(virSwizzle));
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
             __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
 
             /* for opstore and is block, we need set src0 to base address,
@@ -8578,7 +8783,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spvOperand));
             }
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -8605,7 +8810,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
                 }
                 VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
                 VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-                VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+                VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
             }
             else
             {
@@ -8615,7 +8820,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
                     __SpvInsertWorkGroupOffsetInst(spv, virShader, virInst, baseOffset, baseOffsetType);
                     VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->curOffsetSymId));
                 VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-                    VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+                    VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
             }
             else
             {
@@ -8646,7 +8851,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetSwizzle(operand, virSwizzle);
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
             __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
         }
         else
@@ -8658,7 +8863,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, virEnableMask);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, dstVirTypeId);
+            VIR_Operand_SetTypeId(operand, dstVirTypeId);
             VIR_Operand_SetSym(operand, dstVirSym);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
@@ -8667,7 +8872,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
             spvOperand = spv->operands[1];
             operand = VIR_Inst_GetSource(virInst, 0);
             VIR_Operand_SetSwizzle(operand, virSwizzle);
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -8683,8 +8888,8 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
             }
             __SetAccessChainOffsetToOperand(spv, spvOperand, operand, SpvOffsetType_Normal);
 
-            if(VIR_GetTypeComponentType(VIR_Operand_GetType(VIR_Inst_GetDest(virInst))) == VIR_TYPE_BOOLEAN &&
-               VIR_GetTypeComponentType(VIR_Operand_GetType(VIR_Inst_GetSource(virInst, 0))) != VIR_TYPE_BOOLEAN)
+            if(VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetDest(virInst))) == VIR_TYPE_BOOLEAN &&
+               VIR_GetTypeComponentType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(virInst, 0))) != VIR_TYPE_BOOLEAN)
             {
                 VIR_Operand* source1;
                 VIR_Operand* source2;
@@ -8717,7 +8922,7 @@ static VSC_ErrCode __SpvEmitStore(gcSPV spv, VIR_Shader * virShader)
                     VIR_Operand_SetEnable(VIR_Inst_GetDest(restoreVectorInst), (VIR_Enable)(1 << i));
                     VIR_Operand_SetSym(VIR_Inst_GetSource(restoreVectorInst, 0), dstVirSym);
                     VIR_Operand_SetOpKind(VIR_Inst_GetSource(restoreVectorInst, 0), VIR_OPND_SYMBOL);
-                    VIR_Operand_SetType(VIR_Inst_GetSource(restoreVectorInst, 0), dstVirTypeId);
+                    VIR_Operand_SetTypeId(VIR_Inst_GetSource(restoreVectorInst, 0), dstVirTypeId);
                     VIR_Operand_SetIsConstIndexing(VIR_Inst_GetSource(restoreVectorInst, 0), 1);
                     VIR_Operand_SetRelIndex(VIR_Inst_GetSource(restoreVectorInst, 0), i);
                 }
@@ -8818,7 +9023,7 @@ static VSC_ErrCode __SpvEmitArrayLength(gcSPV spv, VIR_Shader * virShader)
     VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
     VIR_Operand_SetEnable(operand, virEnableMask);
     VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(operand, dstVirTypeId);
+    VIR_Operand_SetTypeId(operand, dstVirTypeId);
     VIR_Operand_SetSym(operand, dstVirSym);
     VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
     __SetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
@@ -8837,7 +9042,7 @@ static VSC_ErrCode __SpvEmitArrayLength(gcSPV spv, VIR_Shader * virShader)
             {
                 operand = VIR_Inst_GetSource(virInst, 0);
                 VIR_Operand_SetSwizzle(operand, virSwizzle);
-                VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
+                VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spvOperand));
                 VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
                 VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
                 VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -8947,7 +9152,7 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetEnable(operand, virEnableMask);
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, dstVirTypeId);
+        VIR_Operand_SetTypeId(operand, dstVirTypeId);
         VIR_Operand_SetSym(operand, dstVirSym);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         __SetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
@@ -8998,14 +9203,14 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, (i == 0) ? VIR_ENABLE_X : VIR_ENABLE_Y);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, dstVirTypeId);
+            VIR_Operand_SetTypeId(operand, dstVirTypeId);
             VIR_Operand_SetSym(operand, newSymbol);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
 
             spvOperand = spv->operands[i + 1];
             virSwizzle = __SpvID2Swizzle(spv, spvOperand);
             operand = VIR_Inst_GetSource(newInst, 0);
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
             VIR_Operand_SetSwizzle(operand, virSwizzle);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
@@ -9029,7 +9234,7 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
 
         /* Set the new value to the src2 of atom inst. */
         operand = VIR_Inst_GetSource(virInst, 2);
-        VIR_Operand_SetType(operand, newSymTypeId);
+        VIR_Operand_SetTypeId(operand, newSymTypeId);
         VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XYYY);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
@@ -9107,7 +9312,7 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spvOperand));
             }
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
             VIR_Operand_SetSwizzle(operand, virSwizzle);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
@@ -9123,7 +9328,7 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
                     VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, SPV_WORKGROUP_INFO()->curOffsetSymId));
                     VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
                     VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-                    VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+                    VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
                 }
                 else
                 {
@@ -9132,14 +9337,14 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
                         VIR_Operand_SetSym(operand, VIR_Shader_GetSymFromId(virShader, baseOffset));
                         VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
                         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-                        VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+                        VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
                     }
                     else
                     {
                         VIR_ScalarConstVal constVal;
                         constVal.uValue = baseOffset;
                         VIR_Operand_SetImmediate(operand, VIR_TYPE_UINT32, constVal);
-                        VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+                        VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
                         VIR_Operand_SetSwizzle(operand, virSwizzle);
                     }
                 }
@@ -9159,7 +9364,7 @@ static VSC_ErrCode __SpvEmitAtomic(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetSwizzle(operand, virSwizzle);
             VIR_Operand_SetConstId(operand, SPV_ID_VIR_CONST_ID(spv->operands[i]));
             VIR_Operand_SetOpKind(operand, VIR_OPND_CONST);
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(spv->operands[i]));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spv->operands[i]));
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -9264,7 +9469,7 @@ static VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
         VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
         VIR_Operand_SetEnable(operand, virEnableMask);
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, dstVirTypeId);
+        VIR_Operand_SetTypeId(operand, dstVirTypeId);
         VIR_Operand_SetSym(operand, dstVirSym);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         __SetAccessChainOffsetToOperand(spv, spv->resultId, operand, SpvOffsetType_Normal);
@@ -9290,7 +9495,7 @@ static VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
 
             VIR_Operand_SetSym(operand, SPV_ID_VIR_SYM(spvOperand));
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(resultTypeId));
             VIR_Operand_SetSwizzle(operand, virSwizzle);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
@@ -9305,7 +9510,7 @@ static VSC_ErrCode __SpvEmitInstructions(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetSwizzle(operand, virSwizzle);
             VIR_Operand_SetConstId(operand, SPV_ID_VIR_CONST_ID(spv->operands[i]));
             VIR_Operand_SetOpKind(operand, VIR_OPND_CONST);
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(spv->operands[i]));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(spv->operands[i]));
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -9442,7 +9647,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, virDstEnable);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, virDstTypeId);
+            VIR_Operand_SetTypeId(operand, virDstTypeId);
             VIR_Operand_SetSym(operand, dstSym);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             if (!dstBlockSym)
@@ -9455,7 +9660,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XYZW);
             VIR_Operand_SetSym(operand, srcBlockSym);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, VIR_Type_GetIndex(VIR_Symbol_GetType(srcBlockSym)));
+            VIR_Operand_SetTypeId(operand, VIR_Type_GetIndex(VIR_Symbol_GetType(srcBlockSym)));
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -9479,7 +9684,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetImmediate(operand, VIR_TYPE_UINT32, constVal);
             }
 
-            VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+            VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
             VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
@@ -9505,14 +9710,14 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, virDstEnable);
-            VIR_Operand_SetType(operand, virDstTypeId);
+            VIR_Operand_SetTypeId(operand, virDstTypeId);
 
             /* Set src block addr. */
             operand = VIR_Inst_GetSource(virInst, 0);
             VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XYZW);
             VIR_Operand_SetSym(operand, dstBlockSym);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, VIR_Type_GetIndex(VIR_Symbol_GetType(dstBlockSym)));
+            VIR_Operand_SetTypeId(operand, VIR_Type_GetIndex(VIR_Symbol_GetType(dstBlockSym)));
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -9536,7 +9741,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetImmediate(operand, VIR_TYPE_UINT32, constVal);
             }
 
-            VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+            VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
             VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
@@ -9551,7 +9756,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetSwizzle(operand, virSrcSwizzle);
-            VIR_Operand_SetType(operand, virDstTypeId);
+            VIR_Operand_SetTypeId(operand, virDstTypeId);
         }
     }
     /* Source is not a block member
@@ -9588,14 +9793,14 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, virDstEnable);
-            VIR_Operand_SetType(operand, virDstTypeId);
+            VIR_Operand_SetTypeId(operand, virDstTypeId);
 
             /* Set src block addr. */
             operand = VIR_Inst_GetSource(virInst, 0);
             VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XYZW);
             VIR_Operand_SetSym(operand, dstBlockSym);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, VIR_Type_GetIndex(VIR_Symbol_GetType(dstBlockSym)));
+            VIR_Operand_SetTypeId(operand, VIR_Type_GetIndex(VIR_Symbol_GetType(dstBlockSym)));
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
@@ -9619,7 +9824,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
                 VIR_Operand_SetImmediate(operand, VIR_TYPE_UINT32, constVal);
             }
 
-            VIR_Operand_SetType(operand, VIR_TYPE_UINT32);
+            VIR_Operand_SetTypeId(operand, VIR_TYPE_UINT32);
             VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_XXXX);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
@@ -9643,7 +9848,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetSwizzle(operand, virSrcSwizzle);
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(srcId));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(srcId));
             __SetAccessChainOffsetToOperand(spv, srcId, operand, SpvOffsetType_Normal);
         }
         else
@@ -9659,7 +9864,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetEnable(operand, virDstEnable);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, virDstTypeId);
+            VIR_Operand_SetTypeId(operand, virDstTypeId);
             VIR_Operand_SetSym(operand, dstSym);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             __SetAccessChainOffsetToOperand(spv, targetId, operand, SpvOffsetType_Normal);
@@ -9680,7 +9885,7 @@ static VSC_ErrCode __SpvEmitCopyMemory(gcSPV spv, VIR_Shader * virShader)
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);
             VIR_Operand_SetSwizzle(operand, virSrcSwizzle);
-            VIR_Operand_SetType(operand, SPV_ID_VIR_TYPE_ID(srcId));
+            VIR_Operand_SetTypeId(operand, SPV_ID_VIR_TYPE_ID(srcId));
             __SetAccessChainOffsetToOperand(spv, srcId, operand, SpvOffsetType_Normal);
         }
     }
@@ -9746,7 +9951,7 @@ static VSC_ErrCode __SpvEmitSwitch(gcSPV spv, VIR_Shader * virShader)
             sym = SPV_ID_VIR_SYM(selectorId);
             VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, virType);
+            VIR_Operand_SetTypeId(operand, virType);
             VIR_Operand_SetSym(operand, sym);
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             break;
@@ -9754,7 +9959,7 @@ static VSC_ErrCode __SpvEmitSwitch(gcSPV spv, VIR_Shader * virShader)
         case SPV_ID_TYPE_CONST:
             VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
             VIR_Operand_SetOpKind(operand, VIR_OPND_CONST);
-            VIR_Operand_SetType(operand, virType);
+            VIR_Operand_SetTypeId(operand, virType);
             VIR_Operand_SetConstId(operand, SPV_ID_VIR_CONST_ID(selectorId));
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             break;
@@ -9773,7 +9978,7 @@ static VSC_ErrCode __SpvEmitSwitch(gcSPV spv, VIR_Shader * virShader)
         constVal.uValue = literalValue;
         VIR_Operand_SetImmediate(operand, virType, constVal);
         VIR_Operand_SetOpKind(operand, VIR_OPND_IMMEDIATE);
-        VIR_Operand_SetType(operand, virType);
+        VIR_Operand_SetTypeId(operand, virType);
     }
 
     /* Generate a JMP to the default label. */
@@ -9970,7 +10175,7 @@ static VSC_ErrCode __SpvAddBranchConditional(gcSPV spv, VIR_Shader * virShader)
         sym = SPV_ID_VIR_SYM(spv->operands[0]);
         VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
         VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-        VIR_Operand_SetType(operand, VIR_TYPE_BOOLEAN);
+        VIR_Operand_SetTypeId(operand, VIR_TYPE_BOOLEAN);
         VIR_Operand_SetSym(operand, sym);
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         break;
@@ -9978,7 +10183,7 @@ static VSC_ErrCode __SpvAddBranchConditional(gcSPV spv, VIR_Shader * virShader)
     case SPV_ID_TYPE_CONST:
         VIR_Operand_SetSwizzle(operand, VIR_SWIZZLE_X);
         VIR_Operand_SetOpKind(operand, VIR_OPND_CONST);
-        VIR_Operand_SetType(operand, VIR_TYPE_BOOLEAN);
+        VIR_Operand_SetTypeId(operand, VIR_TYPE_BOOLEAN);
         VIR_Operand_SetConstId(operand, SPV_ID_VIR_CONST_ID(spv->operands[0]));
         VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
         break;
@@ -9993,7 +10198,7 @@ static VSC_ErrCode __SpvAddBranchConditional(gcSPV spv, VIR_Shader * virShader)
     constVal.uValue = 0;
     VIR_Operand_SetImmediate(operand, VIR_TYPE_BOOLEAN, constVal);
     VIR_Operand_SetOpKind(operand, VIR_OPND_IMMEDIATE);
-    VIR_Operand_SetType(operand, VIR_TYPE_BOOLEAN);
+    VIR_Operand_SetTypeId(operand, VIR_TYPE_BOOLEAN);
 
     /* Add a JMP to jump to the false label. */
     virErrCode =  VIR_Function_AddInstruction(spv->virFunction,
@@ -10354,6 +10559,25 @@ static void __SpvSetClientVersion(
         break;
     default:
         gcmASSERT(0);
+    }
+
+    /*
+    ** OpSource is belong to debug information, which is not required.
+    ** If there is OpSource in this binary, get the srcLanguage from OpMemoryModel, which is required.
+    */
+    if (spv->srcLanguage == SpvSourceLanguageUnknown)
+    {
+        if (spv->srcMemoryMode == SpvMemoryModelGLSL450)
+        {
+            spv->srcLanguage = SpvSourceLanguageGLSL;
+            spv->srcLanguageVersion = 450;
+        }
+        else if (spv->srcMemoryMode == SpvMemoryModelOpenCL)
+        {
+            spv->srcLanguage = SpvSourceLanguageOpenCL_C;
+            /* Assume it is OCL 1.1. */
+            spv->srcLanguageVersion = 110;
+        }
     }
 
     /* base on srcLanguageVersion/srcLanguage to decide client version */
@@ -10720,6 +10944,39 @@ static void __SpvParameterize(gcSPV spv)
 
 }
 
+static VSC_ErrCode __SpvAddBuiltinVariable(gcSPV spv, VIR_Shader * virShader)
+{
+    VIR_NameId nameId;
+    VIR_Symbol * sym = gcvNULL;
+    VIR_SymId symId;
+    VSC_ErrCode virErrCode = VSC_ERR_NONE;
+
+    if (spv->shaderStage == VSC_SHADER_STAGE_PS)
+    {
+        VIR_Shader_AddString(virShader, "gl_FragCoord", &nameId);
+
+        VIR_Shader_AddSymbol(
+            virShader,
+            VIR_SYM_VARIABLE,
+            nameId,
+            VIR_Shader_GetTypeFromId(virShader, VIR_TYPE_FLOAT_X4),
+            VIR_STORAGE_GLOBAL,
+            &symId);
+
+        sym = VIR_Shader_GetSymFromId(virShader, symId);
+
+        VIR_Symbol_SetPrecision(sym, VIR_PRECISION_HIGH);
+        VIR_Symbol_SetTyQualifier(sym, VIR_TYQUAL_NONE);
+        VIR_Symbol_SetLayoutQualifier(sym, VIR_LAYQUAL_NONE);
+        VIR_Symbol_SetFlag(sym, VIR_SYMFLAG_WITHOUT_REG);
+        VIR_Symbol_SetLocation(sym, -1);
+
+        spv->builtinVariable[SPV_FRAGCOORD] = symId;
+    }
+
+    return virErrCode;
+}
+
 static gceSTATUS __SpvConstructAndInitializeVIRShader(
     IN gcSPV spv,
     IN SpvExecutionModel model,
@@ -10805,6 +11062,8 @@ static gceSTATUS __SpvConstructAndInitializeVIRShader(
     }
 
     spv->shaderStage = shaderStage;
+
+    __SpvAddBuiltinVariable(spv, *virShader);
 
     return gcvSTATUS_OK;
 }
@@ -11452,9 +11711,10 @@ gceSTATUS __SpvInitialize(
     Spv->workgroupInfo = gcvNULL;
     Spv->hasWorkGroup = gcvFALSE;
 
-
     Spv->renderpassInfo = gcvNULL;
     Spv->subPass = ~0U;
+
+    Spv->internalSym = gcvNULL;
 
     gcmFOOTER();
     return status;
@@ -11494,7 +11754,7 @@ static gceSTATUS _SpvCheckUnhandleVariables(
             VIR_Operand_SetSym(operand, sym);
             VIR_SymAliasTable_Insert(symAliasTable, sym, VIR_Operand_GetSymbol(dest));
             VIR_Operand_SetOpKind(operand, VIR_OPND_SYMBOL);
-            VIR_Operand_SetType(operand, VIR_Operand_GetType(dest));
+            VIR_Operand_SetTypeId(operand, VIR_Operand_GetTypeId(dest));
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetSwizzle(operand, operandSwizzle);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
@@ -11505,7 +11765,7 @@ static gceSTATUS _SpvCheckUnhandleVariables(
             VIR_Operand_SetSwizzle(operand, operandSwizzle);
             VIR_Operand_SetConstId(operand, SPV_ID_VIR_CONST_ID(spvId));
             VIR_Operand_SetOpKind(operand, VIR_OPND_CONST);
-            VIR_Operand_SetType(operand, VIR_Operand_GetType(dest));
+            VIR_Operand_SetTypeId(operand, VIR_Operand_GetTypeId(dest));
             VIR_Operand_SetPrecision(operand, VIR_PRECISION_HIGH);
             VIR_Operand_SetRoundMode(operand, VIR_ROUND_DEFAULT);
             VIR_Operand_SetModifier(operand, VIR_MOD_NONE);

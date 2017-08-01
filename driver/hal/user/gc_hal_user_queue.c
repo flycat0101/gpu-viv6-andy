@@ -250,9 +250,8 @@ gcoQUEUE_Commit(
         /* Initialize event commit command. */
         iface.ignoreTLS     = gcvFALSE;
         iface.command       = gcvHAL_EVENT_COMMIT;
+        iface.engine        = Queue->engine;
         iface.u.Event.queue = gcmPTR_TO_UINT64(Queue->head);
-
-        iface.u.Event.engine = Queue->engine;
 
         /* Send command to kernel. */
         gcmONERROR(

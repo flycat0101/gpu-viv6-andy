@@ -788,6 +788,11 @@ gcChipResidentTextureLevel(
         {
             patchCase = __GL_CHIP_FMT_PATCH_ASTC;
         }
+        else if ((mipmap->formatInfo->drvFormat == __GL_FMT_A8) &&
+            (chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4652))
+        {
+            patchCase = __GL_CHIP_FMT_PATCH_ALPHA8;
+        }
         else if ((texObj->targetIndex == __GL_TEXTURE_2D_ARRAY_INDEX) ||
                  (texObj->targetIndex == __GL_TEXTURE_3D_INDEX))
         {
@@ -1542,8 +1547,6 @@ gcChipResolveDrawToTempBitmap(
         gctINT right       = 0;
         gctINT bottom      = 0;
 
-        gceORIENTATION srcOrient;
-
         gcsSURF_VIEW tmpView = {gcvNULL, 0, 1};
         gcsSURF_RESOLVE_ARGS rlvArgs = {0};
         GLboolean surfYInverted = (gcoSURF_QueryFlags(srcView->surf, gcvSURF_FLAG_CONTENT_YINVERTED) == gcvSTATUS_TRUE);
@@ -1616,10 +1619,6 @@ gcChipResolveDrawToTempBitmap(
             rlvArgs.uArgs.v2.rectSize.x,
             rlvArgs.uArgs.v2.rectSize.y
             ));
-
-        /* Set orient as src. */
-        gcmERR_BREAK(gcoSURF_QueryOrientation(srcView->surf, &srcOrient));
-        gcmERR_BREAK(gcoSURF_SetOrientation(chipCtx->tempBitmap, srcOrient));
 
         tmpView.surf = chipCtx->tempBitmap;
         /* Resolve the aligned area. */
@@ -1851,6 +1850,13 @@ gcChipCopyTexImage(
         }
 
         tryShader = gcvFALSE;
+    }
+
+    if ((chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4652) &&
+        mipmap->formatInfo->drvFormat == __GL_FMT_A8 &&
+        srcView.surf->tiling == texView.surf->tiling)
+    {
+        tryShader = gcvTRUE;
     }
 
     do
@@ -2285,6 +2291,13 @@ gcChipCopyTexSubImage(
             tryResolve = gcvFALSE;
         }
         tryShader = gcvFALSE;
+    }
+
+    if ((chipCtx->chipModel == gcv600 && chipCtx->chipRevision == 0x4652) &&
+        mipmap->formatInfo->drvFormat == __GL_FMT_A8 &&
+        srcView.surf->tiling == texView.surf->tiling)
+    {
+        tryShader = gcvTRUE;
     }
 
     /* If tex is bound to FBO and draw before calling CopyTexSubImage2D, shadow surface is dirty.
@@ -3571,6 +3584,7 @@ __glChipGenerateMipMap(
         gcoSURF srcSurface = gcvNULL, dstSurface = gcvNULL;
         __GLmipMapLevel *mipmap = &texObj->faceMipmap[0][level];
         GLint numSlices = (texObj->targetIndex == __GL_TEXTURE_3D_INDEX) ? mipmap->depth : texObj->arrays;
+        __GLchipMipmapInfo *chipMipBaseLevel = &texInfo->mipLevels[baseLevel];
         GLint slice;
 
         chipMipLevel = &texInfo->mipLevels[level];
@@ -3584,7 +3598,7 @@ __glChipGenerateMipMap(
         gcmONERROR(gcoTEXTURE_AddMipMapEx(texInfo->object,
                                           level,
                                           baseMipmap->requestedFormat,
-                                          chipMipLevel->formatMapInfo->readFormat,
+                                          chipMipBaseLevel->formatMapInfo->readFormat,
                                           (gctSIZE_T)mipmap->width,
                                           (gctSIZE_T)mipmap->height,
                                           __GL_IS_TEXTURE_ARRAY(texObj->targetIndex) ? texObj->arrays : mipmap->depth,
@@ -3598,13 +3612,6 @@ __glChipGenerateMipMap(
         /* For split texture, we don't need the real data of other mips. Fix bug #8768 */
         if (CHIP_TEX_IMAGE_IS_UPTODATE(texInfo, baseLevel) && !splitTexture)
         {
-            gceORIENTATION srcOrientation, dstOrientation;
-
-            /* down sample to create the lower level. */
-            gcmONERROR(gcoSURF_QueryOrientation(srcSurface, &srcOrientation));
-            gcmONERROR(gcoSURF_QueryOrientation(dstSurface, &dstOrientation));
-            gcmONERROR(gcoSURF_SetOrientation(dstSurface, srcOrientation));
-
             /* For blit engine, we generate mipmap in one shot */
             if (chipCtx->chipFeature.hasBlitEngine)
             {
@@ -3628,8 +3635,6 @@ __glChipGenerateMipMap(
 #if gcdSYNC
             gcmONERROR(gcoSURF_GetFence(dstSurface, gcvFENCE_TYPE_ALL));
 #endif
-            gcmONERROR(gcoSURF_SetOrientation(dstSurface, dstOrientation));
-
             for (slice = 0; slice < numSlices; ++slice)
             {
                 chipMipLevel->shadow[slice].masterDirty = GL_TRUE;
@@ -3990,7 +3995,6 @@ __glChipBindTexImage(
 
         /* Resolve surface to texture mipmap: no flip in the resolve. */
         gcmONERROR(gcoSURF_ResolveRect(&surfView, &texView, gcvNULL));
-        gcmONERROR(gcoSURF_SetOrientation(texView.surf, gcvORIENTATION_TOP_BOTTOM));
     }
 
     if (pBinder != gcvNULL)
@@ -5110,6 +5114,7 @@ gcChipTexSyncEGLImage(
                         gcsHAL_INTERFACE iface;
 
                         iface.command            = gcvHAL_SIGNAL;
+                        iface.engine             = gcvENGINE_RENDER;
                         iface.u.Signal.signal    = handle->hwDoneSignal;
                         iface.u.Signal.auxSignal = 0;
                         /* Stuff the client's PID. */
@@ -5514,14 +5519,18 @@ __glChipGetTextureAttribFromImage(
             type = GL_UNSIGNED_SHORT_5_5_5_1;
             break;
 
-        case gcvSURF_A4R4G4B4:
         case gcvSURF_R4G4B4A4:
             format = internalFormat = GL_RGBA;
             type = GL_UNSIGNED_SHORT_4_4_4_4;
             break;
 
+        case gcvSURF_A4R4G4B4:
+            format = internalFormat = __GL_ARGB4;
+            type = GL_UNSIGNED_SHORT_4_4_4_4;
+            break;
+
         case gcvSURF_X4R4G4B4:
-            format = internalFormat = GL_RGB;
+            format = internalFormat = __GL_XRGB4;
             type = GL_UNSIGNED_SHORT_4_4_4_4;
             break;
 
@@ -5732,13 +5741,7 @@ __glChipEglImageTargetTexture2DOES(
             gcsSURF_VIEW imgView = {image->surface, image->u.texture.sliceIndex, 1};
             gcsSURF_VIEW srcView = {image->srcSurface, 0, 1};
 
-            gceORIENTATION srcOrient,dstOrient;
-            gcmONERROR(gcoSURF_QueryOrientation(image->surface, &dstOrient));
-            gcmONERROR(gcoSURF_QueryOrientation(image->srcSurface, &srcOrient));
-
-            gcmONERROR(gcoSURF_SetOrientation(image->surface, srcOrient));
             gcmONERROR(gcoSURF_ResolveRect(&srcView, &imgView, gcvNULL));
-            gcmONERROR(gcoSURF_SetOrientation(image->surface, dstOrient));
 
             gcmONERROR(gcChipSetImageSrc(image, gcvNULL));
         }

@@ -150,7 +150,7 @@ gctBOOL _ConstOrImmZero(
     else if(VIR_Operand_GetOpKind(opnd) == VIR_OPND_CONST)
     {
         VIR_Shader* shader = VIR_Inst_GetShader(inst);
-        VIR_PrimitiveTypeId type = VIR_Operand_GetType(opnd);
+        VIR_PrimitiveTypeId type = VIR_Operand_GetTypeId(opnd);
         VIR_Const* cur_const = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(opnd));
         return VIR_VecConstVal_AllZero(type, &cur_const->value.vecVal);
     }
@@ -167,13 +167,13 @@ gctBOOL _ConstOrImmOne(
 {
     if(VIR_Operand_GetOpKind(opnd) == VIR_OPND_IMMEDIATE)
     {
-        VIR_PrimitiveTypeId type = VIR_Operand_GetType(opnd);
+        VIR_PrimitiveTypeId type = VIR_Operand_GetTypeId(opnd);
         return VIR_ScalarConstVal_One(type, (VIR_ScalarConstVal*)&(opnd->u.n.u1));
     }
     else if(VIR_Operand_GetOpKind(opnd) == VIR_OPND_CONST)
     {
         VIR_Shader* shader = VIR_Inst_GetShader(inst);
-        VIR_PrimitiveTypeId type = VIR_Operand_GetType(opnd);
+        VIR_PrimitiveTypeId type = VIR_Operand_GetTypeId(opnd);
         VIR_Const* cur_const = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(opnd));
         return VIR_VecConstVal_AllOne(type, &cur_const->value.vecVal);
                     }
@@ -216,7 +216,7 @@ gctBOOL _Is16BitOrLess(
     IN VIR_Operand* opnd
     )
 {
-    if (VIR_GetTypeSize(VIR_Operand_GetType(opnd)) <= 2)
+    if (VIR_GetTypeSize(VIR_Operand_GetTypeId(opnd)) <= 2)
     {
         return gcvTRUE;
     }
@@ -256,7 +256,7 @@ gctBOOL _Is8BitOrLess(
     IN VIR_Operand* opnd
     )
 {
-    if (VIR_GetTypeSize(VIR_Operand_GetType(opnd)) <= 1)
+    if (VIR_GetTypeSize(VIR_Operand_GetTypeId(opnd)) <= 1)
     {
         return gcvTRUE;
     }
@@ -327,14 +327,14 @@ void _MOVDestSumSrc0Src1(
 
     if(VIR_Operand_GetOpKind(src0) == VIR_OPND_IMMEDIATE && VIR_Operand_GetOpKind(src1) == VIR_OPND_IMMEDIATE)
     {
-        VIR_PrimitiveTypeId type = VIR_Operand_GetType(src0);
+        VIR_PrimitiveTypeId type = VIR_Operand_GetTypeId(src0);
         VIR_ScalarConstVal_AddScalarConstVal(type, (VIR_ScalarConstVal*)&(src0->u.n.u1), (VIR_ScalarConstVal*)&(src1->u.n.u1), (VIR_ScalarConstVal*)&(src0->u.n.u1));
     }
     else if((VIR_Operand_GetOpKind(src0) == VIR_OPND_CONST && VIR_Operand_GetOpKind(src1) == VIR_OPND_IMMEDIATE)
         || (VIR_Operand_GetOpKind(src0) == VIR_OPND_IMMEDIATE && VIR_Operand_GetOpKind(src1) == VIR_OPND_CONST))
     {
         VIR_Shader* shader = VIR_Inst_GetShader(inst);
-        VIR_PrimitiveTypeId type = VIR_Operand_GetType(src0);
+        VIR_PrimitiveTypeId type = VIR_Operand_GetTypeId(src0);
         VIR_Const* cur_const;
         VIR_ConstVal new_const;
         VIR_ConstId new_const_id;
@@ -357,7 +357,7 @@ void _MOVDestSumSrc0Src1(
     else
     {
         VIR_Shader* shader = VIR_Function_GetShader(VIR_Inst_GetFunction(inst));
-        VIR_PrimitiveTypeId type = VIR_Operand_GetType(src0);
+        VIR_PrimitiveTypeId type = VIR_Operand_GetTypeId(src0);
         VIR_Const* cur_const0 = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(src0));
         VIR_Const* cur_const1 = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(src1));
         VIR_ConstVal new_const;
@@ -384,14 +384,14 @@ void _MOVDestProductSrc0Src1(
 
     if(VIR_Operand_GetOpKind(src0) == VIR_OPND_IMMEDIATE && VIR_Operand_GetOpKind(src1) == VIR_OPND_IMMEDIATE)
     {
-        VIR_PrimitiveTypeId type = VIR_Operand_GetType(src0);
+        VIR_PrimitiveTypeId type = VIR_Operand_GetTypeId(src0);
         VIR_ScalarConstVal_MulScalarConstVal(type, (VIR_ScalarConstVal*)&(src0->u.n.u1), (VIR_ScalarConstVal*)&(src1->u.n.u1), (VIR_ScalarConstVal*)&(src0->u.n.u1));
     }
     else if((VIR_Operand_GetOpKind(src0) == VIR_OPND_CONST && VIR_Operand_GetOpKind(src1) == VIR_OPND_IMMEDIATE)
         || (VIR_Operand_GetOpKind(src0) == VIR_OPND_IMMEDIATE && VIR_Operand_GetOpKind(src1) == VIR_OPND_CONST))
     {
         VIR_Shader* shader = VIR_Inst_GetShader(inst);
-        VIR_PrimitiveTypeId type = VIR_Operand_GetType(src0);
+        VIR_PrimitiveTypeId type = VIR_Operand_GetTypeId(src0);
         VIR_Const* cur_const;
         VIR_ConstVal new_const;
         VIR_ConstId new_const_id;
@@ -414,7 +414,7 @@ void _MOVDestProductSrc0Src1(
     else
     {
         VIR_Shader* shader = VIR_Function_GetShader(VIR_Inst_GetFunction(inst));
-        VIR_PrimitiveTypeId type = VIR_Operand_GetType(src0);
+        VIR_PrimitiveTypeId type = VIR_Operand_GetTypeId(src0);
         VIR_Const* cur_const0 = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(src0));
         VIR_Const* cur_const1 = (VIR_Const *)VIR_Shader_GetSymFromId(shader, VIR_Operand_GetConstId(src1));
         VIR_ConstVal new_const;

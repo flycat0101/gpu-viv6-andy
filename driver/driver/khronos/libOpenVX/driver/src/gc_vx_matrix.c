@@ -100,7 +100,68 @@ VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrix(vx_context context, vx_enum da
     matrix->memory.dims[0][0]   = (vx_int32)dataSize;
     matrix->memory.dims[0][1]   = (vx_int32)(columns * rows);
 
+    matrix->origin.x = (vx_uint32)columns / 2;
+    matrix->origin.y = (vx_uint32)rows / 2;
+    matrix->pattern = VX_PATTERN_OTHER;
+
     return (vx_matrix)matrix;
+}
+
+VX_API_ENTRY vx_matrix VX_API_CALL vxCreateMatrixFromPattern(vx_context context, vx_enum pattern, vx_size columns, vx_size rows)
+{
+    vx_matrix matrix;
+    if (!vxoContext_IsValid(context))
+        return 0;
+
+    if ((columns > VX_INT_MAX_NONLINEAR_DIM) || (rows > VX_INT_MAX_NONLINEAR_DIM))
+    {
+        vxError("Invalid dimensions to matrix\n");
+        vxAddLogEntry(&context->base, VX_ERROR_INVALID_DIMENSION, "Invalid dimensions to matrix\n");
+        return (vx_matrix)vxoError_GetErrorObject(context, VX_ERROR_INVALID_DIMENSION);
+    }
+
+    matrix = vxCreateMatrix(context, VX_TYPE_UINT8, columns, rows);
+    if (vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX) == vx_true_e)
+    {
+        if (vxoMemory_Allocate(matrix->base.context, &matrix->memory) == vx_true_e)
+        {
+            vxAcquireMutex(matrix->base.lock);
+            {
+            vx_uint8* ptr = matrix->memory.logicals[0];
+            vx_size x, y;
+            for (y = 0; y < rows; ++y)
+            {
+                for (x = 0; x < columns; ++x)
+                {
+                    vx_uint8 value = 0;
+                    switch (pattern)
+                    {
+                    case VX_PATTERN_BOX: value = 255; break;
+                    case VX_PATTERN_CROSS: value = ((y == rows / 2) || (x == columns / 2)) ? 255 : 0; break;
+                    case VX_PATTERN_DISK:
+                        value = (((y - rows / 2.0 + 0.5) * (y - rows / 2.0 + 0.5)) / ((rows / 2.0) * (rows / 2.0)) +
+                            ((x - columns / 2.0 + 0.5) * (x - columns / 2.0 + 0.5)) / ((columns / 2.0) * (columns / 2.0)))
+                            <= 1 ? 255 : 0;
+                        break;
+                    }
+                    ptr[x + y * columns] = value;
+                }
+            }
+            }
+            vxReleaseMutex(matrix->base.lock);
+            vxoReference_IncrementWriteCount(&matrix->base);
+            matrix->pattern = pattern;
+        }
+        else
+        {
+            vxReleaseMatrix(&matrix);
+            vxError("Failed to allocate matrix\n");
+            vxAddLogEntry(&context->base, VX_ERROR_NO_MEMORY, "Failed to allocate matrix\n");
+            matrix = (vx_matrix)vxoError_GetErrorObject(context, VX_ERROR_NO_MEMORY);
+        }
+    }
+
+    return matrix;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxQueryMatrix(vx_matrix matrix, vx_enum attribute, void *ptr, vx_size size)
@@ -109,28 +170,40 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryMatrix(vx_matrix matrix, vx_enum attri
 
     switch (attribute)
     {
-        case VX_MATRIX_ATTRIBUTE_TYPE:
+        case VX_MATRIX_TYPE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
 
             *(vx_enum *)ptr = matrix->dataType;
             break;
 
-        case VX_MATRIX_ATTRIBUTE_ROWS:
+        case VX_MATRIX_ROWS:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size *)ptr = matrix->rows;
             break;
 
-        case VX_MATRIX_ATTRIBUTE_COLUMNS:
+        case VX_MATRIX_COLUMNS:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size *)ptr = matrix->columns;
             break;
 
-        case VX_MATRIX_ATTRIBUTE_SIZE:
+        case VX_MATRIX_SIZE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size *)ptr = matrix->columns * matrix->rows * matrix->memory.dims[0][0];
+            break;
+
+        case VX_MATRIX_ORIGIN:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_coordinates2d_t, 0x3);
+
+            *(vx_coordinates2d_t *)ptr = matrix->origin;
+            break;
+
+        case VX_MATRIX_PATTERN:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
+
+            *(vx_enum *)ptr = matrix->pattern;
             break;
 
         default:
@@ -160,7 +233,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxReadMatrix(vx_matrix matrix, void *array)
 
     vxoReference_IncrementReadCount(&matrix->base);
 
-    vxoReference_Increment(&matrix->base, VX_REF_EXTERNAL);
+    /*remove reference count for v1.1(nonlinear)*/
+    /*vxoReference_Increment(&matrix->base, VX_REF_EXTERNAL);*/
 
     return VX_SUCCESS;
 }
@@ -184,8 +258,62 @@ VX_API_ENTRY vx_status VX_API_CALL vxWriteMatrix(vx_matrix matrix, const void *a
 
     vxoReference_IncrementWriteCount(&matrix->base);
 
-    vxoReference_Decrement(&matrix->base, VX_REF_EXTERNAL);
+    /*remove reference count for v1.1(nonlinear)*/
+    /*vxoReference_Decrement(&matrix->base, VX_REF_EXTERNAL);*/
 
     return VX_SUCCESS;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxCopyMatrix(vx_matrix matrix, void *ptr, vx_enum usage, vx_enum mem_type)
+{
+    vx_status status = VX_ERROR_INVALID_REFERENCE;
+    if (vxoReference_IsValidAndSpecific(&matrix->base, VX_TYPE_MATRIX))
+    {
+        if (vxoMemory_Allocate(matrix->base.context, &matrix->memory) == vx_true_e)
+        {
+            if (usage == VX_READ_ONLY)
+            {
+                vxAcquireMutex(matrix->base.lock);
+                if (ptr)
+                {
+                    vx_size size = matrix->memory.strides[0][1] *
+                                   matrix->memory.dims[0][1];
+                    memcpy(ptr, matrix->memory.logicals[0], size);
+                }
+                vxReleaseMutex(matrix->base.lock);
+                vxoReference_IncrementReadCount(&matrix->base);
+                status = VX_SUCCESS;
+            }
+            else if (usage == VX_WRITE_ONLY)
+            {
+                vxAcquireMutex(matrix->base.lock);
+                if (ptr)
+                {
+                    vx_size size = matrix->memory.strides[0][1] *
+                                   matrix->memory.dims[0][1];
+                    memcpy(matrix->memory.logicals[0], ptr, size);
+                }
+                vxReleaseMutex(matrix->base.lock);
+                vxoReference_IncrementWriteCount(&matrix->base);
+                status = VX_SUCCESS;
+            }
+            else
+            {
+                vxError("Wrong parameters for matrix\n");
+                status = VX_ERROR_INVALID_PARAMETERS;
+            }
+        }
+        else
+        {
+            vxError("Failed to allocate matrix\n");
+            status = VX_ERROR_NO_MEMORY;
+        }
+    }
+    else
+    {
+        vxError("Invalid reference for matrix\n");
+    }
+
+    return status;
 }
 

@@ -123,6 +123,9 @@ struct KHRicdStateRec
 /* the global state*/
 extern KHRicdState khrIcdState;
 
+/*platform address*/
+extern cl_platform_id *platforms;
+
 /*
  * khrIcd interface
  */

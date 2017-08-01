@@ -179,12 +179,15 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyFence(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
+    if (fence)
+    {
+        __vkFence *fce = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFence *, fence);
 
-    if (fce->signal)
-        gcoOS_DestroySignal(gcvNULL, fce->signal);
+        if (fce->signal)
+            gcoOS_DestroySignal(gcvNULL, fce->signal);
 
-    __vk_DestroyObject(devCtx, __VK_OBJECT_FENCE, (__vkObject *)fce);
+        __vk_DestroyObject(devCtx, __VK_OBJECT_FENCE, (__vkObject *)fce);
+    }
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_ResetFences(
@@ -363,11 +366,14 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroySemaphore(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, semaphore);
+    if (semaphore)
+    {
+        __vkSemaphore *sph = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSemaphore *, semaphore);
 
-    __vk_FreeHwFence(device, sph->fenceIndex);
+        __vk_FreeHwFence(device, sph->fenceIndex);
 
-    __vk_DestroyObject(devCtx, __VK_OBJECT_SEMAPHORE, (__vkObject *)sph);
+        __vk_DestroyObject(devCtx, __VK_OBJECT_SEMAPHORE, (__vkObject *)sph);
+    }
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateEvent(
@@ -408,11 +414,12 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyEvent(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkEvent *evt = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkEvent *, event);
-
-    __vk_FreeHwFence(device, evt->fenceIndex);
-
-    __vk_DestroyObject(devCtx, __VK_OBJECT_EVENT, (__vkObject *)evt);
+    if (event)
+    {
+        __vkEvent *evt = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkEvent *, event);
+        __vk_FreeHwFence(device, evt->fenceIndex);
+        __vk_DestroyObject(devCtx, __VK_OBJECT_EVENT, (__vkObject *)evt);
+    }
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_GetEventStatus(

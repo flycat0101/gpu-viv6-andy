@@ -35,7 +35,7 @@ void _VIR_ReplaceIndexOpnd(
     }
     else if (opndInfo->isImmVal)
     {
-        VIR_TypeId src1Type = VIR_Operand_GetType(pIdxOpnd);
+        VIR_TypeId src1Type = VIR_Operand_GetTypeId(pIdxOpnd);
         gctINT src1Imm = 0;
 
         if (src1Type == VIR_TYPE_INT32)
@@ -218,7 +218,7 @@ void _VIR_ReplaceLDARR(
                 VIR_Function_DupOperand(pFunc, pSrc0Opnd, &pUseOpnd);
 
                 /* we need to set useOpnd's type to the LDARR's dst type */
-                VIR_Operand_SetType(pUseOpnd, VIR_Operand_GetType(VIR_Inst_GetDest(pInst)));
+                VIR_Operand_SetTypeId(pUseOpnd, VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst)));
 
                 /* use the swizzle of pUseOpnd
                    add t1, base[i].yzyz, t2
@@ -315,7 +315,7 @@ void _VIR_ReplaceSTARR(
         VIR_Shader_AddSymbol(pShader,
                             VIR_SYM_VIRREG,
                             newDstRegNo,
-                            VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetType(src0Opnd)),
+                            VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(src0Opnd)),
                             VIR_STORAGE_UNKNOWN,
                             &newDstSymId);
 
@@ -324,7 +324,7 @@ void _VIR_ReplaceSTARR(
         */
         VIR_Function_AddInstructionBefore(pFunc,
             VIR_OP_MOV,
-            VIR_Operand_GetType(src0Opnd),
+            VIR_Operand_GetTypeId(src0Opnd),
             pInst,
             gcvTRUE,
             &pNewInsertedInst);
@@ -443,8 +443,8 @@ _InsertPrecisionConvInst(
                     if (pDef->defKey.pDefInst != VIR_INPUT_DEF_INST)
                     {
                         VIR_Operand *defDest = VIR_Inst_GetDest(pDef->defKey.pDefInst);
-                        VIR_TypeId ty0 = VIR_Operand_GetType(defDest);
-                        VIR_TypeId ty1 = VIR_Operand_GetType(srcOpnd);
+                        VIR_TypeId ty0 = VIR_Operand_GetTypeId(defDest);
+                        VIR_TypeId ty1 = VIR_Operand_GetTypeId(srcOpnd);
 
                         /* this srcOpnd has different type than its def defDest (implicit conversion)
                            add t1.fp16, t2, t3
@@ -495,7 +495,7 @@ _InsertPrecisionConvInst(
                                 errCode = VIR_Shader_AddSymbol(pShader,
                                                                 VIR_SYM_VIRREG,
                                                                 newDstRegNo,
-                                                                VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetType(defDest)),
+                                                                VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(defDest)),
                                                                 VIR_STORAGE_UNKNOWN,
                                                                 &newDstSymId);
                                 pSym = VIR_Shader_GetSymFromId(pShader, newDstSymId);
@@ -504,7 +504,7 @@ _InsertPrecisionConvInst(
                                     mov new-temp-reg (dest precision), srcOpnd
                                 */
                                 errCode = VIR_Function_AddInstructionBefore(pFunc,
-                                    VIR_OP_MOV, VIR_Operand_GetType(srcOpnd),
+                                    VIR_OP_MOV, VIR_Operand_GetTypeId(srcOpnd),
                                     pInst,
                                     gcvTRUE,
                                     &pNewInsertedInst);
@@ -529,7 +529,7 @@ _InsertPrecisionConvInst(
                                 /* src */
                                 opnd = VIR_Inst_GetSource(pNewInsertedInst, VIR_Operand_Src0);
                                 VIR_Operand_Copy(opnd, srcOpnd);
-                                VIR_Operand_SetType(opnd, VIR_Operand_GetType(defDest));
+                                VIR_Operand_SetTypeId(opnd, VIR_Operand_GetTypeId(defDest));
 
                                 if (srcEnable & (1 << pDef->defKey.channel))
                                 {
@@ -567,7 +567,7 @@ _InsertPrecisionConvInst(
                     VIR_Operand_SetTempRegister(srcOpnd,
                         pFunc,
                         newDstSymId,
-                        VIR_Operand_GetType(srcOpnd));
+                        VIR_Operand_GetTypeId(srcOpnd));
                     VIR_Operand_SetSwizzle(srcOpnd, VIR_SWIZZLE_XYZW);
 
                     vscVIR_AddNewUsageToDef(pDuInfo,
@@ -626,7 +626,7 @@ _InsertCMPInst(
          VIR_Inst_GetOpcode(pInst) == VIR_OP_JMP_ANY) &&
          VIR_Inst_GetThreadMode(pInst) == VIR_THREAD_D16_DUAL_32)
     {
-        dstTy = VIR_Operand_GetType(VIR_Inst_GetSource(pInst, 0));
+        dstTy = VIR_Operand_GetTypeId(VIR_Inst_GetSource(pInst, 0));
 
             /* add a COMP instruction */
         errCode = VIR_Function_AddInstructionBefore(pFunc,
@@ -690,7 +690,7 @@ _InsertCMPInst(
             VIR_Shader_AddInitializedUniform(pShader, &virConst, &pImmUniform, &swizzle);
             /* Set this uniform as operand and set correct swizzle */
             sym = VIR_Shader_GetSymFromId(pShader, pImmUniform->sym);
-            VIR_Operand_SetType(VIR_Inst_GetSource(newInst, 2), VIR_TYPE_FLOAT32);
+            VIR_Operand_SetTypeId(VIR_Inst_GetSource(newInst, 2), VIR_TYPE_FLOAT32);
             VIR_Operand_SetOpKind(VIR_Inst_GetSource(newInst, 2), VIR_OPND_SYMBOL);
             VIR_Operand_SetSym(VIR_Inst_GetSource(newInst, 2), sym);
             VIR_Operand_SetSwizzle(VIR_Inst_GetSource(newInst, 2), swizzle);
@@ -1261,7 +1261,7 @@ _changeConvSrc1(IN VIR_Instruction    *Inst)
     {
         opnd = VIR_Inst_GetSource(Inst, 0);
     }
-    ty = VIR_Operand_GetType(opnd);
+    ty = VIR_Operand_GetTypeId(opnd);
     componentTy = VIR_GetTypeComponentType(ty);
 
     imm0.iValue = 0x1;

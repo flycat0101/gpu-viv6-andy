@@ -231,6 +231,7 @@ static __DRIdriver *OpenDriver(const char *driverName)
              */
             ErrorMessageF("Neither __driCreateScreen or __driCreateNewScreen "
                           "are defined in %s_dri.so!\n", driverName);
+            Xfree(driver->name);
             Xfree(driver);
             dlclose(handle);
             continue;

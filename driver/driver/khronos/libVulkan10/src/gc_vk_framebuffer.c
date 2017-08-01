@@ -76,16 +76,20 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyFramebuffer(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkFramebuffer *fb = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFramebuffer *, framebuffer);
 
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
-
-    if (fb->imageViews)
+    if (framebuffer)
     {
-        __VK_FREE(fb->imageViews);
+        __vkFramebuffer *fb = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFramebuffer *, framebuffer);
+
+        /* Set the allocator to the parent allocator or API defined allocator if valid */
+        __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+
+        if (fb->imageViews)
+        {
+            __VK_FREE(fb->imageViews);
+        }
+        __vk_DestroyObject(devCtx, __VK_OBJECT_FRAMEBUFFER, (__vkObject *)fb);
     }
-    __vk_DestroyObject(devCtx, __VK_OBJECT_FRAMEBUFFER, (__vkObject *)fb);
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateRenderPass(
@@ -278,19 +282,22 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyRenderPass(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkRenderPass *rdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkRenderPass *, renderPass);
-
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
-
-    if (rdp->attachments)
+    if (renderPass)
     {
-        __VK_FREE(rdp->attachments);
-        rdp->attachments = NULL;
-        rdp->subPassInfo = NULL;
-    }
+        __vkRenderPass *rdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkRenderPass *, renderPass);
 
-    __vk_DestroyObject(devCtx, __VK_OBJECT_RENDER_PASS, (__vkObject *)rdp);
+        /* Set the allocator to the parent allocator or API defined allocator if valid */
+        __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+
+        if (rdp->attachments)
+        {
+            __VK_FREE(rdp->attachments);
+            rdp->attachments = NULL;
+            rdp->subPassInfo = NULL;
+        }
+
+        __vk_DestroyObject(devCtx, __VK_OBJECT_RENDER_PASS, (__vkObject *)rdp);
+    }
 }
 
 

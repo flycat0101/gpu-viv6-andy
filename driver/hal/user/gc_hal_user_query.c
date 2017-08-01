@@ -876,7 +876,7 @@ gcoHAL_SetHardwareType(
 
     gcmONERROR(gcoOS_GetTLS(&__tls__));
 
-    if (__tls__->currentType != HardwardType)
+    /* if (__tls__->currentType != HardwardType) */
     {
         /* When hardware type is changed, reset currentCore according to
         ** multiple GPUs affinity setting.
@@ -1336,6 +1336,13 @@ gcoHAL_QuerySuperTileMode(
     return gcoHARDWARE_QuerySuperTileMode(gcvNULL, SuperTileMode);
 }
 
+gceSTATUS
+gcoHAL_QueryChipAxiBusWidth(
+    OUT gctBOOL * AXI128Bits
+    )
+{
+    return gcoHARDWARE_QueryChipAxiBusWidth(gcvNULL, AXI128Bits);
+}
 /*******************************************************************************
 **
 **  gcoHAL_QueryMultiGPUAffinityConfig
@@ -1417,11 +1424,26 @@ gcoHAL_QueryMultiGPUAffinityConfig(
 {
     gctSTRING affinity = gcvNULL;
     gctSIZE_T length;
+    static gctBOOL queriedOnce = gcvFALSE;
+    static gceMULTI_GPU_MODE mode = gcvMULTI_GPU_MODE_COMBINED;
+    static gctUINT32 coreIndex = 0;
+
+    if (queriedOnce)
+    {
+        *Mode = mode;
+        *CoreIndex = coreIndex;
+        return gcvSTATUS_OK;
+    }
+    else
+    {
+        queriedOnce = gcvTRUE;
+    }
 
     if (Type != gcvHARDWARE_3D && Type != gcvHARDWARE_3D2D)
     {
         if (Mode)
         {
+            mode =
             *Mode = gcvMULTI_GPU_MODE_COMBINED;
         }
 
@@ -1435,6 +1457,7 @@ gcoHAL_QueryMultiGPUAffinityConfig(
         /* No configure specified, use default. */
         if (Mode)
         {
+            mode =
             *Mode = gcvMULTI_GPU_MODE_COMBINED;
         }
 
@@ -1452,6 +1475,7 @@ gcoHAL_QueryMultiGPUAffinityConfig(
     {
         if (Mode)
         {
+            mode =
             *Mode = gcvMULTI_GPU_MODE_COMBINED;
         }
 
@@ -1470,11 +1494,13 @@ gcoHAL_QueryMultiGPUAffinityConfig(
 
         if (Mode)
         {
+            mode =
             *Mode = gcvMULTI_GPU_MODE_INDEPENDENT;
         }
 
         if (CoreIndex)
         {
+            coreIndex =
             *CoreIndex = affinity[2] - '0';
         }
     }

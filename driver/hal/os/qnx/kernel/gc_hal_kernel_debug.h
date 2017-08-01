@@ -41,13 +41,13 @@ typedef va_list gctARGUMENTS;
 #define gcmkARGUMENTS_ARG(Arguments, Type) \
     va_arg(Arguments, Type)
 
-#define gcmkDECLARE_LOCK(__lockHandle__) \
-    static pthread_mutex_t __lockHandle__ = PTHREAD_MUTEX_INITIALIZER
+#define gcmkDECLARE_MUTEX(__lockHandle__) \
+    pthread_mutex_t __lockHandle__ = PTHREAD_MUTEX_INITIALIZER
 
-#define gcmkLOCKSECTION(__lockHandle__) \
+#define gcmkMUTEX_LOCK(__lockHandle__) \
     pthread_mutex_lock(&__lockHandle__)
 
-#define gcmkUNLOCKSECTION(__lockHandle__) \
+#define gcmkMUTEX_UNLOCK(__lockHandle__) \
     pthread_mutex_unlock(&__lockHandle__)
 
 #define gcmkGETPROCESSID() \

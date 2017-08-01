@@ -144,7 +144,10 @@ static void __vki_FreeDescriptorSet(
     }
     __VK_VERIFY_OK((*devCtx->chipFuncs->FreeDescriptorSet)((VkDevice)(uintptr_t)devCtx, (VkDescriptorSet)(uintptr_t)descSet));
     __VK_VERIFY_OK(__vk_DestroyObject(devCtx, __VK_OBJECT_DESCRIPTORSET, (__vkObject *)descSet));
-    dsp->allocatedSets--;
+    if (dsp->allocatedSets)
+    {
+        dsp->allocatedSets--;
+    }
     return;
 }
 
@@ -240,15 +243,18 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDescriptorPool(
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
 
-    __vk_ResetDescriptorPool(device, descriptorPool, 0);
-    /* Free __vkDescriptorPool specific data fields here */
-    if (dsp->resourceInfo)
-        __VK_FREE(dsp->resourceInfo);
+    if (dsp)
+    {
+        __vk_ResetDescriptorPool(device, descriptorPool, 0);
+        /* Free __vkDescriptorPool specific data fields here */
+        if (dsp->resourceInfo)
+            __VK_FREE(dsp->resourceInfo);
 
-    if (dsp->sampler)
-        __VK_FREE(dsp->sampler);
+        if (dsp->sampler)
+            __VK_FREE(dsp->sampler);
 
-    __vk_utils_region_set(&dsp->size, 0, 0);
+        __vk_utils_region_set(&dsp->size, 0, 0);
+    }
 
     __vk_DestroyObject(devCtx, __VK_OBJECT_DESCRIPTOR_POOL, (__vkObject *)dsp);
 }
@@ -288,6 +294,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateDescriptorSets(
     __vkDescriptorSet *des;
     VkResult result;
     uint32_t i;
+    __VK_MEMSET(pDescriptorSets, VK_NULL_HANDLE, sizeof(VkDescriptorSet) * pAllocateInfo->descriptorSetCount);
 
     for (i = 0; i < pAllocateInfo->descriptorSetCount; i++)
     {
@@ -329,6 +336,7 @@ OnError:
         if (pDescriptorSets[i])
         {
             __vki_FreeDescriptorSet(devCtx, __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescriptorSets[i]));
+            pDescriptorSets[i] = VK_NULL_HANDLE;
         }
     }
 
@@ -347,7 +355,10 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_FreeDescriptorSets(
 
     for (i = 0; i < count; i++)
     {
-        __vki_FreeDescriptorSet(devCtx, __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescriptorSets[i]));
+        if (pDescriptorSets[i])
+        {
+            __vki_FreeDescriptorSet(devCtx, __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSet *, pDescriptorSets[i]));
+        }
     }
 
     return VK_SUCCESS;
@@ -650,26 +661,29 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDescriptorSetLayout(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkDescriptorSetLayout *dsl = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetLayout *, descriptorSetLayout);
 
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
-
-    if (dsl->binding)
+    if (descriptorSetLayout)
     {
-        uint32_t i;
-        for (i = 0; i < dsl->bindingCount; i++)
-        {
-            if (dsl->binding[i].std.pImmutableSamplers)
-            {
-                __VK_FREE((void*)dsl->binding[i].std.pImmutableSamplers);
-            }
-        }
-        __VK_FREE(dsl->binding);
-        dsl->binding = NULL;
-    }
+        __vkDescriptorSetLayout *dsl = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDescriptorSetLayout *, descriptorSetLayout);
+        /* Set the allocator to the parent allocator or API defined allocator if valid */
+        __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
 
-    __vk_DestroyObject(devCtx, __VK_OBJECT_DESCRIPTORSET_LAYOUT, (__vkObject *)dsl);
+        if (dsl->binding)
+        {
+            uint32_t i;
+            for (i = 0; i < dsl->bindingCount; i++)
+            {
+                if (dsl->binding[i].std.pImmutableSamplers)
+                {
+                    __VK_FREE((void*)dsl->binding[i].std.pImmutableSamplers);
+                }
+            }
+            __VK_FREE(dsl->binding);
+            dsl->binding = NULL;
+        }
+
+        __vk_DestroyObject(devCtx, __VK_OBJECT_DESCRIPTORSET_LAYOUT, (__vkObject *)dsl);
+    }
 }
 
 

@@ -54,6 +54,8 @@ main(
     int height = 480;
     int samples = 0;
     int etc1 = 0;
+    int framesMax = 0;
+    int framesTotal = 0;
 
     const char * tgaTextures[NUM_IMAGES] =
     {
@@ -114,6 +116,11 @@ main(
         if (strcmp(argv[i], "-etc1") == 0)
         {
             etc1 = 1;
+        }
+        else
+        if (strcmp(argv[i], "-frames") == 0 && (i + 1 < argc))
+        {
+            framesMax = atoi(argv[++i]);
         }
     }
 
@@ -277,6 +284,11 @@ main(
                             frames = 0;
                             start = time;
                     }
+            }
+            framesTotal++;
+            if (framesMax > 0 && framesTotal == framesMax)
+            {
+                run = 0;
             }
         }
     }

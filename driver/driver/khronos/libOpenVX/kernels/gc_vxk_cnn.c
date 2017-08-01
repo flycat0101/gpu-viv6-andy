@@ -13,7 +13,14 @@
 
 #include <gc_vxk_common.h>
 
-//#define COMPARE_TO_REF
+/*#define COMPARE_TO_REF*/
+
+#if VX_NN_FC_ACCEL
+extern vx_uint16 Fp32toFp16(const vx_float32 in);
+extern vx_float32 Fp16toFp32(const vx_int16 in);
+extern void fillInKernelBuffer(vx_cnn_kernelStreamInfo_s *inputKernelInfo, vx_cnn_networkDataInfo_s *networkDataInfo, vx_array kernelBuffer, vx_uint8 zeroRunLen, vx_uint32 repeatIndex, vx_uint32 level, vx_uint32 batchSizeValue, vx_uint32 netFlag);
+extern void fillInCmmdBuffer(void *inputInfo, vx_array cmdBuffer, vx_bool isTP);
+#endif
 
 #ifdef COMPARE_TO_REF
 static vx_float32 fp16_to_float32(const vx_int16 in) {
@@ -61,6 +68,9 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
     gctUINT32 inputBufferAddress = (gctUINT32)inputBuffer->memory.physicals[0] + inputOffset;
     gctUINT32 outputBufferAddress = (gctUINT32)outputBuffer->memory.physicals[0] + outputOffset;
     vx_uint32 batchSizeValue = batchSize->value->u32;
+#if VX_NN_FC_ACCEL
+    vx_array tempInputBuffer;
+#endif
 
 #if ENABLE_COV_BATCH
     vx_uint32 orgInImageYSize = node->kernel->cnnAttributes.cnnkernelStreamInfo[layerIndex].orgInImageYSize;
@@ -75,16 +85,14 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
     vx_float32 fDelta, fMax_delta, fPortion_BigDelta;
     vx_uint32 i, count_big_delta, offset_max_delta;
     /**/
-    vx_char *fileName[] = { "fasterRcnn_resource//000456-proposal//layer1_relu1//output_1_96_300_400.dat",
-                            "fasterRcnn_resource//000456-proposal//layer5_relu2//output_1_256_76_101.dat",
-                            "fasterRcnn_resource//000456-proposal//layer9_relu3//output_1_384_39_51.dat",
-                            "fasterRcnn_resource//000456-proposal//layer11_relu4//output_1_384_39_51.dat",
-                            "fasterRcnn_resource//000456-proposal//layer13_relu5//output_1_256_39_51.dat",
-                            "fasterRcnn_resource//000456-proposal//layer15_relu_proposal1//output_1_256_39_51.dat",
-                            "fasterRcnn_resource//000456-proposal//layer17_proposal_cls_score//output_1_18_39_51.dat",
-                            "fasterRcnn_resource//000456-detection//layer2_relu6//output_256_4096.dat",
-                            "fasterRcnn_resource//000456-detection//layer5_relu7//output_256_4096.dat",
-                            "fasterRcnn_resource//000456-detection//layer8_cls_score//output_256_21.dat"};
+    vx_char *fileName[] = { "",
+                            "",
+                            "",
+                            "",
+                            "",
+                            "layer17\\out1_1x4096.dat",
+                            "layer20\\out1_1x4096.dat",
+                            "layer23\\out1_1x1000.dat"};
 
     vx_char fullFileName[256] = {'\0'};
     gctBOOL doCompare = gcvTRUE;
@@ -96,8 +104,6 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
        /* pad 0: FP16 only for now */
        vx_int16* inputBufferPtr = (vx_int16*)inputBuffer->memory.logicals[0];
        vx_int16  *toPadPtr, *toPadBasePtr;
-
-
 
        if (layerIndex == 6 || layerIndex == 7 || layerIndex == 8)
        {
@@ -112,6 +118,173 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
                }
            }
        }
+    }
+#endif
+
+#if VX_NN_FC_ACCEL
+    if (node->kernel->cnnAttributes.cnnkernelStreamInfo[layerIndex].layerType & VIV_NN_FULL_CONNECTED_LAYER)
+    {
+        vx_context context = vxGetContext((vx_reference)node);
+        vx_cnn_kernelStreamInfo_s *inputKernelInfo = &node->kernel->cnnAttributes.cnnkernelStreamInfo[layerIndex];
+        vx_cnn_kernelStreamInfo_s tempKernelInfo;
+        vx_float32 biasBuffer = 0.0f;
+        vx_uint16 halfOne = Fp32toFp16(1.0f);
+        vx_uint16 *inputBufferPtr = (vx_uint16 *)(inputBuffer->memory.logicals[0]);
+        vx_uint32 inputCount;
+        vx_uint32 nonZeroInputCount = 0;
+        vx_uint16 *newKerenelBuffer;
+        vx_uint8 *tranposedWeightBiasData = (vx_uint8 *)inputKernelInfo->tranposedWeightBiasData;
+        vx_uint8 *newInputBufferPtr;
+        vx_uint32 sliceSize;
+        vx_uint32 i;
+
+        for (i = 0; i < inputKernelInfo->orgWeightDepth; i++)
+        {
+            if (inputBufferPtr[i])
+            {
+                nonZeroInputCount++;
+            }
+        }
+
+        if (node->base.context->perfEnable)
+        {
+            printf("layer %3d non-zero input:%10d/%10d (%9.6f%%)\n", layerIndex,
+                   nonZeroInputCount, inputKernelInfo->orgWeightDepth,
+                   (float)nonZeroInputCount * 100.0f / inputKernelInfo->orgWeightDepth);
+        }
+
+        nonZeroInputCount++;    /* For bias. */
+        newKerenelBuffer = (vx_uint16 *)malloc(nonZeroInputCount * dataTypeSize);
+
+        memcpy(&tempKernelInfo, inputKernelInfo, sizeof(vx_cnn_kernelStreamInfo_s));
+        switch (layerIndex)
+        {
+        case 5:
+            tempKernelInfo.orgInImageXSize = 64;
+            tempKernelInfo.orgInImageYSize = 64;
+            tempKernelInfo.orgInImageZSize = nonZeroInputCount;
+            tempKernelInfo.alignedInImageXSize = 64;
+            tempKernelInfo.alignedInImageYSize = 64;
+            tempKernelInfo.inImageXSize = 64;
+            tempKernelInfo.inImageYSize = 64;
+            tempKernelInfo.orgWeightWidth = 1;
+            tempKernelInfo.orgWeightHeight = 1;
+            tempKernelInfo.orgWeightDepth = nonZeroInputCount;
+            tempKernelInfo.weightWidth = 1;
+            tempKernelInfo.weightHeight = 1;
+            tempKernelInfo.sliceCount = nonZeroInputCount;
+            tempKernelInfo.filtersPerCore = 1;
+            tempKernelInfo.filterTotalCount = 1;
+            tempKernelInfo.outImageXSize = 64;
+            tempKernelInfo.outImageYSize = 64;
+            tempKernelInfo.outImageZSize = 1;
+            tempKernelInfo.outFinalImageXSize = 64;
+            tempKernelInfo.outFinalImageYSize = 64;
+            tempKernelInfo.outImageTileXSize = 64;
+            tempKernelInfo.outImageTileYSize = 4;
+            tempKernelInfo.zeroRunLen = 0;
+            tempKernelInfo.zeroRunLen2 = 0;
+            tempKernelInfo.weightData = newKerenelBuffer;
+            tempKernelInfo.biasData = &biasBuffer;
+            break;
+
+        case 6:
+            tempKernelInfo.orgInImageXSize = 64;
+            tempKernelInfo.orgInImageYSize = 64;
+            tempKernelInfo.orgInImageZSize = nonZeroInputCount;
+            tempKernelInfo.alignedInImageXSize = 64;
+            tempKernelInfo.alignedInImageYSize = 64;
+            tempKernelInfo.inImageXSize = 64;
+            tempKernelInfo.inImageYSize = 64;
+            tempKernelInfo.orgWeightWidth = 1;
+            tempKernelInfo.orgWeightHeight = 1;
+            tempKernelInfo.orgWeightDepth = nonZeroInputCount;
+            tempKernelInfo.weightWidth = 1;
+            tempKernelInfo.weightHeight = 1;
+            tempKernelInfo.sliceCount = nonZeroInputCount;
+            tempKernelInfo.filtersPerCore = 1;
+            tempKernelInfo.filterTotalCount = 1;
+            tempKernelInfo.outImageXSize = 64;
+            tempKernelInfo.outImageYSize = 64;
+            tempKernelInfo.outImageZSize = 1;
+            tempKernelInfo.outFinalImageXSize = 64;
+            tempKernelInfo.outFinalImageYSize = 64;
+            tempKernelInfo.outImageTileXSize = 64;
+            tempKernelInfo.outImageTileYSize = 4;
+            tempKernelInfo.zeroRunLen = 0;
+            tempKernelInfo.zeroRunLen2 = 0;
+            tempKernelInfo.weightData = newKerenelBuffer;
+            tempKernelInfo.biasData = &biasBuffer;
+            break;
+
+        case 7:
+            tempKernelInfo.orgInImageXSize = 50;
+            tempKernelInfo.orgInImageYSize = 20;
+            tempKernelInfo.orgInImageZSize = nonZeroInputCount;
+            tempKernelInfo.alignedInImageXSize = 50;
+            tempKernelInfo.alignedInImageYSize = 20;
+            tempKernelInfo.inImageXSize = 50;
+            tempKernelInfo.inImageYSize = 20;
+            tempKernelInfo.orgWeightWidth = 1;
+            tempKernelInfo.orgWeightHeight = 1;
+            tempKernelInfo.orgWeightDepth = nonZeroInputCount;
+            tempKernelInfo.weightWidth = 1;
+            tempKernelInfo.weightHeight = 1;
+            tempKernelInfo.sliceCount = nonZeroInputCount;
+            tempKernelInfo.filtersPerCore = 1;
+            tempKernelInfo.filterTotalCount = 1;
+            tempKernelInfo.outImageXSize = 50;
+            tempKernelInfo.outImageYSize = 20;
+            tempKernelInfo.outImageZSize = 1;
+            tempKernelInfo.outFinalImageXSize = 50;
+            tempKernelInfo.outFinalImageYSize = 20;
+            tempKernelInfo.outImageTileXSize = 50;
+            tempKernelInfo.outImageTileYSize = 4;
+            tempKernelInfo.zeroRunLen = 0;
+            tempKernelInfo.zeroRunLen2 = 0;
+            tempKernelInfo.weightData = newKerenelBuffer;
+            tempKernelInfo.biasData = &biasBuffer;
+            break;
+        }
+
+        /* Copy inputBuffer to the new non-zero kernelBuffer. */
+        /* Copy kernel/bias to input data. */
+        inputCount = tempKernelInfo.inImageXSize * tempKernelInfo.inImageYSize * tempKernelInfo.orgInImageZSize;
+        tempInputBuffer = vxCreateArray(context, (dataType == 0) ? VX_TYPE_INT8 : VX_TYPE_INT16, inputCount);
+        if (!vxoArray_AllocateMemory(tempInputBuffer))
+        {
+            status |= VX_ERROR_NO_MEMORY;
+        }
+        inputBufferAddress = (gctUINT32)tempInputBuffer->memory.physicals[0];
+        newInputBufferPtr = (vx_uint8 *)(tempInputBuffer->memory.logicals[0]);
+        sliceSize = tempKernelInfo.inImageXSize * tempKernelInfo.inImageYSize * dataTypeSize;
+        nonZeroInputCount = 0;
+        for (i = 0; i < inputKernelInfo->orgWeightDepth; i++)
+        {
+            if (inputBufferPtr[i])
+            {
+                newKerenelBuffer[nonZeroInputCount++] = inputBufferPtr[i];
+                memcpy(newInputBufferPtr, tranposedWeightBiasData, sliceSize);
+                newInputBufferPtr += sliceSize;
+            }
+            tranposedWeightBiasData += sliceSize;
+        }
+        /* For bias. */
+        newKerenelBuffer[nonZeroInputCount++] = halfOne;
+        memcpy(newInputBufferPtr, tranposedWeightBiasData, sliceSize);
+
+        fillInKernelBuffer(&tempKernelInfo,
+                           &node->kernel->cnnAttributes.networkDataInfo,
+                           inputKernelBuffer,
+                           0,
+                           0,
+                           layerIndex,
+                           node->kernel->cnnAttributes.batchSizeValue,
+                           node->kernel->cnnAttributes.netFlag);
+
+        fillInCmmdBuffer((void*)&tempKernelInfo, nnCmdBuffer, vx_false_e);
+
+        free(newKerenelBuffer);
     }
 #endif
 
@@ -177,7 +350,6 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
 #endif
     }
 
-
 #if gcdDUMP
     gcmDUMP_BUFFER(gcvNULL,
                     "verify",
@@ -186,6 +358,13 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
                     0,
                     node->kernel->cnnAttributes.cnnkernelStreamInfo[layerIndex].outItemCount * outputBuffer->itemSize > 16 ?
                     node->kernel->cnnAttributes.cnnkernelStreamInfo[layerIndex].outItemCount * outputBuffer->itemSize : 16);
+#endif
+
+#if VX_NN_FC_ACCEL
+    if (layerIndex >= bacthLevelIndex)
+    {
+        vxReleaseArray(&tempInputBuffer);
+    }
 #endif
 
 #ifdef COMPARE_TO_REF
@@ -308,7 +487,7 @@ vx_status vxCnnLayer(vx_node node, vx_uint32 layerIndex, vx_uint32 bacthLevelInd
                 }
                 fclose(outputFile);
 
-                if (layerIndex == 7 || layerIndex == 8)
+                if ((netFlag == CNN_DAHUA_NET) && (layerIndex == 7 || layerIndex == 8))
                 {
                     vx_uint32 ii, jj;
                     vx_uint32 batchSizeValue2 = 256;

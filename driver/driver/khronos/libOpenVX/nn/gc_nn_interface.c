@@ -13,6 +13,9 @@
 
 #include <gc_nn_interface.h>
 
+#define ROI_DUMP   0
+
+
 void vxoFillMetaData(vx_meta_format_s *ptr, vx_enum type, vx_df_image format, vx_uint32 width, vx_uint32 height, vx_enum dataInfoType)
 {
     ptr->type               = type;
@@ -176,7 +179,7 @@ ErrorExit:
     return status;
 }
 
-VX_INTERNAL_API vx_status VX_CALLBACK vxoAddParameterToGraphByIndex(vx_graph graph, vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status VX_CALLBACK vxoAddParameterToGraphByIndex(vx_graph graph, vx_node node, vx_uint32 index)
 {
     vx_parameter param;
     vx_status    status;
@@ -288,9 +291,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxLrnInitializer(vx_node nodObj, const vx_r
         {0, 0, 0},  // localWorkSize: local group size in threads
         {0, 0, 0}}; // globalWorkSize: image size in threads
 
-    vx_int32 width = 0;
+    vx_int32 width = 0,depth;
     vx_scalar width_s = (vx_scalar)paramObj[1];
+    vx_scalar depth_s = (vx_scalar)paramObj[3];
     vxReadScalarValue(width_s, &width);
+    vxReadScalarValue(depth_s,&depth);
 
     shaderParam.globalWorkOffset[0] = 0;
     shaderParam.globalWorkOffset[1] = 0;
@@ -301,7 +306,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxLrnInitializer(vx_node nodObj, const vx_r
     shaderParam.globalWorkSize[0]    = (((width + shaderParam.globalWorkScale[0]-1 ) / shaderParam.globalWorkScale[0]
                                       + shaderParam.localWorkSize[0] - 1) / shaderParam.localWorkSize[0])
                                      * shaderParam.localWorkSize[0];
-    shaderParam.globalWorkSize[1]    = 1;//(imgHei - offset + shaderParam.globalWorkScale[1] - 1) / shaderParam.globalWorkScale[1];
+    shaderParam.globalWorkSize[1]    = depth;//(imgHei - offset + shaderParam.globalWorkScale[1] - 1) / shaderParam.globalWorkScale[1];
     {
     vx_uint32 dp_fp16_1[16] = {
                 0x15151515, // TCfg
@@ -367,11 +372,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxLrnFunction(vx_node node, const vx_refere
 
     int depth_s;
     int width_s, height_s;
-
+ #if defined(__linux__)
+    struct timeval start = gcfVX_PerfStart((vx_reference)node);
+#endif
     vxReadScalarValue(width, &width_s);
     vxReadScalarValue(depth, &depth_s);
     vxReadScalarValue(height, &height_s);
-
+    output_array->itemCount =  width_s*height_s*depth_s;
     {
         int itemSize = (int)input_array->itemSize;
         gcoOS_ZeroMemory(&imgObj, sizeof(vx_image_s));
@@ -404,6 +411,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxLrnFunction(vx_node node, const vx_refere
     ucParameters[12] = (vx_reference)(&imgObj2);
 
     /*step2: call the base function */
+
     status = vxProgramKernel_Function(node, parameters, paramCount);
 
     /* step3 : post-process */
@@ -411,6 +419,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxLrnFunction(vx_node node, const vx_refere
     ucParameters[12] = (vx_reference)(output_array);
 
     gcoVX_Flush(gcvTRUE);
+ #if defined(__linux__)
+       if (node->base.context->perfEnable)
+            printf("lrn execution time: %10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
+#endif
     return status;
 }
 
@@ -694,8 +706,10 @@ static vx_float32 __Round(vx_float32 x)
         for( i=0;i<6;i++)
         {
           int xx = pw_sz_arr[i];
+          int yy = ph_sz_arr[i];
           short *mask;
-          if(xx==0)      mask = mask0;
+
+          if(xx==0 || yy==0) mask = mask0;
           else if(xx==1) mask = mask1;
           else if(xx==2) mask = mask2;
           else if(xx==3) mask = mask3;
@@ -732,8 +746,8 @@ static vx_float32 __Round(vx_float32 x)
                 int posy = szy;
                 dst[dd++] = (short)posx;
                 dst[dd++] = (short)posy;
-                if(n==0  && ph==5 && pw==3)
-                    n  = n;
+           //     if(n==0  && ph==5 && pw==3)
+           //         n  = n;
             }
         }
         dst +=130;
@@ -756,7 +770,9 @@ static vx_float32 __Round(vx_float32 x)
     void *roi = NULL;
     vx_size item_count1,    item_size1;
     void *hist = NULL ;
-
+#if defined(__linux__)
+    struct timeval start = gcfVX_PerfStart((vx_reference)node);
+#endif
     if (num != 4)
         return VX_ERROR_INVALID_PARAMETERS;
 
@@ -764,6 +780,7 @@ static vx_float32 __Round(vx_float32 x)
     num_rois_s  = (vx_scalar)parameters[1];
     dstImage    = (vx_image) parameters[2];
     arrHist     = (vx_array) parameters[3];
+     arrRoi->itemCount = 1024;
 
     vxReadScalarValue(num_rois_s,   &num_rois);
 
@@ -784,12 +801,35 @@ static vx_float32 __Round(vx_float32 x)
     status |= vxAccessArrayRange(arrHist, 0, item_count1, &item_size1, &hist, VX_WRITE_ONLY);
 
     RoiProcess((void*)roi,(int)item_size,num_rois, (short*)imgBaseAddr[0],(int*)hist);
+ #if ROI_DUMP
+    {
+       static FILE *fp = NULL;
+       if(!fp)
+       {
+           fp = fopen("RoisF32_256_input.txt","wb");
+           fwrite(roi,4,256*4,fp);
+           fclose(fp);
 
+           fp = fopen("RoisF32_256_output.txt","wb");
+           fwrite(imgBaseAddr[0],4,256*4,fp);
+           fclose(fp);
+
+           fp = fopen("RoisINT4_Hist_8_output.txt","wb");
+           fwrite(hist,4,8,fp);
+           fclose(fp);
+       }
+
+    }
+#endif
     status |= vxCommitImagePatch(dstImage, &imgRect[0], 0, &imgInfo[0], imgBaseAddr[0]);
 
     status |= vxCommitArrayRange(arrRoi, 0, item_count, roi);
     status |= vxCommitArrayRange(arrHist, 0, item_count1, hist);
 
+#endif
+#if defined(__linux__)
+    if (node->base.context->perfEnable)
+        printf("vxRectprocessInternalKernel      CPU time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
 #endif
    return status;
  }
@@ -1036,6 +1076,9 @@ static void ReSorting(short *rois,int *hist,int num,short* dst)
 
     vx_size item_count,    item_size;
     void *hist = NULL;
+#if defined(__linux__)
+    struct timeval start = gcfVX_PerfStart((vx_reference)node);
+#endif
 
     if (num != 4)
         return VX_ERROR_INVALID_PARAMETERS;
@@ -1052,7 +1095,9 @@ static void ReSorting(short *rois,int *hist,int num,short* dst)
 
     status |= vxGetValidRegionImage(srcImage, &imgRect[0]);
     status |= vxAccessImagePatch(srcImage, &imgRect[0], 0, &imgInfo[0], &imgBaseAddr[0], VX_READ_ONLY);
-    status |= vxAccessImagePatch(dstImage, &imgRect[0], 0, &imgInfo[0], &imgBaseAddr[1], VX_READ_ONLY);
+
+    status |= vxGetValidRegionImage(dstImage, &imgRect[1]);
+    status |= vxAccessImagePatch(dstImage, &imgRect[1], 0, &imgInfo[1], &imgBaseAddr[1], VX_WRITE_ONLY);
 
 
     status |= vxQueryArray(arrHist, VX_ARRAY_ATTRIBUTE_NUMITEMS, &item_count, sizeof(vx_size));
@@ -1060,10 +1105,36 @@ static void ReSorting(short *rois,int *hist,int num,short* dst)
     status |= vxAccessArrayRange(arrHist, 0, item_count, &item_size, &hist, VX_READ_ONLY);
 
     ReSorting((short*)imgBaseAddr[0],(int*)hist,height,(short*)imgBaseAddr[1]);
+ #if ROI_DUMP
+    {
+       static FILE *fp = NULL;
+       if(!fp)
+       {
+
+           fp = fopen("Resorting_130x256_input.txt","wb");
+           fwrite(imgBaseAddr[0],2,130*256,fp);
+           fclose(fp);
+
+           fp = fopen("Resorting_130x256_output.txt","wb");
+           fwrite(imgBaseAddr[1],2,130*256,fp);
+           fclose(fp);
+
+           fp = fopen("Resorting_hist_8_input.txt","wb");
+           fwrite(hist,4,8,fp);
+           fclose(fp);
+       }
+
+    }
+#endif
+
      status |= vxCommitImagePatch(srcImage, &imgRect[0], 0, &imgInfo[0], imgBaseAddr[0]);
     status |= vxCommitImagePatch(dstImage, &imgRect[1], 0, &imgInfo[1], imgBaseAddr[1]);
      status |= vxCommitArrayRange(arrHist, 0, item_count, hist);
 
+#endif
+#if defined(__linux__)
+    if (node->base.context->perfEnable)
+        printf("vxResortingInternalKernel      CPU  time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
 #endif
    return status;
  }
@@ -1253,7 +1324,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxHoripoolFunction(vx_node node, const vx_r
 
     /*step1: pre-process */
     vx_image_s   imgObj2;
-    vx_array  input_array2 = (vx_array)parameters[0];
+   // vx_array  input_array2 = (vx_array)parameters[0];
     vx_scalar depth  = (vx_scalar)parameters[2];
     vx_scalar width  = (vx_scalar)parameters[3];
     vx_scalar height = (vx_scalar)parameters[4];
@@ -1261,19 +1332,22 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxHoripoolFunction(vx_node node, const vx_r
 
     int depth_s;
     int width_s, height_s;
-
+#if defined(__linux__)
+    struct timeval start = gcfVX_PerfStart((vx_reference)node);
+#endif
+     output_array->itemCount = 36*256*256;
     vxReadScalarValue(width, &width_s);
     vxReadScalarValue(depth, &depth_s);
     vxReadScalarValue(height, &height_s);
     {
 //        int itemSize = output_array->itemSize;
-        int itemCount = (int)input_array2->itemCount/4;
+       // int itemCount = (int)input_array2->itemCount/4;
         gcoOS_ZeroMemory(&imgObj2, sizeof(vx_image_s));
 
         imgObj2.base = output_array->base;
         imgObj2.base.type = VX_TYPE_IMAGE;
         imgObj2.width = depth_s*36;
-        imgObj2.height =itemCount;
+        imgObj2.height =256;
         imgObj2.format = VX_DF_IMAGE_S16;
         imgObj2.planeCount = 1;
         imgObj2.memory = output_array->memory;
@@ -1283,9 +1357,231 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxHoripoolFunction(vx_node node, const vx_r
     status = vxProgramKernel_Function(node, parameters, paramCount);
     /* step3 : post-process */
     ucParameters[5] = (vx_reference)(output_array);
+#if defined(__linux__)
+    if (node->base.context->perfEnable)
+    {
+        gcoVX_Flush(gcvTRUE);
+        printf("vxHoripoolFunction      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
+    }
+#endif
     return status;
 
 }
+static void ReadRect16(vx_int16* base,vx_int16* buf, int x0,int y0,int rw,int rh,int width,int height)
+{
+    int j = 0,i=0,x=0,y=0;
+    for( j=0 ; j<rh; j++)
+    {
+        for( i = 0; i <rw ; i++)
+        {
+             x = x0 + i;
+             y = y0 + j;
+            if( x < 0)
+            {
+                buf[j*16+i] = 0;
+                continue;
+            }
+            else if( x > width-1)
+            {
+                buf[j*16+i] = 0;
+                continue;
+            }
+
+            if( y < 0)
+            {
+                buf[j*16+i] = 0;
+                continue;
+            }
+            else if( y > height-1)
+            {
+                buf[j*16+i] = 0;
+                continue;
+            }
+            buf[j*16+i] = base[y*width + x];
+        }
+    }
+}
+
+static void WriteRect16(vx_int16* base,vx_int16* buf,int x0,int y0,int rw,int rh,int width,int height)
+{
+    int j = 0,i=0,x=0,y=0;
+    for( j=0 ; j<rh; j++)
+    {
+        for( i = 0; i <rw ; i++)
+        {
+             x = x0 + i;
+             y = y0 + j;
+            if( x < 0)
+                continue ;
+            else if( x > width-1)
+                continue;
+
+            if( y < 0)
+                continue;
+            else if( y > height-1)
+                continue;
+
+             base[y*width + x] = buf[j*16+i];
+        }
+    }
+
+}
+static void MaxLine(vx_int16 *line0,vx_int16* line1,vx_int16* maxline)
+{
+    int k = 0;
+  for( k = 0; k < 16; k++)
+  {
+     maxline[k] = gcmMAX(line0[k], line1[k]);
+  }
+
+}
+
+void c_RoiPool_HoriPool(short *rect,vx_int16 *vertPool,int depth,int width,int height, vx_int16* dst)
+  {
+    vx_int32 num_rois = 256;
+    vx_int32 pooled_width = 6, pooled_height = 6, channels = 256;    //channels =>depth
+    vx_int32 n, c, ph, pw;
+
+    // max vert pooling
+
+
+    for (c = 0; c < channels; ++c)
+    //for (c = 0; c < 1; ++c)
+    {
+        if(c == 32)
+            c =c;
+        for (n = 0; n < num_rois; ++n)
+        {
+            short *rt = &rect[130*n];
+            int dstx = rt[2]+c*36;
+            int dsty = rt[3];
+            short *mask[6];
+            int i = 0;
+
+            short *szx   = &rt[52];
+            short *posxy = &rt[58];
+            int pp = 0;
+            int dd = 0;
+            for( i=0;i<6;i++)
+            {
+               mask[i] =&rt[4+8*i];
+            }
+            for (ph = 0; ph < pooled_height; ++ph)
+            {
+                for (pw = 0; pw < pooled_width; ++pw)
+                {
+                     int posx = posxy[pp++];
+                     int posy = posxy[pp++]+c*8;
+                     vx_int16 buf0[16];
+                     vx_int16 buf1[16];
+                     vx_int16 maxval = 0;
+                     int szxx = szx[pw];
+                     int j = 0;
+                    if(n == 31 && c==1  && ph==3 && pw==3)
+                        n  = n;
+
+                     ReadRect16(vertPool,buf0,posx  ,posy,8,1,51*39,256*8);
+                     ReadRect16(vertPool,buf1,posx+8,posy,1,1,51*39,256*8);
+
+                     for( j = 0;j<8;j++)
+                     {
+                        buf0[j] = buf0[j]*mask[pw][j];
+                        maxval = gcmMAX(maxval,buf0[j]);
+                     }
+                     if(szxx == 9)
+                        maxval = gcmMAX(maxval,buf1[0]);
+
+                     WriteRect16(dst,&maxval,dstx+dd,dsty,1,1,36*256,256);
+                     dd++;
+                }
+            }
+        }
+
+    }
+  }
+
+
+ vx_status VX_CALLBACK vxHoripoolInternalKernel(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_status status = VX_SUCCESS;
+#ifndef USE_HORIPOOL_VXC
+    vx_image roiImage,vpoolImage;
+    vx_scalar width, height, depth;
+    int  _width, _height, _depth;
+    vx_array  arrDst;
+    if (num != 6)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    roiImage     = (vx_image) parameters[0];
+    vpoolImage   = (vx_image)parameters[1];
+    depth      = (vx_scalar)parameters[2];
+    width      = (vx_scalar)parameters[3];
+    height     = (vx_scalar)parameters[4];
+    arrDst     = (vx_array) parameters[5];
+
+    arrDst->itemCount = 36*256*256;
+    vxReadScalarValue(width,   &_width);
+    vxReadScalarValue(height,  &_height);
+    vxReadScalarValue(depth,   &_depth);
+    {
+    vx_image imgObj[2] = {NULL, NULL};
+    void* imgBaseAddr[2] = {NULL, NULL};
+    vx_rectangle_t imgRect[2] = { { 0, 0, 0, 0 }, { 0, 0, 0, 0 }};
+    vx_imagepatch_addressing_t imgInfo[2] = {VX_IMAGEPATCH_ADDR_INIT, VX_IMAGEPATCH_ADDR_INIT};
+    vx_size item_count1,    item_size1;
+    void *dst = NULL ;
+
+
+    imgObj[0]    = roiImage;
+    status |= vxGetValidRegionImage(imgObj[0], &imgRect[0]);
+    status |= vxAccessImagePatch(imgObj[0], &imgRect[0], 0, &imgInfo[0], &imgBaseAddr[0], VX_READ_ONLY);
+
+    imgObj[1]    = vpoolImage;
+    status |= vxGetValidRegionImage(imgObj[1], &imgRect[1]);
+    status |= vxAccessImagePatch(imgObj[1], &imgRect[1], 0, &imgInfo[1], &imgBaseAddr[1], VX_READ_ONLY);
+
+
+    status |= vxQueryArray(arrDst, VX_ARRAY_ATTRIBUTE_NUMITEMS, &item_count1, sizeof(vx_size));
+    status |= vxQueryArray(arrDst, VX_ARRAY_ATTRIBUTE_ITEMSIZE, &item_size1, sizeof(vx_size));
+    status |= vxAccessArrayRange(arrDst, 0, item_count1, &item_size1, &dst, VX_WRITE_ONLY);
+
+
+    c_RoiPool_HoriPool((short*)imgBaseAddr[0],
+                       (short*)imgBaseAddr[1],
+                        _depth,
+                        _width,
+                        _height,
+                        (short*)dst);
+ #if ROI_DUMP
+    {
+       static FILE *fp = NULL;
+       if(!fp)
+       {
+           fp = fopen("Horipool_roi_130x256_input.txt","wb");
+           fwrite(imgBaseAddr[0],2,130*256,fp);
+           fclose(fp);
+           fp = fopen("Horipool_vpool_51x39x8x256_input.txt","wb");
+           fwrite(imgBaseAddr[1],2,51*39*8*256,fp);
+           fclose(fp);
+
+           fp = fopen("Horipool_36x256x256_output.txt","wb");
+           fwrite(dst,2,36*256*256,fp);
+           fclose(fp);
+       }
+    }
+#endif
+
+
+    status |= vxCommitImagePatch(imgObj[0], &imgRect[0], 0, &imgInfo[0], imgBaseAddr[0]);
+    status |= vxCommitImagePatch(imgObj[1], &imgRect[1], 0, &imgInfo[1], imgBaseAddr[1]);
+    vxWriteScalarValue(depth,   &_depth);
+    vxWriteScalarValue(width,   &_width);
+    vxWriteScalarValue(height,  &_height);
+    status |= vxCommitArrayRange(arrDst, 0, item_count1, dst);
+    }
+#endif
+   return status;
+ }
 //Vertpool*****************************************************************
 
 
@@ -1369,32 +1665,15 @@ vx_status VX_CALLBACK vxVertpoolInitializer(vx_node nodObj, const vx_reference *
     vx_scalar depth_s = (vx_scalar)paramObj[1];
     vx_scalar width_s = (vx_scalar)paramObj[2];
     vx_scalar height_s = (vx_scalar)paramObj[3];
-    vx_image  imageVpool = (vx_image)paramObj[4];
-    vx_status status = VX_SUCCESS;
+//    vx_image  imageVpool = (vx_image)paramObj[4];
+//    vx_status status = VX_SUCCESS;
 //     void *pool = NULL;
-     int c = 0;
+//     int c = 0;
     int depth,width,height;
     vxReadScalarValue(depth_s, &depth);
     vxReadScalarValue(width_s, &width);
     vxReadScalarValue(height_s, &height);
 
-    {
-    vx_rectangle_t rect = {0, 0, 0, 0};
-    vx_imagepatch_addressing_t imgInfo = VX_IMAGEPATCH_ADDR_INIT;
-    void* imgBaseAddr = 0;
-    int width_img,height_img;
-    status = vxQueryImage(imageVpool, VX_IMAGE_ATTRIBUTE_WIDTH, &width_img, sizeof(width_img));
-    status |= vxQueryImage(imageVpool, VX_IMAGE_ATTRIBUTE_HEIGHT, &height_img, sizeof(height_img));
-    rect.end_x = width_img;
-    rect.end_y = height_img;
-       vxAccessImagePatch(imageVpool, &rect, 0, &imgInfo, &imgBaseAddr, VX_WRITE_ONLY);
-    for( c = 0;c < depth; c++)
-    {
-        vx_int16* ptr = (vx_int16*)imgBaseAddr + c*8*(width*height) ;
-        memset(ptr,0,8*width*height*sizeof(vx_int16));
-    }
-    vxCommitImagePatch(imageVpool, &rect, 0, &imgInfo, imgBaseAddr);
-    }
 
     shaderParam.globalWorkOffset[0] = 0;
     shaderParam.globalWorkOffset[1] = 0;
@@ -1430,7 +1709,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxVertpoolFunction(vx_node node, const vx_r
 
     int depth_s;
     int width_s, height_s;
-
+#if defined(__linux__)
+    struct timeval start = gcfVX_PerfStart((vx_reference)node);
+#endif
     vxReadScalarValue(width, &width_s);
     vxReadScalarValue(depth, &depth_s);
     vxReadScalarValue(height, &height_s);
@@ -1453,12 +1734,194 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxVertpoolFunction(vx_node node, const vx_r
 //    ucParameters[4] = (vx_reference)(&imgObj2);
     /*step2: call the base function */
     status = vxProgramKernel_Function(node, parameters, paramCount);
+#if ROI_DUMP
+    {
+       static FILE *fp = NULL;
+       if(!fp)
+       {
+           fp = fopen("Vertpool_51x39x256_input_vx.txt","wb");
+           fwrite(input_array->memory.logicals[0],2,51*39*256,fp);
+           fclose(fp);
+
+           fp = fopen("Vertpool_51x39x8x256_output_vx.txt","wb");
+           fwrite(((vx_image)parameters[4])->memory.logicals[0],2,51*39*8*256,fp);
+           fclose(fp);
+       }
+
+    }
+#endif
+
     /* step3 : post-process */
     ucParameters[0] = (vx_reference)(input_array);
  //   ucParameters[4] = (vx_reference)(output_array);
+#if defined(__linux__)
+    if (node->base.context->perfEnable)
+    {
+        gcoVX_Flush(gcvTRUE);
+        printf("vxVertpoolFunction      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
+    }
+#endif
     return status;
 
 }
+
+void c_RoiPool_VertPool(vx_int16 *input1,int depth,int width,int height,vx_int16 *vertPool)
+{
+       int sz = width*height;
+    vx_int16 line[9][16] = {0};
+    vx_int16 maxline[16] = {0};
+    vx_int16 line0[16] = {0};
+    int c = 0,w=0;
+    for( c = 0 ;c < depth ;c++)
+    {
+        for( w = 0; w < (width+7); w+=8)
+        {
+
+              int loop_height = height-6;
+            int x = w;
+            int y = 0;
+            ReadRect16(input1,line[0],x,0,8,1,width,height);
+            ReadRect16(input1,line[1],x,1,8,1,width,height);
+            ReadRect16(input1,line[2],x,2,8,1,width,height);
+            ReadRect16(input1,line[3],x,3,8,1,width,height);
+            ReadRect16(input1,line[4],x,4,8,1,width,height);
+            ReadRect16(input1,line[5],x,5,8,1,width,height);
+//            ReadRect16(input1,line[7],x,7,8,1,width,height);
+           do
+           {
+               int k=0;
+//               ReadRect16(input1,line[8],x,y+8,8,1,width,height);
+               ReadRect16(input1,line[6],x,y+6,8,1,width,height);
+
+               WriteRect16(&vertPool[0*sz],line0  ,x,y,8,1,width,height);//0 lines
+               WriteRect16(&vertPool[1*sz],line[0],x,y,8,1,width,height);    //1 lines
+
+               MaxLine(line[1],line[0],maxline);     WriteRect16(&vertPool[2*sz],maxline,x,y,8,1,width,height);    //2 lines
+               MaxLine(line[2],maxline,maxline);      WriteRect16(&vertPool[3*sz],maxline,x,y,8,1,width,height);    //3 lines
+               MaxLine(line[3],maxline,maxline);      WriteRect16(&vertPool[4*sz],maxline,x,y,8,1,width,height);    //4 lines
+               MaxLine(line[4],maxline,maxline);      WriteRect16(&vertPool[5*sz],maxline,x,y,8,1,width,height);    //5 lines
+               MaxLine(line[5],maxline,maxline);      WriteRect16(&vertPool[6*sz],maxline,x,y,8,1,width,height);    //6 lines
+               MaxLine(line[6],maxline,maxline);     WriteRect16(&vertPool[7*sz],maxline,x,y,8,1,width,height);    //7 lines
+//               MaxLine(line[7],maxline,maxline);      WriteRect16(&vertPool[6*sz],maxline,x,y,8,1,width,height);    //8 lines
+//               MaxLine(line[8],maxline,maxline);     WriteRect16(&vertPool[7*sz],maxline,x,y,8,1,width,height);    //9 lines
+               for( k=0;k<6;k++)
+                   memcpy(line[k],line[k+1],sizeof(line[0]));
+
+               if(loop_height==1)
+                   loop_height = loop_height;
+
+               y++;
+               loop_height--;
+           }while(loop_height>0);
+           //remain
+           loop_height = 6;
+           do
+           {
+               int k = 0;
+               if(y == 35)
+                   y = y;
+               WriteRect16(&vertPool[0*sz],line0,x,y,8,1,width,height);
+               WriteRect16(&vertPool[1*sz],line[0],x,y,8,1,width,height);
+
+               if(loop_height > 1) {
+                   MaxLine(line[1],line[0],maxline);     WriteRect16(&vertPool[2*sz],maxline,x,y,8,1,width,height);}    //2 lines
+               if(loop_height > 2) {
+                   MaxLine(line[2],maxline,maxline);      WriteRect16(&vertPool[3*sz],maxline,x,y,8,1,width,height);}    //3 lines
+               if(loop_height > 3) {
+                   MaxLine(line[3],maxline,maxline);      WriteRect16(&vertPool[4*sz],maxline,x,y,8,1,width,height);}    //4 lines
+               if(loop_height > 4) {
+                   MaxLine(line[4],maxline,maxline);      WriteRect16(&vertPool[5*sz],maxline,x,y,8,1,width,height);}    //5 lines
+               if(loop_height > 5) {
+                   MaxLine(line[5],maxline,maxline);      WriteRect16(&vertPool[6*sz],maxline,x,y,8,1,width,height);}    //6 lines
+    //           if(loop_height > 6) {
+    //               MaxLine(line[6],maxline,maxline);     WriteRect16(&vertPool[5*sz],maxline,x,y,8,1,width,height);}    //7 lines
+    //           if(loop_height > 7) {
+    //               MaxLine(line[7],maxline,maxline);      WriteRect16(&vertPool[6*sz],maxline,x,y,8,1,width,height);}    //8 lines
+
+               for( k=0;k<6;k++)
+                   memcpy(line[k],line[k+1],sizeof(line[0]));
+               y++;
+               loop_height--;
+           }while(loop_height>0);
+        }
+        input1 += width*height;
+        vertPool += width*height*8;
+
+    }
+
+}
+
+
+ vx_status VX_CALLBACK vxVertpoolInternalKernel(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_status status = VX_SUCCESS;
+#ifndef USE_VERTPOOL_VXC
+    vx_scalar width_s, height_s, depth_s;
+    int  _width, _height, _depth;
+    vx_array  input;
+    vx_image vpool;
+    if (num != 5)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    input    = (vx_array) parameters[0];
+    depth_s      = (vx_scalar)parameters[1];
+    width_s      = (vx_scalar)parameters[2];
+    height_s     = (vx_scalar)parameters[3];
+    vpool     = (vx_image) parameters[4];
+
+    vxReadScalarValue(width_s,   &_width);
+    vxReadScalarValue(height_s,  &_height);
+    vxReadScalarValue(depth_s,   &_depth);
+    {
+    vx_image imgObj[2] = {NULL, NULL};
+    void* imgBaseAddr[2] = {NULL, NULL};
+    vx_rectangle_t imgRect[2] = { { 0, 0, 0, 0 }, { 0, 0, 0, 0 }};
+    vx_imagepatch_addressing_t imgInfo[2] = {VX_IMAGEPATCH_ADDR_INIT, VX_IMAGEPATCH_ADDR_INIT};
+
+       vx_size item_count,    item_size;
+    void *ptr = NULL;
+
+    imgObj[0] = vpool ;
+    status |= vxGetValidRegionImage(imgObj[0], &imgRect[0]);
+    status |= vxAccessImagePatch(imgObj[0], &imgRect[0], 0, &imgInfo[0], &imgBaseAddr[0], VX_WRITE_ONLY);
+
+    status |= vxQueryArray(input, VX_ARRAY_ATTRIBUTE_NUMITEMS, &item_count, sizeof(vx_size));
+    status |= vxQueryArray(input, VX_ARRAY_ATTRIBUTE_ITEMSIZE, &item_size, sizeof(vx_size));
+    status |= vxAccessArrayRange(input, 0, item_count, &item_size, &ptr, VX_READ_ONLY);
+
+    c_RoiPool_VertPool((short*)ptr,_depth,_width,_height, (short*)imgBaseAddr[0]);
+ #if ROI_DUMP
+    {
+       static FILE *fp = NULL;
+       if(!fp)
+       {
+           fp = fopen("Vertpool_51x39x256_input.txt","wb");
+           fwrite(ptr,2,51*39*256,fp);
+           fclose(fp);
+
+           fp = fopen("Vertpool_51x39x8x256_output.txt","wb");
+           fwrite(imgBaseAddr[0],2,51*39*8*256,fp);
+           fclose(fp);
+       }
+    }
+#endif
+
+
+
+
+    status |= vxCommitImagePatch(imgObj[0], &imgRect[0], 0, &imgInfo[0], imgBaseAddr[0]);
+    status |= vxCommitArrayRange(input, 0, item_count, ptr);
+
+    }
+    vxWriteScalarValue(depth_s,   &_depth);
+    vxWriteScalarValue(width_s,   &_width);
+    vxWriteScalarValue(height_s,  &_height);
+#endif
+   return status;
+ }
+
+
+
 //Roipool******************************************
 vx_status VX_CALLBACK vxRoipoolInitializer(vx_node nodObj, const vx_reference *paramObj, vx_uint32 paraNum)
 {
@@ -1480,8 +1943,8 @@ vx_status VX_CALLBACK vxRoipoolInitializer(vx_node nodObj, const vx_reference *p
     int num_rois = 256;
 //    int  sz_vpool = height * width * depth * 8;
      vx_border_mode_t border;
-    border.mode = VX_BORDER_MODE_CONSTANT;
-    border.constant_value = 0;
+    border.mode = VX_BORDER_MODE_REPLICATE;
+    border.constant_value.U32 = 0;
 
     if (paraNum != 6)
         return VX_ERROR_INVALID_PARAMETERS;
@@ -1617,7 +2080,7 @@ vx_status VX_CALLBACK vxRoipoolInitializer(vx_node nodObj, const vx_reference *p
     status |= vxoAddParameterToGraphByIndex(graph, nodeHori, 4);
     status |= vxoAddParameterToGraphByIndex(graph, nodeHori, 5);
 
-    status |= vxoNode_SetChildGraph(nodObj, graph);
+    status |= vxSetChildGraphOfNode(nodObj, graph);
     status |= vxVerifyGraph(graph);
 
     vxReleaseNode(&nodeVert);
@@ -1644,7 +2107,7 @@ vx_status VX_CALLBACK vxRoipoolDeinitializer(vx_node nodObj, const vx_reference 
 {
      if (paraNum != 6) return VX_ERROR_INVALID_PARAMETERS;
 
-    return vxoNode_SetChildGraph(nodObj, 0);
+    return vxSetChildGraphOfNode(nodObj, 0);
 }
 vx_status VX_CALLBACK vxRoipoolValidateInput(vx_node node, vx_uint32 index)
 {
@@ -1688,26 +2151,49 @@ vx_status VX_CALLBACK vxRoipoolValidateOutput(vx_node node, vx_uint32 index, vx_
 vx_status VX_CALLBACK vxRoipoolInternalKernel(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph;
+    vx_status status;
+#if defined(__linux__)
+    struct timeval start = gcfVX_PerfStart((vx_reference)node);
+#endif
     if (num != 6) return VX_ERROR_INVALID_PARAMETERS;
     node->kernelAttributes.isAllGPU = vx_true_e;
 
-    graph = vxoNode_GetChildGraph(node);
+    graph = vxGetChildGraphOfNode(node);
 
-    return vxProcessGraph(graph);
+    status = vxProcessGraph(graph);
+#if defined(__linux__)
+    if (node->base.context->perfEnable)
+    {
+        gcoVX_Flush(gcvTRUE);
+        printf("vxRoipoolInternalKernel      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
+    }
+#endif
+    return status;
 }
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxRoipoolFunction(vx_node node, const vx_reference parameters[], vx_uint32 paramCount)
 {
     //vx_status status = vxProgramKernel_Function(node, parameters, paramCount);
     vx_graph graph;
+    vx_status status;
+#if defined(__linux__)
+    struct timeval start = gcfVX_PerfStart((vx_reference)node);
+#endif
     if (paramCount != 6)
         return VX_ERROR_INVALID_PARAMETERS;
 
     node->kernelAttributes.isAllGPU = vx_true_e;
-    graph = vxoNode_GetChildGraph(node);
+    graph = vxGetChildGraphOfNode(node);
 
-    return vxProcessGraph(graph);
-
+    status = vxProcessGraph(graph);
+#if defined(__linux__)
+    if (node->base.context->perfEnable)
+    {
+        gcoVX_Flush(gcvTRUE);
+        printf("vxRoipoolFunction      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
+    }
+#endif
+    return status;
 }
 
 //nms**********************************************
@@ -2299,7 +2785,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxfasterRcnnReshuffleImageFunction(vx_node 
     vx_uint32 levelIndex, padScalarValue, out_xSize, out_ySize, out_zSize;
     vx_uint8 strideXValue, strideYValue;
     vx_uint32 batchSizeValue, width_s, height_s, padWidth = 0, padHeight = 0;
-
+#if defined(__linux__)
+    struct timeval start = gcfVX_PerfStart((vx_reference)node);
+#endif
     levelIndex       = levelScalar->value->u32;
     levelIndex       = levelScalar->value->u32;
     padScalarValue   = padScalar->value->u32;
@@ -2324,7 +2812,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxfasterRcnnReshuffleImageFunction(vx_node 
             imgObj1.base.type = VX_TYPE_IMAGE;
 
             imgObj1.width = width_s * channel_s;
-            imgObj1.height = height_s;
+            imgObj1.height = height_s + batchSizeValue * height_s;
             imgObj1.format = VX_DF_IMAGE_U8;
             imgObj1.planeCount = 1;
             imgObj1.memory = imgObj->memory;
@@ -2400,9 +2888,16 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxfasterRcnnReshuffleImageFunction(vx_node 
     ucParameters[1] = (vx_reference)(input_array);
     ucParameters[8] = (vx_reference)(output_array);
 
+#if defined(__linux__)
+    if (node->base.context->perfEnable)
+    {
+        gcoVX_Flush(gcvTRUE);
+        printf("ReshuffleImage      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
+    }
+#endif
 #if (NN_MULTI_THREAD || NN_MULTI_THREAD2)
     if (node->base.context->cnnEvent != VX_NULL)
-        vxSetEvent(node->base.context->cnnEvent);
+         vxSetEvent(node->base.context->cnnEvent);
 #endif
     return status;
 }
@@ -2585,6 +3080,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxFasterRcnnInterleaveFunction(vx_node node
     vx_array output_array = (vx_array)parameters[5];
 
     int width_s, height_s;
+#if defined(__linux__)
+    struct timeval start = gcfVX_PerfStart((vx_reference)node);
+#endif
 
     vxReadScalarValue(width, &width_s);
     vxReadScalarValue(height, &height_s);
@@ -2636,7 +3134,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxFasterRcnnInterleaveFunction(vx_node node
         vxSetEvent(node->base.context->cnnEvent);
     }
 #endif
-
+#if defined(__linux__)
+    if (node->base.context->perfEnable)
+        printf("interleave      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
+#endif
     return status;
 }
 VX_PRIVATE_API vx_status VX_CALLBACK vxFasterRcnnInterleaveDeinitializer(vx_node nodObj, const vx_reference *paraObj, vx_uint32 paraNum)
@@ -2821,7 +3322,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxfasterRcnnReshuffleDataFunction(vx_node n
     vx_scalar strideX     = (vx_scalar)parameters[2];
     vx_scalar strideY     = (vx_scalar)parameters[3];
     vx_array output_array = (vx_array)parameters[6];
-
+#if defined(__linux__)
+    struct timeval start = gcfVX_PerfStart((vx_reference)node);
+#endif
     levelIndex       = levelScalar->value->u32;
     strideXValue     = strideX->value->u8;
     strideYValue     = strideY->value->u8;
@@ -2881,10 +3384,268 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxfasterRcnnReshuffleDataFunction(vx_node n
     /* step3 : post-process */
     ucParameters[0] = (vx_reference)(input_array);
     ucParameters[6] = (vx_reference)(output_array);
-
+#if defined(__linux__)
+    if (node->base.context->perfEnable)
+    {
+        gcoVX_Flush(gcvTRUE);
+        printf("ReshuffleData      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
+    }
+#endif
     return status;
 }
 VX_PRIVATE_API vx_status VX_CALLBACK vxfasterRcnnReshuffleDataDeinitializer(vx_node nodObj, const vx_reference *paraObj, vx_uint32 paraNum)
+{
+    return VX_SUCCESS;
+}
+//MaxPool3x3*******************************************/
+VX_PRIVATE_API vx_status VX_CALLBACK vxMaxPool3x3InputValidator(vx_node node, vx_uint32 index)
+{
+    vx_status status = VX_ERROR_INVALID_PARAMETERS;
+    vx_parameter param = NULL;
+
+    if(index == 0)
+    {
+        param = vxGetParameterByIndex(node, index);
+        if(param != NULL)
+        {
+            vx_array array = NULL;
+            vx_enum type = 0;
+            if(VX_SUCCESS == vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &array, sizeof(array)))
+            {
+                vxQueryArray(array, VX_ARRAY_ATTRIBUTE_ITEMTYPE, &type, sizeof(type));
+                if (type == VX_TYPE_INT16) status = VX_SUCCESS;
+                else status = VX_ERROR_INVALID_TYPE;
+                status |= vxReleaseArray(&array);
+            }
+            status |= vxReleaseParameter(&param);
+        }
+    }
+    else if(index == 1 || index == 2 || index == 3 || index == 4 || index == 5 || index == 6 || index == 7 || index == 8 || index == 9 || index == 10)
+    {
+        param = vxGetParameterByIndex(node, index);
+        if(param != NULL)
+        {
+            vx_scalar scalar = NULL;
+            vx_enum type = 0;
+            if(VX_SUCCESS == vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &scalar, sizeof(scalar)))
+            {
+                vxQueryScalar(scalar, VX_SCALAR_ATTRIBUTE_TYPE, &type, sizeof(type));
+                if (VX_TYPE_INT32 == type || VX_TYPE_UINT32 == type || VX_TYPE_UINT8 == type || VX_TYPE_ENUM == type) status = VX_SUCCESS;
+                else status = VX_ERROR_INVALID_TYPE;
+                status |= vxReleaseScalar(&scalar);
+            }
+            status |= vxReleaseParameter(&param);
+        }
+    }
+    if(status < 0)
+        printf("error-%s,%d\n",__FILE__,__LINE__);
+    return status;
+}
+VX_PRIVATE_API vx_status VX_CALLBACK vxMaxPool3x3OutputValidator(vx_node node, vx_uint32 index, vx_meta_format metaObj)
+{
+    vx_status status = VX_ERROR_INVALID_PARAMETERS;
+    vx_parameter param = NULL;
+
+    if(index == 11)
+    {
+        param = vxGetParameterByIndex(node, index);
+        if(param != NULL)
+        {
+            vx_array array = NULL;
+            if((VX_SUCCESS == vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &array, sizeof(vx_array))))
+            {
+                vx_enum type = 0;
+                vx_size capacity = 0;
+                vxQueryArray(array, VX_ARRAY_ATTRIBUTE_ITEMTYPE, &type, sizeof(type));
+                vxQueryArray(array, VX_ARRAY_ATTRIBUTE_CAPACITY, &capacity, sizeof(capacity));
+                status = vxSetMetaFormatAttribute(metaObj, VX_ARRAY_ATTRIBUTE_ITEMTYPE, &type, sizeof(type));
+                status |= vxSetMetaFormatAttribute(metaObj, VX_ARRAY_ATTRIBUTE_CAPACITY, &capacity, sizeof(capacity));
+                status |= vxSetArrayAttribute(array, VX_ARRAY_ATTRIBUTE_NUMITEMS, &capacity, sizeof(capacity));
+                status |= vxReleaseArray(&array);
+            }
+            status |= vxReleaseParameter(&param);
+        }
+    }
+    if(status < 0)
+        printf("error-%s,%d\n",__FILE__,__LINE__);
+    return status;
+}
+VX_PRIVATE_API vx_status VX_CALLBACK vxMaxPool3x3Initializer(vx_node nodObj, const vx_reference *paramObj, vx_uint32 paraNum)
+{
+#ifdef USE_MAXPOOL3x3_VXC
+    vx_kernel_execution_parameters_t shaderParam = {
+        2,          // workdim
+        {0, 0, 0},  // globalWorkOffset: control the start location be processed in the image
+        {0, 0, 0},  // globalWorkScale: how many pixels could be processed by a single thread
+        {0, 0, 0},  // localWorkSize: local group size in threads
+        {0, 0, 0}}; // globalWorkSize: image size in threads
+    vx_int32 stride_v = 2, kernel_v = 3, pad_v = 0;
+    vx_int32 width = 0, height = 0, depth = 0, b = 0, width_o = 0, height_o = 0;
+    vx_enum format_v = VX_TYPE_FLOAT32;
+    vx_scalar format    = (vx_scalar)paramObj[1];
+    vx_scalar _width    = (vx_scalar)paramObj[2];
+    vx_scalar _height   = (vx_scalar)paramObj[3];
+    vx_scalar _depth    = (vx_scalar)paramObj[4];
+    vx_scalar batch     = (vx_scalar)paramObj[5];
+    vx_scalar _width_o  = (vx_scalar)paramObj[6];
+    vx_scalar _height_o = (vx_scalar)paramObj[7];
+    vx_scalar _kernel   = (vx_scalar)paramObj[8];
+    vx_scalar stride    = (vx_scalar)paramObj[9];
+    vx_scalar pad       = (vx_scalar)paramObj[10];
+    vxReadScalarValue(format,   &format_v);
+    vxReadScalarValue(_width,   &width);
+    vxReadScalarValue(_height,  &height);
+    vxReadScalarValue(_depth,   &depth);
+    vxReadScalarValue(batch,    &b);
+    vxReadScalarValue(_width_o, &width_o);
+    vxReadScalarValue(_height_o,&height_o);
+    vxReadScalarValue(_kernel,   &kernel_v);
+    vxReadScalarValue(stride,   &stride_v);
+    vxReadScalarValue(pad,      &pad_v);
+
+    vxWriteScalarValue(format,   &format_v);
+    vxWriteScalarValue(_width,   &width);
+    vxWriteScalarValue(_height,  &height);
+    vxWriteScalarValue(_depth,   &depth);
+    vxWriteScalarValue(batch,    &b);
+    vxWriteScalarValue(_width_o, &width_o);
+    vxWriteScalarValue(_height_o,&height_o);
+    vxWriteScalarValue(_kernel,   &kernel_v);
+    vxWriteScalarValue(stride,   &stride_v);
+    vxWriteScalarValue(pad,      &pad_v);
+
+    shaderParam.globalWorkOffset[0] = 0;
+    shaderParam.globalWorkOffset[1] = 0;
+    shaderParam.globalWorkScale[0]  = 6;
+    shaderParam.globalWorkScale[1]  = 1;
+    shaderParam.localWorkSize[0]    = 8;
+    shaderParam.localWorkSize[1]    = 1;
+    shaderParam.globalWorkSize[0]   = (((width_o + shaderParam.globalWorkScale[0] - 1) / shaderParam.globalWorkScale[0] + shaderParam.localWorkSize[0] - 1) / shaderParam.localWorkSize[0]) * shaderParam.localWorkSize[0];
+    shaderParam.globalWorkSize[1]   = (((depth + shaderParam.globalWorkScale[1] - 1) / shaderParam.globalWorkScale[1] + shaderParam.localWorkSize[1] - 1) / shaderParam.localWorkSize[1]) * shaderParam.localWorkSize[1];
+    {
+        // uniforms
+        vx_uint32 UniPackMaxPool2x8[16] = {
+            0x00333333, // TCfg
+            0x00111000, // ASelt
+            0x00040200, 0x00000402, // ABin
+            0x00000000, // BSelt
+            0x00000000, 0x00000000, // BBin
+            0x00003400, // AccumType, ConstantType, and PostShift
+            0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000, 0x00000000 // Constant
+        };
+
+        vxSetNodeUniform(nodObj, "UniPackMaxPool2x8", 1, UniPackMaxPool2x8);
+    }
+
+    vxSetNodeAttribute(nodObj, VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS, &shaderParam, sizeof(vx_kernel_execution_parameters_t));
+#endif
+    return VX_SUCCESS;
+}
+VX_PRIVATE_API vx_status VX_CALLBACK vxMaxPool3x3Function(vx_node node, const vx_reference parameters[], vx_uint32 paramCount)
+{
+    vx_status   status;
+
+    vx_reference *ucParameters = (vx_reference*)parameters;
+
+    /*step1: pre-process */
+    vx_image_s  imgObj, imgObj2;
+    vx_int32 stride_v = 2, kernel_v = 3, pad_v = 0;
+    vx_int32 width = 0, height = 0, depth = 0, b = 0, width_o = 0, height_o = 0;
+    vx_enum format_v = VX_TYPE_FLOAT32;
+
+    vx_array  input_array  = (vx_array)parameters[0];
+    vx_scalar format       = (vx_scalar)parameters[1];
+    vx_scalar _width       = (vx_scalar)parameters[2];
+    vx_scalar _height      = (vx_scalar)parameters[3];
+    vx_scalar _depth       = (vx_scalar)parameters[4];
+    vx_scalar batch        = (vx_scalar)parameters[5];
+    vx_scalar _width_o     = (vx_scalar)parameters[6];
+    vx_scalar _height_o    = (vx_scalar)parameters[7];
+    vx_scalar _kernel      = (vx_scalar)parameters[8];
+    vx_scalar stride       = (vx_scalar)parameters[9];
+    vx_scalar pad          = (vx_scalar)parameters[10];
+    vx_array  output_array = (vx_array)parameters[11];
+
+#if defined(__linux__)
+    struct timeval start = gcfVX_PerfStart((vx_reference)node);
+#endif
+    vxReadScalarValue(format,   &format_v);
+    vxReadScalarValue(_width,   &width);
+    vxReadScalarValue(_height,  &height);
+    vxReadScalarValue(_depth,   &depth);
+    vxReadScalarValue(batch,    &b);
+    vxReadScalarValue(_width_o, &width_o);
+    vxReadScalarValue(_height_o,&height_o);
+    vxReadScalarValue(_kernel,  &kernel_v);
+    vxReadScalarValue(stride,   &stride_v);
+    vxReadScalarValue(pad,      &pad_v);
+
+    vxWriteScalarValue(format,   &format_v);
+    vxWriteScalarValue(_width,   &width);
+    vxWriteScalarValue(_height,  &height);
+    vxWriteScalarValue(_depth,   &depth);
+    vxWriteScalarValue(batch,    &b);
+    vxWriteScalarValue(_width_o, &width_o);
+    vxWriteScalarValue(_height_o,&height_o);
+    vxWriteScalarValue(_kernel,  &kernel_v);
+    vxWriteScalarValue(stride,   &stride_v);
+    vxWriteScalarValue(pad,      &pad_v);
+
+    {
+        int itemSize = (int)input_array->itemSize;
+        gcoOS_ZeroMemory(&imgObj, sizeof(vx_image_s));
+
+        imgObj.base = input_array->base;
+        imgObj.base.type = VX_TYPE_IMAGE;
+
+        imgObj.width = width;
+        imgObj.height = height * depth;
+        imgObj.format = (itemSize == 4)?VX_DF_IMAGE_F32:VX_DF_IMAGE_S16;
+        imgObj.planeCount = 1;
+        imgObj.memory = input_array->memory;
+    }
+
+    {
+        int itemSize = (int)output_array->itemSize;
+        gcoOS_ZeroMemory(&imgObj2, sizeof(vx_image_s));
+
+        imgObj2.base = output_array->base;
+        imgObj2.base.type = VX_TYPE_IMAGE;
+        imgObj2.width = width_o;
+        imgObj2.height = height_o * depth;
+        imgObj2.format = (itemSize == 4)?VX_DF_IMAGE_F32:VX_DF_IMAGE_S16;
+        imgObj2.planeCount = 1;
+        imgObj2.memory = output_array->memory;
+    }
+
+
+    ucParameters[0] = (vx_reference)(&imgObj);
+    ucParameters[11] = (vx_reference)(&imgObj2);
+
+    /*step2: call the base function */
+    status = vxProgramKernel_Function(node, parameters, paramCount);
+
+    /* step3 : post-process */
+    ucParameters[0] = (vx_reference)(input_array);
+    ucParameters[11] = (vx_reference)(output_array);
+
+    gcoVX_Flush(gcvTRUE);
+
+#if defined(__linux__)
+    if (node->base.context->perfEnable)
+    {
+        printf("MaxPool3x3      shader time:%10d us\n", gcfVX_PerfEnd((vx_reference)node, start));
+    }
+#endif
+#if VX_SHADER_TP
+#if NN_MULTI_THREAD2
+    if ((node->base.context->cnnEvent != VX_NULL))
+        vxSetEvent(node->base.context->cnnEvent);
+#endif
+#endif
+    return status;
+}
+VX_PRIVATE_API vx_status VX_CALLBACK vxMaxPool3x3Deinitializer(vx_node nodObj, const vx_reference *paraObj, vx_uint32 paraNum)
 {
     return VX_SUCCESS;
 }
@@ -2932,6 +3693,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxInitializeTarget(
                                     kernelDescTable[index]->enumeration,
                                     kernelDescTable[index]->function,
                                     kernelDescTable[index]->numParams,
+                                    kernelDescTable[index]->validate,
                                     kernelDescTable[index]->inputValidate,
                                     kernelDescTable[index]->outputValidate,
                                     kernelDescTable[index]->initialize,
@@ -2976,18 +3738,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxInitializeTarget(
 }
 
 vx_kernel_description_s *target_program_kernels[] = {
-   &internal_nn_lrn,
-#if VX_NN_USE_SHADER_ROIPOOL
+    &internal_nn_lrn,
     &internal_kernel_horipool,
     &internal_kernel_vertpool,
     &internal_kernel_roipool,
     &internalkernel_rectprocess,
     &internalkernel_resorting,
-#endif
     //&internal_kernel_nms,
     &vxfasterRcnnReshuffleImageKernelInfo,
     &vxFasterRcnnInterleaveKernelInfo,
     &vxfasterRcnnReshuffleDataKernelInfo,
+    &vxMaxPool3x3KernelInfo,
 };
 
 vx_uint32 num_target_program_kernels = vxmLENGTH_OF(target_program_kernels);

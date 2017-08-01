@@ -65,6 +65,13 @@ static const gceTEXTURE_SWIZZLE baseComponents_rg00[] =
     gcvTEXTURE_SWIZZLE_0
 };
 
+static const gceTEXTURE_SWIZZLE baseComponents_000a[] =
+{
+    gcvTEXTURE_SWIZZLE_0,
+    gcvTEXTURE_SWIZZLE_0,
+    gcvTEXTURE_SWIZZLE_0,
+    gcvTEXTURE_SWIZZLE_A
+};
 
 static const gceTEXTURE_SWIZZLE baseComponents_000r[] =
 {
@@ -1205,6 +1212,15 @@ static struct _gcsSURF_FORMAT_INFO formatAlpha[] =
           { 0, gcvCOMPONENT_NOTPRESENT }, { 0, gcvCOMPONENT_NOTPRESENT }, {0}, {0}}},
         gcvINVALID_RENDER_FORMAT, gcmINVALID_RENDER_FORMAT_ENTRY,
         gcvSURF_A8, gcmINVALID_TEXTURE_FORMAT_ENTRY
+    },
+
+    {
+        gcmNameFormat(A8_1_A8R8G8B8), gcvFORMAT_CLASS_RGBA, gcvFORMAT_DATATYPE_UNSIGNED_NORMALIZED, gcmNON_COMPRESSED_BPP_ENTRY(32),
+        1, 1, 0, gcvFALSE,
+        {{{ 24, 8 }, { 16, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 | gcvCOMPONENT_DONTCARE }, {0}, {0}}},
+        {{{ 24, 8 }, { 16, 8 | gcvCOMPONENT_DONTCARE }, { 8, 8 | gcvCOMPONENT_DONTCARE }, { 0, 8 | gcvCOMPONENT_DONTCARE }, {0}, {0}}},
+        gcvSURF_A8_1_A8R8G8B8, 0x06, baseComponents_rgba,
+        gcvSURF_A8_1_A8R8G8B8, 0x07, baseComponents_000a, gcvTRUE
     },
 };
 
@@ -4946,8 +4962,16 @@ gcoHARDWARE_QueryCommandBuffer(
 
     if (ReservedHead != gcvNULL)
     {
-        /* Reserve space for SelectPipe. */
-        *ReservedHead = 32;
+        /* BLT engine possible need flush MMU */
+        if (Engine == gcvENGINE_BLT)
+        {
+            *ReservedHead = 40;
+        }
+        else
+        {
+            /* Only render engine need select pipe */
+            *ReservedHead = 32;
+        }
     }
 
     if (ReservedTail != gcvNULL)
@@ -4977,7 +5001,7 @@ gcoHARDWARE_QueryCommandBuffer(
                 }
             }
 
-            if (Hardware->features[gcvFEATURE_FENCE])
+            if (Hardware->features[gcvFEATURE_FENCE_64BIT])
             {
                 *ReservedTail += gcdRENDER_FENCE_LENGTH;
             }
@@ -4998,47 +5022,71 @@ gcoHARDWARE_QueryCommandBuffer(
 
     if (ReservedUser != gcvNULL)
     {
-        *ReservedUser  = (gpuFlushBytes + mGpuSyncBytes);
-        *ReservedUser += (gcdRESERVED_HW_FENCE + mGpuModeSwitchBytes);
-        *ReservedUser += gcdRESERVED_PAUSE_OQ_LENGTH;
-
-        if (Hardware->features[gcvFEATURE_HW_TFB])
+         if (Engine == gcvENGINE_BLT)
         {
-            *ReservedUser += (gcdRESERVED_PAUSE_XFBWRITTEN_QUERY_LENGTH + mGpuModeSwitchBytes);
-            *ReservedUser += (gcdRESERVED_PAUSE_PRIMGEN_QUERY_LENGTH    + mGpuModeSwitchBytes);
-            *ReservedUser += (gcdRESERVED_PAUSE_XFB_LENGTH              + mGpuModeSwitchBytes);
-        }
-
-        if (Hardware->features[gcvFEATURE_PROBE])
-        {
-            gctSTRING profilemode = gcvNULL;
-            gcmONERROR(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &profilemode));
-            if (profilemode != gcvNULL &&
-                gcoOS_StrCmp(profilemode, "0") == gcvSTATUS_LARGER)
+            /* BLT engine will flush within command, so, don't need flush here
+               All other semphore/stall/flush/sync command is unknown to Async 3DBLT pipe
+            */
+            if (Hardware->features[gcvFEATURE_FENCE_64BIT])
             {
-                *ReservedUser += gcdRESERVED_PAUSE_PROBE_LENGTH;
+                *ReservedUser = gcdRESERVED_HW_FENCE_64BIT;
+            }
+            else if (Hardware->features[gcvFEATURE_FENCE_32BIT])
+            {
+                *ReservedUser = gcdRESERVED_HW_FENCE_32BIT;
+            }
+        }
+        else
+        {
+            *ReservedUser  = (gpuFlushBytes + mGpuSyncBytes);
+
+            if (Hardware->features[gcvFEATURE_FENCE_64BIT])
+            {
+                *ReservedUser += (gcdRESERVED_HW_FENCE_64BIT + mGpuModeSwitchBytes);
+            }
+            else if (Hardware->features[gcvFEATURE_FENCE_32BIT])
+            {
+                *ReservedUser += (gcdRESERVED_HW_FENCE_32BIT + mGpuModeSwitchBytes);
+            }
+
+            *ReservedUser += gcdRESERVED_PAUSE_OQ_LENGTH;
+
+            if (Hardware->features[gcvFEATURE_HW_TFB])
+            {
+                *ReservedUser += (gcdRESERVED_PAUSE_XFBWRITTEN_QUERY_LENGTH + mGpuModeSwitchBytes);
+                *ReservedUser += (gcdRESERVED_PAUSE_PRIMGEN_QUERY_LENGTH    + mGpuModeSwitchBytes);
+                *ReservedUser += (gcdRESERVED_PAUSE_XFB_LENGTH              + mGpuModeSwitchBytes);
+            }
+
+            if (Hardware->features[gcvFEATURE_PROBE])
+            {
+                gctSTRING profilemode = gcvNULL;
+                gcmONERROR(gcoOS_GetEnv(gcvNULL, "VIV_PROFILE", &profilemode));
+                if (profilemode != gcvNULL &&
+                    gcoOS_StrCmp(profilemode, "0") == gcvSTATUS_LARGER)
+                {
+                    if (Hardware->config->gpuCoreCount > 1)
+                    {
+                        *ReservedUser += (Hardware->config->gpuCoreCount * (2 * gcmSIZEOF(gctUINT32) + gcdRESERVED_PAUSE_PROBE_LENGTH)
+                                         + 2 * gcmSIZEOF(gctUINT32));
+                    }
+                    else
+                    {
+                        *ReservedUser += gcdRESERVED_PAUSE_PROBE_LENGTH;
+                    }
+                }
             }
         }
     }
 
     if (Source != gcvNULL)
     {
-#if ((defined(LINUX) || defined(__QNXNTO__)) && !defined(gcdFPGA)) && !defined(EMULATOR)
-        *Source = gcvCMDBUF_VIRTUAL;
-#else
-        *Source = gcvCMDBUF_CONTIGUOUS;
-#endif
-
-#if defined(UNDER_CE) && USE_KERNEL_VIRTUAL_BUFFERS
-        *Source = gcvCMDBUF_VIRTUAL;
-#endif
-
-#if gcdSECURITY || gcdDISABLE_GPU_VIRTUAL_ADDRESS
-        *Source = gcvCMDBUF_CONTIGUOUS;
-#endif
-
 #if gcdALLOC_CMD_FROM_RESERVE
         *Source = gcvCMDBUF_RESERVED;
+#elif gcdSECURITY || gcdDISABLE_GPU_VIRTUAL_ADDRESS || !USE_KERNEL_VIRTUAL_BUFFERS || defined(VSIMULATOR_DEBUG)
+        *Source = gcvCMDBUF_CONTIGUOUS;
+#else
+        *Source = gcvCMDBUF_VIRTUAL;
 #endif
     }
 
@@ -7000,15 +7048,23 @@ gcoHARDWARE_IsFlatMapped(
     IN gctPHYS_ADDR_T Address
     )
 {
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_FALSE;
+    gctUINT32 i;
 
     gcmHEADER_ARG("0x%X", Address);
 
     gcmGETHARDWARE(Hardware);
 
-    status = (Address >= Hardware->flatMappingStart) && (Address < Hardware->flatMappingEnd)
-           ? gcvSTATUS_TRUE
-           : gcvSTATUS_OK;
+    for (i = 0; i < Hardware->flatMappingRangeCount; i++)
+    {
+        if ((Address >= Hardware->flatMappingRanges[i].start) &&
+            (Address < Hardware->flatMappingRanges[i].end) &&
+            (Address != ~0U))
+        {
+            status = gcvSTATUS_TRUE;
+            break;
+        }
+    }
 
 OnError:
     gcmFOOTER();
@@ -7066,6 +7122,25 @@ gcoHARDWARE_QuerySuperTileMode(
 #if gcdENABLE_3D
     *SuperTileMode = Hardware->config->superTileMode;
 #endif
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoHARDWARE_QueryChipAxiBusWidth(
+    IN gcoHARDWARE Hardware,
+    OUT gctBOOL * AXI128Bits
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER();
+
+    gcmGETHARDWARE(Hardware);
+
+    *AXI128Bits = ((Hardware->config->chipFlags & gcvCHIP_AXI_BUS128_BITS) != 0);
 
 OnError:
     gcmFOOTER();
@@ -7178,6 +7253,8 @@ gcoHARDWARE_QueryNNConfig(
         NNConfig->nnCoreCount   = Hardware->config->nnConfig.nnCoreCount;
         NNConfig->nnInputBufferDepth = Hardware->config->nnConfig.nnInputBufferDepth;
         NNConfig->nnAccumBufferDepth = Hardware->config->nnConfig.nnAccumBufferDepth;
+        NNConfig->nnDPAmount = Hardware->config->nnConfig.nnDPAmount;
+        NNConfig->nnL2CacheSize = Hardware->config->nnConfig.nnL2CacheSize;
         NNConfig->isSet = gcvTRUE;
     }
 

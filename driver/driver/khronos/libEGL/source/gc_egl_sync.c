@@ -217,6 +217,7 @@ veglCreateSync(
 
         /* Submit the sync point. */
         iface.command            = gcvHAL_SIGNAL;
+        iface.engine             = gcvENGINE_RENDER;
         iface.u.Signal.signal    = gcmPTR_TO_UINT64(sync->signal);
         iface.u.Signal.auxSignal = 0;
         iface.u.Signal.process   = gcmPTR_TO_UINT64(dpy->process);
@@ -245,6 +246,7 @@ veglCreateSync(
 
         /* Submit the signal. */
         iface.command            = gcvHAL_SIGNAL;
+        iface.engine             = gcvENGINE_RENDER;
         iface.u.Signal.signal    = gcmPTR_TO_UINT64(sync->signal);
         iface.u.Signal.auxSignal = 0;
         iface.u.Signal.process   = gcmPTR_TO_UINT64(dpy->process);

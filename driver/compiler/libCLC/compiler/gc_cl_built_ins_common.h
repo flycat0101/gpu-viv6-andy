@@ -346,6 +346,20 @@ static clsBUILTIN_FUNCTION CommonBuiltinFunctions[] =
     {clvEXTENSION_NONE,     "viv_signbit",              T_I_GENTYPE,    1, {T_F_GENTYPE}, {0}, {1}, 1},
     {clvEXTENSION_NONE,     "viv_lgamma",               T_F_GENTYPE,    1, {T_F_GENTYPE}, {0}, {1}, 1},
     {clvEXTENSION_NONE,     "viv_lgamma_r",             T_F_GENTYPE,    2, {T_F_GENTYPE, T_I_GENTYPE}, {0, 1}, {1, 0}, 0},
+    {clvEXTENSION_VIV_BITFIELD,     "viv_findLSB",              T_I_GENTYPE,    1, {T_I_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_VIV_BITFIELD,     "viv_findLSB",              T_U_GENTYPE,    1, {T_U_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_VIV_BITFIELD,     "viv_findMSB",              T_I_GENTYPE,    1, {T_I_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_VIV_BITFIELD,     "viv_findMSB",              T_U_GENTYPE,    1, {T_U_GENTYPE}, {0}, {0}, 1},
+
+    {clvEXTENSION_VIV_BITFIELD,     "viv_bitfieldReverse",      T_I_GENTYPE,    1, {T_I_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_VIV_BITFIELD,     "viv_bitfieldReverse",      T_U_GENTYPE,    1, {T_U_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_VIV_BITFIELD,     "viv_byteReverse",          T_I_GENTYPE,    1, {T_I_GENTYPE}, {0}, {0}, 1},
+    {clvEXTENSION_VIV_BITFIELD,     "viv_byteReverse",          T_U_GENTYPE,    1, {T_U_GENTYPE}, {0}, {0}, 1},
+
+    {clvEXTENSION_VIV_BITFIELD,     "viv_bitfieldExtract",      T_I_GENTYPE,    3, {T_I_GENTYPE, T_INT, T_INT}, {0}, {0, 1, 1}, 1},
+    {clvEXTENSION_VIV_BITFIELD,     "viv_bitfieldExtract",      T_U_GENTYPE,    3, {T_U_GENTYPE, T_INT, T_INT}, {0}, {0, 1, 1}, 1},
+    {clvEXTENSION_VIV_BITFIELD,     "viv_bitfieldInsert",       T_I_GENTYPE,    4, {T_I_GENTYPE, T_I_GENTYPE, T_INT, T_INT}, {0}, {0, 0, 1, 1}, 1},
+    {clvEXTENSION_VIV_BITFIELD,     "viv_bitfieldInsert",       T_U_GENTYPE,    4, {T_U_GENTYPE, T_U_GENTYPE, T_INT, T_INT}, {0}, {0, 0, 1, 1}, 1},
 
     {clvEXTENSION_NONE,     "viv_shuffle",              T_I_GENTYPE,    2, {T_CHAR2,    T_U_GENTYPE}, {0}, {0}, 0, 0, 1},
     {clvEXTENSION_NONE,     "viv_shuffle",              T_I_GENTYPE,    2, {T_CHAR4,    T_U_GENTYPE}, {0}, {0}, 0, 0, 1},
@@ -726,11 +740,7 @@ static clsBUILTIN_FUNCTION CommonBuiltinFunctions[] =
     {clvEXTENSION_NONE,        "atom_xor",      T_UINT,   2, {T_UINT, T_UINT}, {1, 0}, {0, 1}, 1},
     {clvEXTENSION_NONE,        "atom_xor",      T_INT,    2, {T_INT,  T_UINT}, {1, 0}, {0, 1}, 1},
     {clvEXTENSION_NONE,        "atom_xor",      T_UINT,   2, {T_UINT, T_INT},  {1, 0}, {0, 1}, 1},
-
-#if _SUPPORT_PRINTF_BUILTIN
-    {clvEXTENSION_NONE,        "printf",        T_INT,   1, {T_CHAR},  {1}, {0}, 1, 0, 0, 1},
-#endif
-
+    {clvEXTENSION_NONE,        "printf",        T_INT,    1, {T_CHAR},  {1}, {0}, 1, 0, 0, 1},
 };
 
 #define _cldCommonBuiltinFunctionCount (sizeof(CommonBuiltinFunctions) / sizeof(clsBUILTIN_FUNCTION))
@@ -892,6 +902,8 @@ _GenScalarMinCode(
 
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextNanX,
                                     gcvFALSE);
@@ -940,6 +952,8 @@ _GenScalarMinCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextNanY,
                                     gcvFALSE);
@@ -1127,6 +1141,8 @@ _GenScalarMaxCode(
 
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextNanX,
                                     gcvFALSE);
@@ -1175,6 +1191,8 @@ _GenScalarMaxCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextNanY,
                                     gcvFALSE);
@@ -1451,6 +1469,8 @@ _GenFDimCode(
 
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextNanXY,
                                     gcvFALSE);
@@ -1547,9 +1567,11 @@ _GenFDimCode(
     }
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
-                                    CodeGenerator,
-                                    &selectionContextXOverY,
-                                    gcvFALSE);
+                                     PolynaryExpr->exprBase.base.lineNo,
+                                     PolynaryExpr->exprBase.base.stringNo,
+                                     CodeGenerator,
+                                     &selectionContextXOverY,
+                                     gcvFALSE);
 
     if (gcmIS_ERROR(status)) return status;
 
@@ -2748,6 +2770,8 @@ _GenFaceForwardCode(
 
     status = clDefineSelectionTrueOperandEnd(
                                             Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext,
                                             gcvFALSE);
@@ -3041,6 +3065,8 @@ _GenRefractCode(
 
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                         PolynaryExpr->exprBase.base.lineNo,
+                         PolynaryExpr->exprBase.base.stringNo,
                          CodeGenerator,
                          &selectionContext,
                          gcvFALSE);
@@ -4388,6 +4414,119 @@ _GenBitSelectCode(
 }
 
 static gceSTATUS
+_MakeUchar16PackedSwizzle(
+     IN cloCOMPILER Compiler,
+     IN gctUINT  LineNo,
+     IN gctUINT  StringNo,
+     IN clsROPERAND *CompSelection,
+     OUT clsROPERAND *PackedSwizzle
+)
+{
+     gceSTATUS status;
+     clsIOPERAND iOperand[1];
+     clsROPERAND evenSwizzle[1], oddSwizzle[1];
+     clsROPERAND rOperand[1];
+     clsLOPERAND lOperand[1];
+     clsROPERAND rOperands[3];
+     clsROPERAND constantZero[1];
+     clsROPERAND constantOperand[1];
+     clsGEN_CODE_DATA_TYPE dataType;
+
+     clsROPERAND_InitializeIntOrIVecConstant(constantZero,
+                                             clmGenCodeDataType(T_UINT),
+                                             (gctUINT)0);
+     clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT2));
+     clsLOPERAND_InitializeUsingIOperand(lOperand, iOperand);
+     status = clGenAssignCode(Compiler,
+                              LineNo,
+                              StringNo,
+                              lOperand,
+                              constantZero);
+     if (gcmIS_ERROR(status)) return status;
+     rOperands[0] = CompSelection[0];
+     clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
+                                             clmGenCodeDataType(T_UINT),
+                                             (gctUINT)0xECA86420);
+     clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                             clmGenCodeDataType(T_UINT),
+                                             (gctUINT)0x0FF);
+     dataType = clmGenCodeDataType(T_UCHAR8_PACKED);
+     clsLOPERAND_InitializeTempRegWithComponentSelection(lOperand,
+                                                         clvQUALIFIER_NONE,
+                                                         dataType,
+                                                         dataType,
+                                                         iOperand->tempRegIndex,
+                                                         clGetDefaultComponentSelection(Compiler, dataType));
+     status = clGenIntrinsicAsmCode(Compiler,
+                                    LineNo,
+                                    StringNo,
+                                    CL_VIR_IK_swizzle_full_def,
+                                    lOperand,
+                                    3,
+                                    rOperands);
+     if (gcmIS_ERROR(status)) return status;
+     clsROPERAND_InitializeUsingIOperand(evenSwizzle, iOperand);
+
+     clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT2));
+     clsLOPERAND_InitializeUsingIOperand(lOperand, iOperand);
+     status = clGenAssignCode(Compiler,
+                              LineNo,
+                              StringNo,
+                              lOperand,
+                              constantZero);
+     if (gcmIS_ERROR(status)) return status;
+     clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
+                                             clmGenCodeDataType(T_UINT),
+                                             (gctUINT)0xFDB97531);
+     clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                             clmGenCodeDataType(T_UINT),
+                                             (gctUINT)0x0FF);
+     dataType = clmGenCodeDataType(T_UCHAR8_PACKED);
+     clsLOPERAND_InitializeTempRegWithComponentSelection(lOperand,
+                                                         clvQUALIFIER_NONE,
+                                                         dataType,
+                                                         dataType,
+                                                         iOperand->tempRegIndex,
+                                                         clGetDefaultComponentSelection(Compiler, dataType));
+     status = clGenIntrinsicAsmCode(Compiler,
+                                    LineNo,
+                                    StringNo,
+                                    CL_VIR_IK_swizzle_full_def,
+                                    lOperand,
+                                    3,
+                                    rOperands);
+     if (gcmIS_ERROR(status)) return status;
+
+     clsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+     clsROPERAND_InitializeIntOrIVecConstant(constantOperand,
+                                             clmGenCodeDataType(T_UINT),
+                                             (gctUINT)0x4);
+     clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT2));
+     status = clGenGenericCode2(Compiler,
+                                LineNo,
+                                StringNo,
+                                clvOPCODE_LSHIFT,
+                                iOperand,
+                                rOperand,
+                                constantOperand);
+     if (gcmIS_ERROR(status)) return status;
+
+     clsROPERAND_InitializeUsingIOperand(oddSwizzle, iOperand);
+
+     clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT2));
+     status = clGenGenericCode2(Compiler,
+                                LineNo,
+                                StringNo,
+                                clvOPCODE_OR_BITWISE,
+                                iOperand,
+                                evenSwizzle,
+                                oddSwizzle);
+     if (gcmIS_ERROR(status)) return status;
+     clsROPERAND_InitializeUsingIOperand(PackedSwizzle, iOperand);
+     return gcvSTATUS_OK;
+}
+
+static gceSTATUS
 _GenShuffleCode(
     IN cloCOMPILER Compiler,
     IN cloCODE_GENERATOR CodeGenerator,
@@ -4398,154 +4537,673 @@ _GenShuffleCode(
     )
 {
     gceSTATUS    status;
-    clsIOPERAND     intermIOperands[20];
-    clsIOPERAND     indexIOperand, intermIndexIOperand, intermMaskIOperand;
-    clsROPERAND     intermIndexROperand, intermMaskROperand;
-    clsROPERAND     intermROperands[20], maskROperand, *maskComponent;
-    clsROPERAND     constantOneROperand;
-    gctREG_INDEX    tempRegIndex;
-    clsLOPERAND tempLOperand, destLOperands[16];
+    clsIOPERAND  intermIndexIOperand;
+    clsROPERAND  intermIndexROperand;
+    clsROPERAND  maskROperand;
     gctUINT8 vectorSize0 = clmGEN_CODE_IsScalarDataType(OperandsParameters[0].dataTypes[0].def) ? 1: clmGEN_CODE_vectorSize_GET(OperandsParameters[0].dataTypes[0].def);
     gctUINT8 vectorSize1 = clmGEN_CODE_IsScalarDataType(OperandsParameters[1].dataTypes[0].def) ? 1: clmGEN_CODE_vectorSize_GET(OperandsParameters[1].dataTypes[0].def);
-    gctUINT8 i, vSizeMax = vectorSize0>vectorSize1 ? vectorSize0 : vectorSize1;
-    clsGEN_CODE_DATA_TYPE operandType;
-    gctSIZE_T    binaryDataTypeRegSize;
-    gctSIZE_T    regOffset;
+    gctUINT8 maskValue;
 
-    /* Verify the arguments. */
-    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
-    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
-    gcmASSERT(OperandCount == 2);
-    gcmASSERT(OperandsParameters);
-    gcmASSERT(IOperand);
-
-    operandType = gcGetComponentDataType(OperandsParameters[0].dataTypes[0].def);
-    if(IOperand->dataType.elementType == clvTYPE_FLOAT)
-    {
-        operandType.elementType = clvTYPE_UINT;
-    }
-
+    maskValue = vectorSize0 - 1;
+    if(maskValue == 2) maskValue = 3;
     clsROPERAND_InitializeIntOrIVecConstant(&maskROperand,
                                             clmGenCodeDataType(T_UINT),
-                                            (gctUINT) (vectorSize0 - 1) );
-    clsLOPERAND_InitializeUsingIOperand(&tempLOperand, IOperand);
-    tempRegIndex = clNewTempRegs(Compiler, vSizeMax, operandType.elementType);
-    binaryDataTypeRegSize    = gcGetDataTypeRegSize(operandType);
-    regOffset = _clmGetTempRegIndexOffset(binaryDataTypeRegSize,
-                                          operandType.elementType);
+                                            maskValue);
 
-    status = clNewVariable(Compiler,
-                           0,
-                           0,
-                           "_GenShuffleCode$tempArray",
-                           clvQUALIFIER_NONE,
-                           clvQUALIFIER_NONE,
-                           clvSTORAGE_QUALIFIER_NONE,
-                           operandType,
-                           vSizeMax,
-                           tempRegIndex,
-                           gcvNULL);
+    /*Get the effective LSB */
+    clsIOPERAND_New(Compiler, &intermIndexIOperand, OperandsParameters[1].dataTypes[0].def);
+    status = clGenGenericCode2(Compiler,
+                               PolynaryExpr->exprBase.base.lineNo,
+                               PolynaryExpr->exprBase.base.stringNo,
+                               clvOPCODE_AND_BITWISE,
+                               &intermIndexIOperand,
+                               OperandsParameters[1].rOperands,
+                               &maskROperand);
+    if (gcmIS_ERROR(status)) return status;
 
-    clsROPERAND_InitializeTempReg(Compiler,
-                                  &intermROperands[17],
-                                  clvQUALIFIER_NONE,
-                                  operandType,
-                                  tempRegIndex);
+    clsROPERAND_InitializeUsingIOperand(&intermIndexROperand, &intermIndexIOperand);
+    if(clmIsElementTypePacked(IOperand->dataType.elementType)) {
+        clsIOPERAND iOperand[1];
+        clsROPERAND evenSwizzle[1], oddSwizzle[1];
+        clsROPERAND rOperand[1];
+        clsLOPERAND lOperand[1];
+        clsROPERAND rOperands[3];
+        clsROPERAND constantZero[1];
+        clsROPERAND constantOperand[1];
+        clsGEN_CODE_DATA_TYPE dataType;
+        gctUINT shiftCount, swizzleMaskValue;
 
-    intermROperands[17].arrayIndex.mode = clvINDEX_REG;
-    clsIOPERAND_New(Compiler, &intermIndexIOperand, clmGenCodeDataType(T_UINT));
-    if(clmIsElementTypeHighPrecision(operandType.elementType))
-    {
-        clsROPERAND_InitializeIntOrIVecConstant(&constantOneROperand,
-                                                clmGenCodeDataType(T_INT),
-                                                (gctINT)1);
+        clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
 
-        clsIOPERAND_New(Compiler, &indexIOperand, clmGenCodeDataType(T_UINT));
-        clsROPERAND_InitializeUsingIOperand(&intermIndexROperand, &intermIndexIOperand);
-        intermROperands[17].arrayIndex.u.indexRegIndex = indexIOperand.tempRegIndex;
-    }
-    else
-    {
-        intermROperands[17].arrayIndex.u.indexRegIndex = intermIndexIOperand.tempRegIndex;
-    }
+        switch(vectorSize1) {
+        case 2:
+             dataType = clmGenCodeDataType(T_UINT);
+             intermIndexROperand.dataType = dataType;
+             intermIndexROperand.u.reg.dataType = dataType;
+             intermIndexROperand.u.reg.componentSelection = clGetDefaultComponentSelection(Compiler, dataType);
 
-    if(clmIsElementTypeHighPrecision(OperandsParameters[1].rOperands[0].dataType.elementType))
-    {
-        clsIOPERAND_New(Compiler, &intermMaskIOperand, clmGenCodeDataType(T_UINT));
-        clsROPERAND_InitializeUsingIOperand(&intermMaskROperand, &intermMaskIOperand);
-        maskComponent = &intermMaskROperand;
-    }
-    else
-    {
-        maskComponent = &intermROperands[16];
-    }
-
-    for(i = 0; i<vSizeMax; i++){
-        gctREG_INDEX regIndex;
-
-        regIndex = tempRegIndex + (gctREG_INDEX)(regOffset * i);
-        clsIOPERAND_Initialize(Compiler,
-                               &intermIOperands[i],
-                               operandType,
-                               regIndex);
-        clsROPERAND_InitializeUsingIOperand(&intermROperands[i], &intermIOperands[i]);
-    }
-
-    /*Settle the vector to index temp registers */
-    for(i = 0; i<vectorSize0; i++){
-        clmROPERAND_vectorComponent_GET(&intermROperands[16], &OperandsParameters[0].rOperands[0], i);
-        status = clGenGenericCode1(Compiler,
-                        PolynaryExpr->exprBase.base.lineNo,
-                        PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_ASSIGN,
-                        &intermIOperands[i],
-                        &intermROperands[16]);
-    }
-
-    for(i = 0; i<vectorSize1; i++){
-       clmROPERAND_vectorComponent_GET(&intermROperands[16], &OperandsParameters[1].rOperands[0], i);
-       if(clmIsElementTypeHighPrecision(OperandsParameters[1].rOperands[0].dataType.elementType))
-       {
-           status = clGenGenericCode1(Compiler,
-                                      PolynaryExpr->exprBase.base.lineNo,
-                                      PolynaryExpr->exprBase.base.stringNo,
-                                      clvOPCODE_LONGLO,
-                                      &intermMaskIOperand,
-                                      &intermROperands[16]);
-           if (gcmIS_ERROR(status)) return status;
-       }
-
-       /*Get the effective LSB */
-       status = clGenArithmeticExprCode(Compiler,
+             clsROPERAND_InitializeIntOrIVecConstant(constantOperand,
+                                                     dataType,
+                                                     (gctUINT)0x1);
+             clsIOPERAND_New(Compiler, iOperand, dataType);
+             status = clGenGenericCode2(Compiler,
                                         PolynaryExpr->exprBase.base.lineNo,
                                         PolynaryExpr->exprBase.base.stringNo,
                                         clvOPCODE_AND_BITWISE,
-                                        &intermIndexIOperand,
-                                        maskComponent,
-                                        &maskROperand);
-       if (gcmIS_ERROR(status)) return status;
+                                        iOperand,
+                                        &intermIndexROperand,
+                                        constantOperand);
+             if (gcmIS_ERROR(status)) return status;
+             clsROPERAND_InitializeUsingIOperand(evenSwizzle, iOperand);
 
-       if(clmIsElementTypeHighPrecision(operandType.elementType))
-       {
-           status = clGenGenericCode2(Compiler,
+             if(OperandsParameters[1].dataTypes[0].def.elementType == clvTYPE_UCHAR_PACKED) {
+                 shiftCount = 4;
+                 swizzleMaskValue = 0x3;
+             }
+             else {
+                 shiftCount = 12;
+                 swizzleMaskValue = 0xF;
+             }
+
+             clsROPERAND_InitializeIntOrIVecConstant(constantOperand,
+                                                     dataType,
+                                                     shiftCount);
+             clsIOPERAND_New(Compiler, iOperand, dataType);
+             status = clGenGenericCode2(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
+                                        clvOPCODE_RSHIFT,
+                                        iOperand,
+                                        &intermIndexROperand,
+                                        constantOperand);
+             if (gcmIS_ERROR(status)) return status;
+             clsROPERAND_InitializeUsingIOperand(oddSwizzle, iOperand);
+             clsIOPERAND_New(Compiler, iOperand, dataType);
+             status = clGenGenericCode2(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
+                                        clvOPCODE_OR_BITWISE,
+                                        iOperand,
+                                        evenSwizzle,
+                                        oddSwizzle);
+             if (gcmIS_ERROR(status)) return status;
+             clsROPERAND_InitializeUsingIOperand(&rOperands[1], iOperand);
+             clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                                     dataType,
+                                                     swizzleMaskValue);
+             break;
+
+        case 3:
+        case 4:
+             clsROPERAND_InitializeIntOrIVecConstant(constantZero,
+                                                     clmGenCodeDataType(T_UINT),
+                                                     (gctUINT)0);
+             clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT));
+             clsLOPERAND_InitializeUsingIOperand(lOperand, iOperand);
+             status = clGenAssignCode(Compiler,
                                       PolynaryExpr->exprBase.base.lineNo,
                                       PolynaryExpr->exprBase.base.stringNo,
-                                      clvOPCODE_LSHIFT,
-                                      &indexIOperand,
-                                      &intermIndexROperand,
-                                      &constantOneROperand);
-           if (gcmIS_ERROR(status)) return status;
-       }
+                                      lOperand,
+                                      constantZero);
+             if (gcmIS_ERROR(status)) return status;
+             if(OperandsParameters[1].dataTypes[0].def.elementType == clvTYPE_UCHAR_PACKED) {
+                 if(vectorSize1 == 4) {
+                     swizzleMaskValue = (gctUINT)0x0F;
+                 }
+                 else {
+                     swizzleMaskValue = (gctUINT)0x07;
+                 }
+                 rOperands[0] = intermIndexROperand;
+                 clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
+                                                         clmGenCodeDataType(T_UINT),
+                                                         (gctUINT)0x20);
+                 dataType = clmGenCodeDataType(T_UCHAR2_PACKED);
+             }
+             else {
+                 if(vectorSize1 == 4) {
+                     swizzleMaskValue = (gctUINT)0xFF;
+                 }
+                 else {
+                     swizzleMaskValue = (gctUINT)0x37;
+                 }
+                 dataType = clmGenCodeDataType(T_UCHAR8_PACKED);
+                 clsROPERAND_InitializeTempRegWithComponentSelection(&rOperands[0],
+                                                                     clvQUALIFIER_NONE,
+                                                                     dataType,
+                                                                     dataType,
+                                                                     intermIndexROperand.u.reg.regIndex,
+                                                                     clGetDefaultComponentSelection(Compiler, dataType));
+                 clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
+                                                         clmGenCodeDataType(T_UINT),
+                                                         (gctUINT)0x40);
+                 dataType = clmGenCodeDataType(T_UCHAR4_PACKED);
+             }
+             clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                                     clmGenCodeDataType(T_UINT),
+                                                     (gctUINT)0x03);
+             clsLOPERAND_InitializeTempRegWithComponentSelection(lOperand,
+                                                                 clvQUALIFIER_NONE,
+                                                                 dataType,
+                                                                 dataType,
+                                                                 iOperand->tempRegIndex,
+                                                                 clGetDefaultComponentSelection(Compiler, dataType));
+             status = clGenIntrinsicAsmCode(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
+                                            CL_VIR_IK_swizzle_full_def,
+                                            lOperand,
+                                            3,
+                                            rOperands);
+             if (gcmIS_ERROR(status)) return status;
+             clsROPERAND_InitializeUsingIOperand(evenSwizzle, iOperand);
 
-       clmLOPERAND_vectorComponent_GET(&destLOperands[i], &tempLOperand, i);
-       /*integer move. Otherwise, it may impact previous index data type, when IOperand data type is float */
-       destLOperands[i].dataType.elementType = operandType.elementType;
-       status = clGenAssignCode(Compiler,
-                                PolynaryExpr->exprBase.base.lineNo,
-                                PolynaryExpr->exprBase.base.stringNo,
-                                &destLOperands[i],
-                                &intermROperands[17]);
-       if (gcmIS_ERROR(status)) return status;
+             clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT));
+             clsLOPERAND_InitializeUsingIOperand(lOperand, iOperand);
+             status = clGenAssignCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      lOperand,
+                                      constantZero);
+             if (gcmIS_ERROR(status)) return status;
+
+             clsLOPERAND_InitializeTempRegWithComponentSelection(lOperand,
+                                                                 clvQUALIFIER_NONE,
+                                                                 dataType,
+                                                                 dataType,
+                                                                 iOperand->tempRegIndex,
+                                                                 clGetDefaultComponentSelection(Compiler, dataType));
+             if(OperandsParameters[1].dataTypes[0].def.elementType == clvTYPE_UCHAR_PACKED) {
+                 if(vectorSize1 == 4) {
+                     clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
+                                                             clmGenCodeDataType(T_UINT),
+                                                             (gctUINT)0x31);
+                 }
+                 else {
+                     clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
+                                                             clmGenCodeDataType(T_UINT),
+                                                             (gctUINT)0x01);
+                     clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                                             clmGenCodeDataType(T_UINT),
+                                                             (gctUINT)0x01);
+                 }
+             }
+             else {
+                 if(vectorSize1 == 4) {
+                     clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
+                                                             clmGenCodeDataType(T_UINT),
+                                                             (gctUINT)0x53);
+                 }
+                 else {
+                     clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
+                                                             clmGenCodeDataType(T_UINT),
+                                                             (gctUINT)0x03);
+                     clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                                             clmGenCodeDataType(T_UINT),
+                                                             (gctUINT)0x01);
+                 }
+             }
+             status = clGenIntrinsicAsmCode(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
+                                            CL_VIR_IK_swizzle_full_def,
+                                            lOperand,
+                                            3,
+                                            rOperands);
+             if (gcmIS_ERROR(status)) return status;
+
+             clsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+             clsROPERAND_InitializeIntOrIVecConstant(constantOperand,
+                                                     clmGenCodeDataType(T_UINT),
+                                                     (gctUINT)0x4);
+             clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT));
+             status = clGenGenericCode2(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
+                                        clvOPCODE_LSHIFT,
+                                        iOperand,
+                                        rOperand,
+                                        constantOperand);
+             if (gcmIS_ERROR(status)) return status;
+             clsROPERAND_InitializeUsingIOperand(oddSwizzle, iOperand);
+
+             clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT));
+             status = clGenGenericCode2(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
+                                        clvOPCODE_OR_BITWISE,
+                                        iOperand,
+                                        evenSwizzle,
+                                        oddSwizzle);
+             if (gcmIS_ERROR(status)) return status;
+             clsROPERAND_InitializeUsingIOperand(&rOperands[1], iOperand);
+             clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                                     clmGenCodeDataType(T_UINT),
+                                                     swizzleMaskValue);
+             break;
+
+        case 8:
+             clsROPERAND_InitializeIntOrIVecConstant(constantZero,
+                                                     clmGenCodeDataType(T_UINT),
+                                                     (gctUINT)0);
+             clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT));
+             clsLOPERAND_InitializeUsingIOperand(lOperand, iOperand);
+             status = clGenAssignCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      lOperand,
+                                      constantZero);
+             if (gcmIS_ERROR(status)) return status;
+
+             if(OperandsParameters[1].dataTypes[0].def.elementType == clvTYPE_UCHAR_PACKED) {
+                 swizzleMaskValue = (gctUINT)0xFF;
+                 rOperands[0] = intermIndexROperand;
+                 clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
+                                                         clmGenCodeDataType(T_UINT),
+                                                         (gctUINT)0x6420);
+                 dataType = clmGenCodeDataType(T_UCHAR4_PACKED);
+             }
+             else {
+                 swizzleMaskValue = (gctUINT)0xFFFF;
+                 dataType = clmGenCodeDataType(T_UCHAR16_PACKED);
+                 clsROPERAND_InitializeTempRegWithComponentSelection(&rOperands[0],
+                                                                     clvQUALIFIER_NONE,
+                                                                     dataType,
+                                                                     dataType,
+                                                                     intermIndexROperand.u.reg.regIndex,
+                                                                     clGetDefaultComponentSelection(Compiler, dataType));
+                 clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
+                                                         clmGenCodeDataType(T_UINT),
+                                                         (gctUINT)0xC840);
+             }
+             clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                                     clmGenCodeDataType(T_UINT),
+                                                     (gctUINT)0x0F);
+             clsLOPERAND_InitializeTempRegWithComponentSelection(lOperand,
+                                                                 clvQUALIFIER_NONE,
+                                                                 dataType,
+                                                                 dataType,
+                                                                 iOperand->tempRegIndex,
+                                                                 clGetDefaultComponentSelection(Compiler, dataType));
+             status = clGenIntrinsicAsmCode(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
+                                            CL_VIR_IK_swizzle_full_def,
+                                            lOperand,
+                                            3,
+                                            rOperands);
+             if (gcmIS_ERROR(status)) return status;
+             clsROPERAND_InitializeUsingIOperand(evenSwizzle, iOperand);
+
+             clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT));
+             clsLOPERAND_InitializeUsingIOperand(lOperand, iOperand);
+             status = clGenAssignCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      lOperand,
+                                      constantZero);
+             if (gcmIS_ERROR(status)) return status;
+             if(OperandsParameters[1].dataTypes[0].def.elementType == clvTYPE_UCHAR_PACKED) {
+                 clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
+                                                         clmGenCodeDataType(T_UINT),
+                                                         (gctUINT)0x7531);
+             }
+             else {
+                 clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
+                                                         clmGenCodeDataType(T_UINT),
+                                                         (gctUINT)0xEA62);
+             }
+             status = clGenIntrinsicAsmCode(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
+                                            CL_VIR_IK_swizzle_full_def,
+                                            lOperand,
+                                            3,
+                                            rOperands);
+             if (gcmIS_ERROR(status)) return status;
+
+             clsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+             clsROPERAND_InitializeIntOrIVecConstant(constantOperand,
+                                                     clmGenCodeDataType(T_UINT),
+                                                     (gctUINT)0x4);
+             clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT));
+             status = clGenGenericCode2(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
+                                        clvOPCODE_LSHIFT,
+                                        iOperand,
+                                        rOperand,
+                                        constantOperand);
+             if (gcmIS_ERROR(status)) return status;
+
+             clsROPERAND_InitializeUsingIOperand(oddSwizzle, iOperand);
+
+             clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT));
+             status = clGenGenericCode2(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
+                                        clvOPCODE_OR_BITWISE,
+                                        iOperand,
+                                        evenSwizzle,
+                                        oddSwizzle);
+             if (gcmIS_ERROR(status)) return status;
+             clsROPERAND_InitializeUsingIOperand(&rOperands[1], iOperand);
+
+             clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                                     clmGenCodeDataType(T_UINT),
+                                                     swizzleMaskValue);
+             break;
+
+        case 16:
+             if(OperandsParameters[1].dataTypes[0].def.elementType == clvTYPE_UCHAR_PACKED) {
+                 status = _MakeUchar16PackedSwizzle(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
+                                                    &intermIndexROperand,
+                                                    &rOperands[1]);
+                 if (gcmIS_ERROR(status)) return status;
+                 clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                                         clmGenCodeDataType(T_UINT),
+                                                         (gctUINT)0xFFFF);
+             }
+             else if(vectorSize0 < 16) { /* short assumed */
+                 gcsValue swizzleValue[1];
+
+                 /* covert the mask element type from ushort to uchar */
+                 clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UCHAR16_PACKED));
+                 clsLOPERAND_InitializeUsingIOperand(lOperand, iOperand);
+                 dataType = clmGenCodeDataType(T_UCHAR16_PACKED);
+                 clsROPERAND_InitializeTempRegWithComponentSelection(&rOperands[0],
+                                                                     clvQUALIFIER_NONE,
+                                                                     dataType,
+                                                                     dataType,
+                                                                     intermIndexROperand.u.reg.regIndex,
+                                                                     clGetDefaultComponentSelection(Compiler, dataType));
+                 clsROPERAND_InitializeIntOrIVecConstant(&rOperands[1],
+                                                         clmGenCodeDataType(T_UINT),
+                                                         (gctUINT)0xECA86420);
+                 clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                                         clmGenCodeDataType(T_UINT),
+                                                         (gctUINT)0x0FF);
+                 status = clGenIntrinsicAsmCode(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
+                                                CL_VIR_IK_swizzle,
+                                                lOperand,
+                                                3,
+                                                rOperands);
+                 if (gcmIS_ERROR(status)) return status;
+                 clsROPERAND_InitializeTempRegWithComponentSelection(&rOperands[0],
+                                                                     clvQUALIFIER_NONE,
+                                                                     dataType,
+                                                                     dataType,
+                                                                     intermIndexROperand.u.reg.regIndex + 1,
+                                                                     clGetDefaultComponentSelection(Compiler, dataType));
+                 gcoOS_ZeroMemory(swizzleValue, gcmSIZEOF(gcsValue));
+                 swizzleValue->u32_v4[0] = (gctUINT)0x0;
+                 swizzleValue->u32_v4[1] = (gctUINT)0xFDB97531;
+                 status = clROperandInitializeConstant(Compiler,
+                                                       clmGenCodeDataType(T_UINT2),
+                                                       swizzleValue,
+                                                       &rOperands[1]);
+                 if (gcmIS_ERROR(status)) return status;
+                 clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                                         clmGenCodeDataType(T_UINT),
+                                                         (gctUINT)0xFF00);
+                 status = clGenIntrinsicAsmCode(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
+                                                CL_VIR_IK_swizzle_full_def,
+                                                lOperand,
+                                                3,
+                                                rOperands);
+                 if (gcmIS_ERROR(status)) return status;
+                 clsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+                 status = _MakeUchar16PackedSwizzle(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
+                                                    rOperand,
+                                                    &rOperands[1]);
+                 clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                                         clmGenCodeDataType(T_UINT),
+                                                         (gctUINT)0xFFFFFFFF);
+             }
+             else { /* From vector size straddle two registers, resulting SWIZZLE will not be splittable.
+                       Therefore, we need to use existing method */
+                 clsDECL decl[1];
+                 clsGEN_CODE_PARAMETERS parameters[2];
+
+                 clsGEN_CODE_PARAMETERS_Initialize(&parameters[0],
+                                                   gcvFALSE,
+                                                   gcvTRUE);
+                 clsGEN_CODE_PARAMETERS_Initialize(&parameters[1],
+                                                   gcvFALSE,
+                                                   gcvTRUE);
+                 status = clCreateUnpackedDecl(Compiler,
+                                               OperandsParameters[0].dataTypes[0].def,
+                                               decl);
+                 if (gcmIS_ERROR(status)) return status;
+                 status = clsGEN_CODE_PARAMETERS_AllocateOperands(Compiler,
+                                                                  &parameters[0],
+                                                                  decl);
+                 if (gcmIS_ERROR(status)) return status;
+
+                 gcmONERROR(clCreateUnpackedDecl(Compiler,
+                                                 OperandsParameters[1].dataTypes[0].def,
+                                                 decl));
+                 gcmONERROR(clsGEN_CODE_PARAMETERS_AllocateOperands(Compiler,
+                                                                    &parameters[1],
+                                                                    decl));
+
+                 clsIOPERAND_New(Compiler,
+                                 iOperand,
+                                 clConvToUnpackedType(Compiler,
+                                                      OperandsParameters[0].dataTypes[0].def));
+                 gcmONERROR(clUnpackROperand(Compiler,
+                                             PolynaryExpr->exprBase.base.lineNo,
+                                             PolynaryExpr->exprBase.base.stringNo,
+                                             &OperandsParameters[0].rOperands[0],
+                                             iOperand));
+                 clsROPERAND_InitializeUsingIOperand(&parameters[0].rOperands[0], iOperand);
+
+                 clsIOPERAND_New(Compiler,
+                                 iOperand,
+                                 clConvToUnpackedType(Compiler,
+                                                      OperandsParameters[1].dataTypes[0].def));
+                 gcmONERROR(clUnpackROperand(Compiler,
+                                             PolynaryExpr->exprBase.base.lineNo,
+                                             PolynaryExpr->exprBase.base.stringNo,
+                                             &OperandsParameters[1].rOperands[0],
+                                             iOperand));
+                 clsROPERAND_InitializeUsingIOperand(&parameters[1].rOperands[0], iOperand);
+
+                 clsIOPERAND_New(Compiler,
+                                 iOperand,
+                                 clConvToUnpackedType(Compiler,
+                                                      IOperand->dataType));
+                 gcmONERROR(_GenShuffleCode(Compiler,
+                                            CodeGenerator,
+                                            PolynaryExpr,
+                                            OperandCount,
+                                            parameters,
+                                            iOperand));
+                 clsROPERAND_InitializeUsingIOperand(rOperand, iOperand);
+                 status = clPackROperand(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         rOperand,
+                                         IOperand);
+OnError:
+                 clsGEN_CODE_PARAMETERS_Finalize(&parameters[0]);
+                 clsGEN_CODE_PARAMETERS_Finalize(&parameters[1]);
+                 return status;
+             }
+             break;
+
+        default:
+            gcmASSERT(0);
+            break;
+        }
+
+        rOperands[0] = OperandsParameters[0].rOperands[0];
+        clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+        return  clGenIntrinsicAsmCode(Compiler,
+                                      PolynaryExpr->exprBase.base.lineNo,
+                                      PolynaryExpr->exprBase.base.stringNo,
+                                      CL_VIR_IK_swizzle_full_def,
+                                      lOperand,
+                                      3,
+                                      rOperands);
+    }
+    else {
+        clsIOPERAND     intermIOperands[20];
+        clsIOPERAND     indexIOperand, intermMaskIOperand;
+        clsROPERAND     intermMaskROperand;
+        clsROPERAND     intermROperands[20], *maskComponent;
+        clsROPERAND     constantOneROperand;
+        gctREG_INDEX    tempRegIndex;
+        clsLOPERAND tempLOperand, destLOperands[16];
+        gctUINT8 vectorSize0 = clmGEN_CODE_IsScalarDataType(OperandsParameters[0].dataTypes[0].def) ? 1: clmGEN_CODE_vectorSize_GET(OperandsParameters[0].dataTypes[0].def);
+        gctUINT8 i, vSizeMax = vectorSize0>vectorSize1 ? vectorSize0 : vectorSize1;
+        clsGEN_CODE_DATA_TYPE operandType;
+        gctSIZE_T    binaryDataTypeRegSize;
+        gctSIZE_T    regOffset;
+
+        /* Verify the arguments. */
+        clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+        clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+        gcmASSERT(OperandCount == 2);
+        gcmASSERT(OperandsParameters);
+        gcmASSERT(IOperand);
+
+        operandType = gcGetComponentDataType(OperandsParameters[0].dataTypes[0].def);
+        if(IOperand->dataType.elementType == clvTYPE_FLOAT)
+        {
+            operandType.elementType = clvTYPE_UINT;
+        }
+
+        clsROPERAND_InitializeIntOrIVecConstant(&maskROperand,
+                                                clmGenCodeDataType(T_UINT),
+                                                (gctUINT) (vectorSize0 - 1) );
+        clsLOPERAND_InitializeUsingIOperand(&tempLOperand, IOperand);
+        tempRegIndex = clNewTempRegs(Compiler, vSizeMax, operandType.elementType);
+        binaryDataTypeRegSize    = gcGetDataTypeRegSize(operandType);
+        regOffset = _clmGetTempRegIndexOffset(binaryDataTypeRegSize,
+                                              operandType.elementType);
+
+        status = clNewVariable(Compiler,
+                               0,
+                               0,
+                               "_GenShuffleCode$tempArray",
+                               clvQUALIFIER_NONE,
+                               clvQUALIFIER_NONE,
+                               clvSTORAGE_QUALIFIER_NONE,
+                               operandType,
+                               vSizeMax,
+                               gcvTRUE,
+                               tempRegIndex,
+                               gcvNULL);
+
+        clsROPERAND_InitializeTempReg(Compiler,
+                                      &intermROperands[17],
+                                      clvQUALIFIER_NONE,
+                                      operandType,
+                                      tempRegIndex);
+
+        intermROperands[17].arrayIndex.mode = clvINDEX_REG;
+        clsIOPERAND_New(Compiler, &intermIndexIOperand, clmGenCodeDataType(T_UINT));
+        if(clmIsElementTypeHighPrecision(operandType.elementType))
+        {
+            clsROPERAND_InitializeIntOrIVecConstant(&constantOneROperand,
+                                                    clmGenCodeDataType(T_INT),
+                                                    (gctINT)1);
+
+            clsIOPERAND_New(Compiler, &indexIOperand, clmGenCodeDataType(T_UINT));
+            clsROPERAND_InitializeUsingIOperand(&intermIndexROperand, &intermIndexIOperand);
+            intermROperands[17].arrayIndex.u.indexRegIndex = indexIOperand.tempRegIndex;
+        }
+        else
+        {
+            intermROperands[17].arrayIndex.u.indexRegIndex = intermIndexIOperand.tempRegIndex;
+        }
+
+        if(clmIsElementTypeHighPrecision(OperandsParameters[1].rOperands[0].dataType.elementType))
+        {
+            clsIOPERAND_New(Compiler, &intermMaskIOperand, clmGenCodeDataType(T_UINT));
+            clsROPERAND_InitializeUsingIOperand(&intermMaskROperand, &intermMaskIOperand);
+            maskComponent = &intermMaskROperand;
+        }
+        else
+        {
+            maskComponent = &intermROperands[16];
+        }
+
+        for(i = 0; i<vSizeMax; i++){
+            gctREG_INDEX regIndex;
+
+            regIndex = tempRegIndex + (gctREG_INDEX)(regOffset * i);
+            clsIOPERAND_Initialize(Compiler,
+                                   &intermIOperands[i],
+                                   operandType,
+                                   regIndex);
+            clsROPERAND_InitializeUsingIOperand(&intermROperands[i], &intermIOperands[i]);
+        }
+
+        /*Settle the vector to index temp registers */
+        for(i = 0; i<vectorSize0; i++){
+            clmROPERAND_vectorComponent_GET(&intermROperands[16], &OperandsParameters[0].rOperands[0], i);
+            status = clGenGenericCode1(Compiler,
+                            PolynaryExpr->exprBase.base.lineNo,
+                            PolynaryExpr->exprBase.base.stringNo,
+                            clvOPCODE_ASSIGN,
+                            &intermIOperands[i],
+                            &intermROperands[16]);
+        }
+
+        for(i = 0; i<vectorSize1; i++){
+           clmROPERAND_vectorComponent_GET(&intermROperands[16], &OperandsParameters[1].rOperands[0], i);
+           if(clmIsElementTypeHighPrecision(OperandsParameters[1].rOperands[0].dataType.elementType))
+           {
+               status = clGenGenericCode1(Compiler,
+                                          PolynaryExpr->exprBase.base.lineNo,
+                                          PolynaryExpr->exprBase.base.stringNo,
+                                          clvOPCODE_LONGLO,
+                                          &intermMaskIOperand,
+                                          &intermROperands[16]);
+               if (gcmIS_ERROR(status)) return status;
+           }
+
+           /*Get the effective LSB */
+           status = clGenArithmeticExprCode(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
+                                            clvOPCODE_AND_BITWISE,
+                                            &intermIndexIOperand,
+                                            maskComponent,
+                                            &maskROperand);
+           if (gcmIS_ERROR(status)) return status;
+
+           if(clmIsElementTypeHighPrecision(operandType.elementType))
+           {
+               status = clGenGenericCode2(Compiler,
+                                          PolynaryExpr->exprBase.base.lineNo,
+                                          PolynaryExpr->exprBase.base.stringNo,
+                                          clvOPCODE_LSHIFT,
+                                          &indexIOperand,
+                                          &intermIndexROperand,
+                                          &constantOneROperand);
+               if (gcmIS_ERROR(status)) return status;
+           }
+
+           clmLOPERAND_vectorComponent_GET(&destLOperands[i], &tempLOperand, i);
+           /*integer move. Otherwise, it may impact previous index data type, when IOperand data type is float */
+           destLOperands[i].dataType.elementType = operandType.elementType;
+           status = clGenAssignCode(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
+                                    &destLOperands[i],
+                                    &intermROperands[17]);
+           if (gcmIS_ERROR(status)) return status;
+        }
     }
 
     return status;
@@ -4777,6 +5435,7 @@ _GenShufflePtrCode(
                                    clvSTORAGE_QUALIFIER_NONE,
                                    componentDataType,
                                    vSizeMax,
+                                   gcvTRUE,
                                    tempRegIndex,
                                    gcvNULL);
         clsROPERAND_InitializeTempReg(Compiler,
@@ -5063,6 +5722,7 @@ _GenShufflePtr1Code(
                                    clvSTORAGE_QUALIFIER_NONE,
                                    operandType,
                                    vSizeMax,
+                                   gcvTRUE,
                                    tempRegIndex,
                                    gcvNULL);
         clsROPERAND_InitializeTempReg(Compiler,
@@ -5172,150 +5832,386 @@ _GenShuffle2Code(
     )
 {
     gceSTATUS    status;
-    clsIOPERAND     intermIOperands[60];
-    clsIOPERAND     indexIOperand, intermIndexIOperand, intermMaskIOperand;
-    clsROPERAND     intermIndexROperand, intermMaskROperand;
-    clsROPERAND     intermROperands[60], maskROperand, *maskComponent;
-    gctREG_INDEX    tempRegIndex;
-    clsROPERAND     constantOneROperand;
-    clsGEN_CODE_DATA_TYPE componentDataType;
-    clsLOPERAND tempLOperand, destLOperands[16];
     gctUINT8 vectorSize0 = clmGEN_CODE_IsScalarDataType(OperandsParameters[0].dataTypes[0].def) ? 1: clmGEN_CODE_vectorSize_GET(OperandsParameters[0].dataTypes[0].def);
-    gctUINT8 vectorSize1 = clmGEN_CODE_IsScalarDataType(OperandsParameters[2].dataTypes[0].def) ? 1: clmGEN_CODE_vectorSize_GET(OperandsParameters[2].dataTypes[0].def);
-    gctUINT8 i;
-    gctSIZE_T    binaryDataTypeRegSize;
-    gctSIZE_T    regOffset;
+    gctUINT8 vectorSize1;
 
-    /* Verify the arguments. */
-    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
-    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
-    gcmASSERT(OperandCount == 3);
-    gcmASSERT(OperandsParameters);
-    gcmASSERT(IOperand);
+    if(clmIsElementTypePacked(IOperand->dataType.elementType)) {
+        clsGEN_CODE_PARAMETERS parameters[3];
+        clsIOPERAND iOperand[1];
+        clsLOPERAND lOperand[1];
+        clsROPERAND rOperand[1];
+        clsDECL decl[1];
+        gctINT tokenType;
 
-    clsROPERAND_InitializeIntOrIVecConstant(&maskROperand,
-                                            clmGenCodeDataType(T_UINT),
-                                            (gctUINT) (2*vectorSize0 - 1) );
+        clsGEN_CODE_PARAMETERS_Initialize(&parameters[0],
+                                          gcvFALSE,
+                                          gcvTRUE);
+        clsGEN_CODE_PARAMETERS_Initialize(&parameters[1],
+                                          gcvFALSE,
+                                          gcvTRUE);
+        clsGEN_CODE_PARAMETERS_Initialize(&parameters[2],
+                                          gcvFALSE,
+                                          gcvTRUE);
 
-    clsLOPERAND_InitializeUsingIOperand(&tempLOperand, IOperand);
-    componentDataType = gcGetVectorComponentDataType(OperandsParameters[0].dataTypes[0].def),
-    tempRegIndex = clNewTempRegs(Compiler, 2*vectorSize0, componentDataType.elementType);
-    binaryDataTypeRegSize    = gcGetDataTypeRegSize(componentDataType);
-    regOffset = _clmGetTempRegIndexOffset(binaryDataTypeRegSize,
-                                          componentDataType.elementType);
+        if(vectorSize0 < 16) {
+            clsGEN_CODE_DATA_TYPE dataType;
 
-    status = clNewVariable(Compiler,
-                           PolynaryExpr->exprBase.base.lineNo,
-                           PolynaryExpr->exprBase.base.stringNo,
-                           "_GenShuffle2Code$tempArray",
-                           clvQUALIFIER_NONE,
-                           clvQUALIFIER_NONE,
-                           clvSTORAGE_QUALIFIER_NONE,
-                           componentDataType,
-                           2*vectorSize0,
-                           tempRegIndex,
-                           gcvNULL);
-    clsROPERAND_InitializeTempReg(Compiler,
-                                  &intermROperands[59],
-                                  clvQUALIFIER_NONE,
-                                  componentDataType,
-                                  tempRegIndex);
+            if(vectorSize0 == 3) vectorSize0++;
+            clmGEN_CODE_DATA_TYPE_Initialize(dataType,
+                                             vectorSize0 << 1,
+                                             0,
+                                             OperandsParameters[0].dataTypes[0].def.elementType);
 
-    intermROperands[59].arrayIndex.mode = clvINDEX_REG;
-    clsIOPERAND_New(Compiler, &intermIndexIOperand, clmGenCodeDataType(T_UINT));
-    if(clmIsElementTypeHighPrecision(componentDataType.elementType))
-    {
-        clsROPERAND_InitializeIntOrIVecConstant(&constantOneROperand,
-                                                clmGenCodeDataType(T_INT),
-                                                (gctINT)1);
+            tokenType = clGetVectorTerminalToken(dataType.elementType,
+                                                 clmGEN_CODE_vectorSize_GET(dataType));
+            status = cloCOMPILER_CreateDecl(Compiler,
+                                            tokenType,
+                                            gcvNULL,
+                                            clvQUALIFIER_CONST,
+                                            clvQUALIFIER_NONE,
+                                            decl);
+            status = clsGEN_CODE_PARAMETERS_AllocateOperands(Compiler,
+                                                             &parameters[0],
+                                                             decl);
+            if (gcmIS_ERROR(status)) return status;
+            clsIOPERAND_New(Compiler,
+                            iOperand,
+                            dataType);
 
-        clsIOPERAND_New(Compiler, &indexIOperand, clmGenCodeDataType(T_UINT));
-        clsROPERAND_InitializeUsingIOperand(&intermIndexROperand, &intermIndexIOperand);
-        intermROperands[59].arrayIndex.u.indexRegIndex = indexIOperand.tempRegIndex;
+            clsLOPERAND_InitializeTempReg(Compiler,
+                                          lOperand,
+                                          clvQUALIFIER_NONE,
+                                          OperandsParameters[0].dataTypes[0].def,
+                                          iOperand->tempRegIndex);
+            gcmONERROR(clGenAssignCode(Compiler,
+                                       PolynaryExpr->exprBase.base.lineNo,
+                                       PolynaryExpr->exprBase.base.stringNo,
+                                       lOperand,
+                                       OperandsParameters[0].rOperands));
+
+            clsLOPERAND_InitializeTempReg(Compiler,
+                                          lOperand,
+                                          clvQUALIFIER_NONE,
+                                          OperandsParameters[0].dataTypes[0].def,
+                                          iOperand->tempRegIndex + 1);
+            gcmONERROR(clGenAssignCode(Compiler,
+                                       PolynaryExpr->exprBase.base.lineNo,
+                                       PolynaryExpr->exprBase.base.stringNo,
+                                       lOperand,
+                                       OperandsParameters[1].rOperands));
+
+            clsROPERAND_InitializeUsingIOperand(&parameters[0].rOperands[0], iOperand);
+
+            tokenType = clGetVectorTerminalToken(OperandsParameters[2].dataTypes[0].def.elementType,
+                                                 clmGEN_CODE_vectorSize_GET(OperandsParameters[2].dataTypes[0].def));
+            status = cloCOMPILER_CreateDecl(Compiler,
+                                            tokenType,
+                                            gcvNULL,
+                                            clvQUALIFIER_CONST,
+                                            clvQUALIFIER_NONE,
+                                            decl);
+            gcmONERROR(clsGEN_CODE_PARAMETERS_AllocateOperands(Compiler,
+                                                               &parameters[1],
+                                                               decl));
+            parameters[1].rOperands[0] = OperandsParameters[2].rOperands[0];
+
+            gcmONERROR(_GenShuffleCode(Compiler,
+                                       CodeGenerator,
+                                       PolynaryExpr,
+                                       2,
+                                       parameters,
+                                       IOperand));
+        }
+        else { /* From vector size straddle two registers, resulting SWIZZLE will not be splittable.
+                       Therefore, we need to use existing method */
+/* Loop over each selected component at a time */
+            clsROPERAND maskROperand[1];
+            clsIOPERAND indexIOperand[1], intermIOperand[1];
+            clsROPERAND indexROperand[1], intermIndexROperand[1], intermROperand[1];
+            clsROPERAND constantZero[1];
+            clsIOPERAND iOperandComponent[1];
+            clsLOPERAND intermLOperand[1];
+            clsROPERAND rOperands[3];
+            clsIOPERAND *swizzleValue;
+            gctUINT swizzleMaskValue, shiftCount;
+            gctUINT8 i, shift;
+            gctUINT8 maskValue;
+
+            maskValue = vectorSize0 - 1;
+            clsROPERAND_InitializeIntOrIVecConstant(maskROperand,
+                                                    clmGenCodeDataType(T_UINT),
+                                                    (maskValue == 2) ? 3 : maskValue);
+
+            /*Get the effective LSB */
+            clsIOPERAND_New(Compiler, indexIOperand, OperandsParameters[2].dataTypes[0].def);
+            status = clGenGenericCode2(Compiler,
+                                       PolynaryExpr->exprBase.base.lineNo,
+                                       PolynaryExpr->exprBase.base.stringNo,
+                                       clvOPCODE_AND_BITWISE,
+                                       indexIOperand,
+                                       OperandsParameters[2].rOperands,
+                                       maskROperand);
+            if (gcmIS_ERROR(status)) return status;
+            clsROPERAND_InitializeUsingIOperand(indexROperand, indexIOperand);
+
+            clsROPERAND_InitializeIntOrIVecConstant(maskROperand,
+                                                    clmGenCodeDataType(T_UINT),
+                                                    vectorSize0 == 3 ? 4 : vectorSize0);
+
+            clsROPERAND_InitializeIntOrIVecConstant(constantZero,
+                                                    clmGenCodeDataType(T_UINT),
+                                                    (gctUINT)0);
+            clsIOPERAND_New(Compiler, intermIOperand, clmGenCodeDataType(T_UINT));
+            clsROPERAND_InitializeUsingIOperand(intermROperand, intermIOperand);
+
+            if(OperandsParameters[0].dataTypes[0].def.elementType == clvTYPE_UCHAR_PACKED ||
+               OperandsParameters[0].dataTypes[0].def.elementType == clvTYPE_CHAR_PACKED) {
+                shiftCount = 1;
+                swizzleMaskValue = 0x1;
+            }
+            else {
+                shiftCount = 2;
+                swizzleMaskValue = 0x3;
+            }
+            clsLOPERAND_InitializeUsingIOperand(lOperand, IOperand);
+            vectorSize1 = clmGEN_CODE_IsScalarDataType(OperandsParameters[2].dataTypes[0].def) ? 1: clmGEN_CODE_vectorSize_GET(OperandsParameters[2].dataTypes[0].def);
+            for(i = 0; i < vectorSize1; i++) {
+                clmROPERAND_vectorComponent_GET(intermIndexROperand, indexROperand, i);
+                clmROPERAND_vectorComponent_GET(rOperand, OperandsParameters[2].rOperands, i);
+                status = clGenGenericCode2(Compiler,
+                                           PolynaryExpr->exprBase.base.lineNo,
+                                           PolynaryExpr->exprBase.base.stringNo,
+                                           clvOPCODE_AND_BITWISE,
+                                           intermIOperand,
+                                           rOperand,
+                                           maskROperand);
+                if (gcmIS_ERROR(status)) return status;
+
+                clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT));
+                if(i < 8) {
+                    clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT));
+                    swizzleValue = iOperand;
+                    shift = i * 4;
+                }
+                else {
+                    clsIOPERAND_New(Compiler, iOperand, clmGenCodeDataType(T_UINT2));
+                    clsLOPERAND_InitializeUsingIOperand(intermLOperand, iOperand);
+                    status = clGenAssignCode(Compiler,
+                                             PolynaryExpr->exprBase.base.lineNo,
+                                             PolynaryExpr->exprBase.base.stringNo,
+                                             intermLOperand,
+                                             constantZero);
+                    if (gcmIS_ERROR(status)) return status;
+                    clmIOPERAND_vectorComponent_GET(iOperandComponent, iOperand, 1);
+                    swizzleValue = iOperandComponent;
+                    shift = (i - 8) * 4;
+                }
+                clsROPERAND_InitializeIntOrIVecConstant(rOperand,
+                                                        clmGenCodeDataType(T_UINT),
+                                                        shift);
+                status = clGenGenericCode2(Compiler,
+                                           PolynaryExpr->exprBase.base.lineNo,
+                                           PolynaryExpr->exprBase.base.stringNo,
+                                           clvOPCODE_LSHIFT,
+                                           swizzleValue,
+                                           intermIndexROperand,
+                                           rOperand);
+                if (gcmIS_ERROR(status)) return status;
+
+                clsROPERAND_InitializeUsingIOperand(&rOperands[1], iOperand);
+                clsROPERAND_InitializeIntOrIVecConstant(&rOperands[2],
+                                                        clmGenCodeDataType(T_UINT),
+                                                        swizzleMaskValue);
+                swizzleMaskValue <<= shiftCount;
+                clmGEN_CODE_IF(Compiler,
+                               CodeGenerator,
+                               PolynaryExpr->exprBase.base.lineNo,
+                               PolynaryExpr->exprBase.base.stringNo,
+                               intermROperand,
+                               clvCONDITION_EQUAL,
+                               constantZero);
+
+                    rOperands[0] = OperandsParameters[0].rOperands[0];
+                    status = clGenIntrinsicAsmCode(Compiler,
+                                                   PolynaryExpr->exprBase.base.lineNo,
+                                                   PolynaryExpr->exprBase.base.stringNo,
+                                                   CL_VIR_IK_swizzle,
+                                                   lOperand,
+                                                   3,
+                                                   rOperands);
+                    if (gcmIS_ERROR(status)) return status;
+
+                clmGEN_CODE_ELSE(Compiler,
+                                 CodeGenerator,
+                                 PolynaryExpr->exprBase.base.lineNo,
+                                 PolynaryExpr->exprBase.base.stringNo);
+                    rOperands[0] = OperandsParameters[1].rOperands[0];
+                    status = clGenIntrinsicAsmCode(Compiler,
+                                                   PolynaryExpr->exprBase.base.lineNo,
+                                                   PolynaryExpr->exprBase.base.stringNo,
+                                                   CL_VIR_IK_swizzle,
+                                                   lOperand,
+                                                   3,
+                                                   rOperands);
+                    if (gcmIS_ERROR(status)) return status;
+                clmGEN_CODE_ENDIF(Compiler,
+                                  CodeGenerator,
+                                  PolynaryExpr->exprBase.base.lineNo,
+                                  PolynaryExpr->exprBase.base.stringNo);
+            }
+OnError:
+            clsGEN_CODE_PARAMETERS_Finalize(&parameters[0]);
+            clsGEN_CODE_PARAMETERS_Finalize(&parameters[1]);
+            clsGEN_CODE_PARAMETERS_Finalize(&parameters[2]);
+            return status;
+        }
     }
-    else
-    {
-        intermROperands[59].arrayIndex.u.indexRegIndex = intermIndexIOperand.tempRegIndex;
-    }
+    else {
+       clsIOPERAND     intermIOperands[60];
+       clsIOPERAND     indexIOperand, intermIndexIOperand, intermMaskIOperand;
+       clsROPERAND     intermIndexROperand, intermMaskROperand;
+       clsROPERAND     intermROperands[60], maskROperand, *maskComponent;
+       gctREG_INDEX    tempRegIndex;
+       clsROPERAND     constantOneROperand;
+       clsGEN_CODE_DATA_TYPE componentDataType;
+       clsLOPERAND tempLOperand, destLOperands[16];
+       gctUINT8 i;
+       gctSIZE_T    binaryDataTypeRegSize;
+       gctSIZE_T    regOffset;
 
-    if(clmIsElementTypeHighPrecision(OperandsParameters[2].rOperands[0].dataType.elementType))
-    {
-        clsIOPERAND_New(Compiler, &intermMaskIOperand, clmGenCodeDataType(T_UINT));
-        clsROPERAND_InitializeUsingIOperand(&intermMaskROperand, &intermMaskIOperand);
-        maskComponent = &intermMaskROperand;
-    }
-    else
-    {
-        maskComponent = &intermROperands[58];
-    }
+       /* Verify the arguments. */
+       clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+       clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+       gcmASSERT(OperandCount == 3);
+       gcmASSERT(OperandsParameters);
+       gcmASSERT(IOperand);
 
-    for(i = 0; i<2*vectorSize0; i++){
-        gctREG_INDEX regIndex;
+       vectorSize1 = clmGEN_CODE_IsScalarDataType(OperandsParameters[2].dataTypes[0].def) ? 1: clmGEN_CODE_vectorSize_GET(OperandsParameters[2].dataTypes[0].def);
+       clsROPERAND_InitializeIntOrIVecConstant(&maskROperand,
+                                               clmGenCodeDataType(T_UINT),
+                                               (gctUINT) (2*vectorSize0 - 1) );
 
-        regIndex = tempRegIndex + (gctREG_INDEX)(regOffset * i);
-        clsIOPERAND_Initialize(Compiler,
-                               &intermIOperands[i], componentDataType, regIndex);
-        clsROPERAND_InitializeUsingIOperand(&intermROperands[i], &intermIOperands[i]);
-    }
+       clsLOPERAND_InitializeUsingIOperand(&tempLOperand, IOperand);
+       componentDataType = gcGetVectorComponentDataType(OperandsParameters[0].dataTypes[0].def),
+       tempRegIndex = clNewTempRegs(Compiler, 2*vectorSize0, componentDataType.elementType);
+       binaryDataTypeRegSize    = gcGetDataTypeRegSize(componentDataType);
+       regOffset = _clmGetTempRegIndexOffset(binaryDataTypeRegSize,
+                                             componentDataType.elementType);
 
-    /*Settle the vector to index temp registers */
-    for(i = 0; i<vectorSize0; i++){
-        clmROPERAND_vectorComponent_GET(&intermROperands[58], &OperandsParameters[0].rOperands[0], i);
-        status = clGenGenericCode1(Compiler,
-                                   PolynaryExpr->exprBase.base.lineNo,
-                                   PolynaryExpr->exprBase.base.stringNo,
-                                   clvOPCODE_ASSIGN,
-                                   &intermIOperands[i],
-                                   &intermROperands[58]);
-        clmROPERAND_vectorComponent_GET(&intermROperands[58], &OperandsParameters[1].rOperands[0], i);
-        status = clGenGenericCode1(Compiler,
-                                   PolynaryExpr->exprBase.base.lineNo,
-                                   PolynaryExpr->exprBase.base.stringNo,
-                                   clvOPCODE_ASSIGN,
-                                   &intermIOperands[i+vectorSize0],
-                                   &intermROperands[58]);
-    }
-    for(i = 0; i<vectorSize1; i++){
-       clmROPERAND_vectorComponent_GET(&intermROperands[58], &OperandsParameters[2].rOperands[0], i);
+       status = clNewVariable(Compiler,
+                              PolynaryExpr->exprBase.base.lineNo,
+                              PolynaryExpr->exprBase.base.stringNo,
+                              "_GenShuffle2Code$tempArray",
+                              clvQUALIFIER_NONE,
+                              clvQUALIFIER_NONE,
+                              clvSTORAGE_QUALIFIER_NONE,
+                              componentDataType,
+                              2*vectorSize0,
+                              gcvTRUE,
+                              tempRegIndex,
+                              gcvNULL);
+       clsROPERAND_InitializeTempReg(Compiler,
+                                     &intermROperands[59],
+                                     clvQUALIFIER_NONE,
+                                     componentDataType,
+                                     tempRegIndex);
+
+       intermROperands[59].arrayIndex.mode = clvINDEX_REG;
+       clsIOPERAND_New(Compiler, &intermIndexIOperand, clmGenCodeDataType(T_UINT));
+       if(clmIsElementTypeHighPrecision(componentDataType.elementType))
+       {
+           clsROPERAND_InitializeIntOrIVecConstant(&constantOneROperand,
+                                                   clmGenCodeDataType(T_INT),
+                                                   (gctINT)1);
+
+           clsIOPERAND_New(Compiler, &indexIOperand, clmGenCodeDataType(T_UINT));
+           clsROPERAND_InitializeUsingIOperand(&intermIndexROperand, &intermIndexIOperand);
+           intermROperands[59].arrayIndex.u.indexRegIndex = indexIOperand.tempRegIndex;
+       }
+       else
+       {
+           intermROperands[59].arrayIndex.u.indexRegIndex = intermIndexIOperand.tempRegIndex;
+       }
+
        if(clmIsElementTypeHighPrecision(OperandsParameters[2].rOperands[0].dataType.elementType))
        {
+           clsIOPERAND_New(Compiler, &intermMaskIOperand, clmGenCodeDataType(T_UINT));
+           clsROPERAND_InitializeUsingIOperand(&intermMaskROperand, &intermMaskIOperand);
+           maskComponent = &intermMaskROperand;
+       }
+       else
+       {
+           maskComponent = &intermROperands[58];
+       }
+
+       for(i = 0; i<2*vectorSize0; i++){
+           gctREG_INDEX regIndex;
+
+           regIndex = tempRegIndex + (gctREG_INDEX)(regOffset * i);
+           clsIOPERAND_Initialize(Compiler,
+                                  &intermIOperands[i], componentDataType, regIndex);
+           clsROPERAND_InitializeUsingIOperand(&intermROperands[i], &intermIOperands[i]);
+       }
+
+       /*Settle the vector to index temp registers */
+       for(i = 0; i<vectorSize0; i++){
+           clmROPERAND_vectorComponent_GET(&intermROperands[58], &OperandsParameters[0].rOperands[0], i);
            status = clGenGenericCode1(Compiler,
                                       PolynaryExpr->exprBase.base.lineNo,
                                       PolynaryExpr->exprBase.base.stringNo,
-                                      clvOPCODE_LONGLO,
-                                      &intermMaskIOperand,
+                                      clvOPCODE_ASSIGN,
+                                      &intermIOperands[i],
                                       &intermROperands[58]);
-           if (gcmIS_ERROR(status)) return status;
-       }
-        /*Get the effect LSB */
-       status = clGenArithmeticExprCode(Compiler,
-                                        PolynaryExpr->exprBase.base.lineNo,
-                                        PolynaryExpr->exprBase.base.stringNo,
-                                        clvOPCODE_AND_BITWISE,
-                                        &intermIndexIOperand,
-                                        maskComponent,
-                                        &maskROperand);
-       if (gcmIS_ERROR(status)) return status;
-
-       if(clmIsElementTypeHighPrecision(componentDataType.elementType))
-       {
-           status = clGenGenericCode2(Compiler,
+           clmROPERAND_vectorComponent_GET(&intermROperands[58], &OperandsParameters[1].rOperands[0], i);
+           status = clGenGenericCode1(Compiler,
                                       PolynaryExpr->exprBase.base.lineNo,
                                       PolynaryExpr->exprBase.base.stringNo,
-                                      clvOPCODE_LSHIFT,
-                                      &indexIOperand,
-                                      &intermIndexROperand,
-                                      &constantOneROperand);
-           if (gcmIS_ERROR(status)) return status;
+                                      clvOPCODE_ASSIGN,
+                                      &intermIOperands[i+vectorSize0],
+                                      &intermROperands[58]);
        }
+       for(i = 0; i<vectorSize1; i++){
+          clmROPERAND_vectorComponent_GET(&intermROperands[58], &OperandsParameters[2].rOperands[0], i);
+          if(clmIsElementTypeHighPrecision(OperandsParameters[2].rOperands[0].dataType.elementType))
+          {
+              status = clGenGenericCode1(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         clvOPCODE_LONGLO,
+                                         &intermMaskIOperand,
+                                         &intermROperands[58]);
+              if (gcmIS_ERROR(status)) return status;
+          }
+           /*Get the effect LSB */
+          status = clGenArithmeticExprCode(Compiler,
+                                           PolynaryExpr->exprBase.base.lineNo,
+                                           PolynaryExpr->exprBase.base.stringNo,
+                                           clvOPCODE_AND_BITWISE,
+                                           &intermIndexIOperand,
+                                           maskComponent,
+                                           &maskROperand);
+          if (gcmIS_ERROR(status)) return status;
 
-       clmLOPERAND_vectorComponent_GET(&destLOperands[i], &tempLOperand, i);
-       status = clGenAssignCode(Compiler,
-                    PolynaryExpr->exprBase.base.lineNo,
-                    PolynaryExpr->exprBase.base.stringNo,
-                    &destLOperands[i],
-                    &intermROperands[59]);
-       if (gcmIS_ERROR(status)) return status;
+          if(clmIsElementTypeHighPrecision(componentDataType.elementType))
+          {
+              status = clGenGenericCode2(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         clvOPCODE_LSHIFT,
+                                         &indexIOperand,
+                                         &intermIndexROperand,
+                                         &constantOneROperand);
+              if (gcmIS_ERROR(status)) return status;
+          }
+
+          clmLOPERAND_vectorComponent_GET(&destLOperands[i], &tempLOperand, i);
+          status = clGenAssignCode(Compiler,
+                       PolynaryExpr->exprBase.base.lineNo,
+                       PolynaryExpr->exprBase.base.stringNo,
+                       &destLOperands[i],
+                       &intermROperands[59]);
+          if (gcmIS_ERROR(status)) return status;
+       }
     }
 
     return status;
@@ -5612,6 +6508,7 @@ _GenShuffle2PtrCode(
                                    clvSTORAGE_QUALIFIER_NONE,
                                    componentDataType,
                                    2*vectorSize0,
+                                   gcvTRUE,
                                    tempRegIndex,
                                    gcvNULL);
         clsROPERAND_InitializeTempReg(Compiler,
@@ -5964,6 +6861,7 @@ _GenShuffle2Ptr1Code(
                                    clvSTORAGE_QUALIFIER_NONE,
                                    componentDataType,
                                    2*vectorSize0,
+                                   gcvTRUE,
                                    tempRegIndex,
                                    gcvNULL);
         clsROPERAND_InitializeTempReg(Compiler,
@@ -6316,6 +7214,181 @@ _GenAnyAllCode(
     return gcvSTATUS_OK;
 }
 
+static gceSTATUS
+_GenFindLSBCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    gceSTATUS    status;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 1);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    status = clGenGenericCode1(Compiler,
+                    PolynaryExpr->exprBase.base.lineNo,
+                    PolynaryExpr->exprBase.base.stringNo,
+                    clvOPCODE_FINDLSB,
+                    IOperand,
+                    &OperandsParameters[0].rOperands[0]);
+
+    if (gcmIS_ERROR(status)) return status;
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_GenFindMSBCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    gceSTATUS    status;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 1);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    status = clGenGenericCode1(Compiler,
+                    PolynaryExpr->exprBase.base.lineNo,
+                    PolynaryExpr->exprBase.base.stringNo,
+                    clvOPCODE_FINDMSB,
+                    IOperand,
+                    &OperandsParameters[0].rOperands[0]);
+
+    if (gcmIS_ERROR(status)) return status;
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_GenBitReversalCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    gceSTATUS    status;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 1);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    status = clGenGenericCode1(Compiler,
+                    PolynaryExpr->exprBase.base.lineNo,
+                    PolynaryExpr->exprBase.base.stringNo,
+                    clvOPCODE_BIT_REVERSAL,
+                    IOperand,
+                    &OperandsParameters[0].rOperands[0]);
+
+    if (gcmIS_ERROR(status)) return status;
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_GenByteReversalCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    gceSTATUS    status;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 1);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    status = clGenGenericCode1(Compiler,
+                    PolynaryExpr->exprBase.base.lineNo,
+                    PolynaryExpr->exprBase.base.stringNo,
+                    clvOPCODE_BYTE_REVERSAL,
+                    IOperand,
+                    &OperandsParameters[0].rOperands[0]);
+
+    if (gcmIS_ERROR(status)) return status;
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_GenBitExtractCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 3);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    return clGenBuiltinToIntrinsicAsmCode(Compiler,
+                                          CodeGenerator,
+                                          PolynaryExpr,
+                                          OperandCount,
+                                          OperandsParameters,
+                                          IOperand,
+                                          CL_VIR_IK_bitextract);
+}
+
+static gceSTATUS
+_GenBitInsertCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 4);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand);
+
+    return clGenBuiltinToIntrinsicAsmCode(Compiler,
+                                          CodeGenerator,
+                                          PolynaryExpr,
+                                          OperandCount,
+                                          OperandsParameters,
+                                          IOperand,
+                                          CL_VIR_IK_bitinsert);
+}
 
 static gceSTATUS
 _GenAsyncCopyCode(
@@ -6459,6 +7532,8 @@ _GenAsyncCopyCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextLoopBack,
                                     gcvFALSE);
@@ -6725,6 +7800,8 @@ _GenAsyncCopyStridedCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextLoopBack,
                                     gcvFALSE);
@@ -6771,6 +7848,8 @@ _GenAsyncCopyStridedCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextOuterLoopBack,
                                     gcvFALSE);
@@ -6853,6 +7932,8 @@ _GenAtomCode(
     clsROPERAND *cmpOperand = gcvNULL;
     clsROPERAND *valOperand = gcvNULL;
     clsROPERAND constOne[1];
+    clsROPERAND srcBuf[1];
+    clsROPERAND *srcPtr;
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -6870,6 +7951,23 @@ _GenAtomCode(
        return gcvSTATUS_INVALID_DATA;
     }
 
+    srcPtr = &OperandsParameters[0].rOperands[0];
+    if(!clIsIntegerZero(&OperandsParameters[0].dataTypes[0].byteOffset)) {
+        clsIOPERAND srcIOperand[1];
+        clsIOPERAND_New(Compiler,
+                        srcIOperand,
+                        OperandsParameters[0].dataTypes[0].def);
+        status = clGenArithmeticExprCode(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         clvOPCODE_ADD,
+                                         srcIOperand,
+                                         srcPtr,
+                                         &OperandsParameters[0].dataTypes[0].byteOffset);
+        if (gcmIS_ERROR(status)) return status;
+        clsROPERAND_InitializeUsingIOperand(srcBuf, srcIOperand);
+        srcPtr = srcBuf;
+    }
     functionName = PolynaryExpr->funcName->symbol;
     if ((strcmp(functionName, "atomic_add") == 0) ||
         (strcmp(functionName, "atom_add") == 0))
@@ -6963,7 +8061,7 @@ _GenAtomCode(
                              PolynaryExpr->exprBase.base.stringNo,
                              opcode,
                              IOperand,
-                             &OperandsParameters[0].rOperands[0],
+                             srcPtr,
                              cmpOperand,
                              valOperand);
     if (gcmIS_ERROR(status)) return status;
@@ -6971,7 +8069,6 @@ _GenAtomCode(
     return gcvSTATUS_OK;
 }
 
-#if _SUPPORT_PRINTF_BUILTIN
 #define _cldPrintfConversionSpecifiers "diouxXfFeEgGaAcsp"
 #define _cldDigits                     "0123456789"
 
@@ -7689,6 +8786,5 @@ OnError:
 
     return status;
 }
-#endif
 
 #endif /* __gc_cl_built_ins_common_h_ */

@@ -33,6 +33,10 @@
  */
 #define C_MAX_CONVOLUTION_DIM (15)
 
+#define C_MAX_NONLINEAR_DIM (9)
+
+#define VX_INT_MAX_PATH     (256)
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -171,9 +175,16 @@ gcfVX_GetImageInfo(
     IN vx_uint32 Multiply
     );
 
+gceSTATUS
+gcfVX_GetImageInfoFromTensor(
+    IN vx_enum              borderMode,
+    IN vx_tensor            tensor,
+    IN gcsVX_IMAGE_INFO_PTR Info
+    );
+
 /* base kernel function */
 vx_status Convolve(vx_node node, vx_image src, vx_image dst, vx_int16* matrix, vx_uint32 scale, vx_bool clamp,
-                   vx_size conv_width, vx_size conv_height, vx_border_mode_t *bordermode);
+                   vx_size conv_width, vx_size conv_height, vx_border_t *bordermode);
 
 vx_status vxAbsDiff(vx_node node, vx_image in1, vx_image in2, vx_image output);
 
@@ -195,15 +206,15 @@ vx_status vxChannelExtract(vx_node node, vx_image src, vx_scalar channel, vx_ima
 vx_status vxConvertColor(vx_node node, vx_image src, vx_image dst);
 vx_status vxConvertDepth(vx_node node, vx_image input, vx_image output, vx_scalar spol, vx_scalar sshf);
 
-vx_status vxConvolve(vx_node node, vx_image src, vx_convolution conv, vx_image dst, vx_border_mode_t *bordermode);
-vx_status vxConvolution3x3(vx_node node, vx_image src, vx_image dst, vx_int16 conv[3][3], const vx_border_mode_t *borders);
+vx_status vxConvolve(vx_node node, vx_image src, vx_convolution conv, vx_image dst, vx_border_t *bordermode);
+vx_status vxConvolution3x3(vx_node node, vx_image src, vx_image dst, vx_int16 conv[3][3], const vx_border_t *borders);
 
 vx_status vxFast9Corners(vx_node node, vx_image src, vx_scalar sens, vx_scalar nonm,
-                         vx_array points, vx_scalar num_corners, vx_border_mode_t *bordermode, vx_reference* staging);
+                         vx_array points, vx_scalar num_corners, vx_border_t *bordermode, vx_reference* staging);
 
-vx_status vxMedian3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *bordermode);
-vx_status vxBox3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *bordermode);
-vx_status vxGaussian3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *bordermode);
+vx_status vxMedian3x3(vx_node node, vx_image src, vx_image dst, vx_border_t *bordermode);
+vx_status vxBox3x3(vx_node node, vx_image src, vx_image dst, vx_border_t *bordermode);
+vx_status vxGaussian3x3(vx_node node, vx_image src, vx_image dst, vx_border_t *bordermode);
 
 vx_status vxHistogram(vx_node node, vx_image src, vx_distribution dist, vx_reference* staging);
 
@@ -218,8 +229,8 @@ vx_status vxTableLookup(vx_node node, vx_image src, vx_lut lut, vx_image dst);
 vx_status vxMeanStdDev(vx_node node, vx_image input, vx_scalar mean, vx_scalar stddev);
 vx_status vxMinMaxLoc(vx_node node, vx_image input, vx_scalar minVal, vx_scalar maxVal, vx_array minLoc, vx_array maxLoc, vx_scalar minCount, vx_scalar maxCount, vx_reference* staging);
 
-vx_status vxErode3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *bordermode);
-vx_status vxDilate3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *bordermode);
+vx_status vxErode3x3(vx_node node, vx_image src, vx_image dst, vx_border_t *bordermode);
+vx_status vxDilate3x3(vx_node node, vx_image src, vx_image dst, vx_border_t *bordermode);
 
 vx_status vxMagnitude(vx_node node, vx_image grad_x, vx_image grad_y, vx_image output);
 
@@ -234,29 +245,29 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
     );
 
 vx_status vxPhase(vx_node node, vx_image grad_x, vx_image grad_y, vx_image output);
-vx_status vxRemap(vx_node node, vx_image input, vx_remap remap, vx_enum policy, vx_border_mode_t *borders, vx_image output);
+vx_status vxRemap(vx_node node, vx_image input, vx_remap remap, vx_enum policy, vx_border_t *borders, vx_image output);
 
-vx_status vxScaleImage(vx_node node, vx_image src_image, vx_image dst_image, vx_scalar stype, vx_border_mode_t *bordermode, vx_float64 *interm, vx_size size);
+vx_status vxScaleImage(vx_node node, vx_image src_image, vx_image dst_image, vx_scalar stype, vx_border_t *bordermode, vx_float64 *interm, vx_size size);
 
-vx_status vxSobel3x3(vx_node node, vx_image input, vx_image grad_x, vx_image grad_y, vx_border_mode_t *bordermode);
+vx_status vxSobel3x3(vx_node node, vx_image input, vx_image grad_x, vx_image grad_y, vx_border_t *bordermode);
 
 vx_status vxScharr3x3(vx_node node, vx_image input, vx_image grad_x, vx_image grad_y);
 
 vx_status vxThreshold(vx_node node, vx_image src_image, vx_threshold threshold, vx_image dst_image);
 
-vx_status vxWarpPerspective(vx_node node, vx_image src_image, vx_matrix matrix, vx_scalar stype, vx_image dst_image, const vx_border_mode_t *borders);
-vx_status vxWarpAffine(vx_node node, vx_image src_image, vx_matrix matrix, vx_scalar stype, vx_image dst_image, const vx_border_mode_t *borders);
+vx_status vxWarpPerspective(vx_node node, vx_image src_image, vx_matrix matrix, vx_scalar stype, vx_image dst_image, const vx_border_t *borders);
+vx_status vxWarpAffine(vx_node node, vx_image src_image, vx_matrix matrix, vx_scalar stype, vx_image dst_image, const vx_border_t *borders);
 
 /* internal kernel function */
-vx_status vxSobelMxN(vx_node node, vx_image input, vx_scalar win, vx_image grad_x, vx_image grad_y, vx_border_mode_t *bordermode);
+vx_status vxSobelMxN(vx_node node, vx_image input, vx_scalar win, vx_image grad_x, vx_image grad_y, vx_border_t *bordermode);
 vx_status vxNorm(vx_node node, vx_image input_x, vx_image input_y, vx_scalar norm_type, vx_image output);
-vx_status vxNonMaxSuppression(vx_node node, vx_image i_mag, vx_image i_ang, vx_image i_edge, vx_border_mode_t *borders);
+vx_status vxNonMaxSuppression(vx_node node, vx_image i_mag, vx_image i_ang, vx_image i_edge, vx_border_t *borders);
 
 vx_status vxEdgeTraceThreshold(vx_node node, vx_image input, vx_threshold threshold, vx_image output);
 vx_status vxEdgeTraceHysteresis(vx_node node, vx_image input, vx_scalar flag);
 vx_status vxEdgeTraceClamp(vx_node node, vx_image input, vx_image output);
 
-vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image dst, vx_scalar scales, vx_scalar winds, vx_scalar sens, vx_border_mode_t borders);
+vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image dst, vx_scalar scales, vx_scalar winds, vx_scalar sens, vx_border_t borders);
 vx_status vxEuclideanNonMaxSuppression(vx_node node, vx_image src, vx_scalar thr, vx_scalar rad, vx_image dst);
 
 vx_status vxImageLister(vx_node node, vx_image src, vx_array arrays, vx_scalar num, vx_reference* staging);
@@ -288,7 +299,9 @@ vx_status vxPathCost_0(vx_node node, vx_image cost, vx_image lr, vx_uint32 disp_
 
 vx_status vxSelectDisp(vx_node node, vx_image path, vx_image depth, vx_uint32 disp_range, vx_uint32 width, vx_uint32 height);
 
-vx_status vxLaplacian3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *bordermode);
+vx_status vxNonLinearFilter(vx_node node, vx_scalar function, vx_image src, vx_matrix mask, vx_image dst, vx_border_t *border);
+
+vx_status vxLaplacian3x3(vx_node node, vx_image src, vx_image dst, vx_border_t *bordermode);
 
 vx_status vxCensus3x3(vx_node node, vx_image src, vx_image dst);
 
@@ -311,6 +324,18 @@ vx_status vxROIPool(vx_node node, vx_array input1, vx_array input2, vx_scalar ke
 vx_status vxRPN(vx_node node, vx_array src, vx_array dst0, vx_array dst1);
 
 vx_status vxRCNNSoftEnd(vx_node node, vx_array src, vx_array src_bbox, vx_array prob, vx_array ddbox, vx_scalar batch, vx_scalar networkType);
+
+vx_status vxNNExecute(vx_node node,
+                      vx_array cmd_buf, vx_uint32 cmdOffset,
+                      vx_weights_biases_parameter weights_biases, vx_uint32 wbOffset,
+                      vx_tensor inputs, vx_uint32 inputOffset,
+                      vx_tensor outputs, vx_uint32 outputOffset);
+
+vx_status vxTPExecute(vx_node node,
+                      vx_array cmd_buf,
+                      vx_weights_biases_parameter weights_biases,
+                      vx_tensor inputs,
+                      vx_tensor outputs);
 
 #ifdef __cplusplus
 }

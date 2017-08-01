@@ -12,6 +12,9 @@
 
 
 #include "gc_cl_precomp.h"
+#if defined(__QNXNTO__)
+#include <stdlib.h>
+#endif
 
 #ifdef WIN32
 #include <windows.h>
@@ -23,7 +26,49 @@ DllMain(
     IN LPVOID Reserved
 )
 {
+    switch (Reason)
+    {
+    case DLL_PROCESS_ATTACH:
+        break;
+
+    case DLL_PROCESS_DETACH:
+        if(clgDispatchTable)
+        {
+            free(clgDispatchTable);
+            clgDispatchTable = NULL;
+        }
+
+        if(clgDevices) gcmOS_SAFE_FREE(gcvNULL, clgDevices);
+
+        if (clgGlobalId == gcvNULL)
+        {
+            gcoOS_AtomDestroy(gcvNULL, clgGlobalId);
+        }
+
+        break;
+
+    case DLL_THREAD_DETACH:
+        break;
+    }
     return gcvTRUE;
+}
+#elif defined(__linux__) || defined(ANDROID) || defined(__QNXNTO__)
+static void __attribute__((destructor)) _ModuleDestructor(void);
+
+static void _ModuleDestructor(void)
+{
+    if(clgDispatchTable)
+    {
+        free(clgDispatchTable);
+        clgDispatchTable = NULL;
+    }
+
+    if(clgDevices) gcmOS_SAFE_FREE(gcvNULL, clgDevices);
+
+    if (clgGlobalId == gcvNULL)
+    {
+        gcoOS_AtomDestroy(gcvNULL, clgGlobalId);
+    }
 }
 #endif
 

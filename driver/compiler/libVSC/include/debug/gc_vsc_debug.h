@@ -26,26 +26,28 @@
 #include "gc_vsc_debug_extern.h"
 
 typedef enum {
-    VSC_DI_TAG_INVALID,
-    VSC_DI_TAG_COMPILE_UNIT,
-    VSC_DI_TAG_VARIABE,
-    VSC_DI_TAG_SUBPROGRAM,
-    VSC_DI_TAG_LEXICALBLOCK,
-    VSC_DI_TAG_PARAMETER,
-    VSC_DI_TAG_CONSTANT,
-    VSC_DI_TAG_TYPE,
+    VSC_DI_TAG_INVALID       = 0,
+    VSC_DI_TAG_COMPILE_UNIT  = 1,
+    VSC_DI_TAG_VARIABE       = 2,
+    VSC_DI_TAG_SUBPROGRAM    = 3,
+    VSC_DI_TAG_LEXICALBLOCK  = 4,
+    VSC_DI_TAG_PARAMETER     = 5,
+    VSC_DI_TAG_CONSTANT      = 6,
+    VSC_DI_TAG_TYPE          = 7,
 }VSC_DIE_TAG;
 
+typedef enum{
+    VSC_DIE_REG_TYPE_TMP,
+    VSC_DIE_REG_TYPE_CONST,
+}VSC_DIE_REG_TYPE;
+
 typedef struct _VSC_DI_REG{
+    VSC_DIE_REG_TYPE    type;
     gctUINT16 start;
     gctUINT16 end;
+    /* we need consider give mask for every reg, for struct, etc */
+    gctUINT16 mask;
 }VSC_DI_REG;
-
-typedef struct _VSC_DI_OFFSET{
-    gctUINT32 baseAddr;
-    gctUINT16 offset;
-    gctUINT16 endOffset;
-}VSC_DI_OFFSET;
 
 #define VSC_DI_INVALID_SW_LOC        0xffff
 
@@ -75,8 +77,8 @@ typedef struct _VSC_DI_HW_LOC{
     gctBOOL reg;
     union
     {
-        struct _VSC_DI_REG reg;
-        struct _VSC_DI_OFFSET offset;
+        VSC_DI_HW_REG reg;
+        VSC_DI_OFFSET offset;
     }u;
 }VSC_DI_HW_LOC;
 
@@ -108,31 +110,23 @@ struct _VSC_DIE
     gctUINT8 fileNo;
     gctUINT8 colNo;
     gctUINT16 lineNo;
+    gctUINT16 endLineNo;
 
     union
     {
         struct
         {
-            VSC_DI_SW_LOC loc;
+            gctUINT16 swLoc;
             VSC_DI_TYPE type;
         }
         variable;
 
         struct
         {
-            gctUINT16 startLineNo;
-            gctUINT16 endLineNo;
             gctUINT16 pcLine[2];
             VSC_DI_TYPE retType;
         }
         func;
-
-        struct
-        {
-            gctUINT16 startLineNo;
-            gctUINT16 endLineNo;
-        }
-        lexScope;
 
         VSC_DI_TYPE type;
     }u;
@@ -152,6 +146,7 @@ typedef gceSTATUS (* PFN_Free)(
     );
 
 #define VSC_DI_INVALIDE_DIE 0xffff
+#define VSC_DI_SPACE_SKIP_DIE 0xfffe
 
 #define VSC_DI_STRTABLE_INIT_SIZE    10240
 
@@ -184,6 +179,26 @@ struct _VSC_DI_DIE_INDEX{
 #define VSC_DI_MC_RANGE_START(mc)  ((mc) & VSC_DI_MC_RANGE_MASK)
 #define VSC_DI_MC_RANGE_END(mc)   (((mc) >> VSC_DI_MC_RANGE_SHIFT) & VSC_DI_MC_RANGE_MASK)
 #define VSC_DI_MC_RANGE(start, end) ((start) | ((end) << VSC_DI_MC_RANGE_SHIFT ))
+
+#define VSC_DI_CALL_DEPTH       4
+
+typedef enum {
+    VSC_STEP_STATE_NONE = 0,
+    VSC_STEP_STATE_OVER,
+    VSC_STEP_STATE_INTO,
+    VSC_STEP_STATE_OUT,
+} VSC_STEP_STATE;
+
+typedef struct _VSC_DI_CALL_STACK
+{
+    VIR_SourceFileLoc sourceLoc; /* current location */
+    VIR_SourceFileLoc nextSourceLoc;
+
+    gctUINT nextPC;
+
+    VSC_DIE * die; /* DIE of this subprogram */
+
+} VSC_DI_CALL_STACK;
 
 /* use to record source line to mc line mapping */
 typedef struct _VSC_DI_LINE_TABLE_MAP
@@ -230,7 +245,11 @@ typedef struct{
 
     gctUINT16 cu;
 
-    gctCHAR tmpLog[VSC_DI_TEMP_LOG_SIZE];
+    gctCHAR * tmpLog;
+
+    VSC_DI_CALL_STACK callStack[VSC_DI_CALL_DEPTH]; /* always be current call frame */
+    gctINT32 callDepth;
+    VSC_STEP_STATE stepState;
 }VSC_DIContext;
 
 
@@ -254,6 +273,7 @@ vscDIAddDIE(
     gctCONST_STRING name,
     gctUINT fileNo,
     gctUINT lineNo,
+    gctUINT endLineNo,
     gctUINT colNo
     );
 
@@ -261,7 +281,8 @@ void
 vscDIDumpDIE(
     VSC_DIContext * context,
     gctUINT16 id,
-    gctUINT shift
+    gctUINT shift,
+    gctUINT tag
     );
 
 gctUINT16
@@ -278,7 +299,8 @@ vscDIGetDIE(
 void
 vscDIDumpDIETree(
     VSC_DIContext * context,
-    gctUINT16 id
+    gctUINT16 id,
+    gctUINT tag
     );
 
 gceSTATUS
@@ -340,20 +362,17 @@ vscDIGetSWLoc(
 void
 vscDISetHwLocToSWLoc(
     VSC_DIContext * context,
-    gctUINT16 swLoc,
-    gctUINT16 hwLoc
+    VSC_DI_SW_LOC * swLoc,
+    VSC_DI_HW_LOC * hwLoc
     );
 
-void vscDIDumpLocTable(
-    VSC_DIContext * context
-    );
-
-gctBOOL vscDIGetVaribleLocByNameAndPC(
+void
+vscDIChangeUniformSWLoc(
     VSC_DIContext * context,
-    gctUINT pc,
-    char * name,
-    VSC_DI_HW_LOC ** loc
-    );
+    gctUINT tmpStart,
+    gctUINT tmpEnd,
+    gctUINT uniformIdx);
+
 #endif
 
 

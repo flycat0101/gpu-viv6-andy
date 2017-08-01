@@ -589,6 +589,7 @@ _LoadBuiltinConstants(IN cloCOMPILER Compiler)
         __BUILD_BUILT_IN(NON_LVAL)
 
         __BUILD_BUILT_IN(BARRIER)
+        __BUILD_BUILT_IN(MEM_FENCE)
         __BUILD_BUILT_IN(LOAD)
         __BUILD_BUILT_IN(STORE)
         __BUILD_BUILT_IN(STORE1)
@@ -2028,6 +2029,8 @@ clGenInverseCode(
                 &intermIOperands[6],
                 &twenty5To1ROperand);
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            LineNo,
+                                            StringNo,
                                             CodeGenerator,
                                             &selectContextSmallRcp, 0);
         /*Normal case, don't need enlarge, set enlarge factor = 1.0 */
@@ -2351,6 +2354,8 @@ clGenDivCode(
                 &cnst_25ROperand);
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            LineNo,
+                                            StringNo,
                                             CodeGenerator,
                                             &selectContextBigY,
                                             0);
@@ -2481,24 +2486,24 @@ clGenDivCode(
         IOperand->dataType.elementType = clvTYPE_FLOAT;
         clmGEN_CODE_ELSE(Compiler,
                            CodeGenerator,
-                           PolynaryExpr->exprBase.base.lineNo,
-                           PolynaryExpr->exprBase.base.stringNo);
+                           LineNo,
+                           StringNo);
 
        clmGEN_CODE_ENDIF(Compiler,
                          CodeGenerator,
-                         PolynaryExpr->exprBase.base.lineNo,
-                         PolynaryExpr->exprBase.base.stringNo);
+                         LineNo,
+                         StringNo);
 
 
        clmGEN_CODE_ELSE(Compiler,
                            CodeGenerator,
-                           PolynaryExpr->exprBase.base.lineNo,
-                           PolynaryExpr->exprBase.base.stringNo);
+                           LineNo,
+                           StringNo);
 
        clmGEN_CODE_ENDIF(Compiler,
                          CodeGenerator,
-                         PolynaryExpr->exprBase.base.lineNo,
-                         PolynaryExpr->exprBase.base.stringNo);
+                         LineNo,
+                         StringNo);
 
     }
 OnError:
@@ -2694,7 +2699,8 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"get_global_offset",  gcvFALSE,    gcvFALSE,   gcvNULL, _GenGetGlobalOffsetCode},
 
     /* Synchronization function. */
-    {"barrier",           gcvFALSE,    gcvFALSE,   gcvNULL, _GenBarrierCode},
+    {"barrier",            gcvFALSE,    gcvFALSE,   gcvNULL, _GenBarrierCode},
+    {"mem_fence",          gcvFALSE,    gcvFALSE,   gcvNULL, _GenMemFenceCode},
 
     /* Conversion functions - non-saturated mode */
     {"convert_char",       gcvFALSE,    gcvFALSE,   gcvNULL, _GenConvert_rtzCode},
@@ -4296,6 +4302,14 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
 
     {"viv_mul_rtz",     gcvFALSE,       gcvTRUE,        gcvNULL, _GenNativeMulRtzCode},
 
+
+    {"viv_findLSB",         gcvFALSE,       gcvFALSE,        gcvNULL, _GenFindLSBCode},
+    {"viv_findMSB",         gcvFALSE,       gcvFALSE,        gcvNULL, _GenFindMSBCode},
+    {"viv_bitfieldReverse", gcvFALSE,       gcvFALSE,        gcvNULL, _GenBitReversalCode},
+    {"viv_byteReverse",     gcvFALSE,       gcvFALSE,        gcvNULL, _GenByteReversalCode},
+    {"viv_bitfieldExtract", gcvFALSE,       gcvFALSE,        gcvNULL, _GenBitExtractCode},
+    {"viv_bitfieldInsert",  gcvFALSE,       gcvFALSE,        gcvNULL, _GenBitInsertCode},
+
     /* Relational Functions */
     {"isequal",         gcvTRUE,        gcvTRUE,        gcvNULL, _GenEqualCode},
     {"isnotequal",      gcvTRUE,        gcvTRUE,        gcvNULL, _GenNotEqualCode},
@@ -4539,11 +4553,7 @@ static clsBUILTIN_FUNCTION_INFO    _BuiltinFunctionInfos[] =
     {"atom_or",         gcvFALSE,       gcvFALSE,       gcvNULL, _GenAtomCode},
     {"atom_and",        gcvFALSE,       gcvFALSE,       gcvNULL, _GenAtomCode},
     {"atom_xor",        gcvFALSE,       gcvFALSE,       gcvNULL, _GenAtomCode},
-
-#if _SUPPORT_PRINTF_BUILTIN
     {"printf",          gcvFALSE,       gcvFALSE,       gcvNULL, _GenPrintfCode},
-#endif
-
 };
 
 #define _cldBuiltinFunctionCount \
@@ -4788,6 +4798,8 @@ OUT cloIR_CONSTANT * ResultConstant
 
 extern clsBUILTIN_FUNCTION    MathBuiltinFunctions[];
 
+/* Do allocate of the local variables instead of defining them as arrays to avoid potential
+   overrun of run time stack */
 static gceSTATUS
 _GenBuiltinVectorCode(
     IN cloCOMPILER Compiler,
@@ -4799,17 +4811,20 @@ _GenBuiltinVectorCode(
     IN cltBUILT_IN_GEN_CODE_FUNC_PTR genCode
     )
 {
-    gceSTATUS    status;
+    gceSTATUS    status = gcvSTATUS_OK;
     gctUINT8 vectorSize = clmGEN_CODE_vectorSize_GET(OperandsParameters[0].dataTypes[0].def);
     gctUINT8 i;
     gctUINT opCnt;
-    clsROPERAND    tempROperand[16*4], copyROperand[16], cntROperands[2], inputROperands[16], destInitROperand;
-    clsIOPERAND tempIOperand, cntIOperands[2], inputIOperands[16];
-    clsLOPERAND tempLOperand, destLOperands[16];
-    clsROPERAND    vSizeROperand, zero123ROperands[16], zero123X4ROperands[16], negOneROperand;
+    clsROPERAND    *tempROperand, *copyROperand, *cntROperands, *inputROperands, destInitROperand;
+    clsIOPERAND *tempIOperand, *cntIOperands, *inputIOperands;
+    clsLOPERAND *tempLOperand, *destLOperands;
+    clsROPERAND    vSizeROperand, *zero123ROperands, *zero123X4ROperands, negOneROperand;
     clsSELECTION_CONTEXT   selectionContextLoopBack;
     gctUINT8 copy_matrixSize_rowCount[16];
     gctUINT8 copy_matrixSize_columnCount[16];
+    gctPOINTER rPointer = gcvNULL;
+    gctPOINTER iPointer = gcvNULL;
+    gctPOINTER lPointer = gcvNULL;
 #if cldNoInlineVectorToScalar
     cloIR_POLYNARY_EXPR scalarFuncCall = gcvNULL;
 
@@ -4825,6 +4840,31 @@ _GenBuiltinVectorCode(
     }
 #endif
 
+    gcmASSERT(OperandCount < 5);
+    status = cloCOMPILER_Allocate(Compiler,
+                                  sizeof(clsROPERAND) * 130,
+                                  &rPointer);
+    if (gcmIS_ERROR(status)) return status;
+    tempROperand = rPointer;
+    copyROperand = tempROperand + 64;
+    cntROperands = copyROperand + 16;
+    inputROperands = cntROperands + 2;
+    zero123ROperands = inputROperands + 16;
+    zero123X4ROperands = zero123ROperands + 16;
+
+    gcmONERROR(cloCOMPILER_Allocate(Compiler,
+                                    sizeof(clsIOPERAND) * 19,
+                                    &iPointer));
+    tempIOperand = iPointer;
+    cntIOperands = tempIOperand + 1;
+    inputIOperands = cntIOperands + 2;
+
+    gcmONERROR(cloCOMPILER_Allocate(Compiler,
+                                    sizeof(clsLOPERAND) * 17,
+                                    &lPointer));
+    tempLOperand = lPointer;
+    destLOperands = tempLOperand + 1;
+
     for(opCnt = 0; opCnt<OperandCount; opCnt++){
         copyROperand[opCnt] = OperandsParameters[opCnt].rOperands[0];
         copy_matrixSize_rowCount[opCnt] = OperandsParameters[opCnt].dataTypes[0].def.matrixSize.rowCount;
@@ -4836,11 +4876,11 @@ _GenBuiltinVectorCode(
         clsROPERAND_InitializeUsingIOperand(&inputROperands[opCnt], &inputIOperands[opCnt]);
 
     }
-    clsLOPERAND_InitializeUsingIOperand(&tempLOperand, IOperand);
-    clsIOPERAND_New(Compiler, &tempIOperand, IOperand->dataType);
+    clsLOPERAND_InitializeUsingIOperand(tempLOperand, IOperand);
+    clsIOPERAND_New(Compiler, tempIOperand, IOperand->dataType);
     /*Force to Scalar */
-    tempIOperand.dataType.matrixSize.columnCount = 0;
-    tempIOperand.dataType.matrixSize.rowCount = 0;
+    tempIOperand->dataType.matrixSize.columnCount = 0;
+    tempIOperand->dataType.matrixSize.rowCount = 0;
 
     for(i = 0; i<2; i++){
         clsIOPERAND_New(Compiler, &cntIOperands[i], clmGenCodeDataType(T_UINT));
@@ -4848,7 +4888,7 @@ _GenBuiltinVectorCode(
     }
 
     clsROPERAND_InitializeIntOrIVecConstant(&destInitROperand,
-                                            tempIOperand.dataType,
+                                            tempIOperand->dataType,
                                             (gctUINT) 0);
     for(i = 0; i<vectorSize; i++){
         for(opCnt = 0; opCnt<OperandCount; opCnt++){
@@ -4859,12 +4899,12 @@ _GenBuiltinVectorCode(
                 tempROperand[4*i + opCnt] = copyROperand[opCnt];
             }
         }
-        clmLOPERAND_vectorComponent_GET(&destLOperands[i], &tempLOperand, i);
-        status = clGenAssignCode(Compiler,
-                                 PolynaryExpr->exprBase.base.lineNo,
-                                 PolynaryExpr->exprBase.base.stringNo,
-                                 &destLOperands[i],
-                                 &destInitROperand);
+        clmLOPERAND_vectorComponent_GET(&destLOperands[i], tempLOperand, i);
+        gcmONERROR(clGenAssignCode(Compiler,
+                                   PolynaryExpr->exprBase.base.lineNo,
+                                   PolynaryExpr->exprBase.base.stringNo,
+                                   &destLOperands[i],
+                                   &destInitROperand));
     }
 
 
@@ -4883,34 +4923,31 @@ _GenBuiltinVectorCode(
     clsROPERAND_InitializeIntOrIVecConstant(&negOneROperand,
                                             clmGenCodeDataType(T_INT),
                                             (gctINT) -1);
-    status = clGenGenericCode1(Compiler,
+    gcmONERROR(clGenGenericCode1(Compiler,
                             PolynaryExpr->exprBase.base.lineNo,
                             PolynaryExpr->exprBase.base.stringNo,
                             clvOPCODE_ASSIGN,
                             &cntIOperands[0],
-                            &zero123ROperands[0]);
+                            &zero123ROperands[0]));
 
     for(opCnt = 0; opCnt<OperandCount; opCnt++){
         OperandsParameters[opCnt].rOperands[0] = inputROperands[opCnt];
     }
 
-    status = clDefineSelectionBegin(Compiler,
+    gcmONERROR(clDefineSelectionBegin(Compiler,
                                     CodeGenerator,
                                     gcvTRUE,
-                                    &selectionContextLoopBack);
-    if (gcmIS_ERROR(status)) return status;
+                                    &selectionContextLoopBack));
 
     /* Loop End, jump back here*/
-    status = clDefineSelectionFalseOperandBegin(Compiler,
-                                            CodeGenerator,
-                                            &selectionContextLoopBack);
+    gcmONERROR(clDefineSelectionFalseOperandBegin(Compiler,
+                                                  CodeGenerator,
+                                                  &selectionContextLoopBack));
 
 
-    status = clDefineSelectionFalseOperandEnd(Compiler,
-                                    CodeGenerator,
-                                    &selectionContextLoopBack);
-
-    if (gcmIS_ERROR(status)) return status;
+    gcmONERROR(clDefineSelectionFalseOperandEnd(Compiler,
+                                                CodeGenerator,
+                                                &selectionContextLoopBack));
 
     /* Initialize the input value by using last argument.
     ** Otherwise it would create a uninitialize temp register.
@@ -4919,22 +4956,22 @@ _GenBuiltinVectorCode(
     {
         if(clmGEN_CODE_IsScalarDataType(copyROperand[opCnt].dataType) == 0)
         {
-            status = clGenGenericCode1(Compiler,
-                        PolynaryExpr->exprBase.base.lineNo,
-                        PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_ASSIGN,
-                        &inputIOperands[opCnt],
-                        &tempROperand[4*(vectorSize - 1) + opCnt]);
+            gcmONERROR(clGenGenericCode1(Compiler,
+                                         PolynaryExpr->exprBase.base.lineNo,
+                                         PolynaryExpr->exprBase.base.stringNo,
+                                         clvOPCODE_ASSIGN,
+                                         &inputIOperands[opCnt],
+                                         &tempROperand[4*(vectorSize - 1) + opCnt]));
         }
         else
         {
-            status = clGenArithmeticExprCode(Compiler,
-                        PolynaryExpr->exprBase.base.lineNo,
-                        PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_ADD,
-                        &inputIOperands[opCnt],
-                        &tempROperand[opCnt],
-                        &zero123X4ROperands[vectorSize - 1]);
+            gcmONERROR(clGenArithmeticExprCode(Compiler,
+                                               PolynaryExpr->exprBase.base.lineNo,
+                                               PolynaryExpr->exprBase.base.stringNo,
+                                               clvOPCODE_ADD,
+                                               &inputIOperands[opCnt],
+                                               &tempROperand[opCnt],
+                                               &zero123X4ROperands[vectorSize - 1]));
         }
     }
 
@@ -4953,22 +4990,22 @@ _GenBuiltinVectorCode(
         {
             if(clmGEN_CODE_IsScalarDataType(copyROperand[opCnt].dataType) == 0)
             {
-                status = clGenGenericCode1(Compiler,
-                            PolynaryExpr->exprBase.base.lineNo,
-                            PolynaryExpr->exprBase.base.stringNo,
-                            clvOPCODE_ASSIGN,
-                            &inputIOperands[opCnt],
-                            &tempROperand[4*i + opCnt]);
+                gcmONERROR(clGenGenericCode1(Compiler,
+                                             PolynaryExpr->exprBase.base.lineNo,
+                                             PolynaryExpr->exprBase.base.stringNo,
+                                             clvOPCODE_ASSIGN,
+                                             &inputIOperands[opCnt],
+                                             &tempROperand[4*i + opCnt]));
             }
             else
             {
-                status = clGenArithmeticExprCode(Compiler,
-                            PolynaryExpr->exprBase.base.lineNo,
-                            PolynaryExpr->exprBase.base.stringNo,
-                            clvOPCODE_ADD,
-                            &inputIOperands[opCnt],
-                            &tempROperand[opCnt],
-                            &zero123X4ROperands[i]);
+                gcmONERROR(clGenArithmeticExprCode(Compiler,
+                                                   PolynaryExpr->exprBase.base.lineNo,
+                                                   PolynaryExpr->exprBase.base.stringNo,
+                                                   clvOPCODE_ADD,
+                                                   &inputIOperands[opCnt],
+                                                   &tempROperand[opCnt],
+                                                   &zero123X4ROperands[i]));
             }
         }
 
@@ -4982,122 +5019,115 @@ _GenBuiltinVectorCode(
                      CodeGenerator,
                      PolynaryExpr->exprBase.base.lineNo,
                      PolynaryExpr->exprBase.base.stringNo);
-        if (gcmIS_ERROR(status)) return status;
+        gcmONERROR(status);
     }
 #if cldNoInlineVectorToScalar
-        if(scalarFuncCall) {
-            clsGEN_CODE_PARAMETERS rtnParameters[1];
+    if(scalarFuncCall) {
+        clsGEN_CODE_PARAMETERS rtnParameters[1];
 
-            clsGEN_CODE_PARAMETERS_Initialize(rtnParameters,
-                                gcvFALSE,
-                                gcvTRUE);
-            status = clGenBuiltinFunctionCode(Compiler,
-                              CodeGenerator,
-                              scalarFuncCall,
-                              OperandCount,
-                              OperandsParameters,
-                              &tempIOperand,
-                              rtnParameters,
-                              gcvTRUE);
-            clsGEN_CODE_PARAMETERS_Finalize(rtnParameters);
-            if (gcmIS_ERROR(status)) return status;
-        }
-        else {
-            gcmONERROR((*genCode)(Compiler,
-                          CodeGenerator,
-                          PolynaryExpr,
-                          OperandCount,
-                          OperandsParameters,
-                          &tempIOperand));
-        }
+        clsGEN_CODE_PARAMETERS_Initialize(rtnParameters,
+                            gcvFALSE,
+                            gcvTRUE);
+        status = clGenBuiltinFunctionCode(Compiler,
+                                            CodeGenerator,
+                                            scalarFuncCall,
+                                            OperandCount,
+                                            OperandsParameters,
+                                            tempIOperand,
+                                            rtnParameters,
+                                            gcvTRUE);
+        clsGEN_CODE_PARAMETERS_Finalize(rtnParameters);
+        gcmONERROR(status);
+    }
+    else {
+        gcmONERROR((*genCode)(Compiler,
+                      CodeGenerator,
+                      PolynaryExpr,
+                      OperandCount,
+                      OperandsParameters,
+                      tempIOperand));
+    }
 #else
-            gcmONERROR((*genCode)(Compiler,
-                          CodeGenerator,
-                          PolynaryExpr,
-                          OperandCount,
-                          OperandsParameters,
-                          &tempIOperand));
+    gcmONERROR((*genCode)(Compiler,
+                  CodeGenerator,
+                  PolynaryExpr,
+                  OperandCount,
+                  OperandsParameters,
+                  tempIOperand));
 #endif
 
 
-        clsROPERAND_InitializeUsingIOperand(&tempROperand[0], &tempIOperand);
-        for(i = 0; i<vectorSize; i++){
-          clmGEN_CODE_IF(Compiler,
-                         CodeGenerator,
-                         PolynaryExpr->exprBase.base.lineNo,
-                         PolynaryExpr->exprBase.base.stringNo,
-                         &cntROperands[0],
-                         clvCONDITION_EQUAL,
-                         &zero123ROperands[i]);
-          if(PolynaryExpr->funcName->symbol[0] == 'i' && PolynaryExpr->funcName->symbol[1] == 's'){
-              /*isless, isequal, isnan, vector result is -1 and 0 */
-            status = clGenArithmeticExprCode(Compiler,
+    clsROPERAND_InitializeUsingIOperand(&tempROperand[0], tempIOperand);
+    for(i = 0; i<vectorSize; i++){
+      clmGEN_CODE_IF(Compiler,
+                     CodeGenerator,
+                     PolynaryExpr->exprBase.base.lineNo,
+                     PolynaryExpr->exprBase.base.stringNo,
+                     &cntROperands[0],
+                     clvCONDITION_EQUAL,
+                     &zero123ROperands[i]);
+      if(PolynaryExpr->funcName->symbol[0] == 'i' && PolynaryExpr->funcName->symbol[1] == 's'){
+          /*isless, isequal, isnan, vector result is -1 and 0 */
+          gcmONERROR(clGenArithmeticExprCode(Compiler,
+                                             PolynaryExpr->exprBase.base.lineNo,
+                                             PolynaryExpr->exprBase.base.stringNo,
+                                             clvOPCODE_MUL,
+                                             tempIOperand,
+                                             &negOneROperand,
+                                             &tempROperand[0]));
+
+      }
+      gcmONERROR(clGenAssignCode(Compiler,
+                                 PolynaryExpr->exprBase.base.lineNo,
+                                 PolynaryExpr->exprBase.base.stringNo,
+                                 &destLOperands[i],
+                                 &tempROperand[0]));
+
+      /* The false part, "!==i" */
+      clmGEN_CODE_ELSE(Compiler,
+                       CodeGenerator,
+                       PolynaryExpr->exprBase.base.lineNo,
+                       PolynaryExpr->exprBase.base.stringNo);
+
+      clmGEN_CODE_ENDIF(Compiler,
+                        CodeGenerator,
                         PolynaryExpr->exprBase.base.lineNo,
-                        PolynaryExpr->exprBase.base.stringNo,
-                        clvOPCODE_MUL,
-                        &tempIOperand,
-                        &negOneROperand,
-                        &tempROperand[0]);
+                        PolynaryExpr->exprBase.base.stringNo);
+      gcmONERROR(status);
+    }
 
-          }
-            status = clGenAssignCode(
-                    Compiler,
-                    PolynaryExpr->exprBase.base.lineNo,
-                    PolynaryExpr->exprBase.base.stringNo,
-                    &destLOperands[i],
-                    &tempROperand[0]);
-            if (gcmIS_ERROR(status)) return status;
+    /* Cnt++ */
+    gcmONERROR(clGenArithmeticExprCode(Compiler,
+                                       PolynaryExpr->exprBase.base.lineNo,
+                                       PolynaryExpr->exprBase.base.stringNo,
+                                       clvOPCODE_ADD,
+                                       &cntIOperands[0],
+                                       &cntROperands[0],
+                                       &zero123ROperands[1]));
 
-             /* The false part, "!==i" */
-             clmGEN_CODE_ELSE(Compiler,
-                               CodeGenerator,
-                               PolynaryExpr->exprBase.base.lineNo,
-                               PolynaryExpr->exprBase.base.stringNo);
+    gcmONERROR(clGenSelectionCompareConditionCode(Compiler,
+                                                  CodeGenerator,
+                                                  &selectionContextLoopBack,
+                                                  PolynaryExpr->exprBase.base.lineNo,
+                                                  PolynaryExpr->exprBase.base.stringNo,
+                                                  clvCONDITION_GREATER_THAN_EQUAL,
+                                                  &cntROperands[0],
+                                                  &vSizeROperand));
 
-           clmGEN_CODE_ENDIF(Compiler,
-                             CodeGenerator,
-                             PolynaryExpr->exprBase.base.lineNo,
-                             PolynaryExpr->exprBase.base.stringNo);
-           if (gcmIS_ERROR(status)) return status;
-        }
+    gcmONERROR(clDefineSelectionTrueOperandBegin(Compiler,
+                                                 CodeGenerator,
+                                                 &selectionContextLoopBack));
 
-        /* Cnt++ */
-        status = clGenArithmeticExprCode(Compiler,
-                PolynaryExpr->exprBase.base.lineNo,
-                PolynaryExpr->exprBase.base.stringNo,
-                clvOPCODE_ADD,
-                &cntIOperands[0],
-                &cntROperands[0],
-                &zero123ROperands[1]);
+    gcmONERROR(clDefineSelectionTrueOperandEnd(Compiler,
+                                               PolynaryExpr->exprBase.base.lineNo,
+                                               PolynaryExpr->exprBase.base.stringNo,
+                                               CodeGenerator,
+                                               &selectionContextLoopBack,
+                                               gcvFALSE));
 
-    status = clGenSelectionCompareConditionCode(Compiler,
-                                                CodeGenerator,
-                                                &selectionContextLoopBack,
-                                                PolynaryExpr->exprBase.base.lineNo,
-                                                PolynaryExpr->exprBase.base.stringNo,
-                                                clvCONDITION_GREATER_THAN_EQUAL,
-                                                &cntROperands[0],
-                                                &vSizeROperand);
-    if (gcmIS_ERROR(status)) return status;
-
-    status = clDefineSelectionTrueOperandBegin(Compiler,
-                                            CodeGenerator,
-                                            &selectionContextLoopBack);
-    if (gcmIS_ERROR(status)) return status;
-
-    status = clDefineSelectionTrueOperandEnd(Compiler,
+    gcmONERROR(clDefineSelectionEnd(Compiler,
                                     CodeGenerator,
-                                    &selectionContextLoopBack,
-                                    gcvFALSE);
-
-
-    status = clDefineSelectionEnd(Compiler,
-                                CodeGenerator,
-                                &selectionContextLoopBack);
-    if (gcmIS_ERROR(status)) return status;
-
-
-
+                                    &selectionContextLoopBack));
 
     for(opCnt = 0; opCnt<OperandCount; opCnt++){
         OperandsParameters[opCnt].rOperands[0] = copyROperand[opCnt];
@@ -5105,9 +5135,17 @@ _GenBuiltinVectorCode(
         OperandsParameters[opCnt].dataTypes[0].def.matrixSize.columnCount = copy_matrixSize_columnCount[opCnt];
     }
 
-    return gcvSTATUS_OK;
 OnError:
-   return status;
+    if(rPointer) {
+        cloCOMPILER_Free(Compiler, rPointer);
+    }
+    if(iPointer) {
+        cloCOMPILER_Free(Compiler, iPointer);
+    }
+    if(lPointer) {
+        cloCOMPILER_Free(Compiler, lPointer);
+    }
+    return status;
 }
 
 gceSTATUS

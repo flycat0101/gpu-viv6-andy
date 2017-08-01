@@ -3356,7 +3356,6 @@ gcoTEXTURE_RenderIntoMipMap(
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SINGLE_BUFFER)
                           == gcvSTATUS_TRUE)
     {
-
         gcsSURF_VIEW texView = {map->surface, 0, 1};
         status = gcoSURF_DisableTileStatus(&texView, gcvTRUE);
 
@@ -4199,6 +4198,9 @@ _ReplaceSurfaceForBorderPatch(
         lockedDstNode = gcvNULL;
     }
 
+    gcsSURF_NODE_GetFence(&curSurf->node, gcvENGINE_RENDER, gcvFENCE_TYPE_READ);
+    gcsSURF_NODE_GetFence(&surface->node, gcvENGINE_RENDER, gcvFENCE_TYPE_WRITE);
+
     gcmASSERT(curSurf->hzNode.pool == gcvPOOL_UNKNOWN);
     gcmASSERT(surface->hzNode.pool == gcvPOOL_UNKNOWN);
 
@@ -4465,7 +4467,6 @@ gcoTEXTURE_BindTextureDesc(
     }
     else
     {
-        gctINT j;
         /* Unlock the texture if locked. */
         for (map = Texture->maps; map != gcvNULL; map = map->next)
         {
@@ -4478,20 +4479,6 @@ gcoTEXTURE_BindTextureDesc(
             /* Mark the surface as unlocked. */
             map->locked = gcvNULL;
         }
-
-        for (j = 0; j <= Texture->descCurIndex; j++)
-        {
-            gctINT i;
-            for (i = 0; i < 2; i++)
-            {
-                if (Texture->descArray[j].descLocked[i])
-                {
-                    gcmONERROR(gcoSURF_UnLockNode(Texture->descArray[j].descNode[i], gcvSURF_TXDESC));
-                    Texture->descArray[j].descLocked[i] = gcvNULL;
-                }
-            }
-        }
-
     }
 
 OnError:

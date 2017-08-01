@@ -144,7 +144,8 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
     (VIR_OpcodeInfo[(Opcode)].flags & VIR_OPFLAG_UseCondCode)
 
 #define VIR_OPCODE_isDestEnableFixed(Opcode)                \
-    ((Opcode) == VIR_OP_NORM                            ||  \
+    ((Opcode) == VIR_OP_SWIZZLE                         ||  \
+     (Opcode) == VIR_OP_NORM                            ||  \
      (Opcode) == VIR_OP_ARCTRIG                         ||  \
      (Opcode) == VIR_OP_GET_SAMPLER_LMM                 ||  \
      (Opcode) == VIR_OP_GET_SAMPLER_LBS                 ||  \
@@ -507,6 +508,11 @@ typedef struct _VIR_FUNC_BLOCK          VIR_FB;
 #define VIR_Inst_SetDest(Inst, Dest)        do { (Inst)->__DEST = (Dest); } while (0)
 #define VIR_Inst_SetSource(Inst, SrcNo, Src) do { gcmASSERT(SrcNo < VIR_MAX_SRC_NUM); (Inst)->__SRC[(SrcNo)] = (Src); } while (0)
 #define VIR_Inst_SetSrcLocLine(Inst, Line)  do { (Inst)->sourceLoc.lineNo = Line ;} while(0)
+#define VIR_Inst_CopySrcLoc(SrcLoc, DstLoc) do {                                    \
+                                                (DstLoc).fileId = (SrcLoc).fileId;  \
+                                                (DstLoc).colNo = (SrcLoc).colNo;    \
+                                                (DstLoc).lineNo = (SrcLoc).lineNo;  \
+                                            } while(0)
 
 #define VIR_Inst_SetLoopInvariant(Inst, Val)  do { (Inst)->_isLoopInvariant = (Val); } while (0)
 #define VIR_Inst_SetPatched(Inst, Val)      do { (Inst)->_patched = (Val); } while (0)
@@ -573,7 +579,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 
 #define VIR_Operand_GetLShift(Opnd)         ((VIR_RoundMode)(Opnd)->u.n._lshift)
 
-#define VIR_Operand_GetType(Opnd)           ((Opnd)->u.n._opndType)
+#define VIR_Operand_GetTypeId(Opnd)         ((Opnd)->u.n._opndType)
 #define VIR_Operand_GetEnable(Opnd)         ((VIR_Enable)(Opnd)->u.n._swizzleOrEnable)
 #define VIR_Operand_GetSwizzle(Opnd)        ((VIR_Swizzle)(Opnd)->u.n._swizzleOrEnable)
 #define VIR_Operand_GetFinalAccessType(Opnd) ((Opnd)->u.n._opndType)
@@ -645,7 +651,7 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Operand_SetModifier(Opnd, Val)      do { (Opnd)->header._modifier = (gctUINT)(Val); } while (0)
 #define VIR_Operand_SetTexModifierFlag(Opnd, F) do { ((VIR_Operand_Header_TM *)&((Opnd)->header))->_texmodifiers |= (F); } while (0)
 #define VIR_Operand_ClrTexModifierFlag(Opnd, F) do { ((VIR_Operand_Header_TM *)&((Opnd)->header))->_texmodifiers &= ~(F); } while (0)
-#define VIR_Operand_SetType(Opnd, TypeId)       do { (Opnd)->u.n._opndType = (TypeId); } while (0)
+#define VIR_Operand_SetTypeId(Opnd, TypeId)       do { (Opnd)->u.n._opndType = (TypeId); } while (0)
 #define VIR_Operand_SetSym(Opnd, Val)           do { (Opnd)->u.n.u1.sym = (Val); } while (0)
 #define VIR_Operand_SetFunc(Opnd, Val)          do { (Opnd)->u.n.u1.func = (Val); } while (0)
 #define VIR_Operand_SetIntrinsicKind(Opnd, Val) do { (Opnd)->u.n.u1.intrinsic = (Val); } while (0)
@@ -1148,6 +1154,8 @@ typedef VSC_BL_ITERATOR VIR_InstIterator;
 #define VIR_Uniform_SetRealUseArraySize(Uniform, r)     ((Uniform)->realUseArraySize = (r))
 #define VIR_Uniform_GetInitializer(Uniform)             ((Uniform)->u.initializer)
 #define VIR_Uniform_SetInitializer(Uniform, i)          ((Uniform)->u.initializer = (i))
+#define VIR_Uniform_GetInitializerPtr(Uniform)          ((Uniform)->u.initializerPtr)
+#define VIR_Uniform_SetInitializerPtr(Uniform, p)       ((Uniform)->u.initializerPtr = (p))
 
 #define VIR_UniformBlock_GetBlockSize(UB)               ((UB)->blockSize)
 
@@ -1998,6 +2006,14 @@ typedef enum _VIR_INTRINSICSKIND
                                                      ((Kind) == VIR_IK_texld_proj)              || \
                                                      ((Kind) == VIR_IK_texld_gather)            || \
                                                      ((Kind) == VIR_IK_texld_fetch_ms))
+
+#define VIR_Intrinsics_isInterpolateAtCentroid(Kind)((Kind) == VIR_IK_interpolateAtCentroid)
+#define VIR_Intrinsics_isInterpolateAtSample(Kind)  ((Kind) == VIR_IK_interpolateAtSample)
+#define VIR_Intrinsics_isInterpolateAtOffset(Kind)  ((Kind) == VIR_IK_interpolateAtOffset)
+#define VIR_intrinsics_isInterpolateRelated(Kind)   (VIR_Intrinsics_isInterpolateAtCentroid(Kind)   || \
+                                                      VIR_Intrinsics_isInterpolateAtSample(Kind)    || \
+                                                      VIR_Intrinsics_isInterpolateAtOffset(Kind))
+
 
 #define VIR_OPINFO(OPCODE, OPNDNUM, FLAGS, WRITE2DEST, LEVEL)   VIR_OP_##OPCODE
 typedef enum _VIR_OPCODE
@@ -2895,12 +2911,14 @@ VIR_Shader_GetBuiltInTypes(
 #define VIR_TypeId_isImageArray(Id)         (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_IMAGE_ARRAY) != 0)
 #define VIR_TypeId_isImageBuffer(Id)        (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_IMAGE_BUFFER) != 0)
 #define VIR_TypeId_isImageCube(Id)          (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_IMAGE_CUBE) != 0)
+#define VIR_TypeId_isSubPass(Id)            (VIR_TypeId_isPrimitive(Id) && (VIR_GetTypeFlag(Id) & VIR_TYFLAG_IS_SUBPASS) != 0)
 #define VIR_TypeId_isImage(Id)              (VIR_TypeId_isImage1D(Id)       || \
                                              VIR_TypeId_isImage2D(Id)       || \
                                              VIR_TypeId_isImage3D(Id)       || \
                                              VIR_TypeId_isImageArray(Id)    || \
                                              VIR_TypeId_isImageBuffer(Id)   || \
-                                             VIR_TypeId_isImageCube(Id))
+                                             VIR_TypeId_isImageCube(Id)     || \
+                                             VIR_TypeId_isSubPass(Id))
 
 #define VIR_TypeId_isImageDataFloat(Id)              ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_IMAGE_DATA_FLOAT) != 0)
 #define VIR_TypeId_isImageDataSignedInteger(Id)      ((VIR_GetTypeFlag(Id) & VIR_TYFLAG_IMAGE_DATA_SIGNED_INT) != 0)
@@ -3384,6 +3402,7 @@ typedef enum _VIR_INSTFLAG
     VIR_INSTFLAG_NONE       = 0x00,
     VIR_INSTFLAG_PACKEDMODE = 0x01,
     VIR_INSTFLAG_FULL_DEF   = 0x02,
+    VIR_INSTFLAG_FORCE_GEN  = 0x04,
 }
 VIR_InstFlag;
 
@@ -3601,6 +3620,7 @@ struct _VIR_UNIFORM
     union
     {
         VIR_ConstId         initializer;    /* Compile-time constant value, */
+        VIR_ConstId         *initializerPtr; /* Pointer to compile-time constant values when constant is an array */
         struct
         {
             VIR_SymId       lodMinMax; /* The lodMinMax uniform for this sampler/image. */
@@ -3609,7 +3629,12 @@ struct _VIR_UNIFORM
             VIR_SymId       extraImageLayer; /* The extraImageLayer uniform for this image. */
 
             VIR_SymId       parentSamplerSymId;  /* indicating this attribute uniform belongs to which sampler/image. */
-            gctUINT         arrayIdxInParent; /* If parent is array, which array index in parent */
+            /*
+            ** If parent is an array, which array index in parent, we use this for link lib entry.
+            ** But since we create one only symbol for a sampler array, if there are more than one element in this sampler array need to be transformed,
+            ** then we can't handle it.
+            */
+            gctUINT         arrayIdxInParent;
         } samplerOrImageAttr;
         VIR_SymId          parentSSBO;     /* if the uniform is base addr of SSBO, indicating which SSBO it represents. */
     } u;
@@ -5049,6 +5074,13 @@ VIR_Uniform_Identical(
     );
 
 VSC_ErrCode
+VIR_Sampler_CopyResOpBits(
+    IN VIR_Shader* Shader,
+    IN VIR_Uniform* SourceUniform,
+    IN VIR_Uniform* DestUniform
+    );
+
+VSC_ErrCode
 VIR_Sampler_UpdateResOpBits(
     IN VIR_Shader* Shader,
     IN VIR_Uniform* Sampler,
@@ -5084,6 +5116,11 @@ VIR_InterfaceBlock_CalcDataByteSize(
 /* typeId-related functions. */
 VIR_Enable
 VIR_TypeId_Conv2Enable(
+    IN VIR_TypeId       TypeId
+    );
+
+VIR_Enable
+VIR_TypeId_GetImplicitEnableForPackType(
     IN VIR_TypeId       TypeId
     );
 
@@ -5157,6 +5194,15 @@ VIR_Shader_AddSymbolContents(
 
 VSC_ErrCode
 VIR_Shader_AddSymbol(
+    IN  VIR_Shader *    Shader,
+    IN  VIR_SymbolKind  SymbolKind,
+    IN  VIR_Id          NameOrConstIdOrRegId,
+    IN  VIR_Type*       Type,
+    IN  VIR_StorageClass Storage,
+    OUT VIR_SymId*      SymId);
+
+VSC_ErrCode
+VIR_Shader_FindSymbol(
     IN  VIR_Shader *    Shader,
     IN  VIR_SymbolKind  SymbolKind,
     IN  VIR_Id          NameOrConstIdOrRegId,

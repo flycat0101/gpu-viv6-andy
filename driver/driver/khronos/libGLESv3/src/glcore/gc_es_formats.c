@@ -2493,6 +2493,92 @@ __GLformatInfo __glFormatInfoTable[__GL_FMT_MAX + 1] =
     },
 
     {
+        __GL_FMT_ARGB4,                     /* drvFormat */
+        __GL_ARGB4,                         /* glFormat*/
+        GL_RGBA,                            /* baseFormat */
+        GL_UNSIGNED_NORMALIZED,             /* type */
+        GL_FALSE,                           /* compressed */
+        GL_TRUE,                            /* filterable */
+        GL_TRUE,                            /* renderable */
+        16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
+        4, 4, 4, 4, 0, 0,                   /* r/g/b/a/d/s size */
+        __GL_ARGB4,                         /* data format */
+        GL_UNSIGNED_SHORT_4_4_4_4,          /* data type */
+        0,                                  /* shared size */
+        GL_NONE,
+        GL_NONE,
+        GL_NONE,
+        GL_NONE,
+        GL_NONE,
+        GL_LINEAR,
+    },
+    {
+        __GL_FMT_ABGR4,                     /* drvFormat */
+        __GL_ABGR4,                         /* glFormat*/
+        GL_RGBA,                            /* baseFormat */
+        GL_UNSIGNED_NORMALIZED,             /* type */
+        GL_FALSE,                           /* compressed */
+        GL_TRUE,                            /* filterable */
+        GL_TRUE,                            /* renderable */
+        16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
+        4, 4, 4, 4, 0, 0,                   /* r/g/b/a/d/s size */
+        __GL_ABGR4,                         /* data format */
+        GL_UNSIGNED_SHORT_4_4_4_4,          /* data type */
+        0,                                  /* shared size */
+        GL_NONE,
+        GL_NONE,
+        GL_NONE,
+        GL_NONE,
+        GL_NONE,
+        GL_LINEAR,
+    },
+
+    {
+        __GL_FMT_XRGB4,                     /* drvFormat */
+        __GL_XRGB4,                         /* glFormat*/
+        GL_RGBA,                            /* baseFormat */
+        GL_UNSIGNED_NORMALIZED,             /* type */
+        GL_FALSE,                           /* compressed */
+        GL_TRUE,                            /* filterable */
+        GL_TRUE,                            /* renderable */
+        16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
+        4, 4, 4, 0, 0, 0,                   /* r/g/b/a/d/s size */
+        __GL_XRGB4,                         /* data format */
+        GL_UNSIGNED_SHORT_4_4_4_4,          /* data type */
+        0,                                  /* shared size */
+        GL_NONE,
+        GL_NONE,
+        GL_NONE,
+        GL_NONE,
+        GL_NONE,
+        GL_LINEAR,
+    },
+    {
+        __GL_FMT_XBGR4,                     /* drvFormat */
+        __GL_XBGR4,                         /* glFormat*/
+        GL_RGBA,                            /* baseFormat */
+        GL_UNSIGNED_NORMALIZED,             /* type */
+        GL_FALSE,                           /* compressed */
+        GL_TRUE,                            /* filterable */
+        GL_TRUE,                            /* renderable */
+        16,                                 /* bitsPerPixel */
+        1, 1,                               /* blockW/H */
+        4, 4, 4, 0, 0, 0,                   /* r/g/b/a/d/s size */
+        __GL_XBGR4,                         /* data format */
+        GL_UNSIGNED_SHORT_4_4_4_4,          /* data type */
+        0,                                  /* shared size */
+        GL_NONE,
+        GL_NONE,
+        GL_NONE,
+        GL_NONE,
+        GL_NONE,
+        GL_LINEAR,
+    },
+
+    {
         __GL_FMT_A32F,                      /* drvFormat */
         GL_ALPHA,                           /* glFormat*/
         GL_ALPHA,                           /* baseFormat */
@@ -2895,6 +2981,20 @@ __GLformatInfo* __glGetFormatInfo(GLenum internalFormat)
         break;
     case __GL_BGRX8:
         drvFormat = __GL_FMT_BGRX8;
+        break;
+
+    case __GL_ARGB4:
+        drvFormat = __GL_FMT_ARGB4;
+        break;
+    case __GL_ABGR4:
+        drvFormat = __GL_FMT_ABGR4;
+        break;
+
+    case __GL_XRGB4:
+        drvFormat = __GL_FMT_XRGB4;
+        break;
+    case __GL_XBGR4:
+        drvFormat = __GL_FMT_XBGR4;
         break;
 
     default:

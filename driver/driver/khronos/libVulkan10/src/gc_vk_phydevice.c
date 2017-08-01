@@ -321,8 +321,8 @@ static void __vki_InitializeShaderCaps(
     const gcsFEATURE_DATABASE *database = phyDev->phyDevConfig.database;
     uint32_t i;
 
-
-    shaderCaps->extensions = "";
+    /* GLSL extension string. */
+    shaderCaps->extensions = gcvNULL;
     shaderCaps->maxDrawBuffers = phyDevProp->limits.maxColorAttachments;
     shaderCaps->maxSamples = database->REG_MSAA ? 4 : 1;
     shaderCaps->maxVertTextureImageUnits = phyDevProp->limits.maxPerStageDescriptorSampledImages;
@@ -1101,14 +1101,20 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_EnumeratePhysicalDevices(
             }
         }
 
-        /* Spec does not specify how to handle requests for less than the number of physical devices so we return
-           only the number requested if less than the max. */
         for (i = 0; i < devCount; i++)
         {
             *pPhysicalDevices = (VkPhysicalDevice)&inst->physicalDevice[i];
         }
 
         *pPhysicalDeviceCount = devCount;
+
+        /* If pPhysicalDeviceCount is smaller than the number of physical devices available,
+        ** VK_INCOMPLETE will be returned instead of VK_SUCCESS, to indicate that not all the available physical devices were returned.
+        */
+        if (*pPhysicalDeviceCount < inst->physicalDeviceCount)
+        {
+            __VK_ONERROR(VK_INCOMPLETE);
+        }
     }
     else
     {
@@ -1142,21 +1148,33 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_EnumerateDeviceExtensionProperties(
     VkExtensionProperties* pProperties
     )
 {
+    VkResult result = VK_SUCCESS;
+    uint32_t devExtCount = __VK_COUNTOF(g_DeviceExtensions);
+
     if (!pProperties)
     {
-        *pCount = __VK_COUNTOF(g_DeviceExtensions);
+        *pCount = devExtCount;
     }
     else
     {
         uint32_t i;
+        uint32_t extCount = gcmMIN(*pCount, devExtCount);
 
-        for (i = 0; i < __VK_COUNTOF(g_DeviceExtensions); i++)
+        for (i = 0; i < extCount; i++)
         {
             __VK_MEMCOPY(&pProperties[i], &g_DeviceExtensions[i], sizeof(VkExtensionProperties));
         }
+
+        /* If pPropertyCount is smaller than the number of extensions available, VK_INCOMPLETE will be returned instead of VK_SUCCESS,
+        ** to indicate that not all the available properties were returned.
+        */
+        if (extCount < devExtCount)
+        {
+            result = VK_INCOMPLETE;
+        }
     }
 
-    return VK_SUCCESS;
+    return result;
 }
 
 VKAPI_ATTR void VKAPI_CALL __vk_GetPhysicalDeviceFeatures(

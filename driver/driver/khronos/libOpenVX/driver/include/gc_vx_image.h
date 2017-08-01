@@ -39,6 +39,8 @@ VX_INTERNAL_API vx_bool vxoImage_WrapUserMemory(vx_image image);
 
 VX_INTERNAL_API void vxoImage_FreeWrappedMemory(vx_image image);
 
+VX_INTERNAL_API vx_image VX_API_CALL vxoImage_CreateImageFromInternalHandle(vx_context context, vx_df_image format, vx_imagepatch_addressing_t *addr, void **ptrs, vx_uint32 *phys);
+
 EXTERN_C_END
 
 #endif /* __GC_VX_IMAGE_H__ */

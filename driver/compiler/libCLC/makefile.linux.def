@@ -31,7 +31,6 @@ INCLUDE +=	-I$(AQROOT)/hal/os/linux/user
 INCLUDE +=	-I$(AQROOT)/compiler/libVSC/include
 INCLUDE +=	-I$(CLC_DIR)/inc
 
-CFLAGS += -DBUILD_OPENCL_12=1
 ifneq ($(USE_ARMCC), 1)
 CFLAGS += -Werror -ansi
 endif

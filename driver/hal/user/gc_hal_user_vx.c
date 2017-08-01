@@ -17,6 +17,9 @@
 
 #define _GC_OBJ_ZONE            gcvZONE_VX
 
+static gctUINT32 memory_size = 0;
+static gctUINT64 free_memory_size = 0;
+
 /******************************************************************************\
 |********************************* Structures *********************************|
 \******************************************************************************/
@@ -559,6 +562,10 @@ gcoVX_InvokeKernel(
         twParameters.globalScaleY   = Parameters->ystep;
     }
 
+#if gcdVX_OPTIMIZER > 1
+    twParameters.tileMode           = Parameters->tileMode;
+#endif
+
     gcoOS_ZeroMemory(&info, gcmSIZEOF(gcsTHREAD_WALKER_INFO));
 
     info.dimensions         = twParameters.workDim;
@@ -640,6 +647,8 @@ gcoVX_Upload(
         }
         else
             gcoOS_ZeroMemory((gctPOINTER)logical, Size);
+
+        memory_size += Size;
 
      }
 
@@ -735,8 +744,6 @@ OnError:
     return status;
 }
 
-static gctUINT32 memory_size = 0;
-
 gceSTATUS gcoVX_GetMemorySize(OUT gctUINT32_PTR Size)
 {
     *Size = memory_size;
@@ -746,6 +753,8 @@ gceSTATUS gcoVX_GetMemorySize(OUT gctUINT32_PTR Size)
 gceSTATUS gcoVX_ZeroMemorySize()
 {
     memory_size = 0;
+
+    free_memory_size = 0;
 
     return gcvSTATUS_OK;
 }
@@ -834,6 +843,8 @@ gcoVX_FreeMemory(
         /* Create an event to free the video memory. */
         gcmONERROR(gcsSURF_NODE_Destroy(Node));
 
+        free_memory_size += Node->size;
+
         /* Free node. */
         gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Node));
     }
@@ -853,6 +864,7 @@ gcoVX_LoadKernelShader(
 {
 
     gceSTATUS status;
+    gceAPI    currentApi;
 
     gcmHEADER_ARG("StateBufferSize=%zu StateBuffer=0x%x Hints=0x%x",
                   StateBufferSize, StateBuffer, Hints);
@@ -863,6 +875,15 @@ gcoVX_LoadKernelShader(
 
     /* Switch to the 3D pipe. */
     gcmONERROR(gcoHARDWARE_SelectPipe(gcvNULL, gcvPIPE_3D, gcvNULL));
+
+    /* Get Current API. */
+    gcmVERIFY_OK(gcoHARDWARE_GetAPI(gcvNULL, &currentApi, gcvNULL));
+
+    if (currentApi == 0)
+    {
+        /* Set HAL API to OpenCL only when there is API is not set. */
+        gcmVERIFY_OK(gcoHARDWARE_SetAPI(gcvNULL, gcvAPI_OPENCL));
+    }
 
     if (!gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_PIPE_CL))
     {
@@ -934,7 +955,6 @@ gcoVX_InvokeKernelShader(
         info.workGroupCountZ = info.globalSizeZ / info.workGroupSizeZ;
     }
 
-    /* TODO - Handle GLW order and in-use. */
     info.traverseOrder    = 0;  /* XYZ */
     info.enableSwathX     = 0;
     info.enableSwathY     = 0;
@@ -1069,6 +1089,36 @@ gcoVX_WaitNNEvent(
     gcmHEADER_ARG("id=%d", EventId);
 
     gcmONERROR(gcoHARDWAREVX_WaitNNEvent(gcvNULL, EventId));
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoVX_FlushCache(
+    IN gctBOOL      InvalidateICache,
+    IN gctBOOL      FlushPSSHL1Cache,
+    IN gctBOOL      FlushNNL1Cache,
+    IN gctBOOL      FlushTPL1Cache,
+    IN gctBOOL      Stall
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER_ARG("Stall=%d", Stall);
+
+    /* Flush the shader cache. */
+    gcmONERROR(gcoHARDWARE_FlushCacheVX(gcvNULL, InvalidateICache, FlushPSSHL1Cache, FlushNNL1Cache, FlushTPL1Cache));
+
+    if (Stall)
+    {
+        /* Commit the command buffer to hardware. */
+        gcmONERROR(gcoHARDWARE_Commit(gcvNULL));
+
+        /* Stall the hardware. */
+        gcmONERROR(gcoHARDWARE_Stall(gcvNULL));
+    }
 
 OnError:
     gcmFOOTER();

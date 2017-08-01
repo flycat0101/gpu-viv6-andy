@@ -31,6 +31,16 @@
      ((pUsage)->nextWebUsageIdx == VIR_INVALID_USAGE_INDEX) &&           \
      (UD_CHAIN_CHECK_EMPTY(&((pUsage)->udChain))))
 
+static gctUINT _HFUNC_DefPassThroughRegNoInst(const void* pKey)
+{
+    VIR_DEF_KEY*     pDefKey = (VIR_DEF_KEY*)pKey;
+
+    gcmASSERT(pDefKey->regNo != VIR_INVALID_REG_NO  &&
+              pDefKey->pDefInst != VIR_ANY_DEF_INST);
+
+    return pDefKey->regNo ^ (((gctUINT)(gctPTRDIFF_T)pDefKey->pDefInst) << 6);
+}
+
 static gctUINT _HFUNC_DefPassThroughRegNo(const void* pKey)
 {
     VIR_DEF_KEY*     pDefKey = (VIR_DEF_KEY*)pKey;
@@ -38,6 +48,31 @@ static gctUINT _HFUNC_DefPassThroughRegNo(const void* pKey)
     gcmASSERT(pDefKey->regNo != VIR_INVALID_REG_NO);
 
     return pDefKey->regNo;
+}
+
+static gctBOOL _HKCMP_DefKeyInstEqual(const void* pHashKey1, const void* pHashKey2)
+{
+    VIR_DEF_KEY*     pDefKey1 = (VIR_DEF_KEY*)pHashKey1;
+    VIR_DEF_KEY*     pDefKey2 = (VIR_DEF_KEY*)pHashKey2;
+
+    gcmASSERT(pDefKey1->regNo != VIR_INVALID_REG_NO &&
+              pDefKey2->regNo != VIR_INVALID_REG_NO &&
+              pDefKey1->pDefInst != VIR_ANY_DEF_INST &&
+              pDefKey2->pDefInst != VIR_ANY_DEF_INST);
+
+    if ((pDefKey1->regNo == pDefKey2->regNo) &&
+        (pDefKey1->pDefInst == pDefKey2->pDefInst)
+         &&
+        (pDefKey1->channel == pDefKey2->channel   || /* Channel compare */
+         pDefKey1->channel == VIR_CHANNEL_ANY     ||
+         pDefKey2->channel == VIR_CHANNEL_ANY))
+    {
+        return gcvTRUE;
+    }
+    else
+    {
+        return gcvFALSE;
+    }
 }
 
 static gctBOOL _HKCMP_DefKeyEqual(const void* pHashKey1, const void* pHashKey2)
@@ -61,6 +96,171 @@ static gctBOOL _HKCMP_DefKeyEqual(const void* pHashKey1, const void* pHashKey2)
     else
     {
         return gcvFALSE;
+    }
+}
+static gctUINT _HFUNC_FirstDefRegNo(const void* pKey)
+{
+    gctUINT     regNo = (gctUINT)(gctPTRDIFF_T)pKey;
+
+    gcmASSERT(regNo != VIR_INVALID_REG_NO);
+
+    return regNo;
+}
+static gctBOOL _HKCMP_FirstDefKeyEqual(const void* pHashKey1, const void* pHashKey2)
+{
+    gctUINT     regNo1 = (gctUINT)(gctPTRDIFF_T)pHashKey1;
+    gctUINT     regNo2 = (gctUINT)(gctPTRDIFF_T)pHashKey2;
+
+    gcmASSERT(regNo1 != VIR_INVALID_REG_NO &&
+              regNo2 != VIR_INVALID_REG_NO);
+
+    return regNo1 == regNo2;
+}
+
+VIR_1st_DEF_INFO* vscVIR_FindFirstDefInfo(VIR_DEF_USAGE_INFO* pDuInfo,
+                                           gctUINT FirstDefRegNo)
+{
+    VIR_1st_DEF_INFO * ptr;
+
+    ptr = (VIR_1st_DEF_INFO *)vscHTBL_DirectGet(pDuInfo->pFirstDefTable, (void*)(gctPTRDIFF_T)FirstDefRegNo);
+    return ptr;
+}
+
+gctUINT vscVIR_FindFirstDefIndex(VIR_DEF_USAGE_INFO* pDuInfo,
+                                 gctUINT FirstDefRegNo)
+{
+    gctUINT fisrtDefIndex;
+    if (pDuInfo->bHashRegNoInst)
+    {
+        VIR_1st_DEF_INFO * ptr;
+
+        ptr = (VIR_1st_DEF_INFO *)vscHTBL_DirectGet(pDuInfo->pFirstDefTable, (void*)(gctPTRDIFF_T)FirstDefRegNo);
+        fisrtDefIndex =  (ptr == gcvNULL) ? VIR_INVALID_DEF_INDEX : ptr->firstDefIndex;
+    }
+    else
+    {
+        VIR_DEF_KEY            defKey;
+        defKey.pDefInst = VIR_ANY_DEF_INST;
+        defKey.regNo = FirstDefRegNo;
+        defKey.channel = VIR_CHANNEL_ANY;
+        fisrtDefIndex = vscBT_HashSearch(&pDuInfo->defTable, &defKey);
+    }
+    return fisrtDefIndex;
+}
+
+gctUINT vscVIR_FindFirstDefIndexWithChannel(VIR_DEF_USAGE_INFO* pDuInfo,
+                                           gctUINT             FirstDefRegNo,
+                                           gctUINT8            Channel)
+{
+    gctUINT fisrtDefIndex = VIR_INVALID_DEF_INDEX;
+    if (pDuInfo->bHashRegNoInst)
+    {
+        VIR_1st_DEF_INFO * ptr;
+
+        ptr = (VIR_1st_DEF_INFO *)vscHTBL_DirectGet(pDuInfo->pFirstDefTable, (void*)(gctPTRDIFF_T)FirstDefRegNo);
+        if (gcvNULL != ptr)
+        {
+            VIR_DEF*                 pDef;
+            gctUINT                  defIdx;
+
+            defIdx = ptr->firstDefIndex;
+            if (defIdx != VIR_INVALID_DEF_INDEX)
+            {
+                pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
+                if (pDef->defKey.channel == Channel ||
+                    Channel == VIR_CHANNEL_ANY)
+                {
+                    fisrtDefIndex = defIdx;
+                }
+            }
+        }
+    }
+    else
+    {
+        VIR_DEF_KEY            defKey;
+        defKey.pDefInst = VIR_ANY_DEF_INST;
+        defKey.regNo = FirstDefRegNo;
+        defKey.channel = Channel;
+        fisrtDefIndex = vscBT_HashSearch(&pDuInfo->defTable, &defKey);
+    }
+    return fisrtDefIndex;
+}
+
+static void _AddFirstDefIndex(VIR_DEF_USAGE_INFO* pDuInfo,
+                                            gctUINT FirstDefRegNo,
+                                            gctUINT NewDefIndex)
+{
+    VIR_DEF *    pDef;
+    if (pDuInfo->bHashRegNoInst)
+    {
+        VIR_1st_DEF_INFO * firstDefInfo;
+        firstDefInfo = vscVIR_FindFirstDefInfo(pDuInfo, FirstDefRegNo);
+        if (gcvNULL == firstDefInfo)
+        {
+            /* first time, create a new entry */
+            firstDefInfo = (VIR_1st_DEF_INFO *)vscMM_Alloc(&pDuInfo->pmp.mmWrapper,
+                                                           sizeof(VIR_1st_DEF_INFO));
+            firstDefInfo->firstDefIndex = firstDefInfo->lastDefIndex = NewDefIndex;
+            vscHTBL_DirectSet(pDuInfo->pFirstDefTable,
+                              (void*)(gctPTRDIFF_T)FirstDefRegNo,
+                              (void*)firstDefInfo);
+        }
+        else
+        {
+            /* update the lastDefIndex */
+            if (firstDefInfo->firstDefIndex == VIR_INVALID_DEF_INDEX)
+            {
+                /* the firstDef is entered then removed from the table */
+                gcmASSERT(firstDefInfo->lastDefIndex == VIR_INVALID_DEF_INDEX);
+                firstDefInfo->firstDefIndex = firstDefInfo->lastDefIndex = NewDefIndex;
+            }
+            else
+            {
+                gcmASSERT(firstDefInfo->lastDefIndex != VIR_INVALID_DEF_INDEX);
+                pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, NewDefIndex);
+                pDef->nextDefIdxOfSameRegNo = firstDefInfo->firstDefIndex;
+                firstDefInfo->firstDefIndex = NewDefIndex;
+            }
+        }
+    }
+    else
+    {
+        gctUINT firstDefIdxOfSameRegNo = vscVIR_FindFirstDefIndex(pDuInfo, FirstDefRegNo);
+        if (VIR_INVALID_DEF_INDEX != firstDefIdxOfSameRegNo)
+        {
+            pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, NewDefIndex);
+            pDef->nextDefIdxOfSameRegNo = firstDefIdxOfSameRegNo;
+        }
+    }
+    return ;
+}
+
+/* update the first def table when deleting a defIndex,
+ * DelDefIndex is the defIndex to delete,
+ * PrevDefIndex is the previous defIndex in the def chain */
+static void _UpdateFirstDefInfo(VIR_DEF_USAGE_INFO* pDuInfo,
+                                gctUINT RegNo,
+                                gctUINT DelDefIndex,
+                                gctUINT PrevDefIndex)
+{
+    if (pDuInfo->bHashRegNoInst)
+    {
+        VIR_1st_DEF_INFO * firstDefInfo;
+        firstDefInfo = vscVIR_FindFirstDefInfo(pDuInfo, RegNo);
+        if (gcvNULL != firstDefInfo)
+        {
+            VIR_DEF *    pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, DelDefIndex);
+            if (firstDefInfo->firstDefIndex == DelDefIndex)
+            {
+                firstDefInfo->firstDefIndex = pDef->nextDefIdxOfSameRegNo;
+                gcmASSERT(PrevDefIndex == VIR_INVALID_DEF_INDEX);
+            }
+            if (firstDefInfo->lastDefIndex == DelDefIndex)
+            {
+                firstDefInfo->lastDefIndex = PrevDefIndex;
+                gcmASSERT(pDef->nextDefIdxOfSameRegNo == VIR_INVALID_DEF_INDEX);
+            }
+        }
     }
 }
 
@@ -135,7 +335,7 @@ static gctBOOL _AddNewDefToTable(VIR_DEF_USAGE_INFO* pDuInfo,
 {
     VIR_DEF*               pNewDef;
     VIR_DEF*               pOldDef;
-    gctUINT                regNo, newDefIdx, oldDefIdx, firstDefIdxOfSameRegNo;
+    gctUINT                regNo, newDefIdx, oldDefIdx;
     VIR_DEF_KEY            defKey;
     gctUINT8               channel;
     VIR_Enable             totalEnableMask = defEnableMask;
@@ -243,14 +443,8 @@ static gctBOOL _AddNewDefToTable(VIR_DEF_USAGE_INFO* pDuInfo,
             }
             else
             {
-                defKey.pDefInst = VIR_ANY_DEF_INST;
-                defKey.regNo = regNo;
-                defKey.channel = VIR_CHANNEL_ANY;
-                firstDefIdxOfSameRegNo = vscBT_HashSearch(pDefTable, &defKey);
-                if (VIR_INVALID_DEF_INDEX != firstDefIdxOfSameRegNo)
-                {
-                    pNewDef->nextDefIdxOfSameRegNo = firstDefIdxOfSameRegNo;
-                }
+                /* add newDefIdx to the first def table */
+                _AddFirstDefIndex(pDuInfo, regNo, newDefIdx);
             }
 
             /* Take care of bDynIndexed */
@@ -305,6 +499,7 @@ static gctBOOL _DeleteDefFromTable(VIR_DEF_USAGE_INFO* pDuInfo,
     VIR_DEF*                 pDefToDel;
     VIR_DEF*                 pTmpDef;
     VIR_DEF*                 pTmpPrevDef;
+    gctUINT                  tmpPrevDefIndex;
     VIR_USAGE*               pUsage;
     VIR_WEB*                 pWeb;
     gctUINT                  regNo, defIdxToDel, tmpDefIdx;
@@ -430,11 +625,9 @@ static gctBOOL _DeleteDefFromTable(VIR_DEF_USAGE_INFO* pDuInfo,
                 }
 
                 /* Update def link for same reg */
-                defKey.pDefInst = VIR_ANY_DEF_INST;
-                defKey.regNo = regNo;
-                defKey.channel = VIR_CHANNEL_ANY;
-                tmpDefIdx = vscBT_HashSearch(pDefTable, &defKey);
+                tmpDefIdx = vscVIR_FindFirstDefIndex(pDuInfo, regNo);
                 pTmpPrevDef = gcvNULL;
+                tmpPrevDefIndex = VIR_INVALID_DEF_INDEX;
                 while (VIR_INVALID_DEF_INDEX != tmpDefIdx)
                 {
                     pTmpDef = GET_DEF_BY_IDX(&pDuInfo->defTable, tmpDefIdx);
@@ -442,16 +635,18 @@ static gctBOOL _DeleteDefFromTable(VIR_DEF_USAGE_INFO* pDuInfo,
 
                     if (tmpDefIdx == defIdxToDel)
                     {
+                        _UpdateFirstDefInfo(pDuInfo, regNo,
+                                                   defIdxToDel,
+                                                   tmpPrevDefIndex);
                         if (pTmpPrevDef != gcvNULL)
                         {
                             pTmpPrevDef->nextDefIdxOfSameRegNo = pTmpDef->nextDefIdxOfSameRegNo;
                         }
-
                         break;
                     }
 
                     pTmpPrevDef = pTmpDef;
-
+                    tmpPrevDefIndex = tmpDefIdx;
                     /* Get next def with same regNo */
                     tmpDefIdx = pTmpDef->nextDefIdxOfSameRegNo;
                 }
@@ -798,6 +993,13 @@ static VSC_ErrCode _BuildDefTable(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuIn
     VIR_Function*          pFunc;
     VIR_InstIterator       instIter;
     VIR_Instruction*       pInst;
+    gctINT                 duHTSize = estimateDUHashTableSize(pShader);
+
+    pDuInfo->pFirstDefTable =
+        vscHTBL_Create(&pDuInfo->pmp.mmWrapper,
+                        _HFUNC_FirstDefRegNo,
+                        _HKCMP_FirstDefKeyEqual,
+                        duHTSize);
 
     /* Initialize def table with hash enabled due to we want to get def index with def content */
     vscBT_Initialize(&pDuInfo->defTable,
@@ -807,11 +1009,12 @@ static VSC_ErrCode _BuildDefTable(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuIn
                      40*sizeof(VIR_DEF),
                      1,
                      gcvNULL,
-                     _HFUNC_DefPassThroughRegNo,
-                     _HKCMP_DefKeyEqual,
-                     estimateDUHashTableSize(pShader));
+                     pDuInfo->bHashRegNoInst ? _HFUNC_DefPassThroughRegNoInst : _HFUNC_DefPassThroughRegNo,
+                     pDuInfo->bHashRegNoInst ? _HKCMP_DefKeyInstEqual : _HKCMP_DefKeyEqual,
+                     duHTSize);
 
     pDuInfo->maxVirRegNo = 0;
+    pDuInfo->bHashRegNoInst = gcvFALSE;
 
     /* Go through whole shader func by func */
     CG_ITERATOR_INIT(&funcBlkIter, pCg);
@@ -851,7 +1054,6 @@ static void _Update_ReachDef_Local_Kill_All_Output_Defs(VIR_DEF_USAGE_INFO* pDuI
     VIR_DEF*                 pDef;
     VIR_DEF*                 pThisDef;
     gctUINT                  thisDefIdx, defIdx;
-    VIR_DEF_KEY              defKey;
     VSC_BIT_VECTOR           tmpMask;
 
     vscBV_Initialize(&tmpMask, pDuInfo->baseTsDFA.baseDFA.pMM, pDuInfo->baseTsDFA.baseDFA.flowSize);
@@ -868,10 +1070,7 @@ static void _Update_ReachDef_Local_Kill_All_Output_Defs(VIR_DEF_USAGE_INFO* pDuI
 
         if (pThisDef->flags.nativeDefFlags.bIsOutput)
         {
-            defKey.pDefInst = VIR_ANY_DEF_INST;
-            defKey.regNo = pThisDef->defKey.regNo;
-            defKey.channel = VIR_CHANNEL_ANY;
-            defIdx = vscBT_HashSearch(pDefTable, &defKey);
+            defIdx = vscVIR_FindFirstDefIndex(pDuInfo, pThisDef->defKey.regNo);
 
             while (VIR_INVALID_DEF_INDEX != defIdx)
             {
@@ -900,7 +1099,7 @@ static void _Update_ReachDef_Local_Kill_All_Output_Defs(VIR_DEF_USAGE_INFO* pDuI
     vscBV_Finalize(&tmpMask);
 }
 
-static void _Update_ReachDef_Local_GenKill(VSC_BLOCK_TABLE* pDefTable,
+static void _Update_ReachDef_Local_GenKill(VIR_DEF_USAGE_INFO* pDuInfo,
                                            VSC_BIT_VECTOR* pGenFlow,
                                            VSC_BIT_VECTOR* pKillFlow,
                                            VSC_STATE_VECTOR* pLocalHalfChannelKillFlow,
@@ -911,7 +1110,7 @@ static void _Update_ReachDef_Local_GenKill(VSC_BLOCK_TABLE* pDefTable,
                                            gctUINT8 halfChannelMask,
                                            gctBOOL bCertainWrite) /* Means regs in range are 100% written by inst */
 {
-    VIR_DEF_KEY            defKey;
+    VSC_BLOCK_TABLE*       pDefTable = &pDuInfo->defTable;
     gctUINT                regNo, defIdx;
     VIR_DEF*               pDef;
     gctUINT8               channel;
@@ -927,10 +1126,7 @@ static void _Update_ReachDef_Local_GenKill(VSC_BLOCK_TABLE* pDefTable,
     /* A def generates this def, but kill all others of same regNo on same channels */
     for (regNo = firstRegNo; regNo < firstRegNo + regNoRange; regNo ++)
     {
-        defKey.pDefInst = VIR_ANY_DEF_INST;
-        defKey.regNo = regNo;
-        defKey.channel = VIR_CHANNEL_ANY;
-        defIdx = vscBT_HashSearch(pDefTable, &defKey);
+        defIdx = vscVIR_FindFirstDefIndex(pDuInfo, regNo);
 
         /* Check all defs with the same channels on same regNo */
         while (VIR_INVALID_DEF_INDEX != defIdx)
@@ -990,6 +1186,7 @@ static void _ReachDef_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
 {
     VIR_BASIC_BLOCK*       pBasicBlock = pTsBlockFlow->pOwnerBB;
     VIR_Shader*            pShader = pBasicBlock->pOwnerCFG->pOwnerFuncBlk->pOwnerCG->pOwnerShader;
+    VIR_DEF_USAGE_INFO*    pDuInfo = (VIR_DEF_USAGE_INFO*)pBaseTsDFA; /* pBaseTsDFA is the first field of VIR_DEF_USAGE_INFO!!! */
     VSC_BLOCK_TABLE*       pDefTable = &((VIR_DEF_USAGE_INFO*)pBaseTsDFA)->defTable;
     VSC_BIT_VECTOR*        pGenFlow = &pTsBlockFlow->genFlow;
     VSC_BIT_VECTOR*        pKillFlow = &pTsBlockFlow->killFlow;
@@ -1025,7 +1222,7 @@ static void _ReachDef_Local_GenKill_Resolver(VIR_BASE_TS_DFA* pBaseTsDFA, VIR_TS
                              !VIR_Inst_ConditionalWrite(pInst) &&
                              !VIR_OPCODE_DestOnlyUseEnable(VIR_Inst_GetOpcode(pInst)));
 
-            _Update_ReachDef_Local_GenKill(pDefTable,
+            _Update_ReachDef_Local_GenKill(pDuInfo,
                                            pGenFlow,
                                            pKillFlow,
                                            &localHalfChannelKillFlow,
@@ -1478,7 +1675,6 @@ static gctBOOL _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
     VIR_USAGE*               pNewUsage = gcvNULL;
     VIR_USAGE*               pTmpUsage;
     VIR_DEF*                 pDef;
-    VIR_DEF_KEY              defKey;
     VIR_USAGE_KEY            usageKey;
     VSC_BLOCK_TABLE*         pDefTable = &pDuInfo->defTable;
     VSC_BLOCK_TABLE*         pUsageTable = &pDuInfo->usageTable;
@@ -1546,10 +1742,7 @@ static gctBOOL _AddNewUsageToTable(VIR_DEF_USAGE_INFO* pDuInfo,
                 continue;
             }
 
-            defKey.pDefInst = VIR_ANY_DEF_INST;
-            defKey.regNo = regNo;
-            defKey.channel = VIR_CHANNEL_ANY;
-            defIdx = vscBT_HashSearch(pDefTable, &defKey);
+            defIdx = vscVIR_FindFirstDefIndex(pDuInfo, regNo);
 
             bDefFound = gcvFALSE;
 
@@ -1752,10 +1945,17 @@ static gctBOOL _DeleteUsageFromTable(VIR_DEF_USAGE_INFO* pDuInfo,
                 continue;
             }
 
+            if (pDefInst == VIR_ANY_DEF_INST)
+            {
+                defIdx = vscVIR_FindFirstDefIndex(pDuInfo, regNo);
+            }
+            else
+            {
             defKey.pDefInst = pDefInst;
             defKey.regNo = regNo;
-            defKey.channel = (pDefInst == VIR_ANY_DEF_INST) ? VIR_CHANNEL_ANY : channel;
+                defKey.channel = channel;
             defIdx = vscBT_HashSearch(pDefTable, &defKey);
+            }
             while (VIR_INVALID_DEF_INDEX != defIdx)
             {
                 pDef = GET_DEF_BY_IDX(pDefTable, defIdx);
@@ -1942,7 +2142,6 @@ static void _AddOutputUsages(VIR_DEF_USAGE_INFO* pDuInfo,
     gctUINT                  newUsageIdx, thisDefIdx, defIdx;
     VIR_USAGE*               pNewUsage;
     VIR_DU_CHAIN_USAGE_NODE* pUsageNode;
-    VIR_DEF_KEY              defKey;
     VSC_BIT_VECTOR           tmpMask;
 
     vscBV_Initialize(&tmpMask, pDuInfo->baseTsDFA.baseDFA.pMM, pDuInfo->baseTsDFA.baseDFA.flowSize);
@@ -1981,10 +2180,8 @@ static void _AddOutputUsages(VIR_DEF_USAGE_INFO* pDuInfo,
             /* Add usageIdx to hash */
             vscBT_AddToHash(pUsageTable, newUsageIdx, &pNewUsage->usageKey);
 
-            defKey.pDefInst = VIR_ANY_DEF_INST;
-            defKey.regNo = pThisDef->defKey.regNo;
-            defKey.channel = VIR_CHANNEL_ANY;
-            defIdx = vscBT_HashSearch(pDefTable, &defKey);
+
+            defIdx = vscVIR_FindFirstDefIndex(pDuInfo, pThisDef->defKey.regNo);
 
             while (VIR_INVALID_DEF_INDEX != defIdx)
             {
@@ -2231,7 +2428,7 @@ static void _BuildDUUDChainPerBB(VIR_BASIC_BLOCK* pBasicBlk, VIR_DEF_USAGE_INFO*
                              !VIR_Inst_ConditionalWrite(pInst) &&
                              !VIR_OPCODE_DestOnlyUseEnable(VIR_Inst_GetOpcode(pInst)));
 
-            _Update_ReachDef_Local_GenKill(pDefTable,
+            _Update_ReachDef_Local_GenKill(pDuInfo,
                                            &workingDefFlow,
                                            gcvNULL,
                                            &localHalfChannelKillFlow,
@@ -2449,7 +2646,6 @@ static void _PostProcessNewWeb(VIR_DEF_USAGE_INFO* pDuInfo, gctUINT newWebIdx)
     VSC_BLOCK_TABLE*         pDefTable = &pDuInfo->defTable;
     VSC_BLOCK_TABLE*         pWebTable = &pDuInfo->webTable;
     VIR_WEB*                 pNewWeb = GET_WEB_BY_IDX(pWebTable, newWebIdx);
-    VIR_DEF_KEY              defKey;
     VIR_DEF*                 pDef;
     VIR_DEF*                 pTempDef;
     gctUINT                  defIdx;
@@ -2465,10 +2661,7 @@ static void _PostProcessNewWeb(VIR_DEF_USAGE_INFO* pDuInfo, gctUINT newWebIdx)
     {
         if (pDef->flags.nativeDefFlags.bIsOutput)
         {
-            defKey.pDefInst = VIR_ANY_DEF_INST;
-            defKey.regNo = pDef->defKey.regNo;
-            defKey.channel = VIR_CHANNEL_ANY;
-            defIdx = vscBT_HashSearch(pDefTable, &defKey);
+            defIdx = vscVIR_FindFirstDefIndex(pDuInfo, pDef->defKey.regNo);
 
             while (VIR_INVALID_DEF_INDEX != defIdx)
             {
@@ -2492,10 +2685,7 @@ static void _PostProcessNewWeb(VIR_DEF_USAGE_INFO* pDuInfo, gctUINT newWebIdx)
     /* 2. Do HW dependent web merge */
     if (pDef->flags.nativeDefFlags.bHwSpecialInput || pDef->defKey.pDefInst == VIR_HW_SPECIAL_DEF_INST)
     {
-        defKey.pDefInst = VIR_ANY_DEF_INST;
-        defKey.regNo = pDef->defKey.regNo;
-        defKey.channel = VIR_CHANNEL_ANY;
-        defIdx = vscBT_HashSearch(pDefTable, &defKey);
+        defIdx = vscVIR_FindFirstDefIndex(pDuInfo, pDef->defKey.regNo);
 
         while (VIR_INVALID_DEF_INDEX != defIdx)
         {
@@ -2519,10 +2709,7 @@ static void _PostProcessNewWeb(VIR_DEF_USAGE_INFO* pDuInfo, gctUINT newWebIdx)
     if (pDef->defKey.pDefInst < VIR_OUTPUT_USAGE_INST &&
         VIR_Inst_GetDual16ExpandSeq(pDef->defKey.pDefInst) != NOT_ASSIGNED)
     {
-        defKey.pDefInst = VIR_ANY_DEF_INST;
-        defKey.regNo = pDef->defKey.regNo;
-        defKey.channel = VIR_CHANNEL_ANY;
-        defIdx = vscBT_HashSearch(pDefTable, &defKey);
+        defIdx = vscVIR_FindFirstDefIndex(pDuInfo, pDef->defKey.regNo);
 
         while (VIR_INVALID_DEF_INDEX != defIdx)
         {
@@ -2540,6 +2727,34 @@ static void _PostProcessNewWeb(VIR_DEF_USAGE_INFO* pDuInfo, gctUINT newWebIdx)
 
             /* Get next def with same regNo */
             defIdx = pTempDef->nextDefIdxOfSameRegNo;
+        }
+    }
+
+    /* 4. In debug mode, merge all "varibles" with same regno into one web */
+    if (gcmOPT_EnableDebug())
+    {
+        VIR_Symbol  *sym = gcvNULL;
+        sym = VIR_Shader_FindSymbolByTempIndex(pDuInfo->baseTsDFA.baseDFA.pOwnerCG->pOwnerShader,
+                                               pDef->defKey.regNo);
+
+        /* this temp has underlying variable */
+        if (VIR_Symbol_GetVregVariable(sym) != gcvNULL)
+        {
+            defIdx = vscVIR_FindFirstDefIndex(pDuInfo, pDef->defKey.regNo);
+
+            while (VIR_INVALID_DEF_INDEX != defIdx)
+            {
+                pTempDef = GET_DEF_BY_IDX(pDefTable, defIdx);
+
+                if (pTempDef->webIdx != VIR_INVALID_WEB_INDEX && pTempDef->webIdx != newWebIdx)
+                {
+                    _MergeTwoWebs(pDuInfo, pTempDef->webIdx, newWebIdx);
+                    break;
+                }
+
+                /* Get next def with same regNo */
+                defIdx = pTempDef->nextDefIdxOfSameRegNo;
+            }
         }
     }
 }
@@ -2867,7 +3082,6 @@ static VSC_ErrCode _BuildWebs(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuInfo)
     VSC_BIT_VECTOR         globalWorkingFlow, localWorkingFlow;
     gctUINT                defIdx, globalsearchStartDefIdx = 0;
     VIR_DEF*               pDef;
-    VIR_DEF_KEY            defKey;
 
     vscBT_Initialize(&pDuInfo->webTable,
                      &pDuInfo->pmp.mmWrapper,
@@ -2908,10 +3122,7 @@ static VSC_ErrCode _BuildWebs(VIR_CALL_GRAPH* pCg, VIR_DEF_USAGE_INFO* pDuInfo)
             continue;
         }
 
-        defKey.pDefInst = VIR_ANY_DEF_INST;
-        defKey.regNo = pDef->defKey.regNo;
-        defKey.channel = VIR_CHANNEL_ANY;
-        defIdx = vscBT_HashSearch(pDefTable, &defKey);
+        defIdx = vscVIR_FindFirstDefIndex(pDuInfo, pDef->defKey.regNo);
 
         /* For all defs with same regNo, try to build webs */
         while (VIR_INVALID_DEF_INDEX != defIdx)
@@ -3744,16 +3955,12 @@ gctBOOL vscVIR_HasHomonymyDefs(VIR_DEF_USAGE_INFO*          pDuInfo,
                                gctUINT8                     defChannel,
                                gctBOOL                      bSameBBOnly)
 {
-    VIR_DEF_KEY            defKey;
     gctUINT                defIdx;
     VIR_DEF*               pDef;
 
     gcmASSERT(pDefInst != VIR_ANY_DEF_INST);
 
-    defKey.pDefInst = VIR_ANY_DEF_INST;
-    defKey.regNo = defRegNo;
-    defKey.channel = VIR_CHANNEL_ANY;
-    defIdx = vscBT_HashSearch(&pDuInfo->defTable, &defKey);
+    defIdx = vscVIR_FindFirstDefIndex(pDuInfo, defRegNo);
 
     /* Note that order is reversed */
     while (VIR_INVALID_DEF_INDEX != defIdx)
@@ -3782,17 +3989,13 @@ VIR_DEF* vscVIR_GetNextHomonymyDef(VIR_DEF_USAGE_INFO*      pDuInfo,
                                    gctUINT8                 defChannel,
                                    gctBOOL                  bSameBBOnly)
 {
-    VIR_DEF_KEY            defKey;
     gctUINT                defIdx;
     VIR_DEF*               pDef;
     VIR_DEF*               pPrevDef = gcvNULL;
 
     gcmASSERT(pDefInst != VIR_ANY_DEF_INST);
 
-    defKey.pDefInst = VIR_ANY_DEF_INST;
-    defKey.regNo = defRegNo;
-    defKey.channel = VIR_CHANNEL_ANY;
-    defIdx = vscBT_HashSearch(&pDuInfo->defTable, &defKey);
+    defIdx = vscVIR_FindFirstDefIndex(pDuInfo, defRegNo);
 
     /* Note that order is reversed */
     while (VIR_INVALID_DEF_INDEX != defIdx)
@@ -4272,5 +4475,4 @@ gctBOOL vscVIR_IsUniqueDefInstOfUsagesInItsDUChain(VIR_DEF_USAGE_INFO* pDuInfo,
 
     return gcvFALSE;
 }
-
 

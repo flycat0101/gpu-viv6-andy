@@ -169,153 +169,28 @@ typedef struct _gcsCENTROIDS
 }
 gcsCENTROIDS;
 
-/* Composition state buffer definitions. */
-#define gcdCOMP_BUFFER_COUNT        8
-#define gcdCOMP_BUFFER_SIZE         (16 * 1024)
-
-/* Composition layer descriptor. */
-typedef struct _gcsCOMPOSITION_LAYER * gcsCOMPOSITION_LAYER_PTR;
-typedef struct _gcsCOMPOSITION_LAYER
-{
-    /* Input parameters. */
-    gcsCOMPOSITION                  input;
-
-    /* Surface parameters. */
-    gcoSURF                         surface;
-    gceSURF_TYPE                    type;
-    gctUINT                         stride;
-    gctUINT32                       swizzle;
-    gctUINT32                       physical;
-
-    gctUINT                         sizeX;
-    gctUINT                         sizeY;
-
-    gctUINT8                        samplesX;
-    gctUINT8                        samplesY;
-
-    gctUINT32                       format;
-    gctBOOL                         hasAlpha;
-
-    gctBOOL                         flip;
-
-    /* Blending parameters. */
-    gctBOOL                         needPrevious;
-    gctBOOL                         replaceAlpha;
-    gctBOOL                         modulateAlpha;
-
-    /* Allocated resources. */
-    gctUINT                         constRegister;
-    gctUINT                         samplerNumber;
-}
-gcsCOMPOSITION_LAYER;
-
-/* Composition layer node. */
-typedef struct _gcsCOMPOSITION_NODE * gcsCOMPOSITION_NODE_PTR;
-typedef struct _gcsCOMPOSITION_NODE
-{
-    /* Pointer to the layer structure. */
-    gcsCOMPOSITION_LAYER_PTR        layer;
-
-    /* Next layer node. */
-    gcsCOMPOSITION_NODE_PTR         next;
-}
-gcsCOMPOSITION_NODE;
-
-/* Set of overlapping layers. */
-typedef struct _gcsCOMPOSITION_SET * gcsCOMPOSITION_SET_PTR;
-typedef struct _gcsCOMPOSITION_SET
-{
-    /* Blurring layer. */
-    gctBOOL                         blur;
-
-    /* Bounding box. */
-    gcsRECT                         trgRect;
-
-    /* List of layer nodes. */
-    gcsCOMPOSITION_NODE_PTR         nodeHead;
-    gcsCOMPOSITION_NODE_PTR         nodeTail;
-
-    /* Pointer to the previous/next sets. */
-    gcsCOMPOSITION_SET_PTR          prev;
-    gcsCOMPOSITION_SET_PTR          next;
-}
-gcsCOMPOSITION_SET;
-
-/* Composition state buffer. */
-typedef struct _gcsCOMPOSITION_STATE_BUFFER * gcsCOMPOSITION_STATE_BUFFER_PTR;
-typedef struct _gcsCOMPOSITION_STATE_BUFFER
-{
-    gctSIGNAL                       signal;
-
-    gctSIZE_T                       size;
-    gctPHYS_ADDR                    physical;
-    gctUINT32                       address;
-    gctUINT32_PTR                   logical;
-    gctUINT                         reserve;
-
-    gctUINT32_PTR                   head;
-    gctUINT32_PTR                   tail;
-    gctSIZE_T                       available;
-    gctUINT                         count;
-    gctUINT32_PTR                   rectangle;
-
-    gcsCOMPOSITION_STATE_BUFFER_PTR next;
-}
-gcsCOMPOSITION_STATE_BUFFER;
-
-/* Composition states. */
-typedef struct _gcsCOMPOSITION_STATE
-{
-    /* State that indicates whether we are in the composition mode. */
-    gctBOOL                         enabled;
-
-    /* Shader parameters. */
-    gctUINT                         maxConstCount;
-    gctUINT                         maxShaderLength;
-    gctUINT                         constBase;
-    gctUINT                         instBase;
-
-    /* Composition state buffer. */
-    gcsCOMPOSITION_STATE_BUFFER     compStateBuffer[gcdCOMP_BUFFER_COUNT];
-    gcsCOMPOSITION_STATE_BUFFER_PTR compStateBufferCurrent;
-
-    /* Allocated structures. */
-    gcsCONTAINER                    freeSets;
-    gcsCONTAINER                    freeNodes;
-    gcsCONTAINER                    freeLayers;
-
-    /* User signals. */
-    gctHANDLE                       process;
-    gctSIGNAL                       signal1;
-    gctSIGNAL                       signal2;
-
-    /* Current states. */
-    gctBOOL                         synchronous;
-    gctBOOL                         initDone;
-    gcoSURF                         target;
-
-    /* Size of hardware event command. */
-    gctUINT                         eventSize;
-
-    /* Temporary surface for blurring. */
-    struct _gcoSURF                 tempBuffer;
-    gcsCOMPOSITION_LAYER            tempLayer;
-
-    /* The list of layer sets to be composed. */
-    gcsCOMPOSITION_SET              head;
-}
-gcsCOMPOSITION_STATE;
 #endif
 
 #if gcdSYNC
 typedef enum{
     gcvFENCE_RLV,
     gcvFENCE_HW,
+    gcvFENCE_CPU,
 }gctFENCE;
+
+typedef gceSTATUS
+        (* pfn_WaitFence)(
+        IN gcoHARDWARE Hardware,
+        IN gcoFENCE Fence,
+        IN gctUINT64 WaitID,
+        IN gceENGINE CmdEngine,
+        OUT gctPOINTER *Memory
+        );
 
 struct _gcoFENCE
 {
     gctBOOL                     fenceEnable;
+    gceENGINE                   engine;
     gctUINT64                   fenceID;
     gctUINT64                   fenceIDSend;
     gctUINT64                   commitID;
@@ -326,6 +201,11 @@ struct _gcoFENCE
     gctBOOL                     fromCommit;
 
     gctFENCE                    type;
+    gctINT32                    id;
+
+    pfn_WaitFence               waitFunc[gcvENGINE_ALL_COUNT];
+    gctUINT64                   waitID[gcvENGINE_ALL_COUNT];
+
     union{
         struct{
             gcoSURF             fenceSurface;
@@ -558,6 +438,13 @@ struct _gcoENGINE
     gcoBUFFER                   buffer;
     /* Event queue. */
     gcoQUEUE                    queue;
+
+    /* Stall signal. */
+    gctSIGNAL                   stallSignal;
+
+    /* Idle flag, idle when stalled. */
+    gctBOOL                     idle;
+
 };
 
 #if gcdENABLE_3D
@@ -662,6 +549,10 @@ typedef struct _gcsSHSTATES
 
     /* Rounding mode */
     gctBOOL                     rtneRounding;
+#if gcdALPHA_KILL_IN_SHADER
+    gctBOOL                     alphaKill;
+    gctBOOL                     colorKill;
+#endif
 }gcsSHSTATES;
 
 /******** SH dirty ********************************
@@ -951,7 +842,7 @@ struct _gcoHARDWARE
 
     gctUINT32                   numStates;
 
-    struct _gcoENGINE           engine[gcvENGINE_COUNT];
+    struct _gcoENGINE           engine[gcvENGINE_GPU_ENGINE_COUNT];
 
     /* Context buffer. */
     gcePIPE_SELECT              currentPipe;
@@ -1094,11 +985,6 @@ struct _gcoHARDWARE
     /* Stall from source to destination if it's legal */
     gceWHERE                    stallSource;
     gceWHERE                    stallDestination;
-    /* Stall signal. */
-    gctSIGNAL                   stallSignal;
-
-    /* Idle flag, idle when stalled. */
-    gctBOOL                     idle;
 
     /***************************************************************************
     ** 2D states.
@@ -1129,12 +1015,6 @@ struct _gcoHARDWARE
 #if gcdENABLE_3D
     /* OpenCL threadwalker in PS. */
     gctBOOL                     threadWalkerInPS;
-
-    /* Composition states. */
-    gcsCOMPOSITION_STATE        composition;
-
-    /* Composition engine support. */
-    gctBOOL                     hwComposition;
 #endif
 
     /* Temp surface for fast clear */
@@ -1174,7 +1054,7 @@ struct _gcoHARDWARE
     gcePATCH_ID                 patchID;
 
 #if gcdSYNC
-    gcoFENCE                    fence;
+    gcoFENCE                    fence[gcvENGINE_GPU_ENGINE_COUNT];
     gctBOOL                     fenceEnabled;
 #endif
 
@@ -1200,8 +1080,8 @@ struct _gcoHARDWARE
 #endif
 
     /* Flat mapping range. */
-    gctUINT32                   flatMappingStart;
-    gctUINT32                   flatMappingEnd;
+    gctUINT32                   flatMappingRangeCount;
+    gcsFLAT_MAPPING_RANGE       flatMappingRanges[gcdMAX_FLAT_MAPPING_COUNT];
 
 #if gcdENABLE_3D
     gcsHARDWARE_SLOT           *hwSlot;
@@ -1220,6 +1100,10 @@ struct _gcoHARDWARE
 
     gcsPROBEBUFFER              *probeBuffer;
 
+#if gcdENABLE_3D
+    /* For Mixed streams bug.*/
+    gctBOOL                     bForceVirtual;
+#endif
 };
 
 #if gcdENABLE_3D
@@ -1297,6 +1181,14 @@ gcoHARDWARE_FlushDepthOnly(
     IN gcoHARDWARE Hardware
     );
 
+/* Flush shader video memory node. */
+gceSTATUS
+gcoHARDWARE_FlushShaderVidMemNode(
+    IN gcoHARDWARE Hardware,
+    IN gcsHINT_PTR Hints,
+    INOUT gctPOINTER *Memory
+    );
+
 gceSTATUS
 gcoHARDWARE_FlushShaders(
     IN gcoHARDWARE Hardware,
@@ -1360,16 +1252,6 @@ gcoHARDWARE_FastFlushDepthCompare(
 gceSTATUS gcoHARDWARE_ProgramIndex(
     IN gcoHARDWARE Hardware,
     INOUT gctPOINTER *Memory
-    );
-
-gceSTATUS
-gcoHARDWARE_InitializeComposition(
-    IN gcoHARDWARE Hardware
-    );
-
-gceSTATUS
-gcoHARDWARE_DestroyComposition(
-    IN gcoHARDWARE Hardware
     );
 
 #if gcdENABLE_TRUST_APPLICATION

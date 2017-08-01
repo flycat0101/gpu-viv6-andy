@@ -40,11 +40,11 @@ vx_status vxConvertColor(vx_node node, vx_image input, vx_image output)
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(input, VX_IMAGE_ATTRIBUTE_FORMAT, &inputFormat, sizeof(vx_df_image));
+    vxQueryImage(input, VX_IMAGE_FORMAT, &inputFormat, sizeof(vx_df_image));
 
-    vxQueryImage(output, VX_IMAGE_ATTRIBUTE_FORMAT, &outputFormat, sizeof(vx_df_image));
+    vxQueryImage(output, VX_IMAGE_FORMAT, &outputFormat, sizeof(vx_df_image));
 
-    vxQueryImage(input, VX_IMAGE_ATTRIBUTE_WIDTH, &inputWidth, sizeof(vx_uint32));
+    vxQueryImage(input, VX_IMAGE_WIDTH, &inputWidth, sizeof(vx_uint32));
 
     if (inputFormat == VX_DF_IMAGE_RGB)
     {

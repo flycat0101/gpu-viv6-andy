@@ -2221,6 +2221,11 @@ VkResult halti5_copyImage(
             default:
                 break;
             }
+
+            if (dstFormat == __VK_FORMAT_D24_UNORM_S8_UINT_PACKED32)
+            {
+                useComputeBlit = VK_TRUE;
+            }
         }
 
         if (!useComputeBlit)
@@ -2357,8 +2362,11 @@ VkResult halti5_copyImage(
  8:8))) | (((gctUINT32) ((gctUINT32) (dstBltDesc.sRGB) & ((gctUINT32) ((((1 ?
  8:8) - (0 ? 8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
  8:8)))
-        | dstTileConfigEx
-        ;
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 22:22) - (0 ?
+ 22:22) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:22) - (0 ? 22:22) + 1))))))) << (0 ?
+ 22:22))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 22:22) - (0 ? 22:22) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 22:22) - (0 ? 22:22) + 1))))))) << (0 ? 22:22)))
+        | dstTileConfigEx;
 
     /* Flush the pipe. */
     __VK_ONERROR(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE));
@@ -2528,6 +2536,31 @@ VkResult halti5_copyImage(
  31:16) + 1))))))) << (0 ? 31:16)))
                 );
         }
+        /* Tilesize for customer config */
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5028, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (4) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:16) - (0 ?
+ 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ?
+ 31:16))) | (((gctUINT32) ((gctUINT32) (4) & ((gctUINT32) ((((1 ? 31:16) - (0 ?
+ 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ?
+ 31:16))));
+
+         /* block size for customer config*/
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x5027, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x40) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:16) - (0 ?
+ 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ?
+ 31:16))) | (((gctUINT32) ((gctUINT32) (0x40) & ((gctUINT32) ((((1 ? 31:16) - (0 ?
+ 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ?
+ 31:16))));
 
         /* Set SrcTileStatusAddress. */
         if (srcFastClear)
@@ -2721,6 +2754,9 @@ VkResult halti5_fillBuffer(
     address += (uint32_t)(buf->memOffset + offset);
 
     pCmdBuffer = pCmdBufferBegin = &cmd->scratchCmdBuffer[cmd->curScrachBufIndex];
+
+    /* Flush the pipe. */
+    __VK_VERIFY_OK(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE));
 
     if ((devCtx)->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE) {halti5_setMultiGpuSync((VkDevice)(devCtx),
  &(pCmdBuffer), VK_NULL_HANDLE); if (forceSGPU) {*(*&(pCmdBuffer))++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -2984,6 +3020,9 @@ VkResult halti5_copyBuffer(
 
     pCmdBuffer = pCmdBufferBegin = &cmd->scratchCmdBuffer[cmd->curScrachBufIndex];
 
+    /* Flush the pipe. */
+    __VK_VERIFY_OK(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE));
+
     if ((devCtx)->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE) {halti5_setMultiGpuSync((VkDevice)(devCtx),
  &(pCmdBuffer), VK_NULL_HANDLE); if (forceSGPU) {*(*&(pCmdBuffer))++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
@@ -3154,6 +3193,9 @@ VkResult halti5_updateBuffer(
     __VK_ASSERT(pCmdBuf->devCtx->database->REG_BltEngine);
 
     pCmdBuffer = pCmdBufferBegin = &pCmdBuf->scratchCmdBuffer[pCmdBuf->curScrachBufIndex];
+
+    /* Flush the pipe. */
+    __VK_VERIFY_OK(halti5_flushCache((VkDevice)devCtx, &pCmdBuffer, VK_NULL_HANDLE));
 
     if ((devCtx)->option->affinityMode == __VK_MGPU_AFFINITY_COMBINE) {halti5_setMultiGpuSync((VkDevice)(devCtx),
  &(pCmdBuffer), VK_NULL_HANDLE); if (forceSGPU) {*(*&(pCmdBuffer))++ = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -3813,6 +3855,8 @@ VkResult halti5_helper_convertHwTxDesc(
         VkMemoryAllocateInfo mem_alloc;
         uint32_t *texDesc;
         gcsTEXTUREDESCRIPTORREGS *hwDescriptor;
+        uint32_t levelCount = subResourceRange->levelCount;
+        uint32_t layerCount = subResourceRange->layerCount;
 
         /* Allocate device memory for texture descriptor */
         __VK_MEMZERO(&mem_alloc, sizeof(mem_alloc));
@@ -3837,11 +3881,21 @@ VkResult halti5_helper_convertHwTxDesc(
         hwTxDesc[partIdx].baseDepth  = baseLevel->requestD;
         hwTxDesc[partIdx].baseSlice  = (uint32_t)(baseLevel->sliceSize) / (residentFormatInfo->bitsPerBlock >> 3);
 
+        if (subResourceRange->levelCount == VK_REMAINING_MIP_LEVELS)
+        {
+            levelCount = img->createInfo.mipLevels - subResourceRange->baseMipLevel;
+        }
+
+        if (subResourceRange->layerCount == VK_REMAINING_ARRAY_LAYERS)
+        {
+            layerCount = img->createInfo.arrayLayers - subResourceRange->baseArrayLayer;
+        }
+
         if (imgv)
         {
             uint32_t levelIdx;
             __VK_ASSERT(img);
-            for (levelIdx = 0; levelIdx < subResourceRange->levelCount; ++levelIdx)
+            for (levelIdx = 0; levelIdx < levelCount; ++levelIdx)
             {
                 __vkImageLevel *level = &img->pImgLevels[subResourceRange->baseMipLevel + levelIdx];
                 uint32_t physical = 0;
@@ -3904,7 +3958,7 @@ VkResult halti5_helper_convertHwTxDesc(
         {
             hwDescriptor->gcregTX3D = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
- 13:0))) | (((gctUINT32) ((gctUINT32) (subResourceRange->layerCount) & ((gctUINT32) ((((1 ?
+ 13:0))) | (((gctUINT32) ((gctUINT32) (layerCount) & ((gctUINT32) ((((1 ?
  13:0) - (0 ? 13:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:0) - (0 ? 13:0) + 1))))))) << (0 ?
  13:0)));
         }
@@ -5642,6 +5696,46 @@ VkResult halti5_helper_convertHwImgDesc(
  30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ?
  30:28) + 1))))))) << (0 ? 30:28)))
                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 5:4) - (0 ? 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
+ 5:4))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 5:4) - (0 ? 5:4) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));
+        break;
+    case __VK_FORMAT_D24_UNORM_X8_PACKED32:
+        imageDesc = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 9:6) - (0 ? 9:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ?
+ 9:6))) | (((gctUINT32) (0xF & ((gctUINT32) ((((1 ? 9:6) - (0 ? 9:6) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 9:6) - (0 ? 9:6) + 1))))))) << (0 ? 9:6)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 2:0) - (0 ? 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0))) | (((gctUINT32) ((gctUINT32) (2) & ((gctUINT32) ((((1 ? 2:0) - (0 ?
+ 2:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:0) - (0 ? 2:0) + 1))))))) << (0 ?
+ 2:0)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:14) - (0 ?
+ 15:14) + 1))))))) << (0 ? 15:14))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 15:14) - (0 ? 15:14) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:14) - (0 ?
+ 15:14) + 1))))))) << (0 ? 15:14)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ? 18:16))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ?
+ 18:16) - (0 ? 18:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 18:16) - (0 ?
+ 18:16) + 1))))))) << (0 ? 18:16)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20))) | (((gctUINT32) (0x2 & ((gctUINT32) ((((1 ?
+ 22:20) - (0 ? 22:20) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:20) - (0 ?
+ 22:20) + 1))))))) << (0 ? 22:20)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ? 26:24))) | (((gctUINT32) (0x3 & ((gctUINT32) ((((1 ?
+ 26:24) - (0 ? 26:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:24) - (0 ?
+ 26:24) + 1))))))) << (0 ? 26:24)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ?
+ 30:28) + 1))))))) << (0 ? 30:28))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ?
+ 30:28) - (0 ? 30:28) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 30:28) - (0 ?
+ 30:28) + 1))))))) << (0 ? 30:28)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ? 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
  5:4))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 5:4) - (0 ? 5:4) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ? 5:4)));

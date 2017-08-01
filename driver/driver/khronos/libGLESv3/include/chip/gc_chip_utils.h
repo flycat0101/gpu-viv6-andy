@@ -21,8 +21,11 @@ extern "C" {
 enum {
     __GL_SAVE_SURF_AS_TGA = 1 << 0,
     __GL_SAVE_SURF_AS_RAW = 1 << 1,
+    __GL_SAVE_SURF_AS_COMPRESSED = 1 << 2,
 
-    __GL_SAVE_SURF_AS_BOTH = __GL_SAVE_SURF_AS_TGA | __GL_SAVE_SURF_AS_RAW,
+    __GL_SAVE_SURF_AS_BOTH = __GL_SAVE_SURF_AS_TGA |
+                             __GL_SAVE_SURF_AS_RAW |
+                             __GL_SAVE_SURF_AS_COMPRESSED,
 };
 
 typedef struct __GLsurfRawHeadRec {

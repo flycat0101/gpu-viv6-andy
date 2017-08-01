@@ -13,6 +13,8 @@
 
 #include <gc_vx_common.h>
 
+#define PRE_SORT 1
+
 VX_INTERNAL_API void vxoGraph_Dump(vx_graph graph)
 {
     if (graph == VX_NULL)
@@ -87,8 +89,7 @@ VX_PRIVATE_API vx_uint32 vxoGraph_GetNextNodeIndex(vx_graph graph, vx_uint32 nod
 VX_PRIVATE_API vx_bool vxoReference_HasWriteDependency(vx_reference ref1, vx_reference ref2)
 {
     if (ref1 == VX_NULL || ref2 == VX_NULL) return vx_false_e;
-
-    if (ref1 == ref2) return (((vx_array)ref1)->base.isStage)?vx_false_e:vx_true_e;/*if is staging reference, skip dependency checking*/
+    if ((ref1->type != VX_TYPE_TENSOR && ref2->type != VX_TYPE_TENSOR) && (ref1 == ref2)) return (((vx_array)ref1)->base.isStage)?vx_false_e:vx_true_e;/*if is staging reference, skip dependency checking*/
 
     if (ref1->type == VX_TYPE_PYRAMID && ref2->type == VX_TYPE_IMAGE)
     {
@@ -122,6 +123,43 @@ VX_PRIVATE_API vx_bool vxoReference_HasWriteDependency(vx_reference ref1, vx_ref
                 && rect1.end_y      > rect2.start_y)
             {
                 return vx_true_e;
+            }
+        }
+    }
+    else if (ref1->type == VX_TYPE_TENSOR && ref2->type == VX_TYPE_TENSOR)
+    {
+
+        vx_view_region_s viewRegion1, viewRegion2;
+        vx_tensor_buffer_s* tensorBuf1, *tensorBuf2;
+        tensorBuf1 = vxoTensor_LocateView((vx_tensor)ref1, &viewRegion1);
+        tensorBuf2 = vxoTensor_LocateView((vx_tensor)ref2, &viewRegion2);
+
+        if (tensorBuf1 == tensorBuf2)
+        {
+            if (viewRegion1.dimCount == viewRegion2.dimCount)
+            {
+                vx_uint32 dimIndex = viewRegion1.dimCount - 1;
+                vx_bool isInterCross = vx_false_e;
+
+                do
+                {
+                    vx_bool result = vx_false_e;
+                    if ((viewRegion1.viewStarts[dimIndex] < viewRegion2.viewEnds[dimIndex])
+                        && (viewRegion1.viewEnds[dimIndex] > viewRegion2.viewStarts[dimIndex]))
+                    {
+                        result = vx_true_e;
+                    }
+
+                    isInterCross = (vx_bool)(isInterCross && result);
+
+                    dimIndex--;
+                }while (dimIndex > 0);
+
+                if (isInterCross)
+                {
+                    return vx_true_e;
+                }
+
             }
         }
     }
@@ -289,6 +327,173 @@ VX_PRIVATE_API vx_status vxoGraph_Traverse(
     return VX_SUCCESS;
 }
 
+
+#if PRE_SORT
+VX_INTERNAL_API void vxoGraph_GenerateAllNodeIndexTable(vx_graph graph)
+{
+    vx_uint32 possibleNextNodeIndexTable[VX_MAX_REF_COUNT];
+    vx_uint32 leftNodeIndexTable[VX_MAX_REF_COUNT];
+    vx_uint32 lastNodeIndexTable[VX_MAX_REF_COUNT];
+
+    vx_uint32 possibleNextNodeCount = 0;
+    vx_uint32 index;
+    vx_uint32 paramIndex;
+
+    vx_uint32 nextNodeCount = graph->nodeCount - graph->headNodeCount;
+    vx_uint32 lastNodeCount = graph->headNodeCount;
+    vx_uint32 leftNodeCount = 0;
+
+    vx_uint32 nextIndex = 0;
+    vx_uint32 lastIndex = 0;
+
+    for (index = 0; index < graph->headNodeCount; index++)
+    {
+        vx_node headNode = graph->nodeTable[graph->headNodeIndexTable[index]];
+        headNode->visited = vx_true_e;
+        graph->allNodeIndexTable[index] = graph->headNodeIndexTable[index];
+        lastNodeIndexTable[index] = graph->headNodeIndexTable[index];
+    }
+    nextIndex = graph->headNodeCount;
+
+    while (nextNodeCount > 0)
+    {
+        /* Build up the possible next index table from the last node index table */
+        for (index = 0; index < lastNodeCount; index++)
+        {
+            vx_node lastNode = graph->nodeTable[lastNodeIndexTable[index]];
+
+            vxmASSERT(lastNode);
+
+            for (paramIndex = 0; paramIndex < lastNode->kernel->signature.paramCount; paramIndex++)
+            {
+                vx_reference    paramRef;
+                vx_uint32       newPossibleNextNodeCount;
+
+                if (lastNode->kernel->signature.directionTable[paramIndex] == VX_INPUT) continue;
+
+                paramRef = lastNode->paramTable[paramIndex];
+
+                if (paramRef == VX_NULL) continue;
+
+                newPossibleNextNodeCount = vxmLENGTH_OF(possibleNextNodeIndexTable) - possibleNextNodeCount;
+
+                if (vxoGraph_FindAllRelatedNodes(graph, VX_INPUT, paramRef,
+                                            &possibleNextNodeIndexTable[possibleNextNodeCount],
+                                            INOUT &newPossibleNextNodeCount) == VX_SUCCESS)
+                {
+                    possibleNextNodeCount += newPossibleNextNodeCount;
+                }
+            }
+        }
+
+        /* Add all left nodes to the possible next node index table */
+        for (index = 0; index < leftNodeCount; index++)
+        {
+            vx_uint32   index2;
+            vx_bool     found = vx_false_e;
+
+            for (index2 = 0; index2 < possibleNextNodeCount; index2++)
+            {
+                if (leftNodeIndexTable[index] == possibleNextNodeIndexTable[index2])
+                {
+                    found = vx_true_e;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                possibleNextNodeIndexTable[possibleNextNodeCount] = leftNodeIndexTable[index];
+                possibleNextNodeCount++;
+                vxmASSERT(possibleNextNodeCount < VX_MAX_REF_COUNT);
+            }
+        }
+
+        leftNodeCount = 0;
+        lastIndex = 0;
+
+        /* now check all possible next nodeTable to see if the parent nodeTable are visited. */
+        for (index = 0; index < possibleNextNodeCount; index++)
+        {
+            vx_uint32   possibleNextNodeIndex = possibleNextNodeIndexTable[index];
+            vx_node     possibleNextNode = graph->nodeTable[possibleNextNodeIndex];
+
+            vx_uint32   possibleParamIndexTable[VX_MAX_PARAMETERS];
+            vx_uint32   possibleParamCount = 0;
+            vx_uint32   index2;
+            vx_bool     areAllParamsReady = vx_true_e;
+
+            /* Build up the possible parameter index table from the possible next node */
+            for (paramIndex = 0; paramIndex < possibleNextNode->kernel->signature.paramCount; paramIndex++)
+            {
+                if (possibleNextNode->kernel->signature.directionTable[paramIndex] == VX_INPUT)
+                {
+                    possibleParamIndexTable[possibleParamCount] = paramIndex;
+                    possibleParamCount++;
+                }
+            }
+
+            /* Check if all possible parameters are ready */
+            for (index2 = 0; index2 < possibleParamCount; index2++)
+            {
+                vx_uint32       possibleParamIndex  = possibleParamIndexTable[index2];
+                vx_reference    possibleParamRef    = possibleNextNode->paramTable[possibleParamIndex];
+                vx_direction_e  paramDirTable[]     = {VX_OUTPUT, VX_BIDIRECTIONAL};
+                vx_uint32       index3;
+
+                for (index3 = 0; index3 < vxmLENGTH_OF(paramDirTable); index3++)
+                {
+                    vx_direction_e  direction = paramDirTable[index3];
+                    vx_uint32       predicateNodeIndexTable[VX_MAX_REF_COUNT];
+                    vx_uint32       predicateNodeCount = vxmLENGTH_OF(predicateNodeIndexTable);
+                    vx_uint32       index4;
+
+                    if (vxoGraph_FindAllRelatedNodes(graph, direction, possibleParamRef,
+                                                predicateNodeIndexTable, INOUT &predicateNodeCount) != VX_SUCCESS) continue;
+
+                    /* Check if all predicate nodes executed */
+                    for (index4 = 0; index4 < predicateNodeCount; index4++)
+                    {
+                        vx_node predicateNode = graph->nodeTable[predicateNodeIndexTable[index4]];
+
+                        vxmASSERT(predicateNode);
+
+                        if (!predicateNode->visited)
+                        {
+                            areAllParamsReady = vx_false_e;
+                            break;
+                        }
+                    }
+
+                    if (!areAllParamsReady) break;
+                }
+            }
+
+            /* Add the possible node index to the next node index table or the left node index table */
+            if (areAllParamsReady)
+            {
+                if (!possibleNextNode->visited)
+                {
+                    graph->allNodeIndexTable[nextIndex] = possibleNextNodeIndex;
+                    nextIndex++;
+                    vxmASSERT(nextIndex <= graph->nodeCount);
+                    lastNodeIndexTable[lastIndex] = possibleNextNodeIndex;
+                    lastIndex++;
+                    possibleNextNode->visited = vx_true_e;
+                    nextNodeCount--;
+                }
+            }
+            else
+            {
+                leftNodeIndexTable[leftNodeCount] = possibleNextNodeIndex;
+                leftNodeCount++;
+            }
+            lastNodeCount = lastIndex;
+        }
+    }
+}
+#endif
+
 VX_INTERNAL_API void vxoGraph_GenerateNextNodeTable(vx_graph graph,
         vx_uint32 lastNodeIndexTable[VX_MAX_REF_COUNT], vx_uint32 lastNodeCount,
         OUT vx_uint32 nextNodeIndexTable[VX_MAX_REF_COUNT], OUT vx_uint32_ptr nextNodeCountPtr,
@@ -436,7 +641,6 @@ VX_INTERNAL_API void vxoGraph_GenerateNextNodeTable(vx_graph graph,
         }
     }
 }
-
 VX_INTERNAL_API void vxoGraph_PolluteIfInput(vx_graph graph, vx_reference targetRef)
 {
     vx_uint32 nodeIndex;
@@ -455,7 +659,11 @@ VX_INTERNAL_API void vxoGraph_PolluteIfInput(vx_graph graph, vx_reference target
 
             if (node->paramTable[paramIndex] == targetRef)
             {
+                graph->reverify = graph->verified;
+
                 graph->verified = vx_false_e;
+
+                graph->status   = VX_GRAPH_STATE_UNVERIFIED;
                 return;
             }
         }
@@ -473,6 +681,12 @@ VX_API_ENTRY vx_graph VX_API_CALL vxCreateGraph(vx_context context)
     if (vxoReference_GetStatus((vx_reference)graph) != VX_SUCCESS) return graph;
 
     graph->dirty = vx_true_e;
+
+    graph->reverify = graph->verified;
+
+    graph->verified = vx_false_e;
+
+    graph->status = VX_GRAPH_STATE_UNVERIFIED;
 
     vxCreateMutex(OUT &graph->scheduleLock);
 
@@ -496,7 +710,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryGraph(vx_graph graph, vx_enum attribut
 
     switch (attribute)
     {
-        case VX_GRAPH_ATTRIBUTE_PERFORMANCE:
+        case VX_GRAPH_PERFORMANCE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_perf_t, 0x3);
 
             *(vx_perf)ptr = graph->perf;
@@ -504,19 +718,19 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryGraph(vx_graph graph, vx_enum attribut
             vxoPerf_Dump(&graph->perf);
             break;
 
-        case VX_GRAPH_ATTRIBUTE_STATUS:
+        case VX_GRAPH_STATE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_status, 0x3);
 
             *(vx_status *)ptr = graph->status;
             break;
 
-        case VX_GRAPH_ATTRIBUTE_NUMNODES:
+        case VX_GRAPH_NUMNODES:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = graph->nodeCount;
             break;
 
-        case VX_GRAPH_ATTRIBUTE_NUMPARAMETERS:
+        case VX_GRAPH_NUMPARAMETERS:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = graph->paramCount;
@@ -530,13 +744,550 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryGraph(vx_graph graph, vx_enum attribut
     return VX_SUCCESS;
 }
 
+VX_API_ENTRY vx_status VX_API_CALL vx_vivPeferGraph(vx_graph graph, vx_char* path, vx_bool only_top, vx_bool top, vx_char* buffer)
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 nodeIndex = 0;
+
+    vx_char log[1024] = {0};
+    vx_char outputBuffer[1024 * 100] = {'\0'};
+    vx_char tempBuffer[1024 * 100] = {'\0'};
+
+    FILE* fp = NULL;
+    vx_char * output = (buffer != NULL)? buffer:outputBuffer;
+
+    if(!graph)
+        return VX_ERROR_INVALID_GRAPH;
+
+    if (only_top && graph->isChildGraph)
+        return VX_ERROR_INVALID_GRAPH;
+
+    strcat(output, "    <graph>\n");
+    sprintf(log, "        <name>%p</name>\n", graph);
+    strcat(output, log);
+    sprintf(log, "        <start>%llu</start>\n", (unsigned long long)graph->perf.beg);
+    strcat(output, log);
+    sprintf(log, "        <end>%llu</end>\n", (unsigned long long)graph->perf.end);
+    strcat(output, log);
+    sprintf(log, "        <interval>%llu</interval>\n\n", (unsigned long long)graph->perf.tmp);
+    strcat(output, log);
+
+    for (nodeIndex = 0; nodeIndex <graph->nodeCount; nodeIndex++)
+    {
+        vx_node node = graph->nodeTable[nodeIndex];
+
+        strcat(output, "        <node>\n");
+
+                sprintf(log, "            <name>%s</name>\n", node->kernel->name);
+                strcat(output, log);
+
+                sprintf(log, "            <start>%llu</start>\n", (unsigned long long)node->perf.beg);
+                strcat(output, log);
+
+                sprintf(log, "            <end>%llu</end>\n", (unsigned long long)node->perf.end);
+                strcat(output, log);
+
+                sprintf(log, "            <interval>%llu</interval>\n\n", (unsigned long long)node->perf.tmp);
+                strcat(output, log);
+
+        strcat(output, "        </node>\n");
+
+        if (node->childGraph != NULL)
+        {
+            memset(tempBuffer, 0, sizeof(tempBuffer));
+            vx_vivPeferGraph(node->childGraph, NULL, vx_false_e, vx_false_e, tempBuffer);
+            strcat(output, tempBuffer);
+        }
+    }
+
+        strcat(output, "    </graph>\n");
+
+    if(top)
+    {
+        fp = fopen(path, "w+");
+        fwrite(output, sizeof(vx_char), strlen(output), fp);
+        fclose(fp);
+    }
+
+    return status;
+}
+
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseGraph(vx_graph *graph)
 {
+    vx_char* path;
+    gcoOS_GetEnv(gcvNULL, "VIV_VX_GRAPH_PERF", &path);
+    if (path)
+        vx_vivPeferGraph(*graph, path, vx_true_e, vx_true_e, NULL);
 
 
     return vxoReference_Release((vx_reference_ptr)graph, VX_TYPE_GRAPH, VX_REF_EXTERNAL);
 }
 
+VX_PRIVATE_API vx_status vxoGraph_InitMetaFormatData(vx_graph graph, vx_node node, vx_uint32 paramIndex, vx_reference_s **vRef, vx_meta_format* metaFormat, vx_status* status)
+{
+    *vRef = node->paramTable[paramIndex];
+    *metaFormat = vxoMetaFormat_Create(graph->base.context);
+
+    if ((*vRef)->isVirtual == vx_false_e)
+    {
+        *vRef = NULL;
+    }
+    else
+    {
+        if ((*vRef)->scope->type == VX_TYPE_GRAPH &&
+            (*vRef)->scope != (vx_reference_s *)graph &&
+            (*vRef)->scope != (vx_reference_s *)graph->parentGraph)
+        {
+            *status = VX_ERROR_INVALID_SCOPE;
+            vxAddLogEntry((vx_reference)(*vRef), *status, "Virtual Reference is in the wrong scope, created from another graph!\n");
+
+            return vx_false_e;
+        }
+    }
+    (*metaFormat)->type = node->kernel->signature.dataTypeTable[paramIndex];
+    return vx_true_e;
+}
+
+/* calculate image valid rectangle through callback */
+VX_PRIVATE_API vx_bool vxoGraph_SetImagValidRect(vx_node node, vx_reference paramRef, vx_uint32 paramIndex, vx_meta_format metaFormat)
+{
+    vx_image img = (vx_image)paramRef;
+
+    if (NULL != metaFormat->setValidRectangleCallback)
+        node->kernelAttributes.validRectReset = vx_false_e;
+
+    if (vx_false_e == node->kernelAttributes.validRectReset &&
+        NULL != metaFormat->setValidRectangleCallback)
+    {
+        vx_uint32 i;
+        vx_uint32 nparams = 0;
+        vx_uint32 num_in_images = 0;
+        vx_rectangle_t** in_rect = NULL;
+        vx_rectangle_t* out_rect[1] = { NULL };
+        vx_bool res = vx_true_e;
+
+        if (VX_SUCCESS != vxQueryNode(node, VX_NODE_PARAMETERS, &nparams, sizeof(nparams)))
+            return vx_false_e;
+
+        /* get the num of input images */
+        for (i = 0; i < nparams; i++)
+        {
+            if (VX_INPUT == node->kernel->signature.directionTable[i] &&
+                VX_TYPE_IMAGE == node->paramTable[i]->type)
+                num_in_images++;
+        }
+        in_rect = (vx_rectangle_t**)malloc(num_in_images * sizeof(vx_rectangle_t*));
+        if (NULL == in_rect)
+        {
+            return vx_false_e;
+        }
+
+        for (i = 0; i < nparams; i++)
+        {
+            if (VX_INPUT == node->kernel->signature.directionTable[i] &&
+                VX_TYPE_IMAGE == node->paramTable[i]->type)
+            {
+                in_rect[i] = (vx_rectangle_t*)malloc(sizeof(vx_rectangle_t));
+                if (NULL == in_rect[i])
+                {
+                    res = vx_false_e;
+                    break;
+                }
+                /* collect input images valid rectagles in array */
+                if (VX_SUCCESS != vxGetValidRegionImage((vx_image)node->paramTable[i], in_rect[i]))
+                {
+                    res = vx_false_e;
+                    break;
+                }
+
+            }
+        }
+
+        if (vx_false_e != res)
+        {
+            out_rect[0] = (vx_rectangle_t*)malloc(sizeof(vx_rectangle_t));
+            if (NULL == out_rect[0])
+                res = vx_false_e;
+
+            if (VX_SUCCESS == metaFormat->setValidRectangleCallback(node, paramIndex, (const vx_rectangle_t* const*)in_rect,
+                                                                 (vx_rectangle_t* const*)out_rect))
+            {
+                /* set output image valid rectangle */
+                if (VX_SUCCESS != vxSetImageValidRectangle(img, (const vx_rectangle_t*)out_rect[0]))
+                    res = vx_false_e;
+            }
+
+            else
+                res = vx_false_e;
+
+            free(out_rect[0]);
+        }
+
+        /* deallocate arrays memory */
+        for (i = 0; i < num_in_images; i++)
+        {
+            if (NULL != in_rect[i])
+                free(in_rect[i]);
+        }
+
+        if (NULL != in_rect)
+            free(in_rect);
+
+        return res;
+    }
+
+    if (vx_true_e == node->kernelAttributes.validRectReset)
+    {
+        /* reset image valid rectangle */
+        vx_rectangle_t out_rect;
+        out_rect.start_x = 0;
+        out_rect.start_y = 0;
+        out_rect.end_x   = img->width;
+        out_rect.end_y   = img->height;
+
+        if (VX_SUCCESS != vxSetImageValidRectangle(img, &out_rect))
+            return vx_false_e;
+    }
+
+    return vx_true_e;
+}
+
+VX_PRIVATE_API vx_status vxoGraph_PostMetaFormatData(vx_node node, vx_reference paramRef, vx_uint32 paramIndex, vx_reference_s **vRef, vx_meta_format metaFormat)
+{
+
+    switch (metaFormat->type)
+    {
+        case VX_TYPE_IMAGE:
+            if ((vRef != NULL) && (paramRef == *vRef))
+            {
+                vx_image image = (vx_image)paramRef;
+
+                if (image->format != metaFormat->u.imageInfo.format && image->format != VX_DF_IMAGE_VIRT)
+                {
+                    vxError("Node %p(\"%s\"): No.%d image parameter's format, %d, is invalid (expected: %d)",
+                            node, node->kernel->name, paramIndex, image->format, metaFormat->u.imageInfo.format);
+                    return VX_ERROR_INVALID_FORMAT;
+                }
+
+                image->format   = metaFormat->u.imageInfo.format;
+                image->width    = metaFormat->u.imageInfo.width;
+                image->height   = metaFormat->u.imageInfo.height;
+
+                vxoImage_Initialize(image, image->width, image->height, image->format);
+
+                vxoImage_Dump(image);
+            }
+            else
+                vxoGraph_SetImagValidRect(node, paramRef, paramIndex, metaFormat);
+            break;
+
+        case VX_TYPE_PYRAMID:
+            {
+                vx_pyramid pyramid = (vx_pyramid)paramRef;
+
+                if (pyramid->levelCount != metaFormat->u.pyramidInfo.levelCount)
+                {
+                    vxError("Node %p(\"%s\"): No.%d pyramid parameter has invalid levels, %d (expected: %d)",
+                            node, node->kernel->name, paramIndex,
+                            pyramid->levelCount, metaFormat->u.pyramidInfo.levelCount);
+                    return VX_ERROR_INVALID_VALUE;
+                }
+
+                if (pyramid->scale != metaFormat->u.pyramidInfo.scale)
+                {
+                    vxError("Node %p(\"%s\"): No.%d pyramid parameter has invalid scale, %f (expected: %f)",
+                            node, node->kernel->name, paramIndex,
+                            pyramid->scale, metaFormat->u.pyramidInfo.scale);
+                    return VX_ERROR_INVALID_VALUE;
+                }
+
+                if (pyramid->format != VX_DF_IMAGE_VIRT && pyramid->format != metaFormat->u.pyramidInfo.format)
+                {
+                    vxError("Node %p(\"%s\"): No.%d pyramid parameter's format, %d, is invalid (expected: %d)",
+                            node, node->kernel->name, paramIndex,
+                            pyramid->format, metaFormat->u.pyramidInfo.format);
+                    return VX_ERROR_INVALID_FORMAT;
+                }
+
+                if ((pyramid->width != 0 && pyramid->width != metaFormat->u.pyramidInfo.width)
+                    || (pyramid->height != 0 && pyramid->height != metaFormat->u.pyramidInfo.height))
+                {
+                    vxError("Node %p(\"%s\"): No.%d pyramid parameter's width and height, %dx%d"
+                                ", is invalid (expected: %dx%d)",
+                                node, node->kernel->name, paramIndex, pyramid->width, pyramid->height,
+                                metaFormat->u.pyramidInfo.width, metaFormat->u.pyramidInfo.height);
+                    return VX_ERROR_INVALID_DIMENSION;
+                }
+
+                if (pyramid->base.isVirtual)
+                {
+                    vxoPyramid_Initialize(pyramid, pyramid->levelCount, pyramid->scale, metaFormat->u.pyramidInfo.width,
+                                    metaFormat->u.pyramidInfo.height, metaFormat->u.pyramidInfo.format);
+                }
+            }
+            break;
+
+        case VX_TYPE_SCALAR:
+            {
+                vx_scalar scalar = (vx_scalar)paramRef;
+
+                if (scalar->dataType != metaFormat->u.scalarInfo.type)
+                {
+                    vxError("Node %p(\"%s\"): No.%d scalar parameter's type, %d, is invalid (expected: %d)",
+                            node, node->kernel->name, paramIndex,
+                            scalar->dataType, metaFormat->u.scalarInfo.type);
+                    return VX_ERROR_INVALID_TYPE;
+                }
+            }
+            break;
+
+        case VX_TYPE_ARRAY:
+            {
+                vx_array array = (vx_array)paramRef;
+
+                if (array->base.isVirtual)
+                {
+                    if (!vxoArray_InitializeAsVirtual(array, metaFormat->u.arrayInfo.itemType,
+                                                    metaFormat->u.arrayInfo.capacity))
+                    {
+                        vxError("Node %p(\"%s\"): No.%d virtual array parameter: "
+                                "the corresponding metaFormat format's item type and/or capacity, %d/%d, is invalid",
+                                node, node->kernel->name, paramIndex,
+                                metaFormat->u.arrayInfo.itemType, metaFormat->u.arrayInfo.capacity);
+                        return VX_ERROR_INVALID_DIMENSION;
+                    }
+                }
+                else
+                {
+                    if (!vxoArray_CheckItemTypeAndCapacity(array, metaFormat->u.arrayInfo.itemType,
+                                            metaFormat->u.arrayInfo.capacity))
+                    {
+                        vxError("Node %p(\"%s\"): No.%d array parameter's item type and/or capacity"
+                                ", %d/%d, is invalid (expected: %d/%d)",
+                                node, node->kernel->name, paramIndex,
+                                array->itemType, array->capacity,
+                                metaFormat->u.arrayInfo.itemType, metaFormat->u.arrayInfo.capacity);
+                        return VX_ERROR_INVALID_DIMENSION;
+                    }
+                }
+            }
+            break;
+
+        case VX_TYPE_MATRIX:
+            {
+                vx_matrix matrix = (vx_matrix)paramRef;
+                if (matrix->dataType != metaFormat->u.matrixInfo.type)
+                {
+                    vxAddLogEntry(&node->base, VX_ERROR_INVALID_TYPE,
+                        "Node: %s: parameter[%u] has an invalid data type 0x%08x\n",
+                        node->kernel->name, paramIndex, matrix->dataType);
+
+                    return VX_ERROR_INVALID_TYPE;
+                }
+
+                if (matrix->columns != metaFormat->u.matrixInfo.cols || matrix->rows != metaFormat->u.matrixInfo.rows)
+                {
+                    vxAddLogEntry(&node->base, VX_ERROR_INVALID_DIMENSION,
+                        "Node: %s: parameter[%u] has an invalid matrix dimention %ux%u\n",
+                        node->kernel->name, paramIndex, matrix->dataType, matrix->rows, matrix->columns);
+
+                    return VX_ERROR_INVALID_DIMENSION;
+                }
+            }
+            break;
+
+        case VX_TYPE_DISTRIBUTION:
+            {
+                vx_distribution distribution = (vx_distribution)paramRef;
+
+                if (distribution->offsetX != metaFormat->u.distributionInfo.offset ||
+                    distribution->rangeX != metaFormat->u.distributionInfo.range ||
+                    (vx_size)distribution->memory.dims[0][VX_DIM_X] != metaFormat->u.distributionInfo.bins)
+                {
+                    vxAddLogEntry(&node->base, VX_ERROR_INVALID_VALUE,
+                        "Node: %s: parameter[%u] has an invalid offset %u, number of bins %u or range %u\n",
+                        node->kernel->name, paramIndex, distribution->offsetX,
+                        distribution->memory.dims[0][VX_DIM_X], distribution->rangeX);
+
+                    return VX_ERROR_INVALID_VALUE;
+                }
+            }
+            break;
+
+        case VX_TYPE_REMAP:
+            {
+                vx_remap remap = (vx_remap)paramRef;
+                if (remap->srcWidth != metaFormat->u.remapInfo.src_width || remap->srcWidth != metaFormat->u.remapInfo.src_height)
+                {
+                    vxAddLogEntry(&node->base, VX_ERROR_INVALID_DIMENSION,
+                        "Node: %s: parameter[%u] has an invalid source dimention %ux%u\n",
+                        node->kernel->name, paramIndex);
+
+                    return VX_ERROR_INVALID_DIMENSION;
+                }
+
+                if (remap->destWidth != metaFormat->u.remapInfo.dst_width || remap->destHeight != metaFormat->u.remapInfo.dst_height)
+                {
+                    vxAddLogEntry(&node->base, VX_ERROR_INVALID_DIMENSION,
+                        "Node: %s: parameter[%u] has an invalid dest dimention %ux%u\n",
+                        node->kernel->name, paramIndex);
+
+                    return VX_ERROR_INVALID_DIMENSION;
+                }
+            }
+            break;
+
+        case VX_TYPE_LUT:
+            {
+                vx_lut_s *lut = (vx_lut_s *)paramRef;
+                if (lut->itemType != metaFormat->u.lutInfo.type || lut->itemCount != metaFormat->u.lutInfo.count)
+                {
+                    vxAddLogEntry(&node->base, VX_ERROR_INVALID_DIMENSION,
+                        "Node: %s: parameter[%u] has an invalid item type 0x%08x or count "VX_FMT_SIZE"\n",
+                        node->kernel->name, paramIndex, lut->itemType, lut->itemCount);
+
+                    return VX_ERROR_INVALID_DIMENSION;
+                }
+            }
+            break;
+
+        case VX_TYPE_THRESHOLD:
+            {
+                vx_threshold threshold = (vx_threshold)paramRef;
+                if (threshold->thresholdType != metaFormat->u.thresholdInfo.type)
+                {
+                    vxAddLogEntry(&node->base, VX_ERROR_INVALID_TYPE,
+                          "Threshold contains invalid typed objects for node %s\n", node->kernel->name);
+
+                    return VX_ERROR_INVALID_TYPE;
+                }
+            }
+            break;
+
+        case VX_TYPE_OBJECT_ARRAY:
+            {
+                vx_object_array_s *objarr = (vx_object_array_s *)paramRef;
+                vxError("meta: type 0x%08x, 0x%08x "VX_FMT_SIZE"\n", metaFormat->type, metaFormat->u.objectArrayInfo.item_type, metaFormat->u.objectArrayInfo.item_count);
+
+                if (vxoOA_ValidateObjectArray(objarr, metaFormat->u.objectArrayInfo.item_type, metaFormat->u.objectArrayInfo.item_type) != vx_true_e)
+                {
+                    vxAddLogEntry(&node->base, VX_ERROR_INVALID_DIMENSION,
+                        "Node: %s: parameter[%u] has an invalid item type 0x%08x or num_items "VX_FMT_SIZE"\n",
+                        node->kernel->name, paramIndex, objarr->itemType, objarr->itemCount);
+
+                    return VX_ERROR_INVALID_DIMENSION;
+                }
+
+                if (*vRef == (vx_reference_s *)objarr)
+                {
+                    vx_int32 i = 0;
+
+                    for (i = 0; i < metaFormat->u.objectArrayInfo.item_type; i++)
+                    {
+                        vx_reference item = vxGetObjectArrayItem(objarr, i);
+
+                        if (!vxoGraph_PostMetaFormatData(node, item, paramIndex, vRef, metaFormat))
+                        {
+                            vxReleaseReference(&item);
+                            vxAddLogEntry(&node->base, VX_ERROR_INVALID_PARAMETERS,
+                                "Node: %s: meta[%u] has an invalid meta of exemplar\n",
+                                node->kernel->name, paramIndex);
+
+                            return VX_ERROR_INVALID_PARAMETERS;
+                        }
+
+                        vxReleaseReference(&item);
+                    }
+                }
+                else
+                {
+                    vx_int32 i = 0;
+                    /* check the data that came back from the output validator against the object */
+                    for (i = 0; i < metaFormat->u.objectArrayInfo.item_type; i++)
+                    {
+                        vx_reference item = vxGetObjectArrayItem(objarr, i);
+                        vx_reference itemref = vxGetObjectArrayItem((vx_object_array)*vRef, i);
+
+                        if (!vxoGraph_PostMetaFormatData(node, item, paramIndex, &itemref, metaFormat))
+                        {
+                            vxReleaseReference(&item);
+                            vxAddLogEntry(&node->base, VX_ERROR_INVALID_PARAMETERS,
+                                "Node: %s: meta[%u] has an invalid meta of exemplar\n",
+                                node->kernel->name, paramIndex);
+
+                            return VX_ERROR_INVALID_PARAMETERS;
+                        }
+
+                        vxReleaseReference(&item);
+                    }
+                }
+            }
+            break;
+
+        case VX_TYPE_TENSOR:
+            break;
+
+        default:
+           vxAddLogEntry(&node->base, VX_ERROR_INVALID_TYPE,
+                 "The format of meta is invalid objects %s for node: %s\n", metaFormat->type, node->kernel->name);
+           return VX_ERROR_INVALID_FORMAT;
+    }
+
+    return VX_SUCCESS;
+}
+
+
+VX_PRIVATE_API vx_status vxoGraph_UserKernelPreprocess(vx_graph graph, vx_bool first)
+{
+    vx_uint32 nodeIndex;
+
+    vxmASSERT(graph);
+
+    for (nodeIndex = 0; nodeIndex < graph->nodeCount; nodeIndex++)
+    {
+        vx_node node = graph->nodeTable[nodeIndex];
+
+        if (node->kernel->isUserkernel)
+        {
+            if (!first)
+            {
+                if (node->kernel->deinitializeFunction != VX_NULL)
+                {
+                    vx_status status = VX_SUCCESS;
+
+                    if (node->localDataSetByImplementation == vx_false_e)
+                        node->localDataChangeIsEnabled = vx_true_e;
+
+                    status = node->kernel->deinitializeFunction(
+                                            node, node->paramTable, node->kernel->signature.paramCount);
+
+                    node->localDataChangeIsEnabled = vx_false_e;
+
+                    if (status != VX_SUCCESS)
+                    {
+                        vxError("Failed to deinitialize Kernel \"%s\" of Node %p (status = %d)",
+                                node->kernel->name, node, status);
+                        return status;
+                    }
+                }
+
+                if (node->kernelAttributes.localDataSize > 0 && node->kernelAttributes.localDataPtr == VX_NULL)
+                {
+                    if (node->kernelAttributes.localDataPtr)
+                    {
+                        vxFree(node->kernelAttributes.localDataPtr);
+                        node->kernelAttributes.localDataSize = 0;
+                        node->kernelAttributes.localDataPtr = VX_NULL;
+                    }
+
+                }
+
+                node->localDataSetByImplementation = vx_false_e;
+            }
+        }
+    }
+    return VX_SUCCESS;
+}
 VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodeParameters(vx_graph graph)
 {
     vx_uint32 nodeIndex, paramIndex;
@@ -578,217 +1329,161 @@ VX_PRIVATE_API vx_status vxoGraph_VerifyAllNodeParameters(vx_graph graph)
         }
 
         if (status != VX_SUCCESS) return status;
-
-        /* Validate all input/bidirectional parameters */
-        for (paramIndex = 0; paramIndex < node->kernel->signature.paramCount; paramIndex++)
+        /*if user kernel, use validateFunction to check input and output*/
+        if (node->kernel->validateFunction != VX_NULL)
         {
-            vx_status validationStatus;
-            vx_reference paramRef = node->paramTable[paramIndex];
+            vx_status validationStatus = VX_SUCCESS;
+            vx_meta_format metaFormat[VX_MAX_PARAMETERS];
+            vx_uint32 index;
+            vx_uint32 paramIndex;
+            vx_reference_s *vRef = NULL;
 
-            if (paramRef == VX_NULL) continue;
-
-            if (!vxmIS_INPUT_OR_BIDIRECTION(node->kernel->signature.directionTable[paramIndex])) continue;
-
-            vxmASSERT(node->kernel->inputValidateFunction);
-
-            validationStatus = node->kernel->inputValidateFunction(node, paramIndex);
-
-            if (validationStatus != VX_SUCCESS)
+            for (index = 0; index < vxmLENGTH_OF(metaFormat); index++)
             {
-                vxError("Node %p(\"%s\"): No.%d parameter input validation failure (status = %d)",
-                        node, node->kernel->name, paramIndex, validationStatus);
-                status = validationStatus;
-                continue;
+                metaFormat[index] = NULL;
             }
-        }
 
-        if (status != VX_SUCCESS) return status;
-
-        /* Validate all output/bidirectional parameters */
-        for (paramIndex = 0; paramIndex < node->kernel->signature.paramCount; paramIndex++)
-        {
-            vx_status validationStatus;
-            vx_reference paramRef = node->paramTable[paramIndex];
-
-            if (paramRef == VX_NULL) continue;
-
-            if (node->kernel->signature.directionTable[paramIndex] != VX_OUTPUT) continue;
-
-            if (paramRef->isVirtual)
+            for (paramIndex = 0; paramIndex < node->kernel->signature.paramCount; paramIndex++)
             {
-                if (vxoReference_GetType(paramRef->scope) == VX_TYPE_GRAPH && (vx_graph)paramRef->scope != graph && !graph->isChildGraph)
+                if ((node->paramTable[paramIndex] != NULL) &&
+                    (node->kernel->signature.directionTable[paramIndex] == VX_OUTPUT))
                 {
-                    vxError("Node %p(\"%s\") in Graph %p: No.%d virtual parameter has an invalid scope, %p",
-                            node, node->kernel->name, graph, paramIndex, paramRef->scope);
-                    status = VX_ERROR_INVALID_SCOPE;
-                    continue;
+                    vxoGraph_InitMetaFormatData(graph, node, paramIndex, &vRef, &metaFormat[paramIndex], &status);
                 }
             }
 
+            if (status == VX_SUCCESS)
+            {
+                validationStatus = node->kernel->validateFunction(node,
+                                                                  node->paramTable,
+                                                                  node->kernel->signature.paramCount,
+                                                                  metaFormat);
+                if (validationStatus != VX_SUCCESS)
+                {
+                    status = validationStatus;
+                    vxError("Node %p(\"%s\"): No.%d parameter output validation failure (status = %d)",
+                                node, node->kernel->name, paramIndex, validationStatus);
+                }
+            }
+
+            if (status == VX_SUCCESS)
+            {
+                for (paramIndex = 0; paramIndex < node->kernel->signature.paramCount; paramIndex++)
+                {
+                    if ((node->paramTable[paramIndex] != NULL) &&
+                        (node->kernel->signature.directionTable[paramIndex] == VX_OUTPUT))
+                    {
+                        if (vxoGraph_PostMetaFormatData(node, node->paramTable[paramIndex], paramIndex, &vRef, metaFormat[paramIndex]) != VX_SUCCESS)
+                            break;
+                    }
+                }
+            }
+
+            for (index = 0; index < vxmLENGTH_OF(metaFormat); index++)
+            {
+                if (metaFormat[index])  vxoMetaFormat_Release(&metaFormat[index]);
+            }
+        }
+        else
+        {
+
+            /* Validate all input/bidirectional parameters */
+            for (paramIndex = 0; paramIndex < node->kernel->signature.paramCount; paramIndex++)
+            {
+                vx_status validationStatus;
+                vx_reference paramRef = node->paramTable[paramIndex];
+
+                if (paramRef == VX_NULL) continue;
+
+                if (!vxmIS_INPUT_OR_BIDIRECTION(node->kernel->signature.directionTable[paramIndex])) continue;
+
+                if (node->kernel->validateFunction == VX_NULL)
+                {
+                    vxmASSERT(node->kernel->inputValidateFunction);
+
+                    validationStatus = node->kernel->inputValidateFunction(node, paramIndex);
+
+                    if (validationStatus != VX_SUCCESS)
+                    {
+                        vxError("Node %p(\"%s\"): No.%d parameter input validation failure (status = %d)",
+                                node, node->kernel->name, paramIndex, validationStatus);
+                        status = validationStatus;
+                        continue;
+                    }
+                }
+            }
+
+
+            if (status != VX_SUCCESS) return status;
+
+            /* Validate all output/bidirectional parameters */
+            for (paramIndex = 0; paramIndex < node->kernel->signature.paramCount; paramIndex++)
+            {
+                vx_status validationStatus;
+                vx_reference paramRef = node->paramTable[paramIndex];
+                    vx_reference vRef = node->paramTable[paramIndex];
+
+
+                if (paramRef == VX_NULL) continue;
+
+                if (node->kernel->signature.directionTable[paramIndex] != VX_OUTPUT) continue;
+
+                if (paramRef->isVirtual)
+                {
+                        if (vxoReference_GetType(paramRef->scope) == VX_TYPE_GRAPH
+                            && (vx_graph)paramRef->scope != graph
+                            && paramRef->scope != (vx_reference)graph->parentGraph
+                            )
+                    {
+                        vxError("Node %p(\"%s\") in Graph %p: No.%d virtual parameter has an invalid scope, %p",
+                                node, node->kernel->name, graph, paramIndex, paramRef->scope);
+                        status = VX_ERROR_INVALID_SCOPE;
+                        continue;
+                    }
+                }
+                    else
+                        vRef = NULL;
+
+
+                if (metaFormat != VX_NULL) vxoMetaFormat_Release(&metaFormat);
+
+                metaFormat = vxoMetaFormat_Create(graph->base.context);
+
+                if (vxoReference_GetStatus((vx_reference)metaFormat) != VX_SUCCESS)
+                {
+                    status = vxoReference_GetStatus((vx_reference)metaFormat);
+                    continue;
+                }
+
+                metaFormat->type = node->kernel->signature.dataTypeTable[paramIndex];
+
+                vxmASSERT(node->kernel->outputValidateFunction);
+
+                validationStatus = node->kernel->outputValidateFunction(node, paramIndex, metaFormat);
+
+                if (validationStatus != VX_SUCCESS)
+                {
+                    vxError("Node %p(\"%s\"): No.%d parameter output validation failure (status = %d)",
+                                node, node->kernel->name, paramIndex, validationStatus);
+                    status = validationStatus;
+                    continue;
+                }
+
+                if (!vxDataType_IsValid(metaFormat->type))
+                {
+                    vxError("Node %p(\"%s\"): No.%d parameter's type, %d, is invalid",
+                                node, node->kernel->name, paramIndex, metaFormat->type);
+                    status = VX_ERROR_INVALID_TYPE;
+                    continue;
+                }
+
+
+                    /*set metaformat data to paramRef*/
+                    status = vxoGraph_PostMetaFormatData(node, paramRef, paramIndex, &vRef, metaFormat);
+            }  /* for (paramIndex = 0; paramIndex < node->kernel->signature.paramCount; paramIndex++) */
+
             if (metaFormat != VX_NULL) vxoMetaFormat_Release(&metaFormat);
-
-            metaFormat = vxoMetaFormat_Create(graph->base.context);
-
-            if (vxoReference_GetStatus((vx_reference)metaFormat) != VX_SUCCESS)
-            {
-                status = vxoReference_GetStatus((vx_reference)metaFormat);
-                continue;
-            }
-
-            metaFormat->type = node->kernel->signature.dataTypeTable[paramIndex];
-
-            vxmASSERT(node->kernel->outputValidateFunction);
-
-            validationStatus = node->kernel->outputValidateFunction(node, paramIndex, metaFormat);
-
-            if (validationStatus != VX_SUCCESS)
-            {
-                vxError("Node %p(\"%s\"): No.%d parameter output validation failure (status = %d)",
-                            node, node->kernel->name, paramIndex, validationStatus);
-                status = validationStatus;
-                continue;
-            }
-
-            if (!vxDataType_IsValid(metaFormat->type))
-            {
-                vxError("Node %p(\"%s\"): No.%d parameter's type, %d, is invalid",
-                            node, node->kernel->name, paramIndex, metaFormat->type);
-                status = VX_ERROR_INVALID_TYPE;
-                continue;
-            }
-
-            switch (metaFormat->type)
-            {
-                case VX_TYPE_IMAGE:
-                    {
-                        vx_image image = (vx_image)paramRef;
-
-                        if (image->format != metaFormat->u.imageInfo.format && !image->base.isVirtual)
-                        {
-                            vxError("Node %p(\"%s\"): No.%d image parameter's format, %d, is invalid (expected: %d)",
-                                    node, node->kernel->name, paramIndex, image->format, metaFormat->u.imageInfo.format);
-                            status = VX_ERROR_INVALID_FORMAT;
-                            continue;
-                        }
-                        else if (image->base.isVirtual)
-                        {
-
-                            image->format   = metaFormat->u.imageInfo.format;
-                            image->width    = metaFormat->u.imageInfo.width;
-                            image->height   = metaFormat->u.imageInfo.height;
-
-                            vxoImage_Initialize(image, image->width, image->height, image->format);
-                        }
-
-                        vxoImage_Dump(image);
-                    }
-                    break;
-
-                case VX_TYPE_PYRAMID:
-                    {
-                        vx_pyramid pyramid = (vx_pyramid)paramRef;
-
-                        if (pyramid->levelCount != metaFormat->u.pyramidInfo.levelCount)
-                        {
-                            vxError("Node %p(\"%s\"): No.%d pyramid parameter has invalid levels, %d (expected: %d)",
-                                    node, node->kernel->name, paramIndex,
-                                    pyramid->levelCount, metaFormat->u.pyramidInfo.levelCount);
-                            status = VX_ERROR_INVALID_VALUE;
-                            continue;
-                        }
-
-                        if (pyramid->scale != metaFormat->u.pyramidInfo.scale)
-                        {
-                            vxError("Node %p(\"%s\"): No.%d pyramid parameter has invalid scale, %f (expected: %f)",
-                                    node, node->kernel->name, paramIndex,
-                                    pyramid->scale, metaFormat->u.pyramidInfo.scale);
-                            status = VX_ERROR_INVALID_VALUE;
-                            continue;
-                        }
-
-                        if (pyramid->format != VX_DF_IMAGE_VIRT && pyramid->format != metaFormat->u.pyramidInfo.format)
-                        {
-                            vxError("Node %p(\"%s\"): No.%d pyramid parameter's format, %d, is invalid (expected: %d)",
-                                    node, node->kernel->name, paramIndex,
-                                    pyramid->format, metaFormat->u.pyramidInfo.format);
-                            status = VX_ERROR_INVALID_FORMAT;
-                            continue;
-                        }
-
-                        if ((pyramid->width != 0 && pyramid->width != metaFormat->u.pyramidInfo.width)
-                            || (pyramid->height != 0 && pyramid->height != metaFormat->u.pyramidInfo.height))
-                        {
-                            vxError("Node %p(\"%s\"): No.%d pyramid parameter's width and height, %dx%d"
-                                        ", is invalid (expected: %dx%d)",
-                                        node, node->kernel->name, paramIndex, pyramid->width, pyramid->height,
-                                        metaFormat->u.pyramidInfo.width, metaFormat->u.pyramidInfo.height);
-                            status = VX_ERROR_INVALID_DIMENSION;
-                            continue;
-                        }
-
-                        if (pyramid->base.isVirtual)
-                        {
-                            vxoPyramid_Initialize(pyramid, pyramid->levelCount, pyramid->scale, metaFormat->u.pyramidInfo.width,
-                                            metaFormat->u.pyramidInfo.height, metaFormat->u.pyramidInfo.format);
-                        }
-                    }
-                    break;
-
-                case VX_TYPE_SCALAR:
-                    {
-                        vx_scalar scalar = (vx_scalar)paramRef;
-
-                        if (scalar->dataType != metaFormat->u.scalarInfo.type)
-                        {
-                            vxError("Node %p(\"%s\"): No.%d scalar parameter's type, %d, is invalid (expected: %d)",
-                                    node, node->kernel->name, paramIndex,
-                                    scalar->dataType, metaFormat->u.scalarInfo.type);
-                            status = VX_ERROR_INVALID_TYPE;
-                            continue;
-                        }
-                    }
-                    break;
-
-                case VX_TYPE_ARRAY:
-                    {
-                        vx_array array = (vx_array)paramRef;
-
-                        if (array->base.isVirtual)
-                        {
-                            if (!vxoArray_InitializeAsVirtual(array, metaFormat->u.arrayInfo.itemType,
-                                                            metaFormat->u.arrayInfo.capacity))
-                            {
-                                vxError("Node %p(\"%s\"): No.%d virtual array parameter: "
-                                        "the corresponding metaFormat format's item type and/or capacity, %d/%d, is invalid",
-                                        node, node->kernel->name, paramIndex,
-                                        metaFormat->u.arrayInfo.itemType, metaFormat->u.arrayInfo.capacity);
-                                status = VX_ERROR_INVALID_DIMENSION;
-                                continue;
-                            }
-                        }
-                        else
-                        {
-                            if (!vxoArray_CheckItemTypeAndCapacity(array, metaFormat->u.arrayInfo.itemType,
-                                                    metaFormat->u.arrayInfo.capacity))
-                            {
-                                vxError("Node %p(\"%s\"): No.%d array parameter's item type and/or capacity"
-                                        ", %d/%d, is invalid (expected: %d/%d)",
-                                        node, node->kernel->name, paramIndex,
-                                        array->itemType, array->capacity,
-                                        metaFormat->u.arrayInfo.itemType, metaFormat->u.arrayInfo.capacity);
-                                status = VX_ERROR_INVALID_DIMENSION;
-                                continue;
-                            }
-                        }
-                    }
-                    break;
-
-                default:
-                    break;
-            }
-        }  /* for (paramIndex = 0; paramIndex < node->kernel->signature.paramCount; paramIndex++) */
-
-        if (metaFormat != VX_NULL) vxoMetaFormat_Release(&metaFormat);
+        }
 
         if (status != VX_SUCCESS) return status;
     } /* for (nodeIndex = 0; nodeIndex <graph->nodeCount; nodeIndex++) */
@@ -919,7 +1614,7 @@ VX_PRIVATE_API vx_status vxoGraph_AllocateAllMemoryObjects(vx_graph graph)
                     {
                         vxError("Node %p(\"%s\"): Can't allocate memory for No.%d image parameter",
                                 node, node->kernel->name, paramIndex);
-                        status = VX_ERROR_NO_MEMORY;
+                        /*status = VX_ERROR_NO_MEMORY;*/
                     }
                     break;
 
@@ -936,6 +1631,17 @@ VX_PRIVATE_API vx_status vxoGraph_AllocateAllMemoryObjects(vx_graph graph)
                                     node, node->kernel->name, paramIndex);
                                 status = VX_ERROR_NO_MEMORY;
                             }
+                        }
+                    }
+                    break;
+
+                case VX_TYPE_TENSOR:
+                    {
+                        if (vxoTensor_AllocateMemory((vx_tensor)paramRef) != VX_SUCCESS)
+                        {
+                            vxError("Node %p(\"%s\"): Can't allocate memory for No.%d tensor parameter",
+                                node, node->kernel->name, paramIndex);
+                            status = VX_ERROR_NO_MEMORY;
                         }
                     }
                     break;
@@ -1104,17 +1810,21 @@ VX_PRIVATE_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
     vx_uint32 nodeIndex;
 
     vxmASSERT(graph);
-
-
     for (nodeIndex = 0; nodeIndex < graph->nodeCount; nodeIndex++)
     {
         vx_node node = graph->nodeTable[nodeIndex];
 
-
         if (node->kernel->initializeFunction != VX_NULL)
         {
-            vx_status status = node->kernel->initializeFunction(
+            vx_status status = VX_SUCCESS;
+
+            if (node->kernel->isUserkernel && node->kernelAttributes.localDataSize == 0)
+                node->localDataChangeIsEnabled = vx_true_e;
+
+            status = node->kernel->initializeFunction(
                                     node, node->paramTable, node->kernel->signature.paramCount);
+
+            node->localDataChangeIsEnabled = vx_false_e;
 
             if (status != VX_SUCCESS)
             {
@@ -1124,9 +1834,13 @@ VX_PRIVATE_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
             }
         }
 
+
         if (node->kernelAttributes.localDataSize > 0 && node->kernelAttributes.localDataPtr == VX_NULL)
         {
             node->kernelAttributes.localDataPtr = vxAllocate(node->kernelAttributes.localDataSize);
+
+            if (node->kernel->isUserkernel)
+                node->localDataSetByImplementation = vx_true_e;
         }
 
 #ifdef OPENVX_KHR_TILING
@@ -1136,6 +1850,8 @@ VX_PRIVATE_API vx_status vxoGraph_InitializeAllNodeKernels(vx_graph graph)
         }
 #endif
     }
+
+    graph->Initilized = vx_true_e;
 
 
     return VX_SUCCESS;
@@ -1454,10 +2170,21 @@ OnError:
 VX_API_ENTRY vx_status VX_API_CALL vxVerifyGraph(vx_graph graph)
 {
     vx_status status;
+    vx_bool first = ((graph->verified == vx_false_e) && (graph->reverify == vx_false_e)) ? vx_true_e : vx_false_e;
 
     if (!vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH)) return VX_ERROR_INVALID_REFERENCE;
 
     vxAcquireMutex(graph->base.lock);
+
+    /* CTS UserNode.UserKernel/42/_FROM_REF/ UserNode.UserKernel/42/_FROM_ATTR/ w/a*/
+    if (graph->nodeTable[0]->kernel->isUserkernel)
+        graph->verified = vx_false_e;
+    else if (graph->verified)
+        return VX_SUCCESS;
+
+    status = vxoGraph_UserKernelPreprocess(graph, first);
+
+    if (status != VX_SUCCESS) goto ErrorExit;
 
 
     status = vxoGraph_VerifyAllNodeParameters(graph);
@@ -1496,7 +2223,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxVerifyGraph(vx_graph graph)
 
     if (status != VX_SUCCESS) goto ErrorExit;
 
+    graph->reverify = vx_false_e;
+
     graph->verified = vx_true_e;
+
+    graph->status   = VX_GRAPH_STATE_VERIFIED;
 
 #if gcdVX_OPTIMIZER
     vxoGraph_Flatten(graph);
@@ -1508,6 +2239,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxVerifyGraph(vx_graph graph)
     }
 #endif
 
+#if PRE_SORT
+    vxoGraph_GenerateAllNodeIndexTable(graph);
+#endif
+
+
     vxReleaseMutex(graph->base.lock);
 
     if (status != VX_SUCCESS) goto ErrorExit;
@@ -1515,7 +2251,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxVerifyGraph(vx_graph graph)
     return VX_SUCCESS;
 
 ErrorExit:
+
+    graph->reverify = vx_false_e;
+
     graph->verified = vx_false_e;
+
+    graph->status   = VX_GRAPH_STATE_UNVERIFIED;
 
     vxReleaseMutex(graph->base.lock);
 
@@ -1531,9 +2272,13 @@ VX_PRIVATE_API vx_status vxoGraph_ProcessOptimized(vx_graph graph)
 
     vxmASSERT(graph && graph->verified && graph->optimized);
 
+#if gcdVX_OPTIMIZER > 2
+    /* Flush ICache and PSSHL1 cache without stall. */
+    gcoVX_FlushCache(vx_true_e, vx_true_e, vx_false_e, vx_false_e, vx_false_e);
+#endif
     vxoPerf_Begin(&graph->perf);
 
-Restart:
+/*Restart:*/
 
     action = VX_ACTION_CONTINUE;
 
@@ -1547,6 +2292,10 @@ Restart:
 
         if (batch->cpuInvolved)
         {
+#if gcdVX_OPTIMIZER > 2
+            /* Flush PSSHL1 cache with stall for cpu to work on the data. */
+            gcoVX_FlushCache(vx_false_e, vx_true_e, vx_true_e, vx_false_e, vx_false_e);
+#endif
             node = graph->optimizedNodeTable[batch->startIndex];
             target = &graph->base.context->targetTable[node->targetIndex];
 
@@ -1635,7 +2384,8 @@ Restart:
                         /* Bind uniforms. */
                         if (kernelContext->uniform_num > 0)
                         {
-                            vx_uint32  kk;
+                            vx_uint32 kk;
+
                             for(kk = 0; kk < kernelContext->uniform_num; kk++)
                             {
                                 gcoVX_BindUniform(GC_VX_UNIFORM_PIXEL, kernelContext->uniforms[kk].index, (gctUINT32*)&kernelContext->uniforms[kk].uniform, kernelContext->uniforms[kk].num);
@@ -1646,6 +2396,8 @@ Restart:
 #if gcdVX_OPTIMIZER > 2
                         kernelContext->params.xoffset = tileOffsetI;
                         kernelContext->params.yoffset = tileOffsetJ;
+                        /* Light-weight InvokeKernel that does not include flush nor semaphore-stall. */
+                        kernelContext->params.tileMode = vx_true_e;
 #endif
                         status = gcoVX_InvokeKernel(&kernelContext->params);
 #else
@@ -1670,6 +2422,10 @@ Restart:
 
             if (batch->endHasCallback)
             {
+#if gcdVX_OPTIMIZER > 2
+                /* Flush PSSHL1 cache with stall for callback. */
+                gcoVX_FlushCache(vx_false_e, vx_true_e, vx_true_e, vx_false_e, vx_false_e);
+#endif
                 action = node->completeCallback(node);
             }
         }
@@ -1679,8 +2435,8 @@ Restart:
 
     switch (action)
     {
-        case VX_ACTION_RESTART:
-            goto Restart;
+        /*case VX_ACTION_RESTART:
+            goto Restart;*/
 
         case VX_ACTION_ABANDON:
             status = VX_ERROR_GRAPH_ABANDONED;
@@ -1689,6 +2445,10 @@ Restart:
 
     if (status == VX_SUCCESS)
     {
+#if gcdVX_OPTIMIZER > 2
+        /* Flush PSSHL1 cache without stall. */
+        gcoVX_FlushCache(vx_false_e, vx_true_e, vx_false_e, vx_false_e, vx_false_e);
+#endif
         gcfVX_Flush(gcvTRUE);
         graph->dirty = vx_false_e;
     }
@@ -1705,24 +2465,52 @@ VX_PRIVATE_API void vxoGraph_BeginProcess(
         vx_graph graph, OUT vx_uint32 nextNodeIndexTable[VX_MAX_NODE_COUNT], OUT vx_uint32 * nextNodeCountPtr)
 {
     vxmASSERT(graph);
+#if !PRE_SORT
     vxmASSERT(nextNodeIndexTable);
     vxmASSERT(nextNodeCountPtr);
+#endif
 
     vxoGraph_ClearAllVisitedFlags(graph);
 
     vxoGraph_ClearAllExecutedFlags(graph);
-
+#if !PRE_SORT
     vxCopyNodeIndexTable(graph->headNodeIndexTable, graph->headNodeCount,
                         OUT nextNodeIndexTable, OUT nextNodeCountPtr);
+#endif
 
-    vxoPerf_Begin(&graph->perf);
+    if (graph->base.context->perfEnable)
+        vxoPerf_Begin(&graph->perf);
+}
+
+VX_PRIVATE_API vx_status vxoGraph_ProcessKernelPrint(vx_graph graph)
+{
+    vx_uint32 nodeIndex;
+    vx_status status = VX_SUCCESS;
+    vxmASSERT(graph);
+
+    for (nodeIndex = 0; nodeIndex < graph->nodeCount; nodeIndex++)
+    {
+        if (graph->nodeTable[nodeIndex]->executed)
+        {
+            vx_kernel kernel = graph->nodeTable[nodeIndex]->kernel;
+
+            status = vxoKernel_ProcessKernelShaderPrint(kernel, &graph->nodeTable[nodeIndex]->kernelAttributes.shaderParameter);
+            if (status != VX_SUCCESS) goto OnError;
+        }
+    }
+
+OnError:
+    return status;
 }
 
 VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
 {
     vxmASSERT(graph);
 
+
     gcfVX_Flush(gcvTRUE);
+
+    vxoGraph_ProcessKernelPrint(graph);
 
     graph->dirty = vx_false_e;
 
@@ -1733,14 +2521,17 @@ VX_PRIVATE_API void vxoGraph_EndProcess(vx_graph graph)
     vxoGraph_ClearAllVisitedFlags(graph);
 }
 
+
 VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 {
     vx_status status = VX_SUCCESS;
     vx_action action;
-    vx_uint32 lastNodeIndexTable[VX_MAX_NODE_COUNT] = {0};
-    vx_uint32 nextNodeIndexTable[VX_MAX_NODE_COUNT] = {0};
+#if !PRE_SORT
+    vx_uint32 lastNodeIndexTable[VX_MAX_NODE_COUNT];
+    vx_uint32 nextNodeIndexTable[VX_MAX_NODE_COUNT];
     vx_uint32 leftNodeIndexTable[VX_MAX_NODE_COUNT] = {0};
     vx_uint32 lastNodeCount, nextNodeCount, leftNodeCount = 0;
+#endif
     vx_uint32 i;
 
     vxmASSERT(graph);
@@ -1769,17 +2560,16 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 #endif
     {
 
-//Restart:
+/*Restart:*/
 
-    action = VX_ACTION_CONTINUE;
+        action = VX_ACTION_CONTINUE;
+        graph->status = VX_GRAPH_STATE_RUNNING;
 
-    vxoGraph_BeginProcess(graph, OUT nextNodeIndexTable, OUT &nextNodeCount);
-
-    while (nextNodeCount > 0)
-    {
-        for (i = 0; i < nextNodeCount; i++)
+#if PRE_SORT
+        vxoGraph_BeginProcess(graph, OUT gcvNULL, OUT gcvNULL);
+        for (i = 0; i < graph->nodeCount; i++)
         {
-            vx_node node = graph->nodeTable[nextNodeIndexTable[i]];
+            vx_node node = graph->nodeTable[graph->allNodeIndexTable[i]];
             vx_target target = &graph->base.context->targetTable[node->targetIndex];
 
             if (node->executed)
@@ -1816,28 +2606,81 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
 
             if (action != VX_ACTION_CONTINUE) break;
         }
+#else
+        vxoGraph_BeginProcess(graph, OUT nextNodeIndexTable, OUT &nextNodeCount);
+        while (nextNodeCount > 0)
+        {
+            for (i = 0; i < nextNodeCount; i++)
+            {
+                vx_node node = graph->nodeTable[nextNodeIndexTable[i]];
+                vx_target target = &graph->base.context->targetTable[node->targetIndex];
 
-        if (action != VX_ACTION_CONTINUE) break;
+                if (node->executed)
+                {
+                    vxError("Node %p in Graph %p was executed", node, graph);
+                    continue;
+                }
 
-        vxCopyNodeIndexTable(nextNodeIndexTable, nextNodeCount, OUT lastNodeIndexTable, OUT &lastNodeCount);
+                vxoNode_EnableVirtualAccessible(node);
 
-        vxoGraph_GenerateNextNodeTable(graph, lastNodeIndexTable, lastNodeCount,
-                                        OUT nextNodeIndexTable, OUT &nextNodeCount,
-                                        INOUT leftNodeIndexTable, INOUT &leftNodeCount);
-    }
 
-    switch (action)
-    {
-        //case VX_ACTION_RESTART:
-        //    goto Restart;
+                if (graph->dirty)
+                {
+                    action = target->funcs.processnodes(target, &node, 0, 1);
+                    vxoNode_Record(node);
+                }
+                else
+                {
+                    action = VX_ACTION_CONTINUE;
+                    if (vxoNode_Replay(node) != VX_SUCCESS)
+                    {
+                        action = target->funcs.processnodes(target, &node, 0, 1);
+                    }
+                    else
+                    {
+                        if (node->completeCallback != VX_NULL)
+                        {
+                           action = node->completeCallback(node);
+                        }
+                    }
+                }
 
-        case VX_ACTION_ABANDON:
-            status = VX_ERROR_GRAPH_ABANDONED;
-            break;
-    }
+                vxoNode_DisableVirtualAccessible(node);
+
+                if (action != VX_ACTION_CONTINUE) break;
+            }
+
+            if (action != VX_ACTION_CONTINUE) break;
+
+            vxCopyNodeIndexTable(nextNodeIndexTable, nextNodeCount, OUT lastNodeIndexTable, OUT &lastNodeCount);
+
+            vxoGraph_GenerateNextNodeTable(graph, lastNodeIndexTable, lastNodeCount,
+                                            OUT nextNodeIndexTable, OUT &nextNodeCount,
+                                            INOUT leftNodeIndexTable, INOUT &leftNodeCount);
+        }
+#endif
+        switch (action)
+        {
+            /*case VX_ACTION_RESTART:
+                goto Restart;*/
+
+            case VX_ACTION_ABANDON:
+                status = VX_ERROR_GRAPH_ABANDONED;
+                break;
+        }
 
         vxoGraph_EndProcess(graph);
+
+        if (action == VX_ACTION_ABANDON)
+            graph->dirty = vx_true_e;
+
+        for (i = 0; i < VX_MAX_REF_COUNT; i++)
+        {
+            if (vxoReference_IsValidAndSpecific(&graph->delays[i]->base, VX_TYPE_DELAY) == vx_true_e)
+                vxAgeDelay(graph->delays[i]);
+        }
     }
+
 
 #if VIVANTE_PROFILER
     if (!graph->isChildGraph)
@@ -1846,7 +2689,14 @@ VX_PRIVATE_API vx_status vxoGraph_Process(vx_graph graph)
     }
 #endif
 
-    if (status != VX_SUCCESS) return status;
+    if (status == VX_SUCCESS)
+        graph->status = VX_GRAPH_STATE_COMPLETED;
+    else
+    {
+        graph->status = VX_GRAPH_STATE_ABANDONED;
+
+        return status;
+    }
 
     return VX_SUCCESS;
 }
@@ -1908,6 +2758,9 @@ VX_API_ENTRY vx_status VX_API_CALL vxWaitGraph(vx_graph graph)
 VX_API_ENTRY vx_status VX_API_CALL vxProcessGraph(vx_graph graph)
 {
     if (!vxoReference_IsValidAndNoncontext(&graph->base)) return VX_ERROR_INVALID_REFERENCE;
+#if (0 && !PRE_SORT)
+    vxoGraph_Sort(graph);
+#endif
 
     return vxoGraph_Process(graph);
 }
@@ -1944,8 +2797,9 @@ VX_INTERNAL_API vx_status vxoGraph_SetParameter(vx_graph graph, vx_uint32 index,
 
     if (status != VX_SUCCESS) return status;
 
-    graph->verified = vx_true_e;
     graph->dirty = vx_true_e;
+
+    graph->reverify = vx_false_e;
 
     return VX_SUCCESS;
 }

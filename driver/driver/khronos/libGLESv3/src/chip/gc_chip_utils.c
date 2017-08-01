@@ -689,6 +689,68 @@ gcChipUtilsDumpSurfaceRAW(
 }
 
 gceSTATUS
+gcChipUtilsDumpSurfaceCOMPRAW(
+    __GLcontext *gc,
+    gcsSURF_VIEW *surfView,
+    gctCONST_STRING fileName,
+    GLboolean yInverted
+    )
+{
+    gctFILE file = gcvNULL;
+    gceSTATUS status = gcvSTATUS_OK;
+    gctPOINTER logical[3]  = {0};
+    gctUINT height = 0;
+    gctINT stride = 0;
+    char level[10] = "+.compraw";
+    GLchar fName[__GLES_MAX_FILENAME_LEN]= {0};
+    const GLchar *formatName = "";
+
+    gcmHEADER_ARG("gc=0x%x, surfView=0x%x, fileName=%s, yInverted=%d", gc, surfView, fileName, yInverted);
+
+    do
+    {
+        gcsSURF_FORMAT_INFO_PTR srcFmtInfo;
+
+        gcmERR_BREAK(gcoSURF_GetSize(surfView->surf, gcvNULL, &height, gcvNULL));
+        gcmERR_BREAK(gcoSURF_GetAlignedSize(surfView->surf, gcvNULL, gcvNULL, &stride));
+        gcmERR_BREAK(gcoSURF_GetFormatInfo(surfView->surf, &srcFmtInfo));
+        formatName = srcFmtInfo->formatName;
+
+        /* Commit resolve command and stall hardware. */
+        gcmERR_BREAK(gcoHAL_Commit(gcvNULL, gcvTRUE));
+        gcmERR_BREAK(gcoSURF_Lock(surfView->surf, gcvNULL, logical));
+
+        level[0] = '-';
+    } while (GL_FALSE);
+
+    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, gcdDUMP_PATH));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, fileName));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, formatName));
+    gcmVERIFY_OK(gcoOS_StrCatSafe(fName, __GLES_MAX_FILENAME_LEN, level));
+
+    gcmVERIFY_OK(gcoOS_Open(gcvNULL, fName, gcvFILE_CREATE, &file));
+
+    if (logical[0])
+    {
+        /* Write pixel data. */
+        gcmVERIFY_OK(gcoOS_Write(gcvNULL, file, stride * height, logical[0]));
+
+        /* Unlock linear surface. */
+        gcmVERIFY_OK(gcoSURF_Unlock(surfView->surf, logical[0]));
+        logical[0] = gcvNULL;
+    }
+
+    if (gcvNULL != file)
+    {
+        /* Close tga file. */
+        gcmVERIFY_OK(gcoOS_Close(gcvNULL, file));
+    }
+
+    gcmFOOTER();
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
 gcChipUtilsDumpSurface(
     __GLcontext *gc,
     gcsSURF_VIEW *surfView,
@@ -742,6 +804,10 @@ gcChipUtilsDumpSurface(
         gcChipUtilsDumpSurfaceRAW(gc, surfView, fileName, yInverted);
     }
 
+    if (saveMask & __GL_SAVE_SURF_AS_COMPRESSED)
+    {
+        gcChipUtilsDumpSurfaceCOMPRAW(gc, surfView, fileName, yInverted);
+    }
     gcmFOOTER();
     return status;
 }

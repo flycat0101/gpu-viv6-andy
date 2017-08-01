@@ -1627,7 +1627,7 @@ typedef struct _gcsSTACK_FRAME
     gctCONST_STRING     function;
     gctINT              line;
     gctCONST_STRING     text;
-    gctPOINTER          arguments[12];
+    gctARGUMENTS        arguments;
 }
 gcsSTACK_FRAME;
 
@@ -1752,12 +1752,7 @@ gcoOS_StackPush(
         if (Text != gcvNULL)
         {
             /* Copy the arguments. */
-            gctSIZE_T i;
-            gctPOINTER * arguments = ((gctPOINTER *) &Text) + 1;
-            for (i = 0; i < gcmCOUNTOF(frame->arguments); ++i)
-            {
-                frame->arguments[i] = arguments[i];
-            }
+            va_start(frame->arguments, Text);
         }
     }
 }
@@ -1788,7 +1783,10 @@ gcoOS_StackPop(
     if (traceStack->level > 0)
     {
         /* Pop arguments from the stack. */
+        gcsSTACK_FRAME* prevFrame = &traceStack->frames[traceStack->level];
         gcsSTACK_FRAME* frame = &traceStack->frames[--traceStack->level];
+
+        va_end(prevFrame->arguments);
 
         /* Check for function mismatch. */
         if (frame->identity != Identity)
@@ -1858,10 +1856,9 @@ gcoOS_StackDump(
             {
                 char buffer[192] = "";
                 gctUINT offset = 0;
-                gctPOINTER pointer = (gctPOINTER) frame->arguments;
 
                 gcoOS_PrintStrVSafe(buffer, gcmSIZEOF(buffer),
-                                    &offset, frame->text, *(gctARGUMENTS *) &pointer);
+                                    &offset, frame->text, frame->arguments);
 
                 gcmPRINT("    (%s)", buffer);
             }
@@ -1924,10 +1921,10 @@ _DumpAPI(
         {
             char buffer[192] = "";
             gctUINT offset = 0;
-            gctPOINTER pointer = (gctPOINTER) frame->arguments;
 
-                gcoOS_PrintStrVSafe(buffer, gcmSIZEOF(buffer),
-                                    &offset, frame->text, *(gctARGUMENTS *) &pointer);
+            gcoOS_PrintStrVSafe(buffer, gcmSIZEOF(buffer),
+                &offset, frame->text, frame->arguments);
+
             gcmPRINT("    (%s)", buffer);
         }
     }

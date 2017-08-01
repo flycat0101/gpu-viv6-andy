@@ -202,7 +202,6 @@ typedef struct _cl_object *     clsObject_PTR;
 
 /* Global ID for all objects. */
 extern gcsATOM_PTR clgGlobalId;
-
 /* Helper string for query functions to return empty null-terminated string */
 extern const gctSTRING clgEmptyStr;
 
@@ -216,9 +215,6 @@ extern const gctSTRING clgEmptyStr;
 /******************************************************************************\
 ******************************* Testing Control *******************************
 \******************************************************************************/
-
-/* Use sequential execution mode--no thread. */
-#define cldSEQUENTIAL_EXECUTION     0
 
 #define cldSYNC_MEMORY              0
 

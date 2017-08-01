@@ -1418,6 +1418,14 @@ gceSTATUS vgshIMAGE_Initialize(
         gcvPOOL_DEFAULT,
         &image->surface));
 
+    gcmVERIFY_OK(gcoSURF_SetOrientation(
+        image->surface,
+        orientation));
+
+    gcmVERIFY_OK(gcoSURF_SetOrientation(
+        image->texSurface,
+        orientation));
+
     return gcvSTATUS_OK;
 }
 
@@ -1448,6 +1456,7 @@ gceSTATUS vgshIMAGE_WrapFromSurface(
     image->rootOffsetX  = 0;
     image->rootOffsetY  = 0;
 
+    image->orient       = orient;
     image->surface      = surface;
     image->wrapped      = gcvTRUE;
 
@@ -1457,6 +1466,7 @@ gceSTATUS vgshIMAGE_WrapFromSurface(
         image->internalColorDesc.surFormat,
         &image->texture, &image->texSurface));
 
+    gcmVERIFY_OK(gcoSURF_SetOrientation(image->texSurface,  orient));
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }

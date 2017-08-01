@@ -17,9 +17,8 @@ vx_status vxTableLookup(vx_node node, vx_image src, vx_lut lut, vx_image dst)
 {
     vx_status status = VX_SUCCESS;
 
-    vx_uint32 constantData[8] = {0, 8, 16, 24, 0, 0, 0, 0};
-    vx_uint8 bin[16] = {0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0};
     gcoVX_Kernel_Context * kernelContext = gcvNULL;
+    vx_df_image inputFormat = 0;
 
 #if gcdVX_OPTIMIZER
     if (node && node->kernelContext)
@@ -39,6 +38,8 @@ vx_status vxTableLookup(vx_node node, vx_image src, vx_lut lut, vx_image dst)
         kernelContext->uniform_num = 0;
     }
 
+    vxQueryImage(src, VX_IMAGE_FORMAT, &inputFormat, sizeof(vx_df_image));
+
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
 
@@ -48,19 +49,58 @@ vx_status vxTableLookup(vx_node node, vx_image src, vx_lut lut, vx_image dst)
     /*index = 2*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, dst, GC_VX_INDEX_AUTO);
 
-    gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
-    kernelContext->uniforms[0].index       = 3;
-    kernelContext->uniforms[0].num         = sizeof(constantData) / sizeof(vx_uint32);
+    if (inputFormat == VX_DF_IMAGE_U8)
+    {
+        vx_uint32 constantData[8] = {0, 8, 16, 24, 0, 0, 0, 0};
+        vx_uint8 bin[16] = {0, 32, 64, 96, 0, 0, 0, 0, 8, 8, 8, 8, 0, 0, 0, 0};
 
-    gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, bin, sizeof(bin));
-    kernelContext->uniforms[1].index = 4;
-    kernelContext->uniforms[1].num = sizeof(bin) / sizeof(vx_uint8);
-    kernelContext->uniform_num = 2;
+        gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData, sizeof(constantData));
+        kernelContext->uniforms[0].index       = 3;
+        kernelContext->uniforms[0].num         = sizeof(constantData) / sizeof(vx_uint32);
 
-    kernelContext->params.kernel = gcvVX_KERNEL_TABLE_LOOKUP;
-    kernelContext->params.xstep = 16;
+        gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, bin, sizeof(bin));
+        kernelContext->uniforms[1].index = 4;
+        kernelContext->uniforms[1].num = sizeof(bin) / sizeof(vx_uint8);
+        kernelContext->uniform_num = 2;
+
+        kernelContext->params.kernel = gcvVX_KERNEL_TABLE_LOOKUP;
+        kernelContext->params.xstep = 16;
+    }
+    else
+    {
+        vx_uint8 constantData0[16] = {0, 8, 0, 0, 16, 24, 0, 0, 8, 8, 0, 0, 8, 8, 0, 0};
+        vx_uint8 constantData1[16] = {32, 40, 0, 0, 48, 56, 0, 0, 8, 8, 0, 0, 8, 8, 0, 0};
+        vx_uint8 constantData2[16] = {64, 72, 0, 0, 80, 88, 0, 0, 8, 8, 0, 0, 8, 8, 0, 0};
+        vx_uint8 constantData3[16] = {96, 104, 0, 0, 112, 120, 0, 0, 8, 8, 0, 0, 8, 8, 0, 0};
+        vx_uint8 bin[16] = {0, 8, 32, 40, 64, 72, 96, 104, 8, 8, 8, 8, 8, 8, 8, 8};
+
+        gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, constantData0, sizeof(constantData0));
+        kernelContext->uniforms[0].index       = 3;
+        kernelContext->uniforms[0].num         = sizeof(constantData0) / sizeof(vx_uint32);
+
+        gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, constantData1, sizeof(constantData1));
+        kernelContext->uniforms[1].index       = 4;
+        kernelContext->uniforms[1].num         = sizeof(constantData1) / sizeof(vx_uint32);
+
+        gcoOS_MemCopy(&kernelContext->uniforms[2].uniform, constantData2, sizeof(constantData2));
+        kernelContext->uniforms[2].index       = 5;
+        kernelContext->uniforms[2].num         = sizeof(constantData2) / sizeof(vx_uint32);
+
+        gcoOS_MemCopy(&kernelContext->uniforms[3].uniform, constantData3, sizeof(constantData3));
+        kernelContext->uniforms[3].index       = 6;
+        kernelContext->uniforms[3].num         = sizeof(constantData3) / sizeof(vx_uint32);
+
+        gcoOS_MemCopy(&kernelContext->uniforms[4].uniform, bin, sizeof(bin));
+        kernelContext->uniforms[4].index = 7;
+        kernelContext->uniforms[4].num = sizeof(bin) / sizeof(vx_uint8);
+        kernelContext->uniform_num = 5;
+
+        kernelContext->params.xstep = 8;
+    }
 
     kernelContext->node = node;
+
+    kernelContext->params.kernel = gcvVX_KERNEL_TABLE_LOOKUP;
 
     status = gcfVX_Kernel(kernelContext);
 

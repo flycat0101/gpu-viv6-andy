@@ -31,6 +31,8 @@ VX_INTERNAL_API vx_type_e vxoReference_GetType(vx_reference ref);
 
 VX_INTERNAL_API void vxoReference_Dump(vx_reference ref);
 
+VX_INTERNAL_API vx_bool vxoReference_IsValid(vx_reference ref);
+
 VX_INTERNAL_API vx_bool vxoReference_IsValidAndNoncontext(vx_reference ref);
 
 VX_INTERNAL_API vx_bool vxoReference_IsValidAndSpecific(vx_reference ref, vx_type_e type);

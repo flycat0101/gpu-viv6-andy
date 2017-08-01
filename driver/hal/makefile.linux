@@ -26,7 +26,11 @@ else
   HAL_USER_ARCH     := $(AQROOT)/hal/user/arch
 endif
 
+ifeq ($(LINUX_VSIMULATOR),1)
+  HAL_USER_OS       := $(AQROOT)/vsimulator/os/linux/user
+else
   HAL_USER_OS       := $(AQROOT)/hal/os/linux/user
+endif
 
 HAL_USER_MAIN       := $(AQROOT)/hal/user
 

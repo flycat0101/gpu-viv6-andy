@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Khronos Group Inc.
+ * Copyright (c) 2012-2016 The Khronos Group Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and/or associated documentation files (the
@@ -12,6 +12,11 @@
  * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Materials.
  *
+ * MODIFICATIONS TO THIS FILE MAY MEAN IT NO LONGER ACCURATELY REFLECTS
+ * KHRONOS STANDARDS. THE UNMODIFIED, NORMATIVE VERSIONS OF KHRONOS
+ * SPECIFICATIONS AND HEADER INFORMATION ARE LOCATED AT
+ *    https://www.khronos.org/registry/
+ *
  * THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
  * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
@@ -23,6 +28,7 @@
 
 #ifndef _VX_KHR_OPENCL_H_
 #define _VX_KHR_OPENCL_H_
+#include <VX/vx.h>
 
 /*! \file
  * \brief The OpenVX to OpenCL Inter-op Extension Header.
@@ -227,6 +233,43 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxAddOpenCLAsBinaryKernel(vx_context context,
  */
 #define vxDecFrequency(ptr, value, offset, range, window_size) \
     ((offset <= value) && (value <= (range+offset)) ? --ptr[(value-offset)/window_size] : 0)
+
+#if defined(VX_VERSION_1_1) && (VX_VERSION >= VX_VERSION_1_1)
+
+/*! \brief Allows access to a distribution frequency counter.
+ * \param ptr The <tt>__global</tt> pointer to the base of the distribution.
+ * \param value The value to retrive the frequency count for.
+ * \param offset The offset within the input domain.
+ * \param range The total range within the domain starting from offset.
+ * \param num_bins The number of bins in the domain range.
+ * \ingroup group_cl_distribution
+ */
+#define vxGetFrequency2(ptr, value, offset, range, num_bins) \
+    ((offset <= value) && (value <= (range+offset)) ? ptr[(value-offset)*num_bins/range] : 0)
+
+/*! \brief Increments a distribution frequency counter for a value.
+ * \param ptr The <tt>__global</tt> pointer to the base of the distribution.
+ * \param value The value to increment the frequency count for.
+ * \param offset The offset within the input domain.
+ * \param range The total range within the domain starting from offset.
+ * \param num_bins The number of bins in the domain range.
+ * \ingroup group_cl_distribution
+ */
+#define vxIncFrequency2(ptr, value, offset, range, num_bins) \
+    ((offset <= value) && (value <= (range+offset)) ? ++ptr[(value-offset)*num_bins/range] : 0)
+
+/*! \brief Decrements a distribution frequency counter for a value.
+ * \param ptr The <tt>__global</tt> pointer to the base of the distribution.
+ * \param value The value to decrement the frequency count for.
+ * \param offset The offset within the input domain.
+ * \param range The total range within the domain starting from offset.
+ * \param num_bins The number of bins in the domain range.
+ * \ingroup group_cl_distribution
+ */
+#define vxDecFrequency2(ptr, value, offset, range, num_bins) \
+    ((offset <= value) && (value <= (range+offset)) ? --ptr[(value-offset)*num_bins/range] : 0)
+
+#endif /*VX_VERSION_1_1*/
 
 #endif
 

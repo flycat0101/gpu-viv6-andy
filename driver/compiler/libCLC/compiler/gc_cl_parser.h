@@ -591,7 +591,8 @@ cloIR_SET
 clParseCompoundStatementEnd(
     IN cloCOMPILER Compiler,
     IN clsLexToken * StartToken,
-    IN cloIR_SET Set
+    IN cloIR_SET Set,
+    IN clsLexToken * EndToken
     );
 
 void
@@ -603,7 +604,8 @@ cloIR_SET
 clParseCompoundStatementNoNewScopeEnd(
     IN cloCOMPILER Compiler,
     IN clsLexToken *StartToken,
-    IN cloIR_SET Set
+    IN cloIR_SET Set,
+    IN clsLexToken *EndToken
     );
 
 cloIR_BASE
@@ -628,7 +630,8 @@ cloIR_BASE
 clParseSwitchBodyEnd(
     IN cloCOMPILER Compiler,
     IN clsLexToken * StartToken,
-    IN cloIR_SET Set
+    IN cloIR_SET Set,
+    IN clsLexToken * EndToken
     );
 
 cloIR_SET

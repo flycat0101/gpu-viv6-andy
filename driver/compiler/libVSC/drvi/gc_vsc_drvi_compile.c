@@ -671,6 +671,12 @@ static VSC_ErrCode _CompileShaderAtMedLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
     /* Fix the texld offset */
     CALL_SH_PASS(vscVIR_FixTexldOffset, 0, gcvNULL);
 
+    /*
+    ** Generate combined sampler for separated samper and separated texture.
+    ** We need to do this before patch lib linking.
+    */
+    CALL_SH_PASS(vscVIR_GenCombinedSampler, 0, gcvNULL);
+
     /* We are at end of ML of VIR, so set this correct level */
     VIR_Shader_SetLevel(pShader, VIR_SHLEVEL_Post_Medium);
 
@@ -687,9 +693,6 @@ static VSC_ErrCode _CompileShaderAtLowLevel(VSC_SHADER_PASS_MANAGER* pShPassMnge
 
     gcmASSERT(VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Pre_Low ||
               VIR_Shader_GetLevel((pShader)) == VIR_SHLEVEL_Post_Medium);
-
-    /* Link intrinsic functions. */
-    CALL_SH_PASS(VIR_LinkInternalLibFunc, 0, gcvNULL);
 
     /* Lower ML to LL firstly */
     CALL_SH_PASS(VIR_Lower_MiddleLevel_To_LowLevel, 0, &bRAEnabled);
@@ -748,6 +751,7 @@ static VSC_ErrCode _CompileShaderAtMCLevel(VSC_SHADER_PASS_MANAGER* pShPassMnger
         CALL_SH_PASS(vscVIR_CheckPosAndDepthConflict, 0, gcvNULL);
         CALL_SH_PASS(VSC_CPP_PerformOnShader, 1, &bGlobalCPP);
         CALL_SH_PASS(VSC_DCE_Perform, 1, gcvNULL);
+        CALL_SH_PASS(vscVIR_FixDynamicIdxDep, 0, gcvNULL);
     }
 
     /* We are at end of MC level of VIR, so set this correct level */
@@ -932,6 +936,9 @@ static VSC_ErrCode _DoMLPostCompilation(VSC_SHADER_PASS_MANAGER* pShPassMnger)
             ON_ERROR(errCode, "Lib link");
         }
     }
+
+    /* Link intrinsic functions. */
+    CALL_SH_PASS(VIR_LinkInternalLibFunc, 0, gcvNULL);
 
 OnError:
     return errCode;

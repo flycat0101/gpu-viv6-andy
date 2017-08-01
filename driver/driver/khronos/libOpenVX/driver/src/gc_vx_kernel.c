@@ -13,11 +13,880 @@
 
 #include <gc_vx_common.h>
 
-gceSTATUS gcfVX_FreeKernelShader(vx_kernel_shader kernel);
+
+#define _cldPrintfConvSpecifiers "diouxXfFeEgGaAcsp"
+#define _cldDigits               "0123456789"
+#define _cldFlags                "-+ #0"
+#define _cldLowercase "0123456789abcdefghijklmnopqrstuvwxyz"
+#define _cldUppercase "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+#define LEFT 0x01
+#define PLUS 0x02
+#define SPACE 0x04
+#define SPECIAL 0x08
+#define ZEROPAD 0x10
+#define SMALL 0x20
+#define LARGE 0x40
+#define SIGN 0x80
+
+typedef enum _cleARGTYPE
+{
+    cleARGTYPE_CHAR = 1,
+    cleARGTYPE_UCHAR,
+    cleARGTYPE_SHORT,
+    cleARGTYPE_USHORT,
+    cleARGTYPE_LONG,
+    cleARGTYPE_ULONG,
+    cleARGTYPE_HALF,
+    cleARGTYPE_INT,
+    cleARGTYPE_UINT,
+    cleARGTYPE_FLOAT,
+    cleARGTYPE_DOUBLE
+
+}cleARGTYPE;
+
+gctBOOL gcfVX_IsNan(gctFLOAT val)
+{
+    gcuFLOAT_UINT32 uValue;
+    uValue.f = val;
+    if ((uValue.u & (gctUINT)0x7FFFFFFF) > (gctUINT)0x7F800000)
+    {
+        return gcvTRUE;
+    }else{
+        return gcvFALSE;
+    }
+}
+
+gctBOOL gcfVX_IsInf(gctFLOAT val)
+{
+    gcuFLOAT_UINT32 uValue;
+    uValue.f = val;
+    if ((uValue.u & (gctUINT)0x7FFFFFFF) == (gctUINT)0x7F800000)
+    {
+        return gcvTRUE;
+    }else{
+        return gcvFALSE;
+    }
+}
+
+gctBOOL gcfVX_IsInString(gctCHAR s, gctCHAR* string)
+{
+    while (*string)
+    {
+        if (s != *string++)
+            continue;
+        return gcvTRUE;
+    }
+    return gcvFALSE;
+}
+
+void
+gcfVX_GetSingleFormat(
+    gctCHAR* StartPtr,
+    gctCHAR* EndPtr,
+    gctCHAR* Format,
+    gctINT*  VectorSize,
+    gctINT*  ArgType,
+    gctINT*  Flags,
+    gctINT*  FieldWidth,
+    gctINT*  Precision
+    )
+{
+    gctCHAR chr;
+    gctCHAR followChr;
+    gctBOOL isVectorSpecifier = gcvFALSE;
+
+    gctINT vectorSize = 0;
+    *ArgType = 0;
+    *VectorSize = 0;
+    *Flags = 0;
+    *FieldWidth = 0;
+    *Precision = 0;
+
+    while (StartPtr <= EndPtr) {
+         chr = *StartPtr++;
+
+         switch(chr) {
+         case 'v':
+             if (StartPtr < EndPtr)
+             {
+                 chr = *StartPtr++;
+                 switch(chr) {
+                 case '1':
+                     chr = *StartPtr++;
+                     if(StartPtr < EndPtr) {
+                         if(chr != '6') return;
+                     }
+                     else return;
+                     vectorSize = 16;
+                     break;
+                 case '2':
+                     vectorSize = 2;
+                     break;
+
+                 case '4':
+                     vectorSize = 4;
+                     break;
+
+                 case '8':
+                     vectorSize = 8;
+                     break;
+
+                 default:
+                     return;
+                 }
+             }
+             else return;
+             isVectorSpecifier = gcvTRUE;
+             break;
+
+         case 'h':
+             *Format++ = chr;
+             followChr = *StartPtr;
+             if ((followChr == 'd') || (followChr == 'i'))
+             {
+                 *ArgType = cleARGTYPE_SHORT;
+             }else if ((followChr == 'o') || (followChr == 'u') || (followChr == 'x') || (followChr == 'X'))
+             {
+                 *ArgType = cleARGTYPE_USHORT;
+             }else if ((followChr == 'a') || (followChr == 'A') || (followChr == 'e') || (followChr == 'E') ||
+                       (followChr == 'f') || (followChr == 'F') || (followChr == 'g') || (followChr == 'G'))
+             {
+                 *ArgType = cleARGTYPE_HALF;
+             }
+             switch (*StartPtr) {
+             case 'h':
+                 *Format++ = 'h';
+                 StartPtr++;
+                 followChr = *StartPtr;
+                 if ((followChr == 'd') || (followChr == 'o'))
+                 {
+                     *ArgType = cleARGTYPE_CHAR;
+                 }else if ((followChr == 'o') || (followChr == 'u') || (followChr == 'x') || (followChr == 'X'))
+                 {
+                     *ArgType = cleARGTYPE_UCHAR;
+                 }
+                 break;
+
+             case 'l':
+                 if(isVectorSpecifier) {  /* hl applies to vector specifier appeared only */
+                     Format--;
+                     StartPtr++;
+                     followChr = *StartPtr;
+                     if ((followChr == 'd') || (followChr == 'o'))
+                     {
+                         *ArgType = cleARGTYPE_INT;
+                     }else if ((followChr == 'o') || (followChr == 'u') || (followChr == 'x') || (followChr == 'X'))
+                     {
+                         *ArgType = cleARGTYPE_UINT;
+                     }else if ((followChr == 'a') || (followChr == 'A') || (followChr == 'e') || (followChr == 'E') ||
+                               (followChr == 'f') || (followChr == 'F') || (followChr == 'g') || (followChr == 'G'))
+                     {
+                         *ArgType = cleARGTYPE_FLOAT;
+                     }
+                 }
+                 else return;
+                 break;
+
+             default:
+                 break;
+             }
+
+             break;
+
+         case 'l':
+             *Format++ = chr;
+             followChr = *StartPtr;
+              if (followChr == 'd' || followChr == 'o')
+              {
+                  *ArgType = cleARGTYPE_LONG;
+              }else if (followChr == 'o' || followChr == 'u' || followChr == 'x' || followChr == 'X')
+              {
+                  *ArgType = cleARGTYPE_ULONG;
+              }else if (followChr == 'a' || followChr == 'A' || followChr == 'e' || followChr == 'E' ||
+                        followChr == 'f' || followChr == 'F' || followChr == 'g' || followChr == 'G')
+              {
+                  *ArgType = cleARGTYPE_DOUBLE;
+              }
+             break;
+
+         default:
+             {
+                 /* process flags */
+                 if(gcfVX_IsInString(chr, (gctCHAR*)_cldFlags))
+                 {
+                     *Format++ = chr;
+                     switch(chr)
+                     {
+                     case '-':
+                         *Flags |= LEFT;
+                         break;
+                     case '+':
+                         *Flags |= PLUS;
+                         break;
+                     case ' ':
+                         *Flags |= SPACE;
+                         break;
+                     case '#':
+                         *Flags |= SPECIAL;
+                         break;
+                     case '0':
+                         *Flags |= ZEROPAD;
+                         break;
+                     }
+                 }else if (gcfVX_IsInString(chr, (gctCHAR*)_cldDigits)) /* get field width */
+                 {
+                     gctINT i = 0;
+                     do
+                     {
+                         *Format++ = chr;
+                         i = i*10 + chr - '0';
+                         chr = *StartPtr++;
+                     }while (gcfVX_IsInString(chr, (gctCHAR*)_cldDigits));
+                     *FieldWidth = i;
+                     StartPtr--;
+                 }else if (chr == '.') /* get the precision */
+                 {
+                     *Format++ = chr;
+                     chr = *StartPtr++;
+                     if (gcfVX_IsInString(chr, (gctCHAR*)_cldDigits))
+                     {
+                         gctINT i = 0;
+                         do
+                         {
+                             *Format++ = chr;
+                             i = i*10 + chr - '0';
+                             chr = *StartPtr++;
+                         }while (gcfVX_IsInString(chr, (gctCHAR*)_cldDigits));
+                         *Precision = i;
+                         StartPtr--;
+                     }
+                     if (*Precision < 0)
+                     {
+                         *Precision = 0;
+                     }
+                 }else{
+                     *Format++ = chr;
+                 }
+                 break;
+             }
+        }
+    }
+
+    *VectorSize = vectorSize;
+    return;
+}
+
+void floatToaHex(
+    double Num,
+    gctINT Precision,
+    gctBOOL IsUpperCase,
+    gctCHAR* Buff,
+    gctINT* DecimalPos,
+    gctINT* Exp)
+{
+    gctINT intData;
+    gctINT i = 0;
+    gctINT j = 0;
+    double decimalData;
+    gctBOOL binaryData[255] = {0};
+    gctBOOL binaryInt[255] = {0};
+    gctCHAR* dig = (char*)_cldLowercase;
+    gctINT len;
+
+    if (IsUpperCase)
+    {
+        dig = (char*)_cldUppercase;
+    }
+    /* Process value sign */
+    if (Num < 0.0)
+    {
+        Num = -Num;
+        *Buff++ = '-';
+    }
+    else
+    {
+        *Buff++ = '+';
+    }
+
+    if (Num > -0.000005 && Num < 0.000005)
+    {
+        for (i = 0; i < Precision + 1; i++)
+        {
+            *Buff++ = '0';
+        }
+        *Buff++ = '\0';
+        *DecimalPos = 1;
+        *Exp = 0;
+        return;
+    }
+
+    intData = (gctINT)Num;
+    decimalData = Num - intData;
+    *Exp = 0;
+
+    if (intData == 0)
+    {
+        j = 0;
+        while(decimalData < 1.0)
+        {
+            decimalData *= 2;
+            j++;
+        }
+        *Exp = -j;
+        intData = (int)decimalData;
+        decimalData -= intData;
+    }
+    /* handle integer part */
+    while(intData)
+    {
+        binaryInt[i++] = (intData % 2 == 1) ? gcvTRUE : gcvFALSE;
+        intData /= 2;
+    }
+    *Exp = ((*Exp) == 0) ? i - 1 : *Exp;
+    j = 0;
+    while(i)
+    {
+        binaryData[j++] = binaryInt[--i];
+    }
+
+    if (decimalData > -0.000005 && decimalData < 0.000005)
+    {
+        for(i = 0; i < 4 * Precision; i++)
+        {
+            binaryData[j++] = gcvFALSE;
+        }
+    }else
+    {
+        /* handle decimal part */
+        while(decimalData != 0.0)
+        {
+            gctINT t = (gctINT)(decimalData * 2);
+            binaryData[j++] = (t > 0) ? gcvTRUE : gcvFALSE;
+            decimalData = decimalData * 2 - t;
+        }
+    }
+
+    len = j - 1;
+
+    if (len % 4)
+    {
+        memset(binaryData + len + 1, 0, 4 - len % 4);
+        len += 4 - len % 4;
+    }
+
+    *Buff++ = binaryData[0] ? '1':'0';
+    *DecimalPos = 1;
+
+    i = 0;
+    j = 0;
+    while((i < len))
+    {
+        *Buff++ = dig[((binaryData[i+1] ? 8 : 0) + (binaryData[i+2] ? 4 : 0) + (binaryData[i+3] ? 2 : 0) + (binaryData[i+4] ? 1 : 0)) % 16];
+        i += 4;
+        j++;
+    }
+    *Buff++ = '\0';
+}
+
+void fltRound(
+    gctCHAR* NumBuf,
+    gctINT* DecimalPos,
+    gctINT Precision,
+    gctBOOL IsUppderCase)
+{
+    gctCHAR* last_digit = NumBuf + 1 +Precision;
+    gctCHAR* after_last = last_digit + 1;
+
+    if (*after_last > '4')
+    {
+        gctCHAR *p = last_digit;
+        gctINT carry = 1;
+
+        do
+        {
+            gctINT sum;
+            if (*p == '.')
+            {
+                p--;
+            }
+            if (IsUppderCase)
+            {
+                if (*p == '9')
+                {
+                    *p-- = 'A';
+                    carry = 0;
+                }
+                else
+                {
+                    sum = *p + carry;
+                    carry = sum > 'F';
+                    *p-- = (gctCHAR)(sum - carry * 23);
+                }
+            }else
+            {
+                if (*p == '9')
+                {
+                    *p-- = 'a';
+                    carry = 0;
+                }
+                else
+                {
+                    sum = *p + carry;
+                    carry = sum > 'f';
+                    *p-- = (gctCHAR)(sum - carry * 55);
+                }
+            }
+        } while (carry && p >= NumBuf);
+
+        /* We have fffff... which needs to be rounded to 100000.. */
+        if (carry && p == NumBuf)
+        {
+            *p = '1';
+            *DecimalPos += 1;
+        }
+    }
+}
+
+void floatToText(
+    double Value,
+    gctINT Precision,
+    gctCHAR *Buf,
+    gctBOOL IsUpperCase)
+{
+    char chBuffer[255] = {'\0'};
+
+    char *cvtBuf = chBuffer;
+    int decimalPos;
+    int pos;
+    int exp;
+
+    floatToaHex(Value, Precision, IsUpperCase, cvtBuf, &decimalPos, &exp);
+    fltRound(cvtBuf, &decimalPos, Precision, IsUpperCase);
+
+    if ('-' == *cvtBuf++)
+    {
+        *Buf++ = '-';
+    }
+
+    if (*cvtBuf)
+    {
+        *Buf++ = '0';
+        *Buf++ = IsUpperCase ? 'X' : 'x';
+        *Buf++ = *cvtBuf;
+        if (Precision > 0)
+        {
+            *Buf++ = '.';
+        }
+        gcoOS_MemCopy(Buf, cvtBuf + 1, Precision);
+        Buf += Precision;
+        {
+            *Buf++ = IsUpperCase ? 'P' : 'p';
+        }
+
+        if (exp < 0)
+        {
+            *Buf++ = '-';
+            exp = -exp;
+        }else{
+            *Buf++ = '+';
+        }
+
+        do
+        {
+            if ((exp / 10) == 0)
+            {
+                *Buf++ = (gctCHAR)(exp % 10 + '0');
+                break;
+            }
+            else
+            {
+                *Buf++ = (gctCHAR)(exp / 10 + '0');
+                exp = exp % 10;
+            }
+        }while(exp);
+    }
+    else
+    {
+        *Buf++ = '0';
+        if (Precision > 0)
+        {
+            *Buf++ = '.';
+            for (pos = 0; pos < Precision; pos++)
+            {
+                *Buf++ = '0';
+            }
+        }
+    }
+}
+
+void printf_aA(
+    gctCHAR *Str,
+    double Num,
+    gctINT Size,
+    gctINT Precision,
+    gctCHAR Fmt,
+    gctINT Flags)
+{
+    gctCHAR tmp[255] = {'\0'};
+    gctCHAR c, sign;
+    gctINT n, i;
+    gctBOOL isUpperCase = gcvFALSE;
+
+    if (Flags & LEFT) Flags &= ~ZEROPAD;
+
+    c = (Flags & ZEROPAD) ? '0' : ' ';
+    sign = 0;
+    if (Flags & SIGN)
+    {
+        if (Num < 0.0)
+        {
+            sign = '-';
+            Num = -Num;
+            Size--;
+        }
+        else if (Flags & PLUS)
+        {
+            sign = '+';
+            Size--;
+        }
+        else if (Flags & SPACE)
+        {
+            sign = ' ';
+            Size--;
+        }
+    }
+
+    if (Precision < 0)
+    {
+        Precision = 6; /* Default precision: 6 */
+    }
+
+    isUpperCase = (Fmt == 'A') ? gcvTRUE : gcvFALSE;
+
+    floatToText(Num, Precision, tmp, isUpperCase);
+
+    n = (gctINT)strlen(tmp);
+
+    Size -= n;
+    if (!(Flags & (ZEROPAD | LEFT)))
+    {
+        while (Size-- > 0)
+        {
+            *Str++ = ' ';
+        }
+    }
+    if (sign)
+    {
+        *Str++ = sign;
+    }
+    if (!(Flags & LEFT))
+    {
+        while (Size-- > 0)
+        {
+            *Str++ = c;
+        }
+    }
+    for (i = 0; i < n; i++)
+    {
+        *Str++ = tmp[i];
+    }
+    while (Size-- > 0)
+    {
+        *Str++ = ' ';
+    }
+}
+
+void
+gcfVX_PrintData(
+    gctPOINTER** Data,
+    gctCHAR* Format,
+    gctINT ArgType,
+    gctCHAR FollowType,
+    gctINT Flags,
+    gctINT FieldWidth,
+    gctINT Precision,
+    gctBOOL IsDoublePrecision)
+{
+    if (ArgType)
+    {
+        switch (ArgType)
+        {
+        case cleARGTYPE_CHAR:
+            printf(Format, *(gctINT8*)(**Data));
+            **Data = (gctCHAR*)(**Data) + 1;
+            break;
+        case cleARGTYPE_UCHAR:
+            printf(Format, *(gctUINT8*)(**Data));
+            **Data = (gctUINT8*)(**Data) + 1;
+            break;
+        case cleARGTYPE_SHORT:
+            printf(Format, *(gctINT16*)(**Data));
+            **Data = (gctINT16*)(**Data) + 1;
+            break;
+        case cleARGTYPE_USHORT:
+            printf(Format, *(gctUINT16*)(**Data));
+            **Data = (gctUINT16*)(**Data) + 1;
+            break;
+        case cleARGTYPE_LONG:
+            printf(Format, *(gctINT64*)(**Data));
+            **Data = (gctINT64*)(**Data) + 1;
+            break;
+        case cleARGTYPE_ULONG:
+            printf(Format, *(gctINT64*)(**Data));
+            **Data = (gctINT64*)(**Data) + 1;
+            break;
+        case cleARGTYPE_HALF:
+            printf(Format, *(gctINT16*)(**Data));
+            **Data = (gctINT16*)(**Data) + 1;
+            break;
+        case cleARGTYPE_INT:
+            printf(Format, *(gctINT32*)(**Data));
+            **Data = (gctINT32*)(**Data) + 1;
+            break;
+        case cleARGTYPE_UINT:
+            printf(Format, *(gctUINT32*)(**Data));
+            **Data = (gctUINT32*)(**Data) + 1;
+            break;
+        case cleARGTYPE_FLOAT:
+            {
+                gctFLOAT value = *(gctFLOAT*)(**Data);
+                if (gcfVX_IsNan(value))
+                {
+                    printf("%s", "nan");
+                }else if (gcfVX_IsInf(value))
+                {
+                    printf("%s", "inf");
+                }else{
+                    if (FollowType == 'a' || FollowType == 'A')
+                    {
+                        gctCHAR tmpBuf[512] = {'\0'};
+                        printf_aA(tmpBuf, *(gctFLOAT*)(**Data), FieldWidth, Precision, FollowType, Flags);
+                        printf("%s", tmpBuf);
+                    }else{
+                        printf(Format, value);
+                    }
+                }
+
+                if (IsDoublePrecision == 0)
+                {
+                    **Data = (gctFLOAT*)(**Data) + 1;
+                }else{
+                    **Data = (double*)(**Data) + 1;
+                }
+            }
+            break;
+        case cleARGTYPE_DOUBLE:
+            {
+                gctFLOAT value = *(gctFLOAT*)(**Data);
+                if (gcfVX_IsNan(value))
+                {
+                    printf("%s", "nan");
+                }else if (gcfVX_IsInf(value))
+                {
+                    printf("%s", "inf");
+                }else{
+                    if (FollowType == 'a' || FollowType == 'A')
+                    {
+                        gctCHAR tmpBuf[512] = {'\0'};
+                        printf_aA(tmpBuf, *(double*)(**Data), FieldWidth, Precision, FollowType, Flags);
+                        printf("%s", tmpBuf);
+                    }else{
+                        printf(Format, *(double*)(**Data));
+                    }
+                }
+                if (IsDoublePrecision == 0)
+                {
+                    **Data = (gctFLOAT*)(**Data) + 1;
+                }else{
+                    **Data = (double*)(**Data) + 1;
+                }
+            }
+            break;
+        default:
+            break;
+        }
+    }
+    else
+    {
+        switch(FollowType)
+        {
+         case 'd':
+         case 'i':
+         case 'o':
+         case 'u':
+         case 'x':
+         case 'X':
+             printf(Format, *(gctINT32*)(**Data));
+             **Data = (gctINT32*)(**Data) + 1;
+             break;
+         case 'a':
+         case 'A':
+         case 'e':
+         case 'E':
+         case 'f':
+         case 'F':
+         case 'g':
+         case 'G':
+             {
+                 gctFLOAT value = *(gctFLOAT*)(**Data);
+                 if (gcfVX_IsNan(value))
+                 {
+                     printf("%s", "nan");
+                 }else if (gcfVX_IsInf(value))
+                 {
+                     printf("%s", "inf");
+                 }else if (FollowType == 'a' || FollowType == 'A')
+                 {
+                     gctCHAR tmpBuf[512] = {'\0'};
+                     printf_aA(tmpBuf, value, FieldWidth, Precision, FollowType, Flags);
+                     printf("%s", tmpBuf);
+                 }else
+                 {
+                     printf(Format, value);
+                 }
+                 **Data = (gctFLOAT*)(**Data) + 1;
+             }
+             break;
+         case 'c':
+             printf(Format, *(gctINT8*)(**Data));
+             **Data = (gctINT8*)(**Data) + 1;
+             break;
+         default:
+            break;
+        }
+    }
+}
+
+void
+gcfVX_PrintfFmt(
+    gctCHAR* FmtString,
+    gctCHAR SpecificChar,
+    gctPOINTER* Data,
+    gctINT VectorSize,
+    gctINT ArgType,
+    gctINT Flags,
+    gctINT FieldWidth,
+    gctINT Precision
+    )
+{
+    gctINT i = 0;
+    gctINT numVector = (VectorSize == 0) ? 1 : VectorSize;
+    gctINT isDoublePrecision = 0;
+    /* Get precision info */
+    isDoublePrecision = *(gctINT*)(*Data);
+    /* Get Data */
+    *Data = (gctINT*)(*Data) + 1;
+    switch(SpecificChar) {
+        case 'd':
+        case 'i':
+        case 'o':
+        case 'u':
+        case 'x':
+        case 'X':
+        case 'f':
+        case 'F':
+        case 'e':
+        case 'E':
+        case 'g':
+        case 'G':
+        case 'a':
+        case 'A':
+        case 'c':
+            while (i < numVector)
+            {
+                if (i > 0 && i < numVector)
+                {
+                    printf(",");
+                }
+                gcfVX_PrintData(&Data, FmtString, ArgType, SpecificChar, Flags, FieldWidth, Precision, isDoublePrecision);
+                i++;
+            }
+            break;
+
+        case 'p':
+            printf("%016x", *(gctUINT*)(*Data));
+            *Data = (gctUINT*)(*Data) + 1;
+            break;
+
+        default:
+            break;
+    }
+}
+
+void gcfVX_PrintParseData(
+    gctCHAR *formatString,
+    gctPOINTER data)
+{
+    gctCHAR* bufPtr = formatString;
+
+    while(*bufPtr) {
+        gctCHAR c = *bufPtr++;
+
+        if(c == '%') {
+            if(*bufPtr == '%') {
+                bufPtr++;
+                continue;
+            }else {
+                /*indentify the conversion specification */
+                gctCHAR* startPtr = bufPtr - 1;
+                while (*bufPtr)
+                {
+                    c = *bufPtr++;
+                    if (gcfVX_IsInString(c, (gctCHAR*)_cldPrintfConvSpecifiers))
+                    {
+                        gctINT vectorSize = 0;
+                        gctINT argType = 0;
+                        gctINT flags = 0;
+                        gctINT fieldWidth = 0;
+                        gctINT precision = 0;
+                        gctCHAR* endPtr = bufPtr - 1;
+                        gctCHAR fmt[255] = {'\0'};
+                        /* get vector size and length and new format */
+                        gcfVX_GetSingleFormat(startPtr, endPtr, fmt, &vectorSize, &argType, &flags, &fieldWidth, &precision);
+                        if (c == 's')
+                        {
+                            gctUINT value = *((gctINT*)data + 1);
+                            if (value == 0xFFFFFFFF) /* handle printf("%s", 0);*/
+                            {
+                                printf(fmt, "(null)");
+                            }else{
+                                /* the string is stored in const buffer, offset is stored in printf buffer */
+                                gctUINT offset = value;
+                                printf(fmt, formatString + offset);
+                            }
+                            data = (gctINT*)data + 2;
+                        }else{
+                            gcfVX_PrintfFmt(fmt, c, &data, vectorSize, argType, flags, fieldWidth, precision);
+                        }
+                        break;
+                    }
+                }
+            }
+        }else {
+            gctINT constStrLen = 0;
+            gctCHAR* constString;
+            gctCHAR* startConstStrPtr;
+            bufPtr--;
+            startConstStrPtr = bufPtr;
+
+            while((*bufPtr) && (*bufPtr != '%'))
+            {
+                constStrLen++;
+                bufPtr++;
+            }
+            gcoOS_Allocate(gcvNULL, (constStrLen+1)*sizeof(gctCHAR), (gctPOINTER *)&constString);
+            gcoOS_StrCopySafe(constString, constStrLen + 1, startConstStrPtr);
+            *(constString + constStrLen) = '\0';
+            printf("%s", constString);
+            gcoOS_Free(gcvNULL, constString);
+        }
+    }
+}
 
 gceSTATUS
 gcfVX_AdjustLocalWorkSize(
-    vx_kernel_shader    Kernel,
+    vx_shader    Kernel,
     gctUINT             WorkDim,
     size_t              GlobalWorkOffset[3],
     size_t              GlobalWorkSize[3],
@@ -142,7 +1011,7 @@ gcfVX_GetUniformArrayInfo(
 
 gceSTATUS
 gcfVX_LoadKernelArgLocalMemValues(
-    vx_kernel_shader    Kernel,
+    vx_shader    Kernel,
     gctUINT             NumArgs,
     vx_argument         Args,
     gctUINT             WorkDim,
@@ -162,10 +1031,10 @@ gcfVX_LoadKernelArgLocalMemValues(
     gctUINT             i;
     vx_mem_alloc_info   memAllocInfo;
     gctINT *            data;
-    gctUINT             allocatedSize;
-    gctPHYS_ADDR        physical;
-    gctPOINTER          logical;
-    gcsSURF_NODE_PTR    node;
+    gctUINT             allocatedSize = 0;
+    gctPHYS_ADDR        physical = gcvNULL;
+    gctPOINTER          logical = gcvNULL;
+    gcsSURF_NODE_PTR    node = gcvNULL;
     gceSTATUS           status;
 
     /* Add up sizes for all local kernel args. */
@@ -266,12 +1135,16 @@ gcfVX_LoadKernelArgLocalMemValues(
     status = gcvSTATUS_OK;
 
 OnError:
+    if(node && gcmIS_ERROR(status))
+    {
+       gcoVX_FreeMemoryEx(physical, logical, allocatedSize, node);
+    }
     return status;
 }
 
 static gceSTATUS
 gcfVX_LoadKernelArgValues(
-    vx_kernel_shader    Kernel,
+    vx_shader    Kernel,
     gcSHADER            Shader,
     vx_argument         Arg,
     vx_border_mode_t*   BorderMode,
@@ -309,22 +1182,81 @@ gcfVX_LoadKernelArgValues(
             {
                 vx_image image = *(vx_image*) Arg->data;
 
-                gcsVX_IMAGE_INFO     info = {0};
+                if (image)
+                {
+                    gcsVX_IMAGE_INFO     info = {0};
 
-                context = (gcoVX_Kernel_Context *) vxAllocate(sizeof(gcoVX_Kernel_Context));
+                    context = (gcoVX_Kernel_Context *) vxAllocate(sizeof(gcoVX_Kernel_Context));
 
 #if gcdVX_OPTIMIZER
-                context->borders = BorderMode->mode;
+                    context->borders = BorderMode->mode;
 #else
-                context->params.borders = BorderMode->mode;
+                    context->params.borders = BorderMode->mode;
 #endif
 
-                gcmONERROR(gcfVX_GetImageInfo(context, (vx_image)image, &info, 0));
+                    gcmONERROR(gcfVX_GetImageInfo(context, (vx_image)image, &info, 0));
 
-                vxFree(context);
-                context = gcvNULL;
+                    info.isVXC = gcvTRUE;
 
-                gcmONERROR(gcoVX_BindImage(GetUniformPhysical(Arg->uniform), &info));
+                    vxFree(context);
+
+                    context = gcvNULL;
+
+                    gcmONERROR(gcoVX_BindImage(GetUniformPhysical(Arg->uniform), &info));
+                }
+                else
+                {
+                    gcmONERROR(gcUNIFORM_SetValue(Arg->uniform,
+                                        length,
+                                        (gctINT*)Arg->data));
+                }
+            }
+            else if ((type == gcSHADER_IMAGE_2D_ARRAY) && (Arg->data != gcvNULL))
+            {
+                vx_reference ref = *(vx_reference*) Arg->data;
+
+                if (ref && ref->type == VX_TYPE_OBJECT_ARRAY)
+                {
+                    vx_object_array imageArray = (vx_object_array) ref;
+
+                    gcsVX_IMAGE_INFO     info = {0};
+                    gcoVX_Kernel_Context context = {0};
+
+                    vx_image_s image =  *(vx_image)imageArray->itemsTable[0];
+
+                    /* warp to an imageArray/image3D */
+                    image.arraySize = (gctUINT32)imageArray->itemCount;
+
+
+#if gcdVX_OPTIMIZER
+                    context.borders = BorderMode->mode;
+#else
+                    context.params.borders = BorderMode->mode;
+#endif
+
+                    gcmONERROR(gcfVX_GetImageInfo(&context, (vx_image)&image, &info, 0));
+
+                    info.isVXC = gcvTRUE;
+
+                    gcmONERROR(gcoVX_BindImage(GetUniformPhysical(Arg->uniform), &info));
+                }
+                else if (ref && ref->type == VX_TYPE_TENSOR)
+                {
+                    vx_tensor tensor = (vx_tensor) ref;
+                    gcsVX_IMAGE_INFO     info = {0};
+
+                    gcmONERROR(gcfVX_GetImageInfoFromTensor(BorderMode->mode, tensor, &info));
+
+                    info.isVXC = gcvTRUE;
+
+                    gcmONERROR(gcoVX_BindImage(GetUniformPhysical(Arg->uniform), &info));
+                }
+                else
+                {
+                    gcmONERROR(gcUNIFORM_SetValue(Arg->uniform,
+                                        length,
+                                        (gctINT*)Arg->data));
+                }
             }
             else
             {
@@ -448,14 +1380,17 @@ gcfVX_LoadKernelArgValues(
 
                 context = (gcoVX_Kernel_Context *) vxAllocate(sizeof(gcoVX_Kernel_Context));
 #if gcdVX_OPTIMIZER
-                context->borders = VX_BORDER_MODE_UNDEFINED;
+                context->borders = VX_BORDER_UNDEFINED;
 #else
                 context->params.borders = BorderMode->mode;
 #endif
 
                 gcmONERROR(gcfVX_GetImageInfo(context, (vx_image)image, &info, 1));
 
+                info.isVXC = gcvTRUE;
+
                 vxFree(context);
+
                 context = gcvNULL;
 
                 gcmONERROR(gcoVX_BindImage(0, &info));
@@ -612,6 +1547,55 @@ gcfVX_LoadKernelArgValues(
         gcoOS_MemCopy(memAllocInfo->logical, Kernel->constantMemBuffer, Kernel->constantMemSize);
 
     }
+    else if (isUniformPrintfAddress(Arg->uniform))
+    {
+        vx_mem_alloc_info memAllocInfo = (vx_mem_alloc_info) Arg->data;
+        gctINT * data;
+
+        if (!Arg->isMemAlloc)
+        {
+            status = gcvSTATUS_INVALID_DATA;
+            goto OnError;
+        }
+
+
+        if (memAllocInfo->node)
+        {
+            gcmONERROR(gcoVX_FreeMemoryEx(memAllocInfo->physical,
+                        memAllocInfo->logical,
+                        memAllocInfo->allocatedSize,
+                        memAllocInfo->node));
+
+            gcoOS_ZeroMemory(memAllocInfo, sizeof(vx_mem_alloc_info_s));
+        }
+
+        memAllocInfo->allocatedSize = VX_MAX_PRINTF_BUFFER_SIZE;
+
+        {
+            /* Allocate the physical buffer */
+            gcmONERROR(gcoVX_AllocateMemoryEx(&memAllocInfo->allocatedSize,
+                                        &memAllocInfo->physical,
+                                        &memAllocInfo->logical,
+                                        &memAllocInfo->node));
+        }
+
+        data = (gctINT *) &memAllocInfo->physical;
+        gcmONERROR(gcUNIFORM_SetValue(Arg->uniform, length, data));
+
+    }
+    else if (isUniformWorkItemPrintfBufferSize(Arg->uniform))
+    {
+        gctINT totalNumItems  = (gctINT)(GlobalWorkSize[0]
+                                  * (WorkDim > 1 ? GlobalWorkSize[1] : 1)
+                                  * (WorkDim > 2 ? GlobalWorkSize[2] : 1));
+
+        gctINT printBufferSize = VX_MAX_PRINTF_BUFFER_SIZE / totalNumItems;
+        gcoOS_MemCopy(Arg->data, &printBufferSize, gcmSIZEOF(printBufferSize));
+
+        gcmONERROR(gcUNIFORM_SetValue(Arg->uniform,
+                                      length,
+                                      (gctINT*)Arg->data));
+    }
     else if (isUniformKernelArgSampler(Arg->uniform))
     {
         gcmASSERT(length == 1);
@@ -753,7 +1737,7 @@ gcfVX_LoadKernelArgValues(
     else if (gcoOS_StrCmp(Arg->uniform->name, "$ConstBorderValue") == gcvSTATUS_OK)
     {
         gctUINT32   data[4] = {0};
-        gctUINT32   data32 = (gctUINT32)BorderMode->constant_value;
+        gctUINT32   data32 = (gctUINT32)BorderMode->constant_value.U32;
 
         gctUINT8  data8 = data32 & 0xFF;
         gctUINT16 data16 = data32 & 0xFFFF;
@@ -926,8 +1910,8 @@ OnError:
 }
 
 static vx_argument
-clfGetKernelArg(
-    vx_kernel_shader    Kernel,
+gcfVX_GetKernelArg(
+    vx_shader    Kernel,
     gctUINT             Index,
     gctBOOL *           isLocal,
     gctBOOL *           isPrivate,
@@ -956,9 +1940,9 @@ clfGetKernelArg(
 
 gceSTATUS
 gcfVX_SetKernelArg(
-    vx_kernel_shader    Kernel,
+    vx_shader           Kernel,
     vx_uint32           ArgIndex,
-    size_t              ArgSize,
+    vx_uint32           ArgSize,
     const void *        ArgValue
     )
 {
@@ -982,7 +1966,7 @@ gcfVX_SetKernelArg(
  //   gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, Kernel->argMutex, gcvINFINITE));
  //   acquired = gcvTRUE;
 
-    argument = clfGetKernelArg(Kernel, ArgIndex, &isLocal, &isPrivate, &isSampler);
+    argument = gcfVX_GetKernelArg(Kernel, ArgIndex, &isLocal, &isPrivate, &isSampler);
 
     if (argument == gcvNULL)
     {
@@ -1069,12 +2053,12 @@ OnError:
 
 gceSTATUS
 gcfVX_AllocateKernelArgs(
-    vx_kernel_shader   Kernel
+    vx_shader   Kernel
     )
 {
     gceSTATUS       status = gcvSTATUS_OK;
     gctPOINTER      pointer;
-    gctSIZE_T       bytes;
+    gctUINT32       bytes;
     vx_argument     argument;
     gctUINT         i, uniformCount;
     gcSHADER        shader = (gcSHADER)Kernel->states.binary;
@@ -1120,7 +2104,7 @@ gcfVX_AllocateKernelArgs(
         gcSL_FORMAT format;
         gctBOOL isPointer;
         gctUINT length;
-        gctSIZE_T bytes;
+        gctUINT32 bytes;
 
         gcmONERROR(gcSHADER_GetUniform(
                         shader,
@@ -1179,7 +2163,7 @@ gcfVX_AllocateKernelArgs(
         {
             if (isPointer)
             {
-                if (type == gcSHADER_IMAGE_2D)
+                if ((type == gcSHADER_IMAGE_2D) || (type == gcSHADER_IMAGE_2D_ARRAY))
                 {
                     bytes = gcmSIZEOF(gctPOINTER);
                 }
@@ -1313,7 +2297,7 @@ OnError:
 
 gceSTATUS
 gcfVX_ExecuteKernel(
-    vx_kernel_shader    Kernel,
+    vx_shader    Kernel,
     gctUINT             NumArgs,
     vx_argument         Args,
     vx_border_mode_t*   BorderMode,
@@ -1330,6 +2314,7 @@ gcfVX_ExecuteKernel(
     gcmONERROR(gcoVX_LoadKernelShader(Kernel->states.stateBufferSize,
                                 Kernel->states.stateBuffer,
                                 Kernel->states.hints));
+
 
     /* Load argument values. */
     for (i = 0; i < NumArgs; i++)
@@ -1378,7 +2363,7 @@ OnError:
 
 
 gceSTATUS
-gcfVX_CreateKernelShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL constBorder, vx_kernel_shader *kernelShader)
+gcfVX_CreateShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], gctBOOL constBorder, vx_shader *kernelShader)
 {
     gcSHADER        pgmBinary, kernelBinary;
     gctUINT         binarySize;
@@ -1395,12 +2380,12 @@ gcfVX_CreateKernelShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], g
     gctSIZE_T       strLen = 0;
 
     gcKERNEL_FUNCTION   kernelFunction;
-    vx_kernel_shader    kernel;
+    vx_shader           kernel = gcvNULL;
     gctUINT             maxComputeUnits, threadCount, maxDeviceWorkGroupSize;
 
     /* Allocate kernel. */
-    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(vx_kernel_shader_s), (gctPOINTER*)&kernel));
-    gcoOS_ZeroMemory(kernel, sizeof(vx_kernel_shader_s));
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(vx_shader_s), (gctPOINTER*)&kernel));
+    gcoOS_ZeroMemory(kernel, sizeof(vx_shader_s));
 
     /* Save program binary into buffer */
     pgmBinary = (gcSHADER) program->binary;
@@ -1411,10 +2396,13 @@ gcfVX_CreateKernelShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], g
     /* Construct kernel binary. */
     gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &kernelBinary));
 
+    kernel->states.binary          = (gctUINT8_PTR) kernelBinary;
+
     /* Load kernel binary from program binary */
     gcmONERROR(gcSHADER_LoadEx(kernelBinary, pointer, binarySize));
 
     gcoOS_Free(gcvNULL, pointer);
+    pointer = gcvNULL;
 
     /* Load kernel binary uniforms with the given kernel name */
     gcmONERROR(gcSHADER_LoadKernel(kernelBinary, name));
@@ -1438,7 +2426,7 @@ gcfVX_CreateKernelShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], g
     /* Assume all dead code is removed by optimizer. */
     flags = gcvSHADER_RESOURCE_USAGE /*| gcvSHADER_DEAD_CODE*/ | gcvSHADER_OPTIMIZER;
 
-    gcSetCLCompiler(gcCompileKernel);
+    gcSetCLCompiler(program->base.context->compileKernel);
 
     if (constBorder)
     {
@@ -1450,6 +2438,10 @@ gcfVX_CreateKernelShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], g
                           &bufferSize,
                           &buffer,
                           &hints));
+
+    kernel->states.stateBuffer     = buffer;
+    kernel->states.stateBufferSize = bufferSize;
+    kernel->states.hints           = hints;
 
     if (constBorder)
     {
@@ -1464,10 +2456,7 @@ gcfVX_CreateKernelShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], g
 
     pointer = gcvNULL;
 
-    kernel->states.binary          = (gctUINT8_PTR) kernelBinary;
-    kernel->states.stateBuffer     = buffer;
-    kernel->states.stateBufferSize = bufferSize;
-    kernel->states.hints           = hints;
+
 
 
     gcmONERROR(
@@ -1506,7 +2495,7 @@ gcfVX_CreateKernelShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], g
     /* maxWorkGroupSize should not over the device's maxWorkGroupSize. */
     if (kernel->maxWorkGroupSize > maxDeviceWorkGroupSize)
     {
-        kernel->maxWorkGroupSize =  maxDeviceWorkGroupSize;
+        kernel->maxWorkGroupSize = maxDeviceWorkGroupSize;
     }
 
     gcmVERIFY_OK(gcSHADER_GetAttributeCount(kernelBinary, &kernel->attributeCount));
@@ -1519,12 +2508,10 @@ gcfVX_CreateKernelShader(vx_program program, vx_char name[VX_MAX_KERNEL_NAME], g
     status =  gcvSTATUS_OK;
 
     return status;
-
 OnError:
     if (kernel)
     {
-        gcfVX_FreeKernelShader(kernel);
-        gcoOS_Free(gcvNULL, kernel);
+        vxoShader_Free(kernel);
     }
 
     if(pointer != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, pointer);
@@ -1551,52 +2538,7 @@ VX_PRIVATE_API vx_string _getShaderName(vx_string orignal, vx_string name)
     return name;
 }
 
-gceSTATUS
-gcfVX_CreateKernelShaders(vx_kernel kernel)
-{
-    gceSTATUS status;
-    gctUINT    i;
-    gcKERNEL_FUNCTION kernelFunction;
-    gctSTRING kernelName;
-    gcSHADER  kernelBinary = (gcSHADER) kernel->program->binary;
-    gctUINT32 kernelCount;
-    gctSIZE_T length;
-    vx_char shader_name[128] = {0}, searchName[128]= {0};
 
-    if (kernelBinary == gcvNULL)
-    {
-        status = gcvSTATUS_INVALID_ARGUMENT;
-        goto OnError;
-    }
-
-    _getShaderName(kernel->name, shader_name);
-    gcoOS_StrLen(shader_name, &length);
-
-    kernel->kernelShaderCount = 0;
-
-    gcmONERROR(gcSHADER_GetKernelFunctionCount(kernelBinary, &kernelCount));
-    gcmONERROR(gcoOS_AllocateMemory(gcvNULL, gcmSIZEOF(gctPOINTER) * kernelCount * 2, (gctPOINTER*)&kernel->kernelShader));
-
-    for (i = 0; i < kernelCount; i++)
-    {
-        gcmONERROR(gcSHADER_GetKernelFunction(kernelBinary, i, &kernelFunction));
-        gcmONERROR(gcKERNEL_FUNCTION_GetName(kernelFunction, gcvNULL, (gctCONST_STRING *)&kernelName));
-        gcoOS_StrCopySafe(searchName, length+1, kernelName);
-
-        if (gcoOS_StrCmp(shader_name, searchName) == 0)
-        {
-            gcmONERROR(gcfVX_CreateKernelShader(kernel->program, kernelName, gcvFALSE, &kernel->kernelShader[kernel->kernelShaderCount*2]));
-            gcmONERROR(gcfVX_CreateKernelShader(kernel->program, kernelName, gcvTRUE, &kernel->kernelShader[kernel->kernelShaderCount*2 + 1]));
-            kernel->kernelShaderCount++;
-        }
-    }
-
-
-    return gcvSTATUS_OK;
-
-OnError:
-    return status;
-}
 
 gceSTATUS gcfVX_SplitWork(
     vx_uint32 deviceCount,
@@ -1740,6 +2682,249 @@ OnError:
     return gcvSTATUS_INVALID_ARGUMENT;
 }
 
+gceSTATUS gcfVX_LoadShaderFromLinkedBinary(gctPOINTER linkedBinary, gctUINT32 linkedBinarySize, gctCHAR *name, vx_shader *kernelShader)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcSHADER  kernelBinary = gcvNULL;
+    vx_shader kernel = gcvNULL;
+    gctPOINTER pointer;
+    gctSIZE_T strLen;
+
+    gcKERNEL_FUNCTION   kernelFunction;
+    gctUINT             maxComputeUnits, threadCount, maxDeviceWorkGroupSize;
+
+    gctUINT         count, propertySize = 0, i;
+    gctINT          propertyType = 0;
+    gctSIZE_T       propertyValues[3] = {0};
+
+
+    /* Allocate kernel. */
+    gcmONERROR(gcoOS_Allocate(gcvNULL, sizeof(vx_shader_s), (gctPOINTER*)&kernel));
+    gcoOS_ZeroMemory(kernel, sizeof(vx_shader_s));
+
+    /* Construct kernel binary. */
+    gcmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &kernelBinary));
+
+    kernel->states.binary = (gctUINT8_PTR)kernelBinary;
+
+    gcmONERROR(gcLoadCLSingleKernel(
+        (gctPOINTER)linkedBinary,
+        linkedBinarySize,
+        kernelBinary,
+        (gctUINT32*)&kernel->states.stateBufferSize,
+        &kernel->states.stateBuffer,
+        &kernel->states.hints));
+
+
+    /* Set the required work group size. */
+    gcmONERROR(gcSHADER_GetKernelFunctionByName(kernelBinary, name, &kernelFunction));
+    gcKERNEL_FUNCTION_GetPropertyCount(kernelFunction, &count);
+
+    for (i = 0; i < count; i++)
+    {
+        gcKERNEL_FUNCTION_GetProperty(kernelFunction, i, &propertySize, &propertyType, (gctINT *)propertyValues);
+
+        if (propertyType == gcvPROPERTY_REQD_WORK_GRP_SIZE)
+        {
+            gcoOS_MemCopy(kernel->compileWorkGroupSize,
+                propertyValues,
+                gcmSIZEOF(gctINT) * propertySize);
+        }
+    }
+
+    /* Copy kernel name */
+    strLen = gcoOS_StrLen(name, gcvNULL) + 1;
+    gcmONERROR(gcoOS_Allocate(gcvNULL, strLen, &pointer));
+    gcoOS_StrCopySafe((gctSTRING)pointer, strLen, name);
+    kernel->name                   = (gctSTRING) pointer;
+
+
+    gcmONERROR(
+        gcoHAL_QueryShaderCaps(gcvNULL,
+                                    gcvNULL,
+                                    gcvNULL,
+                                    gcvNULL,
+                                    gcvNULL,
+                                    &maxComputeUnits,
+                                    &threadCount,
+                                    gcvNULL,
+                                    gcvNULL));
+
+    kernel->maxWorkItemSizes[0]   = gcmMIN(threadCount, 1024);
+    kernel->maxWorkItemSizes[1]   = gcmMIN(threadCount, 1024);
+    kernel->maxWorkItemSizes[2]   = gcmMIN(threadCount, 1024);
+
+    kernel->maxGlobalWorkSize     = (gctUINT64) 4*1024*1024*1024;
+
+    maxDeviceWorkGroupSize        = gcmMIN(threadCount, 1024);
+
+
+    kernel->preferredWorkGroupSizeMultiple = 4 * maxComputeUnits;
+
+    if (kernel->states.hints->threadWalkerInPS)
+    {
+        kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->fsMaxTemp)) *
+                                   4 * maxComputeUnits;
+    }
+    else
+    {
+        kernel->maxWorkGroupSize = (gctUINT32)(113 / gcmMAX(2, kernel->states.hints->vsMaxTemp)) *
+                                   4 * maxComputeUnits;
+    }
+
+    /* maxWorkGroupSize should not over the device's maxWorkGroupSize. */
+    if (kernel->maxWorkGroupSize > maxDeviceWorkGroupSize)
+    {
+        kernel->maxWorkGroupSize = maxDeviceWorkGroupSize;
+    }
+
+    gcmVERIFY_OK(gcSHADER_GetAttributeCount(kernelBinary, &kernel->attributeCount));
+
+    /* Allocate kernel arguments. */
+    gcmONERROR(gcfVX_AllocateKernelArgs(kernel));
+
+    *kernelShader = kernel;
+
+    return gcvSTATUS_OK;
+
+OnError:
+
+    vxoShader_Free(kernel);
+
+    return status;
+}
+
+VX_INTERNAL_API vx_status vxoKernel_CreateShaders(vx_program program, vx_char *name, vx_uint32* kernelShaderCount, vx_shader ** kernelShaders)
+{
+    gceSTATUS status;
+    gctUINT    i;
+    gcKERNEL_FUNCTION kernelFunction;
+    gctSTRING kernelName;
+    gcSHADER  kernelBinary = (gcSHADER) program->binary;
+    gctUINT32 kernelCount = 0;
+    gctSIZE_T length;
+
+    vx_char             searchName[128]= {0};
+    vx_uint32           findkernelShaderCount = 0;
+    vx_shader           *findKernelShaders = gcvNULL;
+
+    if (kernelBinary == gcvNULL)
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        goto OnError;
+    }
+
+    gcoOS_StrLen(name, &length);
+
+    if (!program->linked)
+    {
+        gcmONERROR(gcSHADER_GetKernelFunctionCount(kernelBinary, &kernelCount));
+        gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctPOINTER) * kernelCount * 2, (gctPOINTER*)&findKernelShaders));
+        gcoOS_ZeroMemory(findKernelShaders, gcmSIZEOF(gctPOINTER) * kernelCount * 2);
+
+        for (i = 0; i < kernelCount; i++)
+        {
+            gcmONERROR(gcSHADER_GetKernelFunction(kernelBinary, i, &kernelFunction));
+            gcmONERROR(gcKERNEL_FUNCTION_GetName(kernelFunction, gcvNULL, (gctCONST_STRING *)&kernelName));
+            gcoOS_StrCopySafe(searchName, length+1, kernelName);
+
+            if (gcoOS_StrCmp(name, searchName) == 0)
+            {
+                gcmONERROR(gcfVX_CreateShader(program, kernelName, gcvFALSE, &findKernelShaders[findkernelShaderCount*2]));
+                gcmONERROR(gcfVX_CreateShader(program, kernelName, gcvTRUE, &findKernelShaders[findkernelShaderCount*2 + 1]));
+                findkernelShaderCount++;
+            }
+        }
+    }
+    else
+    {
+        gctUINT32 subKernelCount = 0, linkedBinarySize, kernelNameLength = 0;
+        gctUINT32 *linkedBinary = (gctUINT32*)program->binary;
+        gctBOOL   find = gcvFALSE;
+
+        linkedBinary += 2;
+        kernelCount = *linkedBinary;
+        linkedBinary++;
+        gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gctPOINTER) * kernelCount * 2, (gctPOINTER*)&findKernelShaders));
+        gcoOS_ZeroMemory(findKernelShaders, gcmSIZEOF(gctPOINTER) * kernelCount * 2);
+        /* skip the full size */
+        linkedBinary++;
+
+        for (i = 0; i < kernelCount; i++)
+        {
+            /* skip the kernel name length */
+            kernelNameLength = *linkedBinary;
+            linkedBinary++;
+
+            kernelName = (gctCHAR*)linkedBinary;
+            linkedBinary = (gctUINT32*)((gctUINT8*)linkedBinary + kernelNameLength);
+            gcoOS_StrCopySafe(searchName, length+1, kernelName);
+
+            find = (gcoOS_StrCmp(name, searchName) == 0);
+
+            subKernelCount = *linkedBinary;
+            if (subKernelCount != 2) goto OnError;
+            linkedBinary++;
+
+            if (*linkedBinary != gcvKERNEL_BINARY_NONE) goto OnError;
+            linkedBinary++;
+
+            linkedBinarySize = *linkedBinary;
+            linkedBinary++;
+
+            if (find)
+            {
+                gcmONERROR(gcfVX_LoadShaderFromLinkedBinary(
+                    (gctPOINTER)linkedBinary,
+                    linkedBinarySize, kernelName,
+                    &findKernelShaders[findkernelShaderCount*2]));
+            }
+
+            /* locate to the next kernel binary */
+            linkedBinary = (gctUINT32*) ((gctUINT8*)(linkedBinary) + linkedBinarySize);
+
+            if (*linkedBinary != gcvKERNEL_BINARY_CONST_BORDER) goto OnError;
+            linkedBinary++;
+
+            linkedBinarySize = *linkedBinary;
+            linkedBinary++;
+
+            if (find)
+            {
+                gcmONERROR(gcfVX_LoadShaderFromLinkedBinary(
+                    (gctPOINTER)linkedBinary,
+                    linkedBinarySize,
+                    kernelName,
+                    &findKernelShaders[findkernelShaderCount*2 + 1]));
+
+                findkernelShaderCount++;
+            }
+
+            /* locate to the next kernel binary */
+            linkedBinary = (gctUINT32*) ((gctUINT8*)(linkedBinary) + linkedBinarySize);
+        }
+
+    }
+
+    *kernelShaderCount  = findkernelShaderCount;
+    *kernelShaders      = findKernelShaders;
+
+    return VX_SUCCESS;
+
+OnError:
+
+    if (findKernelShaders)
+        for(i = 0; i < kernelCount * 2; i++)
+        {
+            if (findKernelShaders[i]) vxoShader_Free(findKernelShaders[i]);
+        }
+
+        gcoOS_Free(gcvNULL, findKernelShaders);
+
+    return VX_FAILURE;
+
+}
+
 
 VX_INTERNAL_API vx_status vxoKernel_Initialize(
     vx_context context,
@@ -1750,6 +2935,7 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
     vx_kernel_f function,
     vx_param_description_s *parameters,
     vx_uint32 paramCount,
+    vx_kernel_validate_f validateFunction,
     vx_kernel_input_validate_f inputValidateFunction,
     vx_kernel_output_validate_f outputValidateFunction,
     vx_kernel_initialize_f initializeFunction,
@@ -1782,13 +2968,15 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
 
     kernel->signature.paramCount    = paramCount;
 
+    kernel->validateFunction        = validateFunction;
+
     kernel->inputValidateFunction   = inputValidateFunction;
     kernel->outputValidateFunction  = outputValidateFunction;
     kernel->initializeFunction      = initializeFunction;
     kernel->deinitializeFunction    = deinitializeFunction;
 
-    kernel->attributes.borderMode.mode              = VX_BORDER_MODE_UNDEFINED;
-    kernel->attributes.borderMode.constant_value    = 0;
+    kernel->attributes.borderMode.mode              = VX_BORDER_UNDEFINED;
+    kernel->attributes.borderMode.constant_value.U32= 0;
 
 #if gcdVX_OPTIMIZER
     kernel->attributes.optAttributes                = optAttributes;
@@ -1798,11 +2986,17 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
 
     if (kernel->program != VX_NULL)
     {
-         gceSTATUS status = gcfVX_CreateKernelShaders(kernel);
-         if (gcmIS_ERROR(status))
-         {
-             return VX_FAILURE;
-         }
+        vx_char shader_name[128] = {0};
+
+        vx_status status = vxoKernel_CreateShaders(kernel->program,
+                                                    _getShaderName(kernel->name, shader_name),
+                                                    &kernel->kernelShaderCount,
+                                                    &kernel->kernelShader);
+        if (status != VX_SUCCESS)
+        {
+             return status;
+        }
+
     }
 
     if (parameters != VX_NULL)
@@ -1814,8 +3008,9 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
             kernel->signature.stateTable[i]     = parameters[i].state;
         }
 
-        kernel->enabled = vx_true_e;
+        //kernel->enabled = vx_true_e;
     }
+
 
     return VX_SUCCESS;
 }
@@ -1873,21 +3068,6 @@ VX_INTERNAL_API vx_status vxoKernel_ExternalRelease(vx_kernel_ptr kernelPtr)
     return vxoReference_Release((vx_reference_ptr)&kernel, VX_TYPE_KERNEL, VX_REF_EXTERNAL);
 }
 
-VX_PRIVATE_API vx_status vxoKernel_Remove(vx_kernel kernel)
-{
-    if (!vxoReference_IsValidAndSpecific(&kernel->base, VX_TYPE_KERNEL)) return VX_ERROR_INVALID_REFERENCE;
-
-    if (kernel->enabled)
-    {
-        vxError("Can't remove the enabled kernel, \"%s\"", kernel->name);
-        return VX_ERROR_INVALID_REFERENCE;
-    }
-
-    kernel->enumeration = VX_KERNEL_INVALID;
-    kernel->base.context->kernelCount--;
-
-    return vxoReference_Release((vx_reference*)&kernel, VX_TYPE_KERNEL, VX_REF_INTERNAL);
-}
 
 VX_INTERNAL_API vx_bool vxoKernel_IsUnique(vx_kernel kernel)
 {
@@ -1915,9 +3095,115 @@ VX_INTERNAL_API vx_bool vxoKernel_IsUnique(vx_kernel kernel)
     return vx_true_e;
 }
 
-VX_INTERNAL_API vx_kernel vxoKernel_GetByEnum(vx_context context, vx_enum kernelEnum)
+VX_PRIVATE_API vx_size gcOOS_StrNIndex(const vx_char *str, vx_char c, vx_size limit)
 {
-    vx_uint32 targetIndex, kernelIndex;
+    vx_size index = 0;
+    while (index < limit && *str != c)
+    {
+        if(!*str)
+        {
+            index = limit;
+            break;
+        }
+        str++;
+        index++;
+    }
+    return index;
+}
+
+
+VX_PRIVATE_API vx_status vxoKernel_Remove(vx_kernel kernel)
+{
+    vx_status status = VX_SUCCESS;
+
+    if (kernel == NULL
+        || !vxoReference_IsValidAndSpecific(&kernel->base, VX_TYPE_KERNEL)
+        || !kernel->isUserkernel)
+        return VX_ERROR_INVALID_PARAMETERS;
+    if (kernel->base.context->targetCount > 0)
+    {
+        vx_uint32 t = 0, k = 0;
+        vx_target target = VX_NULL;
+
+        vx_char targetName[VX_MAX_TARGET_NAME];
+        vx_uint32 kernelIdx = 0u;
+        vx_context context = kernel->base.context;
+
+        /* find back references to kernel's target and kernel in target->kernels array */
+        vx_uint32 index = (vx_uint32)(gcOOS_StrNIndex(kernel->name, ':', VX_MAX_TARGET_NAME));
+        if (index == VX_MAX_TARGET_NAME)
+        {
+            strcpy(targetName,"vivante.any");
+        }
+        else
+        {
+            strncpy(targetName, kernel->name, index);
+        }
+
+        for (t = 0u; t < kernel->base.context->targetCount; t++)
+        {
+            target = &context->targetTable[t];
+            if (strncmp(targetName,target->name, VX_MAX_TARGET_NAME) == 0)
+            {
+                break;
+            }
+            target = NULL;
+        }
+
+        if (target)
+        {
+            for (k = 0u; k < VX_MAX_KERNEL_COUNT; k++)
+            {
+                if (kernel == &(target->kernelTable[k]))
+                {
+                    kernelIdx = k;
+                    break;
+                }
+            }
+        }
+
+        if (target && kernelIdx < VX_MAX_KERNEL_COUNT)
+        {
+
+            if (kernel->enabled)
+            {
+                kernel->enabled = vx_false_e;
+                context->kernelCount --;
+
+                if (vxoKernel_IsUnique(kernel))
+                    context->uniqueKernelCount--;
+            }
+
+            target->kernelCount--;
+
+            kernel->isUserkernel = vx_false_e;
+
+            status = vxoReference_Decrement(&kernel->base, VX_REF_EXTERNAL);
+
+            status = vxoReference_Release((vx_reference*)&kernel, VX_TYPE_KERNEL, VX_REF_INTERNAL);
+
+            if (status == VX_SUCCESS)
+            {
+                target->kernelTable[kernelIdx].enumeration = VX_KERNEL_INVALID;
+                target->kernelTable[kernelIdx].isUserkernel = vx_false_e;
+            }
+            else
+            {
+                vxError("Can't deinitialize kernel properly\n");
+            }
+        }
+        else
+        {
+            vxError("Can't locate kernel in its context\n");
+        }
+    }
+
+    return status;
+}
+
+VX_INTERNAL_API vx_kernel vxoKernel_GetByEnumFromTarget(vx_context context, vx_target target, vx_uint32 targetIndex, vx_enum kernelEnum)
+{
+    vx_uint32 kernelIndex;
 
     if (!vxoContext_IsValid(context)) return VX_NULL;
 
@@ -1926,29 +3212,55 @@ VX_INTERNAL_API vx_kernel vxoKernel_GetByEnum(vx_context context, vx_enum kernel
         return (vx_kernel)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
     }
 
-    for (targetIndex = 0; targetIndex < context->targetCount; targetIndex++)
+    if (target == VX_NULL || !target->enabled) return (vx_kernel)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
+
+    for (kernelIndex = 0; kernelIndex < target->kernelCount; kernelIndex++)
     {
-        vx_target target = &context->targetTable[context->targetPriorityTable[targetIndex]];
+        if (target->kernelTable[kernelIndex].enumeration == kernelEnum)
+        {
+            vx_kernel kernel = &target->kernelTable[kernelIndex];
+
+            if (!kernel->enabled) continue;
+
+            kernel->targetIndex = targetIndex;
+
+            vxoReference_Increment(&kernel->base, VX_REF_EXTERNAL);
+
+            vxoKernel_Dump(kernel);
+
+            return kernel;
+        }
+    }
+    vxError("Kernel enum %d does not exist", kernelEnum);
+
+    return (vx_kernel)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
+}
+
+VX_INTERNAL_API vx_kernel vxoKernel_GetByEnum(vx_context context, vx_enum kernelEnum)
+{
+    vx_uint32 index, targetIndex;
+    vx_kernel kernel = VX_NULL;
+
+    if (!vxoContext_IsValid(context)) return VX_NULL;
+
+    if (kernelEnum < VX_KERNEL_INVALID)
+    {
+        return (vx_kernel)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
+    }
+
+    for (index = 0; index < context->targetCount; index++)
+    {
+        vx_target target;
+        targetIndex = context->targetPriorityTable[index];
+        target = &context->targetTable[targetIndex];
 
         if (target == VX_NULL || !target->enabled) continue;
 
-        for (kernelIndex = 0; kernelIndex < target->kernelCount; kernelIndex++)
-        {
-            if (target->kernelTable[kernelIndex].enumeration == kernelEnum)
-            {
-                vx_kernel kernel = &target->kernelTable[kernelIndex];
+        kernel = vxoKernel_GetByEnumFromTarget(context, target, targetIndex, kernelEnum);
 
-                if (!kernel->enabled) continue;
-
-                kernel->targetIndex = context->targetPriorityTable[targetIndex];
-
-                vxoReference_Increment(&kernel->base, VX_REF_EXTERNAL);
-
-                vxoKernel_Dump(kernel);
+        if (kernel == VX_NULL) continue;
 
                 return kernel;
-            }
-        }
     }
 
     vxError("Kernel enum %d does not exist", kernelEnum);
@@ -2154,9 +3466,9 @@ VX_API_ENTRY vx_status VX_API_CALL vxReleaseKernel(vx_kernel *kernel)
     return vxoKernel_ExternalRelease(kernel);
 }
 
-VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernel(
+VX_API_ENTRY vx_kernel VX_API_CALL vxoKernel_Add(
         vx_context context, const vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration,
-        vx_kernel_f func_ptr, vx_uint32 num_params, vx_kernel_input_validate_f input,
+        vx_kernel_f func_ptr, vx_uint32 num_params, vx_kernel_validate_f validate, vx_kernel_input_validate_f input,
         vx_kernel_output_validate_f output, vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize)
 {
     vx_size     colonCharIndex;
@@ -2173,11 +3485,11 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernel(
     if (num_params == 0 || num_params > VX_MAX_PARAMETERS) goto ErrorExit;
 
     /* The initialize and de-initialize function can be null */
-    if (input == VX_NULL || output == VX_NULL) goto ErrorExit;
+    if ((validate == NULL) && (input == NULL || output == NULL)) goto ErrorExit;
 
     colonCharIndex = vxString_GetCharIndex(name, ':', VX_MAX_TARGET_NAME);
 
-    if (colonCharIndex != VX_MAX_TARGET_NAME) vxStrCopySafe(targetName, colonCharIndex, name);
+    colonCharIndex == VX_MAX_TARGET_NAME ? strcpy(targetName,"vivante.any") : strncpy(targetName, name, colonCharIndex);
 
     for (targetIndex = 0; targetIndex < context->targetCount; targetIndex++)
     {
@@ -2188,10 +3500,13 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernel(
             vxmASSERT(target->funcs.addkernel);
 
             kernel = target->funcs.addkernel(target, name, enumeration,
-                                             VX_NULL, func_ptr, num_params,
+                                             VX_NULL, func_ptr, num_params, validate,
                                              input, output, initialize, deinitialize);
 
             kernel->attributes.isGPUKernel = vx_false_e;
+            kernel->isUserkernel = vx_true_e;
+
+            vxoReference_Increment(&kernel->base, VX_REF_EXTERNAL);
 
             return kernel;
         }
@@ -2201,6 +3516,27 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernel(
 
 ErrorExit:
     return (vx_kernel)vxoContext_GetErrorObject(context, VX_ERROR_INVALID_PARAMETERS);
+}
+
+VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernel(
+        vx_context context, const vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration,
+        vx_kernel_f func_ptr, vx_uint32 num_params, vx_kernel_input_validate_f input,
+        vx_kernel_output_validate_f output, vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize)
+{
+    return vxoKernel_Add(context, name, enumeration, func_ptr, num_params, VX_NULL, input, output, initialize, deinitialize);
+}
+
+VX_API_ENTRY vx_kernel VX_API_CALL vxAddUserKernel(vx_context context,
+                             const vx_char name[VX_MAX_KERNEL_NAME],
+                             vx_enum enumeration,
+                             vx_kernel_f func_ptr,
+                             vx_uint32 numParams,
+                             vx_kernel_validate_f validate,
+                             vx_kernel_initialize_f initialize,
+                             vx_kernel_deinitialize_f deinitialize)
+{
+    return vxoKernel_Add(context, name, enumeration, func_ptr, numParams, validate,
+                         VX_NULL, VX_NULL, initialize, deinitialize);
 }
 
 VX_API_ENTRY vx_kernel VX_API_CALL vxAddTilingKernel(
@@ -2269,7 +3605,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxAddParameterToKernel(
         if (dataType != VX_TYPE_IMAGE && dataType != VX_TYPE_SCALAR) return VX_ERROR_INVALID_PARAMETERS;
     }
 
-    if (!vxmIS_VALID_DIRECTION_FOR_USER_KERNEL(dir) || !vxmIS_VALID_STATE(state))
+    if (!vxmIS_VALID_DIRECTION_FOR_USER_KERNEL(dir) || !vxmIS_VALID_STATE(state) || !vxDataType_IsValid(dataType) || (dataType == VX_TYPE_DELAY && dir != VX_INPUT))
     {
         return VX_ERROR_INVALID_PARAMETERS;
     }
@@ -2289,6 +3625,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxFinalizeKernel(vx_kernel kernel)
 
     for (i = 0; i < kernel->signature.paramCount; i++)
     {
+        if (i >= kernel->signature.paramCount)
+            break;
         if (!vxmIS_VALID_DIRECTION(kernel->signature.directionTable[i])
             || !vxDataType_IsValid(kernel->signature.dataTypeTable[i]))
         {
@@ -2296,7 +3634,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxFinalizeKernel(vx_kernel kernel)
         }
     }
 
-    kernel->base.context->kernelCount++;
+    if (i == kernel->signature.paramCount)
+    {
 
     if (vxoKernel_IsUnique(kernel))
     {
@@ -2304,6 +3643,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxFinalizeKernel(vx_kernel kernel)
     }
 
     kernel->enabled = vx_true_e;
+    }
 
     return VX_SUCCESS;
 }
@@ -2317,13 +3657,13 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryKernel(vx_kernel kernel, vx_enum attri
 
     switch (attribute)
     {
-        case VX_KERNEL_ATTRIBUTE_PARAMETERS:
+        case VX_KERNEL_PARAMETERS:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = kernel->signature.paramCount;
             break;
 
-        case VX_KERNEL_ATTRIBUTE_NAME:
+        case VX_KERNEL_NAME:
             if (ptr == NULL || size > VX_MAX_KERNEL_NAME) return VX_ERROR_INVALID_PARAMETERS;
 
             vxStrCopySafe(name, VX_MAX_KERNEL_NAME, kernel->name);
@@ -2333,26 +3673,26 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryKernel(vx_kernel kernel, vx_enum attri
             vxStrCopySafe((vx_string)ptr, VX_MAX_KERNEL_NAME, namePtr);
             break;
 
-        case VX_KERNEL_ATTRIBUTE_ENUM:
+        case VX_KERNEL_ENUM:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
 
             *(vx_enum *)ptr = kernel->enumeration;
             break;
 
-        case VX_KERNEL_ATTRIBUTE_LOCAL_DATA_SIZE:
+        case VX_KERNEL_LOCAL_DATA_SIZE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size *)ptr = kernel->attributes.localDataSize;
             break;
 
 #ifdef OPENVX_KHR_TILING
-        case VX_KERNEL_ATTRIBUTE_INPUT_NEIGHBORHOOD:
+        case VX_KERNEL_INPUT_NEIGHBORHOOD:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_neighborhood_size_t, 0x3);
 
             *(vx_neighborhood_size_t *)ptr = kernel->attributes.inputNeighborhoodSize;
             break;
 
-        case VX_KERNEL_ATTRIBUTE_OUTPUT_TILE_BLOCK_SIZE:
+        case VX_KERNEL_OUTPUT_TILE_BLOCK_SIZE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_tile_block_size_t, 0x3);
 
             *(vx_tile_block_size_t *)ptr = kernel->attributes.tileBlockSize;
@@ -2369,7 +3709,9 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryKernel(vx_kernel kernel, vx_enum attri
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetKernelAttribute(vx_kernel kernel, vx_enum attribute, const void *ptr, vx_size size)
 {
-    vx_border_mode_t *borderMode;
+#ifdef OPENVX_KHR_TILING
+    vx_border_t *borderMode;
+#endif
 
     if (!vxoReference_IsValidAndSpecific(&kernel->base, VX_TYPE_KERNEL)) return VX_ERROR_INVALID_REFERENCE;
 
@@ -2377,40 +3719,35 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetKernelAttribute(vx_kernel kernel, vx_enu
 
     switch (attribute)
     {
-        case VX_KERNEL_ATTRIBUTE_LOCAL_DATA_SIZE:
+        case VX_KERNEL_LOCAL_DATA_SIZE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             kernel->attributes.localDataSize = *(vx_size *)ptr;
             break;
 
-        case VX_KERNEL_ATTRIBUTE_LOCAL_DATA_PTR:
-            vxmVALIDATE_PARAMETERS(ptr, size, vx_ptr, 0x3);
-
-            kernel->attributes.localDataPtr = *(vx_ptr *)ptr;
-            break;
 
 #ifdef OPENVX_KHR_TILING
-        case VX_KERNEL_ATTRIBUTE_INPUT_NEIGHBORHOOD:
+        case VX_KERNEL_INPUT_NEIGHBORHOOD:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_neighborhood_size_t, 0x3);
 
             kernel->attributes.inputNeighborhoodSize = *(vx_neighborhood_size_t *)ptr;
             break;
 
-        case VX_KERNEL_ATTRIBUTE_OUTPUT_TILE_BLOCK_SIZE:
+        case VX_KERNEL_OUTPUT_TILE_BLOCK_SIZE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_tile_block_size_t, 0x3);
 
             kernel->attributes.tileBlockSize = *(vx_tile_block_size_t *)ptr;
             break;
 
-        case VX_KERNEL_ATTRIBUTE_BORDER:
-            vxmVALIDATE_PARAMETERS(ptr, size, vx_border_mode_t, 0x3);
+        case VX_KERNEL_BORDER:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_border_t, 0x3);
 
-            borderMode = (vx_border_mode_t *)ptr;
+            borderMode = (vx_border_t *)ptr;
 
             switch (borderMode->mode)
             {
-                case VX_BORDER_MODE_SELF:
-                case VX_BORDER_MODE_UNDEFINED:
+                case VX_BORDER_SELF:
+                case VX_BORDER_UNDEFINED:
                     break;
 
                 default:
@@ -2490,79 +3827,16 @@ VX_INTERNAL_API vx_status vxoDumpOutput(vx_node node, const vx_reference paramet
 }
 #endif
 
-VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, const vx_reference parameters[], vx_uint32 paramCount)
+
+VX_INTERNAL_API vx_status vxoShader_SetParameters(vx_shader kernelShader, vx_reference parameters[], vx_uint32 paramCount, vx_enum dataTypeTable[])
 {
-    vx_uint32           i;
-    gceSTATUS           status;
-    gctUINT             shaderID, argIndex = 0;
-    vx_kernel_shader    kernelShader;
-    gctCHAR             kernelName[256] = {0};
-    vx_char             kernelMainName[128] = {0};
-    vx_size             workGroupSize = 1;
-
-    gcoOS_StrCopySafe(kernelName, 256, _getShaderName(node->kernel->name, kernelMainName));
-    gcoOS_StrCatSafe(kernelName, 256, node->kernel->subname);
-
-    for(i = 0; i < node->kernel->kernelShaderCount; i++)
-    {
-        if (gcoOS_StrCmp(node->kernel->kernelShader[i*2]->name, kernelName) == 0)
-            break;
-    }
-
-    if (i == node->kernel->kernelShaderCount) goto OnError;
-
-    shaderID = ((node->kernelAttributes.borderMode.mode == VX_BORDER_MODE_CONSTANT) ? 1 : 0);
-
-    kernelShader = node->kernel->kernelShader[i*2 + shaderID];
-
-
-
-    /* adjust the localworksize while it is unset */
-    gcmONERROR(gcfVX_AdjustLocalWorkSize(kernelShader,
-                              node->kernelAttributes.shaderParameter.workDim,
-                              node->kernelAttributes.shaderParameter.globalWorkOffset,
-                              node->kernelAttributes.shaderParameter.globalWorkSize,
-                              node->kernelAttributes.shaderParameter.localWorkSize));
-
-    /* validate the arguments */
-    for (i = 0; i < node->kernelAttributes.shaderParameter.workDim; i++)
-    {
-        if(node->kernelAttributes.shaderParameter.globalWorkSize[i] == 0)
-        {
-            goto OnError;
-        }
-
-        if (node->kernelAttributes.shaderParameter.globalWorkSize[i] > kernelShader->maxGlobalWorkSize)
-        {
-            goto OnError;
-        }
-
-        if ((node->kernelAttributes.shaderParameter.globalWorkSize[i] + node->kernelAttributes.shaderParameter.globalWorkOffset[i]) > kernelShader->maxGlobalWorkSize)
-        {
-            goto OnError;
-        }
-
-
-        if((node->kernelAttributes.shaderParameter.globalWorkSize[i] % node->kernelAttributes.shaderParameter.localWorkSize[i]) != 0)
-        {
-            goto OnError;
-        }
-
-        if (node->kernelAttributes.shaderParameter.localWorkSize[i] > kernelShader->maxWorkItemSizes[i])
-        {
-            goto OnError;
-        }
-
-        workGroupSize *= node->kernelAttributes.shaderParameter.localWorkSize[i];
-
-    }
-
-    if (workGroupSize > kernelShader->maxWorkGroupSize) goto OnError;
-
+    gceSTATUS status;
+    gctUINT   argIndex = 0;
+    vx_uint32 i;
 
     for (i = 0; i < paramCount; i++)
     {
-        vx_type_e type = (vx_type_e)((parameters[i] != gcvNULL) ? parameters[i]->type : node->kernel->signature.dataTypeTable[i]);
+        vx_type_e type = (vx_type_e)((parameters[i] != gcvNULL) ? parameters[i]->type : dataTypeTable[i]);
 
         switch(type)
         {
@@ -2570,7 +3844,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
         {
             gctBOOL isPointer;
             vx_scalar scalar = (vx_scalar)parameters[i];
-            vx_argument argument = clfGetKernelArg(kernelShader, argIndex, gcvNULL, gcvNULL, gcvNULL);
+            vx_argument argument = gcfVX_GetKernelArg(kernelShader, argIndex, gcvNULL, gcvNULL, gcvNULL);
 
             if (scalar)
             {
@@ -2715,7 +3989,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
                                 kernelShader,
                                 argIndex,
                                 sizeof(gctUINT32),
-                                &threshold->type));
+                                &threshold->dataType));
                 argIndex ++;
 
                 gcmONERROR(gcfVX_SetKernelArg(
@@ -2888,6 +4162,42 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
 
             break;
         }
+        case VX_TYPE_OBJECT_ARRAY:
+        {
+
+            vx_object_array objArray = (vx_object_array)parameters[i];
+
+            if (objArray && (objArray->itemType == VX_TYPE_IMAGE))
+            {
+                gcmONERROR(gcfVX_SetKernelArg(
+                        kernelShader,
+                        argIndex,
+                        sizeof(vx_reference),
+                        &parameters[i]));
+            }
+
+            argIndex ++;
+
+            break;
+        }
+        case VX_TYPE_TENSOR:
+        {
+
+            vx_tensor tensor = (vx_tensor)parameters[i];
+
+            if (tensor)
+            {
+                gcmONERROR(gcfVX_SetKernelArg(
+                        kernelShader,
+                        argIndex,
+                        sizeof(vx_reference),
+                        &parameters[i]));
+            }
+
+            argIndex ++;
+
+            break;
+        }
         case VX_TYPE_PYRAMID:
         {
             gctUINT32 j = 0;
@@ -2966,23 +4276,77 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
         }
     }
 
-    /* sync CNN layer */
-    if (node->cnnWaitEventID0 != 0xffffffff)
-    {
-        gcmASSERT((node->cnnWaitEventID0 > 0) && (node->cnnWaitEventID0 < 32));
+    return VX_SUCCESS;
 
-        gcoVX_WaitNNEvent(node->cnnWaitEventID0);
+OnError:
+    return VX_FAILURE;
+
+}
+
+VX_INTERNAL_API vx_status vxoShader_Execute(
+    vx_shader kernelShader,
+    vx_border_mode_t *borderMode,
+    vx_kernel_execution_parameters_t *shaderParameter,
+    gctPOINTER* devices,
+    vx_uint32 deviceCount)
+{
+    gceSTATUS status;
+    vx_size   workGroupSize = 1;
+    vx_uint32           i;
+
+    vx_kernel_execution_parameters_t newShaderParameter = *shaderParameter;
+
+    /* adjust the localworksize while it is unset */
+    gcmONERROR(gcfVX_AdjustLocalWorkSize(kernelShader,
+                              newShaderParameter.workDim,
+                              newShaderParameter.globalWorkOffset,
+                              newShaderParameter.globalWorkSize,
+                              newShaderParameter.localWorkSize));
+
+    /* validate the arguments */
+    for (i = 0; i < newShaderParameter.workDim; i++)
+    {
+        if(newShaderParameter.globalWorkSize[i] == 0)
+        {
+            goto OnError;
+        }
+
+        if (newShaderParameter.globalWorkSize[i] > kernelShader->maxGlobalWorkSize)
+        {
+            goto OnError;
+        }
+
+        if ((newShaderParameter.globalWorkSize[i] + newShaderParameter.globalWorkOffset[i]) > kernelShader->maxGlobalWorkSize)
+        {
+            goto OnError;
+        }
+
+
+        if((newShaderParameter.globalWorkSize[i] % newShaderParameter.localWorkSize[i]) != 0)
+        {
+            goto OnError;
+        }
+
+        if (newShaderParameter.localWorkSize[i] > kernelShader->maxWorkItemSizes[i])
+        {
+            goto OnError;
+        }
+
+        workGroupSize *= newShaderParameter.localWorkSize[i];
+
     }
 
-    if (node->base.context->deviceCount > 1)
+    if (workGroupSize > kernelShader->maxWorkGroupSize) goto OnError;
+
+    if (deviceCount > 1)
     {
         gctINT  i;
         gctUINT usedDeviceCount;
-        vx_kernel_execution_parameters_t shaderParameter[VX_MAX_DEVICES] = {{0}};
+        vx_kernel_execution_parameters_t shaderParam[VX_MAX_DEVICES] = {{0}};
 
-        gcmONERROR(gcfVX_SplitWork(node->base.context->deviceCount,
-                        &node->kernelAttributes.shaderParameter,
-                        shaderParameter,
+        gcmONERROR(gcfVX_SplitWork(deviceCount,
+                        &newShaderParameter,
+                        shaderParam,
                         &usedDeviceCount));
 
 
@@ -2990,17 +4354,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
         {
             for (i = usedDeviceCount - 1; i >= 0; i--)
             {
-                gcmONERROR(gcoVX_SetCurrentDevice(node->base.context->devices[i], i));
+                gcmONERROR(gcoVX_SetCurrentDevice(devices[i], i));
 
                 gcmONERROR(gcfVX_ExecuteKernel(kernelShader,
                             kernelShader->numArgs,
                             kernelShader->args,
-                            &node->kernelAttributes.borderMode,
-                            shaderParameter[i].workDim,
-                            shaderParameter[i].globalWorkOffset,
-                            shaderParameter[i].globalWorkScale,
-                            shaderParameter[i].globalWorkSize,
-                            shaderParameter[i].localWorkSize));
+                            borderMode,
+                            shaderParam[i].workDim,
+                            shaderParam[i].globalWorkOffset,
+                            shaderParam[i].globalWorkScale,
+                            shaderParam[i].globalWorkSize,
+                            shaderParam[i].localWorkSize));
 
                gcmONERROR(gcoVX_MultiDeviceSync(gcvNULL));
 
@@ -3011,12 +4375,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
             gcmONERROR(gcfVX_ExecuteKernel(kernelShader,
                         kernelShader->numArgs,
                         kernelShader->args,
-                        &node->kernelAttributes.borderMode,
-                        node->kernelAttributes.shaderParameter.workDim,
-                        node->kernelAttributes.shaderParameter.globalWorkOffset,
-                        node->kernelAttributes.shaderParameter.globalWorkScale,
-                        node->kernelAttributes.shaderParameter.globalWorkSize,
-                        node->kernelAttributes.shaderParameter.localWorkSize));
+                        borderMode,
+                        newShaderParameter.workDim,
+                        newShaderParameter.globalWorkOffset,
+                        newShaderParameter.globalWorkScale,
+                        newShaderParameter.globalWorkSize,
+                        newShaderParameter.localWorkSize));
         }
     }
     else
@@ -3024,31 +4388,74 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, con
         gcmONERROR(gcfVX_ExecuteKernel(kernelShader,
                         kernelShader->numArgs,
                         kernelShader->args,
-                        &node->kernelAttributes.borderMode,
-                        node->kernelAttributes.shaderParameter.workDim,
-                        node->kernelAttributes.shaderParameter.globalWorkOffset,
-                        node->kernelAttributes.shaderParameter.globalWorkScale,
-                        node->kernelAttributes.shaderParameter.globalWorkSize,
-                        node->kernelAttributes.shaderParameter.localWorkSize));
+                        borderMode,
+                        newShaderParameter.workDim,
+                        newShaderParameter.globalWorkOffset,
+                        newShaderParameter.globalWorkScale,
+                        newShaderParameter.globalWorkSize,
+                        newShaderParameter.localWorkSize));
     }
 
-    /* sync CNN layer */
-    if (node->cnnWaitEventID1 != 0xffffffff)
+
+    return VX_SUCCESS;
+
+OnError:
+    return VX_FAILURE;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Function(vx_node node, const vx_reference parameters[], vx_uint32 paramCount)
+{
+    vx_uint32           i;
+    gctUINT             shaderID;
+    vx_shader           kernelShader;
+    gctCHAR             kernelName[256] = {0};
+    vx_char             kernelMainName[128] = {0};
+    vx_status           status = VX_FAILURE;
+
+    gcoOS_StrCopySafe(kernelName, 256, _getShaderName(node->kernel->name, kernelMainName));
+    gcoOS_StrCatSafe(kernelName, 256, node->kernel->subname);
+
+    for(i = 0; i < node->kernel->kernelShaderCount; i++)
     {
-        gcmASSERT((node->cnnWaitEventID1 > 0) && (node->cnnWaitEventID1 < 32));
-
-        gcoVX_WaitNNEvent(node->cnnWaitEventID1);
+        if (gcoOS_StrCmp(node->kernel->kernelShader[i*2]->name, kernelName) == 0)
+            break;
     }
+
+    if (i == node->kernel->kernelShaderCount) goto error;
+
+    shaderID = ((node->kernelAttributes.borderMode.mode == VX_BORDER_MODE_CONSTANT) ? 1 : 0);
+
+    kernelShader = node->kernel->kernelShader[i*2 + shaderID];
+
+    node->kernel->currShaderID = i*2 + shaderID;
+
+
+
+    status = vxoShader_SetParameters(kernelShader, (vx_reference*)parameters, paramCount, node->kernel->signature.dataTypeTable);
+    if (status != VX_SUCCESS) goto error;
+
+
+    for(i = 0; i < node->uniformCount; i++)
+    {
+        status = vxoShader_SetUniform(kernelShader, node->uniforms[i].name, node->uniforms[i].count, node->uniforms[i].data);
+        if (status != VX_SUCCESS) goto error;
+
+    }
+
+    status = vxoShader_Execute(kernelShader,
+                                &node->kernelAttributes.borderMode,
+                                &node->kernelAttributes.shaderParameter, node->base.context->devices,
+                                node->base.context->deviceCount);
+    if (status != VX_SUCCESS) goto error;
+
 #if gcdDUMP
     gcfVX_Flush(gcvTRUE);
 
     vxoDumpOutput(node, parameters, paramCount);
 #endif
 
-    return VX_SUCCESS;
-
-OnError:
-    return VX_FAILURE;
+error:
+    return status;
 }
 
 VX_API_ENTRY vx_status VX_CALLBACK vxProgramKernel_Function(vx_node node, const vx_reference parameters[], vx_uint32 paramCount)
@@ -3073,7 +4480,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoProgramKernel_Deinitialize(vx_node node,
 
 VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernelInProgramEx(
         vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration, vx_kernel_f func_ptr,
-        vx_uint32 num_params, vx_kernel_input_validate_f input,
+        vx_uint32 num_params, vx_kernel_validate_f validate, vx_kernel_input_validate_f input,
         vx_kernel_output_validate_f output, vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize)
 {
     vx_context  context;
@@ -3097,7 +4504,7 @@ VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernelInProgramEx(
             return target->funcs.addkernel(target, name, enumeration,
                                             program,
                                             (func_ptr != VX_NULL) ? func_ptr:vxoProgramKernel_Function,
-                                            num_params,
+                                            num_params, validate,
                                             input, output,
                                             (initialize != VX_NULL)?initialize:vxoProgramKernel_Initialize,
                                             (deinitialize != VX_NULL)?deinitialize:vxoProgramKernel_Deinitialize);
@@ -3111,10 +4518,10 @@ ErrorExit:
 }
 
 VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernelInProgram(
-        vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration, vx_uint32 num_params, vx_kernel_input_validate_f input,
-        vx_kernel_output_validate_f output, vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize)
+        vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration, vx_uint32 num_params, vx_kernel_validate_f validate,
+        vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize)
 {
-    return vxAddKernelInProgramEx(program, name, enumeration, vxoProgramKernel_Function, num_params, input, output, initialize, deinitialize);
+    return vxAddKernelInProgramEx(program, name, enumeration, vxoProgramKernel_Function, num_params, validate, VX_NULL, VX_NULL, initialize, deinitialize);
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxSelectKernelSubname(vx_node node, const vx_char * subname)
@@ -3125,41 +4532,43 @@ VX_API_ENTRY vx_status VX_API_CALL vxSelectKernelSubname(vx_node node, const vx_
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetNodeUniform(vx_node node, const vx_char * name, vx_size count, void * value)
 {
-    vx_argument         arg;
-    gctUINT             i, j;
-    vx_kernel_shader    kernelShader;
-    gctUINT             shaderID;
-    gceSTATUS           status;
-    gctUINT             length;
-    vx_status           vStatus = VX_FAILURE;
+    vx_uint32 size;
+    vx_status vStatus = VX_FAILURE;
+    gceSTATUS status;
 
-    shaderID = ((node->kernelAttributes.borderMode.mode == VX_BORDER_MODE_CONSTANT) ? 1 : 0);
+    if (node->kernel->kernelShader[0] && (node->uniformCount >= node->kernel->kernelShader[0]->numArgs)) goto error;
 
-    for (j = 0; j < node->kernel->kernelShaderCount; j++)
+    if (!node->uniforms)
     {
-        kernelShader = node->kernel->kernelShader[j * 2 + shaderID];
-
-        for (i = 0; i < kernelShader->numArgs; i++)
+        /*allocat the maximum number uniforms */
+        status = gcoOS_Allocate(gcvNULL, node->kernel->kernelShader[0]->numArgs * gcmSIZEOF(vx_node_s), (gctPOINTER*)&node->uniforms);
+        if (gcmIS_ERROR(status))
         {
-            arg = &kernelShader->args[i];
-
-            if (arg->uniform == gcvNULL) continue;
-
-            if ((gcoOS_StrCmp(arg->uniform->name, name) == gcvSTATUS_OK))
-            {
-                gcmONERROR(gcUNIFORM_GetType(arg->uniform, gcvNULL, &length));
-
-                if (length != count) break;
-
-                gcoOS_MemCopy(arg->data, value, arg->size);
-
-                vStatus = VX_SUCCESS;
-                break;
-            }
+            vStatus = VX_FAILURE;
+            goto error;
         }
     }
 
-OnError:
+
+    vStatus = vxoShader_GetUniformSize(node->kernel->kernelShader[0], (vx_char*)name, &size);
+    if (vStatus != VX_SUCCESS) goto error;
+
+    status = gcoOS_Allocate(gcvNULL, size, (gctPOINTER*)&node->uniforms[node->uniformCount].data);
+    if (gcmIS_ERROR(status))
+    {
+        vStatus = VX_FAILURE;
+        goto error;
+    }
+
+    gcoOS_MemCopy(node->uniforms[node->uniformCount].data, value, size);
+
+    node->uniforms[node->uniformCount].count = (vx_uint32)count;
+    node->uniforms[node->uniformCount].name  = (vx_char*)name;
+    node->uniforms[node->uniformCount].size  = size;
+
+    node->uniformCount++;
+
+error:
     return vStatus;
 }
 
@@ -3200,7 +4609,7 @@ gcfVX_FreeKernelArgs(
 }
 
 
-gceSTATUS gcfVX_FreeKernelShader(vx_kernel_shader kernel)
+VX_INTERNAL_API vx_status vxoShader_Free(vx_shader kernel)
 {
     if (kernel)
     {
@@ -3211,6 +4620,8 @@ gceSTATUS gcfVX_FreeKernelShader(vx_kernel_shader kernel)
         if (kernel->states.hints) gcoOS_Free(gcvNULL, kernel->states.hints);
         if (kernel->states.binary) gcSHADER_Destroy((gcSHADER)kernel->states.binary);
         if (kernel->name) gcoOS_Free(gcvNULL, kernel->name);
+
+        gcoOS_Free(gcvNULL, kernel);
     }
 
     return gcvSTATUS_OK;
@@ -3224,8 +4635,156 @@ VX_INTERNAL_CALLBACK_API void vxoKernel_Destructor(vx_reference ref)
 
     for (i = 0; i < vKernel->kernelShaderCount*2; i++)
     {
-        gcfVX_FreeKernelShader(vKernel->kernelShader[i]);
+        vxoShader_Free(vKernel->kernelShader[i]);
     }
+
+    if (vKernel->kernelShader) gcoOS_Free(gcvNULL, vKernel->kernelShader);
 }
 
+VX_INTERNAL_API vx_status vxoKernel_ProcessKernelShaderPrint(vx_kernel kernel, vx_kernel_execution_parameters_t* shaderParameter)
+{
+    if (kernel->kernelShader)
+    {
+        gctUINT i, j;
+        char *fmt;
+        vx_shader shader;
+
+        gctUINT totalNumItems  =
+            (gctUINT)(shaderParameter->globalWorkSize[0]
+            * (shaderParameter->workDim > 1 ? shaderParameter->globalWorkSize[1] : 1)
+            * (shaderParameter->workDim > 2 ? shaderParameter->globalWorkSize[2] : 1));
+
+
+        gcmASSERT((kernel->currShaderID >= 0) && (kernel->currShaderID < (kernel->kernelShaderCount * 2)));
+        shader = kernel->kernelShader[kernel->currShaderID];
+        gcmASSERT (shader);
+
+        fmt = shader->constantMemBuffer;
+        for (i = 0; i < shader->numArgs; i++)
+        {
+            if (shader->args[i].isMemAlloc)
+            {
+                vx_mem_alloc_info memAllocInfo = (vx_mem_alloc_info)shader->args[i].data;
+                if (strcmp(shader->args[i].uniform->name, "#printf_address") == 0)
+                {
+                    gctCHAR * printfAddr = (gctCHAR*)memAllocInfo->logical;
+                    for(j = 0; j < totalNumItems; j++)
+                    {
+                        void* dataAddress = (void*)((gctUINT*)(printfAddr) + 1);
+                        gcfVX_PrintParseData(fmt, dataAddress);
+                        printfAddr += (VX_MAX_PRINTF_BUFFER_SIZE/totalNumItems);
+                    }
+                }
+            }
+        }
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_INTERNAL_API vx_status vxoShader_SetUniform(vx_shader shader, vx_char * name, vx_size count, void * value)
+{
+    vx_argument         arg;
+    gctUINT             i;
+    gceSTATUS           status;
+    gctUINT             length;
+    vx_status           vStatus = VX_FAILURE;
+
+    for (i = 0; i < shader->numArgs; i++)
+    {
+        arg = &shader->args[i];
+
+        if (arg->uniform == gcvNULL) continue;
+
+        if ((gcoOS_StrCmp(arg->uniform->name, name) == gcvSTATUS_OK))
+        {
+            gcmONERROR(gcUNIFORM_GetType(arg->uniform, gcvNULL, &length));
+
+            if (length != count) break;
+
+            gcoOS_MemCopy(arg->data, value, arg->size);
+
+            vStatus = VX_SUCCESS;
+            break;
+        }
+    }
+
+OnError:
+    return vStatus;
+}
+
+
+VX_API_ENTRY vx_status VX_API_CALL vxUnloadKernels(vx_context context, const vx_char *name)
+{
+    vx_status status = VX_SUCCESS;
+
+    vx_char module[VX_INT_MAX_PATH];
+    vx_uint32 m = 0;
+    vx_unpublish_kernels_f unpublish = NULL;
+
+    sprintf(module, VX_MODULE_NAME("%s"), (name?name:"openvx-ext"));
+
+    if (vxoContext_IsValid(context) == vx_false_e)
+    {
+        vxError("Context is invalid!\n");
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+
+    for (m = 0; m < VX_MAX_MODULE_COUNT; m++)
+    {
+        if (context->moduleTable[m].handle != NULL && strncmp(name, context->moduleTable[m].name, VX_INT_MAX_PATH) == 0)
+        {
+            vx_symbol_handle sym = vxGetSymbol(context->moduleTable[m].handle, "vxUnpublishKernels");
+            unpublish = (vx_unpublish_kernels_f)sym;
+            if (unpublish == NULL)
+            {
+                vxError("Failed to load symbol vxUnpublishKernels\n");
+                status = VX_ERROR_INVALID_MODULE;
+            }
+            else
+            {
+                vxError("Calling %s unpublish function\n", module);
+                status = unpublish((vx_context)context);
+                if (status != VX_SUCCESS)
+                {
+                    vxError("Failed to unpublish kernels in module\n");
+                }
+                else
+                {
+                    vxUnloadModule(context->moduleTable[m].handle);
+                    context->moduleTable[m].handle = NULL;
+                    context->moduleCount--;
+                    return VX_SUCCESS;
+                }
+            }
+        }
+    }
+
+    vxError("Failed to find module %s in libraries path\n", module);
+
+    return status;
+}
+
+VX_INTERNAL_API vx_status vxoShader_GetUniformSize(vx_shader shader, vx_char * name, vx_uint32 *size)
+{
+    vx_argument         arg;
+    gctUINT             i;
+
+    for (i = 0; i < shader->numArgs; i++)
+    {
+        arg = &shader->args[i];
+
+        if (arg->uniform == gcvNULL) continue;
+
+        if ((gcoOS_StrCmp(arg->uniform->name, name) == gcvSTATUS_OK))
+        {
+            *size = arg->size;
+            return VX_SUCCESS;
+        }
+    }
+
+    *size = 0;
+
+    return VX_FAILURE;
+}
 

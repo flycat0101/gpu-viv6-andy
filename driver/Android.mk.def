@@ -74,7 +74,6 @@ export ARCH_TYPE
 
 ifeq ($(USE_OPENCL),1)
 BUILD_OPENCL_ICD := 1
-BUILD_OPENCL_FP  := 1
 ENABLE_CL_GL     := 1
 else
 BUILD_OPENCL_ICD := 0

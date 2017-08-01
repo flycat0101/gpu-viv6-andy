@@ -68,20 +68,23 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyShaderModule(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkShaderModule *shm = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkShaderModule *, shaderModule);
-
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
-
-    /* Free the function dependency */
-    if (shm->funcTable)
+    if (shaderModule)
     {
-        gcSPV_PostDecode(shm->funcTable);
+        __vkShaderModule *shm = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkShaderModule *, shaderModule);
+
+        /* Set the allocator to the parent allocator or API defined allocator if valid */
+        __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+
+        /* Free the function dependency */
+        if (shm->funcTable)
+        {
+            gcSPV_PostDecode(shm->funcTable);
+        }
+
+        __VK_FREE(shm->pCode);
+
+        __vk_DestroyObject(devCtx, __VK_OBJECT_SHADER_MODULE, (__vkObject *)shm);
     }
-
-    __VK_FREE(shm->pCode);
-
-    __vk_DestroyObject(devCtx, __VK_OBJECT_SHADER_MODULE, (__vkObject *)shm);
 }
 
 

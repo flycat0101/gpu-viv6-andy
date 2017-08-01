@@ -14,23 +14,14 @@
 #ifndef __gc_vk_query_h__
 #define __gc_vk_query_h__
 
-typedef enum
-{
-    __VK_QUERY_UNDEFINED,
-    __VK_QUERY_RESET,
-    __VK_QUERY_BEGIN,
-    __VK_QUERY_ISSUED,
-    __VK_QUERY_END
-} __vkQueryState;
-
 typedef struct __vkQueryRec
 {
     VkQueryType type;
     VkQueryPool queryPool;
     uint32_t queryPoolIndex;
-    __vkQueryState state;
     VkQueryControlFlags flags;
     VkEvent event;
+    VkBool32 isBegin;
 } __vkQuery;
 
 typedef struct __vkQueryPoolRec

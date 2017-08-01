@@ -35,7 +35,8 @@ enum
     VX_KERNEL_ENUM_FASTERRCNNRESHUFFLEDATA = 10006,
     VX_KERNEL_ENUM_NMS            = 1007 ,
     VX_KERNEL_ENUM_RECTPROCESS    = 1008,
-    VX_KERNEL_ENUM_RESORTING      = 1009
+    VX_KERNEL_ENUM_RESORTING      = 1009,
+    VX_KERNEL_ENUM_MAXPOOL3x3     = 1010
 };
 
 #define USE_LRN_VXC
@@ -66,6 +67,9 @@ enum
 #define  VX_KERNEL_NAME_RECTPROCESS  "com.vivantecorp.extension.vxcRectprocess"
 //#define USE_RESORTING_VXC
 #define  VX_KERNEL_NAME_RESORTING  "com.vivantecorp.extension.vxcResorting"
+
+#define USE_MAXPOOL3x3_VXC
+#define VX_KERNEL_NAME_MAXPOOL3x3  "com.vivantecorp.extension.maxpool3x3VXC"
 //LRN**********************************
 VX_PRIVATE_API vx_status VX_CALLBACK vxoLRN_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoLRN_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format  metaObj);
@@ -99,6 +103,7 @@ vx_kernel_description_s internal_nn_lrn = {
 #endif
     basekernel_lrn_params,
     (sizeof(basekernel_lrn_params)/sizeof(basekernel_lrn_params[0])),
+    VX_NULL,
     vxoLRN_ValidateInput,
     vxoLRN_ValidateOutput,
     vxLrnInitializer,
@@ -132,6 +137,7 @@ vx_kernel_description_s internalkernel_rectprocess = {
 #endif
     basekernel_rectprocess_params,
     (sizeof(basekernel_rectprocess_params)/sizeof(basekernel_rectprocess_params[0])),
+    VX_NULL,
     vxRectprocessValidateInput,
     vxRectprocessValidateOutput,
     vxRectprocessInitializer,
@@ -163,6 +169,7 @@ vx_kernel_description_s internalkernel_resorting = {
 #endif
     basekernel_resorting_params,
     (sizeof(basekernel_resorting_params)/sizeof(basekernel_resorting_params[0])),
+    VX_NULL,
     vxResortingValidateInput,
     vxResortingValidateOutput,
     vxResortingInitializer,
@@ -197,6 +204,7 @@ vx_kernel_description_s internal_kernel_horipool = {
 #endif
     basekernel_horipool_params,
     (sizeof(basekernel_horipool_params)/sizeof(basekernel_horipool_params[0])),
+    VX_NULL,
     vxHoripoolValidateInput,
     vxHoripoolValidateOutput,
     vxHoripoolInitializer,
@@ -234,6 +242,7 @@ vx_kernel_description_s internal_kernel_vertpool = {
 #endif
     basekernel_vertpool_params,
     (sizeof(basekernel_vertpool_params)/sizeof(basekernel_vertpool_params[0])),
+    VX_NULL,
     vxVertpoolValidateInput,
     vxVertpoolValidateOutput,
     vxVertpoolInitializer,
@@ -267,6 +276,7 @@ vx_kernel_description_s internal_kernel_roipool = {
     vxRoipoolInternalKernel,
     basekernel_roipool_params,
     (sizeof(basekernel_roipool_params)/sizeof(basekernel_roipool_params[0])),
+    VX_NULL,
     vxRoipoolValidateInput,
     vxRoipoolValidateOutput,
     vxRoipoolInitializer,
@@ -300,6 +310,7 @@ vx_kernel_description_s internal_kernel_nms = {
 #endif
     basekernel_nms_params,
     (sizeof(basekernel_nms_params)/sizeof(basekernel_nms_params[0])),
+    VX_NULL,
     vxNmsValidateInput,
     vxNmsValidateOutput,
     vxNmsInitializer,
@@ -342,6 +353,7 @@ vx_kernel_description_s vxfasterRcnnReshuffleImageKernelInfo =
 #endif
     vxfasterRcnnReshuffleImageKernelParam,
     (sizeof(vxfasterRcnnReshuffleImageKernelParam)/sizeof(vxfasterRcnnReshuffleImageKernelParam[0])),
+    VX_NULL,
     vxfasterRcnnReshuffleImageInputValidator,
     vxfasterRcnnReshuffleImageOutputValidator,
     vxfasterRcnnReshuffleImageInitializer,
@@ -379,6 +391,7 @@ vx_kernel_description_s vxFasterRcnnInterleaveKernelInfo =
 #endif
     vxFasterRcnnInterleaveKernelParam,
     (sizeof(vxFasterRcnnInterleaveKernelParam)/sizeof(vxFasterRcnnInterleaveKernelParam[0])),
+    VX_NULL,
     vxFasterRcnnInterleaveInputValidator,
     vxFasterRcnnInterleaveOutputValidator,
     vxFasterRcnnInterleaveInitializer,
@@ -418,6 +431,7 @@ vx_kernel_description_s vxfasterRcnnReshuffleDataKernelInfo =
 #endif
     vxfasterRcnnReshuffleDataKernelParam,
     (sizeof(vxfasterRcnnReshuffleDataKernelParam)/sizeof(vxfasterRcnnReshuffleDataKernelParam[0])),
+    VX_NULL,
     vxfasterRcnnReshuffleDataInputValidator,
     vxfasterRcnnReshuffleDataOutputValidator,
     vxfasterRcnnReshuffleDataInitializer,
@@ -427,7 +441,51 @@ vx_kernel_description_s vxfasterRcnnReshuffleDataKernelInfo =
 #endif
     {"fasterRcnnReshuffleData.vx"},
 };
+//MaxPool3x3*****************************/
+VX_PRIVATE_API vx_status VX_CALLBACK vxMaxPool3x3InputValidator(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxMaxPool3x3OutputValidator(vx_node node, vx_uint32 index, vx_meta_format metaObj);
+VX_PRIVATE_API vx_status VX_CALLBACK vxMaxPool3x3Initializer(vx_node nodObj, const vx_reference *paramObj, vx_uint32 paraNum);
+VX_PRIVATE_API vx_status VX_CALLBACK vxMaxPool3x3Deinitializer(vx_node nodObj, const vx_reference *paraObj, vx_uint32 paraNum);
+VX_PRIVATE_API vx_status VX_CALLBACK vxMaxPool3x3Function(vx_node node, const vx_reference parameters[], vx_uint32 paramCount);
 
+vx_param_description_s vxMaxPool3x3KernelParam[] =
+{
+    {VX_INPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED},
+    {VX_OUTPUT, VX_TYPE_ARRAY, VX_PARAMETER_STATE_REQUIRED}
+
+};
+vx_kernel_description_s vxMaxPool3x3KernelInfo =
+{
+    /*VX_KERNEL_ENUM_MAXPOOL3x3,*/
+    VX_KERNEL_INTERNAL_MAX_POOL3x3,
+    VX_KERNEL_NAME_MAXPOOL3x3,
+#ifdef USE_MAXPOOL3x3_VXC
+    vxMaxPool3x3Function,
+#else
+    vxMaxPool3x3Kernel,
+#endif
+    vxMaxPool3x3KernelParam,
+    (sizeof(vxMaxPool3x3KernelParam)/sizeof(vxMaxPool3x3KernelParam[0])),
+    VX_NULL,
+    vxMaxPool3x3InputValidator,
+    vxMaxPool3x3OutputValidator,
+    vxMaxPool3x3Initializer,
+    vxMaxPool3x3Deinitializer,
+#if gcdVX_OPTIMIZER
+    {vx_false_e, vx_false_e, 0, 0, 0, 0, 0, 0},
+#endif
+    {"MaxPool3x3.vx"},
+};
 
 
 #endif

@@ -417,6 +417,11 @@
 #define GL3_PROFILER_FRAME_TYPE 11
 #define GL3_PROFILER_FRAME_COUNT 12
 #define GL3_PROFILER_SYNC_MODE 13
+#define GL3_PROFILER_FINISH_BEGIN 14
+#define GL3_PROFILER_FINISH_END 15
+#define GL3_PROFILER_BEGIN 16
+#define GL3_PROFILER_END 17
+
 
 #define GL3_PROFILER_PRIMITIVE_END 20
 #define GL3_PROFILER_PRIMITIVE_TYPE 21
@@ -442,8 +447,14 @@
 #define GL3_PROGRAM_FRAGMENT_SHADER 75
 #define GL3_PROGRAM_LINK_FUNCTION 76
 
+#define GL3_PROFILER_COMPUTE_BEGIN 80
+#define GL3_PROFILER_COMPUTE_END 81
 
-
+#define GL3_PROFILER_WRITE_HEADER 90
+#define GL3_PROFILER_WRITE_FRAME_BEGIN 91
+#define GL3_PROFILER_WRITE_FINISH_BEGIN 92
+#define GL3_PROFILER_WRITE_FRAME_END 93
+#define GL3_PROFILER_WRITE_FRAME_RESET 94
 /* Profile information. */
 typedef struct _glsPROFILER
 {
@@ -456,12 +467,18 @@ typedef struct _glsPROFILER
     gctBOOL         perFrame;
     gctBOOL         useFBO;
     gctBOOL         useGlfinish;
+    gctBOOL         syncMode;
     gctBOOL         enableOutputCounters;  /* for VIV_PROFILE = 2 */
+    gctBOOL         writeDrawable;
 
-    gctUINT32       frameBegun;
+    gctBOOL         need_dump;
+    gctBOOL         frameBegun;
+    gctUINT32       frameBegunPos;
+    gctBOOL         finishBegun;
     gctUINT32       frameCount;       /* for VIV_PROFILE = 1 */
     gctUINT32       frameStartNumber; /* for VIV_PROFILE = 3 */
     gctUINT32       frameEndNumber;   /* for VIV_PROFILE = 3 */
+    gctUINT32       curFrameNumber;
 
     /* Aggregate Information */
     gctUINT64       frameStart;
@@ -469,10 +486,11 @@ typedef struct _glsPROFILER
 
     /* Current frame information */
     gctUINT32       frameNumber;
+    gctUINT32       finishNumber;
     gctUINT64       frameStartTimeusec;
     gctUINT64       frameEndTimeusec;
-    gctUINT64       frameStartCPUTimeusec;
-    gctUINT64       frameEndCPUTimeusec;
+    gctUINT64       finishStartTimeusec;
+    gctUINT64       finishEndTimeusec;
 
     gctUINT64       shaderCompileTime;
     gctUINT64       shaderStartTimeusec;
@@ -485,8 +503,6 @@ typedef struct _glsPROFILER
 
     /* Current primitive information */
     gctUINT32       primitiveNumber;
-    gctUINT64       primitiveStartTimeusec;
-    gctUINT64       primitiveEndTimeusec;
     gctUINT32       primitiveType;
     gctUINT32       primitiveCount;
 
@@ -494,7 +510,7 @@ typedef struct _glsPROFILER
     gctUINT32       redundantStateChangeCalls;
 
     gctUINT64       apiTimes[GLES3_NUM_API_CALLS];
-     gctUINT64      totalDriverTime;
+    gctUINT64       totalDriverTime;
 
     gctUINT32       textureUploadSize;
     gctUINT32       drawCount;

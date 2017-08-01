@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Khronos Group Inc.
+ * Copyright (c) 2012-2016 The Khronos Group Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and/or associated documentation files (the
@@ -11,6 +11,11 @@
  *
  * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Materials.
+ *
+ * MODIFICATIONS TO THIS FILE MAY MEAN IT NO LONGER ACCURATELY REFLECTS
+ * KHRONOS STANDARDS. THE UNMODIFIED, NORMATIVE VERSIONS OF KHRONOS
+ * SPECIFICATIONS AND HEADER INFORMATION ARE LOCATED AT
+ *    https://www.khronos.org/registry/
  *
  * THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
@@ -49,7 +54,7 @@
 #else
 #if defined(__cplusplus) || defined(ANDROID)
 #define VX_RESTRICT     __restrict
-#elif defined LINUX
+#elif defined(__linux__)
 #define VX_RESTRICT
 #elif defined __QNXNTO__
 #define VX_RESTRICT
@@ -213,18 +218,18 @@ typedef struct _vx_tile_t {
  */
 enum vx_kernel_attribute_tiling_e {
     /*! \brief This allows a tiling mode kernel to set its input neighborhood. */
-    VX_KERNEL_ATTRIBUTE_INPUT_NEIGHBORHOOD      = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x7,
+    VX_KERNEL_INPUT_NEIGHBORHOOD      = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x7,
     /*! \brief This allows a tiling mode kernel to set its output tile block size. */
-    VX_KERNEL_ATTRIBUTE_OUTPUT_TILE_BLOCK_SIZE  = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x8,
+    VX_KERNEL_OUTPUT_TILE_BLOCK_SIZE  = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x8,
     /*! \brief This allows the author to set the border mode on the tiling kernel. */
-    VX_KERNEL_ATTRIBUTE_BORDER                  = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x9,
+    VX_KERNEL_BORDER                  = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x9,
     /*! \brief This determines the per tile memory allocation. */
-    VX_KERNEL_ATTRIBUTE_TILE_MEMORY_SIZE        = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0xA,
+    VX_KERNEL_TILE_MEMORY_SIZE        = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0xA,
 #if defined(OPENVX_TILING_1_1)
     /*! \brief This allows a tiling mode kernel to set its input tile block size. */
-    VX_KERNEL_ATTRIBUTE_INPUT_TILE_BLOCK_SIZE   = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0xB,
+    VX_KERNEL_INPUT_TILE_BLOCK_SIZE   = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0xB,
     /*! \brief This allows a tiling mode kernel to set its output neighborhood. */
-    VX_KERNEL_ATTRIBUTE_OUTPUT_NEIGHBORHOOD     = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0xC,
+    VX_KERNEL_OUTPUT_NEIGHBORHOOD     = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0xC,
 #endif
 };
 
@@ -234,29 +239,29 @@ enum vx_kernel_attribute_tiling_e {
  */
 enum vx_node_attribute_tiling_e {
     /*! \brief This allows a tiling mode node to get its input neighborhood. */
-    VX_NODE_ATTRIBUTE_INPUT_NEIGHBORHOOD      = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0x7,
+    VX_NODE_INPUT_NEIGHBORHOOD      = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0x7,
     /*! \brief This allows a tiling mode node to get its output tile block size. */
-    VX_NODE_ATTRIBUTE_OUTPUT_TILE_BLOCK_SIZE  = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0x8,
+    VX_NODE_OUTPUT_TILE_BLOCK_SIZE  = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0x8,
     /*! \brief This is the size of the tile local memory area. */
-    VX_NODE_ATTRIBUTE_TILE_MEMORY_SIZE        = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0xA,
+    VX_NODE_TILE_MEMORY_SIZE        = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0xA,
 #if defined(OPENVX_TILING_1_1)
     /*! \brief This allows a tiling mode node to get its input tile block size. */
-    VX_NODE_ATTRIBUTE_INPUT_TILE_BLOCK_SIZE   = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0xB,
+    VX_NODE_INPUT_TILE_BLOCK_SIZE   = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0xB,
     /*! \brief This allows a tiling mode node to get its output neighborhood. */
-    VX_NODE_ATTRIBUTE_OUTPUT_NEIGHBORHOOD     = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0xC,
+    VX_NODE_OUTPUT_NEIGHBORHOOD     = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0xC,
 #endif
 };
 
 /*! \brief The tiling border mode extensions
  * \ingroup group_tiling
  */
-enum vx_border_mode_tiling_e {
+enum vx_border_tiling_e {
     /*! \brief This value indicates that the author of the tiling kernel wrote
      * code to handle border conditions into the kernel itself. If this mode
      * is set, it can not be overriden by a call to the \ref vxSetNodeAttribute
-     * with \ref VX_NODE_ATTRIBUTE_BORDER_MODE.
+     * with \ref VX_NODE_BORDER.
      */
-    VX_BORDER_MODE_SELF = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_BORDER_MODE) + 0x3,
+    VX_BORDER_SELF = VX_ENUM_BASE(VX_ID_KHRONOS, VX_ENUM_BORDER) + 0x3,
 };
 
 /*! \typedef vx_tiling_kernel_f
@@ -310,33 +315,5 @@ typedef void (*vx_tiling_kernel_f)(void * VX_RESTRICT parameters[VX_RESTRICT],
     *((type *)(&((vx_uint8 *)(ptile)->base[i])[vxImageOffset(ptile, i, x, y, ox, oy)]))
 
 #endif
-
-/*! \brief Allows a user to add a tile-able kernel to the OpenVX system.
- * \param [in] context The handle to the implementation context.
- * \param [in] name The string to be used to match the kernel.
- * \param [in] enumeration The enumerated value of the kernel to be used by clients.
- * \param [in] flexible_func_ptr The process-local flexible function pointer to be invoked.
- * \param [in] fast_func_ptr The process-local fast function pointer to be invoked.
- * \param [in] num_params The number of parameters for this kernel.
- * \param [in] input The pointer to a function which will validate the
- * input parameters to this kernel.
- * \param [in] output The pointer to a function which will validate the
- * output parameters to this kernel.
- * \note Tiling Kernels do not have access to any of the normal node attributes listed
- * in \ref vx_node_attribute_e.
- * \post Call <tt>\ref vxAddParameterToKernel</tt> for as many parameters as the function has,
- * then call <tt>\ref vxFinalizeKernel</tt>.
- * \retval 0 Indicates that an error occurred when adding the kernel.
- * Note that the fast or flexible formula, but not both, can be NULL.
- * \ingroup group_tiling
- */
-VX_API_ENTRY vx_kernel VX_API_CALL vxAddTilingKernel(vx_context context,
-                            vx_char name[VX_MAX_KERNEL_NAME],
-                            vx_enum enumeration,
-                            vx_tiling_kernel_f flexible_func_ptr,
-                            vx_tiling_kernel_f fast_func_ptr,
-                            vx_uint32 num_params,
-                            vx_kernel_input_validate_f input,
-                            vx_kernel_output_validate_f output);
 
 #endif

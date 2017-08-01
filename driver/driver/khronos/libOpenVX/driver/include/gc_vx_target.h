@@ -30,6 +30,8 @@ VX_INTERNAL_API vx_status vxoTarget_Load(vx_context context, vx_string moduleNam
 
 VX_INTERNAL_API vx_status vxoTarget_Unload(vx_context context, vx_uint32 index, vx_bool unloadModule);
 
+VX_INTERNAL_API vx_bool vxoTarget_MatchTargetNameWithString(const char* target_name, const char* target_string);
+
 EXTERN_C_END
 
 #endif /* __GC_VX_TARGET_H__ */

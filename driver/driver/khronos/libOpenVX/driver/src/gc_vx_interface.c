@@ -75,20 +75,20 @@ vx_status vxoGetObjAttributeByNodeIndex(vx_node node, vx_uint32 index, vx_enum t
     switch (type)
     {
         case VX_TYPE_IMAGE:
-            vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &image, sizeof(image));
+            vxQueryParameter(param, VX_PARAMETER_REF, &image, sizeof(image));
             if (image == VX_NULL) goto ErrorExit;
 
-            vxQueryImage(image, VX_IMAGE_ATTRIBUTE_FORMAT, &objData->u.imageInfo.format, sizeof(vx_df_image));
-            vxQueryImage(image, VX_IMAGE_ATTRIBUTE_WIDTH, &objData->u.imageInfo.width, sizeof(vx_uint32));
-            vxQueryImage(image, VX_IMAGE_ATTRIBUTE_HEIGHT, &objData->u.imageInfo.height, sizeof(vx_uint32));
+            vxQueryImage(image, VX_IMAGE_FORMAT, &objData->u.imageInfo.format, sizeof(vx_df_image));
+            vxQueryImage(image, VX_IMAGE_WIDTH, &objData->u.imageInfo.width, sizeof(vx_uint32));
+            vxQueryImage(image, VX_IMAGE_HEIGHT, &objData->u.imageInfo.height, sizeof(vx_uint32));
 
             break;
 
         case VX_TYPE_SCALAR:
-            vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &scalar, sizeof(scalar));
+            vxQueryParameter(param, VX_PARAMETER_REF, &scalar, sizeof(scalar));
             if (scalar == VX_NULL) goto ErrorExit;
 
-            vxQueryScalar(scalar, VX_SCALAR_ATTRIBUTE_TYPE, &objData->u.scalarInfo.dataType, sizeof(vx_enum));
+            vxQueryScalar(scalar, VX_SCALAR_TYPE, &objData->u.scalarInfo.dataType, sizeof(vx_enum));
             if (objData->u.scalarInfo.scalarValuePtr != VX_NULL)
             {
                 vxReadScalarValue(scalar, objData->u.scalarInfo.scalarValuePtr);
@@ -97,72 +97,72 @@ vx_status vxoGetObjAttributeByNodeIndex(vx_node node, vx_uint32 index, vx_enum t
             break;
 
         case VX_TYPE_LUT:
-            vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &lut, sizeof(lut));
+            vxQueryParameter(param, VX_PARAMETER_REF, &lut, sizeof(lut));
             if (lut == VX_NULL) goto ErrorExit;
 
-            vxQueryLUT(lut, VX_LUT_ATTRIBUTE_TYPE, &objData->u.lutArrayInfo.dataType, sizeof(vx_enum));
+            vxQueryLUT(lut, VX_LUT_TYPE, &objData->u.lutArrayInfo.dataType, sizeof(vx_enum));
 
             break;
 
         case VX_TYPE_DISTRIBUTION:
-            vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &dist, sizeof(dist));
+            vxQueryParameter(param, VX_PARAMETER_REF, &dist, sizeof(dist));
             if (dist == VX_NULL) goto ErrorExit;
 
-            vxQueryDistribution(dist, VX_DISTRIBUTION_ATTRIBUTE_BINS, &objData->u.distributionInfo.numBins, sizeof(vx_size));
+            vxQueryDistribution(dist, VX_DISTRIBUTION_BINS, &objData->u.distributionInfo.numBins, sizeof(vx_size));
 
             break;
         case VX_TYPE_THRESHOLD:
-            vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &threshold, sizeof(threshold));
+            vxQueryParameter(param, VX_PARAMETER_REF, &threshold, sizeof(threshold));
             if (threshold == VX_NULL) goto ErrorExit;
 
-            vxQueryThreshold(threshold, VX_THRESHOLD_ATTRIBUTE_TYPE, &objData->u.thresholdInfo.dataType, sizeof(vx_enum));
+            vxQueryThreshold(threshold, VX_THRESHOLD_TYPE, &objData->u.thresholdInfo.dataType, sizeof(vx_enum));
             break;
 
         case VX_TYPE_CONVOLUTION:
-            vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &conv, sizeof(conv));
+            vxQueryParameter(param, VX_PARAMETER_REF, &conv, sizeof(conv));
             if (conv == VX_NULL) goto ErrorExit;
 
-            vxQueryConvolution(conv, VX_CONVOLUTION_ATTRIBUTE_COLUMNS, &objData->u.convolutionInfo.columns, sizeof(vx_size));
-            vxQueryConvolution(conv, VX_CONVOLUTION_ATTRIBUTE_ROWS,&objData->u.convolutionInfo.rows, sizeof(vx_size));
+            vxQueryConvolution(conv, VX_CONVOLUTION_COLUMNS, &objData->u.convolutionInfo.columns, sizeof(vx_size));
+            vxQueryConvolution(conv, VX_CONVOLUTION_ROWS,&objData->u.convolutionInfo.rows, sizeof(vx_size));
             break;
 
         case VX_TYPE_MATRIX:
-            vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &matrix, sizeof(matrix));
+            vxQueryParameter(param, VX_PARAMETER_REF, &matrix, sizeof(matrix));
             if (matrix == VX_NULL) goto ErrorExit;
 
-            vxQueryMatrix(matrix, VX_MATRIX_ATTRIBUTE_TYPE, &objData->u.matrixInfo.dataType, sizeof(vx_enum));
-            vxQueryMatrix(matrix, VX_MATRIX_ATTRIBUTE_ROWS, &objData->u.matrixInfo.rows, sizeof(vx_size));
-            vxQueryMatrix(matrix, VX_MATRIX_ATTRIBUTE_COLUMNS, &objData->u.matrixInfo.columns, sizeof(vx_size));
+            vxQueryMatrix(matrix, VX_MATRIX_TYPE, &objData->u.matrixInfo.dataType, sizeof(vx_enum));
+            vxQueryMatrix(matrix, VX_MATRIX_ROWS, &objData->u.matrixInfo.rows, sizeof(vx_size));
+            vxQueryMatrix(matrix, VX_MATRIX_COLUMNS, &objData->u.matrixInfo.columns, sizeof(vx_size));
             break;
 
         case VX_TYPE_REMAP:
-            vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &remap, sizeof(remap));
+            vxQueryParameter(param, VX_PARAMETER_REF, &remap, sizeof(remap));
             if (remap == VX_NULL) goto ErrorExit;
 
-            vxQueryRemap(remap, VX_REMAP_ATTRIBUTE_SOURCE_WIDTH, &objData->u.remapInfo.srcWidth, sizeof(vx_uint32));
-            vxQueryRemap(remap, VX_REMAP_ATTRIBUTE_SOURCE_HEIGHT, &objData->u.remapInfo.srcHeight, sizeof(vx_uint32));
-            vxQueryRemap(remap, VX_REMAP_ATTRIBUTE_DESTINATION_WIDTH, &objData->u.remapInfo.dstWidth, sizeof(vx_uint32));
-            vxQueryRemap(remap, VX_REMAP_ATTRIBUTE_DESTINATION_HEIGHT, &objData->u.remapInfo.dstHeight, sizeof(vx_uint32));
+            vxQueryRemap(remap, VX_REMAP_SOURCE_WIDTH, &objData->u.remapInfo.srcWidth, sizeof(vx_uint32));
+            vxQueryRemap(remap, VX_REMAP_SOURCE_HEIGHT, &objData->u.remapInfo.srcHeight, sizeof(vx_uint32));
+            vxQueryRemap(remap, VX_REMAP_DESTINATION_WIDTH, &objData->u.remapInfo.dstWidth, sizeof(vx_uint32));
+            vxQueryRemap(remap, VX_REMAP_DESTINATION_HEIGHT, &objData->u.remapInfo.dstHeight, sizeof(vx_uint32));
             break;
 
         case VX_TYPE_PYRAMID:
-            vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &pyramid, sizeof(pyramid));
+            vxQueryParameter(param, VX_PARAMETER_REF, &pyramid, sizeof(pyramid));
             if (pyramid == VX_NULL) goto ErrorExit;
 
-            vxQueryPyramid(pyramid, VX_PYRAMID_ATTRIBUTE_LEVELS, &objData->u.pyramidInfo.numLevels, sizeof(vx_size));
-            vxQueryPyramid(pyramid, VX_PYRAMID_ATTRIBUTE_SCALE, &objData->u.pyramidInfo.scale, sizeof(vx_float32));
-            vxQueryPyramid(pyramid, VX_PYRAMID_ATTRIBUTE_FORMAT, &objData->u.pyramidInfo.format, sizeof(vx_df_image));
-            vxQueryPyramid(pyramid, VX_PYRAMID_ATTRIBUTE_WIDTH, &objData->u.pyramidInfo.width, sizeof(vx_uint32));
-            vxQueryPyramid(pyramid, VX_PYRAMID_ATTRIBUTE_HEIGHT, &objData->u.pyramidInfo.height, sizeof(vx_uint32));
+            vxQueryPyramid(pyramid, VX_PYRAMID_LEVELS, &objData->u.pyramidInfo.numLevels, sizeof(vx_size));
+            vxQueryPyramid(pyramid, VX_PYRAMID_SCALE, &objData->u.pyramidInfo.scale, sizeof(vx_float32));
+            vxQueryPyramid(pyramid, VX_PYRAMID_FORMAT, &objData->u.pyramidInfo.format, sizeof(vx_df_image));
+            vxQueryPyramid(pyramid, VX_PYRAMID_WIDTH, &objData->u.pyramidInfo.width, sizeof(vx_uint32));
+            vxQueryPyramid(pyramid, VX_PYRAMID_HEIGHT, &objData->u.pyramidInfo.height, sizeof(vx_uint32));
             break;
 
         case VX_TYPE_ARRAY:
-            vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_REF, &array, sizeof(array));
+            vxQueryParameter(param, VX_PARAMETER_REF, &array, sizeof(array));
             if (array == VX_NULL) goto ErrorExit;
 
-            vxQueryArray(array, VX_ARRAY_ATTRIBUTE_ITEMTYPE, &objData->u.arrayInfo.dataType, sizeof(vx_enum));
+            vxQueryArray(array, VX_ARRAY_ITEMTYPE, &objData->u.arrayInfo.dataType, sizeof(vx_enum));
 
-            vxQueryArray(array, VX_ARRAY_ATTRIBUTE_CAPACITY, &objData->u.arrayInfo.capacity, sizeof(vx_size));
+            vxQueryArray(array, VX_ARRAY_CAPACITY, &objData->u.arrayInfo.capacity, sizeof(vx_size));
             break;
     }
 
@@ -194,7 +194,7 @@ ErrorExit:
     return status;
 }
 
-vx_status vxoAddParameterToGraphByIndex(vx_graph graph, vx_node node, vx_uint32 index)
+VX_PRIVATE_API vx_status vxoAddParameterToGraphByIndex(vx_graph graph, vx_node node, vx_uint32 index)
 {
     vx_parameter param;
     vx_status    status;
@@ -366,6 +366,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoChannelExtract_ValidateInput(vx_node nod
     else if (index == 1)
     {
         vx_enum channel = 0;
+        /* vx_enum max_channel = 0; */
         objData1.u.scalarInfo.scalarValuePtr = &channel;
 
         if (vxoGetObjAttributeByNodeIndex(node, 1, VX_TYPE_SCALAR, &objData1) != VX_SUCCESS)
@@ -374,6 +375,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoChannelExtract_ValidateInput(vx_node nod
         if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objData0) != VX_SUCCESS)
             return VX_ERROR_INVALID_PARAMETERS;
 
+        /* max_channel = VX_CHANNEL_V; */
 
         if (VX_CHANNEL_0 <= channel && channel <= VX_CHANNEL_V)
         {
@@ -513,7 +515,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoChannelCombine_ValidateOutput(vx_node no
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Sobel3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
-    vx_border_mode_t bordermode;
+    vx_border_t bordermode;
     vx_image         input;
     vx_image         grad_x;
     vx_image         grad_y;
@@ -524,7 +526,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Sobel3x3(vx_node node, const 
     grad_x = (vx_image)parameters[1];
     grad_y = (vx_image)parameters[2];
 
-    if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
+    if (vxQueryNode(node, VX_NODE_BORDER, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
     {
         return vxSobel3x3(node, input, grad_x, grad_y, &bordermode);
     }
@@ -588,6 +590,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMagnitude_ValidateInput(vx_node node, vx
     vx_object_data_s objData[2] = {{0}};
 
     if (index != 0 && index != 1) return VX_ERROR_INVALID_PARAMETERS;
+
 
     switch (index)
     {
@@ -665,6 +668,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoPhase_ValidateInput(vx_node node, vx_uin
 
     if (index != 0 && index != 1) return VX_ERROR_INVALID_PARAMETERS;
 
+
     switch (index)
     {
     case 1:
@@ -711,9 +715,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoPhase_ValidateOutput(vx_node node, vx_ui
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_TableLookup(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
+    vx_status status = VX_SUCCESS;
     vx_image srcImage;
     vx_lut   lut;
     vx_image dstImage;
+    vx_bool is_replicated = vx_false_e;
 
     if (num != 3) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -721,7 +727,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_TableLookup(vx_node node, con
     lut      = (vx_lut)parameters[1];
     dstImage = (vx_image) parameters[2];
 
-    return vxTableLookup(node, srcImage, lut, dstImage);
+    status = vxQueryNode(node, VX_NODE_IS_REPLICATED, &is_replicated, sizeof(is_replicated));
+    if (VX_SUCCESS != status)
+        return status;
+
+    status =  vxTableLookup(node, srcImage, lut, dstImage);
+
+    return status;
 }
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoTableLookup_ValidateInput(vx_node node, vx_uint32 index)
@@ -760,7 +772,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoTableLookup_ValidateOutput(vx_node node,
     if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
         return VX_ERROR_INVALID_PARAMETERS;
 
-    vxoFillMetaData(ptr, VX_TYPE_IMAGE, VX_DF_IMAGE_U8, objData.u.imageInfo.width, objData.u.imageInfo.height, 0);
+    vxoFillMetaData(ptr, VX_TYPE_IMAGE, objData.u.imageInfo.format, objData.u.imageInfo.width, objData.u.imageInfo.height, 0);
 
     return VX_SUCCESS;
 }
@@ -770,7 +782,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_ScaleImage(vx_node node, cons
     vx_image         srcImage;
     vx_image         dstImage;
     vx_scalar        type;
-    vx_border_mode_t borderMode;
+    vx_border_t      borderMode;
     vx_float64 *     localDataPtr = VX_NULL;
     vx_size          size = 0ul;
 
@@ -779,12 +791,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_ScaleImage(vx_node node, cons
     srcImage                  = (vx_image) parameters[0];
     dstImage                  = (vx_image) parameters[1];
     type                      = (vx_scalar)parameters[2];
-    borderMode.mode           = VX_BORDER_MODE_UNDEFINED;
-    borderMode.constant_value = 0;
+    borderMode.mode           = VX_BORDER_UNDEFINED;
+    borderMode.constant_value.U32 = 0;
 
-    vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borderMode, sizeof(borderMode));
-    vxQueryNode(node, VX_NODE_ATTRIBUTE_LOCAL_DATA_PTR, &localDataPtr, sizeof(localDataPtr));
-    vxQueryNode(node, VX_NODE_ATTRIBUTE_LOCAL_DATA_SIZE,&size, sizeof(size));
+    vxQueryNode(node, VX_NODE_BORDER, &borderMode, sizeof(borderMode));
+    vxQueryNode(node, VX_NODE_LOCAL_DATA_PTR, &localDataPtr, sizeof(localDataPtr));
+    vxQueryNode(node, VX_NODE_LOCAL_DATA_SIZE,&size, sizeof(size));
 
     node->kernelAttributes.isAllGPU = vx_true_e;
     return vxScaleImage(node, srcImage, dstImage, type, &borderMode, localDataPtr, size);
@@ -796,37 +808,58 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoScaleImage_Initializer(vx_node node, con
 
     if (num != 3) return VX_ERROR_INVALID_PARAMETERS;
 
-    return vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_LOCAL_DATA_SIZE, &size, sizeof(size));
+
+    if (node->kernelAttributes.localDataSize == 0)
+        node->kernelAttributes.localDataSize = size;
+
+    return VX_SUCCESS;
 }
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoScaleImage_ValidateInput(vx_node node, vx_uint32 index)
 {
-    vx_object_data_s objData = {0};
+    vx_object_data_s objData[2] = {{0}};
 
     if (index != 0 && index != 2) return VX_ERROR_INVALID_PARAMETERS;
 
     if (index == 0)
     {
-        if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+        if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData[0]) != VX_SUCCESS)
             return VX_ERROR_INVALID_PARAMETERS;
 
-        if (objData.u.imageInfo.format != VX_DF_IMAGE_U8) return VX_ERROR_INVALID_FORMAT;
+        if (objData[0].u.imageInfo.format == VX_DF_IMAGE_U8)
+            return VX_SUCCESS;
+        else if (objData[0].u.imageInfo.format == VX_DF_IMAGE_S16)
+        {
+            vx_enum interp = 0;
+
+            objData[1].u.scalarInfo.scalarValuePtr = &interp;
+
+
+            if (vxoGetObjAttributeByNodeIndex(node, 2, VX_TYPE_SCALAR, &objData[1]) != VX_SUCCESS)
+                return VX_ERROR_INVALID_PARAMETERS;
+
+            if (objData[1].u.scalarInfo.dataType != VX_TYPE_ENUM) return VX_ERROR_INVALID_TYPE;
+
+            if (interp != VX_INTERPOLATION_NEAREST_NEIGHBOR)
+                return VX_ERROR_INVALID_FORMAT;
+        }
+        else
+            return VX_ERROR_INVALID_FORMAT;
     }
     else if (index == 2)
     {
         vx_enum interp = 0;
 
-        objData.u.scalarInfo.scalarValuePtr = &interp;
+        objData[0].u.scalarInfo.scalarValuePtr = &interp;
 
-
-        if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_SCALAR, &objData) != VX_SUCCESS)
+        if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_SCALAR, &objData[0]) != VX_SUCCESS)
             return VX_ERROR_INVALID_PARAMETERS;
 
-        if (objData.u.scalarInfo.dataType != VX_TYPE_ENUM) return VX_ERROR_INVALID_TYPE;
+        if (objData[0].u.scalarInfo.dataType != VX_TYPE_ENUM) return VX_ERROR_INVALID_TYPE;
 
-        if ((interp != VX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR) &&
-            (interp != VX_INTERPOLATION_TYPE_BILINEAR) &&
-            (interp != VX_INTERPOLATION_TYPE_AREA))
+        if ((interp != VX_INTERPOLATION_NEAREST_NEIGHBOR) &&
+            (interp != VX_INTERPOLATION_BILINEAR) &&
+            (interp != VX_INTERPOLATION_AREA))
         {
             return VX_ERROR_INVALID_VALUE;
         }
@@ -900,7 +933,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHalfscaleGaussian_ValidateInput(vx_node 
 
         if (objData2.u.scalarInfo.dataType != VX_TYPE_INT32) return VX_ERROR_INVALID_TYPE;
 
-        if ((kSize != 3) && (kSize != 5)) return VX_ERROR_INVALID_VALUE;
+        if ((kSize != 1) && (kSize != 3) && (kSize != 5)) return VX_ERROR_INVALID_VALUE;
     }
 
     return VX_SUCCESS;
@@ -938,7 +971,7 @@ VX_PRIVATE_API vx_convolution vxCreateGaussian5x5Convolution(vx_context context)
     status = vxWriteConvolutionCoefficients(conv, (vx_int16 *)gaussian5x5);
     if (status != VX_SUCCESS) goto ErrorExit;
 
-    vxSetConvolutionAttribute(conv, VX_CONVOLUTION_ATTRIBUTE_SCALE, (void *)&gaussian5x5scale, sizeof(vx_uint32));
+    vxSetConvolutionAttribute(conv, VX_CONVOLUTION_SCALE, (void *)&gaussian5x5scale, sizeof(vx_uint32));
     if (status != VX_SUCCESS) goto ErrorExit;
 
     return conv;
@@ -957,7 +990,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHalfscaleGaussian_Initializer(vx_node no
     vx_graph         graph          = VX_NULL;
     vx_image         virtualImage   = VX_NULL;
     vx_node          filterNodes[2] = {VX_NULL, VX_NULL};
-    vx_border_mode_t borderModes;
+    vx_border_t      borderModes;
     vx_uint32        i;
     vx_int32         kernelSize     = 0;
     vx_status        status         = VX_ERROR_INVALID_PARAMETERS;
@@ -973,7 +1006,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHalfscaleGaussian_Initializer(vx_node no
 
     vxReadScalarValue((vx_scalar)parameters[2], &kernelSize);
 
-    if (kernelSize != 3 && kernelSize != 5) return VX_ERROR_INVALID_PARAMETERS;
+    if (kernelSize != 1 && kernelSize != 3 && kernelSize != 5) return VX_ERROR_INVALID_PARAMETERS;
 
     if (kernelSize == 5)
     {
@@ -981,6 +1014,21 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHalfscaleGaussian_Initializer(vx_node no
     }
 
     virtualImage = vxCreateVirtualImage(graph, 0, 0, VX_DF_IMAGE_U8);
+
+    vxQueryNode(node, VX_NODE_BORDER, &borderModes, sizeof(borderModes));
+
+    if (kernelSize == 1)
+    {
+        filterNodes[0]= vxScaleImageNode(graph, inputImage, outputImage, VX_INTERPOLATION_NEAREST_NEIGHBOR);
+        vxSetNodeAttribute(filterNodes[0], VX_NODE_BORDER, &borderModes, sizeof(borderModes));
+
+        status  = vxoAddParameterToGraphByIndex(graph, filterNodes[0], 0);
+        status |= vxoAddParameterToGraphByIndex(graph, filterNodes[0], 1);
+        status |= vxoAddParameterToGraphByIndex(graph, node, 2);
+
+    }
+    else
+    {
 
     if (kernelSize == 3)
     {
@@ -991,20 +1039,27 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHalfscaleGaussian_Initializer(vx_node no
         filterNodes[0] = vxConvolveNode(graph, inputImage, convolution5x5, virtualImage);
     }
 
-    filterNodes[1] = vxScaleImageNode(graph, virtualImage, outputImage, VX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR);
+        filterNodes[1] = vxScaleImageNode(graph, virtualImage, outputImage, VX_INTERPOLATION_NEAREST_NEIGHBOR);
 
-    vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borderModes, sizeof(borderModes));
+        for (i = 0; i < vxmLENGTH_OF(filterNodes); i++)
+        {
+            vxSetNodeAttribute(filterNodes[i], VX_NODE_BORDER, &borderModes, sizeof(borderModes));
+        }
 
-    for (i = 0; i < vxmLENGTH_OF(filterNodes); i++)
-    {
-        vxSetNodeAttribute(filterNodes[i], VX_NODE_ATTRIBUTE_BORDER_MODE, &borderModes, sizeof(borderModes));
+        status  = vxoAddParameterToGraphByIndex(graph, filterNodes[0], 0);
+        status |= vxoAddParameterToGraphByIndex(graph, filterNodes[1], 1);
+        status |= vxoAddParameterToGraphByIndex(graph, node, 2);
     }
-
-    status  = vxoAddParameterToGraphByIndex(graph, filterNodes[0], 0);
-    status |= vxoAddParameterToGraphByIndex(graph, filterNodes[1], 1);
-    status |= vxoAddParameterToGraphByIndex(graph, node, 2);
-    status |= vxoNode_SetChildGraph(node, graph);
     status |= vxVerifyGraph(graph);
+
+    if (status == VX_SUCCESS)
+    {
+        status |= vxoNode_SetChildGraph(node, graph);
+    }
+    else
+    {
+        vxReleaseGraph(&graph);
+    }
 
     if (convolution5x5 != VX_NULL) vxReleaseConvolution(&convolution5x5);
     if (virtualImage != VX_NULL) vxReleaseImage(&virtualImage);
@@ -1012,14 +1067,18 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHalfscaleGaussian_Initializer(vx_node no
     {
         if (filterNodes[i] != VX_NULL) vxReleaseNode(&filterNodes[i]);
     }
-    if (graph != VX_NULL) vxReleaseGraph(&graph);
+
     return status;
 }
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoHalfscaleGaussian_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
+    vx_graph graph = VX_NULL;
     if (num != 3) return VX_ERROR_INVALID_PARAMETERS;
 
+    graph = vxoNode_GetChildGraph(node);
+
+    vxReleaseGraph(&graph);
     return vxoNode_SetChildGraph(node, 0);
 }
 
@@ -1057,6 +1116,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHistogram_ValidateOutput(vx_node node, v
 {
     vx_object_data_s objData0 = {0};
     vx_object_data_s objData1 = {0};
+    vx_distribution dist = VX_NULL;
+    vx_parameter param = VX_NULL;
 
     if (index != 1) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -1066,7 +1127,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHistogram_ValidateOutput(vx_node node, v
     if (vxoGetObjAttributeByNodeIndex(node, 1, VX_TYPE_DISTRIBUTION, &objData1) != VX_SUCCESS)
         return VX_ERROR_INVALID_PARAMETERS;
 
-    vxoFillMetaData(ptr, VX_TYPE_DISTRIBUTION, 0, 0, 0, 0);
+    param = vxGetParameterByIndex(node, index);
+
+    vxQueryParameter(param, VX_PARAMETER_REF, &dist, sizeof(dist));
+
+    vxSetMetaFormatFromReference(ptr, (vx_reference)dist);
+
+    vxReleaseDistribution(&dist);
+
+    vxReleaseParameter(&param);
 
     return VX_SUCCESS;
 }
@@ -1171,6 +1240,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHist_Initializer(vx_node node, c
     nodes[1] = vxEqualizeHistGcdfNode(graph, histImage[0], minIndexScalar, cdfImage, minValueScalar);
     nodes[2] = vxEqualizeHistCdfNode(graph, srcImage, cdfImage, minValueScalar, histImage[1]);
     nodes[3] = vxEqualizeHistLutNode(graph, srcImage, histImage[1], dstImage);
+
 
     status |= vxoAddParameterToGraphByIndex(graph, nodes[0], 0);
     status |= vxoAddParameterToGraphByIndex(graph, nodes[3], 2);
@@ -1478,9 +1548,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegral_Initializer(vx_node node, const
     graph         = vxCreateGraph(context);
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
 
-    vxQueryImage(outputImage, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(outputImage, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
-    vxQueryImage(outputImage, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
+    vxQueryImage(outputImage, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(outputImage, VX_IMAGE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(outputImage, VX_IMAGE_FORMAT, &format, sizeof(format));
 
     tempImage = vxCreateImage(context, width, height, format);
     if (!vxoImage_AllocateMemory(tempImage))
@@ -1496,6 +1566,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegral_Initializer(vx_node node, const
     nodes[0] = vxIntegralImageStepNode(graph, inputImage, stepScalar[0], tempImage);
 
     nodes[1] = vxIntegralImageStepNode(graph, tempImage, stepScalar[1], outputImage);
+
 
     status |= vxoAddParameterToGraphByIndex(graph, nodes[0], 0);
     status |= vxoAddParameterToGraphByIndex(graph, nodes[1], 2);
@@ -1546,7 +1617,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoIntegral_Deinitializer(vx_node node, con
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Erode3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
-    vx_border_mode_t bordermode;
+    vx_border_t bordermode;
     vx_image srcImage;
     vx_image dstImage;
 
@@ -1555,7 +1626,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Erode3x3(vx_node node, const 
     srcImage = (vx_image)parameters[0];
     dstImage = (vx_image)parameters[1];
 
-    if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
+    if (vxQueryNode(node, VX_NODE_BORDER, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
     {
         return vxErode3x3(node, srcImage, dstImage, &bordermode);
     }
@@ -1565,7 +1636,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Erode3x3(vx_node node, const 
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Dilate3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
-    vx_border_mode_t bordermode;
+    vx_border_t bordermode;
     vx_image srcImage;
     vx_image dstImage;
 
@@ -1574,7 +1645,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Dilate3x3(vx_node node, const
     srcImage = (vx_image)parameters[0];
     dstImage = (vx_image)parameters[1];
 
-    if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
+    if (vxQueryNode(node, VX_NODE_BORDER, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
     {
         return vxDilate3x3(node, srcImage, dstImage, &bordermode);
     }
@@ -1612,7 +1683,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMorphology_ValidateOutput(vx_node node, 
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Median3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
-    vx_border_mode_t bordermode;
+    vx_border_t bordermode;
     vx_image         srcImage;
     vx_image         dstImage;
 
@@ -1621,7 +1692,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Median3x3(vx_node node, const
     srcImage = (vx_image)parameters[0];
     dstImage = (vx_image)parameters[1];
 
-    if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
+    if (vxQueryNode(node, VX_NODE_BORDER, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
     {
         return vxMedian3x3(node, srcImage, dstImage, &bordermode);
     }
@@ -1632,7 +1703,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Median3x3(vx_node node, const
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Box3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
-    vx_border_mode_t bordermode;
+    vx_border_t bordermode;
     vx_image         srcImage;
     vx_image         dstImage;
 
@@ -1642,7 +1713,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Box3x3(vx_node node, const vx
     dstImage = (vx_image)parameters[1];
 
     node->kernelAttributes.isAllGPU = vx_true_e;
-    if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
+    if (vxQueryNode(node, VX_NODE_BORDER, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
     {
         return vxBox3x3(node, srcImage, dstImage, &bordermode);
     }
@@ -1652,7 +1723,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Box3x3(vx_node node, const vx
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Gaussian3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
-    vx_border_mode_t bordermode;
+    vx_border_t bordermode;
     vx_image         srcImage;
     vx_image         dstImage;
 
@@ -1662,7 +1733,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Gaussian3x3(vx_node node, con
     dstImage = (vx_image)parameters[1];
 
     node->kernelAttributes.isAllGPU = vx_true_e;
-    if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
+    if (vxQueryNode(node, VX_NODE_BORDER, &bordermode, sizeof(bordermode)) == VX_SUCCESS)
     {
         return vxGaussian3x3(node, srcImage, dstImage, &bordermode);
     }
@@ -1700,7 +1771,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoFilter_ValidateOutput(vx_node node, vx_u
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBasekernel_Convolve(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
-    vx_border_mode_t bordermode;
+    vx_border_t bordermode;
     vx_image         srcImage;
     vx_convolution   conv;
     vx_image         dstImage;
@@ -1710,9 +1781,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBasekernel_Convolve(vx_node node, const 
     srcImage  = (vx_image)parameters[0];
     conv = (vx_convolution)parameters[1];
     dstImage  = (vx_image)parameters[2];
-    node->kernelAttributes.isAllGPU = vx_true_e;
-
-    vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &bordermode, sizeof(bordermode));
+    vxQueryNode(node, VX_NODE_BORDER, &bordermode, sizeof(bordermode));
 
     return vxConvolve(node, srcImage, conv, dstImage, &bordermode);
 }
@@ -1727,13 +1796,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoConvolve_ValidateInput(vx_node node, vx_
     {
         if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
             return VX_ERROR_INVALID_PARAMETERS;
-
-        if ((objData.u.imageInfo.width <= VX_MAX_CONVOLUTION_DIM) ||
-            (objData.u.imageInfo.height <= VX_MAX_CONVOLUTION_DIM))
-
-        {
-            return VX_ERROR_INVALID_PARAMETERS;
-        }
 
         if ((objData.u.imageInfo.format != VX_DF_IMAGE_U8) &&
             (objData.u.imageInfo.format != VX_DF_IMAGE_S16))
@@ -1780,20 +1842,430 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoConvolve_ValidateOutput(vx_node node, vx
 
     return VX_SUCCESS;
 }
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianPyramid_ValidateInput(vx_node node, vx_uint32 index)
+{
+    vx_object_data_s objData = {0};
+
+    if (index != 0) return VX_ERROR_INVALID_PARAMETERS;
+
+    if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objData) != VX_SUCCESS)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    if (objData.u.imageInfo.format != VX_DF_IMAGE_U8) return VX_ERROR_INVALID_FORMAT;
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianPyramid_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+{
+    vx_object_data_s objData[2] = {{0}};
+
+    if (index != 1 && index != 2) return VX_ERROR_INVALID_PARAMETERS;
+
+    if(index == 1)
+    {
+        if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_IMAGE, &objData[0]) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
+
+        if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_PYRAMID, &objData[1]) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
+
+        if (objData[1].u.pyramidInfo.width == objData[0].u.imageInfo.width
+            && objData[1].u.pyramidInfo.height == objData[0].u.imageInfo.height
+            && objData[1].u.pyramidInfo.format == VX_DF_IMAGE_S16 && objData[1].u.pyramidInfo.scale == VX_SCALE_PYRAMID_HALF)
+        {
+            /* fill in the meta data with the attributes so that the checker will pass */
+            ptr->type = VX_TYPE_PYRAMID;
+            ptr->u.pyramidInfo.width = objData[0].u.imageInfo.width;
+            ptr->u.pyramidInfo.height = objData[0].u.imageInfo.height;
+            ptr->u.pyramidInfo.format = objData[1].u.pyramidInfo.format;
+            ptr->u.pyramidInfo.scale = objData[1].u.pyramidInfo.scale;
+            ptr->u.pyramidInfo.levelCount = objData[1].u.pyramidInfo.numLevels;
+        }
+        else
+            return VX_ERROR_INVALID_PARAMETERS;
+    }
+    else if(index == 2)
+    {
+        vx_image lastLev;
+        vx_pyramid laplacian;
+        vx_uint32 lastWidth;
+        vx_uint32 lastHeight;
+        vx_parameter lapParam = vxGetParameterByIndex(node, 1);
+
+        if (vxoGetObjAttributeByNodeIndex(node, 1, VX_TYPE_PYRAMID, &objData[0]) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
+
+        if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData[1]) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
+
+        vxQueryParameter(lapParam, VX_PARAMETER_ATTRIBUTE_REF, &laplacian, sizeof(laplacian));
+        if (laplacian == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
+        lastLev = vxGetPyramidLevel(laplacian, (vx_uint32)objData[0].u.pyramidInfo.numLevels - 1);
+        if (lastLev == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
+        vxQueryImage(lastLev, VX_IMAGE_ATTRIBUTE_WIDTH, &lastWidth, sizeof(lastWidth));
+        vxQueryImage(lastLev, VX_IMAGE_ATTRIBUTE_HEIGHT, &lastHeight, sizeof(lastHeight));
+        vxReleaseImage(&lastLev);
+        vxReleasePyramid(&laplacian);
+        vxReleaseParameter(&lapParam);
+
+        if (lastWidth == objData[1].u.imageInfo.width
+            && lastHeight == objData[1].u.imageInfo.height
+            && objData[1].u.imageInfo.format == VX_DF_IMAGE_S16)
+        {
+
+            /* fill in the meta data with the attributes so that the checker will pass */
+            ptr->type = VX_TYPE_IMAGE;
+            ptr->u.imageInfo.width = objData[1].u.imageInfo.width;
+            ptr->u.imageInfo.height = objData[1].u.imageInfo.height;
+            ptr->u.imageInfo.format = objData[1].u.imageInfo.format;
+        }
+        else
+            return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianPyramid_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_status        status = VX_SUCCESS;
+    vx_size          level, numLevels = 1;
+    vx_border_mode_t border;
+    vx_image         input, output;
+    vx_image         gaussCurLev, gaussCurLevConv;
+    vx_image         lapCurLev;
+    vx_pyramid       laplacian;
+    vx_context       context;
+    vx_graph         graph;
+    vx_enum          interp;
+    vx_node          copyNode = VX_NULL;
+    vx_node          gaussNode = VX_NULL;
+    vx_node          scaleNode = VX_NULL;
+    vx_node          subNode = VX_NULL;
+    vx_node          depNode = VX_NULL;
+    vx_df_image      format;
+    vx_convolution   conv = 0;
+    vx_uint32        width = 0;
+    vx_uint32        height = 0;
+    vx_uint32        levelWidth = 0;
+    vx_uint32        levelHeight = 0;
+    vx_enum          policy;
+
+    if (num != 3) return VX_ERROR_INVALID_PARAMETERS;
+
+    context = vxGetContext((vx_reference)node);
+    graph = vxCreateGraph(context);
+
+    if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+
+    if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border)) != VX_SUCCESS)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    input     = (vx_image)parameters[0];
+    laplacian = (vx_pyramid)parameters[1];
+    output    = (vx_image)parameters[2];
+    interp = VX_INTERPOLATION_NEAREST_NEIGHBOR;
+    format = VX_DF_IMAGE_U8; /* OpenVX 1.1 only support VX_DF_IMAGE_U8 for gaussian pyramid */
+    policy = VX_CONVERT_POLICY_WRAP;
+
+    status |= vxQueryImage(input, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
+    status |= vxQueryImage(input, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+
+    status |= vxQueryPyramid(laplacian, VX_PYRAMID_ATTRIBUTE_LEVELS, &numLevels, sizeof(numLevels));
+
+    gaussCurLev = vxCreateVirtualImage(graph, width, height, format);
+    copyNode = vxCopyImageNode(graph, input, gaussCurLev);
+    levelWidth = width;
+    levelHeight = height;
+
+    for (level = 0; level < numLevels; level++)
+    {
+        conv = vxCreateGaussian5x5Convolution(context);
+        gaussCurLevConv = vxCreateVirtualImage(graph, levelWidth, levelHeight, format);
+        gaussNode = vxConvolveNode(graph, gaussCurLev, conv, gaussCurLevConv);
+        status |= vxSetNodeAttribute(gaussNode, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border));
+
+        levelWidth = (vx_uint32)ceilf(levelWidth * VX_SCALE_PYRAMID_HALF);
+        levelHeight = (vx_uint32)ceilf(levelHeight * VX_SCALE_PYRAMID_HALF);
+
+        lapCurLev = vxGetPyramidLevel(laplacian, (vx_uint32)level);
+        subNode = vxSubtractNode(graph, gaussCurLev, gaussCurLevConv, policy, lapCurLev);
+        status |= vxReleaseImage(&gaussCurLev);
+
+        if (numLevels - 1 == level)
+        {
+            vx_uint32 shif = 0;
+            vx_scalar shift = vxCreateScalar(context, VX_TYPE_INT32, &shif);
+            depNode = vxConvertDepthNode(graph, gaussCurLevConv, output, policy, shift);
+            status |= vxReleaseScalar(&shift);
+        }
+        else
+        {
+            gaussCurLev = vxCreateVirtualImage(graph, levelWidth, levelHeight, format);
+            scaleNode = vxScaleImageNode(graph, gaussCurLevConv, gaussCurLev, interp);
+        }
+        if (gaussCurLevConv != VX_NULL) status |= vxReleaseImage(&gaussCurLevConv);
+        if (lapCurLev != VX_NULL)       status |= vxReleaseImage(&lapCurLev);
+        if (gaussNode != VX_NULL)       status |= vxReleaseNode(&gaussNode);
+        if (subNode != VX_NULL)         status |= vxReleaseNode(&subNode);
+        if (scaleNode != VX_NULL)       status |= vxReleaseNode(&scaleNode);
+        if (conv != VX_NULL)     status |= vxReleaseConvolution(&conv);
+    }
+    status |= vxoAddParameterToGraphByIndex(graph, copyNode, 0);
+    status |= vxoAddParameterToGraphByIndex(graph, node, 1);
+    status |= vxoAddParameterToGraphByIndex(graph, depNode, 1);
+
+    status |= vxVerifyGraph(graph);
+
+    if (copyNode != VX_NULL) status |= vxReleaseNode(&copyNode);
+    if (depNode != VX_NULL)  status |= vxReleaseNode(&depNode);
+
+    status |= vxoNode_SetChildGraph(node, graph);
+
+    return status;
+}
+
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianPyramid_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_graph  graph  = VX_NULL;
+
+    if (num != 3) return VX_ERROR_INVALID_PARAMETERS;
+
+    graph = vxoNode_GetChildGraph(node);
+
+    vxReleaseGraph(&graph);
+
+    vxoNode_SetChildGraph(node, 0);
+
+    return VX_SUCCESS;
+}
+
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_LaplacianPyramid(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_graph graph;
+
+    if (num != vxmLENGTH_OF(basekernel_laplacian_pyramid_params)) return VX_ERROR_INVALID_PARAMETERS;
+
+    node->kernelAttributes.isAllGPU = vx_false_e;
+
+    graph = vxoNode_GetChildGraph(node);
+
+    return vxProcessGraph(graph);
+}
+
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_ValidateInput(vx_node node, vx_uint32 index)
+{
+    vx_object_data_s objData[2] = {{0}};
+
+    if (index != 0 && index != 1) return VX_ERROR_INVALID_PARAMETERS;
+
+    if(index == 0)
+    {
+        if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_PYRAMID, &objData[0]) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
+
+        if (objData[0].u.pyramidInfo.format != VX_DF_IMAGE_S16 || objData[0].u.pyramidInfo.scale != VX_SCALE_PYRAMID_HALF)
+            return VX_ERROR_INVALID_PARAMETERS;
+    }
+    else if(index == 1)
+    {
+        vx_image lastLev;
+        vx_pyramid laplacian;
+        vx_uint32 lastWidth;
+        vx_uint32 lastHeight;
+        vx_parameter lapParam = vxGetParameterByIndex(node, 0);
+        if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_PYRAMID, &objData[0]) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
+
+        if (vxoGetObjAttributeByNodeIndex(node, 1, VX_TYPE_IMAGE, &objData[1]) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
+
+        vxQueryParameter(lapParam, VX_PARAMETER_ATTRIBUTE_REF, &laplacian, sizeof(laplacian));
+        if (laplacian == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
+        lastLev = vxGetPyramidLevel(laplacian, (vx_uint32)objData[0].u.pyramidInfo.numLevels - 1);
+        if (lastLev == VX_NULL) return VX_ERROR_INVALID_PARAMETERS;
+        vxQueryImage(lastLev, VX_IMAGE_ATTRIBUTE_WIDTH, &lastWidth, sizeof(lastWidth));
+        vxQueryImage(lastLev, VX_IMAGE_ATTRIBUTE_HEIGHT, &lastHeight, sizeof(lastHeight));
+        vxReleaseImage(&lastLev);
+        vxReleasePyramid(&laplacian);
+        vxReleaseParameter(&lapParam);
+
+        if (objData[0].u.pyramidInfo.format != VX_DF_IMAGE_S16 || lastWidth != objData[1].u.imageInfo.width
+            || lastHeight != objData[1].u.imageInfo.height)
+            return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+{
+    vx_object_data_s objData[2] = {{0}};
+
+    if (index != 2) return VX_ERROR_INVALID_PARAMETERS;
+
+    {
+        if (vxoGetObjAttributeByNodeIndex(node, 0, VX_TYPE_PYRAMID, &objData[0]) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
+
+        if (vxoGetObjAttributeByNodeIndex(node, index, VX_TYPE_IMAGE, &objData[1]) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
+
+        if (objData[0].u.pyramidInfo.width == objData[1].u.imageInfo.width
+            && objData[0].u.pyramidInfo.height == objData[1].u.imageInfo.height
+            && objData[1].u.imageInfo.format == VX_DF_IMAGE_U8)
+        {
+
+            /* fill in the meta data with the attributes so that the checker will pass */
+            ptr->type = VX_TYPE_IMAGE;
+            ptr->u.imageInfo.width = objData[1].u.imageInfo.width;
+            ptr->u.imageInfo.height = objData[1].u.imageInfo.height;
+            ptr->u.imageInfo.format = objData[1].u.imageInfo.format;
+        }
+        else
+            return VX_ERROR_INVALID_PARAMETERS;
+    }
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_status        status = VX_SUCCESS;
+    vx_size          level, numLevels = 1;
+    vx_border_mode_t border;
+    vx_image         input, output;
+    vx_image         gaussCurLev, gaussPreLev;
+    vx_image         lapCurLev;
+    vx_pyramid       laplacian;
+    vx_context       context;
+    vx_graph         graph;
+    vx_enum          interp;
+    vx_node          copyNode = VX_NULL;
+    vx_node          scaleNode = VX_NULL;
+    vx_node          addNode = VX_NULL;
+    vx_node          depNode = VX_NULL;
+    vx_df_image      format;
+    vx_uint32        width = 0;
+    vx_uint32        height = 0;
+    vx_uint32        levelWidth = 0;
+    vx_uint32        levelHeight = 0;
+    vx_enum          policy;
+
+    if (num != 3) return VX_ERROR_INVALID_PARAMETERS;
+
+    context = vxGetContext((vx_reference)node);
+    graph = vxCreateGraph(context);
+
+    if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
+
+    if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border)) != VX_SUCCESS)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    laplacian = (vx_pyramid)parameters[0];
+    input     = (vx_image)parameters[1];
+    output    = (vx_image)parameters[2];
+    interp = VX_INTERPOLATION_NEAREST_NEIGHBOR;
+    format = VX_DF_IMAGE_S16;
+    policy = VX_CONVERT_POLICY_SATURATE;
+
+    status |= vxQueryImage(input, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
+    status |= vxQueryImage(input, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+
+    status |= vxQueryPyramid(laplacian, VX_PYRAMID_ATTRIBUTE_LEVELS, &numLevels, sizeof(numLevels));
+
+    gaussPreLev = vxCreateVirtualImage(graph, width, height, format);
+    copyNode = vxCopyImageNode(graph, input, gaussPreLev);
+    levelWidth = width;
+    levelHeight = height;
+
+    for (level = 0; level < numLevels; level++)
+    {
+        gaussCurLev = vxCreateVirtualImage(graph, levelWidth, levelHeight, format);
+        lapCurLev = vxGetPyramidLevel(laplacian, (vx_uint32)((numLevels - 1) - level));
+        addNode = vxAddNode(graph, gaussPreLev, lapCurLev, policy, gaussCurLev);
+
+        levelWidth = (vx_uint32)ceilf(levelWidth * 2.0f);
+        levelHeight = (vx_uint32)ceilf(levelHeight * 2.0f);
+        status |= vxReleaseImage(&gaussPreLev);
+
+        if (level == numLevels - 1)
+        {
+            vx_uint32 shif = 0;
+            vx_scalar shift = vxCreateScalar(context, VX_TYPE_INT32, &shif);
+            depNode = vxConvertDepthNode(graph, gaussCurLev, output, policy, shift);
+            status |= vxReleaseScalar(&shift);
+        }
+        else
+        {
+            gaussPreLev = vxCreateVirtualImage(graph, levelWidth, levelHeight, format);
+            scaleNode = vxScaleImageNode(graph, gaussCurLev, gaussPreLev, interp);
+        }
+
+        if (gaussCurLev != VX_NULL) status |= vxReleaseImage(&gaussCurLev);
+        if (lapCurLev != VX_NULL)       status |= vxReleaseImage(&lapCurLev);
+        if (addNode != VX_NULL)         status |= vxReleaseNode(&addNode);
+        if (scaleNode != VX_NULL)       status |= vxReleaseNode(&scaleNode);
+    }
+
+    status |= vxoAddParameterToGraphByIndex(graph, node, 0);
+    status |= vxoAddParameterToGraphByIndex(graph, copyNode, 0);
+    status |= vxoAddParameterToGraphByIndex(graph, depNode, 1);
+
+    status |= vxVerifyGraph(graph);
+
+    if (copyNode != VX_NULL) status |= vxReleaseNode(&copyNode);
+    if (depNode != VX_NULL)  status |= vxReleaseNode(&depNode);
+
+    status |= vxoNode_SetChildGraph(node, graph);
+
+    return status;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_graph  graph  = VX_NULL;
+
+    if (num != 3) return VX_ERROR_INVALID_PARAMETERS;
+
+    graph = vxoNode_GetChildGraph(node);
+
+    vxReleaseGraph(&graph);
+
+    vxoNode_SetChildGraph(node, 0);
+
+    return VX_SUCCESS;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_LaplacianReconstruct(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_graph graph;
+
+    if (num != vxmLENGTH_OF(basekernel_laplacian_pyramid_params)) return VX_ERROR_INVALID_PARAMETERS;
+
+    node->kernelAttributes.isAllGPU = vx_false_e;
+
+    graph = vxoNode_GetChildGraph(node);
+
+    return vxProcessGraph(graph);
+}
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Pyramid(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_graph graph = VX_NULL;
-    vx_size  size  = 0;
+    //vx_size  size  = 0;
 
     if (num != 2) return VX_ERROR_INVALID_PARAMETERS;
 
-    vxQueryNode(node, VX_NODE_ATTRIBUTE_LOCAL_DATA_PTR, &graph, sizeof(graph));
-    vxQueryNode(node, VX_NODE_ATTRIBUTE_LOCAL_DATA_SIZE, &size, sizeof(size));
+    graph = vxoNode_GetChildGraph(node);
 
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
 
-    if (size != sizeof(graph)) return VX_ERROR_INVALID_GRAPH;
+    //if (size != sizeof(graph)) return VX_ERROR_INVALID_GRAPH;
 
     return vxProcessGraph(graph);
 }
@@ -1834,12 +2306,184 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramid_ValidateOutput(vx_node node, vx_
     return VX_SUCCESS;
 }
 
+VX_PRIVATE_API vx_status VX_CALLBACK vxNonLinearFilterKernel(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+    vx_status status = VX_ERROR_INVALID_PARAMETERS;
+    if (num == 4)
+    {
+        vx_border_t bordermode;
+        vx_scalar function = (vx_scalar)parameters[0];
+        vx_image src  = (vx_image)parameters[1];
+        vx_matrix mask = (vx_matrix)parameters[2];
+        vx_image dst = (vx_image)parameters[3];
+        status = vxQueryNode(node, VX_NODE_BORDER, &bordermode, sizeof(bordermode));
+        if (status == VX_SUCCESS)
+        {
+            status = vxNonLinearFilter(node, function, src, mask, dst, &bordermode);
+        }
+    }
+    return status;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxNonLinearFilterInputValidator(vx_node node, vx_uint32 index)
+{
+    vx_status status = VX_ERROR_INVALID_PARAMETERS;
+    if (index == 0)
+    {
+        vx_scalar scalar = 0;
+        vx_parameter param = vxGetParameterByIndex(node, index);
+
+        vxQueryParameter(param, VX_PARAMETER_REF, &scalar, sizeof(scalar));
+        if (scalar)
+        {
+            vx_enum stype = 0;
+            vxQueryScalar(scalar, VX_SCALAR_TYPE, &stype, sizeof(stype));
+            if (stype == VX_TYPE_ENUM)
+            {
+                vx_enum function = 0;
+                vxCopyScalar(scalar, &function, VX_READ_ONLY, VX_MEMORY_TYPE_HOST);
+                if ((function == VX_NONLINEAR_FILTER_MEDIAN) ||
+                    (function == VX_NONLINEAR_FILTER_MIN) ||
+                    (function == VX_NONLINEAR_FILTER_MAX))
+                {
+                    status = VX_SUCCESS;
+                }
+                else
+                {
+                    status = VX_ERROR_INVALID_VALUE;
+                }
+            }
+            else
+            {
+                status = VX_ERROR_INVALID_TYPE;
+            }
+            vxReleaseScalar(&scalar);
+        }
+        vxReleaseParameter(&param);
+    }
+    else if (index == 1)
+    {
+        vx_image input = 0;
+        vx_parameter param = vxGetParameterByIndex(node, index);
+
+        vxQueryParameter(param, VX_PARAMETER_REF, &input, sizeof(input));
+        if (input)
+        {
+            vx_df_image format = 0;
+            vxQueryImage(input, VX_IMAGE_FORMAT, &format, sizeof(format));
+            if (format == VX_DF_IMAGE_U8)
+            {
+                status = VX_SUCCESS;
+            }
+            vxReleaseImage(&input);
+        }
+        vxReleaseParameter(&param);
+    }
+    else if (index == 2)
+    {
+        vx_parameter param = vxGetParameterByIndex(node, index);
+        if (param)
+        {
+            vx_matrix matrix;
+            vxQueryParameter(param, VX_PARAMETER_REF, &matrix, sizeof(matrix));
+            if (matrix)
+            {
+                vx_enum data_type = 0;
+                vx_size cols = 0, rows = 0;
+                vxQueryMatrix(matrix, VX_MATRIX_TYPE, &data_type, sizeof(data_type));
+                vxQueryMatrix(matrix, VX_MATRIX_COLUMNS, &cols, sizeof(cols));
+                vxQueryMatrix(matrix, VX_MATRIX_ROWS, &rows, sizeof(rows));
+                if ((rows <= VX_INT_MAX_NONLINEAR_DIM) &&
+                    (cols <= VX_INT_MAX_NONLINEAR_DIM) &&
+                    (data_type == VX_TYPE_UINT8))
+                {
+                    status = VX_SUCCESS;
+                }
+                vxReleaseMatrix(&matrix);
+            }
+            vxReleaseParameter(&param);
+        }
+    }
+    return status;
+}
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxNonLinearFilterOutputValidator(vx_node node, vx_uint32 index, vx_meta_format_s *ptr)
+{
+    vx_status status = VX_ERROR_INVALID_PARAMETERS;
+    if (index == 3)
+    {
+        vx_parameter param = vxGetParameterByIndex(node, 1); /* we reference the input image */
+        if (param)
+        {
+            vx_image input = 0;
+            vxQueryParameter(param, VX_PARAMETER_REF, &input, sizeof(input));
+            if (input)
+            {
+                vx_uint32 width = 0, height = 0;
+                vxQueryImage(input, VX_IMAGE_WIDTH, &width, sizeof(width));
+                vxQueryImage(input, VX_IMAGE_HEIGHT, &height, sizeof(height));
+                ptr->type = VX_TYPE_IMAGE;
+                ptr->u.imageInfo.format = VX_DF_IMAGE_U8;
+                ptr->u.imageInfo.width = width;
+                ptr->u.imageInfo.height = height;
+                status = VX_SUCCESS;
+                vxReleaseImage(&input);
+            }
+            vxReleaseParameter(&param);
+        }
+    }
+    return status;
+}
+vx_status vxoCopyImage(vx_image input, vx_image output)
+{
+    vx_imagepatch_addressing_t srcAddrInfo;
+    vx_imagepatch_addressing_t dstAddrInfo;
+    vx_rectangle_t             rect;
+    void *                     baseAddressSrc = VX_NULL;
+    void *                     baseAddressDst = VX_NULL;
+    void *                     srcPixelValue  = VX_NULL;
+    void *                     dstPixelValue  = VX_NULL;
+    vx_size                    numplanes = 0;
+    vx_uint32                  plane = 0, y = 0, len = 0;
+
+    if (vxQueryImage(input, VX_IMAGE_PLANES, &numplanes, sizeof(vx_size)) != VX_SUCCESS)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    if (vxGetValidRegionImage(input, &rect) != VX_SUCCESS)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    for (plane = 0; plane < numplanes; plane++)
+    {
+        baseAddressSrc = baseAddressDst = NULL;
+
+        if (vxAccessImagePatch(input, &rect, plane, &srcAddrInfo, &baseAddressSrc, VX_READ_ONLY) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
+
+        if (vxAccessImagePatch(output, &rect, plane, &dstAddrInfo, &baseAddressDst, VX_WRITE_ONLY) != VX_SUCCESS)
+            return VX_ERROR_INVALID_PARAMETERS;
+
+        for (y = 0; y < srcAddrInfo.dim_y; y += srcAddrInfo.step_y)
+        {
+            srcPixelValue = vxFormatImagePatchAddress2d(baseAddressSrc, 0, y, &srcAddrInfo);
+            dstPixelValue = vxFormatImagePatchAddress2d(baseAddressDst, 0, y, &dstAddrInfo);
+
+            len = (srcAddrInfo.stride_x * srcAddrInfo.dim_x * srcAddrInfo.scale_x) / VX_SCALE_UNITY;
+
+            memcpy(dstPixelValue, srcPixelValue, len);
+        }
+
+        vxCommitImagePatch(input, NULL, plane, &srcAddrInfo, baseAddressSrc);
+        vxCommitImagePatch(output, &rect, plane, &dstAddrInfo, baseAddressDst);
+    }
+
+    return VX_SUCCESS;
+}
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramid_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     vx_status        status = VX_SUCCESS;
     vx_size          level, numLevels = 1;
-    vx_border_mode_t border;
+    vx_border_t      border;
     vx_image         input;
     vx_pyramid       gaussian;
     vx_context       context;
@@ -1858,21 +2502,17 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramid_Initializer(vx_node node, const 
 
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
 
-    /* set graph as child graph */
-    graph->isChildGraph = vx_true_e;
-
-    if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border)) != VX_SUCCESS)
+    if (vxQueryNode(node, VX_NODE_BORDER, &border, sizeof(border)) != VX_SUCCESS)
         return VX_ERROR_INVALID_PARAMETERS;
 
-    interp   = VX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR;
+    interp   = VX_INTERPOLATION_NEAREST_NEIGHBOR;
 
     level0 = vxGetPyramidLevel(gaussian, 0);
 
     cNode = vxCopyImageNode(graph, input, level0);
-
     vxReleaseImage(&level0);
 
-    status |= vxQueryPyramid(gaussian, VX_PYRAMID_ATTRIBUTE_LEVELS, &numLevels, sizeof(numLevels));
+    status |= vxQueryPyramid(gaussian, VX_PYRAMID_LEVELS, &numLevels, sizeof(numLevels));
 
     for (level = 1; level < numLevels; level++)
     {
@@ -1889,6 +2529,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramid_Initializer(vx_node node, const 
         if (level == 1)
         {
             gNode = vxConvolveNode(graph, input, conv, virtImage);
+
         }
         else
         {
@@ -1896,12 +2537,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramid_Initializer(vx_node node, const 
             gNode = vxConvolveNode(graph, inputImage, conv, virtImage);
         }
 
-        vxSetNodeAttribute(gNode, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border));
+        vxSetNodeAttribute(gNode, VX_NODE_BORDER, &border, sizeof(border));
 
         dstImage = vxGetPyramidLevel(gaussian, (vx_uint32)level);
 
         sNode    = vxScaleImageNode(graph, virtImage, dstImage, interp);
-
         if (inputImage != VX_NULL) vxReleaseImage(&inputImage);
         if (conv != VX_NULL )      vxReleaseConvolution(&conv);
         if (dstImage != VX_NULL)   vxReleaseImage(&dstImage);
@@ -1911,14 +2551,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramid_Initializer(vx_node node, const 
     }
 
     if (cNode != VX_NULL )     vxReleaseNode(&cNode);
+
+    status |= vxoAddParameterToGraphByIndex(graph, cNode, 0); /* input image */
+    status |= vxoAddParameterToGraphByIndex(graph, node, 1); /* output pyramid - refer to self to quiet sub-graph validator */
+
     status = vxVerifyGraph(graph);
 
     if (status == VX_SUCCESS)
     {
-        vx_size size = sizeof(vx_graph);
-
-        status |= vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_LOCAL_DATA_SIZE, &size, sizeof(size));
-        status |= vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_LOCAL_DATA_PTR, &graph, sizeof(graph));
+        status |= vxoNode_SetChildGraph(node, graph);
     }
 
     return status;
@@ -1928,23 +2569,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoPyramid_Deinitializer(vx_node node, cons
 {
     vx_status status = VX_SUCCESS;
     vx_graph  graph  = 0;
-    vx_size   size   = 0;
 
     if (num != 2) return VX_ERROR_INVALID_PARAMETERS;
 
-    status  = vxQueryNode(node, VX_NODE_ATTRIBUTE_LOCAL_DATA_PTR, &graph, sizeof(graph));
-    status |= vxQueryNode(node, VX_NODE_ATTRIBUTE_LOCAL_DATA_SIZE, &size, sizeof(size));
+    graph = vxoNode_GetChildGraph(node);
 
-    if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
-
-    if (size != sizeof(graph)) return VX_ERROR_INVALID_GRAPH;
-
-    vxReleaseGraph(&graph);
-
-    graph   = 0;
-    size    = 0;
-    status |= vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_LOCAL_DATA_PTR, &graph, sizeof(graph));
-    status |= vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_LOCAL_DATA_SIZE, &size, sizeof(size));
+    status |= vxReleaseGraph(&graph);
+    status |= vxoNode_SetChildGraph(node, 0);
 
     return status;
 }
@@ -2246,9 +2877,9 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxLoc_Initializer(vx_node node, cons
 
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
 
-    vxQueryImage(inputImage, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(inputImage, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
-    vxQueryImage(inputImage, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
+    vxQueryImage(inputImage, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(inputImage, VX_IMAGE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(inputImage, VX_IMAGE_FORMAT, &format, sizeof(format));
 
     widthScalar = vxCreateScalar(context, VX_TYPE_UINT32, &width);
     heightScalar = vxCreateScalar(context, VX_TYPE_UINT32, &height);
@@ -2310,7 +2941,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxLoc_Initializer(vx_node node, cons
 
     if (minLocArray)
     {
-        vxQueryArray(minLocArray, VX_ARRAY_ATTRIBUTE_ITEMTYPE, &itemType, sizeof(itemType));
+        vxQueryArray(minLocArray, VX_ARRAY_ITEMTYPE, &itemType, sizeof(itemType));
         minArray = vxCreateArray(context, itemType, width*height);
 
         if (!vxoArray_AllocateMemory(minArray))
@@ -2321,7 +2952,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxLoc_Initializer(vx_node node, cons
     }
     if (maxLocArray)
     {
-        vxQueryArray(maxLocArray, VX_ARRAY_ATTRIBUTE_ITEMTYPE, &itemType, sizeof(itemType));
+        vxQueryArray(maxLocArray, VX_ARRAY_ITEMTYPE, &itemType, sizeof(itemType));
         maxArray = vxCreateArray(context, itemType, width*height);
 
         if (!vxoArray_AllocateMemory(maxArray))
@@ -2634,7 +3265,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoCannyEdge_Initializer(vx_node node, cons
     vx_uint32        i;
     vx_image         virtImages[5];
     vx_node          nodes[5];
-    vx_border_mode_t borders;
+    vx_border_t      borders;
 
     if (num != 5) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -2661,11 +3292,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoCannyEdge_Initializer(vx_node node, cons
     nodes[4] = vxEdgeTraceNode(graph, virtImages[4], hyst, output);
 
 
-    vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borders, sizeof(borders));
+    vxQueryNode(node, VX_NODE_BORDER, &borders, sizeof(borders));
 
     for (i = 0; i < vxmLENGTH_OF(nodes); i++)
     {
-        vxSetNodeAttribute(nodes[i], VX_NODE_ATTRIBUTE_BORDER_MODE, &borders, sizeof(borders));
+        vxSetNodeAttribute(nodes[i], VX_NODE_BORDER, &borders, sizeof(borders));
     }
 
     status  = vxoAddParameterToGraphByIndex(graph, nodes[0], 0);
@@ -2674,9 +3305,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoCannyEdge_Initializer(vx_node node, cons
     status |= vxoAddParameterToGraphByIndex(graph, nodes[1], 2);
     status |= vxoAddParameterToGraphByIndex(graph, nodes[4], 2);
 
-    status |= vxoNode_SetChildGraph(node, graph);
-
     status |= vxVerifyGraph(graph);
+
+    if (status == VX_SUCCESS)
+        status |= vxoNode_SetChildGraph(node, graph);
+    else
+        vxReleaseGraph(&graph);
 
     for (i = 0; i < vxmLENGTH_OF(nodes); i++)
     {
@@ -2688,15 +3322,16 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoCannyEdge_Initializer(vx_node node, cons
         vxReleaseImage(&virtImages[i]);
     }
 
-    vxReleaseGraph(&graph);
-
     return status;
 }
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoCannyEdge_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
+    vx_graph graph;
     if (num != 5) return VX_ERROR_INVALID_PARAMETERS;
+    graph = vxoNode_GetChildGraph(node);
 
+    vxReleaseGraph(&graph);
     return vxoNode_SetChildGraph(node, 0);
 }
 
@@ -2837,12 +3472,14 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Not(vx_node node, const vx_re
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Multiply(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
+    vx_status status = VX_FAILURE;
     vx_image  inputImage0;
     vx_image  inputImage1;
     vx_scalar scale_param;
     vx_scalar opolicy_param;
     vx_scalar rpolicy_param;
     vx_image  outputImage;
+    vx_bool is_replicated = vx_false_e;
 
     if (num != 6) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -2852,6 +3489,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Multiply(vx_node node, const 
     opolicy_param = (vx_scalar)parameters[3];
     rpolicy_param = (vx_scalar)parameters[4];
     outputImage   = (vx_image)parameters[5];
+
+    status = vxQueryNode(node, VX_NODE_IS_REPLICATED, &is_replicated, sizeof(is_replicated));
+
+    if (VX_SUCCESS != status)
+        return status;
 
     node->kernelAttributes.isAllGPU = vx_true_e;
     return vxMultiply(node, inputImage0, inputImage1, scale_param, opolicy_param, rpolicy_param, outputImage);
@@ -2978,10 +3620,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoMultiply_ValidateOutput(vx_node node, vx
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Add(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
+    vx_status status = VX_FAILURE;
     vx_image  inputImage0;
     vx_image  inputImage1;
     vx_scalar policy_param;
     vx_image  outputImage;
+    vx_bool is_replicated = vx_false_e;
 
     if (num != 4) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -2990,16 +3634,23 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Add(vx_node node, const vx_re
     policy_param = (vx_scalar)parameters[2];
     outputImage  = (vx_image)parameters[3];
 
+    status = vxQueryNode(node, VX_NODE_IS_REPLICATED, &is_replicated, sizeof(is_replicated));
+
+    if (VX_SUCCESS != status)
+        return status;
+
     node->kernelAttributes.isAllGPU = vx_true_e;
     return vxAddition(node, inputImage0, inputImage1, policy_param, outputImage);
 }
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Sub(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
+    vx_status status = VX_FAILURE;
     vx_image  inputImage0;
     vx_image  inputImage1;
     vx_scalar policy_param;
     vx_image  outputImage;
+    vx_bool is_replicated = vx_false_e;
 
     if (num != 4) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -3007,6 +3658,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Sub(vx_node node, const vx_re
     inputImage1 = (vx_image)parameters[1];
     policy_param = (vx_scalar)parameters[2];
     outputImage = (vx_image)parameters[3];
+
+    status = vxQueryNode(node, VX_NODE_IS_REPLICATED, &is_replicated, sizeof(is_replicated));
+
+    if (VX_SUCCESS != status)
+        return status;
+
+    node->kernelAttributes.isAllGPU = vx_true_e;
 
     return vxSubtraction(node, inputImage0, inputImage1, policy_param, outputImage);
 }
@@ -3100,7 +3758,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_WarpPerspective(vx_node node,
     vx_matrix        matrix;
     vx_scalar        scalarType;
     vx_image         outputImage;
-    vx_border_mode_t borders;
+    vx_border_t      borders;
 
     if (num != 4) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -3109,7 +3767,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_WarpPerspective(vx_node node,
     scalarType  = (vx_scalar)parameters[2];
     outputImage = (vx_image) parameters[3];
 
-    vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borders, sizeof(borders));
+    vxQueryNode(node, VX_NODE_BORDER, &borders, sizeof(borders));
 
     return vxWarpPerspective(node, inputImage, matrix, scalarType, outputImage, &borders);
 }
@@ -3120,7 +3778,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxWarpAffineKernel(vx_node node, const vx_r
     vx_matrix        matrix;
     vx_scalar        scalarType;
     vx_image         outputImage;
-    vx_border_mode_t borders;
+    vx_border_t      borders;
 
     if (num != 4) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -3129,7 +3787,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxWarpAffineKernel(vx_node node, const vx_r
     scalarType  = (vx_scalar)parameters[2];
     outputImage = (vx_image) parameters[3];
 
-    vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borders, sizeof(borders));
+    vxQueryNode(node, VX_NODE_BORDER, &borders, sizeof(borders));
 
     return vxWarpAffine(node, inputImage, matrix, scalarType, outputImage, &borders);
 }
@@ -3168,8 +3826,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoWarp_ValidateInput(vx_node node, vx_uint
 
         if (objData[2].u.scalarInfo.dataType != VX_TYPE_ENUM) return VX_ERROR_INVALID_TYPE;
 
-        if ((interp != VX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR) &&
-            (interp != VX_INTERPOLATION_TYPE_BILINEAR))
+        if ((interp != VX_INTERPOLATION_NEAREST_NEIGHBOR) &&
+            (interp != VX_INTERPOLATION_BILINEAR))
         {
             return VX_ERROR_INVALID_VALUE;
         }
@@ -3251,7 +3909,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHarris_ValidateInput(vx_node node, vx_ui
 
             if (objData[2].u.scalarInfo.dataType != VX_TYPE_FLOAT32) return VX_ERROR_INVALID_TYPE;
 
-            if (d < 1.0 || d > 5.0) return VX_ERROR_INVALID_VALUE;
+            if (d < 0.0 || d > 30.0) return VX_ERROR_INVALID_VALUE;
 
             break;
         case 3:
@@ -3356,6 +4014,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoHarris_Initializer(vx_node node, const v
     nodes[1] = vxHarrisScoreNode(graph, virtImages[0], virtImages[1], senScalar, winScalar, blkScalar, virtImages[2]),
     nodes[2] = vxEuclideanNonMaxNode(graph, virtImages[2], strScalar, minScalar, virtImages[3]),
     nodes[3] = vxImageListerNode(graph, virtImages[3], array, numCornersScalar);
+
 
     status = VX_SUCCESS;
     status |= vxoAddParameterToGraphByIndex(graph, nodes[0], 0);
@@ -3491,7 +4150,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9_Initializer(vx_node node, const vx
     vx_array points;
     vx_scalar s_num_corners;
 
-    vx_border_mode_t bordermode;
+    vx_border_t bordermode;
     vx_node nodes[3];
     vx_context context;
     vx_graph   graph;
@@ -3507,7 +4166,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9_Initializer(vx_node node, const vx
 
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
 
-    vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &bordermode, sizeof(vx_border_mode_t));
+    vxQueryNode(node, VX_NODE_BORDER, &bordermode, sizeof(vx_border_t));
 
     /* remove any pre-existing points */
     status |= vxTruncateArray(points, 0);
@@ -3516,7 +4175,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9_Initializer(vx_node node, const vx
     if (status == VX_SUCCESS)
     {
         /*! \todo implement other Fast9 Corners border modes */
-        if (bordermode.mode == VX_BORDER_MODE_UNDEFINED)
+        if (bordermode.mode == VX_BORDER_UNDEFINED)
         {
             vx_bool s_num_corners_b = vx_false_e;
 
@@ -3541,6 +4200,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9_Initializer(vx_node node, const vx
             nodes[0] = vxFast9CornersStrengthNode(graph, src, sens, nonm, output[0]);
             nodes[1] = vxFast9CornersNonMaxNode(graph, output[0], sens, nonm, output[1]);
             nodes[2] = vxImageListerNode(graph, (nonm)?output[1]:output[0], points, s_num_corners);
+
 
             status = VX_SUCCESS;
             status |= vxoAddParameterToGraphByIndex(graph, nodes[0], 0);
@@ -3730,10 +4390,10 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoOpticalFlowPyrLK_Initializer(vx_node nod
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
 
     /* generate original, new and scharr images */
-    vxQueryPyramid(oldPyramid, VX_PYRAMID_ATTRIBUTE_LEVELS, &maxLevel, sizeof(maxLevel));
-    vxQueryPyramid(oldPyramid, VX_PYRAMID_ATTRIBUTE_SCALE, &scale, sizeof(scale));
-    vxQueryPyramid(oldPyramid, VX_PYRAMID_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryPyramid(oldPyramid, VX_PYRAMID_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryPyramid(oldPyramid, VX_PYRAMID_LEVELS, &maxLevel, sizeof(maxLevel));
+    vxQueryPyramid(oldPyramid, VX_PYRAMID_SCALE, &scale, sizeof(scale));
+    vxQueryPyramid(oldPyramid, VX_PYRAMID_WIDTH, &width, sizeof(width));
+    vxQueryPyramid(oldPyramid, VX_PYRAMID_HEIGHT, &height, sizeof(height));
 
     gradXPyramid = vxCreatePyramid(context, maxLevel, scale, width, height, VX_DF_IMAGE_S16);
     gradYPyramid = vxCreatePyramid(context, maxLevel, scale, width, height, VX_DF_IMAGE_S16);
@@ -3760,7 +4420,6 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoOpticalFlowPyrLK_Initializer(vx_node nod
     nodes[i]= vxVLKTrackerNode(graph, oldPyramid, newPyramid, gradXPyramid, gradYPyramid,
                                                prevPts, estimatedPts, nextPts,
                                                criteriaScalar, epsilonScalar, numIterationsScalar, useInitialEstimateScalar, winSizeScalar);
-
     status |= vxoAddParameterToGraphByIndex(graph, nodes[i], 0);
     status |= vxoAddParameterToGraphByIndex(graph, nodes[i], 1);
     status |= vxoAddParameterToGraphByIndex(graph, nodes[i], 4);
@@ -3833,7 +4492,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Remap(vx_node node, const vx_
     vx_scalar        scalarType;
     vx_image         outputImage;
     vx_enum          policy = 0;
-    vx_border_mode_t borders;
+    vx_border_t      borders;
 
     if (num != 4) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -3844,7 +4503,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Remap(vx_node node, const vx_
 
     vxReadScalarValue(scalarType, &policy);
 
-    vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borders, sizeof(borders));
+    vxQueryNode(node, VX_NODE_BORDER, &borders, sizeof(borders));
 
     return vxRemap(node, inputImage, remapTable, policy, &borders, outputImage);
 }
@@ -3878,8 +4537,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoRemap_ValidateInput(vx_node node, vx_uin
 
             if (objData[2].u.scalarInfo.dataType != VX_TYPE_ENUM) return VX_ERROR_INVALID_TYPE;
 
-            if ((policy != VX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR) &&
-                (policy != VX_INTERPOLATION_TYPE_BILINEAR))
+            if ((policy != VX_INTERPOLATION_NEAREST_NEIGHBOR) &&
+                (policy != VX_INTERPOLATION_BILINEAR))
             {
                 return VX_ERROR_INVALID_VALUE;
             }
@@ -3923,7 +4582,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SobelMxN(vx_node node, co
     vx_scalar winScalar      = VX_NULL;
     vx_image grad_x          = VX_NULL;
     vx_image grad_y          = VX_NULL;
-    vx_border_mode_t borders = {VX_BORDER_MODE_UNDEFINED, 0};;
+    vx_border_t borders      = {VX_BORDER_UNDEFINED, 0};;
 
     if (num != 4) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -3932,9 +4591,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SobelMxN(vx_node node, co
     grad_x      = (vx_image)parameters[2];
     grad_y      = (vx_image)parameters[3];
 
-    node->kernelAttributes.isAllGPU = vx_true_e;
-
-    if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borders, sizeof(borders)) == VX_SUCCESS)
+    if (vxQueryNode(node, VX_NODE_BORDER, &borders, sizeof(borders)) == VX_SUCCESS)
     {
         return vxSobelMxN(node, inputImage, winScalar, grad_x, grad_y, &borders);
     }
@@ -3997,7 +4654,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_HarrisScore(vx_node node,
     vx_scalar        sens     = VX_NULL;
     vx_scalar        winds    = VX_NULL;
     vx_image         dstImage = VX_NULL;
-    vx_border_mode_t borders  = {VX_BORDER_MODE_UNDEFINED, 0};
+    vx_border_t      borders  = {VX_BORDER_UNDEFINED, 0};
 
     if (num != 6) return VX_ERROR_INVALID_PARAMETERS;
 
@@ -4008,7 +4665,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_HarrisScore(vx_node node,
      winds    = (vx_scalar)parameters[4];
      dstImage = (vx_image)parameters[5];
 
-     if (vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borders, sizeof(borders)) == VX_SUCCESS)
+     if (vxQueryNode(node, VX_NODE_BORDER, &borders, sizeof(borders)) == VX_SUCCESS)
      {
          return vxHarrisScore(node, grad_x, grad_y, dstImage, scales, winds, sens, borders);
      }
@@ -4131,7 +4788,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoEuclideanNonMax_ValidateInput(vx_node no
 
         if (objData.u.scalarInfo.dataType != VX_TYPE_FLOAT32) return VX_ERROR_INVALID_TYPE;
 
-        if ((radius <= 1.0) || (radius > 5.0)) return VX_ERROR_INVALID_VALUE;
+        if ((radius <= 0.0) || (radius > 30.0)) return VX_ERROR_INVALID_VALUE;
 
         break;
     }
@@ -4186,8 +4843,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLister_Initializer(vx_node node, const v
     graph         = vxCreateGraph(context);
     if (graph == VX_NULL) return VX_ERROR_INVALID_GRAPH;
 
-    vxQueryImage(inputImage, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(inputImage, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(inputImage, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(inputImage, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
     widthScalar = vxCreateScalar(context, VX_TYPE_UINT32, &width);
     heightScalar = vxCreateScalar(context, VX_TYPE_UINT32, &height);
@@ -4196,7 +4853,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoLister_Initializer(vx_node node, const v
 
     if (!outputArray) return VX_ERROR_INVALID_PARAMETERS;
 
-    vxQueryArray(outputArray, VX_ARRAY_ATTRIBUTE_ITEMTYPE, &itemType, sizeof(itemType));
+    vxQueryArray(outputArray, VX_ARRAY_ITEMTYPE, &itemType, sizeof(itemType));
     tempArray = vxCreateArray(context, itemType, width*height);
 
     if (!vxoArray_AllocateMemory(tempArray))
@@ -4377,15 +5034,15 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_NonMaxSuppression(vx_node
     vx_image i_mag;
     vx_image i_ang;
     vx_image i_edge;
-    vx_border_mode_t borders;
+    vx_border_t borders;
 
     if (num != 3) return VX_ERROR_INVALID_PARAMETERS;
 
     i_mag  = (vx_image)parameters[0];
     i_ang  = (vx_image)parameters[1];
     i_edge = (vx_image)parameters[2];
-    node->kernelAttributes.isAllGPU = vx_true_e;
-    vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borders, sizeof(borders));
+
+    vxQueryNode(node, VX_NODE_BORDER, &borders, sizeof(borders));
 
     return vxNonMaxSuppression(node, i_mag, i_ang, i_edge, &borders);
 
@@ -4451,7 +5108,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EdgeTrace(vx_node node, c
 
     if (num != vxmLENGTH_OF(internalkernel_edge_trace_params)) return VX_ERROR_INVALID_PARAMETERS;
 
-    node->kernelAttributes.isAllGPU = vx_true_e;
+    node->kernelAttributes.isAllGPU = vx_false_e;
 
     graph = vxoNode_GetChildGraph(node);
 
@@ -4533,6 +5190,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoEdgeTrace_Initializer(vx_node node, cons
     nodes[0] = vxEdgeTraceThresholdNode(graph, normImage, threshold, image);
     nodes[1] = vxEdgeTraceHysteresisNode(graph, image, flag);
     nodes[2] = vxEdgeTraceClampNode(graph, image, outputImage);
+
 
     status |= vxoAddParameterToGraphByIndex(graph, nodes[0], 0);
     status |= vxoAddParameterToGraphByIndex(graph, nodes[0], 1);
@@ -4746,8 +5404,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoSGM_Initializer(vx_node node, const vx_r
     vx_image left = (vx_image)parameters[1];
     vx_image depth = (vx_image)parameters[2];
 
-    status |= vxQueryImage(right, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    status |= vxQueryImage(right, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    status |= vxQueryImage(right, VX_IMAGE_WIDTH, &width, sizeof(width));
+    status |= vxQueryImage(right, VX_IMAGE_HEIGHT, &height, sizeof(height));
     context = vxGetContext((vx_reference)node);
     graph = vxCreateGraph(context);
     cost = vxCreateImage(context, width * range, height, VX_DF_IMAGE_U16);
@@ -4892,7 +5550,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_CopyImage(vx_node node, c
     input  = (vx_image)parameters[0];
     output  = (vx_image)parameters[1];
 
-    return vxCopyImage(node, input, output);
+    return vxoCopyImage(input, output);
 
 }
 
@@ -5088,13 +5746,13 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_CreateLister(vx_node node
     outputImage = (vx_image)parameters[1];
     array       = (vx_array)parameters[2];
 
-    vxQueryImage(inputImage, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
-    vxQueryImage(inputImage, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
+    vxQueryImage(inputImage, VX_IMAGE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(inputImage, VX_IMAGE_WIDTH, &width, sizeof(width));
 
     if (array)
     {
         vxTruncateArray(array, 0);
-        vxQueryArray(array, VX_ARRAY_ATTRIBUTE_ITEMSIZE, &itemSize, sizeof(itemSize));
+        vxQueryArray(array, VX_ARRAY_ITEMSIZE, &itemSize, sizeof(itemSize));
     }
 
     return vxCreateLister(node, inputImage, outputImage, array, width, height, itemSize);
@@ -5172,8 +5830,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_PackArrays(vx_node node, 
     if (outputArray)
     {
         vxTruncateArray(outputArray, 0);
-        vxQueryArray(outputArray, VX_ARRAY_ATTRIBUTE_CAPACITY, &cap, sizeof(cap));
-        vxQueryArray(outputArray, VX_ARRAY_ATTRIBUTE_ITEMSIZE, &itemSize, sizeof(itemSize));
+        vxQueryArray(outputArray, VX_ARRAY_CAPACITY, &cap, sizeof(cap));
+        vxQueryArray(outputArray, VX_ARRAY_ITEMSIZE, &itemSize, sizeof(itemSize));
     }
 
     return vxPackArrays(node, inputImage, inputArray, widthScalar, heightScalar, itemSize, cap, outputArray, numScalar);
@@ -5261,8 +5919,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_MinMaxlocPackArrays(vx_no
     if (outputArray)
     {
         vxTruncateArray(outputArray, 0);
-        vxQueryArray(outputArray, VX_ARRAY_ATTRIBUTE_CAPACITY, &cap, sizeof(cap));
-        vxQueryArray(outputArray, VX_ARRAY_ATTRIBUTE_ITEMSIZE, &itemSize, sizeof(itemSize));
+        vxQueryArray(outputArray, VX_ARRAY_CAPACITY, &cap, sizeof(cap));
+        vxQueryArray(outputArray, VX_ARRAY_ITEMSIZE, &itemSize, sizeof(itemSize));
     }
 
     return vxMinMaxPackLocation(node, inputImage, inputArray, widthScalar, heightScalar, countScalar, itemSize, cap, outputArray);
@@ -5420,7 +6078,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_MinMaxGetLocation(vx_node
     minCount = (vx_scalar)parameters[7];
     maxCount = (vx_scalar)parameters[8];
 
-    vxQueryImage(inputImage, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
+    vxQueryImage(inputImage, VX_IMAGE_FORMAT, &format, sizeof(format));
 
     return vxMinMaxGetLocation(node, inputImage, minVal, maxVal, format, minImage, maxImage, minCount, maxCount, minArray, maxArray);
 }
@@ -5595,20 +6253,20 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_VLKTracker(vx_node node, 
     isUseInitialEstimateScalar = (vx_scalar)parameters[10];
     winSizeScalar              = (vx_scalar)parameters[11];
 
-    vxQueryPyramid(oldPyramid, VX_PYRAMID_ATTRIBUTE_LEVELS, &maxLevel, sizeof(maxLevel));
-    vxQueryPyramid(oldPyramid, VX_PYRAMID_ATTRIBUTE_SCALE, &pyramidScaleValue, sizeof(pyramidScaleValue));
+    vxQueryPyramid(oldPyramid, VX_PYRAMID_LEVELS, &maxLevel, sizeof(maxLevel));
+    vxQueryPyramid(oldPyramid, VX_PYRAMID_SCALE, &pyramidScaleValue, sizeof(pyramidScaleValue));
 
     /* checking and preparing */
     vxReadScalarValue(isUseInitialEstimateScalar, &isUseInitialEstimate);
-    vxQueryArray(prevPts, VX_ARRAY_ATTRIBUTE_NUMITEMS, &listLength, sizeof(listLength));
+    vxQueryArray(prevPts, VX_ARRAY_NUMITEMS, &listLength, sizeof(listLength));
     if (isUseInitialEstimate)
     {
         vx_size estimateListLength = 0;
 
-        vxQueryArray(estimatedPts, VX_ARRAY_ATTRIBUTE_NUMITEMS, &estimateListLength, sizeof(vx_size));
+        vxQueryArray(estimatedPts, VX_ARRAY_NUMITEMS, &estimateListLength, sizeof(vx_size));
         if (estimateListLength != listLength) return VX_ERROR_INVALID_PARAMETERS;
     }
-    vxSetArrayAttribute(nextPts, VX_ARRAY_ATTRIBUTE_NUMITEMS, &listLength, sizeof(listLength));
+    vxSetArrayAttribute(nextPts, VX_ARRAY_NUMITEMS, &listLength, sizeof(listLength));
 
     return vxVLKTracker(node, oldPyramid, newPyramid, gradXPyramid, gradYPyramid,
                         prevPts, estimatedPts, nextPts,
@@ -5736,8 +6394,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_EqualizeHistogramCdf(vx_n
     minValueScalar = (vx_scalar)parameters[2];
     histImage = (vx_image)parameters[3];
 
-    vxQueryImage(srcImage, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
-    vxQueryImage(srcImage, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
+    vxQueryImage(srcImage, VX_IMAGE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(srcImage, VX_IMAGE_WIDTH, &width, sizeof(width));
 
     wxh = width * height;
 
@@ -5796,6 +6454,12 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoEqualizeHistogramLut_ValidateOutput(vx_n
     return VX_SUCCESS;
 }
 
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Laplacian3x3(vx_node node, const vx_reference *parameters, vx_uint32 num)
+{
+
+    return VX_SUCCESS;
+}
+
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmCost(vx_node node, const vx_reference parameters[], vx_uint32 num)
 {
     vx_image right, left, cost;
@@ -5807,8 +6471,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmCost(vx_node node, con
     disp_range = (vx_scalar)parameters[2];
     if (num != 4) return VX_ERROR_INVALID_PARAMETERS;
 
-    vxQueryImage(right, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(right, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(right, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(right, VX_IMAGE_HEIGHT, &height, sizeof(height));
     vxReadScalarValue(disp_range, &range);
     vxWriteScalarValue(disp_range, &range);
     return vxSGMCost(node, right, left, cost, width, height, range);
@@ -5862,8 +6526,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmPath90(vx_node node, c
     path = (vx_image)parameters[2];
     disp_range = (vx_scalar)parameters[1];
 
-    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(cost, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(cost, VX_IMAGE_HEIGHT, &height, sizeof(height));
     vxReadScalarValue(disp_range, &range);
     vxWriteScalarValue(disp_range, &range);
     width /= range;
@@ -5922,8 +6586,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmPath45(vx_node node, c
     path = (vx_image)parameters[2];
     disp_range = (vx_scalar)parameters[1];
 
-    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(cost, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(cost, VX_IMAGE_HEIGHT, &height, sizeof(height));
     vxReadScalarValue(disp_range, &range);
     vxWriteScalarValue(disp_range, &range);
     width /= range;
@@ -5974,8 +6638,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmPath135(vx_node node, 
     path = (vx_image)parameters[2];
     disp_range = (vx_scalar)parameters[1];
 
-    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(cost, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(cost, VX_IMAGE_HEIGHT, &height, sizeof(height));
     vxReadScalarValue(disp_range, &range);
     vxWriteScalarValue(disp_range, &range);
     width /= range;
@@ -6026,8 +6690,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmPath0(vx_node node, co
     path = (vx_image)parameters[2];
     disp_range = (vx_scalar)parameters[1];
 
-    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(cost, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(cost, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(cost, VX_IMAGE_HEIGHT, &height, sizeof(height));
     vxReadScalarValue(disp_range, &range);
     vxWriteScalarValue(disp_range, &range);
     width /= range;
@@ -6078,8 +6742,8 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_SgmDisp(vx_node node, con
     depth = (vx_image)parameters[2];
     disp_range = (vx_scalar)parameters[1];
 
-    vxQueryImage(depth, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(depth, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(depth, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(depth, VX_IMAGE_HEIGHT, &height, sizeof(height));
     vxReadScalarValue(disp_range, &range);
     vxWriteScalarValue(disp_range, &range);
 
@@ -6198,6 +6862,10 @@ vx_kernel_description_s *target_kernels[] = {
     &internalKernel_EqualizeHistogramCdf,
     &internalKernel_EqualizeHistogramLut,
     &internalkernel_sgm,
+    &basekernel_laplacian3x3,
+    &basekernel_laplacian_pyramid,
+    &basekernel_laplacian_reconstruct,
+    &basekernel_nonlinear_filter,
     &internalkernel_sgm_cost,
     &internalkernel_sgm_path90,
     &internalkernel_sgm_path45,
@@ -6206,6 +6874,25 @@ vx_kernel_description_s *target_kernels[] = {
     &internalkernel_sgm_disp,
     &internalKernel_Laplacian3x3,
     &internalKernel_census3x3,
+    &internalkernel_NNConvolutionReluCnnLayer,
+    &internalkernel_NNConvolutionReluPoolingCnnLayer,
+    &internalkernel_NNFullyConnectedReluLayer,
+    &internalkernel_NNSoftmaxLayer,
+    &internalkernel_NNNormalization,
+    &internalkernel_NNNormalizeImage,
+    &internalkernel_NNPoolingLayer,
+    &internalkernel_NNFullyConnectedLayer,
+    &internalkernel_NNActivationLayer,
+    &internalkernel_NNTensorAdd,
+    &internalkernel_NNTensorSub,
+    &internalkernel_NNTensorMul,
+    &internalkernel_NNLeakyReluLayer,
+    &internalkernel_NNBatchNormLayer,
+    &internalkernel_NNRPNLayer,
+    &internalkernel_NNROIPoolLayer,
+    &internalkernel_NNConcat2Layer,
+    &internalkernel_NNConvolutionLayer,
+
 };
 
 vx_uint32 num_target_kernels = vxmLENGTH_OF(target_kernels);

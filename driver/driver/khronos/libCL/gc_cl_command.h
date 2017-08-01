@@ -40,7 +40,7 @@ struct _cl_commit_request
 {
     gctBOOL                     stall;
     gctUINT64                   nextEnqueueNo;
-    gctSIGNAL                   signal;
+    gctSIGNAL                   signal[gcvENGINE_GPU_ENGINE_COUNT];
     clsCommitRequest_PTR        next;
     clsCommitRequest_PTR        previous;
 };
@@ -55,6 +55,9 @@ struct clsPrivateBuffer
     gcUNIFORM                   uniform;
     clsPrivateBuffer_PTR        next;
 };
+
+typedef gctINT (*clfProcessCommandQueue)(clsCommandQueue_PTR CommandQueue, clsCommand_PTR Command);
+typedef gctINT (*clfProcessCommitRequest)(clsCommandQueue_PTR CommandQueue, clsCommitRequest_PTR CommitRequest);
 
 typedef struct _cl_command_queue
 {
@@ -81,11 +84,18 @@ typedef struct _cl_command_queue
     clsCommandQueue_PTR         next;
     clsCommandQueue_PTR         previous;
 
+    gctBOOL                     inThread;
+
     gctPOINTER                  workerThread;
     gctSIGNAL                   workerStartSignal;
     gctSIGNAL                   workerStopSignal;
 
+    clfProcessCommandQueue      processCommandQueue;
+    clfProcessCommitRequest     processCommitRequest;
+
     clsPrivateBuffer_PTR        privateBufList;
+
+    gcoHARDWARE                  hardware;
 }
 clsCommandQueue;
 
@@ -95,23 +105,17 @@ typedef enum _cleCOMMAND_TYPE
     clvCOMMAND_READ_BUFFER,
     clvCOMMAND_READ_BUFFER_RECT,
     clvCOMMAND_WRITE_BUFFER,
-#if BUILD_OPENCL_12
     clvCOMMAND_FILL_BUFFER,
-#endif
     clvCOMMAND_WRITE_BUFFER_RECT,
     clvCOMMAND_COPY_BUFFER,
     clvCOMMAND_COPY_BUFFER_RECT,
     clvCOMMAND_READ_IMAGE,
     clvCOMMAND_WRITE_IMAGE,
-#if BUILD_OPENCL_12
     clvCOMMAND_FILL_IMAGE,
-#endif
     clvCOMMAND_COPY_IMAGE,
     clvCOMMAND_COPY_IMAGE_TO_BUFFER,
     clvCOMMAND_COPY_BUFFER_TO_IMAGE,
-#if BUILD_OPENCL_12
     clvCOMMAND_MIGRATE_MEM_OBJECTS,
-#endif
     clvCOMMAND_MAP_BUFFER,
     clvCOMMAND_MAP_IMAGE,
     clvCOMMAND_UNMAP_MEM_OBJECT,
@@ -158,7 +162,6 @@ typedef struct {
 } clsCommandWriteBuffer,
 * clsCommandWriteBuffer_PTR;
 
-#if BUILD_OPENCL_12
 typedef struct {
     clsMem_PTR          buffer;
     size_t              offset;
@@ -167,7 +170,6 @@ typedef struct {
     gctCONST_POINTER    pattern;
 } clsCommandFillBuffer,
 * clsCommandFillBuffer_PTR;
-#endif
 
 typedef struct {
     clsMem_PTR          buffer;
@@ -227,7 +229,6 @@ typedef struct {
 } clsCommandWriteImage,
 * clsCommandWriteImage_PTR;
 
-#if BUILD_OPENCL_12
 typedef struct {
     clsMem_PTR          image;
     size_t              origin[3];
@@ -238,7 +239,6 @@ typedef struct {
     gctCONST_POINTER    fillColorPtr;
 } clsCommandFillImage,
 * clsCommandFillImage_PTR;
-#endif
 
 typedef struct {
     clsMem_PTR          srcImage;
@@ -317,11 +317,7 @@ typedef struct {
 * clsCommandTask_PTR;
 
 typedef struct {
-#if BUILD_OPENCL_12
     void                (CL_CALLBACK * userFunc)(void *);
-#else
-    void                (*userFunc)(void *);
-#endif
     void *              args;
     size_t              cbArgs;
     gctUINT             numMemObjects;
@@ -363,22 +359,19 @@ typedef struct _cl_command
     clsEvent_PTR            internalEventWaitList[2];
     gctINT                  (* handler)(clsCommand_PTR);
     gctSIGNAL               releaseSignal;
+    gceENGINE               submitEngine;
 
     union {
         clsCommandReadBuffer        readBuffer;
         clsCommandReadBufferRect    readBufferRect;
         clsCommandWriteBuffer       writeBuffer;
-#if BUILD_OPENCL_12
         clsCommandFillBuffer        fillBuffer;
-#endif
         clsCommandWriteBufferRect   writeBufferRect;
         clsCommandCopyBuffer        copyBuffer;
         clsCommandCopyBufferRect    copyBufferRect;
         clsCommandReadImage         readImage;
         clsCommandWriteImage        writeImage;
-#if BUILD_OPENCL_12
         clsCommandFillImage         fillImage;
-#endif
         clsCommandCopyImage         copyImage;
         clsCommandCopyImageToBuffer copyImageToBuffer;
         clsCommandCopyBufferToImage copyBufferToImage;
@@ -399,7 +392,6 @@ clsCommand;
 \******************************************************************************/
 
 /* Get event command type from command type */
-#if BUILD_OPENCL_12
 #define clmGET_COMMANDTYPE(type) ( \
     (type) == clvCOMMAND_READ_BUFFER          ? CL_COMMAND_READ_BUFFER          : \
     (type) == clvCOMMAND_READ_BUFFER_RECT     ? CL_COMMAND_READ_BUFFER_RECT     : \
@@ -426,30 +418,6 @@ clsCommand;
     (type) == clvCOMMAND_BARRIER              ? CL_COMMAND_BARRIER              : \
     (type) == clvCOMMAND_FILL_BUFFER          ? CL_COMMAND_FILL_BUFFER          : \
                                                 CL_COMMAND_USER )
-#else
-#define clmGET_COMMANDTYPE(type) ( \
-    (type) == clvCOMMAND_READ_BUFFER          ? CL_COMMAND_READ_BUFFER          : \
-    (type) == clvCOMMAND_READ_BUFFER_RECT     ? CL_COMMAND_READ_BUFFER_RECT     : \
-    (type) == clvCOMMAND_WRITE_BUFFER         ? CL_COMMAND_WRITE_BUFFER         : \
-    (type) == clvCOMMAND_WRITE_BUFFER_RECT    ? CL_COMMAND_WRITE_BUFFER_RECT    : \
-    (type) == clvCOMMAND_COPY_BUFFER          ? CL_COMMAND_COPY_BUFFER          : \
-    (type) == clvCOMMAND_COPY_BUFFER_RECT     ? CL_COMMAND_COPY_BUFFER_RECT     : \
-    (type) == clvCOMMAND_READ_IMAGE           ? CL_COMMAND_READ_IMAGE           : \
-    (type) == clvCOMMAND_WRITE_IMAGE          ? CL_COMMAND_WRITE_IMAGE          : \
-    (type) == clvCOMMAND_COPY_IMAGE           ? CL_COMMAND_COPY_IMAGE           : \
-    (type) == clvCOMMAND_COPY_IMAGE_TO_BUFFER ? CL_COMMAND_COPY_IMAGE_TO_BUFFER : \
-    (type) == clvCOMMAND_COPY_BUFFER_TO_IMAGE ? CL_COMMAND_COPY_BUFFER_TO_IMAGE : \
-    (type) == clvCOMMAND_MAP_BUFFER           ? CL_COMMAND_MAP_BUFFER           : \
-    (type) == clvCOMMAND_MAP_IMAGE            ? CL_COMMAND_MAP_IMAGE            : \
-    (type) == clvCOMMAND_UNMAP_MEM_OBJECT     ? CL_COMMAND_UNMAP_MEM_OBJECT     : \
-    (type) == clvCOMMAND_NDRANGE_KERNEL       ? CL_COMMAND_NDRANGE_KERNEL       : \
-    (type) == clvCOMMAND_TASK                 ? CL_COMMAND_TASK                 : \
-    (type) == clvCOMMAND_NATIVE_KERNEL        ? CL_COMMAND_NATIVE_KERNEL        : \
-    (type) == clvCOMMAND_MARKER               ? CL_COMMAND_MARKER               : \
-    (type) == clvCOMMAND_ACQUIRE_GL_OBJECTS   ? CL_COMMAND_ACQUIRE_GL_OBJECTS   : \
-    (type) == clvCOMMAND_RELEASE_GL_OBJECTS   ? CL_COMMAND_RELEASE_GL_OBJECTS   : \
-                                                CL_COMMAND_USER )
-#endif
 
 /* Return true if command requires hardware execution
  * Most commands are executed purely in driver stack
@@ -469,7 +437,6 @@ clsCommand;
 
 
 /* Return true if command is a buffer operation */
-#if BUILD_OPENCL_12
 
 #define clmCOMMAND_BUFFER_OPERATION(type) ( \
     (type) == clvCOMMAND_READ_BUFFER             ? gcvTRUE : \
@@ -489,24 +456,6 @@ clsCommand;
     (type) == clvCOMMAND_MAP_BUFFER              ? gcvTRUE : \
     (type) == clvCOMMAND_MAP_IMAGE               ? gcvTRUE : gcvFALSE )
 
-#else
-
-#define clmCOMMAND_BUFFER_OPERATION(type) ( \
-    (type) == clvCOMMAND_READ_BUFFER             ? gcvTRUE : \
-    (type) == clvCOMMAND_READ_BUFFER_RECT        ? gcvTRUE : \
-    (type) == clvCOMMAND_WRITE_BUFFER            ? gcvTRUE : \
-    (type) == clvCOMMAND_WRITE_BUFFER_RECT       ? gcvTRUE : \
-    (type) == clvCOMMAND_COPY_BUFFER             ? gcvTRUE : \
-    (type) == clvCOMMAND_COPY_BUFFER_RECT        ? gcvTRUE : \
-    (type) == clvCOMMAND_READ_IMAGE              ? gcvTRUE : \
-    (type) == clvCOMMAND_WRITE_IMAGE             ? gcvTRUE : \
-    (type) == clvCOMMAND_COPY_IMAGE              ? gcvTRUE : \
-    (type) == clvCOMMAND_COPY_IMAGE_TO_BUFFER    ? gcvTRUE : \
-    (type) == clvCOMMAND_COPY_BUFFER_TO_IMAGE    ? gcvTRUE : \
-    (type) == clvCOMMAND_MAP_BUFFER              ? gcvTRUE : \
-    (type) == clvCOMMAND_MAP_IMAGE               ? gcvTRUE : gcvFALSE )
-
-#endif
 
 /*****************************************************************************\
 |*                         Supporting functions                              *|
@@ -568,6 +517,12 @@ clfReleaseCommandQueue(
 gceSTATUS
 clfRetainCommandQueue(
     cl_command_queue CommandQueue
+    );
+
+
+gctINT
+clfProcessDeferredReleaseCommandList(
+    clsCommandQueue_PTR     CommandQueue
     );
 
 #ifdef __cplusplus

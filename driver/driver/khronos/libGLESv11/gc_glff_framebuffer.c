@@ -1028,48 +1028,19 @@ GL_API void GL_APIENTRY glBindFramebufferOES(
         /* Unbind any current framebuffer. */
         if (context->frameBuffer != gcvNULL)
         {
-            if(context->frameBuffer->color.surface != gcvNULL)
-            {
-                gcmERR_BREAK(gcoSURF_SetOrientation(
-                    context->frameBuffer->color.surface,
-                    gcvORIENTATION_TOP_BOTTOM
-                ));
-            }
-
             if ((context->frameBuffer->color.target != gcvNULL) &&
                 context->frameBuffer->needResolve &&
                 (context->frameBuffer->color.surface != gcvNULL))
             {
-                /* Set orientation. */
-                gcmERR_BREAK(gcoSURF_SetOrientation(
-                    context->frameBuffer->color.target,
-                    gcvORIENTATION_TOP_BOTTOM
-                    ));
-
                 /* Resolve color render target into texture. */
                 surfView.surf = context->frameBuffer->color.surface;
                 tgtView.surf  = context->frameBuffer->color.target;
                 gcmERR_BREAK(gcoSURF_ResolveRect(&tgtView, &surfView, gcvNULL));
             }
 
-            if(context->frameBuffer->depth.surface != gcvNULL)
-            {
-                gcmERR_BREAK(gcoSURF_SetOrientation(
-                    context->frameBuffer->depth.surface,
-                    gcvORIENTATION_TOP_BOTTOM
-                    ));
-            }
-
-
             if ((context->frameBuffer->depth.target != gcvNULL) &&
                 context->frameBuffer->needResolve)
             {
-                /* Set orientation. */
-                gcmERR_BREAK(gcoSURF_SetOrientation(
-                    context->frameBuffer->depth.target,
-                    gcvORIENTATION_TOP_BOTTOM
-                    ));
-
                 /* Resolve depth render target into texture. */
                 surfView.surf = context->frameBuffer->depth.surface;
                 tgtView.surf  = context->frameBuffer->depth.target;
@@ -1482,6 +1453,7 @@ GL_API void GL_APIENTRY glFramebufferTexture2DOES(
                             gcsHAL_INTERFACE iface;
 
                             iface.command            = gcvHAL_SIGNAL;
+                            iface.engine             = gcvENGINE_RENDER;
                             iface.u.Signal.signal    = handle->hwDoneSignal;
                             iface.u.Signal.auxSignal = 0;
                             /* Stuff the client's PID. */
@@ -1607,24 +1579,6 @@ GL_API void GL_APIENTRY glFramebufferTexture2DOES(
         switch (Attachment)
         {
         case GL_COLOR_ATTACHMENT0_OES:
-            if(context->frameBuffer->color.surface != gcvNULL)
-            {
-                /* Set orientation. */
-                gcoSURF_SetOrientation(
-                    context->frameBuffer->color.surface,
-                    gcvORIENTATION_TOP_BOTTOM
-                    );
-            }
-
-            if(context->frameBuffer->color.target != gcvNULL)
-            {
-                /* Set orientation. */
-                gcoSURF_SetOrientation(
-                    context->frameBuffer->color.target,
-                    gcvORIENTATION_TOP_BOTTOM
-                    );
-            }
-
             if ((context->frameBuffer->color.target != gcvNULL)
                 &&  (context->frameBuffer->color.target != target))
             {
@@ -1811,7 +1765,6 @@ GL_API void GL_APIENTRY glFramebufferRenderbufferOES(
         gcoSURF target = gcvNULL;
         gcsSURF_VIEW surfView = {gcvNULL, 0, 1};
         gcsSURF_VIEW tgtView = {gcvNULL, 0, 1};
-        gceORIENTATION srcOrient,dstOrient;
 
         gcmDUMP_API("${ES11 glFramebufferRenderbufferOES 0x%08X 0x%08X 0x%08X 0x%08X}",
             Target, Attachment, RenderBufferTarget, RenderBuffer);
@@ -1903,28 +1856,12 @@ GL_API void GL_APIENTRY glFramebufferRenderbufferOES(
                 context->frameBuffer->color.surface != gcvNULL &&
                 context->frameBuffer->needResolve)
             {
-                gcmONERROR(
-                    gcoSURF_QueryOrientation(context->frameBuffer->color.target,
-                                             &srcOrient));
-
-                gcmONERROR(
-                    gcoSURF_QueryOrientation(context->frameBuffer->color.surface,
-                                             &dstOrient));
-
-                gcmONERROR(
-                    gcoSURF_SetOrientation(context->frameBuffer->color.surface,
-                                           srcOrient));
-
                 /* Resolve color render target into texture. */
                 surfView.surf = context->frameBuffer->color.surface;
                 tgtView.surf  = context->frameBuffer->color.target;
                 gcmONERROR(gcoSURF_ResolveRect(&tgtView, &surfView, gcvNULL));
 
-                gcmONERROR(
-                    gcoSURF_SetOrientation(context->frameBuffer->color.surface,
-                                           dstOrient));
-
-                    context->frameBuffer->needResolve = gcvFALSE;
+                context->frameBuffer->needResolve = gcvFALSE;
             }
 
             if(context->frameBuffer->color.target != gcvNULL )
@@ -1953,25 +1890,9 @@ GL_API void GL_APIENTRY glFramebufferRenderbufferOES(
             if (context->frameBuffer->color.target != gcvNULL &&
                 context->frameBuffer->color.surface != gcvNULL)
             {
-                gcmONERROR(
-                    gcoSURF_QueryOrientation(context->frameBuffer->color.target,
-                                             &srcOrient));
-
-                gcmONERROR(
-                    gcoSURF_QueryOrientation(context->frameBuffer->color.surface,
-                                             &dstOrient));
-
-                gcmONERROR(
-                    gcoSURF_SetOrientation(context->frameBuffer->color.surface,
-                                           srcOrient));
-
                 surfView.surf = context->frameBuffer->color.surface;
                 tgtView.surf  = context->frameBuffer->color.target;
                 gcmONERROR(gcoSURF_ResolveRect(&surfView, &tgtView, gcvNULL));
-
-                gcmONERROR(
-                        gcoSURF_SetOrientation(context->frameBuffer->color.surface,
-                                               dstOrient));
             }
 
             glfReferenceNamedObject(wrapper);

@@ -26,6 +26,7 @@
 #include <sys/mman.h>
 #include <pthread.h>
 
+/* Default Display Enumeration. */
 #define FB_MAX_BUFFER_COUNT     8
 
 /*
@@ -47,46 +48,61 @@ __vkFbdevDisplayMapping[] =
     /* Display 1 */ {0, {0,}}
 };
 
-typedef struct __vkFbdevDisplayKHRRec           __vkFbdevDisplayKHR;
+
 typedef struct __vkFbdevDisplayPlaneRec         __vkFbdevDisplayPlane;
 typedef struct __vkFbdevSwapchainKHRRec         __vkFbdevSwapchainKHR;
 typedef struct __vkFbdevImageBufferRec          __vkFbdevImageBuffer;
 
-struct __vkFbdevDisplayKHRRec
-{
-    __vkDisplayKHR                  base;
-
-    /* Pointer to main-lay, ie, graphics plane. */
-    __vkFbdevDisplayPlane *         graphicPlane;
-
-};
-
 struct __vkFbdevDisplayPlaneRec
 {
-    __vkDisplayPlane                base;
+    __vkDisplayPlane                    base;
 
-    char                            fbPath[32];
-    int                             fd;
+    char                                fbPath[32];
+    int                                 fd;
 
     /* properties. */
-    VkFormat                        supportedFormats[16];
-    uint32_t                        supportedFormatCount;
-    uint32_t                        minImageCount;
-    uint32_t                        maxImageCount;
+    VkFormat                            supportedFormats[16];
+    uint32_t                            supportedFormatCount;
+    uint32_t                            minImageCount;
+    uint32_t                            maxImageCount;
 
     /* map memory to userspace. */
-    void *                          userPtr;
-    uint32_t                        userLength;
+    void *                              userPtr;
+    uint32_t                            userLength;
 
     /* underlying driver information. */
-    struct fb_fix_screeninfo        fixInfo;
-    struct fb_var_screeninfo        varInfo;
+    struct fb_fix_screeninfo            fixInfo;
+    struct fb_var_screeninfo            varInfo;
 
-    VkFormat                        format;
-    uint32_t                        stride;
-    uint32_t                        alignedWidth;
-    uint32_t                        alignedHeight;
-    uint32_t                        imageCount;
+    VkFormat                            format;
+    uint32_t                            stride;
+    uint32_t                            alignedWidth;
+    uint32_t                            alignedHeight;
+    uint32_t                            imageCount;
+};
+
+typedef struct __vkFbdevDisplayPlaneParameterRec    __vkFbdevDisplayPlaneParameter;
+
+struct __vkFbdevDisplayPlaneParameterRec
+{
+    VkDisplayModeKHR                    displayMode;
+    uint32_t                            planeStackIndex;
+    VkSurfaceTransformFlagBitsKHR       transform;
+    float                               globalAlpha;
+    VkDisplayPlaneAlphaFlagBitsKHR      alphaMode;
+    VkExtent2D                          imageExtent;
+    uint32_t                            imageCount;
+    VkFormat                            imageFormat;
+    VkColorSpaceKHR                     imageColorSpace;
+    /* VkExtent2D                          imageExtent; */
+    uint32_t                            imageArrayLayers;
+    VkImageUsageFlags                   imageUsage;
+    VkSharingMode                       imageSharingMode;
+    VkSurfaceTransformFlagBitsKHR       preTransform;
+    VkCompositeAlphaFlagBitsKHR         compositeAlpha;
+    VkPresentModeKHR                    presentMode;
+    VkBool32                            clipped;
+
 };
 
 /*
@@ -96,91 +112,94 @@ struct __vkFbdevDisplayPlaneRec
  */
 struct __vkFbdevSwapchainKHRRec
 {
-    __vkSwapchainKHR                base;
+    __vkSwapchainKHR                    base;
 
-    VkDevice                        device;
-    VkIcdSurfaceDisplay *           surface;
-    __vkFbdevDisplayPlane *         plane;
+    VkDevice                            device;
+    VkIcdSurfaceDisplay *               surface;
+    __vkFbdevDisplayPlane *             plane;
 
     /* It's an old swapchain, replaced by new one. */
-    VkBool32                        expired;
+    VkBool32                            expired;
 
-    uint32_t                        minImageCount;
-    VkFormat                        imageFormat;
-    VkColorSpaceKHR                 imageColorSpace;
-    VkExtent2D                      imageExtent;
-    uint32_t                        imageArrayLayers;
-    VkImageUsageFlags               imageUsage;
-    VkSharingMode                   imageSharingMode;
-    VkCompositeAlphaFlagBitsKHR     compositeAlpha;
-    VkSurfaceTransformFlagBitsKHR   preTransform;
-    VkPresentModeKHR                presentMode;
-    VkBool32                        clipped;
+    uint32_t                            minImageCount;
+    VkFormat                            imageFormat;
+    VkColorSpaceKHR                     imageColorSpace;
+    VkExtent2D                          imageExtent;
+    uint32_t                            imageArrayLayers;
+    VkImageUsageFlags                   imageUsage;
+    VkSharingMode                       imageSharingMode;
+    VkCompositeAlphaFlagBitsKHR         compositeAlpha;
+    VkSurfaceTransformFlagBitsKHR       preTransform;
+    VkPresentModeKHR                    presentMode;
+    VkBool32                            clipped;
 
-    __vkFbdevImageBuffer *          imageBuffers;
-    uint32_t                        imageCount;
-    uint32_t                        currentImageIndex;
+    __vkFbdevImageBuffer *              imageBuffers;
+    uint32_t                            imageCount;
+    uint32_t                            currentImageIndex;
 
-    VkCommandPool                   cmdPool;
-    VkCommandBuffer                 cmdBuf;
+    VkCommandPool                       cmdPool;
+    VkCommandBuffer                     cmdBuf;
 };
 
 struct __vkFbdevImageBufferRec
 {
-    __vkFbdevSwapchainKHR *         swapchain;
+    __vkFbdevSwapchainKHR *             swapchain;
 
-    VkImage                         renderTarget;
-    VkDeviceMemory                  renderTargetMemory;
+    VkImage                             renderTarget;
+    VkDeviceMemory                      renderTargetMemory;
 
-    VkBuffer                        resolveTarget;
-    VkDeviceMemory                  resolveTargetMemory;
-    uint32_t                        bufferRowLength;
-    uint32_t                        bufferImageHeight;
+    VkBuffer                            resolveTarget;
+    VkDeviceMemory                      resolveTargetMemory;
+    uint32_t                            bufferRowLength;
+    uint32_t                            bufferImageHeight;
 
     /* Acquired by app. */
-    VkBool32                        acquired;
+    VkBool32                            acquired;
 };
-
 
 static struct
 {
-    VkFormat format;
-    uint32_t bitsPerPixel;
-    struct fb_bitfield red;
-    struct fb_bitfield green;
-    struct fb_bitfield blue;
-    struct fb_bitfield transp;
+    VkFormat                            format;
+    VkBool32                            enableAlpha;
+
+    uint32_t                            bitsPerPixel;
+    struct fb_bitfield                  red;
+    struct fb_bitfield                  green;
+    struct fb_bitfield                  blue;
+    struct fb_bitfield                  transp;
 }
-__formatXlateTable[] =
+__fbdevFormatXlate[] =
 {
-    {VK_FORMAT_R8G8B8A8_UNORM, 32, { 0, 8, 0}, { 8, 8, 0}, {16, 8, 0}, {24, 8, 0}},
-    /* Fake RGRX8888 as BGRA8888. */
-    {VK_FORMAT_R8G8B8A8_UNORM, 32, { 0, 8, 0}, { 8, 8, 0}, {16, 8, 0}, { 0, 0, 0}},
+    {VK_FORMAT_R8G8B8A8_UNORM, VK_TRUE, 32, { 0, 8, 0}, { 8, 8, 0}, {16, 8, 0}, {24, 8, 0}},
+    /* Fake RGRX8888 as RGBA8888. */
+    {VK_FORMAT_R8G8B8A8_UNORM, VK_FALSE, 32, { 0, 8, 0}, { 8, 8, 0}, {16, 8, 0}, { 0, 0, 0}},
 
-    {VK_FORMAT_B8G8R8A8_UNORM, 32, {16, 8, 0}, { 8, 8, 0}, { 0, 8, 0}, {24, 8, 0}},
+    {VK_FORMAT_B8G8R8A8_UNORM, VK_TRUE, 32, {16, 8, 0}, { 8, 8, 0}, { 0, 8, 0}, {24, 8, 0}},
     /* Fake BGRX8888 as BGRA8888. */
-    {VK_FORMAT_B8G8R8A8_UNORM, 32, {16, 8, 0}, { 8, 8, 0}, { 0, 8, 0}, { 0, 0, 0}},
+    {VK_FORMAT_B8G8R8A8_UNORM, VK_FALSE, 32, {16, 8, 0}, { 8, 8, 0}, { 0, 8, 0}, { 0, 0, 0}},
 
-    {VK_FORMAT_R5G6B5_UNORM_PACK16, 16, {11, 5, 0}, { 5, 6, 0}, { 0, 5, 0}, { 0, 0, 0}},
+    {VK_FORMAT_R5G6B5_UNORM_PACK16, VK_FALSE, 16, {11, 5, 0}, { 5, 6, 0}, { 0, 5, 0}, { 0, 0, 0}},
 
 };
 
-static VkResult __TranslateVkFormat(
-    VkFormat format,
-    struct fb_var_screeninfo *varInfo
+static VkResult __TranslateFormatToFbdevInfo(
+    VkFormat                            format,
+    VkBool32                            enableAlpha,
+    struct fb_var_screeninfo *          varInfo
     )
 {
     uint32_t i;
 
-    for (i = 0; i < __VK_COUNTOF(__formatXlateTable); i++)
+    for (i = 0; i < __VK_COUNTOF(__fbdevFormatXlate); i++)
     {
-        if (__formatXlateTable[i].format == format)
+        if ((__fbdevFormatXlate[i].format == format) &&
+            __fbdevFormatXlate[i].enableAlpha == enableAlpha)
         {
-            varInfo->bits_per_pixel = __formatXlateTable[i].bitsPerPixel;
-            varInfo->red            = __formatXlateTable[i].red;
-            varInfo->green          = __formatXlateTable[i].green;
-            varInfo->blue           = __formatXlateTable[i].blue;
-            varInfo->transp         = __formatXlateTable[i].transp;
+            varInfo->bits_per_pixel = __fbdevFormatXlate[i].bitsPerPixel;
+            varInfo->red            = __fbdevFormatXlate[i].red;
+            varInfo->green          = __fbdevFormatXlate[i].green;
+            varInfo->blue           = __fbdevFormatXlate[i].blue;
+            varInfo->transp         = __fbdevFormatXlate[i].transp;
             return VK_SUCCESS;
         }
     }
@@ -188,66 +207,73 @@ static VkResult __TranslateVkFormat(
     return VK_ERROR_FORMAT_NOT_SUPPORTED;
 }
 
-static VkFormat __TranslateFbdevFormat(
-    const struct fb_var_screeninfo *varInfo
-    )
+static VkFormat __TranslateFbdevInfoToFormat(
+    const struct fb_var_screeninfo *    varInfo,
+    VkBool32 *                          pEnableAlpha)
 {
     uint32_t i;
 
-    for (i = 0; i < __VK_COUNTOF(__formatXlateTable); i++)
+    for (i = 0; i < __VK_COUNTOF(__fbdevFormatXlate); i++)
     {
-        if ((__formatXlateTable[i].bitsPerPixel == varInfo->bits_per_pixel) &&
-            (__formatXlateTable[i].red.offset == varInfo->red.offset) &&
-            (__formatXlateTable[i].red.length == varInfo->red.length) &&
-            (__formatXlateTable[i].green.offset == varInfo->green.offset) &&
-            (__formatXlateTable[i].green.length == varInfo->green.length) &&
-            (__formatXlateTable[i].blue.offset == varInfo->blue.offset) &&
-            (__formatXlateTable[i].blue.length == varInfo->blue.length) &&
-            (__formatXlateTable[i].transp.offset == varInfo->transp.offset) &&
-            (__formatXlateTable[i].transp.length == varInfo->transp.length))
+        if ((__fbdevFormatXlate[i].bitsPerPixel == varInfo->bits_per_pixel) &&
+            (__fbdevFormatXlate[i].red.offset == varInfo->red.offset) &&
+            (__fbdevFormatXlate[i].red.length == varInfo->red.length) &&
+            (__fbdevFormatXlate[i].green.offset == varInfo->green.offset) &&
+            (__fbdevFormatXlate[i].green.length == varInfo->green.length) &&
+            (__fbdevFormatXlate[i].blue.offset == varInfo->blue.offset) &&
+            (__fbdevFormatXlate[i].blue.length == varInfo->blue.length) &&
+            (__fbdevFormatXlate[i].transp.offset == varInfo->transp.offset) &&
+            (__fbdevFormatXlate[i].transp.length == varInfo->transp.length))
         {
-            return __formatXlateTable[i].format;
+            if (pEnableAlpha)
+                *pEnableAlpha = __fbdevFormatXlate[i].enableAlpha;
+
+            return __fbdevFormatXlate[i].format;
         }
     }
 
     return VK_FORMAT_UNDEFINED;
 }
 
+/*
+ * NOTICE:
+ * It is platform specific.
+ * alignedHeight may be aligned to page size on some platforms.
+ */
 static inline uint32_t __CalcAlignedHeight(
-    const struct fb_var_screeninfo *varInfo
-    )
+    const struct fb_var_screeninfo *    varInfo)
 {
     return varInfo->yres_virtual / (varInfo->yres_virtual / varInfo->yres);
 }
 
-static __vkFbdevDisplayKHR *__CreateFbdevDisplay(
-    __vkPhysicalDevice *phyDev,
-    __vkFbdevDisplayPlane *graphicPlane
-    )
+/* Default: one display-plane for one display, can not switch planes. */
+static __vkDisplayKHR *__CreateFbdevDisplay(
+    __vkPhysicalDevice *                phyDev,
+    __vkFbdevDisplayPlane *             graphicPlane)
 {
     struct fb_var_screeninfo *info = &graphicPlane->varInfo;
-    __vkFbdevDisplayKHR *display;
+    __vkDisplayKHR *display;
     __vkDisplayModeKHR *displayMode;
     __VK_SET_ALLOCATIONCB(&phyDev->pInst->memCb);
 
-    display = (__vkFbdevDisplayKHR *)__VK_ALLOC(sizeof(__vkFbdevDisplayKHR), 8, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
-    __VK_MEMZERO(display, sizeof(__vkFbdevDisplayKHR));
+    display = (__vkDisplayKHR *)__VK_ALLOC(sizeof(__vkDisplayKHR), 8, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+    __VK_MEMZERO(display, sizeof(__vkDisplayKHR));
 
     /* Get display name from graphics plane. */
-    strncpy(display->base.displayName, graphicPlane->fixInfo.id, sizeof(display->base.displayName));
+    strncpy(display->displayName, graphicPlane->fixInfo.id, sizeof(display->displayName));
 
-    display->base.physicalDimensions.width  = (info->width  <= 0) ? ((info->xres * 25.4f)/160.0f + 0.5f) : info->width;
-    display->base.physicalDimensions.height = (info->height <= 0) ? ((info->yres * 25.4f)/160.0f + 0.5f) : info->height;
-    display->base.physicalResolution.width  = info->xres;
-    display->base.physicalResolution.height = info->yres;
-    display->base.supportedTransforms       = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-    display->base.planeReorderPossible      = VK_FALSE;
-    display->base.persistentContent         = VK_FALSE;
-    display->base.planeStack[0]             = (__vkDisplayPlane *) graphicPlane;
+    display->physicalDimensions.width  = (info->width  <= 0) ? ((info->xres * 25.4f)/160.0f + 0.5f) : info->width;
+    display->physicalDimensions.height = (info->height <= 0) ? ((info->yres * 25.4f)/160.0f + 0.5f) : info->height;
+    display->physicalResolution.width  = info->xres;
+    display->physicalResolution.height = info->yres;
+    display->supportedTransforms       = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    display->planeReorderPossible      = VK_FALSE;
+    display->persistentContent         = VK_FALSE;
 
-    displayMode = (__vkDisplayModeKHR *)__VK_ALLOC(sizeof(__vkFbdevDisplayKHR), 8, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+    /* Default: only current mode. */
+    displayMode = (__vkDisplayModeKHR *)__VK_ALLOC(sizeof(__vkDisplayKHR), 8, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
     __VK_MEMZERO(displayMode, sizeof(__vkDisplayModeKHR));
-    displayMode->sType = __VK_OBJECT_DISPLAY_MODE_KHR;
+    displayMode->sType = __VK_OBJECT_TYPE_DISPLAY_MODE_KHR;
 
     uint64_t refreshQuotient = (uint64_t) (info->upper_margin + info->lower_margin + info->yres)
             * (info->left_margin  + info->right_margin + info->xres) * info->pixclock;
@@ -258,19 +284,22 @@ static __vkFbdevDisplayKHR *__CreateFbdevDisplay(
         refreshRate = 60*1000;
     }
 
+    displayMode->display                         = display;
     displayMode->parameters.visibleRegion.width  = info->xres;
     displayMode->parameters.visibleRegion.height = info->yres;
     displayMode->parameters.refreshRate          = refreshRate;
 
-    display->base.displayModeCount = 1;
-    display->base.displayModes[0]  = displayMode;
+    display->displayModeCount = 1;
+    display->displayModes[0]  = displayMode;
+
+    display->planeStack[0]  = (__vkDisplayPlane *) graphicPlane;
+    display->planeStackSize = 1;
 
     return display;
 }
 
 static VkResult __ValidateFbdevDisplayPlane(
-    __vkFbdevDisplayPlane *plane
-    )
+    __vkFbdevDisplayPlane *             plane)
 {
     int ret;
 
@@ -296,7 +325,7 @@ static VkResult __ValidateFbdevDisplayPlane(
     plane->varInfo.yoffset = 0;
     plane->varInfo.activate = FB_ACTIVATE_NOW;
 
-    plane->format = __TranslateFbdevFormat(&plane->varInfo);
+    plane->format = __TranslateFbdevInfoToFormat(&plane->varInfo, VK_NULL_HANDLE);
     plane->stride = plane->fixInfo.line_length;
 
     plane->alignedWidth  = plane->fixInfo.line_length / (plane->varInfo.bits_per_pixel / 8);
@@ -315,10 +344,9 @@ static VkResult __ValidateFbdevDisplayPlane(
 }
 
 static __vkFbdevDisplayPlane *__CreateFbdevDisplayPlane(
-    __vkPhysicalDevice *phyDev,
-    const char *fbPath,
-    uint32_t planeIndex
-    )
+    __vkPhysicalDevice *                phyDev,
+    const char *                        fbPath,
+    uint32_t                            planeIndex)
 {
     int fd = -1;
     uint32_t i;
@@ -348,15 +376,12 @@ static __vkFbdevDisplayPlane *__CreateFbdevDisplayPlane(
     plane->fd = fd;
 
     /* check supported formats. */
-    for (i = 0; i < __VK_COUNTOF(__formatXlateTable); i++)
+    for (i = 0; i < __VK_COUNTOF(__fbdevFormatXlate); i++)
     {
-        VkFormat format;
+        VkFormat format = __fbdevFormatXlate[i].format;
+        VkBool32 enableAlpha = __fbdevFormatXlate[i].enableAlpha;
 
-        varInfo.bits_per_pixel = __formatXlateTable[i].bitsPerPixel;
-        varInfo.red            = __formatXlateTable[i].red;
-        varInfo.green          = __formatXlateTable[i].green;
-        varInfo.blue           = __formatXlateTable[i].blue;
-        varInfo.transp         = __formatXlateTable[i].transp;
+        __TranslateFormatToFbdevInfo(format, enableAlpha, &varInfo);
 
         /* Test format. */
         varInfo.activate = FB_ACTIVATE_TEST;
@@ -369,9 +394,9 @@ static __vkFbdevDisplayPlane *__CreateFbdevDisplayPlane(
         if (ret < 0)
             continue;
 
-        format = __TranslateFbdevFormat(&varInfo);
+        format = __TranslateFbdevInfoToFormat(&varInfo, VK_NULL_HANDLE);
 
-        if (format == __formatXlateTable[i].format)
+        if (format == __fbdevFormatXlate[i].format)
         {
             plane->supportedFormats[plane->supportedFormatCount] = format;
 
@@ -433,37 +458,35 @@ OnError:
 }
 
 static VkResult __SetFbdevDisplayPlaneFormat(
-    __vkFbdevDisplayPlane *plane,
-    VkFormat format
+    __vkFbdevDisplayPlane *             plane,
+    VkFormat                            format
     )
 {
-    uint32_t i;
-    VkResult result = VK_ERROR_FORMAT_NOT_SUPPORTED;
+    int ret;
+    VkResult result = VK_SUCCESS;
     struct fb_var_screeninfo varInfo = plane->varInfo;
 
-    for (i = 0; i < __VK_COUNTOF(__formatXlateTable); i++)
+    do
     {
-        int ret;
-        if (format != __formatXlateTable[i].format) continue;
+        varInfo.activate = FB_ACTIVATE_NOW;
 
-        varInfo.bits_per_pixel = __formatXlateTable[i].bitsPerPixel;
-        varInfo.red            = __formatXlateTable[i].red;
-        varInfo.green          = __formatXlateTable[i].green;
-        varInfo.blue           = __formatXlateTable[i].blue;
-        varInfo.transp         = __formatXlateTable[i].transp;
-        varInfo.activate       = FB_ACTIVATE_NOW;
+        /* Try update format */
+        __TranslateFormatToFbdevInfo(format, VK_TRUE, &varInfo);
 
-        /*
-         * Try update format, try more if failed because one vk-format can
-         * have multiple fb formats.
-         */
         ret = ioctl(plane->fd, FBIOPUT_VSCREENINFO, &varInfo);
-        if (ret < 0)
-            continue;
+        if (!ret)
+            break;
 
-        result = VK_SUCCESS;
-        break;
+        /* Try update format without alpha channel. */
+        __TranslateFormatToFbdevInfo(format, VK_FALSE, &varInfo);
+
+        ret = ioctl(plane->fd, FBIOPUT_VSCREENINFO, &varInfo);
+        if (!ret)
+            break;
+
+        result = VK_ERROR_FORMAT_NOT_SUPPORTED;
     }
+    while (VK_FALSE);
 
     if (result != VK_SUCCESS)
     {
@@ -476,8 +499,8 @@ static VkResult __SetFbdevDisplayPlaneFormat(
 }
 
 static VkResult __SetFbdevDisplayPlaneImageCount(
-    __vkFbdevDisplayPlane *plane,
-    uint32_t imageCount
+    __vkFbdevDisplayPlane *             plane,
+    uint32_t                            imageCount
     )
 {
     int ret;
@@ -509,9 +532,29 @@ static VkResult __SetFbdevDisplayPlaneImageCount(
     return result;
 }
 
+static VkResult __SetFbdevDisplayPlaneParameter(
+    __vkFbdevDisplayPlane *             plane,
+    __vkFbdevDisplayPlaneParameter *    parameter)
+{
+    VkResult result = VK_SUCCESS;
+
+    if (parameter->imageFormat != plane->format)
+    {
+        __VK_ONERROR(__SetFbdevDisplayPlaneFormat(plane, parameter->imageFormat));
+    }
+
+    if (parameter->imageCount != plane->imageCount)
+    {
+        __VK_ONERROR(__SetFbdevDisplayPlaneImageCount(plane, parameter->imageCount));
+    }
+
+OnError:
+    return result;
+}
+
 static void __PostFbdevDisplayPlaneImage(
-    __vkFbdevDisplayPlane * plane,
-    uint32_t imageIndex
+    __vkFbdevDisplayPlane *             plane,
+    uint32_t                            imageIndex
     )
 {
     int ret;
@@ -532,83 +575,70 @@ static void __PostFbdevDisplayPlaneImage(
     }
 }
 
-static void __InitializeFbdevDisplays(
-    __vkPhysicalDevice *phyDev
+static void __GetFbdevBufferSize(
+    __vkFbdevDisplayPlane *             plane,
+    uint32_t *                          pWidth,
+    uint32_t *                          pHeight,
+    uint32_t *                          pAlignedWidth,
+    uint32_t *                          pAlignedHeight,
+    uint32_t *                          pMemorySize
     )
 {
-    uint32_t i, j;
-    char fbPath[32];
-    char * fbPathTemplate[] = {"/dev/fb%d", "/dev/graphics/fb%d"};
+    if (pWidth)
+        *pWidth = plane->varInfo.xres;
 
-    /* Go through displays. */
-    for (i = 0; i < __VK_COUNTOF(__vkFbdevDisplayMapping); i++)
-    {
-        __vkFbdevDisplayKHR *display = NULL;
+    if (pHeight)
+        *pHeight = plane->varInfo.yres;
 
-        /* Go through display planes. */
-        for (j = 0; j < __vkFbdevDisplayMapping[i].planeCount; j++)
-        {
-            uint32_t k;
-            __vkFbdevDisplayPlane *plane = NULL;
-            uint32_t planeIndex = __vkFbdevDisplayMapping[i].fbdevIndex[j];
+    if (pAlignedWidth)
+        *pAlignedWidth = plane->alignedWidth;
 
-            for (k = 0; k < __VK_COUNTOF(fbPathTemplate); k++)
-            {
-                snprintf(fbPath, sizeof(fbPath), fbPathTemplate[k], planeIndex);
-                plane = __CreateFbdevDisplayPlane(phyDev, fbPath, phyDev->numberOfDisplayPlanes);
+    if (pAlignedHeight)
+        *pAlignedHeight = plane->alignedHeight;
 
-                if (plane)
-                {
-                    phyDev->displayPlanes[phyDev->numberOfDisplayPlanes++] = (__vkDisplayPlane *) plane;
-                    break;
-                }
-            }
+    if (pMemorySize)
+        *pMemorySize = plane->stride * plane->alignedHeight;
+}
 
-            if (!plane)
-            {
-                continue;
-            }
-
-            if (!display)
-            {
-                /* The first plane is the graphics plane, create display. */
-                display = __CreateFbdevDisplay(phyDev, plane);
-                phyDev->displays[phyDev->numberOfDisplays++] = (__vkDisplayKHR *)display;
-            }
-
-            plane->base.currentDisplay = (__vkDisplayKHR *)display;
-            plane->base.currentStackIndex = planeIndex;
-            plane->base.supportedDisplays[plane->base.supportedDisplayCount++] = (__vkDisplayKHR *)display;
-
-            display->base.planeStack[j] = (__vkDisplayPlane *)plane;
-        }
-    }
+/* Display functions. */
+static VkResult fbdevCreateDisplayMode(
+    VkPhysicalDevice                    physicalDevice,
+    VkDisplayKHR                        display,
+    const VkDisplayModeCreateInfoKHR*   pCreateInfo,
+    const VkAllocationCallbacks*        pAllocator,
+    VkDisplayModeKHR*                   pMode)
+{
+    return VK_ERROR_INCOMPATIBLE_DISPLAY_KHR;
 }
 
 
-/* __vkSurfaceOperation::DestroySurface. */
-static void fbdevDestroySurface(
-    VkInstance  instance,
-    VkSurfaceKHR surface,
-    const VkAllocationCallbacks* pAllocator
-    )
+static VkResult fbdevGetDisplayPlaneCapabilities(
+    VkPhysicalDevice                    physicalDevice,
+    VkDisplayModeKHR                    mode,
+    uint32_t                            planeIndex,
+    VkDisplayPlaneCapabilitiesKHR*      pCapabilities)
 {
-    __vkInstance *inst = (__vkInstance *)instance;
-    VkIcdSurfaceDisplay *surf = __VK_NON_DISPATCHABLE_HANDLE_CAST(VkIcdSurfaceDisplay *, surface);
+    __vkDisplayModeKHR *m = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDisplayModeKHR *, mode);
 
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    __VK_SET_API_ALLOCATIONCB(&inst->memCb);
+    pCapabilities->supportedAlpha = VK_DISPLAY_PLANE_ALPHA_OPAQUE_BIT_KHR;
+    pCapabilities->minSrcPosition = (VkOffset2D) {0, 0};
+    pCapabilities->maxSrcPosition = (VkOffset2D) {0, 0};
+    pCapabilities->minSrcExtent   = m->parameters.visibleRegion;
+    pCapabilities->maxSrcExtent   = m->parameters.visibleRegion;
+    pCapabilities->minDstPosition = (VkOffset2D) {0, 0};
+    pCapabilities->maxDstPosition = (VkOffset2D) {0, 0};
+    pCapabilities->minDstExtent   = m->parameters.visibleRegion;
+    pCapabilities->maxDstExtent   = m->parameters.visibleRegion;
 
-    __VK_FREE(surf);
+    return VK_SUCCESS;
 }
 
-/* __vkSurfaceOperation::GetPhysicalDeviceSurfaceSupport. */
+/* Surface. */
 static VkResult fbdevGetPhysicalDeviceSurfaceSupport(
-    VkPhysicalDevice physicalDevice,
-    uint32_t queueFamilyIndex,
-    VkSurfaceKHR surface,
-    VkBool32* pSupported
-    )
+    VkPhysicalDevice                    physicalDevice,
+    uint32_t                            queueFamilyIndex,
+    VkSurfaceKHR                        surface,
+    VkBool32*                           pSupported)
 {
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
 
@@ -622,12 +652,10 @@ static VkResult fbdevGetPhysicalDeviceSurfaceSupport(
     return VK_SUCCESS;
 }
 
-/* __vkSurfaceOperation::GetPhysicalDeviceSurfaceCapabilities. */
 static VkResult fbdevGetPhysicalDeviceSurfaceCapabilities(
-    VkPhysicalDevice physicalDevice,
-    VkSurfaceKHR surface,
-    VkSurfaceCapabilitiesKHR* pSurfaceCapabilities
-    )
+    VkPhysicalDevice                    physicalDevice,
+    VkSurfaceKHR                        surface,
+    VkSurfaceCapabilitiesKHR*           pSurfaceCapabilities)
 {
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkIcdSurfaceDisplay *surf = __VK_NON_DISPATCHABLE_HANDLE_CAST(VkIcdSurfaceDisplay *, surface);
@@ -650,13 +678,11 @@ static VkResult fbdevGetPhysicalDeviceSurfaceCapabilities(
     return VK_SUCCESS;
 }
 
-/* __vkSurfaceOperation::GetPhysicalDeviceSurfaceFormats. */
 static VkResult fbdevGetPhysicalDeviceSurfaceFormats(
-    VkPhysicalDevice physicalDevice,
-    VkSurfaceKHR surface,
-    uint32_t* pSurfaceFormatCount,
-    VkSurfaceFormatKHR* pSurfaceFormats
-    )
+    VkPhysicalDevice                    physicalDevice,
+    VkSurfaceKHR                        surface,
+    uint32_t*                           pSurfaceFormatCount,
+    VkSurfaceFormatKHR*                 pSurfaceFormats)
 {
     __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
     VkIcdSurfaceDisplay *surf = __VK_NON_DISPATCHABLE_HANDLE_CAST(VkIcdSurfaceDisplay *, surface);
@@ -686,13 +712,11 @@ static VkResult fbdevGetPhysicalDeviceSurfaceFormats(
     return VK_SUCCESS;
 }
 
-/* __vkSurfaceOperation::GetPhysicalDeviceSurfacePresentModes. */
 static VkResult fbdevGetPhysicalDeviceSurfacePresentModes(
-    VkPhysicalDevice physicalDevice,
-    VkSurfaceKHR surface,
-    uint32_t* pPresentModeCount,
-    VkPresentModeKHR* pPresentModes
-    )
+    VkPhysicalDevice                    physicalDevice,
+    VkSurfaceKHR                        surface,
+    uint32_t*                           pPresentModeCount,
+    VkPresentModeKHR*                   pPresentModes)
 {
     static VkPresentModeKHR presentModes[] =
     {
@@ -722,8 +746,10 @@ static VkResult fbdevGetPhysicalDeviceSurfacePresentModes(
     return VK_SUCCESS;
 }
 
+/******************************************************************************/
+
 static VkResult __CreateSwapchainCommandBuffer(
-    __vkFbdevSwapchainKHR *sc
+    __vkFbdevSwapchainKHR *             sc
     )
 {
     VkResult result;
@@ -758,11 +784,11 @@ static VkResult __CreateSwapchainCommandBuffer(
 }
 
 static VkResult __WrapFbdevBufferMemory(
-    VkDevice device,
-    __vkFbdevDisplayPlane *plane,
-    uint32_t bufferIndex,
-    const VkAllocationCallbacks *pAllocator,
-    VkDeviceMemory *pMemory
+    VkDevice                            device,
+    __vkFbdevDisplayPlane *             plane,
+    uint32_t                            bufferIndex,
+    const VkAllocationCallbacks *       pAllocator,
+    VkDeviceMemory *                    pMemory
     )
 {
     VkMemoryAllocateInfo allocInfo;
@@ -790,35 +816,10 @@ static VkResult __WrapFbdevBufferMemory(
     return __vk_ImportMemory(device, &allocInfo, &importInfo, pAllocator, pMemory);
 }
 
-static void __GetFbdevBufferSize(
-    __vkFbdevDisplayPlane *plane,
-    uint32_t *pWidth,
-    uint32_t *pHeight,
-    uint32_t *pAlignedWidth,
-    uint32_t *pAlignedHeight,
-    uint32_t *pMemorySize
-    )
-{
-    if (pWidth)
-        *pWidth = plane->varInfo.xres;
-
-    if (pHeight)
-        *pHeight = plane->varInfo.yres;
-
-    if (pAlignedWidth)
-        *pAlignedWidth = plane->alignedWidth;
-
-    if (pAlignedHeight)
-        *pAlignedHeight = plane->alignedHeight;
-
-    if (pMemorySize)
-        *pMemorySize = plane->stride * plane->alignedHeight;
-}
-
 static VkResult __CreateImageBuffer(
-    __vkFbdevSwapchainKHR  *sc,
-    uint32_t index,
-    __vkFbdevImageBuffer *imageBuffer
+    __vkFbdevSwapchainKHR  *            sc,
+    uint32_t                            index,
+    __vkFbdevImageBuffer *              imageBuffer
     )
 {
     VkImageCreateInfo imgInfo;
@@ -903,7 +904,7 @@ OnError:
 }
 
 static void __DestroyImageBuffer(
-    __vkFbdevImageBuffer *imageBuffer
+    __vkFbdevImageBuffer *              imageBuffer
     )
 {
     __vkFbdevSwapchainKHR *sc = imageBuffer->swapchain;
@@ -935,9 +936,9 @@ static void __DestroyImageBuffer(
 
 /* __vkSwapchainKHR::DestroySwapchain. */
 static void __DestroySwapchain(
-    VkDevice  device,
-    VkSwapchainKHR swapchain,
-    const VkAllocationCallbacks* pAllocator
+    VkDevice                            device,
+    VkSwapchainKHR                      swapchain,
+    const VkAllocationCallbacks*        pAllocator
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
@@ -963,10 +964,10 @@ static void __DestroySwapchain(
 
 /* __vkSwapchainKHR::GetSwapchainImages. */
 static VkResult __GetSwapchainImages(
-    VkDevice  device,
-    VkSwapchainKHR swapchain,
-    uint32_t*  pSwapchainImageCount,
-    VkImage*  pSwapchainImages
+    VkDevice                            device,
+    VkSwapchainKHR                      swapchain,
+    uint32_t*                           pSwapchainImageCount,
+    VkImage*                            pSwapchainImages
     )
 {
     __vkFbdevSwapchainKHR *sc = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFbdevSwapchainKHR *, swapchain);
@@ -996,12 +997,12 @@ static VkResult __GetSwapchainImages(
 
 /* __vkSwapchainKHR::AcquireNextImage. */
 static VkResult __AcquireNextImage(
-    VkDevice  device,
-    VkSwapchainKHR swapchain,
-    uint64_t  timeout,
-    VkSemaphore  semaphore,
-    VkFence  fence,
-    uint32_t*  pImageIndex
+    VkDevice                            device,
+    VkSwapchainKHR                      swapchain,
+    uint64_t                            timeout,
+    VkSemaphore                         semaphore,
+    VkFence                             fence,
+    uint32_t*                           pImageIndex
     )
 {
     __vkFbdevSwapchainKHR *sc = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkFbdevSwapchainKHR *, swapchain);
@@ -1015,7 +1016,6 @@ static VkResult __AcquireNextImage(
 
     if (semaphore)
     {
-        /* VIV: [todo] hook with fbdev. */
         __vk_SetSemaphore(device, semaphore, VK_TRUE);
     }
 
@@ -1031,9 +1031,9 @@ static VkResult __AcquireNextImage(
 }
 
 static VkResult __GenPresentCommand(
-    __vkDevContext *devCtx,
-    __vkFbdevSwapchainKHR *sc,
-    __vkFbdevImageBuffer *imageBuffer
+    __vkDevContext *                    devCtx,
+    __vkFbdevSwapchainKHR *             sc,
+    __vkFbdevImageBuffer *              imageBuffer
     )
 {
     VkResult result = VK_SUCCESS;
@@ -1075,9 +1075,9 @@ OnError:
 }
 
 static VkResult __CommitPresentCommand(
-    VkQueue queue,
-    __vkFbdevSwapchainKHR *sc,
-    uint32_t imageIndex
+    VkQueue                             queue,
+    __vkFbdevSwapchainKHR *             sc,
+    uint32_t                            imageIndex
     )
 {
     VkResult result;
@@ -1109,10 +1109,10 @@ OnError:
 
 /* __vkSwapchainKHR::QueuePresentSingle. */
 static VkResult __QueuePresentSingle(
-    VkQueue  queue,
-    const VkDisplayPresentInfoKHR* pDisplayPresentInfo,
-    VkSwapchainKHR swapchain,
-    uint32_t imageIndex
+    VkQueue                             queue,
+    const VkDisplayPresentInfoKHR*      pDisplayPresentInfo,
+    VkSwapchainKHR                      swapchain,
+    uint32_t                            imageIndex
     )
 {
     VkResult result = VK_SUCCESS;
@@ -1130,13 +1130,11 @@ OnError:
     return result;
 }
 
-/* __vkSurfaceOperation::CreateSwapchain. */
-VkResult fbdevCreateSwapchain(
-    VkDevice  device,
-    const VkSwapchainCreateInfoKHR*  pCreateInfo,
-    const VkAllocationCallbacks* pAllocator,
-    VkSwapchainKHR* pSwapchain
-    )
+static VkResult fbdevCreateSwapchain(
+    VkDevice                            device,
+    const VkSwapchainCreateInfoKHR*     pCreateInfo,
+    const VkAllocationCallbacks*        pAllocator,
+    VkSwapchainKHR*                     pSwapchain)
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
     __vkFbdevSwapchainKHR *sc = NULL;
@@ -1145,6 +1143,7 @@ VkResult fbdevCreateSwapchain(
     __vkPhysicalDevice *phyDev = devCtx->pPhyDevice;
     VkIcdSurfaceDisplay *surf = __VK_NON_DISPATCHABLE_HANDLE_CAST(VkIcdSurfaceDisplay *, pCreateInfo->surface);
     __vkFbdevDisplayPlane *plane = (__vkFbdevDisplayPlane *) phyDev->displayPlanes[surf->planeIndex];
+    __vkFbdevDisplayPlaneParameter parameter;
 
     /* Set the allocator to the parent allocator or API defined allocator if valid */
     __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
@@ -1210,15 +1209,26 @@ VkResult fbdevCreateSwapchain(
 
     __VK_ONERROR(__CreateSwapchainCommandBuffer(sc));
 
-    if (pCreateInfo->imageFormat != plane->format)
-    {
-        __VK_ONERROR(__SetFbdevDisplayPlaneFormat(plane, pCreateInfo->imageFormat));
-    }
+    parameter = (__vkFbdevDisplayPlaneParameter) {
+        surf->displayMode,
+        surf->planeStackIndex,
+        surf->transform,
+        surf->globalAlpha,
+        surf->alphaMode,
+        surf->imageExtent,
+        pCreateInfo->minImageCount,
+        pCreateInfo->imageFormat,
+        pCreateInfo->imageColorSpace,
+        pCreateInfo->imageArrayLayers,
+        pCreateInfo->imageUsage,
+        pCreateInfo->imageSharingMode,
+        pCreateInfo->preTransform,
+        pCreateInfo->compositeAlpha,
+        pCreateInfo->presentMode,
+        pCreateInfo->clipped
+    };
 
-    if (pCreateInfo->minImageCount != plane->imageCount)
-    {
-        __VK_ONERROR(__SetFbdevDisplayPlaneImageCount(plane, pCreateInfo->minImageCount));
-    }
+    __VK_ONERROR(__SetFbdevDisplayPlaneParameter(plane, &parameter));
 
     /* Create swap chain images */
     sc->imageBuffers = (__vkFbdevImageBuffer *)__VK_ALLOC(
@@ -1269,223 +1279,75 @@ OnError:
     return result;
 }
 
-VkResult VKAPI_CALL __vk_GetPhysicalDeviceDisplayPropertiesKHR(
-    VkPhysicalDevice physicalDevice,
-    uint32_t* pPropertyCount,
-    VkDisplayPropertiesKHR* pProperties)
+
+static VkResult __vkInitializePhysicalDeviceDisplaysDefault(
+    __vkPhysicalDevice *                phyDev)
 {
-    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
-    uint32_t i = 0;
+    uint32_t i, j;
+    char fbPath[32];
+    char * fbPathTemplate[] = {"/dev/fb%d", "/dev/graphics/fb%d"};
 
-    if (phyDev->numberOfDisplays == 0)
+    /* Go through displays. */
+    for (i = 0; i < __VK_COUNTOF(__vkFbdevDisplayMapping); i++)
     {
-        __InitializeFbdevDisplays(phyDev);
-    }
+        __vkDisplayKHR *display = NULL;
 
-    if (pProperties)
-    {
-        if (*pPropertyCount > phyDev->numberOfDisplays)
-            *pPropertyCount = phyDev->numberOfDisplays;
-
-        for (i = 0; i < *pPropertyCount; i++)
+        /* Go through display planes. */
+        for (j = 0; j < __vkFbdevDisplayMapping[i].planeCount; j++)
         {
-            __vkDisplayKHR *disp                = phyDev->displays[i];
-            pProperties[i].display              = (VkDisplayKHR)(uintptr_t)disp;
-            pProperties[i].displayName          = disp->displayName;
-            pProperties[i].physicalDimensions   = disp->physicalDimensions;
-            pProperties[i].physicalResolution   = disp->physicalResolution;
-            pProperties[i].supportedTransforms  = disp->supportedTransforms;
-            pProperties[i].planeReorderPossible = disp->planeReorderPossible;
-            pProperties[i].persistentContent    = disp->persistentContent;
+            uint32_t k;
+            __vkFbdevDisplayPlane *plane = NULL;
+            uint32_t planeIndex = __vkFbdevDisplayMapping[i].fbdevIndex[j];
+
+            for (k = 0; k < __VK_COUNTOF(fbPathTemplate); k++)
+            {
+                snprintf(fbPath, sizeof(fbPath), fbPathTemplate[k], planeIndex);
+                plane = __CreateFbdevDisplayPlane(phyDev, fbPath, phyDev->numberOfDisplayPlanes);
+
+                if (plane)
+                {
+                    phyDev->displayPlanes[phyDev->numberOfDisplayPlanes++] = (__vkDisplayPlane *) plane;
+                    break;
+                }
+            }
+
+            if (!plane)
+            {
+                continue;
+            }
+
+            if (!display)
+            {
+                /* The first plane is the graphics plane, create display. */
+                display = __CreateFbdevDisplay(phyDev, plane);
+                phyDev->displays[phyDev->numberOfDisplays++] = (__vkDisplayKHR *)display;
+
+                display->CreateDisplayMode                    = fbdevCreateDisplayMode;
+                display->GetDisplayPlaneCapabilities          = fbdevGetDisplayPlaneCapabilities;
+                display->GetPhysicalDeviceSurfaceSupport      = fbdevGetPhysicalDeviceSurfaceSupport;
+                display->GetPhysicalDeviceSurfaceCapabilities = fbdevGetPhysicalDeviceSurfaceCapabilities;
+                display->GetPhysicalDeviceSurfaceFormats      = fbdevGetPhysicalDeviceSurfaceFormats;
+                display->GetPhysicalDeviceSurfacePresentModes = fbdevGetPhysicalDeviceSurfacePresentModes;
+                display->CreateSwapchain                      = fbdevCreateSwapchain;
+            }
+            else
+            {
+                display->planeStack[display->planeStackSize++] = (__vkDisplayPlane *)plane;
+            }
+
+            plane->base.currentDisplay = (VkDisplayKHR)(uintptr_t)display;
+            plane->base.currentStackIndex = planeIndex;
+            plane->base.supportedDisplays[plane->base.supportedDisplayCount++] = (__vkDisplayKHR *)display;
+
         }
-
-        if (*pPropertyCount < phyDev->numberOfDisplays)
-            return VK_INCOMPLETE;
-    }
-    else
-    {
-        *pPropertyCount = phyDev->numberOfDisplays;;
     }
 
     return VK_SUCCESS;
 }
 
-VkResult VKAPI_CALL __vk_GetPhysicalDeviceDisplayPlanePropertiesKHR(
-    VkPhysicalDevice physicalDevice,
-    uint32_t* pPropertyCount,
-    VkDisplayPlanePropertiesKHR* pProperties
-    )
-{
-    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
+VkResult __vkInitializePhysicalDeviceDisplays(
+    __vkPhysicalDevice *                phyDevice)
+    __attribute__((weak,alias("__vkInitializePhysicalDeviceDisplaysDefault")));
 
-    if (pProperties)
-    {
-        uint32_t i;
-
-        if (*pPropertyCount > phyDev->numberOfDisplayPlanes)
-            *pPropertyCount = phyDev->numberOfDisplayPlanes;
-
-        for (i = 0; i < *pPropertyCount; i++)
-        {
-            __vkDisplayPlane *plane         = phyDev->displayPlanes[i];
-
-            pProperties[i].currentDisplay   = (VkDisplayKHR)(uintptr_t) plane->currentDisplay;
-            pProperties[i].currentStackIndex = plane->currentStackIndex;
-        }
-
-        if (*pPropertyCount < phyDev->numberOfDisplayPlanes)
-            return VK_INCOMPLETE;
-    }
-    else
-    {
-        *pPropertyCount = phyDev->numberOfDisplayPlanes;
-    }
-
-    return VK_SUCCESS;
-}
-
-VkResult VKAPI_CALL __vk_GetDisplayPlaneSupportedDisplaysKHR(
-    VkPhysicalDevice physicalDevice,
-    uint32_t planeIndex,
-    uint32_t* pDisplayCount,
-    VkDisplayKHR* pDisplays
-    )
-{
-    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
-    __vkDisplayPlane *plane    = phyDev->displayPlanes[planeIndex];
-    uint32_t i;
-
-    if (pDisplays)
-    {
-        if (*pDisplayCount > plane->supportedDisplayCount)
-            *pDisplayCount = plane->supportedDisplayCount;
-
-        for (i = 0; i < *pDisplayCount; i++)
-        {
-            pDisplays[i] = (VkDisplayKHR)(uintptr_t)plane->supportedDisplays[i];
-        }
-
-        if (*pDisplayCount < plane->supportedDisplayCount)
-            return VK_INCOMPLETE;
-    }
-    else
-    {
-        *pDisplayCount = plane->supportedDisplayCount;
-    }
-
-    return VK_SUCCESS;
-}
-
-VkResult VKAPI_CALL __vk_GetDisplayModePropertiesKHR(
-    VkPhysicalDevice physicalDevice,
-    VkDisplayKHR display,
-    uint32_t* pPropertyCount,
-    VkDisplayModePropertiesKHR* pProperties
-    )
-{
-    __vkDisplayKHR *dpy = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDisplayKHR *, display);
-
-    if (pProperties)
-    {
-        uint32_t i;
-
-        if (*pPropertyCount > dpy->displayModeCount)
-            *pPropertyCount = dpy->displayModeCount;
-
-        for (i = 0; i < *pPropertyCount; i++)
-        {
-            __vkDisplayModeKHR *mode   = dpy->displayModes[i];
-            pProperties[i].displayMode = (VkDisplayModeKHR)(uintptr_t) mode;
-            pProperties[i].parameters  = mode->parameters;
-        }
-
-        if (*pPropertyCount < dpy->displayModeCount)
-            return VK_INCOMPLETE;
-    }
-    else
-    {
-        *pPropertyCount = dpy->displayModeCount;
-    }
-
-    return VK_SUCCESS;
-}
-
-VkResult VKAPI_CALL __vk_CreateDisplayModeKHR(
-    VkPhysicalDevice physicalDevice,
-    VkDisplayKHR display,
-    const VkDisplayModeCreateInfoKHR*pCreateInfo,
-    const VkAllocationCallbacks* pAllocator,
-    VkDisplayModeKHR* pMode
-    )
-{
-    return VK_ERROR_INCOMPATIBLE_DISPLAY_KHR;
-}
-
-VkResult VKAPI_CALL __vk_GetDisplayPlaneCapabilitiesKHR(
-    VkPhysicalDevice physicalDevice,
-    VkDisplayModeKHR mode,
-    uint32_t planeIndex,
-    VkDisplayPlaneCapabilitiesKHR* pCapabilities
-    )
-{
-    __vkDisplayModeKHR *m = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkDisplayModeKHR *, mode);
-
-    pCapabilities->supportedAlpha = VK_DISPLAY_PLANE_ALPHA_OPAQUE_BIT_KHR;
-    pCapabilities->minSrcPosition = (VkOffset2D) {0, 0};
-    pCapabilities->maxSrcPosition = (VkOffset2D) {0, 0};
-    pCapabilities->minSrcExtent   = m->parameters.visibleRegion;
-    pCapabilities->maxSrcExtent   = m->parameters.visibleRegion;
-    pCapabilities->minDstPosition = (VkOffset2D) {0, 0};
-    pCapabilities->maxDstPosition = (VkOffset2D) {0, 0};
-    pCapabilities->minDstExtent   = m->parameters.visibleRegion;
-    pCapabilities->maxDstExtent   = m->parameters.visibleRegion;
-
-    return VK_SUCCESS;
-}
-
-VkResult VKAPI_CALL __vk_CreateDisplayPlaneSurfaceKHR(
-    VkInstance instance,
-    const VkDisplaySurfaceCreateInfoKHR* pCreateInfo,
-    const VkAllocationCallbacks* pAllocator,
-    VkSurfaceKHR* pSurface
-    )
-{
-    __vkInstance *inst = (__vkInstance *)instance;
-    VkIcdSurfaceDisplay *surf;
-
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    __VK_SET_API_ALLOCATIONCB(&inst->memCb);
-
-    surf = (VkIcdSurfaceDisplay *)__VK_ALLOC(sizeof(VkIcdSurfaceDisplay), 8, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
-
-    if (!surf)
-    {
-        *pSurface = VK_NULL_HANDLE;
-        return VK_ERROR_OUT_OF_HOST_MEMORY;
-    }
-
-    /* Assign function poionters. */
-    surf->base.platform   = VK_ICD_WSI_PLATFORM_DISPLAY;
-    surf->displayMode     = pCreateInfo->displayMode;
-    surf->planeIndex      = pCreateInfo->planeIndex;
-    surf->planeStackIndex = pCreateInfo->planeStackIndex;
-    surf->transform       = pCreateInfo->transform;
-    surf->globalAlpha     = pCreateInfo->globalAlpha;
-    surf->alphaMode       = pCreateInfo->alphaMode;
-    surf->imageExtent     = pCreateInfo->imageExtent;
-
-    *pSurface = (VkSurfaceKHR)(uintptr_t)surf;
-    return VK_SUCCESS;
-}
-
-__vkSurfaceOperation __vkDisplaySurfaceOperation =
-{
-    fbdevDestroySurface,
-    fbdevGetPhysicalDeviceSurfaceSupport,
-    fbdevGetPhysicalDeviceSurfaceCapabilities,
-    fbdevGetPhysicalDeviceSurfaceFormats,
-    fbdevGetPhysicalDeviceSurfacePresentModes,
-    fbdevCreateSwapchain,
-};
 
 

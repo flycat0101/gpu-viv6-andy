@@ -45,7 +45,8 @@ IN clsNAME * Name
 );
 
 /* Maximum operand count for a variable to stay in register */
-#define _cldMaxOperandCountToUseMemory  8
+#define _clmMaxOperandCountToUseMemory(Decl)  (((!_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES && (Decl)->dataType->addrSpaceQualifier == clvQUALIFIER_CONSTANT) || !gcmOPT_CLUseVIRCodeGen()) \
+                                               ? 8U : 16U)
 
 #define _clmCheckVariableForMemory(Name) \
   (!clmDECL_IsPointerType(&((Name)->decl)) && \
@@ -55,7 +56,7 @@ IN clsNAME * Name
       (Name)->u.variableInfo.isAddressed)))
 
 #define clmDECL_IsAggregateTypeOverRegLimit(Decl) \
-   (clmDECL_IsAggregateType(Decl) && clGetOperandCountForRegAlloc(Decl) > _cldMaxOperandCountToUseMemory)
+   (clmDECL_IsAggregateType(Decl) && clGetOperandCountForRegAlloc(Decl) > _clmMaxOperandCountToUseMemory(Decl))
 
 #define clmGEN_CODE_checkVariableForMemory(Name) \
   (_clmCheckVariableForMemory(Name) || \
@@ -270,6 +271,7 @@ typedef enum _cleOPCODE
     clvOPCODE_NON_LVAL,
 
     clvOPCODE_BARRIER,
+    clvOPCODE_MEM_FENCE,
     clvOPCODE_LOAD,
     clvOPCODE_STORE,
     clvOPCODE_STORE1,
@@ -380,6 +382,12 @@ typedef enum _cleOPCODE
 
     clvOPCODE_FMA_MUL,
     clvOPCODE_FMA_ADD,
+
+    clvOPCODE_FINDLSB,
+    clvOPCODE_FINDMSB,
+
+    clvOPCODE_BIT_REVERSAL,
+    clvOPCODE_BYTE_REVERSAL,
 
     clvOPCODE_MAXOPCODE    /* All new opcode should be inserted before this */
 }
@@ -599,6 +607,8 @@ clsLOGICAL_REG;
            SelectionContext->beginLabelOfFalseOperand = SelectionContext->endLabel; \
            SelectionContext->endLabel = clNewLabel(Compiler); \
        status = clDefineSelectionTrueOperandEnd(Compiler, \
+                                                LineNo,\
+                                                StringNo,\
                                                     CodeGenerator, \
                                                     SelectionContext, \
                                                     gcvFALSE); \
@@ -619,6 +629,8 @@ clsLOGICAL_REG;
            } \
            else { \
            status = clDefineSelectionTrueOperandEnd(Compiler, \
+                                                    LineNo,\
+                                                    StringNo,\
                                                         CodeGenerator, \
                                                         SelectionContext, \
                                                         gcvFALSE); \
@@ -928,6 +940,7 @@ clsROPERAND_CONSTANT_IsAllVectorComponentsEqual(
         (operand)->arrayIndex.mode    = clvINDEX_NONE; \
         (operand)->matrixIndex.mode    = clvINDEX_NONE; \
         (operand)->vectorIndex.mode    = clvINDEX_NONE; \
+        (operand)->u.constant.allValuesEqual = clsROPERAND_CONSTANT_IsAllVectorComponentsEqual(operand); \
     } \
     while (gcvFALSE)
 
@@ -944,6 +957,7 @@ clsROPERAND_CONSTANT_IsAllVectorComponentsEqual(
         (operand)->arrayIndex.mode    = clvINDEX_NONE; \
         (operand)->matrixIndex.mode    = clvINDEX_NONE; \
         (operand)->vectorIndex.mode    = clvINDEX_NONE; \
+        (operand)->u.constant.allValuesEqual = clsROPERAND_CONSTANT_IsAllVectorComponentsEqual(operand); \
     } \
     while (gcvFALSE)
 
@@ -960,6 +974,7 @@ clsROPERAND_CONSTANT_IsAllVectorComponentsEqual(
         (operand)->arrayIndex.mode    = clvINDEX_NONE; \
         (operand)->matrixIndex.mode    = clvINDEX_NONE; \
         (operand)->vectorIndex.mode    = clvINDEX_NONE; \
+        (operand)->u.constant.allValuesEqual = clsROPERAND_CONSTANT_IsAllVectorComponentsEqual(operand); \
     } \
     while (gcvFALSE)
 
@@ -976,6 +991,7 @@ clsROPERAND_CONSTANT_IsAllVectorComponentsEqual(
         (operand)->arrayIndex.mode    = clvINDEX_NONE; \
         (operand)->matrixIndex.mode    = clvINDEX_NONE; \
         (operand)->vectorIndex.mode    = clvINDEX_NONE; \
+        (operand)->u.constant.allValuesEqual = clsROPERAND_CONSTANT_IsAllVectorComponentsEqual(operand); \
     } \
     while (gcvFALSE)
 
@@ -992,6 +1008,7 @@ clsROPERAND_CONSTANT_IsAllVectorComponentsEqual(
         (operand)->arrayIndex.mode    = clvINDEX_NONE; \
         (operand)->matrixIndex.mode    = clvINDEX_NONE; \
         (operand)->vectorIndex.mode    = clvINDEX_NONE; \
+        (operand)->u.constant.allValuesEqual = clsROPERAND_CONSTANT_IsAllVectorComponentsEqual(operand); \
     } \
     while (gcvFALSE)
 
@@ -1316,6 +1333,8 @@ clDefineSelectionTrueOperandBegin(
 gceSTATUS
 clDefineSelectionTrueOperandEnd(
     IN cloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
     IN cloCODE_GENERATOR CodeGenerator,
     IN clsSELECTION_CONTEXT * SelectionContext,
     IN gctBOOL HasReturn
@@ -1679,5 +1698,65 @@ gceSTATUS
 cloCODE_GENERATOR_Destroy(
     IN cloCOMPILER Compiler,
     IN cloCODE_GENERATOR CodeGenerator
+    );
+
+clsGEN_CODE_DATA_TYPE
+clConvToUnpackedType(
+    IN cloCOMPILER Compiler,
+    IN clsGEN_CODE_DATA_TYPE PackedType
+    );
+
+gceSTATUS
+clCreateUnpackedDecl(
+    IN cloCOMPILER Compiler,
+    IN clsGEN_CODE_DATA_TYPE PackedType,
+    IN clsDECL *Decl
+    );
+
+gceSTATUS
+clUnpackROperand(
+    IN cloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
+    IN clsROPERAND *From,
+    OUT clsIOPERAND *To
+    );
+
+clsGEN_CODE_DATA_TYPE
+clConvToPackedType(
+    IN cloCOMPILER Compiler,
+    IN clsGEN_CODE_DATA_TYPE UnpackedType
+    );
+
+gceSTATUS
+clCreatePackedDecl(
+    IN cloCOMPILER Compiler,
+    IN clsGEN_CODE_DATA_TYPE UnPackedType,
+    IN clsDECL *Decl
+    );
+
+gceSTATUS
+clPackROperand(
+    IN cloCOMPILER Compiler,
+    IN gctUINT LineNo,
+    IN gctUINT StringNo,
+    IN clsROPERAND *From,
+    OUT clsIOPERAND *To
+    );
+
+gceSTATUS
+clROperandInitializeConstant(
+    IN cloCOMPILER Compiler,
+    IN clsGEN_CODE_DATA_TYPE DataType,
+    IN gcsValue *Value,
+    OUT clsROPERAND *Operand
+    );
+
+gceSTATUS
+clConvComponentSelectionToPackedSwizzle(
+    IN cloCOMPILER Compiler,
+    IN gctUINT8 LastComponent,
+    IN clsCOMPONENT_SELECTION *ComponentSelection,
+    OUT clsROPERAND *Operand
     );
 #endif /* __gc_cl_gen_code_h_ */

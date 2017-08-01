@@ -85,18 +85,35 @@ typedef union _VSC_MC_NO_OPERAND_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 26;/* Must be zero'ed */
+#else
+        gctUINT        reserved0             : 26;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
         gctUINT        reserved1             : 32;/* Must be zero'ed */
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved2             : 16;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
         gctUINT        reserved3             : 15;/* Must be zero'ed */
+#else
+        gctUINT        reserved3             : 15;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        reserved2             : 16;/* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved4             : 4; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
         gctUINT        reserved5             : 20;/* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+#else
+        gctUINT        reserved5             : 20;/* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        extOpcode             : 8;
+        gctUINT        reserved4             : 4; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -108,6 +125,7 @@ typedef union _VSC_MC_ALU_3_SRCS_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        condOpCode            : 5;
         gctUINT        bResultSat            : 1;
@@ -115,10 +133,19 @@ typedef union _VSC_MC_ALU_3_SRCS_INST
         gctUINT        dstRelAddr            : 3;
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
-        gctUINT        reserved0             : 5; /* For load_attr, see NOTE 6;
-                                                     For mad, see NOTE 7;
-                                                     For others, must be zero'ed */
+        gctUINT        reserved0             : 5; /* For load_attr, see NOTE 6; For mad, see NOTE 7; For others, must be zero'ed */
+#else
+        gctUINT        reserved0             : 5; /* For load_attr, see NOTE 6; For mad, see NOTE 7; For others, must be zero'ed */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        condOpCode            : 5;
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
         gctUINT        reserved1             : 4; /* For load_attr, see NOTE 6; For others, must be zero'ed */
@@ -131,7 +158,22 @@ typedef union _VSC_MC_ALU_3_SRCS_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        bDenorm               : 1;
+        gctUINT        reserved2             : 2; /* Must be zero'ed for non-atomics. For atomics, see NOTE 8 */
+        gctUINT        bSkipForHelperKickoff : 1;
+        gctUINT        reserved1             : 4; /* For load_attr, see NOTE 6; For others, must be zero'ed */
+        gctUINT        packMode              : 1;
+        gctUINT        roundMode             : 2;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
@@ -142,7 +184,20 @@ typedef union _VSC_MC_ALU_3_SRCS_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
@@ -154,6 +209,19 @@ typedef union _VSC_MC_ALU_3_SRCS_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -165,6 +233,7 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        condOpCode            : 5;
         gctUINT        bResultSat            : 1;
@@ -173,7 +242,18 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        reserved0             : 5; /* Must be zero'ed for non NORM_MUL/MUL/MULLO/DST/DP, otherwise, see NOTE 7 */
+#else
+        gctUINT        reserved0             : 5; /* Must be zero'ed for non NORM_MUL/MUL/MULLO/DST/DP, otherwise, see NOTE 7 */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1;
+        gctUINT        bResultSat            : 1;
+        gctUINT        condOpCode            : 5;
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
         gctUINT        reserved1             : 8; /* Must be zero'ed */
@@ -183,7 +263,19 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        reserved1             : 8; /* Must be zero'ed */
+        gctUINT        packMode              : 1;
+        gctUINT        roundMode             : 2;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
@@ -194,7 +286,20 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        reserved2             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
@@ -204,6 +309,17 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC1_INST
         gctUINT        dstRegNoBit8          : 1;
         gctUINT        reserved5             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        reserved5             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        reserved4             : 10;/* Must be zero'ed */
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        reserved3             : 1; /* Must be zero'ed */
+        gctUINT        extOpcode             : 8;
+        gctUINT        reserved2             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -215,6 +331,7 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC2_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -223,7 +340,18 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC2_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
         gctUINT        reserved2             : 8; /* Must be zero'ed */
@@ -233,14 +361,35 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC2_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        reserved2             : 8; /* Must be zero'ed */
+        gctUINT        packMode              : 1;
+        gctUINT        roundMode             : 2;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        reserved3             : 10;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
         gctUINT        reserved4             : 13;/* Must be zero'ed */
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        reserved4             : 13;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved5             : 3; /* Must be zero'ed */
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
@@ -252,6 +401,19 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC0_SRC2_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        reserved5             : 3; /* Must be zero'ed */
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -263,6 +425,7 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC1_SRC2_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -271,13 +434,32 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC1_SRC2_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
         gctUINT        reserved2             : 18;/* Must be zero'ed */
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        reserved3             : 10;/* Must be zero'ed */
+#else
+        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        reserved2             : 18;/* Must be zero'ed */
+        gctUINT        packMode              : 1;
+        gctUINT        roundMode             : 2;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved4             : 6; /* Must be zero'ed */
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
         gctUINT        src1RegNo             : 9;
@@ -287,7 +469,19 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC1_SRC2_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        reserved4             : 6; /* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
@@ -299,6 +493,19 @@ typedef union _VSC_MC_ALU_2_SRCS_SRC1_SRC2_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -310,6 +517,7 @@ typedef union _VSC_MC_ALU_1_SRC_SRC0_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -318,7 +526,18 @@ typedef union _VSC_MC_ALU_1_SRC_SRC0_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 5; /* Must be zero'ed for non NORM_DP, otherwise, see NOTE 7 */
+#else
+        gctUINT        reserved1             : 5; /* Must be zero'ed for non NORM_DP, otherwise, see NOTE 7 */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
         gctUINT        reserved2             : 8; /* Must be zero'ed */
@@ -328,14 +547,35 @@ typedef union _VSC_MC_ALU_1_SRC_SRC0_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        reserved2             : 8; /* Must be zero'ed */
+        gctUINT        packMode              : 1;
+        gctUINT        roundMode             : 2;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        reserved3             : 10;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
         gctUINT        reserved4             : 13;/* Must be zero'ed */
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        reserved4             : 13;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved5             : 4; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
         gctUINT        reserved6             : 1; /* Must be zero'ed */
@@ -344,6 +584,16 @@ typedef union _VSC_MC_ALU_1_SRC_SRC0_INST
         gctUINT        dstRegNoBit8          : 1;
         gctUINT        reserved8             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        reserved8             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        reserved7             : 10;/* Must be zero'ed */
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        reserved6             : 1; /* Must be zero'ed */
+        gctUINT        extOpcode             : 8;
+        gctUINT        reserved5             : 4; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -355,6 +605,7 @@ typedef union _VSC_MC_ALU_1_SRC_SRC1_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -363,13 +614,32 @@ typedef union _VSC_MC_ALU_1_SRC_SRC1_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
         gctUINT        reserved2             : 18;/* Must be zero'ed */
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        reserved3             : 10;/* Must be zero'ed */
+#else
+        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        reserved2             : 18;/* Must be zero'ed */
+        gctUINT        packMode              : 1;
+        gctUINT        roundMode             : 2;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved4             : 6; /* Must be zero'ed */
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
         gctUINT        src1RegNo             : 9;
@@ -379,7 +649,19 @@ typedef union _VSC_MC_ALU_1_SRC_SRC1_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        reserved4             : 6; /* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        reserved5             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
@@ -389,6 +671,17 @@ typedef union _VSC_MC_ALU_1_SRC_SRC1_INST
         gctUINT        dstRegNoBit8          : 1;
         gctUINT        reserved8             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        reserved8             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        reserved7             : 10;/* Must be zero'ed */
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        reserved6             : 1; /* Must be zero'ed */
+        gctUINT        extOpcode             : 8;
+        gctUINT        reserved5             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -400,6 +693,7 @@ typedef union _VSC_MC_ALU_1_SRC_SRC2_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -408,18 +702,44 @@ typedef union _VSC_MC_ALU_1_SRC_SRC2_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        roundMode             : 2;
         gctUINT        packMode              : 1;
         gctUINT        reserved2             : 18;/* Must be zero'ed */
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        reserved3             : 10;/* Must be zero'ed */
+#else
+        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        reserved2             : 18;/* Must be zero'ed */
+        gctUINT        packMode              : 1;
+        gctUINT        roundMode             : 2;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved4             : 16;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
         gctUINT        reserved5             : 13;/* Must be zero'ed */
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        reserved5             : 13;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        reserved4             : 16;/* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved6             : 3; /* Must be zero'ed */
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
@@ -431,6 +751,19 @@ typedef union _VSC_MC_ALU_1_SRC_SRC2_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        reserved6             : 3; /* Must be zero'ed */
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -442,6 +775,7 @@ typedef union _VSC_MC_PACK_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -450,7 +784,18 @@ typedef union _VSC_MC_PACK_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved2             : 3; /* Must be zero'ed */
         gctUINT        srcSelect             : 8;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
@@ -459,7 +804,18 @@ typedef union _VSC_MC_PACK_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        srcSelect             : 8;
+        gctUINT        reserved2             : 3; /* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
@@ -470,7 +826,20 @@ typedef union _VSC_MC_PACK_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
@@ -482,6 +851,19 @@ typedef union _VSC_MC_PACK_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -493,6 +875,7 @@ typedef union _VSC_MC_SAMPLE_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -501,7 +884,18 @@ typedef union _VSC_MC_SAMPLE_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        samplerSlot           : 5;
+#else
+        gctUINT        samplerSlot           : 5;
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        samplerRelAddr        : 3;
         gctUINT        samplerSwizzle        : 8;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
@@ -510,7 +904,18 @@ typedef union _VSC_MC_SAMPLE_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        samplerSwizzle        : 8;
+        gctUINT        samplerRelAddr        : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1;
@@ -521,7 +926,20 @@ typedef union _VSC_MC_SAMPLE_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1;
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        bSrc2Valid            : 1;
         gctUINT        src2RegNo             : 9;
@@ -533,6 +951,19 @@ typedef union _VSC_MC_SAMPLE_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1;
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -544,6 +975,7 @@ typedef union _VSC_MC_SAMPLE_EXT_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -552,7 +984,18 @@ typedef union _VSC_MC_SAMPLE_EXT_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        samplerSlot           : 5;
+#else
+        gctUINT        samplerSlot           : 5;
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        samplerRelAddr        : 3;
         gctUINT        samplerSwizzle        : 8;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
@@ -561,7 +1004,18 @@ typedef union _VSC_MC_SAMPLE_EXT_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        samplerSwizzle        : 8;
+        gctUINT        samplerRelAddr        : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1;
@@ -572,7 +1026,20 @@ typedef union _VSC_MC_SAMPLE_EXT_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1;
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        reserved1             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
@@ -582,6 +1049,17 @@ typedef union _VSC_MC_SAMPLE_EXT_INST
         gctUINT        dstRegNoBit8          : 1;
         gctUINT        reserved4             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        reserved4             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        reserved2             : 1; /* Must be zero'ed */
+        gctUINT        extOpcode             : 8;
+        gctUINT        reserved1             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -593,6 +1071,7 @@ typedef union _VSC_MC_LD_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -601,7 +1080,18 @@ typedef union _VSC_MC_LD_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved2             : 2; /* Must be zero'ed */
         gctUINT        packMode              : 1;
         gctUINT        offsetLeftShift       : 3; /* Act after X3, do (<< offsetLeftShift) */
@@ -616,7 +1106,24 @@ typedef union _VSC_MC_LD_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 and instTypeBit3 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        bDenorm               : 1;
+        gctUINT        instTypeBit3          : 1;
+        gctUINT        bAccessLocalStorage   : 1;
+        gctUINT        bSkipForHelperKickoff : 1;
+        gctUINT        bOffsetX3             : 1;
+        gctUINT        offsetLeftShift       : 3; /* Act after X3, do (<< offsetLeftShift) */
+        gctUINT        packMode              : 1;
+        gctUINT        reserved2             : 2; /* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
@@ -627,7 +1134,20 @@ typedef union _VSC_MC_LD_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        reserved3             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
@@ -637,6 +1157,17 @@ typedef union _VSC_MC_LD_INST
         gctUINT        dstRegNoBit8          : 1;
         gctUINT        reserved6             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        reserved6             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        reserved5             : 10;/* Must be zero'ed */
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        reserved4             : 1; /* Must be zero'ed */
+        gctUINT        extOpcode             : 8;
+        gctUINT        reserved3             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -648,6 +1179,7 @@ typedef union _VSC_MC_IMG_LD_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -656,7 +1188,18 @@ typedef union _VSC_MC_IMG_LD_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 5; /* For non-evis-mode, must be zero'ed; otherwise, see NOTE 9 */
+#else
+        gctUINT        reserved1             : 5; /* For non-evis-mode, must be zero'ed; otherwise, see NOTE 9 */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved2             : 7; /* Must be zero'ed for non-evis mode, otherwise, see NOTE 9 */
         gctUINT        bSkipForHelperKickoff : 1;
         gctUINT        bAccessLocalStorage   : 1;
@@ -667,7 +1210,20 @@ typedef union _VSC_MC_IMG_LD_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        reserved3             : 2; /* Must be zero'ed */
+        gctUINT        bAccessLocalStorage   : 1;
+        gctUINT        bSkipForHelperKickoff : 1;
+        gctUINT        reserved2             : 7; /* Must be zero'ed for non-evis mode, otherwise, see NOTE 9 */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
@@ -678,7 +1234,20 @@ typedef union _VSC_MC_IMG_LD_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
@@ -690,6 +1259,19 @@ typedef union _VSC_MC_IMG_LD_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -701,11 +1283,19 @@ typedef union _VSC_MC_ST_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 17;/* Must be zero'ed */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        writeMask             : 4;
+        gctUINT        reserved0             : 17;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved2             : 2; /* Must be zero'ed */
         gctUINT        packMode              : 1;
         gctUINT        offsetLeftShift       : 3; /* Act after X3, do (<< offsetLeftShift) */
@@ -720,7 +1310,24 @@ typedef union _VSC_MC_ST_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 and instTypeBit3 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        bDenorm               : 1;
+        gctUINT        instTypeBit3          : 1;
+        gctUINT        bAccessLocalStorage   : 1;
+        gctUINT        bSkipForHelperKickoff : 1;
+        gctUINT        bOffsetX3             : 1;
+        gctUINT        offsetLeftShift       : 3; /* Act after X3, do (<< offsetLeftShift) */
+        gctUINT        packMode              : 1;
+        gctUINT        reserved2             : 2; /* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
@@ -731,7 +1338,20 @@ typedef union _VSC_MC_ST_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
@@ -743,6 +1363,19 @@ typedef union _VSC_MC_ST_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        reserved3             : 1; /* Must be zero'ed */
+#else
+        gctUINT        reserved3             : 1; /* Must be zero'ed */
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        threadTypeBit1        : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        threadTypeBit0        : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -754,11 +1387,19 @@ typedef union _VSC_MC_IMG_ST_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 17;/* Must be zero'ed */
         gctUINT        writeMask             : 4; /* For evis-mode, see Note 9 */
         gctUINT        reserved1             : 5; /* For non-evis-mode, must be zero'ed; otherwise, see NOTE 9 */
+#else
+        gctUINT        reserved1             : 5; /* For non-evis-mode, must be zero'ed; otherwise, see NOTE 9 */
+        gctUINT        writeMask             : 4; /* For evis-mode, see Note 9 */
+        gctUINT        reserved0             : 17;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved2             : 7; /* Must be zero'ed for non-evis mode, otherwise, see NOTE 9 */
         gctUINT        bSkipForHelperKickoff : 1;
         gctUINT        bAccessLocalStorage   : 1;
@@ -769,7 +1410,20 @@ typedef union _VSC_MC_IMG_ST_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        reserved3             : 2; /* Must be zero'ed */
+        gctUINT        bAccessLocalStorage   : 1;
+        gctUINT        bSkipForHelperKickoff : 1;
+        gctUINT        reserved2             : 7; /* Must be zero'ed for non-evis mode, otherwise, see NOTE 9 */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
@@ -780,7 +1434,20 @@ typedef union _VSC_MC_IMG_ST_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
@@ -792,6 +1459,19 @@ typedef union _VSC_MC_IMG_ST_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        reserved4             : 1; /* Must be zero'ed */
+#else
+        gctUINT        reserved4             : 1; /* Must be zero'ed */
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        threadTypeBit1        : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        threadTypeBit0        : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -803,6 +1483,7 @@ typedef union _VSC_MC_IMG_ATOM_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -811,7 +1492,18 @@ typedef union _VSC_MC_IMG_ATOM_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved2             : 3; /* Must be zero'ed */
         gctUINT        atomicMode            : 3;
         gctUINT        b3dImgMode            : 1;
@@ -824,7 +1516,22 @@ typedef union _VSC_MC_IMG_ATOM_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        reserved3             : 2; /* Must be zero'ed */
+        gctUINT        bAccessLocalStorage   : 1;
+        gctUINT        bSkipForHelperKickoff : 1;
+        gctUINT        b3dImgMode            : 1;
+        gctUINT        atomicMode            : 3;
+        gctUINT        reserved2             : 3; /* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
@@ -835,7 +1542,20 @@ typedef union _VSC_MC_IMG_ATOM_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
@@ -847,6 +1567,19 @@ typedef union _VSC_MC_IMG_ATOM_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -858,13 +1591,23 @@ typedef union _VSC_MC_STORE_ATTR_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 17;/* Must be zero'ed */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 3; /* Must be zero'ed */
         gctUINT        bNeedUscSync          : 1;
         gctUINT        reserved2             : 1; /* Must be zero'ed */
+#else
+        gctUINT        reserved2             : 1; /* Must be zero'ed */
+        gctUINT        bNeedUscSync          : 1;
+        gctUINT        reserved1             : 3; /* Must be zero'ed */
+        gctUINT        writeMask             : 4;
+        gctUINT        reserved0             : 17;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved3             : 3; /* Must be zero'ed */
         gctUINT        shStageClient         : 2;
         gctUINT        reserved4             : 1; /* Must be zero'ed */
@@ -876,7 +1619,21 @@ typedef union _VSC_MC_STORE_ATTR_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        reserved5             : 4; /* Must be zero'ed */
+        gctUINT        attrLayout            : 1;
+        gctUINT        reserved4             : 1; /* Must be zero'ed */
+        gctUINT        shStageClient         : 2;
+        gctUINT        reserved3             : 3; /* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
@@ -887,7 +1644,20 @@ typedef union _VSC_MC_STORE_ATTR_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
@@ -899,6 +1669,19 @@ typedef union _VSC_MC_STORE_ATTR_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        reserved6             : 1; /* Must be zero'ed */
+#else
+        gctUINT        reserved6             : 1; /* Must be zero'ed */
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        threadTypeBit1        : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        threadTypeBit0        : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -910,6 +1693,7 @@ typedef union _VSC_MC_SELECT_MAP_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -918,7 +1702,18 @@ typedef union _VSC_MC_SELECT_MAP_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid, see rangeToMatch for more info */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved2             : 3; /* Must be zero'ed */
         gctUINT        rangeToMatch          : 4; /* Only the range is matched, the dst will be written */
         gctUINT        reserved3             : 3; /* Must be zero'ed */
@@ -929,7 +1724,20 @@ typedef union _VSC_MC_SELECT_MAP_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        bCompSel              : 1; /* If TRUE, component select, otherwise, src select */
+        gctUINT        reserved3             : 3; /* Must be zero'ed */
+        gctUINT        rangeToMatch          : 4; /* Only the range is matched, the dst will be written */
+        gctUINT        reserved2             : 3; /* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
@@ -940,7 +1748,20 @@ typedef union _VSC_MC_SELECT_MAP_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
@@ -952,6 +1773,19 @@ typedef union _VSC_MC_SELECT_MAP_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -963,10 +1797,17 @@ typedef union _VSC_MC_DIRECT_BRANCH_0_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        condOpCode            : 5;
         gctUINT        reserved0             : 21;/* Must be zero'ed */
+#else
+        gctUINT        reserved0             : 21;/* Must be zero'ed */
+        gctUINT        condOpCode            : 5;
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        packMode              : 1;
         gctUINT        reserved2             : 8; /* Must be zero'ed */
@@ -976,7 +1817,19 @@ typedef union _VSC_MC_DIRECT_BRANCH_0_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1;
+        gctUINT        reserved2             : 8; /* Must be zero'ed */
+        gctUINT        packMode              : 1;
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1;
@@ -987,13 +1840,34 @@ typedef union _VSC_MC_DIRECT_BRANCH_0_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1;
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        reserved3             : 1; /* Must be zero'ed */
         gctUINT        loopOpType            : 1; /* Must be 0x0 under dual16 mode */
         gctUINT        reserved4             : 2; /* Must be zero'ed */
         gctUINT        branchTarget          : 20;
         gctUINT        reserved5             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved5             : 5; /* Must be zero'ed */
+        gctUINT        branchTarget          : 20;
+        gctUINT        reserved4             : 2; /* Must be zero'ed */
+        gctUINT        loopOpType            : 1; /* Must be 0x0 under dual16 mode */
+        gctUINT        reserved3             : 1; /* Must be zero'ed */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -1005,10 +1879,17 @@ typedef union _VSC_MC_DIRECT_BRANCH_1_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        condOpCode            : 5;
         gctUINT        reserved0             : 21;/* Must be zero'ed */
+#else
+        gctUINT        reserved0             : 21;/* Must be zero'ed */
+        gctUINT        condOpCode            : 5;
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        packMode              : 1;
         gctUINT        reserved2             : 8; /* Must be zero'ed */
@@ -1018,7 +1899,19 @@ typedef union _VSC_MC_DIRECT_BRANCH_1_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1;
+        gctUINT        reserved2             : 8; /* Must be zero'ed */
+        gctUINT        packMode              : 1;
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1;
@@ -1029,7 +1922,20 @@ typedef union _VSC_MC_DIRECT_BRANCH_1_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1;
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        branchTargetBit0_8    : 9;
@@ -1040,6 +1946,18 @@ typedef union _VSC_MC_DIRECT_BRANCH_1_INST
         gctUINT        immType               : 2;
         gctUINT        src2Type              : 3; /* Must be set to 0x7 */
         gctUINT        reserved3             : 1; /* Must be zero'ed */
+#else
+        gctUINT        reserved3             : 1; /* Must be zero'ed */
+        gctUINT        src2Type              : 3; /* Must be set to 0x7 */
+        gctUINT        immType               : 2;
+        gctUINT        branchTargetBit19     : 1;
+        gctUINT        threadTypeBit1        : 1;
+        gctUINT        branchTargetBit9_18   : 10;
+        gctUINT        threadTypeBit0        : 1;
+        gctUINT        branchTargetBit0_8    : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -1051,21 +1969,43 @@ typedef union _VSC_MC_INDIRECT_BRANCH_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        condOpCode            : 5; /* Must be set to 0x00 */
         gctUINT        reserved0             : 21;/* Must be zero'ed */
+#else
+        gctUINT        reserved0             : 21;/* Must be zero'ed */
+        gctUINT        condOpCode            : 5; /* Must be set to 0x00 */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved1             : 2; /* Must be zero'ed */
         gctUINT        packMode              : 1;
         gctUINT        reserved2             : 18;/* Must be zero'ed */
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        reserved3             : 10;/* Must be zero'ed */
+#else
+        gctUINT        reserved3             : 10;/* Must be zero'ed */
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        reserved2             : 18;/* Must be zero'ed */
+        gctUINT        packMode              : 1;
+        gctUINT        reserved1             : 2; /* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved4             : 16;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
         gctUINT        reserved5             : 13;/* Must be zero'ed */
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        reserved5             : 13;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        reserved4             : 16;/* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved6             : 3; /* Must be zero'ed */
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
@@ -1077,6 +2017,19 @@ typedef union _VSC_MC_INDIRECT_BRANCH_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        reserved7             : 1; /* Must be zero'ed */
+#else
+        gctUINT        reserved7             : 1; /* Must be zero'ed */
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        threadTypeBit1        : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        threadTypeBit0        : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        reserved6             : 3; /* Must be zero'ed */
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -1088,18 +2041,35 @@ typedef union _VSC_MC_DIRECT_CALL_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 26;/* Must be zero'ed */
+#else
+        gctUINT        reserved0             : 26;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
         gctUINT        reserved1             : 32;/* Must be zero'ed */
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved2             : 16;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
         gctUINT        reserved3             : 15;/* Must be zero'ed */
+#else
+        gctUINT        reserved3             : 15;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        reserved2             : 16;/* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved4             : 7; /* Must be zero'ed */
         gctUINT        callTarget            : 20;
         gctUINT        reserved5             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved5             : 5; /* Must be zero'ed */
+        gctUINT        callTarget            : 20;
+        gctUINT        reserved4             : 7; /* Must be zero'ed */
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -1111,18 +2081,37 @@ typedef union _VSC_MC_INDIRECT_CALL_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 26;/* Must be zero'ed */
+#else
+        gctUINT        reserved0             : 26;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved1             : 21;/* Must be zero'ed */
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        reserved2             : 10;
+#else
+        gctUINT        reserved2             : 10;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        reserved1             : 21;/* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved3             : 16;/* Must be zero'ed */
         gctUINT        baseOpcodeBit6        : 1;
         gctUINT        reserved4             : 13;/* Must be zero'ed */
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        reserved4             : 13;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        reserved3             : 16;/* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved5             : 3; /* Must be zero'ed */
         gctUINT        bSrc2Valid            : 1; /* Must be valid */
         gctUINT        src2RegNo             : 9;
@@ -1134,6 +2123,19 @@ typedef union _VSC_MC_INDIRECT_CALL_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        reserved6             : 1; /* Must be zero'ed */
+#else
+        gctUINT        reserved6             : 1; /* Must be zero'ed */
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        threadTypeBit1        : 1;
+        gctUINT        bSrc2ModAbs           : 1;
+        gctUINT        bSrc2ModNeg           : 1;
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        threadTypeBit0        : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1; /* Must be valid */
+        gctUINT        reserved5             : 3; /* Must be zero'ed */
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -1145,13 +2147,25 @@ typedef union _VSC_MC_LOOP_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 26;/* Must be zero'ed */
+#else
+        gctUINT        reserved0             : 26;/* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved1             : 21;/* Must be zero'ed */
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        reserved2             : 10;
+#else
+        gctUINT        reserved2             : 10;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        reserved1             : 21;/* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved3             : 6;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
         gctUINT        src1RegNo             : 9;
@@ -1161,11 +2175,29 @@ typedef union _VSC_MC_LOOP_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        reserved3             : 6;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        reserved4             : 4; /* Must be zero'ed */
         gctUINT        branchTarget          : 20;
         gctUINT        reserved5             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved5             : 5; /* Must be zero'ed */
+        gctUINT        branchTarget          : 20;
+        gctUINT        reserved4             : 4; /* Must be zero'ed */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -1177,6 +2209,7 @@ typedef union _VSC_MC_EMIT_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -1185,7 +2218,18 @@ typedef union _VSC_MC_EMIT_INST
         gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
         gctUINT        writeMask             : 4;
         gctUINT        reserved1             : 5; /* Must be zero'ed */
+#else
+        gctUINT        reserved1             : 5; /* Must be zero'ed */
+        gctUINT        writeMask             : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        dstRelAddr            : 3;
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        reserved2             : 3; /* Must be zero'ed */
         gctUINT        bNeedRestartPrim      : 1;
         gctUINT        bJmpToEndOnMaxVtxCnt  : 1;
@@ -1196,7 +2240,20 @@ typedef union _VSC_MC_EMIT_INST
         gctUINT        src0Swizzle           : 8;
         gctUINT        bSrc0ModNeg           : 1;
         gctUINT        bSrc0ModAbs           : 1;
+#else
+        gctUINT        bSrc0ModAbs           : 1;
+        gctUINT        bSrc0ModNeg           : 1;
+        gctUINT        src0Swizzle           : 8;
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        reserved3             : 6; /* Must be zero'ed */
+        gctUINT        bJmpToEndOnMaxVtxCnt  : 1;
+        gctUINT        bNeedRestartPrim      : 1;
+        gctUINT        reserved2             : 3; /* Must be zero'ed */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1;
@@ -1207,7 +2264,20 @@ typedef union _VSC_MC_EMIT_INST
         gctUINT        bSrc1ModAbs           : 1;
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        bSrc1ModAbs           : 1;
+        gctUINT        bSrc1ModNeg           : 1;
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1;
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        reserved4             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        extOpcode             : 8;
@@ -1217,6 +2287,17 @@ typedef union _VSC_MC_EMIT_INST
         gctUINT        dstRegNoBit8          : 1;
         gctUINT        reserved7             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        reserved7             : 6; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        reserved6             : 10;/* Must be zero'ed */
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        reserved5             : 1; /* Must be zero'ed */
+        gctUINT        extOpcode             : 8;
+        gctUINT        reserved4             : 1; /* Must be zero'ed for non-extopcode mode, otherwise, see NOTE 4 */
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -1228,6 +2309,7 @@ typedef union _VSC_MC_EVIS_INST
 {
     struct
     {
+#if !gcdENDIAN_BIG
         gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode, and base-opcode must be 0x45 */
         gctUINT        reserved0             : 5; /* Must be zero'ed */
         gctUINT        bResultSat            : 1;
@@ -1237,7 +2319,19 @@ typedef union _VSC_MC_EVIS_INST
         gctUINT        startDstCompIdx       : 4;
         gctUINT        endDstCompIdx         : 4;
         gctUINT        extEvisOpCodeBit3     : 1;
+#else
+        gctUINT        extEvisOpCodeBit3     : 1;
+        gctUINT        endDstCompIdx         : 4;
+        gctUINT        startDstCompIdx       : 4;
+        gctUINT        dstRegNoBit0_6        : 7; /* Together with dstRegNoBit7 and dstRegNoBit8 to compose dstRegNo */
+        gctUINT        extEvisOpCodeBit0_2   : 3; /* Together with extEvisOpCodeBit3 and extEvisOpCodeBit4_5 to extEvisOpCode */
+        gctUINT        bDstValid             : 1; /* Must be valid */
+        gctUINT        bResultSat            : 1;
+        gctUINT        reserved0             : 5; /* Must be zero'ed */
+        gctUINT        baseOpcodeBit0_5      : 6; /* Together with baseOpcodeBit6 to compose base-opcode, and base-opcode must be 0x45 */
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        extEvisOpCodeBit4_5   : 2;
         gctUINT        evisState             : 9;
         gctUINT        bSrc0Valid            : 1; /* Must be valid */
@@ -1245,7 +2339,17 @@ typedef union _VSC_MC_EVIS_INST
         gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
         gctUINT        startSrcCompIdx       : 4; /* AKA sourceBin */
         gctUINT        reserved1             : 6; /* Must be zero'ed */
+#else
+        gctUINT        reserved1             : 6; /* Must be zero'ed */
+        gctUINT        startSrcCompIdx       : 4; /* AKA sourceBin */
+        gctUINT        instTypeBit0          : 1; /* Together with instTypeBit1_2 to compose instType */
+        gctUINT        src0RegNo             : 9;
+        gctUINT        bSrc0Valid            : 1; /* Must be valid */
+        gctUINT        evisState             : 9;
+        gctUINT        extEvisOpCodeBit4_5   : 2;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src0RelAddr           : 3;
         gctUINT        src0Type              : 3;
         gctUINT        bSrc1Valid            : 1; /* Must be valid */
@@ -1255,7 +2359,19 @@ typedef union _VSC_MC_EVIS_INST
         gctUINT        reserved2             : 2; /* Must be zero'ed */
         gctUINT        src1RelAddr           : 3;
         gctUINT        instTypeBit1_2        : 2;
+#else
+        gctUINT        instTypeBit1_2        : 2;
+        gctUINT        src1RelAddr           : 3;
+        gctUINT        reserved2             : 2; /* Must be zero'ed */
+        gctUINT        src1Swizzle           : 8;
+        gctUINT        baseOpcodeBit6        : 1;
+        gctUINT        src1RegNo             : 9;
+        gctUINT        bSrc1Valid            : 1; /* Must be valid */
+        gctUINT        src0Type              : 3;
+        gctUINT        src0RelAddr           : 3;
+#endif
 
+#if !gcdENDIAN_BIG
         gctUINT        src1Type              : 3;
         gctUINT        bSrc2Valid            : 1;
         gctUINT        src2RegNo             : 9;
@@ -1266,6 +2382,18 @@ typedef union _VSC_MC_EVIS_INST
         gctUINT        src2RelAddr           : 3;
         gctUINT        src2Type              : 3;
         gctUINT        dstType               : 1;
+#else
+        gctUINT        dstType               : 1;
+        gctUINT        src2Type              : 3;
+        gctUINT        src2RelAddr           : 3;
+        gctUINT        dstRegNoBit8          : 1;
+        gctUINT        reserved3             : 2; /* Must be zero'ed */
+        gctUINT        src2Swizzle           : 8;
+        gctUINT        dstRegNoBit7          : 1;
+        gctUINT        src2RegNo             : 9;
+        gctUINT        bSrc2Valid            : 1;
+        gctUINT        src1Type              : 3;
+#endif
     } inst;
 
     gctUINT            data[4];
@@ -2552,7 +3680,19 @@ static gctBOOL _Common_Encode_Mc_Alu_Inst(VSC_MC_CODEC* pMcCodec,
     else
     {
         pOutMcInst->tri_srcs_alu_inst.inst.roundMode = pInCodecHelperInst->instCtrl.roundingMode;
-        pOutMcInst->tri_srcs_alu_inst.inst.packMode = pInCodecHelperInst->instCtrl.packMode;
+
+        /*
+        ** For CONV instruction, bit:2 of word1 is saved the evis mode, not packMode, and we use data type to check if it is packMode.
+        ** Right now, it is disabled.
+        */
+        if (pInCodecHelperInst->baseOpcode == 0x72)
+        {
+            ((VSC_MC_INST*)pOutMcInst)->evis_inst.inst.evisState &= 0x1FE;
+        }
+        else
+        {
+            pOutMcInst->tri_srcs_alu_inst.inst.packMode = pInCodecHelperInst->instCtrl.packMode;
+        }
     }
 
     return gcvTRUE;
@@ -4373,6 +5513,12 @@ static gctBOOL _VerifyMCLegality(VSC_MC_CODEC* pMcCodec, VSC_MC_CODEC_INST* pCod
               pCodecHelperInst->extOpcode != 0x13 &&
               pCodecHelperInst->extOpcode != 0x14 &&
               pCodecHelperInst->extOpcode != 0x15 &&
+              pCodecHelperInst->extOpcode != 0x18 &&
+              pCodecHelperInst->extOpcode != 0x19 &&
+              pCodecHelperInst->extOpcode != 0x1A &&
+              pCodecHelperInst->extOpcode != 0x1B &&
+              pCodecHelperInst->extOpcode != 0x1C &&
+              pCodecHelperInst->extOpcode != 0x1D &&
               !(pCodecHelperInst->extOpcode == 0x0C && isVX2))))
         {
             GotoError();

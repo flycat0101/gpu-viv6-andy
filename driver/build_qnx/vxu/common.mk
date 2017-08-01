@@ -44,7 +44,7 @@ MISSING_OBJECTS := $(filter-out $(OBJECTS_FROM_SRCVPATH), $(basename $(SOURCE_OB
 ifneq ($(MISSING_OBJECTS), )
 $(error ***** Missing source objects:  $(MISSING_OBJECTS))
 endif
-CCFLAGS += -g -O0
+
 #-Wno-error=switch -Wno-error=missing-braces
 
 CCFLAGS += -D_LITTLE_ENDIAN_ \
@@ -67,12 +67,7 @@ LIBS +=  LLVM_viv OpenVX CLC VSC GAL
 #CCFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_1_APIS
 #CCFLAGS += -DBUILD_OPENCL_12=1
 
-ifneq ($(filter v7, $(VARIANT_LIST)), v7)
-	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp
-	LIBS += m-vfp
-else
-	LIBS += m
-endif
+include $(qnx_build_dir)/math.mk
 
 ifeq ($(filter so dll, $(VARIANT_LIST)),)
 INSTALLDIR=/dev/null

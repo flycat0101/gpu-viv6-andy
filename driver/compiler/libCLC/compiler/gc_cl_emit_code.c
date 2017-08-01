@@ -257,6 +257,7 @@ IN gcSL_OPCODE Opcode
     case gcSL_STORE1:   return "gcSL_STORE1";
 #endif
     case gcSL_BARRIER:  return "gcSL_BARRIER";
+    case gcSL_MEM_BARRIER:  return "gcSL_MEM_BARRIER";
     case gcSL_RCP:      return "gcSL_RCP";
     case gcSL_SUB:      return "gcSL_SUB";
     case gcSL_NEG:      return "gcSL_NEG";
@@ -344,6 +345,10 @@ IN gcSL_OPCODE Opcode
     case gcSL_CLAMP0MAX:     return "gcSL_CLAMP0MAX";
     case gcSL_FMA_MUL:       return "gcSL_FMA_MUL";
     case gcSL_FMA_ADD:       return "gcSL_FMA_ADD";
+    case gcSL_FINDLSB:      return "gcSL_FINDLSB";
+    case gcSL_FINDMSB:      return "gcSL_FINDMSB";
+    case gcSL_BIT_REVERSAL: return "gcSL_BIT_REVERSAL";
+    case gcSL_BYTE_REVERSAL:  return "gcSL_BYTE_REVERSAL";
     default:
     gcmASSERT(0);
     return "Invalid";
@@ -479,8 +484,8 @@ IN gcSL_TYPE Type
     }
 }
 
-static gcsTYPE_SIZE
-_ConvToShaderDataType(
+gcsTYPE_SIZE
+clConvToShaderDataType(
 cloCOMPILER Compiler,
 clsGEN_CODE_DATA_TYPE DataType
 )
@@ -1607,7 +1612,7 @@ IN clsGEN_CODE_DATA_TYPE DataType
 {
   gcsTYPE_SIZE typeSize;
 
-  typeSize = _ConvToShaderDataType(Compiler, DataType);
+  typeSize = clConvToShaderDataType(Compiler, DataType);
   return gcGetShaderDataTypeName(typeSize.type);
 }
 
@@ -1965,6 +1970,7 @@ IN gctCONST_STRING Name,
 IN gctTYPE_QUALIFIER Qualifier,
 IN gcSHADER_TYPE Type,
 IN gctSIZE_T Length,
+IN gctBOOL   IsArray,
 IN gctREG_INDEX TempRegister,
 OUT gcVARIABLE *Variable
 )
@@ -1983,13 +1989,13 @@ OUT gcVARIABLE *Variable
                       Length,
                       TempRegister));
 
-    if (Length == 1)
+    if (IsArray || Length > 1)
     {
-        arrayLengthCount = 0;
+        arrayLengthCount = 1;
     }
     else
     {
-        arrayLengthCount = 1;
+        arrayLengthCount = 0;
     }
 
     status = gcSHADER_AddVariableEx(binary,
@@ -2643,8 +2649,8 @@ _GetFunctionLabel(
     return gcFUNCTION_GetLabel(Function, Label);
 }
 
-static gcSL_FORMAT
-_ConvDataTypeToFormat(
+gcSL_FORMAT
+clConvDataTypeToFormat(
 clsGEN_CODE_DATA_TYPE DataType
 )
 {
@@ -2738,7 +2744,7 @@ _EmitOpcodeAndTarget(
 
     gcmASSERT(Target);
 
-    format = _ConvDataTypeToFormat(Target->dataType);
+    format = clConvDataTypeToFormat(Target->dataType);
 
     srcLoc = GCSL_Build_SRC_LOC(LineNo, StringNo);
 
@@ -2761,7 +2767,7 @@ _EmitOpcodeAndTarget(
                                    srcLoc);
     }
 
-    if(clmIsElementTypePacked(Target->dataType.elementType))
+    if(clmGEN_CODE_IsExtendedVectorType(Target->dataType))
     {
         gcSHADER binary;
         gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
@@ -2798,7 +2804,7 @@ _EmitOpcodeConditionAndTarget(
     gcmASSERT(Target);
 
     srcLoc = GCSL_Build_SRC_LOC(LineNo, StringNo);
-    format = _ConvDataTypeToFormat(Target->dataType);
+    format = clConvDataTypeToFormat(Target->dataType);
 
     if (Target->indexMode == gcSL_NOT_INDEXED) {
         status = _AddOpcodeCondition(Compiler,
@@ -2821,7 +2827,7 @@ _EmitOpcodeConditionAndTarget(
                                             srcLoc);
     }
 
-    if(clmIsElementTypePacked(Target->dataType.elementType))
+    if(clmGEN_CODE_IsExtendedVectorType(Target->dataType))
     {
         gcSHADER binary;
         gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
@@ -2862,7 +2868,7 @@ _EmitOpcodeConditional(
        status = _AddOpcodeConditionalFormatted(Compiler,
                                                Opcode,
                                                Condition,
-                                               _ConvDataTypeToFormat(*DataType),
+                                               clConvDataTypeToFormat(*DataType),
                                                Label,
                                                srcLoc);
     }
@@ -2902,7 +2908,7 @@ _EmitSourceTemp(
 
    gcmASSERT(SourceReg);
 
-   format = _ConvDataTypeToFormat(DataType);
+   format = clConvDataTypeToFormat(DataType);
    gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
 
    if (gcIsSamplerDataType(DataType)) {
@@ -2966,7 +2972,7 @@ _EmitSourceAttribute(
 
     gcmASSERT(SourceReg);
 
-    format = _ConvDataTypeToFormat(DataType);
+    format = clConvDataTypeToFormat(DataType);
 
     if (SourceReg->indexMode == gcSL_NOT_INDEXED)
     {
@@ -3017,7 +3023,7 @@ _EmitSourceUniform(
 
     gcmASSERT(SourceReg);
 
-    format = _ConvDataTypeToFormat(DataType);
+    format = clConvDataTypeToFormat(DataType);
 
     if (SourceReg->indexMode == gcSL_NOT_INDEXED)
     {
@@ -3091,7 +3097,7 @@ _EmitSource(
     gcSHADER_INSTRUCTION_INDEX instrIndex = gcSHADER_OPCODE;
     gcmASSERT(Source);
 
-    if(clmIsElementTypePacked(Source->dataType.elementType))
+    if(clmGEN_CODE_IsExtendedVectorType(Source->dataType))
     {
         gcmVERIFY_OK(cloCOMPILER_GetBinary(Compiler, &binary));
         instrIndex = binary->instrIndex;
@@ -3178,7 +3184,7 @@ _EmitSource(
         {
             gctUINT32 format[1];
 
-            format[0] = (gctUINT32)_ConvDataTypeToFormat(Source->dataType);
+            format[0] = (gctUINT32)clConvDataTypeToFormat(Source->dataType);
             status =  _EmitSourceConstant(Compiler,
                                           LineNo,
                                           StringNo,
@@ -3222,7 +3228,7 @@ clNewAttribute(
     gcsTYPE_SIZE typeSize;
     gcSHADER_TYPE type;
 
-    typeSize = _ConvToShaderDataType(Compiler, DataType);
+    typeSize = clConvToShaderDataType(Compiler, DataType);
     type = typeSize.type;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -3340,9 +3346,9 @@ clNewUniform(
     gcsTYPE_SIZE typeSize;
     gcSHADER_TYPE type;
 
-    typeSize = _ConvToShaderDataType(Compiler, DataType);
+    typeSize = clConvToShaderDataType(Compiler, DataType);
     type = typeSize.type;
-    format = _ConvDataTypeToFormat(Format);
+    format = clConvDataTypeToFormat(Format);
     flags = _GetUniformFlags(Flags, gcvNULL);
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -3439,9 +3445,9 @@ clNewKernelUniformArgument(
     gcsTYPE_SIZE typeSize;
     gcSHADER_TYPE type;
 
-    typeSize = _ConvToShaderDataType(Compiler, DataType);
+    typeSize = clConvToShaderDataType(Compiler, DataType);
     type = typeSize.type;
-    format = _ConvDataTypeToFormat(Format);
+    format = clConvDataTypeToFormat(Format);
     flags = _GetUniformFlags(clvBUILTIN_KERNEL_ARG, ParamName);
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -3528,7 +3534,7 @@ IN gctREG_INDEX TempRegIndex
     gcsTYPE_SIZE typeSize;
     gcSHADER_TYPE type;
 
-    typeSize = _ConvToShaderDataType(Compiler, DataType);
+    typeSize = clConvToShaderDataType(Compiler, DataType);
     type = typeSize.type;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
@@ -3639,6 +3645,7 @@ IN cltQUALIFIER AddrSpaceQualifier,
 IN cltQUALIFIER StorageQualifier,
 IN clsGEN_CODE_DATA_TYPE DataType,
 IN gctSIZE_T Length,
+IN gctBOOL   IsArray,
 IN gctREG_INDEX TempRegIndex,
 OUT gcVARIABLE *Variable
 )
@@ -3647,7 +3654,7 @@ OUT gcVARIABLE *Variable
     gcsTYPE_SIZE typeSize;
     gcSHADER_TYPE type;
 
-    typeSize = _ConvToShaderDataType(Compiler, DataType);
+    typeSize = clConvToShaderDataType(Compiler, DataType);
     type = typeSize.type;
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                       clvDUMP_CODE_EMITTER,
@@ -3667,6 +3674,7 @@ OUT gcVARIABLE *Variable
                           clConvStorageQualifierToShaderTypeQualifier(StorageQualifier),
                           type,
                           Length * typeSize.length,
+                          IsArray,
                           TempRegIndex,
                           Variable);
 
@@ -4144,6 +4152,7 @@ _ConvOpcode(
     case clvOPCODE_XOR_BITWISE:      return gcSL_XOR_BITWISE;
 
     case clvOPCODE_BARRIER:          return gcSL_BARRIER;
+    case clvOPCODE_MEM_FENCE:        return gcSL_MEM_BARRIER;
     case clvOPCODE_LOAD:             return gcSL_LOAD;
     case clvOPCODE_STORE:            return gcSL_STORE;
 #if cldUseSTORE1
@@ -4268,8 +4277,14 @@ _ConvOpcode(
     case clvOPCODE_PARAM_CHAIN:      return gcSL_PARAM_CHAIN;
     case clvOPCODE_INTRINSIC:        return gcSL_INTRINSIC;
     case clvOPCODE_INTRINSIC_ST:     return gcSL_INTRINSIC_ST;
-    case clvOPCODE_FMA_MUL:         return gcSL_FMA_MUL;
-    case clvOPCODE_FMA_ADD:         return gcSL_FMA_ADD;
+    case clvOPCODE_FMA_MUL:          return gcSL_FMA_MUL;
+    case clvOPCODE_FMA_ADD:          return gcSL_FMA_ADD;
+
+    case clvOPCODE_FINDLSB:          return gcSL_FINDLSB;
+    case clvOPCODE_FINDMSB:          return gcSL_FINDMSB;
+    case clvOPCODE_BIT_REVERSAL:     return gcSL_BIT_REVERSAL;
+    case clvOPCODE_BYTE_REVERSAL:    return gcSL_BYTE_REVERSAL;
+
     default:
         gcmASSERT(0);
         return gcSL_NOP;
@@ -5105,6 +5120,8 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                             LineNo,
+                                             StringNo,
                                              codeGenerator,
                                              &selectionContextZero,
                                              gcvFALSE);
@@ -5126,6 +5143,8 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                             LineNo,
+                                             StringNo,
                                              codeGenerator,
                                              &selectionContextHalfway,
                                              gcvFALSE);
@@ -5213,6 +5232,8 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                             LineNo,
+                                             StringNo,
                                              codeGenerator,
                                              &selectionContextDiff,
                                              gcvFALSE);
@@ -5244,6 +5265,8 @@ _EmitIntToFloatCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                             LineNo,
+                                             StringNo,
                                              codeGenerator,
                                              &selectionContextIntConv,
                                              gcvFALSE);

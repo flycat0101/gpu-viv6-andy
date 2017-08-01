@@ -403,23 +403,14 @@ VX_INTERNAL_API vx_node vxLaplacian3x3Node(vx_graph graph, vx_image src, vx_imag
     return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_LAPLACIAN3x3, parameters, vxmLENGTH_OF(parameters));
 }
 
-VX_INTERNAL_API vx_node vxCensus3x3Node(vx_graph graph, vx_image src, vx_image dst)
-{
-    vx_reference parameters[] = {
-        (vx_reference)src,
-        (vx_reference)dst,
-    };
-
-    return vxoNode_CreateSpecific(graph, VX_KERNEL_INTERNAL_CENSUS3x3, parameters, vxmLENGTH_OF(parameters));
-}
-
-VX_INTERNAL_API vx_node vxCnnSoftMaxNode(vx_graph graph, vx_array src, vx_scalar batchSize, vx_scalar networkType, vx_scalar hasInterleave, vx_array dst)
+VX_INTERNAL_API vx_node vxCnnSoftMaxNode(vx_graph graph, vx_array src, vx_scalar batchSize, vx_scalar networkType, vx_scalar hasInterleave, vx_scalar fractionLength, vx_array dst)
 {
      vx_reference parameters[] = {
         (vx_reference)src,
         (vx_reference)batchSize,
         (vx_reference)networkType,
         (vx_reference)hasInterleave,
+        (vx_reference)fractionLength,
         (vx_reference)dst,
     };
 

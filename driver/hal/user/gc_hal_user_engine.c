@@ -3494,6 +3494,51 @@ gco3D_SetAlphaReferenceF(
     return status;
 }
 
+#if gcdALPHA_KILL_IN_SHADER
+/*******************************************************************************
+**
+**  gco3D_SetAlphaKill
+**
+**  Set the alphaKill and colorKill state which will used in shader.
+**
+**  INPUT:
+**
+**      gco3D Engine
+**          Pointer to an gco3D object.
+**
+**      gctBOOL AlphaKill
+**          AlphaKill state value.
+**
+**      gctBOOL ColorKill
+**          ColorKill state value.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gco3D_SetAlphaKill(
+    IN gco3D Engine,
+    IN gctBOOL AlphaKill,
+    IN gctBOOL ColorKill
+    )
+{
+    gceSTATUS status;
+
+    gcmHEADER_ARG("Engine=0x%x AlphaKill=%d ColorKill=%d", Engine, AlphaKill, ColorKill);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Engine, gcvOBJ_3D);
+
+    /* Program the alpha test. */
+    status = gcoHARDWARE_SetAlphaKill(Engine->hardware, AlphaKill, ColorKill);
+
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+#endif
+
 /*******************************************************************************
 **
 **  gco3D_SetAntiAliasLine.

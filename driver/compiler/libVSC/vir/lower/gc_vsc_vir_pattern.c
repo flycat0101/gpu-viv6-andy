@@ -282,9 +282,9 @@ _Pattern_CmpOperand(
         return gcvTRUE;
     case VIR_OPND_IMMEDIATE:
         {
-            VIR_TypeId ty0 = VIR_Operand_GetType(Opnd0);
+            VIR_TypeId ty0 = VIR_Operand_GetTypeId(Opnd0);
 
-            VIR_TypeId ty1 = VIR_Operand_GetType(Opnd1);
+            VIR_TypeId ty1 = VIR_Operand_GetTypeId(Opnd1);
 
             if (ty0 != ty1)
             {
@@ -297,12 +297,12 @@ _Pattern_CmpOperand(
     case VIR_OPND_SYMBOL:
     case VIR_OPND_SAMPLER_INDEXING:
         {
-            VIR_TypeId  ty0   = VIR_Operand_GetType(Opnd0);
+            VIR_TypeId  ty0   = VIR_Operand_GetTypeId(Opnd0);
             VIR_Symbol *sym0  = VIR_Operand_GetSymbol(Opnd0);
             VIR_Modifier mod0 = VIR_Operand_GetModifier(Opnd0);
             VIR_RoundMode rnd0 = VIR_Operand_GetRoundMode(Opnd0);
 
-            VIR_TypeId  ty1   = VIR_Operand_GetType(Opnd1);
+            VIR_TypeId  ty1   = VIR_Operand_GetTypeId(Opnd1);
             VIR_Symbol *sym1  = VIR_Operand_GetSymbol(Opnd1);
             VIR_Modifier mod1 = VIR_Operand_GetModifier(Opnd1);
             VIR_RoundMode rnd1 = VIR_Operand_GetRoundMode(Opnd1);
@@ -446,7 +446,7 @@ _Pattern_SetTypeByComponents(
     IN gctUINT             Component
     )
 {
-    VIR_Type            *ty    = VIR_Shader_GetTypeFromId(Context->shader, VIR_Operand_GetType(Operand));
+    VIR_Type            *ty    = VIR_Shader_GetTypeFromId(Context->shader, VIR_Operand_GetTypeId(Operand));
     VIR_PrimitiveTypeId  baseType;
     VIR_PrimitiveTypeId  dstTy = VIR_TYPE_UNKNOWN;
 
@@ -459,7 +459,7 @@ _Pattern_SetTypeByComponents(
         dstTy = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(baseType), Component, 1);
     }
 
-    VIR_Operand_SetType(Operand, dstTy);
+    VIR_Operand_SetTypeId(Operand, dstTy);
 }
 
 static gctBOOL
@@ -772,8 +772,8 @@ _Pattern_ReplaceNormal(
 
                         if (templeteOpnd != gcvNULL)
                         {
-                            VIR_Operand_SetType(opnd, VIR_Operand_GetType(templeteOpnd));
-                            VIR_Symbol_SetType(sym, VIR_Shader_GetTypeFromId(Context->shader, VIR_Operand_GetType(templeteOpnd)));
+                            VIR_Operand_SetTypeId(opnd, VIR_Operand_GetTypeId(templeteOpnd));
+                            VIR_Symbol_SetType(sym, VIR_Shader_GetTypeFromId(Context->shader, VIR_Operand_GetTypeId(templeteOpnd)));
                             if (VIR_Operand_isLvalue(templeteOpnd))
                             {
                                 VIR_Operand_SetEnable(opnd, VIR_Operand_GetEnable(templeteOpnd));
@@ -1093,7 +1093,7 @@ _Pattern_ReplaceInline(
         _Pattern_SetOperand(movTemp2Dest, 0, VIR_Inst_GetDest(Inst));
         _Pattern_SetOperand(movTemp2Dest, 1, VIR_Inst_GetDest(lastReplacedInst));
 
-        VIR_Operand_SetType(VIR_Inst_GetSource(movTemp2Dest, 0), VIR_Operand_GetType(VIR_Inst_GetDest(Inst)));
+        VIR_Operand_SetTypeId(VIR_Inst_GetSource(movTemp2Dest, 0), VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst)));
         VIR_Operand_SetSwizzle(VIR_Inst_GetSource(movTemp2Dest, 0),
             VIR_Enable_2_Swizzle_WShift(VIR_Operand_GetEnable(VIR_Inst_GetDest(Inst))));
     }

@@ -14,7 +14,7 @@
 #include <gc_vxk_common.h>
 
 #if VIV_NONMAX_SUPPRESSION
-vx_status vxNonMaxSuppression(vx_node node, vx_image i_mag, vx_image i_ang, vx_image i_edge, vx_border_mode_t *borders)
+vx_status vxNonMaxSuppression(vx_node node, vx_image i_mag, vx_image i_ang, vx_image i_edge, vx_border_t *borders)
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 constantData[2] = {0, 16};
@@ -40,8 +40,8 @@ vx_status vxNonMaxSuppression(vx_node node, vx_image i_mag, vx_image i_ang, vx_i
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(i_edge, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(i_edge, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(i_edge, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(i_edge, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, i_mag, GC_VX_INDEX_AUTO);
@@ -91,7 +91,7 @@ vx_status vxEuclideanNonMaxSuppression(vx_node node, vx_image src, vx_scalar thr
     vx_float32 radius = 0.0f, thresh = 0.0f;
     vx_df_image format = VX_DF_IMAGE_VIRT;
 
-    status |= vxQueryImage(src, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
+    status |= vxQueryImage(src, VX_IMAGE_FORMAT, &format, sizeof(format));
 
     status |= vxReadScalarValue(rad, &radius);
     status |= vxReadScalarValue(thr, &thresh);

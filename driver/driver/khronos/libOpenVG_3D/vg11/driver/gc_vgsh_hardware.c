@@ -955,6 +955,7 @@ gceSTATUS vgshCreateTexture(
                                              surface));
 
             gcmERR_BREAK(gcoSURF_SetResolvability(*surface, gcvFALSE));
+            gcmERR_BREAK(gcoSURF_SetOrientation(*surface,  vgvORIENTATION_LEFT_BOT));
         }
 
         gcmFOOTER();
@@ -1608,7 +1609,6 @@ gceSTATUS SetUniform_ProjectionMatrix(_vgHARDWARE *hardware, gcUNIFORM uniform)
 
 gceSTATUS SetUniform_GradientMatrix(_vgHARDWARE *hardware, gcUNIFORM uniform)
 {
-    /* VIV: [todo] need to optimize */
     gctINT32 width, height;
     gctFLOAT galMatrix[16];
     _VGMatrix3x3 matrix;
@@ -2968,7 +2968,6 @@ static gceSTATUS _GenColorConvertCodeEx(_VGShader *Shader, gctUINT16 color, gctU
             /* no need to process the pre/unpre*/
             break;
         }
-        /* VIV: [todo] need to optimize */
         gcmERR_BREAK(_GenUnPreMultiColorCode(Shader, color, alphaConvert));
 
         /*
@@ -3920,7 +3919,6 @@ static gceSTATUS _GenPathImageFragmentCode(_vgHARDWARE *hardware)
             else
             {
 
-                /* VIV: [todo] do more opitimize */
                 vgmDEFINE_ALLOCATE_VARYING(a2, X4, 1);
                 vgmDEFINE_ALLOCATE_UNIFORM(TexBound, X4, 3);
                 vgmDEFINE_ALLOCATE_SAMPLER(PatternSampler, SAMPLER_2D, 1);
@@ -4605,7 +4603,6 @@ static gceSTATUS _GenColorRampVertexCode(_vgHARDWARE *hardware)
 
         if ((hardware->drawPipe == vgvDRAWPIPE_CLEAR)  && hardware->scissoring)
         {
-            /* VIV: [todo] can use uniform to pass in, map to 0.0f - 1.0f */
             vgmDEFINE_ALLOCATE_OUTPUT_VARYING(texCoord, "texCoord", X2, 1);
             vgmDEFINE_ALLOCATE_TEMP(temp1);
 
@@ -4996,7 +4993,6 @@ static gceSTATUS _GenFilterVertexCode(_vgHARDWARE *hardware)
         if (hardware->scissoring && (hardware->filterType == vgvFILTER_COPY))
         {
 
-            /* VIV: [todo] can use uniform to pass in, map to 0.0f - 1.0f */
             vgmDEFINE_ALLOCATE_OUTPUT_VARYING(texCoord, "texCoord", X2, 1);
             vgmDEFINE_ALLOCATE_TEMP(temp0);
 
@@ -6754,7 +6750,6 @@ static gceSTATUS _EnableAttributes(_vgHARDWARE *hardware)
             y1 = y1 / (gctFLOAT)ancHeight   * 2.0f - 1.0f;
 
 
-            /* VIV: [todo] opitimize */
             if (hardware->rectStream != gcvNULL)
             {
                 gcmVERIFY_OK(gcoSTREAM_Destroy(hardware->rectStream));

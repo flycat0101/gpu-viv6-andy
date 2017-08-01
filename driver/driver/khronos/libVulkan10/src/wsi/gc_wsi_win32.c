@@ -1303,237 +1303,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateWin32SurfaceKHR(
     return result;
 }
 
-/*****************************************************************************/
-/* VK_KHR_display for win32. */
-
-typedef struct __vkWin32DisplayKHRRec       __vkWin32DisplayKHR;
-typedef struct __vkWin32DisplayPlaneRec     __vkWin32DisplayPlane;
-typedef struct __vkWin32DisplayModeKHRRec   __vkWin32DisplayModeKHR;
-
-struct __vkWin32DisplayKHRRec
-{
-    /* Display specific fields */
-    DISPLAY_DEVICE device;
-    DEVMODE displayMode;
-    VkExtent2D dimensions;
-    VkExtent2D resoultion;
-    uint32_t bpp;
-};
-
-struct __vkWin32DisplayPlaneRec
-{
-    uint32_t planeIndex;
-};
-
-struct __vkWin32DisplayModeKHRRec
-{
-    __vkObjectType sType;
-
-    /* DisplayMode specific fields */
-};
-
-
-VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceDisplayPropertiesKHR(
-    VkPhysicalDevice physicalDevice,
-    uint32_t* pPropertyCount,
-    VkDisplayPropertiesKHR* pProperties
-    )
-{
-    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
-    __vkWin32DisplayKHR *disp;
-    VkResult result = VK_SUCCESS;
-    uint32_t i = 0;
-    __VK_SET_ALLOCATIONCB(&phyDev->pInst->memCb);
-
-    if (pProperties)
-    {
-        if (*pPropertyCount > phyDev->numberOfDisplays)
-            *pPropertyCount = phyDev->numberOfDisplays;
-
-        for (i = 0; i < *pPropertyCount; i++)
-        {
-            disp = (__vkWin32DisplayKHR *) phyDev->displays[i];
-            pProperties[i].display = (VkDisplayKHR)(uintptr_t)disp;
-            pProperties[i].displayName = disp->device.DeviceName;
-            pProperties[i].physicalDimensions = disp->dimensions;
-            pProperties[i].physicalResolution = disp->resoultion;
-            pProperties[i].supportedTransforms = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
-            pProperties[i].persistentContent = VK_FALSE;
-            pProperties[i].planeReorderPossible = VK_FALSE;
-        }
-
-        if (*pPropertyCount < phyDev->numberOfDisplays)
-            result = VK_INCOMPLETE;
-    }
-    else
-    {
-        VkBool32 validAdapter = VK_TRUE;
-
-        do
-        {
-            DISPLAY_DEVICE adapter;
-            VkBool32 validDisplay = VK_TRUE;
-
-            adapter.cb = sizeof(DISPLAY_DEVICE);
-            validAdapter = EnumDisplayDevices(
-                gcvNULL,
-                i,
-                &adapter,
-                EDD_GET_DEVICE_INTERFACE_NAME
-                );
-
-            /* Only concerned with the primary adapter for now */
-            if (!(adapter.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE))
-            {
-                continue;
-            }
-
-            do
-            {
-                disp = (__vkWin32DisplayKHR *)__VK_ALLOC(sizeof(__vkWin32DisplayKHR), 4, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
-                phyDev->displays[i] = (__vkDisplayKHR *) disp;
-                __VK_MEMZERO(disp, sizeof(__vkWin32DisplayKHR));
-
-                disp->device.cb = sizeof(DISPLAY_DEVICE);
-                validAdapter = EnumDisplayDevices(
-                    adapter.DeviceName,
-                    i,
-                    &disp->device,
-                    EDD_GET_DEVICE_INTERFACE_NAME
-                    );
-
-                if (disp->device.StateFlags & DISPLAY_DEVICE_ACTIVE &&
-                    disp->device.StateFlags & DISPLAY_DEVICE_ATTACHED)
-                {
-                    HDC hdc;
-                    hdc = CreateDC(disp->device.DeviceName, NULL, NULL, NULL);
-                    disp->dimensions.width  = GetDeviceCaps(hdc, HORZSIZE);
-                    disp->dimensions.height = GetDeviceCaps(hdc, VERTSIZE);
-                    disp->resoultion.width  = GetDeviceCaps(hdc, HORZRES);
-                    disp->resoultion.height = GetDeviceCaps(hdc, VERTRES);
-                    disp->bpp               = GetDeviceCaps(hdc, BITSPIXEL);
-                    i++;
-                }
-
-                if (i >= __VK_WSI_MAX_PHYSICAL_DISPLAYS)
-                {
-                    i--;
-                    validDisplay = validAdapter = VK_FALSE;
-                }
-            } while (validDisplay);
-
-        } while (validAdapter);
-
-        *pPropertyCount = i;
-        phyDev->numberOfDisplays = *pPropertyCount;
-    }
-
-    return result;
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL __vk_GetPhysicalDeviceDisplayPlanePropertiesKHR(
-    VkPhysicalDevice physicalDevice,
-    uint32_t* pPropertyCount,
-    VkDisplayPlanePropertiesKHR* pProperties
-    )
-{
-    if (pProperties)
-    {
-        uint32_t i;
-
-        if (*pPropertyCount > 1)
-            *pPropertyCount = 1;
-
-        for (i = 0; i < *pPropertyCount; i++)
-        {
-            pProperties[i].currentStackIndex = 0;
-        }
-
-        if (*pPropertyCount < 1)
-            return VK_INCOMPLETE;
-    }
-    else
-    {
-        *pPropertyCount = 1;
-    }
-
-    return VK_SUCCESS;
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL __vk_GetDisplayPlaneSupportedDisplaysKHR(
-    VkPhysicalDevice physicalDevice,
-    uint32_t planeIndex,
-    uint32_t* pDisplayCount,
-    VkDisplayKHR* pDisplays
-    )
-{
-    __vkPhysicalDevice *phyDev = (__vkPhysicalDevice *)physicalDevice;
-
-    if (pDisplays)
-    {
-        uint32_t i;
-
-        if (*pDisplayCount > 1)
-            *pDisplayCount = 1;
-
-        for (i = 0; i < *pDisplayCount; i++)
-        {
-            pDisplays[i] = (VkDisplayKHR)(uintptr_t)phyDev->displays[i];
-        }
-
-        if (*pDisplayCount < 1)
-            return VK_INCOMPLETE;
-    }
-    else
-    {
-        *pDisplayCount = 1;
-    }
-
-    return VK_SUCCESS;
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL __vk_GetDisplayModePropertiesKHR(
-    VkPhysicalDevice physicalDevice,
-    VkDisplayKHR display,
-    uint32_t* pPropertyCount,
-    VkDisplayModePropertiesKHR* pProperties
-    )
-{
-    return VK_SUCCESS;
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDisplayModeKHR(
-    VkPhysicalDevice physicalDevice,
-    VkDisplayKHR display,
-    const VkDisplayModeCreateInfoKHR* pCreateInfo,
-    const VkAllocationCallbacks* pAllocator,
-    VkDisplayModeKHR* pMode
-    )
-{
-    return VK_SUCCESS;
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL __vk_GetDisplayPlaneCapabilitiesKHR(
-    VkPhysicalDevice physicalDevice,
-    VkDisplayModeKHR mode,
-    uint32_t planeIndex,
-    VkDisplayPlaneCapabilitiesKHR* pCapabilities
-    )
-{
-    return VK_SUCCESS;
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDisplayPlaneSurfaceKHR(
-    VkInstance instance,
-    const VkDisplaySurfaceCreateInfoKHR* pCreateInfo,
-    const VkAllocationCallbacks* pAllocator,
-    VkSurfaceKHR* pSurface
-    )
-{
-    return VK_SUCCESS;
-}
-
-
 __vkSurfaceOperation __vkWin32SurfaceOperation =
 {
     win32DestroySurface,
@@ -1544,16 +1313,148 @@ __vkSurfaceOperation __vkWin32SurfaceOperation =
     win32CreateSwapchain,
 };
 
+/*****************************************************************************/
+/* VK_KHR_display for win32. */
 
-__vkSurfaceOperation __vkDisplaySurfaceOperation =
+typedef struct __vkWin32DisplayKHRRec       __vkWin32DisplayKHR;
+
+struct __vkWin32DisplayKHRRec
 {
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
+    __vkDisplayKHR base;
+
+    /* Display specific fields */
+    DISPLAY_DEVICE device;
+    uint32_t bpp;
 };
+
+static void __AddDisplay(__vkPhysicalDevice *phyDev, LPCTSTR deviceName, DISPLAY_DEVICE *monitor)
+{
+    __vkWin32DisplayKHR *disp = NULL;
+    __vkDisplayPlane *plane = NULL;
+    uint32_t numModes;
+    HDC hdc;
+
+    /* Set the allocator to the parent allocator or API defined allocator if valid */
+    __VK_SET_ALLOCATIONCB(&phyDev->pInst->memCb);
+
+    /* Create display structure. */
+    disp = (__vkWin32DisplayKHR *)__VK_ALLOC(sizeof(__vkWin32DisplayKHR), 4, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+    disp->base.sType = __VK_OBJECT_TYPE_DISPLAY_KHR;
+    phyDev->displays[phyDev->numberOfDisplays] = (__vkDisplayKHR *) disp;
+    __VK_MEMZERO(disp, sizeof(__vkWin32DisplayKHR));
+
+    strncpy(disp->base.displayName, monitor->DeviceName, sizeof(disp->base.displayName));
+
+    hdc = CreateDC(deviceName, NULL, NULL, NULL);
+    disp->base.physicalDimensions.width  = GetDeviceCaps(hdc, HORZSIZE);
+    disp->base.physicalDimensions.height = GetDeviceCaps(hdc, VERTSIZE);
+    disp->base.physicalResolution.width  = GetDeviceCaps(hdc, HORZRES);
+    disp->base.physicalResolution.height = GetDeviceCaps(hdc, VERTRES);
+    disp->base.supportedTransforms       = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    disp->base.planeReorderPossible      = VK_FALSE;
+    disp->base.persistentContent         = VK_FALSE;
+    disp->bpp = GetDeviceCaps(hdc, BITSPIXEL);
+
+    disp->device = *monitor;
+
+    DeleteDC(hdc);
+
+    /* Create display plane structure. */
+    plane = (__vkDisplayPlane *)__VK_ALLOC(sizeof(__vkDisplayPlane), 4, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+    phyDev->displayPlanes[phyDev->numberOfDisplayPlanes] = plane;
+    plane->planeIndex            = phyDev->numberOfDisplayPlanes;
+    plane->currentDisplay        = (VkDisplayKHR)(uintptr_t)disp;
+    plane->currentStackIndex     = 0;
+    plane->supportedDisplays[0]  = (__vkDisplayKHR *)disp;
+    plane->supportedDisplayCount = 1;
+
+    disp->base.planeStack[0]  = plane;
+    disp->base.planeStackSize = 1;
+
+    for (numModes = 0; numModes < __VK_WSI_MAX_DISPLAY_MODES; numModes++)
+    {
+        __vkDisplayModeKHR *mode = NULL;
+        DEVMODE devMode;
+        BOOL ret;
+
+        devMode.dmSize = sizeof(devMode);
+        devMode.dmDriverExtra = 0;
+
+        ret = EnumDisplaySettingsEx(deviceName, numModes, &devMode, 0);
+
+        if (ret == 0)
+            break;
+
+        /* Create display mode. */
+        mode = (__vkDisplayModeKHR *)__VK_ALLOC(sizeof(__vkDisplayModeKHR), 4, VK_SYSTEM_ALLOCATION_SCOPE_INSTANCE);
+        mode->sType = __VK_OBJECT_TYPE_DISPLAY_MODE_KHR;
+        mode->display = (__vkDisplayKHR *)disp;
+        mode->parameters.visibleRegion.width  = devMode.dmPelsWidth;
+        mode->parameters.visibleRegion.height = devMode.dmPelsHeight;
+        mode->parameters.refreshRate   = devMode.dmDisplayFrequency * 1000;
+        mode->bitsPerPixel = devMode.dmBitsPerPel;
+        mode->interlaced = !!(devMode.dmDisplayFlags & DM_INTERLACED);
+
+        disp->base.displayModes[numModes] = (__vkDisplayModeKHR *)mode;
+    }
+
+    disp->base.displayModeCount = numModes;
+
+    phyDev->numberOfDisplays++;
+    phyDev->numberOfDisplayPlanes++;
+}
+
+static void __EnumAdaptorDisplays(__vkPhysicalDevice *phyDev, LPCTSTR deviceName)
+{
+    DISPLAY_DEVICE monitor;
+    uint32_t id;
+
+    for (id = 0; phyDev->numberOfDisplays < __VK_WSI_MAX_PHYSICAL_DISPLAYS; id++)
+    {
+        BOOL valid;
+
+        monitor.cb = sizeof(DISPLAY_DEVICE);
+        valid = EnumDisplayDevices(deviceName, id, &monitor, EDD_GET_DEVICE_INTERFACE_NAME);
+
+        if (!valid)
+            break;
+
+        if (monitor.StateFlags & DISPLAY_DEVICE_ACTIVE &&
+            monitor.StateFlags & DISPLAY_DEVICE_ATTACHED)
+        {
+            __AddDisplay(phyDev, deviceName, &monitor);
+        }
+    }
+}
+
+VkResult __vkInitializePhysicalDeviceDisplays(__vkPhysicalDevice *phyDev)
+{
+    VkResult result = VK_SUCCESS;
+    DISPLAY_DEVICE adapter;
+    uint32_t id;
+
+    __VK_SET_ALLOCATIONCB(&phyDev->pInst->memCb);
+
+    /* Loop devices. */
+    for (id = 0; phyDev->numberOfDisplays < __VK_WSI_MAX_PHYSICAL_DISPLAYS; id++)
+    {
+        BOOL valid;
+
+        adapter.cb = sizeof(DISPLAY_DEVICE);
+        valid = EnumDisplayDevices(NULL, id, &adapter, EDD_GET_DEVICE_INTERFACE_NAME);
+
+        if (!valid)
+            break;
+
+        /* Only concerned with the primary adapter for now */
+        if (!(adapter.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE))
+            continue;
+
+        __EnumAdaptorDisplays(phyDev, adapter.DeviceName);
+    }
+
+    return result;
+}
 
 #endif
 

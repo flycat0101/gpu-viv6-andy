@@ -13,6 +13,12 @@
 
 #include <gc_vxk_common.h>
 
+#ifdef WIN32
+#define SYNC_OUTPUT_MEMORY 1
+#else
+#define SYNC_OUTPUT_MEMORY 0
+#endif
+
 #if defined(__linux__)
 VX_INTERNAL_API struct timeval gcfVX_PerfStart(vx_reference ref)
 {
@@ -205,13 +211,13 @@ static vx_status _SetBorderMode(vx_enum border, gctUINT32 *viv_border)
 
     switch(border)
     {
-    case VX_BORDER_MODE_UNDEFINED:
+    case VX_BORDER_UNDEFINED:
         *viv_border = gcvVX_BORDER_MODE_UNDEFINED;
         break;
-    case VX_BORDER_MODE_CONSTANT:
+    case VX_BORDER_CONSTANT:
         *viv_border = gcvVX_BORDER_MODE_CONSTANT;
         break;
-    case VX_BORDER_MODE_REPLICATE:
+    case VX_BORDER_REPLICATE:
         *viv_border = gcvVX_BORDER_MODE_REPLACEMENT;
         break;
     default:
@@ -394,6 +400,11 @@ gcfVX_BindInstructions(
 
     hwContext->evisNoInst = Context->evisNoInst;
 
+    for (i = 0; i < sizeof(hwContext->optionalOutputs) / sizeof(vx_uint32); i++)
+    {
+        hwContext->optionalOutputs[i] = Context->optionalOutputs[i];
+    }
+
 
     gcmONERROR(gcoVX_KernelConstruct(hwContext));
 #if gcdVX_OPTIMIZER
@@ -408,8 +419,9 @@ gcfVX_BindInstructions(
     {
         if (C->uniform_num > 0)
         {
-            for(i = 0; i < C->uniform_num; i++)
+            for(i = 0; i < (GC_VX_MAX_ARRAY * GC_VX_MAX_ARRAY)/*C->uniform_num*/; i++)
             {
+                if (C->uniforms[i].num > 0)
                 gcoVX_BindUniform(GC_VX_UNIFORM_PIXEL, C->uniforms[i].index, (gctUINT32*)&C->uniforms[i].uniform, C->uniforms[i].num);
             }
         }
@@ -463,9 +475,9 @@ gcfVX_GetImageInfo(
     _SetBorderMode(Context->params.borders, &Info->border);
 #endif
 
-    vxQueryImage(Image, VX_IMAGE_ATTRIBUTE_WIDTH, &Info->width, sizeof(vx_uint32));
-    vxQueryImage(Image, VX_IMAGE_ATTRIBUTE_HEIGHT, &Info->height, sizeof(vx_uint32));
-    vxQueryImage(Image, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
+    vxQueryImage(Image, VX_IMAGE_WIDTH, &Info->width, sizeof(vx_uint32));
+    vxQueryImage(Image, VX_IMAGE_HEIGHT, &Info->height, sizeof(vx_uint32));
+    vxQueryImage(Image, VX_IMAGE_FORMAT, &format, sizeof(format));
 
     /* Initialize information structure.*/
     Info->format    = gcfVX_ConvertFormat(format);
@@ -490,12 +502,55 @@ gcfVX_GetImageInfo(
         Info->stride[plane] = gcmALIGN(w * b, (b == 3) ? 4 : b);
         Info->bytes = gcmALIGN(Info->stride[plane] * h, 64);
 
-        if (Image->importType == VX_IMPORT_TYPE_HOST)
+        /*overwrite the stride for the 1 plane case*/
+        /*Stride must larger than 0, Graph.ReplicateNode */
+        if (Info->planes == 1 && Image->memory.strides[plane][VX_DIM_Y] > 0)
         {
-            gcoOS_CacheInvalidate(gcvNULL, 0, Image->memory.logicals[plane], Image->memory.wrappedSize[plane]);
-            Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
+            Info->stride[plane] = Image->memory.strides[plane][VX_DIM_Y];
         }
-        else if (Image->importType == VX_IMPORT_TYPE_DMABUF)
+
+        if (Image->importType == VX_MEMORY_TYPE_HOST)
+        {
+#if !SYNC_OUTPUT_MEMORY && !defined(WIN32)
+            if (Image->memory.logicals[plane] && Image->memory.wrappedSize[plane])
+            {
+                gcoOS_CacheInvalidate(gcvNULL, 0, Image->memory.logicals[plane], Image->memory.wrappedSize[plane]);
+            }
+            Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
+#else
+            node = gcvNULL;
+            vxQuerySurfaceNode((vx_reference)Image, plane, (void**)&node);
+
+            if (node == NULL)
+            {
+                vx_context context = vxGetContext((vx_reference)Image);
+
+                vx_rectangle_t rect;
+                vx_size size = 0;
+                gctUINT32_PTR logical = 0;
+
+                vxGetValidRegionImage(Image, &rect);
+                size = vxComputeImagePatchSize(Image, &rect, plane);
+
+                gcoVX_AllocateMemory((gctUINT32)size, (gctPOINTER*)&logical,
+                                            (gctPHYS_ADDR*)&Image->memory.physicals[plane],
+                                            &Image->memory.nodePtrs[plane]);
+
+                context->memoryCount ++;
+
+                node = Image->memory.nodePtrs[plane];
+
+                if (size > 0)
+                    gcoOS_MemCopy(node->logical, Image->memory.logicals[plane], size);
+            }
+
+            Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
+            Info->logicals[plane] = (gctPOINTER)node->logical;
+#endif
+        }
+        else if (Image->importType == VX_MEMORY_TYPE_DMABUF ||
+                 Image->importType == VX_MEMORY_TYPE_INTERNAL ||
+                 Image->importType == VX_MEMORY_TYPE_HOST_UNCACHED)
         {
             Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
         }
@@ -504,8 +559,8 @@ gcfVX_GetImageInfo(
             node = gcvNULL;
             vxQuerySurfaceNode((vx_reference)Image, plane, (void**)&node);
 
-            Info->physicals[plane] = (node->hardwareAddresses[1] != ~0) ? (node->hardwareAddresses[1]) : (node->hardwareAddresses[2]);
-            Info->logicals[plane] = node->logical;
+            Info->physicals[plane] = (gctUINT32)Image->memory.physicals[plane];
+            Info->logicals[plane] = Image->memory.logicals[plane];
         }
     }
 
@@ -515,11 +570,118 @@ gcfVX_GetImageInfo(
         Info->width *= Multiply;
     }
 
+    /* for imageArray/image3D  plane count should be 1 */
+    Info->arraySize = Image->arraySize;
+    Info->sliceSize = Info->height * Info->stride[0];
+
 OnError:
     gcmFOOTER_ARG("%d", status);
 
     return status;
 }
+
+gceSTATUS
+gcfVX_GetImageInfoFromTensor(
+    IN vx_enum              borderMode,
+    IN vx_tensor            tensor,
+    IN gcsVX_IMAGE_INFO_PTR Info
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("borderMode=%d", borderMode);
+
+    if ((tensor->viewRegion.dimCount < 2) || (tensor->viewRegion.dimCount > 3))
+    {
+        status =  gcvSTATUS_INVALID_ARGUMENT;
+        goto OnError;
+    }
+
+    _SetBorderMode(borderMode, &Info->border);
+
+    Info->width  = tensor->viewRegion.viewEnds[0] - tensor->viewRegion.viewStarts[0];
+    Info->height = tensor->viewRegion.viewEnds[1] - tensor->viewRegion.viewStarts[1];
+
+    Info->isFloat = gcvFALSE;
+    /* Initialize information structure.*/
+    switch (tensor->tensorBuffer->dataFormat)
+    {
+    case VX_TYPE_INT8:
+        Info->format = 0x4;
+        Info->planes = 1;
+        Info->bpp = 8;
+        Info->componentCount = 1;
+        Info->internalFormat = gcvSURF_R8;
+        break;
+    case VX_TYPE_UINT8:
+        Info->format = 0x7;
+        Info->planes = 1;
+        Info->bpp = 8;
+        Info->componentCount = 1;
+        Info->internalFormat = gcvSURF_R8;
+        break;
+    case VX_TYPE_INT16:
+        Info->format = 0x3;
+        Info->planes = 1;
+        Info->bpp = 16;
+        Info->componentCount = 1;
+        Info->internalFormat = gcvSURF_R16;
+        break;
+    case VX_TYPE_UINT16:
+        Info->format = 0x6;
+        Info->planes = 1;
+        Info->bpp = 16;
+        Info->componentCount = 1;
+        Info->internalFormat = gcvSURF_R16;
+        break;
+    case VX_TYPE_INT32:
+        Info->format = 0x2;
+        Info->planes = 1;
+        Info->bpp = 32;
+        Info->componentCount = 1;
+        Info->internalFormat = gcvSURF_R32;
+        break;
+    case VX_TYPE_UINT32:
+        Info->format = 0x5;
+        Info->planes = 1;
+        Info->bpp = 32;
+        Info->componentCount = 1;
+        Info->internalFormat = gcvSURF_R32;
+        break;
+    case VX_TYPE_FLOAT32:
+        Info->format = 0x0;
+        Info->planes = 1;
+        Info->bpp = 32;
+        Info->componentCount = 1;
+        Info->internalFormat = gcvSURF_R32F;
+        Info->isFloat = gcvTRUE;
+        break;
+    case VX_TYPE_FLOAT16:
+        Info->format = 0x1;
+        Info->planes = 1;
+        Info->bpp = 16;
+        Info->componentCount = 1;
+        Info->internalFormat = gcvSURF_R16F;
+        Info->isFloat = gcvTRUE;
+        break;
+    default:
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        goto OnError;
+    }
+
+    Info->stride[0] = Info->width * (Info->bpp / 8);
+    Info->physicals[0] = (gctUINT32)tensor->tensorBuffer->memory.physicals[0];
+
+    /* for imageArray/image3D  plane count should be 1 */
+    Info->arraySize = (tensor->viewRegion.dimCount == 3 ? (tensor->viewRegion.viewEnds[2] - tensor->viewRegion.viewStarts[2]) : 1);
+    Info->sliceSize = Info->height * Info->stride[0];
+
+OnError:
+    gcmFOOTER_ARG("%d", status);
+
+    return status;
+}
+
 
 gceSTATUS gcfVX_GetInfo(
     IN gcoVX_Kernel_Context *Context
@@ -556,19 +718,21 @@ gceSTATUS gcfVX_GetInfo(
             break;
 
         case GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT:
+            if (object->obj)
+            {
+                gcfVX_GetImageInfo(Context, (vx_image)object->obj, info, Context->params.outputMultipleWidth);
 
-            gcfVX_GetImageInfo(Context, (vx_image)object->obj, info, Context->params.outputMultipleWidth);
+                Context->params.output_type[Context->params.output_count++] = info->format;
 
-            Context->params.output_type[Context->params.output_count++] = info->format;
-
-            gcmONERROR(gcoVX_BindImage(object->index, info));
+                gcmONERROR(gcoVX_BindImage(object->index, info));
+            }
 
             break;
 
         case GC_VX_CONTEXT_OBJECT_REMAP:
 
-            vxQueryRemap(((vx_remap)object->obj), VX_REMAP_ATTRIBUTE_DESTINATION_WIDTH, &info->width, sizeof(vx_uint32));
-            vxQueryRemap(((vx_remap)object->obj), VX_REMAP_ATTRIBUTE_DESTINATION_HEIGHT, &info->height, sizeof(vx_uint32));
+            vxQueryRemap(((vx_remap)object->obj), VX_REMAP_DESTINATION_WIDTH, &info->width, sizeof(vx_uint32));
+            vxQueryRemap(((vx_remap)object->obj), VX_REMAP_DESTINATION_HEIGHT, &info->height, sizeof(vx_uint32));
 
             info->bpp               = 64;
             info->planes            = 1;
@@ -602,7 +766,7 @@ gceSTATUS gcfVX_GetInfo(
 
         case GC_VX_CONTEXT_OBJECT_LUT:
 
-            vxQueryLUT((vx_lut)object->obj, VX_LUT_ATTRIBUTE_COUNT, &info->width, sizeof(vx_uint32));
+            vxQueryLUT((vx_lut)object->obj, VX_LUT_COUNT, &info->width, sizeof(vx_uint32));
 
             gcfVX_Kernel_ConvertFormat(VX_DF_IMAGE_U8, info);
 
@@ -636,9 +800,9 @@ gceSTATUS gcfVX_GetInfo(
         case GC_VX_CONTEXT_OBJECT_ARRAY:
             {
                 vx_size capacity = 0, itemsize = 0, numItems = 0;
-                status = (gceSTATUS)vxQueryArray((vx_array)object->obj, VX_ARRAY_ATTRIBUTE_CAPACITY, &capacity, sizeof(capacity));
-                status = (gceSTATUS)vxQueryArray((vx_array)object->obj, VX_ARRAY_ATTRIBUTE_ITEMSIZE, &itemsize, sizeof(itemsize));
-                status = (gceSTATUS)vxQueryArray((vx_array)object->obj, VX_ARRAY_ATTRIBUTE_NUMITEMS, &numItems, sizeof(numItems));
+                status = (gceSTATUS)vxQueryArray((vx_array)object->obj, VX_ARRAY_CAPACITY, &capacity, sizeof(capacity));
+                status = (gceSTATUS)vxQueryArray((vx_array)object->obj, VX_ARRAY_ITEMSIZE, &itemsize, sizeof(itemsize));
+                status = (gceSTATUS)vxQueryArray((vx_array)object->obj, VX_ARRAY_NUMITEMS, &numItems, sizeof(numItems));
 
                 gcfVX_Kernel_ConvertFormat(VX_DF_IMAGE_S16, info);
 
@@ -744,6 +908,50 @@ gceSTATUS gcfVX_Commit(
     return status;
 }
 
+#if SYNC_OUTPUT_MEMORY
+gceSTATUS gcfVX_SyncMemoryForOutPut(
+    IN gcoVX_Kernel_Context *Context
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    vx_uint32 i = 0, plane = 0;
+
+    gcmHEADER_ARG("Context=%d", Context);
+
+    for(i = 0; i < Context->objects_num; i++)
+    {
+        gcoVX_Kernel_Context_Object* object = &Context->obj[i];
+
+        switch(object->type)
+        {
+        case GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT:
+            {
+                vx_rectangle_t rect;
+                vx_image image = (vx_image)object->obj;
+
+                vxGetValidRegionImage(image, &rect);
+
+                for (plane = 0; plane < image->memory.planeCount; plane++)
+                {
+                    if (image->memory.nodePtrs[plane] != VX_NULL && image->memory.logicals[plane] != image->memory.nodePtrs[plane]->logical)
+                    {
+                        vx_size size = 0;
+                        size = vxComputeImagePatchSize(image, &rect, plane);
+                        /*Only copy different memory. For CTS GraphROI.Simple */
+                        if (size > 0 && (abs((vx_int32)((vx_uint32)(image->memory.logicals[plane]) - (vx_uint32)(image->memory.nodePtrs[plane]->logical))) > (vx_int32)size))
+                            gcoOS_MemCopy(image->memory.logicals[plane], image->memory.nodePtrs[plane]->logical, size);
+                    }
+                }
+            }
+            break;
+        }
+    }
+
+    gcmFOOTER_ARG("%d", status);
+    return status;
+}
+#endif
+
 gceSTATUS
 gcfVX_RunKernel(
     IN gcoVX_Kernel_Context *Context
@@ -788,6 +996,10 @@ gcfVX_RunKernel(
         gcmONERROR(gcoVX_InvokeKernel(&Context->params));
     }
 
+#if SYNC_OUTPUT_MEMORY
+    gcmONERROR(gcfVX_SyncMemoryForOutPut(Context));
+#endif
+
 #if VX_NN_SH_PARALLEL
     if (Context->node->cnnWaitEventID1 != 0xffffffff)
     {
@@ -829,6 +1041,7 @@ gcfVX_Kernel(
 
     gcmHEADER_ARG("Context=%d", Context);
 
+
     Context->params.deviceCount = Context->node->base.context->deviceCount;
     Context->params.devices     = Context->node->base.context->devices;
 
@@ -863,6 +1076,7 @@ gcfVX_Kernel(
     {
         gcmONERROR(gcfVX_RunKernel(Context));
     }
+
 
     gcmFOOTER();
     return VX_SUCCESS;

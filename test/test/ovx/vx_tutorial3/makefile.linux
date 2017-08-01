@@ -26,20 +26,45 @@
 ##############################################################################
 
 
+#
+# Driver part of OpenVX.
+#
+
 #############################################################################
 # Include common definitions.
 
 include ../makefile.linux.def
 
+INCLUDE += -I $(VIVANTE_SDK_DIR)/include
+CFLAGS += $(INCLUDE)
+
 #############################################################################
 # Macros.
+
+#CFLAGS  += -DHAVE_NEON=1 -march=armv7-a -mfpu=neon -ftree-vectorize -ffast-math -mfloat-abi=hard
+
+#CFLAGS += -std=c99
+
+ifeq ($(NO_SHOW_ON_SCREEN),1)
+    CFLAGS += -DNO_SHOW
+endif
+
 PROGRAM = 1
+
 TARGET_NAME = vx_tutorial3
 
 #############################################################################
 # Objects.
 
-OBJECTS = $(OBJ_DIR)/vx_tutorial3.o    \
+OBJECTS         =   $(OBJ_DIR)/vx_tutorial3.o
+
+################################################################################
+LIBS += -L $(VIVANTE_SDK_DIR)//drivers
+LIBS += -l dl -l pthread -l m -l stdc++
+LIBS += -l OpenVX -l OpenVXU
+
+################################################################################
+# Define the macros used in common makefile.
 
 # installation directory
 INSTALL_DIR := $(SDK_DIR)/samples/ovx
@@ -57,5 +82,6 @@ install: extra_install
 .PHONY: extra_install
 extra_install:
 	@-mkdir -p $(INSTALL_DIR)
-	@-cp -f *.bmp $(INSTALL_DIR)
+	@-cp -f left_gray.bmp $(INSTALL_DIR)
+	@-cp -f right_gray.bmp $(INSTALL_DIR)
 	@-cp -f $(VIVANTE_SDK_DIR)/include/CL/cl_viv_vx_ext.h $(INSTALL_DIR)

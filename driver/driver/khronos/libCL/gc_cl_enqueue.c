@@ -139,7 +139,6 @@ clfCreateLongULongDirective(
                               (gctPOINTER *)&pointer),
                               CL_OUT_OF_HOST_MEMORY);
 
-
     /* link the new directive to existing directive */
     pointer->next      = *PatchDirectivePtr;
     pointer->kind      = gceRK_PATCH_CL_LONGULONG;
@@ -334,8 +333,6 @@ static gceSTATUS clfUpdateKernelArgs(
         clsArgument_PTR         argument;
         gctSIZE_T               bytes;
         gcUNIFORM               gcUniform1, gcUniform2;
-        gctUINT                 dstFormat;
-        gctUINT                 opcode;
         gctUINT                 oldNumArgs;
 
         switch (patchDirective->kind)
@@ -370,7 +367,7 @@ static gceSTATUS clfUpdateKernelArgs(
             argument = &((*Args)[oldNumArgs + 1]);
             bytes = gcmSIZEOF(cl_uint) * 3;
             clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
-#if BUILD_OPENCL_12
+
             if ((imageHeader->imageType != CL_MEM_OBJECT_IMAGE1D_ARRAY) && (imageHeader->imageType != CL_MEM_OBJECT_IMAGE2D_ARRAY))
             {
                 gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
@@ -389,9 +386,6 @@ static gceSTATUS clfUpdateKernelArgs(
                 gcoOS_MemCopy(p++, &imageHeader->height, gcmSIZEOF(cl_uint));
                 gcoOS_MemCopy(p, &imageHeader->arraySize, gcmSIZEOF(cl_uint));
             }
-#else
-            gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
-#endif
             argument->uniform    = gcUniform2;
             argument->size       = bytes;
             argument->set        = gcvTRUE;
@@ -430,7 +424,7 @@ static gceSTATUS clfUpdateKernelArgs(
             argument++;
             bytes = gcmSIZEOF(cl_uint) * 3;
             clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
-#if BUILD_OPENCL_12
+
             if ((imageHeader->imageType != CL_MEM_OBJECT_IMAGE1D_ARRAY) && (imageHeader->imageType != CL_MEM_OBJECT_IMAGE2D_ARRAY))
             {
                 gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
@@ -449,10 +443,7 @@ static gceSTATUS clfUpdateKernelArgs(
                 gcoOS_MemCopy(p++, &imageHeader->height, gcmSIZEOF(cl_uint));
                 gcoOS_MemCopy(p, &imageHeader->arraySize, gcmSIZEOF(cl_uint));
             }
-#else
-            gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
-#endif
-            gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
+
             argument->uniform    = gcUniform2;
             argument->size       = bytes;
             argument->set        = gcvTRUE;
@@ -460,31 +451,6 @@ static gceSTATUS clfUpdateKernelArgs(
             break;
 
         case gceRK_PATCH_CL_LONGULONG:
-            {
-                dstFormat = gcmSL_TARGET_GET(GetInstTemp(patchDirective->patchValue.longULong->instruction), Format);
-                opcode = gcmSL_OPCODE_GET(patchDirective->patchValue.longULong->instruction->opcode, Opcode);
-                if (NEED_PATCH_LONGULONG(patchDirective->patchValue.longULong->instruction, opcode, dstFormat))
-                {
-                    /* Add a patch argument. */
-                    oldNumArgs = *NumArgs;
-                    *NumArgs += 1;
-                    clmONERROR(clfReallocateKernelArgs(oldNumArgs,
-                                                       *NumArgs,
-                                                       Args),
-                               CL_OUT_OF_HOST_MEMORY);
-                    gcoOS_ZeroMemory(*Args + oldNumArgs, gcmSIZEOF(clsArgument));
-
-                    clmONERROR(gcSHADER_GetUniform((gcSHADER) Kernel->patchedStates->binary, prePatchDirective->patchValue.longULong->channelCountIndex, &gcUniform1), CL_INVALID_VALUE);
-                    argument = &((*Args)[oldNumArgs]);
-                    bytes = gcmSIZEOF(cl_uint);
-                    clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
-
-                    *((gctUINT*)argument->data) = patchDirective->patchValue.longULong->channelCount;
-                    argument->uniform    = gcUniform1;
-                    argument->size       = bytes;
-                    argument->set        = gcvTRUE;
-                }
-            }
             break;
 
         default:
@@ -529,15 +495,10 @@ clfDynamicPatchKernel(
     clsPatchDirective_PTR   patchDirective1 = gcvNULL;
     gcPatchDirective_PTR    gcPatchDirective = gcvNULL;
     gctUINT                 oldNumArgs, numToUpdate = *NumArgs, i;
-    gctUINT                 isScalar = 0;
     gceSHADER_FLAGS         flags = gcvSHADER_RESOURCE_USAGE | gcvSHADER_OPTIMIZER | gcvSHADER_REMOVE_UNUSED_UNIFORMS;
     gctUINT32_PTR           comVersion;
-#if BUILD_OPENCL_FP
     gctBOOL                 reLinkNeed = gcvFALSE;
     gctPOINTER              orgArgs = gcvNULL;
-    gceCHIPMODEL            chipModel;
-    gctUINT32               chipRevision;
-#endif
 
     struct _imageData {
         gctUINT             physical;   /* GPU address is 32-bit. */
@@ -639,28 +600,14 @@ clfDynamicPatchKernel(
             }
             else if (patchDirective->kind == gceRK_PATCH_CL_LONGULONG)
             {
-                clsArgument_PTR     argument;
-                gctSIZE_T           bytes;
-
-                argument = &((*Args)[oldNumArgs]);
-                bytes = sizeof(cl_uint);
-                clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
-                *((cl_uint*)argument->data) = patchDirective1->patchValue.longULong->channelCount;
-                isScalar = patchDirective->patchValue.longULong->channelCount == 1 ? 1 : 0;
-                argument->uniform    = GetShaderUniform(kernelBinary, patchDirective1->patchValue.longULong->channelCountIndex);
-                argument->size       = bytes;
-                argument->set        = gcvTRUE;
+                /* do nothing */
             }
         }
 
         return gcvSTATUS_OK;
     }
 
-#if BUILD_OPENCL_FP
-    chipModel = Kernel->context->devices[0]->deviceInfo.chipModel;
-    chipRevision = Kernel->context->devices[0]->deviceInfo.chipRevision;
 DoReLink:
-#endif
     /* Save program binary into buffer */
     clmONERROR(gcSHADER_SaveEx((gcSHADER)Kernel->states.binary, gcvNULL, &binarySize),
                CL_OUT_OF_HOST_MEMORY);
@@ -701,8 +648,6 @@ DoReLink:
         gctBOOL                 found1, found2;
         gctUINT                 foundCount;
         gcUNIFORM               gcUniform1, gcUniform2/*, gcUniform3*/;
-        gctUINT                 dstFormat;
-        gctUINT                 opcode;
 #if gcdOCL_READ_IMAGE_OPTIMIZATION
         gctFLOAT                rcpImageSize[3];
         gcSHADER_TYPE           imageType = 0;
@@ -826,7 +771,7 @@ DoReLink:
             argument = &((*Args)[oldNumArgs + 1]);
             bytes = gcmSIZEOF(cl_uint) * 3;
             clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
-#if BUILD_OPENCL_12
+
             if ((imageHeader->imageType != CL_MEM_OBJECT_IMAGE1D_ARRAY) && (imageHeader->imageType != CL_MEM_OBJECT_IMAGE2D_ARRAY))
             {
                 gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
@@ -845,9 +790,7 @@ DoReLink:
                 gcoOS_MemCopy(p++, &imageHeader->height, gcmSIZEOF(cl_uint));
                 gcoOS_MemCopy(p, &imageHeader->arraySize, gcmSIZEOF(cl_uint));
             }
-#else
-            gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
-#endif
+
             argument->uniform    = gcUniform2;
             argument->size       = bytes;
             argument->set        = gcvTRUE;
@@ -976,7 +919,7 @@ DoReLink:
             argument++;
             bytes = gcmSIZEOF(cl_uint) * 3;
             clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
-#if BUILD_OPENCL_12
+
             if ((imageHeader->imageType != CL_MEM_OBJECT_IMAGE1D_ARRAY) && (imageHeader->imageType != CL_MEM_OBJECT_IMAGE2D_ARRAY))
             {
                 gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
@@ -995,9 +938,7 @@ DoReLink:
                 gcoOS_MemCopy(p++, &imageHeader->height, gcmSIZEOF(cl_uint));
                 gcoOS_MemCopy(p, &imageHeader->arraySize, gcmSIZEOF(cl_uint));
             }
-#else
-            gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
-#endif
+
             gcoOS_MemCopy(argument->data, &imageHeader->width, bytes);
             argument->uniform    = gcUniform2;
             argument->size       = bytes;
@@ -1018,37 +959,8 @@ DoReLink:
 
         case gceRK_PATCH_CL_LONGULONG:
             {
-                dstFormat = gcmSL_TARGET_GET(GetInstTemp(patchDirective->patchValue.longULong->instruction), Format);
-                opcode = gcmSL_OPCODE_GET(patchDirective->patchValue.longULong->instruction->opcode, Opcode);
-                if (NEED_PATCH_LONGULONG(patchDirective->patchValue.longULong->instruction, opcode, dstFormat))
-                {
-                    /* Add a patch argument. */
-                    oldNumArgs = *NumArgs;
-                    *NumArgs += 1;
-                    clmONERROR(clfReallocateKernelArgs(oldNumArgs,
-                                                       *NumArgs,
-                                                       Args),
-                               CL_OUT_OF_HOST_MEMORY);
-                    gcoOS_ZeroMemory(*Args + oldNumArgs, gcmSIZEOF(clsArgument));
-
-                    clmONERROR(gcSHADER_AddUniform(kernelBinary, "#channel_count", gcSHADER_INTEGER_X1, 1, gcSHADER_PRECISION_DEFAULT, &gcUniform1),
-                                CL_OUT_OF_HOST_MEMORY);
-                    SetUniformFlag(gcUniform1, gcvUNIFORM_FLAG_KERNEL_ARG_PATCH);
-                    clmONERROR(gcUNIFORM_SetFormat(gcUniform1, gcSL_UINT32, gcvFALSE), CL_OUT_OF_HOST_MEMORY);
-                    argument = &((*Args)[oldNumArgs]);
-                    bytes = gcmSIZEOF(cl_uint);
-                    clmONERROR(gcoOS_Allocate(gcvNULL, bytes, &argument->data), CL_OUT_OF_HOST_MEMORY);
-
-                    *((gctUINT*)argument->data) = patchDirective->patchValue.longULong->channelCount;
-                    isScalar = patchDirective->patchValue.longULong->channelCount == 1 ? 1 : 0;
-                    argument->uniform    = gcUniform1;
-                    argument->size       = bytes;
-                    argument->set        = gcvTRUE;
-                    patchDirective->patchValue.longULong->channelCountIndex = GetUniformIndex(gcUniform1);
-                }
-
                 clmONERROR(gcCreateCLLongULongDirective(patchDirective->patchValue.longULong->instructionIndex,
-                                                        patchDirective->patchValue.longULong->channelCountIndex,
+                                                        patchDirective->patchValue.longULong->channelCount,
                                                         &gcPatchDirective),
                                                         CL_OUT_OF_HOST_MEMORY);
             }
@@ -1060,15 +972,11 @@ DoReLink:
         }
     }
 
-#if BUILD_OPENCL_FP
-    if(((chipModel == gcv2500 && chipRevision == 0x5422) ||
-        (chipModel == gcv3000 && chipRevision == 0x5435) ||
-        (chipModel == gcv7000)) && (reLinkNeed == gcvFALSE))
+    if(reLinkNeed == gcvFALSE)
     {
         gcoOS_Allocate(gcvNULL,  numToUpdate * gcmSIZEOF(clsArgument), &orgArgs);
         gcoOS_MemCopy(orgArgs, *Args, numToUpdate * gcmSIZEOF(clsArgument));
     }
-#endif
 
     /* Recompile shader */
     gcmASSERT(Kernel->context->platform->compiler11);
@@ -1076,7 +984,7 @@ DoReLink:
 
     clmONERROR(gcSHADER_DynamicPatch(kernelBinary,
                                      gcPatchDirective,
-                                     isScalar),
+                                     0),
                                      CL_OUT_OF_HOST_MEMORY);
 
     /*gcPatchDirective will reset to NULL after this*/
@@ -1095,36 +1003,32 @@ DoReLink:
                           &buffer,
                           &hints);
 
-#if BUILD_OPENCL_FP
-    if((chipModel == gcv2500 && chipRevision == 0x5422) || (chipModel == gcv3000 && chipRevision == 0x5435) || (chipModel == gcv7000))
+    if((status == gcvSTATUS_NOT_FOUND || status == gcvSTATUS_OUT_OF_RESOURCES) && gcmOPT_INLINELEVEL() != 4)
     {
-        if((status == gcvSTATUS_NOT_FOUND || status == gcvSTATUS_OUT_OF_RESOURCES) && gcmOPT_INLINELEVEL() != 4)
-        {
-            bufferSize = 0;
-            gcSHADER_Destroy(kernelBinary);
-            flags |= gcvSHADER_SET_INLINE_LEVEL_4;
-            gcoOS_Free(gcvNULL, *Args);
-            *Args = orgArgs;
-            *NumArgs = numToUpdate;
-            reLinkNeed = gcvTRUE;
-            goto DoReLink;
-        }
-
-        if(reLinkNeed == gcvTRUE)
-        {
-            reLinkNeed = gcvFALSE;
-        }
-        else
-        {
-            gcmOS_SAFE_FREE(gcvNULL, orgArgs);
-        }
+        bufferSize = 0;
+        gcSHADER_Destroy(kernelBinary);
+        flags |= gcvSHADER_SET_INLINE_LEVEL_4;
+        gcoOS_Free(gcvNULL, *Args);
+        *Args = orgArgs;
+        *NumArgs = numToUpdate;
+        reLinkNeed = gcvTRUE;
+        goto DoReLink;
     }
-#endif
+
+    if(reLinkNeed == gcvTRUE)
+    {
+        reLinkNeed = gcvFALSE;
+    }
+    else
+    {
+        gcmOS_SAFE_FREE(gcvNULL, orgArgs);
+    }
 
     if (gcmIS_ERROR(status))
     {
         clmRETURN_ERROR(CL_OUT_OF_RESOURCES);
     }
+
 
     clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsKernelStates), &pointer),
                CL_OUT_OF_HOST_MEMORY);
@@ -1166,12 +1070,11 @@ OnError:
         gcmOS_SAFE_FREE(gcvNULL, pointer);
     }
 
-#if BUILD_OPENCL_FP
     if(orgArgs)
     {
         gcmOS_SAFE_FREE(gcvNULL, orgArgs);
     }
-#endif
+
     return status;
 }
 
@@ -1267,14 +1170,15 @@ clEnqueueReadBuffer(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-#if BUILD_OPENCL_12
     if (Buffer->flags & (CL_MEM_HOST_WRITE_ONLY | CL_MEM_HOST_NO_ACCESS))
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010210: (clEnqueueReadBuffer) Host flag is not compatible.\n");
         clmRETURN_ERROR(CL_INVALID_OPERATION);
     }
-#endif
+
+    /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
+    clfRetainMemObject(Buffer);
 
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
 
@@ -1297,13 +1201,8 @@ clEnqueueReadBuffer(
     readBuffer->cb                  = Cb;
     readBuffer->ptr                 = Ptr;
 
-#if cldSEQUENTIAL_EXECUTION
-    clmONERROR(clfExecuteCommandReadBuffer(command),
-               CL_OUT_OF_HOST_MEMORY);
-#else
     clmONERROR(clfSubmitCommand(CommandQueue, command, BlockingRead),
                CL_OUT_OF_HOST_MEMORY);
-#endif
 
     VCL_TRACE_API(EnqueueReadBuffer)(CommandQueue, Buffer, BlockingRead, Offset, Cb, Ptr, NumEventsInWaitList, EventWaitList, Event);
     gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
@@ -1370,14 +1269,12 @@ clEnqueueReadBufferRect(
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
     }
 
-#if BUILD_OPENCL_12
     if (Buffer->flags & (CL_MEM_HOST_WRITE_ONLY | CL_MEM_HOST_NO_ACCESS))
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010211: (clEnqueueReadBufferRect) Host flag is not compatible.\n");
         clmRETURN_ERROR(CL_INVALID_OPERATION);
     }
-#endif
 
     if (CommandQueue->context != Buffer->context)
     {
@@ -1487,6 +1384,9 @@ clEnqueueReadBufferRect(
             "OCL-010021: (clEnqueueReadBufferRect) last byte is out of bounds.\n");
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
+
+    /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
+    clfRetainMemObject(Buffer);
 
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
 
@@ -1632,14 +1532,16 @@ clEnqueueWriteBuffer(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-#if BUILD_OPENCL_12
     if (Buffer->flags & (CL_MEM_HOST_READ_ONLY | CL_MEM_HOST_NO_ACCESS))
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010212: (clEnqueueWriteBuffer) Host flag is not compatible.\n");
         clmRETURN_ERROR(CL_INVALID_OPERATION);
     }
-#endif
+
+    /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
+    clfRetainMemObject(Buffer);
+
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -1728,14 +1630,12 @@ clEnqueueWriteBufferRect(
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
     }
 
-#if BUILD_OPENCL_12
     if (Buffer->flags & (CL_MEM_HOST_READ_ONLY | CL_MEM_HOST_NO_ACCESS))
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-010213: (clEnqueueWriteBufferRect) Host flag is not compatible.\n");
         clmRETURN_ERROR(CL_INVALID_OPERATION);
     }
-#endif
 
     if (CommandQueue->context != Buffer->context)
     {
@@ -1845,6 +1745,9 @@ clEnqueueWriteBufferRect(
             "OCL-010044: (clEnqueueWriteBufferRect) last byte is out of bounds.\n");
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
+
+    /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
+    clfRetainMemObject(Buffer);
 
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
@@ -2006,8 +1909,8 @@ clEnqueueCopyBuffer(
     }
 
     /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
-    clRetainMemObject(SrcBuffer);
-    clRetainMemObject(DstBuffer);
+    clfRetainMemObject(SrcBuffer);
+    clfRetainMemObject(DstBuffer);
 
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
@@ -2237,8 +2140,8 @@ clEnqueueCopyBufferRect(
     }
 
     /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
-    clRetainMemObject(SrcBuffer);
-    clRetainMemObject(DstBuffer);
+    clfRetainMemObject(SrcBuffer);
+    clfRetainMemObject(DstBuffer);
 
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
@@ -2311,9 +2214,7 @@ clEnqueueReadImage(
     clsCommand_PTR      command = gcvNULL;
     clsCommandReadImage_PTR readImage;
     size_t              rowPitch;
-#if BUILD_OPENCL_12
     size_t              slicePitch;
-#endif
     gctPOINTER          pointer = gcvNULL;
     gctINT              status;
 
@@ -2328,7 +2229,7 @@ clEnqueueReadImage(
             "OCL-010073: (clEnqueueReadImage) invalid CommandQueue.\n");
         clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
     }
-#if BUILD_OPENCL_12
+
     if (Image == gcvNULL ||
         Image->objectType != clvOBJECT_MEM ||
         (Image->type != CL_MEM_OBJECT_IMAGE2D &&
@@ -2349,17 +2250,6 @@ clEnqueueReadImage(
             "OCL-010215: (clEnqueueReadImage) Host flag is not compatible.\n");
         clmRETURN_ERROR(CL_INVALID_OPERATION);
     }
-#else
-    if (Image == gcvNULL ||
-        Image->objectType != clvOBJECT_MEM ||
-        (Image->type != CL_MEM_OBJECT_IMAGE2D &&
-         Image->type != CL_MEM_OBJECT_IMAGE3D))
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010074: (clEnqueueReadImage) invalid Image.\n");
-        clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
-    }
-#endif
 
     if (CommandQueue->context != Image->context)
     {
@@ -2405,7 +2295,6 @@ clEnqueueReadImage(
         }
     }
 
-#if BUILD_OPENCL_12
     switch (Image->type)
     {
     case CL_MEM_OBJECT_IMAGE1D:
@@ -2452,6 +2341,12 @@ clEnqueueReadImage(
                 "OCL-010221: (clEnqueueReadImage) Image is 2D, but Origin[2] is not 0 or Region[2] is not 1 or SlicePitch is not 0.\n");
             clmRETURN_ERROR(CL_INVALID_VALUE);
         }
+        if (Region[0] == 0 || Region[1] == 0 || Region[2] == 0)
+        {
+            gcmUSER_DEBUG_ERROR_MSG(
+                "OCL-010080: (clEnqueueReadImage) One of Region's dimension size is 0.\n");
+            clmRETURN_ERROR(CL_INVALID_VALUE);
+        }
         break;
     case CL_MEM_OBJECT_IMAGE2D_ARRAY:
         if (Origin[0] + Region[0] > Image->u.image.width ||
@@ -2460,6 +2355,12 @@ clEnqueueReadImage(
         {
             gcmUSER_DEBUG_ERROR_MSG(
                 "OCL-010222: (clEnqueueReadImage) (Origina + Region) is outside of Image's boundary.\n");
+            clmRETURN_ERROR(CL_INVALID_VALUE);
+        }
+        if (Region[0] == 0 || Region[1] == 0 || Region[2] == 0)
+        {
+            gcmUSER_DEBUG_ERROR_MSG(
+                "OCL-010080: (clEnqueueReadImage) One of Region's dimension size is 0.\n");
             clmRETURN_ERROR(CL_INVALID_VALUE);
         }
         break;
@@ -2472,6 +2373,12 @@ clEnqueueReadImage(
                 "OCL-010223: (clEnqueueReadImage) (Origina + Region) is outside of Image's boundary.\n");
             clmRETURN_ERROR(CL_INVALID_VALUE);
         }
+        if (Region[0] == 0 || Region[1] == 0 || Region[2] == 0)
+        {
+            gcmUSER_DEBUG_ERROR_MSG(
+                "OCL-010080: (clEnqueueReadImage) One of Region's dimension size is 0.\n");
+            clmRETURN_ERROR(CL_INVALID_VALUE);
+        }
         break;
     default:
         gcmUSER_DEBUG_ERROR_MSG(
@@ -2479,32 +2386,6 @@ clEnqueueReadImage(
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
 
     }
-#else
-    if (Region[0] == 0 || Region[1] == 0 || Region[2] == 0)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010080: (clEnqueueReadImage) One of Region's dimension size is 0.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    if (Image->type == CL_MEM_OBJECT_IMAGE2D &&
-        (Origin[2] != 0 || Region[2] != 1 || SlicePitch != 0))
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010081: (clEnqueueReadImage) Image is 2D, but Origin[2] is not 0 or Region[2] is not 1 or SlicePitch is not 0.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    /* Check if region is outside of Image */
-    if (Origin[0] + Region[0] > Image->u.image.width ||
-        Origin[1] + Region[1] > Image->u.image.height ||
-        Origin[2] + Region[2] > Image->u.image.depth)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010082: (clEnqueueReadImage) (Origina + Region) is outside of Image's boundary.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-#endif
 
     rowPitch = Region[0] * Image->u.image.elementSize;
     if (RowPitch == 0)
@@ -2523,7 +2404,6 @@ clEnqueueReadImage(
         }
     }
 
-#if BUILD_OPENCL_12
     slicePitch =  Image->type != CL_MEM_OBJECT_IMAGE1D_ARRAY ? Region[1] * rowPitch : rowPitch;
     if (SlicePitch == 0)
     {
@@ -2540,7 +2420,10 @@ clEnqueueReadImage(
             clmRETURN_ERROR(CL_INVALID_VALUE);
         }
     }
-#endif
+
+    /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
+    clfRetainMemObject(Image);
+
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -2608,9 +2491,7 @@ clEnqueueWriteImage(
     clsCommand_PTR      command = gcvNULL;
     clsCommandWriteImage_PTR writeImage;
     size_t              inputRowPitch;
-#if BUILD_OPENCL_12
     size_t              inputSlicePitch;
-#endif
     gctPOINTER          pointer = gcvNULL;
     gctINT              status;
 
@@ -2628,7 +2509,6 @@ clEnqueueWriteImage(
         clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
     }
 
-#if BUILD_OPENCL_12
     if (Image == gcvNULL ||
         Image->objectType != clvOBJECT_MEM ||
         (Image->type != CL_MEM_OBJECT_IMAGE2D &&
@@ -2649,17 +2529,6 @@ clEnqueueWriteImage(
             "OCL-010227: (clEnqueueWriteImage) Host flag is not compatible.\n");
         clmRETURN_ERROR(CL_INVALID_OPERATION);
     }
-#else
-    if (Image == gcvNULL ||
-        Image->objectType != clvOBJECT_MEM ||
-        (Image->type != CL_MEM_OBJECT_IMAGE2D &&
-         Image->type != CL_MEM_OBJECT_IMAGE3D))
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010086: (clEnqueueWriteImage) invalid Image.\n");
-        clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
-    }
-#endif
 
     if (CommandQueue->context != Image->context)
     {
@@ -2705,7 +2574,6 @@ clEnqueueWriteImage(
         }
     }
 
-#if BUILD_OPENCL_12
     switch (Image->type)
     {
     case CL_MEM_OBJECT_IMAGE1D:
@@ -2762,6 +2630,12 @@ clEnqueueWriteImage(
                 "OCL-010234: (clEnqueueWriteImage) (Origina + Region) is outside of Image's boundary.\n");
             clmRETURN_ERROR(CL_INVALID_VALUE);
         }
+        if (Region[0] == 0 || Region[1] == 0 || Region[2] == 0)
+        {
+            gcmUSER_DEBUG_ERROR_MSG(
+                "OCL-010092: (clEnqueueWriteImage) One of Region's dimension size is 0.\n");
+            clmRETURN_ERROR(CL_INVALID_VALUE);
+        }
         break;
     case CL_MEM_OBJECT_IMAGE3D:
         if (Origin[0] + Region[0] > Image->u.image.width ||
@@ -2772,6 +2646,12 @@ clEnqueueWriteImage(
                 "OCL-010235: (clEnqueueWriteImage) (Origina + Region) is outside of Image's boundary.\n");
             clmRETURN_ERROR(CL_INVALID_VALUE);
         }
+        if (Region[0] == 0 || Region[1] == 0 || Region[2] == 0)
+        {
+            gcmUSER_DEBUG_ERROR_MSG(
+                "OCL-010092: (clEnqueueWriteImage) One of Region's dimension size is 0.\n");
+            clmRETURN_ERROR(CL_INVALID_VALUE);
+        }
         break;
     default:
         gcmUSER_DEBUG_ERROR_MSG(
@@ -2779,32 +2659,6 @@ clEnqueueWriteImage(
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
 
     }
-#else
-    if (Region[0] == 0 || Region[1] == 0 || Region[2] == 0)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010092: (clEnqueueWriteImage) One of Region's dimension size is 0.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    if (Image->type == CL_MEM_OBJECT_IMAGE2D &&
-        (Origin[2] != 0 || Region[2] != 1 || InputSlicePitch != 0))
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010093: (clEnqueueWriteImage) Image is 2D, but Origin[2] is not 0 or Region[2] is not 1 or InputSlicePitch is not 0.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    /* Check if region is outside of Image */
-    if (Origin[0] + Region[0] > Image->u.image.width ||
-        Origin[1] + Region[1] > Image->u.image.height ||
-        Origin[2] + Region[2] > Image->u.image.depth)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010094: (clEnqueueWriteImage) (Origina + Region) is outside of Image's boundary.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-#endif
 
     inputRowPitch = Region[0] * Image->u.image.elementSize;
     if (InputRowPitch == 0)
@@ -2823,7 +2677,6 @@ clEnqueueWriteImage(
         }
     }
 
-#if BUILD_OPENCL_12
     inputSlicePitch = Image->type != CL_MEM_OBJECT_IMAGE1D_ARRAY ? Region[1] * inputRowPitch : inputRowPitch;
     if (InputSlicePitch == 0)
     {
@@ -2840,7 +2693,10 @@ clEnqueueWriteImage(
             clmRETURN_ERROR(CL_INVALID_VALUE);
         }
     }
-#endif
+
+    /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
+    clfRetainMemObject(Image);
+
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -2889,7 +2745,6 @@ OnError:
     return status;
 }
 
-#if BUILD_OPENCL_12
 CL_API_ENTRY cl_int CL_API_CALL
 clEnqueueFillImage(
     cl_command_queue    CommandQueue ,
@@ -3029,6 +2884,9 @@ clEnqueueFillImage(
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
     }
 
+    /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
+    clfRetainMemObject(Image);
+
     if (clfImageFormat2GcFormat(&(Image->u.image.format), &elementSize, gcvNULL, gcvNULL))
     {
         gcmUSER_DEBUG_ERROR_MSG(
@@ -3112,7 +2970,6 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
-#endif
 
 CL_API_ENTRY cl_int CL_API_CALL
 clEnqueueCopyImage(
@@ -3143,7 +3000,7 @@ clEnqueueCopyImage(
             "OCL-010097: (clEnqueueCopyImage) invalid CommandQueue.\n");
         clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
     }
-#if BUILD_OPENCL_12
+
     if (SrcImage == gcvNULL ||
         SrcImage->objectType != clvOBJECT_MEM ||
         (SrcImage->type != CL_MEM_OBJECT_IMAGE2D &&
@@ -3171,28 +3028,6 @@ clEnqueueCopyImage(
             "OCL-010255: (clEnqueueCopyImage) invalid DstImage.\n");
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
     }
-#else
-    if (SrcImage == gcvNULL ||
-        SrcImage->objectType != clvOBJECT_MEM ||
-        (SrcImage->type != CL_MEM_OBJECT_IMAGE2D &&
-         SrcImage->type != CL_MEM_OBJECT_IMAGE3D))
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010098: (clEnqueueCopyImage) invalid SrcImage.\n");
-        clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
-    }
-
-    if (DstImage == gcvNULL ||
-        DstImage->objectType != clvOBJECT_MEM ||
-        (DstImage->type != CL_MEM_OBJECT_IMAGE2D &&
-         DstImage->type != CL_MEM_OBJECT_IMAGE3D))
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010099: (clEnqueueCopyImage) invalid DstImage.\n");
-        clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
-    }
-#endif
-
 
     if (CommandQueue->context != SrcImage->context)
     {
@@ -3247,7 +3082,6 @@ clEnqueueCopyImage(
         }
     }
 
-#if BUILD_OPENCL_12
     switch (SrcImage->type)
     {
     case CL_MEM_OBJECT_IMAGE1D:
@@ -3377,6 +3211,12 @@ clEnqueueCopyImage(
                 "OCL-010271: (clEnqueueCopyImage) (DstOrigina + Region) is outside of Image's boundary.\n");
             clmRETURN_ERROR(CL_INVALID_VALUE);
         }
+        if (Region[0] == 0 || Region[1] == 0 || Region[2] == 0)
+        {
+            gcmUSER_DEBUG_ERROR_MSG(
+                "OCL-010106: (clEnqueueCopyImage) One of Region's dimension size is 0.\n");
+            clmRETURN_ERROR(CL_INVALID_VALUE);
+        }
         break;
     case CL_MEM_OBJECT_IMAGE3D:
         if (DstOrigin[0] + Region[0] > DstImage->u.image.width ||
@@ -3387,6 +3227,12 @@ clEnqueueCopyImage(
                 "OCL-010272: (clEnqueueCopyImage) (DstOrigina + Region) is outside of Image's boundary.\n");
             clmRETURN_ERROR(CL_INVALID_VALUE);
         }
+        if (Region[0] == 0 || Region[1] == 0 || Region[2] == 0)
+        {
+            gcmUSER_DEBUG_ERROR_MSG(
+                "OCL-010106: (clEnqueueCopyImage) One of Region's dimension size is 0.\n");
+            clmRETURN_ERROR(CL_INVALID_VALUE);
+        }
         break;
     default:
         gcmUSER_DEBUG_ERROR_MSG(
@@ -3394,50 +3240,6 @@ clEnqueueCopyImage(
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
 
     }
-#else
-    if (Region[0] == 0 || Region[1] == 0 || Region[2] == 0)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010106: (clEnqueueCopyImage) One of Region's dimension size is 0.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    if (SrcImage->type == CL_MEM_OBJECT_IMAGE2D &&
-        (SrcOrigin[2] != 0 || Region[2] != 1))
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010107: (clEnqueueCopyImage) SrcImage is 2D, but SrcOrigin[2] is not 0 or Region[2] is not 1.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    if (DstImage->type == CL_MEM_OBJECT_IMAGE2D &&
-        (DstOrigin[2] != 0 || Region[2] != 1))
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010108: (clEnqueueCopyImage) DstImage is 2D, but DstOrigin[2] is not 0 or Region[2] is not 1.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    /* Check if region is outside of SrcImage */
-    if (SrcOrigin[0] + Region[0] > SrcImage->u.image.width ||
-        SrcOrigin[1] + Region[1] > SrcImage->u.image.height ||
-        SrcOrigin[2] + Region[2] > SrcImage->u.image.depth)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010109: (clEnqueueCopyImage) (SrcOrigin + Region) is outside of SrcImage's boundary.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    /* Check if region is outside of DstImage */
-    if (DstOrigin[0] + Region[0] > DstImage->u.image.width ||
-        DstOrigin[1] + Region[1] > DstImage->u.image.height ||
-        DstOrigin[2] + Region[2] > DstImage->u.image.depth)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010110: (clEnqueueCopyImage) (DstOrigin + Region) is outside of DstImage's boundary.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-#endif
 
     /* Check if src and dst overlap */
     if (SrcImage == DstImage)
@@ -3458,6 +3260,11 @@ clEnqueueCopyImage(
             clmRETURN_ERROR(CL_MEM_COPY_OVERLAP);
         }
     }
+
+    /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
+    clfRetainMemObject(SrcImage);
+    clfRetainMemObject(DstImage);
+
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -3536,7 +3343,6 @@ clEnqueueCopyImageToBuffer(
         clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
     }
 
-#if BUILD_OPENCL_12
     if (SrcImage == gcvNULL ||
         SrcImage->objectType != clvOBJECT_MEM ||
         (SrcImage->type != CL_MEM_OBJECT_IMAGE2D &&
@@ -3551,17 +3357,6 @@ clEnqueueCopyImageToBuffer(
             "OCL-010274: (clEnqueueCopyImageToBuffer) invalid SrcImage.\n");
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
     }
-#else
-    if (SrcImage == gcvNULL ||
-        SrcImage->objectType != clvOBJECT_MEM ||
-        (SrcImage->type != CL_MEM_OBJECT_IMAGE2D &&
-         SrcImage->type != CL_MEM_OBJECT_IMAGE3D))
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010114: (clEnqueueCopyImageToBuffer) invalid SrcImage.\n");
-        clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
-    }
-#endif
 
     if (DstBuffer == gcvNULL ||
         DstBuffer->objectType != clvOBJECT_MEM ||
@@ -3625,7 +3420,6 @@ clEnqueueCopyImageToBuffer(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-#if BUILD_OPENCL_12
     if ((SrcImage->type == CL_MEM_OBJECT_IMAGE1D || SrcImage->type == CL_MEM_OBJECT_IMAGE1D_BUFFER) &&
         (SrcOrigin[1] != 0 || Region[1] != 1 || SrcOrigin[2] != 0 || Region[2] != 1))
     {
@@ -3641,10 +3435,8 @@ clEnqueueCopyImageToBuffer(
             "OCL-010276: (clEnqueueCopyImageToBuffer) SrcImage is 1D array, but SrcOrigin[2] is not 0 or Region[2] is not 1.\n");
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
-#endif
 
     /* Check if region is outside of SrcImage */
-#if BUILD_OPENCL_12
     switch (SrcImage->type)
     {
     case CL_MEM_OBJECT_IMAGE1D:
@@ -3700,16 +3492,6 @@ clEnqueueCopyImageToBuffer(
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
 
     }
-#else
-    if (SrcOrigin[0] + Region[0] > SrcImage->u.image.width ||
-        SrcOrigin[1] + Region[1] > SrcImage->u.image.height ||
-        SrcOrigin[2] + Region[2] > SrcImage->u.image.depth)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010122: (clEnqueueCopyImageToBuffer) (SrcOrigin + Region) is outside of SrcImage's boundary.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-#endif
 
     /* Check if region is outside of DstBuffer */
     if (DstBuffer->u.buffer.size <
@@ -3719,6 +3501,10 @@ clEnqueueCopyImageToBuffer(
             "OCL-010123: (clEnqueueCopyImageToBuffer) lastbyte is outside of DstBuffer's boundary.\n");
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
+
+    /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
+    clfRetainMemObject(SrcImage);
+    clfRetainMemObject(DstBuffer);
 
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
@@ -3805,7 +3591,7 @@ clEnqueueCopyBufferToImage(
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
     }
 
-#if BUILD_OPENCL_12
+
     if (DstImage == gcvNULL ||
         DstImage->objectType != clvOBJECT_MEM ||
         (DstImage->type != CL_MEM_OBJECT_IMAGE2D &&
@@ -3820,17 +3606,6 @@ clEnqueueCopyBufferToImage(
             "OCL-010283: (clEnqueueCopyBufferToImage) invalid DstImage.\n");
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
     }
-#else
-    if (DstImage == gcvNULL ||
-        DstImage->objectType != clvOBJECT_MEM ||
-        (DstImage->type != CL_MEM_OBJECT_IMAGE2D &&
-         DstImage->type != CL_MEM_OBJECT_IMAGE3D))
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010127: (clEnqueueCopyBufferToImage) invalid DstImage.\n");
-        clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
-    }
-#endif
 
     if (CommandQueue->context != SrcBuffer->context)
     {
@@ -3884,7 +3659,6 @@ clEnqueueCopyBufferToImage(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
-#if BUILD_OPENCL_12
     if ((DstImage->type == CL_MEM_OBJECT_IMAGE1D || DstImage->type == CL_MEM_OBJECT_IMAGE1D_BUFFER) &&
         (DstOrigin[1] != 0 || Region[1] != 1 || DstOrigin[2] != 0 || Region[2] != 1))
     {
@@ -3900,10 +3674,8 @@ clEnqueueCopyBufferToImage(
             "OCL-010285: (clEnqueueCopyBufferToImage) DstImage is 1D array, but DstOrigin[2] is not 0 or Region[2] is not 1.\n");
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
-#endif
 
     /* Check if region is outside of DstImage */
-#if BUILD_OPENCL_12
     switch (DstImage->type)
     {
     case CL_MEM_OBJECT_IMAGE1D:
@@ -3959,17 +3731,6 @@ clEnqueueCopyBufferToImage(
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
 
     }
-#else
-    if (DstOrigin[0] + Region[0] > DstImage->u.image.width ||
-        DstOrigin[1] + Region[1] > DstImage->u.image.height ||
-        DstOrigin[2] + Region[2] > DstImage->u.image.depth)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010134: (clEnqueueCopyBufferToImage) (DstOrigin + Region) is outside of DstImage's boundary.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-#endif
-
 
     /* Check if region is outside of SrcBuffer */
     if (SrcBuffer->u.buffer.size <
@@ -3979,6 +3740,10 @@ clEnqueueCopyBufferToImage(
             "OCL-010135: (clEnqueueCopyBufferToImage) last byte of source is out of bounds.\n");
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
+
+    /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
+    clfRetainMemObject(SrcBuffer);
+    clfRetainMemObject(DstImage);
 
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
@@ -4068,7 +3833,6 @@ clEnqueueMapBuffer(
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
     }
 
-#if BUILD_OPENCL_12
     if (    (   (Buffer->flags & (CL_MEM_HOST_WRITE_ONLY | CL_MEM_HOST_NO_ACCESS))
              && (MapFlags & CL_MAP_READ))
          || (   (Buffer->flags & (CL_MEM_HOST_READ_ONLY | CL_MEM_HOST_NO_ACCESS))
@@ -4080,7 +3844,6 @@ clEnqueueMapBuffer(
             "OCL-010292: (clEnqueueMapBuffer) Map flags and Host flags are not compatible.\n");
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
     }
-#endif
 
     if (CommandQueue->context != Buffer->context)
     {
@@ -4170,13 +3933,12 @@ clEnqueueMapBuffer(
     VCL_TRACE_API(EnqueueMapBuffer_Post)(CommandQueue, Buffer, BlockingMap, MapFlags, Offset, Cb, NumEventsInWaitList, EventWaitList, Event, ErrCodeRet, mappedPtr);
     gcmFOOTER_ARG("%d Command=0x%x mappedPtr=0x%x",
                   CL_SUCCESS, command, mappedPtr);
-#if BUILD_OPENCL_12
+
     if ((Buffer->flags & CL_MEM_USE_HOST_PTR) &&
         (Buffer->host != gcvNULL))
     {
         mappedPtr = gcmINT2PTR((gcmPTR2INT(Buffer->host) + Offset));
     }
-#endif
 
     return mappedPtr;
 
@@ -4222,10 +3984,8 @@ clEnqueueMapImage(
     size_t              stride;
     gctUINT             elementSize;
     gctPOINTER          pointer = gcvNULL;
-#if BUILD_OPENCL_12
     size_t              slicePitch;
     size_t              hostOffset = 0;
-#endif
 
     gcmHEADER_ARG("CommandQueue=0x%x Image=0x%x BlockingMap=%u "
                   "MapFlags=0x%x Origin=%u Region=0x%x",
@@ -4239,7 +3999,7 @@ clEnqueueMapImage(
             "OCL-010146: (clEnqueueMapImage) invalid CommandQueue.\n");
         clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
     }
-#if BUILD_OPENCL_12
+
     if (Image == gcvNULL ||
         Image->objectType != clvOBJECT_MEM ||
         (Image->type != CL_MEM_OBJECT_IMAGE2D &&
@@ -4265,18 +4025,6 @@ clEnqueueMapImage(
             "OCL-010294: (clEnqueueMapImage) Map flags and Host flags are not compatible.\n");
         clmRETURN_ERROR(CL_INVALID_OPERATION);
     }
-
-#else
-    if (Image == gcvNULL ||
-        Image->objectType != clvOBJECT_MEM ||
-        (Image->type != CL_MEM_OBJECT_IMAGE2D &&
-         Image->type != CL_MEM_OBJECT_IMAGE3D))
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010147: (clEnqueueMapImage) invalid Image.\n");
-        clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
-    }
-#endif
 
     if (CommandQueue->context != Image->context)
     {
@@ -4316,7 +4064,6 @@ clEnqueueMapImage(
         }
     }
 
-#if BUILD_OPENCL_12
     switch (Image->type)
     {
     case CL_MEM_OBJECT_IMAGE1D:
@@ -4373,6 +4120,12 @@ clEnqueueMapImage(
                 "OCL-010301: (clEnqueueMapImage) (Origina + Region) is outside of Image's boundary.\n");
             clmRETURN_ERROR(CL_INVALID_VALUE);
         }
+        if (Region[0] == 0 || Region[1] == 0 || Region[2] == 0)
+        {
+            gcmUSER_DEBUG_ERROR_MSG(
+                "OCL-010152: (clEnqueueMapImage) One of Region's dimension size is 0.\n");
+            clmRETURN_ERROR(CL_INVALID_VALUE);
+        }
         break;
     case CL_MEM_OBJECT_IMAGE3D:
         if (Origin[0] + Region[0] > Image->u.image.width ||
@@ -4383,6 +4136,12 @@ clEnqueueMapImage(
                 "OCL-010302: (clEnqueueMapImage) (Origina + Region) is outside of Image's boundary.\n");
             clmRETURN_ERROR(CL_INVALID_VALUE);
         }
+        if (Region[0] == 0 || Region[1] == 0 || Region[2] == 0)
+        {
+            gcmUSER_DEBUG_ERROR_MSG(
+                "OCL-010152: (clEnqueueMapImage) One of Region's dimension size is 0.\n");
+            clmRETURN_ERROR(CL_INVALID_VALUE);
+        }
         break;
     default:
         gcmUSER_DEBUG_ERROR_MSG(
@@ -4390,33 +4149,6 @@ clEnqueueMapImage(
         clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
 
     }
-#else
-
-    if (Region[0] == 0 || Region[1] == 0 || Region[2] == 0)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010152: (clEnqueueMapImage) One of Region's dimension size is 0.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    if (Image->type == CL_MEM_OBJECT_IMAGE2D &&
-        (Origin[2] != 0 || Region[2] != 1))
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010153: (clEnqueueMapImage) Image is 2D, but Origin[2] is not 0 or Region[2] is not 1.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    /* Check if region is outside of Image */
-    if (Origin[0] + Region[0] > Image->u.image.width ||
-        Origin[1] + Region[1] > Image->u.image.height ||
-        Origin[2] + Region[2] > Image->u.image.depth)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010154: (clEnqueueMapImage) (Origina + Region) is outside of Image's boundary.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-#endif
 
     /* Check if MapFlags is valid */
     if (MapFlags & ~((cl_map_flags)(CL_MAP_READ|CL_MAP_WRITE)))
@@ -4468,7 +4200,6 @@ clEnqueueMapImage(
 
     stride                          = Image->u.image.textureStride;
     elementSize                     = Image->u.image.elementSize;
-#if BUILD_OPENCL_12
     slicePitch                      = Image->u.image.textureSlicePitch;
     mappedPtr                       = (gctUINT8_PTR) Image->u.image.textureLogical + Origin[2]*slicePitch +
                                                      Origin[1] * stride +
@@ -4495,21 +4226,7 @@ clEnqueueMapImage(
     {
         *ImageSlicePitch = slicePitch;
     }
-#else
-    mappedPtr                       = (gctUINT8_PTR) Image->u.image.textureLogical +
-                                                     Origin[1] * stride +
-                                                     Origin[0] * elementSize;
-    mapImage->imageSlicePitch       = 0;
-    mapImage->imageRowPitch         = stride;
-    if (ImageRowPitch)
-    {
-        *ImageRowPitch = stride;
-    }
-    if (ImageSlicePitch)
-    {
-        *ImageSlicePitch = 0;
-    }
-#endif
+
     mapImage->mappedPtr             = mappedPtr;
 
     clmONERROR(clfSubmitCommand(CommandQueue, command, BlockingMap),
@@ -4647,7 +4364,6 @@ OnError:
     return status;
 }
 
-#if BUILD_OPENCL_12
 CL_API_ENTRY cl_int CL_API_CALL
 clEnqueueMigrateMemObjects(
     cl_command_queue        CommandQueue ,
@@ -4752,7 +4468,6 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
-#endif
 
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
 /* To check whether an instruction has 64-bit operands. */
@@ -5187,11 +4902,7 @@ clEnqueueNDRangeKernel(
 
         /* Patch for write_image funtions. */
         {
-#if BUILD_OPENCL_FP
             gctUINT uniformIndex[128] = {(gctUINT) ~0};
-#else
-            gctUINT uniformIndex[32] = {(gctUINT) ~0};
-#endif
             gctUINT count = 0;
             gctUINT i;
 
@@ -5253,7 +4964,7 @@ clEnqueueNDRangeKernel(
 
                 clmONERROR(gcUNIFORM_GetType(arg->uniform, &type, gcvNULL),
                            CL_INVALID_VALUE);
-#if BUILD_OPENCL_12
+
                 if (type == gcSHADER_IMAGE_2D ||
                     type == gcSHADER_IMAGE_3D ||
                     type == gcSHADER_IMAGE_1D ||
@@ -5261,10 +4972,6 @@ clEnqueueNDRangeKernel(
                     type == gcSHADER_IMAGE_1D_BUFFER ||
                     type == gcSHADER_IMAGE_2D_ARRAY
                     )
-#else
-                if (type == gcSHADER_IMAGE_2D ||
-                    type == gcSHADER_IMAGE_3D)
-#endif
                 {
                     clsMem_PTR              image;
                     clsImageHeader_PTR      imageHeader;
@@ -5315,11 +5022,7 @@ clEnqueueNDRangeKernel(
         /* Patch for read_image funtions. */
         if (GetKFunctionISamplerCount(kernelFunction) > 0)
         {
-#if BUILD_OPENCL_FP
             gctUINT uniformIndex[128];
-#else
-            gctUINT uniformIndex[32];
-#endif
             gctUINT count = 0;
             gctUINT i;
             gctUINT vsSamplers = 0, psSamplers = 0;
@@ -5454,10 +5157,8 @@ clEnqueueNDRangeKernel(
                             if (( Kernel->patchNeeded == gcvFALSE) &&
                                 (sampler < maxSampler) &&
                                 (image->type != CL_MEM_OBJECT_IMAGE3D) &&
-#if BUILD_OPENCL_12
                                 (image->type != CL_MEM_OBJECT_IMAGE2D_ARRAY) &&
                                 (image->type != CL_MEM_OBJECT_IMAGE1D_ARRAY) &&
-#endif
                                 (channelDataType != CL_FLOAT) &&
                                 (channelDataType != CL_UNSIGNED_INT32) &&
                                 (channelDataType != CL_SIGNED_INT32) &&
@@ -5510,13 +5211,9 @@ clEnqueueNDRangeKernel(
                                 arg->image            = image;
                                 arg->samplerValue     = samplerValue;
 
-                                if ((image->type != CL_MEM_OBJECT_IMAGE3D)
-#if BUILD_OPENCL_12
-                                    &&
-                                    (image->type != CL_MEM_OBJECT_IMAGE2D_ARRAY)
-                                    &&
+                                if ((image->type != CL_MEM_OBJECT_IMAGE3D) &&
+                                    (image->type != CL_MEM_OBJECT_IMAGE2D_ARRAY) &&
                                     (image->type != CL_MEM_OBJECT_IMAGE1D_ARRAY)
-#endif
                                     )
                                 {
                                     /* Check filter mode and normalized mode. */
@@ -5628,13 +5325,8 @@ clEnqueueNDRangeKernel(
     /* Retain kernel. */
     clfRetainKernel(Kernel);
 
-#if cldSEQUENTIAL_EXECUTION
-    clmONERROR(clfExecuteCommandNDRangeKernel(command),
-               CL_OUT_OF_HOST_MEMORY);
-#else
     clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
                CL_OUT_OF_HOST_MEMORY);
-#endif
 
     VCL_TRACE_API(EnqueueNDRangeKernel)(CommandQueue, Kernel, WorkDim, GlobalWorkOffset, GlobalWorkSize, LocalWorkSize, NumEventsInWaitList, EventWaitList, Event);
 
@@ -5803,7 +5495,6 @@ OnError:
     return status;
 }
 
-#if BUILD_OPENCL_12
 CL_API_ENTRY cl_int CL_API_CALL
 clEnqueueNativeKernel(
     cl_command_queue    CommandQueue,
@@ -5959,161 +5650,6 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
-#else
-CL_API_ENTRY cl_int CL_API_CALL
-clEnqueueNativeKernel(
-    cl_command_queue    CommandQueue,
-    void                (*UserFunc)(void *),
-    void *              Args,
-    size_t              CbArgs,
-    cl_uint             NumMemObjects,
-    const cl_mem *      MemList,
-    const void **       ArgsMemLoc,
-    cl_uint             NumEventsInWaitList,
-    const cl_event *    EventWaitList,
-    cl_event *          Event
-    )
-{
-    clsCommand_PTR      command = gcvNULL;
-    clsCommandNativeKernel_PTR nativeKernel;
-    gctPOINTER          pointer = gcvNULL;
-    gctINT              status;
-
-    gcmHEADER_ARG("CommandQueue=0x%x UserFunc=0x%x Args=0x%x",
-                  CommandQueue, UserFunc, Args);
-
-    if (CommandQueue == gcvNULL || CommandQueue->objectType != clvOBJECT_COMMAND_QUEUE)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010190: (clEnqueueNativeKernel) invalid CommandQueue.\n");
-        clmRETURN_ERROR(CL_INVALID_COMMAND_QUEUE);
-    }
-
-    if (EventWaitList == gcvNULL && NumEventsInWaitList > 0)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010191: (clEnqueueNativeKernel) EventWaitList is NULL, but NumEventsInWaitList is not 0.\n");
-        clmRETURN_ERROR(CL_INVALID_EVENT_WAIT_LIST);
-    }
-
-    if (EventWaitList)
-    {
-        gctUINT i = 0;
-        clmCHECK_ERROR(NumEventsInWaitList == 0, CL_INVALID_EVENT_WAIT_LIST);
-        for (i=0; i<NumEventsInWaitList; i++)
-        {
-            if (CommandQueue->context != EventWaitList[i]->context)
-            {
-                gcmUSER_DEBUG_ERROR_MSG(
-                    "OCL-010192: (clEnqueueNativeKernel) EventWaitList[%d]'s context is not the same as CommandQueue's context.\n",
-                    i);
-                clmRETURN_ERROR(CL_INVALID_CONTEXT);
-            }
-        }
-    }
-
-    if (UserFunc == gcvNULL)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010193: (clEnqueueNativeKernel) UserFunc is NULL.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    if (MemList == gcvNULL && NumMemObjects > 0)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010194: (clEnqueueNativeKernel) invalid MemList.\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    if (MemList)
-    {
-        gctUINT i = 0;
-
-        if (NumMemObjects == 0)
-        {
-            gcmUSER_DEBUG_ERROR_MSG(
-                "OCL-010195: (clEnqueueNativeKernel) MemList is not NULL, but NumMemObjects is 0.\n");
-            clmRETURN_ERROR(CL_INVALID_VALUE);
-        }
-
-        for (i = 0; i < NumMemObjects; i++)
-        {
-            if (MemList[i] == gcvNULL ||
-                MemList[i]->objectType != clvOBJECT_MEM ||
-                MemList[i]->type != CL_MEM_OBJECT_BUFFER)
-            {
-                gcmUSER_DEBUG_ERROR_MSG(
-                    "OCL-010196: (clEnqueueNativeKernel) MemList[%d] is invalid.\n",
-                    i);
-                clmRETURN_ERROR(CL_INVALID_MEM_OBJECT);
-            }
-        }
-    }
-
-    if (Args == gcvNULL && (CbArgs > 0 || NumMemObjects > 0))
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010197: (clEnqueueNativeKernel) Args is NULL, but CbArgs is not 0 or NumMemObjects is not 0).\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    if (Args != gcvNULL && CbArgs == 0)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010198: (clEnqueueNativeKernel) Args is not NULL, but CbArgs is 0).\n");
-        clmRETURN_ERROR(CL_INVALID_VALUE);
-    }
-
-    if ((CommandQueue->device->deviceInfo.execCapability & CL_EXEC_NATIVE_KERNEL) == 0)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010199: (clEnqueueNativeKernel) device's cannot execute native kernel.\n");
-        clmRETURN_ERROR(CL_INVALID_OPERATION);
-    }
-
-    clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
-    if (EventWaitList && (NumEventsInWaitList > 0))
-    {
-        clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(gctPOINTER) * NumEventsInWaitList, &pointer), CL_OUT_OF_HOST_MEMORY);
-        gcoOS_MemCopy(pointer, (gctPOINTER)EventWaitList, sizeof(gctPOINTER) * NumEventsInWaitList);
-    }
-
-    command->type                   = clvCOMMAND_NATIVE_KERNEL;
-    command->handler                = &clfExecuteCommandNativeKernel;
-    command->outEvent               = Event;
-    command->numEventsInWaitList    = NumEventsInWaitList;
-    command->eventWaitList          = (clsEvent_PTR *)pointer;
-
-    nativeKernel                    = &command->u.nativeKernel;
-    nativeKernel->userFunc          = UserFunc;
-    nativeKernel->args              = Args;
-    nativeKernel->cbArgs            = CbArgs;
-    nativeKernel->numMemObjects     = NumMemObjects;
-    nativeKernel->memList           = MemList;
-    nativeKernel->argsMemLoc        = ArgsMemLoc;
-
-    clmONERROR(clfSubmitCommand(CommandQueue, command, gcvFALSE),
-               CL_OUT_OF_HOST_MEMORY);
-
-    gcmFOOTER_ARG("%d Command=0x%x", CL_SUCCESS, command);
-    return CL_SUCCESS;
-
-OnError:
-    if (status == CL_OUT_OF_HOST_MEMORY)
-    {
-        gcmUSER_DEBUG_ERROR_MSG(
-            "OCL-010200: (clEnqueueNativeKernel) Run out of memory.\n");
-    }
-
-    if(command != gcvNULL)
-    {
-        clfReleaseCommand(command);
-    }
-    gcmFOOTER_ARG("%d", status);
-    return status;
-}
-#endif
 
 CL_API_ENTRY cl_int CL_API_CALL
 clEnqueueMarker(
@@ -6169,7 +5705,6 @@ OnError:
     return status;
 }
 
-#if BUILD_OPENCL_12
 CL_API_ENTRY cl_int CL_API_CALL
 clEnqueueMarkerWithWaitList(
     cl_command_queue    CommandQueue,
@@ -6299,7 +5834,6 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
-#endif
 
 CL_API_ENTRY cl_int CL_API_CALL
 clEnqueueWaitForEvents(
@@ -6427,7 +5961,6 @@ OnError:
     return status;
 }
 
-#if BUILD_OPENCL_12
 CL_API_ENTRY cl_int CL_API_CALL
 clEnqueueFillBuffer(
     cl_command_queue    CommandQueue ,
@@ -6510,6 +6043,9 @@ clEnqueueFillBuffer(
         clmRETURN_ERROR(CL_INVALID_VALUE);
     }
 
+    /* Add reference count for memory object here to make sure the memory object will not be released in another thread, maybe refine later for performance issue */
+    clfRetainMemObject(Buffer);
+
     clmONERROR(clfAllocateCommand(CommandQueue, &command), CL_OUT_OF_HOST_MEMORY);
     if (EventWaitList && (NumEventsInWaitList > 0))
     {
@@ -6551,4 +6087,3 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
-#endif

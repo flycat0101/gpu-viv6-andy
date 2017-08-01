@@ -737,6 +737,7 @@ enum
 
     __GL_PERDRAW_DUMP_AS_TGA        = 1 << 16,
     __GL_PERDRAW_DUMP_AS_RAW        = 1 << 17,
+    __GL_PERDRAW_DUMP_AS_COMPRESSED = 1 << 18,
 
     __GL_PERDRAW_DUMP_NONE      = 0x0,
     __GL_PERDRAW_DUMP_ALL       = 0xFFFFFFFF,

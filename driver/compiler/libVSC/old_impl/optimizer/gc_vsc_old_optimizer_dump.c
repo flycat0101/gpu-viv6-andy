@@ -561,7 +561,8 @@ _DumpSource(
         if (type == gcSL_CONSTANT)
         {
             /* Assemble the 32-bit value. */
-            gctUINT32 value = Index | (Indexed << 16);
+            gcuFLOAT_UINT32 constant;
+            constant.u = Index | ((Indexed&0xFFFF) << 16);
 
             switch (gcmSL_SOURCE_GET(Source, Format))
             {
@@ -569,28 +570,28 @@ _DumpSource(
                 /* Print the floating point constant. */
                 gcmVERIFY_OK(
                     gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
-                                       "%f", gcoMATH_UIntAsFloat(value)));
+                                       "%f", constant.f));
                 break;
 
             case gcSL_INTEGER:
                 /* Print the integer constant. */
                 gcmVERIFY_OK(
                     gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
-                                       "%d", value));
+                                       "%d", (gctINT32)constant.u));
                 break;
 
             case gcSL_UINT32:
                 /* Print the unsigned integer constant. */
                 gcmVERIFY_OK(
                     gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
-                                       "%u", value));
+                                       "%u", constant.u));
                 break;
 
             case gcSL_BOOLEAN:
                 /* Print the boolean constant. */
                 gcmVERIFY_OK(
                     gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
-                                       "%s", value ? "true" : "false"));
+                                       "%s", constant.u ? "true" : "false"));
                 break;
             }
         }
@@ -740,7 +741,8 @@ _DumpSourceTargetFormat(
         "invalid"
     };
     gctUINT offset = 0;
-    gctUINT32 value = Index | (Indexed << 16);
+    gcuFLOAT_UINT32 constant;
+    constant.u = Index | ((Indexed & 0xFFFF) << 16);
 
     if (AddComma)
     {
@@ -753,11 +755,11 @@ _DumpSourceTargetFormat(
 
     gcmASSERT(gcmSL_SOURCE_GET(Source, Format) == gcSL_UINT32);
 
-    gcmASSERT(value <= gcSL_INVALID);
+    gcmASSERT(constant.u <= gcSL_INVALID);
 
     gcmVERIFY_OK(
         gcoOS_PrintStrSafe(Buffer, BufferSize, &offset,
-                           "%s", targetFormat[value]));
+                           "%s", targetFormat[constant.u]));
 
     /* Return the number of characters printed. */
     return offset;
@@ -1393,12 +1395,13 @@ _DumpIR(
                           buffer + offset, gcmSIZEOF(buffer) - offset);
     }
 
-#if gcdCOMPILER_DEBUGOUTPUT
-    /* Append source loc */
-    gcmVERIFY_OK(
-            gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
-                               ", srcLoc(line = %d, col = %d)", GCSL_SRC_LOC_LINENO(code->srcLoc), GCSL_SRC_LOC_COLNO(code->srcLoc)));
-#endif
+    if (gcmOPT_EnableDebug())
+    {
+        /* Append source loc */
+        gcmVERIFY_OK(
+                gcoOS_PrintStrSafe(buffer, gcmSIZEOF(buffer), &offset,
+                                   ", srcLoc(line = %d, col = %d)", GCSL_SRC_LOC_LINENO(code->srcLoc), GCSL_SRC_LOC_COLNO(code->srcLoc)));
+    }
 
     /* Dump the instruction. */
     gcmVERIFY_OK(

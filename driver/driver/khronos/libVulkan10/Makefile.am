@@ -42,6 +42,7 @@ libvulkan_la_SOURCES = \
     src/gc_vk_utils.c \
     src/gc_vk_validation.c \
     src/wsi/gc_wsi_surface.c \
+    src/wsi/gc_wsi_display.c \
     src/wsi/gc_wsi_swapchain.c
 
 libvulkan_la_SOURCES += \

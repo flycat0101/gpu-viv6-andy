@@ -2636,16 +2636,16 @@ IN OUT clsNAME **RefParamName
         case clvTYPE_U_GEN:
         case clvTYPE_IU_GEN:
            _clmInitGenType(refDataType->elementType,
-                          1,
-                          dataType);
+                           1,
+                           dataType);
            break;
 
         case clvTYPE_F_GEN:
         case clvTYPE_GEN:
            if(clmIsElementTypeInteger(rDecl->dataType->elementType)) {
               _clmInitGenType(rDecl->dataType->elementType,
-                             1,
-                             dataType);
+                              1,
+                              dataType);
            }
            break;
         default:
@@ -2668,8 +2668,8 @@ IN OUT clsNAME **RefParamName
         case clvTYPE_F_GEN:
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
               _clmInitGenType(rDecl->dataType->elementType,
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
-                             dataType);
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
            }
            updateRefDataType = gcvTRUE;
            break;
@@ -2692,15 +2692,15 @@ IN OUT clsNAME **RefParamName
         case clvTYPE_IU_GEN:
         case clvTYPE_U_GEN:
            _clmInitGenType(_clmConvElementTypeToSigned(refDataType->elementType),
-                          clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
-                          dataType);
+                           clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                           dataType);
            break;
 
         case clvTYPE_SIU_GEN:
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
               _clmInitGenType(_clmConvElementTypeToSigned(refDataType->elementType),
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType),
-                             dataType);
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType),
+                              dataType);
            }
            updateRefDataType = gcvTRUE;
            break;
@@ -2719,8 +2719,8 @@ IN OUT clsNAME **RefParamName
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType) &&
               clmIsElementTypeInteger(rDecl->dataType->elementType)) {
               _clmInitGenType(_clmConvElementTypeToSigned(rDecl->dataType->elementType),
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
-                             dataType);
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
            }
            break;
         default:
@@ -2733,8 +2733,8 @@ IN OUT clsNAME **RefParamName
         case clvTYPE_IU_GEN:
         case clvTYPE_I_GEN:
            _clmInitGenType(_clmConvElementTypeToUnsigned(refDataType->elementType),
-                          clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
-                          dataType);
+                           clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                           dataType);
            break;
 
         case clvTYPE_U_GEN:
@@ -2749,8 +2749,8 @@ IN OUT clsNAME **RefParamName
         case clvTYPE_SIU_GEN:
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
               _clmInitGenType(_clmConvElementTypeToUnsigned(refDataType->elementType),
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType),
-                             dataType);
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType),
+                              dataType);
            }
            updateRefDataType = gcvTRUE;
            break;
@@ -2760,8 +2760,8 @@ IN OUT clsNAME **RefParamName
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType) &&
               clmIsElementTypeInteger(rDecl->dataType->elementType)) {
               _clmInitGenType(_clmConvElementTypeToUnsigned(rDecl->dataType->elementType),
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
-                             dataType);
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
            }
            break;
         default:
@@ -2789,8 +2789,8 @@ IN OUT clsNAME **RefParamName
                  dataType->elementType = refDataType->elementType;
               }
               _clmInitGenType(dataType->elementType,
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
-                             dataType);
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
            }
            updateRefDataType = gcvTRUE;
            break;
@@ -2804,8 +2804,8 @@ IN OUT clsNAME **RefParamName
                  dataType->elementType = refDataType->elementType;
               }
               _clmInitGenType(dataType->elementType,
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
-                             dataType);
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
            }
            updateRefDataType = gcvTRUE;
            break;
@@ -2813,8 +2813,8 @@ IN OUT clsNAME **RefParamName
         case clvTYPE_SIU_GEN:
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType)) {
               _clmInitGenType(refDataType->elementType,
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType),
-                             dataType);
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(rDecl->dataType),
+                              dataType);
            }
            updateRefDataType = gcvTRUE;
            break;
@@ -2824,8 +2824,8 @@ IN OUT clsNAME **RefParamName
            if(_clmDATA_TYPE_IsValidGenType(rDecl->dataType) &&
               clmIsElementTypeInteger(rDecl->dataType->elementType)) {
               _clmInitGenType(rDecl->dataType->elementType,
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
-                             dataType);
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
            }
            break;
         default:
@@ -2848,8 +2848,8 @@ IN OUT clsNAME **RefParamName
         case clvTYPE_IU_GEN:
            if(clmIsElementTypeFloating(rDecl->dataType->elementType)) {
               _clmInitGenType(rDecl->dataType->elementType,
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
-                             dataType);
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
            }
            updateRefDataType = gcvTRUE;
            break;
@@ -2866,8 +2866,8 @@ IN OUT clsNAME **RefParamName
         case clvTYPE_GEN:
            if(clmIsElementTypeFloating(rDecl->dataType->elementType)) {
               _clmInitGenType(rDecl->dataType->elementType,
-                             clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
-                             dataType);
+                              clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                              dataType);
            }
            break;
         default:
@@ -3000,8 +3000,8 @@ IN OUT clsDATA_TYPE *FuncDataType
        return;
      }
      _clmInitGenType(elementType,
-                    clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
-                    FuncDataType);
+                     clmDATA_TYPE_vectorSize_NOCHECK_GET(refDataType),
+                     FuncDataType);
   }
 }
 
@@ -3709,7 +3709,8 @@ IN OUT cloIR_POLYNARY_EXPR PolynaryExpr
                             &PolynaryExpr->exprBase.decl);
             if (gcmIS_ERROR(status)) return status;
 
-            if(name->u.funcInfo.passArgByRef) {
+            if(name->u.funcInfo.passArgByRef &&
+               !clmDECL_IsPackedType(&PolynaryExpr->exprBase.decl)) {
                status = _MapFuncCallToPassByRef(Compiler,
                                                 NameSpace,
                                                 &hasGenType,
@@ -4631,6 +4632,13 @@ OUT cloIR_ITERATION * Iteration
         iteration->forInitStatement    = ForInitStatement;
         iteration->forRestExpr        = ForRestExpr;
 
+        if (CondExpr)
+            iteration->base.endLineNo = gcmMAX(CondExpr->base.endLineNo,iteration->base.endLineNo);
+        if (LoopBody)
+            iteration->base.endLineNo = gcmMAX(LoopBody->endLineNo,iteration->base.endLineNo);
+        else if (ForInitStatement)
+            iteration->base.endLineNo = gcmMAX(ForInitStatement->endLineNo,iteration->base.endLineNo);
+
         *Iteration = iteration;
         return gcvSTATUS_OK;
     } while (gcvFALSE);
@@ -4759,7 +4767,7 @@ OUT cloIR_JUMP *Jump
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
 
     do {
-        status = cloCOMPILER_Allocate(Compiler,
+        status = cloCOMPILER_ZeroMemoryAllocate(Compiler,
                           (gctSIZE_T)sizeof(struct _cloIR_JUMP),
                           (gctPOINTER *) &jump);
         if (gcmIS_ERROR(status)) break;
@@ -4802,6 +4810,7 @@ OUT cloIR_JUMP *GotoStmt
         Label->u.labelInfo.isReferenced = gcvTRUE;
         jump->type = clvGOTO;
         jump->u.label = Label;
+        jump->nameSpace = cloCOMPILER_GetCurrentSpace(Compiler);
         *GotoStmt = jump;
         return gcvSTATUS_OK;
     } while (gcvFALSE);
@@ -5094,7 +5103,7 @@ IN cloIR_BASE This
         }
     }
     if (constant->uniformCount > 0) {
-        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant->uniform));
+        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant->u.uniformArr));
     }
 
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant));
@@ -5200,7 +5209,7 @@ OUT cloIR_CONSTANT *Constant
 
   status = cloCOMPILER_CloneDecl(Compiler,
                                  clvQUALIFIER_CONST,
-                                 clvQUALIFIER_NONE,
+                                 clvQUALIFIER_CONSTANT,
                                  Decl,
                                  &decl);
   if (gcmIS_ERROR(status)) return status;
@@ -5220,10 +5229,10 @@ OUT cloIR_CONSTANT *Constant
                            decl);
 
 #if _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
-     if (clmDECL_IsUnderlyingStructOrUnion(&decl)) {
+     if (clmDECL_IsAggregateType(&decl)) {
 #else
      if (clmDECL_IsUnderlyingStructOrUnion(&decl) &&
-         (clGetOperandCountForRegAlloc(&decl) > _cldMaxOperandCountToUseMemory)) {
+         (clGetOperandCountForRegAlloc(&decl) > _clmMaxOperandCountToUseMemory(&decl))) {
 #endif
          constant->valueCount = clsDECL_GetByteSize(Compiler, &decl);
          size = (gctSIZE_T)(sizeof(gctCHAR) * constant->valueCount);
@@ -5258,7 +5267,7 @@ OUT cloIR_CONSTANT *Constant
         gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant->buffer));
     }
     if (constant->uniformCount > 0) {
-        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant->uniform));
+        gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant->u.uniformArr));
     }
     gcmVERIFY_OK(cloCOMPILER_Free(Compiler, constant));
   }
@@ -5361,9 +5370,9 @@ OUT cloIR_CONSTANT * Constant
                                           (gctSIZE_T)sizeof(gcUNIFORM) * Source->uniformCount,
                                           (gctPOINTER *) &pointer);
             if (gcmIS_ERROR(status)) break;
-            constant->uniform = pointer;
-            gcoOS_MemCopy(constant->uniform,
-                          Source->uniform,
+            constant->u.uniformArr = pointer;
+            gcoOS_MemCopy(constant->u.uniformArr,
+                          Source->u.uniformArr,
                           (gctSIZE_T)sizeof(gcUNIFORM) * Source->uniformCount);
             constant->uniformCount = Source->uniformCount;
         }
@@ -5641,23 +5650,28 @@ OUT cluCONSTANT_VALUE * Value
 
     switch (Constant->exprBase.decl.dataType->elementType) {
     case clvTYPE_BOOL:
+    case clvTYPE_BOOL_PACKED:
         Value->uintValue = clmB2U(Constant->values[ValueNo].boolValue);
         break;
 
     case clvTYPE_CHAR:
+    case clvTYPE_CHAR_PACKED:
         Value->uintValue = clmC2U(Constant->values[ValueNo].intValue);
         break;
 
     case clvTYPE_INT:
     case clvTYPE_SHORT:
+    case clvTYPE_SHORT_PACKED:
     case clvTYPE_LONG:
         Value->uintValue = clmI2U(Constant->values[ValueNo].intValue);
         break;
 
     case clvTYPE_UINT:
     case clvTYPE_USHORT:
+    case clvTYPE_USHORT_PACKED:
     case clvTYPE_ULONG:
     case clvTYPE_UCHAR:
+    case clvTYPE_UCHAR_PACKED:
         Value->uintValue = Constant->values[ValueNo].uintValue;
         break;
 
@@ -7973,6 +7987,156 @@ _cloIR_CONSTANT_BitwiseShift(
     return gcvSTATUS_OK;
 }
 
+gceSTATUS
+clConvFieldConstantToConstantValues(
+cluCONSTANT_VALUE *Values,
+clsDECL *Decl,
+gctSTRING Buffer
+)
+{
+    gctUINT8 vectorSize, i;
+    gctSTRING ptr;
+
+    gcoOS_ZeroMemory(Values, gcmSIZEOF(cluCONSTANT_VALUE) * cldMAX_VECTOR_COMPONENT);
+
+    ptr = Buffer;
+    vectorSize = clmDATA_TYPE_vectorSize_GET(Decl->dataType);
+    if(vectorSize == 0) vectorSize = 1;
+    switch(Decl->dataType->elementType) {
+    case clvTYPE_CHAR:
+    case clvTYPE_CHAR_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr++) {
+            Values[i].intValue = *((gctINT8 *) ptr);
+        }
+        break;
+
+    case clvTYPE_UCHAR:
+    case clvTYPE_UCHAR_PACKED:
+    case clvTYPE_BOOL_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr++) {
+            Values[i].uintValue = *((gctUINT8 *) ptr);
+        }
+        break;
+
+    case clvTYPE_SHORT:
+    case clvTYPE_SHORT_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr += 2) {
+            Values[i].intValue = *((gctINT16 *) ptr);
+        }
+        break;
+
+    case clvTYPE_USHORT:
+    case clvTYPE_USHORT_PACKED:
+        for(i = 0; i < vectorSize; i++, ptr += 2) {
+            Values[i].uintValue = *((gctUINT16 *) ptr);
+        }
+        break;
+
+    case clvTYPE_INT:
+        for(i = 0; i < vectorSize; i++, ptr += 4) {
+            Values[i].intValue = *((gctINT32 *) ptr);
+        }
+        break;
+
+    case clvTYPE_UINT:
+    case clvTYPE_BOOL:
+        for(i = 0; i < vectorSize; i++, ptr += 4) {
+            Values[i].uintValue = *((gctUINT32 *) ptr);
+        }
+        break;
+
+    case clvTYPE_FLOAT:
+        for(i = 0; i < vectorSize; i++, ptr += 4) {
+            Values[i].floatValue = *((gctFLOAT *) ptr);
+        }
+        break;
+
+    default:
+        gcmASSERT(0);
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+    return gcvSTATUS_OK;
+}
+
+gctSIZE_T
+clGetFieldByteOffset(
+    IN cloCOMPILER Compiler,
+    IN clsDECL * StructDecl,
+    IN clsNAME * FieldName,
+    OUT gctUINT * Alignment
+    )
+{
+   gctSIZE_T    offset = 0;
+   clsNAME *    fieldName;
+   gctUINT alignment;
+   gctBOOL packed = gcvFALSE;
+
+   gcmASSERT(StructDecl);
+   gcmASSERT(clmDATA_TYPE_IsStructOrUnion(StructDecl->dataType));
+   gcmASSERT(FieldName);
+
+   gcmASSERT(StructDecl->dataType->u.fieldSpace);
+
+   FOR_EACH_DLINK_NODE(&StructDecl->dataType->u.fieldSpace->names, clsNAME, fieldName)
+   {
+      if (fieldName == FieldName) break;
+      gcmASSERT(fieldName->decl.dataType);
+
+      if(fieldName->u.variableInfo.specifiedAttr & clvATTR_PACKED) {
+         packed = gcvTRUE;
+      }
+      else {
+         packed = gcvFALSE;
+      }
+      if(StructDecl->dataType->elementType == clvTYPE_UNION) continue;
+      else {
+        if(fieldName->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
+           alignment = fieldName->context.alignment;
+        }
+        else {
+           if(clmDECL_IsUnderlyingStructOrUnion(&fieldName->decl)) {
+              clsNAME *subField;
+              subField = slsDLINK_LIST_First(&fieldName->decl.dataType->u.fieldSpace->names, struct _clsNAME);
+              if(subField->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
+                 alignment = subField->context.alignment;
+              }
+              else alignment = clPermissibleAlignment(Compiler, &fieldName->decl);
+           }
+           else alignment = clPermissibleAlignment(Compiler, &fieldName->decl);
+        }
+        offset = clmALIGN(offset, alignment, packed) + clsDECL_GetByteSize(Compiler, &fieldName->decl);
+      }
+   }
+
+   gcmASSERT(fieldName == FieldName);
+
+   if(FieldName->u.variableInfo.specifiedAttr & clvATTR_PACKED) {
+      packed = gcvTRUE;
+   }
+   else {
+      packed = gcvFALSE;
+   }
+   if(FieldName->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
+       alignment = FieldName->context.alignment;
+   }
+   else {
+       if(clmDECL_IsUnderlyingStructOrUnion(&FieldName->decl)) {
+          clsNAME *subField;
+          subField = slsDLINK_LIST_First(&fieldName->decl.dataType->u.fieldSpace->names, struct _clsNAME);
+          if(subField->u.variableInfo.specifiedAttr & clvATTR_ALIGNED) {
+             alignment = subField->context.alignment;
+          }
+          else alignment = clPermissibleAlignment(Compiler, &FieldName->decl);
+       }
+       else alignment = clPermissibleAlignment(Compiler, &FieldName->decl);
+   }
+
+   if(Alignment) {
+       *Alignment = alignment;
+   }
+   return clmALIGN(offset, alignment, packed);
+}
+
 static gceSTATUS
 _cloIR_CONSTANT_SelectField(
 IN cloCOMPILER Compiler,
@@ -7983,7 +8147,7 @@ OUT cloIR_CONSTANT * FieldConstant
 {
     gceSTATUS status;
     clsDECL    decl;
-    cloIR_CONSTANT    fieldConstant;
+    cloIR_CONSTANT    fieldConstant = gcvNULL;
     gctSIZE_T    size, offset;
 
     /* Verify the arguments. */
@@ -8003,22 +8167,46 @@ OUT cloIR_CONSTANT * FieldConstant
                         &decl);
         if (gcmIS_ERROR(status)) break;
 
-        status = cloIR_CONSTANT_Construct(Compiler,
+        status = cloIR_CONSTANT_Allocate(Compiler,
                         Constant->exprBase.base.lineNo,
                         Constant->exprBase.base.stringNo,
                         &decl,
                         &fieldConstant);
         if (gcmIS_ERROR(status)) break;
 
-        size = clsDECL_GetSize(&FieldName->decl);
-        gcmASSERT(size > 0);
+        if(_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES) {
+            if(clmDECL_IsAggregateType(&FieldName->decl)) {
+                offset = clGetFieldByteOffset(Compiler, &Constant->exprBase.decl, FieldName, gcvNULL);
+                gcoOS_MemCopy(fieldConstant->buffer,
+                              Constant->buffer + offset,
+                              clsDECL_GetByteSize(Compiler,
+                                                  &FieldName->decl));
+            }
+            else {
+                cluCONSTANT_VALUE values[cldMAX_VECTOR_COMPONENT];
 
-        offset = clsDECL_GetFieldOffset(&Constant->exprBase.decl, FieldName);
-        status = cloIR_CONSTANT_AddValues(Compiler,
-                        fieldConstant,
-                        size,
-                        Constant->values + offset);
-        if (gcmIS_ERROR(status)) break;
+                size = clsDECL_GetSize(&FieldName->decl);
+                gcmASSERT(size > 0);
+
+                offset = clsDECL_GetFieldOffset(&Constant->exprBase.decl, FieldName);
+                status = clConvFieldConstantToConstantValues(values,
+                                                             &FieldName->decl,
+                                                             Constant->buffer + offset);
+                if (gcmIS_ERROR(status)) break;
+                gcoOS_MemCopy(fieldConstant->values,
+                              values,
+                              (gctSIZE_T)sizeof(cluCONSTANT_VALUE) * size);
+            }
+        }
+        else {
+            size = clsDECL_GetSize(&FieldName->decl);
+            gcmASSERT(size > 0);
+
+            offset = clsDECL_GetFieldOffset(&Constant->exprBase.decl, FieldName);
+            gcoOS_MemCopy(fieldConstant->values,
+                          Constant->values + offset,
+                          (gctSIZE_T)sizeof(cluCONSTANT_VALUE) * size);
+        }
 
         gcmVERIFY_OK(cloIR_OBJECT_Destroy(Compiler, &Constant->exprBase.base));
 
@@ -8026,6 +8214,9 @@ OUT cloIR_CONSTANT * FieldConstant
         return gcvSTATUS_OK;
     } while (gcvFALSE);
 
+    if(fieldConstant) {
+        gcmVERIFY_OK(cloIR_OBJECT_Destroy(Compiler, &fieldConstant->exprBase.base));
+    }
     *FieldConstant = gcvNULL;
     return status;
 }
@@ -8963,7 +9154,20 @@ OUT clsDECL * Decl
                                        &Operand->decl,
                                        Decl);
         if (gcmIS_ERROR(status)) return status;
-        clParseSetOperandAddressed(Compiler, Operand);
+        if(cloIR_OBJECT_GetType(&Operand->base) == clvIR_BINARY_EXPR) {
+            cloIR_BINARY_EXPR binaryExpr = (cloIR_BINARY_EXPR) &Operand->base;
+            if(binaryExpr->type == clvBINARY_SUBSCRIPT &&
+               clmDECL_IsPointerType(&binaryExpr->leftOperand->decl)) {
+               /* expression is of the form P[i] where P is of pointer type and
+                  therefore P need not be set as addressed */
+                ;
+            }
+            else {
+                clParseSetOperandAddressed(Compiler, Operand);
+            }
+        }
+        else clParseSetOperandAddressed(Compiler, Operand);
+
         if(clmDECL_IsArray(Decl)) {
            Decl->ptrDominant = gcvTRUE;
         }

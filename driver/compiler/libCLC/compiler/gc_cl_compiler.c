@@ -18,25 +18,8 @@
 #include "gc_cl_emit_code.h"
 #include "debug/gc_vsc_debug.h"
 
-#define VSC_DI_DEBUG     0
-
 #define _cldFILENAME_MAX 1024
-
-#define clmLockCompiler(Status)  do { \
-    if (CompilerLock == gcvNULL) { \
-           if(CompilerLockRef != gcvNULL) (Status) = gcvSTATUS_INVALID_OBJECT; \
-           else (Status) = gcvSTATUS_OK; \
-    } \
-    else (Status) = gcoOS_AcquireMutex(gcvNULL, CompilerLock, gcvINFINITE); \
-   } while (gcvFALSE)
-
-#define clmUnlockCompiler(Status)  do { \
-    if (CompilerLock == gcvNULL) { \
-           if(CompilerLockRef != gcvNULL) (Status) = gcvSTATUS_INVALID_OBJECT; \
-           else (Status) = gcvSTATUS_OK; \
-    } \
-    else (Status) = gcoOS_ReleaseMutex(gcvNULL, CompilerLock); \
-   } while (gcvFALSE)
+#define _TURN_OFF_OPTIMIZATION_LOOP_UNROLL   0
 
 /* cloCOMPILER object. */
 struct _cloCOMPILER
@@ -118,7 +101,6 @@ clsPOOL_STRING_NODE;
 
 static gcsATOM_PTR  CompilerLockRef = gcvNULL;
 static gctINT32  CompilerLockRefCount = 0;
-static gctPOINTER   CompilerLock = gcvNULL;
 
 gceSTATUS
 cloCOMPILER_Load(void)
@@ -128,11 +110,8 @@ cloCOMPILER_Load(void)
   if(CompilerLockRef) return gcvSTATUS_INVALID_REQUEST;
   else {
      /* Create a new reference counter. */
-     CompilerLock = gcvNULL;
      CompilerLockRefCount = 0;
      gcmONERROR(gcoOS_AtomConstruct(gcvNULL, &CompilerLockRef));
-     /* Create a global lock. */
-     gcmONERROR(gcoOS_CreateMutex(gcvNULL, &CompilerLock));
   }
 OnError:
   return status;
@@ -149,18 +128,14 @@ cloCOMPILER_Unload(void)
      gcmASSERT(CompilerLockRefCount <= 1);
 
      if (CompilerLockRefCount <= 1) {
-       clmLockCompiler(status);
+       status = gcoOS_LockCLFECompiler();
        if(gcmIS_ERROR(status)) return status;
 
      status = clCleanupBuiltins();
      if(gcmIS_ERROR(status)) return status;
 
-       clmUnlockCompiler(status);
+       status = gcoOS_UnLockCLFECompiler();
        if(gcmIS_ERROR(status)) return status;
-
-       /* Delete the global lock */
-       gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, CompilerLock));
-       CompilerLock = gcvNULL;
 
        /* Destroy the reference counter */
        gcmONERROR(gcoOS_AtomDestroy(gcvNULL, CompilerLockRef));
@@ -207,7 +182,7 @@ cloCOMPILER_Construct(
         /* Initialize members */
         compiler->object.type   = clvOBJ_COMPILER;
         compiler->shaderType    = clvSHADER_TYPE_CL;
-        compiler->langVersion   = _cldDefaultLanguageVersion;
+        compiler->langVersion   = cloGetDefaultLanguageVersion();
         compiler->binary        = gcvNULL;
         compiler->log           = gcvNULL;
         compiler->logBufSize    = 0;
@@ -244,13 +219,11 @@ cloCOMPILER_Construct(
 
         patchId = *gcGetPatchId();
 
-#if gcdCOMPILER_DEBUGOUTPUT
-        if (gcmIS_ERROR(vscDIConstructContext(gcvNULL,gcvNULL, &compiler->context.debugInfo)))
+        if (vscDIConstructContext(gcvNULL,gcvNULL, &compiler->context.debugInfo) != gcvSTATUS_OK)
         {
             vscDIDestroyContext(compiler->context.debugInfo);
             compiler->context.debugInfo = gcvNULL;
         }
-#endif
 
         if (patchId == gcvPATCH_OCLCTS)
         {
@@ -290,7 +263,7 @@ cloCOMPILER_Construct(
         }
 
         compiler->context.unnamedSpace->die = compiler->context.debugInfo ?
-                                              compiler->context.debugInfo->cu :
+                                              VSC_DI_SPACE_SKIP_DIE :
                                               VSC_DI_INVALIDE_DIE;
 
         /* Create built-in name space */
@@ -650,9 +623,10 @@ cloCOMPILER_VOutputLog(
     gcmVERIFY_OK(gcoOS_PrintStrVSafe(buffer, gcmSIZEOF(buffer), &offset, Message, Arguments));
 
     buffer[MAX_SINGLE_LOG_LENGTH] = '\0';
-#if gcdCOMPILER_DEBUGOUTPUT
+
+    if (Compiler->context.debugInfo != gcvNULL)
         gcmPRINT("%s", buffer);
-#endif
+
     return cloCOMPILER_AddLog(Compiler, buffer);
 }
 
@@ -1056,6 +1030,7 @@ cloCOMPILER_Compile(
             gctUINT i;
             gctUINT length;
 
+            gcoOS_Print("Compiler Options: %s", Options ? Options : "none");
             for (i = 0; i < StringCount; i++) {
                 offset = 0;
                 theSource = Strings[i];
@@ -1119,6 +1094,16 @@ cloCOMPILER_Compile(
 #if cldSupportMultiKernelFunction
         gcmONERROR(gcSHADER_SetMaxKernelFunctionArgs(Compiler->binary,
                                                      Compiler->context.maxKernelFunctionArgs));
+#endif
+
+        /* turn off unrolling if VIR is used */
+#if _TURN_OFF_OPTIMIZATION_LOOP_UNROLL
+        if(gcGetHWCaps()->hwFeatureFlags.hasHalti2 &&
+           gcmOPT_CLUseVIRCodeGen() &&
+           (!Compiler->context.hasInt64 ||
+            gcmOPT_oclInt64InVIR())) {
+            Compiler->context.optimizationOptions &= ~clvOPTIMIZATION_UNROLL_ITERATION;
+        }
 #endif
 
         /* Generate the code */
@@ -1250,6 +1235,25 @@ IN cloCOMPILER Compiler
     return gcvSTATUS_OK;
 }
 
+gctUINT32
+cloGetDefaultLanguageVersion()
+{
+    gctUINT chipModel = gcGetHWCaps()->chipModel;
+    gctUINT chipRevision = gcGetHWCaps()->chipRevision;
+
+    if(((chipModel == gcv1500 && chipRevision == 0x5246) ||
+        (chipModel == gcv3000 && chipRevision == 0x5450) ||
+        (chipModel == gcv2000 && chipRevision == 0x5108) ||
+        (chipModel == gcv3000 && chipRevision == 0x5513)))
+    {
+        return _cldCL1Dot1;
+    }
+    else
+    {
+        return _cldCL1Dot2;
+    }
+}
+
 gceSTATUS
 cloCOMPILER_Lock(
 IN cloCOMPILER Compiler
@@ -1259,7 +1263,7 @@ IN cloCOMPILER Compiler
 
     /* Verify the arguments. */
     clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
-    clmLockCompiler(status);
+    status = gcoOS_LockCLFECompiler();
     return status;
 }
 
@@ -1272,7 +1276,7 @@ IN cloCOMPILER Compiler
 
     /* Verify the arguments. */
     clmASSERT_OBJECT(Compiler, clvOBJ_COMPILER);
-    clmUnlockCompiler(status);
+    status = gcoOS_UnLockCLFECompiler();
     return status;
 }
 
@@ -1800,9 +1804,8 @@ cloCOMPILER_DumpDIE(
     IN gctUINT16 id
     )
 {
-#if VSC_DI_DEBUG
-    vscDIDumpDIE(Compiler->context.debugInfo, id, 0);
-#endif
+    if (gcmOPT_EnableDebugDump())
+        vscDIDumpDIE(Compiler->context.debugInfo, id, 0, 0xffffffff);
 
     return gcvSTATUS_OK;
 }
@@ -2111,7 +2114,6 @@ cloCOMPILER_MakeCurrent(
     gcmVERIFY_OK(cloCOMPILER_SetCurrentStringNo(CurrentCompiler, 0));
     CurrentCompiler->context.currentCharNo    = 0;
 
-    Compiler->context.basicTypePacked = cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX);
 
     /* Load the built-ins */
     status = cloCOMPILER_LoadBuiltins(Compiler);
@@ -3253,12 +3255,13 @@ cloCOMPILER_SetLanguageVersion(
 )
 {
    gceSTATUS status = gcvSTATUS_OK;
+   gctUINT32 defaultLanguageVersion = cloGetDefaultLanguageVersion();
 
    gcmHEADER_ARG("Compiler=0x%x LangVersion=%s",
                  Compiler, LangVersion);
 
    if (gcmIS_SUCCESS(gcoOS_StrCmp(LangVersion, "CL1.1"))) {
-      if(_cldCL1Dot1 <= _cldDefaultLanguageVersion) {
+      if(_cldCL1Dot1 <= defaultLanguageVersion) {
           Compiler->langVersion = _cldCL1Dot1;
       }
       else {
@@ -3266,7 +3269,7 @@ cloCOMPILER_SetLanguageVersion(
       }
    }
    else if (gcmIS_SUCCESS(gcoOS_StrCmp(LangVersion, "CL1.2"))) {
-      if(_cldCL1Dot2 <= _cldDefaultLanguageVersion) {
+      if(_cldCL1Dot2 <= defaultLanguageVersion) {
           Compiler->langVersion = _cldCL1Dot2;
       }
       else {
@@ -3274,7 +3277,7 @@ cloCOMPILER_SetLanguageVersion(
       }
    }
    else {
-      Compiler->langVersion = _cldDefaultLanguageVersion;
+      Compiler->langVersion = defaultLanguageVersion;
       status = gcvSTATUS_INVALID_DATA;
    }
 
@@ -3289,7 +3292,7 @@ cloCOMPILER_GetLanguageVersion(
     IN cloCOMPILER Compiler
 )
 {
-  return Compiler ? Compiler->langVersion : _cldDefaultLanguageVersion;
+  return Compiler ? Compiler->langVersion : cloGetDefaultLanguageVersion();
 }
 
 void
@@ -3299,7 +3302,7 @@ cloCOMPILER_GetVersion(
     IN OUT gctUINT32 *CompilerVersion
 )
 {
-  gctUINT32 version = _cldDefaultLanguageVersion;
+  gctUINT32 version = cloGetDefaultLanguageVersion();
   gcmASSERT(CompilerVersion);
   if(Compiler) {
      version = Compiler->langVersion;
@@ -3763,6 +3766,22 @@ IN cloCOMPILER Compiler
     return (Compiler->context.debugInfo != gcvNULL);
 }
 
+void
+cloCOMPILER_ChangeUniformDebugInfo(
+    IN cloCOMPILER Compiler,
+    gctUINT tmpStart,
+    gctUINT tmpEnd,
+    gctUINT uniformIdx
+)
+{
+    if (Compiler->context.debugInfo != gcvNULL)
+    {
+        vscDIChangeUniformSWLoc(Compiler->context.debugInfo,
+                                tmpStart,
+                                tmpEnd,
+                                uniformIdx);
+    }
+}
 gctUINT16
 cloCOMPILER_AddDIE(
 IN cloCOMPILER Compiler,
@@ -3771,6 +3790,7 @@ IN gctUINT16 Parent,
 IN gctCONST_STRING Name,
 IN gctUINT FileNo,
 IN gctUINT LineNo,
+IN gctUINT EndLineNo,
 IN gctUINT ColNo
 )
 {
@@ -3786,12 +3806,14 @@ IN gctUINT ColNo
     if (!Compiler->context.mainFile && (Parent == VSC_DI_INVALIDE_DIE))
         return VSC_DI_INVALIDE_DIE;
 
-    FileNo = Compiler->context.mainFile ? 0 : 1;
-    die = vscDIAddDIE(Compiler->context.debugInfo, Tag, Parent, Name, FileNo, LineNo, ColNo);
+    if (Parent == VSC_DI_SPACE_SKIP_DIE)
+        return VSC_DI_INVALIDE_DIE;
 
-#if VSC_DI_DEBUG
-    vscDIDumpDIE(Compiler->context.debugInfo,die, 0);
-#endif
+    FileNo = Compiler->context.mainFile ? 0 : 1;
+    die = vscDIAddDIE(Compiler->context.debugInfo, Tag, Parent, Name, FileNo, LineNo, EndLineNo, ColNo);
+
+    if (gcmOPT_EnableDebugDumpALL())
+        vscDIDumpDIE(Compiler->context.debugInfo,die, 0, 0xffffffff);
 
     return die;
 }
@@ -3801,10 +3823,8 @@ cloCOMPILER_DumpDIETree(
 IN cloCOMPILER Compiler
 )
 {
-#if VSC_DI_DEBUG
-    if (Compiler->context.debugInfo)
-        vscDIDumpDIETree(Compiler->context.debugInfo, Compiler->context.debugInfo->cu);
-#endif
+    if (gcmOPT_EnableDebugDumpALL() && Compiler->context.debugInfo)
+        vscDIDumpDIETree(Compiler->context.debugInfo, Compiler->context.debugInfo->cu, 0xffffffff);
 }
 
 void
@@ -3813,6 +3833,7 @@ IN cloCOMPILER Compiler,
 IN gctUINT16 Id,
 IN gctUINT FileNo,
 IN gctUINT LineNo,
+IN gctUINT EndLineNo,
 IN gctUINT ColNo
 )
 {
@@ -3829,6 +3850,7 @@ IN gctUINT ColNo
 
         die->fileNo = (gctUINT8)FileNo;
         die->lineNo = (gctUINT16)LineNo;
+        die->endLineNo = (gctUINT16) EndLineNo;
         die->colNo = (gctUINT8)ColNo;
     }
 
@@ -3840,7 +3862,8 @@ cloCOMPILER_SetDIELogicalReg(
 IN cloCOMPILER Compiler,
 IN gctUINT16 Id,
 IN gctUINT32 regIndex,
-IN gctUINT num
+IN gctUINT num,
+IN gctUINT mask
 )
 {
     VSC_DIE * die;
@@ -3854,9 +3877,70 @@ IN gctUINT num
         (die->tag == VSC_DI_TAG_PARAMETER))
         )
     {
-        die->u.variable.loc.reg = gcvTRUE;
-        die->u.variable.loc.u.reg.start = (gctUINT16)regIndex;
-        die->u.variable.loc.u.reg.end = (gctUINT16)(regIndex + num -1);
+        VSC_DI_SW_LOC * swLoc, * prevSwLoc;
+        gctUINT16 loc = VSC_DI_INVALID_SW_LOC;
+
+        loc = vscDIAddSWLoc(Compiler->context.debugInfo);
+
+        swLoc = vscDIGetSWLoc(Compiler->context.debugInfo, loc);
+
+        if (swLoc == gcvNULL)
+        {
+            gcmPRINT("%s, invalid swLoc = %d!!!!!!!", __FUNCTION__,die->u.variable.swLoc);
+            return;
+        }
+
+        swLoc->reg = gcvTRUE;
+        swLoc->u.reg.type = VSC_DIE_REG_TYPE_TMP;
+        swLoc->u.reg.start = (gctUINT16)regIndex;
+        swLoc->u.reg.end = (gctUINT16)(regIndex + num -1);
+        swLoc->u.reg.mask = (gctUINT16)mask;
+
+        if (die->u.variable.swLoc == VSC_DI_INVALID_SW_LOC)
+        {
+            die->u.variable.swLoc = loc;
+        }
+        else
+        {
+            prevSwLoc = vscDIGetSWLoc(Compiler->context.debugInfo, die->u.variable.swLoc);
+
+            while (prevSwLoc->next != VSC_DI_INVALID_SW_LOC)
+            {
+                prevSwLoc = vscDIGetSWLoc(Compiler->context.debugInfo, prevSwLoc->next);
+            }
+            prevSwLoc->next = loc;
+        }
+
+        if (gcmOPT_EnableDebugDumpALL())
+        {
+            gcmPRINT("set swLoc[%d] reg[%d,%d]", swLoc->id, regIndex, regIndex + num -1);
+            vscDIDumpDIE(Compiler->context.debugInfo, die->id, 0, (1 << VSC_DI_TAG_VARIABE)|(1 << VSC_DI_TAG_PARAMETER));
+        }
+    }
+}
+
+void
+cloCOMPILER_SetStructDIELogicalReg(
+IN cloCOMPILER Compiler,
+IN gctUINT16 ParentId,
+IN gctCONST_STRING Symbol,
+IN gctUINT32 regIndex,
+IN gctUINT num,
+IN gctUINT mask
+)
+{
+    VSC_DIE * die;
+
+    if (Compiler->context.debugInfo == gcvNULL)  return;
+
+    die = vscDIGetDIE(Compiler->context.debugInfo, vscDIAddDIE(Compiler->context.debugInfo, VSC_DI_TAG_VARIABE, ParentId, Symbol, 0, 0, 0, 0));
+
+    cloCOMPILER_SetDIELogicalReg(Compiler, die->id, regIndex, num, mask);
+
+    /* set the member of structure to primitive */
+    if (die->tag == VSC_DI_TAG_VARIABE)
+    {
+        die->u.variable.type.primitiveType = gcvTRUE;
     }
 }
 
@@ -3922,6 +4006,11 @@ IN clsNAME * Variable
 
         if (!Compiler->context.mainFile &&
             Variable->mySpace->die == VSC_DI_INVALIDE_DIE)
+        {
+            gen = gcvFALSE;
+        }
+
+        if (Variable->mySpace->die == VSC_DI_SPACE_SKIP_DIE)
         {
             gen = gcvFALSE;
         }
@@ -4028,6 +4117,7 @@ IN clsNAME * Variable
                               (Compiler->context.mainFile ? 0 : 1),
                               /*Variable->fileNo,*/
                               Variable->lineNo,
+                              Variable->lineNo,
                               Variable->stringNo
                               );
 
@@ -4056,9 +4146,8 @@ IN clsNAME * Variable
         }
     }
 
-#if VSC_DI_DEBUG
-        vscDIDumpDIE(Compiler->context.debugInfo,die, 0);
-#endif
+    if (gcmOPT_EnableDebugDumpALL())
+        vscDIDumpDIE(Compiler->context.debugInfo,die, 0, 0xffffffff);
 
     return die;
 }

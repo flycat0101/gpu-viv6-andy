@@ -18,6 +18,9 @@
 */
 
 #include "gc_hal_user_precomp.h"
+#if defined(__QNXNTO__)
+#include <sys/mman.h>
+#endif
 
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcvZONE_HAL
@@ -246,7 +249,7 @@ _FillInOptions(
     IN gcoHAL Hal
     )
 {
-    gctSTRING fboScheme = gcvNULL;
+    gctSTRING envctrl = gcvNULL;
 
     gcoOS_ZeroMemory(gcOptions, sizeof(gcOptions[0]) * gcvOPTION_COUNT);
     gcOptions[gcvOPTION_PREFER_ZCONVERT_BYPASS] = gcvTRUE;
@@ -255,28 +258,40 @@ _FillInOptions(
     gcOptions[gcvOPTION_PREFER_TPG_TRIVIALMODEL] = gcvFALSE;
     gcOptions[gcvOPTION_PREFER_RA_DEPTH_WRITE] = gcvTRUE;
     gcOptions[gcvOPTION_PREFER_USC_RECONFIG] = gcvFALSE;
+    gcOptions[gcvOPTION_PREFER_DISALBE_HZ] = gcvFALSE;
 
 
     gcOptions[gcvOPTION_KERNEL_FENCE] = gcvFALSE;
     gcOptions[gcvOPTION_ASYNC_PIPE] = gcvFALSE;
     gcOptions[gcvOPTION_GPU_TEX_UPLOAD] = gcvTRUE;
     gcOptions[gcvOPTION_GPU_BUFOBJ_UPLOAD] = gcvTRUE;
-
-
+    gcOptions[gcvOPTION_OCL_IN_THREAD] = gcvTRUE;
+    gcOptions[gcvOPTION_OCL_ASYNC_BLT] = gcvFALSE;
     gcOptions[gcvOPTION_FBO_PREFER_MEM] = gcvFALSE;
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_FBO_PREFER_MEM", &fboScheme)) && fboScheme)
+
+
+    /* overwrite option with environment settings here. */
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_FBO_PREFER_MEM", &envctrl)) && envctrl)
     {
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(fboScheme, "1")))
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
         {
             gcOptions[gcvOPTION_FBO_PREFER_MEM] = gcvTRUE;
         }
     }
 
-    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_FBO_PREFER_TILED", &fboScheme)) && fboScheme)
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_FBO_PREFER_TILED", &envctrl)) && envctrl)
     {
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(fboScheme, "1")))
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
         {
             gcOptions[gcvOPTION_PREFER_TILED_DISPLAY_BUFFER] = gcvTRUE;
+        }
+    }
+
+    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL, "VIV_DISABLE_HZ", &envctrl)) && envctrl)
+    {
+        if (gcmIS_SUCCESS(gcoOS_StrCmp(envctrl, "1")))
+        {
+            gcOptions[gcvOPTION_PREFER_DISALBE_HZ] = gcvTRUE;
         }
     }
 
@@ -890,6 +905,7 @@ gcoHAL_ScheduleUnmapMemory(
 
     /* Schedule an event to unmap the user memory. */
     iface.command                = gcvHAL_UNMAP_MEMORY;
+    iface.engine                 = gcvENGINE_RENDER;
     iface.u.UnmapMemory.bytes    = NumberOfBytes;
     iface.u.UnmapMemory.physical = gcmPTR2INT32(Physical);
     iface.u.UnmapMemory.logical  = gcmPTR_TO_UINT64(Logical);
@@ -1143,6 +1159,7 @@ gcoHAL_ScheduleUnmapUserMemory(
 
     /* Schedule an event to unmap the user memory. */
     iface.command = gcvHAL_UNMAP_USER_MEMORY;
+    iface.engine             = gcvENGINE_RENDER;
     iface.u.UnmapUserMemory.info    = gcmPTR2INT32(Info);
     iface.u.UnmapUserMemory.size    = Size;
     iface.u.UnmapUserMemory.address = Address;
@@ -1200,7 +1217,7 @@ gcoHAL_SendFence(
 
         if (fenceEnable)
         {
-            gcmVERIFY_OK(gcoHARDWARE_SendFence(gcvNULL, gcvFALSE, gcvNULL));
+            gcmVERIFY_OK(gcoHARDWARE_SendFence(gcvNULL, gcvTRUE, gcvENGINE_RENDER, gcvNULL));
         }
     }
 
@@ -1265,9 +1282,11 @@ gcoHAL_Commit(
 
         gcoHARDWARE_GetFenceEnabled(gcvNULL, &fenceEnable);
 
-        if (fenceEnable)
+        /*only send rlv fence here before commit as hw fence will be send when commit*/
+        if (fenceEnable && !gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE_32BIT)
+            && !gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE_64BIT))
         {
-            gcoHARDWARE_SendFence(gcvNULL, gcvTRUE, gcvNULL);
+            gcoHARDWARE_SendFence(gcvNULL, gcvTRUE, gcvENGINE_RENDER, gcvNULL);
         }
     }
 #endif
@@ -1960,6 +1979,7 @@ gcoHAL_SetTimer(
 
     /* Call kernel API to map the memory. */
     iface.command             = gcvHAL_TIMESTAMP;
+    iface.engine              = gcvENGINE_RENDER;
     iface.u.TimeStamp.timer   = Timer;
     iface.u.TimeStamp.request = Start;
     gcmONERROR(gcoHAL_ScheduleEvent(gcvNULL, &iface));
@@ -2352,191 +2372,6 @@ OnError:
 #else
     return gcvSTATUS_NOT_SUPPORTED;
 #endif
-}
-
-/*******************************************************************************
- *  Generic record allocation using preallocated containers.
- ******************************************************************************/
-
-gceSTATUS
-gcsCONTAINER_Construct(
-    IN gcsCONTAINER_PTR Container,
-    gctUINT RecordsPerContainer,
-    gctUINT RecordSize
-    )
-{
-    gcmHEADER_ARG("Container=0x%x RecordsPerContainer=%d RecordSize=%d",
-        Container, RecordsPerContainer, RecordSize);
-
-    gcmDEBUG_VERIFY_ARGUMENT(Container           != gcvNULL);
-    gcmDEBUG_VERIFY_ARGUMENT(RecordsPerContainer != 0);
-    gcmDEBUG_VERIFY_ARGUMENT(RecordSize          != 0);
-
-    RecordSize += gcmSIZEOF(gcsCONTAINER_RECORD);
-
-    Container->containerSize
-        = gcmSIZEOF(gcsCONTAINER_LINK)
-        + RecordSize * RecordsPerContainer;
-
-    Container->recordSize  = RecordSize;
-    Container->recordCount = RecordsPerContainer;
-
-    Container->containers = gcvNULL;
-
-    Container->freeList.next  = &Container->freeList;
-    Container->freeList.prev  = &Container->freeList;
-    Container->allocList.next = &Container->allocList;
-    Container->allocList.prev = &Container->allocList;
-
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS
-gcsCONTAINER_Destroy(
-    IN gcsCONTAINER_PTR Container
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcsCONTAINER_LINK_PTR container;
-
-    gcmHEADER_ARG("Container=0x%x", Container);
-    gcmDEBUG_VERIFY_ARGUMENT(Container != gcvNULL);
-
-    while (Container->containers != gcvNULL)
-    {
-        /* Get the current container. */
-        container = Container->containers;
-
-        /* Remove it from the list. */
-        Container->containers = container->next;
-
-        /* Free the current container. */
-        gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, container));
-    }
-
-    Container->containerSize = 0;
-    Container->recordSize    = 0;
-    Container->recordCount   = 0;
-
-    Container->freeList.next  = &Container->freeList;
-    Container->freeList.prev  = &Container->freeList;
-    Container->allocList.next = &Container->allocList;
-    Container->allocList.prev = &Container->allocList;
-
-OnError:
-    gcmFOOTER();
-    return status;
-}
-
-gceSTATUS
-gcsCONTAINER_AllocateRecord(
-    IN gcsCONTAINER_PTR Container,
-    OUT gctPOINTER * Record
-    )
-{
-    gceSTATUS status;
-    gcsCONTAINER_RECORD_PTR currRecord;
-    gcsCONTAINER_LINK_PTR container;
-    gctUINT i;
-
-    /* Are there free nodes available? */
-    if (Container->freeList.next == &Container->freeList)
-    {
-        /* No, allocate an array of nodes. */
-        gcmONERROR(gcoOS_Allocate(
-            gcvNULL, Container->containerSize, (gctPOINTER *) &container
-            ));
-
-        /* Add to the list of containers. */
-        container->next = Container->containers;
-        Container->containers = container;
-
-        /* Determine the pointer to the first layer item. */
-        currRecord = (gcsCONTAINER_RECORD_PTR) (container + 1);
-
-        /* Initialize free list. */
-        for (i = 0; i < Container->recordCount; i += 1)
-        {
-            currRecord->prev = Container->freeList.prev;
-            currRecord->next = &Container->freeList;
-            Container->freeList.prev->next = currRecord;
-            Container->freeList.prev       = currRecord;
-
-            currRecord = (gcsCONTAINER_RECORD_PTR)
-                ((gctUINT8_PTR) currRecord + Container->recordSize);
-        }
-    }
-
-    /* Get the first free record. */
-    currRecord = Container->freeList.next;
-
-    /* Remove the record from free list. */
-    currRecord->prev->next = currRecord->next;
-    currRecord->next->prev = currRecord->prev;
-
-    /* Add to allocated list. */
-    currRecord->prev = &Container->allocList;
-    currRecord->next = Container->allocList.next;
-    Container->allocList.next->prev = currRecord;
-    Container->allocList.next       = currRecord;
-
-    /* Set return pointer. */
-    * Record = currRecord + 1;
-
-    /* Success. */
-    return gcvSTATUS_OK;
-
-    /* Return error. */
-OnError:
-    return status;
-}
-
-gceSTATUS
-gcsCONTAINER_FreeRecord(
-    IN gcsCONTAINER_PTR Container,
-    IN gctPOINTER Record
-    )
-{
-    gcsCONTAINER_RECORD_PTR currRecord;
-
-    /* Get the record pointer */
-    currRecord = (gcsCONTAINER_RECORD_PTR) Record - 1;
-
-    /* Remove from allocated list. */
-    currRecord->prev->next = currRecord->next;
-    currRecord->next->prev = currRecord->prev;
-
-    /* Add to free list. */
-    currRecord->prev = &Container->freeList;
-    currRecord->next = Container->freeList.next;
-    Container->freeList.next->prev = currRecord;
-    Container->freeList.next       = currRecord;
-
-    /* Success. */
-    return gcvSTATUS_OK;
-}
-
-gceSTATUS
-gcsCONTAINER_FreeAll(
-    IN gcsCONTAINER_PTR Container
-    )
-{
-    if (Container->allocList.next != &Container->allocList)
-    {
-        /* Move the entire allocated list to free list. */
-        Container->allocList.prev->next = Container->freeList.next;
-        Container->freeList.next->prev = Container->allocList.prev;
-        Container->allocList.next->prev = &Container->freeList;
-        Container->freeList.next = Container->allocList.next;
-
-        /* Reset allocated list. */
-        Container->allocList.prev = &Container->allocList;
-        Container->allocList.next = &Container->allocList;
-    }
-
-    /* Success. */
-    return gcvSTATUS_OK;
 }
 
 gceSTATUS
@@ -3004,6 +2839,7 @@ gceSTATUS
 gcoHAL_LockVideoMemory(
     IN gctUINT32 Node,
     IN gctBOOL Cacheable,
+    IN gceENGINE engine,
     OUT gctUINT32 * Physical,
     OUT gctPOINTER * Logical
     )
@@ -3016,14 +2852,39 @@ gcoHAL_LockVideoMemory(
     /* Verify the arguments. */
     gcmVERIFY_ARGUMENT(Node != 0);
 
-    /* Fill in the kernel call structure. */
-    iface.engine = gcvENGINE_RENDER;
-    iface.command = gcvHAL_LOCK_VIDEO_MEMORY;
-    iface.u.LockVideoMemory.node = Node;
-    iface.u.LockVideoMemory.cacheable = Cacheable;
+    if (engine == gcvENGINE_RENDER)
+    {
+        /* Fill in the kernel call structure. */
+        iface.engine = gcvENGINE_RENDER;
+        iface.command = gcvHAL_LOCK_VIDEO_MEMORY;
+        iface.u.LockVideoMemory.node = Node;
+        iface.u.LockVideoMemory.cacheable = Cacheable;
 
-    /* Call the kernel. */
-    gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+        /* Call the kernel. */
+        gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+    }
+    else if (engine == gcvENGINE_BLT)
+    {
+        if (gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT))
+        {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+
+        /* Fill in the kernel call structure. */
+        iface.engine = gcvENGINE_BLT;
+        iface.command = gcvHAL_LOCK_VIDEO_MEMORY;
+        iface.u.LockVideoMemory.node = Node;
+        iface.u.LockVideoMemory.cacheable = Cacheable;
+
+        /* Call the kernel. */
+        gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+    }
+    else
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+        gcmFOOTER();
+        return status;
+    }
 
     if (Physical)
     {
@@ -3050,22 +2911,48 @@ OnError:
 gceSTATUS
 gcoHAL_UnlockVideoMemory(
     IN gctUINT32 Node,
-    IN gceSURF_TYPE Type
+    IN gceSURF_TYPE Type,
+    IN gceENGINE engine
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcsHAL_INTERFACE iface;
+
     gcmHEADER_ARG("Node=0x%x", Node);
 
-    iface.engine = gcvENGINE_RENDER;
-    iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
-    iface.u.UnlockVideoMemory.node = Node;
-    iface.u.UnlockVideoMemory.type = Type;
+    if (engine == gcvENGINE_RENDER)
+    {
+        iface.engine = gcvENGINE_RENDER;
+        iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
+        iface.u.UnlockVideoMemory.node = Node;
+        iface.u.UnlockVideoMemory.type = Type;
 
-    gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+        gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
 
-    /* Schedule an event for the unlock. */
-    gcmONERROR(gcoHARDWARE_CallEvent(gcvNULL, &iface));
+        /* Schedule an event for the unlock. Always goto render pipe for now */
+        gcmONERROR(gcoHARDWARE_CallEvent(gcvNULL, &iface));
+    }
+    else if (engine == gcvENGINE_BLT)
+    {
+        if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_BLIT) != gcvSTATUS_TRUE)
+        {
+            gcmONERROR(gcvSTATUS_INVALID_ARGUMENT);
+        }
+
+        iface.engine = gcvENGINE_BLT;
+        iface.command = gcvHAL_UNLOCK_VIDEO_MEMORY;
+        iface.u.UnlockVideoMemory.node = Node;
+        iface.u.UnlockVideoMemory.type = Type;
+
+        gcmONERROR(gcoHAL_Call(gcvNULL, &iface));
+
+        /* Schedule an event for the unlock. Always goto render pipe for now */
+        gcmONERROR(gcoHARDWARE_CallEvent(gcvNULL, &iface));
+    }
+    else
+    {
+        status = gcvSTATUS_INVALID_ARGUMENT;
+    }
 
 OnError:
     /* Return status. */
@@ -3205,10 +3092,18 @@ gcoHAL_WrapUserMemory(
 {
     gceSTATUS status;
     gcsHAL_INTERFACE iface;
+#if defined(__QNXNTO__)
+    gctPOINTER lock_addr = gcmINT2PTR(gcmPTR2INT(UserMemoryDesc->logical) & ~(__PAGESIZE - 1));    /* Get the address aligned to pagesize */
+    size_t lock_size = (gcmPTR2INT(UserMemoryDesc->logical) & (__PAGESIZE - 1)) + UserMemoryDesc->size;        /* Get the size to lock (from the address + size */
+#endif
 
     gcmHEADER_ARG("UserMemoryDesc=%d", UserMemoryDesc);
 
     iface.command = gcvHAL_WRAP_USER_MEMORY;
+
+#if defined(__QNXNTO__)
+    mlock(lock_addr, lock_size);
+#endif
 
     gcoOS_MemCopy(&iface.u.WrapUserMemory.desc, UserMemoryDesc, gcmSIZEOF(gcsUSER_MEMORY_DESC));
 
@@ -3405,7 +3300,7 @@ gcoHAL_AttachExternalMemory(
     gcmONERROR(gcoHAL_WrapUserMemory(&desc, &info->node));
 
     /* Lock and get hardware address. */
-    gcmONERROR(gcoHAL_LockVideoMemory(info->node, gcvFALSE, GPU2DAddress, gcvNULL));
+    gcmONERROR(gcoHAL_LockVideoMemory(info->node, gcvFALSE, gcvENGINE_RENDER, GPU2DAddress, gcvNULL));
 
     *Handle = info;
 
@@ -3436,7 +3331,7 @@ gcoHAL_DetachExternalMemory(
 
     if (info->node)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(info->node, gcvSURF_BITMAP));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(info->node, gcvSURF_BITMAP, gcvENGINE_RENDER));
 
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(info->node));
     }
@@ -3460,6 +3355,7 @@ gcoHAL_ScheduleSignal(
     gcsHAL_INTERFACE iface;
 
     iface.command             = gcvHAL_SIGNAL;
+    iface.engine              = gcvENGINE_RENDER;
     iface.u.Signal.signal     = gcmPTR_TO_UINT64(Signal);
     iface.u.Signal.auxSignal  = gcmPTR_TO_UINT64(AuxSignal);
     iface.u.Signal.process    = ProcessID;

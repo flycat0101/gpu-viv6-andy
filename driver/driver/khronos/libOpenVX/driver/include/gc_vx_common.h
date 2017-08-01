@@ -35,6 +35,8 @@
 
 #include <VX/vx.h>
 #include <VX/vx_khr_tiling.h>
+#include <VX/vx_compatibility.h>
+
 #if defined(OPENVX_USE_NODE_MEMORY)
 #include <VX/vx_khr_node_memory.h>
 #endif
@@ -56,11 +58,12 @@
 
 #include <VX/vx_ext_program.h>
 #include <VX/vx_viv_cnn.h>
+#include <VX/vx_khr_cnn.h>
 
 #include "gc_vxk_common.h"
 
 #include <gc_vx_profiler.h>
-
+#include <gc_vx_layer.h>
 /*
 ** Macro definitions
 */
@@ -99,27 +102,30 @@
 
 #define NN_MULTI_THREAD     1
 #define NN_MULTI_THREAD2    1
-#define NN_PERF_ZRL         1
 #define NN_WSZIE_REG        0   /* to match old register. 05/18 FPGA result is not stable without this */
 #define NN_LAYER_FLUSH      1
-#define NN_POOLING          1
-#define USE_GPU_RESHUFFLE   0
-#define ALL_LAYERS          1
-#define CURR_LAYER          1
-#define NUM_LAYERS          9
-#define ENABLE_COMPRESSION  1
 #define ENABLE_LRN_LAYER    0
 #define ENABLE_COV_BATCH    1
 #define VX_C_MEMORY_MANAGE  1
 
 #define NN_TP_ENGINE        0
-#define NN_TP_NEW_ROI       1
-
 #define VX_SHADER_TP        1
 
-#define VX_NN_SH_PARALLEL   0
+#define VX_NN_SH_PARALLEL   1
 
+#define VX_NN_FC_ACCEL      0
+
+#define NN_LAYER_C          0
+
+#define ENABLE_SPLIT_WB     1
+
+
+#define NN_INTEGER_BIAS_BITS                27
+#define NN_INTEGER_BIAS_BITS_VIP_V7         32
 #define NN_Z_POSITION_OFFSET_BITS           24
+#define NN_Z_POSITION_OFFSET_BITS_VIP_V7    32
+
+#define CONST_FILTER_PERCORE                0
 
 #define VX_PRIVATE_API                      static
 #define VX_INTERNAL_API
@@ -142,23 +148,22 @@
 #define VX_REF_SIGNATURE_RELEASED           0xDEADDEAD
 
 #define VX_MAX_PATH                         1024
-#define VX_MAX_REF_COUNT                    1024
-#define VX_MAX_NODE_COUNT                   VX_MAX_REF_COUNT
+#define VX_MAX_REF_COUNT                    4096
+#define VX_MAX_NODE_COUNT                   1024
 #define VX_MAX_MODULE_COUNT                 16
 #define VX_MAX_TARGET_COUNT                 1
 #define VX_MAX_KERNEL_COUNT                 1024
 #define VX_MAX_USER_STRUCT_COUNT            1024
 #define VX_MAX_CONVOLUTION_DIM              15
+#define VX_INT_MAX_NONLINEAR_DIM            9
 #define VX_MAX_OPTICAL_FLOW_WINDOW_DIM      9
 #define VX_MAX_PARAMETERS                   15
 #define VX_MAX_NODES_IN_GRAPH               VX_MAX_NODE_COUNT
 #define VX_MAX_PLANES                       4
 
-
 #define VX_HOST_CORE_COUNT                  1
 #define VX_MAX_DEVICES                      4
-
-
+#define VX_MAX_PRINTF_BUFFER_SIZE           (1024*1024)
 
 /* Function macros */
 #ifndef vxmLENGTH_OF
@@ -177,9 +182,18 @@
         ((size) == sizeof(type) && ((vx_size)(ptr) & (align)) == 0)
 
 #define vxmVALIDATE_PARAMETERS(ptr, size, type, align) \
+    vxmVALIDATE_PARAMETER(ptr, size, type, 1, align)
+#define vxmVALIDATE_PARAMETER(ptr, size, type, num, align) \
         do \
         { \
-            if ((size) != sizeof(type) || ((vx_size)(ptr) & (align)) != 0) return VX_ERROR_INVALID_PARAMETERS; \
+            if ((size) != sizeof(type) * (num) || ((vx_size)(ptr) & (align)) != 0) return VX_ERROR_INVALID_PARAMETERS; \
+        } \
+        while (vx_false_e)
+
+#define vxmVALIDATE_PARAMETERS_EX(ptr, size, type) \
+        do \
+        { \
+            if ((size) != sizeof(type) || (vx_size)(ptr) == 0) return VX_ERROR_INVALID_PARAMETERS; \
         } \
         while (vx_false_e)
 
@@ -333,7 +347,6 @@ enum vx_kernel_internal_e
     VX_KERNEL_INTERNAL_FASTERRCNN_WAIT             = VX_KERNEL_BASE(VX_ID_VIVANTE, VX_LIBRARY_KHR_INTERNAL) + 0x2F,
 };
 
-
 enum _vx_extra_df_image
 {
     VX_DF_IMAGE_F32 = VX_DF_IMAGE('F','0','3','2'),
@@ -363,7 +376,7 @@ typedef gctHANDLE                           vx_symbol_handle;
 
 #define VX_NULL_MODULE_HANDLE               ((vx_module_handle)VX_NULL)
 
-#define VX_DEFAULT_TARGET_NAME              "vivante"
+#define VX_DEFAULT_TARGET_NAME              "vivante.any"
 
 typedef struct _vx_value_set_s
 {
@@ -487,6 +500,8 @@ typedef struct _vx_reference
     vx_bool                                 isVirtual;
     vx_bool                                 accessible;
 
+    vx_char                                 name[VX_MAX_REFERENCE_NAME];
+
     vx_delay                                delay;
     vx_int32                                delayIndex;
 
@@ -578,9 +593,29 @@ typedef struct _vx_parameter
 }
 vx_parameter_s;
 
+enum vx_kernel_invalid_e
+{
+    VX_KERNEL_INVALID = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE)
+};
+
 #if gcdVX_OPTIMIZER
 typedef struct _vx_kernel_optimization_attribute_s
 {
+    vx_bool                                 hwModule;
+    vx_uint8                                moduleClass;
+    vx_uint32                               outputSize;
+    vx_uint32                               outputStride;
+    vx_uint32                               inputSize;
+    vx_uint32                               inputStride;
+    vx_uint32                               inputOffset;
+    vx_uint32                               tileWalkingPattern;
+    vx_uint32                               bufferAttribute;
+
+    vx_uint32                               outputTileSize;
+    vx_uint32                               outputTileStride;
+    vx_uint32                               inputTileSize;
+    vx_uint32                               inputTileStride;
+
     vx_bool                                 oneKernelModule;
     vx_bool                                 tileOptimizable;
     vx_uint32                               dim;
@@ -601,7 +636,7 @@ typedef struct _vx_kernel_attribute_s
     vx_size                                 globalDataSize;
     vx_ptr                                  globalDataPtr;
 
-    vx_border_mode_t                        borderMode;
+    vx_border_t                             borderMode;
 
     vx_bool                                 isAllGPU;
 
@@ -625,6 +660,8 @@ typedef struct _vx_kernel_attribute_s
     /* User-input attributes. */
     vx_kernel_optimization_attribute_s      optAttributes;
 #endif
+
+    vx_bool                                 validRectReset;
 }
 vx_kernel_attribute_s;
 
@@ -643,8 +680,8 @@ vx_cnn_net_name_e;
 typedef struct _vx_cnn_kernelStreamInfo
 {
     /* parameters from input */
-    vx_float32 *orgWeightData;
-    vx_float32 *orgBiasData;
+    const vx_float32 *orgWeightData;
+    const vx_float32 *orgBiasData;
     vx_uint32 orgWeightWidth;
     vx_uint32 orgWeightHeight;
     vx_uint32 orgWeightDepth;
@@ -679,13 +716,34 @@ typedef struct _vx_cnn_kernelStreamInfo
     vx_uint32 strideX;
     vx_uint32 strideY;
     vx_uint32 outItemCount;
+    vx_uint32 roundingMode;
     viv_nn_non_linear_func_e nonlinearFunc;
-    viv_nn_pooling_type_e    poolingType;
-    unsigned int             poolingSize;
-    unsigned int             poolingStride;
+    vx_uint32 inImageBitWidth;
+    vx_uint32 outImageBitWidth;
+    vx_uint32 weightBitWidth;
+    vx_int32  inImageFractionLength;
+    vx_int32  outImageFractionLength;
+    vx_int32  weightFractionLength;
+    vx_uint32 postMultiplier;
+    vx_uint32 postShift;
+    vx_uint8  kernelDataType;
+    vx_uint8  inImageDataType;
+    vx_uint8  outImageDataType;
+#if ENABLE_LRN_LAYER
+    viv_nn_norm_type_e      lrnType;
+    unsigned int            lrnKernelSize;
+    float                   lrnAlpha;
+    float                   lrnBeta;
+#endif
+    viv_nn_pooling_type_e   poolingType;
+    unsigned int            poolingSize;
+    unsigned int            poolingStride;
     vx_uint8 zeroRunLen;
     vx_uint8 zeroRunLen2;
     unsigned int layerType;
+#if VX_NN_FC_ACCEL
+    void *tranposedWeightBiasData;
+#endif
 }
 vx_cnn_kernelStreamInfo_s;
 
@@ -711,6 +769,7 @@ typedef struct _vx_cnn_attributes_s
     vx_cnn_networkDataInfo_s                networkDataInfo;
     vx_uint32                               batchLevelIndex;
     vx_cnn_net_name_e                       netFlag;
+    unsigned int                            layerType[20];
 }
 vx_cnn_attributes_s;
 
@@ -774,6 +833,14 @@ typedef struct _vx_tp_coomandInfo_s
     vx_uint32 outLoop3Count;
     vx_uint32 outLoop4Count;
     vx_uint32 outLoop5Count;
+    vx_uint32 inImageDataType;
+    vx_uint32 outImageDataType;
+    vx_uint32 kernelDataType;
+    vx_uint32 aluFilterPwlSwap;
+    vx_uint32 aluPwlSignSupport;
+    vx_uint32 aluReluEnable;
+    vx_uint32 floatRoundingMode;
+    vx_uint32 integeroundingMode;
 }
 vx_tp_coomandInfo_s;
 
@@ -838,11 +905,11 @@ typedef struct _vx_program
     gctSTRING                               buildOptions;
     gctSTRING                               buildLog;
     vx_build_status                         buildStatus;
+    gctBOOL                                 linked;
 }
 vx_program_s;
 
 typedef vx_program *                        vx_program_ptr;
-
 
 typedef struct _vx_mem
 {
@@ -890,7 +957,7 @@ typedef vx_mem_alloc_info_s *               vx_mem_alloc_info;
 typedef struct _vx_argument
 {
     gcUNIFORM               uniform;
-    size_t                  size;
+    gctUINT32               size;
     gctPOINTER              data;
     gctBOOL                 set;
     gctBOOL                 isMemAlloc;
@@ -900,7 +967,6 @@ typedef struct _vx_argument
 vx_argument_s;
 
 typedef vx_argument_s *                     vx_argument;
-
 
 typedef struct _vx_shader_states
 {
@@ -913,7 +979,7 @@ typedef struct _vx_shader_states
 }
 vx_shader_states_s;
 
-typedef struct _vx_kernel_shader
+typedef struct _vx_shader_s
 {
     gctSTRING               name;
     size_t                  maxWorkGroupSize;
@@ -933,12 +999,11 @@ typedef struct _vx_kernel_shader
     vx_shader_states_s      states;
     gctUINT                 attributeCount;
 
+
 }
-vx_kernel_shader_s;
+vx_shader_s;
 
-typedef vx_kernel_shader_s *                vx_kernel_shader;
-
-typedef vx_kernel_shader *                  vx_kernel_shader_ptr;
+typedef vx_shader_s *                vx_shader;
 
 typedef struct _vx_kernel
 {
@@ -952,13 +1017,19 @@ typedef struct _vx_kernel
 
     vx_kernel_f                             function;
 
-    vx_kernel_shader                        *kernelShader;
+    vx_shader                               *kernelShader;
     vx_uint32                               kernelShaderCount;
+    vx_uint32                               currShaderID;
+
     vx_char                                 subname[VX_MAX_KERNEL_NAME];
 
     vx_signature_s                          signature;
 
     vx_bool                                 enabled;
+
+    vx_bool                                 isUserkernel;
+
+    vx_kernel_validate_f                    validateFunction;
 
     vx_kernel_input_validate_f              inputValidateFunction;
 
@@ -1004,7 +1075,7 @@ typedef vx_status (* vx_target_iskernelsupported_f) (
 typedef vx_kernel (*vx_target_addkernel_f)          (
         vx_target target, const vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration,
         vx_program program, vx_kernel_f funcPtr, vx_uint32 paramCount,
-        vx_kernel_input_validate_f inputValidator, vx_kernel_output_validate_f outputValidator,
+        vx_kernel_validate_f validate, vx_kernel_input_validate_f inputValidator, vx_kernel_output_validate_f outputValidator,
         vx_kernel_initialize_f initializer, vx_kernel_deinitialize_f deinitializer);
 
 typedef vx_kernel (* vx_target_addtilingkernel_f)   (
@@ -1078,6 +1149,40 @@ typedef struct _vx_user_struct
 }
 vx_user_struct_s;
 
+typedef union _vx_memory_map_extra_s
+{
+    struct
+    {
+        vx_rectangle_t rect;
+        vx_uint32 plane_index;
+    } image_data;
+
+    struct
+    {
+        vx_size start;
+        vx_size end;
+    } array_data;
+
+} vx_memory_map_extra_s;
+
+typedef struct _vx_memory_map_s
+{
+    vx_bool used;
+
+    vx_reference ref;
+
+    vx_memory_map_extra_s extra;
+
+    vx_enum usage;
+
+    vx_enum mem_type;
+
+    vx_uint32 flags;
+
+    void* logical;
+
+} vx_memory_map_s;
+
 typedef struct _vx_context
 {
     vx_reference_s                          base;
@@ -1104,6 +1209,9 @@ typedef struct _vx_context
 
     vx_accessor_s                           accessorTable[VX_MAX_REF_COUNT];
 
+    vx_mutex                                memoryMapsLock;
+    vx_memory_map_s                         memoryMaps[VX_MAX_REF_COUNT];
+
     vx_user_struct_s                        userStructTable[VX_MAX_USER_STRUCT_COUNT];
 
 #if (NN_MULTI_THREAD || NN_MULTI_THREAD2)
@@ -1116,7 +1224,16 @@ typedef struct _vx_context
     vx_threadpool                           threadPool;
 #endif
 
-    vx_border_mode_t                        immediateBorderMode;
+    vx_uint32                               NextDynamicUserKernelID;
+
+    vx_uint32                               NextDynamicUserLibraryID;
+
+    vx_border_t                                immediateBorderMode;
+    vx_enum                                 immediateBorderModePolicy;
+
+    vx_enum                                 immediateTargetEnum;
+
+    vx_char                                 immediateTargetString[VX_MAX_TARGET_NAME];
 
     vx_evis_no_inst_s                       evisNoInst;
 
@@ -1135,6 +1252,15 @@ typedef struct _vx_context
     vx_nn_config                            nnConfig;
 
     vx_uint32                               cnnAvailableEventID;
+
+    vxnne_kernel_shaders_s                  kernels[VXNNE_KERNEL_COUNT];
+
+    /* gcCompileKernel */
+    gctCLCompiler                           compileKernel;
+    gctHANDLE                               libCLC;
+    gceSTATUS                               (*loadCompiler)(IN gcsHWCaps *HWCaps, IN gcePATCH_ID PatchId);
+    gceSTATUS                               (*unloadCompiler)(void);
+
 
 }
 vx_context_s;
@@ -1186,6 +1312,7 @@ typedef struct _vx_node
 
     vx_bool                                 executed;
 
+
     vx_kernel_attribute_s                   kernelAttributes;
 
     vx_uint32                               targetIndex;
@@ -1219,6 +1346,19 @@ typedef struct _vx_node
     vx_uint32                               cnnTriggerEventID;
     vx_uint32                               cnnWaitEventID0;
     vx_uint32                               cnnWaitEventID1;
+
+    vxnne_layer                             layer;
+
+    vx_uniform                              uniforms;
+    vx_uint32                               uniformCount;
+
+    vx_bool                                    isReplicated;
+
+    vx_bool                                    replicated_flags[VX_MAX_PARAMETERS];
+
+    vx_bool                                 localDataChangeIsEnabled;
+
+    vx_bool                                 localDataSetByImplementation;
 }
 vx_node_s;
 
@@ -1265,11 +1405,17 @@ typedef struct _vx_graph
 
     vx_uint32                               headNodeCount;
     vx_uint32                               headNodeIndexTable[VX_MAX_NODE_COUNT];
+    vx_uint32                               allNodeIndexTable[VX_MAX_NODE_COUNT];
 
     vx_status                               status;
 
     vx_bool                                 verified;
+
+    vx_bool                                 reverify;
+
     vx_bool                                 dirty;
+
+    vx_bool                                 Initilized;
 
     vx_uint32                               paramCount;
     vx_graph_parameter_s                    paramTable[VX_MAX_PARAMETERS];
@@ -1279,6 +1425,10 @@ typedef struct _vx_graph
     vx_mutex                                scheduleLock;
 
     vx_value_set_s                          data;
+
+    vx_graph                                parentGraph;
+
+    vx_delay                                delays[VX_MAX_REF_COUNT];
 
     vx_bool                                 isChildGraph;
 
@@ -1318,6 +1468,8 @@ typedef enum vx_dim_e
 }
 vx_dim_e;
 
+#define VX_CONTEXT_TENSOR_MAX_DIMENSION     6
+
 typedef enum vx_bounds_e
 {
     VX_BOUND_START = 0,
@@ -1332,10 +1484,12 @@ typedef struct _vx_memory_s
     vx_uint32                               planeCount;
 
     vx_uint32                               dimCount;
-    vx_int32                                dims[VX_MAX_PLANES][VX_MAX_DIMS];
-    vx_int32                                strides[VX_MAX_PLANES][VX_MAX_DIMS];
+    vx_int32                                dims[VX_MAX_PLANES][VX_CONTEXT_TENSOR_MAX_DIMENSION];
+    vx_int32                                strides[VX_MAX_PLANES][VX_CONTEXT_TENSOR_MAX_DIMENSION];
 
     vx_bool                                 allocated;
+
+    vx_uint32                                offset[VX_MAX_PLANES];
 
     vx_uint8_ptr                            logicals[VX_MAX_PLANES];
     vx_uint32                               physicals[VX_MAX_PLANES];
@@ -1359,6 +1513,11 @@ typedef struct _vx_image
 
     vx_uint32                               width;
     vx_uint32                               height;
+
+    /*arraySize,sliceSize is for imageArray / image3D */
+    gctUINT32                               arraySize;
+    gctUINT32                               sliceSize;
+
     vx_df_image                             format;
 
     vx_uint32                               planeCount;
@@ -1378,10 +1537,135 @@ typedef struct _vx_image
     vx_rectangle_t                          region;
 
     vx_enum                                 importType;
+
+    vx_image                                subimages[VX_MAX_REF_COUNT];
 }
 vx_image_s;
 
 typedef vx_image *                          vx_image_ptr;
+
+typedef struct _vx_tensor_addressing_t
+{
+    vx_reference_s                          base;
+
+    vx_uint32                               dimCount;
+    vx_uint32                               dimSizesUser[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+    vx_uint32                               dimStridesUser[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+}
+vx_tensor_addressing_s;
+
+typedef struct _vx_view_region_s
+{
+    vx_uint32                               dimCount;
+    vx_uint32                               viewStarts[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+    vx_uint32                               viewEnds[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+}
+vx_view_region_s;
+
+typedef struct _vx_tensor_view_t
+{
+    vx_reference_s                          base;
+
+    vx_view_region_s                        viewRegion;
+}
+vx_tensor_view_s;
+
+typedef struct _vx_tensor_buffer_t
+{
+    vx_enum                                 dataFormat;
+    vx_uint8                                fixedPointPos;
+    vx_uint32                               elementSize;
+
+    vx_memory_s                             memory;
+
+    vx_int32                                bufRefCount;
+    vx_int32                                memRefCount;
+}
+vx_tensor_buffer_s;
+
+typedef struct _vx_tensor_t
+{
+    vx_reference_s                          base;
+
+    vx_view_region_s                        viewRegion; /* default is whole size */
+    vx_bool                                 isViewed;
+
+    vx_tensor_buffer_s *                    tensorBuffer; /* shared by all related tensors */
+    vx_bool                                 isVirtual;
+
+    vx_uint32                               insideDims[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+    vx_uint32                               finalDims[VX_CONTEXT_TENSOR_MAX_DIMENSION];
+}
+vx_tensor_s;
+
+typedef struct  _vx_weights_biases_parameter
+{
+    vx_reference_s                           base;
+
+    vx_uint32                                inout_num_of_dims;
+    vx_uint32                                weights_num_of_dims;
+    vx_uint32 *                              weights_sizes;
+    vx_uint32 *                              org_weights_sizes;
+    vx_enum                                  weights_data_format;
+    vx_uint8                                 weights_fixed_point_pos;
+    vx_uint32                                biases_num_of_dims;
+    vx_uint32 *                              biases_sizes;
+    vx_enum                                  biases_data_format;
+    vx_uint8                                 biases_fixed_point_pos;
+
+    vx_uint32                                stride;
+    vx_uint32                                pooling_size_x;
+    vx_uint32                                pooling_size_y;
+    vx_uint32                                pad_x;
+    vx_uint32                                pad_y;
+    vx_uint32                                pooling_stride;
+    vx_enum                                  down_scale_size_rounding;
+    vx_enum                                  layer_type;
+
+#define MAX_WEIGHT_BIAS_GROUPS 4
+    vx_uint32                                kernelsPerCore[MAX_WEIGHT_BIAS_GROUPS];
+    vx_uint32                                outImageTileXSize[MAX_WEIGHT_BIAS_GROUPS];
+    vx_uint32                                outImageTileYSize[MAX_WEIGHT_BIAS_GROUPS];
+
+    vx_size                                  perfCycleCount[MAX_WEIGHT_BIAS_GROUPS];
+    vx_size                                  perfReadBandWidth[MAX_WEIGHT_BIAS_GROUPS];
+    vx_size                                  perfNCReadBandWidth[MAX_WEIGHT_BIAS_GROUPS];
+    vx_size                                  perfWriteBandWidth[MAX_WEIGHT_BIAS_GROUPS];
+
+    vx_uint32                                zgroup_num;
+    vx_uint32                                zgroup_array[MAX_WEIGHT_BIAS_GROUPS];
+
+    vx_memory_s                              memory;
+    vx_size                                  memory_size;
+    vx_size                                  memory_offset_array[MAX_WEIGHT_BIAS_GROUPS];
+    vx_uint32                                memory_pad;
+    vx_uint32                                memroy_head_offset;
+
+    vx_uint32 *                              input_sizes;
+    vx_uint32 *                              output_sizes;
+    vx_uint32                                all_count[MAX_WEIGHT_BIAS_GROUPS];
+    vx_uint32                                zero_count[MAX_WEIGHT_BIAS_GROUPS];
+    vx_uint32                                orig_size[MAX_WEIGHT_BIAS_GROUPS];
+    vx_uint32                                compressed_size[MAX_WEIGHT_BIAS_GROUPS];
+    vx_float32                               sustained_bandwidth;
+    vx_uint32                                current_mad_per_core;
+
+    vx_bool                                  use_fc_accel;
+    vx_bool                                  fc_accel_large_size;
+    vx_uint32                                input_nonzero_count;
+    void *                                   tmp_fcaccel_input_ptr;
+    void *                                   tmp_fcaccel_wb_ptr;
+
+    vx_int32                                 inImageFractionLength;
+    vx_int32                                 outImageFractionLength;
+    vx_int32                                 weightFractionLength;
+
+    vx_uint8                                 weightFixedPointPos;
+
+    vx_uint32                                postMultiplier;
+    vx_uint32                                postShift;
+}
+vx_weights_biases_parameter_s;
 
 typedef struct _vx_array
 {
@@ -1394,6 +1678,8 @@ typedef struct _vx_array
     vx_size                                 itemSize;
 
     vx_size                                 itemCount;
+
+    vx_uint32                                offset;
 
     vx_size                                 capacity;
 
@@ -1413,6 +1699,15 @@ vx_delay_parameter_s;
 
 typedef vx_delay_parameter_s *              vx_delay_parameter;
 
+typedef struct _vx_object_array {
+    vx_reference_s                          base;
+
+    vx_reference                            itemsTable[VX_MAX_REF_COUNT];
+    vx_size                                 itemCount;
+
+    vx_enum                                 itemType;
+} vx_object_array_s;
+
 typedef struct _vx_delay
 {
     vx_reference_s                          base;
@@ -1425,6 +1720,8 @@ typedef struct _vx_delay
     vx_delay_parameter                      paramListTable;
 
     vx_reference_ptr                        refTable;
+
+    vx_delay                                *pyramidTable;
 }
 vx_delay_s;
 
@@ -1458,6 +1755,9 @@ typedef struct _vx_distribution
     vx_int32                                offsetX;
     vx_int32                                offsetY;
 
+    vx_uint32                               rangeX;
+    vx_uint32                               rangeY;
+
     vx_mem_alloc_info_s                     memAllocInfo;
 }
 vx_distribution_s;
@@ -1466,7 +1766,9 @@ typedef struct _vx_threshold
 {
     vx_reference_s                          base;
 
-    vx_enum                                 type;
+    vx_enum                                 thresholdType;
+
+    vx_enum                                 dataType;
 
     vx_uint32                               value;
 
@@ -1492,6 +1794,9 @@ typedef struct _vx_matrix
     vx_size                                 rows;
 
     vx_mem_alloc_info_s                     memAllocInfo;
+
+    vx_coordinates2d_t                      origin;
+    vx_enum                                 pattern;
 
 }
 vx_matrix_s;
@@ -1568,8 +1873,47 @@ typedef struct _vx_meta_format
             vx_size                         capacity;
         }
         arrayInfo;
+
+        struct matrix {
+            vx_enum                         type;
+            vx_size                         rows;
+            vx_size                         cols;
+        } matrixInfo;
+
+        struct distribution {
+            vx_size                         bins;
+            vx_int32                        offset;
+            vx_uint32                       range;
+        } distributionInfo;
+
+        struct remap {
+            vx_uint32                       src_width;
+            vx_uint32                       src_height;
+            vx_uint32                       dst_width;
+            vx_uint32                       dst_height;
+        } remapInfo;
+
+        struct lut {
+            vx_enum                         type;
+            vx_size                         count;
+        } lutInfo;
+
+        struct threshold {
+            vx_enum                         type;
+        } thresholdInfo;
+
+        struct object_array {
+            vx_enum item_type;
+            vx_size item_count;
+        } objectArrayInfo;
+
+        struct tensor {
+            vx_enum                         dataFormat;
+        }tensorInfo;
     }
     u;
+
+    vx_kernel_image_valid_rectangle_f setValidRectangleCallback;
 }
 vx_meta_format_s;
 
@@ -1609,6 +1953,8 @@ typedef struct _vx_kernel_description_s
 
     vx_param_description_s *                parameters;
     vx_uint32                               numParams;
+
+    vx_kernel_validate_f                    validate;
 
     vx_kernel_input_validate_f              inputValidate;
     vx_kernel_output_validate_f             outputValidate;
@@ -1738,6 +2084,8 @@ VX_INTERNAL_API vx_uint32 gcfVX_PerfEnd(vx_reference ref, struct timeval start);
 #include <gc_vx_array.h>
 #include <gc_vx_error.h>
 #include <gc_vx_meta_format.h>
+#include <gc_vx_object_array.h>
+#include <gc_vx_tensor.h>
 
 #include <gc_vx_program.h>
 

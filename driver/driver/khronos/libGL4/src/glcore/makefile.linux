@@ -79,7 +79,8 @@ LIBS += -L $(ROOTDIR)/src/glcore/display_list/$(OBJ_DIR)
 LIBS += -L $(ROOTDIR)/src/GLX/client/$(OBJ_DIR)
 
 LIBS += -lgl4chip -lgl4display_list  -lgl4api
-LIBS += -lm -lpthread -lGAL -lGL
+LIBS += -lm -lpthread -lGAL -lVSC -lGL -lXext -lX11 -lXfixes -lXdamage -ldrm
+#LIBS += -lm -lpthread -lGAL -lGL
 
 LFLAGS += -Wl,--version-script=glCoreSymExport
 

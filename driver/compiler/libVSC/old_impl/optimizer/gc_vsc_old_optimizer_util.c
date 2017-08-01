@@ -147,10 +147,10 @@ gcOPTIMIZER_OPTION theOptimizerOption =
 
     /* debug:
 
-        VC_OPTION=-DEBUG:0|1
+        VC_OPTION=-DEBUG:0|1|2|3
 
      */
-    gcvFALSE,
+    0,
 
     /* VC_OPTION=-Ddef1[=value1] -Ddef2[=value2] -Uundef1 */
     gcvNULL, /* macroDefines; */
@@ -301,6 +301,13 @@ gcOPTIMIZER_OPTION theOptimizerOption =
      *
      */
     gcvTRUE, /* oclHasLong; */
+
+    /*  OCL long and ulong support in VIR:
+     *
+     *   VC_OPTION=-OCLINT64INVIR:0|1
+     *
+     */
+    gcvFALSE, /* oclInt64InVIR; */
 
     /*  USE gcSL_NEG for -a instead of SUB(0, a)
      *
@@ -746,10 +753,12 @@ gcSHADER_GoVIRPass(gcSHADER Shader)
         ** Turn on VIRCG for OpenCL only if:
         ** 1) OpenCL has no int64 in the shader.
         ** 2) This chip can support HALTI2.
+        ** 3) Has int64 in the shader and VIR has support for int64
         */
         if (gcHWCaps.hwFeatureFlags.hasHalti2 &&
             gcmOPT_CLUseVIRCodeGen() &&
-            !gcShaderHasInt64(Shader))
+            (!gcShaderHasInt64(Shader) ||
+             gcmOPT_oclInt64InVIR()))
         {
             gctINT   startId = gcmOPT_VIRCGStart();
             gctINT   endId   = gcmOPT_VIRCGEnd();
@@ -3715,8 +3724,15 @@ gcOpt_DeleteFunction(
         if (argument->variableIndex != 0xffff)
         {
             gcSHADER_GetVariable(Optimizer->shader, argument->variableIndex, &variable);
-            if (variable != gcvNULL && DeleteVariable)
-                SetVariableIsNotUsed(variable);
+
+            if (variable != gcvNULL)
+            {
+                SetVariableIsParamFuncDelete(variable);
+                if (DeleteVariable)
+                {
+                    SetVariableIsNotUsed(variable);
+                }
+            }
         }
     }
 
@@ -4422,9 +4438,10 @@ _RemoveInstByChangeToNOP(
 
     if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) != gcSL_NOP)
     {
-        /* For jump, we need update its target's info before we change it to
+        /* For jump or call, we need update its target's info before we change it to
         ** NOP. */
-        if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) == gcSL_JMP)
+        if (gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) == gcSL_JMP ||
+            gcmSL_OPCODE_GET(code->instruction.opcode, Opcode) == gcSL_CALL)
         {
             gcOPT_LIST caller;
             gcmASSERT(code->callee);

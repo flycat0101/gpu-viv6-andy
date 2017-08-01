@@ -1066,6 +1066,12 @@ gcoHARDWARE_QuerySuperTileMode(
     );
 
 gceSTATUS
+gcoHARDWARE_QueryChipAxiBusWidth(
+    IN gcoHARDWARE Hardware,
+    OUT gctBOOL *AXI128Bits
+    );
+
+gceSTATUS
 gcoHARDWARE_QueryMultiGPUSyncLength(
     IN gcoHARDWARE Hardware,
     OUT gctUINT32_PTR Bytes
@@ -2332,6 +2338,15 @@ gcoHARDWARE_SetAlphaReferenceF(
     IN gctFLOAT Reference
     );
 
+#if gcdALPHA_KILL_IN_SHADER
+gceSTATUS
+gcoHARDWARE_SetAlphaKill(
+    IN gcoHARDWARE Hardware,
+    IN gctBOOL AlphaKill,
+    IN gctBOOL ColorKill
+    );
+#endif
+
 gceSTATUS
 gcoHARDWARE_SetAlphaAll(
     IN gcoHARDWARE Hardware,
@@ -2541,13 +2556,22 @@ gceSTATUS
 gcoHARDWARE_WaitFence(
     IN gcoHARDWARE Hardware,
     IN gcsSYNC_CONTEXT_PTR Ctx,
+    IN gceENGINE From,
+    IN gceENGINE On,
     IN gceFENCE_TYPE Type
+    );
+
+gceSTATUS
+gcoHARDWARE_OnIssueFence(
+    IN gcoHARDWARE Hardware,
+    IN gceENGINE engine
     );
 
 gceSTATUS
 gcoHARDWARE_SendFence(
     IN gcoHARDWARE Hardware,
-    IN gctBOOL IsFromCommit,
+    IN gctBOOL SyncAndFlush,
+    IN gceENGINE engine,
     OUT gctPOINTER *Memory
     );
 
@@ -2555,6 +2579,15 @@ gceSTATUS
 gcoHARDWARE_GetFence(
     IN gcoHARDWARE Hardware,
     IN gcsSYNC_CONTEXT_PTR *Ctx,
+    IN gceENGINE engine,
+    IN gceFENCE_TYPE Type
+    );
+
+gctBOOL
+gcoHARDWARE_IsFenceBack(
+    IN gcoHARDWARE Hardware,
+    IN gcsSYNC_CONTEXT_PTR Ctx,
+    IN gceENGINE Engine,
     IN gceFENCE_TYPE Type
     );
 
@@ -2568,6 +2601,14 @@ gceSTATUS
 gcoHARDWARE_SetFenceEnabled(
     IN gcoHARDWARE Hardware,
     IN gctBOOL Enabled
+    );
+
+gceSTATUS
+gcoHARDWARE_AppendFence(
+    IN gcoHARDWARE Hardware,
+    IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE Engine,
+    IN gceFENCE_TYPE Type
     );
 
 #endif
@@ -2638,6 +2679,20 @@ gcoHARDWARE_3DBlit420Tiler(
     IN gcsPOINT_PTR RectSize
     );
 
+#if gcdENABLE_3D
+gceSTATUS
+gcoHARDWARE_GetForceVirtual(
+    IN gcoHARDWARE Hardware,
+    OUT gctBOOL* bForceVirtual
+    );
+
+gceSTATUS
+gcoHARDWARE_SetForceVirtual(
+    IN gcoHARDWARE Hardware,
+    IN gctBOOL bForceVirtual
+    );
+#endif
+
 #if gcdENABLE_3D && gcdUSE_VX
 typedef enum _gceVX_KERNEL
 {
@@ -2692,6 +2747,11 @@ typedef enum _gceVX_KERNEL
     gcvVX_KERNEL_SOBEL_MxN,
 
     gcvVX_KERNEL_SGM,
+
+    gcvVX_KERNEL_NONLINEAR_FILTER_MIN,
+    gcvVX_KERNEL_NONLINEAR_FILTER_MAX,
+    gcvVX_KERNEL_NONLINEAR_FILTER_MEDIAN,
+
     gcvVX_KERNEL_LAPLACIAN_3x3,
     gcvVX_KERNEL_CENSUS_3x3,
     gcvVX_KERNEL_COPY_IMAGE,
@@ -2716,6 +2776,14 @@ typedef enum _gceVX_BorderMode
     gcvVX_BORDER_MODE_REPLACEMENT,
 }
 gceVX_BorderMode;
+
+typedef enum _gceVX_PatternMode
+{
+    gcvVX_PARTTERN_MODE_BOX,
+    gcvVX_PARTTERN_MODE_CROSS,
+    gcvVX_PARTTERN_MODE_DISK,
+}
+gceVX_PatternMode;
 
 typedef struct _gcoVX_Instruction
 {
@@ -2792,6 +2860,11 @@ typedef struct _vx_nn_config
     gctUINT nnCoreCount;
     gctUINT nnInputBufferDepth;
     gctUINT nnAccumBufferDepth;
+    gctUINT nnDPAmount;
+    gctUINT nnL2CacheSize;
+    gctUINT nnUSCCacheSize;
+    gctUINT vipSRAMSize;
+    gctUINT vipSRAMRemapAddress;
 }
 vx_nn_config;
 
@@ -2799,7 +2872,8 @@ typedef union _vx_nn_cmd_info_union
 {
     struct _vx_nn_general_cmd_info
     {
-        gctUINT32 kernelXYSize;
+        gctUINT32 kernelXSize;
+        gctUINT32 kernelYSize;
         gctUINT32 kernelZSize;
         gctUINT32 kernelsPerCore;
         gctUINT32 pooling;
@@ -2814,12 +2888,15 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 outImageTileXSize;
         gctUINT32 outImageTileYSize;
 
+        gctUINT32  roundingMode;
         gctUINT32  relu;
         gctINT32   nn_layer_flush;
         gctUINT32  postMultiplier;
         gctUINT32  postShift;
         gctUINT32  wSize;
-        gctUINT8   dataType;
+        gctUINT8   kernelDataType;
+        gctUINT8   inImageDataType;
+        gctUINT8   outImageDataType;
     }
     vx_nn_general_cmd_info;
 
@@ -2883,6 +2960,14 @@ typedef union _vx_nn_cmd_info_union
         gctUINT32 outLoop3Count;
         gctUINT32 outLoop4Count;
         gctUINT32 outLoop5Count;
+        gctUINT32 inImageDataType;
+        gctUINT32 outImageDataType;
+        gctUINT32 kernelDataType;
+        gctUINT32 aluFilterPwlSwap;
+        gctUINT32 aluPwlSignSupport;
+        gctUINT32 aluReluEnable;
+        gctUINT32 floatRoundingMode;
+        gctUINT32 integeroundingMode;
     }
     vx_nn_tp_cmd_info;
 
@@ -2972,6 +3057,17 @@ typedef struct _gcoVX_Hardware_Context
 
     vx_evis_no_inst_s    evisNoInst;
 
+    gctUINT32            optionalOutputs[3];
+
+#if gcdVX_OPTIMIZER > 1
+    gctBOOL                 tileMode;
+    gctUINT32               curDeviceID;
+    gctUINT32               usedDeviceCount;
+    gcsTHREAD_WALKER_INFO   splitInfo[4];
+    gctUINT32               deviceCount;
+    gctPOINTER              *devices;
+#endif
+
 }
 gcoVX_Hardware_Context;
 
@@ -3033,11 +3129,11 @@ gcoHARDWARE_InvokeThreadWalkerVX(
 
 gceSTATUS
 gcoHARDWARE_LoadKernelVX(
-    IN gcoHARDWARE                          Hardware,
-    IN gctUINT32                            Address,
-    IN gctUINT32                            Size,
-    IN gctUINT32                            TempRegCount,
-    OUT gctUINT32_PTR                       ValueOrder
+    IN gcoHARDWARE          Hardware,
+    IN gctUINT32            Address,
+    IN gctUINT32            Size,
+    IN gctUINT32            TempRegCount,
+    OUT gctUINT32_PTR       ValueOrder
     );
 
 gceSTATUS
@@ -3047,7 +3143,7 @@ gcoHARDWAREVX_KenrelConstruct(
 
 gceSTATUS
 gcoHARDWAREVX_InitVX(
-    IN gcoHARDWARE                          Hardware
+    IN gcoHARDWARE          Hardware
 );
 
 gceSTATUS
@@ -3093,15 +3189,21 @@ gcoHARDWAREVX_GenerateMC(
 );
 #endif
 
+gceSTATUS
+gcoHARDWARE_FlushCacheVX(
+    IN gcoHARDWARE          Hardware,
+    IN gctBOOL              InvalidateICache,
+    IN gctBOOL              FlushPSSHL1Cache,
+    IN gctBOOL              FlushNNL1Cache,
+    IN gctBOOL              FlushTPL1Cache
+    );
 #endif
 
-#if VIVANTE_PROFILER_CONTEXT
 gceSTATUS
 gcoHARDWARE_GetContext(
     IN gcoHARDWARE Hardware,
     OUT gctUINT32 * Context
     );
-#endif
 
 gceSTATUS
 gcoHARDWARE_SetProbeCmd(
@@ -3115,17 +3217,6 @@ gceSTATUS
 gcoHARDWARE_EnableCounters(
     IN gcoHARDWARE Hardware
     );
-
-#if VIVANTE_PROFILER_PROBE
-gceSTATUS
-gcoHARDWARE_ProbeCounter(
-    IN gcoHARDWARE Hardware,
-    IN gctUINT32 address,
-    IN gceCOUNTER module,
-    IN gctBOOL enable,
-    INOUT gctPOINTER *Memory
-    );
-#endif
 
 gceSTATUS
 gcoHARDWARE_ProbeCounter(
@@ -3236,6 +3327,23 @@ gcoBUFFER_Commit(
     );
 
 gceSTATUS
+gcoBUFFER_AppendFence(
+    IN gcoBUFFER Buffer,
+    IN gcsSURF_NODE_PTR Node,
+    IN gceFENCE_TYPE Type
+    );
+
+gceSTATUS
+gcoBUFFER_OnIssueFence(
+    IN gcoBUFFER Buffer
+    );
+
+gceSTATUS
+gcoBUFFER_GetFence(
+    IN gcoBUFFER Buffer
+    );
+
+gceSTATUS
 gcoBUFFER_IsEmpty(
     IN gcoBUFFER Buffer
     );
@@ -3334,13 +3442,18 @@ typedef void  (* _PFNcalcPixelAddr)(
     );
 
 #if gcdSYNC
-typedef struct _gcsSYNC_CONTEXT
-{
+typedef struct {
     gctUINT64               writeFenceID;
     gctUINT64               readFenceID;
     gctPOINTER              fence;
-    gctBOOL                 mark;
-    gcsSYNC_CONTEXT_PTR     next;
+    gctINT32                id;
+    gctBOOL                 mark[gcvENGINE_ALL_COUNT];
+}gcsFENCE_ENGINE_CONTEXT;
+
+typedef struct _gcsSYNC_CONTEXT
+{
+    gcsFENCE_ENGINE_CONTEXT  engine[gcvENGINE_ALL_COUNT];
+    gcsSYNC_CONTEXT_PTR      next;
 }
 gcsSYNC_CONTEXT;
 #endif
@@ -3351,9 +3464,7 @@ typedef struct _gcsSURF_NODE
     gcePOOL                 pool;
 
     /* Lock count for the surface. */
-    gctINT                  lockCount;
-
-    gctINT                  lockCounts[gcvHARDWARE_NUM_TYPES][gcvENGINE_COUNT];
+    gctINT                  lockCounts[gcvHARDWARE_NUM_TYPES][gcvENGINE_GPU_ENGINE_COUNT];
 
     /* If not zero, the node is locked in the kernel. */
     gctBOOL                 lockedInKernel;
@@ -4185,6 +4296,36 @@ gcoHARDWARE_SetVertexArray(
 #endif
 
 gceSTATUS
+gcoVERTEX_AdjustStreamPoolEx(
+    IN gcoSTREAM Stream,
+    IN gcsVERTEXARRAY_BUFOBJ_PTR Streams,
+    IN gctUINT StreamCount,
+    IN gctUINT StartVertex,
+    IN gctUINT FirstCopied,
+    IN gctBOOL DrawElements,
+    IN OUT gcoSTREAM * UncacheableStream
+);
+
+#if OPT_VERTEX_ARRAY
+gceSTATUS
+gcoVERTEX_AdjustStreamPool(
+    IN gcoSTREAM Stream,
+    IN gctUINT BufferCount,
+    IN gcsVERTEXARRAY_BUFFER_PTR Buffers,
+    IN gctUINT AttributeCount,
+    IN gcsVERTEXARRAY_ATTRIBUTE_PTR Attributes,
+    IN gctUINT StreamCount,
+    IN gcsVERTEXARRAY_STREAM_PTR Streams,
+    IN gctUINT First,
+    IN gctUINT Count,
+    IN gctUINT TotalBytes,
+    IN gctBOOL DrawArraysInstanced,
+    IN OUT gctUINT32_PTR Physical,
+    OUT gcoSTREAM * OutStream
+);
+#endif
+
+gceSTATUS
 gcoSTREAM_MergeStreams(
     IN gcoSTREAM Stream,
     IN gctUINT First,
@@ -4322,24 +4463,29 @@ gcsSURF_NODE_Destroy(
 gceSTATUS
 gcsSURF_NODE_Lock(
     IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE engine,
     OUT gctUINT32 * Address,
     OUT gctPOINTER * Memory
     );
 
 gceSTATUS
 gcsSURF_NODE_Unlock(
-    IN gcsSURF_NODE_PTR Node
+    IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE engine
     );
 
 gceSTATUS
 gcsSURF_NODE_GetFence(
     IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE engine,
     IN gceFENCE_TYPE Type
 );
 
 gceSTATUS
 gcsSURF_NODE_WaitFence(
     IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE From,
+    IN gceENGINE On,
     IN gceFENCE_TYPE Type
 );
 

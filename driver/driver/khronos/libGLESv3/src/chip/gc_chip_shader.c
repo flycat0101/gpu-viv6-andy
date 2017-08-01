@@ -5088,6 +5088,11 @@ gcChipProgramBuildBindingInfo(
         program->aLocPosition = __glChipGetAttributeLocation(gc, programObject, "a_position");
     }
 
+    if (program->progFlags.wideLineFix)
+    {
+        program->aLocPosition = __glChipGetAttributeLocation(gc, programObject, "a_position");
+    }
+
     if (program->progFlags.CTSMaxUBOSize)
     {
         program->indexUniform = gcChipGetUniformByName(gc, program, "index", (gctSIZE_T)-1);
@@ -6804,14 +6809,13 @@ gcChipIsLTCEnabled(
 
     gcoHAL_GetPatchID(gcvNULL, &patchId);
 
-#if defined(ANDROID)
     /* general disable LTC */
     if (patchId == gcvPATCH_INVALID)
     {
         gcmFOOTER_ARG("return=0x%04x", gcvFALSE);
         return gcvFALSE;
     }
-#endif
+
     /* Disable LTC optimization for real racing */
     if (patchId == gcvPATCH_REALRACING || patchId == gcvPATCH_NENAMARK
         || patchId == gcvPATCH_LEANBACKSCROLLING)
@@ -7689,17 +7693,18 @@ __glChipUseProgram(
     }
 
 #if VIVANTE_PROFILER
-    /*if (programObject &&
+    if (gc->profiler.enable &&
+        programObject &&
         programObject->programInfo.attachedShader[__GLSL_STAGE_VS] &&
         programObject->programInfo.attachedShader[__GLSL_STAGE_FS])
     {
         gcSHADER vertexShader   = (gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_VS]->shaderInfo.hBinary;
         gcSHADER fragmentShader = (gcSHADER)programObject->programInfo.attachedShader[__GLSL_STAGE_FS]->shaderInfo.hBinary;
-        __glChipProfiler(&gc->profiler, GL3_PROGRAM_IN_USE_BEGIN, programObject);
-        __glChipProfiler(&gc->profiler, GL3_PROGRAM_VERTEX_SHADER, vertexShader);
-        __glChipProfiler(&gc->profiler, GL3_PROGRAM_FRAGMENT_SHADER, fragmentShader);
-        __glChipProfiler(&gc->profiler, GL3_PROGRAM_IN_USE_END, (gctHANDLE)(gctUINTPTR_T)1);
-    }*/
+        __glChipProfilerSet(gc, GL3_PROGRAM_IN_USE_BEGIN, programObject);
+        __glChipProfilerSet(gc, GL3_PROGRAM_VERTEX_SHADER, vertexShader);
+        __glChipProfilerSet(gc, GL3_PROGRAM_FRAGMENT_SHADER, fragmentShader);
+        __glChipProfilerSet(gc, GL3_PROGRAM_IN_USE_END, (gctHANDLE)(gctUINTPTR_T)1);
+    }
 #endif
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;

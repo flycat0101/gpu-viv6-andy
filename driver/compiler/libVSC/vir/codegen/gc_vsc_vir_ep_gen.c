@@ -196,27 +196,39 @@ static VSC_ErrCode _CollectMachineCodeToSEP(VSC_SEP_GEN_HELPER* pSepGenHelper, S
             diLineMapCount = 0;
         }
 
-        /* Main routine firstly */
-        VIR_InstIterator_Init(&instIter, &pShader->mainFunction->instList);
-        pInst = VIR_InstIterator_First(&instIter);
+        /* Main rountine firstly */
+        VIR_FuncIterator_Init(&funcIter, &pShader->functions);
+        pFuncNode = VIR_FuncIterator_First(&funcIter);
+
         startPC = curPC;
 
-        for (; pInst != gcvNULL; pInst = VIR_InstIterator_Next(&instIter))
+        for(; pFuncNode != gcvNULL; pFuncNode = VIR_FuncIterator_Next(&funcIter))
         {
-            if (pInst->mcInstCount)
+            VIR_Function *pFunc = pFuncNode->function;
+
+            if (pFunc->flags & VIR_FUNCFLAG_MAIN)
             {
-                gcmASSERT(pInst->mcInst);
+                VIR_InstIterator_Init(&instIter, &pFunc->instList);
+                pInst = VIR_InstIterator_First(&instIter);
 
-                gcoOS_MemCopy((gctUINT8*)pOutSEP->pMachineCode + curPC*sizeof(VSC_MC_RAW_INST),
-                              pInst->mcInst,
-                              pInst->mcInstCount*sizeof(VSC_MC_RAW_INST));
-
-                curPC += pInst->mcInstCount;
-
-                if (diContext != gcvNULL)
+                for (; pInst != gcvNULL; pInst = VIR_InstIterator_Next(&instIter))
                 {
-                    vscDIAddLineMap(diContext, diLineMapCount, pInst->sourceLoc,curPC - pInst->mcInstCount,curPC - 1);
-                    diLineMapCount++;
+                    if (pInst->mcInstCount)
+                    {
+                        gcmASSERT(pInst->mcInst);
+
+                        gcoOS_MemCopy((gctUINT8*)pOutSEP->pMachineCode + curPC*sizeof(VSC_MC_RAW_INST),
+                            pInst->mcInst,
+                            pInst->mcInstCount*sizeof(VSC_MC_RAW_INST));
+
+                        curPC += pInst->mcInstCount;
+
+                        if (diContext != gcvNULL)
+                        {
+                            vscDIAddLineMap(diContext, diLineMapCount, pInst->sourceLoc,curPC - pInst->mcInstCount,curPC - 1);
+                            diLineMapCount++;
+                        }
+                    }
                 }
             }
         }
@@ -1179,62 +1191,82 @@ static VSC_ErrCode _CollectConstantMappingToSEP(VSC_SEP_GEN_HELPER* pSepGenHelpe
                 /* Collect CTC */
                 if (isSymUniformCompiletimeInitialized(pVirUniformSym))
                 {
+                    VIR_Type *symType = VIR_Symbol_GetType(pVirUniformSym);
+                    VIR_ConstId *initializerPtr;
+                    gctUINT  uniformIdx = 0;
+                    gctUINT arraySize = 1;
+                    gctUINT subRegCount, arrElemIdx;
+
+                    if(VIR_Type_isArray(symType)) {
+                        /* To be handled for arrays */
+                        arraySize = pVirUniform->realUseArraySize;
+                        initializerPtr = pVirUniform->u.initializerPtr;                        ;
+                    }
+                    else {
+                        initializerPtr = &pVirUniform->u.initializer;
+                    }
+
+                    subRegCount = VIR_Type_GetVirRegCount(pShader, pVirUniformType, 1);
                     /* Maxium is 512-bits uniform (4 HW constants) */
-                    gcmASSERT(thisUniformRegCount <= 4);
+                    gcmASSERT(subRegCount <= 4);
+                    gcmASSERT((subRegCount * arraySize) == thisUniformRegCount);
 
-                    pThisVirCTCVal = (VIR_Const*)VIR_GetSymFromId(&pShader->constTable, pVirUniform->u.initializer);
-
-                    for (subUniformIdx = 0; subUniformIdx < thisUniformRegCount; subUniformIdx ++)
+                    for(arrElemIdx = 0; arrElemIdx < arraySize; arrElemIdx++)
                     {
-                        pThisCTC = gcvNULL;
+                        pThisVirCTCVal = (VIR_Const*)VIR_GetSymFromId(&pShader->constTable, initializerPtr[arrElemIdx]);
 
-                        thisSubUniformPhysicalAddr = pVirUniform->physical + subUniformIdx;
-                        pThisSubUniformConstValue = &pThisVirCTCVal->value.vecVal.u32Value[CHANNEL_NUM * subUniformIdx];
-
-                        /* Check whether there is already a CTC allocated on same HW location */
-                        for (ctcSlot = 0; ctcSlot < pCnstMapping->countOfCompileTimeConstant; ctcSlot ++)
+                        for (subUniformIdx = 0; subUniformIdx < subRegCount; subUniformIdx++, uniformIdx++)
                         {
-                            if (_IsUniformAllocatedOnHwCnstReg(thisSubUniformPhysicalAddr,
-                                                     &pCnstMapping->pCompileTimeConstant[ctcSlot].hwConstantLocation))
+                            pThisCTC = gcvNULL;
+
+                            thisSubUniformPhysicalAddr = pVirUniform->physical + uniformIdx;
+                            pThisSubUniformConstValue = &pThisVirCTCVal->value.vecVal.u32Value[CHANNEL_NUM * subUniformIdx];
+
+                            /* Check whether there is already a CTC allocated on same HW location */
+                            for (ctcSlot = 0; ctcSlot < pCnstMapping->countOfCompileTimeConstant; ctcSlot ++)
                             {
-                                pThisCTC = &pCnstMapping->pCompileTimeConstant[ctcSlot];
-                                break;
-                            }
-                        }
-
-                        /* Enlarge CTC set to make room for current CTC */
-                        if (pThisCTC == gcvNULL)
-                        {
-                            pThisCTC = _EnlargeCTCRoom(pCnstMapping, 1, &ctcSlot);
-                            vscInitializeCTC(pThisCTC);
-                            _SetUniformHwCnstReg(thisSubUniformPhysicalAddr, &pThisCTC->hwConstantLocation);
-                        }
-
-                        /* Copy CTC now */
-                        for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
-                        {
-                            if (channel >= (gctUINT)(VIR_GetTypeComponents(pThisVirCTCVal->type)))
-                            {
-                                break;
+                                if (_IsUniformAllocatedOnHwCnstReg(thisSubUniformPhysicalAddr,
+                                                         &pCnstMapping->pCompileTimeConstant[ctcSlot].hwConstantLocation))
+                                {
+                                    pThisCTC = &pCnstMapping->pCompileTimeConstant[ctcSlot];
+                                    break;
+                                }
                             }
 
-                            hwChannel = (((pVirUniform->swizzle) >> ((channel) * 2)) & 0x3);
-                            thisChannelValue = *(gctUINT*)&pThisSubUniformConstValue[channel];
-
-                            if (pThisCTC->hwConstantLocation.validHWChannelMask & (1 << hwChannel))
+                            /* Enlarge CTC set to make room for current CTC */
+                            if (pThisCTC == gcvNULL)
                             {
-                                gcmASSERT(thisChannelValue == pThisCTC->constantValue[hwChannel]);
+                                pThisCTC = _EnlargeCTCRoom(pCnstMapping, 1, &ctcSlot);
+                                vscInitializeCTC(pThisCTC);
+                                _SetUniformHwCnstReg(thisSubUniformPhysicalAddr, &pThisCTC->hwConstantLocation);
                             }
-                            else
-                            {
-                                _SetValidChannelForHwConstantLoc(&pThisCTC->hwConstantLocation, hwChannel);
-                                pThisCTC->constantValue[hwChannel] = thisChannelValue;
-                            }
-                        }
 
-                        if (subUniformIdx == 0)
-                        {
-                            VIR_Symbol_SetFirstSlot(pVirUniformSym, ctcSlot);
+                            /* Copy CTC now */
+                            for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
+                            {
+                                if (channel >= (gctUINT)(VIR_GetTypeComponents(pThisVirCTCVal->type)))
+                                {
+                                    break;
+                                }
+
+                                hwChannel = (((pVirUniform->swizzle) >> ((channel) * 2)) & 0x3);
+                                thisChannelValue = *(gctUINT*)&pThisSubUniformConstValue[channel];
+
+                                if (pThisCTC->hwConstantLocation.validHWChannelMask & (1 << hwChannel))
+                                {
+                                    gcmASSERT(thisChannelValue == pThisCTC->constantValue[hwChannel]);
+                                }
+                                else
+                                {
+                                    _SetValidChannelForHwConstantLoc(&pThisCTC->hwConstantLocation, hwChannel);
+                                    pThisCTC->constantValue[hwChannel] = thisChannelValue;
+                                }
+                            }
+
+                            if (subUniformIdx == 0)
+                            {
+                                VIR_Symbol_SetFirstSlot(pVirUniformSym, ctcSlot);
+                            }
                         }
                     }
                 }
@@ -2374,6 +2406,42 @@ static VSC_ErrCode _CollectStaticPrivateMappingToSEP(VSC_SEP_GEN_HELPER* pSepGen
                 pPrivCnstEntry->mode = SHADER_PRIV_CONSTANT_MODE_VAL_2_MEMORREG;
                 pPrivCnstEntry->u.pSubCBMapping = &pOutSEP->constantMapping.pConstantArrayMapping[llArraySlot].pSubConstantArrays[llSlot];
             }
+
+            /* For sample location. */
+            if (VIR_Symbol_GetUniformKind(pVirUniformSym) == VIR_UNIFORM_SAMPLE_LOCATION)
+            {
+                pPrivCnstEntry = _enlargePrivCnstMappingRoom(&pOutSEP->staticPrivMapping.privConstantMapping, 1, gcvNULL);
+
+                pPrivCnstEntry->commonPrivm.privmFlag = SHS_PRIV_CONSTANT_FLAG_SAMPLE_LOCATION;
+                pPrivCnstEntry->commonPrivm.privmFlagIndex = 0;
+                pPrivCnstEntry->commonPrivm.pPrivateData = gcvNULL;
+
+                llArraySlot = VIR_Symbol_GetArraySlot(pVirUniformSym);
+                gcmASSERT(llArraySlot != NOT_ASSIGNED);
+
+                llSlot = VIR_Symbol_GetFirstSlot(pVirUniformSym);
+
+                pPrivCnstEntry->mode = SHADER_PRIV_CONSTANT_MODE_VAL_2_MEMORREG;
+                pPrivCnstEntry->u.pSubCBMapping = &pOutSEP->constantMapping.pConstantArrayMapping[llArraySlot].pSubConstantArrays[llSlot];
+            }
+
+            /* For enable multisample buffers. */
+            if (VIR_Symbol_GetUniformKind(pVirUniformSym) == VIR_UNIFORM_ENABLE_MULTISAMPLE_BUFFERS)
+            {
+                pPrivCnstEntry = _enlargePrivCnstMappingRoom(&pOutSEP->staticPrivMapping.privConstantMapping, 1, gcvNULL);
+
+                pPrivCnstEntry->commonPrivm.privmFlag = SHS_PRIV_CONSTANT_FLAG_ENABLE_MULTISAMPLE_BUFFERS;
+                pPrivCnstEntry->commonPrivm.privmFlagIndex = 0;
+                pPrivCnstEntry->commonPrivm.pPrivateData = gcvNULL;
+
+                llArraySlot = VIR_Symbol_GetArraySlot(pVirUniformSym);
+                gcmASSERT(llArraySlot != NOT_ASSIGNED);
+
+                llSlot = VIR_Symbol_GetFirstSlot(pVirUniformSym);
+
+                pPrivCnstEntry->mode = SHADER_PRIV_CONSTANT_MODE_VAL_2_MEMORREG;
+                pPrivCnstEntry->u.pSubCBMapping = &pOutSEP->constantMapping.pConstantArrayMapping[llArraySlot].pSubConstantArrays[llSlot];
+            }
         }
     }
 
@@ -2830,13 +2898,27 @@ static void _SetResOpBits(VIR_Shader* pShader,
     {
         pVirUniformSym = VIR_Shader_GetSymFromId(pShader, VIR_IdList_GetId(pVirUniformLsts, virUniformIdx));
 
-        if (!VIR_Symbol_isSampler(pVirUniformSym) ||
-            (VIR_Symbol_GetIndex(pVirUniformSym) == VIR_Shader_GetBaseSamplerId(pShader)))
+        if (VIR_Symbol_isUniform(pVirUniformSym))
+        {
+            pVirUniform = VIR_Symbol_GetUniform(pVirUniformSym);
+        }
+        else if (VIR_Symbol_isSampler(pVirUniformSym))
+        {
+            pVirUniform = VIR_Symbol_GetSampler(pVirUniformSym);
+        }
+        else if (VIR_Symbol_isImage(pVirUniformSym))
+        {
+            pVirUniform = VIR_Symbol_GetImage(pVirUniformSym);
+        }
+        else if (isSymCombinedSampler(pVirUniformSym))
+        {
+            pVirUniform = VIR_Symbol_GetSampler(pVirUniformSym);
+        }
+        else
         {
             continue;
         }
 
-        pVirUniform = VIR_Symbol_GetSampler(pVirUniformSym);
         if (pVirUniform == gcvNULL)
         {
             continue;
@@ -2944,6 +3026,128 @@ static PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY* _enlargeVkCombTsEntryRoom(PROG_
     return &pCombinedSampTexTable->pCombTsEntries[oldCombTsEntryCount];
 }
 
+static VSC_ErrCode _AddExtraSamplerArray(SHADER_PRIV_SAMPLER_ENTRY*** pppExtraSamplerArray,
+                                         VSC_SHADER_RESOURCE_BINDING* pResBinding,
+                                         VIR_Shader* pShader,
+                                         SHADER_EXECUTABLE_PROFILE* pSep,
+                                         gctBOOL bCheckSeparateImage,
+                                         gctBOOL bCheckSeparateSampler,
+                                         gctINT arraySize,
+                                         gctINT arrayStride,
+                                         gctINT offset)
+{
+    VSC_ErrCode                               errCode = VSC_ERR_NONE;
+    gctUINT                                   i;
+    gctUINT                                   resArraySize, resArrayIndex;
+    VIR_Symbol*                               pVirUniformSym;
+    VIR_Symbol*                               pVirUniformSymParent;
+    VIR_Uniform*                              pVirUniform;
+    VIR_Type*                                 pVirUniformSymType;
+    gctBOOL                                   matched = gcvFALSE;
+    SHADER_PRIV_SAMPLER_ENTRY*                pPrivSamplerEntry;
+    SHADER_PRIV_SAMPLER_ENTRY**               ppExtraSamplerArray = *pppExtraSamplerArray;
+
+    for (i = 0; i < pSep->dynamicPrivMapping.privSamplerMapping.countOfEntries; i ++)
+    {
+        matched = gcvFALSE;
+        pPrivSamplerEntry = &pSep->dynamicPrivMapping.privSamplerMapping.pPrivSamplerEntries[i];
+
+        if (pPrivSamplerEntry->commonPrivm.privmFlag == VSC_LIB_LINK_TYPE_RESOURCE)
+        {
+            pVirUniformSym = (VIR_Symbol*)pPrivSamplerEntry->commonPrivm.pPrivateData;
+
+            gcmASSERT(pVirUniformSym);
+            gcmASSERT(VIR_Symbol_isSampler(pVirUniformSym));
+
+            pVirUniform = VIR_Symbol_GetSampler(pVirUniformSym);
+
+            pVirUniformSymParent = VIR_Shader_GetSymFromId(pShader, pVirUniform->u.samplerOrImageAttr.parentSamplerSymId);
+
+            pVirUniformSymType = VIR_Symbol_GetType(pVirUniformSymParent);
+            if (VIR_Type_GetKind(pVirUniformSymType) == VIR_TY_ARRAY)
+            {
+                resArraySize = VIR_Type_GetArrayLength(pVirUniformSymType);
+            }
+            else
+            {
+                resArraySize = 1;
+            }
+
+            if (VIR_Symbol_GetDescriptorSet(pVirUniformSymParent) == pResBinding->set &&
+                VIR_Symbol_GetBinding(pVirUniformSymParent) == pResBinding->binding &&
+                resArraySize == pResBinding->arraySize)
+            {
+                matched = gcvTRUE;
+            }
+            else if (bCheckSeparateImage || bCheckSeparateSampler)
+            {
+                VIR_Symbol*   pSparateImageSym = gcvNULL;
+                VIR_Symbol*   pSeparateSamplerSym = gcvNULL;
+
+                if (bCheckSeparateImage)
+                {
+                    if (VIR_Symbol_GetSeparateImage(pVirUniformSymParent) != VIR_INVALID_ID)
+                    {
+                        pSparateImageSym = VIR_Shader_GetSymFromId(pShader, VIR_Symbol_GetSeparateImage(pVirUniformSymParent));
+
+                        if (VIR_Symbol_GetDescriptorSet(pSparateImageSym) == pResBinding->set &&
+                            VIR_Symbol_GetBinding(pSparateImageSym) == pResBinding->binding &&
+                            resArraySize == pResBinding->arraySize)
+                        {
+                            matched = gcvTRUE;
+                        }
+                    }
+                }
+                else if (!matched && bCheckSeparateSampler)
+                {
+                    if (VIR_Symbol_GetSeparateSampler(pVirUniformSymParent) != VIR_INVALID_ID)
+                    {
+                        pSeparateSamplerSym = VIR_Shader_GetSymFromId(pShader, VIR_Symbol_GetSeparateSampler(pVirUniformSymParent));
+
+                        if (VIR_Symbol_GetDescriptorSet(pSeparateSamplerSym) == pResBinding->set &&
+                            VIR_Symbol_GetBinding(pSeparateSamplerSym) == pResBinding->binding &&
+                            resArraySize == pResBinding->arraySize)
+                        {
+                            matched = gcvTRUE;
+                        }
+                    }
+                }
+            }
+
+            if (matched)
+            {
+                if (arraySize != -1)
+                {
+                    resArraySize = arraySize;
+                }
+
+                if (ppExtraSamplerArray == gcvNULL)
+                {
+                    gcoOS_Allocate(gcvNULL, sizeof(SHADER_PRIV_SAMPLER_ENTRY*) * resArraySize,
+                                    (gctPOINTER*)&ppExtraSamplerArray);
+                    memset(ppExtraSamplerArray, 0,
+                            sizeof(SHADER_PRIV_SAMPLER_ENTRY*) * resArraySize);
+                }
+                /*
+                ** Since we don't check the array index right now, so arrayIdxInParent is invalid.
+                */
+                /* resArrayIndex = pVirUniform->u.samplerOrImageAttr.arrayIdxInParent; */
+                resArrayIndex = pPrivSamplerEntry->commonPrivm.privmFlagIndex -
+                                VIR_Symbol_GetFirstSlot(VIR_Shader_GetSymFromId(pShader, pVirUniform->u.samplerOrImageAttr.parentSamplerSymId));
+
+                gcmASSERT(resArrayIndex < resArraySize);
+                gcmASSERT(ppExtraSamplerArray[resArrayIndex] == gcvNULL);
+
+                ppExtraSamplerArray[resArrayIndex * arrayStride + offset] = pPrivSamplerEntry;
+            }
+        }
+    }
+
+    *pppExtraSamplerArray = ppExtraSamplerArray;
+
+    return errCode;
+}
+
 static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(PROG_VK_COMBINED_TEXTURE_SAMPLER_TABLE* pCombinedSampTexTable,
                                                        VIR_SHADER_RESOURCE_ALLOC_ENTRY* pResAllocEntry,
                                                        VIR_Shader* pShader,
@@ -2952,12 +3156,7 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(PROG_VK_COMBINED_TEXTURE_
 {
     PROG_VK_COMBINED_TEX_SAMPLER_TABLE_ENTRY* pCombTsEntry = gcvNULL;
     gctUINT                                   i, combTsEntryIndex;
-    gctUINT                                   resArraySize, resArrayIndex;
-    VIR_Symbol*                               pVirUniformSym;
-    VIR_Symbol*                               pVirUniformSymParent;
-    VIR_Uniform*                              pVirUniform;
-    VIR_Type*                                 pVirUniformSymType;
-    SHADER_PRIV_SAMPLER_ENTRY*                pPrivSamplerEntry;
+    gctUINT                                   resArraySize;
     VIR_Symbol*                               pTextureSym;
     VIR_Type*                                 pSymType;
     SHADER_PRIV_CONSTANT_ENTRY*               pPrivCnstEntry;
@@ -2995,50 +3194,15 @@ static VSC_ErrCode _AddVkCombStEntryToCombStTableOfPEP(PROG_VK_COMBINED_TEXTURE_
     /* Extra samplers for VSC_LIB_LINK_TYPE_RESOURCE */
     if (pResAllocEntry->hwRegNo != NOT_ASSIGNED)
     {
-        for (i = 0; i < pSep->dynamicPrivMapping.privSamplerMapping.countOfEntries; i ++)
-        {
-            pPrivSamplerEntry = &pSep->dynamicPrivMapping.privSamplerMapping.pPrivSamplerEntries[i];
-
-            if (pPrivSamplerEntry->commonPrivm.privmFlag == VSC_LIB_LINK_TYPE_RESOURCE)
-            {
-                pVirUniformSym = (VIR_Symbol*)pPrivSamplerEntry->commonPrivm.pPrivateData;
-
-                gcmASSERT(pVirUniformSym);
-                gcmASSERT(VIR_Symbol_isSampler(pVirUniformSym));
-
-                pVirUniform = VIR_Symbol_GetSampler(pVirUniformSym);
-
-                pVirUniformSymParent = VIR_Shader_GetSymFromId(pShader, pVirUniform->u.samplerOrImageAttr.parentSamplerSymId);
-
-                pVirUniformSymType = VIR_Symbol_GetType(pVirUniformSymParent);
-                if (VIR_Type_GetKind(pVirUniformSymType) == VIR_TY_ARRAY)
-                {
-                    resArraySize = VIR_Type_GetArrayLength(pVirUniformSymType);
-                }
-                else
-                {
-                    resArraySize = 1;
-                }
-
-                if (VIR_Symbol_GetDescriptorSet(pVirUniformSymParent) == pCombTsEntry->combTsBinding.set &&
-                    VIR_Symbol_GetBinding(pVirUniformSymParent) == pCombTsEntry->combTsBinding.binding &&
-                    resArraySize == pCombTsEntry->combTsBinding.arraySize)
-                {
-                    if (pCombTsEntry->hwMappings[stageIdx].ppExtraSamplerArray == gcvNULL)
-                    {
-                        gcoOS_Allocate(gcvNULL, sizeof(SHADER_PRIV_SAMPLER_ENTRY*) * resArraySize,
-                                       (gctPOINTER*)&pCombTsEntry->hwMappings[stageIdx].ppExtraSamplerArray);
-                        memset(pCombTsEntry->hwMappings[stageIdx].ppExtraSamplerArray, 0,
-                               sizeof(SHADER_PRIV_SAMPLER_ENTRY*) * resArraySize);
-                    }
-
-                    resArrayIndex = pVirUniform->u.samplerOrImageAttr.arrayIdxInParent;
-                    gcmASSERT(resArrayIndex < resArraySize);
-                    gcmASSERT(pCombTsEntry->hwMappings[stageIdx].ppExtraSamplerArray[resArrayIndex] == gcvNULL);
-                    pCombTsEntry->hwMappings[stageIdx].ppExtraSamplerArray[resArrayIndex] = pPrivSamplerEntry;
-                }
-            }
-        }
+        _AddExtraSamplerArray(&pCombTsEntry->hwMappings[stageIdx].ppExtraSamplerArray,
+                              &pCombTsEntry->combTsBinding,
+                              pShader,
+                              pSep,
+                              gcvFALSE,
+                              gcvFALSE,
+                              -1,
+                              1,
+                              0);
     }
 
     /* Set textureSize/lodMinMax */
@@ -3985,6 +4149,16 @@ static VSC_ErrCode _CollectCompilerGeneatedCombinedSampler(VSC_PEP_GEN_HELPER* p
                         pPctsHwMapping->samplerSubBinding.pResBinding = &pSeparatedSamplerEntry->samplerBinding;
                         pPctsHwMapping->samplerSubBinding.startIdxOfSubArray = samplerStartIdx;
                         pPctsHwMapping->samplerSubBinding.subArraySize = samplerSubRange;
+                        _AddExtraSamplerArray(&pPctsHwMapping->ppExtraSamplerArray,
+                                              &pSeparatedSamplerEntry->samplerBinding,
+                                              pShader,
+                                              &pOutPEP->seps[stageIdx],
+                                              gcvFALSE,
+                                              gcvTRUE,
+                                              pPctsHwMapping->samplerSubBinding.subArraySize * pPctsHwMapping->texSubBinding.subArraySize,
+                                              pPctsHwMapping->texSubBinding.subArraySize,
+                                              0
+                                              );
 
                         pSeparatedSamplerEntry->activeStageMask |= 1 << stageIdx;
                         pSeparatedSamplerEntry->bUsingHwMppingList = gcvTRUE;
@@ -4149,6 +4323,36 @@ OnError:
     return errCode;
 }
 
+static VSC_ErrCode _PostProcessPrivateCombTsHwMapping(PROGRAM_EXECUTABLE_PROFILE* pOutPEP, gctUINT stageIdx)
+{
+    VSC_ErrCode                          errCode = VSC_ERR_NONE;
+    gctUINT                              i, j, k;
+    PROG_VK_PRIV_COMB_TEX_SAMP_HW_MAPPING* pPrivCombTsHwMappingEntry;
+    SHADER_PRIV_SAMPLER_ENTRY*           pPrivSamplerEntry;
+
+    for (i = 0; i < pOutPEP->u.vk.privateCombTsHwMappingPool.countOfArray; i++)
+    {
+        pPrivCombTsHwMappingEntry = &pOutPEP->u.vk.privateCombTsHwMappingPool.pPrivCombTsHwMappingArray[i];
+
+        if (pPrivCombTsHwMappingEntry->ppExtraSamplerArray)
+        {
+            for (j = 0; j < pPrivCombTsHwMappingEntry->samplerSubBinding.subArraySize; j++)
+            {
+                for (k = 0; k < pPrivCombTsHwMappingEntry->texSubBinding.subArraySize; k++)
+                {
+                    pPrivSamplerEntry = pPrivCombTsHwMappingEntry->ppExtraSamplerArray[j * pPrivCombTsHwMappingEntry->texSubBinding.subArraySize + k];
+                    if (pPrivSamplerEntry)
+                    {
+                        pPrivSamplerEntry->commonPrivm.pPrivateData = gcvNULL;
+                    }
+                }
+            }
+        }
+    }
+
+    return errCode;
+}
+
 static VSC_ErrCode _CollectResourceLayoutTablesToPEP(VSC_PEP_GEN_HELPER* pPepGenHelper,
                                                      gctUINT stageIdx,
                                                      PROGRAM_EXECUTABLE_PROFILE* pOutPEP)
@@ -4276,6 +4480,10 @@ static VSC_ErrCode _CollectResourceLayoutTablesToPEP(VSC_PEP_GEN_HELPER* pPepGen
 
     /* Post process resource set */
     errCode = _PostProcessResourceSetTables(pOutPEP, stageIdx);
+    ON_ERROR(errCode, "Post process resource set tables");
+
+    /* Post privateCombTsHwMappingPool. */
+    errCode = _PostProcessPrivateCombTsHwMapping(pOutPEP, stageIdx);
     ON_ERROR(errCode, "Post process resource set tables");
 
 OnError:

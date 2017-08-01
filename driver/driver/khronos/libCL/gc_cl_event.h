@@ -55,6 +55,7 @@ typedef struct _cl_event
     gctINT                  executionStatus;
     gctBOOL                 executionStatusSet;
     gctBOOL                 userEvent;
+    gctBOOL                 fromUserCommand;
     cl_command_type         commandType;
     clsEventCallback_PTR    callback;
     gctPOINTER              callbackMutex;
@@ -151,6 +152,14 @@ gctINT
 clfReleaseEvent(
     cl_event Event
     );
+
+/* command that execute by GPU need set the RUNNING statue by this */
+#define EVENT_SET_GPU_RUNNING(Command, engine) if (Command->event) Command->submitEngine = engine, clfSubmitEventForRunning(Command);
+
+/* command that execute by CPU need set the RUNNING statue by this */
+#define EVENT_SET_CPU_RUNNING(Command) if (Command->event) { \
+            clfSetEventExecutionStatus(Command->event, CL_RUNNING); \
+            clfScheduleEventCallback(Command->event, CL_RUNNING);}
 
 #ifdef __cplusplus
 }

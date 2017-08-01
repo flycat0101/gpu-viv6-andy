@@ -449,6 +449,7 @@ struct __GLchipContextRec
 
     gctBOOL                     robust;
 
+    gcoPROFILER                 profiler;
 #ifdef OPENGL40
     gctBOOL                     hwPointSprite;
     gcoSURF                     drawRT[__GL_MAX_DRAW_BUFFERS];
@@ -1043,23 +1044,6 @@ gcChipLTCReleaseResultArray(
     IN gcoOS               Os
     );
 
-
-extern void
-gcChipInitializeProfiler(
-    __GLcontext *gc
-    );
-
-extern void
-gcChipDestroyProfiler(
-    __GLcontext *gc
-    );
-
-extern GLboolean
-__glChipProfiler(
-    gctPOINTER Profiler,
-    GLuint Enum,
-    gctHANDLE Value);
-
 extern gceSTATUS
 gcChipSetError(
     __GLchipContext *chipCtx,
@@ -1071,6 +1055,28 @@ __glChipGetError(
     __GLcontext *gc
     );
 
+GLboolean
+__glChipProfilerSet(
+    IN __GLcontext *gc,
+    IN GLuint Enum,
+    IN gctHANDLE Value
+    );
+
+gceSTATUS
+gcChipProfilerInitialize(
+    IN __GLcontext *gc
+    );
+
+gceSTATUS
+gcChipProfilerDestroy(
+    IN __GLcontext *gc
+    );
+
+gceSTATUS
+gcChipProfilerWrite(
+    IN __GLcontext *gc,
+    IN GLuint Enum
+    );
 
 GLvoid
 gcChipInitProfileDevicePipeline(

@@ -211,6 +211,8 @@ VX_PRIVATE_API vx_status vxoScalar_CommitValue(vx_scalar scalar, const void *ptr
     return VX_SUCCESS;
 }
 
+void vxoReference_Destroy(vx_reference ref);
+
 VX_INTERNAL_CALLBACK_API void vxoScalar_Destructor(vx_reference ref)
 {
     vx_scalar scalar = (vx_scalar)ref;
@@ -219,7 +221,12 @@ VX_INTERNAL_CALLBACK_API void vxoScalar_Destructor(vx_reference ref)
 
     if (scalar->node != VX_NULL)
     {
+        vx_context context = vxGetContext(ref);
+
         gcoVX_FreeMemory((gcsSURF_NODE_PTR)scalar->node);
+
+        context->memoryCount --;
+
         scalar->value = VX_NULL;
         scalar->node = VX_NULL;
     }
@@ -244,6 +251,9 @@ VX_API_ENTRY vx_scalar VX_API_CALL vxCreateScalar(vx_context context, vx_enum da
     scalar->dataType = dataType;
 
     gcoVX_AllocateMemory(sizeof(vx_scalar_data), (gctPOINTER*)&scalar->value, (gctPHYS_ADDR*)&scalar->physical, (gcsSURF_NODE_PTR*)&scalar->node);
+
+    context->memoryCount ++;
+
     memset(scalar->value, 0, sizeof(vx_scalar_data));
 
     vxoScalar_CommitValue(scalar, (vx_ptr)ptr);
@@ -264,7 +274,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryScalar(vx_scalar scalar, vx_enum attri
 
     switch (attribute)
     {
-        case VX_SCALAR_ATTRIBUTE_TYPE:
+        case VX_SCALAR_TYPE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
 
             *(vx_enum *)ptr = vxoScalar_GetDataType(scalar);
@@ -277,6 +287,116 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryScalar(vx_scalar scalar, vx_enum attri
 
     return VX_SUCCESS;
 }
+
+static vx_status gcoVX_ScalarToHostMem(vx_scalar scalar, void* user_ptr)
+{
+    vx_status status = VX_SUCCESS;
+
+    if (vx_false_e == vxAcquireMutex(scalar->base.lock))
+        return VX_ERROR_NO_RESOURCES;
+
+    //vxPrintScalarValue(scalar);
+
+    switch (scalar->dataType)
+    {
+    case VX_TYPE_CHAR:     *(vx_char*)user_ptr = scalar->value->u8; break;
+    case VX_TYPE_INT8:     *(vx_int8*)user_ptr = scalar->value->n8; break;
+    case VX_TYPE_UINT8:    *(vx_uint8*)user_ptr = scalar->value->u8; break;
+    case VX_TYPE_INT16:    *(vx_int16*)user_ptr = scalar->value->n16; break;
+    case VX_TYPE_UINT16:   *(vx_uint16*)user_ptr = scalar->value->u16; break;
+    case VX_TYPE_INT32:    *(vx_int32*)user_ptr = scalar->value->n32; break;
+    case VX_TYPE_UINT32:   *(vx_uint32*)user_ptr = scalar->value->u32; break;
+    case VX_TYPE_INT64:    *(vx_int64*)user_ptr = scalar->value->n64; break;
+    case VX_TYPE_UINT64:   *(vx_uint64*)user_ptr = scalar->value->u64; break;
+#if OVX_SUPPORT_HALF_FLOAT
+    case VX_TYPE_FLOAT16:  *(vx_float16*)ptr = scalar->data.f16; break;
+#endif
+    case VX_TYPE_FLOAT32:  *(vx_float32*)user_ptr = scalar->value->f32; break;
+    case VX_TYPE_FLOAT64:  *(vx_float64*)user_ptr = scalar->value->f64; break;
+    case VX_TYPE_DF_IMAGE: *(vx_df_image*)user_ptr = scalar->value->imageFormat; break;
+    case VX_TYPE_ENUM:     *(vx_enum*)user_ptr = scalar->value->e; break;
+    case VX_TYPE_SIZE:     *(vx_size*)user_ptr = scalar->value->s; break;
+    case VX_TYPE_BOOL:     *(vx_bool*)user_ptr = scalar->value->b; break;
+
+    default:
+        vxError("some case is not covered in %s\n", __FUNCTION__);
+        status = VX_ERROR_NOT_SUPPORTED;
+        break;
+    }
+
+    if (vx_false_e == vxReleaseMutex(scalar->base.lock))
+        return VX_ERROR_NO_RESOURCES;
+
+    vxoReference_IncrementReadCount(&scalar->base);
+
+    return status;
+} /* gcoVX_ScalarToHostMem() */
+
+static vx_status gcoVX_HostMemToScalar(vx_scalar scalar, void* user_ptr)
+{
+    vx_status status = VX_SUCCESS;
+
+    if (vx_false_e == vxAcquireMutex(scalar->base.lock))
+        return VX_ERROR_NO_RESOURCES;
+
+    switch (scalar->dataType)
+    {
+    case VX_TYPE_CHAR:     scalar->value->u8 = *(vx_char*)user_ptr; break;
+    case VX_TYPE_INT8:     scalar->value->n8 = *(vx_int8*)user_ptr; break;
+    case VX_TYPE_UINT8:    scalar->value->u8 = *(vx_uint8*)user_ptr; break;
+    case VX_TYPE_INT16:    scalar->value->n16 = *(vx_int16*)user_ptr; break;
+    case VX_TYPE_UINT16:   scalar->value->u16 = *(vx_uint16*)user_ptr; break;
+    case VX_TYPE_INT32:    scalar->value->n32 = *(vx_int32*)user_ptr; break;
+    case VX_TYPE_UINT32:   scalar->value->u32 = *(vx_uint32*)user_ptr; break;
+    case VX_TYPE_INT64:    scalar->value->n64 = *(vx_int64*)user_ptr; break;
+    case VX_TYPE_UINT64:   scalar->value->u64 = *(vx_uint64*)user_ptr; break;
+#if OVX_SUPPORT_HALF_FLOAT
+    case VX_TYPE_FLOAT16:  scalar->data.f16 = *(vx_float16*)user_ptr; break;
+#endif
+    case VX_TYPE_FLOAT32:  scalar->value->f32 = *(vx_float32*)user_ptr; break;
+    case VX_TYPE_FLOAT64:  scalar->value->f64 = *(vx_float64*)user_ptr; break;
+    case VX_TYPE_DF_IMAGE: scalar->value->imageFormat = *(vx_df_image*)user_ptr; break;
+    case VX_TYPE_ENUM:     scalar->value->e = *(vx_enum*)user_ptr; break;
+    case VX_TYPE_SIZE:     scalar->value->s = *(vx_size*)user_ptr; break;
+    case VX_TYPE_BOOL:     scalar->value->b = *(vx_bool*)user_ptr; break;
+
+    default:
+        vxError("some case is not covered in %s\n", __FUNCTION__);
+        status = VX_ERROR_NOT_SUPPORTED;
+        break;
+    }
+
+    //vxPrintScalarValue(scalar);
+
+    if (vx_false_e == vxReleaseMutex(scalar->base.lock))
+        return VX_ERROR_NO_RESOURCES;
+
+    vxoReference_IncrementWriteCount(&scalar->base);
+
+    return status;
+} /* gcoVX_HostMemToScalar() */
+
+VX_API_ENTRY vx_status VX_API_CALL vxCopyScalar(vx_scalar scalar, void* user_ptr, vx_enum usage, vx_enum user_mem_type)
+{
+    vx_status status = VX_SUCCESS;
+
+    if (!vxoReference_IsValidAndSpecific(&scalar->base,VX_TYPE_SCALAR)) return VX_ERROR_INVALID_REFERENCE;
+
+    if (NULL == user_ptr || VX_MEMORY_TYPE_HOST != user_mem_type)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    switch (usage)
+    {
+    case VX_READ_ONLY:  status = gcoVX_ScalarToHostMem(scalar, user_ptr);  break;
+    case VX_WRITE_ONLY: status = gcoVX_HostMemToScalar(scalar, user_ptr); break;
+
+    default:
+        status = VX_ERROR_INVALID_PARAMETERS;
+        break;
+    }
+
+    return status;
+} /* vxCopyScalar() */
 
 VX_API_ENTRY vx_status VX_API_CALL vxReadScalarValue(vx_scalar scalar, void *ptr)
 {

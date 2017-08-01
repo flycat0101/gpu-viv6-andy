@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Khronos Group Inc.
+ * Copyright (c) 2012-2016 The Khronos Group Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and/or associated documentation files (the
@@ -11,6 +11,11 @@
  *
  * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Materials.
+ *
+ * MODIFICATIONS TO THIS FILE MAY MEAN IT NO LONGER ACCURATELY REFLECTS
+ * KHRONOS STANDARDS. THE UNMODIFIED, NORMATIVE VERSIONS OF KHRONOS
+ * SPECIFICATIONS AND HEADER INFORMATION ARE LOCATED AT
+ *    https://www.khronos.org/registry/
  *
  * THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
@@ -40,16 +45,9 @@
  */
 #define VX_MAX_TARGET_NAME (64)
 
-/*! \brief The Object Type Enumeration for Targets.
- * \ingroup group_target
- */
-enum vx_ext_target_type_e {
-    VX_TYPE_TARGET = 0x813,/*!< \brief A <tt>\ref vx_target</tt> */
-};
-
 enum vx_ext_target_context_attribute_e {
     /*! \brief Used to query the context for the number of active targets. Use a <tt>\ref vx_uint32</tt> parameter. */
-    VX_CONTEXT_ATTRIBUTE_TARGETS = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_CONTEXT) + 0xC,
+    VX_CONTEXT_TARGETS = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_CONTEXT) + 0xC,
 };
 
 /*! \brief An abstract handle to a target.
@@ -91,7 +89,7 @@ extern "C" {
  * \return <tt>\ref vx_target</tt>
  * \retval 0 Invalid index.
  * \retval * A target reference.
- * \note Use <tt>\ref vxQueryContext</tt> with <tt>\ref VX_CONTEXT_ATTRIBUTE_NUMTARGETS</tt> to retrieve the upper limit of targets.
+ * \note Use <tt>\ref vxQueryContext</tt> with <tt>\ref VX_CONTEXT_NUMTARGETS</tt> to retrieve the upper limit of targets.
  * \ingroup group_target
  */
 VX_API_ENTRY vx_target VX_API_CALL vxGetTargetByIndex(vx_context context, vx_uint32 index);

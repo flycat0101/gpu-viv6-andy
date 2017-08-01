@@ -39,11 +39,11 @@ vx_status vxThreshold(vx_node node, vx_image src_image, vx_threshold threshold, 
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryThreshold(threshold, VX_THRESHOLD_ATTRIBUTE_TYPE, &type, sizeof(type));
+    vxQueryThreshold(threshold, VX_THRESHOLD_TYPE, &type, sizeof(type));
 
     if (type == VX_THRESHOLD_TYPE_BINARY)
     {
-        vxQueryThreshold(threshold, VX_THRESHOLD_ATTRIBUTE_THRESHOLD_VALUE, &value, sizeof(value));
+        vxQueryThreshold(threshold, VX_THRESHOLD_THRESHOLD_VALUE, &value, sizeof(value));
         bin[0] = FORMAT_VALUE(value + 1);
         bin[1] = FORMAT_VALUE(0xffu);
 
@@ -54,8 +54,8 @@ vx_status vxThreshold(vx_node node, vx_image src_image, vx_threshold threshold, 
     }
     else if (type == VX_THRESHOLD_TYPE_RANGE)
     {
-        vxQueryThreshold(threshold, VX_THRESHOLD_ATTRIBUTE_THRESHOLD_LOWER, &lower, sizeof(lower));
-        vxQueryThreshold(threshold, VX_THRESHOLD_ATTRIBUTE_THRESHOLD_UPPER, &upper, sizeof(upper));
+        vxQueryThreshold(threshold, VX_THRESHOLD_THRESHOLD_LOWER, &lower, sizeof(lower));
+        vxQueryThreshold(threshold, VX_THRESHOLD_THRESHOLD_UPPER, &upper, sizeof(upper));
         bin[0] = FORMAT_VALUE(lower);
         bin[1] = FORMAT_VALUE(upper);
 

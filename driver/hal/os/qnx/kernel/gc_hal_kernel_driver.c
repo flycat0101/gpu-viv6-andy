@@ -232,45 +232,6 @@ drv_signal_mgr_update_iface(
         }
         break;
 
-    case gcvHAL_COMPOSE:
-        {
-            iface->u.Compose.rcvid  = Rcvid;
-
-            gcmkONERROR(drv_signal_mgr_add(
-                    Pid,
-                    iface->u.Compose.coid,
-                    Rcvid,
-                    iface->u.Compose.signal,
-                    &signal));
-
-            iface->u.Compose.signal = gcmPTR_TO_UINT64(signal);
-
-            if (iface->u.Compose.userSignal1 != 0)
-            {
-                gcmkONERROR(drv_signal_mgr_add(
-                        Pid,
-                        iface->u.Compose.coid,
-                        Rcvid,
-                        iface->u.Compose.userSignal1,
-                        &signal));
-
-                iface->u.Compose.userSignal1 = gcmPTR_TO_UINT64(signal);
-            }
-
-            if (iface->u.Compose.userSignal2 != 0)
-            {
-                gcmkONERROR(drv_signal_mgr_add(
-                        Pid,
-                        iface->u.Compose.coid,
-                        Rcvid,
-                        iface->u.Compose.userSignal2,
-                        &signal));
-
-                iface->u.Compose.userSignal2 = gcmPTR_TO_UINT64(signal);
-            }
-        }
-        break;
-
     default:
         break;
     }
@@ -1806,7 +1767,6 @@ int drv_msg(resmgr_context_t *ctp,
     switch (drvArgs->iface.command)
     {
     case gcvHAL_SIGNAL:
-    case gcvHAL_COMPOSE:
         status = drv_signal_mgr_update_iface(pid, ctp->rcvid, &drvArgs->iface);
         if (gcmIS_ERROR(status))
         {

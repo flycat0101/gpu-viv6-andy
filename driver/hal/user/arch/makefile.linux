@@ -84,8 +84,7 @@ OBJECTS  := $(OBJ_DIR)/gc_hal_user_hardware_blt.o \
             $(OBJ_DIR)/gc_hal_user_hardware_dec.o
 
 ifeq ($(VIVANTE_ENABLE_3D),1)
-  OBJECTS += $(OBJ_DIR)/gc_hal_user_hardware_composition.o \
-             $(OBJ_DIR)/gc_hal_user_hardware_clear.o \
+  OBJECTS += $(OBJ_DIR)/gc_hal_user_hardware_clear.o \
              $(OBJ_DIR)/gc_hal_user_hardware_filter_blt_de.o \
              $(OBJ_DIR)/gc_hal_user_hardware_engine.o \
              $(OBJ_DIR)/gc_hal_user_hardware_frag_proc.o \

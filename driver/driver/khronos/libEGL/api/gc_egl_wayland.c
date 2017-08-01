@@ -57,6 +57,8 @@ struct wl_egl_window
     int nr_buffers;
     int next;
 
+    int indequeue;
+
     int32_t dx;
     int32_t dy;
     int32_t width;
@@ -673,14 +675,16 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
     struct wl_event_queue *wl_queue = window->display->wl_queue;
     int ret = 0;
 
+    if (window->indequeue)
+    {
+        fprintf(stderr, "ERROR: nested dequeue buffer\n");
+        return NULL;
+    }
+
+    window->indequeue = 1;
+
     /* Try to read and dispatch some events. */
     dispatch_queue(wl_dpy, wl_queue, 0);
-
-    /* Dispatch the default queue. */
-    if (wl_display_prepare_read(wl_dpy) == -1)
-        wl_display_dispatch_pending(wl_dpy);
-    else
-        wl_display_cancel_read(wl_dpy);
 
     if (window->nr_buffers > 1)
     {
@@ -701,12 +705,6 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
             }
 
             dispatch_queue(wl_dpy, wl_queue, 1);
-
-            /* Dispatch the default queue. */
-            if (wl_display_prepare_read(wl_dpy) == -1)
-                wl_display_dispatch_pending(wl_dpy);
-            else
-                wl_display_cancel_read(wl_dpy);
         }
     }
     else
@@ -716,6 +714,7 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
 
     if (!buffer)
     {
+        window->indequeue = 0;
         return NULL;
     }
 
@@ -741,17 +740,62 @@ wl_egl_window_dequeue_buffer(struct wl_egl_window *window)
                 window->type,  window->format);
     }
 
+    window->indequeue = 0;
     buffer->state = BUFFER_STATE_DEQUEUED;
     return buffer;
 }
 
+static void
+make_bounding_box(struct wl_egl_buffer *buffer, const struct eglRegion *region,
+        int *x, int *y, int *width, int *height)
+{
+    if (region)
+    {
+        int i;
+        /* region is relative to bottom-left corner. */
+        int left   = region->rects[0];
+        int bottom = region->rects[1];
+        int right  = region->rects[2] + left;
+        int top    = region->rects[3] + bottom;
+
+        for (i = 1; i < region->numRects; i++)
+        {
+            int l = region->rects[i * 4 + 0];
+            int b = region->rects[i * 4 + 1];
+            int r = region->rects[i * 4 + 2] + l;
+            int t = region->rects[i * 4 + 3] + b;
+
+            left   = gcmMIN(l, left);
+            bottom = gcmMIN(b, bottom);
+            right  = gcmMAX(r, right);
+            top    = gcmMAX(t, top);
+        }
+
+        /* translate to upper-left corner relative. */
+        *x = left;
+        *y = buffer->info.height - top;
+        *width  = right - left;
+        *height = top - bottom;
+    }
+    else
+    {
+        *x = *y = 0;
+        *width  = buffer->info.width;
+        *height = buffer->info.height;
+    }
+}
+
 static int
 wl_egl_window_queue_buffer(struct wl_egl_window *window,
-        struct wl_egl_buffer *buffer)
+        struct wl_egl_buffer *buffer,
+        struct eglRegion *damage)
 {
     struct wl_egl_display *display = window->display;
     struct wl_display *wl_dpy = display->wl_dpy;
     struct wl_event_queue *wl_queue = display->wl_queue;
+    int x, y, width, height;
+
+    make_bounding_box(buffer, damage, &x, &y, &width, &height);
 
     if (display->swap_interval > 0)
     {
@@ -778,7 +822,7 @@ wl_egl_window_queue_buffer(struct wl_egl_window *window,
     window->dy = 0;
 
     wl_surface_attach(window->surface, buffer->wl_buf, window->dx, window->dy);
-    wl_surface_damage(window->surface, 0, 0, window->width, window->height);
+    wl_surface_damage(window->surface, x, y, width, height);
     wl_surface_commit(window->surface);
 
     /*
@@ -1066,6 +1110,9 @@ _BindWindow(
 
     format = window->format;
     type   = window->type;
+
+    (void)status;
+    (void)type;
 
     if (Surface->openVG)
     {
@@ -1384,8 +1431,8 @@ _PostWindowBackBuffer(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN struct eglBackBuffer * BackBuffer,
-    IN EGLint NumRects,
-    IN EGLint Rects[]
+    IN struct eglRegion * Region,
+    IN struct eglRegion * DamageHint
     )
 {
     int err;
@@ -1398,7 +1445,7 @@ _PostWindowBackBuffer(
 
     gcmASSERT(Surface->type & EGL_WINDOW_BIT);
 
-    err = wl_egl_window_queue_buffer(window, BackBuffer->context);
+    err = wl_egl_window_queue_buffer(window, BackBuffer->context, DamageHint);
 
     if (err)
     {
@@ -1929,6 +1976,12 @@ void wl_egl_window_resize(struct wl_egl_window *window,
         window->width  = width;
         window->height = height;
 
+        /* handle recursive call to dequeue issue. */
+        if (window->indequeue)
+        {
+            return;
+        }
+
         /* Reset age. */
         for (i = 0; i < window->nr_buffers; i++)
         {
@@ -1957,7 +2010,14 @@ void wl_egl_window_resize(struct wl_egl_window *window,
 
         if (dpy != NULL && sur != NULL)
         {
-            veglResizeSurface(dpy, sur, width, height);
+            VEGLThreadData thread = veglGetThreadData();
+            if (thread && thread->context &&
+                thread->context->context &&
+                (thread->context->read == sur ||
+                 thread->context->draw == sur))
+            {
+                veglResizeSurface(dpy, sur, width, height);
+            }
         }
     }
 }

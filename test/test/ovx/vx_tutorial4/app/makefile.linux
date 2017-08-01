@@ -45,6 +45,10 @@ CFLAGS += $(INCLUDE)
 
 #CFLAGS += -std=c99
 
+ifeq ($(NO_SHOW_ON_SCREEN),1)
+	CFLAGS += -DNO_SHOW
+endif
+
 PROGRAM = 1
 
 TARGET_NAME = vx_tutorial4

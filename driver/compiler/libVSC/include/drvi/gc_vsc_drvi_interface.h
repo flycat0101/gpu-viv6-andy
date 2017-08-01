@@ -141,6 +141,7 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          hasExtraInst2          : 1;
         gctUINT          hasAtomic              : 1;
         gctUINT          supportFullIntBranch   : 1;
+        gctUINT          hasDynamicIdxDepFix    : 1;
 
         /* Followings will be removed after shader programming is removed out of VSC */
         gctUINT          hasSHEnhance3          : 1;
@@ -156,7 +157,7 @@ typedef struct _VSC_HW_CONFIG
         gctUINT          robustAtomic           : 1;
         gctUINT          newGPIPE               : 1;
 
-        gctUINT          reserved               : 6;
+        gctUINT          reserved               : 5;
 
     } hwFeatureFlags;
 
@@ -236,8 +237,9 @@ typedef gcsGLSLCaps VSC_GL_API_CONFIG, *PVSC_GL_API_CONFIG;
 #define VSC_COMPILER_OPT_IO_PACKING                     0x0000000000004000ULL /* Physical io packing */
 #define VSC_COMPILER_OPT_FULL_ACTIVE_IO                 0x0000000000008000ULL
 #define VSC_COMPILER_OPT_DUAL16                         0x0000000000010000ULL
+#define VSC_COMPILER_OPT_ILF_LINK                       0x0000000000020000ULL
 
-#define VSC_COMPILER_OPT_FULL                           0x000000000001FFFFULL
+#define VSC_COMPILER_OPT_FULL                           0x000000000003FFFFULL
 
 #define VSC_COMPILER_OPT_NO_ALGE_SIMP                   0x0000000100000000ULL
 #define VSC_COMPILER_OPT_NO_GCP                         0x0000000200000000ULL
@@ -256,8 +258,9 @@ typedef gcsGLSLCaps VSC_GL_API_CONFIG, *PVSC_GL_API_CONFIG;
 #define VSC_COMPILER_OPT_NO_IO_PACKING                  0x0000400000000000ULL /* Physical io packing */
 #define VSC_COMPILER_OPT_NO_FULL_ACTIVE_IO              0x0000800000000000ULL
 #define VSC_COMPILER_OPT_NO_DUAL16                      0x0001000000000000ULL
+#define VSC_COMPILER_OPT_NO_ILF_LINK                    0x0002000000000000ULL
 
-#define VSC_COMPILER_OPT_NO_OPT                         0x0001FFFF00000000ULL
+#define VSC_COMPILER_OPT_NO_OPT                         0x0003FFFF00000000ULL
 
 /* Compiler flag for special purpose */
 #define VSC_COMPILER_FLAG_COMPILE_TO_HL                0x00000001   /* Compile IR to HL, including doing all opts in HL */

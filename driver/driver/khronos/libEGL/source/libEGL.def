@@ -76,3 +76,8 @@ EXPORTS
     eglWaitSyncKHR                      @54
 
     eglSwapBuffersRegionEXT             @55
+
+    eglSetDamageRegionKHR               @56
+    eglSwapBuffersWithDamageKHR         @57
+    eglSwapBuffersWithDamageEXT         @58
+

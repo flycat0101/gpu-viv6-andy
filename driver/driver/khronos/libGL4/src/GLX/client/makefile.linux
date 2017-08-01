@@ -78,7 +78,6 @@ INCLUDE += \
 	-I$(TOPDIR)/include -I$(TOPDIR)/include/backend -I$(TOPDIR)/include/dri -I$(TOPDIR)/include/gl  -I$(TOPDIR)/include/glcore \
 	-I$(ROOTFS_USR)/include/X11/extensions \
 	-I$(ROOTFS_USR)/include \
-	-I$(ROOTFS_USR)/include/arm-linux-gnueabi \
 	-I$(ROOTFS_USR)/include/pixman-1 \
 	-I$(ROOTFS_USR)/include/libdrm
 
@@ -116,7 +115,7 @@ OBJECTS = \
 	$(OBJ_DIR)/g_pri_api_entry.o
 
 
-LFLAGS += $(LIBDIR) $(LLDLIBS) -Wl,--version-script=GLSymExport
+LFLAGS += -Wl,--version-script=GLSymExport $(LIBDIR)
 
 install: extra_install
 
@@ -128,3 +127,16 @@ extra_install: $(TARGET_OUTPUT)
 	@-cp -f $(AQROOT)/sdk/inc/GL/*.h $(SDK_DIR)/include/GL
 	-cd $(OBJ_DIR); ln -sf $(TARGET_NAME) libGL.so; ln -sf $(TARGET_NAME) libGL.so.1
 	cd $(SDK_DIR)/drivers; rm -f libGL.so libGL.so.1; ln -s $(TARGET_NAME) libGL.so; ln -s $(TARGET_NAME) libGL.so.1; cd -
+
+
+
+# module dependencies
+$(TARGET_MODULE): $(wildcard $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.so \
+                             $(AQROOT)/hal/user/$(OBJ_DIR)/libGAL.a) \
+                  $(wildcard $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.so \
+                             $(AQROOT)/compiler/libVSC/$(OBJ_DIR)/libVSC.a)
+
+
+$(TARGET_OUTPUT): $(OBJECTS)
+	$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LLDLIBS)
+

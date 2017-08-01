@@ -79,7 +79,7 @@ VX_INTERNAL_API vx_node vxSgmCostPath0Node(vx_graph graph, vx_image cost, vx_sca
 VX_INTERNAL_API vx_node vxSgmGetDispNode(vx_graph graph, vx_image path, vx_scalar range, vx_image depth);
 VX_INTERNAL_API vx_node vxLaplacian3x3Node(vx_graph graph, vx_image src, vx_image dst);
 
-VX_INTERNAL_API vx_node vxCnnSoftMaxNode(vx_graph graph, vx_array src, vx_scalar batchSize, vx_scalar networkType, vx_scalar hasInterleave, vx_array dst);
+VX_INTERNAL_API vx_node vxCnnSoftMaxNode(vx_graph graph, vx_array src, vx_scalar batchSize, vx_scalar networkType, vx_scalar hasInterleave, vx_scalar fractionLength, vx_array dst);
 VX_INTERNAL_API vx_node vxCnnInterleaveBuffersNode(vx_graph graph, vx_array src, vx_scalar itemSize, vx_scalar batchSize, vx_scalar networkType, vx_scalar setEvent, vx_array dst);
 VX_INTERNAL_API vx_node vxCnnLayerNode(vx_graph graph, vx_array src, vx_scalar levelScalar, vx_array kernelBuffer, vx_array nnCmdBuffer, vx_scalar repeatScalar, vx_scalar batchSize, vx_scalar networkType, vx_array dst);
 VX_INTERNAL_API vx_node vxCnnReshuffleImageNode(vx_graph graph, vx_image src, vx_array mean, vx_scalar levelScalar, vx_scalar padScalar, vx_scalar strideX, vx_scalar strideY, vx_scalar batchSize, vx_scalar networkType, vx_array dst);

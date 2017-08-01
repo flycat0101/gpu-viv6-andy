@@ -56,8 +56,6 @@
 #ifndef __gc_hal_kernel_linux_h_
 #define __gc_hal_kernel_linux_h_
 
-/* VIV: Latest kernel version supported: 4.1.0. */
-
 #include <linux/version.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -214,14 +212,6 @@ struct _gckOS
     /* signal id database. */
     gcsINTEGER_DB               signalDB;
 
-#if gcdANDROID_NATIVE_FENCE_SYNC
-    /* Lock. */
-    gctPOINTER                  syncPointMutex;
-
-    /* sync point id database. */
-    gcsINTEGER_DB               syncPointDB;
-#endif
-
     gcsUSER_MAPPING_PTR         userMap;
 
     /* workqueue for os timer. */
@@ -254,7 +244,10 @@ typedef struct _gcsSIGNAL * gcsSIGNAL_PTR;
 typedef struct _gcsSIGNAL
 {
     /* Kernel sync primitive. */
-    struct completion obj;
+    volatile unsigned int done;
+    spinlock_t lock;
+
+    wait_queue_head_t wait;
 
     /* Manual reset flag. */
     gctBOOL manualReset;
@@ -269,8 +262,12 @@ typedef struct _gcsSIGNAL
     gctUINT32 id;
 
 #if gcdANDROID_NATIVE_FENCE_SYNC
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4,9,0)
     /* Parent timeline. */
     struct sync_timeline * timeline;
+#  else
+    struct fence *fence;
+#  endif
 #endif
 }
 gcsSIGNAL;
@@ -293,6 +290,23 @@ gckOS_FreeAllocators(
     gckOS Os
     );
 
+/* Reserved memory. */
+gceSTATUS
+gckOS_RequestReservedMemory(
+    gckOS Os,
+    unsigned long Start,
+    unsigned long Size,
+    const char * Name,
+    gctBOOL Requested,
+    void ** MemoryHandle
+    );
+
+void
+gckOS_ReleaseReservedMemory(
+    gckOS Os,
+    void * MemoryHandle
+    );
+
 gceSTATUS
 _ConvertLogical2Physical(
     IN gckOS Os,
@@ -300,12 +314,6 @@ _ConvertLogical2Physical(
     IN gctUINT32 ProcessID,
     IN PLINUX_MDL Mdl,
     OUT gctPHYS_ADDR_T * Physical
-    );
-
-void
-_UnmapUserLogical(
-    IN gctPOINTER Logical,
-    IN gctUINT32  Size
     );
 
 gctBOOL

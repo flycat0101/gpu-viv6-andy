@@ -26,7 +26,10 @@ LOCAL_SRC_FILES := \
 	spvconverter/gc_spriv_disassmble.c
 
 LOCAL_CFLAGS := \
-	$(CFLAGS)
+	$(CFLAGS) \
+	-Wno-tautological-constant-out-of-range-compare \
+	-Wno-tautological-compare \
+	-Wno-sign-compare
 
 LOCAL_C_INCLUDES := \
 	$(AQROOT)/sdk/inc \

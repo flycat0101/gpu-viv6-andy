@@ -95,8 +95,11 @@ typedef struct gbm_bo     *EGLNativePixmapType;
 typedef void              *EGLNativeWindowType;
 
 #elif defined(__ANDROID__) || defined(ANDROID)
-
-#include <android/native_window.h>
+#if ANDROID_SDK_VERSION >= 26
+#    include <system/window.h>
+#  else
+#    include <android/native_window.h>
+#  endif
 
 struct egl_native_pixmap_t;
 

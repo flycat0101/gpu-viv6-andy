@@ -757,12 +757,13 @@ value_type0(
     );
 #endif
 
-static void _UpdateMaxRegister(
-    IN gcsCODE_GENERATOR_PTR CodeGen,
+void gcCGUpdateMaxRegister(
+    IN void *                 pCodeGen,
     IN gctUINT                Regs,
     IN gcLINKTREE             Tree
     )
 {
+    gcsCODE_GENERATOR_PTR CodeGen = (gcsCODE_GENERATOR_PTR)pCodeGen;
     /* do not update max register if Regs is fake subsampleDepth register */
     if (CodeGen->subsampleDepthPhysical == Regs)
     {
@@ -5001,7 +5002,7 @@ _AllocateRegisterForTemp(
                        &enable,
                        0));
 
-        _UpdateMaxRegister(CodeGen, Temp->assigned, Tree);
+        gcCGUpdateMaxRegister(CodeGen, Temp->assigned, Tree);
 
         if (gcSHADER_DumpCodeGenVerbose(Tree->shader))
             dumpRegisterAllocation(Temp);
@@ -5016,7 +5017,7 @@ _AllocateRegisterForTemp(
             Temp[i].swizzle  = Temp->swizzle;
             Temp[i].shift    = Temp->shift;
 
-            _UpdateMaxRegister(CodeGen, Temp[i].assigned, Tree);
+            gcCGUpdateMaxRegister(CodeGen, Temp[i].assigned, Tree);
 
             if (gcSHADER_DumpCodeGenVerbose(Tree->shader))
                 dumpRegisterAllocation(&Temp[i]);
@@ -5160,7 +5161,7 @@ _SetDest(
  26:23) + 1))))))) << (0 ? 26:23)));
 
         /* Keep maximum physical register. */
-        _UpdateMaxRegister(CodeGen, index, Tree);
+        gcCGUpdateMaxRegister(CodeGen, index, Tree);
 
         /* Success. */
         status = gcvSTATUS_OK;
@@ -5257,7 +5258,7 @@ _SetDestWithPrecision(
  31:31) + 1))))))) << (0 ? 31:31)));
 
         /* Keep maximum physical register. */
-        _UpdateMaxRegister(CodeGen, index, Tree);
+        gcCGUpdateMaxRegister(CodeGen, index, Tree);
 
         /* Success. */
         status = gcvSTATUS_OK;
@@ -5829,7 +5830,7 @@ _SetSource(
         /* Keep maximum physical register. */
         if (type == 0x0)
         {
-            _UpdateMaxRegister(CodeGen, index, Tree);
+            gcCGUpdateMaxRegister(CodeGen, index, Tree);
         }
         break;
 
@@ -5881,7 +5882,7 @@ _SetSource(
             swizzle = (gctUINT8) Swizzle;
 
             /* Keep maximum physical register. */
-            _UpdateMaxRegister(CodeGen,
+            gcCGUpdateMaxRegister(CodeGen,
                                Tree->shader->attributes[Index]->inputIndex + rows - 1,
                                Tree);
         }
@@ -6104,7 +6105,7 @@ _SetSourceWithPrecision(
         if (type == 0x0 ||
             type == 0x4)
         {
-            _UpdateMaxRegister(CodeGen, index, Tree);
+            gcCGUpdateMaxRegister(CodeGen, index, Tree);
         }
         break;
 
@@ -6154,12 +6155,12 @@ _SetSourceWithPrecision(
             /* Keep maximum physical register. */
             if(Relative > 0 && Tree->shader->attributes[Index]->arraySize > 1)
             {
-                _UpdateMaxRegister(CodeGen, Tree->shader->attributes[Index]->inputIndex +
+                gcCGUpdateMaxRegister(CodeGen, Tree->shader->attributes[Index]->inputIndex +
                         Tree->shader->attributes[Index]->arraySize - 1, Tree);
             }
             else
             {
-                _UpdateMaxRegister(CodeGen, index, Tree);
+                gcCGUpdateMaxRegister(CodeGen, index, Tree);
             }
         }
         break;
@@ -6342,7 +6343,7 @@ _TempEmit(
             }
         }
 
-        _UpdateMaxRegister(CodeGen, physical, Tree);
+        gcCGUpdateMaxRegister(CodeGen, physical, Tree);
 
         /* MOV temp, sourceX */
         switch (Source)
@@ -7198,7 +7199,7 @@ _FinalEmit(
                     }
                 }
 
-                _UpdateMaxRegister(CodeGen, physical, Tree);
+                gcCGUpdateMaxRegister(CodeGen, physical, Tree);
 
                 if(opcode == 0x67)
                 {
@@ -7368,7 +7369,7 @@ _FinalEmit(
                 }
             }
 
-            _UpdateMaxRegister(CodeGen, physical, Tree);
+            gcCGUpdateMaxRegister(CodeGen, physical, Tree);
 
             /* Save States[0]. */
             states[0] = States[0];
@@ -7705,7 +7706,7 @@ _SourceConvertEmit(
                               &enable1,
                               0));
         }
-        _UpdateMaxRegister(CodeGen, physical1, Tree);
+        gcCGUpdateMaxRegister(CodeGen, physical1, Tree);
 
         if (ValueType == 0x7
         ||  ValueType == 0x4)
@@ -7952,7 +7953,7 @@ _SourceConvertEmit(
                               &enable1,
                               0));
         }
-        _UpdateMaxRegister(CodeGen, physical1, Tree);
+        gcCGUpdateMaxRegister(CodeGen, physical1, Tree);
 
         if (ValueType == 0x7
         ||  ValueType == 0x4)
@@ -8229,7 +8230,7 @@ _SourceConvertEmit(
                               &enable1,
                               0));
         }
-        _UpdateMaxRegister(CodeGen, physical1, Tree);
+        gcCGUpdateMaxRegister(CodeGen, physical1, Tree);
 
         if (ValueType == 0x7
         ||  ValueType == 0x4)
@@ -8370,7 +8371,7 @@ _SourceConvertEmit(
         enable1 = gcSL_ENABLE_X;
         swizzle1 = gcSL_SWIZZLE_XXXX;
 
-        _UpdateMaxRegister(CodeGen, physical1, Tree);
+        gcCGUpdateMaxRegister(CodeGen, physical1, Tree);
 
         states[0] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ?
@@ -8461,7 +8462,7 @@ _SourceConvertEmit(
                               &enable1,
                               0));
         }
-        _UpdateMaxRegister(CodeGen, physical1);
+        gcCGUpdateMaxRegister(CodeGen, physical1);
 
         /* Set enable and swizzle. */
         enable1 = (((((gctUINT32) (States[0])) >> (0 ? 26:23)) & ((gctUINT32) ((((1 ? 26:23) - (0 ? 26:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:23) - (0 ? 26:23) + 1)))))) );
@@ -8576,7 +8577,7 @@ _SourceConvertEmit(
                               0));
         }
 
-        _UpdateMaxRegister(CodeGen, physical1);
+        gcCGUpdateMaxRegister(CodeGen, physical1);
 
         /* Set enable and swizzle. */
         enable1 = (((((gctUINT32) (States[0])) >> (0 ? 26:23)) & ((gctUINT32) ((((1 ? 26:23) - (0 ? 26:23) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:23) - (0 ? 26:23) + 1)))))) );
@@ -9064,7 +9065,7 @@ _TargetConvertEmit(
                           &enable,
                           0));
     }
-    _UpdateMaxRegister(CodeGen, physical, Tree);
+    gcCGUpdateMaxRegister(CodeGen, physical, Tree);
 
     /* Add conversion instruction(s). */
     if (Saturate)
@@ -11337,7 +11338,7 @@ _PatchSubsampleDepthRegister(
 
     /* update register allocation in Tree */
     Tree->tempArray[CodeGen->subsampleDepthIndex].assigned = realSubsampleDepthReg;
-    _UpdateMaxRegister(CodeGen, realSubsampleDepthReg, Tree);
+    gcCGUpdateMaxRegister(CodeGen, realSubsampleDepthReg, Tree);
 
     for (f = 0; f <= Tree->shader->functionCount + Tree->shader->kernelFunctionCount; ++f)
     {
@@ -12332,26 +12333,9 @@ _ProcessSource(
                     gctUINT32 hex32;
                 }
                 value;
-
-                /* If hardware is BigEndian, we must change the extract order. */
-                if (!CodeGen->isBigEndian)
-                {
-                    value.hex[0] = (match->sourceIndex == 0)
-                        ? instruction->source0Index
-                        : instruction->source1Index;
-                    value.hex[1] = (match->sourceIndex == 0)
-                        ? instruction->source0Indexed
-                        : instruction->source1Indexed;
-                }
-                else
-                {
-                    value.hex[1] = (match->sourceIndex == 0)
-                        ? instruction->source0Index
-                        : instruction->source1Index;
-                    value.hex[0] = (match->sourceIndex == 0)
-                        ? instruction->source0Indexed
-                        : instruction->source1Indexed;
-                }
+                value.hex32 = (match->sourceIndex == 0)
+                        ? (instruction->source0Index | (instruction->source0Indexed << 16))
+                        : (instruction->source1Index | (instruction->source1Indexed << 16));
 
                 if (Generate20BitsImmediate(CodeGen, instruction, Source) &&
                     _ValueFit20Bits(format, value.hex32))
@@ -13042,19 +13026,7 @@ _getSourceConstant(
                 gctUINT32 hex32;
             }
             value;
-
-            /* If hardware is BigEndian, we must change the extract order. */
-            if (!CodeGen->isBigEndian)
-            {
-                value.hex[0] = index;
-                value.hex[1] = indexed;
-            }
-            else
-            {
-                value.hex[1] = index;
-                value.hex[0] = indexed;
-            }
-
+            value.hex32 = (index & 0xFFFF) | (indexed << 16);
             if (Generate20BitsImmediate(CodeGen, instruction, SourceNo) &&
                 _ValueFit20Bits(format, value.hex32))
             {
@@ -13296,7 +13268,7 @@ _GenerateFunction(
                                             gcvNULL,
                                             0));
 
-                    _UpdateMaxRegister(CodeGen, CodeGen->positionPhysical, Tree);
+                    gcCGUpdateMaxRegister(CodeGen, CodeGen->positionPhysical, Tree);
 
                     /* MOV temp, r0 */
                     states[0] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -13469,7 +13441,7 @@ _GenerateFunction(
                                         &enable,
                                         0));
 
-                _UpdateMaxRegister(CodeGen, CodeGen->facePhysical, Tree);
+                gcCGUpdateMaxRegister(CodeGen, CodeGen->facePhysical, Tree);
 
                 /* SET.NOT temp.enable, face.x */
                 states[0] = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -15007,7 +14979,7 @@ _adjustMaxTemp(
      */
     maxRegToUse = (_totalTempRegisters(CodeGen) * texldCount)/256;
     /* the register starts from 0 */
-    _UpdateMaxRegister(CodeGen, maxRegToUse - 1, Tree);
+    gcCGUpdateMaxRegister(CodeGen, maxRegToUse - 1, Tree);
 
     return;
 }
@@ -15461,18 +15433,18 @@ _GenerateStates(
     {
         if (CodeGen->isCL_XE)
         {
-            _UpdateMaxRegister(CodeGen, 3, Tree);
+            gcCGUpdateMaxRegister(CodeGen, 3, Tree);
         }
         else
         {
-            _UpdateMaxRegister(CodeGen, 9, Tree);
+            gcCGUpdateMaxRegister(CodeGen, 9, Tree);
         }
     }
 
     if (CodeGen->useICache &&
         !gcHWCaps.hwFeatureFlags.hasICacheAllocCountFix)
     {
-        _UpdateMaxRegister(CodeGen, 3, Tree);
+        gcCGUpdateMaxRegister(CodeGen, 3, Tree);
     }
 
     /* Count number of active attributes. */
@@ -15765,7 +15737,7 @@ _GenerateStates(
                         VertexShaderOutputComponentsEncode[thisLink] =
                                                            componentsEncode;
 
-                        _UpdateMaxRegister(CodeGen, (gctUINT)reg, Tree);
+                        gcCGUpdateMaxRegister(CodeGen, (gctUINT)reg, Tree);
                     }
                 }
             }
@@ -16778,7 +16750,7 @@ _GenerateStates(
                       curIndex++;
                   }
 
-                  _UpdateMaxRegister(CodeGen, (gctUINT)reg, Tree);
+                  gcCGUpdateMaxRegister(CodeGen, (gctUINT)reg, Tree);
                   if (dumpCodeGen)
                   {
                         gctCHAR nameBuffer[256] = {'\0'};
@@ -16920,7 +16892,7 @@ _GenerateStates(
                     Tree->shader->outputs[i]->output2RTIndex = Tree->shader->outputs[i]->location;
                 }
 
-                _UpdateMaxRegister(CodeGen, (gctUINT)reg, Tree);
+                gcCGUpdateMaxRegister(CodeGen, (gctUINT)reg, Tree);
 
                 if (dumpCodeGen)
                 {
@@ -16956,7 +16928,7 @@ _GenerateStates(
                 rows *= attribute->arraySize;
 
                 reg = attribute->inputIndex + rows - 1;
-                _UpdateMaxRegister(CodeGen, (gctUINT) reg, Tree);
+                gcCGUpdateMaxRegister(CodeGen, (gctUINT) reg, Tree);
             }
         }
 
@@ -18737,7 +18709,7 @@ _GenerateStates(
     {
         gctSIZE_T           size = 0;
         gctUINT32           physical = (gctUINT32)~0;
-        gcsSURF_NODE_PTR    node = gcvNULL;
+        gctPOINTER          memory = gcvNULL;
         gctPOINTER          pointer = gcvNULL;
 
         /* Calculate instruction buffer size. */
@@ -18787,7 +18759,7 @@ _GenerateStates(
                                      "instruction memory for old linker",
                                      size,
                                      256,
-                                     (gctPOINTER *)&node,
+                                     &memory,
                                      gcvNULL,
                                      &physical,
                                      instPtr,
@@ -18798,16 +18770,16 @@ _GenerateStates(
             }
             if (CodeGen->shaderType == gcSHADER_TYPE_VERTEX)
             {
-                Hints->shaderVidNodes.instVidmemNode[gceSGSK_VERTEX_SHADER] = node;
+                Hints->shaderVidNodes.instVidmemNode[gceSGSK_VERTEX_SHADER] = memory;
             }
             else if (CodeGen->shaderType == gcSHADER_TYPE_FRAGMENT)
             {
-                Hints->shaderVidNodes.instVidmemNode[gceSGSK_FRAGMENT_SHADER] = node;
+                Hints->shaderVidNodes.instVidmemNode[gceSGSK_FRAGMENT_SHADER] = memory;
             }
             else if (CodeGen->shaderType == gcSHADER_TYPE_COMPUTE ||
                      CodeGen->shaderType == gcSHADER_TYPE_CL)
             {
-                Hints->shaderVidNodes.instVidmemNode[gceSGSK_COMPUTE_SHADER] = node;
+                Hints->shaderVidNodes.instVidmemNode[gceSGSK_COMPUTE_SHADER] = memory;
             }
 
             /* Debug shader. */

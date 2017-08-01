@@ -5461,7 +5461,6 @@ gcoHARDWARE_UpdateTextureDesc(
  23:22) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 23:22) - (0 ? 23:22) + 1))))))) << (0 ?
  23:22)));
 
-
     pDesc->gcregTXSize =
           ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 14:0) - (0 ?
  14:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 14:0) - (0 ? 14:0) + 1))))))) << (0 ?
@@ -5826,12 +5825,23 @@ gcoHARDWARE_UpdateTextureDesc(
     /* BC */
     _GetBorderColor(Hardware, TexParam, &baseSurf->formatInfo, UpdateInfo->borderColor32, pDesc);
 
+#if gcdENDIAN_BIG
+    {
+        gctSIZE_T i;
+        gctUINT32_PTR pUI = (gctUINT32_PTR)pDesc;
+
+        for (i = 0; i < sizeof(gcsTEXTUREDESCRIPTORREGS) / sizeof(gctUINT32); ++i)
+        {
+            pUI[i] = gcmBSWAP32(pUI[i]);
+        }
+    }
+#endif
+
     gcmDUMP_BUFFER(gcvNULL, "memory", UpdateInfo->physical, pDesc, 0, 256);
 
 OnError:
     gcmFOOTER();
     return status;
-
 }
 
 gceSTATUS

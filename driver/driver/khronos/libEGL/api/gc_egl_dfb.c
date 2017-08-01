@@ -2106,8 +2106,8 @@ _PostWindowBackBuffer(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN struct eglBackBuffer * BackBuffer,
-    IN EGLint NumRects,
-    IN EGLint Rects[]
+    IN struct eglRegion * Region,
+    IN struct eglRegion * DamageHint
     )
 {
     void * win = Surface->hwnd;

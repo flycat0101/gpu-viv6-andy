@@ -116,7 +116,11 @@ LOCAL_GENERATED_SOURCES := \
 	$(AQREG)
 
 LOCAL_CFLAGS := \
-	$(CFLAGS)
+	$(CFLAGS) \
+	-Wno-enum-conversion \
+	-Wno-sign-compare \
+	-Wno-tautological-constant-out-of-range-compare \
+	-Wno-tautological-compare
 
 LOCAL_C_INCLUDES := \
 	$(AQROOT)/hal/inc \

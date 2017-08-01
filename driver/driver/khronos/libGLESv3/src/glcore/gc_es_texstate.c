@@ -1001,7 +1001,7 @@ GLvoid GL_APIENTRY __gles_TexParameteriv(__GLcontext *gc, GLenum target, GLenum 
         if ((__GL_TEXTURE_2D_MS_INDEX == targetIdx) ||
             (__GL_TEXTURE_2D_MS_ARRAY_INDEX == targetIdx))
         {
-            __GL_ERROR_RET(GL_INVALID_ENUM);
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
         }
         else
         {
@@ -1504,12 +1504,12 @@ GLvoid GL_APIENTRY __gles_ActiveTexture(__GLcontext *gc, GLenum texture)
     if ((texture > (GL_TEXTURE0 + gc->constants.shaderCaps.maxCombinedTextureImageUnits - 1)) ||
         (texture < GL_TEXTURE0))
     {
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
     texture = texture - GL_TEXTURE0;
     gc->state.texture.activeTexIndex = texture;
-
+OnError:
     __GL_FOOTER();
 }
 
@@ -2296,7 +2296,7 @@ GLvoid GL_APIENTRY __gles_GenSamplers(__GLcontext *gc, GLsizei count, GLuint* sa
 
     if (count < 0)
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
     if (NULL == samplers)
@@ -2319,6 +2319,7 @@ GLvoid GL_APIENTRY __gles_GenSamplers(__GLcontext *gc, GLsizei count, GLuint* sa
     }
 
 OnExit:
+OnError:
     __GL_FOOTER();
 }
 
@@ -2546,7 +2547,7 @@ GLvoid GL_APIENTRY __gles_TexParameterIiv(__GLcontext *gc, GLenum target, GLenum
             break;
         }
     default:
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
     if (pname == GL_TEXTURE_BORDER_COLOR_EXT)
@@ -2573,7 +2574,7 @@ GLvoid GL_APIENTRY __gles_TexParameterIiv(__GLcontext *gc, GLenum target, GLenum
         }
         imageUserList = imageUserList->next;
     }
-
+OnError:
     __GL_FOOTER();
 }
 

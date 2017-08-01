@@ -517,6 +517,11 @@ clSetKernelExecInfoARM(cl_kernel            /* kernel */,
                        size_t               /* param_value_size */,
                        const void *         /* param_value */) CL_EXT_SUFFIX__VERSION_1_2;
 
+/*********************************
+* cl_vivante_device_attribute_query
+*********************************/
+#define CL_MEM_USE_UNCACHED_HOST_MEMORY_VIV         (1 << 28)
+
 #endif /* CL_VERSION_1_2 */
 
 #ifdef __cplusplus

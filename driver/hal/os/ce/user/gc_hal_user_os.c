@@ -453,6 +453,9 @@ _PLSDestructor(
     gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.glFECompilerAccessLock));
     gcPLS.glFECompilerAccessLock = gcvNULL;
 
+    gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.clFECompilerAccessLock));
+    gcPLS.clFECompilerAccessLock = gcvNULL;
+
     gcmVERIFY_OK(gcoOS_AtomDestroy(gcPLS.os, gcPLS.reference));
     gcPLS.reference = gcvNULL;
 
@@ -647,6 +650,9 @@ static void _ModuleConstructor(
     /* Construct gl FE compiler access lock */
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.glFECompilerAccessLock));
 
+    /* Construct cl FE compiler access lock */
+    gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.clFECompilerAccessLock));
+
 #if gcdDUMP_2D
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &dumpMemInfoListMutex));
 #endif
@@ -671,6 +677,12 @@ OnError:
     {
         /* Destroy access lock */
         gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.glFECompilerAccessLock));
+    }
+
+    if (gcPLS.clFECompilerAccessLock != gcvNULL)
+    {
+        /* Destroy access lock */
+        gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.clFECompilerAccessLock));
     }
 
     if (gcPLS.reference != gcvNULL)
@@ -1201,6 +1213,66 @@ gcoOS_UnLockGLFECompiler(
         status = gcoOS_ReleaseMutex(gcPLS.os, gcPLS.glFECompilerAccessLock);
     }
     gcmFOOTER_ARG("Release GL FE compiler ret=%d", status);
+
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoOS_LockCLFECompiler
+**
+**  Lock mutext before access CL FE compiler if needed
+**
+**  INPUT:
+**
+**      Nothing.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcoOS_LockCLFECompiler(
+    void
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
+    if (gcPLS.clFECompilerAccessLock)
+    {
+        status = gcoOS_AcquireMutex(gcPLS.os, gcPLS.clFECompilerAccessLock, gcvINFINITE);
+    }
+    gcmFOOTER_ARG("Lock CL FE compiler ret=%d", status);
+
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoOS_UnLockCLFECompiler
+**
+**  Release mutext after access CL FE compiler if needed
+**
+**  INPUT:
+**
+**      Nothing.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcoOS_UnLockCLFECompiler(
+    void
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
+    if (gcPLS.clFECompilerAccessLock)
+    {
+        status = gcoOS_ReleaseMutex(gcPLS.os, gcPLS.clFECompilerAccessLock);
+    }
+    gcmFOOTER_ARG("Release CL FE compiler ret=%d", status);
 
     return status;
 }
@@ -4022,7 +4094,7 @@ gcoOS_MapUserMemoryEx(
 
     gcmONERROR(gcoHAL_WrapUserMemory(&desc, &node));
 
-    gcmONERROR(gcoHAL_LockVideoMemory(node, gcvFALSE, Address, gcvNULL));
+    gcmONERROR(gcoHAL_LockVideoMemory(node, gcvFALSE, gcvENGINE_RENDER, Address, gcvNULL));
 
     *Info = (gctPOINTER)(gctUINTPTR_T)node;
 
@@ -4080,7 +4152,7 @@ gcoOS_UnmapUserMemory(
 
     node = (gctUINT32)(gctUINTPTR_T) Info;
 
-    gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(node, gcvSURF_BITMAP));
+    gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(node, gcvSURF_BITMAP, gcvENGINE_RENDER));
 
     gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(node));
 

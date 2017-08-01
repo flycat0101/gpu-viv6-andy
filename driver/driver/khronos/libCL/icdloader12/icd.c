@@ -57,6 +57,7 @@
 #include <string.h>
 
 KHRicdState khrIcdState = {0};
+cl_platform_id *platforms = NULL;
 
 /* entrypoint to initialize the ICD and add all vendors */
 void khrIcdInitialize(void)
@@ -81,7 +82,6 @@ void khrIcdVendorAdd(const char *libraryName)
     pfn_clIcdGetPlatformIDs p_clIcdGetPlatformIDs = NULL;
     cl_uint i = 0;
     cl_uint platformCount = 0;
-    cl_platform_id *platforms = NULL;
 
     /* require that the library name be valid*/
     if (!libraryName)

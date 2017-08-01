@@ -28,10 +28,10 @@ extern "C" {
 
 typedef gcoVX_Hardware_Context *    gcsVX_KERNEL_PARAMETERS_PTR;
 #else
+
+
 /* VX kernel parameters. */
 typedef struct _gcsVX_KERNEL_PARAMETERS * gcsVX_KERNEL_PARAMETERS_PTR;
-
-
 typedef struct _gcsVX_KERNEL_PARAMETERS
 {
     gctUINT32           kernel;
@@ -91,6 +91,8 @@ typedef struct _gcsVX_KERNEL_PARAMETERS
     gcsTHREAD_WALKER_INFO   splitInfo[4];
     gctUINT32               deviceCount;
     gctPOINTER              *devices;
+
+    gctUINT32               optionalOutputs[3];
 }
 gcsVX_KERNEL_PARAMETERS;
 #endif
@@ -233,6 +235,15 @@ gcoVX_WaitNNEvent(
     );
 
 gceSTATUS
+gcoVX_FlushCache(
+    IN gctBOOL      FlushICache,
+    IN gctBOOL      FlushPSSHL1Cache,
+    IN gctBOOL      FlushNNL1Cache,
+    IN gctBOOL      FlushTPL1Cache,
+    IN gctBOOL      Stall
+    );
+
+gceSTATUS
 gcoVX_AllocateMemoryEx(
     IN OUT gctUINT *        Bytes,
     OUT gctPHYS_ADDR *      Physical,
@@ -255,7 +266,6 @@ gcoVX_GetMemorySize(
 
 gceSTATUS
 gcoVX_ZeroMemorySize();
-
 
 gceSTATUS
 gcoVX_CreateDevices(
@@ -285,7 +295,6 @@ gceSTATUS
 gcoVX_MultiDeviceSync(
     IN gctPOINTER   device
     );
-
 
 gceSTATUS
 gcoVX_SaveContext(

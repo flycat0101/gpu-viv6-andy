@@ -20,7 +20,6 @@ extern "C" {
 #endif
 
 #define     USE_NEW_MEMORY_ALLOCATION   0
-
 /******************************************************************************\
 ****************************** Object Declarations *****************************
 \******************************************************************************/
@@ -132,7 +131,40 @@ gcoCL_InitializeHardware(
 */
 gceSTATUS
 gcoCL_SetHardware(
+    IN gcoHARDWARE hw,
+    OUT gcoHARDWARE *savedHW,
+    OUT gceHARDWARE_TYPE *savedType,
+    OUT gctUINT32 *savedCoreIndex
     );
+
+
+
+    gceSTATUS
+gcoCL_RestoreContext(
+    IN gcoHARDWARE preHW,
+    IN gceHARDWARE_TYPE preType,
+    IN gctUINT32  preCoreIndex
+    );
+
+
+
+#define gcmDECLARE_SWITCHVARS \
+    gcoHARDWARE _savedHW = gcvNULL; \
+    gctBOOL  _switched = gcvFALSE;  \
+    gctUINT32  _savedCoreIndex = 0;  \
+    gceHARDWARE_TYPE  _savedType = gcvHARDWARE_INVALID
+
+#define gcmSWITCH_TO_HW(hw)\
+    { gcoCL_SetHardware((hw), &_savedHW, &_savedType, &_savedCoreIndex); \
+        _switched = gcvTRUE;}
+
+#define gcmSWITCH_TO_DEFAULT() \
+     {gcoCL_SetHardware(gcvNULL, &_savedHW, &_savedType, &_savedCoreIndex); \
+         _switched = gcvTRUE;}
+
+#define gcmRESTORE_HW() \
+    {if(_switched) { gcoCL_RestoreContext(_savedHW, _savedType, _savedCoreIndex);  _switched = gcvFALSE; }}
+
 
 /*******************************************************************************
 **
@@ -165,10 +197,11 @@ gcoCL_SetHardware(
 */
 gceSTATUS
 gcoCL_AllocateMemory(
-    IN OUT gctUINT *      Bytes,
+    IN OUT gctUINT *        Bytes,
     OUT gctPHYS_ADDR *      Physical,
     OUT gctPOINTER *        Logical,
-    OUT gcsSURF_NODE_PTR *  Node
+    OUT gcsSURF_NODE_PTR *  Node,
+    IN  gctUINT32           Flag
     );
 
 /*******************************************************************************
@@ -202,6 +235,19 @@ gcoCL_FreeMemory(
     IN gctPOINTER           Logical,
     IN gctUINT              Bytes,
     IN gcsSURF_NODE_PTR     Node
+    );
+
+/*******************************************************************************
+**
+**  gcoCL_WrapUserMemory
+**
+*/
+gceSTATUS
+gcoCL_WrapUserMemory(
+    IN gctPOINTER           Ptr,
+    IN gctUINT              Bytes,
+    OUT gctUINT32_PTR       Physical,
+    OUT gcsSURF_NODE_PTR *  Node
     );
 
 /*******************************************************************************
@@ -518,6 +564,17 @@ gcoCL_SelectDevice(
     IN gctUINT32    DeviceId
     );
 
+ gceSTATUS
+    gcoCL_CreateHW(
+    IN gctUINT32    DeviceId,
+    OUT gcoHARDWARE * Hardware
+    );
+
+gceSTATUS
+    gcoCL_DestroyHW(
+    gcoHARDWARE  Hardware
+    );
+
 /*******************************************************************************
 **
 **  gcoCL_Commit
@@ -593,7 +650,8 @@ gcoCL_DestroySignal(
 gceSTATUS
 gcoCL_SubmitSignal(
     IN gctSIGNAL    Signal,
-    IN gctHANDLE    Process
+    IN gctHANDLE    Process,
+    IN gceENGINE    Engine
     );
 
 /*******************************************************************************
@@ -687,6 +745,36 @@ gcoCL_MultiGPUSync(
     IN gctUINT32 GPUCount,
     IN gctUINT_PTR ChipIDs
     );
+
+gceSTATUS
+gcoCL_MemBltCopy(
+    IN gctUINT32 SrcAddress,
+    IN gctUINT32 DestAddress,
+    IN gctUINT32 CopySize,
+    IN gceENGINE engine
+    );
+
+gctBOOL
+gcoCL_MemIsFenceBack(
+    IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE Engine,
+    IN gceFENCE_TYPE WaitType
+    );
+
+gceSTATUS
+gcoCL_MemWaitAndGetFence(
+    IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE Engine,
+    IN gceFENCE_TYPE GetType,
+    IN gceFENCE_TYPE WaitType
+    );
+
+gceSTATUS
+gcoCL_ChooseBltEngine(
+    IN gcsSURF_NODE_PTR node,
+    OUT gceENGINE * engine
+    );
+
 
 #ifdef __cplusplus
 }

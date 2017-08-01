@@ -42,8 +42,8 @@ vx_status vxNorm(vx_node node, vx_image input_x, vx_image input_y, vx_scalar nor
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(output, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(output, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(output, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(output, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input_x, GC_VX_INDEX_AUTO);
@@ -129,8 +129,8 @@ vx_status vxEdgeTraceThreshold(vx_node node, vx_image input, vx_threshold thresh
     constantData[0] = FV2(15);
     constantData[1] = FV2(8);
 
-    vxQueryThreshold(threshold, VX_THRESHOLD_ATTRIBUTE_THRESHOLD_LOWER, &lower, sizeof(lower));
-    vxQueryThreshold(threshold, VX_THRESHOLD_ATTRIBUTE_THRESHOLD_UPPER, &upper, sizeof(upper));
+    vxQueryThreshold(threshold, VX_THRESHOLD_THRESHOLD_LOWER, &lower, sizeof(lower));
+    vxQueryThreshold(threshold, VX_THRESHOLD_THRESHOLD_UPPER, &upper, sizeof(upper));
 
     bin[0] = FV2(lower+1);
     bin[1] = FV2(upper);
@@ -197,8 +197,8 @@ vx_status vxEdgeTraceHysteresis(vx_node node, vx_image input, vx_scalar flag)
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(input, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(input, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(input, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(input, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);

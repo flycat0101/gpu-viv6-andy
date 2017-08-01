@@ -101,6 +101,9 @@ int main(int argc, char* argv[])
     u16 desPixel;
     int status = -1;
 
+    vx_map_id map_id = 0;
+    vx_map_id map_id1 = 0;
+
     /* read image data */
     srcFile = fopen("lena_gray.bmp", "rb");
     if(NULL==srcFile)
@@ -162,7 +165,7 @@ int main(int argc, char* argv[])
         imgObj[1] = vxCreateImage(ContextVX, imgWid, imgHei, VX_DF_IMAGE_S16);
         imgObj[2] = vxCreateImage(ContextVX, imgWid, imgHei, VX_DF_IMAGE_S16);
 
-        if(VX_SUCCESS!=vxAccessImagePatch(imgObj[0], &imgRect, 0, &imgInfo[0], &imgAddr[0], VX_WRITE_ONLY))
+        if(VX_SUCCESS != vxMapImagePatch(imgObj[0], &imgRect, 0, &map_id, &imgInfo[0], &imgAddr[0], VX_WRITE_ONLY, VX_MEMORY_TYPE_HOST, 0))
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
@@ -187,7 +190,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        if(VX_SUCCESS!=vxCommitImagePatch(imgObj[0], &imgRect, 0, &(imgInfo[0]), imgAddr[0]))
+        if(VX_SUCCESS!=vxUnmapImagePatch(imgObj[0], map_id))
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
@@ -206,7 +209,7 @@ int main(int argc, char* argv[])
         }
 
         /* transfer image from gpu to cpu */
-        if(VX_SUCCESS!=vxAccessImagePatch(imgObj[1], &imgRect, 0, &(imgInfo[1]), &imgAddr[1], VX_READ_ONLY))
+        if(VX_SUCCESS!=vxMapImagePatch(imgObj[1], &imgRect, 0, &map_id, &(imgInfo[1]), &imgAddr[1], VX_READ_ONLY, VX_MEMORY_TYPE_HOST, 0))
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
@@ -214,7 +217,7 @@ int main(int argc, char* argv[])
             goto exit;
         }
 
-        if(VX_SUCCESS!=vxAccessImagePatch(imgObj[2], &imgRect, 0, &(imgInfo[2]), &imgAddr[2], VX_READ_ONLY))
+        if(VX_SUCCESS!=vxMapImagePatch(imgObj[2], &imgRect, 0, &map_id1, &(imgInfo[2]), &imgAddr[2], VX_READ_ONLY, VX_MEMORY_TYPE_HOST, 0))
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
@@ -248,7 +251,7 @@ int main(int argc, char* argv[])
             }
         }
 
-        if(VX_SUCCESS!=vxCommitImagePatch(imgObj[1], NULL, 0, &(imgInfo[1]), imgAddr[1]))
+        if(VX_SUCCESS!=vxUnmapImagePatch(imgObj[1], map_id))
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
@@ -257,7 +260,8 @@ int main(int argc, char* argv[])
         }
         imgAddr[1] = NULL;
 
-        if(VX_SUCCESS!=vxCommitImagePatch(imgObj[2], NULL, 0, &(imgInfo[2]), imgAddr[2]))
+
+        if(VX_SUCCESS!=vxUnmapImagePatch(imgObj[2], map_id1))
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 

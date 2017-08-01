@@ -27,11 +27,8 @@ INCLUDE += -I$(AQARCH)/cmodel/inc
 INCLUDE += -I$(AQROOT)/sdk/inc
 INCLUDE += -I$(AQROOT)/compiler/libVSC/include
 
-INCLUDE += -I../../../backend
-
 INCLUDE += -I../include
-
-INCLUDE += -I../../inc
+INCLUDE += -I../../kernels
 
 ifeq ($(gcdSTATIC_LINK), 1)
 STATIC=1
@@ -63,6 +60,7 @@ OBJECTS         =  \
                     $(OBJ_DIR)/gc_vx_meta_format.o \
                     $(OBJ_DIR)/gc_vx_node.o    \
                     $(OBJ_DIR)/gc_vx_node_api.o \
+                    $(OBJ_DIR)/gc_vx_object_array.o \
                     $(OBJ_DIR)/gc_vx_runtime.o    \
                     $(OBJ_DIR)/gc_vx_parameter.o   \
                     $(OBJ_DIR)/gc_vx_pyramid.o \
@@ -72,10 +70,13 @@ OBJECTS         =  \
                     $(OBJ_DIR)/gc_vx_threshold.o   \
                     $(OBJ_DIR)/gc_vx_program.o  \
                     $(OBJ_DIR)/gc_vx_profiler.o  \
+                    $(OBJ_DIR)/gc_vx_tensor.o   \
+                    $(OBJ_DIR)/gc_vx_layer.o   \
 
 # API
 OBJECTS         +=    \
                     $(OBJ_DIR)/gc_vx_interface.o \
+                    $(OBJ_DIR)/gc_vx_nn_extension_interface.o \
                     $(OBJ_DIR)/gc_vx_internal_node_api.o \
 
 # Kernels
@@ -98,6 +99,7 @@ OBJECTS         +=  \
                     $(OBJ_DIR)/gc_vxk_common.o \
                     $(OBJ_DIR)/gc_vxk_morphology.o \
                     $(OBJ_DIR)/gc_vxk_multiply.o \
+                    $(OBJ_DIR)/gc_vxk_nn_layers.o \
                     $(OBJ_DIR)/gc_vxk_norm.o \
                     $(OBJ_DIR)/gc_vxk_nonmax.o \
                     $(OBJ_DIR)/gc_vxk_optpyrlk.o \
@@ -111,18 +113,18 @@ OBJECTS         +=  \
                     $(OBJ_DIR)/gc_vxk_rpn.o \
 
 
-LIBS += -l CLC -l VSC -l GAL
-
-INCLUDE += -I../../kernels
-
-VPATH = ../../backend:../include:../../kernels
-
-CFLAGS += $(INCLUDE)
 
 ################################################################################
 # Add extra library path.
-LIBS += -L $(AQROOT)/build/sdk/drivers
+LIBS += -L $(SDK_DIR)/drivers
 LIBS += -L $(AQROOT)/hal/user/$(OBJ_DIR)
+
+LIBS += -l VSC -l GAL
+
+
+VPATH = ../../kernels
+
+CFLAGS += $(INCLUDE)
 
 LIBS += -l dl -l pthread -lm
 

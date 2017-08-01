@@ -558,7 +558,12 @@ void vscPrintSEP(VSC_SYS_CONTEXT* pSysCtx, SHADER_EXECUTABLE_PROFILE* pSEP, SHAD
                       pSEP->exeHints.derivedHints.globalStates.bExecuteOnDual16,
                       &sepDumper);
 
-    vscDIDumpLineTable(pShader->debugInfo);
+    if (gcmOPT_EnableDebugDump() &&
+        pShader->debugInfo)
+    {
+        vscDIDumpDIETree(pShader->debugInfo, 0, 0xffffffff);
+        vscDIDumpLineTable(pShader->debugInfo);
+    }
 
     /* Release dumper buffer */
     gcoOS_Free(gcvNULL, pDumpBuffer);

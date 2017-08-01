@@ -192,7 +192,7 @@ GLsizei g_minVertexNumber[] =
 #define __GL_CHECK_INSTANCE_COUNT(primCount) \
     if (primCount < 1)                       \
     {                                        \
-        return;                              \
+        __GL_EXIT();                         \
     }
 
 
@@ -689,6 +689,8 @@ __GL_INLINE GLvoid __glDrawArraysInstanced(__GLcontext *gc, GLenum mode, GLint f
     __GL_CHECK_VERTEX_COUNT(gc, mode, count)
 
     __glDrawPrimitive(gc, mode);
+OnExit:
+    return;
 }
 
 

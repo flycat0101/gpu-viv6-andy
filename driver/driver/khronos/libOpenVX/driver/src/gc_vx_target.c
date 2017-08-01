@@ -44,6 +44,7 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
                                                 kernelDescTable[index]->function,
                                                 kernelDescTable[index]->parameters,
                                                 kernelDescTable[index]->numParams,
+                                                kernelDescTable[index]->validate,
                                                 kernelDescTable[index]->inputValidate,
                                                 kernelDescTable[index]->outputValidate,
                                                 kernelDescTable[index]->initialize,
@@ -53,11 +54,16 @@ VX_PRIVATE_API vx_status vxInitializeTarget(
 #endif
                                                 );
 
-        if (status != VX_SUCCESS) return status;
+        if (status != VX_SUCCESS)
+            return status;
 
         if (vxoKernel_IsUnique(&target->kernelTable[index])) target->base.context->uniqueKernelCount++;
         target->kernelCount++;
         target->base.context->kernelCount++;
+
+        status = vxFinalizeKernel(&target->kernelTable[index]);
+        if (status != VX_SUCCESS)
+            return status;
     }
 
     /* ToDo : Add more specific return status check */
@@ -156,6 +162,19 @@ VX_PRIVATE_API vx_status vxoTarget_IsKernelSupported(
     return VX_ERROR_NOT_SUPPORTED;
 }
 
+VX_PRIVATE_API vx_bool isGPUNode(vx_node node)
+{
+    if ((node->layer && node->layer->operations[0]->target != VXNNE_OPERATION_TARGET_SW)  ||
+        (!node->layer && node->kernelAttributes.isGPUKernel))
+    {
+        return vx_true_e;
+    }
+    else
+    {
+        return vx_false_e;
+    }
+}
+
 VX_PRIVATE_API vx_action vxoTarget_ProcessNodes(
         vx_target target, vx_node nodes[], vx_size startIndex, vx_size nodeCount)
 {
@@ -171,21 +190,96 @@ VX_PRIVATE_API vx_action vxoTarget_ProcessNodes(
 
         vxoPerf_Begin(&node->perf);
 
-        if (!node->kernelAttributes.isGPUKernel)
+        if (!isGPUNode(node))
         {
             status = gcfVX_Flush(gcvTRUE);
         }
 
         if (status == VX_SUCCESS)
         {
-            status = node->kernel->function(node, (vx_reference *)node->paramTable, node->kernel->signature.paramCount);
+            if (node->isReplicated == vx_true_e)
+            {
+                vx_size num_replicas = 0;
+                vx_uint32 param;
+                vx_uint32 num_parameters = node->kernel->signature.paramCount;
+                vx_reference parameters[VX_MAX_PARAMETERS] = { NULL };
+
+                for (param = 0; param < num_parameters; ++param)
+                {
+                    if (node->replicated_flags[param] == vx_true_e)
+                    {
+                        vx_size numItems = 0;
+                        if ((node->paramTable[param])->scope->type == VX_TYPE_PYRAMID)
+                        {
+                            vx_pyramid pyr = (vx_pyramid)(node->paramTable[param])->scope;
+                            numItems = pyr->levelCount;
+                        }
+                        else if ((node->paramTable[param])->scope->type == VX_TYPE_OBJECT_ARRAY)
+                        {
+                            vx_object_array arr = (vx_object_array)(node->paramTable[param])->scope;
+                            numItems = arr->itemCount;
+                        }
+                        else
+                        {
+                            status = VX_ERROR_INVALID_PARAMETERS;
+                            break;
+                        }
+
+                        if (num_replicas == 0)
+                            num_replicas = numItems;
+                        else if (numItems != num_replicas)
+                        {
+                            status = VX_ERROR_INVALID_PARAMETERS;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        parameters[param] = node->paramTable[param];
+                    }
+                }
+
+                if (status == VX_SUCCESS)
+                {
+                    vx_size replica;
+                    for (replica = 0; replica < num_replicas; ++replica)
+                    {
+                        for (param = 0; param < num_parameters; ++param)
+                        {
+                            if (node->replicated_flags[param] == vx_true_e)
+                            {
+                                if ((node->paramTable[param])->scope->type == VX_TYPE_PYRAMID)
+                                {
+                                    vx_pyramid pyr = (vx_pyramid)(node->paramTable[param])->scope;
+                                    parameters[param] = (vx_reference)pyr->levels[replica];
+                                }
+                                else if ((node->paramTable[param])->scope->type == VX_TYPE_OBJECT_ARRAY)
+                                {
+                                    vx_object_array arr = (vx_object_array)(node->paramTable[param])->scope;
+                                    parameters[param] = (vx_reference)arr->itemsTable[replica];
+                                }
+                            }
+                        }
+
+                        status = node->kernel->function((vx_node)node,
+                            parameters,
+                            num_parameters);
+                    }
+                }
+            }
+            else
+            {
+                status = node->kernel->function(node, (vx_reference *)node->paramTable, node->kernel->signature.paramCount);
+            }
         }
 
         node->executed = vx_true_e;
         node->status = status;
 
         vxoPerf_End(&node->perf);
-
+#if VIVANTE_PROFILER
+        vxoProfiler_End((vx_reference)target);
+#endif
         if (status != VX_SUCCESS) return VX_ACTION_ABANDON;
 
         if (node->completeCallback != VX_NULL)
@@ -194,10 +288,12 @@ VX_PRIVATE_API vx_action vxoTarget_ProcessNodes(
 
             if (action != VX_ACTION_CONTINUE) return action;
         }
+
     }
 
     return VX_ACTION_CONTINUE;
 }
+
 
 VX_PRIVATE_API vx_status vxoTarget_VerifyNode(vx_target target, vx_node node)
 {
@@ -210,7 +306,7 @@ VX_PRIVATE_API vx_status vxoTarget_VerifyNode(vx_target target, vx_node node)
 VX_PRIVATE_API vx_kernel vxoTarget_AddKernel(
         vx_target target, const vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration,
         vx_program program, vx_kernel_f funcPtr, vx_uint32 paramCount,
-        vx_kernel_input_validate_f input, vx_kernel_output_validate_f output,
+        vx_kernel_validate_f validate, vx_kernel_input_validate_f input, vx_kernel_output_validate_f output,
         vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize)
 {
     vx_uint32 index;
@@ -233,7 +329,7 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddKernel(
                                                     name, enumeration,
                                                     program, funcPtr,
                                                     VX_NULL, paramCount,
-                                                    input, output, initialize, deinitialize
+                                                    validate, input, output, initialize, deinitialize
 #if gcdVX_OPTIMIZER
 , optAttributes
 #endif
@@ -278,7 +374,7 @@ VX_PRIVATE_API vx_kernel vxoTarget_AddTilingKernel(
                                                     name, enumeration,
                                                     VX_NULL, vxTilingKernelFunction,
                                                     VX_NULL, paramCount,
-                                                    input, output, VX_NULL, VX_NULL
+                                                    VX_NULL, input, output, VX_NULL, VX_NULL
 #if gcdVX_OPTIMIZER
 , optAttributes
 #endif
@@ -351,7 +447,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
     vx_ptr              tileKernelParams[VX_MAX_PARAMETERS];
     vx_uint32           firstOutputImageIndex = VX_INVALID_INDEX;
     vx_uint32           imageWidth, imageHeight;
-    vx_border_mode_t    borderMode;
+    vx_border_t         borderMode;
     vx_size             tileMemorySize;
     vx_uint32           tileWidth, tileHeight;
     vx_uint32           x, y;
@@ -363,11 +459,11 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
 
         if (vxoReference_GetStatus((vx_reference)param) != VX_SUCCESS) return VX_ERROR_INVALID_PARAMETERS;
 
-        status = vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_DIRECTION,
+        status = vxQueryParameter(param, VX_PARAMETER_DIRECTION,
                                     &dirTable[paramIndex], sizeof(dirTable[paramIndex]));
         if (status != VX_SUCCESS) return status;
 
-        status = vxQueryParameter(param, VX_PARAMETER_ATTRIBUTE_TYPE,
+        status = vxQueryParameter(param, VX_PARAMETER_TYPE,
                                     &typeTable[paramIndex], sizeof(typeTable[paramIndex]));
         if (status != VX_SUCCESS) return status;
 
@@ -376,33 +472,33 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
         switch (typeTable[paramIndex])
         {
             case VX_TYPE_IMAGE:
-                status = vxQueryNode(node, VX_NODE_ATTRIBUTE_OUTPUT_TILE_BLOCK_SIZE,
+                status = vxQueryNode(node, VX_NODE_OUTPUT_TILE_BLOCK_SIZE,
                             &tileTable[paramIndex].tile_block, sizeof(vx_tile_block_size_t));
                 if (status != VX_SUCCESS) return status;
 
-                status = vxQueryNode(node, VX_NODE_ATTRIBUTE_INPUT_NEIGHBORHOOD,
+                status = vxQueryNode(node, VX_NODE_INPUT_NEIGHBORHOOD,
                             &tileTable[paramIndex].neighborhood, sizeof(vx_neighborhood_size_t));
                 if (status != VX_SUCCESS) return status;
 
                 imageTable[paramIndex] = (vx_image)paramTable[paramIndex];
 
-                status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_ATTRIBUTE_WIDTH,
+                status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_WIDTH,
                                         &tileTable[paramIndex].image.width, sizeof(vx_uint32));
                 if (status != VX_SUCCESS) return status;
 
-                status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_ATTRIBUTE_HEIGHT,
+                status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_HEIGHT,
                                         &tileTable[paramIndex].image.height, sizeof(vx_uint32));
                 if (status != VX_SUCCESS) return status;
 
-                status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_ATTRIBUTE_FORMAT,
+                status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_FORMAT,
                                         &tileTable[paramIndex].image.format, sizeof(vx_df_image));
                 if (status != VX_SUCCESS) return status;
 
-                status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_ATTRIBUTE_SPACE,
+                status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_SPACE,
                                         &tileTable[paramIndex].image.space, sizeof(vx_enum));
                 if (status != VX_SUCCESS) return status;
 
-                status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_ATTRIBUTE_RANGE,
+                status = vxQueryImage(imageTable[paramIndex], VX_IMAGE_RANGE,
                                         &tileTable[paramIndex].image.range, sizeof(vx_enum));
                 if (status != VX_SUCCESS) return status;
 
@@ -425,23 +521,23 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
 
     if (firstOutputImageIndex == VX_INVALID_INDEX) return VX_ERROR_INVALID_PARAMETERS;
 
-    status = vxQueryImage(imageTable[firstOutputImageIndex], VX_IMAGE_ATTRIBUTE_WIDTH,
+    status = vxQueryImage(imageTable[firstOutputImageIndex], VX_IMAGE_WIDTH,
                             &imageWidth, sizeof(imageWidth));
     if (status != VX_SUCCESS) return status;
 
-    status = vxQueryImage(imageTable[firstOutputImageIndex], VX_IMAGE_ATTRIBUTE_HEIGHT,
+    status = vxQueryImage(imageTable[firstOutputImageIndex], VX_IMAGE_HEIGHT,
                             &imageHeight, sizeof(imageHeight));
     if (status != VX_SUCCESS) return status;
 
-    status = vxQueryNode(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &borderMode, sizeof(borderMode));
+    status = vxQueryNode(node, VX_NODE_BORDER, &borderMode, sizeof(borderMode));
     if (status != VX_SUCCESS) return status;
 
-    if (borderMode.mode != VX_BORDER_MODE_UNDEFINED && borderMode.mode != VX_BORDER_MODE_SELF)
+    if (borderMode.mode != VX_BORDER_UNDEFINED && borderMode.mode != VX_BORDER_SELF)
     {
         return VX_ERROR_NOT_SUPPORTED;
     }
 
-    status = vxQueryNode(node, VX_NODE_ATTRIBUTE_TILE_MEMORY_SIZE, &tileMemorySize, sizeof(tileMemorySize));
+    status = vxQueryNode(node, VX_NODE_TILE_MEMORY_SIZE, &tileMemorySize, sizeof(tileMemorySize));
     if (status != VX_SUCCESS) return status;
 
     tileHeight  = imageHeight / VX_TILE_BLOCK_MULTIPLER;
@@ -471,7 +567,7 @@ VX_PRIVATE_API vx_status VX_CALLBACK vxTilingKernelFunction(vx_node node, const 
                 }
             }
 
-            status = vxQueryNode(node, VX_NODE_ATTRIBUTE_TILE_MEMORY_PTR, &tileMemoryPtr, sizeof(vx_ptr));
+            status = vxQueryNode(node, VX_NODE_TILE_MEMORY_PTR, &tileMemoryPtr, sizeof(vx_ptr));
             if (status != VX_SUCCESS) return status;
 
             node->kernel->tilingFunction(tileKernelParams, tileMemoryPtr, tileMemorySize);
@@ -569,7 +665,6 @@ VX_INTERNAL_API vx_status vxoTarget_Load(vx_context context, vx_string moduleNam
     target->funcs.addtilingkernel   = vxoTarget_AddTilingKernel;
     target->funcs.verifynode        = vxoTarget_VerifyNode;
     target->funcs.processnodes      = vxoTarget_ProcessNodes;
-
     return VX_SUCCESS;
 }
 
@@ -755,6 +850,54 @@ VX_API_ENTRY vx_status VX_API_CALL vxAssignNodeAffinity(vx_node node, vx_target 
     }
 
     return VX_ERROR_NOT_SUPPORTED;
+}
+
+static vx_const_string gcoOS_ReverseStrstr(vx_const_string string, vx_const_string substr)
+{
+    vx_const_string last = NULL;
+    vx_const_string cur = string;
+    do {
+        cur = (vx_const_string) strstr(cur, substr);
+        if (cur != NULL)
+        {
+            last = cur;
+            cur = cur+1;
+        }
+    } while (cur != NULL);
+    return last;
+}
+
+vx_bool vxoTarget_MatchTargetNameWithString(const char* targetName, const char* targetString)
+{
+    /* 1. find latest occurrence of target_string in target_name;
+       2. match only the cases: target_name == "[smth.]<target_string>[.smth]"
+     */
+    const char dot = '.';
+    vx_bool match = vx_false_e;
+    size_t len = strlen(targetString);
+    vx_string lowerString = (char*)calloc(len + 1, sizeof(char));
+
+    if (lowerString != VX_NULL) vxStrToLower(targetString, lowerString);
+
+    {
+        vx_const_string ptr = gcoOS_ReverseStrstr(targetName, lowerString);
+        if (ptr != VX_NULL)
+        {
+            vx_size name_len = strlen(targetName);
+            vx_size string_len = strlen(targetString);
+            vx_size begin = (vx_size)(ptr - targetName);
+            vx_size end = begin + string_len;
+            if ((!(begin > 0) || ((begin > 0) && (targetName[begin-1] == dot))) ||
+                (!(end < name_len) || ((end < name_len) && (targetName[end] == dot))))
+            {
+                match = vx_true_e;
+            }
+        }
+    }
+
+    free(lowerString);
+
+    return match;
 }
 
 #endif /* defined(OPENVX_USE_TARGET) */

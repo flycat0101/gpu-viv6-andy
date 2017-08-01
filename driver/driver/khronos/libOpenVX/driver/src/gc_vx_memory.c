@@ -69,6 +69,7 @@ VX_INTERNAL_API vx_bool vxoMemory_Allocate(vx_context context, vx_memory memory)
         status = gcoVX_AllocateMemory((gctUINT32)size, (gctPOINTER*)&memory->logicals[planeIndex],
                                         (gctPHYS_ADDR*)&memory->physicals[planeIndex],
                                         &memory->nodePtrs[planeIndex]);
+        context->memoryCount++;
 
         if (gcmIS_ERROR(status)) goto ErrorExit;
 
@@ -128,6 +129,8 @@ VX_INTERNAL_API vx_bool vxoMemory_Free(vx_context context, vx_memory memory)
             gcoVX_FreeMemory((gcsSURF_NODE_PTR)memory->nodePtrs[planeIndex]);
             memory->logicals[planeIndex]    = VX_NULL;
             memory->nodePtrs[planeIndex]    = VX_NULL;
+
+            context->memoryCount --;
         }
 
         if (memory->writeLocks[planeIndex] != VX_NULL)
@@ -189,6 +192,7 @@ VX_INTERNAL_API vx_bool vxoMemory_WrapUserMemory(vx_context context, vx_memory m
         /* Get the physical address. */
         status = gcoHAL_LockVideoMemory(memory->wrappedNode[planeIndex],
                                gcvFALSE,
+                               gcvENGINE_RENDER,
                                &memory->physicals[planeIndex],
                                gcvNULL);
 
@@ -215,7 +219,8 @@ ErrorExit:
         {
             gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(
                             memory->wrappedNode[planeIndex],
-                            gcvSURF_BITMAP));
+                            gcvSURF_BITMAP,
+                            gcvENGINE_RENDER));
 
             gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(
                             memory->wrappedNode[planeIndex]));
@@ -253,7 +258,8 @@ VX_INTERNAL_API vx_bool vxoMemory_FreeWrappedMemory(vx_context context, vx_memor
         {
             gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(
                             memory->wrappedNode[planeIndex],
-                            gcvSURF_BITMAP));
+                            gcvSURF_BITMAP,
+                            gcvENGINE_RENDER));
 
             gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(
                             memory->wrappedNode[planeIndex]));
@@ -329,4 +335,21 @@ VX_INTERNAL_API vx_size vxoMemory_ComputeSize(vx_memory memory, vx_uint32 planeI
     return memory->dims[planeIndex][memory->dimCount - 1] * memory->strides[planeIndex][memory->dimCount - 1];
 }
 
+VX_INTERNAL_API vx_size vxoMemory_ComputeElementCount(vx_memory memory, vx_uint32 planeIndex)
+{
+    vx_uint32 index;
+    vx_uint32 elementCount = 1;
+
+    vxmASSERT(memory);
+    vxmASSERT(planeIndex < memory->planeCount);
+
+    if (memory->dimCount == 0) return 0;
+
+    for (index = 0; index < memory->dimCount; index++)
+    {
+        elementCount *= memory->dims[planeIndex][index];
+    }
+
+    return elementCount;
+}
 

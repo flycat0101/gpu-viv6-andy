@@ -73,6 +73,10 @@
         eglGetRenderBufferVIV*;
         eglPostBufferVIV*;
 
+        eglSetDamageRegionKHR*;
+        eglSwapBuffersWithDamageKHR*;
+        eglSwapBuffersWithDamageEXT*;
+
         fb*;
         dfb*;
         wl_egl_*;

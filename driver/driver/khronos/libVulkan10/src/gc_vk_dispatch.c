@@ -51,6 +51,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_GetRenderAreaGranularity(
     VkExtent2D* pGranularity
     )
 {
+    pGranularity->width = pGranularity->height = 1;
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateDebugReportCallbackEXT(

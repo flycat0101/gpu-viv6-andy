@@ -82,7 +82,6 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateQueryPool(
     {
         VkEventCreateInfo ci;
 
-        qyp->pQueries[iq].state          = __VK_QUERY_UNDEFINED;
         qyp->pQueries[iq].type           = pCreateInfo->queryType;
         qyp->pQueries[iq].queryPool      = (VkQueryPool)(uintptr_t)qyp;
         qyp->pQueries[iq].queryPoolIndex = iq;
@@ -139,36 +138,39 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyQueryPool(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkQueryPool *qyp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkQueryPool *, queryPool);
-    uint32_t iq;
-
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
-
-    if (qyp->queryBuffer)
+    if (queryPool)
     {
-        __vkBuffer *buf;
+        __vkQueryPool *qyp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkQueryPool *, queryPool);
+        uint32_t iq;
 
-        buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, qyp->queryBuffer);
+        /* Set the allocator to the parent allocator or API defined allocator if valid */
+        __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
 
-        if (buf->memory)
-            __vk_FreeMemory(device, (VkDeviceMemory)(uintptr_t)buf->memory, gcvNULL);
-
-        __vk_DestroyBuffer(device, qyp->queryBuffer, gcvNULL);
-    }
-
-    if (qyp->pQueries)
-    {
-        for (iq = 0; iq < qyp->queryCount; iq++)
+        if (qyp->queryBuffer)
         {
-            if (qyp->pQueries[iq].event)
-                __vk_DestroyEvent(device, qyp->pQueries[iq].event, VK_NULL_HANDLE);
+            __vkBuffer *buf;
+
+            buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, qyp->queryBuffer);
+
+            if (buf->memory)
+                __vk_FreeMemory(device, (VkDeviceMemory)(uintptr_t)buf->memory, gcvNULL);
+
+            __vk_DestroyBuffer(device, qyp->queryBuffer, gcvNULL);
         }
 
-        __VK_FREE(qyp->pQueries);
-    }
+        if (qyp->pQueries)
+        {
+            for (iq = 0; iq < qyp->queryCount; iq++)
+            {
+                if (qyp->pQueries[iq].event)
+                    __vk_DestroyEvent(device, qyp->pQueries[iq].event, VK_NULL_HANDLE);
+            }
 
-    __vk_DestroyObject(devCtx, __VK_OBJECT_QUERY_POOL, (__vkObject *)qyp);
+            __VK_FREE(qyp->pQueries);
+        }
+
+        __vk_DestroyObject(devCtx, __VK_OBJECT_QUERY_POOL, (__vkObject *)qyp);
+    }
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_GetQueryPoolResults(

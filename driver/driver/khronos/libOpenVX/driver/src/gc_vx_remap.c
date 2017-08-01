@@ -62,25 +62,25 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryRemap(vx_remap remap, vx_enum attribut
 
     switch (attribute)
     {
-        case VX_REMAP_ATTRIBUTE_SOURCE_WIDTH:
+        case VX_REMAP_SOURCE_WIDTH:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = remap->srcWidth;
             break;
 
-        case VX_REMAP_ATTRIBUTE_SOURCE_HEIGHT:
+        case VX_REMAP_SOURCE_HEIGHT:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = remap->srcHeight;
             break;
 
-        case VX_REMAP_ATTRIBUTE_DESTINATION_WIDTH:
+        case VX_REMAP_DESTINATION_WIDTH:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = remap->destWidth;
             break;
 
-        case VX_REMAP_ATTRIBUTE_DESTINATION_HEIGHT:
+        case VX_REMAP_DESTINATION_HEIGHT:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = remap->destHeight;

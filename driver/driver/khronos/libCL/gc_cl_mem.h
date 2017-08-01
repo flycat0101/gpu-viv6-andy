@@ -111,9 +111,7 @@ typedef struct _cl_mem
     void *                  host;
     clsMemObjCallback_PTR   memObjCallback;
     gctUINT                 mapCount;
-#if BUILD_OPENCL_12
     cl_map_flags            mapFlag;
-#endif
 
     /* GL sharing. */
     gctBOOL                 fromGL;
@@ -127,6 +125,7 @@ typedef struct _cl_mem
     /* track buffer status event */
     clsBufferWaitEvent      waitEvent;
 
+    gcsSURF_NODE_PTR        tmpNode;  /* Used for write buffer Command */
     union {
         struct {
             size_t                  size;
@@ -138,10 +137,7 @@ typedef struct _cl_mem
             gctPOINTER              logical;
             gcsSURF_NODE_PTR        node;
             gctBOOL                 wrapped;
-            gctUINT32               wrappedNode;
-#if BUILD_OPENCL_12
             clsMem_PTR              image;      /* The associated image object. Used in 1D image buffer. */
-#endif
 
         } buffer;
 
@@ -203,12 +199,10 @@ clfExecuteCommandWriteBuffer(
     clsCommand_PTR              Command
     );
 
-#if BUILD_OPENCL_12
 gctINT
 clfExecuteCommandFillBuffer(
     clsCommand_PTR              Command
     );
-#endif
 
 gctINT
 clfExecuteCommandWriteBufferRect(
@@ -226,7 +220,17 @@ clfExecuteCommandCopyBufferRect(
     );
 
 gctINT
+clfReadImage(
+    clsCommand_PTR  Command
+    );
+
+gctINT
 clfExecuteCommandReadImage(
+    clsCommand_PTR  Command
+    );
+
+gctINT
+clfWriteImage(
     clsCommand_PTR  Command
     );
 
@@ -255,12 +259,10 @@ clfExecuteCommandCopyBufferToImage(
     clsCommand_PTR  Command
     );
 
-#if BUILD_OPENCL_12
 gctINT
 clfExecuteCommandMigrateMemObjects(
     clsCommand_PTR  Command
     );
-#endif
 
 gctINT
 clfExecuteCommandMapBuffer(
@@ -297,7 +299,6 @@ clfImageFormat2GcFormat(
     gctSIZE_T *             ChanelCount
     );
 
-#if BUILD_OPENCL_12
 gctINT
 clfPackImagePixeli(
     cl_int *srcVector,
@@ -315,7 +316,6 @@ clfPackImagePixelf(
     cl_float *srcVector,
     const cl_image_format *imageFormat,
     void *outData );
-#endif
 
 gctINT
 clfRetainMemObject(

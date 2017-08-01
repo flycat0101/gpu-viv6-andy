@@ -24,7 +24,6 @@ static void _Update_Liveness_Local_Kill(VIR_DEF_USAGE_INFO* pDuInfo,
                                         gctUINT8 halfChannelMask)
 {
     VSC_BLOCK_TABLE*         pDefTable = &pDuInfo->defTable;
-    VIR_DEF_KEY              defKey;
     VIR_DEF*                 pDef;
     gctUINT                  regNo, defIdx;
     gctUINT8                 channel;
@@ -50,10 +49,7 @@ static void _Update_Liveness_Local_Kill(VIR_DEF_USAGE_INFO* pDuInfo,
             }
 
             /* Find the def with current channel */
-            defKey.pDefInst = VIR_ANY_DEF_INST;
-            defKey.regNo = regNo;
-            defKey.channel = VIR_CHANNEL_ANY;
-            defIdx = vscBT_HashSearch(&pDuInfo->defTable, &defKey);
+            defIdx = vscVIR_FindFirstDefIndex(pDuInfo, regNo);
             while (VIR_INVALID_DEF_INDEX != defIdx)
             {
                 pDef = GET_DEF_BY_IDX(pDefTable, defIdx);
@@ -236,6 +232,7 @@ static void _Update_Liveness_Local_Gen(VIR_DEF_USAGE_INFO* pDuInfo,
         VIR_OperandInfo  operandInfo, operandInfo1;
 
         defIdx = UD_CHAIN_GET_DEF(&pUsage->udChain, 0);
+        gcmASSERT(VIR_INVALID_DEF_INDEX != defIdx);
         pDef = GET_DEF_BY_IDX(&pDuInfo->defTable, defIdx);
 
         if (pDef->defKey.pDefInst < VIR_INPUT_DEF_INST)

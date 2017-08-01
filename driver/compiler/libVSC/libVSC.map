@@ -11,10 +11,12 @@
     gcOptimizeShader;
     gcLinkShaders;
     gcSaveProgram;
+	gcSaveCLSingleKernel;
     gcLinkProgram;
     gcLinkProgramPipeline;
     gcValidateProgramPipeline;
     gcLoadProgram;
+	gcLoadCLSingleKernel;
     gcLinkKernel;
 
     gcSHADER_IsHaltiCompiler;
@@ -377,6 +379,7 @@
     vscMC_BeginCodec;
     vscMC_EndCodec;
     vscMC_DumpInst;
+	vscMC_DisassembleInst;
 
     vscDIConstructContext;
     vscDIDestroyContext;
@@ -389,6 +392,13 @@
     vscDIGetPCBySrcLine;
     vscDIGetPCByFuncName;
     vscDIGetNearPCBySrcLine;
+    vscDIAddSWLoc;
+    vscDIGetSWLoc;
+    vscDIChangeUniformSWLoc;
+    vscDIGetVaribleLocByNameAndPC;
+	vscDIStep;
+	vscDIPushCallStack;
+	vscDIPopCallStack;
 
     VIR_Adjust_Imagetypesize;
     VIR_GetSymFromId;

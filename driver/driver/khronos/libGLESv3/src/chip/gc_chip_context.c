@@ -77,6 +77,14 @@ static GLint __glCompressedTextureFormats_palette[] =
     GL_PALETTE8_RGBA8_OES,
 };
 
+static GLint __glCompressedTextureFormats_s3tc[] =
+{
+    GL_COMPRESSED_RGB_S3TC_DXT1_EXT,
+    GL_COMPRESSED_RGBA_S3TC_DXT1_EXT,
+    GL_COMPRESSED_RGBA_S3TC_DXT3_EXT,
+    GL_COMPRESSED_RGBA_S3TC_DXT5_EXT,
+};
+
 static GLint __glCompressedTextureFormats[] =
 {
     GL_COMPRESSED_R11_EAC,
@@ -365,12 +373,7 @@ gcChipInitDevicePipeline(
     gc->dp.blendBarrier = __glChipBlendBarrier;
 
     /* profiler */
-#if VIVANTE_PROFILER
-    /*gc->dp.profiler = __glChipProfiler;*/
-#else
-    gc->dp.profiler = NULL;
-#endif
-    gc->dp.profiler = __glChipProfiler_NEW_Set;
+    gc->dp.profiler = __glChipProfilerSet;
     /* Patches. */
 #if __GL_CHIP_PATCH_ENABLED
     gc->dp.patchBlend = __glChipPatchBlend;
@@ -440,6 +443,11 @@ gcChipInitExtension(
         __glExtension[__GL_EXTID_OES_vertex_type_10_10_10_2].bEnabled = GL_TRUE;
     }
 
+    if (gcoHAL_IsFeatureAvailable(chipCtx->hal, gcvFEATURE_TX_DXT) == gcvSTATUS_TRUE)
+    {
+        __glExtension[__GL_EXTID_EXT_texture_compression_dxt1].bEnabled = GL_TRUE;
+        __glExtension[__GL_EXTID_EXT_texture_compression_s3tc].bEnabled = GL_TRUE;
+    }
     __glExtension[__GL_EXTID_EXT_texture_format_BGRA8888].bEnabled = GL_TRUE;
     __glExtension[__GL_EXTID_EXT_blend_minmax].bEnabled = GL_TRUE;
     __glExtension[__GL_EXTID_EXT_read_format_bgra].bEnabled = GL_TRUE;
@@ -657,6 +665,12 @@ gcChipInitExtension(
         constants->numCompressedTextureFormats += __GL_TABLE_SIZE(__glCompressedTextureFormats_palette);
     }
 
+    if (__glExtension[__GL_EXTID_EXT_texture_compression_s3tc].bEnabled ||
+        __glExtension[__GL_EXTID_EXT_texture_compression_dxt1].bEnabled)
+    {
+        constants->numCompressedTextureFormats += __GL_TABLE_SIZE(__glCompressedTextureFormats_s3tc);
+    }
+
     if (constants->numCompressedTextureFormats > 0)
     {
         constants->pCompressedTexturesFormats = (GLint*)(*gc->imports.calloc)(NULL, 1, sizeof(GLint) * constants->numCompressedTextureFormats);
@@ -686,6 +700,13 @@ gcChipInitExtension(
     {
         __GL_MEMCOPY(pCurFmt, __glCompressedTextureFormats_palette, sizeof(__glCompressedTextureFormats_palette));
         pCurFmt += sizeof(__glCompressedTextureFormats_palette);
+    }
+
+    if (__glExtension[__GL_EXTID_EXT_texture_compression_s3tc].bEnabled ||
+        __glExtension[__GL_EXTID_EXT_texture_compression_dxt1].bEnabled)
+    {
+        __GL_MEMCOPY(pCurFmt, __glCompressedTextureFormats_s3tc, sizeof(__glCompressedTextureFormats_s3tc));
+        pCurFmt += sizeof(__glCompressedTextureFormats_s3tc);
     }
 
     /* Go through the extension table to get the extension string length */
@@ -1609,11 +1630,8 @@ __glChipDestroyContext(
     gcmVERIFY_OK(gcChipLTCReleaseResultArray(chipCtx, gcvNULL));
     gcmVERIFY_OK(gcChipReleaseCompiler(gc));
     (*gc->imports.free)(0, gc->constants.pCompressedTexturesFormats);
-#if VIVANTE_PROFILER
-    /* Destroy the profiler. */
-    /*gcChipDestroyProfiler(gc);*/
-#endif
-    gcmVERIFY_OK(gcChipProfiler_NEW_Destroy(gc));
+
+    gcmVERIFY_OK(gcChipProfilerDestroy(gc));
 
     if (chipCtx->rtTexture)
     {
@@ -1800,6 +1818,10 @@ __glChipCreateContext(
 
     gcmONERROR(gco3D_SetShading(chipCtx->engine, gcvSHADING_SMOOTH));
 
+#if gcdALPHA_KILL_IN_SHADER
+    chipCtx->alphaKillInShader = gcvFALSE;
+#endif
+
 #if gcdUSE_WCLIP_PATCH
     /* For WClipping. */
     chipCtx->wLimitRms = 0.0f;
@@ -1873,10 +1895,8 @@ __glChipCreateContext(
     gcmONERROR(gcChipInitializeSampler(gc));
     gcmONERROR(gcChipLoadCompiler(gc));
     gcmONERROR(gcChipInitDeafultObjects(gc));
-#if VIVANTE_PROFILER
-    /*gcChipInitializeProfiler(gc);*/
-#endif
-    gcmONERROR(gcChipProfiler_NEW_Initialize(gc));
+    gcmONERROR(gcChipProfilerInitialize(gc));
+
     dpGlobalInfo.numContext++;
 
     if (chipCtx->patchId == gcvPATCH_GLBM25   ||

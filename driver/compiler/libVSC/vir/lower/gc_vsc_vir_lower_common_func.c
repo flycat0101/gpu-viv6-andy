@@ -248,7 +248,7 @@ VIR_Lower_SetEnableXYZWAndSymType(
     )
 {
     VIR_Symbol*     symbol = VIR_Operand_GetSymbol(Opnd);
-    VIR_TypeId      typeId =  VIR_GetTypeComponentType(VIR_Operand_GetType(Opnd));
+    VIR_TypeId      typeId =  VIR_GetTypeComponentType(VIR_Operand_GetTypeId(Opnd));
 
     VIR_Operand_SetEnable(Opnd, VIR_ENABLE_XYZW);
     VIR_Symbol_SetTypeId(symbol, VIR_TypeId_ComposeNonOpaqueType(typeId, 4, 1));
@@ -273,7 +273,7 @@ VIR_Lower_AdjustCoordSwizzleForShadow(
     IN VIR_Operand        *Opnd
     )
 {
-    VIR_TypeId samplerType = VIR_Operand_GetType(VIR_Inst_GetSource(Inst, 0));
+    VIR_TypeId samplerType = VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 0));
     VIR_Swizzle newSwizzle = VIR_Operand_GetSwizzle(Opnd);
 
     switch (samplerType)
@@ -354,6 +354,17 @@ VIR_Lower_SetSwizzleXYZW(
     )
 {
     VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_XYZW);
+    return gcvTRUE;
+}
+
+gctBOOL
+VIR_Lower_SetSwizzleXY(
+    IN VIR_PatternContext *Context,
+    IN VIR_Instruction    *Inst,
+    IN VIR_Operand        *Opnd
+    )
+{
+    VIR_Operand_SetSwizzle(Opnd, VIR_SWIZZLE_XYYY);
     return gcvTRUE;
 }
 
@@ -446,7 +457,7 @@ VIR_Lower_GetBaseType(
     gcmASSERT(Opnd != gcvNULL);
 
     type = VIR_Shader_GetTypeFromId(Shader,
-        VIR_Operand_GetType(Opnd));
+        VIR_Operand_GetTypeId(Opnd));
     gcmASSERT(VIR_Type_isPrimitive(type));
 
     baseType = VIR_Type_GetBaseTypeId(type);
@@ -480,7 +491,7 @@ VIR_Lower_IsDstFloat(
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId   typeId   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
+    VIR_TypeId   typeId   = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
 
     gcmASSERT(typeId < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
@@ -499,7 +510,7 @@ VIR_Lower_IsSrc0Unsigned(
     gcmASSERT(src0);
     if(src0 == gcvNULL) return gcvFALSE;
 
-    typeId= VIR_Operand_GetType(src0);
+    typeId= VIR_Operand_GetTypeId(src0);
 
     gcmASSERT(typeId < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
@@ -512,7 +523,7 @@ VIR_Lower_IsDstInt(
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId   ty   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
+    VIR_TypeId   ty   = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
     gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
     return VIR_TypeId_isInteger(ty);
@@ -524,7 +535,7 @@ VIR_Lower_IsDstInt32(
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId   ty   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
+    VIR_TypeId   ty   = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
     gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
     return VIR_GetTypeComponentType(ty) == VIR_TYPE_INT32
@@ -537,7 +548,7 @@ VIR_Lower_IsDstInt16(
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId   ty   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
+    VIR_TypeId   ty   = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
     gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
     return VIR_GetTypeComponentType(ty) == VIR_TYPE_INT16
@@ -550,7 +561,7 @@ VIR_Lower_IsDstIntPacked(
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId   ty   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
+    VIR_TypeId   ty   = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
     gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
     return VIR_TypeId_isInteger(ty) && VIR_TypeId_isPacked(ty);
@@ -571,7 +582,7 @@ VIR_Lower_IsDstSigned(
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId   ty   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
+    VIR_TypeId   ty   = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
     gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
     return VIR_GetTypeComponentType(ty) == VIR_TYPE_INT32
@@ -585,7 +596,7 @@ VIR_Lower_IsDstUnsigned(
     IN VIR_Instruction    *Inst
     )
 {
-    VIR_TypeId   ty   = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
+    VIR_TypeId   ty   = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
     gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
     return VIR_GetTypeComponentType(ty) == VIR_TYPE_UINT32
@@ -793,7 +804,7 @@ _SetValueType0(
     IN VIR_PrimitiveTypeId  Format
     )
 {
-    VIR_Operand_SetType(Opnd, VIR_TypeId_ComposeNonOpaqueType(Format,
+    VIR_Operand_SetTypeId(Opnd, VIR_TypeId_ComposeNonOpaqueType(Format,
         VIR_GetTypeComponents(VIR_Lower_GetBaseType(Context->shader, Opnd)), 1));
 
     return gcvTRUE;
@@ -870,11 +881,11 @@ _SetEnableBaseOnSrc(
         parm = VIR_Operand_GetParameters(SrcOpnd);
         gcmASSERT(parm->argNum >= 1);
 
-        opndTypeId = VIR_Operand_GetType(parm->args[0]);
+        opndTypeId = VIR_Operand_GetTypeId(parm->args[0]);
     }
     else
     {
-        opndTypeId = VIR_Operand_GetType(SrcOpnd);
+        opndTypeId = VIR_Operand_GetTypeId(SrcOpnd);
     }
 
     /* Change enable and type. */
@@ -898,7 +909,7 @@ _SetEnableBaseOnSrc(
     }
 
     VIR_Operand_SetEnable(Opnd, enable);
-    VIR_Operand_SetType(Opnd, opndTypeId);
+    VIR_Operand_SetTypeId(Opnd, opndTypeId);
 
     return gcvTRUE;
 }

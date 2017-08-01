@@ -940,7 +940,7 @@ static VSC_ErrCode _LinkIoBetweenTwoShaderStagesPerExeObj(VSC_BASE_LINKER_HELPER
             }
 
             if ((isSymSample(pAttrSym) != isSymSample(pOutputSym)) &&
-                !VIR_Shader_IsES31Compiler(pUpperShader))
+                !VIR_Shader_IsES31AndAboveCompiler(pUpperShader))
             {
                 errCode = VSC_ERR_VARYING_TYPE_MISMATCH;
                 ON_ERROR(errCode, "Link Io between two shader stages");

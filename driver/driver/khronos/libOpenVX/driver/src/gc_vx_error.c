@@ -29,3 +29,27 @@ VX_INTERNAL_API vx_status vxError_Release(vx_error_ptr errorPtr)
     return vxoReference_Release((vx_reference_ptr)errorPtr, VX_TYPE_ERROR, VX_REF_INTERNAL);
 }
 
+VX_INTERNAL_API vx_error_s *vxoError_GetErrorObject(vx_context_s *context, vx_status status)
+{
+    vx_error_s *error = NULL;
+    vx_size i = 0ul;
+    vxAcquireMutex(context->base.lock);
+    for (i = 0ul; i < context->refCount; i++)
+    {
+        if (context->refTable[i] == NULL)
+            continue;
+
+        if (context->refTable[i]->type == VX_TYPE_ERROR)
+        {
+            error = (vx_error_s *)context->refTable[i];
+            if (error->status == status)
+            {
+                break;
+            }
+            error = NULL;
+        }
+    }
+    vxReleaseMutex(context->base.lock);
+    return error;
+}
+

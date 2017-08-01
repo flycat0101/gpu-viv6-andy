@@ -699,16 +699,45 @@ static gceSTATUS _VertexArray(
     gcmONERROR(_computeAttribMask(Context, &enableBits));
 
     /* Bind the vertex array to the hardware. */
-    gcmONERROR(gcoVERTEXARRAY_Bind(Context->vertexArray,
-                                   enableBits, Context->attributeArray,
-                                   First, &vertexCount,
-                                   IndexType, index, (gctPOINTER) Indices,
-                                   PrimitiveType,
-                                   PrimitiveCount,
-                                   gcvNULL,
-                                   gcvNULL));
+    if (!Context->isQuadrant ||
+        (Context->isQuadrant && ((Context->varrayDirty) || (IndexBuffer == gcvNULL))
+        ))
+    {
+        gcmONERROR(gcoVERTEXARRAY_Bind(Context->vertexArray,
+            enableBits, Context->attributeArray,
+            First, &vertexCount,
+            IndexType, index, (gctPOINTER)Indices,
+            PrimitiveType,
+            PrimitiveCount,
+            gcvNULL,
+            gcvNULL));
+    }
+    else
+    {
+        /* Collect hal leve info.*/
+        gcsVERTEXARRAY_STREAM_INFO streamInfo;
+        gcsVERTEXARRAY_INDEX_INFO  indexInfo;
+        streamInfo.attribMask = enableBits;
+        streamInfo.u.es11.attributes = Context->attributeArray;
+        streamInfo.first = First;
+        streamInfo.count = *Count;
+        streamInfo.primMode = *PrimitiveType;
+        streamInfo.primCount = *PrimitiveCount;
+        streamInfo.instanced = gcvFALSE;
+        streamInfo.instanceCount = 1;
+
+        indexInfo.count = *Count;
+        indexInfo.indexType = IndexType;
+        indexInfo.u.es11.indexBuffer = index;
+        indexInfo.indexMemory = (gctPOINTER)Indices;
+
+        gcmONERROR(gcoVERTEXARRAY_IndexBind_Ex(Context->vertexArray,
+            &streamInfo,
+            &indexInfo));
+    }
 
     *Count = (GLsizei)vertexCount;
+    Context->varrayDirty = gcvFALSE;
 
     /* Success. */
     gcmFOOTER_NO();
@@ -2051,14 +2080,11 @@ GL_API void GL_APIENTRY glDrawArrays(
 
     glmENTER3(glmARGENUM, Mode, glmARGINT, First, glmARGINT, Count)
     {
-#if VIVANTE_PROFILER && VIVANTE_PROFILER_PERDRAW
-        glmPROFILE(context, GLES1_DRAWARRAYS, 0);
-        _glffProfiler(&context->profiler, GL1_PROFILER_DRAW_BEGIN, 0);
-#endif
+
         glmPROFILE(context, GLES1_DRAWARRAYS, 0);
         if (context->profiler.enable)
         {
-            _glffProfiler_NEW_Set(context, GL1_PROFILER_DRAW_BEGIN, 0);
+            _glffProfilerSet(context, GL1_PROFILER_DRAW_BEGIN, 0);
         }
         do
         {
@@ -2279,17 +2305,8 @@ GL_API void GL_APIENTRY glDrawArrays(
 
             if (context->profiler.enable)
             {
-                _glffProfiler_NEW_Set(context, GL1_PROFILER_DRAW_END, 0);
+                _glffProfilerSet(context, GL1_PROFILER_DRAW_END, 0);
             }
-#if VIVANTE_PROFILER_PERDRAW
-            if (context->profiler.enable)
-            {
-                gcoHAL_Commit(context->hal, gcvTRUE);
-            }
-#endif
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-            _glffProfiler(&context->profiler, GL1_PROFILER_DRAW_END, 0);
-#endif
 #endif
 
         }
@@ -2652,14 +2669,10 @@ GL_API void GL_APIENTRY glDrawElements(
               glmARGPTR, Indices)
     {
 
-#if VIVANTE_PROFILER && VIVANTE_PROFILER_PERDRAW
-        glmPROFILE(context, GLES1_DRAWELEMENTS, 0);
-        _glffProfiler(&context->profiler, GL1_PROFILER_DRAW_BEGIN, 0);
-#endif
         glmPROFILE(context, GLES1_DRAWELEMENTS, 0);
         if (context->profiler.enable)
         {
-            _glffProfiler_NEW_Set(context, GL1_PROFILER_DRAW_BEGIN, 0);
+            _glffProfilerSet(context, GL1_PROFILER_DRAW_BEGIN, 0);
         }
         do
         {
@@ -2762,6 +2775,12 @@ GL_API void GL_APIENTRY glDrawElements(
             )
             {
                 break;
+            }
+
+            if (Mode != context->primMode)
+            {
+                context->primMode = Mode;
+                context->varrayDirty = gcvTRUE;
             }
 
             /* Update stencil states. */
@@ -2989,18 +3008,8 @@ GL_API void GL_APIENTRY glDrawElements(
 
             if (context->profiler.enable)
             {
-                _glffProfiler_NEW_Set(context, GL1_PROFILER_DRAW_END, 0);
+                _glffProfilerSet(context, GL1_PROFILER_DRAW_END, 0);
             }
-
-#if VIVANTE_PROFILER_PERDRAW
-            if (context->profiler.enable)
-            {
-                gcoHAL_Commit(context->hal, gcvTRUE);
-            }
-#endif
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-            _glffProfiler(&context->profiler, GL1_PROFILER_DRAW_END, 0);
-#endif
 #endif
 
         }
@@ -4117,6 +4126,7 @@ void _FreeStream(
                 :  (Context->streamIndex - 1) / gldSTREAM_GROUP_SIZE;
 
             halInterface.command            = gcvHAL_SIGNAL;
+            halInterface.engine             = gcvENGINE_RENDER;
             halInterface.u.Signal.signal    = gcmPTR_TO_UINT64(Context->streamSignals[signalIndex]);
             halInterface.u.Signal.auxSignal = 0;
             halInterface.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());

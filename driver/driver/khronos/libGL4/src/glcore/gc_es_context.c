@@ -1590,7 +1590,7 @@ GLvoid *__glCreateContext(GLint clientVersion,
     /* Initialize dpGlobalInfo and device entry functions */
     if (__glDpInitialize(&__glDevicePipe) == GL_FALSE)
     {
-        return;
+        return gcvNULL;
     }
     clientVersion = (GLint)__glDevice->devGetESVersion();
 #endif

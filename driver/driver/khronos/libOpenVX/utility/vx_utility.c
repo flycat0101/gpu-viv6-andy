@@ -14,6 +14,10 @@
 #include <VX/vx.h>
 #include <VX/vxu.h>
 
+#ifndef gcmCOUNTOF
+#define gcmCOUNTOF(array)                 (sizeof(array) / sizeof((array)[0]))
+#endif
+
 VX_API_ENTRY vx_status VX_API_CALL vxuColorConvert(vx_context context, vx_image src, vx_image dst)
 {
     vx_status status = VX_FAILURE;
@@ -91,17 +95,65 @@ VX_API_ENTRY vx_status VX_API_CALL vxuChannelCombine(vx_context context,
     return status;
 }
 
-static vx_status vx_useImmediateBorderMode(vx_context context, vx_node node)
+static const vx_enum vx_border_modes_2_e[] =
 {
-    vx_border_mode_t border;
+    VX_BORDER_UNDEFINED,
+    VX_BORDER_CONSTANT
+};
+
+static const vx_enum vx_border_modes_3_e[] =
+{
+    VX_BORDER_UNDEFINED,
+    VX_BORDER_CONSTANT,
+    VX_BORDER_REPLICATE
+};
+
+static vx_status vxIsBorderModeSupported(vx_enum borderMode, const vx_enum supportedModes[], vx_size modeCount)
+{
+    vx_uint32 index = 0;
+
+    for ( index = 0; index < modeCount; index++)
+    {
+        if (borderMode == supportedModes[index]) return VX_SUCCESS;
+    }
+    return VX_ERROR_NOT_SUPPORTED;
+}
+
+static vx_status vx_useImmediateBorderMode(vx_context context, vx_node node, const vx_enum supportedModes[], vx_size modeCount)
+{
+    vx_border_t border;
     vx_status        status = VX_FAILURE;
 
-    if (vxQueryContext(context, VX_CONTEXT_ATTRIBUTE_IMMEDIATE_BORDER_MODE, &border, sizeof(border)) == VX_SUCCESS)
+    status = vxQueryContext(context, VX_CONTEXT_IMMEDIATE_BORDER, &border, sizeof(border));
+
+    if (status != VX_SUCCESS) return status;
+
+    status = vxIsBorderModeSupported(border.mode, supportedModes, modeCount);
+
+    if (status == VX_ERROR_NOT_SUPPORTED)
     {
-        status = vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border));
+        vx_enum policy;
+
+        status = vxQueryContext(context, VX_CONTEXT_IMMEDIATE_BORDER_POLICY, &policy, sizeof(policy));
+
+        if (status != VX_SUCCESS) return status;
+
+        switch (policy)
+        {
+            case VX_BORDER_POLICY_DEFAULT_TO_UNDEFINED:
+                border.mode = VX_BORDER_UNDEFINED;
+                status = VX_SUCCESS;
+                break;
+            case VX_BORDER_POLICY_RETURN_ERROR:
+                status = VX_ERROR_NOT_SUPPORTED;
+                break;
+            default:
+                status = VX_ERROR_NOT_SUPPORTED;
+                break;
+        }
     }
 
-    return status;
+    return status == VX_SUCCESS ? vxSetNodeAttribute(node, VX_NODE_BORDER, &border, sizeof(border)) : status;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxuSobel3x3(vx_context context, vx_image src, vx_image output_x, vx_image output_y)
@@ -116,7 +168,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxuSobel3x3(vx_context context, vx_image src,
     node = vxSobel3x3Node(graph, src, output_x, output_y);
     if (node == NULL) return VX_FAILURE;
 
-    status = vx_useImmediateBorderMode(context, node);
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_3_e, gcmCOUNTOF(vx_border_modes_3_e));
     if (status == VX_SUCCESS)
     {
         status = vxVerifyGraph(graph);
@@ -192,7 +244,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxuScaleImage(vx_context context, vx_image sr
     node = vxScaleImageNode(graph, src, dst, type);
     if (node == NULL) return VX_FAILURE;
 
-    status = vx_useImmediateBorderMode(context, node);
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_3_e, gcmCOUNTOF(vx_border_modes_3_e));
     if (status == VX_SUCCESS)
         status = vxVerifyGraph(graph);
 
@@ -323,8 +375,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxuMeanStdDev(vx_context context, vx_image in
     if (status == VX_SUCCESS)
     {
         status = vxProcessGraph(graph);
-        vxReadScalarValue(s_mean, mean);
-        vxReadScalarValue(s_stddev, stddev);
+        vxCopyScalar(s_mean, (void*)mean, VX_READ_ONLY, VX_MEMORY_TYPE_HOST);
+        vxCopyScalar(s_stddev, (void*)stddev, VX_READ_ONLY, VX_MEMORY_TYPE_HOST);
     }
 
     vxReleaseNode(&node);
@@ -394,7 +446,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxuErode3x3(vx_context context, vx_image inpu
     node = vxErode3x3Node(graph, input, output);
     if (node == NULL) return VX_FAILURE;
 
-    status = vx_useImmediateBorderMode(context, node);
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_3_e, gcmCOUNTOF(vx_border_modes_3_e));
 
     if (status == VX_SUCCESS)
         status = vxVerifyGraph(graph);
@@ -422,7 +474,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxuDilate3x3(vx_context context, vx_image inp
     node = vxDilate3x3Node(graph, input, output);
     if (node == NULL) return VX_FAILURE;
 
-    status = vx_useImmediateBorderMode(context, node);
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_3_e, gcmCOUNTOF(vx_border_modes_3_e));
     if (status == VX_SUCCESS)
         status = vxVerifyGraph(graph);
     if (status == VX_SUCCESS)
@@ -447,7 +499,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxuMedian3x3(vx_context context, vx_image inp
     node = vxMedian3x3Node(graph, input, output);
     if (node == NULL) return VX_FAILURE;
 
-    status = vx_useImmediateBorderMode(context, node);
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_3_e, gcmCOUNTOF(vx_border_modes_3_e));
     if (status == VX_SUCCESS)
         status = vxVerifyGraph(graph);
     if (status == VX_SUCCESS)
@@ -472,7 +524,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxuBox3x3(vx_context context, vx_image input,
     node = vxBox3x3Node(graph, input, output);
     if (node == NULL) return VX_FAILURE;
 
-    status = vx_useImmediateBorderMode(context, node);
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_3_e, gcmCOUNTOF(vx_border_modes_3_e));
 
     if (status == VX_SUCCESS)
         status = vxVerifyGraph(graph);
@@ -500,7 +552,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxuGaussian3x3(vx_context context, vx_image i
     node = vxGaussian3x3Node(graph, input, output);
     if (node == NULL) return VX_FAILURE;
 
-    status = vx_useImmediateBorderMode(context, node);
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_3_e, gcmCOUNTOF(vx_border_modes_3_e));
 
     if (status == VX_SUCCESS)
         status = vxVerifyGraph(graph);
@@ -516,6 +568,30 @@ VX_API_ENTRY vx_status VX_API_CALL vxuGaussian3x3(vx_context context, vx_image i
     return status;
 }
 
+VX_API_ENTRY vx_status VX_API_CALL vxuNonLinearFilter(vx_context context, vx_enum function, vx_image input, vx_matrix mask, vx_image output)
+{
+    vx_status status = VX_FAILURE;
+    vx_graph graph = vxCreateGraph(context);
+    if (vxGetStatus((vx_reference)graph) == VX_SUCCESS)
+    {
+        vx_node node = vxNonLinearFilterNode(graph, function, input, mask, output);
+        if (vxGetStatus((vx_reference)node) == VX_SUCCESS)
+        {
+            status = vx_useImmediateBorderMode(context, node, vx_border_modes_3_e, gcmCOUNTOF(vx_border_modes_3_e));
+
+            if (status == VX_SUCCESS)
+                status = vxVerifyGraph(graph);
+
+            if (status == VX_SUCCESS)
+                status = vxProcessGraph(graph);
+
+            vxReleaseNode(&node);
+        }
+        vxReleaseGraph(&graph);
+    }
+    return status;
+}
+
 VX_API_ENTRY vx_status VX_API_CALL vxuConvolve(vx_context context, vx_image input, vx_convolution conv, vx_image output)
 {
     vx_status status = VX_FAILURE;
@@ -528,7 +604,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxuConvolve(vx_context context, vx_image inpu
     node = vxConvolveNode(graph, input, conv, output);
     if (node == NULL) return VX_FAILURE;
 
-    status = vx_useImmediateBorderMode(context, node);
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_3_e, gcmCOUNTOF(vx_border_modes_3_e));
     if (status == VX_SUCCESS)
         status = vxVerifyGraph(graph);
 
@@ -555,7 +631,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxuGaussianPyramid(vx_context context, vx_ima
     node = vxGaussianPyramidNode(graph, input, gaussian);
     if (node == NULL) return VX_FAILURE;
 
-    status = vx_useImmediateBorderMode(context, node);
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_2_e, gcmCOUNTOF(vx_border_modes_2_e));
 
     if (status == VX_SUCCESS)
         status = vxVerifyGraph(graph);
@@ -735,7 +811,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxuHalfScaleGaussian(vx_context context, vx_i
     node = vxHalfScaleGaussianNode(graph, input, output, kernel_size);
     if (node == NULL) return VX_FAILURE;
 
-    status = vx_useImmediateBorderMode(context, node);
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_2_e, gcmCOUNTOF(vx_border_modes_2_e));
 
     if (status == VX_SUCCESS)
         status = vxVerifyGraph(graph);
@@ -935,7 +1011,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxuWarpAffine(vx_context context, vx_image in
     node = vxWarpAffineNode(graph, input, matrix, type, output);
     if (node == NULL) return VX_FAILURE;
 
-    status = vx_useImmediateBorderMode(context, node);
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_2_e, gcmCOUNTOF(vx_border_modes_2_e));
 
     if (status == VX_SUCCESS)
         status = vxVerifyGraph(graph);
@@ -963,7 +1039,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxuWarpPerspective(vx_context context, vx_ima
     node = vxWarpPerspectiveNode(graph, input, matrix, type, output);
     if (node == NULL) return VX_FAILURE;
 
-    status = vx_useImmediateBorderMode(context, node);
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_2_e, gcmCOUNTOF(vx_border_modes_2_e));
 
     if (status == VX_SUCCESS)
         status = vxVerifyGraph(graph);
@@ -1080,7 +1156,64 @@ VX_API_ENTRY vx_status VX_API_CALL vxuRemap(vx_context context, vx_image input, 
     node = vxRemapNode(graph, input, table, policy, output);
     if (node == NULL) return VX_FAILURE;
 
-    status = vx_useImmediateBorderMode(context, node);
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_2_e, gcmCOUNTOF(vx_border_modes_2_e));
+
+    if (status == VX_SUCCESS)
+        status = vxVerifyGraph(graph);
+
+    if (status == VX_SUCCESS)
+    {
+        status = vxProcessGraph(graph);
+    }
+
+    vxReleaseNode(&node);
+    vxReleaseGraph(&graph);
+
+    return status;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxuLaplacianPyramid(vx_context context, vx_image input, vx_pyramid laplacian, vx_image output)
+{
+    vx_status status = VX_FAILURE;
+    vx_graph  graph  = NULL;
+    vx_node   node   = NULL;
+
+   graph = vxCreateGraph(context);
+   if (graph == NULL) return VX_FAILURE;
+
+    node = vxLaplacianPyramidNode(graph, input, laplacian, output);
+    if (node == NULL) return VX_FAILURE;
+
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_2_e, gcmCOUNTOF(vx_border_modes_2_e));
+
+    if (status == VX_SUCCESS)
+        status = vxVerifyGraph(graph);
+
+    if (status == VX_SUCCESS)
+    {
+        status = vxProcessGraph(graph);
+    }
+
+    vxReleaseNode(&node);
+    vxReleaseGraph(&graph);
+
+    return status;
+}
+
+
+VX_API_ENTRY vx_status VX_API_CALL vxuLaplacianReconstruct(vx_context context, vx_pyramid laplacian, vx_image input, vx_image output)
+{
+    vx_status status = VX_FAILURE;
+    vx_graph  graph  = NULL;
+    vx_node   node   = NULL;
+
+   graph = vxCreateGraph(context);
+   if (graph == NULL) return VX_FAILURE;
+
+    node = vxLaplacianReconstructNode(graph, laplacian, input, output);
+    if (node == NULL) return VX_FAILURE;
+
+    status = vx_useImmediateBorderMode(context, node, vx_border_modes_2_e, gcmCOUNTOF(vx_border_modes_2_e));
 
     if (status == VX_SUCCESS)
         status = vxVerifyGraph(graph);

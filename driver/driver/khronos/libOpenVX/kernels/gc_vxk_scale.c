@@ -14,13 +14,14 @@
 #include <gc_vxk_common.h>
 
 static vx_status vxVivScale(vx_node node, vx_image src_image, vx_image dst_image, vx_scalar stype,
-                               const vx_border_mode_t *borders)
+                               const vx_border_t *borders)
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 width = 0, height = 0;
     vx_uint32 dst_width, dst_height;
     vx_int32 uniformNum = 0;
     vx_int32 index = 0;
+    vx_df_image format = 0;
 
     vx_float32 m[16] = {0};
     vx_enum type = 0;
@@ -44,11 +45,12 @@ static vx_status vxVivScale(vx_node node, vx_image src_image, vx_image dst_image
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(src_image, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(src_image, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(src_image, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(src_image, VX_IMAGE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(src_image, VX_IMAGE_FORMAT, &format, sizeof(format));
 
-    vxQueryImage(dst_image, VX_IMAGE_ATTRIBUTE_WIDTH, &dst_width, sizeof(dst_width));
-    vxQueryImage(dst_image, VX_IMAGE_ATTRIBUTE_HEIGHT, &dst_height, sizeof(dst_height));
+    vxQueryImage(dst_image, VX_IMAGE_WIDTH, &dst_width, sizeof(dst_width));
+    vxQueryImage(dst_image, VX_IMAGE_HEIGHT, &dst_height, sizeof(dst_height));
 
     status |= vxReadScalarValue(stype, &type);
 
@@ -60,25 +62,25 @@ static vx_status vxVivScale(vx_node node, vx_image src_image, vx_image dst_image
 
     kernelContext->params.kernel           = gcvVX_KERNEL_SCALE_IMAGE;
 
-    kernelContext->params.xstep            = 16;
-    kernelContext->params.policy           = (type == VX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR)?gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR:(type == VX_INTERPOLATION_TYPE_BILINEAR?gcvVX_INTERPOLATION_TYPE_BILINEAR:gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR);
+    kernelContext->params.xstep            = (format == VX_DF_IMAGE_U8) ? 16 : 8;
+    kernelContext->params.policy           = (type == VX_INTERPOLATION_NEAREST_NEIGHBOR)?gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR:(type == VX_INTERPOLATION_BILINEAR?gcvVX_INTERPOLATION_TYPE_BILINEAR:gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR);
 #if gcdVX_OPTIMIZER
     kernelContext->borders                 = borders->mode;
 #else
     kernelContext->params.borders          = borders->mode;
 #endif
-    kernelContext->params.constant_value   = borders->constant_value;
+    kernelContext->params.constant_value   = borders->constant_value.U32;
 
     kernelContext->params.xmax             = dst_width;
     kernelContext->params.ymax             = dst_height;
 
-    if(borders->mode == VX_BORDER_MODE_CONSTANT || borders->mode == VX_BORDER_MODE_UNDEFINED)
+    if(borders->mode == VX_BORDER_CONSTANT || borders->mode == VX_BORDER_UNDEFINED)
     {
         vx_uint32 bin[4];
         bin[0] =
         bin[1] =
         bin[2] =
-        bin[3] = FORMAT_VALUE(borders->mode == VX_BORDER_MODE_CONSTANT?borders->constant_value:0xcd);
+        bin[3] = FORMAT_VALUE(borders->mode == VX_BORDER_CONSTANT?borders->constant_value.U32:0xcd);
 
         gcoOS_MemCopy(&kernelContext->uniforms[index].uniform, bin, sizeof(bin));
         kernelContext->uniforms[index].num     = 4 * 4;
@@ -139,7 +141,7 @@ static vx_status vxVivScale(vx_node node, vx_image src_image, vx_image dst_image
     return status;
 }
 
-vx_status vxScaleImage(vx_node node, vx_image src_image, vx_image dst_image, vx_scalar stype, vx_border_mode_t *bordermode, vx_float64 *interm, vx_size size)
+vx_status vxScaleImage(vx_node node, vx_image src_image, vx_image dst_image, vx_scalar stype, vx_border_t *bordermode, vx_float64 *interm, vx_size size)
 {
     vx_status status = VX_FAILURE;
     vx_enum type = 0;

@@ -253,11 +253,13 @@ static int (* _ReleaseVideoMemory)(uint32_t node);
 
 static int (* _LockVideoMemory)(uint32_t node,
                                 int cacheable,
+                                int engine,
                                 uint32_t *address,
                                 void **memory);
 
 static int (* _UnlockVideoMemory)(uint32_t node,
-                                  int type);
+                                  int type,
+                                  int engine);
 
 /*******************************************************************************
 ** Initialization.
@@ -1042,12 +1044,12 @@ _LockPixmap(
         return;
     }
 
-    status = _LockVideoMemory(node, 0, &address, &memory);
+    status = _LockVideoMemory(node, 0, 0, &address, &memory);
 
     if (status != 0)
     {
         /* Try again without cache. */
-        status = _LockVideoMemory(node, 1, &address, &memory);
+        status = _LockVideoMemory(node, 1, 0, &address, &memory);
     }
 
     if (status != 0)
@@ -1085,7 +1087,7 @@ _UnlockPixmap(
 {
     if (Pix->node)
     {
-        _UnlockVideoMemory(Pix->node, 6);
+        _UnlockVideoMemory(Pix->node, 6, 0);
         _ReleaseVideoMemory(Pix->node);
 
         Pix->memory  = NULL;

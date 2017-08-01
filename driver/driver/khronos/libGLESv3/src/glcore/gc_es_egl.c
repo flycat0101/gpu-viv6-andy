@@ -234,6 +234,8 @@ static EGLBoolean veglFlushContext_es3(void * Context)
 static void veglFlush_es3(void)
 {
     __GLcontext *gc = __glGetGLcontext();
+    gctBOOL temp = gc->profiler.useGlfinish;
+    gc->profiler.useGlfinish = gcvFALSE;
 
     if (gcvNULL == gc)
     {
@@ -242,11 +244,15 @@ static void veglFlush_es3(void)
     }
 
     __gles_Flush(gc);
+
+    gc->profiler.useGlfinish = temp;
 }
 
 static void veglFinish_es3(void)
 {
     __GLcontext *gc = __glGetGLcontext();
+    gctBOOL temp = gc->profiler.useGlfinish;
+    gc->profiler.useGlfinish = gcvFALSE;
 
     if (gcvNULL == gc)
     {
@@ -255,6 +261,8 @@ static void veglFinish_es3(void)
     }
 
     __gles_Finish(gc);
+
+    gc->profiler.useGlfinish = temp;
 }
 
 static EGLenum veglCreateImageTexture_es3(void * Context,

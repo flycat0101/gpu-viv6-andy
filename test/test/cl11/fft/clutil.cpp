@@ -38,7 +38,6 @@ cl_device_id cdDeviceID[2];
 cl_kernel kernels[FFT_MAX_LOG2N];
 cl_command_queue commandQueue;
 cl_event gpuExecution[FFT_MAX_LOG2N];
-cl_event gpuDone;
 
 #define ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]))
 
@@ -254,8 +253,6 @@ cleanup(
     if (d_intime) clReleaseMemObject(d_intime);
     if (d_outfft) clReleaseMemObject(d_outfft);
 
-    if (gpuDone) clReleaseEvent(gpuDone);
-
     for (unsigned kk=0; kk<ARRAY_SIZE(kernels); kk++) {
         if (gpuExecution[kk]) clReleaseEvent(gpuExecution[kk]);
     }
@@ -468,7 +465,7 @@ copyToDevice(
     const unsigned size
     )
 {
-    const cl_int ciErrNum = clEnqueueWriteBuffer(commandQueue, mem, CL_FALSE, 0, sizeof(float) * size, hostPtr, 0, NULL, NULL);
+    const cl_int ciErrNum = clEnqueueWriteBuffer(commandQueue, mem, CL_TRUE, 0, sizeof(float) * size, hostPtr, 0, NULL, NULL);
     checkError(ciErrNum, CL_SUCCESS,  "clEnqueueWriteBuffer");
 }
 
@@ -479,7 +476,7 @@ copyFromDevice(
     const unsigned size
     )
 {
-    cl_int ciErrNum = clEnqueueReadBuffer(commandQueue, dMem, CL_FALSE, 0, sizeof(float) * size, hostPtr, 0, NULL, &gpuDone);
+    cl_int ciErrNum = clEnqueueReadBuffer(commandQueue, dMem, CL_TRUE, 0, sizeof(float) * size, hostPtr, 0, NULL, NULL);
     checkError(ciErrNum, CL_SUCCESS, "clEnqueueReadBuffer");
 }
 

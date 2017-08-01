@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 ########################################################
 # establish build environment and build options value
 # Please modify the following items according your build environment

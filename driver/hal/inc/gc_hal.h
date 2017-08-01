@@ -99,8 +99,10 @@ extern "C" {
 ******************************** Useful Macro *********************************
 \******************************************************************************/
 
-#define gcvINVALID_ADDRESS          ~0U
-#define gcvINVALID_VALUE            0xCCCCCCCC
+#define gcvINVALID_ADDRESS              ~0U
+#define gcvINVALID_VALUE                0xCCCCCCCC
+
+#define gcvINVALID_PHYSICAL_ADDRESS     ~0U
 
 #define gcmGET_PRE_ROTATION(rotate) \
     ((rotate) & (~(gcvSURF_POST_FLIP_X | gcvSURF_POST_FLIP_Y)))
@@ -1840,7 +1842,8 @@ gckKERNEL_UnmapMemory(
     IN gckKERNEL Kernel,
     IN gctPHYS_ADDR Physical,
     IN gctSIZE_T Bytes,
-    IN gctPOINTER Logical
+    IN gctPOINTER Logical,
+    IN gctUINT32 ProcessID
     );
 
 /* Notification of events. */
@@ -2124,6 +2127,13 @@ gckHARDWARE_FlushMMU(
     IN gckHARDWARE Hardware
     );
 
+gceSTATUS
+gckHARDWARE_FlushAsyncMMU(
+    IN gckHARDWARE Hardware,
+    IN gctPOINTER Logical,
+    IN OUT gctUINT32 * Bytes
+    );
+
 /* Set the page table base address. */
 gceSTATUS
 gckHARDWARE_SetMMUv2(
@@ -2266,18 +2276,6 @@ gckHARDWARE_SetIsrManager(
     IN gctISRMANAGERFUNC StartIsr,
     IN gctISRMANAGERFUNC StopIsr,
     IN gctPOINTER Context
-    );
-
-/* Start a composition. */
-gceSTATUS
-gckHARDWARE_Compose(
-    IN gckHARDWARE Hardware,
-    IN gctUINT32 ProcessID,
-    IN gctPHYS_ADDR Physical,
-    IN gctPOINTER Logical,
-    IN gctSIZE_T Offset,
-    IN gctSIZE_T Size,
-    IN gctUINT8 EventID
     );
 
 /* Check for Hardware features. */
@@ -2503,13 +2501,6 @@ gckEVENT_Commit(
     IN gcsQUEUE_PTR Queue
     );
 
-/* Schedule a composition event. */
-gceSTATUS
-gckEVENT_Compose(
-    IN gckEVENT Event,
-    IN gcsHAL_COMPOSE_PTR Info
-    );
-
 /* Event callback routine. */
 gceSTATUS
 gckEVENT_Notify(
@@ -2733,7 +2724,6 @@ gckHARDWARE_QueryProfileRegisters(
     );
 #endif
 
-#if VIVANTE_PROFILER_CONTEXT
 gceSTATUS
 gckHARDWARE_QueryContextProfile(
     IN gckHARDWARE Hardware,
@@ -2747,7 +2737,6 @@ gckHARDWARE_UpdateContextProfile(
     IN gckHARDWARE Hardware,
     IN gckCONTEXT Context
     );
-#endif
 
 gceSTATUS
 gckHARDWARE_QueryContextNewProfile(

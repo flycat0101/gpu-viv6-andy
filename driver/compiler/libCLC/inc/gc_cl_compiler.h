@@ -397,6 +397,10 @@ typedef enum _cleEXTENSION
 
     clvEXTENSION_VIV_VX                      = 0x00000004,
 
+    clvEXTENSION_VIV_BITFIELD                = 0x00000008,
+
+    clvEXTENSION_VIV_CMPLX                   = 0x00000010,
+
     clvEXTENSION_ALL                        = clvEXTENSION_STANDARD_DERIVATIVES
 }
 cleEXTENSION;

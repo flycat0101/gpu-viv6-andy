@@ -141,8 +141,8 @@ _gcChangeAtomicCounterUniform2BaseAddrBindingUniform(
 
                 loadInst.source1        = gcmSL_SOURCE_SET(0, Type, gcSL_CONSTANT)
                                         | gcmSL_SOURCE_SET(0, Format, gcSL_UINT32);
-                loadInst.source1Index   = ((gctUINT16 *) &offset)[0];
-                loadInst.source1Indexed = ((gctUINT16 *) &offset)[1];
+                loadInst.source1Index   = (gctUINT16) (offset & 0xFFFF);
+                loadInst.source1Indexed = (gctUINT16) (offset >> 16);
 
                 *source      = gcmSL_SOURCE_SET(*source, Type, gcSL_TEMP);
                 *source      = gcmSL_SOURCE_SET(*source, Swizzle, gcSL_SWIZZLE_XXXX);
@@ -172,6 +172,7 @@ _gcChangeAtomicCounterUniform2BaseAddrBindingUniform(
                 gcSL_SWIZZLE srcSwz = gcSL_SWIZZLE_XXXX;
                 gctINT k;
                 gcSHADER_PRECISION precision = gcSHADER_PRECISION_DEFAULT;
+                gctINT iVal;
 
                 for(k = (gctINT)(i - 1); k >= 0; k--)
                 {
@@ -224,8 +225,9 @@ _gcChangeAtomicCounterUniform2BaseAddrBindingUniform(
 
                 mulInst.source1      = gcmSL_SOURCE_SET(0, Type, gcSL_CONSTANT)
                                      | gcmSL_SOURCE_SET(0, Format, gcSL_UINT32);
-                mulInst.source1Index   = 4;
-                mulInst.source1Indexed = 0;
+                iVal = 4;
+                mulInst.source1Index   = (gctUINT16)(iVal & 0xFFFF);
+                mulInst.source1Indexed = (gctUINT16)(iVal >> 16);
 
 
                 gcmSL_OPCODE_UPDATE(addInst.opcode, Opcode, gcSL_ADD);
@@ -247,8 +249,8 @@ _gcChangeAtomicCounterUniform2BaseAddrBindingUniform(
 
                 addInst.source1      = gcmSL_SOURCE_SET(0, Type, gcSL_CONSTANT)
                                      | gcmSL_SOURCE_SET(0, Format, gcSL_UINT32);
-                addInst.source1Index   = ((gctUINT16 *) &offset)[0];
-                addInst.source1Indexed = ((gctUINT16 *) &offset)[1];
+                addInst.source1Index   = (gctUINT16) (offset&0xFFFF);
+                addInst.source1Indexed = (gctUINT16) (offset >> 16);
 
 
                 gcmSL_OPCODE_UPDATE(loadInst.opcode, Opcode, gcSL_LOAD);
@@ -388,6 +390,7 @@ _gcPreprocessHeplerInvocation(
 
         if (gcHWCaps.hwFeatureFlags.supportHelperInv)
         {
+            gctINT iVal;
             setCode->opcode = gcSL_SET;
             setCode->temp = gcmSL_TARGET_SET(0, Format, gcSL_BOOLEAN)  |
                             gcmSL_TARGET_SET(0, Enable, gcSL_ENABLE_X) |
@@ -402,7 +405,9 @@ _gcPreprocessHeplerInvocation(
 
             setCode->source1 = gcmSL_SOURCE_SET(0, Type, gcSL_CONSTANT) |
                                gcmSL_SOURCE_SET(0, Format, gcSL_BOOLEAN);
-            setCode->source1Index = 1;
+            iVal = 1;
+            setCode->source1Index = (gctUINT16)(iVal & 0xFFFF);
+            setCode->source1Indexed = (gctUINT16)(iVal >> 16);
         }
         else
         {
@@ -856,7 +861,7 @@ _gcRemoveNOPsInMainFunction(
         /* Copy the instructions. */
         if (lastNOPCodeIndex < (Shader->lastInstruction -1))
         {
-            gcoOS_MemCopy(Shader->code + firstNOPCodeIndex,
+            gcoOS_MemMove(Shader->code + firstNOPCodeIndex,
                           Shader->code + lastNOPCodeIndex + 1,
                           leftCodeCount * gcmSIZEOF(struct _gcSL_INSTRUCTION));
         }

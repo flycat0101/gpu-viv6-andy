@@ -168,7 +168,7 @@ static VSC_ErrCode _VSC_SCL_CollectInformationFromOper(
     )
 {
     VSC_ErrCode errcode  = VSC_ERR_NONE;
-    VIR_TypeId type_id = VIR_Operand_GetType(opnd);
+    VIR_TypeId type_id = VIR_Operand_GetTypeId(opnd);
     VIR_Type* type = VIR_Shader_GetTypeFromId(VSC_SCL_Scalarization_GetShader(scl), type_id);
 
     if(VIR_Type_GetKind(type) == VIR_TY_ARRAY)
@@ -404,7 +404,7 @@ static VSC_ErrCode _VSC_SCL_DoSubstitutionForShader(
                 opnd_node != gcvNULL; opnd_node = (VSC_SCL_OperandListNode*)vscULIterator_Next(&opnd_iter))
             {
                 VIR_Operand* opnd = VSC_SCL_OperandListNode_GetOpnd(opnd_node);
-                VIR_TypeId type_id = VIR_Operand_GetType(opnd);
+                VIR_TypeId type_id = VIR_Operand_GetTypeId(opnd);
                 VIR_Type* type = VIR_Shader_GetTypeFromId(shader, type_id);
 
                 if(VIR_Type_GetKind(type) == VIR_TY_ARRAY)

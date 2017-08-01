@@ -2404,8 +2404,65 @@ gcChipSetAlphaBlend(
 OnError:
     gcmFOOTER();
     return status;
-
 }
+
+#if gcdALPHA_KILL_IN_SHADER
+gceSTATUS
+gcChipSetAlphaKill(
+    __GLcontext *gc
+    )
+{
+    __GLchipContext *chipCtx = CHIP_CTXINFO(gc);
+    gceSTATUS status = gcvSTATUS_OK;
+    __GLchipSLProgramInstance *fsInstance = chipCtx->activePrograms[__GLSL_STAGE_FS] ?
+        chipCtx->activePrograms[__GLSL_STAGE_FS]->curPgInstance : gcvNULL;
+    GLboolean shaderBlendPatch = (fsInstance && (fsInstance->pgStateKeyMask.s.hasShaderBlend == 1)) ? GL_TRUE : GL_FALSE;
+    GLboolean alphaBlend = (fsInstance && (fsInstance->pgStateKeyMask.s.hasAlphaBlend == 1)) ? GL_TRUE : GL_FALSE;
+    GLboolean hwBlend, alphaKill, colorKill;
+
+    gcmHEADER_ARG("gc=0x%x", gc);
+
+    hwBlend = (!shaderBlendPatch &&
+                !chipCtx->advBlendInShader &&
+                !alphaBlend &&
+                gc->state.enables.colorBuffer.blend[0]);
+
+    alphaKill = (hwBlend &&
+                (gc->state.raster.blendSrcRGB[0] == GL_SRC_ALPHA) &&
+                (gc->state.raster.blendSrcAlpha[0] == GL_SRC_ALPHA) &&
+                (gc->state.raster.blendDstRGB[0] == GL_ONE_MINUS_SRC_ALPHA) &&
+                (gc->state.raster.blendDstAlpha[0] == GL_ONE_MINUS_SRC_ALPHA) &&
+                (gc->state.raster.blendEquationRGB[0] == GL_FUNC_ADD) &&
+                (gc->state.raster.blendEquationAlpha[0] == GL_FUNC_ADD) &&
+                (fsInstance->programState.hints->killStateAddress != 0)
+                );
+
+    colorKill = (hwBlend &&
+                (gc->state.raster.blendSrcRGB[0] == GL_ONE) &&
+                (gc->state.raster.blendSrcAlpha[0] == GL_ONE) &&
+                (gc->state.raster.blendDstRGB[0] == GL_ONE) &&
+                (gc->state.raster.blendDstAlpha[0] == GL_ONE) &&
+                (gc->state.raster.blendEquationRGB[0] == GL_FUNC_ADD) &&
+                (gc->state.raster.blendEquationAlpha[0] == GL_FUNC_ADD) &&
+                (fsInstance->programState.hints->killStateAddress != 0)
+                );
+
+    gcmONERROR(gco3D_SetAlphaKill(chipCtx->engine, alphaKill, colorKill));
+
+    /*program should reload because of alphaKill value change from 1 to 0 , the shader instruction code will changed*/
+    if (!chipCtx->chipDirty.uDefer.sDefer.fsReload &&
+        !alphaKill && chipCtx->alphaKillInShader )
+    {
+        chipCtx->chipDirty.uDefer.sDefer.fsReload = 1;
+    }
+
+    chipCtx->alphaKillInShader = alphaKill;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+#endif
 
 gceSTATUS
 gcChipSetColorMask(
@@ -2646,16 +2703,20 @@ gcChipSetDrawBuffers(
         chipDirty->uBuffer.sBuffer.sOffsetDirty = GL_TRUE;
     }
 
-    if (chipCtx->drawDepthView.surf != dView->surf)
+    if ((chipCtx->drawDepthView.surf != dView->surf) ||
+        (chipCtx->drawDepthView.numSlices != dView->numSlices))
     {
         chipCtx->drawDepthView.surf = dView->surf;
+        chipCtx->drawDepthView.numSlices = dView->numSlices;
         chipDirty->uBuffer.sBuffer.zSurfDirty = GL_TRUE;
         chipDirty->uDefer.sDefer.polygonOffset = GL_TRUE;
     }
 
-    if (chipCtx->drawStencilView.surf != sView->surf)
+    if ((chipCtx->drawStencilView.surf != sView->surf) ||
+        (chipCtx->drawStencilView.numSlices != sView->numSlices))
     {
         chipCtx->drawStencilView.surf = sView->surf;
+        chipCtx->drawStencilView.numSlices = sView->numSlices;
         chipDirty->uBuffer.sBuffer.sSurfDirty = GL_TRUE;
     }
 

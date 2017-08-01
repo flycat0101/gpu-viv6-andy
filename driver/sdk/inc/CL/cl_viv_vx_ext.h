@@ -239,6 +239,10 @@ enum VXC_OP {
     VXC_OP_horz_med3,
     VXC_OP_error,
     OP_bit_extract,
+    VXC_OP_dp16x1_b,
+    VXC_OP_dp8x2_b,
+    VXC_OP_dp4x4_b,
+    VXC_OP_dp2x8_b,
 };
 
 enum eVXC_ERROR
@@ -253,63 +257,63 @@ enum eVXC_ERROR
 
 #define VXC_OP2(Op, Dest, Src0, Src1)                  \
     do {                                               \
-        int t1;                                        \
-        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);         \
-        _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, t1);    \
+        int _t1;                                       \
+        _viv_asm(PARAM_CHAIN, _t1, Src0, Src1);         \
+        _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, _t1);    \
     } while(0)
 
 #define VXC_OP3(Op, Dest, Src0, Src1, Src2)            \
     do {                                               \
-        int t1, t2;                                    \
-        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);         \
-        _viv_asm(PARAM_CHAIN, t2, t1, Src2);           \
-        _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, t2);    \
+        int _t1, _t2;                                  \
+        _viv_asm(PARAM_CHAIN, _t1, Src0, Src1);        \
+        _viv_asm(PARAM_CHAIN, _t2, _t1, Src2);         \
+        _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, _t2);   \
     } while(0)
 
 #define VXC_OP3_NoDest(Op, Src0, Src1, Src2)           \
     do {                                               \
-        int t1, t2, t3;                                \
-        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);         \
-        _viv_asm(PARAM_CHAIN, t2, t1, Src2);           \
-        _viv_asm(INTRINSIC_ST, t3, VXC_OP_##Op, t2);   \
+        int _t1, _t2, _t3;                             \
+        _viv_asm(PARAM_CHAIN, _t1, Src0, Src1);        \
+        _viv_asm(PARAM_CHAIN, _t2, _t1, Src2);         \
+        _viv_asm(INTRINSIC_ST, _t3, VXC_OP_##Op, _t2); \
     } while(0)
 
 
 #define VXC_OP4(Op, Dest, Src0, Src1, Src2, Src3)      \
     do {                                               \
-        int t1, t2, t3;                                \
-        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);         \
-        _viv_asm(PARAM_CHAIN, t2, t1, Src2);           \
-        _viv_asm(PARAM_CHAIN, t3, t2, Src3);           \
-        _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, t3);    \
+        int _t1, _t2, _t3;                             \
+        _viv_asm(PARAM_CHAIN, _t1, Src0, Src1);        \
+        _viv_asm(PARAM_CHAIN, _t2, _t1, Src2);         \
+        _viv_asm(PARAM_CHAIN, _t3, _t2, Src3);         \
+        _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, _t3);   \
     } while(0)
 
 #define VXC_OP4_NoDest(Op, Src0, Src1, Src2, Src3)     \
     do {                                               \
-        int t1, t2, t3, t4;                            \
-        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);         \
-        _viv_asm(PARAM_CHAIN, t2, t1, Src2);           \
-        _viv_asm(PARAM_CHAIN, t3, t2, Src3);           \
-        _viv_asm(INTRINSIC_ST, t4, VXC_OP_##Op, t3);   \
+        int _t1, _t2, _t3, _t4;                        \
+        _viv_asm(PARAM_CHAIN, _t1, Src0, Src1);        \
+        _viv_asm(PARAM_CHAIN, _t2, _t1, Src2);         \
+        _viv_asm(PARAM_CHAIN, _t3, _t2, Src3);         \
+        _viv_asm(INTRINSIC_ST, _t4, VXC_OP_##Op, _t3); \
     } while(0)
 
 #define VXC_OP4_ST(Op, Dest, Src0, Src1, Src2, Src3)   \
     do {                                               \
-        int t1, t2, t3;                                \
-        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);         \
-        _viv_asm(PARAM_CHAIN, t2, t1, Src2);           \
-        _viv_asm(PARAM_CHAIN, t3, t2, Src3);           \
-        _viv_asm(INTRINSIC_ST, Dest, VXC_OP_##Op, t3); \
+        int _t1, _t2, _t3;                             \
+        _viv_asm(PARAM_CHAIN, _t1, Src0, Src1);        \
+        _viv_asm(PARAM_CHAIN, _t2, _t1, Src2);         \
+        _viv_asm(PARAM_CHAIN, _t3, _t2, Src3);         \
+        _viv_asm(INTRINSIC_ST, Dest, VXC_OP_##Op, _t3);\
     } while(0)
 
 #define VXC_OP5(Op, Dest, Src0, Src1, Src2, Src3, Src4)   \
     do {                                                  \
-        int t1, t2, t3, t4;                               \
-        _viv_asm(PARAM_CHAIN, t1, Src0, Src1);            \
-        _viv_asm(PARAM_CHAIN, t2, t1, Src2);              \
-        _viv_asm(PARAM_CHAIN, t3, t2, Src3);              \
-        _viv_asm(PARAM_CHAIN, t4, t3, Src4);              \
-        _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, t4);       \
+        int _t1, _t2, _t3, _t4;                           \
+        _viv_asm(PARAM_CHAIN, _t1, Src0, Src1);           \
+        _viv_asm(PARAM_CHAIN, _t2, _t1, Src2);            \
+        _viv_asm(PARAM_CHAIN, _t3, _t2, Src3);            \
+        _viv_asm(PARAM_CHAIN, _t4, _t3, Src4);            \
+        _viv_asm(INTRINSIC, Dest, VXC_OP_##Op, _t4);      \
     } while(0)
 
 /* make sure the immediate value offsetX and offsetY are in range of [-16, 15] */
@@ -355,6 +359,22 @@ enum eVXC_ERROR
 #define VXC_DP2x16(Dest, Src0, Src1, Info, U512)    VXC_OP1(error, ERROR_DP2x16_NOT_SUPPORTED)
 #else
 #define VXC_DP2x16(Dest, Src0, Src1, Info, U512)    VXC_OP4(dp2x16, Dest, Src0, Src1, Info, U512)
+#endif
+
+#if (VX_VERSION >= 2)
+/* DP16 <a, b> dot c
+ *  vxc_char32 a;
+ *  vxc_char16 b;
+ *  vxc_int result;
+ *  VXC_DP16x1_b(result, a.hi, a.lo, b, modifier, u);
+ *
+ * Src0 must be hi part of 256 bit value, Src1 must be lo part
+ *
+ */
+#define VXC_DP16x1_b(Dest, Src0, Src1, Src2, Info, U512)    VXC_OP5(dp32x1_b, Dest, Src0, Src1, Src2, Info, U512)
+#define VXC_DP8x2_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp16x2_b, Dest, Src0, Src1, Src2, Info, U512)
+#define VXC_DP4x4_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp8x4_b,  Dest, Src0, Src1, Src2, Info, U512)
+#define VXC_DP2x8_b(Dest, Src0, Src1, Src2, Info, U512)     VXC_OP5(dp4x8_b,  Dest, Src0, Src1, Src2, Info, U512)
 #endif
 
 /* DP32 <a, b> dot c

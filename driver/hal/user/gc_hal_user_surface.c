@@ -39,7 +39,7 @@ const gcsSAMPLES g_sampleInfos[] =
 **
 **  _LockAuxiliary
 **
-**  Lock auxiliary node (ts/hz/hz ts...) and make sure the lockCount same
+**  Lock auxiliary node (ts/hz/hz ts...) and make sure the lockCounts same
 **  as main node.
 **
 */
@@ -59,7 +59,7 @@ _LockAuxiliaryNode(
 
     for (i = 0 ; i < gcvHARDWARE_NUM_TYPES; i++)
     {
-        for (j = 0; j < gcvENGINE_COUNT; j++)
+        for (j = 0; j < gcvENGINE_GPU_ENGINE_COUNT; j++)
         {
             gcmASSERT(Node->lockCounts[i][j] <= Reference->lockCounts[i][j]);
 
@@ -117,12 +117,10 @@ gcoSURF_LockTileStatus(
         gcmGETHARDWAREADDRESS(Surface->tileStatusNode, address);
 
         gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
-                      "Locked tile status 0x%x: physical=0x%08X logical=0x%x "
-                      "lockedCount=%d",
+                      "Locked tile status 0x%x: physical=0x%08X logical=0x%x",
                       &Surface->tileStatusNode,
                       address,
-                      Surface->tileStatusNode.logical,
-                      Surface->tileStatusNode.lockCount);
+                      Surface->tileStatusNode.logical);
 
         /* Only 1 address. */
         Surface->tileStatusNode.count = 1;
@@ -179,12 +177,10 @@ gcoSURF_LockTileStatus(
         gcmGETHARDWAREADDRESS(Surface->hzTileStatusNode, address);
 
         gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
-                      "Locked HZ tile status 0x%x: physical=0x%08X logical=0x%x "
-                      "lockedCount=%d",
+                      "Locked HZ tile status 0x%x: physical=0x%08X logical=0x%x",
                       &Surface->hzTileStatusNode,
                       address,
-                      Surface->hzTileStatusNode.logical,
-                      Surface->hzTileStatusNode.lockCount);
+                      Surface->hzTileStatusNode.logical);
 
         /* Only 1 address. */
         Surface->hzTileStatusNode.count = 1;
@@ -256,12 +252,10 @@ gcoSURF_LockHzBuffer(
         gcmGETHARDWAREADDRESS(Surface->hzNode, address);
 
         gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
-                      "Locked HZ surface 0x%x: physical=0x%08X logical=0x%x "
-                      "lockCount=%d",
+                      "Locked HZ surface 0x%x: physical=0x%08X logical=0x%x",
                       &Surface->hzNode,
                       address,
-                      Surface->hzNode.logical,
-                      Surface->hzNode.lockCount);
+                      Surface->hzNode.logical);
 
         /* Only 1 address. */
         Surface->hzNode.count = 1;
@@ -843,11 +837,10 @@ _Lock(
         address + Surface->bottomBufferOffset;
 
     gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
-                  "Locked surface 0x%x: physical=0x%08X logical=0x%x lockCount=%d",
+                  "Locked surface 0x%x: physical=0x%08X logical=0x%x",
                   &Surface->node,
                   address,
-                  Surface->node.logical,
-                  Surface->node.lockCount);
+                  Surface->node.logical);
 
 #if gcdENABLE_3D
     /* Lock the hierarchical Z node. */
@@ -922,9 +915,8 @@ _Unlock(
     }
 
     gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
-                  "Unlocked surface 0x%x: lockCount=%d",
-                  &Surface->node,
-                  Surface->node.lockCount);
+                  "Unlocked surface 0x%x",
+                  &Surface->node);
 
 #if gcdENABLE_3D
     /* Unlock the hierarchical Z buffer. */
@@ -935,9 +927,8 @@ _Unlock(
                                gcvSURF_HIERARCHICAL_DEPTH));
 
         gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
-                      "Unlocked HZ surface 0x%x: lockCount=%d",
-                      &Surface->hzNode,
-                      Surface->hzNode.lockCount);
+                      "Unlocked HZ surface 0x%x",
+                      &Surface->hzNode);
     }
 
     /* Unlock the tile status buffer. */
@@ -948,9 +939,8 @@ _Unlock(
                                gcvSURF_TILE_STATUS));
 
         gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
-                      "Unlocked tile status 0x%x: lockCount=%d",
-                      &Surface->hzNode,
-                      Surface->hzNode.lockCount);
+                      "Unlocked tile status 0x%x",
+                      &Surface->hzNode);
     }
 
     /* Unlock the hierarchical tile status buffer. */
@@ -961,9 +951,8 @@ _Unlock(
                                gcvSURF_TILE_STATUS));
 
         gcmTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_SURFACE,
-                      "Unlocked HZ tile status 0x%x: lockCount=%d",
-                      &Surface->hzNode,
-                      Surface->hzNode.lockCount);
+                      "Unlocked HZ tile status 0x%x",
+                      &Surface->hzNode);
     }
 #endif /* gcdENABLE_3D */
 
@@ -2319,7 +2308,8 @@ gcoSURF_Construct(
     surface->object.type        = gcvOBJ_SURF;
     surface->dither2D      = gcvFALSE;
     surface->deferDither3D = gcvFALSE;
-    surface->paddingFormat = (format == gcvSURF_R8_1_X8R8G8B8 || format == gcvSURF_G8R8_1_X8R8G8B8)
+    surface->paddingFormat = (format == gcvSURF_R8_1_X8R8G8B8 || format == gcvSURF_G8R8_1_X8R8G8B8
+                             || format == gcvSURF_A8_1_A8R8G8B8)
                                 ? gcvTRUE : gcvFALSE;
     surface->garbagePadded = gcvTRUE;
 
@@ -2574,9 +2564,7 @@ gcoSURF_WrapSurface(
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT32 address;
 
-#if gcdENABLE_VG
     gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
-#endif
 
     gcmHEADER_ARG("Surface=0x%x Alignment=%u Logical=0x%x Physical=%08x",
               Surface, Alignment, Logical, Physical);
@@ -2593,8 +2581,10 @@ gcoSURF_WrapSurface(
             break;
         }
 
+        gcmGETCURRENTHARDWARE(currentType);
+
         /* Already mapped? */
-        if (Surface->node.lockCount > 0)
+        if (Surface->node.lockCounts[currentType][gcvENGINE_RENDER] > 0)
         {
             if ((Logical != gcvNULL) &&
                 (Logical != Surface->node.logical))
@@ -2616,9 +2606,6 @@ gcoSURF_WrapSurface(
             break;
         }
 
-#if gcdENABLE_VG
-        gcmGETCURRENTHARDWARE(currentType);
-#endif
         /* Set new alignment. */
         if (Alignment != 0)
         {
@@ -2644,7 +2631,7 @@ gcoSURF_WrapSurface(
         Surface->node.valid = gcvTRUE;
 
         /* Set the lock count. */
-        Surface->node.lockCount++;
+        Surface->node.lockCounts[currentType][gcvENGINE_RENDER]++;
 
         /* Set the node parameters. */
         Surface->node.u.normal.node = 0;
@@ -2701,9 +2688,7 @@ gcoSURF_MapUserSurface(
     gceSTATUS status = gcvSTATUS_OK;
 
     gctPOINTER logical = gcvNULL;
-#if gcdENABLE_VG
     gceHARDWARE_TYPE currentType = gcvHARDWARE_INVALID;
-#endif
     gctUINT32 address;
     gcsUSER_MEMORY_DESC desc;
 
@@ -2722,8 +2707,10 @@ gcoSURF_MapUserSurface(
             break;
         }
 
+        gcmGETCURRENTHARDWARE(currentType);
+
         /* Already mapped? */
-        if (Surface->node.lockCount > 0)
+        if (Surface->node.lockCounts[currentType][gcvENGINE_RENDER] > 0)
         {
             if ((Logical != gcvNULL) &&
                 (Logical != Surface->node.logical))
@@ -2745,9 +2732,6 @@ gcoSURF_MapUserSurface(
             break;
         }
 
-#if gcdENABLE_VG
-        gcmGETCURRENTHARDWARE(currentType);
-#endif
         /* Set new alignment. */
         if (Alignment != 0)
         {
@@ -3986,7 +3970,7 @@ gcoSURF_GetFence(
 
     if (Surface)
     {
-        status = gcsSURF_NODE_GetFence(&Surface->node, Type);
+        status = gcsSURF_NODE_GetFence(&Surface->node,  gcvENGINE_RENDER, Type);
     }
 
     gcmFOOTER();
@@ -4004,7 +3988,7 @@ gcoSURF_WaitFence(
 
     if (Surface)
     {
-        status = gcsSURF_NODE_WaitFence(&Surface->node, gcvFENCE_TYPE_ALL);
+        status = gcsSURF_NODE_WaitFence(&Surface->node,  gcvENGINE_CPU, gcvENGINE_RENDER, gcvFENCE_TYPE_ALL);
     }
 
     gcmFOOTER();
@@ -10021,8 +10005,13 @@ gcoSURF_CopyPixels(
             gctSTRING pos = gcvNULL;
 
             gcoOS_GetEnv(gcvNULL, "VIV_SW_READPIXELS", &p);
-            gcoOS_StrStr(p, "1", &pos);
-            if(pos)
+
+            if (p)
+            {
+                gcoOS_StrStr(p, "1", &pos);
+            }
+
+            if (pos)
             {
                 cpuBlt = gcvTRUE;
             }
@@ -10579,11 +10568,9 @@ gcoSURF_SetOrientation(
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Surface, gcvOBJ_SURF);
 
-#if !gcdREMOVE_SURF_ORIENTATION
     /* Set the orientation. */
     Surface->orientation = Orientation;
 
-#endif
     /* Success. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -11688,8 +11675,6 @@ gcoSURF_SetWindow(
 
     Surface->pfGetAddr = gcoHARDWARE_GetProcCalcPixelAddr(gcvNULL, Surface);
 
-    Surface->node.lockCount = 1;
-
     /* Initial lock. */
     gcmONERROR(_Lock(Surface));
 
@@ -11873,8 +11858,6 @@ gcoSURF_SetImage(
     gcmONERROR(gcoHAL_WrapUserMemory(&desc, &Surface->node.u.normal.node));
 
     Surface->pfGetAddr = gcoHARDWARE_GetProcCalcPixelAddr(gcvNULL, Surface);
-
-    Surface->node.lockCount = 1;
 
     /* Initial lock. */
     gcmONERROR(_Lock(Surface));
@@ -13448,6 +13431,7 @@ gcsSURF_NODE_Construct(
         = (struct _gcsHAL_ALLOCATE_LINEAR_VIDEO_MEMORY *) &iface.u;
     gctUINT i;
 #if gcdENABLE_3D
+    gctBOOL bForceVirtual = gcvFALSE;
     gceHARDWARE_TYPE type = gcvHARDWARE_INVALID;
 #endif
 
@@ -13503,8 +13487,11 @@ gcsSURF_NODE_Construct(
 
     if (type == gcvHARDWARE_3D)
     {
+        gcoHARDWARE_GetForceVirtual(gcvNULL, &bForceVirtual);
+
         if ((Type == gcvSURF_INDEX || Type == gcvSURF_VERTEX) &&
-            !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MIXED_STREAMS) )
+            !gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MIXED_STREAMS) &&
+            bForceVirtual)
         {
             Pool = gcvPOOL_VIRTUAL;
         }
@@ -13600,25 +13587,28 @@ gcsSURF_NODE_Destroy(
 gceSTATUS
 gcsSURF_NODE_Lock(
     IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE engine,
     OUT gctUINT32 * Address,
     OUT gctPOINTER * Memory
     )
 {
-    return gcoHARDWARE_LockEx(Node, gcvENGINE_RENDER, Address, Memory);
+    return gcoHARDWARE_LockEx(Node, engine, Address, Memory);
 }
 
 gceSTATUS
 gcsSURF_NODE_Unlock(
-    IN gcsSURF_NODE_PTR Node
+    IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE engine
     )
 {
-    return gcoHARDWARE_UnlockEx(Node, gcvENGINE_RENDER, gcvSURF_TYPE_UNKNOWN);
+    return gcoHARDWARE_UnlockEx(Node, engine, gcvSURF_TYPE_UNKNOWN);
 }
 
 #if gcdENABLE_3D
 gceSTATUS
 gcsSURF_NODE_GetFence(
     IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE engine,
     IN gceFENCE_TYPE Type
 )
 {
@@ -13628,10 +13618,12 @@ gcsSURF_NODE_GetFence(
          if (Node)
          {
             gctBOOL fenceEnable;
+
             gcoHARDWARE_GetFenceEnabled(gcvNULL, &fenceEnable);
+
             if(fenceEnable)
             {
-                gcoHARDWARE_GetFence(gcvNULL, &Node->fenceCtx, Type);
+                gcoHARDWARE_GetFence(gcvNULL, &Node->fenceCtx, engine, Type);
                 Node->fenceStatus = gcvFENCE_ENABLE;
             }
             else
@@ -13647,6 +13639,8 @@ gcsSURF_NODE_GetFence(
 gceSTATUS
 gcsSURF_NODE_WaitFence(
     IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE From,
+    IN gceENGINE On,
     IN gceFENCE_TYPE Type
 )
 {
@@ -13658,10 +13652,12 @@ gcsSURF_NODE_WaitFence(
     else if (Node)
     {
         gctBOOL fenceEnable;
+
         gcoHARDWARE_GetFenceEnabled(gcvNULL, &fenceEnable);
+
         if(fenceEnable)
         {
-            gcoHARDWARE_WaitFence(gcvNULL, Node->fenceCtx, Type);
+            gcoHARDWARE_WaitFence(gcvNULL, Node->fenceCtx, From, On, Type);
         }
         else
         {

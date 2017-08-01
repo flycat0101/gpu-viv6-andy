@@ -189,10 +189,6 @@ FFTGpu(
     }
 
     copyFromDevice(d_result, h_outfft + workOffset,  2*workSize);
-
-    // wait for copy event
-    ciErrNum = clWaitForEvents(1, &gpuDone);
-    checkError(ciErrNum, CL_SUCCESS, "clWaitForEvents");
     printGpuTime((2==rad)?log2n:(log2n>>1));
 }
 

@@ -1164,6 +1164,9 @@ static veglLOOKUP _veglLookup[] =
     /* EGL_ANDROID_native_fence_sync. */
     eglMAKE_LOOKUP(eglDupNativeFenceFDANDROID),
 #endif
+    eglMAKE_LOOKUP(eglSetDamageRegionKHR),
+    eglMAKE_LOOKUP(eglSwapBuffersWithDamageKHR),
+    eglMAKE_LOOKUP(eglSwapBuffersWithDamageEXT),
     eglMAKE_LOOKUP(eglPatchID),
 
     GL_API_ENTRIES(forwardGLFunction)

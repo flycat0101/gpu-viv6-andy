@@ -34,6 +34,8 @@ LOCAL_CFLAGS := \
 	$(CFLAGS) \
 	-Wall \
 	-Wextra \
+	-Wno-gnu-designator \
+	-Wno-unused-parameter \
 	-DLOG_TAG=\"v_hwc\"
 
 LOCAL_C_INCLUDES := \

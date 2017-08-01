@@ -1190,6 +1190,9 @@ static VkResult halti5_pip_emit_graphicsShaderInstance(
     halti5_pipeline *chipPipeline = (halti5_pipeline *)chipGfxPipeline;
     struct _gcsHINT *hints = &chipPipeline->curInstance->hwStates.hints;
     const gcsFEATURE_DATABASE *database = devCtx->database;
+    VkBool32 bypass = chipGfxPipeline->depthOnly;
+    VkBool32 isRenderPnt = pip->topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST;
+    uint32_t msaaExtraPsInput = 0;
 
     chipPipeline->curInstance->curInstanceCmdIndex = 0;
 
@@ -1202,74 +1205,88 @@ static VkResult halti5_pip_emit_graphicsShaderInstance(
             if (chipGfxPipeline->subSampleZUsedInPS)
             {
                 msaaExtraPsTemp = 1;
+                msaaExtraPsInput = hints->fsIsDual16 ? 2 : 1;
             }
         }
         else
         {
             msaaExtraPsTemp = 1;
+            msaaExtraPsInput = hints->fsIsDual16 ? 2 : 1;
         }
     }
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0403, VK_FALSE,
         hints->fsMaxTemp + msaaExtraPsTemp);
 
-    chipPipeline->curInstance->curInstanceCmdIndex+= (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E07, VK_FALSE,
+        (bypass ? 0 : hints->componentCount));
 
-    __VK_ASSERT(chipPipeline->curInstance->curInstanceCmdIndex <= HALTI5_INSTANCE_CMD_BUFSIZE);
-
-    return VK_SUCCESS;
-}
-
-static VkResult halti5_pip_emit_graphicsProgram(
-    __vkDevContext *devCtx,
-    __vkPipeline *pip,
-    const VkGraphicsPipelineCreateInfo *info
-    )
-{
-    uint32_t *pCmdBuffer, *pCmdBufferBegin;
-    uint32_t msaaExtraPsInput = 0;
-    const VkPipelineMultisampleStateCreateInfo *msaaInfo = info->pMultisampleState;
-    VkBool32 msaaEnable = VK_FALSE, sampleMaskOutFromPS = VK_FALSE;
-    halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
-    halti5_pipeline *chipPipeline = (halti5_pipeline *)chipGfxPipeline;
-    struct _gcsHINT *hints = &chipPipeline->masterInstance->hwStates.hints;
-    uint32_t psOutCntl4to7 = hints->psOutCntl4to7;
-    uint32_t outputMode0to7, saturationMode0to3;
-    __vkRenderPass *rdp = pip->renderPass;
-    __vkRenderSubPassInfo *subPass = &rdp->subPassInfo[pip->subPass];
-    uint32_t reservedPages;
-    VkBool32 bypass = chipGfxPipeline->depthOnly;
-    uint32_t i;
-    uint32_t colorOutCount;
-    VkBool32 isRenderPnt = (info->pInputAssemblyState->topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST);
-    const gcsFEATURE_DATABASE *database = devCtx->database;
-
-    /* step 1: emit hardware states for shader instance */
-    halti5_pip_emit_graphicsShaderInstance(devCtx, pip);
-
-    /* step 2: emit hardware states for this program(pipeline), shared between instances */
-    pCmdBuffer = pCmdBufferBegin = &chipPipeline->cmdBuffer[chipPipeline->curCmdIndex];
-
-    reservedPages = database->SH_SNAP2PAGE_MAXPAGES_FIX  ? 0 : 1;
-
-    if (pip->msaaEnabled)
+    if (!hints->vsUseStoreAttr)
     {
-        if (database->REG_RAWriteDepth)
+        uint32_t output;
+        if (hints->stageBits & (gcvPROGRAM_STAGE_GEOMETRY_BIT | gcvPROGRAM_STAGE_TES_BIT))
         {
-            if (chipGfxPipeline->subSampleZUsedInPS)
-            {
-                msaaExtraPsInput = hints->fsIsDual16 ? 2 : 1;
-            }
+            output = hints->vsOutputCount;
         }
         else
         {
-            msaaExtraPsInput = hints->fsIsDual16 ? 2 : 1;
+            if (bypass)
+            {
+                /* In bypass mode, we only need the position output and the point
+                ** size if present and the primitive is a point list. */
+                output = 1 + ((hints->vsHasPointSize && isRenderPnt) ? 1 : 0);
+            }
+            else
+            {
+                /* If the Vertex Shader generates a point size, and this point size will not be streamed out,
+                   and the primitive is not a point, we don't need to send it down. */
+                output
+                    = (hints->vsHasPointSize && hints->vsPtSizeAtLastLinkLoc &&
+                    !isRenderPnt && !hints->isPtSizeStreamedOut)
+                        ? hints->vsOutputCount - 1
+                        : hints->vsOutputCount;
+            }
         }
 
-        sampleMaskOutFromPS = hints->sampleMaskOutWritten;
-    }
+        /* SW WA for transform feedback, when VS has no output. */
+        if (output == 0)
+        {
+            output = 1;
+        }
 
-    halti5_helper_GetPsOutputSetting(devCtx, pip, &outputMode0to7, &saturationMode0to3, &psOutCntl4to7);
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0201, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 5:0) - (0 ?
+ 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) (output) & ((gctUINT32) ((((1 ? 5:0) - (0 ?
+ 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
+ 5:0)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:8) - (0 ? 13:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ?
+ 13:8))) | (((gctUINT32) ((gctUINT32) (hints->vsOutput16RegNo) & ((gctUINT32) ((((1 ?
+ 13:8) - (0 ? 13:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ?
+ 13:8)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 21:16) - (0 ? 21:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:16) - (0 ?
+ 21:16) + 1))))))) << (0 ? 21:16))) | (((gctUINT32) ((gctUINT32) (hints->vsOutput17RegNo) & ((gctUINT32) ((((1 ?
+ 21:16) - (0 ? 21:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:16) - (0 ?
+ 21:16) + 1))))))) << (0 ? 21:16)))
+            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 29:24) - (0 ? 29:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:24) - (0 ?
+ 29:24) + 1))))))) << (0 ? 29:24))) | (((gctUINT32) ((gctUINT32) (hints->vsOutput18RegNo) & ((gctUINT32) ((((1 ?
+ 29:24) - (0 ? 29:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:24) - (0 ?
+ 29:24) + 1))))))) << (0 ? 29:24))));
+    }
+    else
+    {
+        /* USC has been stored by shader, attr-sequencer does not need this info, so just
+           set output count to 0 */
+        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0201, VK_FALSE,
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 5:0) - (0 ?
+ 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
+ 5:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 5:0) - (0 ?
+ 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
+ 5:0))));
+    }
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0402, VK_FALSE,
         ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 5:0) - (0 ?
@@ -1292,6 +1309,51 @@ static VkResult halti5_pip_emit_graphicsProgram(
  24:24))) | (((gctUINT32) ((gctUINT32) ((hints->psInputControlHighpPosition | chipGfxPipeline->sampleMaskInPos | (hints->rtArrayComponent != -1))) & ((gctUINT32) ((((1 ?
  24:24) - (0 ? 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:24) - (0 ?
  24:24) + 1))))))) << (0 ? 24:24))));
+
+    chipPipeline->curInstance->curInstanceCmdIndex+= (uint32_t)(pCmdBuffer - pCmdBufferBegin);
+
+    __VK_ASSERT(chipPipeline->curInstance->curInstanceCmdIndex <= HALTI5_INSTANCE_CMD_BUFSIZE);
+
+    return VK_SUCCESS;
+}
+
+static VkResult halti5_pip_emit_graphicsProgram(
+    __vkDevContext *devCtx,
+    __vkPipeline *pip,
+    const VkGraphicsPipelineCreateInfo *info
+    )
+{
+    uint32_t *pCmdBuffer, *pCmdBufferBegin;
+    const VkPipelineMultisampleStateCreateInfo *msaaInfo = info->pMultisampleState;
+    VkBool32 msaaEnable = VK_FALSE, sampleMaskOutFromPS = VK_FALSE;
+    halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)pip->chipPriv;
+    halti5_pipeline *chipPipeline = (halti5_pipeline *)chipGfxPipeline;
+    struct _gcsHINT *hints = &chipPipeline->masterInstance->hwStates.hints;
+    uint32_t psOutCntl4to7 = hints->psOutCntl4to7;
+    uint32_t outputMode0to7, saturationMode0to3;
+    __vkRenderPass *rdp = pip->renderPass;
+    __vkRenderSubPassInfo *subPass = &rdp->subPassInfo[pip->subPass];
+    uint32_t reservedPages;
+    VkBool32 bypass = chipGfxPipeline->depthOnly;
+    uint32_t i;
+    uint32_t colorOutCount;
+    const gcsFEATURE_DATABASE *database = devCtx->database;
+    halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
+
+    /* step 1: emit hardware states for shader instance */
+    halti5_pip_emit_graphicsShaderInstance(devCtx, pip);
+
+    /* step 2: emit hardware states for this program(pipeline), shared between instances */
+    pCmdBuffer = pCmdBufferBegin = &chipPipeline->cmdBuffer[chipPipeline->curCmdIndex];
+
+    reservedPages = database->SH_SNAP2PAGE_MAXPAGES_FIX  ? 0 : 1;
+
+    if (pip->msaaEnabled)
+    {
+        sampleMaskOutFromPS = hints->sampleMaskOutWritten;
+    }
+
+    halti5_helper_GetPsOutputSetting(devCtx, pip, &outputMode0to7, &saturationMode0to3, &psOutCntl4to7);
 
     colorOutCount = ((subPass->colorCount + chipGfxPipeline->patchOutput.count) != 0) ?
         (subPass->colorCount + chipGfxPipeline->patchOutput.count - 1) : 0;
@@ -1463,9 +1525,6 @@ static VkResult halti5_pip_emit_graphicsProgram(
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x02AA, VK_FALSE,
         (bypass ? 1 : hints->shader2PaOutputCount));
 
-    __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E07, VK_FALSE,
-        (bypass ? 0 : hints->componentCount));
-
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x040C, VK_FALSE, outputMode0to7);
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x040B, VK_FALSE, psOutCntl4to7);
@@ -1504,73 +1563,6 @@ static VkResult halti5_pip_emit_graphicsProgram(
  5:0) - (0 ? 5:0) + 1)))))) ) ) ) & ((gctUINT32) ((((1 ? 5:0) - (0 ? 5:0) + 1) == 32) ?
  ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ? 5:0)));
        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0202, VK_FALSE, vsInputState);
-    }
-
-    if (!hints->vsUseStoreAttr)
-    {
-        uint32_t output;
-        if (hints->stageBits & (gcvPROGRAM_STAGE_GEOMETRY_BIT | gcvPROGRAM_STAGE_TES_BIT))
-        {
-            output = hints->vsOutputCount;
-        }
-        else
-        {
-            if (bypass)
-            {
-                /* In bypass mode, we only need the position output and the point
-                ** size if present and the primitive is a point list. */
-                output = 1 + ((hints->vsHasPointSize && isRenderPnt) ? 1 : 0);
-            }
-            else
-            {
-                /* If the Vertex Shader generates a point size, and this point size will not be streamed out,
-                   and the primitive is not a point, we don't need to send it down. */
-                output
-                    = (hints->vsHasPointSize && hints->vsPtSizeAtLastLinkLoc &&
-                    !isRenderPnt && !hints->isPtSizeStreamedOut)
-                        ? hints->vsOutputCount - 1
-                        : hints->vsOutputCount;
-            }
-        }
-
-        /* SW WA for transform feedback, when VS has no output. */
-        if (output == 0)
-        {
-            output = 1;
-        }
-
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0201, VK_FALSE,
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 5:0) - (0 ?
- 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
- 5:0))) | (((gctUINT32) ((gctUINT32) (output) & ((gctUINT32) ((((1 ? 5:0) - (0 ?
- 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
- 5:0)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 13:8) - (0 ? 13:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ?
- 13:8))) | (((gctUINT32) ((gctUINT32) (hints->vsOutput16RegNo) & ((gctUINT32) ((((1 ?
- 13:8) - (0 ? 13:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:8) - (0 ? 13:8) + 1))))))) << (0 ?
- 13:8)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 21:16) - (0 ? 21:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:16) - (0 ?
- 21:16) + 1))))))) << (0 ? 21:16))) | (((gctUINT32) ((gctUINT32) (hints->vsOutput17RegNo) & ((gctUINT32) ((((1 ?
- 21:16) - (0 ? 21:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 21:16) - (0 ?
- 21:16) + 1))))))) << (0 ? 21:16)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 29:24) - (0 ? 29:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:24) - (0 ?
- 29:24) + 1))))))) << (0 ? 29:24))) | (((gctUINT32) ((gctUINT32) (hints->vsOutput18RegNo) & ((gctUINT32) ((((1 ?
- 29:24) - (0 ? 29:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 29:24) - (0 ?
- 29:24) + 1))))))) << (0 ? 29:24))));
-    }
-    else
-    {
-        /* USC has been stored by shader, attr-sequencer does not need this info, so just
-           set output count to 0 */
-        __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0201, VK_FALSE,
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 5:0) - (0 ?
- 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
- 5:0))) | (((gctUINT32) ((gctUINT32) (0) & ((gctUINT32) ((((1 ? 5:0) - (0 ?
- 5:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:0) - (0 ? 5:0) + 1))))))) << (0 ?
- 5:0))));
     }
 
     __vkCmdLoadSingleHWState(&pCmdBuffer, 0x0E22, VK_FALSE,
@@ -1626,6 +1618,19 @@ static VkResult halti5_pip_emit_graphicsProgram(
     if (info->pTessellationState)
     {
         __vkCmdLoadSingleHWState(&pCmdBuffer, 0x01F0, VK_FALSE, info->pTessellationState->patchControlPoints);
+    }
+
+    /* Flush private constant uniform. */
+    if (chipGfxPipeline->sampleLocation.bUsed)
+    {
+        __vkCmdLoadBatchHWStates(&pCmdBuffer, chipGfxPipeline->sampleLocation.hwRegAddress, VK_FALSE,
+            4 * 4, &chipModule->sampleLocations[0][0]);
+    }
+
+    if (chipGfxPipeline->ehableMultiSampleBuffers.bUsed)
+    {
+        __vkCmdLoadSingleHWState(&pCmdBuffer, chipGfxPipeline->ehableMultiSampleBuffers.hwRegAddress, VK_FALSE,
+        ((info->pMultisampleState->rasterizationSamples > VK_SAMPLE_COUNT_1_BIT) ? 1 : 0));
     }
 
     chipPipeline->curCmdIndex += (uint32_t)(pCmdBuffer - pCmdBufferBegin);
@@ -1857,8 +1862,9 @@ static VkResult halti5_pip_emit_rt(
     /* step 3: depth programming */
     if (dsInfo)
     {
+        __vkAttachmentDesc *attachMent;
         chipGfxPipeline->earlyZ = VK_TRUE;
-
+        attachMent = &rdp->attachments[subPass->dsAttachIndex];
         if ((dsInfo->depthCompareOp == VK_COMPARE_OP_NOT_EQUAL) ||
             (dsInfo->stencilTestEnable &&
              ((dsInfo->front.passOp != VK_STENCIL_OP_KEEP) ||
@@ -1870,7 +1876,17 @@ static VkResult halti5_pip_emit_rt(
         }
 
         depthMode = ((dsInfo->stencilTestEnable || dsInfo->depthTestEnable) && hasDsSurface) ? 0x1 : 0x0;
-        stencilMode = (dsInfo->stencilTestEnable && hasDsSurface) ? 0x2 : 0x0;
+
+        if (hasDsSurface &&
+            (attachMent->formatInfo->residentImgFormat != VK_FORMAT_D16_UNORM && attachMent->formatInfo->residentImgFormat != VK_FORMAT_D32_SFLOAT)
+            && dsInfo->stencilTestEnable)
+        {
+            stencilMode = 0x2;
+        }
+        else
+        {
+            stencilMode = 0x0;
+        }
         chipGfxPipeline->depthCompareOp = (dsInfo->depthTestEnable && hasDsSurface) ? dsInfo->depthCompareOp : VK_COMPARE_OP_ALWAYS;
 
         fullfuncZ = dsInfo->depthWriteEnable || !chipGfxPipeline->earlyZ || dsInfo->stencilTestEnable;
@@ -3555,6 +3571,110 @@ static void halti5_pip_build_patchKeyMask(
     }
 }
 
+static VkResult halti5_pip_process_priv_const(
+    halti5_vscprogram_instance *masterInstance,
+    void *chipPipeline,
+    gctBOOL isGraphicsPipeline
+    )
+{
+    VkResult result = VK_SUCCESS;
+    uint32_t i;
+
+    if (isGraphicsPipeline)
+    {
+        halti5_graphicsPipeline *chipGfxPipeline = (halti5_graphicsPipeline *)chipPipeline;
+
+        /* VS private constant mapping. */
+        if (masterInstance->pep.seps[VSC_SHADER_STAGE_VS].staticPrivMapping.privConstantMapping.countOfEntries)
+        {
+            SHADER_PRIV_CONSTANT_MAPPING *privConstMapping = &masterInstance->pep.seps[VSC_SHADER_STAGE_VS].staticPrivMapping.privConstantMapping;
+            for (i = 0; i < privConstMapping->countOfEntries; i++)
+            {
+                SHADER_PRIV_CONSTANT_ENTRY *privConstEntry = &privConstMapping->pPrivmConstantEntries[i];
+                switch (privConstEntry->commonPrivm.privmFlag)
+                {
+                case SHS_PRIV_CONSTANT_FLAG_BASE_INSTANCE:
+                    __VK_ASSERT(privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel == 0);
+                    chipGfxPipeline->baseInstance.bUsed = VK_TRUE;
+                    chipGfxPipeline->baseInstance.hwRegNo = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
+                    chipGfxPipeline->baseInstance.hwRegAddress =
+                        (masterInstance->hwStates.hints.hwConstRegBases[gcvPROGRAM_STAGE_VERTEX] >> 2) + (chipGfxPipeline->baseInstance.hwRegNo * 4);
+                    chipGfxPipeline->baseInstance.hwRegCount = privConstEntry->u.pSubCBMapping->subArrayRange;
+                    break;
+
+                default:
+                    break;
+                }
+            }
+        }
+
+        /* PS private constant mapping. */
+        if (masterInstance->pep.seps[VSC_SHADER_STAGE_PS].staticPrivMapping.privConstantMapping.countOfEntries)
+        {
+            SHADER_PRIV_CONSTANT_MAPPING *privConstMapping = &masterInstance->pep.seps[VSC_SHADER_STAGE_PS].staticPrivMapping.privConstantMapping;
+            for (i = 0; i < privConstMapping->countOfEntries; i++)
+            {
+                SHADER_PRIV_CONSTANT_ENTRY *privConstEntry = &privConstMapping->pPrivmConstantEntries[i];
+                switch (privConstEntry->commonPrivm.privmFlag)
+                {
+                case SHS_PRIV_CONSTANT_FLAG_SAMPLE_LOCATION:
+                    __VK_ASSERT(privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel == 0);
+                    chipGfxPipeline->sampleLocation.bUsed = VK_TRUE;
+                    chipGfxPipeline->sampleLocation.hwRegNo = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
+                    chipGfxPipeline->sampleLocation.hwRegAddress =
+                        (masterInstance->hwStates.hints.hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2) +
+                        (chipGfxPipeline->sampleLocation.hwRegNo * 4) +
+                        privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+                    chipGfxPipeline->sampleLocation.hwRegCount = privConstEntry->u.pSubCBMapping->subArrayRange;
+                    break;
+
+                case SHS_PRIV_CONSTANT_FLAG_ENABLE_MULTISAMPLE_BUFFERS:
+                    __VK_ASSERT(privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel == 0);
+                    chipGfxPipeline->ehableMultiSampleBuffers.bUsed = VK_TRUE;
+                    chipGfxPipeline->ehableMultiSampleBuffers.hwRegNo = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
+                    chipGfxPipeline->ehableMultiSampleBuffers.hwRegAddress =
+                        (masterInstance->hwStates.hints.hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2) +
+                        (chipGfxPipeline->ehableMultiSampleBuffers.hwRegNo * 4) +
+                        privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel;
+                    chipGfxPipeline->ehableMultiSampleBuffers.hwRegCount = privConstEntry->u.pSubCBMapping->subArrayRange;
+                    break;
+
+                default:
+                    break;
+                }
+            }
+        }
+    }
+    else
+    {
+        halti5_computePipeline *chipCmptPipeline = (halti5_computePipeline *)chipPipeline;
+
+        if (masterInstance->pep.seps[VSC_SHADER_STAGE_CS].staticPrivMapping.privConstantMapping.countOfEntries)
+        {
+            SHADER_PRIV_CONSTANT_MAPPING *privConstMapping = &masterInstance->pep.seps[VSC_SHADER_STAGE_CS].staticPrivMapping.privConstantMapping;
+            for (i = 0; i < privConstMapping->countOfEntries; i++)
+            {
+                SHADER_PRIV_CONSTANT_ENTRY *privConstEntry = &privConstMapping->pPrivmConstantEntries[i];
+                switch (privConstEntry->commonPrivm.privmFlag)
+                {
+                case SHS_PRIV_CONSTANT_FLAG_COMPUTE_GROUP_NUM:
+                    __VK_ASSERT(privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel == 0);
+                    chipCmptPipeline->numberOfWorkGroup.bUsed = VK_TRUE;
+                    chipCmptPipeline->numberOfWorkGroup.hwRegNo = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
+                    chipCmptPipeline->numberOfWorkGroup.hwRegAddress =
+                        (masterInstance->hwStates.hints.hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2) + (chipCmptPipeline->numberOfWorkGroup.hwRegNo * 4);
+                    chipCmptPipeline->numberOfWorkGroup.hwRegCount = privConstEntry->u.pSubCBMapping->subArrayRange;
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+    }
+
+    return result;
+}
+
 static VkResult halti5_pip_build_gfxshaders(
     __vkDevContext *devCtx,
     __vkPipeline *pip,
@@ -3787,6 +3907,7 @@ static VkResult halti5_pip_build_gfxshaders(
                 {
                     vsclinkEntries[linkEntryIdx].mainShaderStageBits = VSC_SHADER_STAGE_BIT_PS;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib;
+                    vsclinkEntries[linkEntryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPointCount = 1;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_COLOR_OUTPUT;
                     vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].u.clrOutput.location = chipGfxPipeline->patchOutput.outputs[j].locations[0];
@@ -3806,6 +3927,7 @@ static VkResult halti5_pip_build_gfxshaders(
             vsclinkEntries[linkEntryIdx].mainShaderStageBits = VSC_SHADER_STAGE_BIT_PS;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPointCount = 1;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib;
+            vsclinkEntries[linkEntryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
             vsclinkEntries[linkEntryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_FRONTFACING_CCW;
             linkEntryIdx++;
         }
@@ -3859,26 +3981,8 @@ static VkResult halti5_pip_build_gfxshaders(
         __VK_MEMZERO(chipPipeline->separateBindingProgramed, chipPipeline->countOfseparateBinding * sizeof(VkBool32));
     }
 
-    if (masterInstance->pep.seps[VSC_SHADER_STAGE_VS].staticPrivMapping.privConstantMapping.countOfEntries)
-    {
-        SHADER_PRIV_CONSTANT_MAPPING *privConstMapping = &masterInstance->pep.seps[VSC_SHADER_STAGE_VS].staticPrivMapping.privConstantMapping;
-        for (i = 0; i < privConstMapping->countOfEntries; i++)
-        {
-            SHADER_PRIV_CONSTANT_ENTRY *privConstEntry = &privConstMapping->pPrivmConstantEntries[i];
-            switch (privConstEntry->commonPrivm.privmFlag)
-            {
-            case SHS_PRIV_CONSTANT_FLAG_BASE_INSTANCE:
-                __VK_ASSERT(privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel == 0);
-                chipGfxPipeline->baseInstance.bUsed = VK_TRUE;
-                chipGfxPipeline->baseInstance.hwRegNo = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
-                chipGfxPipeline->baseInstance.hwRegAddress =
-                    (masterInstance->hwStates.hints.hwConstRegBases[gcvPROGRAM_STAGE_VERTEX] >> 2) + (chipGfxPipeline->baseInstance.hwRegNo * 4);
-                break;
-            default:
-                break;
-            }
-        }
-    }
+    /* process private constants. */
+    halti5_pip_process_priv_const(masterInstance, chipGfxPipeline, VK_TRUE);
 
     chipPipeline->curInstance = chipPipeline->masterInstance = masterInstance;
 
@@ -4225,26 +4329,8 @@ static VkResult halti5_pip_build_computeshader(
 
     chipPipeline->curInstance = chipPipeline->masterInstance = masterInstance;
 
-    if (masterInstance->pep.seps[VSC_SHADER_STAGE_CS].staticPrivMapping.privConstantMapping.countOfEntries)
-    {
-        SHADER_PRIV_CONSTANT_MAPPING *privConstMapping = &masterInstance->pep.seps[VSC_SHADER_STAGE_CS].staticPrivMapping.privConstantMapping;
-        for (i = 0; i < privConstMapping->countOfEntries; i++)
-        {
-            SHADER_PRIV_CONSTANT_ENTRY *privConstEntry = &privConstMapping->pPrivmConstantEntries[i];
-            switch (privConstEntry->commonPrivm.privmFlag)
-            {
-            case SHS_PRIV_CONSTANT_FLAG_COMPUTE_GROUP_NUM:
-                __VK_ASSERT(privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.firstValidHwChannel == 0);
-                chipCmptPipeline->numberOfWorkGroup.bUsed = VK_TRUE;
-                chipCmptPipeline->numberOfWorkGroup.hwRegNo = privConstEntry->u.pSubCBMapping->hwFirstConstantLocation.hwLoc.hwRegNo;
-                chipCmptPipeline->numberOfWorkGroup.hwRegAddress =
-                    (masterInstance->hwStates.hints.hwConstRegBases[gcvPROGRAM_STAGE_FRAGMENT] >> 2) + (chipCmptPipeline->numberOfWorkGroup.hwRegNo * 4);
-                break;
-            default:
-                break;
-            }
-        }
-    }
+    /* process private constants. */
+    halti5_pip_process_priv_const(masterInstance, chipCmptPipeline, VK_FALSE);
 
     if (masterInstance->pep.u.vk.privateCombTsHwMappingPool.countOfArray)
     {
@@ -4759,6 +4845,7 @@ VkResult halti5_patch_pipeline(
                                 VSC_RES_ACT_BIT actBits = 0;
                                 uint32_t subType;
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.hShaderLib = chipModule->patchLib;
+                                vscLinkEntriesCur[entryIdx].shLibLinkEntry.pTempHashTable = gcvNULL;
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].libLinkType = VSC_LIB_LINK_TYPE_RESOURCE;
                                 vscLinkEntriesCur[entryIdx].shLibLinkEntry.linkPoint[0].strFunc =
                                     halti5_helper_patchFuc(patchInfo->patchFormat, k, patchInfo->viewType, &opTypeBits, &actBits, &subType);

@@ -116,31 +116,31 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryParameter(vx_parameter parameter, vx_e
 
     switch (attribute)
     {
-        case VX_PARAMETER_ATTRIBUTE_DIRECTION:
+        case VX_PARAMETER_DIRECTION:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
 
             *(vx_enum *)ptr = parameter->kernel->signature.directionTable[parameter->index];
             break;
 
-        case VX_PARAMETER_ATTRIBUTE_INDEX:
+        case VX_PARAMETER_INDEX:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = parameter->index;
             break;
 
-        case VX_PARAMETER_ATTRIBUTE_TYPE:
+        case VX_PARAMETER_TYPE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
 
             *(vx_enum *)ptr = parameter->kernel->signature.dataTypeTable[parameter->index];
             break;
 
-        case VX_PARAMETER_ATTRIBUTE_STATE:
+        case VX_PARAMETER_STATE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
 
             *(vx_enum *)ptr = (vx_enum)parameter->kernel->signature.stateTable[parameter->index];
             break;
 
-        case VX_PARAMETER_ATTRIBUTE_REF:
+        case VX_PARAMETER_REF:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_reference, 0x3);
 
             if (parameter->node == VX_NULL) return VX_ERROR_NOT_SUPPORTED;

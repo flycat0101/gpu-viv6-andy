@@ -43,9 +43,7 @@ typedef struct _cl_program
     gctSTRING               compileOptions;
     gctSTRING               buildLog;
     cl_build_status         buildStatus;
-#if BUILD_OPENCL_12
     cl_program_binary_type  binaryType;
-#endif
     gctINT                  status;
 }
 clsProgram;

@@ -58,6 +58,24 @@ VX_INTERNAL_API void vxoContext_RemoveAccessor(vx_context context, vx_uint32 ind
 
 VX_INTERNAL_API vx_bool vxoContext_SearchAccessor(vx_context context, vx_ptr ptr, OUT vx_uint32_ptr indexPtr);
 
+VX_INTERNAL_API vx_bool vxoContext_MemoryMap(
+    vx_context   context,
+    vx_reference ref,
+    vx_size      size,
+    vx_enum      usage,
+    vx_enum      mem_type,
+    vx_uint32    flags,
+    void*        extra_data,
+    void**       ptr,
+    vx_map_id*   map_id);
+
+VX_INTERNAL_API vx_bool vxoContext_FindMemoryMap(
+    vx_context   context,
+    vx_reference ref,
+    vx_map_id    map_id);
+
+VX_INTERNAL_API void vxoContext_MemoryUnmap(vx_context context, vx_map_id map_id);
+
 EXTERN_C_END
 
 #endif /* __GC_VX_CONTEXT_H__ */

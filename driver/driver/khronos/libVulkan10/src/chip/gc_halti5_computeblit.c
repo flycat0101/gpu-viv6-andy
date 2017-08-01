@@ -173,6 +173,7 @@ static VkResult halti5_program_blit_src_tex(
     const __vkFormatToHwTxFmtInfo *hwTxFmtInfo = gcvNULL;
     SHADER_SAMPLER_SLOT_MAPPING *hwMapping = gcvNULL;
     uint32_t hwSamplerNo;
+    uint32_t tmpFormat;
 
     if (srcRes->isImage)
     {
@@ -209,7 +210,14 @@ static VkResult halti5_program_blit_src_tex(
         params->srcSize.height = srcRes->u.buf.imgHeight != 0 ? srcRes->u.buf.imgHeight : dstRes->u.img.extent.height;
         params->srcSize.depth  = dstRes->u.img.extent.depth;
 
-        txFormat = pDstImg->createInfo.format;
+        if (dstRes->u.img.subRes.aspectMask & VK_IMAGE_ASPECT_STENCIL_BIT)
+        {
+            txFormat = VK_FORMAT_R8_UNORM;
+        }
+        else
+        {
+            txFormat = pDstImg->createInfo.format;
+        }
         fmtInfo = &g_vkFormatInfoTable[txFormat];
         txStride = (params->srcSize.width / fmtInfo->blockSize.width) * fmtInfo->bitsPerBlock / 8;
         txSliceSize = (params->srcSize.height / fmtInfo->blockSize.height) * txStride;
@@ -250,7 +258,20 @@ static VkResult halti5_program_blit_src_tex(
         break;
     }
 
-    hwTxFmtInfo = halti5_helper_convertHwTxInfo(devCtx, txFormat);
+    tmpFormat = txFormat;
+
+    switch (txFormat)
+    {
+    case VK_FORMAT_X8_D24_UNORM_PACK32:
+    case VK_FORMAT_D24_UNORM_S8_UINT:
+    case __VK_FORMAT_D24_UNORM_S8_UINT_PACKED32:
+        tmpFormat = VK_FORMAT_R8G8B8A8_UNORM;
+        break;
+    default:
+        break;
+    }
+
+    hwTxFmtInfo = halti5_helper_convertHwTxInfo(devCtx, tmpFormat);
     txSRGB = (hwTxFmtInfo->hwFormat >> TX_FORMAT_SRGB_SHIFT) & 0x1;
     params->srcSRGB = txSRGB ? VK_TRUE : VK_FALSE;
     /* Disable src texture SRGB if dst also require SRGB */
@@ -556,6 +577,7 @@ static VkResult halti5_program_blit_dst_img(
         tmpImgView.createInfo.subresourceRange.levelCount = 1;
         tmpImgView.createInfo.subresourceRange.baseArrayLayer = dstRes->u.img.subRes.arrayLayer;
         tmpImgView.createInfo.subresourceRange.layerCount = 1;
+        tmpImgView.createInfo.subresourceRange.aspectMask = dstRes->u.img.subRes.aspectMask;
 
         __VK_MEMZERO(&tmpFormatInfo, sizeof(tmpFormatInfo));
         __VK_MEMCOPY(&tmpFormatInfo, &pDstImg->formatInfo, sizeof(tmpFormatInfo));
@@ -609,6 +631,9 @@ static VkResult halti5_program_blit_dst_img(
         case VK_FORMAT_EAC_R11G11_UNORM_BLOCK:
         case VK_FORMAT_EAC_R11G11_SNORM_BLOCK:
             tmpFormatInfo.residentImgFormat = VK_FORMAT_R32G32_SFLOAT;
+            break;
+        case __VK_FORMAT_D24_UNORM_S8_UINT_PACKED32:
+            tmpFormatInfo.residentImgFormat = VK_FORMAT_R32_UINT;
             break;
         default:
             break;
@@ -1292,6 +1317,12 @@ static halti5_vscprogram_blit* halti5_GetComputeBlitProg(
             {"copy_buf_to_2layers_img", {12, 13}, {14, 15}, 20},
             {"copy_2D_unorm_float", {16, ~0u}, {6, ~0u}, 20},
 
+            {"copy_buf_to_x8d24_img", { 0, ~0u}, {6, ~0u}, 20},
+            {"copy_buf_to_d24s8_img_stencil", { 0, ~0u}, {8, ~0u}, 20},
+            {"copy_buf_to_d24s8_img_depth", { 0, ~0u}, {8, ~0u}, 20},
+            {"copy_img_to_d24s8_img_stencil", { 0, ~0u}, { 8, ~0u}, 20},
+            {"copy_img_to_d24s8_img_depth", { 0, ~0u}, { 8, ~0u}, 20},
+
             {"clear_2D_uint", {~0u,~0u}, { 8, ~0u}, 20},
             {"clear_to_2layers_img", {~0u,~0u}, {14, 15}, 20},
             {"blit_2D_buffer", {17, ~0u}, {7, ~0u}, 20},
@@ -1355,6 +1386,46 @@ static halti5_vscprogram_blit* halti5_GetComputeBlitProg(
 
             blitProg->program_src   = halti3_program_copy_src_img;
             blitProg->program_dst   = halti3_program_copy_dst_img;
+            blitProg->program_const = halti5_program_blit_const;
+            break;
+
+        case HALTI5_BLIT_COPY_BUF_TO_X8D24_IMG:
+            blitProg->srcTexEntry = halti5_getCombinedTexSamplerEntry(progResSet, entryInfos[blitKind].srcBindings[0]);
+            blitProg->dstImgEntry[0] = halti5_getImageEntry(progResSet, entryInfos[blitKind].dstBindings[0]);
+
+            blitProg->program_src = halti5_program_blit_src_tex;
+            blitProg->program_dst = halti5_program_blit_dst_img;
+            blitProg->program_const = halti5_program_blit_const;
+            break;
+
+        case HALTI5_BLIT_COPY_BUF_TO_D24S8IMG_STENCIL:
+            blitProg->srcTexEntry = halti5_getCombinedTexSamplerEntry(progResSet, entryInfos[blitKind].srcBindings[0]);
+            blitProg->dstImgEntry[0] = halti5_getImageEntry(progResSet, entryInfos[blitKind].dstBindings[0]);
+            blitProg->program_src = halti5_program_blit_src_tex;
+            blitProg->program_dst = halti5_program_blit_dst_img;
+            blitProg->program_const = halti5_program_blit_const;
+            break;
+        case HALTI5_BLIT_COPY_BUF_TO_D24S8IMG_DEPTH:
+            blitProg->srcTexEntry = halti5_getCombinedTexSamplerEntry(progResSet, entryInfos[blitKind].srcBindings[0]);
+            blitProg->dstImgEntry[0] = halti5_getImageEntry(progResSet, entryInfos[blitKind].dstBindings[0]);
+            blitProg->program_src = halti5_program_blit_src_tex;
+            blitProg->program_dst = halti5_program_blit_dst_img;
+            blitProg->program_const = halti5_program_blit_const;
+            break;
+
+        case HALTI5_BLIT_COPY_IMG_TO_D24S8IMG_STENCIL:
+            blitProg->srcTexEntry = halti5_getCombinedTexSamplerEntry(progResSet, entryInfos[blitKind].srcBindings[0]);
+            blitProg->dstImgEntry[0] = halti5_getImageEntry(progResSet, entryInfos[blitKind].dstBindings[0]);
+            blitProg->program_src = halti5_program_blit_src_tex;
+            blitProg->program_dst = halti5_program_blit_dst_img;
+            blitProg->program_const = halti5_program_blit_const;
+            break;
+
+        case HALTI5_BLIT_COPY_IMG_TO_D24S8IMG_DEPTH:
+            blitProg->srcTexEntry = halti5_getCombinedTexSamplerEntry(progResSet, entryInfos[blitKind].srcBindings[0]);
+            blitProg->dstImgEntry[0] = halti5_getImageEntry(progResSet, entryInfos[blitKind].dstBindings[0]);
+            blitProg->program_src = halti5_program_blit_src_tex;
+            blitProg->program_dst = halti5_program_blit_dst_img;
             blitProg->program_const = halti5_program_blit_const;
             break;
 
@@ -1504,12 +1575,8 @@ static uint32_t halti5_detect_blit_kind(
         /* For depth or stencil only aspect: cannot support combined formats now. */
         switch (dstFormat)
         {
-        //case VK_FORMAT_X8_D24_UNORM_PACK32:
         case VK_FORMAT_D16_UNORM_S8_UINT:
-        case VK_FORMAT_D24_UNORM_S8_UINT:
         case VK_FORMAT_D32_SFLOAT_S8_UINT:
-        case __VK_FORMAT_D24_UNORM_S8_UINT_PACKED32:
-        // case __VK_FORMAT_D24_UNORM_X8_PACKED32:
             __VK_DEBUG_PRINT(__VK_DBG_LEVEL_ERROR, "Compute blit does NOT support the combination now: dstAspect=0x%x dstFormat=%d\n",
                              dstAspect, dstFormat);
             __VK_ASSERT(VK_FALSE);
@@ -1566,6 +1633,29 @@ static uint32_t halti5_detect_blit_kind(
             break;
         case VK_FORMAT_A2B10G10R10_UINT_PACK32:
             kind = HALTI5_BLIT_2D_UINT_A2B10G10R10_PACKED;
+            break;
+        case __VK_FORMAT_D24_UNORM_X8_PACKED32:
+            kind = HALTI5_BLIT_COPY_BUF_TO_X8D24_IMG;
+            break;
+        case __VK_FORMAT_D24_UNORM_S8_UINT_PACKED32:
+            if ((dstRes->u.img.subRes.aspectMask == VK_IMAGE_ASPECT_STENCIL_BIT) && !srcRes->isImage)
+            {
+                kind = HALTI5_BLIT_COPY_BUF_TO_D24S8IMG_STENCIL;
+            }
+            else if (dstRes->u.img.subRes.aspectMask == VK_IMAGE_ASPECT_DEPTH_BIT && !srcRes->isImage)
+            {
+                kind = HALTI5_BLIT_COPY_BUF_TO_D24S8IMG_DEPTH;
+            }
+            else if ((dstRes->u.img.subRes.aspectMask == VK_IMAGE_ASPECT_STENCIL_BIT) &&
+                (srcRes->isImage) && (dstRes->isImage))
+            {
+                kind = HALTI5_BLIT_COPY_IMG_TO_D24S8IMG_STENCIL;
+            }
+            else if ((dstRes->u.img.subRes.aspectMask == VK_IMAGE_ASPECT_DEPTH_BIT) &&
+                (srcRes->isImage) && (dstRes->isImage))
+            {
+                kind = HALTI5_BLIT_COPY_IMG_TO_D24S8IMG_DEPTH;
+            }
             break;
         default:
             switch (dstCategory)

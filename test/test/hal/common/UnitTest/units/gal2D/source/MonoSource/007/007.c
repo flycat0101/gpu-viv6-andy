@@ -107,6 +107,19 @@ unsigned char MaskAddr[] =
 0x80, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 };
 
+static unsigned int swap_dword(unsigned int dw)
+{
+#if defined(__GNUC__)
+    return __builtin_bswap32(dw);
+#else
+    return
+        (((gctUINT32)(dw) & (gctUINT32)0x000000FFUL) << 24) |
+        (((gctUINT32)(dw) & (gctUINT32)0x0000FF00UL) << 8)  |
+        (((gctUINT32)(dw) & (gctUINT32)0x00FF0000UL) >> 8)  |
+        (((gctUINT32)(dw) & (gctUINT32)0xFF000000UL) >> 24);
+#endif
+}
+
 static gctBOOL CDECL Render(Test2D *t2d, gctUINT frameNo)
 {
     gcsRECT dstRect = {0, 0, 32, 16};
@@ -265,7 +278,7 @@ static gctBOOL CDECL Init(Test2D *t2d, GalRuntime *runtime)
 
         for (i = 0; i < gcmCOUNTOF(MaskAddr) / 4; i++)
         {
-            t2d->monoSrcData[i] = gcmSWAB32(t2d->monoSrcData[i]);
+            t2d->monoSrcData[i] = swap_dword(t2d->monoSrcData[i]);
         }
     }
 

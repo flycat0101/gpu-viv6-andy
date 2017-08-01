@@ -2818,6 +2818,13 @@ void VSC_OPTN_DumpOptions_Dump(
     VIR_LOG_FLUSH(dumper);
 }
 
+void VSC_OPTN_ILFLinkOptions_SetDefault(
+    IN OUT VSC_OPTN_ILFLinkOptions* options
+    )
+{
+    VSC_OPTN_ILFLinkOptions_SetSwitchOn(options, gcvTRUE);
+}
+
 static gctBOOL
 _IsTriageForShaderId(
     IN gctINT           ShaderId,
@@ -2889,6 +2896,7 @@ void VSC_OPTN_Options_SetDefault(
     VSC_OPTN_MCGenOptions_SetDefault(VSC_OPTN_Options_GetMCGenOptions(options, 0), optLevel);
     VSC_OPTN_SEPGenOptions_SetDefault(VSC_OPTN_Options_GetSEPGenOptions(options, 0), optLevel);
     VSC_OPTN_DumpOptions_SetDefault(VSC_OPTN_Options_GetDumpOptions(options));
+    VSC_OPTN_ILFLinkOptions_SetDefault(VSC_OPTN_Options_GetILFLinkOptions(options));
     VSC_OPTN_Options_SetOptionsUsage(options, gcvFALSE);
 }
 
@@ -2944,6 +2952,8 @@ VSC_OPTN_BASE* VSC_OPTN_Options_GetOption(VSC_OPTN_Options* pOptions, VSC_PASS_O
         return &pOptions->sepgen_options[passId].optnBase;
     case VSC_PASS_OPTN_TYPE_DUMP:
         return &pOptions->dump_options.optnBase;
+    case VSC_PASS_OPTN_TYPE_ILF_LINK:
+        return &pOptions->ilflink_options.optnBase;
     default:
         return gcvNULL;
     }
@@ -3356,6 +3366,16 @@ void VSC_OPTN_Options_SetOptionsByOptFlags(
         VSC_OPTN_DUAL16Options_SetSwitchOn(VSC_OPTN_Options_GetDUAL16Options(Options, 0), gcvFALSE);
     }
 
+    if(OptFlags & VSC_COMPILER_OPT_ILF_LINK)
+    {
+        gcmASSERT(!(OptFlags & VSC_COMPILER_OPT_NO_ILF_LINK));
+        VSC_OPTN_ILFLinkOptions_SetSwitchOn(VSC_OPTN_Options_GetILFLinkOptions(Options), gcvTRUE);
+    }
+    else if(OptFlags & VSC_COMPILER_OPT_NO_ILF_LINK)
+    {
+        VSC_OPTN_ILFLinkOptions_SetSwitchOn(VSC_OPTN_Options_GetILFLinkOptions(Options), gcvFALSE);
+    }
+
     if(OptFlags & VSC_COMPILER_OPT_FUNC_INLINE)
     {
         gcmASSERT(!(OptFlags & VSC_COMPILER_OPT_NO_FUNC_INLINE));
@@ -3503,6 +3523,7 @@ void VSC_OPTN_Options_MergeVCEnvOption(
         {
             VSC_OPTN_ISOptions_SetSwitchOn(VSC_OPTN_Options_GetISOptions(options, 0), gcvFALSE);
             VSC_OPTN_ISOptions_SetSwitchOn(VSC_OPTN_Options_GetISOptions(options, 1), gcvFALSE);
+            VSC_OPTN_LoopOptsOptions_SetSwitchOn(VSC_OPTN_Options_GetLoopOptsOptions(options, 0), gcvFALSE);
         }
     }
 }

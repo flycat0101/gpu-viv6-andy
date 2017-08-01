@@ -51,8 +51,8 @@ typedef struct __vkChipInfoRec
 {
     uint32_t gpuCoreCount;
     uint32_t gpuCoreID[__VK_MAX_GPU_CORE_COUNT];
-    uint32_t flatMappingStart;
-    uint32_t flatMappingEnd;
+    uint32_t flatMappingRangeCount;
+    gcsFLAT_MAPPING_RANGE flatMappingRanges[gcdMAX_FLAT_MAPPING_COUNT];
 }__vkChipInfo;
 
 /* 16 byte for hw fence data because of hardware limitation. */

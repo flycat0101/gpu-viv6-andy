@@ -28,7 +28,12 @@ VX_PRIVATE_API vx_bool vxoThreshold_IsValidType(vx_enum thresholdType)
 
 VX_PRIVATE_API vx_bool vxoThreshold_IsValidDataType(vx_enum dataType)
 {
-    return (vx_bool)(dataType == VX_TYPE_UINT8);
+    return (vx_bool)(dataType == VX_TYPE_INT8 ||
+                    dataType == VX_TYPE_UINT8 ||
+                    dataType == VX_TYPE_INT16 ||
+                    dataType == VX_TYPE_UINT16 ||
+                    dataType == VX_TYPE_INT32 ||
+                    dataType == VX_TYPE_UINT32);
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseThreshold(vx_threshold *threshold)
@@ -51,7 +56,9 @@ VX_API_ENTRY vx_threshold VX_API_CALL vxCreateThreshold(vx_context context, vx_e
 
     if (vxoReference_GetStatus((vx_reference)threshold) != VX_SUCCESS) return threshold;
 
-    threshold->type = thresh_type;
+    threshold->thresholdType = thresh_type;
+
+    threshold->dataType      = data_type;
 
     return threshold;
 }
@@ -64,37 +71,37 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetThresholdAttribute(vx_threshold threshol
 
     switch (attribute)
     {
-        case VX_THRESHOLD_ATTRIBUTE_THRESHOLD_VALUE:
+        case VX_THRESHOLD_THRESHOLD_VALUE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_int32, 0x3);
 
-            if (threshold->type != VX_THRESHOLD_TYPE_BINARY) return VX_ERROR_INVALID_PARAMETERS;
+            if (threshold->thresholdType != VX_THRESHOLD_TYPE_BINARY) return VX_ERROR_INVALID_PARAMETERS;
 
             threshold->value = *(vx_int32 *)ptr;
 
             vxoReference_IncrementWriteCount(&threshold->base);
             break;
 
-        case VX_THRESHOLD_ATTRIBUTE_THRESHOLD_LOWER:
+        case VX_THRESHOLD_THRESHOLD_LOWER:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_int32, 0x3);
 
-            if (threshold->type != VX_THRESHOLD_TYPE_RANGE) return VX_ERROR_INVALID_PARAMETERS;
+            if (threshold->thresholdType != VX_THRESHOLD_TYPE_RANGE) return VX_ERROR_INVALID_PARAMETERS;
 
             threshold->lower = *(vx_int32 *)ptr;
 
             vxoReference_IncrementWriteCount(&threshold->base);
             break;
 
-        case VX_THRESHOLD_ATTRIBUTE_THRESHOLD_UPPER:
+        case VX_THRESHOLD_THRESHOLD_UPPER:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_int32, 0x3);
 
-            if (threshold->type != VX_THRESHOLD_TYPE_RANGE) return VX_ERROR_INVALID_PARAMETERS;
+            if (threshold->thresholdType != VX_THRESHOLD_TYPE_RANGE) return VX_ERROR_INVALID_PARAMETERS;
 
             threshold->upper = *(vx_int32 *)ptr;
 
             vxoReference_IncrementWriteCount(&threshold->base);
             break;
 
-        case VX_THRESHOLD_ATTRIBUTE_TRUE_VALUE:
+        case VX_THRESHOLD_TRUE_VALUE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_int32, 0x3);
 
             threshold->trueValue = *(vx_int32 *)ptr;
@@ -102,7 +109,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetThresholdAttribute(vx_threshold threshol
             vxoReference_IncrementWriteCount(&threshold->base);
             break;
 
-        case VX_THRESHOLD_ATTRIBUTE_FALSE_VALUE:
+        case VX_THRESHOLD_FALSE_VALUE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_int32, 0x3);
 
             threshold->falseValue = *(vx_int32 *)ptr;
@@ -110,14 +117,14 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetThresholdAttribute(vx_threshold threshol
             vxoReference_IncrementWriteCount(&threshold->base);
             break;
 
-        case VX_THRESHOLD_ATTRIBUTE_TYPE:
+        case VX_THRESHOLD_TYPE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
 
             type = *(vx_enum *)ptr;
 
             if (!vxoThreshold_IsValidType(type)) return VX_ERROR_INVALID_PARAMETERS;
 
-            threshold->type = type;
+            threshold->thresholdType = type;
             break;
 
         default:
@@ -134,37 +141,37 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryThreshold(vx_threshold threshold, vx_e
 
     switch (attribute)
     {
-        case VX_THRESHOLD_ATTRIBUTE_THRESHOLD_VALUE:
+        case VX_THRESHOLD_THRESHOLD_VALUE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_int32, 0x3);
 
-            if (threshold->type != VX_THRESHOLD_TYPE_BINARY) return VX_ERROR_INVALID_PARAMETERS;
+            if (threshold->thresholdType != VX_THRESHOLD_TYPE_BINARY) return VX_ERROR_INVALID_PARAMETERS;
 
             *(vx_int32 *)ptr = threshold->value;
 
             vxoReference_IncrementReadCount(&threshold->base);
             break;
 
-        case VX_THRESHOLD_ATTRIBUTE_THRESHOLD_LOWER:
+        case VX_THRESHOLD_THRESHOLD_LOWER:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_int32, 0x3);
 
-            if (threshold->type != VX_THRESHOLD_TYPE_RANGE) return VX_ERROR_INVALID_PARAMETERS;
+            if (threshold->thresholdType != VX_THRESHOLD_TYPE_RANGE) return VX_ERROR_INVALID_PARAMETERS;
 
             *(vx_int32 *)ptr = threshold->lower;
 
             vxoReference_IncrementReadCount(&threshold->base);
             break;
 
-        case VX_THRESHOLD_ATTRIBUTE_THRESHOLD_UPPER:
+        case VX_THRESHOLD_THRESHOLD_UPPER:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_int32, 0x3);
 
-            if (threshold->type != VX_THRESHOLD_TYPE_RANGE) return VX_ERROR_INVALID_PARAMETERS;
+            if (threshold->thresholdType != VX_THRESHOLD_TYPE_RANGE) return VX_ERROR_INVALID_PARAMETERS;
 
             *(vx_int32 *)ptr = threshold->upper;
 
             vxoReference_IncrementReadCount(&threshold->base);
             break;
 
-        case VX_THRESHOLD_ATTRIBUTE_TRUE_VALUE:
+        case VX_THRESHOLD_TRUE_VALUE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_int32, 0x3);
 
             *(vx_int32 *)ptr = threshold->trueValue;
@@ -172,7 +179,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryThreshold(vx_threshold threshold, vx_e
             vxoReference_IncrementReadCount(&threshold->base);
             break;
 
-        case VX_THRESHOLD_ATTRIBUTE_FALSE_VALUE:
+        case VX_THRESHOLD_FALSE_VALUE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_int32, 0x3);
 
             *(vx_int32 *)ptr = threshold->falseValue;
@@ -180,10 +187,16 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryThreshold(vx_threshold threshold, vx_e
             vxoReference_IncrementReadCount(&threshold->base);
             break;
 
-        case VX_THRESHOLD_ATTRIBUTE_TYPE:
+        case VX_THRESHOLD_TYPE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
 
-            *(vx_enum *)ptr = threshold->type;
+            *(vx_enum *)ptr = threshold->thresholdType;
+            break;
+
+        case VX_THRESHOLD_DATA_TYPE:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
+
+            *(vx_enum *)ptr = threshold->dataType;
             break;
 
         default:

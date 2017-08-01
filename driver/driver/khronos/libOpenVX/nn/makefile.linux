@@ -44,7 +44,7 @@ endif
 # Core
 OBJECTS = $(OBJ_DIR)/gc_nn_interface.o
 
-LIBS += -l OpenVX -l CLC -l VSC -l GAL
+LIBS += -l OpenVX -l VSC -l GAL
 
 INCLUDE += -I../kernels
 
@@ -54,7 +54,7 @@ CFLAGS += $(INCLUDE)
 
 ################################################################################
 # Add extra library path.
-LIBS += -L $(AQROOT)/build/sdk/drivers
+LIBS += -L $(SDK_DIR)/drivers
 LIBS += -L $(AQROOT)/hal/user/$(OBJ_DIR)
 
 LIBS += -l dl -l pthread -lm

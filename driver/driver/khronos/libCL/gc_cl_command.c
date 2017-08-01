@@ -54,6 +54,7 @@ clfAllocateCommand(
     command->event                  = gcvNULL;
     command->next                   = gcvNULL;
     command->previous               = gcvNULL;
+    command->submitEngine           = gcvENGINE_RENDER;
 
     clmONERROR(gcoOS_AtomIncrement(gcvNULL, clgGlobalId, (gctINT*)&command->id), CL_INVALID_VALUE);
 
@@ -578,12 +579,24 @@ clfDeferredReleaseCommand(
     }
 
     /* Submmit command's release signal. */
-    gcmONERROR(gcoCL_SubmitSignal(Command->releaseSignal,
-                                  commandQueue->context->process));
+    gcmONERROR((gctINT)gcoCL_SubmitSignal(Command->releaseSignal,
+                                  commandQueue->context->process,
+                                  Command->submitEngine));
 
-    /* Wake up the queue worker to do the release after the release signal is set. */
-    gcmONERROR(gcoCL_SubmitSignal(commandQueue->workerStartSignal,
-                                  commandQueue->context->process));
+    if (commandQueue->inThread)
+    {
+        /* Wake up the event worker to do the release after the release signal is set */
+        gcmONERROR((gctINT)gcoCL_SubmitSignal(commandQueue->context->eventListWorkerStartSignal,
+                                      commandQueue->context->process,
+                                      Command->submitEngine));
+    }
+    else
+    {
+        /* Wake up the queue worker to do the release after the release signal is set. */
+        gcmONERROR((gctINT)gcoCL_SubmitSignal(commandQueue->workerStartSignal,
+                                      commandQueue->context->process,
+                                      Command->submitEngine));
+    }
 
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
@@ -1519,7 +1532,7 @@ void clfPrintParseData(
     }
 }
 
-static gctINT
+gctINT
 clfProcessDeferredReleaseCommandList(
     clsCommandQueue_PTR     CommandQueue
     )
@@ -1649,6 +1662,13 @@ clfRemoveSyncPoint(
     /* Find the sync point associated with the command */
     syncPoint = CommandQueue->syncPointList;
 
+    if (syncPoint == gcvNULL)
+    {
+        /* No sync point */
+        clfUnlockSyncPointList(CommandQueue);
+        return CL_SUCCESS;
+    }
+
     while (syncPoint)
     {
         if (syncPoint->enqueueNo == Command->enqueueNo) break;
@@ -1700,17 +1720,6 @@ clfStartCommand(
         clfSetEventExecutionStatus(Command->event, CL_SUBMITTED);
 
         clfScheduleEventCallback(Command->event, CL_SUBMITTED);
-
-        if (clmCOMMAND_EXEC_HARDWARE(Command->type))
-        {
-            clfSubmitEventForRunning(Command);
-        }
-        else
-        {
-            clfSetEventExecutionStatus(Command->event, CL_RUNNING);
-
-            clfScheduleEventCallback(Command->event, CL_RUNNING);
-        }
     }
 
     status = CL_SUCCESS;
@@ -1783,6 +1792,7 @@ clfProcessCommand(
     clsCommandQueue_PTR     commandQueue;
     /*clsContext_PTR          context;*/
     gctINT                  status;
+    gctUINT                 i;
     gctINT                  pendingEventStatus;
 
     gcmHEADER_ARG("Command=0x%x", Command);
@@ -1802,6 +1812,11 @@ clfProcessCommand(
     }
     else
     {
+        /*At this point, we Can sure the eventListWaitlist will be no used*/
+        for (i = 0; i < Command->numEventsInWaitList; ++i)
+        {
+            clfReleaseEvent(Command->eventWaitList[i]);
+        }
         /* Handle commands. */
         clfStartCommand(Command);
         status = Command->handler(Command);
@@ -1863,7 +1878,8 @@ clfWakeUpAllCommandQueueWorkers(
     queue = Context->queueList;
 
     /* Wake up all queue worker threads */
-    while (queue != gcvNULL)
+    while (queue != gcvNULL &&
+        !queue->inThread)
     {
         clfWakeUpCommandQueueWorker(queue);
         queue = queue->next;
@@ -1882,21 +1898,38 @@ clfCreateCommitRequest(
     gctINT                  status;
     clsCommitRequest_PTR    commitRequest = gcvNULL;
     gctPOINTER              pointer;
+    gctUINT                 i;
+    gctBOOL                 enableAsyc = gcvFALSE;
 
     gcmHEADER_ARG("Stall=%d" , Stall);
 
     clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsCommitRequest), &pointer),
                CL_OUT_OF_HOST_MEMORY);
 
+    enableAsyc = gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT);
+
     commitRequest                   = (clsCommitRequest_PTR) pointer;
     commitRequest->stall            = Stall;
-    commitRequest->signal           = gcvNULL;
     commitRequest->previous         = gcvNULL;
     commitRequest->next             = gcvNULL;
 
-    clmONERROR(gcoCL_CreateSignal(gcvFALSE,
-                                  &commitRequest->signal),
-               CL_OUT_OF_HOST_MEMORY);
+    for (i = 0; i < gcvENGINE_GPU_ENGINE_COUNT; i++)
+    {
+        commitRequest->signal[i]    = gcvNULL;
+
+        if (i == gcvENGINE_BLT && enableAsyc)
+        {
+            clmONERROR(gcoCL_CreateSignal(gcvFALSE,
+                                          &commitRequest->signal[i]),
+                       CL_OUT_OF_HOST_MEMORY);
+        }
+        if(i == gcvENGINE_RENDER)
+        {
+             clmONERROR(gcoCL_CreateSignal(gcvFALSE,
+                                          &commitRequest->signal[i]),
+                       CL_OUT_OF_HOST_MEMORY);
+        }
+    }
 
     *CommitRequest = commitRequest;
 
@@ -1923,15 +1956,19 @@ clfDeleteCommitRequest(
     )
 {
     gctINT                  status;
+    gctUINT                 i;
 
     gcmHEADER_ARG("CommitRequest=0x%x", CommitRequest);
 
     clmASSERT(CommitRequest, CL_INVALID_VALUE);
 
-    if (CommitRequest->signal != gcvNULL)
+    for (i = 0; i < gcvENGINE_GPU_ENGINE_COUNT; i++)
     {
-        gcmVERIFY_OK(gcoCL_DestroySignal(CommitRequest->signal));
-        CommitRequest->signal = gcvNULL;
+        if (CommitRequest->signal[i] != gcvNULL)
+        {
+            gcmVERIFY_OK(gcoCL_DestroySignal(CommitRequest->signal[i]));
+            CommitRequest->signal[i] = gcvNULL;
+        }
     }
 
     gcmVERIFY_OK(gcoOS_Free(gcvNULL, CommitRequest));
@@ -2005,7 +2042,8 @@ clfProcessCommitRequestList(
         gctBOOL             checkEnqueueNoForFinish;
         gctUINT64           minExistingEnqueueNoForFinish;
         clsCommand_PTR      command;
-
+        gctUINT32           i;
+        gctSIGNAL           signals[gcvENGINE_GPU_ENGINE_COUNT];
 
         /* Get the min existing enqueue no for clFlush */
         if (CommandQueue->numCommands > 0)
@@ -2065,10 +2103,20 @@ clfProcessCommitRequestList(
 
                     doneStall = gcvTRUE;
 
-                    /* Submit an event command for the signal for clFinish */
-                    gcmONERROR(gcoCL_SubmitSignal(commitRequest->signal,
-                                                  CommandQueue->context->process));
-                }
+                    for (i = 0; i < gcvENGINE_GPU_ENGINE_COUNT; i++)
+                    {
+                        signals[i] = commitRequest->signal[i];
+                    }
+                    /* copy the signal to local var to keep thread safe */
+                    for(i = 0; i < gcvENGINE_GPU_ENGINE_COUNT; i++)
+                    {
+                        if(signals[i])
+                        {
+                             gcmONERROR(gcoCL_SubmitSignal(signals[i],
+                                                          CommandQueue->context->process,
+                                                          i));
+                        }
+                    }                }
             }
             else
             {
@@ -2093,8 +2141,19 @@ clfProcessCommitRequestList(
                             /* Commit all previously queued commands/events to GPU */
                     gcmONERROR(gcoCL_Commit(gcvFALSE));
 
-                    /* Wake up the corresponding clFlush thead by signal directly */
-                    gcmONERROR(gcoCL_SetSignal(commitRequest->signal));
+                    for (i = 0; i < gcvENGINE_GPU_ENGINE_COUNT; i++)
+                    {
+                        signals[i] = commitRequest->signal[i];
+                    }
+
+                    for (i = 0; i < gcvENGINE_GPU_ENGINE_COUNT; i++)
+                    {
+                        /* Wake up the corresponding clFlush thead by signal directly */
+                        if(signals[i])
+                        {
+                            gcmONERROR(gcoCL_SetSignal(signals[i]));
+                        }
+                    }
                 }
             }
 
@@ -2125,7 +2184,7 @@ clfFlushCommandQueue(
 {
     gctINT                  status;
     clsCommitRequest_PTR    commitRequest = gcvNULL;
-
+    gctUINT32 i = 0;
     gcmHEADER_ARG("CommandQueue=0x%x", CommandQueue);
 
     clmASSERT(CommandQueue && CommandQueue->objectType == clvOBJECT_COMMAND_QUEUE,
@@ -2134,18 +2193,26 @@ clfFlushCommandQueue(
     /* Create a new commit request */
     gcmONERROR(clfCreateCommitRequest(Stall, &commitRequest));
 
-    /* Add the commit request to the list */
-    gcmONERROR(clfAddCommitRequestToList(CommandQueue, commitRequest));
+    gcmONERROR(CommandQueue->processCommitRequest(CommandQueue, commitRequest));
 
     /* Wait for the commit is done */
-    gcmVERIFY_OK(gcoCL_WaitSignal(commitRequest->signal, gcvINFINITE));
+    for(i = 0; i < gcvENGINE_GPU_ENGINE_COUNT; i ++)
+    {
+        if(commitRequest->signal[i])
+        {
+            gcmVERIFY_OK(gcoCL_WaitSignal(commitRequest->signal[i], gcvINFINITE));
+        }
+    }
 
     /* Delete the used commit request */
     gcmVERIFY_OK(clfDeleteCommitRequest(commitRequest));
 
+
 #if !cldSYNC_MEMORY
-    if (Stall) gcmONERROR(gcoCL_Flush(gcvTRUE));
+     gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+     gcmONERROR(gcoCL_Flush(Stall)); /*Meomory is alloacted by default hw, so flush the default hw to make pending event to commit .*/
 #endif
+
 
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
@@ -2278,11 +2345,9 @@ clfAddCommandDependency(
         case clvCOMMAND_WRITE_BUFFER:
             memObj[0] = Command->u.writeBuffer.buffer;
             break;
-#if BUILD_OPENCL_12
         case clvCOMMAND_FILL_BUFFER:
             memObj[0] = Command->u.fillBuffer.buffer;
             break;
-#endif
         case clvCOMMAND_WRITE_BUFFER_RECT:
             memObj[0] = Command->u.writeBufferRect.buffer;
             break;
@@ -2300,11 +2365,9 @@ clfAddCommandDependency(
         case clvCOMMAND_WRITE_IMAGE:
             memObj[0] = Command->u.writeImage.image;
             break;
-#if BUILD_OPENCL_12
         case clvCOMMAND_FILL_IMAGE:
             memObj[0] = Command->u.fillImage.image;
             break;
-#endif
         case clvCOMMAND_COPY_IMAGE:
             memObj[0] = Command->u.copyImage.srcImage;
             memObj[1] = Command->u.copyImage.dstImage;
@@ -2317,10 +2380,8 @@ clfAddCommandDependency(
             memObj[0] = Command->u.copyBufferToImage.srcBuffer;
             memObj[1] = Command->u.copyBufferToImage.dstImage;
             break;
-#if BUILD_OPENCL_12
         case clvCOMMAND_MIGRATE_MEM_OBJECTS:
             break;
-#endif
         case clvCOMMAND_MAP_BUFFER:
             memObj[0] = Command->u.mapBuffer.buffer;
             break;
@@ -2362,6 +2423,67 @@ OnError:
 }
 #endif
 
+gceSTATUS
+clfChooseThreadMode(
+    clsCommandQueue_PTR     CommandQueue,
+    clsCommand_PTR          Command,
+    gctBOOL *               inThread
+)
+{
+    gctUINT             i;
+    gceSTATUS           status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Command=0x%x", Command);
+
+    if (!Command)
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    if ((CommandQueue->properties & CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE) ||
+        (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_IN_THREAD) == gcvFALSE))
+    {
+        *inThread = gcvFALSE;
+        gcmFOOTER_NO();
+        return status;
+    }
+
+    for (i = 0; i < Command->numEventsInWaitList; i++)
+    {
+        if (Command->eventWaitList[i]->userEvent ||
+            Command->eventWaitList[i]->fromUserCommand ||
+            Command->eventWaitList[i]->queue != CommandQueue)
+        {
+            *inThread = gcvFALSE;
+            gcmFOOTER_NO();
+            return status;
+        }
+    }
+
+    for (i = 0; i < Command->internalNumEventsInWaitList; i++)
+    {
+        if (Command->internalEventWaitList[i]->userEvent ||
+            Command->internalEventWaitList[i]->queue != CommandQueue)
+        {
+            *inThread = gcvFALSE;
+            gcmFOOTER_NO();
+            return status;
+        }
+    }
+
+    *inThread = gcvTRUE;
+
+    gcmFOOTER_NO();
+    return status;
+}
+
+gceSTATUS
+clfSwitchInOrderMode(
+    clsCommandQueue_PTR     CommandQueue,
+    gctBOOL                 isInOrder
+    );
+
 gctINT
 clfSubmitCommand(
     clsCommandQueue_PTR         CommandQueue,
@@ -2371,6 +2493,8 @@ clfSubmitCommand(
 {
     cl_event        commandEvent = gcvNULL;
     gctINT          status;
+    gctUINT         i;
+    gctBOOL         inThread = gcvTRUE;
 
     gcmHEADER_ARG("CommandQueue=0x%x Command=0x%x Blocking=%d",
                   CommandQueue, Command, Blocking);
@@ -2380,6 +2504,18 @@ clfSubmitCommand(
 
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND,
               CL_INVALID_VALUE);
+
+    clfChooseThreadMode(CommandQueue, Command, &inThread);
+
+    clfSwitchInOrderMode(CommandQueue, inThread);
+
+    if(!CommandQueue->inThread)
+    {
+        for (i = 0; i < Command->numEventsInWaitList; ++i)
+        {
+            clfRetainEvent(Command->eventWaitList[i]);
+        }
+    }
 #if cldFSL_OPT
     if (Command->outEvent ||
         Blocking ||
@@ -2414,12 +2550,23 @@ clfSubmitCommand(
         clfRetainEvent(commandEvent);
 
         *Command->outEvent = Command->event;
+
+        /* check if outEvent is from user Command */
+        for (i = 0; i < Command->numEventsInWaitList; i++)
+        {
+            if (Command->eventWaitList[i]->userEvent ||
+                Command->eventWaitList[i]->fromUserCommand)
+            {
+                Command->event->fromUserCommand = gcvTRUE;
+                break;
+            }
+        }
     }
 #if cldFSL_OPT
     /* establish the buffer dependency */
     clfAddCommandDependency(CommandQueue, Command);
 #endif
-    clfAddCommandToCommandQueue(CommandQueue, Command);
+    CommandQueue->processCommandQueue(CommandQueue, Command);
 
     if (Blocking)
     {
@@ -2438,6 +2585,148 @@ OnError:
     return status;
 }
 
+
+static gctINT
+clfProcessCommitInThread(
+    clsCommandQueue_PTR     CommandQueue,
+    clsCommitRequest_PTR    CommitRequest
+    )
+{
+    gceSTATUS           status;
+    gctUINT32           i;
+    gcmDECLARE_SWITCHVARS;
+
+    clfLockCommandList(CommandQueue);
+
+    gcmSWITCH_TO_HW(CommandQueue->hardware);
+
+    /* Handle the commit request */
+    if (CommitRequest->stall)
+    {
+        for (i = 0; i < gcvENGINE_GPU_ENGINE_COUNT; i++)
+        {
+            /* Submit an event command for the signal for clFinish */
+            if(CommitRequest->signal[i])
+            {
+                gcmONERROR(gcoCL_SubmitSignal(CommitRequest->signal[i],
+                    CommandQueue->context->process,
+                    i));
+            }
+        }
+
+        /* Commit all stall event commands to GPU */
+        gcmONERROR(gcoCL_Commit(gcvFALSE));
+    }
+    else
+    {
+        /* Commit all previously queued commands/events to GPU */
+        gcmONERROR(gcoCL_Commit(gcvFALSE));
+
+        for (i  = 0 ; i < gcvENGINE_GPU_ENGINE_COUNT; i++)
+        {
+            /* Wake up the corresponding clFlush thead by signal directly */
+            if(CommitRequest->signal[i])
+            {
+                gcmONERROR(gcoCL_SetSignal(CommitRequest->signal[i]));
+            }
+        }
+    }
+OnError:
+    gcmRESTORE_HW();
+    clfUnlockCommandList(CommandQueue);
+    return (gctINT)status;
+}
+
+static gceSTATUS
+clfCheckPendingEventsListInThread(
+    clsCommandQueue_PTR     CommandQueue,
+    clsCommand_PTR      Command,
+    gctUINT             numEventsInWaitList,
+    const clsEvent_PTR  *eventWaitList
+    )
+{
+    gctUINT             i;
+    gceSTATUS           status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Command=0x%x", Command);
+
+    if (!Command)
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    for (i = 0; i < numEventsInWaitList; i++)
+    {
+        gctINT execution = clfGetEventExecutionStatus(eventWaitList[i]);
+
+        if (clmNO_ERROR(execution))
+        {
+            if (Command->eventWaitList[i]->queue != CommandQueue)
+            {
+                status = gcoCL_WaitSignal(eventWaitList[i]->finishSignal, gcvINFINITE);
+                if (clmIS_ERROR(status))
+                {
+                    break;
+                }
+            }
+        }
+        else
+        {
+            if (Command->event)
+            {
+                clfFinishEvent(Command->event, execution);
+                gcmFOOTER_ARG("status=%d", gcvSTATUS_TERMINATE);
+                return gcvSTATUS_TERMINATE;
+            }
+        }
+    }
+
+    gcmFOOTER_NO();
+    return status;
+}
+
+static gctINT
+clfProcessCommandInThread(
+    clsCommandQueue_PTR     CommandQueue,
+    clsCommand_PTR          Command
+    )
+{
+    gceSTATUS           status = gcvSTATUS_OK;
+    gcmDECLARE_SWITCHVARS;
+    /* Lock the command list in this command queue. */
+    clfLockCommandList(CommandQueue);
+    gcmSWITCH_TO_HW(CommandQueue->hardware);
+    if (Command)
+    {
+        gceSTATUS pendingStatus0 = clfCheckPendingEventsListInThread(CommandQueue, Command, Command->numEventsInWaitList, Command->eventWaitList);
+        gceSTATUS pendingStatus1 = clfCheckPendingEventsListInThread(CommandQueue, Command, Command->internalNumEventsInWaitList, Command->internalEventWaitList);
+
+        if (clmIS_ERROR(pendingStatus0) ||
+            clmIS_ERROR(pendingStatus1))
+        {
+            gcmASSERT(gcvFALSE);
+        }
+
+        if ((pendingStatus0 != gcvSTATUS_TERMINATE) &&
+            (pendingStatus1 != gcvSTATUS_TERMINATE))
+        {
+            clfStartCommand(Command);
+            status = Command->handler(Command);
+
+            if (clmIS_ERROR(clfFinishCommand(Command, status)))
+                goto OnError;
+        }
+    }
+
+OnError:
+    gcmRESTORE_HW();
+    /* Unlock the command list in the command queue. */
+    clfUnlockCommandList(CommandQueue);
+    return (gctINT)status;
+}
+
+
 gctTHREAD_RETURN CL_API_CALL
 clfCommandQueueWorker(
     gctPOINTER Data
@@ -2445,13 +2734,11 @@ clfCommandQueueWorker(
 {
     clsCommandQueue_PTR commandQueue = (clsCommandQueue_PTR) Data;
     clsCommand_PTR      command = gcvNULL;
-    gceSTATUS           status;
     gctBOOL             acquired = gcvFALSE;
+    gcmDECLARE_SWITCHVARS;
 
     /* Use the same hardware for command queue worker. */
-
-    gcmONERROR(gcoCL_SelectDevice(commandQueue->device->gpuId));
-    gcmONERROR(gcoCL_SetHardware());
+    gcmSWITCH_TO_HW(commandQueue->hardware);
 
     while (gcvTRUE)
     {
@@ -2496,8 +2783,10 @@ clfCommandQueueWorker(
         clfUnlockCommandList(commandQueue);
         acquired = gcvFALSE;
     }
-
+    gcmRESTORE_HW();
 OnError:
+
+    gcmRESTORE_HW();
     if (acquired)
     {
         /* Unlock the command list in the command queue. */
@@ -2519,6 +2808,8 @@ clfExecuteCommandMarker(
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
     clmASSERT(Command->type == clvCOMMAND_MARKER, CL_INVALID_VALUE);
 
+    EVENT_SET_CPU_RUNNING(Command);
+
     status = clfRemoveSyncPoint(commandQueue, Command);
 
 OnError:
@@ -2538,6 +2829,8 @@ clfExecuteCommandBarrier(
 
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
     clmASSERT(Command->type == clvCOMMAND_BARRIER, CL_INVALID_VALUE);
+
+    EVENT_SET_CPU_RUNNING(Command);
 
     status = clfRemoveSyncPoint(commandQueue, Command);
 
@@ -2559,10 +2852,134 @@ clfExecuteCommandWaitForEvents(
     clmASSERT(Command && Command->objectType == clvOBJECT_COMMAND, CL_INVALID_VALUE);
     clmASSERT(Command->type == clvCOMMAND_WAIT_FOR_EVENTS, CL_INVALID_VALUE);
 
+    EVENT_SET_CPU_RUNNING(Command);
+
     status = clfRemoveSyncPoint(commandQueue, Command);
 
 OnError:
     gcmFOOTER_ARG("%d", status);
+    return status;
+}
+
+gceSTATUS clfConstructWorkerThread(
+    clsCommandQueue_PTR CommandQueue
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    if (CommandQueue)
+    {
+        if (CommandQueue->workerStartSignal == gcvNULL)
+        {
+            /* Create thread start signal. */
+            clmONERROR(gcoCL_CreateSignal(gcvFALSE,
+                                          &CommandQueue->workerStartSignal),
+                       CL_OUT_OF_HOST_MEMORY);
+        }
+
+        if (CommandQueue->workerStopSignal == gcvNULL)
+        {
+            /* Create thread stop signal. */
+            clmONERROR(gcoCL_CreateSignal(gcvTRUE,
+                                          &CommandQueue->workerStopSignal),
+                       CL_OUT_OF_HOST_MEMORY);
+        }
+
+        if (CommandQueue->workerThread == gcvNULL)
+        {
+            /* Start the worker thread. */
+            clmONERROR(gcoOS_CreateThread(gcvNULL,
+                                          clfCommandQueueWorker,
+                                          CommandQueue,
+                                          &CommandQueue->workerThread),
+                       CL_OUT_OF_HOST_MEMORY);
+        }
+    }
+
+OnError:
+    return status;
+}
+
+gceSTATUS clfDestroyWorkerThread(
+    clsCommandQueue_PTR CommandQueue
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    if (CommandQueue)
+    {
+        /* Send signal to stop worker thread. */
+        if (CommandQueue->workerStopSignal)
+        {
+            gcmONERROR(gcoCL_SetSignal(CommandQueue->workerStopSignal));
+        }
+
+        if (CommandQueue->workerStartSignal)
+        {
+            gcmONERROR(gcoCL_SetSignal(CommandQueue->workerStartSignal));
+        }
+
+        gcmONERROR(gcoCL_Flush(gcvTRUE));
+
+        /* Wait until the thread is closed. */
+        if (CommandQueue->workerThread)
+        {
+            gcoOS_CloseThread(gcvNULL, CommandQueue->workerThread);
+            CommandQueue->workerThread = gcvNULL;
+        }
+
+        /* Free signals and mutex. */
+        if (CommandQueue->workerStartSignal)
+        {
+            gcmVERIFY_OK(gcoCL_DestroySignal(CommandQueue->workerStartSignal));
+            CommandQueue->workerStartSignal = gcvNULL;
+        }
+
+        if (CommandQueue->workerStopSignal)
+        {
+            gcmVERIFY_OK(gcoCL_DestroySignal(CommandQueue->workerStopSignal));
+            CommandQueue->workerStopSignal = gcvNULL;
+        }
+    }
+
+OnError:
+    return status;
+}
+
+gceSTATUS
+clfSwitchInOrderMode(
+    clsCommandQueue_PTR     CommandQueue,
+    gctBOOL                 isInThread
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    if (CommandQueue->inThread != isInThread)
+    {
+        clfFlushCommandQueue(CommandQueue, gcvTRUE);
+
+        clfLockCommandList(CommandQueue);
+
+        if (isInThread)
+        {
+            /*
+            clfDestroyWorkerThread(CommandQueue);
+            */
+            CommandQueue->processCommandQueue = clfProcessCommandInThread;
+            CommandQueue->processCommitRequest = clfProcessCommitInThread;
+        }
+        else
+        {
+            clfConstructWorkerThread(CommandQueue);
+            CommandQueue->processCommandQueue = clfAddCommandToCommandQueue;
+            CommandQueue->processCommitRequest = clfAddCommitRequestToList;
+        }
+
+        CommandQueue->inThread = isInThread;
+
+        clfUnlockCommandList(CommandQueue);
+    }
+
     return status;
 }
 
@@ -2642,25 +3059,7 @@ gceSTATUS clfReleaseCommandQueue(
         /* Unlock the command queue list in the context. */
         clfUnlockCommandQueueList(CommandQueue->context);
 
-#if !cldSEQUENTIAL_EXECUTION
-        /* Send signal to stop worker thread. */
-        gcmONERROR(gcoCL_SetSignal(CommandQueue->workerStopSignal));
-
-        gcmONERROR(gcoCL_SetSignal(CommandQueue->workerStartSignal));
-
-        gcmONERROR(gcoCL_Flush(gcvTRUE));
-
-        /* Wait until the thread is closed. */
-        gcoOS_CloseThread(gcvNULL, CommandQueue->workerThread);
-        CommandQueue->workerThread = gcvNULL;
-
-        /* Free signals and mutex. */
-        gcmVERIFY_OK(gcoCL_DestroySignal(CommandQueue->workerStartSignal));
-        CommandQueue->workerStartSignal = gcvNULL;
-
-        gcmVERIFY_OK(gcoCL_DestroySignal(CommandQueue->workerStopSignal));
-        CommandQueue->workerStopSignal = gcvNULL;
-#endif
+        gcmVERIFY_OK(clfDestroyWorkerThread(CommandQueue));
 
         gcmVERIFY_OK(gcoOS_DeleteMutex(gcvNULL, CommandQueue->syncPointListMutex));
         CommandQueue->syncPointListMutex = gcvNULL;
@@ -2671,7 +3070,7 @@ gceSTATUS clfReleaseCommandQueue(
         /* Destroy the reference count object */
         gcmVERIFY_OK(gcoOS_AtomDestroy(gcvNULL, CommandQueue->referenceCount));
         CommandQueue->referenceCount = gcvNULL;
-
+        gcoCL_DestroyHW(CommandQueue->hardware);
         /* Release context. */
         clfReleaseContext(CommandQueue->context);
 
@@ -2744,6 +3143,7 @@ clCreateCommandQueue(
     }
     /* Allocate command queue. */
     clmONERROR(gcoOS_Allocate(gcvNULL, sizeof(clsCommandQueue), &pointer), CL_OUT_OF_HOST_MEMORY);
+    gcoOS_ZeroMemory(pointer, sizeof(clsCommandQueue));
 
     queue                       = (clsCommandQueue_PTR) pointer;
     queue->dispatch             = Context->dispatch;
@@ -2782,31 +3182,31 @@ clCreateCommandQueue(
     clmONERROR(gcoOS_CreateMutex(gcvNULL,
                                  &queue->syncPointListMutex),
                CL_OUT_OF_HOST_MEMORY);
+    gcmONERROR(gcoCL_CreateHW(queue->device->gpuId, &(queue->hardware)));
 
-#if cldSEQUENTIAL_EXECUTION
     queue->workerStartSignal  = gcvNULL;
     queue->workerStopSignal   = gcvNULL;
     queue->workerThread = gcvNULL;
-#else
-    /* Create worker thread. */
+    queue->inThread = gcvFALSE;
+    if (!(queue->properties & CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE) &&
+        (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_IN_THREAD)))
+    {
+        queue->inThread = gcvTRUE;
+    }
 
-    /* Create thread start signal. */
-    clmONERROR(gcoCL_CreateSignal(gcvFALSE,
-                                  &queue->workerStartSignal),
-               CL_OUT_OF_HOST_MEMORY);
-
-    /* Create thread stop signal. */
-    clmONERROR(gcoCL_CreateSignal(gcvTRUE,
-                                  &queue->workerStopSignal),
-               CL_OUT_OF_HOST_MEMORY);
-
-    /* Start the worker thread. */
-    clmONERROR(gcoOS_CreateThread(gcvNULL,
-                                  clfCommandQueueWorker,
-                                  queue,
-                                  &queue->workerThread),
-               CL_OUT_OF_HOST_MEMORY);
-#endif
+    if (queue->inThread)
+    {
+        queue->processCommandQueue = clfProcessCommandInThread;
+        queue->processCommitRequest = clfProcessCommitInThread;
+    }
+    else
+    {
+        queue->processCommandQueue = clfAddCommandToCommandQueue;
+        queue->processCommitRequest = clfAddCommitRequestToList;
+        /* Create worker thread. */
+        clmONERROR(clfConstructWorkerThread(queue),
+                   CL_OUT_OF_HOST_MEMORY);
+    }
 
     /* Lock the command queue list in the context. */
     clfLockCommandQueueList(Context);

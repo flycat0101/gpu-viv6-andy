@@ -14,7 +14,7 @@
 #include "gc_spirv_disassemble.h"
 
 #define spvPRINT                    gcmPRINT
-#define SPV_DUMP_MAX_SIZE           256
+#define SPV_DUMP_MAX_SIZE           2048
 
 #define SpvDump_Is_ValidId(Id)      ((Id) != SPV_INVALID_ID)
 #define SpvDump_Goto_OnError()      {goto OnError;}
@@ -24,16 +24,6 @@ typedef enum ExtInstSet {
     GLSL450Inst,
     OpenCLExtInst,
 }ExtInstSet;
-
-gctSTRING __SpvKernelProfilingInfoToString(gctUINT info)
-{
-    switch (info)
-    {
-    case 0:  return "CmdExecTime";
-
-    default: return "Bad";
-    }
-}
 
 gctSTRING __SpvKernelEnqueueFlagsToString(gctUINT flag)
 {
@@ -68,58 +58,6 @@ gctSTRING __SpvScopeToString(gctUINT mem)
     case 2:  return "Workgroup";
     case 3:  return "Subgroup";
     case 4:  return "Invocation";
-
-    default: return "Bad";
-    }
-}
-
-gctSTRING __SpvMemoryAccessToString(gctUINT mem)
-{
-    switch (mem) {
-    case 0:  return "Volatile";
-    case 1:  return "Aligned";
-    case 2:  return "Nontemporal";
-
-    default: return "Bad";
-    }
-}
-
-gctSTRING __SpvMemorySemanticsToString(gctUINT mem)
-{
-    // Note: No bits set (None) means "Relaxed"
-    switch (mem) {
-    case 0: return "Bad"; // Note: this is a placeholder for 'Consume'
-    case 1: return "Acquire";
-    case 2: return "Release";
-    case 3: return "AcquireRelease";
-    case 4: return "SequentiallyConsistent";
-    case 5: return "Bad"; // Note: reserved for future expansion
-    case 6: return "UniformMemory";
-    case 7: return "SubgroupMemory";
-    case 8: return "WorkgroupMemory";
-    case 9: return "CrossWorkgroupMemory";
-    case 10: return "AtomicCounterMemory";
-    case 11: return "ImageMemory";
-
-    default:     return "Bad";
-    }
-}
-
-gctSTRING __SpvLoopControlToString(gctUINT cont)
-{
-    switch (cont) {
-    case 0:  return "Unroll";
-    case 1:  return "DontUnroll";
-
-    default: return "Bad";
-    }
-}
-
-gctSTRING __SpvSelectControlToString(gctUINT cont)
-{
-    switch (cont) {
-    case 0:  return "Flatten";
-    case 1:  return "DontFlatten";
 
     default: return "Bad";
     }
@@ -160,36 +98,6 @@ gctSTRING __SpvFPRoundingModeToString(gctUINT mode)
     case 3:  return "RTN";
 
     default: return "Bad";
-    }
-}
-
-gctSTRING __SpvFPFastMathToString(gctUINT mode)
-{
-    switch (mode) {
-    case 0: return "NotNaN";
-    case 1: return "NotInf";
-    case 2: return "NSZ";
-    case 3: return "AllowRecip";
-    case 4: return "Fast";
-
-    default:     return "Bad";
-    }
-}
-
-gctSTRING __SpvImageOperandsToString(gctUINT format)
-{
-    switch (format) {
-    case 0: return "Bias";
-    case 1: return "Lod";
-    case 2: return "Grad";
-    case 3: return "ConstOffset";
-    case 4: return "Offset";
-    case 5: return "ConstOffsets";
-    case 6: return "Sample";
-    case 7: return "MinLod";
-
-    default:
-        return "Bad";
     }
 }
 
@@ -266,18 +174,6 @@ gctSTRING __SpvSamplerAddressingModeToString(gctUINT mode)
     case 2:  return "Clamp";
     case 3:  return "Repeat";
     case 4:  return "RepeatMirrored";
-
-    default: return "Bad";
-    }
-}
-
-gctSTRING __SpvFunctionControlToString(gctUINT cont)
-{
-    switch (cont) {
-    case 0:  return "Inline";
-    case 1:  return "DontInline";
-    case 2:  return "Pure";
-    case 3:  return "Const";
 
     default: return "Bad";
     }
@@ -1079,29 +975,6 @@ gctSTRING __SpvDumpIds(SpvId *Ids, gctUINT numOperands)
     return line;
 }
 
-gctBOOL __SpvIsOperandHasBitmask(SpvOperandClass operandClass)
-{
-    gctBOOL hasBitmask = gcvFALSE;
-
-    switch (operandClass)
-    {
-    case OperandImageOperands:
-    case OperandFPFastMath:
-    case OperandSelect:
-    case OperandLoop:
-    case OperandFunction:
-    case OperandMemorySemantics:
-    case OperandMemoryAccess:
-    case OperandKernelProfilingInfo:
-        hasBitmask = gcvTRUE;
-        break;
-    default:
-        break;
-    }
-
-    return hasBitmask;
-}
-
 gctSTRING __SpvDumpGeneralOperand(
     SpvOperandClass operandClass,
     gctUINT * stream,
@@ -1120,28 +993,20 @@ gctSTRING __SpvDumpGeneralOperand(
     case OperandSource:             dumpString = __SpvSourceToString(dumpId); break;
     case OperandDecoration:         dumpString = __SpvDecorationToString(dumpId); break;
     case OperandStorage:            dumpString = __SpvStorageClassToString(dumpId); break;
-    case OperandFunction:           dumpString = __SpvFunctionControlToString(dumpId); break;
     case OperandDimensionality:     dumpString = __SpvDimensionToString(dumpId); break;
     case OperandSamplerAddressingMode:  dumpString = __SpvSamplerAddressingModeToString(dumpId); break;
     case OperandSamplerFilterMode:  dumpString = __SpvSamplerFilterModeToString(dumpId); break;
     case OperandSamplerImageFormat: dumpString = __SpvImageFormatToString(dumpId); break;
     case OperandImageChannelOrder:  dumpString = __SpvImageChannelOrderToString(dumpId); break;
     case OperandImageChannelDataType: dumpString = __SpvImageChannelDataTypeToString(dumpId); break;
-    case OperandImageOperands:      dumpString = __SpvImageOperandsToString(dumpId); break;
-    case OperandFPFastMath:         dumpString = __SpvFPFastMathToString(dumpId); break;
     case OperandFPRoundingMode:     dumpString = __SpvFPRoundingModeToString(dumpId); break;
     case OperandLinkageType:        dumpString = __SpvLinkageTypeToString(dumpId); break;
     case OperandFuncParamAttr:      dumpString = __SpvFuncParamAttrToString(dumpId); break;
     case OperandAccessQualifier:    dumpString = __SpvAccessQualifierToString(dumpId); break;
     case OperandBuiltIn:            dumpString = __SpvBuiltInToString(dumpId); break;
-    case OperandSelect:             dumpString = __SpvSelectControlToString(dumpId); break;
-    case OperandLoop:               dumpString = __SpvLoopControlToString(dumpId); break;
-    case OperandMemorySemantics:    dumpString = __SpvMemorySemanticsToString(dumpId); break;
-    case OperandMemoryAccess:       dumpString = __SpvMemoryAccessToString(dumpId); break;
     case OperandScope:              dumpString = __SpvScopeToString(dumpId); break;
     case OperandGroupOperation:     dumpString = __SpvGroupOperationToString(dumpId); break;
     case OperandKernelEnqueueFlags: dumpString = __SpvKernelEnqueueFlagsToString(dumpId); break;
-    case OperandKernelProfilingInfo:dumpString = __SpvKernelProfilingInfoToString(dumpId); break;
     case OperandOpcode:             dumpString = __SpvOpcodeToString(dumpId); break;
     default: break;
     }
@@ -1149,33 +1014,238 @@ gctSTRING __SpvDumpGeneralOperand(
     return dumpString;
 }
 
-gctSTRING __SpvDumpMask(
-    SpvOperandClass operandClass,
-    gctUINT * stream,
-    gctUINT word)
+void __SpvDumpImageOperandMask(
+    gctCHAR*Line,
+    gctUINT*Offset,
+    gctUINT Mask)
 {
-    static gctCHAR line[SPV_DUMP_MAX_SIZE];
-    gctUINT offset = 0;
     gctUINT i;
-    gctUINT mask = stream[word];
+    gctSTRING masks[SPV_MAX_IMAGE_OPERAND_MASK] = {"Bias", "Lod", "Grad", "ConstOffset", "Offset", "ConstOffsets", "Sample", "MinLod"};
 
-    if (mask == 0)
+    if (Mask == 0)
     {
-        return "None";
+        gcoOS_PrintStrSafe(Line,
+                            SPV_DUMP_MAX_SIZE - 1,
+                            Offset,
+                            "None ");
     }
-    else
-    {
-        i = 0;
-        while (mask & (1 << i))
-        {
-            gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s ", __SpvDumpGeneralOperand(operandClass, stream, word));
 
-            mask &= ~(1 << i);
-            i++;
+    for (i = 0; i < SPV_MAX_IMAGE_OPERAND_MASK; i++)
+    {
+        if (Mask & (1 << i))
+        {
+            gcoOS_PrintStrSafe(Line,
+                               SPV_DUMP_MAX_SIZE - 1,
+                               Offset,
+                               "%s ",
+                               masks[i]);
         }
     }
+}
 
-    return line;
+void __SpvDumpFPFastMathMask(
+    gctCHAR*Line,
+    gctUINT*Offset,
+    gctUINT Mask)
+{
+    gctUINT i;
+    gctSTRING masks[5] = {"NotNaN", "NotInf", "NSZ", "AllowRecip", "Fast"};
+
+    if (Mask == 0)
+    {
+        gcoOS_PrintStrSafe(Line,
+                           SPV_DUMP_MAX_SIZE - 1,
+                           Offset,
+                           "None ");
+    }
+
+    for (i = 0; i < sizeof(masks) / sizeof(gctSTRING); i++)
+    {
+        if (Mask & (1 << i))
+        {
+            gcoOS_PrintStrSafe(Line,
+                               SPV_DUMP_MAX_SIZE - 1,
+                               Offset,
+                               "%s ",
+                               masks[i]);
+        }
+    }
+}
+
+void __SpvDumpSelectMask(
+    gctCHAR*Line,
+    gctUINT*Offset,
+    gctUINT Mask)
+{
+    gctUINT i;
+    gctSTRING masks[2] = {"Flatten", "DontFlatten"};
+
+    if (Mask == 0)
+    {
+        gcoOS_PrintStrSafe(Line,
+                           SPV_DUMP_MAX_SIZE - 1,
+                           Offset,
+                           "None ");
+    }
+
+    for (i = 0; i < sizeof(masks) / sizeof(gctSTRING); i++)
+    {
+        if (Mask & (1 << i))
+        {
+            gcoOS_PrintStrSafe(Line,
+                               SPV_DUMP_MAX_SIZE - 1,
+                               Offset,
+                               "%s ",
+                               masks[i]);
+        }
+    }
+}
+
+void __SpvDumpLoopMask(
+    gctCHAR*Line,
+    gctUINT*Offset,
+    gctUINT Mask)
+{
+    gctUINT i;
+    gctSTRING masks[2] = {"Unroll", "DontUnroll"};
+
+    if (Mask == 0)
+    {
+        gcoOS_PrintStrSafe(Line,
+                           SPV_DUMP_MAX_SIZE - 1,
+                           Offset,
+                           "None ");
+    }
+
+    for (i = 0; i < sizeof(masks) / sizeof(gctSTRING); i++)
+    {
+        if (Mask & (1 << i))
+        {
+            gcoOS_PrintStrSafe(Line,
+                               SPV_DUMP_MAX_SIZE - 1,
+                               Offset,
+                               "%s ",
+                               masks[i]);
+        }
+    }
+}
+
+void __SpvDumpFunctionControlMask(
+    gctCHAR*Line,
+    gctUINT*Offset,
+    gctUINT Mask)
+{
+    gctUINT i;
+    gctSTRING masks[4] = {"Inline", "DontInline", "Pure", "Const"};
+
+    if (Mask == 0)
+    {
+        gcoOS_PrintStrSafe(Line,
+                           SPV_DUMP_MAX_SIZE - 1,
+                           Offset,
+                           "None ");
+    }
+
+    for (i = 0; i < sizeof(masks) / sizeof(gctSTRING); i++)
+    {
+        if (Mask & (1 << i))
+        {
+            gcoOS_PrintStrSafe(Line,
+                               SPV_DUMP_MAX_SIZE - 1,
+                               Offset,
+                               "%s ",
+                               masks[i]);
+        }
+    }
+}
+
+void __SpvDumpMemorySemanticsMask(
+    gctCHAR*Line,
+    gctUINT*Offset,
+    gctUINT Mask)
+{
+    gctUINT i;
+    gctSTRING masks[12] = {"Bad", "Acquire", "Release", "AcquireRelease", "SequentiallyConsistent", "Bad",
+                           "UniformMemory", "SubgroupMemory", "WorkgroupMemory", "CrossWorkgroupMemory",
+                           "AtomicCounterMemory", "ImageMemory"};
+
+    if (Mask == 0)
+    {
+        gcoOS_PrintStrSafe(Line,
+                           SPV_DUMP_MAX_SIZE - 1,
+                           Offset,
+                           "None ");
+    }
+
+    for (i = 0; i < sizeof(masks) / sizeof(gctSTRING); i++)
+    {
+        if (Mask & (1 << i))
+        {
+            gcoOS_PrintStrSafe(Line,
+                               SPV_DUMP_MAX_SIZE - 1,
+                               Offset,
+                               "%s ",
+                               masks[i]);
+        }
+    }
+}
+
+void __SpvDumpMemoryAccessMask(
+    gctCHAR*Line,
+    gctUINT*Offset,
+    gctUINT Mask)
+{
+    gctUINT i;
+    gctSTRING masks[3] = {"Volatile", "Aligned", "Nontemporal"};
+
+    if (Mask == 0)
+    {
+        gcoOS_PrintStrSafe(Line,
+                           SPV_DUMP_MAX_SIZE - 1,
+                           Offset,
+                           "None ");
+    }
+
+    for (i = 0; i < sizeof(masks) / sizeof(gctSTRING); i++)
+    {
+        if (Mask & (1 << i))
+        {
+            gcoOS_PrintStrSafe(Line,
+                               SPV_DUMP_MAX_SIZE - 1,
+                               Offset,
+                               "%s ",
+                               masks[i]);
+        }
+    }
+}
+
+void __SpvDumpKernelProfilingInfoMask(
+    gctCHAR*Line,
+    gctUINT*Offset,
+    gctUINT Mask)
+{
+    gctUINT i;
+    gctSTRING masks[1] = {"CmdExecTime"};
+
+    if (Mask == 0)
+    {
+        gcoOS_PrintStrSafe(Line,
+                           SPV_DUMP_MAX_SIZE - 1,
+                           Offset,
+                           "None ");
+    }
+
+    for (i = 0; i < sizeof(masks) / sizeof(gctSTRING); i++)
+    {
+        if (Mask & (1 << i))
+        {
+            gcoOS_PrintStrSafe(Line,
+                               SPV_DUMP_MAX_SIZE - 1,
+                               Offset,
+                               "%s ",
+                               masks[i]);
+        }
+    }
 }
 
 gceSTATUS __SpvDumpValidator(
@@ -1265,23 +1335,12 @@ gceSTATUS __SpvDumpLine(
         {
         case OperandId:
         case OperandScope:
-        case OperandMemorySemantics:
             gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s ", __SpvDumpId(stream[word++]));
             --numOperands;
             break;
 
         case OperandVariableIds:
             gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s ", __SpvDumpIds(&stream[word], numOperands));
-            SpvDump_Goto_OnError();
-            break;
-
-        case OperandImageOperands:
-            gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s ", __SpvDumpMask(operandClass, stream, word));
-            word++;
-            --numOperands;
-
-            gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s ", __SpvDumpIds(&stream[word], numOperands));
-
             SpvDump_Goto_OnError();
             break;
 
@@ -1345,17 +1404,58 @@ gceSTATUS __SpvDumpLine(
             }
             break;
 
+        case OperandImageOperands:
+            __SpvDumpImageOperandMask(line, &offset, stream[word]);
+            word++;
+            --numOperands;
+            break;
+
+        case OperandFPFastMath:
+            __SpvDumpFPFastMathMask(line, &offset, stream[word]);
+            word++;
+            --numOperands;
+            break;
+
+        case OperandSelect:
+            __SpvDumpSelectMask(line, &offset, stream[word]);
+            word++;
+            --numOperands;
+            break;
+
+        case OperandLoop:
+            __SpvDumpLoopMask(line, &offset, stream[word]);
+            word++;
+            --numOperands;
+            break;
+
+        case OperandFunction:
+            __SpvDumpFunctionControlMask(line, &offset, stream[word]);
+            word++;
+            --numOperands;
+            break;
+
+        case OperandMemorySemantics:
+            __SpvDumpMemorySemanticsMask(line, &offset, stream[word]);
+            word++;
+            --numOperands;
+            break;
+
+        case OperandMemoryAccess:
+            __SpvDumpMemoryAccessMask(line, &offset, stream[word]);
+            word++;
+            --numOperands;
+            break;
+
+        case OperandKernelProfilingInfo:
+            __SpvDumpKernelProfilingInfoMask(line, &offset, stream[word]);
+            word++;
+            --numOperands;
+            break;
+
         default:
             gcmASSERT(operandClass >= OperandSource && operandClass < OperandOpcode);
 
-            if (__SpvIsOperandHasBitmask(operandClass))
-            {
-                gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s ", __SpvDumpMask(operandClass, stream, word));
-            }
-            else
-            {
-                gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s ", __SpvDumpGeneralOperand(operandClass, stream, word));
-            }
+            gcoOS_PrintStrSafe(line, SPV_DUMP_MAX_SIZE - 1, &offset, "%s ", __SpvDumpGeneralOperand(operandClass, stream, word));
 
             word++;
             --numOperands;

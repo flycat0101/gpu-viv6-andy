@@ -109,15 +109,22 @@ gal_is_dest_format( void                  *dev,
                  (color == DSPF_RGB16)    || /* R5G6B5 */
                  (color == DSPF_RGB555)   || /* X1R5G5B5 */
                  (color == DSPF_RGB444)   || /* X4R4G4B4 */
-                 (color == DSPF_RGB32));     /* X8R8G8B8 */
+                 (color == DSPF_RGB32)    || /* X8R8G8B8 */
+                 (color == DSPF_YUY2)     || /* YUY2 */
+                 (color == DSPF_UYVY));      /* UYVY */
 
     if (!supported && vdev->hw_2d_pe20) {
         supported = ((color == DSPF_BGR555)    || /* B5G5R5X1 */
 #if (DIRECTFB_MAJOR_VERSION >= 1) && (DIRECTFB_MINOR_VERSION >= 4)
                      (color == DSPF_RGBA4444 ) || /* R4G4B4A4 */
 #endif
-                     (color == DSPF_A8)        || /* A8 */
-                     (color == DSPF_YUY2));       /* YUY2 */
+                     (color == DSPF_A8));         /* A8 */
+    }
+
+    if (!supported && vdev->hw_yuv420_output) {
+        supported = ((color == DSPF_NV12)     || /* NV12 */
+                     (color == DSPF_NV21)     || /* NV21 */
+                     (color == DSPF_NV16));      /* NV16 */
     }
 
     return supported;

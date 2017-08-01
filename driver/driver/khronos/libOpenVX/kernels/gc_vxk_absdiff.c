@@ -37,7 +37,7 @@ vx_status vxAbsDiff(vx_node node, vx_image in1, vx_image in2, vx_image output)
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(in1, VX_IMAGE_ATTRIBUTE_FORMAT, &inputFormat, sizeof(vx_df_image));
+    vxQueryImage(in1, VX_IMAGE_FORMAT, &inputFormat, sizeof(vx_df_image));
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, in1, GC_VX_INDEX_AUTO);

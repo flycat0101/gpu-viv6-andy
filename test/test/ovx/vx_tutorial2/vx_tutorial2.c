@@ -108,6 +108,8 @@ int main(int argc, char* argv[])
     u32 x = 0, y = 0;
     int status = -1;
 
+    vx_map_id map_id = 0;
+
     /* read image data */
     srcFile = fopen("lena_gray.bmp", "rb");
     if(NULL==srcFile)
@@ -178,7 +180,7 @@ int main(int argc, char* argv[])
             imgRect.end_x = imgWid;
             imgRect.end_y = imgHei;
 
-            if(VX_SUCCESS!=vxSetThresholdAttribute(thrObj, VX_THRESHOLD_ATTRIBUTE_THRESHOLD_VALUE, &thrVal, sizeof(thrVal)))
+            if(VX_SUCCESS!=vxSetThresholdAttribute(thrObj, VX_THRESHOLD_THRESHOLD_VALUE, &thrVal, sizeof(thrVal)))
             {
                 printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
@@ -224,7 +226,7 @@ int main(int argc, char* argv[])
     }
 
     /* transfer image from cpu to gpu */
-    if(VX_SUCCESS!=vxAccessImagePatch(imgObj[0], &imgRect, 0, &imgInfo[0], &imgAddr[0], VX_WRITE_ONLY))
+    if(VX_SUCCESS != vxMapImagePatch(imgObj[0], &imgRect, 0, &map_id, &imgInfo[0], &imgAddr[0], VX_WRITE_ONLY, VX_MEMORY_TYPE_HOST, 0))
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
@@ -249,7 +251,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    if(VX_SUCCESS!=vxCommitImagePatch(imgObj[0], &imgRect, 0, &(imgInfo[0]), imgAddr[0]))
+    if(VX_SUCCESS!=vxUnmapImagePatch(imgObj[0], map_id))
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
@@ -268,7 +270,7 @@ int main(int argc, char* argv[])
     }
 
     /* transfer image from gpu to cpu */
-    if(VX_SUCCESS!=vxAccessImagePatch(imgObj[1], &imgRect, 0, &(imgInfo[1]), &imgAddr[1], VX_READ_ONLY))
+    if(VX_SUCCESS!=vxMapImagePatch(imgObj[1], &imgRect, 0, &map_id, &imgInfo[1], &imgAddr[1], VX_READ_ONLY, VX_MEMORY_TYPE_HOST, 0))
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 
@@ -293,7 +295,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    if(VX_SUCCESS!=vxCommitImagePatch(imgObj[1], NULL, 0, &(imgInfo[1]), imgAddr[1]))
+    if(VX_SUCCESS!=vxUnmapImagePatch(imgObj[1], map_id))
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
 

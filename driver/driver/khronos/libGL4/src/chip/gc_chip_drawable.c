@@ -1087,6 +1087,11 @@ GLboolean __glChipSwapBuffers(__GLcontext *gc,
     resolveRenderTargetToScreen(gc);
     exchangeBufferHandles(gc, draw, !bSwapFront);
 
+    if (gc->profiler.enable)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_FRAME_END, 0);
+    }
+
     /* Success. */
     return retValue;
 }

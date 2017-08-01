@@ -11,10 +11,29 @@
 *****************************************************************************/
 
 
-#ifndef _OPENVX_INTERFACE_H_
-#define _OPENVX_INTERFACE_H_
+#ifndef _GC_INTERFACE_H_
+#define _GC_INTERFACE_H_
 
 #include <gc_vxk_common.h>
+
+extern vx_kernel_description_s internalkernel_NNConvolutionReluCnnLayer;
+extern vx_kernel_description_s internalkernel_NNConvolutionReluPoolingCnnLayer;
+extern vx_kernel_description_s internalkernel_NNFullyConnectedReluLayer;
+extern vx_kernel_description_s internalkernel_NNSoftmaxLayer;
+extern vx_kernel_description_s internalkernel_NNNormalization;
+extern vx_kernel_description_s internalkernel_NNNormalizeImage;
+extern vx_kernel_description_s internalkernel_NNPoolingLayer;
+extern vx_kernel_description_s internalkernel_NNFullyConnectedLayer;
+extern vx_kernel_description_s internalkernel_NNActivationLayer;
+extern vx_kernel_description_s internalkernel_NNTensorAdd;
+extern vx_kernel_description_s internalkernel_NNTensorSub;
+extern vx_kernel_description_s internalkernel_NNTensorMul;
+extern vx_kernel_description_s internalkernel_NNLeakyReluLayer;
+extern vx_kernel_description_s internalkernel_NNBatchNormLayer;
+extern vx_kernel_description_s internalkernel_NNRPNLayer;
+extern vx_kernel_description_s internalkernel_NNROIPoolLayer;
+extern vx_kernel_description_s internalkernel_NNConcat2Layer;
+extern vx_kernel_description_s internalkernel_NNConvolutionLayer;
 
 VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Invalid(vx_node node, const vx_reference paramTable[], vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInvalid_ValidateInput(vx_node node, vx_uint32 index);
@@ -25,6 +44,7 @@ VX_PRIVATE_API vx_kernel_description_s invalid_kernel = {
     "org.khronos.openvx.invalid",
     vxoBaseKernel_Invalid,
     invalid_kernel_params, 0,
+    NULL,
     vxoInvalid_ValidateInput,
     vxoInvalid_ValidateOutput,
     NULL,
@@ -79,6 +99,7 @@ vx_kernel_description_s basekernel_colorconvert = {
     "org.khronos.openvx.color_convert",
     vxoBaseKernel_ColorConvert,
     basekernel_colorConvert_params, vxmLENGTH_OF(basekernel_colorConvert_params),
+    NULL,
     vxoColorConvert_ValidateInput,
     vxoColorConvert_ValidateOutput,
     NULL,
@@ -102,6 +123,7 @@ vx_kernel_description_s basekernel_channelextract = {
     "org.khronos.openvx.channel_extract",
     vxoBaseKernel_ChannelExtract,
     basekernel_channelExtract_params, vxmLENGTH_OF(basekernel_channelExtract_params),
+    NULL,
     vxoChannelExtract_ValidateInput,
     vxoChannelExtract_ValidateOutput,
     NULL,
@@ -121,6 +143,7 @@ vx_kernel_description_s basekernel_channelcombine = {
     "org.khronos.openvx.channel_combine",
     vxoBaseKernel_ChannelCombine,
     basekernel_channelCombine_params, vxmLENGTH_OF(basekernel_channelCombine_params),
+    NULL,
     vxoChannelCombine_ValidateInput,
     vxoChannelCombine_ValidateOutput,
     NULL,
@@ -141,6 +164,7 @@ vx_kernel_description_s basekernel_sobel3x3 = {
     "org.khronos.openvx.sobel_3x3",
     vxoBaseKernel_Sobel3x3,
     basekernel_Sobel3x3_params, vxmLENGTH_OF(basekernel_Sobel3x3_params),
+    NULL,
     vxoSobel3x3_ValidateInput,
     vxoSobel3x3_ValidateOutput,
     NULL,
@@ -161,6 +185,7 @@ vx_kernel_description_s basekernel_magnitude = {
     "org.khronos.openvx.magnitude",
     vxoBaseKernel_Magnitude,
     basekernel_magnitude_params, vxmLENGTH_OF(basekernel_magnitude_params),
+    NULL,
     vxoMagnitude_ValidateInput,
     vxoMagnitude_ValidateOutput,
     NULL,
@@ -184,6 +209,7 @@ vx_kernel_description_s basekernel_phase = {
     "org.khronos.openvx.phase",
     vxoBaseKernel_Phase,
     basekernel_phase_params, vxmLENGTH_OF(basekernel_phase_params),
+    NULL,
     vxoPhase_ValidateInput,
     vxoPhase_ValidateOutput,
     NULL,
@@ -207,6 +233,7 @@ vx_kernel_description_s basekernel_lut = {
     "org.khronos.openvx.table_lookup",
     vxoBaseKernel_TableLookup,
     basekernel_lut_params, vxmLENGTH_OF(basekernel_lut_params),
+    NULL,
     vxoTableLookup_ValidateInput,
     vxoTableLookup_ValidateOutput,
     NULL,
@@ -228,6 +255,7 @@ vx_kernel_description_s basekernel_scale_image = {
     "org.khronos.openvx.scale_image",
     vxoBaseKernel_ScaleImage,
     basekernel_scale_params, vxmLENGTH_OF(basekernel_scale_params),
+    NULL,
     vxoScaleImage_ValidateInput,
     vxoScaleImage_ValidateOutput,
     vxoScaleImage_Initializer,
@@ -244,6 +272,7 @@ vx_kernel_description_s basekernel_halfscale_gaussian = {
     "org.khronos.openvx.halfscale_gaussian",
     vxoBasekernel_HalfscaleGaussian,
     basekernel_scale_params, vxmLENGTH_OF(basekernel_scale_params),
+    NULL,
     vxoHalfscaleGaussian_ValidateInput,
     vxoHalfscaleGaussian_ValidateOutput,
     vxoHalfscaleGaussian_Initializer,
@@ -263,6 +292,7 @@ vx_kernel_description_s basekernel_histogram = {
     "org.khronos.openvx.histogram",
     vxoBaseKernel_Histogram,
     basekernel_histogram_params, vxmLENGTH_OF(basekernel_histogram_params),
+    NULL,
     vxoHistogram_ValidateInput,
     vxoHistogram_ValidateOutput,
     NULL,
@@ -284,6 +314,7 @@ vx_kernel_description_s basekernel_equalize_hist = {
     "org.khronos.openvx.equalize_histogram",
     vxoBaseKernel_EqualizeHist,
     basekernel_equalize_hist_params, vxmLENGTH_OF(basekernel_equalize_hist_params),
+    NULL,
     vxoEqualizeHist_ValidateInput,
     vxoEqualizeHist_ValidateOutput,
     vxoEqualizeHist_Initializer,
@@ -304,6 +335,7 @@ vx_kernel_description_s basekernel_absdiff = {
     "org.khronos.openvx.absdiff",
     vxoBaseKernel_AbsDiff,
     basekernel_absdiff_params, vxmLENGTH_OF(basekernel_absdiff_params),
+    NULL,
     vxoAbsDiff_ValidateInput,
     vxoAbsDiff_ValidateOutput,
     NULL,
@@ -324,6 +356,7 @@ vx_kernel_description_s basekernel_mean_stddev = {
     "org.khronos.openvx.mean_stddev",
     vxoBaseKernel_MeanStdDev,
     basekernel_mean_stddev_params, vxmLENGTH_OF(basekernel_mean_stddev_params),
+    NULL,
     vxoMeanStdDev_ValidateInput,
     vxoMeanStdDev_ValidateOutput,
     NULL,
@@ -344,6 +377,7 @@ vx_kernel_description_s basekernel_threshold = {
     "org.khronos.openvx.threshold",
     vxoBaseKernel_Threshold,
     basekernel_threshold_params, vxmLENGTH_OF(basekernel_threshold_params),
+    NULL,
     vxoThreshold_ValidateInput,
     vxoThreshold_ValidatorOutput,
     NULL,
@@ -365,6 +399,7 @@ vx_kernel_description_s basekernel_integral_image = {
     "org.khronos.openvx.integral_image",
     vxoBaseKernel_IntegralImage,
     basekernel_integral_image_params, vxmLENGTH_OF(basekernel_integral_image_params),
+    NULL,
     vxoIntegral_ValidateInput,
     vxoIntegral_ValidateOutput,
     vxoIntegral_Initializer,
@@ -384,6 +419,7 @@ vx_kernel_description_s basekernel_erode3x3 = {
     "org.khronos.openvx.erode_3x3",
     vxoBaseKernel_Erode3x3,
     basekernel_morphology_params, vxmLENGTH_OF(basekernel_morphology_params),
+    NULL,
     vxoMorphology_ValidateInput,
     vxoMorphology_ValidateOutput,
     NULL,
@@ -396,6 +432,7 @@ vx_kernel_description_s basekernel_dilate3x3 = {
     "org.khronos.openvx.dilate_3x3",
     vxoBaseKernel_Dilate3x3,
     basekernel_morphology_params, vxmLENGTH_OF(basekernel_morphology_params),
+    NULL,
     vxoMorphology_ValidateInput,
     vxoMorphology_ValidateOutput,
     NULL,
@@ -415,6 +452,7 @@ vx_kernel_description_s basekernel_box3x3 = {
     "org.khronos.openvx.box_3x3:default",
     vxoBaseKernel_Box3x3,
     basekernel_filter_params, vxmLENGTH_OF(basekernel_filter_params),
+    NULL,
     vxoFilter_ValidateInput,
     vxoFilter_ValidateOutput,
 };
@@ -424,6 +462,7 @@ vx_kernel_description_s basekernel_box3x3_2 = {
     "org.khronos.openvx.box_3x3:duplicate",
     vxoBaseKernel_Box3x3,
     basekernel_filter_params, vxmLENGTH_OF(basekernel_filter_params),
+    NULL,
     vxoFilter_ValidateInput,
     vxoFilter_ValidateOutput,
 };
@@ -434,6 +473,7 @@ vx_kernel_description_s basekernel_median3x3 = {
     "org.khronos.openvx.median_3x3",
     vxoBaseKernel_Median3x3,
     basekernel_filter_params, vxmLENGTH_OF(basekernel_filter_params),
+    NULL,
     vxoFilter_ValidateInput,
     vxoFilter_ValidateOutput,
 };
@@ -444,6 +484,7 @@ vx_kernel_description_s basekernel_gaussian3x3 = {
     "org.khronos.openvx.gaussian_3x3",
     vxoBaseKernel_Gaussian3x3,
     basekernel_filter_params, vxmLENGTH_OF(basekernel_filter_params),
+    NULL,
     vxoFilter_ValidateInput,
     vxoFilter_ValidateOutput,
 };
@@ -462,6 +503,7 @@ vx_kernel_description_s basekernel_convolution = {
     "org.khronos.openvx.custom_convolution",
     vxoBasekernel_Convolve,
     basekernel_convolution_params, vxmLENGTH_OF(basekernel_convolution_params),
+    NULL,
     vxoConvolve_ValidateInput,
     vxoConvolve_ValidateOutput,
     NULL,
@@ -483,10 +525,82 @@ vx_kernel_description_s basekernel_pyramid = {
     "org.khronos.openvx.gaussian_pyramid",
     vxoBaseKernel_Pyramid,
     basekernel_pyramid_params, vxmLENGTH_OF(basekernel_pyramid_params),
+    NULL,
     vxoPyramid_ValidateInput,
     vxoPyramid_ValidateOutput,
     vxoPyramid_Initializer,
     vxoPyramid_Deinitializer,
+};
+
+static vx_param_description_s basekernel_laplacian_pyramid_params[] =
+{
+    { VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED },
+    { VX_OUTPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED },
+    { VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED },
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_LaplacianPyramid(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianPyramid_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianPyramid_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianPyramid_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianPyramid_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+vx_kernel_description_s basekernel_laplacian_pyramid = {
+    VX_KERNEL_LAPLACIAN_PYRAMID,
+    "org.khronos.openvx.laplacianpyramid",
+    vxoBaseKernel_LaplacianPyramid,
+    basekernel_laplacian_pyramid_params, vxmLENGTH_OF(basekernel_laplacian_pyramid_params),
+    NULL,
+    vxoLaplacianPyramid_ValidateInput,
+    vxoLaplacianPyramid_ValidateOutput,
+    vxoLaplacianPyramid_Initializer,
+    vxoLaplacianPyramid_Deinitializer,
+};
+
+static vx_param_description_s basekernel_laplacian_reconstruct_params[] =
+{
+    { VX_INPUT, VX_TYPE_PYRAMID, VX_PARAMETER_STATE_REQUIRED },
+    { VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED },
+    { VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED },
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_LaplacianReconstruct(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_ValidateInput(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoLaplacianReconstruct_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+vx_kernel_description_s basekernel_laplacian_reconstruct = {
+    VX_KERNEL_LAPLACIAN_RECONSTRUCT,
+    "org.khronos.openvx.laplacianreconstruct",
+    vxoBaseKernel_LaplacianReconstruct,
+    basekernel_laplacian_reconstruct_params, vxmLENGTH_OF(basekernel_laplacian_reconstruct_params),
+    NULL,
+    vxoLaplacianReconstruct_ValidateInput,
+    vxoLaplacianReconstruct_ValidateOutput,
+    vxoLaplacianReconstruct_Initializer,
+    vxoLaplacianReconstruct_Deinitializer,
+};
+
+
+static vx_param_description_s basekernel_filter_kernel_params[] = {
+    { VX_INPUT, VX_TYPE_SCALAR, VX_PARAMETER_STATE_REQUIRED },
+    { VX_INPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED },
+    { VX_INPUT, VX_TYPE_MATRIX, VX_PARAMETER_STATE_REQUIRED },
+    { VX_OUTPUT, VX_TYPE_IMAGE, VX_PARAMETER_STATE_REQUIRED },
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxNonLinearFilterInputValidator(vx_node node, vx_uint32 index);
+VX_PRIVATE_API vx_status VX_CALLBACK vxNonLinearFilterOutputValidator(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxNonLinearFilterKernel(vx_node node, const vx_reference *parameters, vx_uint32 num);
+vx_kernel_description_s basekernel_nonlinear_filter = {
+    VX_KERNEL_NON_LINEAR_FILTER,
+    "org.khronos.openvx.non_linear_filter",
+    vxNonLinearFilterKernel,
+    basekernel_filter_kernel_params, vxmLENGTH_OF(basekernel_filter_kernel_params),
+    NULL,
+    vxNonLinearFilterInputValidator,
+    vxNonLinearFilterOutputValidator,
+    NULL,
+    NULL,
 };
 
 static vx_param_description_s accumulate_kernel_params[] = {
@@ -508,6 +622,7 @@ vx_kernel_description_s basekernel_accumulate = {
     "org.khronos.openvx.accumulate",
     vxoBaseKernel_Accumulate,
     accumulate_kernel_params, vxmLENGTH_OF(accumulate_kernel_params),
+    NULL,
     vxoAccumulate_ValidateInput,
     vxoAccumulate_ValidateOutput,
     NULL,
@@ -521,6 +636,7 @@ vx_kernel_description_s basekernel_accumulate_weighted = {
     "org.khronos.openvx.accumulate_weighted",
     vxoBaseKernel_AccumulateWeighted,
     accumulate_scaled_kernel_params, vxmLENGTH_OF(accumulate_scaled_kernel_params),
+    NULL,
     vxoAccumulateWeighted_ValidateInput,
     vxoAccumulate_ValidateOutput,
     NULL,
@@ -534,6 +650,7 @@ vx_kernel_description_s basekernel_accumulate_square = {
     "org.khronos.openvx.accumulate_square",
     vxoBaseKernel_AccumulateSquare,
     accumulate_scaled_kernel_params, vxmLENGTH_OF(accumulate_scaled_kernel_params),
+    NULL,
     vxoAccumulateSquared_ValidateInput,
     vxoAccumulate_ValidateOutput,
     NULL,
@@ -560,6 +677,7 @@ vx_kernel_description_s basekernel_minmaxloc = {
     "org.khronos.openvx.minmaxloc",
     vxoBaseKernel_MinMaxLoc,
     basekernel_minmaxloc_params, vxmLENGTH_OF(basekernel_minmaxloc_params),
+    NULL,
     vxoMinMaxLoc_ValidateInput,
     vxoMinMaxLoc_ValidateOutput,
     vxoMinMaxLoc_Initializer,
@@ -595,6 +713,7 @@ vx_kernel_description_s basekernel_convertdepth = {
     "org.khronos.openvx.convertdepth",
     vxoBaseKernel_ConvertDepth,
     basekernel_convertdepth_params, vxmLENGTH_OF(basekernel_convertdepth_params),
+    NULL,
     vxoConvertDepth_ValidateInput,
     vxoConvertDepth_ValidateOutput,
     NULL,
@@ -619,6 +738,7 @@ vx_kernel_description_s basekernel_canny = {
     "org.khronos.openvx.canny_edge_detector",
     vxoBaseKernel_CannyEdge,
     basekernel_canny_params, vxmLENGTH_OF(basekernel_canny_params),
+    NULL,
     vxoCannyEdge_ValidateInput,
     vxoCannyEdge_ValidateOutput,
     vxoCannyEdge_Initializer,
@@ -639,6 +759,7 @@ vx_kernel_description_s basekernel_and = {
     "org.khronos.openvx.and",
     vxoBaseKernel_And,
     basekernel_binary_bitwise_params, vxmLENGTH_OF(basekernel_binary_bitwise_params),
+    NULL,
     vxoBinaryBitwise_ValidateInput,
     vxoBinaryBitwise_ValidateOutput,
     NULL,
@@ -651,6 +772,7 @@ vx_kernel_description_s basekernel_or = {
     "org.khronos.openvx.or",
     vxoBaseKernel_Or,
     basekernel_binary_bitwise_params, vxmLENGTH_OF(basekernel_binary_bitwise_params),
+    NULL,
     vxoBinaryBitwise_ValidateInput,
     vxoBinaryBitwise_ValidateOutput,
     NULL,
@@ -663,6 +785,7 @@ vx_kernel_description_s basekernel_xor = {
     "org.khronos.openvx.xor",
     vxoBasekernel_Xor,
     basekernel_binary_bitwise_params, vxmLENGTH_OF(basekernel_binary_bitwise_params),
+    NULL,
     vxoBinaryBitwise_ValidateInput,
     vxoBinaryBitwise_ValidateOutput,
     NULL,
@@ -682,6 +805,7 @@ vx_kernel_description_s basekernel_not = {
     "org.khronos.openvx.not",
     vxoBaseKernel_Not,
     unary_bitwise_kernel_params, vxmLENGTH_OF(unary_bitwise_kernel_params),
+    NULL,
     vxoUnaryBitwise_ValidateInput,
     vxoUnaryBitwise_ValidateOutput,
     NULL,
@@ -705,6 +829,7 @@ vx_kernel_description_s basekernel_multiply = {
     "org.khronos.openvx.multiply",
     vxoBaseKernel_Multiply,
     basekernel_multiply_params, vxmLENGTH_OF(basekernel_multiply_params),
+    NULL,
     vxoMultiply_ValidateInput,
     vxoMultiply_ValidateOutput,
     NULL,
@@ -726,6 +851,7 @@ vx_kernel_description_s basekernel_add = {
     "org.khronos.openvx.add",
     vxoBaseKernel_Add,
     basekernel_add_subtract_params, vxmLENGTH_OF(basekernel_add_subtract_params),
+    NULL,
     vxoAddSubtract_ValidateInput,
     vxoAddSubtract_ValidateOutput,
     NULL,
@@ -738,6 +864,7 @@ vx_kernel_description_s basekernel_subtract = {
     "org.khronos.openvx.subtract",
     vxoBaseKernel_Sub,
     basekernel_add_subtract_params, vxmLENGTH_OF(basekernel_add_subtract_params),
+    NULL,
     vxoAddSubtract_ValidateInput,
     vxoAddSubtract_ValidateOutput,
     NULL,
@@ -759,6 +886,7 @@ vx_kernel_description_s basekernel_warp_affine = {
     "org.khronos.openvx.warp_affine",
     vxWarpAffineKernel,
     basekernel_warp_params, vxmLENGTH_OF(basekernel_warp_params),
+    NULL,
     vxoWarpAffine_ValidateInput,
     vxoWarp_ValidateOutput,
     NULL,
@@ -772,6 +900,7 @@ vx_kernel_description_s basekernel_warp_perspective = {
     "org.khronos.openvx.warp_perspective",
     vxoBaseKernel_WarpPerspective,
     basekernel_warp_params, vxmLENGTH_OF(basekernel_warp_params),
+    NULL,
     vxoWarpPerspective_ValidateInput,
     vxoWarp_ValidateOutput,
     NULL,
@@ -799,6 +928,7 @@ vx_kernel_description_s basekernel_harris = {
     "org.khronos.openvx.harris_corners",
     vxoBaseKernel_HarrisCorners,
     basekernel_harris_params, vxmLENGTH_OF(basekernel_harris_params),
+    NULL,
     vxoHarris_ValidateInput,
     vxoHarris_ValidateOutput,
     vxoHarris_Initializer,
@@ -823,6 +953,7 @@ vx_kernel_description_s basekernel_fast9 = {
     "org.khronos.openvx.fast_corners",
     vxoBaseKernel_Fast9Corners,
     basekernel_fast9_params, vxmLENGTH_OF(basekernel_fast9_params),
+    NULL,
     vxoFast9_ValidateInput,
     vxoFast9_ValidateOutput,
     vxoFast9_Initializer,
@@ -852,6 +983,7 @@ vx_kernel_description_s basekernel_optpyrlk = {
     "org.khronos.openvx.optical_flow_pyr_lk",
     vxoBaseKernel_OpticalFlowPyrLK,
     basekernel_optpyrlk_params, vxmLENGTH_OF(basekernel_optpyrlk_params),
+    NULL,
     vxoOpticalFlowPyrLK_ValidateInput,
     vxoOpticalFlowPyrLK_ValidateOutput,
     vxoOpticalFlowPyrLK_Initializer,
@@ -873,6 +1005,7 @@ vx_kernel_description_s basekernel_remap = {
     "org.khronos.openvx.remap",
     vxoBaseKernel_Remap,
     remap_kernel_params, vxmLENGTH_OF(remap_kernel_params),
+    NULL,
     vxoRemap_ValidateInput,
     vxoRemap_ValidateOutput,
     NULL,
@@ -895,6 +1028,7 @@ vx_kernel_description_s internalkernel_sobelMxN = {
     "org.khronos.internal.sobelMxN",
     vxoInternalKernel_SobelMxN,
     internlkernel_gradientMxN_params, vxmLENGTH_OF(internlkernel_gradientMxN_params),
+    NULL,
     vxoGradientMxN_ValidateInput,
     vxoGradientMxN_ValidateOutput,
     NULL,
@@ -921,6 +1055,7 @@ vx_kernel_description_s internalkernel_harris_score = {
     "org.khronos.internal.harris_score",
     vxoInternalKernel_HarrisScore,
     internalkernel_harrisscore_params, vxmLENGTH_OF(internalkernel_harrisscore_params),
+    NULL,
     vxoHarrisScore_ValidateInput,
     vxoHarrisScore_ValidateOutput,
     NULL,
@@ -942,6 +1077,7 @@ vx_kernel_description_s internalkernel_euclidian_nonmax = {
     "org.khronos.internal.euclidean_nonmaxsuppression",
     vxoInternalKernel_EuclideanNonMaxSuppression,
     intenralkernel_euclidean_non_max_suppression_params, vxmLENGTH_OF(intenralkernel_euclidean_non_max_suppression_params),
+    NULL,
     vxoEuclideanNonMax_ValidateInput,
     vxoEuclideanNonMax_ValidateOutput,
 };
@@ -962,6 +1098,7 @@ vx_kernel_description_s internalkernel_lister = {
     "org.khronos.internal.image_to_list",
     vxoInternalKernel_ImageLister,
     internalkernel_lister_params, vxmLENGTH_OF(internalkernel_lister_params),
+    NULL,
     vxoLister_ValidateInput,
     vxoLister_ValidateOutput,
     vxoLister_Initializer,
@@ -983,6 +1120,7 @@ vx_kernel_description_s internalkernel_norm = {
     "org.khronos.internal.elementwise_norm",
     vxoInternalKernel_Norm,
     internalkernel_norm_params, vxmLENGTH_OF(internalkernel_norm_params),
+    NULL,
     vxoNorm_ValidateInput,
     vxoNorm_ValidateOutput,
     NULL,
@@ -1006,6 +1144,7 @@ vx_kernel_description_s internalkernel_nonmax = {
     "org.khronos.internal.nonmaximasuppression",
     vxoInternalKernel_NonMaxSuppression,
     internalkernel_nonmaxsuppression_params, vxmLENGTH_OF(internalkernel_nonmaxsuppression_params),
+    NULL,
     vxoNonMaxSuppression_ValidateInput,
     vxoNonMaxSuppression_ValidateOutput,
     NULL,
@@ -1031,6 +1170,7 @@ vx_kernel_description_s internalkernel_edge_trace = {
     "org.khronos.extra.edge_trace",
     vxoInternalKernel_EdgeTrace,
     internalkernel_edge_trace_params, vxmLENGTH_OF(internalkernel_edge_trace_params),
+    NULL,
     vxoEdgeTrace_ValidateInput,
     vxoEdgeTrace_ValidateOutput,
     vxoEdgeTrace_Initializer,
@@ -1053,6 +1193,7 @@ vx_kernel_description_s internalkernel_sgm = {
     "vivante.internal.sgm",
     vxoInternalKernel_SGM,
     internalkernel_sgm_params, vxmLENGTH_OF(internalkernel_sgm_params),
+    NULL,
     vxoSGM_ValidateInput,
     vxoSGM_ValidateOutput,
     vxoSGM_Initializer,
@@ -1067,11 +1208,14 @@ static vx_param_description_s internalkernel_copy_image_params[] = {
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_CopyImage(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoCopyImage_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_kernel_description_s internalkernel_copy_image = {
     VX_KERNEL_INTERNAL_COPY_IMAGE,
     "vivante.internal.copy_image",
     vxoInternalKernel_CopyImage,
     internalkernel_copy_image_params, vxmLENGTH_OF(internalkernel_copy_image_params),
+    NULL,
     vxoCopyImage_ValidateInput,
     vxoCopyImage_ValidateOutput,
     NULL,
@@ -1090,11 +1234,14 @@ static vx_param_description_s internalkernel_fast9corners_strength_params[] = {
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Fast9CornersStrength(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersStrength_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_kernel_description_s internalkernel_Fast9Corners_Strength = {
     VX_KERNEL_INTERNAL_FAST9CORNERS_STRENGTH,
     "vivante.internal.fast9corners_strength",
     vxoInternalKernel_Fast9CornersStrength,
     internalkernel_fast9corners_strength_params, vxmLENGTH_OF(internalkernel_fast9corners_strength_params),
+    NULL,
     vxoFast9CornersStrength_ValidateInput,
     vxoFast9CornersStrength_ValidateOutput,
     NULL,
@@ -1111,11 +1258,14 @@ static vx_param_description_s internalkernel_fast9corners_nonmax_params[] = {
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_Fast9CornersNonMax(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoFast9CornersNonMax_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_kernel_description_s internalKernel_Fast9Corners_NonMax = {
     VX_KERNEL_INTERNAL_FAST9CORNERS_NONMAX,
     "vivante.internal.fast9corners_nonmax",
     vxoInternalKernel_Fast9CornersNonMax,
     internalkernel_fast9corners_nonmax_params, vxmLENGTH_OF(internalkernel_fast9corners_nonmax_params),
+    NULL,
     vxoFast9CornersNonMax_ValidateInput,
     vxoFast9CornersNonMax_ValidateOutput,
     NULL,
@@ -1136,6 +1286,7 @@ vx_kernel_description_s internalKernel_CreateLister = {
     "vivante.internal.createlister",
     vxoInternalKernel_CreateLister,
     internalkernel_createlister_params, vxmLENGTH_OF(internalkernel_createlister_params),
+    NULL,
     vxoCreateLister_ValidateInput,
     vxoCreateLister_ValidateOutput,
     NULL,
@@ -1159,6 +1310,7 @@ vx_kernel_description_s internalKernel_PackArrays = {
     "vivante.internal.packarrays",
     vxoInternalKernel_PackArrays,
     internalkernel_pack_arrays_params, vxmLENGTH_OF(internalkernel_pack_arrays_params),
+    NULL,
     vxoPackArrays_ValidateInput,
     vxoPackArrays_ValidateOutput,
     NULL,
@@ -1182,6 +1334,7 @@ vx_kernel_description_s internalKernel_MinMacLocPackArrays = {
     "vivante.internal.minmaxloc.packarrays",
     vxoInternalKernel_MinMaxlocPackArrays,
     internalkernel_minmaxloc_pack_arrays_params, vxmLENGTH_OF(internalkernel_minmaxloc_pack_arrays_params),
+    NULL,
     vxoMinMaxLocPackArrays_ValidateInput,
     vxoMinMaxLocPackArrays_ValidateOutput,
     NULL,
@@ -1202,6 +1355,7 @@ vx_kernel_description_s internalKernel_MinMaxLocFilter = {
     "vivante.internal.minmaxlocfilter",
     vxoInternalKernel_MinMaxLocFilter,
     internalkernel_minmaxloc_filter_params, vxmLENGTH_OF(internalkernel_minmaxloc_filter_params),
+    NULL,
     vxoMinMaxLocFilter_ValidateInput,
     vxoMinMaxLocFilter_ValidateOutput,
     NULL,
@@ -1223,15 +1377,16 @@ static vx_param_description_s internalkernel_minmax_get_location_params[] = {
 VX_PRIVATE_API vx_status VX_CALLBACK vxoInternalKernel_MinMaxGetLocation(vx_node node, const vx_reference *parameters, vx_uint32 num);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_ValidateInput(vx_node node, vx_uint32 index);
 VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_ValidateOutput(vx_node node, vx_uint32 index, vx_meta_format_s *ptr);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_Initializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
+VX_PRIVATE_API vx_status VX_CALLBACK vxoMinMaxGetLocation_Deinitializer(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_kernel_description_s internalKernel_MinMaxGetLocation = {
     VX_KERNEL_INTERNAL_GET_LOCATION,
     "vivante.internal.minmax.getlocation",
     vxoInternalKernel_MinMaxGetLocation,
     internalkernel_minmax_get_location_params, vxmLENGTH_OF(internalkernel_minmax_get_location_params),
-    vxoMinMaxGetLocation_ValidateInput,
-    vxoMinMaxGetLocation_ValidateOutput,
     NULL,
-    NULL
+    vxoMinMaxGetLocation_ValidateInput,
+    vxoMinMaxGetLocation_ValidateOutput
 };
 
 static vx_param_description_s internalkernel_edgeTrace_threshold_params[] = {
@@ -1248,6 +1403,7 @@ vx_kernel_description_s internalKernel_EdgeTraceThreshold = {
     "vivante.internal.edge.trace.threshold",
     vxoInternalKernel_EdgeTraceThreshold,
     internalkernel_edgeTrace_threshold_params, vxmLENGTH_OF(internalkernel_edgeTrace_threshold_params),
+    NULL,
     vxoEdgeTraceThreshold_ValidateInput,
     vxoEdgeTraceThreshold_ValidateOutput
 };
@@ -1265,6 +1421,7 @@ vx_kernel_description_s internalKernel_EdgeTraceHysteresis = {
     "vivante.internal.edge.trace.hysteresis",
     vxoInternalKernel_EdgeTraceHysteresis,
     internalkernel_edgeTrace_hysteresis_params, vxmLENGTH_OF(internalkernel_edgeTrace_hysteresis_params),
+    NULL,
     vxoEdgeTraceHysteresis_ValidateInput,
     vxoEdgeTraceHysteresis_ValidateOutput
 };
@@ -1282,6 +1439,7 @@ vx_kernel_description_s internalKernel_EdgeTraceClamp = {
     "vivante.internal.edge.trace.clamp",
     vxoInternalKernel_EdgeTraceClamp,
     internalkernel_edgeTrace_clamp_params, vxmLENGTH_OF(internalkernel_edgeTrace_clamp_params),
+    NULL,
     vxoEdgeTraceClamp_ValidateInput,
     vxoEdgeTraceClamp_ValidateOutput
 };
@@ -1300,6 +1458,7 @@ vx_kernel_description_s internalKernel_IntegralImageStep = {
     "vivante.internal.integral.image.step",
     vxoInternalKernel_IntegralImageStep,
     internalkernel_integral_image_step_params, vxmLENGTH_OF(internalkernel_integral_image_step_params),
+    NULL,
     vxoIntegralImageStep_ValidateInput,
     vxoIntegralImageStep_ValidateOutput
 };
@@ -1318,6 +1477,7 @@ vx_kernel_description_s internalKernel_Scharr3x3 = {
     "vivante.internal.scharr3x3",
     vxoInternalKernel_Scharr3x3,
     internalkernel_scharr3x3_params, vxmLENGTH_OF(internalkernel_scharr3x3_params),
+    NULL,
     vxoScharr3x3_ValidateInput,
     vxoScharr3x3_ValidateOutput
 };
@@ -1345,6 +1505,7 @@ vx_kernel_description_s internalKernel_VLKTracker = {
     "vivante.internal.vlk.tracker",
     vxoInternalKernel_VLKTracker,
     internalkernel_vlk_tracker_params, vxmLENGTH_OF(internalkernel_vlk_tracker_params),
+    NULL,
     vxoVLKTracker_ValidateInput,
     vxoVLKTracker_ValidateOutput
 };
@@ -1363,6 +1524,7 @@ vx_kernel_description_s internalKernel_EqualizeHistogramHist = {
     "vivante.internal.equalizehistogram.hist",
     vxoInternalKernel_EqualizeHistogramHist,
     internalkernel_equalize_histogram_hist_params, vxmLENGTH_OF(internalkernel_equalize_histogram_hist_params),
+    NULL,
     vxoEqualizeHistogramHist_ValidateInput,
     vxoEqualizeHistogramHist_ValidateOutput
 };
@@ -1382,6 +1544,7 @@ vx_kernel_description_s internalKernel_EqualizeHistogramGcdf = {
     "vivante.internal.equalizehistogram.gcdf",
     vxoInternalKernel_EqualizeHistogramGcdf,
     internalkernel_equalize_histogram_gcdf_params, vxmLENGTH_OF(internalkernel_equalize_histogram_gcdf_params),
+    NULL,
     vxoEqualizeHistogramGcdf_ValidateInput,
     vxoEqualizeHistogramGcdf_ValidateOutput
 };
@@ -1401,6 +1564,7 @@ vx_kernel_description_s internalKernel_EqualizeHistogramCdf = {
     "vivante.internal.equalizehistogram.cdf",
     vxoInternalKernel_EqualizeHistogramCdf,
     internalkernel_equalize_histogram_cdf_params, vxmLENGTH_OF(internalkernel_equalize_histogram_cdf_params),
+    NULL,
     vxoEqualizeHistogramCdf_ValidateInput,
     vxoEqualizeHistogramCdf_ValidateOutput
 };
@@ -1419,8 +1583,20 @@ vx_kernel_description_s internalKernel_EqualizeHistogramLut = {
     "vivante.internal.equalizehistogram.lut",
     vxoInternalKernel_EqualizeHistogramLut,
     internalkernel_equalize_histogram_lut_params, vxmLENGTH_OF(internalkernel_equalize_histogram_lut_params),
+    NULL,
     vxoEqualizeHistogramLut_ValidateInput,
     vxoEqualizeHistogramLut_ValidateOutput
+};
+
+VX_PRIVATE_API vx_status VX_CALLBACK vxoBaseKernel_Laplacian3x3(vx_node node, const vx_reference *parameters, vx_uint32 num);
+vx_kernel_description_s basekernel_laplacian3x3 = {
+    VX_KERNEL_INTERNAL_LAPLACIAN3x3,
+    "org.khronos.openvx.laplacian3x3",
+    vxoBaseKernel_Laplacian3x3,
+    basekernel_filter_params, vxmLENGTH_OF(basekernel_filter_params),
+    NULL,
+    vxoFilter_ValidateInput,
+    vxoFilter_ValidateOutput,
 };
 
 static vx_param_description_s internalkernel_sgm_cost_params[] = {
@@ -1438,6 +1614,7 @@ vx_kernel_description_s internalkernel_sgm_cost = {
     "vivante.internal.sgm.cost",
     vxoInternalKernel_SgmCost,
     internalkernel_sgm_cost_params, vxmLENGTH_OF(internalkernel_sgm_cost_params),
+    NULL,
     vxoSgmCost_ValidateInput,
     vxoSgmCost_ValidateOutput
 };
@@ -1456,6 +1633,7 @@ vx_kernel_description_s internalkernel_sgm_path90 = {
     "vivante.internal.sgm.path90",
     vxoInternalKernel_SgmPath90,
     internalkernel_sgm_path90_params, vxmLENGTH_OF(internalkernel_sgm_path90_params),
+    NULL,
     vxoSgmPath90_ValidateInput,
     vxoSgmPath90_ValidateOutput
 };
@@ -1474,6 +1652,7 @@ vx_kernel_description_s internalkernel_sgm_path45 = {
     "vivante.internal.sgm.path45",
     vxoInternalKernel_SgmPath45,
     internalkernel_sgm_path45_params, vxmLENGTH_OF(internalkernel_sgm_path45_params),
+    NULL,
     vxoSgmPath45_ValidateInput,
     vxoSgmPath45_ValidateOutput
 };
@@ -1492,6 +1671,7 @@ vx_kernel_description_s internalkernel_sgm_path135 = {
     "vivante.internal.sgm.path135",
     vxoInternalKernel_SgmPath135,
     internalkernel_sgm_path135_params, vxmLENGTH_OF(internalkernel_sgm_path135_params),
+    NULL,
     vxoSgmPath135_ValidateInput,
     vxoSgmPath135_ValidateOutput
 };
@@ -1510,6 +1690,7 @@ vx_kernel_description_s internalkernel_sgm_path0 = {
     "vivante.internal.sgm.path0",
     vxoInternalKernel_SgmPath0,
     internalkernel_sgm_path0_params, vxmLENGTH_OF(internalkernel_sgm_path0_params),
+    NULL,
     vxoSgmPath0_ValidateInput,
     vxoSgmPath0_ValidateOutput
 };
@@ -1528,6 +1709,7 @@ vx_kernel_description_s internalkernel_sgm_disp = {
     "vivante.internal.sgm.disp",
     vxoInternalKernel_SgmDisp,
     internalkernel_sgm_disp_params, vxmLENGTH_OF(internalkernel_sgm_disp_params),
+    NULL,
     vxoSgmDisp_ValidateInput,
     vxoSgmDisp_ValidateOutput
 };
@@ -1545,6 +1727,7 @@ vx_kernel_description_s internalKernel_Laplacian3x3 = {
     "vivante.internal.laplacian3x3",
     vxoInternalKernel_Laplacian3x3,
     internalkernel_laplacian3x3_params, vxmLENGTH_OF(internalkernel_laplacian3x3_params),
+    NULL,
     vxoLaplacian3x3_ValidateInput,
     vxoLaplacian3x3_ValidateOutput
 };
@@ -1561,6 +1744,7 @@ vx_kernel_description_s internalKernel_census3x3 = {
     "vivante.internal.census3x3",
     vxoInternalKernel_Census3x3,
     internalkernel_census3x3_params, vxmLENGTH_OF(internalkernel_census3x3_params),
+    NULL,
     vxoCensus3x3_ValidateInput,
     vxoCensus3x3_ValidateOutput
 };

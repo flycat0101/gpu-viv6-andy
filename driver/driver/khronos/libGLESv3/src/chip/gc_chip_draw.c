@@ -3596,17 +3596,10 @@ gcChipValidateDrawPath(
                 break;
             }
 
-#if VIVANTE_PROFILER
             if (gc->profiler.enable)
             {
-                /*__glChipProfiler(&gc->profiler, GL3_PROFILER_PRIMITIVE_TYPE, (gctHANDLE)(gctUINTPTR_T)defaultInstant->primMode);
-                __glChipProfiler(&gc->profiler, GL3_PROFILER_PRIMITIVE_COUNT, (gctHANDLE)(gctUINTPTR_T)(defaultInstant->primCount * gc->vertexArray.instanceCount));*/
-            }
-#endif
-            if (gc->profiler.enable)
-            {
-                __glChipProfiler_NEW_Set(gc, GL3_PROFILER_PRIMITIVE_TYPE, (gctHANDLE)(gctUINTPTR_T)defaultInstant->primMode);
-                __glChipProfiler_NEW_Set(gc, GL3_PROFILER_PRIMITIVE_COUNT, (gctHANDLE)(gctUINTPTR_T)(defaultInstant->primCount * gc->vertexArray.instanceCount));
+                __glChipProfilerSet(gc, GL3_PROFILER_PRIMITIVE_TYPE, (gctHANDLE)(gctUINTPTR_T)defaultInstant->primMode);
+                __glChipProfilerSet(gc, GL3_PROFILER_PRIMITIVE_COUNT, (gctHANDLE)(gctUINTPTR_T)(defaultInstant->primCount * gc->vertexArray.instanceCount));
             }
 
             /* Is any of the attrib need SW converted? */
@@ -4860,6 +4853,13 @@ gcChipValidateChipDirty(
             gcmONERROR(gcChipSetAlphaBlend(gc));
         }
 
+#if gcdALPHA_KILL_IN_SHADER
+        if (chipCtx->chipDirty.uDefer.sDefer.blend || chipCtx->chipDirty.uDefer.sDefer.fsReload)
+        {
+            gcmONERROR(gcChipSetAlphaKill(gc));
+        }
+#endif
+
         if(chipCtx->chipDirty.uDefer.sDefer.polygonOffset)
         {
             gcmONERROR(gcChipSetPolygonOffset(gc));
@@ -5733,6 +5733,104 @@ OnError:
     return status;
 }
 
+gceSTATUS
+gcChipSplitDrawWideLine(
+    IN gctPOINTER GC,
+    IN gctPOINTER InstantDraw,
+    IN gctPOINTER SplitDrawInfo
+    )
+{
+    gceSTATUS status                     = gcvSTATUS_OK;
+    __GLcontext* gc                      = (__GLcontext*)(GC);
+    __GLchipInstantDraw* instantDraw     = (__GLchipInstantDraw*)(InstantDraw);
+    __GLchipContext *chipCtx             = CHIP_CTXINFO(gc);
+    gctFLOAT coordPerPixel = gc->state.line.aliasedWidth / (gctFLOAT)(gc->state.viewport.width - gc->state.viewport.x);
+    gctFLOAT triPos[] = {-1.5f, -0.4f + coordPerPixel, 0.0f, 1.0f,
+                         -1.5f, -0.4f - coordPerPixel, 0.0f, 1.0f,
+                         0.1f, 0.5f + coordPerPixel, 0.0f, 1.0f,
+                         0.1f, 0.5f - coordPerPixel, 0.0f, 1.0f
+    };
+
+    __GLchipInstantDraw tmpInstantDraw;
+    gcsVERTEXARRAY_STREAM_INFO streamInfo;
+    gcsVERTEXARRAY_INDEX_INFO  indexInfo;
+
+    gcmHEADER();
+
+    /* Draw the two lines.*/
+    __GL_MEMCOPY(&tmpInstantDraw, instantDraw, sizeof(__GLchipInstantDraw));
+    tmpInstantDraw.count = 4;
+    tmpInstantDraw.primCount = 2;
+
+    gcmONERROR(gcChipSetVertexArrayBindBegin(gc, &tmpInstantDraw, gcvTRUE));
+
+    /* Collect info for hal level.*/
+    gcmES30_COLLECT_STREAM_INFO(streamInfo, (&tmpInstantDraw), gc, chipCtx, gcvTRUE);
+    gcmES30_COLLECT_INDEX_INFO(indexInfo, (&tmpInstantDraw));
+
+#if gcdUSE_WCLIP_PATCH
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRms,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRmsDirty,
+                                         &streamInfo,
+                                         &indexInfo));
+#else
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         &streamInfo,
+                                         &indexInfo));
+#endif
+
+    gcmONERROR(gcChipSetVertexArrayBindEnd(gc, &tmpInstantDraw, gcvTRUE));
+
+    /* Draw */
+    gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                                             tmpInstantDraw.primMode,
+                                             gcvFALSE,
+                                             tmpInstantDraw.first,
+                                             0,
+                                             tmpInstantDraw.primCount,
+                                             tmpInstantDraw.count,
+                                             gc->vertexArray.instanceCount));
+
+    /* Draw Last line, and split it into two triangle.*/
+    gcmONERROR(gco3D_SetAALineWidth(chipCtx->engine, (GLfloat)1));
+    tmpInstantDraw.attributes->pointer = triPos;
+    tmpInstantDraw.primMode = gcvPRIMITIVE_TRIANGLE_STRIP;
+    tmpInstantDraw.count = 4;
+    tmpInstantDraw.primCount = 2;
+    tmpInstantDraw.first = 0;
+
+    gcmES30_COLLECT_STREAM_INFO(streamInfo, (&tmpInstantDraw), gc, chipCtx, gcvTRUE);
+    gcmES30_COLLECT_INDEX_INFO(indexInfo, (&tmpInstantDraw));
+
+#if gcdUSE_WCLIP_PATCH
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRms,
+                                         (!chipCtx->wLimitPatch || chipCtx->wLimitSettled) ? gcvNULL : &chipCtx->wLimitRmsDirty,
+                                         &streamInfo,
+                                         &indexInfo));
+#else
+    gcmONERROR(gcoVERTEXARRAY_StreamBind(chipCtx->vertexArray,
+                                         &streamInfo,
+                                         &indexInfo));
+#endif
+
+    /* Draw */
+    gcmONERROR(gco3D_DrawInstancedPrimitives(chipCtx->engine,
+                                             tmpInstantDraw.primMode,
+                                             gcvFALSE,
+                                             tmpInstantDraw.first,
+                                             0,
+                                             tmpInstantDraw.primCount,
+                                             tmpInstantDraw.count,
+                                             gc->vertexArray.instanceCount));
+
+OnError:
+
+    gcmFOOTER();
+    return status;
+}
+
 __GL_INLINE gceSTATUS
 gcChipCollectSplitDrawArraysInfo(
     IN __GLcontext*         gc,
@@ -5772,6 +5870,14 @@ gcChipCollectSplitDrawArraysInfo(
     {
         splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_3;
         splitDrawInfo->splitDrawFunc = gcChipSplitDraw3;
+        return gcvSTATUS_OK;
+    }
+
+    /* wide line split.*/
+    if (vsProgram->progFlags.wideLineFix)
+    {
+        splitDrawInfo->splitDrawType = gcvSPLIT_DRAW_WIDE_LINE;
+        splitDrawInfo->splitDrawFunc = gcChipSplitDrawWideLine;
         return gcvSTATUS_OK;
     }
 
@@ -6148,10 +6254,6 @@ __glChipDrawArraysInstanced(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_BEGIN, 0);
-#endif
-
  #if gcdDEBUG_OPTION && gcdDEBUG_OPTION_NO_GL_DRAWS
     {
         gcePATCH_ID patchId = gcvPATCH_INVALID;
@@ -6205,18 +6307,6 @@ __glChipDrawArraysInstanced(
         }
     }
 
-#if VIVANTE_PROFILER
-#if VIVANTE_PROFILER_PERDRAW
-    if (gc->profiler.enable)
-    {
-        gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
-    }
-#endif
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_END, 0);
-#endif
-#endif
-
     /* Intentional fall through */
 OnError:
     if (gcmIS_ERROR(status))
@@ -6243,10 +6333,6 @@ __glChipDrawElementsInstanced(
     gcoBUFOBJ alignedBuffer = gcvNULL;
 
     gcmHEADER_ARG("gc=0x%x", gc);
-
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_BEGIN, 0);
-#endif
 
 #if gcdDEBUG_OPTION && gcdDEBUG_OPTION_NO_GL_DRAWS
     {
@@ -6343,18 +6429,6 @@ __glChipDrawElementsInstanced(
             alignedBuffer = gcvNULL;
         }
     }
-
-#if VIVANTE_PROFILER
-#if VIVANTE_PROFILER_PERDRAW
-    if (gc->profiler.enable)
-    {
-        gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
-    }
-#endif
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_END, 0);
-#endif
-#endif
 
     /* Intentional fall through */
 OnError:
@@ -6528,10 +6602,6 @@ __glChipDrawArraysIndirect(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_BEGIN, 0);
-#endif
-
     /* Bind the vertex array to the hardware. */
     gcmONERROR(gcChipSetVertexArrayBind(gc, instantDraw, gcvTRUE, gcvFALSE));
 
@@ -6541,10 +6611,6 @@ __glChipDrawArraysIndirect(
                                             gcvFALSE,
                                             offset,
                                             bufInfo->bufObj));
-
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_END, 0);
-#endif
 
     /* Intentional fall through */
 OnError:
@@ -6575,10 +6641,6 @@ __glChipDrawElementsIndirect(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_BEGIN, 0);
-#endif
-
     /* Bind the vertex array to the hardware. */
     gcmONERROR(gcChipSetVertexArrayBind(gc, instantDraw, gcvTRUE, gcvFALSE));
 
@@ -6588,10 +6650,6 @@ __glChipDrawElementsIndirect(
                                             gcvTRUE,
                                             offset,
                                             bufInfo->bufObj));
-
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_END, 0);
-#endif
 
     /* Intentional fall through */
 OnError:
@@ -6624,10 +6682,6 @@ __glChipMultiDrawArraysIndirect(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_BEGIN, 0);
-#endif
-
     /* Bind the vertex array to the hardware. */
     gcmONERROR(gcChipSetVertexArrayBind(gc, instantDraw, gcvTRUE, gcvFALSE));
 
@@ -6639,10 +6693,6 @@ __glChipMultiDrawArraysIndirect(
                                             drawCount,
                                             stride,
                                             bufInfo->bufObj));
-
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_END, 0);
-#endif
 
     /* Intentional fall through */
 OnError:
@@ -6675,10 +6725,6 @@ __glChipMultiDrawElementsIndirect(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_BEGIN, 0);
-#endif
-
     /* Bind the vertex array to the hardware. */
     gcmONERROR(gcChipSetVertexArrayBind(gc, instantDraw, gcvTRUE, gcvFALSE));
 
@@ -6690,10 +6736,6 @@ __glChipMultiDrawElementsIndirect(
                                             drawCount,
                                             stride,
                                             bufInfo->bufObj));
-
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_END, 0);
-#endif
 
     /* Intentional fall through */
 OnError:
@@ -6738,11 +6780,21 @@ __glChipFlush(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
+    if (gc->profiler.enable && gc->profiler.useGlfinish)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_BEGIN, 0);
+    }
+
     /* Freon requires sync to external in Flush api. */
     gcmONERROR(gcChipFboSyncFromShadowFreon(gc, gc->frameBuffer.drawFramebufObj));
 
     /* Commit command buffer. */
     gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvFALSE));
+
+    if (gc->profiler.enable && gc->profiler.useGlfinish)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_END, 0);
+    }
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
@@ -6763,6 +6815,11 @@ __glChipFinish(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
+    if (gc->profiler.enable && gc->profiler.useGlfinish)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_BEGIN, 0);
+    }
+
     /* Sychronization between CPU and GPU, then drain all commands */
     gcmONERROR(gcChipFboSyncFromShadow(gc, gc->frameBuffer.drawFramebufObj));
 
@@ -6774,17 +6831,11 @@ __glChipFinish(
     /* Commit command buffer. */
     gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
 
-#if VIVANTE_PROFILER
-    /*if (gc->profiler.enable && gc->profiler.useGlfinish)
-    {
-        __glChipProfiler(&gc->profiler, GL3_PROFILER_FRAME_END, (gctHANDLE)(gctUINTPTR_T)1);
-    }*/
-#endif
-
     if (gc->profiler.enable && gc->profiler.useGlfinish)
     {
-        __glChipProfiler_NEW_Set(gc, GL3_PROFILER_FRAME_END, (gctHANDLE)(gctUINTPTR_T)1);
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_END, 0);
     }
+
 OnError:
     if (gcmIS_SUCCESS(status))
     {
@@ -6945,7 +6996,7 @@ __glChipDrawBegin(
 
         if (gc->profiler.enable)
         {
-            __glChipProfiler_NEW_Set(gc, GL3_PROFILER_DRAW_BEGIN, 0);
+            __glChipProfilerSet(gc, GL3_PROFILER_DRAW_BEGIN, 0);
         }
 
         /* Special patch for fishnoodle.*/
@@ -7342,7 +7393,7 @@ __glChipDrawBegin(
 
     if (ret == GL_FALSE && gc->profiler.enable)
     {
-        __glChipProfiler_NEW_Set(gc, GL3_PROFILER_DRAW_END, 0);
+        __glChipProfilerSet(gc, GL3_PROFILER_DRAW_END, 0);
     }
     gcmFOOTER_ARG("return=%d", ret);
     return ret;
@@ -7458,7 +7509,7 @@ __glChipDrawEnd(
 
     if (gc->profiler.enable)
     {
-        __glChipProfiler_NEW_Set(gc, GL3_PROFILER_DRAW_END, 0);
+        __glChipProfilerSet(gc, GL3_PROFILER_DRAW_END, 0);
     }
 
 #if gcdFRAMEINFO_STATISTIC
@@ -7587,136 +7638,6 @@ OnError:
             default:\
                 mode = gcvBLEND_ADD;\
             }
-
-#define gcmCOMPUTE_FORMAT_ENDIAN_BYTES_FROM_GL()                        \
-    switch (format)                                                     \
-    {                                                                   \
-    case gcvVERTEX_SHORT:                                               \
-        format = 0x2;                   \
-        endian = hardware->bigEndian                                    \
-               ? 0x1        \
-               : 0x0;         \
-        bytes = attArray->size * 2;                                     \
-        break;                                                          \
-    case gcvVERTEX_UNSIGNED_SHORT:                                      \
-        format = 0x3;                  \
-        endian = hardware->bigEndian                                    \
-               ? 0x1        \
-               : 0x0;         \
-        bytes = attArray->size * 2;                                     \
-        break;                                                          \
-    case gcvVERTEX_INT:                                                 \
-        format = 0x4;                     \
-        endian = hardware->bigEndian                                    \
-               ? 0x2       \
-               : 0x0;         \
-        bytes = attArray->size * 4;                                     \
-        break;                                                          \
-    case gcvVERTEX_UNSIGNED_INT:                                        \
-        format = 0x5;                    \
-        endian = hardware->bigEndian                                    \
-               ? 0x2       \
-               : 0x0;         \
-        bytes = attArray->size * 4;                                     \
-        break;                                                          \
-    case gcvVERTEX_FIXED:                                               \
-        format = 0xB;            \
-        endian = hardware->bigEndian                                    \
-               ? 0x2       \
-               : 0x0;         \
-        break;                                                          \
-    case gcvVERTEX_HALF:                                                \
-        format = 0x9;                 \
-        endian = hardware->bigEndian                                    \
-               ? 0x1        \
-               : 0x0;         \
-        bytes = attArray->size * 2;                                     \
-        break;                                                          \
-    case gcvVERTEX_FLOAT:                                               \
-        format = 0x8;                   \
-        endian = hardware->bigEndian                                    \
-               ? 0x2       \
-               : 0x0;         \
-        bytes = attArray->size * 4;                                     \
-        break;                                                          \
-    case gcvVERTEX_UNSIGNED_INT_10_10_10_2:                             \
-        format = 0xD;      \
-        endian = hardware->bigEndian                                    \
-               ? 0x2       \
-               : 0x0;         \
-        bytes = 4;                                                      \
-        break;                                                          \
-    case gcvVERTEX_INT_10_10_10_2:                                      \
-        format = 0xC;       \
-        endian = hardware->bigEndian                                    \
-               ? 0x2       \
-               : 0x0;         \
-        bytes = 4;                                                      \
-        break;                                                          \
-    case gcvVERTEX_BYTE:                                                \
-        format = 0x0;                    \
-        endian = 0x0;         \
-        bytes = attArray->size;                                         \
-        break;                                                          \
-    case gcvVERTEX_UNSIGNED_BYTE:                                       \
-        format = 0x1;                   \
-        endian = 0x0;         \
-        bytes = attArray->size;                                         \
-        break;                                                          \
-    case gcvVERTEX_UNSIGNED_INT_2_10_10_10_REV:                         \
-        format = 0x7;                    \
-        endian = hardware->bigEndian                                    \
-               ? 0x2       \
-               : 0x0;         \
-        bytes = 4;                                                      \
-        break;                                                          \
-    case gcvVERTEX_INT_2_10_10_10_REV:                                  \
-        format = 0x6;                     \
-        endian = hardware->bigEndian                                    \
-               ? 0x2       \
-               : 0x0;         \
-        bytes = 4;                                                      \
-        break;                                                          \
-    case gcvVERTEX_INT8:                                                \
-        format = 0xE;                    \
-        endian = hardware->bigEndian                                    \
-               ? 0x2       \
-               : 0x0;         \
-        genericW = 1;                                                   \
-        bytes = attArray->size;                                         \
-        break;                                                          \
-    case gcvVERTEX_INT16:                                               \
-        format = 0xF;                   \
-        endian = hardware->bigEndian                                    \
-               ? 0x2       \
-               : 0x0;         \
-        genericW = 1;                                                   \
-        bytes = attArray->size * 2;                                     \
-        break;                                                          \
-    case gcvVERTEX_INT32:                                               \
-        format = 0x8;                   \
-        endian = hardware->bigEndian                                    \
-               ? 0x2       \
-               : 0x0;         \
-        genericW = 1;                                                   \
-        bytes = attArray->size * 4;                                     \
-        break;                                                          \
-    default:                                                            \
-        break;                                                          \
-    }
-
-#define _gcmSETSTATEDATA_FAST(StateDelta, Memory, Address, Data) \
-    do \
-    { \
-        gctUINT32 __temp_data32__ = Data; \
-        \
-        *Memory++ = __temp_data32__; \
-        \
-        gcmDUMPSTATEDATA(StateDelta, gcvFALSE, Address, __temp_data32__); \
-        \
-        Address += 1; \
-    } \
-    while (gcvFALSE)
 
 GLboolean
 __glChipDrawPattern(
@@ -8270,10 +8191,6 @@ __glChipDispatchCompute(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-#if VIVANTE_PROFILER_PROBE
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_COMPUTE_BEGIN, 0);
-#endif
-
     do {
         gcsTHREAD_WALKER_INFO info;
         __GLprogramObject *programObject = gc->shaderProgram.activeProgObjs[__GLSL_STAGE_CS];
@@ -8325,10 +8242,6 @@ __glChipDispatchCompute(
         info.barrierUsed = program->curPgInstance->programState.hints->threadGroupSync;
         gcmERR_BREAK(gco3D_InvokeThreadWalker(chipCtx->engine, &info));
     } while (GL_FALSE);
-
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_COMPUTE_END, 0);
-#endif
 
     if (bufInfo)
     {

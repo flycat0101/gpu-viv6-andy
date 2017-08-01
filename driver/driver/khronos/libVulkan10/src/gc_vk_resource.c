@@ -894,6 +894,27 @@ OnError:
     return result;
 }
 
+static VkBool32
+__vki_IsResourceFlatMapped(
+    __vkDevContext *devCtx,
+    uint32_t physical
+    )
+{
+    uint32_t i;
+    for (i = 0; i < devCtx->chipInfo->flatMappingRangeCount; i++)
+    {
+        if ((physical >= devCtx->chipInfo->flatMappingRanges[i].start) &&
+            (physical < devCtx->chipInfo->flatMappingRanges[i].end) &&
+            (physical != ~0U))
+        {
+            return VK_TRUE;
+        }
+    }
+
+    return VK_FALSE;
+}
+
+
 VkResult __vki_LockSurfNode(
     __vkDevContext *devCtx,
     gcsSURF_NODE_PTR node,
@@ -939,8 +960,7 @@ VkResult __vki_LockSurfNode(
                 gcmASSERT(node->logical != gcvNULL);
                 node->hardwareAddresses[type] = physical + (gctUINT32)node->bufferOffset;
             }
-            else if ((physical >= devCtx->chipInfo->flatMappingStart)
-                  && (physical < devCtx->chipInfo->flatMappingEnd))
+            else if (__vki_IsResourceFlatMapped(devCtx, physical))
             {
                 /*
                 ** If physical address is in flat mapping range of current hardware,
@@ -969,8 +989,6 @@ VkResult __vki_LockSurfNode(
             /* Validate the node. */
             node->valid = gcvTRUE;
 
-            /* VIV: This flag is needed by bg2ct specific patch, if it is not set
-            ** all cache function is skipped. */
             if (node->pool != gcvPOOL_USER)
             {
                 node->lockedInKernel = gcvTRUE;
@@ -1188,7 +1206,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
         gcmERR_BREAK(gcsSURF_NODE_Construct(&dvm->node, dvm->size, dvm->align, gcvSURF_TYPE_UNKNOWN,
                                             gcvALLOC_FLAG_NONE, gcvPOOL_DEFAULT));
 
-        gcmERR_BREAK(gcsSURF_NODE_Lock(&dvm->node, &dvm->devAddr, &dvm->hostAddr));
+        gcmERR_BREAK(gcsSURF_NODE_Lock(&dvm->node, gcvENGINE_RENDER, &dvm->devAddr, &dvm->hostAddr));
 #endif
 #if gcdDUMP
         __VK_MEMZERO(dvm->hostAddr, dvm->size);
@@ -1220,7 +1238,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_AllocateMemory(
 #else
         if (dvm->hostAddr)
         {
-            gcmVERIFY_OK(gcsSURF_NODE_Unlock(&dvm->node));
+            gcmVERIFY_OK(gcsSURF_NODE_Unlock(&dvm->node, gcvENGINE_RENDER));
         }
 
         if (dvm->node.pool != gcvPOOL_UNKNOWN)
@@ -1295,7 +1313,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ImportMemory(
         __VK_ERR_BREAK(__vki_LockSurfNode(devCtx, &dvm->node, &dvm->devAddr, &dvm->hostAddr));
 
 #else
-        if (gcmIS_ERROR(gcsSURF_NODE_Lock(&dvm->node, &dvm->devAddr, &dvm->hostAddr)))
+        if (gcmIS_ERROR(gcsSURF_NODE_Lock(&dvm->node, gcvENGINE_RENDER, &dvm->devAddr, &dvm->hostAddr)))
         {
             break;
         }
@@ -1334,7 +1352,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_ImportMemory(
 #else
         if (dvm->hostAddr)
         {
-            gcmVERIFY_OK(gcsSURF_NODE_Unlock(&dvm->node));
+            gcmVERIFY_OK(gcsSURF_NODE_Unlock(&dvm->node, gcvENGINE_RENDER));
         }
 
         if (dvm->node.pool != gcvPOOL_UNKNOWN)
@@ -1383,14 +1401,14 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeMemory(
             __VK_FREE(dvm->ts);
         }
 #else
-        gcmVERIFY_OK(gcsSURF_NODE_Unlock(&dvm->node));
+        gcmVERIFY_OK(gcsSURF_NODE_Unlock(&dvm->node, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcsSURF_NODE_Destroy(&dvm->node));
 
         /* Free TS related information. */
         if (dvm->ts)
         {
             uint32_t i = 0;
-            gcmVERIFY_OK(gcsSURF_NODE_Unlock(&dvm->ts->tsNode));
+            gcmVERIFY_OK(gcsSURF_NODE_Unlock(&dvm->ts->tsNode, gcvENGINE_RENDER));
             gcmVERIFY_OK(gcsSURF_NODE_Destroy(&dvm->ts->tsNode));
             for (i = 0; i < dvm->ts->mipLevels; i++)
             {
@@ -1623,7 +1641,7 @@ VkResult __vki_AllocateTileStatus(
             __VK_ERR_BREAK(gcsSURF_NODE_Construct(&tsResource->tsNode, totalBytes, 1, gcvSURF_TILE_STATUS,
                 gcvALLOC_FLAG_NONE, gcvPOOL_DEFAULT));
 
-            __VK_ERR_BREAK(gcsSURF_NODE_Lock(&tsResource->tsNode, VK_NULL_HANDLE, VK_NULL_HANDLE));
+            __VK_ERR_BREAK(gcsSURF_NODE_Lock(&tsResource->tsNode, gcvENGINE_RENDER, VK_NULL_HANDLE, VK_NULL_HANDLE));
 #endif
             /* Fill the tile status memory with the invalid filler.
                APP may give memory with context, we set TS to be invalid, and make it enable
@@ -1892,7 +1910,22 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateBuffer(
             /* Index buffer required 16 bytes alignment */
             align = gcmMAX(align, 16);
         }
-        if (pCreateInfo->usage & ~(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT))
+        if (pCreateInfo->usage & (VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT))
+        {
+            align = devCtx->pPhyDevice->phyDevProp.limits.minTexelBufferOffsetAlignment;
+        }
+        if (pCreateInfo->usage & VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT)
+        {
+            align = devCtx->pPhyDevice->phyDevProp.limits.minUniformBufferOffsetAlignment;
+        }
+        if (pCreateInfo->usage & VK_BUFFER_USAGE_STORAGE_BUFFER_BIT)
+        {
+            align = devCtx->pPhyDevice->phyDevProp.limits.minStorageBufferOffsetAlignment;
+        }
+        if (pCreateInfo->usage &
+            ~(VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT
+            | VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT
+            | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT))
         {
             /* Other buffer required 8 bytes alignment */
             align = gcmMAX(align, 8);
@@ -1984,14 +2017,17 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyBufferView(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkBufferView *bfv = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBufferView *, bufferView);
-
-    if (bfv->chipPriv)
+    if (bufferView)
     {
-        (*devCtx->chipFuncs->DestroyBufferView)(device, (VkBufferView)(uintptr_t)bfv);
-    }
+        __vkBufferView *bfv = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBufferView *, bufferView);
 
-    __vk_DestroyObject(devCtx, __VK_OBJECT_BUFFER_VIEW, (__vkObject *)bfv);
+        if (bfv->chipPriv)
+        {
+            (*devCtx->chipFuncs->DestroyBufferView)(device, (VkBufferView)(uintptr_t)bfv);
+        }
+
+        __vk_DestroyObject(devCtx, __VK_OBJECT_BUFFER_VIEW, (__vkObject *)bfv);
+    }
 }
 
 #if defined(ANDROID) && (ANDROID_SDK_VERSION >= 24)
@@ -2218,19 +2254,21 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyImage(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext*)device;
-    __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, image);
-
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
-
-    if (img->residentMemory)
+    if (image)
     {
-        __vk_FreeMemory(device, (VkDeviceMemory)(uintptr_t)img->memory, pAllocator);
+        __vkImage *img = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImage*, image);
+
+        /* Set the allocator to the parent allocator or API defined allocator if valid */
+        __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+        if (img->residentMemory)
+        {
+            __vk_FreeMemory(device, (VkDeviceMemory)(uintptr_t)img->memory, pAllocator);
+        }
+
+        __VK_FREE(img->pImgLevels);
+
+        __vk_DestroyObject(devCtx, __VK_OBJECT_IMAGE, (__vkObject*)img);
     }
-
-    __VK_FREE(img->pImgLevels);
-
-    __vk_DestroyObject(devCtx, __VK_OBJECT_IMAGE, (__vkObject*)img);
 }
 
 VKAPI_ATTR void VKAPI_CALL __vk_GetImageSubresourceLayout(
@@ -2300,11 +2338,13 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyImageView(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkImageView *imv = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImageView *, imageView);
 
-    (*devCtx->chipFuncs->DestroyImageView)(device, (VkImageView)(uintptr_t)imv);
-
-    __vk_DestroyObject(devCtx, __VK_OBJECT_IMAGE_VIEW, (__vkObject *)imv);
+    if (imageView)
+    {
+        __vkImageView *imv = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkImageView *, imageView);
+        (*devCtx->chipFuncs->DestroyImageView)(device, (VkImageView)(uintptr_t)imv);
+        __vk_DestroyObject(devCtx, __VK_OBJECT_IMAGE_VIEW, (__vkObject *)imv);
+    }
 }
 
 
@@ -2355,14 +2395,17 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroySampler(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkSampler *spl = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSampler *, sampler);
+    if (sampler)
+    {
+        __vkSampler *spl = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkSampler *, sampler);
 
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+        /* Set the allocator to the parent allocator or API defined allocator if valid */
+        __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
 
-    __VK_FREE(spl->chipPriv);
+        __VK_FREE(spl->chipPriv);
 
-    __vk_DestroyObject(devCtx, __VK_OBJECT_SAMPLER, (__vkObject *)spl);
+        __vk_DestroyObject(devCtx, __VK_OBJECT_SAMPLER, (__vkObject *)spl);
+    }
 }
 
 

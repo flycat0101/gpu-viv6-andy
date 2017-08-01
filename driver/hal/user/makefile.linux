@@ -44,7 +44,12 @@ INCLUDE := -I$(AQROOT)/hal/inc \
            -I$(AQROOT)/hal/user \
            -I$(AQROOT)/compiler/libVSC/include
 
+ifeq ($(LINUX_VSIMULATOR),1)
+  INCLUDE += -I$(AQROOT)/vsimulator/os/linux/user \
+             -I$(AQROOT)/vsimulator/os/linux/inc
+else
   INCLUDE += -I$(AQROOT)/hal/os/linux/user
+endif
 
 CFLAGS += $(INCLUDE)
 
@@ -55,10 +60,6 @@ ifneq ($(USE_ARMCC),1)
   CFLAGS += -fPIC -Werror
 
     CFLAGS += -Werror -ansi
-endif
-
-ifeq ($(BUILD_OPENCL_FP),1)
-  CFLAGS += -DBUILD_OPENCL_FP=1
 endif
 
 ################################################################################
@@ -91,7 +92,14 @@ endif
 # Specify Vivante library paths.
 LIBS += -L$(AQROOT)/hal/user/arch/$(OBJ_DIR)
 
+ifeq ($(LINUX_VSIMULATOR),1)
+  LIBS += -L $(AQROOT)/vsimulator/os/linux/user/$(OBJ_DIR)
+
+  LIBS += -L$(AQROOT)/vsimulator/os/linux/emulator/$(OBJ_DIR) \
+          -lEmulator
+else
   LIBS += -L $(AQROOT)/hal/os/linux/user/$(OBJ_DIR)
+endif
 
 ifeq ($(VIVANTE_ENABLE_VG),1)
   LIBS += -L$(AQROOT)/hal/user/archvg/$(OBJ_DIR)
@@ -209,7 +217,15 @@ else
 $(TARGET_MODULE): $(AQROOT)/hal/user/arch/$(OBJ_DIR)/libhalarchuser.a
 endif
 
-$(TARGET_MODULE): $(AQROOT)/hal/os/linux/user/$(OBJ_DIR)/libhalosuser.a
+
+  ifeq ($(LINUX_VSIMULATOR),1)
+    $(TARGET_MODULE): $(AQROOT)/vsimulator/os/linux/user/$(OBJ_DIR)/libhalosuser.a
+    $(TARGET_MODULE): $(wildcard $(AQROOT)/vsimulator/os/linux/emulator/$(OBJ_DIR)/libEmulator.so \
+                             $(AQROOT)/vsimulator/os/linux/emulator/$(OBJ_DIR)/libEmulator.a)
+  else
+    $(TARGET_MODULE): $(AQROOT)/hal/os/linux/user/$(OBJ_DIR)/libhalosuser.a
+  endif
+
 
 $(TARGET_MODULE): $(OBJECTS)
 	$(CC) $(LFLAGS) -o $@ $(OBJECTS) $(LIBS)

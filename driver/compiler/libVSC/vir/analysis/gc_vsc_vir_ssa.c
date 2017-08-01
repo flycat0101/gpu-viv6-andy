@@ -237,7 +237,7 @@ VSC_ErrCode vscVIR_TransformFromSpvSSA(VIR_Shader* pShader)
                             }
                         }
 
-                        VIR_Function_AddInstructionAfter(func, VIR_OP_MOV, VIR_Operand_GetType(dest), prevMovToDupInst, gcvTRUE, &movToDupInst);
+                        VIR_Function_AddInstructionAfter(func, VIR_OP_MOV, VIR_Operand_GetTypeId(dest), prevMovToDupInst, gcvTRUE, &movToDupInst);
                         VIR_Operand_SetSymbol(VIR_Inst_GetDest(movToDupInst), func, VIR_Symbol_GetIndex(dupDestSym));
                         VIR_Operand_SetEnable(VIR_Inst_GetDest(movToDupInst), VIR_Operand_GetEnable(dest));
 
@@ -251,7 +251,7 @@ VSC_ErrCode vscVIR_TransformFromSpvSSA(VIR_Shader* pShader)
                             prevMovFromDupInst = movToDupInst;
                         }
 
-                        VIR_Function_AddInstructionAfter(func, VIR_OP_MOV, VIR_Operand_GetType(dest), prevMovFromDupInst, gcvTRUE, &movFromDupInst);
+                        VIR_Function_AddInstructionAfter(func, VIR_OP_MOV, VIR_Operand_GetTypeId(dest), prevMovFromDupInst, gcvTRUE, &movFromDupInst);
                         VIR_Operand_Copy(VIR_Inst_GetDest(movFromDupInst), dest);
 
                         VIR_Operand_SetSymbol(VIR_Inst_GetSource(movFromDupInst, 0), func, VIR_Symbol_GetIndex(dupDestSym));

@@ -25,12 +25,12 @@ static vx_int16 ops_y[3][3] = {
         {-1,-2,-1},
 };
 
-vx_status vxSobel3x3(vx_node node, vx_image input, vx_image grad_x, vx_image grad_y, vx_border_mode_t *bordermode)
+vx_status vxSobel3x3(vx_node node, vx_image input, vx_image grad_x, vx_image grad_y, vx_border_t *bordermode)
 {
     vx_status status = VX_SUCCESS;
     gcoVX_Kernel_Context * kernelContext = gcvNULL;
     vx_uint32 height;
-    vxQueryImage(input, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(input, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
 #if gcdVX_OPTIMIZER
     if (node && node->kernelContext)
@@ -54,9 +54,13 @@ vx_status vxSobel3x3(vx_node node, vx_image input, vx_image grad_x, vx_image gra
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
 
     /*index = 1*/
+    if (grad_x == VX_NULL)
+        kernelContext->params.optionalOutputs[0] = 1;
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_x, GC_VX_INDEX_AUTO);
 
     /* index = 2 */
+    if (grad_y == VX_NULL)
+        kernelContext->params.optionalOutputs[1] = 1;
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, grad_y, GC_VX_INDEX_AUTO);
 
     kernelContext->params.kernel = gcvVX_KERNEL_SOBEL_3x3;
@@ -88,14 +92,14 @@ vx_status vxSobel3x3(vx_node node, vx_image input, vx_image grad_x, vx_image gra
     }
 
 
-    if(bordermode->mode == VX_BORDER_MODE_CONSTANT)
+    if(bordermode->mode == VX_BORDER_CONSTANT)
     {
         vx_uint32 bin[4];
 
         bin[0] =
         bin[1] =
         bin[2] =
-        bin[3] = FORMAT_VALUE(bordermode->constant_value);
+        bin[3] = FORMAT_VALUE(bordermode->constant_value.U32);
 
         gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
         kernelContext->uniforms[0].num         = 4 * 4;
@@ -135,7 +139,7 @@ vx_status vxScharr3x3(vx_node node, vx_image input, vx_image grad_x, vx_image gr
     vx_uint32 bin[4] = {0, 0, 0, 0};
     vx_uint32 width = 0, height = 0;
     gcoVX_Kernel_Context * kernelContext = gcvNULL;
-    vx_border_mode_t bordermode = { VX_BORDER_MODE_UNDEFINED, 0 };
+    vx_border_t bordermode = { VX_BORDER_UNDEFINED, 0 };
 
 #if gcdVX_OPTIMIZER
     if (node && node->kernelContext)
@@ -155,8 +159,8 @@ vx_status vxScharr3x3(vx_node node, vx_image input, vx_image grad_x, vx_image gr
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(input, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(input, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(input, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(input, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
@@ -268,7 +272,7 @@ static vx_int16 ops7_y[7][7] = {
 };
 
 vx_status vxSobelMxN(vx_node node, vx_image input, vx_scalar win, vx_image grad_x,
-                     vx_image grad_y, vx_border_mode_t *bordermode)
+                     vx_image grad_y, vx_border_t *bordermode)
 {
     gcoVX_Kernel_Context * kernelContext = gcvNULL;
     vx_status status = VX_SUCCESS;
@@ -298,7 +302,7 @@ vx_status vxSobelMxN(vx_node node, vx_image input, vx_scalar win, vx_image grad_
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(input, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(input, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
     status = vxReadScalarValue(win, &wins);
 
@@ -328,14 +332,14 @@ vx_status vxSobelMxN(vx_node node, vx_image input, vx_scalar win, vx_image grad_
     kernelContext->params.borders = bordermode->mode;
     kernelContext->params.volume = height;
 
-    if (bordermode->mode == VX_BORDER_MODE_CONSTANT || bordermode->mode == VX_BORDER_MODE_UNDEFINED)
+    if (bordermode->mode == VX_BORDER_CONSTANT || bordermode->mode == VX_BORDER_UNDEFINED)
     {
         vx_uint32 bin[4];
 
         bin[0] =
         bin[1] =
         bin[2] =
-        bin[3] = FORMAT_VALUE((bordermode->mode == VX_BORDER_MODE_UNDEFINED)?0xcd:bordermode->constant_value);
+        bin[3] = FORMAT_VALUE((bordermode->mode == VX_BORDER_UNDEFINED)?0xcd:bordermode->constant_value.U32);
 
         gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
         kernelContext->uniforms[0].num = 4 * 4;
@@ -415,7 +419,7 @@ vx_status vxLaplacian3x3(vx_node node, vx_image src, vx_image dst, vx_border_mod
         bin[0] =
         bin[1] =
         bin[2] =
-        bin[3] = FORMAT_VALUE((bordermode->mode == VX_BORDER_MODE_UNDEFINED)?0xcd:bordermode->constant_value);
+        bin[3] = FORMAT_VALUE((bordermode->mode == VX_BORDER_MODE_UNDEFINED)?0xcd:bordermode->constant_value.U32);
 
         gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
         kernelContext->uniforms[0].num = 4 * 4;

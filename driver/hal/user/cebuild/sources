@@ -63,10 +63,6 @@ SOURCES = $(SOURCES) \
 !    ENDIF
 !ENDIF
 
-!IF "$(BUILD_OPENCL_FP)" == "1"
-CDEFINES=$(CDEFINES) -DBUILD_OPENCL_FP=1
-!ENDIF
-
 INCLUDES = \
     $(INCLUDES); \
     $(AQROOT)\hal\user; \

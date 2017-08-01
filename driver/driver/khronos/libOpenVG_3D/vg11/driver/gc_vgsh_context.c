@@ -664,7 +664,6 @@ void _PSCManagerDismiss(_VGContext *context, gctINT32 qual)
     {
         while (pscm->records[i].weight < qual)
         {
-            /* VIV: [todo] Find the path object and dirty it. */
             path = (_VGPath*)vgshFindObject(context, pscm->records[i].pid);
             gcmASSERT((path != gcvNULL) && (path->object.type == VGObject_Path));
 

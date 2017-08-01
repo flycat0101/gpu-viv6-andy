@@ -39,7 +39,8 @@ ifeq ($(ENABLE_CL_GL), 1)
 endif
 
 LOCAL_CFLAGS := \
-	$(CFLAGS)
+	$(CFLAGS) \
+	-Wno-sign-compare
 
 LOCAL_C_INCLUDES := \
 	$(AQROOT)/sdk/inc \
@@ -53,7 +54,7 @@ LOCAL_LDFLAGS := \
 	-Wl,-z,defs \
 	-Wl,--version-script=$(LOCAL_PATH)/libOpenCL12.map
 
-CFLAGS         += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS -DCL_USE_DEPRECATED_OPENCL_1_1_APIS -DBUILD_OPENCL_12=1
+CFLAGS         += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS -DCL_USE_DEPRECATED_OPENCL_1_1_APIS
 LOCAL_CFLAGS += \
          $(CFLAGS)
 
@@ -74,10 +75,6 @@ LOCAL_CFLAGS         += -DBUILD_OPENCL_ICD=1
 LOCAL_MODULE         := libVivanteOpenCL
 else
 LOCAL_MODULE         := libOpenCL
-endif
-
-ifeq ($(BUILD_OPENCL_FP),1)
-LOCAL_CFLAGS         += -DBUILD_OPENCL_FP=1
 endif
 
 ifeq ($(ENABLE_CL_GL), 1)

@@ -751,7 +751,7 @@ gckGALDEVICE_Construct(
             {
                 gcmkTRACE_ZONE(gcvLEVEL_INFO, gcvZONE_DRIVER,
                         "[galcore] gckGALDEVICE_Construct: Unable to map location->0x%lX for size->%ld\n",
-                        device->requestedRegisterMemBases[i],
+                        (unsigned long)device->requestedRegisterMemBases[i],
                         device->requestedRegisterMemSizes[i]);
 
                 return gcvSTATUS_OUT_OF_RESOURCES;

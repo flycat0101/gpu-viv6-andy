@@ -444,7 +444,7 @@ ProcVIVEXTDrawableInfo(register ClientPtr client)
     rep.relY = relY - screenY;
     #endif
 
-    pClippedRects = pClipRects;
+    pClippedRects = NULL;
 
     if (rep.numClipRects) {
         /* Clip cliprects to screen dimensions (redirected windows) */
@@ -463,11 +463,11 @@ ProcVIVEXTDrawableInfo(register ClientPtr client)
     WriteToClient(client, sizeof(xVIVEXTDrawableInfoReply), &rep);
 
     if (rep.numClipRects) {
-    WriteToClient(client,
-    sizeof(drm_clip_rect_t) * rep.numClipRects,
-    pClippedRects);
-    free(pClippedRects);
+        WriteToClient(client, sizeof(drm_clip_rect_t) * rep.numClipRects, pClippedRects);
     }
+
+    if (pClippedRects)
+        free(pClippedRects);
 
     return Success;
 

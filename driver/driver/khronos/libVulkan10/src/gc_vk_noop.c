@@ -15,16 +15,11 @@
 
 #define __VK_NOP_MESSAGE(...)  __VK_PRINT("No Vulkan Instance Initialized!")
 
-VKAPI_ATTR VkResult VKAPI_CALL __nop_CreateInstance(const VkInstanceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkInstance* pInstance)
-{
-    __VK_NOP_MESSAGE();
-    return VK_SUCCESS;
-}
-
-VKAPI_ATTR void VKAPI_CALL __nop_DestroyInstance(VkInstance instance, const VkAllocationCallbacks* pAllocator)
-{
-    __VK_NOP_MESSAGE();
-}
+/* Instance APIs should always work */
+#define __nop_CreateInstance vkCreateInstance
+#define __nop_DestroyInstance vkDestroyInstance
+#define __nop_EnumerateInstanceExtensionProperties vkEnumerateInstanceExtensionProperties
+#define __nop_EnumerateInstanceLayerProperties vkEnumerateInstanceLayerProperties
 
 VKAPI_ATTR VkResult VKAPI_CALL __nop_EnumeratePhysicalDevices(VkInstance instance, uint32_t* pPhysicalDeviceCount, VkPhysicalDevice* pPhysicalDevices)
 {
@@ -67,7 +62,7 @@ VKAPI_ATTR void VKAPI_CALL __nop_GetPhysicalDeviceMemoryProperties(VkPhysicalDev
 
 VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __nop_GetInstanceProcAddr(VkInstance instance, const char* pName)
 {
-    return VK_NULL_HANDLE;
+    return __vk_GetInstanceProcAddr(instance, pName);
 }
 
 VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __nop_GetDeviceProcAddr(VkDevice device, const char* pName)
@@ -86,17 +81,7 @@ VKAPI_ATTR void VKAPI_CALL __nop_DestroyDevice(VkDevice device, const VkAllocati
     __VK_NOP_MESSAGE();
 }
 
-VKAPI_ATTR VkResult VKAPI_CALL __nop_EnumerateInstanceExtensionProperties(const char* pLayerName, uint32_t* pCount, VkExtensionProperties* pProperties)
-{
-    return __vk_EnumerateInstanceExtensionProperties(pLayerName, pCount, pProperties);
-}
-
 VKAPI_ATTR VkResult VKAPI_CALL __nop_EnumerateDeviceExtensionProperties(VkPhysicalDevice physicalDevice, const char* pLayerName, uint32_t* pCount, VkExtensionProperties* pProperties)
-{
-    return __vk_EnumerateDeviceExtensionProperties(physicalDevice, pLayerName, pCount, pProperties);
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL __nop_EnumerateInstanceLayerProperties(uint32_t* pCount, VkLayerProperties* pProperties)
 {
     __VK_NOP_MESSAGE();
     return VK_SUCCESS;

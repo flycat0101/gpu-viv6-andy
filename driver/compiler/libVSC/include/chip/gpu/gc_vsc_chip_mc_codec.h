@@ -171,6 +171,7 @@ typedef struct _VSC_MC_CODEC_INST_CTRL
     gctUINT     threadType;
     gctBOOL     bSkipForHelperKickoff;
     gctBOOL     bResultSat;
+    gctBOOL     bForceGen;
 
     union
     {

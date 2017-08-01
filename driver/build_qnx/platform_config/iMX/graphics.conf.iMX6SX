@@ -1,0 +1,27 @@
+begin khronos
+
+  begin wfd device 1
+    # ===============================================================================
+
+    device-base-address = 2147483648
+
+    gpu-physBase        = 0
+    gpu-physSize        = 0
+    gpu-gpuProfiler     = 0
+    gpu-powerManagement = 1
+
+    gpu-irq-3D          = 42
+    gpu-reg-base-3D     = 25165824
+    gpu-reg-size-3D     = 16384
+
+    hasPL310            = 1
+
+    # ===============================================================================
+
+  end wfd device
+
+end khronos
+
+begin winmgr
+
+end winmgr

@@ -71,6 +71,7 @@
  *
  */
 
+static void __attribute__((destructor)) _ModuleDestructor(void);
 /* go through the list of vendors in the two configuration files */
 void khrIcdOsVendorsEnumerate(void)
 {
@@ -199,3 +200,31 @@ void khrIcdOsLibraryUnload(void *library)
     dlclose(library);
 }
 
+static void
+_ModuleDestructor(
+    void
+    )
+{
+    KHRicdVendor * vendor = NULL;
+
+    if(platforms)
+    {
+        free(platforms);
+        platforms = NULL;
+    }
+    for(vendor = khrIcdState.vendors; vendor != NULL; )
+    {
+        KHRicdVendor * next = vendor->next;
+        if(vendor->suffix)
+        {
+            free(vendor->suffix);
+            vendor->suffix = NULL;
+        }
+        if(vendor)
+        {
+            free(vendor);
+        }
+        vendor = next;
+    }
+
+}

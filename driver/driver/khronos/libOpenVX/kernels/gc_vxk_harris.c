@@ -15,10 +15,10 @@
 
 #if VIV_HARRIS_SCORE
 vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image dst,
-                        vx_scalar scales, vx_scalar winds, vx_scalar sens, vx_border_mode_t borders)
+                        vx_scalar scales, vx_scalar winds, vx_scalar sens, vx_border_t borders)
 {
     vx_status status = VX_SUCCESS;
-    if (borders.mode == VX_BORDER_MODE_UNDEFINED)
+    if (borders.mode == VX_BORDER_UNDEFINED)
     {
         vx_uint32 block_size = 0, i = 0;
         vx_float32 k = 0.0f;
@@ -59,8 +59,8 @@ vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image
 
         s = s * s * s * s;
 
-        status |= vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-        status |= vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+        status |= vxQueryImage(grad_x, VX_IMAGE_WIDTH, &width, sizeof(width));
+        status |= vxQueryImage(grad_x, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
         /*index = 0*/
         gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_x, GC_VX_INDEX_AUTO);
@@ -74,9 +74,9 @@ vx_status vxHarrisScore(vx_node node, vx_image grad_x, vx_image grad_y, vx_image
         kernelContext->params.kernel               = gcvVX_KERNEL_HARRIS_CORNERS;
 
 #if gcdVX_OPTIMIZER
-        kernelContext->borders                     = VX_BORDER_MODE_UNDEFINED;
+        kernelContext->borders                     = VX_BORDER_UNDEFINED;
 #else
-        kernelContext->params.borders              = VX_BORDER_MODE_UNDEFINED;
+        kernelContext->params.borders              = VX_BORDER_UNDEFINED;
 #endif
 
         kernelContext->params.volume               = block_size;
@@ -173,6 +173,17 @@ vx_status vxPackArrays(vx_node node, vx_image inputImage, vx_array inputArray, v
         kernelContext->uniforms[0].index       = 3;
         kernelContext->uniforms[0].num         = 16;
         kernelContext->uniform_num             = 1;
+
+        /* set (scale, orientation, tracking_status, error) as (0, 0, 1, 0), for ovx 1.1*/
+        bin[2] = 1;
+        bin[0] =
+        bin[1] =
+        bin[3] = 0;
+
+        gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, bin, sizeof(bin));
+        kernelContext->uniforms[1].index       = 4;
+        kernelContext->uniforms[1].num         = 16;
+        kernelContext->uniform_num             = 2;
     }
 
     kernelContext->params.kernel           = gcvVX_KERNEL_IMAGE_LISTER;

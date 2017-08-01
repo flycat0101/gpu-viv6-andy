@@ -251,6 +251,7 @@ _UploadA8toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadA8toARGBBE(
     IN gctPOINTER Logical,
@@ -394,6 +395,7 @@ _UploadA8toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadBGRtoARGB(
@@ -539,6 +541,7 @@ _UploadBGRtoARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadBGRtoARGBBE(
     IN gctPOINTER Logical,
@@ -682,6 +685,7 @@ _UploadBGRtoARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadBGRtoABGR(
@@ -827,6 +831,7 @@ _UploadBGRtoABGR(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadBGRtoABGRBE(
     IN gctPOINTER Logical,
@@ -970,6 +975,7 @@ _UploadBGRtoABGRBE(
         }
     }
 }
+#endif
 
 static void
 _UploadABGRtoARGB(
@@ -1115,6 +1121,7 @@ _UploadABGRtoARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadABGRtoARGBBE(
     IN gctPOINTER Logical,
@@ -1258,7 +1265,7 @@ _UploadABGRtoARGBBE(
         }
     }
 }
-
+#endif
 
 static void
 _UploadL8toARGB(
@@ -1431,6 +1438,7 @@ _UploadL8toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadL8toARGBBE(
     IN gctPOINTER Logical,
@@ -1600,6 +1608,7 @@ _UploadL8toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadA8L8toARGB(
@@ -1771,6 +1780,7 @@ _UploadA8L8toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadA8L8toARGBBE(
     IN gctPOINTER Logical,
@@ -1940,6 +1950,7 @@ _UploadA8L8toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _Upload32bppto32bpp(
@@ -2136,6 +2147,7 @@ _Upload32bppto32bpp(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _Upload32bppto32bppBE(
     IN gctPOINTER Logical,
@@ -2330,6 +2342,7 @@ _Upload32bppto32bppBE(
         }
     }
 }
+#endif
 
 static void
 _Upload64bppto64bpp(
@@ -2568,6 +2581,7 @@ _Upload64bppto64bpp(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _Upload64bppto64bppBE(
     IN gctPOINTER Logical,
@@ -2804,6 +2818,7 @@ _Upload64bppto64bppBE(
         }
     }
 }
+#endif
 
 static void
 _UploadRGB565toARGB(
@@ -2975,6 +2990,7 @@ _UploadRGB565toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadRGB565toARGBBE(
     IN gctPOINTER Logical,
@@ -3144,6 +3160,7 @@ _UploadRGB565toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadRGBA4444toARGB(
@@ -3315,6 +3332,7 @@ _UploadRGBA4444toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadRGBA4444toARGBBE(
     IN gctPOINTER Logical,
@@ -3486,6 +3504,7 @@ _UploadRGBA4444toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadRGBA5551toARGB(
@@ -3657,6 +3676,7 @@ _UploadRGBA5551toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadRGBA5551toARGBBE(
     IN gctPOINTER Logical,
@@ -3826,6 +3846,7 @@ _UploadRGBA5551toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _Upload8bppto8bpp(
@@ -3982,6 +4003,7 @@ _Upload8bppto8bpp(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _Upload8bppto8bppBE(
     IN gctPOINTER Logical,
@@ -4136,6 +4158,7 @@ _Upload8bppto8bppBE(
         }
     }
 }
+#endif
 
 static void
 _Upload16bppto16bpp(
@@ -4312,6 +4335,7 @@ _Upload16bppto16bpp(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _Upload16bppto16bppBE(
     IN gctPOINTER Logical,
@@ -4486,6 +4510,7 @@ _Upload16bppto16bppBE(
         }
     }
 }
+#endif
 
 static void
 _UploadRGBA4444toARGB4444(
@@ -4621,6 +4646,7 @@ _UploadRGBA4444toARGB4444(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadRGBA4444toARGB4444BE(
     IN gctPOINTER Logical,
@@ -4754,6 +4780,7 @@ _UploadRGBA4444toARGB4444BE(
         }
     }
 }
+#endif
 
 static void
 _UploadRGBA5551toARGB1555(
@@ -4889,6 +4916,7 @@ _UploadRGBA5551toARGB1555(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadRGBA5551toARGB1555BE(
     IN gctPOINTER Logical,
@@ -5022,6 +5050,7 @@ _UploadRGBA5551toARGB1555BE(
         }
     }
 }
+#endif
 
 static gceSTATUS
 _UploadTextureTiled(
@@ -5136,23 +5165,64 @@ _UploadTextureTiled(
         switch (SourceFormat)
         {
         case gcvSURF_A8:
-            if (Hardware->bigEndian)
-            {
-                _UploadA8toARGBBE(trgLogical,
-                                  trgStride,
-                                  X, Y,
-                                  right, bottom,
-                                  edgeX, edgeY,
-                                  countX, countY,
-                                  Memory,
-                                  (SourceStride == 0)
-                                  ? (gctINT) Width
-                                  : SourceStride);
+#if gcdENDIAN_BIG
+            _UploadA8toARGBBE(trgLogical,
+                              trgStride,
+                              X, Y,
+                              right, bottom,
+                              edgeX, edgeY,
+                              countX, countY,
+                              Memory,
+                              (SourceStride == 0)
+                              ? (gctINT) Width
+                              : SourceStride);
+#else
+            _UploadA8toARGB(trgLogical,
+                            trgStride,
+                            X, Y,
+                            right, bottom,
+                            edgeX, edgeY,
+                            countX, countY,
+                            Memory,
+                            (SourceStride == 0)
+                            ? (gctINT) Width
+                            : SourceStride);
+#endif
 
-            }
-            else
-            {
-                _UploadA8toARGB(trgLogical,
+            gcmFOOTER_NO();
+            return gcvSTATUS_OK;
+
+        case gcvSURF_B8G8R8:
+#if gcdENDIAN_BIG
+            _UploadBGRtoARGBBE(trgLogical,
+                               trgStride,
+                               X, Y,
+                               right, bottom,
+                               edgeX, edgeY,
+                               countX, countY,
+                               Memory,
+                               (SourceStride == 0)
+                               ? (gctINT) Width * 3
+                               : SourceStride);
+#else
+            _UploadBGRtoARGB(trgLogical,
+                             trgStride,
+                             X, Y,
+                             right, bottom,
+                             edgeX, edgeY,
+                             countX, countY,
+                             Memory,
+                             (SourceStride == 0)
+                             ? (gctINT) Width * 3
+                             : SourceStride);
+#endif
+
+            gcmFOOTER_NO();
+            return gcvSTATUS_OK;
+
+        case gcvSURF_A8B8G8R8:
+#if gcdENDIAN_BIG
+            _UploadABGRtoARGBBE(trgLogical,
                                 trgStride,
                                 X, Y,
                                 right, bottom,
@@ -5160,61 +5230,83 @@ _UploadTextureTiled(
                                 countX, countY,
                                 Memory,
                                 (SourceStride == 0)
-                                ? (gctINT) Width
+                                ? (gctINT) Width * 4
                                 : SourceStride);
-            }
+#else
+            _UploadABGRtoARGB(trgLogical,
+                              trgStride,
+                              X, Y,
+                              right, bottom,
+                              edgeX, edgeY,
+                              countX, countY,
+                              Memory,
+                              (SourceStride == 0)
+                              ? (gctINT) Width * 4
+                              : SourceStride);
+#endif
 
             gcmFOOTER_NO();
             return gcvSTATUS_OK;
 
-        case gcvSURF_B8G8R8:
-            if (Hardware->bigEndian)
-            {
-                _UploadBGRtoARGBBE(trgLogical,
-                                   trgStride,
-                                   X, Y,
-                                   right, bottom,
-                                   edgeX, edgeY,
-                                   countX, countY,
-                                   Memory,
-                                   (SourceStride == 0)
-                                   ? (gctINT) Width * 3
-                                   : SourceStride);
-            }
-            else
-            {
-                _UploadBGRtoARGB(trgLogical,
-                                 trgStride,
-                                 X, Y,
-                                 right, bottom,
-                                 edgeX, edgeY,
-                                 countX, countY,
-                                 Memory,
-                                 (SourceStride == 0)
-                                 ? (gctINT) Width * 3
-                                 : SourceStride);
-            }
+        case gcvSURF_L8:
+#if gcdENDIAN_BIG
+            _UploadL8toARGBBE(trgLogical,
+                              trgStride,
+                              X, Y,
+                              right, bottom,
+                              edgeX, edgeY,
+                              countX, countY,
+                              Memory,
+                              (SourceStride == 0)
+                              ? (gctINT) Width
+                              : SourceStride);
+#else
+            _UploadL8toARGB(trgLogical,
+                            trgStride,
+                            X, Y,
+                            right, bottom,
+                            edgeX, edgeY,
+                            countX, countY,
+                            Memory,
+                            (SourceStride == 0)
+                            ? (gctINT) Width
+                            : SourceStride);
+#endif
 
             gcmFOOTER_NO();
             return gcvSTATUS_OK;
 
-        case gcvSURF_A8B8G8R8:
-            if (Hardware->bigEndian)
-            {
-                _UploadABGRtoARGBBE(trgLogical,
-                                    trgStride,
-                                    X, Y,
-                                    right, bottom,
-                                    edgeX, edgeY,
-                                    countX, countY,
-                                    Memory,
-                                    (SourceStride == 0)
-                                    ? (gctINT) Width * 4
-                                    : SourceStride);
-            }
-            else
-            {
-                _UploadABGRtoARGB(trgLogical,
+        case gcvSURF_A8L8:
+#if gcdENDIAN_BIG
+            _UploadA8L8toARGBBE(trgLogical,
+                                trgStride,
+                                X, Y,
+                                right, bottom,
+                                edgeX, edgeY,
+                                countX, countY,
+                                Memory,
+                                (SourceStride == 0)
+                                ? (gctINT) Width * 2
+                                : SourceStride);
+#else
+            _UploadA8L8toARGB(trgLogical,
+                              trgStride,
+                              X, Y,
+                              right, bottom,
+                              edgeX, edgeY,
+                              countX, countY,
+                              Memory,
+                              (SourceStride == 0)
+                              ? (gctINT) Width * 2
+                              : SourceStride);
+#endif
+
+            gcmFOOTER_NO();
+            return gcvSTATUS_OK;
+
+        case gcvSURF_A8R8G8B8:
+#if gcdENDIAN_BIG
+            _Upload32bppto32bppBE(trgLogical,
                                   trgStride,
                                   X, Y,
                                   right, bottom,
@@ -5224,28 +5316,8 @@ _UploadTextureTiled(
                                   (SourceStride == 0)
                                   ? (gctINT) Width * 4
                                   : SourceStride);
-            }
-
-            gcmFOOTER_NO();
-            return gcvSTATUS_OK;
-
-        case gcvSURF_L8:
-            if (Hardware->bigEndian)
-            {
-                _UploadL8toARGBBE(trgLogical,
-                                  trgStride,
-                                  X, Y,
-                                  right, bottom,
-                                  edgeX, edgeY,
-                                  countX, countY,
-                                  Memory,
-                                  (SourceStride == 0)
-                                  ? (gctINT) Width
-                                  : SourceStride);
-            }
-            else
-            {
-                _UploadL8toARGB(trgLogical,
+#else
+            _Upload32bppto32bpp(trgLogical,
                                 trgStride,
                                 X, Y,
                                 right, bottom,
@@ -5253,78 +5325,15 @@ _UploadTextureTiled(
                                 countX, countY,
                                 Memory,
                                 (SourceStride == 0)
-                                ? (gctINT) Width
+                                ? (gctINT) Width * 4
                                 : SourceStride);
-            }
-
-            gcmFOOTER_NO();
-            return gcvSTATUS_OK;
-
-        case gcvSURF_A8L8:
-            if (Hardware->bigEndian)
-            {
-                _UploadA8L8toARGBBE(trgLogical,
-                                    trgStride,
-                                    X, Y,
-                                    right, bottom,
-                                    edgeX, edgeY,
-                                    countX, countY,
-                                    Memory,
-                                    (SourceStride == 0)
-                                    ? (gctINT) Width * 2
-                                    : SourceStride);
-            }
-            else
-            {
-                _UploadA8L8toARGB(trgLogical,
-                                  trgStride,
-                                  X, Y,
-                                  right, bottom,
-                                  edgeX, edgeY,
-                                  countX, countY,
-                                  Memory,
-                                  (SourceStride == 0)
-                                  ? (gctINT) Width * 2
-                                  : SourceStride);
-            }
-
-            gcmFOOTER_NO();
-            return gcvSTATUS_OK;
-
-        case gcvSURF_A8R8G8B8:
-            if (Hardware->bigEndian)
-            {
-                _Upload32bppto32bppBE(trgLogical,
-                                      trgStride,
-                                      X, Y,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 4
-                                      : SourceStride);
-            }
-            else
-            {
-                _Upload32bppto32bpp(trgLogical,
-                                    trgStride,
-                                    X, Y,
-                                    right, bottom,
-                                    edgeX, edgeY,
-                                    countX, countY,
-                                    Memory,
-                                    (SourceStride == 0)
-                                    ? (gctINT) Width * 4
-                                    : SourceStride);
-            }
+#endif
 
             gcmFOOTER_NO();
             return gcvSTATUS_OK;
 
         case gcvSURF_R5G6B5:
-            if (Hardware->bigEndian)
-            {
+#if gcdENDIAN_BIG
                 _UploadRGB565toARGBBE(trgLogical,
                                       trgStride,
                                       X, Y,
@@ -5335,9 +5344,7 @@ _UploadTextureTiled(
                                       (SourceStride == 0)
                                       ? (gctINT) Width * 2
                                       : SourceStride);
-            }
-            else
-            {
+#else
                 _UploadRGB565toARGB(trgLogical,
                                     trgStride,
                                     X, Y,
@@ -5348,14 +5355,13 @@ _UploadTextureTiled(
                                     (SourceStride == 0)
                                     ? (gctINT) Width * 2
                                     : SourceStride);
-            }
+#endif
 
             gcmFOOTER_NO();
             return gcvSTATUS_OK;
 
         case gcvSURF_R4G4B4A4:
-            if (Hardware->bigEndian)
-            {
+#if gcdENDIAN_BIG
                  _UploadRGBA4444toARGBBE(trgLogical,
                                         trgStride,
                                         X, Y,
@@ -5366,9 +5372,7 @@ _UploadTextureTiled(
                                         (SourceStride == 0)
                                         ? (gctINT) Width * 2
                                         : SourceStride);
-            }
-            else
-            {
+#else
                  _UploadRGBA4444toARGB(trgLogical,
                                       trgStride,
                                       X, Y,
@@ -5379,38 +5383,35 @@ _UploadTextureTiled(
                                       (SourceStride == 0)
                                       ? (gctINT) Width * 2
                                       : SourceStride);
-            }
+#endif
 
             gcmFOOTER_NO();
             return gcvSTATUS_OK;
 
         case gcvSURF_R5G5B5A1:
-            if (Hardware->bigEndian)
-            {
-                _UploadRGBA5551toARGBBE(trgLogical,
-                                        trgStride,
-                                        X, Y,
-                                        right, bottom,
-                                        edgeX, edgeY,
-                                        countX, countY,
-                                        Memory,
-                                        (SourceStride == 0)
-                                        ? (gctINT) Width * 2
-                                        : SourceStride);
-            }
-            else
-            {
-                _UploadRGBA5551toARGB(trgLogical,
-                                      trgStride,
-                                      X, Y,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _UploadRGBA5551toARGBBE(trgLogical,
+                                    trgStride,
+                                    X, Y,
+                                    right, bottom,
+                                    edgeX, edgeY,
+                                    countX, countY,
+                                    Memory,
+                                    (SourceStride == 0)
+                                    ? (gctINT) Width * 2
+                                    : SourceStride);
+#else
+            _UploadRGBA5551toARGB(trgLogical,
+                                  trgStride,
+                                  X, Y,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#endif
 
             gcmFOOTER_NO();
             return gcvSTATUS_OK;
@@ -5427,32 +5428,29 @@ _UploadTextureTiled(
         case gcvSURF_A8:
             if (trgFormat == gcvSURF_A8)
             {
-                if (Hardware->bigEndian)
-                {
-                    _Upload8bppto8bppBE(trgLogical,
-                                        trgStride,
-                                        X, Y,
-                                        right, bottom,
-                                        edgeX, edgeY,
-                                        countX, countY,
-                                        Memory,
-                                        (SourceStride == 0)
-                                        ? (gctINT) Width
-                                        : SourceStride);
-                }
-                else
-                {
-                    _Upload8bppto8bpp(trgLogical,
-                                      trgStride,
-                                      X, Y,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width
-                                      : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _Upload8bppto8bppBE(trgLogical,
+                                    trgStride,
+                                    X, Y,
+                                    right, bottom,
+                                    edgeX, edgeY,
+                                    countX, countY,
+                                    Memory,
+                                    (SourceStride == 0)
+                                    ? (gctINT) Width
+                                    : SourceStride);
+#else
+                _Upload8bppto8bpp(trgLogical,
+                                  trgStride,
+                                  X, Y,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width
+                                  : SourceStride);
+#endif
 
                 gcmFOOTER_NO();
                 return gcvSTATUS_OK;
@@ -5462,65 +5460,59 @@ _UploadTextureTiled(
         case gcvSURF_B8G8R8:
             if (trgFormat == gcvSURF_X8R8G8B8)
             {
-               /* Same as BGR to ARGB. */
-                if (Hardware->bigEndian)
-                {
-                    _UploadBGRtoARGBBE(trgLogical,
-                                       trgStride,
-                                       X, Y,
-                                       right, bottom,
-                                       edgeX, edgeY,
-                                       countX, countY,
-                                       Memory,
-                                       (SourceStride == 0)
-                                       ? (gctINT) Width * 3
-                                       : SourceStride);
-                }
-                else
-                {
-                    _UploadBGRtoARGB(trgLogical,
-                                     trgStride,
-                                     X, Y,
-                                     right, bottom,
-                                     edgeX, edgeY,
-                                     countX, countY,
-                                     Memory,
-                                     (SourceStride == 0)
-                                     ? (gctINT) Width * 3
-                                     : SourceStride);
-                }
+                /* Same as BGR to ARGB. */
+#if gcdENDIAN_BIG
+                _UploadBGRtoARGBBE(trgLogical,
+                                   trgStride,
+                                   X, Y,
+                                   right, bottom,
+                                   edgeX, edgeY,
+                                   countX, countY,
+                                   Memory,
+                                   (SourceStride == 0)
+                                   ? (gctINT) Width * 3
+                                   : SourceStride);
+#else
+                _UploadBGRtoARGB(trgLogical,
+                                 trgStride,
+                                 X, Y,
+                                 right, bottom,
+                                 edgeX, edgeY,
+                                 countX, countY,
+                                 Memory,
+                                 (SourceStride == 0)
+                                 ? (gctINT) Width * 3
+                                 : SourceStride);
+#endif
 
                 gcmFOOTER_NO();
                 return gcvSTATUS_OK;
             }
             else if (trgFormat == gcvSURF_X8B8G8R8)
             {
-                if (Hardware->bigEndian)
-                {
-                    _UploadBGRtoABGRBE(trgLogical,
-                                       trgStride,
-                                       X, Y,
-                                       right, bottom,
-                                       edgeX, edgeY,
-                                       countX, countY,
-                                       Memory,
-                                       (SourceStride == 0)
-                                       ? (gctINT) Width * 3
-                                       : SourceStride);
-                }
-                else
-                {
-                    _UploadBGRtoABGR(trgLogical,
-                                     trgStride,
-                                     X, Y,
-                                     right, bottom,
-                                     edgeX, edgeY,
-                                     countX, countY,
-                                     Memory,
-                                     (SourceStride == 0)
-                                     ? (gctINT) Width * 3
-                                     : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadBGRtoABGRBE(trgLogical,
+                                   trgStride,
+                                   X, Y,
+                                   right, bottom,
+                                   edgeX, edgeY,
+                                   countX, countY,
+                                   Memory,
+                                   (SourceStride == 0)
+                                   ? (gctINT) Width * 3
+                                   : SourceStride);
+#else
+                _UploadBGRtoABGR(trgLogical,
+                                 trgStride,
+                                 X, Y,
+                                 right, bottom,
+                                 edgeX, edgeY,
+                                 countX, countY,
+                                 Memory,
+                                 (SourceStride == 0)
+                                 ? (gctINT) Width * 3
+                                 : SourceStride);
+#endif
 
                 gcmFOOTER_NO();
                 return gcvSTATUS_OK;
@@ -5533,32 +5525,29 @@ _UploadTextureTiled(
         case gcvSURF_L8:
             if (trgFormat == gcvSURF_L8)
             {
-                if (Hardware->bigEndian)
-                {
-                    _Upload8bppto8bppBE(trgLogical,
-                                        trgStride,
-                                        X, Y,
-                                        right, bottom,
-                                        edgeX, edgeY,
-                                        countX, countY,
-                                        Memory,
-                                        (SourceStride == 0)
-                                        ? (gctINT) Width
-                                        : SourceStride);
-                }
-                else
-                {
-                    _Upload8bppto8bpp(trgLogical,
-                                      trgStride,
-                                      X, Y,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width
-                                      : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _Upload8bppto8bppBE(trgLogical,
+                                    trgStride,
+                                    X, Y,
+                                    right, bottom,
+                                    edgeX, edgeY,
+                                    countX, countY,
+                                    Memory,
+                                    (SourceStride == 0)
+                                    ? (gctINT) Width
+                                    : SourceStride);
+#else
+                _Upload8bppto8bpp(trgLogical,
+                                  trgStride,
+                                  X, Y,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width
+                                  : SourceStride);
+#endif
 
                 gcmFOOTER_NO();
                 return gcvSTATUS_OK;
@@ -5568,32 +5557,29 @@ _UploadTextureTiled(
         case gcvSURF_A8L8:
             if (trgFormat == gcvSURF_A8L8)
             {
-                if (Hardware->bigEndian)
-                {
-                    _Upload16bppto16bppBE(trgLogical,
-                                          trgStride,
-                                          X, Y,
-                                          right, bottom,
-                                          edgeX, edgeY,
-                                          countX, countY,
-                                          Memory,
-                                          (SourceStride == 0)
-                                          ? (gctINT) Width * 2
-                                          : SourceStride);
-                }
-                else
-                {
-                    _Upload16bppto16bpp(trgLogical,
-                                        trgStride,
-                                        X, Y,
-                                        right, bottom,
-                                        edgeX, edgeY,
-                                        countX, countY,
-                                        Memory,
-                                        (SourceStride == 0)
-                                        ? (gctINT) Width * 2
-                                        : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _Upload16bppto16bppBE(trgLogical,
+                                      trgStride,
+                                      X, Y,
+                                      right, bottom,
+                                      edgeX, edgeY,
+                                      countX, countY,
+                                      Memory,
+                                      (SourceStride == 0)
+                                      ? (gctINT) Width * 2
+                                      : SourceStride);
+#else
+                _Upload16bppto16bpp(trgLogical,
+                                    trgStride,
+                                    X, Y,
+                                    right, bottom,
+                                    edgeX, edgeY,
+                                    countX, countY,
+                                    Memory,
+                                    (SourceStride == 0)
+                                    ? (gctINT) Width * 2
+                                    : SourceStride);
+#endif
 
                 gcmFOOTER_NO();
                 return gcvSTATUS_OK;
@@ -5605,32 +5591,29 @@ _UploadTextureTiled(
         case gcvSURF_R5G6B5:
             if (trgFormat == gcvSURF_R5G6B5)
             {
-                if (Hardware->bigEndian)
-                {
-                    _Upload16bppto16bppBE(trgLogical,
-                                          trgStride,
-                                          X, Y,
-                                          right, bottom,
-                                          edgeX, edgeY,
-                                          countX, countY,
-                                          Memory,
-                                          (SourceStride == 0)
-                                          ? (gctINT) Width * 2
-                                          : SourceStride);
-                }
-                else
-                {
-                    _Upload16bppto16bpp(trgLogical,
-                                        trgStride,
-                                        X, Y,
-                                        right, bottom,
-                                        edgeX, edgeY,
-                                        countX, countY,
-                                        Memory,
-                                        (SourceStride == 0)
-                                        ? (gctINT) Width * 2
-                                        : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _Upload16bppto16bppBE(trgLogical,
+                                      trgStride,
+                                      X, Y,
+                                      right, bottom,
+                                      edgeX, edgeY,
+                                      countX, countY,
+                                      Memory,
+                                      (SourceStride == 0)
+                                      ? (gctINT) Width * 2
+                                      : SourceStride);
+#else
+                _Upload16bppto16bpp(trgLogical,
+                                    trgStride,
+                                    X, Y,
+                                    right, bottom,
+                                    edgeX, edgeY,
+                                    countX, countY,
+                                    Memory,
+                                    (SourceStride == 0)
+                                    ? (gctINT) Width * 2
+                                    : SourceStride);
+#endif
 
                 gcmFOOTER_NO();
                 return gcvSTATUS_OK;
@@ -5640,32 +5623,29 @@ _UploadTextureTiled(
         case gcvSURF_R4G4B4A4:
             if (trgFormat == gcvSURF_A4R4G4B4)
             {
-                if (Hardware->bigEndian)
-                {
-                    _UploadRGBA4444toARGB4444BE(trgLogical,
-                                                trgStride,
-                                                X, Y,
-                                                right, bottom,
-                                                edgeX, edgeY,
-                                                countX, countY,
-                                                Memory,
-                                                (SourceStride == 0)
-                                                ? (gctINT) Width * 2
-                                                : SourceStride);
-                }
-                else
-                {
-                    _UploadRGBA4444toARGB4444(trgLogical,
-                                              trgStride,
-                                              X, Y,
-                                              right, bottom,
-                                              edgeX, edgeY,
-                                              countX, countY,
-                                              Memory,
-                                              (SourceStride == 0)
-                                              ? (gctINT) Width * 2
-                                              : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadRGBA4444toARGB4444BE(trgLogical,
+                                            trgStride,
+                                            X, Y,
+                                            right, bottom,
+                                            edgeX, edgeY,
+                                            countX, countY,
+                                            Memory,
+                                            (SourceStride == 0)
+                                            ? (gctINT) Width * 2
+                                            : SourceStride);
+#else
+                _UploadRGBA4444toARGB4444(trgLogical,
+                                          trgStride,
+                                          X, Y,
+                                          right, bottom,
+                                          edgeX, edgeY,
+                                          countX, countY,
+                                          Memory,
+                                          (SourceStride == 0)
+                                          ? (gctINT) Width * 2
+                                          : SourceStride);
+#endif
 
                 gcmFOOTER_NO();
                 return gcvSTATUS_OK;
@@ -5675,32 +5655,29 @@ _UploadTextureTiled(
         case gcvSURF_R5G5B5A1:
             if (trgFormat == gcvSURF_A1R5G5B5)
             {
-                if (Hardware->bigEndian)
-                {
-                    _UploadRGBA5551toARGB1555BE(trgLogical,
-                                                trgStride,
-                                                X, Y,
-                                                right, bottom,
-                                                edgeX, edgeY,
-                                                countX, countY,
-                                                Memory,
-                                                (SourceStride == 0)
-                                                ? (gctINT) Width * 2
-                                                : SourceStride);
-                }
-                else
-                {
-                    _UploadRGBA5551toARGB1555(trgLogical,
-                                              trgStride,
-                                              X, Y,
-                                              right, bottom,
-                                              edgeX, edgeY,
-                                              countX, countY,
-                                              Memory,
-                                              (SourceStride == 0)
-                                              ? (gctINT) Width * 2
-                                              : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadRGBA5551toARGB1555BE(trgLogical,
+                                            trgStride,
+                                            X, Y,
+                                            right, bottom,
+                                            edgeX, edgeY,
+                                            countX, countY,
+                                            Memory,
+                                            (SourceStride == 0)
+                                            ? (gctINT) Width * 2
+                                            : SourceStride);
+#else
+                _UploadRGBA5551toARGB1555(trgLogical,
+                                          trgStride,
+                                          X, Y,
+                                          right, bottom,
+                                          edgeX, edgeY,
+                                          countX, countY,
+                                          Memory,
+                                          (SourceStride == 0)
+                                          ? (gctINT) Width * 2
+                                          : SourceStride);
+#endif
 
                 gcmFOOTER_NO();
                 return gcvSTATUS_OK;
@@ -5755,22 +5732,37 @@ _UploadTextureTiled(
         switch (bitsPerPixel)
         {
         case 8:
-            if (Hardware->bigEndian)
-            {
-                _Upload8bppto8bppBE(trgLogical,
-                                    trgStride,
-                                    X, Y,
-                                    right, bottom,
-                                    edgeX, edgeY,
-                                    countX, countY,
-                                    Memory,
-                                    (SourceStride == 0)
-                                    ? (gctINT) Width
-                                    : SourceStride);
-            }
-            else
-            {
-                _Upload8bppto8bpp(trgLogical,
+#if gcdENDIAN_BIG
+            _Upload8bppto8bppBE(trgLogical,
+                                trgStride,
+                                X, Y,
+                                right, bottom,
+                                edgeX, edgeY,
+                                countX, countY,
+                                Memory,
+                                (SourceStride == 0)
+                                ? (gctINT) Width
+                                : SourceStride);
+#else
+            _Upload8bppto8bpp(trgLogical,
+                              trgStride,
+                              X, Y,
+                              right, bottom,
+                              edgeX, edgeY,
+                              countX, countY,
+                              Memory,
+                              (SourceStride == 0)
+                              ? (gctINT) Width
+                              : SourceStride);
+#endif
+
+            /* Success. */
+            gcmFOOTER_NO();
+            return gcvSTATUS_OK;
+
+        case 16:
+#if gcdENDIAN_BIG
+            _Upload16bppto16bppBE(trgLogical,
                                   trgStride,
                                   X, Y,
                                   right, bottom,
@@ -5778,105 +5770,78 @@ _UploadTextureTiled(
                                   countX, countY,
                                   Memory,
                                   (SourceStride == 0)
-                                  ? (gctINT) Width
+                                  ? (gctINT) Width * 2
                                   : SourceStride);
-            }
-
-            /* Success. */
-            gcmFOOTER_NO();
-            return gcvSTATUS_OK;
-
-        case 16:
-            if (Hardware->bigEndian)
-            {
-                _Upload16bppto16bppBE(trgLogical,
-                                      trgStride,
-                                      X, Y,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-            }
-            else
-            {
-                _Upload16bppto16bpp(trgLogical,
-                                    trgStride,
-                                    X, Y,
-                                    right, bottom,
-                                    edgeX, edgeY,
-                                    countX, countY,
-                                    Memory,
-                                    (SourceStride == 0)
-                                    ? (gctINT) Width * 2
-                                    : SourceStride);
-            }
+#else
+            _Upload16bppto16bpp(trgLogical,
+                                trgStride,
+                                X, Y,
+                                right, bottom,
+                                edgeX, edgeY,
+                                countX, countY,
+                                Memory,
+                                (SourceStride == 0)
+                                ? (gctINT) Width * 2
+                                : SourceStride);
+#endif
 
             /* Success. */
             gcmFOOTER_NO();
             return gcvSTATUS_OK;
 
         case 32:
-            if (Hardware->bigEndian)
-            {
-                _Upload32bppto32bppBE(trgLogical,
-                                      trgStride,
-                                      X, Y,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 4
-                                      : SourceStride);
-            }
-            else
-            {
-                _Upload32bppto32bpp(trgLogical,
-                                    trgStride,
-                                    X, Y,
-                                    right, bottom,
-                                    edgeX, edgeY,
-                                    countX, countY,
-                                    Memory,
-                                    (SourceStride == 0)
-                                    ? (gctINT) Width * 4
-                                    : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _Upload32bppto32bppBE(trgLogical,
+                                  trgStride,
+                                  X, Y,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 4
+                                  : SourceStride);
+#else
+            _Upload32bppto32bpp(trgLogical,
+                                trgStride,
+                                X, Y,
+                                right, bottom,
+                                edgeX, edgeY,
+                                countX, countY,
+                                Memory,
+                                (SourceStride == 0)
+                                ? (gctINT) Width * 4
+                                : SourceStride);
+#endif
 
             /* Success. */
             gcmFOOTER_NO();
             return gcvSTATUS_OK;
 
         case 64:
-            if (Hardware->bigEndian)
-            {
-                _Upload64bppto64bppBE(trgLogical,
-                                      trgStride,
-                                      X, Y,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 8
-                                      : SourceStride);
-            }
-            else
-            {
-                _Upload64bppto64bpp(trgLogical,
-                                    trgStride,
-                                    X, Y,
-                                    right, bottom,
-                                    edgeX, edgeY,
-                                    countX, countY,
-                                    Memory,
-                                    (SourceStride == 0)
-                                    ? (gctINT) Width * 8
-                                    : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _Upload64bppto64bppBE(trgLogical,
+                                  trgStride,
+                                  X, Y,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 8
+                                  : SourceStride);
+#else
+            _Upload64bppto64bpp(trgLogical,
+                                trgStride,
+                                X, Y,
+                                right, bottom,
+                                edgeX, edgeY,
+                                countX, countY,
+                                Memory,
+                                (SourceStride == 0)
+                                ? (gctINT) Width * 8
+                                : SourceStride);
+#endif
 
             /* Success. */
             gcmFOOTER_NO();
@@ -6201,6 +6166,7 @@ _UploadSuperTiledL8toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiledL8toARGBBE(
     IN gcoHARDWARE Hardware,
@@ -6365,6 +6331,7 @@ _UploadSuperTiledL8toARGBBE(
         }
     }
 }
+#endif
 
 
 static void
@@ -6533,6 +6500,7 @@ _UploadSuperTiledA8L8toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiledA8L8toARGBBE(
     IN gcoHARDWARE Hardware,
@@ -6697,6 +6665,7 @@ _UploadSuperTiledA8L8toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadSuperTiledA8toARGB(
@@ -6837,6 +6806,7 @@ _UploadSuperTiledA8toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiledA8toARGBBE(
     IN gcoHARDWARE Hardware,
@@ -6974,6 +6944,7 @@ _UploadSuperTiledA8toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadSuperTiledRGB565toARGB(
@@ -7141,6 +7112,7 @@ _UploadSuperTiledRGB565toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiledRGB565toARGBBE(
     IN gcoHARDWARE Hardware,
@@ -7305,6 +7277,7 @@ _UploadSuperTiledRGB565toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadSuperTiledRGBA4444toARGB(
@@ -7472,7 +7445,7 @@ _UploadSuperTiledRGBA4444toARGB(
     }
 }
 
-
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiledRGBA4444toARGBBE(
     IN gcoHARDWARE Hardware,
@@ -7638,6 +7611,7 @@ _UploadSuperTiledRGBA4444toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadSuperTiledRGBA5551toARGB(
@@ -7804,6 +7778,7 @@ _UploadSuperTiledRGBA5551toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiledRGBA5551toARGBBE(
     IN gcoHARDWARE Hardware,
@@ -7968,6 +7943,7 @@ _UploadSuperTiledRGBA5551toARGBBE(
          }
     }
 }
+#endif
 
 static void
 _UploadSuperTiledBGRtoABGR(
@@ -8109,6 +8085,7 @@ _UploadSuperTiledBGRtoABGR(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiledBGRtoABGRBE(
     IN gcoHARDWARE Hardware,
@@ -8247,6 +8224,7 @@ _UploadSuperTiledBGRtoABGRBE(
         }
     }
 }
+#endif
 
 static void
 _UploadSuperTiledBGRtoARGB(
@@ -8388,6 +8366,7 @@ _UploadSuperTiledBGRtoARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiledBGRtoARGBBE(
     IN gcoHARDWARE Hardware,
@@ -8526,6 +8505,7 @@ _UploadSuperTiledBGRtoARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadSuperTiledABGRtoARGB(
@@ -8666,6 +8646,7 @@ _UploadSuperTiledABGRtoARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiledABGRtoARGBBE(
     IN gcoHARDWARE Hardware,
@@ -8802,6 +8783,7 @@ _UploadSuperTiledABGRtoARGBBE(
         }
     }
 }
+#endif
 #endif
 
 static gceSTATUS
@@ -9060,6 +9042,7 @@ _UploadSuperTiled8bppto8bpp(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiled8bppto8bppBE(
     IN gcoHARDWARE Hardware,
@@ -9203,6 +9186,7 @@ _UploadSuperTiled8bppto8bppBE(
         }
     }
 }
+#endif
 
 static void
 _UploadSuperTiled16bppto16bpp(
@@ -9367,6 +9351,7 @@ _UploadSuperTiled16bppto16bpp(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiled16bppto16bppBE(
     IN gcoHARDWARE Hardware,
@@ -9529,6 +9514,7 @@ _UploadSuperTiled16bppto16bppBE(
         }
     }
 }
+#endif
 
 static void
 _UploadSuperTiled32bppto32bpp(
@@ -9714,6 +9700,7 @@ _UploadSuperTiled32bppto32bpp(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiled32bppto32bppBE(
     IN gcoHARDWARE Hardware,
@@ -9897,6 +9884,7 @@ _UploadSuperTiled32bppto32bppBE(
         }
     }
 }
+#endif
 
 static void
 _UploadSuperTiledRGBA4444toARGB4444(
@@ -10027,6 +10015,7 @@ _UploadSuperTiledRGBA4444toARGB4444(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiledRGBA4444toARGB4444BE(
     IN gcoHARDWARE Hardware,
@@ -10156,6 +10145,7 @@ _UploadSuperTiledRGBA4444toARGB4444BE(
         }
     }
 }
+#endif
 
 static void
 _UploadSuperTiledRGBA5551toARGB1555(
@@ -10286,6 +10276,7 @@ _UploadSuperTiledRGBA5551toARGB1555(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadSuperTiledRGBA5551toARGB1555BE(
     IN gcoHARDWARE Hardware,
@@ -10414,6 +10405,7 @@ _UploadSuperTiledRGBA5551toARGB1555BE(
     }
 }
 #endif
+#endif
 
 static gceSTATUS
 _UploadTextureSuperTiled(
@@ -10508,283 +10500,255 @@ _UploadTextureSuperTiled(
         switch (SourceFormat)
         {
         case gcvSURF_A8:
-            if (Hardware->bigEndian)
-            {
-                _UploadSuperTiledA8toARGBBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width
-                                      : SourceStride);
-
-            }
-            else
-            {
-                _UploadSuperTiledA8toARGB(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width
-                                      : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _UploadSuperTiledA8toARGBBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width
+                                  : SourceStride);
+#else
+            _UploadSuperTiledA8toARGB(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width
+                                  : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         case gcvSURF_B8G8R8:
-            if (Hardware->bigEndian)
-            {
-                _UploadSuperTiledBGRtoARGBBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 3
-                                      : SourceStride);
-            }
-            else
-            {
-                _UploadSuperTiledBGRtoARGB(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 3
-                                      : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _UploadSuperTiledBGRtoARGBBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 3
+                                  : SourceStride);
+#else
+            _UploadSuperTiledBGRtoARGB(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 3
+                                  : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         case gcvSURF_A8B8G8R8:
-            if (Hardware->bigEndian)
-            {
-                _UploadSuperTiledABGRtoARGBBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 4
-                                      : SourceStride);
-            }
-            else
-            {
-                _UploadSuperTiledABGRtoARGB(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 3
-                                      : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _UploadSuperTiledABGRtoARGBBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 4
+                                  : SourceStride);
+#else
+            _UploadSuperTiledABGRtoARGB(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 3
+                                  : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         case gcvSURF_L8:
-            if (Hardware->bigEndian)
-            {
-                _UploadSuperTiledL8toARGBBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width
-                                      : SourceStride);
-            }
-            else
-            {
-                _UploadSuperTiledL8toARGB(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width
-                                      : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _UploadSuperTiledL8toARGBBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width
+                                  : SourceStride);
+#else
+            _UploadSuperTiledL8toARGB(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width
+                                  : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         case gcvSURF_A8L8:
-            if (Hardware->bigEndian)
-            {
-                _UploadSuperTiledA8L8toARGBBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-            }
-            else
-            {
-                _UploadSuperTiledA8L8toARGB(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 3
-                                      : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _UploadSuperTiledA8L8toARGBBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#else
+            _UploadSuperTiledA8L8toARGB(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 3
+                                  : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         case gcvSURF_A8R8G8B8:
-            if (Hardware->bigEndian)
-            {
-                _UploadSuperTiled32bppto32bppBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 4
-                                      : SourceStride);
-            }
-            else
-            {
-                _UploadSuperTiled32bppto32bpp(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 4
-                                      : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _UploadSuperTiled32bppto32bppBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 4
+                                  : SourceStride);
+#else
+            _UploadSuperTiled32bppto32bpp(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 4
+                                  : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         case gcvSURF_R5G6B5:
-            if (Hardware->bigEndian)
-            {
-                _UploadSuperTiledRGB565toARGBBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-            }
-            else
-            {
-                _UploadSuperTiledRGB565toARGB(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _UploadSuperTiledRGB565toARGBBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#else
+            _UploadSuperTiledRGB565toARGB(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         case gcvSURF_R4G4B4A4:
-            if (Hardware->bigEndian)
-            {
-                 _UploadSuperTiledRGBA4444toARGBBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-            }
-            else
-            {
-                 _UploadSuperTiledRGBA4444toARGB(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-            }
+#if gcdENDIAN_BIG
+             _UploadSuperTiledRGBA4444toARGBBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#else
+             _UploadSuperTiledRGBA4444toARGB(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         case gcvSURF_R5G5B5A1:
-            if (Hardware->bigEndian)
-            {
-                _UploadSuperTiledRGBA5551toARGBBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-            }
-            else
-            {
-                _UploadSuperTiledRGBA5551toARGB(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _UploadSuperTiledRGBA5551toARGBBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#else
+            _UploadSuperTiledRGBA5551toARGB(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         default:
@@ -10799,34 +10763,31 @@ _UploadTextureSuperTiled(
         case gcvSURF_A8:
             if (TexSurf->format == gcvSURF_A8)
             {
-                if (Hardware->bigEndian)
-                {
-                    _UploadSuperTiled8bppto8bppBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width
-                                      : SourceStride);
-                }
-                else
-                {
-                    _UploadSuperTiled8bppto8bpp(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width
-                                      : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadSuperTiled8bppto8bppBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width
+                                  : SourceStride);
+#else
+                _UploadSuperTiled8bppto8bpp(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width
+                                  : SourceStride);
+#endif
                 return gcvSTATUS_OK;
             }
             break;
@@ -10835,66 +10796,60 @@ _UploadTextureSuperTiled(
             if (TexSurf->format == gcvSURF_X8R8G8B8)
             {
                /* Same as BGR to ARGB. */
-                if (Hardware->bigEndian)
-                {
-                    _UploadSuperTiledBGRtoARGBBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 3
-                                      : SourceStride);
-                }
-                else
-                {
-                    _UploadSuperTiledBGRtoARGB(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 3
-                                      : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadSuperTiledBGRtoARGBBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 3
+                                  : SourceStride);
+#else
+                _UploadSuperTiledBGRtoARGB(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 3
+                                  : SourceStride);
+#endif
                 return gcvSTATUS_OK;
             }
             else if (TexSurf->format == gcvSURF_X8B8G8R8)
             {
-                if (Hardware->bigEndian)
-                {
-                    _UploadSuperTiledBGRtoABGRBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 3
-                                      : SourceStride);
-                }
-                else
-                {
-                    _UploadSuperTiledBGRtoABGR(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 3
-                                      : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadSuperTiledBGRtoABGRBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 3
+                                  : SourceStride);
+#else
+                _UploadSuperTiledBGRtoABGR(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 3
+                                  : SourceStride);
+#endif
                 return gcvSTATUS_OK;
             }
 
@@ -10905,34 +10860,31 @@ _UploadTextureSuperTiled(
         case gcvSURF_L8:
             if (TexSurf->format == gcvSURF_L8)
             {
-                if (Hardware->bigEndian)
-                {
-                    _UploadSuperTiled8bppto8bppBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width
-                                      : SourceStride);
-                }
-                else
-                {
-                    _UploadSuperTiled8bppto8bpp(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width
-                                      : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadSuperTiled8bppto8bppBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width
+                                  : SourceStride);
+#else
+                _UploadSuperTiled8bppto8bpp(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width
+                                  : SourceStride);
+#endif
                 return gcvSTATUS_OK;
             }
             break;
@@ -10940,34 +10892,31 @@ _UploadTextureSuperTiled(
         case gcvSURF_A8L8:
             if (TexSurf->format == gcvSURF_A8L8)
             {
-                if (Hardware->bigEndian)
-                {
-                    _UploadSuperTiled16bppto16bppBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-                }
-                else
-                {
-                    _UploadSuperTiled16bppto16bpp(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadSuperTiled16bppto16bppBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#else
+                _UploadSuperTiled16bppto16bpp(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#endif
                 return gcvSTATUS_OK;
             }
             break;
@@ -10977,34 +10926,31 @@ _UploadTextureSuperTiled(
         case gcvSURF_R5G6B5:
             if (TexSurf->format == gcvSURF_R5G6B5)
             {
-                if (Hardware->bigEndian)
-                {
-                    _UploadSuperTiled16bppto16bppBE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-                }
-                else
-                {
-                    _UploadSuperTiled16bppto16bpp(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadSuperTiled16bppto16bppBE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#else
+                _UploadSuperTiled16bppto16bpp(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#endif
                 return gcvSTATUS_OK;
             }
             break;
@@ -11012,34 +10958,31 @@ _UploadTextureSuperTiled(
         case gcvSURF_R4G4B4A4:
             if (TexSurf->format == gcvSURF_A4R4G4B4)
             {
-                if (Hardware->bigEndian)
-                {
-                    _UploadSuperTiledRGBA4444toARGB4444BE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-                }
-                else
-                {
-                    _UploadSuperTiledRGBA4444toARGB4444(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadSuperTiledRGBA4444toARGB4444BE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#else
+                _UploadSuperTiledRGBA4444toARGB4444(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#endif
                 return gcvSTATUS_OK;
             }
             break;
@@ -11047,34 +10990,31 @@ _UploadTextureSuperTiled(
         case gcvSURF_R5G5B5A1:
             if (TexSurf->format == gcvSURF_A1R5G5B5)
             {
-                if (Hardware->bigEndian)
-                {
-                    _UploadSuperTiledRGBA5551toARGB1555BE(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-                }
-                else
-                {
-                    _UploadSuperTiledRGBA5551toARGB1555(Hardware,
-                                      trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      right, bottom,
-                                      edgeX, edgeY,
-                                      countX, countY,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width * 2
-                                      : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadSuperTiledRGBA5551toARGB1555BE(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#else
+                _UploadSuperTiledRGBA5551toARGB1555(Hardware,
+                                  trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  right, bottom,
+                                  edgeX, edgeY,
+                                  countX, countY,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width * 2
+                                  : SourceStride);
+#endif
                 return gcvSTATUS_OK;
             }
             break;
@@ -11096,23 +11036,36 @@ _UploadTextureSuperTiled(
             switch (formatInfo->bitsPerPixel)
             {
             case 8:
-                if (Hardware->bigEndian)
-                {
-                    _UploadSuperTiled8bppto8bppBE(Hardware,
-                                                  trgLogical,
-                                                  trgStride,
-                                                  XOffset, YOffset,
-                                                  right, bottom,
-                                                  edgeX, edgeY,
-                                                  countX, countY,
-                                                  Memory,
-                                                  (SourceStride == 0)
-                                                  ? (gctINT) Width
-                                                  : SourceStride);
-                }
-                else
-                {
-                    _UploadSuperTiled8bppto8bpp(Hardware,
+#if gcdENDIAN_BIG
+                _UploadSuperTiled8bppto8bppBE(Hardware,
+                                              trgLogical,
+                                              trgStride,
+                                              XOffset, YOffset,
+                                              right, bottom,
+                                              edgeX, edgeY,
+                                              countX, countY,
+                                              Memory,
+                                              (SourceStride == 0)
+                                              ? (gctINT) Width
+                                              : SourceStride);
+#else
+                _UploadSuperTiled8bppto8bpp(Hardware,
+                                            trgLogical,
+                                            trgStride,
+                                            XOffset, YOffset,
+                                            right, bottom,
+                                            edgeX, edgeY,
+                                            countX, countY,
+                                            Memory,
+                                            (SourceStride == 0)
+                                            ? (gctINT) Width
+                                            : SourceStride);
+#endif
+                return gcvSTATUS_OK;
+
+            case 16:
+#if gcdENDIAN_BIG
+                _UploadSuperTiled16bppto16bppBE(Hardware,
                                                 trgLogical,
                                                 trgStride,
                                                 XOffset, YOffset,
@@ -11121,71 +11074,49 @@ _UploadTextureSuperTiled(
                                                 countX, countY,
                                                 Memory,
                                                 (SourceStride == 0)
-                                                ? (gctINT) Width
+                                                ? (gctINT) Width * 2
                                                 : SourceStride);
-                }
-                return gcvSTATUS_OK;
-
-            case 16:
-                if (Hardware->bigEndian)
-                {
-                    _UploadSuperTiled16bppto16bppBE(Hardware,
-                                                    trgLogical,
-                                                    trgStride,
-                                                    XOffset, YOffset,
-                                                    right, bottom,
-                                                    edgeX, edgeY,
-                                                    countX, countY,
-                                                    Memory,
-                                                    (SourceStride == 0)
-                                                    ? (gctINT) Width * 2
-                                                    : SourceStride);
-                }
-                else
-                {
-                    _UploadSuperTiled16bppto16bpp(Hardware,
-                                                  trgLogical,
-                                                  trgStride,
-                                                  XOffset, YOffset,
-                                                  right, bottom,
-                                                  edgeX, edgeY,
-                                                  countX, countY,
-                                                  Memory,
-                                                  (SourceStride == 0)
-                                                  ? (gctINT) Width * 2
-                                                  : SourceStride);
-                }
+#else
+                _UploadSuperTiled16bppto16bpp(Hardware,
+                                              trgLogical,
+                                              trgStride,
+                                              XOffset, YOffset,
+                                              right, bottom,
+                                              edgeX, edgeY,
+                                              countX, countY,
+                                              Memory,
+                                              (SourceStride == 0)
+                                              ? (gctINT) Width * 2
+                                              : SourceStride);
+#endif
                 return gcvSTATUS_OK;
 
             case 32:
-                if (Hardware->bigEndian)
-                {
-                    _UploadSuperTiled32bppto32bppBE(Hardware,
-                                                    trgLogical,
-                                                    trgStride,
-                                                    XOffset, YOffset,
-                                                    right, bottom,
-                                                    edgeX, edgeY,
-                                                    countX, countY,
-                                                    Memory,
-                                                    (SourceStride == 0)
-                                                    ? (gctINT) Width * 4
-                                                    : SourceStride);
-                }
-                else
-                {
-                    _UploadSuperTiled32bppto32bpp(Hardware,
-                                                  trgLogical,
-                                                  trgStride,
-                                                  XOffset, YOffset,
-                                                  right, bottom,
-                                                  edgeX, edgeY,
-                                                  countX, countY,
-                                                  Memory,
-                                                  (SourceStride == 0)
-                                                  ? (gctINT) Width * 4
-                                                  : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadSuperTiled32bppto32bppBE(Hardware,
+                                                trgLogical,
+                                                trgStride,
+                                                XOffset, YOffset,
+                                                right, bottom,
+                                                edgeX, edgeY,
+                                                countX, countY,
+                                                Memory,
+                                                (SourceStride == 0)
+                                                ? (gctINT) Width * 4
+                                                : SourceStride);
+#else
+                _UploadSuperTiled32bppto32bpp(Hardware,
+                                              trgLogical,
+                                              trgStride,
+                                              XOffset, YOffset,
+                                              right, bottom,
+                                              edgeX, edgeY,
+                                              countX, countY,
+                                              Memory,
+                                              (SourceStride == 0)
+                                              ? (gctINT) Width * 4
+                                              : SourceStride);
+#endif
                 return gcvSTATUS_OK;
 
             case 64:
@@ -11315,6 +11246,7 @@ _UploadLinearA8toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadLinearA8toARGBBE(
     IN gctPOINTER Logical,
@@ -11345,6 +11277,7 @@ _UploadLinearA8toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadLinearBGRtoARGB(
@@ -11378,6 +11311,7 @@ _UploadLinearBGRtoARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadLinearBGRtoARGBBE(
     IN gctPOINTER Logical,
@@ -11409,6 +11343,7 @@ _UploadLinearBGRtoARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadLinearBGRtoABGR(
@@ -11442,6 +11377,7 @@ _UploadLinearBGRtoABGR(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadLinearBGRtoABGRBE(
     IN gctPOINTER Logical,
@@ -11473,6 +11409,7 @@ _UploadLinearBGRtoABGRBE(
         }
     }
 }
+#endif
 
 static void
 _UploadLinearABGRtoARGB(
@@ -11506,6 +11443,7 @@ _UploadLinearABGRtoARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadLinearABGRtoARGBBE(
     IN gctPOINTER Logical,
@@ -11537,6 +11475,7 @@ _UploadLinearABGRtoARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadLinearL8toARGB(
@@ -11571,6 +11510,7 @@ _UploadLinearL8toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadLinearL8toARGBBE(
     IN gctPOINTER Logical,
@@ -11603,6 +11543,7 @@ _UploadLinearL8toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadLinearA8L8toARGB(
@@ -11638,6 +11579,7 @@ _UploadLinearA8L8toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadLinearA8L8toARGBBE(
     IN gctPOINTER Logical,
@@ -11672,6 +11614,7 @@ _UploadLinearA8L8toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadLinear32bppto32bpp(
@@ -11763,6 +11706,7 @@ _UploadLinearRGB565toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadLinearRGB565toARGBBE(
     IN gctPOINTER Logical,
@@ -11794,6 +11738,7 @@ _UploadLinearRGB565toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadLinearRGBA4444toARGB(
@@ -11827,6 +11772,7 @@ _UploadLinearRGBA4444toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadLinearRGBA4444toARGBBE(
     IN gctPOINTER Logical,
@@ -11858,6 +11804,7 @@ _UploadLinearRGBA4444toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadLinearRGBA5551toARGB(
@@ -11891,6 +11838,7 @@ _UploadLinearRGBA5551toARGB(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadLinearRGBA5551toARGBBE(
     IN gctPOINTER Logical,
@@ -11922,6 +11870,7 @@ _UploadLinearRGBA5551toARGBBE(
         }
     }
 }
+#endif
 
 static void
 _UploadLinear8bppto8bpp(
@@ -12013,6 +11962,7 @@ _UploadLinearRGBA4444toARGB4444(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadLinearRGBA4444toARGB4444BE(
     IN gctPOINTER Logical,
@@ -12044,6 +11994,7 @@ _UploadLinearRGBA4444toARGB4444BE(
         }
     }
 }
+#endif
 
 static void
 _UploadLinearRGBA5551toARGB1555(
@@ -12077,6 +12028,7 @@ _UploadLinearRGBA5551toARGB1555(
     }
 }
 
+#if gcdENDIAN_BIG
 static void
 _UploadLinearRGBA5551toARGB1555BE(
     IN gctPOINTER Logical,
@@ -12108,6 +12060,7 @@ _UploadLinearRGBA5551toARGB1555BE(
         }
     }
 }
+#endif
 
 static gceSTATUS
 _UploadTextureLinear(
@@ -12153,129 +12106,113 @@ _UploadTextureLinear(
         switch (SourceFormat)
         {
         case gcvSURF_A8:
-            if (Hardware->bigEndian)
-            {
-                _UploadLinearA8toARGBBE(trgLogical,
-                                        trgStride,
-                                        XOffset, YOffset,
-                                        Width, Height,
-                                        Memory,
-                                        (SourceStride == 0)
-                                        ? (gctINT) Width
-                                        : SourceStride);
-
-            }
-            else
-            {
-                _UploadLinearA8toARGB(trgLogical,
-                                      trgStride,
-                                      XOffset, YOffset,
-                                      Width, Height,
-                                      Memory,
-                                      (SourceStride == 0)
-                                      ? (gctINT) Width
-                                      : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _UploadLinearA8toARGBBE(trgLogical,
+                                    trgStride,
+                                    XOffset, YOffset,
+                                    Width, Height,
+                                    Memory,
+                                    (SourceStride == 0)
+                                    ? (gctINT) Width
+                                    : SourceStride);
+#else
+            _UploadLinearA8toARGB(trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  Width, Height,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width
+                                  : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         case gcvSURF_B8G8R8:
-            if (Hardware->bigEndian)
-            {
-                _UploadLinearBGRtoARGBBE(trgLogical,
-                                        trgStride,
-                                        XOffset, YOffset,
-                                        Width, Height,
-                                        Memory,
-                                        (SourceStride == 0)
-                                        ? (gctINT) Width * 3
-                                        : SourceStride);
-            }
-            else
-            {
-                _UploadLinearBGRtoARGB(trgLogical,
-                                       trgStride,
-                                       XOffset, YOffset,
-                                       Width, Height,
-                                       Memory,
-                                       (SourceStride == 0)
-                                       ? (gctINT) Width * 3
-                                       : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _UploadLinearBGRtoARGBBE(trgLogical,
+                                    trgStride,
+                                    XOffset, YOffset,
+                                    Width, Height,
+                                    Memory,
+                                    (SourceStride == 0)
+                                    ? (gctINT) Width * 3
+                                    : SourceStride);
+#else
+            _UploadLinearBGRtoARGB(trgLogical,
+                                   trgStride,
+                                   XOffset, YOffset,
+                                   Width, Height,
+                                   Memory,
+                                   (SourceStride == 0)
+                                   ? (gctINT) Width * 3
+                                   : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         case gcvSURF_A8B8G8R8:
-            if (Hardware->bigEndian)
-            {
-                _UploadLinearABGRtoARGBBE(trgLogical,
-                                          trgStride,
-                                          XOffset, YOffset,
-                                          Width, Height,
-                                          Memory,
-                                          (SourceStride == 0)
-                                          ? (gctINT) Width * 4
-                                          : SourceStride);
-            }
-            else
-            {
-                _UploadLinearABGRtoARGB(trgLogical,
-                                        trgStride,
-                                        XOffset, YOffset,
-                                        Width, Height,
-                                        Memory,
-                                        (SourceStride == 0)
-                                        ? (gctINT) Width * 3
-                                        : SourceStride);
-            }
-            return gcvSTATUS_OK;
-
-        case gcvSURF_L8:
-            if (Hardware->bigEndian)
-            {
-                _UploadLinearL8toARGBBE(trgLogical,
-                                        trgStride,
-                                        XOffset, YOffset,
-                                        Width, Height,
-                                        Memory,
-                                        (SourceStride == 0)
-                                        ? (gctINT) Width
-                                        : SourceStride);
-            }
-            else
-            {
-                _UploadLinearL8toARGB(trgLogical,
+#if gcdENDIAN_BIG
+            _UploadLinearABGRtoARGBBE(trgLogical,
                                       trgStride,
                                       XOffset, YOffset,
                                       Width, Height,
                                       Memory,
                                       (SourceStride == 0)
-                                      ? (gctINT) Width
+                                      ? (gctINT) Width * 4
                                       : SourceStride);
-            }
+#else
+            _UploadLinearABGRtoARGB(trgLogical,
+                                    trgStride,
+                                    XOffset, YOffset,
+                                    Width, Height,
+                                    Memory,
+                                    (SourceStride == 0)
+                                    ? (gctINT) Width * 3
+                                    : SourceStride);
+#endif
+            return gcvSTATUS_OK;
+
+        case gcvSURF_L8:
+#if gcdENDIAN_BIG
+            _UploadLinearL8toARGBBE(trgLogical,
+                                    trgStride,
+                                    XOffset, YOffset,
+                                    Width, Height,
+                                    Memory,
+                                    (SourceStride == 0)
+                                    ? (gctINT) Width
+                                    : SourceStride);
+#else
+            _UploadLinearL8toARGB(trgLogical,
+                                  trgStride,
+                                  XOffset, YOffset,
+                                  Width, Height,
+                                  Memory,
+                                  (SourceStride == 0)
+                                  ? (gctINT) Width
+                                  : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         case gcvSURF_A8L8:
-            if (Hardware->bigEndian)
-            {
-                _UploadLinearA8L8toARGBBE(trgLogical,
-                                          trgStride,
-                                          XOffset, YOffset,
-                                          Width, Height,
-                                          Memory,
-                                          (SourceStride == 0)
-                                          ? (gctINT) Width * 2
-                                          : SourceStride);
-            }
-            else
-            {
-                _UploadLinearA8L8toARGB(trgLogical,
-                                        trgStride,
-                                        XOffset, YOffset,
-                                        Width, Height,
-                                        Memory,
-                                        (SourceStride == 0)
-                                        ? (gctINT) Width * 3
-                                        : SourceStride);
-            }
+#if gcdENDIAN_BIG
+            _UploadLinearA8L8toARGBBE(trgLogical,
+                                      trgStride,
+                                      XOffset, YOffset,
+                                      Width, Height,
+                                      Memory,
+                                      (SourceStride == 0)
+                                      ? (gctINT) Width * 2
+                                      : SourceStride);
+#else
+            _UploadLinearA8L8toARGB(trgLogical,
+                                    trgStride,
+                                    XOffset, YOffset,
+                                    Width, Height,
+                                    Memory,
+                                    (SourceStride == 0)
+                                    ? (gctINT) Width * 3
+                                    : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         case gcvSURF_A8R8G8B8:
@@ -12290,9 +12227,30 @@ _UploadTextureLinear(
             return gcvSTATUS_OK;
 
         case gcvSURF_R5G6B5:
-            if (Hardware->bigEndian)
-            {
-                _UploadLinearRGB565toARGBBE(trgLogical,
+#if gcdENDIAN_BIG
+            _UploadLinearRGB565toARGBBE(trgLogical,
+                                       trgStride,
+                                       XOffset, YOffset,
+                                       Width, Height,
+                                       Memory,
+                                       (SourceStride == 0)
+                                       ? (gctINT) Width * 2
+                                       : SourceStride);
+#else
+            _UploadLinearRGB565toARGB(trgLogical,
+                                      trgStride,
+                                      XOffset, YOffset,
+                                      Width, Height,
+                                      Memory,
+                                      (SourceStride == 0)
+                                      ? (gctINT) Width * 2
+                                      : SourceStride);
+#endif
+            return gcvSTATUS_OK;
+
+        case gcvSURF_R4G4B4A4:
+#if gcdENDIAN_BIG
+             _UploadLinearRGBA4444toARGBBE(trgLogical,
                                            trgStride,
                                            XOffset, YOffset,
                                            Width, Height,
@@ -12300,10 +12258,21 @@ _UploadTextureLinear(
                                            (SourceStride == 0)
                                            ? (gctINT) Width * 2
                                            : SourceStride);
-            }
-            else
-            {
-                _UploadLinearRGB565toARGB(trgLogical,
+#else
+             _UploadLinearRGBA4444toARGB(trgLogical,
+                                         trgStride,
+                                         XOffset, YOffset,
+                                         Width, Height,
+                                         Memory,
+                                         (SourceStride == 0)
+                                         ? (gctINT) Width * 2
+                                         : SourceStride);
+#endif
+            return gcvSTATUS_OK;
+
+        case gcvSURF_R5G5B5A1:
+#if gcdENDIAN_BIG
+            _UploadLinearRGBA5551toARGBBE(trgLogical,
                                           trgStride,
                                           XOffset, YOffset,
                                           Width, Height,
@@ -12311,57 +12280,16 @@ _UploadTextureLinear(
                                           (SourceStride == 0)
                                           ? (gctINT) Width * 2
                                           : SourceStride);
-            }
-            return gcvSTATUS_OK;
-
-        case gcvSURF_R4G4B4A4:
-            if (Hardware->bigEndian)
-            {
-                 _UploadLinearRGBA4444toARGBBE(trgLogical,
-                                               trgStride,
-                                               XOffset, YOffset,
-                                               Width, Height,
-                                               Memory,
-                                               (SourceStride == 0)
-                                               ? (gctINT) Width * 2
-                                               : SourceStride);
-            }
-            else
-            {
-                 _UploadLinearRGBA4444toARGB(trgLogical,
-                                             trgStride,
-                                             XOffset, YOffset,
-                                             Width, Height,
-                                             Memory,
-                                             (SourceStride == 0)
-                                             ? (gctINT) Width * 2
-                                             : SourceStride);
-            }
-            return gcvSTATUS_OK;
-
-        case gcvSURF_R5G5B5A1:
-            if (Hardware->bigEndian)
-            {
-                _UploadLinearRGBA5551toARGBBE(trgLogical,
-                                              trgStride,
-                                              XOffset, YOffset,
-                                              Width, Height,
-                                              Memory,
-                                              (SourceStride == 0)
-                                              ? (gctINT) Width * 2
-                                              : SourceStride);
-            }
-            else
-            {
-                _UploadLinearRGBA5551toARGB(trgLogical,
-                                            trgStride,
-                                            XOffset, YOffset,
-                                            Width, Height,
-                                            Memory,
-                                            (SourceStride == 0)
-                                            ? (gctINT) Width * 2
-                                            : SourceStride);
-            }
+#else
+            _UploadLinearRGBA5551toARGB(trgLogical,
+                                        trgStride,
+                                        XOffset, YOffset,
+                                        Width, Height,
+                                        Memory,
+                                        (SourceStride == 0)
+                                        ? (gctINT) Width * 2
+                                        : SourceStride);
+#endif
             return gcvSTATUS_OK;
 
         default:
@@ -12392,54 +12320,48 @@ _UploadTextureLinear(
             if (TexSurf->format == gcvSURF_X8R8G8B8)
             {
                /* Same as BGR to ARGB. */
-                if (Hardware->bigEndian)
-                {
-                    _UploadLinearBGRtoARGBBE(trgLogical,
-                                             trgStride,
-                                             XOffset, YOffset,
-                                             Width, Height,
-                                             Memory,
-                                             (SourceStride == 0)
-                                             ? (gctINT) Width * 3
-                                             : SourceStride);
-                }
-                else
-                {
-                    _UploadLinearBGRtoARGB(trgLogical,
-                                           trgStride,
-                                           XOffset, YOffset,
-                                           Width, Height,
-                                           Memory,
-                                           (SourceStride == 0)
-                                           ? (gctINT) Width * 3
-                                           : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadLinearBGRtoARGBBE(trgLogical,
+                                         trgStride,
+                                         XOffset, YOffset,
+                                         Width, Height,
+                                         Memory,
+                                         (SourceStride == 0)
+                                         ? (gctINT) Width * 3
+                                         : SourceStride);
+#else
+                _UploadLinearBGRtoARGB(trgLogical,
+                                       trgStride,
+                                       XOffset, YOffset,
+                                       Width, Height,
+                                       Memory,
+                                       (SourceStride == 0)
+                                       ? (gctINT) Width * 3
+                                       : SourceStride);
+#endif
                 return gcvSTATUS_OK;
             }
             else if (TexSurf->format == gcvSURF_X8B8G8R8)
             {
-                if (Hardware->bigEndian)
-                {
-                    _UploadLinearBGRtoABGRBE(trgLogical,
-                                             trgStride,
-                                             XOffset, YOffset,
-                                             Width, Height,
-                                             Memory,
-                                             (SourceStride == 0)
-                                             ? (gctINT) Width * 3
-                                             : SourceStride);
-                }
-                else
-                {
-                    _UploadLinearBGRtoABGR(trgLogical,
-                                           trgStride,
-                                           XOffset, YOffset,
-                                           Width, Height,
-                                           Memory,
-                                           (SourceStride == 0)
-                                           ? (gctINT) Width * 3
-                                           : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadLinearBGRtoABGRBE(trgLogical,
+                                         trgStride,
+                                         XOffset, YOffset,
+                                         Width, Height,
+                                         Memory,
+                                         (SourceStride == 0)
+                                         ? (gctINT) Width * 3
+                                         : SourceStride);
+#else
+                _UploadLinearBGRtoABGR(trgLogical,
+                                       trgStride,
+                                       XOffset, YOffset,
+                                       Width, Height,
+                                       Memory,
+                                       (SourceStride == 0)
+                                       ? (gctINT) Width * 3
+                                       : SourceStride);
+#endif
                 return gcvSTATUS_OK;
             }
 
@@ -12497,28 +12419,25 @@ _UploadTextureLinear(
         case gcvSURF_R4G4B4A4:
             if (TexSurf->format == gcvSURF_A4R4G4B4)
             {
-                if (Hardware->bigEndian)
-                {
-                    _UploadLinearRGBA4444toARGB4444BE(trgLogical,
-                                                      trgStride,
-                                                      XOffset, YOffset,
-                                                      Width, Height,
-                                                      Memory,
-                                                      (SourceStride == 0)
-                                                      ? (gctINT) Width * 2
-                                                      : SourceStride);
-                }
-                else
-                {
-                    _UploadLinearRGBA4444toARGB4444(trgLogical,
-                                                    trgStride,
-                                                    XOffset, YOffset,
-                                                    Width, Height,
-                                                    Memory,
-                                                    (SourceStride == 0)
-                                                    ? (gctINT) Width * 2
-                                                    : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadLinearRGBA4444toARGB4444BE(trgLogical,
+                                                  trgStride,
+                                                  XOffset, YOffset,
+                                                  Width, Height,
+                                                  Memory,
+                                                  (SourceStride == 0)
+                                                  ? (gctINT) Width * 2
+                                                  : SourceStride);
+#else
+                _UploadLinearRGBA4444toARGB4444(trgLogical,
+                                                trgStride,
+                                                XOffset, YOffset,
+                                                Width, Height,
+                                                Memory,
+                                                (SourceStride == 0)
+                                                ? (gctINT) Width * 2
+                                                : SourceStride);
+#endif
                 return gcvSTATUS_OK;
             }
             break;
@@ -12526,28 +12445,25 @@ _UploadTextureLinear(
         case gcvSURF_R5G5B5A1:
             if (TexSurf->format == gcvSURF_A1R5G5B5)
             {
-                if (Hardware->bigEndian)
-                {
-                    _UploadLinearRGBA5551toARGB1555BE(trgLogical,
-                                                      trgStride,
-                                                      XOffset, YOffset,
-                                                      Width, Height,
-                                                      Memory,
-                                                      (SourceStride == 0)
-                                                      ? (gctINT) Width * 2
-                                                      : SourceStride);
-                }
-                else
-                {
-                    _UploadLinearRGBA5551toARGB1555(trgLogical,
-                                                    trgStride,
-                                                    XOffset, YOffset,
-                                                    Width, Height,
-                                                    Memory,
-                                                    (SourceStride == 0)
-                                                    ? (gctINT) Width * 2
-                                                    : SourceStride);
-                }
+#if gcdENDIAN_BIG
+                _UploadLinearRGBA5551toARGB1555BE(trgLogical,
+                                                  trgStride,
+                                                  XOffset, YOffset,
+                                                  Width, Height,
+                                                  Memory,
+                                                  (SourceStride == 0)
+                                                  ? (gctINT) Width * 2
+                                                  : SourceStride);
+#else
+                _UploadLinearRGBA5551toARGB1555(trgLogical,
+                                                trgStride,
+                                                XOffset, YOffset,
+                                                Width, Height,
+                                                Memory,
+                                                (SourceStride == 0)
+                                                ? (gctINT) Width * 2
+                                                : SourceStride);
+#endif
                 return gcvSTATUS_OK;
             }
             break;
@@ -13183,7 +13099,8 @@ gcoHARDWARE_UploadTextureYUV(
     IN gceSURF_FORMAT SourceFormat
     )
 {
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_OK;
+#if !gcdENDIAN_BIG
     gcoHARDWARE Hardware = gcvNULL;
     gctUINT x, y;
     gctUINT edgeX[6];
@@ -13192,6 +13109,7 @@ gcoHARDWARE_UploadTextureYUV(
     gctUINT countY = 0;
     gctUINT right  = X + Width;
     gctUINT bottom = Y + Height;
+#endif
 
     gcmHEADER_ARG("TargetFormat=%d Address=%08x Logical=0x%x "
                   "Offset=%u TargetStride=%d X=%u Y=%u Width=%u Height=%u "
@@ -13200,6 +13118,9 @@ gcoHARDWARE_UploadTextureYUV(
                   TargetStride, X, Y, Width, Height, Memory, SourceStride,
                   SourceFormat);
 
+#if gcdENDIAN_BIG
+    gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+#else
     gcmGETHARDWARE(Hardware);
 
     (void) TargetFormat;
@@ -13251,51 +13172,32 @@ gcoHARDWARE_UploadTextureYUV(
     switch (SourceFormat)
     {
     case gcvSURF_NV16:
-        if (Hardware->bigEndian)
-        {
-            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-        }
-        else
-        {
-            _UploadNV16toYUY2(Logical,
-                            TargetStride,
-                            X, Y,
-                            right, bottom,
-                            edgeX, edgeY,
-                            countX, countY,
-                            Memory,
-                            SourceStride);
-        }
-        gcmFOOTER_NO();
-        return gcvSTATUS_OK;
+        _UploadNV16toYUY2(Logical,
+                        TargetStride,
+                        X, Y,
+                        right, bottom,
+                        edgeX, edgeY,
+                        countX, countY,
+                        Memory,
+                        SourceStride);
+        break;
 
     case gcvSURF_NV61:
-        if (Hardware->bigEndian)
-        {
-            gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
-        }
-        else
-        {
-            _UploadNV61toYUY2(Logical,
-                            TargetStride,
-                            X, Y,
-                            right, bottom,
-                            edgeX, edgeY,
-                            countX, countY,
-                            Memory,
-                            SourceStride);
-        }
-        gcmFOOTER_NO();
-        return gcvSTATUS_OK;
+        _UploadNV61toYUY2(Logical,
+                        TargetStride,
+                        X, Y,
+                        right, bottom,
+                        edgeX, edgeY,
+                        countX, countY,
+                        Memory,
+                        SourceStride);
+        break;
 
     default:
         gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
         break;
     }
-
-    /* Success. */
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
+#endif
 
 OnError:
     /* Return the status. */

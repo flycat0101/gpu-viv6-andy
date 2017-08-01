@@ -32,11 +32,11 @@
 #if gcdDUMP_FRAME_TGA || defined(EMULATOR) || gcdFPGA_BUILD
 
 #ifdef ANDROID
-#    include <cutils/properties.h>
+#  include <cutils/properties.h>
 #endif
 
 #ifdef UNDER_CE
-#    include <winbase.h>
+#  include <winbase.h>
 #endif
 
 #include <stdio.h>
@@ -47,7 +47,7 @@
 #define STRING_LEN   1024
 
 static void
-_SaveFrameTga(
+_SaveFrameTGA(
     VEGLThreadData thread,
     VEGLSurface draw,
     gcsPOINT_PTR RectOrigin,
@@ -370,7 +370,299 @@ _SaveFrameTga(
     while(gcvFALSE);
 }
 
+static void
+_DumpTGA(
+    VEGLThreadData Thread,
+    VEGLSurface Draw
+    )
+{
+    gcsPOINT origin = {0, 0};
+    gcsPOINT size   = {Draw->config.width, Draw->config.height};
+
+#if gcdDUMP_FRAME_TGA
+    _SaveFrameTGA(Thread, Draw, &origin, &size);
+#  elif (defined(EMULATOR) || gcdFPGA_BUILD)
+    static EGLint checkStatus = -1;
+
+    if (checkStatus < 0)
+    {
+        gctSTRING dumpFrameTGA = gcvNULL;
+        checkStatus = 0;
+
+        if (gcmIS_ERROR(gcoOS_GetEnv(gcvNULL,
+                                       "VIV_DUMP_FRAME_TGA",
+                                       &dumpFrameTGA)))
+        {
+            /* No dump. */
+            return;
+        }
+
+        if (dumpFrameTGA &&
+            gcoOS_StrCmp(dumpFrameTGA, "1") == gcvSTATUS_OK)
+        {
+            checkStatus = 1;
+        }
+    }
+
+    if (checkStatus)
+    {
+        _SaveFrameTGA(Thread, Draw, &origin, &size);
+    }
+#  endif
+}
+
+#  define VEGL_DUMP_TGA(thread, draw) \
+    _DumpTGA(thread, draw)
+#else
+
+/* Nop when gcdDUMP_FRAME_TGA etc disabled. */
+#  define VEGL_DUMP_TGA(thread, draw) \
+    do {} while (0)
 #endif
+
+#if gcdDUMP
+static void
+_DumpSwapTag(
+    gcoSURF Surface,
+    EGLint width,
+    EGLint height
+    )
+{
+    gctUINT32 address[3] = {0};
+    gctPOINTER logical[3] = {gcvNULL};
+    gctINT stride;
+
+    gcoSURF_Lock(Surface, address, logical);
+    gcoSURF_Unlock(Surface, logical[0]);
+    gcoSURF_GetAlignedSize(Surface, gcvNULL, gcvNULL, &stride);
+
+    gcmDUMP(gcvNULL,
+            "@[swap 0x%08X %dx%d +%u]",
+            address[0],
+            width,
+            height,
+            stride);
+}
+#  define VEGL_DUMP_SWAP_TAG(draw, sur) \
+    _DumpSwapTag(sur, (draw)->config.width, (draw)->config.height)
+
+#else
+/* Nop. */
+#  define VEGL_DUMP_SWAP_TAG(draw, sur) \
+    do {} while (0)
+#endif
+
+#if gcdDUMP && gcdENABLE_3D
+
+static void
+_GetSurfaceHwFormat(
+    gcoSURF Surface,
+    gctUINT_PTR HwFormat,
+    gctUINT_PTR Swizzle,
+    gctUINT_PTR HwTiling
+    )
+{
+    gceSURF_FORMAT format;
+    gceTILING tiling;
+    gctUINT hwFormat;
+    gctUINT swizzle;
+    gctUINT hwTiling;
+
+    gcoSURF_GetFormat(Surface, gcvNULL, &format);
+    gcoSURF_GetTiling(Surface, &tiling);
+
+    switch (format)
+    {
+    case gcvSURF_A8B8G8R8:
+        hwFormat = 0x06;
+        swizzle  = 1;
+        break;
+    case gcvSURF_X8B8G8R8:
+        hwFormat = 0x05;
+        swizzle  = 1;
+        break;
+        case gcvSURF_X8R8G8B8:
+        hwFormat = 0x05;
+        swizzle  = 0;
+        break;
+    case gcvSURF_R5G6B5:
+        hwFormat = 0x04;
+        swizzle  = 0;
+        break;
+    case gcvSURF_A8R8G8B8:
+        hwFormat = 0x06;
+        swizzle  = 0;
+        break;
+    case gcvSURF_A1R5G5B5:
+        hwFormat = 0x03;
+        swizzle  = 0;
+        break;
+    case gcvSURF_A4R4G4B4:
+        hwFormat = 0x01;
+        swizzle  = 0;
+        break;
+    case gcvSURF_YUY2:
+        hwFormat = 0x07;
+        swizzle  = 0;
+        break;
+    default:
+        hwFormat = 0xFF;
+        swizzle  = 0;
+        break;
+    }
+
+    switch (tiling)
+    {
+    case gcvLINEAR:
+        hwTiling = 0x0;
+        break;
+    case gcvTILED:
+        hwTiling = 0x1;
+        break;
+    case gcvSUPERTILED:
+        hwTiling = 0x2;
+        break;
+    case gcvMULTI_TILED:
+        hwTiling = 0x3;
+        break;
+    case gcvMULTI_SUPERTILED:
+        hwTiling = 0x4;
+        break;
+    case gcvYMAJOR_SUPERTILED:
+        hwTiling = 0x5;
+        break;
+    default:
+        hwTiling = 0xF;
+        break;
+    }
+
+    *HwFormat = hwFormat;
+    *Swizzle  = swizzle;
+    *HwTiling = hwTiling;
+}
+
+static void
+_DumpFrameTag(
+    gcoSURF Surface,
+    gctCONST_STRING Tag,
+    EGLint Width,
+    EGLint Height
+    )
+{
+    gctUINT32 address[3] = {0};
+    gctPOINTER logical[3] = {gcvNULL};
+    gctUINT bottomBufferOffset = 0;
+    gctUINT hwFormat;
+    gctUINT swizzle;
+    gctUINT hwTiling;
+
+    gcoSURF_Lock(Surface, address, logical);
+    gcoSURF_Unlock(Surface, logical[0]);
+
+    gcoSURF_GetBottomBufferOffset(Surface,
+                                  &bottomBufferOffset);
+
+    _GetSurfaceHwFormat(Surface,
+                        &hwFormat,
+                        &swizzle,
+                        &hwTiling);
+
+    gcmDUMP(gcvNULL,
+            "@[%s 0x%08X:0x%08X %dx%d %d:%d %d]",
+            Tag,
+            address[0],
+            address[0] + bottomBufferOffset,
+            Width,
+            Height,
+            hwFormat,
+            swizzle,
+            hwTiling);
+}
+
+#  define VEGL_DUMP_FRAME_TAG(draw, sur) \
+    _DumpFrameTag(sur, "frame", (draw)->config.width, (draw)->config.height)
+
+#  define VEGL_DUMP_FCFILL_TAG(draw, sur) \
+    _DumpFrameTag(sur, "fcfill", (draw)->config.width, (draw)->config.height)
+#else
+
+/* Nop when gcdDUMP disabled. */
+#  define VEGL_DUMP_FRAME_TAG(draw, sur) \
+    do {} while (0)
+
+#  define VEGL_DUMP_FCFILL_TAG(draw, sur) \
+    do {} while (0)
+#endif
+
+/* Realloc region with give capacity. */
+static gcmINLINE EGLBoolean
+_ReallocRegion(
+    IN struct eglRegion * Region,
+    IN EGLint             NumRects
+    )
+{
+    gctPOINTER ptr;
+
+    if (Region->maxNumRects >= NumRects)
+    {
+        Region->numRects = 0;
+        return EGL_TRUE;
+    }
+
+    if (Region->rects)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, Region->rects);
+        Region->rects = gcvNULL;
+    }
+
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, 4 * gcmSIZEOF(EGLint) * NumRects, &ptr)))
+    {
+        /* Out of memory. */
+        return EGL_FALSE;
+    }
+
+    Region->numRects    = 0;
+    Region->maxNumRects = NumRects;
+    Region->rects       = ptr;
+
+    return EGL_TRUE;
+}
+
+static gcmINLINE EGLBoolean
+_CopyRegion(
+    IN struct eglRegion * Dest,
+    IN struct eglRegion * Source
+    )
+{
+    if (!_ReallocRegion(Dest, Source->numRects))
+    {
+        return EGL_FALSE;
+    }
+
+    gcoOS_MemCopy(Dest->rects, Source->rects,
+                  sizeof (EGLint) * 4 * Source->numRects);
+
+    Dest->numRects = Source->numRects;
+
+    return EGL_TRUE;
+}
+
+static gcmINLINE EGLBoolean
+_ValidateRegion(
+    IN struct eglRegion * Region
+    )
+{
+    if (Region)
+    {
+        if ((Region->numRects < 0) ||
+            (Region->numRects > 0 && !Region->rects))
+        {
+            return EGL_FALSE;
+        }
+    }
+
+    return EGL_TRUE;
+}
 
 VEGLWorkerInfo
 veglGetWorker(
@@ -452,6 +744,16 @@ veglGetWorker(
             __FUNCTION__, __LINE__,
             worker->signal
             );
+
+        if (!_ReallocRegion(&worker->region, 1))
+        {
+            gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+        }
+
+        if (!_ReallocRegion(&worker->damageHint, 1))
+        {
+            gcmONERROR(gcvSTATUS_OUT_OF_MEMORY);
+        }
     }
 
     /* Return the worker. */
@@ -679,6 +981,7 @@ veglSubmitWorker(
             gcsHAL_INTERFACE iface;
 
             iface.command            = gcvHAL_SIGNAL;
+            iface.engine             = gcvENGINE_RENDER;
             iface.u.Signal.signal    = gcmPTR_TO_UINT64(Worker->signal);
             iface.u.Signal.auxSignal = 0;
             iface.u.Signal.process   = gcmPTR_TO_UINT64(Display->process);
@@ -693,6 +996,7 @@ veglSubmitWorker(
             }
 
             iface.command            = gcvHAL_SIGNAL;
+            iface.engine             = gcvENGINE_RENDER;
             iface.u.Signal.signal    = gcmPTR_TO_UINT64(Display->startSignal);
             iface.u.Signal.auxSignal = 0;
             iface.u.Signal.process   = gcmPTR_TO_UINT64(Display->process);
@@ -765,7 +1069,6 @@ veglSwapWorker(
                 break;
             }
 
-/* #if defined(ANDROID) || defined(UNDER_CE) || defined(EGL_API_DFB) || defined(EGL_API_WL) */
             /* Wait for the worker's surface. */
             if (gcmIS_ERROR(gcoOS_WaitSignal(gcvNULL, currWorker->signal, gcvINFINITE)))
             {
@@ -774,14 +1077,15 @@ veglSwapWorker(
 
             /* The current worker is the one to be displayed. */
             displayWorker = currWorker;
+
             gcmDUMP_FRAMERATE();
 
             /* Post window back buffer. */
             display->platform->postWindowBackBuffer(display,
                                                     displayWorker->draw,
                                                     &displayWorker->backBuffer,
-                                                    displayWorker->numRects,
-                                                    displayWorker->rects);
+                                                    &displayWorker->region,
+                                                    &displayWorker->damageHint);
 
             /* Acquire synchronization mutex. */
             veglSuspendSwapWorker(display);
@@ -855,37 +1159,49 @@ OnError:
     return;
 }
 
-/* Local function to combine common code between eglSwapBuffers and
- * eglSwapBuffersRegionEXT.
- *
- * NumRects = 0 signifies fullscreen swap.
- */
 #ifdef EGL_API_DRI
 
 #if gcdENABLE_VG
-gceSTATUS gcoSURF_ResolveRectVG(gcoSURF SrcSurface, gcoSURF DestSurface, gcsPOINT_PTR SrcOrigin, gcsPOINT_PTR DestOrigin, gcsPOINT_PTR RectSize)
+static gceSTATUS
+_ResolveRectVG(
+    gcoSURF SrcSurface,
+    gcoSURF DestSurface,
+    gcsPOINT_PTR SrcOrigin,
+    gcsPOINT_PTR DestOrigin,
+    gcsPOINT_PTR RectSize
+    )
 {
     VEGLThreadData  Thread = veglGetThreadData();
     veglDISPATCH   *dispatch;
+
     if (Thread == gcvNULL)
+    {
         return gcvSTATUS_OUT_OF_RESOURCES;
+    }
 
     dispatch = _GetDispatch(Thread, gcvNULL);
+
     if ((dispatch != gcvNULL) &&  (dispatch->resolveVG != gcvNULL))
     {
         (*dispatch->resolveVG)(Thread->context->context, DestSurface);
         return gcvSTATUS_OK;
     }
+
     return gcvSTATUS_GENERIC_IO;
 }
 #endif
 
-EGLBoolean
+/*
+ * Local function to combine common code between eglSwapBuffers and
+ * eglSwapBuffersRegionEXT.
+ * DRI verision.
+ */
+static EGLBoolean
 _eglSwapBuffersRegion(
     EGLDisplay Dpy,
     EGLSurface Draw,
-    EGLint NumRects,
-    const EGLint* Rects
+    struct eglRegion * SwapRegion,
+    struct eglRegion * DamageHint
     )
 {
     EGLBoolean result = EGL_TRUE;
@@ -898,7 +1214,7 @@ _eglSwapBuffersRegion(
     gctPOINTER resolveBits[3] = {gcvNULL};
     struct eglBackBuffer backBuffer;
 
-    gcmHEADER_ARG("Dpy=0x%x Draw=0x%x NumRects=0x%x Rects=0x%x", Dpy, Draw, NumRects, Rects);
+    gcmHEADER_ARG("Dpy=0x%x Draw=0x%x", Dpy, Draw);
 
     /* Get thread data. */
     thread = veglGetThreadData();
@@ -1020,29 +1336,12 @@ _eglSwapBuffersRegion(
         width  = draw->config.width;
         height = draw->config.height;
 
-#if gcdDUMP
-        {
-            gctUINT32 physical[3] = {0};
-            gctPOINTER logical[3] = {gcvNULL};
-            gctINT stride;
-
-            gcoSURF_Lock(resolveTarget, physical, logical);
-            gcoSURF_Unlock(resolveTarget, logical[0]);
-            gcoSURF_GetAlignedSize(resolveTarget, gcvNULL, gcvNULL, &stride);
-
-            gcmDUMP(gcvNULL,
-                    "@[swap 0x%08X %dx%d +%u]",
-                    physical[0],
-                    draw->config.width,
-                    draw->config.height,
-                    stride);
-        }
-#endif
+        VEGL_DUMP_SWAP_TAG(draw, resolveTarget);
 
 #if gcdENABLE_VG
         if ( thread->openVGpipe && (thread->api == EGL_OPENVG_API) )
         {
-            if (!dpy->platform->rsForSwap(dpy->localInfo, draw->hwnd, (gctPOINTER)gcoSURF_ResolveRectVG))
+            if (!dpy->platform->rsForSwap(dpy->localInfo, draw->hwnd, (gctPOINTER)_ResolveRectVG))
             {
                 veglSetEGLerror(thread, EGL_BAD_PARAMETER);
                 break;
@@ -1066,14 +1365,7 @@ _eglSwapBuffersRegion(
             break;
         }
 
-#if gcdDUMP_FRAME_TGA
-        {
-            gcsPOINT origin = {0, 0};
-            gcsPOINT size   = {draw->config.width, draw->config.height};
-
-            _SaveFrameTga(thread, draw, &origin, &size);
-        }
-#endif
+        VEGL_DUMP_TGA(thread, draw);
 
         /* Check for window resize. */
         if ((draw->config.width != width) ||
@@ -1128,184 +1420,340 @@ _eglSwapBuffersRegion(
     return result;
 }
 
-#else
+#else /* !EGL_API_DRI */
 
 /*
-#if gcdENABLE_3D
-static void
-_DumpSurface(
-    gcoDUMP Dump,
-    gcoSURF Surface,
-    gceDUMP_TAG Type
+ * Compute valid swap region.
+ * Clip swap region with surface size.
+ * Rects form: {x, y, width, height}, relative to the bottom-left of the surface.
+ */
+static gcmINLINE EGLBoolean
+_ComputeSwapRegion(
+    VEGLDisplay Dpy,
+    VEGLSurface Draw,
+    struct eglRegion * SwapRegion
     )
 {
-    gctUINT32 address[3] = {0};
-    gctPOINTER memory[3] = {gcvNULL};
-    gctUINT width, height;
-    gctINT stride;
-    gceSTATUS status;
+    EGLint i;
 
-    if (Surface != gcvNULL)
+    if (!SwapRegion || SwapRegion->numRects == 0)
     {
-        gcmONERROR(gcoSURF_Lock(
-            Surface, address, memory
-            ));
+        /* Full surface. */
+        Draw->clipRegion.rects[0] = 0;
+        Draw->clipRegion.rects[1] = 0;
+        Draw->clipRegion.rects[2] = Draw->config.width;
+        Draw->clipRegion.rects[3] = Draw->config.height;
+        Draw->clipRegion.numRects = 1;
+    }
+    else
+    {
+        EGLint numRects = 0;
 
-        gcmONERROR(gcoSURF_GetAlignedSize(
-            Surface, &width, &height, &stride
-            ));
+        if (!_ReallocRegion(&Draw->clipRegion, SwapRegion->numRects))
+        {
+            return EGL_FALSE;
+        }
 
-        gcmONERROR(gcoDUMP_DumpData(
-            Dump, Type, address[0], height * stride, memory[0]
-            ));
+        for (i = 0; i < SwapRegion->numRects; ++i)
+        {
+            EGLint left   = SwapRegion->rects[i * 4 + 0];
+            EGLint bottom = SwapRegion->rects[i * 4 + 1];
+            EGLint right  = left + SwapRegion->rects[i * 4 + 2];
+            EGLint top    = bottom + SwapRegion->rects[i * 4 + 3];
 
-        gcmONERROR(gcoSURF_Unlock(
-            Surface, memory[0]
-            ));
-        memory[0] = gcvNULL;
+            /* Clip with surface size. */
+            left   = gcmMAX(left, 0);
+            bottom = gcmMAX(bottom, 0);
+            right  = gcmMIN(right,  Draw->config.width);
+            top    = gcmMIN(top, Draw->config.height);
+
+            if (left >= right || bottom >= top)
+            {
+                /* Invalid rect. */
+                continue;
+            }
+
+            Draw->clipRegion.rects[numRects * 4 + 0] = left;
+            Draw->clipRegion.rects[numRects * 4 + 1] = bottom;
+            Draw->clipRegion.rects[numRects * 4 + 2] = right - left;
+            Draw->clipRegion.rects[numRects * 4 + 3] = top - bottom;
+            numRects++;
+        }
+
+        Draw->clipRegion.numRects = numRects;
     }
 
-OnError:
-    if (memory[0] != gcvNULL)
-    {
-        gcmVERIFY_OK(gcoSURF_Unlock(Surface, memory[0]));
-    }
-
-    return;
+    return EGL_TRUE;
 }
-#endif
-*/
 
-#if gcdENABLE_3D
-#if gcdDUMP
-static void
-_GetSurfaceHwFormat(
-    gcoSURF Surface,
-    gctUINT_PTR HwFormat,
-    gctUINT_PTR Swizzle,
-    gctUINT_PTR HwTiling
+static gcmINLINE EGLBoolean
+_ComputeDamageHint(
+    VEGLDisplay Dpy,
+    VEGLSurface Draw,
+    struct eglRegion * DamageHint
     )
 {
-    gceSURF_FORMAT format;
-    gceTILING tiling;
-    gctUINT hwFormat;
-    gctUINT swizzle;
-    gctUINT hwTiling;
-
-    gcoSURF_GetFormat(Surface, gcvNULL, &format);
-    gcoSURF_GetTiling(Surface, &tiling);
-
-    switch (format)
+    if (!DamageHint || DamageHint->numRects == 0)
     {
-    case gcvSURF_A8B8G8R8:
-        hwFormat = 0x06;
-        swizzle  = 1;
-        break;
-    case gcvSURF_X8B8G8R8:
-        hwFormat = 0x05;
-        swizzle  = 1;
-        break;
-        case gcvSURF_X8R8G8B8:
-        hwFormat = 0x05;
-        swizzle  = 0;
-        break;
-    case gcvSURF_R5G6B5:
-        hwFormat = 0x04;
-        swizzle  = 0;
-        break;
-    case gcvSURF_A8R8G8B8:
-        hwFormat = 0x06;
-        swizzle  = 0;
-        break;
-    case gcvSURF_A1R5G5B5:
-        hwFormat = 0x03;
-        swizzle  = 0;
-        break;
-    case gcvSURF_A4R4G4B4:
-        hwFormat = 0x01;
-        swizzle  = 0;
-        break;
-    case gcvSURF_YUY2:
-        hwFormat = 0x07;
-        swizzle  = 0;
-        break;
-    default:
-        hwFormat = 0xFF;
-        swizzle  = 0;
-        break;
-    }
+        /* Full surface. */
+        Draw->damageHint.rects[0] = 0;
+        Draw->damageHint.rects[1] = 0;
+        Draw->damageHint.rects[2] = Draw->config.width;
+        Draw->damageHint.rects[3] = Draw->config.height;
+        Draw->damageHint.numRects = 1;
 
-    switch (tiling)
+        return EGL_TRUE;
+    }
+    else
     {
-    case gcvLINEAR:
-        hwTiling = 0x0;
-        break;
-    case gcvTILED:
-        hwTiling = 0x1;
-        break;
-    case gcvSUPERTILED:
-        hwTiling = 0x2;
-        break;
-    case gcvMULTI_TILED:
-        hwTiling = 0x3;
-        break;
-    case gcvMULTI_SUPERTILED:
-        hwTiling = 0x4;
-        break;
-    case gcvYMAJOR_SUPERTILED:
-        hwTiling = 0x5;
-        break;
-    default:
-        hwTiling = 0xF;
-        break;
+        return _CopyRegion(&Draw->damageHint, DamageHint);
     }
-
-    *HwFormat = hwFormat;
-    *Swizzle  = swizzle;
-    *HwTiling = hwTiling;
 }
 
-#endif
+/*
+ * EGL_KHR_partial_update.
+ * Clip swap region with damage region.
+ * Must work together with buffer age.
+ */
+static void
+_ClipDamageRegion(
+    VEGLDisplay Dpy,
+    VEGLSurface Draw,
+    struct eglBackBuffer * BackBuffer
+    )
+{
+    EGLint age = 0;
+
+    if (!Draw->damageValid)
+    {
+        return;
+    }
+
+    /* Reset damage set flag. */
+    Draw->damageValid = EGL_FALSE;
+
+    if (Draw->renderMode != VEGL_INDIRECT_RENDERING)
+    {
+        /*
+         * EGL_KHR_partial_update is not useful for direct rendering, skip
+         * direct rendering case.
+         */
+        return;
+    }
+
+    /* Get Surface age. No need to clip for fully new buffer (age == 0). */
+    if (Dpy->platform->queryBufferAge &&
+        Dpy->platform->queryBufferAge(Dpy, Draw, BackBuffer, &age) &&
+        age > 0)
+    {
+        EGLint i, j;
+        EGLint index;
+        EGLint left, top, right, bottom;
+        EGLint numRects;
+
+        /* Use bounding box for damage currently. */
+        gcsRECT bounding = {0, 0, 0, 0};
+        EGLBoolean boundingValid = EGL_FALSE;
+
+        index = (Draw->curDamage == 0) ? (EGL_WORKER_COUNT - 1)
+              : (Draw->curDamage - 1);
+
+        for (i = 0; i < age; i++)
+        {
+            for (j = 0; j < Draw->damage[index].numRects; j = j + 4)
+            {
+                left   = Draw->damage[index].rects[j + 0];
+                bottom = Draw->damage[index].rects[j + 1];
+                right  = left + Draw->damage[index].rects[j + 2];
+                top    = bottom + Draw->damage[index].rects[j + 3];
+
+                if (left >= right || bottom >= top)
+                {
+                    /* Skip invalid rectangle. */
+                    continue;
+                }
+
+                if (boundingValid)
+                {
+                    /* Merge rects */
+                    bounding.left   = gcmMIN(left,   bounding.left);
+                    bounding.bottom = gcmMIN(bottom, bounding.bottom);
+                    bounding.right  = gcmMAX(right,  bounding.right);
+                    bounding.top    = gcmMAX(top,    bounding.top);
+                }
+                else
+                {
+                    bounding.left   = left;
+                    bounding.bottom = bottom;
+                    bounding.right  = right;
+                    bounding.top    = top;
+                    boundingValid = EGL_TRUE;
+                }
+            }
+
+            index = (index == 0) ? (EGL_WORKER_COUNT - 1)
+                  : (index - 1);
+        }
+
+        if (!boundingValid)
+        {
+            /* Empty damage region, no rectangle to resolve out. */
+            Draw->clipRegion.numRects = 0;
+            return;
+        }
+
+        numRects = 0;
+
+        /* Do clip with the damage bounding box. */
+        for (i = 0; i < Draw->clipRegion.numRects; i++)
+        {
+            left   = Draw->clipRegion.rects[i * 4 + 0];
+            bottom = Draw->clipRegion.rects[i * 4 + 1];
+            right  = left + Draw->clipRegion.rects[i * 4 + 2];
+            top    = bottom + Draw->clipRegion.rects[i * 4 + 3];
+
+            /* clip with bouding damage. */
+            left   = gcmMAX(left,   bounding.left);
+            bottom = gcmMAX(bottom, bounding.bottom);
+            right  = gcmMIN(right,  bounding.right);
+            top    = gcmMIN(top,    bounding.top);
+
+            if (left >= right || bottom >= top)
+            {
+                /* Skip invalid rectangle. */
+                continue;
+            }
+
+            Draw->clipRegion.rects[numRects * 4 + 0] = left;
+            Draw->clipRegion.rects[numRects * 4 + 1] = bottom;
+            Draw->clipRegion.rects[numRects * 4 + 2] = right - left;
+            Draw->clipRegion.rects[numRects * 4 + 3] = top - bottom;
+            numRects++;
+        }
+
+        Draw->clipRegion.numRects = numRects;
+    }
+}
+
+#if gcdENABLE_3D
+/*
+ * Resolve internal render target to back buffer.
+ * Returns EGL_TRUE on success.
+ */
+static EGLBoolean
+_ResolveRects(
+    gcoSURF Source,
+    gcoSURF Dest,
+    EGLint Width,
+    EGLint Height,
+    EGLBoolean YInverted,
+    struct eglRegion * Region
+    )
+{
+    EGLint i;
+    gcsSURF_RESOLVE_ARGS rlvArgs = {0};
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcsSURF_VIEW rtView =  {Source,  0, 1};
+    gcsSURF_VIEW tgtView = {Dest, 0, 1};
+
+    /* Resolve engine alignment limitation. */
+    gctUINT xAlignment = 0;
+    gctUINT yAlignment = 0;
+    gctUINT widthAlignment  = 0;
+    gctUINT heightAlignment = 0;
+
+    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE) != gcvTRUE)
+    {
+        /* Unlikey to fail. */
+        gcmVERIFY_OK(
+            gcoSURF_GetResolveAlignment(Source,
+                                        &xAlignment,
+                                        &yAlignment,
+                                        &widthAlignment,
+                                        &heightAlignment));
+    }
+
+    if (xAlignment < widthAlignment)
+    {
+        xAlignment = widthAlignment;
+    }
+
+    rlvArgs.version = gcvHAL_ARG_VERSION_V2;
+
+    rlvArgs.uArgs.v2.yInverted = !YInverted;
+    rlvArgs.uArgs.v2.numSlices = 1;
+
+    for (i = 0; i < Region->numRects; i++)
+    {
+        /* Relative to upper-left of display. */
+        EGLint left = Region->rects[i * 4 + 0];
+        EGLint top  = Region->rects[i * 4 + 1];
+        EGLint right  = left + Region->rects[i * 4 + 2];
+        EGLint bottom = top  + Region->rects[i * 4 + 3];
+
+        if (YInverted)
+        {
+            /* Flip Y for Y-inverted rendering. */
+            EGLint t = Height - bottom;
+            bottom = Height - top;
+            top = t;
+        }
+
+        if (xAlignment != 0)
+        {
+            left   = gcmALIGN_BASE(left, xAlignment);
+            top    = gcmALIGN_BASE(top,  yAlignment);
+            right  = left + gcmALIGN(right  - left, widthAlignment);
+            bottom = top  + gcmALIGN(bottom - top,  heightAlignment);
+        }
+
+        rlvArgs.uArgs.v2.srcOrigin.x = rlvArgs.uArgs.v2.dstOrigin.x = left;
+        rlvArgs.uArgs.v2.srcOrigin.y = rlvArgs.uArgs.v2.dstOrigin.y = top;
+        rlvArgs.uArgs.v2.rectSize.x  = right  - left;
+        rlvArgs.uArgs.v2.rectSize.y  = bottom - top;
+
+        status = gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
+
+        if (gcmIS_ERROR(status))
+        {
+            /* Bad surface. */
+            return EGL_FALSE;
+        }
+    }
+
+    return EGL_TRUE;
+}
 #endif
 
-/* SwapBuffers with new swap model. */
-EGLBoolean
-_SwapBuffersRegionNew(
+/*
+ * Local function to combine common code between eglSwapBuffers and
+ * eglSwapBuffersRegionEXT.
+ * Non-DRI verision.
+ */
+static EGLBoolean
+_SwapBuffersRegion(
     VEGLThreadData Thread,
     EGLDisplay Dpy,
-    EGLSurface Draw,
-    EGLint NumRects,
-    const EGLint* Rects
+    EGLSurface Draw
     )
 {
-    EGLBoolean result = EGL_TRUE;
+    EGLBoolean result;
     VEGLThreadData thread;
     VEGLDisplay dpy;
-    VEGLSurface draw;
-#if gcdENABLE_3D
-    gcsSURF_VIEW drawView = {gcvNULL, 0, 1};
-#endif
     VEGLPlatform platform;
 
     do
     {
-        VEGLContext context;
-        EGLint i;
+        VEGLSurface draw;
+        struct eglBackBuffer backBuffer;
+        EGLBoolean synchronous;
 
+        /* Create shortcuts to objects. */
         thread   = Thread;
-        context  = thread->context;
-
         dpy      = VEGL_DISPLAY(Dpy);
         draw     = VEGL_SURFACE(Draw);
         platform = dpy->platform;
-
-        if (draw->backBuffer.surface == gcvNULL)
-        {
-            /* Requires back buffer surface in this swap mode. */
-            veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
-            result = EGL_FALSE;
-            break;
-        }
 
 #if defined(ANDROID) && (ANDROID_SDK_VERSION < 17)
         if (draw->skipResolve)
@@ -1313,11 +1761,10 @@ _SwapBuffersRegionNew(
             /* EGL_ANDROID_get_render_buffer. */
             if (!platform->postWindowBackBuffer(dpy, draw,
                                                 &draw->backBuffer,
-                                                NumRects,
-                                                (EGLint *) Rects))
+                                                &draw->clipRegion,
+                                                &draw->damageHint))
             {
-                veglSetEGLerror(thread,  EGL_BAD_NATIVE_WINDOW);
-                result = EGL_FALSE;
+                veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
                 break;
             }
 
@@ -1330,46 +1777,55 @@ _SwapBuffersRegionNew(
             if (!platform->getWindowBackBuffer(dpy, draw, &draw->backBuffer))
             {
                 /* Cannot get window back buffer. */
-                veglSetEGLerror(thread,  EGL_BAD_NATIVE_WINDOW);
-                result = EGL_FALSE;
+                veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
                 break;
             }
 
             /* Success. */
-            veglSetEGLerror(thread,  EGL_SUCCESS);
+            veglSetEGLerror(thread, EGL_SUCCESS);
             break;
         }
 #endif
 
-        platform->updateBufferAge(dpy, draw, &draw->backBuffer);
-
-        for (i = 0; i < NumRects; ++i)
+        if (draw->newSwapModel)
         {
-            EGLint left   = Rects[i * 4 + 0];
-            EGLint top    = Rects[i * 4 + 1];
-            EGLint width  = Rects[i * 4 + 2];
-            EGLint height = Rects[i * 4 + 3];
+            /*
+             * In newSwapModel, window back buffer is dequeued in previous
+             * eglSwapBuffers or eglMakeCurrent.
+             */
+            if (draw->backBuffer.surface == gcvNULL)
+            {
+                /* Requires back buffer surface in this swap mode. */
+                veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
+                break;
+            }
 
-            draw->clipRects[i * 4 + 0] = (left < 0) ? 0 : left;
-            draw->clipRects[i * 4 + 1] = (top  < 0) ? 0 : top;
-            draw->clipRects[i * 4 + 2] = (width  < draw->config.width)  ? width
-                                       : draw->config.width;
-            draw->clipRects[i * 4 + 3] = (height < draw->config.height) ? height
-                                       : draw->config.height;
+            /* Use direct rendered backBuffer. */
+            backBuffer = draw->backBuffer;
+        }
+        else
+        {
+            /* Get window back buffer. */
+            result = platform->getWindowBackBuffer(dpy, draw, &backBuffer);
+
+            if (!result)
+            {
+                gcmTRACE(
+                    gcvLEVEL_ERROR,
+                    "%s(%d): Get back buffer failed",
+                    __FUNCTION__, __LINE__
+                    );
+                veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
+                break;
+            }
         }
 
-        /*
-         * New swap model:
-         * 1. Resolve stage:
-         *    a. Resolve to window back buffer in normal mode, or
-         *    b. FC Fill if direct rendering fc fill mode.
-         *    b. Nothing
-         * 2. Post back buffer stage:
-         *    Submit swap worker / wait until done.
-         * 3. Get next window back buffer.
-         *
-         * Skip step 2,3 if single buffer mode, ie, no flip.
-         */
+        /* EGL_KHR_partial_update: Clip with damage region. */
+        _ClipDamageRegion(dpy, draw, &backBuffer);
+
+        /* Update buffer age. */
+        platform->updateBufferAge(dpy, draw, &backBuffer);
+
 #if gcdENABLE_3D
         if (!draw->openVG)
         {
@@ -1392,59 +1848,28 @@ _SwapBuffersRegionNew(
                     if (gcmIS_ERROR(gcoSURF_ResolveRect(&prevView, &rtView, gcvNULL)))
                     {
                         veglSetEGLerror(thread, EGL_BAD_SURFACE);
-                        result = EGL_FALSE;
                         break;
                     }
                 }
-            }
 
+                VEGL_DUMP_SWAP_TAG(draw, draw->renderTarget);
+            }
             else if (draw->renderMode == VEGL_DIRECT_RENDERING_FCFILL)
             {
-                drawView.surf = draw->renderTarget;
+                gcsSURF_VIEW rtView = {draw->renderTarget, 0, 1};
+
                 /* Basic No-resolve path. */
-                if (gcmIS_ERROR(gcoSURF_FillFromTile(&drawView)))
+                if (gcmIS_ERROR(gcoSURF_FillFromTile(&rtView)))
                 {
                     veglSetEGLerror(thread, EGL_BAD_SURFACE);
-                    result = EGL_FALSE;
                     break;
                 }
 
                 /* Flush the pipe. */
                 _Flush(thread);
 
-#if gcdDUMP
-                {
-                    gctUINT32 physical[3] = {0};
-                    gctPOINTER logical[3] = {gcvNULL};
-                    gctUINT bottomBufferOffset = 0;
-                    gctUINT hwFormat;
-                    gctUINT swizzle;
-                    gctUINT hwTiling;
-
-                    gcoSURF_Lock(draw->renderTarget, physical, logical);
-                    gcoSURF_Unlock(draw->renderTarget, logical[0]);
-
-                    gcoSURF_GetBottomBufferOffset(draw->renderTarget,
-                                                  &bottomBufferOffset);
-
-                    _GetSurfaceHwFormat(draw->renderTarget,
-                                        &hwFormat,
-                                        &swizzle,
-                                        &hwTiling);
-
-                    gcmDUMP(gcvNULL,
-                            "@[fcfill 0x%08X:0x%08X %dx%d %d:%d %d]",
-                            physical[0],
-                            physical[0] + bottomBufferOffset,
-                            draw->config.width,
-                            draw->config.height,
-                            hwFormat,
-                            swizzle,
-                            hwTiling);
-                }
-#   endif
+                VEGL_DUMP_FCFILL_TAG(draw, draw->renderTarget);
             }
-
             else if (draw->renderMode > VEGL_INDIRECT_RENDERING)
             {
                 /* direct rendering without fcfill . */
@@ -1461,251 +1886,38 @@ _SwapBuffersRegionNew(
                      * Do not turn off hardware tile status, this buffer can still
                      * be access when buffer preserve.
                      */
-                    drawView.surf = draw->renderTarget;
-                    gcmVERIFY_OK(gcoSURF_FlushTileStatus(&drawView, gcvFALSE));
+                    gcsSURF_VIEW rtView = {draw->renderTarget, 0, 1};
+                    gcmVERIFY_OK(gcoSURF_FlushTileStatus(&rtView, gcvFALSE));
                 }
 
                 /* Flush the pipe. */
                 _Flush(thread);
 
-#if gcdDUMP
-                {
-                    gctUINT32 physical[3] = {0};
-                    gctPOINTER logical[3] = {gcvNULL};
-                    gctUINT bottomBufferOffset = 0;
-                    gctUINT hwFormat;
-                    gctUINT swizzle;
-                    gctUINT hwTiling;
-
-                    gcoSURF_Lock(draw->renderTarget, physical, logical);
-                    gcoSURF_Unlock(draw->renderTarget, logical[0]);
-
-                    _GetSurfaceHwFormat(draw->renderTarget,
-                                        &hwFormat,
-                                        &swizzle,
-                                        &hwTiling);
-
-                    gcoSURF_GetBottomBufferOffset(draw->renderTarget,
-                                                  &bottomBufferOffset);
-
-                    gcmDUMP(gcvNULL,
-                            "@[frame 0x%08X:0x%08X %dx%d %d:%d %d]",
-                            physical[0],
-                            physical[0] + bottomBufferOffset,
-                            draw->config.width,
-                            draw->config.height,
-                            hwFormat,
-                            swizzle,
-                            hwTiling);
-                }
-#   endif
+                VEGL_DUMP_FRAME_TAG(draw, draw->renderTarget);
             }
-
             else
             {
-                /* Resolve path. */
-
-                gceSTATUS status = gcvSTATUS_OK;
-
-                gcsSURF_VIEW rtView = {draw->renderTarget, 0, 1};
-                gcsSURF_VIEW tgtView = {draw->backBuffer.surface, 0, 1};
-                gcsSURF_RESOLVE_ARGS rlvArgs = {0};
-
-                if (tgtView.surf == gcvNULL)
-                {
-                    /* No window back buffer? */
-                    veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
-                    break;
-                }
-
-                rlvArgs.version = gcvHAL_ARG_VERSION_V2;
-                rlvArgs.uArgs.v2.numSlices = 1;
-                /* 3D VG renders in BOTTOM_TOP, while the surface is TOP_BOTTOM by default. */
-                rlvArgs.uArgs.v2.yInverted = (Thread->api == EGL_OPENVG_API) ? gcvTRUE : gcvFALSE;
-
                 /* Flush the pipe. */
                 _Flush(thread);
 
-#if defined(ANDROID) && gcdSUPPORT_SWAP_RECTANGLE
-                gctINT   left, top, right, bottom;
-                gctUINT  xAlignment, yAlignment, widthAlignment, heightAlignment = 0;
-                gctUINT  i;
-
-                /* Set bounding box to swap rectangle of this buffer. */
-                left   = draw->swapRect.x;
-                top    = draw->swapRect.y;
-                right  = left + draw->swapRect.width;
-                bottom = top  + draw->swapRect.height;
-
-                for (i = 0; i < draw->swapRect.count; i++)
+                /* Resolve path. */
+                if (!_ResolveRects(draw->renderTarget,
+                                   backBuffer.surface,
+                                   draw->config.width,
+                                   draw->config.height,
+                                   1,
+                                   &draw->clipRegion))
                 {
-                    if (draw->swapRect.buffers[i] == draw->backBuffer.context)
-                    {
-                        /* Update swap rectangle. */
-                        draw->swapRect.rects[i].left   = left;
-                        draw->swapRect.rects[i].top    = top;
-                        draw->swapRect.rects[i].right  = right;
-                        draw->swapRect.rects[i].bottom = bottom;
-                        break;
-                    }
-                }
-
-                if (i == draw->swapRect.count)
-                {
-                    if (i >= draw->swapRect.capacity)
-                    {
-                        /* Enlarge rects/buffers slots, x2. */
-                        gctUINT capacity     = draw->swapRect.capacity * 2;
-                        gcsRECT * rects      = gcvNULL;
-                        gctPOINTER * buffers = gcvNULL;
-                        gctUINT j;
-
-                        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
-                                                       gcmSIZEOF(gcsRECT) * capacity,
-                                                       (gctPOINTER) &rects)))
-                        {
-                            veglSetEGLerror(thread, EGL_BAD_ALLOC);
-                            break;
-                        }
-
-                        if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL,
-                                                       gcmSIZEOF(gctPOINTER) * capacity,
-                                                       (gctPOINTER) &buffers)))
-                        {
-                            gcmOS_SAFE_FREE(gcvNULL, rects);
-                            veglSetEGLerror(thread, EGL_BAD_ALLOC);
-                            break;
-                        }
-
-                        /* Copy slots. */
-                        for (j = 0; j < draw->swapRect.capacity; j++)
-                        {
-                            rects[j]   = draw->swapRect.rects[j];
-                            buffers[j] = draw->swapRect.buffers[j];
-                        }
-
-                        for (j = draw->swapRect.capacity; j < capacity; j++)
-                        {
-                            /* Clear new allocated slots. */
-                            buffers[j] = gcvNULL;
-                        }
-
-                        /* Free old slots. */
-                        gcmOS_SAFE_FREE(gcvNULL, draw->swapRect.rects);
-                        gcmOS_SAFE_FREE(gcvNULL, draw->swapRect.buffers);
-
-                        /* Assign new slots. */
-                        draw->swapRect.capacity = capacity;
-                        draw->swapRect.rects    = rects;
-                        draw->swapRect.buffers  = buffers;
-                    }
-
-                    /* Swap rectangle for new buffer. */
-                    draw->swapRect.rects[i].left   = left;
-                    draw->swapRect.rects[i].top    = top;
-                    draw->swapRect.rects[i].right  = right;
-                    draw->swapRect.rects[i].bottom = bottom;
-
-                    draw->swapRect.buffers[i] = draw->backBuffer.context;
-                    draw->swapRect.count++;
-                }
-
-                for (i = 0; i < draw->swapRect.count; i++)
-                {
-                    if (draw->swapRect.buffers[i] != draw->backBuffer.context)
-                    {
-                        gcsRECT_PTR r = &draw->swapRect.rects[i];
-
-                        /* Update bounding box. */
-                        left   = gcmMIN(left,   r->left);
-                        top    = gcmMIN(top,    r->top);
-                        right  = gcmMAX(right,  r->right);
-                        bottom = gcmMAX(bottom, r->bottom);
-                    }
-                }
-
-                if (gcmIS_ERROR(gcoSURF_GetResolveAlignment(draw->renderTarget,
-                                                            &xAlignment,
-                                                            &yAlignment,
-                                                            &widthAlignment,
-                                                            &heightAlignment)))
-                {
-                    veglSetEGLerror(thread, EGL_BAD_SURFACE);
-                    result = EGL_FALSE;
+                    /* Error in resolve out. */
+                    veglSetEGLerror(Thread, EGL_BAD_SURFACE);
                     break;
                 }
 
-                if (xAlignment < widthAlignment)
-                {
-                    xAlignment = widthAlignment;
-                }
-
-                if (yAlignment < heightAlignment)
-                {
-                    yAlignment = heightAlignment;
-                }
-
-                /* Align the swap rectangle. */
-                left   = gcmALIGN_BASE(left, xAlignment);
-                top    = gcmALIGN_BASE(top,  yAlignment);
-                right  = left + gcmALIGN((right  - left), widthAlignment);
-                bottom = top  + gcmALIGN((bottom - top),  heightAlignment);
-
-                rlvArgs.uArgs.v2.srcOrigin.x = left;
-                rlvArgs.uArgs.v2.srcOrigin.y = top;
-                rlvArgs.uArgs.v2.dstOrigin.x = left;
-                rlvArgs.uArgs.v2.dstOrigin.y = top;
-                rlvArgs.uArgs.v2.rectSize.x  = right  - left;
-                rlvArgs.uArgs.v2.rectSize.y  = bottom - top;
-
-                /* Resolve internal renderTarget to window back buffer. */
-                if ((rlvArgs.uArgs.v2.rectSize.x != 0) && (rlvArgs.uArgs.v2.rectSize.y != 0))
-                {
-                    status = gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
-
-                    if (gcmIS_ERROR(status))
-                    {
-                        veglSetEGLerror(thread, EGL_BAD_SURFACE);
-                        result = EGL_FALSE;
-                        break;
-                    }
-                }
-#else
-                rlvArgs.uArgs.v2.rectSize.x = draw->config.width;
-                rlvArgs.uArgs.v2.rectSize.y = draw->config.height;
-                status = gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
-
-                if (gcmIS_ERROR(status))
-                {
-                    veglSetEGLerror(thread, EGL_BAD_SURFACE);
-                    result = EGL_FALSE;
-                    break;
-                }
-#endif
-
-#if gcdDUMP
-                {
-                    gctUINT32 physical[3] = {0};
-                    gctPOINTER logical[3] = {gcvNULL};
-                    gctINT stride;
-
-                    gcoSURF_Lock(tgtView.surf, physical, logical);
-                    gcoSURF_Unlock(tgtView.surf, logical[0]);
-                    gcoSURF_GetAlignedSize(tgtView.surf, gcvNULL, gcvNULL, &stride);
-
-                    gcmDUMP(gcvNULL,
-                            "@[swap 0x%08X %dx%d +%u]",
-                            physical[0],
-                            draw->config.width,
-                            draw->config.height,
-                            stride);
-                }
-#endif
+                VEGL_DUMP_SWAP_TAG(draw, backBuffer.surface);
             }
         }
         else
 #endif
-
         {
             /* VG pipe. */
 #if gcdENABLE_VG
@@ -1720,442 +1932,71 @@ _SwapBuffersRegionNew(
                 if ((dispatch != gcvNULL) && (dispatch->resolveVG != gcvNULL))
                 {
                     (*dispatch->resolveVG)(Thread->context->context,
-                                           draw->backBuffer.surface);
-                }
-            }
-#endif
-        }
-
-#if gcdDUMP_FRAME_TGA
-        {
-            gcsPOINT origin = {0, 0};
-            gcsPOINT size   = {draw->config.width, draw->config.height};
-
-            _SaveFrameTga(thread, draw, &origin, &size);
-        }
-#endif
-
-        if (!draw->backBuffer.flip)
-        {
-            /* Check if need stall. */
-            EGLBoolean stall = platform->synchronousPost(dpy, draw);
-
-            /* No flip, commit accumulated commands. */
-            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, stall));
-
-            /* No need to switch back buffer. */
-            break;
-        }
-
-#if gcdANDROID_NATIVE_FENCE_SYNC >= 2
-        /* Sumit swap worker / Wait until done. */
-        if (platform->synchronousPost(dpy, draw))
-        {
-            /* Commit-stall. */
-            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
-
-            /* Post back buffer. */
-            if (!platform->postWindowBackBuffer(dpy, draw,
-                                          &draw->backBuffer,
-                                          NumRects,
-                                          draw->clipRects))
-            {
-                veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
-                result = EGL_FALSE;
-                break;
-            }
-        }
-        else
-        {
-            /* Using android native fence sync. */
-            if (!platform->postWindowBackBufferFence(dpy, draw, &draw->backBuffer))
-            {
-                veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
-                result = EGL_FALSE;
-                break;
-            }
-        }
-
-#else
-        /* Sumit swap worker / Wait until done. */
-        if ((dpy->workerThread == gcvNULL) ||
-            platform->synchronousPost(dpy, draw))
-        {
-            /* Commit-stall. */
-            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
-
-            /* Post back buffer. */
-            if (!platform->postWindowBackBuffer(dpy, draw,
-                                          &draw->backBuffer,
-                                          NumRects,
-                                          draw->clipRects))
-            {
-                veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
-                result = EGL_FALSE;
-                break;
-            }
-        }
-        else
-        {
-            /* Using swap worker. */
-            VEGLWorkerInfo worker;
-
-            /* Find an available worker. */
-            worker = veglGetWorker(thread, dpy, draw);
-
-            if (worker == gcvNULL)
-            {
-                /* Something horrible has happened. */
-                veglSetEGLerror(thread,  EGL_BAD_ACCESS);
-                result = EGL_FALSE;
-                break;
-            }
-
-            /* Fill in the worker information. */
-            worker->draw         = draw;
-            worker->backBuffer   = draw->backBuffer;
-            worker->targetSignal = gcvNULL;
-            worker->numRects     = NumRects;
-            gcoOS_MemCopy(worker->rects,
-                          draw->clipRects,
-                          sizeof (EGLint) * 4 * NumRects);
-
-            /* Suspend the worker thread. */
-            veglSuspendSwapWorker(dpy);
-
-            /* Submit the worker. */
-            veglSubmitWorker(thread, dpy, worker, gcvTRUE);
-
-            /* Resume the swap thread. */
-            veglResumeSwapWorker(dpy);
-
-            /* Commit the command buffer. */
-            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
-        }
-#endif
-
-        /* Reset back buffer. */
-        draw->backBuffer.context = gcvNULL;
-        draw->backBuffer.surface = gcvNULL;
-
-        /* Get native window back buffer for next frame. */
-        if (!platform->getWindowBackBuffer(dpy, draw, &draw->backBuffer))
-        {
-            draw->backBuffer.surface = gcvNULL;
-            draw->backBuffer.context = gcvNULL;
-
-            /* Cannot get window back buffer. */
-            veglSetEGLerror(thread,  EGL_BAD_SURFACE);
-            result = EGL_FALSE;
-
-            /*
-             * Do not break here, need update client drawable if
-             * direct rendering mode is enabled. See below.
-             */
-        }
-
-        /* Switch render target in no-resolve mode. */
-        if (draw->renderMode > 0)
-        {
-            if (draw->prevRenderTarget)
-            {
-                /* Dereference previous back buffer. */
-                gcoSURF_Destroy(draw->prevRenderTarget);
-                draw->prevRenderTarget = gcvNULL;
-            }
-
-            if (draw->swapBehavior == EGL_BUFFER_PRESERVED)
-            {
-                /* Becomes previous back buffer. */
-                draw->prevRenderTarget = draw->renderTarget;
-                draw->renderTarget = gcvNULL;
-            }
-            else
-            {
-                /* Dereference last window back buffer. */
-                gcoSURF_Destroy(draw->renderTarget);
-            }
-
-            /* Get renderTarget from new window back buffer. */
-            draw->renderTarget = draw->backBuffer.surface;
-
-            if (draw->renderTarget)
-            {
-                /* Reference new window back buffer. */
-                gcoSURF_ReferenceSurface(draw->renderTarget);
-
-                /* Update preserved flag for next renderTarget. */
-                gcmVERIFY_OK(gcoSURF_SetFlags(
-                    draw->renderTarget,
-                    gcvSURF_FLAG_CONTENT_PRESERVED,
-                    (draw->swapBehavior == EGL_BUFFER_PRESERVED)
-                    ));
-            }
-
-            /* Sync drawable with renderTarget. */
-            draw->drawable.rtHandle = draw->renderTarget;
-            draw->drawable.prevRtHandle = draw->prevRenderTarget;
-
-            /* Update drawable to api. */
-            if (!_SetDrawable(thread,
-                              context,
-                              &draw->drawable,
-                              &draw->drawable))
-            {
-                veglSetEGLerror(thread,  EGL_BAD_CONTEXT);
-                result = EGL_FALSE;
-                break;
-            }
-        }
-
-        if (result == EGL_FALSE)
-        {
-            /* Error. */
-            break;
-        }
-
-        /* Success. */
-        veglSetEGLerror(thread,  EGL_SUCCESS);
-
-        /* reset the flags.*/
-        if (draw->renderTarget != gcvNULL)
-        {
-            gcoSURF_SetFlags(draw->renderTarget,
-                             gcvSURF_FLAG_CONTENT_UPDATED,
-                             gcvFALSE);
-        }
-
-        if (draw->depthBuffer != gcvNULL)
-        {
-            gcoSURF_SetFlags(draw->depthBuffer,
-                             gcvSURF_FLAG_CONTENT_UPDATED,
-                             gcvFALSE);
-        }
-    }
-    while (gcvFALSE);
-
-    return result;
-}
-
-/* Swap buffers, normal (or legacy) swap model. */
-static EGLBoolean
-_SwapBuffersRegion(
-    VEGLThreadData Thread,
-    EGLDisplay Dpy,
-    EGLSurface Draw,
-    EGLint NumRects,
-    const EGLint* Rects
-    )
-{
-    EGLBoolean result;
-    VEGLThreadData thread;
-    VEGLDisplay dpy;
-    VEGLPlatform platform;
-
-    do
-    {
-        VEGLSurface draw;
-        struct eglBackBuffer backBuffer;
-        EGLint i;
-
-        /* Create shortcuts to objects. */
-        thread   = Thread;
-        dpy      = VEGL_DISPLAY(Dpy);
-        draw     = VEGL_SURFACE(Draw);
-        platform = dpy->platform;
-
-#if defined(ANDROID) && (ANDROID_SDK_VERSION < 17)
-        if (draw->skipResolve)
-        {
-            /* EGL_ANDROID_get_render_buffer. */
-            if (!platform->postWindowBackBuffer(dpy, draw,
-                                                &draw->backBuffer,
-                                                NumRects,
-                                                (EGLint *) Rects))
-            {
-                veglSetEGLerror(thread,  EGL_BAD_NATIVE_WINDOW);
-                result = EGL_FALSE;
-                break;
-            }
-
-            /* Clear back buffer flag. */
-            draw->backBuffer.context = gcvNULL;
-            draw->backBuffer.surface = gcvNULL;
-            draw->skipResolve = EGL_FALSE;
-
-            /* Success. */
-            veglSetEGLerror(thread,  EGL_SUCCESS);
-            break;
-        }
-#endif
-
-        for (i = 0; i < NumRects; ++i)
-        {
-            EGLint left   = Rects[i * 4 + 0];
-            EGLint top    = Rects[i * 4 + 1];
-            EGLint width  = Rects[i * 4 + 2];
-            EGLint height = Rects[i * 4 + 3];
-
-            draw->clipRects[i * 4 + 0] = (left < 0) ? 0 : left;
-            draw->clipRects[i * 4 + 1] = (top  < 0) ? 0 : top;
-            draw->clipRects[i * 4 + 2] = (width  < draw->config.width)  ? width
-                                       : draw->config.width;
-            draw->clipRects[i * 4 + 3] = (height < draw->config.height) ? height
-                                       : draw->config.height;
-        }
-
-        /* Flush the pipe. */
-        _Flush(thread);
-
-        /* Get window back buffer. */
-        result = platform->getWindowBackBuffer(dpy, draw, &backBuffer);
-
-        if (!result)
-        {
-            gcmTRACE(
-                gcvLEVEL_ERROR,
-                "%s(%d): Get back buffer failed",
-                __FUNCTION__, __LINE__
-                );
-            veglSetEGLerror(thread,  EGL_BAD_NATIVE_WINDOW);
-            break;
-        }
-
-        /* Update buffer age. */
-        platform->updateBufferAge(dpy, draw, &backBuffer);
-
-#if gcdENABLE_3D
-        if (!draw->openVG)
-        {
-            /* 3D pipe. */
-            gcoSURF resolveTarget;
-
-            /* Will resolve into window back buffer. */
-            resolveTarget = backBuffer.surface;
-
-            /* If using cached video memory, we should clean cache before using
-             * GPU to do resolve rectangle.
-             */
-            gcoSURF_CPUCacheOperation(draw->renderTarget, gcvCACHE_CLEAN);
-
-            for (i = 0; i < NumRects; i++)
-            {
-                gcsSURF_VIEW rtView = {draw->renderTarget, 0, 1};
-                gcsSURF_VIEW tgtView = {resolveTarget, 0, 1};
-                gcsSURF_RESOLVE_ARGS rlvArgs = {0};
-                gceSTATUS status = gcvSTATUS_OK;
-
-                rlvArgs.version = gcvHAL_ARG_VERSION_V2;
-                rlvArgs.uArgs.v2.srcOrigin.x =
-                rlvArgs.uArgs.v2.dstOrigin.x = draw->clipRects[i * 4 + 0];
-                rlvArgs.uArgs.v2.srcOrigin.y =
-                rlvArgs.uArgs.v2.dstOrigin.y = draw->clipRects[i * 4 + 1];
-                rlvArgs.uArgs.v2.rectSize.x  = draw->clipRects[i * 4 + 2];
-                rlvArgs.uArgs.v2.rectSize.y  = draw->clipRects[i * 4 + 3];
-                rlvArgs.uArgs.v2.numSlices   = 1;
-                /* (3D) VG renders in BOTTOM_TOP, while the surface is TOP_BOTTOM by default. */
-                rlvArgs.uArgs.v2.yInverted   = (Thread->api == EGL_OPENVG_API) ? gcvTRUE : gcvFALSE;
-
-                status = gcoSURF_ResolveRect(&rtView, &tgtView, &rlvArgs);
-
-                if (gcmIS_ERROR(status))
-                {
-                    /* Bad surface. */
-                    veglSetEGLerror(thread, EGL_BAD_SURFACE);
-                    break;
+                                           backBuffer.surface);
                 }
             }
 
-            if (thread->error == EGL_BAD_SURFACE)
-            {
-                /* Error in above loop. */
-                break;
-            }
-        }
-        else
-#endif
-        {
-#if gcdENABLE_VG
-            /* VG pipe. */
-            veglDISPATCH * dispatch = gcvNULL;
-
-            dispatch = _GetDispatch(Thread, gcvNULL);
-
-            if ((dispatch != gcvNULL) && (dispatch->resolveVG != gcvNULL))
-            {
-                (*dispatch->resolveVG)(Thread->context->context, backBuffer.surface);
-            }
+            VEGL_DUMP_SWAP_TAG(draw, backBuffer.surface);
 #endif
         }
 
-#if gcdDUMP
-        {
-            gctUINT32 physical[3] = {0};
-            gctPOINTER logical[3] = {gcvNULL};
-            gctINT stride;
+        VEGL_DUMP_TGA(thread, draw);
 
-            gcoSURF_Lock(backBuffer.surface, physical, logical);
-            gcoSURF_Unlock(backBuffer.surface, logical[0]);
-            gcoSURF_GetAlignedSize(backBuffer.surface, gcvNULL, gcvNULL, &stride);
+        synchronous = platform->synchronousPost(dpy, draw);
 
-            gcmDUMP(gcvNULL,
-                    "@[swap 0x%08X %dx%d +%u]",
-                    physical[0],
-                    draw->config.width, draw->config.height,
-                    stride);
-        }
-#endif
-
-#if gcdANDROID_NATIVE_FENCE_SYNC >= 2
-        /* Sumit swap worker / Wait until done. */
-        if (platform->synchronousPost(dpy, draw))
-        {
-            /* Commit-stall. */
-            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
-
-            /* Post back buffer. */
-            if (!platform->postWindowBackBuffer(dpy, draw,
-                                          &backBuffer,
-                                          NumRects,
-                                          draw->clipRects))
-            {
-                veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
-                result = EGL_FALSE;
-                break;
-            }
-        }
-
-        else
-        {
-            /* Using android native fence sync. */
-            if (!platform->postWindowBackBufferFence(dpy, draw, &backBuffer))
-            {
-                veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
-                result = EGL_FALSE;
-                break;
-            }
-        }
-
-#else
         if (!backBuffer.flip)
         {
             /* No flip, commit accumulated commands. */
-            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvFALSE));
+            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, synchronous));
+
+            /* Success. */
+            veglSetEGLerror(thread, EGL_SUCCESS);
+
+            /* No need to post or switch back buffer. */
+            break;
         }
-        else if ((dpy->workerThread == gcvNULL) ||
-            platform->synchronousPost(dpy, draw))
+
+#if defined(ANDROID) && gcdANDROID_NATIVE_FENCE_SYNC >= 2
+        /* Sumit swap worker / Wait until done. */
+        if (synchronous)
         {
             /* Commit-stall. */
             gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
 
             /* Post back buffer. */
             if (!platform->postWindowBackBuffer(dpy, draw,
-                                          &backBuffer,
-                                          NumRects,
-                                          draw->clipRects))
+                                                &backBuffer,
+                                                &draw->clipRegion,
+                                                &draw->damageHint))
             {
                 veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
-                result = EGL_FALSE;
+                break;
+            }
+        }
+        else
+        {
+            /* Using android native fence sync. */
+            if (!platform->postWindowBackBufferFence(dpy, draw,
+                                                     &backBuffer,
+                                                     &draw->damageHint))
+            {
+                veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
+                break;
+            }
+        }
+#else
+        if ((dpy->workerThread == gcvNULL) || synchronous)
+        {
+            /* Commit-stall. */
+            gcmVERIFY_OK(gcoHAL_Commit(gcvNULL, gcvTRUE));
+
+            /* Post back buffer. */
+            if (!platform->postWindowBackBuffer(dpy, draw,
+                                                &backBuffer,
+                                                &draw->clipRegion,
+                                                &draw->damageHint))
+            {
+                veglSetEGLerror(thread, EGL_BAD_NATIVE_WINDOW);
                 break;
             }
         }
@@ -2178,10 +2019,8 @@ _SwapBuffersRegion(
             worker->draw         = draw;
             worker->backBuffer   = backBuffer;
             worker->targetSignal = gcvNULL;
-            worker->numRects     = NumRects;
-            gcoOS_MemCopy(worker->rects,
-                          draw->clipRects,
-                          sizeof (EGLint) * 4 * NumRects);
+            _CopyRegion(&worker->region, &draw->clipRegion);
+            _CopyRegion(&worker->damageHint, &draw->damageHint);
 
             /* Suspend the worker thread. */
             veglSuspendSwapWorker(dpy);
@@ -2202,50 +2041,113 @@ _SwapBuffersRegion(
         }
 #endif
 
-#if gcdDUMP_FRAME_TGA || defined(EMULATOR) || gcdFPGA_BUILD
+        if (draw->newSwapModel)
         {
-            gcsPOINT origin = {0, 0};
-            gcsPOINT size   = {draw->config.width, draw->config.height};
+            /* Get next back buffer for rendering in newSwapModel. */
+            /* Reset back buffer. */
+            draw->backBuffer.context = gcvNULL;
+            draw->backBuffer.surface = gcvNULL;
 
-#if gcdDUMP_FRAME_TGA
-            _SaveFrameTga(thread, draw, &origin, &size);
-#   elif (defined(EMULATOR) || gcdFPGA_BUILD)
+            result = EGL_TRUE;
+
+            /* Get native window back buffer for next frame. */
+            if (!platform->getWindowBackBuffer(dpy, draw, &draw->backBuffer))
             {
-                static EGLint checkStatus = -1;
+                draw->backBuffer.surface = gcvNULL;
+                draw->backBuffer.context = gcvNULL;
 
-                if (checkStatus < 0)
+                /* Cannot get window back buffer. */
+                veglSetEGLerror(thread, EGL_BAD_SURFACE);
+                result = EGL_FALSE;
+
+                /*
+                 * Do not break here, need update client drawable if
+                 * direct rendering mode is enabled. See below.
+                 */
+            }
+
+            /* Switch render target in no-resolve mode. */
+            if (draw->renderMode > 0)
+            {
+                if (draw->prevRenderTarget)
                 {
-                    gctSTRING dumpFrameTGA = gcvNULL;
-                    checkStatus = 0;
-
-                    if (gcmIS_SUCCESS(gcoOS_GetEnv(gcvNULL,
-                                                   "VIV_DUMP_FRAME_TGA",
-                                                   &dumpFrameTGA)) &&
-                        dumpFrameTGA)
-                    {
-                        if (gcmIS_SUCCESS(gcoOS_StrCmp(dumpFrameTGA, "1")))
-                        {
-                            checkStatus = 1;
-                        }
-                    }
+                    /* Dereference previous back buffer. */
+                    gcoSURF_Destroy(draw->prevRenderTarget);
+                    draw->prevRenderTarget = gcvNULL;
                 }
 
-                if (checkStatus)
+                if (draw->swapBehavior == EGL_BUFFER_PRESERVED)
                 {
-                    _SaveFrameTga(thread, draw, &origin, &size);
+                    /* Becomes previous back buffer. */
+                    draw->prevRenderTarget = draw->renderTarget;
+                    draw->renderTarget = gcvNULL;
+                }
+                else
+                {
+                    /* Dereference last window back buffer. */
+                    gcoSURF_Destroy(draw->renderTarget);
+                }
+
+                /* Get renderTarget from new window back buffer. */
+                draw->renderTarget = draw->backBuffer.surface;
+
+                if (draw->renderTarget)
+                {
+                    /* Reference new window back buffer. */
+                    gcoSURF_ReferenceSurface(draw->renderTarget);
+
+                    /* Update preserved flag for next renderTarget. */
+                    gcmVERIFY_OK(gcoSURF_SetFlags(
+                        draw->renderTarget,
+                        gcvSURF_FLAG_CONTENT_PRESERVED,
+                        (draw->swapBehavior == EGL_BUFFER_PRESERVED)
+                        ));
+                }
+
+                /* Sync drawable with renderTarget. */
+                draw->drawable.rtHandle = draw->renderTarget;
+                draw->drawable.prevRtHandle = draw->prevRenderTarget;
+
+                /* Update drawable to api. */
+                if (!_SetDrawable(thread,
+                                  thread->context,
+                                  &draw->drawable,
+                                  &draw->drawable))
+                {
+                    veglSetEGLerror(thread, EGL_BAD_CONTEXT);
+                    break;
                 }
             }
-#   endif
+
+            if (result == EGL_FALSE)
+            {
+                /* Error. */
+                break;
+            }
+
+            /* reset the flags.*/
+            if (draw->renderTarget != gcvNULL)
+            {
+                gcoSURF_SetFlags(draw->renderTarget,
+                                 gcvSURF_FLAG_CONTENT_UPDATED,
+                                 gcvFALSE);
+            }
+
+            if (draw->depthBuffer != gcvNULL)
+            {
+                gcoSURF_SetFlags(draw->depthBuffer,
+                                 gcvSURF_FLAG_CONTENT_UPDATED,
+                                 gcvFALSE);
+            }
         }
-#endif
 
         /* Success. */
-        veglSetEGLerror(thread,  EGL_SUCCESS);
+        veglSetEGLerror(thread, EGL_SUCCESS);
     }
     while (EGL_FALSE);
 
     /* Determine result. */
-    result = ( thread->error == EGL_SUCCESS)
+    result = (thread->error == EGL_SUCCESS)
         ? EGL_TRUE
         : EGL_FALSE;
 
@@ -2258,12 +2160,12 @@ _SwapBuffersRegion(
     return result;
 }
 
-EGLBoolean
+static EGLBoolean
 _eglSwapBuffersRegion(
     EGLDisplay Dpy,
     EGLSurface Draw,
-    EGLint NumRects,
-    const EGLint* Rects
+    struct eglRegion * SwapRegion,
+    struct eglRegion * DamageHint
     )
 {
     EGLBoolean result = EGL_TRUE;
@@ -2271,9 +2173,9 @@ _eglSwapBuffersRegion(
     VEGLDisplay dpy;
     VEGLSurface draw;
     EGLint width, height;
-    EGLint rects[4];
 
-    gcmHEADER_ARG("Dpy=0x%x Draw=0x%x NumRects=0x%x Rects=0x%x", Dpy, Draw, NumRects, Rects);
+    gcmHEADER_ARG("Dpy=0x%p Draw=0x%p SwapRegion=0x%p",
+                  Dpy, Draw, (void *)SwapRegion);
 
     /* Get thread data. */
     thread = veglGetThreadData();
@@ -2295,7 +2197,7 @@ _eglSwapBuffersRegion(
     if (dpy == gcvNULL)
     {
         /* Bad display. */
-        veglSetEGLerror(thread,  EGL_BAD_DISPLAY);
+        veglSetEGLerror(thread, EGL_BAD_DISPLAY);
         gcmFOOTER_ARG("%d", EGL_FALSE);
         return EGL_FALSE;
 
@@ -2307,7 +2209,7 @@ _eglSwapBuffersRegion(
         if (!dpy->initialized)
         {
             /* Not initialized. */
-            veglSetEGLerror(thread,  EGL_NOT_INITIALIZED);;
+            veglSetEGLerror(thread, EGL_NOT_INITIALIZED);;
             result = EGL_FALSE;
             break;
         }
@@ -2333,7 +2235,7 @@ _eglSwapBuffersRegion(
             (thread->context->draw != draw))
         {
             /* Bad surface. */
-            veglSetEGLerror(thread,  EGL_BAD_SURFACE);
+            veglSetEGLerror(thread, EGL_BAD_SURFACE);
             result = EGL_FALSE;
             break;
         }
@@ -2341,7 +2243,7 @@ _eglSwapBuffersRegion(
         /* Test if surface is locked. */
         if (draw->locked)
         {
-            veglSetEGLerror(thread,  EGL_BAD_ACCESS);
+            veglSetEGLerror(thread, EGL_BAD_ACCESS);
             result = EGL_FALSE;
             break;
         }
@@ -2350,7 +2252,7 @@ _eglSwapBuffersRegion(
         if (!(draw->type & EGL_WINDOW_BIT))
         {
             /* Not a window surface. */
-            veglSetEGLerror(thread,  EGL_SUCCESS);
+            veglSetEGLerror(thread, EGL_SUCCESS);
             break;
         }
 
@@ -2358,7 +2260,7 @@ _eglSwapBuffersRegion(
         if (draw->buffer != EGL_BACK_BUFFER)
         {
             /* Not a back buffer. */
-            veglSetEGLerror(thread,  EGL_SUCCESS);
+            veglSetEGLerror(thread, EGL_SUCCESS);
             break;
         }
 
@@ -2370,32 +2272,38 @@ _eglSwapBuffersRegion(
             break;
         }
 
+        /* Test region parameters. */
+        if (!_ValidateRegion(SwapRegion) ||
+            !_ValidateRegion(DamageHint))
+        {
+            /* Invalid parameters. */
+            veglSetEGLerror(thread, EGL_BAD_PARAMETER);
+            break;
+        }
+
 #if gcdFRAME_DB
         /* Add (previous) frame to the database. */
         gcoHAL_AddFrameDB();
 #endif
 
-        if (NumRects == 0)
+        /* Clip swap region with surface size. */
+        if (!_ComputeSwapRegion(dpy, draw, SwapRegion))
         {
-            /* Set the coordinates. */
-            rects[0] = 0;
-            rects[1] = 0;
-            rects[2] = draw->config.width;
-            rects[3] = draw->config.height;
+            /* Out of memory. */
+            veglSetEGLerror(thread, EGL_BAD_ALLOC);
+            break;
+        }
 
-            Rects    = rects;
-            NumRects = 1;
+        /* Compute damage hints. */
+        if (!_ComputeDamageHint(dpy, draw, DamageHint))
+        {
+            /* Out of memory. */
+            veglSetEGLerror(thread, EGL_BAD_ALLOC);
+            break;
         }
 
         /* Call generic function. */
-        if (draw->newSwapModel)
-        {
-            result = _SwapBuffersRegionNew(thread, Dpy, Draw, NumRects, Rects);
-        }
-        else
-        {
-            result = _SwapBuffersRegion(thread, Dpy, Draw, NumRects, Rects);
-        }
+        result = _SwapBuffersRegion(thread, Dpy, Draw);
 
         /* Buffer swapped. */
         draw->initialFrame = EGL_FALSE;
@@ -2490,50 +2398,29 @@ _eglSwapBuffersRegion(
     gcmFOOTER_ARG("%d", result);
     return result;
 }
-#endif
+#endif /* EGL_API_DRI */
 
-static void
-eglfDoSwapBuffers(
+static EGLBoolean
+veglSwapBuffers(
     EGLDisplay Dpy,
-    EGLSurface Draw
-    )
-{
-    gcmHEADER_ARG("Dpy=0x%x Draw=0x%x", Dpy, Draw);
-    gcmDUMP_API("${EGL eglSwapBuffers 0x%08X 0x%08X}", Dpy, Draw);
-
-    _eglSwapBuffersRegion(Dpy, Draw, 0, gcvNULL);
-
-    gcmFOOTER_NO();
-}
-
-EGLAPI EGLBoolean EGLAPIENTRY
-eglSwapBuffers(
-    EGLDisplay Dpy,
-    EGLSurface Draw
+    EGLSurface Draw,
+    struct eglRegion * SwapRegion,
+    struct eglRegion * DamageHint
     )
 {
     EGLBoolean result = EGL_FALSE;
-    /* Get dispatch table. */
-    veglDISPATCH * dispatch;
 
-
-    gcmHEADER_ARG("Dpy=0x%x Draw=0x%x", Dpy, Draw);
-
-    gcmDUMP_API("${EGL eglSwapBuffers 0x%08X 0x%08X}", Dpy, Draw);
-    VEGL_TRACE_API(SwapBuffers)(Dpy, Draw);
 
 #if gcdDEBUG_OPTION && gcdDEBUG_OPTION_SKIP_SWAP && gcdDEBUG_OPTION_SKIP_FRAMES
     {
-        static EGLint count = 0;
+        static gctUINT count = 0;
         gcePATCH_ID patchId = gcvPATCH_INVALID;
 
         gcoHAL_GetPatchID(gcvNULL, &patchId);
 
         if (patchId == gcvPATCH_DEBUG)
         {
-            if (count > 0x7FFFFFFE)count = 0;
-
-            if (count ++ % gcdDEBUG_OPTION_SKIP_FRAMES != 0)
+            if (count++ % gcdDEBUG_OPTION_SKIP_FRAMES != 0)
             {
                 return EGL_TRUE;
             }
@@ -2541,18 +2428,8 @@ eglSwapBuffers(
     }
 #endif
 
-    dispatch = _GetDispatch(veglGetThreadData(), gcvNULL);
 
-    /* Check if there is a swapbuffer function. */
-    if ((dispatch != gcvNULL) && (dispatch->swapBuffers != gcvNULL))
-    {
-        /* Call the swapbuffer function. */
-        result = (*dispatch->swapBuffers)(Dpy, Draw, eglfDoSwapBuffers);
-    }
-    else
-    {
-        result = _eglSwapBuffersRegion(Dpy, Draw, 0, gcvNULL);
-    }
+    result = _eglSwapBuffersRegion(Dpy, Draw, SwapRegion, DamageHint);
 
 
 #if gcdGC355_PROFILER
@@ -2607,6 +2484,23 @@ eglSwapBuffers(
 
 #endif
 
+    return result;
+}
+
+EGLAPI EGLBoolean EGLAPIENTRY
+eglSwapBuffers(
+    EGLDisplay Dpy,
+    EGLSurface Draw
+    )
+{
+    EGLBoolean result;
+    gcmHEADER_ARG("Dpy=0x%x Draw=0x%x", Dpy, Draw);
+
+    gcmDUMP_API("${EGL eglSwapBuffers 0x%08X 0x%08X}", Dpy, Draw);
+    VEGL_TRACE_API(SwapBuffers)(Dpy, Draw);
+
+    result = veglSwapBuffers(Dpy, Draw, gcvNULL, gcvNULL);
+
     gcmFOOTER_ARG("%d", result);
     return result;
 }
@@ -2624,25 +2518,63 @@ eglSwapBuffersRegionEXT(
     gcmHEADER_ARG("Dpy=0x%x Draw=0x%x NumRects=0x%x Rects=0x%x", Dpy, Draw, NumRects, Rects);
     gcmDUMP_API("${EGL eglSwapBuffersRegionEXT 0x%08X 0x%08X %d 0x%x}", Dpy, Draw, NumRects, Rects);
 
-    if (NumRects < 0)
-    {
-        gcmFOOTER_ARG("return=%d", EGL_BAD_PARAMETER);
-        return EGL_BAD_PARAMETER;
-    }
+    result = veglSwapBuffers(Dpy, Draw, gcvNULL, gcvNULL);
 
-    if (NumRects > 0 && Rects == gcvNULL)
-    {
-        gcmFOOTER_ARG("return=%d", EGL_BAD_PARAMETER);
-        return EGL_BAD_PARAMETER;
-    }
+    gcmFOOTER_ARG("%d", result);
+    return result;
+}
 
-    if (NumRects > VEGL_MAX_SWAP_BUFFER_REGION_RECTS)
+EGLAPI EGLBoolean EGLAPIENTRY
+eglSwapBuffersWithDamageKHR(
+    EGLDisplay Dpy,
+    EGLSurface Surface,
+    EGLint *Rects,
+    EGLint NumRects
+    )
+{
+    EGLBoolean result;
+    struct eglRegion region =
     {
-        /* Just resolve entire surface. */
-        NumRects = 0;
-    }
+        NumRects,
+        0,
+        Rects,
+    };
 
-    result = _eglSwapBuffersRegion(Dpy, Draw, 0, gcvNULL);
+    gcmHEADER_ARG("Dpy=0x%p Surface=0x%p rects=0x%p n_rects=%d",
+                  Dpy, Surface, (void *)Rects, NumRects);
+    gcmDUMP_API("${EGL eglSwapBuffersWithDamageKHR 0x%p 0x%p 0x%p 0x%X}",
+                Dpy, Surface, (void *)Rects, NumRects);
+    VEGL_TRACE_API(SwapBuffersWithDamageKHR)(Dpy, Surface, Rects, NumRects);
+
+    result = veglSwapBuffers(Dpy, Surface, gcvNULL, &region);
+
+    gcmFOOTER_ARG("%d", result);
+    return result;
+}
+
+EGLAPI EGLBoolean EGLAPIENTRY
+eglSwapBuffersWithDamageEXT(
+    EGLDisplay Dpy,
+    EGLSurface Surface,
+    EGLint *Rects,
+    EGLint NumRects
+    )
+{
+    EGLBoolean result;
+    struct eglRegion region =
+    {
+        NumRects,
+        0,
+        Rects,
+    };
+
+    gcmHEADER_ARG("Dpy=0x%p Surface=0x%p rects=0x%p n_rects=%d",
+                  Dpy, Surface, (void *)Rects, NumRects);
+    gcmDUMP_API("${EGL eglSwapBuffersWithDamageEXT 0x%p 0x%p 0x%p 0x%X}",
+                Dpy, Surface, (void *)Rects, NumRects);
+    VEGL_TRACE_API(SwapBuffersWithDamageKHR)(Dpy, Surface, Rects, NumRects);
+
+    result = veglSwapBuffers(Dpy, Surface, gcvNULL, &region);
 
     gcmFOOTER_ARG("%d", result);
     return result;
@@ -2765,6 +2697,116 @@ eglSetSwapRectangleVIV(
 }
 #endif
 
+/* EGL_KHR_partial_update */
+EGLAPI EGLBoolean EGLAPIENTRY
+eglSetDamageRegionKHR(
+    EGLDisplay Dpy,
+    EGLSurface Surface,
+    EGLint *Rects,
+    EGLint NumRects
+    )
+{
+    VEGLThreadData thread;
+    VEGLDisplay dpy;
+    VEGLSurface surface;
+    struct eglRegion *region;
+    EGLint numRects;
+
+    gcmHEADER_ARG("Dpy=0x%x Surface=0x%x rects=0x%x n_rects=%d", Dpy, Surface, Rects, NumRects);
+    gcmDUMP_API("${EGL eglSetDamageRegionKHR 0x%08X 0x%08X 0x%08X 0x%08X}",
+                Dpy, Surface, Rects, NumRects);
+
+    VEGL_TRACE_API(SetDamageRegionKHR)(Dpy, Surface, Rects, NumRects);
+
+    /* Get thread data. */
+    thread = veglGetThreadData();
+    if (thread == gcvNULL)
+    {
+        gcmTRACE(
+            gcvLEVEL_ERROR,
+            "%s(%d): veglGetThreadData failed.",
+            __FUNCTION__, __LINE__
+            );
+
+        gcmFOOTER_ARG("%d", EGL_FALSE);
+        return EGL_FALSE;
+    }
+
+    /* Test for valid EGLDisplay structure. */
+    dpy = veglGetDisplay(Dpy);
+    if (dpy == gcvNULL)
+    {
+        /* Bad display. */
+        veglSetEGLerror(thread,  EGL_BAD_DISPLAY);
+        gcmFOOTER_ARG("%d", EGL_FALSE);
+        return EGL_FALSE;
+    }
+
+    surface = VEGL_SURFACE(Surface);
+
+    /*
+     * * If <surface> is not a postable surface, an EGL_BAD_MATCH error is
+     *   generated
+     * * If <surface> is not the current draw surface for the calling thread, an
+     *   EGL_BAD_MATCH error is generated
+     * * If the value of EGL_SWAP_BEHAVIOR for <surface> is not
+     *   EGL_BUFFER_DESTROYED, an EGL_BAD_MATCH error is generated
+     */
+    if ((surface->type != EGL_WINDOW_BIT) ||
+        (thread->context == gcvNULL || thread->context->draw != surface) ||
+        (surface->swapBehavior != EGL_BUFFER_DESTROYED))
+    {
+        veglSetEGLerror(thread,  EGL_BAD_MATCH);
+        gcmFOOTER_ARG("%d", EGL_FALSE);
+        return EGL_FALSE;
+    }
+
+    /*
+     * * If eglSetDamageRegionKHR has already been called on <surface> since the
+     *   most recent frame boundary, an EGL_BAD_ACCESS error is generated
+     * * If the EGL_BUFFER_AGE_KHR attribute of <surface> has not been queried
+     *   since the most recent frame boundary, an EGL_BAD_ACCESS error is generated
+     */
+    if (surface->damageValid || !surface->queriedAge)
+    {
+        veglSetEGLerror(thread,  EGL_BAD_ACCESS);
+        gcmFOOTER_ARG("%d", EGL_FALSE);
+        return EGL_FALSE;
+    }
+
+    region = &surface->damage[surface->curDamage];
+
+    numRects = (NumRects == 0) ? 1 : NumRects;
+    _ReallocRegion(region, numRects);
+
+    /*
+     * If <n_rects> is zero, <rects> is ignored and the damage region is set to the
+     * full dimensions of the surface.
+     */
+    if (NumRects == 0)
+    {
+        region->numRects = 1;
+
+        region->rects[0] = 0;
+        region->rects[1] = 0;
+        region->rects[2] = (EGLint)surface->config.width;
+        region->rects[3] = (EGLint)surface->config.height;
+    }
+    else
+    {
+        region->numRects = NumRects;
+        gcoOS_MemCopy(region->rects, Rects, 4 * gcmSIZEOF(EGLint) * NumRects);
+    }
+
+    surface->curDamage   = (surface->curDamage + 1) % EGL_WORKER_COUNT;
+    surface->damageValid = EGL_TRUE;
+
+    /* Safe to reset queriedAge flag because damageValid flag is set. */
+    surface->queriedAge  = EGL_FALSE;
+
+    gcmFOOTER_ARG("%d", EGL_TRUE);
+    return EGL_TRUE;
+}
 
 EGLAPI EGLBoolean EGLAPIENTRY
 eglCopyBuffers(
@@ -3059,13 +3101,6 @@ eglGetRenderBufferv0VIV(
 
             *((gctINT_PTR) &nativeBuffer->common.reserved[1]) =
                 (draw->swapRect.width << 16) | draw->swapRect.height;
-
-#if gcdSUPPORT_SWAP_RECTANGLE
-            draw->swapRect.x = 0;
-            draw->swapRect.y = 0;
-            draw->swapRect.width   = draw->config.width;
-            draw->swapRect.height  = draw->config.height;
-#endif
         }
     }
     while (gcvFALSE);
@@ -3180,13 +3215,6 @@ eglGetRenderBufferVIV(
 
             *((gctINT_PTR) &nativeBuffer->common.reserved[1]) =
                 (draw->swapRect.width << 16) | draw->swapRect.height;
-
-#if gcdSUPPORT_SWAP_RECTANGLE
-            draw->swapRect.x = 0;
-            draw->swapRect.y = 0;
-            draw->swapRect.width   = draw->config.width;
-            draw->swapRect.height  = draw->config.height;
-#endif
         }
     }
     while (gcvFALSE);
@@ -3242,7 +3270,10 @@ eglPostBufferVIV(
              * reduce some resources.
              * HWComposer HAL has that fenceFd and can handle it there.
              */
-            dpy->platform->postWindowBackBuffer(dpy, draw, &draw->backBuffer, 0, gcvNULL);
+            dpy->platform->postWindowBackBuffer(dpy, draw,
+                                                &draw->backBuffer,
+                                                &draw->clipRegion,
+                                                &draw->damageHint);
 
             draw->backBuffer.context = gcvNULL;
             draw->backBuffer.surface = gcvNULL;

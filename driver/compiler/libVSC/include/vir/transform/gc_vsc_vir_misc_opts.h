@@ -63,6 +63,12 @@ DECLARE_QUERY_PASS_PROP(vscVIR_FixTexldOffset);
 VSC_ErrCode vscVIR_InitializeVariables(VSC_SH_PASS_WORKER* pPassWorker);
 DECLARE_QUERY_PASS_PROP(vscVIR_InitializeVariables);
 
+VSC_ErrCode vscVIR_FixDynamicIdxDep(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_FixDynamicIdxDep);
+
+VSC_ErrCode vscVIR_GenCombinedSampler(VSC_SH_PASS_WORKER* pPassWorker);
+DECLARE_QUERY_PASS_PROP(vscVIR_GenCombinedSampler);
+
 END_EXTERN_C()
 
 #endif /* __gc_vsc_vir_misc_opts_h_ */

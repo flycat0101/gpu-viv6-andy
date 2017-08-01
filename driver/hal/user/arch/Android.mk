@@ -41,8 +41,7 @@ LOCAL_SRC_FILES += \
     gc_hal_user_hardware_frag_proc.c \
     gc_hal_user_hardware_texture.c \
     gc_hal_user_hardware_texture_upload.c \
-    gc_hal_user_hardware_stream.c \
-    gc_hal_user_hardware_composition.c
+    gc_hal_user_hardware_stream.c
 
 endif
 ifeq ($(VIVANTE_ENABLE_2D),1)

@@ -73,9 +73,9 @@ gceMMU_TYPE;
 
 #define gcdVERTEX_START      (128 << 10)
 
-typedef struct _gcsMMU_STLB *gcsMMU_STLB_PTR;
+typedef struct _gcsMMU_STLB_CHUNK *gcsMMU_STLB_CHUNK_PTR;
 
-typedef struct _gcsMMU_STLB
+typedef struct _gcsMMU_STLB_CHUNK
 {
     gctPHYS_ADDR    physical;
     gctUINT32_PTR   logical;
@@ -84,8 +84,8 @@ typedef struct _gcsMMU_STLB
     gctSIZE_T       pageCount;
     gctUINT32       mtlbIndex;
     gctUINT32       mtlbEntryNum;
-    gcsMMU_STLB_PTR next;
-} gcsMMU_STLB;
+    gcsMMU_STLB_CHUNK_PTR next;
+} gcsMMU_STLB_CHUNK;
 
 #if gcdSHARED_PAGETABLE
 typedef struct _gcsSharedPageTable * gcsSharedPageTable_PTR;
@@ -113,42 +113,23 @@ typedef struct _gcsDynamicSpaceNode
 }
 gcsDynamicSpaceNode;
 
-static void
-_WritePageEntry(
-    IN gctUINT32_PTR PageEntry,
-    IN gctUINT32     EntryValue
-    )
-{
-    static gctUINT16 data = 0xff00;
+#if gcdENDIAN_BIG
 
-    if (*(gctUINT8 *)&data == 0xff)
-    {
-        *PageEntry = gcmSWAB32(EntryValue);
-    }
-    else
-    {
-        *PageEntry = EntryValue;
-    }
-}
+#  define _WritePageEntry(pageEntry, entryValue) \
+    *(gctUINT32_PTR)(pageEntry) = gcmBSWAP32((gctUINT32)(entryValue))
 
-static gctUINT32
-_ReadPageEntry(
-    IN gctUINT32_PTR PageEntry
-    )
-{
-    static gctUINT16 data = 0xff00;
-    gctUINT32 entryValue;
+#  define _ReadPageEntry(pageEntry) \
+    gcmBSWAP32(*(gctUINT32_PTR)(pageEntry))
 
-    if (*(gctUINT8 *)&data == 0xff)
-    {
-        entryValue = *PageEntry;
-        return gcmSWAB32(entryValue);
-    }
-    else
-    {
-        return *PageEntry;
-    }
-}
+#else
+
+#  define _WritePageEntry(pageEntry, entryValue) \
+    *(gctUINT32_PTR)(pageEntry) = (gctUINT32)(entryValue)
+
+#  define _ReadPageEntry(pageEntry) \
+    *(gctUINT32_PTR)(pageEntry)
+
+#endif
 
 static gceSTATUS
 _FillPageTable(
@@ -581,19 +562,60 @@ _FillFlatMapping(
     )
 {
     gceSTATUS status;
-    gctBOOL mutex = gcvFALSE;
-    gcsMMU_STLB_PTR head = gcvNULL, pre = gcvNULL;
-    gctUINT32 start = PhysBase & ~gcdMMU_PAGE_64K_MASK;
-    gctUINT32 end = (gctUINT32) (PhysBase + Size - 1) & ~gcdMMU_PAGE_64K_MASK;
-    gctUINT32 mStart = start >> gcdMMU_MTLB_SHIFT;
-    gctUINT32 mEnd = end >> gcdMMU_MTLB_SHIFT;
-    gctUINT32 sStart = (start & gcdMMU_STLB_64K_MASK) >> gcdMMU_STLB_64K_SHIFT;
-    gctUINT32 sEnd = (end & gcdMMU_STLB_64K_MASK) >> gcdMMU_STLB_64K_SHIFT;
-    gctPHYS_ADDR_T physical;
-    gctUINT32 size;
-
-    gctUINT32 mtlb = _MtlbOffset(PhysBase);
+    gctUINT32 mtlb;
     gcsADDRESS_AREA_PTR area = &Mmu->area[0];
+
+    /************************ look up existing flat mapping ranges. ****************/
+    gctUINT64 flatBase = (gctUINT64)PhysBase;
+    gctUINT32 flatSize = (gctUINT32)Size;
+    gctUINT64 base = flatBase;
+    gctUINT32 size = flatSize;
+    gctUINT64 end  = base + size;
+    gctUINT32 i;
+    end = gcmMIN(end, 0x100000000ull);
+
+    for (i = 0; i < Mmu->flatMappingRangeCount; i++)
+    {
+        if (base < Mmu->flatMappingRanges[i].start)
+        {
+            end  = gcmMIN(end, Mmu->flatMappingRanges[i].start);
+            flatSize = (gctUINT32) (end - base);
+        }
+        else if (end > Mmu->flatMappingRanges[i].end)
+        {
+            base = gcmMAX(base, Mmu->flatMappingRanges[i].end);
+
+            flatBase = (gctUINT32) base;
+            flatSize = (gctUINT32) (end - base);
+
+            if (base > 0xFFFFFFFF)
+            {
+                flatSize = 0;
+            }
+        }
+        else
+        {
+            /* it is already inside existing flat mapping ranges. */
+            flatSize = 0;
+        }
+
+        if (flatSize == 0)
+        {
+            return gcvSTATUS_OK;
+        }
+    }
+
+    Mmu->flatMappingRanges[Mmu->flatMappingRangeCount].start = flatBase;
+    Mmu->flatMappingRanges[Mmu->flatMappingRangeCount].end = flatBase + flatSize;
+    Mmu->flatMappingRangeCount++;
+
+    gcmkASSERT(Mmu->flatMappingRangeCount <= gcdMAX_FLAT_MAPPING_COUNT);
+
+    /* overwrite the orignal parameters */
+    PhysBase = (gctUINT32)flatBase;
+    Size = (gctSIZE_T)flatSize;
+
+    mtlb = _MtlbOffset(PhysBase);
 
     /************************ Setup flat mapping in dynamic range. ****************/
 
@@ -622,195 +644,260 @@ _FillFlatMapping(
     }
 
     /************************ Setup flat mapping in non dynamic range. **************/
-
-    /* Grab the mutex. */
-    gcmkONERROR(gckOS_AcquireMutex(Mmu->os, Mmu->pageTableMutex, gcvINFINITE));
-    mutex = gcvTRUE;
-
-    while (mStart <= mEnd)
     {
-        gcsMMU_STLB_PTR stlb = gcvNULL;
-        gctUINT32 last = (mStart == mEnd) ? sEnd : (gcdMMU_STLB_64K_ENTRY_NUM - 1);
+        gctBOOL mutex = gcvFALSE;
+        gctUINT32 start = PhysBase & ~gcdMMU_PAGE_64K_MASK;
+        gctUINT32 end = (gctUINT32) (PhysBase + Size - 1) & ~gcdMMU_PAGE_64K_MASK;
+        gctUINT32 mStart = start >> gcdMMU_MTLB_SHIFT;
+        gctUINT32 mEnd = end >> gcdMMU_MTLB_SHIFT;
+        gctUINT32 sStart = (start & gcdMMU_STLB_64K_MASK) >> gcdMMU_STLB_64K_SHIFT;
+        gctUINT32 sEnd = (end & gcdMMU_STLB_64K_MASK) >> gcdMMU_STLB_64K_SHIFT;
+        gctPHYS_ADDR_T physical;
+        gcsMMU_STLB_CHUNK_PTR newStlbChunk = gcvNULL;
+        gctUINT32 stlbIndex = 0;
+        gctUINT32 totalNewStlbs = 0;
+        gctINT32 firstMtlbEntry = -1;
+        gctUINT32 mtlbCurEntry = mStart;
+        gcsMMU_STLB_CHUNK_PTR curStlbChunk = gcvNULL;
+        gctUINT32 seqs[2] = {0, 0};
+        gctUINT32 seqIdx = 0;
+        /* Grab the mutex. */
+        gcmkONERROR(gckOS_AcquireMutex(Mmu->os, Mmu->pageTableMutex, gcvINFINITE));
+        mutex = gcvTRUE;
 
-        gcmkASSERT(mStart < gcdMMU_MTLB_ENTRY_NUM);
-        if (*(Mmu->mtlbLogical + mStart) == 0)
+        /* find all new stlbs, part of new flat mapping range may already have stlbs*/
+        while (mtlbCurEntry <= mEnd)
         {
-            gctPOINTER pointer = gcvNULL;
-
-            gctUINT32 mtlbEntry;
-
-            gcmkONERROR(gckOS_Allocate(Mmu->os, sizeof(struct _gcsMMU_STLB), &pointer));
-            stlb = pointer;
-
-            stlb->mtlbEntryNum = 0;
-            stlb->next = gcvNULL;
-            stlb->physical = gcvNULL;
-            stlb->logical = gcvNULL;
-            stlb->size = gcdMMU_STLB_64K_SIZE;
-            stlb->pageCount = 0;
-
-            if (pre == gcvNULL)
+            if (*(Mmu->mtlbLogical + mtlbCurEntry) == 0)
             {
-                pre = head = stlb;
+                if (seqIdx < 2)
+                {
+                    if (seqs[seqIdx] != 2)
+                    {
+                        seqs[seqIdx] = 1;
+                    }
+                    else if (seqIdx < 1)
+                    {
+                        seqs[++seqIdx] = 1;
+                    }
+                    else
+                    {
+                        gcmkASSERT(gcvFALSE);
+                    }
+                }
+                else if (seqs[1] != 1)
+                {
+                    gcmkPRINT("There is a hole in new flat mapping range, which is not correct");
+                }
+                totalNewStlbs++;
+                if (-1 == firstMtlbEntry)
+                {
+                    firstMtlbEntry = mtlbCurEntry;
+                }
             }
             else
             {
-                gcmkASSERT(pre->next == gcvNULL);
-                pre->next = stlb;
-                pre = stlb;
+                if (seqIdx < 2)
+                {
+                    if (seqs[seqIdx] != 1)
+                    {
+                        seqs[seqIdx] = 2;
+                    }
+                    else if (seqIdx < 1)
+                    {
+                        seqs[++seqIdx] = 2;
+                    }
+                    else
+                    {
+                        gcmkASSERT(gcvFALSE);
+                    }
+                }
+                else if (seqs[1] != 2)
+                {
+                    gcmkPRINT("There is a hole in new flat mapping range, which is not correct");
+                }
             }
+            mtlbCurEntry++;
+        }
 
+        /* Need allocate a new chunk of stlbs */
+        if (totalNewStlbs)
+        {
+            gcmkONERROR(
+                gckOS_Allocate(Mmu->os,
+                               sizeof(struct _gcsMMU_STLB_CHUNK),
+                               (gctPOINTER *)&newStlbChunk));
+
+            newStlbChunk->mtlbEntryNum = totalNewStlbs;
+            newStlbChunk->next = gcvNULL;
+            newStlbChunk->physical = gcvNULL;
+            newStlbChunk->logical = gcvNULL;
+            newStlbChunk->size = gcdMMU_STLB_64K_SIZE * newStlbChunk->mtlbEntryNum;
+            newStlbChunk->pageCount = 0;
+            newStlbChunk->mtlbIndex = firstMtlbEntry;
             gcmkONERROR(
                     gckOS_AllocateContiguous(Mmu->os,
                                              gcvFALSE,
-                                             &stlb->size,
-                                             &stlb->physical,
-                                             (gctPOINTER)&stlb->logical));
-
-            gcmkONERROR(gckOS_ZeroMemory(stlb->logical, stlb->size));
+                                             &newStlbChunk->size,
+                                             &newStlbChunk->physical,
+                                             (gctPOINTER)&newStlbChunk->logical));
+            gcmkONERROR(gckOS_ZeroMemory(newStlbChunk->logical, newStlbChunk->size));
 
             gcmkONERROR(gckOS_GetPhysicalAddress(
                 Mmu->os,
-                stlb->logical,
+                newStlbChunk->logical,
                 &physical));
 
-            gcmkSAFECASTPHYSADDRT(stlb->physBase, physical);
+            gcmkSAFECASTPHYSADDRT(newStlbChunk->physBase, physical);
 
-            if (stlb->physBase & (gcdMMU_STLB_64K_SIZE - 1))
+            if (newStlbChunk->physBase & (gcdMMU_STLB_64K_SIZE - 1))
             {
                 gcmkONERROR(gcvSTATUS_NOT_ALIGNED);
             }
-
-            physical  = stlb->physBase
-                      /* 64KB page size */
-                      | (1 << 2)
-                      /* Ignore exception */
-                      | (0 << 1)
-                      /* Present */
-                      | (1 << 0);
-
-            gcmkSAFECASTPHYSADDRT(mtlbEntry, physical);
-
-            _WritePageEntry(Mmu->mtlbLogical + mStart, mtlbEntry);
-
-#if gcdMMU_TABLE_DUMP
-            gckOS_Print("%s(%d): insert MTLB[%d]: %08x\n",
-                __FUNCTION__, __LINE__,
-                mStart,
-                _ReadPageEntry(Mmu->mtlbLogical + mStart));
-#endif
-
-            stlb->mtlbIndex = mStart;
-            stlb->mtlbEntryNum = 1;
-#if gcdMMU_TABLE_DUMP
-            gckOS_Print("%s(%d): STLB: logical:%08x -> physical:%08x\n",
-                    __FUNCTION__, __LINE__,
-                    stlb->logical,
-                    stlb->physBase);
-#endif
-
-
         }
-        else
-        {
-            stlb = Mmu->staticSTLB;
 
-            while (stlb)
+        while (mStart <= mEnd)
+        {
+            gctUINT32 last = (mStart == mEnd) ? sEnd : (gcdMMU_STLB_64K_ENTRY_NUM - 1);
+            gctPHYS_ADDR_T stlbPhyBase;
+            gctUINT32_PTR stlbLogical;
+
+            gcmkASSERT(mStart < gcdMMU_MTLB_ENTRY_NUM);
+
+            if (*(Mmu->mtlbLogical + mStart) == 0)
+            {
+                gctUINT32 mtlbEntry;
+                curStlbChunk = newStlbChunk;
+                stlbPhyBase = curStlbChunk->physBase + (stlbIndex * gcdMMU_STLB_64K_SIZE);
+                stlbLogical = (gctUINT32_PTR)((gctUINT8_PTR)curStlbChunk->logical + (stlbIndex * gcdMMU_STLB_64K_SIZE));
+                physical  = stlbPhyBase
+                          /* 64KB page size */
+                          | (1 << 2)
+                          /* Ignore exception */
+                          | (0 << 1)
+                          /* Present */
+                          | (1 << 0);
+
+                gcmkSAFECASTPHYSADDRT(mtlbEntry, physical);
+
+                _WritePageEntry(Mmu->mtlbLogical + mStart, mtlbEntry);
+
+#if gcdMMU_TABLE_DUMP
+                gckOS_Print("%s(%d): insert MTLB[%d]: %08x\n",
+                    __FUNCTION__, __LINE__,
+                    mStart,
+                    _ReadPageEntry(Mmu->mtlbLogical + mStart));
+#endif
+
+#if gcdMMU_TABLE_DUMP
+                gckOS_Print("%s(%d): STLB: logical:%08x -> physical:%08x\n",
+                        __FUNCTION__, __LINE__,
+                        stlbLogical,
+                        stlbPhyBase);
+#endif
+                ++stlbIndex;
+            }
+            else
             {
                 gctUINT32 mtlbEntry = _ReadPageEntry(Mmu->mtlbLogical + mStart);
+                gctUINT stlbOffset;
 
-                if (stlb->physBase == (mtlbEntry & gcdMMU_MTLB_ENTRY_STLB_MASK))
+                curStlbChunk = (gcsMMU_STLB_CHUNK_PTR)Mmu->staticSTLB;
+
+                while (curStlbChunk)
                 {
-                    break;
+                    if ((mStart >= curStlbChunk->mtlbIndex) &&
+                        (mStart < (curStlbChunk->mtlbIndex + curStlbChunk->mtlbEntryNum)))
+                    {
+                        break;
+                    }
+                    curStlbChunk = curStlbChunk->next;
                 }
+                gcmkASSERT(curStlbChunk);
+                stlbOffset = mStart - curStlbChunk->mtlbIndex;
 
-                stlb = stlb->next;
+                stlbPhyBase = curStlbChunk->physBase + (stlbOffset * gcdMMU_STLB_64K_SIZE);
+                stlbLogical = (gctUINT32_PTR)((gctUINT8_PTR)curStlbChunk->logical + (stlbOffset * gcdMMU_STLB_64K_SIZE));
+                if (stlbPhyBase != (mtlbEntry & gcdMMU_MTLB_ENTRY_STLB_MASK))
+                {
+                    gcmkASSERT(0);
+                }
+            }
+            /* Fill STLB. */
+            sStart = (start & gcdMMU_STLB_64K_MASK) >> gcdMMU_STLB_64K_SHIFT;
+
+            while (sStart <= last)
+            {
+                gcmkASSERT(!(start & gcdMMU_PAGE_64K_MASK));
+                _WritePageEntry(stlbLogical + sStart, _SetPage(start, 0, gcvTRUE));
+#if gcdMMU_TABLE_DUMP
+                gckOS_Print("%s(%d): insert STLB[%d]: %08x\n",
+                    __FUNCTION__, __LINE__,
+                    sStart,
+                    _ReadPageEntry(stlbLogical + sStart));
+#endif
+                /* next page. */
+                start += gcdMMU_PAGE_64K_SIZE;
+                sStart++;
+                curStlbChunk->pageCount++;
+            }
+
+            ++mStart;
+        }
+
+        gcmkASSERT(totalNewStlbs == stlbIndex);
+
+        if (newStlbChunk)
+        {
+            /* Insert the stlbChunk into staticSTLB. */
+            if (Mmu->staticSTLB == gcvNULL)
+            {
+                Mmu->staticSTLB = newStlbChunk;
+            }
+            else
+            {
+                gcmkASSERT(newStlbChunk != gcvNULL);
+                gcmkASSERT(newStlbChunk->next == gcvNULL);
+                newStlbChunk->next = Mmu->staticSTLB;
+                Mmu->staticSTLB = newStlbChunk;
             }
         }
 
-        /* Fill STLB. */
-        sStart = (start & gcdMMU_STLB_64K_MASK) >> gcdMMU_STLB_64K_SHIFT;
-
-        while (sStart <= last)
-        {
-            gcmkASSERT(!(start & gcdMMU_PAGE_64K_MASK));
-            _WritePageEntry(stlb->logical + sStart, _SetPage(start, 0, gcvTRUE));
-#if gcdMMU_TABLE_DUMP
-            gckOS_Print("%s(%d): insert STLB[%d]: %08x\n",
-                __FUNCTION__, __LINE__,
-                sStart,
-                _ReadPageEntry(stlb->logical + sStart));
-#endif
-            /* next page. */
-            start += gcdMMU_PAGE_64K_SIZE;
-            sStart++;
-            stlb->pageCount++;
-        }
-
-        ++mStart;
-    }
-
-    if (pre)
-    {
-        /* Insert the stlb into staticSTLB. */
-        if (Mmu->staticSTLB == gcvNULL)
-        {
-            Mmu->staticSTLB = head;
-        }
-        else
-        {
-            gcmkASSERT(pre != gcvNULL);
-            gcmkASSERT(pre->next == gcvNULL);
-            pre->next = Mmu->staticSTLB;
-            Mmu->staticSTLB = head;
-        }
-    }
-
-    /* Release the mutex. */
-    gcmkVERIFY_OK(gckOS_ReleaseMutex(Mmu->os, Mmu->pageTableMutex));
-
-#if gcdENABLE_TRUST_APPLICATION
-    if (Mmu->hardware->secureMode == gcvSECURE_IN_TA)
-    {
-        gckKERNEL_SecurityMapMemory(Mmu->hardware->kernel, gcvNULL, PhysBase, (gctUINT32)Size/4096, &PhysBase);
-    }
-#endif
-
-    return gcvSTATUS_OK;
-
-OnError:
-
-    /* Roll back. */
-    while (head != gcvNULL)
-    {
-        pre = head;
-        head = head->next;
-
-        if (pre->physical != gcvNULL)
-        {
-            gcmkVERIFY_OK(
-                gckOS_FreeContiguous(Mmu->os,
-                    pre->physical,
-                    pre->logical,
-                    pre->size));
-        }
-
-        if (pre->mtlbEntryNum != 0)
-        {
-            gcmkASSERT(pre->mtlbEntryNum == 1);
-            _WritePageEntry(Mmu->mtlbLogical + pre->mtlbIndex, 0);
-        }
-
-        gcmkVERIFY_OK(gcmkOS_SAFE_FREE(Mmu->os, pre));
-    }
-
-    if (mutex)
-    {
         /* Release the mutex. */
         gcmkVERIFY_OK(gckOS_ReleaseMutex(Mmu->os, Mmu->pageTableMutex));
-    }
 
-    return status;
+#if gcdENABLE_TRUST_APPLICATION
+        if (Mmu->hardware->secureMode == gcvSECURE_IN_TA)
+        {
+            gckKERNEL_SecurityMapMemory(Mmu->hardware->kernel, gcvNULL, PhysBase, (gctUINT32)Size/4096, &PhysBase);
+        }
+#endif
+
+        return gcvSTATUS_OK;
+OnError:
+        /* Roll back the allocation.
+        ** We don't need roll back mtlb programming as gckmONERROR
+        ** is only used during allocation time.
+        */
+        if (newStlbChunk)
+        {
+            if (newStlbChunk->physical)
+            {
+                gcmkVERIFY_OK(
+                    gckOS_FreeContiguous(Mmu->os,
+                        newStlbChunk->physical,
+                        newStlbChunk->logical,
+                        newStlbChunk->size));
+            }
+            gcmkVERIFY_OK(gcmkOS_SAFE_FREE(Mmu->os, newStlbChunk));
+        }
+        if (mutex)
+        {
+            /* Release the mutex. */
+            gcmkVERIFY_OK(gckOS_ReleaseMutex(Mmu->os, Mmu->pageTableMutex));
+        }
+        return status;
+    }
 }
 
 static gceSTATUS
@@ -1136,7 +1223,7 @@ _Construct(
     gctUINT32 physBase;
     gctUINT32 physSize;
     gctUINT32 contiguousBase;
-    gctUINT32 contiguousSize;
+    gctUINT32 contiguousSize = 0;
     gctUINT32 gpuAddress;
     gctPHYS_ADDR_T gpuPhysical;
     gcsADDRESS_AREA_PTR area = gcvNULL;
@@ -1274,9 +1361,6 @@ _Construct(
 
         gcmkSAFECASTPHYSADDRT(gpuAddress, gpuPhysical);
 
-        mmu->flatMappingStart = gpuAddress;
-        mmu->flatMappingEnd   = gpuAddress + physSize;
-
         if (physSize)
         {
             /* Setup user specified flat mapping. */
@@ -1288,15 +1372,12 @@ _Construct(
         if (gcmIS_SUCCESS(status))
         {
             status = gckOS_QueryOption(mmu->os, "contiguousSize", &contiguousSize);
+        }
 
-            if (gcmIS_SUCCESS(status))
-            {
-                if (contiguousSize)
-                {
-                    /* Setup flat mapping for reserved memory (VIDMEM). */
-                    gcmkONERROR(_FillFlatMapping(mmu, contiguousBase, contiguousSize));
-                }
-            }
+        if (gcmIS_SUCCESS(status) && contiguousSize)
+        {
+            /* Setup flat mapping for reserved memory (VIDMEM). */
+            gcmkONERROR(_FillFlatMapping(mmu, contiguousBase, contiguousSize));
         }
 
         gcmkONERROR(_SetupDynamicSpace(mmu));
@@ -1406,7 +1487,7 @@ _Destroy(
 
     while (Mmu->staticSTLB != gcvNULL)
     {
-        gcsMMU_STLB_PTR pre = Mmu->staticSTLB;
+        gcsMMU_STLB_CHUNK_PTR pre = Mmu->staticSTLB;
         Mmu->staticSTLB = pre->next;
 
         if (pre->physical != gcvNULL)
@@ -1420,13 +1501,16 @@ _Destroy(
 
         if (pre->mtlbEntryNum != 0)
         {
-            gcmkASSERT(pre->mtlbEntryNum == 1);
-            _WritePageEntry(Mmu->mtlbLogical + pre->mtlbIndex, 0);
+            gctUINT i;
+            for (i = 0; i < pre->mtlbEntryNum; ++i)
+            {
+                _WritePageEntry(Mmu->mtlbLogical + pre->mtlbIndex + i, 0);
 #if gcdMMU_TABLE_DUMP
-            gckOS_Print("%s(%d): clean MTLB[%d]\n",
-                __FUNCTION__, __LINE__,
-                pre->mtlbIndex);
+                gckOS_Print("%s(%d): clean MTLB[%d]\n",
+                    __FUNCTION__, __LINE__,
+                    pre->mtlbIndex + i);
 #endif
+            }
         }
 
         gcmkVERIFY_OK(gcmkOS_SAFE_FREE(Mmu->os, pre));
@@ -1469,7 +1553,7 @@ _Destroy(
 #if gcdPROCESS_ADDRESS_SPACE
     for (i = 0; i < Mmu->mtlbSize / 4; i++)
     {
-        struct _gcsMMU_STLB *stlb = ((struct _gcsMMU_STLB **)Mmu->stlbs)[i];
+        struct _gcsMMU_STLB_CHUNK *stlb = ((struct _gcsMMU_STLB_CHUNK **)Mmu->stlbs)[i];
 
         if (stlb)
         {
@@ -2142,8 +2226,8 @@ gckMMU_GetPageEntry(
     )
 {
     gceSTATUS status;
-    struct _gcsMMU_STLB *stlb;
-    struct _gcsMMU_STLB **stlbs = Mmu->stlbs;
+    struct _gcsMMU_STLB_CHUNK *stlb;
+    struct _gcsMMU_STLB_CHUNK **stlbs = Mmu->stlbs;
     gctUINT32 offset = _MtlbOffset(Address);
     gctUINT32 mtlbEntry;
     gctBOOL ace = gckHARDWARE_IsFeatureAvailable(Mmu->hardware, gcvFEATURE_ACE);
@@ -2260,8 +2344,8 @@ gckMMU_FreePagesEx(
 
 #if gcdUSE_MMU_EXCEPTION
     gctUINT32 i;
-    struct _gcsMMU_STLB *stlb;
-    struct _gcsMMU_STLB **stlbs = Mmu->stlbs;
+    struct _gcsMMU_STLB_CHUNK *stlb;
+    struct _gcsMMU_STLB_CHUNK **stlbs = Mmu->stlbs;
 #endif
 
     gcmkHEADER_ARG("Mmu=0x%x Address=0x%x PageCount=%lu",
@@ -2326,6 +2410,7 @@ gckMMU_Flush(
 #endif
     gctUINT32 mask;
     gctINT i;
+    gctUINT j;
 
     if (Type == gcvSURF_VERTEX || Type == gcvSURF_INDEX)
     {
@@ -2351,13 +2436,20 @@ gckMMU_Flush(
         hardware = sharedPageTable->hardwares[i];
         if (hardware)
         {
-            gcmkVERIFY_OK(gckOS_AtomSetMask(hardware->pageTableDirty, mask));
+            for (j = 0; j < gcvENGINE_GPU_ENGINE_COUNT; j++)
+            {
+                gcmkVERIFY_OK(gckOS_AtomSetMask(hardware->pageTableDirty[j], mask));
+            }
         }
     }
 #else
     hardware = Mmu->hardware;
-    gcmkVERIFY_OK(
-        gckOS_AtomSetMask(hardware->pageTableDirty, mask));
+
+    for (j = 0 ; j < gcvENGINE_GPU_ENGINE_COUNT; j++)
+    {
+        gcmkVERIFY_OK(
+            gckOS_AtomSetMask(hardware->pageTableDirty[j], mask));
+    }
 
     {
         gcsLISTHEAD_PTR hardwareHead;
@@ -2367,8 +2459,11 @@ gckMMU_Flush(
 
             if (hardware != Mmu->hardware)
             {
-                gcmkVERIFY_OK(
-                    gckOS_AtomSetMask(hardware->pageTableDirty, mask));
+                for (j = 0 ; j < gcvENGINE_GPU_ENGINE_COUNT; j++)
+                {
+                    gcmkVERIFY_OK(
+                        gckOS_AtomSetMask(hardware->pageTableDirty[j], mask));
+                }
             }
         }
     }
@@ -2426,23 +2521,32 @@ gckMMU_DumpPageTableEntry(
     }
     else
     {
-        gcsMMU_STLB_PTR stlbObj = Mmu->staticSTLB;
+        gcsMMU_STLB_CHUNK_PTR stlbChunkObj = Mmu->staticSTLB;
         gctUINT32 entry = Mmu->mtlbLogical[mtlb];
 
         stlb = (Address & gcdMMU_STLB_64K_MASK) >> gcdMMU_STLB_64K_SHIFT;
 
         entry &= 0xFFFFFFF0;
 
-        while (stlbObj)
+        while (stlbChunkObj)
         {
-
-            if (entry == stlbObj->physBase)
+            gctUINT i;
+            gctBOOL found = gcvFALSE;
+            for (i = 0; i < stlbChunkObj->mtlbEntryNum; ++i)
             {
-                gcmkPRINT("    Page table entry = 0x%08X", stlbObj->logical[stlb]);
-                break;
+                gctPHYS_ADDR_T stlbPhysBase = stlbChunkObj->physBase + (i * gcdMMU_STLB_64K_SIZE);
+                gctUINT32_PTR stlbLogical =
+                    (gctUINT32_PTR)((gctUINT8_PTR)stlbChunkObj->logical + (i * gcdMMU_STLB_64K_SIZE));
+                if (entry == stlbPhysBase)
+                {
+                    gcmkPRINT("    Page table entry = 0x%08X", stlbLogical[stlb]);
+                    found = gcvTRUE;
+                    break;
+                }
             }
-
-            stlbObj = stlbObj->next;
+            if (found)
+                break;
+            stlbChunkObj = stlbChunkObj->next;
         }
     }
 #endif
@@ -2583,7 +2687,8 @@ gckMMU_IsFlatMapped(
     )
 {
     gceSTATUS status;
-
+    gctUINT32 i;
+    gctBOOL inFlatmapping = gcvFALSE;
     gcmkHEADER();
 
     gcmkVERIFY_ARGUMENT(In != gcvNULL);
@@ -2593,9 +2698,17 @@ gckMMU_IsFlatMapped(
         gcmkONERROR(gcvSTATUS_NOT_SUPPORTED);
     }
 
-    *In = (Physical >= Mmu->flatMappingStart) && (Physical < Mmu->flatMappingEnd)
-        ? gcvTRUE
-        : gcvFALSE;
+    for (i = 0; i < Mmu->flatMappingRangeCount; i++)
+    {
+        if ((Physical >= Mmu->flatMappingRanges[i].start) &&
+            (Physical < Mmu->flatMappingRanges[i].end))
+        {
+            inFlatmapping = gcvTRUE;
+            break;
+        }
+    }
+
+    *In = inFlatmapping;
 
     gcmkFOOTER_NO();
     return gcvSTATUS_OK;

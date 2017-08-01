@@ -341,7 +341,7 @@ gctUINT _VSC_PH_Func_GetNodeSourceBaseTypeId(
         VSC_PH_Tree_Node* node = VSC_PH_Tree_GetNode(tree, nodeId);
         VIR_Instruction* inst = VSC_PH_Tree_Node_GetInst(node);
         VIR_Operand* operand = VIR_Inst_GetSource(inst, operandId);
-        VIR_TypeId typeId = VIR_Operand_GetType(operand);
+        VIR_TypeId typeId = VIR_Operand_GetTypeId(operand);
 
         return VIR_GetTypeComponentType(typeId);
     }
@@ -655,7 +655,7 @@ _VSC_PH_ResultInstOperand_AppendSymOperand(
 {
     gctUINT channelCount = VSC_PH_ResultInstOperand_GetChannelCount(operand);
     VSC_PH_ResultInstSymOperand* symOperand = VSC_PH_ResultInstOperand_GetSymOperand(operand);
-    VIR_TypeId opndTypeId = VIR_Operand_GetType(opnd);
+    VIR_TypeId opndTypeId = VIR_Operand_GetTypeId(opnd);
     VIR_TypeId opndBaseTypeId = VIR_GetTypeComponentType(opndTypeId);
 
     gcmASSERT(channelCount == 0  || !VSC_PH_ResultInstOperand_GetIsConst(operand));
@@ -877,7 +877,7 @@ gctUINT _VSC_PH_Func_AppendResultInstImmAsOperand(
 
         if(VIR_Operand_isImm(fromNodeInstSrc))
         {
-            VIR_TypeId baseTypeId = VIR_Operand_GetType(fromNodeInstSrc);
+            VIR_TypeId baseTypeId = VIR_Operand_GetTypeId(fromNodeInstSrc);
             switch(baseTypeId)
             {
                 case VIR_TYPE_INT32:
@@ -976,7 +976,7 @@ gctUINT _VSC_PH_Func_AppendResultInstImmAsTwoOperandsComputation(
         VIR_Instruction* fromNodeInst0 = VSC_PH_Tree_Node_GetInst(fromNode0);
         gctUINT fromChannel0 = VSC_PH_Tree_Node_GetChannel(fromNode0);
         VIR_Operand* fromNodeInstSrc0 = VIR_Inst_GetSource(fromNodeInst0, fromSrcNum0);
-        VIR_TypeId fromNodeInstSrcTypeId0 = VIR_Operand_GetType(fromNodeInstSrc0);
+        VIR_TypeId fromNodeInstSrcTypeId0 = VIR_Operand_GetTypeId(fromNodeInstSrc0);
         VIR_TypeId fromNodeInstSrcBaseTypeId0 = VIR_GetTypeComponentType(fromNodeInstSrcTypeId0);
         VIR_Swizzle fromNodeInstSrcSwizzle0 = VIR_Operand_GetSwizzle(fromNodeInstSrc0);
         VIR_Swizzle fromNodeInstSrcChannelSwizzle0 = VIR_Swizzle_GetChannel(fromNodeInstSrcSwizzle0, fromChannel0);
@@ -984,7 +984,7 @@ gctUINT _VSC_PH_Func_AppendResultInstImmAsTwoOperandsComputation(
         VIR_Instruction* fromNodeInst1 = VSC_PH_Tree_Node_GetInst(fromNode1);
         gctUINT fromChannel1 = VSC_PH_Tree_Node_GetChannel(fromNode1);
         VIR_Operand* fromNodeInstSrc1 = VIR_Inst_GetSource(fromNodeInst1, fromSrcNum1);
-        VIR_TypeId fromNodeInstSrcTypeId1 = VIR_Operand_GetType(fromNodeInstSrc1);
+        VIR_TypeId fromNodeInstSrcTypeId1 = VIR_Operand_GetTypeId(fromNodeInstSrc1);
         VIR_TypeId fromNodeInstSrcBaseTypeId1 = VIR_GetTypeComponentType(fromNodeInstSrcTypeId1);
         VIR_Swizzle fromNodeInstSrcSwizzle1 = VIR_Operand_GetSwizzle(fromNodeInstSrc1);
         VIR_Swizzle fromNodeInstSrcChannelSwizzle1 = VIR_Swizzle_GetChannel(fromNodeInstSrcSwizzle1, fromChannel1);
@@ -1539,7 +1539,7 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
     VIR_OpCode mergedOpcode;
     VIR_Operand* instDest = VIR_Inst_GetDest(inst);
     VIR_Enable instDestEnable = VIR_Operand_GetEnable(instDest);
-    VIR_TypeId instDestTypeId = VIR_Operand_GetType(instDest);
+    VIR_TypeId instDestTypeId = VIR_Operand_GetTypeId(instDest);
     VIR_Shader* shader = VSC_PH_Peephole_GetShader(ph);
     VIR_Function* func = VIR_Shader_GetCurrentFunction(shader);
     VIR_Instruction* newInst = gcvNULL;
@@ -1651,7 +1651,7 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
 
                         if(firstHandledChannel == -1)
                         {
-                            VIR_Operand_SetType(newInstOperand,
+                            VIR_Operand_SetTypeId(newInstOperand,
                                                 VIR_TypeId_ComposeNonOpaqueType(VSC_PH_ResultInstOperand_GetBaseTypeId(resultInstOperand),
                                                                                 VIR_Enable_Channel_Count(instDestEnable),
                                                                                 1));
@@ -1667,7 +1667,7 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
                         if(firstHandledChannel == -1)
                         {
                             VIR_Operand_Copy(newInstOperand, fromOperand);
-                            VIR_Operand_SetType(newInstOperand,
+                            VIR_Operand_SetTypeId(newInstOperand,
                                                 VIR_TypeId_ComposeNonOpaqueType(VSC_PH_ResultInstOperand_GetBaseTypeId(resultInstOperand),
                                                                                 VIR_Enable_Channel_Count(instDestEnable),
                                                                                 1));
@@ -1825,7 +1825,7 @@ static VSC_ErrCode _VSC_PH_MergeAndAddResultInsts(
                             }
                         }
                     }
-                    VIR_Operand_SetType(newInstOperand,
+                    VIR_Operand_SetTypeId(newInstOperand,
                                         VIR_TypeId_ComposeNonOpaqueType(VSC_PH_ResultInstOperand_GetBaseTypeId(resultInstOperand),
                                                                         VSC_PH_ResultInstOperand_GetChannelCount(resultInstOperand),
                                                                         1));
@@ -2983,7 +2983,7 @@ static VSC_ErrCode _VSC_PH_GenerateModifier(
     {
         /* if inst's src0 is an integer, skip it */
         VIR_Operand* src0 = VIR_Inst_GetSource(inst, 0);
-        VIR_TypeId src0_typeid = VIR_Operand_GetType(src0);
+        VIR_TypeId src0_typeid = VIR_Operand_GetTypeId(src0);
         VIR_Type* src0_type = VIR_Shader_GetTypeFromId(VSC_PH_Peephole_GetShader(ph), src0_typeid);
         if(VIR_Type_GetFlags(src0_type) & VIR_TYFLAG_ISINTEGER)
         {
@@ -3154,7 +3154,7 @@ static VSC_ErrCode _VSC_PH_GenerateMAD(
             }
 
             /* the result of mul must be of the same basic type of its usage in add/sub */
-            if(VIR_GetTypeComponentType(VIR_Operand_GetType(mul_dest)) != VIR_GetTypeComponentType(VIR_Operand_GetType(use_inst_opnd)))
+            if(VIR_GetTypeComponentType(VIR_Operand_GetTypeId(mul_dest)) != VIR_GetTypeComponentType(VIR_Operand_GetTypeId(use_inst_opnd)))
             {
                 if(VSC_UTILS_MASK(VSC_OPTN_PHOptions_GetTrace(options), VSC_OPTN_PHOptions_TRACE_MAD))
                 {
@@ -4495,7 +4495,7 @@ static VSC_ErrCode _VSC_PH_VEC_MergeInst(
         gcmASSERT(inst_src1);
         VIR_Operand_GetOperandInfo(inst, inst_src1, &inst_src1_info);
         if (inst_src1_info.isImmVal &&
-            VIR_Operand_GetType(inst_src1) == VIR_TYPE_INT32)
+            VIR_Operand_GetTypeId(inst_src1) == VIR_TYPE_INT32)
         {
             inst_src1_immediate = inst_src1_info.u1.immValue.uValue;
             /* hash table only use 4 bits of the inst_src1_immediate as hash value,

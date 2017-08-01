@@ -30,9 +30,6 @@
 #include "gc_hal_engine.h"
 #include "gc_egl_common.h"
 
-/* Max SwapBuffersRegion rectangle count. */
-#define VEGL_MAX_SWAP_BUFFER_REGION_RECTS       10
-
 /* Duplicate 8888 configs to ARGB and ABGR visual. */
 #if defined(ANDROID)
 #   define VEGL_DUPLICATE_ABGR_EGL_CONFIGS      1
@@ -124,6 +121,13 @@ struct eglResObj
 
 typedef void * EGLResObj;
 
+struct eglRegion
+{
+    EGLint                      numRects;
+    EGLint                      maxNumRects;
+    EGLint *                    rects;
+};
+
 struct eglBackBuffer
 {
     gctPOINTER                  context;
@@ -142,8 +146,11 @@ struct eglWorkerInfo
 
     struct eglBackBuffer        backBuffer;
 
-    gctINT                      numRects;
-    gctINT                      rects[VEGL_MAX_SWAP_BUFFER_REGION_RECTS * 4];
+    /* Buffer damage region. */
+    struct eglRegion            region;
+
+    /* Surface damage region hints. */
+    struct eglRegion            damageHint;
 
     /* Used by eglDisplay worker list. */
     VEGLWorkerInfo              prev;
@@ -395,6 +402,19 @@ struct eglSurface
     /* Previous render target. */
     gcoSURF                     prevRenderTarget;
 
+    /*
+     * Damage for this surface. For EGL_KHR_partial_update,
+     * This is only useful for indirect render.
+     * For direct render, we ignore this damage range.
+     * For indirect render, we always report buffer age == 1 (initial buffer age is 0).
+     * use this damage range to compute the difference of back buffer to internal RT
+     */
+    struct eglRegion            damage[EGL_WORKER_COUNT];
+    gctUINT                     curDamage;
+
+    EGLBoolean                  damageValid;
+    EGLBoolean                  queriedAge;
+
     /* Depth buffer. */
     gcoSURF                     depthBuffer;
     gceSURF_FORMAT              depthFormat;
@@ -483,8 +503,23 @@ struct eglSurface
     /* Signaled when all workers are free, ie, no worker in workerThread. */
     gctSIGNAL                   workerDoneSignal;
 
-    EGLint                      clipRects[VEGL_MAX_SWAP_BUFFER_REGION_RECTS * 4];
+    /*
+     * Rectangles to resolve out.
+     * 1. Swap region
+     * 2. clip with surface size
+     * 3. clip with damage region (EGL_KHR_partial_update)
+     * 4. clip with swap rect (obsolete EGL_ANDROID_swap_rectange)
+     *
+     * NOTICE:
+     * It's safe to enlarge the rects when resolve out.
+     *
+     * clipRegion::rects: 4 elements for one group, each representing a single
+     * rectangle in surface coordinates in the form {x, y, width, height}.
+     */
+    struct eglRegion            clipRegion;
 
+    /* EGL_KHR_swap_buffers_with_damage. */
+    struct eglRegion            damageHint;
 
 #if defined(ANDROID)
     /* EGL_ANDROID_set_swap_rectangle. */
@@ -495,15 +530,6 @@ struct eglSurface
         EGLint                  y;
         EGLint                  width;
         EGLint                  height;
-
-#if gcdSUPPORT_SWAP_RECTANGLE
-        gctUINT                 count;
-        gctUINT                 capacity;
-
-        /* Accumulated swap rectangles. */
-        gcsRECT *               rects;
-        gctPOINTER *            buffers;
-#   endif
     }
     swapRect;
 
@@ -627,7 +653,6 @@ typedef enum _VEGL_EXTID
     VEGL_EXTID_KHR_gl_texture_cubemap_image,
     VEGL_EXTID_KHR_gl_renderbuffer_image,
     VEGL_EXTID_EXT_image_dma_buf_import,
-    VEGL_EXTID_EXT_client_extensions,
     VEGL_EXTID_KHR_lock_surface,
     VEGL_EXTID_KHR_create_context,
     VEGL_EXTID_KHR_surfaceless_context,
@@ -642,6 +667,9 @@ typedef enum _VEGL_EXTID
     VEGL_EXTID_ANDROID_native_fence_sync,
     VEGL_EXTID_WL_bind_wayland_display,
     VEGL_EXTID_WL_create_wayland_buffer_from_image,
+    VEGL_EXTID_KHR_partial_update,
+    VEGL_EXTID_EXT_swap_buffers_with_damage,
+    VEGL_EXTID_KHR_swap_buffers_with_damage,
 
     VEGL_EXTID_COUNT,
 }
@@ -1145,6 +1173,14 @@ typedef struct
     EGLDisplay (* GetPlatformDisplayEXT_post)(EGLenum platform, void *native_display, const EGLint *attrib_list, EGLDisplay ret_dpy);
     EGLSurface (* CreatePlatformWindowSurfaceEXT_post)(EGLDisplay dpy, EGLConfig config, void *native_window, const EGLint *attrib_list, EGLSurface ret_surface);
     EGLSurface (* CreatePlatformPixmapSurfaceEXT_post)(EGLDisplay dpy, EGLConfig config, void *native_pixmap, const EGLint *attrib_list, EGLSurface ret_surface);
+
+    /* EGL_KHR_partial_update */
+    EGLBoolean (* SetDamageRegionKHR)(EGLDisplay dpy, EGLSurface surface, EGLint *rects, EGLint n_rects);
+
+    /* EGL_KHR_swap_buffers_with_damage. */
+    EGLBoolean (* SwapBuffersWithDamageKHR)(EGLDisplay dpy, EGLSurface surface, EGLint *rects, EGLint n_rects);
+    EGLBoolean (* SwapBuffersWithDamageEXT)(EGLDisplay dpy, EGLSurface surface, EGLint *rects, EGLint n_rects);
+    /* EGL_EXT_swap_buffers_with_damage. */
 
     /******  The above interfaces are used to link with external vTracer library libGLES_vlogger.so ******/
 

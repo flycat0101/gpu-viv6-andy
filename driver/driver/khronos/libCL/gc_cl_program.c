@@ -226,25 +226,18 @@ OnError:
             "OCL-006003: (clCreateProgramWithSource) cannot create program.  Maybe run out of memory.\n");
     }
 
-    if (sizes)
-    {
-        gcmOS_SAFE_FREE(gcvNULL, sizes);
-    }
+    if(source != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, source);
+
+    if (sizes  != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, sizes);
 
     if(program != gcvNULL && program->devices != gcvNULL)
     {
         gcmOS_SAFE_FREE(gcvNULL, program->devices);
     }
 
-    if(program != gcvNULL)
-    {
-        if (program->source)
-        {
-            gcmOS_SAFE_FREE(gcvNULL, program->source);
-        }
+    if(program->referenceCount) gcoOS_AtomDestroy(gcvNULL, program->referenceCount);
 
-        gcmOS_SAFE_FREE(gcvNULL, program);
-    }
+    if(program != gcvNULL) gcmOS_SAFE_FREE(gcvNULL, program);
 
     if (ErrcodeRet)
     {
@@ -270,7 +263,7 @@ clCreateProgramWithBinary(
     gctINT          status;
     gctUINT         i;
     gcSHADER        binary;
-    gctUINT32_PTR   comVersion;
+    gctUINT32       comVersion[2];
 
     gcmHEADER_ARG("Context=0x%x NumDevices=%u Binaries=0x%x Lengths=0x%x",
                   Context, NumDevices, Binaries, Lengths);
@@ -346,8 +339,9 @@ clCreateProgramWithBinary(
     clmONERROR(gcSHADER_Construct(gcSHADER_TYPE_CL, &binary),
                CL_OUT_OF_HOST_MEMORY);
 
-    gcmONERROR(gcSHADER_GetCompilerVersion((gcSHADER)(Binaries[0]), &comVersion));
-
+    /* Set version to 1.1. */
+    comVersion[0] = _cldLanguageType | (gcSHADER_TYPE_CL<< 16);
+    comVersion[1] = _cldCL1Dot1;
     gcmONERROR(gcSHADER_SetCompilerVersion(binary, comVersion));
 
     /* Load binary */
@@ -403,7 +397,6 @@ OnError:
     return gcvNULL;
 }
 
-#if BUILD_OPENCL_12
 CL_API_ENTRY cl_program CL_API_CALL
 clCreateProgramWithBuiltInKernels(
     cl_context             Context ,
@@ -417,7 +410,6 @@ clCreateProgramWithBuiltInKernels(
     VCL_TRACE_API(CreateProgramWithBuiltInKernels_Pre)(Context, NumDevices, DeviceList, KernelNames, ErrcodeRet);
     return gcvNULL;
 }
-#endif
 
 CL_API_ENTRY cl_int CL_API_CALL
 clRetainProgram(
@@ -548,7 +540,7 @@ clBuildProgram(
     )
 {
     clsPlatformId_PTR   platform = gcvNULL;
-    gctPOINTER          pointer;
+    gctPOINTER          pointer  = gcvNULL;
     gctSIZE_T           length;
     gcSHADER            binary;
     gctUINT             binarySize;
@@ -637,9 +629,7 @@ clBuildProgram(
         Program->binary = (unsigned char *) binary;
         clmONERROR(gcSHADER_SaveEx(binary,  gcvNULL,  &binarySize), CL_INVALID_VALUE);
         Program->binarySize = binarySize;
-#if BUILD_OPENCL_12
         Program->binaryType = CL_PROGRAM_BINARY_TYPE_EXECUTABLE;
-#endif
     }
 
     status = CL_SUCCESS;
@@ -713,8 +703,6 @@ OnError:
     return status;
 }
 
-#if BUILD_OPENCL_12
-
 CL_API_ENTRY cl_int CL_API_CALL
 clCompileProgram(
     cl_program            Program ,
@@ -737,7 +725,7 @@ clCompileProgram(
 
     gcmHEADER_ARG("Program=0x%x NumDevices=%u DeviceList=0x%x Options=%s",
                   Program, NumDevices, DeviceList, Options);
-    gcmDUMP_API("${OCL clCompileProgram 0x%x}", Context);
+    gcmDUMP_API("${OCL clCompileProgram 0x%x}", Program);
 
     if (Program == gcvNULL || Program->objectType != clvOBJECT_PROGRAM)
     {
@@ -1058,8 +1046,6 @@ OnError:
     return NULL;
 }
 
-
-
 CL_API_ENTRY cl_int CL_API_CALL
 clUnloadPlatformCompiler(
     cl_platform_id  Platform
@@ -1115,7 +1101,6 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return status;
 }
-#endif
 
 CL_API_ENTRY cl_int CL_API_CALL
 clGetProgramInfo(
@@ -1194,7 +1179,7 @@ clGetProgramInfo(
         retParamSize = gcmSIZEOF(Program->binary);
         retParamPtr = Program->binary;
         break;
-#if BUILD_OPENCL_12
+
     case CL_PROGRAM_NUM_KERNELS:
         retParamSize = gcmSIZEOF(GetShaderKernelFunctionCount((gcSHADER)(Program->binary)));
         retParamPtr = &GetShaderKernelFunctionCount((gcSHADER)(Program->binary));
@@ -1246,7 +1231,6 @@ clGetProgramInfo(
             }
         }
         break;
-#endif
 
     default:
         gcmUSER_DEBUG_ERROR_MSG(
@@ -1280,7 +1264,6 @@ clGetProgramInfo(
                     }
                 }
             }
-#if BUILD_OPENCL_12
             else if (ParamName == CL_PROGRAM_KERNEL_NAMES)
             {
                 if (ParamValue)
@@ -1289,7 +1272,6 @@ clGetProgramInfo(
                     gcoOS_Free(gcvNULL, retParamPtr);
                 }
             }
-#endif
             else
             {
                 gcoOS_MemCopy(ParamValue, retParamPtr, retParamSize);
@@ -1380,12 +1362,12 @@ clGetProgramBuildInfo(
             retParamPtr = clgEmptyStr;
         }
         break;
-#if BUILD_OPENCL_12
+
     case CL_PROGRAM_BINARY_TYPE:
         retParamSize = gcmSIZEOF(Program->binaryType);
         retParamPtr = &Program->binaryType;
         break;
-#endif
+
     default:
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-006026: (clGetProgramBuildInfo) invalid ParamName (0x%x).\n",

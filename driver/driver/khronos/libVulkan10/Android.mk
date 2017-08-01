@@ -51,6 +51,7 @@ LOCAL_SRC_FILES := \
 	src/gc_vk_validation.c \
 	src/wsi/gc_wsi_surface.c \
 	src/wsi/gc_wsi_swapchain.c \
+	src/wsi/gc_wsi_display.c \
 	src/wsi/gc_wsi_surface_android.c
 
 LOCAL_SRC_FILES += \

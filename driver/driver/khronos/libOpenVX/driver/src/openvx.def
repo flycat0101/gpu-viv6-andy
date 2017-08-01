@@ -12,14 +12,14 @@
 
 
 LIBRARY "libopenvx.dll"
-VERSION 1.0
+VERSION 1.1
 EXPORTS
 ; Framework API
-;    vxAccessArrayRange
+;    vxReadArrayRange
 ;    vxReadConvolutionCoefficients
-;    vxAccessDistribution
+;    vxReadDistribution
 ;    vxAccessImagePatch
-;    vxAccessLUT
+;    vxReadLUT
 ;    vxReadMatrix
 ;    vxReadScalarValue
 ;    vxAddArrayItems
@@ -31,11 +31,11 @@ EXPORTS
 ;    vxAssignNode
 ;    vxAssignNodeCallback
 ;    vxAssociateDelayWithNode
-;    vxCommitArrayRange
+;    vxWriteArrayRange
 ;    vxWriteConvolutionCoefficients
 ;    vxCommitDistribution
-;    vxCommitImagePatch
-;    vxCommitLUT
+;    vxWriteImagePatch
+;    vxWriteLUT
 ;    vxWriteMatrix
 ;    vxWriteScalarValue
 ;    vxComputeImagePatchSize
@@ -202,7 +202,7 @@ EXPORTS
 ;    vxSemWait
 ;    vxSemPost
 ;    vxImageFormat_IsSupported
-    vxoImage_Dump
+;    vxoImage_Dump
     vxSetEvent
-	vxoNode_SetChildGraph
-	vxoNode_GetChildGraph
+;	vxoNode_SetChildGraph
+;	vxoNode_GetChildGraph

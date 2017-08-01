@@ -143,6 +143,7 @@ VivPrepareCopy(PixmapPtr pSrcPixmap, PixmapPtr pDstPixmap,
  *
 **/
 static int  _last_hw_cpy = 0;
+static int  _support_pixman_blit = 1;
 void
 VivCopy(PixmapPtr pDstPixmap, int srcX, int srcY,
     int dstX, int dstY, int width, int height) {
@@ -172,7 +173,9 @@ VivCopy(PixmapPtr pDstPixmap, int srcX, int srcY,
     if ( psrc->mHWPath == FALSE && pdst->mHWPath == FALSE )
     {
         /* when surface > IMX_EXA_NONCACHESURF_SIZE but actual copy size < IMX_EXA_NONCACHESURF_SIZE, go sw path */
-        if ( ( width * height ) < IMX_EXA_NONCACHESURF_SIZE && pViv->mGrCtx.mBlitInfo.mOperationCode == VIVSIMCOPY )
+        if ( ( width * height ) < IMX_EXA_NONCACHESURF_SIZE
+            && pViv->mGrCtx.mBlitInfo.mOperationCode == VIVSIMCOPY
+            && _support_pixman_blit )
         {
 
             /* mStride should be 4 aligned cause width is 8 aligned,Stride%4 !=0 shouldn't happen */
@@ -188,7 +191,7 @@ VivCopy(PixmapPtr pDstPixmap, int srcX, int srcY,
                     VIV2DGPUBlitComplete(&pViv->mGrCtx,TRUE);
                 _last_hw_cpy = 0;
 
-                pixman_blt((uint32_t *) MapViv2DPixmap(psrc),
+                if ( pixman_blt((uint32_t *) MapViv2DPixmap(psrc),
                     (uint32_t *) MapViv2DPixmap(pdst),
                     pViv->mGrCtx.mBlitInfo.mSrcSurfInfo.mStride/4,
                     pViv->mGrCtx.mBlitInfo.mDstSurfInfo.mStride/4,
@@ -199,13 +202,17 @@ VivCopy(PixmapPtr pDstPixmap, int srcX, int srcY,
                     dstX,
                     dstY,
                     width,
-                    height);
-
-                pBlt->mSwcpy = TRUE;
-                TRACE_EXIT();
+                    height) )
+                {
+                    pBlt->mSwcpy = TRUE;
+                    TRACE_EXIT();
+                } else {
+                    _support_pixman_blit = 0;
+                }
             }
         }
     }
+
 
     psrc->mHWPath = FALSE;
     pdst->mHWPath = FALSE;

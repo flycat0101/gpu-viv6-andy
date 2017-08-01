@@ -55,8 +55,8 @@ vx_status _gcfVX_Morphology(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
-    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_FORMAT, &inputFormat, sizeof(inputFormat));
+    vxQueryImage(src, VX_IMAGE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(src, VX_IMAGE_FORMAT, &inputFormat, sizeof(inputFormat));
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
@@ -108,14 +108,14 @@ vx_status _gcfVX_Morphology(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_
 
     kernelContext->uniform_num             = 1;
 
-    if(bordermode->mode == VX_BORDER_MODE_CONSTANT)
+    if(bordermode->mode == VX_BORDER_CONSTANT)
     {
         vx_uint32 bin[4];
 
         bin[0] =
         bin[1] =
         bin[2] =
-        bin[3] = FORMAT_VALUE(bordermode->constant_value);
+        bin[3] = FORMAT_VALUE(bordermode->constant_value.U32);
 
         gcoOS_MemCopy(&kernelContext->uniforms[1].uniform, bin, sizeof(bin));
         kernelContext->uniforms[1].num = 4 * 4;
@@ -151,13 +151,13 @@ vx_status _gcfVX_Morphology(vx_node node, gceVX_KERNEL kernel, vx_image src, vx_
 }
 
 /* nodeless version of the Erode3x3 kernel*/
-vx_status vxErode3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *bordermode)
+vx_status vxErode3x3(vx_node node, vx_image src, vx_image dst, vx_border_t *bordermode)
 {
     return _gcfVX_Morphology(node, gcvVX_KERNEL_ERODE_3x3, src, dst, bordermode);
 }
 
 /* nodeless version of the Dilate3x3 kernel*/
-vx_status vxDilate3x3(vx_node node, vx_image src, vx_image dst, vx_border_mode_t *bordermode)
+vx_status vxDilate3x3(vx_node node, vx_image src, vx_image dst, vx_border_t *bordermode)
 {
     return _gcfVX_Morphology(node, gcvVX_KERNEL_DILATE_3x3, src, dst, bordermode);
 }
@@ -228,8 +228,8 @@ vx_status vxMaxPool3x3(vx_node node, vx_array src, vx_scalar format, vx_scalar _
         tpCommand.inImageSlice = width * height;
         tpCommand.inWindowXStart = -pad_v;
         tpCommand.inWindowYStart = -pad_v;
-        tpCommand.inWindowXEnd = (width_o - 1) * stride_v + kernel_v - stride_v;
-        tpCommand.inWindowYEnd = (height_o - 1) * stride_v + kernel_v - stride_v;
+        tpCommand.inWindowXEnd = (width_o - 1) * stride_v + kernel_v - 1 - pad_v;
+        tpCommand.inWindowYEnd = (height_o - 1) * stride_v + kernel_v - 1 - pad_v;
         tpCommand.inTileSequence = 0x0;
         tpCommand.inImageGlobalMem = 1;
         tpCommand.inImageBaseAddress = src->memory.physicals[0];
@@ -271,6 +271,14 @@ vx_status vxMaxPool3x3(vx_node node, vx_array src, vx_scalar format, vx_scalar _
         tpCommand.outLoop5Count = 1;
         tpCommand.outLoop6Inc   = width_o * height_o;
         tpCommand.last          = 1;
+        tpCommand.inImageDataType = 1;
+        tpCommand.outImageDataType = 1;
+        tpCommand.kernelDataType = 1;
+        tpCommand.aluFilterPwlSwap = 0;
+        tpCommand.aluPwlSignSupport = 0;
+        tpCommand.aluReluEnable = 0;
+        tpCommand.floatRoundingMode = 1;
+        tpCommand.integeroundingMode = 0;
 
         /* Create tp command buffer*/
         cmdBuffer = vxCreateArray(context, VX_TYPE_CHAR, 128);
@@ -482,9 +490,19 @@ vx_status vxMaxPool3x3(vx_node node, vx_array src, vx_scalar format, vx_scalar _
                                 {
                                     const vx_int32 index = h * (width) + w;
                                     vx_int16 *d = (vx_int16*)data + index;
-                                    if ((*d) > (*d_f16))
+                                    if ((*d > 0) || (*d_f16 > 0))
                                     {
-                                        *d_f16 = *d;
+                                        if ((*d) > (*d_f16))
+                                        {
+                                            *d_f16 = *d;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        if ((*d) < (*d_f16))
+                                        {
+                                            *d_f16 = *d;
+                                        }
                                     }
                                 }
                             }
@@ -515,8 +533,10 @@ vx_status vxMaxPool3x3(vx_node node, vx_array src, vx_scalar format, vx_scalar _
         vx_float32 *pfNN_out, *pfRef_out;
         vx_float32 fDelta, fMax_delta, fPortion_BigDelta;
         vx_uint32 i, count_big_delta, offset_max_delta;
-        vx_char *fileName[] = { "fasterRcnn_resource\\000456-proposal\\layer3_pool1\\output_1_96_151_201.dat",
-                                "fasterRcnn_resource\\000456-proposal\\layer7_pool2\\output_1_256_39_51.dat"};
+        char* fileName[] = {"",
+                            "",
+                            "layer05\\out1_1x96x27x27.dat",
+                            "layer09\\out1_1x256x13x13.dat"};
         vx_char fullFileName[256] = {'\0'};
         pfNN_out =  (vx_float32*)malloc(itemCount * sizeof(vx_float32));
         pfRef_out = (vx_float32*)malloc(itemCount * sizeof(vx_float32));
@@ -604,7 +624,7 @@ vx_status vxMaxPool3x3(vx_node node, vx_array src, vx_scalar format, vx_scalar _
 #ifdef WIN32
 static vx_float32 round(vx_float32 x)
 {
-    return (floorf((vx_float32)(fabs(x) + 0.5f)));
+    return (floorf((fabsf(x) + 0.5f)));
 }
 #endif
 
@@ -641,24 +661,12 @@ vx_status vxROIPool(vx_node node, vx_array input1, vx_array input2, vx_scalar ke
     {
         typedef struct _vxsTP_ROI_Pool
         {
-#if NN_TP_NEW_ROI
             vx_uint32 xcoord        :  8;   // [7:0]
             vx_uint32 ycoord        :  8;   // [15:8]
             vx_uint32 last          :  1;   // [16]
             vx_uint32 _pad0         : 15;   // [31:17]
-            vx_uint32 poolingHInc   : 14;   // [13:0]
-            vx_uint32 _pad1         :  2;   // [15:14]
-            vx_uint32 poolingVInc   : 14;   // [29:16]
-            vx_uint32 _pad2         :  2;   // [31:30]
-#else
-            vx_uint32 poolingHsize :  6;   // [5:0]
-            vx_uint32 hstride      :  1;   // [6]
-            vx_uint32 poolingVsize :  6;   // [12:7]
-            vx_uint32 vstride      :  1;   // [13]
-            vx_uint32 last         :  1;   // [15]
-            vx_uint32 xcoord       :  8;   // [23:16]
-            vx_uint32 ycoord       :  8;   // [31:24]
-#endif
+            vx_uint32 poolingHInc   : 16;   // [15:0]
+            vx_uint32 poolingVInc   : 16;   // [31:16]
         }
         vxsTP_ROI_Pool;
 
@@ -767,6 +775,14 @@ vx_status vxROIPool(vx_node node, vx_array input1, vx_array input2, vx_scalar ke
         tpCommand.outLoop5Count = 1;
         tpCommand.outLoop6Inc   = hPoolSlice;
         tpCommand.last          = 1;
+        tpCommand.inImageDataType = 1;
+        tpCommand.outImageDataType = 1;
+        tpCommand.kernelDataType = 1;
+        tpCommand.aluFilterPwlSwap = 0;
+        tpCommand.aluPwlSignSupport = 0;
+        tpCommand.aluReluEnable = 0;
+        tpCommand.floatRoundingMode = 1;
+        tpCommand.integeroundingMode = 0;
 
         fillInCmmdBuffer((void*)&tpCommand, cmdBuffer, vx_true_e);
 
@@ -804,15 +820,8 @@ vx_status vxROIPool(vx_node node, vx_array input1, vx_array input2, vx_scalar ke
 
             roiPool->xcoord = roi_start_w;
             roiPool->ycoord = roi_start_h;
-#if NN_TP_NEW_ROI
             roiPool->poolingHInc = (vx_uint32)round((float)roi_width  * 256.0f / pooled_width);
             roiPool->poolingVInc = (vx_uint32)round((float)roi_height * 256.0f / pooled_height);
-#else
-            roiPool->poolingHsize = (roi_width + pooled_width - 1) / pooled_width;
-            roiPool->poolingVsize = (roi_height + pooled_height - 1) / pooled_height;
-            roiPool->hstride = (roiPool->poolingHsize * pooled_width  == roi_width)  ? 0 : 1;
-            roiPool->vstride = (roiPool->poolingVsize * pooled_height == roi_height) ? 0 : 1;
-#endif
             roiPool->last = 0;
         }
         roiPool--;
@@ -873,6 +882,14 @@ vx_status vxROIPool(vx_node node, vx_array input1, vx_array input2, vx_scalar ke
         tpCommand.outLoop5Count = 1;
         tpCommand.outLoop6Inc   = pooled_width * pooled_height * proposalsInterleaved * zTogether;
         tpCommand.last          = 1;
+        tpCommand.inImageDataType = 1;
+        tpCommand.outImageDataType = 1;
+        tpCommand.kernelDataType = 1;
+        tpCommand.aluFilterPwlSwap = 0;
+        tpCommand.aluPwlSignSupport = 0;
+        tpCommand.aluReluEnable = 0;
+        tpCommand.floatRoundingMode = 1;
+        tpCommand.integeroundingMode = 0;
 
         fillInCmmdBuffer((void*)&tpCommand, cmdBuffer, vx_true_e);
 
@@ -984,6 +1001,7 @@ vx_status vxROIPool(vx_node node, vx_array input1, vx_array input2, vx_scalar ke
         vx_uint32 count_big_delta, offset_max_delta;
         vx_float32 * ref = (vx_float32*)malloc(itemCount * sizeof(vx_float32));
         FILE* ref_f = fopen("fasterRcnn_resource\\000456-detection\\layer0_roi_pool5\\output_256_256_6_6.dat", "rb");
+        //FILE* ref_f = fopen("output_256_256_6_6.dat", "rb");
         fread(ref, itemCount, sizeof(vx_float32), ref_f);
         fclose(ref_f);
 
@@ -1051,6 +1069,132 @@ float fast4throot(float x)
 }
 #endif
 
+/* merge from Wei-Lun's check in on projects_nn_vx branch, maybe it only works for AlexNet. need test for other cnn case */
+//#include <stdio.h>
+/* Input buffer and output buffer can be the same buffer. */
+VX_PRIVATE_API vx_status VX_CALLBACK vxCrossChannelLRNLayer(
+    vx_array inputBuffer,
+    vx_array outputBuffer,
+    vx_uint32 xSize,
+    vx_uint32 ySize,
+    vx_uint32 zSize,
+    vx_uint32 kernelSize,
+    vx_float32 shift,
+    vx_float32 alpha,
+    vx_float32 beta
+    )
+{
+    void * pInBuf   = (void *)inputBuffer->memory.logicals[0];
+    void * pOutBuf  = (void *)outputBuffer->memory.logicals[0];
+    vx_float32 * buffer = NULL;
+    vx_float32 * pFP32Buf;
+    vx_float32 * pFP32BufOut;
+    vx_uint16 * pFP16Buf = (vx_uint16 *) pInBuf;
+    vx_float32 alphaOverSize = alpha / (float) kernelSize;    /* Use alpha over size, instead of alpha. */
+    vx_float32 negativeBeta = -beta;
+    vx_uint32 step = xSize * ySize;
+    vx_uint32 x, y, z;
+
+    /* Convert input data from FP16 to FP32. */
+    buffer = (vx_float32 *) malloc(xSize * ySize * zSize * sizeof(vx_float32));
+    pFP32Buf = buffer;
+    for (z = 0; z < zSize; z++)
+    {
+        for (y = 0; y < ySize; y++)
+        {
+            for (x = 0; x < xSize; x++)
+            {
+                *pFP32Buf++ = Fp16toFp32(*pFP16Buf++);
+            }
+        }
+    }
+
+    /* Calculate LRN and write to output buffer. */
+    for (x = 0; x < xSize; x++)
+    {
+        for (y = 0; y < ySize; y++)
+        {
+            vx_float32 inData0, inData1, inData2;
+            vx_float32 square0, square1, square2, square3, square4;
+            vx_float32 sum;
+            pFP32Buf = pFP32BufOut = buffer + x + y * xSize;
+            if (zSize > 2)
+            {
+                square0 = 0;
+                square1 = 0;
+                inData0 = *pFP32Buf;
+                pFP32Buf += step;
+                square2 = inData0 * inData0 * alphaOverSize;
+                inData1 = *pFP32Buf;
+                pFP32Buf += step;
+                square3 = inData1 * inData1 * alphaOverSize;
+                sum = shift + square2 + square3;
+                for (z = 0; z < zSize - 2; z++)
+                {
+                    inData2 = *pFP32Buf;
+                    pFP32Buf += step;
+                    square4 = inData2 * inData2 * alphaOverSize;
+                    sum += square4;
+                    /**pFP32BufOut = inData0 * gcoMATH_Power(sum, negativeBeta);*/
+                    *pFP32BufOut = inData0 / (sqrtf(sqrtf((sum * sum * sum))));
+                    pFP32BufOut += step;
+                    sum -= square0;
+                    square0 = square1;
+                    square1 = square2;
+                    square2 = square3;
+                    square3 = square4;
+                    inData0 = inData1;
+                    inData1 = inData2;
+                }
+                /**pFP32BufOut = inData0 * gcoMATH_Power(sum, negativeBeta);*/
+                *pFP32BufOut = inData0 / (sqrtf(sqrtf((sum * sum * sum))));
+                pFP32BufOut += step;
+                sum -= square0;
+
+                /**pFP32BufOut = inData1 * gcoMATH_Power(sum, negativeBeta);*/
+                *pFP32BufOut = inData1 / (sqrtf(sqrtf((sum * sum * sum))));
+            }
+            else
+            {
+                inData0 = *pFP32Buf;
+                pFP32Buf += step;
+                square2 = inData0 * inData0 * alphaOverSize;
+                sum = 2 + square2;
+                if (zSize > 1)
+                {
+                    inData1 = *pFP32Buf;
+                    square3 = inData1 * inData1 * alphaOverSize;
+                    sum += square3;
+                    /**pFP32BufOut = inData0 * gcoMATH_Power(sum, negativeBeta);*/
+                    *pFP32BufOut = inData0 / (sqrtf(sqrtf((sum * sum * sum))));
+                    pFP32BufOut += step;
+                    inData0 = inData1;
+                }
+                /**pFP32BufOut = inData0 / (sqrtf(sqrtf((sum * sum * sum))));*/
+                *pFP32BufOut = inData0 * gcoMATH_Power(sum, negativeBeta);
+            }
+        }
+    }
+
+    {
+        pFP32Buf = buffer;
+        pFP16Buf = (vx_uint16 *) pOutBuf;
+        for (x = 0; x < xSize; x++)
+        {
+            for (y = 0; y < ySize; y++)
+            {
+                for (z = 0; z < zSize; z++)
+                {
+                    *pFP16Buf++ = Fp32toFp16(*pFP32Buf++);
+                }
+            }
+        }
+    }
+    free(buffer);
+
+    return VX_SUCCESS;
+}
+
 vx_status vxLRN(vx_node node, vx_array src, vx_scalar _width, vx_scalar _height, vx_scalar _depth, vx_scalar batch, vx_scalar type,
                 vx_scalar kernel, vx_scalar stride, vx_scalar pad, vx_scalar sf, vx_scalar ap, vx_scalar bt, vx_array dst)
 {
@@ -1074,130 +1218,259 @@ vx_status vxLRN(vx_node node, vx_array src, vx_scalar _width, vx_scalar _height,
     vxReadScalarValue(ap, &alpha);
     vxReadScalarValue(bt, &beta);
 
+
 #if NN_TP_ENGINE
-    /* Create PWL LUT. */
-    {
-        vx_uint16  base;
-        vx_uint16  baseF16;
-        vx_float32 baseF32;
-        vx_uint32  baseU32;
-        vx_float32 pwlValue;
-        for (base = 0; base < 0x20; base++)
-        {
-            pwlLUT[base] = 1.0f;
-        }
-        for (base = 0x20; base < 0x3E0; base++)
-        {
-            baseF16 = base << 5;
-            baseF32 = Fp16toFp32(baseF16);
-            pwlValue = shift + alpha * (baseF32 * 65536.0f / 9.0f);
-            pwlValue = 1.0f / (sqrtf(sqrtf(pwlValue * pwlValue * pwlValue)));
-            pwlLUT[base] = pwlValue;
-        }
-        baseU32 = (31 - 15 + 127) << 23;
-        baseF32 = *((vx_float32*) &baseU32);
-        pwlValue = shift + alpha * (baseF32 * 65536.0f / 9.0f);
-        pwlValue = 1.0f / (sqrtf(sqrtf(pwlValue * pwlValue * pwlValue)));
-        for (base = 0x3E0; base < 0x400; base++)
-        {
-            pwlLUT[base] = pwlValue;
-        }
-    }
-
-
     if (gcoHAL_IsFeatureAvailable1(gcvNULL, gcvFEATURE_TP_ENGINE) && 1)
     {
         vx_array            cmdBuffer;
         vx_tp_coomandInfo_s tpCommand;
         vx_context          context = vxGetContext((vx_reference)node);
         vx_array            pwlLUTBuffer = VX_NULL;
-        vx_uint16 *         pwlLUTBase;
-        vx_uint16           base;
-        vx_uint32           outTileXsize = 64;
-        vx_uint32           outTileYsize = 16;
 
         pwlLUTBuffer = vxCreateArray(context, VX_TYPE_UINT16, 1024);
         if (!vxoArray_AllocateMemory(pwlLUTBuffer))
         {
             status |= VX_ERROR_NO_MEMORY;
         }
-        pwlLUTBuffer->itemCount = 1024;
-        pwlLUTBuffer->base.isStage = vx_true_e;
-        pwlLUTBase = (vx_uint16 *) pwlLUTBuffer->memory.logicals[0];
-        for (base = 0; base < 1024; base++)
-        {
-            pwlLUTBase[base] = F32toF16(pwlLUT[base]);
-        }
-
-        /* Fill in tpCommand */
-        memset(&tpCommand, 0, sizeof(vx_tp_coomandInfo_s));
-        tpCommand.inImageXSize = width;
-        tpCommand.inImageYSize = height;
-        tpCommand.inImageZSize = depth;
-        tpCommand.inImageStride = width;
-        tpCommand.inImageSlice = width * height;
-        tpCommand.inWindowXStart = -1;
-        tpCommand.inWindowYStart = -1;
-        tpCommand.inWindowXEnd = width;
-        tpCommand.inWindowYEnd = height;
-        tpCommand.inTileSequence = 0;
-        tpCommand.inImageGlobalMem = 1;
-        tpCommand.inImageBaseAddress = src->memory.physicals[0];
-        tpCommand.inTileXSize = outTileXsize + 3 - 1;
-        tpCommand.inTileYSize = outTileYsize + 3 - 1;
-        tpCommand.inTileXInc = outTileXsize;
-        tpCommand.inTileYInc = outTileYsize;
-        tpCommand.aluSquarePreshift = 8;
-        tpCommand.aluSquareEnable = 1;
-        tpCommand.aluHorzProcessing = 0;
-        tpCommand.aluHorzProcCount = 2;
-        tpCommand.aluHorzProcStride = 0;
-        tpCommand.aluVertProcessing = 0;
-        tpCommand.aluVertProcCount = 2;
-        tpCommand.aluVertProcStride = 0;
-        tpCommand.aluPwlEnable = 1;
-        tpCommand.aluMultEnable = 1;
-        tpCommand.aluLoadPwlLUT = 1;
-        tpCommand.aluLoadPwlLUTAddress = pwlLUTBuffer->memory.physicals[0];
-        tpCommand.aluLoadPwlLUTGlobalMem = 1;
-        tpCommand.outBaseAddress = dst->memory.physicals[0];
-        tpCommand.outGlobalMem  = 1;
-        tpCommand.outTileSkipAtborder = 0;
-        tpCommand.outBrickMode  = 0;
-        tpCommand.outLoop0Inc   = 0;
-        tpCommand.outLoop0Count = 1;
-        tpCommand.outLoop1Inc   = 1;
-        tpCommand.outLoop1Count = 0;
-        tpCommand.outLoop1Reset = 1;
-        tpCommand.outLoop2Inc   = width;
-        tpCommand.outLoop2Count = 0;
-        tpCommand.outLoop2Reset = 1;
-        tpCommand.outLoop3Inc   = outTileXsize;   /* outtile_xsize */
-        tpCommand.outLoop3Count = (width + outTileXsize - 1) / outTileXsize;
-        tpCommand.outLoop3Reset = 0;
-        tpCommand.outLoop4Inc   = outTileYsize * width;
-        tpCommand.outLoop4Count = (height + outTileYsize - 1) / outTileYsize;
-        tpCommand.outLoop5Inc   = 0;
-        tpCommand.outLoop5Count = 1;
-        tpCommand.outLoop6Inc   = width * height;
-        tpCommand.last          = 1;
-
         /* Create tp command buffer*/
         cmdBuffer = vxCreateArray(context, VX_TYPE_CHAR, 128);
-        if (vxoArray_AllocateMemory(cmdBuffer))
-        {
-            gctUINT32 cmdBufferAddress;
-
-            fillInCmmdBuffer((void*)&tpCommand, cmdBuffer, vx_true_e);
-
-            /* Execute tp command buffer. */
-            cmdBufferAddress = (gctUINT32)cmdBuffer->memory.physicals[0];
-            status = gcfVX_Accel((gctUINT32)cmdBufferAddress, gcvVX_ACCELERATOR_TP, 0, gcvFALSE);
-        }
-        else
+        if (!vxoArray_AllocateMemory(cmdBuffer))
         {
             status |= VX_ERROR_NO_MEMORY;
         }
+
+        if (type_v == 0)
+        {
+            /* CNN_LRN_Type_WITHIN_CHANNELS */
+            vx_uint16 * pwlLUTBase;
+            vx_uint16   base;
+            vx_uint32   outTileXsize = 64;
+            vx_uint32   outTileYsize = 16;
+            vx_uint16   baseF16;
+            vx_float32  baseF32;
+            vx_uint32   baseU32;
+            vx_float32  pwlValue;
+
+            /* Create PWL LUT. */
+            for (base = 0; base < 0x20; base++)
+            {
+                pwlLUT[base] = 1.0f;
+            }
+            for (base = 0x20; base < 0x3E0; base++)
+            {
+                baseF16 = base << 5;
+                baseF32 = Fp16toFp32(baseF16);
+                pwlValue = shift + alpha * (baseF32 * 65536.0f / 9.0f);
+                pwlValue = 1.0f / (sqrtf(sqrtf(pwlValue * pwlValue * pwlValue)));
+                pwlLUT[base] = pwlValue;
+            }
+            baseU32 = (31 - 15 + 127) << 23;
+            baseF32 = *((vx_float32*) &baseU32);
+            pwlValue = shift + alpha * (baseF32 * 65536.0f / 9.0f);
+            pwlValue = 1.0f / (sqrtf(sqrtf(pwlValue * pwlValue * pwlValue)));
+            for (base = 0x3E0; base < 0x400; base++)
+            {
+                pwlLUT[base] = pwlValue;
+            }
+
+            pwlLUTBuffer->itemCount = 1024;
+            pwlLUTBuffer->base.isStage = vx_true_e;
+            pwlLUTBase = (vx_uint16 *) pwlLUTBuffer->memory.logicals[0];
+            for (base = 0; base < 1024; base++)
+            {
+                pwlLUTBase[base] = F32toF16(pwlLUT[base]);
+            }
+
+
+            /* Fill in tpCommand */
+            memset(&tpCommand, 0, sizeof(vx_tp_coomandInfo_s));
+            tpCommand.inImageXSize = width;
+            tpCommand.inImageYSize = height;
+            tpCommand.inImageZSize = depth;
+            tpCommand.inImageStride = width;
+            tpCommand.inImageSlice = width * height;
+            tpCommand.inWindowXStart = -1;
+            tpCommand.inWindowYStart = -1;
+            tpCommand.inWindowXEnd = width;
+            tpCommand.inWindowYEnd = height;
+            tpCommand.inTileSequence = 0x0;
+            tpCommand.inImageGlobalMem = 1;
+            tpCommand.inImageBaseAddress = src->memory.physicals[0];
+            tpCommand.inTileXSize = outTileXsize + 3 - 1;
+            tpCommand.inTileYSize = outTileYsize + 3 - 1;
+            tpCommand.inTileXInc = outTileXsize;
+            tpCommand.inTileYInc = outTileYsize;
+            tpCommand.aluSquarePreshift = 8;
+            tpCommand.aluSquareEnable = 1;
+            tpCommand.aluHorzProcessing = 0;
+            tpCommand.aluHorzProcCount = 2;
+            tpCommand.aluHorzProcStride = 0;
+            tpCommand.aluVertProcessing = 0;
+            tpCommand.aluVertProcCount = 2;
+            tpCommand.aluVertProcStride = 0;
+            tpCommand.aluPwlEnable = 1;
+            tpCommand.aluMultEnable = 1;
+            tpCommand.aluLoadPwlLUT = 1;
+            tpCommand.aluLoadPwlLUTAddress = pwlLUTBuffer->memory.physicals[0];
+            tpCommand.aluLoadPwlLUTGlobalMem = 1;
+            tpCommand.outBaseAddress = dst->memory.physicals[0];
+            tpCommand.outGlobalMem  = 1;
+            tpCommand.outTileSkipAtborder = 0;
+            tpCommand.outBrickMode  = 0;
+            tpCommand.outLoop0Inc   = 0;
+            tpCommand.outLoop0Count = 1;
+            tpCommand.outLoop1Inc   = 1;
+            tpCommand.outLoop1Count = 0;
+            tpCommand.outLoop1Reset = 1;
+            tpCommand.outLoop2Inc   = width;
+            tpCommand.outLoop2Count = 0;
+            tpCommand.outLoop2Reset = 1;
+            tpCommand.outLoop3Inc   = outTileXsize;   /* outtile_xsize */
+            tpCommand.outLoop3Count = (width + outTileXsize - 1) / outTileXsize;
+            tpCommand.outLoop3Reset = 0;
+            tpCommand.outLoop4Inc   = outTileYsize * width;
+            tpCommand.outLoop4Count = (height + outTileYsize - 1) / outTileYsize;
+            tpCommand.outLoop5Inc   = 0;
+            tpCommand.outLoop5Count = 1;
+            tpCommand.outLoop6Inc   = width * height;
+            tpCommand.last          = 1;
+            tpCommand.inImageDataType = 1;
+            tpCommand.outImageDataType = 1;
+            tpCommand.kernelDataType = 1;
+            tpCommand.aluFilterPwlSwap = 0;
+            tpCommand.aluPwlSignSupport = 0;
+            tpCommand.aluReluEnable = 0;
+            tpCommand.floatRoundingMode = 1;
+            tpCommand.integeroundingMode = 0;
+
+            {
+                gctUINT32 cmdBufferAddress;
+
+                fillInCmmdBuffer((void*)&tpCommand, cmdBuffer, vx_true_e);
+
+                /* Execute tp command buffer. */
+                cmdBufferAddress = (gctUINT32)cmdBuffer->memory.physicals[0];
+                status = gcfVX_Accel((gctUINT32)cmdBufferAddress, gcvVX_ACCELERATOR_TP, 0, gcvFALSE);
+            }
+        }
+        else
+        {
+            /* CNN_LRN_Type_ACROSS_CHANNELS */
+            vx_uint16 * pwlLUTBase;
+            vx_uint16   base;
+            vx_uint32   outTileXsize = 1;
+            vx_uint32   outTileYsize = 1;
+            vx_uint16   baseF16;
+            vx_float32  baseF32;
+            vx_uint32   baseU32;
+            vx_float32  pwlValue;
+
+            /* Create PWL LUT. */
+            for (base = 0; base < 0x20; base++)
+            {
+                pwlLUT[base] = 1.0f;
+            }
+            for (base = 0x20; base < 0x3E0; base++)
+            {
+                baseF16 = base << 5;
+                baseF32 = Fp16toFp32(baseF16);
+                pwlValue = shift + alpha * (baseF32 * 65536.0f / 5.0f);
+                pwlValue = 1.0f / (sqrtf(sqrtf(pwlValue * pwlValue * pwlValue)));
+                pwlLUT[base] = pwlValue;
+            }
+            baseU32 = (31 - 15 + 127) << 23;
+            baseF32 = *((vx_float32*) &baseU32);
+            pwlValue = shift + alpha * (baseF32 * 65536.0f / 5.0f);
+            pwlValue = 1.0f / (sqrtf(sqrtf(pwlValue * pwlValue * pwlValue)));
+            for (base = 0x3E0; base < 0x400; base++)
+            {
+                pwlLUT[base] = pwlValue;
+            }
+
+            pwlLUTBuffer->itemCount = 1024;
+            pwlLUTBuffer->base.isStage = vx_true_e;
+            pwlLUTBase = (vx_uint16 *) pwlLUTBuffer->memory.logicals[0];
+            for (base = 0; base < 1024; base++)
+            {
+                pwlLUTBase[base] = F32toF16(pwlLUT[base]);
+            }
+
+
+            /* Fill in tpCommand */
+            memset(&tpCommand, 0, sizeof(vx_tp_coomandInfo_s));
+            tpCommand.inImageXSize = width;
+            tpCommand.inImageYSize = height;
+            tpCommand.inImageZSize = depth;
+            tpCommand.inImageStride = width;
+            tpCommand.inImageSlice = width * height;
+            tpCommand.inWindowXStart = 0;
+            tpCommand.inWindowYStart = 0;
+            tpCommand.inWindowXEnd = width - 1;
+            tpCommand.inWindowYEnd = height - 1;
+            tpCommand.inTileSequence = 0x1;
+            tpCommand.inImageGlobalMem = 1;
+            tpCommand.inImageBaseAddress = src->memory.physicals[0];
+            tpCommand.inTileXSize = outTileXsize;
+            tpCommand.inTileYSize = outTileYsize;
+            tpCommand.inTileXInc = outTileXsize;
+            tpCommand.inTileYInc = outTileYsize;
+            tpCommand.aluSquarePreshift = 8;
+            tpCommand.aluSquareEnable = 1;
+            tpCommand.aluHorzProcessing = 0x0;
+            tpCommand.aluHorzProcCount = 2;
+            tpCommand.aluHorzProcStride = 0;
+            tpCommand.aluVertProcessing = 0x2;
+            tpCommand.aluVertProcCount = 2;
+            tpCommand.aluVertProcStride = 0;
+            tpCommand.aluZFilterMode = 1;
+            tpCommand.aluZFilterStartOverfetch = 2;
+            tpCommand.aluZFilterEndOverfetch = 2;
+            tpCommand.aluPwlEnable = 1;
+            tpCommand.aluMultEnable = 1;
+            tpCommand.aluLoadPwlLUT = 1;
+            tpCommand.aluLoadPwlLUTAddress = pwlLUTBuffer->memory.physicals[0];
+            tpCommand.aluLoadPwlLUTGlobalMem = 1;
+            tpCommand.outBaseAddress = dst->memory.physicals[0];
+            tpCommand.outGlobalMem  = 1;
+            tpCommand.outTileSkipAtborder = 0;
+            tpCommand.outBrickMode  = 0;
+            tpCommand.outLoop0Inc   = width * height;
+            tpCommand.outLoop0Count = depth;
+            tpCommand.outLoop1Inc   = 1;
+            tpCommand.outLoop1Count = width;
+            tpCommand.outLoop1Reset = 0;
+            tpCommand.outLoop2Inc   = width;
+            tpCommand.outLoop2Count = height;
+            tpCommand.outLoop2Reset = 0;
+            tpCommand.outLoop3Inc   = 0;
+            tpCommand.outLoop3Count = 1;
+            tpCommand.outLoop3Reset = 0;
+            tpCommand.outLoop4Inc   = 0;
+            tpCommand.outLoop4Count = 1;
+            tpCommand.outLoop5Inc   = 0;
+            tpCommand.outLoop5Count = 1;
+            tpCommand.outLoop6Inc   = 0;
+            tpCommand.last          = 1;
+            tpCommand.inImageDataType = 1;
+            tpCommand.outImageDataType = 1;
+            tpCommand.kernelDataType = 1;
+            tpCommand.aluFilterPwlSwap = 0;
+            tpCommand.aluPwlSignSupport = 0;
+            tpCommand.aluReluEnable = 0;
+            tpCommand.floatRoundingMode = 1;
+            tpCommand.integeroundingMode = 0;
+
+            {
+                gctUINT32 cmdBufferAddress;
+
+                fillInCmmdBuffer((void*)&tpCommand, cmdBuffer, vx_true_e);
+
+                /* Execute tp command buffer. */
+                cmdBufferAddress = (gctUINT32)cmdBuffer->memory.physicals[0];
+                status = gcfVX_Accel((gctUINT32)cmdBufferAddress, gcvVX_ACCELERATOR_TP, 0, gcvFALSE);
+            }
+        }
+
         vxReleaseArray(&cmdBuffer);
         vxReleaseArray(&pwlLUTBuffer);
     }
@@ -1352,14 +1625,6 @@ vx_status vxLRN(vx_node node, vx_array src, vx_scalar _width, vx_scalar _height,
         data_d = (vx_float32*)dst->memory.logicals[0];
 #endif
 
-#if VX_C_MEMORY_MANAGE
-       vxoMemory_CAllocate(node->base.context, (void**)&sum_buffer, 2 * width * height * sizeof(vx_float32));
-#else
-        sum_buffer = (vx_float32*)malloc(2 * width * height * sizeof(vx_float32));
-#endif
-        sum_buffer2 = sum_buffer + width * height;
-        avg = kernel_v * kernel_v;
-
         /*
          * B(i) = A(i)/(shift + a * ((A0*A0 + A1*A2 + ... + An*An)/n))^b
          * shift : k
@@ -1371,6 +1636,14 @@ vx_status vxLRN(vx_node node, vx_array src, vx_scalar _width, vx_scalar _height,
         switch(type_v)
         {
         case CNN_LRN_Type_WITHIN_CHANNELS:
+#if VX_C_MEMORY_MANAGE
+            vxoMemory_CAllocate(node->base.context, (void**)&sum_buffer, 2 * width * height * sizeof(vx_float32));
+#else
+            sum_buffer = (vx_float32*)malloc(2 * width * height * sizeof(vx_float32));
+#endif
+            sum_buffer2 = sum_buffer + width * height;
+            avg = kernel_v * kernel_v;
+
             for (k = 0; k < b; k ++)
             {
                 for (p = 0; p < depth; p ++)
@@ -1480,17 +1753,21 @@ vx_status vxLRN(vx_node node, vx_array src, vx_scalar _width, vx_scalar _height,
                     data_d += width * height;
                 }
             }
-            break;
-        }
 
 #if CPU_CACHE_MEORMY
-        free(data_p);
+            free(data_p);
 #endif
 #if VX_C_MEMORY_MANAGE
-        vxoMemory_CFree(node->base.context, (void**)&sum_buffer);
+            vxoMemory_CFree(node->base.context, (void**)&sum_buffer);
 #else
-        free(sum_buffer);
+            free(sum_buffer);
 #endif
+            break;
+
+        case CNN_LRN_Type_ACROSS_CHANNELS:
+            status = vxCrossChannelLRNLayer(src, dst, width, height, depth, kernel_v, shift, alpha, beta);
+            break;
+        }
 
 #if defined(__linux__)
         if (node->base.context->perfEnable)
@@ -1500,7 +1777,6 @@ vx_status vxLRN(vx_node node, vx_array src, vx_scalar _width, vx_scalar _height,
 #endif
     }
 
-#if NN_TP_ENGINE
 
 #ifdef COMPARE_TO_REF
     {
@@ -1510,8 +1786,9 @@ vx_status vxLRN(vx_node node, vx_array src, vx_scalar _width, vx_scalar _height,
         vx_float32 *pfNN_out, *pfRef_out;
         vx_float32 fDelta, fMax_delta, fPortion_BigDelta;
         vx_uint32 i, count_big_delta, offset_max_delta;
-        vx_char *fileName[] = { "fasterRcnn_resource\\000456-proposal\\layer2_norm1\\output_1_96_300_400.dat",
-                                "fasterRcnn_resource\\000456-proposal\\layer6_norm2\\output_1_256_76_101.dat"};
+        char* fileName[3] = {"",
+                             "layer04\\out1_1x96x55x55.dat",
+                             "layer08\\out1_1x256x27x27.dat"};
         vx_char fullFileName[256] = {'\0'};
         pfNN_out =  (vx_float32*)malloc(itemCount * sizeof(vx_float32));
         pfRef_out = (vx_float32*)malloc(itemCount * sizeof(vx_float32));
@@ -1568,7 +1845,6 @@ vx_status vxLRN(vx_node node, vx_array src, vx_scalar _width, vx_scalar _height,
         free(pfRef_out);
         free(pfNN_out);
     }
-#endif
 #endif
 
     vxWriteScalarValue(_width, &width);

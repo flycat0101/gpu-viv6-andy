@@ -19,8 +19,6 @@ QCONFIG=qconfig.mk
 endif
 include $(QCONFIG)
 
-include $(qnx_build_dir)/platform_config/$(PLATFORM)/platform_config
-
 define PINFO
 PINFO DESCRIPTION="Vivante GPU module"
 endef
@@ -35,6 +33,7 @@ EXTRA_INCVPATH += $(driver_root)/hal/kernel
 EXTRA_INCVPATH += $(driver_root)/hal/user
 EXTRA_INCVPATH += $(driver_root)/hal/kernel/arch
 EXTRA_INCVPATH += $(driver_root)/hal/kernel/archvg
+EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/kernel
 EXTRA_INCVPATH += $(driver_root)/build_qnx/platform_config/$(PLATFORM)
 
 # from galcore (trunk/hal/os/qnx/kernel/Makefile.linux)

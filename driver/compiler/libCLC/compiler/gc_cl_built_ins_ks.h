@@ -16,16 +16,17 @@
 
 static clsBUILTIN_FUNCTION    KSBuiltinFunctions[] =
 {
-    {clvEXTENSION_NONE,    "get_global_id",      T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
-    {clvEXTENSION_NONE,    "get_local_id",      T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
-    {clvEXTENSION_NONE,    "get_group_id",      T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
-    {clvEXTENSION_NONE,    "get_work_dim",      T_UINT,        0, {T_VOID}, {0}, {1}, 1},
-    {clvEXTENSION_NONE,    "get_global_size",      T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
+    {clvEXTENSION_NONE,    "get_global_id",       T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
+    {clvEXTENSION_NONE,    "get_local_id",        T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
+    {clvEXTENSION_NONE,    "get_group_id",        T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
+    {clvEXTENSION_NONE,    "get_work_dim",        T_UINT,      0, {T_VOID}, {0}, {1}, 1},
+    {clvEXTENSION_NONE,    "get_global_size",     T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
     {clvEXTENSION_NONE,    "get_local_size",      T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
-    {clvEXTENSION_NONE,    "get_global_offset",      T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
+    {clvEXTENSION_NONE,    "get_global_offset",   T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
     {clvEXTENSION_NONE,    "get_num_groups",      T_SIZE_T,    1, {T_UINT}, {0}, {1}, 1},
 
     {clvEXTENSION_NONE,    "barrier",          T_VOID, 1, {T_UINT}, {0}, {1}, 1},
+    {clvEXTENSION_NONE,    "mem_fence",        T_VOID, 1, {T_UINT}, {0}, {1}, 1},
 
 };
 
@@ -1244,6 +1245,36 @@ _GenBarrierCode(
                                             PolynaryExpr->exprBase.base.lineNo,
                                             PolynaryExpr->exprBase.base.stringNo,
                                             clvOPCODE_BARRIER,
+                                            &OperandsParameters[0].rOperands[0],
+                                            gcvNULL);
+        if (gcmIS_ERROR(status)) return status;
+
+    return gcvSTATUS_OK;
+}
+
+static gceSTATUS
+_GenMemFenceCode(
+    IN cloCOMPILER Compiler,
+    IN cloCODE_GENERATOR CodeGenerator,
+    IN cloIR_POLYNARY_EXPR PolynaryExpr,
+    IN gctUINT OperandCount,
+    IN clsGEN_CODE_PARAMETERS * OperandsParameters,
+    IN clsIOPERAND * IOperand
+    )
+{
+    gceSTATUS status;
+
+    /* Verify the arguments. */
+    clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
+    clmVERIFY_IR_OBJECT(PolynaryExpr, clvIR_POLYNARY_EXPR);
+    gcmASSERT(OperandCount == 1);
+    gcmASSERT(OperandsParameters);
+    gcmASSERT(IOperand == gcvNULL);
+
+        status = clGenGenericNullTargetCode(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
+                                            clvOPCODE_MEM_FENCE,
                                             &OperandsParameters[0].rOperands[0],
                                             gcvNULL);
         if (gcmIS_ERROR(status)) return status;

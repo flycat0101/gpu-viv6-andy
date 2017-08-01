@@ -811,6 +811,8 @@ fully_specified_type :
                 { $$ = clParseQualifiedType(Compiler, gcvNULL, gcvFALSE, &$1); }
 	| type_qualifier_list type_specifier
                 { $$ = clParseQualifiedType(Compiler, $1, gcvFALSE, &$2); }
+	| type_specifier type_qualifier_list
+                { $$ = clParseQualifiedType(Compiler, $2, gcvFALSE, &$1); }
 	| T_TYPEOF '(' typeof_type_specifier ')'
                 { $$ = $3; }
 	;
@@ -1096,7 +1098,7 @@ compound_statement :
 	| '{'
 		{ clParseCompoundStatementBegin(Compiler); }
 		statement_list '}'
-		{ $$ = clParseCompoundStatementEnd(Compiler, &$1, $3); }
+		{ $$ = clParseCompoundStatementEnd(Compiler, &$1, $3, $4); }
 	;
 
 statement_no_new_scope :
@@ -1112,7 +1114,7 @@ compound_statement_no_new_scope :
 	| '{'
 			{ clParseCompoundStatementNoNewScopeBegin(Compiler); }
 		statement_list '}'
-		{ $$ = clParseCompoundStatementNoNewScopeEnd(Compiler, &$1, $3); }
+		{ $$ = clParseCompoundStatementNoNewScopeEnd(Compiler, &$1, $3, $4); }
 	;
 
 statement_list :
@@ -1158,7 +1160,7 @@ switch_body :
 	| '{'
 		{ clParseSwitchBodyBegin(Compiler); }
 		switch_body_statement_list '}'
-		{ $$ = clParseSwitchBodyEnd(Compiler, &$1, $3); }
+		{ $$ = clParseSwitchBodyEnd(Compiler, &$1, $3, $4); }
 	;
 
 if_sub_statement :

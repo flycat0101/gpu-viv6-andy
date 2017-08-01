@@ -41,8 +41,8 @@ vx_status vxIntegralImage(vx_node node, vx_image src, vx_uint32 step, vx_image d
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(src, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(src, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
     constantData[4] = width;
     constantData[5] = height;

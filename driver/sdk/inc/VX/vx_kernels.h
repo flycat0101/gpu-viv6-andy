@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Khronos Group Inc.
+ * Copyright (c) 2012-2016 The Khronos Group Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and/or associated documentation files (the
@@ -11,6 +11,11 @@
  *
  * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Materials.
+ *
+ * MODIFICATIONS TO THIS FILE MAY MEAN IT NO LONGER ACCURATELY REFLECTS
+ * KHRONOS STANDARDS. THE UNMODIFIED, NORMATIVE VERSIONS OF KHRONOS
+ * SPECIFICATIONS AND HEADER INFORMATION ARE LOCATED AT
+ *    https://www.khronos.org/registry/
  *
  * THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
@@ -53,14 +58,6 @@ enum vx_library_e {
  * \ingroup group_kernel
  */
 enum vx_kernel_e {
-
-    /*!
-     * \brief The invalid kernel is used to for conformance failure in relation to
-     * some kernel operation (Get/Release).
-     * \details If the kernel is executed it shall always return an error.
-     * The kernel has no parameters. To address by name use "org.khronos.openvx.invalid".
-     */
-    VX_KERNEL_INVALID = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x0,
 
     /*!
      * \brief The Color Space conversion kernel.
@@ -286,10 +283,67 @@ enum vx_kernel_e {
      */
     VX_KERNEL_HALFSCALE_GAUSSIAN = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x29,
 
-    /* insert new kernels here */
-    VX_KERNEL_CNN = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x2A,
+    /* kernel added in OpenVX 1.1 */
 
-    VX_KERNEL_FASTER_RCNN = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x2B,
+    /*! \brief The Laplacian Image Pyramid Kernel.
+    * \see group_vision_function_laplacian_pyramid
+    */
+    VX_KERNEL_LAPLACIAN_PYRAMID = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x2A,
+
+    /*! \brief The Laplacian Pyramid Reconstruct Kernel.
+    * \see group_vision_function_laplacian_pyramid
+    */
+    VX_KERNEL_LAPLACIAN_RECONSTRUCT = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x2B,
+
+    /*! \brief The Non Linear Filter Kernel.
+    * \see group_vision_function_nonlinear_filter
+    */
+    VX_KERNEL_NON_LINEAR_FILTER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x2C,
+
+    /* insert new kernels here */
+    VX_KERNEL_CNN = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x2D,
+
+    VX_KERNEL_FASTER_RCNN = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x2E,
+
+    VX_KERNEL_NN_CONVOLUTION_RELU_POOLING_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x2F,
+
+    VX_KERNEL_NN_CONVOLUTION_RELU_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x30,
+
+    VX_KERNEL_NN_FULLY_CONNECTED_RELU_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x31,
+
+    VX_KERNEL_NN_SOFTMAX_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x32,
+
+    VX_KERNEL_NN_NORMALIZATION_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x33,
+    VX_KERNEL_NN_LRN_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x34,
+    VX_KERNEL_NN_NORMALIZE_IMAGE_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x35,
+
+    VX_KERNEL_NN_POOLING_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x36,
+
+    VX_KERNEL_NN_FULLY_CONNECTED_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x37,
+
+    VX_KERNEL_NN_ACTIVATION_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x38,
+
+    VX_KERNEL_NN_TENSOR_ADD = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x39,
+
+    VX_KERNEL_NN_TENSOR_SUB = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x3A,
+
+    VX_KERNEL_NN_TENSOR_MUL = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x3B,
+
+    VX_KERNEL_NN_TENSOR_LUT = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x3C,
+
+    VX_KERNEL_NN_TENSOR_TRANS = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x3D,
+
+    VX_KERNEL_NN_LEAKY = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x3E,
+
+    VX_KERNEL_NN_BATCH_NORM = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x3F,
+
+    VX_KERNEL_NN_RPN = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x40,
+
+    VX_KERNEL_NN_ROIPOOL = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x41,
+
+    VX_KERNEL_NN_CONCAT2_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x42,
+
+    VX_KERNEL_NN_CONVOLUTION_LAYER = VX_KERNEL_BASE(VX_ID_KHRONOS, VX_LIBRARY_KHR_BASE) + 0x43,
 
     VX_KERNEL_MAX_1_0, /*!< \internal Used for bounds checking in the conformance test. */
 };

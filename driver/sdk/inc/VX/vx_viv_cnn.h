@@ -1,20 +1,10 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
-
 
 #ifndef _VX_VIV_CNN_H_
 #define _VX_VIV_CNN_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef enum viv_nn_op_type_e
 {
@@ -65,8 +55,12 @@ typedef enum _vx_nn_layer_type_e
 typedef struct _viv_nn_tensor_op_s
 {
     /* Raw filter weight and bias data in float32 type */
-    float *weightData;
-    float *biasData;
+    const float *weightData;
+    const float *biasData;
+    unsigned int weightDataSize;
+    unsigned int biasDataSize;
+    const void  *weightObj;
+    const void  *biasObj;
 
 
     /* Dimensions */
@@ -152,4 +146,7 @@ VX_API_ENTRY vx_status VX_API_CALL vx_vivQueryCNN(vx_char* prototxt, viv_nn_attr
 
 VX_API_ENTRY vx_status VX_API_CALL vx_vivConcatenate(vx_array* pInputs, vx_uint32 numInputs, vx_array outputs, viv_nn_concatenate_op_s* pConcatenateOp);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

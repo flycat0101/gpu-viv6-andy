@@ -256,6 +256,8 @@ glfCreateContext(
                                     " "
                                     "GL_OES_surfaceless_context"
                                     " "
+                                    "GL_EXT_texture_compression_dxt1"
+                                    " "
                                     "GL_EXT_texture_format_BGRA8888"
                                     " "
                                     "GL_IMG_read_format"
@@ -283,6 +285,8 @@ glfCreateContext(
                                     "GL_OES_EGL_image_external"
                                     " "
                                     "GL_VIV_direct_texture"
+                                    " "
+                                    "GL_EXT_texture_compression_s3tc"
                                     " "
                                     /* MM06 depends on this. */
                                     "GL_ARB_vertex_buffer_object"
@@ -360,6 +364,8 @@ glfCreateContext(
                                     " "
                                     "GL_OES_packed_depth_stencil"
                                     " "
+                                    "GL_EXT_texture_compression_dxt1"
+                                    " "
                                     "GL_EXT_texture_format_BGRA8888"
                                     " "
                                     "GL_IMG_read_format"
@@ -387,6 +393,8 @@ glfCreateContext(
                                     "GL_OES_EGL_image_external"
                                     " "
                                     "GL_VIV_direct_texture"
+                                    " "
+                                    "GL_EXT_texture_compression_s3tc"
                                     " "
                                     /* MM06 depends on this. */
                                     "GL_ARB_vertex_buffer_object"
@@ -706,6 +714,7 @@ glfCreateContext(
         context->base.destructor = gcvNULL;
 
         context->isQuadrant = (patchId == gcvPATCH_QUADRANT);
+        context->varrayDirty = gcvFALSE;
         context->curFrameBufferID = 0;
 
         /* Load compiler. */
@@ -745,7 +754,7 @@ glfCreateContext(
 #if VIVANTE_PROFILER
     if (context != gcvNULL)
     {
-        _glffProfiler_NEW_Initialize(context);
+        _glffProfilerInitialize(context);
     }
 #endif
 
@@ -848,7 +857,7 @@ glfDestroyContext(
     gcmCHECK_STATUS(gco3D_SetDepth(context->hw, gcvNULL));
 
 #if VIVANTE_PROFILER
-    _glffProfiler_NEW_Destroy(context);
+    _glffProfilerDestroy(context);
 #endif
 
     if (context->chipInfo.extensions != gcvNULL)
@@ -1364,7 +1373,7 @@ glfProfiler(
 #if VIVANTE_PROFILER
     glsCONTEXT_PTR context;
     context = GetCurrentContext();
-    return _glffProfiler_NEW_Set(context, Enum, Value);
+    return _glffProfilerSet(context, Enum, Value);
 #else
     return gcvFALSE;
 #endif
@@ -1406,6 +1415,12 @@ GL_API void GL_APIENTRY glFlush(
         gcmDUMP_API("${ES11 glFlush}");
 
         glmPROFILE(context, GLES1_FLUSH, 0);
+
+        if ((context != gcvNULL) && context->profiler.useGlfinish)
+        {
+            glmPROFILE(context, GL1_PROFILER_FINISH_BEGIN, 0);
+        }
+
         /* Flush the frame buffer. */
         if (gcmIS_ERROR(gcoSURF_Flush(context->draw)))
         {
@@ -1418,6 +1433,11 @@ GL_API void GL_APIENTRY glFlush(
         {
             glmERROR(GL_INVALID_OPERATION);
             break;
+        }
+
+        if ((context != gcvNULL) && context->profiler.useGlfinish)
+        {
+            glmPROFILE(context, GL1_PROFILER_FINISH_END, 0);
         }
     }
     glmLEAVE();
@@ -1451,6 +1471,12 @@ GL_API void GL_APIENTRY glFinish(
         gcmDUMP_API("${ES11 glFinish}");
 
         glmPROFILE(context, GLES1_FINISH, 0);
+
+        if ((context != gcvNULL) && context->profiler.useGlfinish)
+        {
+            glmPROFILE(context, GL1_PROFILER_FINISH_BEGIN, 0);
+        }
+
         /* Flush the cache. */
         if (gcmIS_ERROR(gcoSURF_Flush(context->draw)))
         {
@@ -1467,13 +1493,10 @@ GL_API void GL_APIENTRY glFinish(
             break;
         }
 
-#if VIVANTE_PROFILER
-    if ((context != gcvNULL) && context->profiler.useGlfinish)
-    {
-       glmPROFILE(context, GL1_PROFILER_DRAW_END,  (gctUINTPTR_T)1);
-    }
-#endif
-
+        if ((context != gcvNULL) && context->profiler.useGlfinish)
+        {
+            glmPROFILE(context, GL1_PROFILER_FINISH_END, 0);
+        }
     }
     glmLEAVE();
 }

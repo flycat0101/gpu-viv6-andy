@@ -78,6 +78,12 @@ ifneq ($(ABI), 0)
 	CCFLAGS += -mabi=$(ABI)
 endif
 
+# 64 bit
+ifneq ($(CPU),aarch64)
+AARCH64 = 1
+CCFLAGS += -DAARCH64
+endif
+
 #CCFLAGS += -Werror
 #CCFLAGS += -ansi
 #CCFLAGS += -pedantic

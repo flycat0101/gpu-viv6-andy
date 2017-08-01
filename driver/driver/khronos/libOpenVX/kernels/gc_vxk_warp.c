@@ -14,7 +14,7 @@
 #include <gc_vxk_common.h>
 
 static vx_status vxVivWarpGeneric(vx_node node, vx_image src_image, vx_matrix matrix, vx_scalar stype, vx_image dst_image,
-                               const vx_border_mode_t *borders, vx_uint32 kernel)
+                               const vx_border_t *borders, vx_uint32 kernel)
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 dst_width, dst_height;
@@ -42,8 +42,8 @@ static vx_status vxVivWarpGeneric(vx_node node, vx_image src_image, vx_matrix ma
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(dst_image, VX_IMAGE_ATTRIBUTE_WIDTH, &dst_width, sizeof(dst_width));
-    vxQueryImage(dst_image, VX_IMAGE_ATTRIBUTE_HEIGHT, &dst_height, sizeof(dst_height));
+    vxQueryImage(dst_image, VX_IMAGE_WIDTH, &dst_width, sizeof(dst_width));
+    vxQueryImage(dst_image, VX_IMAGE_HEIGHT, &dst_height, sizeof(dst_height));
 
     status |= vxReadMatrix(matrix, m);
     status |= vxReadScalarValue(stype, &type);
@@ -57,25 +57,25 @@ static vx_status vxVivWarpGeneric(vx_node node, vx_image src_image, vx_matrix ma
     kernelContext->params.kernel           = kernel;
 
     kernelContext->params.xstep            = 16;
-    kernelContext->params.policy           = (type == VX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR)?gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR:(type == VX_INTERPOLATION_TYPE_BILINEAR?gcvVX_INTERPOLATION_TYPE_BILINEAR:gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR);
+    kernelContext->params.policy           = (type == VX_INTERPOLATION_NEAREST_NEIGHBOR)?gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR:(type == VX_INTERPOLATION_BILINEAR?gcvVX_INTERPOLATION_TYPE_BILINEAR:gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR);
 #if gcdVX_OPTIMIZER
     kernelContext->borders                 = borders->mode;
 #else
     kernelContext->params.borders          = borders->mode;
 #endif
-    kernelContext->params.constant_value   = borders->constant_value;
+    kernelContext->params.constant_value   = borders->constant_value.U32;
 
     kernelContext->params.xmax             = dst_width;
     kernelContext->params.ymax             = dst_height;
     kernelContext->params.evisNoInst       = node->base.context->evisNoInst;
 
-    if(borders->mode == VX_BORDER_MODE_CONSTANT || borders->mode == VX_BORDER_MODE_UNDEFINED)
+    if(borders->mode == VX_BORDER_CONSTANT || borders->mode == VX_BORDER_UNDEFINED)
     {
         vx_uint32 bin[4];
         bin[0] =
         bin[1] =
         bin[2] =
-        bin[3] = FORMAT_VALUE(borders->mode == VX_BORDER_MODE_CONSTANT?borders->constant_value:0xcd);
+        bin[3] = FORMAT_VALUE(((borders->mode == VX_BORDER_CONSTANT)?borders->constant_value.U32:0xcd));
 
         gcoOS_MemCopy(&kernelContext->uniforms[index].uniform, bin, sizeof(bin));
         kernelContext->uniforms[index].num     = 4 * 4;
@@ -122,12 +122,12 @@ static vx_status vxVivWarpGeneric(vx_node node, vx_image src_image, vx_matrix ma
     return status;
 }
 
-vx_status vxWarpAffine(vx_node node, vx_image src_image, vx_matrix matrix, vx_scalar stype, vx_image dst_image, const vx_border_mode_t *borders)
+vx_status vxWarpAffine(vx_node node, vx_image src_image, vx_matrix matrix, vx_scalar stype, vx_image dst_image, const vx_border_t *borders)
 {
     return vxVivWarpGeneric(node, src_image, matrix, stype, dst_image, borders, gcvVX_KERNEL_WARP_AFFINE);
 }
 
-vx_status vxWarpPerspective(vx_node node, vx_image src_image, vx_matrix matrix, vx_scalar stype, vx_image dst_image, const vx_border_mode_t *borders)
+vx_status vxWarpPerspective(vx_node node, vx_image src_image, vx_matrix matrix, vx_scalar stype, vx_image dst_image, const vx_border_t *borders)
 {
     return vxVivWarpGeneric(node, src_image, matrix, stype, dst_image, borders, gcvVX_KERNEL_WARP_PERSPECTIVE);
 }

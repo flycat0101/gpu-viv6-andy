@@ -1,0 +1,17 @@
+vv_launcher - demo application. Shows animated application launcher on screen.
+
+Parameters:
+  -vga          sets resolution to 640x480 (default)
+  -qvga         sets resolution to 320x240
+  -flip         flip image vertically
+  -frames val   number of frames to render (default 0 = no limit)
+  -w val        specify window width
+  -h val        specify window height
+  -help         show options
+
+Example:
+  vv_launcher -w 1024 -h 768
+
+Keyboard control:
+  ESC          quit
+  0-9          select application

@@ -59,14 +59,14 @@ vx_status Convolve(vx_node node, vx_image src, vx_image dst, vx_int16* matrix, v
     kernelContext->params.borders = bordermode->mode;
 #endif
 
-    if(bordermode->mode == VX_BORDER_MODE_CONSTANT || bordermode->mode == VX_BORDER_MODE_UNDEFINED)
+    if(bordermode->mode == VX_BORDER_CONSTANT || bordermode->mode == VX_BORDER_UNDEFINED)
     {
         vx_uint32 bin[4];
 
         bin[0] =
         bin[1] =
         bin[2] =
-        bin[3] = FORMAT_VALUE((bordermode->mode == VX_BORDER_MODE_UNDEFINED)?0xcd:bordermode->constant_value);
+        bin[3] = FORMAT_VALUE((bordermode->mode == VX_BORDER_UNDEFINED)?0xcd:bordermode->constant_value.U32);
 
         gcoOS_MemCopy(&kernelContext->uniforms[0].uniform, bin, sizeof(bin));
         kernelContext->uniforms[0].num = 4 * 4;
@@ -88,16 +88,16 @@ vx_status Convolve(vx_node node, vx_image src, vx_image dst, vx_int16* matrix, v
     return status;
 }
 
-vx_status vxConvolve(vx_node node, vx_image src, vx_convolution conv, vx_image dst, vx_border_mode_t *bordermode)
+vx_status vxConvolve(vx_node node, vx_image src, vx_convolution conv, vx_image dst, vx_border_t *bordermode)
 {
     vx_status status  = VX_SUCCESS;
     vx_size conv_width, conv_height;
     vx_uint32 scale = 1;
     vx_int16 conv_mat[C_MAX_CONVOLUTION_DIM * C_MAX_CONVOLUTION_DIM] = {0};
 
-    status |= vxQueryConvolution(conv, VX_CONVOLUTION_ATTRIBUTE_COLUMNS, &conv_width, sizeof(conv_width));
-    status |= vxQueryConvolution(conv, VX_CONVOLUTION_ATTRIBUTE_ROWS, &conv_height, sizeof(conv_height));
-    status |= vxQueryConvolution(conv, VX_CONVOLUTION_ATTRIBUTE_SCALE, &scale, sizeof(scale));
+    status |= vxQueryConvolution(conv, VX_CONVOLUTION_COLUMNS, &conv_width, sizeof(conv_width));
+    status |= vxQueryConvolution(conv, VX_CONVOLUTION_ROWS, &conv_height, sizeof(conv_height));
+    status |= vxQueryConvolution(conv, VX_CONVOLUTION_SCALE, &scale, sizeof(scale));
 
     status |= vxReadConvolutionCoefficients(conv, conv_mat);
     status |= vxWriteConvolutionCoefficients(conv, NULL);

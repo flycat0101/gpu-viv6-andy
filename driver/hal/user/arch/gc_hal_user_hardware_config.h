@@ -149,7 +149,6 @@ gctBOOL gcHARDWARE_Feature_gc2000_rev5108[gcvFEATURE_COUNT] =
     1, /* gcvFEATURE_TEXTURE_ARRAY */
     0, /* gcvFEATURE_TILE_FILLER */
     0, /* gcvFEATURE_LOGIC_OP */
-    0, /* gcvFEATURE_COMPOSITION */
     0, /* gcvFEATURE_MIXED_STREAMS */
     0, /* gcvFEATURE_2D_MULTI_SOURCE_BLT */
     0, /* gcvFEATURE_END_EVENT */

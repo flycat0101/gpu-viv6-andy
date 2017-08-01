@@ -3555,13 +3555,11 @@ gcChipValidateDrawPath(
                 break;
             }
 
-#if VIVANTE_PROFILER
             if (gc->profiler.enable)
             {
-                __glChipProfiler(&gc->profiler, GL3_PROFILER_PRIMITIVE_TYPE,  (gctHANDLE)(gctUINTPTR_T)defaultInstant->primMode);
-                __glChipProfiler(&gc->profiler, GL3_PROFILER_PRIMITIVE_COUNT, (gctHANDLE)(gctUINTPTR_T)(defaultInstant->primCount * gc->vertexArray.instanceCount));
+                __glChipProfilerSet(gc, GL3_PROFILER_PRIMITIVE_TYPE, (gctHANDLE)(gctUINTPTR_T)defaultInstant->primMode);
+                __glChipProfilerSet(gc, GL3_PROFILER_PRIMITIVE_COUNT, (gctHANDLE)(gctUINTPTR_T)(defaultInstant->primCount * gc->vertexArray.instanceCount));
             }
-#endif
 
             /* Is any of the attrib need SW converted? */
             if (chipCtx->anyAttibConverted)
@@ -7335,10 +7333,6 @@ __glChipDrawArraysInstanced(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
-#if VIVANTE_PROFILER && VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_BEGIN, 0);
-#endif
-
  #if gcdDEBUG_OPTION && gcdDEBUG_OPTION_NO_GL_DRAWS
     {
         gcePATCH_ID patchId = gcvPATCH_INVALID;
@@ -7472,18 +7466,6 @@ __glChipDrawArraysInstanced(
         }
     }
 
-#if VIVANTE_PROFILER
-#if VIVANTE_PROFILER_PERDRAW
-    if (gc->profiler.enable)
-    {
-        gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
-    }
-#endif
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_END, 0);
-#endif
-#endif
-
     /* Intentional fall through */
 OnError:
     if (gcmIS_ERROR(status))
@@ -7511,10 +7493,6 @@ __glChipDrawElementsInstanced(
     gcoBUFOBJ alignedBuffer = gcvNULL;
 
     gcmHEADER_ARG("gc=0x%x", gc);
-
-#if VIVANTE_PROFILER && VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_BEGIN, 0);
-#endif
 
 #if gcdDEBUG_OPTION && gcdDEBUG_OPTION_NO_GL_DRAWS
     {
@@ -7632,18 +7610,6 @@ __glChipDrawElementsInstanced(
             alignedBuffer = gcvNULL;
         }
     }
-
-#if VIVANTE_PROFILER
-#if VIVANTE_PROFILER_PERDRAW
-    if (gc->profiler.enable)
-    {
-        gcmONERROR(gcoHAL_Commit(chipCtx->hal, gcvTRUE));
-    }
-#endif
-#if VIVANTE_PROFILER_PROBE | VIVANTE_PROFILER_PERDRAW
-    __glChipProfiler(&gc->profiler, GL3_PROFILER_DRAW_END, 0);
-#endif
-#endif
 
     /* Intentional fall through */
 OnError:
@@ -7995,6 +7961,11 @@ __glChipFlush(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
+    if (gc->profiler.enable && gc->profiler.useGlfinish)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_BEGIN, 0);
+    }
+
 #ifdef OPENGL40
     if (chipCtx->drawRtViews[0].surf) {
         /* Flush the cache. */
@@ -8011,6 +7982,12 @@ __glChipFlush(
         }
     }
 #endif
+
+    if (gc->profiler.enable && gc->profiler.useGlfinish)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_END, 0);
+    }
+
     gcmFOOTER_ARG("return=%d", GL_TRUE);
     return GL_TRUE;
 
@@ -8030,6 +8007,11 @@ __glChipFinish(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
+    if (gc->profiler.enable && gc->profiler.useGlfinish)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_BEGIN, 0);
+    }
+
     /* Sychronization between CPU and GPU, then drain all commands */
     gcmONERROR(gcChipFramebufferMasterSyncFromShadow(gc, gc->frameBuffer.drawFramebufObj));
 
@@ -8048,12 +8030,10 @@ __glChipFinish(
     }
 #endif
 
-#if VIVANTE_PROFILER
     if (gc->profiler.enable && gc->profiler.useGlfinish)
     {
-        __glChipProfiler(&gc->profiler, GL3_PROFILER_FRAME_END,  (gctHANDLE)(gctUINTPTR_T)1);
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_END, 0);
     }
-#endif
 
 OnError:
     if (gcmIS_SUCCESS(status))
@@ -8229,6 +8209,11 @@ __glChipDrawBegin(
 
         }
 #endif
+
+        if (gc->profiler.enable)
+        {
+            __glChipProfilerSet(gc, GL3_PROFILER_DRAW_BEGIN, 0);
+        }
 
         /* Special patch for fishnoodle.*/
         if (chipCtx->patchId == gcvPATCH_FISHNOODLE &&
@@ -8606,6 +8591,11 @@ __glChipDrawBegin(
     }
 #endif
 
+    if (ret == GL_FALSE && gc->profiler.enable)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_DRAW_END, 0);
+    }
+
     gcmFOOTER_ARG("return=%d", ret);
     return ret;
 }
@@ -8695,6 +8685,11 @@ __gl4ChipFlush(
 
     gcmHEADER_ARG("gc=0x%x", gc);
 
+    if (gc->profiler.enable && gc->profiler.useGlfinish)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_BEGIN, 0);
+    }
+
     if (chipCtx->drawRtViews[0].surf) {
         /* Flush the cache. */
         gcmONERROR(gcoSURF_Flush(chipCtx->drawRtViews[0].surf));
@@ -8706,6 +8701,11 @@ __gl4ChipFlush(
         {
             (*gc->imports.internalSwapBuffers)(gc,GL_TRUE, GL_FALSE);
         }
+    }
+
+    if (gc->profiler.enable && gc->profiler.useGlfinish)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_FINISH_END, 0);
     }
 
     gcmFOOTER_ARG("return=%d", GL_TRUE);
@@ -8788,6 +8788,11 @@ __glChipDrawEnd(
         }
     }
 
+    if (gc->profiler.enable)
+    {
+        __glChipProfilerSet(gc, GL3_PROFILER_DRAW_END, 0);
+    }
+
 #if gcdFRAMEINFO_STATISTIC
     {
         gcoHAL_FrameInfoOps(chipCtx->hal,
@@ -8814,7 +8819,7 @@ __glChipDrawEnd(
         gcmDUMP(gcvNULL, "#[fID=%d, dID=%d(draw), pID=%d, ppID=%d]",
                 frameCount, drawCount,
                 gc->shaderProgram.currentProgram ? gc->shaderProgram.currentProgram->objectInfo.id : 0,
-                gc->shaderProgram.currentProgram ? 0 : gc->shaderProgram.boundPPO->name);
+                gc->shaderProgram.currentProgram ? 0 : (gc->shaderProgram.boundPPO ? gc->shaderProgram.boundPPO->name : 0));
     }
 
     if (g_dbgPerDrawKickOff)

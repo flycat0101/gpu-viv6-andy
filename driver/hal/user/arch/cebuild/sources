@@ -34,7 +34,6 @@ SOURCES = \
 !IF "$(VIVANTE_ENABLE_3D)" == "1"
 SOURCES = $(SOURCES) \
     ../gc_hal_user_hardware_clear.c \
-    ../gc_hal_user_hardware_composition.c \
     ../gc_hal_user_hardware_engine.c \
     ../gc_hal_user_hardware_filter_blt_de.c \
     ../gc_hal_user_hardware_frag_proc.c \

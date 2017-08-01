@@ -118,7 +118,7 @@ _VSC_MC_GEN_IsTypeEqualTo(
     IN VIR_TyFlag   TyFlag
 )
 {
-    VIR_TypeId   ty   = VIR_Operand_GetType(Opnd);
+    VIR_TypeId   ty   = VIR_Operand_GetTypeId(Opnd);
     gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
 
     return (VIR_GetTypeFlag(ty) & TyFlag);
@@ -384,7 +384,7 @@ _VSC_MC_GEN_GenOpcode(
     case VIR_OP_STORE:
     case VIR_OP_STORE_S:
     case VIR_OP_STORE_L:
-        if (VIR_TypeId_isPacked(VIR_Operand_GetType(VIR_Inst_GetSource(Inst, 2))))
+        if (VIR_TypeId_isPacked(VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 2))))
         {
             *BaseOpcode = (VIR_Inst_Store_Have_Dst(Inst) && Gen->pComCfg->ctx.pSysCtx->pCoreSysCtx->hwCfg.hwFeatureFlags.hasHalti5) ?
                           MC_AUXILIARY_OP_CODE_USC_STOREP :
@@ -400,7 +400,7 @@ _VSC_MC_GEN_GenOpcode(
     case VIR_OP_LOAD:
     case VIR_OP_LOAD_L:
     case VIR_OP_LOAD_S:
-        if (VIR_TypeId_isPacked(VIR_Operand_GetType(VIR_Inst_GetDest(Inst))))
+        if (VIR_TypeId_isPacked(VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst))))
         {
             *BaseOpcode = 0x39;
         }
@@ -412,10 +412,10 @@ _VSC_MC_GEN_GenOpcode(
     case VIR_OP_KILL:
         *BaseOpcode = 0x17;
         break;
-    case VIR_OP_BITINSERT:
+    case VIR_OP_BITINSERT1:
         *BaseOpcode = 0x54;
         break;
-    case VIR_OP_BITINSERT1:
+    case VIR_OP_BITINSERT2:
         *BaseOpcode = 0x55;
         break;
     case VIR_OP_SWIZZLE:
@@ -574,6 +574,9 @@ _VSC_MC_GEN_GenOpcode(
         break;
     case VIR_OP_BITREV:
         *BaseOpcode = 0x6D;
+        break;
+    case VIR_OP_BYTEREV:
+        *BaseOpcode = 0x6E;
         break;
     case VIR_OP_POPCOUNT:
         *BaseOpcode = 0x61;
@@ -756,18 +759,22 @@ _VSC_MC_GEN_GenOpcode(
         *ExternOpcode = 0x07;
         break;
     case VIR_OP_VX_DP16X1:
+    case VIR_OP_VX_DP16X1_B:
         *BaseOpcode   = 0x45;
         *ExternOpcode = 0x08;
         break;
     case VIR_OP_VX_DP8X2:
+    case VIR_OP_VX_DP8X2_B:
         *BaseOpcode   = 0x45;
         *ExternOpcode = 0x09;
         break;
     case VIR_OP_VX_DP4X4:
+    case VIR_OP_VX_DP4X4_B:
         *BaseOpcode   = 0x45;
         *ExternOpcode = 0x0A;
         break;
     case VIR_OP_VX_DP2X8:
+    case VIR_OP_VX_DP2X8_B:
         *BaseOpcode   = 0x45;
         *ExternOpcode = 0x0B;
         break;
@@ -1039,7 +1046,7 @@ _VSC_MC_GEN_GetInstType(
 {
     VIR_OpCode      opcode = VIR_Inst_GetOpcode(Inst);
     VIR_Symbol     *sym         = VIR_Operand_GetSymbol(Opnd);
-    VIR_TypeId      ty           = VIR_Operand_GetType(Opnd);
+    VIR_TypeId      ty           = VIR_Operand_GetTypeId(Opnd);
     VIR_OperandKind opndKind     = VIR_Operand_GetOpKind(Opnd);
     VIR_TypeId      componentTy;
     VIR_LayoutQual  imgQual;
@@ -1068,7 +1075,7 @@ _VSC_MC_GEN_GetInstType(
             /* need to get the image type from dest for load */
             Opnd       = VIR_Inst_GetDest(Inst);
             opndKind   = VIR_Operand_GetOpKind(Opnd);
-            ty         = VIR_Operand_GetType(Opnd);
+            ty         = VIR_Operand_GetTypeId(Opnd);
         }
     }
 
@@ -1356,7 +1363,7 @@ _VSC_MC_GEN_GenResultSat(
         opcode == VIR_OP_VX_IMG_STORE || opcode == VIR_OP_VX_IMG_STORE_3D)
     {
         opnd = VIR_Inst_GetSource(Inst, 2);
-        ty  = VIR_Operand_GetType(opnd);
+        ty  = VIR_Operand_GetTypeId(opnd);
 
         gcmASSERT(ty < VIR_TYPE_PRIMITIVETYPE_COUNT);
         componentTy  = VIR_GetTypeComponentType(ty);
@@ -1419,6 +1426,7 @@ _VSC_MC_GEN_GenInstCtrl(
     McInstCtrl->bResultSat                      = _VSC_MC_GEN_GenResultSat(Gen, Inst);
     McInstCtrl->packMode                        = VIR_Inst_GetFlags(Inst) & VIR_INSTFLAG_PACKEDMODE ?
                                                       0x0 : 0x1;
+    McInstCtrl->bForceGen                       = VIR_Inst_GetFlags(Inst) & VIR_INSTFLAG_FORCE_GEN;
 
     /* For a union variable, set value only if the opcode match the requirement. */
     if (opCode == VIR_OP_MUL_Z || opCode == VIR_OP_NORM_MUL)
@@ -1738,7 +1746,7 @@ _VSC_MC_GEN_GenImmTypeAndValue(
     OUT VSC_MC_CODEC_IMM_VALUE  *ImmVal
     )
 {
-    VIR_TypeId ty           = VIR_Operand_GetType(Opnd);
+    VIR_TypeId ty           = VIR_Operand_GetTypeId(Opnd);
     VIR_TypeId componentTy  = VIR_GetTypeComponentType(ty);
 
     if (VIR_Shader_isDual16Mode(Gen->Shader))
@@ -2255,7 +2263,11 @@ _VSC_MC_GEN_GenSource(
             }
             else if (VIR_OPCODE_isVXOnly(opCode) &&
                      srcKind == 0x0 &&
-                     (opCode == VIR_OP_VX_DP32X1_B ||
+                     (opCode == VIR_OP_VX_DP16X1_B ||
+                      opCode == VIR_OP_VX_DP8X2_B  ||
+                      opCode == VIR_OP_VX_DP4X4_B  ||
+                      opCode == VIR_OP_VX_DP2X8_B  ||
+                      opCode == VIR_OP_VX_DP32X1_B ||
                       opCode == VIR_OP_VX_DP16X2_B ||
                       opCode == VIR_OP_VX_DP8X4_B  ||
                       opCode == VIR_OP_VX_DP4X8_B  ||
@@ -2411,6 +2423,10 @@ _VSC_MC_GEN_GenGeneralInst(
         {
             /* skip the hidden temp 256 register lower part */
             switch (VIR_Inst_GetOpcode(Inst)) {
+            case VIR_OP_VX_DP16X1_B:
+            case VIR_OP_VX_DP8X2_B:
+            case VIR_OP_VX_DP4X4_B:
+            case VIR_OP_VX_DP2X8_B:
             case VIR_OP_VX_DP32X1_B:
             case VIR_OP_VX_DP16X2_B:
             case VIR_OP_VX_DP8X4_B:
@@ -2449,7 +2465,7 @@ _VSC_MC_GEN_GenGeneralInst(
 
 static void _NegMcSrc(VSC_MC_CODEC_SRC *McSrc, VIR_Operand * Opnd)
 {
-    VIR_TypeId ty           = VIR_Operand_GetType(Opnd);
+    VIR_TypeId ty           = VIR_Operand_GetTypeId(Opnd);
 
     if (McSrc->regType == 0x7)
     {
@@ -2572,7 +2588,7 @@ static void _AbsMcSrc(VSC_MC_CODEC_SRC *McSrc)
 
 static gctBOOL _NeedGen(gctUINT                baseOpcode,
                         gctUINT                extOpcode,
-                        VSC_MC_CODEC_INST_CTRL instCtrl,
+                        VSC_MC_CODEC_INST_CTRL*pInstCtrl,
                         VSC_MC_CODEC_DST*      pDst,
                         VSC_MC_CODEC_SRC*      pSrc,
                         gctUINT                srcCount)
@@ -2581,14 +2597,15 @@ static gctBOOL _NeedGen(gctUINT                baseOpcode,
 
     /* FB_INSERT_MOV_INPUT: insert MOV Rn, Rn for input to help HW team to debug */
     if (!gcmOPT_hasFeature(FB_INSERT_MOV_INPUT) &&
+        !pInstCtrl->bForceGen &&
         baseOpcode == 0x09 &&
         pSrc[srcCount - 1].regType == 0x0 &&
         pSrc[srcCount - 1].u.reg.regNo == pDst->regNo &&
         pDst->u.nmlDst.indexingAddr == pSrc[srcCount - 1].u.reg.indexingAddr &&
         !pSrc[srcCount - 1].u.reg.bAbs &&
         !pSrc[srcCount - 1].u.reg.bNegative &&
-        !instCtrl.bResultSat &&
-        instCtrl.condOpCode == 0x00 &&
+        !pInstCtrl->bResultSat &&
+        pInstCtrl->condOpCode == 0x00 &&
         pSrc[srcCount - 1].regType == pDst->regType)
     {
         for (channel = CHANNEL_X; channel < CHANNEL_NUM; channel ++)
@@ -2969,7 +2986,7 @@ _VSC_MC_GEN_GenInst(
     {
         if (!_NeedGen(baseOpcode,
                       externOpcode,
-                      mcInstCtrl,
+                      &mcInstCtrl,
                       bDstWrite ? &mcDest : gcvNULL,
                       mcSrc,
                       srcNum))

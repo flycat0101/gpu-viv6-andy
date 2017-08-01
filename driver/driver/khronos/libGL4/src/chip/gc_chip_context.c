@@ -414,11 +414,7 @@ gcChipInitDevicePipeline(
     gc->dp.blendBarrier = __glChipBlendBarrier;
 
     /* profiler */
-#if VIVANTE_PROFILER
-    gc->dp.profiler = __glChipProfiler;
-#else
-    gc->dp.profiler = NULL;
-#endif
+    gc->dp.profiler = __glChipProfilerSet;
 
     /* Patches. */
 #if __GL_CHIP_PATCH_ENABLED
@@ -1658,10 +1654,7 @@ __glChipDestroyContext(
     gcmVERIFY_OK(gcChipLTCReleaseResultArray(chipCtx, gcvNULL));
     gcmVERIFY_OK(gcChipReleaseCompiler(gc));
     (*gc->imports.free)(0, gc->constants.pCompressedTexturesFormats);
-#if VIVANTE_PROFILER
-    /* Destroy the profiler. */
-    gcChipDestroyProfiler(gc);
-#endif
+    gcmVERIFY_OK(gcChipProfilerDestroy(gc));
 
     if (chipCtx->rtTexture)
     {
@@ -1928,9 +1921,7 @@ __glChipCreateContext(
     initLineStipplePatch(gc, chipCtx);
 #endif
     gcmONERROR(gcChipInitDeafultObjects(gc));
-#if VIVANTE_PROFILER
-    gcChipInitializeProfiler(gc);
-#endif
+    gcmONERROR(gcChipProfilerInitialize(gc));
 
     dpGlobalInfo.numContext++;
 

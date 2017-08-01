@@ -372,8 +372,6 @@ gcoSTREAM_Construct(
         stream->node.pool           = gcvPOOL_UNKNOWN;
         stream->node.valid          = gcvFALSE;
         stream->node.logical        = gcvNULL;
-        stream->node.lockCount      = 0;
-        stream->node.lockedInKernel = 0;
         stream->size                = 0;
         stream->stride              = 0;
         stream->lastStart           = 0;
@@ -543,7 +541,7 @@ gcoSTREAM_GetFence(
 
     if (Stream)
     {
-        status = gcsSURF_NODE_GetFence(&Stream->node, gcvFENCE_TYPE_READ);
+        status = gcsSURF_NODE_GetFence(&Stream->node, gcvENGINE_RENDER, gcvFENCE_TYPE_READ);
     }
 
     gcmFOOTER();
@@ -560,7 +558,7 @@ gcoSTREAM_WaitFence(
 
     if (Stream)
     {
-        status = gcsSURF_NODE_WaitFence(&Stream->node, gcvFENCE_TYPE_ALL);
+        status = gcsSURF_NODE_WaitFence(&Stream->node, gcvENGINE_CPU, gcvENGINE_RENDER, gcvFENCE_TYPE_ALL);
     }
 
     gcmFOOTER();
@@ -781,6 +779,71 @@ gcoSTREAM_Upload(
 
     gcmPROFILE_GC(GLVERTEX_OBJECT_BYTES, bytes32);
 
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoSTREAM_ReAllocBufNode(
+    IN gcoSTREAM Stream
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsSURF_NODE tmpMemory;
+    gctUINT32 alignment;
+
+    gcmHEADER();
+
+    /* Query the stream alignment. */
+    gcmONERROR(
+        gcoHARDWARE_QueryStreamCaps(gcvNULL,
+                                    gcvNULL,
+                                    gcvNULL,
+                                    gcvNULL,
+                                    &alignment,
+                                    gcvNULL));
+
+    /* Allocate the linear memory. */
+    gcmONERROR(gcsSURF_NODE_Construct(&tmpMemory,
+                                      Stream->size,
+                                      alignment,
+                                      gcvSURF_VERTEX,
+                                      gcvALLOC_FLAG_NONE,
+                                      gcvPOOL_DEFAULT
+                                      ));
+
+    /* Lock the memory. */
+    gcmONERROR(gcoHARDWARE_Lock(&tmpMemory,
+                                gcvNULL,
+                                gcvNULL
+                                ));
+
+    /* Copy user buffer to stream memory. */
+    gcoOS_MemCopyFast(
+        (gctUINT8 *) tmpMemory.logical,
+        (gctUINT8 *) Stream->node.logical,
+        Stream->size
+        );
+
+    /* Free old node. */
+    gcmONERROR(_FreeMemory(Stream));
+
+    gcmDUMP_BUFFER(gcvNULL,
+                   "stream",
+                   gcsSURF_NODE_GetHWAddress(&tmpMemory),
+                   tmpMemory.logical,
+                   0,
+                   Stream->size);
+
+    /* update Node.*/
+    Stream->node = tmpMemory;
+
+    /* Success. */
+    gcmFOOTER();
+    return gcvSTATUS_OK;
+
+OnError:
     /* Return the status. */
     gcmFOOTER();
     return status;
@@ -2622,6 +2685,7 @@ gcoSTREAM_UploadDynamic(
 
         /* ...schedule a signal event... */
         iface.command            = gcvHAL_SIGNAL;
+        iface.engine             = gcvENGINE_RENDER;
         iface.u.Signal.signal    = gcmPTR_TO_UINT64(dynamic->signal);
         iface.u.Signal.auxSignal = 0;
         iface.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());
@@ -3735,6 +3799,7 @@ _NewCache(
 
         /* Schedule a signal event. */
         ioctl.command = gcvHAL_SIGNAL;
+        ioctl.engine             = gcvENGINE_RENDER;
         ioctl.u.Signal.signal    = gcmPTR_TO_UINT64(cache->signal);
         ioctl.u.Signal.auxSignal = 0;
         ioctl.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());
@@ -3821,6 +3886,7 @@ static gceSTATUS
 _NewDynamicCache(
     IN gcoSTREAM Stream,
     IN gctUINT   Bytes,
+    IN gctBOOL   bForceVirtual,
     OUT  gcsSTREAM_CACHE_BUFFER_PTR * Cache
     )
 {
@@ -3829,6 +3895,7 @@ _NewDynamicCache(
     gceSTATUS status;
     gctUINT   cacheSize;
     gctPOINTER pointer;
+    gctBOOL bReAlloc = gcvFALSE;
 
     gcmHEADER_ARG("Stream=0x%x", Stream);
 
@@ -3868,6 +3935,7 @@ _NewDynamicCache(
 
         /* Schedule a signal event. */
         ioctl.command = gcvHAL_SIGNAL;
+        ioctl.engine  = gcvENGINE_RENDER;
         ioctl.u.Signal.signal    = gcmPTR_TO_UINT64(cache->signal);
         ioctl.u.Signal.auxSignal = 0;
         ioctl.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());
@@ -3892,7 +3960,9 @@ _NewDynamicCache(
 
     /* Wait for the cache to become ready. */
     status = gcoOS_WaitSignal(gcvNULL, cache->signal, 0);
-    if (status == gcvSTATUS_TIMEOUT || cache->bytes < Bytes)
+
+    bReAlloc = (cache->bytes < Bytes) || bForceVirtual;
+    if (status == gcvSTATUS_TIMEOUT || bReAlloc)
     {
         if (Stream->cacheAllocatedCount == Stream->cacheCount)
         {
@@ -3910,7 +3980,7 @@ _NewDynamicCache(
 
             /* As we have allocate all cache and we still got a wait,
                that means we need enlarge our cache size */
-            if (cache->bytes < gcdSTREAM_CACHE_SIZE)
+            if (cache->bytes <= gcdSTREAM_CACHE_SIZE)
             {
                 /* Destroy the old one */
                 if (cache->dynamicNode != gcvNULL)
@@ -3969,6 +4039,301 @@ _NewDynamicCache(
 
 OnError:
     /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+/* Check the stream pool type, for old mms, we need make sure the all stream from
+   virtual or physic
+*/
+#if OPT_VERTEX_ARRAY
+gceSTATUS
+gcoVERTEX_AdjustStreamPool(
+    IN gcoSTREAM Stream,
+    IN gctUINT BufferCount,
+    IN gcsVERTEXARRAY_BUFFER_PTR Buffers,
+    IN gctUINT AttributeCount,
+    IN gcsVERTEXARRAY_ATTRIBUTE_PTR Attributes,
+    IN gctUINT StreamCount,
+    IN gcsVERTEXARRAY_STREAM_PTR Streams,
+    IN gctUINT First,
+    IN gctUINT Count,
+    IN gctUINT TotalBytes,
+    IN gctBOOL DrawArraysInstanced,
+    IN OUT gctUINT32_PTR Physical,
+    IN OUT gcoSTREAM * OutStream
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT i;
+    gcsVERTEXARRAY_STREAM_PTR streamPtr;
+    gcsVERTEXARRAY_BUFFER_PTR bufferPtr;
+    gctUINT32 base, stride;
+    gctUINT lastPhysical = 0;
+    gctUINT basePhysical = 0;
+    gctBOOL basePhysicalSet = gcvFALSE;
+    gctBOOL bNeedReAllocBufObj = gcvFALSE;
+    gctBOOL bNeedReAllocCache = gcvFALSE;
+    gctBOOL bIn2GAddr = gcvFALSE;
+
+    gcmHEADER();
+
+    /* Process the copied stream first. */
+    for(i = 0, bufferPtr = Buffers; i < BufferCount; ++i, ++bufferPtr)
+    {
+        /* Get stride and offset for this stream. */
+        stride = bufferPtr->stride;
+
+        if (DrawArraysInstanced)
+        {
+            lastPhysical = *Physical + bufferPtr->offset;
+        }
+        else
+        {
+            lastPhysical = *Physical + bufferPtr->offset - (First * stride);
+        }
+
+        if (!basePhysicalSet)
+        {
+            basePhysical = lastPhysical;
+            basePhysicalSet = gcvTRUE;
+        }
+        else if (( basePhysical & 0x80000000) != (lastPhysical & 0x80000000))
+        {
+            bNeedReAllocCache = gcvTRUE;
+            break;
+        }
+    }
+
+    /* Walk all stream objects. */
+    for (i = 0, streamPtr = Streams; i < StreamCount; ++i, ++streamPtr)
+    {
+        /* Check if we have to skip this stream. */
+        if (streamPtr->logical == gcvNULL)
+        {
+            continue;
+        }
+
+        stride  = streamPtr->subStream->stride;
+        base    = streamPtr->attribute->offset;
+
+        if (DrawArraysInstanced)
+        {
+            lastPhysical = streamPtr->physical + base + (First * stride);
+        }
+        else
+        {
+            lastPhysical = streamPtr->physical + base;
+        }
+
+        if (!basePhysicalSet)
+        {
+            basePhysical = lastPhysical;
+            basePhysicalSet = gcvTRUE;
+        }
+        else if (( basePhysical & 0x80000000) != (lastPhysical & 0x80000000))
+        {
+            bNeedReAllocBufObj = gcvTRUE;
+            break;
+        }
+    }
+
+    /* Reallocate memory.*/
+    if (bNeedReAllocCache || bNeedReAllocBufObj)
+    {
+        /* Set flag, indicate allocate behavior when re-alloc / re-bind happen.*/
+        gcoHARDWARE_SetForceVirtual(gcvNULL, gcvTRUE);
+
+        if (bNeedReAllocCache)
+        {
+            /* Copy the vertex data. */
+            status = gcoSTREAM_CacheAttributes(Stream,
+                                               First, Count,
+                                               TotalBytes,
+                                               BufferCount, Buffers,
+                                               AttributeCount, Attributes,
+                                               Physical);
+            if (gcmIS_ERROR(status))
+            {
+                gcmONERROR(gcoSTREAM_UploadUnCacheableAttributes(*OutStream,
+                                                                 First, Count,
+                                                                 TotalBytes,
+                                                                 BufferCount, Buffers,
+                                                                 AttributeCount, Attributes,
+                                                                 Physical,
+                                                                 OutStream));
+            }
+        }
+
+        if (bNeedReAllocBufObj)
+        {
+            for (i = 0, streamPtr = Streams; i < StreamCount; ++i, ++streamPtr)
+            {
+                /* Check if we have to skip this stream. */
+                if (streamPtr->logical == gcvNULL)
+                {
+                    continue;
+                }
+
+                /* re-get physical address, which may be already re-allocated and changed.*/
+                gcoSTREAM_Lock(streamPtr->stream, (gctPOINTER *) &streamPtr->logical, &streamPtr->physical);
+
+                if (DrawArraysInstanced)
+                {
+                    bIn2GAddr = ((streamPtr->physical + (gctUINT32)streamPtr->attribute->offset + First * streamPtr->subStream->stride) & 0x80000000) == 0;
+                }
+                else
+                {
+                    bIn2GAddr = ((streamPtr->physical + (gctUINT32)streamPtr->attribute->offset) & 0x80000000) == 0;
+                }
+
+                if (bIn2GAddr)
+                {
+                    /* re-alloc stream.*/
+                    gcmONERROR(gcoSTREAM_ReAllocBufNode(streamPtr->stream));
+
+                    /* Update stream data.*/
+                    gcoSTREAM_Lock(streamPtr->stream, (gctPOINTER *) &streamPtr->logical, &streamPtr->physical);
+                }
+            }
+        }
+    }
+
+    gcmFOOTER();
+    return gcvSTATUS_OK;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+#endif
+
+gceSTATUS
+gcoVERTEX_AdjustStreamPoolEx(
+    IN gcoSTREAM Stream,
+    IN gcsVERTEXARRAY_BUFOBJ_PTR Streams,
+    IN gctUINT StreamCount,
+    IN gctUINT StartVertex,
+    IN gctUINT FirstCopied,
+    IN gctBOOL DrawElements,
+    IN OUT gcoSTREAM * UncacheableStream
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT stride;
+    gctUINT32 base;
+    gctUINT stream;
+    gcsVERTEXARRAY_BUFOBJ_PTR streamPtr = gcvNULL;
+    gctBOOL basePhySet = gcvFALSE;
+    gctUINT32 basePhysical = 0;
+    gctUINT32 lastPhysical = 0;
+    gctBOOL bIn2GAddr = gcvFALSE;
+    gctBOOL bNeedReAllocBufObj = gcvFALSE;
+    gctBOOL bNeedReAllocCache = gcvFALSE;
+    gctBOOL bForceVirtual = gcvFALSE;
+    gcsSURF_NODE_PTR node = gcvNULL;
+
+    gcmHEADER();
+
+    /**************************** setp 1 ************************************************************
+    ** check stream
+    **/
+    for (stream = 0, streamPtr = Streams; stream < StreamCount; streamPtr = streamPtr->next, ++stream)
+    {
+        /* Check if we have to skip this stream. */
+        if (streamPtr->logical == gcvNULL)
+        {
+            continue;
+        }
+
+        stride = streamPtr->stream == gcvNULL ? streamPtr->dynamicCacheStride : streamPtr->stride;
+        base   = (gctUINT32)streamPtr->attributePtr->offset;
+
+        if (streamPtr->stream != gcvNULL)
+        {
+            lastPhysical = streamPtr->physical + base;
+            /* update info.*/
+            bIn2GAddr = ((lastPhysical & 0x80000000) == 0);
+            bNeedReAllocBufObj |= bIn2GAddr;
+        }
+        else
+        {
+            if (DrawElements)
+            {
+                lastPhysical = streamPtr->physical + base - ((StartVertex + FirstCopied) * stride);
+            }
+            else
+            {
+                lastPhysical = streamPtr->physical + base - (FirstCopied * stride);
+            }
+
+            /* update info.*/
+            bIn2GAddr = ((lastPhysical & 0x80000000) == 0);
+            bNeedReAllocCache |= bIn2GAddr;
+        }
+
+        if (!basePhySet)
+        {
+            basePhysical = lastPhysical;
+            basePhySet = gcvTRUE;
+        }
+        else if (( basePhysical & 0x80000000) != (lastPhysical & 0x80000000))
+        {
+            bForceVirtual = gcvTRUE;
+        }
+    }
+
+    /**************************** setp 2 ************************************************************
+    ** Force virtual, re-alloc memory
+    **/
+    if (bForceVirtual)
+    {
+        /* Set flag, indicate allocate behavior when re-alloc / re-bind happen.*/
+        gcoHARDWARE_SetForceVirtual(gcvNULL, gcvTRUE);
+
+        if (bNeedReAllocBufObj)
+        {
+            for (stream = 0, streamPtr = Streams; stream < StreamCount; streamPtr = streamPtr->next, ++stream)
+            {
+                if (streamPtr->stream != gcvNULL)
+                {
+                    /* re-get physical address, which may be already re-allocated and changed.*/
+                    gcoBUFOBJ_FastLock(streamPtr->stream, &streamPtr->physical, (gctPOINTER *) &streamPtr->logical);
+                    gcoBUFOBJ_GetNode(streamPtr->stream, &node);
+                    streamPtr->nodePtr = node;
+
+                    bIn2GAddr = ((streamPtr->physical + (gctUINT32)streamPtr->attributePtr->offset) & 0x80000000) == 0;
+
+                    if (bIn2GAddr)
+                    {
+                        /* re-alloc stream.*/
+                        gcmONERROR(gcoBUFOBJ_ReAllocBufNode(streamPtr->stream));
+
+                        /* Update stream data.*/
+                        gcoBUFOBJ_FastLock(streamPtr->stream, &streamPtr->physical, (gctPOINTER *) &streamPtr->logical);
+                        gcoBUFOBJ_GetNode(streamPtr->stream, &node);
+                        streamPtr->nodePtr = node;
+                    }
+                }
+            }
+        }
+
+        if (bNeedReAllocCache)
+        {
+            /* re-bind dynamic cache.*/
+            gcmONERROR(gcoSTREAM_CacheAttributesEx(Stream,
+                                                   StreamCount,
+                                                   Streams,
+                                                   FirstCopied,
+                                                   UncacheableStream
+                                                   ));
+        }
+    }
+
+    gcmFOOTER();
+    return gcvSTATUS_OK;
+
+OnError:
     gcmFOOTER();
     return status;
 }
@@ -4395,6 +4760,8 @@ gcoSTREAM_DynamicCacheAttributes(
     gcsSTREAM_CACHE_BUFFER_PTR cache = gcvNULL;
     gctUINT offset;
     gctSIZE_T copiedBytes = 0;
+    gctUINT32 address;
+    gctBOOL bForceVirtual = gcvFALSE;
 
     gcmHEADER_ARG("Stream=0x%x First=%u Count=%u Bytes=%u BufferCount=%u "
                   "Buffers=0x%x AttributeCount=%u Attributes=0x%x",
@@ -4417,11 +4784,20 @@ gcoSTREAM_DynamicCacheAttributes(
        gcmONERROR(gcvSTATUS_INVALID_REQUEST);
     }
 
+    if (cache->dynamicNode != gcvNULL)
+    {
+        gcmGETHARDWAREADDRESS(*(cache->dynamicNode), address);
+
+        gcoHARDWARE_GetForceVirtual(gcvNULL, &bForceVirtual);
+        /* Need virtual pool, but current cache is physical.*/
+        bForceVirtual = bForceVirtual && (((address + cache->offset) & 0x80000000) == 0);
+    }
+
     /* Check if the stream will fit in the current cache. */
-    if (Bytes > cache->free)
+    if (Bytes > cache->free || bForceVirtual)
     {
         /* Move to a new cache. */
-        gcmONERROR(_NewDynamicCache(Stream, Bytes, &cache));
+        gcmONERROR(_NewDynamicCache(Stream, Bytes, bForceVirtual, &cache));
     }
 
     /* Allocate data form the cache. */
@@ -4482,6 +4858,7 @@ gcoSTREAM_DynamicCacheAttributesEx(
     gctUINT offset;
     gctSIZE_T copiedBytes = 0;
     gctUINT32 address;
+    gctBOOL bForceVirtual = gcvFALSE;
 
     gcmHEADER_ARG("Stream=0x%x StreamCount=%u Streams=0x%x First=%u ",
                   Stream, StreamCount, Streams, First);
@@ -4494,11 +4871,19 @@ gcoSTREAM_DynamicCacheAttributesEx(
     /* Index current cache. */
     cache = &Stream->cache[Stream->cacheCurrent];
 
+    if (cache->dynamicNode != gcvNULL)
+    {
+        gcmGETHARDWAREADDRESS(*(cache->dynamicNode), address);
+
+        gcoHARDWARE_GetForceVirtual(gcvNULL, &bForceVirtual);
+        /* Need virtual pool, but current cache is physical.*/
+        bForceVirtual = bForceVirtual && (((address + cache->offset) & 0x80000000) == 0);
+    }
     /* Check if the stream will fit in the current cache. */
-    if (TotalBytes > cache->free)
+    if (TotalBytes > cache->free || bForceVirtual)
     {
         /* Move to a new cache. */
-        gcmONERROR(_NewDynamicCache(Stream, TotalBytes, &cache));
+        gcmONERROR(_NewDynamicCache(Stream, TotalBytes, bForceVirtual, &cache));
     }
 
     /* Allocate data form the cache. */

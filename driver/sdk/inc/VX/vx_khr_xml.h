@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Khronos Group Inc.
+ * Copyright (c) 2012-2016 The Khronos Group Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and/or associated documentation files (the
@@ -11,6 +11,11 @@
  *
  * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Materials.
+ *
+ * MODIFICATIONS TO THIS FILE MAY MEAN IT NO LONGER ACCURATELY REFLECTS
+ * KHRONOS STANDARDS. THE UNMODIFIED, NORMATIVE VERSIONS OF KHRONOS
+ * SPECIFICATIONS AND HEADER INFORMATION ARE LOCATED AT
+ *    https://www.khronos.org/registry/
  *
  * THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
@@ -35,22 +40,6 @@
 
 #include <VX/vx.h>
 
-/*! \brief Defines the maximum number of characters in a reference name string.
- * \ingroup group_xml
- * \see vxSetReferenceName
- * \see vxGetImportReferenceByName
- */
-#define VX_MAX_REFERENCE_NAME (64)
-
-/*! \brief Extended reference attribute list.
- *          This extension adds new attributes that can be queried by the
- *          \ref <tt>vxQueryReference</tt> function.
- * \ingroup group_xml
- */
-enum vx_ext_import_reference_attribute_e {
-    /*! \brief Used to query the reference for its name. Use a <tt>\ref *vx_char</tt> parameter. */
-    VX_REF_ATTRIBUTE_NAME = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_REFERENCE) + 0x2,
-};
 
 /*! \brief The Object Type Enumeration for Imports.
  * \ingroup group_xml
@@ -97,7 +86,7 @@ extern "C" {
  * should be inclusive from index number 0 to [number of references - 1]. For example,
  * if there are 20 references in the xml file, none of the reference indices should be >= 20.
  * \return A <tt>\ref vx_status_e</tt> enumeration.
- * \see https://www.khronos.org/registry/vx/schema/openvx-1-0.xsd
+ * \see https://www.khronos.org/registry/vx/schema/openvx-1-1.xsd
  * \ingroup group_xml
  */
 VX_API_ENTRY vx_status VX_API_CALL vxExportToXML(vx_context context, vx_char xmlfile[]);
@@ -114,35 +103,11 @@ VX_API_ENTRY vx_status VX_API_CALL vxExportToXML(vx_context context, vx_char xml
  * all references of interest have been retrieved, this import obects should be released using
  * <tt>\ref vxReleaseImport</tt>.
  * \return \ref vx_import object containing references to the imported objects in the context
- * \see https://www.khronos.org/registry/vx/schema/openvx-1-0.xsd
+ * \see https://www.khronos.org/registry/vx/schema/openvx-1-1.xsd
  * \ingroup group_xml
  */
 VX_API_ENTRY vx_import VX_API_CALL vxImportFromXML(vx_context context, vx_char xmlfile[]);
 
-/*! \brief Name a reference
- * \ingroup group_xml
- *
- * This function is used to associate a name to a reference. This name
- * can be used by the OpenVX implementation in log messages and any
- * other reporting mechanisms.  It is also intended to be used by
- * <tt>\ref vxGetImportReferenceByName</tt> to retrieve a named reference from
- * a \ref vx_import object.
- *
- * The OpenVX implementation will not check if the name is unique in
- * the reference scope (context or graph). Several references can then
- * have the same name.
- *
- * \param [in] ref The reference to name.
- * \param [in] name Pointer to the '\0' terminated string that identifies
- *             the reference.
- *             The string is copied by the function so that it
- *             stays the property of the caller.
- *             NULL means that the reference is not named.
- * \return A \ref vx_status_e enumeration.
- * \retval VX_SUCCESS No errors.
- * \retval VX_ERROR_INVALID_REFERENCE if reference is not valid.
- */
-VX_API_ENTRY vx_status VX_API_CALL vxSetReferenceName(vx_reference ref, const vx_char *name);
 
 /*! \brief Used to retrieve a reference by name from the import when the name is known beforehand.  If
  *  multiple references have the same name, then *any* one of them may be returned.
@@ -196,17 +161,6 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryImport(vx_import import, vx_enum attri
  */
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseImport(vx_import *import);
 
-/*! \brief Releases a reference.
- * The object may not be garbage collected until its total reference count is zero.
- * \param [in] ref The pointer to the reference to release.
- * \return A <tt>\ref vx_status_e</tt> enumeration.
- * \retval VX_SUCCESS No errors.
- * \retval VX_ERROR_INVALID_REFERENCE If reference is not a <tt>\ref vx_reference</tt>.
- * \note After returning from this function the reference will be zeroed.
- * \pre <tt>\ref vxGetImportReferenceByName</tt> or <tt>\ref vxGetImportReferenceByIndex</tt>
- * \ingroup group_xml
- */
-VX_API_ENTRY vx_status VX_API_CALL vxReleaseReference(vx_reference *ref);
 
 #ifdef __cplusplus
 }

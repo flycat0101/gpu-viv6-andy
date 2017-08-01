@@ -27,18 +27,9 @@ static struct _cl_platform_id _platform =
     gcvNULL,                    /* Contexts. */
     "Vivante OpenCL Platform"   /* Platform name. */,
     "Vivante Corporation"       /* Vendor name. */,
-#if BUILD_OPENCL_12
-    "OpenCL 1.2 V" gcvVERSION_STRING               /* Version name. */,
-    "OpenCL C 1.2 "             /* C Version name. */,
-#else
-    "OpenCL 1.1 V" gcvVERSION_STRING               /* Version name. */,
-    "OpenCL C 1.1 "             /* C Version name. */,
-#endif
-#if BUILD_OPENCL_FP
+    gcvNULL                     /* Version name. */,
+    gcvNULL                     /* C Version name. */,
     "FULL_PROFILE",             /* Profile          */
-#else
-    "EMBEDDED_PROFILE",         /* Profile          */
-#endif
     "cl_khr_icd",               /* Extensions. */
     "viv",                      /* ICD Extensioin suffix. */
 
@@ -57,6 +48,11 @@ gcsATOM_PTR clgGlobalId = gcvNULL;
 
 gceTRACEMODE vclTraceMode = gcvTRACEMODE_NONE;
 
+#define __clApiNameStr(func)  #func
+char *__clTracerFuncNames[] = {
+    __CL_API_ENTRY(__clApiNameStr)
+};
+
 /*****************************************************************************\
 |*                         Supporting functions                              *|
 \*****************************************************************************/
@@ -72,7 +68,60 @@ cl_bool clfInitTracerDispatchTable()
             vclTracerDispatchTable = vclLogFunctionTable;
         }
         break;
+    case gcvTRACEMODE_LOGGER:
+        {
+            gctHANDLE trlib = gcvNULL;
+            cl_int tableSize = 0;
+            gctPOINTER funcPtr = gcvNULL;
+            gceSTATUS status;
+            char trApiName[80];
+            int i = 0;
 
+#if defined(_WIN32) || defined(_WIN32_WCE)
+            gcoOS_LoadLibrary(gcvNULL, "libGLES_vlogger.dll", &trlib);
+#else
+            gcoOS_LoadLibrary(gcvNULL, "libGLES_vlogger.so", &trlib);
+#endif
+
+            if (trlib  == gcvNULL)
+            {
+#if defined(_WIN32) || defined(_WIN32_WCE)
+                gcoOS_Print("Failed to open libGLES_vlogger.dll!\n");
+#else
+                gcoOS_Print("Failed to open libGLES_vlogger.so!\n");
+#endif
+
+                /* Clear vclTracerDispatchTable[] */
+                memset(&vclTracerDispatchTable, 0, sizeof(clsTracerDispatchTableStruct));
+
+                return CL_FALSE;
+            }
+            tableSize = (cl_int)(sizeof(vclTracerDispatchTable) / sizeof(void*));
+
+            for (i = 0; i < tableSize; ++i)
+            {
+                trApiName[0] = '\0';
+                gcoOS_StrCatSafe(trApiName, 80, "TR_cl");
+                gcoOS_StrCatSafe(trApiName, 80, __clTracerFuncNames[i]);
+                status =  gcoOS_GetProcAddress(gcvNULL, trlib, trApiName, &funcPtr);
+
+                if (status == gcvSTATUS_OK)
+                {
+                    ((void *(*))(&vclTracerDispatchTable))[i] = funcPtr;
+                }
+                else
+                {
+                    gcoOS_Print("Failed to initialize vclTracerDispatchTable: gl%s!\n", __clTracerFuncNames[i]);
+
+                    /* Clear __glesTracerDispatchTable[] */
+                    /*memset(&vclTracerDispatchTable, 0, sizeof(clsTracerDispatchTableStruct));*/
+
+                    /*gcoOS_FreeLibrary(gcvNULL, trlib);*/
+                    /*return CL_FALSE;*/
+                }
+            }
+        }
+        break;
      case gcvTRACEMODE_NONE:
      default:
          {
@@ -106,6 +155,10 @@ clfSetTraceMode(
             {
                 vclTraceMode = gcvTRACEMODE_FULL;
             }
+            else if (gcmIS_SUCCESS(gcoOS_StrCmp(tracemode, "2")))
+            {
+                vclTraceMode = gcvTRACEMODE_LOGGER;
+            }
             else
             {
                 gcmPRINT("OCL: unsupported trace mode");
@@ -124,19 +177,19 @@ clfGetDefaultPlatformID(
     )
 {
     gctINT           status;
+    static gcsATOM_PTR delay = gcvNULL;
+    gcmDECLARE_SWITCHVARS ;
 
     gcmHEADER_ARG("Platform=%p", Platform);
 
     if (clgDefaultPlatform == gcvNULL)
     {
-        static gcsATOM_PTR delay = gcvNULL;
         static gctINT32  delayCount = -1;
-#if BUILD_OPENCL_FP
         gctSTRING epProfile = "EMBEDDED_PROFILE";
         gceCHIPMODEL  chipModel;
         gctUINT32 chipRevision;
-        gctBOOL chipEnableFP = gcvFALSE;
-#endif
+        gctBOOL chipEnableEP = gcvFALSE;
+        gctBOOL version11 = gcvFALSE;
 
         clgDefaultPlatform = &_platform;
         if (delay == gcvNULL)
@@ -152,22 +205,42 @@ clfGetDefaultPlatformID(
            clmONERROR(gcoOS_AtomDestroy(gcvNULL, delay), CL_INVALID_VALUE);
         }
 
-        gcoCL_SetHardware();
-#if BUILD_OPENCL_FP
+
+        gcoHAL_SetHardwareType(gcvNULL,gcvHARDWARE_3D); /* cl used the 3d type!*/
+        gcmSWITCH_TO_DEFAULT();
+        gcoCL_InitializeHardware(); /*Init cl hardware for default hw */
         gcoHAL_QueryChipIdentity(gcvNULL,&chipModel,&chipRevision,gcvNULL,gcvNULL);
-        chipEnableFP = ((chipModel == gcv2500 && chipRevision == 0x5422) ||
-                        (chipModel == gcv3000 && chipRevision == 0x5435) ||
-                        (chipModel == gcv7000));
+        chipEnableEP = ((chipModel == gcv1500 && chipRevision == 0x5246) ||
+                        (chipModel == gcv3000 && chipRevision == 0x5450) ||
+                        (chipModel == gcv2000 && chipRevision == 0x5108) ||
+                        (chipModel == gcv3000 && chipRevision == 0x5513) ||
+                        (chipModel == gcv5000));
         if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) ||
            (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE)   ||
-           (chipEnableFP == gcvFALSE))
+           chipEnableEP)
         {
             /*if the features on the platform are not availble, still report embedded profile even if BUILD_OPENCL_FP is 1*/
             clgDefaultPlatform->profile = epProfile;
         }
-#endif
+
+         version11 = ((chipModel == gcv1500 && chipRevision == 0x5246) ||
+                     (chipModel == gcv3000 && chipRevision == 0x5450) ||
+                     (chipModel == gcv2000 && chipRevision == 0x5108) ||
+                     (chipModel == gcv3000 && chipRevision == 0x5513));
+        if(version11)
+        {
+            clgDefaultPlatform->version = clfVERSION11;
+            clgDefaultPlatform->Cversion = clcVERSION11;
+        }
+        else
+        {
+            clgDefaultPlatform->version = clfVERSION12;
+            clgDefaultPlatform->Cversion = clcVERSION12;
+        }
+
         clmONERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &clgDefaultPlatform->hwCfg), CL_INVALID_VALUE);
         clmONERROR(gcoHAL_GetPatchID(gcvNULL, &clgDefaultPlatform->patchId), CL_INVALID_VALUE);
+        gcmRESTORE_HW();
     }
 
     if (clgGlobalId == gcvNULL)
@@ -184,6 +257,14 @@ clfGetDefaultPlatformID(
     return;
 
 OnError:
+    if(delay) gcoOS_AtomDestroy(gcvNULL, delay);
+
+
+    if(clgGlobalId) gcoOS_AtomDestroy(gcvNULL, clgGlobalId);
+
+    if(clgDefaultPlatform->compilerMutex) gcoOS_DeleteMutex(gcvNULL, clgDefaultPlatform->compilerMutex);
+
+    gcmRESTORE_HW();
     gcmFOOTER();
     return;
 }

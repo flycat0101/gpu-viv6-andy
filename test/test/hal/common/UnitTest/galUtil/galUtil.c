@@ -65,7 +65,6 @@ static int            write_dword(FILE *fp, unsigned int dw);
 static int            write_long(FILE *fp, int l);
 
 static unsigned short swap_word(unsigned short w);
-static unsigned int   swap_dword(unsigned int dw);
 
 static gceSTATUS
 ConvertToGalTiling(
@@ -534,10 +533,6 @@ static unsigned short swap_word(unsigned short w)
     return ((w << 8) | (w >> 8));
 }
 
-static unsigned int swap_dword(unsigned int dw)
-{
-    return gcmSWAB32(dw);
-}
 
 /*
  *  Output runtime data/message. They will be saved in corresponding files.

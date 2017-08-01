@@ -1730,17 +1730,17 @@ _VIR_LoopInfo_IdentifyBasicIVs(
                                     diff = VIR_IV_GetDiff(iv);
                                         if(VIR_Operand_isImm(addSrc1))
                                         {
-                                        if(VIR_TypeId_isFloat(VIR_Operand_GetType(addSrc1)))
+                                        if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(addSrc1)))
                                             {
                                             diff->type = VIR_TYPE_FLOAT32;
                                             diff->value.scalarVal.fValue = VIR_Operand_GetImmediateFloat(addSrc1);
                                             }
-                                        else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetType(addSrc1)))
+                                        else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(addSrc1)))
                                             {
                                             diff->type = VIR_TYPE_INT32;
                                             diff->value.scalarVal.iValue = VIR_Operand_GetImmediateInt(addSrc1);
                                             }
-                                        else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetType(addSrc1)))
+                                        else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(addSrc1)))
                                             {
                                             diff->type = VIR_TYPE_UINT32;
                                             diff->value.scalarVal.uValue = VIR_Operand_GetImmediateUint(addSrc1);
@@ -1787,17 +1787,17 @@ _VIR_LoopInfo_IdentifyBasicIVs(
                                     diff = VIR_IV_GetDiff(iv);
                                         if(VIR_Operand_isImm(addSrc0))
                                         {
-                                        if(VIR_TypeId_isFloat(VIR_Operand_GetType(addSrc0)))
+                                        if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(addSrc0)))
                                             {
                                             diff->type = VIR_TYPE_FLOAT32;
                                             diff->value.scalarVal.fValue = VIR_Operand_GetImmediateFloat(addSrc0);
                                             }
-                                        else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetType(addSrc0)))
+                                        else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(addSrc0)))
                                             {
                                             diff->type = VIR_TYPE_INT32;
                                             diff->value.scalarVal.iValue = VIR_Operand_GetImmediateInt(addSrc0);
                                             }
-                                        else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetType(addSrc0)))
+                                        else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(addSrc0)))
                                             {
                                             diff->type = VIR_TYPE_UINT32;
                                             diff->value.scalarVal.uValue = VIR_Operand_GetImmediateUint(addSrc0);
@@ -1852,12 +1852,12 @@ _VIR_LoopInfo_IdentifyBasicIVs(
                                     diff = VIR_IV_GetDiff(iv);
                                     if(VIR_Operand_isImm(subSrc1))
                                     {
-                                        if(VIR_TypeId_isFloat(VIR_Operand_GetType(subSrc1)))
+                                        if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(subSrc1)))
                                         {
                                             diff->type = VIR_TYPE_FLOAT32;
                                             diff->value.scalarVal.fValue = -VIR_Operand_GetImmediateFloat(subSrc1);
                                             }
-                                        else if(VIR_TypeId_isInteger(VIR_Operand_GetType(subSrc1)))
+                                        else if(VIR_TypeId_isInteger(VIR_Operand_GetTypeId(subSrc1)))
                                             {
                                             diff->type = VIR_TYPE_INT32;
                                             diff->value.scalarVal.iValue = -VIR_Operand_GetImmediateInt(subSrc1);
@@ -3267,17 +3267,17 @@ _VIR_LoopInfo_DetectLoopUpbound(
                         {
                             VIR_Const* upboundConst = VIR_LoopUpbound_GetUpboundConst(upbound);
 
-                        if(VIR_TypeId_isFloat(VIR_Operand_GetType(cmpSrc1)))
+                        if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(cmpSrc1)))
                             {
                                 upboundConst->type = VIR_TYPE_FLOAT32;
                                 upboundConst->value.scalarVal.fValue = VIR_Operand_GetImmediateFloat(cmpSrc1);
                             }
-                        else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetType(cmpSrc1)))
+                        else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(cmpSrc1)))
                             {
                                 upboundConst->type = VIR_TYPE_INT32;
                                 upboundConst->value.scalarVal.iValue = VIR_Operand_GetImmediateInt(cmpSrc1);
                             }
-                        else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetType(cmpSrc1)))
+                        else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(cmpSrc1)))
                             {
                                 upboundConst->type = VIR_TYPE_UINT32;
                                 upboundConst->value.scalarVal.uValue = VIR_Operand_GetImmediateUint(cmpSrc1);
@@ -3353,17 +3353,17 @@ _VIR_LoopInfo_DetectLoopUpbound(
                     {
                         VIR_Const* upboundConst = VIR_LoopUpbound_GetUpboundConst(upbound);
 
-                    if(VIR_TypeId_isFloat(VIR_Operand_GetType(jmpcSrc1)))
+                    if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(jmpcSrc1)))
                         {
                             upboundConst->type = VIR_TYPE_FLOAT32;
                             upboundConst->value.scalarVal.fValue = VIR_Operand_GetImmediateFloat(jmpcSrc1);
                         }
-                    else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetType(jmpcSrc1)))
+                    else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(jmpcSrc1)))
                         {
                             upboundConst->type = VIR_TYPE_INT32;
                             upboundConst->value.scalarVal.iValue = VIR_Operand_GetImmediateInt(jmpcSrc1);
                         }
-                    else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetType(jmpcSrc1)))
+                    else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(jmpcSrc1)))
                         {
                             upboundConst->type = VIR_TYPE_UINT32;
                             upboundConst->value.scalarVal.uValue = VIR_Operand_GetImmediateUint(jmpcSrc1);
@@ -3462,17 +3462,17 @@ _VIR_LoopInfo_DetectLoopLowbound(
                         {
                             VIR_Const* lowboundConst = VIR_LoopLowbound_GetLowboundConst(lowbound);
 
-                            if(VIR_TypeId_isFloat(VIR_Operand_GetType(src)))
+                            if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(src)))
                             {
                                 lowboundConst->type = VIR_TYPE_FLOAT32;
                                 lowboundConst->value.scalarVal.fValue = VIR_Operand_GetImmediateFloat(src);
                             }
-                            else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetType(src)))
+                            else if(VIR_TypeId_isSignedInteger(VIR_Operand_GetTypeId(src)))
                             {
                                 lowboundConst->type = VIR_TYPE_INT32;
                                 lowboundConst->value.scalarVal.iValue = VIR_Operand_GetImmediateInt(src);
                             }
-                            else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetType(src)))
+                            else if(VIR_TypeId_isUnSignedInteger(VIR_Operand_GetTypeId(src)))
                             {
                                 lowboundConst->type = VIR_TYPE_UINT32;
                                 lowboundConst->value.scalarVal.uValue = VIR_Operand_GetImmediateUint(src);

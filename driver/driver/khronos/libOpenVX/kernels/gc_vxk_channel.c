@@ -40,9 +40,9 @@ vx_status vxChannelCombine(vx_node node, vx_image inputs[4], vx_image output)
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(output, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(output, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
-    vxQueryImage(output, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
+    vxQueryImage(output, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(output, VX_IMAGE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(output, VX_IMAGE_FORMAT, &format, sizeof(format));
 
     switch (format)
     {
@@ -211,9 +211,9 @@ vx_status vxChannelCombine(vx_node node, vx_image inputs[4], vx_image output)
 
     kernelContext->params.kernel = gcvVX_KERNEL_CHANNEL_COMBINE;
 #if gcdVX_OPTIMIZER
-    kernelContext->borders = VX_BORDER_MODE_CONSTANT;
+    kernelContext->borders = VX_BORDER_CONSTANT;
 #else
-    kernelContext->params.borders = VX_BORDER_MODE_CONSTANT;
+    kernelContext->params.borders = VX_BORDER_CONSTANT;
 #endif
     kernelContext->params.constant_value = 0;
     kernelContext->params.row = width;
@@ -260,9 +260,9 @@ vx_status vxChannelExtract(vx_node node, vx_image src, vx_scalar channel, vx_ima
     }
 
     vxReadScalarValue(channel, &chan);
-    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
-    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(src, VX_IMAGE_FORMAT, &format, sizeof(format));
+    vxQueryImage(src, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(src, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
     if (format == VX_DF_IMAGE_RGB)
     {
@@ -543,9 +543,9 @@ vx_status vxChannelExtract(vx_node node, vx_image src, vx_scalar channel, vx_ima
     kernelContext->uniform_num = 1;
 
 #if gcdVX_OPTIMIZER
-    kernelContext->borders = VX_BORDER_MODE_CONSTANT;
+    kernelContext->borders = VX_BORDER_CONSTANT;
 #else
-    kernelContext->params.borders = VX_BORDER_MODE_CONSTANT;
+    kernelContext->params.borders = VX_BORDER_CONSTANT;
 #endif
     kernelContext->params.constant_value = 0;
     kernelContext->params.row = width;

@@ -11,6 +11,9 @@
 *****************************************************************************/
 
 
+#ifdef __QNXNTO__
+#include <ctype.h>
+#endif
 #include <gc_vx_common.h>
 
 #define VX_TRACE_BUFFER_COUNT      2048
@@ -151,6 +154,24 @@ VX_INTERNAL_API vx_string vxStrDup(vx_const_string string)
     gcoOS_StrDup(gcvNULL, string, &target);
 
     return target;
+}
+
+VX_INTERNAL_API vx_bool vxStrToLower(vx_const_string srcString, vx_string lowerString)
+{
+    if (srcString != VX_NULL && lowerString!= VX_NULL)
+    {
+        vx_uint32 i;
+
+        /* to lower case */
+        for (i = 0; srcString[i] != 0; i++)
+        {
+            lowerString[i] = (char)tolower(srcString[i]);
+        }
+
+        return vx_true_e;
+    }
+
+    return vx_false_e;
 }
 
 /* Mutex APIs */

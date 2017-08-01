@@ -70,9 +70,7 @@ static void * vk_dso = NULL;
 
 static void hwvulkan_device_init(void)
 {
-    PFN_vkVoidFunction * drv;
-
-    static char * vklib[] =
+    const char * vklib[] =
     {
         "libvulkan_" GPU_VENDOR ".so",
         "/system/vendor/lib/libvulkan_" GPU_VENDOR ".so",

@@ -47,12 +47,7 @@ include $(MKFILES_ROOT)/qmacros.mk
 
 LIBS += GAL VSC CLC OpenCL LLVM_viv
 
-ifneq ($(filter v7, $(VARIANT_LIST)), v7)
-	CCFLAGS += -mfpu=vfp -mfloat-abi=softfp
-	LIBS += m-vfp
-else
-	LIBS += m
-endif
+include $(qnx_build_dir)/math.mk
 
 INSTALLDIR=$(firstword $(INSTALLDIR_$(OS)) samples/cl11/UnitTest)
 

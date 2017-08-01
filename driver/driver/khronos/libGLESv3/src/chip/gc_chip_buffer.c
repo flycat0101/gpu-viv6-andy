@@ -166,6 +166,10 @@ static __GLchipFmtMapInfo __glChipFmtMapInfo[__GL_FMT_MAX + 1] =
     __GL_INITIALIZE_FORMAT_MAP_INFO_WITH_FLAGS(gcvSURF_X8R8G8B8, __GL_CHIP_FMTFLAGS_FMT_DIFF_CORE_REQ), /* __GL_FMT_RGBX8 */
 
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_X8R8G8B8),      /* __GL_FMT_BGRX8 */
+    __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_A4R4G4B4),      /* __GL_FMT_ARGB4 */
+    __GL_INITIALIZE_FORMAT_MAP_INFO_WITH_FLAGS(gcvSURF_A4R4G4B4, __GL_CHIP_FMTFLAGS_FMT_DIFF_CORE_REQ), /* __GL_FMT_ABGR4 */
+    __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_X4R4G4B4),      /* __GL_FMT_XRGB4 */
+    __GL_INITIALIZE_FORMAT_MAP_INFO_WITH_FLAGS(gcvSURF_X4R4G4B4, __GL_CHIP_FMTFLAGS_FMT_DIFF_CORE_REQ), /* __GL_FMT_XBGR4 */
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_A32F),           /* __GL_FMT_A32F */
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_L32F),           /* __GL_FMT_L32F */
     __GL_INITIALIZE_FORMAT_MAP_INFO_DEFAULT(gcvSURF_A32L32F),        /* __GL_FMT_LA32F */
@@ -280,6 +284,7 @@ gcChipInitFormatMapInfo(
     GLuint patch8bitMsaaCount        = 0;
     GLuint patchD32FCount            = 0;
     GLuint patchAstcCount            = 0;
+    GLuint patchAlpha8Count          = 0;
     GLuint patchFmtMapInfoCount      = 0;
     static __GLApiVersion initializedVer = __GL_API_VERSION_INVALID;
 
@@ -341,6 +346,11 @@ gcChipInitFormatMapInfo(
         {gcvSURF_ASTC10x10_SRGB,    gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
         {gcvSURF_ASTC12x10_SRGB,    gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
         {gcvSURF_ASTC12x12_SRGB,    gcvSURF_A8R8G8B8, gcvSURF_A8R8G8B8, -1},
+    };
+
+    __GLChipPatchFmt patchAlpha8Formats[] =
+    {
+        {gcvSURF_A8, gcvSURF_A8_1_A8R8G8B8, gcvSURF_UNKNOWN, -1},
     };
 
     GLuint halfFloatTableSize = 0;
@@ -435,6 +445,15 @@ gcChipInitFormatMapInfo(
                 patchAstcCount++;
             }
         }
+
+        for (j = 0; j < gcmCOUNTOF(patchAlpha8Formats); ++j)
+        {
+            if (patchAlpha8Formats[j].requestFormat == __glChipFmtMapInfo[i].requestFormat)
+            {
+                patchAlpha8Formats[j].entry = i;
+                patchAlpha8Count++;
+            }
+        }
     }
 
     /* case0 */
@@ -460,6 +479,9 @@ gcChipInitFormatMapInfo(
 
     /* case7: ASTC */
     patchFmtMapInfoCount += patchAstcCount;
+
+    /* case8 : ALPHA8*/
+    patchFmtMapInfoCount += patchAlpha8Count;
 
     GL_ASSERT(patchFmtMapInfoCount < __GL_CHIP_PATCH_FMT_MAX);
 
@@ -603,6 +625,24 @@ gcChipInitFormatMapInfo(
                 __glChipFmtMapInfo_patch[index].writeFormat   = patchAstcFmts[i].writeFormat;
                 __glChipFmtMapInfo_patch[index].patchCase     = __GL_CHIP_FMT_PATCH_ASTC;
                 __glChipFmtMapInfo_patch[index].flags         = 0;
+
+                gcChipSetFmtMapAttribs(gc, entry, &__glChipFmtMapInfo_patch[index], maxSamples);
+            }
+            index++;
+        }
+
+        for (i = 0; i < gcmCOUNTOF(patchAlpha8Formats); ++i)
+        {
+            GLint entry = patchAlpha8Formats[i].entry;
+
+            GL_ASSERT(entry != -1);
+            if ((entry != -1) && (index < __GL_CHIP_PATCH_FMT_MAX))
+            {
+                __glChipFmtMapInfo_patch[index].requestFormat = patchAlpha8Formats[i].requestFormat;
+                __glChipFmtMapInfo_patch[index].readFormat = patchAlpha8Formats[i].readFormat;
+                __glChipFmtMapInfo_patch[index].writeFormat = patchAlpha8Formats[i].writeFormat;
+                __glChipFmtMapInfo_patch[index].patchCase = __GL_CHIP_FMT_PATCH_ALPHA8;
+                __glChipFmtMapInfo_patch[index].flags = 0;
 
                 gcChipSetFmtMapAttribs(gc, entry, &__glChipFmtMapInfo_patch[index], maxSamples);
             }

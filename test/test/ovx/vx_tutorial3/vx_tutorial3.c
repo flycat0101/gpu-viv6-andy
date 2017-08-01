@@ -138,7 +138,7 @@ vx_status VX_CALLBACK vxcAbsDiffValidateInput(vx_node node, vx_uint32 index);
 vx_status VX_CALLBACK vxcAbsDiffValidateOutput(vx_node node, vx_uint32 index, vx_meta_format meta);
 vx_status VX_CALLBACK vxcAbsDiffInitialize(vx_node node, const vx_reference *parameters, vx_uint32 num);
 vx_status vxcAbsDiffRegisterKernel(vx_context context);
-
+vx_status VX_CALLBACK vxAbsDiffValidator(vx_node node, const vx_reference parameters[], vx_uint32 num, vx_meta_format metas[]);
 int main(int argc, char* argv[])
 {
     /* VX variables */
@@ -165,6 +165,8 @@ int main(int argc, char* argv[])
     u32 fileOffset = 0;
     u32 x = 0, y = 0;
     int i = 0;
+
+    vx_map_id map_id = 0;
 
     /* read image data */
     fFile0 = fopen("left_gray.bmp", "rb");
@@ -296,7 +298,8 @@ int main(int argc, char* argv[])
     /* transfer image from cpu to gpu */
     for (i = 0; i < 2; i++)
     {
-        status = vxAccessImagePatch(imgObj[i], &imgRect, 0, &imgInfo[i], &imgAddr[i], VX_WRITE_ONLY);
+        status = vxMapImagePatch(imgObj[i], &imgRect, 0, &map_id, &imgInfo[i], &imgAddr[i], VX_WRITE_ONLY, VX_MEMORY_TYPE_HOST, 0);
+
         if(status != VX_SUCCESS)
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx vxAccessImagePatch error.");
@@ -319,7 +322,8 @@ int main(int argc, char* argv[])
             }
         }
 
-        status = vxCommitImagePatch(imgObj[i], &imgRect, 0, &(imgInfo[i]), imgAddr[i]);
+        status = vxUnmapImagePatch(imgObj[i], map_id);
+
         if(status != VX_SUCCESS)
         {
             printf("%s:%d, %s\n", __FILE__, __LINE__, "vx vxCommitImagePatch error.");
@@ -339,7 +343,7 @@ int main(int argc, char* argv[])
     }
 
     /* transfer image from gpu to cpu */
-    status = vxAccessImagePatch(imgObj[2], &imgRect, 0, &(imgInfo[2]), &imgAddr[2], VX_READ_ONLY);
+    status = vxMapImagePatch(imgObj[2], &imgRect, 0, &map_id, &(imgInfo[2]), &imgAddr[2], VX_READ_ONLY, VX_MEMORY_TYPE_HOST, 0);
     if(status != VX_SUCCESS)
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "vx vxAccessImagePatch error.");
@@ -363,7 +367,7 @@ int main(int argc, char* argv[])
         }
     }
 
-    status = vxCommitImagePatch(imgObj[2], NULL, 0, &(imgInfo[2]), imgAddr[2]);
+    status = vxUnmapImagePatch(imgObj[2], map_id);
     if(status != VX_SUCCESS)
     {
         printf("%s:%d, %s\n", __FILE__, __LINE__, "vx procedure error.");
@@ -422,10 +426,10 @@ vx_status VX_CALLBACK vxcAbsDiffValidateInput(vx_node node, vx_uint32 index)
     paramObj=vxGetParameterByIndex(node, index);
     if(NULL==paramObj) goto OnError;
 
-    if(VX_SUCCESS!=vxQueryParameter(paramObj, VX_PARAMETER_ATTRIBUTE_REF, &imgObj, sizeof(vx_image)))
+    if(VX_SUCCESS!=vxQueryParameter(paramObj, VX_PARAMETER_REF, &imgObj, sizeof(vx_image)))
         goto OnError;
 
-    if(VX_SUCCESS!=vxQueryImage(imgObj, VX_IMAGE_ATTRIBUTE_FORMAT, &imgFmt, sizeof(imgFmt)))
+    if(VX_SUCCESS!=vxQueryImage(imgObj, VX_IMAGE_FORMAT, &imgFmt, sizeof(imgFmt)))
         goto OnError;
 
     if(VX_DF_IMAGE_U8!=imgFmt)
@@ -453,22 +457,22 @@ vx_status VX_CALLBACK vxcAbsDiffValidateOutput(vx_node node, vx_uint32 index, vx
     paramObj = vxGetParameterByIndex(node, 0);
     if(NULL==paramObj) return VX_ERROR_INVALID_PARAMETERS;
 
-    if(VX_SUCCESS!=vxQueryParameter(paramObj, VX_PARAMETER_ATTRIBUTE_REF, &imgObj, sizeof(vx_image)))
+    if(VX_SUCCESS!=vxQueryParameter(paramObj, VX_PARAMETER_REF, &imgObj, sizeof(vx_image)))
         goto OnError;
 
-    if(VX_SUCCESS!=vxQueryImage(imgObj, VX_IMAGE_ATTRIBUTE_WIDTH, &imgWid, sizeof(imgWid)))
+    if(VX_SUCCESS!=vxQueryImage(imgObj, VX_IMAGE_WIDTH, &imgWid, sizeof(imgWid)))
         goto OnError;
 
-    if(VX_SUCCESS!=vxQueryImage(imgObj, VX_IMAGE_ATTRIBUTE_HEIGHT, &imgHei, sizeof(imgHei)))
+    if(VX_SUCCESS!=vxQueryImage(imgObj, VX_IMAGE_HEIGHT, &imgHei, sizeof(imgHei)))
         goto OnError;
 
-    if(VX_SUCCESS!=vxSetMetaFormatAttribute(meta, VX_IMAGE_ATTRIBUTE_WIDTH, &imgWid, sizeof(imgWid)))
+    if(VX_SUCCESS!=vxSetMetaFormatAttribute(meta, VX_IMAGE_WIDTH, &imgWid, sizeof(imgWid)))
         goto OnError;
 
-    if(VX_SUCCESS!=vxSetMetaFormatAttribute(meta, VX_IMAGE_ATTRIBUTE_HEIGHT, &imgHei, sizeof(imgHei)))
+    if(VX_SUCCESS!=vxSetMetaFormatAttribute(meta, VX_IMAGE_HEIGHT, &imgHei, sizeof(imgHei)))
         goto OnError;
 
-    if(VX_SUCCESS!=vxSetMetaFormatAttribute(meta, VX_IMAGE_ATTRIBUTE_FORMAT, &imgFmt, sizeof(imgFmt)))
+    if(VX_SUCCESS!=vxSetMetaFormatAttribute(meta, VX_IMAGE_FORMAT, &imgFmt, sizeof(imgFmt)))
         goto OnError;
 
     status = VX_SUCCESS;
@@ -479,7 +483,24 @@ OnError:
 
     return status;
 }
+vx_status VX_CALLBACK vxAbsDiffValidator(vx_node node, const vx_reference parameters[], vx_uint32 num, vx_meta_format metas[])
+{
+    vx_status status = VX_SUCCESS;
+    vx_uint32 index = 0;
+    for(index = 0; index < num; index++)
+    {
+        if(index < 2)
+        {
+            status |= vxcAbsDiffValidateInput(node,index);
+        }
+        else
+        {
+            status |= vxcAbsDiffValidateOutput(node,index,metas[index]);
+        }
 
+    }
+    return status;
+}
 vx_status VX_CALLBACK vxcAbsDiffInitialize(vx_node node, const vx_reference *parameters, vx_uint32 num)
 {
     /* workdim,    globel offset,    globel scale,    local size,    globel size */
@@ -487,8 +508,8 @@ vx_status VX_CALLBACK vxcAbsDiffInitialize(vx_node node, const vx_reference *par
     vx_int32 imgWid = 0, imgHei = 0;
     vx_image imgObj = (vx_image)parameters[0];
 
-    vxQueryImage(imgObj, VX_IMAGE_ATTRIBUTE_WIDTH, &imgWid, sizeof(vx_uint32));
-    vxQueryImage(imgObj, VX_IMAGE_ATTRIBUTE_HEIGHT, &imgHei, sizeof(vx_uint32));
+    vxQueryImage(imgObj, VX_IMAGE_WIDTH, &imgWid, sizeof(vx_uint32));
+    vxQueryImage(imgObj, VX_IMAGE_HEIGHT, &imgHei, sizeof(vx_uint32));
 
     shaderParam.globalWorkOffset[0] = 0;
     shaderParam.globalWorkOffset[1] = 0;
@@ -527,8 +548,7 @@ vx_status vxcAbsDiffRegisterKernel(vx_context context)
                                   VXV_KERNEL_NAME_VXCABSDIFF,
                                   VXV_KERNEL_VXCABSDIFF,
                                   paramCnt,
-                                  vxcAbsDiffValidateInput,
-                                  vxcAbsDiffValidateOutput,
+                                  vxAbsDiffValidator,
                                   vxcAbsDiffInitialize,
                                   NULL
                                  );

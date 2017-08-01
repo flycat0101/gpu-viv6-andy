@@ -13,7 +13,7 @@
 
 #include <gc_vxk_common.h>
 
-vx_status vxRemap(vx_node node, vx_image input, vx_remap remap, vx_enum policy, vx_border_mode_t *borders, vx_image output)
+vx_status vxRemap(vx_node node, vx_image input, vx_remap remap, vx_enum policy, vx_border_t *borders, vx_image output)
 {
     vx_status status = VX_SUCCESS;
     vx_uint32 width = 0, height = 0;
@@ -39,8 +39,8 @@ vx_status vxRemap(vx_node node, vx_image input, vx_remap remap, vx_enum policy, 
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryRemap(remap, VX_REMAP_ATTRIBUTE_DESTINATION_WIDTH, &width, sizeof(width));
-    vxQueryRemap(remap, VX_REMAP_ATTRIBUTE_DESTINATION_HEIGHT, &height, sizeof(height));
+    vxQueryRemap(remap, VX_REMAP_DESTINATION_WIDTH, &width, sizeof(width));
+    vxQueryRemap(remap, VX_REMAP_DESTINATION_HEIGHT, &height, sizeof(height));
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
@@ -53,26 +53,24 @@ vx_status vxRemap(vx_node node, vx_image input, vx_remap remap, vx_enum policy, 
 
     kernelContext->params.kernel = gcvVX_KERNEL_REMAP;
     kernelContext->params.xstep = 16;
-    kernelContext->params.policy           = (policy == VX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR)?
-gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR:(policy == VX_INTERPOLATION_TYPE_BILINEAR?
-gcvVX_INTERPOLATION_TYPE_BILINEAR:gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR);
+    kernelContext->params.policy           = (policy == VX_INTERPOLATION_NEAREST_NEIGHBOR)?gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR:(policy == VX_INTERPOLATION_BILINEAR?gcvVX_INTERPOLATION_TYPE_BILINEAR:gcvVX_INTERPOLATION_TYPE_NEAREST_NEIGHBOR);
 #if gcdVX_OPTIMIZER
     kernelContext->borders                 = borders->mode;
 #else
     kernelContext->params.borders          = borders->mode;
 #endif
-    kernelContext->params.constant_value   = borders->constant_value;
+    kernelContext->params.constant_value   = borders->constant_value.U32;
 
     kernelContext->params.xmax = width;
     kernelContext->params.ymax = height;
 
-    if(borders->mode == VX_BORDER_MODE_CONSTANT || borders->mode == VX_BORDER_MODE_UNDEFINED)
+    if(borders->mode == VX_BORDER_CONSTANT || borders->mode == VX_BORDER_UNDEFINED)
     {
         vx_uint32 bin[4];
         bin[0] =
         bin[1] =
         bin[2] =
-        bin[3] = FORMAT_VALUE(borders->mode == VX_BORDER_MODE_CONSTANT?borders->constant_value:0xcd);
+        bin[3] = FORMAT_VALUE(borders->mode == VX_BORDER_CONSTANT?borders->constant_value.U32:0xcd);
 
         gcoOS_MemCopy(&kernelContext->uniforms[index].uniform, bin, sizeof(bin));
         kernelContext->uniforms[index].num = 4 * 4;

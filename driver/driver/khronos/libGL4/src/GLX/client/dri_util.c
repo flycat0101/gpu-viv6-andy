@@ -1028,10 +1028,10 @@ GLvoid __driUtilUpdateExtraDrawableInfo(__DRIdrawablePrivate *pdp)
     __DRIcontextPrivate *pcp = pdp->driContextPriv;
     unsigned int stride;
     int x,y,w,h;
-    int numrects;
+    int numrects = 0;
     drm_clip_rect_t *prects = NULL;
     int backx, backy;
-    int numbackrects;
+    int numbackrects = 0;
     drm_clip_rect_t *pbackrects = NULL;
     gctUINT32 directPix = 0;
 
@@ -1083,6 +1083,18 @@ GLvoid __driUtilUpdateExtraDrawableInfo(__DRIdrawablePrivate *pdp)
        pdp->pStamp = &pdp->lastStamp;
        directPix = 1;
     }
+
+    if ( numrects >0 && prects )
+        Xfree((void *)prects);
+
+    if ( numbackrects >0 && pbackrects )
+        Xfree((void *)pbackrects);
+
+
+    if ( pdp->numClipRects >0 && pdp->pClipRects)
+        Xfree((void *)pdp->pClipRects);
+    pdp->numClipRects = 0;
+
 
     VIVEXTDrawableInfo(pdp->display, pdp->screen, pdp->draw,
                     &pdp->x, &pdp->y, &pdp->w, &pdp->h,

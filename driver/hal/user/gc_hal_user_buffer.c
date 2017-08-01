@@ -39,7 +39,6 @@ struct _gcoBUFFER
 
     /* Pointer to the hardware objects. */
     gcoHARDWARE                 hardware;
-    gceENGINE                   engine;
 
     /* Flag to indicate thread default or not */
     gctBOOL                     threadDefault;
@@ -63,6 +62,7 @@ struct _gcoBUFFER
         gctUINT32   reservedTail;
         gctUINT32   reservedUser;
         gceCMDBUF_SOURCE source;
+        gceENGINE   engine;
     }                           info;
     gctUINT32                   totalReserved;
 
@@ -82,14 +82,14 @@ struct _gcoBUFFER
     gctUINT32                   probeResumeBytes;
 #endif
 
-#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
     gctBOOL                     inRerserved;
-#endif
 
     /* Commit stamp of each commit. */
     gctUINT64                   commitStamp;
 
     gctUINT32                   mirrorCount;
+
+    gcsFENCE_LIST_PTR           fenceList;
 };
 
 /******************************************************************************\
@@ -133,7 +133,7 @@ _FreeCommandBuffer(
                         ));
                     break;
                 case gcvCMDBUF_RESERVED:
-                    gcmONERROR(gcoHAL_UnlockVideoMemory(CommandBuffer->physical, gcvSURF_BITMAP));
+                    gcmONERROR(gcoHAL_UnlockVideoMemory(CommandBuffer->physical, gcvSURF_BITMAP, Info->engine));
                     gcmONERROR(gcoHAL_ReleaseVideoMemory(CommandBuffer->physical));
                     break;
                 default:
@@ -146,6 +146,7 @@ _FreeCommandBuffer(
                 {
                 case gcvCMDBUF_VIRTUAL:
                     iface.command = gcvHAL_FREE_VIRTUAL_COMMAND_BUFFER;
+                    iface.engine = Info->engine;
                     iface.u.FreeVirtualCommandBuffer.bytes    = CommandBuffer->bytes;
                     iface.u.FreeVirtualCommandBuffer.physical = CommandBuffer->physical;
                     iface.u.FreeVirtualCommandBuffer.logical  = CommandBuffer->logical;
@@ -156,6 +157,7 @@ _FreeCommandBuffer(
                     break;
                 case gcvCMDBUF_CONTIGUOUS:
                     iface.command = gcvHAL_FREE_CONTIGUOUS_MEMORY;
+                    iface.engine = Info->engine;
                     iface.u.FreeContiguousMemory.bytes    = CommandBuffer->bytes;
                     iface.u.FreeContiguousMemory.physical = CommandBuffer->physical;
                     iface.u.FreeContiguousMemory.logical  = CommandBuffer->logical;
@@ -165,7 +167,7 @@ _FreeCommandBuffer(
 
                     break;
                 case gcvCMDBUF_RESERVED:
-                    gcmONERROR(gcoHAL_UnlockVideoMemory(CommandBuffer->physical, gcvSURF_BITMAP));
+                    gcmONERROR(gcoHAL_UnlockVideoMemory(CommandBuffer->physical, gcvSURF_BITMAP, Info->engine));
                     gcmONERROR(gcoHAL_ReleaseVideoMemory(CommandBuffer->physical));
                     break;
                 default:
@@ -537,7 +539,7 @@ gcoCMDBUF_Construct(
             gcmONERROR(status);
 
             gcmONERROR(gcoHAL_LockVideoMemory(
-                node, gcvFALSE, (gctUINT32 *)&physical, &pointer));
+                node, gcvFALSE, Info->engine, (gctUINT32 *)&physical, &pointer));
             gcmSAFECASTSIZET(commandBuffer->bytes, tmpSize);
             commandBuffer->physical = node;
             commandBuffer->logical = gcmPTR_TO_UINT64(pointer);
@@ -738,7 +740,7 @@ gcoBUFFER_Construct(
     buffer->patchList     = gcvNULL;
 
     buffer->hardware = Hardware;
-    buffer->engine   = Engine;
+    buffer->info.engine   = Engine;
 
     /**************************************************************************
     ** Allocate temp command buffer.
@@ -752,7 +754,7 @@ gcoBUFFER_Construct(
     */
     gcmONERROR(gcoHARDWARE_QueryCommandBuffer(
         buffer->hardware,
-        buffer->engine,
+        buffer->info.engine,
         &buffer->info.alignment,
         &buffer->info.reservedHead,
         &buffer->info.reservedTail,
@@ -1010,6 +1012,223 @@ _RecyclePatchList(
     return gcvSTATUS_OK;
 }
 
+#if gcdENABLE_3D
+static gceSTATUS
+_FreeFenceList(
+    gcsFENCE_LIST_PTR fenceList
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("fenceList=0x%x", fenceList);
+
+    if (fenceList)
+    {
+        if (fenceList->pendingList)
+        {
+            gcoOS_Free(gcvNULL, fenceList->pendingList);
+            fenceList->pendingList = gcvNULL;
+        }
+
+        if (fenceList->onIssueList)
+        {
+            gcoOS_Free(gcvNULL, fenceList->onIssueList);
+            fenceList->onIssueList = gcvNULL;
+        }
+
+        gcoOS_Free(gcvNULL, fenceList);
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS
+_AllocFenceList(
+    IN gcsFENCE_LIST_PTR srcList,
+    IN gcsFENCE_LIST_PTR * outList
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctPOINTER pointer;
+    gcsFENCE_LIST_PTR fenceList = gcvNULL;
+    gctUINT pendingCount;
+    gctUINT onIssueCount;
+    gctUINT size;
+
+    gcmHEADER_ARG("srcList=0x%x, outList=0x%x", srcList, outList);
+
+    gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcsFENCE_LIST), &pointer));
+    fenceList = (gcsFENCE_LIST_PTR)pointer;
+    gcoOS_ZeroMemory(fenceList, gcmSIZEOF(gcsFENCE_LIST));
+
+    pendingCount = FENCE_NODE_LIST_INIT_COUNT;
+    onIssueCount = FENCE_NODE_LIST_INIT_COUNT;
+
+    if (srcList)
+    {
+        pendingCount += srcList->pendingCount;
+        onIssueCount += srcList->onIssueCount;
+    }
+
+    size = gcmSIZEOF(gcsFENCE_APPEND_NODE) * pendingCount;
+    gcmONERROR(gcoOS_Allocate(gcvNULL, size, &pointer));
+    fenceList->pendingList = (gcsFENCE_APPEND_NODE_PTR)pointer;
+    fenceList->pendingAllocCount = pendingCount;
+
+    if (srcList && srcList->pendingCount > 0)
+    {
+        gcoOS_MemCopy(fenceList->pendingList,
+            srcList->pendingList,
+            srcList->pendingCount * gcmSIZEOF(gcsFENCE_APPEND_NODE));
+        fenceList->pendingCount += srcList->pendingCount;
+    }
+
+    size = gcmSIZEOF(gcsFENCE_APPEND_NODE) * onIssueCount;
+    gcmONERROR(gcoOS_Allocate(gcvNULL, size, &pointer));
+    fenceList->onIssueList = ((gcsFENCE_APPEND_NODE_PTR)pointer);
+    fenceList->onIssueAllocCount = onIssueCount;
+
+    if (srcList && srcList->onIssueCount > 0)
+    {
+        gcoOS_MemCopy(fenceList->onIssueList,
+            srcList->onIssueList,
+            srcList->onIssueCount * gcmSIZEOF(gcsFENCE_APPEND_NODE));
+        fenceList->onIssueCount += srcList->onIssueCount;
+    }
+
+    *outList = fenceList;
+
+    gcmFOOTER();
+    return status;
+
+OnError:
+    _FreeFenceList(fenceList);
+    *outList = gcvNULL;
+
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoBUFFER_AppendFence(
+    IN gcoBUFFER Buffer,
+    IN gcsSURF_NODE_PTR Node,
+    IN gceFENCE_TYPE Type
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsFENCE_LIST_PTR fenceList;
+
+    gcmHEADER_ARG("Buffer=0x%x", Buffer);
+
+    fenceList = Buffer->fenceList;
+
+    /* empty or full */
+    if (!fenceList ||
+        (fenceList->pendingAllocCount == fenceList->pendingCount))
+    {
+        gcmONERROR(_AllocFenceList(fenceList, &fenceList));
+
+        if (Buffer->fenceList)
+        {
+            _FreeFenceList(Buffer->fenceList);
+        }
+
+        Buffer->fenceList = fenceList;
+    }
+
+    fenceList->pendingList[fenceList->pendingCount].node = Node;
+    fenceList->pendingList[fenceList->pendingCount].type = Type;
+    fenceList->pendingCount++;
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+/*after command that use resource in pending list, we need move it to onIssue list  */
+gceSTATUS
+gcoBUFFER_OnIssueFence(
+    IN gcoBUFFER Buffer
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT count;
+    gctPOINTER pointer;
+    gcsFENCE_LIST_PTR fenceList = gcvNULL;
+
+    gcmHEADER_ARG("Buffer=0x%x", Buffer);
+
+    fenceList = Buffer->fenceList;
+
+    if (Buffer->tempCMDBUF.inUse)
+    {
+        gcmPRINT("Warning, should not OnIssue Fence in temp command buffer");
+    }
+
+    if (fenceList && fenceList->pendingCount > 0)
+    {
+        if (fenceList->onIssueAllocCount - fenceList->onIssueCount < fenceList->pendingCount)
+        {
+            gcsFENCE_APPEND_NODE_PTR ptr;
+
+            count = fenceList->onIssueCount + fenceList->pendingCount + FENCE_NODE_LIST_INIT_COUNT;
+
+            gcmONERROR(gcoOS_Allocate(gcvNULL, count * gcmSIZEOF(gcsFENCE_APPEND_NODE), &pointer));
+
+            ptr = (gcsFENCE_APPEND_NODE_PTR)pointer;
+            fenceList->onIssueAllocCount = count;
+
+            gcoOS_MemCopy(ptr, fenceList->onIssueList, fenceList->onIssueCount * gcmSIZEOF(gcsFENCE_APPEND_NODE));
+            gcoOS_Free(gcvNULL, fenceList->onIssueList);
+
+            fenceList->onIssueList = ptr;
+        }
+
+        gcoOS_MemCopy(&fenceList->onIssueList[fenceList->onIssueCount],
+            fenceList->pendingList,
+            fenceList->pendingCount * gcmSIZEOF(gcsFENCE_APPEND_NODE));
+
+        fenceList->onIssueCount += fenceList->pendingCount;
+        fenceList->pendingCount = 0;
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+/* Before send fence, we need get fence for all onIssue fence */
+gceSTATUS
+gcoBUFFER_GetFence(
+    IN gcoBUFFER Buffer
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT i;
+    gcsSURF_NODE_PTR node;
+    gcsFENCE_LIST_PTR fenceList;
+
+    gcmHEADER_ARG("Buffer=0x%x", Buffer);
+
+    fenceList = Buffer->fenceList;
+
+    if(fenceList)
+    {
+        for (i = 0; i < fenceList->onIssueCount; i++)
+        {
+            node = fenceList->onIssueList[i].node;
+            gcoHARDWARE_GetFence(gcvNULL, &node->fenceCtx, Buffer->info.engine, fenceList->onIssueList[i].type);
+        }
+
+        fenceList->onIssueCount = 0;
+    }
+
+    gcmFOOTER();
+    return status;
+}
+#endif
+
 /*******************************************************************************
 **
 **  gcoBUFFER_Destroy
@@ -1065,6 +1284,10 @@ gcoBUFFER_Destroy(
         /* Destroy command buffer. */
         gcmONERROR(gcoCMDBUF_Destroy(Buffer->hardware, &Buffer->info, commandBuffer));
     }
+#if gcdENABLE_3D
+    gcmONERROR(_FreeFenceList(Buffer->fenceList));
+    Buffer->fenceList = gcvNULL;
+#endif
 
     /* Destroy the free patch list. */
     while (Buffer->freePatchList != NULL)
@@ -1207,11 +1430,9 @@ gcoBUFFER_Reserve(
 
     gcmSAFECASTSIZET(originalBytes, Bytes);
 
-#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
     /* Recursive call must be detected and avoided */
     gcmASSERT(Buffer->inRerserved == gcvFALSE);
     Buffer->inRerserved = gcvTRUE;
-#endif
 
     resumeBytes = _GetResumeCommandLength(Buffer);
 
@@ -1268,6 +1489,7 @@ gcoBUFFER_Reserve(
     {
         /* Sent event to signal when command buffer completes. */
         iface.command            = gcvHAL_SIGNAL;
+        iface.engine             = Buffer->info.engine;
         iface.u.Signal.signal    = gcmPTR_TO_UINT64(commandBuffer->signal);
         iface.u.Signal.auxSignal = 0;
         iface.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());
@@ -1375,9 +1597,7 @@ gcoBUFFER_Reserve(
     /* Set the result. */
     * Reserve = commandBuffer;
 
-#if gcmIS_DEBUG(gcdDEBUG_ASSERT)
     Buffer->inRerserved = gcvFALSE;
-#endif
 
     /* Success. */
     gcmFOOTER();
@@ -1482,109 +1702,114 @@ gcoBUFFER_Commit(
         {
             gctINT32 type;
 
-            /* need pauseQuery per commit and resumeQuery when next draw flushQuery */
-            for (type = gcvQUERY_OCCLUSION; type < gcvQUERY_MAX_NUM; type++)
+            if (Buffer->info.engine == gcvENGINE_RENDER)
             {
-                gctUINT64 pauseQueryCommand, pauseQueryCommandsaved;
-                pauseQueryCommandsaved =
-                pauseQueryCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
+                /* need pauseQuery per commit and resumeQuery when next draw flushQuery */
+                for (type = gcvQUERY_OCCLUSION; type < gcvQUERY_MAX_NUM; type++)
+                {
+                    gctUINT64 pauseQueryCommand, pauseQueryCommandsaved;
+                    pauseQueryCommandsaved =
+                    pauseQueryCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
+                                                    + tailCommandBuffer->offset);
+
+                    gcoHARDWARE_SetQuery(gcvNULL, ~0U, (gceQueryType)type, gcvQUERYCMD_PAUSE, (gctPOINTER*)&pauseQueryCommand);
+                    if ((pauseQueryCommand - pauseQueryCommandsaved) > 0)
+                    {
+                        tailCommandBuffer->offset += (gctUINT32)(pauseQueryCommand - pauseQueryCommandsaved);
+                        Buffer->queryPaused[type] = gcvTRUE;
+                    }
+                }
+
+                /* need pauseXFB per commit and resuemeXFB when next draw flushXFB */
+                if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_HW_TFB))
+                {
+                    gctUINT64 pauseXfbCommand, pauseXfbCommandsaved;
+
+                    pauseXfbCommandsaved =
+                    pauseXfbCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
                                                 + tailCommandBuffer->offset);
 
-                gcoHARDWARE_SetQuery(gcvNULL, ~0U, (gceQueryType)type, gcvQUERYCMD_PAUSE, (gctPOINTER*)&pauseQueryCommand);
-                if ((pauseQueryCommand - pauseQueryCommandsaved) > 0)
-                {
-                    tailCommandBuffer->offset += (gctUINT32)(pauseQueryCommand - pauseQueryCommandsaved);
-                    Buffer->queryPaused[type] = gcvTRUE;
+                    gcoHARDWARE_SetXfbCmd(gcvNULL, gcvXFBCMD_PAUSE_INCOMMIT, (gctPOINTER*)&pauseXfbCommand);
+                    if (pauseXfbCommand - pauseXfbCommandsaved > 0)
+                    {
+                        tailCommandBuffer->offset += (gctUINT32)(pauseXfbCommand - pauseXfbCommandsaved);
+                        Buffer->tfbPaused = gcvTRUE;
+                    }
                 }
-            }
 
-            /* need pauseXFB per commit and resuemeXFB when next draw flushXFB */
-            if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_HW_TFB))
-            {
-                gctUINT64 pauseXfbCommand, pauseXfbCommandsaved;
-
-                pauseXfbCommandsaved =
-                pauseXfbCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
-                                            + tailCommandBuffer->offset);
-
-                gcoHARDWARE_SetXfbCmd(gcvNULL, gcvXFBCMD_PAUSE_INCOMMIT, (gctPOINTER*)&pauseXfbCommand);
-                if (pauseXfbCommand - pauseXfbCommandsaved > 0)
+                if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_PROBE))
                 {
-                    tailCommandBuffer->offset += (gctUINT32)(pauseXfbCommand - pauseXfbCommandsaved);
-                    Buffer->tfbPaused = gcvTRUE;
+                    gctUINT64 pauseProbeCommand, pauseProbeCommandsaved;
+
+                    pauseProbeCommandsaved =
+                    pauseProbeCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR)gcmUINT64_TO_PTR(tailCommandBuffer->logical)
+                                                    + tailCommandBuffer->offset);
+
+                    gcoHARDWARE_SetProbeCmd(gcvNULL, gcvPROBECMD_PAUSE, ~0U, (gctPOINTER*)&pauseProbeCommand);
+                    if (pauseProbeCommand - pauseProbeCommandsaved > 0)
+                    {
+                        tailCommandBuffer->offset += (gctUINT32)(pauseProbeCommand - pauseProbeCommandsaved);
+                        Buffer->probePaused = gcvTRUE;
+                    }
                 }
-            }
 
-            if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_PROBE))
-            {
-                gctUINT64 pauseProbeCommand, pauseProbeCommandsaved;
-
-                pauseProbeCommandsaved =
-                pauseProbeCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR)gcmUINT64_TO_PTR(tailCommandBuffer->logical)
-                                                + tailCommandBuffer->offset);
-
-                gcoHARDWARE_SetProbeCmd(gcvNULL, gcvPROBECMD_PAUSE, ~0U, (gctPOINTER*)&pauseProbeCommand);
-                if (pauseProbeCommand - pauseProbeCommandsaved > 0)
-                {
-                    tailCommandBuffer->offset += (gctUINT32)(pauseProbeCommand - pauseProbeCommandsaved);
-                    Buffer->probePaused = gcvTRUE;
-                }
-            }
-
-            gcoHARDWARE_Query3DCoreCount(gcvNULL, &coreCount);
-
-            if (coreCount > 1)
-            {
-                gctUINT32_PTR syncCommandLogical;
-                gctUINT32 bytes;
+                gcoHARDWARE_Query3DCoreCount(gcvNULL, &coreCount);
 
                 alignedBytes = gcmALIGN(tailCommandBuffer->offset, Buffer->info.alignment) - tailCommandBuffer->offset;
+                if (coreCount > 1)
+                {
+                    gctUINT32 bytes;
+                    gctUINT32_PTR syncCommandLogical;
 
-                syncCommandLogical =  (gctUINT32_PTR)((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
-                                   + tailCommandBuffer->offset + alignedBytes);
+                    syncCommandLogical = (gctUINT32_PTR)((gctUINT8_PTR)gcmUINT64_TO_PTR(tailCommandBuffer->logical) +
+                                                         tailCommandBuffer->offset + alignedBytes);
 
-                gcoHARDWARE_MultiGPUCacheFlush(gcvNULL, &syncCommandLogical);
+                    gcoHARDWARE_MultiGPUCacheFlush(gcvNULL, &syncCommandLogical);
 
-                gcoHARDWARE_MultiGPUSync(gcvNULL, &syncCommandLogical);
-                gcoHARDWARE_QueryMultiGPUSyncLength(gcvNULL, &bytes);
-                tailCommandBuffer->offset += bytes + alignedBytes;
-                gcoHARDWARE_QueryMultiGPUCacheFlushLength(gcvNULL, &bytes);
-                tailCommandBuffer->offset += bytes;
-            }
-            else
-            {
-                gctUINT64 flushCacheCommand, flushCacheCommandsaved;
-                alignedBytes = gcmALIGN(tailCommandBuffer->offset, Buffer->info.alignment)
-                                 - tailCommandBuffer->offset;
-                flushCacheCommandsaved =
-                flushCacheCommand = gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
-                                                               + tailCommandBuffer->offset + alignedBytes);
+                    gcoHARDWARE_MultiGPUSync(gcvNULL, &syncCommandLogical);
+                    gcoHARDWARE_QueryMultiGPUSyncLength(gcvNULL, &bytes);
+                    tailCommandBuffer->offset += bytes + alignedBytes;
+                    gcoHARDWARE_QueryMultiGPUCacheFlushLength(gcvNULL, &bytes);
+                    tailCommandBuffer->offset += bytes;
+                }
+                else
+                {
+                    gctUINT8_PTR flushCacheCommand, flushCacheCommandsaved;
 
-                /* need flush ccache zcache and shl1_cache per commit */
-                gcoHARDWARE_FlushCache(gcvNULL, (gctPOINTER *)&flushCacheCommand);
-                tailCommandBuffer->offset += (gctUINT32)(flushCacheCommand - flushCacheCommandsaved) + alignedBytes;
+                    flushCacheCommandsaved =
+                    flushCacheCommand = (gctUINT8_PTR)gcmUINT64_TO_PTR(tailCommandBuffer->logical)
+                                      + tailCommandBuffer->offset + alignedBytes;
+
+                    /* need flush ccache zcache and shl1_cache per commit */
+                    gcoHARDWARE_FlushCache(gcvNULL, (gctPOINTER *)&flushCacheCommand);
+                    tailCommandBuffer->offset += (gctUINT32)(flushCacheCommand - flushCacheCommandsaved) + alignedBytes;
+                }
             }
 
 #if gcdSYNC
+            /*Only send hw fence when commit, the fence type is hw fence when support gcvFEAUTRE_FENCE_32BIT*/
+            if ((gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE_32BIT) || gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_FENCE_64BIT)) &&
+                Buffer->inRerserved == gcvFALSE)
             {
-                gceHARDWARE_TYPE currentHW = gcvHARDWARE_INVALID;
-                gctBOOL fenceEnable;
+                gctUINT8_PTR fenceCommand, fenceCommandSaved;
 
-                gcmGETCURRENTHARDWARE(currentHW);
-                gcoHARDWARE_GetFenceEnabled(gcvNULL, &fenceEnable);
+                alignedBytes = gcmALIGN(tailCommandBuffer->offset, Buffer->info.alignment) - tailCommandBuffer->offset;
 
-                if (currentHW != gcvHARDWARE_VG && fenceEnable)
+                fenceCommandSaved =
+                fenceCommand = (gctUINT8_PTR)gcmUINT64_TO_PTR(tailCommandBuffer->logical)
+                                                      + tailCommandBuffer->offset + alignedBytes;
+
+                if (Buffer->info.engine == gcvENGINE_BLT)
                 {
-                    gctUINT64 fenceCommand, fenceCommandSaved;
-                    alignedBytes = gcmALIGN(tailCommandBuffer->offset, Buffer->info.alignment) - tailCommandBuffer->offset;
-
-                    fenceCommandSaved =
-                    fenceCommand =  gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
-                                                      + tailCommandBuffer->offset + alignedBytes);
-
-                    gcoHARDWARE_SendFence(gcvNULL, gcvTRUE, (gctPOINTER*)&fenceCommand);
-                    tailCommandBuffer->offset += (gctUINT32)(fenceCommand - fenceCommandSaved) + alignedBytes;
+                    /*no need flush cache and do multi gpu sync here*/
+                    gcoHARDWARE_SendFence(gcvNULL, gcvFALSE, gcvENGINE_BLT,(gctPOINTER*)&fenceCommand);
                 }
+                else
+                {
+                    /*no need flush cache and do multi gpu sync here*/
+                    gcoHARDWARE_SendFence(gcvNULL, gcvFALSE, gcvENGINE_RENDER,(gctPOINTER*)&fenceCommand);
+                }
+                tailCommandBuffer->offset += (gctUINT32)(fenceCommand - fenceCommandSaved) + alignedBytes;
             }
 #endif
         }
@@ -1609,7 +1834,7 @@ gcoBUFFER_Commit(
         if (gcoHAL_GetOption(gcvNULL, gcvOPTION_KERNEL_FENCE))
         {
 #if gcdENABLE_3D
-            gcmONERROR(gcoHARDWARE_BuildPatchList(Buffer->hardware, Buffer, commandBuffer, Buffer->engine));
+            gcmONERROR(gcoHARDWARE_BuildPatchList(Buffer->hardware, Buffer, commandBuffer, Buffer->info.engine));
 #endif
 
             commandBuffer->patchHead = gcmPTR_TO_UINT64(Buffer->patchList);
@@ -1631,15 +1856,15 @@ gcoBUFFER_Commit(
 
         iface.ignoreTLS = gcvFALSE;
         iface.command = gcvHAL_COMMIT;
+        iface.engine = Buffer->info.engine;
         iface.u.Commit.commandBuffers[0] = gcmPTR_TO_UINT64(commandBuffer);
         iface.u.Commit.deltas[0] = gcmPTR_TO_UINT64(StateDelta);
         iface.u.Commit.queue = gcmPTR_TO_UINT64(Queue->head);
-        iface.u.Commit.engine = Buffer->engine;
 
         iface.u.Commit.shared = (coreCount > 1) ? gcvTRUE : gcvFALSE;
         iface.u.Commit.index = 0;
 
-        if (Buffer->engine == gcvENGINE_RENDER)
+        if (Buffer->info.engine == gcvENGINE_RENDER)
         {
             gctUINT32 i;
             gctUINT32 originalCoreIndex;

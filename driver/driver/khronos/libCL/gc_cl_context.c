@@ -15,6 +15,7 @@
 
 #define __NEXT_MSG_ID__     002016
 
+
 gctINT clfRetainContext(
     cl_context Context
     )
@@ -44,8 +45,6 @@ gctINT clfReleaseContext(
 {
     gctINT          status;
     gctINT32        oldReference;
-    gceCHIPMODEL    chipModel;
-    gctUINT32       chipRevision;
 
     gcmHEADER_ARG("Context=0x%x", Context);
 
@@ -66,16 +65,9 @@ gctINT clfReleaseContext(
         /* Destroy the profiler. */
         clfDestroyProfiler(Context);
 #endif
-        chipModel = Context->devices[0]->deviceInfo.chipModel;
-        chipRevision = Context->devices[0]->deviceInfo.chipRevision;
-        if ((chipModel == gcv3000 && chipRevision == 0x5435) ||
-            (chipModel == gcv3000 && chipRevision == 0x5450) ||
-            (chipModel == gcv2500 && chipRevision == 0x5422) ||
-            (chipModel == gcv7000))
-        {
-            gcoHAL_SetTimeOut(gcvNULL, gcdGPU_TIMEOUT);
-        }
-
+#if !gcdFPGA_BUILD
+        gcoHAL_SetTimeOut(gcvNULL, gcdGPU_TIMEOUT);
+#endif
         /* Send signal to stop event list worker thread. */
         gcoCL_SetSignal(Context->eventListWorkerStopSignal);
 
@@ -144,7 +136,6 @@ gctINT clfReleaseContext(
         /* Free context. */
         gcoOS_Free(gcvNULL, Context);
     }
-
     gcmFOOTER_ARG("%d", CL_SUCCESS);
     return CL_SUCCESS;
 
@@ -178,10 +169,6 @@ clCreateContext(
     gctUINT         i;
     /*cl_context_properties prop[CONTEXT_PROPERTIES]={0};*/
     cl_context_properties  propPlatform = 0;
-#if !gcdFPGA_BUILD
-    gceCHIPMODEL  chipModel;
-    gctUINT32 chipRevision;
-#endif
 
     gcmHEADER_ARG("Properties=0x%x NumDevices=%u Devices=0x%x",
                   Properties, NumDevices, Devices);
@@ -372,6 +359,7 @@ clCreateContext(
     /* Delay the creation of the event callback worker thread. */
     context->eventCallbackWorkerThread = gcvNULL;
 
+
     if (ErrcodeRet)
     {
         *ErrcodeRet = CL_SUCCESS;
@@ -385,21 +373,14 @@ clCreateContext(
 #endif
 
 #if !gcdFPGA_BUILD
-    chipModel = Devices[0]->deviceInfo.chipModel;
-    chipRevision = Devices[0]->deviceInfo.chipRevision;
-    if ((chipModel == gcv3000 && chipRevision == 0x5435) ||
-        (chipModel == gcv3000 && chipRevision == 0x5450) ||
-        (chipModel == gcv2500 && chipRevision == 0x5422) ||
-        (chipModel == gcv7000))
-    {
-        gcoHAL_SetTimeOut(gcvNULL, 1200*gcdGPU_TIMEOUT);
-    }
+    gcoHAL_SetTimeOut(gcvNULL, 1200*gcdGPU_TIMEOUT);
 #endif
 
     VCL_TRACE_API(CreateContext_Post)(Properties, NumDevices, Devices, PfnNotify, UserData, ErrcodeRet, context);
     return context;
 
 OnError:
+
     if (status == CL_OUT_OF_HOST_MEMORY)
     {
         gcmUSER_DEBUG_ERROR_MSG(

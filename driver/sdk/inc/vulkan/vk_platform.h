@@ -1,16 +1,3 @@
-/****************************************************************************
-*
-*    Copyright (c) 2005 - 2017 by Vivante Corp.  All rights reserved.
-*
-*    The material in this file is confidential and contains trade secrets
-*    of Vivante Corporation. This is proprietary information owned by
-*    Vivante Corporation. No part of this work may be disclosed,
-*    reproduced, copied, transmitted, or used in any way for any purpose,
-*    without the express written permission of Vivante Corporation.
-*
-*****************************************************************************/
-
-
 //
 // File: vk_platform.h
 //
@@ -106,7 +93,11 @@ extern "C"
 // controls inclusion of the extension interfaces in vulkan.h.
 
 #ifdef VK_USE_PLATFORM_ANDROID_KHR
-#include <android/native_window.h>
+#if ANDROID_SDK_VERSION >= 26
+#    include <system/window.h>
+#  else
+#    include <android/native_window.h>
+#  endif
 #endif
 
 #ifdef VK_USE_PLATFORM_MIR_KHR

@@ -255,15 +255,10 @@ gcOpt_RemoveDeadCode(
             /* Skip intrinsic instructions. */
             {
                 gcOPT_CODE definingCode;
-                union
-                {
-                    VIR_IntrinsicsKind intrinsicKind;
-                    gctUINT16 hex[2];
-                }
-                value;
-                value.hex[0] = code->instruction.source0Index;
-                value.hex[1] = code->instruction.source0Indexed;
-                if(value.intrinsicKind != VIR_IK_swizzle) break;
+                VIR_IntrinsicsKind intrinsicKind;
+                intrinsicKind = (VIR_IntrinsicsKind)(code->instruction.source0Index |
+                                                     code->instruction.source0Indexed << 16);
+                if(intrinsicKind != VIR_IK_swizzle) break;
                 /* Skip if no prevDefines or more than one preDefines. */
                 if (code->prevDefines == gcvNULL ||
                     code->prevDefines->next) break;
@@ -5313,7 +5308,6 @@ static gceSTATUS _EvaluateConstantInstruction(
                 union
                 {
                     gctFLOAT f;
-                    gctUINT16 hex[2];
                     gctINT32 hex32;
                 }
                 uValue;
@@ -5368,7 +5362,6 @@ static gceSTATUS _EvaluateConstantInstruction(
                 union
                 {
                     gctFLOAT f;
-                    gctUINT16 hex[2];
                     gctINT32 hex32;
                 }
                 value;
@@ -5398,13 +5391,13 @@ static gceSTATUS _EvaluateConstantInstruction(
                 else
                 {
                     gcmASSERT(opcode == gcSL_F2I);
-                    value.hex[0] = code->instruction.source0Index;
-                    value.hex[1] = code->instruction.source0Indexed;
+                    value.hex32 = (gctINT)(code->instruction.source0Index |
+                                           (code->instruction.source0Indexed << 16));
                     value.hex32 = (gctINT)(value.f);
                 }
 
-                sourceIndex = value.hex[0];
-                sourceIndexed = value.hex[1];
+                sourceIndex = (gctUINT16)(value.hex32 & 0xFFFF);
+                sourceIndexed = (gctUINT16)(value.hex32 >> 16);
                 needToPropagate = gcvTRUE;
             }
             break;
@@ -6560,8 +6553,8 @@ gcOpt_PropagateArgumentConstants(
 
                     movCode->instruction.source0        = gcmSL_SOURCE_SET(0, Type, gcSL_CONSTANT)
                         | gcmSL_SOURCE_SET(0, Format, funcInfo[INDEX(tempIndex, channel)].Value.Format);
-                    movCode->instruction.source0Index   = ((gctUINT16 *) &funcInfo[INDEX(tempIndex, channel)].Value.v)[0];
-                    movCode->instruction.source0Indexed = ((gctUINT16 *) &funcInfo[INDEX(tempIndex, channel)].Value.v)[1];
+                    movCode->instruction.source0Index   = (gctUINT16 ) (funcInfo[INDEX(tempIndex, channel)].Value.v & 0xFFFF);
+                    movCode->instruction.source0Indexed = (gctUINT16) (funcInfo[INDEX(tempIndex, channel)].Value.v >> 16);
 
                     ++constPropagated;
                     optFunction->arguments[arg].enable &= ~(1 << channel);
@@ -8373,21 +8366,19 @@ _ChangeSrcToImmZero(
     gctINT              SrcNo
     )
 {
-    gctUINT32           constant = 0x00000000;
-
     if (SrcNo == 0)
     {
         Inst->source0        = gcmSL_SOURCE_SET(0, Type, gcSL_CONSTANT)
                              | gcmSL_SOURCE_SET(0, Format, gcmSL_SOURCE_GET(Inst->source0, Format));
-        Inst->source0Index   = ((gctUINT16 *) &constant)[0];
-        Inst->source0Indexed = ((gctUINT16 *) &constant)[1];
+        Inst->source0Index   = 0;
+        Inst->source0Indexed = 0;
     }
     else
     {
         Inst->source1        = gcmSL_SOURCE_SET(0, Type, gcSL_CONSTANT)
                              | gcmSL_SOURCE_SET(0, Format, gcmSL_SOURCE_GET(Inst->source1, Format));
-        Inst->source1Index   = ((gctUINT16 *) &constant)[0];
-        Inst->source1Indexed = ((gctUINT16 *) &constant)[1];
+        Inst->source1Index   = 0;
+        Inst->source1Indexed = 0;
     }
 }
 
@@ -10127,7 +10118,7 @@ gcOptimizeShader(
     gceSTATUS status = gcvSTATUS_OK;
     gctUINT option;
     gcOPTIMIZER optimizer = gcvNULL;
-    gctBOOL   dumpOptimizer = gcSHADER_DumpOptimizer(Shader);
+    gctBOOL   dumpOptimizer = gcSHADER_DumpOptimizerVerbose(Shader);
     gctBOOL   useFullNewLinker = gcvFALSE;
 
     gcmHEADER_ARG("Shader=0x%x LogFile=0x%x", Shader, LogFile);

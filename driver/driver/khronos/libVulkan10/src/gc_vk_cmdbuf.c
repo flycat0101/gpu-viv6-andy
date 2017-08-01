@@ -94,15 +94,19 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyCommandPool(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, commandPool);
 
-    /* Free any remaining command buffers that the app forgot */
-    while (cdp->vkCmdBufferList)
+    if (commandPool)
     {
-        __vk_FreeCommandBuffers(device, commandPool, 1, &cdp->vkCmdBufferList);
-    }
+        __vkCommandPool *cdp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkCommandPool *, commandPool);
 
-    __vk_DestroyObject(devCtx, __VK_OBJECT_COMMAND_POOL, (__vkObject *)cdp);
+        /* Free any remaining command buffers that the app forgot */
+        while (cdp->vkCmdBufferList)
+        {
+            __vk_FreeCommandBuffers(device, commandPool, 1, &cdp->vkCmdBufferList);
+        }
+
+        __vk_DestroyObject(devCtx, __VK_OBJECT_COMMAND_POOL, (__vkObject *)cdp);
+    }
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_ResetCommandPool(
@@ -266,73 +270,76 @@ VKAPI_ATTR void VKAPI_CALL __vk_FreeCommandBuffers(
     {
         cmd = (__vkCommandBuffer *)pCommandBuffers[i];
 
-        if (commandPool == cmd->commandPool)
+        if (cmd)
         {
-            __vkScratchMem *pScratch = cmd->scratchHead;
-
-            if (pCommandBuffers[i] == cdp->vkCmdBufferList)
+            if (commandPool == cmd->commandPool)
             {
-                cdp->vkCmdBufferList = (VkCommandBuffer)cmd->next;
+                __vkScratchMem *pScratch = cmd->scratchHead;
+
+                if (pCommandBuffers[i] == cdp->vkCmdBufferList)
+                {
+                    cdp->vkCmdBufferList = (VkCommandBuffer)cmd->next;
+                }
+                else
+                {
+                    __vkCommandBuffer *tmp = (__vkCommandBuffer *)cdp->vkCmdBufferList;
+
+                    while (cmd != tmp->next)
+                    {
+                        tmp = tmp->next;
+
+                        if (tmp == NULL)
+                            __VK_ASSERT(0);
+                    }
+                    tmp->next = cmd->next;
+                }
+
+                /* Free all the scratch memory used in this command buffer */
+                while (pScratch)
+                {
+                    __vkScratchMem *pCurrent = pScratch;
+                    pScratch = pScratch->next;
+
+                    __vk_FreeMemory(device, (VkDeviceMemory)(uintptr_t)pCurrent->memory, VK_NULL_HANDLE);
+
+                    __VK_FREE(pCurrent);
+                }
+                cmd->scratchHead = gcvNULL;
+
+#if __VK_RESOURCE_INFO
+                __vk_utils_freeCmdRes(cmd);
+#endif
+                /* Free any secondary execute info */
+                while (cmd->executeList)
+                {
+                    __vkCmdExecuteCommandsInfo *temp = cmd->executeList;
+
+                    cmd->executeList = cmd->executeList->next;
+                    __VK_FREE(temp);
+                }
+                cmd->executeTail = cmd->executeList;
+
+                /* Free the state buffers */
+                while (cmd->stateBufferList)
+                {
+                    __vkStateBuffer *temp = cmd->stateBufferList;
+
+                    cmd->stateBufferList = cmd->stateBufferList->next;
+                    __vk_FreeStateBuffer(cmd->commandPool, temp->bufStart);
+                    __VK_FREE(temp);
+                }
+                cmd->stateBufferTail = cmd->stateBufferList;
+
+                (*devCtx->chipFuncs->FreeCommandBuffer)(device, (VkCommandBuffer)(uintptr_t)cmd);
+
+                __VK_VERIFY_OK(__vk_DestroyObject(devCtx, __VK_OBJECT_COMMAND_BUFFER, (__vkObject *)cmd));
+
+                cdp->numOfCmdBuffers--;
             }
             else
             {
-                __vkCommandBuffer *tmp = (__vkCommandBuffer *)cdp->vkCmdBufferList;
-
-                while (cmd != tmp->next)
-                {
-                    tmp = tmp->next;
-
-                    if (tmp == NULL)
-                        __VK_ASSERT(0);
-                }
-                tmp->next = cmd->next;
+                __VK_ASSERT(0);
             }
-
-            /* Free all the scratch memory used in this command buffer */
-            while (pScratch)
-            {
-                __vkScratchMem *pCurrent = pScratch;
-                pScratch = pScratch->next;
-
-                __vk_FreeMemory(device, (VkDeviceMemory)(uintptr_t)pCurrent->memory, VK_NULL_HANDLE);
-
-                __VK_FREE(pCurrent);
-            }
-            cmd->scratchHead = gcvNULL;
-
-#if __VK_RESOURCE_INFO
-            __vk_utils_freeCmdRes(cmd);
-#endif
-            /* Free any secondary execute info */
-            while (cmd->executeList)
-            {
-                __vkCmdExecuteCommandsInfo *temp = cmd->executeList;
-
-                cmd->executeList = cmd->executeList->next;
-                __VK_FREE(temp);
-            }
-            cmd->executeTail = cmd->executeList;
-
-            /* Free the state buffers */
-            while (cmd->stateBufferList)
-            {
-                __vkStateBuffer *temp = cmd->stateBufferList;
-
-                cmd->stateBufferList = cmd->stateBufferList->next;
-                __vk_FreeStateBuffer(cmd->commandPool, temp->bufStart);
-                __VK_FREE(temp);
-            }
-            cmd->stateBufferTail = cmd->stateBufferList;
-
-            (*devCtx->chipFuncs->FreeCommandBuffer)(device, (VkCommandBuffer)(uintptr_t)cmd);
-
-            __VK_VERIFY_OK(__vk_DestroyObject(devCtx, __VK_OBJECT_COMMAND_BUFFER, (__vkObject *)cmd));
-
-            cdp->numOfCmdBuffers--;
-        }
-        else
-        {
-            __VK_ASSERT(0);
         }
     }
 }
@@ -524,7 +531,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdExecuteCommands(
         if (secondary->secondaryInfo.prevPrimarySubmission != commandBuffer)
         {
             __vkCommandBuffer *previous = (__vkCommandBuffer *)secondary->secondaryInfo.prevPrimarySubmission;
-            if (previous)
+            if (previous && !(secondary->usage & VK_COMMAND_BUFFER_USAGE_SIMULTANEOUS_USE_BIT))
                 previous->state = __VK_CMDBUF_STATE_RESET_REQUIRED;
         }
 
@@ -1198,7 +1205,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBeginRenderPass(
             else
                 clearAttachment.colorAttachment = 0;
 
-            clearRect.baseArrayLayer = 0;
+            clearRect.baseArrayLayer = fb->imageViews[i]->createInfo.subresourceRange.baseArrayLayer;
             clearRect.layerCount = fb->layers;
             clearRect.rect = pRenderPassBegin->renderArea;
 
@@ -1381,7 +1388,7 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearAttachments(
 
             subResource.aspectMask = pAttachments[ia].aspectMask;
             subResource.mipLevel = fb->imageViews[imgViewIndex]->createInfo.subresourceRange.baseMipLevel;
-            for (il = pRects[ir].baseArrayLayer; il < pRects[ir].layerCount; il++)
+            for (il = pRects[ir].baseArrayLayer; il < (pRects[ir].baseArrayLayer + pRects[ir].layerCount); il++)
             {
                 subResource.arrayLayer = il;
                 __VK_ONERROR(cmd->devCtx->chipFuncs->ClearImage(
@@ -2508,12 +2515,24 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearColorImage(
 
     for (i = 0; i < rangeCount; i++)
     {
+        uint32_t levelCount;
+
         dstRes.u.img.subRes.aspectMask = pRanges[i].aspectMask;
         clearValue.color = *pColor;
         clearRect.offset.x = 0;
         clearRect.offset.y = 0;
 
-        for (level = pRanges[i].baseMipLevel; level < pRanges[i].baseMipLevel + pRanges[i].levelCount; ++level)
+        if (pRanges[i].levelCount == VK_REMAINING_MIP_LEVELS)
+        {
+            levelCount = dstRes.u.img.pImage->createInfo.mipLevels
+                - pRanges[i].baseMipLevel;
+        }
+        else
+        {
+            levelCount = pRanges[i].levelCount;
+        }
+
+        for (level = pRanges[i].baseMipLevel; level < pRanges[i].baseMipLevel + levelCount; ++level)
         {
             uint32_t il, layers;
             __vkImageLevel *pLevel = &pDstImage->pImgLevels[level];
@@ -2525,15 +2544,23 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearColorImage(
             if (pDstImage->createInfo.imageType == VK_IMAGE_TYPE_3D)
             {
                 dstRes.u.img.subRes.arrayLayer = 0;
-                layers = pDstImage->createInfo.extent.depth;
+                layers = pLevel->requestD;
             }
             else
             {
                 dstRes.u.img.subRes.arrayLayer = pRanges->baseArrayLayer;
-                layers = pRanges->layerCount;
+                if (pRanges[i].layerCount == VK_REMAINING_ARRAY_LAYERS)
+                {
+                    layers = dstRes.u.img.pImage->createInfo.arrayLayers
+                        - pRanges[i].baseArrayLayer;
+                }
+                else
+                {
+                    layers = pRanges[i].layerCount;
+                }
             }
 
-            for (il = 0; il < layers; ++il)
+            for (il = pRanges[i].baseArrayLayer; il < (pRanges[i].baseArrayLayer + layers); ++il)
             {
                 __VK_ONERROR((*devCtx->chipFuncs->ClearImage)(commandBuffer, image, &dstRes.u.img.subRes, &clearValue, &clearRect));
 
@@ -2574,11 +2601,24 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearDepthStencilImage(
 
     for (i = 0; i < rangeCount; i++)
     {
+        uint32_t levelCount;
+
         dstRes.u.img.subRes.aspectMask = pRanges[i].aspectMask;
         clearValue.depthStencil = *pDepthStencil;
         clearRect.offset.x = 0;
         clearRect.offset.y = 0;
-        for (level = pRanges[i].baseMipLevel; level < pRanges[i].baseMipLevel + pRanges[i].levelCount; ++level)
+
+        if (pRanges[i].levelCount == VK_REMAINING_MIP_LEVELS)
+        {
+            levelCount = dstRes.u.img.pImage->createInfo.mipLevels
+                - pRanges[i].baseMipLevel;
+        }
+        else
+        {
+            levelCount = pRanges[i].levelCount;
+        }
+
+        for (level = pRanges[i].baseMipLevel; level < pRanges[i].baseMipLevel + levelCount; ++level)
         {
             uint32_t il, layers;
             __vkImageLevel *pLevel = &pDstImage->pImgLevels[level];
@@ -2590,15 +2630,23 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdClearDepthStencilImage(
             if (pDstImage->createInfo.imageType == VK_IMAGE_TYPE_3D)
             {
                 dstRes.u.img.subRes.arrayLayer = 0;
-                layers = pDstImage->createInfo.extent.depth;
+                layers = pLevel->requestD;
             }
             else
             {
                 dstRes.u.img.subRes.arrayLayer = pRanges->baseArrayLayer;
-                layers = pRanges->layerCount;
+                if (pRanges[i].layerCount == VK_REMAINING_ARRAY_LAYERS)
+                {
+                    layers = dstRes.u.img.pImage->createInfo.arrayLayers
+                        - pRanges[i].baseArrayLayer;
+                }
+                else
+                {
+                    layers = pRanges[i].layerCount;
+                }
             }
 
-            for (il = 0; il < layers; ++il)
+            for (il = pRanges[i].baseArrayLayer; il < (pRanges[i].baseArrayLayer + layers); ++il)
             {
                 __VK_ONERROR((*devCtx->chipFuncs->ClearImage)(commandBuffer, image, &dstRes.u.img.subRes, &clearValue, &clearRect));
 
@@ -2684,16 +2732,9 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdBeginQuery(
     __vkDevContext *devCtx = ((__vkCommandBuffer*)commandBuffer)->devCtx;
     __vkQueryPool *qyp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkQueryPool *, queryPool);
 
-    if (qyp->pQueries[query].state != __VK_QUERY_RESET)
-    {
-        __VK_ASSERT(0);
-        return;
-    }
-
-    qyp->pQueries[query].state = __VK_QUERY_BEGIN;
     qyp->pQueries[query].flags = flags;
 
-    __VK_VERIFY_OK(devCtx->chipFuncs->ProcessQueryRequest(commandBuffer, queryPool, query));
+    __VK_VERIFY_OK(devCtx->chipFuncs->ProcessQueryRequest(commandBuffer, queryPool, query, VK_TRUE));
 }
 
 VKAPI_ATTR void VKAPI_CALL __vk_CmdEndQuery(
@@ -2705,10 +2746,9 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdEndQuery(
     __vkDevContext *devCtx = ((__vkCommandBuffer*)commandBuffer)->devCtx;
     __vkQueryPool *qyp = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkQueryPool *, queryPool);
 
-    if (qyp->pQueries[query].state == __VK_QUERY_ISSUED)
+    if (qyp->pQueries[query].isBegin)
     {
-        qyp->pQueries[query].state = __VK_QUERY_END;
-        __VK_VERIFY_OK(devCtx->chipFuncs->ProcessQueryRequest(commandBuffer, queryPool, query));
+        __VK_VERIFY_OK(devCtx->chipFuncs->ProcessQueryRequest(commandBuffer, queryPool, query, VK_FALSE));
     }
 }
 
@@ -2726,8 +2766,6 @@ VKAPI_ATTR void VKAPI_CALL __vk_CmdResetQueryPool(
     /* We use events to determine if a query's status is available or not */
     for (iq = firstQuery; iq < (firstQuery + queryCount); iq++)
     {
-        qyp->pQueries[iq].state = __VK_QUERY_RESET;
-        __VK_VERIFY_OK(devCtx->chipFuncs->ProcessQueryRequest(commandBuffer, queryPool, iq));
         __vk_CmdResetEvent(commandBuffer, qyp->pQueries[iq].event, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
     }
 

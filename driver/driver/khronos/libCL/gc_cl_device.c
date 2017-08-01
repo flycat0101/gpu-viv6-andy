@@ -26,21 +26,10 @@ static struct _cl_device_id _device =
     gcvNULL,                    /* Platform         */
     "Vivante OpenCL Device GCxxxx.xxxx.xxxx",    /* Name             */
     "Vivante Corporation",      /* Vendor           */
-#if BUILD_OPENCL_12
-    "OpenCL 1.2 ",              /* Device Version   */
-    "OpenCL 1.2 V" gcvVERSION_STRING,           /* Driver Version   */
-    "OpenCL C 1.2 ",            /* OpenCL C Version */
-#else
-    "OpenCL 1.1 ",              /* Device Version   */
-    "OpenCL 1.1 V" gcvVERSION_STRING,           /* Driver Version   */
-    "OpenCL C 1.1 ",            /* OpenCL C Version */
-#endif
-#if BUILD_OPENCL_FP
+    gcvNULL,                    /* Device Version   */
+    gcvNULL,                    /* Driver Version   */
+    gcvNULL,                    /* OpenCL C Version */
     "FULL_PROFILE",         /* Profile          */
-#else
-    "EMBEDDED_PROFILE",         /* Profile          */
-#endif
-
 #if BUILD_OPENCL_ICD
     "cl_khr_icd "
 #endif
@@ -116,7 +105,7 @@ static struct _cl_device_id _device =
 #endif
 
 cl_device_id clgDefaultDevice = gcvNULL;
-
+clsDeviceId_PTR clgDevices = gcvNULL;
 
 /*****************************************************************************\
 |*                         Supporting functions                              *|
@@ -155,10 +144,10 @@ clGetDeviceIDs(
 {
     clsPlatformId_PTR   platform = Platform;
     gctINT              status;
-
     gcmHEADER_ARG("NumEntries=%u", NumEntries);
     gcmDUMP_API("${OCL clGetDeviceIDs %d}", NumEntries);
 
+    gcoHAL_SetHardwareType(gcvNULL,gcvHARDWARE_3D);
     if (Devices && NumEntries == 0)
     {
         gcmUSER_DEBUG_ERROR_MSG(
@@ -179,134 +168,148 @@ clGetDeviceIDs(
 
     if (platform->devices == gcvNULL)
     {
-        clsDeviceId_PTR device;
         gctUINT         numDevices;
-        gctPOINTER      pointer = gcvNULL;
-        gctUINT         i;
-
-        /* Borrow compiler mutex for hardware initialization. */
-        gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, platform->compilerMutex, gcvINFINITE));
-
-        if (gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PIPE_CL))
-        {
-            gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, platform->compilerMutex));
-
-            gcmUSER_DEBUG_ERROR_MSG(
-                "OCL-001002: (clGetDeviceIDs) cannot initialized HW for OpenCL.\n");
-            clmRETURN_ERROR(CL_INVALID_VALUE);
-        }
-
-        gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, platform->compilerMutex));
-
-        /* Initialize default device info. */
-        clfGetDefaultDevice(gcvNULL);
-        clmONERROR(gcoCL_QueryDeviceInfo(&clgDefaultDevice->deviceInfo), CL_INVALID_VALUE);
-        clgDefaultDevice->dispatch  = platform->dispatch;
-        clgDefaultDevice->platform  = platform;
-
-#if !BUILD_OPENCL_12
-        /* No image3D support. */
-        clgDefaultDevice->deviceInfo.image3DMaxWidth  = 0;
-        clgDefaultDevice->deviceInfo.image3DMaxHeight = 0;
-        clgDefaultDevice->deviceInfo.image3DMaxDepth  = 0;
-#endif
 
         /* Query number GPUs. */
         gcoCL_QueryDeviceCount(&numDevices);
 
-        /* Allocate device array. */
-        status = gcoOS_Allocate(gcvNULL, sizeof(clsDeviceId) * numDevices, &pointer);
-        if (gcmIS_ERROR(status))
+        if(clgDevices == gcvNULL)
         {
-            gcmUSER_DEBUG_ERROR_MSG(
-                "OCL-001003: (clGetDeviceIDs) cannot allocate memory for devices.\n");
-            clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
-        }
+            gctPOINTER      pointer = gcvNULL;
+            gctUINT         i;
+            gctBOOL         version11 = gcvFALSE;
 
-        device = (clsDeviceId_PTR) pointer;
-        for (i = 0; i < numDevices; i++)
-        {
-            gceCHIPMODEL  chipModel;
-            gctUINT32 chipRevision;
-            gcePATCH_ID patchId = platform->patchId;
-            gctUINT offset;
-#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
-            gctBOOL skipCLGLSharingExtension = gcvFALSE;
-#endif
-#if BUILD_OPENCL_FP
-            gctSTRING epProfile = "EMBEDDED_PROFILE";
-            gctBOOL chipEnableFP = gcvFALSE;
-#endif
-            chipModel = clgDefaultDevice->deviceInfo.chipModel;
-            chipRevision = clgDefaultDevice->deviceInfo.chipRevision;
-#if BUILD_OPENCL_FP
-            chipEnableFP = ((chipModel == gcv2500 && chipRevision == 0x5422) ||
-                            (chipModel == gcv3000 && chipRevision == 0x5435) ||
-                            (chipModel == gcv7000));
-            if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) ||
-               (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE) ||
-               (chipEnableFP == gcvFALSE))
+            /* Borrow compiler mutex for hardware initialization. */
+            gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, platform->compilerMutex, gcvINFINITE));
+
+            if (gcvSTATUS_TRUE != gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_PIPE_CL))
             {
-                /*if the features on the device are not availble, still report embedded profile even if BUILD_OPENCL_FP is 1*/
-                clgDefaultDevice->profile = epProfile;
+                gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, platform->compilerMutex));
+
+                gcmUSER_DEBUG_ERROR_MSG(
+                        "OCL-001002: (clGetDeviceIDs) cannot initialized HW for OpenCL.\n");
+                clmRETURN_ERROR(CL_INVALID_VALUE);
             }
-#endif
 
-            gcoOS_MemCopy(&device[i], clgDefaultDevice, sizeof(clsDeviceId));
-            clmONERROR(gcoOS_AtomIncrement(gcvNULL, clgGlobalId, (gctINT*)&device[i].id), CL_INVALID_VALUE);
+            gcmVERIFY_OK(gcoOS_ReleaseMutex(gcvNULL, platform->compilerMutex));
 
-#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
-            if(patchId == gcvPATCH_COMPUTBENCH_CL)
+            /* Initialize default device info. */
+            clfGetDefaultDevice(gcvNULL);
+            clmONERROR(gcoCL_QueryDeviceInfo(&clgDefaultDevice->deviceInfo), CL_INVALID_VALUE);
+            clgDefaultDevice->dispatch  = platform->dispatch;
+            clgDefaultDevice->platform  = platform;
+
+            version11 = ((clgDefaultDevice->deviceInfo.chipModel == gcv1500 && clgDefaultDevice->deviceInfo.chipRevision == 0x5246) ||
+                    (clgDefaultDevice->deviceInfo.chipModel == gcv3000 && clgDefaultDevice->deviceInfo.chipRevision == 0x5450) ||
+                    (clgDefaultDevice->deviceInfo.chipModel == gcv2000 && clgDefaultDevice->deviceInfo.chipRevision == 0x5108) ||
+                    (clgDefaultDevice->deviceInfo.chipModel == gcv3000 && clgDefaultDevice->deviceInfo.chipRevision == 0x5513));
+            if (version11)
             {
-                skipCLGLSharingExtension = gcvTRUE;
-            }
-#endif
-
-            device[i].gpuId = i;
-            if (clgDefaultDevice->deviceInfo.atomicSupport)
-            {
-#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
-                device[i].extensions = skipCLGLSharingExtension ? extension_w_atomic_wo_glsharing : extension_w_atomic;
-#else
-                device[i].extensions = extension_w_atomic;
-#endif
+                /* No image3D support. */
+                clgDefaultDevice->deviceInfo.image3DMaxWidth  = 0;
+                clgDefaultDevice->deviceInfo.image3DMaxHeight = 0;
+                clgDefaultDevice->deviceInfo.image3DMaxDepth  = 0;
+                clgDefaultDevice->deviceVersion = cldVERSION11;
+                clgDefaultDevice->driverVersion = clfVERSION11;
+                clgDefaultDevice->openCLCVersion = clcVERSION11;
             }
             else
             {
-                device[i].extensions = extension_without_atomic;
+                clgDefaultDevice->deviceVersion = cldVERSION12;
+                clgDefaultDevice->driverVersion = clfVERSION12;
+                clgDefaultDevice->openCLCVersion = clcVERSION12;
             }
 
-            if(chipModel == gcv3000 && chipRevision == 0x5450)
+            /* Allocate device array. */
+            status = gcoOS_Allocate(gcvNULL, sizeof(clsDeviceId) * numDevices, &pointer);
+            if (gcmIS_ERROR(status))
             {
-                 gctSTRING productName = gcvNULL;
+                gcmUSER_DEBUG_ERROR_MSG(
+                        "OCL-001003: (clGetDeviceIDs) cannot allocate memory for devices.\n");
+                clmRETURN_ERROR(CL_OUT_OF_HOST_MEMORY);
+            }
 
-                gcoHAL_GetProductName(gcvNULL, &productName);
-
-                if (gcmIS_SUCCESS(gcoOS_StrCmp(productName, "GC2000+")))
-                {
+            clgDevices = (clsDeviceId_PTR) pointer;
+            for (i = 0; i < numDevices; i++)
+            {
+                gceCHIPMODEL  chipModel;
+                gctUINT32 chipRevision;
+                gcePATCH_ID patchId = platform->patchId;
+                gctUINT offset;
+                gctSTRING productName = gcvNULL;
 #if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
-                    device[i].extensions = skipCLGLSharingExtension ? extension_without_atomic_wo_glsharing : extension_without_atomic;
-#else
-                    device[i].extensions = extension_without_atomic;
+                gctBOOL skipCLGLSharingExtension = gcvFALSE;
 #endif
+                const gctSTRING epProfile = "EMBEDDED_PROFILE";
+                gctBOOL chipEnableEP = gcvFALSE;
+                chipModel = clgDefaultDevice->deviceInfo.chipModel;
+                chipRevision = clgDefaultDevice->deviceInfo.chipRevision;
+
+                chipEnableEP = ((chipModel == gcv1500 && chipRevision == 0x5246) ||
+                        (chipModel == gcv3000 && chipRevision == 0x5450) ||
+                        (chipModel == gcv2000 && chipRevision == 0x5108) ||
+                        (chipModel == gcv3000 && chipRevision == 0x5513) ||
+                        (chipModel == gcv5000));
+                if((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) != gcvSTATUS_TRUE) ||
+                        (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) != gcvSTATUS_TRUE)   ||
+                        chipEnableEP)
+                {
+                    /*if the features on the device are not availble, still report embedded profile even if BUILD_OPENCL_FP is 1*/
+                    clgDefaultDevice->profile = epProfile;
                 }
 
+                gcoOS_MemCopy(&clgDevices[i], clgDefaultDevice, sizeof(clsDeviceId));
+                clmONERROR(gcoOS_AtomIncrement(gcvNULL, clgGlobalId, (gctINT*)&clgDevices[i].id), CL_INVALID_VALUE);
+
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
+                if(patchId == gcvPATCH_COMPUTBENCH_CL)
+                {
+                    skipCLGLSharingExtension = gcvTRUE;
+                }
+#endif
+
+                clgDevices[i].gpuId = i;
+                if (clgDefaultDevice->deviceInfo.atomicSupport)
+                {
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
+                    clgDevices[i].extensions = skipCLGLSharingExtension ? extension_w_atomic_wo_glsharing : extension_w_atomic;
+#else
+                    clgDevices[i].extensions = extension_w_atomic;
+#endif
+                }
+                else
+                {
+                    clgDevices[i].extensions = extension_without_atomic;
+                }
+
+                gcoHAL_GetProductName(gcvNULL, &productName);
+                if(chipModel == gcv3000 && chipRevision == 0x5450)
+                {
+                    if (gcmIS_SUCCESS(gcoOS_StrCmp(productName, "GC2000+")))
+                    {
+#if defined(ANDROID) && (ANDROID_SDK_VERSION >= 20)
+                        clgDevices[i].extensions = skipCLGLSharingExtension ? extension_without_atomic_wo_glsharing : extension_without_atomic;
+#else
+                        clgDevices[i].extensions = extension_without_atomic;
+#endif
+                    }
+                }
+
+                offset = 0;
+                gcmVERIFY_OK(gcoOS_PrintStrSafe(clgDevices[i].name,
+                            64,
+                            &offset,
+                            "Vivante OpenCL Device %s.%04x.%04d",
+                            productName,
+                            chipRevision,
+                            patchId));
+
                 gcmOS_SAFE_FREE(gcvNULL, productName);
-
             }
-
-            offset = 0;
-            gcmVERIFY_OK(gcoOS_PrintStrSafe(device[i].name,
-                                            64,
-                                            &offset,
-                                            "Vivante OpenCL Device GC%04x.%04x.%04d",
-                                            chipModel,
-                                            chipRevision,
-                                            patchId));
         }
 
         platform->numDevices = numDevices;
-        platform->devices    = device;
+        platform->devices    = clgDevices;
     }
 
     switch((DeviceType)&0xFFFFFFFF)
@@ -352,6 +355,7 @@ clGetDeviceIDs(
         clmRETURN_ERROR(CL_INVALID_DEVICE_TYPE);
     }
 
+
     VCL_TRACE_API(GetDeviceIDs)(Platform, DeviceType, NumEntries, Devices, NumDevices);
     gcmFOOTER_ARG("%d *Devices=0x%x *NumDevices=%u",
                   CL_SUCCESS, gcmOPT_POINTER(Devices),
@@ -363,7 +367,6 @@ OnError:
     return status;
 }
 
-#if BUILD_OPENCL_12
 /*****************************************************************************\
 |*   sub-device is not supported in our driver, only add the error check     *|
 \*****************************************************************************/
@@ -528,9 +531,6 @@ OnError:
     return status;
 }
 
-
-#endif
-
 CL_API_ENTRY cl_int CL_API_CALL
 clGetDeviceInfo(
     cl_device_id    Device,
@@ -545,10 +545,8 @@ clGetDeviceInfo(
     gctPOINTER       retParamPtr = NULL;
     gctBOOL          isRetParamString = gcvFALSE;
     size_t           retValue_size_t[3];
-#if BUILD_OPENCL_12
     cl_bitfield      retValue_bitfield;
     cl_bool          retValue_bool;
-#endif
     gctINT           status;
 
     gcmHEADER_ARG("Device=0x%x ParamName=%u ParamValueSize=%lu ParamValue=0x%x",
@@ -611,7 +609,6 @@ clGetDeviceInfo(
         retParamPtr = &Device->deviceInfo.maxComputeUnits;
         break;
 
-#if BUILD_OPENCL_12
     case CL_DEVICE_PARTITION_MAX_SUB_DEVICES:
     case CL_DEVICE_PARTITION_PROPERTIES:
     case CL_DEVICE_PARTITION_TYPE:
@@ -625,7 +622,6 @@ clGetDeviceInfo(
         retParamSize = gcmSIZEOF(retValue_bitfield);
         retParamPtr = &retValue_bitfield;
         break;
-#endif
 
     case CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS:
         retParamSize = gcmSIZEOF(Device->deviceInfo.maxWorkItemDimensions);
@@ -721,9 +717,8 @@ clGetDeviceInfo(
         retParamSize = gcmSIZEOF(retValue_size_t[0]);
         retParamPtr = retValue_size_t;
         break;
-#if BUILD_OPENCL_12
+
     case CL_DEVICE_IMAGE_MAX_ARRAY_SIZE:
-#endif
     case CL_DEVICE_IMAGE3D_MAX_DEPTH:
         /*retParamSize = gcmSIZEOF(Device->deviceInfo.image3DMaxDepth);
         retParamPtr = &Device->deviceInfo.image3DMaxDepth;*/
@@ -905,7 +900,6 @@ clGetDeviceInfo(
         retParamPtr = &Device->deviceInfo.execCapability;
         break;
 
-#if BUILD_OPENCL_12
     case CL_DEVICE_IMAGE_MAX_BUFFER_SIZE:
         retParamSize = gcmSIZEOF(Device->deviceInfo.imageMaxBufferSize);
         retParamPtr = &Device->deviceInfo.imageMaxBufferSize;
@@ -940,7 +934,6 @@ clGetDeviceInfo(
         retParamSize = gcmSIZEOF(retValue_size_t[0]);
         retParamPtr = retValue_size_t;
         break;
-#endif
 
     default:
         gcmFOOTER_NO();

@@ -41,6 +41,7 @@ VIVANTE_ENABLE_3D   ?= 1
 VIVANTE_NO_VG       ?= 0
 
 LINUX_EMULATOR      ?= 0
+LINUX_VSIMULATOR    ?= 0
 NO_KERNEL           ?= 0
 
 USE_OPENCL          ?= 1
@@ -76,17 +77,19 @@ SOC_PLATFORM        ?= default
 
 ifeq ($(VIVANTE_ENABLE_3D),1)
   ifeq ($(USE_OPENCL),1)
+    ifeq ($(LINUX_VSIMULATOR),1)
+    ENABLE_CL_GL    ?= 0
+    BUILD_OPENCL_ICD:= 0
+    else
     ENABLE_CL_GL    ?= 1
     BUILD_OPENCL_ICD:= 1
-    BUILD_OPENCL_FP := 1
+    endif
   else
     ENABLE_CL_GL    ?= 0
     BUILD_OPENCL_ICD:= 0
-    BUILD_OPENCL_FP := 0
   endif
 else
   BUILD_OPENCL_ICD  := 0
-  BUILD_OPENCL_FP   := 0
 endif
 
 ifeq ($(VIVANTE_NO_VG),1)
@@ -311,18 +314,17 @@ endif
 
 ifeq ($(EGL_API_DRI),1)
   ifeq ($(YOCTO_DRI_BUILD),1)
-    CFLAGS          += -DDRI_PIXMAPRENDER_ASYNC
-    CFLAGS          += -DDRI_PIXMAPRENDER_GL
+    CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
   endif
+  CFLAGS          += -DDRI_PIXMAPRENDER_ASYNC
+  CFLAGS          += -DDRI_PIXMAPRENDER_GL
 
   ifeq ($(GL4_LINUX_ENABLE),1)
    CFLAGS            += -DEGL_API_DRI -DOPENGL40
   else
    CFLAGS            += -DEGL_API_DRI
   endif
-
   CFLAGS            += -I$(X11_ARM_DIR)/include
-  CFLAGS            += -I$(X11_ARM_DIR)/include/arm-linux-gnueabi
 endif
 
 ifeq ($(EGL_API_DFB),1)
@@ -394,6 +396,11 @@ else
   CFLAGS            += -DGC_ENABLE_LOADTIME_OPT=0
 endif
 
+
+ifeq ($(LINUX_VSIMULATOR),1)
+  CFLAGS            += -DEMULATOR -DVSIMULATOR_DEBUG
+  CXXFLAGS          += -DEMULATOR -DVSIMULATOR_DEBUG
+endif
 
 
 CFLAGS              += -DgcdGC355_MEM_PRINT=$(GC355_MEM_PRINT)

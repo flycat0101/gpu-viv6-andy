@@ -28,6 +28,7 @@ LOCAL_C_INCLUDES := \
 LOCAL_CFLAGS := \
     -Wall \
     -Wextra \
+    -Wno-unused-parameter \
     -DGPU_VENDOR=\"$(GPU_VENDOR)\" \
     -DLOG_TAG=\"v_vulkan\"
 

@@ -94,6 +94,7 @@ EXPORTS
     gcoOS_QueryVideoMemory
     gcoOS_LockPLS
 	gcoOS_LockGLFECompiler
+	gcoOS_LockCLFECompiler
     gcoOS_Read
     gcoOS_ReadRegister
     gcoOS_ReleaseMutex
@@ -128,6 +129,7 @@ EXPORTS
     gcoOS_StrToInt
     gcoOS_UnLockPLS
 	gcoOS_UnLockGLFECompiler
+	gcoOS_UnLockCLFECompiler
     gcoOS_UnmapUserMemory
     gcoOS_Verify
     gcoOS_WaitSignal
@@ -521,10 +523,6 @@ EXPORTS
     gco3D_Set3DEngine
     gco3D_Get3DEngine
     gco3D_UnSet3DEngine
-    gco3D_ComposeLayer
-    gco3D_CompositionBegin
-    gco3D_CompositionEnd
-    gco3D_CompositionSignals
     gco3D_Construct
     gco3D_Destroy
     gco3D_DrawIndexedPrimitives
@@ -542,7 +540,6 @@ EXPORTS
     gco3D_EnableDither
     gco3D_EnableTextureStage
     gco3D_InvokeThreadWalker
-    gco3D_ProbeComposition
     gco3D_Semaphore
     gco3D_FlushSHL1Cache
     gco3D_SetAALineTexSlot
@@ -558,6 +555,7 @@ EXPORTS
     gco3D_SetAlphaReferenceX
     gco3D_SetAlphaTest
     gco3D_SetAlphaTextureFunction
+    gco3D_SetAlphaKill
     gco3D_SetAntiAlias
     gco3D_SetSamples
     gco3D_SetAntiAliasLine
@@ -791,8 +789,12 @@ EXPORTS
     gcoCLHardware_Construct
     gcoCL_InitializeHardware
     gcoCL_SetHardware
+    gcoCL_RestoreContext
+    gcoCL_CreateHW
+    gcoCL_DestroyHW
     gcoCL_AllocateMemory
     gcoCL_FreeMemory
+    gcoCL_WrapUserMemory
     gcoCL_FlushMemory
     gcoCL_InvalidateMemoryCache
     gcoCL_ShareMemoryWithStream
@@ -818,6 +820,10 @@ EXPORTS
     gcoCL_InvokeThreadWalker
     gcoCL_SetSignal
     gcoCL_MultiGPUSync
+    gcoCL_MemBltCopy
+    gcoCL_MemWaitAndGetFence
+    gcoCL_MemIsFenceBack
+    gcoCL_ChooseBltEngine
 
     ; gcoPROFILER
     gcoPROFILER_Initialize
@@ -839,6 +845,8 @@ EXPORTS
     gcoPROFILER_NEW_RecordCounters
     gcoPROFILER_NEW_WriteCounters
     gcoPROFILER_NEW_Write
+    gcoPROFILER_NEW_GetPos
+    gcoPROFILER_NEW_Seek
     gcoPROFILER_NEW_Flush
 
     ; gcoMATH
@@ -1044,11 +1052,14 @@ EXPORTS
     gcoVX_WaitNNEvent
 
 !IF "$(VSIMULATOR_DEBUG)" == "1"
-	gcoOS_SetSimulatorCallback
+    gcoOS_UpdateSimulatorCallback
+    gcoOS_SetFrameworkType
     gcoVX_addDebugShader
     gcoVX_QueryShader
     gcoVX_QueryShaderList
     gcoVX_cleanDebugShader
+	gcoVX_addNNProfileInfo
+	gcoVX_QueryNNPerf
 !ENDIF
 
 !ENDIF

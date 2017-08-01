@@ -55,7 +55,7 @@ INSTALLDIR=$(firstword $(INSTALLDIR_$(OS)) samples/ovx/vx_tutorial3/)
 
 target_dir=$(INSTALL_ROOT_$(OS))/$(CPU)$(filter le be, $(VARIANT_LIST))$(CPUVARDIR_SUFFIX)/$(INSTALLDIR)
 
-POST_BUILD+= && $(CP_HOST) $(test_root)/test/ovx/vx_tutorial3/*.bmp $(target_dir)/
-POST_BUILD+= && $(CP_HOST) $(driver_root)/sdk/inc/CL/cl_viv_vx_ext.h $(target_dir)/
+POST_BUILD+= && $(CP_HOST) $(test_root)/test/ovx/vx_tutorial3/*.bmp $(target_dir)/ -f
+POST_BUILD+= && $(CP_HOST) $(driver_root)/sdk/inc/CL/cl_viv_vx_ext.h $(target_dir)/ -f
 
 include $(MKFILES_ROOT)/qtargets.mk

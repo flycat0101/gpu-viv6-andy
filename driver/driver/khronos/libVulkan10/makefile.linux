@@ -68,6 +68,7 @@ OBJECTS := \
     $(OBJ_DIR)/gc_vk_utils.o \
     $(OBJ_DIR)/gc_vk_validation.o \
     $(OBJ_DIR)/gc_wsi_surface.o \
+    $(OBJ_DIR)/gc_wsi_display.o \
     $(OBJ_DIR)/gc_wsi_swapchain.o
 
 # fbdev display.

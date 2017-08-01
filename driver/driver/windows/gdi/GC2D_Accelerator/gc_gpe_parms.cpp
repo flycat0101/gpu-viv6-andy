@@ -407,7 +407,7 @@ gctBOOL GC2DParms::SetSurface(
                 return gcvFALSE;
             }
 
-            status = gcoHAL_LockVideoMemory(node, gcvFALSE, &address, gcvNULL);
+            status = gcoHAL_LockVideoMemory(node, gcvFALSE, gcvENGINE_RENDER, &address, gcvNULL);
             if (gcmIS_ERROR(status))
             {
                 gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(node));
@@ -484,7 +484,8 @@ gctBOOL GC2DParms::ResetSurface(gctBOOL bSrc)
     {
         gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(
             surf->mWrappedNode,
-            gcvSURF_BITMAP));
+            gcvSURF_BITMAP,
+            gcvENGINE_RENDER));
 
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(
             surf->mWrappedNode));

@@ -47,6 +47,9 @@ VX_API_ENTRY vx_distribution VX_API_CALL vxCreateDistribution(vx_context context
     distribution->offsetX   = (vx_uint32)offset;
     distribution->offsetY   = 0;
 
+    distribution->rangeX    = range;
+    distribution->rangeY    = 1;
+
     return distribution;
 }
 
@@ -63,37 +66,45 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryDistribution(vx_distribution distribut
 
     switch (attribute)
     {
-        case VX_DISTRIBUTION_ATTRIBUTE_DIMENSIONS:
+        case VX_DISTRIBUTION_DIMENSIONS:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size*)ptr = (vx_size)(distribution->memory.dimCount - 1);
             break;
 
-        case VX_DISTRIBUTION_ATTRIBUTE_RANGE:
-            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
+        case VX_DISTRIBUTION_RANGE:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_int32, 0x3);
 
-            *(vx_uint32*)ptr = (vx_uint32)(distribution->memory.dims[0][VX_DIM_X] * distribution->windowX);
+            *(vx_int32*)ptr = (vx_int32)(distribution->rangeX);
             break;
 
-        case VX_DISTRIBUTION_ATTRIBUTE_BINS:
+        case VX_DISTRIBUTION_BINS:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size*)ptr = (vx_size)distribution->memory.dims[0][VX_DIM_X];
             break;
 
-        case VX_DISTRIBUTION_ATTRIBUTE_WINDOW:
+        case VX_DISTRIBUTION_WINDOW:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
-            *(vx_uint32*)ptr = distribution->windowX;
+            {
+                vx_size nbins = (vx_size)distribution->memory.dims[0][VX_DIM_X];
+                vx_uint32 range = (vx_uint32)(distribution->rangeX);
+                vx_size window = range / nbins;
+                if (window*nbins == range)
+                    *(vx_uint32*)ptr = (vx_uint32)window;
+                else
+                    *(vx_uint32*)ptr = 0;
+            }
             break;
 
-        case VX_DISTRIBUTION_ATTRIBUTE_OFFSET:
+        case VX_DISTRIBUTION_OFFSET:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_int32, 0x3);
 
             *(vx_int32*)ptr = (vx_int32)distribution->offsetX;
             break;
 
-        case VX_DISTRIBUTION_ATTRIBUTE_SIZE:
+        case VX_DISTRIBUTION_SIZE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             dims = distribution->memory.dimCount - 1;
@@ -169,6 +180,169 @@ VX_API_ENTRY vx_status VX_API_CALL vxCommitDistribution(vx_distribution distribu
     vxoReference_Decrement(&distribution->base, VX_REF_EXTERNAL);
 
     return VX_SUCCESS;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxCopyDistribution(vx_distribution distribution, void *user_ptr, vx_enum usage, vx_enum mem_type)
+{
+    vx_status status = VX_FAILURE;
+    vx_size size = 0;
+
+    /* bad references */
+    if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION) ||
+        (vxoMemory_Allocate(distribution->base.context, &distribution->memory) != vx_true_e))
+    {
+        status = VX_ERROR_INVALID_REFERENCE;
+        vxError("Not a valid distribution object!\n");
+        return status;
+    }
+
+    /* bad parameters */
+    if (((usage != VX_READ_ONLY) && (usage != VX_WRITE_ONLY)) ||
+        (user_ptr == NULL) || (mem_type != VX_MEMORY_TYPE_HOST))
+    {
+        status = VX_ERROR_INVALID_PARAMETERS;
+        vxError("Invalid parameters to copy distribution\n");
+        return status;
+    }
+
+    /* copy data */
+    size = vxoMemory_ComputeSize(&distribution->memory, 0);
+
+    switch (usage)
+    {
+    case VX_READ_ONLY:
+        if (vxAcquireMutex(distribution->base.lock) == vx_true_e)
+        {
+            memcpy(user_ptr, distribution->memory.logicals[0], size);
+            vxReleaseMutex(distribution->base.lock);
+
+            vxoReference_IncrementReadCount(&distribution->base);
+            status = VX_SUCCESS;
+        }
+        break;
+    case VX_WRITE_ONLY:
+        if (vxAcquireMutex(distribution->base.lock) == vx_true_e)
+        {
+            memcpy(distribution->memory.logicals[0], user_ptr, size);
+            vxReleaseMutex(distribution->base.lock);
+
+            vxoReference_IncrementWriteCount(&distribution->base);
+            status = VX_SUCCESS;
+        }
+        break;
+    }
+
+    return status;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxMapDistribution(vx_distribution distribution, vx_map_id *map_id, void **ptr, vx_enum usage, vx_enum mem_type, vx_bitfield flags)
+{
+    vx_status status = VX_FAILURE;
+    vx_size size = 0;
+
+    /* bad references */
+    if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION) ||
+        (vxoMemory_Allocate(distribution->base.context, &distribution->memory) != vx_true_e))
+    {
+        status = VX_ERROR_INVALID_REFERENCE;
+        vxError("Not a valid distribution object!\n");
+        return status;
+    }
+
+    /* bad parameters */
+    if (((usage != VX_READ_ONLY) && (usage != VX_READ_AND_WRITE) && (usage != VX_WRITE_ONLY)) ||
+        (mem_type != VX_MEMORY_TYPE_HOST))
+    {
+        status = VX_ERROR_INVALID_PARAMETERS;
+        vxError("Invalid parameters to map distribution\n");
+        return status;
+    }
+
+    /* map data */
+    size = vxoMemory_ComputeSize(&distribution->memory, 0);
+
+    if (vxoContext_MemoryMap(distribution->base.context, (vx_reference)distribution, size, usage, mem_type, flags, NULL, ptr, map_id) == vx_true_e)
+    {
+        switch (usage)
+        {
+        case VX_READ_ONLY:
+        case VX_READ_AND_WRITE:
+            if (vxAcquireMutex(distribution->base.lock) == vx_true_e)
+            {
+                memcpy(*ptr, distribution->memory.logicals[0], size);
+                vxReleaseMutex(distribution->base.lock);
+
+                vxoReference_IncrementReadCount(&distribution->base);
+                status = VX_SUCCESS;
+            }
+            break;
+        case VX_WRITE_ONLY:
+            status = VX_SUCCESS;
+            break;
+        }
+
+        if (status == VX_SUCCESS)
+            vxoReference_Increment(&distribution->base, VX_REF_EXTERNAL);
+    }
+
+    return status;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxUnmapDistribution(vx_distribution distribution, vx_map_id map_id)
+{
+    vx_status status = VX_FAILURE;
+    vx_size size = 0;
+
+    /* bad references */
+    if (!vxoReference_IsValidAndSpecific(&distribution->base, VX_TYPE_DISTRIBUTION) ||
+        (vxoMemory_Allocate(distribution->base.context, &distribution->memory) != vx_true_e))
+    {
+        status = VX_ERROR_INVALID_REFERENCE;
+        vxError("Not a valid distribution object!\n");
+        return status;
+    }
+
+    /* bad parameters */
+    if (vxoContext_FindMemoryMap(distribution->base.context, (vx_reference)distribution, map_id) != vx_true_e)
+    {
+        status = VX_ERROR_INVALID_PARAMETERS;
+        vxError("Invalid parameters to unmap distribution\n");
+        return status;
+    }
+
+    /* unmap data */
+    size = vxoMemory_ComputeSize(&distribution->memory, 0);
+
+    {
+        vx_uint32 id = (vx_uint32)map_id;
+        vx_memory_map_s* map = &distribution->base.context->memoryMaps[id];
+
+        switch (map->usage)
+        {
+        case VX_READ_ONLY:
+            status = VX_SUCCESS;
+            break;
+        case VX_READ_AND_WRITE:
+        case VX_WRITE_ONLY:
+            if (vxAcquireMutex(distribution->base.lock) == vx_true_e)
+            {
+                memcpy(distribution->memory.logicals[0], map->logical, size);
+                vxReleaseMutex(distribution->base.lock);
+
+                vxoReference_IncrementWriteCount(&distribution->base);
+                status = VX_SUCCESS;
+            }
+            break;
+        }
+
+        vxoContext_MemoryUnmap(distribution->base.context, map_id);
+
+        /* regardless of the current status, if we're here, so previous call to vxMapDistribution()
+         * was successful and thus ref was locked once by a call to vxoReference_Increment() */
+        vxoReference_Decrement(&distribution->base, VX_REF_EXTERNAL);
+    }
+
+    return status;
 }
 
 

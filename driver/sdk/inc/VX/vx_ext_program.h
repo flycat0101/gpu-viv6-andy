@@ -148,8 +148,8 @@ VX_API_ENTRY vx_status VX_API_CALL vxBuildProgram(vx_program program, const vx_c
 VX_API_ENTRY vx_status VX_API_CALL vxQueryProgram(vx_program program, vx_enum attribute, void *ptr, vx_size size);
 
 VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernelInProgram(
-        vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration, vx_uint32 num_params, vx_kernel_input_validate_f input,
-        vx_kernel_output_validate_f output, vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize);
+        vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration, vx_uint32 num_params, vx_kernel_validate_f validate,
+        vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize);
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetNodeUniform(vx_node node, const vx_char * name, vx_size count, void * value);
 

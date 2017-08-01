@@ -533,8 +533,9 @@ typedef struct __GLchipProgramFlagsRec
     gctUINT deqpMinCompTime         : 1;    /* for compile-time purpose */
 
     gctUINT helperInvocationCheck   : 1;
+    gctUINT wideLineFix             : 1;
 
-    gctUINT reserved                : 10;
+    gctUINT reserved                : 9;
 
 
 } __GLchipProgramFlags;

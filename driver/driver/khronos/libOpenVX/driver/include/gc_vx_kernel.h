@@ -25,6 +25,7 @@ VX_INTERNAL_API vx_status vxoKernel_Initialize(
     vx_kernel_f function,
     vx_param_description_s * parameters,
     vx_uint32 paramCount,
+    vx_kernel_validate_f validateFunction,
     vx_kernel_input_validate_f inputValidateFunction,
     vx_kernel_output_validate_f outputValidateFunction,
     vx_kernel_initialize_f initializeFunction,
@@ -44,13 +45,35 @@ VX_INTERNAL_API vx_bool vxoKernel_IsUnique(vx_kernel kernel);
 
 VX_INTERNAL_API vx_kernel vxoKernel_GetByEnum(vx_context context, vx_enum kernelEnum);
 
+VX_INTERNAL_API vx_kernel vxoKernel_GetByEnumFromTarget(vx_context context, vx_target target, vx_uint32 targetIndex, vx_enum kernelEnum);
+
 VX_INTERNAL_API vx_status vxoKernel_ExternalRelease(vx_kernel_ptr kernelPtr);
+
+VX_INTERNAL_API vx_status vxoKernel_ProcessKernelShaderPrint(vx_kernel kernel, vx_kernel_execution_parameters_t* shaderParameter);
+
+
+VX_INTERNAL_API vx_status vxoKernel_CreateShaders(vx_program program, vx_char *name, vx_uint32* kernelShaderCount, vx_shader ** kernelShaders);
+
+VX_INTERNAL_API vx_status vxoShader_SetParameters(vx_shader kernelShader, vx_reference parameters[], vx_uint32 paramCount, vx_enum dataTypeTable[]);
+
+VX_INTERNAL_API vx_status vxoShader_Free(vx_shader kernel);
+
+VX_INTERNAL_API vx_status vxoShader_Execute(
+    vx_shader kernelShader,
+    vx_border_mode_t *borderMode,
+    vx_kernel_execution_parameters_t *shaderParameter,
+    gctPOINTER* devices,
+    vx_uint32 deviceCount);
+
+VX_INTERNAL_API vx_status vxoShader_SetUniform(vx_shader shader, vx_char * name, vx_size count, void * value);
+
+VX_INTERNAL_API vx_status vxoShader_GetUniformSize(vx_shader shader, vx_char * name, vx_uint32 *size);
 
 VX_INTERNAL_CALLBACK_API void vxoKernel_Destructor(vx_reference ref);
 
 VX_API_ENTRY vx_kernel VX_API_CALL vxAddKernelInProgramEx(
         vx_program program, vx_char name[VX_MAX_KERNEL_NAME], vx_enum enumeration, vx_kernel_f func_ptr,
-        vx_uint32 num_params, vx_kernel_input_validate_f input,
+        vx_uint32 num_params, vx_kernel_validate_f validate, vx_kernel_input_validate_f input,
         vx_kernel_output_validate_f output, vx_kernel_initialize_f initialize, vx_kernel_deinitialize_f deinitialize);
 
 VX_API_ENTRY vx_status VX_CALLBACK vxProgramKernel_Function(vx_node node, const vx_reference parameters[], vx_uint32 paramCount);

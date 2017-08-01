@@ -31,6 +31,8 @@ BEGIN_EXTERN_C()
 typedef VSC_SIMPLE_QUEUE  VIR_LIB_WORKLIST;
 typedef VSC_SIMPLE_QUEUE  VIR_LIB_CALLSITES;
 
+typedef struct _VIR_LinkLib_CONTEXT     VIR_LinkLibContext;
+
 typedef struct _VIR_LINKER_CALL_INST_NODE         VIR_LINKER_CALL_INST_NODE;
 
 struct _VIR_LINKER_CALL_INST_NODE
@@ -71,6 +73,7 @@ VIR_TypeId VIR_LinkLib_TypeConv(
 
 VSC_ErrCode
 VIR_Lib_LinkFunctions(
+    IN  VIR_LinkLibContext      *Context,
     IN  VIR_Shader              *pShader,
     IN  VIR_Shader              *pLibShader,
     IN  VSC_MM                  *pMM,
@@ -155,8 +158,6 @@ VIR_Intrinsic_LibList_GetNodeByLibKind(
 /* functions for link lib library (e.g., recompile) */
 typedef VSC_SIMPLE_QUEUE  VIR_TRANS_WORKLIST;
 
-typedef struct _VIR_LinkLib_CONTEXT     VIR_LinkLibContext;
-
 typedef struct _VIR_LinkLib_TRANSPOINT
 {
     /* for output cvt */
@@ -185,6 +186,7 @@ struct _VIR_LinkLib_CONTEXT
 {
     VIR_Shader                          *shader;
     VIR_Shader                          *libShader;
+    VSC_HASH_TABLE                      *pTempHashTable;
     VIR_ShaderKind                      shaderKind;
     VSC_LIB_LINK_POINT                  *linkPoint;
     gctUINT                             libSpecializationConstantCount;

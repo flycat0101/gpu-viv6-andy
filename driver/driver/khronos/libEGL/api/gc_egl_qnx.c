@@ -1309,15 +1309,15 @@ _CreateWindowBuffers(
 
     /* If the front buffer is non zero, I need to add it to the list (in case it is not already there */
     if (front_buf != NULL) {
-        for (i = 0; i <= num_of_buffers; i++) {
+        for (i = 0; i < num_of_buffers; i++) {
             /* Check if the front buffer is already in the list (probably just the case when the window does have only one buffer */
             if (bufs[i] == front_buf) {
                 break;
             }
-            if (i == num_of_buffers) {
-                bufs[num_of_buffers] = front_buf; /* Not found, add it to the list and increase the num of buffers */
-                num_of_buffers++;
-            }
+        }
+        if (i == num_of_buffers) {
+            bufs[num_of_buffers] = front_buf; /* Not found, add it to the list and increase the num of buffers */
+            num_of_buffers++;
         }
     }
 
@@ -1926,8 +1926,8 @@ _PostWindowBackBuffer(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN struct eglBackBuffer * BackBuffer,
-    IN EGLint NumRects,
-    IN EGLint Rects[]
+    IN struct eglRegion * Region,
+    IN struct eglRegion * DamageHint
     )
 {
     void * win = Surface->hwnd;
@@ -1950,8 +1950,8 @@ _PostWindowBackBuffer(
         status = qnx_DisplayBufferRegions((PlatformDisplayType)gcmPTR2INT32(Display->hdc),
                                             (PlatformWindowType) win,
                                             screen_buf,
-                                            NumRects,
-                                            Rects);
+                                            Region->numRects,
+                                            Region->rects);
 
         if (gcmIS_ERROR(status))
         {
@@ -2007,12 +2007,12 @@ _PostWindowBackBuffer(
             return EGL_FALSE;
         }
 
-        for (i = 0; i < NumRects; i++)
+        for (i = 0; i < Region->numRects; i++)
         {
-            EGLint left   = Rects[i * 4 + 0];
-            EGLint top    = Rects[i * 4 + 1];
-            EGLint width  = Rects[i * 4 + 2];
-            EGLint height = Rects[i * 4 + 3];
+            EGLint left   = Region->rects[i * 4 + 0];
+            EGLint top    = Region->rects[i * 4 + 1];
+            EGLint width  = Region->rects[i * 4 + 2];
+            EGLint height = Region->rects[i * 4 + 3];
 
             /* Draw image. */
             status = qnx_DrawImageEx((PlatformDisplayType)gcmPTR2INT32(Display->hdc),

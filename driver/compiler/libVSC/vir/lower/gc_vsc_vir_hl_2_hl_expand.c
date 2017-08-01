@@ -848,7 +848,7 @@ _GenInvocationIndex(
     /* src0 - (Y, Z) */
     src = VIR_Inst_GetSource(mul1Inst, 0);
     VIR_Operand_SetOpKind(src, VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(src, VIR_TYPE_UINT_X2);
+    VIR_Operand_SetTypeId(src, VIR_TYPE_UINT_X2);
     VIR_Operand_SetSym(src, newVarSym);
     VIR_Operand_SetSwizzle(src, VIR_SWIZZLE_YZZZ);
 
@@ -967,7 +967,7 @@ _GenInvocationIndex(
     /* src1 */
     src = VIR_Inst_GetSource(add2Inst, 1);
     VIR_Operand_SetOpKind(src, VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(src, VIR_TYPE_UINT32);
+    VIR_Operand_SetTypeId(src, VIR_TYPE_UINT32);
     VIR_Operand_SetSym(src, newVarSym);
     VIR_Operand_SetSwizzle(src, VIR_SWIZZLE_XXXX);
 
@@ -1096,7 +1096,7 @@ _GenWorkGroupIndex(
     /* src0 - (Y, Z) */
     src = VIR_Inst_GetSource(mul1Inst, 0);
     VIR_Operand_SetOpKind(src, VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(src, VIR_TYPE_UINT_X2);
+    VIR_Operand_SetTypeId(src, VIR_TYPE_UINT_X2);
     VIR_Operand_SetSym(src, newVarSym);
     VIR_Operand_SetSwizzle(src, VIR_SWIZZLE_YZZZ);
 
@@ -1217,7 +1217,7 @@ _GenWorkGroupIndex(
     /* src1 */
     src = VIR_Inst_GetSource(add2Inst, 1);
     VIR_Operand_SetOpKind(src, VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(src, VIR_TYPE_UINT32);
+    VIR_Operand_SetTypeId(src, VIR_TYPE_UINT32);
     VIR_Operand_SetSym(src, newVarSym);
     VIR_Operand_SetSwizzle(src, VIR_SWIZZLE_XXXX);
 
@@ -1348,7 +1348,7 @@ _GenInstanceIndex(
     /* src0 - instanceId */
     src = VIR_Inst_GetSource(addInst, 0);
     VIR_Operand_SetOpKind(src, VIR_OPND_SYMBOL);
-    VIR_Operand_SetType(src, VIR_TYPE_UINT32);
+    VIR_Operand_SetTypeId(src, VIR_TYPE_UINT32);
     VIR_Operand_SetSym(src, newVarSym);
     VIR_Operand_SetSwizzle(src, VIR_SWIZZLE_X);
 
@@ -2547,7 +2547,7 @@ _ReplaceInterfaceBlockWithBaseSymbol(
     }
 
     /* Update the symbol and operand type. */
-    VIR_Operand_SetType(Operand, VIR_Type_GetIndex(type));
+    VIR_Operand_SetTypeId(Operand, VIR_Type_GetIndex(type));
     VIR_Operand_SetSym(Operand, replaceSym);
     VIR_Operand_SetPrecision(Operand, VIR_Symbol_GetPrecision(replaceSym));
 
@@ -3059,7 +3059,7 @@ _ConvMatrixOperandToVectorOperand(
     VIR_SymId                    symId;
     VIR_Symbol                  *symbol;
     VIR_OperandKind              opKind = VIR_Operand_GetOpKind(MatrixOperand);
-    VIR_TypeId                   matrixTypeId = VIR_Operand_GetType(MatrixOperand);
+    VIR_TypeId                   matrixTypeId = VIR_Operand_GetTypeId(MatrixOperand);
     VIR_TypeId                   rowTypeId = VIR_GetTypeRowType(matrixTypeId);
     VIR_Enable                   enable = VIR_TypeId_Conv2Enable(rowTypeId);
     VIR_Swizzle                  swizzle = VIR_Enable_2_Swizzle_WShift(enable);
@@ -3088,7 +3088,7 @@ _ConvMatrixOperandToVectorOperand(
             {
                 VIR_Operand_Copy(vectorOperand, MatrixOperand);
                 VIR_Operand_SetMatrixConstIndex(vectorOperand, MatrixIndex);
-                VIR_Operand_SetType(vectorOperand, rowTypeId);
+                VIR_Operand_SetTypeId(vectorOperand, rowTypeId);
             }
             else
             {
@@ -3172,7 +3172,7 @@ _SplitMatrixMulScalar(
     )
 {
     VSC_ErrCode                  errCode  = VSC_ERR_NONE;
-    VIR_TypeId                   src0TypeId = VIR_Operand_GetType(VIR_Inst_GetSource(Inst, 0));
+    VIR_TypeId                   src0TypeId = VIR_Operand_GetTypeId(VIR_Inst_GetSource(Inst, 0));
     VIR_TypeId                   newTypeId = VIR_GetTypeRowType(src0TypeId);
     VIR_Instruction             *newInst = gcvNULL;
     VIR_Operand                 *newOperand;
@@ -3246,7 +3246,7 @@ _SplitMatrixMulVector(
     VIR_VirRegId                 virRegId;
     gctINT                       i, rowCount;
 
-    src0TypeId = VIR_Operand_GetType(Source0);
+    src0TypeId = VIR_Operand_GetTypeId(Source0);
     vectorTypeId = VIR_GetTypeRowType(src0TypeId);
 
     rowCount = VIR_GetTypeRows(src0TypeId);
@@ -3358,8 +3358,8 @@ _SplitMatrixMulMatrix(
     VIR_Operand                 *src1 = VIR_Inst_GetSource(Inst, 1);
     VIR_Operand                 *vectorOperand;
     VIR_Operand                 *newOperand;
-    VIR_TypeId                   src0TypeId = VIR_Operand_GetType(src0);
-    VIR_TypeId                   src1TypeId = VIR_Operand_GetType(src1);
+    VIR_TypeId                   src0TypeId = VIR_Operand_GetTypeId(src0);
+    VIR_TypeId                   src1TypeId = VIR_Operand_GetTypeId(src1);
     VIR_TypeId                   vectorTypeId = VIR_GetTypeRowType(src1TypeId);
     VIR_SymId                    returnValueSymId[4] = {VIR_INVALID_ID, VIR_INVALID_ID, VIR_INVALID_ID, VIR_INVALID_ID};
     VIR_Instruction             *newInst;
@@ -3447,8 +3447,8 @@ _SplitVectorMulVector(
     VIR_Operand                 *dest = VIR_Inst_GetDest(Inst);
     VIR_Operand                 *src0 = VIR_Inst_GetSource(Inst, 0);
     VIR_Operand                 *src1 = VIR_Inst_GetSource(Inst, 1);
-    VIR_TypeId                   rowTypeId = VIR_Operand_GetType(src0);
-    VIR_TypeId                   columnTypeId = VIR_Operand_GetType(src1);
+    VIR_TypeId                   rowTypeId = VIR_Operand_GetTypeId(src0);
+    VIR_TypeId                   columnTypeId = VIR_Operand_GetTypeId(src1);
     VIR_TypeId                   scalarTypeId = VIR_GetTypeComponentType(rowTypeId);
     VIR_OpCode                   opcode = VIR_OP_MUL;
     VIR_Instruction             *newInst = gcvNULL;
@@ -3486,7 +3486,7 @@ _SplitVectorMulVector(
         /* Set SOURCE1. */
         newOperand = VIR_Inst_GetSource(newInst, 1);
         VIR_Operand_Copy(newOperand, src1);
-        VIR_Operand_SetType(newOperand, scalarTypeId);
+        VIR_Operand_SetTypeId(newOperand, scalarTypeId);
         VIR_Operand_SetSwizzle(newOperand,
             VIR_Swizzle_Trim(VIR_Operand_GetSwizzle(src1), (VIR_Enable)(1 << i)));
     }
@@ -3511,9 +3511,9 @@ _SplitVectorMulMatrix(
     VIR_Operand                 *src0 = VIR_Inst_GetSource(Inst, 0);
     VIR_Operand                 *src1 = VIR_Inst_GetSource(Inst, 1);
     VIR_Operand                 *newOperand;
-    VIR_TypeId                   src1TypeId = VIR_Operand_GetType(src1);
+    VIR_TypeId                   src1TypeId = VIR_Operand_GetTypeId(src1);
     VIR_TypeId                   componentTypeId = VIR_GetTypeComponentType(src1TypeId);
-    VIR_TypeId                   vectorTypeId = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
+    VIR_TypeId                   vectorTypeId = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
     VIR_OpCode                   opcode;
     VIR_VirRegId                 virRegId;
     VIR_SymId                    symId;
@@ -3616,10 +3616,10 @@ _SplitMatrixMul(
     gctBOOL                      isSrc0Matrix = gcvFALSE, isSrc1Matrix = gcvFALSE;
     gctBOOL                      isSrc0Vector = gcvFALSE, isSrc1Vector = gcvFALSE;
 
-    src0TypeId = VIR_Operand_GetType(src0);
-    src1TypeId = VIR_Operand_GetType(src1);
+    src0TypeId = VIR_Operand_GetTypeId(src0);
+    src1TypeId = VIR_Operand_GetTypeId(src1);
 
-    gcmASSERT(VIR_TypeId_isPrimitive(VIR_Operand_GetType(VIR_Inst_GetDest(Inst))) &&
+    gcmASSERT(VIR_TypeId_isPrimitive(VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst))) &&
               VIR_TypeId_isPrimitive(src0TypeId) &&
               VIR_TypeId_isPrimitive(src1TypeId));
 
@@ -3685,7 +3685,7 @@ _SplitMatrixLoadStore(
     VIR_Operand                 *origDest = VIR_Inst_GetDest(Inst);
     VIR_Operand                 *baseAddr = VIR_Inst_GetSource(Inst, 0);
     VIR_Operand                 *origOffset = VIR_Inst_GetSource(Inst, 1);
-    VIR_TypeId                   destTypeId = VIR_Operand_GetType(origDest);
+    VIR_TypeId                   destTypeId = VIR_Operand_GetTypeId(origDest);
     VIR_Type                    *destType = VIR_Shader_GetTypeFromId(Shader, destTypeId);
     VIR_TypeId                   componentTypeId = VIR_GetTypeComponentType(destTypeId);
     VIR_Instruction             *newInst = gcvNULL;
@@ -3818,7 +3818,7 @@ _SplitMatrixLoadStore(
                                                             &newOperand);
                 CHECK_ERROR(errCode, "_ConvMatrixOperandToVectorOperand failed.");
                 VIR_Operand_SetEnable(newOperand, VIR_ENABLE_X << j);
-                VIR_Operand_SetType(newOperand, componentTypeId);
+                VIR_Operand_SetTypeId(newOperand, componentTypeId);
                 VIR_Inst_SetDest(newInst, newOperand);
 
                 /* Set SOURCE0. */
@@ -3841,7 +3841,7 @@ _SplitMatrixLoadStore(
                                                                 &newOperand);
                     CHECK_ERROR(errCode, "_ConvMatrixOperandToVectorOperand failed.");
                     VIR_Operand_SetSwizzle(newOperand, VIR_Enable_2_Swizzle_WShift(VIR_ENABLE_X << j));
-                    VIR_Operand_SetType(newOperand, componentTypeId);
+                    VIR_Operand_SetTypeId(newOperand, componentTypeId);
                     VIR_Inst_SetSource(newInst, 2, newOperand);
                 }
             }
@@ -3920,7 +3920,7 @@ _SplitIntrinsicMatrixSrcOpnd(
     {
         VIR_TypeId typeId;
         srcOpnd = opndParm->args[i];
-        typeId = VIR_Operand_GetType(srcOpnd);
+        typeId = VIR_Operand_GetTypeId(srcOpnd);
 
         if (VIR_TypeId_isPrimitive(typeId) && (VIR_GetTypeRows(typeId) > 1))
         {
@@ -3942,7 +3942,7 @@ _SplitIntrinsicMatrixSrcOpnd(
         {
             VIR_TypeId typeId;
             srcOpnd = opndParm->args[i];
-            typeId = VIR_Operand_GetType(srcOpnd);
+            typeId = VIR_Operand_GetTypeId(srcOpnd);
 
             if (VIR_TypeId_isPrimitive(typeId) && (VIR_GetTypeRows(typeId) > 1))
             {
@@ -4116,7 +4116,7 @@ _SplitCompositeRegAssignment(
     VIR_Operand                 *source = VIR_Inst_GetSource(Inst, 0);
     VIR_Symbol                  *sourceSymbol = VIR_Operand_GetSymbol(source);
     VIR_Type                    *destType = VIR_Shader_GetTypeFromId(Shader,
-                                                VIR_Operand_GetType(dest));
+                                                VIR_Operand_GetTypeId(dest));
     VIR_SymbolKind               destOffsetKind = VIR_SYM_UNKNOWN, sourceOffsetKind = VIR_SYM_UNKNOWN;
     VIR_SymId                    destOffset = VIR_INVALID_ID, sourceOffset = VIR_INVALID_ID;
 
@@ -4279,7 +4279,7 @@ _SplitArrayMemoryAssignment(
         newOperand = VIR_Inst_GetDest(newInst);
         VIR_Operand_Copy(newOperand, Dest);
         enable = VIR_TypeId_isPrimitive(baseTypeId) ? VIR_TypeId_Conv2Enable(baseTypeId) : VIR_ENABLE_NONE;
-        VIR_Operand_SetType(newOperand, baseTypeId);
+        VIR_Operand_SetTypeId(newOperand, baseTypeId);
         VIR_Operand_SetEnable(newOperand, enable);
         VIR_Operand_SetRelIndexingImmed(newOperand, destRegOffset);
 
@@ -4297,7 +4297,7 @@ _SplitArrayMemoryAssignment(
         {
             newOperand = VIR_Inst_GetSource(newInst, 2);
             VIR_Operand_Copy(newOperand, Data);
-            VIR_Operand_SetType(newOperand, baseTypeId);
+            VIR_Operand_SetTypeId(newOperand, baseTypeId);
             VIR_Operand_SetSwizzle(newOperand, VIR_Enable_2_Swizzle_WShift(enable));
             VIR_Operand_SetRelIndexingImmed(newOperand, destRegOffset);
         }
@@ -4387,7 +4387,7 @@ _SplitStructMemoryAssignment(
         newOperand = VIR_Inst_GetDest(newInst);
         VIR_Operand_Copy(newOperand, Dest);
         enable = VIR_TypeId_isPrimitive(fieldTypeId) ? VIR_TypeId_Conv2Enable(fieldTypeId) : VIR_ENABLE_NONE;
-        VIR_Operand_SetType(newOperand, fieldTypeId);
+        VIR_Operand_SetTypeId(newOperand, fieldTypeId);
         VIR_Operand_SetEnable(newOperand, enable);
         VIR_Operand_SetRelIndexingImmed(newOperand, destRegOffset);
 
@@ -4405,7 +4405,7 @@ _SplitStructMemoryAssignment(
         {
             newOperand = VIR_Inst_GetSource(newInst, 2);
             VIR_Operand_Copy(newOperand, Data);
-            VIR_Operand_SetType(newOperand, fieldTypeId);
+            VIR_Operand_SetTypeId(newOperand, fieldTypeId);
             VIR_Operand_SetSwizzle(newOperand, VIR_Enable_2_Swizzle_WShift(enable));
             VIR_Operand_SetRelIndexingImmed(newOperand, destRegOffset);
         }
@@ -4430,7 +4430,7 @@ _SplitAggregateMemoryAssignment(
     VIR_Operand                 *baseOffset = VIR_Inst_GetSource(Inst, 1);
     VIR_Operand                 *data = gcvNULL;
     VIR_Type                    *destType = VIR_Shader_GetTypeFromId(Shader,
-                                                VIR_Operand_GetType(dest));
+                                                VIR_Operand_GetTypeId(dest));
 
     if (VIR_OPCODE_isMemSt(opCode))
     {
@@ -4539,7 +4539,7 @@ static VSC_ErrCode _VIR_HL_Preprocess(
             dest = VIR_Inst_GetDest(inst);
             if (dest && VIR_Operand_GetOpKind(dest) == VIR_OPND_SYMBOL)
             {
-                destType = VIR_Shader_GetTypeFromId(Shader, VIR_Operand_GetType(dest));
+                destType = VIR_Shader_GetTypeFromId(Shader, VIR_Operand_GetTypeId(dest));
 
                 if ((VIR_Type_isArray(destType) || VIR_Type_isStruct(destType))
                     &&
@@ -4574,14 +4574,14 @@ static VSC_ErrCode _VIR_HL_Preprocess(
                     errCode = VIR_Shader_AddSymbol(Shader,
                                                    VIR_SYM_VIRREG,
                                                    regId,
-                                                   VIR_Shader_GetTypeFromId(Shader, VIR_Operand_GetType(dest)),
+                                                   VIR_Shader_GetTypeFromId(Shader, VIR_Operand_GetTypeId(dest)),
                                                    VIR_STORAGE_UNKNOWN,
                                                    &regSymId);
 
                     CHECK_ERROR(errCode, "VIR_Shader_AddSymbol failed.");
 
                     /* Set DEST. */
-                    VIR_Operand_SetTempRegister(dest, func, regSymId, VIR_Operand_GetType(dest));
+                    VIR_Operand_SetTempRegister(dest, func, regSymId, VIR_Operand_GetTypeId(dest));
                 }
             }
 
@@ -4598,7 +4598,7 @@ static VSC_ErrCode _VIR_HL_Preprocess(
                 for (i = 0; i < argNum; i++)
                 {
                     srcOpnd = opndParm->args[i];
-                    typeId = VIR_Operand_GetType(srcOpnd);
+                    typeId = VIR_Operand_GetTypeId(srcOpnd);
 
                     if (VIR_TypeId_isPrimitive(typeId) && (VIR_GetTypeRows(typeId) > 1))
                     {
@@ -4612,7 +4612,7 @@ static VSC_ErrCode _VIR_HL_Preprocess(
                 for (i = 0; i < VIR_Inst_GetSrcNum(inst); i++)
                 {
                     srcOpnd = VIR_Inst_GetSource(inst, i);
-                    typeId = VIR_Operand_GetType(srcOpnd);
+                    typeId = VIR_Operand_GetTypeId(srcOpnd);
 
                     if (VIR_TypeId_isPrimitive(typeId) && (VIR_GetTypeRows(typeId) > 1))
                     {
@@ -4657,7 +4657,7 @@ static VSC_ErrCode _VIR_HL_Preprocess(
                 srcOpnd = VIR_Inst_GetSource(inst, i);
 
                 if (VIR_Operand_isConst(srcOpnd) &&
-                    VIR_Type_isScalar(VIR_Shader_GetTypeFromId(Shader, VIR_Operand_GetType(srcOpnd))))
+                    VIR_Type_isScalar(VIR_Shader_GetTypeFromId(Shader, VIR_Operand_GetTypeId(srcOpnd))))
                 {
                     VIR_ScalarConstVal scalarConstVal;
 
@@ -4673,7 +4673,7 @@ static VSC_ErrCode _VIR_HL_Preprocess(
                         scalarConstVal.fValue = srcConst->value.vecVal.f32Value[channel];
                     }
 
-                    VIR_Operand_SetImmediate(srcOpnd, VIR_Operand_GetType(srcOpnd), scalarConstVal);
+                    VIR_Operand_SetImmediate(srcOpnd, VIR_Operand_GetTypeId(srcOpnd), scalarConstVal);
                 }
             }
         }

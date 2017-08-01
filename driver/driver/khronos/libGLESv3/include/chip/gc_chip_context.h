@@ -413,6 +413,10 @@ struct __GLchipContextRec
     gctBOOL                     needTexRecompile;
     gctBOOL                     needRTRecompile;
 
+#if gcdALPHA_KILL_IN_SHADER
+    gctBOOL                     alphaKillInShader;
+#endif
+
     gcoPROFILER                 profiler;
 };
 
@@ -687,6 +691,12 @@ gcChipSetAlphaBlend(
     __GLcontext *gc
     );
 
+#if gcdALPHA_KILL_IN_SHADER
+gceSTATUS
+gcChipSetAlphaKill(
+    __GLcontext *gc
+    );
+#endif
 
 extern gceSTATUS
 gcChipSetViewportScissor(
@@ -931,23 +941,6 @@ gcChipLTCReleaseResultArray(
     IN gcoOS               Os
     );
 
-
-extern void
-gcChipInitializeProfiler(
-    __GLcontext *gc
-    );
-
-extern void
-gcChipDestroyProfiler(
-    __GLcontext *gc
-    );
-
-extern GLboolean
-__glChipProfiler(
-    gctPOINTER Profiler,
-    GLuint Enum,
-    gctHANDLE Value);
-
 extern gceSTATUS
 gcChipSetError(
     __GLchipContext *chipCtx,
@@ -960,24 +953,24 @@ __glChipGetError(
     );
 
 GLboolean
-__glChipProfiler_NEW_Set(
+__glChipProfilerSet(
     IN __GLcontext *gc,
     IN GLuint Enum,
     IN gctHANDLE Value
     );
 
 gceSTATUS
-gcChipProfiler_NEW_Initialize(
+gcChipProfilerInitialize(
     IN __GLcontext *gc
     );
 
 gceSTATUS
-gcChipProfiler_NEW_Destroy(
+gcChipProfilerDestroy(
     IN __GLcontext *gc
     );
 
 gceSTATUS
-gcChipProfiler_NEW_Write(
+gcChipProfilerWrite(
     IN __GLcontext *gc,
     IN GLuint Enum
     );

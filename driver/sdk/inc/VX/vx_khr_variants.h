@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Khronos Group Inc.
+ * Copyright (c) 2012-2016 The Khronos Group Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and/or associated documentation files (the
@@ -11,6 +11,11 @@
  *
  * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Materials.
+ *
+ * MODIFICATIONS TO THIS FILE MAY MEAN IT NO LONGER ACCURATELY REFLECTS
+ * KHRONOS STANDARDS. THE UNMODIFIED, NORMATIVE VERSIONS OF KHRONOS
+ * SPECIFICATIONS AND HEADER INFORMATION ARE LOCATED AT
+ *    https://www.khronos.org/registry/
  *
  * THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
@@ -49,11 +54,9 @@
  * In each of the cases a client of OpenVX could request the kernels in nearly
  * the same the same manner. There are two main approaches, which depend on the
  * method a client calls to get the kernel reference. The first uses enumerations.
- * \snippet examples/vx_kernels.c firstmethod
  * This method allows to client to attempt to find other targets and variants, but if
  * these are not present, the default node would still have been constructed.
  * The second method depends on using fully qualified strings to get the kernel reference.
- * \snippet examples/vx_kernels.c secondmethod
  * This second method is more compact but is does not permit fail-safing to default versions.
  *
  * As part of this extension, the function <tt>vxGetKernelByName</tt> will now accept more

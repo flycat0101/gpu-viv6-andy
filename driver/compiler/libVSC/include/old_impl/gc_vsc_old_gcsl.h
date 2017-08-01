@@ -85,10 +85,13 @@ BEGIN_EXTERN_C()
 /* bump up version to 1.17 for type name var index on 03/16/2017 */
 #define gcdSL_SHADER_BINARY_BEFORE_SAVEING_TYPE_NAME_VAR_INDEX gcmCC(0, 0, 1, 17)
 
-/* current version */
-#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(0, 0, 1, 18)
+/* bump up version to 1.18 for uniform physical addr on 04/12/2017 */
+#define gcdSL_SHADER_BINARY_BEFORE_SAVEING_UNIFORM_PHYSICAL_ADDR gcmCC(0, 0, 1, 18)
 
-#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(0, 0, 1, 18)
+/* current version */
+#define gcdSL_SHADER_BINARY_FILE_VERSION gcmCC(0, 0, 1, 19)
+
+#define gcdSL_PROGRAM_BINARY_FILE_VERSION gcmCC(0, 0, 1, 19)
 
 typedef union _gcsValue
 {
@@ -2568,6 +2571,11 @@ typedef struct _gcBINARY_UNIFORM
     /* Length of the uniform name. */
     gctINT16                        nameLength;
 
+    /* physical and address. */
+    gctINT                          physical;
+    gctINT                          samplerPhysical;
+    gctUINT32                       address;
+
     /* uniform flags */
     char                            flags[sizeof(gceUNIFORM_FLAGS)];
 
@@ -2722,6 +2730,11 @@ typedef struct _gcBINARY_UNIFORM_EX
     /* Uniform block index:
        Default block index = -1 */
     gctINT16                        blockIndex;
+
+    /* physical and address. */
+    char                            physical[sizeof(gctINT16)];
+    char                            samplerPhysical[sizeof(gctINT16)];
+    char                            address[sizeof(gctUINT32)];
 
     /* stride on array */
     char                            arrayStride[sizeof(gctINT32)];
@@ -3005,6 +3018,8 @@ typedef enum _gceVARIABLE_FLAG
     gceVARFLAG_IS_PRECISE               = 0x200,
     gceVARFLAG_IS_STATICALLY_USED       = 0x400,
     gceVARFLAG_IS_PERVERTEX             = 0x800,
+    /* This variable is a function parameter, but the function is deleted. */
+    gceVARFLAG_IS_PARAM_FUNC_DELETE     = 0x1000,
 } gceVARIABLE_FLAG;
 
 /* Structure that defines a variable for a shader. */
@@ -3124,6 +3139,7 @@ struct _gcVARIABLE
 #define GetVariableIsPointer(v)                 (((v)->flags & gceVARFLAG_IS_POINTER) != 0)
 #define GetVariableIsPrecise(v)                 (((v)->flags & gceVARFLAG_IS_PRECISE) != 0)
 #define GetVariableIsPerVertex(v)               (((v)->flags & gceVARFLAG_IS_PERVERTEX) != 0)
+#define GetVariableIsParamFuncDelete(v)         (((v)->flags & gceVARFLAG_IS_PARAM_FUNC_DELETE) != 0)
 
 #define GetVariableArraySize(v)                 ((v)->arraySize)
 #define SetVariableArraySize(v, s)              ((v)->arraySize = (s))
@@ -3161,6 +3177,7 @@ struct _gcVARIABLE
 #define SetVariableIsPrecise(v)                 do { (v)->flags |= gceVARFLAG_IS_PRECISE; } while(0)
 #define SetVariableIsPerVertex(v)               do { (v)->flags |= gceVARFLAG_IS_PERVERTEX; } while(0)
 #define SetVariableIsStaticallyUsed(v)          do { (v)->flags |= gceVARFLAG_IS_STATICALLY_USED; } while(0)
+#define SetVariableIsParamFuncDelete(v)         do { (v)->flags |= gceVARFLAG_IS_PARAM_FUNC_DELETE; } while(0)
 
 #define IsVariableIsNotUsed(v)                  (((v)->flags & gceVARFLAG_IS_NOT_USED) != 0)
 #define IsVariablePointer(v)                    (((v)->flags & gceVARFLAG_IS_POINTER) != 0)
@@ -3685,7 +3702,9 @@ struct _gcsKERNEL_FUNCTION
     gctUINT                         codeCount;
 
     gctBOOL                         isRecursion;
-
+    gctBOOL                         isCalledByEntryKernel;   /* kernel function can be called
+                                                              * by another kernel, cannot remove it
+                                                              * if it is called by main */
     /* kernel specific fields */
     gcSHADER                        shader;
 

@@ -61,7 +61,6 @@ typedef struct _clsPatchLongULong
     gcSL_INSTRUCTION        instruction;
     gctUINT                 instructionIndex;
     gctUINT                 channelCount;   /* How many channel enabled in target. */
-    gctUINT                 channelCountIndex;  /* The corresponding uniform index. */
 }
 clsPatchLongULong;
 

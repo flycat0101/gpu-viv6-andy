@@ -44,7 +44,7 @@ OBJECTS         =   $(OBJ_DIR)/vx_utility.o   \
 
 ################################################################################
 # Add extra library path.
-LIBS += -L $(AQROOT)/build/sdk/drivers
+LIBS += -L $(SDK_DIR)/drivers
 
 LIBS += -l dl -l pthread -lm
 

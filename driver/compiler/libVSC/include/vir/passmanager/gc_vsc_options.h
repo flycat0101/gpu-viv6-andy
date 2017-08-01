@@ -1322,6 +1322,20 @@ gctBOOL VSC_OPTN_DumpOptions_CheckDumpFlag(
     IN gctUINT DumpFlag
     );
 
+/* internal lib functions link */
+typedef struct _VSC_OPTN_ILFLINKOPTIONS
+{
+    /* Must be first element */
+    VSC_OPTN_BASE optnBase;
+} VSC_OPTN_ILFLinkOptions;
+
+#define VSC_OPTN_ILFLinkOptions_GetSwitchOn(option)         VSC_OPTN_GetSwitchOn(&(option)->optnBase)
+#define VSC_OPTN_ILFLinkOptions_SetSwitchOn(option, s)      VSC_OPTN_SetSwitchOn(&(option)->optnBase, (s))
+
+void VSC_OPTN_ILFLinkOptions_SetDefault(
+    IN OUT VSC_OPTN_ILFLinkOptions* options
+    );
+
 #define VSC_OPTN_SCPP_COUNT 1
 #define VSC_OPTN_LoopOpts_COUNT 1
 #define VSC_OPTN_CFO_COUNT 1
@@ -1376,6 +1390,7 @@ typedef struct _VSC_OPTN_OPTIONS
     VSC_OPTN_MCGenOptions       mcgen_options[VSC_OPTN_MCGen_COUNT];
     VSC_OPTN_SEPGenOptions      sepgen_options[VSC_OPTN_SEPGen_COUNT];
     VSC_OPTN_DumpOptions        dump_options;
+    VSC_OPTN_ILFLinkOptions     ilflink_options;
     gctBOOL                     options_usage;
 } VSC_OPTN_Options;
 
@@ -1406,6 +1421,7 @@ typedef enum _VSC_PASS_OPTN_TYPE
     VSC_PASS_OPTN_TYPE_MC_GEN,
     VSC_PASS_OPTN_TYPE_SEP_GEN,
     VSC_PASS_OPTN_TYPE_DUMP,
+    VSC_PASS_OPTN_TYPE_ILF_LINK,
     VSC_PASS_OPTN_TYPE_MAX,
 } VSC_PASS_OPTN_TYPE;
 
@@ -1434,6 +1450,7 @@ typedef enum _VSC_PASS_OPTN_TYPE
 #define VSC_OPTN_Options_GetDUAL16Options(option, i)       (&((option)->dual16_options[i]))
 #define VSC_OPTN_Options_GetFCPOptions(option, i)          (&((option)->fcp_options[i]))
 #define VSC_OPTN_Options_GetDumpOptions(option)            (&((option)->dump_options))
+#define VSC_OPTN_Options_GetILFLinkOptions(option)         (&((option)->ilflink_options))
 #define VSC_OPTN_Options_GetOptionsUsage(option)           ((option)->options_usage)
 #define VSC_OPTN_Options_SetOptionsUsage(option, u)        ((option)->options_usage = (u))
 #define VSC_OPTN_Options_SetReset(option, u)               ((option)->reset = (u))

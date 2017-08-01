@@ -78,7 +78,9 @@ typedef enum
     /* EXT extensions */
     __GL_EXTID_EXT_texture_type_2_10_10_10_REV,
     __GL_EXTID_EXT_texture_filter_anisotropic,
+    __GL_EXTID_EXT_texture_compression_dxt1,
     __GL_EXTID_EXT_texture_format_BGRA8888,
+    __GL_EXTID_EXT_texture_compression_s3tc,
     __GL_EXTID_EXT_read_format_bgra,
     __GL_EXTID_EXT_multi_draw_arrays,
     __GL_EXTID_EXT_frag_depth,

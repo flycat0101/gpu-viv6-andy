@@ -158,8 +158,6 @@ gcoINDEX_Construct(
     index->bytes                 = 0;
     index->memory.pool           = gcvPOOL_UNKNOWN;
     index->memory.valid          = gcvFALSE;
-    index->memory.lockCount      = 0;
-    index->memory.lockedInKernel = gcvFALSE;
     index->dynamic               = gcvNULL;
     index->dynamicCount          = 0;
 
@@ -279,7 +277,7 @@ gcoINDEX_GetFence(
 
     if (Index)
     {
-        status = gcsSURF_NODE_GetFence(&Index->memory, gcvFENCE_TYPE_READ);
+        status = gcsSURF_NODE_GetFence(&Index->memory, gcvENGINE_RENDER, gcvFENCE_TYPE_READ);
     }
 
     gcmFOOTER();
@@ -298,7 +296,7 @@ gcoINDEX_WaitFence(
 
     if (Index)
     {
-        status = gcsSURF_NODE_WaitFence(&Index->memory, Type);
+        status = gcsSURF_NODE_WaitFence(&Index->memory, gcvENGINE_CPU, gcvENGINE_RENDER, Type);
     }
 
     gcmFOOTER();
@@ -1956,6 +1954,7 @@ gcoINDEX_UploadDynamicEx(
 
         /* Schedule a signal event. */
         ioctl.command            = gcvHAL_SIGNAL;
+        ioctl.engine             = gcvENGINE_RENDER;
         ioctl.u.Signal.signal    = gcmPTR_TO_UINT64(dynamic->signal);
         ioctl.u.Signal.auxSignal = 0;
         ioctl.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());
@@ -2161,6 +2160,7 @@ gcoINDEX_UploadDynamicEx2(
 
             /* Schedule a signal event. */
             ioctl.command            = gcvHAL_SIGNAL;
+            ioctl.engine             = gcvENGINE_RENDER;
             ioctl.u.Signal.signal    = gcmPTR_TO_UINT64(dynamic->signal);
             ioctl.u.Signal.auxSignal = 0;
             ioctl.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());

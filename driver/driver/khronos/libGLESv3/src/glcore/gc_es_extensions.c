@@ -94,7 +94,9 @@ __GLextension __glExtension[] =
     /* EXT extensions */
     {"GL_EXT_texture_type_2_10_10_10_REV",          GL_FALSE, GL_FALSE},
     {"GL_EXT_texture_filter_anisotropic",           GL_FALSE, GL_FALSE},
+    {"GL_EXT_texture_compression_dxt1",             GL_FALSE, GL_FALSE},
     {"GL_EXT_texture_format_BGRA8888",              GL_FALSE, GL_FALSE},
+    {"GL_EXT_texture_compression_s3tc",             GL_FALSE, GL_FALSE},
     {"GL_EXT_read_format_bgra",                     GL_FALSE, GL_FALSE},
     {"GL_EXT_multi_draw_arrays",                    GL_FALSE, GL_FALSE},
     {"GL_EXT_frag_depth",                           GL_FALSE, GL_TRUE },

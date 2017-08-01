@@ -5336,7 +5336,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __valid_GetDisplayPlaneCapabilitiesKHR(VkPhysical
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;
     }
-    if (!dpm || dpm->sType != __VK_OBJECT_DISPLAY_MODE_KHR)
+    if (!dpm || dpm->sType != __VK_OBJECT_TYPE_DISPLAY_MODE_KHR)
     {
         result = __VK_ERROR_INVALID_HANDLE;
         goto vk_Exit;

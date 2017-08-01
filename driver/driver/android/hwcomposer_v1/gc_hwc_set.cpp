@@ -62,18 +62,19 @@ _HasAlpha(
     IN gceSURF_FORMAT Format
     );
 
+#if ENABLE_SWAP_RECTANGLE
 static gctBOOL
 _IsValidRect(
     IN gcsRECT * Rect
     );
 
-void
+static void
 _MapSource2Target(
     IN hwcLayer * Layer,
     IN gcsRECT * SrcRect,
     OUT gcsRECT * DstRect
     );
-
+#endif
 
 /*******************************************************************************
 **
@@ -1754,8 +1755,8 @@ _HasAlpha(
 }
 
 
-
-static gctBOOL
+#if ENABLE_SWAP_RECTANGLE
+gctBOOL
 _IsValidRect(
     IN gcsRECT * Rect
     )
@@ -1763,7 +1764,6 @@ _IsValidRect(
    return ((Rect->bottom > Rect->top) &&
            (Rect->right > Rect->left));
 }
-
 
 void
 _MapSource2Target(
@@ -1860,7 +1860,7 @@ _MapSource2Target(
 
     *DstRect = rect;
 }
-
+#endif
 
 /*
  * Area spliting feature depends on the following 3 functions:
@@ -2709,6 +2709,7 @@ hwc_set(
 
             /* Submit the sync point. */
             iface.command            = gcvHAL_SIGNAL;
+            iface.engine             = gcvENGINE_RENDER;
             iface.u.Signal.signal    = gcmPTR_TO_UINT64(signal);
             iface.u.Signal.auxSignal = 0;
             iface.u.Signal.process   = 0;

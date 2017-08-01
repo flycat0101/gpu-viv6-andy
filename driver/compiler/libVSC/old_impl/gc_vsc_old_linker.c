@@ -9231,7 +9231,6 @@ _ConvertGetSamplerIdxToMovOrAdd(
     union
     {
         gctFLOAT f;
-        gctUINT16 hex[2];
         gctUINT32 hex32;
     } index, offsetConst;
 
@@ -9268,8 +9267,8 @@ _ConvertGetSamplerIdxToMovOrAdd(
         {
             code->source1 = gcmSL_SOURCE_SET(code->source0, Type, gcSL_CONSTANT);
             code->source1 = gcmSL_SOURCE_SET(code->source1, Format, format);
-            code->source1Index = offsetConst.hex[0];
-            code->source1Indexed = offsetConst.hex[1];
+            code->source1Index = (gctUINT16)(offsetConst.hex32 & 0xFFFF);
+            code->source1Indexed = (gctUINT16)(offsetConst.hex32 >> 16);
         }
         else
         {
@@ -9300,8 +9299,8 @@ _ConvertGetSamplerIdxToMovOrAdd(
         code->source0 = gcmSL_SOURCE_SET(code->source0, Type, gcSL_CONSTANT);
         code->source0 = gcmSL_SOURCE_SET(code->source0, Format, format);
         code->source0 = gcmSL_SOURCE_SET(code->source0, Indexed, gcSL_NOT_INDEXED);
-        code->source0Index = index.hex[0];
-        code->source0Indexed = index.hex[1];
+        code->source0Index = (gctUINT16)(index.hex32 & 0xFFFF);
+        code->source0Indexed = (gctUINT16)(index.hex32 >> 16);
 
         if (mode == gcSL_NOT_INDEXED)
         {
@@ -10980,6 +10979,7 @@ _TempIsUsedForIndexedOnly(
     union
     {
         gctUINT16 hex[2];
+        gctUINT32 hex32;
         gctFLOAT floatValue;
     } constValue;
 
@@ -11037,8 +11037,7 @@ _TempIsUsedForIndexedOnly(
         {
             if (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_CONSTANT)
             {
-                constValue.hex[0] = code->source1Index;
-                constValue.hex[1] = code->source1Indexed;
+                constValue.hex32 = (code->source1Index) | (code->source1Indexed << 16);
                 if ((gctFLOAT)((gctINT)constValue.floatValue) != constValue.floatValue)
                 {
                     indexedOnly = gcvFALSE;
@@ -11060,8 +11059,7 @@ _TempIsUsedForIndexedOnly(
         {
             if (gcmSL_SOURCE_GET(code->source0, Type) == gcSL_CONSTANT)
             {
-                constValue.hex[0] = code->source0Index;
-                constValue.hex[1] = code->source0Indexed;
+                constValue.hex32 = (code->source1Index) | (code->source1Indexed << 16);
                 if ((gctFLOAT)((gctINT)constValue.floatValue) != constValue.floatValue)
                 {
                     indexedOnly = gcvFALSE;
@@ -11102,7 +11100,7 @@ _ConvertUsersOfCONV(
     gctBOOL checkTarget = gcvTRUE;
     union
     {
-        gctUINT16 hex[2];
+        gctUINT32 hex32;
         gctINT32 intValue;
         gctFLOAT floatValue;
     } constValue;
@@ -11149,11 +11147,10 @@ _ConvertUsersOfCONV(
             }
             code->source0 = gcmSL_SOURCE_SET(code->source0, Format, Format);
             code->source1 = gcmSL_SOURCE_SET(code->source1, Format, Format);
-            constValue.hex[0] = code->source1Index;
-            constValue.hex[1] = code->source1Indexed;
+            constValue.hex32 = (code->source1Index) | (code->source1Indexed << 16);
             constValue.intValue = (gctINT)constValue.floatValue;
-            code->source1Index = constValue.hex[0];
-            code->source1Indexed = constValue.hex[1];
+            code->source1Index = (gctUINT16)(constValue.hex32 & 0xFFFF);
+            code->source1Indexed = (gctUINT16)(constValue.hex32 >> 16);
 
             /* Change the register. */
             if (checkTarget)
@@ -11175,11 +11172,10 @@ _ConvertUsersOfCONV(
             }
             code->source0 = gcmSL_SOURCE_SET(code->source0, Format, Format);
             code->source1 = gcmSL_SOURCE_SET(code->source1, Format, Format);
-            constValue.hex[0] = code->source0Index;
-            constValue.hex[1] = code->source0Indexed;
+            constValue.hex32 = (code->source0Index) | (code->source0Indexed << 16);
             constValue.intValue = (gctINT)constValue.floatValue;
-            code->source0Index = constValue.hex[0];
-            code->source0Indexed = constValue.hex[1];
+            code->source0Index = (gctUINT16)(constValue.hex32 & 0xFFFF);
+            code->source0Indexed = (gctUINT16)(constValue.hex32 >> 16);
 
             /* Change the register. */
             if (checkTarget)
@@ -12386,7 +12382,7 @@ _splitInstructionHasSameDestAndSrcTempIndex(
     if (isCodeChanged)
     {
         gcmONERROR(gcSHADER_Pack(Shader));
-        if (gcSHADER_DumpOptimizer(Shader))
+        if (gcSHADER_DumpOptimizerVerbose(Shader))
         {
             gcOpt_Dump(gcvNULL, "After add mov before instructions hold the same target index and source index", gcvNULL, Shader);
         }
@@ -12862,7 +12858,7 @@ _convertImageReadToTexld(
     if (isCodeChanged)
     {
         gcmONERROR(gcSHADER_Pack(Shader));
-        if (gcSHADER_DumpOptimizer(Shader))
+        if (gcSHADER_DumpOptimizerVerbose(Shader))
         {
             gcOpt_Dump(gcvNULL, "Change image_rd to texld", gcvNULL, Shader);
         }
@@ -13532,7 +13528,6 @@ gcLinkTreeThruVirShaders(
         if (StateBuffer)
         {
             VSC_HW_PIPELINE_SHADERS_STATES hwPgStates = {0};
-            VSC_DIContext * debugCtx;
 
             if (clKernel)
             {
@@ -13577,12 +13572,17 @@ gcLinkTreeThruVirShaders(
 
                 gcmONERROR(gcSHADER_ConvFromVIR(csShader, csVirShader, Flags));
 
-                debugCtx = (VSC_DIContext *)csShader->debugInfo;
 
-                if (debugCtx != gcvNULL)
+                if (gcmOPT_EnableDebugDumpALL())
                 {
-                    vscDIDumpDIETree(debugCtx, debugCtx->cu);
-                    vscDIDumpLineTable(debugCtx);
+                    VSC_DIContext * debugCtx;
+                    debugCtx = (VSC_DIContext *)csShader->debugInfo;
+
+                    if (debugCtx != gcvNULL)
+                    {
+                        vscDIDumpDIETree(debugCtx, debugCtx->cu, 0xffffffff);
+                        vscDIDumpLineTable(debugCtx);
+                    }
                 }
             }
 
@@ -14769,7 +14769,6 @@ _GetIndexedRegAndModeForLoadInstruction(
     gcSL_SWIZZLE swizzle = gcSL_SWIZZLE_XYZW;
     gctINT offset = 0;
     gctINT codeIndex = 0;
-    gctUINT16 *offsetPtr = gcvNULL;
     gctBOOL swizzleChanged = gcvFALSE;
 
     /* If this uniform is not a matrix, the array index reg is holding by the previous instruction of uniform offset.*/
@@ -14863,9 +14862,7 @@ _GetIndexedRegAndModeForLoadInstruction(
         {
             gcmASSERT(matrixIndexType == gcSL_TEMP);
 
-            offsetPtr = (gctUINT16 *) (&offset);
-            offsetPtr[0] = arrayIndexCode->source0Index;
-            offsetPtr[1] = arrayIndexCode->source0Indexed;
+            offset = (arrayIndexCode->source0Index) | (arrayIndexCode->source0Indexed << 16);
 
             offset *= _GetMatrixDataTypeColumnCount(Uniform->u.type);
             constIndex = (gctUINT16)offset;
@@ -14880,9 +14877,7 @@ _GetIndexedRegAndModeForLoadInstruction(
         {
             gcmASSERT(arrayIndexType == gcSL_TEMP && matrixIndexType == gcSL_CONSTANT);
 
-            offsetPtr = (gctUINT16 *) (&offset);
-            offsetPtr[0] = matrixIndexCode->source0Index;
-            offsetPtr[1] = matrixIndexCode->source0Indexed;
+            offset = (matrixIndexCode->source0Index) | (matrixIndexCode->source0Indexed << 16);
 
             constIndex = (gctUINT16)offset;
 
@@ -14900,9 +14895,7 @@ _GetIndexedRegAndModeForLoadInstruction(
         code = Code - 2;
         if (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_CONSTANT)
         {
-            offsetPtr = (gctUINT16 *) (&offset);
-            offsetPtr[0] = code->source1Index;
-            offsetPtr[1] = code->source1Indexed;
+            offset = (gctINT)(code->source1Index) | (code->source1Indexed << 16);
 
             offset /= Uniform->matrixStride;
 
@@ -14958,7 +14951,6 @@ _gcChangeLoadToMovUniform(
     {
        gcUNIFORM blockUniform, blockUniformMember;
        gctINT offset[1];
-       gctUINT16 *offsetPtr;
        gctUINT16 regIndex;
        gctINT startChannel;
        gctUINT curInstIdx;
@@ -14986,16 +14978,12 @@ _gcChangeLoadToMovUniform(
 
                gcmASSERT(gcmSL_SOURCE_GET(prevCode->source1, Type) == gcSL_CONSTANT);
 
-               offsetPtr = (gctUINT16 *) offset;
-               offsetPtr[0] = prevCode->source1Index;
-               offsetPtr[1] = prevCode->source1Indexed;
+               offset[0] = (prevCode->source1Index) | (prevCode->source1Indexed << 16);
            }
            else
            {
                isIndexedLoad = gcvFALSE;
-               offsetPtr = (gctUINT16 *) offset;
-               offsetPtr[0] = code->source1Index;
-               offsetPtr[1] = code->source1Indexed;
+               offset[0] = (code->source1Index) | (code->source1Indexed << 16);
            }
 
            gcmASSERT((gcmSL_SOURCE_GET(code->source1, Format) == gcSL_INTEGER ||
@@ -15128,7 +15116,6 @@ _IsTempResolvedToConstant(
     gctBOOL isConst0 = gcvTRUE;
     gctBOOL isConst1 = gcvTRUE;
     gctINT constRes = -1;
-    gctUINT16 *constValPtr;
     gctINT searchLimit;
 
     for (instIdx = CurInstIdx, searchLimit = 0; instIdx >= 0 && searchLimit < 3; instIdx--, searchLimit++)
@@ -15159,9 +15146,7 @@ _IsTempResolvedToConstant(
                 }
                 else if (gcmSL_SOURCE_GET(code->source0, Type) == gcSL_CONSTANT)
                 {
-                    constValPtr = (gctUINT16 *) &constVal0;
-                    constValPtr[0] = code->source0Index;
-                    constValPtr[1] = code->source0Indexed;
+                    constVal0 = (code->source0Index) | (code->source0Indexed << 16);
                 }
                 else if(gcmSL_SOURCE_GET(code->source0, Type) != gcSL_NONE)
                 {
@@ -15178,9 +15163,7 @@ _IsTempResolvedToConstant(
                 }
                 else if (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_CONSTANT)
                 {
-                    constValPtr = (gctUINT16 *) &constVal1;
-                    constValPtr[0] = code->source1Index;
-                    constValPtr[1] = code->source1Indexed;
+                    constVal1 = (code->source1Index) | (code->source1Indexed << 16);
                 }
                 else if(gcmSL_SOURCE_GET(code->source1, Type) != gcSL_NONE)
                 {
@@ -15269,7 +15252,6 @@ _IsTempOffsetToConstantMemoryAddressReg(
 {
     gctINT instIdx;
     gctBOOL found = gcvFALSE;
-    gctUINT16 *offsetPtr;
 
     if(TempIndex == _gcdOCL_ConstantMemoryAddressRegIndex)
     {
@@ -15301,9 +15283,7 @@ _IsTempOffsetToConstantMemoryAddressReg(
                 }
                 else if (gcmSL_SOURCE_GET(code->source0, Type) == gcSL_CONSTANT)
                 {
-                    offsetPtr = (gctUINT16 *) &offset0;
-                    offsetPtr[0] = code->source0Index;
-                    offsetPtr[1] = code->source0Indexed;
+                    offset0 = (code->source0Index) | (code->source0Indexed << 16);
                 }
                 else
                 {
@@ -15319,9 +15299,7 @@ _IsTempOffsetToConstantMemoryAddressReg(
                 }
                 else if (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_CONSTANT)
                 {
-                    offsetPtr = (gctUINT16 *) &offset1;
-                    offsetPtr[0] = code->source1Index;
-                    offsetPtr[1] = code->source1Indexed;
+                    offset1 = code->source1Index | (code->source1Indexed << 16);
                 }
                 else if(gcmSL_SOURCE_GET(code->source1, Type) != gcSL_NONE)
                 {
@@ -15389,7 +15367,6 @@ _gcOCL_ChangeLoadToMovUniform(
        gcUNIFORM blockUniform, blockUniformMember;
        gctINT offset;
        gctINT constVal;
-       gctUINT16 *offsetPtr;
        gctUINT16 regIndex;
        gctINT startChannel;
        gctINT curInstIdx;
@@ -15469,9 +15446,7 @@ _gcOCL_ChangeLoadToMovUniform(
            }
            else if (gcmSL_SOURCE_GET(code->source1, Type) == gcSL_CONSTANT)
            {
-               offsetPtr = (gctUINT16 *) &constVal;
-               offsetPtr[0] = code->source1Index;
-               offsetPtr[1] = code->source1Indexed;
+               constVal = code->source1Index | (code->source1Indexed << 16);
                offset += constVal;
            }
            else if(gcmSL_SOURCE_GET(code->source1, Type) != gcSL_NONE)
@@ -18009,7 +17984,7 @@ gcLinkKernel(
             gcmONERROR(_gcOCL_ChangeLoadToMovUniform(Kernel));
         }
 
-        if (gcSHADER_DumpOptimizer(Kernel))
+        if (gcSHADER_DumpOptimizerVerbose(Kernel))
         {
             gcOpt_Dump(gcvNULL, "After UBO Transformation", gcvNULL, Kernel);
         }
@@ -19860,6 +19835,136 @@ OnError:
 
 #endif /* !DX_SHADER */
 
+/* Save/Load shader video nodes. */
+static gctUINT32
+_CaculateShaderVidNodesSize(
+    IN gcSHADER Shader,
+    IN gcsHINT_PTR Hints
+    )
+{
+    gctUINT32       sizeInByte = 0;
+    gctUINT         i;
+
+    if (Hints == gcvNULL)
+    {
+        return sizeInByte;
+    }
+
+    do
+    {
+        /* Inst video memory. */
+        for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
+        {
+            sizeInByte += gcmSIZEOF(gctUINT32);
+
+            if (Hints->shaderVidNodes.instVidmemNode[i] != gcvNULL)
+            {
+                gcsSURF_NODE_PTR surfNode = (gcsSURF_NODE_PTR)Hints->shaderVidNodes.instVidmemNode[i];
+
+                sizeInByte += surfNode->size;
+            }
+        }
+    } while (gcvFALSE);
+
+    return sizeInByte;
+}
+
+static gceSTATUS
+_SaveShaderVidNodes(
+    IN gcSHADER Shader,
+    IN gcsHINT_PTR Hints,
+    INOUT gctPOINTER Buffer
+    )
+{
+    gceSTATUS       status = gcvSTATUS_OK;
+    gctUINT8_PTR    buffer = (gctUINT8_PTR)Buffer;
+    gctUINT         i;
+
+    gcmASSERT(Hints);
+
+    do
+    {
+        /* Inst video memory. */
+        for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
+        {
+            gctPOINTER          instMem = Hints->shaderVidNodes.instVidmemNode[i];
+            gctPOINTER          data = gcvNULL;
+            gctUINT32           sizeInByte = 0;
+
+            if (instMem != gcvNULL)
+            {
+                sizeInByte += ((gcsSURF_NODE_PTR)instMem)->size;
+                gcmERR_BREAK(gcoSURF_LockNode((gcsSURF_NODE_PTR)instMem,
+                                              gcvNULL,
+                                              &data));
+
+                gcmASSERT(sizeInByte != 0);
+            }
+
+            gcoOS_MemCopy(buffer, &sizeInByte, gcmSIZEOF(gctUINT32));
+            buffer += gcmSIZEOF(gctUINT32);
+
+            if (sizeInByte != 0)
+            {
+                gcoOS_MemCopy(buffer, data, sizeInByte);
+                buffer += sizeInByte;
+            }
+        }
+    } while (gcvFALSE);
+
+    return status;
+}
+
+static gceSTATUS
+_LoadShaderVidNodes(
+    IN gcSHADER Shader,
+    IN gcsHINT_PTR Hints,
+    IN gctPOINTER Buffer
+    )
+{
+    gceSTATUS       status = gcvSTATUS_OK;
+    gctUINT8_PTR    buffer = (gctUINT8_PTR)Buffer;
+    gctUINT         i;
+
+    gcmASSERT(Hints);
+
+    do
+    {
+        /* Inst video memory. */
+        for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
+        {
+            gctUINT32           sizeInByte = *(gctUINT32*)buffer;
+            gctUINT32           physical = (gctUINT32)~0;
+
+            buffer += gcmSIZEOF(gctUINT32);
+
+            if (sizeInByte > 0)
+            {
+                gcmASSERT(Hints->shaderVidNodes.instVidmemNode[i]);
+
+                gcoSHADER_AllocateVidMem(gcvNULL,
+                                         gcvSURF_ICACHE,
+                                         "video memory for loading CL kernel",
+                                         sizeInByte,
+                                         256,
+                                         (gctPOINTER *)&Hints->shaderVidNodes.instVidmemNode[i],
+                                         gcvNULL,
+                                         &physical,
+                                         buffer,
+                                         gcvFALSE);
+
+                gcmASSERT((gctUINT32)~0 != physical);
+
+                Hints->shaderVidNodes.flushInstVidmemNode[i] = gcvTRUE;
+            }
+
+            buffer += sizeInByte;
+        }
+    } while (gcvFALSE);
+
+    return status;
+}
+
 /** Program binary file header format: -
        Word 1:  gcmCC('P', 'R', 'G', 'M') Program binary file signature
        Word 2:  ('\od' '\od' '\od' '\od') od = octal digits; program binary file version
@@ -20414,6 +20519,444 @@ gcLoadProgram(
         }
 
         buffer += *bufferSize;
+
+        /* Assert we copied the right number of bytes */
+        gcmASSERT(buffer - BinarySize == Binary);
+
+        /* Success. */
+        gcmFOOTER_ARG("*ProgramBufferSize=%lu *ProgramBuffer=0x%x *Hints=0x%x",
+                      ProgramBufferSize ? *ProgramBufferSize : 0,
+                      ProgramBuffer ? *ProgramBuffer : gcvNULL,
+                      Hints ? *Hints : gcvNULL);
+
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+    /* Return the status. */
+    gcmFOOTER_ARG("*ProgramBufferSize=%lu *ProgramBuffer=0x%x *Hints=0x%x",
+                   ProgramBufferSize ? *ProgramBufferSize : 0,
+                   ProgramBuffer ? *ProgramBuffer : gcvNULL,
+                   Hints ? *Hints : gcvNULL);
+    return status;
+}
+
+/*******************************************************************************
+**                                gcSaveCLSingleKernel
+********************************************************************************
+**
+**    Save pre-compiled shaders and pre-linked programs to a binary file.
+**
+**    INPUT:
+**
+**        gcSHADER KernelShader
+**            Pointer to vertex shader object.
+**
+**        gctUINT32 ProgramBufferSize
+**            Number of bytes in 'ProgramBuffer'.
+**
+**        gctPOINTER ProgramBuffer
+**            Pointer to buffer containing the program states.
+**
+**        gcsHINT_PTR Hints
+**            Pointer to HINTS structure for program states.
+**
+**    OUTPUT:
+**
+**        gctPOINTER * Binary
+**            Pointer to a variable receiving the binary data to be saved.
+**
+**        gctUINT32 * BinarySize
+**            Pointer to a variable receiving the number of bytes inside 'Binary'.
+*/
+gceSTATUS
+gcSaveCLSingleKernel(
+    IN gcSHADER KernelShader,
+    IN gctUINT32 ProgramBufferSize,
+    IN gctPOINTER ProgramBuffer,
+    IN gcsHINT_PTR Hints,
+    OUT gctPOINTER * Binary,
+    OUT gctUINT32 * BinarySize
+    )
+{
+    gctUINT32 kernelShaderBytes;
+    gctUINT32 bytes;
+    gctUINT32 hintSize = Hints ? gcSHADER_GetHintSize() : 0;
+    gctUINT32 vidNodesSize = _CaculateShaderVidNodesSize(KernelShader, Hints);
+    gctUINT8_PTR bytePtr;
+    gctUINT32 bufferSize;
+    gctUINT8_PTR buffer = gcvNULL;
+    gceSTATUS status;
+
+    gcmHEADER_ARG("KernelShader=0x%x ProgramBufferSize=%lu "
+                  "ProgramBuffer=0x%x Hints=0x%x",
+                  KernelShader, ProgramBufferSize,
+                  ProgramBuffer, Hints);
+
+    do
+    {
+        /* Get size of kernel shader bibary. */
+        gcmERR_BREAK(gcSHADER_SaveEx(KernelShader,
+                                    gcvNULL,
+                                    &kernelShaderBytes));
+
+        /* Compute number of bytes required for binary buffer. */
+        bufferSize = _gcdProgramBinaryHeaderSize
+                     + gcmSIZEOF(gctUINT32) + gcmALIGN(kernelShaderBytes, 4)
+                     + gcmSIZEOF(gctUINT32) + ProgramBufferSize
+                     + gcmSIZEOF(gctUINT32) + hintSize
+                     + gcmSIZEOF(gctUINT32) + vidNodesSize;
+
+        if (BinarySize)
+        {
+            *BinarySize = bufferSize;
+        }
+
+        if (Binary == gcvNULL)
+        {
+            gcmFOOTER_NO();
+            return gcvSTATUS_OK;
+        }
+
+        if (*Binary)
+        {
+            /* a buffer has been passed here */
+            /* Make sure the buffer is large enough. */
+            if(BinarySize)
+            {
+                if (*BinarySize < bufferSize)
+                {
+                    *BinarySize = bufferSize;
+                    gcmFOOTER_ARG("*BinarySize=%d status=%d",
+                                  *BinarySize, gcvSTATUS_BUFFER_TOO_SMALL);
+                    return gcvSTATUS_BUFFER_TOO_SMALL;
+                }
+           }
+        }
+        else
+        {
+            /* Allocate binary buffer. */
+            gcmERR_BREAK(gcoOS_Allocate(gcvNULL,
+                                        bufferSize,
+                                        Binary));
+        }
+
+        /* Cast binary buffer to UINT8 pointer for easy byte copying. */
+        buffer    = (gctUINT8_PTR) *Binary;
+
+        /* Word 1: program binary signature */
+        buffer[0] = 'P';
+        buffer[1] = 'R';
+        buffer[2] = 'G';
+        buffer[3] = 'M';
+        buffer += 4;
+
+        /* Word 2: binary file version # */
+        *(gctUINT32 *) buffer = gcdSL_PROGRAM_BINARY_FILE_VERSION;
+        buffer += sizeof(gctUINT32);
+
+        /* Word 3: language type */
+        *(gctUINT32 *) buffer = KernelShader->compilerVersion[0];
+        buffer += sizeof(gctUINT32);
+
+        /* Word 4: chip model */
+        *(gctUINT32 *) buffer = gcmCC('\0', '\0', '\0', '\0');
+        buffer += sizeof(gctUINT32);
+
+        /* Word 5: chip version */
+        *(gctUINT32 *) buffer = gcmCC('\1', gcvVERSION_PATCH, gcvVERSION_MINOR, gcvVERSION_MAJOR);
+        buffer += sizeof(gctUINT32);
+
+        /* Word 6: size of binary excluding header */
+        *(gctUINT32 *) buffer = bufferSize - _gcdProgramBinaryHeaderSize;
+        buffer += sizeof(gctUINT32);
+
+        /* Copy the size of the vertex shader binary. */
+        gcoOS_MemCopy(buffer,
+                      &kernelShaderBytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Save the vertex shader binary. */
+        gcmERR_BREAK(gcSHADER_SaveEx(KernelShader,
+                                     buffer,
+                                     &kernelShaderBytes));
+        bytePtr = buffer + kernelShaderBytes;
+        buffer += gcmALIGN(kernelShaderBytes, 4);
+        while (bytePtr < buffer)
+        {
+            /* clear the alignment bytes to help file comparison when needed*/
+            *bytePtr++ = '\0';
+        }
+
+        /* Copy the size of the state buffer. */
+        gcoOS_MemCopy(buffer,
+                      &ProgramBufferSize,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Copy the state buffer if needed. */
+        if (ProgramBufferSize > 0)
+        {
+            gcoOS_MemCopy(buffer,
+                          ProgramBuffer,
+                          ProgramBufferSize);
+        }
+        buffer += ProgramBufferSize;
+
+        /* Copy the size of the HINT structure. */
+        bytes = hintSize;
+        gcoOS_MemCopy(buffer,
+                      &bytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Copy the HINT structure if needed. */
+        if (bytes > 0)
+        {
+            gcoOS_MemCopy(buffer, Hints, bytes);
+        }
+        buffer += bytes;
+
+        /* Copy the size of the video nodes. */
+        bytes = vidNodesSize;
+        gcoOS_MemCopy(buffer,
+                      &bytes,
+                      gcmSIZEOF(gctUINT32));
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Copy the video nodes if needed. */
+        if (bytes > 0)
+        {
+            gcmASSERT(Hints);
+            gcmERR_BREAK(_SaveShaderVidNodes(KernelShader,
+                                             Hints,
+                                             buffer));
+        }
+        buffer += bytes;
+
+        /* Assert we copied the right number of bytes */
+        gcmASSERT(buffer - *BinarySize == *Binary);
+
+        /* Success. */
+        gcmFOOTER_ARG("*Binary=0x%x *BinarySize=%ul", *Binary, *BinarySize);
+        return gcvSTATUS_OK;
+    }
+    while (gcvFALSE);
+
+    if (gcmIS_ERROR(status) && (buffer != gcvNULL))
+    {
+        /* Free binary buffer on error. */
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, *Binary));
+
+        /* Reset pointers on error. */
+        *Binary     = gcvNULL;
+        if (BinarySize)
+        {
+            *BinarySize = 0;
+        }
+    }
+
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+/*******************************************************************************
+**                                gcLoadCLSingleKernel
+********************************************************************************
+**
+**    Load pre-compiled shaders and pre-linked programs from a binary file.
+**
+**    INPUT:
+**
+**        gctPOINTER Binary
+**            Pointer to the binary data loaded.
+**
+**        gctUINT32 BinarySize
+**            Number of bytes in 'Binary'.
+**
+**    OUTPUT:
+**
+**        gcSHADER KernelShader
+**            Pointer to a vertex shader object.
+**
+**        gctUINT32 * ProgramBufferSize
+**            Pointer to a variable receicing the number of bytes in the buffer
+**            returned in 'ProgramBuffer'.
+**
+**        gctPOINTER * ProgramBuffer
+**            Pointer to a variable receiving a buffer pointer that contains the
+**            states required to download the shaders into the hardware.
+**
+**        gcsHINT_PTR * Hints
+**            Pointer to a variable receiving a gcsHINT structure pointer that
+**            contains information required when loading the shader states.
+*/
+gceSTATUS
+gcLoadCLSingleKernel(
+    IN gctPOINTER Binary,
+    IN gctUINT32 BinarySize,
+    OUT gcSHADER KernelShader,
+    OUT gctUINT32 * ProgramBufferSize,
+    OUT gctPOINTER * ProgramBuffer,
+    OUT gcsHINT_PTR * Hints
+    )
+{
+    gcoOS os;
+    gctUINT32 bytes;
+    gctUINT8_PTR buffer;
+    gctUINT32 *bufferSize;
+    gctUINT32 alignBufferSize;
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT8 language[4];
+    gctPOINTER pointer;
+
+    gcmHEADER_ARG("Binary=0x%x BinarySize=%lu",
+                  Binary, BinarySize);
+
+    do {
+        if (ProgramBufferSize)
+        {
+            *ProgramBufferSize = 0;
+        }
+        if (ProgramBuffer)
+        {
+            if (ProgramBufferSize == gcvNULL)
+            {
+                gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+                return gcvSTATUS_INVALID_DATA;
+            }
+            *ProgramBuffer = gcvNULL;
+        }
+        if (Hints)
+        {
+            *Hints = gcvNULL;
+        }
+
+        /* Extract the gcoOS object pointer. */
+        os = gcvNULL;
+
+        gcmERR_BREAK(_gcLoadProgramHeader(Binary, BinarySize, (gctPOINTER)language));
+
+        if (language[0] != 'C' || language[1] != 'L')
+        {
+            gcmFATAL("gcLoadCLSingleKernel: expect language type 'CL' instead of %c%c",
+                    language[0], language[1]);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+
+        buffer = (gctUINT8 *)Binary + _gcdProgramBinaryHeaderSize;
+        bytes = BinarySize - _gcdProgramBinaryHeaderSize;
+
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            /* Invalid kernel shader size. */
+            gcmFATAL("gcLoadCLSingleKernel: Invalid kernel shader size %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+
+        bytes -=  sizeof(gctUINT32);
+        buffer += gcmSIZEOF(gctUINT32);
+
+        /* Load kernel shader bibary. */
+        gcmERR_BREAK(gcSHADER_LoadEx(KernelShader,
+                                     buffer,
+                                     *bufferSize));
+
+        alignBufferSize = gcmALIGN(*bufferSize, 4);
+        buffer += alignBufferSize;
+        bytes -=  alignBufferSize;
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) || bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            /* Invalid program states size. */
+            gcmFATAL("gcLoadProgram: Invalid program states size %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+
+        bytes -=  gcmSIZEOF(gctUINT32);
+        buffer += gcmSIZEOF(gctUINT32);
+
+        if (ProgramBufferSize)
+        {
+            *ProgramBufferSize = *bufferSize;
+        }
+
+        /* If this binary saves state buffer, then load it. */
+        if (ProgramBuffer && *bufferSize > 0)
+        {
+            /* Allocate program states buffer. */
+            gcmERR_BREAK(gcoOS_Allocate(os, *bufferSize, &pointer));
+            *ProgramBuffer = pointer;
+            gcoOS_MemCopy(*ProgramBuffer, buffer, *bufferSize);
+        }
+
+        buffer += *bufferSize;
+        bytes -=  *bufferSize;
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) ||
+            bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            /* Invalid hint size. */
+            gcmFATAL("gcLoadCLSingleKernel: Invalid hints size %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+
+        buffer += gcmSIZEOF(gctUINT32);
+        bytes -= gcmSIZEOF(gctUINT32);
+
+        /* If this binary saves hints, then load it. */
+        if (Hints && *bufferSize > 0)
+        {
+            /* Allocate hint structure buffer. */
+            gcmERR_BREAK(gcoOS_Allocate(os,
+                                        gcSHADER_GetHintSize(),
+                                        &pointer));
+
+            *Hints = pointer;
+
+            /* Copy the HINT structure. */
+            gcoOS_MemCopy(*Hints, buffer, *bufferSize);
+        }
+
+        buffer += *bufferSize;
+        bytes -= *bufferSize;
+
+        /* Load video nodes. */
+        bufferSize = (gctUINT32 *) buffer;
+
+        if (bytes < sizeof(gctUINT32) ||
+            bytes < (*bufferSize + sizeof(gctUINT32)))
+        {
+            /* Invalid video nodes. */
+            gcmFATAL("gcLoadCLSingleKernel: Invalid video nodes %u", bytes);
+            gcmFOOTER_ARG("status=%d", gcvSTATUS_INVALID_DATA);
+            return gcvSTATUS_INVALID_DATA;
+        }
+
+        buffer += gcmSIZEOF(gctUINT32);
+        bytes -= gcmSIZEOF(gctUINT32);
+
+        /* Load vide nodes. */
+        if (*bufferSize > 0)
+        {
+            gcmASSERT(*Hints);
+            /* Allocate hint structure buffer. */
+            gcmERR_BREAK(_LoadShaderVidNodes(KernelShader,
+                                             *Hints,
+                                             buffer));
+        }
+
+        buffer += *bufferSize;
+        bytes -= *bufferSize;
 
         /* Assert we copied the right number of bytes */
         gcmASSERT(buffer - BinarySize == Binary);

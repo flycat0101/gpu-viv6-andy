@@ -3599,6 +3599,11 @@ GLboolean GL_APIENTRY __glesProfile_UnmapBuffer(__GLcontext *gc, GLenum target)
                         gc, tid, target);
     }
 
+    if (__glesTracerDispatchTable.UnmapBuffer)
+    {
+        (*__glesTracerDispatchTable.UnmapBuffer)(target);
+    }
+
     __GLES_PROFILE_HEADER();
     success = __gles_UnmapBuffer(gc, target);
     __GLES_PROFILE_FOOTER(GLES3_UNMAPBUFFER);
@@ -3606,11 +3611,6 @@ GLboolean GL_APIENTRY __glesProfile_UnmapBuffer(__GLcontext *gc, GLenum target)
     if (__glesApiTraceMode == gcvTRACEMODE_FULL || __glesApiTraceMode == gcvTRACEMODE_POST)
     {
         __GLES_LOG_API("        glUnmapBuffer => %d\n", success);
-    }
-
-    if (__glesTracerDispatchTable.UnmapBuffer)
-    {
-        (*__glesTracerDispatchTable.UnmapBuffer)(target);
     }
 
     return success;

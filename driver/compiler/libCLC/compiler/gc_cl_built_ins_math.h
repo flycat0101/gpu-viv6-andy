@@ -2314,6 +2314,7 @@ _GenSinCode(
                        clvSTORAGE_QUALIFIER_NONE,
                        clmGenCodeDataType(T_UINT),
                        7,
+                       gcvTRUE,
                        tempRegIndex,
                        gcvNULL);
     for(i = 0; i<7; i++){
@@ -2562,6 +2563,8 @@ _GenSinCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext6,
                                             gcvFALSE);
@@ -2690,6 +2693,8 @@ _GenSinCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext7,
                                             gcvFALSE);
@@ -2942,6 +2947,8 @@ _GenSinCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext8,
                                             gcvFALSE);
@@ -3025,6 +3032,8 @@ _GenSinCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext9,
                                             gcvFALSE);
@@ -3129,6 +3138,8 @@ _GenSinCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext10,
                                             gcvFALSE);
@@ -3364,6 +3375,8 @@ _GenSinCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext10,
                                             gcvFALSE);
@@ -3456,6 +3469,8 @@ _GenSinCode(
                 if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContext11,
                                                     gcvFALSE);
@@ -3597,6 +3612,8 @@ _GenSinCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext12,
                                             gcvFALSE);
@@ -3800,6 +3817,8 @@ _GenSinCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext12,
                                             gcvFALSE);
@@ -3887,10 +3906,9 @@ _GenSinCode(
 
     if (gcmIS_ERROR(status)) return status;
 
-
-
-
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext13,
                                             gcvFALSE);
@@ -4416,6 +4434,7 @@ _GenCosCode(
                        clvSTORAGE_QUALIFIER_NONE,
                        clmGenCodeDataType(T_UINT),
                        7,
+                       gcvTRUE,
                        tempRegIndex,
                        gcvNULL);
     for(i = 0; i<7; i++){
@@ -4664,6 +4683,8 @@ _GenCosCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext6,
                                             gcvFALSE);
@@ -4805,6 +4826,8 @@ _GenCosCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext7,
                                             gcvFALSE);
@@ -5057,6 +5080,8 @@ _GenCosCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext8,
                                             gcvFALSE);
@@ -5140,6 +5165,8 @@ _GenCosCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext9,
                                             gcvFALSE);
@@ -5244,6 +5271,8 @@ _GenCosCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext10,
                                             gcvFALSE);
@@ -5479,6 +5508,8 @@ _GenCosCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext10,
                                             gcvFALSE);
@@ -5571,6 +5602,8 @@ _GenCosCode(
                 if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContext11,
                                                     gcvFALSE);
@@ -5712,6 +5745,8 @@ _GenCosCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext12,
                                             gcvFALSE);
@@ -5915,6 +5950,8 @@ _GenCosCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext12,
                                             gcvFALSE);
@@ -6522,6 +6559,7 @@ _GenSinCosCode(
                        clvSTORAGE_QUALIFIER_NONE,
                        clmGenCodeDataType(T_UINT),
                        7,
+                       gcvTRUE,
                        tempRegIndex,
                        gcvNULL);
     for(i = 0; i<7; i++){
@@ -6770,6 +6808,8 @@ _GenSinCosCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext6,
                                             gcvFALSE);
@@ -8305,6 +8345,7 @@ _GenTanCode(
                        clvSTORAGE_QUALIFIER_NONE,
                        clmGenCodeDataType(T_UINT),
                        7,
+                       gcvTRUE,
                        tempRegIndex,
                        gcvNULL);
     for(i = 0; i<7; i++){
@@ -8553,6 +8594,8 @@ _GenTanCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext6,
                                             gcvFALSE);
@@ -8681,6 +8724,8 @@ _GenTanCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext7,
                                             gcvFALSE);
@@ -8933,6 +8978,8 @@ _GenTanCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext8,
                                             gcvFALSE);
@@ -9017,6 +9064,8 @@ _GenTanCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext9,
                                             gcvFALSE);
@@ -9121,6 +9170,8 @@ _GenTanCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext10,
                                             gcvFALSE);
@@ -9617,6 +9668,8 @@ _GenAsinCode(
                     &unsignROperand);
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectionContext1,
                                         gcvFALSE);
@@ -9917,6 +9970,8 @@ _GenAsinCode(
 
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                            PolynaryExpr->exprBase.base.lineNo,
+                                                            PolynaryExpr->exprBase.base.stringNo,
                                                             CodeGenerator,
                                                             &selectionContext3,
                                                             gcvFALSE);
@@ -9978,6 +10033,8 @@ _GenAsinCode(
                             if (gcmIS_ERROR(status)) return status;
 
                             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                                    PolynaryExpr->exprBase.base.stringNo,
                                                                     CodeGenerator,
                                                                     &selectionContext4,
                                                                     gcvFALSE);
@@ -10292,6 +10349,8 @@ _GenAsinCode(
                             if (gcmIS_ERROR(status)) return status;
 
                             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext5,
                                             gcvFALSE);
@@ -10652,6 +10711,8 @@ _GenAcosCode(
                     &unsignROperand);
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectionContext1,
                                         gcvFALSE);
@@ -10980,6 +11041,8 @@ _GenAcosCode(
                     if (gcmIS_ERROR(status)) return status;
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                            PolynaryExpr->exprBase.base.lineNo,
+                                                            PolynaryExpr->exprBase.base.stringNo,
                                                             CodeGenerator,
                                                             &selectionContext3,
                                                             gcvFALSE);
@@ -11052,6 +11115,8 @@ _GenAcosCode(
                             if (gcmIS_ERROR(status)) return status;
 
                             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                                    PolynaryExpr->exprBase.base.stringNo,
                                                                     CodeGenerator,
                                                                     &selectionContext4,
                                                                     gcvFALSE);
@@ -11371,6 +11436,8 @@ _GenAcosCode(
                             if (gcmIS_ERROR(status)) return status;
 
                             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext5,
                                             gcvFALSE);
@@ -11781,6 +11848,8 @@ _GenAtanCode(
 
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContext2,
                                                     gcvFALSE);
@@ -11860,6 +11929,8 @@ _GenAtanCode(
             if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext1,
                                             gcvFALSE);
@@ -11940,15 +12011,9 @@ _GenAtanCode(
 
             if (gcmIS_ERROR(status)) return status;
 
-
-
-
-
-
-
-
-
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContext3,
                                                     gcvFALSE);
@@ -12605,9 +12670,9 @@ _GenAtan2Code(
                     IOperand,
                     &intermROperands[10]);
 
-
-
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextNan,
                                     gcvFALSE);
@@ -12652,6 +12717,8 @@ _GenAtan2Code(
             if (gcmIS_ERROR(status)) return status;
         }
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextNegY,
                                         gcvFALSE);
@@ -12725,6 +12792,8 @@ _GenAtan2Code(
     }/*End of |x| = 0 */
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextZeroX,
                                         gcvFALSE);
@@ -12795,6 +12864,8 @@ _GenAtan2Code(
             }/*End of |X| = Inf */
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextInfX,
                                         gcvFALSE);
@@ -12829,6 +12900,8 @@ _GenAtan2Code(
             IOperand->dataType.elementType = clvTYPE_FLOAT;
         } /*End of |y| == inf */
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextInfY,
                                         gcvFALSE);
@@ -12890,6 +12963,8 @@ _GenAtan2Code(
             }/*End of |X| = Inf */
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextInfX1,
                                             gcvFALSE);
@@ -12959,6 +13034,8 @@ _GenAtan2Code(
     if (gcmIS_ERROR(status)) return status;
     /*do nothing, special case already setup */
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextSpecial,
                                     gcvFALSE);
@@ -13352,6 +13429,8 @@ _GenSinhCode(
 
 
                         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContext1,
                                                     gcvFALSE);
@@ -13411,6 +13490,8 @@ _GenSinhCode(
                                             &constantROperand);
 
                             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                                    PolynaryExpr->exprBase.base.stringNo,
                                                                     CodeGenerator,
                                                                     &selectionContextOver126,
                                                                     gcvFALSE);
@@ -13524,6 +13605,8 @@ _GenSinhCode(
 
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextRcp0,
                                                     gcvFALSE);
@@ -13958,6 +14041,8 @@ _GenCoshCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                PolynaryExpr->exprBase.base.lineNo,
+                                PolynaryExpr->exprBase.base.stringNo,
                                 CodeGenerator,
                                 &selectionContext1,
                                 gcvFALSE);
@@ -14018,6 +14103,8 @@ _GenCoshCode(
                             &oneROperand);
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextOver126,
                                                     gcvFALSE);
@@ -14131,6 +14218,8 @@ _GenCoshCode(
 
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextRcp0,
                                                     gcvFALSE);
@@ -14513,6 +14602,8 @@ _GenTanhCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                PolynaryExpr->exprBase.base.lineNo,
+                                PolynaryExpr->exprBase.base.stringNo,
                                 CodeGenerator,
                                 &selectionContext1,
                                 gcvFALSE);
@@ -14565,6 +14656,8 @@ _GenTanhCode(
                         &constantROperand);
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextOver34,
                                             0);
@@ -14926,6 +15019,8 @@ _GenAsinhCode(
                 if (gcmIS_ERROR(status)) return status;
 
                 status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext2,
                                             gcvFALSE);
@@ -15084,6 +15179,8 @@ _GenAsinhCode(
                 if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                PolynaryExpr->exprBase.base.lineNo,
+                                PolynaryExpr->exprBase.base.stringNo,
                                 CodeGenerator,
                                 &selectionContext1,
                                 gcvFALSE);
@@ -16001,6 +16098,8 @@ _GenAcoshCode(
 
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext1,
                                             gcvFALSE);
@@ -16088,6 +16187,8 @@ _GenAcoshCode(
                         if (gcmIS_ERROR(status)) return status;
 
                         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext2,
                                             gcvFALSE);
@@ -16239,6 +16340,8 @@ _GenAcoshCode(
 
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext,
                                             gcvFALSE);
@@ -16296,6 +16399,8 @@ _GenAcoshCode(
 
         if (gcmIS_ERROR(status)) return status;
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
                                                 CodeGenerator,
                                                 &selectContextX1,
                                                 gcvFALSE);
@@ -16505,6 +16610,8 @@ _GenAtanhCode(
         IOperand->dataType.elementType = clvTYPE_FLOAT;
         if (gcmIS_ERROR(status)) return status;
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
                                                 CodeGenerator,
                                                 &selectContextX1,
                                                 gcvFALSE);
@@ -16540,6 +16647,8 @@ _GenAtanhCode(
 
     }
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextOver1,
                                     gcvFALSE);
@@ -16893,6 +17002,8 @@ _GenSinPiCode(
                     &nanROperand);
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextInf,
                                             gcvFALSE);
@@ -17172,6 +17283,8 @@ _GenCosPiCode(
                     &nanROperand);
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextInf,
                                             gcvFALSE);
@@ -17266,6 +17379,8 @@ _GenCosPiCode(
     }
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextInt,
                                             gcvFALSE);
@@ -17556,6 +17671,8 @@ _GenTanPiCode(
                     &nanROperand);
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextInf,
                                             gcvFALSE);
@@ -17644,6 +17761,8 @@ _GenTanPiCode(
     }
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextHalfInt,
                                             gcvFALSE);
@@ -17830,6 +17949,8 @@ _GenTanPiCode(
 
     }
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextOverQ,
                                             gcvFALSE);
@@ -18052,6 +18173,8 @@ _GenCbrtCode(
                     &OperandsParameters[0].rOperands[0]);
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextInf,
                                             gcvFALSE);
@@ -18435,6 +18558,8 @@ _GenCbrtCode(
 
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext1,
                                             gcvFALSE);
@@ -18763,6 +18888,8 @@ _GenHypotCode(
                         &maskROperand);
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
                                                 CodeGenerator,
                                                 &selectContextInf,
                                                 gcvFALSE);
@@ -19505,6 +19632,8 @@ _GenPowCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &slctCntxtOverDot5,
                                     gcvFALSE);
@@ -19885,6 +20014,8 @@ _GenPowCode(
                         &zeroROperand);
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextMain0,
                                         gcvFALSE);
@@ -19910,6 +20041,8 @@ _GenPowCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &slctCntxtSmallPow,
                                             gcvFALSE);
@@ -19968,6 +20101,8 @@ _GenPowCode(
                 &zeroROperand,
                 &fExpROperand);
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextEps0,
                                         gcvFALSE);
@@ -20081,6 +20216,8 @@ _GenPowCode(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextDenormX,
                                             gcvFALSE);
@@ -20155,6 +20292,8 @@ _GenPowCode(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextX1,
                                             gcvFALSE);
@@ -20203,6 +20342,8 @@ _GenPowCode(
 
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextY0,
                                             gcvFALSE);
@@ -20277,6 +20418,8 @@ _GenPowCode(
         if (gcmIS_ERROR(status)) return status;
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextNan,
                                         gcvFALSE);
@@ -20392,6 +20535,8 @@ _GenPowCode(
                                 &zeroROperand);
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectContextSat,
                                                     gcvFALSE);
@@ -20454,6 +20599,8 @@ _GenPowCode(
                                 &signROperand);
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectContextOddIntY,
                                                     gcvFALSE);
@@ -20543,6 +20690,8 @@ _GenPowCode(
                         if (gcmIS_ERROR(status)) return status;
 
                         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                        PolynaryExpr->exprBase.base.lineNo,
+                                                        PolynaryExpr->exprBase.base.stringNo,
                                                         CodeGenerator,
                                                         &selectContextXLess1,
                                                         gcvFALSE);
@@ -20588,6 +20737,8 @@ _GenPowCode(
                         if (gcmIS_ERROR(status)) return status;
 
                         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                        PolynaryExpr->exprBase.base.lineNo,
+                                                        PolynaryExpr->exprBase.base.stringNo,
                                                         CodeGenerator,
                                                         &selectContextXGreater1,
                                                         gcvFALSE);
@@ -20638,6 +20789,8 @@ _GenPowCode(
 
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectContextInfY,
                                                     gcvFALSE);
@@ -20705,6 +20858,8 @@ _GenPowCode(
                     if (gcmIS_ERROR(status)) return status;
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectContextInfX,
                                                     gcvFALSE);
@@ -20794,6 +20949,8 @@ _GenPowCode(
                     IOperand->dataType.elementType = clvTYPE_FLOAT;
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectContextNegY,
                                                     gcvFALSE);
@@ -20823,6 +20980,8 @@ _GenPowCode(
                     }/* End For X = 0.0, verify Y<0?*/
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectContextX0,
                                                     gcvFALSE);
@@ -20903,6 +21062,8 @@ _GenPowCode(
                     IOperand->dataType.elementType = clvTYPE_FLOAT;
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectContextIntegerY,
                                                     gcvFALSE);
@@ -20933,6 +21094,8 @@ _GenPowCode(
 
 
                         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                        PolynaryExpr->exprBase.base.lineNo,
+                                                        PolynaryExpr->exprBase.base.stringNo,
                                                         CodeGenerator,
                                                         &selectContextNegX,
                                                         gcvFALSE);
@@ -21082,6 +21245,8 @@ _GenPowrCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextNan,
                                     gcvFALSE);
@@ -21122,6 +21287,8 @@ _GenPowrCode(
                                     &nanROperand);
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &slctCntxtNeg,
                                         gcvFALSE);
@@ -21193,6 +21360,8 @@ _GenPowrCode(
         if (gcmIS_ERROR(status)) return status;
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextLogx_yNan,
                                         gcvFALSE);
@@ -21412,6 +21581,8 @@ _GenPownCode(
 
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextSmallY,
                                         gcvFALSE);
@@ -21479,6 +21650,8 @@ _GenPownCode(
                 /* Do nothing, since x^y is same as x^main(y)*/
 
                 status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
                                                 CodeGenerator,
                                                 &selectContextNormal,
                                                 gcvFALSE);
@@ -21539,6 +21712,8 @@ _GenPownCode(
                         &intermIOperands[11],
                         &twenty5To1ROperand);
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextSmallExp,
                                             gcvFALSE);
@@ -21813,6 +21988,8 @@ _GenRootnCode(
             &intermIOperands[14],
             &oddROperand);
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextY0,
                                             gcvFALSE);
@@ -21857,6 +22034,8 @@ _GenRootnCode(
                                 &intermROperands[3]);
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextNegX,
                                             gcvFALSE);
@@ -21985,6 +22164,8 @@ _GenRootnCode(
 
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextInfX,
                                             gcvFALSE);
@@ -22066,6 +22247,8 @@ _GenRootnCode(
 
     /*Do nothing, the value (nan) already set */
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextSpecialCase,
                                             gcvFALSE);
@@ -22226,6 +22409,8 @@ _GenExp_E_10Code(
                                         &intermROperands[0],
                                         &oneROperand);
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextOver87,
                                         gcvFALSE);
@@ -22296,6 +22481,8 @@ _GenExp_E_10Code(
 
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextExp0,
                                     gcvFALSE);
@@ -22454,6 +22641,8 @@ _GenExp_E_10Code(
                 &twenty5To1ROperand);
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextSmallExp,
                                         gcvFALSE);
@@ -22985,6 +23174,8 @@ _GenExpm1Code(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectionContext2,
                                             gcvFALSE);
@@ -23347,6 +23538,8 @@ _GenExpm1Code(
                         if (gcmIS_ERROR(status)) return status;
 
                         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                                PolynaryExpr->exprBase.base.lineNo,
+                                                                PolynaryExpr->exprBase.base.stringNo,
                                                                 CodeGenerator,
                                                                 &selectionContext3,
                                                                 gcvFALSE);
@@ -23355,6 +23548,8 @@ _GenExpm1Code(
 
                         /* The false part, t0 < -1.0 */
                         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                                PolynaryExpr->exprBase.base.lineNo,
+                                                                PolynaryExpr->exprBase.base.stringNo,
                                                                 CodeGenerator,
                                                                 &selectionContext1,
                                                                 gcvFALSE);
@@ -23608,6 +23803,8 @@ _GenLog2_E_10Code(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextNan,
                                     gcvFALSE);
@@ -24147,14 +24344,13 @@ _GenLog2_E_10Code(
                                                 IOperand,
                                                 &intermROperands[23],
                                                 &intermROperands[29]);
-
                     }
-
-
                 }
                 if (gcmIS_ERROR(status)) return status;
 
                 status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
                                                 CodeGenerator,
                                                 &selectionContext1,
                                                 gcvFALSE);
@@ -24162,6 +24358,8 @@ _GenLog2_E_10Code(
                 if (gcmIS_ERROR(status)) return status;
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
                                                 CodeGenerator,
                                                 &selectionContext,
                                                 gcvFALSE);
@@ -24770,6 +24968,8 @@ _GenRintCode(
                             &OperandsParameters[0].rOperands[0]);
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextBigX,
                                         gcvFALSE);
@@ -24861,6 +25061,8 @@ _GenRintCode(
                             &intermROperands[1]);
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextFrac05,
                                             gcvFALSE);
@@ -25481,6 +25683,8 @@ _GenFrexpCode(
 
     }
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextX0,
                                     gcvFALSE);
@@ -25674,6 +25878,8 @@ _GenNextAfterCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextNan,
                                     gcvFALSE);
@@ -25753,6 +25959,8 @@ _GenNextAfterCode(
                                     &OperandsParameters[0].rOperands[0]);
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextEq,
                                         gcvFALSE);
@@ -25792,6 +26000,8 @@ _GenNextAfterCode(
 
 
                 status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
                                                 CodeGenerator,
                                                 &selectContextNeg[i],
                                                 gcvFALSE);
@@ -25849,6 +26059,8 @@ _GenNextAfterCode(
 
 
                 status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
                                                 CodeGenerator,
                                                 &selectContextXlessY,
                                                 gcvFALSE);
@@ -25908,6 +26120,8 @@ _GenNextAfterCode(
 
 
                 status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
                                                 CodeGenerator,
                                                 &selectContextNeg[i],
                                                 gcvFALSE);
@@ -26336,6 +26550,8 @@ _GenModCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    LineNo,
+                                    StringNo,
                                     CodeGenerator,
                                     &selectionContext0,
                                     gcvFALSE);
@@ -26443,6 +26659,8 @@ _GenModCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    LineNo,
+                                    StringNo,
                                     CodeGenerator,
                                     &selectionContext1,
                                     gcvFALSE);
@@ -26477,6 +26695,8 @@ _GenModCode(
 
     /*End of Normal U32 divider */
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    LineNo,
+                                    StringNo,
                                     CodeGenerator,
                                     &selectionContextGreater1,
                                     gcvFALSE);
@@ -26870,6 +27090,8 @@ _GenILogbCode(
                 IOperand,
                 &minROperand);
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextX0,
                                     gcvFALSE);
@@ -26909,6 +27131,8 @@ _GenILogbCode(
                     IOperand,
                     &unsignROperand);
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextInfX,
                                         gcvFALSE);
@@ -27047,6 +27271,8 @@ _GenLogbCode(
                 IOperand,
                 &negInfROperand);
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextX0,
                                     gcvFALSE);
@@ -27089,6 +27315,8 @@ _GenLogbCode(
                     &OperandsParameters[0].rOperands[0]);
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextInfX,
                                         gcvFALSE);
@@ -27249,6 +27477,8 @@ _GenLdexpCode(
                 IOperand,
                 &zeroROperand);
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextX0,
                                     gcvFALSE);
@@ -27288,6 +27518,8 @@ _GenLdexpCode(
                     IOperand,
                     &OperandsParameters[0].rOperands[0]);
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectContextInfX,
                                         gcvFALSE);
@@ -27360,6 +27592,8 @@ _GenLdexpCode(
                 IOperand->dataType.elementType = clvTYPE_FLOAT;
 
                 status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
                                                 CodeGenerator,
                                                 &selectContextXYOver,
                                                 gcvFALSE);
@@ -27417,6 +27651,8 @@ _GenLdexpCode(
                     IOperand->dataType.elementType = clvTYPE_FLOAT;
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectContextXYUnder,
                                                     gcvFALSE);
@@ -27649,6 +27885,8 @@ _GenFModCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContext0,
                                     gcvFALSE);
@@ -28025,6 +28263,8 @@ _GenFModCode(
                         &intermROperands[2]);
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContext20,
                                     gcvFALSE);
@@ -28188,6 +28428,8 @@ _GenFModCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextUp1,
                                     gcvFALSE);
@@ -28229,11 +28471,11 @@ _GenFModCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextLoopBack,
                                     gcvFALSE);
-
-
 
     status = clDefineSelectionEnd(Compiler,
                                 CodeGenerator,
@@ -28241,6 +28483,8 @@ _GenFModCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextLoop,
                                     gcvFALSE);
@@ -28408,6 +28652,8 @@ _GenFModCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextNan,
                                     gcvFALSE);
@@ -28464,6 +28710,8 @@ _GenFModCode(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextY0,
                                             gcvFALSE);
@@ -28518,6 +28766,8 @@ _GenFModCode(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextInfX,
                                             gcvFALSE);
@@ -28571,6 +28821,8 @@ _GenFModCode(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextInfY,
                                             gcvFALSE);
@@ -28760,6 +29012,8 @@ _GenRemainderCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContext0,
                                     gcvFALSE);
@@ -29136,6 +29390,8 @@ _GenRemainderCode(
                         &intermROperands[2]);
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContext20,
                                     gcvFALSE);
@@ -29299,6 +29555,8 @@ _GenRemainderCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextUp1,
                                     gcvFALSE);
@@ -29340,6 +29598,8 @@ _GenRemainderCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextLoopBack,
                                     gcvFALSE);
@@ -29352,6 +29612,8 @@ _GenRemainderCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextLoop,
                                     gcvFALSE);
@@ -29497,6 +29759,8 @@ _GenRemainderCode(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContext2ROverY,
                                             gcvFALSE);
@@ -29572,6 +29836,8 @@ _GenRemainderCode(
                 if (gcmIS_ERROR(status)) return status;
 
                 status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
                                                 CodeGenerator,
                                                 &selectContext2RSameY,
                                                 gcvFALSE);
@@ -29686,6 +29952,8 @@ _GenRemainderCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextNan,
                                     gcvFALSE);
@@ -29742,6 +30010,8 @@ _GenRemainderCode(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextY0,
                                             gcvFALSE);
@@ -29795,6 +30065,8 @@ _GenRemainderCode(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextInfX,
                                             gcvFALSE);
@@ -29847,6 +30119,8 @@ _GenRemainderCode(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextInfY,
                                             gcvFALSE);
@@ -30040,6 +30314,8 @@ _GenRemquoCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContext0,
                                     gcvFALSE);
@@ -30415,6 +30691,8 @@ _GenRemquoCode(
                         &intermROperands[2]);
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContext20,
                                     gcvFALSE);
@@ -30578,6 +30856,8 @@ _GenRemquoCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextUp1,
                                     gcvFALSE);
@@ -30619,6 +30899,8 @@ _GenRemquoCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextLoopBack,
                                     gcvFALSE);
@@ -30631,6 +30913,8 @@ _GenRemquoCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextLoop,
                                     gcvFALSE);
@@ -30748,6 +31032,8 @@ _GenRemquoCode(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContext2ROverY,
                                             gcvFALSE);
@@ -30824,6 +31110,8 @@ _GenRemquoCode(
                 if (gcmIS_ERROR(status)) return status;
 
                 status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
                                                 CodeGenerator,
                                                 &selectContext2RSameY,
                                                 gcvFALSE);
@@ -31051,6 +31339,8 @@ _GenRemquoCode(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectContextNan,
                                     gcvFALSE);
@@ -31107,6 +31397,8 @@ _GenRemquoCode(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextY0,
                                             gcvFALSE);
@@ -31169,6 +31461,8 @@ _GenRemquoCode(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextInfX,
                                             gcvFALSE);
@@ -31228,6 +31522,8 @@ _GenRemquoCode(
                         &zeroROperand);
             if (gcmIS_ERROR(status)) return status;
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                            PolynaryExpr->exprBase.base.lineNo,
+                                            PolynaryExpr->exprBase.base.stringNo,
                                             CodeGenerator,
                                             &selectContextInfY,
                                             gcvFALSE);
@@ -33526,6 +33822,8 @@ _GenGammaCode(
         if (gcmIS_ERROR(status)) return status;
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectionContextLoopBack,
                                         gcvFALSE);
@@ -33740,6 +34038,8 @@ _GenGammaCode(
         if (gcmIS_ERROR(status)) return status;
 
         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                        PolynaryExpr->exprBase.base.lineNo,
+                                        PolynaryExpr->exprBase.base.stringNo,
                                         CodeGenerator,
                                         &selectionContextLoopBack,
                                         gcvFALSE);

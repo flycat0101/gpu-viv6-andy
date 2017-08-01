@@ -27,6 +27,7 @@ include $(qnx_build_dir)/common.mk
 
 EXTRA_INCVPATH += $(driver_root)/hal/inc
 EXTRA_INCVPATH += $(driver_root)/hal/user
+EXTRA_INCVPATH += $(driver_root)/hal/os/qnx/user
 EXTRA_INCVPATH += $(driver_root)/compiler/libVSC/include
 
 ifeq ($(VIVANTE_ENABLE_VG), 1)

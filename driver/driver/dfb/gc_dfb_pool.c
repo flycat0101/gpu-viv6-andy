@@ -354,20 +354,42 @@ galAllocateBuffer( CoreSurfacePool       *pool,
              }
          }
 
-        /* Create a gcoSURF surface. */
-        gcmERR_BREAK(gcoSURF_Construct( vdrv->hal,
-                                        surface->config.size.w,
-                                        surface->config.size.h,
-                                        1,
-                                        gcvSURF_BITMAP,
-                                        format,
-                                        alloc->prealloc_addr!=gcvNULL ? gcvPOOL_USER :  gcvPOOL_DEFAULT,
-                                        &surf ));
+        if (vdrv->vdev->hw_yuv420_output && format == gcvSURF_NV16)
+        {
+            gcmERR_BREAK(gcoSURF_Construct( vdrv->hal,
+                                            gcmALIGN(surface->config.size.w, 64),
+                                            surface->config.size.h,
+                                            1,
+                                            gcvSURF_BITMAP,
+                                            gcvSURF_NV16,
+                                            gcvPOOL_DEFAULT,
+                                            &surf ));
 
-        gcmERR_BREAK(gcoSURF_GetAlignedSize( surf,
-                                             &aligned_width,
-                                             &aligned_height,
-                                             &aligned_stride ));
+            aligned_width = surface->config.size.w;
+            aligned_height = surface->config.size.h;
+            aligned_stride = surface->config.size.w;
+
+            alloc->size = aligned_height * gcmALIGN(surface->config.size.w, 64);
+        }
+        else
+        {
+            /* Create a gcoSURF surface. */
+            gcmERR_BREAK(gcoSURF_Construct( vdrv->hal,
+                                            surface->config.size.w,
+                                            surface->config.size.h,
+                                            1,
+                                            gcvSURF_BITMAP,
+                                            format,
+                                            alloc->prealloc_addr!=gcvNULL ? gcvPOOL_USER :  gcvPOOL_DEFAULT,
+                                            &surf ));
+
+            gcmERR_BREAK(gcoSURF_GetAlignedSize( surf,
+                                                 &aligned_width,
+                                                 &aligned_height,
+                                                 &aligned_stride ));
+
+            alloc->size = aligned_height * aligned_stride;
+        }
 
         D_DEBUG_AT( Gal_Pool,
                     "aligned_width: %u, aligned_height: %u, aligned_stride: %d\n",
@@ -375,7 +397,6 @@ galAllocateBuffer( CoreSurfacePool       *pool,
 
         alloc->surf   = surf;
         alloc->pitch  = aligned_stride;
-        alloc->size   = aligned_height * alloc->pitch;
         alloc->offset = 0;
 
 #if GAL_SURFACE_COMPRESSED
@@ -395,6 +416,7 @@ galAllocateBuffer( CoreSurfacePool       *pool,
             gcmERR_BREAK(gcoHAL_LockVideoMemory(
                 alloc->tsnode,
                 gcvFALSE,
+                gcvENGINE_RENDER,
                 &alloc->tsphysical,
                 &alloc->tslogical));
 
@@ -485,7 +507,7 @@ galDeallocateBuffer( CoreSurfacePool       *pool,
     if (vdrv->vdev->hw_2d_compression &&
         alloc->tsphysical != gcvINVALID_ADDRESS)
     {
-        gcoHAL_UnlockVideoMemory(alloc->tsnode, gcvSURF_BITMAP);
+        gcoHAL_UnlockVideoMemory(alloc->tsnode, gcvSURF_BITMAP, gcvENGINE_RENDER);
         gcoHAL_ReleaseVideoMemory(alloc->tsnode);
         alloc->tsphysical = gcvINVALID_ADDRESS;
     }

@@ -1,0 +1,20 @@
+cover_flow - demo application. Shows animated DVD covers on screen.
+
+Parameters:
+ -width val    render width (default 640)
+ -height val   render height (default 480)
+ -samples val  number of samples for AA (default 0)
+ -steps val    animation speed (default 16)
+ -frames val   number of frames to render (default 0 = no limit)
+ -etc1         use pkm textures instead of tga (default tga)
+
+Example:
+  cover_flow -width 1024 -height 768 -steps 150 -frames 2000
+
+Keyboard control:
+  ESC          quit
+  Left/Right   select image
+  A/G/R        enable/disable auto-run (enabled by default)
+  ,/keypad -   rotate left
+  ./keypad +   rotate right
+  space        reset rotation

@@ -23,7 +23,9 @@
 #define cldBASIC_VECTOR_BYTE_SIZE (cldBASIC_VECTOR_SIZE * cldMachineBytesPerWord)
 #define cldMAX_ARRAY_DIMENSION  4      /*maximum number of dimension for array allowed */
 
+#ifndef _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
 #define _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES 0
+#endif
 
 /* Compute aligned value in bytes */
 #define clmALIGN(N, Alignment, Packed) \
@@ -542,6 +544,14 @@ clsDECL_GetFieldOffset(
 IN clsDECL * StructDecl,
 IN struct _clsNAME * FieldName
 );
+
+gctSIZE_T
+clGetFieldByteOffset(
+    IN cloCOMPILER Compiler,
+    IN clsDECL * StructDecl,
+    IN struct _clsNAME * FieldName,
+    OUT gctUINT * Alignment
+    );
 
 gctBOOL
 clsDECL_IsAssignableAndComparable(
@@ -1165,6 +1175,14 @@ IN cloCOMPILER Compiler
 );
 
 void
+cloCOMPILER_ChangeUniformDebugInfo(
+    IN cloCOMPILER Compiler,
+    gctUINT tmpStart,
+    gctUINT tmpEnd,
+    gctUINT uniformIdx
+);
+
+void
 cloCOMPILER_SetCollectDIE(
 IN cloCOMPILER Compiler,
 gctBOOL collect
@@ -1184,6 +1202,7 @@ IN gctUINT16 Parent,
 IN gctCONST_STRING Name,
 IN gctUINT FileNo,
 IN gctUINT LineNo,
+IN gctUINT EndLineNo,
 IN gctUINT ColNo
 );
 
@@ -1198,6 +1217,7 @@ IN cloCOMPILER Compiler,
 IN gctUINT16 Id,
 IN gctUINT FileNo,
 IN gctUINT LineNo,
+IN gctUINT EndLineNo,
 IN gctUINT ColNo
 );
 
@@ -1206,7 +1226,18 @@ cloCOMPILER_SetDIELogicalReg(
 IN cloCOMPILER Compiler,
 IN gctUINT16 Id,
 IN gctUINT32 regIndex,
-IN gctUINT num
+IN gctUINT num,
+IN gctUINT mask
+);
+
+void
+cloCOMPILER_SetStructDIELogicalReg(
+IN cloCOMPILER Compiler,
+IN gctUINT16 ParentId,
+IN gctCONST_STRING Symbol,
+IN gctUINT32 regIndex,
+IN gctUINT num,
+IN gctUINT mask
 );
 
 gctBOOL
@@ -1321,6 +1352,7 @@ struct _cloIR_BASE
     cltVPTR        vptr;
     gctUINT        lineNo;
     gctUINT        stringNo;
+    gctUINT        endLineNo;
 };
 
 typedef struct _cloIR_BASE *cloIR_BASE;
@@ -1361,6 +1393,7 @@ clsVTAB;
         (base)->vptr        = (finalVPtr); \
         (base)->lineNo        = (finalLineNo); \
         (base)->stringNo    = (finalStringNo); \
+        (base)->endLineNo   = (finalLineNo);\
     } while (gcvFALSE)
 
 #if gcdDEBUG
@@ -1610,6 +1643,7 @@ struct _cloIR_JUMP
       cloIR_EXPR    returnExpr;
       clsNAME    *label;
     } u;
+    clsNAME_SPACE * nameSpace;
 };
 
 typedef struct _cloIR_JUMP *    cloIR_JUMP;
@@ -1721,15 +1755,22 @@ struct _cloIR_CONSTANT
     gctSTRING buffer;
     clsNAME * variable;
     gctUINT uniformCount;
-#if _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
-    gcUNIFORM *uniform;
-#else
-    gcUNIFORM uniform;
-#endif
+
+    union {
+       gcUNIFORM *uniformArr;
+       gcUNIFORM uniform;
+    } u;
     gctBOOL allValuesEqual;
 };
 
 typedef struct _cloIR_CONSTANT *cloIR_CONSTANT;
+
+gceSTATUS
+clConvFieldConstantToConstantValues(
+cluCONSTANT_VALUE *Values,
+clsDECL *Decl,
+gctSTRING Buffer
+);
 
 gceSTATUS
 cloIR_CONSTANT_Allocate(

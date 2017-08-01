@@ -113,6 +113,9 @@ int main(
 {
     // Parse all command line arguments.
     int i;
+    // Frame counter
+    int framesMax = 0;
+    int framesTotal = 0;
     // Initialize EGL.
     EGLDisplay eglDisplay;
     EGLContext eglContext;
@@ -175,13 +178,19 @@ int main(
         }
 
         // Test for -w.
-        else if (strcmp("-w", argv[i]) == 0)
+        else if ((strcmp("-w", argv[i]) == 0) && (i + 1 < argc))
         {
             appWidth = atoi(argv[++i]);
         }
 
+        // Test for -frames.
+        else if ((strcmp("-frames", argv[i]) == 0) && (i + 1 < argc))
+        {
+            framesMax = atoi(argv[++i]);
+        }
+
         // Test for -h.
-        else if (strcmp("-h", argv[i]) == 0)
+        else if ((strcmp("-h", argv[i]) == 0) && (i + 1 < argc))
         {
             appHeight = atoi(argv[++i]);
         }
@@ -190,12 +199,13 @@ int main(
         else if (strcmp("-help", argv[i]) == 0)
         {
             puts("Supported options:");
-            puts(" -vga  : sets resolution to 640x480");
-            puts(" -qvga : sets resolution to 320x240");
-            puts(" -flip : flip image vertically");
-            puts(" -w    : specify window width");
-            puts(" -h    : specify window height");
-            puts(" -help : show options");
+            puts(" -vga  :      sets resolution to 640x480");
+            puts(" -qvga :         sets resolution to 320x240");
+            puts(" -flip :      flip image vertically");
+            puts(" -frames val: number of frames to render (default 0 = no limit)");
+            puts(" -w val:      specify window width");
+            puts(" -h val:      specify window height");
+            puts(" -help :      show options");
 
             return RETURN_SUCCESS;
         }
@@ -205,12 +215,13 @@ int main(
         {
             printf("%s - Unknown option: %s\n", argv[0], argv[i]);
             puts("Supported options:");
-            puts(" -vga  : sets resolution to 640x480");
-            puts(" -qvga : sets resolution to 320x240");
-            puts(" -flip : flip image vertically");
-            puts(" -w    : specify window width");
-            puts(" -h    : specify window height");
-            puts(" -help : show options");
+            puts(" -vga  :      sets resolution to 640x480");
+            puts(" -qvga :         sets resolution to 320x240");
+            puts(" -flip :      flip image vertically");
+            puts(" -frames val: number of frames to render (default 0 = no limit)");
+            puts(" -w val:      specify window width");
+            puts(" -h val:      specify window height");
+            puts(" -help :      show options");
 
             return RETURN_ERROR;
         }
@@ -443,6 +454,12 @@ int main(
             // Render one frame.
             LauncherAppDraw(app, appWidth, appHeight);
             eglSwapBuffers(eglDisplay, eglSurface);
+
+            framesTotal++;
+            if (framesMax > 0 && framesTotal == framesMax)
+            {
+                finished = 1;
+            }
         }
     }
 

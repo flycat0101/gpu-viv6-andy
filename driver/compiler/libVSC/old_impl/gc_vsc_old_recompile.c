@@ -257,7 +257,7 @@ _copySource(
         source = gcmSL_SOURCE_SET(source, Format, gcSL_INTEGER);
         source = gcmSL_SOURCE_SET(source, Precision, gcSHADER_PRECISION_HIGH);
         sourceIndex = (gctUINT16) ((SourceValue->i32) & 0xFFFF);
-        sourceIndexed = (gctUINT16) (((SourceValue->i32) & 0xFFFF0000) >> 16);
+        sourceIndexed = (gctUINT16) (SourceValue->i32 >> 16);
         break;
 
     case gcvUIntConstant:
@@ -265,7 +265,7 @@ _copySource(
         source = gcmSL_SOURCE_SET(source, Format, gcSL_UINT32);
         source = gcmSL_SOURCE_SET(source, Precision, gcSHADER_PRECISION_HIGH);
         sourceIndex = (gctUINT16) ((SourceValue->u32) & 0xFFFF);
-        sourceIndexed = (gctUINT16) (((SourceValue->u32) & 0xFFFF0000) >> 16);
+        sourceIndexed = (gctUINT16) (SourceValue->u32 >> 16);
         break;
 
     case gcvFloatConstant:
@@ -273,7 +273,7 @@ _copySource(
         source = gcmSL_SOURCE_SET(source, Format, gcSL_FLOAT);
         source = gcmSL_SOURCE_SET(source, Precision, gcSHADER_PRECISION_HIGH);
         sourceIndex = (gctUINT16) ((SourceValue->u32) & 0xFFFF);
-        sourceIndexed = (gctUINT16) (((SourceValue->u32) & 0xFFFF0000) >> 16);
+        sourceIndexed = (gctUINT16) (SourceValue->u32 >> 16);
         break;
 
     case gcvIntTempIndex:
@@ -2258,21 +2258,16 @@ _createFormatConvertStubFunction(
             /* the component must be interger constant expression */
             gctINT comp;
             gctFLOAT fval;
-            gctUINT16 *ptr;
             if (gcmSL_SOURCE_GET(TexldStatusInst->source0, Type) == gcSL_CONSTANT)
             {
                 if (gcmSL_SOURCE_GET(TexldStatusInst->source0, Format) == gcSL_FLOAT)
                 {
-                    ptr = (gctUINT16 *) (&fval);
-                    ptr[0] = TexldStatusInst->source0Index;
-                    ptr[1] = TexldStatusInst->source0Indexed;
+                    *(gctUINT *) (&fval) = (TexldStatusInst->source0Index | (TexldStatusInst->source0Indexed << 16));
                     comp = (gctINT)fval;
                 }
                 else if (gcmSL_SOURCE_GET(TexldStatusInst->source0, Format) == gcSL_INTEGER)
                 {
-                    ptr = (gctUINT16 *) (&comp);
-                    ptr[0] = TexldStatusInst->source0Index;
-                    ptr[1] = TexldStatusInst->source0Indexed;
+                    *(gctUINT *) (&comp) = (TexldStatusInst->source0Index | (TexldStatusInst->source0Indexed << 16));
                 }
                 else
                 {
@@ -2749,10 +2744,10 @@ _createLongULongStubFunction_src2(
 
     argNo = 0;
 
-    val.u32 = Patch->channelCountIndex;
+    val.u32 = Patch->channelCount;
     /* mov  arg0, count */
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++ /*ARG0*/,
-                    gcvUIntUniformIndex, &val, gcSL_SWIZZLE_INVALID, gcvFALSE, Shader->uniforms[Patch->channelCountIndex]->precision);
+                    gcvUIntConstant, &val, gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
 
     /* mov  arg1, src0 */
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++ /*ARG0*/,
@@ -2845,10 +2840,10 @@ _createLongULongStubFunction_src1(
 
     argNo = 0;
 
-    val.u32 = Patch->channelCountIndex;
+    val.u32 = Patch->channelCount;
     /* mov  arg0, count */
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++ /*ARG0*/,
-                    gcvUIntUniformIndex, &val, gcSL_SWIZZLE_INVALID, gcvFALSE, Shader->uniforms[Patch->channelCountIndex]->precision);
+                    gcvUIntConstant, &val, gcSL_SWIZZLE_INVALID, gcvFALSE, gcSHADER_PRECISION_ANY);
 
     /* mov  arg1, src0 */
     _addArgPassInst(Shader, ConvertFunction, stubFunction, code, argNo++ /*ARG0*/,
@@ -7916,8 +7911,7 @@ static gceSTATUS
 _patchLongULong(
     IN OUT gcSHADER         Shader,
     IN OUT gcPatchDirective_PTR CurDir,
-    IN gcsPatchLongULong *  Patch,
-    IN gctUINT              isScalar
+    IN gcsPatchLongULong *  Patch
     )
 {
     /* How to do patch.
@@ -8329,7 +8323,7 @@ _patchLongULong(
                                               gcCLPatchLibrary[LONG_ULONG_LIB_INDEX],
                                               Patch,
                                               &convertFunction,
-                                              isScalar);
+                                              Patch->channelCount == 1? gcvTRUE : gcvFALSE);
             gcmONERROR(status);
 
             /* Construct call stub function. */
@@ -9138,8 +9132,7 @@ gcSHADER_DynamicPatch(
 #if _SUPPORT_LONG_ULONG_DATA_TYPE
         case gceRK_PATCH_CL_LONGULONG:
             status = _patchLongULong(Shader, curDirective,
-                            curDirective->patchValue.longULong,
-                            isScalar);
+                            curDirective->patchValue.longULong);
             break;
 #endif
 
@@ -10922,7 +10915,6 @@ _fixUniformIndexByMappingTable(
                 &newUniform);
     }
     /* enter the mapping */
-    gcmASSERT(newUniformIndex < 0xFFFF);
     MI->LibList->uniformMappingTable[*UniformIndexPtr] = (gctUINT16)newUniformIndex;
     *UniformIndexPtr = (gctUINT16)newUniformIndex;
 
@@ -12018,8 +12010,8 @@ _InsertAssignmentForInterpolation(
                                 | gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XXXX)
                                 | gcmSL_SOURCE_SET(0, Indexed, gcSL_NOT_INDEXED)
                                 | gcmSL_SOURCE_SET(0, Precision, gcSL_PRECISION_HIGH);
-        insertCode0->source0Index = interpolateTypeValue.hex[0];
-        insertCode0->source0Indexed = interpolateTypeValue.hex[1];
+        insertCode0->source0Index = (gctUINT16)(interpolateTypeValue.hex32 & 0xFFFF);
+        insertCode0->source0Indexed = (gctUINT16)(interpolateTypeValue.hex32 >> 16);
         currentPos++;
         currentArg++;
 
@@ -12073,8 +12065,8 @@ _InsertAssignmentForInterpolation(
                                 | gcmSL_SOURCE_SET(0, Swizzle, gcSL_SWIZZLE_XXXX)
                                 | gcmSL_SOURCE_SET(0, Indexed, gcSL_NOT_INDEXED)
                                 | gcmSL_SOURCE_SET(0, Precision, gcSL_PRECISION_HIGH);
-        insertCode0->source0Index = underSampleShadingValue.hex[1];
-        insertCode0->source0Indexed = underSampleShadingValue.hex[0];
+        insertCode0->source0Index = (gctUINT16)(underSampleShadingValue.hex32 & 0xFFFF);
+        insertCode0->source0Indexed = (gctUINT16)(underSampleShadingValue.hex32 >> 16);
         currentPos++;
         currentArg++;
 

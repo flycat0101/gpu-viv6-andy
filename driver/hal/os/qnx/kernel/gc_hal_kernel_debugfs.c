@@ -18,6 +18,8 @@
 #include <pthread.h>
 #include <stdarg.h>
 #include <string.h>
+#include <stdlib.h>
+#include <KHR/khronos_utils.h>
 
 
 #define BUFSIZE 512
@@ -341,8 +343,23 @@ _ShowRecord(
     IN gcsDATABASE_RECORD_PTR record
     )
 {
-    debugfs_print("%4d%8d%16p%16p%16zu\n",
-        record->type,
+    static const char * recordTypes[gcvDB_NUM_TYPES] = {
+        "Unknown",
+        "VideoMemory",
+        "CommandBuffer",
+        "NonPaged",
+        "Contiguous",
+        "Signal",
+        "VidMemLock",
+        "Context",
+        "Idel",
+        "MapMemory",
+        "MapUserMemory",
+        "ShBuf",
+    };
+
+    debugfs_print("%-14s %8d %16p %16p %16zu\n",
+        recordTypes[record->type],
         record->kernel->core,
         record->data,
         record->physical,
@@ -361,7 +378,7 @@ _ShowRecords(
 
     debugfs_print("Records:\n");
 
-    debugfs_print("%s%8s%16s%16s%16s\n",
+    debugfs_print("%14s %8s %16s %16s %16s\n",
                "Type", "GPU", "Data", "Physical", "Bytes");
 
     for (i = 0; i < gcmCOUNTOF(Database->list); i++)
@@ -812,13 +829,25 @@ static void *debugfs_thread(void *data)
     struct stat stat;
     int n;
     char buffer[BUFSIZE] = { 0 };
+    int rc;
+    int flags;
+    int dumpFd = 0;
 
     pathname = s_debugfs_state.u.fifo.pathname;
 
     while (!s_debugfs_state.quitFlag)
     {
         /* Open the file. */
-        fd = open(pathname, O_RDONLY);
+        rc = __khrGetDeviceConfigValue(1, "gpu-debugfs-dump-to-fd", buffer, sizeof(buffer));
+        if (rc == EOK)
+        {
+            dumpFd = (atoi(buffer) == 1);
+        }
+
+        flags = dumpFd ? O_RDWR : O_RDONLY;
+
+        fd = open(pathname, flags);
+
         if (fd == -1)
         {
             gcmkPRINT("[VIV]: %s:%d: file open error: '%s'.\n", __FUNCTION__, __LINE__, strerror(errno));
@@ -849,6 +878,16 @@ static void *debugfs_thread(void *data)
         {
             gcmkPRINT("[VIV]: %s:%d: file read error: '%s'.\n", __FUNCTION__, __LINE__, strerror(errno));
             goto OnError;
+        }
+
+        if (dumpFd)
+        {
+            /*
+             * Otherwise the data would be dumped with gcmkPRINT() as fd is
+             * zero'ed at the beginning. This has the side effect that from
+             * the shell we won't be able to retrieve the data.
+             */
+            s_debugfs_state.out = fd;
         }
 
         /* Handle the command. */

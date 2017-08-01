@@ -28,6 +28,8 @@ VX_INTERNAL_API void vxoMemory_Dump(vx_memory memory);
 
 VX_INTERNAL_API vx_size vxoMemory_ComputeSize(vx_memory memory, vx_uint32 planeIndex);
 
+VX_INTERNAL_API vx_size vxoMemory_ComputeElementCount(vx_memory memory, vx_uint32 planeIndex);
+
 VX_INTERNAL_API vx_status vxoMemory_CAllocate(vx_context context, void** memory, vx_uint32 size);
 
 VX_INTERNAL_API vx_status vxoMemory_CFree(vx_context context, void** memory);

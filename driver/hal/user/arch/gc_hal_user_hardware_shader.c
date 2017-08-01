@@ -254,8 +254,7 @@ gcoHARDWARE_QueryShaderCompilerHwCfg(
     pVscHwCfg->hwFeatureFlags.hasExtraInst2          = IS_HW_SUPPORT(gcvFEATURE_SHADER_HAS_EXTRA_INSTRUCTIONS2);
     pVscHwCfg->hwFeatureFlags.hasAtomic              = IS_HW_SUPPORT(gcvFEATURE_SHADER_HAS_ATOMIC);
     pVscHwCfg->hwFeatureFlags.supportFullIntBranch   = IS_HW_SUPPORT(gcvFEATURE_FULLLY_SUPPORT_INTEGER_BRANCH);
-
-
+    pVscHwCfg->hwFeatureFlags.hasDynamicIdxDepFix    = IS_HW_SUPPORT(gcvFEATURE_HALTI5);
 
 OnError:
     gcmFOOTER();
@@ -1318,6 +1317,8 @@ gcoHARDWARE_InvokeThreadWalkerCL(
     /* Validate the state buffer. */
     gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, cmdBuffer);
 
+    gcoBUFFER_OnIssueFence(Hardware->engine[gcvENGINE_RENDER].buffer);
+
     /* Flush the Shader L1 cache. */
     gcmONERROR(gcoHARDWARE_LoadCtrlState(
         Hardware,
@@ -1335,6 +1336,8 @@ gcoHARDWARE_InvokeThreadWalkerCL(
     /* Add FE - PE samaphore stall to prevent unwanted SHL1_CACHE flush. */
     gcmONERROR(gcoHARDWARE_Semaphore(
         Hardware, gcvWHERE_COMMAND, gcvWHERE_PIXEL, gcvHOW_SEMAPHORE_STALL, gcvNULL));
+
+    gcoHARDWARE_SendFence(Hardware, gcvFALSE, gcvENGINE_RENDER, gcvNULL);
 
 OnError:
     /* Return the status. */

@@ -139,7 +139,10 @@ typedef enum _gcePATCH_ID
     gcvPATCH_CAR_CHASE,
     gcvPATCH_ANDROID_BROWSER,
     gcvPATCH_COMPUTBENCH_CL,  /* ComputBench 1.5 */
-    gcvPATCH_MIRADA,          /* Mirada */
+    gcvPATCH_GLU3,            /* gfx3.0 glu.*/
+    gcvPATCH_GLU4,            /* gfx4.0 glu.*/
+    gcvPATCH_MRVELBM20,
+    gcvPATCH_OGLES3OQ,
 
     gcvPATCH_COUNT
 } gcePATCH_ID;
@@ -211,8 +214,18 @@ typedef struct _gcsPLS
     /* Mutex to gurad gl FE compiler access. */
     gctPOINTER                  glFECompilerAccessLock;
 
+    /* Mutex to gurad CL FE compiler access. */
+    gctPOINTER                  clFECompilerAccessLock;
+
     /* Global patchID to overwrite the detection */
     gcePATCH_ID                 patchID;
+
+    /* Global fenceID to record each fence object */
+#if gcdENABLE_3D
+#if gcdSYNC
+    gcsATOM_PTR                 globalFenceID;
+#endif
+#endif
 }
 gcsPLS;
 

@@ -133,6 +133,8 @@ typedef struct _VSC_SHADER_LIB_LINK_ENTRY
 {
     /* Lib shader */
     SHADER_HANDLE                     hShaderLib;
+    /* vreg map from libShader to the current shader */
+    void*                             pTempHashTable;
 
     /* Some variables in function of lib will be determined when function of lib is linking */
     gctUINT                           libSpecializationConstantCount;

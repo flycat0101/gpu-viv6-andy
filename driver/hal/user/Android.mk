@@ -67,10 +67,6 @@ LOCAL_CFLAGS := \
     $(CFLAGS) \
     -Werror
 
-ifeq ($(BUILD_OPENCL_FP),1)
-LOCAL_CFLAGS         += -DBUILD_OPENCL_FP=1
-endif
-
 LOCAL_C_INCLUDES := \
     $(AQROOT)/hal/inc \
     $(AQROOT)/hal/user \

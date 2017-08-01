@@ -63,25 +63,25 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryConvolution(vx_convolution convolution
 
     switch (attribute)
     {
-        case VX_CONVOLUTION_ATTRIBUTE_ROWS:
+        case VX_CONVOLUTION_ROWS:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size *)ptr = convolution->matrix.rows;
             break;
 
-        case VX_CONVOLUTION_ATTRIBUTE_COLUMNS:
+        case VX_CONVOLUTION_COLUMNS:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size *)ptr = convolution->matrix.columns;
             break;
 
-        case VX_CONVOLUTION_ATTRIBUTE_SCALE:
+        case VX_CONVOLUTION_SCALE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = convolution->scale;
             break;
 
-        case VX_CONVOLUTION_ATTRIBUTE_SIZE:
+        case VX_CONVOLUTION_SIZE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size *)ptr = convolution->matrix.columns * convolution->matrix.rows * sizeof(vx_int16);
@@ -106,7 +106,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetConvolutionAttribute(vx_convolution conv
 
     switch (attribute)
     {
-        case VX_CONVOLUTION_ATTRIBUTE_SCALE:
+        case VX_CONVOLUTION_SCALE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             scale = *(vx_uint32_ptr)ptr;
@@ -149,7 +149,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxReadConvolutionCoefficients(vx_convolution 
 
     vxoReference_IncrementReadCount(&convolution->matrix.base);
 
-    vxoReference_Increment(&convolution->matrix.base, VX_REF_EXTERNAL);
+    /*vxoReference_Increment(&convolution->matrix.base, VX_REF_EXTERNAL);*/
 
     return VX_SUCCESS;
 }
@@ -179,8 +179,61 @@ VX_API_ENTRY vx_status VX_API_CALL vxWriteConvolutionCoefficients(vx_convolution
 
     vxoReference_IncrementWriteCount(&convolution->matrix.base);
 
-    vxoReference_Decrement(&convolution->matrix.base, VX_REF_EXTERNAL);
+    /*vxoReference_Decrement(&convolution->matrix.base, VX_REF_EXTERNAL);*/
 
     return VX_SUCCESS;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxCopyConvolutionCoefficients(vx_convolution convolution, void *ptr, vx_enum usage, vx_enum mem_type)
+{
+    vx_status status = VX_ERROR_INVALID_REFERENCE;
+    if (vxoReference_IsValidAndSpecific(&convolution->matrix.base, VX_TYPE_CONVOLUTION) == vx_true_e)
+    {
+        if (vxoMemory_Allocate(convolution->matrix.base.context, &convolution->matrix.memory) == vx_true_e)
+        {
+            if (usage == VX_READ_ONLY)
+            {
+                vxAcquireMutex(convolution->matrix.base.lock);
+                if (ptr)
+                {
+                    vx_size size = convolution->matrix.memory.strides[0][1] *
+                                   convolution->matrix.memory.dims[0][1];
+                    memcpy(ptr, convolution->matrix.memory.logicals[0], size);
+                }
+                vxReleaseMutex(convolution->matrix.base.lock);
+                vxoReference_IncrementReadCount(&convolution->matrix.base);
+                status = VX_SUCCESS;
+            }
+            else if (usage == VX_WRITE_ONLY)
+            {
+                vxAcquireMutex(convolution->matrix.base.lock);
+                if (ptr)
+                {
+                    vx_size size = convolution->matrix.memory.strides[0][1] *
+                                   convolution->matrix.memory.dims[0][1];
+
+                    memcpy(convolution->matrix.memory.logicals[0], ptr, size);
+                }
+                vxReleaseMutex(convolution->matrix.base.lock);
+                vxoReference_IncrementWriteCount(&convolution->matrix.base);
+                status = VX_SUCCESS;
+            }
+            else
+            {
+                vxError("Wrong parameters for convolution\n");
+                status = VX_ERROR_INVALID_PARAMETERS;
+            }
+        }
+        else
+        {
+            vxError("Failed to allocate convolution\n");
+            status = VX_ERROR_NO_MEMORY;
+        }
+    }
+    else
+    {
+        vxError("Invalid reference for convolution\n");
+    }
+    return status;
 }
 

@@ -16,10 +16,11 @@
 # Common inlude file for QNX build.
 #
 
+include $(MKFILES_ROOT)/qmacros.mk
+
 CUSTOM_PIXMAP?=0
 USE_NEW_LINUX_SIGNAL?=1
 USE_FB_DOUBLE_BUFFER?=0
-BUILD_OPENCL_FP?=1
 ENABLE_CL_GL ?=1
 
 # This prevents the platform/board name from getting appended to every build target name.
@@ -41,18 +42,39 @@ POST_BUILD=$(CP_HOST) $@ $(LOCAL_INSTALL)/$(@F)
 # Perform clean of local install directory
 POST_CLEAN=$(RM_HOST) $(LOCAL_INSTALL)/*$(NAME)*
 
+# 64 bit
+ifeq ($(CPU),aarch64)
+AARCH64 = 1
+CCFLAGS += -DAARCH64
+endif
+
+# If GCC version 4.4/4.7 not found, we are on SDP7 (GCC 5.4+)
+ifeq ($(shell qcc -V 2>&1 | grep '[^0-9]4\.[47]\..*default'),)
+SDP_VERSION = 700
+else
+SDP_VERSION = 660
+endif
+
 include $(qnx_build_dir)/platform_config/$(PLATFORM)/platform_config
 
 ###############################################################
 # Common CCFLAGS.
+
+ifeq ($(SDP_VERSION), 700)
+CCFLAGS += -Werror
+CCFLAGS += -Wno-error=unused-function
+
+# for llvm c++ compile, use __cxa_atexit:
+CXXFLAGS += -fuse-cxa-atexit
+LDFLAGS += -fuse-cxa-atexit
+else
+CCFLAGS += -Werror
+endif
+
 ifneq ($(ABI), 0)
 	CCFLAGS += -mabi=$(ABI)
 endif
 
-CCFLAGS += -Werror
-ifeq ($(QNX_SDP700), 1)
-CCFLAGS += -Wno-error=unused-function
-endif
 # We have commented this in order to allow some extensions not contemplated in C89 see: http://reviews.ott.qnx.com/r/118143/
 #CCFLAGS += -ansi
 
@@ -71,10 +93,6 @@ endif
 
 ifeq ($(PLATFORM), iMX8DV)
         CCFLAGS += -DIMX8X
-endif
-
-ifeq ($(PLATFORM), iMX8DV_64bit)
-        CCFLAGS += -DIMX8X_64bit
 endif
 
 ifeq ($(PLATFORM), iMX6X)
@@ -101,10 +119,6 @@ ifeq ($(PLATFORM), iMX6DQP_vProfile)
 	CCFLAGS += -DIMX6X
 endif
 
-ifeq ($(QNX_SDP700), 1)
-        CCFLAGS += -DgcdQNX_SDP700
-endif
-
 ifeq ($(USE_VDK), 1)
 	CCFLAGS += -DUSE_VDK=1 -DUSE_SW_FB=$(USE_SW_FB)
 else
@@ -121,12 +135,6 @@ ifeq ($(USE_NEW_LINUX_SIGNAL), 1)
 	CCFLAGS += -DUSE_NEW_LINUX_SIGNAL=1
 else
 	CCFLAGS += -DUSE_NEW_LINUX_SIGNAL=0
-endif
-
-ifeq ($(BUILD_OPENCL_FP), 1)
-	CCFLAGS += -DBUILD_OPENCL_FP=1
-else
-	CCFLAGS += -DBUILD_OPENCL_FP=0
 endif
 
 ifeq ($(ENABLE_CL_GL), 1)

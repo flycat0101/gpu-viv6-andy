@@ -518,26 +518,15 @@ static VkResult __vki_QueueInitialize(
                             + info->reservedTailSize
                             + info->reservedUserSize;
 
-#if ((defined(LINUX) || defined(__QNXNTO__)) && !defined(gcdFPGA)) && !defined(EMULATOR)
-    info->source = gcvCMDBUF_VIRTUAL;
-#else
-    info->source = gcvCMDBUF_CONTIGUOUS;
-#endif
-
-#if defined(UNDER_CE) && USE_KERNEL_VIRTUAL_BUFFERS
-    info->source = gcvCMDBUF_VIRTUAL;
-#endif
-
-#if gcdSECURITY
-    info->source = gcvCMDBUF_CONTIGUOUS;
-#endif
-
 #if gcdALLOC_CMD_FROM_RESERVE
     info->source = gcvCMDBUF_RESERVED;
+#elif gcdSECURITY || gcdDISABLE_GPU_VIRTUAL_ADDRESS || !USE_KERNEL_VIRTUAL_BUFFERS
+    info->source = gcvCMDBUF_CONTIGUOUS;
+#else
+    info->source = gcvCMDBUF_VIRTUAL;
 #endif
 
 OnError:
-
     return result;
 }
 
@@ -721,10 +710,10 @@ VkResult __vk_QueueCommit(
             {
                 iface.u.Commit.contexts[coreIdx] = devCtx->context[coreIdx];
                 iface.command = gcvHAL_COMMIT;
+                iface.engine = s_xlateQueueFamily[devQueue->queueFamilyIndex];
                 iface.u.Commit.commandBuffers[coreIdx] = gcmPTR_TO_UINT64(commandBuffer);
                 iface.u.Commit.deltas[coreIdx] = 0;
                 iface.u.Commit.queue = gcmPTR_TO_UINT64(devQueue->eventHead);
-                iface.u.Commit.engine = s_xlateQueueFamily[devQueue->queueFamilyIndex];
                 iface.u.Commit.shared = gcvTRUE;
                 iface.u.Commit.index = coreIdx;
 
@@ -746,10 +735,10 @@ VkResult __vk_QueueCommit(
             coreIdx = devCtx->option->affinityCoreID;
             iface.u.Commit.contexts[0] = devCtx->context[coreIdx];
             iface.command = gcvHAL_COMMIT;
+            iface.engine = s_xlateQueueFamily[devQueue->queueFamilyIndex];
             iface.u.Commit.commandBuffers[0] = gcmPTR_TO_UINT64(commandBuffer);
             iface.u.Commit.deltas[0] = 0;
             iface.u.Commit.queue = gcmPTR_TO_UINT64(devQueue->eventHead);
-            iface.u.Commit.engine = s_xlateQueueFamily[devQueue->queueFamilyIndex];
             iface.u.Commit.shared = gcvFALSE;
             iface.u.Commit.index = 0;
             iface.u.Commit.count = 1;
@@ -975,7 +964,7 @@ VkResult __vk_QueueCommitEvents(
         };
         iface.command       = gcvHAL_EVENT_COMMIT;
         iface.u.Event.queue = gcmPTR_TO_UINT64(devQueue->eventHead);
-        iface.u.Event.engine = s_xlateQueueFamily[devQueue->queueFamilyIndex];
+        iface.engine = s_xlateQueueFamily[devQueue->queueFamilyIndex];
         /* For combine or native mode, affinityCoreID is always zero */
         __VK_ONERROR(__vk_DeviceControl(&iface, devQueue->pDevContext->option->affinityCoreID));
         /* Free any records in the queue. */

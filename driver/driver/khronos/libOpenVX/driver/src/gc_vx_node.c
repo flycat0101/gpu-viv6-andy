@@ -80,7 +80,11 @@ VX_PRIVATE_API vx_node vxoNode_CreateGeneric(vx_graph graph, vx_kernel kernel)
 
     vxoPerf_Initialize(&graph->nodeTable[i]->perf);
 
+    graph->reverify = graph->verified;
+
     graph->verified = vx_false_e;
+
+    graph->status = VX_GRAPH_STATE_UNVERIFIED;
 
     vxReleaseMutex(graph->base.lock);
 
@@ -155,8 +159,15 @@ VX_INTERNAL_CALLBACK_API void vxoNode_Destructor(vx_reference ref)
 
     if (node->kernel->deinitializeFunction != VX_NULL)
     {
-        vx_status status = node->kernel->deinitializeFunction(
+        vx_status status;
+
+        if (node->localDataSetByImplementation == vx_false_e)
+           node->localDataChangeIsEnabled = vx_true_e;
+
+        status = node->kernel->deinitializeFunction(
                                 node, node->paramTable, node->kernel->signature.paramCount);
+
+        node->localDataChangeIsEnabled = vx_false_e;
 
         if (status != VX_SUCCESS)
         {
@@ -226,6 +237,16 @@ VX_INTERNAL_CALLBACK_API void vxoNode_Destructor(vx_reference ref)
 
     /* Remove the ref count of the kernel from the node */
     vxoReference_Release((vx_reference *)&node->kernel, VX_TYPE_KERNEL, VX_REF_INTERNAL);
+
+    if (node->uniforms)
+    {
+        for(i = 0 ; i < node->uniformCount; i++)
+        {
+            gcoOS_Free(gcvNULL, node->uniforms[i].data);
+        }
+
+        gcoOS_Free(gcvNULL, node->uniforms);
+    }
 }
 
 VX_INTERNAL_API void vxoNode_RemoveFromGraph(vx_node_ptr nodePtr)
@@ -259,6 +280,8 @@ VX_INTERNAL_API void vxoNode_RemoveFromGraph(vx_node_ptr nodePtr)
                 graph->nodeCount--;
 
                 removedFromGraph = vx_true_e;
+
+                graph->reverify = graph->verified;
 
                 graph->verified = vx_false_e;
                 break;
@@ -324,7 +347,7 @@ VX_INTERNAL_API vx_status vxoNode_SetParameter(vx_node node, vx_uint32 index, vx
     }
     else
     {
-        if (value == VX_NULL) return VX_ERROR_INVALID_VALUE;
+        if (value == VX_NULL) return VX_ERROR_INVALID_REFERENCE;
     }
 
     if (!vxoReference_IsValidAndNoncontext((vx_reference_s *)value)) return VX_ERROR_INVALID_VALUE;
@@ -575,6 +598,7 @@ VX_INTERNAL_API vx_status vxoNode_Record(vx_node node)
     return VX_SUCCESS;
 }
 
+
 VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
 {
     gceSTATUS gcStatus = gcvSTATUS_OK;
@@ -617,8 +641,18 @@ VX_INTERNAL_API vx_status vxoNode_Replay(vx_node node)
     return VX_SUCCESS;
 }
 
+
+
 VX_INTERNAL_API vx_status vxoNode_Release(vx_node_ptr nodePtr)
 {
+    if ((*nodePtr)->cmdBuffer)
+    {
+#if VX_C_MEMORY_MANAGE
+        vxoMemory_CFree((*nodePtr)->base.context, (void**)&(*nodePtr)->cmdBuffer);
+#else
+        free((*nodePtr)->cmdBuffer);
+#endif
+    }
 
 #if gcdVX_OPTIMIZER
     if ((*nodePtr)->kernelContext)
@@ -692,7 +726,7 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryNode(vx_node node, vx_enum attribute, 
 
     switch (attribute)
     {
-        case VX_NODE_ATTRIBUTE_PERFORMANCE:
+        case VX_NODE_PERFORMANCE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_perf_t, 0x3);
 
             vxoPerf_Dump(&node->perf);
@@ -700,69 +734,82 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryNode(vx_node node, vx_enum attribute, 
             *(vx_perf_t *)ptr = node->perf;
             break;
 
-        case VX_NODE_ATTRIBUTE_STATUS:
+        case VX_NODE_STATUS:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_status, 0x3);
 
             *(vx_status *)ptr = node->status;
             break;
 
-        case VX_NODE_ATTRIBUTE_LOCAL_DATA_SIZE:
+        case VX_NODE_LOCAL_DATA_SIZE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size *)ptr = node->kernelAttributes.localDataSize;
             break;
 
-        case VX_NODE_ATTRIBUTE_LOCAL_DATA_PTR:
+        case VX_NODE_LOCAL_DATA_PTR:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_ptr, 0x3);
 
             *(vx_ptr *)ptr = node->kernelAttributes.localDataPtr;
             break;
 
-#ifdef OPENVX_KHR_NODE_MEMORY
-        case VX_NODE_ATTRIBUTE_GLOBAL_DATA_SIZE:
-            vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
-            *(vx_size *)ptr = node->kernelAttributes.globalDataSize;
-            break;
+        case VX_NODE_BORDER:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_border_t, 0x3);
 
-        case VX_NODE_ATTRIBUTE_GLOBAL_DATA_PTR:
-            vxmVALIDATE_PARAMETERS(ptr, size, vx_ptr, 0x3);
-
-            *(vx_ptr *)ptr = node->kernelAttributes.globalDataPtr;
-            break;
-#endif
-
-        case VX_NODE_ATTRIBUTE_BORDER_MODE:
-            vxmVALIDATE_PARAMETERS(ptr, size, vx_border_mode_t, 0x3);
-
-            *(vx_border_mode_t *)ptr = node->kernelAttributes.borderMode;
+            *(vx_border_t *)ptr = node->kernelAttributes.borderMode;
             break;
 
 #ifdef OPENVX_KHR_TILING
-        case VX_NODE_ATTRIBUTE_INPUT_NEIGHBORHOOD:
-            vxmVALIDATE_PARAMETERS(ptr, size, vx_neighborhood_size_t, 0x3);
-
-            *(vx_neighborhood_size_t *)ptr = node->kernel->attributes.inputNeighborhoodSize;
-            break;
-
-        case VX_NODE_ATTRIBUTE_OUTPUT_TILE_BLOCK_SIZE:
+        case VX_NODE_OUTPUT_TILE_BLOCK_SIZE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_tile_block_size_t, 0x3);
 
             *(vx_tile_block_size_t *)ptr = node->kernel->attributes.tileBlockSize;
             break;
 
-        case VX_NODE_ATTRIBUTE_TILE_MEMORY_SIZE:
+        case VX_NODE_TILE_MEMORY_SIZE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size *)ptr = node->kernelAttributes.tileMemorySize;
             break;
 
-        case VX_NODE_ATTRIBUTE_TILE_MEMORY_PTR:
+        case VX_NODE_TILE_MEMORY_PTR:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_ptr, 0x3);
 
             *(vx_ptr *)ptr = node->kernelAttributes.tileMemoryPtr;
             break;
 #endif
+        case VX_NODE_PARAMETERS:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
+
+            memcpy((vx_uint32*)ptr, &node->kernel->signature.paramCount, sizeof(vx_uint32));
+
+            break;
+
+        case VX_NODE_IS_REPLICATED:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_bool, 0x3);
+            {
+                vx_bool isReplicated = node->isReplicated;
+                if (vx_true_e == isReplicated)
+                    vxError("Node is replicated\n");
+                else
+                    vxError("Number is not replicated\n");
+
+                memcpy((vx_bool*)ptr, &isReplicated, sizeof(isReplicated));
+            }
+            break;
+
+        case VX_NODE_REPLICATE_FLAGS:
+            {
+                vx_size sz = sizeof(vx_bool)*node->kernel->signature.paramCount;
+                if (size == sz && ((vx_size)ptr & 0x3) == 0)
+                {
+                    vx_uint32 i = 0;
+                    vx_uint32 numParams = node->kernel->signature.paramCount;
+                    for (i = 0; i < numParams; i++)
+                        ((vx_bool*)ptr)[i] = node->replicated_flags[i];
+                }
+            }
+            break;
 
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
@@ -786,29 +833,42 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetNodeAttribute(vx_node node, vx_enum attr
 
     switch (attribute)
     {
-        case VX_NODE_ATTRIBUTE_LOCAL_DATA_SIZE:
+        case VX_NODE_LOCAL_DATA_SIZE:
+
+            if (!node->localDataChangeIsEnabled)
+                return VX_ERROR_NOT_SUPPORTED;
+
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             node->kernelAttributes.localDataSize = *(vx_size *)ptr;
+
+            node->localDataSetByImplementation = vx_false_e;
             break;
 
-        case VX_NODE_ATTRIBUTE_LOCAL_DATA_PTR:
+        case VX_NODE_LOCAL_DATA_PTR:
+
+            if (!node->localDataChangeIsEnabled)
+                return VX_ERROR_NOT_SUPPORTED;
+
             vxmVALIDATE_PARAMETERS(ptr, size, vx_ptr, 0x3);
 
             node->kernelAttributes.localDataPtr = *(vx_ptr *)ptr;
+
+            node->localDataSetByImplementation = vx_false_e;
+
             break;
 
-        case VX_NODE_ATTRIBUTE_BORDER_MODE:
-            vxmVALIDATE_PARAMETERS(ptr, size, vx_border_mode_t, 0x3);
+        case VX_NODE_BORDER:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_border_t, 0x3);
 
 #ifdef OPENVX_KHR_TILING
-            if (node->kernelAttributes.borderMode.mode == VX_BORDER_MODE_SELF)
+            if (node->kernelAttributes.borderMode.mode == VX_BORDER_SELF)
             {
                 return VX_ERROR_INVALID_VALUE;
             }
 #endif
 
-            node->kernelAttributes.borderMode = *(vx_border_mode_t *)ptr;
+            node->kernelAttributes.borderMode = *(vx_border_t *)ptr;
             break;
 
         case VX_NODE_ATTRIBUTE_KERNEL_EXECUTION_PARAMETERS:
@@ -824,6 +884,107 @@ VX_API_ENTRY vx_status VX_API_CALL vxSetNodeAttribute(vx_node node, vx_enum attr
     }
 
     return VX_SUCCESS;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxReplicateNode(vx_graph graph, vx_node first_node, vx_bool replicate[], vx_uint32 number_of_parameters)
+{
+    vx_uint32 n;
+    vx_uint32 p;
+    vx_uint32 numParams = 0;
+    vx_size   num_of_replicas = 0;
+    vx_status status = VX_SUCCESS;
+
+    if (vxoReference_IsValidAndSpecific(&graph->base, VX_TYPE_GRAPH) != vx_true_e)
+    {
+        vxError("Graph %p was invalid!\n", graph);
+        vxAddLogEntry((vx_reference)graph, VX_ERROR_INVALID_REFERENCE, "Graph %p as invalid!\n", graph);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+
+    if (vxoReference_IsValidAndSpecific(&first_node->base, VX_TYPE_NODE) != vx_true_e)
+    {
+        vxError("Node %p was invalid!\n", first_node);
+        vxAddLogEntry((vx_reference)first_node, VX_ERROR_INVALID_REFERENCE, "Node %p as invalid!\n", first_node);
+        return VX_ERROR_INVALID_REFERENCE;
+    }
+
+    if (first_node->graph != graph)
+        return VX_FAILURE;
+
+    if (replicate == NULL)
+        return VX_ERROR_INVALID_PARAMETERS;
+
+    /* validate replicated params */
+    status = vxQueryNode(first_node, VX_NODE_PARAMETERS, &numParams, sizeof(numParams));
+    if (VX_SUCCESS == status)
+    {
+        if (numParams != number_of_parameters)
+            return VX_ERROR_INVALID_PARAMETERS;
+    }
+    else
+        return status;
+
+    for (p = 0; p < number_of_parameters; p++)
+    {
+        vx_parameter param = 0;
+        vx_reference ref = 0;
+        vx_enum type = 0;
+        vx_enum state = 0;
+        vx_enum dir = 0;
+
+        param = vxGetParameterByIndex(first_node, p);
+
+        vxQueryParameter(param, VX_PARAMETER_TYPE, &type, sizeof(vx_enum));
+        vxQueryParameter(param, VX_PARAMETER_REF, &ref, sizeof(vx_reference));
+        vxQueryParameter(param, VX_PARAMETER_STATE, &state, sizeof(vx_enum));
+        vxQueryParameter(param, VX_PARAMETER_DIRECTION, &dir, sizeof(vx_enum));
+
+
+        if (replicate[p] == vx_false_e && (dir == VX_OUTPUT || dir == VX_BIDIRECTIONAL))
+            return VX_FAILURE;
+
+        if (replicate[p] == vx_true_e)
+        {
+            if (vxoReference_IsValidAndSpecific(ref, (vx_type_e)type) == vx_true_e)
+            {
+                vx_size levels = 0;
+
+                if (vxoReference_IsValidAndSpecific(ref->scope, VX_TYPE_PYRAMID) == vx_true_e)
+                {
+                    vx_pyramid pyramid = (vx_pyramid)ref->scope;
+                    vxQueryPyramid(pyramid, VX_PYRAMID_LEVELS, &levels, sizeof(vx_size));
+                }
+                else if (vxoReference_IsValidAndSpecific(ref->scope, VX_TYPE_OBJECT_ARRAY) == vx_true_e)
+                {
+                    vx_object_array object_array = (vx_object_array)ref->scope;
+                    vxQueryObjectArray(object_array, VX_OBJECT_ARRAY_NUMITEMS, &levels, sizeof(vx_size));
+                }
+                else
+                    return VX_FAILURE;
+
+                if (num_of_replicas == 0)
+                    num_of_replicas = levels;
+
+                if (num_of_replicas != 0 && levels != num_of_replicas)
+                    return VX_FAILURE;
+            }
+            else
+                return VX_FAILURE;
+        }
+
+        vxReleaseReference(&ref);
+        vxReleaseParameter(&param);
+    }
+
+    /* set replicate flag for node */
+    first_node->isReplicated = vx_true_e;
+
+    for (n = 0; n < number_of_parameters; n++)
+    {
+        first_node->replicated_flags[n] = replicate[n];
+    }
+
+    return status;
 }
 
 VX_API_ENTRY vx_status VX_API_CALL vxReleaseNode(vx_node *node)
@@ -901,4 +1062,60 @@ VX_API_ENTRY vx_status VX_API_CALL vxChooseKernelVariant(vx_node node, vx_char v
     return VX_SUCCESS;
 }
 #endif
+
+VX_API_ENTRY vx_status VX_API_CALL vxSetNodeTarget(vx_node node, vx_enum target_enum, const char* target_string)
+{
+    vx_context context;
+    vx_kernel_s *kernel = VX_NULL;
+    vx_status status = VX_ERROR_INVALID_REFERENCE;
+    vx_uint32 index, targetIndex = 0;
+
+    if (!vxoReference_IsValidAndSpecific(&node->base, VX_TYPE_NODE)) return VX_ERROR_INVALID_NODE;
+
+    context = vxGetContext((vx_reference)node);
+
+    for (index = 0; index < context->targetCount; index++)
+    {
+        if (target_enum == VX_TARGET_ANY)
+        {
+            targetIndex = index;
+            kernel = vxoKernel_GetByEnumFromTarget(context, &context->targetTable[index], index, node->kernel->enumeration);
+        }
+        else if (target_enum == VX_TARGET_STRING)
+        {
+            targetIndex = context->targetPriorityTable[index];
+            if (vxoTarget_MatchTargetNameWithString(context->targetTable[targetIndex].name, target_string) == vx_true_e)
+            {
+                kernel = vxoKernel_GetByEnumFromTarget(context, &context->targetTable[targetIndex], targetIndex, node->kernel->enumeration);
+            }
+        }
+        else
+        {
+            status = VX_ERROR_NOT_SUPPORTED;
+            break;
+        }
+
+        if (kernel == VX_NULL) continue;
+    }
+
+    if (kernel != NULL)
+    {
+        vxoReference_Decrement(&node->kernel->base, VX_REF_INTERNAL);
+        node->kernel = kernel;
+        vxoReference_Increment(&node->kernel->base, VX_REF_INTERNAL);
+
+        node->targetIndex = targetIndex;
+
+        node->graph->reverify = node->graph->verified;
+
+        node->graph->verified = vx_false_e;
+        status = VX_SUCCESS;
+    }
+    else
+    {
+        status = VX_ERROR_NOT_SUPPORTED;
+    }
+
+    return status;
+}
 

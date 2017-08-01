@@ -683,7 +683,7 @@ _VSC_CPF_DataFlow_Dump(
     )
 {
     VIR_Dumper      *pDumper = VSC_CPF_GetDumper(pCPF);
-    gctUINT          i = 0, constIdx;
+    gctUINT          i = 0, constIdx, count = 0;
 
     gcmASSERT(SV_IS_VALID(tmpFlow));
 
@@ -740,7 +740,11 @@ _VSC_CPF_DataFlow_Dump(
                     regNo,
                     _VSC_CPF_GetChannelName(channel));
         }
-
+        count++;
+        if (count % 8 == 0)
+        {
+            VIR_LOG_FLUSH(pDumper);
+        }
         i = constIdx + 1;
     }
 
@@ -967,7 +971,7 @@ _VSC_CPF_isScalarConst(
     VIR_Swizzle swizzle = VIR_Operand_GetSwizzle(pOpnd);
     gctUINT8 symChannel = VIR_Swizzle_GetChannel(swizzle, opndChannel);
 
-    if (!_VSC_CPF_typeToChannelType(VIR_Operand_GetType(pOpnd), &type))
+    if (!_VSC_CPF_typeToChannelType(VIR_Operand_GetTypeId(pOpnd), &type))
     {
         return gcvFALSE;
     }
@@ -995,9 +999,25 @@ _VSC_CPF_isScalarConst(
         VIR_Symbol* uniformSym = VIR_Operand_GetSymbol(pOpnd);
         if(isSymUniformCompiletimeInitialized(uniformSym))
         {
+            VIR_Type *symType = VIR_Symbol_GetType(uniformSym);
             VIR_Uniform* uniform = VIR_Symbol_GetUniform(uniformSym);
-            VIR_ConstId constID = VIR_Uniform_GetInitializer(uniform);
-            VIR_Const* cur_const = VIR_Shader_GetConstFromId(pShader, constID);
+            VIR_Const* cur_const;
+            VIR_ConstId constId;
+
+            if(VIR_Type_isArray(symType)) {
+                VIR_TypeId  baseTypeId = VIR_Type_GetBaseTypeId(symType);
+                gctUINT rows = VIR_GetTypeRows(baseTypeId);
+                gctINT arrayIndex;
+                gcmASSERT(VIR_Operand_GetRelAddrMode(pOpnd) == VIR_INDEXED_NONE );
+
+                arrayIndex = (VIR_Operand_GetConstIndexingImmed(pOpnd) +
+                              VIR_Operand_GetMatrixConstIndex(pOpnd)) / rows;
+                constId = *(VIR_Uniform_GetInitializerPtr(uniform) + arrayIndex);
+            }
+            else {
+                constId = VIR_Uniform_GetInitializer(uniform);
+            }
+            cur_const = VIR_Shader_GetConstFromId(pShader, constId);
             constVal->value = cur_const->value.vecVal.u32Value[symChannel];
             constVal->type = type;
             lattic = VSC_CPF_CONSTANT;
@@ -1013,7 +1033,8 @@ _VSC_CPF_isScalarConst(
         VIR_OperandInfo opndInfo;
         VIR_Operand_GetOperandInfo(pInst, pOpnd, &opndInfo);
 
-        if (VIR_OpndInfo_Is_Virtual_Reg(&opndInfo))
+        if (VIR_OpndInfo_Is_Virtual_Reg(&opndInfo) &&
+            opndOffset < opndInfo.u1.virRegInfo.virRegCount)        /* check whether array indexing is out of bound */
         {
             gctUINT regNo = _VSC_CPF_GetVRegNo(pInst, pOpnd);
             if (regNo != VIR_INVALID_ID)
@@ -1070,7 +1091,7 @@ _VSC_CPF_SetDestConst(
 
     if (regNo != VIR_INVALID_ID)
     {
-        _VSC_CPF_typeToChannelType(VIR_Operand_GetType(dstOpnd), &type);
+        _VSC_CPF_typeToChannelType(VIR_Operand_GetTypeId(dstOpnd), &type);
 
         if (type != constVal->type)
         {
@@ -1135,7 +1156,7 @@ _VSC_CPF_FoldConst(
 
     dstOpnd = VIR_Inst_GetDest(pInst);
     gcmASSERT(dstOpnd != gcvNULL);
-    dstType = VIR_Operand_GetType(dstOpnd);
+    dstType = VIR_Operand_GetTypeId(dstOpnd);
     dstEnable = VIR_Operand_GetEnable(dstOpnd);
     dstEnableChannelCount = VIR_Enable_Channel_Count(dstEnable);
 
@@ -1200,7 +1221,6 @@ _VSC_CPF_FoldConst(
         gcmASSERT(dstType < VIR_TYPE_LAST_PRIMITIVETYPE);
 
         VIR_Operand_SetOpKind(srcOpnd, VIR_OPND_IMMEDIATE);
-        VIR_Operand_SetType(srcOpnd, VIR_GetTypeComponentType(dstType));
         VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
         VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
         VIR_Inst_SetSrcNum(pInst, 1);
@@ -1280,7 +1300,6 @@ _VSC_CPF_FoldConst(
         new_const->type = dstType;
         VIR_Operand_SetConstId(srcOpnd, new_const_id);
         VIR_Operand_SetOpKind(srcOpnd, VIR_OPND_CONST);
-        VIR_Operand_SetType(srcOpnd, dstType);
         VIR_Operand_SetSwizzle(srcOpnd, new_swizzle);
         VIR_Inst_SetOpcode(pInst, VIR_OP_MOV);
         VIR_Inst_SetConditionOp(pInst, VIR_COP_ALWAYS);
@@ -1541,7 +1560,7 @@ _VSC_CPF_PropagateConst(
         VIR_LOG_FLUSH(pDumper);
     }
 
-    _VSC_CPF_typeToChannelType(VIR_Operand_GetType(pOpnd), &srcType);
+    _VSC_CPF_typeToChannelType(VIR_Operand_GetTypeId(pOpnd), &srcType);
     dstEnableCount = VIR_Enable_Channel_Count(dstEnable);
     opndSwizzleCount = VIR_Swizzle_Channel_Count(opndSwizzle);
 
@@ -1593,7 +1612,7 @@ _VSC_CPF_PropagateConst(
 
         gcmASSERT(srcType < VIR_TYPE_LAST_PRIMITIVETYPE);
 
-        VIR_Operand_SetType(pOpnd, VIR_GetTypeComponentType(srcType));
+        VIR_Operand_SetTypeId(pOpnd, VIR_GetTypeComponentType(srcType));
         VIR_Operand_SetOpKind(pOpnd, VIR_OPND_IMMEDIATE);
         /* change the immediate to EvisModifier for EVIS inst if it is modifier operand */
         opCode = VIR_Inst_GetOpcode(pInst);
@@ -2048,7 +2067,7 @@ _VSC_CPF_EvaluateConst(
 {
     VIR_OpCode opcode = VIR_Inst_GetOpcode(pInst);
     VIR_PrimitiveTypeId dstType = VIR_TYPE_VOID;
-    _VSC_CPF_typeToChannelType(VIR_Operand_GetType(VIR_Inst_GetDest(pInst)), &dstType);
+    _VSC_CPF_typeToChannelType(VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst)), &dstType);
 
     switch (opcode)
     {
@@ -2357,7 +2376,7 @@ _VSC_CPF_EvaluateConst(
         case VIR_OP_RSHIFT:
         {
             VIR_PrimitiveTypeId src0Type = VIR_TYPE_VOID;
-            _VSC_CPF_typeToChannelType(VIR_Operand_GetType(VIR_Inst_GetSource(pInst, 0)), &src0Type);
+            _VSC_CPF_typeToChannelType(VIR_Operand_GetTypeId(VIR_Inst_GetSource(pInst, 0)), &src0Type);
 
             switch(src0Type)
             {

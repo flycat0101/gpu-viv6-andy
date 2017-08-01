@@ -259,7 +259,6 @@ static gctBOOL _VSC_CPP_RedefineBetweenInsts(
     gctUINT         firstRegNo, regNoRange, regNo, defIdx;
     gctUINT8        channel;
     VIR_DEF         *pDef;
-    VIR_DEF_KEY     defKey;
 
     VIR_Operand_GetOperandInfo(startInst, srcOpnd, &srcInfo);
     firstRegNo = srcInfo.u1.virRegInfo.virReg;
@@ -277,11 +276,7 @@ static gctBOOL _VSC_CPP_RedefineBetweenInsts(
                 continue;
             }
 
-            defKey.pDefInst = VIR_ANY_DEF_INST;
-            defKey.regNo = regNo;
-            defKey.channel = VIR_CHANNEL_ANY;
-            defIdx = vscBT_HashSearch(&duInfo->defTable, &defKey);
-
+            defIdx = vscVIR_FindFirstDefIndex(duInfo, regNo);
             while (VIR_INVALID_DEF_INDEX != defIdx)
             {
                 pDef = GET_DEF_BY_IDX(&duInfo->defTable, defIdx);
@@ -570,7 +565,7 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOV(
                     /* duplicate movSrc */
                     VIR_Function_DupOperand(func, movSrc, &newSrc);
                     VIR_Operand_SetLShift(newSrc, VIR_Operand_GetLShift(srcOpnd));
-                    VIR_Operand_SetType(newSrc, VIR_Operand_GetType(srcOpnd));
+                    VIR_Operand_SetTypeId(newSrc, VIR_Operand_GetTypeId(srcOpnd));
                     /* we need to map swizzle for a vector constant. */
                     if (movSrcInfo.isVecConst)
                     {
@@ -643,8 +638,8 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOV(
                 {
                     /* In the IR, there exists implict type conversion, thus we need
                        to bail out if the types mismatch */
-                    VIR_TypeId ty0 = VIR_Operand_GetType(movDst);
-                    VIR_TypeId ty1 = VIR_Operand_GetType(srcOpnd);
+                    VIR_TypeId ty0 = VIR_Operand_GetTypeId(movDst);
+                    VIR_TypeId ty1 = VIR_Operand_GetTypeId(srcOpnd);
 
                     if(!VIR_TypeId_isPrimitive(ty0)) {
                         ty0 = VIR_Type_GetBaseTypeId(VIR_Shader_GetTypeFromId(shader, ty0));
@@ -1036,13 +1031,13 @@ static VSC_ErrCode _VSC_CPP_CopyFromMOV(
 
                     /* duplicate movSrc */
                     {
-                        VIR_TypeId ty = VIR_Operand_GetType(srcOpnd);
+                        VIR_TypeId ty = VIR_Operand_GetTypeId(srcOpnd);
 
                         VIR_Function_DupOperand(func, movSrc, &newSrc);
                         VIR_Operand_SetSwizzle(newSrc, newSwizzle);
                         VIR_Operand_SetLShift(newSrc, VIR_Operand_GetLShift(srcOpnd));
                         VIR_Inst_FreeSource(inst, srcNum);
-                        VIR_Operand_SetType(newSrc, ty);
+                        VIR_Operand_SetTypeId(newSrc, ty);
                         VIR_Inst_SetSource(inst, srcNum, newSrc);
                         srcOpnd = gcvNULL;    /* reset srcOpnd to avoid misuse */
                     }
@@ -1224,8 +1219,8 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
         return errCode;
     }
 
-    ty0 = VIR_Operand_GetType(inst_src0);
-    ty1 = VIR_Operand_GetType(inst_dest);
+    ty0 = VIR_Operand_GetTypeId(inst_src0);
+    ty1 = VIR_Operand_GetTypeId(inst_dest);
 
     /* must be primitive type */
     if (!VIR_Type_isPrimitive(VIR_Shader_GetTypeFromId(shader, ty0)) ||
@@ -1398,8 +1393,8 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
             break;
         }
 
-        ty0 = VIR_Operand_GetType(def_inst_dest);
-        ty1 = VIR_Operand_GetType(inst_dest);
+        ty0 = VIR_Operand_GetTypeId(def_inst_dest);
+        ty1 = VIR_Operand_GetTypeId(inst_dest);
 
         gcmASSERT(ty0 < VIR_TYPE_PRIMITIVETYPE_COUNT &&
             ty1 < VIR_TYPE_PRIMITIVETYPE_COUNT);
@@ -1757,12 +1752,12 @@ static VSC_ErrCode _VSC_CPP_CopyToMOV(
                  *    ==>
                  *   004: RSHIFT   uchar_P2  temp(278).x, uchar_P2 temp(6).x, int 7
                  */
-                tyId = VIR_Operand_GetType(def_inst_dest);
+                tyId = VIR_Operand_GetTypeId(def_inst_dest);
                 VIR_Operand_ReplaceDefOperandWithDef(
                     def_inst_dest,
                     inst_dest,
                     def_inst_enable);
-                VIR_Operand_SetType(def_inst_dest, tyId);
+                VIR_Operand_SetTypeId(def_inst_dest, tyId);
 
                 memset(&nativeDefFlags, 0, sizeof(nativeDefFlags));
                 nativeDefFlags.bIsInput = inst_dest_info.isInput;
@@ -2048,7 +2043,7 @@ VSC_ErrCode _ConvEvisInstForShader(
                 opCode != VIR_OP_VX_ATOMICADD
                 )
             {
-                VIR_TypeId       src2TypeId = VIR_Operand_GetType(pSrc2Opnd);
+                VIR_TypeId       src2TypeId = VIR_Operand_GetTypeId(pSrc2Opnd);
                 VIR_Swizzle      src2Swizzle = VIR_Operand_GetSwizzle(pSrc2Opnd);
 
                 if ((VIR_Operand_isVirReg(pSrc2Opnd) || VIR_Operand_isSymbol(pSrc2Opnd) || VIR_Operand_isConst(pSrc2Opnd))
@@ -2084,8 +2079,8 @@ VSC_ErrCode _ConvEvisInstForShader(
                             continue;
                         }
                     }
-                    /* Create a temp with 4 components to hold the src2. */
-                    regTypeId = VIR_TypeId_ComposeNonOpaqueType(VIR_GetTypeComponentType(src2TypeId), 4, 1);
+                    /* Create a temp to hold the src2. */
+                    regTypeId = src2TypeId;
                     regId = VIR_Shader_NewVirRegId(pShader, 1);
                     errCode = VIR_Shader_AddSymbol(pShader,
                                                    VIR_SYM_VIRREG,
@@ -2470,8 +2465,8 @@ _VIR_SCPP_AbleToDoNeighborPropagation(
         return gcvFALSE;
     }
 
-    prevInstDestType = VIR_Shader_GetTypeFromId(shader, VIR_Operand_GetType(prevInstDest));
-    curInstDestType = VIR_Shader_GetTypeFromId(shader, VIR_Operand_GetType(VIR_Inst_GetDest(inst)));
+    prevInstDestType = VIR_Shader_GetTypeFromId(shader, VIR_Operand_GetTypeId(prevInstDest));
+    curInstDestType = VIR_Shader_GetTypeFromId(shader, VIR_Operand_GetTypeId(VIR_Inst_GetDest(inst)));
 
     if (VIR_GetTypeComponentType(VIR_Type_GetBaseTypeId(prevInstDestType)) !=
         VIR_GetTypeComponentType(VIR_Type_GetBaseTypeId(curInstDestType)))

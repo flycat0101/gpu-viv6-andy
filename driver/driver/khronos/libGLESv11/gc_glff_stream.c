@@ -313,6 +313,12 @@ void glfSetStreamParameters(
     /* Mark stream dirty. */
     Stream->dirty = GL_TRUE;
 
+    if (Stream->format != format || Stream->normalize != normalize || Stream->components != (GLuint)Components
+        || Stream->stride != Stride || Stream->pointer != Pointer || Stream->buffer != Buffer)
+    {
+        Context->varrayDirty = gcvTRUE;
+    }
+
     /* Set stream parameters. */
     Stream->format         = format;
     Stream->normalize      = normalize;

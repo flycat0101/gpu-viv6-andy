@@ -74,6 +74,8 @@ int main(int argc, char** argv)
     vx_imagepatch_addressing_t imgInfo = VX_IMAGEPATCH_ADDR_INIT;
     void* imgBaseAddr = 0;
 
+    vx_map_id map_id = 0;
+
     // bmp file interface variables
     BmpInterface bmpInterface;
     ifstream fileList;
@@ -141,13 +143,14 @@ int main(int argc, char** argv)
         // transfer image from cpu to gpu
         rect.end_x = imgWid;
         rect.end_y = imgHei;
-        FUNCHECK(vxAccessImagePatch(pImgObj[0], &rect, 0, &imgInfo, &imgBaseAddr, VX_WRITE_ONLY));// get data pointer of image in GPU side
+        FUNCHECK(vxMapImagePatch(pImgObj[0], &rect, 0, &map_id, &imgInfo, &imgBaseAddr, VX_WRITE_ONLY, VX_MEMORY_TYPE_HOST, 0));// get data pointer of image in GPU side
+
         //FUNCHECK(bmpInterface.readBMP(fArgv.c_str(), (u08*)imgBaseAddr, imgWid, imgHei, 1));// image read by GPU
         fread((u08*)imgBaseAddr, bmpInterface.imgHei*bmpInterface.imgWid*sizeof(u08), 1, bmpInterface.srcFile);
 #ifdef LINUX
         memcpy(bmpInterface.imgBuf1, (u08*)imgBaseAddr, bmpInterface.imgHei*bmpInterface.imgWid*sizeof(u08));// copy image from GPU to CPU for display
 #endif
-        FUNCHECK(vxCommitImagePatch(pImgObj[0], &rect, 0, &imgInfo, imgBaseAddr));// match with vxAccessImagePatch()
+        FUNCHECK(vxUnmapImagePatch(pImgObj[0], map_id));// match with vxUnmapImagePatch()
         imgBaseAddr = NULL;
 
         fclose(bmpInterface.srcFile);
@@ -169,7 +172,8 @@ int main(int argc, char** argv)
         // transfer image from GPU to CPU
         rect.end_x = imgWid * 3;
         rect.end_y = imgHei;
-        FUNCHECK(vxAccessImagePatch(pImgObj[1], &rect, 0, &imgInfo, &imgBaseAddr, VX_READ_ONLY));
+        FUNCHECK(vxMapImagePatch(pImgObj[1], &rect, 0, &map_id, &imgInfo, &imgBaseAddr, VX_READ_ONLY, VX_MEMORY_TYPE_HOST, 0));
+
         void* imgPixel;
         for(u32 y=0; y < imgHei; y++)
         {
@@ -188,7 +192,7 @@ int main(int argc, char** argv)
 #endif
             }
         }
-        FUNCHECK(vxCommitImagePatch(pImgObj[1], &rect, 0, &imgInfo, imgBaseAddr));
+        FUNCHECK(vxUnmapImagePatch(pImgObj[1], map_id));
         imgBaseAddr = NULL;
 
 #ifdef LINUX
@@ -271,10 +275,10 @@ vx_node vxTutorial4Node(vx_graph graph, vx_image in_image, vx_image out_image)
                 }
 
                 // node attributes
-                vx_border_mode_t border;
-                border.mode = VX_BORDER_MODE_REPLICATE;
-                border.constant_value = 0;
-                status |= vxSetNodeAttribute(node, VX_NODE_ATTRIBUTE_BORDER_MODE, &border, sizeof(border));
+                vx_border_t border;
+                border.mode = VX_BORDER_REPLICATE;
+                border.constant_value.U32 = 0;
+                status |= vxSetNodeAttribute(node, VX_NODE_BORDER, &border, sizeof(border));
                 if(VX_SUCCESS != status)
                 {
                     vxReleaseNode(&node);

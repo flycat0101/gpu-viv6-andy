@@ -93,6 +93,8 @@ gcoOS_MemCopy(
     gcmASSERT(Destination != gcvNULL);
     gcmASSERT(Source != gcvNULL);
     gcmASSERT(Bytes > 0);
+    gcmASSERT((Destination >= Source && (gctCHAR*)Source + Bytes <= (gctCHAR*)Destination) ||
+              (Source > Destination && (gctCHAR*)Destination + Bytes <= (gctCHAR*)Source));
 
     /* Copy the memory. */
 #if gcdUSE_FAST_MEM_COPY
@@ -100,6 +102,23 @@ gcoOS_MemCopy(
 #else
     memcpy(Destination, Source, Bytes);
 #endif
+}
+
+/* Perform a memory move. */
+static gcmINLINE void
+gcoOS_MemMove(
+    IN gctPOINTER Destination,
+    IN gctCONST_POINTER Source,
+    IN gctSIZE_T Bytes
+    )
+{
+    /* Verify the arguments. */
+    gcmASSERT(Destination != gcvNULL);
+    gcmASSERT(Source != gcvNULL);
+    gcmASSERT(Bytes > 0);
+
+    /* Move the memory. */
+    memmove(Destination, Source, Bytes);
 }
 
 /* Perform a memory fill. */

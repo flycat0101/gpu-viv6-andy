@@ -35,6 +35,8 @@ vx_status _gcfVX_AddSubOpration(vx_node node, gceVX_KERNEL kernel, vx_image in0,
         kernelContext = (gcoVX_Kernel_Context *)node->kernelContext;
         kernelContext->objects_num = 0;
         kernelContext->uniform_num = 0;
+
+        memset(&kernelContext->params, 0, sizeof(gcsVX_KERNEL_PARAMETERS));
     }
 
     vxReadScalarValue(policy_param, &overflow_policy);

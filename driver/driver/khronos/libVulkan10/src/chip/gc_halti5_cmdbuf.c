@@ -557,6 +557,11 @@ VkResult halti5_draw(
         cmdBuf->bindInfo.vertexBuffers.dirtyBits |= chipGfxPipeline->instancedVertexBindingMask;
     }
 
+    if (vertexCount == 0)
+    {
+        return VK_SUCCESS;
+    }
+
     if (chipGfxPipeline->chipPipeline.tweakHandler)
     {
         __VK_MEMZERO(&cmdParams, sizeof(cmdParams));
@@ -2680,7 +2685,11 @@ static VkResult halti5_3DBlitToSelf(
  17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ? 17:17) + 1))))))) << (0 ?
  17:17))) | (((gctUINT32) ((gctUINT32) (cacheMode) & ((gctUINT32) ((((1 ?
  17:17) - (0 ? 17:17) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 17:17) - (0 ?
- 17:17) + 1))))))) << (0 ? 17:17)));
+ 17:17) + 1))))))) << (0 ? 17:17)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 22:22) - (0 ?
+ 22:22) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:22) - (0 ? 22:22) + 1))))))) << (0 ?
+ 22:22))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 22:22) - (0 ? 22:22) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 22:22) - (0 ? 22:22) + 1))))))) << (0 ? 22:22)));
 
     srcConfigEx = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
@@ -2751,6 +2760,31 @@ static VkResult halti5_3DBlitToSelf(
     __vkCmdLoadSingleHWState(commandBuffer, 0x5002, VK_FALSE, config);
     __vkCmdLoadSingleHWState(commandBuffer, 0x5003, VK_FALSE, srcConfigEx);
     __vkCmdLoadSingleHWState(commandBuffer, 0x5000, VK_FALSE, address);
+    /* Tilesize for customer config */
+    __vkCmdLoadSingleHWState(commandBuffer, 0x5028, VK_FALSE,
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (4) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:16) - (0 ?
+ 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ?
+ 31:16))) | (((gctUINT32) ((gctUINT32) (4) & ((gctUINT32) ((((1 ? 31:16) - (0 ?
+ 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ?
+ 31:16))));
+
+     /* block size for customer config*/
+    __vkCmdLoadSingleHWState(commandBuffer, 0x5027, VK_FALSE,
+        ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x40) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)))
+      | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:16) - (0 ?
+ 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ?
+ 31:16))) | (((gctUINT32) ((gctUINT32) (0x40) & ((gctUINT32) ((((1 ? 31:16) - (0 ?
+ 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ?
+ 31:16))));
 
     if (fastClear)
     {
@@ -3814,7 +3848,7 @@ static VkResult halti5_helper_setDescSetSeperateImage(
 {
     halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
     halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
-    PROGRAM_EXECUTABLE_PROFILE *pep = &chipPipeline->masterInstance->pep;
+    PROGRAM_EXECUTABLE_PROFILE *pep = &chipPipeline->curInstance->pep;
     struct _gcsHINT *hints = &chipPipeline->curInstance->hwStates.hints;
     VkBool32 *separateBindingProgramed = chipPipeline->separateBindingProgramed;
 
@@ -3959,7 +3993,7 @@ static VkResult halti5_helper_setDescSetSeperateSampler(
 {
     halti5_module *chipModule = (halti5_module *)devCtx->chipPriv;
     halti5_pipeline *chipPipeline = (halti5_pipeline *)pip->chipPriv;
-    PROGRAM_EXECUTABLE_PROFILE *pep = &chipPipeline->masterInstance->pep;
+    PROGRAM_EXECUTABLE_PROFILE *pep = &chipPipeline->curInstance->pep;
     struct _gcsHINT *hints = &chipPipeline->curInstance->hwStates.hints;
     VkBool32 *separateBindingProgramed = chipPipeline->separateBindingProgramed;
 
@@ -5700,7 +5734,8 @@ VkResult halti5_setMultiGPURenderingMode(
 VkResult halti5_processQueryRequest(
     VkCommandBuffer commandBuffer,
     VkQueryPool queryPool,
-    uint32_t query
+    uint32_t query,
+    VkBool32 beginOQ
     )
 {
     __vkCommandBuffer *cmd = (__vkCommandBuffer *)commandBuffer;
@@ -5715,7 +5750,7 @@ VkResult halti5_processQueryRequest(
 
     if (qyp->pQueries[query].type == VK_QUERY_TYPE_OCCLUSION)
     {
-        if (qyp->pQueries[query].state == __VK_QUERY_BEGIN)
+        if (beginOQ)
         {
             const gcsFEATURE_DATABASE *database = cmd->devCtx->database;
             VkBool32 peDepth = VK_TRUE;
@@ -5799,10 +5834,10 @@ VkResult halti5_processQueryRequest(
                 cmd->curScrachBufIndex = 0;
             }
 
-            qyp->pQueries[query].state = __VK_QUERY_ISSUED;
+            qyp->pQueries[query].isBegin = VK_TRUE;
             cmd->bindInfo.oqEnable = VK_TRUE;
         }
-        else if (qyp->pQueries[query].state == __VK_QUERY_END)
+        else
         {
             uint32_t data = 31415926;
             uint32_t *pCmdBuffer, *pCmdBufferBegin;

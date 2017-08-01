@@ -5299,6 +5299,9 @@ static VSC_ErrCode _ProgramGPS(SHADER_HW_INFO* pShHwInfo, VSC_CHIP_STATES_PROGRA
                                pShHwInfo->hwProgrammingHints.hwSamplerRegAddrOffset;
     }
 
+    /* Save local memory size. */
+    pStatesPgmer->pHints->localMemSizeInByte = pGpsSEP->exeHints.nativeHints.prvStates.gps.shareMemSizePerThreadGrpInByte;
+
     switch (gpsInputCount)
     {
     case 3:

@@ -2911,6 +2911,7 @@ long_ulong_second_logical_op(
                                 States);
 
     address = (((((gctUINT32) (States[0])) >> (0 ? 22:16)) & ((gctUINT32) ((((1 ? 22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ? 22:16) + 1)))))) ) + 1;
+    gcCGUpdateMaxRegister(CodeGen, address, Tree);
     States[0] = ((((gctUINT32) (States[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ?
  22:16) + 1))))))) << (0 ? 22:16))) | (((gctUINT32) ((gctUINT32) (address) & ((gctUINT32) ((((1 ?
@@ -2921,6 +2922,7 @@ long_ulong_second_logical_op(
     {
     case gcSL_TEMP:
         address = (((((gctUINT32) (States[1])) >> (0 ? 20:12)) & ((gctUINT32) ((((1 ? 20:12) - (0 ? 20:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:12) - (0 ? 20:12) + 1)))))) ) + 1;
+        gcCGUpdateMaxRegister(CodeGen, address, Tree);
         States[1] = ((((gctUINT32) (States[1])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  20:12) - (0 ? 20:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 20:12) - (0 ?
  20:12) + 1))))))) << (0 ? 20:12))) | (((gctUINT32) ((gctUINT32) (address) & ((gctUINT32) ((((1 ?
@@ -3112,6 +3114,7 @@ long_ulong_second_logical_not_op(
                                 States);
 
     address = (((((gctUINT32) (States[0])) >> (0 ? 22:16)) & ((gctUINT32) ((((1 ? 22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ? 22:16) + 1)))))) ) + 1;
+    gcCGUpdateMaxRegister(CodeGen, address, Tree);
     States[0] = ((((gctUINT32) (States[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ?
  22:16) + 1))))))) << (0 ? 22:16))) | (((gctUINT32) ((gctUINT32) (address) & ((gctUINT32) ((((1 ?
@@ -3255,6 +3258,7 @@ long_ulong_second_mov(
     }
 
     address = (((((gctUINT32) (States[0])) >> (0 ? 22:16)) & ((gctUINT32) ((((1 ? 22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ? 22:16) + 1)))))) ) + 1;
+    gcCGUpdateMaxRegister(CodeGen, address, Tree);
     States[0] = ((((gctUINT32) (States[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ?
  22:16) + 1))))))) << (0 ? 22:16))) | (((gctUINT32) ((gctUINT32) (address) & ((gctUINT32) ((((1 ?
@@ -3588,6 +3592,8 @@ long_ulong_second_load_mov(
     _SetValueType0(type_conv[format], States);
 
     address = (((((gctUINT32) (States[0])) >> (0 ? 22:16)) & ((gctUINT32) ((((1 ? 22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ? 22:16) + 1)))))) ) + 1;
+    gcCGUpdateMaxRegister(CodeGen, address, Tree);
+
     States[0] = ((((gctUINT32) (States[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ?
  22:16) + 1))))))) << (0 ? 22:16))) | (((gctUINT32) ((gctUINT32) (address) & ((gctUINT32) ((((1 ?
@@ -3711,6 +3717,7 @@ long_ulong_fourth_load_mov(
     _SetValueType0(type_conv[format], States);
 
     address = (((((gctUINT32) (States[0])) >> (0 ? 22:16)) & ((gctUINT32) ((((1 ? 22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ? 22:16) + 1)))))) ) + 1;
+    gcCGUpdateMaxRegister(CodeGen, address, Tree);
     States[0] = ((((gctUINT32) (States[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ?
  22:16) + 1))))))) << (0 ? 22:16))) | (((gctUINT32) ((gctUINT32) (address) & ((gctUINT32) ((((1 ?
@@ -3904,6 +3911,7 @@ long_ulong_set_upper(
     _SetValueType0(type_conv[format], States);
 
     address = (((((gctUINT32) (States[0])) >> (0 ? 22:16)) & ((gctUINT32) ((((1 ? 22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ? 22:16) + 1)))))) ) + 1;
+    gcCGUpdateMaxRegister(CodeGen, address, Tree);
     States[0] = ((((gctUINT32) (States[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ?
  22:16) + 1))))))) << (0 ? 22:16))) | (((gctUINT32) ((gctUINT32) (address) & ((gctUINT32) ((((1 ?
@@ -5457,6 +5465,7 @@ isSource1_RCP_OF_LOG2_E(
 {
     if (gcmSL_SOURCE_GET(Instruction->source1, Type) == gcSL_CONSTANT)
     {
+        /* endianness neutral??? */
         if (Instruction->source1Index == 0x7218 && Instruction->source1Indexed == 0x3f31)
         {
             return gcvTRUE;
@@ -7328,6 +7337,7 @@ destAddrT1MpHpMp(
 
     /* set r + 1, for T1 */
     address = (((((gctUINT32) (States[0])) >> (0 ? 22:16)) & ((gctUINT32) ((((1 ? 22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ? 22:16) + 1)))))) ) + 1;
+    gcCGUpdateMaxRegister(CodeGen, address, Tree);
     States[0] = ((((gctUINT32) (States[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ?
  22:16) + 1))))))) << (0 ? 22:16))) | (((gctUINT32) ((gctUINT32) (address) & ((gctUINT32) ((((1 ?
@@ -11675,7 +11685,7 @@ _set_helper_or_not(
     gctUINT16      src0Idx = gcmSL_INDEX_GET(Instruction->source0Index, Index);
     gcSL_TYPE      src1Type = (gcSL_TYPE)gcmSL_SOURCE_GET(Instruction->source1, Type);
     gcSL_FORMAT    src1Fmt = (gcSL_FORMAT)gcmSL_SOURCE_GET(Instruction->source1, Format);
-
+    gctUINT32      src1Constant = (Instruction->source1Index & 0xFFFF) | (Instruction->source1Indexed << 16);
     value_type0_32bit_from_src0(Tree, CodeGen, Instruction, States);
 
     if (Condition == gcSL_EQUAL &&
@@ -11684,7 +11694,7 @@ _set_helper_or_not(
         Tree->shader->attributes[src0Idx]->nameLength == gcSL_HELPER_INVOCATION &&
         src1Type == gcSL_CONSTANT &&
         src1Fmt == gcSL_BOOLEAN &&
-        Instruction->source1Index == 1)
+        src1Constant == 1)
     {
         States[0] = ((((gctUINT32) (States[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  10:6) - (0 ? 10:6) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 10:6) - (0 ? 10:6) + 1))))))) << (0 ?
@@ -17784,6 +17794,7 @@ int2longulong_sign_bit_set(
     _SetValueType0(type_conv[format], States);
 
     address = (((((gctUINT32) (States[0])) >> (0 ? 22:16)) & ((gctUINT32) ((((1 ? 22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ? 22:16) + 1)))))) ) + 1;
+    gcCGUpdateMaxRegister(CodeGen, address, Tree);
     States[0] = ((((gctUINT32) (States[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ?
  22:16) + 1))))))) << (0 ? 22:16))) | (((gctUINT32) ((gctUINT32) (address) & ((gctUINT32) ((((1 ?
@@ -17848,6 +17859,7 @@ uint2longulong_second_mov(
     _SetValueType0(type_conv[gcSL_UINT32], States);
 
     address = (((((gctUINT32) (States[0])) >> (0 ? 22:16)) & ((gctUINT32) ((((1 ? 22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ? 22:16) + 1)))))) ) + 1;
+    gcCGUpdateMaxRegister(CodeGen, address, Tree);
     States[0] = ((((gctUINT32) (States[0])) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  22:16) - (0 ? 22:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:16) - (0 ?
  22:16) + 1))))))) << (0 ? 22:16))) | (((gctUINT32) ((gctUINT32) (address) & ((gctUINT32) ((((1 ?

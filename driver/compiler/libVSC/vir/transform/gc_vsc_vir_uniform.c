@@ -1019,7 +1019,7 @@ _VSC_UF_AUBO_CollectIndirectlyAccessedUniforms(
                                     case VSC_IndirectAccessLevel_UNIFORM_DYNAMICALLY:
                                     {
                                         VIR_Operand* src1 = VIR_Inst_GetSource(inst, 1);
-                                        if(!VIR_Operand_HasFlag(src1, VIR_OPNDFLAG_UNIFORM_INDEX) || VIR_TypeId_isFloat(VIR_Operand_GetType(src1)))
+                                        if(!VIR_Operand_HasFlag(src1, VIR_OPNDFLAG_UNIFORM_INDEX) || VIR_TypeId_isFloat(VIR_Operand_GetTypeId(src1)))
                                         {
                                             uniform_sym = sym;
                                         }
@@ -1636,7 +1636,7 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
         }
         indexing_src_swizzle = VIR_Swizzle_GetChannel(VIR_Operand_GetSwizzle(indexing_src), VIR_Swizzle_GetChannel(src1_swizzle, 0));
 
-        if(VIR_TypeId_isFloat(VIR_Operand_GetType(indexing_src)))
+        if(VIR_TypeId_isFloat(VIR_Operand_GetTypeId(indexing_src)))
         {
             VIR_Instruction *f2i_inst;
             VIR_Operand *f2i_dest;
@@ -1828,7 +1828,7 @@ _VSC_UF_AUBO_TransformLdarrInstruction(
     }
     else if(VIR_Operand_GetRelAddrMode(src))
     {
-        VIR_Operand_SetTempRegister(src, func, load_symid, VIR_Operand_GetType(src));
+        VIR_Operand_SetTempRegister(src, func, load_symid, VIR_Operand_GetTypeId(src));
         VIR_Operand_SetMatrixConstIndex(src, 0);
         VIR_Operand_SetRelIndexing(src, 0);
         VIR_Operand_SetRelAddrMode(src, 0);
@@ -1867,7 +1867,7 @@ _VSC_UF_AUBO_TransformNormalInstruction(
     VSC_ErrCode virErrCode = VSC_ERR_NONE;
     gctUINT shader_kind_id = VIR_ShaderKind_Map2KindId(VIR_Shader_GetKind(shader));
     VIR_Instruction* new_inst, *conv_inst = gcvNULL;
-    VIR_TypeId src_type_id = VIR_Operand_GetType(src);
+    VIR_TypeId src_type_id = VIR_Operand_GetTypeId(src);
     /*VIR_Type* src_type = VIR_Shader_GetTypeFromId(shader, src_type_id);*/
     VIR_VirRegId load_regid, conv_regid;
     VIR_SymId load_symid, conv_symid, replacing_symid;
@@ -3126,7 +3126,7 @@ _VSC_UF_AUBO_InsertInstructions(
         VIR_Instruction* inst = VSC_UF_AUBO_UniformInfoNode_GetInst(uin);
         VIR_OpCode opcode = VIR_Inst_GetOpcode(inst);
         VIR_Operand* operand = VSC_UF_AUBO_UniformInfoNode_GetOperand(uin);
-        VIR_TypeId operandTypeId = VIR_Operand_GetType(operand);
+        VIR_TypeId operandTypeId = VIR_Operand_GetTypeId(operand);
         VIR_Type* operandType = VIR_Shader_GetTypeFromId(shader, operandTypeId);
         VIR_Swizzle operandSwizzle = VIR_Operand_GetSwizzle(operand);
         VIR_Symbol* uniformSym = VSC_UF_AUBO_UniformInfoNode_GetUniformSym(uin);
@@ -3755,7 +3755,7 @@ _VSC_UF_AUBO_InsertInstructions(
                 VIR_VirRegId loadRegId;
                 VIR_SymId loadSymId;
 
-                VIR_Function_AddInstructionBefore(func, VIR_OP_LOAD, VIR_Operand_GetType(operand), insertBefore, gcvTRUE, &load);
+                VIR_Function_AddInstructionBefore(func, VIR_OP_LOAD, VIR_Operand_GetTypeId(operand), insertBefore, gcvTRUE, &load);
                 loadDest = VIR_Inst_GetDest(load);
                 loadSrc0 = VIR_Inst_GetSource(load, 0);
                 loadSrc1 = VIR_Inst_GetSource(load, 1);
@@ -4429,6 +4429,45 @@ VSC_CheckUniformUsage(
     }
 
     /* check usage in LTC: to-do LTC is not in VIR yet */
+
+    for (i = 0; i < VIR_IdList_Count(VIR_Shader_GetUniforms(pShader)); ++i)
+    {
+        VIR_Id      id  = VIR_IdList_GetId(VIR_Shader_GetUniforms(pShader), i);
+        VIR_Symbol *sym = VIR_Shader_GetSymFromId(pShader, id);
+        VIR_Uniform*symUniform;
+        VIR_Type   *symType = VIR_Symbol_GetType(sym);
+
+        if (VIR_Symbol_isUniform(sym))
+        {
+            symUniform = VIR_Symbol_GetUniform(sym);
+        }
+        else if (VIR_Symbol_isSampler(sym))
+        {
+            symUniform = VIR_Symbol_GetSampler(sym);
+        }
+        else if (VIR_Symbol_isImage(sym))
+        {
+            symUniform = VIR_Symbol_GetImage(sym);
+        }
+        else
+        {
+            gcmASSERT(isSymCombinedSampler(sym));
+            symUniform = VIR_Symbol_GetSampler(sym);
+        }
+
+        if (VIR_Uniform_GetRealUseArraySize(symUniform) == -1)
+        {
+            if (VIR_Type_GetKind(symType) == VIR_TY_ARRAY)
+            {
+                VIR_Uniform_SetRealUseArraySize(symUniform, VIR_Type_GetArrayLength(symType));
+            }
+            else
+            {
+                VIR_Uniform_SetRealUseArraySize(symUniform, 1);
+            }
+        }
+    }
+
     return retValue;
 }
 

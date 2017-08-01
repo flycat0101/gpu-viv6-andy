@@ -2482,8 +2482,8 @@ _PostWindowBackBuffer(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN struct eglBackBuffer * BackBuffer,
-    IN EGLint NumRects,
-    IN EGLint Rects[]
+    IN struct eglRegion * Region,
+    IN struct eglRegion * DamageHint
     )
 {
     void * win = Surface->hwnd;
@@ -2556,12 +2556,12 @@ _PostWindowBackBuffer(
             return EGL_FALSE;
         }
 
-        for (i = 0; i < NumRects; i++)
+        for (i = 0; i < Region->numRects; i++)
         {
-            EGLint left   = Rects[i * 4 + 0];
-            EGLint top    = Rects[i * 4 + 1];
-            EGLint width  = Rects[i * 4 + 2];
-            EGLint height = Rects[i * 4 + 3];
+            EGLint left   = Region->rects[i * 4 + 0];
+            EGLint top    = Region->rects[i * 4 + 1];
+            EGLint width  = Region->rects[i * 4 + 2];
+            EGLint height = Region->rects[i * 4 + 3];
 
             /* Draw image. */
             status = x11_DrawImageEx((PlatformDisplayType) Display->hdc,

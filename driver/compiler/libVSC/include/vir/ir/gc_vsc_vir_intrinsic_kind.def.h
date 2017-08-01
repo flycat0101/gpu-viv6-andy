@@ -65,6 +65,13 @@
     VIR_INTRINSIC_INFO(evis_horz_max3),
     VIR_INTRINSIC_INFO(evis_horz_med3),
     VIR_INTRINSIC_INFO(evis_error),
+
+    VIR_INTRINSIC_INFO(bit_extract), /* = 51, bitfieldExtract intrinsic whose order should not be changed,
+                                        since it is also used in cl_viv_vx_ext.h*/
+    VIR_INTRINSIC_INFO(evis_dp16x1_b),
+    VIR_INTRINSIC_INFO(evis_dp8x2_b),
+    VIR_INTRINSIC_INFO(evis_dp4x4_b),
+    VIR_INTRINSIC_INFO(evis_dp2x8_b),
     VIR_INTRINSIC_INFO(evis_end), /* end of evis instrinsic */
     /* DO NOT add or change order of any Intrinsic before */
 
@@ -202,9 +209,9 @@
     VIR_INTRINSIC_INFO(get_num_groups),
 
     /* Interpolation Functions. */
-    VIR_INTRINSIC_INFO(interpolateatcenroid),
-    VIR_INTRINSIC_INFO(interpolateatsample),
-    VIR_INTRINSIC_INFO(interpolateatoffset),
+    VIR_INTRINSIC_INFO(interpolateAtCentroid),
+    VIR_INTRINSIC_INFO(interpolateAtSample),
+    VIR_INTRINSIC_INFO(interpolateAtOffset),
 
     /* synchronization functions */
     VIR_INTRINSIC_INFO(barrier),
@@ -256,6 +263,9 @@
 
     VIR_INTRINSIC_INFO(imadhi0),
     VIR_INTRINSIC_INFO(imadlo0),
+
+    VIR_INTRINSIC_INFO(bitextract),
+    VIR_INTRINSIC_INFO(bitinsert),
 
     VIR_INTRINSIC_INFO(LAST),
 

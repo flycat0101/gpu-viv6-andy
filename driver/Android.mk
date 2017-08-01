@@ -55,7 +55,7 @@ ifeq ($(VIVANTE_ENABLE_3D)_$(USE_OPENCL),1_1)
 endif
 
 ifeq ($(USE_OPENVX),1)
-  VIVANTE_MAKEFILES += $(LOCAL_PATH)/driver/khronos/libOpenVX/reference/Android.mk
+  VIVANTE_MAKEFILES += $(LOCAL_PATH)/driver/khronos/libOpenVX/Android.mk
 endif
 
 ifeq ($(VIVANTE_ENABLE_3D),1)

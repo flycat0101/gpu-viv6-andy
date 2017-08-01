@@ -21,12 +21,9 @@
 
 #if VIVANTE_PROFILER
 
-#if gcdNEW_PROFILER_FILE
-#if VIVANTE_PROFILER_CONTEXT
+
 #define VGPROFILER_HAL Context->phal
-#else
-#define VGPROFILER_HAL Context->hal
-#endif
+
 
 #define gcmWRITE_CONST(ConstValue) \
     do \
@@ -62,127 +59,7 @@
     } \
     while (gcvFALSE)
 
-#else
 
-static const char * apiCallString[] =
-{
-    "vgAppendPath",
-    "vgAppendPathData",
-    "vgChildImage",
-    "vgClear",
-    "vgClearGlyph",
-    "vgClearImage",
-    "vgClearPath",
-    "vgColorMatrix",
-    "vgConvolve",
-    "vgCopyImage",
-    "vgCopyMask",
-    "vgCopyPixels",
-    "vgCreateFont",
-    "vgCreateImage",
-    "vgCreateMaskLayer",
-    "vgCreatePaint",
-    "vgCreatePath",
-    "vgDestroyFont",
-    "vgDestroyImage",
-    "vgDestroyMaskLayer",
-    "vgDestroyPaint",
-    "vgDestroyPath",
-    "vgDrawGlyph",
-    "vgDrawGlyphs",
-    "vgDrawImage",
-    "vgDrawPath",
-    "vgFillMaskLayer",
-    "vgFinish",
-    "vgFlush",
-    "vgGaussianBlur",
-    "vgGetColor",
-    "vgGetError",
-    "vgGetf",
-    "vgGetfv",
-    "vgGeti",
-    "vgGetImageSubData",
-    "vgGetiv",
-    "vgGetMatrix",
-    "vgGetPaint",
-    "vgGetParameterf",
-    "vgGetParameterfv",
-    "vgGetParameteri",
-    "vgGetParameteriv",
-    "vgGetParameterVectorSize",
-    "vgGetParent",
-    "vgGetPathCapabilities",
-    "vgGetPixels",
-    "vgGetString",
-    "vgGetVectorSize",
-    "vgHardwareQuery",
-    "vgImageSubData",
-    "vgInterpolatePath",
-    "vgLoadIdentity",
-    "vgLoadMatrix",
-    "vgLookup",
-    "vgLookupSingle",
-    "vgMask",
-    "vgModifyPathCoords",
-    "vgMultMatrix",
-    "vgPaintPattern",
-    "vgPathBounds",
-    "vgPathLength",
-    "vgPathTransformedBounds",
-    "vgPointAlongPath",
-    "vgReadPixels",
-    "vgRemovePathCapabilities",
-    "vgRenderToMask",
-    "vgRotate",
-    "vgScale",
-    "vgSeparableConvolve",
-    "vgSetColor",
-    "vgSetf",
-    "vgSetfv",
-    "vgSetGlyphToImage",
-    "vgSetGlyphToPath",
-    "vgSeti",
-    "vgSetiv",
-    "vgSetPaint",
-    "vgSetParameterf",
-    "vgSetParameterfv",
-    "vgSetParameteri",
-    "vgSetParameteriv",
-    "vgSetPixels",
-    "vgShear",
-    "vgTransformPath",
-    "vgTranslate",
-    "vgWritePixels",
-};
-
-static gceSTATUS
-_Print(
-    _VGContext * Context,
-    gctCONST_STRING Format,
-    ...
-    )
-{
-    char buffer[256];
-    gctUINT offset = 0;
-    gceSTATUS status;
-
-    gcmONERROR(
-        gcoOS_PrintStrVSafe(buffer, gcmSIZEOF(buffer),
-                            &offset,
-                            Format,
-                            (gctPOINTER) (&Format + 1)));
-
-    gcmONERROR(
-        gcoPROFILER_Write(VGPROFILER_HAL,
-                          offset,
-                          buffer));
-
-    return gcvSTATUS_OK;
-
-OnError:
-    return status;
-}
-#endif
 
 /*******************************************************************************
 **    InitializeVGProfiler
@@ -209,7 +86,7 @@ InitializeVGProfiler(
         Context->profiler.enable = gcvFALSE;
         return;
     }
-#if VIVANTE_PROFILER_CONTEXT
+
     if(VGPROFILER_HAL == gcvNULL)
     {
         gctPOINTER pointer = gcvNULL;
@@ -219,7 +96,7 @@ InitializeVGProfiler(
         gcoOS_MemFill(pointer,0,gcmSIZEOF(struct _gcoHAL));
         VGPROFILER_HAL = (gcoHAL) pointer;
     }
-#endif
+
     status = gcoPROFILER_Initialize(VGPROFILER_HAL, gcvNULL, gcvTRUE);
 
     switch (status)
@@ -230,10 +107,10 @@ InitializeVGProfiler(
         case gcvSTATUS_NOT_SUPPORTED:/*fall through*/
         default:
             Context->profiler.enable = gcvFALSE;
-#if VIVANTE_PROFILER_CONTEXT
+
             if(VGPROFILER_HAL != gcvNULL)
                 gcoOS_Free(gcvNULL, VGPROFILER_HAL);
-#endif
+
             return;
     }
 
@@ -279,7 +156,6 @@ InitializeVGProfiler(
 
     Context->profiler.enable = gcvTRUE;
 
-#if gcdNEW_PROFILER_FILE
     {
         /* Write Generic Info. */
         char* infoCompany = "Vivante Corporation";
@@ -322,27 +198,7 @@ InitializeVGProfiler(
 
         gcmWRITE_CONST(VPG_END);
     }
-#else
-    /* Print generic info */
-    _Print(Context, "<GenericInfo company=\"Vivante Corporation\" "
-        "version=\"%d.%d\" renderer=\"%s\" ",
-        1, 0, Context->chipName);
 
-       rev = Context->revision;
-#define BCD(digit)        ((rev >> (digit * 4)) & 0xF)
-       if (BCD(3) == 0)
-       {
-           /* Old format. */
-           _Print(Context, "revision=\"%d.%d\" ", BCD(1), BCD(0));
-       }
-       else
-       {
-           /* New format. */
-           _Print(Context, "revision=\"%d.%d.%d_rc%d\" ",
-                  BCD(3), BCD(2), BCD(1), BCD(0));
-       }
-    _Print(Context, "driver=\"%s\" />\n", "OpenVG 1.1");
-#endif
 
     gcoOS_GetTime(&Context->profiler.frameStart);
     Context->profiler.frameStartTimeusec     = Context->profiler.frameStart;
@@ -369,10 +225,10 @@ DestroyVGProfiler(
     {
         Context->profiler.enable = gcvFALSE;
         gcmVERIFY_OK(gcoPROFILER_Destroy(VGPROFILER_HAL));
-#if VIVANTE_PROFILER_CONTEXT
+
         if(VGPROFILER_HAL != gcvNULL)
             gcoOS_Free(gcvNULL, VGPROFILER_HAL);
-#endif
+
     }
 }
 
@@ -394,12 +250,9 @@ beginFrame(
     {
         if (!Context->profiler.frameBegun)
         {
-#if gcdNEW_PROFILER_FILE
+
             gcmWRITE_COUNTER(VPG_FRAME, Context->profiler.frameNumber);
-#else
-            _Print(Context, "<Frame value=\"%d\">\n",
-                   Context->profiler.frameNumber);
-#endif
+
             Context->profiler.frameBegun = 1;
         }
     }
@@ -422,7 +275,6 @@ endFrame(
 
         if (Context->profiler.timeEnable)
         {
-#if gcdNEW_PROFILER_FILE
             gcmWRITE_CONST(VPG_TIME);
 
             gcmWRITE_COUNTER(VPC_ELAPSETIME, (gctINT32)(Context->profiler.frameEndTimeusec
@@ -430,25 +282,11 @@ endFrame(
             gcmWRITE_COUNTER(VPC_CPUTIME, (gctINT32)Context->profiler.totalDriverTime);
 
             gcmWRITE_CONST(VPG_END);
-#else
-            _Print(Context, "<Time>\n");
 
-            _Print(Context, "<ElapseTime value=\"%llu\"/>\n",
-                   ( Context->profiler.frameEndTimeusec
-                   - Context->profiler.frameStartTimeusec
-                   ));
-
-            _Print(Context, "<CPUTime value=\"%llu\"/>\n",
-                   Context->profiler.frameEndCPUTimeusec
-                   - Context->profiler.frameStartCPUTimeusec);
-
-            _Print(Context, "</Time>\n");
-#endif
         }
 
         if (Context->profiler.memEnable)
         {
-#if gcdNEW_PROFILER_FILE
             gcoOS_GetMemoryUsage(&maxrss, &ixrss, &idrss, &isrss);
 
             gcmWRITE_CONST(VPG_MEM);
@@ -459,22 +297,11 @@ endFrame(
             gcmWRITE_COUNTER(VPC_MEMUNSHAREDSTACK, isrss);
 
             gcmWRITE_CONST(VPG_END);
-#else
-            _Print(Context, "<Memory>\n");
 
-            gcoOS_GetMemoryUsage(&maxrss, &ixrss, &idrss, &isrss);
-            _Print(Context, "<MemMaxResidentSize value=\"%lu\"/>\n", maxrss);
-            _Print(Context, "<MemSharedSize value=\"%lu\"/>\n", ixrss);
-            _Print(Context, "<MemUnsharedDataSize value=\"%lu\"/>\n", idrss);
-            _Print(Context, "<MemUnsharedStackSize value=\"%lu\"/>\n", isrss);
-
-            _Print(Context, "</Memory>\n");
-#endif
         }
 
         if (Context->profiler.drvEnable)
         {
-#if gcdNEW_PROFILER_FILE
             /* write api time counters */
             gcmWRITE_CONST(VPG_VG11_TIME);
             for (i = 0; i < NUM_API_CALLS; ++i)
@@ -487,24 +314,16 @@ endFrame(
             gcmWRITE_CONST(VPG_END);
 
             gcmWRITE_CONST(VPG_VG11);
-#else
-            _Print(Context, "<VGCounters>\n");
-#endif
 
             for (i = 0; i < NUM_API_CALLS; ++i)
             {
                 if (Context->profiler.apiCalls[i] > 0)
                 {
-#if gcdNEW_PROFILER_FILE
                     gcmWRITE_COUNTER(VPG_VG11 + 1 + i, Context->profiler.apiCalls[i]);
-#else
-                    _Print(Context, "<%s value=\"%d\"/>\n",
-                        apiCallString[i], Context->profiler.apiCalls[i]);
-#endif
+
 
                     totalVGCalls += Context->profiler.apiCalls[i];
 
-                    /* VIV: [todo] Correctly place function calls into bins. */
                     switch(i + APICALLBASE)
                     {
                     case VGDRAWPATH:
@@ -545,7 +364,6 @@ endFrame(
                 Context->profiler.apiCalls[i] = 0;
             }
 
-#if gcdNEW_PROFILER_FILE
             gcmWRITE_COUNTER(VPC_VG11CALLS, totalVGCalls);
             gcmWRITE_COUNTER(VPC_VG11DRAWCALLS, totalVGDrawCalls);
             gcmWRITE_COUNTER(VPC_VG11STATECHANGECALLS, totalVGStateChangeCalls);
@@ -554,25 +372,13 @@ endFrame(
             gcmWRITE_COUNTER(VPC_VG11STROKECOUNT, Context->profiler.drawStrokeCount);
 
             gcmWRITE_CONST(VPG_END);
-#else
-            PRINT_XML2(totalVGCalls);
-            PRINT_XML2(totalVGDrawCalls);
-            PRINT_XML2(totalVGStateChangeCalls);
 
-            PRINT_XML(drawFillCount);
-            PRINT_XML(drawStrokeCount);
-
-            _Print(Context, "</VGCounters>\n");
-#endif
         }
 
         gcoPROFILER_EndFrame(VGPROFILER_HAL);
 
-#if gcdNEW_PROFILER_FILE
         gcmWRITE_CONST(VPG_END);
-#else
-        _Print(Context, "</Frame>\n\n");
-#endif
+
 
         gcoPROFILER_Flush(VGPROFILER_HAL);
 

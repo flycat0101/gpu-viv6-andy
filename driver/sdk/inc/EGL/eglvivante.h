@@ -229,7 +229,7 @@ typedef struct _platEvent
 }
 platEvent;
 
-#if defined(LINUX) && defined(EGL_API_FB) && !defined(__APPLE__)
+#if defined(__linux__) && defined(EGL_API_FB) && !defined(__APPLE__)
 
 void *
 fbGetDisplay(
@@ -336,7 +336,7 @@ fbDestroyPixmap(
 
 #endif
 
-#if defined(LINUX) && defined(EGL_API_DFB) && !defined(__APPLE__)
+#if defined(__linux__) && defined(EGL_API_DFB) && !defined(__APPLE__)
 
 void *
 dfbGetDisplay(

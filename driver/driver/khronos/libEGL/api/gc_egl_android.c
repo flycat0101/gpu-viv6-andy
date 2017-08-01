@@ -677,9 +677,19 @@ _SetBufferCount(
          * Hence, do NOT set buffer here in EGL.
          */
         struct framebuffer_device_t* device;
-        framebuffer_open(gralloc, &device);
-        Info->bufferCount = device->numFramebuffers;
-        framebuffer_close(device);
+        if (framebuffer_open(gralloc, &device) == 0)
+        {
+            Info->bufferCount = device->numFramebuffers;
+            framebuffer_close(device);
+        }
+        else
+        {
+#ifdef NUM_FRAMEBUFFER_SURFACE_BUFFERS
+            Info->bufferCount = NUM_FRAMEBUFFER_SURFACE_BUFFERS;
+#  else
+            Info->bufferCount = 3;
+#  endif
+        }
 
         LOGI("FramebufferSurface: bufferCount=%d", Info->bufferCount);
         /* native_window_set_buffer_count(win, Info->bufferCount); */
@@ -1736,8 +1746,8 @@ _PostWindowBackBuffer(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN struct eglBackBuffer * BackBuffer,
-    IN EGLint NumRects,
-    IN EGLint Rects[]
+    IN struct eglRegion * Region,
+    IN struct eglRegion * DamageHint
     )
 {
     PlatformWindowType win = Surface->hwnd;
@@ -1771,7 +1781,8 @@ static EGLBoolean
 _PostWindowBackBufferFence(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
-    IN struct eglBackBuffer * BackBuffer
+    IN struct eglBackBuffer * BackBuffer,
+    IN struct eglRegion * DamageHint
     )
 {
     PlatformWindowType win = Surface->hwnd;
@@ -1860,6 +1871,7 @@ _PostWindowBackBufferFence(
 
             /* Submit the sync point. */
             iface.command            = gcvHAL_SIGNAL;
+            iface.engine             = gcvENGINE_RENDER;
             iface.u.Signal.signal    = gcmPTR_TO_UINT64(signal);
             iface.u.Signal.auxSignal = 0;
             iface.u.Signal.process   = gcmPTR_TO_UINT64(Display->process);

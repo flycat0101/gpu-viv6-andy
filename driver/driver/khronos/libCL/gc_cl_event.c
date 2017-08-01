@@ -145,6 +145,7 @@ clfAllocateEvent(
     event->next                 = gcvNULL;
     event->previous             = gcvNULL;
     event->userEvent            = gcvFALSE;
+    event->fromUserCommand      = gcvFALSE;
 
     event->profileInfo.queued   = 0;
     event->profileInfo.submit   = 0;
@@ -559,16 +560,15 @@ clfScheduleEventCallback(
 {
     gctINT                  status;
     clsEventCallback_PTR    eventCallback, prev, next;
+    gctINT                  checkPoint = CL_SUBMITTED;
 
     gcmHEADER_ARG("Event=0x%x Status=%d", Event, ExecutionStatus);
 
     clmASSERT(Event, CL_INVALID_VALUE);
 
-#if BUILD_OPENCL_12
-    if (ExecutionStatus <= CL_SUBMITTED)
-#else
-    if (ExecutionStatus <= CL_COMPLETE)
-#endif
+    if(!gcoOS_StrCmp(clgDefaultDevice->deviceVersion, cldVERSION11)) checkPoint = CL_COMPLETE;
+
+    if (ExecutionStatus <= checkPoint)
     {
         gcmVERIFY_OK(gcoOS_AcquireMutex(gcvNULL, Event->callbackMutex, gcvINFINITE));
 
@@ -796,11 +796,13 @@ clfSubmitEventForFinish(
 
     /* Submit the event's finish signal. */
     gcmONERROR(gcoCL_SubmitSignal(event->finishSignal,
-                                  context->process));
+                                  context->process,
+                                  Command->submitEngine));
 
     /* Submit the signal to wake up the event list worker to handle the event. */
     gcmONERROR(gcoCL_SubmitSignal(context->eventListWorkerStartSignal,
-                                  context->process));
+                                  context->process,
+                                  Command->submitEngine));
 
     status = CL_SUCCESS;
 
@@ -862,11 +864,13 @@ clfSubmitEventForRunning(
 
     /* Add event's running signal. */
     gcmONERROR(gcoCL_SubmitSignal(event->runSignal,
-                                  context->process));
+                                  context->process,
+                                  Command->submitEngine));
 
     /* Add signal to wake up worker to handle the event. */
     gcmONERROR(gcoCL_SubmitSignal(context->eventListWorkerStartSignal,
-                                  context->process));
+                                  context->process,
+                                  Command->submitEngine));
 
     status = CL_SUCCESS;
 
@@ -881,10 +885,8 @@ clfEventListWorker(
     )
 {
     clsContext_PTR          context = (clsContext_PTR) Data;
-    gctINT                  status;
+    clsCommandQueue_PTR     CommandQueue = gcvNULL;
 
-    /* Use the same hardware for event callback worker. */
-    gcmONERROR(gcoCL_SetHardware());
 
     while (gcvTRUE)
     {
@@ -898,11 +900,17 @@ clfEventListWorker(
             break;
         }
 
+        CommandQueue = context->queueList;
+        while(CommandQueue && CommandQueue->inThread)
+        {
+            clfProcessDeferredReleaseCommandList(CommandQueue);
+            CommandQueue = CommandQueue->next;
+        }
+
         /* Process pending event signals. */
         clfProcessEventList(context);
     }
 
-OnError:
     return (gctTHREAD_RETURN) 0;
 }
 
@@ -912,11 +920,10 @@ clfEventCallbackWorker(
     )
 {
     clsContext_PTR          context = (clsContext_PTR) Data;
-    gctINT                  status;
     clsEventCallback_PTR    eventCallback = gcvNULL;
 
     /* Use the same hardware for event callback worker. */
-    gcmONERROR(gcoCL_SetHardware());
+   /* gcmONERROR(gcoCL_SetHardware()); */
 
     while (gcvTRUE)
     {
@@ -952,8 +959,6 @@ clfEventCallbackWorker(
             }
         }
     }
-
-OnError:
     return (gctTHREAD_RETURN) 0;
 }
 
@@ -1268,6 +1273,7 @@ clSetEventCallback(
     clsEventCallback_PTR    eventCallback;
     gctPOINTER              pointer;
     gctINT                  status;
+    gctINT                  checkPoint = CL_SUBMITTED | CL_RUNNING | CL_COMPLETE;
 
     gcmHEADER_ARG("Event=0x%x CallBackType=%d PfnNotify=0x%x UserData=0x%x",
                   Event, CommandExecCallbackType, PfnNotify, UserData);
@@ -1280,14 +1286,10 @@ clSetEventCallback(
         clmRETURN_ERROR(CL_INVALID_EVENT);
     }
 
-#if BUILD_OPENCL_12
-    if ((CommandExecCallbackType != CL_SUBMITTED) &&
-        (CommandExecCallbackType != CL_RUNNING) &&
-        (CommandExecCallbackType != CL_COMPLETE)
-       )
-#else
-    if (CommandExecCallbackType != CL_COMPLETE)
-#endif
+    if(!gcoOS_StrCmp(clgDefaultDevice->deviceVersion, cldVERSION11))
+        checkPoint = CL_COMPLETE;
+
+    if ((CommandExecCallbackType != CL_COMPLETE) && ((CommandExecCallbackType & checkPoint) == 0))
     {
         gcmUSER_DEBUG_ERROR_MSG(
             "OCL-008018: (clSetEventCallback) invalid CommandExecCallbackType.\n");

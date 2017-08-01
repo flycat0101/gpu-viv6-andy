@@ -134,6 +134,8 @@ gcoCL_Construct(
     /* Construct hardware object for this engine */
     gcmONERROR(gcoHARDWARE_Construct(clObj->hal, gcvFALSE,  gcvFALSE, &clObj->hardware));
 
+    gcmONERROR(gcoHARDWARE_SetFenceEnabled(clObj->hardware, gcvTRUE);
+
     /* Switch to the 3D pipe. */
     gcmONERROR(gcoHARDWARE_SelectPipe(clObj->hardware, gcvPIPE_3D, gcvNULL));
 
@@ -226,11 +228,6 @@ gcoCL_InitializeHardware()
         gcmVERIFY_OK(gcoHARDWARE_SetRTNERounding(gcvNULL, gcvTRUE));
     }
 
-    if (_gCL == gcvNULL)
-    {
-        /* Construct _gCL. */
-        gcmONERROR(gcoCL_Construct(&_gCL));
-    }
     gcmONERROR(gcoCLHardware_Construct());
 
     /* Success. */
@@ -251,95 +248,70 @@ OnError:
     return status;
 }
 
-gceSTATUS
-gcoCL_SaveContext(
-    OUT gcoHARDWARE *Hardware
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcmHEADER();
-    gcmVERIFY_ARGUMENT(Hardware != gcvNULL);
-    gcmONERROR(gcoHARDWARE_Get3DHardware(Hardware));
-    gcmONERROR(gcoHARDWARE_Set3DHardware(gcvNULL));
-OnError:
-    gcmFOOTER();
-    return status;
-}
 
-gceSTATUS
-gcoCL_RestoreContext(
-    IN gcoHARDWARE Hardware
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcmHEADER();
-
-    gcmONERROR(gcoHARDWARE_Set3DHardware(Hardware));
-
-OnError:
-    gcmFOOTER();
-    return status;
-}
 
 /**********************************************************************
 **
 **  gcoCL_SetHardware
 **
-**  Set the gcoHARDWARE object for current thread.
+**  Set the gcoHARDWARE object for current thread., CL used its own hardware, Need Save'
+**  Current Thread's information.
 **
 **  INPUT:
 **
-**      Nothing
+**      the new hardware.
 **
 **  OUTPUT:
 **
-**      Nothing
+**      current thread's hw, hwType, coreIndex.
 */
 gceSTATUS
-gcoCL_SetHardware()
+gcoCL_SetHardware(
+    IN gcoHARDWARE hw,
+    OUT gcoHARDWARE *savedHW,
+    OUT gceHARDWARE_TYPE *savedType,
+    OUT gctUINT32 *savedCoreIndex
+)
 {
-#if _USE_CL_HARDWARE_ && 0
-    gceSTATUS status;
-    gcsTLS_PTR tls;
-
+    gceSTATUS status = gcvSTATUS_OK;
+    gctUINT32 coreIndex = 0;
     gcmHEADER();
-
-    gcmONERROR(gcoOS_GetTLS(&tls));
-
-    gcmASSERT(tls->currentHardware == gcvNULL);
-
-    /* Set current hardware. */
-    tls->currentType = gcvHARDWARE_3D;
-    tls->currentHardware = _gCL->hardware;
-
-#if gcdDUMP
-    gcmDUMP(gcvNULL, "@[start contextid %d, default=%d]", _gCL->hardware->context, _gCL->hardware->threadDefault);
-#endif
-
-    /* Success. */
-    gcmFOOTER_NO();
-    return gcvSTATUS_OK;
-
+    gcmVERIFY_ARGUMENT(savedHW != gcvNULL);
+    gcoHAL_GetCurrentCoreIndex(gcvNULL, savedCoreIndex);
+    gcmONERROR(gcoHARDWARE_Get3DHardware(savedHW));
+    gcmONERROR(gcoHAL_GetHardwareType(gcvNULL, savedType));
+    gcmONERROR(gcoHARDWARE_Set3DHardware(hw));
+    gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
+    if(hw)
+    {
+        gcoHARDWARE_QueryCoreIndex(hw,0,&coreIndex);
+        gcoHAL_SetCoreIndex(gcvNULL, coreIndex);
+    }
 OnError:
-    /* Return the status. */
     gcmFOOTER();
     return status;
-#else
-    gceSTATUS   status;
-    gcoHARDWARE savedHardware = gcvNULL;
 
-    gcmHEADER();
-
-    gcmONERROR(gcoCL_SaveContext(&savedHardware));
-    gcmONERROR(gcoCL_InitializeHardware());
-
-OnError:
-    gcmONERROR(gcoCL_RestoreContext(savedHardware));
-    /* Return the status. */
-    gcmFOOTER();
-    return status;
-#endif
 }
+
+
+    gceSTATUS
+gcoCL_RestoreContext(
+     gcoHARDWARE preHW,
+     gceHARDWARE_TYPE preType,
+     gctUINT32 preCoreIndex
+    )
+    {
+        gceSTATUS status = gcvSTATUS_OK;
+        gcmHEADER();
+
+        gcmONERROR(gcoHARDWARE_Set3DHardware(preHW));
+        gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, preType));
+        gcoHAL_SetCoreIndex(gcvNULL, preCoreIndex);
+
+OnError:
+        gcmFOOTER();
+        return status;
+    }
 
 /******************************************************************************\
 |****************************** MEMORY MANAGEMENT *****************************|
@@ -379,7 +351,8 @@ gcoCL_AllocateMemory(
     IN OUT gctUINT *        Bytes,
     OUT gctPHYS_ADDR *      Physical,
     OUT gctPOINTER *        Logical,
-    OUT gcsSURF_NODE_PTR *  Node
+    OUT gcsSURF_NODE_PTR *  Node,
+    IN  gctUINT32           Flag
     )
 {
     /*gcmSWITCHHARDWAREVAR*/
@@ -418,7 +391,7 @@ gcoCL_AllocateMemory(
         bytes,
         alignBytes,
         gcvSURF_INDEX,
-        gcvALLOC_FLAG_NONE,
+        Flag == 0 ? gcvALLOC_FLAG_NONE:Flag,
         gcvPOOL_DEFAULT
         ));
 
@@ -522,6 +495,73 @@ OnError:
 
     /* Return the status. */
     gcmFOOTER();
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoCL_WrapUserMemory
+**
+*/
+gceSTATUS
+gcoCL_WrapUserMemory(
+    IN gctPOINTER           Ptr,
+    IN gctUINT              Bytes,
+    OUT gctUINT32_PTR       Physical,
+    OUT gcsSURF_NODE_PTR *  Node
+    )
+{
+    gctUINT32 node = 0;
+    gctUINT i;
+    gceSTATUS status;
+    gcsUSER_MEMORY_DESC desc;
+    gctPOINTER pointer = gcvNULL;
+    gcsSURF_NODE_PTR surf = gcvNULL;
+
+    /* Allocate node. */
+    gcoOS_ZeroMemory(&desc, gcmSIZEOF(desc));
+    desc.flag     = gcvALLOC_FLAG_USERMEMORY;
+    desc.logical  = gcmPTR_TO_UINT64(Ptr);
+    desc.physical = gcvINVALID_ADDRESS;
+    desc.size     = Bytes;
+
+    /* Map the host ptr to a vidmem node. */
+    gcmONERROR(gcoHAL_WrapUserMemory(&desc, &node));
+
+    gcmONERROR(gcoOS_Allocate(gcvNULL,
+                              gcmSIZEOF(gcsSURF_NODE),
+                              &pointer));
+    gcoOS_ZeroMemory(pointer, gcmSIZEOF(gcsSURF_NODE));
+
+    surf = pointer;
+
+    surf->u.normal.node = node;
+    surf->pool          = gcvPOOL_VIRTUAL;
+    surf->size          = Bytes;
+
+    surf->u.normal.cacheable = gcvTRUE;
+
+    surf->physical2     = gcvINVALID_ADDRESS;
+    surf->physical3     = gcvINVALID_ADDRESS;
+
+    for (i = 0; i < gcvHARDWARE_NUM_TYPES; i++)
+    {
+        surf->hardwareAddresses[i] = gcvINVALID_ADDRESS;
+    }
+
+    gcmONERROR(gcoHARDWARE_Lock(surf, Physical, gcvNULL));
+
+    *Node = surf;
+
+    return gcvSTATUS_OK;
+
+OnError:
+    if (surf)
+    {
+        gcsSURF_NODE_Destroy(surf);
+        gcoOS_Free(gcvNULL, surf);
+    }
+
     return status;
 }
 
@@ -1288,24 +1328,19 @@ gcoCL_QueryDeviceInfo(
     OUT gcoCL_DEVICE_INFO_PTR   DeviceInfo
     )
 {
-    /*gcmSWITCHHARDWAREVAR*/
+
     gceSTATUS status;
     gctUINT threadCount;
     gctSIZE_T contiguousSize;
     gctPHYS_ADDR contiguousAddress;
     gctSIZE_T physicalSystemMemSize;
-    gceCHIPMODEL  chipModel;
-    gctUINT32 chipRevision;
-#if BUILD_OPENCL_FP
-    gctBOOL chipEnableFP = gcvFALSE;
-#endif
-
+    gceCHIPMODEL  chipModel = gcv200;
+    gctUINT32 chipRevision = 0;
+    gctBOOL chipEnableEP = gcvFALSE;
     gcmHEADER();
-
-    /*gcmSWITCHHARDWARE();*/
-
     gcmASSERT(DeviceInfo != gcvNULL);
 
+    gcoHAL_SetHardwareType(gcvNULL,gcvHARDWARE_3D);
     /* Number of shader cores and threads */
     gcmONERROR(
         gcoHARDWARE_QueryShaderCaps(gcvNULL,
@@ -1485,13 +1520,14 @@ gcoCL_QueryDeviceInfo(
     gcoHAL_QueryChipIdentity(gcvNULL, &chipModel, &chipRevision, gcvNULL, gcvNULL);
     DeviceInfo->chipModel = chipModel;
     DeviceInfo->chipRevision = chipRevision;
-#if BUILD_OPENCL_FP
-    chipEnableFP = ((chipModel == gcv2500 && chipRevision == 0x5422) ||
-                    (chipModel == gcv3000 && chipRevision == 0x5435) ||
-                    (chipModel == gcv7000));
+    chipEnableEP = ((chipModel == gcv1500 && chipRevision == 0x5246) ||
+                    (chipModel == gcv3000 && chipRevision == 0x5450) ||
+                    (chipModel == gcv2000 && chipRevision == 0x5108) ||
+                    (chipModel == gcv3000 && chipRevision == 0x5513) ||
+                    (chipModel == gcv5000));
     if(gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_ATOMIC) &&
        gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_SHADER_HAS_RTNE) &&
-       (chipEnableFP == gcvTRUE))
+       (chipEnableEP == gcvFALSE))
     {
         DeviceInfo->singleFpConfig |= 0x2; /* CL_FP_INF_NAN */
         DeviceInfo->localMemSize    = 32*1024;
@@ -1501,7 +1537,6 @@ gcoCL_QueryDeviceInfo(
         DeviceInfo->maxConstantBufferSize = 64*1024;
         DeviceInfo->vectorWidthLong       = 4;
     }
-#endif
 
     DeviceInfo->doubleFpConfig        = 0;      /* unsupported extension */
 
@@ -1542,7 +1577,6 @@ gcoCL_QueryDeviceInfo(
 
 OnError:
     /*gcmRESTOREHARDWARE();*/
-
     gcmFOOTER_ARG("status=%d", status);
     return status;
 }
@@ -1560,6 +1594,11 @@ gcoCL_QueryDeviceCount(
     gcmDEBUG_VERIFY_ARGUMENT(Count != gcvNULL);
 
     gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D, Count, chipIDs);
+
+    if (*Count == 0)
+    {
+        gcoHAL_QueryCoreCount(gcvNULL, gcvHARDWARE_3D2D, Count, chipIDs);
+    }
 
     gcmFOOTER_ARG("*Count=%d", *Count);
     return gcvSTATUS_OK;
@@ -1579,6 +1618,85 @@ gcoCL_SelectDevice(
     gcmFOOTER();
     return status;
 }
+
+/*
+ Example 2, a client wants to use 3D GPU0 and 3D GPU1 separately, it should do like this:
+**      a) gcoHAL_SetHardwareType(gcvHARDWARE_3D)
+**      b) gcoHAL_SetCurrentCoreIndex(0)
+**      c) hardware0 = gcoHARDWARE_Construct()
+**      d) gcoHARDWARE_SetMultiGPUMode(hardware0, gcvMULTI_GPU_MODE_INDEPENENT)
+**      e) gcoHAL_SetCurrentCoreIndex(1)
+**      f) hardware1 = gcoHARDWARE_Construct()
+**      g) gcoHARDWARE_SetMultiGPUMode(hardware1, gcvMULTI_GPU_MODE_INDEPENENT)
+**      h) gcoHAL_SetCurrentCoreIndex(0)
+**      i) submit hardware0 related command to kernel
+**      j) gcoHAL_SetCurrentCoreIndex(1)
+**      k) submit hardware1 related command to kernel
+*/
+
+ gceSTATUS
+gcoCL_CreateHW(
+    IN gctUINT32    DeviceId,
+    OUT gcoHARDWARE * Hardware
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcoHARDWARE  hardware = gcvNULL;
+    gcmDECLARE_SWITCHVARS;
+    gcmHEADER_ARG("DeviceId=%d", DeviceId);
+    gcmSWITCH_TO_DEFAULT();
+    gcoHAL_SetHardwareType(gcvNULL,gcvHARDWARE_3D);
+    gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, DeviceId));
+
+    gcmONERROR(gcoHARDWARE_Construct(gcPLS.hal, gcvFALSE, gcvFALSE, &hardware));
+    gcmONERROR(gcoHARDWARE_SetMultiGPUMode(hardware, gcvMULTI_GPU_MODE_INDEPENDENT));
+    /* Switch to the 3D pipe. */
+    gcmONERROR(gcoHARDWARE_SelectPipe(hardware, gcvPIPE_3D, gcvNULL));
+
+    /* Set HAL API to OpenCL only when there is API is not set. */
+    gcmVERIFY_OK(gcoHARDWARE_SetAPI(hardware, gcvAPI_OPENCL));
+
+    if (!gcoHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_PIPE_CL))
+    {
+        gcmONERROR(gcvSTATUS_NOT_SUPPORTED);
+    }
+
+    /* Set rounding mode */
+    if (gcoHARDWARE_IsFeatureAvailable(hardware, gcvFEATURE_SHADER_HAS_RTNE))
+    {
+        gcmVERIFY_OK(gcoHARDWARE_SetRTNERounding(hardware, gcvTRUE));
+    }
+
+    gcoHARDWARE_SetFenceEnabled(hardware, gcvTRUE);
+
+    gcoHARDWARE_InitializeCL(hardware);
+    gcmRESTORE_HW();
+    *Hardware = hardware;
+
+    gcmFOOTER();
+    return status;
+
+OnError:
+    gcmRESTORE_HW();
+    if(hardware)
+    {
+        gcoHARDWARE_Destroy(hardware, gcvFALSE);
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+
+gceSTATUS
+    gcoCL_DestroyHW(
+    gcoHARDWARE  Hardware
+    )
+ {
+     gcoHARDWARE_Destroy((gcoHARDWARE)Hardware,gcvFALSE);
+     return gcvSTATUS_OK;
+ }
+
 
 /*******************************************************************************
 **
@@ -1728,11 +1846,12 @@ gcoCL_DestroySignal(
 gceSTATUS
 gcoCL_SubmitSignal(
     IN gctSIGNAL    Signal,
-    IN gctHANDLE    Process
+    IN gctHANDLE    Process,
+    IN gceENGINE    Engine
     )
 {
     /*gcmSWITCHHARDWAREVAR*/
-    gceSTATUS       status;
+    gceSTATUS       status = gcvSTATUS_OK;
 #if COMMAND_PROCESSOR_VERSION > 1
     gcsTASK_SIGNAL_PTR signal;
 #else
@@ -1742,6 +1861,12 @@ gcoCL_SubmitSignal(
     gcmHEADER_ARG("Signal=0x%x Process=0x%x", Signal, Process);
 
     /*gcmSWITCHHARDWARE();*/
+    /* Sometime we disable BLT engine */
+    if (Signal == gcvNULL)
+    {
+        gcmFOOTER();
+        return status;
+    }
 
 #if COMMAND_PROCESSOR_VERSION > 1
 #if gcdGC355_PROFILER
@@ -1766,6 +1891,7 @@ gcoCL_SubmitSignal(
     signal->signal   = Signal;
 #else
     iface.command            = gcvHAL_SIGNAL;
+    iface.engine             = Engine;
     iface.u.Signal.signal    = gcmPTR_TO_UINT64(Signal);
     iface.u.Signal.auxSignal = 0;
     iface.u.Signal.process   = gcmPTR_TO_UINT64(Process);
@@ -1845,11 +1971,14 @@ gcoCL_SetSignal(
     )
 {
     /*gcmSWITCHHARDWAREVAR*/
-    gceSTATUS   status;
+    gceSTATUS   status = gcvSTATUS_OK;
 
     gcmHEADER_ARG("Signal=0x%x", Signal);
 
-    status = gcoOS_Signal(gcvNULL, Signal, gcvTRUE);
+    if (Signal != gcvNULL)
+    {
+        status = gcoOS_Signal(gcvNULL, Signal, gcvTRUE);
+    }
 
     gcmFOOTER();
     return status;
@@ -2024,6 +2153,120 @@ gcoCL_MultiGPUSync(
     /* TODO: need refine later */
     return gcoHARDWARE_MultiGPUSyncV2(gcvNULL, GPUCount, ChipIDs, gcvNULL);
 }
+
+gctBOOL
+gcoCL_MemIsFenceBack(
+    IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE Engine,
+    IN gceFENCE_TYPE WaitType
+    )
+{
+    return gcoHARDWARE_IsFenceBack(gcvNULL, Node->fenceCtx, Engine, WaitType);
+}
+
+gceSTATUS
+gcoCL_MemWaitAndGetFence(
+    IN gcsSURF_NODE_PTR Node,
+    IN gceENGINE Engine,
+    IN gceFENCE_TYPE GetType,
+    IN gceFENCE_TYPE WaitType
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Node=0x%x", Node);
+
+    if (Node)
+    {
+        if (Engine == gcvENGINE_CPU)
+        {
+            gcmONERROR(gcsSURF_NODE_WaitFence(Node, Engine, gcvENGINE_RENDER, WaitType));
+            gcmONERROR(gcsSURF_NODE_WaitFence(Node, Engine, gcvENGINE_BLT, WaitType));
+        }
+        else if (Engine == gcvENGINE_RENDER)
+        {
+            gcmONERROR(gcsSURF_NODE_WaitFence(Node, Engine, gcvENGINE_BLT, WaitType));
+        }
+        else if (Engine == gcvENGINE_BLT)
+        {
+            gcmONERROR(gcsSURF_NODE_WaitFence(Node, Engine, gcvENGINE_RENDER, WaitType));
+        }
+
+        if ((Engine != gcvENGINE_INVALID) && (Engine != gcvENGINE_CPU) && (GetType != gcvFNECE_TYPE_INVALID))
+        {
+            status = gcoHARDWARE_AppendFence(gcvNULL, Node, Engine, GetType);
+            /* status = gcsSURF_NODE_GetFence(Node, Engine, GetType);*/
+        }
+    }
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoCL_ChooseBltEngine(
+    IN gcsSURF_NODE_PTR node,
+    OUT gceENGINE * engine
+    )
+{
+    if (node)
+    {
+        if (gcoHAL_GetOption(gcvNULL, gcvOPTION_OCL_ASYNC_BLT))
+        {
+            if (gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_ASYNC_FE_FENCE_FIX))
+            {
+                *engine = gcvENGINE_BLT;
+            }
+            else
+            {
+                if (!gcoHARDWARE_IsFenceBack(gcvNULL, node->fenceCtx, gcvENGINE_RENDER, gcvFENCE_TYPE_ALL))
+                {
+                    *engine = gcvENGINE_RENDER;
+                }
+                else
+                {
+                    *engine = gcvENGINE_BLT;
+                }
+            }
+        }
+        else
+        {
+            *engine = gcvENGINE_RENDER;
+        }
+
+        return gcvSTATUS_OK;
+    }
+
+    *engine = gcvENGINE_RENDER;
+
+    return gcvSTATUS_INVALID_ARGUMENT;
+}
+
+gceSTATUS
+gcoCL_MemBltCopy(
+    IN gctUINT32 SrcAddress,
+    IN gctUINT32 DestAddress,
+    IN gctUINT32 CopySize,
+    IN gceENGINE engine
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcoHARDWARE Hardware = gcvNULL;
+    gcmHEADER();
+
+    gcmGETHARDWARE(Hardware);
+    gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, engine, SrcAddress, DestAddress, CopySize));
+
+
+    gcoHARDWARE_OnIssueFence(gcvNULL, engine);
+    gcoHARDWARE_SendFence(gcvNULL, gcvFALSE, engine, gcvNULL);
+
+
+OnError:
+    gcmFOOTER();
+    return status;
+}
+
 
 #endif /* gcdENABLE_3D */
 

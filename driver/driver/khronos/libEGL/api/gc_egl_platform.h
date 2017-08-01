@@ -179,8 +179,8 @@ struct eglPlatform
     EGLBoolean (* postWindowBackBuffer)(VEGLDisplay Display,
                                         VEGLSurface Surface,
                                         struct eglBackBuffer * BackBuffer,
-                                        EGLint NumRects,
-                                        EGLint Rects[]);
+                                        struct eglRegion * Region,
+                                        struct eglRegion * DamageHint);
 
     /*
      * Android only.
@@ -188,7 +188,8 @@ struct eglPlatform
      */
     EGLBoolean (* postWindowBackBufferFence)(VEGLDisplay Display,
                                              VEGLSurface Surface,
-                                             struct eglBackBuffer * BackBuffer);
+                                             struct eglBackBuffer * BackBuffer,
+                                             struct eglRegion * DamageHint);
 
     /*
      * Cancel window back buffer.

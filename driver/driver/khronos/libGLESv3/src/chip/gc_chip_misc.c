@@ -177,6 +177,7 @@ __glChipEndQuery(
 
     /* Send an event to signal that the data is in the buffer. */
     iface.command            = gcvHAL_SIGNAL;
+    iface.engine             = gcvENGINE_RENDER;
     iface.u.Signal.signal    = gcmPTR_TO_UINT64(chipQuery->querySignal);
     iface.u.Signal.auxSignal = 0;
     iface.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());
@@ -447,6 +448,7 @@ __glChipCreateSync(
     __glChipSyncImage(gc);
 
     iface.command            = gcvHAL_SIGNAL;
+    iface.engine             = gcvENGINE_RENDER;
     iface.u.Signal.signal    = gcmPTR_TO_UINT64(syncObject->privateData);
     iface.u.Signal.auxSignal = 0;
     iface.u.Signal.process   = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());

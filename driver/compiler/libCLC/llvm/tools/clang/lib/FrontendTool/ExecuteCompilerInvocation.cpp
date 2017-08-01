@@ -720,13 +720,33 @@ unsigned *pped_count)
            Act.take();
 
         {
-            IdentifierInfo *id = Clang->getPreprocessor().getIdentifierInfo("CL_VIV_asm");
-            MacroInfo *macroInfo = Clang->getPreprocessor().getMacroInfo(id);
+            IdentifierInfo *id;
+            MacroInfo *macroInfo;
 
+            id = Clang->getPreprocessor().getIdentifierInfo("CL_VIV_asm");
+            macroInfo = Clang->getPreprocessor().getMacroInfo(id);
             if(macroInfo != gcvNULL && macroInfo->isEnabled())
             {
                 cloCOMPILER_EnableExtension(Compiler,
                                             clvEXTENSION_VASM,
+                                            gcvTRUE);
+            }
+
+            id = Clang->getPreprocessor().getIdentifierInfo("cl_viv_bitfield_extension");
+            macroInfo = Clang->getPreprocessor().getMacroInfo(id);
+            if(macroInfo != gcvNULL && macroInfo->isEnabled())
+            {
+                cloCOMPILER_EnableExtension(Compiler,
+                                            clvEXTENSION_VIV_BITFIELD,
+                                            gcvTRUE);
+            }
+
+            id = Clang->getPreprocessor().getIdentifierInfo("cl_viv_cmplx_extension");
+            macroInfo = Clang->getPreprocessor().getMacroInfo(id);
+            if(macroInfo != gcvNULL && macroInfo->isEnabled())
+            {
+                cloCOMPILER_EnableExtension(Compiler,
+                                            clvEXTENSION_VIV_CMPLX,
                                             gcvTRUE);
             }
         }

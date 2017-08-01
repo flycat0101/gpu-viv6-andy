@@ -1108,6 +1108,8 @@ gal_setup_driver( GalDriverData *drv,
             vdrv->per_process_compression = gcvFALSE;
 #endif
 
+            vdev->hw_yuv420_output = gcoHAL_IsFeatureAvailable(vdrv->hal, gcvFEATURE_2D_YUV420_OUTPUT_LINEAR) == gcvTRUE;
+
             vdev->max_pending_num  = MAX_PENDING_NUM;
             vdev->gard_pending_num = GARD_PENDING_NUM;
         }
@@ -1328,7 +1330,8 @@ gal_release_memory_mappings( DirectHash    *hash,
                     mapping->gpu_addr );
 
         gcmERR_BREAK(gcoHAL_UnlockVideoMemory( mapping->node,
-                                               gcvSURF_BITMAP ));
+                                               gcvSURF_BITMAP,
+                                               gcvENGINE_RENDER));
 
         gcmERR_BREAK(gcoHAL_ReleaseVideoMemory( mapping->node ));
 

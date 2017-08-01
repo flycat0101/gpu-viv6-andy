@@ -83,6 +83,8 @@ VSC_IL_DupInstruction(
         VIR_Inst_SetFunction(inst, Function);
         VIR_Inst_SetId(inst, VIR_Function_GetAndIncressLastInstId(Function));
 
+        VIR_Inst_CopySrcLoc(OrigInst->sourceLoc, inst->sourceLoc);
+
         /* allocate dest operand */
         if (VIR_OPCODE_hasDest(VIR_Inst_GetOpcode(OrigInst)))
         {

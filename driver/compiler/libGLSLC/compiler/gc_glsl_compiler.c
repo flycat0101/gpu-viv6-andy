@@ -299,13 +299,11 @@ sloCOMPILER_Construct(
         compiler->context.uniformLocationMaxLength = GetGLMaxUniformLocations();
         compiler->context.currentIterationCount = 1;
 
-#if gcdCOMPILER_DEBUGOUTPUT
-        if (gcmIS_ERROR(vscDIConstructContext(gcvNULL,gcvNULL, &compiler->context.debugInfo)))
+        if (vscDIConstructContext(gcvNULL,gcvNULL, &compiler->context.debugInfo) != gcvSTATUS_OK)
         {
             vscDIDestroyContext(compiler->context.debugInfo);
             compiler->context.debugInfo = gcvNULL;
         }
-#endif
 
         /* Create IR root */
         status = sloIR_SET_Construct(compiler,

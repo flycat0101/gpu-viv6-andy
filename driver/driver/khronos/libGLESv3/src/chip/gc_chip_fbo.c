@@ -101,7 +101,6 @@ gcChipUtilGetPixelPlane(
 
         gcmONERROR(gcoSURF_Construct(chipCtx->hal, width, height, 1, surfType,
                                      fmtInfo->format, gcvPOOL_DEFAULT, &pixelPlaneView->surf));
-        gcmONERROR(gcoSURF_SetOrientation(pixelPlaneView->surf, gcvORIENTATION_TOP_BOTTOM));
 
         pixelPlaneView->firstSlice = 0;
         pixelPlaneView->numSlices   = 1;
@@ -156,20 +155,17 @@ gcChipUtilGetShadowTexView(
     if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SUPERTILED_TEXTURE) != gcvTRUE &&
         pixelPlaneView.surf->tiling != gcvTILED)
     {
-        gceORIENTATION orient;
         GLuint width, height;
         gceSURF_FORMAT format;
 
         gcmONERROR(gcoSURF_GetSize(pixelPlaneView.surf, &width, &height, gcvNULL));
         gcmONERROR(gcoSURF_GetFormat(pixelPlaneView.surf, gcvNULL, &format));
-        gcmONERROR(gcoSURF_QueryOrientation(pixelPlaneView.surf, &orient));
         gcmONERROR(gcoSURF_Construct(chipCtx->hal, width, height, 1, gcvSURF_TEXTURE,
                                      format, gcvPOOL_DEFAULT, &shadowView->surf));
         shadowView->firstSlice = 0;
         shadowView->numSlices   = 1;
 
         gcmONERROR(gcoSURF_ResolveRect(&pixelPlaneView, shadowView, gcvNULL));
-        gcmONERROR(gcoSURF_SetOrientation(pixelPlaneView.surf, orient));
         gcmONERROR(gcChipUtilDestroyPixelPlane(gc, masterView, &pixelPlaneView));
     }
     else
@@ -2113,7 +2109,6 @@ __glChipRenderbufferStorage(
                                  &chipRBO->surface));
 
     gcmONERROR(gcoSURF_SetSamples(chipRBO->surface, rbo->samplesUsed));
-    gcmONERROR(gcoSURF_SetOrientation(chipRBO->surface, gcvORIENTATION_TOP_BOTTOM));
 
     if (chipCtx->needStencilOpt)
     {
@@ -2210,10 +2205,6 @@ __glChipCleanRenderbufferShadow(
         {
             gcsSURF_VIEW shadowView = {shadow->surface,  0, 1};
             gcsSURF_VIEW rboView    = {chipRBO->surface, 0, 1};
-
-#if !gcdYINVERTED_RENDERING
-            gcmONERROR(gcoSURF_SetOrientation(chipRBO->surface, gcvORIENTATION_BOTTOM_TOP));
-#endif
 
             gcmONERROR(gcoSURF_ResolveRect(&shadowView, &rboView, gcvNULL));
             gcmONERROR(gcChipSetImageSrc(rbo->eglImage, chipRBO->surface));
@@ -3385,6 +3376,7 @@ gcChipFBOSyncEGLImageNativeBuffer(
         /* Signal the signal, so CPU apps
          * can lock again once resolve is done. */
         iface.command            = gcvHAL_SIGNAL;
+        iface.engine             = gcvENGINE_RENDER;
         iface.u.Signal.signal    = handle->hwDoneSignal;
         iface.u.Signal.auxSignal = 0;
         /* Stuff the client's PID. */

@@ -1048,6 +1048,8 @@ _GenConvert_Code(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextMin,
                                                     gcvFALSE);
@@ -1098,6 +1100,8 @@ _GenConvert_Code(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextMax,
                                                     gcvFALSE);
@@ -1229,6 +1233,8 @@ _GenConvert_Code(
                         if (gcmIS_ERROR(status)) return status;
 
                         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                        PolynaryExpr->exprBase.base.lineNo,
+                                                        PolynaryExpr->exprBase.base.stringNo,
                                                         CodeGenerator,
                                                         &selectionContextFrac05,
                                                         gcvFALSE);
@@ -1604,6 +1610,8 @@ _GenConvert_Code(
                     if (gcmIS_ERROR(status)) return status;
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextZero,
                                                     gcvFALSE);
@@ -1625,6 +1633,8 @@ _GenConvert_Code(
                     if (gcmIS_ERROR(status)) return status;
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextHalfway,
                                                     gcvFALSE);
@@ -1685,6 +1695,8 @@ _GenConvert_Code(
                     if (gcmIS_ERROR(status)) return status;
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextDiff,
                                                     gcvFALSE);
@@ -1716,6 +1728,8 @@ _GenConvert_Code(
                     if (gcmIS_ERROR(status)) return status;
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextIntConv,
                                                     gcvFALSE);
@@ -1868,7 +1882,9 @@ _GenConvert_Code(
                         if (gcmIS_ERROR(status)) return status;
 
                         status = clDefineSelectionTrueOperandEnd(Compiler,
-                                                        CodeGenerator,
+                                                       PolynaryExpr->exprBase.base.lineNo,
+                                                       PolynaryExpr->exprBase.base.stringNo,
+                                                       CodeGenerator,
                                                         &selectionContextIntConv,
                                                         gcvFALSE);
                         if (gcmIS_ERROR(status)) return status;
@@ -1899,6 +1915,8 @@ _GenConvert_Code(
                         if (isInputSigned ) {
 
                             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                            0,
+                                                            0,
                                                             CodeGenerator,
                                                             &selectionContextNeg,
                                                             gcvFALSE);
@@ -2331,6 +2349,8 @@ _GenOldConvert_Code(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextMin,
                                                     gcvFALSE);
@@ -2392,6 +2412,8 @@ _GenOldConvert_Code(
             if (gcmIS_ERROR(status)) return status;
 
             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextMax,
                                                     gcvFALSE);
@@ -2523,6 +2545,8 @@ _GenOldConvert_Code(
                         if (gcmIS_ERROR(status)) return status;
 
                         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                        PolynaryExpr->exprBase.base.lineNo,
+                                                        PolynaryExpr->exprBase.base.stringNo,
                                                         CodeGenerator,
                                                         &selectionContextFrac05,
                                                         gcvFALSE);
@@ -2898,6 +2922,8 @@ _GenOldConvert_Code(
                     if (gcmIS_ERROR(status)) return status;
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextZero,
                                                     gcvFALSE);
@@ -2919,6 +2945,8 @@ _GenOldConvert_Code(
                     if (gcmIS_ERROR(status)) return status;
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextHalfway,
                                                     gcvFALSE);
@@ -2979,6 +3007,8 @@ _GenOldConvert_Code(
                     if (gcmIS_ERROR(status)) return status;
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextDiff,
                                                     gcvFALSE);
@@ -3010,6 +3040,8 @@ _GenOldConvert_Code(
                     if (gcmIS_ERROR(status)) return status;
 
                     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                    PolynaryExpr->exprBase.base.lineNo,
+                                                    PolynaryExpr->exprBase.base.stringNo,
                                                     CodeGenerator,
                                                     &selectionContextIntConv,
                                                     gcvFALSE);
@@ -3162,6 +3194,8 @@ _GenOldConvert_Code(
                         if (gcmIS_ERROR(status)) return status;
 
                         status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                        PolynaryExpr->exprBase.base.lineNo,
+                                                        PolynaryExpr->exprBase.base.stringNo,
                                                         CodeGenerator,
                                                         &selectionContextIntConv,
                                                         gcvFALSE);
@@ -3193,6 +3227,8 @@ _GenOldConvert_Code(
                         if (isInputSigned ) {
 
                             status = clDefineSelectionTrueOperandEnd(Compiler,
+                                                            PolynaryExpr->exprBase.base.lineNo,
+                                                            PolynaryExpr->exprBase.base.stringNo,
                                                             CodeGenerator,
                                                             &selectionContextNeg,
                                                             gcvFALSE);
@@ -4643,6 +4679,8 @@ _GenAs_Type3Code(
     if (gcmIS_ERROR(status)) return status;
 
     status = clDefineSelectionTrueOperandEnd(Compiler,
+                                    PolynaryExpr->exprBase.base.lineNo,
+                                    PolynaryExpr->exprBase.base.stringNo,
                                     CodeGenerator,
                                     &selectionContextLoopBack,
                                     gcvFALSE);

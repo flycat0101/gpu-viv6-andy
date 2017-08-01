@@ -1919,6 +1919,33 @@ OnError:
     return status;
 }
 
+#if gcdALPHA_KILL_IN_SHADER
+gceSTATUS
+gcoHARDWARE_SetAlphaKill(
+    IN gcoHARDWARE Hardware,
+    IN gctBOOL AlphaKill,
+    IN gctBOOL ColorKill
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Hardware=0x%x AlphaKill=%d ColorKill=%d", Hardware, AlphaKill, ColorKill);
+
+    gcmGETHARDWARE(Hardware);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+
+    Hardware->SHStates->alphaKill = AlphaKill;
+    Hardware->SHStates->colorKill = ColorKill;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+#endif
+
 gceSTATUS
 gcoHARDWARE_SetAlphaAll(
     IN gcoHARDWARE Hardware,
@@ -2113,6 +2140,48 @@ gcoHARDWARE_SetAPI(
 
         gcmONERROR(gcoHARDWARE_LoadState32(Hardware, 0x0384C, system));
     }
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoHARDWARE_SetForceVirtual(
+    IN gcoHARDWARE Hardware,
+    IN gctBOOL bForceVirtual
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Hardware=0x%x", Hardware);
+
+    gcmGETHARDWARE(Hardware);
+    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+
+    Hardware->bForceVirtual = bForceVirtual;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
+gcoHARDWARE_GetForceVirtual(
+    IN gcoHARDWARE Hardware,
+    OUT gctBOOL* bForceVirtual
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Hardware=0x%x", Hardware);
+
+    gcmGETHARDWARE(Hardware);
+    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
+
+    *bForceVirtual = Hardware->bForceVirtual;
 
 OnError:
     /* Return the status. */
@@ -6049,6 +6118,42 @@ _FlushMultiTarget(
         if (Hardware->features[gcvFEATURE_SEPARATE_RT_CTRL] ||
             Hardware->features[gcvFEATURE_128BTILE])
         {
+            gctUINT32 endianCtrl = 0x0;
+
+            if (Hardware->bigEndian)
+            {
+                switch (pColorTarget->format)
+                {
+                case 0x00:
+                case 0x01:
+                case 0x02:
+                case 0x03:
+                case 0x04:
+                case 0x11:
+                case 0x12:
+                case 0x13:
+                case 0x1A:
+                case 0x1B:
+                case 0x1C:
+                    endianCtrl = 0x1;
+                    break;
+
+                case 0x16:
+                case 0x1D:
+                case 0x1E:
+                case 0x14:
+                case 0x15:
+                case 0x25:
+                case 0x26:
+                case 0x27:
+                    endianCtrl = 0x2;
+                    break;
+
+                default:
+                    break;
+                }
+            }
+
             {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -6071,9 +6176,10 @@ _FlushMultiTarget(
 };
     gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x5248 + (i-1), ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  1:0) - (0 ? 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
- 1:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 1:0) - (0 ? 1:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ? 1:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 7:4) - (0 ? 7:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
+ 1:0))) | (((gctUINT32) ((gctUINT32) (endianCtrl) & ((gctUINT32) ((((1 ?
+ 1:0) - (0 ? 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
+ 1:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 7:4) - (0 ?
+ 7:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4))) | (((gctUINT32) ((gctUINT32) (pColorTarget->hwColorWrite) & ((gctUINT32) ((((1 ?
  7:4) - (0 ? 7:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1))))))) << (0 ?
  7:4))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 8:8) - (0 ?
@@ -6470,6 +6576,12 @@ gcoHARDWARE_FlushTarget(
             }
 
             depthvMsaa = depth->vMsaa;
+
+            /* For some Quality sensitive case, disable depthvMsaa. Because the optimization in HW has precision issue.*/
+            if (Hardware->patchID == gcvPATCH_DEQP || Hardware->patchID == gcvPATCH_GTFES30)
+            {
+                depthvMsaa = gcvFALSE;
+            }
         }
 
         if (Hardware->features[gcvFEATURE_MSAA_SHADING])
@@ -6566,30 +6678,91 @@ gcoHARDWARE_FlushTarget(
         Hardware->features[gcvFEATURE_VMSAA])
     {
         gcoSURF depth = Hardware->PEStates->depthStates.surface;
+        gctUINT32 colorEndianCtrl = 0x0;
+        gctUINT32 depthEndianCtrl = 0x0;
+        gctUINT32 colorCacheCtrl = colorCacheMode == gcvCACHE_128
+                                 ? 0x0
+                                 : 0x1;
+        gctUINT32 colorVmsaa = vMsaa ? 0x1
+                                     : 0x0;
+
+
+        if (Hardware->bigEndian)
+        {
+            switch (format)
+            {
+            case 0x00:
+            case 0x01:
+            case 0x02:
+            case 0x03:
+            case 0x04:
+            case 0x11:
+            case 0x12:
+            case 0x13:
+            case 0x1A:
+            case 0x1B:
+            case 0x1C:
+                colorEndianCtrl = 0x1;
+                break;
+
+            case 0x16:
+            case 0x1D:
+            case 0x1E:
+            case 0x14:
+            case 0x15:
+            case 0x25:
+            case 0x26:
+            case 0x27:
+                colorEndianCtrl = 0x2;
+                break;
+
+            default:
+                break;
+            }
+
+            if (depth)
+            {
+                depthEndianCtrl = (depth->bitsPerPixel == 16)
+                                ? 0x1
+                                : 0x2;
+            }
+        }
+
+        Hardware->PEStates->peConfigExReg =
+            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
+ 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
+ 0:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 6:5) - (0 ?
+ 6:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:5) - (0 ? 6:5) + 1))))))) << (0 ?
+ 6:5))) | (((gctUINT32) ((gctUINT32) (colorEndianCtrl) & ((gctUINT32) ((((1 ?
+ 6:5) - (0 ? 6:5) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 6:5) - (0 ? 6:5) + 1))))))) << (0 ?
+ 6:5)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 8:7) - (0 ?
+ 8:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:7) - (0 ? 8:7) + 1))))))) << (0 ?
+ 8:7))) | (((gctUINT32) ((gctUINT32) (depthEndianCtrl) & ((gctUINT32) ((((1 ?
+ 8:7) - (0 ? 8:7) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:7) - (0 ? 8:7) + 1))))))) << (0 ?
+ 8:7)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 24:24) - (0 ?
+ 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:24) - (0 ? 24:24) + 1))))))) << (0 ?
+ 24:24))) | (((gctUINT32) ((gctUINT32) (colorCacheCtrl) & ((gctUINT32) ((((1 ?
+ 24:24) - (0 ? 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:24) - (0 ?
+ 24:24) + 1))))))) << (0 ? 24:24)))
+          | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 15:15) - (0 ?
+ 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:15) - (0 ? 15:15) + 1))))))) << (0 ?
+ 15:15))) | (((gctUINT32) ((gctUINT32) (colorVmsaa) & ((gctUINT32) ((((1 ?
+ 15:15) - (0 ? 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:15) - (0 ?
+ 15:15) + 1))))))) << (0 ? 15:15)));
 
         if (depth)
         {
-            Hardware->PEStates->peConfigExReg =
-                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
-                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 24:24) - (0 ? 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:24) - (0 ?
- 24:24) + 1))))))) << (0 ? 24:24))) | (((gctUINT32) ((gctUINT32) (colorCacheMode == gcvCACHE_128 ?
- 0x0 : 0x1) & ((gctUINT32) ((((1 ? 24:24) - (0 ? 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
- 24:24) - (0 ? 24:24) + 1))))))) << (0 ? 24:24)))
-                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            Hardware->PEStates->peConfigExReg |=
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
  26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (depth->cacheMode == gcvCACHE_128 ?
  0x0 : 0x1) & ((gctUINT32) ((((1 ? 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
  26:26) - (0 ? 26:26) + 1))))))) << (0 ? 26:26)))
-                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:15) - (0 ? 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:15) - (0 ?
- 15:15) + 1))))))) << (0 ? 15:15))) | (((gctUINT32) ((gctUINT32) (vMsaa ?
- 0x1 : 0x0) & ((gctUINT32) ((((1 ? 15:15) - (0 ? 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
- 15:15) - (0 ? 15:15) + 1))))))) << (0 ? 15:15)))
-                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+              | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 16:16) - (0 ?
  16:16) + 1))))))) << (0 ? 16:16))) | (((gctUINT32) ((gctUINT32) (depthvMsaa ?
  0x1 : 0x0) & ((gctUINT32) ((((1 ? 16:16) - (0 ? 16:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
@@ -6598,27 +6771,14 @@ gcoHARDWARE_FlushTarget(
         else
         {
             /* Make sure depth cache mode set the same to prevMode */
-            Hardware->PEStates->peConfigExReg =
-                    ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 0:0) - (0 ? 0:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ?
- 0:0))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 0:0) - (0 ? 0:0) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0)))
-                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 24:24) - (0 ? 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 24:24) - (0 ?
- 24:24) + 1))))))) << (0 ? 24:24))) | (((gctUINT32) ((gctUINT32) (colorCacheMode == gcvCACHE_128 ?
- 0x0 : 0x1) & ((gctUINT32) ((((1 ? 24:24) - (0 ? 24:24) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
- 24:24) - (0 ? 24:24) + 1))))))) << (0 ? 24:24)))
-                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+            Hardware->PEStates->peConfigExReg |=
+                ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
  26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (Hardware->preDepthCacheMode128 == gcvCACHE_128 ?
  0x0 : 0x1) & ((gctUINT32) ((((1 ? 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
- 26:26) - (0 ? 26:26) + 1))))))) << (0 ? 26:26)))
-                   | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
- 15:15) - (0 ? 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:15) - (0 ?
- 15:15) + 1))))))) << (0 ? 15:15))) | (((gctUINT32) ((gctUINT32) (vMsaa ?
- 0x1 : 0x0) & ((gctUINT32) ((((1 ? 15:15) - (0 ? 15:15) + 1) == 32) ? ~0U : (~(~0U << ((1 ?
- 15:15) - (0 ? 15:15) + 1))))))) << (0 ? 15:15)));
+ 26:26) - (0 ? 26:26) + 1))))))) << (0 ? 26:26)));
         }
+
         {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
     *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
@@ -6781,7 +6941,7 @@ gcoHARDWARE_FlushTarget(
         gctBOOL is5bitFormat = gcvFALSE;
         gctBOOL isBlendEnable = Hardware->PEStates->alphaStates.blend[0];
 
-        if(rtSurf)
+        if (rtSurf)
         {
             is4bitFormat = rtSurf->format == gcvSURF_A4R4G4B4 || rtSurf->format == gcvSURF_X4R4G4B4;
             is5bitFormat = rtSurf->format == gcvSURF_A1B5G5R5 || rtSurf->format == gcvSURF_X1B5G5R5 ||
@@ -7220,6 +7380,10 @@ gcoHARDWARE_FlushTarget(
     /* Reset dirty flags. */
     Hardware->PEDirty->colorConfigDirty = gcvFALSE;
     Hardware->PEDirty->colorTargetDirty = gcvFALSE;
+
+    /* 6:5 relate with RT format, If RT changed,
+    ** need reprogram the register.*/
+    Hardware->PEDirty->alphaDirty = gcvTRUE;
 
     if (Hardware->features[gcvFEATURE_HALTI2])
     {
@@ -10254,6 +10418,200 @@ _GetPsOutputSetting(
 }
 
 gceSTATUS
+gcoHARDWARE_FlushShaderVidMemNode(
+    IN gcoHARDWARE Hardware,
+    IN gcsHINT_PTR Hints,
+    INOUT gctPOINTER *Memory
+    )
+{
+    gceSTATUS status;
+    gctUINT i;
+
+    /* Define state buffer variables. */
+    gcmDEFINESTATEBUFFER_NEW(reserve, stateDelta, memory);
+
+    gcmHEADER_ARG("Hardware=0x%x Hints=0x%x", Hardware, Hints);
+
+    gcmGETHARDWARE(Hardware);
+
+    gcmASSERT(Hints);
+
+    /* Reserve space in the command buffer. */
+    gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
+
+    /* Flush inst memory. */
+    for (i = 0; i < gcMAX_SHADERS_IN_LINK_GOURP; i++)
+    {
+        gctUINT32   physical = (gctUINT32)~0;
+
+        if (!Hints->shaderVidNodes.flushInstVidmemNode[i] || !Hints->shaderVidNodes.instVidmemNode[i])
+        {
+            continue;
+        }
+
+        gcmONERROR(gcoSURF_LockNode((gcsSURF_NODE_PTR)Hints->shaderVidNodes.instVidmemNode[i],
+                                    &physical,
+                                    gcvNULL));
+        gcmASSERT((gctUINT32)~0 != physical);
+
+        /* Update the states. */
+        switch ((gcsSHADER_GROUP_SHADER_KIND)i)
+        {
+        case gceSGSK_VERTEX_SHADER:
+            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x021B) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x021B, physical);
+    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+            break;
+
+        case gceSGSK_TC_SHADER:
+            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x5282) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x5282, physical);
+    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+            break;
+
+        case gceSGSK_TE_SHADER:
+            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x52C3) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x52C3, physical);
+    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+            break;
+
+        case gceSGSK_GEOMETRY_SHADER:
+            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x0445) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x0445, physical);
+    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+            break;
+
+        case gceSGSK_CL_SHADER:
+        case gceSGSK_FRAGMENT_SHADER:
+            {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x040A) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETSTATEDATA_NEW(stateDelta, reserve, memory, gcvFALSE, 0x040A, physical);
+    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+            break;
+
+        default:
+            gcmASSERT(gcvFALSE);
+            break;
+        }
+    }
+
+    /* Validate the state buffer. */
+    gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, Memory);
+
+    /* Success. */
+    status = gcvSTATUS_OK;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
+}
+
+gceSTATUS
 gcoHARDWARE_FlushShaders(
     IN gcoHARDWARE Hardware,
     IN gcePRIMITIVE PrimitiveType,
@@ -10353,42 +10711,12 @@ gcoHARDWARE_FlushShaders(
     }
 
 #if gcdALPHA_KILL_IN_SHADER
-    alphaKill = (Hardware->PEStates->alphaStates.blend[0]
-                 &&
-                 (hints->killStateAddress != 0)
-                 &&
-                 (Hardware->PEStates->alphaStates.srcFuncColor[0] == gcvBLEND_SOURCE_ALPHA)
-                 &&
-                 (Hardware->PEStates->alphaStates.srcFuncAlpha[0] == gcvBLEND_SOURCE_ALPHA)
-                 &&
-                 (Hardware->PEStates->alphaStates.trgFuncColor[0] == gcvBLEND_INV_SOURCE_ALPHA)
-                 &&
-                 (Hardware->PEStates->alphaStates.trgFuncAlpha[0] == gcvBLEND_INV_SOURCE_ALPHA)
-                 &&
-                 (Hardware->PEStates->alphaStates.modeColor[0] == gcvBLEND_ADD)
-                 &&
-                 (Hardware->PEStates->alphaStates.modeAlpha[0] == gcvBLEND_ADD)
-                 );
+    /* Determine alpka kill. */
+    alphaKill = Hardware->SHStates->alphaKill;
 
     /* Determine color kill. */
-    colorKill = (Hardware->PEStates->alphaStates.blend[0]
-                 &&
-                 (hints->killStateAddress != 0)
-                 &&
-                 (Hardware->PEStates->alphaStates.srcFuncColor[0] == gcvBLEND_ONE)
-                 &&
-                 (Hardware->PEStates->alphaStates.srcFuncAlpha[0] == gcvBLEND_ONE)
-                 &&
-                 (Hardware->PEStates->alphaStates.trgFuncColor[0] == gcvBLEND_ONE)
-                 &&
-                 (Hardware->PEStates->alphaStates.trgFuncAlpha[0] == gcvBLEND_ONE)
-                 &&
-                 (Hardware->PEStates->alphaStates.modeColor[0] == gcvBLEND_ADD)
-                 &&
-                 (Hardware->PEStates->alphaStates.modeAlpha[0] == gcvBLEND_ADD)
-                 &&
-                 !Hardware->PEStates->depthStates.write
-                 );
+    colorKill = Hardware->SHStates->colorKill &&
+                !Hardware->PEStates->depthStates.write;
 #endif
 
     if (hints->stageBits & gcvPROGRAM_STAGE_VERTEX_BIT)
@@ -11548,11 +11876,20 @@ gcoHARDWARE_FlushShaders(
     gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, Memory);
 
 
+    /* Flush shader video memory nodes if needed. */
+    if (Hardware->SHStates->programState.hints != gcvNULL)
+    {
+        gcmONERROR(gcoHARDWARE_FlushShaderVidMemNode(Hardware,
+                                                     Hardware->SHStates->programState.hints,
+                                                     Memory));
+    }
+
     /* Reset dirty. */
     Hardware->SHDirty->shaderDirty = 0;
 #if gcdENABLE_APPCTXT_BLITDRAW
     Hardware->SHDirty->programSwitched = gcvFALSE;
 #endif
+
 OnError:
     /* Return the status. */
     gcmFOOTER();
@@ -13321,12 +13658,12 @@ gceSTATUS gcoHARDWARE_FastProgramIndex(
  1:0))) | (((gctUINT32) ((gctUINT32) (indexFormat) & ((gctUINT32) ((((1 ?
  1:0) - (0 ? 1:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 1:0) - (0 ? 1:0) + 1))))))) << (0 ?
  1:0)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  5:4) - (0 ? 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
  5:4))) | (((gctUINT32) ((gctUINT32) (indexEndian) & ((gctUINT32) ((((1 ?
  5:4) - (0 ? 5:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 5:4) - (0 ? 5:4) + 1))))))) << (0 ?
  5:4)))
-            | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+                | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  8:8) - (0 ? 8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
  8:8))) | (((gctUINT32) ((gctUINT32) (Hardware->FEStates->primitiveRestart) & ((gctUINT32) ((((1 ?
  8:8) - (0 ? 8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
@@ -13936,11 +14273,11 @@ gceSTATUS gcoHARDWARE_FastFlushStream(
         /* Store the current vertex element control value. */
         _gcmSETSTATEDATA_FAST(
             stateDelta, vertexCtrl, vertexCtrlState,
-            ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 13:12) - (0 ?
- 13:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:12) - (0 ? 13:12) + 1))))))) << (0 ?
- 13:12))) | (((gctUINT32) ((gctUINT32) (size) & ((gctUINT32) ((((1 ? 13:12) - (0 ?
- 13:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:12) - (0 ? 13:12) + 1))))))) << (0 ?
- 13:12)))
+              ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 13:12) - (0 ? 13:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:12) - (0 ?
+ 13:12) + 1))))))) << (0 ? 13:12))) | (((gctUINT32) ((gctUINT32) (size) & ((gctUINT32) ((((1 ?
+ 13:12) - (0 ? 13:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 13:12) - (0 ?
+ 13:12) + 1))))))) << (0 ? 13:12)))
             | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
  3:0) - (0 ? 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1))))))) << (0 ?
  3:0))) | (((gctUINT32) ((gctUINT32) (format) & ((gctUINT32) ((((1 ? 3:0) - (0 ?

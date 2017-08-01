@@ -166,8 +166,8 @@ _VIR_CFO_PerformPatternTransformationOnFunction(
                                 {
                                     gcmASSERT(0);
                                 }
-                                else if(VIR_TypeId_isInteger(VIR_Operand_GetType(VIR_Inst_GetSource(inst, 0))) &&
-                                        (VIR_Inst_GetSource(inst, 1) == gcvNULL || VIR_TypeId_isInteger(VIR_Operand_GetType(VIR_Inst_GetSource(inst, 0)))))
+                                else if(VIR_TypeId_isInteger(VIR_Operand_GetTypeId(VIR_Inst_GetSource(inst, 0))) &&
+                                        (VIR_Inst_GetSource(inst, 1) == gcvNULL || VIR_TypeId_isInteger(VIR_Operand_GetTypeId(VIR_Inst_GetSource(inst, 0)))))
                                 {
                                     if(VIR_CFO_GetHWCfg(cfo)->hwFeatureFlags.hasHalti4)
                                     {

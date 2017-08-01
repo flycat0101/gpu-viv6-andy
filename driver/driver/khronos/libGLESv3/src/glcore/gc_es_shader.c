@@ -4777,7 +4777,7 @@ GLvoid GL_APIENTRY __gles_UseProgramStages(__GLcontext *gc, GLuint pipeline, GLb
 
     if (stages != GL_ALL_SHADER_BITS && (stages & ~(allowedStages)))
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
     if (program)
@@ -4786,15 +4786,15 @@ GLvoid GL_APIENTRY __gles_UseProgramStages(__GLcontext *gc, GLuint pipeline, GLb
         progObj = (__GLprogramObject *)__glGetObject(gc, gc->shaderProgram.spShared, program);
         if (!progObj)
         {
-            __GL_ERROR_RET(GL_INVALID_VALUE);
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
         }
         else if (progObj->objectInfo.objectType != __GL_PROGRAM_OBJECT_TYPE)
         {
-            __GL_ERROR_RET(GL_INVALID_OPERATION);
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
         }
         else if (!progObj->bindingInfo.isSeparable || !progObj->programInfo.linkedStatus)
         {
-            __GL_ERROR_RET(GL_INVALID_OPERATION);
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
         }
     }
     else
@@ -4839,6 +4839,7 @@ GLvoid GL_APIENTRY __gles_UseProgramStages(__GLcontext *gc, GLuint pipeline, GLb
     }
 
 OnExit:
+OnError:
     __GL_FOOTER();
 }
 

@@ -2060,8 +2060,6 @@ gcChipResolveDrawToTempBitmap(
         gctINT right       = 0;
         gctINT bottom      = 0;
 
-        gceORIENTATION srcOrient;
-
         gcsSURF_VIEW tmpView = {gcvNULL, 0, 1};
         gcsSURF_RESOLVE_ARGS rlvArgs = {0};
 
@@ -2128,10 +2126,6 @@ gcChipResolveDrawToTempBitmap(
             rlvArgs.uArgs.v2.rectSize.x,
             rlvArgs.uArgs.v2.rectSize.y
             ));
-
-        /* Set orient as src. */
-        gcmERR_BREAK(gcoSURF_QueryOrientation(srcView->surf, &srcOrient));
-        gcmERR_BREAK(gcoSURF_SetOrientation(chipCtx->tempBitmap, srcOrient));
 
         tmpView.surf = chipCtx->tempBitmap;
         /* Resolve the aligned area. */
@@ -2380,7 +2374,6 @@ gcChipCopyTexImage(
 
         if (width > 0 && height > 0)
         {
-            gceORIENTATION srcOrient, dstOrient;
             gcsSURF_RESOLVE_ARGS rlvArgs = {0};
 
             rlvArgs.version = gcvHAL_ARG_VERSION_V2;
@@ -2397,13 +2390,7 @@ gcChipCopyTexImage(
             /* Disable the tile status for the destination. */
             gcmONERROR(gcoSURF_DisableTileStatus(&texView, gcvTRUE));
 
-            /* Set orientation the same with read buffer */
-            gcmONERROR(gcoSURF_QueryOrientation(srcView.surf, &srcOrient));
-            gcmONERROR(gcoSURF_QueryOrientation(texView.surf, &dstOrient));
-
-            gcmONERROR(gcoSURF_SetOrientation(texView.surf, srcOrient));
             gcmONERROR(gcoSURF_ResolveRect(&srcView, &texView, &rlvArgs));
-            gcmONERROR(gcoSURF_SetOrientation(texView.surf, dstOrient));
         }
     }
     else if (useShader)
@@ -2839,7 +2826,6 @@ gcChipCopyTexSubImage(
 
         if (width > 0 && height > 0)
         {
-            gceORIENTATION srcOrient, dstOrient;
             gcsSURF_RESOLVE_ARGS rlvArgs = {0};
 
             rlvArgs.version = gcvHAL_ARG_VERSION_V2;
@@ -2860,13 +2846,7 @@ gcChipCopyTexSubImage(
             /* Disable the tile status for the destination. */
             gcmONERROR(gcoSURF_DisableTileStatus(&texView, gcvTRUE));
 
-            /* Set orientation the same with read buffer */
-            gcmONERROR(gcoSURF_QueryOrientation(srcView.surf, &srcOrient));
-            gcmONERROR(gcoSURF_QueryOrientation(texView.surf, &dstOrient));
-
-            gcmONERROR(gcoSURF_SetOrientation(texView.surf, srcOrient));
             gcmONERROR(gcoSURF_ResolveRect(&srcView, &texView, &rlvArgs));
-            gcmONERROR(gcoSURF_SetOrientation(texView.surf, dstOrient));
 
             gcoTEXTURE_Flush(texInfo->object);
         }
@@ -4320,12 +4300,6 @@ __glChipGenerateMipMap(
         /* For split texture, we don't need the real data of other mips. Fix bug #8768 */
         if (CHIP_TEX_IMAGE_IS_UPTODATE(texInfo, baseLevel) && !splitTexture)
         {
-            gceORIENTATION srcOrientation, dstOrientation;
-
-            /* down sample to create the lower level. */
-            gcmONERROR(gcoSURF_QueryOrientation(srcSurface, &srcOrientation));
-            gcmONERROR(gcoSURF_QueryOrientation(dstSurface, &dstOrientation));
-            gcmONERROR(gcoSURF_SetOrientation(dstSurface, srcOrientation));
 
             /* For blit engine, we generate mipmap in one shot */
             if (chipCtx->chipFeature.hasBlitEngine)
@@ -4350,7 +4324,6 @@ __glChipGenerateMipMap(
 #if gcdSYNC
             gcmONERROR(gcoSURF_GetFence(dstSurface, gcvFENCE_TYPE_ALL));
 #endif
-            gcmONERROR(gcoSURF_SetOrientation(dstSurface, dstOrientation));
 
             for (slice = 0; slice < numSlices; ++slice)
             {
@@ -4486,7 +4459,6 @@ __glChipBindTexImage(
 
         /* Resolve surface to texture mipmap: no flip in the resolve. */
         gcmONERROR(gcoSURF_ResolveRect(&surfView, &texView, gcvNULL));
-        gcmONERROR(gcoSURF_SetOrientation(texView.surf, gcvORIENTATION_TOP_BOTTOM));
     }
 
     if (pBinder != gcvNULL)
@@ -5984,13 +5956,7 @@ __glChipEglImageTargetTexture2DOES(
             gcsSURF_VIEW imgView = {image->surface, image->u.texture.sliceIndex, 1};
             gcsSURF_VIEW srcView = {image->srcSurface, 0, 1};
 
-            gceORIENTATION srcOrient,dstOrient;
-            gcmONERROR(gcoSURF_QueryOrientation(image->surface, &dstOrient));
-            gcmONERROR(gcoSURF_QueryOrientation(image->srcSurface, &srcOrient));
-
-            gcmONERROR(gcoSURF_SetOrientation(image->surface, srcOrient));
             gcmONERROR(gcoSURF_ResolveRect(&srcView, &imgView, gcvNULL));
-            gcmONERROR(gcoSURF_SetOrientation(image->surface, dstOrient));
 
             gcmONERROR(gcChipSetImageSrc(image, gcvNULL));
         }

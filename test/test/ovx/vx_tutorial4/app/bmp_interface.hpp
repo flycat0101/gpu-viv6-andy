@@ -512,6 +512,10 @@ int BmpInterface::rgb2YUV(u08* inputBuf, u32 xSize, u32 ySize)
 #ifdef LINUX
 int BmpInterface::showFPGA(u08* inputBuf, u32 xSize, u32 ySize)
 {
+#ifdef NO_SHOW	// for goke cann't call ioctl
+	return 0;
+#endif
+
     struct fb_var_screeninfo vInfo;
     struct fb_fix_screeninfo fInfo;
     s32  hFB = 0;

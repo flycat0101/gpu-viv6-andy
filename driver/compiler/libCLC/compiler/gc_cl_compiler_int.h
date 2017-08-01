@@ -37,16 +37,9 @@ enum _cleLANGUAGE_VERSION
 
 typedef gctUINT32 cltLANGUAGE_VERSION;
 
-#if defined(BUILD_OPENCL_12) && (BUILD_OPENCL_12 != 0)
-#define _SUPPORT_PRINTF_BUILTIN   1
-#else
-#define _SUPPORT_PRINTF_BUILTIN   0
-#endif
-#if _SUPPORT_PRINTF_BUILTIN
-#define _cldDefaultLanguageVersion _cldCL1Dot2
-#else
-#define _cldDefaultLanguageVersion _cldCL1Dot1
-#endif
+gctUINT32
+cloGetDefaultLanguageVersion(
+    );
 
 #define clmHasRightLanguageVersion(Compiler, Version) \
       (cloCOMPILER_GetLanguageVersion(Compiler) >= (Version))

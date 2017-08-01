@@ -292,6 +292,10 @@ typedef struct _glsCONTEXT
     gctGLSLInitCompiler         pfInitCompiler;
     gctGLSLFinalizeCompiler     pfFinalizeCompiler;
 
+    /* vertex Array dirty. */
+    gctBOOL                     varrayDirty;
+    GLenum                      primMode;
+
     gcoPROFILER                 profilerObj;
 }
 glsCONTEXT;

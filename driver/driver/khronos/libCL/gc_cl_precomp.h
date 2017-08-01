@@ -43,4 +43,12 @@
 #include "gc_cl_sampler.h"
 #include "gc_cl_log.h"
 
+#define cldVERSION12    "OpenCL 1.2 "                        /* Device Version   */
+#define clfVERSION12    "OpenCL 1.2 V" gcvVERSION_STRING     /* Driver Version   */
+#define clcVERSION12    "OpenCL C 1.2 "                      /* OpenCL C Version */
+#define cldVERSION11    "OpenCL 1.1 "                        /* Device Version   */
+#define clfVERSION11    "OpenCL 1.1 V" gcvVERSION_STRING     /* Driver Version   */
+#define clcVERSION11    "OpenCL C 1.1 "                      /* OpenCL C Version */
+extern cl_device_id clgDefaultDevice;
+
 #endif /* __gc_cl_precomp_h_ */

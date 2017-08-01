@@ -80,6 +80,7 @@ struct _FBDisplay
     gceTILING               tiling;
     gctINT                  swapInterval;
     gctINT                  refCount;
+    gctBOOL                 panVsync;
 
     struct _FBDisplay *     next;
 };
@@ -460,6 +461,9 @@ fbdev_GetDisplayByIndex(
 
         display->refCount = 0;
 
+        /* Find a way to detect if pan display is with vsync. */
+        display->panVsync = gcvTRUE;
+
         display->memory = mmap(0,
                                display->size,
                                PROT_READ | PROT_WRITE,
@@ -821,37 +825,34 @@ fbdev_SetDisplayVirtual(
     {
         /* clamp swap interval to be safe */
         swapInterval = display->swapInterval;
-        if (swapInterval > GC_FB_MAX_SWAP_INTERVAL)
-        {
-            swapInterval = GC_FB_MAX_SWAP_INTERVAL;
-        }
-        else if (swapInterval < GC_FB_MIN_SWAP_INTERVAL)
-        {
-            swapInterval = GC_FB_MIN_SWAP_INTERVAL;
-        }
 
         /* if swap interval is 0 skip this step */
-        if (swapInterval != 0)
+        if (swapInterval != 0 || !display->panVsync)
         {
-            pthread_mutex_lock(&(display->condMutex));
-            /* Panning will wait for the vsync. */
-            swapInterval--;
-            /* wait for swap interval  * vsync */
-            while(swapInterval--)
-            {
+            pthread_mutex_lock(&display->condMutex);
+
 #ifdef FBIO_WAITFORVSYNC
-                ioctl(display->file, FBIO_WAITFORVSYNC, (void *)0);
-#endif
+            if (display->panVsync)
+            {
+                /* Panning will wait for the vsync. */
+                swapInterval--;
             }
+
+            /* wait for swap interval  * vsync */
+            while (swapInterval--)
+            {
+                ioctl(display->file, FBIO_WAITFORVSYNC, (void *)0);
+            }
+#endif
 
             /* Set display offset. */
             display->varInfo.xoffset  = X;
             display->varInfo.yoffset  = Y;
             display->varInfo.activate = FB_ACTIVATE_VBL;
-            ioctl(display->file, FBIOPAN_DISPLAY, &(display->varInfo));
+            ioctl(display->file, FBIOPAN_DISPLAY, &display->varInfo);
 
-            pthread_cond_broadcast(&(display->cond));
-            pthread_mutex_unlock(&(display->condMutex));
+            pthread_cond_broadcast(&display->cond);
+            pthread_mutex_unlock(&display->condMutex);
         }
     }
 
@@ -3339,8 +3340,8 @@ _PostWindowBackBuffer(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN struct eglBackBuffer * BackBuffer,
-    IN EGLint NumRects,
-    IN EGLint Rects[]
+    IN struct eglRegion * Region,
+    IN struct eglRegion * DamageHint
     )
 {
     void * win = Surface->hwnd;
@@ -3413,12 +3414,12 @@ _PostWindowBackBuffer(
             return EGL_FALSE;
         }
 
-        for (i = 0; i < NumRects; i++)
+        for (i = 0; i < Region->numRects; i++)
         {
-            EGLint left   = Rects[i * 4 + 0];
-            EGLint top    = Rects[i * 4 + 1];
-            EGLint width  = Rects[i * 4 + 2];
-            EGLint height = Rects[i * 4 + 3];
+            EGLint left   = Region->rects[i * 4 + 0];
+            EGLint top    = Region->rects[i * 4 + 1];
+            EGLint width  = Region->rects[i * 4 + 2];
+            EGLint height = Region->rects[i * 4 + 3];
 
             /* Draw image. */
             status = fbdev_DrawImageEx((PlatformDisplayType) Display->hdc,

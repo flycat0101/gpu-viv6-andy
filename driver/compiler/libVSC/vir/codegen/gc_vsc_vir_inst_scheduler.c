@@ -1208,7 +1208,9 @@ static gctUINT32 _VSC_IS_InstConflict(
             (opc0 == VIR_OP_IMG_STORE && opc1 == VIR_OP_IMG_LOAD) ||
             (opc0 == VIR_OP_IMG_STORE_3D && opc1 == VIR_OP_IMG_LOAD_3D) ||
             (opc0 == VIR_OP_VX_IMG_STORE && opc1 == VIR_OP_VX_IMG_LOAD) ||
-            (opc0 == VIR_OP_VX_IMG_STORE_3D && opc1 == VIR_OP_VX_IMG_LOAD_3D))
+            (opc0 == VIR_OP_VX_IMG_STORE_3D && opc1 == VIR_OP_VX_IMG_LOAD_3D) ||
+            /* kill should not be scheduled before inst with store flag */
+            (VIR_OPCODE_Stores(opc0) && opc1 == VIR_OP_KILL))
     {
         VSC_IS_ConflictType_ExclusivelySet(conflict_types, *excludeCTs, VSC_IS_ConflictType_MS_ML);
         VSC_IS_ConflictType_Set(*excludeCTs, VSC_IS_ConflictType_MS_ML);

@@ -2606,6 +2606,8 @@ void __hwc2_get_capabilities(hwc2_device_t* device, uint32_t* outCount,
     __hwc2_trace(0, "device=%p outCapabilities=%p", dev, outCapabilities);
 
     if (!outCapabilities) {
+        *outCount = dev->numCapabilities;
+    } else {
         if (*outCount > dev->numCapabilities)
             *outCount = dev->numCapabilities;
 
@@ -2616,8 +2618,6 @@ void __hwc2_get_capabilities(hwc2_device_t* device, uint32_t* outCount,
 
             outCapabilities[i] = dev->capabilities[i];
         }
-    } else {
-        *outCount = dev->numCapabilities;
     }
 
     __hwc2_trace(1, "out outCount=%d", *outCount);

@@ -97,9 +97,9 @@ static vx_status vxVivMeanStdDev(vx_node node, vx_image input, vx_scalar mean, v
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(input, VX_IMAGE_ATTRIBUTE_WIDTH, &inputWidth, sizeof(vx_uint32));
+    vxQueryImage(input, VX_IMAGE_WIDTH, &inputWidth, sizeof(vx_uint32));
 
-    vxQueryImage(input, VX_IMAGE_ATTRIBUTE_HEIGHT, &inputHeight, sizeof(vx_uint32));
+    vxQueryImage(input, VX_IMAGE_HEIGHT, &inputHeight, sizeof(vx_uint32));
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
@@ -308,11 +308,11 @@ vx_status vxMinMaxGetLocation(vx_node node, vx_image img, vx_scalar minVal, vx_s
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(img, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
-    vxQueryImage(img, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
+    vxQueryImage(img, VX_IMAGE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(img, VX_IMAGE_WIDTH, &width, sizeof(width));
     if(minArray && maxArray)
     {
-        vxQueryArray(minArray, VX_ARRAY_ATTRIBUTE_ITEMSIZE, &itemSize, sizeof(itemSize));
+        vxQueryArray(minArray, VX_ARRAY_ITEMSIZE, &itemSize, sizeof(itemSize));
         return_loc = vx_true_e;
     }
 
@@ -409,8 +409,8 @@ vx_status vxMinMaxLocFilter(vx_node node, vx_image input, vx_scalar filter_min, 
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(input, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
-    vxQueryImage(input, VX_IMAGE_ATTRIBUTE_FORMAT, &format, sizeof(format));
+    vxQueryImage(input, VX_IMAGE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(input, VX_IMAGE_FORMAT, &format, sizeof(format));
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, input, GC_VX_INDEX_AUTO);
@@ -423,9 +423,9 @@ vx_status vxMinMaxLocFilter(vx_node node, vx_image input, vx_scalar filter_min, 
 
     kernelContext->params.step             = MML_FILTER;
 #if gcdVX_OPTIMIZER
-    kernelContext->borders                 = VX_BORDER_MODE_REPLICATE;
+    kernelContext->borders                 = VX_BORDER_REPLICATE;
 #else
-    kernelContext->params.borders          = VX_BORDER_MODE_REPLICATE;
+    kernelContext->params.borders          = VX_BORDER_REPLICATE;
 #endif
     kernelContext->params.kernel           = gcvVX_KERNEL_MINMAXLOC;
     if (node->base.context->evisNoInst.noFilter)

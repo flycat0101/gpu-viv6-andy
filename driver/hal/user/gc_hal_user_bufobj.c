@@ -82,7 +82,7 @@ gcoBUFOBJ_GetFence(
 
     if ((BufObj) && (BufObj->memory.pool != gcvPOOL_UNKNOWN))
     {
-        status = gcsSURF_NODE_GetFence(&BufObj->memory, Type);
+        status = gcsSURF_NODE_GetFence(&BufObj->memory, gcvENGINE_RENDER, Type);
     }
 
     gcmFOOTER();
@@ -100,7 +100,7 @@ gcoBUFOBJ_WaitFence(
 
     if (BufObj)
     {
-        status = gcsSURF_NODE_WaitFence(&BufObj->memory, Type);
+        status = gcsSURF_NODE_WaitFence(&BufObj->memory, gcvENGINE_CPU, gcvENGINE_RENDER, Type);
     }
 
     gcmFOOTER();
@@ -176,11 +176,10 @@ gcoBUFOBJ_Construct(
     bufobj->bytes                       = 0;
     bufobj->memory.pool                 = gcvPOOL_UNKNOWN;
     bufobj->memory.valid                = gcvFALSE;
-    bufobj->memory.lockCount            = 0;
-    bufobj->memory.lockedInKernel       = gcvFALSE;
 
     /* Generic Attributes */
     bufobj->type                        = Type;
+
     switch (Type)
     {
     case gcvBUFOBJ_TYPE_ARRAY_BUFFER:
@@ -591,6 +590,8 @@ static gceSTATUS _gpuUpload(
     }
 
     gcmONERROR(gcoHARDWARE_3DBlitCopy(gcvNULL, blitEngine, srcAddress, destAddress, (gctUINT32)Bytes));
+
+    gcmONERROR(gcsSURF_NODE_GetFence(&srcMemory, blitEngine, gcvFENCE_TYPE_READ));
 
     gcmONERROR(gcoBUFOBJ_GetFence(BufObj, gcvFENCE_TYPE_WRITE));
 
@@ -1038,6 +1039,83 @@ gcoBUFOBJ_GetNode(
     /* Success. */
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoBUFOBJ_ReAllocBufNode(
+    IN gcoBUFOBJ BufObj
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcsSURF_NODE tmpMemory;
+    gctUINT alignment = 0;
+
+    gcmHEADER_ARG("BufObj=0x%x", BufObj);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(BufObj, gcvOBJ_BUFOBJ);
+
+    switch (BufObj->type)
+    {
+        case gcvBUFOBJ_TYPE_ARRAY_BUFFER:
+            /* Query the stream alignment. */
+            gcmONERROR(
+                    gcoHARDWARE_QueryStreamCaps(gcvNULL,
+                        gcvNULL,
+                        gcvNULL,
+                        gcvNULL,
+                        &alignment,
+                        gcvNULL));
+            break;
+
+        case gcvBUFOBJ_TYPE_ELEMENT_ARRAY_BUFFER:
+            /* Get alignment */
+            alignment = BUFFER_INDEX_ALIGNMENT;
+            break;
+
+        case gcvBUFOBJ_TYPE_GENERIC_BUFFER:
+            /* Get alignment */
+            alignment = BUFFER_OBJECT_ALIGNMENT;
+            break;
+
+        default:
+            /* Get alignment */
+            alignment = BUFFER_OBJECT_ALIGNMENT;
+            break;
+    }
+
+    gcmONERROR(gcsSURF_NODE_Construct(
+                &tmpMemory,
+                BufObj->bytes,
+                alignment,
+                BufObj->surfType,
+                gcvALLOC_FLAG_NONE,
+                gcvPOOL_DEFAULT
+                ));
+
+    /* Lock the bufobj buffer. */
+    gcmONERROR(gcoHARDWARE_Lock(&tmpMemory,
+               gcvNULL,
+               gcvNULL));
+
+    gcmONERROR(gcoHARDWARE_CopyData(&tmpMemory,
+               0,
+               BufObj->memory.logical,
+               BufObj->bytes));
+    /* Free any allocated video memory. */
+    gcmONERROR(gcoBUFOBJ_Free(BufObj));
+
+    /* Reset BufObj */
+    BufObj->memory = tmpMemory;
+
+    /* Success. */
+    gcmFOOTER_NO();
+    return gcvSTATUS_OK;
+
+OnError:
+    /* Return the status. */
+    gcmFOOTER();
+    return status;
 }
 
 /*******************************************************************************

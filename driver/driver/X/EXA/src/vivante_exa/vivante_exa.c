@@ -350,6 +350,10 @@ static Bool DoneByMapFuncs(PixmapPtr pDst, int x, int y, int w,
     mmap.mSize = h * aligned_pitch;
     mmap.physical = 0;
     start = calloc(1, mmap.mSize + 64);
+    if (!start) {
+        /* Out of memory. */
+        TRACE_EXIT(FALSE);
+    }
     mmap.mUserAddr = aligned_start = (char*) VIV_ALIGN(((int) start), 64);
 
     while (height--) {
@@ -359,6 +363,7 @@ static Bool DoneByMapFuncs(PixmapPtr pDst, int x, int y, int w,
     }
 
     if (!GetDefaultFormat(pDst->drawable.bitsPerPixel, &(pBltInfo->mDstSurfInfo.mFormat))) {
+        free(start);
         TRACE_EXIT(FALSE);
     }
     pBltInfo->mSrcSurfInfo.mFormat = pBltInfo->mDstSurfInfo.mFormat;

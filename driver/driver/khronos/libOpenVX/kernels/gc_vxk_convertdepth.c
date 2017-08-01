@@ -43,8 +43,8 @@ vx_status vxConvertDepth(vx_node node, vx_image input, vx_image output, vx_scala
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(input, VX_IMAGE_ATTRIBUTE_FORMAT, &inputFormat, sizeof(inputFormat));
-    vxQueryImage(output, VX_IMAGE_ATTRIBUTE_FORMAT, &outputFormat, sizeof(outputFormat));
+    vxQueryImage(input, VX_IMAGE_FORMAT, &inputFormat, sizeof(inputFormat));
+    vxQueryImage(output, VX_IMAGE_FORMAT, &outputFormat, sizeof(outputFormat));
 
     status = vxReadScalarValue(spol, &policy);
     status = vxReadScalarValue(sshf, &shift);

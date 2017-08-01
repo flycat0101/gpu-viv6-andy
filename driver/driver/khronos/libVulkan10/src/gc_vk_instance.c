@@ -197,8 +197,9 @@ static VkResult __vki_InitializeChipInfo(
 #if __VK_NEW_DEVICE_QUEUE
     iface.command = gcvHAL_GET_BASE_ADDRESS;
     __VK_ONERROR(__vk_DeviceControl(&iface, 0));
-    chipInfo->flatMappingStart = iface.u.GetBaseAddress.flatMappingStart;
-    chipInfo->flatMappingEnd   = iface.u.GetBaseAddress.flatMappingEnd;
+    chipInfo->flatMappingRangeCount = iface.u.GetBaseAddress.flatMappingRangeCount;
+    __VK_MEMCOPY(chipInfo->flatMappingRanges, iface.u.GetBaseAddress.flatMappingRanges,
+        sizeof(gcsFLAT_MAPPING_RANGE) * chipInfo->flatMappingRangeCount);
 #endif
 
     return VK_SUCCESS;
@@ -477,21 +478,33 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_EnumerateInstanceExtensionProperties
     VkExtensionProperties* pProperties
     )
 {
+    VkResult result = VK_SUCCESS;
+    uint32_t insExtCount = __VK_COUNTOF(g_InstanceExtensions);
+
     if (!pProperties)
     {
-        *pCount = __VK_COUNTOF(g_InstanceExtensions);
+        *pCount = insExtCount;
     }
     else
     {
         uint32_t i;
+        uint32_t extCount = gcmMIN(*pCount, insExtCount);
 
-        for (i = 0; i < __VK_COUNTOF(g_InstanceExtensions); i++)
+        for (i = 0; i < extCount; i++)
         {
             __VK_MEMCOPY(&pProperties[i], &g_InstanceExtensions[i], sizeof(VkExtensionProperties));
         }
+
+        /* If pPropertyCount is smaller than the number of extensions available,
+        ** VK_INCOMPLETE will be returned instead of VK_SUCCESS, to indicate that not all the available properties were returned.
+        */
+        if (extCount < insExtCount)
+        {
+            result = VK_INCOMPLETE;
+        }
     }
 
-    return VK_SUCCESS;
+    return result;
 }
 
 VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL __vk_GetInstanceProcAddr(

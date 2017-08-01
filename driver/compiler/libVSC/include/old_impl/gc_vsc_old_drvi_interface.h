@@ -42,13 +42,27 @@ BEGIN_EXTERN_C()
 
 
 #define GC_ICACHE_PREFETCH_TABLE_SIZE   8
-
 #define GC_DEFAULT_INLINE_LEVEL         2
+
+#define FULL_PROGRAM_BINARY_SIG_1           gcmCC('F', 'U', 'L', 'L')
+#define FULL_PROGRAM_BINARY_SIG_2           gcmCC('P', 'R', 'G', 'M')
+/** Full program binary file header format: -
+       Word 1:  gcmCC('F', 'U', 'L', 'L') Program binary file signature.
+       Word 2:  gcmCC('P', 'R', 'G', 'M') Program binary file signature.
+       Word 3:  kernel count.
+       Word 4:  size of program binary file in bytes excluding this header.
+*/
+#define __FULL_PROGRAM_BINARY_HEADER_SIZE__     (sizeof(gctUINT32) * 4) /* Full program binary file header size in bytes*/
+
+typedef enum _gceKernelBinaryKind
+{
+    gcvKERNEL_BINARY_NONE               = 0x00,
+    gcvKERNEL_BINARY_CONST_BORDER       = 0x01,
+}gceKernelinaryKind;
 
 /*
  *   Re-compilation & Dynamic Linker data sturctures
  */
-
 enum gceRecompileKind
 {
     gceRK_PATCH_NONE = 0,
@@ -298,8 +312,7 @@ gcsPatchWriteImage;
 typedef struct _gcsPatchLongULong
 {
     gctUINT                 instructionIndex;
-    gctUINT                 channelCountIndex;      /* Uniform index for channel (target enabled) count, which
-                                                       will be passed as a function argument. */
+    gctUINT                 channelCount;       /* channel (target enabled) count */
 }
 gcsPatchLongULong;
 
@@ -457,9 +470,16 @@ gcsPROGRAM_UNIFIED_STATUS;
 typedef struct _gcSHADER_VID_NODES
 {
     gctPOINTER  instVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* SURF Node for instruction buffer for I-Cache. */
+    gctBOOL     flushInstVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* If driver need to flush them. */
+
     gctPOINTER  gprSpillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* SURF Node for gpr spill memory. */
+    gctBOOL     flushGprSpillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* If driver need to flush them. */
+
     gctPOINTER  crSpillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* SURF Node for cr spill memory. */
+    gctBOOL     flushCrSpillVidmemNode[gcMAX_SHADERS_IN_LINK_GOURP]; /* If driver need to flush them. */
+
     gctPOINTER  sharedMemVidMemNode;
+    gctBOOL     flushSharedMemVidMemNode;
 }gcSHADER_VID_NODES;
 
 typedef enum _gceMEMORY_ACCESS_FLAG
@@ -661,6 +681,9 @@ struct _gcsHINT
     gctUINT     tcsPerVertexAttributeCount;
 
     gctUINT     vsInputState;
+
+    /* Local/share memory size. */
+    gctUINT     localMemSizeInByte;
 };
 
 #define gcsHINT_isCLShader(Hint)            ((Hint)->clShader)
@@ -946,8 +969,6 @@ typedef enum _gceSHADER_OPTIMIZATION
     gcvOPTIMIZATION_INLINE_LEVEL_3              = 1 << 19,
     gcvOPTIMIZATION_INLINE_LEVEL_4              = 1 << 20,
 
-    /* limit some optimization for minimal compile-time */
-    /* VIV: specifically for dEQP-GLES3.functional.uniform_api.random.83 */
     gcvOPTIMIZATION_MIN_COMP_TIME               = 1 << 21,
 
     /*  Full optimization. */
@@ -1216,10 +1237,10 @@ typedef struct _gcOPTIMIZER_OPTION
 
     /* debug option:
 
-        VC_OPTION=-DEBUG:0|1
+        VC_OPTION=-DEBUG:0|1|2|3
 
     */
-    gctBOOL     enableDebug;
+    gctUINT     enableDebug;
 
     /* VC_OPTION=-Ddef1[=value1] -Ddef2[=value2] -Uundef1 */
     MacroDefineList * macroDefines;
@@ -1374,6 +1395,13 @@ typedef struct _gcOPTIMIZER_OPTION
      */
     gctBOOL     oclHasLong;
 
+    /*  OCL long and ulong support in VIR:
+     *
+     *   VC_OPTION=-OCLINT64INVIR:0|1
+     *
+     */
+    gctBOOL     oclInt64InVir;
+
     /*  USE gcSL_NEG for -a instead of SUB(0, a)
      *
      *   VC_OPTION=-OCLUSENEG
@@ -1495,7 +1523,9 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_MacroDefines()     (gcmGetOptimizerOption()->macroDefines)
 
 #define gcmOPT_EnableLTC()          (gcmGetOptimizerOption()->enableLTC)
-#define gcmOPT_EnableDebug()        (gcmGetOptimizerOption()->enableDebug)
+#define gcmOPT_EnableDebug()        (gcmGetOptimizerOption()->enableDebug > 0)
+#define gcmOPT_EnableDebugDump()    (gcmGetOptimizerOption()->enableDebug > 1)
+#define gcmOPT_EnableDebugDumpALL() (gcmGetOptimizerOption()->enableDebug > 2)
 #define gcmOPT_INLINERKIND()        (gcmGetOptimizerOption()->inlinerKind)
 #define gcmOPT_INLINELEVEL()        (gcmGetOptimizerOption()->inlineLevel)
 #define gcmOPT_SetINLINELEVEL(v)    (gcmGetOptimizerOptionVariable()->inlineLevel = (v))
@@ -1515,6 +1545,7 @@ extern gcOPTIMIZER_OPTION theOptimizerOption;
 #define gcmOPT_oclPackedBasicType() (gcmGetOptimizerOption()->oclPackedBasicType)
 #define gcmOPT_oclOcvLocalAddressSpace() (gcmGetOptimizerOption()->oclOcvLocalAddressSpace)
 #define gcmOPT_oclHasLong()         (gcmGetOptimizerOption()->oclHasLong)
+#define gcmOPT_oclInt64InVIR()      (gcmGetOptimizerOption()->oclInt64InVir)
 #define gcmOPT_oclUseNeg()          (gcmGetOptimizerOption()->oclUseNeg)
 #define gcmOPT_oclUseImgIntrinsicQuery()   (gcmGetOptimizerOption()->oclUseImgIntrinsicQuery)
 #define gcmOPT_oclPassKernelStructArgByValue()   (gcmGetOptimizerOption()->oclPassKernelStructArgByValue)
@@ -1607,6 +1638,18 @@ typedef enum _gcePROVOKING_VERTEX_CONVENSION
 }
 gcePROVOKING_VERTEX_CONVENSION;
 
+#define __DEFAULT_GLSL_EXTENSION_STRING__       "GL_OES_texture_storage_multisample_2d_array "\
+                                                "GL_KHR_blend_equation_advanced "\
+                                                "GL_EXT_texture_buffer "\
+                                                "GL_EXT_texture_cube_map_array "\
+                                                "GL_EXT_shader_io_blocks "\
+                                                "GL_EXT_gpu_shader5 "\
+                                                "GL_EXT_geometry_shader "\
+                                                "GL_EXT_geometry_point_size "\
+                                                "GL_EXT_tessellation_shader "\
+                                                "GL_EXT_tessellation_point_size "\
+                                                "GL_OES_sample_variables "\
+                                                "GL_OES_shader_multisample_interpolation"
 
 typedef struct _gcsGLSLCaps
 {
@@ -7306,7 +7349,7 @@ gcCreateWriteImageDirective(
 gceSTATUS
 gcCreateCLLongULongDirective(
     IN  gctUINT                 InstructionIndex,
-    IN  gctUINT                 ChannelCountIndex,
+    IN  gctUINT                 ChannelCount,
     OUT gcPatchDirective  **    PatchDirectivePtr
 );
 
@@ -7499,6 +7542,85 @@ gcLoadProgram(
     IN gctUINT32 BinarySize,
     OUT gcSHADER VertexShader,
     OUT gcSHADER FragmentShader,
+    OUT gctUINT32 * ProgramBufferSize,
+    OUT gctPOINTER * ProgramBuffer,
+    OUT gcsHINT_PTR * Hints
+    );
+
+/*******************************************************************************
+**                                gcSaveCLSingleKernel
+********************************************************************************
+**
+**    Save pre-compiled shaders and pre-linked programs to a binary file.
+**
+**    INPUT:
+**
+**        gcSHADER KernelShader
+**            Pointer to vertex shader object.
+**
+**        gctUINT32 ProgramBufferSize
+**            Number of bytes in 'ProgramBuffer'.
+**
+**        gctPOINTER ProgramBuffer
+**            Pointer to buffer containing the program states.
+**
+**        gcsHINT_PTR Hints
+**            Pointer to HINTS structure for program states.
+**
+**    OUTPUT:
+**
+**        gctPOINTER * Binary
+**            Pointer to a variable receiving the binary data to be saved.
+**
+**        gctUINT32 * BinarySize
+**            Pointer to a variable receiving the number of bytes inside 'Binary'.
+*/
+gceSTATUS
+gcSaveCLSingleKernel(
+    IN gcSHADER KernelShader,
+    IN gctUINT32 ProgramBufferSize,
+    IN gctPOINTER ProgramBuffer,
+    IN gcsHINT_PTR Hints,
+    OUT gctPOINTER * Binary,
+    OUT gctUINT32 * BinarySize
+    );
+
+/*******************************************************************************
+**                                gcLoadCLSingleKernel
+********************************************************************************
+**
+**    Load pre-compiled shaders and pre-linked programs from a binary file.
+**
+**    INPUT:
+**
+**        gctPOINTER Binary
+**            Pointer to the binary data loaded.
+**
+**        gctUINT32 BinarySize
+**            Number of bytes in 'Binary'.
+**
+**    OUTPUT:
+**
+**        gcSHADER KernelShader
+**            Pointer to a vertex shader object.
+**
+**        gctUINT32 * ProgramBufferSize
+**            Pointer to a variable receicing the number of bytes in the buffer
+**            returned in 'ProgramBuffer'.
+**
+**        gctPOINTER * ProgramBuffer
+**            Pointer to a variable receiving a buffer pointer that contains the
+**            states required to download the shaders into the hardware.
+**
+**        gcsHINT_PTR * Hints
+**            Pointer to a variable receiving a gcsHINT structure pointer that
+**            contains information required when loading the shader states.
+*/
+gceSTATUS
+gcLoadCLSingleKernel(
+    IN gctPOINTER Binary,
+    IN gctUINT32 BinarySize,
+    OUT gcSHADER KernelShader,
     OUT gctUINT32 * ProgramBufferSize,
     OUT gctPOINTER * ProgramBuffer,
     OUT gcsHINT_PTR * Hints

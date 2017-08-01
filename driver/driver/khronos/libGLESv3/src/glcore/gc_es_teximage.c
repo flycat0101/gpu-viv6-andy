@@ -42,7 +42,7 @@ extern GLint __glCalcTexMaxLevelUsed(__GLcontext *gc, __GLtextureObject *texObj,
         tex->arrays = 6; \
         break; \
     default: \
-        __GL_ERROR_RET(GL_INVALID_ENUM); \
+        __GL_ERROR_EXIT(GL_INVALID_ENUM); \
     }
 
 #define __GL_TEXIMAGE3D_GET_OBJECT() \
@@ -65,7 +65,7 @@ extern GLint __glCalcTexMaxLevelUsed(__GLcontext *gc, __GLtextureObject *texObj,
         break; \
         } \
     default: \
-        __GL_ERROR_RET(GL_INVALID_ENUM); \
+        __GL_ERROR_EXIT(GL_INVALID_ENUM); \
     }
 
 /* Macro to get 2D texture target and get the texture object
@@ -88,7 +88,7 @@ extern GLint __glCalcTexMaxLevelUsed(__GLcontext *gc, __GLtextureObject *texObj,
         tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_INDEX]; \
         break; \
     default: \
-        __GL_ERROR_RET(GL_INVALID_ENUM); \
+        __GL_ERROR_EXIT(GL_INVALID_ENUM); \
     }
 
 extern __GLformatInfo __glFormatInfoTable[];
@@ -1017,6 +1017,13 @@ GLboolean __glCheckTexImgFmt(__GLcontext *gc,
 
     case __GL_BGRX8:
         invalid = (__GL_BGRX8 != internalFormat);
+        break;
+
+    case __GL_ARGB4:
+    case __GL_ABGR4:
+    case __GL_XRGB4:
+    case __GL_XBGR4:
+        invalid = (format != (GLenum) internalFormat);
         break;
 
     default:
@@ -2287,6 +2294,7 @@ GLvoid GL_APIENTRY __gles_TexImage3D(__GLcontext *gc,
     tex->seqNumber++;
 
 OnExit:
+OnError:
     __GL_FOOTER();
 }
 
@@ -2371,6 +2379,7 @@ GLvoid GL_APIENTRY __gles_TexImage2D(__GLcontext *gc,
     tex->seqNumber++;
 
 OnExit:
+OnError:
     __GL_FOOTER();
 }
 
@@ -2540,6 +2549,7 @@ GLvoid GL_APIENTRY __gles_TexSubImage2D(__GLcontext *gc,
     tex->seqNumber++;
 
 OnExit:
+OnError:
     __GL_FOOTER();
 }
 
@@ -2604,6 +2614,7 @@ GLvoid GL_APIENTRY __gles_CopyTexImage2D(__GLcontext *gc,
     }
 
 OnExit:
+OnError:
     __GL_FOOTER();
 }
 
@@ -2641,7 +2652,7 @@ GLvoid GL_APIENTRY __gles_CopyTexSubImage3D(__GLcontext *gc,
         tex = gc->texture.units[activeUnit].boundTextures[__GL_TEXTURE_CUBEMAP_ARRAY_INDEX];
         break;
     default:
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
     /* Check arguments */
@@ -2674,7 +2685,7 @@ GLvoid GL_APIENTRY __gles_CopyTexSubImage3D(__GLcontext *gc,
             __GL_ERROR((*gc->dp.getError)(gc));
         }
     }
-
+OnError:
 OnExit:
     __GL_FOOTER();
 }
@@ -2736,6 +2747,7 @@ GLvoid GL_APIENTRY __gles_CopyTexSubImage2D(__GLcontext *gc,
     }
 
 OnExit:
+OnError:
     __GL_FOOTER();
 }
 
@@ -2894,7 +2906,7 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage2D(__GLcontext *gc,
 
     if (imageSize < 0)
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
     /* Check for paletted texture */
@@ -2912,13 +2924,13 @@ GLvoid GL_APIENTRY __gles_CompressedTexImage2D(__GLcontext *gc,
     case GL_PALETTE8_RGBA8_OES:
         if (lod > 0)
         {
-            __GL_ERROR_RET(GL_INVALID_VALUE);
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
         }
         lod = -lod;
         /* If number of lods exceeded the size allowed one */
         if (lod > (GLint)__glFloorLog2(__GL_MAX(width, height)))
         {
-            __GL_ERROR_RET(GL_INVALID_VALUE);
+            __GL_ERROR_EXIT(GL_INVALID_VALUE);
         }
         level = 0;
         isPalette = GL_TRUE;
@@ -3492,6 +3504,21 @@ GLboolean __glCheckTexStorageArgs(__GLcontext *gc,
         }
         break;
 
+    case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:
+    case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
+    case GL_COMPRESSED_RGBA_S3TC_DXT3_EXT:
+    case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
+        if (!__glExtension[__GL_EXTID_EXT_texture_compression_s3tc].bEnabled)
+        {
+            __GL_ERROR_RET_VAL(GL_INVALID_ENUM, GL_FALSE);
+        }
+
+        if (tex->targetIndex == __GL_TEXTURE_3D_INDEX)
+        {
+            __GL_ERROR_RET_VAL(GL_INVALID_OPERATION, GL_FALSE);
+        }
+        break;
+
     /* DEPTH STENCIL */
     case GL_DEPTH_COMPONENT16:
     case GL_DEPTH_COMPONENT24:
@@ -3684,6 +3711,7 @@ GLvoid GL_APIENTRY __gles_TexStorage3D(__GLcontext *gc,
     tex->seqNumber++;
 
 OnExit:
+OnError:
     __GL_FOOTER();
 }
 
@@ -4457,7 +4485,7 @@ GLvoid GL_APIENTRY __gles_TexBuffer(__GLcontext *gc, GLenum target, GLenum inter
 
     if (target != GL_TEXTURE_BUFFER_EXT)
     {
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
     if (!__glGetTBOFmt(gc, internalformat, &type, &format, &bppPerTexel))
@@ -4477,7 +4505,7 @@ GLvoid GL_APIENTRY __gles_TexBuffer(__GLcontext *gc, GLenum target, GLenum inter
 
     if ((buffer != 0) && (!bufObj))
     {
-        __GL_ERROR_RET(GL_INVALID_OPERATION);
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
 
     size = (GLint)bufObj->size;
@@ -4519,6 +4547,7 @@ GLvoid GL_APIENTRY __gles_TexBuffer(__GLcontext *gc, GLenum target, GLenum inter
     tex->seqNumber++;
 
 OnExit:
+OnError:
      __GL_FOOTER();
      return;
 }
@@ -4536,7 +4565,7 @@ GLvoid GL_APIENTRY __gles_TexBufferRange(__GLcontext *gc, GLenum target, GLenum 
 
     if (target != GL_TEXTURE_BUFFER_EXT)
     {
-        __GL_ERROR_RET(GL_INVALID_ENUM);
+        __GL_ERROR_EXIT(GL_INVALID_ENUM);
     }
 
     if (!__glGetTBOFmt(gc, internalformat, &type, &format, &bppPerTexel))
@@ -4556,17 +4585,17 @@ GLvoid GL_APIENTRY __gles_TexBufferRange(__GLcontext *gc, GLenum target, GLenum 
 
     if ((buffer != 0) && (!bufObj))
     {
-        __GL_ERROR_RET(GL_INVALID_OPERATION);
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
 
     if ((offset < 0) || (size <= 0) || ((offset + size) > bufObj->size))
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
     if ((offset % gc->constants.textureBufferOffsetAlignment) != 0)
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
     /* Already bound with same setting*/
@@ -4603,6 +4632,7 @@ GLvoid GL_APIENTRY __gles_TexBufferRange(__GLcontext *gc, GLenum target, GLenum 
     __glSetTexImageDirtyBit(gc, tex, __GL_TEX_IMAGE_CONTENT_CHANGED_BIT);
 
 OnExit:
+OnError:
      __GL_FOOTER();
      return;
 }
@@ -4939,7 +4969,7 @@ GLvoid GL_APIENTRY __gles_BindImageTexture(__GLcontext *gc, GLuint unit, GLuint 
 
     if (unit >= gc->constants.shaderCaps.maxImageUnit)
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
     imageUnit = &gc->state.image.imageUnit[unit];
@@ -5235,7 +5265,7 @@ GLvoid GL_APIENTRY __gles_GetTexImage(__GLcontext *gc, GLenum target, GLint leve
                 break;
             }
         default:
-            __GL_ERROR_RET(GL_INVALID_ENUM);
+            __GL_ERROR_EXIT(GL_INVALID_ENUM);
         }
 
     if (!tex)
@@ -5246,7 +5276,7 @@ GLvoid GL_APIENTRY __gles_GetTexImage(__GLcontext *gc, GLenum target, GLint leve
     /* Check lod, width, height */
     if (level < 0 || level > maxLod)
     {
-        __GL_ERROR_RET(GL_INVALID_VALUE);
+        __GL_ERROR_EXIT(GL_INVALID_VALUE);
     }
 
     if (!__glCheckTexImgTypeArg(gc, tex, type))
@@ -5280,6 +5310,7 @@ GLvoid GL_APIENTRY __gles_GetTexImage(__GLcontext *gc, GLenum target, GLint leve
     }
 
 OnExit:
+OnError:
     __GL_FOOTER();
 }
 

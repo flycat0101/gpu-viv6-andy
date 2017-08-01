@@ -151,8 +151,6 @@ computeWLimit(gctFLOAT_PTR Logical,
 }
 #endif
 
-#define gcdVERTEXARRAY_POOL_CAPACITY 32
-
 #define gcmCOMPUTE_BYTES()                                              \
     if (vertexPtr->enable)                                              \
     {                                                                   \
@@ -900,7 +898,9 @@ gcoVERTEXARRAY_StreamBind_Ex(
     gceSTATUS status                     = gcvSTATUS_OK;
     gcsVERTEXARRAY_PTR vertexPtr = StreamInfo->u.es11.attributes;
     gctUINT first                = (gctUINT)StreamInfo->first;
-    gctUINT i, n;
+    gctUINT i;
+    /* total stream count, include client pointer and vbo.*/
+    gctUINT n;
     gctUINT count, count32;
 
     /* Zero the arrays. */
@@ -929,6 +929,7 @@ gcoVERTEXARRAY_StreamBind_Ex(
     gctBOOL convertToIndexedTriangleList = gcvFALSE;
     gcePATCH_ID patchId                  = gcvPATCH_INVALID;
     gctUINT enableBits                   = StreamInfo->attribMask;
+    gctUINT totalBufSize                 = 0;
 
     gcmHEADER_ARG("Vertex=0x%x StreamInfo=0x%x IndexInfo=0x%x",
                   Vertex, StreamInfo, IndexInfo);
@@ -1393,7 +1394,6 @@ gcoVERTEXARRAY_StreamBind_Ex(
     {
 #if OPT_VERTEX_ARRAY
         /* Total size in bytes of all attributes need to be copied */
-        gctUINT totalBufSize = 0;
         gctUINT hwStream = Vertex->maxStreams - n + 1;
         gctUINT j, k;
 
@@ -1602,6 +1602,26 @@ gcoVERTEXARRAY_StreamBind_Ex(
                                              &copyPhysical));
 #endif
     }
+
+    /* Fix mixed stream issue.*/
+#if OPT_VERTEX_ARRAY
+    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MIXED_STREAMS) &&
+        (Vertex->maxStreams > 1) &&
+        (n > 1)
+        )
+    {
+        gcmONERROR(gcoVERTEX_AdjustStreamPool(Vertex->dynamicStream,
+                                              bufferCount, bufferArray,
+                                              copyCount, copyArray,
+                                              streamCount, streamArray,
+                                              first, count,
+                                              totalBufSize,
+                                              StreamInfo->instanced,
+                                              &copyPhysical,
+                                              &Vertex->uncacheableStream
+                                              ));
+    }
+#endif
 
     /***************************************************************************
     ***** Phase 5: Program the Hardware ***************************************/
@@ -1916,10 +1936,10 @@ gceSTATUS gcoVERTEXARRAY_MergeClientStreams(IN gcsVERTEXARRAY_BUFOBJ_PTR Streams
     return status;
 }
 
-gceSTATUS gcoVERTEXARRAY_MergeStreams(IN gcsVERTEXARRAY_BUFOBJ_PTR Streams,
-                                      IN gctUINT MaxStreamCount,
-                                      IN OUT gctUINT_PTR StreamCount,
-                                      IN OUT gctUINT_PTR CopyCount)
+gceSTATUS gcoVERTEXARRAY_MergeAllStreams(IN gcsVERTEXARRAY_BUFOBJ_PTR Streams,
+                                         IN gctUINT MaxStreamCount,
+                                         IN OUT gctUINT_PTR StreamCount,
+                                         IN OUT gctUINT_PTR CopyCount)
 
 {
     gceSTATUS status = gcvSTATUS_OK;
@@ -1927,7 +1947,6 @@ gceSTATUS gcoVERTEXARRAY_MergeStreams(IN gcsVERTEXARRAY_BUFOBJ_PTR Streams,
     gcsVERTEXARRAY_BUFOBJ_PTR streamLoopPtr = gcvNULL;
     gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE_PTR lastAttr = gcvNULL;
     gcsVERTEXARRAY_BUFOBJ_ATTRIBUTE_PTR attr = gcvNULL;
-    gcsVERTEXARRAY_BUFOBJ_PTR first = gcvNULL;
     gcsVERTEXARRAY_BUFOBJ_PTR prev = gcvNULL;
     gctBOOL removed = gcvFALSE;
 
@@ -1935,69 +1954,88 @@ gceSTATUS gcoVERTEXARRAY_MergeStreams(IN gcsVERTEXARRAY_BUFOBJ_PTR Streams,
      * It may be much better to sort stream w.r.t. attribute count so that we first merge
      * streams with less attributes.
      */
+    /* If stream count is 0, don't merge */
+    if (MaxStreamCount == 0)
+        return status;
+
+    /* We loop the stream until *StreamCount <= MaxStreamCount or loop all streams.
+     */
     for (streamLoopPtr = Streams; (streamLoopPtr != gcvNULL) && (*StreamCount > MaxStreamCount);
-         streamLoopPtr = streamLoopPtr->next)
+        streamLoopPtr = streamLoopPtr->next)
     {
         if (streamLoopPtr->stream != gcvNULL)
         {
-            /* Found it */
-            first = streamLoopPtr;
-        }
-
-        if (first)
-        {
             /* Find last attribute */
-            for (attr = first->attributePtr; attr != gcvNULL; attr = attr->next)
+            for (attr = streamLoopPtr->attributePtr; attr != gcvNULL; attr = attr->next)
             {
-                attr->pointer = first->logical + attr->offset;
+                attr->pointer = streamLoopPtr->logical + attr->offset;
                 lastAttr = attr;
             }
 
-            /* Find first server stream */
-            for (streamPtr = first; streamPtr != gcvNULL; streamPtr = streamPtr->next)
+            streamLoopPtr->stream = gcvNULL;
+        }
+        else
+        {
+            /* Find last attribute */
+            lastAttr = streamLoopPtr->attributePtr;
+            while((lastAttr != gcvNULL) && (lastAttr->next != gcvNULL))
             {
-                if ((streamPtr->stream != gcvNULL) && streamPtr != first)
-                {
-                    if (first->divisor == streamPtr->divisor)
-                    {
-                        /* Merge streams */
-                        lastAttr->next = streamPtr->attributePtr;
-
-                        /* Find last attribute */
-                        for (attr = lastAttr->next; attr != gcvNULL; attr = attr->next)
-                        {
-                            attr->pointer = streamPtr->logical + attr->offset;
-                            lastAttr = attr;
-                        }
-
-                        first->merged = gcvTRUE;
-                        first->stream = gcvNULL;
-                        first->attributeCount += streamPtr->attributeCount;
-                        (*StreamCount)--;
-
-                        /* remove stream */
-                        prev->next = streamPtr->next;
-                        removed = gcvTRUE;
-                    }
-                }
-
-                /* Set this stream as previous stream */
-                if (!removed)
-                {
-                    prev = streamPtr;
-                }
-
-                /* Reset */
-                removed = gcvFALSE;
-
-                if (*StreamCount <= MaxStreamCount)
-                {
-                    /* We're done */
-                    break;
-                }
+                lastAttr = lastAttr->next;
             }
         }
-        first = gcvNULL;
+
+        prev = streamLoopPtr;
+
+        /* Find next stream */
+        for (streamPtr = streamLoopPtr->next; (streamPtr != gcvNULL) && (*StreamCount > MaxStreamCount); streamPtr = streamPtr->next)
+        {
+            /* It can happen that first stream divisor would not allow any
+            * merge. If we had chosen a different first then it would be possible.
+            * We need to address this when needed
+            */
+            if (streamLoopPtr->divisor == streamPtr->divisor)
+            {
+                /* Merge streams */
+                lastAttr->next = streamPtr->attributePtr;
+
+                if (streamPtr->stream == gcvNULL)
+                {
+                    /* Update last attribute */
+                    while((lastAttr != gcvNULL) && (lastAttr->next != gcvNULL))
+                    {
+                        lastAttr = lastAttr->next;
+                    }
+                    (*CopyCount)--;
+                }
+                else
+                {
+                    /* Find last attribute */
+                    for (attr = lastAttr->next; attr != gcvNULL; attr = attr->next)
+                    {
+                        attr->pointer = streamPtr->logical + attr->offset;
+                        lastAttr = attr;
+                    }
+
+                    streamLoopPtr->stream = gcvNULL;
+                }
+
+                streamLoopPtr->merged = gcvTRUE;
+                streamLoopPtr->attributeCount += streamPtr->attributeCount;
+                (*StreamCount)--;
+
+                /* remove stream */
+                prev->next = streamPtr->next;
+                removed = gcvTRUE;
+            }
+
+            if (!removed)
+            {
+                prev = streamPtr;
+            }
+
+            /* Reset */
+            removed = gcvFALSE;
+        }
     }
 
     return status;
@@ -2367,7 +2405,7 @@ gcoVERTEXARRAY_StreamBind(
         /* Then try to merge video memory streams */
         if (streamCount > Vertex->maxStreams)
         {
-            gcmONERROR(gcoVERTEXARRAY_MergeStreams(streams, Vertex->maxStreams, &streamCount, &copyCount));
+            gcmONERROR(gcoVERTEXARRAY_MergeAllStreams(streams, Vertex->maxStreams, &streamCount, &copyCount));
         }
 
         /* Bail out if we still exceed max streams. */
@@ -2431,6 +2469,20 @@ gcoVERTEXARRAY_StreamBind(
                                                firstCopied,
                                                &Vertex->uncacheableStream
                                                ));
+    }
+
+    /* Check Stream pool and fix the issue.*/
+    if (!gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MIXED_STREAMS) &&
+        (streamCount > 1)
+        )
+    {
+        gcmONERROR(gcoVERTEX_AdjustStreamPoolEx(Vertex->dynamicStream,
+                                                streams,
+                                                streamCount,
+                                                (gctUINT)StreamInfo->first,
+                                                firstCopied,
+                                                (IndexInfo->u.es30.indexBuffer != gcvNULL) || (IndexInfo->indexMemory != gcvNULL),
+                                                &Vertex->uncacheableStream));
     }
 
     /* Bind Hardware */

@@ -73,15 +73,15 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
         gradXImage[level-1] = vxGetPyramidLevel(gradXPyramid, level-1);
         gradYImage[level-1] = vxGetPyramidLevel(gradYPyramid, level-1);
 
-        vxQueryImage(prevImg[level-1], VX_IMAGE_ATTRIBUTE_WIDTH, &(width[level-1]), sizeof(width[level-1]));
-        vxQueryImage(prevImg[level-1], VX_IMAGE_ATTRIBUTE_HEIGHT, &(height[level-1]), sizeof(height[level-1]));
+        vxQueryImage(prevImg[level-1], VX_IMAGE_WIDTH, &(width[level-1]), sizeof(width[level-1]));
+        vxQueryImage(prevImg[level-1], VX_IMAGE_HEIGHT, &(height[level-1]), sizeof(height[level-1]));
     }
     vxReadScalarValue(epsilonScalar, &epsilon);
     vxReadScalarValue(numIterationsScalar, &numIterations);
     //vxReadScalarValue(winSizeScalar, &winSize);
 
-    status = (gceSTATUS)vxQueryArray(prevPts, VX_ARRAY_ATTRIBUTE_CAPACITY, &capacity, sizeof(capacity));
-    status = (gceSTATUS)vxQueryArray(prevPts, VX_ARRAY_ATTRIBUTE_ITEMSIZE, &itemsize, sizeof(itemsize));
+    status = (gceSTATUS)vxQueryArray(prevPts, VX_ARRAY_CAPACITY, &capacity, sizeof(capacity));
+    status = (gceSTATUS)vxQueryArray(prevPts, VX_ARRAY_ITEMSIZE, &itemsize, sizeof(itemsize));
 
     kernelContext->params.kernel = gcvVX_KERNEL_OPTICAL_FLOW_PYR_LK;
     kernelContext->params.xmax = (vx_uint32)(capacity * itemsize);
@@ -89,9 +89,9 @@ vx_status vxVLKTracker(vx_node node, vx_pyramid oldPyramid, vx_pyramid newPyrami
     kernelContext->params.xstep = (vx_uint32)itemsize;
     kernelContext->params.ystep = 1;
 #if gcdVX_OPTIMIZER
-    kernelContext->borders = VX_BORDER_MODE_UNDEFINED;
+    kernelContext->borders = VX_BORDER_UNDEFINED;
 #else
-    kernelContext->params.borders = VX_BORDER_MODE_UNDEFINED;
+    kernelContext->params.borders = VX_BORDER_UNDEFINED;
 #endif
     kernelContext->params.isUseInitialEstimate = (gctUINT8)isUseInitialEstimate;
     kernelContext->params.maxLevel = (gctINT32)maxLevel;

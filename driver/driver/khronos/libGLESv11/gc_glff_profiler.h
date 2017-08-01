@@ -179,6 +179,10 @@ extern "C" {
 #define GL1_PROFILER_FRAME_TYPE 11
 #define GL1_PROFILER_FRAME_COUNT 12
 #define GL1_PROFILER_SYNC_MODE 13
+#define GL1_PROFILER_FINISH_BEGIN 14
+#define GL1_PROFILER_FINISH_END 15
+#define GL1_PROFILER_BEGIN 16
+#define GL1_PROFILER_END 17
 
 #define GL1_PROFILER_PRIMITIVE_END 20
 #define GL1_PROFILER_PRIMITIVE_TYPE 21
@@ -192,8 +196,9 @@ extern "C" {
 
 #define GL1_PROFILER_WRITE_HEADER 90
 #define GL1_PROFILER_WRITE_FRAME_BEGIN 91
-#define GL1_PROFILER_WRITE_FRAME_END 92
-#define GL1_PROFILER_WRITE_FRAME_RESET 93
+#define GL1_PROFILER_WRITE_FINISH_BEGIN 92
+#define GL1_PROFILER_WRITE_FRAME_END 93
+#define GL1_PROFILER_WRITE_FRAME_RESET 94
 
 /* Profile information. */
 typedef struct _glsPROFILER
@@ -206,9 +211,13 @@ typedef struct _glsPROFILER
     gctBOOL         perFrame;
     gctBOOL         useFBO;
     gctBOOL         useGlfinish;
+    gctBOOL         writeDrawable;
 
     gctBOOL         need_dump;
-    gctUINT32       frameBegun;
+    gctBOOL         fromFinish;
+    gctBOOL         frameBegun;
+    gctUINT32       frameBegunPos;
+    gctBOOL         finishBegun;
     gctUINT32       frameCount;       /* for VIV_PROFILE = 1 */
     gctBOOL         enableOutputCounters;  /* for VIV_PROFILE = 2 */
     gctUINT32       frameStartNumber; /* for VIV_PROFILE = 3 */
@@ -221,10 +230,11 @@ typedef struct _glsPROFILER
 
     /* Current frame information */
     gctUINT32       frameNumber;
+    gctUINT32       finishNumber;
     gctUINT64       frameStartTimeusec;
     gctUINT64       frameEndTimeusec;
-    gctUINT64       frameStartCPUTimeusec;
-    gctUINT64       frameEndCPUTimeusec;
+    gctUINT64       finishStartTimeusec;
+    gctUINT64       finishEndTimeusec;
 
     gctUINT64       shaderCompileTime;
     gctUINT64       shaderStartTimeusec;
@@ -237,8 +247,6 @@ typedef struct _glsPROFILER
 
     /* Current primitive information */
     gctUINT32       primitiveNumber;
-    gctUINT64       primitiveStartTimeusec;
-    gctUINT64       primitiveEndTimeusec;
     gctUINT32       primitiveType;
     gctUINT32       primitiveCount;
 
@@ -254,42 +262,25 @@ typedef struct _glsPROFILER
 glsPROFILER;
 
 void
-_glffProfiler_NEW_Initialize(
+_glffProfilerInitialize(
     glsCONTEXT_PTR Context
     );
 
 void
-_glffProfiler_NEW_Destroy(
+_glffProfilerDestroy(
     glsCONTEXT_PTR Context
     );
 
 gceSTATUS
-_glffProfiler_NEW_Write(
+_glffProfilerWrite(
     glsCONTEXT_PTR Context,
     GLuint Enum
     );
 
 GLboolean
-_glffProfiler_NEW_Set(
+_glffProfilerSet(
     glsCONTEXT_PTR Context,
     GLuint Enum,
-    gctHANDLE Value
-    );
-
-void
-_glffInitializeProfiler(
-    glsCONTEXT_PTR Context
-    );
-
-void
-_glffDestroyProfiler(
-    glsCONTEXT_PTR Context
-    );
-
-gctBOOL
-_glffProfiler(
-    gctPOINTER Profiler,
-    gctUINT32 Enum,
     gctHANDLE Value
     );
 
@@ -305,7 +296,7 @@ _glffProfiler(
                 } \
                 else \
                 { \
-                        _glffProfiler_NEW_Set(c, e, (gctHANDLE)v); \
+                        _glffProfilerSet(c, e, (gctHANDLE)v); \
                 } \
         } \
         while (gcvFALSE)

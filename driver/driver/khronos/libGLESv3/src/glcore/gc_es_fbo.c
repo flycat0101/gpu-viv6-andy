@@ -1496,7 +1496,7 @@ GLvoid GL_APIENTRY __gles_FramebufferTexture2D(__GLcontext *gc, GLenum target, G
 
         if (texObj->targetIndex != targetIdx)
         {
-            __GL_ERROR_RET(GL_INVALID_OPERATION);
+            __GL_ERROR_EXIT(GL_INVALID_OPERATION);
         }
 
         if (level >= (GLint)gc->constants.maxNumTextureLevels || level < 0)
@@ -1922,7 +1922,7 @@ GLvoid GL_APIENTRY __gles_BlitFramebuffer(__GLcontext *gc,
 
     if (GL_LINEAR == filter && (mask & (GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT)))
     {
-        __GL_ERROR_RET(GL_INVALID_OPERATION);
+        __GL_ERROR_EXIT(GL_INVALID_OPERATION);
     }
 
     /* If either draw or read frame buffer is not complete.

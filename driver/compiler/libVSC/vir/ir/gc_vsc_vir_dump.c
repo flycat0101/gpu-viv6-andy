@@ -750,7 +750,7 @@ VIR_Enable_Dump(
 
     gcmASSERT(Dumper->baseDumper.pOffset != gcvNULL);
 
-    if (Enable != VIR_ENABLE_NONE)
+    if (Enable != VIR_ENABLE_NONE && Enable != VIR_ENABLE_XYZW)
     {
         /* Enable dot. */
         VERIFY_OK(
@@ -1125,13 +1125,32 @@ VIR_Symbol_Dump(
         }
         if (isSymUniformCompiletimeInitialized(Sym))
         {
-            VIR_Const *      pConstVal =
-                (VIR_Const *)VIR_GetSymFromId(&Dumper->Shader->constTable,
-                                              VIR_Uniform_GetInitializer(Sym->u2.uniform));
-            /* dump initializer */
-            VERIFY_OK(
-                VIR_LOG(Dumper, " = "));
-            _DumpConst(Dumper, pConstVal);
+            VIR_Const *      pConstVal;
+
+            if(VIR_Type_isArray(type)) {
+                VIR_ConstId   *initializerPtr;
+                gctUINT   arrayLength = VIR_Type_GetArrayLength(type);
+                gctUINT   i;
+
+                initializerPtr = VIR_Uniform_GetInitializerPtr(Sym->u2.uniform);
+                VERIFY_OK(VIR_LOG(Dumper, " = {"));
+                for(i = 0; i < arrayLength; i++) {
+                    if(i != 0) {
+                        VERIFY_OK(VIR_LOG(Dumper, ", "));
+                    }
+                    pConstVal = (VIR_Const *)VIR_GetSymFromId(&Dumper->Shader->constTable,
+                                                              *initializerPtr++);
+                    _DumpConst(Dumper, pConstVal);
+                }
+                VERIFY_OK(VIR_LOG(Dumper, "}"));
+            }
+            else {
+                pConstVal = (VIR_Const *)VIR_GetSymFromId(&Dumper->Shader->constTable,
+                                                          VIR_Uniform_GetInitializer(Sym->u2.uniform));
+                /* dump initializer */
+                VERIFY_OK(VIR_LOG(Dumper, " = "));
+                _DumpConst(Dumper, pConstVal);
+            }
         }
         break;
     case VIR_SYM_VARIABLE:
@@ -1509,7 +1528,7 @@ _DumpOperand(
         return errCode;
     case VIR_OPND_IMMEDIATE:
         type = VIR_Shader_GetTypeFromId(Dumper->Shader,
-            VIR_Operand_GetType(Operand));
+            VIR_Operand_GetTypeId(Operand));
         if(type == gcvNULL)
         {
             return VSC_ERR_INVALID_ARGUMENT;
@@ -1545,7 +1564,7 @@ _DumpOperand(
                 gcvTRUE,
                 typeFormat);
             CHECK_ERROR(errCode, "DumpOperand");
-            componentTyId = VIR_GetTypeComponentType(VIR_Operand_GetType(Operand));
+            componentTyId = VIR_GetTypeComponentType(VIR_Operand_GetTypeId(Operand));
             gcmASSERT((componentTyId < gcmCOUNTOF(formats)) &&
                 formats[componentTyId].Type == (gctUINT32)componentTyId);
 
@@ -1633,7 +1652,7 @@ _DumpOperand(
     case VIR_OPND_SYMBOL:
     case VIR_OPND_VIRREG:
         type = VIR_Shader_GetTypeFromId(Dumper->Shader,
-            VIR_Operand_GetType(Operand));
+            VIR_Operand_GetTypeId(Operand));
         sym  = VIR_Operand_GetSymbol(Operand);
 
         if(type == gcvNULL || sym == gcvNULL)
@@ -1658,7 +1677,7 @@ _DumpOperand(
         break;
     case VIR_OPND_FIELD:
         type = VIR_Shader_GetTypeFromId(Dumper->Shader,
-            VIR_Operand_GetType(Operand));
+            VIR_Operand_GetTypeId(Operand));
         if(type == gcvNULL)
         {
             return VSC_ERR_INVALID_ARGUMENT;
@@ -1689,7 +1708,7 @@ _DumpOperand(
         break;
     case VIR_OPND_ARRAY:
         type = VIR_Shader_GetTypeFromId(Dumper->Shader,
-            VIR_Operand_GetType(Operand));
+            VIR_Operand_GetTypeId(Operand));
         if(type == gcvNULL)
         {
             return VSC_ERR_INVALID_ARGUMENT;
@@ -1728,7 +1747,7 @@ _DumpOperand(
 
     case VIR_OPND_SIZEOF:
         VERIFY_OK(VIR_LOG(Dumper, "SizeOf["));
-        type = VIR_Shader_GetTypeFromId(Dumper->Shader, VIR_Operand_GetType(Operand));
+        type = VIR_Shader_GetTypeFromId(Dumper->Shader, VIR_Operand_GetTypeId(Operand));
         sym  = VIR_Operand_GetSymbol(Operand);
 
         if(type == gcvNULL || sym == gcvNULL)
@@ -1749,7 +1768,7 @@ _DumpOperand(
     case VIR_OPND_OFFSETOF:
         VERIFY_OK(VIR_LOG(Dumper, "OffsetOf["));
         type = VIR_Shader_GetTypeFromId(Dumper->Shader,
-            VIR_Operand_GetType(Operand));
+            VIR_Operand_GetTypeId(Operand));
         sym  = VIR_Operand_GetSymbol(Operand);
 
         if(type == gcvNULL || sym == gcvNULL)

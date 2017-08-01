@@ -240,6 +240,7 @@ VkResult halti5_initializeChipModule(
     float limit;
     uint32_t *pCmdBuffer, *pCmdBufferBegin;
     VkResult result = VK_SUCCESS;
+    uint32_t i;
 
     __VK_SET_ALLOCATIONCB(&devCtx->memCb);
 
@@ -477,6 +478,16 @@ VkResult halti5_initializeChipModule(
         3, chipModule->sampleCoords4, chipModule->centroids4
         );
 
+    /* Compute sampleLocations. */
+    for (i = 0; i < 4; i++)
+    {
+        uint32_t sampleCoords = chipModule->sampleCoords4[0];
+        sampleCoords = sampleCoords >> (8 * i);
+        chipModule->sampleLocations[i][0] = (((((gctUINT32) (sampleCoords)) >> (0 ? 3:0)) & ((gctUINT32) ((((1 ? 3:0) - (0 ? 3:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 3:0) - (0 ? 3:0) + 1)))))) ) / 16.0f;
+        chipModule->sampleLocations[i][1] = (((((gctUINT32) (sampleCoords)) >> (0 ? 7:4)) & ((gctUINT32) ((((1 ? 7:4) - (0 ? 7:4) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 7:4) - (0 ? 7:4) + 1)))))) ) / 16.0f;
+    }
+
+
     chipModule->curInitCmdIndex = 0;
 
     pCmdBuffer = pCmdBufferBegin = &chipModule->initialCmds[chipModule->curInitCmdIndex];
@@ -567,7 +578,7 @@ VkResult halti5_initializeChipModule(
     vscCompileParams.cfg.cFlags = VSC_COMPILER_FLAG_COMPILE_TO_ML
                                 | VSC_COMPILER_FLAG_FLUSH_DENORM_TO_ZERO
                                 | VSC_COMPILER_FLAG_UNI_SAMPLER_UNIFIED_ALLOC;
-    vscCompileParams.cfg.optFlags = VSC_COMPILER_OPT_FULL;
+    vscCompileParams.cfg.optFlags = (VSC_COMPILER_OPT_FULL & (~VSC_COMPILER_OPT_ILF_LINK)) | VSC_COMPILER_OPT_NO_ILF_LINK;
     vscCompileParams.hShader = chipModule->patchLib;
 
     __VK_ONERROR((gcvSTATUS_OK == vscCompileShader(&vscCompileParams, gcvNULL))

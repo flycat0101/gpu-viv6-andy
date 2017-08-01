@@ -68,13 +68,9 @@ endif
 
 ################################################################################
 # Add extra flags for object files.
-CFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS -DCL_USE_DEPRECATED_OPENCL_1_1_APIS -DBUILD_OPENCL_12=1
+CFLAGS += -DCL_USE_DEPRECATED_OPENCL_1_0_APIS -DCL_USE_DEPRECATED_OPENCL_1_1_APIS
 ifeq ($(BUILD_OPENCL_ICD),1)
 CFLAGS += -DBUILD_OPENCL_ICD=1
-endif
-
-ifeq ($(BUILD_OPENCL_FP),1)
-CFLAGS += -DBUILD_OPENCL_FP=1
 endif
 
 ifeq ($(ENABLE_CL_GL),1)

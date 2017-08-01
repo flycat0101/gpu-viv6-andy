@@ -39,6 +39,7 @@
 #include <errno.h>
 #include <sys/syscall.h>
 #include <dirent.h>
+#include <poll.h>
 
 #include <signal.h>
 #ifdef ANDROID
@@ -138,6 +139,7 @@ struct _gcoOS
 static pthread_key_t gcProcessKey;
 
 gcsPLS gcPLS = gcPLS_INITIALIZER;
+static pthread_mutex_t plsMutex = PTHREAD_MUTEX_INITIALIZER;
 
 /******************************************************************************\
 ****************************** Internal Functions ******************************
@@ -356,25 +358,52 @@ OnError:
 }
 
 #if gcmIS_DEBUG(gcdDEBUG_STACK) && !defined(ANDROID)
-void
+
+static __sighandler_t handleSEGV;
+static __sighandler_t handleINT;
+
+static void
 _DumpCallStackOnCrash(
     int signo
     )
 {
     printf("libGAL: catch signal %d\n", signo);
+    fflush(stdout);
 
     gcmSTACK_DUMP();
 
-    exit(0);
+    /* Restore old signal handler. */
+    switch (signo)
+    {
+    case SIGSEGV:
+        signal(SIGSEGV, handleSEGV);
+        break;
+    case SIGINT:
+        signal(SIGINT, handleINT);
+        break;
+    default:
+        break;
+    }
+
+    raise(signo);
 }
 
-void
+static void
 _InstallSignalHandler(
     void
     )
 {
-    signal(SIGSEGV, _DumpCallStackOnCrash);
-    signal(SIGINT, _DumpCallStackOnCrash);
+    handleSEGV = signal(SIGSEGV, _DumpCallStackOnCrash);
+    handleINT  = signal(SIGINT, _DumpCallStackOnCrash);
+}
+
+static void
+_RestoreSignalHandler(
+    void
+    )
+{
+    signal(SIGSEGV, handleSEGV);
+    signal(SIGINT, handleINT);
 }
 #endif
 
@@ -390,11 +419,6 @@ _ConstructOs(
     gcmPROFILE_DECLARE_ONLY(gctUINT64 freq);
 
     gcmHEADER_ARG("Context=0x%x", Context);
-
-    /* On Android, crash stack is in logcat log, so don't try to catch these signals. */
-#if gcmIS_DEBUG(gcdDEBUG_STACK) && !defined(ANDROID)
-    _InstallSignalHandler();
-#endif
 
     if (os == gcvNULL)
     {
@@ -694,6 +718,12 @@ _PLSDestructor(
 {
     gcmHEADER();
 
+#if gcdENABLE_3D
+#if gcdSYNC
+    if(gcPLS.globalFenceID) gcoOS_AtomDestroy(gcvNULL, gcPLS.globalFenceID);
+#endif
+#endif
+
     if (gcPLS.destructor != gcvNULL)
     {
         gcPLS.destructor(&gcPLS);
@@ -743,6 +773,9 @@ _PLSDestructor(
 
     gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.glFECompilerAccessLock));
     gcPLS.glFECompilerAccessLock = gcvNULL;
+
+    gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.clFECompilerAccessLock));
+    gcPLS.clFECompilerAccessLock = gcvNULL;
 
     gcmVERIFY_OK(gcoOS_AtomDestroy(gcPLS.os, gcPLS.reference));
     gcPLS.reference = gcvNULL;
@@ -924,6 +957,14 @@ _OnceInit(
     /* Use once control to avoid registering the handler multiple times. */
     pthread_atfork(gcvNULL, gcvNULL, _AtForkChild);
 #endif
+
+    /*
+     * On Android, crash stack is in logcat log, so don't try to catch
+     * these signals.
+     */
+#if gcmIS_DEBUG(gcdDEBUG_STACK) && !defined(ANDROID)
+    _InstallSignalHandler();
+#endif
 }
 
 static gceSTATUS
@@ -936,6 +977,12 @@ _ModuleConstructor(
     static pthread_once_t onceControl = PTHREAD_ONCE_INIT;
 
     gcmHEADER();
+
+    if (gcPLS.processID)
+    {
+        gcmFOOTER_NO();
+        return gcvSTATUS_OK;
+    }
 
     /* Each process gets its own objects. */
     gcmASSERT(gcPLS.os  == gcvNULL);
@@ -980,6 +1027,9 @@ _ModuleConstructor(
     /* Construct gl FE compiler access lock */
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.glFECompilerAccessLock));
 
+    /* Construct cl FE compiler access lock */
+    gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &gcPLS.clFECompilerAccessLock));
+
 #if gcdDUMP_2D
     gcmONERROR(gcoOS_CreateMutex(gcPLS.os, &dumpMemInfoListMutex));
 #endif
@@ -1006,6 +1056,12 @@ OnError:
         gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.glFECompilerAccessLock));
     }
 
+    if (gcPLS.clFECompilerAccessLock != gcvNULL)
+    {
+        /* Destroy access lock */
+        gcmVERIFY_OK(gcoOS_DeleteMutex(gcPLS.os, gcPLS.clFECompilerAccessLock));
+    }
+
     if (gcPLS.reference != gcvNULL)
     {
         /* Destroy the reference. */
@@ -1026,8 +1082,11 @@ _OpenDevice(
 
     gcmHEADER();
 
+    pthread_mutex_lock(&plsMutex);
+
     if (Os->device > 0)
     {
+        pthread_mutex_unlock(&plsMutex);
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
     }
@@ -1075,12 +1134,18 @@ _OpenDevice(
 
     if (Os->device < 0)
     {
+        pthread_mutex_unlock(&plsMutex);
+
         gcmPRINT(
             "%s(%d): FATAL: Failed to open device, errno=%s.",
             __FUNCTION__, __LINE__, strerror(errno)
             );
 
         exit(1);
+
+        /* Should not run here. */
+        gcmFOOTER();
+        return gcvSTATUS_GENERIC_IO;
     }
 
     /* Construct gcoHAL object. */
@@ -1128,6 +1193,8 @@ _OpenDevice(
     }
 
 OnError:
+    pthread_mutex_unlock(&plsMutex);
+
     gcmFOOTER();
     return status;
 }
@@ -1159,6 +1226,10 @@ _ModuleDestructor(
             gcoOS_FreeThreadData();
         }
     }
+
+#if gcmIS_DEBUG(gcdDEBUG_STACK) && !defined(ANDROID)
+    _RestoreSignalHandler();
+#endif
 
     gcmFOOTER_NO();
 }
@@ -1248,19 +1319,14 @@ gcoOS_SetPLSValue(
     }
 }
 
-static pthread_mutex_t plsMutex = PTHREAD_MUTEX_INITIALIZER;
-
-static gceSTATUS
+static gcmINLINE gceSTATUS
 _GetTLS(
-    IN gctBOOL NeedOpenDevice,
     OUT gcsTLS_PTR * TLS
     )
 {
-    gceSTATUS status;
+    gceSTATUS status = gcvSTATUS_OK;
     gcsTLS_PTR tls = gcvNULL;
     int res;
-
-    gcmHEADER_ARG("TLS=%p", TLS);
 
     if (!gcPLS.processID)
     {
@@ -1313,9 +1379,50 @@ _GetTLS(
 #endif
     }
 
-    if (NeedOpenDevice)
+    *TLS = tls;
+
+    return gcvSTATUS_OK;
+
+OnError:
+    if (tls != gcvNULL)
     {
-        gcmONERROR(_OpenDevice(gcPLS.os));
+        gcmVERIFY_OK(gcoOS_FreeMemory(gcvNULL, (gctPOINTER) tls));
+    }
+
+    * TLS = gcvNULL;
+
+    return status;
+}
+
+/*******************************************************************************
+ **
+ ** gcoOS_GetTLS
+ **
+ ** Get access to the thread local storage.
+ **
+ ** INPUT:
+ **
+ **     Nothing.
+ **
+ ** OUTPUT:
+ **
+ **     gcsTLS_PTR * TLS
+ **         Pointer to a variable that will hold the pointer to the TLS.
+ */
+gceSTATUS
+gcoOS_GetTLS(
+    OUT gcsTLS_PTR * TLS
+    )
+{
+    gceSTATUS status;
+    gcsTLS_PTR tls = gcvNULL;
+
+    gcmONERROR(_GetTLS(&tls));
+
+    if (gcPLS.os->device < 0)
+    {
+        status = _OpenDevice(gcPLS.os);
+        gcmONERROR(status);
     }
 
     /* Assign default hardware type. */
@@ -1341,44 +1448,12 @@ _GetTLS(
         }
     }
 
-    * TLS = tls;
-
-    gcmFOOTER_NO();
+    *TLS = tls;
     return gcvSTATUS_OK;
 
 OnError:
-    if (tls != gcvNULL)
-    {
-        gcmVERIFY_OK(gcoOS_FreeMemory(gcvNULL, (gctPOINTER) tls));
-    }
-
-    * TLS = gcvNULL;
-
-    gcmFOOTER();
+    *TLS = gcvNULL;
     return status;
-}
-
-/*******************************************************************************
- **
- ** gcoOS_GetTLS
- **
- ** Get access to the thread local storage.
- **
- ** INPUT:
- **
- **     Nothing.
- **
- ** OUTPUT:
- **
- **     gcsTLS_PTR * TLS
- **         Pointer to a variable that will hold the pointer to the TLS.
- */
-gceSTATUS
-gcoOS_GetTLS(
-    OUT gcsTLS_PTR * TLS
-    )
-{
-    return _GetTLS(gcvTRUE, TLS);
 }
 
 /*
@@ -1489,7 +1564,7 @@ gcoOS_GetDriverTLS(
     }
 
     /* Get generic tls. */
-    gcmONERROR(_GetTLS(gcvFALSE, &tls));
+    gcmONERROR(_GetTLS(&tls));
 
     *TLS = tls->driverTLS[Key];
     gcmFOOTER_NO();
@@ -1519,7 +1594,7 @@ gcoOS_SetDriverTLS(
     }
 
     /* Get generic tls. */
-    gcmONERROR(_GetTLS(gcvFALSE, &tls));
+    gcmONERROR(_GetTLS(&tls));
 
     tls->driverTLS[Key] = TLS;
     gcmFOOTER_NO();
@@ -1650,6 +1725,66 @@ gcoOS_UnLockGLFECompiler(
         status = gcoOS_ReleaseMutex(gcPLS.os, gcPLS.glFECompilerAccessLock);
     }
     gcmFOOTER_ARG("Release GL FE compiler ret=%d", status);
+
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoOS_LockCLFECompiler
+**
+**  Lock mutext before access CL FE compiler if needed
+**
+**  INPUT:
+**
+**      Nothing.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcoOS_LockCLFECompiler(
+    void
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
+    if (gcPLS.clFECompilerAccessLock)
+    {
+        status = gcoOS_AcquireMutex(gcPLS.os, gcPLS.clFECompilerAccessLock, gcvINFINITE);
+    }
+    gcmFOOTER_ARG("Lock CL FE compiler ret=%d", status);
+
+    return status;
+}
+
+/*******************************************************************************
+**
+**  gcoOS_UnLockCLFECompiler
+**
+**  Release mutext after access CL FE compiler if needed
+**
+**  INPUT:
+**
+**      Nothing.
+**
+**  OUTPUT:
+**
+**      Nothing.
+*/
+gceSTATUS
+gcoOS_UnLockCLFECompiler(
+    void
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER();
+    if (gcPLS.clFECompilerAccessLock)
+    {
+        status = gcoOS_ReleaseMutex(gcPLS.os, gcPLS.clFECompilerAccessLock);
+    }
+    gcmFOOTER_ARG("Release CL FE compiler ret=%d", status);
 
     return status;
 }
@@ -2695,8 +2830,6 @@ gcoOS_FreeContiguous(
     return status;
 }
 
-/* VIV: These three functions are only used to be comptible with Freescale Android,
-   VIV: do NOT use them in other places. */
 /*******************************************************************************
 **
 **  gcoOS_AllocateVideoMemory (OBSOLETE, do NOT use it)
@@ -2752,6 +2885,7 @@ gcoOS_AllocateVideoMemory(
     gcsHAL_INTERFACE iface;
     gceHARDWARE_TYPE type;
     gctUINT32 flag = 0;
+    gcoHAL hal = gcvNULL;
 
     gcmHEADER_ARG("InUserSpace=%d *Bytes=%lu",
                   InUserSpace, gcmOPT_VALUE(Bytes));
@@ -2762,7 +2896,8 @@ gcoOS_AllocateVideoMemory(
     gcmVERIFY_ARGUMENT(Logical != gcvNULL);
 
     gcmVERIFY_OK(gcoHAL_GetHardwareType(gcvNULL, &type));
-    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+    hal = gcPLS.hal;
+    gcoHAL_SetHardwareType(gcvNULL, hal->is3DAvailable ? gcvHARDWARE_3D : gcvHARDWARE_2D);
 
     flag |= gcvALLOC_FLAG_CONTIGUOUS;
 
@@ -2866,12 +3001,13 @@ gcoOS_FreeVideoMemory(
 {
     gcsHAL_INTERFACE iface;
     gceHARDWARE_TYPE type;
+    gcoHAL hal = gcPLS.hal;
     gceSTATUS status;
 
     gcmHEADER_ARG("Os=0x%x Handle=0x%x",
                   Os, Handle);
     gcmVERIFY_OK(gcoHAL_GetHardwareType(gcvNULL, &type));
-    gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D);
+    gcoHAL_SetHardwareType(gcvNULL, hal->is3DAvailable ? gcvHARDWARE_3D : gcvHARDWARE_2D);
 
     do
     {
@@ -4868,7 +5004,7 @@ gcoOS_MapUserMemoryEx(
 
     gcmONERROR(gcoHAL_WrapUserMemory(&desc, &node));
 
-    gcmONERROR(gcoHAL_LockVideoMemory(node, gcvFALSE, Address, gcvNULL));
+    gcmONERROR(gcoHAL_LockVideoMemory(node, gcvFALSE, gcvENGINE_RENDER, Address, gcvNULL));
 
     *Info = (gctPOINTER)(gctUINTPTR_T)node;
 
@@ -4923,7 +5059,7 @@ gcoOS_UnmapUserMemory(
 
     node = (gctUINT32)(gctUINTPTR_T) Info;
 
-    gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(node, gcvSURF_BITMAP));
+    gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(node, gcvSURF_BITMAP, gcvENGINE_RENDER));
 
     gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(node));
 

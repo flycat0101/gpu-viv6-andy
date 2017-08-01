@@ -141,6 +141,33 @@ VX_INTERNAL_API void vxoReference_Dump(vx_reference ref)
     }
 }
 
+VX_INTERNAL_API vx_bool vxoReference_IsValid(vx_reference ref)
+{
+    if (ref == VX_NULL) return vx_false_e;
+
+    vxoReference_Dump(ref);
+
+    if (ref->signature == VX_REF_SIGNATURE_RELEASED)
+    {
+        vxError("The reference object, %p, has already been released", ref);
+        return vx_false_e;
+    }
+    else if (ref->signature != VX_REF_SIGNATURE_ALIVE)
+    {
+        vxError("The signature of the reference object is unexpected: "VX_FORMAT_HEX,
+                ref->signature);
+        return vx_false_e;
+    }
+
+    if (!vxDataType_IsValid(ref->type)) return vx_false_e;
+
+    if (ref->type == VX_TYPE_CONTEXT && (ref->context != NULL)) return vx_false_e;
+
+    if ((ref->type != VX_TYPE_CONTEXT) && !vxoContext_IsValid(ref->context)) return vx_false_e;
+
+    return vx_true_e;
+}
+
 VX_INTERNAL_API vx_bool vxoReference_IsValidAndNoncontext(vx_reference ref)
 {
     if (ref == VX_NULL) return vx_false_e;
@@ -449,6 +476,12 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryReference(vx_reference ref, vx_enum at
             *(vx_enum *)ptr = vxoReference_GetType(ref);
             break;
 
+        case VX_REF_ATTRIBUTE_NAME:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_char*, 0x3);
+
+            *(vx_char**)ptr = &ref->name[0];
+            break;
+
         default:
             vxError("The attribute parameter, %d, is not supported", attribute);
             return VX_ERROR_NOT_SUPPORTED;
@@ -506,7 +539,7 @@ vx_status vxQuerySurfaceNode(vx_reference reference,
             vx_uint32 size = 0;
             void * pointer = NULL;
             status |= vxAccessDistribution((vx_distribution)reference, &pointer, VX_WRITE_ONLY);
-            status |= vxQueryDistribution((vx_distribution)reference, VX_DISTRIBUTION_ATTRIBUTE_SIZE, &size, sizeof(size));
+            status |= vxQueryDistribution((vx_distribution)reference, VX_DISTRIBUTION_SIZE, &size, sizeof(size));
             memset(pointer, 0, size);
             status |= vxCommitDistribution((vx_distribution)reference, pointer);
 
@@ -550,12 +583,59 @@ vx_status vxQuerySurfaceNode(vx_reference reference,
     return status;
 }
 
+VX_API_ENTRY vx_status VX_API_CALL vxReleaseReference(vx_reference* ref_ptr)
+{
+    //return vxoReference_Release(ref_ptr, (*ref_ptr)->type, VX_REF_INTERNAL);
+
+    vx_status status = VX_SUCCESS;
+
+    vx_reference ref = (ref_ptr ? *ref_ptr : NULL);
+    if ((ref->type == VX_TYPE_CONTEXT && vxoContext_IsValid((vx_context)ref)) ||
+        (vxoReference_IsValidAndNoncontext(ref) == vx_true_e))
+    {
+        status = vxoReference_Release(ref_ptr, ref->type, VX_REF_EXTERNAL);
+    }
+    else
+    {
+        status = VX_ERROR_INVALID_REFERENCE;
+    }
+
+    return status;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxSetReferenceName(vx_reference ref, const vx_char *name)
+{
+    vx_status status = VX_ERROR_INVALID_REFERENCE;
+    if (vxoReference_IsValidAndNoncontext(ref))
+    {
+        strncpy(ref->name, name, strnlen(name, VX_MAX_REFERENCE_NAME));
+        status = VX_SUCCESS;
+    }
+    return status;
+}
+
 
 vx_status vxCommitSurfaceNode(vx_reference reference)
 {
     vx_status status = VX_FAILURE;
 
     /*status = vxReleaseMutex(reference->lock);*/ /*disable this because vxRelaseMutes has problem in test case related with array*/
+    return status;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxRetainReference(vx_reference ref)
+{
+    vx_status status = VX_SUCCESS;
+
+    if ((ref->type == VX_TYPE_CONTEXT && vxoContext_IsValid((vx_context)ref)) ||
+        (vxoReference_IsValidAndNoncontext(ref) == vx_true_e))
+    {
+        vxoReference_Increment(ref, VX_REF_EXTERNAL);
+    }
+    else
+    {
+        status = VX_ERROR_INVALID_REFERENCE;
+    }
 
     return status;
 }

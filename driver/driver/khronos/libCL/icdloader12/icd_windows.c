@@ -209,3 +209,55 @@ void khrIcdOsLibraryUnload(void *library)
     FreeLibrary( (HMODULE)library);
 }
 
+static void
+_ModuleDestructor(
+    void
+    )
+{
+    INT32 reference = 0;
+
+    KHRicdVendor * vendor = NULL;
+
+    if(platforms)
+    {
+        free(platforms);
+        platforms = NULL;
+    }
+    for(vendor = khrIcdState.vendors; vendor != NULL; )
+    {
+        KHRicdVendor * next = vendor->next;
+        if(vendor->suffix)
+        {
+            free(vendor->suffix);
+            vendor->suffix = NULL;
+        }
+        if(vendor)
+        {
+            free(vendor);
+        }
+        vendor = next;
+    }
+}
+
+BOOL WINAPI
+DllMain(
+    IN HINSTANCE Instance,
+    IN DWORD Reason,
+    IN LPVOID Reserved
+    )
+{
+    switch (Reason)
+    {
+    case DLL_PROCESS_ATTACH:
+        break;
+
+    case DLL_PROCESS_DETACH:
+        _ModuleDestructor();
+        break;
+
+    case DLL_THREAD_DETACH:
+        break;
+    }
+
+    return 1;
+}

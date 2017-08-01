@@ -252,6 +252,7 @@ struct __DRIdrawableRec {
 /* only for VG 2D, otherwise should be NULL */
     RSFUNC rsFunc;
 #endif
+
 };
 
 
@@ -692,14 +693,18 @@ static gceSTATUS _FreeVideoNode(
         IN gcoHAL Hal,
         IN gctUINT32 Node) {
     gcsHAL_INTERFACE iface;
+    gceSTATUS status;
 
     gcmASSERT(Node != 0);
 
     iface.command = gcvHAL_RELEASE_VIDEO_MEMORY;
     iface.u.ReleaseVideoMemory.node = Node;
 
-    /* Call kernel API. */
-    return gcoHAL_Call(Hal, &iface);
+    status = gcoHAL_Call(Hal, &iface);
+
+    gcoHAL_Commit(Hal, gcvFALSE);
+
+    return status;
 }
 
 #if defined(DRI_PIXMAPRENDER) || defined(DRI_PIXMAPRENDER_ASYNC)
@@ -718,7 +723,7 @@ static void _createPixmapInfo(
     int xx, yy;
     unsigned int ww, hh, bb;
     int xw,yw;
-    int numRects;
+    int numRects = 0;
     drm_clip_rect_t *pClipRects;
     unsigned int alignedW;
     unsigned int alignedH;
@@ -752,6 +757,9 @@ static void _createPixmapInfo(
                     &stride,
                     &nodeName,
                     (unsigned int *)&physAddr);
+
+    if ( numRects >0 && pClipRects )
+        Xfree((void *)pClipRects);
 
     if ( nodeName )
         gcoHAL_ImportVideoMemory((gctUINT32)nodeName, (gctUINT32 *)backNode);
@@ -849,12 +857,13 @@ static void renderThread(void* refData)
 
     int i = 0;
     Display                        *dpy = gcvNULL;
+    #define T_OPEN 10
+    int opentimes = T_OPEN;
 
     if ( drawable == gcvNULL )
         return ;
 
     XInitThreads();
-    dpy = XOpenDisplay(NULL);
 
     while( 1 && drawable->frameMutex ) {
 
@@ -892,8 +901,21 @@ static void renderThread(void* refData)
 */
                     if ( drawable->ascframe[i].backPixmap )
                     {
+                        if ( opentimes == T_OPEN )
+                        dpy = XOpenDisplay(NULL);
+
                         XCopyArea(dpy, drawable->ascframe[i].backPixmap, drawable->ascframe[i].Drawable, drawable->ascframe[i].xgc, 0, 0, drawable->ascframe[i].w, drawable->ascframe[i].h, 0, 0);
                         XFlush(dpy);
+                        opentimes--;
+
+                        if ( opentimes == 0 )
+                        {
+                           XCloseDisplay(dpy);
+                           dpy = gcvNULL;
+                           opentimes = T_OPEN;
+                        }
+
+
                     }
 /*
                     LINUX_UNLOCK_FRAMEBUFFER(context);
@@ -916,8 +938,8 @@ static void renderThread(void* refData)
     if ( drawable->exitSIG)
     gcoOS_Signal(gcvNULL, drawable->exitSIG, gcvTRUE);
 
-    if ( dpy )
-    XCloseDisplay(dpy);
+    if ( dpy != 0 )
+        XCloseDisplay(dpy);
 
 }
 
@@ -1153,6 +1175,7 @@ static void asyncRenderEnd(__DRIdrawablePriv * drawable, PlatformWindowType Draw
     drawable->busyNum ++;
 
     iface.command            = gcvHAL_SIGNAL;
+    iface.engine             = gcvENGINE_RENDER;
     iface.u.Signal.signal    = gcmPTR_TO_UINT64(drawable->ascframe[index].signal);
     iface.u.Signal.auxSignal = 0;
     iface.u.Signal.process = gcmPTR_TO_UINT64(gcoOS_GetCurrentProcessID());
@@ -1166,8 +1189,10 @@ static void asyncRenderEnd(__DRIdrawablePriv * drawable, PlatformWindowType Draw
 
 
 ENDUNLOCK:
+
     gcoOS_ReleaseMutex(gcvNULL, drawable->frameMutex);
 
+#if gcdENABLE_VG
 /* drawable->rsFunc != NULL is VG path */
     if ( drawable->rsFunc )
     {
@@ -1175,9 +1200,11 @@ ENDUNLOCK:
         if ( drawable->ascframe[index].busy ==  _FRAME_BUSY )
             gcoOS_Signal(gcvNULL, drawable->ascframe[index].signal, gcvTRUE);
     } else {
+#endif
         gcoHAL_Commit(gcvNULL, gcvFALSE);
+#if gcdENABLE_VG
     }
-
+#endif
 }
 
 #endif
@@ -1344,7 +1371,7 @@ gceSTATUS _getPixmapDrawableInfo(Display *dpy, Drawable pixmap, gctUINT* videoNo
     int discarded;
     unsigned int uDiscarded;
     unsigned int nodeName;
-    int numClipRects;
+    int numClipRects = 0;
     drm_clip_rect_t* pClipRects;
     int stride = 0;
     int x;
@@ -1371,7 +1398,8 @@ gceSTATUS _getPixmapDrawableInfo(Display *dpy, Drawable pixmap, gctUINT* videoNo
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
-
+    if ( numClipRects >0 && pClipRects )
+        Xfree((void *)pClipRects);
 
     /* Extract the data needed for pixmaps from the variables set in dri.c */
     if ( nodeName )
@@ -1393,13 +1421,17 @@ void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
     int y;
     int w;
     int h;
-    int numClipRects;
+    int numClipRects = 0;
     drm_clip_rect_t *pClipRects;
     unsigned int stride;
     unsigned int nodeName = 0;
 
     display = drawable->display;
 
+    if ( pdp->numBackClipRects >0 && pdp->pBackClipRects )
+    Xfree((void *)pdp->pBackClipRects);
+
+    pdp->numBackClipRects = 0;
 
     /* Assign __DRIdrawablePrivate first */
     if (!XF86DRIGetDrawableInfo(display->dpy, pdp->screen, pdp->drawable,
@@ -1425,6 +1457,14 @@ void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
        pdp->pStamp = &(display->pSAREA->drawableTable[pdp->index].stamp);
 
 
+    if ( numClipRects >0 && pClipRects )
+        Xfree((void *)pClipRects);
+
+
+    if ( pdp->numClipRects >0 && pdp->pClipRects )
+        Xfree((void *)pdp->pClipRects);
+    pdp->numClipRects = 0;
+
     VIVEXTDrawableInfo(display->dpy, pdp->screen, pdp->drawable,
                     &pdp->x, &pdp->y, &pdp->w, &pdp->h,
                     &pdp->numClipRects, &pdp->pClipRects,
@@ -1435,8 +1475,6 @@ void _UpdateDrawableInfoDrawableInfo(__DRIdrawablePriv * drawable)
                     &stride,
                     &nodeName,
                     (unsigned int *)&pdp->backBufferPhysAddr);
-
-
 
     if ( nodeName )
     {
@@ -2267,6 +2305,7 @@ dri_CreateDrawable(IN gctPOINTER localDisplay, IN PlatformWindowType Drawable)
     drawable->exitSIG = gcvNULL;
 #endif
 
+
 OnError:
     /* Success. */
     gcmFOOTER();
@@ -2306,6 +2345,16 @@ dri_DestroyDrawable(IN gctPOINTER localDisplay, IN PlatformWindowType Drawable)
 
         cur->backNode = 0;
         cur->nodeName = 0;
+
+        if ( cur->numClipRects >0 && cur->pClipRects )
+            Xfree((void *)cur->pClipRects);
+
+        cur->numClipRects = 0;
+
+        if ( cur->numBackClipRects >0 && cur->pBackClipRects )
+            Xfree((void *)cur->pBackClipRects);
+
+        cur->numBackClipRects = 0;
 
 #ifdef DRI_PIXMAPRENDER
         _DestroyBackPixmapForDrawable(cur);
@@ -3344,10 +3393,7 @@ dri_SwapBuffers(
     OUT gctUINT *Height
     )
 {
-    gctBOOL yInverted;
-    VEGLThreadData thread;
-    thread = veglGetThreadData();
-    yInverted = (thread->api == EGL_OPENVG_API) ? gcvTRUE : gcvFALSE;
+    gctBOOL yInverted = gcvFALSE;
 #ifdef DRI_PIXMAPRENDER_ASYNC
 #define dri_SwapBuffersUnityAsync dri_SwapBuffersXwinAsync
 #endif
@@ -5544,8 +5590,8 @@ _PostWindowBackBuffer(
     IN VEGLDisplay Display,
     IN VEGLSurface Surface,
     IN struct eglBackBuffer * BackBuffer,
-    IN EGLint NumRects,
-    IN EGLint Rects[]
+    IN struct eglRegion * Region,
+    IN struct eglRegion * DamageHint
     )
 {
     void * win = Surface->hwnd;
@@ -5618,12 +5664,12 @@ _PostWindowBackBuffer(
             return EGL_FALSE;
         }
 
-        for (i = 0; i < NumRects; i++)
+        for (i = 0; i < Region->numRects; i++)
         {
-            EGLint left   = Rects[i * 4 + 0];
-            EGLint top    = Rects[i * 4 + 1];
-            EGLint width  = Rects[i * 4 + 2];
-            EGLint height = Rects[i * 4 + 3];
+            EGLint left   = Region->rects[i * 4 + 0];
+            EGLint top    = Region->rects[i * 4 + 1];
+            EGLint width  = Region->rects[i * 4 + 2];
+            EGLint height = Region->rects[i * 4 + 3];
 
             /* Draw image. */
             status = dri_DrawImageEx((PlatformDisplayType) Display->hdc,

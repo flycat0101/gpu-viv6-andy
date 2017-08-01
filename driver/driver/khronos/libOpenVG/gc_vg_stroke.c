@@ -1169,7 +1169,6 @@ _ResetStrokeConversion(
 
         if (! StrokeConversion->useFastMode)
         {
-            /* VIV: [todo] Clear swing related data. */
         }
     }
 
@@ -3744,8 +3743,6 @@ _ProcessLineJoint(
                 StrokeConversion->swingStrokeDeltaX = X2 - prevPoint->x;
                 StrokeConversion->swingStrokeDeltaY = Y2 - prevPoint->y;
 
-                /* Add extra center point for swing out pie area. */
-                /* VIV: [todo] Should adjust prevPoint, instead of adding new point? */
                 gcmERR_GOTO(_AddAPointToLeftStrokePointListHead(Context, StrokeConversion, Point->x, Point->y));
 
                 /* Add extra start stroke point for swing out pie area. */
@@ -3872,8 +3869,6 @@ _ProcessLineJoint(
                 StrokeConversion->swingStrokeDeltaX = X1 - prevPoint->x;
                 StrokeConversion->swingStrokeDeltaY = Y1 - prevPoint->y;
 
-                /* Add extra center point for swing out pie area. */
-                /* VIV: [todo] Should adjust prevPoint, instead of adding new point? */
                 gcmERR_GOTO(_AddAPointToRightStrokePointListTail(Context, StrokeConversion, Point->x, Point->y));
 
                 /* Add extra start stroke point for swing out pie area. */
@@ -4056,7 +4051,6 @@ _CreateStrokePath(
 
         StrokeConversion->currentSubPath = subPath;
 
-        /* VIV: [todo] Need to check/debug closed stroke path. */
         needToHandleSwing = (StrokeConversion->strokeCapStyle == gcvCAP_BUTT || subPath->closed);
         if (needToHandleSwing)
         {
@@ -6733,7 +6727,6 @@ _FlattenPath_I(
 needToUseFloat:
     StrokeConversion->useFixedPoint = gcvFALSE;
 
-    /* VIV: [todo] Use free list. */
     /* Free subPaths. */
     if (StrokeConversion->subPathList)
     {
@@ -7063,7 +7056,6 @@ needToUseFloat:
 needToUseSlowMode:
     StrokeConversion->useFastMode   = gcvFALSE;
 
-    /* VIV: [todo] Use free list. */
     /* Free subPaths. */
     if (StrokeConversion->subPathList)
     {
@@ -7591,7 +7583,6 @@ _StartANewStrokeSubPath_I(
 #if gcvUSE_FAST_STROKE
             if (StrokeConversion->useFastMode)
             {
-                /* VIV: [todo] Add a point. */
             }
             else
 #endif
@@ -7654,7 +7645,6 @@ _EndAStrokeSubPath_I(
 #if gcvUSE_FAST_STROKE
         if (StrokeConversion->useFastMode)
         {
-            /* VIV: [todo] Add a point. */
         }
         else
 #endif
@@ -8141,8 +8131,6 @@ _ProcessLineJoint_I(
                 StrokeConversion->swingStrokeDeltaX = X2 - prevPoint->x;
                 StrokeConversion->swingStrokeDeltaY = Y2 - prevPoint->y;
 
-                /* Add extra center point for swing out pie area. */
-                /* VIV: [todo] Should adjust prevPoint, instead of adding new point? */
                 gcmERR_GOTO(_AddAPointToLeftStrokePointListHead_I(Context, StrokeConversion, Point->x, Point->y));
 
                 /* Add extra start stroke point for swing out pie area. */
@@ -8269,8 +8257,6 @@ _ProcessLineJoint_I(
                 StrokeConversion->swingStrokeDeltaX = X1 - prevPoint->x;
                 StrokeConversion->swingStrokeDeltaY = Y1 - prevPoint->y;
 
-                /* Add extra center point for swing out pie area. */
-                /* VIV: [todo] Should adjust prevPoint, instead of adding new point? */
                 gcmERR_GOTO(_AddAPointToRightStrokePointListTail_I(Context, StrokeConversion, Point->x, Point->y));
 
                 /* Add extra start stroke point for swing out pie area. */
@@ -8450,7 +8436,6 @@ _CreateStrokePath_I(
 
         StrokeConversion->currentSubPath = subPath;
 
-        /* VIV: [todo] Need to check/debug closed stroke path. */
         needToHandleSwing = (StrokeConversion->strokeCapStyle == gcvCAP_BUTT || subPath->closed);
         if (needToHandleSwing)
         {
@@ -9320,7 +9305,6 @@ _FastProcessLineJoint_I(
 
     if (counterClockwise)
     {
-        /* VIV: [todo] Check if the turn is more than 90 degree. */
         if (Point->flattenFlag == vgcFLATTEN_NO)
         {
             /* Add the point to avoid incorrect sharp angle. */
@@ -9359,7 +9343,6 @@ _FastProcessLineJoint_I(
     }
     else
     {
-        /* VIV: [todo] Check if the turn is more than 90 degree. */
         if (Point->flattenFlag == vgcFLATTEN_NO)
         {
             /* Add the point to avoid incorrect sharp angle. */

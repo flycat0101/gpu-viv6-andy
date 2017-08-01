@@ -43,7 +43,7 @@ typedef struct __vkChipFuncTableRec
     VkResult (*AllocDescriptorSet)(VkDevice device, VkDescriptorSet descriptorSet);
     VkResult (*FreeDescriptorSet)(VkDevice device, VkDescriptorSet descriptorSet);
     VkResult (*UpdateDescriptorSet)(VkDevice device, VkDescriptorSet descriptorSet);
-    VkResult (*ProcessQueryRequest)(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t query);
+    VkResult (*ProcessQueryRequest)(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t query, VkBool32 beginOQ);
     VkResult (*BindDescritptors)(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, uint32_t firstSet, uint32_t setCount);
     void (*PipelineBarrier)(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask,
  VkPipelineStageFlags destStageMask, VkDependencyFlags dependencyFlags,

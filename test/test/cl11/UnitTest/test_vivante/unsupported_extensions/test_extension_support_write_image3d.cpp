@@ -98,8 +98,6 @@ int test_write_image3d(cl_device_id device, cl_context context, cl_command_queue
 
     img_format.image_channel_order = CL_RGBA;
 
-
-
     for(int i = 0; i < 3; i++)
     {
         switch(i)
@@ -119,143 +117,129 @@ int test_write_image3d(cl_device_id device, cl_context context, cl_command_queue
                 break;
         }
 
-
-        // if this condition is true, this means device does not support 3D images
-        if(!clGetDeviceInfo(device, CL_DEVICE_IMAGE_SUPPORT, 0, NULL, NULL))
+        streams[0] = clCreateImage3D(context, CL_MEM_READ_WRITE, &img_format, img_width, img_height, img_depth, 0, 0, NULL, NULL);
+        if (!streams[0])
         {
-            //only check if kernel build is successful
-            sprintf(kernel_code_int, kernel_write_image3d, types[typeIndex], types[typeIndex], types[typeIndex], types[typeIndex], types[typeIndex],
-                types[typeIndex], floatNormalization, func[i]);
-            constkernelint = kernel_code_int;
+            printf("clCreateImage3D failed\n");
+            if(output_h) free(output_h);
+            if(input_h) free(input_h);
+            return -1;
+        }
+
+        streams[1] = clCreateBuffer(context, CL_MEM_READ_WRITE, length, NULL, NULL);
+        if (!streams[1])
+        {
+            printf("clCreateImage3D failed\n");
+            if(output_h) free(output_h);
+            if(input_h) free(input_h);
+            if(streams[0]) clReleaseMemObject(streams[0]);
+            return -1;
+        }
+
+        err = clEnqueueWriteBuffer(queue, streams[0], CL_TRUE, 0, length, input_h, 0, NULL, NULL);
+        if (err != CL_SUCCESS)
+        {
+            printf("clEnqueueWriteBuffer failed\n");
+            if(output_h) free(output_h);
+            if(input_h) free(input_h);
+            if(streams[0]) clReleaseMemObject(streams[0]);
+            if(streams[1]) clReleaseMemObject(streams[1]);
+            return -1;
+        }
+
+        //only check if kernel build is successful
+        sprintf(kernel_code_int, kernel_write_image3d, types[typeIndex], types[typeIndex], types[typeIndex], types[typeIndex], types[typeIndex],
+            types[typeIndex], floatNormalization, func[i]);
+        constkernelint = kernel_code_int;
+
+        if(is_extension_available(device, "cl_khr_3d_image_writes"))
+        {
             err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_rgba8888_write" );
             if (err)
             {
-                // check if image extension is supported
-                if(is_extension_available(device, "cl_khr_3d_image_writes"))
-                {
-                    printf("Kernel compilation error using 3D image writes.\n");
-                    clReleaseMemObject(streams[0]);
-                    clReleaseMemObject(streams[1]);
-                    if(!kernel)
-                        clReleaseKernel(kernel);
-                    clReleaseProgram(program);
-                    free(output_h);
-                    return -1;
-                }
-                printf("\n!!Kernel build not successful.\n");
-                printf("cl_khr_3d_image_writes extension is not supported.!!\n");
-                printf("Test passed.\n");
-
-                passCount++;
-                                typeIndex++;
-
-                continue;
+                printf("Kernel compilation error using 3D image writes.\n");
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(output_h) free(output_h);
+                if(input_h) free(input_h);
+                return -1;
             }
         }
         else
         {
-            streams[0] = clCreateImage3D(context, CL_MEM_READ_WRITE, &img_format, img_width, img_height, img_depth, 0, 0, NULL, NULL);
-            if (!streams[0])
-            {
-                printf("clCreateImage3D failed\n");
-                free(output_h);
-                free(input_h);
-                return -1;
-            }
+            if(streams[0]) clReleaseMemObject(streams[0]);
+            if(streams[1]) clReleaseMemObject(streams[1]);
+            if(kernel) clReleaseKernel(kernel);
+            if(program) clReleaseProgram(program);
+            if(output_h) free(output_h);
+            if(input_h) free(input_h);
 
-            streams[1] = clCreateBuffer(context, CL_MEM_READ_WRITE, length, NULL, NULL);
-            if (!streams[1])
-            {
-                printf("clCreateImage3D failed\n");
-                free(output_h);
-                free(input_h);
-                return -1;
-            }
+            printf("\n!!Kernel build not successful.\n");
+            printf("cl_khr_3d_image_writes extension is not supported.!!\n");
+            printf("Test passed.\n");
 
-            err = clEnqueueWriteBuffer(queue, streams[0], CL_TRUE, 0, length, input_h, 0, NULL, NULL);
-            if (err != CL_SUCCESS)
-            {
-                printf("clEnqueueWriteBuffer failed\n");
-                free(output_h);
-                free(input_h);
-                clReleaseMemObject(streams[0]);
-                return -1;
-            }
+            passCount++;
+            typeIndex++;
 
-            sprintf(kernel_code_int, kernel_write_image3d, types[typeIndex], types[typeIndex], types[typeIndex], types[typeIndex]);
-            constkernelint = kernel_code_int;
-            err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_rgba8888_write" );
-            if (err)
-            {
-                printf("kernel build failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
-                return -1;
-            }
-
-            err  = clSetKernelArg(kernel, 0, sizeof(streams[0]), &streams[0]);
-            if (err != CL_SUCCESS)
-            {
-                printf("clSetKernelArgs failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
-                return -1;
-            }
-
-            err  = clSetKernelArg(kernel, 0, sizeof(streams[1]), &streams[1]);
-            if (err != CL_SUCCESS)
-            {
-                printf("clSetKernelArgs failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
-                return -1;
-            }
-
-            threads[0] = img_width;
-            threads[1] = img_height;
-            threads[2] = img_depth;
-
-            err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
-            if (err != CL_SUCCESS)
-            {
-                printf("clEnqueueNDRangeKernel failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
-                return -1;
-            }
-
-            clReleaseMemObject(streams[0]);
-            clReleaseMemObject(streams[1]);
-            if(!kernel)
-                clReleaseKernel(kernel);
-            clReleaseProgram(program);
-            free(output_h);
+            continue;
         }
+
+        err  = clSetKernelArg(kernel, 0, sizeof(streams[0]), &streams[0]);
+        if (err != CL_SUCCESS)
+        {
+            printf("clSetKernelArgs failed\n");
+            if(streams[0]) clReleaseMemObject(streams[0]);
+            if(streams[1]) clReleaseMemObject(streams[1]);
+            if(kernel) clReleaseKernel(kernel);
+            if(program) clReleaseProgram(program);
+            if(output_h) free(output_h);
+            if(input_h) free(input_h);
+            return -1;
+        }
+
+        err  = clSetKernelArg(kernel, 0, sizeof(streams[1]), &streams[1]);
+        if (err != CL_SUCCESS)
+        {
+            printf("clSetKernelArgs failed\n");
+            if(streams[0]) clReleaseMemObject(streams[0]);
+            if(streams[1]) clReleaseMemObject(streams[1]);
+            if(kernel) clReleaseKernel(kernel);
+            if(program) clReleaseProgram(program);
+            if(output_h) free(output_h);
+            if(input_h) free(input_h);
+            return -1;
+        }
+
+        threads[0] = img_width;
+        threads[1] = img_height;
+        threads[2] = img_depth;
+
+        err = clEnqueueNDRangeKernel(queue, kernel, 1, NULL, threads, NULL, 0, NULL, NULL);
+        if (err != CL_SUCCESS)
+        {
+            printf("clEnqueueNDRangeKernel failed\n");
+            if(streams[0]) clReleaseMemObject(streams[0]);
+            if(streams[1]) clReleaseMemObject(streams[1]);
+            if(kernel) clReleaseKernel(kernel);
+            if(program) clReleaseProgram(program);
+            if(output_h) free(output_h);
+            if(input_h) free(input_h);
+            return -1;
+        }
+
+        if(streams[0]) clReleaseMemObject(streams[0]);
+        if(streams[1]) clReleaseMemObject(streams[1]);
+        if(kernel) clReleaseKernel(kernel);
+        if(program) clReleaseProgram(program);
 
         typeIndex++;
     }
 
-/*
-    printf("--------------------------------------------------------\n");
-    printf("cl_khr_fp16 tests:\n");
-    printf("%d / %d internal tests passed.\n",passCount, typeIndex);
-*/
+    if(output_h) free(output_h);
+    if(input_h) free(input_h);
+
     total += typeIndex;
     passed += passCount;
     fail += typeIndex - passCount;

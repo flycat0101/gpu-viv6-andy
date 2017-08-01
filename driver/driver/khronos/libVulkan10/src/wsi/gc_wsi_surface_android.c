@@ -1085,6 +1085,7 @@ static VkResult __CommitPresentCommand(
 
         /* Submit the sync point. */
         iface.command            = gcvHAL_SIGNAL;
+        iface.engine             = gcvENGINE_RENDER;
         iface.u.Signal.signal    = gcmPTR_TO_UINT64(signal);
         iface.u.Signal.auxSignal = 0;
         iface.u.Signal.process   = (gctINT)gcoOS_GetCurrentProcessID();
@@ -1449,6 +1450,7 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_QueueSignalReleaseImageANDROID(
 
         /* Submit the sync point. */
         iface.command            = gcvHAL_SIGNAL;
+        iface.engine             = gcvENGINE_RENDER;
         iface.u.Signal.signal    = gcmPTR_TO_UINT64(signal);
         iface.u.Signal.auxSignal = 0;
         iface.u.Signal.process   = (gctINT)gcoOS_GetCurrentProcessID();

@@ -854,8 +854,7 @@ _addInstructionToLTCList(
                 else
                 {
                     /* Get the convet format. */
-                    src1Format.hex[0] = inst->source1Index;
-                    src1Format.hex[1] = inst->source1Indexed;
+                    src1Format.hex32 = (gcSL_FORMAT)(inst->source1Index | inst->source1Indexed << 16);
 
                     if (src1Format.hex32 != gcSL_FLOAT)
                     {
@@ -3435,7 +3434,7 @@ _LTCDumpValue(
     for (; i <MAX_LTC_COMPONENTS; i++)
     {
         gcmVERIFY_OK(gcoOS_PrintStrSafe(Buffer, BufferLen, Offset,
-            "%10.6f", Value->v[i].f32));
+            "%10.6f (0x%08X)", Value->v[i].f32, Value->v[i].u32));
         if (i != MAX_LTC_COMPONENTS -1 )
         {
             gcmVERIFY_OK(gcoOS_PrintStrSafe(Buffer, BufferLen, Offset, ", "));
@@ -3462,7 +3461,6 @@ _LTCGetSourceValue(
     gctSOURCE_t                source;
     gctUINT16                  index;
     gcSL_FORMAT                format;
-    gctUINT32                  value;
     gctINT                     i;
     gcSL_OPCODE                opcode = gcmSL_OPCODE_GET(Instruction->opcode, Opcode);
 
@@ -3503,30 +3501,30 @@ _LTCGetSourceValue(
         /* get values one component at a time*/
         for (i = 0; i < MAX_LTC_COMPONENTS; i++)
         {
+            gcuFLOAT_UINT32 constant;
             /* value is constant, it is stored in SourceIndex and
             * SourceINdexed fields */
-            value = (SourceId == 0) ? (Instruction->source0Index & 0xFFFF)
+            constant.u = (SourceId == 0) ? (Instruction->source0Index & 0xFFFF)
                 | (Instruction->source0Indexed << 16)
                 : (Instruction->source1Index & 0xFFFF)
                 | (Instruction->source1Indexed << 16);
             if (format == gcSL_FLOAT)
             {
                 /* float value */
-                float f = gcoMATH_UIntAsFloat(value);
-                SourceValue->v[i].f32 = f;
+                SourceValue->v[i].f32 = constant.f;
             }
             else if (format == gcSL_INTEGER)
             {
                 /* integer value */
-                SourceValue->v[i].i32 = value;
+                SourceValue->v[i].i32 = (gctINT32)constant.u;
             }
             else if (format == gcSL_UINT32)
             {
-                SourceValue->v[i].u32 = value;
+                SourceValue->v[i].u32 = constant.u;
             }
             else if (format == gcSL_BOOLEAN)
             {
-                SourceValue->v[i].b = (value == 0 ? gcvFALSE : gcvTRUE);
+                SourceValue->v[i].b = (constant.u == 0 ? gcvFALSE : gcvTRUE);
             }
             else
             {

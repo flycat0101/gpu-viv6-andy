@@ -101,6 +101,7 @@ typedef struct _cl_context
 #if cldTUNING
     gctBOOL                 sortRects;
 #endif
+
 }
 clsContext;
 

@@ -526,6 +526,44 @@ _ConvertBlitFormat(
     return gcvSTATUS_OK;
 }
 
+static gctUINT32
+_GetEndianControl(
+    IN gcoHARDWARE Hardware,
+    IN gctUINT32 hwFormat
+    )
+{
+    gctUINT32 endianCtrl = 0x0;
+
+    if (Hardware->bigEndian)
+    {
+        switch (hwFormat)
+        {
+        case 0x00:
+        case 0x01:
+        case 0x02:
+        case 0x03:
+        case 0x04:
+        case 0x18:
+        case 0x1C:
+            endianCtrl = 0x1;
+            break;
+        case 0x16:
+        case 0x17:
+        case 0x19:
+        case 0x1A:
+        case 0x25:
+        case 0x26:
+        case 0x27:
+            endianCtrl = 0x2;
+            break;
+        default:
+            break;
+        }
+    }
+
+    return endianCtrl;
+}
+
 static void
 _ConfigMSAA(
     IN gcsSAMPLES *SampleInfo,
@@ -572,10 +610,6 @@ _3DBlitExecute(
 {
     gceSTATUS   status;
     gctUINT32   data = 0;
-#if VIVANTE_PROFILER_PROBE_PERDRAW
-    gctUINT32 probeAddress;
-    gctINT32 module;
-#endif
 
     static gctUINT32 commands[] = {
         0x1,
@@ -613,16 +647,6 @@ _3DBlitExecute(
 
     /* Reserve space in the command buffer. */
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, Memory);
-
-#if VIVANTE_PROFILER_PROBE_PERDRAW
-    gcoBUFOBJ_Lock(Hardware->probeBuffer->newCounterBuf[Hardware->probeBuffer->curBufId], &probeAddress, gcvNULL);
-
-    for (module = 0; module < gcvCOUNTER_COUNT; module++)
-    {
-        gcoHARDWARE_ProbeCounter(Hardware, probeAddress, (gceCOUNTER)module, gcvTRUE, Memory);
-    }
-    Hardware->probeBuffer->opType[Hardware->probeBuffer->curBufId] = gcvCOUNTER_OP_BLT;
-#endif
 
     {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -737,14 +761,6 @@ _3DBlitExecute(
  _MultiGPUSync(Hardware, Engine, forceSGPU, gcvFALSE, &memory);
  ;
 
-
-#if VIVANTE_PROFILER_PROBE_PERDRAW
-    for (module = 0; module < gcvCOUNTER_COUNT; module++)
-    {
-        gcoHARDWARE_ProbeCounter(Hardware, probeAddress, (gceCOUNTER)module, gcvFALSE, Memory);
-    }
-    Hardware->probeBuffer->curBufId++;
-#endif
 
     /* Validate the state buffer. */
     gcmENDSTATEBUFFER_NEW(Hardware, reserve, memory, Memory);
@@ -1438,8 +1454,8 @@ gcoHARDWARE_3DBlitBlt(
         default:
             break;
         }
-
     }
+
     gcmONERROR(_ConvertBlitFormat(gcvTRUE, srcSurfFmt, &srcFormat, &srcSwizzle, &srcDownsampleMode, &bSrcFake));
     gcmONERROR(_ConvertBlitFormat(gcvFALSE, dstSurf->format, &dstFormat, &dstSwizzle, gcvNULL, &bDstFake));
     srcSRGB = (srcSurf->colorSpace == gcvSURF_COLOR_SPACE_NONLINEAR) ? gcvTRUE : gcvFALSE;
@@ -1662,7 +1678,6 @@ gcoHARDWARE_3DBlitBlt(
  8:8))) | (((gctUINT32) ((gctUINT32) (srcSRGB) & ((gctUINT32) ((((1 ? 8:8) - (0 ?
  8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
  8:8)));
-        ;
 
     dstConfigEx
         = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 0:0) - (0 ?
@@ -1713,8 +1728,12 @@ gcoHARDWARE_3DBlitBlt(
  8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
  8:8))) | (((gctUINT32) ((gctUINT32) (dstSRGB) & ((gctUINT32) ((((1 ? 8:8) - (0 ?
  8:8) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 8:8) - (0 ? 8:8) + 1))))))) << (0 ?
- 8:8)));
-        ;
+ 8:8)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 22:22) - (0 ?
+ 22:22) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 22:22) - (0 ? 22:22) + 1))))))) << (0 ?
+ 22:22))) | (((gctUINT32) (0x1 & ((gctUINT32) ((((1 ? 22:22) - (0 ? 22:22) + 1) == 32) ?
+ ~0U : (~(~0U << ((1 ? 22:22) - (0 ? 22:22) + 1))))))) << (0 ? 22:22)));
+
 
     swizzleConfig
         = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 2:0) - (0 ?
@@ -1771,7 +1790,17 @@ gcoHARDWARE_3DBlitBlt(
  12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ? 12:12) + 1))))))) << (0 ?
  12:12))) | (((gctUINT32) ((gctUINT32) (srcDownsampleMode) & ((gctUINT32) ((((1 ?
  12:12) - (0 ? 12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ?
- 12:12) + 1))))))) << (0 ? 12:12)));
+ 12:12) + 1))))))) << (0 ? 12:12)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 2:1) - (0 ?
+ 2:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:1) - (0 ? 2:1) + 1))))))) << (0 ?
+ 2:1))) | (((gctUINT32) ((gctUINT32) (_GetEndianControl(Hardware, srcFormat)) & ((gctUINT32) ((((1 ?
+ 2:1) - (0 ? 2:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:1) - (0 ? 2:1) + 1))))))) << (0 ?
+ 2:1)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:3) - (0 ?
+ 4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
+ 4:3))) | (((gctUINT32) ((gctUINT32) (_GetEndianControl(Hardware, dstFormat)) & ((gctUINT32) ((((1 ?
+ 4:3) - (0 ? 4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
+ 4:3)));
 
     if (Hardware->features[gcvFEATURE_128BTILE])
     {
@@ -1887,6 +1916,10 @@ gcoHARDWARE_3DBlitBlt(
         /* Switch to 3D pipe. */
         gcmONERROR(gcoHARDWARE_SelectPipe(Hardware, gcvPIPE_3D, (gctPOINTER *)&memory));
     }
+
+    /* lock surface on the execute engine */
+    gcsSURF_NODE_Lock(&srcSurf->node, CurrentEngine, gcvNULL, gcvNULL);
+    gcsSURF_NODE_Lock(&dstSurf->node, CurrentEngine, gcvNULL, gcvNULL);
 
      _MultiGPUSync(Hardware, Args->uArgs.v2.engine, forceSGPU, gcvTRUE,
  &memory); {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
@@ -2018,6 +2051,72 @@ gcoHARDWARE_3DBlitBlt(
 };
     gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x502F, swizzleConfig );
     gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+    /* Tilesize for customer config */
+    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x5028) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5028, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (4) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:16) - (0 ?
+ 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ?
+ 31:16))) | (((gctUINT32) ((gctUINT32) (4) & ((gctUINT32) ((((1 ? 31:16) - (0 ?
+ 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ?
+ 31:16))));    gcmENDSTATEBATCH_NEW(reserve, memory);
+};
+
+
+     /* block size for customer config*/
+    {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
+    gcmASSERT((gctUINT32)1 <= 1024);
+    *memory++        = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27))) | (((gctUINT32) (0x01 & ((gctUINT32) ((((1 ?
+ 31:27) - (0 ? 31:27) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:27) - (0 ?
+ 31:27) + 1))))))) << (0 ? 31:27)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26))) | (((gctUINT32) ((gctUINT32) (gcvFALSE) & ((gctUINT32) ((((1 ?
+ 26:26) - (0 ? 26:26) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 26:26) - (0 ?
+ 26:26) + 1))))))) << (0 ? 26:26)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16))) | (((gctUINT32) ((gctUINT32) (1) & ((gctUINT32) ((((1 ?
+ 25:16) - (0 ? 25:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 25:16) - (0 ?
+ 25:16) + 1))))))) << (0 ? 25:16)))        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x5027) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0)));    gcmSKIPSECUREUSER();
+};
+    gcmSETCTRLSTATE_NEW(stateDelta, reserve, memory, 0x5027, ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ?
+ 15:0) - (0 ? 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | (((gctUINT32) ((gctUINT32) (0x40) & ((gctUINT32) ((((1 ? 15:0) - (0 ?
+ 15:0) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 15:0) - (0 ? 15:0) + 1))))))) << (0 ?
+ 15:0))) | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 31:16) - (0 ?
+ 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ?
+ 31:16))) | (((gctUINT32) ((gctUINT32) (0x40) & ((gctUINT32) ((((1 ? 31:16) - (0 ?
+ 31:16) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 31:16) - (0 ? 31:16) + 1))))))) << (0 ?
+ 31:16))));    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
 
@@ -2641,8 +2740,15 @@ gcoHARDWARE_3DBlitBlt(
                                          gcvNULL));
     }
 
+    /* unlock, can we make sure the command and event in same commit? */
+    gcsSURF_NODE_Unlock(&srcSurf->node, CurrentEngine);
+    gcsSURF_NODE_Unlock(&dstSurf->node, CurrentEngine);
+
     gcoHARDWARE_SetHWSlot(gcvNULL, Args->uArgs.v2.engine, gcvHWSLOT_BLT_DST, srcSurf->node.u.normal.node, 0);
     gcoHARDWARE_SetHWSlot(gcvNULL, Args->uArgs.v2.engine, gcvHWSLOT_BLT_DST, dstSurf->node.u.normal.node, 0);
+
+    gcsSURF_NODE_GetFence(&srcSurf->node, CurrentEngine, gcvFENCE_TYPE_READ);
+    gcsSURF_NODE_GetFence(&dstSurf->node, CurrentEngine, gcvFENCE_TYPE_WRITE);
 
     /* Avoid build warning. */
     stateDelta = gcvNULL;
@@ -2978,6 +3084,11 @@ gcoHARDWARE_3DBlitClear(
     /************************************************
     * Program states.
     */
+    if (Engine == gcvENGINE_RENDER)
+    {
+        /* Flush the pipe. */
+        gcmONERROR(gcoHARDWARE_FlushPipe(Hardware, gcvNULL));
+    }
 
     /* Reserve space in the command buffer. */
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, outside);
@@ -2994,6 +3105,8 @@ gcoHARDWARE_3DBlitClear(
     }
 #endif
 
+    /* lock surface on the execute engine */
+    gcsSURF_NODE_Lock(&DstSurf->node, CurrentEngine, gcvNULL, gcvNULL);
      _MultiGPUSync(Hardware, Engine, forceSGPU, gcvTRUE, &memory);
  {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
     gcmASSERT((gctUINT32)1 <= 1024);
@@ -3775,7 +3888,11 @@ gcoHARDWARE_3DBlitClear(
                                          gcvNULL));
     }
 
+    gcsSURF_NODE_Unlock(&DstSurf->node, CurrentEngine);
+
     gcoHARDWARE_SetHWSlot(gcvNULL, Engine, gcvHWSLOT_BLT_DST, DstSurf->node.u.normal.node, 0);
+
+    gcsSURF_NODE_GetFence(&DstSurf->node, CurrentEngine, gcvFENCE_TYPE_WRITE);
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -3929,6 +4046,11 @@ gcoHARDWARE_3DBlitTileFill(
     /************************************************
     * Program states.
     */
+    if (Engine == gcvENGINE_RENDER)
+    {
+        /* Flush the pipe. */
+        gcmONERROR(gcoHARDWARE_FlushPipe(Hardware, gcvNULL));
+    }
 
     /* Reserve space in the command buffer. */
     gcmBEGINSTATEBUFFER_NEW(Hardware, reserve, stateDelta, memory, outside);
@@ -3972,6 +4094,9 @@ gcoHARDWARE_3DBlitTileFill(
  ~0U : (~(~0U << ((1 ? 0:0) - (0 ? 0:0) + 1))))))) << (0 ? 0:0))) );    gcmENDSTATEBATCH_NEW(reserve, memory);
 };
 
+
+    /* lock surface on the execute engine */
+    gcsSURF_NODE_Lock(&DstSurf->node, CurrentEngine, gcvNULL, gcvNULL);
 
      _MultiGPUSync(Hardware, Engine, forceSGPU, gcvTRUE, &memory);
  {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
@@ -4330,7 +4455,12 @@ gcoHARDWARE_3DBlitTileFill(
                                          gcvNULL));
     }
 
+    /* unlock */
+    gcsSURF_NODE_Unlock(&DstSurf->node, CurrentEngine);
+
     gcoHARDWARE_SetHWSlot(gcvNULL, Engine, gcvHWSLOT_BLT_DST, DstSurf->node.u.normal.node, 0);
+
+    gcsSURF_NODE_GetFence(&DstSurf->node, CurrentEngine, gcvFENCE_TYPE_WRITE);
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -4491,6 +4621,10 @@ gcoHARDWARE_3DBlit420Tiler(
         Hardware->GPUProtecedModeDirty = gcvTRUE;
     }
 #endif
+
+    /* lock surface on the execute engine */
+    gcsSURF_NODE_Lock(&SrcSurf->node, CurrentEngine, gcvNULL, gcvNULL);
+    gcsSURF_NODE_Lock(&DstSurf->node, CurrentEngine, gcvNULL, gcvNULL);
 
      _MultiGPUSync(Hardware, Engine, forceSGPU, gcvTRUE, &memory);
  {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
@@ -4802,8 +4936,16 @@ gcoHARDWARE_3DBlit420Tiler(
                                          gcvNULL));
     }
 
-    gcoHARDWARE_SetHWSlot(gcvNULL, Engine, gcvHWSLOT_BLT_DST, SrcSurf->node.u.normal.node, 0);
+    /* unlock */
+    gcsSURF_NODE_Unlock(&SrcSurf->node, CurrentEngine);
+    gcsSURF_NODE_Unlock(&DstSurf->node, CurrentEngine);
+
+
+    gcoHARDWARE_SetHWSlot(gcvNULL, Engine, gcvHWSLOT_BLT_SRC, SrcSurf->node.u.normal.node, 0);
     gcoHARDWARE_SetHWSlot(gcvNULL, Engine, gcvHWSLOT_BLT_DST, DstSurf->node.u.normal.node, 0);
+
+    gcsSURF_NODE_GetFence(&SrcSurf->node, CurrentEngine, gcvFENCE_TYPE_READ);
+    gcsSURF_NODE_GetFence(&DstSurf->node, CurrentEngine, gcvFENCE_TYPE_WRITE);
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
@@ -5157,7 +5299,17 @@ gcoHARDWARE_3DBlitMipMap(
         = ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 12:12) - (0 ?
  12:12) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 12:12) - (0 ? 12:12) + 1))))))) << (0 ?
  12:12))) | (((gctUINT32) (0x0 & ((gctUINT32) ((((1 ? 12:12) - (0 ? 12:12) + 1) == 32) ?
- ~0U : (~(~0U << ((1 ? 12:12) - (0 ? 12:12) + 1))))))) << (0 ? 12:12)));
+ ~0U : (~(~0U << ((1 ? 12:12) - (0 ? 12:12) + 1))))))) << (0 ? 12:12)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 2:1) - (0 ?
+ 2:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:1) - (0 ? 2:1) + 1))))))) << (0 ?
+ 2:1))) | (((gctUINT32) ((gctUINT32) (_GetEndianControl(Hardware, srcFormat)) & ((gctUINT32) ((((1 ?
+ 2:1) - (0 ? 2:1) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 2:1) - (0 ? 2:1) + 1))))))) << (0 ?
+ 2:1)))
+        | ((((gctUINT32) (0)) & ~(((gctUINT32) (((gctUINT32) ((((1 ? 4:3) - (0 ?
+ 4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
+ 4:3))) | (((gctUINT32) ((gctUINT32) (_GetEndianControl(Hardware, destFormat)) & ((gctUINT32) ((((1 ?
+ 4:3) - (0 ? 4:3) + 1) == 32) ? ~0U : (~(~0U << ((1 ? 4:3) - (0 ? 4:3) + 1))))))) << (0 ?
+ 4:3)));
 
     gcmGETHARDWAREADDRESS(Info->LODs[0]->node, srcAddress);
 
@@ -5183,6 +5335,9 @@ gcoHARDWARE_3DBlitMipMap(
         /* Switch to 3D pipe. */
         gcmONERROR(gcoHARDWARE_SelectPipe(Hardware, gcvPIPE_3D, (gctPOINTER *)&memory));
     }
+
+    /* lock surface on the execute engine */
+    gcsSURF_NODE_Lock(&srcSurf->node, CurrentEngine, gcvNULL, gcvNULL);
 
      _MultiGPUSync(Hardware, Engine, forceSGPU, gcvTRUE, &memory);
  {    {    gcmVERIFYLOADSTATEALIGNED(reserve, memory);
@@ -5693,6 +5848,8 @@ gcoHARDWARE_3DBlitMipMap(
 
     gcoHARDWARE_SetHWSlot(gcvNULL, Engine, gcvHWSLOT_BLT_DST, srcSurf->node.u.normal.node, 0);
 
+    gcsSURF_NODE_GetFence(&srcSurf->node, CurrentEngine, gcvFENCE_TYPE_ALL);
+
     /* Remove compiler warning. */
 #ifndef __clang__
     stateDelta = stateDelta;
@@ -5709,6 +5866,9 @@ gcoHARDWARE_3DBlitMipMap(
                                          gcvHOW_SEMAPHORE_STALL,
                                          gcvNULL));
     }
+
+    /* unlock */
+    gcsSURF_NODE_Unlock(&srcSurf->node, CurrentEngine);
 
     gcmFOOTER_NO();
     return gcvSTATUS_OK;

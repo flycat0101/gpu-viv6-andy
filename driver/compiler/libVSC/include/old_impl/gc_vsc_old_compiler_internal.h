@@ -700,6 +700,12 @@ gcLINKTREE_GenerateStates(
     OUT gcsHINT_PTR *                   Hints
     );
 
+void gcCGUpdateMaxRegister(
+    IN void *                 CodeGen,
+    IN gctUINT                Regs,
+    IN gcLINKTREE             Tree
+    );
+
 gceSTATUS
 gcEncodeSourceImmediate20(
     IN OUT gctUINT32         States[4],
@@ -1340,6 +1346,28 @@ gcGetDualFP16Mode(
         }                                                      \
     }                                                          \
     while(0)                                                   \
+
+void
+gcoSHADER_AllocateVidMemForNoKernel(
+    gctPOINTER context,
+    gceSURF_TYPE type,
+    gctSTRING tag,
+    gctSIZE_T size,
+    gctUINT32 align,
+    gctPOINTER *vidMem,
+    gctPOINTER *memory,
+    gctUINT32 *physical,
+    gctPOINTER initialData,
+    gctBOOL zeroMemory
+    );
+
+void
+gcoSHADER_FreeVidMemForNoKernel(
+    gctPOINTER context,
+    gceSURF_TYPE type,
+    gctSTRING tag,
+    gctPOINTER vidMem
+    );
 
 END_EXTERN_C()
 

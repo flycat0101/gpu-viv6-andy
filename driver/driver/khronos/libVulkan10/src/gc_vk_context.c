@@ -407,76 +407,79 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyDevice(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkPhysicalDevice *phyDev = devCtx->pPhyDevice;
-    __vkDevContext *tmpctx, *prectx;
-
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
-
-    /* Lock the phyDev->mutex */
-    gcoOS_AcquireMutex(gcvNULL, phyDev->mutex, gcvINFINITE);
-
-    /* Remove devCtx from the phyDev->devContextList linked list */
-    prectx = tmpctx = phyDev->devContextList;
-    while (tmpctx != devCtx && tmpctx->pNext)
+    if (devCtx)
     {
-        prectx = tmpctx;
-        tmpctx = tmpctx->pNext;
-    }
-    if (tmpctx == devCtx)
-    {
-        if (tmpctx == phyDev->devContextList)
-        {
-            phyDev->devContextList = tmpctx->pNext;
-        }
-        else
-        {
-            prectx->pNext = tmpctx->pNext;
-        }
-    }
+        __vkPhysicalDevice *phyDev = devCtx->pPhyDevice;
+        __vkDevContext *tmpctx, *prectx;
 
-    /* Release the phyDev->mutex */
-    gcoOS_ReleaseMutex(gcvNULL, phyDev->mutex);
+        /* Set the allocator to the parent allocator or API defined allocator if valid */
+        __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+
+        /* Lock the phyDev->mutex */
+        gcoOS_AcquireMutex(gcvNULL, phyDev->mutex, gcvINFINITE);
+
+        /* Remove devCtx from the phyDev->devContextList linked list */
+        prectx = tmpctx = phyDev->devContextList;
+        while (tmpctx != devCtx && tmpctx->pNext)
+        {
+            prectx = tmpctx;
+            tmpctx = tmpctx->pNext;
+        }
+        if (tmpctx == devCtx)
+        {
+            if (tmpctx == phyDev->devContextList)
+            {
+                phyDev->devContextList = tmpctx->pNext;
+            }
+            else
+            {
+                prectx->pNext = tmpctx->pNext;
+            }
+        }
+
+        /* Release the phyDev->mutex */
+        gcoOS_ReleaseMutex(gcvNULL, phyDev->mutex);
 
 #if __VK_RESOURCE_SAVE_TGA
-    if (devCtx->auxCmdPool)
-    {
-        if (devCtx->auxCmdBuf)
+        if (devCtx->auxCmdPool)
         {
-            __vk_FreeCommandBuffers(device, devCtx->auxCmdPool, 1, &devCtx->auxCmdBuf);
-        }
+            if (devCtx->auxCmdBuf)
+            {
+                __vk_FreeCommandBuffers(device, devCtx->auxCmdPool, 1, &devCtx->auxCmdBuf);
+            }
 
-        __vk_DestroyCommandPool(device, devCtx->auxCmdPool, gcvNULL);
-    }
+            __vk_DestroyCommandPool(device, devCtx->auxCmdPool, gcvNULL);
+        }
 #endif
 
-    (*devCtx->chipFuncs->FinializeChipModule)(device);
+        (*devCtx->chipFuncs->FinializeChipModule)(device);
 
 #if __VK_RESOURCE_INFO
-    gcoOS_AtomDestroy(gcvNULL, devCtx->atom_id);
+        gcoOS_AtomDestroy(gcvNULL, devCtx->atom_id);
 #endif
 
-    /* Destroy the devCtx if it is valid (in the phyDev->devContextList) */
-    if (tmpctx == devCtx)
-    {
-        if (devCtx->fenceBuffer)
+        /* Destroy the devCtx if it is valid (in the phyDev->devContextList) */
+        if (tmpctx == devCtx)
         {
-            __vkBuffer *buf;
+            if (devCtx->fenceBuffer)
+            {
+                __vkBuffer *buf;
 
-            buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, devCtx->fenceBuffer);
+                buf = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkBuffer *, devCtx->fenceBuffer);
 
-            if (buf->memory)
-                __vk_FreeMemory((VkDevice)(uintptr_t)devCtx, (VkDeviceMemory)(uintptr_t)buf->memory, gcvNULL);
+                if (buf->memory)
+                    __vk_FreeMemory((VkDevice)(uintptr_t)devCtx, (VkDeviceMemory)(uintptr_t)buf->memory, gcvNULL);
 
-            __vk_DestroyBuffer((VkDevice)(uintptr_t)devCtx, devCtx->fenceBuffer, gcvNULL);
-        }
+                __vk_DestroyBuffer((VkDevice)(uintptr_t)devCtx, devCtx->fenceBuffer, gcvNULL);
+            }
 
-        __vk_DestroyDeviceQueues(devCtx);
+            __vk_DestroyDeviceQueues(devCtx);
 
 #if __VK_NEW_DEVICE_QUEUE
-        __vki_DetachDevice(devCtx);
+            __vki_DetachDevice(devCtx);
 #endif
-        __VK_FREE(devCtx);
+            __VK_FREE(devCtx);
+        }
     }
 }
 

@@ -843,6 +843,61 @@ static gctBOOL _VIR_RA_isShaderNeedSampleDepth(
     return gcvFALSE;
 }
 
+/* return true if instruction requires no shift for its def */
+static gctBOOL
+_VIR_RA_LS_IsRestrictInst(
+    VIR_RA_LS       *pRA,
+    VIR_Instruction *pInst)
+{
+    VIR_Shader  *pShader = VIR_RA_LS_GetShader(pRA);
+    VIR_OpCode  opcode = VIR_Inst_GetOpcode(pInst);
+
+    if (opcode == VIR_OP_MOD            ||
+        opcode == VIR_OP_REM            ||
+        opcode == VIR_OP_LOAD_ATTR      ||
+        opcode == VIR_OP_LOAD_ATTR_O    ||
+        opcode == VIR_OP_ATTR_LD        ||
+        opcode == VIR_OP_IMG_ADDR       ||
+        opcode == VIR_OP_IMG_ADDR_3D    ||
+        opcode == VIR_OP_IMG_LOAD       ||
+        opcode == VIR_OP_VX_IMG_LOAD    ||
+        opcode == VIR_OP_IMG_LOAD_3D    ||
+        opcode == VIR_OP_VX_IMG_LOAD_3D ||
+        opcode == VIR_OP_ARCTRIG        ||
+        opcode == VIR_OP_DP2            ||
+        VIR_OPCODE_isTexLd(opcode)      ||
+        VIR_OPCODE_isAtom(opcode)       ||
+        VIR_OPCODE_isVXOnly(opcode)     ||
+        opcode == VIR_OP_SWIZZLE)
+    {
+        return gcvTRUE;
+    }
+
+    if (opcode == VIR_OP_DIV)
+    {
+        VIR_Operand *pOpnd = VIR_Inst_GetDest(pInst);
+        VIR_Type    *type = VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(pOpnd));
+        VIR_PrimitiveTypeId baseType = VIR_Type_GetBaseTypeId(type);
+        if(VIR_GetTypeFlag(baseType) & VIR_TYFLAG_ISINTEGER)
+        {
+            return gcvTRUE;
+        }
+    }
+
+    return gcvFALSE;
+}
+
+/* set LR to be restrict (e.g, non-component wise instruction, or
+   output temp) */
+void _VIR_RA_LS_SetRestrictLR(
+    VIR_RA_LS       *pRA,
+    gctUINT         defIdx)
+{
+    VIR_RA_LS_Liverange     *pLR = _VIR_RA_LS_Def2LR(pRA, defIdx);
+    gcmASSERT(pLR);
+    VIR_RA_LR_SetFlag(pLR, VIR_RA_LRFLAG_NO_SHIFT);
+}
+
 static void _VIR_RA_LS_Init(
     VIR_RA_LS           *pRA,
     VIR_Shader          *pShader,
@@ -899,8 +954,30 @@ static void _VIR_RA_LS_Init(
        _VIR_RA_LS_InitLRTable that is called for each function */
     for (i = 0; i < VIR_RA_LS_GetNumWeb(pRA); i++)
     {
+        VIR_DEF              *pDef;
+        VIR_Instruction      *pDefInst;
+        VIR_WEB              *pWeb;
+        gctUINT               defIdx;
         pLR = _VIR_RA_LS_Web2LR(pRA, i);
         _VIR_RA_LS_InitLRShader(pLR, i);
+        pWeb = GET_WEB_BY_IDX(&pLvInfo->pDuInfo->webTable, i);
+        /* find all defs */
+        defIdx = pWeb->firstDefIdx;
+        while (VIR_INVALID_DEF_INDEX != defIdx)
+        {
+            pDef = GET_DEF_BY_IDX(&pLvInfo->pDuInfo->defTable, defIdx);
+            pDefInst = pDef->defKey.pDefInst;
+            /* set restricted flag according to define instruction, so even the
+             * LR is node defined out of usage function, we can still can get
+             * the correct no-shift restriction
+             */
+            if (!VIR_IS_IMPLICIT_DEF_INST(pDefInst) && _VIR_RA_LS_IsRestrictInst(pRA, pDefInst) )
+            {
+                _VIR_RA_LS_SetRestrictLR(pRA, defIdx);
+                break;
+            }
+            defIdx = pDef->nextDefInWebIdx;
+        }
     }
 
     /* allocate the LR sorted list head
@@ -1219,7 +1296,7 @@ void _VIR_RS_LS_DumpLR(
     VIR_Dumper          *pDumper = VIR_RA_LS_GetDumper(pRA);
     VIR_RA_LS_Interval  *pInterval;
 
-    VIR_LOG(pDumper, "web[%d]: \t", pLR->webIdx);
+    VIR_LOG(pDumper, "LR%d: \t", pLR->webIdx);
     VIR_LOG(pDumper, "tmp(%d", _VIR_RS_LS_GetWebRegNo(pRA, pLR));
     if (pLR->regNoRange > 1 && !isLRInvalid(pLR))
     {
@@ -1477,7 +1554,7 @@ gctBOOL _VIR_RA_LS_removableLDARR(
     /* dual16 should not replace its uses, since instruction with indexing
        should not be dual16 */
     if (VIR_Shader_isDual16Mode(pShader) &&
-        !VIR_TypeId_isSamplerOrImage(VIR_Operand_GetType(pDest)))
+        !VIR_TypeId_isSamplerOrImage(VIR_Operand_GetTypeId(pDest)))
     {
         return gcvFALSE;
     }
@@ -1612,7 +1689,7 @@ gctBOOL _VIR_RA_LS_removableLDARR(
                 VIR_Function_DupOperand(pFunc, pBaseOpnd, &newOpnd);
                 VIR_Operand_SetSwizzle(newOpnd,
                                        VIR_Swizzle_ApplyMappingSwizzle(useSwizzle, mappingSwizzle));
-                VIR_Operand_SetType(newOpnd, VIR_Operand_GetType(pUseInst->src[srcIndex]));
+                VIR_Operand_SetTypeId(newOpnd, VIR_Operand_GetTypeId(pUseInst->src[srcIndex]));
 
                 /* update the du - not complete yet
                    only delete the usage of t1, not add usage for base and offset */
@@ -1705,60 +1782,6 @@ gctBOOL _VIR_RA_LS_IsExcludedLR(
     }
 
     return gcvFALSE;
-}
-
-/* return true if instruction requires no shift for its def */
-gctBOOL
-_VIR_RA_LS_IsRestrictInst(
-    VIR_RA_LS       *pRA,
-    VIR_Instruction *pInst)
-{
-    VIR_Shader  *pShader = VIR_RA_LS_GetShader(pRA);
-    VIR_OpCode  opcode = VIR_Inst_GetOpcode(pInst);
-
-    if (opcode == VIR_OP_MOD            ||
-        opcode == VIR_OP_REM            ||
-        opcode == VIR_OP_LOAD_ATTR      ||
-        opcode == VIR_OP_LOAD_ATTR_O    ||
-        opcode == VIR_OP_ATTR_LD        ||
-        opcode == VIR_OP_IMG_ADDR       ||
-        opcode == VIR_OP_IMG_ADDR_3D    ||
-        opcode == VIR_OP_IMG_LOAD       ||
-        opcode == VIR_OP_VX_IMG_LOAD    ||
-        opcode == VIR_OP_IMG_LOAD_3D    ||
-        opcode == VIR_OP_VX_IMG_LOAD_3D ||
-        opcode == VIR_OP_ARCTRIG        ||
-        VIR_OPCODE_isTexLd(opcode)      ||
-        VIR_OPCODE_isAtom(opcode)       ||
-        VIR_OPCODE_isVXOnly(opcode)     ||
-        opcode == VIR_OP_SWIZZLE)
-    {
-        return gcvTRUE;
-    }
-
-    if (opcode == VIR_OP_DIV)
-    {
-        VIR_Operand *pOpnd = VIR_Inst_GetDest(pInst);
-        VIR_Type    *type = VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetType(pOpnd));
-        VIR_PrimitiveTypeId baseType = VIR_Type_GetBaseTypeId(type);
-        if(VIR_GetTypeFlag(baseType) & VIR_TYFLAG_ISINTEGER)
-        {
-            return gcvTRUE;
-        }
-    }
-
-    return gcvFALSE;
-}
-
-/* set LR to be restrict (e.g, non-component wise instruction, or
-   output temp) */
-void _VIR_RA_LS_SetRestrictLR(
-    VIR_RA_LS       *pRA,
-    gctUINT         defIdx)
-{
-    VIR_RA_LS_Liverange     *pLR = _VIR_RA_LS_Def2LR(pRA, defIdx);
-    gcmASSERT(pLR);
-    VIR_RA_LR_SetFlag(pLR, VIR_RA_LRFLAG_NO_SHIFT);
 }
 
 void _VIR_RA_LS_SetDynIndexingLR(
@@ -2294,7 +2317,7 @@ void _VIR_RA_LS_ChangeMovaType(
                     continue;
                 }
                 gcmASSERT(pDef->defKey.pDefInst->dest);
-                VIR_Operand_SetType(pInst->dest, VIR_Operand_GetType(pDef->defKey.pDefInst->dest));
+                VIR_Operand_SetTypeId(pInst->dest, VIR_Operand_GetTypeId(pDef->defKey.pDefInst->dest));
                 break;
             }
         }
@@ -2312,7 +2335,6 @@ void _VIR_RA_LS_MarkDef(
     VIR_LIVENESS_INFO   *pLvInfo = VIR_RA_LS_GetLvInfo(pRA);
     gctUINT             regNo, defIdx;
     gctUINT8            channel;
-    VIR_DEF_KEY         defKey;
     VIR_DEF             *pDef;
     gctBOOL             removableLDARR = gcvFALSE;
     VIR_OpCode          instOpcode = VIR_Inst_GetOpcode(pInst);
@@ -2332,10 +2354,7 @@ void _VIR_RA_LS_MarkDef(
                 continue;
             }
 
-            defKey.pDefInst = VIR_ANY_DEF_INST;
-            defKey.regNo = regNo;
-            defKey.channel = VIR_CHANNEL_ANY;
-            defIdx = vscBT_HashSearch(&pLvInfo->pDuInfo->defTable, &defKey);
+            defIdx = vscVIR_FindFirstDefIndex(pLvInfo->pDuInfo, regNo);
             while (VIR_INVALID_DEF_INDEX != defIdx)
             {
                 VIR_RA_LS_Liverange     *pLR = _VIR_RA_LS_Def2LR(pRA, defIdx);
@@ -2419,7 +2438,8 @@ void _VIR_RA_LS_MarkDef(
                             VIR_RA_LR_SetFlag(pLR, VIR_RA_LRFLAG_ST_DEP);
                             pLR->pLDSTInst  = pInst;
                         }
-                        else if (VIR_OPCODE_isVXOnly(instOpcode))
+
+                        if (VIR_OPCODE_isVXOnly(instOpcode))
                         {
                             VIR_RA_LR_SetFlag(pLR, VIR_RA_LRFLAG_VX);
 
@@ -2633,9 +2653,10 @@ void _VIR_RA_LS_MarkUses(
     VIR_OperandInfo         operandInfo, operandInfo1;
     VIR_SrcOperand_Iterator srcOpndIter;
     VIR_Operand             *pOpnd;
+    VIR_OpCode               opCode = VIR_Inst_GetOpcode(pInst);
 
     /* A ldarr inst to attribute array may potentially read all elements in array */
-    if (VIR_Inst_GetOpcode(pInst) == VIR_OP_LDARR)
+    if (opCode == VIR_OP_LDARR)
     {
         VIR_Operand_GetOperandInfo(pInst,
                                    pInst->src[VIR_Operand_Src0],
@@ -2711,21 +2732,28 @@ void _VIR_RA_LS_MarkUses(
     }
 
     /* specially handling for VX instruction */
-    if (VIR_Inst_GetOpcode(pInst) == VIR_OP_VX_DP32X1_B ||
-        VIR_Inst_GetOpcode(pInst) == VIR_OP_VX_DP16X2_B ||
-        VIR_Inst_GetOpcode(pInst) == VIR_OP_VX_DP8X4_B ||
-        VIR_Inst_GetOpcode(pInst) == VIR_OP_VX_DP4X8_B ||
-        VIR_Inst_GetOpcode(pInst) == VIR_OP_VX_DP2X16_B)
+    if (opCode == VIR_OP_VX_DP16X1_B ||
+        opCode == VIR_OP_VX_DP8X2_B  ||
+        opCode == VIR_OP_VX_DP4X4_B  ||
+        opCode == VIR_OP_VX_DP2X8_B  ||
+        opCode == VIR_OP_VX_DP32X1_B ||
+        opCode == VIR_OP_VX_DP16X2_B ||
+        opCode == VIR_OP_VX_DP8X4_B  ||
+        opCode == VIR_OP_VX_DP4X8_B  ||
+        opCode == VIR_OP_VX_DP2X16_B)
     {
         gctUINT             src0WebIdx, src1WebIdx;
-        VIR_RA_LS_Liverange *pLR;
+        VIR_RA_LS_Liverange *pSrc0LR = gcvNULL;
+        VIR_RA_LS_Liverange *pSrc1LR = gcvNULL;
 
         src0WebIdx = _VIR_RA_LS_SrcOpnd2WebIdx(pRA, pInst, VIR_Inst_GetSource(pInst, 0));
         if (VIR_INVALID_WEB_INDEX != src0WebIdx)
         {
-            pLR = _VIR_RA_LS_Web2ColorLR(pRA, src0WebIdx);
-            pLR->regNoRange = 2;
-            VIR_RA_LR_SetFlag(pLR, VIR_RA_LRFLAG_VX_EVEN);
+            pSrc0LR = _VIR_RA_LS_Web2ColorLR(pRA, src0WebIdx);
+            gcmASSERT(pSrc0LR);
+
+            pSrc0LR->regNoRange = 2;
+            VIR_RA_LR_SetFlag(pSrc0LR, VIR_RA_LRFLAG_VX_EVEN);
         }
         else
         {
@@ -2735,9 +2763,14 @@ void _VIR_RA_LS_MarkUses(
         src1WebIdx = _VIR_RA_LS_SrcOpnd2WebIdx(pRA, pInst, VIR_Inst_GetSource(pInst, 1));
         if (VIR_INVALID_WEB_INDEX != src1WebIdx)
         {
-            pLR = _VIR_RA_LS_Web2ColorLR(pRA, src1WebIdx);
-            VIR_RA_LR_SetFlag(pLR, VIR_RA_LRFLAG_INVALID | VIR_RA_LRFLAG_MASTER_WEB_IDX_SET | VIR_RA_LRFLAG_VX_ODD);
-            pLR->masterWebIdx = src0WebIdx;
+            pSrc1LR = _VIR_RA_LS_Web2ColorLR(pRA, src1WebIdx);
+            gcmASSERT(pSrc1LR);
+
+            if (pSrc0LR != pSrc1LR)
+            {
+                VIR_RA_LR_SetFlag(pSrc1LR, VIR_RA_LRFLAG_INVALID | VIR_RA_LRFLAG_MASTER_WEB_IDX_SET | VIR_RA_LRFLAG_VX_ODD);
+                pSrc1LR->masterWebIdx = src0WebIdx;
+            }
         }
         else
         {
@@ -2934,83 +2967,83 @@ _VIR_RA_LS_GetMaxReg(
     VSC_HW_CONFIG       *hwConfig = VIR_RA_LS_GetHwCfg(pRA);
     gctUINT             maxReg = pCP->colorMap[hwType].maxReg;
 
-    /* if the shader needs sampleDepth, we need to make sure the last
-       register is for sampleDepth */
-    if (_VIR_RA_isShaderNeedSampleDepth(pRA))
-    {
-        maxReg -= 1;
-    }
-
-    if (VIR_Shader_HasBarrier(pShader))
-    {
-        /* if compute shader has barrier, the temp count must follow
-           ceiling(work_group_size/(shader_core_count*4*threads_per_register)) <= floor(113/temp_register_count)
-        */
-
-        /* VIR_SHADER_TESSELLATION_CONTROL should not have barrier if core == 8 */
-        gcmASSERT(pShader->shaderKind == VIR_SHADER_COMPUTE ||
-                  pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL);
-        threadCount = (gctFLOAT) (hwConfig->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1));
-
-        /* Halti5 HW with TS/GS supports */
-        if (hwConfig->hwFeatureFlags.hasHalti5
-            && hwConfig->hwFeatureFlags.supportGS
-            && hwConfig->hwFeatureFlags.supportTS
-            )
+        /* if the shader needs sampleDepth, we need to make sure the last
+           register is for sampleDepth */
+        if (_VIR_RA_isShaderNeedSampleDepth(pRA))
         {
-            /*  128: total temp registers per workgroup (128 = 512/4: total temp register per core/4)
-                16: reserved 1 page (16 registers) each for other shaders.
-                3: partial page (up to 3 registers) used by current shader previously.
-                free registers: 128 - 16 - 3 = 109 */
-            maxFreeReg = 109;
-        }
-        else
-        {
-            /* 128: total temp registers per workgroup.
-               8: reserved 1 page (8 registers) for VS or PS.
-               7: partial page (up to 7 registers) used by PS or VS.
-               free registers: 128 - 8 - 7 = 113 */
-            maxFreeReg = 113;
+            maxReg -= 1;
         }
 
-        if (VIR_Shader_IsGlCompute(pShader))
+        if (VIR_Shader_HasBarrier(pShader))
         {
-            workGroupSize = (gctFLOAT) (pShader->shaderLayout.compute.workGroupSize[0] *
-                                        pShader->shaderLayout.compute.workGroupSize[1] *
-                                        pShader->shaderLayout.compute.workGroupSize[2]);
-            maxReg = maxFreeReg / (gctUINT) (ceil(workGroupSize / threadCount));
-        }
-        else if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
-        {
-            workGroupSize = (gctFLOAT) (pShader->shaderLayout.tcs.tcsPatchOutputVertices);
-            maxReg = maxFreeReg / (gctUINT) (ceil(workGroupSize / threadCount));
-        }
-        else if (VIR_Shader_IsCL(pShader))
-        {
-            /* workgroup size can be set by attribute, which makes workGroupSize none-zero */
-            workGroupSize = (gctFLOAT) (pShader->shaderLayout.compute.workGroupSize[0] *
-                                        pShader->shaderLayout.compute.workGroupSize[1] *
-                                        pShader->shaderLayout.compute.workGroupSize[2]);
-            if (workGroupSize <= 0.0)
+            /* if compute shader has barrier, the temp count must follow
+               ceiling(work_group_size/(shader_core_count*4*threads_per_register)) <= floor(113/temp_register_count)
+               */
+
+            /* VIR_SHADER_TESSELLATION_CONTROL should not have barrier if core == 8 */
+            gcmASSERT(pShader->shaderKind == VIR_SHADER_COMPUTE ||
+                pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL);
+            threadCount = (gctFLOAT)(hwConfig->maxCoreCount * 4 * (VIR_Shader_isDual16Mode(pShader) ? 2 : 1));
+
+            /* Halti5 HW with TS/GS supports */
+            if (hwConfig->hwFeatureFlags.hasHalti5
+                && hwConfig->hwFeatureFlags.supportGS
+                && hwConfig->hwFeatureFlags.supportTS
+                )
             {
-                workGroupSize = 128.0;  /* assume minumum work group size is 128 */
+                /*  128: total temp registers per workgroup (128 = 512/4: total temp register per core/4)
+                    16: reserved 1 page (16 registers) each for other shaders.
+                    3: partial page (up to 3 registers) used by current shader previously.
+                    free registers: 128 - 16 - 3 = 109 */
+                maxFreeReg = 109;
+            }
+            else
+            {
+                /* 128: total temp registers per workgroup.
+                   8: reserved 1 page (8 registers) for VS or PS.
+                   7: partial page (up to 7 registers) used by PS or VS.
+                   free registers: 128 - 8 - 7 = 113 */
+                maxFreeReg = 113;
             }
 
-            maxReg = maxFreeReg / (gctUINT) (ceil(workGroupSize / threadCount));
+            if (VIR_Shader_IsGlCompute(pShader))
+            {
+                workGroupSize = (gctFLOAT)(pShader->shaderLayout.compute.workGroupSize[0] *
+                    pShader->shaderLayout.compute.workGroupSize[1] *
+                    pShader->shaderLayout.compute.workGroupSize[2]);
+                maxReg = maxFreeReg / (gctUINT)(ceil(workGroupSize / threadCount));
+            }
+            else if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
+            {
+                workGroupSize = (gctFLOAT)(pShader->shaderLayout.tcs.tcsPatchOutputVertices);
+                maxReg = maxFreeReg / (gctUINT)(ceil(workGroupSize / threadCount));
+            }
+            else if (VIR_Shader_IsCL(pShader))
+            {
+                /* workgroup size can be set by attribute, which makes workGroupSize none-zero */
+                workGroupSize = (gctFLOAT)(pShader->shaderLayout.compute.workGroupSize[0] *
+                    pShader->shaderLayout.compute.workGroupSize[1] *
+                    pShader->shaderLayout.compute.workGroupSize[2]);
+                if (workGroupSize <= 0.0)
+                {
+                    workGroupSize = 128.0;  /* assume minumum work group size is 128 */
+                }
+
+                maxReg = maxFreeReg / (gctUINT)(ceil(workGroupSize / threadCount));
+            }
+
+            maxReg = vscMIN(maxReg, pCP->colorMap[hwType].maxReg);
         }
 
-        maxReg = vscMIN(maxReg, pCP->colorMap[hwType].maxReg);
-    }
+        maxReg = vscMIN(maxReg, hwConfig->maxGPRCountPerThread);
 
-    maxReg = vscMIN(maxReg, hwConfig->maxGPRCountPerThread);
-
-    /* we need to reserve 3 more registers (baseRegister/movaRegister) +
-       data registers for spilling */
-    if (reservedDataReg > 0 &&
-        hwType == VIR_RA_HWREG_GR)
-    {
+        /* we need to reserve 3 more registers (baseRegister/movaRegister) +
+           data registers for spilling */
+        if (reservedDataReg > 0 &&
+            hwType == VIR_RA_HWREG_GR)
+        {
         maxReg = maxReg - reservedDataReg - 1 - VIR_RA_LS_MOVA_REG;
-    }
+            }
 
     return maxReg;
 }
@@ -5832,7 +5865,7 @@ void  _VIR_RA_LS_Reserve_AttrColor(
             {
                 VIR_LOG(pDumper, "mark ");
                 _VIR_RA_LS_DumpColor(pRA, _VIR_RA_GetLRColor(pLR), pLR);
-                VIR_LOG(pDumper, " to be used because of web[%d]\n",
+                VIR_LOG(pDumper, " to be used because of LR%d\n",
                     pLR->webIdx);
                 VIR_LOG_FLUSH(pDumper);
             }
@@ -6787,7 +6820,7 @@ _VIR_RA_LS_InsertSpill(
 
     retErrCode = VIR_Function_AddInstructionBefore(pFunc,
         VIR_OP_LOAD_S,
-        VIR_Operand_GetType(pOpnd),
+        VIR_Operand_GetTypeId(pOpnd),
         pInst,
         gcvTRUE,
         &newInst);
@@ -6818,7 +6851,7 @@ _VIR_RA_LS_InsertSpill(
     VIR_Operand_SetTempRegister(newInst->dest,
                                 pFunc,
                                 VIR_Operand_GetSymbolId_(pOpnd),
-                                VIR_Operand_GetType(pOpnd));
+                                VIR_Operand_GetTypeId(pOpnd));
     if(retErrCode != VSC_ERR_NONE) return retErrCode;
 
     for (i = 0 ; i < VIR_MAX_SRC_NUM; i++)
@@ -6905,7 +6938,7 @@ _VIR_RA_LS_InsertFill(
 
     retErrCode = VIR_Function_AddInstructionAfter(pFunc,
         VIR_OP_STORE_S,
-        VIR_Operand_GetType(pOpnd),
+        VIR_Operand_GetTypeId(pOpnd),
         pInst,
         gcvTRUE,
         &newInst);
@@ -6963,7 +6996,7 @@ _VIR_RA_LS_InsertFill(
 
         retErrCode = VIR_Function_AddInstructionAfter(pFunc,
                         VIR_OP_JMPC,
-                        VIR_Operand_GetType(pOpnd),
+                        VIR_Operand_GetTypeId(pOpnd),
                         pInst,
                         gcvTRUE,
                         &newInst);
@@ -7250,7 +7283,7 @@ _VIR_RA_LS_InsertSpill_LDARR(
     VIR_Operand_SetTempRegister(newInst->dest,
                                 pFunc,
                                 symId,
-                                VIR_Operand_GetType(pOpnd));
+                                VIR_Operand_GetTypeId(pOpnd));
     if(retErrCode != VSC_ERR_NONE) return retErrCode;
     /* destination is always dataRegister[0] */
     _VIR_RA_MakeColor(pRA->dataRegister[0], 0, &curColor);
@@ -7265,7 +7298,7 @@ _VIR_RA_LS_InsertSpill_LDARR(
     VIR_Operand_SetTempRegister(pOpnd,
                                 pFunc,
                                 symId,
-                                VIR_Operand_GetType(pOpnd));
+                                VIR_Operand_GetTypeId(pOpnd));
     _VIR_RA_LS_SetOperandHwRegInfo(pRA, pOpnd, curColor);
     VIR_Operand_SetSwizzle(pOpnd, newSwizzle);
     VIR_Operand_SetRelAddrMode(pOpnd, VIR_INDEXED_NONE);
@@ -7323,7 +7356,7 @@ _VIR_RA_LS_InsertFill_STARR(
     /* store instruction */
     retErrCode = VIR_Function_AddInstructionAfter(pFunc,
         VIR_OP_STORE_S,
-        VIR_Operand_GetType(pOpnd),
+        VIR_Operand_GetTypeId(pOpnd),
         pInst,
         gcvTRUE,
         &newInst);
@@ -7417,14 +7450,6 @@ _VIR_RA_LS_GetSpillSize(
     groupCount =  maxGPRPerWorkgroup / VIR_Shader_GetRegWatermark(pShader);
     groupSize = groupCount * threadCount;
 
-    /* VIV: double the spill space to avoid overlapping problem.
-       we are using atomic_inc to get a counter for indexing the spill space,
-       but because of I$ behavior, we may get an out-of-order number. e.g.,
-       gr       0, 1, 2, 3, ... 20, 0, 1,
-       counter  1, 0, 2, 3, ... 20, 0, 1, --> in the active window,
-                                              there are two threads accessing 0 spill space
-       TO-DO: HW will generate a spillID
-    */
     spillSize += (pRA->spillOffset) * groupSize * 2;
 
     if (pGroupSize)
@@ -7741,10 +7766,6 @@ _VIR_RA_LS_RewriteColor_Src(
     }
     else if (VIR_Operand_GetHwRegId(pOpnd) == VIR_REG_SAMPLE_POS)
     {
-        /* VIV: hw samplePos source type has no swizzle support,
-           (also pre-swizzle opt needs to be disabled,
-           since there is an implicit sampleId r0.z used)
-           thus we need to generate an extra mov, if samplePos swizzle is not XYZW */
         if (!VIR_RA_LS_GetHwCfg(pRA)->hwFeatureFlags.hasSamplePosSwizzleFix &&
             (VIR_Operand_GetSwizzle(pOpnd) != VIR_SWIZZLE_XYZW))
         {
@@ -7755,7 +7776,7 @@ _VIR_RA_LS_RewriteColor_Src(
 
             VIR_Function_AddInstructionBefore(pFunc,
                 VIR_OP_MOV,
-                VIR_Operand_GetType(pOpnd),
+                VIR_Operand_GetTypeId(pOpnd),
                 pInst,
                 gcvTRUE,
                 &newInst);
@@ -7770,7 +7791,7 @@ _VIR_RA_LS_RewriteColor_Src(
             VIR_Operand_SetTempRegister(newInst->dest,
                                         pFunc,
                                         symId,
-                                        VIR_Operand_GetType(pOpnd));
+                                        VIR_Operand_GetTypeId(pOpnd));
             if (pRA->samplePosRegister != VIR_INVALID_ID)
             {
                 _VIR_RA_MakeColor(pRA->samplePosRegister, 0, &curColor);
@@ -7798,7 +7819,7 @@ _VIR_RA_LS_RewriteColor_Src(
             VIR_Operand_SetTempRegister(pOpnd,
                                         pFunc,
                                         symId,
-                                        VIR_Operand_GetType(pOpnd));
+                                        VIR_Operand_GetTypeId(pOpnd));
             _VIR_RA_LS_SetOperandHwRegInfo(pRA, pOpnd, curColor);
             VIR_Inst_SetThreadMode(newInst, VIR_THREAD_D16_DUAL_32);
         }
@@ -7919,7 +7940,7 @@ VSC_ErrCode _VIR_RS_LS_InsertSelectMap(
         VIR_Operand_SetTempRegister(newInst->src[VIR_Operand_Src0],
                                     pFunc,
                                     movDstSymId,
-                                    VIR_Operand_GetType(pInst->src[VIR_Operand_Src1]));
+                                    VIR_Operand_GetTypeId(pInst->src[VIR_Operand_Src1]));
         _VIR_RA_MakeColor(destReg, 0, &curColor);
         _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->src[VIR_Operand_Src0], curColor);
         VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src0], VIR_SWIZZLE_YYYY);
@@ -8212,7 +8233,6 @@ void _VIR_RA_LS_GenLoadAttr_SetEnable(
         VIR_OperandInfo         instDstInfo;
         gctUINT8                 channel;
         gctBOOL                 needExtraMov = gcvTRUE;
-        VIR_DEF_KEY             defKey;
         gctUINT                 defIdx = VIR_INVALID_DEF_INDEX;
 
         VIR_Operand_GetOperandInfo(pInst, destOpnd, &instDstInfo);
@@ -8220,13 +8240,13 @@ void _VIR_RA_LS_GenLoadAttr_SetEnable(
         {
             if (ldEnable & (1 << channel))
             {
-                defKey.pDefInst = VIR_ANY_DEF_INST;
-                defKey.regNo = instDstInfo.u1.virRegInfo.virReg;
-                defKey.channel = channel;
-                defIdx = vscBT_HashSearch(&pLvInfo->pDuInfo->defTable, &defKey);
+                defIdx = vscVIR_FindFirstDefIndexWithChannel(pLvInfo->pDuInfo,
+                                                             instDstInfo.u1.virRegInfo.virReg,
+                                                             channel);
                 if (VIR_INVALID_DEF_INDEX != defIdx)
                 {
                     needExtraMov = gcvTRUE;
+                    break;
                 }
             }
         }
@@ -8240,7 +8260,7 @@ void _VIR_RA_LS_GenLoadAttr_SetEnable(
             VIR_Operand_SetTempRegister(newDest,
                                         pFunc,
                                         symId,
-                                        VIR_Operand_GetType(destOpnd));
+                                        VIR_Operand_GetTypeId(destOpnd));
             _VIR_RA_MakeColor(pRA->resRegister, 0, &curColor);
             _VIR_RA_LS_SetOperandHwRegInfo(pRA, newDest, curColor);
             VIR_Operand_SetEnable(newDest, ldEnable);
@@ -8251,7 +8271,7 @@ void _VIR_RA_LS_GenLoadAttr_SetEnable(
             VIR_Operand_SetTempRegister(src0Opnd,
                                         pFunc,
                                         symId,
-                                        VIR_Operand_GetType(destOpnd));
+                                        VIR_Operand_GetTypeId(destOpnd));
             _VIR_RA_MakeColor(pRA->resRegister, 0, &curColor);
             _VIR_RA_LS_SetOperandHwRegInfo(pRA, src0Opnd, curColor);
             useSwizzle = VIR_Enable_2_Swizzle(ldEnable);
@@ -8507,7 +8527,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
         secondSelectMap = gcvFALSE;
 
         /* write this way to be clear */
-        switch (VIR_GetTypeComponentType(VIR_Operand_GetType(src1Opnd)))
+        switch (VIR_GetTypeComponentType(VIR_Operand_GetTypeId(src1Opnd)))
         {
         case VIR_TYPE_UINT32:
         case VIR_TYPE_INT32:
@@ -8585,7 +8605,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
 
                 VIR_Function_AddInstructionBefore(pFunc,
                     VIR_OP_MOV,
-                    VIR_Operand_GetType(src1Opnd),
+                    VIR_Operand_GetTypeId(src1Opnd),
                     pInst,
                     gcvTRUE,
                     &movInst);
@@ -8599,7 +8619,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
                 VIR_Operand_SetTempRegister(movDest,
                                             pFunc,
                                             movDstSymId,
-                                            VIR_Operand_GetType(src1Opnd));
+                                            VIR_Operand_GetTypeId(src1Opnd));
                 _VIR_RA_MakeColor(destReg, 0, &curColor);
                 _VIR_RA_LS_SetOperandHwRegInfo(pRA, movDest, curColor);
                 VIR_Operand_SetEnable(movDest, VIR_ENABLE_Y);
@@ -8682,7 +8702,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
                 VIR_Operand_SetTempRegister(addDest,
                                             pFunc,
                                             addDstSymId,
-                                            VIR_Operand_GetType(src1Opnd));
+                                            VIR_Operand_GetTypeId(src1Opnd));
                 _VIR_RA_MakeColor(pRA->resRegister, 0, &curColor);
                 _VIR_RA_LS_SetOperandHwRegInfo(pRA, addDest, curColor);
                 VIR_Operand_SetEnable(addDest, VIR_ENABLE_X);
@@ -8703,7 +8723,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
     {
         gctUINT indexValue = 0;
 
-        switch (VIR_GetTypeComponentType(VIR_Operand_GetType(src2Opnd)))
+        switch (VIR_GetTypeComponentType(VIR_Operand_GetTypeId(src2Opnd)))
         {
         case VIR_TYPE_UINT32:
         case VIR_TYPE_INT32:
@@ -8742,7 +8762,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
         VIR_Operand_SetTempRegister(addDest,
                                     pFunc,
                                     addDstSymId,
-                                    VIR_Operand_GetType(src2Opnd));
+                                    VIR_Operand_GetTypeId(src2Opnd));
         _VIR_RA_MakeColor(pRA->resRegister, 0, &curColor);
         _VIR_RA_LS_SetOperandHwRegInfo(pRA, addDest, curColor);
         /* x component could be already used by src1 */
@@ -8776,7 +8796,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
         VIR_Operand_SetTempRegister(newSrc,
                                     pFunc,
                                     addDstSymId,
-                                    VIR_Operand_GetType(src1Opnd));
+                                    VIR_Operand_GetTypeId(src1Opnd));
         _VIR_RA_MakeColor(pRA->resRegister, 0, &curColor);
         _VIR_RA_LS_SetOperandHwRegInfo(pRA, newSrc, curColor);
         VIR_Operand_SetSwizzle(newSrc, VIR_SWIZZLE_X);
@@ -8790,7 +8810,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Vertex(
         VIR_Operand_SetTempRegister(newSrc,
                                     pFunc,
                                     addDstSymId,
-                                    VIR_Operand_GetType(src2Opnd));
+                                    VIR_Operand_GetTypeId(src2Opnd));
         _VIR_RA_MakeColor(pRA->resRegister, 0, &curColor);
         _VIR_RA_LS_SetOperandHwRegInfo(pRA, newSrc, curColor);
         VIR_Operand_SetSwizzle(newSrc, VIR_SWIZZLE_Y);
@@ -8939,7 +8959,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Patch(
         VIR_Operand_SetTempRegister(addDest,
                                     pFunc,
                                     addDstSymId,
-                                    VIR_Operand_GetType(src2Opnd));
+                                    VIR_Operand_GetTypeId(src2Opnd));
         _VIR_RA_MakeColor(pRA->resRegister, 0, &curColor);
         _VIR_RA_LS_SetOperandHwRegInfo(pRA, addDest, curColor);
         VIR_Operand_SetEnable(addDest, VIR_ENABLE_X);
@@ -8975,7 +8995,7 @@ VSC_ErrCode _VIR_RA_LS_GenLoadAttr_Patch(
         VIR_Operand_SetTempRegister(newSrc,
                                     pFunc,
                                     addDstSymId,
-                                    VIR_Operand_GetType(src2Opnd));
+                                    VIR_Operand_GetTypeId(src2Opnd));
         _VIR_RA_MakeColor(pRA->resRegister, 0, &curColor);
         _VIR_RA_LS_SetOperandHwRegInfo(pRA, newSrc, curColor);
         VIR_Operand_SetSwizzle(newSrc, VIR_SWIZZLE_X);
@@ -9225,7 +9245,7 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr(
         VIR_Operand_SetTempRegister(addInst->dest,
                                     pFunc,
                                     addDstSymId,
-                                    VIR_Operand_GetType(pInst->src[VIR_Operand_Src1]));
+                                    VIR_Operand_GetTypeId(pInst->src[VIR_Operand_Src1]));
         _VIR_RA_MakeColor(pRA->resRegister, 0, &curColor);
         _VIR_RA_LS_SetOperandHwRegInfo(pRA, addInst->dest, curColor);
         VIR_Operand_SetEnable(addInst->dest, VIR_ENABLE_X);
@@ -9235,7 +9255,7 @@ VSC_ErrCode _VIR_RA_LS_GenStoreAttr(
         VIR_Operand_SetTempRegister(newInst->src[VIR_Operand_Src1],
                                     pFunc,
                                     addDstSymId,
-                                    VIR_Operand_GetType(pInst->src[VIR_Operand_Src1]));
+                                    VIR_Operand_GetTypeId(pInst->src[VIR_Operand_Src1]));
         _VIR_RA_MakeColor(pRA->resRegister, 0, &curColor);
         _VIR_RA_LS_SetOperandHwRegInfo(pRA, newInst->src[VIR_Operand_Src1], curColor);
         VIR_Operand_SetSwizzle(newInst->src[VIR_Operand_Src1], VIR_SWIZZLE_X);
@@ -10080,7 +10100,7 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
             /* insert a MOVA instruction here */
             retValue = VIR_Function_AddInstructionBefore(pFunc,
                             VIR_OP_MOVA,
-                            VIR_Operand_GetType(pOpnd),
+                            VIR_Operand_GetTypeId(pOpnd),
                             pInst,
                             gcvTRUE,
                             &pNewInst);
@@ -10191,16 +10211,16 @@ VSC_ErrCode _VIR_RA_LS_AssignColorA0Inst(
             VIR_Operand_SetRelIndexing(VIR_Inst_GetSource(pInst, 0), indexSymId);
             VIR_Operand_SetRelAddrMode(VIR_Inst_GetSource(pInst, 0),
                                        (_VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pMovaLR)) + src_swizzle + 1));
-            pOpndType = VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetType(VIR_Inst_GetSource(pInst, 0)));
-            VIR_Operand_SetType(VIR_Inst_GetSource(pInst, 0), VIR_Type_GetBaseTypeId(pOpndType));
+            pOpndType = VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(VIR_Inst_GetSource(pInst, 0)));
+            VIR_Operand_SetTypeId(VIR_Inst_GetSource(pInst, 0), VIR_Type_GetBaseTypeId(pOpndType));
         }
         else
         {
             VIR_Operand_SetRelIndexing(VIR_Inst_GetDest(pInst), indexSymId);
             VIR_Operand_SetRelAddrMode(VIR_Inst_GetDest(pInst),
                                         (_VIR_RA_Color_Shift(_VIR_RA_GetLRColor(pMovaLR)) + src_swizzle + 1));
-            pOpndType = VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetType(VIR_Inst_GetDest(pInst)));
-            VIR_Operand_SetType(VIR_Inst_GetDest(pInst), VIR_Type_GetBaseTypeId(pOpndType));
+            pOpndType = VIR_Shader_GetTypeFromId(pShader, VIR_Operand_GetTypeId(VIR_Inst_GetDest(pInst)));
+            VIR_Operand_SetTypeId(VIR_Inst_GetDest(pInst), VIR_Type_GetBaseTypeId(pOpndType));
         }
     }
 
@@ -10600,7 +10620,7 @@ void _VIR_RA_LS_UpdateWorkgroupId(
                     VIR_Operand_GetHwShift(srcOpnd),
                     &curColor);
                 _VIR_RA_LS_SetOperandHwRegInfo(pRA, newOpnd, curColor);
-                VIR_Operand_SetType(newOpnd, VIR_TYPE_INT16);
+                VIR_Operand_SetTypeId(newOpnd, VIR_TYPE_INT16);
 
                 imodAdd = gcvTRUE;
 
@@ -10825,8 +10845,8 @@ void _VIR_RA_SetInputOutputFlag(
     if (pShader->shaderKind == VIR_SHADER_TESSELLATION_CONTROL)
     {
         for (outputIdx = 0;
-                outputIdx < VIR_IdList_Count(VIR_Shader_GetOutputs(pShader));
-                outputIdx ++)
+             outputIdx < VIR_IdList_Count(VIR_Shader_GetOutputs(pShader));
+             outputIdx ++)
         {
             VIR_Symbol* pOutputSym = VIR_Shader_GetSymFromId(pShader,
                                 VIR_IdList_GetId(VIR_Shader_GetOutputs(pShader), outputIdx));
@@ -10838,8 +10858,8 @@ void _VIR_RA_SetInputOutputFlag(
         }
 
         for (outputIdx = 0;
-                outputIdx < VIR_IdList_Count(VIR_Shader_GetPerpatchOutputs(pShader));
-                outputIdx ++)
+             outputIdx < VIR_IdList_Count(VIR_Shader_GetPerpatchOutputs(pShader));
+             outputIdx ++)
         {
             VIR_Symbol* pOutputSym = VIR_Shader_GetSymFromId(pShader,
                                 VIR_IdList_GetId(VIR_Shader_GetPerpatchOutputs(pShader), outputIdx));
@@ -10858,8 +10878,8 @@ void _VIR_RA_SetInputOutputFlag(
             they are not used by any inst. For these inputs, we should also set LOAD_STORE_ATTR
             flag */
         for (inputIdx = 0;
-                inputIdx < VIR_IdList_Count(VIR_Shader_GetAttributes(pShader));
-                inputIdx ++)
+             inputIdx < VIR_IdList_Count(VIR_Shader_GetAttributes(pShader));
+             inputIdx ++)
         {
             VIR_Symbol* pAttrSym = VIR_Shader_GetSymFromId(pShader,
                                 VIR_IdList_GetId(VIR_Shader_GetAttributes(pShader), inputIdx));
@@ -10871,8 +10891,8 @@ void _VIR_RA_SetInputOutputFlag(
         }
 
         for (inputIdx = 0;
-                inputIdx < VIR_IdList_Count(VIR_Shader_GetPerpatchAttributes(pShader));
-                inputIdx ++)
+             inputIdx < VIR_IdList_Count(VIR_Shader_GetPerpatchAttributes(pShader));
+             inputIdx ++)
         {
             VIR_Symbol* pAttrSym = VIR_Shader_GetSymFromId(pShader,
                                 VIR_IdList_GetId(VIR_Shader_GetPerpatchAttributes(pShader), inputIdx));
@@ -10889,56 +10909,160 @@ void
 _VIR_RA_LS_WriteDebugInfo(
     VIR_RA_LS           *pRA)
 {
+    VIR_Shader          *pShader = VIR_RA_LS_GetShader(pRA);
     VIR_RA_LS_Liverange *pLR;
     gctUINT             webIdx;
-    VSC_DI_SW_LOC       *SWLoc;
-    VSC_DI_HW_LOC       *HWLoc;
-    gctUINT16           SWLocId, HWLocId;
+    VSC_DI_SW_LOC       SWLoc;
+    VSC_DI_HW_LOC       HWLoc;
+    gctUINT             *instMapping;
+    VIR_FuncIterator    func_iter;
+    VIR_FunctionNode    *func_node;
+    VIR_Function        *pFunc;
+    gctUINT             instIdx = 0, i;
+    gctUINT             instCount, totalInstCount = 0;
 
     gcmASSERT(pRA->DIContext);
 
-    for (webIdx = 0; webIdx < VIR_RA_LS_GetNumWeb(pRA); webIdx++)
-    {
-        pLR = _VIR_RA_LS_Web2LR(pRA, webIdx);
+    /* write tmp debug */
+    if (gcmOPT_EnableDebugDump())
+        gcmPRINT("------------hwLoc alloc for tmp reg----------------");
 
-        if (pLR->colorFunc == gcvNULL)
+    VIR_FuncIterator_Init(&func_iter, VIR_Shader_GetFunctions(pShader));
+    for (func_node = VIR_FuncIterator_First(&func_iter);
+        func_node != gcvNULL; func_node = VIR_FuncIterator_Next(&func_iter))
+    {
+        VIR_InstIterator inst_iter;
+        VIR_Instruction* inst;
+
+        pFunc = func_node->function;
+        instCount = VIR_Function_GetInstCount(pFunc);
+        totalInstCount += instCount;
+
+            /* since load/store are inserted because of spilling, the instruction order is changed.
+               thus we need to reorder the instructions and record the instruction mapping */
+        gcoOS_Allocate(gcvNULL, instCount *sizeof(gctUINT), (gctPOINTER*)&instMapping);
+
+        instIdx = 0;
+        VIR_InstIterator_Init(&inst_iter, VIR_Function_GetInstList(pFunc));
+        for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
+             inst != gcvNULL; inst = VIR_InstIterator_Next(&inst_iter))
+        {
+            instMapping[VIR_Inst_GetId(inst)] = instIdx;
+            VIR_Inst_SetId(inst, instIdx++);
+        }
+        gcmASSERT(instIdx == instCount);
+
+        for (webIdx = 0; webIdx < VIR_RA_LS_GetNumWeb(pRA); webIdx++)
+        {
+            pLR = _VIR_RA_LS_Web2LR(pRA, webIdx);
+
+            if (pLR->colorFunc != pFunc)
+            {
+                continue;
+            }
+
+            /* RA assigns register/memory for all temps */
+            SWLoc.reg = gcvTRUE;
+            SWLoc.u.reg.start = (gctUINT16)pLR->firstRegNo;
+            SWLoc.u.reg.end = (gctUINT16)(pLR->firstRegNo + pLR->regNoRange - 1);
+
+            if (pLR->startPoint == 0)
+            {
+                HWLoc.beginPC = (gctUINT16)instMapping[1];
+            }
+            else
+            {
+                HWLoc.beginPC = (gctUINT16)instMapping[pLR->startPoint];
+            }
+            if (pLR->endPoint == 0)
+            {
+                HWLoc.endPC = (gctUINT16)instMapping[1];
+            }
+            else
+            {
+                HWLoc.endPC = (gctUINT16)instMapping[pLR->endPoint];
+            }
+            HWLoc.next = VSC_DI_INVALID_HW_LOC;
+
+            if (isLRSpilled(pLR))
+            {
+                HWLoc.reg = gcvFALSE;
+                /* to-do: for a complex type (e.g., struct) */
+                HWLoc.u.offset.baseAddr.type = VSC_DIE_HW_REG_TMP;
+                HWLoc.u.offset.baseAddr.start = (unsigned short) pRA->baseRegister; /* base address register */
+                HWLoc.u.offset.baseAddr.end = (unsigned short) pRA->baseRegister;
+                HWLoc.u.offset.offset = (gctUINT16)_VIR_RA_GetLRSpillOffset(pLR);
+                HWLoc.u.offset.endOffset = HWLoc.u.offset.offset + (gctUINT16)pLR->regNoRange * 16;
+            }
+            else
+            {
+                HWLoc.reg = gcvTRUE;
+                HWLoc.u.reg.type = VSC_DIE_HW_REG_TMP;
+                HWLoc.u.reg.start = (gctUINT16)pLR->u1.color._hwRegId;
+                HWLoc.u.reg.end = (gctUINT16)(pLR->u1.color._hwRegId + pLR->regNoRange - 1);
+            }
+
+            vscDISetHwLocToSWLoc(pRA->DIContext, &SWLoc, &HWLoc);
+        }
+
+        gcoOS_Free(gcvNULL, instMapping);
+        }
+
+    /* write debug infor for uniform */
+    if (gcmOPT_EnableDebugDump())
+    {
+        gcmPRINT("\n------------hwLoc alloc for uniform reg----------------");
+    }
+
+    for (i = 0; i < (gctINT) VIR_IdList_Count(&pShader->uniforms); ++i)
+    {
+        VIR_Id      id  = VIR_IdList_GetId(&pShader->uniforms, i);
+        VIR_Symbol  *sym = VIR_Shader_GetSymFromId(pShader, id);
+        VIR_Uniform *symUniform = gcvNULL;
+
+        if (VIR_Symbol_isUniform(sym))
+        {
+            symUniform = VIR_Symbol_GetUniform(sym);
+        }
+        else if (VIR_Symbol_isSampler(sym))
+        {
+            symUniform = VIR_Symbol_GetSampler(sym);
+        }
+        else if (VIR_Symbol_isImage(sym))
+        {
+            symUniform = VIR_Symbol_GetImage(sym);
+        }
+
+        if (symUniform == gcvNULL)
         {
             continue;
         }
 
-        SWLocId = vscDIAddSWLoc(pRA->DIContext);
-        SWLoc = vscDIGetSWLoc(pRA->DIContext, SWLocId);
-
-        /* RA assigns register/memory for all temps */
-        SWLoc->reg = gcvTRUE;
-        SWLoc->u.reg.start = (gctUINT16)pLR->firstRegNo;
-        SWLoc->u.reg.end = (gctUINT16)(pLR->firstRegNo + pLR->regNoRange - 1);
-
-        HWLocId = vscDIAddHWLoc(pRA->DIContext);
-        HWLoc = vscDIGetHWLoc(pRA->DIContext, HWLocId);
-        HWLoc->beginPC = (gctUINT16)pLR->startPoint;
-        HWLoc->endPC = (gctUINT16)pLR->endPoint;
-
-        SWLoc->hwLoc = HWLocId;
-
-        if (isLRSpilled(pLR))
+        if (!isSymCompilerGen(sym) && symUniform->physical != -1)
         {
-            HWLoc->reg = gcvFALSE;
-            /* to-do: for a complex type (e.g., struct) */
-            HWLoc->u.offset.baseAddr = _VIR_RA_GetLRSpillOffset(pLR);
-            HWLoc->u.offset.endOffset = (gctUINT16)pLR->regNoRange * 16;
-            HWLoc->u.offset.offset = 0;
+            /* find the temp reg for the uniform */
+            SWLoc.reg = gcvTRUE;
+            SWLoc.u.reg.type = VSC_DIE_REG_TYPE_CONST;
+            SWLoc.u.reg.start = (gctUINT16) symUniform->index;
+            SWLoc.u.reg.end = (gctUINT16)(symUniform->index + symUniform->realUseArraySize - 1);
 
-        }
-        else
-        {
-            HWLoc->reg = gcvTRUE;
-            HWLoc->u.reg.start = (gctUINT16)pLR->u1.color._hwRegId;
-            HWLoc->u.reg.end = (gctUINT16)(pLR->u1.color._hwRegId + pLR->regNoRange - 1);
+            HWLoc.beginPC = 0;
+            HWLoc.endPC = (gctUINT16) totalInstCount;
+            HWLoc.next = VSC_DI_INVALID_HW_LOC;
+
+            HWLoc.reg = gcvTRUE;
+            HWLoc.u.reg.type = VSC_DIE_HW_REG_CONST;
+            HWLoc.u.reg.start = (gctUINT16) symUniform->physical;
+            HWLoc.u.reg.end = (gctUINT16) symUniform->physical;
+            vscDISetHwLocToSWLoc(pRA->DIContext, &SWLoc, &HWLoc);
         }
     }
 
-    vscDIDumpLocTable(pRA->DIContext);
+    if (gcmOPT_EnableDebugDump())
+    {
+        gcmPRINT("---------------------------------------------------");
+    }
+
 }
 
 DEF_QUERY_PASS_PROP(VIR_RA_LS_PerformTempRegAlloc)
@@ -11167,6 +11291,7 @@ VSC_ErrCode VIR_RA_LS_PerformTempRegAlloc(
 
     if (debugEnabled)
     {
+        if (ra.DIContext)
         _VIR_RA_LS_WriteDebugInfo(&ra);
     }
 

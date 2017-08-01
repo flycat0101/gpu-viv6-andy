@@ -169,7 +169,7 @@ vx_status vxViv_Fast9Corners_Strength(vx_node node, vx_image src, vx_scalar t, v
     indexData[32].bin[0] = indexData[32].bin[2] = FV2((vx_int8)toleranceValue);
     vxReadScalarValue(do_nonmax, &isDoNonmax);
 
-    vxQueryImage(src, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(vx_uint32));
+    vxQueryImage(src, VX_IMAGE_HEIGHT, &height, sizeof(vx_uint32));
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, src, GC_VX_INDEX_AUTO);
@@ -180,9 +180,9 @@ vx_status vxViv_Fast9Corners_Strength(vx_node node, vx_image src, vx_scalar t, v
     kernelContext->params.step                 = F9C_STRENGTH;
     kernelContext->params.kernel               = gcvVX_KERNEL_FAST_CORNERS;
 #if gcdVX_OPTIMIZER
-    kernelContext->borders                     = VX_BORDER_MODE_UNDEFINED;
+    kernelContext->borders                     = VX_BORDER_UNDEFINED;
 #else
-    kernelContext->params.borders              = VX_BORDER_MODE_UNDEFINED;
+    kernelContext->params.borders              = VX_BORDER_UNDEFINED;
 #endif
     kernelContext->params.row                  = (vx_int8)toleranceValue;;
     kernelContext->params.xstep                = 8;
@@ -307,9 +307,9 @@ vx_status vxViv_Fast9Corners_NonMax(vx_node node, vx_image src, vx_scalar t, vx_
     kernelContext->params.step     = F9C_NONMAX;
     kernelContext->params.kernel   = gcvVX_KERNEL_FAST_CORNERS;
 #if gcdVX_OPTIMIZER
-    kernelContext->borders         = VX_BORDER_MODE_UNDEFINED;
+    kernelContext->borders         = VX_BORDER_UNDEFINED;
 #else
-    kernelContext->params.borders  = VX_BORDER_MODE_UNDEFINED;
+    kernelContext->params.borders  = VX_BORDER_UNDEFINED;
 #endif
     kernelContext->params.row      = (vx_uint8)toleranceValue;;
     kernelContext->params.col      = isDoNonmax;;

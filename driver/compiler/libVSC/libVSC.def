@@ -28,10 +28,12 @@ EXPORTS
     gcOptimizeShader
     gcLinkShaders
     gcSaveProgram
+	gcSaveCLSingleKernel
     gcLinkProgram
     gcLinkProgramPipeline
 	gcValidateProgramPipeline
     gcLoadProgram
+	gcLoadCLSingleKernel
     gcLinkKernel
     gcSHADER_IsHaltiCompiler
     gcSHADER_IsES31Compiler
@@ -385,18 +387,25 @@ EXPORTS
 	vscMM_Alloc
 	vscMM_Free
 
-	;vsc debug functions
-	vscDIConstructContext
-	vscDIDestroyContext
-	vscDIAddDIE
-	vscDIDumpDIE
-	vscDIGetDIEType
-	vscDIGetDIE
-	vscDIDumpDIETree
-	vscDIGetSrcLineByPC
-	vscDIGetPCBySrcLine
-	vscDIGetPCByFuncName
-	vscDIGetNearPCBySrcLine
+    ;vsc debug functions
+    vscDIConstructContext
+    vscDIDestroyContext
+    vscDIAddDIE
+    vscDIDumpDIE
+    vscDIGetDIEType
+    vscDIGetDIE
+    vscDIDumpDIETree
+    vscDIGetSrcLineByPC
+    vscDIGetPCBySrcLine
+    vscDIGetPCByFuncName
+    vscDIGetNearPCBySrcLine
+    vscDIGetSWLoc
+    vscDIAddSWLoc
+    vscDIChangeUniformSWLoc
+    vscDIGetVaribleLocByNameAndPC
+	vscDIStep
+	vscDIPushCallStack
+	vscDIPopCallStack
 
     vscERR_ReportError
     vscERR_ReportWarning
@@ -405,6 +414,7 @@ EXPORTS
 	vscMC_BeginCodec
 	vscMC_EndCodec
 	vscMC_DumpInst
+	vscMC_DisassembleInst
 
 	VIR_Adjust_Imagetypesize
 	VIR_GetSymFromId

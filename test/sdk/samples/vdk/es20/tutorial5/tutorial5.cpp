@@ -393,6 +393,20 @@ GLuint LoadTGA( const char* strFileName)
     unsigned int nPixelSize = header.PixelDepth / 8;
     format = nPixelSize == 3 ? GL_RGB : GL_BGRA_EXT;
 
+    const unsigned short data = 0xff00;
+    if ((*(unsigned char*)&data) == 0xff)
+    {
+#define SWAP16(x) ((unsigned short)( \
+    (((unsigned short)(x) & (unsigned short)0x00FF) << 8) | \
+    (((unsigned short)(x) & (unsigned short)0xFF00) >> 8)))
+
+        header.XOrigin = SWAP16(header.XOrigin);
+        header.YOrigin = SWAP16(header.YOrigin);
+        header.ImageWidth = SWAP16(header.ImageWidth);
+        header.ImageHeight = SWAP16(header.ImageHeight);
+#undef SWAP16
+    }
+
     /* Create the texture. */
     glGenTextures(1, &name);
     glBindTexture(GL_TEXTURE_2D, name);

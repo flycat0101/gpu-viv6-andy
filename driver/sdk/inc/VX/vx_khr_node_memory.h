@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2015 The Khronos Group Inc.
+ * Copyright (c) 2012-2016 The Khronos Group Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and/or associated documentation files (the
@@ -11,6 +11,11 @@
  *
  * The above copyright notice and this permission notice shall be included
  * in all copies or substantial portions of the Materials.
+ *
+ * MODIFICATIONS TO THIS FILE MAY MEAN IT NO LONGER ACCURATELY REFLECTS
+ * KHRONOS STANDARDS. THE UNMODIFIED, NORMATIVE VERSIONS OF KHRONOS
+ * SPECIFICATIONS AND HEADER INFORMATION ARE LOCATED AT
+ *    https://www.khronos.org/registry/
  *
  * THE MATERIALS ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
  * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
@@ -39,12 +44,12 @@ enum vx_kernel_attribute_memory_e {
      * Use a \ref vx_size parameter.
      * \note If not set it will default to zero.
      */
-    VX_KERNEL_ATTRIBUTE_GLOBAL_DATA_SIZE = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x5,
+    VX_KERNEL_GLOBAL_DATA_SIZE = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x5,
     /*! \brief The global data pointer to the shared across all the instances of
      * the kernel (nodes are instances of the kernels).
      * Use a \ref void * parameter.
      */
-    VX_KERNEL_ATTRIBUTE_GLOBAL_DATA_PTR = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x6,
+    VX_KERNEL_GLOBAL_DATA_PTR = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_KERNEL) + 0x6,
 };
 
 /*! \brief The node object attributes for global and local memory.
@@ -54,11 +59,11 @@ enum vx_node_attribute_memory_e {
     /*! \brief Used to indicate the size of the shared kernel global memory area.
      * Use a \ref vx_size parameter.
      */
-    VX_NODE_ATTRIBUTE_GLOBAL_DATA_SIZE = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0x5,
+    VX_NODE_GLOBAL_DATA_SIZE = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0x5,
     /*! \brief Used to indicate the pointer to the shared kernel global memory area.
      * Use a void * parameter.
      */
-    VX_NODE_ATTRIBUTE_GLOBAL_DATA_PTR = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0x6,
+    VX_NODE_GLOBAL_DATA_PTR = VX_ATTRIBUTE_BASE(VX_ID_KHRONOS, VX_TYPE_NODE) + 0x6,
 };
 
 #endif

@@ -25,13 +25,14 @@ VX_INTERNAL_API vx_bool vxIsValidImportType(vx_enum type)
 {
     switch (type)
     {
-        case VX_IMPORT_TYPE_HOST:
+        case VX_MEMORY_TYPE_HOST:
+        case VX_MEMORY_TYPE_HOST_UNCACHED:
             return vx_true_e;
 #if defined(__linux__)
-        case VX_IMPORT_TYPE_DMABUF:
+        case VX_MEMORY_TYPE_DMABUF:
             return vx_true_e;
 #endif
-        case VX_IMPORT_TYPE_NONE:
+        case VX_MEMORY_TYPE_NONE:
             return vx_false_e;
 
         default:
@@ -44,9 +45,23 @@ VX_INTERNAL_API vx_bool vxIsValidBorderMode(vx_enum borderMode)
 {
     switch (borderMode)
     {
-        case VX_BORDER_MODE_UNDEFINED:
-        case VX_BORDER_MODE_CONSTANT:
-        case VX_BORDER_MODE_REPLICATE:
+        case VX_BORDER_UNDEFINED:
+        case VX_BORDER_CONSTANT:
+        case VX_BORDER_REPLICATE:
+            return vx_true_e;
+
+        default:
+            vxmASSERT(0);
+            return vx_false_e;
+    }
+}
+
+VX_INTERNAL_API vx_bool vxIsValidBorderModePolicy(vx_enum borderModePolicy)
+{
+    switch (borderModePolicy)
+    {
+        case VX_BORDER_POLICY_DEFAULT_TO_UNDEFINED:
+        case VX_BORDER_POLICY_RETURN_ERROR:
             return vx_true_e;
 
         default:
@@ -79,6 +94,7 @@ static vx_datatype_size_record_s vxDataTypeSizeRecords[] = {
     {VX_TYPE_UINT16, sizeof(vx_uint16)},
     {VX_TYPE_UINT32, sizeof(vx_uint32)},
     {VX_TYPE_UINT64, sizeof(vx_uint64)},
+    {VX_TYPE_FLOAT16, sizeof(vx_uint16)},
     {VX_TYPE_FLOAT32, sizeof(vx_float32)},
     {VX_TYPE_FLOAT64, sizeof(vx_float64)},
     {VX_TYPE_ENUM, sizeof(vx_enum)},
@@ -109,6 +125,7 @@ static vx_datatype_size_record_s vxDataTypeSizeRecords[] = {
 
     /* Data objects */
     {VX_TYPE_ARRAY, sizeof(vx_array_s)},
+    {VX_TYPE_OBJECT_ARRAY, sizeof(vx_object_array_s)},
     {VX_TYPE_CONVOLUTION, sizeof(vx_convolution_s)},
     {VX_TYPE_DELAY, sizeof(vx_delay_s)},
     {VX_TYPE_DISTRIBUTION, sizeof(vx_distribution_s)},
@@ -118,7 +135,12 @@ static vx_datatype_size_record_s vxDataTypeSizeRecords[] = {
     {VX_TYPE_PYRAMID, sizeof(vx_pyramid_s)},
     {VX_TYPE_REMAP, sizeof(vx_remap_s)},
     {VX_TYPE_SCALAR, sizeof(vx_scalar_s)},
-    {VX_TYPE_THRESHOLD, sizeof(vx_threshold_s)}
+    {VX_TYPE_THRESHOLD, sizeof(vx_threshold_s)},
+
+    {VX_TYPE_TENSOR, sizeof(vx_tensor_s)},
+    {VX_TYPE_TENSOR_VIEW, sizeof(vx_tensor_view_s)},
+    {VX_TYPE_TENSOR_ADDRESS, sizeof(vx_tensor_addressing_s)},
+    {VX_TYPE_WEIGHTS_BIASES_PARAMETER, sizeof(vx_weights_biases_parameter_s)}
 };
 
 VX_INTERNAL_API vx_size vxDataType_GetSize(vx_type_e type)
@@ -170,6 +192,7 @@ static vx_object_destructor_record_s vxDestructorRecords[] = {
     {VX_TYPE_META_FORMAT, VX_NULL},
 
     {VX_TYPE_ARRAY, &vxoArray_Destructor},
+    {VX_TYPE_OBJECT_ARRAY, &vxoOA_DestructObjectArray},
     {VX_TYPE_CONVOLUTION, &vxoConvolution_Destructor},
     {VX_TYPE_DISTRIBUTION, &vxoDistribution_Destructor},
     {VX_TYPE_DELAY, &vxoDelay_Destructor},
@@ -180,6 +203,10 @@ static vx_object_destructor_record_s vxDestructorRecords[] = {
     {VX_TYPE_PYRAMID, &vxoPyramid_Destructor},
     {VX_TYPE_REMAP, &vxoRemap_Destructor},
     {VX_TYPE_THRESHOLD, VX_NULL},
+
+    {VX_TYPE_TENSOR, &vxoTensor_Destructor},
+    {VX_TYPE_TENSOR_VIEW, VX_NULL},
+    {VX_TYPE_TENSOR_ADDRESS,VX_NULL},
 
     {VX_TYPE_PROGRAM, &vxoProgram_Destructor}
 };
@@ -203,6 +230,7 @@ VX_INTERNAL_API vx_bool vxDataType_IsStatic(vx_type_e type)
 {
     switch (type)
     {
+        case VX_TYPE_TARGET:
         case VX_TYPE_KERNEL:
             return vx_true_e;
 
@@ -255,7 +283,6 @@ VX_PRIVATE_API vx_bool vxNodeWorkerCallback(vx_threadpool_worker worker)
 VX_PRIVATE_API vx_return_value vxGraphThreadRoutine(vx_ptr arg)
 {
     vx_processor processor = (vx_processor)arg;
-
     while (processor->running)
     {
         vx_value_set data = VX_NULL;
@@ -278,7 +305,6 @@ VX_PRIVATE_API vx_return_value vxGraphThreadRoutine(vx_ptr arg)
             }
         }
     }
-
     return 0;
 }
 
@@ -297,8 +323,6 @@ VX_PRIVATE_API vx_bool vxoContext_CreateAllPredefinedErrorObjects(vx_context con
 VX_PRIVATE_API vx_context vxoContext_Create()
 {
     vx_context context = VX_NULL;
-    VSC_HW_CONFIG hwCfg;
-    gcePATCH_ID patchId;
 
     if (vxSingletonContext == VX_NULL)
     {
@@ -324,7 +348,11 @@ VX_PRIVATE_API vx_context vxoContext_Create()
 
         vxoReference_Increment(&context->base, VX_REF_EXTERNAL);
 
-        context->immediateBorderMode.mode = VX_BORDER_MODE_UNDEFINED;
+        context->immediateBorderMode.mode = VX_BORDER_UNDEFINED;
+        context->immediateBorderModePolicy  = VX_BORDER_POLICY_DEFAULT_TO_UNDEFINED;
+
+        context->NextDynamicUserKernelID    = 0;
+        context->NextDynamicUserLibraryID   = 1;
 
 #if VX_USE_THREADPOOL
         context->threadPool = vxoThreadPool_Create(
@@ -337,7 +365,6 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         if (vxoTarget_Load(context, VX_NULL) != VX_SUCCESS) goto ErrorExit;
 
         context->targetCount++;
-
         if (context->targetTable[0].funcs.initialize(&context->targetTable[0]) != VX_SUCCESS)
         {
             vxoTarget_Unload(context, 0, vx_true_e);
@@ -359,19 +386,10 @@ VX_PRIVATE_API vx_context vxoContext_Create()
         if (oldEnv)
             context->perfEnable = (atoi(oldEnv) == 1)?vx_true_e:vx_false_e;
 
-
         context->deviceCount = 1;
-        if (gcmIS_ERROR(gcQueryShaderCompilerHwCfg(gcvNULL, &hwCfg)))
-        {
-            goto ErrorExit;
-        }
 
-        gcoHAL_GetPatchID(gcvNULL, &patchId);
-
-        if (gcmIS_ERROR(gcLoadKernelCompiler(&hwCfg, patchId)))
-        {
-            goto ErrorExit;
-        }
+        /* memory maps table lock */
+        vxCreateMutex(&context->memoryMapsLock);
 
         gcoOS_GetEnv(gcvNULL, "VC_OPTION", &oldEnv);
         if (oldEnv)
@@ -478,17 +496,45 @@ VX_PRIVATE_API void vxoContext_ForceReleaseAllObjects(vx_context context)
     }
 }
 
+gceSTATUS
+gcfVX_UnloadCompiler(
+    vx_context context
+    )
+{
+    gceSTATUS   status = gcvSTATUS_OK;
+
+    {
+        if (context->unloadCompiler != gcvNULL)
+        {
+            gcmONERROR((*context->unloadCompiler)());
+
+            gcmVERIFY_OK(gcoOS_FreeLibrary(gcvNULL, context->libCLC));
+
+            context->libCLC             = gcvNULL;
+            context->compileKernel      = gcvNULL;
+            context->loadCompiler       = gcvNULL;
+            context->unloadCompiler     = gcvNULL;
+        }
+    }
+
+OnError:
+    return status;
+}
+
 VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
 {
     vx_context context;
-    vx_uint32 i;
+    vx_uint32 i, j;
     vx_char* flag;
     gcoOS_GetEnv(gcvNULL, "ENABLE_TRACE_MEMORY", &flag);
     if (flag)
     {
         vx_uint32 size = 0;
         gcoVX_GetMemorySize(&size);
-        printf("Memory size (Mbyte) = %d\n", size/(1000*1000));
+        if (size > 1000 * 1000)
+            printf("Memory size = %.2f Mbyte\n", size/(1000.0f*1000.0f));
+        else
+            printf("Memory size = %d byte\n", size);
     }
 
     if (contextPtr == VX_NULL) return VX_ERROR_INVALID_REFERENCE;
@@ -501,8 +547,9 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
     vxmASSERT(vxContextGlobalLock);
     vxAcquireMutex(vxContextGlobalLock);
 
-    if (!vxoContext_IsValid(context)) return VX_ERROR_INVALID_REFERENCE;
+    gcfVX_Flush(gcvTRUE);
 
+    if (!vxoContext_IsValid(context)) return VX_ERROR_INVALID_REFERENCE;
 #if VIVANTE_PROFILER
         /* Destroy the profiler. */
         vxoProfiler_Destroy(context);
@@ -562,7 +609,20 @@ VX_PRIVATE_API vx_status vxoContext_Release(vx_context_ptr contextPtr)
         vxmASSERT(context->base.lock);
         vxDestroyMutex(context->base.lock);
 
-        gcUnloadKernelCompiler();
+        vxReleaseMutex(context->memoryMapsLock);
+        vxDestroyMutex(context->memoryMapsLock);
+
+        for (i = 0; i < VXNNE_KERNEL_COUNT; i++)
+        {
+            for (j = 0; j < context->kernels[i].kernelShaderCount*2; j++)
+            {
+                vxoShader_Free(context->kernels[i].kernelShader[j]);
+            }
+
+            if (context->kernels[i].kernelShader) gcoOS_Free(gcvNULL, context->kernels[i].kernelShader);
+        }
+
+        gcfVX_UnloadCompiler(context);
 
         gcoVX_DestroyDevices(context->deviceCount, context->devices);
 
@@ -868,20 +928,31 @@ VX_API_ENTRY vx_context VX_API_CALL vxGetContext(vx_reference reference)
 
 VX_API_ENTRY vx_status VX_API_CALL vxSetContextAttribute(vx_context context, vx_enum attribute, const void *ptr, vx_size size)
 {
-    vx_border_mode_t * borderMode;
+    vx_border_t * borderMode;
+    vx_enum * immediateBorderModePolicy;
 
     if (!vxoContext_IsValid(context)) return VX_ERROR_INVALID_REFERENCE;
 
     switch (attribute)
     {
-        case VX_CONTEXT_ATTRIBUTE_IMMEDIATE_BORDER_MODE:
-            vxmVALIDATE_PARAMETERS(ptr, size, vx_border_mode_t, 0x3);
+        case VX_CONTEXT_IMMEDIATE_BORDER:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_border_t, 0x3);
 
-            borderMode = (vx_border_mode_t *)ptr;
+            borderMode = (vx_border_t *)ptr;
 
             if (!vxIsValidBorderMode(borderMode->mode)) return VX_ERROR_INVALID_VALUE;
 
             context->immediateBorderMode = *borderMode;
+            break;
+        case VX_CONTEXT_IMMEDIATE_BORDER_POLICY:
+
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
+
+            immediateBorderModePolicy = (vx_enum *)ptr;
+
+            if (!vxIsValidBorderModePolicy(*immediateBorderModePolicy)) return VX_ERROR_INVALID_VALUE;
+
+            context->immediateBorderModePolicy = *immediateBorderModePolicy;
             break;
 
         default:
@@ -955,39 +1026,41 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryContext(vx_context context, vx_enum at
 
     switch (attribute)
     {
-        case VX_CONTEXT_ATTRIBUTE_VENDOR_ID:
+        case VX_CONTEXT_VENDOR_ID:
              vxmVALIDATE_PARAMETERS(ptr, size, vx_uint16, 0x1);
 
             *(vx_uint16 *)ptr = VX_ID_VIVANTE;
             break;
 
-        case VX_CONTEXT_ATTRIBUTE_VERSION:
+        case VX_CONTEXT_VERSION:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint16, 0x1);
 
             *(vx_uint16 *)ptr = (vx_uint16)VX_VERSION;
             break;
 
-        case VX_CONTEXT_ATTRIBUTE_MODULES:
+        case VX_CONTEXT_MODULES:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = context->moduleCount;
             break;
 
-        case VX_CONTEXT_ATTRIBUTE_REFERENCES:
+        case VX_CONTEXT_REFERENCES:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = context->refCount;
             break;
 
 #ifdef OPENVX_USE_TARGET
-        case VX_CONTEXT_ATTRIBUTE_TARGETS:
+        /*the value of VX_CONTEXT_TARGETS is repetitous with VX_CONTEXT_IMMEDIATE_BORDER_POLICY's value*/
+        /*case VX_CONTEXT_TARGETS:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = context->targetCount;
             break;
+        */
 #endif
 
-        case VX_CONTEXT_ATTRIBUTE_IMPLEMENTATION:
+        case VX_CONTEXT_IMPLEMENTATION:
             if (size > VX_MAX_IMPLEMENTATION_NAME || ptr == VX_NULL)
             {
                 return VX_ERROR_INVALID_PARAMETERS;
@@ -996,13 +1069,13 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryContext(vx_context context, vx_enum at
             vxStrCopySafe((vx_string)ptr, VX_MAX_IMPLEMENTATION_NAME, VX_IMPLEMENTATION_NAME);
             break;
 
-        case VX_CONTEXT_ATTRIBUTE_EXTENSIONS_SIZE:
+        case VX_CONTEXT_EXTENSIONS_SIZE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size *)ptr = sizeof(extensions);
             break;
 
-        case VX_CONTEXT_ATTRIBUTE_EXTENSIONS:
+        case VX_CONTEXT_EXTENSIONS:
             if (size >= sizeof(extensions) || ptr == VX_NULL)
             {
                 return VX_ERROR_INVALID_PARAMETERS;
@@ -1011,31 +1084,37 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryContext(vx_context context, vx_enum at
             vxStrCopySafe((vx_string)ptr, sizeof(extensions), extensions);
             break;
 
-        case VX_CONTEXT_ATTRIBUTE_CONVOLUTION_MAXIMUM_DIMENSION:
+        case VX_CONTEXT_CONVOLUTION_MAX_DIMENSION:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size *)ptr = VX_MAX_CONVOLUTION_DIM;
             break;
 
-        case VX_CONTEXT_ATTRIBUTE_OPTICAL_FLOW_WINDOW_MAXIMUM_DIMENSION:
+        case VX_CONTEXT_OPTICAL_FLOW_MAX_WINDOW_DIMENSION:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size *)ptr = VX_MAX_OPTICAL_FLOW_WINDOW_DIM;
             break;
 
-        case VX_CONTEXT_ATTRIBUTE_IMMEDIATE_BORDER_MODE:
-            vxmVALIDATE_PARAMETERS(ptr, size, vx_border_mode_t, 0x3);
+        case VX_CONTEXT_IMMEDIATE_BORDER:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_border_t, 0x3);
 
-            *(vx_border_mode_t *)ptr = context->immediateBorderMode;
+            *(vx_border_t *)ptr = context->immediateBorderMode;
             break;
 
-        case VX_CONTEXT_ATTRIBUTE_UNIQUE_KERNELS:
+        case VX_CONTEXT_IMMEDIATE_BORDER_POLICY:
+            vxmVALIDATE_PARAMETERS(ptr, size, vx_enum, 0x3);
+
+            *(vx_enum *)ptr = context->immediateBorderModePolicy;
+            break;
+
+        case VX_CONTEXT_UNIQUE_KERNELS:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = context->uniqueKernelCount;
             break;
 
-        case VX_CONTEXT_ATTRIBUTE_UNIQUE_KERNEL_TABLE:
+        case VX_CONTEXT_UNIQUE_KERNEL_TABLE:
             if (size != (context->uniqueKernelCount * sizeof(vx_kernel_info_t))
                 || ptr == VX_NULL)
             {
@@ -1053,19 +1132,15 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryContext(vx_context context, vx_enum at
     return VX_SUCCESS;
 }
 
-VX_API_ENTRY vx_status VX_API_CALL vxHint(vx_reference reference, vx_enum hint)
+VX_API_ENTRY vx_status VX_API_CALL vxHint(vx_reference reference, vx_enum hint, const void* data, vx_size data_size)
 {
-    if (!vxoContext_IsValid(reference->context)) return VX_ERROR_INVALID_REFERENCE;
-
-    if (!vxoReference_IsValidAndNoncontext(reference)) return VX_ERROR_INVALID_REFERENCE;
+    if (!vxoContext_IsValid((vx_context)reference) && !vxoReference_IsValidAndNoncontext(reference))
+        return VX_ERROR_INVALID_REFERENCE;
 
     switch (hint)
     {
         case VX_HINT_SERIALIZE:
-            if (!vxoReference_IsValidAndSpecific(reference, VX_TYPE_GRAPH))
-            {
-                return VX_ERROR_INVALID_REFERENCE;
-            }
+            if (vxoReference_IsValidAndSpecific(reference, VX_TYPE_GRAPH))
 
             {
                 vx_graph graph = (vx_graph)reference;
@@ -1084,18 +1159,36 @@ VX_API_ENTRY vx_status VX_API_CALL vxHint(vx_reference reference, vx_enum hint)
 
 VX_API_ENTRY vx_status VX_API_CALL vxDirective(vx_reference reference, vx_enum directive)
 {
-    if (!vxoContext_IsValid(reference->context)) return VX_ERROR_INVALID_REFERENCE;
+    vx_context context;
 
-    if (!vxoReference_IsValidAndNoncontext(reference)) return VX_ERROR_INVALID_REFERENCE;
+    /*if (!vxoContext_IsValid(reference->context)) return VX_ERROR_INVALID_REFERENCE;*/
+
+    if (!vxoReference_IsValid(reference)) return VX_ERROR_INVALID_REFERENCE;
+
+    context = ((reference->type == VX_TYPE_CONTEXT))?((vx_context)reference):(reference->context);
 
     switch (directive)
     {
         case VX_DIRECTIVE_DISABLE_LOGGING:
-            reference->context->logEnabled = vx_false_e;
+            context->logEnabled = vx_false_e;
             break;
 
         case VX_DIRECTIVE_ENABLE_LOGGING:
-            reference->context->logEnabled = vx_true_e;
+            context->logEnabled = vx_true_e;
+            break;
+
+        case VX_DIRECTIVE_DISABLE_PERFORMANCE:
+            if (reference->type == VX_TYPE_CONTEXT)
+                context->perfEnable = vx_false_e;
+            else
+                return VX_ERROR_NOT_SUPPORTED;
+
+            break;
+        case VX_DIRECTIVE_ENABLE_PERFORMANCE:
+            if (reference->type == VX_TYPE_CONTEXT)
+                context->perfEnable = vx_true_e;
+            else
+                return VX_ERROR_NOT_SUPPORTED;
             break;
 
         default:
@@ -1123,5 +1216,223 @@ VX_API_ENTRY vx_enum VX_API_CALL vxRegisterUserStruct(vx_context context, vx_siz
     }
 
     return VX_TYPE_INVALID;
+}
+
+static vx_target_s* vxoContext_FindTargetByString(vx_context context, const char* targetString)
+{
+    vx_uint32 index = 0;
+    for (index = 0; index < context->targetCount; index++)
+    {
+        vx_uint32 targetIndex = context->targetPriorityTable[index];
+        vx_target_s *target = &context->targetTable[targetIndex];
+        if (vxoTarget_MatchTargetNameWithString(target->name, targetString) == vx_true_e)
+        {
+            return target;
+        }
+    }
+    /* indicate 'not found' state */
+    return (vx_target_s*)NULL;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxSetImmediateModeTarget(vx_context context, vx_enum target_enum, const char* target_string)
+{
+    vx_status status = VX_ERROR_INVALID_REFERENCE;
+    vx_target_s* target = NULL;
+
+    if (!vxoContext_IsValid(context)) return VX_TYPE_INVALID;
+
+
+    switch (target_enum)
+    {
+        case VX_TARGET_ANY:
+            context->immediateTargetEnum = VX_TARGET_ANY;
+            memset(context->immediateTargetString, 0, sizeof(context->immediateTargetString));
+            status = VX_SUCCESS;
+            break;
+        case VX_TARGET_STRING:
+            target = vxoContext_FindTargetByString(context, target_string);
+            if (target != NULL)
+            {
+                context->immediateTargetEnum = VX_TARGET_STRING;
+                strncpy(context->immediateTargetString, target_string, sizeof(context->immediateTargetString));
+                context->immediateTargetString[sizeof(context->immediateTargetString) - 1] = '\0';
+                status = VX_SUCCESS;
+            }
+            else /* target was not found */
+            {
+                status = VX_ERROR_NOT_SUPPORTED;
+            }
+            break;
+        default:
+            status = VX_ERROR_NOT_SUPPORTED;
+            break;
+    }
+
+    return status;
+}
+
+VX_INTERNAL_API vx_bool vxoContext_MemoryMap(
+    vx_context   context,
+    vx_reference ref,
+    vx_size      size,
+    vx_enum      usage,
+    vx_enum      mem_type,
+    vx_uint32    flags,
+    void*        extra_data,
+    void**       ptr,
+    vx_map_id*   map_id)
+{
+    vx_uint32 id;
+    vx_bool worked = vx_false_e;
+
+    /* lock the table for modification */
+    if (vx_true_e == vxAcquireMutex(context->memoryMapsLock))
+    {
+        for (id = 0u; id < vxmLENGTH_OF(context->memoryMaps); id++)
+        {
+            if (context->memoryMaps[id].used == vx_false_e)
+            {
+                vx_memory_map_extra_s* extra;
+                vx_uint8_ptr buf = 0;
+                vxError("Found free memory map slot[%u]\n", id);
+
+                /* allocate mapped buffer */
+                //buf = (vx_uint8*)malloc(size);
+                if (size > 0)
+                {
+
+                    buf = (vx_uint8_ptr)vxAllocate(size);
+
+                    context->memoryCount ++;
+
+                    if (buf == NULL)
+                        break;
+                }
+
+                context->memoryMaps[id].used       = vx_true_e;
+                context->memoryMaps[id].ref        = ref;
+                context->memoryMaps[id].logical    = buf;
+                context->memoryMaps[id].usage      = usage;
+                context->memoryMaps[id].mem_type   = mem_type;
+                context->memoryMaps[id].flags      = flags;
+
+                extra = (vx_memory_map_extra_s*)extra_data;
+                if (VX_TYPE_IMAGE == ref->type)
+                {
+                    context->memoryMaps[id].extra.image_data.plane_index = extra->image_data.plane_index;
+                    context->memoryMaps[id].extra.image_data.rect        = extra->image_data.rect;
+                }
+                else if (VX_TYPE_ARRAY == ref->type || VX_TYPE_LUT == ref->type)
+                {
+                    vx_memory_map_extra_s* extra = (vx_memory_map_extra_s*)extra_data;
+                    context->memoryMaps[id].extra.array_data.start = extra->array_data.start;
+                    context->memoryMaps[id].extra.array_data.end   = extra->array_data.end;
+                }
+
+                *ptr = buf;
+                *map_id = (vx_map_id)id;
+
+                worked = vx_true_e;
+
+                break;
+            }
+        }
+
+        /* we're done, unlock the table */
+        worked = vxReleaseMutex(context->memoryMapsLock);
+    }
+    else
+        worked = vx_false_e;
+
+    return worked;
+} /* vxoContext_MemoryMap() */
+
+VX_INTERNAL_API vx_bool vxoContext_FindMemoryMap(
+    vx_context   context,
+    vx_reference ref,
+    vx_map_id    map_id)
+{
+    vx_bool worked = vx_false_e;
+    vx_uint32 id = (vx_uint32)map_id;
+
+    /* check index range */
+    if (id < vxmLENGTH_OF(context->memoryMaps))
+    {
+        /* lock the table for exclusive access */
+        if (vx_true_e == vxAcquireMutex(context->memoryMapsLock))
+        {
+            if ((context->memoryMaps[id].used == vx_true_e) && (context->memoryMaps[id].ref == ref))
+            {
+                worked = vx_true_e;
+            }
+
+            /* unlock teh table */
+            worked = vxReleaseMutex(context->memoryMapsLock);
+        }
+    }
+
+    return worked;
+} /* vxoContext_FindMemoryMap() */
+
+VX_INTERNAL_API void vxoContext_MemoryUnmap(vx_context context, vx_map_id m_id)
+{
+    vx_uint32 map_id = (vx_uint32)m_id;
+
+    /* lock the table for modification */
+    if (vx_true_e == vxAcquireMutex(context->memoryMapsLock))
+    {
+        if (context->memoryMaps[map_id].used == vx_true_e &&
+            context->memoryMaps[map_id].logical != NULL)
+        {
+            /* freeing mapped buffer */
+            //free(context->memoryMaps[map_id].ptr);
+
+            vxFree(context->memoryMaps[map_id].logical);
+
+            memset(&context->memoryMaps[map_id], 0, sizeof(vx_memory_map_s));
+            vxError("Removed memory mapping[%u]\n", map_id);
+
+            context->memoryCount --;
+        }
+
+        context->memoryMaps[map_id].used = vx_false_e;
+
+        /* we're done, unlock the table */
+        vxReleaseMutex(context->memoryMapsLock);
+    }
+    else
+        vxError("vxAcquireMutex() failed!\n");
+
+    return;
+} /* vxoContext_MemoryUnmap() */
+
+VX_API_ENTRY vx_status VX_API_CALL vxAllocateUserKernelId(vx_context context, vx_enum * pKernelEnumId)
+{
+    vx_status status = VX_ERROR_INVALID_REFERENCE;
+    if ((vxoContext_IsValid(context) == vx_true_e) && pKernelEnumId)
+    {
+        status = VX_ERROR_NO_RESOURCES;
+        if(context->NextDynamicUserKernelID <= VX_KERNEL_MASK)
+        {
+            *pKernelEnumId = VX_KERNEL_BASE(VX_ID_USER,0) + context->NextDynamicUserKernelID++;
+            status = VX_SUCCESS;
+        }
+    }
+    return status;
+}
+
+VX_API_ENTRY vx_status VX_API_CALL vxAllocateUserKernelLibraryId(vx_context context, vx_enum * pLibraryId)
+{
+    vx_status status = VX_ERROR_INVALID_REFERENCE;
+    if ((vxoContext_IsValid(context) == vx_true_e) && pLibraryId)
+    {
+        status = VX_ERROR_NO_RESOURCES;
+        if(context->NextDynamicUserLibraryID <= VX_LIBRARY(VX_LIBRARY_MASK))
+        {
+            *pLibraryId = context->NextDynamicUserLibraryID++;
+            status = VX_SUCCESS;
+        }
+    }
+    return status;
 }
 

@@ -165,7 +165,7 @@ static VSC_DIE * _nextDIE(VSC_DIContext * context)
 
     if (context->dieTable.usedCount == context->dieTable.count)
     {
-        context->dieTable.die = _ReallocateBuffer(context,(gctPOINTER)context->dieTable.die,
+        context->dieTable.die = (VSC_DIE *)_ReallocateBuffer(context,(gctPOINTER)context->dieTable.die,
                                                   (gctINT)(gcmSIZEOF(VSC_DIE) * context->dieTable.count),
                                                   (gcmSIZEOF(VSC_DIE) * VSC_DI_DIETABLE_INIT_COUNT),
                                                   &newSize);
@@ -193,6 +193,57 @@ static VSC_DIE * _nextDIE(VSC_DIContext * context)
     context->dieTable.usedCount++;
 
     return die;
+}
+
+static VSC_DIE* _getCurrentSubProgramDie(VSC_DIContext * context, unsigned int pc)
+{
+    gctUINT line;
+    VSC_DIE * die = gcvNULL;
+    VSC_DIE * innerDie = gcvNULL;
+
+    if (vscDIGetSrcLineByPC((void *)context, pc, &line))
+    {
+        /* look into the die table to find the die match the pc */
+        die = &context->dieTable.die[context->cu];
+        die = VSC_DI_DIE_PTR(die->child);
+
+        while (die)
+        {
+            if((die->tag == VSC_DI_TAG_SUBPROGRAM) ||
+                (die->tag == VSC_DI_TAG_LEXICALBLOCK))
+            {
+                if((die->lineNo <= line) &&
+                    (die->endLineNo >= line))
+                {
+                    innerDie = die;
+                    die = VSC_DI_DIE_PTR(die->child);
+                    continue;
+                }
+            }
+
+            if ((die->lineNo <= line) &&
+                (die->endLineNo >= line))
+            {
+                break;
+            }
+
+            innerDie = die;
+            die = VSC_DI_DIE_PTR(die->sib);
+        }
+
+        /* look up subprogram from inner to outer */
+        while (innerDie)
+        {
+            if (innerDie->tag == VSC_DI_TAG_SUBPROGRAM)
+            {
+                break;
+            }
+
+            innerDie = VSC_DI_DIE_PTR(innerDie->parent);
+        }
+    }
+
+    return innerDie;
 }
 
 static void _addChildDIE(VSC_DIContext * context, VSC_DIE * parent, VSC_DIE * child)
@@ -272,6 +323,7 @@ gctUINT16 vscDIAddDIE(VSC_DIContext * context,
                       gctCONST_STRING name,
                       gctUINT fileNo,
                       gctUINT lineNo,
+                      gctUINT endLineNo,
                       gctUINT colNo
                       )
 {
@@ -294,8 +346,15 @@ gctUINT16 vscDIAddDIE(VSC_DIContext * context,
         {
             die->fileNo = (gctUINT8)fileNo;
             die->lineNo = (gctUINT16)lineNo;
+            die->endLineNo = (gctUINT16)endLineNo;
             die->colNo = (gctUINT8)colNo;
             die->name = nameID;
+
+            if (tag == VSC_DI_TAG_VARIABE ||
+                tag == VSC_DI_TAG_PARAMETER)
+            {
+                die->u.variable.swLoc = VSC_DI_INVALID_SW_LOC;
+            }
         }
         return die->id;
     }
@@ -305,7 +364,7 @@ gctUINT16 vscDIAddDIE(VSC_DIContext * context,
     }
 }
 
-void _DIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT shift)
+void _DIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT shift, gctUINT tag)
 {
     VSC_DIE * die;
     gctUINT16 child;
@@ -313,20 +372,20 @@ void _DIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT shift)
 
     if (id != VSC_DI_INVALIDE_DIE)
     {
-        vscDIDumpDIE(context, id,shift);
+        vscDIDumpDIE(context, id,shift, tag);
 
         die = VSC_DI_DIE_PTR(id);
         child = die->child;
 
         shift++;
 
-        _DIDumpDIETree(context, child, shift);
+        _DIDumpDIETree(context, child, shift, tag);
 
         shift--;
 
         sibling = die->sib;
 
-        _DIDumpDIETree(context, sibling, shift);
+        _DIDumpDIETree(context, sibling, shift, tag);
     }
 }
 
@@ -373,6 +432,7 @@ gctUINT16 vscDIAddSWLoc(VSC_DIContext * context)
     loc = &context->swLocTable.loc[context->swLocTable.usedCount];
     loc->id = context->swLocTable.usedCount;
     loc->next = VSC_DI_INVALID_SW_LOC;
+    loc->hwLoc = VSC_DI_INVALID_HW_LOC;
 
     context->swLocTable.usedCount++;
 
@@ -427,112 +487,242 @@ gctUINT16 vscDIAddHWLoc(VSC_DIContext * context)
     return loc->id;
 }
 
-void vscDISetHwLocToSWLoc(VSC_DIContext * context, gctUINT16 swLoc, gctUINT16 hwLoc)
+
+/* BE RA call this function to set hwLoc to swLoc, as the swLoc table is from FE, the reg/mem is not excatly match the BE
+   reg/mem, so, we use this swLoc to check inside swLoc table, insert the hwLoc under swLoc, this may involve split the SW loc
+   to small one.
+*/
+void vscDISetHwLocToSWLoc(VSC_DIContext * context, VSC_DI_SW_LOC * swLoc, VSC_DI_HW_LOC * hwLoc)
 {
-    VSC_DI_SW_LOC * sl;
-    VSC_DI_HW_LOC * hl;
-    gctUINT16 id;
+    VSC_DI_SW_LOC * sl = gcvNULL;
+    VSC_DI_HW_LOC * hl = gcvNULL;
+    gctUINT     i;
+    gctUINT16   id;
+    gctBOOL     found = gcvFALSE;
 
-    sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, swLoc);
+    if (!swLoc || !hwLoc)
+        return;
 
-    if (sl)
+    if (swLoc->reg)
     {
-        id = sl->hwLoc;
-
-        if (id == VSC_DI_INVALID_HW_LOC)
+        for (i = 0 ; i < context->swLocTable.usedCount; i ++)
         {
-            sl->hwLoc = hwLoc;
-        }
-        else
-        {
-            hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, id);
-            id = hl->next;
+            sl = &context->swLocTable.loc[i];
 
-            while (id != VSC_DI_INVALID_HW_LOC)
+            if (sl->reg)
             {
-                hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, id);
-                id = hl->next;
-            }
+                if (swLoc->u.reg.type == VSC_DIE_REG_TYPE_CONST)
+                {
+                    if (sl->u.reg.type == VSC_DIE_REG_TYPE_TMP)
+                    {
+                        continue;
+                    }
 
-            hl->next = hwLoc;
+                    if (sl->u.reg.start == swLoc->u.reg.start &&
+                        sl->u.reg.end == swLoc->u.reg.end)
+                    {
+                        found = gcvTRUE;
+                    }
+                }
+                else
+                {
+                    if (sl->u.reg.type == VSC_DIE_REG_TYPE_CONST ||
+                        sl->u.reg.start > swLoc->u.reg.end ||
+                        sl->u.reg.end < swLoc->u.reg.start)
+                    {
+                        continue;
+                    }
+
+                    if (sl->u.reg.start == swLoc->u.reg.start &&
+                        sl->u.reg.end == swLoc->u.reg.end)
+                    {
+                        found = gcvTRUE;
+                    }
+                    else
+                    {
+                        /* we need split the sw loc here */
+                        /* the split is not finished yet, we create a sw loc and add to next */
+                        if (sl->u.reg.end != swLoc->u.reg.end)
+                        {
+                            VSC_DI_SW_LOC * newSWLoc = gcvNULL;
+                            gctUINT16 newSWLocId = VSC_DI_INVALID_SW_LOC;
+
+                            newSWLocId = vscDIAddSWLoc(context);
+
+                            /* re-get the sl in case we flush out the loc table in addSwLoc */
+                            sl = &context->swLocTable.loc[i];
+                            sl->next = newSWLocId;
+
+                            /* copy the information of the base sw loc */
+                            newSWLoc = vscDIGetSWLoc(context, newSWLocId);
+                            *newSWLoc = *sl;
+                            newSWLoc->id = newSWLocId;
+                            newSWLoc->next = VSC_DI_INVALID_SW_LOC;
+                        }
+
+                        /* set the reg to new start and new end */
+                        sl->u.reg.start = swLoc->u.reg.start;
+                        sl->u.reg.end = swLoc->u.reg.end;
+
+                        found = gcvTRUE;
+                    }
+                }
+
+                if (!found)
+                {
+                    continue;
+                }
+
+                hl = vscDIGetHWLoc(context, vscDIAddHWLoc(context));
+
+                if (hl)
+                {
+                    id = hl->id;
+                    *hl = *hwLoc;
+                    hl->id = id;
+                    hl->next = sl->hwLoc;
+                    sl->hwLoc = hl->id;
+
+                    if (gcmOPT_EnableDebugDump())
+                    {
+                        if (hl->reg)
+                        {
+                            if (hl->u.reg.type == VSC_DIE_HW_REG_CONST)
+                            {
+                                gcmPRINT("| uniform[%d,%d]    -> [pc%d, pc%d] c[%d,%d] |",
+                                    swLoc->u.reg.start, swLoc->u.reg.end, hl->beginPC, hl->endPC, hl->u.reg.start, hl->u.reg.end);
+                            }
+                            else
+                            {
+                                gcmPRINT("| reg[%d,%d]    -> [pc%d, pc%d] r[%d,%d] |",
+                                swLoc->u.reg.start, swLoc->u.reg.end, hl->beginPC, hl->endPC, hl->u.reg.start, hl->u.reg.end);
+                            }
+                        }
+                        else
+                        {
+                            gcmPRINT("| reg[%d,%d]    -> [pc%d, pc%d] 0x%x[0x%x,0x%x] |",
+                                swLoc->u.reg.start, swLoc->u.reg.end,
+                                hl->beginPC, hl->endPC,
+                                hl->u.offset.baseAddr, hl->u.offset.offset, hl->u.offset.endOffset);
+                        }
+                    }
+                    break;
+                }
+                else
+                {
+                    gcmASSERT(0);
+                    return;
+                }
+            }
+        }
+
+        if (gcmOPT_EnableDebugDump() && (i == context->swLocTable.usedCount))
+        {
+            gcmPRINT("| reg[%d,%d]    -> none                       |", swLoc->u.reg.start, swLoc->u.reg.end);
+        }
+    }
+    else
+    {
+        for (i = 0 ; i < context->swLocTable.usedCount; i ++)
+        {
+            sl = &context->swLocTable.loc[i];
+
+            if (!sl->reg)
+            {
+                if (sl->u.offset.baseAddr.type != swLoc->u.offset.baseAddr.type ||
+                    sl->u.offset.baseAddr.start != swLoc->u.offset.baseAddr.start)
+                {
+                    continue;
+                }
+
+                if (sl->u.offset.offset > swLoc->u.offset.endOffset||
+                    sl->u.offset.endOffset < swLoc->u.offset.offset)
+                {
+                    continue;
+                }
+
+                if (sl->u.offset.offset == swLoc->u.offset.offset&&
+                    sl->u.offset.endOffset == swLoc->u.offset.endOffset)
+                {
+                    hl = vscDIGetHWLoc(context, vscDIAddHWLoc(context));
+
+                    if (hl)
+                    {
+                        id = hl->id;
+                        *hl = *hwLoc;
+                        hl->id = id;
+                        hl->next = sl->hwLoc;
+                        sl->hwLoc = hl->id;
+
+                        if (gcmOPT_EnableDebugDump())
+                        {
+                            if (hl->reg)
+                            {
+                                if (hl->u.reg.type == VSC_DIE_HW_REG_CONST)
+                                {
+                                    gcmPRINT("| 0x%x[0x%x,0x%x]    -> [pc%d, pc%d] c[%d,%d] |",
+                                        swLoc->u.reg.start, swLoc->u.reg.end, hl->beginPC, hl->endPC, hl->u.reg.start, hl->u.reg.end);
+                                }
+                                else
+                                {
+                                    gcmPRINT("| 0x%x[0x%x,0x%x]    -> [pc%d, pc%d] r[%d,%d] |",
+                                        swLoc->u.reg.start, swLoc->u.reg.end, hl->beginPC, hl->endPC, hl->u.reg.start, hl->u.reg.end);
+                                }
+                            }
+                            else
+                            {
+                                gcmPRINT("| 0x%x[0x%x,0x%x]    -> [pc%d, pc%d] 0x%x[0x%x,0x%x] |",
+                                    swLoc->u.offset.baseAddr, swLoc->u.offset.offset, swLoc->u.offset.endOffset,
+                                    hl->beginPC, hl->endPC,
+                                    hl->u.offset.baseAddr, hl->u.offset.offset, hl->u.offset.endOffset);
+                            }
+                        }
+                        break;
+                    }
+                    else
+                    {
+                        gcmASSERT(0);
+                        return;
+                    }
+                }
+                else
+                {
+                    /* TO_DO */
+                    gcmASSERT(0);
+                }
+            }
+        }
+
+        if (gcmOPT_EnableDebugDump()&& (i == context->swLocTable.usedCount))
+        {
+            gcmPRINT("| 0x%x[0x%x,0x%x]    -> none                       |",
+                swLoc->u.offset.baseAddr, swLoc->u.offset.offset, swLoc->u.offset.endOffset);
         }
     }
 }
 
-void _vscDIDumpVariableLoc(VSC_DIContext * context, gctUINT16 loc, gctBOOL * flagTable)
+void vscDIChangeUniformSWLoc(VSC_DIContext * context, gctUINT tmpStart, gctUINT tmpEnd, gctUINT uniformIdx)
 {
-    VSC_DI_SW_LOC * sl;
-    VSC_DI_HW_LOC * hl;
+    VSC_DI_SW_LOC * sl = gcvNULL;
+    gctUINT i;
 
-    sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, loc);
+    if (context == gcvNULL)  return;
 
-    if (sl && flagTable[sl->id])
+    for (i = 0 ; i < context->swLocTable.usedCount; i ++)
     {
-        return;
-    }
-
-    gcmPRINT("variable");
-
-    while (sl)
-    {
-        if (flagTable)
-        {
-            flagTable[sl->id] = gcvTRUE;
-        }
+        sl = &context->swLocTable.loc[i];
 
         if (sl->reg)
         {
-             gcmPRINT("SWLoc %d logic reg(%d,%d)", sl->id, sl->u.reg.start, sl->u.reg.end);
-        }
-        else
-        {
-            gcmPRINT("SWLoc %d 0x%x[0x%x,0x%x]",sl->id, sl->u.offset.baseAddr, sl->u.offset.offset, sl->u.offset.endOffset);
-        }
-
-        hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, sl->hwLoc);
-
-        while(hl)
-        {
-            if (hl->reg)
+            if (sl->u.reg.start == tmpStart &&
+                sl->u.reg.end == tmpEnd)
             {
-                gcmPRINT("        [pc%d, pc%d] hw r(%d,%d)", hl->beginPC, hl->endPC, hl->u.reg.start, hl->u.reg.end);
+                sl->u.reg.type = VSC_DIE_REG_TYPE_CONST;
+                sl->u.reg.start = (gctUINT16) uniformIdx;
+                sl->u.reg.end = (gctUINT16) uniformIdx;
+                break;
             }
-            else
-            {
-                gcmPRINT("        [pc%d, pc%d] hw 0x%x(0x%x,0x%x)", hl->beginPC, hl->endPC, hl->u.offset.baseAddr, hl->u.offset.offset, hl->u.offset.endOffset);
-            }
-
-            hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, hl->next);
         }
-        sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
-    }
-
-    gcmPRINT("\n");
-}
-
-void vscDIDumpLocTable(VSC_DIContext * context)
-{
-    gctUINT i;
-    gctBOOL * table = gcvNULL;
-
-    if (context->swLocTable.usedCount > 0)
-    {
-        gcmPRINT("-------------------------Loc table--------------------");
-        if (gcmIS_ERROR(context->pfnAllocate(gcvNULL,gcmSIZEOF(gctBOOL) * context->swLocTable.usedCount, (gctPOINTER *)&table)))
-        {
-            gcmPRINT("-----------------------------------------------------");
-            return;
-        }
-
-        gcoOS_ZeroMemory(table, gcmSIZEOF(gctBOOL) * context->swLocTable.usedCount);
-
-        for (i = 0 ; i < context->swLocTable.usedCount; i++)
-        {
-            _vscDIDumpVariableLoc(context, (gctUINT16)i, table);
-        }
-
-        context->pfnFree(gcvNULL, table);
-        gcmPRINT("-----------------------------------------------------");
     }
 }
 
@@ -597,97 +787,199 @@ void vscDIDumpLineTable(VSC_DIContext * context)
     gcmPRINT("---------------------------------------------");
 }
 
-void vscDIDumpDIETree(VSC_DIContext * context, gctUINT16 id)
+void vscDIDumpDIETree(VSC_DIContext * context, gctUINT16 id, gctUINT tag)
 {
     if (context)
     {
-        _DIDumpDIETree(context,id, 0);
+        gcmPRINT("------------------------------------------DIE TREE id = %d---------------------------------------", id);
+        _DIDumpDIETree(context,id, 0, tag);
+        gcmPRINT("-------------------------------------------------------------------------------------------------");
     }
 }
 
-void vscDIDumpDIE(VSC_DIContext * context, gctUINT16 id, gctUINT shift)
+#define VSC_DI_DUMP_DIE_LINE_HEADER()   \
+            offset = 0; \
+            context->tmpLog[offset] = '\0'; \
+            gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,"|"); \
+            while (tmp--) \
+            { \
+               gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,"    "); \
+            }
+
+void vscDIDumpDIE(VSC_DIContext * context, gctUINT16 id, gctUINT shift, gctUINT tag)
 {
     gctUINT offset = 0;
     VSC_DIE * die;
-    gctCHAR str[128];
+    gctUINT tmp = shift;
 
     if (context)
     {
         die = VSC_DI_DIE_PTR(id);
         if (die != gcvNULL)
         {
-            context->tmpLog[offset] = '\0';
-            while (shift--)
-            {
-                gcoOS_StrCatSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, "    ");
-            }
+            if (!(tag & (1 << die->tag)))
+                return;
+
+            VSC_DI_DUMP_DIE_LINE_HEADER();
 
             if (die->tag == VSC_DI_TAG_VARIABE ||
                 die->tag == VSC_DI_TAG_PARAMETER)
             {
-                if (die->u.variable.loc.reg)
+                gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                   "id = %d tag = %s parent = %d line (%d,%d,%d) name = \"%s\", type(%d, %d)\n",
+                   die->id, _GetTagNameStr(context, die->tag),die->parent, die->fileNo, die->lineNo, die->colNo, _GetNameStr(context,die->name),
+                   die->u.variable.type.primitiveType, die->u.variable.type.type);
+
+                gcmPRINT(context->tmpLog);
+
+                /* Dump loc */
                 {
-                    gcoOS_PrintStrSafe(str, 128, &offset,
-                       "id = %d tag = %s parent = %d line (%d,%d,%d) name = %s, PrimType = %d, type = %d, r%d - r%d",
-                       die->id, _GetTagNameStr(context, die->tag),die->parent,die->fileNo, die->lineNo, die->colNo, _GetNameStr(context,die->name),
-                        die->u.variable.type.primitiveType, die->u.variable.type.type, die->u.variable.loc.u.reg.start,
-                        die->u.variable.loc.u.reg.end);
-                }
-                else
-                {
-                    gcoOS_PrintStrSafe(str, 128, &offset,
-                       "id = %d tag = %s parent = %d line (%d,%d,%d) name = %s, PrimType = %d, type = %d, 0x%x(0x%x - 0x%x)",
-                        die->id, _GetTagNameStr(context, die->tag),die->parent,die->fileNo,die->lineNo, die->colNo, _GetNameStr(context,die->name),
-                        die->u.variable.type.primitiveType, die->u.variable.type.type, die->u.variable.loc.u.offset.baseAddr,
-                        die->u.variable.loc.u.offset.offset,
-                        die->u.variable.loc.u.offset.endOffset);
+                    VSC_DI_SW_LOC * sl;
+                    VSC_DI_HW_LOC * hl;
+
+                    sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, die->u.variable.swLoc);
+
+                    while (sl)
+                    {
+                        tmp = shift + 1;
+                        VSC_DI_DUMP_DIE_LINE_HEADER();
+
+                        gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                                            "---------------------------");
+                        gcmPRINT(context->tmpLog);
+
+                        tmp = shift + 1;
+                        VSC_DI_DUMP_DIE_LINE_HEADER();
+
+                        if (sl->reg)
+                        {
+                            if (sl->u.reg.type == VSC_DIE_REG_TYPE_CONST)
+                            {
+                                gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                                                   "|SWLoc[%d] uniform[%d,%d]        |", sl->id, sl->u.reg.start, sl->u.reg.end);
+                            }
+                            else
+                            {
+                                gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                                                   "|SWLoc[%d] reg[%d,%d]        |", sl->id, sl->u.reg.start, sl->u.reg.end);
+                            }
+                        }
+                        else
+                        {
+                            gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                                               "|SWLoc[%d] %d[0x%x,0x%x]        |",sl->id, sl->u.offset.baseAddr.start,
+                                               sl->u.offset.offset, sl->u.offset.endOffset);
+                        }
+                        gcmPRINT(context->tmpLog);
+
+                        hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, sl->hwLoc);
+
+                        while(hl)
+                        {
+                            tmp = shift + 1;
+                            VSC_DI_DUMP_DIE_LINE_HEADER();
+
+                            if (hl->reg)
+                            {
+                                if (hl->u.reg.type == VSC_DIE_HW_REG_CONST)
+                                {
+                                    gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                                                   "|[pc%d, pc%d]  |  c(%d,%d)  |",
+                                                   hl->beginPC, hl->endPC, hl->u.reg.start, hl->u.reg.end);
+                                }
+                                else
+                                {
+                                    gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                                                   "|[pc%d, pc%d]  |  r(%d,%d)  |",
+                                                   hl->beginPC, hl->endPC, hl->u.reg.start, hl->u.reg.end);
+                                }
+                            }
+                            else
+                            {
+                                if (hl->u.offset.baseAddr.type == VSC_DIE_HW_REG_CONST)
+                                {
+                                    gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                                                    "|[pc%d, pc%d]  |  c%d(0x%x,0x%x)  |",
+                                                    hl->beginPC, hl->endPC,
+                                                    hl->u.offset.baseAddr.start,
+                                                    hl->u.offset.offset, hl->u.offset.endOffset);
+                                }
+                                else
+                                {
+                                    gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                                                    "|[pc%d, pc%d]  |  r%d(0x%x,0x%x)  |",
+                                                    hl->beginPC, hl->endPC,
+                                                    hl->u.offset.baseAddr.start,
+                                                    hl->u.offset.offset, hl->u.offset.endOffset);
+                                }
+                            }
+
+                            hl = (VSC_DI_HW_LOC *) vscDIGetHWLoc(context, hl->next);
+                            gcmPRINT(context->tmpLog);
+                        }
+
+                        tmp = shift + 1;
+                        VSC_DI_DUMP_DIE_LINE_HEADER();
+
+                        gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                                            "---------------------------");
+                        gcmPRINT(context->tmpLog);
+
+                        sl = (VSC_DI_SW_LOC *)vscDIGetSWLoc(context, sl->next);
+                    }
                 }
             }
             else if (die->tag == VSC_DI_TAG_TYPE)
             {
                 if (!die->u.type.primitiveType)
                 {
-                    gcoOS_PrintStrSafe(str, 128, &offset, "id = %d tag = %s parent = %d line (%d,%d,%d) name = %s, defined type id = %d",
-                        die->id, _GetTagNameStr(context, die->tag),die->parent,die->fileNo,die->lineNo, die->colNo, _GetNameStr(context,die->name),
+                    gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                        "id = %d tag = %s parent = %d line (%d,%d,%d) name = %s, defined type id = %d",
+                        die->id, _GetTagNameStr(context, die->tag),die->parent,die->fileNo,die->lineNo,
+                        die->colNo, _GetNameStr(context,die->name),
                         die->u.type.type);
                 }
                 else
                 {
                     if (die->u.type.array.numDim > 0)
                     {
-                        gcoOS_PrintStrSafe(str, 128, &offset, "id = %d tag = %s parent = %d line (%d,%d,%d) name = %s, VIR primitive type ID = %d, %d {%d, %d, %d, %d}",
+                        gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                            "id = %d tag = %s parent = %d line (%d,%d,%d) name = %s, VIR primitive type ID = %d, %d {%d, %d, %d, %d}",
                             die->id, _GetTagNameStr(context, die->tag),die->parent,die->fileNo, die->lineNo, die->colNo, _GetNameStr(context,die->name),
                             die->u.type.primitiveType, die->u.type.array.numDim, die->u.type.array.length[0],die->u.type.array.length[1],
                             die->u.type.array.length[2],die->u.type.array.length[3]);
                     }
                     else
                     {
-                        gcoOS_PrintStrSafe(str, 128, &offset, "id = %d tag = %s parent = %d line (%d,%d,%d) name = %s, VIR primitive type ID = %d",
+                        gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                            "id = %d tag = %s parent = %d line (%d,%d,%d) name = %s, VIR primitive type ID = %d",
                             die->id, _GetTagNameStr(context, die->tag),die->parent,die->fileNo,die->lineNo, die->colNo, _GetNameStr(context,die->name),
                             die->u.type.primitiveType);
                     }
                 }
+                gcmPRINT(context->tmpLog);
             }
             else if (die->tag == VSC_DI_TAG_SUBPROGRAM)
             {
-                gcoOS_PrintStrSafe(str, 128, &offset, "id = %d tag = %s parent = %d line(%d,%d,%d) name = %s, range (%d,%d), pc(%d,%d)",
+                gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                    "id = %d tag = %s parent = %d line(%d,%d,%d) name = %s, pc(%d,%d)",
                     die->id, _GetTagNameStr(context, die->tag),die->parent,die->fileNo,die->lineNo, die->colNo, _GetNameStr(context,die->name),
-                    die->u.func.startLineNo, die->u.func.endLineNo, die->u.func.pcLine[0], die->u.func.pcLine[1]);
+                    die->u.func.pcLine[0], die->u.func.pcLine[1]);
+                gcmPRINT(context->tmpLog);
             }
             else if (die->tag == VSC_DI_TAG_LEXICALBLOCK)
             {
-                gcoOS_PrintStrSafe(str, 128, &offset, "id = %d tag = %s parent = %d line (%d,%d,%d) name = %s, scope (%d,%d)",
-                    die->id, _GetTagNameStr(context, die->tag),die->parent,die->fileNo,die->lineNo, die->colNo, _GetNameStr(context,die->name),
-                    die->u.lexScope.startLineNo, die->u.lexScope.endLineNo);
+                gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset,
+                    "id = %d tag = %s parent = %d line (%d,%d,%d) name = %s",
+                    die->id, _GetTagNameStr(context, die->tag),die->parent,die->fileNo,die->lineNo, die->colNo, _GetNameStr(context,die->name));
+                gcmPRINT(context->tmpLog);
             }
             else
             {
-                gcoOS_PrintStrSafe(str, 128, &offset, "id = %d tag = %s parent = %d line (%d,%d,%d) name = %s",
+                gcoOS_PrintStrSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, &offset, "id = %d tag = %s parent = %d line (%d,%d,%d) name = %s",
                     die->id, _GetTagNameStr(context, die->tag),die->parent,die->fileNo,die->lineNo, die->colNo, _GetNameStr(context,die->name));
+                gcmPRINT(context->tmpLog);
             }
-
-            gcoOS_StrCatSafe(context->tmpLog, VSC_DI_TEMP_LOG_SIZE, str);
-            gcmPRINT(context->tmpLog);
         }
     }
 }
@@ -695,6 +987,7 @@ void vscDIDumpDIE(VSC_DIContext * context, gctUINT16 id, gctUINT shift)
 gceSTATUS vscDISaveDebugInfo(VSC_DIContext * context, gctPOINTER * buffer, gctUINT32 * bufferSize)
 {
     gctUINT8 * ptr;
+    VSC_DIContext * ctx;
 
     if (context == gcvNULL)
     {
@@ -716,11 +1009,11 @@ gceSTATUS vscDISaveDebugInfo(VSC_DIContext * context, gctPOINTER * buffer, gctUI
     {
         *bufferSize += gcmSIZEOF(gctUINT8)
                      + gcmSIZEOF(VSC_DIContext)
-                     + context->dieTable.count * gcmSIZEOF(VSC_DIE)
-                     + context->strTable.size
+                     + context->dieTable.usedCount* gcmSIZEOF(VSC_DIE)
+                     + context->strTable.usedSize
                      + context->lineTable.count * gcmSIZEOF(VSC_DI_LINE_TABLE_MAP)
-                     + context->swLocTable.count * gcmSIZEOF(VSC_DI_SW_LOC)
-                     + context->locTable.count * gcmSIZEOF(VSC_DI_HW_LOC);
+                     + context->swLocTable.usedCount* gcmSIZEOF(VSC_DI_SW_LOC)
+                     + context->locTable.usedCount* gcmSIZEOF(VSC_DI_HW_LOC);
     }
 
     if (buffer && *buffer)
@@ -731,16 +1024,24 @@ gceSTATUS vscDISaveDebugInfo(VSC_DIContext * context, gctPOINTER * buffer, gctUI
         ptr += gcmSIZEOF(gctUINT8);
 
         *(VSC_DIContext *)ptr = *context;
+        ctx = (VSC_DIContext *)ptr;
         ptr += gcmSIZEOF(VSC_DIContext);
 
-        gcoOS_MemCopy(ptr, (gctPOINTER)context->dieTable.die, context->dieTable.count * gcmSIZEOF(VSC_DIE) );
-        ptr += context->dieTable.count * gcmSIZEOF(VSC_DIE);
-
-        if (context->strTable.size > 0)
+        if (context->dieTable.usedCount > 0)
         {
-            gcoOS_MemCopy(ptr, context->strTable.str, context->strTable.size);
-            ptr += context->strTable.size;
+            gcoOS_MemCopy(ptr, (gctPOINTER)context->dieTable.die, context->dieTable.usedCount* gcmSIZEOF(VSC_DIE) );
+            ptr += context->dieTable.usedCount * gcmSIZEOF(VSC_DIE);
         }
+
+        ctx->dieTable.count = ctx->dieTable.usedCount = context->dieTable.usedCount;
+
+        if (context->strTable.usedSize > 0)
+        {
+            gcoOS_MemCopy(ptr, context->strTable.str, context->strTable.usedSize);
+            ptr += context->strTable.usedSize;
+        }
+
+        ctx->strTable.size = ctx->strTable.usedSize = context->strTable.usedSize;
 
         if (context->lineTable.count > 0)
         {
@@ -748,17 +1049,25 @@ gceSTATUS vscDISaveDebugInfo(VSC_DIContext * context, gctPOINTER * buffer, gctUI
             ptr +=context->lineTable.count * gcmSIZEOF(VSC_DI_LINE_TABLE_MAP);
         }
 
-        if (context->swLocTable.count > 0)
+        ctx->lineTable.count = context->lineTable.count;
+
+        if (context->swLocTable.usedCount> 0)
         {
-            gcoOS_MemCopy(ptr, context->swLocTable.loc, context->swLocTable.count * gcmSIZEOF(VSC_DI_SW_LOC));
-            ptr += context->swLocTable.count * gcmSIZEOF(VSC_DI_SW_LOC);
+            gcoOS_MemCopy(ptr, context->swLocTable.loc, context->swLocTable.usedCount* gcmSIZEOF(VSC_DI_SW_LOC));
+            ptr += context->swLocTable.usedCount* gcmSIZEOF(VSC_DI_SW_LOC);
         }
 
-        if (context->locTable.count > 0)
+        ctx->swLocTable.count = ctx->swLocTable.usedCount = context->swLocTable.usedCount;
+
+        if (context->locTable.usedCount> 0)
         {
-            gcoOS_MemCopy(ptr, context->locTable.loc, context->locTable.count * gcmSIZEOF(VSC_DI_HW_LOC));
-            ptr += context->locTable.count * gcmSIZEOF(VSC_DI_HW_LOC);
+            gcoOS_MemCopy(ptr, context->locTable.loc, context->locTable.usedCount* gcmSIZEOF(VSC_DI_HW_LOC));
+            ptr += context->locTable.usedCount* gcmSIZEOF(VSC_DI_HW_LOC);
         }
+
+        ctx->locTable.count = ctx->locTable.usedCount = context->locTable.usedCount;
+
+        ctx->tmpLog = gcvNULL;
 
         *buffer = (gctPOINTER)ptr;
     }
@@ -774,13 +1083,15 @@ vscDILoadDebugInfo(VSC_DIContext ** context, gctPOINTER* buffer, gctUINT32 * buf
     gctUINT8 * pos;
     gctUINT size;
     PFN_Allocate pfnAllocate;
+    PFN_Free pfnFree;
 
     if (context == gcvNULL || buffer == gcvNULL)
         return gcvSTATUS_INVALID_ARGUMENT;
 
     ptr = *(VSC_DIContext **)buffer;
 
-    pfnAllocate = ptr->pfnAllocate;
+    pfnAllocate = gcoOS_Allocate;
+    pfnFree = gcoOS_Free;
 
     if (gcmIS_ERROR(pfnAllocate(gcvNULL,gcmSIZEOF(VSC_DIContext), (gctPOINTER *)&ctx)))
     {
@@ -793,6 +1104,9 @@ vscDILoadDebugInfo(VSC_DIContext ** context, gctPOINTER* buffer, gctUINT32 * buf
 
     pos = (gctUINT8 *)(ptr + 1);
     *bufferSize -= gcmSIZEOF(VSC_DIContext);
+
+    ctx->pfnAllocate = pfnAllocate;
+    ctx->pfnFree = pfnFree;
 
     if (ctx->dieTable.count > 0)
     {
@@ -869,9 +1183,27 @@ vscDILoadDebugInfo(VSC_DIContext ** context, gctPOINTER* buffer, gctUINT32 * buf
         *bufferSize -= size;
     }
 
+    if (gcmIS_ERROR(pfnAllocate(gcvNULL,VSC_DI_TEMP_LOG_SIZE,(gctPOINTER *)&ctx->tmpLog)))
+    {
+        return gcvSTATUS_OUT_OF_MEMORY;
+    }
+
     *buffer = (gctPOINTER)pos;
 
     return gcvSTATUS_OK;
+}
+
+void _vscDIInitCallStack(VSC_DIContext * context)
+{
+    gctUINT32 i;
+
+    for (i = 0; i < VSC_DI_CALL_DEPTH; i++)
+    {
+        context->callStack[i].die = gcvNULL;
+        context->callStack[i].sourceLoc.lineNo = 0;
+        context->callStack[i].nextSourceLoc.lineNo = 0;
+        context->callStack[i].nextPC = 0;
+    }
 }
 
 gceSTATUS vscDIConstructContext(PFN_Allocate allocPfn, PFN_Free freePfn, VSC_DIContext ** context)
@@ -880,24 +1212,40 @@ gceSTATUS vscDIConstructContext(PFN_Allocate allocPfn, PFN_Free freePfn, VSC_DIC
     PFN_Allocate pfnAllocate;
     PFN_Free pfnFree;
 
-    pfnAllocate = (allocPfn == gcvNULL) ? gcoOS_Allocate : allocPfn;
-    pfnFree = (freePfn == gcvNULL) ? gcoOS_Free : freePfn;
-
-    if (gcmIS_ERROR(pfnAllocate(gcvNULL,gcmSIZEOF(VSC_DIContext), (gctPOINTER *)&ptr)))
+    if (gcmOPT_EnableDebug())
     {
-        return gcvSTATUS_OUT_OF_MEMORY;
+        pfnAllocate = (allocPfn == gcvNULL) ? gcoOS_Allocate : allocPfn;
+        pfnFree = (freePfn == gcvNULL) ? gcoOS_Free : freePfn;
+
+        if (gcmIS_ERROR(pfnAllocate(gcvNULL,gcmSIZEOF(VSC_DIContext), (gctPOINTER *)&ptr)))
+        {
+            return gcvSTATUS_OUT_OF_MEMORY;
+        }
+
+        gcoOS_ZeroMemory(ptr, gcmSIZEOF(VSC_DIContext));
+
+        ptr->pfnAllocate = pfnAllocate;
+        ptr->pfnFree = pfnFree;
+
+        ptr->cu = vscDIAddDIE(ptr, VSC_DI_TAG_COMPILE_UNIT, VSC_DI_INVALIDE_DIE, "CU_DIE", 0, 0, 0, 0);
+
+        _vscDIInitCallStack(ptr);
+        ptr->callDepth = -1;
+        ptr->stepState = VSC_STEP_STATE_NONE;
+
+        if (gcmIS_ERROR(pfnAllocate(gcvNULL,VSC_DI_TEMP_LOG_SIZE,(gctPOINTER *) &ptr->tmpLog)))
+        {
+            return gcvSTATUS_OUT_OF_MEMORY;
+        }
+
+        *context = ptr;
+
+        return gcvSTATUS_OK;
     }
-
-    gcoOS_ZeroMemory(ptr, gcmSIZEOF(VSC_DIContext));
-
-    ptr->pfnAllocate = pfnAllocate;
-    ptr->pfnFree = pfnFree;
-
-    ptr->cu = vscDIAddDIE(ptr, VSC_DI_TAG_COMPILE_UNIT, VSC_DI_INVALIDE_DIE, "CU_DIE", 0, 0, 0);
-
-    *context = ptr;
-
-    return gcvSTATUS_OK;
+    else
+    {
+        return gcvSTATUS_INVALID_CONFIG;
+    }
 }
 
 void vscDIDestroyContext(VSC_DIContext * context)
@@ -923,7 +1271,7 @@ void vscDIDestroyContext(VSC_DIContext * context)
         {
             /* make stupid compiler happy, will delete soon */
             vscDIGetHWLoc(context, vscDIAddHWLoc(context));
-            vscDISetHwLocToSWLoc(context, 0xffff, 0xffff);
+            vscDISetHwLocToSWLoc(context, gcvNULL, gcvNULL);
             context->pfnFree(gcvNULL, context->locTable.loc);
         }
 
@@ -934,7 +1282,71 @@ void vscDIDestroyContext(VSC_DIContext * context)
             context->pfnFree(gcvNULL, context->swLocTable.loc);
         }
 
+        if (context->tmpLog)
+        {
+            context->pfnFree(gcvNULL, context->tmpLog);
+        }
+
         context->pfnFree(gcvNULL, context);
+    }
+}
+
+void vscDIStep(void * ptr, unsigned int pc, unsigned int stepFlag)
+{
+    VSC_DIContext * context = (VSC_DIContext *)ptr;
+
+    if (context == gcvNULL || pc < 0)
+        return;
+
+    context->stepState = (VSC_STEP_STATE)stepFlag;
+}
+
+void vscDIPushCallStack(
+    void * ptr,
+    unsigned int currentPC,
+    unsigned int intoPC
+    )
+{
+    VSC_DIContext * context = (VSC_DIContext *)ptr;
+
+    if (context == gcvNULL)
+        return;
+
+    if (currentPC == 0)
+    {
+        if (context->callDepth == -1)
+        {
+            /* first initialize */
+            VSC_DIE * intoDie = _getCurrentSubProgramDie(context, intoPC);
+            context->callDepth++;
+            context->callStack[context->callDepth].die = intoDie;
+        }
+        return;
+    }
+
+    if (context->callDepth + 1 < VSC_DI_CALL_DEPTH)
+    {
+        VSC_DIE * intoDie = _getCurrentSubProgramDie(context, intoPC);
+
+        context->callStack[context->callDepth].nextPC = currentPC + 1;
+        context->callDepth++;
+        context->callStack[context->callDepth].die = intoDie;
+    }
+}
+
+void vscDIPopCallStack(
+    void * ptr,
+    unsigned int currentPC
+    )
+{
+    VSC_DIContext * context = (VSC_DIContext *)ptr;
+
+    if (context == gcvNULL)
+        return;
+
+    if (context->callDepth > 0)
+    {
+        context->callDepth--;
     }
 }
 
@@ -944,6 +1356,12 @@ int vscDIGetSrcLineByPC(void * ptr, unsigned int pc, unsigned int * line)
     gctUINT pcStart;
     gctUINT pcEnd;
     VSC_DIContext * context = (VSC_DIContext *) ptr;
+
+    if ((context->stepState == VSC_STEP_STATE_OUT) &&
+        (context->callDepth > 0))
+    {
+        pc = context->callStack[context->callDepth - 1].nextPC;
+    }
 
     for (i = 0 ; i < context->lineTable.count; i++)
     {
@@ -961,11 +1379,13 @@ int vscDIGetSrcLineByPC(void * ptr, unsigned int pc, unsigned int * line)
 }
 
 /* very slow loop, will refine */
-void vscDIGetPCBySrcLine(void * ptr, unsigned int src, unsigned int * start, unsigned int * end)
+void vscDIGetPCBySrcLine(void * ptr, unsigned int src, unsigned int refPC, unsigned int * start, unsigned int * end)
 {
+
     gctUINT i;
     VSC_DIContext * context = (VSC_DIContext *) ptr;
     gctUINT j = VSC_DI_INVALID_PC;
+    gctBOOL srcNoBreak = gcvTRUE; /* the source line must be continuouse */
 
     *start = VSC_DI_INVALID_PC;
     for (i = 0 ; i < context->lineTable.count; i++)
@@ -975,14 +1395,29 @@ void vscDIGetPCBySrcLine(void * ptr, unsigned int src, unsigned int * start, uns
         {
             if (*start == VSC_DI_INVALID_PC)
             {
-                *start = i;
+                *start = VSC_DI_MC_RANGE_START(context->lineTable.map[i].mcRange);
             }
 
             j = i;
         }
+
+        if (srcNoBreak &&
+            (j != VSC_DI_INVALID_PC) &&
+            (j != i))
+        {
+            /* The same source line may occurs in many places, this condition is used to extract the current one line */
+            break;
+        }
     }
 
-    *end = j;
+    if (j != VSC_DI_INVALID_PC)
+    {
+        *end = VSC_DI_MC_RANGE_END(context->lineTable.map[j].mcRange);
+    }
+    else
+    {
+        *end = VSC_DI_INVALID_PC;
+    }
 }
 
 void vscDIGetNearPCBySrcLine(void * ptr, unsigned int src,unsigned int * newSrc, unsigned int * start, unsigned int * end)
@@ -1046,47 +1481,170 @@ VSC_DIE * _lookDieInScope(VSC_DIContext * context, VSC_DIE * scope, char * name)
 
     die = VSC_DI_DIE_PTR(scope->child);
 
-    if (die &&
-        (die->tag == VSC_DI_TAG_VARIABE ||
-        die->tag == VSC_DI_TAG_PARAMETER)
-       )
+    while (die)
     {
-        str = _GetNameStr(context,die->name);
-
-        if (gcmIS_SUCCESS(gcoOS_StrCmp(str, name)))
+        if(die->tag == VSC_DI_TAG_VARIABE ||
+            die->tag == VSC_DI_TAG_PARAMETER)
         {
-            return die;
+            str = _GetNameStr(context,die->name);
+
+            if (gcmIS_SUCCESS(gcoOS_StrCmp(str, name)))
+            {
+                return die;
+            }
         }
+
+        if (die->child != VSC_DI_INVALIDE_DIE)
+        {
+            VSC_DIE * orgDie = die;
+            die = _lookDieInScope(context, die, name);
+            if (die)
+            {
+                return die;
+            }
+
+            die = orgDie;
+        }
+
+        die = VSC_DI_DIE_PTR(die->sib);
     }
 
     return gcvNULL;
 }
 
-gctBOOL _vscDIGetVariableLocByPC(VSC_DIContext * context, gctUINT pc, VSC_DIE * die, VSC_DI_HW_LOC ** loc)
+gctBOOL _vscDIGetVariableLocByPC(VSC_DIContext * context, gctUINT pc, VSC_DIE * die, VSC_DI_EXTERN_LOC * loc, gctUINT * locCount)
 {
     VSC_DI_HW_LOC * hwLoc;
+    VSC_DI_SW_LOC * swLoc;
+    gctUINT j = 0;
 
-    hwLoc = VSC_DI_HW_LOC_PTR(die->u.variable.loc.hwLoc);
+    swLoc = vscDIGetSWLoc(context,die->u.variable.swLoc);
 
-    while (hwLoc)
+    if (swLoc == gcvNULL)
+        return gcvFALSE;
+
+    while (swLoc)
     {
-        if (hwLoc->beginPC <= pc && hwLoc->endPC >= pc)
+        hwLoc = VSC_DI_HW_LOC_PTR(swLoc->hwLoc);
+
+        while (hwLoc)
         {
-            *loc = hwLoc;
-            return gcvTRUE;
+            if (loc && hwLoc->beginPC <= pc && hwLoc->endPC >= pc)
+            {
+                gctUINT16 mask;
+                gctUINT i = 0;
+
+                loc[j].reg = (unsigned int)hwLoc->reg;
+                loc[j].u.reg = hwLoc->u.reg;
+                loc[j].u.offset = hwLoc->u.offset;
+
+                /* Get mask from SWLoc, this is just tmp code, slLoc mask not same to HW loc, and we can't do this */
+                if (swLoc->reg)
+                {
+                    if (loc[j].reg)
+                    {
+                        loc[j].u.reg.mask = swLoc->u.reg.mask;
+                    }
+                    else
+                    {
+                        mask = swLoc->u.reg.mask;
+
+                        while (mask)
+                        {
+                            i++;
+                            loc[j].u.offset.endOffset = (unsigned short)(loc[j].u.offset.offset + 4 * i);
+                            mask = mask >> 1;
+                        }
+                    }
+                }
+
+                break;
+            }
+
+            hwLoc = VSC_DI_HW_LOC_PTR(hwLoc->next);
         }
-        hwLoc = VSC_DI_HW_LOC_PTR(hwLoc->next);
+
+        swLoc = vscDIGetSWLoc(context, swLoc->next);
+        j++;
     }
 
-    return gcvFALSE;
+    if (locCount)
+    {
+        *locCount = j;
+    }
+
+    return gcvTRUE;
 }
 
-gctBOOL vscDIGetVaribleLocByNameAndPC(VSC_DIContext * context, gctUINT pc, char * name, VSC_DI_HW_LOC ** loc)
+gctBOOL _vscDIGetStructVariableLocByPC(VSC_DIContext * context, gctUINT pc, VSC_DIE * die, VSC_DI_EXTERN_LOC * loc, gctUINT * locCount)
+{
+    VSC_DI_EXTERN_LOC * hwLoc;
+    gctUINT i, j = 0;
+    VSC_DIE * childDie = gcvNULL;
+
+    if (die->child == VSC_DI_INVALIDE_DIE)
+        return gcvFALSE;
+
+    childDie = vscDIGetDIE(context, die->child);
+
+    while (childDie)
+    {
+        gcmASSERT(childDie->u.variable.type.primitiveType);
+
+        _vscDIGetVariableLocByPC(context, pc, childDie, gcvNULL, &i);
+
+        j += i;
+
+        childDie = VSC_DI_DIE_PTR(childDie->sib);
+    }
+
+    if (j <= 0)
+    {
+        return gcvFALSE;
+    }
+
+    if (loc)
+    {
+        if (gcoOS_Allocate(gcvNULL, gcmSIZEOF(VSC_DI_EXTERN_LOC) * j, (gctPOINTER *)&hwLoc) == gcvSTATUS_OK)
+        {
+            j = 0;
+            childDie = vscDIGetDIE(context, die->child);
+        }
+
+        while (childDie)
+        {
+            _vscDIGetVariableLocByPC(context, pc, childDie, (VSC_DI_EXTERN_LOC *)(&hwLoc[j]), &i);
+
+            j += i;
+
+            childDie = VSC_DI_DIE_PTR(childDie->sib);
+        }
+
+        gcoOS_MemCopy(loc, hwLoc, gcmSIZEOF(VSC_DI_EXTERN_LOC) * j);
+
+        if (hwLoc)
+        {
+            gcoOS_Free(gcvNULL, hwLoc);
+        }
+    }
+
+    if (locCount)
+    {
+        *locCount = j;
+    }
+
+    return gcvTRUE;
+}
+
+unsigned int
+vscDIGetVaribleLocByNameAndPC(void * ptr, unsigned int pc, char * name, void * loc, unsigned int * locCount)
 {
     /*VIR_SourceFileLoc line;*/
     gctUINT line;
     VSC_DIE * innerDie;
     VSC_DIE * die;
+    VSC_DIContext * context = (VSC_DIContext *) ptr;
+    VSC_DI_EXTERN_LOC * location = (VSC_DI_EXTERN_LOC *)loc;
 
     /* base on pc to located name space */
     if(vscDIGetSrcLineByPC(context, pc, &line))
@@ -1103,26 +1661,33 @@ gctBOOL vscDIGetVaribleLocByNameAndPC(VSC_DIContext * context, gctUINT pc, char 
 
             if (die->tag == VSC_DI_TAG_SUBPROGRAM )
             {
-                if (die->u.func.startLineNo >= line &&
-                    die->u.func.endLineNo <= line)
+                if (die->lineNo <= line &&
+                    die->endLineNo >= line)
                 {
                     innerDie = die;
                     die =  VSC_DI_DIE_PTR(die->child);
                 }
+                else
+                {
+                    die = VSC_DI_DIE_PTR(die->sib);
+                }
             }
             else if (die->tag == VSC_DI_TAG_LEXICALBLOCK)
             {
-                if (die->u.lexScope.startLineNo >= line &&
-                    die->u.lexScope.endLineNo <= line)
+                if (die->lineNo <= line &&
+                    die->endLineNo >= line)
                 {
                     innerDie = die;
                     die =  VSC_DI_DIE_PTR(die->child);
+                }
+                else
+                {
+                    die = VSC_DI_DIE_PTR(die->sib);
                 }
             }
             else
             {
                 die = VSC_DI_DIE_PTR(die->sib);
-                continue;
             }
         }
 
@@ -1135,13 +1700,24 @@ gctBOOL vscDIGetVaribleLocByNameAndPC(VSC_DIContext * context, gctUINT pc, char 
             {
                 innerDie = VSC_DI_DIE_PTR(innerDie->parent);
             }
+            else
+            {
+                break;
+            }
         }
 
         /* look up the variable location by PC */
-        if (die != gcvNULL &&
-            _vscDIGetVariableLocByPC(context, pc, die, loc))
+        if (die)
         {
-            return gcvTRUE;
+            if (die->u.variable.type.primitiveType &&
+                _vscDIGetVariableLocByPC(context, pc, die, location, locCount))
+            {
+                return gcvTRUE;
+            }
+            else if (_vscDIGetStructVariableLocByPC(context, pc, die, location, locCount))
+            {
+                return gcvTRUE;
+            }
         }
     }
 

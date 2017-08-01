@@ -578,6 +578,7 @@ gcInitializeCompiler(
 {
     gctINT32 reference;
     gceSTATUS status;
+    gcsGLSLCaps *glslCaps = gcGetGLSLCaps();
 
     gcmHEADER_ARG("Hal=0x%x", Hal);
 
@@ -597,11 +598,16 @@ gcInitializeCompiler(
 
     if (Caps)
     {
-        *gcGetGLSLCaps() = *Caps;
+        *glslCaps = *Caps;
+
+        if (glslCaps->extensions == gcvNULL)
+        {
+            glslCaps->extensions = __DEFAULT_GLSL_EXTENSION_STRING__;
+        }
     }
     else
     {
-        gcmVERIFY_OK(gcInitGLSLCaps(gcGetGLSLCaps()));
+        gcmVERIFY_OK(gcInitGLSLCaps(glslCaps));
     }
 
 OnError:

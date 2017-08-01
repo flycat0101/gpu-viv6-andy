@@ -4995,7 +4995,7 @@ _PrepareAnotherSource(
         }
         {
             gctBOOL     useFullNewLinker = gcvFALSE;
-            gctBOOL     hasHalti2 = gcoHAL_IsFeatureAvailable(gcvNULL, (gcvFEATURE_HALTI2));
+            gctBOOL     hasHalti2 = GetHWHasHalti2();
 
             useFullNewLinker = gcUseFullNewLinker(hasHalti2);
 

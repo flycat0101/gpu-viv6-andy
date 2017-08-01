@@ -25,6 +25,9 @@
 #define Src1Componentwise   VIR_OPFLAG_Src1Componentwise
 #define Src2Componentwise   VIR_OPFLAG_Src2Componentwise
 #define Src3Componentwise   VIR_OPFLAG_Src3Componentwise
+#define Src01Componentwise  (Src0Componentwise | Src1Componentwise)
+#define Src012Componentwise (Src0Componentwise | Src1Componentwise | Src2Componentwise)
+#define Src12Componentwise  (Src1Componentwise | Src2Componentwise)
 #define OnlyUseEnable       VIR_OPFLAG_OnlyUseEnable
 #define Loads               VIR_OPFLAG_Loads
 #define Stores              VIR_OPFLAG_Stores
@@ -743,11 +746,12 @@
                                                                                   component type of x, if x is a vector. */
     VIR_OPINFO(BITSEL, 2, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* bit select */
     VIR_OPINFO(BITREV, 1, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* bit reverse of an integer */
-    VIR_OPINFO(BITINSERT, 4, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* bit insert, 4 operands */
-    VIR_OPINFO(BITINSERT1, 3, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* bit insert1, 3 operands */
-    VIR_OPINFO(LEADZERO, 1, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /*   */
+    VIR_OPINFO(BITINSERT, 4, HasDest|Src01Componentwise|Expr|EPFromS0, 1, NM), /* bit insert, 4 operands, src2: offset, src3: bits) */
+    VIR_OPINFO(BITINSERT1, 3, HasDest|Src01Componentwise|Expr|EPFromS0, 1, LM), /* bit insert, 3 operands, src2.x encoded ((bits << 8) | (offset & 0xFF)) */
+    VIR_OPINFO(BITINSERT2, 3, HasDest|Src01Componentwise|Expr|EPFromS0, 1, LM), /* bit insert1, 3 operands, src2.x is offset, src2.y is bits */
+    VIR_OPINFO(LEADZERO, 1, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* lead zero bits, clz()  */
     VIR_OPINFO(POPCOUNT, 1, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* bit population count */
-    VIR_OPINFO(BYTEREV, 2, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* byte reverse of an integer */
+    VIR_OPINFO(BYTEREV, 1, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* byte reverse of an integer */
     VIR_OPINFO(BITEXTRACT, 3, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* bit extract, 3 operands */
     VIR_OPINFO(BITRANGE, 2, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* bit range, 2 operands to pair with bit extract */
     VIR_OPINFO(BITRANGE1, 1, HasDest|Componentwise|Expr|EPFromS0, 1, AL), /* bit range, 2 operands to pair with bit extract */
@@ -899,6 +903,34 @@
      * U16, S16, and FP16.*/
     VIR_OPINFO(VX_DP2X8, 4, HasDest|Expr|VXUse512BitUniform(3)|EVISModifier(2), 1, AL),
 
+    /* The DP16x1 instruction performs two dot-product of two 16-component values.
+     * It will produce up only one output values. Valid instruction formats are U8, S8,
+     * U16, S16, U32, S32, FP16, and FP32. The _B version of the DP16 family instrucitons
+     * take temp256 as its first two source, src0 is the tmp256.hi, src1 is the tmp256.lo
+     */
+    VIR_OPINFO(VX_DP16X1_B, 5, HasDest|Expr|VXUse512BitUniform(4)|EVISModifier(3), 1, AL),
+
+    /* The DP8x2 instruction performs two dot-product of two 8-component values.
+     * It will produce up to two output values. Valid instruction formats are U8, S8,
+     * U16, S16, U32, S32, FP16, and FP32. It take3 temp256 as its first two source,
+     * src0 is the tmp256.hi, src1 is the tmp256.lo
+     */
+    VIR_OPINFO(VX_DP8X2_B, 5, HasDest|Expr|VXUse512BitUniform(4)|EVISModifier(3), 1, AL),
+
+    /* The DP4x4 instruction performs four dot-product of two 4-component values.
+     * It will produce up to four output values. Valid instruction formats are U8, S8,
+     * U16, S16, U32, S32, FP16, and FP32. It take3 temp256 as its first two source,
+     * src0 is the tmp256.hi, src1 is the tmp256.lo
+     */
+    VIR_OPINFO(VX_DP4X4_B, 5, HasDest|Expr|VXUse512BitUniform(4)|EVISModifier(3), 1, AL),
+
+    /* The DP2x8 instruction performs eight dot-product of two 2-component values.
+     * It will produce up to eight output values. Valid instruction formats are U8, S8,
+     * U16, S16, and FP16. It take3 temp256 as its first two source, src0 is the tmp256.hi,
+     * src1 is the tmp256.lo
+     */
+    VIR_OPINFO(VX_DP2X8_B, 5, HasDest|Expr|VXUse512BitUniform(4)|EVISModifier(3), 1, AL),
+
     /* The DP32x1 instruction performs a dot-product of two 32-component values. It
      * will produce only one output value. Valid instruction formats are U8, S8, U16,
      * S16, U32, S32, FP16, and FP32.
@@ -930,31 +962,37 @@
 
     /* The DP32x1 instruction performs a dot-product of two 32-component values. It
      * will produce only one output value. Valid instruction formats are U8, S8, U16,
-     * S16, U32, S32, FP16, and FP32.
+     * S16, U32, S32, FP16, and FP32. The _B version of the DP32 family instrucitons
+     * take temp256 as its first two source, src0 is the tmp256.hi, src1 is the tmp256.lo
      */
     VIR_OPINFO(VX_DP32X1_B, 5, HasDest|Expr|VXUse512BitUniform(4)|EVISModifier(3), 1, AL),
 
     /* The DP16x2 instruction performs a dot-product of two 16-component values.
      * It will produce up to two output values. Valid instruction formats are U8, S8,
-     * U16, S16, U32, S32, FP16, and FP32.
+     * U16, S16, U32, S32, FP16, and FP32. It take3 temp256 as its first two source,
+     * src0 is the tmp256.hi, src1 is the tmp256.lo
      */
     VIR_OPINFO(VX_DP16X2_B, 5, HasDest|Expr|VXUse512BitUniform(4)|EVISModifier(3), 1, AL),
 
     /* The DP8x4 instruction performs a dot-product of two 8-component values. It
      * will produce up to four output values. Valid instruction formats are U8, S8,
-     * U16, S16, U32, S32, FP16, and FP32.
+     * U16, S16, U32, S32, FP16, and FP32. It take3 temp256 as its first two source,
+     * src0 is the tmp256.hi, src1 is the tmp256.lo
      */
     VIR_OPINFO(VX_DP8X4_B, 5, HasDest|Expr|VXUse512BitUniform(4)|EVISModifier(3), 1, AL),
 
     /* The DP4x8 instruction performs a dot-product of two 4-component values. It
      * will produce up to eight output values. Valid instruction formats are U8, S8,
-     * U16, S16, and FP16.
+     * U16, S16, and FP16. It take3 temp256 as its first two source, src0 is the tmp256.hi,
+     * src1 is the tmp256.lo
      */
     VIR_OPINFO(VX_DP4X8_B, 5, HasDest|Expr|VXUse512BitUniform(4)|EVISModifier(3), 1, AL),
 
     /* The DP2x16 instruction performs a dot-product of two 2-component values. It
      * will produce up to sixteen output values. Valid instruction formats are U8, and
-     * S8.*/
+     * S8.  It take3 temp256 as its first two source,
+     * src0 is the tmp256.hi, src1 is the tmp256.lo
+     */
     VIR_OPINFO(VX_DP2X16_B, 5, HasDest|Expr|VX1Use512BitUniform(4)|EVISModifier(3), 1, AL),
 
     /* The Clamp instruction clamps up to 16 values to a min and.or max value. In
@@ -1023,7 +1061,7 @@
 
     /* VX2
      *  These six instructions are added to specifically target Median3x3 filter operation.
-     *  The instruction support U8, S8, U16, S16 formats.  VertMin3, VertMax3 and VertMedian3
+     *  The instruction support U8, S8, U16, S16 and F16 formats.  VertMin3, VertMax3 and VertMedian3
      *  perform comparison operations among three sources on all 16 8-bit (or 8 16-bit)
      *  components in parallel.  HorzMin3, HorzMax3 and HorzMedian3 perform comparison among
      *  three adjacent components on all 14 8-bit (or 6 16-bit) component groups.

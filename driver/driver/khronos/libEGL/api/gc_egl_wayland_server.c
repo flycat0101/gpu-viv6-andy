@@ -21,16 +21,13 @@
 #include <wayland-server.h>
 
 #include <gc_hal_user.h>
+#include <wl-viv-buffer.h>
 
 #include "gc_egl_platform.h"
 
-/* Extended wl buffer. */
-struct wl_viv_buffer
+/* Private data of struct wl_viv_buffer. */
+struct wl_viv_buffer_private
 {
-    struct wl_resource *resource;
-    gcoSURF  surface;
-    gctINT32 width;
-    gctINT32 height;
     gceHARDWARE_TYPE hwType;
 };
 
@@ -38,6 +35,8 @@ static void
 destroy_buffer(struct wl_resource *resource)
 {
     struct wl_viv_buffer *buffer = resource->data;
+    struct wl_viv_buffer_private *priv =
+            (struct wl_viv_buffer_private *)&buffer[1];
 
     if (buffer != NULL)
     {
@@ -49,7 +48,7 @@ destroy_buffer(struct wl_resource *resource)
 
             /* Switch to hardware type when allocation. */
             gcoHAL_GetHardwareType(gcvNULL, &hwType);
-            gcoHAL_SetHardwareType(gcvNULL, buffer->hwType);
+            gcoHAL_SetHardwareType(gcvNULL, priv->hwType);
 
             gcoSURF_Destroy(surface);
 
@@ -92,9 +91,10 @@ viv_handle_create_buffer(struct wl_client *client,
     gceSTATUS status = gcvSTATUS_OK;
     gcoSURF surface = gcvNULL;
     struct wl_viv_buffer * buffer = NULL;
+    struct wl_viv_buffer_private * priv = NULL;
     gceHARDWARE_TYPE hwType = gcvHARDWARE_INVALID;
 
-    buffer = malloc(sizeof(*buffer));
+    buffer = malloc(sizeof(*buffer) + sizeof(struct wl_viv_buffer_private));
 
     if (!buffer)
     {
@@ -102,14 +102,15 @@ viv_handle_create_buffer(struct wl_client *client,
     }
 
     memset(buffer, 0, sizeof(*buffer));
+    priv = (struct wl_viv_buffer_private *)&buffer[1];
 
     gcoHAL_GetHardwareType(gcvNULL, &hwType);
 
     /* Switch to an available hardware type. */
-    buffer->hwType = !gcoHAL_Is3DAvailable(gcvNULL) ? gcvHARDWARE_VG
+    priv->hwType = !gcoHAL_Is3DAvailable(gcvNULL) ? gcvHARDWARE_VG
                    : gcoHAL_QueryHybrid2D(gcvNULL) ? gcvHARDWARE_3D2D : gcvHARDWARE_3D;
 
-    gcoHAL_SetHardwareType(gcvNULL, buffer->hwType);
+    gcoHAL_SetHardwareType(gcvNULL, priv->hwType);
 
     gcmONERROR(
         gcoSURF_Construct(gcvNULL,

@@ -20,6 +20,8 @@ VX_INTERNAL_API vx_error vxoError_Create(vx_context context, vx_status status);
 
 VX_INTERNAL_API vx_status vxoError_Release(vx_error_ptr errorPtr);
 
+VX_INTERNAL_API vx_error_s *vxoError_GetErrorObject(vx_context_s *context, vx_status status);
+
 EXTERN_C_END
 
 #endif /* __GC_VX_ERROR_H__ */

@@ -565,13 +565,12 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateGraphicsPipelines(
             if (result != VK_SUCCESS)
             {
                 __vk_DestroyObject(devCtx, __VK_OBJECT_PIPELINE, (__vkObject *)pip);
+                pip = VK_NULL_HANDLE;
                 retVal = result;
             }
-            else
-            {
-                pPipelines[i] = (VkPipeline)(uintptr_t)pip;
-            }
         }
+
+        pPipelines[i] = (VkPipeline)(uintptr_t)pip;
     }
 
     return retVal;
@@ -632,13 +631,11 @@ VKAPI_ATTR VkResult VKAPI_CALL __vk_CreateComputePipelines(
             if (result != VK_SUCCESS)
             {
                 __vk_DestroyObject(devCtx, __VK_OBJECT_PIPELINE, (__vkObject *)pip);
+                pip = VK_NULL_HANDLE;
                 retVal = result;
             }
-            else
-            {
-                pPipelines[i] = (VkPipeline)(uintptr_t)pip;
-            }
         }
+        pPipelines[i] = (VkPipeline)(uintptr_t)pip;
     }
 
     return retVal;
@@ -651,17 +648,21 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyPipeline(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkPipeline *pip = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkPipeline *, pipeline);
 
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+    if (pipeline)
+    {
+        __vkPipeline *pip = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkPipeline *, pipeline);
 
-    if (pip->blendAttachments)
-        __VK_FREE(pip->blendAttachments);
+        /* Set the allocator to the parent allocator or API defined allocator if valid */
+        __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
 
-    __VK_VERIFY_OK((*devCtx->chipFuncs->DestroyPipeline)(device, pipeline));
+        if (pip->blendAttachments)
+            __VK_FREE(pip->blendAttachments);
 
-    __vk_DestroyObject(devCtx, __VK_OBJECT_PIPELINE, (__vkObject *)pip);
+        __VK_VERIFY_OK((*devCtx->chipFuncs->DestroyPipeline)(device, pipeline));
+
+        __vk_DestroyObject(devCtx, __VK_OBJECT_PIPELINE, (__vkObject *)pip);
+    }
 }
 
 VKAPI_ATTR VkResult VKAPI_CALL __vk_CreatePipelineLayout(
@@ -766,20 +767,23 @@ VKAPI_ATTR void VKAPI_CALL __vk_DestroyPipelineLayout(
     )
 {
     __vkDevContext *devCtx = (__vkDevContext *)device;
-    __vkPipelineLayout *plt = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkPipelineLayout *, pipelineLayout);
-
-    /* Set the allocator to the parent allocator or API defined allocator if valid */
-    __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
-
-    if (plt->descSetLayout)
+    if (pipelineLayout)
     {
-        __VK_FREE(plt->descSetLayout);
+        __vkPipelineLayout *plt = __VK_NON_DISPATCHABLE_HANDLE_CAST(__vkPipelineLayout *, pipelineLayout);
+
+        /* Set the allocator to the parent allocator or API defined allocator if valid */
+        __VK_SET_API_ALLOCATIONCB(&devCtx->memCb);
+
+        if (plt->descSetLayout)
+        {
+            __VK_FREE(plt->descSetLayout);
+        }
+        if (plt->dynamic_index)
+        {
+            __VK_FREE(plt->dynamic_index);
+        }
+        __vk_DestroyObject(devCtx, __VK_OBJECT_PIPELINE_LAYOUT, (__vkObject *)plt);
     }
-    if (plt->dynamic_index)
-    {
-        __VK_FREE(plt->dynamic_index);
-    }
-    __vk_DestroyObject(devCtx, __VK_OBJECT_PIPELINE_LAYOUT, (__vkObject *)plt);
 }
 
 

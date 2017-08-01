@@ -203,7 +203,7 @@ _GetPageCount(
     IN gctSIZE_T Size
     )
 {
-    gctUINT32 logical = gcmPTR2INT32(Logical);
+    gctUINTPTR_T logical = gcmPTR2INT(Logical);
 
     return ((logical + Size + __PAGESIZE - 1) >> 12) - (logical >> 12);
 }
@@ -214,7 +214,7 @@ _GetPageAlignedAddress(
     OUT gctUINT32 *Offset OPTIONAL
     )
 {
-    gctUINT32 logical = gcmPTR2INT32(Logical);
+    gctUINTPTR_T logical = gcmPTR2INT(Logical);
 
     if (Offset != gcvNULL)
     {
@@ -4307,7 +4307,14 @@ munmap_flags_peer(pid_t pid, void *addr, size_t len, unsigned flags) {
 
 int
 munmap_peer(pid_t pid, void *addr, size_t len) {
-    return munmap_flags_peer(pid, addr, len, 0);
+    int rc;
+
+    rc = munmap_flags_peer(pid, addr, len, 0);
+    if ((rc == -1) && (errno == ESRCH)) {
+        /* In case the process is terminating then all its mappings are undone by OS. The return value -1 is then expected. */
+        rc = 0;
+    }
+    return rc;
 }
 
 int

@@ -234,7 +234,7 @@ _GetValidKernel(
 
 gceSTATUS
 _ShrinkMemory(
-    IN gckPLATFORM Platform
+    IN gcsPLATFORM * Platform
     )
 {
     struct platform_device *pdev;
@@ -388,8 +388,8 @@ struct imx_priv {
 static struct imx_priv imxPriv;
 
 gceSTATUS
-gckPLATFORM_AdjustParam(
-    IN gckPLATFORM Platform,
+_AdjustParam(
+    IN gcsPLATFORM * Platform,
     OUT gcsMODULE_PARAMETERS *Args
     )
 {
@@ -480,11 +480,9 @@ gckPLATFORM_AdjustParam(
 
 gceSTATUS
 _AllocPriv(
-    IN gckPLATFORM Platform
+    IN gcsPLATFORM * Platform
     )
 {
-    Platform->priv = &imxPriv;
-
 #ifdef CONFIG_GPU_LOW_MEMORY_KILLER
     task_free_register(&task_nb);
 #endif
@@ -494,7 +492,7 @@ _AllocPriv(
 
 gceSTATUS
 _FreePriv(
-    IN gckPLATFORM Platform
+    IN gcsPLATFORM * Platform
     )
 {
 #ifdef CONFIG_GPU_LOW_MEMORY_KILLER
@@ -506,13 +504,13 @@ _FreePriv(
 
 gceSTATUS
 _SetClock(
-    IN gckPLATFORM Platform,
+    IN gcsPLATFORM * Platform,
     IN gceCORE GPU,
     IN gctBOOL Enable
     );
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
-static void imx6sx_optimize_qosc_for_GPU(IN gckPLATFORM Platform)
+static void imx6sx_optimize_qosc_for_GPU(IN gcsPLATFORM * Platform)
 {
     struct device_node *np;
     void __iomem *src_base;
@@ -536,11 +534,11 @@ static void imx6sx_optimize_qosc_for_GPU(IN gckPLATFORM Platform)
 
 gceSTATUS
 _GetPower(
-    IN gckPLATFORM Platform
+    IN gcsPLATFORM * Platform
     )
 {
     struct device* pdev = &Platform->device->dev;
-    struct imx_priv *priv = Platform->priv;
+    struct imx_priv *priv = &imxPriv;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
     struct reset_control *rstc;
 #endif
@@ -614,10 +612,10 @@ _GetPower(
 
 gceSTATUS
 _PutPower(
-    IN gckPLATFORM Platform
+    IN gcsPLATFORM * Platform
     )
 {
-    struct imx_priv *priv = Platform->priv;
+    struct imx_priv *priv = &imxPriv;
 
     /*Disable clock*/
     if (priv->clk_3d_core) {
@@ -654,12 +652,12 @@ _PutPower(
 
 gceSTATUS
 _SetPower(
-    IN gckPLATFORM Platform,
+    IN gcsPLATFORM * Platform,
     IN gceCORE GPU,
     IN gctBOOL Enable
     )
 {
-    struct imx_priv* priv = Platform->priv;
+    struct imx_priv* priv = &imxPriv;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,14,0)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(3,5,0) || LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
     int ret;
@@ -707,12 +705,12 @@ _SetPower(
 
 gceSTATUS
 _SetClock(
-    IN gckPLATFORM Platform,
+    IN gcsPLATFORM * Platform,
     IN gceCORE GPU,
     IN gctBOOL Enable
     )
 {
-    struct imx_priv* priv = Platform->priv;
+    struct imx_priv* priv = &imxPriv;
     struct clk *clk_3dcore = priv->clk_3d_core;
     struct clk *clk_3dshader = priv->clk_3d_shader;
 
@@ -787,12 +785,9 @@ static struct dev_pm_ops gpu_pm_ops;
 
 gceSTATUS
 _AdjustDriver(
-    IN gckPLATFORM Platform
+    struct platform_driver * driver
     )
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,5,0)
-    struct platform_driver * driver = Platform->driver;
-#endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,5,0)
     driver->driver.of_match_table = mxs_gpu_dt_ids;
@@ -818,7 +813,7 @@ _AdjustDriver(
 
 gceSTATUS
 _Reset(
-    IN gckPLATFORM Platform,
+    IN gcsPLATFORM * Platform,
     gceCORE GPU
     )
 {
@@ -848,7 +843,7 @@ _Reset(
 
     return gcvSTATUS_NOT_SUPPORTED;
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0)
-    struct imx_priv* priv = Platform->priv;
+    struct imx_priv* priv = &imxPriv;
     struct reset_control *rstc = priv->rstc[GPU];
     if (rstc)
         reset_control_reset(rstc);
@@ -860,7 +855,7 @@ _Reset(
 
 gceSTATUS
 _CacheFlush(
-       IN gckPLATFORM Platform,
+       IN gcsPLATFORM * Platform,
        IN gctUINT32 ProcessID,
        IN gctPHYS_ADDR Handle,
        IN gctUINT32 Physical,
@@ -872,30 +867,38 @@ _CacheFlush(
        return gcvSTATUS_OK;
 }
 
-gcmkPLATFROM_Name
-
-gcsPLATFORM_OPERATIONS platformOperations = {
-    .adjustParam  = gckPLATFORM_AdjustParam,
-    .allocPriv    = _AllocPriv,
-    .freePriv     = _FreePriv,
+static struct soc_platform_ops s32v234_ops =
+{
+    .adjustParam  = _AdjustParam,
     .getPower     = _GetPower,
     .putPower     = _PutPower,
     .setPower     = _SetPower,
     .setClock     = _SetClock,
-    .adjustDriver = _AdjustDriver,
     .reset        = _Reset,
 #ifdef CONFIG_GPU_LOW_MEMORY_KILLER
     .shrinkMemory = _ShrinkMemory,
 #endif
-    .name          = _Name,
-    .cache         = _CacheFlush,
+    .cache        = _CacheFlush,
 };
 
-void
-gckPLATFORM_QueryOperations(
-    IN gcsPLATFORM_OPERATIONS ** Operations
-    )
+static struct soc_platform s32v234_platform =
 {
-     *Operations = &platformOperations;
+    .name = __FILE__,
+    .ops  = &s32v234_ops,
+};
+
+int soc_platform_init(struct platform_driver *pdrv,
+            struct soc_platform **platform)
+{
+    _AdjustDriver(pdrv);
+    _AllocPriv(&s32v234_platform);
+    *platform = &s32v234_platform;
+    return 0;
+}
+
+int soc_platform_terminate(struct soc_platform *platform)
+{
+    _FreePriv(&s32v234_platform);
+    return 0;
 }
 

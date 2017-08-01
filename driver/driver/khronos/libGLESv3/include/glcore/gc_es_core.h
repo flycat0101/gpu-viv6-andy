@@ -181,6 +181,10 @@ typedef enum
 
     __GL_FMT_RGBX8,
     __GL_FMT_BGRX8,
+    __GL_FMT_ARGB4,
+    __GL_FMT_ABGR4,
+    __GL_FMT_XRGB4,
+    __GL_FMT_XBGR4,
  /*LUIMANCE ALPHA*/
     __GL_FMT_A32F,
     __GL_FMT_L32F,

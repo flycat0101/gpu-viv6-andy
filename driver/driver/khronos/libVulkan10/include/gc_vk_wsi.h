@@ -16,7 +16,7 @@
 
 #define __VK_WSI_MAX_PHYSICAL_DISPLAYS       4
 #define __VK_WSI_MAX_DISPLAY_PLANES          32
-#define __VK_WSI_MAX_DISPLAY_MODES           32
+#define __VK_WSI_MAX_DISPLAY_MODES           128
 
 
 typedef enum __VkDirectRenderModeRec
@@ -38,33 +38,33 @@ typedef struct __vkSurfaceOperationRec  __vkSurfaceOperation;
 
 struct __vkSurfaceOperationRec
 {
-    void     (* DestroySurface)(VkInstance instance,
-                                VkSurfaceKHR surface,
+    void     (* DestroySurface)(VkInstance                    instance,
+                                VkSurfaceKHR                  surface,
                                 const VkAllocationCallbacks * pAllocator);
 
     VkResult (* GetPhysicalDeviceSurfaceSupport)(VkPhysicalDevice physicalDevice,
-                                                 uint32_t queueFamilyIndex,
-                                                 VkSurfaceKHR surface,
-                                                 VkBool32* pSupported);
+                                                 uint32_t         queueFamilyIndex,
+                                                 VkSurfaceKHR     surface,
+                                                 VkBool32*        pSupported);
 
-    VkResult (* GetPhysicalDeviceSurfaceCapabilities)(VkPhysicalDevice physicalDevice,
-                                                      VkSurfaceKHR surface,
+    VkResult (* GetPhysicalDeviceSurfaceCapabilities)(VkPhysicalDevice          physicalDevice,
+                                                      VkSurfaceKHR              surface,
                                                       VkSurfaceCapabilitiesKHR* pSurfaceCapabilities);
 
-    VkResult (* GetPhysicalDeviceSurfaceFormats)(VkPhysicalDevice physicalDevice,
-                                                 VkSurfaceKHR surface,
-                                                 uint32_t* pSurfaceFormatCount,
+    VkResult (* GetPhysicalDeviceSurfaceFormats)(VkPhysicalDevice    physicalDevice,
+                                                 VkSurfaceKHR        surface,
+                                                 uint32_t*           pSurfaceFormatCount,
                                                  VkSurfaceFormatKHR* pSurfaceFormats);
 
-    VkResult (* GetPhysicalDeviceSurfacePresentModes)(VkPhysicalDevice physicalDevice,
-                                                      VkSurfaceKHR surface,
-                                                      uint32_t* pPresentModeCount,
+    VkResult (* GetPhysicalDeviceSurfacePresentModes)(VkPhysicalDevice  physicalDevice,
+                                                      VkSurfaceKHR      surface,
+                                                      uint32_t*         pPresentModeCount,
                                                       VkPresentModeKHR* pPresentModes);
 
-    VkResult (* CreateSwapchain)(VkDevice device,
+    VkResult (* CreateSwapchain)(VkDevice                        device,
                                  const VkSwapchainCreateInfoKHR* pCreateInfo,
-                                 const VkAllocationCallbacks* pAllocator,
-                                 VkSwapchainKHR* pSwapchain);
+                                 const VkAllocationCallbacks*    pAllocator,
+                                 VkSwapchainKHR*                 pSwapchain);
 };
 
 struct __vkSwapchainKHRRec
@@ -73,26 +73,26 @@ struct __vkSwapchainKHRRec
     const char *                    concreteType;
 
     /* Functions. */
-    void     (* DestroySwapchain)(VkDevice device,
-                                  VkSwapchainKHR swapchain,
+    void     (* DestroySwapchain)(VkDevice                     device,
+                                  VkSwapchainKHR               swapchain,
                                   const VkAllocationCallbacks* pAllocator);
 
-    VkResult (* GetSwapchainImages)(VkDevice device,
+    VkResult (* GetSwapchainImages)(VkDevice       device,
                                     VkSwapchainKHR swapchain,
-                                    uint32_t* pSwapchainImageCount,
-                                    VkImage* pSwapchainImages);
+                                    uint32_t*      pSwapchainImageCount,
+                                    VkImage*       pSwapchainImages);
 
-    VkResult (* AcquireNextImage)(VkDevice device,
+    VkResult (* AcquireNextImage)(VkDevice       device,
                                   VkSwapchainKHR swapchain,
-                                  uint64_t timeout,
-                                  VkSemaphore semaphore,
-                                  VkFence fence,
-                                  uint32_t* pImageIndex);
+                                  uint64_t       timeout,
+                                  VkSemaphore    semaphore,
+                                  VkFence        fence,
+                                  uint32_t*      pImageIndex);
 
-    VkResult (* QueuePresentSingle)(VkQueue queue,
+    VkResult (* QueuePresentSingle)(VkQueue                        queue,
                                     const VkDisplayPresentInfoKHR* pDisplayPresentInfo,
-                                    VkSwapchainKHR swapchain,
-                                    uint32_t imageIndex);
+                                    VkSwapchainKHR                 swapchain,
+                                    uint32_t                       imageIndex);
 };
 
 /* VK_KHR_display. */
@@ -100,7 +100,7 @@ struct __vkDisplayKHRRec
 {
     __vkObjectType                  sType;
 
-    /* Display specific fields */
+    /* Display properties. */
     char                            displayName[32];
     VkExtent2D                      physicalDimensions;
     VkExtent2D                      physicalResolution;
@@ -108,19 +108,63 @@ struct __vkDisplayKHRRec
     VkBool32                        planeReorderPossible;
     VkBool32                        persistentContent;
 
-    __vkDisplayPlane *              planeStack[__VK_WSI_MAX_DISPLAY_PLANES];
-
-    uint32_t                        displayModeCount;
+    /* Display modes. */
     __vkDisplayModeKHR *            displayModes[__VK_WSI_MAX_DISPLAY_MODES];
+    uint32_t                        displayModeCount;
+
+    __vkDisplayPlane *              planeStack[__VK_WSI_MAX_DISPLAY_PLANES];
+    uint32_t                        planeStackSize;
+
+    /* Create DisplayMode. */
+    VkResult (* CreateDisplayMode)(VkPhysicalDevice                  physicalDevice,
+                                   VkDisplayKHR                      display,
+                                   const VkDisplayModeCreateInfoKHR* pCreateInfo,
+                                   const VkAllocationCallbacks*      pAllocator,
+                                   VkDisplayModeKHR*                 pMode);
+
+    /* Get DisplayPlane capabilities with display and mode. */
+    /* Capabilities may vary according to different display and mode combination. */
+    VkResult (* GetDisplayPlaneCapabilities)(VkPhysicalDevice               physicalDevice,
+                                             VkDisplayModeKHR               mode,
+                                             uint32_t                       planeIndex,
+                                             VkDisplayPlaneCapabilitiesKHR* pCapabilities);
+
+    /* Surface functions. */
+    VkResult (* GetPhysicalDeviceSurfaceSupport)(VkPhysicalDevice physicalDevice,
+                                                 uint32_t         queueFamilyIndex,
+                                                 VkSurfaceKHR     surface,
+                                                 VkBool32*        pSupported);
+
+    VkResult (* GetPhysicalDeviceSurfaceCapabilities)(VkPhysicalDevice          physicalDevice,
+                                                      VkSurfaceKHR              surface,
+                                                      VkSurfaceCapabilitiesKHR* pSurfaceCapabilities);
+
+    VkResult (* GetPhysicalDeviceSurfaceFormats)(VkPhysicalDevice    physicalDevice,
+                                                 VkSurfaceKHR        surface,
+                                                 uint32_t*           pSurfaceFormatCount,
+                                                 VkSurfaceFormatKHR* pSurfaceFormats);
+
+    VkResult (* GetPhysicalDeviceSurfacePresentModes)(VkPhysicalDevice  physicalDevice,
+                                                      VkSurfaceKHR      surface,
+                                                      uint32_t*         pPresentModeCount,
+                                                      VkPresentModeKHR* pPresentModes);
+
+    /* Swapchain functions. */
+    VkResult (* CreateSwapchain)(VkDevice                        device,
+                                 const VkSwapchainCreateInfoKHR* pCreateInfo,
+                                 const VkAllocationCallbacks*    pAllocator,
+                                 VkSwapchainKHR*                 pSwapchain);
 };
 
 struct __vkDisplayPlaneRec
 {
     uint32_t                        planeIndex;
 
-    __vkDisplayKHR *                currentDisplay;
+    /* DisplayPlane properties. */
+    VkDisplayKHR                    currentDisplay;
     uint32_t                        currentStackIndex;
 
+    /* DisplayPlane supported displays. */
     __vkDisplayKHR *                supportedDisplays[__VK_WSI_MAX_PHYSICAL_DISPLAYS];
     uint32_t                        supportedDisplayCount;
 };
@@ -129,10 +173,17 @@ struct __vkDisplayModeKHRRec
 {
     __vkObjectType                  sType;
 
+    /* DisplayMode implies the display it belongs to. */
+    __vkDisplayKHR *                display;
+
     /* DisplayMode specific fields */
     VkDisplayModeParametersKHR      parameters;
+
+    uint32_t                        bitsPerPixel;
+    VkBool32                        interlaced;
 };
 
+VkResult __vkInitializePhysicalDeviceDisplays(__vkPhysicalDevice *phyDevice);
 
 extern __vkSurfaceOperation __vkMirSurfaceOperation;
 extern __vkSurfaceOperation __vkWaylandSurfaceOperation;

@@ -49,6 +49,7 @@ typedef struct _cl_device_id
 clsDeviceId;
 
 
+extern clsDeviceId_PTR clgDevices;
 #ifdef __cplusplus
 }
 #endif

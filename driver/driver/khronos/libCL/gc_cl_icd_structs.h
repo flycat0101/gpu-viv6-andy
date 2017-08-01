@@ -31,4 +31,5 @@ struct CLIplatform_st
 extern cl_int cliIcdDispatchTableCreate(CLIicdDispatchTable **outDispatchTable);
 extern void cliIcdDispatchTableDestroy(CLIicdDispatchTable *dispatchTable);
 
+extern CLIicdDispatchTable * clgDispatchTable;
 #endif /* _ICD_STRUCTS_H_ */

@@ -16,6 +16,11 @@
 
 BEGIN_EXTERN_C()
 
+void vscMC_DisassembleInst(VSC_MC_CODEC* pMcCodec,
+                           VSC_MC_RAW_INST* pMcInst,
+                           gctUINT instIdx,
+                           VSC_DUMPER* pDumper);
+
 void vscMC_DumpInst(VSC_MC_CODEC* pMcCodec,
                     VSC_MC_RAW_INST* pMcInst,
                     gctUINT instIdx,

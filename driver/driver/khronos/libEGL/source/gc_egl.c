@@ -62,7 +62,7 @@ _DestroyThreadData(
 
         gcoOS_UnLockPLS();
 
-        if (releaseThread)
+        if (releaseThread && thread->chipCount)
         {
             /* Release current thread data. */
             veglReleaseThread(thread);
@@ -1176,6 +1176,39 @@ EGLSurface LOG_eglCreatePlatformPixmapSurfaceEXT_post(EGLDisplay dpy, EGLConfig 
     return EGL_NO_SURFACE;
 }
 
+/* EGL_KHR_partial_update. */
+EGLBoolean LOG_eglSetDamageRegionKHR (EGLDisplay dpy, EGLSurface surface, EGLint *rects, EGLint n_rects)
+{
+    EGL_LOG_API("EGL(tid=0x%lx): eglSetDamageRegionKHR 0x%08lX 0x%08lX 0x%08lx 0x%08x\n",
+                (long)(uintptr_t)gcoOS_GetCurrentThreadID(),
+                (long)(uintptr_t)dpy, (long)(uintptr_t)surface,
+                (long)(uintptr_t)rects, n_rects);
+
+    return EGL_TRUE;
+}
+
+/* EGL_KHR_swap_buffers_with_damage. */
+EGLBoolean LOG_eglSwapBuffersWithDamageKHR(EGLDisplay dpy, EGLSurface surface, EGLint *rects, EGLint n_rects)
+{
+    EGL_LOG_API("EGL(tid=0x%lx): eglSwapBuffersWithDamageKHR 0x%08lX 0x%08lX 0x%08lx 0x%08x\n",
+                (long)(uintptr_t)gcoOS_GetCurrentThreadID(),
+                (long)(uintptr_t)dpy, (long)(uintptr_t)surface,
+                (long)(uintptr_t)rects, n_rects);
+
+    return EGL_TRUE;
+}
+
+/* EGL_EXT_swap_buffers_with_damage. */
+EGLBoolean LOG_eglSwapBuffersWithDamageEXT(EGLDisplay dpy, EGLSurface surface, EGLint *rects, EGLint n_rects)
+{
+    EGL_LOG_API("EGL(tid=0x%lx): eglSwapBuffersWithDamageEXT 0x%08lX 0x%08lX 0x%08lx 0x%08x\n",
+                (long)(uintptr_t)gcoOS_GetCurrentThreadID(),
+                (long)(uintptr_t)dpy, (long)(uintptr_t)surface,
+                (long)(uintptr_t)rects, n_rects);
+
+    return EGL_TRUE;
+}
+
 eglTracerDispatchTableStruct veglLogFunctionTable = {
     LOG_eglGetError_pre,
     LOG_eglGetDisplay_post,
@@ -1241,6 +1274,10 @@ eglTracerDispatchTableStruct veglLogFunctionTable = {
     LOG_eglGetPlatformDisplayEXT_post,
     LOG_eglCreatePlatformWindowSurfaceEXT_post,
     LOG_eglCreatePlatformPixmapSurfaceEXT_post,
+    /* EGL_KHR_partial_update */
+    LOG_eglSetDamageRegionKHR,
+    LOG_eglSwapBuffersWithDamageKHR,
+    LOG_eglSwapBuffersWithDamageEXT,
 
     /******  The above interfaces are used to link with external vTracer library libGLES_vlogger.so ******/
 
@@ -1346,6 +1383,8 @@ char *veglFunctionNames[] = {
     "eglGetPlatformDisplayEXT",
     "eglCreatePlatformWindowSurfaceEXT",
     "eglCreatePlatformPixmapSurfaceEXT",
+    /* EGL_KHR_partial_update */
+    "eglSetDamageRegionKHR"
 };
 
 

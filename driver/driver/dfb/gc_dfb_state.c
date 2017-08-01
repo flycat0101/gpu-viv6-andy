@@ -592,7 +592,7 @@ gal_validate_destination( GalDriverData          *vdrv,
                         "Dest surface is allocated from GAL surface pool.\n" );
 
             /* It is allocated from GAL surface pool. The address is already GPU address. */
-            vdrv->dst_phys_addr = state->dst.phys;
+            vdrv->dst_phys_addr[0] = state->dst.phys;
         }
         else
 #endif
@@ -635,7 +635,7 @@ gal_validate_destination( GalDriverData          *vdrv,
                 gcmERR_BREAK(gcoHAL_WrapUserMemory(&desc,
                                                    &handle));
 
-                gcmERR_BREAK(gcoHAL_LockVideoMemory(handle, gcvFALSE, &gpu_addr, &logical));
+                gcmERR_BREAK(gcoHAL_LockVideoMemory(handle, gcvFALSE, gcvENGINE_RENDER, &gpu_addr, &logical));
 
                 /* Save the info for memory mapping. */
                 mapping->phys_addr  = state->dst.phys;
@@ -660,7 +660,7 @@ gal_validate_destination( GalDriverData          *vdrv,
                             mapping->gpu_addr );
             }
 
-            vdrv->dst_phys_addr = mapping->gpu_addr;
+            vdrv->dst_phys_addr[0] = mapping->gpu_addr;
 
 #if GAL_SURFACE_COMPRESSED
             if (vdrv->vdev->hw_2d_compression)
@@ -699,13 +699,62 @@ gal_validate_destination( GalDriverData          *vdrv,
 #endif
         }
         vdrv->last_dst_phys_addr = state->dst.phys;
-        vdrv->dst_logic_addr     = state->dst.addr;
-        vdrv->dst_pitch          = state->dst.pitch;
+        vdrv->dst_logic_addr[0]  = state->dst.addr;
+        vdrv->dst_pitch[0]       = vdrv->vdev->hw_yuv420_output && state->destination->config.format == DSPF_NV16 ?
+                                   gcmALIGN(state->dst.pitch, 64) : state->dst.pitch;
         vdrv->dst_width          = state->destination->config.size.w;
         vdrv->dst_aligned_width  = gcmALIGN( state->destination->config.size.w, GAL_WIDTH_ALIGNMENT );
         vdrv->dst_height         = state->destination->config.size.h;
         vdrv->dst_aligned_height = gcmALIGN( state->destination->config.size.h, GAL_HEIGHT_ALIGNMENT );
         vdrv->dst_format         = state->destination->config.format;
+        vdrv->dst_planar_num     = 1;
+
+        if (gal_is_yuv_format( state->destination->config.format )) {
+            vdrv->dst_is_yuv_format = true;
+
+            switch (state->destination->config.format)
+            {
+            case DSPF_YV12:
+                vdrv->dst_pitch[1]      = vdrv->dst_pitch[0] / 2;
+                vdrv->dst_pitch[2]      = vdrv->dst_pitch[0] / 2;
+                vdrv->dst_phys_addr[2]  = vdrv->dst_phys_addr[0] + vdrv->dst_height * vdrv->dst_pitch[0];
+                vdrv->dst_phys_addr[1]  = vdrv->dst_phys_addr[1] + vdrv->dst_height/2 * vdrv->dst_pitch[1];
+                vdrv->dst_logic_addr[2] = (void *)((uintptr_t)vdrv->dst_logic_addr[0] + vdrv->dst_height * vdrv->dst_pitch[0]);
+                vdrv->dst_logic_addr[1] = (void *)((uintptr_t)vdrv->dst_logic_addr[1] + vdrv->dst_height/2 * vdrv->dst_pitch[1]);
+                vdrv->dst_planar_num = 3;
+                break;
+
+            case DSPF_I420:
+                vdrv->dst_pitch[1]      = vdrv->dst_pitch[0] / 2;
+                vdrv->dst_pitch[2]      = vdrv->dst_pitch[0] / 2;
+                vdrv->dst_phys_addr[1]  = vdrv->dst_phys_addr[0] + vdrv->dst_height * vdrv->dst_pitch[0];
+                vdrv->dst_phys_addr[2]  = vdrv->dst_phys_addr[1] + vdrv->dst_height/2 * vdrv->dst_pitch[1];
+                vdrv->dst_logic_addr[1] = (void *)((uintptr_t)vdrv->dst_logic_addr[0] + vdrv->dst_height * vdrv->dst_pitch[0]);
+                vdrv->dst_logic_addr[2] = (void *)((uintptr_t)vdrv->dst_logic_addr[1] + vdrv->dst_height/2 * vdrv->dst_pitch[1]);
+                vdrv->dst_planar_num = 3;
+                break;
+
+            case DSPF_NV12:
+            case DSPF_NV21:
+            case DSPF_NV16:
+                vdrv->dst_pitch[1]      = vdrv->dst_pitch[0];
+                vdrv->dst_phys_addr[1]  = vdrv->dst_phys_addr[0] + vdrv->dst_height * vdrv->dst_pitch[0];
+                vdrv->dst_logic_addr[1] = (void *)((uintptr_t)vdrv->dst_logic_addr[0] + vdrv->dst_height * vdrv->dst_pitch[0]);
+                vdrv->dst_planar_num = 2;
+                break;
+
+            case DSPF_YUY2:
+            case DSPF_UYVY:
+                break;
+
+            default:
+                D_WARN( "Not supported YUV format.\n" );
+                break;
+            }
+        }
+        else {
+            vdrv->dst_is_yuv_format = false;
+        }
 
         D_DEBUG_AT( Gal_State,
                     "vdrv->dst_phys_addr: 0x%08X\n"
@@ -713,9 +762,9 @@ gal_validate_destination( GalDriverData          *vdrv,
                     "vdrv->dst_pitch: %u\n"
                     "vdrv->dst_width: %u\n"
                     "vdrv->dst_format: %s\n",
-                    vdrv->dst_phys_addr,
-                    vdrv->dst_logic_addr,
-                    vdrv->dst_pitch,
+                    vdrv->dst_phys_addr[0],
+                    vdrv->dst_logic_addr[0],
+                    vdrv->dst_pitch[0],
                     vdrv->dst_width,
                     dfb_pixelformat_name(vdrv->dst_format) );
 
@@ -859,7 +908,7 @@ gal_validate_source( GalDriverData          *vdrv,
                     gcmERR_BREAK(gcoHAL_WrapUserMemory(&desc,
                                                        &handle));
 
-                    gcmERR_BREAK(gcoHAL_LockVideoMemory(handle, gcvFALSE, &gpu_addr, &logical));
+                    gcmERR_BREAK(gcoHAL_LockVideoMemory(handle, gcvFALSE, gcvENGINE_RENDER, &gpu_addr, &logical));
 
                     /* Save the info for memory mapping. */
                     mapping->phys_addr  = state->src.phys;
@@ -922,6 +971,7 @@ gal_validate_source( GalDriverData          *vdrv,
                 }
 #endif
             }
+
             vdrv->last_src_phys_addr = state->src.phys;
             vdrv->src_logic_addr[0]  = state->src.addr;
             vdrv->src_pitch[0]       = state->src.pitch;
@@ -930,6 +980,7 @@ gal_validate_source( GalDriverData          *vdrv,
             vdrv->src_height         = state->source->config.size.h;
             vdrv->src_aligned_height = gcmALIGN( state->source->config.size.h, GAL_HEIGHT_ALIGNMENT );
             vdrv->src_format         = state->source->config.format;
+            vdrv->src_planar_num     = 1;
 
             if (gal_is_yuv_format( state->source->config.format )) {
                 vdrv->src_is_yuv_format = true;
@@ -939,42 +990,36 @@ gal_validate_source( GalDriverData          *vdrv,
                 case DSPF_YV12:
                     vdrv->src_pitch[1]      = vdrv->src_pitch[0] / 2;
                     vdrv->src_pitch[2]      = vdrv->src_pitch[0] / 2;
-
                     vdrv->src_phys_addr[2]  = vdrv->src_phys_addr[0] + vdrv->src_height * vdrv->src_pitch[0];
-                    vdrv->src_phys_addr[1]  = vdrv->src_phys_addr[2] + vdrv->src_height/2 * vdrv->src_pitch[2];
-
+                    vdrv->src_phys_addr[1]  = vdrv->src_phys_addr[1] + vdrv->src_height/2 * vdrv->src_pitch[1];
                     vdrv->src_logic_addr[2] = (void *)((uintptr_t)vdrv->src_logic_addr[0] + vdrv->src_height * vdrv->src_pitch[0]);
-                    vdrv->src_logic_addr[1] = (void *)((uintptr_t)vdrv->src_logic_addr[2] + vdrv->src_height/2 * vdrv->src_pitch[2]);
+                    vdrv->src_logic_addr[1] = (void *)((uintptr_t)vdrv->src_logic_addr[1] + vdrv->src_height/2 * vdrv->src_pitch[1]);
+                    vdrv->src_planar_num = 3;
                     break;
+
                 case DSPF_I420:
                     vdrv->src_pitch[1]      = vdrv->src_pitch[0] / 2;
                     vdrv->src_pitch[2]      = vdrv->src_pitch[0] / 2;
-
                     vdrv->src_phys_addr[1]  = vdrv->src_phys_addr[0] + vdrv->src_height * vdrv->src_pitch[0];
                     vdrv->src_phys_addr[2]  = vdrv->src_phys_addr[1] + vdrv->src_height/2 * vdrv->src_pitch[1];
-
                     vdrv->src_logic_addr[1] = (void *)((uintptr_t)vdrv->src_logic_addr[0] + vdrv->src_height * vdrv->src_pitch[0]);
                     vdrv->src_logic_addr[2] = (void *)((uintptr_t)vdrv->src_logic_addr[1] + vdrv->src_height/2 * vdrv->src_pitch[1]);
+                    vdrv->src_planar_num = 3;
                     break;
+
                 case DSPF_NV12:
                 case DSPF_NV21:
-                    vdrv->src_pitch[1]      = vdrv->src_pitch[0];
-
-                    vdrv->src_phys_addr[1]  = vdrv->src_phys_addr[0] + vdrv->src_height * vdrv->src_pitch[0];
-
-                    vdrv->src_logic_addr[1] = (void *)((uintptr_t)vdrv->src_logic_addr[0] + vdrv->src_height * vdrv->src_pitch[0]);
-                    break;
                 case DSPF_NV16:
                     vdrv->src_pitch[1]      = vdrv->src_pitch[0];
-
                     vdrv->src_phys_addr[1]  = vdrv->src_phys_addr[0] + vdrv->src_height * vdrv->src_pitch[0];
-
                     vdrv->src_logic_addr[1] = (void *)((uintptr_t)vdrv->src_logic_addr[0] + vdrv->src_height * vdrv->src_pitch[0]);
+                    vdrv->src_planar_num = 2;
                     break;
+
                 case DSPF_YUY2:
-                    break;
                 case DSPF_UYVY:
                     break;
+
                 default:
                     D_WARN( "Not supported YUV format.\n" );
                     break;
@@ -1080,7 +1125,7 @@ gal_validate_source( GalDriverData          *vdrv,
                     gcmERR_BREAK(gcoHAL_WrapUserMemory(&desc,
                                                        &handle));
 
-                    gcmERR_BREAK(gcoHAL_LockVideoMemory(handle, gcvFALSE, &gpu_addr, &logical));
+                    gcmERR_BREAK(gcoHAL_LockVideoMemory(handle, gcvFALSE, gcvENGINE_RENDER, &gpu_addr, &logical));
 
                     /* Save the info for memory mapping. */
                     mapping->phys_addr  = state->src2.phys;
@@ -1124,40 +1169,30 @@ gal_validate_source( GalDriverData          *vdrv,
                 case DSPF_YV12:
                     vdrv->src2_pitch[1]      = vdrv->src2_pitch[0] / 2;
                     vdrv->src2_pitch[2]      = vdrv->src2_pitch[0] / 2;
-
                     vdrv->src2_phys_addr[2]  = vdrv->src2_phys_addr[0] + vdrv->src2_height * vdrv->src2_pitch[0];
-                    vdrv->src2_phys_addr[1]  = vdrv->src2_phys_addr[2] + vdrv->src2_height/2 * vdrv->src2_pitch[2];
-
+                    vdrv->src2_phys_addr[1]  = vdrv->src2_phys_addr[1] + vdrv->src2_height/2 * vdrv->src2_pitch[1];
                     vdrv->src2_logic_addr[2] = (void *)((uintptr_t)vdrv->src2_logic_addr[0] + vdrv->src2_height * vdrv->src2_pitch[0]);
-                    vdrv->src2_logic_addr[1] = (void *)((uintptr_t)vdrv->src2_logic_addr[2] + vdrv->src2_height/2 * vdrv->src2_pitch[2]);
+                    vdrv->src2_logic_addr[1] = (void *)((uintptr_t)vdrv->src2_logic_addr[1] + vdrv->src2_height/2 * vdrv->src2_pitch[1]);
                     break;
+
                 case DSPF_I420:
                     vdrv->src2_pitch[1]      = vdrv->src2_pitch[0] / 2;
                     vdrv->src2_pitch[2]      = vdrv->src2_pitch[0] / 2;
-
                     vdrv->src2_phys_addr[1]  = vdrv->src2_phys_addr[0] + vdrv->src2_height * vdrv->src2_pitch[0];
                     vdrv->src2_phys_addr[2]  = vdrv->src2_phys_addr[1] + vdrv->src2_height/2 * vdrv->src2_pitch[1];
-
                     vdrv->src2_logic_addr[1] = (void *)((uintptr_t)vdrv->src2_logic_addr[0] + vdrv->src2_height * vdrv->src2_pitch[0]);
                     vdrv->src2_logic_addr[2] = (void *)((uintptr_t)vdrv->src2_logic_addr[1] + vdrv->src2_height/2 * vdrv->src2_pitch[1]);
                     break;
+
                 case DSPF_NV12:
                 case DSPF_NV21:
-                    vdrv->src2_pitch[1]      = vdrv->src2_pitch[0];
-
-                    vdrv->src2_phys_addr[1]  = vdrv->src2_phys_addr[0] + vdrv->src2_height * vdrv->src2_pitch[0];
-
-                    vdrv->src2_logic_addr[1] = (void *)((uintptr_t)vdrv->src2_logic_addr[0] + vdrv->src2_height * vdrv->src2_pitch[0]);
-                    break;
                 case DSPF_NV16:
                     vdrv->src2_pitch[1]      = vdrv->src2_pitch[0];
-
                     vdrv->src2_phys_addr[1]  = vdrv->src2_phys_addr[0] + vdrv->src2_height * vdrv->src2_pitch[0];
-
                     vdrv->src2_logic_addr[1] = (void *)((uintptr_t)vdrv->src2_logic_addr[0] + vdrv->src2_height * vdrv->src2_pitch[0]);
                     break;
+
                 case DSPF_YUY2:
-                    break;
                 case DSPF_UYVY:
                     break;
                 default:
@@ -2652,9 +2687,9 @@ gal_program_source( GalDriverData *vdrv,
 
                 gcmERR_BREAK(gco2D_SetGenericSource(vdrv->engine_2d,
                                                     vdrv->src_phys_addr,
-                                                    1U,
-                                                    (unsigned int*) &vdrv->src_pitch,
-                                                    1U,
+                                                    vdrv->src_planar_num,
+                                                    (unsigned int*) vdrv->src_pitch,
+                                                    vdrv->src_planar_num,
                                                     vdrv->src_tiling,
                                                     vdrv->src_native_format,
                                                     vdrv->src_rotation,
@@ -2696,7 +2731,7 @@ gal_program_target( GalDriverData *vdrv,
     do {
         D_DEBUG_AT( Gal_State,
                     "dst_native_format: 0x%08X, dst_pitch: %u, dst_logic_addr: %p, dst_phys_addr: 0x%08X.\n",
-                    vdrv->dst_native_format, vdrv->dst_pitch, vdrv->dst_logic_addr, vdrv->dst_phys_addr );
+                    vdrv->dst_native_format, vdrv->dst_pitch[0], vdrv->dst_logic_addr[0], vdrv->dst_phys_addr[0] );
 
         gcmERR_BREAK(gco2D_SetTargetTileStatus(
             vdrv->engine_2d,
@@ -2707,10 +2742,10 @@ gal_program_target( GalDriverData *vdrv,
             ));
 
         gcmERR_BREAK(gco2D_SetGenericTarget(vdrv->engine_2d,
-                                            &vdrv->dst_phys_addr,
-                                            1U,
-                                            (unsigned int*) &vdrv->dst_pitch,
-                                            1U,
+                                            vdrv->dst_phys_addr,
+                                            vdrv->dst_planar_num,
+                                            (unsigned int*) vdrv->dst_pitch,
+                                            vdrv->dst_planar_num,
                                             vdrv->dst_tiling,
                                             vdrv->dst_native_format,
                                             vdrv->dst_rotation,
@@ -3148,7 +3183,7 @@ gal_program_state( GalDriverData *vdrv,
                 vdrv->color,
                 vdrv->src_blend, vdrv->dst_blend,
                 vdrv->trans_color,
-                vdrv->dst_phys_addr, vdrv->dst_pitch, vdrv->dst_native_format );
+                vdrv->dst_phys_addr[0], vdrv->dst_pitch[0], vdrv->dst_native_format );
 
     if (vdrv->use_pool_source) {
         D_DEBUG_AT( Gal_State,

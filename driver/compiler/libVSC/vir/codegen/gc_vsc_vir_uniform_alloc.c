@@ -670,6 +670,7 @@ void VIR_CG_SetUniformUsedPacked(
     )
 {
     VSC_BIT_VECTOR  *usedColor = &uniformColorMap->usedColor;
+    gctUINT8        firstEnable = enable;
     gctUINT         count = 0;
 
     while (rows-- > 0)
@@ -700,7 +701,7 @@ void VIR_CG_SetUniformUsedPacked(
 
         count ++;
         startIdx = startIdx + count / step;
-        enable = _VIR_CG_EnableShiftWrap(enable, count, step);;
+        enable = _VIR_CG_EnableShiftWrap(firstEnable, count, step);;
     }
 }
 
@@ -927,8 +928,15 @@ gctBOOL VIR_CG_ConstUniformExistBefore(
     gctBOOL valid[4] = {gcvFALSE, gcvFALSE, gcvFALSE, gcvFALSE};
     VIR_Uniform *uniform = gcvNULL;
 
-    VIR_Const *pConstVal = (VIR_Const *) VIR_GetSymFromId(&pShader->constTable,
-        pSymUniform->u.initializer);
+    VIR_Const *pConstVal;
+    VIR_Type *symType;
+
+    /* skip check for initialized uniform array */
+    symType = VIR_Symbol_GetType(pSym);
+    if(VIR_Type_isArray(symType)) return gcvFALSE;
+
+    pConstVal = (VIR_Const *) VIR_GetSymFromId(&pShader->constTable,
+                                               pSymUniform->u.initializer);
 
     switch (pConstVal->type)
     {
@@ -1038,8 +1046,12 @@ gctBOOL VIR_CG_ConstUniformExistBefore(
     case VIR_TYPE_BOOLEAN:
         valid[0] = gcvTRUE;
         break;
+
+    case VIR_TYPE_FLOAT16_X4:
+        return gcvFALSE;
     default:
         gcmASSERT(gcvFALSE);
+        return gcvFALSE;
     }
 
     count = VIR_GetTypeComponents(pConstVal->type);
@@ -1058,9 +1070,14 @@ gctBOOL VIR_CG_ConstUniformExistBefore(
         if (isSymUniformCompiletimeInitialized(sym) &&
             (uniform->physical != -1))
         {
-            VIR_Const *constVal = (VIR_Const *) VIR_GetSymFromId(
-                &pShader->constTable, uniform->u.initializer);
-            gctINT constCount = VIR_GetTypeComponents(constVal->type);
+            VIR_Const *constVal;
+            gctINT constCount;
+            symType = VIR_Symbol_GetType(sym);
+
+            if(VIR_Type_isArray(symType)) continue;
+
+            constVal = (VIR_Const *) VIR_GetSymFromId(&pShader->constTable, uniform->u.initializer);
+            constCount = VIR_GetTypeComponents(constVal->type);
 
             gcmASSERT(constCount > 0);
 

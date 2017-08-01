@@ -405,7 +405,7 @@ clfEndProfiler(
         gcmWRITE_COUNTER(VPG_FRAME, Context->profiler.frameNumber);
 
         /* write gpu counters */
-        gcoPROFILER_NEW_EndFrame(Context->halProfile);
+        gcoPROFILER_NEW_EndFrame(Context->halProfile, gcvCOUNTER_OP_NONE);
 
         /* write kernel info */
         gcmWRITE_CONST(VPG_PROG);

@@ -71,6 +71,8 @@ clfExecuteCommandAcquireGLObjects(
 
     clmASSERT(Command->type == clvCOMMAND_ACQUIRE_GL_OBJECTS, CL_INVALID_VALUE);
 
+    EVENT_SET_CPU_RUNNING(Command);
+
     aqGLObj = &Command->u.acquireGLObjects;
 
     for (i = 0; i < aqGLObj->numObjects; i++)
@@ -111,7 +113,7 @@ clfExecuteCommandAcquireGLObjects(
                     writeImage->inputRowPitch        = aqGLObj->memObjects[i]->u.image.rowPitch;
                     writeImage->inputSlicePitch      = aqGLObj->memObjects[i]->u.image.slicePitch;
                     writeImage->ptr                  = aqGLObj->objectsDatas[i];
-                    clfExecuteCommandWriteImage(&command);
+                    clfWriteImage(&command);
                 }
                 break;
             case CL_GL_OBJECT_TEXTURE2D_ARRAY:
@@ -161,6 +163,8 @@ clfExecuteCommandReleaseGLObjects(
 
     clmASSERT(Command->type == clvCOMMAND_RELEASE_GL_OBJECTS, CL_INVALID_VALUE);
 
+    EVENT_SET_CPU_RUNNING(Command);
+
     rlsGLObj = &Command->u.releaseGLObjects;
 
     for (i = 0; i < rlsGLObj->numObjects; i++)
@@ -198,7 +202,7 @@ clfExecuteCommandReleaseGLObjects(
                 readImage->rowPitch             = rlsGLObj->memObjects[i]->u.image.rowPitch;
                 readImage->slicePitch           = rlsGLObj->memObjects[i]->u.image.slicePitch;
                 readImage->ptr                  = rlsGLObj->objectsDatas[i];
-                clfExecuteCommandReadImage(&command);
+                clfReadImage(&command);
             }
             break;
         case CL_GL_OBJECT_TEXTURE2D_ARRAY:
@@ -642,7 +646,6 @@ OnError:
     return gcvNULL;
 }
 
-#if BUILD_OPENCL_12
 CL_API_ENTRY cl_mem CL_API_CALL
 clCreateFromGLTexture(
     cl_context      Context,
@@ -813,7 +816,6 @@ OnError:
     gcmFOOTER_ARG("%d", status);
     return gcvNULL;
 }
-#endif
 
 CL_API_ENTRY cl_mem CL_API_CALL
 clCreateFromGLTexture2D(
@@ -835,9 +837,6 @@ clCreateFromGLTexture2D(
     GLenum          realGLType;
     clsMem_PTR      image = gcvNULL;
     cl_image_format imageFormat;
-#if BUILD_OPENCL_12
-    cl_image_desc   imageDesc;
-#endif
     cl_gl_object_type  glObjType;
     GLint          origTex = 0;
 
@@ -927,21 +926,9 @@ clCreateFromGLTexture2D(
 
     imageFormat.image_channel_order = realCLFormat;
     imageFormat.image_channel_data_type = realCLType;
-#if BUILD_OPENCL_12
-    imageDesc.image_width = realWidth;
-    imageDesc.image_height = realHeight;
-    imageDesc.image_depth = 1;
-    imageDesc.image_array_size = 0;
-    imageDesc.buffer = NULL;
-    imageDesc.num_mip_levels = MipLevel;
-    imageDesc.num_samples = 0;
-    imageDesc.image_type = CL_MEM_OBJECT_IMAGE2D;
-    imageDesc.image_row_pitch = 0;
-    imageDesc.image_slice_pitch = 0;
-    image = clCreateImage(Context, Flags, &imageFormat, &imageDesc, gcvNULL, ErrcodeRet);
-#else
+
     image = clCreateImage2D(Context, Flags, &imageFormat, realWidth, realHeight, 0, gcvNULL, ErrcodeRet);
-#endif
+
 
     image->fromGL               = gcvTRUE;
     image->glObj                = Texture;
@@ -999,9 +986,6 @@ clCreateFromGLTexture3D(
     GLenum          realGLType;
     clsMem_PTR      image = gcvNULL;
     cl_image_format imageFormat;
-#if BUILD_OPENCL_12
-    cl_image_desc   imageDesc;
-#endif
     GLint          origTex = 0;
 
     gcmHEADER_ARG("Context=0x%x Flags=%u Target=%u MipLevel=%u Texture=%u",
@@ -1060,21 +1044,7 @@ clCreateFromGLTexture3D(
     imageFormat.image_channel_order = realCLFormat;
     imageFormat.image_channel_data_type = realCLType;
 
-#if BUILD_OPENCL_12
-    imageDesc.image_width = realWidth;
-    imageDesc.image_height = realHeight;
-    imageDesc.image_depth = realDepth;
-    imageDesc.image_array_size = 0;
-    imageDesc.buffer = NULL;
-    imageDesc.num_mip_levels = MipLevel;
-    imageDesc.num_samples = 0;
-    imageDesc.image_type = CL_MEM_OBJECT_IMAGE3D;
-    imageDesc.image_row_pitch = 0;
-    imageDesc.image_slice_pitch = 0;
-    image = clCreateImage(Context, Flags, &imageFormat, &imageDesc, gcvNULL, ErrcodeRet);
-#else
     image = clCreateImage3D(Context, Flags, &imageFormat, realWidth, realHeight, realDepth, 0, 0, gcvNULL, ErrcodeRet);
-#endif
 
     image->fromGL               = gcvTRUE;
     image->glObj                = Texture;
@@ -1118,9 +1088,6 @@ clCreateFromGLRenderbuffer(
     GLenum          glType        = 0;
     clsMem_PTR      image               = gcvNULL;
     cl_image_format imageFormat;
-#if BUILD_OPENCL_12
-    cl_image_desc   imageDesc;
-#endif
 
     gcmHEADER_ARG("Context=0x%x Flags=%u Renderbuffer=%u",
                    Context, Flags, Renderbuffer);
@@ -1150,23 +1117,7 @@ clCreateFromGLRenderbuffer(
     imageFormat.image_channel_order = clFormat;
     imageFormat.image_channel_data_type = clType;
 
-#if BUILD_OPENCL_12
-    imageDesc.image_width = outWidth;
-    imageDesc.image_height = outHeight;
-    imageDesc.image_depth = 1;
-    imageDesc.image_array_size = 0;
-    imageDesc.image_slice_pitch = 0;
-    imageDesc.buffer = NULL;
-    imageDesc.num_mip_levels = 0;
-    imageDesc.num_samples = 0;
-    imageDesc.image_type = CL_MEM_OBJECT_IMAGE2D;
-    imageDesc.image_row_pitch = 0;
-    imageDesc.image_row_pitch = 0;
-    /* don't copy host data, it may dirty when use, so update it at enqueueAquire */
-    image = clCreateImage(Context, Flags, &imageFormat, &imageDesc, gcvNULL, ErrcodeRet);
-#else
     image = clCreateImage2D(Context, Flags, &imageFormat, outWidth, outHeight, 0, gcvNULL, ErrcodeRet);
-#endif
 
     image->fromGL               = gcvTRUE;
     image->glObj                = Renderbuffer;
@@ -1570,6 +1521,8 @@ clEnqueueAcquireGLObjects(
 
                 aqGLObj->objectsDatas[i] = (cl_char *) pointers[i];
 
+                clfRetainMemObject(aqGLObj->memObjects[i]);
+
             }
             break;
         case CL_GL_OBJECT_TEXTURE3D:
@@ -1609,6 +1562,8 @@ clEnqueueAcquireGLObjects(
 
                 aqGLObj->objectsDatas[i] = (cl_char *) pointers[i];
 
+                clfRetainMemObject(aqGLObj->memObjects[i]);
+
             }
             break;
         case CL_GL_OBJECT_RENDERBUFFER:
@@ -1635,6 +1590,8 @@ clEnqueueAcquireGLObjects(
                     glReadPixels(0, 0, (GLsizei)MemObjects[i]->u.image.width, (GLsizei)MemObjects[i]->u.image.height, glFormat, glType, pointers[i]);
                 }
                 aqGLObj->objectsDatas[i] = (cl_char *) pointers[i];
+
+                clfRetainMemObject(aqGLObj->memObjects[i]);
             }
             break;
         case CL_GL_OBJECT_TEXTURE2D_ARRAY:
@@ -1852,6 +1809,8 @@ clEnqueueReleaseGLObjects(
                     }
                 }
                 rlsGLObj->objectsDatas[i] = (cl_char *) pointers[i];
+
+                clfRetainMemObject(rlsGLObj->memObjects[i]);
             }
             break;
 

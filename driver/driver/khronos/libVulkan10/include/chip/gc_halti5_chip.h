@@ -300,6 +300,12 @@ enum
 
     HALTI5_BLIT_COPY_2D_UNORM_FLOAT,
 
+    HALTI5_BLIT_COPY_BUF_TO_X8D24_IMG,
+    HALTI5_BLIT_COPY_BUF_TO_D24S8IMG_STENCIL,
+    HALTI5_BLIT_COPY_BUF_TO_D24S8IMG_DEPTH,
+    HALTI5_BLIT_COPY_IMG_TO_D24S8IMG_STENCIL,
+    HALTI5_BLIT_COPY_IMG_TO_D24S8IMG_DEPTH,
+
     HALTI3_CLEAR_2D_UINT,
     HALTI3_CLEAR_TO_2LAYERS_IMG,
     HALTI3_BLIT_BUFFER_2D,
@@ -307,7 +313,7 @@ enum
     HALTI5_BLIT_NUM,
 };
 
-#define HALTI5_INSTANCE_CMD_BUFSIZE 6
+#define HALTI5_INSTANCE_CMD_BUFSIZE 10
 typedef struct
 {
     __vkDevContext *devCtx;
@@ -423,6 +429,7 @@ typedef struct
     gctUINT32       sampleCoords4[3];
     gcsCENTROIDS    centroids2;
     gcsCENTROIDS    centroids4[3];
+    gctFLOAT        sampleLocations[4][4];
 
     SHADER_HANDLE   patchLib;
 
@@ -600,6 +607,14 @@ enum HwCacheMode
 
 typedef struct
 {
+    uint32_t hwRegNo;
+    uint32_t hwRegCount;
+    uint32_t hwRegAddress;
+    VkBool32 bUsed;
+} halti5_priv_const;
+
+typedef struct
+{
     /* MUST be the first member */
     halti5_pipeline chipPipeline;
 
@@ -629,12 +644,9 @@ typedef struct
         } outputs[__VK_MAX_RENDER_TARGETS];
     } patchOutput;
 
-    struct
-    {
-        uint32_t hwRegNo;
-        uint32_t hwRegAddress;
-        VkBool32 bUsed;
-    } baseInstance;
+    halti5_priv_const baseInstance;
+    halti5_priv_const sampleLocation;
+    halti5_priv_const ehableMultiSampleBuffers;
 
     VkBool32 depthOnly;
     VkBool32 peDepth;
@@ -655,12 +667,7 @@ typedef struct
     /* MUST be the first member */
     halti5_pipeline chipPipeline;
 
-    struct
-    {
-        uint32_t hwRegNo;
-        uint32_t hwRegAddress;
-        VkBool32 bUsed;
-    } numberOfWorkGroup;
+    halti5_priv_const numberOfWorkGroup;
 } halti5_computePipeline;
 
 /* Halti5 Chip function prototypes */
@@ -909,7 +916,8 @@ VkResult halti5_setTxTileStatus(
 VkResult halti5_processQueryRequest(
     VkCommandBuffer commandBuffer,
     VkQueryPool queryPool,
-    uint32_t query
+    uint32_t query,
+    VkBool32 beginOQ
     );
 
 /* Helper functions */

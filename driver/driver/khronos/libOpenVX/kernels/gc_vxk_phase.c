@@ -37,8 +37,8 @@ vx_status vxPhase(vx_node node, vx_image grad_x, vx_image grad_y, vx_image outpu
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(grad_x, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(grad_x, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_x, GC_VX_INDEX_AUTO);
@@ -48,6 +48,9 @@ vx_status vxPhase(vx_node node, vx_image grad_x, vx_image grad_y, vx_image outpu
 
     /*index = 2*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_OUTPUT, output, GC_VX_INDEX_AUTO);
+#if gcdVX_OPTIMIZER > 2
+    kernelContext->uniforms[0].index = 3;
+#endif
 
     if (node->base.context->evisNoInst.isVX2 || node->base.context->evisNoInst.noMagPhase)
     {

@@ -37,8 +37,8 @@ vx_status vxMagnitude(vx_node node, vx_image grad_x, vx_image grad_y, vx_image o
         kernelContext->uniform_num = 0;
     }
 
-    vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_WIDTH, &width, sizeof(width));
-    vxQueryImage(grad_x, VX_IMAGE_ATTRIBUTE_HEIGHT, &height, sizeof(height));
+    vxQueryImage(grad_x, VX_IMAGE_WIDTH, &width, sizeof(width));
+    vxQueryImage(grad_x, VX_IMAGE_HEIGHT, &height, sizeof(height));
 
     /*index = 0*/
     gcoVX_AddObject(kernelContext, GC_VX_CONTEXT_OBJECT_IMAGE_INPUT, grad_x, GC_VX_INDEX_AUTO);

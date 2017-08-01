@@ -43,7 +43,6 @@
 
 #define SPV_VIR_NAME_SIZE           256
 #define SPV_MAX_INST_EMIT_PER_SPV   4
-#define SPV_MAX_IMAGE_OPERAND_MASK  8 /* this is the max number of spvImageOperandMask */
 #define SPV_MAX_INVALID_ENTRY_COUNT 16
 
 #define SPV_DEFAULT_PARAM_NAME      "param"
@@ -73,6 +72,11 @@ typedef struct
     /* So far for SpvSymDescriptor and SpvConstDescriptor*/
     VIR_SymId virSymId;
 }SpvDescriptorHeader;
+
+typedef enum{
+    SPV_FRAGCOORD = 0,
+    SPV_MAX_BUILTINVAR,
+}SpvBuiltinVariable;
 
 typedef struct _SpvTypeDescriptor
 {
@@ -573,6 +577,7 @@ struct _gcSPV
 
     /* Add 5 temp ID for internal used. */
     gctUINT                     internalId[SPV_INTERNAL_ID_NUM];
+    VIR_Symbol *                internalSym;
 
     struct{
         gctUINT SpvCapabilityMatrix                                :1;
@@ -667,6 +672,7 @@ struct _gcSPV
 
     VIR_Function *              virFunction;
     VIR_Function *              initFunction;
+    VIR_SymId                   builtinVariable[SPV_MAX_BUILTINVAR];
     SpvId                       func;
     gctUINT                     argIndex;
     gctCHAR                     virName[SPV_VIR_NAME_SIZE];

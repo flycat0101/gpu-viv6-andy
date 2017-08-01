@@ -157,7 +157,7 @@ gceSTATUS GC2DSurf::Initialize(
         return status;
     }
 
-    status = gcoHAL_LockVideoMemory(node, gcvFALSE, &address, gcvNULL);
+    status = gcoHAL_LockVideoMemory(node, gcvFALSE, gcvENGINE_RENDER, &address, gcvNULL);
     if (gcmIS_ERROR(status))
     {
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(node));
@@ -313,7 +313,7 @@ gceSTATUS GC2DSurf::InitializeYUV(
         return status;
     }
 
-    status = gcoHAL_LockVideoMemory(node, gcvFALSE, &address, gcvNULL);
+    status = gcoHAL_LockVideoMemory(node, gcvFALSE, gcvENGINE_RENDER, &address, gcvNULL);
     if (gcmIS_ERROR(status))
     {
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(node));
@@ -383,7 +383,7 @@ gceSTATUS GC2DSurf::InitializeYUV(
             goto ERROR_EXIT;
         }
 
-        status = gcoHAL_LockVideoMemory(node, gcvFALSE, &address, gcvNULL);
+        status = gcoHAL_LockVideoMemory(node, gcvFALSE, gcvENGINE_RENDER, &address, gcvNULL);
         if (gcmIS_ERROR(status))
         {
             gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(node));
@@ -417,7 +417,7 @@ gceSTATUS GC2DSurf::InitializeYUV(
             return status;
         }
 
-        status = gcoHAL_LockVideoMemory(node, gcvFALSE, &address, gcvNULL);
+        status = gcoHAL_LockVideoMemory(node, gcvFALSE, gcvENGINE_RENDER, &address, gcvNULL);
         if (gcmIS_ERROR(status))
         {
             gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(node));
@@ -454,19 +454,19 @@ ERROR_EXIT:
 
     if (mWrapped)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mWrappedNode, gcvSURF_BITMAP));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mWrappedNode, gcvSURF_BITMAP, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(mWrappedNode));
     }
 
     if (mUWrapped)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mUWrappedNode, gcvSURF_BITMAP));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mUWrappedNode, gcvSURF_BITMAP, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(mUWrappedNode));
     }
 
     if (mVWrapped)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mVWrappedNode, gcvSURF_BITMAP));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mVWrappedNode, gcvSURF_BITMAP, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(mVWrappedNode));
     }
 
@@ -556,19 +556,19 @@ gceSTATUS GC2DSurf::Denitialize(gctBOOL sync)
 
     if (mWrapped)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mWrappedNode, gcvSURF_BITMAP));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mWrappedNode, gcvSURF_BITMAP, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(mWrappedNode));
     }
 
     if (mUWrapped)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mUWrappedNode, gcvSURF_BITMAP));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mUWrappedNode, gcvSURF_BITMAP, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(mUWrappedNode));
     }
 
     if (mVWrapped)
     {
-        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mVWrappedNode, gcvSURF_BITMAP));
+        gcmVERIFY_OK(gcoHAL_UnlockVideoMemory(mVWrappedNode, gcvSURF_BITMAP, gcvENGINE_RENDER));
         gcmVERIFY_OK(gcoHAL_ReleaseVideoMemory(mVWrappedNode));
     }
 

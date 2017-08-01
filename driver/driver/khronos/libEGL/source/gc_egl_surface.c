@@ -100,6 +100,38 @@ OnError:
 }
 #endif
 
+static gcmINLINE EGLBoolean
+_AllocRegion(
+    struct eglRegion * Region
+    )
+{
+    gctPOINTER ptr;
+
+    if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, sizeof(EGLint) * 4, &ptr)))
+    {
+        Region->rects = gcvNULL;
+        return EGL_FALSE;
+    }
+
+    Region->rects    = ptr;
+    Region->numRects = Region->maxNumRects = 1;
+
+    return EGL_TRUE;
+}
+
+static gcmINLINE void
+_FreeRegion(
+    struct eglRegion * Region
+    )
+{
+    if (Region->rects)
+    {
+        gcmOS_SAFE_FREE(gcvNULL, Region->rects);
+    }
+
+    Region->numRects = Region->maxNumRects = 0;
+}
+
 static void
 _AddDumpSurface(
     IN VEGLThreadData Thread,
@@ -260,11 +292,6 @@ _CreateSurfaceObjects(
                     &Surface->renderTarget
                     ));
 
-                /* Set orientation. */
-                gcmERR_BREAK(gcoSURF_SetOrientation(
-                    Surface->renderTarget, gcvORIENTATION_TOP_BOTTOM
-                    ));
-
                 /* Set render surface type. */
                 gcmERR_BREAK(gcoSURF_SetColorType(
                     Surface->renderTarget, Surface->colorType
@@ -359,11 +386,21 @@ _CreateSurfaceObjects(
 
         for (i = 0; i < num; i++)
         {
-            Surface->workers[i].draw                   = gcvNULL;
-            Surface->workers[i].backBuffer.context     = gcvNULL;
-            Surface->workers[i].backBuffer.surface     = gcvNULL;
-            Surface->workers[i].next  = Surface->availableWorkers;
-            Surface->availableWorkers = &Surface->workers[i];
+            VEGLWorkerInfo worker = &Surface->workers[i];
+
+            worker->draw                   = gcvNULL;
+            worker->backBuffer.context     = gcvNULL;
+            worker->backBuffer.surface     = gcvNULL;
+            worker->next  = Surface->availableWorkers;
+            Surface->availableWorkers = worker;
+
+            worker->region.numRects     = worker->region.maxNumRects     = 0;
+            worker->damageHint.numRects = worker->damageHint.maxNumRects = 0;
+        }
+
+        if (gcmIS_ERROR(status))
+        {
+            break;
         }
 
         gcmERR_BREAK(gcoOS_CreateMutex(gcvNULL, &Surface->workerMutex));
@@ -394,22 +431,15 @@ _CreateSurfaceObjects(
             gcvTRUE
             ));
 
-#if defined(ANDROID) && gcdSUPPORT_SWAP_RECTANGLE
-        /* Allocate rect/buffer slots. */
-        Surface->swapRect.capacity = 8;
+        if (!_AllocRegion(&Surface->clipRegion))
+        {
+            gcmERR_BREAK(gcvSTATUS_OUT_OF_MEMORY);
+        }
 
-        gcmERR_BREAK(gcoOS_Allocate(
-            gcvNULL,
-            gcmSIZEOF(gcsRECT) * 8,
-            (gctPOINTER) &Surface->swapRect.rects
-            ));
-
-        gcmERR_BREAK(gcoOS_Allocate(
-            gcvNULL,
-            gcmSIZEOF(gctPOINTER) * 8,
-            (gctPOINTER) &Surface->swapRect.buffers
-            ));
-#endif
+        if (!_AllocRegion(&Surface->damageHint))
+        {
+            gcmERR_BREAK(gcvSTATUS_OUT_OF_MEMORY);
+        }
 
         /* Success. */
         return EGL_SUCCESS;
@@ -420,63 +450,44 @@ _CreateSurfaceObjects(
     gcmFATAL("Failed to allocate surface objects: %d", status);
 
     /* Roll back. */
-    do
+    _FreeRegion(&Surface->clipRegion);
+
+    if (Surface->workerMutex != gcvNULL)
     {
-#if defined(ANDROID) && gcdSUPPORT_SWAP_RECTANGLE
-        if (Surface->swapRect.rects != gcvNULL)
-        {
-            gcmOS_SAFE_FREE(gcvNULL, Surface->swapRect.rects);
-            Surface->swapRect.rects = gcvNULL;
-        }
-
-        if (Surface->swapRect.buffers != gcvNULL)
-        {
-            gcmOS_SAFE_FREE(gcvNULL, Surface->swapRect.buffers);
-            Surface->swapRect.buffers = gcvNULL;
-        }
-
-        Surface->swapRect.count    = 0;
-        Surface->swapRect.capacity = 0;
-#endif
-
-        if (Surface->workerMutex != gcvNULL)
-        {
-            gcmERR_BREAK(
-                gcoOS_DeleteMutex(gcvNULL, Surface->workerMutex));
-        }
-
-        if (Surface->workerAvaiableSignal != gcvNULL)
-        {
-            gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, Surface->workerAvaiableSignal));
-            Surface->workerAvaiableSignal = gcvNULL;
-        }
-
-        if (Surface->workerDoneSignal != gcvNULL)
-        {
-            gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, Surface->workerDoneSignal));
-            Surface->workerDoneSignal = gcvNULL;
-        }
-
-        if (Surface->depthBuffer != gcvNULL)
-        {
-            gcmERR_BREAK(gcoSURF_Destroy(Surface->depthBuffer));
-            Surface->depthBuffer = gcvNULL;
-        }
-
-        if (Surface->renderTarget != gcvNULL)
-        {
-            gcmERR_BREAK(gcoSURF_Destroy(Surface->renderTarget));
-            Surface->renderTarget = gcvNULL;
-        }
-
-        if (Surface->drawable.destroyPrivate)
-        {
-            Surface->drawable.destroyPrivate(&Surface->drawable);
-        }
-
-        gcoOS_ZeroMemory(&Surface->drawable, sizeof(EGLDrawable));
+        gcmVERIFY_OK(
+            gcoOS_DeleteMutex(gcvNULL, Surface->workerMutex));
     }
-    while (gcvFALSE);
+
+    if (Surface->workerAvaiableSignal != gcvNULL)
+    {
+        gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, Surface->workerAvaiableSignal));
+        Surface->workerAvaiableSignal = gcvNULL;
+    }
+
+    if (Surface->workerDoneSignal != gcvNULL)
+    {
+        gcmVERIFY_OK(gcoOS_DestroySignal(gcvNULL, Surface->workerDoneSignal));
+        Surface->workerDoneSignal = gcvNULL;
+    }
+
+    if (Surface->depthBuffer != gcvNULL)
+    {
+        gcmVERIFY_OK(gcoSURF_Destroy(Surface->depthBuffer));
+        Surface->depthBuffer = gcvNULL;
+    }
+
+    if (Surface->renderTarget != gcvNULL)
+    {
+        gcmVERIFY_OK(gcoSURF_Destroy(Surface->renderTarget));
+        Surface->renderTarget = gcvNULL;
+    }
+
+    if (Surface->drawable.destroyPrivate)
+    {
+        Surface->drawable.destroyPrivate(&Surface->drawable);
+    }
+
+    gcoOS_ZeroMemory(&Surface->drawable, sizeof(EGLDrawable));
 
     /* Return error code. */
     return EGL_BAD_ALLOC;
@@ -505,6 +516,9 @@ _DestroySurfaceObjects(
                 gcvNULL, Surface->workerDoneSignal, gcvINFINITE));
         }
 
+        _FreeRegion(&Surface->clipRegion);
+        _FreeRegion(&Surface->damageHint);
+
         for (i = 0; i < num; i++)
         {
             /* Make sure all worker threads are finished. */
@@ -512,8 +526,12 @@ _DestroySurfaceObjects(
             {
                 gcmVERIFY_OK(
                     gcoOS_DestroySignal(gcvNULL, Surface->workers[i].signal));
+
                 Surface->workers[i].signal = gcvNULL;
             }
+
+            _FreeRegion(&Surface->workers[i].region);
+            _FreeRegion(&Surface->workers[i].damageHint);
         }
 
         /* Destroy worker mutex. */
@@ -522,23 +540,6 @@ _DestroySurfaceObjects(
             gcmERR_BREAK(
                 gcoOS_DeleteMutex(gcvNULL, Surface->workerMutex));
         }
-
-#if defined(ANDROID) && gcdSUPPORT_SWAP_RECTANGLE
-        if (Surface->swapRect.rects != gcvNULL)
-        {
-            gcmOS_SAFE_FREE(gcvNULL, Surface->swapRect.rects);
-            Surface->swapRect.rects = gcvNULL;
-        }
-
-        if (Surface->swapRect.buffers != gcvNULL)
-        {
-            gcmOS_SAFE_FREE(gcvNULL, Surface->swapRect.buffers);
-            Surface->swapRect.buffers = gcvNULL;
-        }
-
-        Surface->swapRect.count    = 0;
-        Surface->swapRect.capacity = 0;
-#endif
 
         if (Surface->workerAvaiableSignal != gcvNULL)
         {
@@ -580,6 +581,15 @@ _DestroySurfaceObjects(
             /* Destroy the render target. */
             gcmERR_BREAK(gcoSURF_Destroy(Surface->renderTarget));
             Surface->renderTarget = gcvNULL;
+        }
+
+        for (i = 0; i < EGL_WORKER_COUNT; i++)
+        {
+            if (Surface->damage[Surface->curDamage].numRects != 0)
+            {
+                gcmOS_SAFE_FREE(gcvNULL, Surface->damage[Surface->curDamage].rects);
+                Surface->damage[Surface->curDamage].numRects = 0;
+            }
         }
 
         if (Surface->prevRenderTarget != gcvNULL)
@@ -703,17 +713,6 @@ veglResizeSurface(
         /* Set new parameters. */
         Surface->config.width       = Width;
         Surface->config.height      = Height;
-
-#if defined(ANDROID) && gcdSUPPORT_SWAP_RECTANGLE
-        /* Set the swap rectangle size. */
-        Surface->swapRect.x = 0;
-        Surface->swapRect.y = 0;
-        Surface->swapRect.width  = Width;
-        Surface->swapRect.height = Height;
-
-        /* Reset buffer count. */
-        Surface->swapRect.count  = 0;
-#endif
 
         /* Create surface objects. */
         eglResult = _CreateSurfaceObjects(thread, Surface);
@@ -1381,20 +1380,6 @@ _CreateSurface(
         (void) width;
         (void) height;
 
-#if defined(ANDROID) && gcdSUPPORT_SWAP_RECTANGLE
-        /* Set the swap rectangle size. */
-        Surface->swapRect.x = 0;
-        Surface->swapRect.y = 0;
-        Surface->swapRect.width  = width;
-        Surface->swapRect.height = height;
-
-        /* Reset buffer count. */
-        Surface->swapRect.count    = 0;
-        Surface->swapRect.capacity = 0;
-        Surface->swapRect.rects    = gcvNULL;
-        Surface->swapRect.buffers  = gcvNULL;
-#endif
-
         /* Determine whether OpenVG pipe is present and OpenVG API is active. */
         Surface->openVG = Thread->openVGpipe && (Thread->api == EGL_OPENVG_API);
 
@@ -1749,7 +1734,6 @@ veglCreateRenderTarget(
 #endif
     gctUINT samples;
     gceSURF_TYPE type;
-    gceORIENTATION orientation = gcvORIENTATION_BOTTOM_TOP;
 
     samples = Surface->config.samples;
 
@@ -1794,11 +1778,6 @@ veglCreateRenderTarget(
     gcmONERROR(gcoSURF_SetSamples(
         Surface->renderTarget,
         samples
-        ));
-
-    /* Set orientation. */
-    gcmONERROR(gcoSURF_SetOrientation(
-        Surface->renderTarget, orientation
         ));
 
     /* Set render surface type. */
@@ -3236,6 +3215,20 @@ eglQuerySurface(
     case EGL_BUFFER_AGE_EXT:
         if (thread->context && thread->context->draw == surface)
         {
+            if (surface->buffer == EGL_SINGLE_BUFFER)
+            {
+                *value = 0;
+                surface->queriedAge = EGL_TRUE;
+                break;
+            }
+            else if (surface->type & EGL_PBUFFER_BIT)
+            {
+                /* Pbuffer is not double buffered. */
+                *value = 1;
+                surface->queriedAge = EGL_TRUE;
+                break;
+            }
+
             if ((surface->swapBehavior == EGL_BUFFER_PRESERVED) ||
                 /*
                  * Currently we will resolve the whole internal render target
@@ -3244,13 +3237,15 @@ eglQuerySurface(
                 (surface->renderMode == VEGL_INDIRECT_RENDERING))
             {
                 *value = surface->initialFrame ? 0 : 1;
+                surface->queriedAge = EGL_TRUE;
                 break;
             }
 
-            if (dpy->platform &&
+            if (dpy->platform->queryBufferAge &&
                 dpy->platform->queryBufferAge(dpy, surface,
                                               &surface->backBuffer, value))
             {
+                surface->queriedAge = EGL_TRUE;
                 break;
             }
         }

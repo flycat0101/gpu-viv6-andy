@@ -126,6 +126,9 @@ typedef enum {
     /* Force ASTC to RGBA8 when gcvFEATURE_TX_ASTC_MULTISLICE_FIX is false */
     __GL_CHIP_FMT_PATCH_ASTC,
 
+    /* Force ALPHA8 to RGBA8 */
+    __GL_CHIP_FMT_PATCH_ALPHA8,
+
 } __GLchipFmtPatch;
 
 typedef struct __GLchipFmtMapInfoRec

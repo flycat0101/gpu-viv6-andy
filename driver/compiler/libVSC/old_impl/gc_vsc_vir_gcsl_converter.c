@@ -207,6 +207,7 @@ _CalculateInstCount(
         return 1;
     case VIR_OP_BITEXTRACT:
     case VIR_OP_BITINSERT1:
+    case VIR_OP_BITINSERT2:
     case VIR_OP_TEXLD_U_PLAIN:
     case VIR_OP_TEXLD_U_LOD:
         return 2;
@@ -1401,6 +1402,7 @@ _ConvVirOpcode2Opcode(
     case VIR_OP_BITEXTRACT:     return gcSL_BITEXTRACT;
     case VIR_OP_BITINSERT:      return gcSL_BITINSERT;
     case VIR_OP_BITINSERT1:     return gcSL_BITINSERT;
+    case VIR_OP_BITINSERT2:     return gcSL_BITINSERT;
     case VIR_OP_UCARRY:         return gcSL_UCARRY;
     case VIR_OP_TEXLD_U_PLAIN:  return gcSL_TEXU;
     case VIR_OP_TEXLD_U_LOD:    return gcSL_TEXU_LOD;
@@ -1487,7 +1489,7 @@ _ConvVirOperand2Target(
                       VIR_Operand_GetLabel(Operand) != gcvNULL);
 
             label = VIR_Operand_GetLabel(Operand);
-            type = VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetType(Operand));
+            type = VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetTypeId(Operand));
             defIndex = _FindValue(Converter->InstTable, label->defined);
 
             gcSHADER_AddOpcodeConditionalFormattedEnable(
@@ -1511,7 +1513,7 @@ _ConvVirOperand2Target(
             gcmASSERT(!VirInst->_parentUseBB &&
                       VIR_Inst_GetFunction(VirInst) != gcvNULL);
 
-            type = VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetType(Operand));
+            type = VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetTypeId(Operand));
             if(type == gcvNULL)
             {
                 return gcvSTATUS_NOT_FOUND;
@@ -1539,7 +1541,7 @@ _ConvVirOperand2Target(
     case VIR_OPND_SYMBOL:
         {
             VIR_Type       *type   = VIR_Shader_GetTypeFromId(Converter->VirShader,
-                VIR_Operand_GetType(Operand));
+                VIR_Operand_GetTypeId(Operand));
 
             VIR_Symbol     *sym    = VIR_Operand_GetSymbol(Operand);
             gcSL_OPCODE     opcode = _ConvVirOpcode2Opcode(Opcode);
@@ -1659,7 +1661,7 @@ _ConvVirOperand2Source(
     case VIR_OPND_IMMEDIATE:
         {
             VIR_Type   *type = VIR_Shader_GetTypeFromId(Converter->VirShader,
-                VIR_Operand_GetType(Operand));
+                VIR_Operand_GetTypeId(Operand));
 
             gcmASSERT(!VIR_Operand_isLvalue(Operand));
             if(type == gcvNULL)
@@ -1725,7 +1727,7 @@ _ConvVirOperand2Source(
             VIR_Symbol      *sym        = VIR_Operand_GetSymbol(Operand);
 
             VIR_Type        *type       =
-                VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetType(Operand));
+                VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetTypeId(Operand));
 
             gcSL_TYPE       srcKind     = _ConvVirSymbol2Type(sym);
             gctUINT         index       = _GetRegisterIndex(Converter, sym, Operand);
@@ -1849,7 +1851,7 @@ _CloneVirOpnd2TmpOpnd(
 {
     gceSTATUS       status      = gcvSTATUS_OK;
     VIR_Type        *type       =
-        VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetType(Opnd));
+        VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetTypeId(Opnd));
     gcSHADER_TYPE   gcShaderTy  = _ConvVirType2ShaderType(Converter, type);
 
     gcmASSERT(TempRegIndex < TEMP_REGISTER_COUNT);
@@ -2348,7 +2350,7 @@ _ConvVirInst2Inst(
             VIR_Symbol      *sym        = VIR_Operand_GetSymbol(VIR_Inst_GetSource(VirInst, 1));
             VIR_OperandInfo src1Info;
             gcSL_FORMAT     format = _ConvVirType2Format(Converter,
-                VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetType(VIR_Inst_GetSource(VirInst, 1))));
+                VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetTypeId(VIR_Inst_GetSource(VirInst, 1))));
 
             VIR_Operand_GetOperandInfo(VirInst, VIR_Inst_GetSource(VirInst, 1), &src1Info);
 
@@ -2469,7 +2471,7 @@ _ConvVirInst2Inst(
     case VIR_OP_CONVERT:
         {
             VIR_Type   *type = VIR_Shader_GetTypeFromId(Converter->VirShader,
-                VIR_Operand_GetType(VIR_Inst_GetSource(VirInst, 0)));
+                VIR_Operand_GetTypeId(VIR_Inst_GetSource(VirInst, 0)));
             gcSL_FORMAT format = _ConvVirType2Format(Converter, type);
 
             _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
@@ -2498,13 +2500,13 @@ _ConvVirInst2Inst(
 
             if (src0Info.isImmVal)
             {
-                if (VIR_Operand_GetType(src0) == VIR_TYPE_FLOAT32)
+                if (VIR_Operand_GetTypeId(src0) == VIR_TYPE_FLOAT32)
                 {
-                    VIR_Operand_SetType(VIR_Inst_GetDest(VirInst), VIR_TYPE_FLOAT32);
+                    VIR_Operand_SetTypeId(VIR_Inst_GetDest(VirInst), VIR_TYPE_FLOAT32);
                 }
                 else
                 {
-                    VIR_Operand_SetType(VIR_Inst_GetDest(VirInst), VIR_TYPE_INT32);
+                    VIR_Operand_SetTypeId(VIR_Inst_GetDest(VirInst), VIR_TYPE_INT32);
                 }
             }
 
@@ -2517,7 +2519,7 @@ _ConvVirInst2Inst(
         /*    sub dest, 0, src0 */
     case VIR_OP_NEG:
         {
-            VIR_Type *ty = VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetType(VIR_Inst_GetDest(VirInst)));
+            VIR_Type *ty = VIR_Shader_GetTypeFromId(Converter->VirShader, VIR_Operand_GetTypeId(VIR_Inst_GetDest(VirInst)));
             gctUINT   zero = 0;
 
             _ConvVirOperand2Target(Converter, opcode, VIR_Inst_GetDest(VirInst), VirInst, condition, srcLoc);
@@ -2562,6 +2564,7 @@ _ConvVirInst2Inst(
         break;
 
         case VIR_OP_BITINSERT1:
+        case VIR_OP_BITINSERT2:
         {
             /* bitinsert1 dest, src0, src1, src2 ==>
 
@@ -3316,22 +3319,32 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
 
                 if (VIR_Symbol_HasFlag(virUniformSym, VIR_SYMUNIFORMFLAG_COMPILETIME_INITIALIZED))
                 {
-                    VIR_ConstId initializerId = VIR_Uniform_GetInitializer(virUniform);
-                    VIR_Const* initializerConst = VIR_Shader_GetConstFromId(VirShader, initializerId);
-                    gctUINT i;
+                    VIR_Type *type = VIR_Symbol_GetType(virUniformSym);
 
-                    for(i = 0; i < 4; i++)
-                    {
-                        mappingGCSLUniform->initializer.u32_v4[i] = initializerConst->value.vecVal.u32Value[i];
+                    if(!VIR_Type_isArray(type)) {
+                        VIR_ConstId initializerId = VIR_Uniform_GetInitializer(virUniform);
+                        VIR_Const* initializerConst = VIR_Shader_GetConstFromId(VirShader, initializerId);
+                        gctUINT i;
+                        for(i = 0; i < 4; i++)
+                        {
+                            mappingGCSLUniform->initializer.u32_v4[i] = initializerConst->value.vecVal.u32Value[i];
+                        }
                     }
                 }
             }
 
             if (VIR_Symbol_HasFlag(virUniformSym, VIR_SYMUNIFORMFLAG_MOVED_TO_CUBO))
             {
-                VIR_Const* initializer = VIR_Shader_GetConstFromId(VirShader, VIR_Uniform_GetInitializer(virUniform));
+                VIR_Type *type = VIR_Symbol_GetType(virUniformSym);
 
-                gcoOS_MemCopy(Shader->constUBOData + VIR_Uniform_GetOffset(virUniform) / sizeof(gctUINT32), &initializer->value, VIR_GetTypeSize(initializer->type));
+                if(VIR_Type_isArray(type)) {
+                    gcmASSERT(0);
+                }
+                else {
+                    VIR_Const* initializer = VIR_Shader_GetConstFromId(VirShader, VIR_Uniform_GetInitializer(virUniform));
+
+                    gcoOS_MemCopy(Shader->constUBOData + VIR_Uniform_GetOffset(virUniform) / sizeof(gctUINT32), &initializer->value, VIR_GetTypeSize(initializer->type));
+                }
             }
         }
     }

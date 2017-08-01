@@ -60,7 +60,6 @@ static struct eglExtension extensions[] =
     {"EGL_KHR_gl_texture_cubemap_image",        EGL_TRUE },
     {"EGL_KHR_gl_renderbuffer_image",           EGL_TRUE },
     {"EGL_EXT_image_dma_buf_import",            EGL_FALSE},
-    {"EGL_EXT_client_extensions",               EGL_FALSE},
     {"EGL_KHR_lock_surface",                    EGL_TRUE },
     {"EGL_KHR_create_context",                  EGL_TRUE },
     {"EGL_KHR_surfaceless_context",             EGL_TRUE },
@@ -75,6 +74,9 @@ static struct eglExtension extensions[] =
     {"EGL_ANDROID_native_fence_sync",           EGL_FALSE},
     {"EGL_WL_bind_wayland_display",             EGL_FALSE},
     {"EGL_WL_create_wayland_buffer_from_image", EGL_FALSE},
+    {"EGL_KHR_partial_update",                  EGL_FALSE},
+    {"EGL_EXT_swap_buffers_with_damage",        EGL_FALSE},
+    {"EGL_KHR_swap_buffers_with_damage",        EGL_FALSE},
     {gcvNULL,                                   EGL_FALSE},
 };
 
@@ -90,29 +92,40 @@ _GenExtension(
 
 #if defined(__linux__)
     extensions[VEGL_EXTID_EXT_image_dma_buf_import].enabled = EGL_TRUE;
-    extensions[VEGL_EXTID_EXT_client_extensions].enabled    = EGL_TRUE;
 
     if (Display->platform->platform == EGL_PLATFORM_FBDEV_VIV ||
-        Display->platform->platform == EGL_PLATFORM_WAYLAND_KHR)
+        Display->platform->platform == EGL_PLATFORM_WAYLAND_KHR ||
+        Display->platform->platform == EGL_PLATFORM_GBM_KHR)
     {
         extensions[VEGL_EXTID_EXT_buffer_age].enabled          = EGL_TRUE;
+        extensions[VEGL_EXTID_KHR_partial_update].enabled      = EGL_TRUE;
     }
 #endif
 
 #if defined(ANDROID)
-    extensions[VEGL_EXTID_EXT_buffer_age].enabled              = EGL_TRUE;
-    extensions[VEGL_EXTID_ANDROID_image_native_buffer].enabled = EGL_TRUE;
-    extensions[VEGL_EXTID_ANDROID_swap_rectangle].enabled      = EGL_TRUE;
-    extensions[VEGL_EXTID_ANDROID_blob_cache].enabled          = EGL_TRUE;
-    extensions[VEGL_EXTID_ANDROID_recordable].enabled          = EGL_TRUE;
+    if (Display->platform->platform == EGL_PLATFORM_ANDROID_KHR)
+    {
+        extensions[VEGL_EXTID_EXT_buffer_age].enabled              = EGL_TRUE;
+        extensions[VEGL_EXTID_KHR_partial_update].enabled          = EGL_TRUE;
+        extensions[VEGL_EXTID_ANDROID_image_native_buffer].enabled = EGL_TRUE;
+        extensions[VEGL_EXTID_ANDROID_swap_rectangle].enabled      = EGL_TRUE;
+        extensions[VEGL_EXTID_ANDROID_blob_cache].enabled          = EGL_TRUE;
+        extensions[VEGL_EXTID_ANDROID_recordable].enabled          = EGL_TRUE;
 #if gcdANDROID_NATIVE_FENCE_SYNC
-    extensions[VEGL_EXTID_ANDROID_native_fence_sync].enabled   = EGL_TRUE;
+        extensions[VEGL_EXTID_ANDROID_native_fence_sync].enabled   = EGL_TRUE;
 #  endif
+    }
 #endif
 
 #if defined(WL_EGL_PLATFORM)
     extensions[VEGL_EXTID_WL_bind_wayland_display].enabled             = EGL_TRUE;
     extensions[VEGL_EXTID_WL_create_wayland_buffer_from_image].enabled = EGL_TRUE;
+
+    if (Display->platform->platform == EGL_PLATFORM_WAYLAND_KHR)
+    {
+        extensions[VEGL_EXTID_EXT_swap_buffers_with_damage].enabled = EGL_TRUE;
+        extensions[VEGL_EXTID_KHR_swap_buffers_with_damage].enabled = EGL_TRUE;
+    }
 #endif
 
     if (Thread->security)
@@ -155,6 +168,8 @@ _GenExtension(
 }
 
 static const char clientExtension[] =
+    "EGL_EXT_client_extensions"
+    " "
     "EGL_EXT_platform_base"
 #if defined(ANDROID)
     " "
@@ -192,12 +207,6 @@ _GenClientExtension(
     if (gcmIS_ERROR(gcoOS_Allocate(gcvNULL, len, (gctPOINTER *) &str)))
     {
         return;
-    }
-
-    if (clientExtension[0] == ' ')
-    {
-        /* Skipp the heading space. */
-        src += 1;
     }
 
     gcoOS_StrCopySafe(str, len, src);

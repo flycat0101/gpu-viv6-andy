@@ -4497,6 +4497,7 @@ gceSTATUS glfUpdateTextureStates(
                             gcsHAL_INTERFACE iface;
 
                             iface.command            = gcvHAL_SIGNAL;
+                            iface.engine             = gcvENGINE_RENDER;
                             iface.u.Signal.signal    = handle->hwDoneSignal;
                             iface.u.Signal.auxSignal = 0;
                             /* Stuff the client's PID. */
@@ -9533,12 +9534,6 @@ glfBindTexImage(
 
         /* Copy render target to texture without flip. */
         gcmERR_BREAK(gcoSURF_ResolveRect(&surfView, &mipView, gcvNULL));
-
-        /* Reset texture orientation. */
-        gcmVERIFY_OK(gcoSURF_SetOrientation(
-            mipView.surf,
-            gcvORIENTATION_TOP_BOTTOM
-            ));
 
         if (Binder != gcvNULL)
         {

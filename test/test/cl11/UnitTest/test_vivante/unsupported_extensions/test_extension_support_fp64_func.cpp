@@ -156,12 +156,8 @@ int test_fp64_func_math_1arg(cl_device_id device, cl_context context, cl_command
             if (!streams[0])
             {
                 printf("clCreateBuffer #1 failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(input_h) free(input_h);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -169,56 +165,58 @@ int test_fp64_func_math_1arg(cl_device_id device, cl_context context, cl_command
             if (!streams[1])
             {
                 printf("clCreateBuffer #2 failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(input_h) free(input_h);
+                if(output_h) free(output_h);
                 return -1;
             }
 
             sprintf(kernel_code_int, kernel_test_fp64_func_math_1arg, types[typeIndex], types[typeIndex], func_name[index], types[typeIndex]);
             constkernelint = kernel_code_int;
 
-            err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_fp64_func_math1" );
-            if (err)
+            if(is_extension_available(device, "cl_khr_fp64"))
             {
-                if(is_extension_available(device, "cl_khr_fp64"))
+                err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_fp64_func_math1" );
+                if (err)
                 {
                     printf("Kernel compilation error using double as a type.\n");
-                    clReleaseMemObject(streams[0]);
-                    clReleaseMemObject(streams[1]);
-                    if(!kernel)
-                        clReleaseKernel(kernel);
-                    clReleaseProgram(program);
-                    free(output_h);
+                    printf("\n!!Kernel build not successful.\n");
+                    if(streams[0]) clReleaseMemObject(streams[0]);
+                    if(streams[1]) clReleaseMemObject(streams[1]);
+                    if(kernel) clReleaseKernel(kernel);
+                    if(program) clReleaseProgram(program);
+                    if(input_h) free(input_h);
+                    if(output_h) free(output_h);
                     return -1;
                 }
-                printf("\n!!Kernel build not successful.\n");
-                printf("cl_khr_fp64 extension is not supported.!!\n");
-                printf("%s function with %s argument passed.\n\n", func_name[index], types[typeIndex]);
+            }
+            else
+            {
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(input_h) free(input_h);
+                if(output_h) free(output_h);
 
                 passCount++;
 
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-
-                continue;
+                printf("--------------------------------------------------------\n");
+                printf("cl_khr_fp64 extension is not supported.!!\n");
+                printf("%s function with %s argument passed.\n\n", func_name[index], types[typeIndex]);
+                return 0;
             }
+
             err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
             if (err != CL_SUCCESS)
             {
                 printf("clSetKernelArgs failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(input_h) free(input_h);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -227,12 +225,12 @@ int test_fp64_func_math_1arg(cl_device_id device, cl_context context, cl_command
             if (err != CL_SUCCESS)
             {
                 printf("clEnqueueNDRangeKernel failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(input_h) free(input_h);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -240,12 +238,12 @@ int test_fp64_func_math_1arg(cl_device_id device, cl_context context, cl_command
             if (err != CL_SUCCESS)
             {
                 printf("clReadArray failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(input_h) free(input_h);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -254,24 +252,23 @@ int test_fp64_func_math_1arg(cl_device_id device, cl_context context, cl_command
             if (err != CL_SUCCESS)
             {
                 printf("clReadArray failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(input_h) free(input_h);
+                if(output_h) free(output_h);
                 return -1;
             }
 
-            clReleaseMemObject(streams[0]);
-            clReleaseMemObject(streams[1]);
-            if(!kernel)
-                clReleaseKernel(kernel);
-            clReleaseProgram(program);
-
+            if(streams[0]) clReleaseMemObject(streams[0]);
+            if(streams[1]) clReleaseMemObject(streams[1]);
+            if(kernel) clReleaseKernel(kernel);
+            if(program) clReleaseProgram(program);
         }
 
-        free(output_h);
+        if(input_h) free(input_h);
+        if(output_h) free(output_h);
 
         printf("%s TESTING FOR ALL FUNCTIONS FINISHED.\n", types[typeIndex]);
         printf("-*****************************************************-\n\n\n");
@@ -357,13 +354,9 @@ int test_fp64_func_math_2arg(cl_device_id device, cl_context context, cl_command
             if (!streams[0])
             {
                 printf("clCreateBuffer #1 failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -371,13 +364,10 @@ int test_fp64_func_math_2arg(cl_device_id device, cl_context context, cl_command
             if (!streams[1])
             {
                 printf("clCreateBuffer #2 failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -385,60 +375,62 @@ int test_fp64_func_math_2arg(cl_device_id device, cl_context context, cl_command
             if (!streams[2])
             {
                 printf("clCreateBuffer #3 failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(output_h) free(output_h);
                 return -1;
             }
 
             sprintf(kernel_code_int, kernel_test_fp64_func_math_2arg, types[typeIndex], types[typeIndex], types[typeIndex], func_name[index]);
             constkernelint = kernel_code_int;
 
-            err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_fp64_func_math2" );
-            if (err)
+            if(is_extension_available(device, "cl_khr_fp64"))
             {
-                if(is_extension_available(device, "cl_khr_fp64"))
+                err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_fp64_func_math2" );
+                if(err)
                 {
                     printf("Kernel compilation error using double as a type.\n");
-                    clReleaseMemObject(streams[0]);
-                    clReleaseMemObject(streams[1]);
-                    clReleaseMemObject(streams[2]);
-                    if(!kernel)
-                        clReleaseKernel(kernel);
-                    clReleaseProgram(program);
-                    free(output_h);
+                    if(streams[0]) clReleaseMemObject(streams[0]);
+                    if(streams[1]) clReleaseMemObject(streams[1]);
+                    if(input_A) free(input_A);
+                    if(input_B) free(input_B);
+                    if(output_h) free(output_h);
+                    if(kernel) clReleaseKernel(kernel);
+                    if(program) clReleaseProgram(program);
                     return -1;
                 }
-                printf("\n!!Kernel build not successful.\n");
+            }
+            else
+            {
                 printf("cl_khr_fp64 extension is not supported.!!\n");
                 printf("%s function with %s argument passed.\n\n", func_name[index], types[typeIndex]);
 
                 passCount++;
 
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(output_h) free(output_h);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
 
-                continue;
+                return 0;
             }
+
             err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
             if (err != CL_SUCCESS)
             {
                 printf("clSetKernelArgs failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(output_h) free(output_h);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
                 return -1;
             }
 
@@ -447,13 +439,13 @@ int test_fp64_func_math_2arg(cl_device_id device, cl_context context, cl_command
             if (err != CL_SUCCESS)
             {
                 printf("clEnqueueNDRangeKernel failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(output_h) free(output_h);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
                 return -1;
             }
 
@@ -461,13 +453,13 @@ int test_fp64_func_math_2arg(cl_device_id device, cl_context context, cl_command
             if (err != CL_SUCCESS)
             {
                 printf("clReadArray failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(output_h) free(output_h);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
                 return -1;
             }
 
@@ -476,13 +468,13 @@ int test_fp64_func_math_2arg(cl_device_id device, cl_context context, cl_command
             if (err != CL_SUCCESS)
             {
                 printf("clReadArray failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(output_h) free(output_h);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
                 return -1;
             }
 
@@ -491,26 +483,26 @@ int test_fp64_func_math_2arg(cl_device_id device, cl_context context, cl_command
             if (err != CL_SUCCESS)
             {
                 printf("clReadArray failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(output_h) free(output_h);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
                 return -1;
             }
 
-            clReleaseMemObject(streams[0]);
-            clReleaseMemObject(streams[1]);
-            clReleaseMemObject(streams[2]);
-            if(!kernel)
-                clReleaseKernel(kernel);
-            clReleaseProgram(program);
+            if(streams[0]) clReleaseMemObject(streams[0]);
+            if(streams[1]) clReleaseMemObject(streams[1]);
+            if(kernel) clReleaseKernel(kernel);
+            if(program) clReleaseProgram(program);
 
         }
 
-        free(output_h);
+        if(input_A) free(input_A);
+        if(input_B) free(input_B);
+        if(output_h) free(output_h);
 
         printf("%s TESTING FOR ALL FUNCTIONS FINISHED.\n", types[typeIndex]);
         printf("-*****************************************************-\n\n\n");
@@ -578,14 +570,10 @@ int test_fp64_func_math_3arg(cl_device_id device, cl_context context, cl_command
             if (!streams[0])
             {
                 printf("clCreateBuffer #1 failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                clReleaseMemObject(streams[3]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -593,14 +581,11 @@ int test_fp64_func_math_3arg(cl_device_id device, cl_context context, cl_command
             if (!streams[1])
             {
                 printf("clCreateBuffer #2 failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                clReleaseMemObject(streams[3]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -608,14 +593,12 @@ int test_fp64_func_math_3arg(cl_device_id device, cl_context context, cl_command
             if (!streams[2])
             {
                 printf("clCreateBuffer #3 failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                clReleaseMemObject(streams[3]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -623,14 +606,13 @@ int test_fp64_func_math_3arg(cl_device_id device, cl_context context, cl_command
             if (!streams[1])
             {
                 printf("clCreateBuffer #4 failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                clReleaseMemObject(streams[3]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(streams[2]) clReleaseMemObject(streams[2]);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -638,52 +620,64 @@ int test_fp64_func_math_3arg(cl_device_id device, cl_context context, cl_command
             sprintf(kernel_code_int, kernel_test_fp64_func_math_3arg, types[typeIndex], types[typeIndex], types[typeIndex], types[typeIndex], func_name[index]);
             constkernelint = kernel_code_int;
 
-            err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_fp64_func_math3" );
-            if (err)
+
+            if(is_extension_available(device, "cl_khr_fp64"))
             {
-                if(is_extension_available(device, "cl_khr_fp64"))
+                err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_fp64_func_math3" );
+                if(err)
                 {
                     printf("Kernel compilation error using double as a type.\n");
 
-                    clReleaseMemObject(streams[0]);
-                    clReleaseMemObject(streams[1]);
-                    clReleaseMemObject(streams[2]);
-                    clReleaseMemObject(streams[3]);
-                    if(!kernel)
-                        clReleaseKernel(kernel);
-                    clReleaseProgram(program);
-                    free(output_h);
+                    if(streams[0]) clReleaseMemObject(streams[0]);
+                    if(streams[1]) clReleaseMemObject(streams[1]);
+                    if(streams[2]) clReleaseMemObject(streams[2]);
+                    if(streams[3]) clReleaseMemObject(streams[3]);
+                    if(kernel) clReleaseKernel(kernel);
+                    if(program) clReleaseProgram(program);
+                    if(input_A) free(input_A);
+                    if(input_B) free(input_B);
+                    if(input_C) free(input_C);
+                    if(output_h) free(output_h);
 
                     return -1;
                 }
+            }
+            else
+            {
                 printf("\n!!Kernel build not successful.\n");
                 printf("cl_khr_fp64 extension is not supported.!!\n");
                 printf("%s function with %s argument passed.\n\n", func_name[index], types[typeIndex]);
 
                 passCount++;
 
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                clReleaseMemObject(streams[3]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
+                if(output_h) free(output_h);
 
-                continue;
+                return 0;
             }
+
             err  = clSetKernelArg(kernel, 0, sizeof streams, &streams);
             if (err != CL_SUCCESS)
             {
                 printf("clSetKernelArgs failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                clReleaseMemObject(streams[3]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -692,14 +686,16 @@ int test_fp64_func_math_3arg(cl_device_id device, cl_context context, cl_command
             if (err != CL_SUCCESS)
             {
                 printf("clEnqueueNDRangeKernel failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                clReleaseMemObject(streams[3]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -707,14 +703,16 @@ int test_fp64_func_math_3arg(cl_device_id device, cl_context context, cl_command
             if (err != CL_SUCCESS)
             {
                 printf("clReadArray failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                clReleaseMemObject(streams[3]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -723,14 +721,16 @@ int test_fp64_func_math_3arg(cl_device_id device, cl_context context, cl_command
             if (err != CL_SUCCESS)
             {
                 printf("clReadArray failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                clReleaseMemObject(streams[3]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -739,14 +739,16 @@ int test_fp64_func_math_3arg(cl_device_id device, cl_context context, cl_command
             if (err != CL_SUCCESS)
             {
                 printf("clReadArray failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                clReleaseMemObject(streams[3]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
+                if(output_h) free(output_h);
                 return -1;
             }
 
@@ -755,16 +757,25 @@ int test_fp64_func_math_3arg(cl_device_id device, cl_context context, cl_command
             if (err != CL_SUCCESS)
             {
                 printf("clReadArray failed\n");
-                clReleaseMemObject(streams[0]);
-                clReleaseMemObject(streams[1]);
-                clReleaseMemObject(streams[2]);
-                clReleaseMemObject(streams[3]);
-                if(!kernel)
-                    clReleaseKernel(kernel);
-                clReleaseProgram(program);
-                free(output_h);
+                if(streams[0]) clReleaseMemObject(streams[0]);
+                if(streams[1]) clReleaseMemObject(streams[1]);
+                if(streams[2]) clReleaseMemObject(streams[2]);
+                if(streams[3]) clReleaseMemObject(streams[3]);
+                if(kernel) clReleaseKernel(kernel);
+                if(program) clReleaseProgram(program);
+                if(input_A) free(input_A);
+                if(input_B) free(input_B);
+                if(input_C) free(input_C);
+                if(output_h) free(output_h);
                 return -1;
             }
+
+            if(streams[0]) clReleaseMemObject(streams[0]);
+            if(streams[1]) clReleaseMemObject(streams[1]);
+            if(streams[2]) clReleaseMemObject(streams[2]);
+            if(streams[3]) clReleaseMemObject(streams[3]);
+            if(kernel) clReleaseKernel(kernel);
+            if(program) clReleaseProgram(program);
 
         }
 
@@ -772,18 +783,13 @@ int test_fp64_func_math_3arg(cl_device_id device, cl_context context, cl_command
         printf("-*****************************************************-\n\n\n");
 
         typeIndex++;
+        if(input_A) free(input_A);
+        if(input_B) free(input_B);
+        if(input_C) free(input_C);
+        if(output_h) free(output_h);
 
     }
-/*
-    clReleaseMemObject(streams[0]);
-    clReleaseMemObject(streams[1]);
-    clReleaseMemObject(streams[2]);
-    clReleaseMemObject(streams[3]);
-    if(!kernel)
-        clReleaseKernel(kernel);
-    clReleaseProgram(program);
-    free(output_h);
-*/
+
     //printf("%d / 30 internal tests passed.\n\n", passCount);
     total += 30;
     passed += passCount;
@@ -856,13 +862,9 @@ int test_fp64_func_math4(cl_device_id device, cl_context context, cl_command_que
                 if (!streams[0])
                 {
                     printf("clCreateBuffer #1 failed\n");
-                    clReleaseMemObject(streams[0]);
-                    clReleaseMemObject(streams[1]);
-                    clReleaseMemObject(streams[2]);
-                    if(!kernel)
-                        clReleaseKernel(kernel);
-                    clReleaseProgram(program);
-                    free(output_h);
+                    if(input_A) free(input_A);
+                    if(input_B) free(input_B);
+                    if(output_h) free(output_h);
                     return -1;
                 }
 
@@ -870,13 +872,10 @@ int test_fp64_func_math4(cl_device_id device, cl_context context, cl_command_que
                 if (!streams[1])
                 {
                     printf("clCreateBuffer #2 failed\n");
-                    clReleaseMemObject(streams[0]);
-                    clReleaseMemObject(streams[1]);
-                    clReleaseMemObject(streams[2]);
-                    if(!kernel)
-                        clReleaseKernel(kernel);
-                    clReleaseProgram(program);
-                    free(output_h);
+                    if(streams[0]) clReleaseMemObject(streams[0]);
+                    if(input_A) free(input_A);
+                    if(input_B) free(input_B);
+                    if(output_h) free(output_h);
                     return -1;
                 }
 
@@ -884,13 +883,11 @@ int test_fp64_func_math4(cl_device_id device, cl_context context, cl_command_que
                 if (!streams[2])
                 {
                     printf("clCreateBuffer #3 failed\n");
-                    clReleaseMemObject(streams[0]);
-                    clReleaseMemObject(streams[1]);
-                    clReleaseMemObject(streams[2]);
-                    if(!kernel)
-                        clReleaseKernel(kernel);
-                    clReleaseProgram(program);
-                    free(output_h);
+                    if(streams[0]) clReleaseMemObject(streams[0]);
+                    if(streams[1]) clReleaseMemObject(streams[1]);
+                    if(input_A) free(input_A);
+                    if(input_B) free(input_B);
+                    if(output_h) free(output_h);
                     return -1;
                 }
 
@@ -905,23 +902,37 @@ int test_fp64_func_math4(cl_device_id device, cl_context context, cl_command_que
 
                 constkernelint = kernel_code_int;
 
-                err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_fp64_func_math4" );
-                if (err)
+                if(is_extension_available(device, "cl_khr_fp64"))
                 {
-                    if(is_extension_available(device, "cl_khr_fp64"))
+                    err = create_kernel(context, &program, &kernel, 1, &constkernelint, "test_fp64_func_math4" );
+                    if(err)
                     {
+                        if(streams[0]) clReleaseMemObject(streams[0]);
+                        if(streams[1]) clReleaseMemObject(streams[1]);
+                        if(streams[2]) clReleaseMemObject(streams[2]);
+                        if(kernel) clReleaseKernel(kernel);
+                        if(program) clReleaseProgram(program);
+                        if(input_A) free(input_A);
+                        if(input_B) free(input_B);
+                        if(output_h) free(output_h);
+                        printf("\n!!Kernel build not successful.\n");
                         printf("Kernel compilation error using double as a type.\n");
                         return -1;
                     }
-                    printf("\n!!Kernel build not successful.\n");
+                }
+                else
+                {
                     printf("cl_khr_fp64 extension is not supported.!!\n");
                     printf("%s function with %s %s argument passed.\n\n", func_name[index], qualifier_name[qualIndex], intTypes[typeIndex]);
-                    clReleaseMemObject(streams[0]);
-                    clReleaseMemObject(streams[1]);
-                    clReleaseMemObject(streams[2]);
-                    if(!kernel)
-                        clReleaseKernel(kernel);
-                    clReleaseProgram(program);
+                    if(streams[0]) clReleaseMemObject(streams[0]);
+                    if(streams[1]) clReleaseMemObject(streams[1]);
+                    if(streams[2]) clReleaseMemObject(streams[2]);
+                    if(kernel) clReleaseKernel(kernel);
+                    if(program) clReleaseProgram(program);
+                    if(input_A) free(input_A);
+                    if(input_B) free(input_B);
+                    if(output_h) free(output_h);
+
                     passCount++;
                     continue;
                 }
@@ -929,13 +940,14 @@ int test_fp64_func_math4(cl_device_id device, cl_context context, cl_command_que
                 if (err != CL_SUCCESS)
                 {
                     printf("clSetKernelArgs failed\n");
-                    clReleaseMemObject(streams[0]);
-                    clReleaseMemObject(streams[1]);
-                    clReleaseMemObject(streams[2]);
-                    if(!kernel)
-                        clReleaseKernel(kernel);
-                    clReleaseProgram(program);
-                    free(output_h);
+                    if(streams[0]) clReleaseMemObject(streams[0]);
+                    if(streams[1]) clReleaseMemObject(streams[1]);
+                    if(streams[2]) clReleaseMemObject(streams[2]);
+                    if(kernel) clReleaseKernel(kernel);
+                    if(program) clReleaseProgram(program);
+                    if(input_A) free(input_A);
+                    if(input_B) free(input_B);
+                    if(output_h) free(output_h);
                     return -1;
                 }
 
@@ -944,13 +956,14 @@ int test_fp64_func_math4(cl_device_id device, cl_context context, cl_command_que
                 if (err != CL_SUCCESS)
                 {
                     printf("clEnqueueNDRangeKernel failed\n");
-                    clReleaseMemObject(streams[0]);
-                    clReleaseMemObject(streams[1]);
-                    clReleaseMemObject(streams[2]);
-                    if(!kernel)
-                        clReleaseKernel(kernel);
-                    clReleaseProgram(program);
-                    free(output_h);
+                    if(streams[0]) clReleaseMemObject(streams[0]);
+                    if(streams[1]) clReleaseMemObject(streams[1]);
+                    if(streams[2]) clReleaseMemObject(streams[2]);
+                    if(kernel) clReleaseKernel(kernel);
+                    if(program) clReleaseProgram(program);
+                    if(input_A) free(input_A);
+                    if(input_B) free(input_B);
+                    if(output_h) free(output_h);
                     return -1;
                 }
 
@@ -958,13 +971,14 @@ int test_fp64_func_math4(cl_device_id device, cl_context context, cl_command_que
                 if (err != CL_SUCCESS)
                 {
                     printf("clReadArray failed\n");
-                    clReleaseMemObject(streams[0]);
-                    clReleaseMemObject(streams[1]);
-                    clReleaseMemObject(streams[2]);
-                    if(!kernel)
-                        clReleaseKernel(kernel);
-                    clReleaseProgram(program);
-                    free(output_h);
+                    if(streams[0]) clReleaseMemObject(streams[0]);
+                    if(streams[1]) clReleaseMemObject(streams[1]);
+                    if(streams[2]) clReleaseMemObject(streams[2]);
+                    if(kernel) clReleaseKernel(kernel);
+                    if(program) clReleaseProgram(program);
+                    if(input_A) free(input_A);
+                    if(input_B) free(input_B);
+                    if(output_h) free(output_h);
                     return -1;
                 }
 
@@ -973,13 +987,14 @@ int test_fp64_func_math4(cl_device_id device, cl_context context, cl_command_que
                 if (err != CL_SUCCESS)
                 {
                     printf("clReadArray failed\n");
-                    clReleaseMemObject(streams[0]);
-                    clReleaseMemObject(streams[1]);
-                    clReleaseMemObject(streams[2]);
-                    if(!kernel)
-                        clReleaseKernel(kernel);
-                    clReleaseProgram(program);
-                    free(output_h);
+                    if(streams[0]) clReleaseMemObject(streams[0]);
+                    if(streams[1]) clReleaseMemObject(streams[1]);
+                    if(streams[2]) clReleaseMemObject(streams[2]);
+                    if(kernel) clReleaseKernel(kernel);
+                    if(program) clReleaseProgram(program);
+                    if(input_A) free(input_A);
+                    if(input_B) free(input_B);
+                    if(output_h) free(output_h);
                     return -1;
                 }
 
@@ -988,16 +1003,23 @@ int test_fp64_func_math4(cl_device_id device, cl_context context, cl_command_que
                 if (err != CL_SUCCESS)
                 {
                     printf("clReadArray failed\n");
-                    clReleaseMemObject(streams[0]);
-                    clReleaseMemObject(streams[1]);
-                    clReleaseMemObject(streams[2]);
-                    if(!kernel)
-                        clReleaseKernel(kernel);
-                    clReleaseProgram(program);
-                    free(output_h);
+                    if(streams[0]) clReleaseMemObject(streams[0]);
+                    if(streams[1]) clReleaseMemObject(streams[1]);
+                    if(streams[2]) clReleaseMemObject(streams[2]);
+                    if(kernel) clReleaseKernel(kernel);
+                    if(program) clReleaseProgram(program);
+                    if(input_A) free(input_A);
+                    if(input_B) free(input_B);
+                    if(output_h) free(output_h);
                     return -1;
                 }
             }
+
+            if(streams[0]) clReleaseMemObject(streams[0]);
+            if(streams[1]) clReleaseMemObject(streams[1]);
+            if(streams[2]) clReleaseMemObject(streams[2]);
+            if(kernel) clReleaseKernel(kernel);
+            if(program) clReleaseProgram(program);
 
         }
 
@@ -1006,16 +1028,11 @@ int test_fp64_func_math4(cl_device_id device, cl_context context, cl_command_que
 
         typeIndex++;
 
+        if(input_A) free(input_A);
+        if(input_B) free(input_B);
+        if(output_h) free(output_h);
+
     }
-/*
-    clReleaseMemObject(streams[0]);
-    clReleaseMemObject(streams[1]);
-    clReleaseMemObject(streams[2]);
-    if(!kernel)
-        clReleaseKernel(kernel);
-    clReleaseProgram(program);
-    free(output_h);
-*/
     //printf("%d / 105 internal tests passed.\n\n", passCount);
     total += 105;
     passed += passCount;

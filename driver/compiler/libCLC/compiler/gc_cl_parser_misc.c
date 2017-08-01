@@ -120,6 +120,11 @@ IN gctCONST_STRING Options)
     return status;
 }
 
+#define _clmExprIsConstantForEval(Expr) \
+    (cloIR_OBJECT_GetType(&((Expr)->base)) == clvIR_CONSTANT &&  \
+     (!_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES ||  \
+      !clmDECL_IsAggregateType(&((Expr)->decl))))
+
 static gceSTATUS
 _CheckConstantExpr(
 IN cloCOMPILER Compiler,
@@ -1311,9 +1316,9 @@ IN cloIR_EXPR RightOperand
         leafName = clParseFindLeafName(Compiler,
                                        LeftOperand);
         if(leafName && !clmDECL_IsPointerType(&leafName->decl)) {
-            if (cloIR_OBJECT_GetType(&RightOperand->base) == clvIR_CONSTANT) {
+            if (_clmExprIsConstantForEval(RightOperand)) {
                 /* Constant calculation */
-                if(cloIR_OBJECT_GetType(&LeftOperand->base) == clvIR_CONSTANT &&
+                if (_clmExprIsConstantForEval(LeftOperand) &&
                    leafName->u.variableInfo.isUnnamedConstant &&  /* an unnamed constant variable */
                    (!clmDECL_IsArray(&leafName->decl) ||
                    leafName->decl.array.numDim == 1)) {
@@ -1340,7 +1345,7 @@ IN cloIR_EXPR RightOperand
                     gctUINT elementCount;
 
                     clmGetArrayElementCount(LeftOperand->decl.array, 0, elementCount);
-                    if(elementCount > _cldMaxOperandCountToUseMemory) {
+                    if(elementCount > _clmMaxOperandCountToUseMemory(&LeftOperand->decl)) {
                         status = clParseSetOperandAddressed(Compiler,
                                                             LeftOperand);
                         if (gcmIS_ERROR(status)) return gcvNULL;
@@ -1633,15 +1638,85 @@ IN gctBOOL IsVectorConstructor
 }
 
 static gceSTATUS
+_CheckStructOrUnionMemberMatch(
+IN cloCOMPILER Compiler,
+IN cloIR_POLYNARY_EXPR PolynaryExpr,
+IN clsDECL *Decl,
+IN cloIR_EXPR  *Operand
+)
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    clsNAME *   fieldName;
+    gctBOOL matched = gcvFALSE;
+    cloIR_EXPR operand;
+
+    gcmASSERT(Operand);
+
+    operand = *Operand;
+    if (clmDATA_TYPE_IsStruct(Decl->dataType)) {
+        for (fieldName = slsDLINK_LIST_First(&Decl->dataType->u.fieldSpace->names, clsNAME);
+            (slsDLINK_NODE *)fieldName != &Decl->dataType->u.fieldSpace->names;
+            fieldName = slsDLINK_NODE_Next(&fieldName->node, clsNAME),
+            operand = slsDLINK_NODE_Next(&operand->base.node, struct _cloIR_EXPR)) {
+
+            if ((slsDLINK_NODE *)Operand == &PolynaryExpr->operands->members) {
+                gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                                PolynaryExpr->exprBase.base.lineNo,
+                                                PolynaryExpr->exprBase.base.stringNo,
+                                                clvREPORT_ERROR,
+                                                "require more expressions"));
+                return gcvSTATUS_INVALID_ARGUMENT;
+            }
+
+            gcmONERROR(_CheckStructOrUnionMemberMatch(Compiler,
+                                                      PolynaryExpr,
+                                                      &fieldName->decl,
+                                                      &operand));
+        }
+        matched = gcvTRUE;
+        *Operand = operand;
+        return gcvSTATUS_OK;
+    }
+    else if (clmDATA_TYPE_IsUnion(Decl->dataType)) {
+        matched = gcvFALSE;
+        for (fieldName = slsDLINK_LIST_First(&Decl->dataType->u.fieldSpace->names, clsNAME);
+            (slsDLINK_NODE *)fieldName != &Decl->dataType->u.fieldSpace->names;
+            fieldName = slsDLINK_NODE_Next(&fieldName->node, clsNAME)) {
+            if (clsDECL_IsEqual(&fieldName->decl, &operand->decl)) {
+                operand = slsDLINK_NODE_Next(&operand->base.node, struct _cloIR_EXPR);
+                matched = gcvTRUE;
+                break;
+            }
+            else {
+                continue;
+            }
+        }
+    }
+    else matched = clsDECL_IsEqual(Decl, &operand->decl);
+
+OnError:
+    if(matched) {
+        *Operand = operand;
+        return gcvSTATUS_OK;
+    }
+
+    gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
+                                    operand->base.lineNo,
+                                    operand->base.stringNo,
+                                    clvREPORT_ERROR,
+                                    "require the same typed expression"));
+    return gcvSTATUS_INVALID_ARGUMENT;
+}
+
+static gceSTATUS
 _CheckStructConstructor(
 IN cloCOMPILER Compiler,
 IN cloIR_POLYNARY_EXPR PolynaryExpr
 )
 {
-    gctUINT        operandCount;
-    cloIR_EXPR    operand;
-    clsDATA_TYPE *    structDataType;
-    clsNAME *    fieldName;
+    gceSTATUS    status;
+    gctUINT      operandCount;
+    cloIR_EXPR   operand;
 
     /* Verify the arguments. */
     clmVERIFY_OBJECT(Compiler, clvOBJ_COMPILER);
@@ -1664,44 +1739,26 @@ IN cloIR_POLYNARY_EXPR PolynaryExpr
         return gcvSTATUS_INVALID_ARGUMENT;
     }
 
-    structDataType = PolynaryExpr->exprBase.decl.dataType;
-    gcmASSERT(structDataType);
-    gcmASSERT(clmDATA_TYPE_IsStructOrUnion(structDataType));
+    gcmASSERT(PolynaryExpr->exprBase.decl.dataType);
+    gcmASSERT(clmDATA_TYPE_IsStructOrUnion(PolynaryExpr->exprBase.decl.dataType));
 
-    for (fieldName = slsDLINK_LIST_First(&structDataType->u.fieldSpace->names, clsNAME),
-         operand = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _cloIR_EXPR);
-        (slsDLINK_NODE *)fieldName != &structDataType->u.fieldSpace->names;
-        fieldName = slsDLINK_NODE_Next(&fieldName->node, clsNAME),
-        operand = slsDLINK_NODE_Next(&operand->base.node, struct _cloIR_EXPR)) {
+    operand = slsDLINK_LIST_First(&PolynaryExpr->operands->members, struct _cloIR_EXPR);
+    status = _CheckStructOrUnionMemberMatch(Compiler,
+                                            PolynaryExpr,
+                                            &PolynaryExpr->exprBase.decl,
+                                            &operand);
 
-        if ((slsDLINK_NODE *)operand == &PolynaryExpr->operands->members) {
-            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                            PolynaryExpr->exprBase.base.lineNo,
-                            PolynaryExpr->exprBase.base.stringNo,
-                            clvREPORT_ERROR,
-                            "require more expressions"));
-            return gcvSTATUS_INVALID_ARGUMENT;
-        }
-
-        if (!clsDECL_IsEqual(&fieldName->decl, &operand->decl)) {
-            gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                            operand->base.lineNo,
-                            operand->base.stringNo,
-                            clvREPORT_ERROR,
-                            "require the same typed expression"));
-            return gcvSTATUS_INVALID_ARGUMENT;
-        }
-    }
-
-    if ((slsDLINK_NODE *)operand != &PolynaryExpr->operands->members) {
+    if(status == gcvSTATUS_OK &&
+       (slsDLINK_NODE *)operand != &PolynaryExpr->operands->members) {
         gcmVERIFY_OK(cloCOMPILER_Report(Compiler,
-                        operand->base.lineNo,
-                        operand->base.stringNo,
-                        clvREPORT_ERROR,
-                        "too many expressions"));
+                                        operand->base.lineNo,
+                                        operand->base.stringNo,
+                                        clvREPORT_ERROR,
+                                        "too many expressions"));
         return gcvSTATUS_INVALID_ARGUMENT;
     }
-    return gcvSTATUS_OK;
+
+    return status;
 }
 
 static gceSTATUS
@@ -2514,7 +2571,7 @@ IN clsLexToken * FieldSelection
     }
 
     /* Constant calculation */
-    if (cloIR_OBJECT_GetType(&Operand->base) == clvIR_CONSTANT) {
+    if (_clmExprIsConstantForEval(Operand)) {
         status = cloIR_UNARY_EXPR_Evaluate(Compiler,
                            exprType,
                            (cloIR_CONSTANT)Operand,
@@ -3216,7 +3273,7 @@ IN cloIR_EXPR Operand
     }
 
     /* Constant calculation */
-    if (cloIR_OBJECT_GetType(&Operand->base) == clvIR_CONSTANT) {
+    if (_clmExprIsConstantForEval(Operand)) {
         status = cloIR_UNARY_EXPR_Evaluate(Compiler,
                                            exprType,
                                            (cloIR_CONSTANT)Operand,
@@ -3707,7 +3764,7 @@ gctSIZE_T MaxOperandCount
    byteOffset = *ByteOffset;
    numFilled = _ParseFormVectorLocationMap(Compiler,
                        Location,
-                                           RowCount,
+                       RowCount,
                        &byteOffset,
                        maxOperandCount);
    if(numFilled == 0) {
@@ -4589,43 +4646,43 @@ gctSIZE_T OperandCount
         for(written = 0; written < (gctINT)Constant->valueCount; written++) {
            switch(Location->dataType->elementType) {
            case clvTYPE_CHAR:
-              *(bufPtr.charPtr)++ = (char)Constant->values[0].intValue;
+              *(bufPtr.charPtr)++ = (char)Constant->values[written].intValue;
               break;
 
            case clvTYPE_UCHAR:
-              *(bufPtr.ucharPtr)++ = (unsigned char)Constant->values[0].uintValue;
+              *(bufPtr.ucharPtr)++ = (unsigned char)Constant->values[written].uintValue;
               break;
 
            case clvTYPE_SHORT:
-              *(bufPtr.shortPtr)++ = (short)Constant->values[0].intValue;
+              *(bufPtr.shortPtr)++ = (short)Constant->values[written].intValue;
               break;
 
            case clvTYPE_USHORT:
-              *(bufPtr.ushortPtr)++ = (unsigned short)Constant->values[0].uintValue;
+              *(bufPtr.ushortPtr)++ = (unsigned short)Constant->values[written].uintValue;
               break;
 
            case clvTYPE_BOOL:
-              *(bufPtr.boolPtr)++ = Constant->values[0].boolValue;
+              *(bufPtr.boolPtr)++ = Constant->values[written].boolValue;
               break;
 
            case clvTYPE_INT:
-              *(bufPtr.intPtr)++ = Constant->values[0].intValue;
+              *(bufPtr.intPtr)++ = Constant->values[written].intValue;
               break;
 
            case clvTYPE_UINT:
-              *(bufPtr.uintPtr)++ = Constant->values[0].uintValue;
+              *(bufPtr.uintPtr)++ = Constant->values[written].uintValue;
               break;
 
            case clvTYPE_LONG:
-              *(bufPtr.longPtr)++ = Constant->values[0].longValue;
+              *(bufPtr.longPtr)++ = Constant->values[written].longValue;
               break;
 
            case clvTYPE_ULONG:
-              *(bufPtr.ulongPtr)++ = Constant->values[0].ulongValue;
+              *(bufPtr.ulongPtr)++ = Constant->values[written].ulongValue;
               break;
 
            case clvTYPE_FLOAT:
-              *(bufPtr.floatPtr)++ = Constant->values[0].floatValue;
+              *(bufPtr.floatPtr)++ = Constant->values[written].floatValue;
               break;
 
            case clvTYPE_DOUBLE:
@@ -5015,15 +5072,23 @@ OUT cloIR_EXPR *ConstantExpr
     unnamedConstant->u.variableInfo.u.constant = Constant;
     unnamedConstant->u.variableInfo.isUnnamedConstant = gcvTRUE;
     unnamedConstant->u.variableInfo.u.constant->variable = unnamedConstant;
-    gcmONERROR(clsNAME_SetVariableAddressed(Compiler,
-                                            unnamedConstant));
+    if(_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES) {
+        *ConstantExpr = &Constant->exprBase;
 
-    gcmONERROR(cloIR_VARIABLE_Construct(Compiler,
-                                        Constant->exprBase.base.lineNo,
-                                        Constant->exprBase.base.stringNo,
-                                        unnamedConstant,
-                                        &constantVariable));
-    *ConstantExpr = &constantVariable->exprBase;
+        status = cloCOMPILER_AllocateVariableMemory(Compiler,
+                                                    unnamedConstant);
+        if (gcmIS_ERROR(status)) return status;
+    }
+    else {
+        gcmONERROR(clsNAME_SetVariableAddressed(Compiler,
+                                                unnamedConstant));
+        gcmONERROR(cloIR_VARIABLE_Construct(Compiler,
+                                            Constant->exprBase.base.lineNo,
+                                            Constant->exprBase.base.stringNo,
+                                            unnamedConstant,
+                                            &constantVariable));
+        *ConstantExpr = &constantVariable->exprBase;
+    }
 OnError:
     cloCOMPILER_PopCurrentNameSpace(Compiler, &nameSpace);
     return status;
@@ -5961,7 +6026,7 @@ IN cloIR_EXPR RightOperand
         case '/':
             if((clmDECL_IsFloatingType(&RightOperand->decl) ||
                clmDECL_IsFloatingType(&LeftOperand->decl)) &&
-               cloIR_OBJECT_GetType(&RightOperand->base) == clvIR_CONSTANT) {
+               _clmExprIsConstantForEval(RightOperand)) {
                 cloIR_CONSTANT constantOne;
                 cloIR_CONSTANT resultConstant;
                 cluCONSTANT_VALUE constantValue;
@@ -6089,8 +6154,8 @@ IN cloIR_EXPR RightOperand
     }
 
     /* Constant calculation */
-    if (cloIR_OBJECT_GetType(&LeftOperand->base) == clvIR_CONSTANT
-        && cloIR_OBJECT_GetType(&RightOperand->base) == clvIR_CONSTANT) {
+    if (_clmExprIsConstantForEval(LeftOperand) &&
+        _clmExprIsConstantForEval(RightOperand)) {
         status = cloIR_BINARY_EXPR_Evaluate(Compiler,
                             exprType,
                             (cloIR_CONSTANT)LeftOperand,
@@ -6179,8 +6244,8 @@ IN cloIR_EXPR RightOperand
                                    RightOperand);
        if (gcmIS_ERROR(status)) return gcvNULL;
        /* Constant calculation */
-       if (cloIR_OBJECT_GetType(&LeftOperand->base) == clvIR_CONSTANT
-        && cloIR_OBJECT_GetType(&RightOperand->base) == clvIR_CONSTANT) {
+       if (_clmExprIsConstantForEval(LeftOperand) &&
+           _clmExprIsConstantForEval(RightOperand)) {
         status = cloIR_BINARY_EXPR_Evaluate(Compiler,
                                             clvBINARY_SEQUENCE,
                                             (cloIR_CONSTANT)LeftOperand,
@@ -7105,7 +7170,7 @@ IN cloIR_EXPR RightOperand
            }
         }
         else if(clmDECL_IsUnderlyingStructOrUnion(&LeftOperand->decl) &&
-                clGetOperandCountForRegAlloc(&LeftOperand->decl) > _cldMaxOperandCountToUseMemory) {
+                clGetOperandCountForRegAlloc(&LeftOperand->decl) > _clmMaxOperandCountToUseMemory(&LeftOperand->decl)) {
            gcmASSERT(clmDECL_IsUnderlyingStructOrUnion(&RightOperand->decl));
            status = clParseSetOperandAddressed(Compiler,
                                                LeftOperand);
@@ -7134,7 +7199,7 @@ IN cloIR_EXPR RightOperand
         case T_DIV_ASSIGN:
             if((clmDECL_IsFloatingType(&RightOperand->decl) ||
                clmDECL_IsFloatingType(&LeftOperand->decl)) &&
-               cloIR_OBJECT_GetType(&RightOperand->base) == clvIR_CONSTANT) {
+               _clmExprIsConstantForEval(RightOperand)) {
                 cloIR_CONSTANT constantOne;
                 cloIR_CONSTANT resultConstant;
                 cluCONSTANT_VALUE constantValue;
@@ -7618,7 +7683,7 @@ clsNAME *VariableName
 
 /*klc*/
     if (clmDECL_IsUnderlyingStructOrUnion(&VariableName->decl) &&
-        (clGetOperandCountForRegAlloc(&VariableName->decl) > _cldMaxOperandCountToUseMemory)) {
+        (clGetOperandCountForRegAlloc(&VariableName->decl) > _clmMaxOperandCountToUseMemory(&VariableName->decl))) {
        clsNAME_SPACE *nameSpace;
 
        nameSpace = VariableName->decl.dataType->u.fieldSpace;
@@ -9122,7 +9187,7 @@ IN cloIR_EXPR InitExpr
   cloIR_EXPR lhs;
   cloIR_BINARY_EXPR binaryExpr;
   cloIR_BASE    initStatement;
-  cloIR_CONSTANT constant;
+  cloIR_CONSTANT constant = gcvNULL;
   cloIR_TYPECAST_ARGS typeCastArgs;
   gctINT arraySize;
   cluCONSTANT_VALUE *valStart;
@@ -9174,10 +9239,10 @@ IN cloIR_EXPR InitExpr
         if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
 
 #if _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES
-        if (clmDECL_IsUnderlyingStructOrUnion(&name->decl)) {
+        if (clmDECL_IsAggregateType(&name->decl)) {
 #else
         if (clmDECL_IsUnderlyingStructOrUnion(&name->decl) &&
-            ((clGetOperandCountForRegAlloc(&name->decl) > _cldMaxOperandCountToUseMemory) ||
+            ((clGetOperandCountForRegAlloc(&name->decl) > _clmMaxOperandCountToUseMemory(&constant->exprBase.decl)) ||
              name->u.variableInfo.isAddressed)) {
 #endif
            gctSIZE_T written;
@@ -9353,7 +9418,18 @@ IN cloIR_EXPR InitExpr
               return DeclOrDeclListPtr;
            }
            *dataType = *initExpr->decl.dataType;
-           dataType->type = name->decl.dataType->type;
+           if(clmDECL_IsScalar(&initExpr->decl)) {
+               if(clmDECL_IsArithmeticType(&name->decl)) {
+                   dataType->type = clGetVectorTerminalToken(name->decl.dataType->elementType, 1);
+                   if(clmDECL_IsPackedType(&name->decl)) {
+                       clsBUILTIN_DATATYPE_INFO *typeInfo = clGetBuiltinDataTypeInfo(dataType->type);
+                       dataType->type = typeInfo->dualType;
+                   }
+               }
+           }
+           else {
+               dataType->type = name->decl.dataType->type;
+           }
            status = cloCOMPILER_CloneDataType(Compiler,
                                               initExpr->decl.dataType->accessQualifier,
                                               initExpr->decl.dataType->addrSpaceQualifier,
@@ -9364,8 +9440,14 @@ IN cloIR_EXPR InitExpr
         if(name->decl.dataType->accessQualifier == clvQUALIFIER_CONST) {
            name->u.variableInfo.u.constant = (cloIR_CONSTANT)(&initExpr->base);
            name->u.variableInfo.u.constant->variable = name;
+           if(_GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES &&
+              clmDECL_IsAggregateType(&name->decl)) {
+               status = cloCOMPILER_AllocateVariableMemory(Compiler,
+                                                           name);
+               return DeclOrDeclListPtr;
+           }
            /* if constant variable's elements are not scalar, make this to be allocated in driver */
-           if (!clmDECL_IsPointerType(&name->decl) &&
+           else if (!clmDECL_IsPointerType(&name->decl) &&
                (clmDECL_IsAggregateTypeOverRegLimit(&name->decl) ||
                 (clmDECL_IsExtendedVectorType(&name->decl) &&
                  (clmDECL_IsPackedType(&name->decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))))) {
@@ -9385,9 +9467,12 @@ IN cloIR_EXPR InitExpr
         }
 
 #if _CREATE_UNNAMED_CONSTANT_IN_MEMORY
-        if(clmDECL_IsAggregateTypeOverRegLimit(&name->decl) ||
+        if(!clmDECL_IsScalar(&initExpr->decl) &&
+           (clmDECL_IsAggregateTypeOverRegLimit(&name->decl) ||
+           (constant && clmDECL_IsAggregateTypeOverRegLimit(&constant->exprBase.decl)) ||
+           (constant && clmDECL_IsAggregateType(&constant->exprBase.decl) && _GEN_UNIFORMS_FOR_CONSTANT_ADDRESS_SPACE_VARIABLES) ||
            (clmDECL_IsExtendedVectorType(&name->decl) &&
-            (clmDECL_IsPackedType(&name->decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX)))) {
+            (clmDECL_IsPackedType(&name->decl) || !cloCOMPILER_ExtensionEnabled(Compiler, clvEXTENSION_VIV_VX))))) {
            status = _CreateUnnamedConstantExpr(Compiler,
                                                &name->decl,
                                                (cloIR_CONSTANT) (&initExpr->base),
@@ -9410,7 +9495,8 @@ IN cloIR_EXPR InitExpr
                                       lhs,
                                       initExpr);
     if (gcmIS_ERROR(status)) return DeclOrDeclListPtr;
-    if(clmDECL_IsUnderlyingStructOrUnion(&name->decl)) {
+    if(clmDECL_IsUnderlyingStructOrUnion(&name->decl) &&
+       clGetOperandCountForRegAlloc(&name->decl) > _clmMaxOperandCountToUseMemory(&name->decl)) {
        clsNAME_SetVariableAddressed(Compiler,
                                     name);
     }
@@ -10293,7 +10379,7 @@ IN cloCOMPILER Compiler
     clsNAME_SPACE *    parentSpace = gcvNULL;
 
     parentSpace = cloCOMPILER_GetCurrentSpace(Compiler);
-    die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_LEXICALBLOCK, parentSpace->die, gcvNULL, 0, 0, 0);
+    die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_LEXICALBLOCK, parentSpace->die, gcvNULL, 0, 0, 0, 0);
 
     status = cloCOMPILER_CreateNameSpace(Compiler,
                          &nameSpace);
@@ -10311,7 +10397,8 @@ cloIR_SET
 clParseCompoundStatementEnd(
 IN cloCOMPILER Compiler,
 IN clsLexToken * StartToken,
-IN cloIR_SET Set
+IN cloIR_SET Set,
+IN clsLexToken * EndToken
 )
 {
     clsNAME_SPACE *    nameSpace;
@@ -10322,10 +10409,11 @@ IN cloIR_SET Set
 
     cloCOMPILER_PopCurrentNameSpace(Compiler, &nameSpace);
 
-    cloCOMPILER_SetDIESourceLoc(Compiler, nameSpace->die, 0, StartToken->lineNo, StartToken->stringNo);
+    cloCOMPILER_SetDIESourceLoc(Compiler, nameSpace->die, 0, StartToken->lineNo, EndToken->lineNo, StartToken->stringNo);
 
     Set->base.lineNo    = StartToken->lineNo;
     Set->base.stringNo    = StartToken->stringNo;
+    Set->base.endLineNo    = EndToken->lineNo;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                       clvDUMP_PARSER,
@@ -10347,7 +10435,8 @@ cloIR_SET
 clParseCompoundStatementNoNewScopeEnd(
 IN cloCOMPILER Compiler,
 IN clsLexToken * StartToken,
-IN cloIR_SET Set
+IN cloIR_SET Set,
+IN clsLexToken * EndToken
 )
 {
     gcmASSERT(StartToken);
@@ -10356,6 +10445,7 @@ IN cloIR_SET Set
 
     Set->base.lineNo    = StartToken->lineNo;
     Set->base.stringNo    = StartToken->stringNo;
+    Set->base.endLineNo    = EndToken->lineNo;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                       clvDUMP_PARSER,
@@ -10502,7 +10592,8 @@ cloIR_BASE
 clParseSwitchBodyEnd(
 IN cloCOMPILER Compiler,
 IN clsLexToken * StartToken,
-IN cloIR_SET Set
+IN cloIR_SET Set,
+IN clsLexToken * EndToken
 )
 {
    clsSWITCH_SCOPE *switchScope;
@@ -10516,6 +10607,7 @@ IN cloIR_SET Set
 
    Set->base.lineNo    = StartToken->lineNo;
    Set->base.stringNo    = StartToken->stringNo;
+   Set->base.endLineNo    = EndToken->lineNo;
 
    switchScope = cloCOMPILER_GetSwitchScope(Compiler);
    curLoc = &switchScope->cases;
@@ -11035,10 +11127,17 @@ IN cloCOMPILER Compiler
 {
     gceSTATUS    status;
     clsNAME_SPACE *    nameSpace;
+    gctUINT16   die = VSC_DI_INVALIDE_DIE;
+    clsNAME_SPACE *    parentSpace = gcvNULL;
+
+    parentSpace = cloCOMPILER_GetCurrentSpace(Compiler);
+    die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_LEXICALBLOCK, parentSpace->die, gcvNULL, 0, 0, 0, 0);
 
     status = cloCOMPILER_CreateNameSpace(Compiler,
                          &nameSpace);
     if (gcmIS_ERROR(status)) return;
+
+    nameSpace->die = die;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                       clvDUMP_PARSER,
@@ -11055,10 +11154,11 @@ IN cloIR_BASE LoopBody
 {
     gceSTATUS        status;
     cloIR_ITERATION        iteration;
+    clsNAME_SPACE *    nameSpace;
 
     gcmASSERT(StartToken);
 
-    cloCOMPILER_PopCurrentNameSpace(Compiler, gcvNULL);
+    cloCOMPILER_PopCurrentNameSpace(Compiler, &nameSpace);
 
     /* Check error */
     if (CondExpr == gcvNULL) {
@@ -11085,6 +11185,8 @@ IN cloIR_BASE LoopBody
                        gcvNULL,
                        &iteration);
     if (gcmIS_ERROR(status))  return gcvNULL;
+
+    cloCOMPILER_SetDIESourceLoc(Compiler, nameSpace->die, 0, iteration->base.lineNo, iteration->base.endLineNo, iteration->base.stringNo);
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                       clvDUMP_PARSER,
@@ -11146,10 +11248,17 @@ IN cloCOMPILER Compiler)
 {
     gceSTATUS    status;
     clsNAME_SPACE *    nameSpace;
+    gctUINT16   die = VSC_DI_INVALIDE_DIE;
+    clsNAME_SPACE *    parentSpace = gcvNULL;
+
+    parentSpace = cloCOMPILER_GetCurrentSpace(Compiler);
+    die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_LEXICALBLOCK, parentSpace->die, gcvNULL, 0, 0, 0, 0);
 
     status = cloCOMPILER_CreateNameSpace(Compiler,
                          &nameSpace);
     if (gcmIS_ERROR(status)) return;
+
+    nameSpace->die = die;
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                       clvDUMP_PARSER,
@@ -11191,6 +11300,8 @@ IN cloIR_BASE LoopBody
                                        ForExprPair.restExpr,
                                        &iteration);
     if (gcmIS_ERROR(status)) return gcvNULL;
+
+    cloCOMPILER_SetDIESourceLoc(Compiler, forSpace->die, 0, iteration->base.lineNo, iteration->base.endLineNo, iteration->base.stringNo);
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler,
                                   clvDUMP_PARSER,
@@ -11372,6 +11483,9 @@ IN cloIR_SET Statements
                                      FuncName->stringNo,
                                      clvSTATEMENT_SET,
                                      &Statements);
+
+        cloCOMPILER_SetDIESourceLoc(Compiler, FuncName->die, 0, Statements->base.lineNo, Statements->base.endLineNo, Statements->base.stringNo);
+
         if (gcmIS_ERROR(status)) return;
     }
 
@@ -11444,6 +11558,8 @@ IN cloIR_SET Statements
 
         cloCOMPILER_SetMaxKernelFunctionArgs(Compiler, argCount);
     }
+
+    cloCOMPILER_SetDIESourceLoc(Compiler, FuncName->die, 0, FuncName->lineNo, Statements->base.endLineNo, Statements->base.stringNo);
 }
 
 clsNAME    *
@@ -12153,7 +12269,7 @@ IN clsLexToken * Identifier
     if (gcmIS_ERROR(status)) return;
     nameSpace->symbol = Identifier ? Identifier->u.identifier.name : "";
 
-    nameSpace->die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_TYPE, parentSpace->die , nameSpace->symbol, fileNo, lineNo, colNo);
+    nameSpace->die = cloCOMPILER_AddDIE(Compiler, VSC_DI_TAG_TYPE, parentSpace->die , nameSpace->symbol, fileNo, lineNo, lineNo, colNo);
 
     gcmVERIFY_OK(cloCOMPILER_Dump(Compiler, clvDUMP_PARSER, "<STRUCT_DECL>"));
 }

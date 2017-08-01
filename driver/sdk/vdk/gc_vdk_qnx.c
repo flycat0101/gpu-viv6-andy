@@ -317,6 +317,73 @@ vdkGetDisplayInfo(
     int * BitsPerPixel
     )
 {
+    screen_display_t screen_disp = NULL;
+    screen_display_t *screen_displays;
+    int count = 0;
+    int size[2] = {0, 0};
+    int i = 0;
+    int val = 0;
+    int rc = 0;
+
+    rc = screen_get_context_property_iv(screen_ctx, SCREEN_PROPERTY_DISPLAY_COUNT, &count);
+    if (rc)
+    {
+        return -1;
+    }
+
+    if (count > 0)
+    {
+        screen_displays = calloc(count, sizeof(screen_display_t));
+        screen_get_context_property_pv(screen_ctx, SCREEN_PROPERTY_DISPLAYS, (void**)screen_displays);
+
+        for (i = 0; i < count; i++)
+        {
+            screen_get_display_property_iv(screen_displays[i], SCREEN_PROPERTY_ID, &val);
+            if (val == (int)Display)
+            {
+                screen_disp =screen_displays[i];
+                break;
+            }
+        }
+        free(screen_displays);
+    }
+
+    if (!screen_disp)
+    {
+        return -1;
+    }
+
+    rc =screen_get_display_property_iv(screen_disp, SCREEN_PROPERTY_SIZE, size);
+    if (rc)
+    {
+        return -1;
+    }
+
+    if (Width)
+    {
+        *Width = size[0];
+    }
+
+    if (Height)
+    {
+        *Height = size[1];
+    }
+
+    if (Physical)
+    {
+        *Physical = ~0;
+    }
+
+    if (Stride)
+    {
+        *Stride = 0;
+    }
+
+    if (BitsPerPixel)
+    {
+        *BitsPerPixel = 0;
+    }
+
     return 0;
 }
 
@@ -713,7 +780,7 @@ vdkGetEvent(
             int buffer;
             int scancode;
             static int prefix;
-#ifdef gcdQNX_SDP700
+#if _SCREEN_VERSION_MAJOR >= 2
             screen_get_event_property_iv(screen_evt, SCREEN_PROPERTY_SCAN, &buffer);
 #else
             screen_get_event_property_iv(screen_evt, SCREEN_PROPERTY_KEY_SCAN, &buffer);

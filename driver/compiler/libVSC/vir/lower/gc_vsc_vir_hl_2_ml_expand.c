@@ -30,9 +30,9 @@ _setDestTypeFromSrc0(
     VIR_Operand *coord = VIR_Inst_GetSource(Inst, 0);
     VIR_TypeId newType;
 
-    newType = VIR_Operand_GetType(coord);
+    newType = VIR_Operand_GetTypeId(coord);
     VIR_Symbol_SetType(VIR_Operand_GetSymbol(dest), VIR_Shader_GetTypeFromId(Context->shader, newType));
-    VIR_Operand_SetType(dest, newType);
+    VIR_Operand_SetTypeId(dest, newType);
     VIR_Operand_SetEnable(dest, VIR_TypeId_Conv2Enable(newType));
 
     return gcvTRUE;
@@ -445,7 +445,7 @@ _setEnableXFloat(
 
     /* Change enable and type. */
     VIR_Operand_SetEnable(destOperand, VIR_ENABLE_X);
-    VIR_Operand_SetType(destOperand, VIR_TYPE_FLOAT32);
+    VIR_Operand_SetTypeId(destOperand, VIR_TYPE_FLOAT32);
 
     return gcvTRUE;
 }
@@ -461,7 +461,7 @@ _setEnableYFloat(
 
     /* Change enable and type. */
     VIR_Operand_SetEnable(destOperand, VIR_ENABLE_Y);
-    VIR_Operand_SetType(destOperand, VIR_TYPE_FLOAT32);
+    VIR_Operand_SetTypeId(destOperand, VIR_TYPE_FLOAT32);
 
     return gcvTRUE;
 }
@@ -477,7 +477,7 @@ _setEnableZFloat(
 
     /* Change enable and type. */
     VIR_Operand_SetEnable(destOperand, VIR_ENABLE_Z);
-    VIR_Operand_SetType(destOperand, VIR_TYPE_FLOAT32);
+    VIR_Operand_SetTypeId(destOperand, VIR_TYPE_FLOAT32);
 
     return gcvTRUE;
 }
@@ -496,7 +496,7 @@ _setSwizzleXInt(
 
     /* Change swizzle and type. */
     VIR_Operand_SetSwizzle(srcOperand, VIR_SWIZZLE_XXXX);
-    VIR_Operand_SetType(srcOperand, VIR_TYPE_INT32);
+    VIR_Operand_SetTypeId(srcOperand, VIR_TYPE_INT32);
 
     return gcvTRUE;
 }
@@ -510,13 +510,13 @@ _setSwizzleZ(
 {
     gctUINT                srcIdx = VIR_Inst_GetSourceIndex(Inst, Opnd);
     VIR_Operand           *srcOperand = VIR_Inst_GetSource(Inst, srcIdx);
-    VIR_TypeId             opndTypeId = VIR_Operand_GetType(Opnd);
+    VIR_TypeId             opndTypeId = VIR_Operand_GetTypeId(Opnd);
 
     gcmASSERT(srcIdx < VIR_MAX_SRC_NUM);
 
     /* Change swizzle and type. */
     VIR_Operand_SetSwizzle(srcOperand, VIR_SWIZZLE_ZZZZ);
-    VIR_Operand_SetType(srcOperand, VIR_GetTypeComponentType(opndTypeId));
+    VIR_Operand_SetTypeId(srcOperand, VIR_GetTypeComponentType(opndTypeId));
 
     return gcvTRUE;
 }
@@ -530,7 +530,7 @@ _setSwizzleXY(
 {
     gctUINT                srcIdx = VIR_Inst_GetSourceIndex(Inst, Opnd);
     VIR_Operand           *srcOperand = VIR_Inst_GetSource(Inst, srcIdx);
-    VIR_TypeId             opndTypeId = VIR_Operand_GetType(Opnd);
+    VIR_TypeId             opndTypeId = VIR_Operand_GetTypeId(Opnd);
     VIR_TypeId             vectorTypeId;
 
     gcmASSERT(srcIdx < VIR_MAX_SRC_NUM);
@@ -539,7 +539,7 @@ _setSwizzleXY(
 
     /* Change swizzle and type. */
     VIR_Operand_SetSwizzle(srcOperand, VIR_SWIZZLE_XYYY);
-    VIR_Operand_SetType(srcOperand, vectorTypeId);
+    VIR_Operand_SetTypeId(srcOperand, vectorTypeId);
 
     return gcvTRUE;
 }
@@ -553,7 +553,7 @@ _setSwizzleXYZ(
 {
     gctUINT                srcIdx = VIR_Inst_GetSourceIndex(Inst, Opnd);
     VIR_Operand           *srcOperand = VIR_Inst_GetSource(Inst, srcIdx);
-    VIR_TypeId             opndTypeId = VIR_Operand_GetType(Opnd);
+    VIR_TypeId             opndTypeId = VIR_Operand_GetTypeId(Opnd);
     VIR_TypeId             vectorTypeId;
 
     gcmASSERT(srcIdx < VIR_MAX_SRC_NUM);
@@ -562,7 +562,7 @@ _setSwizzleXYZ(
 
     /* Change swizzle and type. */
     VIR_Operand_SetSwizzle(srcOperand, VIR_SWIZZLE_XYZZ);
-    VIR_Operand_SetType(srcOperand, vectorTypeId);
+    VIR_Operand_SetTypeId(srcOperand, vectorTypeId);
 
     return gcvTRUE;
 }
@@ -581,7 +581,7 @@ _setSwizzleAndTypeFromSymType(
     srcSwizzle = VIR_Swizzle_GenSwizzleByComponentCount(VIR_GetTypeComponents(symTypeId));
 
     VIR_Operand_SetSwizzle(Opnd, srcSwizzle);
-    VIR_Operand_SetType(Opnd, symTypeId);
+    VIR_Operand_SetTypeId(Opnd, symTypeId);
 
     return gcvTRUE;
 }
@@ -592,7 +592,7 @@ _destLE16Byte(
     IN VIR_Instruction      *Inst
     )
 {
-    VIR_TypeId tyId = VIR_Operand_GetType(VIR_Inst_GetDest(Inst));
+    VIR_TypeId tyId = VIR_Operand_GetTypeId(VIR_Inst_GetDest(Inst));
     if (VIR_TypeId_isPrimitive(tyId))
     {
         return VIR_GetTypeSize(tyId) <= 16;
@@ -1466,7 +1466,7 @@ _isIntrinSamplerArray(
     parm = VIR_Operand_GetParameters(pOpnd);
     samplerOpnd = parm->args[0];
 
-    if (VIR_TypeId_isSamplerArray(VIR_Operand_GetType(samplerOpnd)))
+    if (VIR_TypeId_isSamplerArray(VIR_Operand_GetTypeId(samplerOpnd)))
     {
         return gcvTRUE;
     }
@@ -1489,8 +1489,8 @@ _isIntrinSampler1DArray(
     parm = VIR_Operand_GetParameters(pOpnd);
     samplerOpnd = parm->args[0];
 
-    if (VIR_TypeId_isSampler1D(VIR_Operand_GetType(samplerOpnd)) &&
-        VIR_TypeId_isSamplerArray(VIR_Operand_GetType(samplerOpnd)))
+    if (VIR_TypeId_isSampler1D(VIR_Operand_GetTypeId(samplerOpnd)) &&
+        VIR_TypeId_isSamplerArray(VIR_Operand_GetTypeId(samplerOpnd)))
     {
         return gcvTRUE;
     }
@@ -1513,7 +1513,7 @@ _isCoordFloat(
     parm = VIR_Operand_GetParameters(pOpnd);
     samplerOpnd = parm->args[1];
 
-    if (VIR_TypeId_isFloat(VIR_Operand_GetType(samplerOpnd)))
+    if (VIR_TypeId_isFloat(VIR_Operand_GetTypeId(samplerOpnd)))
     {
         return gcvTRUE;
     }
@@ -1661,6 +1661,11 @@ static VIR_Pattern* _intrisicPatterns[] = {
     gcvNULL, /* evis_horz_max3 */
     gcvNULL, /* evis_horz_med3 */
     gcvNULL, /* evis_error */
+    gcvNULL, /* evis_bit_extract */
+    gcvNULL, /* evis_dp16x1_b */
+    gcvNULL, /* evis_dp8x2_b */
+    gcvNULL, /* evis_dp4x4_b */
+    gcvNULL, /* evis_dp2x8_b */
     gcvNULL, /* evis_end */
 
     /* common functions */
@@ -1796,9 +1801,9 @@ static VIR_Pattern* _intrisicPatterns[] = {
     gcvNULL, /* (get_num_groups) */
 
     /* Interpolation Functions. */
-    gcvNULL, /* (interpolateatcenroid), link it from a library later. */
-    gcvNULL, /* (interpolateatsample), link it from a library later. */
-    gcvNULL, /* (interpolateatoffset), link it from a library later. */
+    gcvNULL, /* (interpolateAtCentroid), link it from a library later. */
+    gcvNULL, /* (interpolateAtSample), link it from a library later. */
+    gcvNULL, /* (interpolateAtOffset), link it from a library later. */
 
     gcvNULL, /*  (barrier) */
 
@@ -1846,6 +1851,8 @@ static VIR_Pattern* _intrisicPatterns[] = {
     gcvNULL, /* swizzle_full_def */
     gcvNULL, /* imadhi0 */
     gcvNULL, /* imadlo0 */
+    gcvNULL, /* bitextract */
+    gcvNULL, /* bitInsert */
 };
 
 char _checkIntrisicPatternsSize[(sizeof(_intrisicPatterns) / sizeof(VIR_Pattern*)) == VIR_IK_LAST];
@@ -1923,8 +1930,8 @@ _isSampler1D(
 {
     VIR_Operand             *pOpnd = VIR_Inst_GetSource(Inst, 0);
 
-    if (VIR_TypeId_isSampler1D(VIR_Operand_GetType(pOpnd)) &&
-        !VIR_TypeId_isSamplerArray(VIR_Operand_GetType(pOpnd)))
+    if (VIR_TypeId_isSampler1D(VIR_Operand_GetTypeId(pOpnd)) &&
+        !VIR_TypeId_isSamplerArray(VIR_Operand_GetTypeId(pOpnd)))
     {
         return gcvTRUE;
     }
@@ -1940,9 +1947,9 @@ _isSampler1DShadow(
 {
     VIR_Operand             *pOpnd = VIR_Inst_GetSource(Inst, 0);
 
-    if (VIR_TypeId_isSampler1D(VIR_Operand_GetType(pOpnd)) &&
-        VIR_TypeId_isSamplerShadow(VIR_Operand_GetType(pOpnd)) &&
-        !VIR_TypeId_isSamplerArray(VIR_Operand_GetType(pOpnd)))
+    if (VIR_TypeId_isSampler1D(VIR_Operand_GetTypeId(pOpnd)) &&
+        VIR_TypeId_isSamplerShadow(VIR_Operand_GetTypeId(pOpnd)) &&
+        !VIR_TypeId_isSamplerArray(VIR_Operand_GetTypeId(pOpnd)))
     {
         return gcvTRUE;
     }
@@ -2153,6 +2160,18 @@ _processEvisIntrinsic(
     case VIR_IK_evis_dp2x8:
         opCode = VIR_OP_VX_DP2X8;
         break;
+   case VIR_IK_evis_dp16x1_b:
+        opCode = VIR_OP_VX_DP16X1_B;
+        break;
+    case VIR_IK_evis_dp8x2_b:
+        opCode = VIR_OP_VX_DP8X2_B;
+        break;
+    case VIR_IK_evis_dp4x4_b:
+        opCode = VIR_OP_VX_DP4X4_B;
+        break;
+    case VIR_IK_evis_dp2x8_b:
+        opCode = VIR_OP_VX_DP2X8_B;
+        break;
     case VIR_IK_evis_clamp:
         opCode = VIR_OP_VX_CLAMP;
         break;
@@ -2287,8 +2306,8 @@ _processEvisIntrinsic(
              * make sure it is supported type  */
             if (opCode == VIR_OP_VX_IADD && i == 2 && VIR_Operand_isValueZero(pShader, VIR_Inst_GetSource(pInst, i)))
             {
-                VIR_Operand_SetType(VIR_Inst_GetSource(pInst, i),
-                                    VIR_Operand_GetType(VIR_Inst_GetSource(pInst, 0)));
+                VIR_Operand_SetTypeId(VIR_Inst_GetSource(pInst, i),
+                                    VIR_Operand_GetTypeId(VIR_Inst_GetSource(pInst, 0)));
             }
             gcmASSERT(evisSrcNo >= 0 && (gctUINT)evisSrcNo < VIR_Inst_GetSrcNum(pInst));
 
@@ -2327,7 +2346,7 @@ _processEvisIntrinsic(
     if (storeElements > 0)
     {
         VIR_Operand  *  data = VIR_Inst_GetSource(pInst, 2);
-        VIR_TypeId      tyId = VIR_Operand_GetType(data);
+        VIR_TypeId      tyId = VIR_Operand_GetTypeId(data);
         VIR_TypeId      componentTyId, newTyId;
         VIR_Enable      enable;
         VIR_Operand  *  dest = VIR_Inst_GetDest(pInst);
@@ -2346,19 +2365,19 @@ _processEvisIntrinsic(
             val = VIR_Operand_GetImmediateUint(modifier);
             switch (val) {
             case ERROR_DP2x16_NOT_SUPPORTED:
-                gcoOS_Print("Error: VXC_DP2x16() is not supported");
+                fprintf(stderr, "Error: VXC_DP2x16() is not supported");
                 break;
             case ERROR_IADD_NOT_SUPPORTED:
-                gcoOS_Print("Error: VXC_IAdd() is not supported");
+                fprintf(stderr, "Error: VXC_IAdd() is not supported");
                 break;
             case ERROR_SELECTADD_NOT_SUPPORTED:
-                gcoOS_Print("Error: VXC_SelectAdd() is not supported");
+                fprintf(stderr, "Error: VXC_SelectAdd() is not supported");
                 break;
             case ERROR_BITREPLACE_NOT_SUPPORTED:
-                gcoOS_Print("Error: VXC_BitReplace() is not supported");
+                fprintf(stderr, "Error: VXC_BitReplace() is not supported");
                 break;
             default:
-                gcoOS_Print("Error: unknown VXC operator is not supported");
+                fprintf(stderr, "Error: unknown VXC operator is not supported");
                 break;
             }
         }
@@ -2371,7 +2390,7 @@ _processEvisIntrinsic(
         endBin   =  VXC_GET_END_BIN(val);
         if (endBin - startBin >= 7)
         {
-            gcoOS_Print("Error: %s [StartBin:%d, EndBin:%d] using more than 7 bins is not supported",
+            fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 7 bins is not supported",
                             VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
             return VSC_ERR_NOT_SUPPORTED;
         }
@@ -2384,7 +2403,7 @@ _processEvisIntrinsic(
         endBin   =  VXC_GET_END_BIN(val);
         if (endBin - startBin >= 8)
         {
-            gcoOS_Print("Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported",
+            fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported",
                             VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
             return VSC_ERR_NOT_SUPPORTED;
         }
@@ -2397,7 +2416,7 @@ _processEvisIntrinsic(
         switch (opCode) {
         case VIR_OP_VX_SELECTADD:
         case VIR_OP_VX_DP2X16:
-            gcoOS_Print("Error: opcode %s is not supported in VX2", VIR_OPCODE_GetName(opCode));
+            fprintf(stderr, "Error: opcode %s is not supported in VX2", VIR_OPCODE_GetName(opCode));
             return VSC_ERR_NOT_SUPPORTED;
         case VIR_OP_VX_IACCSQ:
             /* IAccSQ will only support up to 8 outputs*/
@@ -2407,7 +2426,7 @@ _processEvisIntrinsic(
             endBin   =  VXC_GET_END_BIN(val);
             if (endBin - startBin >= 8)
             {
-                gcoOS_Print("Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported in VX2",
+                fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported in VX2",
                                 VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
                 return VSC_ERR_NOT_SUPPORTED;
             }
@@ -2420,7 +2439,7 @@ _processEvisIntrinsic(
             endBin   =  VXC_GET_END_BIN(val);
             if (endBin - startBin >= 7)
             {
-                gcoOS_Print("Error: %s [StartBin:%d, EndBin:%d] using more than 7 bins is not supported in VX2",
+                fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 7 bins is not supported in VX2",
                                 VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
                 return VSC_ERR_NOT_SUPPORTED;
             }
@@ -2440,7 +2459,7 @@ _processEvisIntrinsic(
             endBin   =  VXC_GET_END_BIN(val);
             if (endBin - startBin >= 8)
             {
-                gcoOS_Print("Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported",
+                fprintf(stderr, "Error: %s [StartBin:%d, EndBin:%d] using more than 8 bins is not supported",
                                 VIR_OPCODE_GetName(VIR_Inst_GetOpcode(pInst)), startBin, endBin);
                 return VSC_ERR_NOT_SUPPORTED;
             }
@@ -2452,7 +2471,7 @@ _processEvisIntrinsic(
         case VIR_OP_VX_HORZMIN3:
         case VIR_OP_VX_HORZMAX3:
         case VIR_OP_VX_HORZMED3:
-            gcoOS_Print("Error: VX2 opcode %s is not supported in non-VX2 chip", VIR_OPCODE_GetName(opCode));
+            fprintf(stderr, "Error: VX2 opcode %s is not supported in non-VX2 chip", VIR_OPCODE_GetName(opCode));
             return VSC_ERR_NOT_SUPPORTED;
         default:
             break;
@@ -2542,7 +2561,7 @@ VIR_Lower_MiddleLevel_Process_Intrinsics(
         for (inst = (VIR_Instruction*)VIR_InstIterator_First(&inst_iter);
              inst != gcvNULL;
              inst = (VIR_Instruction*)VIR_InstIterator_Next(&inst_iter))
-        {
+                {
             if (VIR_Inst_GetOpcode(inst) == VIR_OP_INTRINSIC)
             {
                 VIR_Operand *   src0 = VIR_Inst_GetSource(inst, 0);
@@ -2586,6 +2605,14 @@ VIR_Lower_MiddleLevel_Process_Intrinsics(
 
                     case VIR_IK_imadlo0:
                         opCode = VIR_OP_IMADLO0;
+                        break;
+
+                    case VIR_IK_bitextract:
+                        opCode = VIR_OP_BITEXTRACT;
+                        break;
+
+                    case VIR_IK_bitinsert:
+                        opCode = VIR_OP_BITINSERT;
                         break;
 
                     default:

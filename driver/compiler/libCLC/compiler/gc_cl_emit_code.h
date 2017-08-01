@@ -158,6 +158,11 @@ gcGetUniformName(
     IN gcUNIFORM Uniform
     );
 
+gcSL_FORMAT
+clConvDataTypeToFormat(
+clsGEN_CODE_DATA_TYPE DataType
+);
+
 gctUINT8
 clConvPackedTypeToSwizzle(
     IN cloCOMPILER Compiler,
@@ -406,6 +411,12 @@ gcsSUPER_SOURCE;
                 gcSL_NOT_INDEXED, \
                 0)
 
+gcsTYPE_SIZE
+clConvToShaderDataType(
+cloCOMPILER Compiler,
+clsGEN_CODE_DATA_TYPE DataType
+);
+
 gceSTATUS
 clNewAttribute(
     IN cloCOMPILER Compiler,
@@ -473,6 +484,7 @@ clNewVariable(
     IN cltQUALIFIER StorageQualifier,
     IN clsGEN_CODE_DATA_TYPE DataType,
     IN gctSIZE_T Length,
+    IN gctBOOL   IsArray,
     IN gctREG_INDEX TempRegIndex,
     OUT gcVARIABLE *Variable
     );

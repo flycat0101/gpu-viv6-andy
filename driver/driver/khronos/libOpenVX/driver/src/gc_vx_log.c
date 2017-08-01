@@ -56,6 +56,60 @@ VX_API_ENTRY void  VX_API_CALL vxRegisterLogCallback(vx_context context, vx_log_
     vxReleaseMutex(context->base.lock);
 }
 
+#if defined(_WIN32)
+VX_API_ENTRY void  VX_API_CALL _vxAddLogEntry(vx_reference ref, vx_status status, const char *message, ...)
+{
+    vx_context context;
+    va_list argList;
+    vx_char buffer[VX_MAX_LOG_MESSAGE_LEN];
+
+    if (!vxoReference_IsValidAndNoncontext(ref) && !vxoContext_IsValid((vx_context)ref))
+    {
+        vxError("Invalid reference, %p, for vxAddLogEntry", ref);
+        return;
+    }
+
+    if (status == VX_SUCCESS)
+    {
+        vxError("Invalid status, VX_SUCCESS, for vxAddLogEntry", status);
+        return;
+    }
+
+    if (message == VX_NULL)
+    {
+        vxError("The message is NULL, for vxAddLogEntry");
+        return;
+    }
+
+    context = vxoContext_GetFromReference(ref);
+    vxmASSERT(context);
+
+    if (!context->logEnabled) return;
+
+    if (context->logCallback == VX_NULL)
+    {
+        vxError("No registered log callback for vxAddLogEntry");
+        return;
+    }
+
+    va_start(argList, message);
+
+    vsnprintf(buffer, VX_MAX_LOG_MESSAGE_LEN, message, argList);
+
+    buffer[VX_MAX_LOG_MESSAGE_LEN - 1] = 0;
+
+    va_end(argList);
+
+    if (!context->logCallbackReentrant) vxAcquireMutex(context->logLock);
+
+    context->logCallback(context, ref, status, buffer);
+
+    if (!context->logCallbackReentrant) vxReleaseMutex(context->logLock);
+
+    return;
+}
+#endif
+
 VX_API_ENTRY void  VX_API_CALL vxAddLogEntry(vx_reference ref, vx_status status, const char *message, ...)
 {
     vx_context context;

@@ -170,6 +170,7 @@ typedef struct _GalDeviceData {
 
     bool             hw_2d_multi_src;   /**< 2D multi-source blit */
     bool             hw_2d_compression; /**< 2D compression */
+    bool             hw_yuv420_output;  /**< 2D yuv420 output */
 
     /* Pending primitives. */
     int              max_pending_num;   /**< the maximum pending number */
@@ -246,6 +247,7 @@ typedef struct _GalDriverData {
     unsigned int                     src_clear_value;            /**< source tile status clear value. */
     unsigned int                     src_tile_status_size;
     void*                            src_tile_status_logical;
+    unsigned int                     src_planar_num;
 
     /* Source surface2. */
     unsigned int                     src2_phys_addr[3];          /**< the physical address(es) of the source surface2 */
@@ -262,14 +264,14 @@ typedef struct _GalDriverData {
     bool                             use_source2;                /**< source2 is in use. */
 
     /* Dest surface. */
-    unsigned int                     dst_phys_addr;              /**< the physical address of the dest surface */
+    unsigned int                     dst_phys_addr[3];              /**< the physical address of the dest surface */
     unsigned int                     last_dst_phys_addr;         /**< the saved physical address of the dest surface */
-    void                            *dst_logic_addr;             /**< the logical address of the dest surface */
+    void                            *dst_logic_addr[3];             /**< the logical address of the dest surface */
     unsigned int                     dst_width;                  /**< the width of the dest surface in pixels */
     unsigned int                     dst_aligned_width;          /**< the aligned width of the dest surface in pixels */
     unsigned int                     dst_aligned_height;         /**< the aligned height of the dest surface in pixels */
     unsigned int                     dst_height;                 /**< the width of the dest surface in pixels */
-    int                              dst_pitch;                  /**< the ptich of the dest surface */
+    int                              dst_pitch[3];                  /**< the ptich of the dest surface */
     DFBSurfacePixelFormat            dst_format;                 /**< dest surface format in DFB format */
     gceSURF_FORMAT                   dst_native_format;          /**< dest surface format in navtive format */
     gceSURF_ROTATION                 dst_rotation;               /**< dest rotation */
@@ -279,6 +281,7 @@ typedef struct _GalDriverData {
     unsigned int                     dst_clear_value;            /**< dest tile status clear value. */
     unsigned int                     dst_tile_status_size;
     void*                            dst_tile_status_logical;
+    unsigned int                     dst_planar_num;
 
     /* Color. */
     unsigned int                     brush_color;                /**< the color of the brush */
@@ -355,9 +358,10 @@ typedef struct _GalDriverData {
     bool                             need_src_alpha_multiply;    /**< need to enable src alpha multiply */
     bool                             need_glb_alpha_multiply;    /**< need to enable glb alpha multiply */
 
-    /* Source is YUV color format. */
+    /* Source/Destination is YUV color format. */
     bool                             src_is_yuv_format;          /**< source is YUV color format */
     bool                             src2_is_yuv_format;         /**< source2 is YUV color format */
+    bool                             dst_is_yuv_format;          /**< destination is YUV color format */
 
     /* Need smooth scaling. */
     bool                             smooth_scale;               /**< need smooth scaling */

@@ -34,6 +34,7 @@ typedef enum _VSC_ERRCODE
     VSC_ERR_CG_NOT_BUILT          =   8,
     VSC_ERR_OUT_OF_BOUNDS         =   9,
     VSC_ERR_OUT_OF_SAMPLER        =   10,
+    VSC_ERR_NOT_FOUND             =   11,
 
     /* register allocation errors */
     VSC_RA_ERR_OUT_OF_REG_FAIL    =   100, /* not enough registers, RA could not succeed */

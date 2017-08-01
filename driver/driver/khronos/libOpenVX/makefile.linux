@@ -26,8 +26,6 @@ VX_ENTRY               := driver/src
 
 LIB_VX := $(VX_ENTRY) $(VX_VXU)
 
-LIB_VX := $(VX_ENTRY) $(VX_VXU)
-
 ######################################################
 # Define the macros used in the common file.
 

@@ -1785,20 +1785,7 @@ veglMakeCurrent(
                     gcmVERIFY_OK(gcoHAL_Commit(gcvNULL,gcvTRUE));
                 }
 #endif
-                if (thread->api == EGL_OPENGL_ES_API)
-                {
-                    if (MAJOR_API_VER(thread->context->client) == 1)
-                    {
-                        /* GL_PROFILER_FRAME_END */
-                        _ProfilerCallback(thread, 10, 0);
-                    }
-                    else if (MAJOR_API_VER(thread->context->client) == 2 || MAJOR_API_VER(thread->context->client) == 3)
-                    {
-                        /* GL3_PROFILER_FRAME_END */
-                        _ProfilerCallback(thread, 10, 0);
-                    }
-                }
-                else if (thread->api == EGL_OPENVG_API)
+                if (thread->api == EGL_OPENVG_API)
                 {
                     _ProfilerCallback(thread, 10, 0);
                 }
@@ -2041,12 +2028,6 @@ veglMakeCurrent(
                     /* Resolve failed, set error enum. */
                     veglSetEGLerror(thread, EGL_BAD_SURFACE);
                 }
-
-                /* Reset texture orientation. */
-                gcmVERIFY_OK(gcoSURF_SetOrientation(
-                    ctx->draw->texBinder,
-                    gcvORIENTATION_TOP_BOTTOM
-                    ));
 
                 if (thread->error != EGL_SUCCESS)
                 {
@@ -2784,15 +2765,7 @@ _SyncImage(
             gcsSURF_VIEW srcView = {khrImage->srcSurface, 0, 1};
             gcsSURF_VIEW surfView = {khrImage->surface, 0, 1};
 
-            gceORIENTATION srcOrient, dstOrient;
-
-            gcoSURF_QueryOrientation(khrImage->srcSurface,&srcOrient);
-            gcoSURF_QueryOrientation(khrImage->surface,&dstOrient);
-            gcoSURF_SetOrientation(khrImage->surface,srcOrient);
-
             gcoSURF_ResolveRect(&srcView, &surfView, gcvNULL);
-
-            gcoSURF_SetOrientation(khrImage->surface,dstOrient);
 
             gcoSURF_Destroy(khrImage->srcSurface);
             khrImage->srcSurface = gcvNULL;

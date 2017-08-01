@@ -372,6 +372,12 @@ typedef struct _VIR_DU_CHAIN_USAGE_NODE
     gctUINT                   usageIdx;
 }VIR_DU_CHAIN_USAGE_NODE;
 
+typedef struct _VIR_1st_DEF_INFO
+{
+    gctUINT                 firstDefIndex;
+    gctUINT                 lastDefIndex;
+} VIR_1st_DEF_INFO;
+
 void vscUSGN_Initialize(VIR_DU_CHAIN_USAGE_NODE* pUsageNode, gctUINT usageIndex);
 void vscUSGN_Finalize(VIR_DU_CHAIN_USAGE_NODE* pUsageNode);
 #define CAST_USGN_2_ULN(pUsageNode)                 (VSC_UNI_LIST_NODE*)(pUsageNode)
@@ -522,10 +528,15 @@ typedef struct _VIR_WEB
 
 typedef struct _VIR_DEF_USAGE_INFO
 {
-    VIR_BASE_TS_DFA              baseTsDFA;
+    VIR_BASE_TS_DFA              baseTsDFA;  /* must be the first field, some place use pointer
+                                              * to this field as pointer to VIR_DEF_USAGE_INFO !
+                                              */
 
     /* All defs in shader */
     VSC_BLOCK_TABLE              defTable;
+
+    /* hash table for first def index of a regNo in defTable  */
+    VSC_HASH_TABLE             * pFirstDefTable;
 
     /* All usages in shader */
     VSC_BLOCK_TABLE              usageTable;
@@ -545,6 +556,10 @@ typedef struct _VIR_DEF_USAGE_INFO
        of def table and usage table. This is for CPU performance
        consideration. So we need trace its status */
     gctBOOL                      bWebTableBuilt;
+
+    /* compute hash key with regNo and Inst if true,
+       otherwise only hash regNo */
+    gctBOOL                      bHashRegNoInst;
 
     /* Memory pool that this DU-info is built on */
     VSC_PRIMARY_MEM_POOL         pmp;
@@ -639,6 +654,13 @@ void vscVIR_DeleteUsage(VIR_DEF_USAGE_INFO* pDuInfo,
 void vscVIR_MergeTwoWebs(VIR_DEF_USAGE_INFO* pDuInfo,
                          gctUINT dstWebIdx,
                          gctUINT srcWebIdx);
+
+gctUINT vscVIR_FindFirstDefIndex(VIR_DEF_USAGE_INFO* pDuInfo,
+                                            gctUINT firstDefRegNo);
+
+gctUINT vscVIR_FindFirstDefIndexWithChannel(VIR_DEF_USAGE_INFO* pDuInfo,
+                                                       gctUINT             FirstDefRegNo,
+                                                       gctUINT8            Channel);
 
 /* Query routines */
 

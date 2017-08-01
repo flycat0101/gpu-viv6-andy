@@ -988,7 +988,7 @@ VIR_IO_writeOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
 
     if (opndKind != VIR_OPND_TEXLDPARM)
     {
-        val = VIR_Operand_GetType(pOperand) << 12    |
+        val = VIR_Operand_GetTypeId(pOperand) << 12    |
               VIR_Operand_GetSwizzle(pOperand) << 4  |
               VIR_Operand_GetPrecision(pOperand) << 1;
         ON_ERROR0(VIR_IO_writeUint(Buf, val));
@@ -2610,7 +2610,7 @@ VIR_IO_readOperand(VIR_Shader_IOBuffer *Buf, VIR_Operand* pOperand)
     if (opndKind != VIR_OPND_TEXLDPARM)
     {
         ON_ERROR0(VIR_IO_readUint(Buf, &val));
-        VIR_Operand_SetType(pOperand, (VIR_TypeId)((val >> 12)&0x0FFFFF));
+        VIR_Operand_SetTypeId(pOperand, (VIR_TypeId)((val >> 12)&0x0FFFFF));
         if (VIR_Operand_isLvalue(pOperand))
         {
             VIR_Operand_SetEnable(pOperand, ((val >> 4) & 0xFF));

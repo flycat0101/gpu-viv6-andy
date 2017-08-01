@@ -954,6 +954,8 @@ enum OPENCLExtension {
   CL_EXT_KHR_GL_EVENT,
   CL_EXT_KHR_D3D10_SHARING,
   CL_VIV_ASM,
+  CL_VIV_BITFIELD_EXTENSION,
+  CL_VIV_CMPLX_EXTENSION,
   CL_EXT_INVALID,
 };
 
@@ -1099,6 +1101,10 @@ struct PragmaOPENCL_EXTENSIONHandler : public PragmaHandler {
       Extension = CL_EXT_KHR_D3D10_SHARING;
     else if (II->isStr("CL_VIV_asm"))
       Extension = CL_VIV_ASM;
+    else if (II->isStr("cl_viv_bitfield_extension"))
+      Extension = CL_VIV_BITFIELD_EXTENSION;
+    else if (II->isStr("cl_viv_cmplx_extension"))
+      Extension = CL_VIV_CMPLX_EXTENSION;
     else {
       PP.Diag(ExtTok, diag::ext_opencl_pragma_extension_syntax_name);
       return;
@@ -1140,6 +1146,14 @@ struct PragmaOPENCL_EXTENSIONHandler : public PragmaHandler {
        break;
 
     case CL_VIV_ASM:
+       DefineUndefMacro(PP, II, ExtTok.getLocation(), Setting);
+       break;
+
+    case CL_VIV_BITFIELD_EXTENSION:
+       DefineUndefMacro(PP, II, ExtTok.getLocation(), Setting);
+       break;
+
+    case CL_VIV_CMPLX_EXTENSION:
        DefineUndefMacro(PP, II, ExtTok.getLocation(), Setting);
        break;
 

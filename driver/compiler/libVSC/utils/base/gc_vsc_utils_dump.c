@@ -53,6 +53,7 @@ vscDumper_PrintStrSafe(
                                     pFormat,
                                     arguments);
 #else
+#if defined(__i386__) || defined(__x86_64__) || !defined(__STRICT_ANSI__)
     if (*pDumper->pOffset < pDumper->bufferSize)
     {
         /* Format the string. */
@@ -66,6 +67,7 @@ vscDumper_PrintStrSafe(
             *pDumper->pOffset += n;
         }
     }
+#endif
 #endif
     /* Delete the pointer to the variable arguments. */
     va_end(arguments);

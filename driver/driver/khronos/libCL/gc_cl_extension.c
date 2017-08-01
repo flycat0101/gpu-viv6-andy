@@ -43,9 +43,7 @@ static clsLOOKUP clgLookup[] =
     clmMAKE_LOOKUP(clCreateFromGLBuffer),
     clmMAKE_LOOKUP(clCreateFromGLTexture2D),
     clmMAKE_LOOKUP(clCreateFromGLTexture3D),
-#if BUILD_OPENCL_12
     clmMAKE_LOOKUP(clCreateFromGLTexture),
-#endif
     clmMAKE_LOOKUP(clCreateFromGLRenderbuffer),
     clmMAKE_LOOKUP(clGetGLObjectInfo),
     clmMAKE_LOOKUP(clGetGLTextureInfo),
@@ -128,7 +126,6 @@ clGetExtensionFunctionAddress(
     return function.ptr;
 }
 
-#if BUILD_OPENCL_12
 CL_API_ENTRY void * CL_API_CALL
 clGetExtensionFunctionAddressForPlatform(
     cl_platform_id Platform ,
@@ -167,7 +164,6 @@ clGetExtensionFunctionAddressForPlatform(
     gcmFOOTER_ARG("0x%x", function.ptr);
     return function.ptr;
 }
-#endif
 
 extern void clfSetTraceMode(void);
 /*****************************************************************************\

@@ -181,31 +181,31 @@ VX_API_ENTRY vx_status VX_API_CALL vxQueryPyramid(vx_pyramid pyramid, vx_enum at
 
     switch (attribute)
     {
-        case VX_PYRAMID_ATTRIBUTE_LEVELS:
+        case VX_PYRAMID_LEVELS:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_size, 0x3);
 
             *(vx_size *)ptr = pyramid->levelCount;
             break;
 
-        case VX_PYRAMID_ATTRIBUTE_SCALE:
+        case VX_PYRAMID_SCALE:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_float32, 0x3);
 
             *(vx_float32 *)ptr = pyramid->scale;
             break;
 
-        case VX_PYRAMID_ATTRIBUTE_WIDTH:
+        case VX_PYRAMID_WIDTH:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = pyramid->width;
             break;
 
-        case VX_PYRAMID_ATTRIBUTE_HEIGHT:
+        case VX_PYRAMID_HEIGHT:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_uint32, 0x3);
 
             *(vx_uint32 *)ptr = pyramid->height;
             break;
 
-        case VX_PYRAMID_ATTRIBUTE_FORMAT:
+        case VX_PYRAMID_FORMAT:
             vxmVALIDATE_PARAMETERS(ptr, size, vx_df_image, 0x3);
 
             *(vx_df_image *)ptr = pyramid->format;
