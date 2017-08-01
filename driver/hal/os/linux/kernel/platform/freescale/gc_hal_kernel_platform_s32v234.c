@@ -853,20 +853,6 @@ _Reset(
     return gcvSTATUS_OK;
 }
 
-gceSTATUS
-_CacheFlush(
-       IN gcsPLATFORM * Platform,
-       IN gctUINT32 ProcessID,
-       IN gctPHYS_ADDR Handle,
-       IN gctUINT32 Physical,
-       IN gctPOINTER Logical,
-       IN gctSIZE_T Bytes,
-       IN gceCACHEOPERATION Operation
-       )
-{
-       return gcvSTATUS_OK;
-}
-
 static struct soc_platform_ops s32v234_ops =
 {
     .adjustParam  = _AdjustParam,
@@ -878,7 +864,6 @@ static struct soc_platform_ops s32v234_ops =
 #ifdef CONFIG_GPU_LOW_MEMORY_KILLER
     .shrinkMemory = _ShrinkMemory,
 #endif
-    .cache        = _CacheFlush,
 };
 
 static struct soc_platform s32v234_platform =
