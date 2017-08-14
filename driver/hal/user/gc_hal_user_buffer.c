@@ -106,6 +106,8 @@ struct _gcoBUFFER
 
     gcsFENCE_LIST_PTR           fenceList;
 
+    gctPOINTER                  fenceListMutex;
+
     struct
     {
         gctUINT32               hasFence                    : 1;
@@ -1517,6 +1519,8 @@ gcoBUFFER_Construct(
     gcmONERROR(_GetCommandBuffer(buffer));
 #endif
 
+    gcmONERROR(gcoOS_CreateMutex(gcvNULL, &buffer->fenceListMutex));
+
     buffer->commitProcess = gcoOS_GetCurrentProcessID();
 
     gcmONERROR(gcoOS_Allocate(gcvNULL, gcmSIZEOF(gcoWorkerInfo), (gctPOINTER*)&buffer->deltaWorker));
@@ -1830,6 +1834,10 @@ gcoBUFFER_AppendFence(
 
     gcmHEADER_ARG("Buffer=0x%x", Buffer);
 
+    if (!Buffer) return gcvSTATUS_SKIP;
+
+    gcoOS_AcquireMutex(gcvNULL, Buffer->fenceListMutex, gcvINFINITE);
+
     fenceList = Buffer->fenceList;
 
     /* empty or full */
@@ -1851,6 +1859,8 @@ gcoBUFFER_AppendFence(
     fenceList->pendingCount++;
 
 OnError:
+    gcoOS_ReleaseMutex(gcvNULL, Buffer->fenceListMutex);
+
     gcmFOOTER();
     return status;
 }
@@ -1873,6 +1883,10 @@ gcoBUFFER_OnIssueFence(
         gcmFOOTER();
         return status;
     }
+
+    if (!Buffer) return gcvSTATUS_SKIP;
+
+    gcoOS_AcquireMutex(gcvNULL, Buffer->fenceListMutex, gcvINFINITE);
 
     fenceList = Buffer->fenceList;
 
@@ -1909,6 +1923,8 @@ gcoBUFFER_OnIssueFence(
     }
 
 OnError:
+    gcoOS_ReleaseMutex(gcvNULL, Buffer->fenceListMutex);
+
     gcmFOOTER();
     return status;
 }
@@ -1926,6 +1942,10 @@ gcoBUFFER_GetFence(
 
     gcmHEADER_ARG("Buffer=0x%x", Buffer);
 
+    if (!Buffer) return gcvSTATUS_SKIP;
+
+    gcoOS_AcquireMutex(gcvNULL, Buffer->fenceListMutex, gcvINFINITE);
+
     fenceList = Buffer->fenceList;
 
     if(fenceList)
@@ -1938,6 +1958,8 @@ gcoBUFFER_GetFence(
 
         fenceList->onIssueCount = 0;
     }
+
+    gcoOS_ReleaseMutex(gcvNULL, Buffer->fenceListMutex);
 
     gcmFOOTER();
     return status;
@@ -2024,6 +2046,12 @@ gcoBUFFER_Destroy(
         patchList = Buffer->patchList;
         Buffer->patchList = patchList->next;
         gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, patchList));
+    }
+
+    if (Buffer->fenceListMutex)
+    {
+        gcoOS_DeleteMutex(gcvNULL, Buffer->fenceListMutex);
+        Buffer->fenceListMutex = gcvNULL;
     }
 
     gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Buffer->tempCMDBUF.buffer));
