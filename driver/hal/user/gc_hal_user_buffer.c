@@ -29,6 +29,31 @@
 ********************************** Structures **********************************
 \******************************************************************************/
 
+typedef struct _gcoWorkerInfo
+{
+    gctSIGNAL                   signal;
+    gctSIGNAL                   targetSignal;
+
+    gceHARDWARE_TYPE            type;
+    gctPOINTER                  buffer;
+
+    gceHARDWARE_TYPE            hardwareType;
+    gctUINT32                   currentCoreIndex;
+    gcePIPE_SELECT              currentPipe;
+    gctUINT32                   deltasCount;
+    gcsSTATE_DELTA_PTR          stateDelta;
+    gcsSTATE_DELTA_PTR          *stateDeltas;
+    gctUINT32                   context;
+    gctUINT32_PTR               contexts;
+    gcoQUEUE                    queue;
+    gctPOINTER                  *dumpLogical;
+    gctUINT32                   *dumpBytes;
+
+    struct _gcoWorkerInfo        *prev;
+    struct _gcoWorkerInfo        *next;
+}
+gcoWorkerInfo;
+
 struct _gcoBUFFER
 {
     /* Object. */
@@ -102,6 +127,18 @@ struct _gcoBUFFER
         gctUINT32               hasProbe                    : 1;
 
     }hwFeature;
+
+   /* Worker thread for copying data. */
+    gctHANDLE                   workerThread;
+    gctSIGNAL                   startSignal;
+    gctSIGNAL                   stopSignal;
+    gctPOINTER                  suspendMutex;
+
+    /* Process handle. */
+    gctHANDLE                   process;
+    gctHANDLE                   ownerThread;
+
+    gcoWorkerInfo               workerSentinel;
 };
 
 /******************************************************************************\
@@ -666,6 +703,431 @@ OnError:
     return status;
 }
 
+gceSTATUS
+gcoFreeWorkerDeltas(
+    gcoWorkerInfo * Worker
+    )
+{
+    if (!Worker->stateDeltas)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+#if gcdENABLE_3D || gcdENABLE_2D
+    /* 2D indpendent HW doesn't need context. */
+    if (Worker->type != gcvHARDWARE_2D)
+    {
+        gctUINT i;
+
+        for (i = 0; i < Worker->deltasCount; i++)
+        {
+            if (!Worker->stateDeltas[i])
+            {
+                continue;
+            }
+
+            if (Worker->stateDeltas[i]->mapEntryID > 0)
+            {
+                gcmVERIFY_OK(gcoOS_Free(
+                    gcvNULL,
+                    (gctPOINTER *)Worker->stateDeltas[i]->mapEntryID
+                    ));
+            }
+
+            if (Worker->stateDeltas[i]->mapEntryIndex > 0)
+            {
+                gcmVERIFY_OK(gcoOS_Free(
+                    gcvNULL,
+                    (gctPOINTER *)Worker->stateDeltas[i]->mapEntryIndex
+                    ));
+            }
+
+            if (Worker->stateDeltas[i]->recordArray > 0)
+            {
+                gcmVERIFY_OK(gcoOS_Free(
+                    gcvNULL,
+                    (gctPOINTER *)Worker->stateDeltas[i]->recordArray
+                    ));
+            }
+
+            gcmVERIFY_OK(gcoOS_Free(
+                gcvNULL, (gctPOINTER *) Worker->stateDeltas[i]
+                ));
+        }
+
+        gcmVERIFY_OK(gcoOS_Free(
+            gcvNULL,
+            (gctPOINTER *) Worker->stateDeltas
+            ));
+    }
+#endif
+
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcoCopyWorkerDeltas(
+    gcoBUFFER Buffer,
+    gcoWorkerInfo * Worker,
+    gcsSTATE_DELTA_PTR *Deltas
+    )
+{
+    gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
+
+    gcmGETCURRENTHARDWARE(Worker->type);
+
+#if gcdENABLE_3D || gcdENABLE_2D
+    /* 2D indpendent HW doesn't need context. */
+    if (Worker->type != gcvHARDWARE_2D)
+    {
+        gctUINT i;
+        gctUINT coreCount = 1;
+        gctUINT coreIndex;
+
+        gcoHARDWARE_Query3DCoreCount(gcvNULL, &coreCount);
+
+        Worker->deltasCount = coreCount;
+
+        gcmONERROR(gcoOS_Allocate(
+            gcvNULL,
+            gcmSIZEOF(gcsSTATE_DELTA_PTR) * coreCount,
+            (gctPOINTER *)&Worker->stateDeltas
+            ));
+
+        gcoOS_ZeroMemory(Worker->stateDeltas, gcmSIZEOF(gcsSTATE_DELTA_PTR) * coreCount);
+
+        for (i = 0; i < coreCount; i++)
+        {
+            /* Allocate a state delta. */
+            gctPOINTER pointer;
+            gcsSTATE_DELTA_PTR delta;
+            gcsSTATE_DELTA_PTR prev;
+
+            /* Allocate the state delta structure. */
+            gcmONERROR(gcoOS_AllocateSharedMemory(
+                gcvNULL, gcmSIZEOF(gcsSTATE_DELTA), (gctPOINTER *) &delta
+                ));
+
+            /* Reset the context buffer structure. */
+            gcoOS_ZeroMemory(delta, gcmSIZEOF(gcsSTATE_DELTA));
+
+            /* Append to the list. */
+            if (Worker->stateDeltas[i] == gcvNULL)
+            {
+                delta->prev     = gcmPTR_TO_UINT64(delta);
+                delta->next     = gcmPTR_TO_UINT64(delta);
+                Worker->stateDeltas[i] = delta;
+            }
+            else
+            {
+                delta->next = gcmPTR_TO_UINT64(Worker->stateDeltas[i]);
+                delta->prev = Worker->stateDeltas[i]->prev;
+
+                prev = gcmUINT64_TO_PTR(Worker->stateDeltas[i]->prev);
+                prev->next = gcmPTR_TO_UINT64(delta);
+                Worker->stateDeltas[i]->prev = gcmPTR_TO_UINT64(delta);
+            }
+
+            if (Deltas[i]->mapEntryIDSize > 0)
+            {
+                delta->mapEntryIDSize = Deltas[i]->mapEntryIDSize;
+
+                /* Allocate map ID array. */
+                gcmONERROR(gcoOS_AllocateSharedMemory(
+                    gcvNULL, delta->mapEntryIDSize, &pointer
+                    ));
+
+                gcoOS_MemCopy(pointer, gcmUINT64_TO_PTR(Deltas[i]->mapEntryID), delta->mapEntryIDSize);
+
+                delta->mapEntryID = gcmPTR_TO_UINT64(pointer);
+
+                /* Allocate map index array. */
+                gcmONERROR(gcoOS_AllocateSharedMemory(
+                    gcvNULL, delta->mapEntryIDSize, &pointer
+                    ));
+
+                gcoOS_MemCopy(pointer, gcmUINT64_TO_PTR(Deltas[i]->mapEntryIndex), delta->mapEntryIDSize);
+
+                delta->mapEntryIndex = gcmPTR_TO_UINT64(pointer);
+            }
+
+            if (Deltas[i]->recordCount > 0)
+            {
+                delta->recordCount = Deltas[i]->recordCount;
+
+                /* Allocate state record array. */
+                gcmONERROR(gcoOS_AllocateSharedMemory(
+                    gcvNULL,
+                    gcmSIZEOF(gcsSTATE_DELTA_RECORD) * delta->recordCount,
+                    &pointer
+                    ));
+
+                gcoOS_MemCopy(pointer, gcmUINT64_TO_PTR(Deltas[i]->recordArray), gcmSIZEOF(gcsSTATE_DELTA_RECORD) * delta->recordCount);
+
+                delta->recordArray = gcmPTR_TO_UINT64(pointer);
+            }
+
+            delta->id = Deltas[i]->id;
+            delta->elementCount = Deltas[i]->elementCount;
+            delta->refCount = Deltas[i]->refCount;
+        }
+
+        /* Specify delta and context for main core. */
+        gcoHARDWARE_QueryCoreIndex(Buffer->hardware, 0, &coreIndex);
+        Worker->stateDelta = Worker->stateDeltas[coreIndex];
+    }
+#endif
+    return status;
+
+OnError:
+
+    gcoFreeWorkerDeltas(Worker);
+
+    return status;
+}
+
+gcoWorkerInfo*
+gcoGetWorker(
+    gcoOS Os,
+    gcoBUFFER Buffer
+    )
+{
+    gceSTATUS status;
+    gcoWorkerInfo *worker = gcvNULL;
+
+    gcmONERROR(gcoOS_Allocate(Os,gcmSIZEOF(gcoWorkerInfo), (gctPOINTER*)&worker));
+    gcoOS_ZeroMemory(worker,gcmSIZEOF(gcoWorkerInfo));
+
+    gcmONERROR(gcoOS_Allocate(Os,gcmSIZEOF(struct _gcoBUFFER), (gctPOINTER*)&worker->buffer));
+
+    gcmONERROR(gcoOS_Allocate(Os,gcmSIZEOF(struct _gcoQUEUE), (gctPOINTER*)&worker->queue));
+
+    gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvFALSE, &worker->signal));
+
+    /* Return the worker. */
+    return worker;
+
+OnError:
+
+    if (worker)
+    {
+        if (worker->buffer)
+        {
+            gcoOS_Free(Os, worker->buffer);
+        }
+
+        if (worker->queue)
+        {
+            gcoOS_Free(Os, worker->queue);
+        }
+
+        gcoOS_Free(Os, worker);
+    }
+
+    /* Return the status. */
+    gcmFOOTER();
+
+    return gcvNULL;
+}
+
+gcoWorkerInfo*
+gcoFreeWorker(
+    gcoOS Os,
+    gcoBUFFER Buffer,
+    gcoWorkerInfo* Worker
+    )
+{
+    gcoWorkerInfo* nextWorker;
+
+    /* Get the next worker. */
+    nextWorker = Worker->next;
+
+    Worker->prev->next = Worker->next;
+    Worker->next->prev = Worker->prev;
+
+    gcmVERIFY_OK(gcoOS_DestroySignal(Os, Worker->signal));
+
+    gcmVERIFY_OK(gcoOS_Free(Os, Worker->buffer));
+    gcmVERIFY_OK(gcoOS_Free(Os, Worker->queue));
+
+    gcmVERIFY_OK(gcoFreeWorkerDeltas(Worker));
+
+    gcmVERIFY_OK(gcoOS_Free(Os, Worker));
+
+    return nextWorker;
+}
+
+gctBOOL
+gcoSubmitWorker(
+    gcoBUFFER Buffer,
+    gcoWorkerInfo* Worker
+    )
+{
+    Worker->prev =  Buffer->workerSentinel.prev;
+    Worker->next = &Buffer->workerSentinel;
+
+    Buffer->workerSentinel.prev->next = Worker;
+    Buffer->workerSentinel.prev       = Worker;
+
+    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, Worker->signal, gcvTRUE));
+    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, Buffer->startSignal, gcvTRUE));
+
+    return gcvTRUE;
+}
+
+void
+gcoSuspendWorker(
+    gcoBUFFER Buffer
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Buffer=0x%x", Buffer);
+
+    gcmASSERT(Buffer != gcvNULL);
+    if (Buffer->suspendMutex != gcvNULL)
+    {
+        gcmONERROR(gcoOS_AcquireMutex(gcvNULL, Buffer->suspendMutex, gcvINFINITE));
+    }
+    gcmFOOTER_NO();
+    return;
+
+OnError:
+    gcmFOOTER();
+    return;
+}
+
+void
+gcoResumeWorker(
+    gcoBUFFER Buffer
+    )
+{
+    gceSTATUS status = gcvSTATUS_OK;
+    gcmHEADER_ARG("Buffer=0x%x", Buffer);
+
+    gcmASSERT(Buffer != gcvNULL);
+    if (Buffer->suspendMutex != gcvNULL)
+    {
+        gcmONERROR(gcoOS_ReleaseMutex(gcvNULL, Buffer->suspendMutex));
+    }
+    gcmFOOTER_NO();
+    return;
+
+OnError:
+    gcmFOOTER();
+    return;
+}
+
+gceSTATUS
+gcoBUFFER_Commit_Worker(
+    IN gcoBUFFER Buffer,
+    IN gcePIPE_SELECT CurrentPipe,
+    IN gctUINT32 CurrentCoreIndex,
+    IN gceHARDWARE_TYPE HardwareType,
+    IN gcsSTATE_DELTA_PTR StateDelta,
+    IN gcsSTATE_DELTA_PTR *StateDeltas,
+    IN gctUINT32 Context,
+    IN gctUINT32_PTR Contexts,
+    IN gcoQUEUE Queue,
+    OUT gctPOINTER *DumpLogical,
+    OUT gctUINT32 *DumpBytes
+    );
+
+gctTHREAD_RETURN
+gcoBufferCommitWorker(
+    void* Buffer
+    )
+{
+    gcoBUFFER buffer;
+    gcoWorkerInfo *commitWorker;
+    gcoWorkerInfo *currWorker;
+    gctBOOL bStop = gcvFALSE;
+    gctPOINTER dumpCommandLogical;
+    gctUINT32 dumpCommandBytes = 0;
+
+    gcmHEADER_ARG("Buffer=0x%x", Buffer);
+
+    buffer = (gcoBUFFER)Buffer;
+
+    while (gcvTRUE)
+    {
+        /* Wait for the start signal. */
+        if gcmIS_ERROR(gcoOS_WaitSignal(gcvNULL, buffer->startSignal, gcvINFINITE))
+        {
+            break;
+        }
+
+        /* Check the thread's stop signal. */
+        if (gcmIS_SUCCESS(gcoOS_WaitSignal(gcvNULL, buffer->stopSignal, 0)))
+        {
+            /* Stop had been signaled, exit. */
+            bStop = gcvTRUE;
+        }
+
+        /* Acquire synchronization mutex. */
+        gcoSuspendWorker(buffer);
+
+        currWorker = buffer->workerSentinel.next;
+
+        /* Release synchronization mutex. */
+        gcoResumeWorker(buffer);
+
+        for (;;)
+        {
+            if  ((currWorker == gcvNULL) ||
+                 (currWorker->buffer == gcvNULL))
+            {
+                break;
+            }
+
+            if (gcmIS_ERROR(gcoOS_WaitSignal(gcvNULL, currWorker->signal, gcvINFINITE)))
+            {
+                break;
+            }
+
+            commitWorker = currWorker;
+#if 0
+    gcmPRINT("%s %d, buffer = %p, currentPipe =%d, stateDelta = %p, stateDeltas = %p, context = %d, contexts = %p, queue = %p ###\n", __FUNCTION__, __LINE__, currWorker->buffer,currWorker->currentPipe,currWorker->stateDelta,currWorker->stateDeltas,currWorker->context,currWorker->contexts,currWorker->queue);
+#endif
+            gcoBUFFER_Commit_Worker(currWorker->buffer,
+                                    currWorker->currentPipe,
+                                    currWorker->currentCoreIndex,
+                                    currWorker->hardwareType,
+                                    currWorker->stateDelta,
+                                    currWorker->stateDeltas,
+                                    currWorker->context,
+                                    currWorker->contexts,
+                                    currWorker->queue,
+                                    &dumpCommandLogical,
+                                    &dumpCommandBytes);
+
+            /* Acquire synchronization mutex. */
+            gcoSuspendWorker(buffer);
+
+            /* Free the more recent worker. */
+            if (commitWorker != currWorker)
+            {
+                gcoFreeWorker(gcvNULL, buffer, commitWorker);
+            }
+
+            /* Free the current worker. */
+            currWorker = gcoFreeWorker(gcvNULL, buffer, currWorker);
+
+            /* Release synchronization mutex. */
+            gcoResumeWorker(buffer);
+        }
+
+        if (bStop)
+        {
+            break;
+        }
+    }
+
+    gcmFOOTER_ARG("return=%ld", (gctTHREAD_RETURN) 0);
+    /* Success. */
+    return (gctTHREAD_RETURN) 0;
+}
+
+
 /******************************************************************************\
 ******************************* gcoBUFFER API Code ******************************
 \******************************************************************************/
@@ -861,6 +1323,16 @@ gcoBUFFER_Construct(
     /* Get the current command buffer. */
     gcmONERROR(_GetCommandBuffer(buffer));
 #endif
+
+    buffer->workerSentinel.prev   = &buffer->workerSentinel;
+    buffer->workerSentinel.next   = &buffer->workerSentinel;
+    buffer->process               = gcoOS_GetCurrentProcessID();
+
+    gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvFALSE, &buffer->startSignal));
+
+    gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvFALSE, &buffer->stopSignal));
+
+    gcmONERROR(gcoOS_CreateThread(gcvNULL, gcoBufferCommitWorker, buffer, &buffer->workerThread));
 
     /* Return pointer to the gcoBUFFER object. */
     *Buffer = buffer;
@@ -1333,6 +1805,32 @@ gcoBUFFER_Destroy(
 
     gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Buffer->tempCMDBUF.buffer));
 
+    /* Stop the worker thread. */
+    if (Buffer->workerThread != gcvNULL)
+    {
+        /* Set thread's stop signal. */
+        gcmASSERT(Buffer->stopSignal != gcvNULL);
+        gcmVERIFY_OK(gcoOS_Signal(
+            gcvNULL,
+            Buffer->stopSignal,
+            gcvTRUE
+            ));
+
+        /* Set thread's start signal. */
+        gcmASSERT(Buffer->startSignal != gcvNULL);
+        gcmVERIFY_OK(gcoOS_Signal(
+            gcvNULL,
+            Buffer->startSignal,
+            gcvTRUE
+            ));
+
+        /* Wait until the thread is closed. */
+        gcmVERIFY_OK(gcoOS_CloseThread(
+            gcvNULL, Buffer->workerThread
+            ));
+        Buffer->workerThread = gcvNULL;
+    }
+
     /* Free the object memory. */
     gcmONERROR(gcmOS_SAFE_FREE(gcvNULL, Buffer));
 
@@ -1673,9 +2171,74 @@ gcoBUFFER_Commit(
     OUT gctUINT32 *DumpBytes
     )
 {
+    gcsTLS_PTR tls;
+    gceSTATUS status;
+    gcoWorkerInfo* worker;
+
+    /* Find an available worker. */
+    worker = gcoGetWorker(gcvNULL, Buffer);
+
+    if (worker == gcvNULL)
+    {
+        return gcvSTATUS_OUT_OF_MEMORY;
+    }
+
+    status = gcoOS_GetTLS(&tls);
+    if (gcmIS_ERROR(status))
+    {
+        return status;
+    }
+
+    worker->hardwareType = tls->currentType;
+    worker->currentCoreIndex = tls->currentCoreIndex;
+
+    /* Fill in the worker information. */
+    gcoOS_MemCopy(worker->buffer, Buffer, gcmSIZEOF(struct _gcoBUFFER));
+    gcoOS_MemCopy(worker->queue, Queue, gcmSIZEOF(struct _gcoQUEUE));
+    worker->currentPipe   = CurrentPipe;
+    worker->context       = Context;
+    worker->contexts      = Contexts;
+
+    /* clean up the queue now. */
+    worker->queue->head = worker->queue->tail = gcvNULL;
+    worker->queue->recordCount = 0;
+    worker->queue->chunks = gcvNULL;
+    worker->queue->freeList = gcvNULL;
+
+    gcoCopyWorkerDeltas(Buffer, worker, StateDeltas);
+
+    /* Suspend the worker thread. */
+    gcoSuspendWorker(Buffer);
+
+    /* Submit the worker. */
+    gcoSubmitWorker(Buffer, worker);
+
+    /* Resume the swap thread. */
+    gcoResumeWorker(Buffer);
+
+    return gcvSTATUS_OK;
+}
+
+
+gceSTATUS
+gcoBUFFER_Commit_Worker(
+    IN gcoBUFFER Buffer,
+    IN gcePIPE_SELECT CurrentPipe,
+    IN gctUINT32 CurrentCoreIndex,
+    IN gceHARDWARE_TYPE HardwareType,
+    IN gcsSTATE_DELTA_PTR StateDelta,
+    IN gcsSTATE_DELTA_PTR *StateDeltas,
+    IN gctUINT32 Context,
+    IN gctUINT32_PTR Contexts,
+    IN gcoQUEUE Queue,
+    OUT gctPOINTER *DumpLogical,
+    OUT gctUINT32 *DumpBytes
+    )
+{
     gceSTATUS status;
     gcoCMDBUF commandBuffer;
     gctBOOL emptyBuffer;
+    gcsHAL_INTERFACE iface;
 
     gcmHEADER_ARG("Buffer=0x%x Queue=0x%x",
                   Buffer, Queue);
@@ -1706,14 +2269,36 @@ gcoBUFFER_Commit(
         emptyBuffer = (commandBuffer->offset - commandBuffer->startOffset <= Buffer->info.reservedHead);
     }
 
+    iface.ignoreTLS     = gcvTRUE;
+    iface.hardwareType  = HardwareType;
+    iface.coreIndex     = CurrentCoreIndex;
+
     /* Send for execution. */
     if (emptyBuffer)
     {
-        gcmONERROR(gcoQUEUE_Commit(Queue, gcvFALSE));
+        if (Queue->head != gcvNULL)
+        {
+            /* Initialize event commit command. */
+            iface.command       = gcvHAL_EVENT_COMMIT;
+            iface.engine        = Queue->engine;
+            iface.u.Event.queue = gcmPTR_TO_UINT64(Queue->head);
+
+            /* Send command to kernel. */
+            gcmONERROR(
+                gcoOS_DeviceControl(gcvNULL,
+                                    IOCTL_GCHAL_INTERFACE,
+                                    &iface, gcmSIZEOF(iface),
+                                    &iface, gcmSIZEOF(iface)));
+
+            /* Test for error. */
+            gcmONERROR(iface.status);
+
+            /* Free any records in the queue. */
+            gcmONERROR(gcoQUEUE_Free(Queue));
+        }
     }
     else
     {
-        gcsHAL_INTERFACE iface;
         gctUINT32 newOffset;
         gctSIZE_T spaceLeft;
         gctUINT32 coreCount = 1;
@@ -1739,7 +2324,7 @@ gcoBUFFER_Commit(
                     pauseQueryCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
                                                     + tailCommandBuffer->offset);
 
-                    gcoHARDWARE_SetQuery(gcvNULL, ~0U, (gceQueryType)type, gcvQUERYCMD_PAUSE, (gctPOINTER*)&pauseQueryCommand);
+                    gcoHARDWARE_SetQuery(Buffer->hardware, ~0U, (gceQueryType)type, gcvQUERYCMD_PAUSE, (gctPOINTER*)&pauseQueryCommand);
                     if ((pauseQueryCommand - pauseQueryCommandsaved) > 0)
                     {
                         tailCommandBuffer->offset += (gctUINT32)(pauseQueryCommand - pauseQueryCommandsaved);
@@ -1756,7 +2341,7 @@ gcoBUFFER_Commit(
                     pauseXfbCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR) gcmUINT64_TO_PTR(tailCommandBuffer->logical)
                                                 + tailCommandBuffer->offset);
 
-                    gcoHARDWARE_SetXfbCmd(gcvNULL, gcvXFBCMD_PAUSE_INCOMMIT, (gctPOINTER*)&pauseXfbCommand);
+                    gcoHARDWARE_SetXfbCmd(Buffer->hardware, gcvXFBCMD_PAUSE_INCOMMIT, (gctPOINTER*)&pauseXfbCommand);
                     if (pauseXfbCommand - pauseXfbCommandsaved > 0)
                     {
                         tailCommandBuffer->offset += (gctUINT32)(pauseXfbCommand - pauseXfbCommandsaved);
@@ -1772,7 +2357,7 @@ gcoBUFFER_Commit(
                     pauseProbeCommand      = gcmPTR_TO_UINT64((gctUINT8_PTR)gcmUINT64_TO_PTR(tailCommandBuffer->logical)
                                                     + tailCommandBuffer->offset);
 
-                    gcoHARDWARE_SetProbeCmd(gcvNULL, gcvPROBECMD_PAUSE, ~0U, (gctPOINTER*)&pauseProbeCommand);
+                    gcoHARDWARE_SetProbeCmd(Buffer->hardware, gcvPROBECMD_PAUSE, ~0U, (gctPOINTER*)&pauseProbeCommand);
                     if (pauseProbeCommand - pauseProbeCommandsaved > 0)
                     {
                         tailCommandBuffer->offset += (gctUINT32)(pauseProbeCommand - pauseProbeCommandsaved);
@@ -1780,7 +2365,7 @@ gcoBUFFER_Commit(
                     }
                 }
 
-                gcoHARDWARE_Query3DCoreCount(gcvNULL, &coreCount);
+                gcoHARDWARE_Query3DCoreCount(Buffer->hardware, &coreCount);
 
                 alignedBytes = gcmALIGN(tailCommandBuffer->offset, Buffer->info.alignment) - tailCommandBuffer->offset;
                 if (coreCount > 1)
@@ -1791,12 +2376,12 @@ gcoBUFFER_Commit(
                     syncCommandLogical = (gctUINT32_PTR)((gctUINT8_PTR)gcmUINT64_TO_PTR(tailCommandBuffer->logical) +
                                                          tailCommandBuffer->offset + alignedBytes);
 
-                    gcoHARDWARE_MultiGPUCacheFlush(gcvNULL, &syncCommandLogical);
+                    gcoHARDWARE_MultiGPUCacheFlush(Buffer->hardware, &syncCommandLogical);
 
-                    gcoHARDWARE_MultiGPUSync(gcvNULL, &syncCommandLogical);
-                    gcoHARDWARE_QueryMultiGPUSyncLength(gcvNULL, &bytes);
+                    gcoHARDWARE_MultiGPUSync(Buffer->hardware, &syncCommandLogical);
+                    gcoHARDWARE_QueryMultiGPUSyncLength(Buffer->hardware, &bytes);
                     tailCommandBuffer->offset += bytes + alignedBytes;
-                    gcoHARDWARE_QueryMultiGPUCacheFlushLength(gcvNULL, &bytes);
+                    gcoHARDWARE_QueryMultiGPUCacheFlushLength(Buffer->hardware, &bytes);
                     tailCommandBuffer->offset += bytes;
                 }
                 else
@@ -1808,7 +2393,7 @@ gcoBUFFER_Commit(
                                       + tailCommandBuffer->offset + alignedBytes;
 
                     /* need flush ccache zcache and shl1_cache per commit */
-                    gcoHARDWARE_FlushCache(gcvNULL, (gctPOINTER *)&flushCacheCommand);
+                    gcoHARDWARE_FlushCache(Buffer->hardware, (gctPOINTER *)&flushCacheCommand);
                     tailCommandBuffer->offset += (gctUINT32)(flushCacheCommand - flushCacheCommandsaved) + alignedBytes;
                 }
             }
@@ -1829,12 +2414,12 @@ gcoBUFFER_Commit(
                 if (Buffer->info.engine == gcvENGINE_BLT)
                 {
                     /*no need flush cache and do multi gpu sync here*/
-                    gcoHARDWARE_SendFence(gcvNULL, gcvFALSE, gcvENGINE_BLT,(gctPOINTER*)&fenceCommand);
+                    gcoHARDWARE_SendFence(Buffer->hardware, gcvFALSE, gcvENGINE_BLT,(gctPOINTER*)&fenceCommand);
                 }
                 else
                 {
                     /*no need flush cache and do multi gpu sync here*/
-                    gcoHARDWARE_SendFence(gcvNULL, gcvFALSE, gcvENGINE_RENDER,(gctPOINTER*)&fenceCommand);
+                    gcoHARDWARE_SendFence(Buffer->hardware, gcvFALSE, gcvENGINE_RENDER,(gctPOINTER*)&fenceCommand);
                 }
                 tailCommandBuffer->offset += (gctUINT32)(fenceCommand - fenceCommandSaved) + alignedBytes;
             }
@@ -1881,7 +2466,6 @@ gcoBUFFER_Commit(
         iface.u.Commit.contexts[0] = 0;
 #endif
 
-        iface.ignoreTLS = gcvFALSE;
         iface.command = gcvHAL_COMMIT;
         iface.engine = Buffer->info.engine;
         iface.u.Commit.commandBuffers[0] = gcmPTR_TO_UINT64(commandBuffer);
@@ -1894,16 +2478,13 @@ gcoBUFFER_Commit(
         if (Buffer->info.engine == gcvENGINE_RENDER)
         {
             gctUINT32 i;
-            gctUINT32 originalCoreIndex;
-
-            gcmONERROR(gcoHAL_GetCurrentCoreIndex(gcvNULL, &originalCoreIndex));
 
             for (i = 1; i < coreCount; i++)
             {
                 gctUINT32 coreIndex;
 
                 /* Convert core index in this hardware to global core index. */
-                gcmONERROR(gcoHARDWARE_QueryCoreIndex(gcvNULL, i, &coreIndex));
+                gcmONERROR(gcoHARDWARE_QueryCoreIndex(Buffer->hardware, i, &coreIndex));
 
                 if (StateDeltas)
                 {
@@ -1939,13 +2520,7 @@ gcoBUFFER_Commit(
                 {
                     iface.u.Commit.commandBuffers[i] = 0;
                 }
-
-                /* Set it to TLS to find correct command queue. */
-                gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, coreIndex));
             }
-
-            /* Restore core index in TLS. */
-            gcmONERROR(gcoHAL_SetCoreIndex(gcvNULL, originalCoreIndex));
         }
 
         /* Call kernel service. */
