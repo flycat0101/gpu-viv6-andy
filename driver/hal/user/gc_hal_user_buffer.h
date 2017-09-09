@@ -228,6 +228,12 @@ struct _gcoCMDBUF
     gctUINT32                   mirrorCount;
 };
 
+typedef struct _gcsChunkHead * gcsChunkHead_PTR;
+struct _gcsChunkHead
+{
+    gcsChunkHead_PTR next;
+};
+
 typedef struct _gcsQUEUE
 {
     /* Pointer to next gcsQUEUE structure in gcsQUEUE. */
@@ -270,6 +276,54 @@ struct _gcsTEMPCMDBUF
     gctPOINTER buffer;
     gctBOOL  inUse;
 };
+
+typedef struct _gcoWorkerInfo
+{
+    gctSIGNAL                   signal;
+    gctSIGNAL                   targetSignal;
+
+    gceHARDWARE_TYPE            type;
+    gctPOINTER                  buffer;
+
+    gceHARDWARE_TYPE            hardwareType;
+    gctUINT32                   currentCoreIndex;
+    gcePIPE_SELECT              currentPipe;
+    gctUINT32                   deltasCount;
+    gcsSTATE_DELTA_PTR          stateDelta;
+    gcsSTATE_DELTA_PTR          *stateDeltas;
+    gctUINT32                   context;
+    gctUINT32_PTR               contexts;
+    gcoQUEUE                    queue;
+    gctPOINTER                  *dumpLogical;
+    gctUINT32                   *dumpBytes;
+
+    struct _gcoWorkerInfo        *prev;
+    struct _gcoWorkerInfo        *next;
+}
+gcoWorkerInfo;
+
+gcoWorkerInfo*
+gcoGetWorker(
+    gcoOS Os,
+    gcoQUEUE Queue,
+    gcoBUFFER Buffer
+    );
+
+gctBOOL
+gcoSubmitWorker(
+    gcoBUFFER Buffer,
+    gcoWorkerInfo* Worker
+    );
+
+void
+gcoSuspendWorker(
+    gcoBUFFER Buffer
+    );
+
+void
+gcoResumeWorker(
+    gcoBUFFER Buffer
+    );
 
 #ifdef __cplusplus
 }

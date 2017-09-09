@@ -4025,6 +4025,7 @@ gcoQUEUE_Construct(
 /* Destroy a gcoQUEUE object. */
 gceSTATUS
 gcoQUEUE_Destroy(
+    IN gcoBUFFER Buffer,
     IN gcoQUEUE Queue
     );
 
@@ -4038,6 +4039,7 @@ gcoQUEUE_AppendEvent(
 /* Commit and event queue. */
 gceSTATUS
 gcoQUEUE_Commit(
+    IN gcoBUFFER Buffer,
     IN gcoQUEUE Queue,
     IN gctBOOL Stall
     );

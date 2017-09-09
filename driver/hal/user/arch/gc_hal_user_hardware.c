@@ -6051,7 +6051,7 @@ gceSTATUS gcoHARDWARE_Destroy(
 
     if (Hardware->engine[gcvENGINE_BLT].queue != gcvNULL)
     {
-        gcmONERROR(gcoQUEUE_Destroy(Hardware->engine[gcvENGINE_BLT].queue));
+        gcmONERROR(gcoQUEUE_Destroy(Hardware->engine[gcvENGINE_BLT].buffer, Hardware->engine[gcvENGINE_BLT].queue));
         Hardware->engine[gcvENGINE_BLT].queue = gcvNULL;
     }
 
@@ -6063,7 +6063,7 @@ gceSTATUS gcoHARDWARE_Destroy(
 
     if (Hardware->engine[gcvENGINE_RENDER].queue != gcvNULL)
     {
-        gcmONERROR(gcoQUEUE_Destroy(Hardware->engine[gcvENGINE_RENDER].queue));
+        gcmONERROR(gcoQUEUE_Destroy(Hardware->engine[gcvENGINE_RENDER].buffer, Hardware->engine[gcvENGINE_RENDER].queue));
         Hardware->engine[gcvENGINE_RENDER].queue = gcvNULL;
     }
 #endif
@@ -8786,7 +8786,7 @@ gcoHARDWARE_Stall(
             gcmONERROR(gcoHARDWARE_CallEvent(Hardware, &iface));
 
             /* Commit the event queue. */
-            gcmONERROR(gcoQUEUE_Commit(Hardware->engine[i].queue, gcvFALSE));
+            gcmONERROR(gcoQUEUE_Commit(Hardware->engine[i].buffer, Hardware->engine[i].queue, gcvFALSE));
 
             wait[i] = gcvTRUE;
         }

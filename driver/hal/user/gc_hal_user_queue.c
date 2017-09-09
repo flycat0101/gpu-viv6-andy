@@ -24,12 +24,6 @@
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcvZONE_BUFFER
 
-typedef struct _gcsChunkHead * gcsChunkHead_PTR;
-struct _gcsChunkHead
-{
-    gcsChunkHead_PTR next;
-};
-
 gceSTATUS
 gcoQUEUE_Construct(
     IN gcoOS Os,
@@ -89,6 +83,7 @@ OnError:
 
 gceSTATUS
 gcoQUEUE_Destroy(
+    IN gcoBUFFER Buffer,
     IN gcoQUEUE Queue
     )
 {
@@ -101,7 +96,7 @@ gcoQUEUE_Destroy(
     gcmVERIFY_OBJECT(Queue, gcvOBJ_QUEUE);
 
     /* Commit the event queue. */
-    gcmONERROR(gcoQUEUE_Commit(Queue, gcvTRUE));
+    gcmONERROR(gcoQUEUE_Commit(Buffer, Queue, gcvTRUE));
 
     while (Queue->chunks != gcvNULL)
     {
@@ -248,12 +243,12 @@ gcoQUEUE_Free(
 
 gceSTATUS
 gcoQUEUE_Commit(
+    IN gcoBUFFER Buffer,
     IN gcoQUEUE Queue,
     IN gctBOOL Stall
     )
 {
     gceSTATUS status = gcvSTATUS_OK;
-    gcsHAL_INTERFACE iface;
     gcmHEADER_ARG("Queue=0x%x", Queue);
 
     /* Verify the arguments. */
@@ -261,24 +256,50 @@ gcoQUEUE_Commit(
 
     if (Queue->head != gcvNULL)
     {
-        /* Initialize event commit command. */
-        iface.ignoreTLS     = gcvFALSE;
-        iface.command       = gcvHAL_EVENT_COMMIT;
-        iface.engine        = Queue->engine;
-        iface.u.Event.queue = gcmPTR_TO_UINT64(Queue->head);
+        if (Buffer)
+        {
+            gcoWorkerInfo* worker;
 
-        /* Send command to kernel. */
-        gcmONERROR(
-            gcoOS_DeviceControl(gcvNULL,
-                                IOCTL_GCHAL_INTERFACE,
-                                &iface, gcmSIZEOF(iface),
-                                &iface, gcmSIZEOF(iface)));
+            /* Find an available worker. */
+            worker = gcoGetWorker(gcvNULL, Queue, gcvNULL);
 
-        /* Test for error. */
-        gcmONERROR(iface.status);
+            if (worker == gcvNULL)
+            {
+                return gcvSTATUS_OUT_OF_MEMORY;
+            }
 
-        /* Free any records in the queue. */
-        gcmONERROR(gcoQUEUE_Free(Queue));
+            /* Suspend the worker thread. */
+            gcoSuspendWorker(Buffer);
+
+            /* Submit the worker. */
+            gcoSubmitWorker(Buffer, worker);
+
+            /* Resume the swap thread. */
+            gcoResumeWorker(Buffer);
+        }
+        else
+        {
+            gcsHAL_INTERFACE iface;
+
+            /* Initialize event commit command. */
+            iface.ignoreTLS     = gcvFALSE;
+            iface.command       = gcvHAL_EVENT_COMMIT;
+            iface.engine        = Queue->engine;
+            iface.u.Event.queue = gcmPTR_TO_UINT64(Queue->head);
+
+            /* Send command to kernel. */
+            gcmONERROR(
+                gcoOS_DeviceControl(gcvNULL,
+                                    IOCTL_GCHAL_INTERFACE,
+                                    &iface, gcmSIZEOF(iface),
+                                    &iface, gcmSIZEOF(iface)));
+
+            /* Test for error. */
+            gcmONERROR(iface.status);
+
+            /* Free any records in the queue. */
+            gcmONERROR(gcoQUEUE_Free(Queue));
+        }
 
         /* Wait for the execution to complete. */
         if (Stall)
