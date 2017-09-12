@@ -22,9 +22,6 @@ extern "C" {
 ************************ Command Buffer and Event Objects **********************
 \******************************************************************************/
 
-/* The number of context buffers per user. */
-#define gcdCONTEXT_BUFFER_COUNT 2
-
 #define gcdRENDER_FENCE_LENGTH                      (6 * gcmSIZEOF(gctUINT32))
 #define gcdBLT_FENCE_LENGTH                         (10 * gcmSIZEOF(gctUINT32))
 #define gcdRESERVED_FLUSHCACHE_LENGTH               (2 * gcmSIZEOF(gctUINT32))
@@ -70,9 +67,6 @@ typedef struct _gcsSTATE_DELTA
        the overflow.*/
     gctUINT                     id;
 
-    /* The number of contexts pending modification by the delta. */
-    gctINT                      refCount;
-
     /* Vertex element count for the delta buffer. */
     gctUINT                     elementCount;
 
@@ -91,10 +85,6 @@ typedef struct _gcsSTATE_DELTA
     /* If the map entry ID matches the main state delta ID, index points to
        the state record in the record array. */
     gctUINT64                   mapEntryIndex;
-
-    /* Previous and next state deltas in gcsSTATE_DELTA. */
-    gctUINT64                   prev;
-    gctUINT64                   next;
 }
 gcsSTATE_DELTA;
 

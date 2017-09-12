@@ -112,9 +112,6 @@ typedef struct _gcsSTATE_DELTA
        the overflow.*/
     gctUINT                     id;
 
-    /* The number of contexts pending modification by the delta. */
-    gctINT                      refCount;
-
     /* Vertex element count for the delta buffer. */
     gctUINT                     elementCount;
 
@@ -133,10 +130,6 @@ typedef struct _gcsSTATE_DELTA
     /* If the map entry ID matches the main state delta ID, index points to
        the state record in the record array. */
     gctUINT64                   mapEntryIndex;
-
-    /* Previous and next state deltas in gcsSTATE_DELTA. */
-    gctUINT64                   prev;
-    gctUINT64                   next;
 }
 gcsSTATE_DELTA;
 

@@ -104,9 +104,6 @@ static gceSTATUS _ResetDelta(
     IN gcsSTATE_DELTA_PTR StateDelta
     )
 {
-    /* The delta should not be attached to any context. */
-    gcmASSERT(StateDelta->refCount == 0);
-
     /* Not attached yet, advance the ID. */
     StateDelta->id += 1;
 
@@ -128,46 +125,6 @@ static gceSTATUS _ResetDelta(
 
     /* Success. */
     return gcvSTATUS_OK;
-}
-
-static gceSTATUS _MergeDelta(
-    IN gcsSTATE_DELTA_PTR StateDelta
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcsSTATE_DELTA_PTR prevDelta;
-    gcsSTATE_DELTA_RECORD_PTR record;
-    gctUINT i, count;
-
-    /* Get the record count. */
-    count = StateDelta->recordCount;
-
-    /* Set the first record. */
-    record = gcmUINT64_TO_PTR(StateDelta->recordArray);
-
-    /* Get the previous delta. */
-    prevDelta = gcmUINT64_TO_PTR(StateDelta->prev);
-
-    /* Go through all records. */
-    for (i = 0; i < count; i += 1)
-    {
-        /* Update the delta. */
-        gcoHARDWARE_UpdateDelta(
-            prevDelta, record->address, record->mask, record->data
-            );
-
-        /* Advance to the next state. */
-        record += 1;
-    }
-
-    /* Update the element count. */
-    if (StateDelta->elementCount != 0)
-    {
-        prevDelta->elementCount = StateDelta->elementCount;
-    }
-
-    /* Return the status. */
-    return status;
 }
 #endif
 
@@ -4485,7 +4442,6 @@ _Attach(
     gceSTATUS status;
     gcsHAL_INTERFACE iface;
     gcoHARDWARE hardware = Hardware;
-    gctUINT i;
     gctPOINTER pointer;
     gctUINT32 coreIndex;
     gctBOOL coreIndexChanged = gcvFALSE;
@@ -4541,12 +4497,9 @@ _Attach(
 
     /**************************************************************************/
     /* Allocate the context and state delta buffers. **************************/
-
-    for (i = 0; i < gcdCONTEXT_BUFFER_COUNT + 1; i += 1)
     {
         /* Allocate a state delta. */
         gcsSTATE_DELTA_PTR delta;
-        gcsSTATE_DELTA_PTR prev;
         gctUINT32 bytes;
 
         /* Allocate the state delta structure. */
@@ -4557,23 +4510,7 @@ _Attach(
         /* Reset the context buffer structure. */
         gcoOS_ZeroMemory(delta, gcmSIZEOF(gcsSTATE_DELTA));
 
-        /* Append to the list. */
-        if (hardware->deltas[Core] == gcvNULL)
-        {
-            delta->prev     = gcmPTR_TO_UINT64(delta);
-            delta->next     = gcmPTR_TO_UINT64(delta);
-            hardware->deltas[Core] = delta;
-        }
-        else
-        {
-            delta->next = gcmPTR_TO_UINT64(hardware->deltas[Core]);
-            delta->prev = hardware->deltas[Core]->prev;
-
-            prev = gcmUINT64_TO_PTR(hardware->deltas[Core]->prev);
-            prev->next = gcmPTR_TO_UINT64(delta);
-            hardware->deltas[Core]->prev = gcmPTR_TO_UINT64(delta);
-
-        }
+        hardware->deltas[Core] = delta;
 
         /* Set the number of delta in the order of creation. */
 #if gcmIS_DEBUG(gcdDEBUG_CODE)
@@ -4679,35 +4616,6 @@ _UpdateDelta(
 {
     if (Hardware->deltas[Core])
     {
-        /* Did the delta become associated? */
-        if (Hardware->deltas[Core]->refCount == 0)
-        {
-            /* No, merge with the previous. */
-            _MergeDelta(Hardware->deltas[Core]);
-        }
-        else
-        {
-            /* The delta got associated, move to the next one. */
-            Hardware->deltas[Core] = gcmUINT64_TO_PTR(Hardware->deltas[Core]->next);
-            gcmASSERT(Hardware->deltas[Core]->refCount == 0);
-
-#if gcdDUMP && !gcdDUMP_COMMAND && !gcdDUMP_IN_KERNEL
-            if (Core == 0)
-            {
-                /* Dump current context buffer. */
-                gcmDUMP_BUFFER(gcvNULL,
-                    "context",
-                    Hardware->context,
-                    Hardware->contextLogical[Hardware->currentContext],
-                    0,
-                    Hardware->contextBytes);
-
-                /* Advance to next context buffer. */
-                Hardware->currentContext = (Hardware->currentContext + 1) % gcdCONTEXT_BUFFER_COUNT;
-            }
-#endif
-        }
-
         /* Reset the current. */
         _ResetDelta(Hardware->deltas[Core]);
     }
@@ -5810,7 +5718,6 @@ gceSTATUS gcoHARDWARE_Destroy(
     )
 {
     gceSTATUS status;
-    gcsSTATE_DELTA_PTR deltaHead;
     gctUINT i;
     gctUINT32 coreIndex = 0;
     gctBOOL coreIndexChanged = gcvFALSE;
@@ -6078,22 +5985,12 @@ gceSTATUS gcoHARDWARE_Destroy(
     for (i = 0; i < Hardware->deltasCount; i++)
     {
         /* Free state deltas. */
-        for (deltaHead = Hardware->deltas[i]; Hardware->deltas[i] != gcvNULL;)
         {
             /* Get a shortcut to the current delta. */
             gcsSTATE_DELTA_PTR delta = Hardware->deltas[i];
             gctUINT_PTR mapEntryIndex = gcmUINT64_TO_PTR(delta->mapEntryIndex);
             gctUINT_PTR mapEntryID = gcmUINT64_TO_PTR(delta->mapEntryID);
             gcsSTATE_DELTA_RECORD_PTR recordArray = gcmUINT64_TO_PTR(delta->recordArray);
-
-            /* Get the next delta. */
-            gcsSTATE_DELTA_PTR next = gcmUINT64_TO_PTR(delta->next);
-
-            /* Last item? */
-            if (next == deltaHead)
-            {
-                next = gcvNULL;
-            }
 
             /* Free map index array. */
             if (mapEntryIndex != gcvNULL)
@@ -6115,9 +6012,6 @@ gceSTATUS gcoHARDWARE_Destroy(
 
             /* Free state delta. */
             gcmONERROR(gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, delta));
-
-            /* Remove from the list. */
-            Hardware->deltas[i] = next;
         }
     }
 

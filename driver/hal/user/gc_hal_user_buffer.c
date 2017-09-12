@@ -776,7 +776,6 @@ gcoCopyWorkerDeltas(
             /* Allocate a state delta. */
             gctPOINTER pointer;
             gcsSTATE_DELTA_PTR delta;
-            gcsSTATE_DELTA_PTR prev;
 
             /* Allocate the state delta structure. */
             gcmONERROR(gcoOS_AllocateSharedMemory(
@@ -786,22 +785,7 @@ gcoCopyWorkerDeltas(
             /* Reset the context buffer structure. */
             gcoOS_ZeroMemory(delta, gcmSIZEOF(gcsSTATE_DELTA));
 
-            /* Append to the list. */
-            if (Worker->stateDeltas[i] == gcvNULL)
-            {
-                delta->prev     = gcmPTR_TO_UINT64(delta);
-                delta->next     = gcmPTR_TO_UINT64(delta);
-                Worker->stateDeltas[i] = delta;
-            }
-            else
-            {
-                delta->next = gcmPTR_TO_UINT64(Worker->stateDeltas[i]);
-                delta->prev = Worker->stateDeltas[i]->prev;
-
-                prev = gcmUINT64_TO_PTR(Worker->stateDeltas[i]->prev);
-                prev->next = gcmPTR_TO_UINT64(delta);
-                Worker->stateDeltas[i]->prev = gcmPTR_TO_UINT64(delta);
-            }
+            Worker->stateDeltas[i] = delta;
 
             if (Deltas[i]->mapEntryIDSize > 0)
             {
@@ -844,7 +828,6 @@ gcoCopyWorkerDeltas(
 
             delta->id = Deltas[i]->id;
             delta->elementCount = Deltas[i]->elementCount;
-            delta->refCount = Deltas[i]->refCount;
         }
 
         /* Specify delta and context for main core. */
