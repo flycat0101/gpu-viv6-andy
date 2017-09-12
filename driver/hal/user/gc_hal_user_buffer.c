@@ -870,6 +870,7 @@ gcoGetWorker(
 {
     gcsTLS_PTR tls;
     gceSTATUS status;
+    gcoBUFFER buffer = gcvNULL;
     gcoWorkerInfo *worker = gcvNULL;
 
     status = gcoOS_GetTLS(&tls);
@@ -886,8 +887,6 @@ gcoGetWorker(
 
     if (Buffer)
     {
-        gctUINT32 newOffset;
-        gctSIZE_T spaceLeft;
         gcoCMDBUF commandBuffer;
 
         commandBuffer = Buffer->commandBufferTail;
@@ -898,44 +897,11 @@ gcoGetWorker(
 
         gcmONERROR(gcoOS_Allocate(Os,gcmSIZEOF(struct _gcoBUFFER), (gctPOINTER*)&worker->buffer));
 
-        gcoOS_MemCopy(worker->buffer, Buffer, gcmSIZEOF(struct _gcoBUFFER));
+        buffer = (gcoBUFFER)worker->buffer;
+        gcoOS_MemCopy(buffer, Buffer, gcmSIZEOF(struct _gcoBUFFER));
 
-        /* Advance the offset for next commit. */
-        newOffset = commandBuffer->offset + Buffer->info.reservedTail;
-
-        /* Compute the size of the space left in the buffer. */
-        spaceLeft = commandBuffer->bytes - newOffset;
-
-        if (spaceLeft > Buffer->totalReserved)
-        {
-            /* Adjust buffer offset and size. */
-            commandBuffer->startOffset = newOffset;
-            commandBuffer->offset      = commandBuffer->startOffset + Buffer->info.reservedHead;
-            commandBuffer->free        = commandBuffer->bytes - commandBuffer->offset
-                                       - Buffer->info.alignment - Buffer->info.reservedTail - Buffer->info.reservedUser;
-        }
-        else
-        {
-            /* Buffer is full. */
-            commandBuffer->startOffset = commandBuffer->bytes;
-            commandBuffer->offset      = commandBuffer->bytes;
-            commandBuffer->free        = 0;
-        }
-
-        /* The exit pipe becomes the entry pipe for the next command buffer. */
-        commandBuffer->entryPipe = commandBuffer->exitPipe;
-
-#if gcdSECURE_USER
-        /* Reset the state array tail. */
-        commandBuffer->hintArrayTail = commandBuffer->hintArray;
-#endif
-
-        /* Reset usage flags. */
-        commandBuffer->using2D         = gcvFALSE;
-        commandBuffer->using3D         = gcvFALSE;
-
-        Buffer->freePatchList = gcvNULL;
-        Buffer->patchList = gcvNULL;
+        gcmONERROR(gcoOS_Allocate(Os,gcmSIZEOF(struct _gcoCMDBUF), (gctPOINTER*)&buffer->commandBufferTail));
+        gcoOS_MemCopy(buffer->commandBufferTail, commandBuffer, gcmSIZEOF(struct _gcoCMDBUF));
     }
 
     if (Queue)
@@ -960,9 +926,14 @@ OnError:
 
     if (worker)
     {
-        if (worker->buffer)
+        if (buffer)
         {
-            gcoOS_Free(Os, worker->buffer);
+            if (buffer->commandBufferTail)
+            {
+                gcoOS_Free(Os, buffer->commandBufferTail);
+            }
+
+            gcoOS_Free(Os, buffer);
         }
 
         if (worker->queue)
@@ -999,6 +970,11 @@ gcoFreeWorker(
     {
         struct _gcsPATCH_LIST *patchList;
         gcoBUFFER Buffer = Worker->buffer;
+
+        if (Buffer->commandBufferTail)
+        {
+            gcmVERIFY_OK(gcoOS_Free(Os, Buffer->commandBufferTail));
+        }
 
         /* Destroy the free patch list. */
         while (Buffer->freePatchList != NULL)
@@ -1115,9 +1091,7 @@ gcoBUFFER_Commit_Worker(
     IN gcsSTATE_DELTA_PTR *StateDeltas,
     IN gctUINT32 Context,
     IN gctUINT32_PTR Contexts,
-    IN gcoQUEUE Queue,
-    OUT gctPOINTER *DumpLogical,
-    OUT gctUINT32 *DumpBytes
+    IN gcoQUEUE Queue
     );
 
 gctTHREAD_RETURN
@@ -1129,8 +1103,6 @@ gcoBufferCommitWorker(
     gcoWorkerInfo *commitWorker;
     gcoWorkerInfo *currWorker;
     gctBOOL bStop = gcvFALSE;
-    gctPOINTER dumpCommandLogical;
-    gctUINT32 dumpCommandBytes = 0;
 
     gcmHEADER_ARG("Buffer=0x%x", Buffer);
 
@@ -1161,8 +1133,7 @@ gcoBufferCommitWorker(
 
         for (;;)
         {
-            if  ((currWorker == gcvNULL) ||
-                 (currWorker->buffer == gcvNULL))
+            if  (currWorker == gcvNULL)
             {
                 break;
             }
@@ -1184,9 +1155,7 @@ gcoBufferCommitWorker(
                                     currWorker->stateDeltas,
                                     currWorker->context,
                                     currWorker->contexts,
-                                    currWorker->queue,
-                                    &dumpCommandLogical,
-                                    &dumpCommandBytes);
+                                    currWorker->queue);
 
             /* Acquire synchronization mutex. */
             gcoSuspendWorker(buffer);
@@ -2259,6 +2228,8 @@ gcoBUFFER_Commit(
     OUT gctUINT32 *DumpBytes
     )
 {
+    gctUINT32 newOffset;
+    gctSIZE_T spaceLeft;
     gcoCMDBUF commandBuffer;
     gcoWorkerInfo* worker;
     gctBOOL emptyBuffer;
@@ -2280,106 +2251,14 @@ gcoBUFFER_Commit(
         emptyBuffer = (commandBuffer->offset - commandBuffer->startOffset <= Buffer->info.reservedHead);
     }
 
-    /* Find an available worker. */
-    worker = gcoGetWorker(gcvNULL, Queue, emptyBuffer ? gcvNULL : Buffer);
-
-    if (worker == gcvNULL)
-    {
-        return gcvSTATUS_OUT_OF_MEMORY;
-    }
-
     if (emptyBuffer == gcvFALSE)
     {
-        /* Fill in the worker information. */
-        worker->currentPipe   = CurrentPipe;
-        worker->context       = Context;
-        worker->contexts      = Contexts;
-
-        gcoCopyWorkerDeltas(Buffer, worker, StateDeltas);
-    }
-
-    /* Suspend the worker thread. */
-    gcoSuspendWorker(Buffer);
-
-    /* Submit the worker. */
-    gcoSubmitWorker(Buffer, worker);
-
-    /* Resume the swap thread. */
-    gcoResumeWorker(Buffer);
-
-    return gcvSTATUS_OK;
-}
-
-
-gceSTATUS
-gcoBUFFER_Commit_Worker(
-    IN gcoBUFFER Buffer,
-    IN gcePIPE_SELECT CurrentPipe,
-    IN gctUINT32 CurrentCoreIndex,
-    IN gceHARDWARE_TYPE HardwareType,
-    IN gcsSTATE_DELTA_PTR StateDelta,
-    IN gcsSTATE_DELTA_PTR *StateDeltas,
-    IN gctUINT32 Context,
-    IN gctUINT32_PTR Contexts,
-    IN gcoQUEUE Queue,
-    OUT gctPOINTER *DumpLogical,
-    OUT gctUINT32 *DumpBytes
-    )
-{
-    gceSTATUS status;
-    gcoCMDBUF commandBuffer;
-    gcsHAL_INTERFACE iface;
-
-    gcmHEADER_ARG("Buffer=0x%x Queue=0x%x",
-                  Buffer, Queue);
-
-    /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Buffer, gcvOBJ_BUFFER);
-    gcmVERIFY_OBJECT(Queue, gcvOBJ_QUEUE);
-
-    iface.ignoreTLS     = gcvTRUE;
-    iface.hardwareType  = HardwareType;
-    iface.coreIndex     = CurrentCoreIndex;
-
-    /* Send for execution. */
-    if (Buffer == gcvNULL)
-    {
-        if (Queue != gcvNULL && Queue->head != gcvNULL)
-        {
-            /* Initialize event commit command. */
-            iface.command       = gcvHAL_EVENT_COMMIT;
-            iface.engine        = Queue->engine;
-            iface.u.Event.queue = gcmPTR_TO_UINT64(Queue->head);
-
-            /* Send command to kernel. */
-            gcmONERROR(
-                gcoOS_DeviceControl(gcvNULL,
-                                    IOCTL_GCHAL_INTERFACE,
-                                    &iface, gcmSIZEOF(iface),
-                                    &iface, gcmSIZEOF(iface)));
-
-            /* Test for error. */
-            gcmONERROR(iface.status);
-
-            /* Free any records in the queue. */
-            gcmONERROR(gcoQUEUE_Free(Queue));
-        }
-    }
-    else
-    {
-        gctUINT32 newOffset;
-        gctSIZE_T spaceLeft;
         gctUINT32 coreCount = 1;
-        gcoCMDBUF *commandBufferMirrors;
 
         if (Buffer->threadDefault)
         {
             gcmTRACE_ZONE(gcvLEVEL_VERBOSE, gcvZONE_BUFFER, "Thread Default command buffer is comitting commands");
         }
-
-        /* Grab the head command buffer. */
-        commandBuffer = Buffer->commandBufferTail;
-        commandBufferMirrors = commandBuffer->mirrors;
 
 #if gcdENABLE_3D
         gcoCMDBUF tailCommandBuffer = Buffer->commandBufferTail;
@@ -2529,6 +2408,137 @@ gcoBUFFER_Commit_Worker(
             commandBuffer->patchHead = gcmPTR_TO_UINT64(Buffer->patchList);
             Buffer->patchList = gcvNULL;
         }
+    }
+
+    /* Find an available worker. */
+    worker = gcoGetWorker(gcvNULL, Queue, emptyBuffer ? gcvNULL : Buffer);
+
+    if (worker == gcvNULL)
+    {
+        return gcvSTATUS_OUT_OF_MEMORY;
+    }
+
+    if (emptyBuffer == gcvFALSE)
+    {
+        /* Fill in the worker information. */
+        worker->currentPipe   = CurrentPipe;
+        worker->context       = Context;
+        worker->contexts      = Contexts;
+
+        gcoCopyWorkerDeltas(Buffer, worker, StateDeltas);
+
+        /* Advance the offset for next commit. */
+        newOffset = commandBuffer->offset + Buffer->info.reservedTail;
+
+        /* Compute the size of the space left in the buffer. */
+        spaceLeft = commandBuffer->bytes - newOffset;
+
+        if (spaceLeft > Buffer->totalReserved)
+        {
+            /* Adjust buffer offset and size. */
+            commandBuffer->startOffset = newOffset;
+            commandBuffer->offset      = commandBuffer->startOffset + Buffer->info.reservedHead;
+            commandBuffer->free        = commandBuffer->bytes - commandBuffer->offset
+                                       - Buffer->info.alignment - Buffer->info.reservedTail - Buffer->info.reservedUser;
+        }
+        else
+        {
+            /* Buffer is full. */
+            commandBuffer->startOffset = commandBuffer->bytes;
+            commandBuffer->offset      = commandBuffer->bytes;
+            commandBuffer->free        = 0;
+        }
+
+        /* The exit pipe becomes the entry pipe for the next command buffer. */
+        commandBuffer->entryPipe = commandBuffer->exitPipe;
+
+#if gcdSECURE_USER
+        /* Reset the state array tail. */
+        commandBuffer->hintArrayTail = commandBuffer->hintArray;
+#endif
+
+        /* Reset usage flags. */
+        commandBuffer->using2D         = gcvFALSE;
+        commandBuffer->using3D         = gcvFALSE;
+
+        Buffer->freePatchList = gcvNULL;
+        Buffer->patchList = gcvNULL;
+    }
+
+    /* Suspend the worker thread. */
+    gcoSuspendWorker(Buffer);
+
+    /* Submit the worker. */
+    gcoSubmitWorker(Buffer, worker);
+
+    /* Resume the swap thread. */
+    gcoResumeWorker(Buffer);
+
+    return gcvSTATUS_OK;
+}
+
+
+gceSTATUS
+gcoBUFFER_Commit_Worker(
+    IN gcoBUFFER Buffer,
+    IN gcePIPE_SELECT CurrentPipe,
+    IN gctUINT32 CurrentCoreIndex,
+    IN gceHARDWARE_TYPE HardwareType,
+    IN gcsSTATE_DELTA_PTR StateDelta,
+    IN gcsSTATE_DELTA_PTR *StateDeltas,
+    IN gctUINT32 Context,
+    IN gctUINT32_PTR Contexts,
+    IN gcoQUEUE Queue
+    )
+{
+    gceSTATUS status;
+    gcoCMDBUF commandBuffer;
+    gcsHAL_INTERFACE iface;
+
+    gcmHEADER_ARG("Buffer=0x%x Queue=0x%x",
+                  Buffer, Queue);
+
+    /* Verify the arguments. */
+    gcmVERIFY_OBJECT(Buffer, gcvOBJ_BUFFER);
+    gcmVERIFY_OBJECT(Queue, gcvOBJ_QUEUE);
+
+    iface.ignoreTLS     = gcvTRUE;
+    iface.hardwareType  = HardwareType;
+    iface.coreIndex     = CurrentCoreIndex;
+
+    /* Send for execution. */
+    if (Buffer == gcvNULL)
+    {
+        if (Queue != gcvNULL && Queue->head != gcvNULL)
+        {
+            /* Initialize event commit command. */
+            iface.command       = gcvHAL_EVENT_COMMIT;
+            iface.engine        = Queue->engine;
+            iface.u.Event.queue = gcmPTR_TO_UINT64(Queue->head);
+
+            /* Send command to kernel. */
+            gcmONERROR(
+                gcoOS_DeviceControl(gcvNULL,
+                                    IOCTL_GCHAL_INTERFACE,
+                                    &iface, gcmSIZEOF(iface),
+                                    &iface, gcmSIZEOF(iface)));
+
+            /* Test for error. */
+            gcmONERROR(iface.status);
+
+            /* Free any records in the queue. */
+            gcmONERROR(gcoQUEUE_Free(Queue));
+        }
+    }
+    else
+    {
+        gctUINT32 coreCount = 1;
+        gcoCMDBUF *commandBufferMirrors;
+
+        commandBuffer = Buffer->commandBufferTail;
+        commandBufferMirrors = commandBuffer->mirrors;
+
+        gcoHARDWARE_Query3DCoreCount(Buffer->hardware, &coreCount);
 
         iface.u.Commit.count = coreCount;
         iface.u.Commit.delta = gcmPTR_TO_UINT64(iface.u.Commit.deltas);
@@ -2609,40 +2619,6 @@ gcoBUFFER_Commit_Worker(
 
         /* Update commit stamp. */
         Buffer->commitStamp = iface.u.Commit.commitStamp;
-
-        /* Advance the offset for next commit. */
-        newOffset = commandBuffer->offset + Buffer->info.reservedTail;
-
-        /* Compute the size of the space left in the buffer. */
-        spaceLeft = commandBuffer->bytes - newOffset;
-
-        if (spaceLeft > Buffer->totalReserved)
-        {
-            /* Adjust buffer offset and size. */
-            commandBuffer->startOffset = newOffset;
-            commandBuffer->offset      = commandBuffer->startOffset + Buffer->info.reservedHead;
-            commandBuffer->free        = commandBuffer->bytes - commandBuffer->offset
-                                       - Buffer->info.alignment - Buffer->info.reservedTail - Buffer->info.reservedUser;
-        }
-        else
-        {
-            /* Buffer is full. */
-            commandBuffer->startOffset = commandBuffer->bytes;
-            commandBuffer->offset      = commandBuffer->bytes;
-            commandBuffer->free        = 0;
-        }
-
-        /* The exit pipe becomes the entry pipe for the next command buffer. */
-        commandBuffer->entryPipe = commandBuffer->exitPipe;
-
-#if gcdSECURE_USER
-        /* Reset the state array tail. */
-        commandBuffer->hintArrayTail = commandBuffer->hintArray;
-#endif
-
-        /* Reset usage flags. */
-        commandBuffer->using2D         = gcvFALSE;
-        commandBuffer->using3D         = gcvFALSE;
 
         /* Kernel already set fenceID to all node of patchList */
         gcmONERROR(_RecyclePatchList(Buffer, commandBuffer));
