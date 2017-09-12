@@ -215,8 +215,8 @@ gcoHARDWARE_CommitCmdVX(
     status = gcoBUFFER_Commit(
         Hardware->engine[gcvENGINE_RENDER].buffer,
         Hardware->currentPipe,
-        Hardware->delta,
-        Hardware->deltas,
+        &Hardware->delta,
+        &Hardware->deltas,
         Hardware->context,
         Hardware->contexts,
         Hardware->engine[gcvENGINE_RENDER].queue,

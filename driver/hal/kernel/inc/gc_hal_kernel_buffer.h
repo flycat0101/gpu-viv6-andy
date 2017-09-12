@@ -120,6 +120,7 @@ typedef struct _gcsSTATE_DELTA
 
     /* Record array; holds all modified states in gcsSTATE_DELTA_RECORD. */
     gctUINT64                   recordArray;
+    gctUINT                     recordSize;
 
     /* Map entry ID is used for map entry validation. If map entry ID does not
        match the main state delta ID, the entry and the corresponding state are

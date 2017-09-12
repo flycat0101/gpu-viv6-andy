@@ -693,46 +693,56 @@ gcoFreeWorkerDeltas(
     if (Worker->type != gcvHARDWARE_2D)
     {
         gctUINT i;
+        gctUINT_PTR mapEntryID;
+        gcsSTATE_DELTA_PTR delta;
+        gctUINT_PTR mapEntryIndex;
+        gcsSTATE_DELTA_RECORD_PTR recordArray;
 
         for (i = 0; i < Worker->deltasCount; i++)
         {
-            if (!Worker->stateDeltas[i])
+            delta = Worker->stateDeltas[i];
+
+            if (!delta)
             {
                 continue;
             }
 
-            if (Worker->stateDeltas[i]->mapEntryID > 0)
+            mapEntryID = gcmUINT64_TO_PTR(delta->mapEntryID);
+            mapEntryIndex = gcmUINT64_TO_PTR(delta->mapEntryIndex);
+            recordArray = gcmUINT64_TO_PTR(delta->recordArray);
+
+            if (mapEntryID > 0)
             {
-                gcmVERIFY_OK(gcoOS_Free(
+                gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
                     gcvNULL,
-                    (gctPOINTER *)Worker->stateDeltas[i]->mapEntryID
+                    mapEntryID
                     ));
             }
 
-            if (Worker->stateDeltas[i]->mapEntryIndex > 0)
+            if (mapEntryIndex > 0)
             {
-                gcmVERIFY_OK(gcoOS_Free(
+                gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
                     gcvNULL,
-                    (gctPOINTER *)Worker->stateDeltas[i]->mapEntryIndex
+                    mapEntryIndex
                     ));
             }
 
-            if (Worker->stateDeltas[i]->recordArray > 0)
+            if (recordArray > 0)
             {
-                gcmVERIFY_OK(gcoOS_Free(
+                gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
                     gcvNULL,
-                    (gctPOINTER *)Worker->stateDeltas[i]->recordArray
+                    recordArray
                     ));
             }
 
-            gcmVERIFY_OK(gcoOS_Free(
-                gcvNULL, (gctPOINTER *) Worker->stateDeltas[i]
+            gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
+                gcvNULL, delta
                 ));
         }
 
-        gcmVERIFY_OK(gcoOS_Free(
+        gcmVERIFY_OK(gcmOS_SAFE_FREE(
             gcvNULL,
-            (gctPOINTER *) Worker->stateDeltas
+            Worker->stateDeltas
             ));
     }
 #endif
@@ -740,14 +750,22 @@ gcoFreeWorkerDeltas(
     return gcvSTATUS_OK;
 }
 
+#define gcmMAX_CORE_COUNT 8
 gceSTATUS
-gcoCopyWorkerDeltas(
+gcoCreateWorkerDeltas(
     gcoBUFFER Buffer,
     gcoWorkerInfo * Worker,
-    gcsSTATE_DELTA_PTR *Deltas
+    gcsSTATE_DELTA_PTR *Delta,
+    gcsSTATE_DELTA_PTR **Deltas
     )
 {
+    gcsSTATE_DELTA_PTR pDelta, *pDeltas;
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
+
+    if (!Delta || !Deltas)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
 
     gcmGETCURRENTHARDWARE(Worker->type);
 
@@ -759,17 +777,20 @@ gcoCopyWorkerDeltas(
         gctUINT coreCount = 1;
         gctUINT coreIndex;
 
+        pDelta = *Delta;
+        pDeltas = *Deltas;
+
         gcoHARDWARE_Query3DCoreCount(gcvNULL, &coreCount);
 
         Worker->deltasCount = coreCount;
 
         gcmONERROR(gcoOS_Allocate(
             gcvNULL,
-            gcmSIZEOF(gcsSTATE_DELTA_PTR) * coreCount,
+            gcmSIZEOF(gcsSTATE_DELTA_PTR) * gcmMAX_CORE_COUNT,
             (gctPOINTER *)&Worker->stateDeltas
             ));
 
-        gcoOS_ZeroMemory(Worker->stateDeltas, gcmSIZEOF(gcsSTATE_DELTA_PTR) * coreCount);
+        gcoOS_ZeroMemory(Worker->stateDeltas, gcmSIZEOF(gcsSTATE_DELTA_PTR) * gcmMAX_CORE_COUNT);
 
         for (i = 0; i < coreCount; i++)
         {
@@ -787,16 +808,14 @@ gcoCopyWorkerDeltas(
 
             Worker->stateDeltas[i] = delta;
 
-            if (Deltas[i]->mapEntryIDSize > 0)
+            if (pDeltas[i]->mapEntryIDSize > 0)
             {
-                delta->mapEntryIDSize = Deltas[i]->mapEntryIDSize;
+                delta->mapEntryIDSize = pDeltas[i]->mapEntryIDSize;
 
                 /* Allocate map ID array. */
                 gcmONERROR(gcoOS_AllocateSharedMemory(
                     gcvNULL, delta->mapEntryIDSize, &pointer
                     ));
-
-                gcoOS_MemCopy(pointer, gcmUINT64_TO_PTR(Deltas[i]->mapEntryID), delta->mapEntryIDSize);
 
                 delta->mapEntryID = gcmPTR_TO_UINT64(pointer);
 
@@ -805,34 +824,34 @@ gcoCopyWorkerDeltas(
                     gcvNULL, delta->mapEntryIDSize, &pointer
                     ));
 
-                gcoOS_MemCopy(pointer, gcmUINT64_TO_PTR(Deltas[i]->mapEntryIndex), delta->mapEntryIDSize);
+                /* Reset the record map. */
+                gcoOS_ZeroMemory(pointer, delta->mapEntryIDSize);
 
                 delta->mapEntryIndex = gcmPTR_TO_UINT64(pointer);
             }
 
-            if (Deltas[i]->recordCount > 0)
+            if (pDeltas[i]->recordSize > 0)
             {
-                delta->recordCount = Deltas[i]->recordCount;
+                delta->recordSize = pDeltas[i]->recordSize;
 
                 /* Allocate state record array. */
                 gcmONERROR(gcoOS_AllocateSharedMemory(
                     gcvNULL,
-                    gcmSIZEOF(gcsSTATE_DELTA_RECORD) * delta->recordCount,
+                    delta->recordSize,
                     &pointer
                     ));
 
-                gcoOS_MemCopy(pointer, gcmUINT64_TO_PTR(Deltas[i]->recordArray), gcmSIZEOF(gcsSTATE_DELTA_RECORD) * delta->recordCount);
-
                 delta->recordArray = gcmPTR_TO_UINT64(pointer);
             }
-
-            delta->id = Deltas[i]->id;
-            delta->elementCount = Deltas[i]->elementCount;
         }
 
         /* Specify delta and context for main core. */
         gcoHARDWARE_QueryCoreIndex(Buffer->hardware, 0, &coreIndex);
-        Worker->stateDelta = Worker->stateDeltas[coreIndex];
+        *Delta = Worker->stateDeltas[coreIndex];
+        *Deltas = Worker->stateDeltas;
+
+        Worker->stateDelta = pDelta;
+        Worker->stateDeltas = pDeltas;
     }
 #endif
     return status;
@@ -882,9 +901,13 @@ gcoGetWorker(
 
         buffer = (gcoBUFFER)worker->buffer;
         gcoOS_MemCopy(buffer, Buffer, gcmSIZEOF(struct _gcoBUFFER));
+        buffer->commandBufferTail = gcvNULL;
 
-        gcmONERROR(gcoOS_Allocate(Os,gcmSIZEOF(struct _gcoCMDBUF), (gctPOINTER*)&buffer->commandBufferTail));
+        gcmONERROR(gcoOS_AllocateSharedMemory(Os,gcmSIZEOF(struct _gcoCMDBUF), (gctPOINTER*)&buffer->commandBufferTail));
         gcoOS_MemCopy(buffer->commandBufferTail, commandBuffer, gcmSIZEOF(struct _gcoCMDBUF));
+
+        buffer->commandBufferTail->prev = buffer->commandBufferTail;
+        buffer->commandBufferTail->next = buffer->commandBufferTail;
     }
 
     if (Queue)
@@ -956,7 +979,7 @@ gcoFreeWorker(
 
         if (Buffer->commandBufferTail)
         {
-            gcmVERIFY_OK(gcoOS_Free(Os, Buffer->commandBufferTail));
+            gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(Os, Buffer->commandBufferTail));
         }
 
         /* Destroy the free patch list. */
@@ -2202,8 +2225,8 @@ gceSTATUS
 gcoBUFFER_Commit(
     IN gcoBUFFER Buffer,
     IN gcePIPE_SELECT CurrentPipe,
-    IN gcsSTATE_DELTA_PTR StateDelta,
-    IN gcsSTATE_DELTA_PTR *StateDeltas,
+    IN gcsSTATE_DELTA_PTR *StateDelta,
+    IN gcsSTATE_DELTA_PTR **StateDeltas,
     IN gctUINT32 Context,
     IN gctUINT32_PTR Contexts,
     IN gcoQUEUE Queue,
@@ -2408,7 +2431,7 @@ gcoBUFFER_Commit(
         worker->context       = Context;
         worker->contexts      = Contexts;
 
-        gcoCopyWorkerDeltas(Buffer, worker, StateDeltas);
+        gcoCreateWorkerDeltas(Buffer, worker, StateDelta, StateDeltas);
 
         /* Advance the offset for next commit. */
         newOffset = commandBuffer->offset + Buffer->info.reservedTail;
@@ -2508,9 +2531,6 @@ gcoBUFFER_Commit_Worker(
 
             /* Test for error. */
             gcmONERROR(iface.status);
-
-            /* Free any records in the queue. */
-            gcmONERROR(gcoQUEUE_Free(Queue));
         }
     }
     else

@@ -4544,10 +4544,12 @@ _Attach(
 
         if (hardware->numStates > 0)
         {
+            delta->recordSize = gcmSIZEOF(gcsSTATE_DELTA_RECORD) * hardware->numStates;
+
             /* Allocate state record array. */
             gcmONERROR(gcoOS_AllocateSharedMemory(
                 gcvNULL,
-                gcmSIZEOF(gcsSTATE_DELTA_RECORD) * hardware->numStates,
+                delta->recordSize,
                 &pointer
                 ));
 
@@ -5985,6 +5987,7 @@ gceSTATUS gcoHARDWARE_Destroy(
     for (i = 0; i < Hardware->deltasCount; i++)
     {
         /* Free state deltas. */
+        if (Hardware->deltas[i] != gcvNULL)
         {
             /* Get a shortcut to the current delta. */
             gcsSTATE_DELTA_PTR delta = Hardware->deltas[i];
@@ -8549,8 +8552,8 @@ gcoHARDWARE_Commit(
     status = gcoBUFFER_Commit(
         Hardware->engine[gcvENGINE_RENDER].buffer,
         Hardware->currentPipe,
-        Hardware->delta,
-        Hardware->deltas,
+        &Hardware->delta,
+        &Hardware->deltas,
         Hardware->context,
         Hardware->contexts,
         Hardware->engine[gcvENGINE_RENDER].queue,
