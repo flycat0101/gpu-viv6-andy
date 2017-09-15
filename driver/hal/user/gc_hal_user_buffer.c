@@ -698,7 +698,7 @@ gcoFreeWorkerDeltas(
         gctUINT_PTR mapEntryIndex;
         gcsSTATE_DELTA_RECORD_PTR recordArray;
 
-        for (i = 0; i < Worker->deltasCount; i++)
+        for (i = 0; i < gcvCORE_COUNT; i++)
         {
             delta = Worker->stateDeltas[i];
 
@@ -750,7 +750,6 @@ gcoFreeWorkerDeltas(
     return gcvSTATUS_OK;
 }
 
-#define gcmMAX_CORE_COUNT 8
 gceSTATUS
 gcoCreateWorkerDeltas(
     gcoBUFFER Buffer,
@@ -782,15 +781,13 @@ gcoCreateWorkerDeltas(
 
         gcoHARDWARE_Query3DCoreCount(gcvNULL, &coreCount);
 
-        Worker->deltasCount = coreCount;
-
         gcmONERROR(gcoOS_Allocate(
             gcvNULL,
-            gcmSIZEOF(gcsSTATE_DELTA_PTR) * gcmMAX_CORE_COUNT,
+            gcmSIZEOF(gcsSTATE_DELTA_PTR) * gcvCORE_COUNT,
             (gctPOINTER *)&Worker->stateDeltas
             ));
 
-        gcoOS_ZeroMemory(Worker->stateDeltas, gcmSIZEOF(gcsSTATE_DELTA_PTR) * gcmMAX_CORE_COUNT);
+        gcoOS_ZeroMemory(Worker->stateDeltas, gcmSIZEOF(gcsSTATE_DELTA_PTR) * gcvCORE_COUNT);
 
         for (i = 0; i < coreCount; i++)
         {

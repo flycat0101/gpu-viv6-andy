@@ -5309,11 +5309,11 @@ gcoHARDWARE_Construct(
 
         gcmONERROR(gcoOS_Allocate(
             gcvNULL,
-            gcmSIZEOF(gcsSTATE_DELTA_PTR) * coreCount,
+            gcmSIZEOF(gcsSTATE_DELTA_PTR) * gcvCORE_COUNT,
             (gctPOINTER *)&hardware->deltas
             ));
 
-        gcoOS_ZeroMemory(hardware->deltas, gcmSIZEOF(gcsSTATE_DELTA_PTR) * coreCount);
+        gcoOS_ZeroMemory(hardware->deltas, gcmSIZEOF(gcsSTATE_DELTA_PTR) * gcvCORE_COUNT);
 
         gcmONERROR(gcoOS_Allocate(
             gcvNULL,

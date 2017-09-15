@@ -279,7 +279,6 @@ typedef struct _gcoWorkerInfo
     gceHARDWARE_TYPE            hardwareType;
     gctUINT32                   currentCoreIndex;
     gcePIPE_SELECT              currentPipe;
-    gctUINT32                   deltasCount;
     gcsSTATE_DELTA_PTR          stateDelta;
     gcsSTATE_DELTA_PTR          *stateDeltas;
     gctUINT32                   context;
