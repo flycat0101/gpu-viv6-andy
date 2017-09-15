@@ -1845,6 +1845,11 @@ gcoBUFFER_Destroy(
 
         /* Destroy command buffer. */
         gcmONERROR(gcoCMDBUF_Destroy(Buffer->hardware, &Buffer->info, commandBuffer));
+
+        if (Buffer->commandBufferTail == commandBuffer)
+        {
+            Buffer->commandBufferTail = gcvNULL;
+        }
     }
 #if gcdENABLE_3D
     gcmONERROR(_FreeFenceList(Buffer->fenceList));
