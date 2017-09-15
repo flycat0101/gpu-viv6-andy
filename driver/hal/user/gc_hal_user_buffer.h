@@ -270,12 +270,15 @@ struct _gcsTEMPCMDBUF
 
 typedef struct _gcoWorkerInfo
 {
+    gctBOOL                     commit;
     gctSIGNAL                   signal;
-    gctSIGNAL                   targetSignal;
 
     gceHARDWARE_TYPE            type;
-    gctPOINTER                  buffer;
+    gctUINT32                   coreCount;
+    gctBOOL                     emptyBuffer;
+    gcoCMDBUF                   commandBuffer;
 
+    gceENGINE                   engine;
     gceHARDWARE_TYPE            hardwareType;
     gctUINT32                   currentCoreIndex;
     gcePIPE_SELECT              currentPipe;
@@ -284,11 +287,6 @@ typedef struct _gcoWorkerInfo
     gctUINT32                   context;
     gctUINT32_PTR               contexts;
     gcoQUEUE                    queue;
-    gctPOINTER                  *dumpLogical;
-    gctUINT32                   *dumpBytes;
-
-    struct _gcoWorkerInfo        *prev;
-    struct _gcoWorkerInfo        *next;
 }
 gcoWorkerInfo;
 
@@ -296,7 +294,8 @@ gcoWorkerInfo*
 gcoGetWorker(
     gcoOS Os,
     gcoQUEUE Queue,
-    gcoBUFFER Buffer
+    gcoBUFFER Buffer,
+    gctBOOL EmptyBuffer
     );
 
 gctBOOL
