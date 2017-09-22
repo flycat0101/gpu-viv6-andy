@@ -1905,116 +1905,12 @@ gcoHARDWARE_SetCompression(
     IN gctBOOL DstCompress
     );
 
-typedef struct {
-    gctUINT inputBase;
-    gctUINT count;
-    gctUINT outputBase;
-}
-gcsSTATEMIRROR;
-
-extern const gcsSTATEMIRROR mirroredStates[];
-extern gctUINT mirroredStatesCount;
-
-/* Update the state delta. */
-static gcmINLINE void gcoHARDWARE_UpdateDelta(
-    IN gcsSTATE_DELTA_PTR StateDelta,
-    IN gctUINT32 Address,
-    IN gctUINT32 Mask,
-    IN gctUINT32 Data
-    )
-{
-    gcsSTATE_DELTA_RECORD_PTR recordArray;
-    gcsSTATE_DELTA_RECORD_PTR recordEntry;
-    gctUINT32_PTR mapEntryID;
-    gctUINT32_PTR mapEntryIndex;
-    gctUINT deltaID;
-    gctUINT32 i;
-
-    /* Get the current record array. */
-    recordArray = (gcsSTATE_DELTA_RECORD_PTR)(gcmUINT64_TO_PTR(StateDelta->recordArray));
-
-    /* Get shortcuts to the fields. */
-    deltaID       = StateDelta->id;
-    mapEntryID    = (gctUINT32_PTR)(gcmUINT64_TO_PTR(StateDelta->mapEntryID));
-    mapEntryIndex = (gctUINT32_PTR)(gcmUINT64_TO_PTR(StateDelta->mapEntryIndex));
-
-    gcmASSERT(Address < (StateDelta->mapEntryIDSize / gcmSIZEOF(gctUINT)));
-
-    for (i = 0; i < mirroredStatesCount; i++)
-    {
-        if ((Address >= mirroredStates[i].inputBase) &&
-            (Address < (mirroredStates[i].inputBase + mirroredStates[i].count)))
-        {
-            Address = mirroredStates[i].outputBase + (Address - mirroredStates[i].inputBase);
-            break;
-        }
-    }
-
-    /* Has the entry been initialized? */
-    if (mapEntryID[Address] != deltaID)
-    {
-        /* No, initialize the map entry. */
-        mapEntryID    [Address] = deltaID;
-        mapEntryIndex [Address] = StateDelta->recordCount;
-
-        /* Get the current record. */
-        recordEntry = &recordArray[mapEntryIndex[Address]];
-
-        /* Add the state to the list. */
-        recordEntry->address = Address;
-        recordEntry->mask    = Mask;
-        recordEntry->data    = Data;
-
-        /* Update the number of valid records. */
-        StateDelta->recordCount += 1;
-    }
-
-    /* Regular (not masked) states. */
-    else if (Mask == 0)
-    {
-        /* Get the current record. */
-        recordEntry = &recordArray[mapEntryIndex[Address]];
-
-        /* Update the state record. */
-        recordEntry->mask = 0;
-        recordEntry->data = Data;
-    }
-
-    /* Masked states. */
-    else
-    {
-        /* Get the current record. */
-        recordEntry = &recordArray[mapEntryIndex[Address]];
-
-        /* Update the state record. */
-        recordEntry->mask |=  Mask;
-        recordEntry->data &= ~Mask;
-        recordEntry->data |= (Data & Mask);
-    }
-}
-
-static gcmINLINE void gcoHARDWARE_CopyDelta(
-    IN gcsSTATE_DELTA_PTR DestStateDelta,
-    IN gcsSTATE_DELTA_PTR SrcStateDelta
-    )
-{
-    DestStateDelta->recordCount = SrcStateDelta->recordCount;
-
-    if (DestStateDelta->recordCount)
-    {
-        gcoOS_MemCopy(
-            gcmUINT64_TO_PTR(DestStateDelta->recordArray),
-            gcmUINT64_TO_PTR(SrcStateDelta->recordArray),
-            gcmSIZEOF(gcsSTATE_DELTA_RECORD) * DestStateDelta->recordCount
-            );
-    }
-
-    DestStateDelta->elementCount = SrcStateDelta->elementCount;
-}
-
 gceSTATUS gcoHARDWARE_InitializeFormatArrayTable(
     IN gcoHARDWARE Hardware
     );
+
+#define gcoHARDWARE_UpdateDelta UpdateStateDelta
+#define gcoHARDWARE_CopyDelta   CopyStateDelta
 
 gceSTATUS
 gcoHARDWARE_3DBlitCopy(

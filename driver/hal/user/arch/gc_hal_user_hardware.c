@@ -98,37 +98,6 @@ const gcsSTATEMIRROR mirroredStates[] =
 
 gctUINT mirroredStatesCount = 0;
 
-
-#if (gcdENABLE_3D || gcdENABLE_2D)
-static gceSTATUS _ResetDelta(
-    IN gcsSTATE_DELTA_PTR StateDelta
-    )
-{
-    /* Not attached yet, advance the ID. */
-    StateDelta->id += 1;
-
-    /* Did ID overflow? */
-    if (StateDelta->id == 0)
-    {
-        /* Reset the map to avoid erroneous ID matches. */
-        gcoOS_ZeroMemory(gcmUINT64_TO_PTR(StateDelta->mapEntryID), StateDelta->mapEntryIDSize);
-
-        /* Increment the main ID to avoid matches after reset. */
-        StateDelta->id += 1;
-    }
-
-    /* Reset the vertex element count. */
-    StateDelta->elementCount = 0;
-
-    /* Reset the record count. */
-    StateDelta->recordCount = 0;
-
-    /* Success. */
-    return gcvSTATUS_OK;
-}
-#endif
-
-
 #if (gcdENABLE_3D || gcdENABLE_2D)
 static gceSTATUS _LoadStates(
     IN gcoHARDWARE Hardware,
@@ -4557,7 +4526,7 @@ _Attach(
         }
 
         /* Reset the new state delta. */
-        _ResetDelta(delta);
+        ResetStateDelta(delta);
     }
 
     return gcvSTATUS_OK;
@@ -4619,7 +4588,7 @@ _UpdateDelta(
     if (Hardware->deltas[Core])
     {
         /* Reset the current. */
-        _ResetDelta(Hardware->deltas[Core]);
+        ResetStateDelta(Hardware->deltas[Core]);
     }
 }
 
