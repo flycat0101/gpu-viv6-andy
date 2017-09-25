@@ -798,6 +798,8 @@ gcoCreateWorkerDeltas(
 
             if (Worker->stateDeltas[i])
             {
+                Worker->stateDeltas[i]->id = pDeltas[i]->id;
+
                 continue;
             }
 
@@ -820,15 +822,15 @@ gcoCreateWorkerDeltas(
                     gcvNULL, delta->mapEntryIDSize, &pointer
                     ));
 
+                /* Reset the record map. */
+                gcoOS_ZeroMemory(pointer, delta->mapEntryIDSize);
+
                 delta->mapEntryID = gcmPTR_TO_UINT64(pointer);
 
                 /* Allocate map index array. */
                 gcmONERROR(gcoOS_AllocateSharedMemory(
                     gcvNULL, delta->mapEntryIDSize, &pointer
                     ));
-
-                /* Reset the record map. */
-                gcoOS_ZeroMemory(pointer, delta->mapEntryIDSize);
 
                 delta->mapEntryIndex = gcmPTR_TO_UINT64(pointer);
             }
@@ -847,7 +849,7 @@ gcoCreateWorkerDeltas(
                 delta->recordArray = gcmPTR_TO_UINT64(pointer);
             }
 
-            ResetStateDelta(delta);
+            delta->id = pDeltas[i]->id;
         }
 
         /* Specify delta and context for main core. */
@@ -1276,7 +1278,7 @@ gcoBufferCommitWorker(
                                     currWorker->contexts,
                                     currWorker->queue);
 
-            if (currWorker->stateDeltas)
+            if (currWorker->stateDeltas && !currWorker->emptyBuffer)
             {
                 if (worker->stateDeltas == gcvNULL)
                 {
@@ -2768,9 +2770,6 @@ gcoBUFFER_Commit_Worker(
                                        &iface, gcmSIZEOF(iface)));
         gcmONERROR(iface.status);
     }
-
-    /* Empty buffer must be the tail. */
-    gcmONERROR(gcoQUEUE_Free(Queue));
 
     /* Success. */
     gcmFOOTER_NO();
