@@ -128,8 +128,19 @@ gco3D_Construct(
 
     gcmONERROR(gcoHAL_SetHardwareType(gcvNULL, gcvHARDWARE_3D));
 
-    /* Construct hardware object for this engine */
-    gcmONERROR(gcoHARDWARE_Construct(Hal, gcvFALSE, Robust, &engine->hardware));
+#if gcdENABLE_APPCTXT_BLITDRAW
+    if (!Robust)
+    {
+        gcmGETHARDWARE(engine->hardware);
+    }
+#endif
+
+    if (!engine->hardware)
+    {
+        /* Construct hardware object for this engine */
+        gcmONERROR(gcoHARDWARE_Construct(Hal, gcvFALSE, Robust, &engine->hardware));
+    }
+
     gcmONERROR(gcoHARDWARE_SelectPipe(engine->hardware, gcvPIPE_3D, gcvNULL));
     gcmONERROR(gcoHARDWARE_InvalidateCache(engine->hardware));
     /* Initialize 3D hardware. */
@@ -180,6 +191,9 @@ gco3D_Destroy(
     )
 {
     gctINT index;
+    gcoHARDWARE hardware = gcvNULL;
+    gceSTATUS status = gcvSTATUS_OK;
+
     gcmHEADER_ARG("Engine=0x%x", Engine);
 
     /* Verify the arguments. */
@@ -209,8 +223,15 @@ gco3D_Destroy(
         gcmVERIFY_OK(gcoSURF_Destroy(Engine->depth));
     }
 
-    /* Free Hardware Object */
-    gcmVERIFY_OK(gcoHARDWARE_Destroy(Engine->hardware, gcvFALSE));
+    gcmGETHARDWARE(hardware);
+
+OnError:
+
+    if (hardware != Engine->hardware)
+    {
+        /* Free Hardware Object */
+        gcmVERIFY_OK(gcoHARDWARE_Destroy(Engine->hardware, gcvFALSE));
+    }
 
     /* Free the gco3D object. */
     gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, Engine));
