@@ -1249,7 +1249,7 @@ gcoBufferCommitWorker(
 
         for (;;)
         {
-            if  (currWorker == gcvNULL)
+            if (currWorker == gcvNULL)
             {
                 break;
             }
@@ -1259,6 +1259,34 @@ gcoBufferCommitWorker(
                 break;
             }
 
+            if (currWorker->queue->head)
+            {
+                gcoWorkerInfo *nextWorker = buffer->workerFifo[(buffer->workerHead + 1) % gcmCOUNTOF(buffer->workerFifo)];
+
+                while (nextWorker->commit == gcvTRUE && nextWorker->emptyBuffer == gcvTRUE)
+                {
+                    /* Merge all queue events into current worker */
+                    currWorker->queue->tail->next = gcmPTR_TO_UINT64(nextWorker->queue->head);
+
+                    currWorker->queue->tail = nextWorker->queue->tail;
+                    currWorker->queue->recordCount += nextWorker->queue->recordCount;
+
+                    gcoSuspendWorker(buffer);
+
+                    nextWorker->commit = gcvFALSE;
+                    gcmVERIFY_OK(gcoOS_Signal(gcvNULL, nextWorker->signal, gcvTRUE));
+
+                    buffer->workerHead++;
+                    if (buffer->workerHead >= gcmCOUNTOF(buffer->workerFifo))
+                    {
+                        buffer->workerHead = 0;
+                    }
+
+                    nextWorker = buffer->workerFifo[(buffer->workerHead + 1) % gcmCOUNTOF(buffer->workerFifo)];
+
+                    gcoResumeWorker(buffer);
+                }
+            }
 #if 0
     gcmPRINT("%s %d, buffer = %p, currentPipe =%d, stateDelta = %p, stateDeltas = %p, context = %d, contexts = %p, queue = %p ###\n", __FUNCTION__, __LINE__, currWorker->buffer,currWorker->currentPipe,currWorker->stateDelta,currWorker->stateDeltas,currWorker->context,currWorker->contexts,currWorker->queue);
 #endif
@@ -2567,6 +2595,10 @@ gcoBUFFER_Commit(
             Buffer->patchList = gcvNULL;
         }
     }
+    else if (Queue == gcvNULL || Queue->head == gcvNULL)
+    {
+        return gcvSTATUS_SKIP;
+    }
 
     /* Find an available worker. */
     worker = gcoGetWorker(gcvNULL, Queue, Buffer, emptyBuffer);
@@ -2634,7 +2666,6 @@ gcoBUFFER_Commit(
 
     return gcvSTATUS_OK;
 }
-
 
 gceSTATUS
 gcoBUFFER_Commit_Worker(
