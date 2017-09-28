@@ -273,15 +273,13 @@ typedef struct _gcoWorkerInfo
     gctBOOL                     commit;
     gctSIGNAL                   signal;
 
-    gceHARDWARE_TYPE            type;
     gctUINT32                   coreCount;
+    gceHARDWARE_TYPE            hardwareType;
+    gctUINT32                   currentCoreIndex;
+
     gctBOOL                     emptyBuffer;
     gcoCMDBUF                   commandBuffer;
 
-    gceENGINE                   engine;
-    gceHARDWARE_TYPE            hardwareType;
-    gctUINT32                   currentCoreIndex;
-    gcePIPE_SELECT              currentPipe;
     gcsSTATE_DELTA_PTR          stateDelta;
     gcsSTATE_DELTA_PTR          *stateDeltas;
     gctUINT32                   context;

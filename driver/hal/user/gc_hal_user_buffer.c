@@ -694,7 +694,7 @@ gcoFreeWorkerDeltas(
 
 #if gcdENABLE_3D || gcdENABLE_2D
     /* 2D indpendent HW doesn't need context. */
-    if (Worker->type != gcvHARDWARE_2D)
+    if (Worker->hardwareType != gcvHARDWARE_2D)
     {
         gctUINT i;
         gctUINT_PTR mapEntryID;
@@ -772,7 +772,7 @@ gcoCreateWorkerDeltas(
 
 #if gcdENABLE_3D || gcdENABLE_2D
     /* 2D indpendent HW doesn't need context. */
-    if (Worker->type != gcvHARDWARE_2D)
+    if (Worker->hardwareType != gcvHARDWARE_2D)
     {
         gctUINT i;
         gctUINT coreIndex;
@@ -888,7 +888,7 @@ gcoCreateWorker(
     gcmONERROR(gcoOS_Allocate(Os,gcmSIZEOF(gcoWorkerInfo), (gctPOINTER*)&worker));
     gcoOS_ZeroMemory(worker, gcmSIZEOF(gcoWorkerInfo));
 
-    gcmGETCURRENTHARDWARE(worker->type);
+    gcmGETCURRENTHARDWARE(worker->hardwareType);
 
     gcmONERROR(gcoOS_AllocateSharedMemory(Os,gcmSIZEOF(struct _gcoCMDBUF), (gctPOINTER*)&worker->commandBuffer));
 
@@ -971,8 +971,6 @@ gcoGetWorker(
 
     worker->coreCount = coreCount;
     worker->emptyBuffer = EmptyBuffer;
-    worker->engine = Buffer->info.engine;
-    worker->hardwareType = tls->currentType;
     worker->currentCoreIndex = tls->currentCoreIndex;
 
     if (EmptyBuffer == gcvFALSE)
@@ -1188,11 +1186,8 @@ gceSTATUS MergeStateDelta(
 
 gceSTATUS
 gcoBUFFER_Commit_Worker(
-    IN gceENGINE Engine,
-    IN gctUINT CoreCount,
     IN gcoHARDWARE Hardware,
     IN gcoCMDBUF CommandBuffer,
-    IN gcePIPE_SELECT CurrentPipe,
     IN gctUINT32 CurrentCoreIndex,
     IN gceHARDWARE_TYPE HardwareType,
     IN gcsSTATE_DELTA_PTR StateDelta,
@@ -1287,15 +1282,10 @@ gcoBufferCommitWorker(
                     gcoResumeWorker(buffer);
                 }
             }
-#if 0
-    gcmPRINT("%s %d, buffer = %p, currentPipe =%d, stateDelta = %p, stateDeltas = %p, context = %d, contexts = %p, queue = %p ###\n", __FUNCTION__, __LINE__, currWorker->buffer,currWorker->currentPipe,currWorker->stateDelta,currWorker->stateDeltas,currWorker->context,currWorker->contexts,currWorker->queue);
-#endif
-            gcoBUFFER_Commit_Worker(currWorker->engine,
-                                    currWorker->coreCount,
-                                    buffer->hardware,
+
+            gcoBUFFER_Commit_Worker(buffer->hardware,
                                     currWorker->emptyBuffer == gcvFALSE ?
                                     currWorker->commandBuffer : gcvNULL,
-                                    currWorker->currentPipe,
                                     currWorker->currentCoreIndex,
                                     currWorker->hardwareType,
                                     currWorker->stateDelta != gcvNULL ?
@@ -1310,8 +1300,8 @@ gcoBufferCommitWorker(
             {
                 if (worker->stateDeltas == gcvNULL)
                 {
-                    worker->type = currWorker->type;
                     worker->coreCount = currWorker->coreCount;
+                    worker->hardwareType = currWorker->hardwareType;
 
                     gcoCreateWorkerDeltas(Buffer, worker, gcvNULL, &currWorker->stateDeltas);
                 }
@@ -2611,7 +2601,6 @@ gcoBUFFER_Commit(
     if (emptyBuffer == gcvFALSE)
     {
         /* Fill in the worker information. */
-        worker->currentPipe   = CurrentPipe;
         worker->context       = Context;
         worker->contexts      = Contexts;
 
@@ -2669,11 +2658,8 @@ gcoBUFFER_Commit(
 
 gceSTATUS
 gcoBUFFER_Commit_Worker(
-    IN gceENGINE Engine,
-    IN gctUINT CoreCount,
     IN gcoHARDWARE Hardware,
     IN gcoCMDBUF CommandBuffer,
-    IN gcePIPE_SELECT CurrentPipe,
     IN gctUINT32 CurrentCoreIndex,
     IN gceHARDWARE_TYPE HardwareType,
     IN gcsSTATE_DELTA_PTR StateDelta,
@@ -2720,11 +2706,13 @@ gcoBUFFER_Commit_Worker(
     }
     else
     {
+        gctUINT coreCount = 1;
         gcoCMDBUF *commandBufferMirrors;
 
         commandBufferMirrors = CommandBuffer->mirrors;
+        gcoHARDWARE_Query3DCoreCount(Hardware, &coreCount);
 
-        iface.u.Commit.count = CoreCount;
+        iface.u.Commit.count = coreCount;
         iface.u.Commit.delta = gcmPTR_TO_UINT64(iface.u.Commit.deltas);
         iface.u.Commit.context = gcmPTR_TO_UINT64(iface.u.Commit.contexts);
         iface.u.Commit.commandBuffer = gcmPTR_TO_UINT64(iface.u.Commit.commandBuffers);
@@ -2738,19 +2726,19 @@ gcoBUFFER_Commit_Worker(
 #endif
 
         iface.command = gcvHAL_COMMIT;
-        iface.engine = Engine;
+        iface.engine = Queue->engine;
         iface.u.Commit.commandBuffers[0] = gcmPTR_TO_UINT64(CommandBuffer);
         iface.u.Commit.deltas[0] = gcmPTR_TO_UINT64(StateDelta);
         iface.u.Commit.queue = gcmPTR_TO_UINT64(Queue->head);
 
-        iface.u.Commit.shared = (CoreCount > 1) ? gcvTRUE : gcvFALSE;
+        iface.u.Commit.shared = (coreCount > 1) ? gcvTRUE : gcvFALSE;
         iface.u.Commit.index = 0;
 
-        if (Engine == gcvENGINE_RENDER)
+        if (Queue->engine == gcvENGINE_RENDER)
         {
             gctUINT32 i;
 
-            for (i = 1; i < CoreCount; i++)
+            for (i = 1; i < coreCount; i++)
             {
                 gctUINT32 coreIndex;
 
