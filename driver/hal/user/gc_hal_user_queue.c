@@ -24,6 +24,8 @@
 /* Zone used for header/footer. */
 #define _GC_OBJ_ZONE    gcvZONE_BUFFER
 
+#define gcoQUEUE_LIST_SIZE 16
+
 gceSTATUS
 gcoQUEUE_Construct(
     IN gcoOS Os,
@@ -131,7 +133,7 @@ gcoQUEUE_AppendEvent(
     gcsQUEUE_PTR record = gcvNULL;
     gctPOINTER pointer = gcvNULL;
     gcsChunkHead_PTR p;
-    gctSIZE_T i, count = 15;
+    gctSIZE_T i, count = gcoQUEUE_LIST_SIZE;
 
     gcmHEADER_ARG("Queue=0x%x Interface=0x%x", Queue, Interface);
 
@@ -213,26 +215,32 @@ gcoQUEUE_Free(
     IN gcoQUEUE Queue
     )
 {
+    gctSIZE_T i;
+    gcsChunkHead_PTR p;
+    gcsQUEUE_PTR record = gcvNULL;
+
     gcmHEADER_ARG("Queue=0x%x", Queue);
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Queue, gcvOBJ_QUEUE);
 
-    /* Free any records in the queue. */
-    while (Queue->head != gcvNULL)
+    p = Queue->chunks;
+    Queue->freeList = gcvNULL;
+
+    while (p != gcvNULL)
     {
-        gcsQUEUE_PTR record;
+        /* Put the records on free list. */
+        for (i = 0, record = (gcsQUEUE_PTR)(p + 1); i < gcoQUEUE_LIST_SIZE; i++, record++)
+        {
+            record->next    = gcmPTR_TO_UINT64(Queue->freeList);
+            Queue->freeList = record;
+        }
 
-        /* Unlink the first record from the queue. */
-        record      = Queue->head;
-        Queue->head = gcmUINT64_TO_PTR(record->next);
-
-        /* Put record on free list. */
-        record->next    = gcmPTR_TO_UINT64(Queue->freeList);
-        Queue->freeList = record;
+        p = p->next;
     }
 
-    /* Update count */
+    /* clean up the queue now. */
+    Queue->head = Queue->tail = gcvNULL;
     Queue->recordCount = 0;
     Queue->maxUnlockBytes = 0;
 

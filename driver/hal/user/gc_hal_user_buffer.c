@@ -987,25 +987,22 @@ gcoGetWorker(
 
     if (Queue)
     {
-        gcsChunkHead_PTR p;
+        struct _gcoQUEUE queue;
 
-        while (worker->queue->chunks != gcvNULL)
-        {
-            /* Unlink the first chunk. */
-            p = worker->queue->chunks;
-            worker->queue->chunks = p->next;
-
-            /* Free the memory. */
-            gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, p));
-        }
-
+        gcoOS_MemCopy(&queue, worker->queue, gcmSIZEOF(struct _gcoQUEUE));
         gcoOS_MemCopy(worker->queue, Queue, gcmSIZEOF(struct _gcoQUEUE));
+        gcoOS_MemCopy(Queue, &queue, gcmSIZEOF(struct _gcoQUEUE));
 
-         /* clean up the queue now. */
-        Queue->head = Queue->tail = gcvNULL;
-        Queue->recordCount = 0;
-        Queue->chunks = gcvNULL;
-        Queue->freeList = gcvNULL;
+        Queue->engine = worker->queue->engine;
+
+        if (Queue->object.type != gcvOBJ_QUEUE)
+        {
+            Queue->object.type = gcvOBJ_QUEUE;
+        }
+        else
+        {
+            gcoQUEUE_Free(Queue);
+        }
     }
 
     /* Return the worker. */
