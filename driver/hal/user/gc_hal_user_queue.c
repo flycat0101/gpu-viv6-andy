@@ -268,14 +268,8 @@ gcoQUEUE_Commit(
                 return gcvSTATUS_OUT_OF_MEMORY;
             }
 
-            /* Suspend the worker thread. */
-            gcoSuspendWorker(Buffer);
-
             /* Submit the worker. */
             gcoSubmitWorker(Buffer, worker);
-
-            /* Resume the swap thread. */
-            gcoResumeWorker(Buffer);
         }
         else
         {

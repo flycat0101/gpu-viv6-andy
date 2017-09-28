@@ -109,7 +109,6 @@ struct _gcoBUFFER
     gctHANDLE                   workerThread;
     gctSIGNAL                   startSignal;
     gctSIGNAL                   stopSignal;
-    gctPOINTER                  suspendMutex;
 
     /* Process handle. */
     gctHANDLE                   process;
@@ -919,9 +918,6 @@ OnError:
         gcoOS_Free(Os, worker);
     }
 
-    /* Return the status. */
-    gcmFOOTER();
-
     return gcvNULL;
 }
 
@@ -1017,9 +1013,6 @@ gcoGetWorker(
 
 OnError:
 
-    /* Return the status. */
-    gcmFOOTER();
-
     return gcvNULL;
 }
 
@@ -1071,51 +1064,10 @@ gcoSubmitWorker(
     )
 {
     Worker->commit = gcvTRUE;
+
     gcmVERIFY_OK(gcoOS_Signal(gcvNULL, Buffer->startSignal, gcvTRUE));
 
     return gcvTRUE;
-}
-
-void
-gcoSuspendWorker(
-    gcoBUFFER Buffer
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcmHEADER_ARG("Buffer=0x%x", Buffer);
-
-    gcmASSERT(Buffer != gcvNULL);
-    if (Buffer->suspendMutex != gcvNULL)
-    {
-        gcmONERROR(gcoOS_AcquireMutex(gcvNULL, Buffer->suspendMutex, gcvINFINITE));
-    }
-    gcmFOOTER_NO();
-    return;
-
-OnError:
-    gcmFOOTER();
-    return;
-}
-
-void
-gcoResumeWorker(
-    gcoBUFFER Buffer
-    )
-{
-    gceSTATUS status = gcvSTATUS_OK;
-    gcmHEADER_ARG("Buffer=0x%x", Buffer);
-
-    gcmASSERT(Buffer != gcvNULL);
-    if (Buffer->suspendMutex != gcvNULL)
-    {
-        gcmONERROR(gcoOS_ReleaseMutex(gcvNULL, Buffer->suspendMutex));
-    }
-    gcmFOOTER_NO();
-    return;
-
-OnError:
-    gcmFOOTER();
-    return;
 }
 
 #if (gcdENABLE_3D || gcdENABLE_2D)
@@ -1234,13 +1186,7 @@ gcoBufferCommitWorker(
             bStop = gcvTRUE;
         }
 
-        /* Acquire synchronization mutex. */
-        gcoSuspendWorker(buffer);
-
         currWorker = buffer->workerFifo[buffer->workerHead];
-
-        /* Release synchronization mutex. */
-        gcoResumeWorker(buffer);
 
         for (;;)
         {
@@ -1266,8 +1212,6 @@ gcoBufferCommitWorker(
                     currWorker->queue->tail = nextWorker->queue->tail;
                     currWorker->queue->recordCount += nextWorker->queue->recordCount;
 
-                    gcoSuspendWorker(buffer);
-
                     nextWorker->commit = gcvFALSE;
                     gcmVERIFY_OK(gcoOS_Signal(gcvNULL, nextWorker->signal, gcvTRUE));
 
@@ -1278,8 +1222,6 @@ gcoBufferCommitWorker(
                     }
 
                     nextWorker = buffer->workerFifo[(buffer->workerHead + 1) % gcmCOUNTOF(buffer->workerFifo)];
-
-                    gcoResumeWorker(buffer);
                 }
             }
 
@@ -1312,9 +1254,6 @@ gcoBufferCommitWorker(
                 }
             }
 
-            /* Acquire synchronization mutex. */
-            gcoSuspendWorker(buffer);
-
             currWorker->commit = gcvFALSE;
             gcmVERIFY_OK(gcoOS_Signal(gcvNULL, currWorker->signal, gcvTRUE));
 
@@ -1325,9 +1264,6 @@ gcoBufferCommitWorker(
             }
 
             currWorker = buffer->workerFifo[buffer->workerHead];
-
-            /* Release synchronization mutex. */
-            gcoResumeWorker(buffer);
         }
 
         if (bStop)
@@ -2644,14 +2580,8 @@ gcoBUFFER_Commit(
         Buffer->patchList = gcvNULL;
     }
 
-    /* Suspend the worker thread. */
-    gcoSuspendWorker(Buffer);
-
     /* Submit the worker. */
     gcoSubmitWorker(Buffer, worker);
-
-    /* Resume the swap thread. */
-    gcoResumeWorker(Buffer);
 
     return gcvSTATUS_OK;
 }
@@ -2672,12 +2602,12 @@ gcoBUFFER_Commit_Worker(
     gceSTATUS status;
     gcsHAL_INTERFACE iface;
 
-    gcmHEADER_ARG("Buffer=0x%x Queue=0x%x",
-                  Buffer, Queue);
+    gcmHEADER_ARG("CommandBuffer=0x%x Queue=0x%x",
+                  CommandBuffer, Queue);
 
     /* Verify the arguments. */
-    gcmVERIFY_OBJECT(Buffer, gcvOBJ_BUFFER);
     gcmVERIFY_OBJECT(Queue, gcvOBJ_QUEUE);
+    gcmVERIFY_OBJECT(CommandBuffer, gcvOBJ_COMMANDBUFFER);
 
     iface.ignoreTLS     = gcvTRUE;
     iface.hardwareType  = HardwareType;

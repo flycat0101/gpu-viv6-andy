@@ -302,16 +302,6 @@ gcoSubmitWorker(
     gcoWorkerInfo* Worker
     );
 
-void
-gcoSuspendWorker(
-    gcoBUFFER Buffer
-    );
-
-void
-gcoResumeWorker(
-    gcoBUFFER Buffer
-    );
-
 typedef struct {
     gctUINT inputBase;
     gctUINT count;
