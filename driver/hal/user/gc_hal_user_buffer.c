@@ -1487,6 +1487,8 @@ gcoBUFFER_Construct(
 
     gcmONERROR(gcoOS_CreateSignal(gcvNULL, gcvFALSE, &buffer->stopSignal));
 
+    buffer->process = gcoOS_GetCurrentProcessID();
+
     for (i = 0; i < gcmCOUNTOF(buffer->workerFifo); i++)
     {
         buffer->workerFifo[i] = gcoCreateWorker(gcvNULL);
@@ -2468,6 +2470,8 @@ gcoBUFFER_Commit(
             if (Buffer->hwFeature.hasHWFence &&
                 Buffer->inRerserved == gcvFALSE)
             {
+                gctSIGNAL signal;
+                gcsHAL_INTERFACE iface;
                 gctUINT8_PTR fenceCommand, fenceCommandSaved;
 
                 alignedBytes = gcmALIGN(tailCommandBuffer->offset, Buffer->info.alignment) - tailCommandBuffer->offset;
@@ -2487,6 +2491,22 @@ gcoBUFFER_Commit(
                     gcoHARDWARE_SendFence(Buffer->hardware, gcvFALSE, gcvENGINE_RENDER,(gctPOINTER*)&fenceCommand);
                 }
                 tailCommandBuffer->offset += (gctUINT32)(fenceCommand - fenceCommandSaved) + alignedBytes;
+
+                signal = gcoHARDWARE_GetFenceSignal(Buffer->hardware, Buffer->info.engine);
+
+                if (signal)
+                {
+                    /* Submit the signal. */
+                    iface.command            = gcvHAL_SIGNAL;
+                    iface.engine             = Buffer->info.engine;
+                    iface.u.Signal.signal    = gcmPTR_TO_UINT64(signal);
+                    iface.u.Signal.auxSignal = 0;
+                    iface.u.Signal.process   = gcmPTR_TO_UINT64(Buffer->process);
+                    iface.u.Signal.fromWhere = gcvKERNEL_PIXEL;
+
+                    /* Append event to queue */
+                    gcoQUEUE_AppendEvent(Queue, &iface);
+                }
             }
 #endif
         }

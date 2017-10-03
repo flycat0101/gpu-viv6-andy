@@ -2595,6 +2595,12 @@ gcoHARDWARE_GetFence(
     IN gceFENCE_TYPE Type
     );
 
+gctSIGNAL
+gcoHARDWARE_GetFenceSignal(
+    IN gcoHARDWARE Hardware,
+    IN gceENGINE engine
+    );
+
 gctBOOL
 gcoHARDWARE_IsFenceBack(
     IN gcoHARDWARE Hardware,

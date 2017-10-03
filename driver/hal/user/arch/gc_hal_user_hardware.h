@@ -200,6 +200,7 @@ struct _gcoFENCE
     gctUINT                     delayCount;
     gctBOOL                     fromCommit;
 
+    gctSIGNAL                   signal;
     gctFENCE                    type;
     gctINT32                    id;
 

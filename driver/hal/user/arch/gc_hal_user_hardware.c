@@ -6783,6 +6783,11 @@ _DestroyFence(gcoFENCE fence)
 
     if (fence)
     {
+        if (fence->signal)
+        {
+            gcoOS_DestroySignal(gcvNULL, fence->signal);
+        }
+
         if (fence->type == gcvFENCE_RLV)
         {
             if (fence->u.rlvFence.fenceSurface != gcvNULL)
@@ -7081,6 +7086,11 @@ static gceSTATUS _CPUWaitGPUFenceBack(
         }
 
         gcmONERROR(gcoHARDWARE_Commit(gcvNULL));
+    }
+
+    if (Fence->signal)
+    {
+        gcoOS_WaitSignal(gcvNULL, Fence->signal, gcvINFINITE);
     }
 
     if (Fence->type == gcvFENCE_RLV)
@@ -7764,6 +7774,55 @@ OnError:
     /* Return result. */
     gcmFOOTER();
     return status;
+}
+
+gctSIGNAL
+gcoHARDWARE_GetFenceSignal(
+    IN gcoHARDWARE Hardware,
+    IN gceENGINE engine
+    )
+{
+    gcoFENCE fence;
+    gctSIGNAL signal=gcvNULL;
+    gceSTATUS status = gcvSTATUS_OK;
+
+    gcmHEADER_ARG("Hardware=0x%x engine=0x%x",Hardware, engine);
+
+    gcmGETHARDWARE(Hardware);
+
+    if (!Hardware)
+    {
+        gcmFOOTER();
+        return gcvNULL;
+    }
+
+    /* Try to get a fence that not on GPU, return */
+    if (engine >= gcvENGINE_GPU_ENGINE_COUNT)
+    {
+        gcmFOOTER();
+        return gcvNULL;
+    }
+
+    fence = Hardware->fence[engine];
+    if (!fence || !fence->fenceEnable)
+    {
+        gcmFOOTER();
+        return gcvNULL;
+    }
+
+    if (!fence->signal)
+    {
+        gcoOS_CreateSignal(gcvNULL, gcvTRUE, &fence->signal);
+    }
+
+    signal = fence->signal;
+
+    gcoOS_Signal(gcvNULL, signal, gcvFALSE);
+
+OnError:
+    /* Return result. */
+    gcmFOOTER();
+    return signal;
 }
 
 gceSTATUS
