@@ -695,7 +695,6 @@ gcoBUFOBJ_Upload (
     gcsSURF_NODE memory;
     gctBOOL bDisableFenceAndDynamicStream;
     gctBOOL bGPUupload = gcvFALSE;
-    gctBOOL bCanGPUupload = gcvFALSE;
     gctBOOL bWaitFence = gcvFALSE;
 
     gcmHEADER_ARG("BufObj=0x%x Buffer=0x%x Offset=%u Bytes=%lu, Dynamic=%d",
@@ -708,9 +707,6 @@ gcoBUFOBJ_Upload (
     /* Read useage.*/
     bDisableFenceAndDynamicStream = (Usage & gcvBUFOBJ_USAGE_DISABLE_FENCE_DYNAMIC_STREAM) ? gcvTRUE : gcvFALSE;
     Usage &= ~gcvBUFOBJ_USAGE_DISABLE_FENCE_DYNAMIC_STREAM;
-
-    bCanGPUupload =  gcoHAL_GetOption(gcvNULL, gcvOPTION_GPU_BUFOBJ_UPLOAD) &&
-                  gcoHARDWARE_IsFeatureAvailable(gcvNULL, gcvFEATURE_BLT_ENGINE);
 
     /* Dynamic for all cases other than static draw */
     dynamic = (Usage != gcvBUFOBJ_USAGE_STATIC_DRAW);
@@ -804,12 +800,6 @@ gcoBUFOBJ_Upload (
                 bWaitFence = gcvTRUE;
             }
         }
-    }
-
-    if (bWaitFence && bCanGPUupload)
-    {
-        bGPUupload = gcvTRUE;
-        bWaitFence = gcvFALSE;
     }
 
     if (bWaitFence)
