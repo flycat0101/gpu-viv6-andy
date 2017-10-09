@@ -153,10 +153,6 @@ gcoHARDWARE_CommitCmdVX(
     OUT gctUINT32*          pCmdBytes
     )
 {
-
-#if gcdENABLE_3D
-    gctUINT32 coreIndex;
-#endif
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if (gcdENABLE_3D || gcdENABLE_2D)
@@ -172,18 +168,6 @@ gcoHARDWARE_CommitCmdVX(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
-
-#if gcdENABLE_3D
-    if (Hardware->deltas)
-    {
-        for (i = 1; i < Hardware->config->gpuCoreCount; i++)
-        {
-            gcoHARDWARE_QueryCoreIndex(Hardware, i, &coreIndex);
-
-            gcoHARDWARE_CopyDelta(Hardware->deltas[coreIndex], Hardware->delta);
-        }
-    }
-#endif
 
     for (i = 0; i < gcvENGINE_GPU_ENGINE_COUNT; i++)
     {
@@ -203,7 +187,6 @@ gcoHARDWARE_CommitCmdVX(
             Hardware->engine[gcvENGINE_BLT].buffer,
             gcvPIPE_INVALID,
             gcvNULL,
-            gcvNULL,
             0,
             gcvNULL,
             Hardware->engine[gcvENGINE_BLT].queue,
@@ -216,32 +199,12 @@ gcoHARDWARE_CommitCmdVX(
         Hardware->engine[gcvENGINE_RENDER].buffer,
         Hardware->currentPipe,
         &Hardware->delta,
-        &Hardware->deltas,
         Hardware->context,
         Hardware->contexts,
         Hardware->engine[gcvENGINE_RENDER].queue,
         &dumpCommandLogical,
         &dumpCommandBytes
         );
-
-#if gcdENABLE_3D
-    if (Hardware->deltas)
-    {
-        for (i = 0; i < Hardware->config->gpuCoreCount; i++)
-        {
-            /* Update deltas for all GPUs bound to this hardware. */
-            gcoHARDWARE_QueryCoreIndex(Hardware, i, &coreIndex);
-
-            _UpdateDelta(Hardware, coreIndex);
-        }
-
-        /* Delta list for the first GPU is updated in _UpdateDelta,
-        *  update Hardware->delta to the current one. */
-        gcoHARDWARE_QueryCoreIndex(Hardware, 0, &coreIndex);
-
-        Hardware->delta = Hardware->deltas[coreIndex];
-    }
-#endif
 
 #if gcdDUMP && !gcdDUMP_COMMAND && !gcdDUMP_IN_KERNEL
     if (dumpCommandBytes)

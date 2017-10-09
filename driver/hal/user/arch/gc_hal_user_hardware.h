@@ -852,11 +852,6 @@ struct _gcoHARDWARE
     /* List of state delta buffers. */
     gcsSTATE_DELTA_PTR          delta;
 
-    gcsSTATE_DELTA_PTR          *deltas;
-
-    /* Count of deltas it is needed because gpuCoreCount will be changed. */
-    gctUINT32                    deltasCount;
-
     /* Chip configuration. */
     gcsHARDWARE_CONFIG *        config;
     gctBOOL                     features[gcvFEATURE_COUNT];
@@ -1911,7 +1906,6 @@ gceSTATUS gcoHARDWARE_InitializeFormatArrayTable(
     );
 
 #define gcoHARDWARE_UpdateDelta UpdateStateDelta
-#define gcoHARDWARE_CopyDelta   CopyStateDelta
 
 gceSTATUS
 gcoHARDWARE_3DBlitCopy(

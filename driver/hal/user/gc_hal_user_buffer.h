@@ -273,7 +273,6 @@ typedef struct _gcoWorkerInfo
     gctBOOL                     commit;
     gctSIGNAL                   signal;
 
-    gctUINT32                   coreCount;
     gceHARDWARE_TYPE            hardwareType;
     gctUINT32                   currentCoreIndex;
 
@@ -281,7 +280,6 @@ typedef struct _gcoWorkerInfo
     gcoCMDBUF                   commandBuffer;
 
     gcsSTATE_DELTA_PTR          stateDelta;
-    gcsSTATE_DELTA_PTR          *stateDeltas;
     gctUINT32                   context;
     gctUINT32_PTR               contexts;
     gcoQUEUE                    queue;
@@ -388,25 +386,6 @@ static gcmINLINE void UpdateStateDelta(
         recordEntry->data &= ~Mask;
         recordEntry->data |= (Data & Mask);
     }
-}
-
-static gcmINLINE void CopyStateDelta(
-    IN gcsSTATE_DELTA_PTR DestStateDelta,
-    IN gcsSTATE_DELTA_PTR SrcStateDelta
-    )
-{
-    DestStateDelta->recordCount = SrcStateDelta->recordCount;
-
-    if (DestStateDelta->recordCount)
-    {
-        gcoOS_MemCopy(
-            gcmUINT64_TO_PTR(DestStateDelta->recordArray),
-            gcmUINT64_TO_PTR(SrcStateDelta->recordArray),
-            gcmSIZEOF(gcsSTATE_DELTA_RECORD) * DestStateDelta->recordCount
-            );
-    }
-
-    DestStateDelta->elementCount = SrcStateDelta->elementCount;
 }
 
 #if (gcdENABLE_3D || gcdENABLE_2D)

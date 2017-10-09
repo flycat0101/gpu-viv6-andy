@@ -3391,7 +3391,6 @@ gcoBUFFER_Commit(
     IN gcoBUFFER Buffer,
     IN gcePIPE_SELECT CurrentPipe,
     IN gcsSTATE_DELTA_PTR *StateDelta,
-    IN gcsSTATE_DELTA_PTR **StateDeltas,
     IN gctUINT32 Context,
     IN gctUINT32_PTR Contexts,
     IN gcoQUEUE Queue,

@@ -682,11 +682,11 @@ OnError:
 }
 
 gceSTATUS
-gcoFreeWorkerDeltas(
+gcoFreeWorkerDelta(
     gcoWorkerInfo * Worker
     )
 {
-    if (!Worker->stateDeltas)
+    if (!Worker->stateDelta)
     {
         return gcvSTATUS_INVALID_ARGUMENT;
     }
@@ -695,57 +695,43 @@ gcoFreeWorkerDeltas(
     /* 2D indpendent HW doesn't need context. */
     if (Worker->hardwareType != gcvHARDWARE_2D)
     {
-        gctUINT i;
         gctUINT_PTR mapEntryID;
         gcsSTATE_DELTA_PTR delta;
         gctUINT_PTR mapEntryIndex;
         gcsSTATE_DELTA_RECORD_PTR recordArray;
 
-        for (i = 0; i < gcvCORE_COUNT; i++)
+        delta = Worker->stateDelta;
+
+        mapEntryID = gcmUINT64_TO_PTR(delta->mapEntryID);
+        mapEntryIndex = gcmUINT64_TO_PTR(delta->mapEntryIndex);
+        recordArray = gcmUINT64_TO_PTR(delta->recordArray);
+
+        if (mapEntryID > 0)
         {
-            delta = Worker->stateDeltas[i];
-
-            if (!delta)
-            {
-                continue;
-            }
-
-            mapEntryID = gcmUINT64_TO_PTR(delta->mapEntryID);
-            mapEntryIndex = gcmUINT64_TO_PTR(delta->mapEntryIndex);
-            recordArray = gcmUINT64_TO_PTR(delta->recordArray);
-
-            if (mapEntryID > 0)
-            {
-                gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
-                    gcvNULL,
-                    mapEntryID
-                    ));
-            }
-
-            if (mapEntryIndex > 0)
-            {
-                gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
-                    gcvNULL,
-                    mapEntryIndex
-                    ));
-            }
-
-            if (recordArray > 0)
-            {
-                gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
-                    gcvNULL,
-                    recordArray
-                    ));
-            }
-
             gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
-                gcvNULL, delta
+                gcvNULL,
+                mapEntryID
                 ));
         }
 
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(
-            gcvNULL,
-            Worker->stateDeltas
+        if (mapEntryIndex > 0)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
+                gcvNULL,
+                mapEntryIndex
+                ));
+        }
+
+        if (recordArray > 0)
+        {
+            gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
+                gcvNULL,
+                recordArray
+                ));
+        }
+
+        gcmVERIFY_OK(gcmOS_SAFE_FREE_SHARED_MEMORY(
+            gcvNULL, delta
             ));
     }
 #endif
@@ -754,17 +740,17 @@ gcoFreeWorkerDeltas(
 }
 
 gceSTATUS
-gcoCreateWorkerDeltas(
+gcoCreateWorkerDelta(
     gcoBUFFER Buffer,
     gcoWorkerInfo * Worker,
     gcsSTATE_DELTA_PTR *Delta,
-    gcsSTATE_DELTA_PTR **Deltas
+    gctBOOL  exchgDelta
     )
 {
-    gcsSTATE_DELTA_PTR pDelta, *pDeltas;
+    gcsSTATE_DELTA_PTR pDelta;
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
-    if (!Deltas)
+    if (!Delta)
     {
         return gcvSTATUS_INVALID_ARGUMENT;
     }
@@ -773,34 +759,13 @@ gcoCreateWorkerDeltas(
     /* 2D indpendent HW doesn't need context. */
     if (Worker->hardwareType != gcvHARDWARE_2D)
     {
-        gctUINT i;
-        gctUINT coreIndex;
+        pDelta = *Delta;
 
-        pDeltas = *Deltas;
-
-        if (!Worker->stateDeltas)
-        {
-            gcmONERROR(gcoOS_Allocate(
-                gcvNULL,
-                gcmSIZEOF(gcsSTATE_DELTA_PTR) * gcvCORE_COUNT,
-                (gctPOINTER *)&Worker->stateDeltas
-                ));
-
-            gcoOS_ZeroMemory(Worker->stateDeltas, gcmSIZEOF(gcsSTATE_DELTA_PTR) * gcvCORE_COUNT);
-        }
-
-        for (i = 0; i < Worker->coreCount; i++)
+        if (!Worker->stateDelta)
         {
             /* Allocate a state delta. */
             gctPOINTER pointer;
             gcsSTATE_DELTA_PTR delta;
-
-            if (Worker->stateDeltas[i])
-            {
-                Worker->stateDeltas[i]->id = pDeltas[i]->id;
-
-                continue;
-            }
 
             /* Allocate the state delta structure. */
             gcmONERROR(gcoOS_AllocateSharedMemory(
@@ -810,11 +775,11 @@ gcoCreateWorkerDeltas(
             /* Reset the context buffer structure. */
             gcoOS_ZeroMemory(delta, gcmSIZEOF(gcsSTATE_DELTA));
 
-            Worker->stateDeltas[i] = delta;
+            Worker->stateDelta = delta;
 
-            if (pDeltas[i]->mapEntryIDSize > 0)
+            if (pDelta->mapEntryIDSize > 0)
             {
-                delta->mapEntryIDSize = pDeltas[i]->mapEntryIDSize;
+                delta->mapEntryIDSize = pDelta->mapEntryIDSize;
 
                 /* Allocate map ID array. */
                 gcmONERROR(gcoOS_AllocateSharedMemory(
@@ -834,9 +799,9 @@ gcoCreateWorkerDeltas(
                 delta->mapEntryIndex = gcmPTR_TO_UINT64(pointer);
             }
 
-            if (pDeltas[i]->recordSize > 0)
+            if (pDelta->recordSize > 0)
             {
-                delta->recordSize = pDeltas[i]->recordSize;
+                delta->recordSize = pDelta->recordSize;
 
                 /* Allocate state record array. */
                 gcmONERROR(gcoOS_AllocateSharedMemory(
@@ -847,23 +812,16 @@ gcoCreateWorkerDeltas(
 
                 delta->recordArray = gcmPTR_TO_UINT64(pointer);
             }
-
-            delta->id = pDeltas[i]->id;
         }
 
-        /* Specify delta and context for main core. */
-        gcoHARDWARE_QueryCoreIndex(Buffer->hardware, 0, &coreIndex);
-        Worker->stateDelta = Worker->stateDeltas[coreIndex];
+        Worker->stateDelta->id = pDelta->id;
 
-        if (Delta)
+        ResetStateDelta(Worker->stateDelta);
+
+        if (exchgDelta)
         {
-            pDelta = *Delta;
-
             *Delta = Worker->stateDelta;
-            *Deltas = Worker->stateDeltas;
-
             Worker->stateDelta = pDelta;
-            Worker->stateDeltas = pDeltas;
         }
     }
 #endif
@@ -871,7 +829,7 @@ gcoCreateWorkerDeltas(
 
 OnError:
 
-    gcoFreeWorkerDeltas(Worker);
+    gcoFreeWorkerDelta(Worker);
 
     return status;
 }
@@ -932,8 +890,6 @@ gcoGetWorker(
     gcsTLS_PTR tls;
     gceSTATUS status;
     gcoWorkerInfo *worker = gcvNULL;
-    gctUINT coreCount = 1;
-
 
     if (Buffer == gcvNULL)
     {
@@ -963,9 +919,6 @@ gcoGetWorker(
         Buffer->workerFree = 0;
     }
 
-    gcoHARDWARE_Query3DCoreCount(gcvNULL, &coreCount);
-
-    worker->coreCount = coreCount;
     worker->emptyBuffer = EmptyBuffer;
     worker->currentCoreIndex = tls->currentCoreIndex;
 
@@ -1046,9 +999,9 @@ gcoFreeWorker(
         gcmVERIFY_OK(gcoOS_Free(Os, Worker->queue));
     }
 
-    if (Worker->stateDeltas)
+    if (Worker->stateDelta)
     {
-        gcmVERIFY_OK(gcoFreeWorkerDeltas(Worker));
+        gcmVERIFY_OK(gcoFreeWorkerDelta(Worker));
     }
 
     gcmVERIFY_OK(gcoOS_Free(Os, Worker));
@@ -1140,7 +1093,6 @@ gcoBUFFER_Commit_Worker(
     IN gctUINT32 CurrentCoreIndex,
     IN gceHARDWARE_TYPE HardwareType,
     IN gcsSTATE_DELTA_PTR StateDelta,
-    IN gcsSTATE_DELTA_PTR *StateDeltas,
     IN gctUINT32 Context,
     IN gctUINT32_PTR Contexts,
     IN gcoQUEUE Queue
@@ -1157,7 +1109,7 @@ gcoBufferCommitWorker(
     gcoWorkerInfo *worker = gcvNULL;
     gcoWorkerInfo *currWorker = gcvNULL;
 
-    gcmHEADER_ARG("Buffer=0x%x", Buffer);
+    gcmHEADER_ARG("ThreadData=0x%x", ThreadData);
 
     buffer = (gcoBUFFER)Buffer;
 
@@ -1229,26 +1181,20 @@ gcoBufferCommitWorker(
                                     currWorker->hardwareType,
                                     currWorker->stateDelta != gcvNULL ?
                                     worker->stateDelta : gcvNULL,
-                                    currWorker->stateDeltas != gcvNULL ?
-                                    worker->stateDeltas : gcvNULL,
                                     currWorker->context,
                                     currWorker->contexts,
                                     currWorker->queue);
 
-            if (currWorker->stateDeltas && !currWorker->emptyBuffer)
+            if (currWorker->stateDelta && !currWorker->emptyBuffer)
             {
-                if (worker->stateDeltas == gcvNULL)
+                if (worker->stateDelta == gcvNULL)
                 {
-                    worker->coreCount = currWorker->coreCount;
                     worker->hardwareType = currWorker->hardwareType;
 
-                    gcoCreateWorkerDeltas(Buffer, worker, gcvNULL, &currWorker->stateDeltas);
+                    gcoCreateWorkerDelta(Buffer, worker, &currWorker->stateDelta, gcvFALSE);
                 }
 
-                for (i = 0; i < currWorker->coreCount; i++)
-                {
-                    MergeStateDelta(worker->stateDeltas[i], currWorker->stateDeltas[i]);
-                }
+                MergeStateDelta(worker->stateDelta, currWorker->stateDelta);
             }
 
             currWorker->commit = gcvFALSE;
@@ -2331,7 +2277,6 @@ gcoBUFFER_Commit(
     IN gcoBUFFER Buffer,
     IN gcePIPE_SELECT CurrentPipe,
     IN gcsSTATE_DELTA_PTR *StateDelta,
-    IN gcsSTATE_DELTA_PTR **StateDeltas,
     IN gctUINT32 Context,
     IN gctUINT32_PTR Contexts,
     IN gcoQUEUE Queue,
@@ -2557,7 +2502,7 @@ gcoBUFFER_Commit(
         worker->context       = Context;
         worker->contexts      = Contexts;
 
-        gcoCreateWorkerDeltas(Buffer, worker, StateDelta, StateDeltas);
+        gcoCreateWorkerDelta(Buffer, worker, StateDelta, gcvTRUE);
 
         /* Advance the offset for next commit. */
         newOffset = commandBuffer->offset + Buffer->info.reservedTail;
@@ -2610,7 +2555,6 @@ gcoBUFFER_Commit_Worker(
     IN gctUINT32 CurrentCoreIndex,
     IN gceHARDWARE_TYPE HardwareType,
     IN gcsSTATE_DELTA_PTR StateDelta,
-    IN gcsSTATE_DELTA_PTR *StateDeltas,
     IN gctUINT32 Context,
     IN gctUINT32_PTR Contexts,
     IN gcoQUEUE Queue
@@ -2692,15 +2636,7 @@ gcoBUFFER_Commit_Worker(
                 /* Convert core index in this hardware to global core index. */
                 gcmONERROR(gcoHARDWARE_QueryCoreIndex(Hardware, i, &coreIndex));
 
-                if (StateDeltas)
-                {
-                    /* Get State Deltas of the GPU. */
-                    iface.u.Commit.deltas[i] = gcmPTR_TO_UINT64(StateDeltas[coreIndex]);
-                }
-                else
-                {
-                    iface.u.Commit.deltas[i] = iface.u.Commit.deltas[0];
-                }
+                iface.u.Commit.deltas[i] = gcmPTR_TO_UINT64(StateDelta);
 
                 if (Contexts)
                 {

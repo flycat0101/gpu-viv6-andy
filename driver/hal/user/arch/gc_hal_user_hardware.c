@@ -4414,6 +4414,9 @@ _Attach(
     gctPOINTER pointer;
     gctUINT32 coreIndex;
     gctBOOL coreIndexChanged = gcvFALSE;
+#if gcdDUMP
+    gctUINT i;
+#endif
 
     gcoHAL_GetCurrentCoreIndex(gcvNULL, &coreIndex);
 
@@ -4466,6 +4469,7 @@ _Attach(
 
     /**************************************************************************/
     /* Allocate the context and state delta buffers. **************************/
+    if (!hardware->delta)
     {
         /* Allocate a state delta. */
         gcsSTATE_DELTA_PTR delta;
@@ -4479,12 +4483,8 @@ _Attach(
         /* Reset the context buffer structure. */
         gcoOS_ZeroMemory(delta, gcmSIZEOF(gcsSTATE_DELTA));
 
-        hardware->deltas[Core] = delta;
+        hardware->delta = delta;
 
-        /* Set the number of delta in the order of creation. */
-#if gcmIS_DEBUG(gcdDEBUG_CODE)
-        delta->num = i;
-#endif
         if (hardware->maxState > 0)
         {
             /* Compute UINT array size. */
@@ -4585,10 +4585,10 @@ _UpdateDelta(
     IN gctUINT32 Core
     )
 {
-    if (Hardware->deltas[Core])
+    if (Hardware->delta)
     {
         /* Reset the current. */
-        ResetStateDelta(Hardware->deltas[Core]);
+        ResetStateDelta(Hardware->delta);
     }
 }
 
@@ -5274,15 +5274,7 @@ gcoHARDWARE_Construct(
     if (type != gcvHARDWARE_2D)
     {
         gctUINT i;
-        gctUINT coreCount = hardware->deltasCount = hardware->config->gpuCoreCount;
-
-        gcmONERROR(gcoOS_Allocate(
-            gcvNULL,
-            gcmSIZEOF(gcsSTATE_DELTA_PTR) * gcvCORE_COUNT,
-            (gctPOINTER *)&hardware->deltas
-            ));
-
-        gcoOS_ZeroMemory(hardware->deltas, gcmSIZEOF(gcsSTATE_DELTA_PTR) * gcvCORE_COUNT);
+        gctUINT coreCount = hardware->config->gpuCoreCount;
 
         gcmONERROR(gcoOS_Allocate(
             gcvNULL,
@@ -5585,7 +5577,6 @@ gcoHARDWARE_Construct(
 
         /* Specify delta and context for main core. */
         gcoHARDWARE_QueryCoreIndex(hardware, 0, &coreIndex);
-        hardware->delta = hardware->deltas[coreIndex];
         hardware->context = hardware->contexts[coreIndex];
     }
 #endif
@@ -5953,13 +5944,12 @@ gceSTATUS gcoHARDWARE_Destroy(
     }
 #endif
 
-    for (i = 0; i < Hardware->deltasCount; i++)
     {
         /* Free state deltas. */
-        if (Hardware->deltas[i] != gcvNULL)
+        if (Hardware->delta != gcvNULL)
         {
             /* Get a shortcut to the current delta. */
-            gcsSTATE_DELTA_PTR delta = Hardware->deltas[i];
+            gcsSTATE_DELTA_PTR delta = Hardware->delta;
             gctUINT_PTR mapEntryIndex = gcmUINT64_TO_PTR(delta->mapEntryIndex);
             gctUINT_PTR mapEntryID = gcmUINT64_TO_PTR(delta->mapEntryID);
             gcsSTATE_DELTA_RECORD_PTR recordArray = gcmUINT64_TO_PTR(delta->recordArray);
@@ -5985,11 +5975,6 @@ gceSTATUS gcoHARDWARE_Destroy(
             /* Free state delta. */
             gcmONERROR(gcmOS_SAFE_FREE_SHARED_MEMORY(gcvNULL, delta));
         }
-    }
-
-    if (Hardware->deltas)
-    {
-        gcmOS_SAFE_FREE(gcvNULL, Hardware->deltas);
     }
 
 #if gcdENABLE_3D
@@ -7741,8 +7726,6 @@ gcoHARDWARE_GetFence(
 
     gcmGETHARDWARE(Hardware);
 
-    gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
-
     /* Try to get a fence that not on GPU, return */
     if (engine >= gcvENGINE_GPU_ENGINE_COUNT)
     {
@@ -8504,9 +8487,6 @@ gcoHARDWARE_Commit(
 #if (gcdENABLE_3D || gcdENABLE_2D)
     gctUINT i;
 #endif
-#if gcdENABLE_3D
-    gctUINT32 coreIndex;
-#endif
     gceSTATUS status = gcvSTATUS_NOT_SUPPORTED;
 
 #if (gcdENABLE_3D || gcdENABLE_2D)
@@ -8521,18 +8501,6 @@ gcoHARDWARE_Commit(
 
     /* Verify the arguments. */
     gcmVERIFY_OBJECT(Hardware, gcvOBJ_HARDWARE);
-
-#if gcdENABLE_3D
-    if (Hardware->deltas)
-    {
-        for (i = 1; i < Hardware->config->gpuCoreCount; i++)
-        {
-            gcoHARDWARE_QueryCoreIndex(Hardware, i, &coreIndex);
-
-            gcoHARDWARE_CopyDelta(Hardware->deltas[coreIndex], Hardware->delta);
-        }
-    }
-#endif
 
     for (i = 0 ; i < gcvENGINE_GPU_ENGINE_COUNT; i++)
     {
@@ -8558,7 +8526,6 @@ gcoHARDWARE_Commit(
             Hardware->engine[gcvENGINE_BLT].buffer,
             gcvPIPE_INVALID,
             gcvNULL,
-            gcvNULL,
             0,
             gcvNULL,
             Hardware->engine[gcvENGINE_BLT].queue,
@@ -8581,32 +8548,12 @@ gcoHARDWARE_Commit(
         Hardware->engine[gcvENGINE_RENDER].buffer,
         Hardware->currentPipe,
         &Hardware->delta,
-        &Hardware->deltas,
         Hardware->context,
         Hardware->contexts,
         Hardware->engine[gcvENGINE_RENDER].queue,
         &dumpCommandLogical,
         &dumpCommandBytes
         );
-
-#if gcdENABLE_3D
-    if (Hardware->deltas)
-    {
-        for (i = 0; i < Hardware->config->gpuCoreCount; i++)
-        {
-            /* Update deltas for all GPUs bound to this hardware. */
-            gcoHARDWARE_QueryCoreIndex(Hardware, i, &coreIndex);
-
-            _UpdateDelta(Hardware, coreIndex);
-        }
-
-        /* Delta list for the first GPU is updated in _UpdateDelta,
-        *  update Hardware->delta to the current one. */
-        gcoHARDWARE_QueryCoreIndex(Hardware, 0, &coreIndex);
-
-        Hardware->delta = Hardware->deltas[coreIndex];
-    }
-#endif
 
 #if gcdDUMP && !gcdDUMP_COMMAND && !gcdDUMP_IN_KERNEL
     if (dumpCommandBytes)
