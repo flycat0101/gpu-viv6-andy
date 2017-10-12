@@ -29,6 +29,7 @@ if [ -z $VIVANTE_SDK_DIR ]; then
 fi
 
 export SDK_DIR=$AQROOT/build/sdk
+shopt -s extglob
 
 case "$ARCH" in
 
@@ -82,6 +83,20 @@ arm64-yocto)
     export ARCH_TYPE=$ARCH
     export CPU_TYPE=cortex-a53
     export CPU_ARCH=armv8-a
+    BUILD_YOCTO_DRI_BUILD=1
+    BUILD_OPTION_USE_OPENCL=1
+    BUILD_OPTION_USE_VULKAN=1
+    BUILD_OPTION_USE_OPENVX=1
+    BUILD_OPTION_VIVANTE_ENABLE_2D=0
+
+;;
+
+arm64)
+    export ARCH=arm64
+    export ARCH_TYPE=$ARCH
+    export CPU_TYPE=cortex-a53
+    export CPU_ARCH=armv8-a
+    export PATH=$TOOLCHAIN/bin:$PATH
     BUILD_YOCTO_DRI_BUILD=1
     BUILD_OPTION_USE_OPENCL=1
     BUILD_OPTION_USE_VULKAN=1
