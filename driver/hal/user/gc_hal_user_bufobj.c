@@ -22,6 +22,8 @@
 #define BUFFER_INDEX_ALIGNMENT  16 /* max alignmet for index buffer object types */
 #define BUFFER_OBJECT_SURFTYPE  gcvSURF_VERTEX
 #define DYNAMIC_BUFFER_MAX_COUNT    0x1000 /* max dynamic buffer size.*/
+#define BUFOBJ_INDEX_CACHE_LIMIT    256
+#define BUFOBJ_INDEX_CACHE_SIZE     16
 
 /******************************************************************************\
 ********************************** Structures **********************************
@@ -57,6 +59,7 @@ struct _gcoBUFOBJ
 
     /* Index management */
     gcoBUFOBJ_INDEX             indexNode;
+    gcoBUFOBJ_INDEX             indexCache[BUFOBJ_INDEX_CACHE_SIZE];
 
     /* Start and end of the updated dynamic range */
     gctSIZE_T                   dynamicStart;
@@ -215,6 +218,8 @@ gcoBUFOBJ_Construct(
     bufobj->indexNode.maxIndex          = 0;
     bufobj->indexNode.count                = 0;
     bufobj->indexNode.offset            = 0;
+
+    gcoOS_ZeroMemory(bufobj->indexCache, gcmSIZEOF(bufobj->indexCache));
 
     /* Return pointer to the gcoBUFOBJ object. */
     *BufObj = bufobj;
@@ -1236,6 +1241,22 @@ gcoBUFOBJ_IndexGetRange(
     /* Not yet determined or determined for a different count? */
     if ((indexNode->maxIndex == 0) || (indexNode->minIndex == ~0U) || (indexNode->count != Count) || (indexNode->offset != Offset))
     {
+        if (Count >= BUFOBJ_INDEX_CACHE_LIMIT)
+        {
+            for (i = 0; i < BUFOBJ_INDEX_CACHE_SIZE; i++)
+            {
+                if (Index->indexCache[i].count == 0)
+                {
+                     break;
+                }
+                else if (Index->indexCache[i].count == Count && Index->indexCache[i].offset == Offset)
+                {
+                    gcoOS_MemCopy(indexNode, &Index->indexCache[i], gcmSIZEOF(Index->indexCache[i]));
+                    goto OnFound;
+                }
+            }
+        }
+
         /* Lock the bufobj buffer. */
         gcmONERROR(gcoHARDWARE_Lock(&Index->memory, gcvNULL, (gctPOINTER)&data));
 
@@ -1300,10 +1321,23 @@ gcoBUFOBJ_IndexGetRange(
         indexNode->count = Count;
         indexNode->offset = Offset;
 
+        if (Count >= BUFOBJ_INDEX_CACHE_LIMIT)
+        {
+            for (i = 0; i < BUFOBJ_INDEX_CACHE_SIZE; i++)
+            {
+                if (Index->indexCache[i].count == 0)
+                {
+                    gcoOS_MemCopy(&Index->indexCache[i], indexNode, gcmSIZEOF(Index->indexCache[i]));
+                    break;
+                }
+            }
+        }
+
         /* Unlock the bufobj buffer. */
         gcmONERROR(gcoHARDWARE_Unlock(&Index->memory, Index->surfType));
     }
 
+OnFound:
     /* Set results. */
     *MinimumIndex = indexNode->minIndex;
     *MaximumIndex = indexNode->maxIndex;
@@ -1353,6 +1387,8 @@ gcoBUFOBJ_SetDirty(
         BufObj->indexNode.minIndex = ~0U;
         BufObj->indexNode.count = 0;
         BufObj->indexNode.offset = 0;
+
+        gcoOS_ZeroMemory(BufObj->indexCache, gcmSIZEOF(BufObj->indexCache));
     }
 
     /* Success. */
