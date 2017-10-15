@@ -109,6 +109,21 @@ struct _gcoTEXTURE
 
     gctINT                      descCurIndex;
     gcsTXDescNode               descArray[gcdMAX_TXDESC_ARRAY_SIZE];
+
+    struct
+    {
+        gctUINT32               hasSingleBuffer               : 1;
+        gctUINT32               hasTileFiller                 : 1;
+        gctUINT32               hasTxTileStatusRead           : 1;
+        gctUINT32               hasTxASTCBaseLodFix           : 1;
+        gctUINT32               hasTxBorderClampFix           : 1;
+        gctUINT32               hasTxMipFilterNoneFix         : 1;
+        gctUINT32               hasTxDecompressor             : 1;
+        gctUINT32               hasTx8BppTSFix                : 1;
+        gctUINT32               hasTxBaseLod                  : 1;
+        gctUINT32               hasBugFixES18                 : 1;
+        gctUINT32               hasMSAATexture                : 1;
+    }hwFeature;
 };
 
 
@@ -398,6 +413,31 @@ static gceSTATUS _uploadBlitBlt(
     return status;
 }
 
+gceSTATUS
+gcoTEXTURE_InitHWFeature(gcoTEXTURE Texture)
+{
+    gcoTEXTURE texture = Texture;
+
+    if (!texture)
+    {
+        return gcvSTATUS_INVALID_ARGUMENT;
+    }
+
+    texture->hwFeature.hasSingleBuffer       = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SINGLE_BUFFER);
+    texture->hwFeature.hasTileFiller         = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TILE_FILLER);
+    texture->hwFeature.hasTxTileStatusRead   = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_TILE_STATUS_READ);
+    texture->hwFeature.hasTxASTCBaseLodFix   = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_ASTC_BASE_LOD_FIX);
+    texture->hwFeature.hasTxBorderClampFix   = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_BORDER_CLAMP_FIX);
+    texture->hwFeature.hasTxMipFilterNoneFix = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_MIPFILTER_NONE_FIX);
+    texture->hwFeature.hasTxDecompressor     = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_DECOMPRESSOR);
+    texture->hwFeature.hasTx8BppTSFix        = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_8BPP_TS_FIX);
+    texture->hwFeature.hasTxBaseLod          = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEX_BASELOD);
+    texture->hwFeature.hasBugFixES18         = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BUG_FIXES18);
+    texture->hwFeature.hasMSAATexture        = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MSAA_TEXTURE);
+
+    return gcvSTATUS_OK;
+}
+
 /******************************************************************************\
 |**************************** gcoTEXTURE Object Code ***************************|
 \******************************************************************************/
@@ -475,6 +515,8 @@ gcoTEXTURE_ConstructEx(
     texture->type           = Type;
     texture->descDirty      = gcvTRUE;
     texture->descCurIndex   = -1;
+
+    gcoTEXTURE_InitHWFeature(texture);
 
     /* Return the gcoTEXTURE object pointer. */
     *Texture = texture;
@@ -619,6 +661,8 @@ gcoTEXTURE_ConstructSized(
 
     texture->descDirty      = gcvTRUE;
     texture->descCurIndex   = -1;
+
+    gcoTEXTURE_InitHWFeature(texture);
 
     /* Client driver may sent depth = 0 */
     Depth = Depth > 0 ? Depth : 1;
@@ -3339,8 +3383,7 @@ gcoTEXTURE_RenderIntoMipMap(
         return status;
     }
 
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_SINGLE_BUFFER)
-                          == gcvSTATUS_TRUE)
+    if (Texture->hwFeature.hasSingleBuffer)
     {
         gcsSURF_VIEW texView = {map->surface, 0, 1};
         status = gcoSURF_DisableTileStatus(&texView, gcvTRUE);
@@ -3360,7 +3403,7 @@ gcoTEXTURE_RenderIntoMipMap(
     gcoHARDWARE_GetPatchID(gcvNULL, &patchId);
     if (patchId == gcvPATCH_GLBM21 || patchId == gcvPATCH_GLBM25 || patchId == gcvPATCH_GLBM27 || patchId == gcvPATCH_GFXBENCH)
     {
-        hasTileFiller = gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TILE_FILLER) == gcvSTATUS_TRUE;
+        hasTileFiller = Texture->hwFeature.hasTileFiller;
     }
     else
     {
@@ -3560,8 +3603,7 @@ gcoTEXTURE_PrepareForRender(
 #if gcdRTT_DISABLE_FC
         gcmONERROR(gcoSURF_DisableTileStatus(surface, gcvTRUE));
 #else
-        if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_TILE_STATUS_READ) == gcvFALSE) &&
-            (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TILE_FILLER) == gcvFALSE))
+        if ((!Texture->hwFeature.hasTxTileStatusRead) && (!Texture->hwFeature.hasTileFiller))
         {
             gcmONERROR(gcoSURF_DisableTileStatus(&texView, gcvTRUE));
         }
@@ -4032,7 +4074,7 @@ _UpdateTextureDesc(
         }
     }
 
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_ASTC_BASE_LOD_FIX) == gcvFALSE &&
+    if ((!Texture->hwFeature.hasTxASTCBaseLodFix) &&
         baseSurf->formatInfo.fmtClass == gcvFORMAT_CLASS_ASTC &&
         baseLevel > 0)
     {
@@ -4182,7 +4224,7 @@ _ReplaceSurfaceForBorderPatch(
 
     gcmASSERT(curSurf);
 
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_BORDER_CLAMP_FIX))
+    if (Texture->hwFeature.hasTxBorderClampFix)
     {
         gcmFOOTER_NO();
         return gcvSTATUS_OK;
@@ -4319,7 +4361,7 @@ gcoTEXTURE_BindTextureDesc(
                  : (gctFLOAT)gcmMIN(pTexParams->maxLevel, Texture->levels - 1);
 
         if ((gcvTEXTURE_NONE == pTexParams->mipFilter) &&
-            (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_MIPFILTER_NONE_FIX)))
+            Texture->hwFeature.hasTxMipFilterNoneFix)
         {
             maxLevel = (gctFLOAT)baseLevel;
         }
@@ -4476,11 +4518,11 @@ gcoTEXTURE_BindTextureDesc(
             gcmASSERT((!texSurf->isMsaa) ||
                       (Texture->type == gcvTEXTURE_2D_MS || Texture->type == gcvTEXTURE_2D_MS_ARRAY));
 
-            if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_TILE_STATUS_READ) == gcvFALSE) ||
-                (texSurf->compressed && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_DECOMPRESSOR) == gcvFALSE) ||
+            if ((!Texture->hwFeature.hasTxTileStatusRead) ||
+                (texSurf->compressed && (!Texture->hwFeature.hasTxDecompressor)) ||
                 (gcoHAL_IsSwwaNeeded(gcvNULL, gcvSWWA_1165)) ||
                 ((texSurf->bitsPerPixel < 16) &&
-                (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_8BPP_TS_FIX) == gcvFALSE)) ||
+                (!Texture->hwFeature.hasTx8BppTSFix)) ||
                 !canTsEnable
                 )
             {
@@ -4620,15 +4662,13 @@ gcoTEXTURE_BindTextureEx(
              : (gctFLOAT)gcmMIN(pTexParams->maxLevel, Texture->levels - 1);
 
     if ((gcvTEXTURE_NONE == pTexParams->mipFilter) &&
-        (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_MIPFILTER_NONE_FIX)))
+        Texture->hwFeature.hasTxMipFilterNoneFix)
     {
         maxLevel = (gctFLOAT)baseLevel;
     }
 
     /* If HALT > 1 and bug18 fixed. The HW will clamp lodMax with maxLevel, no need SW doing it.*/
-    if (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEX_BASELOD) &&
-        gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_BUG_FIXES18)
-       )
+    if (Texture->hwFeature.hasTxBaseLod && Texture->hwFeature.hasBugFixES18)
     {
         pTexParams->lodMax = Info->lodMax;
     }
@@ -4972,12 +5012,12 @@ gcoTEXTURE_BindTextureEx(
                 gcmASSERT((!baseSurf->isMsaa) ||
                           (Texture->type == gcvTEXTURE_2D_MS || Texture->type == gcvTEXTURE_2D_MS_ARRAY));
 
-                if ((gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TEXTURE_TILE_STATUS_READ) == gcvFALSE) ||
-                    (baseSurf->compressed && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_DECOMPRESSOR) == gcvFALSE) ||
+                if ((!Texture->hwFeature.hasTxTileStatusRead) ||
+                    (baseSurf->compressed && (!Texture->hwFeature.hasTxDecompressor)) ||
                     (gcoHAL_IsSwwaNeeded(gcvNULL, gcvSWWA_1165)) ||
                     ((baseSurf->bitsPerPixel < 16) &&
-                    (gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_TX_8BPP_TS_FIX) == gcvFALSE))||
-                    (baseSurf->isMsaa && gcoHAL_IsFeatureAvailable(gcvNULL, gcvFEATURE_MSAA_TEXTURE) == gcvFALSE) ||
+                    (!Texture->hwFeature.hasTx8BppTSFix))||
+                    (baseSurf->isMsaa && (!Texture->hwFeature.hasMSAATexture)) ||
                     !canTsEnable
                     )
                 {
