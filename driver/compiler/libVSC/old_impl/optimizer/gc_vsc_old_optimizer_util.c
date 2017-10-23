@@ -17,7 +17,7 @@
 
 #include "old_impl/gc_vsc_old_optimizer.h"
 
-#define _W_FOR_MEMORY_CORRUPTION_  1
+#define _W_FOR_MEMORY_CORRUPTION_  0
 #define _DEBUG_FOR_MEMORY_CORRUPTION_       0
 
 #if _DEBUG_FOR_MEMORY_CORRUPTION_
@@ -1358,7 +1358,7 @@ gcOpt_AddIndexToList(
     }
 
     /* Allocate a new gcOPT_LIST structure. */
-    gcmERR_RETURN(_CAllocateList(Optimizer->listMemPool, &list));
+    gcmERR_RETURN(_AllocateList(Optimizer->listMemPool, &list));
 
     /* Initialize the gcOPT_LIST structure. */
     list->next    = *Root;
@@ -1588,7 +1588,7 @@ gcOpt_AddCodeToList(
     }
 
     /* Allocate a new gcOPT_LIST structure. */
-    gcmERR_RETURN(_CAllocateList(Optimizer->listMemPool, &list));
+    gcmERR_RETURN(_AllocateList(Optimizer->listMemPool, &list));
 
 #if _W_FOR_MEMORY_CORRUPTION_
     list1 = list;
@@ -1771,6 +1771,7 @@ gcOpt_AddListToList(
     return gcvSTATUS_OK;
 }
 
+static
 gceSTATUS
 gcOpt_MergeIndexListToList(
     IN gcOPTIMIZER      Optimizer,
@@ -1808,6 +1809,7 @@ gcOpt_MergeIndexListToList(
     return gcvSTATUS_OK;
 }
 
+static
 gceSTATUS
 gcOpt_MergeCodeListToList(
     IN gcOPTIMIZER      Optimizer,
@@ -1857,6 +1859,12 @@ gcOpt_MergeAndClearList(
 
     gcmHEADER_ARG("Optimizer=%p SrcList=%p Root=%p", Optimizer, SrcList, Root);
 
+    if (!*Root && !IsJump)
+    {
+        *Root = SrcList;
+        goto OnExit;
+    }
+
     for (list = SrcList; list; )
     {
         next = list->next;
@@ -1878,6 +1886,7 @@ gcOpt_MergeAndClearList(
         list = next;
     }
 
+OnExit:
     /* Success. */
     gcmFOOTER_ARG("*Root=%p status=%d", *Root, status);
     return gcvSTATUS_OK;
@@ -6575,27 +6584,19 @@ _BuildFunctionFlowGraph(
 
             if (code->tempDefine)
             {
-                if(lastBackwardCallee == gcvNULL)
-                {
-                    gcmERR_RETURN(_MergeAndClearTempDefineArray(Optimizer,
-                                        code->tempDefine, isBackJump, &tempDefineArray));
+                gcmERR_RETURN(_MergeAndClearTempDefineArray(Optimizer,
+                                    code->tempDefine, isBackJump, &tempDefineArray));
 
-                    gcmVERIFY_OK(_FreeTempDefineArray(Optimizer->tempDefineArrayMemPool, code->tempDefine));
-                    code->tempDefine = gcvNULL;
-
-                }
-                else
-                {
-                    gcmERR_RETURN(_MergeTempDefineArray(Optimizer,
-                                        code->tempDefine, isBackJump, &tempDefineArray));
-                }
+                gcmVERIFY_OK(_FreeTempDefineArray(Optimizer->tempDefineArrayMemPool, code->tempDefine));
+                code->tempDefine = gcvNULL;
             }
-
+#if 0 /*FIXME: it is not neessary to merge back with same code */
             if(lastBackwardCallee)
             {
                 gcmERR_RETURN(_MergeTempDefineArray(Optimizer,
                                             tempDefineArray, isBackJump, &code->tempDefine));
             }
+#endif
         }
 
         gcmERR_RETURN(_BuildDataFlowForCode(Optimizer, code, tempDefineArray));
