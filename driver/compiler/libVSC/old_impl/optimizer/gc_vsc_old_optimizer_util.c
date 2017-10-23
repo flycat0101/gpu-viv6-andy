@@ -1771,6 +1771,118 @@ gcOpt_AddListToList(
     return gcvSTATUS_OK;
 }
 
+gceSTATUS
+gcOpt_MergeIndexListToList(
+    IN gcOPTIMIZER      Optimizer,
+    IN OUT gcOPT_LIST * Root,
+    IN gcOPT_LIST List
+    )
+{
+    gcOPT_LIST          list;
+
+    gcmHEADER_ARG("Optimizer=%p Root=%p Index=%d", Optimizer, Root, Index);
+
+    /* Walk all entries in the list. */
+    for (list = *Root; list; list = list->next)
+    {
+        /* Does the current list entry matches the new one? */
+        if (list->index == List->index)
+        {
+            gcmVERIFY_OK(_FreeList(Optimizer->listMemPool, List));
+
+            /* Success. */
+            gcmFOOTER_ARG("*Root=%p", *Root);
+            return gcvSTATUS_OK;
+        }
+    }
+
+    /* Initialize the gcOPT_LIST structure. */
+    List->next    = *Root;
+    List->code    = gcvNULL;
+
+    /* Link the new gcOPT_LIST structure into the list. */
+    *Root = List;
+
+    /* Success. */
+    gcmFOOTER_ARG("*Root=%p", *Root);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcOpt_MergeCodeListToList(
+    IN gcOPTIMIZER      Optimizer,
+    IN OUT gcOPT_LIST * Root,
+    IN gcOPT_LIST List
+    )
+{
+    gcOPT_LIST          list;
+
+    gcmHEADER_ARG("Optimizer=%p Root=%p Code=%p", Optimizer, Root, Code);
+
+    /* Walk all entries in the list. */
+    for (list = *Root; list; list = list->next)
+    {
+        /* Does the current list entry matches the new one? */
+        if (list->code == List->code)
+        {
+            gcmVERIFY_OK(_FreeList(Optimizer->listMemPool, List));
+
+            /* Success. */
+            gcmFOOTER_ARG("*Root=%p", *Root);
+            return gcvSTATUS_OK;
+        }
+    }
+
+    /* Initialize the gcOPT_LIST structure. */
+    List->next  = *Root;
+    List->index = 0;
+
+    *Root = List;
+
+    /* Success. */
+    gcmFOOTER_ARG("*Root=%p", *Root);
+    return gcvSTATUS_OK;
+}
+
+gceSTATUS
+gcOpt_MergeAndClearList(
+    IN gcOPTIMIZER      Optimizer,
+    IN gcOPT_LIST       SrcList,
+    IN gctBOOL          IsJump,
+    IN OUT gcOPT_LIST * Root
+    )
+{
+    gceSTATUS           status = gcvSTATUS_OK;
+    gcOPT_LIST          list, next;
+
+    gcmHEADER_ARG("Optimizer=%p SrcList=%p Root=%p", Optimizer, SrcList, Root);
+
+    for (list = SrcList; list; )
+    {
+        next = list->next;
+
+        if (list->index < 0)
+        {
+            if (IsJump && list->index == gcvOPT_UNDEFINED_REGISTER)
+            {
+                list->index = gcvOPT_JUMPUNDEFINED_REGISTER;
+            }
+
+            gcmERR_BREAK(gcOpt_MergeIndexListToList(Optimizer, Root, list));
+        }
+        else
+        {
+            gcmERR_BREAK(gcOpt_MergeCodeListToList(Optimizer, Root, list));
+        }
+
+        list = next;
+    }
+
+    /* Success. */
+    gcmFOOTER_ARG("*Root=%p status=%d", *Root, status);
+    return gcvSTATUS_OK;
+}
+
 static void
 _UpdateTempRegState(
     gcOPTIMIZER         Optimizer,
@@ -5047,18 +5159,14 @@ _SetDefineList(
         return status;
     }
 
-    gcmERR_RETURN(gcOpt_AddListToList(Optimizer, *Root, gcvFALSE, &Code->prevDefines));
+    /* Allocate a new gcOPT_LIST structure. */
+    gcmERR_RETURN(_CAllocateList(Optimizer->listMemPool, &list));
+    gcoOS_MemCopy(list, *Root, gcmSIZEOF (struct _gcOPT_LIST));
 
-    /* Free all entries in the list except one. */
-    while ((list = (*Root)->next) != gcvNULL)
-    {
-        (*Root)->next = list->next;
-
-        /* Free the gcOPT_LIST structure. */
-        gcmVERIFY_OK(_FreeList(Optimizer->listMemPool, list));
-    }
+    gcmERR_RETURN(gcOpt_MergeAndClearList(Optimizer, list, gcvFALSE, &Code->prevDefines));
 
     /* Set code. */
+    (*Root)->next = gcvNULL;
     (*Root)->code  = Code;
     (*Root)->index = 0;
 
@@ -5658,6 +5766,48 @@ _MergeTempDefineArray(
         gcmERR_BREAK(gcOpt_AddListToList(Optimizer, srcTempDefine->yDefines, isBackJump, &destTempDefine->yDefines));
         gcmERR_BREAK(gcOpt_AddListToList(Optimizer, srcTempDefine->zDefines, isBackJump, &destTempDefine->zDefines));
         gcmERR_BREAK(gcOpt_AddListToList(Optimizer, srcTempDefine->wDefines, isBackJump, &destTempDefine->wDefines));
+    }
+
+    gcmFOOTER();
+    return status;
+}
+
+static gceSTATUS
+_MergeAndClearTempDefineArray(
+    IN gcOPTIMIZER          Optimizer,
+    IN gcOPT_TEMP_DEFINE    SrcTempDefineArray,
+    IN gctBOOL              isBackJump,
+    OUT gcOPT_TEMP_DEFINE * DestTempDefineArray
+    )
+{
+    gceSTATUS               status = gcvSTATUS_OK;
+    gcOPT_TEMP_DEFINE       srcTempDefine;
+    gcOPT_TEMP_DEFINE       destTempDefine;
+    gctUINT                 i;
+
+    gcmHEADER_ARG("Optimizer=0x%x SrcTempDefineArray=0x%x",
+                   Optimizer, SrcTempDefineArray);
+
+    /* Allocate new array if needed. */
+    if (*DestTempDefineArray == gcvNULL && Optimizer->tempCount > 0)
+    {
+        gcmERR_RETURN(_CAllocateTempDefineArray(Optimizer->tempDefineArrayMemPool,
+            DestTempDefineArray, Optimizer->tempCount));
+    }
+
+    srcTempDefine = SrcTempDefineArray;
+    destTempDefine = *DestTempDefineArray;
+    for (i = 0; i < Optimizer->tempCount; i++, srcTempDefine++, destTempDefine++)
+    {
+        gcmERR_BREAK(gcOpt_MergeAndClearList(Optimizer, srcTempDefine->xDefines, isBackJump, &destTempDefine->xDefines));
+        gcmERR_BREAK(gcOpt_MergeAndClearList(Optimizer, srcTempDefine->yDefines, isBackJump, &destTempDefine->yDefines));
+        gcmERR_BREAK(gcOpt_MergeAndClearList(Optimizer, srcTempDefine->zDefines, isBackJump, &destTempDefine->zDefines));
+        gcmERR_BREAK(gcOpt_MergeAndClearList(Optimizer, srcTempDefine->wDefines, isBackJump, &destTempDefine->wDefines));
+
+        srcTempDefine->xDefines = gcvNULL;
+        srcTempDefine->yDefines = gcvNULL;
+        srcTempDefine->zDefines = gcvNULL;
+        srcTempDefine->wDefines = gcvNULL;
     }
 
     gcmFOOTER();
@@ -6425,20 +6575,23 @@ _BuildFunctionFlowGraph(
 
             if (code->tempDefine)
             {
-                gcmERR_RETURN(_MergeTempDefineArray(Optimizer,
-                                        code->tempDefine, isBackJump, &tempDefineArray));
-            }
-
-            if(lastBackwardCallee == gcvNULL)
-            {
-                if(code->tempDefine)
+                if(lastBackwardCallee == gcvNULL)
                 {
-                    gcmVERIFY_OK(gcOpt_ClearTempArray(Optimizer, code->tempDefine));
+                    gcmERR_RETURN(_MergeAndClearTempDefineArray(Optimizer,
+                                        code->tempDefine, isBackJump, &tempDefineArray));
+
                     gcmVERIFY_OK(_FreeTempDefineArray(Optimizer->tempDefineArrayMemPool, code->tempDefine));
                     code->tempDefine = gcvNULL;
+
+                }
+                else
+                {
+                    gcmERR_RETURN(_MergeTempDefineArray(Optimizer,
+                                        code->tempDefine, isBackJump, &tempDefineArray));
                 }
             }
-            else
+
+            if(lastBackwardCallee)
             {
                 gcmERR_RETURN(_MergeTempDefineArray(Optimizer,
                                             tempDefineArray, isBackJump, &code->tempDefine));
@@ -6453,8 +6606,16 @@ _BuildFunctionFlowGraph(
 
             if (! code->backwardJump)
             {
-                gcmERR_RETURN(_MergeTempDefineArray(Optimizer,
+                if (gcmSL_TARGET_GET(code->instruction.temp, Condition) == gcSL_ALWAYS)
+                {
+                    gcmERR_RETURN(_MergeAndClearTempDefineArray(Optimizer,
                                         tempDefineArray, gcvFALSE, &codeDest->tempDefine));
+                }
+                else
+                {
+                    gcmERR_RETURN(_MergeTempDefineArray(Optimizer,
+                                        tempDefineArray, gcvFALSE, &codeDest->tempDefine));
+                }
             }
             else if (! code->handled)
             {
@@ -6477,9 +6638,7 @@ _BuildFunctionFlowGraph(
                 }
                 continue;
             }
-
-            /* Clear tempDefines if the jump is unconditional. */
-            if (gcmSL_TARGET_GET(code->instruction.temp, Condition) == gcSL_ALWAYS)
+            else if (gcmSL_TARGET_GET(code->instruction.temp, Condition) == gcSL_ALWAYS)
             {
                 gcmVERIFY_OK(gcOpt_ClearTempArray(Optimizer, tempDefineArray));
             }
