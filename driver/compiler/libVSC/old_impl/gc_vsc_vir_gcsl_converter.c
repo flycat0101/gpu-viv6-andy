@@ -2837,13 +2837,13 @@ _BuildLabelByFunction(
             }
 
             /* Initialize the gcSHADER_LABEL structure. */
-            label->next       = Converter->Shader->labels;
+            label->next       = Converter->Shader->labelSlots[_GetSlot(Converter->Shader, *InstCount)];
             label->label      = *InstCount;
             label->defined    = *InstCount;
             label->referenced = gcvNULL;
 
             /* Move gcSHADER_LABEL structure to head of list. */
-            Converter->Shader->labels = label;
+            Converter->Shader->labelSlots[_GetSlot(Converter->Shader, *InstCount)] = label;
         }
         *InstCount += _CalculateInstCount(Converter, inst);
     }
@@ -3692,6 +3692,8 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
 
     if (!useFullNewLinker)
     {
+        gctUINT k;
+
         if(VIR_Shader_isRegAllocated(VirShader))
         {
             Shader->_tempRegCount   = VIR_Shader_GetRegWatermark(VirShader);
@@ -3705,23 +3707,26 @@ category| struct1 | normal1 | normal2 | struct2 | number1 | number2 | number3 |
         Shader->instrIndex          = gcSHADER_OPCODE;
 
         /* Free any labels. */
-        while (Shader->labels != gcvNULL)
+        for (k = 0; k < gcmCOUNTOF(Shader->labelSlots); k++)
         {
-            gcSHADER_LABEL label = Shader->labels;
-            Shader->labels = label->next;
-
-            while (label->referenced != gcvNULL)
+            while (Shader->labelSlots[k] != gcvNULL)
             {
-                /* Remove gcSHADER_LINK structure from head of list. */
-                gcSHADER_LINK link = label->referenced;
-                label->referenced = link->next;
+                gcSHADER_LABEL label = Shader->labelSlots[k];
+                Shader->labelSlots[k] = label->next;
 
-                /* Free the gcSHADER_LINK structure. */
-                gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, link));
+                while (label->referenced != gcvNULL)
+                {
+                    /* Remove gcSHADER_LINK structure from head of list. */
+                    gcSHADER_LINK link = label->referenced;
+                    label->referenced = link->next;
+
+                    /* Free the gcSHADER_LINK structure. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, link));
+                }
+
+                /* Free the gcSHADER_LABEL structure. */
+                gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, label));
             }
-
-            /* Free the gcSHADER_LABEL structure. */
-            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, label));
         }
 
         /* Build labels */

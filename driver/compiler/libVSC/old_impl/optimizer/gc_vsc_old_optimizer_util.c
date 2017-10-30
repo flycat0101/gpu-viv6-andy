@@ -4159,9 +4159,6 @@ gcOpt_CopyInShader(
         }
     }
 
-    /* Shader's labels should be empty. */
-    gcmASSERT(Shader->labels == gcvNULL);
-
     gcmFOOTER_NO();
     return gcvSTATUS_OK;
 }

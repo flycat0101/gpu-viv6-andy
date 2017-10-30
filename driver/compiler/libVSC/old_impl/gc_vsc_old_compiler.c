@@ -2368,12 +2368,12 @@ _gcSHADER_Clean(
     }
 
     /* Free any labels. */
-    if (Shader->labels != gcvNULL)
+    for (i = 0; i < gcmCOUNTOF(Shader->labelSlots); i++)
     {
-        while (Shader->labels != gcvNULL)
+        while (Shader->labelSlots[i] != gcvNULL)
         {
-            gcSHADER_LABEL label = Shader->labels;
-            Shader->labels = label->next;
+            gcSHADER_LABEL label = Shader->labelSlots[i];
+            Shader->labelSlots[i] = label->next;
 
             while (label->referenced != gcvNULL)
             {
@@ -3307,38 +3307,41 @@ gcSHADER_Copy(
     /***** Labels *************************************************************/
 
     /* Copy all labels. */
-    for (srcLabel = Source->labels;
-         srcLabel != gcvNULL;
-         srcLabel = srcLabel->next
-    )
+    for (i = 0; i < gcmCOUNTOF(Source->labelSlots); i++)
     {
-        /* Allocate the label. */
-        gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                  gcmSIZEOF(struct _gcSHADER_LABEL),
-                                  (gctPOINTER *) &label));
-
-        /* Copy the label. */
-        label->next       = Shader->labels;
-        label->label      = srcLabel->label;
-        label->defined    = srcLabel->defined;
-        label->referenced = gcvNULL;
-        Shader->labels    = label;
-
-        /* Copy all references. */
-        for (srcReference = srcLabel->referenced;
-             srcReference != gcvNULL;
-             srcReference = srcReference->next
+        for (srcLabel = Source->labelSlots[i];
+                 srcLabel != gcvNULL;
+                 srcLabel = srcLabel->next
         )
         {
-            /* Allocate the reference. */
+            /* Allocate the label. */
             gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                      gcmSIZEOF(struct _gcSHADER_LINK),
-                                      (gctPOINTER *) &reference));
+                                      gcmSIZEOF(struct _gcSHADER_LABEL),
+                                      (gctPOINTER *) &label));
 
-            /* Copy the reference. */
-            reference->next       = label->referenced;
-            reference->referenced = srcReference->referenced;
-            label->referenced     = reference;
+            /* Copy the label. */
+            label->next       = Shader->labelSlots[_GetSlot(Shader, srcLabel->label)];
+            label->label      = srcLabel->label;
+            label->defined    = srcLabel->defined;
+            label->referenced = gcvNULL;
+            Shader->labelSlots[_GetSlot(Shader, srcLabel->label)] = label;
+
+            /* Copy all references. */
+            for (srcReference = srcLabel->referenced;
+                     srcReference != gcvNULL;
+                     srcReference = srcReference->next
+            )
+            {
+                /* Allocate the reference. */
+                gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                          gcmSIZEOF(struct _gcSHADER_LINK),
+                                          (gctPOINTER *) &reference));
+
+                /* Copy the reference. */
+                reference->next       = label->referenced;
+                reference->referenced = srcReference->referenced;
+                label->referenced     = reference;
+            }
         }
     }
 
@@ -3839,7 +3842,7 @@ gcCopyKernel(
 {
     gceSTATUS status = gcvSTATUS_OK;
     gcSHADER kernelBinary = gcvNULL;
-    gctUINT binarySize;
+    gctUINT binarySize, i = 0;
     gctPOINTER pointer = gcvNULL;
     gcSHADER_LABEL srcLabel, label;
     gcSHADER_LINK srcReference, reference;
@@ -3859,38 +3862,41 @@ gcCopyKernel(
 
     /***** Labels *************************************************************/
     /* Copy all labels. */
-    for (srcLabel = Source->labels;
-         srcLabel != gcvNULL;
-         srcLabel = srcLabel->next
-    )
+    for (i = 0; i < gcmCOUNTOF(Source->labelSlots); i++)
     {
-        /* Allocate the label. */
-        gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                  gcmSIZEOF(struct _gcSHADER_LABEL),
-                                  (gctPOINTER *) &label));
-
-        /* Copy the label. */
-        label->next       = kernelBinary->labels;
-        label->label      = srcLabel->label;
-        label->defined    = srcLabel->defined;
-        label->referenced = gcvNULL;
-        kernelBinary->labels    = label;
-
-        /* Copy all references. */
-        for (srcReference = srcLabel->referenced;
-             srcReference != gcvNULL;
-             srcReference = srcReference->next
+        for (srcLabel = Source->labelSlots[i];
+                 srcLabel != gcvNULL;
+                 srcLabel = srcLabel->next
         )
         {
-            /* Allocate the reference. */
+            /* Allocate the label. */
             gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                      gcmSIZEOF(struct _gcSHADER_LINK),
-                                      (gctPOINTER *) &reference));
+                                      gcmSIZEOF(struct _gcSHADER_LABEL),
+                                      (gctPOINTER *) &label));
 
-            /* Copy the reference. */
-            reference->next       = label->referenced;
-            reference->referenced = srcReference->referenced;
-            label->referenced     = reference;
+            /* Copy the label. */
+            label->next       = kernelBinary->labelSlots[_GetSlot(kernelBinary, srcLabel->label)];
+            label->label      = srcLabel->label;
+            label->defined    = srcLabel->defined;
+            label->referenced = gcvNULL;
+            kernelBinary->labelSlots[_GetSlot(kernelBinary, srcLabel->label)]  = label;
+
+            /* Copy all references. */
+            for (srcReference = srcLabel->referenced;
+                     srcReference != gcvNULL;
+                     srcReference = srcReference->next
+            )
+            {
+                /* Allocate the reference. */
+                gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                          gcmSIZEOF(struct _gcSHADER_LINK),
+                                          (gctPOINTER *) &reference));
+
+                /* Copy the reference. */
+                reference->next       = label->referenced;
+                reference->referenced = srcReference->referenced;
+                label->referenced     = reference;
+            }
         }
     }
 
@@ -3952,15 +3958,18 @@ _FindMaxUsedLabel(
     )
 {
     gcSHADER_LABEL label;
-    gctUINT maxLabelId = 0;
+    gctUINT i, maxLabelId = 0;
 
     /* Walk all defines shader labels to find the requested label. */
-    for (label = Shader->labels; label != gcvNULL; label = label->next)
+    for (i = 0; i < gcmCOUNTOF(Shader->labelSlots); i++)
     {
-        if(_gcmIsOrdinaryLabel(BuiltinIndex, label->label) &&
-           label->label > maxLabelId)
+        for (label = Shader->labelSlots[i]; label != gcvNULL; label = label->next)
         {
-            maxLabelId = label->label;
+            if(_gcmIsOrdinaryLabel(BuiltinIndex, label->label) &&
+                label->label > maxLabelId)
+            {
+                maxLabelId = label->label;
+            }
         }
     }
 
@@ -4587,11 +4596,11 @@ _MergeOneKernel(
                             BuiltinIndex->labelMap[labelIndex].labelDesc = label;
 
                             /* Copy the label. */
-                            label->next       = To->labels;
+                            label->next       = To->labelSlots[_GetSlot(To, labelId)];
                             label->label      = labelId;
                             label->defined    = ~0U;
                             label->referenced = gcvNULL;
-                            To->labels    = label;
+                            To->labelSlots[_GetSlot(To, labelId)] = label;
                         }
                         /* Allocate the reference. */
                         gcmONERROR(gcoOS_Allocate(gcvNULL,
@@ -4608,63 +4617,66 @@ _MergeOneKernel(
             } /* for */
 
             /* Copy all labels. */
-            for (srcLabel = From->labels;
-                 srcLabel != gcvNULL;
-                 srcLabel = srcLabel->next)
+            for (i = 0; i < gcmCOUNTOF(From->labelSlots); i++)
             {
-                label = gcvNULL;
-                if(_gcmIsOrdinaryLabel(BuiltinIndex, srcLabel->label))
+                for (srcLabel = From->labelSlots[i];
+                         srcLabel != gcvNULL;
+                         srcLabel = srcLabel->next)
                 {
-                    gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                              gcmSIZEOF(struct _gcSHADER_LABEL),
-                                              (gctPOINTER *) &label));
-
-                    /* Copy the label. */
-                    label->next       = To->labels;
-                    label->label      = srcLabel->label + labelOffset;
-                    label->defined    = srcLabel->defined + oldCodeCount;
-                    label->referenced = gcvNULL;
-                    To->labels    = label;
-                }
-                else
-                {
-                    gctUINT32 labelId;
-
-                    labelIndex = (gctUINT32)~0 - srcLabel->label + currentFunctionCount;
-                    labelId = (gctUINT32)BuiltinIndex->labelMap[labelIndex].newLabel;
-                    labelIndex = (gctUINT32)~0 - labelId;
-                    label = BuiltinIndex->labelMap[labelIndex].labelDesc;
-
-                    if(!label)
+                    label = gcvNULL;
+                    if(_gcmIsOrdinaryLabel(BuiltinIndex, srcLabel->label))
                     {
                         gcmONERROR(gcoOS_Allocate(gcvNULL,
                                                   gcmSIZEOF(struct _gcSHADER_LABEL),
                                                   (gctPOINTER *) &label));
-                        BuiltinIndex->labelMap[labelIndex].labelDesc = label;
 
                         /* Copy the label. */
-                        label->next       = To->labels;
-                        label->label      = labelId;
+                        label->label      = srcLabel->label + labelOffset;
+                        label->next       = To->labelSlots[_GetSlot(To, label->label)];
                         label->defined    = srcLabel->defined + oldCodeCount;
                         label->referenced = gcvNULL;
-                        To->labels    = label;
+                        To->labelSlots[_GetSlot(To,label->label)] = label;
                     }
-                }
+                    else
+                    {
+                        gctUINT32 labelId;
 
-                /* Copy all references. */
-                for (srcReference = srcLabel->referenced;
-                     srcReference != gcvNULL;
-                     srcReference = srcReference->next)
-                {
-                    /* Allocate the reference. */
-                    gcmONERROR(gcoOS_Allocate(gcvNULL,
-                                              gcmSIZEOF(struct _gcSHADER_LINK),
-                                              (gctPOINTER *) &reference));
+                        labelIndex = (gctUINT32)~0 - srcLabel->label + currentFunctionCount;
+                        labelId = (gctUINT32)BuiltinIndex->labelMap[labelIndex].newLabel;
+                        labelIndex = (gctUINT32)~0 - labelId;
+                        label = BuiltinIndex->labelMap[labelIndex].labelDesc;
 
-                    /* Copy the reference. */
-                    reference->next       = label->referenced;
-                    reference->referenced = srcReference->referenced + oldCodeCount;
-                    label->referenced     = reference;
+                        if(!label)
+                        {
+                            gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                                      gcmSIZEOF(struct _gcSHADER_LABEL),
+                                                      (gctPOINTER *) &label));
+                            BuiltinIndex->labelMap[labelIndex].labelDesc = label;
+
+                            /* Copy the label. */
+                            label->next       = To->labelSlots[_GetSlot(To, labelId)];
+                            label->label      = labelId;
+                            label->defined    = srcLabel->defined + oldCodeCount;
+                            label->referenced = gcvNULL;
+                            To->labelSlots[_GetSlot(To, labelId)]    = label;
+                        }
+                    }
+
+                    /* Copy all references. */
+                    for (srcReference = srcLabel->referenced;
+                             srcReference != gcvNULL;
+                             srcReference = srcReference->next)
+                    {
+                        /* Allocate the reference. */
+                        gcmONERROR(gcoOS_Allocate(gcvNULL,
+                                                  gcmSIZEOF(struct _gcSHADER_LINK),
+                                                  (gctPOINTER *) &reference));
+
+                        /* Copy the reference. */
+                        reference->next       = label->referenced;
+                        reference->referenced = srcReference->referenced + oldCodeCount;
+                        label->referenced     = reference;
+                    }
                 }
             }
         }
@@ -4739,10 +4751,10 @@ _MergeOneKernel(
                 BuiltinIndex->labelMap[labelIndex].labelDesc = label;
 
                 /* Copy the label. */
-                label->next       = To->labels;
+                label->next       = To->labelSlots[_GetSlot(To, labelId)];
                 label->label      = labelId;
                 label->referenced = gcvNULL;
-                To->labels    = label;
+                To->labelSlots[_GetSlot(To, labelId)] = label;
             }
 
             if(label == gcvNULL) {
@@ -4895,10 +4907,10 @@ _MergeOneKernel(
                 BuiltinIndex->labelMap[labelIndex].labelDesc = label;
 
                 /* Copy the label. */
-                label->next       = To->labels;
+                label->next       = To->labelSlots[_GetSlot(To, labelId)];
                 label->label      = labelId;
                 label->referenced = gcvNULL;
-                To->labels    = label;
+                To->labelSlots[_GetSlot(To, labelId)]  = label;
             }
             label->defined = kernelFunction->codeStart;
 
@@ -22370,14 +22382,17 @@ gcSHADER_FindNextUsedLabelId(
     )
 {
     gcSHADER_LABEL label;
-    gctUINT        maxLabelId = 0;
+    gctUINT  i, maxLabelId = 0;
 
     /* Walk all defines shader labels to find the requested label. */
-    for (label = Shader->labels; label != gcvNULL; label = label->next)
+    for (i = 0; i < gcmCOUNTOF(Shader->labelSlots); i++)
     {
-        if (label->label > maxLabelId)
+        for (label = Shader->labelSlots[i]; label != gcvNULL; label = label->next)
         {
-            maxLabelId = label->label;
+            if (label->label > maxLabelId)
+            {
+                maxLabelId = label->label;
+            }
         }
     }
 
@@ -22418,8 +22433,10 @@ gcSHADER_FindLabel(
     gcmVERIFY_OBJECT(Shader, gcvOBJ_SHADER);
     gcmDEBUG_VERIFY_ARGUMENT(ShaderLabel != gcvNULL);
 
+    label = Shader->labelSlots[_GetSlot(Shader, Label)];
+
     /* Walk all defines shader labels to find the requested label. */
-    for (label = Shader->labels; label != gcvNULL; label = label->next)
+    for (; label != gcvNULL; label = label->next)
     {
         if (label->label == Label)
         {
@@ -22495,14 +22512,14 @@ _FindOrCreateLabel(
     label = pointer;
 
     /* Initialize the gcSHADER_LABEL structure. */
-    label->next       = Shader->labels;
+    label->next       = Shader->labelSlots[_GetSlot(Shader, Label)];
     label->label      = Label;
     label->defined    = ~0U;
     label->referenced = gcvNULL;
     label->function = gcvNULL;
 
     /* Move gcSHADER_LABEL structure to head of list. */
-    Shader->labels = label;
+    Shader->labelSlots[_GetSlot(Shader, Label)] = label;
 
     /* Return pointer to the gcSHADER_LABEL structure. */
     *ShaderLabel = label;
@@ -25257,7 +25274,7 @@ gcSHADER_Pack(
 {
     gcSHADER_LABEL label;
     gcSHADER_LINK link;
-    gctUINT32 bytes;
+    gctUINT32 bytes, i;
     gcSL_INSTRUCTION code;
     gceSTATUS status;
     gctPOINTER pointer = gcvNULL;
@@ -25319,55 +25336,57 @@ gcSHADER_Pack(
     Shader->codeCount = Shader->lastInstruction;
 
     /* Loop while we have labels to resolve. */
-    while (Shader->labels != gcvNULL)
+    for (i = 0; i < gcmCOUNTOF(Shader->labelSlots); i++)
     {
-        /* Remove gcSHADER_LABEL structure from head of list. */
-        label          = Shader->labels;
-        Shader->labels = label->next;
-
-        if (label->defined != ~0U)
+        while (Shader->labelSlots[i])
         {
-            /* Loop while we have references to this label. */
-            while (label->referenced != gcvNULL)
+            /* Remove gcSHADER_LABEL structure from head of list. */
+            label = Shader->labelSlots[i];
+            Shader->labelSlots[i] = label->next;
+
+            if (label->defined != ~0U)
             {
-                /* Remove gcSHADER_LINK structure from head of list. */
-                link              = label->referenced;
-                label->referenced = link->next;
+                /* Loop while we have references to this label. */
+                while (label->referenced != gcvNULL)
+                {
+                    /* Remove gcSHADER_LINK structure from head of list. */
+                    link              = label->referenced;
+                    label->referenced = link->next;
 
-                /* Update the reference with the correct label location. */
-                gcmASSERT(gcmSL_OPCODE_GET(Shader->code[link->referenced].opcode, Opcode) == gcSL_CALL ||
-                          gcmSL_OPCODE_GET(Shader->code[link->referenced].opcode, Opcode) == gcSL_JMP);
-                Shader->code[link->referenced].tempIndex = label->defined;
+                    /* Update the reference with the correct label location. */
+                    gcmASSERT(gcmSL_OPCODE_GET(Shader->code[link->referenced].opcode, Opcode) == gcSL_CALL ||
+                              gcmSL_OPCODE_GET(Shader->code[link->referenced].opcode, Opcode) == gcSL_JMP);
+                    Shader->code[link->referenced].tempIndex = label->defined;
 
-                /* Free the gcSHADER_LINK structure. */
-                gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, link));
+                    /* Free the gcSHADER_LINK structure. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, link));
+                }
             }
+            else
+            {
+                if (!(label->function &&
+                      (IsFunctionIntrinsicsBuiltIn(label->function) || IsFunctionExtern(label->function))))
+                {
+                    /* only the intrinsic function or extern function labels could be not defined */
+                    /* Make sure the label is defined. */
+                    gcmFATAL("Label %u has not been defined.", label->label);
+                }
+
+                while (label->referenced != gcvNULL)
+                {
+                    /* Remove gcSHADER_LINK structure from head of list. */
+                    link              = label->referenced;
+                    label->referenced = link->next;
+
+                    /* Free the gcSHADER_LINK structure. */
+                    gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, link));
+                }
+            }
+
+            /* Free the gcSHADER_LABEL structure. */
+            gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, label));
         }
-        else
-        {
-            if (!(label->function &&
-                  (IsFunctionIntrinsicsBuiltIn(label->function) || IsFunctionExtern(label->function))))
-            {
-                /* only the intrinsic function or extern function labels could be not defined */
-                /* Make sure the label is defined. */
-                gcmFATAL("Label %u has not been defined.", label->label);
-            }
-
-            while (label->referenced != gcvNULL)
-            {
-                /* Remove gcSHADER_LINK structure from head of list. */
-                link              = label->referenced;
-                label->referenced = link->next;
-
-                /* Free the gcSHADER_LINK structure. */
-                gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, link));
-            }
-        }
-
-        /* Free the gcSHADER_LABEL structure. */
-        gcmVERIFY_OK(gcmOS_SAFE_FREE(gcvNULL, label));
     }
-
 
     /* Success. */
     gcmFOOTER_NO();
@@ -34794,20 +34813,24 @@ gcSHADER_InsertNOP2BeforeCode(
     }
 
     /* 5. adjust shader label's defined */
-    for (label = Shader->labels; label != gcvNULL; label = label->next)
+    for (i = 0; i < gcmCOUNTOF(Shader->labelSlots); i++)
     {
-        gcSHADER_LINK link;
-
-        if (label->defined > CodeIndex)
-            label->defined += AddCodeCount;
-        link = label->referenced;
-        while (link)
+        for (label = Shader->labelSlots[i]; label != gcvNULL; label = label->next)
         {
-            if (link->referenced > CodeIndex)
-                link->referenced += AddCodeCount;
-            link = link->next;
+            gcSHADER_LINK link;
+
+            if (label->defined > CodeIndex)
+                label->defined += AddCodeCount;
+            link = label->referenced;
+            while (link)
+            {
+                if (link->referenced > CodeIndex)
+                    link->referenced += AddCodeCount;
+                link = link->next;
+            }
         }
     }
+
     Shader->instrIndex = gcSHADER_OPCODE;
 
     /* Success. */

@@ -4338,11 +4338,14 @@ struct _gcSHADER
         gcGEOLayout       geo;
     } shaderLayout;
 
+#define _GetSlot(Shader, x) \
+    (gctUINT32)((gctUINT32)(x) % gcmCOUNTOF(Shader->labelSlots))
+
     /* Code. */
     gctUINT32                   codeCount;
     gctUINT                     lastInstruction;
     gcSHADER_INSTRUCTION_INDEX  instrIndex;
-    gcSHADER_LABEL              labels;
+    gcSHADER_LABEL              labelSlots[32];
     gcSL_INSTRUCTION            code;
 
     gctINT *                    loadUsers;

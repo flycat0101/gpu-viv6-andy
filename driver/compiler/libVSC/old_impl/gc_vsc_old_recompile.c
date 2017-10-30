@@ -5467,21 +5467,23 @@ _insertNOP2Shader(
         }
 
         /* 5. adjust shader label's defined */
-        for (label = Shader->labels; label != gcvNULL; label = label->next)
+        for (i = 0; i < gcmCOUNTOF(Shader->labelSlots); i++)
         {
-            gcSHADER_LINK link;
-
-            if (label->defined >= (gctUINT)InsertAtInst)
-                label->defined += Num;
-            link = label->referenced;
-            while (link)
+            for (label = Shader->labelSlots[i]; label != gcvNULL; label = label->next)
             {
-                if (link->referenced >= (gctUINT)InsertAtInst)
-                    link->referenced += Num;
-                link = link->next;
+                gcSHADER_LINK link;
+
+                if (label->defined >= (gctUINT)InsertAtInst)
+                    label->defined += Num;
+                link = label->referenced;
+                while (link)
+                {
+                    if (link->referenced >= (gctUINT)InsertAtInst)
+                        link->referenced += Num;
+                    link = link->next;
+                }
             }
         }
-
     }
 
     Shader->instrIndex = gcSHADER_OPCODE;
@@ -8143,16 +8145,19 @@ _FindClNextUnusedJmpLabelId(
     )
 {
     gcSHADER_LABEL label;
-    gctUINT  maxLabelId = 0;
+    gctUINT i, maxLabelId = 0;
 
     /* Walk all defines shader labels to find the requested label. */
-    for (label = Shader->labels; label != gcvNULL; label = label->next)
+    for (i = 0; i < gcmCOUNTOF(Shader->labelSlots); i++)
     {
-        if (_gcmIsOrdinaryClLabel(Shader, label->label))
+        for (label = Shader->labelSlots[i]; label != gcvNULL; label = label->next)
         {
-            if (label->label > maxLabelId)
+            if (_gcmIsOrdinaryClLabel(Shader, label->label))
             {
-                maxLabelId = label->label;
+                if (label->label > maxLabelId)
+                {
+                    maxLabelId = label->label;
+                }
             }
         }
     }
@@ -8377,18 +8382,21 @@ _patchLongULong(
                 }
 
                 /* 5. adjust shader label's defined */
-                for (label = Shader->labels; label != gcvNULL; label = label->next)
+                for (j = 0; j < gcmCOUNTOF(Shader->labelSlots); j++)
                 {
-                    gcSHADER_LINK link;
-
-                    if (label->defined > i+1)
-                        label->defined += 1;
-                    link = label->referenced;
-                    while (link)
+                    for (label = Shader->labelSlots[j]; label != gcvNULL; label = label->next)
                     {
-                        if (link->referenced > i+1)
-                            link->referenced += 1;
-                        link = link->next;
+                        gcSHADER_LINK link;
+
+                        if (label->defined > i+1)
+                            label->defined += 1;
+                        link = label->referenced;
+                        while (link)
+                        {
+                            if (link->referenced > i+1)
+                                link->referenced += 1;
+                            link = link->next;
+                        }
                     }
                 }
             }
@@ -8531,20 +8539,23 @@ _patchLongULong(
                 }
 
                 /* 5. adjust shader label's defined */
-                for (label = Shader->labels; label != gcvNULL; label = label->next)
+                for (j = 0; j < gcmCOUNTOF(Shader->labelSlots); j++)
                 {
-                    gcSHADER_LINK link;
-
-                    if (label->defined > patchInstrIndex+1)
-                        label->defined += 1;
-                    link = label->referenced;
-                    if(label->label != jmpLabel)
+                    for (label = Shader->labelSlots[j]; label != gcvNULL; label = label->next)
                     {
-                        while (link)
+                        gcSHADER_LINK link;
+
+                        if (label->defined > patchInstrIndex+1)
+                            label->defined += 1;
+                        link = label->referenced;
+                        if(label->label != jmpLabel)
                         {
-                            if (link->referenced > patchInstrIndex)
-                                link->referenced += 1;
-                            link = link->next;
+                            while (link)
+                            {
+                                if (link->referenced > patchInstrIndex+1)
+                                    link->referenced += 1;
+                                link = link->next;
+                            }
                         }
                     }
                 }
